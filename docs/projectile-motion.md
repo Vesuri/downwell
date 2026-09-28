@@ -176,6 +176,14 @@ the retained previous-position snapshot and rejection of nonfinite input.
 The stored owner tests the same boundary after marking destruction. The normal
 gun adapters use this publication entry point, but still supply their legacy
 trajectory coordinates; this does not yet replace their motion or rendering.
+Legacy split-Q20 publication directly rounds its exact signed numerator to
+binary32 using 32-bit integer operations and round-to-nearest-even. Throughout
+the admitted signed-pixel/20-bit-fraction domain the numerator needs at most 52
+bits, so the retained binary64 construction/addition is exact before narrowing.
+The direct path therefore avoids intermediate binary64 work without changing
+the published bits. The reference remains in `coordinateBinary64`; randomized
+host checks and the native field verifier compare it at sign, carry and rounding
+boundaries. This optimization does not validate the approximate trajectory itself.
 `publishBulletAngle` similarly accepts the already-narrowed original angle and
 publishes through the transform owner on both platforms. The stored record
 retains its exact binary32 bits, including fractional degrees. The live legacy

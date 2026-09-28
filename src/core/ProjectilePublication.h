@@ -13,6 +13,33 @@ struct ProjectilePublication {
         DW_PROFILE_SCOPE(profileProjectileCoordinate);
         if(origin<0||value.fraction>=unsigned(MachineGunTrajectory::unit)||
             value.pixel>0x7fffffff-origin)return false;
+        const std::int32_t pixel=value.pixel+origin;
+        const bool negative=pixel<0;
+        std::uint32_t whole=negative?0u-std::uint32_t(pixel):std::uint32_t(pixel);
+        std::uint32_t fraction=value.fraction;
+        if(negative&&fraction){--whole;fraction=unsigned(MachineGunTrajectory::unit)-fraction;}
+        // Exact magnitude in units of 2^-20, at most 52 significant bits.
+        // The retained binary64 addition is exact throughout this domain.
+        const std::uint32_t high=whole>>12,low=(whole<<20)|fraction;
+        if(!high&&!low){out.bits=0;return true;}
+        unsigned top=high?63-MotionBinary64::Words::leadingZeros32(high):
+            31-MotionBinary64::Words::leadingZeros32(low);
+        std::uint32_t mantissa;
+        if(top<=23)mantissa=low<<(23-top);
+        else{
+            const unsigned shift=top-23; // 1..28: no 32-bit/64-bit shift helpers.
+            mantissa=(high<<(32-shift))|(low>>shift);
+            const std::uint32_t tail=low&((1u<<shift)-1),half=1u<<(shift-1);
+            if(tail>half||(tail==half&&(mantissa&1u)))++mantissa;
+            if(mantissa==0x1000000u){mantissa>>=1;++top;}
+        }
+        out.bits=(negative?0x80000000u:0u)|((top+107u)<<23)|(mantissa&0x7fffffu);
+        return true;
+    }
+    // Portable reference for tests; not used by the live publication path.
+    static bool coordinateBinary64(MachineGunTrajectory::Coordinate value,int origin,RunnerImageValue& out){
+        if(origin<0||value.fraction>=unsigned(MachineGunTrajectory::unit)||
+            value.pixel>0x7fffffff-origin)return false;
         auto result=MotionBinary64::fromInteger(value.pixel+origin);
         auto fraction=MotionBinary64::fromInteger(int(value.fraction));
         if(!fraction.zero())fraction.high-=20u<<20;

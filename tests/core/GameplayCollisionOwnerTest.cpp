@@ -315,6 +315,25 @@ int main(){
         expected=static_cast<float>(position.pixel+176+double(position.fraction)/1048576.0);
         std::memcpy(&bits,&expected,4);assert(actual.bits==bits);
     }
+    {
+        std::uint32_t seed=0x97463251u;
+        auto next=[&](){seed=seed*1664525u+1013904223u;return seed;};
+        for(unsigned i=0;i<100000;++i){
+            const auto raw=next();
+            const std::int32_t pixel=raw<=0x7fffffffu?std::int32_t(raw):-1-std::int32_t(~raw);
+            const unsigned fraction=next()&1048575u;
+            const int origin=int(next()&511u);
+            RunnerImageValue actual{0xdeadbeefu},reference=actual;
+            const MachineGunTrajectory::Coordinate position{pixel,fraction};
+            const bool valid=ProjectilePublication::coordinateBinary64(position,origin,reference);
+            assert(ProjectilePublication::coordinate(position,origin,actual)==valid&&actual.bits==reference.bits);
+            if(valid){
+                const float native=float(double(pixel)+origin+double(fraction)/1048576.0);
+                std::uint32_t bits;std::memcpy(&bits,&native,4);assert(actual.bits==bits);
+            }
+        }
+        assert(ProjectilePublicationVerification::run());
+    }
     for(unsigned failure=0;failure<4;++failure){
         auto world=std::make_unique<GameplayWorld>(300,true,0,false);
         ExitAudit audit{world.get(),failure,0,0,world->randomDrawCount()};
