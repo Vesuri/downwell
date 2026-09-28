@@ -984,7 +984,7 @@ test: verify-entry-mask-offset
 verify-entry-mask-offset: build/amiga-entry-mask-test
 	./build/amiga-entry-mask-test
 
-build/amiga-entry-mask-test: tests/platform/amiga/AmigaEntryMaskTest.cpp src/platform/amiga/AmigaEntryMask.h
+build/amiga-entry-mask-test: tests/platform/amiga/AmigaEntryMaskTest.cpp src/platform/amiga/AmigaEntryMask.h src/platform/amiga/AmigaExitMask.h
 	@mkdir -p build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ tests/platform/amiga/AmigaEntryMaskTest.cpp
 

@@ -6,10 +6,10 @@ struct AmigaExitMask {
     static constexpr unsigned stride = 48, height = 648, bytes = stride * height;
     static constexpr unsigned selectionStride = 22, selectionBytes = selectionStride * height;
     static unsigned offset(int screenY) {
-        int row = 284 - screenY;
-        if (row < 0) row = 0;
-        if (row > 364) row = 364;
-        return static_cast<unsigned>(row) * stride;
+        // Clamp before subtraction: an extreme negative view-relative
+        // coordinate must not overflow and select a DMA pointer outside the bank.
+        const unsigned row=screenY>=284?0:screenY<=-80?364:unsigned(284-screenY);
+        return row * stride;
     }
 };
 #endif

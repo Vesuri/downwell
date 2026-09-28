@@ -1,4 +1,5 @@
 #include "AmigaGameplayScene.h"
+#include "AmigaEntryMask.h"
 
 void AmigaGameplayScene::invalidateBackingOutside(int first, int end, int viewY, int height) {
     if (first >= end) return;
@@ -88,4 +89,12 @@ bool AmigaGameplayScene::mask(unsigned slot, const UBYTE* mask) {
     if (slot >= 2 || !ready_[slot]) return false;
     ready_[slot] = lists_[slot].updateExitMask(mask);
     return ready_[slot];
+}
+
+bool AmigaGameplayScene::entryMask(unsigned slot,const UBYTE* storage,unsigned bytes,int screenY){
+    unsigned offset;
+    if(!storage || bytes!=AmigaEntryMask::bytes ||
+       (reinterpret_cast<unsigned long>(storage)&1u) ||
+       !AmigaEntryMask::offset(screenY,offset))return false;
+    return mask(slot,storage+offset);
 }

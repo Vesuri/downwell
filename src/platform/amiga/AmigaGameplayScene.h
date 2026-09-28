@@ -59,6 +59,9 @@ public:
         const Sprite& player, const Sprite* actors, unsigned count,
         const Sprite& overflow, const Palette& palette, unsigned origin);
     bool mask(unsigned slot, const UBYTE* mask);
+    // Borrow immutable Chip RAM until both displayed Copper slots retire it.
+    // Validation failure leaves the slot unchanged. No conversion or repaint.
+    bool entryMask(unsigned slot, const UBYTE* storage, unsigned bytes, int screenY);
     const DownwellGameplayCopperList& copper(unsigned slot) const { return lists_[slot]; }
 };
 #endif

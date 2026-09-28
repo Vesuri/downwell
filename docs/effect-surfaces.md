@@ -74,6 +74,16 @@ This is the shared composition route, not admission of natural entry-dither
 births or its transformed source artwork. Native integration must preserve the
 immutable pointer-scrolled cover rather than rasterizing a full wipe each tick.
 
+The native scene's `entryMask` entry point accepts that immutable 31,104-byte
+Chip-RAM bank and a view-relative Y. It rejects null/unaligned pointers, wrong
+lengths and unsupported finite-sprite positions before patching the selected
+copper slot. Valid calls reuse the existing two mask-plane pointer patches and
+display-mode patch; neither a copper rebuild nor bitmap conversion is needed.
+The caller must retain the bank until both displayed slots stop referencing it.
+Scene tests use copper-method doubles; pixel tests compare 917 viewports with
+the source sprite. This does not yet establish live native entry-wipe timing or
+DMA ownership: automatic effect admission and asset-bank residency remain open.
+
 Currency is also a `drawFx` producer, not an independent direct sprite in the
 normal path. `objCurrency_Draw_0` selects sprite 133/134 for small/large gems,
 updates its collision mask, and calls `drawFx` only when `dflash` is false.

@@ -1,4 +1,5 @@
 #include "platform/amiga/AmigaGameplayScene.h"
+#include "platform/amiga/AmigaEntryMask.h"
 #include <cassert>
 #include <initializer_list>
 #include <cstdio>
@@ -68,6 +69,25 @@ int main() {
     before=builds;
     assert(update(0) && update(1) && builds==before+2);
     assert(!scene.mask(2,mask));
+    alignas(2) static UBYTE entry[AmigaEntryMask::bytes]{};
+    before=builds;
+    for(int y=-116;y<=800;++y){
+        unsigned offset;assert(AmigaEntryMask::offset(y,offset));
+        const auto oldMasks=masks;
+        assert(scene.entryMask(unsigned(y+116)%2,entry,sizeof(entry),y));
+        assert(lastMask==entry+offset&&masks==oldMasks+1&&builds==before);
+        assert(offset+284*AmigaEntryMask::stride<=sizeof(entry));
+    }
+    const auto oldMasks=masks;const auto* oldMask=lastMask;
+    assert(!scene.entryMask(0,entry,sizeof(entry),-117));
+    assert(!scene.entryMask(0,entry,sizeof(entry),(-2147483647-1)));
+    assert(!scene.entryMask(0,entry,sizeof(entry)-1,0));
+    assert(!scene.entryMask(0,nullptr,sizeof(entry),0));
+    assert(!scene.entryMask(0,entry+1,sizeof(entry),0));
+    assert(!scene.entryMask(2,entry,sizeof(entry),0));
+    assert(masks==oldMasks&&lastMask==oldMask&&builds==before);
+    assert(scene.entryMask(0,entry,sizeof(entry),2147483647)&&lastMask==entry);
+    assert(scene.mask(0,nullptr)&&lastMask==nullptr); // explicit retirement
     // Predict only a view being approached. Zero resolved speed includes
     // pressing against a wall, irrespective of the held input direction.
     const int none = AmigaGameplayScene::noStageColumn;

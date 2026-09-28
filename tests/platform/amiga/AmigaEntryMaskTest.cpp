@@ -1,5 +1,12 @@
 #include "platform/amiga/AmigaEntryMask.h"
+#include "platform/amiga/AmigaExitMask.h"
 bool nativeEntryMaskProbe(){
+    for(int y=-1000;y<=1000;++y){
+        const unsigned expected=y>=284?0:y<=-80?364:unsigned(284-y);
+        if(AmigaExitMask::offset(y)!=expected*48)return false;
+    }
+    if(AmigaExitMask::offset(-2147483647-1)!=364*48||
+       AmigaExitMask::offset(2147483647)!=0)return false;
     for(int y=-116;y<=800;++y){
         unsigned offset=0;
         if(!AmigaEntryMask::offset(y,offset)||offset+284*48>AmigaEntryMask::bytes)return false;
