@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_RUNNER_SPATIAL_INDEX_H
 #include "RunnerSpatialNode.h"
 #include "RunnerSpatialLine.h"
+#include "Profile.h"
 namespace downwell {
 // Source-ordered spatial owner. It does not select eligible instances or
 // maintain the runner's dirty queue.
@@ -18,6 +19,7 @@ public:
     unsigned nodeCount()const{return live_;}
     int height()const{return nodes_[root_].level;}
     bool insert(Box box,std::uint32_t instance){
+        DW_PROFILE_SCOPE(profileSpatialInsert);
         if(!good_)return false;
         if(!Math::valid(box)){good_=false;return false;}
         if(!insertRoot({box,0,instance},0)){good_=false;return false;}
@@ -27,6 +29,7 @@ public:
     // bounds no longer locate the instance. Not-found is a successful operation
     // with removed=false; an invalid/failed mutation preserves the output flag.
     bool remove(Box oldBounds,std::uint32_t instance,bool retry,bool& removed){
+        DW_PROFILE_SCOPE(profileSpatialRemove);
         if(!good_)return false;
         if(!Math::valid(oldBounds)){good_=false;return false;}
         unsigned detached=Capacity;

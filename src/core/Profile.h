@@ -37,6 +37,7 @@ enum DownwellProfilePhase {
     profileBoundsGeometry, profileBoundsPublication,
     profileRoomAnimation, profileStandaloneEffectAnimation,
     profileAnimationDispatch,
+    profileSpatialInsert, profileSpatialRemove, profileSpatialPartition, profileSpatialChoose,
     profilePhaseCount
 };
 

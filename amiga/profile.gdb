@@ -28,6 +28,7 @@ printf "Birth detail: 82=instance_birth 83=bounds_refresh 84=bounds_trig 85=laye
 printf "Bounds detail: 87=sprite_geometry 88=cache_and_spatial_publication; excluded from 83 where nested\n"
 printf "Animation detail: 89=room_instance_animation 90=standalone_effect_animation; excluded from 3, includes nested-scope exclusions\n"
 printf "Actor animation: 91=enemy_bullet_script_debris_animation; excluded from 89; no-animation entries have no inner probe\n"
+printf "Spatial publication: 92=insert 93=remove 94=partition 95=choose_child; exclusive nested costs, excluded from 88 where nested\n"
 printf "Damage number births: %lu (zero means this tape did not measure a damaging contact)\n", gDownwellProfileDamageBirths
 if gDownwellProfileRequireDamage && gDownwellProfileDamageBirths == 0
     printf "Damage profiling tape did not reach a damaging contact\n"

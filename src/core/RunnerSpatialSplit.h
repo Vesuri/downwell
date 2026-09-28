@@ -4,6 +4,7 @@
 #include "MultiplyBinary64.h"
 #include "MultiplyBinary32.h"
 #include "SubtractBinary32.h"
+#include "Profile.h"
 namespace downwell {
 // Runner 0x5010e0/0x4fc680/0x500490: partition six entries plus one new
 // entry. This is not a complete spatial index or an instance_place adapter.
@@ -13,6 +14,7 @@ struct RunnerSpatialSplit {
     struct Box { Real left,top,right,bottom; };
     struct Result { unsigned group[7]={}; unsigned count[2]={}; };
     static bool partition(const Box (&boxes)[7],Result& output){
+        DW_PROFILE_SCOPE(profileSpatialPartition);
         Real areas[7];Box all=boxes[0];
         for(unsigned i=0;i<7;++i){
             if(!valid(boxes[i]) || !area(boxes[i],areas[i]))return false;
@@ -63,6 +65,7 @@ struct RunnerSpatialSplit {
     }
     // 0x4fff98: least enlargement, then least area, then earliest slot.
     static bool chooseChild(const Box* boxes,unsigned count,Box incoming,unsigned& chosen){
+        DW_PROFILE_SCOPE(profileSpatialChoose);
         if(!count || count>6 || !valid(incoming))return false;
         unsigned best=0;Real bestGrowth{},bestArea{};
         for(unsigned i=0;i<count;++i){

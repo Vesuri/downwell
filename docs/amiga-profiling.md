@@ -76,6 +76,11 @@ capture), while 90 covers flash, smoke and corpse-expiry animation. Both exclude
 their nested phases and are excluded from simulation phase 3. These brackets
 run once per update rather than once per instance to limit probe overhead.
 
+Phases 92–95 split spatial publication into insertion, removal, node partition
+and child selection. Nested costs are exclusive: partition/selection are
+excluded from insertion/removal, and all are excluded from phase 88 where
+nested. These probes compile away in ordinary and FPS-only builds.
+
 Phase 91 brackets only enemy, bullet, script-effect and debris animation calls
 inside the native room walk, after lifetime validation and previous-position
 capture. It is excluded from 89. Entries with no animation dispatch have no
