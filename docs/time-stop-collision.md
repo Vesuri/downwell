@@ -1,5 +1,18 @@
 # Time-stop collision inputs
 
+## Native player field meeting query
+
+`GameplayCollisionOwner::playerTimeFieldMeeting` exposes the boolean
+`place_meeting(xx,yy,82)` input to player Begin Step using the registered player
+and its actual sprite/mask/transforms. It delegates to the existing VM place
+wrapper and resource-backed compatibility collision path; it does not replace
+the player with a point or use the goal-control lock as time-stop state.
+Fractional-position tests with both player facings cover hits/misses and
+preservation of published/previous-frame coordinates after temporary query
+movement. Missing mask resources fail without overwriting the caller's result.
+This query alone does not connect player transitions, shard identity lookup,
+their effects, or audio to the native Begin Step scheduler.
+
 ## Field wind audio ordering
 
 `goalTimeField`'s player collision checks `global.voidWind` first. If it is not

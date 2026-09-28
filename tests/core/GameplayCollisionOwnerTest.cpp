@@ -1,6 +1,10 @@
 #include "core/GameplayCollisionOwner.h"
 #include "core/MachineGunSourceStep.h"
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
+bool nativePlayerTimeField(downwell::GameplayCollisionOwner& owner,downwell::MotionBinary64 x,
+    downwell::MotionBinary64 y,const downwell::SpriteMaskPack& masks,bool& hit){
+    return owner.playerTimeFieldMeeting(x,y,masks,hit);
+}
 bool nativeOwnedDebrisTick(GameplayWorld& world){
     return world.stepWithOwnedDebris(0,[](auto,const auto&,bool& frozen){frozen=false;return true;},
         [](auto,const auto&,auto,auto,bool& hit){hit=false;return true;});
@@ -751,6 +755,36 @@ int main(){
         assert(!scene->stepWithOwnedDebris(0,[](auto,const auto&,bool&){return false;},
             [&](auto,const auto&,auto,auto,bool&){++queries;return true;}));
         assert(!queries&&!scene->effectsSucceeded());
+    }
+    {
+        auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto scene=std::make_unique<GameplayWorld>(300,true,0,false,collision->enemyBinding(),
+            collision->breakableBinding(),collision->playerBinding(),&collision->terrain());
+        assert(collision->attach(*scene));
+        assert(scene->createGeneratedInstance({82,240,512},objects,[](const auto&){return false;}));
+        InstanceHandle player;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::player,scene->playerHandle(),player));
+        const auto before=*collision->state(player);
+        unsigned hits=0,misses=0;
+        for(int facing:{-1,1}){
+            auto binding=collision->playerBinding();
+            const auto* record=scene->findPlayer(scene->playerHandle());assert(record);
+            assert(binding.integerTransform(scene->playerHandle(),*record,RunnerTransformField::scaleX,facing,{0x3f800000u},0xffffffu));
+            for(int qx=640;qx<=1280;qx+=7){
+                auto x=MotionBinary64::fromInteger(qx);x.high-=2u<<20; // quarter-pixel inputs
+                bool hit=false;
+                assert(collision->playerTimeFieldMeeting(x,MotionBinary64::fromInteger(512),masks,hit));
+                hit?++hits:++misses;
+                const auto* state=collision->state(player);assert(state);
+                assert(state->x.bits==before.x.bits&&state->y.bits==before.y.bits&&
+                    state->previous.x.bits==before.previous.x.bits&&state->previous.y.bits==before.previous.y.bits);
+            }
+            bool hit=false;
+            assert(collision->playerTimeFieldMeeting(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(512),masks,hit)&&hit);
+            assert(collision->playerTimeFieldMeeting(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(10000),masks,hit)&&!hit);
+        }
+        assert(hits&&misses);
+        SpriteMaskPack absent(nullptr,0);bool sentinel=true;
+        assert(!collision->playerTimeFieldMeeting({},{},absent,sentinel)&&sentinel&&!collision->valid());
     }
     for(int area=1;area<=5;++area){
         auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites);

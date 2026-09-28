@@ -480,6 +480,15 @@ public:
             },allowed))return check(false);
         frozen=!allowed;return true;
     }
+    // objPlayer_n Begin Step queries parentTimeField using private xx/yy,
+    // while collision bounds/mask/transforms belong to the registered player.
+    // placeVm temporarily publishes the requested position and restores it.
+    bool playerTimeFieldMeeting(MotionBinary64 x,MotionBinary64 y,const SpriteMaskPack& masks,bool& hit){
+        InstanceHandle self;
+        if(!valid()||!world_||!masks.valid()||
+            !View::encode(View::Kind::player,world_->playerHandle(),self)||!resolves(self))return check(false);
+        return registeredPlaceMeeting(self,82,x,y,masks,hit);
+    }
     // Selected global Step entry, not a pool-local sweep. The caller supplies
     // the original per-instance TimeStopBound result through a checked adapter.
     template<unsigned Capacity,class Stopped>
