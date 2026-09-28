@@ -13,6 +13,10 @@ template<unsigned L,unsigned E,unsigned I> struct StoredLayerLifecycle {
             owner.birth(h,record.instanceId,depth,!record.active);
     }
     bool retire(InstanceHandle h,const InstanceRecord&){return owner.retire(h);}
+    bool depth(InstanceHandle h,const InstanceRecord& record,MotionBinary64 value){
+        const auto* state=owner.resolve(h);
+        return state&&state->sourceId==record.instanceId&&owner.writeDepth(h,value);
+    }
     bool activation(InstanceHandle h,const InstanceRecord&,bool active){return owner.publishInactive(h,!active);}
     // Source 0x48d630 reconciles object membership before layer relinking.
     // The published inactive flag can precede this boundary by several events.

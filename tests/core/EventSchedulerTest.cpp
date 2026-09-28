@@ -1,4 +1,6 @@
 #include "core/EventScheduler.h"
+#include "core/StoredLayerLifecycle.h"
+#include "core/InstanceLifecycle.h"
 #include <cstdlib>
 #include <iostream>
 #include <vector>
@@ -468,6 +470,65 @@ void testCollisionBoundary(){
     }
 }
 
+void testLayerMaintenance(){
+    using namespace downwell;
+    for(unsigned failure=0;failure<=5;++failure){
+        InstanceStore<2> instances;
+        require(instances.create(100,10,11,false)==CreateInstanceResult::success,"maintenance instance");
+        const auto h=instances.handleAt(0);
+        using Registry=RunnerLayerInstances<4,4>;
+        Registry registry;Registry::Layers layers;RunnerLayerIds ids;
+        RunnerLayerLifetimes<4,4,2> owner(layers,registry,ids);
+        StoredLayerLifecycle<4,4,2> observer{owner};InstanceLifecycleBinding binding;
+        require(!binding.publishedDepth(h,instances.at(0),{}),"unowned depth write fails");
+        require(binding.observeLayers(observer)&&binding.birth(h,instances.at(0)),"maintenance layer birth");
+        const int initialLayer=owner.resolve(h)->depth.layerId;
+        unsigned maintained=0,memberships=0,ends=0;
+        const bool ok=EventScheduler<2>::runStepChecked(instances,[](const auto&){return AlarmBank::allEvents;},
+            [&](auto& r,StepEvent event){
+                if(event.phase==StepEventPhase::beginStep){
+                    require(binding.publishedDepth(h,r,MotionBinary64::fromInteger(-60000)),"script publishes deferred depth");
+                    require(owner.pendingDepths()==1&&owner.resolve(h)->depth.layerId==initialLayer,
+                        "depth write does not immediately move element");
+                    r.active=false;
+                    require(binding.activation(h,r,false),"publish inactive before maintenance");
+                }
+                if(event.phase==StepEventPhase::endStep)++ends;
+            },[](auto){},[&](auto key,const auto& r,bool member){
+                ++memberships;return binding.membership(key,r,member);
+            },[]{return true;},[]{return true;},[&]{
+                ++maintained;
+                require(memberships==1&&owner.resolve(h)->inactive,"activation reconciliation precedes depth service");
+                if(maintained==failure)return false;
+                return owner.serviceDepths();
+            });
+        require(ok==(failure==0)&&maintained==(failure?failure:5)&&ends==0,
+            "maintenance includes empty phases and failures stop later phases");
+        require(owner.pendingDepths()==(failure==1?1u:0u),"failed boundary does not replay or roll back depth work");
+        if(failure!=1)require(layers.get(layers.find(owner.resolve(h)->depth.layerId))->depth==-60000,
+            "inactive instance depth migrated at maintenance boundary");
+    }
+    InstanceStore<2> instances;
+    RunnerLayerInstances<4,4> registry;RunnerLayerInstances<4,4>::Layers layers;RunnerLayerIds ids;
+    RunnerLayerLifetimes<4,4,2> owner(layers,registry,ids);
+    StoredLayerLifecycle<4,4,2> observer{owner};InstanceLifecycleBinding binding;
+    require(binding.observeLayers(observer),"animation-order layer observer");
+    for(unsigned id:{100u,200u}){
+        require(instances.create(id,10,11,false)==CreateInstanceResult::success,"animation-order birth");
+        require(binding.birth(instances.handleAt(instances.size()-1),*instances.find(id)),"animation-order layer birth");
+    }
+    std::vector<unsigned> before,after;
+    require(instances.visitAnimationChecked([&](auto,const auto& r){before.push_back(r.instanceId);return true;}),"capture animation order");
+    require(EventScheduler<2>::runStepChecked(instances,[](const auto&){return AlarmBank::allEvents;},
+        [&](auto& r,StepEvent event){
+            if(event.phase==StepEventPhase::step&&r.instanceId==100)
+                require(binding.publishedDepth(instances.handleAt(0),r,MotionBinary64::fromInteger(-60000)),"Step effect depth override");
+        },[](auto){},[&](auto h,const auto& r,bool member){return binding.membership(h,r,member);},
+        []{return true;},[]{return true;},[&]{return owner.serviceDepths();}),"scheduled depth migration");
+    require(instances.visitAnimationChecked([&](auto,const auto& r){after.push_back(r.instanceId);return true;})&&before==after,
+        "layer depth migration must not sort the animation list");
+}
+
 } // namespace
 
 int main() {
@@ -485,6 +546,7 @@ int main() {
     testCheckedDispatch();
     testDeferredDestroyEligibility();
     testCollisionBoundary();
+    testLayerMaintenance();
     std::cout << "event scheduler tests passed\n";
     return 0;
 }

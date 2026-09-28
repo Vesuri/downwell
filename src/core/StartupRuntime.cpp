@@ -462,7 +462,8 @@ void StartupRuntime::stepInternal(bool advancePressed,
             if(phase==StepEventPhase::step)smokeStepPhase=run_.smokeEffects.beginPhase();
         },[this](InstanceHandle h,const InstanceRecord& record,bool member){return lifecycle_.membership(h,record,member);},
         [this]{return run_.effectsSucceeded&&roomLoadSucceeded_&&deferredCommandsSucceeded_;},
-        [this]{return !collisionDispatch_||collisionDispatch_(collisionContext_);})){
+        [this]{return !collisionDispatch_||collisionDispatch_(collisionContext_);},
+        [this]{return !roomPack_||roomLayers_.serviceDepths();})){
         run_.effectsSucceeded=false;return;
     }
     if (deferredInstances_.size() != 0)
@@ -2309,6 +2310,7 @@ void StartupRuntime::loadRoom(int roomId, bool firstGameRoom) {
             [this](InstanceHandle key,const InstanceRecord& record,bool member){
                 return lifecycle_.membership(key,record,member);
             });
+        if(roomLoadSucceeded_&&roomPack_)roomLoadSucceeded_=roomLayers_.serviceDepths();
         if(roomLoadSucceeded_){
             // Original room-entry cleanup, distinct from inter-Step list
             // reconciliation. Only the entrance field currently destroys

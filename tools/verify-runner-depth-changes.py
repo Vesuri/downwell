@@ -139,6 +139,12 @@ assert region(0x50d223, 7) == bytes.fromhex("80 3d 18 7f b5 00 00")
 assert region(0x50d22a, 2) == bytes.fromhex("74 4a")
 assert 0x50d255 + struct.unpack("<i", region(0x50d251, 4))[0] == 0x414660
 assert struct.unpack_from("<I", region(0x490a64, 32), 4)[0] == 0x4904f4
+# Normal-frame maintenance after Begin Step, alarms, Step, collisions and
+# End Step; room-entry maintenance after Room Start uses the same routine.
+for call in (0x50dc89, 0x50dceb, 0x50dd80, 0x50ded1, 0x50defd, 0x510813):
+    instruction = region(call, 5)
+    assert instruction[0] == 0xe8
+    assert call + 5 + struct.unpack_from("<i", instruction, 1)[0] == 0x5108d0
 print("Pinned depth setter, unique pending queue, and selected GMS2 layer migration")
 print("Legacy active-room re-sorting is not the selected depth-update path")
 print("Pinned positive-layer-count Draw selection and inactive-instance layer termination")

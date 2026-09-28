@@ -11,14 +11,14 @@
 #include "core/StoredRoomLayers.h"
 bool compileStoredRoomLayers(downwell::StoredRoomLayers<8,4,16,2>& owner,
     const downwell::RoomPack& pack,downwell::InstanceStore<8>& instances,int room){
-    return owner.leave()&&owner.prepare(pack,room,instances)&&owner.visitDraw(
+    return owner.leave()&&owner.prepare(pack,room,instances)&&owner.serviceDepths()&&owner.visitDraw(
         [](auto,unsigned,auto& state){state.flags=0x10;state.object=true;state.sprite=true;return true;},
         [](auto,unsigned,int,auto){return true;},[](const auto&,int){return true;});
 }
 bool compileLayerObserver(downwell::InstanceLifecycleBinding& binding,
     downwell::StoredLayerLifecycle<4,16,8>& observer,downwell::InstanceHandle h,const downwell::InstanceRecord& r){
     return binding.observeLayers(observer)&&binding.birth(h,r)&&binding.activation(h,r,false)&&
-        binding.membership(h,r,false)&&binding.retire(h,r);
+        binding.membership(h,r,false)&&binding.publishedDepth(h,r,downwell::MotionBinary64::fromInteger(-60000))&&binding.retire(h,r);
 }
 bool compileLayerLifetimes(downwell::RunnerLayerLifetimes<4,16,8>& owner,downwell::InstanceHandle h,unsigned id){
     return owner.birth(h,id,{},false)&&owner.writeDepth(h,downwell::MotionBinary64::fromInteger(-60000))&&

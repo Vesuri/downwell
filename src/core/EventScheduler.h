@@ -67,24 +67,36 @@ public:
     static bool runStepChecked(InstanceStore<Capacity>& instances,
         AlarmEvents alarmEvents,Handler handler,BeforePhase beforePhase,
         Publish publish,Healthy healthy,Collisions collisions) {
+        return runStepChecked(instances,alarmEvents,handler,beforePhase,publish,healthy,collisions,
+            []{return true;});
+    }
+    // Selected runner 0x5108d0: reconcile activation before servicing pending
+    // layer depths. This boundary must also run after an empty event phase.
+    template<class AlarmEvents,class Handler,class BeforePhase,class Publish,class Healthy,class Collisions,class Maintain>
+    static bool runStepChecked(InstanceStore<Capacity>& instances,
+        AlarmEvents alarmEvents,Handler handler,BeforePhase beforePhase,
+        Publish publish,Healthy healthy,Collisions collisions,Maintain maintain) {
         if(!healthy())return false;
         const auto checkedPublish=[&](InstanceHandle h,const InstanceRecord& record,bool member){
             return healthy()&&publish(h,record,member)&&healthy();
         };
+        const auto maintenance=[&]{
+            return instances.reconcileObjectMembership(checkedPublish)&&healthy()&&maintain()&&healthy();
+        };
         beforePhase(StepEventPhase::beginStep);
         if(!healthy() || !dispatchPhase(instances, StepEventPhase::beginStep, handler,healthy))return false;
-        if(!instances.reconcileObjectMembership(checkedPublish)||!healthy())return false;
+        if(!maintenance())return false;
         beforePhase(StepEventPhase::alarm);
         if(!healthy() || !dispatchAlarms(instances, alarmEvents, handler,healthy))return false;
-        if(!instances.reconcileObjectMembership(checkedPublish)||!healthy())return false;
+        if(!maintenance())return false;
         beforePhase(StepEventPhase::step);
         if(!healthy() || !dispatchPhase(instances, StepEventPhase::step, handler,healthy))return false;
-        if(!instances.reconcileObjectMembership(checkedPublish)||!healthy())return false;
+        if(!maintenance())return false;
         if(!collisions()||!healthy())return false;
-        if(!instances.reconcileObjectMembership(checkedPublish)||!healthy())return false;
+        if(!maintenance())return false;
         beforePhase(StepEventPhase::endStep);
         if(!healthy() || !dispatchPhase(instances, StepEventPhase::endStep, handler,healthy))return false;
-        return instances.reconcileObjectMembership(checkedPublish)&&healthy();
+        return maintenance();
     }
 
 private:

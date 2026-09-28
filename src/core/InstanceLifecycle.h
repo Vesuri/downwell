@@ -34,7 +34,13 @@ public:
         layerRetire_=[](void* p,InstanceHandle h,const Record& r){return static_cast<Observer*>(p)->retire(h,r);};
         layerActivation_=[](void* p,InstanceHandle h,const Record& r,bool v){return static_cast<Observer*>(p)->activation(h,r,v);};
         layerMembership_=[](void* p,InstanceHandle h,const Record& r,bool v){return static_cast<Observer*>(p)->membership(h,r,v);};
+        layerDepth_=[](void* p,InstanceHandle h,const Record& r,MotionBinary64 v){return static_cast<Observer*>(p)->depth(h,r,v);};
         return true;
+    }
+    // Selected GMS2 depth publication belongs to the layer owner, not the
+    // legacy room/animation list. Missing ownership is not a successful write.
+    bool publishedDepth(InstanceHandle h,const Record& r,MotionBinary64 value)const{
+        return layerDepth_&&layerDepth_(layerContext_,h,r,value);
     }
     template<class Owner> static RecordLifecycleBinding bind(Owner& owner) {
         RecordLifecycleBinding b;
@@ -227,6 +233,7 @@ private:
     bool (*layerRetire_)(void*,InstanceHandle,const Record&)=nullptr;
     bool (*layerActivation_)(void*,InstanceHandle,const Record&,bool)=nullptr;
     bool (*layerMembership_)(void*,InstanceHandle,const Record&,bool)=nullptr;
+    bool (*layerDepth_)(void*,InstanceHandle,const Record&,MotionBinary64)=nullptr;
     void* context_=nullptr;
     bool (*birth_)(void*,InstanceHandle,const Record&)=nullptr;
     bool (*birthAt_)(void*,InstanceHandle,const Record&,RunnerImageValue,RunnerImageValue)=nullptr;

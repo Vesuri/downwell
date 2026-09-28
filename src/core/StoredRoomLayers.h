@@ -45,6 +45,7 @@ public:
             },[](unsigned,const auto&){return true;});
     }
     bool succeeded()const{return good_&&lifetimes_.succeeded();}
+    bool serviceDepths(){return succeeded()&&lifetimes_.serviceDepths();}
     bool leave(){
         if(!succeeded())return false;
         return lifetimes_.uninitializeRoom([&](unsigned e){return backgrounds_.uninitialize(e);})||fail();

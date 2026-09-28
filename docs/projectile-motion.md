@@ -370,6 +370,16 @@ two-pass removal/reinsertion of the active room list. Therefore applying depth
 changes to `RunnerRoomMembership` would incorrectly change future animation
 order and would not model the selected presentation structure.
 
+The normal frame calls this maintenance routine after Begin Step
+(`0x50dc89`), alarms (`0x50dceb`), ordinary Step (`0x50dd80`), collision
+dispatch (`0x50ded1`) and End Step (`0x50defd`). Room entry also calls it at
+`0x510813`. The stored scheduler exposes a checked post-reconciliation hook
+at those supported phase boundaries, including empty phases, and the stored
+runtime services its layer queue there. The borrowed lifecycle depth setter
+checks both lifetime and source identity and publishes into that queue;
+it does not modify the legacy animation list. This is maintenance plumbing,
+not admission of nonzero combat-effect depths or complete runner phase coverage.
+
 The selected handler first requires a room, instance and flag 0x400 (attached
 layer element), then resolves the layer through instance field 0x140. It
 truncates the requested float depth to an integer and leaves the layer alone

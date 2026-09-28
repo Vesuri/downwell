@@ -654,6 +654,16 @@ void testLayerLifecycleBinding(){
     primary.good=true;
     require(binding.birth(h,record)&&owner.resolve(h),"composed birth publishes layer lifetime");
     const auto copied=binding;
+    const auto originalLayer=owner.resolve(h)->depth.layerId;
+    require(copied.publishedDepth(h,record,RunnerImageValue{0x41280000u}.promoted())&&
+        owner.resolve(h)->depth.depth.bits==0x41280000u&&owner.pendingDepths()==1&&
+        owner.resolve(h)->depth.layerId==originalLayer,"borrowed depth setter publishes fractional value without immediate migration");
+    InstanceRecord wrong=record;wrong.instanceId=101;
+    require(!copied.publishedDepth(h,wrong,{})&&owner.pendingDepths()==1&&owner.succeeded(),
+        "depth setter rejects mismatched source identity without publishing");
+    require(owner.serviceDepths()&&owner.pendingDepths()==0&&
+        layers.get(layers.find(owner.resolve(h)->depth.layerId))->depth==10&&
+        owner.resolve(h)->depth.depth.bits==0x41280000u,"singleton layer moves but published fractional depth survives");
     require(copied.activation(h,record,false)&&owner.resolve(h)->inactive&&copied.membership(h,record,false),
         "copied borrowed binding retains separate activation and reconciliation");
     require(copied.activation(h,record,true)&&!owner.resolve(h)->inactive&&copied.membership(h,record,true),
@@ -662,6 +672,7 @@ void testLayerLifecycleBinding(){
     require(!binding.retire(h,record)&&owner.resolve(h),"primary retirement failure retains layer lifetime");
     primary.good=true;
     require(binding.retire(h,record)&&!owner.resolve(h),"successful retirement reaches both owners");
+    require(!copied.publishedDepth(h,record,{}),"retired lifetime cannot receive a depth write");
     // Primary publication is intentionally not rolled back if the observer
     // rejects capacity. The calling world must stop after false.
     const unsigned before=primary.calls;
