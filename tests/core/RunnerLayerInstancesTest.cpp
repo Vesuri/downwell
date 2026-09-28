@@ -338,6 +338,20 @@ void lifetimeDepthIntegration(){
 }
 void lifetimeRoomInitialization(){
     using R=RunnerLayerInstances<4,8>;using Owner=RunnerLayerLifetimes<4,8,4>;
+    for(unsigned flags=0;flags<8;++flags){
+        R copyRegistry;R::Layers copyLayers;RunnerLayerIds copyIds;
+        Owner copyOwner(copyLayers,copyRegistry,copyIds);
+        const Owner::State input{{2,0x12345678u},0xabcdef12u,
+            {{0x80000000u},-60000,bool(flags&1),bool(flags&2)},bool(flags&4)};
+        require(copyOwner.adopt(input),"adopt all combinations of lifetime flags");
+        const auto* output=copyOwner.resolve(input.handle);
+        require(output&&output->handle.slot==input.handle.slot&&
+            output->handle.generation==input.handle.generation&&output->sourceId==input.sourceId&&
+            output->depth.depth.bits==input.depth.depth.bits&&output->depth.layerId==input.depth.layerId&&
+            output->depth.attached==input.depth.attached&&output->depth.append==input.depth.append&&
+            output->inactive==input.inactive,
+            "adoption preserves every field including signed zero and high identity bits");
+    }
     R registry;R::Layers layers;RunnerLayerIds catalog;
     require(catalog.observeLoaded(131),"room lifetime catalog");
     unsigned fixed=4;require(layers.insertAfterEquals(17,10,false,fixed)&&registry.reserve(layers,fixed,100),

@@ -39,7 +39,18 @@ private:
             !RunnerSpatialSplit::valid(state.depth.depth))return fail();
         for(unsigned i=0;i<I;++i)
             if(state.sourceId&&states_[i].handle.generation&&states_[i].sourceId==state.sourceId)return fail();
-        states_[h.slot]=state;return true;
+        // Scalar stores avoid bytewise aggregate construction in the 68000
+        // compiler. Copy all semantic fields; padding has no stored meaning.
+        auto& target=states_[h.slot];
+        target.handle.slot=state.handle.slot;
+        target.handle.generation=state.handle.generation;
+        target.sourceId=state.sourceId;
+        target.depth.depth.bits=state.depth.depth.bits;
+        target.depth.layerId=state.depth.layerId;
+        target.depth.attached=state.depth.attached;
+        target.depth.append=state.depth.append;
+        target.inactive=state.inactive;
+        return true;
     }
 public:
     // Globals enumerates surviving handles in original global hash order.
