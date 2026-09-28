@@ -1,4 +1,5 @@
 #include "core/RunnerSpriteBounds.h"
+#include "core/RunnerUnitBoundsVerification.h"
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -9,6 +10,31 @@ using Real=Bounds::Real;
 Real packed(float x){Real r;std::memcpy(&r.bits,&x,4);return r;}
 float unpacked(Real r){float x;std::memcpy(&x,&r.bits,4);return x;}
 int main(){
+    assert(downwell::RunnerUnitBoundsVerification::run());
+    {
+        std::uint32_t seed=0x25468u;
+        auto random=[&](){seed=seed*1664525u+1013904223u;return seed;};
+        for(unsigned i=0;i<8192;++i){
+            auto scalar=[&](){return int(random()&65535u)-32768;};
+            downwell::RunnerUnitBoundsVerification::Resource resource{scalar(),scalar(),scalar(),scalar(),scalar(),scalar()};
+            const float x=float(int(random()&0x7fffffu)-0x400000),y=float(int(random()&0x7fffffu)-0x400000);
+            const auto sx=packed(i%7?1.f:-1.f),sy=packed(i%11?1.f:0.5f);
+            auto px=packed(x),py=packed(y);
+            if(i%13==0)px=packed(x+0.5f);
+            if(i%17==0)py.bits=0x80000000u;
+            if(i%19==0)resource.originX=40000; // Gate fallback.
+            for(bool compatibility:{false,true}){
+                Bounds::Box fast{},reference{};unsigned aCalls=0,bCalls=0;
+                auto round=[](Real v,std::int32_t& out){return v.promoted().roundPixel(out);};
+                const bool a=Bounds::fromSprite(resource,px,py,sx,sy,false,{},{},compatibility,
+                    [&](Real v,std::int32_t& p){++aCalls;return round(v,p);},fast);
+                const bool b=Bounds::fromSpriteBinary32(resource,px,py,sx,sy,false,{},{},compatibility,
+                    [&](Real v,std::int32_t& p){++bCalls;return round(v,p);},reference);
+                assert(a==b&&aCalls==bCalls&&fast.left.bits==reference.left.bits&&fast.right.bits==reference.right.bits&&
+                    fast.top.bits==reference.top.bits&&fast.bottom.bits==reference.bottom.bits);
+            }
+        }
+    }
     auto round=[](Real value,std::int32_t& result){return value.promoted().roundPixel(result);};
     unsigned comparisons=0,roundCalls=0,reassociatedDifferences=0;
     auto counted=[&](Real value,std::int32_t& result){++roundCalls;return round(value,result);};

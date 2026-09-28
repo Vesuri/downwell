@@ -128,6 +128,18 @@ an explicit rounding callback. Its host tests use nearest-even and compare
 including cases that distinguish reassociation. This does not establish the
 original runtime's FP control word, nor cover rotated or skeletal resources.
 
+`fromSprite` specializes unrotated +1/+1 scale with integer positions of
+magnitude below 2^21 and signed 16-bit margins/origins. Every intermediate then
+has magnitude below 2^22 and is exactly representable in binary32. Integer
+geometry and direct binary32 encoding reproduce the original operations in
+this domain. Compatibility rounding still calls the supplied policy in the
+original order; failures stop immediately. If a policy changes an integer,
+conversion, sorting and far-edge subtraction use the retained binary32 path.
+Fractional positions, other scales/rotations and larger resources use
+`fromSpriteBinary32`. Differential host cases and the native field verifier
+cover reversed margins, signed zero, policy failures and extreme policy outputs.
+This adds neither a bounds cache nor a change in creation/query ordering.
+
 ## Rotated ordinary-sprite branch
 
 `0x4663da..0x4664ab` subtracts sprite origins from inclusive margins, adds one

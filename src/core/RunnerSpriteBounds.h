@@ -13,6 +13,21 @@ struct RunnerSpriteBounds {
     template<class Resource,class Round> static bool fromSprite(const Resource& sprite,Real x,Real y,
         Real scaleX,Real scaleY,bool hasRotation,Real cosine,Real sine,
         bool compatibility,Round round,Box& result){
+        std::int32_t px,py;
+        if(!hasRotation&&scaleX.bits==0x3f800000u&&scaleY.bits==0x3f800000u&&
+           unitPixel(x,px)&&unitPixel(y,py)&&
+           small(sprite.marginLeft)&&small(sprite.marginRight)&&small(sprite.marginTop)&&
+           small(sprite.marginBottom)&&small(sprite.originX)&&small(sprite.originY)){
+            Box next;
+            if(!unitAxis(sprite.marginLeft,sprite.marginRight,sprite.originX,px,compatibility,round,next.left,next.right)||
+               !unitAxis(sprite.marginTop,sprite.marginBottom,sprite.originY,py,compatibility,round,next.top,next.bottom))return false;
+            result=next;return true;
+        }
+        return fromSpriteBinary32(sprite,x,y,scaleX,scaleY,hasRotation,cosine,sine,compatibility,round,result);
+    }
+    template<class Resource,class Round> static bool fromSpriteBinary32(const Resource& sprite,Real x,Real y,
+        Real scaleX,Real scaleY,bool hasRotation,Real cosine,Real sine,
+        bool compatibility,Round round,Box& result){
         Box margins;
         if(!margins.left.assign(MotionBinary64::fromInteger(sprite.marginLeft))||
            !margins.top.assign(MotionBinary64::fromInteger(sprite.marginTop))||
@@ -58,6 +73,41 @@ struct RunnerSpriteBounds {
         result=next;return true;
     }
 private:
+    static bool small(std::int32_t value){return value>=-32768&&value<=32767;}
+    static bool unitPixel(Real value,std::int32_t& out){
+        if(!(value.bits&0x7fffffffu)){out=0;return true;}
+        const unsigned exponent=(value.bits>>23)&255;
+        if(exponent<127||exponent>147)return false;
+        const unsigned shift=150-exponent,mantissa=(value.bits&0x7fffffu)|0x800000u;
+        if(mantissa&((1u<<shift)-1))return false;
+        const auto magnitude=std::int32_t(mantissa>>shift);
+        out=value.bits&0x80000000u?-magnitude:magnitude;return true;
+    }
+    // The gated domain keeps every intermediate strictly inside +/-2^22,
+    // so every add/subtract and multiplication by +1 is exact in binary32.
+    static Real unitReal(std::int32_t value){
+        if(!value)return {};
+        const auto magnitude=value<0?0u-std::uint32_t(value):std::uint32_t(value);
+        const unsigned top=31-MotionBinary64::Words::leadingZeros32(magnitude);
+        return {(value<0?0x80000000u:0u)|((top+127u)<<23)|((magnitude<<(23-top))&0x7fffffu)};
+    }
+    template<class Round> static bool unitAxis(int low,int high,int origin,std::int32_t position,
+        bool compatibility,Round& round,Real& near,Real& far){
+        std::int32_t a=low-origin+position,b=a+(high-low)+1;
+        near=unitReal(a);far=unitReal(b);
+        if(compatibility){
+            std::int32_t roundedA,roundedB;
+            // Preserve callback order, failures and nonstandard policies.
+            if(!round(near,roundedA)||!round(far,roundedB))return false;
+            if(roundedA!=a||roundedB!=b){
+                if(!near.assign(MotionBinary64::fromInteger(roundedA))||
+                   !far.assign(MotionBinary64::fromInteger(roundedB)))return false;
+                sort(near,far);return Math::sub(far,Real{0x3f800000u},far);
+            }
+        }
+        if(a>b){const auto saved=a;a=b;b=saved;}
+        near=unitReal(a);far=unitReal(compatibility?b-1:b);return true;
+    }
     static void sort(Real& a,Real& b){if(Math::less(b,a)){const auto saved=a;a=b;b=saved;}}
     static bool local(Real low,Real high,int origin,Real scale,Real& near,Real& far){
         Real offset;
