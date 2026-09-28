@@ -59,6 +59,12 @@ spawn_camera = assembly("gml_GlobalScript_scrSpawnCamera",
     "e95f81ae81762898b5db31847cdb37d0109817dbf966e2aefb1df8abeb9e05b4")
 camera = assembly("gml_Object_camMain_Create_0",
     "af5974437a0ca17493d660e850e3bc585816642034457b23ea7ae91037cfd78e")
+ground = assembly("gml_GlobalScript_groundRoom",
+    "9708c07856cb976b1606c27023f8aa1b3fa9370fe38114df9b8361dbce39196d")
+for room_id in range(20,25):
+    assert f"pushi.e {room_id}\ncmp.i.v EQ" in ground
+assert "pushi.e 0\npop.v.i self.freeCam" in camera
+assert "pushi.e 0\npop.v.i self.autoScroll" in camera
 parent = assembly("gml_Object_parentLife_Create_0",
     "19838825dc0e49ada1d670de755ba9942ab622914a87d8d4d2acb51eae4c3c04")
 objects = manifest["resources"]["objects"]

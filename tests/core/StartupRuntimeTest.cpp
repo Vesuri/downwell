@@ -64,6 +64,8 @@ void verifyPlayerChildren(const downwell::StartupRuntime& runtime,int room){
                 "child births share the original numeric allocator");
         require(player.playerCameraId==camera.instanceId&&runtime.instance(player.playerCameraId)==&camera,
                 "myCam retains the completed camera's source numeric identity");
+        require(camera.cameraFreeCam==((room>=20&&room<=24)||room==10||room==17)&&!camera.cameraAutoScroll,
+                "camera Create defaults precede room-specific scrSpawnCamera mode assignments");
     }
     require(found,"room contains a player for synchronous birth test");
 }

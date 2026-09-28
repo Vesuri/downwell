@@ -53,6 +53,8 @@ struct InstanceRecord {
     std::int32_t health = 0;
     std::int32_t reward = 0;
     std::uint32_t playerCameraId = 0; // objPlayer_n.myCam: source numeric ID, not a family slot.
+    bool cameraFreeCam = false;
+    bool cameraAutoScroll = false;
     float preciseX = 0.0F;
     float preciseY = 0.0F;
     float velocityX = 0.0F;

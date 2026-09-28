@@ -44,9 +44,13 @@ boundaries. Successful camera creation returns that child's captured numeric
 ID and publishes it to the player's `myCam` field only after Create completes.
 The reference is included in stored-state digests; it is not reconstructed
 from a storage slot or the allocator cursor after possible nested births.
-Failed births do not publish a result. It still omits 73 and the full
-initializer's child births, along with scrSpawnCamera's camera-mode assignments.
-Native terrain loading retains the
+Failed births do not publish a result. Camera Create initializes freeCam and
+autoScroll to false; the caller then enables freeCam for ground rooms 20–24
+and rooms 10/17, and explicitly clears autoScroll in room 11. Stored-state
+digests include these flags. Live menu/main-room tests cover their final values;
+this does not implement the remaining alternate-camera Step paths or prove
+the other rooms' full behavior. Entry-dither 73 and the full initializer's
+child births remain omitted. Native terrain loading retains the
 authored player/wall IDs but is not complete cross-family room creation.
 Consequently, explicit-ID time-change tests do not establish the natural
 global ID stream. This source check also does not prove original runner room

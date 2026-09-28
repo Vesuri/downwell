@@ -1716,8 +1716,15 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             if(!cameraId){deferredCommandsSucceeded_=false;return;}
             // scrSpawnCamera assigns myCam only after child Create completes.
             instance->playerCameraId=cameraId;
-            // Full initializer companion births, camera mode assignments and
-            // main-room entry-dither creation remain unwired.
+            auto* camera=instances_.find(instance->playerCameraId);
+            if(!camera){deferredCommandsSucceeded_=false;return;}
+            // scrSpawnCamera's assignments happen after camMain Create has
+            // initialized both fields. groundRoom covers all five garden rooms.
+            const int room=instance->roomId;
+            if((room>=20&&room<=24)||room==10||room==17)camera->cameraFreeCam=true;
+            if(room==11)camera->cameraAutoScroll=false;
+            // Full initializer companion births and main-room entry-dither
+            // creation remain unwired. Alternate camera motion is separate.
         }
         return;
     case 849: // gml_Object_objPlayer_n_Step_1 (menu/rmMain movement subsets)
@@ -2052,6 +2059,7 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
         return;
     case 997: // gml_Object_camMain_Create_0 (menu/rmMain camera subsets)
         ++implementedCodeCalls_;
+        if(instance!=nullptr){instance->cameraFreeCam=false;instance->cameraAutoScroll=false;}
         if (menuPlayerInitialized_) {
             menuCameraX_ = menuPlayerX_;
             menuCameraY_ = menuPlayerY_;
@@ -2617,6 +2625,10 @@ std::uint64_t StartupRuntime::stateDigest() const {
             digest.addU32(instance.batDirectionFraction);
         }
         if (instance.objectId == 35) digest.addU32(instance.playerCameraId);
+        if (instance.objectId == 64) {
+            digest.addBool(instance.cameraFreeCam);
+            digest.addBool(instance.cameraAutoScroll);
+        }
         if (instance.objectId == 111 || instance.objectId == 112) {
             digest.addI32(instance.walker.x);
             digest.addI32(instance.walker.y);
