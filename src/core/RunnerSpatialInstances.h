@@ -603,7 +603,12 @@ public:
     // Borrow exact registrations for phase snapshots; callbacks cannot mutate
     // membership. The scheduler supplies phase-specific exclusion flags.
     template<class Visit> bool visitRegistrations(Visit visit)const{
-        return valid()&&membership_.visitRegistrations([&](unsigned slot,std::uint32_t generation,int object){
+        return visitRegistrationRange(0,Capacity,visit);
+    }
+    // Narrow a phase snapshot to a disjoint owner domain before resolving
+    // records. Selected lifetimes remain checked; no slot-order iteration.
+    template<class Visit> bool visitRegistrationRange(unsigned first,unsigned last,Visit visit)const{
+        return valid()&&membership_.visitRegistrationRange(first,last,[&](unsigned slot,std::uint32_t generation,int object){
             const InstanceHandle h{slot,generation};const auto* state=resolve(h);
             return state&&visit(h,object,*state);
         });

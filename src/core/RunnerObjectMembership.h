@@ -17,7 +17,16 @@ public:
     // Exact-object Step ordering is applied after capture, not by traversing
     // ancestor-inclusive collision lists.
     template<class Visit> bool visitRegistrations(Visit visit)const{
+        return visitRegistrationRange(0,Capacity,visit);
+    }
+    // Slot ranges select an internal owner domain, never traversal order.
+    // Retain registration order across rebinds; omitted slots invoke no
+    // callback and need no caller-side record resolution.
+    template<class Visit> bool visitRegistrationRange(unsigned first,unsigned last,Visit visit)const{
+        if(first>last||last>Capacity)return false;
+        if(first==last)return true;
         for(unsigned slot=head_;slot!=End;slot=entries_[slot].next){
+            if(slot<first||slot>=last)continue;
             const auto& e=entries_[slot];
             if(!visit(slot,e.identity,e.object))return false;
         }

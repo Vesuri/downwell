@@ -282,7 +282,8 @@ public:
         world.configureEnemyStepOrder([](void* context,GameplayWorld::EnemyStepOrder& snapshot){
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
             if(!self.valid())return false;
-            return self.check(self.owner_.visitRegistrations([&](InstanceHandle shared,int object,const Owner::State& state){
+            return self.check(self.owner_.visitRegistrationRange(View::enemyBase,View::breakableBase,
+                [&](InstanceHandle shared,int object,const Owner::State& state){
                 View::Kind kind;InstanceHandle local;
                 if(!View::decode(shared,kind,local))return false;
                 if(kind!=View::Kind::enemy||(state.flags&0x100003u))return true;

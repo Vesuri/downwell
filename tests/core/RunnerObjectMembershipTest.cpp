@@ -24,6 +24,22 @@ int main(){
         }else require(registry.unbind(slot)==existed,"unbind preserves membership presence");
         require(registry.size()==reference.size(),"registry size follows successful bindings");
         require(!registry.bind(8,0,999) && !registry.bind(slot,-1,999),"invalid binding is rejected atomically");
+        for(unsigned first=0;first<=8;++first)for(unsigned last=first;last<=8;++last){
+            std::vector<std::uint32_t> expected,actual;
+            for(const auto& r:reference)if(r.slot>=first&&r.slot<last)expected.push_back(r.identity);
+            require(registry.visitRegistrationRange(first,last,[&](unsigned s,std::uint32_t id,int object){
+                auto found=std::find_if(reference.begin(),reference.end(),[&](const Record& r){return r.slot==s;});
+                require(found!=reference.end()&&found->object==object,"range retains object identity");
+                actual.push_back(id);return true;
+            })&&actual==expected,"range filtering preserves source registration order");
+            unsigned calls=0;
+            const bool complete=registry.visitRegistrationRange(first,last,[&](unsigned,std::uint32_t id,int){
+                require(id==expected.front(),"range failure begins at first registration");++calls;return false;
+            });
+            require(complete==expected.empty()&&calls==(expected.empty()?0u:1u),"range callback failure stops traversal");
+        }
+        require(!registry.visitRegistrationRange(3,2,[](auto,auto,auto){return true;})&&
+            !registry.visitRegistrationRange(0,9,[](auto,auto,auto){return true;}),"invalid registration ranges fail");
         for(int object=0;object<4;++object){
             std::vector<std::uint32_t> expected,actual;
             for(const auto& r:reference)if(r.object==object || isA(r.object,object))expected.push_back(r.identity);

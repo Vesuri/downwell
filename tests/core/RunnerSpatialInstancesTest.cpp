@@ -24,6 +24,27 @@ struct Graph {
     }
 };
 int main(){
+    {
+        RunnerSpatialInstances<8,16> owner;
+        assert(owner.attach({5,1},2,{})&&owner.attach({7,1},3,{})&&owner.attach({2,1},1,{}));
+        const auto visit=[&](){
+            std::vector<unsigned> seen;
+            assert(owner.visitRegistrationRange(1,6,[&](InstanceHandle h,int object,const auto& state){
+                assert(owner.resolve(h)==&state&&owner.objectId(h)==object);
+                seen.push_back(h.slot);return true;
+            }));return seen;
+        };
+        assert((visit()==std::vector<unsigned>{5,2}));
+        assert(owner.setExclusions({5,1},2));
+        assert((visit()==std::vector<unsigned>{5,2})); // Flags are the phase's decision.
+        assert(owner.registerObject({5,1},false));assert((visit()==std::vector<unsigned>{2}));
+        assert(owner.registerObject({5,1},true));assert((visit()==std::vector<unsigned>{2,5}));
+        assert(owner.retire({2,1})&&owner.attach({2,2},1,{}));
+        assert(!owner.resolve({2,1})&&(visit()==std::vector<unsigned>{5,2}));
+        unsigned calls=0;
+        assert(!owner.visitRegistrationRange(1,6,[&](auto h,int,const auto&){assert(h.slot==5);++calls;return false;})&&calls==1);
+        assert(!owner.visitRegistrationRange(6,1,[&](auto,int,const auto&){++calls;return true;})&&calls==1);
+    }
     using Owner=RunnerSpatialInstances<64,64>;
     for(unsigned mode=0;mode<4;++mode){
         Owner owner;Graph graph;const InstanceHandle first{9,1},second{4,1};
