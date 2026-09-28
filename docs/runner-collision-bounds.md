@@ -515,6 +515,11 @@ same comparison values. Selection still minimizes enlargement, then area,
 then original slot order. Signed zeros compare equal on both paths. Fractional,
 larger or invalid inputs use the retained path; no approximate arithmetic or
 different collision traversal order is introduced.
+The shared bitwise comparison uses normal unsigned bit ordering for equal-sign
+values (reversed for negatives); identical bits already compare false. Only
+opposite signs need the explicit signed-zero equality check. This preserves the
+previous comparator for all bit patterns; numeric admission remains a separate
+gate. Native boundary fixtures and host raw-bit comparisons guard the change.
 Coordinate admission shifts the 24-bit mantissa down and reconstructs it to
 detect any discarded fractional bits. The admitted shift range is 0–23, so
 reconstruction cannot overflow; this is identical to the low-bit mask test

@@ -228,8 +228,10 @@ public:
     static bool valid(const Box& b){return valid(b.left)&&valid(b.top)&&valid(b.right)&&valid(b.bottom)&&!less(b.right,b.left)&&!less(b.bottom,b.top);}
     static bool equal(Real a,Real b){return a.bits==b.bits || (!(a.bits&0x7fffffff)&&!(b.bits&0x7fffffff));}
     static bool less(Real a,Real b){
-        if(equal(a,b))return false;
-        if((a.bits^b.bits)&0x80000000u)return (a.bits>>31)!=0;
+        // Same-sign bit ordering already makes identical values equal. Only
+        // opposite signs require the special +0/-0 equality check.
+        if((a.bits^b.bits)&0x80000000u)
+            return (a.bits>>31)!=0&&((a.bits|b.bits)&0x7fffffffu)!=0;
         return a.bits&0x80000000u?a.bits>b.bits:a.bits<b.bits;
     }
     static Real negate(Real a){a.bits^=0x80000000u;return a;}

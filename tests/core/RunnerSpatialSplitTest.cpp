@@ -126,6 +126,17 @@ static void check(const Box (&boxes)[7]){
     assert(counts[0]>=2 && counts[1]>=2 && counts[0]+counts[1]==7);
 }
 int main(){
+    {
+        std::uint32_t seed=0x473bed2u;
+        for(unsigned i=0;i<100000;++i){
+            seed=seed*1664525u+1013904223u;const auto a=seed;
+            seed=seed*1664525u+1013904223u;const auto b=seed;
+            const bool equal=a==b||(!(a&0x7fffffffu)&&!(b&0x7fffffffu));
+            const bool expected=!equal&&((a^b)&0x80000000u?bool(a>>31):a&0x80000000u?a>b:a<b);
+            assert(downwell::RunnerSpatialSplit::less({a},{b})==expected);
+            assert(!downwell::RunnerSpatialSplit::less({a},{a}));
+        }
+    }
     // Retain the previous binary64 path as an independent arithmetic oracle.
     auto productCheck=[](std::uint32_t a,std::uint32_t b){
         Split::Real left{a},right{b},actual{0x12345678},expected=actual;

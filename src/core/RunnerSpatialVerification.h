@@ -18,6 +18,15 @@ struct RunnerSpatialVerification {
 // Placement construction also avoids unsupported guarded-static runtime calls.
 [[gnu::noinline]] inline RunnerSpatialVerification verifyRunnerSpatialMutations(){
     RunnerSpatialVerification result;
+    {
+        const std::uint32_t bits[]={0u,0x80000000u,1u,0x80000001u,0x00800000u,0x80800000u,
+            0x3f800000u,0xbf800000u,0x7f7fffffu,0xff7fffffu,0x7f800000u,0xff800000u,0x7fc00000u};
+        for(auto a:bits)for(auto b:bits){
+            const bool equal=a==b||(!(a&0x7fffffffu)&&!(b&0x7fffffffu));
+            const bool expected=!equal&&((a^b)&0x80000000u?bool(a>>31):a&0x80000000u?a>b:a<b);
+            result.check(RunnerSpatialSplit::less({a},{b})==expected);
+        }
+    }
     using Owner=RunnerSpatialInstances<2,8>;
     alignas(Owner) static std::uint8_t storage[sizeof(Owner)];
     const InstanceHandle h{0,1};
