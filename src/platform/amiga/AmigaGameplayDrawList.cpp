@@ -122,6 +122,10 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
             DW_PROFILE_SCOPE(profileActorPreparation);
             if(downwell::RunnerSpatialSplit::less(depth,foregroundDepth)&&!drawForeground())return false;
             if(kind==GameplayWorld::DrawActor::player)return port.findPlayer(key)&&drawPlayer();
+            // This surface producer requires the immutable cover compositor,
+            // not a BOB or the script-effect fallback below. Until production
+            // admission supplies that path, reject rather than omit its Draw.
+            if(kind==GameplayWorld::DrawActor::entryDither)return false;
             if(kind==GameplayWorld::DrawActor::enemy){
 #ifndef DOWNWELL_REPLAY_VERIFY
                 const auto* enemy=port.resolveEnemyLifetime(key);

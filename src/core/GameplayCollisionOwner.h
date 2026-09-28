@@ -23,7 +23,7 @@ public:
     using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2>;
 private:
     Owner owner_;
-    RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8> combatAlarmPhase_;
+    RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity> combatAlarmPhase_;
     RunnerRoomMembership<View::capacity> room_;
     InstanceHandle roomKeys_[View::capacity]{};
     Owner::Properties properties_[View::capacity]{};
@@ -75,6 +75,7 @@ private:
             if constexpr(Kind==View::Kind::scriptEffect)return 219;
             if constexpr(Kind==View::Kind::debris)return 370;
             if constexpr(Kind==View::Kind::timeChange)return 211;
+            if constexpr(Kind==View::Kind::entryDither)return 73;
             if constexpr(Kind==View::Kind::goalField||Kind==View::Kind::exitController)return r.objectId;
             return Kind==View::Kind::player?35:92;
         }
@@ -97,6 +98,7 @@ private:
             else if constexpr(Kind==View::Kind::scriptEffect)pointer=actual.scriptEffect;
             else if constexpr(Kind==View::Kind::debris)pointer=actual.debris;
             else if constexpr(Kind==View::Kind::timeChange)pointer=actual.timeChange;
+            else if constexpr(Kind==View::Kind::entryDither)pointer=actual.entryDither;
             else pointer=actual.breakable;
             return parent.check(pointer==&r);
         }
@@ -113,7 +115,7 @@ private:
             }else if constexpr(Kind==View::Kind::debris){
                 if(!r.effect)return parent.check(false);
                 state.x=r.effect->x;state.y=r.effect->y;
-            }else if constexpr(Kind==View::Kind::timeChange){
+            }else if constexpr(Kind==View::Kind::timeChange||Kind==View::Kind::entryDither){
                 state.x=r.x;state.y=r.y;
             }else{
                 if(r.x>0x7fffffff-ox||r.y>0x7fffffff-oy)return parent.check(false);
@@ -131,6 +133,9 @@ private:
                 // GMS2 OBJT default; Create also selects area-specific art.
                 if(!real(DebrisDraw::sourceDepth,p.depth))return parent.check(false);
                 p.sprite.spriteId=r.effect->spriteId;p.sprite.imageIndex=r.effect->imageIndex;
+            }
+            if constexpr(Kind==View::Kind::entryDither){
+                if(!real(-200000,p.depth))return parent.check(false);
             }
             if(!parent.check(parent.room_.bind(h.slot,p.depth)))return false;
             parent.roomKeys_[h.slot]=h;
@@ -150,8 +155,9 @@ private:
             if constexpr(Kind==View::Kind::terrain)sourceId=r.sourceInstanceId;
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
             if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
+            if constexpr(Kind==View::Kind::entryDither)sourceId=r.sourceId;
             constexpr bool projected=Kind==View::Kind::player||Kind==View::Kind::enemy||
-                Kind==View::Kind::bullet||Kind==View::Kind::scriptEffect||Kind==View::Kind::debris;
+                Kind==View::Kind::bullet||Kind==View::Kind::scriptEffect||Kind==View::Kind::debris||Kind==View::Kind::entryDither;
             {
                 DW_PROFILE_SCOPE(profileInstanceLayerAttach);
                 if(!parent.check(parent.layers_.birth(h,sourceId,p.depth,(state.flags&2u)!=0,projected)))return false;
@@ -213,6 +219,8 @@ private:
     GameplayDebrisInstances debris_{GameplayDebrisInstances::Binding::bindDestruction(debrisBinding_)};
     Binding<NativeTimeChangeRegistration::Record,View::Kind::timeChange> timeChangeBinding_{*this};
     NativeTimeChangeRegistration timeChanges_{*this};
+    Binding<GameplayEntryDithers::Record,View::Kind::entryDither> entryBinding_{*this};
+    GameplayEntryDithers entries_{GameplayEntryDithers::Binding::bindDestruction(entryBinding_)};
     std::uint32_t pendingTimeChangeId_=0;
     GameplayTerrainInstances terrain_;
 public:
@@ -230,7 +238,7 @@ public:
     }
     GameplayCollisionOwner(const GameplayCollisionOwner&)=delete;
     GameplayCollisionOwner& operator=(const GameplayCollisionOwner&)=delete;
-    bool valid()const{return good_&&owner_.valid()&&terrain_.valid()&&scriptEffects_.valid()&&debris_.valid()&&timeChanges_.valid()&&layers_.valid();}
+    bool valid()const{return good_&&owner_.valid()&&terrain_.valid()&&scriptEffects_.valid()&&debris_.valid()&&timeChanges_.valid()&&entries_.valid()&&layers_.valid();}
     bool attach(GameplayWorld& world){
         if(!valid()||(world_&&world_!=&world)||(!world_&&
             (!initialPlayer_||world.findPlayer(initialPlayerKey_)!=initialPlayer_)))return false;
@@ -241,6 +249,7 @@ public:
         if(!world_&&!world.bindScriptSpawnInstances(scriptEffects_))return check(false);
         if(!world_&&!world.bindDebrisInstances(debris_))return check(false);
         if(!world_&&!world.bindTimeChangeInstances(timeChanges_))return check(false);
+        if(!world_&&!world.bindEntryDithers(entries_))return check(false);
         world_=&world;
         world.configureRoomActorDraw([](const void* context,GameplayWorld::DrawActorVisitor visit,void* visitor){
             const auto& self=*static_cast<const GameplayCollisionOwner*>(context);
@@ -250,7 +259,7 @@ public:
                 if(!View::decode(shared,kind,local))return false;
                 // Retained terrain/field composition is not part of this
                 // visitor. Do not resolve or copy their records per frame.
-                if(kind!=View::Kind::enemy&&kind!=View::Kind::bullet&&kind!=View::Kind::scriptEffect&&kind!=View::Kind::debris&&kind!=View::Kind::player)return true;
+                if(kind!=View::Kind::enemy&&kind!=View::Kind::bullet&&kind!=View::Kind::scriptEffect&&kind!=View::Kind::debris&&kind!=View::Kind::player&&kind!=View::Kind::entryDither)return true;
                 const auto* state=self.owner_.resolve(shared);
                 if(!state||!View(*self.world_).contains(shared))return false;
                 if(state->flags&0x100003u)return true;
@@ -260,6 +269,7 @@ public:
                     case View::Kind::bullet:return visit(visitor,GameplayWorld::DrawActor::bullet,local,depth);
                     case View::Kind::scriptEffect:return visit(visitor,GameplayWorld::DrawActor::scriptEffect,local,depth);
                     case View::Kind::debris:return visit(visitor,GameplayWorld::DrawActor::debris,local,depth);
+                    case View::Kind::entryDither:return visit(visitor,GameplayWorld::DrawActor::entryDither,local,depth);
                     default:return true;
                 }
             };
@@ -271,7 +281,7 @@ public:
                 // inactive flag (which terminates a layer), but avoid event
                 // and sprite lookups for every terrain tile each frame.
                 if(kind!=View::Kind::enemy&&kind!=View::Kind::bullet&&kind!=View::Kind::scriptEffect&&
-                    kind!=View::Kind::debris&&kind!=View::Kind::player)return true;
+                    kind!=View::Kind::debris&&kind!=View::Kind::player&&kind!=View::Kind::entryDither)return true;
                 const unsigned metadata=self.drawMetadata_.get(self.owner_.objectId(h));
                 out.object=(metadata&ObjectDrawMetadata<386>::exists)!=0;
                 out.drawEvent=(metadata&ObjectDrawMetadata<386>::drawEvent)!=0;
@@ -348,7 +358,8 @@ public:
                 return kind==View::Kind::enemy?self.world_->advanceEnemyRoomAlarm(local,alarm):
                     kind==View::Kind::breakable?self.world_->advanceBoxRoomAlarm(local,alarm):
                     kind==View::Kind::debris?self.world_->advanceBoundDebrisRoomAlarm(local,alarm):
-                    kind==View::Kind::timeChange&&self.world_->advanceTimeChangeRoomAlarm(local,alarm);
+                    kind==View::Kind::timeChange?self.world_->advanceTimeChangeRoomAlarm(local,alarm):
+                    kind==View::Kind::entryDither&&self.entries_.advanceAlarm(local,alarm);
             });
         },this);
         world.configureDebrisStepOrder([](void* context,GameplayWorld::DebrisStepOrder& phase){
@@ -427,6 +438,7 @@ public:
     GameplayScriptSpawnInstances& scriptEffects(){return scriptEffects_;}
     GameplayDebrisInstances& debris(){return debris_;}
     NativeTimeChangeRegistration& timeChanges(){return timeChanges_;}
+    GameplayEntryDithers& entryDithers(){return entries_;}
     // Until every native dynamic family participates in the source ID stream,
     // this entry point accepts only an explicitly supplied original ID. Never
     // allocate a family-local substitute. The caller owns effects/speed until
@@ -727,6 +739,7 @@ private:
                 case View::Kind::scriptEffect:return retireEffect(local,record);
                 case View::Kind::debris:return record.debris&&world_->retireDebrisRoomEffect(local);
                 case View::Kind::timeChange:return record.timeChange&&world_->retireTimeChangeRoomEffect(local);
+                case View::Kind::entryDither:return record.entryDither&&entries_.retire(local);
                 default:return false;
             }
         });

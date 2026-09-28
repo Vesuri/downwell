@@ -114,6 +114,26 @@ Chip allocation. Its bank-selection path is currently verification-only.
 Automatic native lifetime admission, production ownership/release integration
 and production entry-wipe timing remain open.
 
+`GameplayEntryDithers` now supplies native typed lifetimes using the same
+`EntryDither` Create/Step/Alarm implementation as the stored adapter. Its two
+fixed slots retain original numeric IDs separately from monotonic generations.
+Each coordinate setter publishes to the resource-backed owner before the next
+source read. The mixed-family alarm traversal includes these records; explicit
+ordinary-Step dispatch uses the room's captured lifetime order. Inactive and
+destroyed records do not advance. Alarm expiry marks destruction, with actual
+retirement at Draw cleanup; retry and next-level teardown clear the owner too.
+The layer visitor retains the original -200000 depth and does not origin-cull
+the effect. This is not automatic production creation/Step scheduling: callers
+still must provide source-ordered numeric allocation and camera reads. The BOB
+draw list explicitly rejects this surface producer until its live cover path
+is supplied, rather than interpreting its handle as a script effect.
+
+Resource-backed tests exercise 120 alarm updates, 119 Steps, activation,
+offscreen Draw eligibility, cleanup, generation-safe reuse, retry and failed
+Create prefixes. The bounded entry-wipe verifier also runs an explicit-ID
+native lifetime fixture and retires it before testing the cover presentation.
+That fixture does not establish natural event ordering or entry-wipe timing.
+
 Currency is also a `drawFx` producer, not an independent direct sprite in the
 normal path. `objCurrency_Draw_0` selects sprite 133/134 for small/large gems,
 updates its collision mask, and calls `drawFx` only when `dflash` is false.

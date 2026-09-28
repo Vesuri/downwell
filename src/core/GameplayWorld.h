@@ -19,6 +19,7 @@
 #include "core/RunSession.h"
 #include "core/GameplayGoalFields.h"
 #include "core/GameplayExitControllers.h"
+#include "core/GameplayEntryDithers.h"
 #include "core/GameplayScriptSpawnInstances.h"
 #include "core/GameplayDebrisInstances.h"
 #include "core/GameplayTimeChangeRegistration.h"
@@ -237,6 +238,11 @@ public:
     const downwell::GameplayScriptSpawnInstances* scriptSpawnInstances()const{return scriptSpawnInstances_;}
     const downwell::GameplayDebrisInstances* debrisInstances()const{return debrisInstances_;}
     const downwell::NativeTimeChangeRegistration* timeChangeInstances()const{return timeChangeInstances_;}
+    const downwell::GameplayEntryDithers* entryDithers()const{return entryDithers_;}
+    bool bindEntryDithers(downwell::GameplayEntryDithers& entries){
+        if(entryDithers_||!entries.valid()||entries.size())return false;
+        entryDithers_=&entries;return true;
+    }
     bool bindTimeChangeInstances(downwell::NativeTimeChangeRegistration& registry);
     template<class Pause> bool createTimeChange(downwell::TimeChangeEffects<8>& effects,
         downwell::MotionBinary64 x,downwell::MotionBinary64 y,int& speed,Pause pause){
@@ -386,7 +392,7 @@ public:
         return run_.effectsSucceeded=scriptSpawnInstances_&&effects.advanceRegistered(phase,*scriptSpawnInstances_);
     }
     enum class PhaseBoundary { beginStep, alarm, step, collision, endStep, roomEntry };
-    enum class DrawActor { enemy, bullet, scriptEffect, debris, player };
+    enum class DrawActor { enemy, bullet, scriptEffect, debris, player, entryDither };
     using DrawActorVisitor=bool (*)(void*,DrawActor,downwell::InstanceHandle,downwell::RunnerImageValue);
     using RoomActorDraw=bool (*)(const void*,DrawActorVisitor,void*);
     // Borrowed owner traversal, not a snapshot or a family-local birth sort.
@@ -897,6 +903,7 @@ private:
     downwell::GameplayScriptSpawnInstances* scriptSpawnInstances_=nullptr;
     downwell::GameplayDebrisInstances* debrisInstances_=nullptr;
     downwell::NativeTimeChangeRegistration* timeChangeInstances_=nullptr;
+    downwell::GameplayEntryDithers* entryDithers_=nullptr;
     downwell::TimeChangeEffects<8>* timeChangeEffects_=nullptr;
     int* timeChangeSpeed_=nullptr; // Borrowed source room-speed global, not PAL catch-up.
     bool clearRoomTimeChanges();

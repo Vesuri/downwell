@@ -1566,6 +1566,79 @@ int main(){
     auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
     PackedRoom room;assert(rooms.valid()&&rooms.findRoom(11,room));
     {
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
+            GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&rooms);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain(),&rooms);
+        assert(owner->attach(*world));auto& entries=owner->entryDithers();
+        InstanceHandle key,shared;unsigned reads=0;
+        auto camera=[&](MotionBinary64& value){++reads;value=RunnerImageValue{0x43708000u}.promoted();return true;};
+        // Explicit fixture ID, not an assertion about the unfinished allocator.
+        assert(entries.create(400001,camera,[&](MotionBinary64& value){
+            assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::entryDither,key,shared));
+            assert(owner->state(shared)&&owner->state(shared)->x.bits==0x43708000u&&owner->state(shared)->y.bits==0);
+            value=world->roomEntryView()->y.promoted();return true;
+        },key));
+        assert(entries.find(key)->sourceId==400001&&entries.find(key)->effect.alarm0==120&&reads==1);
+        assert(owner->properties(shared)->sprite.spriteId==129);
+        auto phase=std::make_unique<RunnerStepSnapshot<GameplayCollisionView::capacity>>();
+        auto tick=[&](){
+            assert(owner->dispatchAlarmPhase(*phase,[&](InstanceHandle h,unsigned alarm,const auto& event){
+                if(h.slot!=shared.slot)return true;
+                assert(event.codeId==1032&&alarm==0);return entries.advanceAlarm(key,alarm);
+            }));
+            assert(owner->dispatchStepPhase(0,*phase,[&](InstanceHandle h,const auto& event){
+                if(h.slot!=shared.slot)return true;
+                assert(event.codeId==1033);return entries.step(key,camera);
+            }));
+        };
+        assert(entries.activate(key,false)&&owner->reconcileActivation());
+        tick();assert(reads==1&&entries.find(key)->effect.alarm0==120);
+        assert(entries.activate(key,true)&&owner->reconcileActivation());
+        for(unsigned frame=1;frame<=120;++frame){
+            tick();const auto* entry=entries.find(key);assert(entry);
+            assert(entry->effect.alarm0==120-int(frame)&&entry->destroyRequested==(frame==120));
+            const unsigned steps=frame<120?frame:119;
+            RunnerImageValue expectedY;assert(expectedY.assign(MotionBinary64::fromInteger(16*int(steps))));
+            assert(reads==1+steps&&entry->y.bits==expectedY.bits);
+            unsigned drawn=0;
+            assert(world->visitRoomActors([&](auto kind,auto local,auto depth){
+                if(kind!=GameplayWorld::DrawActor::entryDither)return true;
+                ++drawn;std::int32_t d;assert(depth.promoted().roundPixel(d)&&d==-200000);
+                return local.slot==key.slot&&local.generation==key.generation;
+            }));
+            assert(drawn==(frame==120?0u:1u)); // No offscreen-origin culling.
+        }
+        assert(entries.size()==1&&owner->prepareDraw()&&entries.size()==0&&!owner->state(shared));
+        const auto old=key;
+        assert(entries.create(400002,camera,[](auto& v){v={};return true;},key));
+        assert(key.slot==old.slot&&key.generation>old.generation&&!entries.find(old));
+        assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)==ResultsDestination::gameplay);
+        assert(entries.size()==0&&owner->valid()&&world->entryDithers()==&entries);
+        const auto previous=key;
+        assert(entries.create(400003,camera,[](auto& v){v={};return true;},key));
+        assert(key.generation>previous.generation&&entries.clear()&&owner->valid());
+    }
+    for(unsigned failure=0;failure<3;++failure){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
+            GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&rooms);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain(),&rooms);
+        assert(owner->attach(*world));auto& entries=owner->entryDithers();InstanceHandle key;
+        unsigned cameras=0,views=0;
+        auto camera=[&](MotionBinary64& v){++cameras;v=MotionBinary64::fromInteger(240);return failure!=1;};
+        auto view=[&](MotionBinary64& v){++views;v={};return false;};
+        assert(!entries.create(failure==0?0:400001,camera,view,key)&&!entries.valid());
+        assert(cameras==(failure==0?0u:1u)&&views==(failure==2?1u:0u));
+        assert(entries.size()==(failure==0?0u:1u));
+        if(failure){
+            const auto* r=entries.find(key);assert(r&&r->effect.alarm0==-1&&r->y.bits==0);
+            assert(r->x.bits==(failure==2?0x43700000u:0)); // Accepted setter prefix survives.
+        }
+        assert(!entries.create(400002,camera,view,key));
+        assert(cameras==(failure==0?0u:1u)&&views==(failure==2?1u:0u));
+    }
+    {
         struct PlayerViewProbe {
             GameplayWorld* world=nullptr;unsigned births=0;
             bool birth(InstanceHandle,const GameplayWorld::PlayerInstance&){

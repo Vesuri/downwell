@@ -215,7 +215,7 @@ static unsigned overlayAssetCapacity;
 enum class ResidentCover {none,exit,entry};
 static ResidentCover residentCover;
 #ifdef DOWNWELL_ENTRY_WIPE_VERIFY
-volatile ULONG gDownwellEntryWipeFrames,gDownwellEntryWipeFailures,gDownwellEntryWipeReuses;
+volatile ULONG gDownwellEntryWipeFrames,gDownwellEntryWipeFailures,gDownwellEntryWipeReuses,gDownwellEntryLifetimeChecks;
 __attribute__((noinline, used)) void downwellEntryWipeReady(){__asm__ volatile("" ::: "memory");}
 #endif
 #ifdef DOWNWELL_EXIT_WIPE_VERIFY
@@ -1274,6 +1274,24 @@ __attribute__((noinline)) static int runDownwell(void) {
             collisionOwner.breakableBinding(),collisionOwner.playerBinding(),&collisionOwner.terrain(),&rooms);
 #endif
     if(!port.effectsSucceeded()||!collisionOwner.attach(port))return 20;
+#ifdef DOWNWELL_ENTRY_WIPE_VERIFY
+    {
+        // Explicit-ID lifecycle fixture, not automatic production admission.
+        auto& entries=collisionOwner.entryDithers();downwell::InstanceHandle key;
+        auto camera=[](downwell::MotionBinary64& v){v=downwell::MotionBinary64::fromInteger(240);return true;};
+        if(!entries.create(400001,camera,[&](downwell::MotionBinary64& v){
+            const auto* view=port.roomEntryView();if(!view)return false;v=view->y.promoted();return true;
+        },key))return 20;
+        for(unsigned frame=1;frame<=120;++frame){
+            if(!entries.advanceAlarm(key,0)||!entries.step(key,camera))return 20;
+            const auto* r=entries.find(key);std::int32_t y;
+            if(!r||!r->y.promoted().roundPixel(y)||y!=16*int(frame<120?frame:119)||
+               r->effect.alarm0!=120-int(frame)||r->destroyRequested!=(frame==120))return 20;
+            ++gDownwellEntryLifetimeChecks;
+        }
+        if(!collisionOwner.prepareDraw()||entries.size()||entries.find(key))return 20;
+    }
+#endif
     checkSceneStack(3);
 #ifndef DOWNWELL_REPLAY_VERIFY
 #ifdef DOWNWELL_SCENE_VERIFY
