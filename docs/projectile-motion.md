@@ -937,6 +937,17 @@ installation adds bounded storage to `StartupRuntime`; it does not establish
 A500 memory fit. The separate native gameplay lifetime owner still needs
 installation.
 
+Layer-element allocation retains the lowest-free-slot rule. The instance
+registry resumes its scan at the last candidate while layer ownership has
+only grown; ordinary detach, rebind detach and room discard invalidate that
+hint through the layer owner's vacancy revision. Registry discard also resets
+the hint. External non-instance elements are checked by the same owner query,
+so holes released by backgrounds cannot be missed. The revision saturates;
+once saturated, every allocation scans from zero instead of risking rollover
+aliasing. This changes neither element order nor numeric source IDs. Mixed-owner
+allocation tests compare the chosen slot with an independent full scan on host
+and in the native field-verification gate.
+
 `StoredRoomLayers::visitDraw` supplies mixed element traversal through
 `RunnerLayerDraw`: retained serialized visibility, reverse layer order, forward
 element order, checked instance/source identity and owned background payloads.

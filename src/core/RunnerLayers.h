@@ -16,10 +16,12 @@ public:
     };
     const Layer* get(unsigned slot)const{return slot<Capacity&&layers_[slot].present?&layers_[slot]:nullptr;}
     bool succeeded()const{return !failed_;}
+    // Allocation hints must be invalidated when another owner releases a slot.
+    std::uint32_t vacancyRevision()const{return vacancyRevision_;}
     bool discardUninitialized(){
         if(failed_)return false;
         for(auto& layer:layers_)layer=Layer{};
-        elements_.clear();head_=tail_=End;return true;
+        elements_.clear();head_=tail_=End;releasedSlot();return true;
     }
     unsigned find(std::int32_t id)const{
         for(unsigned i=head_;i!=End;i=layers_[i].next)if(layers_[i].id==id)return i;
@@ -63,6 +65,7 @@ public:
         if(failed_)return false;
         const unsigned layer=elements_.owner(element);
         if(!get(layer)||!elements_.remove(element))return false;
+        releasedSlot();
         if(layers_[layer].dynamic&&!elements_.count(layer))eraseEmpty(layer);
         return true;
     }
@@ -70,7 +73,8 @@ public:
     // keep its layer even when dynamic and empty. Instance retirement and
     // pending-depth state are deliberately not part of this operation.
     bool detachForRebind(unsigned element){
-        return !failed_&&get(elements_.owner(element))&&elements_.remove(element);
+        if(failed_||!get(elements_.owner(element))||!elements_.remove(element))return false;
+        releasedSlot();return true;
     }
     // Room initialization (0x41363e): forward layer traversal, then the same
     // backward inactive-to-tail pass used after merging. Invoke once after
@@ -135,6 +139,8 @@ public:
         return get(layer)&&elements_.visitBackward(layer,visit);
     }
 private:
+    // Saturation avoids a wrapped revision making an ancient hint look valid.
+    void releasedSlot(){if(vacancyRevision_!=0xffffffffu)++vacancyRevision_;}
     void eraseEmpty(unsigned slot){unlink(slot);layers_[slot]=Layer{};}
     void unlink(unsigned slot){
         const auto& l=layers_[slot];
@@ -150,6 +156,7 @@ private:
     RunnerLayerElements<Capacity,Elements> elements_;
     unsigned head_=End,tail_=End;
     bool failed_=false;
+    std::uint32_t vacancyRevision_=0;
 };
 }
 #endif

@@ -17,7 +17,7 @@ public:
         for(auto& entry:entries_)entry=Entry{};
         for(auto& head:identityHead_)head=0;
         for(auto& next:identityNext_)next=0;
-        usedEnd_=0;
+        usedEnd_=0;freeCursor_=0;freeLayers_=nullptr;
         return true;
     }
     const Entry* get(unsigned element)const{return element<ElementCapacity&&entries_[element].present?&entries_[element]:nullptr;}
@@ -202,9 +202,16 @@ private:
         if(*link)*link=identityNext_[element];
         identityNext_[element]=0;
     }
-    unsigned free(const Layers& layers)const{
-        for(unsigned i=0;i<ElementCapacity;++i)
-            if(!entries_[i].present&&layers.elementOwner(i)==Layers::End)return i;
+    unsigned free(const Layers& layers){
+        // External non-instance owners may release slots below our cursor.
+        // No lower slot can become free without retirement/rebinding (which
+        // detaches it) or a registry reset, so an unchanged revision permits
+        // resuming the original lowest-free-slot scan exactly where it stopped.
+        if(freeLayers_!=&layers||freeRevision_!=layers.vacancyRevision()||freeRevision_==0xffffffffu){
+            freeCursor_=0;freeLayers_=&layers;freeRevision_=layers.vacancyRevision();
+        }
+        for(;freeCursor_<ElementCapacity;++freeCursor_)
+            if(!entries_[freeCursor_].present&&layers.elementOwner(freeCursor_)==Layers::End)return freeCursor_;
         return End;
     }
     Entry entries_[ElementCapacity?ElementCapacity:1]{};
@@ -214,6 +221,9 @@ private:
     // Source-ID search bound: slots below it may be holes or non-instance elements.
     // Allocation and painter order remain governed by the original scans/lists.
     unsigned usedEnd_=0;
+    const Layers* freeLayers_=nullptr;
+    unsigned freeCursor_=0;
+    std::uint32_t freeRevision_=0;
 };
 }
 #endif

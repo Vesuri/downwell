@@ -1,4 +1,5 @@
 #include "core/RunnerLayerInstances.h"
+#include "core/RunnerLayerAllocationVerification.h"
 #include "core/InstanceStore.h"
 #include "core/RunnerLayerIds.h"
 #include "core/RunnerLayerLifetimes.h"
@@ -17,6 +18,7 @@ std::vector<unsigned> ids(const Layers& layers,const Registry& registry,unsigned
     }),"bounded elements");return result;
 }
 void permutations(){
+    require(RunnerLayerAllocationVerification::run(8192),"mixed owner allocation equals full scan");
     // Compare the bounded lookups with a full-capacity oracle through sparse
     // mixed membership, retirement, slot reuse and complete room reset.
     {
