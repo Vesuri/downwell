@@ -179,6 +179,15 @@ static void checkCollisionViewMembership(const GameplayWorld& world){
             GameplayCollisionView::Record record;
             const InstanceHandle h{slot,generation};
             assert(view.contains(h)==view.resolve(h,record));
+            auto kind=GameplayCollisionView::Kind::debris;
+            InstanceHandle local{0xffffffffu,0xffffffffu};
+            const bool decoded=GameplayCollisionView::decode(h,kind,local);
+            assert(decoded==(slot<GameplayCollisionView::capacity&&generation!=0));
+            if(decoded){
+                InstanceHandle encoded;
+                assert(GameplayCollisionView::encode(kind,local,encoded));
+                assert(encoded.slot==h.slot&&encoded.generation==h.generation);
+            }else assert(kind==GameplayCollisionView::Kind::debris&&local.slot==0xffffffffu&&local.generation==0xffffffffu);
         }
     }
 }
