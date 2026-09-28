@@ -57,6 +57,23 @@ Therefore an ordinary smoke overlay is not a faithful replacement. Global draw
 ordering, sampling and surface ownership still need live verification; routing
 tests alone do not prove pixels.
 
+`objEnterDither` instead calls `drawOnSurface(global.surfaceFx)`. That script
+checks surface existence, then draws at world-minus-view coordinates without
+`scrInView`, death or low-spec guards. Its origin may be outside the viewport
+while its 800-pixel-high image overlaps it. Opaque black must replace covered
+surface pixels, not erase alpha or draw white. The source helper is pinned by
+`verify-runner-instance-ids.py`.
+
+`prepareWithSurfaceProducers` admits these separately supplied producers after
+the ordinary late effects and before shade subtraction. Normal drawFx families
+still require direct world drawing in death/low-spec mode; unconditional surface
+producers can coexist with that requirement. A missing surface skips enumeration,
+and failed enumeration discards partial composition. Synthetic pixel tests check
+offscreen origins, black replacement, transparent holes and these mode gates.
+This is the shared composition route, not admission of natural entry-dither
+births or its transformed source artwork. Native integration must preserve the
+immutable pointer-scrolled cover rather than rasterizing a full wipe each tick.
+
 Currency is also a `drawFx` producer, not an independent direct sprite in the
 normal path. `objCurrency_Draw_0` selects sprite 133/134 for small/large gems,
 updates its collision mask, and calls `drawFx` only when `dflash` is false.

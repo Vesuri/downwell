@@ -33,8 +33,20 @@ public:
     bool prepareWithLateEffects(Currency currency,const SmokeOwner& smoke,const EffectMaskAssets& assets,
                  const EffectSurfacePlacement::View& view,Settings settings,
                  LateEffects lateEffects,Shades shades,Raster raster){
+        return prepareWithSurfaceProducers(currency,smoke,assets,view,settings,
+            lateEffects,[](auto){return true;},shades,raster);
+    }
+
+    // Unconditional drawOnSurface producers after the supplied drawFx producers
+    // and before controller shade subtraction. Their origins may be outside
+    // the viewport (entry dither), and opaque black replaces earlier colors.
+    // Caller owns depth ordering and transforms; this accepts resolved assets.
+    template<class Currency,class SmokeOwner,class LateEffects,class SurfaceEffects,class Shades,class Raster>
+    bool prepareWithSurfaceProducers(Currency currency,const SmokeOwner& smoke,const EffectMaskAssets& assets,
+                 const EffectSurfacePlacement::View& view,Settings settings,
+                 LateEffects lateEffects,SurfaceEffects surfaceEffects,Shades shades,Raster raster){
         surface_.clear();visible_=false;direct_=settings.death||settings.lowSpec;
-        if(direct_ || !settings.effectsExist)return true;
+        if(!settings.effectsExist)return true;
         bool okay=true,added=false;
         auto add=[&](const EffectMaskAssets::Asset* asset,MotionBinary64 x,MotionBinary64 y){
             if(!okay)return;
@@ -44,16 +56,24 @@ public:
             okay=asset && stamp(*asset,draw.x,draw.y,false,raster);
             added|=okay;
         };
-        currency([&](bool large,unsigned frame,MotionBinary64 x,MotionBinary64 y){
-            add(assets.currency(large,frame),x,y);
-        });
-        smoke.visitNewest([&](std::uint32_t,const SmokeEffect& effect){
-            if(!effect.destroyRequested)add(assets.smoke(effect.drawFrame()),effect.x.promoted(),effect.y.promoted());
-        });
-        if(okay)okay=lateEffects([&](const EffectMaskAssets::Asset& asset,MotionBinary64 x,MotionBinary64 y){
-            add(&asset,x,y);return okay;
+        if(!direct_){
+            currency([&](bool large,unsigned frame,MotionBinary64 x,MotionBinary64 y){
+                add(assets.currency(large,frame),x,y);
+            });
+            smoke.visitNewest([&](std::uint32_t,const SmokeEffect& effect){
+                if(!effect.destroyRequested)add(assets.smoke(effect.drawFrame()),effect.x.promoted(),effect.y.promoted());
+            });
+            if(okay)okay=lateEffects([&](const EffectMaskAssets::Asset& asset,MotionBinary64 x,MotionBinary64 y){
+                add(&asset,x,y);return okay;
+            })&&okay;
+        }
+        if(okay)okay=surfaceEffects([&](const EffectMaskAssets::Asset& asset,MotionBinary64 x,MotionBinary64 y){
+            if(!okay)return false;
+            EffectSurfacePlacement::Draw draw;
+            okay=EffectSurfacePlacement::onSurface(x,y,view,true,draw)&&stamp(asset,draw.x,draw.y,false,raster);
+            added|=okay;return okay;
         })&&okay;
-        if(okay && added && settings.shadeExists && !settings.noControl){
+        if(okay && added && !settings.lowSpec && settings.shadeExists && !settings.noControl){
             shades([&](MotionBinary64 x,MotionBinary64 y){
                 if(!okay)return;
                 EffectSurfacePlacement::Draw draw;

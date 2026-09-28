@@ -168,6 +168,37 @@ int main(int argc,char**argv){
             [&](auto){assert(false);return false;},noShades,raster));
         assert(!colored.visible());
     }
+    // drawOnSurface must keep an offscreen origin whose bitmap overlaps the
+    // viewport. Black pixels cover prior effects; transparent pixels preserve them.
+    const std::uint8_t full[]={255,255},edge[]={0xaa,0x55},black[]={0,0};
+    const EffectMaskAssets::Asset whiteAsset{{full,2,16,1,2},0,0,full,black};
+    const EffectMaskAssets::Asset blackAsset{{edge,2,16,1,2},0,300,black,black};
+    smoke.clear();
+    auto emptyCurrency=[](auto){};
+    for(unsigned mode=0;mode<4;++mode){
+        SmokeComposition::Settings settings;
+        settings.death=mode==1;settings.lowSpec=mode==2;settings.effectsExist=mode!=3;
+        settings.shadeExists=false;
+        unsigned surfaceCalls=0;
+        auto ordinary=[&](auto emit){return emit(whiteAsset,number(80),number(1));};
+        auto cover=[&](auto emit){++surfaceCalls;return emit(blackAsset,number(80),number(301));};
+        assert(colored.prepareWithSurfaceProducers(emptyCurrency,smoke,assets,view,settings,
+            ordinary,cover,noShades,raster));
+        assert(surfaceCalls==(mode==3?0u:1u));
+        assert(colored.visible()==(mode!=3));
+        unsigned visited=0;
+        colored.surface().visit([&](unsigned x,unsigned y,std::uint16_t alpha,std::uint16_t lo,std::uint16_t hi){
+            ++visited;assert(x==80&&y==1&&hi==0);
+            assert(alpha==(mode==0?0xffff:0xaa55));
+            assert(lo==(mode==0?0x55aa:0));
+        });
+        assert(visited==(mode==3?0u:1u));
+    }
+    assert(!colored.prepareWithSurfaceProducers(emptyCurrency,smoke,assets,view,{},
+        [](auto){return true;},[&](auto emit){assert(emit(blackAsset,number(80),number(301)));return false;},
+        noShades,raster));
+    assert(!colored.visible());
+    colored.surface().visit([](auto,auto,auto,auto,auto){assert(false);});
     std::printf("Currency/smoke composition: %u joint color/shade frames match scalar painter\n",frames);
     std::printf("Smoke composition: %u lifecycle/flag/camera frames match scalar masks; direct=%u controller=%u hidden=%u\n",frames,directFrames,controllerFrames,hiddenFrames);
 }

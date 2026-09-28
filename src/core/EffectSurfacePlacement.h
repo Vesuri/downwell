@@ -69,6 +69,18 @@ struct EffectSurfacePlacement {
         }
         out=next;return true;
     }
+    // drawOnSurface: unlike drawFx, no origin visibility or death/lowSpec gate.
+    // A missing surface produces no draw, not a direct-render fallback.
+    static bool onSurface(MotionBinary64 x,MotionBinary64 y,const View& view,
+                          bool surfaceExists,Draw& out){
+        Draw next;
+        if(surfaceExists){
+            next.target=effects;
+            // VM computes the Y argument before X.
+            if(!relative(y,view.y,next.y)||!relative(x,view.x,next.x))return false;
+        }
+        out=next;return true;
+    }
     static bool enemyShade(MotionBinary64 x,MotionBinary64 y,const View& view,
                            bool lowSpec,bool noControl,bool surfaceExists,Draw& out) {
         Draw next;

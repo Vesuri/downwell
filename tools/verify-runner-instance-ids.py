@@ -86,4 +86,10 @@ for suffix, digest in {
 }.items():
     assembly("gml_Object_objEnterDither_" + suffix, digest)
 assert objects[73]["name"] == "objEnterDither" and objects[73]["spriteId"] == 129
+surface_draw = assembly("gml_GlobalScript_drawOnSurface",
+    "8b11cc827e9e620ebe4cd822370493a0211d3abd43ad8eb257304e3c1e0d5cde")
+assert "call.i surface_exists(argc=1)" in surface_draw
+assert "call.i draw_sprite_ext(argc=9)" in surface_draw
+assert "scrInView" not in surface_draw and "global.death" not in surface_draw and "global.lowSpec" not in surface_draw
+assert surface_draw.index("push.v self.y") < surface_draw.index("push.v self.x")
 print("Pinned rmMain's 240 walls/four controllers and player child-birth order; live allocation parity remains unverified")
