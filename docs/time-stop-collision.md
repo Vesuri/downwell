@@ -151,6 +151,23 @@ The transition helper's private coordinates and automatic player dispatch still
 need wiring; normal frame scheduling must not advance both record alarms and
 effect-owner alarms for the same lifetime.
 
+`GameplayTimeChangeRegistration` supplies an integer-only native record adapter
+for the same `TimeChangeEffects` lifecycle. Records retain exact binary32 birth
+coordinates, authoritative alarms, active/destroyed flags, a monotonic local
+generation and a separate original numeric ID. The enclosing world must provide
+resource-backed birth, mark-destroyed and retirement callbacks; birth must return
+a valid numeric ID. Zero, duplicate or out-of-range IDs fail rather than aliasing
+a local slot. Registered effects publish Create alarms before the pause callback.
+Global alarm dispatch imports the already-decremented record counters, and
+cleanup retires one marked lifetime without sweeping other object families.
+
+The host registration fixture checks these boundaries and stale slot reuse.
+Its `DOWNWELL_NATIVE_QUERY_PROBE` branch is freestanding and can be compiled with
+the Amiga compiler for 68000; this is not an emulator execution or a live-world
+integration claim. Native mixed-family membership, original global numeric-ID
+allocation, room teardown/re-entry and player transition wiring still need to
+attach this adapter before normal gameplay may create these instances.
+
 ## Shard registration contract
 
 The explicit registered-player-contact boundary uses the world's RNG and

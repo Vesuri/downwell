@@ -755,6 +755,15 @@ generated/time-stop-masks.json: tools/export-time-stop-masks.csx data/data.win
 
 test: verify-time-change-effects
 .PHONY: verify-time-change-effects
+test: verify-gameplay-time-change-registration
+.PHONY: verify-gameplay-time-change-registration
+verify-gameplay-time-change-registration: build/gameplay-time-change-registration-test
+	./build/gameplay-time-change-registration-test
+
+build/gameplay-time-change-registration-test: tests/core/GameplayTimeChangeRegistrationTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ tests/core/GameplayTimeChangeRegistrationTest.cpp
+
 verify-time-change-effects: build/time-change-effects-test
 	./build/time-change-effects-test
 
