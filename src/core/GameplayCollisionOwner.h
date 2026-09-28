@@ -36,7 +36,10 @@ private:
     Owner::Properties properties_[View::capacity]{};
     RunnerObjectFamilies<386> families_;
     const ObjectPack& objects_;
-    const SpriteCollisionPack& sprites_;
+    // The pinned original has 741 sprite descriptors. Decode once before
+    // any births/queries; keep preparation storage off the target task stack.
+    PackedSpriteCollision preparedSprites_[741];
+    SpriteCollisionPack sprites_;
     GameplayRoomLayers<View::capacity> layers_;
     ObjectDrawMetadata<386> drawMetadata_;
     ObjectAlarmMetadata<386> alarmMetadata_;
@@ -243,7 +246,7 @@ public:
         GameplayTerrainInstances::Presentation presentation={},GameplayTerrainInstances::WallCollision collision={},
         const RoomPack* rooms=nullptr):objects_(objects),sprites_(sprites),layers_(rooms),
         terrain_(GameplayTerrainInstances::Binding::bindDestruction(terrainBinding_),presentation,collision){
-        good_=sprites.valid()&&families_.bindInstanceFlags(objects)&&drawMetadata_.bind(objects)&&alarmMetadata_.bind(objects);
+        good_=sprites_.prepare(preparedSprites_,741)&&families_.bindInstanceFlags(objects)&&drawMetadata_.bind(objects)&&alarmMetadata_.bind(objects);
         if(good_)for(unsigned selector=0;selector<2;++selector){
             terrainFamilies_[selector]=true;
             for(unsigned i=0;i<families_.size();++i)

@@ -41,12 +41,34 @@ int main() {
     std::vector<unsigned char> bytes{std::istreambuf_iterator<char>(file),{}};
     downwell::SpriteCollisionPack pack(bytes.data(),bytes.size());
     require(pack.valid(),"original collision pack validates");
+    auto prepared=pack;
+    std::vector<downwell::PackedSpriteCollision> descriptors(pack.spriteCount());
+    require(!prepared.prepare(nullptr,descriptors.size())&&
+            !prepared.prepare(descriptors.data(),descriptors.size()-1)&&
+            prepared.prepare(descriptors.data(),descriptors.size()),
+        "preparation requires complete caller-owned storage");
+    const auto copiedPrepared=prepared;
     for(std::uint32_t id=0;id<pack.spriteCount();++id){
         downwell::PackedSpriteCollision resource;
         std::uint32_t frames=0xffffffffu;
         require(pack.sprite(id,resource)&&pack.frameCount(id,frames)&&frames==resource.frameCount,
             "direct frame count agrees with complete decoding for every original sprite");
+        downwell::PackedSpriteCollision native;
+        require(copiedPrepared.sprite(id,native)&&
+            native.originX==resource.originX&&native.originY==resource.originY&&
+            native.marginLeft==resource.marginLeft&&native.marginTop==resource.marginTop&&
+            native.marginRight==resource.marginRight&&native.marginBottom==resource.marginBottom&&
+            native.collisionMode==resource.collisionMode&&native.collisionMaskCount==resource.collisionMaskCount&&
+            native.frameCount==resource.frameCount&&copiedPrepared.frameCount(id,frames)&&frames==resource.frameCount,
+            "prepared descriptors and copied views preserve every original field");
     }
+    require(!prepared.prepare(nullptr,0),"failed reprepare leaves the existing view usable");
+    downwell::PackedSpriteCollision missing{};
+    require(!prepared.sprite(pack.spriteCount(),missing)&&
+            !prepared.collisionSprite(31,0x7fffffff,missing)&&
+            !prepared.collisionSprite(-1,-1,missing)&&
+            prepared.collisionSprite(31,-1,missing),
+        "prepared view retains missing-mask versus sprite-fallback behavior");
     std::uint32_t untouched=123;
     require(!pack.frameCount(pack.spriteCount(),untouched)&&untouched==123&&
             !pack.frameCount(0xffffffffu,untouched)&&untouched==123&&

@@ -71,6 +71,17 @@ geometry. The caller still owns resource-kind support, source trigonometry and
 the integer-rounding policy. Zero (including negative zero) angle bypasses trig;
 fractional compatibility-off geometry bypasses integer rounding.
 
+The shared `GameplayCollisionOwner` prepares all 741 immutable sprite
+descriptors at construction, before accepting any instance births. The packed
+`SpriteCollisionPack` decoder remains the reference and is also usable without
+preparation. Its prepared view borrows an owner-resident native-endian table
+(26,676 bytes of descriptor payload), outside the Amiga task stack. Copies of
+that view borrow the same table; its storage must remain immutable and alive.
+Preparation changes no resource IDs, RNG state, instance visibility, bounds
+publication or Create ordering. Insufficient preparation capacity fails owner
+initialization instead of silently preparing only some resources. Collision
+queries and sprite setters use this same prepared view on both backends.
+
 The sprite-pack gate exercises this adapter across all 741 recovered metadata
 records and checks owner flags/cache publication against the full artwork
 metadata view. It also covers mask overrides, missing-resource retirement,
