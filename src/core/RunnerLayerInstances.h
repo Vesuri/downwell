@@ -47,6 +47,7 @@ public:
     }
     bool attach(Layers& layers,unsigned layer,std::uint32_t sourceId,InstanceHandle h,
         RunnerDepthService::Instance& state,bool inactive){
+        DW_PROFILE_SCOPE(profileLayerAttach);
         if(!h.generation||h.slot==0xffffffffu||state.attached||find(h)!=End||!layers.succeeded())return false;
         const auto* destination=layers.get(layer);if(!destination)return false;
         unsigned element=find(sourceId);const bool reused=element!=End;
@@ -149,6 +150,7 @@ public:
     template<class CreateLayer>
     bool attachRoomFallback(Layers& layers,std::uint32_t sourceId,InstanceHandle h,
         RunnerDepthService::Instance& state,bool inactive,CreateLayer create){
+        DW_PROFILE_SCOPE(profileLayerResolve);
         if(!layers.succeeded())return false;
         if(state.attached)return true;
         unsigned layer=state.layerId==-1?Layers::End:layers.find(state.layerId);
@@ -209,6 +211,7 @@ private:
         identityNext_[element]=0;
     }
     unsigned free(const Layers& layers){
+        DW_PROFILE_SCOPE(profileLayerAllocate);
         // External non-instance owners may release slots below our cursor.
         // No lower slot can become free without retirement/rebinding (which
         // detaches it) or a registry reset, so an unchanged revision permits

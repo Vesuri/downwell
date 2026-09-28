@@ -34,6 +34,7 @@ public:
     }
 private:
     bool adoptState(const State& state){
+        DW_PROFILE_SCOPE(profileLayerAdopt);
         const auto h=state.handle;
         if(!succeeded()||h.slot>=I||!h.generation||states_[h.slot].handle.generation||
             !RunnerSpatialSplit::valid(state.depth.depth))return fail();

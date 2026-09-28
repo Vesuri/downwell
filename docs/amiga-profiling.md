@@ -89,6 +89,17 @@ effect creation excludes instance birth, and instance birth excludes nested
 bounds and layer attachment. Bounds refresh also runs outside births. Sum the
 relevant nested phases when comparing older caller totals; phase 86 alone is
 not the total cost of an effect. Normal and FPS-only builds omit these probes.
+
+Layer registration is further separated into lifetime adoption (119), fallback
+depth/layer resolution (120), element attachment (121), and free-slot allocation
+(122). Nested times are excluded from their enclosing scopes, including 85;
+do not add an enclosing scope's call count to its child count as though they
+were separate births. These probes also cover the corresponding operations at
+room initialization when that work occurs inside a measured frame. Numeric-ID
+lookup only applies to numbered lifetimes: generated terrain currently has zero
+source IDs, unlike authored room terrain. A faster numeric-ID search therefore
+does not imply faster generated-terrain registration.
+
 Phases 87 (sprite bounds geometry) and 88 (bounds-cache update and spatial-index
 publication) further split refresh. Publication includes the source no-resource
 branch, which updates the cache without inserting into the index. When nested
