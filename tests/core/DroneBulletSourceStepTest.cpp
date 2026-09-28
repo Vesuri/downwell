@@ -20,6 +20,7 @@ struct Scalar {
 static double snap(float value){double integral;const float fraction=float(std::modf(double(value),&integral));return std::abs(fraction)<0.0001f?integral:double(value);}
 int main(){
     assert(DroneBulletVerification::run());
+    assert(DroneBulletVerification::lifetime(1)&&DroneBulletVerification::lifetime(2));
     assert(DroneBulletSolidVerification::run(true));
     unsigned steps=0;
     for(int degrees:{0,45,90,180,270,359})for(unsigned alarm:{0u,1u,16u}){

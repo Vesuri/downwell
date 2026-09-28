@@ -3,6 +3,8 @@
 #include "MachineGunSourceMotion.h"
 #include "RunnerRealComparison.h"
 #include "BulletSolidScript.h"
+#include "AlarmBank.h"
+#include "UnitSequenceFrames.h"
 namespace downwell {
 // Object 266 (also spawned by Gunpowder Blocks), not bulletExplosion.
 // Shared event arithmetic; room identity, inherited hit-memory storage,
@@ -13,6 +15,7 @@ struct DroneBulletSourceStep {
     MotionBinary64 damage=MotionBinary64::fromInteger(4),spread{};
     MotionBinary64 decline{0x3fe99999u,0x9999999au}; // source double 0.8
     RunnerImageValue imageSpeed{};
+    RunnerImageValue timeline{},imageIndex{};
     bool decelerate=false,animation=false;
     int alarm0=16;
     static constexpr int objectId=266,spriteId=459,hitWallFx=101;
@@ -22,7 +25,23 @@ struct DroneBulletSourceStep {
         *this=next;return true;
     }
     void alarmZero(){decelerate=true;}
+    // Called only for an eligible existing instance in the runner alarm pass.
+    // Birth during ordinary Step must not receive this frame's earlier alarm.
+    void advanceAlarm(){if(AlarmBank::advanceValue(alarm0))alarmZero();}
     bool drawable()const{return motion.initialized;}
+    unsigned drawFrame()const{
+        const unsigned exponent=(imageIndex.bits>>23)&255u;
+        return exponent<127?0:((imageIndex.bits&0x7fffffu)|0x800000u)>>(150u-exponent);
+    }
+    // The owner applies active-room/cutoff/destroyed eligibility before this
+    // animation-phase call. Publish the wrapped index before Other 7 runs.
+    template<class Ops> bool advanceAnimation(Ops& ops,bool& good){
+        if(!good)return false;
+        bool crossed=false;
+        if(!UnitSequenceFrames::advance(timeline,imageSpeed,6,imageIndex,crossed)||
+           !ops.publishImageIndex(imageIndex)||!good)return good=false;
+        return crossed?animationEnd(ops,good):true;
+    }
     // World adapter: use the same solid script as the usual gun, with this
     // object's Create defaults and the caller's current damage/direction.
     // The lower-level step callback remains useful for arithmetic fixtures.

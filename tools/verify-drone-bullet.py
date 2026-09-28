@@ -12,6 +12,8 @@ assert manifest["extractor"]["version"] == "0.9.2.0"
 assert manifest["extractor"]["commit"] == "03c7048438347799e0717b6e57a9358d000472e0"
 obj = manifest["resources"]["objects"][266]
 assert (obj["name"], obj["parentId"], obj["spriteId"]) == ("bulletDrone", 89, 458)
+sprite = manifest["resources"]["sprites"][459]
+assert len(sprite["frames"]) == 6 and (sprite["originX"], sprite["originY"]) == (8, 8)
 events = {
     "Create_0": (2268, "4a73ce9a102aa1f6e41253d42c694db83ca59256c1905c484f236a23bc2f8576"),
     "Alarm_0": (2269, "5fe9821f231d7373f71f2df0f42a481f744b4a2d5a482fb3eac90ca460b6f600"),

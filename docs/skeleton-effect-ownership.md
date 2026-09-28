@@ -129,6 +129,18 @@ damage 4 and the box's override to 20, along with every callback failure prefix.
 The native tape runs those same successful routes. This does not supply the
 remaining resource-backed selectors or register live drone instances.
 
+The drone state also exposes the existing-instance alarm and animation passes.
+Alarm 0 advances from 16 to 0, enables deceleration, then retires to -1 without
+refiring. The six-key sprite 459 uses a zero-speed initial timeline; after Step
+enables speed 0.5 it advances in the following frame's animation pass. For a
+birth during ordinary Step, the controlled tape decelerates at relative tick
+16, enables animation at tick 19 and wraps/requests destruction at tick 31,
+before that tick's alarms or Step. The wrapped index is published before the
+animation-end callback. Failed publication cannot invoke destruction, and a
+failed destruction callback cannot be retried by continuing the same tape.
+Owners must still supply active-room, birth-cutoff and destruction eligibility;
+the standalone state does not invent a separate family-wide scheduling pass.
+
 The final box `alarmStop(0)` adapter also resolves its caller again after the
 time-bound query. A callback which retires the caller cannot publish into its
 old storage, and a nested ownership failure remains terminal even if the

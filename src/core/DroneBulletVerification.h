@@ -20,7 +20,45 @@ struct DroneBulletVerification {
         bool bulletOutOfView(){++bulletOutCalls;return outCalls==1&&call();}
         bool destroySelf(){++kills;destroyed=true;return call();}
     };
+    static bool lifetime(unsigned failure=0){
+        struct LifetimeOps:Ops {
+            unsigned images=0,failure=0;
+            bool solid(DroneBulletSourceStep&){++solids;return call();}
+            bool publishImageIndex(RunnerImageValue index){
+                ++images;
+                // Tick 31 wraps six frames at speed 0.5 back to zero.
+                if(images==31&&index.bits)return false;
+                return !(images==31&&failure==1);
+            }
+            bool destroySelf(){++kills;destroyed=true;return failure!=2;}
+        } ops;
+        ops.failure=failure;
+        DroneBulletSourceStep shot;Random random;bool good=true;
+        if(!shot.reset(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(512)))return false;
+        shot.motion.direction=MotionBinary64::fromInteger(90);shot.damage=MotionBinary64::fromInteger(20);
+        // Synchronous birth after this frame's animation/alarm passes, then
+        // object-266 Step in the same frame. No synthetic early alarm tick.
+        if(!shot.step(random,ops,good)||shot.alarm0!=16||shot.drawFrame()!=0)return false;
+        for(unsigned tick=1;tick<=31;++tick){
+            const bool advanced=shot.advanceAnimation(ops,good);
+            if(tick==31){
+                if(advanced!=(failure==0)||good!=(failure==0)||shot.imageIndex.bits||shot.timeline.bits||
+                    ops.kills!=(failure==1?0u:1u)||ops.solids!=31||random.draws!=1)return false;
+                if(failure&&(shot.advanceAnimation(ops,good)||ops.images!=31||
+                    shot.step(random,ops,good)||ops.solids!=31))return false;
+                return true;
+            }
+            if(!advanced||!good||ops.destroyed)return false;
+            const unsigned expectedFrame=tick<20?0:(tick-19)/2;
+            if(shot.drawFrame()!=expectedFrame)return false;
+            shot.advanceAlarm();
+            if(shot.alarm0!=(tick<16?int(16-tick):tick==16?0:-1)||shot.decelerate!=(tick>=16)||
+               !shot.step(random,ops,good)||shot.animation!=(tick>=19))return false;
+        }
+        return false;
+    }
     static bool run(){
+        if(!lifetime())return false;
         DroneBulletSourceStep shot;Random random;Ops ops;bool good=true;
         if(!shot.reset(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(512))||
             shot.drawable()||shot.alarm0!=16||shot.imageSpeed.bits||shot.animation)return false;
