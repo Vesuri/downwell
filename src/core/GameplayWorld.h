@@ -540,6 +540,9 @@ public:
         if(bulletSlotEnd_||!run_.effectsSucceeded)return false;bulletLifecycle_=binding;return true;
     }
     bool retireMarkedBullet(downwell::InstanceHandle h);
+    // Destruction is visible to collision queries immediately, but the
+    // executing record remains resolvable until room cleanup.
+    bool markBulletDestroyed(downwell::InstanceHandle h);
     const BulletState* findBullet(std::uint32_t lifetimeId) const {
         if(lifetimeId)for(unsigned i=0;i<bulletSlotEnd_;++i)
             if(bullets_[i].active && bullets_[i].lifetimeId==lifetimeId)return &bullets_[i];

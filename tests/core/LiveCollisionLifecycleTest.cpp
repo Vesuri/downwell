@@ -202,6 +202,25 @@ int main(){
     {
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach marked-projectile publication world");world->skipToGameForTesting();
+        for(unsigned tick=0;tick<1000&&!world->mainBulletCount();++tick)
+            world->step(gameplayContactProfileInput(tick,world->mainPlayerX(),world->mainPlayerY()),false);
+        require(world->effectsSucceeded()&&world->mainBulletCount(),"emit a real projectile for destruction publication");
+        const auto key=world->mainBulletAt(0).instance;
+        require(world->markBulletDestroyed(key)&&world->markBulletDestroyed(key)&&owner->resolve(key),
+            "repeated destruction requests retain the executing projectile identity");
+        RunnerImageValue x,y,actualX,actualY;
+        require(x.assign(MotionBinary64::fromInteger(240))&&y.assign(MotionBinary64::fromInteger(500))&&
+            world->publishCollisionPosition(key,x,y)&&owner->collisionPosition(key,actualX,actualY)&&
+            actualX.bits==x.bits&&actualY.bits==y.bits&&owner->resolve(key)->destroyRequested,
+            "Step-tail position setters publish through a real owner after destruction without resurrection");
+        auto stale=key;++stale.generation;
+        require(!world->markBulletDestroyed(stale)&&!world->effectsSucceeded(),
+            "stale projectile destruction latches failure");
+    }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
         require(owner->attach(*world),"attach projectile ownership world");world->skipToGameForTesting();
         std::vector<InstanceHandle> previous;unsigned births=0,retirements=0;
         for(unsigned tick=0;tick<1800;++tick){

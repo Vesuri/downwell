@@ -370,6 +370,13 @@ bool GameplayWorld::retireMarkedBullet(downwell::InstanceHandle h){
     if(!run_.effectsSucceeded||!bullet||!bullet->destroyRequested)return run_.effectsSucceeded=false;
     return retireBulletOwnership(*bullet);
 }
+bool GameplayWorld::markBulletDestroyed(downwell::InstanceHandle h){
+    auto* bullet=const_cast<BulletState*>(resolveBulletLifetime(h));
+    if(!run_.effectsSucceeded||!bullet)return run_.effectsSucceeded=false;
+    if(bullet->destroyRequested)return true;
+    if(!bulletLifecycle_.markDestroyed(h,*bullet))return run_.effectsSucceeded=false;
+    bullet->destroyRequested=true;bullet->active=false;return true;
+}
 
 bool GameplayWorld::configureEnemy(unsigned index, int objectId,
                                       int spriteId, int x, int y,
@@ -1091,8 +1098,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             if(!alive){
                 const downwell::InstanceHandle h{bullet.identitySlot,bullet.lifetimeId};
                 if(bulletLifecycle_.hasOwner()){
-                    if(!bulletLifecycle_.markDestroyed(h,bullet)){run_.effectsSucceeded=false;return {};}
-                    bullet.destroyRequested=true;bullet.active=false;
+                    if(!markBulletDestroyed(h))return {};
                 }else if(!retireBulletOwnership(bullet))return {};
             }
         }

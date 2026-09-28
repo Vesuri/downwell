@@ -841,6 +841,14 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         require(runtime.mainBulletAt(0).animation.index.bits==0,
                 "a Begin Step birth misses the earlier animation traversal and retains Create frame zero");
         {
+            auto marked=runtime.replay();const auto key=marked->mainBulletAt(0).instance;
+            require(marked->markBulletDestroyed(key)&&marked->markBulletDestroyed(key),
+                    "projectile destruction can be requested twice without retiring the executing record");
+            const auto* record=marked->resolveInstance(key);
+            require(record&&record->destroyRequested&&record->objectId==261,
+                    "marked projectile remains resolvable for the Step tail");
+        }
+        {
             // Isolate projectile/block coverage from later randomized layout.
             // Replay into an independent heap owner and use a real room instance;
             // original resources and the main input trajectory stay untouched.

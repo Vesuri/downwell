@@ -148,6 +148,14 @@ position/angle publication, destruction request and event scheduling are still
 fixture callbacks. Shootable, stone-impact, audio, rendering and full shared
 RNG ordering are not established by this case.
 
+Both live worlds route ordinary shot-consumption through `markBulletDestroyed`.
+This handle-based operation publishes the collision exclusion once, retains the
+record until cleanup, accepts repeated requests and rejects stale generations.
+The stored-world integration test also publishes coordinates through the real
+collision owner after marking destruction. This supplies the destruction-request
+boundary needed by the recovered Step; it does not change when the approximate
+gun path currently requests destruction or complete its source scheduling.
+
 ## Collision lookup boundaries
 
 `verify-runner-line-point.py` pins the reviewed registrations, wrappers and

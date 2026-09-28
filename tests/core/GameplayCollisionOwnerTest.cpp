@@ -238,6 +238,19 @@ static void checkEnemySlotDirectory(const ObjectPack& objects,const SpriteCollis
     assert(!world->findEnemy(dormant)&&world->resolveEnemyLifetime(dormant)==&overwritten);
 }
 int main(){
+    {
+        auto world=std::make_unique<GameplayWorld>(300,false,1000,false);
+        BulletAudit audit{world.get()};
+        assert(world->bindBulletLifecycle(GameplayWorld::BulletLifecycleBinding::bindMaskDestruction(audit)));
+        world->step(4);assert(world->effectsSucceeded()&&world->bulletCount()==1);
+        const auto& shot=world->bulletAt(0);const InstanceHandle key{shot.identitySlot,shot.lifetimeId};
+        assert(world->markBulletDestroyed(key)&&audit.last==6);
+        const auto* retained=world->resolveBulletLifetime(key);
+        assert(retained&&retained->destroyRequested&&!retained->active);
+        audit.last=0;assert(world->markBulletDestroyed(key)&&audit.last==0);
+        assert(world->retireMarkedBullet(key)&&audit.last==7&&!world->resolveBulletLifetime(key));
+        assert(!world->markBulletDestroyed(key)&&!world->effectsSucceeded()&&audit.last==7);
+    }
     for(unsigned failure=1;failure<=7;++failure){
         auto world=std::make_unique<GameplayWorld>(300,false,1000,false);
         BulletAudit audit{world.get(),failure};

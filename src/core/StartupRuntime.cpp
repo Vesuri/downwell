@@ -826,10 +826,7 @@ void StartupRuntime::updateMainBullets() {
           });
         if(succeeded&&!publishMainBullet(bullet,false))succeeded=run_.effectsSucceeded=false;
         if(succeeded&&!alive&&bullet.instance.generation){
-            auto* record=instances_.resolve(bullet.instance);
-            if(!record||(lifecycle_.hasOwner()&&!lifecycle_.markDestroyed(bullet.instance,*record)))
-                succeeded=run_.effectsSucceeded=false;
-            else record->destroyRequested=true;
+            succeeded=markBulletDestroyed(bullet.instance);
         }
         if(!succeeded){
             // Keep the failed shot's completed initialization and all untouched

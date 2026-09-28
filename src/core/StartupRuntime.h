@@ -181,6 +181,13 @@ public:
         if(!run_.effectsSucceeded||!r||r->objectId!=92)return run_.effectsSucceeded=false;
         r->box.hit=true;return true;
     }
+    bool markBulletDestroyed(InstanceHandle h){
+        auto* r=instances_.resolve(h);
+        if(!run_.effectsSucceeded||!r||r->objectId!=261)return run_.effectsSucceeded=false;
+        if(r->destroyRequested)return true;
+        if(lifecycle_.hasOwner()&&!lifecycle_.markDestroyed(h,*r))return run_.effectsSucceeded=false;
+        r->destroyRequested=true;return true;
+    }
     InstanceHandle instanceHandleAt(std::size_t index)const{return instances_.handleAt(index);}
     bool publishWallImage(InstanceHandle h,int frame){
         auto* r=instances_.resolve(h);
