@@ -224,7 +224,7 @@ Reference: [upgrade IDs and source entry points](upgrade-coverage.md).
 - Profile generation CPU costs without changing RNG consumption or synchronous
   Create ordering. Shop and exit Create effects must precede the next pattern
   cell's random draw; spreading generation over frames is not behavior-neutral.
-  Remove repeated resource/bounds work and element-allocation scans, and reduce
+  Remove repeated resource/bounds work, and reduce
   spatial-index construction costs while preserving exact collision traversal.
   Require longer gameplay tapes that reach generation bursts; early-room average
   FPS is not evidence that later level population meets the frame budget.

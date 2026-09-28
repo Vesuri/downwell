@@ -25,7 +25,7 @@ public:
             destination->id!=std::int32_t(source.layerId))return false;
         unsigned record=0;while(record<Capacity&&entries_[record].element!=E)++record;
         if(record==Capacity)return false;
-        unsigned element=0;while(element<E&&layers.elementOwner(element)!=Layers::End)++element;
+        const unsigned element=layers.firstFreeElement();
         if(element==E)return false;
         RunnerLayerBackground background;
         if(!RunnerLayerBackground::create(source,background)||

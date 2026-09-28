@@ -257,6 +257,25 @@ void testBackgroundDraw(){
 }
 
 void testBackgroundOwner(){
+    // Backgrounds and instance reservations must select the same lowest free
+    // element across bitmap word/summary boundaries, not their own payload slot.
+    for(unsigned gap:{0u,31u,32u,1023u,1024u,3322u}){
+        downwell::RunnerLayers<1,3323> mixed;
+        downwell::RunnerLayerBackgrounds<1,3323,1> owner;
+        unsigned layer=1;
+        require(mixed.insertAfterEquals(17,0,false,layer),"sparse mixed layer");
+        for(unsigned i=0;i<3323;++i)if(i!=gap)
+            require(mixed.attach(layer,i,true,true,[](unsigned){return false;}),"occupy other-owner slot");
+        downwell::PackedRoomLayer source{};
+        source.type=1;source.layerId=17;source.backgroundSpriteId=-1;
+        source.backgroundColor=0xff000000u;source.backgroundFlags=1;
+        auto inactive=[](unsigned){return false;};
+        require(owner.create(mixed,layer,source,inactive)&&owner.get(gap)&&
+            mixed.firstFreeElement()==3323,"background takes sole free shared element");
+        require(owner.retire(mixed,gap)&&mixed.firstFreeElement()==gap,
+            "background retirement republishes shared vacancy");
+        require(owner.create(mixed,layer,source,inactive)&&owner.get(gap),"background reuses same element");
+    }
     using Registry=downwell::RunnerLayerInstances<2,4>;
     Registry registry;Registry::Layers layers;
     downwell::RunnerLayerBackgrounds<2,4,1> backgrounds;
