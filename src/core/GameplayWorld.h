@@ -208,6 +208,9 @@ public:
         bool active=true;
         std::uint32_t lifetimeId=0;
         int scaleX=1;
+        // Serialized room identity, independent of the reusable native slot.
+        // Zero until the resource-backed room handoff reaches the player.
+        std::uint32_t sourceInstanceId=0;
     };
     using PlayerLifecycleBinding = downwell::RecordLifecycleBinding<PlayerInstance>;
     explicit GameplayWorld(unsigned initialRingOrigin,
@@ -360,6 +363,17 @@ public:
         for(unsigned i=0;i<room.instanceCount;++i){
             downwell::PackedRoomInstance instance;
             if(!rooms.roomInstance(room,i,instance)){run_.effectsSucceeded=false;return false;}
+            if(instance.objectId==35){
+                // The native scheduler currently births its player before this
+                // handoff. Retain the authored identity here without replaying
+                // Create or inventing a numeric ID from its lifetime handle.
+                // Full serialized cross-family birth ordering is still required.
+                if(!instance.instanceId||!playerInstance_.lifetimeId||playerInstance_.sourceInstanceId){
+                    run_.effectsSucceeded=false;return false;
+                }
+                playerInstance_.sourceInstanceId=instance.instanceId;
+                continue;
+            }
             if(instance.objectId!=60&&instance.objectId!=93&&instance.objectId!=99)continue;
             if(!terrain(instance)||(terrainInstances_&&(!terrainInstances_->appendRoom(instance)||
                 !terrainInstances_->createProperties(terrainInstances_->handle(terrainInstances_->size()-1),

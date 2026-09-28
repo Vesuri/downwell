@@ -1044,9 +1044,19 @@ int main(){
         auto roomWorld=std::make_unique<GameplayWorld>(300,true,0,false,roomOwner->enemyBinding(),
             roomOwner->breakableBinding(),roomOwner->playerBinding(),&roomOwner->terrain());
         assert(roomOwner->attach(*roomWorld));
+        const auto oldPlayer=roomWorld->playerHandle();
+        assert(roomWorld->findPlayer(oldPlayer)&&roomWorld->findPlayer(oldPlayer)->sourceInstanceId==0);
         unsigned calls=0,codes=0;
         assert(roomWorld->loadRoomTerrain(rooms,room,[&](const PackedRoomInstance& r){++calls;codes+=r.creationCodeId!=-1;return true;}));
         assert(calls==240&&codes==3&&roomOwner->terrain().size()==240);
+        unsigned authoredPlayers=0;
+        for(unsigned i=0;i<room.instanceCount;++i){
+            PackedRoomInstance r;assert(rooms.roomInstance(room,i,r));
+            if(r.objectId!=35)continue;
+            ++authoredPlayers;
+            assert(r.instanceId==100855&&roomWorld->findPlayer(oldPlayer)->sourceInstanceId==r.instanceId);
+        }
+        assert(authoredPlayers==1);
         unsigned ordinal=0;
         for(unsigned i=0;i<room.instanceCount;++i){
             PackedRoomInstance r;assert(rooms.roomInstance(room,i,r));
@@ -1065,7 +1075,11 @@ int main(){
         const auto old=roomOwner->terrain().handle(0);
         assert(roomWorld->restartFromResults(DeathMenuSequence::Action::Retry,42,300)!=ResultsDestination::none);
         assert(roomOwner->terrain().size()==0&&!roomOwner->terrain().find(old));
+        const auto newPlayer=roomWorld->playerHandle();
+        assert(newPlayer.generation>oldPlayer.generation&&!roomWorld->findPlayer(oldPlayer)&&
+            roomWorld->findPlayer(newPlayer)->sourceInstanceId==0);
         assert(roomWorld->loadRoomTerrain(rooms,room,[](const auto&){return true;}));
+        assert(roomWorld->findPlayer(newPlayer)->sourceInstanceId==100855&&!roomWorld->findPlayer(oldPlayer));
         assert(roomOwner->terrain().size()==240&&roomOwner->terrain().handle(0).generation>old.generation);
         assert(!roomWorld->loadRoomTerrain(rooms,room,[&](const auto&){++calls;return true;})&&calls==240);
         assert(!roomWorld->effectsSucceeded()&&roomOwner->terrain().size()==240);
