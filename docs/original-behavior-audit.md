@@ -34,8 +34,14 @@ publish the view, so substituting camera.y minus half the viewport height
 for that getter is not justified by these events. Neither a dummy ID nor a
 generic overlay reproduces this controller.
 
-The stored adapter currently queues only 66/64 in player Create, omitting 73
-and the full initializer's child births. Native terrain loading retains the
+The stored adapter synchronously creates 66/64 inside player Create, completing
+each child's PreCreate/Create before the next birth and before the next authored
+room instance. It passes the parent's destination room, not the still-current
+old room, to the shared allocator. A rejected child birth retains the allocated
+prefix, prevents later room births and latches failure. Menu/main-room tests
+check child adjacency, destination ownership, numeric IDs and both child-failure
+boundaries. It still omits 73 and the full initializer's child births, along
+with scrSpawnCamera's caller assignments. Native terrain loading retains the
 authored player/wall IDs but is not complete cross-family room creation.
 Consequently, explicit-ID time-change tests do not establish the natural
 global ID stream. This source check also does not prove original runner room

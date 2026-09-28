@@ -47,6 +47,25 @@ void verifyLiveLayers(const downwell::StartupRuntime& runtime){
     }
 }
 
+void verifyPlayerChildren(const downwell::StartupRuntime& runtime,int room){
+    bool found=false;
+    for(std::size_t i=0;i<runtime.activeInstanceCount();++i){
+        const auto& player=runtime.instanceAt(i);
+        if(player.objectId!=35)continue;
+        require(!found&&i+2<runtime.activeInstanceCount(),"player owns synchronous child prefix");
+        found=true;
+        const auto& meter=runtime.instanceAt(i+1);
+        const auto& camera=runtime.instanceAt(i+2);
+        require(meter.objectId==66&&camera.objectId==64,
+                "depth meter and camera are born before the next authored room instance");
+        require(meter.roomId==room&&camera.roomId==room,
+                "synchronous children belong to destination room, not previous room");
+        require(camera.instanceId==meter.instanceId+1,
+                "child births share the original numeric allocator");
+    }
+    require(found,"room contains a player for synchronous birth test");
+}
+
 // Test branches reconstruct independent owners from identical resources and
 // inputs. Copying a runtime would alias borrowed lifecycle/registration state.
 class ReplayRuntime:public downwell::StartupRuntime {
@@ -94,6 +113,8 @@ struct LifecycleAudit {
     bool rejectBoxRemoval=false;
     bool rejectBatScale=false;
     bool rejectBatMask=false;
+    int rejectBirthObject=-1;
+    int rejectBirthRoom=-1;
     unsigned masks=0;
     bool mask(downwell::InstanceHandle h,const downwell::InstanceRecord& r,int next){
         ++calls;require(matches(h,r)&&r.active&&r.objectId==116&&r.batActivity.flying&&next==r.spriteId,
@@ -155,7 +176,7 @@ struct LifecycleAudit {
         return h.slot<entries.size()&&entries[h.slot].live&&entries[h.slot].generation==h.generation&&entries[h.slot].id==r.instanceId;
     }
     bool birth(downwell::InstanceHandle h,const downwell::InstanceRecord& r){
-        ++calls;if(fail==1)return false;
+        ++calls;if(fail==1||(r.objectId==rejectBirthObject&&r.roomId==rejectBirthRoom))return false;
         require(h.slot<entries.size()&&!entries[h.slot].live&&h.generation>entries[h.slot].generation,
                 "live runtime publishes births before reusing generation-checked slots");
         entries[h.slot]={h.generation,r.instanceId,true};++births;return true;
@@ -196,6 +217,25 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
                        const downwell::BuilderPatternPack& patterns){
     using Runtime=downwell::StartupRuntime;
     const auto healthy=[](const Runtime& r){return r.effectsSucceeded()&&r.roomLoadSucceeded()&&r.deferredCommandsSucceeded();};
+    for(int rejectedObject:{66,64}){
+        LifecycleAudit failure;failure.rejectBirthObject=rejectedObject;failure.rejectBirthRoom=11;
+        auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            downwell::InstanceLifecycleBinding::bindMaskDestruction(failure));
+        runtime->skipToGameForTesting();
+        require(!healthy(*runtime),"synchronous player-child birth failure stops room entry");
+        require(runtime->hasInstance(100855)&&!runtime->hasInstance(100854),
+                "failed child retains parent but prevents the next authored controller birth");
+        bool meter=false,camera=false;
+        for(std::size_t i=0;i<runtime->activeInstanceCount();++i){
+            meter|=runtime->instanceAt(i).objectId==66;
+            camera|=runtime->instanceAt(i).objectId==64;
+        }
+        require(meter&&camera==(rejectedObject==64),
+                "failure retains its allocated child and does not execute later child births");
+        const auto calls=failure.calls;const auto tick=runtime->tick();
+        runtime->step(false);
+        require(failure.calls==calls&&runtime->tick()==tick,"failed child creation is not retried");
+    }
     LifecycleAudit audit;
     auto indexed=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
         downwell::InstanceLifecycleBinding::bindMaskDestruction(audit));
@@ -671,6 +711,7 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         require(runtime.instance(105188) != nullptr &&
                     runtime.instance(105188)->objectId == 64,
                 "player Create spawns camMain second");
+        verifyPlayerChildren(runtime,20);
         const downwell::InstanceRecord* title = runtime.instance(105193);
         require(title != nullptr && title->objectId == 317 &&
                     title->x == 328 && title->y == 432 &&
@@ -785,6 +826,7 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         verifyLiveLayers(runtime);
         require(runtime.hasInstance(100855),
                 "rmMain creates its authoritative player instance");
+        verifyPlayerChildren(runtime,11);
         require(runtime.mainPlayerX() == 240.0F &&
                     runtime.mainPlayerY() == 176.0F,
                 "rmMain initializes player motion from the recovered spawn");

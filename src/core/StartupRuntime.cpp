@@ -1687,10 +1687,27 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                 currencyAccount_.playerCreated();
                 // The shared player now owns the default gun's countdown.
             }
-            // scrPlayerInit's full state comes later. These are the two
-            // instance_create calls made directly by the recovered event.
-            if (!deferredInstances_.enqueueCreate(66, -100, instance->y) ||
-                !deferredInstances_.enqueueCreate(64, instance->x, instance->y))
+            // Publish each child and finish its Create before continuing this
+            // event, not at room-load completion. In particular camMain must
+            // exist before later player/room-controller Create reads it.
+            // Use a private one-command queue so a parent's in-flight batch
+            // cannot be replayed recursively. roomId_ still names the previous
+            // room during entry: the parent's destination room is authoritative.
+            const auto createChild=[&](int object,int x,int y){
+                DeferredInstanceQueue<1> child;
+                if(!child.enqueueCreate(object,x,y))return false;
+                return child.applyChecked(instances_,*objectPack_,instance->roomId,
+                    nextRuntimeInstanceId_,[&](InstanceRecord& record){
+                        dispatchInstancePhase(record,RoomInstancePhase::preCreate);
+                        if(!deferredCommandsSucceeded_||!run_.effectsSucceeded)return false;
+                        dispatchInstancePhase(record,RoomInstancePhase::create);
+                        return deferredCommandsSucceeded_&&run_.effectsSucceeded;
+                    },lifecycle_)==ApplyInstanceCommandsResult::success;
+            };
+            // Full scrPlayerInit companion births, scrSpawnCamera's caller
+            // assignments and main-room entry-dither creation remain unwired.
+            if (!createChild(66, -100, instance->y) ||
+                !createChild(64, instance->x, instance->y))
                 deferredCommandsSucceeded_ = false;
         }
         return;
