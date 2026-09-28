@@ -130,6 +130,11 @@ bool ObjectPack::validateObjects() {
 bool ObjectPack::object(std::uint32_t index, PackedObject& output) const {
     if (!valid() || index >= objectCount_)
         return false;
+    auto& cached = definitions_[(index ^ (index >> 3)) & 7u];
+    if (cached.index == index) {
+        output = cached.definition;
+        return true;
+    }
     const std::uint8_t* data = bytes_ + objectsOffset_ + index * objectRecordSize;
     output.objectId = readI32(data + 0);
     output.spriteId = readI32(data + 4);
@@ -140,6 +145,8 @@ bool ObjectPack::object(std::uint32_t index, PackedObject& output) const {
     output.firstBinding = readU32(data + 24);
     output.bindingCount = readU32(data + 28);
     output.creationDepth = readI32(data + 32);
+    cached.definition = output;
+    cached.index = index;
     return true;
 }
 

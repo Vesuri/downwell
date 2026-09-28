@@ -83,3 +83,12 @@ the pack. Event lookup first checks the requested object and then walks its
 parent chain, returning both the recovered code ID and the object that owns the
 binding. That owner is required to implement `event_inherited()` without
 conflating it with ordinary inherited event lookup.
+
+The reader borrows immutable bytes for its entire lifetime. An eight-entry,
+direct-mapped cache retains decoded object definitions (320 bytes per reader),
+keyed by the full resource index. Collisions replace entries; invalid pack or
+index checks precede cache access. This only avoids repeated endian decoding:
+instance flags, depth writes, event execution and inheritance order remain
+outside the cache. Readers are used on the owning game thread; simultaneous
+access to one reader requires external synchronization. Copying a reader copies
+its cache and continues borrowing the same immutable payload.

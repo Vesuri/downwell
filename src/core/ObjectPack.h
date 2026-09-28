@@ -56,6 +56,8 @@ public:
     static constexpr std::size_t objectRecordSize = 36;
     static constexpr std::size_t bindingRecordSize = 16;
 
+    // The borrowed serialized bytes must remain alive and immutable. Decoded
+    // definitions are memoized; mutable instance properties live elsewhere.
     ObjectPack(const std::uint8_t* bytes, std::size_t size);
 
     bool valid() const { return error_ == ObjectPackError::none; }
@@ -86,6 +88,12 @@ public:
 
 private:
     bool validateObjects();
+
+    struct CachedObject {
+        std::uint32_t index = 0xffffffffu;
+        PackedObject definition{};
+    };
+    mutable CachedObject definitions_[8]{};
 
     const std::uint8_t* bytes_ = nullptr;
     std::size_t objectsOffset_ = 0;

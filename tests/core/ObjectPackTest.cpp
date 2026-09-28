@@ -404,11 +404,47 @@ void testGeneratedPack(const char* path) {
     }
 }
 
+void testDefinitionReuse() {
+    auto bytes=makePack();
+    bytes.resize(downwell::ObjectPack::headerSize);
+    bytes[12]=64;
+    downwell::PackedObject expected[64];
+    for(int i=0;i<64;++i){
+        expected[i]={i,-i-1,-1,i*17,-0x70000000+i,unsigned(i),unsigned(i&1),1,0x70000000-i};
+        const auto& o=expected[i];
+        appendI32(bytes,o.objectId);appendI32(bytes,o.spriteId);appendI32(bytes,o.parentId);
+        appendI32(bytes,o.textureMaskId);appendI32(bytes,o.depth);appendU32(bytes,o.flags);
+        appendU32(bytes,o.firstBinding);appendU32(bytes,o.bindingCount);appendI32(bytes,o.creationDepth);
+    }
+    appendBinding(bytes,0,0,100);appendBinding(bytes,3,0,200);
+    const downwell::ObjectPack pack(bytes.data(),bytes.size());
+    require(pack.valid(),"definition-reuse fixture is valid");
+    auto compare=[&](const downwell::ObjectPack& reader,unsigned id){
+        downwell::PackedObject o{};
+        const auto& e=expected[id];
+        require(reader.object(id,o)&&o.objectId==e.objectId&&o.spriteId==e.spriteId&&
+            o.parentId==e.parentId&&o.textureMaskId==e.textureMaskId&&o.depth==e.depth&&
+            o.flags==e.flags&&o.firstBinding==e.firstBinding&&o.bindingCount==e.bindingCount&&
+            o.creationDepth==e.creationDepth,"reused definition matches every serialized field");
+    };
+    for(unsigned pass=0;pass<8;++pass)for(unsigned n=0;n<64;++n){
+        const unsigned id=(n*17+pass*11)&63;
+        compare(pack,id);compare(pack,id); // Cold/replaced entry, then hit.
+        compare(pack,(id+9)&63);compare(pack,id); // Includes conflicting slots.
+    }
+    auto copied=pack;
+    for(unsigned id=0;id<64;++id){compare(copied,id);compare(pack,63-id);}
+    downwell::PackedObject untouched=expected[3];
+    require(!pack.object(64,untouched)&&!pack.findObject(-1,untouched)&&untouched.objectId==3&&
+        untouched.creationDepth==expected[3].creationDepth,"invalid lookup cannot return a cached definition");
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
     testDecodeAndInheritance();
     testValidation();
+    testDefinitionReuse();
     if (argc == 2)
         testGeneratedPack(argv[1]);
     std::cout << "object pack tests passed\n";
