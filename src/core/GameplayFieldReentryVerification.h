@@ -36,6 +36,14 @@ struct GameplayFieldReentryVerification {
         if(!GameplayCollisionView::encode(GameplayCollisionView::Kind::timeChange,timeKey,sharedTime)||
             !owner.state(sharedTime)||owner.state(sharedTime)->x.bits!=0x43704000u||
             !owner.population(211,population)||population!=1)return false;
+        if(!owner.timeChanges().activation(timeKey,false)||!(owner.state(sharedTime)->flags&2u)||
+            !owner.reconcileActivation())return false;
+        for(unsigned tick=0;tick<7;++tick)for(unsigned index=0;index<2;++index)
+            if(!world.advanceTimeChangeRoomAlarm(timeKey,index))return false;
+        const auto* suspended=owner.timeChanges().find(timeKey);
+        if(!suspended||suspended->alarms.get(0)!=2||suspended->alarms.get(1)!=2||sourceRoomSpeed!=30||
+            !owner.timeChanges().activation(timeKey,true)||(owner.state(sharedTime)->flags&2u)||
+            !owner.reconcileActivation())return false;
         for(unsigned tick=1;tick<=14;++tick){
             for(unsigned index=0;index<2;++index)
                 if(!world.advanceTimeChangeRoomAlarm(timeKey,index))return false;

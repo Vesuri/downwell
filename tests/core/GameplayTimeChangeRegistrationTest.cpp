@@ -4,6 +4,7 @@ namespace {
 struct Owner {
     std::uint32_t next=105187;unsigned births=0,marks=0,retires=0;
     bool bad=false;
+    template<class R> bool activation(InstanceHandle h,const R& r,bool){return h.generation==r.lifetimeId&&!bad;}
     template<class R> bool birth(InstanceHandle h,const R& r,std::uint32_t& id){
         if(!h.generation||r.objectId!=211||r.x.bits!=0x43704000u||r.y.bits!=0x43308000u||
            r.alarms.get(0)!=-1||r.alarms.get(1)!=-1)return false;
@@ -33,9 +34,10 @@ bool nativeTimeChangeRegistrationProbe(){
     if(!create()||effects.sourceId(1)!=105187||registry.size()!=1)return false;
     const auto first=registry.handle(1);
     auto* r=registry.schedulerRecord(first);if(!r)return false;
-    r->active=false;bool eligible=true;
+    if(!registry.activation(first,false))return false;
+    bool eligible=true;
     if(!registry.eventEligible(1,105187,eligible)||eligible)return false;
-    r->active=true;
+    if(!registry.activation(first,true))return false;
     // Global per-index decrement/dispatch, not the owner's standalone clock.
     for(unsigned tick=1;tick<=14;++tick){
         for(unsigned index=0;index<2;++index)

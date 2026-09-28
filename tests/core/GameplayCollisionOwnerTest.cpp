@@ -445,6 +445,16 @@ int main(){
         assert(create(105187));
         const auto old=owner->timeChanges().handle(1);InstanceHandle shared;
         assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::timeChange,old,shared));
+        assert(owner->timeChanges().activation(old,false)&&!owner->timeChanges().find(old)->active&&
+            (owner->state(shared)->flags&2u));
+        for(unsigned tick=0;tick<7;++tick){
+            world->step(0);
+            const auto* record=owner->timeChanges().find(old);
+            assert(world->effectsSucceeded()&&owner->valid()&&record&&record->alarms.get(0)==2&&
+                record->alarms.get(1)==2&&speed==30);
+        }
+        assert(owner->timeChanges().activation(old,true)&&owner->timeChanges().find(old)->active&&
+            !(owner->state(shared)->flags&2u));
         for(unsigned tick=1;tick<=14;++tick){
             world->step(0);
             assert(world->effectsSucceeded()&&owner->valid());

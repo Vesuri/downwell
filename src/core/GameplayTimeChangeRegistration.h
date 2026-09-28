@@ -57,6 +57,11 @@ public:
         const auto* r=resolve(local,id);if(!r)return fail();
         eligible=r->active&&!r->destroyRequested;return true;
     }
+    bool activation(InstanceHandle key,bool active){
+        auto* r=schedulerRecord(key);
+        if(!r||r->destroyRequested||!owner_.activation(key,*r,active))return fail();
+        r->active=active;return true;
+    }
     bool destroyed(std::uint32_t local,std::uint32_t id,const TimeChangeEffect& effect){
         auto* r=resolve(local,id);
         if(!r||r->destroyRequested||!effect.destroyRequested||

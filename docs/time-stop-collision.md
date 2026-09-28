@@ -160,6 +160,11 @@ a valid numeric ID. Zero, duplicate or out-of-range IDs fail rather than aliasin
 a local slot. Registered effects publish Create alarms before the pause callback.
 Global alarm dispatch imports the already-decremented record counters, and
 cleanup retires one marked lifetime without sweeping other object families.
+Activation writes publish through the native collision/layer owner and update
+the registered record's event-eligibility flag together. Room-list relinking
+still waits for the ordinary reconciliation boundary. While inactive, neither
+the mixed alarm snapshot nor direct registered dispatch decrements the counters;
+reactivation resumes the existing countdown rather than rerunning Create.
 
 The native collision owner attaches this adapter to resource-backed room and
 layer membership. Its mixed combat alarm snapshot includes object 211; the

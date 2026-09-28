@@ -448,6 +448,9 @@ public:
     bool markDestroyed(InstanceHandle key,const NativeTimeChangeRegistration::Record& record){
         return timeChangeBinding_.markDestroyed(key,record);
     }
+    bool activation(InstanceHandle key,const NativeTimeChangeRegistration::Record& record,bool active){
+        return timeChangeBinding_.activation(key,record,active);
+    }
     bool retire(InstanceHandle key,const NativeTimeChangeRegistration::Record& record){
         return timeChangeBinding_.retire(key,record);
     }
