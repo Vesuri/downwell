@@ -74,6 +74,18 @@ This is the shared composition route, not admission of natural entry-dither
 births or its transformed source artwork. Native integration must preserve the
 immutable pointer-scrolled cover rather than rasterizing a full wipe each tick.
 
+The host Game renderer now consumes registered entry-dither records through
+this route. `EffectMaskAssets` borrows the same offline mask bank and aliases
+its opacity as both color planes (opaque-black pen 3), without allocating or
+converting textures. `EntryDitherMask` supplies the shared window calculation
+used by the Amiga too. The compact representation only admits the verified
+centered, unit-scale, integer-position default-depth case; other transforms or
+missing art fail rather than silently showing an incorrect wipe. Game render
+tests create the effect through player Create and compare full coverage at the
+initial black frame and across the reveal, including transparent pixels.
+The normal executable loads the bank, but default effect ownership remains
+disabled until the native lifetime and residency path is connected.
+
 The native scene's `entryMask` entry point accepts that immutable 31,104-byte
 Chip-RAM bank and a view-relative Y. It rejects null/unaligned pointers, wrong
 lengths and unsupported finite-sprite positions before patching the selected

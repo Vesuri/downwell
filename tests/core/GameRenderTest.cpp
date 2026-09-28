@@ -128,10 +128,13 @@ public:
     unsigned deathFlashCount = 0;
     unsigned gemDraws = 0;
     unsigned effectWords = 0;
-    void drawCoverageWord(int x,int y,std::uint16_t bits,downwell::Color) override {
+    std::vector<int> effectPixels;
+    void drawCoverageWord(int x,int y,std::uint16_t bits,downwell::Color color) override {
         require(x>=110 && x<270 && y>=0 && y<284 && bits,"controller effect words stay in the shaft");
         spriteOrder.push_back(-1000);
         ++effectWords;
+        if(!effectPixels.empty())for(unsigned bit=0;bit<16;++bit)
+            if(bits&(0x8000u>>bit))effectPixels[y*160+x-110+bit]=color.r==0&&color.g==0&&color.b==0?0:1;
     }
     unsigned shopPanels = 0, shopNameCenters = 0;
     unsigned clearTitleDraws = 0, clearChoiceDraws = 0;
@@ -701,6 +704,8 @@ int main() {
         const std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(file),{}};
         downwell::EffectMaskAssets assets;
         require(assets.bind(bytes.data(),bytes.size()),"live effect test binds offline art");
+        const auto entryBytes=read("generated/amiga-game.entry-mask");
+        require(assets.bindEntryMask(entryBytes.data(),entryBytes.size()),"bind immutable entry mask");
         const auto cb=read("generated/downwell-sprites.dwsc"),mb=read("generated/downwell-sprite-masks.dwsm");
         downwell::SpriteCollisionPack sprites(cb.data(),cb.size());downwell::SpriteMaskPack masks(mb.data(),mb.size());
         auto owner=std::make_unique<downwell::StoredWorldCollision>(objects,sprites,masks);
@@ -708,7 +713,40 @@ int main() {
         require(owner->attach(effectStorage->startup()),"composited debris fixture attaches collision owner");
         auto& effectGame = *effectStorage;
         auto& runtime=const_cast<downwell::StartupRuntime&>(effectGame.startup());
-        runtime.skipToGameForTesting();
+        auto entry=runtime.entryDitherRegistration<1>();
+        auto camera=[&](downwell::MotionBinary64& out){
+            out=downwell::MotionBinary64::fromInteger(runtime.mainCameraRenderViewX()+80);return true;
+        };
+        require(runtime.withEntryDitherRoomCreation(entry,camera,[&]{runtime.skipToGameForTesting();return true;}),
+            "render fixture enters through player-created dither");
+        RecordingRenderer covered;covered.effectPixels.assign(160*284,-1);
+        const auto entryRng=runtime.randomDrawCount();effectGame.render(covered);
+        require(effectGame.renderingSucceeded()&&runtime.randomDrawCount()==entryRng&&
+            std::all_of(covered.effectPixels.begin(),covered.effectPixels.end(),[](int p){return p==0;}),
+            "first gameplay view is covered by opaque-black original entry art, not white or missing alpha");
+        downwell::InstanceHandle entryKey;
+        require(runtime.visitEntryDitherDraw([&](auto key,const auto&,int){entryKey=key;return true;})&&entryKey.generation,
+            "resolve rendered entry lifetime");
+        for(int sy:{320,400,450,683,684,800}){
+            // Separate static raster fixtures use the effect's actual Create
+            // setters, not collision-response writes to an actor motion cache.
+            require(entry.clear()&&entry.create(camera,[&](downwell::MotionBinary64& out){
+                out=downwell::MotionBinary64::fromInteger(runtime.mainCameraRenderViewY()+sy);return true;
+            },entryKey),"create entry cover raster fixture");
+            RecordingRenderer edge;edge.effectPixels.assign(160*284,-1);effectGame.render(edge);
+            require(effectGame.renderingSucceeded(),"entry cover remains renderable through reveal");
+            unsigned offset;require(downwell::EntryDitherMask::offset(sy,offset),"verified mask window");
+            for(unsigned y=0;y<284;++y)for(unsigned x=0;x<160;++x){
+                const unsigned bx=x+110;
+                const bool opaque=entryBytes[offset+y*48+bx/8]&(0x80u>>(bx%8));
+                require(edge.effectPixels[y*160+x]==(opaque?0:-1),
+                    "Game controller matches immutable mask coverage including black and transparent edge pixels");
+            }
+        }
+        require(!assets.bindEntryMask(nullptr,0),"reject missing entry mask");
+        RecordingRenderer missingEntry;effectGame.render(missingEntry);
+        require(!effectGame.renderingSucceeded(),"live entry without its mask cannot silently disappear");
+        require(assets.bindEntryMask(entryBytes.data(),entryBytes.size())&&entry.clear(),"restore art and retire test entry");
         const auto x=downwell::MotionBinary64::fromInteger(runtime.mainCameraRenderViewX()+80);
         const auto y=downwell::MotionBinary64::fromInteger(runtime.mainCameraRenderViewY()+60);
         auto registration=runtime.debrisRegistration<1>();downwell::DebrisEffects<1> debris;unsigned id=0;

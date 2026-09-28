@@ -274,13 +274,14 @@ void Game::renderMain(Renderer& renderer) const {
     const float viewX = static_cast<float>(startup_.mainCameraRenderViewX());
     const float viewY = static_cast<float>(startup_.mainCameraRenderViewY());
     const bool composite = effectAssets_ && !startup_.mainDeathSequence().active;
-    if (composite) {
+    if (effectAssets_) {
         using Real = MotionBinary64;
         const EffectSurfacePlacement::View view{Real::fromInteger(int(viewX)),Real::fromInteger(int(viewY)),
             Real::fromInteger(160),Real::fromInteger(284)};
         CurrencySmokeComposition::Settings settings;
+        settings.death = startup_.mainDeathSequence().active;
         settings.noControl = startup_.shops().noControl;
-        renderingSucceeded_ = effects_.prepareWithLateEffects([&](auto emit) {
+        renderingSucceeded_ = effects_.prepareWithSurfaceProducers([&](auto emit) {
             for (std::size_t i = startup_.mainCurrencyCount(); i; --i) {
                 const auto& gem = startup_.mainCurrencyAt(i-1);
                 if (gem.motion.lifetime.visible())
@@ -289,6 +290,25 @@ void Game::renderMain(Renderer& renderer) const {
         }, startup_.smokeEffects(), *effectAssets_, view, settings, [&](auto emit) {
             return startup_.visitDebrisDraw([&](const DebrisAnimation& effect){
                 return DebrisDraw::surface(effect,*effectAssets_,view,emit);
+            });
+        }, [&](auto emit) {
+            return startup_.visitEntryDitherDraw([&](InstanceHandle,const InstanceRecord& record,int depth){
+                // Compact original-art mask only supports its verified default
+                // transform/depth and centered integer viewport placement.
+                if(depth!=-200000||record.spriteId!=129||record.scaleX!=1||record.scaleY!=1||record.rotation!=0)
+                    return false;
+                RunnerImageValue x,y;std::memcpy(&x.bits,&record.preciseX,4);std::memcpy(&y.bits,&record.preciseY,4);
+                if(!SequenceTimeline::valid(x)||!SequenceTimeline::valid(y))return false;
+                Real dx,dy;int px,py;
+                const auto integer=[](Real n,int& out){
+                    if(!n.roundPixel(out))return false;
+                    const auto exact=Real::fromInteger(out);
+                    return n.low==exact.low&&((n.high==exact.high)||(!out&&!(n.high&0x7fffffffu)));
+                };
+                if(!EffectSurfacePlacement::relative(x.promoted(),view.x,dx)||
+                   !EffectSurfacePlacement::relative(y.promoted(),view.y,dy)||!integer(dx,px)||!integer(dy,py))return false;
+                EffectMaskAssets::Asset mask;
+                return effectAssets_->entryDither(px,py,mask)&&emit(mask,view.x,view.y);
             });
         }, [&](auto emit) {
             for (std::size_t i=0;i<startup_.activeInstanceCount();++i) {
@@ -496,7 +516,7 @@ void Game::renderMain(Renderer& renderer) const {
         renderer.drawSprite(96,effect.drawFrame(),effect.pixelX()-static_cast<int>(viewX),
                             effect.pixelY()-static_cast<int>(viewY));
     });
-    if (composite) effects_.surface().visit([&](unsigned x,unsigned y,std::uint16_t a,std::uint16_t lo,std::uint16_t hi) {
+    if (effectAssets_) effects_.surface().visit([&](unsigned x,unsigned y,std::uint16_t a,std::uint16_t lo,std::uint16_t hi) {
         const std::uint16_t masks[4]={std::uint16_t(a&~lo&~hi),std::uint16_t(a&lo&~hi),
             std::uint16_t(a&~lo&hi),std::uint16_t(a&lo&hi)};
         const Color colors[4]={{0,0,0,255},{255,255,255,255},{255,0,0,255},{0,0,0,255}};

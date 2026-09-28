@@ -68,6 +68,9 @@ int main() {
     const std::vector<std::uint8_t> effectBytes{std::istreambuf_iterator<char>(effectFile),{}};
     downwell::EffectMaskAssets effectAssets;
     if (!effectAssets.bind(effectBytes.data(),effectBytes.size())) return 20;
+    std::ifstream entryFile("generated/amiga-game.entry-mask",std::ios::binary);
+    const std::vector<std::uint8_t> entryBytes{std::istreambuf_iterator<char>(entryFile),{}};
+    if(!effectAssets.bindEntryMask(entryBytes.data(),entryBytes.size()))return 20;
     std::ifstream collisionFile("generated/downwell-sprites.dwsc",std::ios::binary);
     const std::vector<std::uint8_t> collisionBytes{std::istreambuf_iterator<char>(collisionFile),{}};
     std::ifstream maskFile("generated/downwell-sprite-masks.dwsm",std::ios::binary);

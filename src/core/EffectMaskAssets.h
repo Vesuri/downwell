@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_EFFECT_MASK_ASSETS_H
 #define DOWNWELL_CORE_EFFECT_MASK_ASSETS_H
 #include "BinaryEffectSurface.h"
+#include "EntryDitherMask.h"
 #include <cstddef>
 #include <cstdint>
 
@@ -17,6 +18,21 @@ public:
         const std::uint8_t* high=nullptr;
     };
     bool ready()const{return ready_;}
+    bool bindEntryMask(const std::uint8_t* data,std::size_t bytes){
+        entryMask_=nullptr;
+        if(!data||bytes!=EntryDitherMask::bytes)return false;
+        entryMask_=data;return true;
+    }
+    // This compact bank represents the centered, unit-scale source sprite.
+    // Unsupported placement fails rather than silently clipping different art.
+    bool entryDither(int screenX,int screenY,Asset& out)const{
+        unsigned offset;
+        if(!entryMask_||screenX!=80||!EntryDitherMask::offset(screenY,offset))return false;
+        const auto* mask=entryMask_+offset;
+        // Pen 3 is opaque black. Alias both color planes to alpha: no zero
+        // bitmap allocation, conversion, or copy is needed on the host.
+        out={{mask,284*48,384,284,48},110,0,mask,mask};return true;
+    }
     const Asset* smoke(unsigned frame)const{return ready_ && frame<9 ? &smoke_[frame] : nullptr;}
     const Asset* shade()const{return ready_ ? &shade_ : nullptr;}
     const Asset* currency(bool large,unsigned frame)const{
@@ -84,6 +100,7 @@ private:
     static int signedWord(const std::uint8_t* p){const unsigned n=u16(p);return n<32768?int(n):int(n)-65536;}
     Asset smoke_[9]{},shade_{},currency_[2][4]{};
     const std::uint8_t* pack_=nullptr;
+    const std::uint8_t* entryMask_=nullptr;
     std::size_t size_=0;
     std::uint32_t count_=0;
     bool ready_=false;
