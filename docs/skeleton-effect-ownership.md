@@ -74,8 +74,10 @@ mixed with a populated production bank. `stepWithOwnedDebris` routes the stored
 bank through the ordinary room scheduler using an explicit checked time-stop
 callback. Its test covers animation, alarm countdown/refund, five frozen frames,
 motion and cleanup at expiry. The native owned-bank per-instance alarm/Step
-hooks have corresponding freeze/motion/expiry checks, but are not yet admitted
-to a complete mixed-actor source event traversal. Live player time-stop and
+hooks have corresponding freeze/motion/expiry checks. Native alarms now run
+alongside registered enemies in the ordinary frame's ordered alarm phase;
+native debris Step is not yet admitted to a mixed-actor source traversal.
+Live player time-stop and
 natural destruction admission remain unfinished; these dispatch adapters do
 not establish a complete live debris feature.
 

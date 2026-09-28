@@ -67,8 +67,14 @@ and dispatches immediately on zero; missing alarm events do not receive a
 countdown. Tests mix real box/enemy/debris registrations, preserve same-object
 registration order, modify a later debris alarm in the same phase, exclude
 newborns from the snapshot, suppress a destroyed later lifetime, and stop after
-callback failure. This dispatcher is not yet wired into the world's ordinary
-alarm loop and does not resolve the remaining original birth/mutation cases.
+callback failure. The ordinary native world now uses the same dispatch body
+for registered enemies and debris, with a caller-resident snapshot restricted
+to those supported families. Unbound component worlds retain their enemy-only
+fallback. Actor alarm bodies are shared between both routes; Retry preserves
+the bound phase callback. A normal-frame test covers debris's thirty-tick
+Alarm 0 expiry and cleanup before and after Retry. This is not a complete
+global alarm owner: other families, the remaining original birth/mutation
+cases, and debris Step's time-stop refunds still require integration.
 
 ## Skeleton consequence
 

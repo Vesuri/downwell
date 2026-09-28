@@ -23,6 +23,7 @@ public:
     using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2>;
 private:
     Owner owner_;
+    RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayDebrisInstances::capacity> combatAlarmPhase_;
     RunnerRoomMembership<View::capacity> room_;
     InstanceHandle roomKeys_[View::capacity]{};
     Owner::Properties properties_[View::capacity]{};
@@ -322,6 +323,23 @@ public:
                 return self.world_->resolveEnemyLifetime(local)&&snapshot.append(local.slot,local.generation,object);
             }));
         },this);
+        world.configureRoomAlarms([](void* context){
+            auto& self=*static_cast<GameplayCollisionOwner*>(context);
+            if(!self.valid())return false;
+            auto& phase=self.combatAlarmPhase_;phase.clear();
+            auto capture=[&](InstanceHandle h,int object,const Owner::State& state){
+                return self.resolves(h)&&((state.flags&0x100003u)||phase.append(h.slot,h.generation,object));
+            };
+            // Only implemented families are admitted. Avoid scanning every
+            // terrain record for this partial combat alarm traversal.
+            if(!self.check(self.owner_.visitRegistrationRange(View::enemyBase,View::breakableBase,capture)&&
+                self.owner_.visitRegistrationRange(View::debrisBase,View::capacity,capture)))return false;
+            return self.dispatchCapturedAlarms(phase,[&](InstanceHandle h,unsigned alarm,const PackedObjectEvent&){
+                View::Kind kind;InstanceHandle local;if(!View::decode(h,kind,local))return false;
+                return kind==View::Kind::enemy?self.world_->advanceEnemyRoomAlarm(local,alarm):
+                    kind==View::Kind::debris&&self.world_->advanceBoundDebrisRoomAlarm(local,alarm);
+            });
+        },this);
         return true;
     }
     auto playerBinding(){return GameplayWorld::PlayerLifecycleBinding::bindTransforms(player_);}
@@ -366,6 +384,11 @@ public:
         if(!check(owner_.visitRegistrations([&](InstanceHandle h,int object,const Owner::State& state){
             return resolves(h)&&((state.flags&0x100003u)||snapshot.append(h.slot,h.generation,object));
         })))return false;
+        return dispatchCapturedAlarms(snapshot,advanceAndDispatch);
+    }
+private:
+    template<unsigned Capacity,class AdvanceAndDispatch>
+    bool dispatchCapturedAlarms(RunnerStepSnapshot<Capacity>& snapshot,AdvanceAndDispatch advanceAndDispatch){
         snapshot.sort();
         const unsigned count=snapshot.size();
         for(unsigned alarm=0;alarm<AlarmBank::count;++alarm)for(unsigned i=0;i<count;++i){
@@ -378,6 +401,7 @@ public:
         }
         return true;
     }
+public:
     GameplayScriptSpawnInstances& scriptEffects(){return scriptEffects_;}
     GameplayDebrisInstances& debris(){return debris_;}
     const Owner::State* state(InstanceHandle key)const{return valid()?owner_.resolve(key):nullptr;}

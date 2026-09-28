@@ -242,6 +242,11 @@ public:
         if(debrisBinding_.effects!=&effects){
             if(debrisInstances_->size())return run_.effectsSucceeded=false;
             debrisBinding_=downwell::ScriptEffectRuntimeBinding::bind<downwell::GameplayDebrisInstances::Record>(effects,*debrisInstances_);
+            debrisAlarm_=[](void* p,downwell::GameplayDebrisInstances& registry,downwell::InstanceHandle key,unsigned index){
+                auto& bank=*static_cast<downwell::DebrisEffects<Capacity>*>(p);
+                const auto* record=registry.find(key);
+                return record&&registry.dispatchAlarm(key,*record,bank,bank.beginPhase(),index);
+            };
         }
         const auto h=effects.createRegistered(x,y,area,enemyRandom_,*debrisInstances_);
         if(!h)return run_.effectsSucceeded=false;
@@ -258,6 +263,10 @@ public:
     bool advanceOwnedDebrisRoomAlarm(downwell::InstanceHandle key,
         downwell::DebrisEffects<downwell::debrisEffectCapacity>::Phase phase,unsigned index){
         return advanceDebrisRoomAlarm(ownedDebrisEffects_,key,phase,index);
+    }
+    bool advanceBoundDebrisRoomAlarm(downwell::InstanceHandle key,unsigned index){
+        return run_.effectsSucceeded=run_.effectsSucceeded&&debrisInstances_&&debrisAlarm_&&debrisBinding_.effects&&
+            debrisAlarm_(debrisBinding_.effects,*debrisInstances_,key,index);
     }
     template<class Stopped,class Meeting>
     bool stepOwnedDebrisRoomEffect(downwell::InstanceHandle key,
@@ -335,6 +344,8 @@ public:
     }
     void configureRoomAnimation(bool (*callback)(void*),void* context){roomAnimation_=callback;roomAnimationContext_=context;}
     bool advanceEnemyRoomAnimation(downwell::InstanceHandle key);
+    bool advanceEnemyRoomAlarm(downwell::InstanceHandle key,unsigned alarm);
+    void configureRoomAlarms(bool (*callback)(void*),void* context){roomAlarms_=callback;roomAlarmsContext_=context;}
     bool advanceBulletRoomAnimation(downwell::InstanceHandle key);
     bool advanceScriptRoomAnimation(downwell::InstanceHandle key){
         if(!run_.effectsSucceeded)return false;
@@ -760,6 +771,9 @@ private:
     EnemyLifecycleBinding enemyLifecycle_;
     downwell::ScriptEffectRuntimeBinding scriptEffectsBinding_;
     downwell::ScriptEffectRuntimeBinding debrisBinding_;
+    bool (*debrisAlarm_)(void*,downwell::GameplayDebrisInstances&,downwell::InstanceHandle,unsigned)=nullptr;
+    bool (*roomAlarms_)(void*)=nullptr;
+    void* roomAlarmsContext_=nullptr;
     downwell::DebrisEffects<downwell::debrisEffectCapacity> ownedDebrisEffects_;
     bool clearRoomDebris(){
         if(debrisInstances_&&debrisInstances_->size()&&!debrisBinding_.clearRoom())return run_.effectsSucceeded=false;

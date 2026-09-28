@@ -50,6 +50,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto debrisInstances=debrisInstances_;
     const auto phaseBoundary=phaseBoundary_;
     const auto roomAnimation=roomAnimation_;
+    const auto roomAlarms=roomAlarms_;void* const roomAlarmsContext=roomAlarmsContext_;
     void* const roomAnimationContext=roomAnimationContext_;
     const auto roomActorDraw=roomActorDraw_;
     const auto roomActorDrawContext=roomActorDrawContext_;
@@ -87,6 +88,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     debrisInstances_=debrisInstances;
     configurePhaseBoundary(phaseBoundary,phaseBoundaryContext);
     configureRoomAnimation(roomAnimation,roomAnimationContext);
+    configureRoomAlarms(roomAlarms,roomAlarmsContext);
     configureRoomActorDraw(roomActorDraw,roomActorDrawContext);
     configureEnemyStepOrder(enemyOrderCapture,enemyOrderContext);
     nextBulletLifetimeId_=nextBulletIdentity;
@@ -717,7 +719,6 @@ bool GameplayWorld::captureEnemyStepOrder(){
 void GameplayWorld::advanceEnemyAlarms()
 {
     DW_PROFILE_PHASE(profileEnemyAlarms);
-    if(!captureEnemyStepOrder())return;
     for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {
         EnemyState& enemy = enemies_[enemyIndex];
         if (!enemy.active)
@@ -726,14 +727,23 @@ void GameplayWorld::advanceEnemyAlarms()
         if (enemy.objectId == 117) enemy.snailHit.advanceFrame();
         if (enemy.objectId == 116) enemy.batHit.advanceFrame();
     }
+    if(roomAlarms_){if(!roomAlarms_(roomAlarmsContext_))run_.effectsSucceeded=false;return;}
+    if(!captureEnemyStepOrder())return;
     // Match the runner's global alarm-index order. Dispatch each event before
     // counting down later slots: frog Alarm 0 writes Alarm 1, for example.
     for (unsigned alarm = 0; alarm < 2; ++alarm) {
       for (unsigned i=0;i<enemyStepOrder_.size();++i) {
-        auto* live=const_cast<EnemyState*>(resolveEnemyLifetime(enemyStepOrder_.handle(i)));
-        if(!live)continue;
+        if(!resolveEnemyLifetime(enemyStepOrder_.handle(i)))continue;
+        if(!advanceEnemyRoomAlarm(enemyStepOrder_.handle(i),alarm))return;
+      }
+    }
+}
+
+bool GameplayWorld::advanceEnemyRoomAlarm(downwell::InstanceHandle key,unsigned alarm){
+        auto* live=const_cast<EnemyState*>(resolveEnemyLifetime(key));
+        if(!run_.effectsSucceeded||!live||alarm>=downwell::AlarmBank::count)return run_.effectsSucceeded=false;
         EnemyState& enemy = *live;
-        if (!enemy.active) continue;
+        if (!enemy.active||enemy.destroyRequested) return true;
         const unsigned events = downwell::enemyAlarmEvents(enemy.objectId);
         const bool alarm0Fired = alarm == 0 && downwell::AlarmBank::advanceValue(enemy.alarm0, (events & 1) != 0);
         const bool alarm1Fired = alarm == 1 && downwell::AlarmBank::advanceValue(enemy.alarm1, (events & 2) != 0);
@@ -758,8 +768,7 @@ void GameplayWorld::advanceEnemyAlarms()
             updateCrawler(enemy, true, cameraPixelX_, viewCameraYQ8());
             enemy.alarm0 = 2;
         }
-      }
-    }
+        return run_.effectsSucceeded;
 }
 
 void GameplayWorld::updateCrawler(EnemyState& enemy, bool alarm, int cameraX, long cameraYQ8)

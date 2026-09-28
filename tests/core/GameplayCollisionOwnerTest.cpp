@@ -699,6 +699,24 @@ int main(){
         assert(!collision->dispatchAlarmPhase(snapshot,[&](InstanceHandle,unsigned,const PackedObjectEvent&){++calls;return true;}));
         assert(calls==1);
     }
+    {
+        auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto scene=std::make_unique<GameplayWorld>(300,true,0,false,collision->enemyBinding(),
+            collision->breakableBinding(),collision->playerBinding(),&collision->terrain());
+        assert(collision->attach(*scene));InstanceHandle key;
+        for(unsigned retry=0;retry<2;++retry){
+            assert(scene->spawnDebris(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(300),1,key));
+            for(unsigned tick=1;tick<=30;++tick){
+                scene->step(0);assert(scene->effectsSucceeded());
+                const auto* actual=scene->debrisEffects().retained(key.generation);assert(actual);
+                assert(actual->alarms.get(0)==int(30-tick));
+                assert(actual->destroyRequested==(tick==30));
+                assert(collision->prepareDraw());
+            }
+            assert(!scene->debrisEffects().retained(key.generation)&&!collision->debris().size());
+            assert(scene->restartFromResults(DeathMenuSequence::Action::Retry,42,300)!=ResultsDestination::none);
+        }
+    }
     for(int area=1;area<=5;++area){
         auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites);
         auto scene=std::make_unique<GameplayWorld>(300,true,0,false,collision->enemyBinding(),
@@ -1505,8 +1523,8 @@ int main(){
         scene->step(0);
         assert(scene->effectsSucceeded()&&scene->enemyAt(1).alarm1==second&&
             scene->enemyAt(2).alarm1==third&&scene->findEnemy(first)->alarm1==reactivated);
-        // A failed external capture is terminal before any actor alarm runs.
-        scene->configureEnemyStepOrder([](void*,GameplayWorld::EnemyStepOrder&){return false;},nullptr);
+        // A failed external combat alarm phase is terminal before countdown.
+        scene->configureRoomAlarms([](void*){return false;},nullptr);
         const int before=scene->enemyAt(1).alarm1;
         scene->step(0);
         assert(!scene->effectsSucceeded()&&scene->enemyAt(1).alarm1==before);
