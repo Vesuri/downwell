@@ -124,10 +124,10 @@ private:
             auto& p=parent.properties_[h.slot];p={};
             {
                 DW_PROFILE_SCOPE(profileBirthMetadata);
+                std::int32_t creationDepth;
                 if(!parent.check(parent.owner_.bindObjectFromPacks(h,object(r),true,p,
-                    parent.objects_,parent.sprites_,parent.families_,false)))return false;
-                PackedObject definition;
-                if(!parent.objects_.findObject(object(r),definition)||!real(definition.creationDepth,p.depth))return parent.check(false);
+                    parent.objects_,parent.sprites_,parent.families_,false,&creationDepth)))return false;
+                if(!real(creationDepth,p.depth))return parent.check(false);
             }
             if constexpr(Kind==View::Kind::debris){
                 // instance_create uses the compatibility depth table, not the

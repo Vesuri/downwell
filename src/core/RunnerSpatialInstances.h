@@ -96,7 +96,7 @@ public:
     template<class Graph>
     bool bindObjectFromPacks(InstanceHandle h,int object,bool registered,Properties& properties,
                             const ObjectPack& objects,const SpriteCollisionPack& sprites,
-                            const Graph& graph,bool allPrepared){
+                            const Graph& graph,bool allPrepared,std::int32_t* creationDepth=nullptr){
         if(!valid()||!live(h))return false;
         PackedObject definition;
         if(!objects.valid()||!sprites.valid()||!graph.valid()||object<0||
@@ -110,10 +110,14 @@ public:
         if(!rebindObjectMembership(h,object,registered))return checked(false);
         properties.sprite.maskId=definition.textureMaskId;
         properties.depth=depth;
-        return applyBindingProperties(h,objectFlags,allPrepared,[&](InstanceHandle live){
+        const bool applied=applyBindingProperties(h,objectFlags,allPrepared,[&](InstanceHandle live){
             return changeSpriteFromPack(live,properties.sprite,properties.timeline,properties.cachedFrame,
                                         definition.spriteId,sprites,objectFlags);
         });
+        // Compatibility Create uses another depth from the same immutable
+        // record. Return it on success instead of decoding the record again.
+        if(applied&&creationDepth)*creationDepth=definition.creationDepth;
+        return applied;
     }
     bool valid()const{return good_ && index_.valid();}
     std::uint32_t bindingRevision()const{return bindingRevision_;}

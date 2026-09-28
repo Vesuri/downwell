@@ -65,9 +65,11 @@ void testGeneratedPack(const char* path,const char* maskPath,const char* objectP
             properties.sprite.spriteId=-999;properties.sprite.maskId=597;
             properties.sprite.imageIndex={0x41000000u};properties.timeline={0x41000000u};
             require(owner.attach({0,1},0,{}),"attach object-binding lifetime");
-            require(owner.bindObjectFromPacks({0,1},int(id),registered,properties,objects,compact,families,false),
+            std::int32_t creationDepth=0x12345678;
+            require(owner.bindObjectFromPacks({0,1},int(id),registered,properties,objects,compact,families,false,&creationDepth),
                     "bind complete original object through both resource packs");
             downwell::PackedObject original;require(objects.object(id,original),"read independent object record");
+            require(creationDepth==original.creationDepth,"binding returns the independently decoded compatibility depth");
             require(properties.sprite.spriteId==original.spriteId&&properties.sprite.maskId==original.textureMaskId,
                     "binding restores object artwork and explicit mask defaults");
             Owner::Real depth;require(depth.assign(downwell::MotionBinary64::fromInteger(original.depth)),"convert original depth");
@@ -87,8 +89,10 @@ void testGeneratedPack(const char* path,const char* maskPath,const char* objectP
         Owner incomplete;Owner::Properties unchanged;
         require(incomplete.attach({0,1},0,{}),"attach incomplete-graph fixture");
         downwell::RunnerObjectFamilies<386> spatialOnly;require(spatialOnly.bindSpatialFlags(objects),"load deliberately incomplete flags");
-        require(!incomplete.bindObjectFromPacks({0,1},0,true,unchanged,objects,compact,spatialOnly,false)&&
+        std::int32_t failedDepth=0x12345678;
+        require(!incomplete.bindObjectFromPacks({0,1},0,true,unchanged,objects,compact,spatialOnly,false,&failedDepth)&&
                 !incomplete.valid()&&unchanged.sprite.spriteId==-1,"reject missing property flags before mutation");
+        require(failedDepth==0x12345678,"failed binding does not publish compatibility depth");
         using StoredOwner=downwell::RunnerSpatialInstances<4,8>;
         StoredOwner storedOwner;StoredOwner::Properties properties[4];
         downwell::InstanceStore<4> records;
