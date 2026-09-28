@@ -63,5 +63,31 @@ int main(){
     rejectedOwner.rejectRetire=true;
     assert(!rejected.clear()&&!healthy&&rejectedRecords.resolve(retained)&&rejectedOwner.retires==1);
     assert(!rejected.clear()&&rejectedRecords.resolve(retained)&&rejectedOwner.retires==1);
+    {
+        InstanceStore<4> local;bool okay=true;InstanceHandle h;
+        StoredEntryDitherRegistration<4,1> strict(local,&objects,{},next,room,okay);
+        assert(!strict.create(camera,[](auto& out){out={};return true;},h)&&!okay);
+        assert(local.resolve(h)&&local.resolve(h)->preciseX==0);
+    }
+    {
+        InstanceStore<4> local;bool okay=true;InstanceHandle h;unsigned cameraReads=0;
+        StoredEntryDitherRegistration<4,1> unindexed(local,&objects,{},next,room,okay,true);
+        auto read=[&](auto& out){++cameraReads;out=RunnerImageValue{0x43704000u}.promoted();return true;};
+        assert(unindexed.create(read,[](auto& out){out={};return true;},h));
+        auto* r=local.resolve(h);
+        for(unsigned tick=1;tick<=120;++tick){
+            if(r->alarms.advanceOne(0))assert(unindexed.alarm(h));
+            assert(unindexed.step(h,read));
+        }
+        assert(okay&&cameraReads==120&&r->destroyRequested&&r->preciseX==240.25F&&r->preciseY==119*16);
+        assert(unindexed.clear()&&!local.resolve(h));
+    }
+    {
+        InstanceStore<4> local;Owner rejecting;rejecting.reject=true;bool okay=true;InstanceHandle h;
+        StoredEntryDitherRegistration<4,1> bound(local,&objects,
+            InstanceLifecycleBinding::bindDestruction(rejecting),next,room,okay,true);
+        assert(!bound.create(camera,[](auto& out){out={};return true;},h)&&!okay&&rejecting.moves==1);
+        assert(local.resolve(h)&&local.resolve(h)->preciseX==0);
+    }
     std::puts("Stored entry dither: source IDs, ordered setters, eligibility, alarm marking, retirement and failure passed");
 }

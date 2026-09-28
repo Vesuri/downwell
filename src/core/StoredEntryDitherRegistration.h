@@ -13,6 +13,9 @@ template<unsigned WorldCapacity,unsigned Capacity> class StoredEntryDitherRegist
     Slot slots_[Capacity]{};
     InstanceStore<WorldCapacity>& records_;const ObjectPack* objects_;
     InstanceLifecycleBinding lifecycle_;std::uint32_t& nextId_;const int& room_;bool& good_;
+    // Unindexed reference worlds explicitly retain local setters/destruction.
+    // This never bypasses a configured owner's publication or failure checks.
+    bool storeOnly_=false;
     bool fail(){good_=false;return false;}
     Slot* slot(InstanceHandle key){
         for(auto& s:slots_)if(s.id&&s.key.slot==key.slot&&s.key.generation==key.generation)return &s;
@@ -32,15 +35,15 @@ template<unsigned WorldCapacity,unsigned Capacity> class StoredEntryDitherRegist
         RunnerImageValue x,y;
         std::memcpy(&x.bits,&r->preciseX,4);std::memcpy(&y.bits,&r->preciseY,4);
         if(write==EntryDither::Write::x)x=value;else y=value;
-        if(!lifecycle_.publishedPosition(s.key,*r,x,y))return fail();
+        if((lifecycle_.hasOwner()||!storeOnly_)&&!lifecycle_.publishedPosition(s.key,*r,x,y))return fail();
         if(write==EntryDither::Write::x){r->x=pixel;r->preciseX=stored(value);}
         else {r->y=pixel;r->preciseY=stored(value);}
         return true;
     }
 public:
     StoredEntryDitherRegistration(InstanceStore<WorldCapacity>& records,const ObjectPack* objects,
-        InstanceLifecycleBinding lifecycle,std::uint32_t& nextId,const int& room,bool& good)
-        :records_(records),objects_(objects),lifecycle_(lifecycle),nextId_(nextId),room_(room),good_(good){}
+        InstanceLifecycleBinding lifecycle,std::uint32_t& nextId,const int& room,bool& good,bool storeOnly=false)
+        :records_(records),objects_(objects),lifecycle_(lifecycle),nextId_(nextId),room_(room),good_(good),storeOnly_(storeOnly){}
     StoredEntryDitherRegistration(const StoredEntryDitherRegistration&)=delete;
     StoredEntryDitherRegistration& operator=(const StoredEntryDitherRegistration&)=delete;
     bool belongsTo(const InstanceStore<WorldCapacity>& records)const{return &records_==&records;}
@@ -79,7 +82,7 @@ public:
         auto* s=slot(key);auto* r=s?record(*s):nullptr;if(!r)return fail();
         if(!r->active||r->destroyRequested)return true;
         if(r->alarms.get(0)!=0)return fail();
-        if(!s->effect.fireAlarm(0)||!lifecycle_.markDestroyed(key,*r))return fail();
+        if(!s->effect.fireAlarm(0)||((lifecycle_.hasOwner()||!storeOnly_)&&!lifecycle_.markDestroyed(key,*r)))return fail();
         r->destroyRequested=true;return true;
     }
     bool retire(InstanceHandle key){

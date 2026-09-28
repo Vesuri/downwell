@@ -913,6 +913,41 @@ int main(){
         require(!world->stepWithCollisionPass(Input{},false,[&]{++calls;return true;})&&
             calls==1&&world->tick()==tick,"failed collision world cannot resume or reuse borrowed callback");
     }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach automatic entry world");
+        world->skipToGameForTesting();
+        std::uint32_t id=0;InstanceHandle key;
+        for(unsigned i=0;i<world->activeInstanceCount();++i){
+            const auto& r=world->instanceAt(i);
+            if(r.objectId!=73)continue;
+            require(!id&&i>0&&world->instanceAt(i-1).objectId==64&&
+                r.instanceId==world->instanceAt(i-1).instanceId+1&&r.roomId==11&&
+                r.preciseY==16&&r.alarms.get(0)==119,"automatic entry follows camera and first room tick");
+            id=r.instanceId;key=world->instanceHandleAt(i);
+        }
+        require(id&&owner->resolve(key),"automatic entry has collision ownership without scoped dispatch");
+        for(unsigned tick=2;tick<=120;++tick){
+            world->step({},false);
+            require(world->effectsSucceeded()&&world->roomLoadSucceeded(),"automatic entry remains healthy");
+            const auto* r=world->instance(id);
+            if(tick<120)require(r&&r->preciseY==float(tick*16)&&r->alarms.get(0)==120-int(tick),
+                "automatic entry advances once per room tick");
+            else require(!r&&!owner->resolve(key),"automatic alarm cleanup retires record and owner");
+        }
+        unsigned drawn=0;
+        require(world->visitEntryDitherDraw([&](auto,const auto&,int){++drawn;return true;})&&!drawn,
+            "expired automatic entry never draws");
+        world->reset(PlatformProfile::nonDesktop);
+        world->skipToGameForTesting();
+        InstanceHandle beforeRetry;
+        for(unsigned i=0;i<world->activeInstanceCount();++i)
+            if(world->instanceAt(i).objectId==73)beforeRetry=world->instanceHandleAt(i);
+        require(beforeRetry.generation&&owner->resolve(beforeRetry),"reset permits another owned entry lifetime");
+        require(world->restartFromResults(DeathMenuSequence::Action::Retry,42)&&!owner->resolve(beforeRetry),
+            "Retry retires an entry cover before alarm expiry");
+    }
     auto storage=std::make_unique<Storage>();require(storage->families.bindInstanceFlags(objects),"bind full source families");
     RecordingLifecycle lifecycle({storage->owner,storage->properties,objects,sprites,storage->families,{}, {}});
     auto runtime=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,

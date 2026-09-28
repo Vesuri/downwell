@@ -70,6 +70,7 @@ StartupRuntime::StartupRuntime(PlatformProfile profile,
 }
 
 void StartupRuntime::reset(PlatformProfile profile) {
+    if(!ownedEntryRegistration_.clear()){roomLoadSucceeded_=false;return;}
     if(!clearRoomDebris()){roomLoadSucceeded_=false;return;}
     if(!clearRoomScriptEffects()){roomLoadSucceeded_=false;return;}
     if(!instances_.clear([this](InstanceHandle h,const InstanceRecord& record){return lifecycle_.retire(h,record);})){
@@ -219,6 +220,7 @@ void StartupRuntime::resetSceneState() {
 
 bool StartupRuntime::restartFromResults(DeathMenuSequence::Action action, std::uint32_t seed) {
     if (resultsDestination(action) == ResultsDestination::none) return false;
+    if(!ownedEntryRegistration_.clear())return false;
     if(!clearRoomDebris())return false;
     if(!clearRoomScriptEffects())return false;
     const auto records = run_.records();
@@ -873,8 +875,10 @@ bool StartupRuntime::publishMainBullet(MainBulletState& bullet,bool angle){
 
 bool StartupRuntime::cleanupMainOwnedDestroyed(){
     return run_.effectsSucceeded&&instances_.cleanupDestroyedIf(
-        [this](const InstanceRecord& r){return r.objectId==92||r.objectId==261||r.objectId==370||(r.objectId==219&&!scriptAnimationDispatch_);},
+        [this](const InstanceRecord& r){return r.objectId==92||r.objectId==261||r.objectId==370||
+            (r.objectId==73&&ownedEntryRegistration_.handle(r).generation)||(r.objectId==219&&!scriptAnimationDispatch_);},
         [this](InstanceHandle key,const InstanceRecord& r){
+            if(r.objectId==73)return ownedEntryRegistration_.retire(key);
             if(r.objectId==219)return scriptEffectsBinding_.retire(key,&r);
             if(r.objectId==370)return debrisBinding_.retire(key,&r);
             return instances_.erase(r.instanceId,
@@ -1460,6 +1464,38 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
     instance.imageIndex = mainPlayerImageIndex_;
 }
 
+bool StartupRuntime::readEntryCameraX(int room,MotionBinary64& value)const{
+    if(!objectPack_||!run_.effectsSucceeded)return false;
+    unsigned count=0;bool okay=true;RunnerImageValue x;
+    instances_.visitObject(63,[&](int object,int parent){
+        for(unsigned depth=0;depth<objectPack_->objectCount();++depth){
+            if(object==parent)return true;
+            PackedObject definition;
+            if(!objectPack_->findObject(object,definition)){okay=false;return false;}
+            if(definition.parentId<0)return false;
+            object=definition.parentId;
+        }
+        okay=false;return false;
+    },[&](InstanceHandle,const InstanceRecord& r){
+        if(!r.active||r.destroyRequested)return true;
+        ++count;
+        // Multiple/alternate cameras require the original object-read selector;
+        // do not quietly choose storage order or a rounded display coordinate.
+        if(r.objectId!=64||r.roomId!=room){okay=false;return false;}
+        std::memcpy(&x.bits,&r.preciseX,4);return true;
+    });
+    if(!okay||count!=1||!SequenceTimeline::valid(x))return false;
+    value=x.promoted();return true;
+}
+
+bool StartupRuntime::createOwnedEntryDither(int room){
+    InstanceHandle key;
+    return ownedEntryRegistration_.createInRoom(room,
+        [&](MotionBinary64& x){return readEntryCameraX(room,x);},
+        [&](MotionBinary64& y){const auto* view=roomEntryViews_.get(0);
+            if(!view)return false;y=view->y.promoted();return true;},key);
+}
+
 bool StartupRuntime::publishMainCameraPosition(InstanceRecord& instance){
     if(!run_.effectsSucceeded)return false;
     RunnerImageValue x,y;
@@ -1551,7 +1587,11 @@ bool StartupRuntime::dispatchObjectEvent(InstanceRecord& instance,
         return false;
     if(instance.objectId==73&&eventSubtype==0&&(eventType==2||eventType==3)){
         ++implementedCodeCalls_;
-        run_.effectsSucceeded=entryDitherDispatch_&&entryDitherDispatch_(entryDitherContext_,instance,eventType==2);
+        const auto key=ownedEntryRegistration_.handle(instance);
+        run_.effectsSucceeded=key.generation?
+            (eventType==2?ownedEntryRegistration_.alarm(key):ownedEntryRegistration_.step(key,
+                [&](MotionBinary64& x){return readEntryCameraX(instance.roomId,x);})):
+            (entryDitherDispatch_&&entryDitherDispatch_(entryDitherContext_,instance,eventType==2));
         return run_.effectsSucceeded;
     }
     if(eventType==3&&eventSubtype==0&&instance.objectId==238&&timeEffectDispatch_){
@@ -1743,11 +1783,12 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             const int room=instance->roomId;
             if((room>=20&&room<=24)||room==10||room==17)camera->cameraFreeCam=true;
             if(room==11)camera->cameraAutoScroll=false;
-            if(room==11&&entryDitherCreate_&&!entryDitherCreate_(entryDitherCreateContext_,room)){
+            if(room==11&&((entryDitherCreate_&&!entryDitherCreate_(entryDitherCreateContext_,room))||
+                (!entryDitherCreate_&&!createOwnedEntryDither(room)))){
                 run_.effectsSucceeded=false;return;
             }
-            // Full initializer companion births and main-room entry-dither
-            // default ownership remain unwired. Alternate camera motion is separate.
+            // Full initializer companion births and alternate camera motion
+            // remain separate. Unindexed fixtures retain identical lifetimes.
         }
         return;
     case 849: // gml_Object_objPlayer_n_Step_1 (menu/rmMain movement subsets)
@@ -2335,6 +2376,7 @@ void StartupRuntime::gotoRoom(int roomId) {
 
 void StartupRuntime::loadRoom(int roomId, bool firstGameRoom) {
     if(!deferredCommandsSucceeded_ || !run_.effectsSucceeded){roomLoadSucceeded_=false;return;}
+    if(!ownedEntryRegistration_.clear()){roomLoadSucceeded_=false;return;}
     if(!clearRoomDebris()){roomLoadSucceeded_=false;return;}
     if(!clearRoomScriptEffects()){roomLoadSucceeded_=false;return;}
     if(roomPack_&&!roomLayers_.leave()){roomLoadSucceeded_=false;run_.effectsSucceeded=false;return;}

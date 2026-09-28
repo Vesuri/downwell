@@ -932,6 +932,8 @@ private:
     void updateMainPlayer(InstanceRecord& instance);
     void updateMainCamera(InstanceRecord& instance);
     bool publishMainCameraPosition(InstanceRecord& instance);
+    bool readEntryCameraX(int room,MotionBinary64& value)const;
+    bool createOwnedEntryDither(int room);
     void updateMainBuilder(InstanceRecord& instance);
     void syncMainBuilderState();
     void syncMainPlayerState();
@@ -1159,6 +1161,8 @@ private:
     float mainCameraY_ = 176.0F;
     float mainCameraTargetY_ = 176.0F;
     // Stable world-owned storage; the registry outlives its borrowed effects.
+    StoredEntryDitherRegistration<instanceCapacity,2> ownedEntryRegistration_{
+        instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded,!lifecycle_.hasOwner()};
     StoredScriptSpawnRegistration<instanceCapacity,scriptSpawnEffectCapacity> ownedScriptRegistration_{
         instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
     ScriptSpawnEffects<scriptSpawnEffectCapacity> ownedScriptEffects_;

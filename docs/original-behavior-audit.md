@@ -95,8 +95,21 @@ verifies the contiguous camera/dither IDs and destination room, then exercises
 and owner/layer retirement. Fast-forward includes the first new-room update,
 so its return snapshot has Y=16/alarm=119, not the Create snapshot Y=0/alarm=120.
 The test checks the single-camera case; alternate camera lookup/publication
-still needs verification. Default production ownership, rendering and native
-controller ownership remain unconnected.
+still needs verification. The stored runtime now also owns a default registration:
+player Create admits the effect after the camera, the normal room scheduler
+dispatches its alarms/Step, and global cleanup retires the destroyed record.
+Reset, Retry and room changes clear that registration before room teardown.
+The default camera read requires one live object-64 parentCamera descendant in
+the destination room and uses its published binary32 X, not its rounded pixel
+cache. Multiple/alternate cameras fail rather than guessing object-read order.
+Explicit scoped registrations retain caller-controlled cleanup for audit tests.
+Unindexed reference worlds opt into local-store publication, retaining identical
+IDs and lifetimes; a configured collision owner must still accept every write.
+Resource-backed tests cover automatic expiry and Retry before expiry in addition
+to the scoped traversal above. Host rendering consumes those registered records.
+Automatic native births/Step and full companion creation ordering remain open;
+the native registered lifetime and immutable presentation fixtures do not close
+those integration requirements.
 
 The offline game-pack generator also exports `amiga-game.entry-mask` and its
 input/tool-hashed provenance. Its 48-byte rows contain transparent padding,

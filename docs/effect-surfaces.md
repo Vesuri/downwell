@@ -83,8 +83,11 @@ centered, unit-scale, integer-position default-depth case; other transforms or
 missing art fail rather than silently showing an incorrect wipe. Game render
 tests create the effect through player Create and compare full coverage at the
 initial black frame and across the reveal, including transparent pixels.
-The normal executable loads the bank, but default effect ownership remains
-disabled until the native lifetime and residency path is connected.
+The stored runtime owns the normal player-created entry lifetime and the host
+executable loads the bank. Create follows camera creation; ordinary room alarms,
+Step and cleanup maintain the effect without a scoped test dispatcher. Native
+automatic birth/Step integration remains separate from its verified registered
+lifetime and immutable-bank presentation path below.
 
 The native scene's `entryMask` entry point accepts that immutable 31,104-byte
 Chip-RAM bank and a view-relative Y. It rejects null/unaligned pointers, wrong
