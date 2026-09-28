@@ -126,6 +126,27 @@ static void check(const Box (&boxes)[7]){
     assert(counts[0]>=2 && counts[1]>=2 && counts[0]+counts[1]==7);
 }
 int main(){
+    // Retain the previous binary64 path as an independent arithmetic oracle.
+    auto productCheck=[](std::uint32_t a,std::uint32_t b){
+        Split::Real left{a},right{b},actual{0x12345678},expected=actual;
+        downwell::MotionBinary64 product;
+        const bool valid=Split::valid(left)&&Split::valid(right);
+        const bool ok=valid&&downwell::multiplyBinary64(left.promoted(),right.promoted(),product)&&expected.assign(product);
+        assert(downwell::multiplyBinary32(left,right,actual)==ok);
+        assert(actual.bits==expected.bits);
+    };
+    const std::uint32_t fractions[]={0,1,0x3fffff,0x400000,0x7ffffe,0x7fffff};
+    for(unsigned a=1;a<255;++a)for(unsigned b=1;b<255;++b)
+        for(auto fraction:fractions)
+            productCheck((a<<23)|fraction,(b<<23)|(0x7fffff-fraction)|0x80000000u);
+    const std::uint32_t productEdges[]={0,0x80000000,1,0x800000,0x00800001,0x3f800000,
+        0x3f800001,0x3fc00000,0x7f7fffff,0x7f800000,0x7fc00000,0xffffffff};
+    for(auto a:productEdges)for(auto b:productEdges)productCheck(a,b);
+    std::uint32_t seed=0x612de529;
+    for(unsigned i=0;i<1000000;++i){
+        seed=seed*1664525u+1013904223u;const auto a=seed;
+        seed=seed*1664525u+1013904223u;productCheck(a,seed);
+    }
     using Node=downwell::RunnerSpatialNode;
     for(unsigned removed=0;removed<6;++removed){
         Node node;

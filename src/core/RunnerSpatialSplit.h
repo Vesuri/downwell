@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_RUNNER_SPATIAL_SPLIT_H
 #include "RunnerImageValue.h"
 #include "MultiplyBinary64.h"
+#include "MultiplyBinary32.h"
 namespace downwell {
 // Runner 0x5010e0/0x4fc680/0x500490: partition six entries plus one new
 // entry. This is not a complete spatial index or an instance_place adapter.
@@ -89,9 +90,9 @@ struct RunnerSpatialSplit {
     static Box unite(Box a,Box b){return {less(a.left,b.left)?a.left:b.left,less(a.top,b.top)?a.top:b.top,
         less(b.right,a.right)?a.right:b.right,less(b.bottom,a.bottom)?a.bottom:b.bottom};}
     static bool area(Box b,Real& out){
-        Real w,h;MotionBinary64 product;
+        Real w,h;
         return sub(b.right,b.left,w)&&sub(b.bottom,b.top,h)&&
-            multiplyBinary64(w.promoted(),h.promoted(),product)&&out.assign(product);
+            multiplyBinary32(w,h,out);
     }
 };
 }
