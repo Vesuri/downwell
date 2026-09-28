@@ -147,9 +147,14 @@ public:
     // Instance-only projection for actor and offscreen debris passes. Their
     // surrounding renderer still owns background/terrain/surface composition.
     template<class Visit> bool visitDrawChecked(Visit visit)const{
-        if(!roomPack_)return instances_.visitDrawChecked(visit); // Explicit resource-less fixtures.
-        return visitSourceDrawChecked([&](InstanceHandle key,const InstanceRecord& r,int,auto){
-            return visit(key,r);
+        return visitDrawAtDepthChecked([&](InstanceHandle key,const InstanceRecord& r,int){return visit(key,r);});
+    }
+    template<class Visit> bool visitDrawAtDepthChecked(Visit visit)const{
+        if(!roomPack_)return instances_.visitDrawChecked([&](InstanceHandle key,const InstanceRecord& r){
+            return visit(key,r,r.depth); // Explicit resource-less fixtures.
+        });
+        return visitSourceDrawChecked([&](InstanceHandle key,const InstanceRecord& r,int depth,auto){
+            return visit(key,r,depth);
         },[](const RunnerLayerBackground&,int){return true;});
     }
     bool hasInstance(std::uint32_t instanceId) const {

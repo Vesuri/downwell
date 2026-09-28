@@ -478,6 +478,7 @@ int main() {
         // layer visibility must affect the live actor projection; a legacy
         // room-depth traversal would still visit the player.
         auto hiddenBytes=roomBytes;
+        auto raisedBytes=roomBytes;
         downwell::PackedRoom room;
         require(rooms.findRoom(downwell::StartupRuntime::mainRoomId,room),"main room exists");
         bool changed=false;
@@ -491,6 +492,10 @@ int main() {
                 rooms.instanceCount()*downwell::RoomPack::instanceRecordSize+
                 (room.firstLayer+i)*downwell::RoomPack::layerRecordSize+8;
             hiddenBytes[offset]&=0xfe;changed=true;
+            // A visible player behind depth-zero actors exercises the actual
+            // painter order, not merely whether the traversal visits it.
+            raisedBytes[offset-4]=1;
+            raisedBytes[offset-3]=raisedBytes[offset-2]=raisedBytes[offset-1]=0;
         }
         downwell::RoomPack hiddenRooms(hiddenBytes.data(),hiddenBytes.size());
         require(changed&&hiddenRooms.valid(),"hidden-layer fixture retains valid resource structure");
@@ -529,6 +534,37 @@ int main() {
         require(normal->visitDrawChecked([&](auto,const auto& r){seen|=r.instanceId==defaultSprite->instanceId;return true;})&&!seen,
             "sprite_index minus one does not fall back to the object resource sprite");
         defaultSprite->spriteId=savedSprite;
+        downwell::RoomPack raisedRooms(raisedBytes.data(),raisedBytes.size());
+        require(raisedRooms.valid(),"raised-layer fixture remains structurally valid");
+        const auto cb=read("generated/downwell-sprites.dwsc"),mb=read("generated/downwell-sprite-masks.dwsm");
+        downwell::SpriteCollisionPack sprites(cb.data(),cb.size());downwell::SpriteMaskPack masks(mb.data(),mb.size());
+        const downwell::RoomPack* packs[]={&rooms,&hiddenRooms,&raisedRooms};
+        for(const auto* pack:packs){
+            auto owner=std::make_unique<downwell::StoredWorldCollision>(objects,sprites,masks);
+            auto scene=std::make_unique<downwell::Game>(pack,&objects,&builders,nullptr,owner->binding());
+            require(owner->attach(scene->startup()),"player layer render owner attaches");
+            auto& world=const_cast<downwell::StartupRuntime&>(scene->startup());world.skipToGameForTesting();
+            auto& inventory=const_cast<downwell::UpgradeInventory&>(world.upgrades());
+            inventory.levels[12]=1; // Draw-only Laser Sight fixture.
+            auto frames=[&](int id,unsigned& count){downwell::PackedSpriteCollision s;
+                if(!sprites.sprite(id,s))return false;count=s.frameCount;return true;};
+            std::uint32_t effect=0;
+            require(world.spawnScriptEffect(downwell::MotionBinary64::fromInteger(240),
+                downwell::MotionBinary64::fromInteger(120),101,{0x3fe00000u,0},{},{},frames,effect),
+                "layer order fixture creates ordinary depth-zero impact");
+            const auto rng=world.randomDrawCount();
+            RecordingRenderer frame;frame.targetPlayer=world.mainPlayerSpriteId();scene->render(frame);
+            require(scene->renderingSucceeded()&&world.randomDrawCount()==rng,"layer-aware player rendering consumes no RNG");
+            const auto playerAt=std::find(frame.spriteOrder.begin(),frame.spriteOrder.end(),frame.targetPlayer);
+            const auto effectAt=std::find(frame.spriteOrder.begin(),frame.spriteOrder.end(),101);
+            require(effectAt!=frame.spriteOrder.end(),"depth-zero effect remains visible");
+            if(pack==&hiddenRooms)
+                require(frame.playerDraws==0&&frame.redPixels==0,"hidden player layer suppresses both character and Laser Sight");
+            else{
+                require(frame.playerDraws==1&&frame.redPixels>0,"visible player layer draws character and Laser Sight once");
+                require((playerAt<effectAt)==(pack==&raisedRooms),"player painter position follows source layer depth");
+            }
+        }
     }
     {
         auto game=std::make_unique<downwell::Game>(&rooms,&objects,&builders);

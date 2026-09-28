@@ -423,9 +423,40 @@ void Game::renderMain(Renderer& renderer) const {
                             static_cast<int>(bullet.y - viewY), 1.0F, 1.0F,
                             static_cast<float>(bullet.trajectory.direction * (360.0 / 4294967296.0)));
     };
-    renderingSucceeded_=startup_.visitDrawChecked([&](InstanceHandle key,const InstanceRecord& instance){
+    bool unregisteredBulletsDrawn=false;
+    const auto drawUnregisteredBullets=[&]{
+        if(unregisteredBulletsDrawn)return;
+        unregisteredBulletsDrawn=true;
+        // Explicit resource-less fixtures have no projectile records. Keep
+        // their fallback behind the foreground bank and player as before.
+        for(unsigned i=0;i<startup_.mainBulletCount();++i){
+            const auto& bullet=startup_.mainBulletAt(i);
+            if(!bullet.instance.generation)drawBullet(bullet);
+        }
+    };
+    const auto drawPlayer=[&]{
+        if (startup_.mainPlayerVisible())
+            renderer.drawSpriteTransformed(
+                startup_.mainPlayerSpriteId(),
+                static_cast<std::uint32_t>(startup_.mainPlayerImageIndex()),
+                player->x - viewX, player->y - viewY,
+                static_cast<float>(startup_.mainPlayerFacing()), 1.0F, 0.0F);
+        // playerDraw places the ray outside dFlash but inside the player's
+        // Draw event/layer. noDraw's Cat interaction is not yet implemented.
+        if (startup_.upgrades().levels[12] && !startup_.goalStopped()) {
+            const auto line = LaserSightLine::from(
+                LaserSightRay::fromQ8(static_cast<std::int32_t>(startup_.mainPlayerX()*256)),
+                LaserSightRay::fromQ8(static_cast<std::int32_t>(startup_.mainPlayerY()*256)),
+                startup_.mainLaserSightEndpoint(), static_cast<int>(viewX), static_cast<int>(viewY));
+            line.draw([&](int x, int y) {
+                renderer.fillRect(x, y, 1, 1, {255, 0, 0, 255});
+            });
+        }
+    };
+    renderingSucceeded_=startup_.visitDrawAtDepthChecked([&](InstanceHandle key,const InstanceRecord& instance,int depth){
         if(!instance.active||instance.destroyRequested)return true;
-        if(instance.depth < -1000&&!drawForeground())return false;
+        if(depth < -1000){drawUnregisteredBullets();if(!drawForeground())return false;}
+        if(instance.objectId==35){drawPlayer();return true;}
         if(instance.objectId==370){
             if(composite)return true;
             const auto* effect=startup_.debrisForDraw(key,instance);
@@ -456,29 +487,8 @@ void Game::renderMain(Renderer& renderer) const {
         return true;
     });
     if(!renderingSucceeded_)return;
-    // Explicit resource-less fixtures have no registered projectile record.
-    for(unsigned i=0;i<startup_.mainBulletCount();++i){
-        const auto& bullet=startup_.mainBulletAt(i);
-        if(!bullet.instance.generation)drawBullet(bullet);
-    }
+    drawUnregisteredBullets();
     if(!drawForeground()){renderingSucceeded_=false;return;}
-    if (startup_.mainPlayerVisible())
-        renderer.drawSpriteTransformed(
-            startup_.mainPlayerSpriteId(),
-            static_cast<std::uint32_t>(startup_.mainPlayerImageIndex()),
-            player->x - viewX, player->y - viewY,
-            static_cast<float>(startup_.mainPlayerFacing()), 1.0F, 0.0F);
-    // playerDraw places this outside dFlash: damage blinking hides the player
-    // sprite, not the ray. noDraw's Cat interaction is not yet implemented.
-    if (startup_.upgrades().levels[12] && !startup_.goalStopped()) {
-        const auto line = LaserSightLine::from(
-            LaserSightRay::fromQ8(static_cast<std::int32_t>(startup_.mainPlayerX()*256)),
-            LaserSightRay::fromQ8(static_cast<std::int32_t>(startup_.mainPlayerY()*256)),
-            startup_.mainLaserSightEndpoint(), static_cast<int>(viewX), static_cast<int>(viewY));
-        line.draw([&](int x, int y) {
-            renderer.fillRect(x, y, 1, 1, {255, 0, 0, 255});
-        });
-    }
     // __global_object_depths: fxFlashBall is -200000, in front of the
     // player (-50000), ordinary projectiles (0) and currency (10000).
     // It draws directly; the controller's effect surfaces follow at -300000.
