@@ -40,8 +40,9 @@ public:
         return createAt({}, {},speed,pause);
     }
     template<class Pause> bool createAt(MotionBinary64 x,MotionBinary64 y,int& speed,Pause pause){
-        if(!succeeded_||count_==Capacity || !next_)return false;
-        RunnerImageValue px,py;if(!px.assign(x)||!py.assign(y))return false;
+        if(!succeeded_)return false;
+        if(count_==Capacity || !next_)return fail();
+        RunnerImageValue px,py;if(!px.assign(x)||!py.assign(y))return fail();
         // Insert before synchronous Create. A failing pause leaves the source
         // assignments and instance present; caller must latch the failure.
         for(unsigned i=count_;i>0;--i)slots_[i]=slots_[i-1];

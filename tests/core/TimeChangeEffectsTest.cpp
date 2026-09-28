@@ -41,7 +41,6 @@ int main(){
         for(unsigned i=0;i<14;++i)registered.advanceAlarm(registered.beginPhase(),1,registeredSpeed);
         if(failure==3||failure==4){assert(!registered.succeeded()&&!registered.clear());continue;}
         assert(registered.succeeded()&&registered.size()==0&&world.destroys==1&&world.retires==0);
-        assert(!registered.createAt(x,y,registeredSpeed,pause)&&world.births==1);
         assert(registered.retireRequested()==(failure!=5)&&world.retires==1);
         if(failure==5)assert(!registered.succeeded()&&!registered.retireRequested()&&world.retires==1);
         else assert(registered.sourceId(1)==0);
@@ -82,10 +81,38 @@ int main(){
     }
     assert(owner.size()==0);
     assert(owner.create(speed,pause) && owner.create(speed,pause) && owner.create(speed,pause));
-    assert(!owner.create(speed,pause) && pauses==6);
     const auto stale=owner.beginPhase();owner.clear();assert(owner.create(speed,pause));
     owner.advanceAlarm(stale,1,speed);owner.advanceAlarm(stale,1,speed);assert(speed==30);
     const auto phase=owner.beginPhase();owner.advanceAlarm(phase,1,speed);owner.advanceAlarm(phase,1,speed);assert(speed==35);
     owner.clear();assert(!owner.create(speed,[](unsigned){return false;}));assert(owner.size()==1 && speed==30);
+    // A failed Create is terminal, not a recoverable skipped visual effect.
+    // Keep earlier children/room-speed writes, but dispatch no later work.
+    for(bool registered:{false,true})for(unsigned fault=0;fault<6;++fault){
+        int failedSpeed=60;Registration world{failedSpeed};TimeChangeEffects<1> effects;
+        if(registered)assert(effects.bind(world));
+        unsigned pauseCount=0;
+        auto countedPause=[&](unsigned){++pauseCount;return true;};
+        if(fault<2)assert(effects.createAt(x,y,failedSpeed,countedPause));
+        // A registered destroyed instance still occupies storage until the
+        // global retirement phase; visible size zero does not free capacity.
+        if(fault==1){
+            if(!registered)continue; // Unregistered owners retire immediately.
+            for(unsigned tick=0;tick<14;++tick)
+                effects.advanceAlarm(effects.beginPhase(),1,failedSpeed);
+            assert(effects.size()==0&&world.destroys==1&&world.retires==0);
+        }
+        const auto phase=effects.beginPhase();
+        const auto oldSize=effects.size(),oldPauses=pauseCount,oldBirths=world.births;
+        const auto oldPublications=world.publishes,oldDestroys=world.destroys;const int oldSpeed=failedSpeed;
+        const MotionBinary64 bad=fault%2==0?MotionBinary64{0x7ff00000u,0}:
+            MotionBinary64{0x7fefffffu,0xffffffffu};
+        assert(!effects.createAt(fault>=2&&fault<4?bad:x,fault>=4?bad:y,failedSpeed,countedPause));
+        assert(!effects.succeeded()&&effects.size()==oldSize&&failedSpeed==oldSpeed);
+        assert(!effects.createAt(x,y,failedSpeed,countedPause));
+        for(unsigned i=0;i<20;++i)effects.advanceAlarm(phase,1,failedSpeed);
+        assert(!effects.clear()&&effects.size()==oldSize&&failedSpeed==oldSpeed);
+        assert(pauseCount==oldPauses&&world.births==oldBirths&&world.publishes==oldPublications);
+        assert(effects.sourceId(2)==0&&world.destroys==oldDestroys&&world.retires==0);
+    }
     std::puts("Time-change ownership: single/overlapping ramps, phase cutoffs, capacity, reset and partial failure passed");
 }
