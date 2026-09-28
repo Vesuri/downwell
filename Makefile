@@ -1188,7 +1188,7 @@ build/legacy-image-animation-test: tests/core/LegacyImageAnimationTest.cpp src/c
 verify-runner-image-value: build/runner-image-value-test
 	./build/runner-image-value-test
 
-build/runner-image-value-test: tests/core/RunnerImageValueTest.cpp src/core/RunnerImageValue.h src/core/MotionBinary64.h
+build/runner-image-value-test: tests/core/RunnerImageValueTest.cpp src/core/RunnerImageValue.h src/core/RunnerIntegerValueVerification.h src/core/MotionBinary64.h
 	@mkdir -p build
 	$(CXX) $(CXXFLAGS) -Isrc -o $@ tests/core/RunnerImageValueTest.cpp
 

@@ -1,13 +1,22 @@
 #include "core/RunnerImageValue.h"
+#include "core/RunnerIntegerValueVerification.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 static void check(bool ok) { if (!ok) std::abort(); }
 int main() {
+    check(downwell::RunnerIntegerValueVerification::run());
     std::uint32_t rng = 1;
     unsigned cases = 0;
     for (unsigned i = 0; i < 100000; ++i) {
         rng = rng * 1664525u + 1013904223u;
+        const std::int32_t integer=std::int32_t(rng&0x7fffffffu)*(rng&0x80000000u?-1:1);
+        check(downwell::RunnerIntegerValueVerification::check(integer));
+        downwell::RunnerImageValue direct;
+        check(direct.assignInteger(integer));
+        const float floatInteger=static_cast<float>(integer);
+        std::uint32_t integerBits;std::memcpy(&integerBits,&floatInteger,4);
+        check(direct.bits==integerBits);
         const auto high = (rng & 0x800fffffu) | ((900u + i % 250) << 20);
         rng = rng * 1664525u + 1013904223u;
         // Random discarded bits plus exact ties and neighbors, both signs.

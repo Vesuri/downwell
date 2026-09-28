@@ -60,7 +60,7 @@ private:
             cosine.assign(c)&&sine.assign(s);
     }
     static bool roundPixel(RunnerImageValue v,std::int32_t& n){return v.promoted().roundPixel(n);}
-    static bool real(int n,RunnerImageValue& out){return out.assign(MotionBinary64::fromInteger(n));}
+    static bool real(int n,RunnerImageValue& out){return out.assignInteger(n);}
     bool refresh(InstanceHandle key,bool publish){
         DW_PROFILE_SCOPE(profileInstanceBounds);
         const auto* flags=families_.flags(unsigned(owner_.objectId(key)));

@@ -54,7 +54,7 @@ public:
             if(entries_[element].instance.generation||layers.elementOwner(element)!=layer)return false;
         }else{element=free(layers);if(element==End)return false;}
         RunnerImageValue depth;
-        if(!depth.assign(MotionBinary64::fromInteger(destination->depth)))return false;
+        if(!depth.assignInteger(destination->depth))return false;
         entries_[element]={sourceId,h,true};
         indexIdentity(element);
         if(element>=usedEnd_)usedEnd_=element+1;

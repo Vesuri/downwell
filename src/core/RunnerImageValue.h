@@ -7,6 +7,24 @@ namespace downwell {
 // subnormal/nonfinite/overflow values fail without changing the destination.
 struct RunnerImageValue {
     std::uint32_t bits = 0;
+    // Every int32 is exactly representable in binary64. Direct nearest-even
+    // narrowing therefore matches assign(MotionBinary64::fromInteger(value)).
+    bool assignInteger(std::int32_t value) {
+        if(!value){bits=0;return true;}
+        const std::uint32_t sign=value<0?0x80000000u:0u;
+        const std::uint32_t magnitude=value<0?0u-std::uint32_t(value):std::uint32_t(value);
+        unsigned top=31-MotionBinary64::Words::leadingZeros32(magnitude);
+        std::uint32_t mantissa;
+        if(top<=23)mantissa=magnitude<<(23-top);
+        else {
+            const unsigned shift=top-23;
+            mantissa=magnitude>>shift;
+            const unsigned half=1u<<(shift-1),remainder=magnitude&((1u<<shift)-1);
+            if(remainder>half||(remainder==half&&(mantissa&1u)))++mantissa;
+            if(mantissa==0x1000000u){mantissa>>=1;++top;}
+        }
+        bits=sign|((top+127u)<<23)|(mantissa&0x7fffffu);return true;
+    }
     bool assign(MotionBinary64 value) {
         const auto sign = value.high & 0x80000000u;
         const auto exponent = (value.high >> 20) & 2047u;

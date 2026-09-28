@@ -106,7 +106,7 @@ public:
             (definition.persistent()?4u:0u)|(definition.managed()?0x80u:0u);
         if((objectFlags&0x87u)!=expected)return checked(false);
         Real depth;
-        if(!depth.assign(MotionBinary64::fromInteger(definition.depth)))return checked(false);
+        if(!depth.assignInteger(definition.depth))return checked(false);
         if(!rebindObjectMembership(h,object,registered))return checked(false);
         properties.sprite.maskId=definition.textureMaskId;
         properties.depth=depth;

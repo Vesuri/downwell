@@ -26,6 +26,17 @@ including tie neighbors and both signs, against host conversion. This uses
 the normal nearest-even floating-point mode; changes to runner FP mode have
 not been independently audited.
 
+For signed 32-bit integer inputs, `assignInteger` directly normalizes the
+magnitude and rounds discarded bits to nearest-even, including mantissa carry.
+All such inputs are exactly representable in binary64, so this matches the
+retained `assign(MotionBinary64::fromInteger(n))` path without its intermediate
+construction. Zero produces positive zero; INT_MIN is handled with unsigned
+magnitude arithmetic. Collision-owner integer publication, object default depth
+and layer attachment depth use this path. Host tests compare 100,000 integers
+with both the retained path and host float conversion; shared native fixtures
+cover powers of two, ties, carries and the signed limits. Fractional inputs
+continue through the existing general narrowing path.
+
 The new, not-yet-live skeleton timing component now narrows `imgSp` when Step
 copies it to `image_speed`; subsequent custom-rate changes still leave that
 Step's stored speed unchanged. Its 64 timing cases pass with the narrowed
