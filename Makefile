@@ -894,8 +894,18 @@ build/gameplay-collision-owner-test: tests/core/GameplayCollisionOwnerTest.cpp s
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
 
-verify-time-field-wind: build/time-field-wind-test
+verify-time-field-wind: verify-sound-play build/time-field-wind-test
 	./build/time-field-wind-test
+
+test: verify-sound-play
+.PHONY: verify-sound-play
+verify-sound-play: build/sound-play-script-test
+	python3 tools/verify-sound-play.py
+	./build/sound-play-script-test
+
+build/sound-play-script-test: tests/core/SoundPlayScriptTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
 
 build/time-field-wind-test: tests/core/TimeFieldWindTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
 	@mkdir -p build

@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_GAMEPLAY_FIELD_REENTRY_VERIFICATION_H
 #define DOWNWELL_GAMEPLAY_FIELD_REENTRY_VERIFICATION_H
 #include "GameplayCollisionOwner.h"
+#include "SoundPlayVerification.h"
 namespace downwell {
 // Test-only lifecycle tape, shared by host tests and the 68000 debugger gate.
 // The exit is deliberately placed at the player; this is not evidence for a
@@ -17,6 +18,7 @@ struct GameplayFieldReentryVerification {
         checks=0;gameSteps=clearSteps=0;
         unsigned population=0;
         stage=1;
+        if(!SoundPlayVerification::run())return false;
         if(!world.effectsSucceeded()||!owner.valid()||world.runStage().area!=1||world.runStage().level!=1||
             !owner.population(255,population)||population)return false;
         firstGeneration=world.goalFieldInstances().birthSequence();

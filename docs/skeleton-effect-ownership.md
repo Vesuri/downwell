@@ -69,6 +69,26 @@ further effect work. Resource-backed tests cover fractional placement, setter
 ordering, unchanged RNG and the partial-failure prefix in both worlds. This
 entry point is not yet admission of the complete natural box destruction Step.
 
+`SoundPlayScript` models the original plain and overlap-aware audio scripts,
+including caller scratch fields and partial-failure ordering. The overlap
+channels are footsteps/gunshot/gunwall/merchant/enemymove/music/waterEnemy/
+waterThings/UI/boss (0–9); unknown names retain channel 0. Enemy movement and
+water-enemy channels suppress offscreen playback but still stop the selected
+resource. Channels 7–9 likewise stop that resource, not the previous channel
+entry, and force `cutPrv` off. Other cutting channels stop the prior entry.
+Gunshot invokes the supplied `bgmDuck` callback before setting channel 1.
+Gain is multiplied by game volume; underwater pitch is 0.55 except for overlap
+channels 5–8. Muted music is started, configured, then stopped as in the VM.
+An offscreen script exits without a voice result; a completed overlap call
+returns -1 when the new voice is not playing. Plain sound returns the voice
+without the final playing query. `TimeFieldWind` uses this shared UI path.
+The channel entry reference must be selected with `channel(name)` by the owner;
+the environment supplies published caller/view coordinates and current globals.
+The bounded native tape exercises the box's waterThings route and each audio
+failure prefix. Actual audio backends, shared channel ownership, duck behavior
+and natural box-event admission remain integration requirements; these tests
+do not establish audible fidelity.
+
 Box Alarm 0 is dispatched by both normal schedulers: the shared event body
 sets `wallHp` to zero, without emitting effects or retiring the box. Native
 storage keeps one 32-bit countdown per box; it does not allocate twelve slots
