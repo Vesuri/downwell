@@ -426,6 +426,25 @@ int main(){
     auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     {
+        ObjectAlarmMetadata<386> metadata;unsigned mask=0;
+        assert(!metadata.mask(0,mask)&&metadata.bind(objects));
+        unsigned inherited=0;
+        for(unsigned pass=0;pass<2;++pass)for(unsigned id=0;id<objects.objectCount();++id){
+            assert(metadata.mask(int(id),mask));
+            for(unsigned alarm=0;alarm<12;++alarm){
+                PackedObjectEvent event;
+                const bool found=objects.findEvent(int(id),2,int(alarm),event);
+                assert(bool(mask&(1u<<alarm))==found);
+                if(found&&event.ownerObjectId!=int(id))++inherited;
+            }
+        }
+        assert(inherited&&!metadata.mask(-1,mask)&&!metadata.mask(int(objects.objectCount()),mask));
+        ObjectPack invalid(nullptr,0);
+        assert(!metadata.bind(invalid)&&!metadata.mask(0,mask));
+        assert(metadata.bind(objects)&&metadata.mask(266,mask));
+        assert(mask&1u);
+    }
+    {
         TimeChangeEffects<8> effects;int speed=60;unsigned pauses=0;
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
         auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),

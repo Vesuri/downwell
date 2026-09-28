@@ -11,6 +11,7 @@
 #include "TimeStopBound.h"
 #include "GameplayRoomLayers.h"
 #include "ObjectDrawMetadata.h"
+#include "ObjectAlarmMetadata.h"
 #include "Profile.h"
 namespace downwell {
 // Resource-backed ownership at the native world's existing publication points.
@@ -33,6 +34,7 @@ private:
     const SpriteCollisionPack& sprites_;
     GameplayRoomLayers<View::capacity> layers_;
     ObjectDrawMetadata<386> drawMetadata_;
+    ObjectAlarmMetadata<386> alarmMetadata_;
     GameplayWorld* world_=nullptr;
     const GameplayWorld::PlayerInstance* initialPlayer_=nullptr;
     InstanceHandle initialPlayerKey_{};
@@ -239,7 +241,7 @@ public:
         GameplayTerrainInstances::Presentation presentation={},GameplayTerrainInstances::WallCollision collision={},
         const RoomPack* rooms=nullptr):objects_(objects),sprites_(sprites),layers_(rooms),
         terrain_(GameplayTerrainInstances::Binding::bindDestruction(terrainBinding_),presentation,collision){
-        good_=sprites.valid()&&families_.bindInstanceFlags(objects)&&drawMetadata_.bind(objects);
+        good_=sprites.valid()&&families_.bindInstanceFlags(objects)&&drawMetadata_.bind(objects)&&alarmMetadata_.bind(objects);
         if(good_)for(unsigned selector=0;selector<2;++selector){
             terrainFamilies_[selector]=true;
             for(unsigned i=0;i<families_.size();++i)
@@ -456,6 +458,11 @@ private:
         for(unsigned alarm=0;alarm<AlarmBank::count;++alarm)for(unsigned i=0;i<count;++i){
             const auto h=snapshot.handle(i);const auto* current=owner_.resolve(h);
             if(!current||(current->flags&0x100003u))continue;
+            unsigned alarmMask;
+            if(!check(alarmMetadata_.mask(owner_.objectId(h),alarmMask)))return false;
+            if(!(alarmMask&(1u<<alarm)))continue;
+            // Capture validated every admitted lifetime. Revalidate the typed
+            // store before each real event, not for absent event-table entries.
             if(!check(resolves(h)))return false;
             PackedObjectEvent event;
             if(!objects_.findEvent(owner_.objectId(h),2,int(alarm),event))continue;

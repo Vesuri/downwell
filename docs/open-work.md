@@ -12,8 +12,10 @@ on PAL; do not add 60 Hz catch-up.
 
 ## Priority and scope
 
-Next: finish live skeleton encounters, following the dependency order in
-section 1. Then make catacombs playable (section 2), followed by the remaining
+Next: recover the A500 gameplay frame budget (section 5), especially full-room
+layer, animation/snapshot and alarm-registration traversal. Then finish live
+skeleton encounters, following the dependency order in section 1, make
+catacombs playable (section 2), followed by the remaining
 content (section 4). Apply the fidelity, performance, architecture, memory and
 verification requirements in sections 3 and 5–8 to each integration; they are
 not deferred cleanup phases.
@@ -191,6 +193,11 @@ Reference: [upgrade IDs and source entry points](upgrade-coverage.md).
 
 - Fit worst-case gameplay, style/upgrade navigation and transitions into 20 ms.
   Re-profile after integration changes; average FPS is not the criterion.
+- Reduce full-room bookkeeping in layer projection, animation/previous-position
+  snapshots and alarm registration capture. Preserve inactive layer termination,
+  callback order, generation checks and synchronous mutation visibility. Measure
+  both steady gameplay and the garden-to-well transition; a short
+  `SKIP_TO_GAME=1` sample does not cover the reported worst transition stall.
 - Remove unnecessary terrain recomposition and transfers. Preserve circular
   hardware scrolling, static terrain backing and incremental restoration.
   Audit external coordinate writes before eliminating stationary terrain's
