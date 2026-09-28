@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_DRONE_BULLET_SOURCE_STEP_H
 #include "MachineGunSourceMotion.h"
 #include "RunnerRealComparison.h"
+#include "BulletSolidScript.h"
 namespace downwell {
 // Object 266 (also spawned by Gunpowder Blocks), not bulletExplosion.
 // Shared event arithmetic; room identity, inherited hit-memory storage,
@@ -22,6 +23,23 @@ struct DroneBulletSourceStep {
     }
     void alarmZero(){decelerate=true;}
     bool drawable()const{return motion.initialized;}
+    // World adapter: use the same solid script as the usual gun, with this
+    // object's Create defaults and the caller's current damage/direction.
+    // The lower-level step callback remains useful for arithmetic fixtures.
+    template<class Random,class Ops>
+    bool stepWithSolid(Random& random,Ops& ops,bool& good){
+        struct Bound {
+            Ops& ops;bool& good;
+            bool publishAngle(RunnerImageValue v){return ops.publishAngle(v);}
+            bool publishImageSpeed(RunnerImageValue v){return ops.publishImageSpeed(v);}
+            bool publishPosition(RunnerImageValue x,RunnerImageValue y){return ops.publishPosition(x,y);}
+            bool solid(DroneBulletSourceStep& shot){
+                const BulletSolidScript::Settings settings{shot.damage,shot.motion.direction,hitWallFx,false,false,false};
+                return BulletSolidScript::run(settings,ops,good);
+            }
+        } bound{ops,good};
+        return step(random,bound,good);
+    }
     template<class Random,class Ops>
     bool step(Random& random,Ops& ops,bool& good){
         if(!good)return false;

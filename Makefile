@@ -586,6 +586,7 @@ test: verify-drone-bullet
 .PHONY: verify-drone-bullet
 verify-drone-bullet: build/drone-bullet-source-step-test
 	python3 tools/verify-drone-bullet.py
+	python3 tools/verify-machine-gun.py
 	./build/drone-bullet-source-step-test
 build/drone-bullet-source-step-test: tests/core/DroneBulletSourceStepTest.cpp src/core/GameMakerRandom.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc
 	@mkdir -p build

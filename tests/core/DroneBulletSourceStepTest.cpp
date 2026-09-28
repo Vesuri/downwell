@@ -1,4 +1,5 @@
 #include "core/DroneBulletVerification.h"
+#include "core/DroneBulletSolidVerification.h"
 #include "core/GameMakerRandom.h"
 #include <cassert>
 #include <cmath>
@@ -19,6 +20,7 @@ struct Scalar {
 static double snap(float value){double integral;const float fraction=float(std::modf(double(value),&integral));return std::abs(fraction)<0.0001f?integral:double(value);}
 int main(){
     assert(DroneBulletVerification::run());
+    assert(DroneBulletSolidVerification::run(true));
     unsigned steps=0;
     for(int degrees:{0,45,90,180,270,359})for(unsigned alarm:{0u,1u,16u}){
         DroneBulletSourceStep shot;GameMakerRandom random(9),oracle(9);bool good=true;
@@ -49,5 +51,5 @@ int main(){
             ++steps;
         }
     }
-    std::printf("Drone bullet: %u source scalar steps, one-time RNG, delayed decay and retained post-destroy movement passed\n",steps);
+    std::printf("Drone bullet: %u source scalar steps, 10 composed solid routes, callback failure prefixes and post-destroy movement passed\n",steps);
 }

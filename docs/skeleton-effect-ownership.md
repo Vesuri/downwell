@@ -118,6 +118,17 @@ then `scrBulletOov`; animation end requests destruction and Draw requires
 object ownership, inherited hit memory, collision-event dispatch, animation
 and both renderers remain unconnected; this helper does not enable the upgrade.
 
+`stepWithSolid` composes that update with the existing `BulletSolidScript`.
+It supplies current damage/direction, hit sprite 101 and the drone's false
+consistent/wave/explode defaults. The adapter uses the same absolute-coordinate
+motion for approach and final movement: approach publishes Y then X in tenths
+of the velocity, while the final Step publishes X then Y even after destruction.
+The composed tape covers solid walls, live/exhausted boxes, empty space and an
+enemy-line-suppressed wall with a shootable object. It checks both ordinary
+damage 4 and the box's override to 20, along with every callback failure prefix.
+The native tape runs those same successful routes. This does not supply the
+remaining resource-backed selectors or register live drone instances.
+
 The final box `alarmStop(0)` adapter also resolves its caller again after the
 time-bound query. A callback which retires the caller cannot publish into its
 old storage, and a nested ownership failure remains terminal even if the
