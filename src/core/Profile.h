@@ -32,6 +32,8 @@ enum DownwellProfilePhase {
     profileDamageNumberDraw,
     profileControllerComposition,
     profileActorLayerWalk, profileActorPreparation,
+    profileInstanceBirth, profileInstanceBounds, profileInstanceBoundsTrig,
+    profileInstanceLayerAttach, profileEffectBirth,
     profilePhaseCount
 };
 

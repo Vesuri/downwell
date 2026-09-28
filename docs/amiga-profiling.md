@@ -58,6 +58,14 @@ traces, allowing for the extra instrumentation overhead. Actor preparation
 includes coordinate/animation selection, asset bounds and foreground insertion;
 it is not planar drawing or DMA publication. Ordinary builds omit these probes.
 
+Birth phases 82–86 separate native instance registration (82), collision bounds
+refresh (83), its nonzero-angle trigonometry (84), room-layer attachment (85),
+and shared script-effect creation (86). These are exclusive nested scopes:
+effect creation excludes instance birth, and instance birth excludes nested
+bounds and layer attachment. Bounds refresh also runs outside births. Sum the
+relevant nested phases when comparing older caller totals; phase 86 alone is
+not the total cost of an effect. Normal and FPS-only builds omit these probes.
+
 Use `SKIP_LEVEL=1` for level completion and `SKIP_INTRO=1` for style selection
 instead of the gameplay shortcut. Use `PROFILE_LASER=1` when investigating
 the upgraded Laser Sight fixture. Keep identical inputs, seeds, build options

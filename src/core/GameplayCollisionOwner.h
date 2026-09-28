@@ -10,6 +10,7 @@
 #include "TimeStopBound.h"
 #include "GameplayRoomLayers.h"
 #include "ObjectDrawMetadata.h"
+#include "Profile.h"
 namespace downwell {
 // Resource-backed ownership at the native world's existing publication points.
 // Terrain-only queries retain their explicit resource-family gate. Projectile
@@ -54,9 +55,11 @@ private:
     static bool roundPixel(RunnerImageValue v,std::int32_t& n){return v.promoted().roundPixel(n);}
     static bool real(int n,RunnerImageValue& out){return out.assign(MotionBinary64::fromInteger(n));}
     bool refresh(InstanceHandle key,bool publish){
+        DW_PROFILE_SCOPE(profileInstanceBounds);
         const auto* flags=families_.flags(unsigned(owner_.objectId(key)));
         return flags&&owner_.refreshSprite(key,*flags,false,sprites_,properties_[key.slot].sprite,true,
             [](auto angle,auto& cosine,auto& sine){
+                DW_PROFILE_SCOPE(profileInstanceBoundsTrig);
                 RunnerImageValue radians;MotionBinary64 c,s;
                 return SmokeDirection::radians(angle,radians)&&smokeTrig(radians.promoted(),c,s)&&
                     cosine.assign(c)&&sine.assign(s);
@@ -95,6 +98,7 @@ private:
             return parent.check(pointer==&r);
         }
         bool birth(InstanceHandle local,const Record& r){
+            DW_PROFILE_SCOPE(profileInstanceBirth);
             InstanceHandle h;if(!key(local,r,h,true))return false;
             if constexpr(Kind==View::Kind::player)if(!parent.check(parent.layers_.prepare()))return false;
             constexpr bool roomCoordinates=Kind==View::Kind::player||Kind==View::Kind::terrain||Kind==View::Kind::timeField||Kind==View::Kind::goalField||Kind==View::Kind::exitController;
@@ -142,7 +146,10 @@ private:
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
             constexpr bool projected=Kind==View::Kind::player||Kind==View::Kind::enemy||
                 Kind==View::Kind::bullet||Kind==View::Kind::scriptEffect||Kind==View::Kind::debris;
-            if(!parent.check(parent.layers_.birth(h,sourceId,p.depth,(state.flags&2u)!=0,projected)))return false;
+            {
+                DW_PROFILE_SCOPE(profileInstanceLayerAttach);
+                if(!parent.check(parent.layers_.birth(h,sourceId,p.depth,(state.flags&2u)!=0,projected)))return false;
+            }
             if constexpr(Kind==View::Kind::player){
                 if(!parent.world_){parent.initialPlayer_=&r;parent.initialPlayerKey_=local;}
             }

@@ -275,6 +275,7 @@ public:
     bool spawnScriptEffect(downwell::ScriptSpawnEffects<Capacity>& effects,
         downwell::MotionBinary64 x,downwell::MotionBinary64 y,int sprite,downwell::MotionBinary64 speed,
         downwell::MotionBinary64 angle,downwell::MotionBinary64 depth,Frames frames,downwell::InstanceHandle& myFx){
+        DW_PROFILE_SCOPE(profileEffectBirth);
         if(!run_.effectsSucceeded)return false;
         if(!scriptSpawnInstances_){run_.effectsSucceeded=false;return false;}
         auto& registration=*scriptSpawnInstances_;
