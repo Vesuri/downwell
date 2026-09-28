@@ -29,6 +29,7 @@ private:
     Owner::RegistrationProjection<View::terrainBase,View::timeFieldBase> actorRegistrations_;
     RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity+GameplayWorld::droneBulletCapacity> combatAlarmPhase_;
     std::uint32_t combatAlarmCaptureRevision_=0;
+    unsigned combatAlarmMask_=0;
     bool combatAlarmCaptureValid_=false;
     RunnerRoomMembership<View::capacity> room_;
     RunnerRoomMembership<View::capacity>::AnimationProjection animationProjection_;
@@ -426,7 +427,7 @@ public:
                     kind==View::Kind::timeChange?self.world_->advanceTimeChangeRoomAlarm(local,alarm):
                     kind==View::Kind::drone?(alarm==0&&self.drones_.advanceAlarm(local)):
                     kind==View::Kind::entryDither&&self.entries_.advanceAlarm(local,alarm);
-            },reused);
+            },reused,&self.combatAlarmMask_);
         },this);
         world.configureDebrisStepOrder([](void* context,GameplayWorld::DebrisStepOrder& phase){
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
@@ -489,21 +490,29 @@ public:
     }
 private:
     template<unsigned Capacity,class AdvanceAndDispatch>
-    bool dispatchCapturedAlarms(RunnerStepSnapshot<Capacity>& snapshot,AdvanceAndDispatch advanceAndDispatch,bool alreadySorted=false){
+    bool dispatchCapturedAlarms(RunnerStepSnapshot<Capacity>& snapshot,AdvanceAndDispatch advanceAndDispatch,
+        bool alreadySorted=false,unsigned* retainedMask=nullptr){
         DW_PROFILE_SCOPE(profileAlarmScan);
         if(!alreadySorted){DW_PROFILE_SCOPE(profileAlarmSort);snapshot.sort();}
         const unsigned count=snapshot.size();
         const auto bindingRevision=owner_.bindingRevision();
-        unsigned capturedAlarms=0;int previousObject=-1;
+        unsigned capturedAlarms=alreadySorted&&retainedMask?*retainedMask:0;
         // Capture admitted resource-backed objects and sort grouped them.
         // No callbacks occur here, so one lookup per group safely identifies
         // entire event-table columns that cannot dispatch any captured entry.
-        for(unsigned i=0;i<count;++i){
-            const int object=snapshot.object(i);
-            if(object==previousObject)continue;
-            unsigned mask;
-            if(!check(alarmMetadata_.mask(object,mask)))return false;
-            capturedAlarms|=mask;previousObject=object;
+        // A reused capture has the same ordered objects and immutable resource
+        // masks. Retain this union with it instead of rescanning every tick.
+        // Binding changes during dispatch still disable absent-column skips.
+        if(!alreadySorted||!retainedMask){
+            int previousObject=-1;
+            for(unsigned i=0;i<count;++i){
+                const int object=snapshot.object(i);
+                if(object==previousObject)continue;
+                unsigned mask;
+                if(!check(alarmMetadata_.mask(object,mask)))return false;
+                capturedAlarms|=mask;previousObject=object;
+            }
+            if(retainedMask)*retainedMask=capturedAlarms;
         }
         for(unsigned alarm=0;alarm<AlarmBank::count;++alarm){
           if(!(capturedAlarms&(1u<<alarm))&&owner_.bindingsUnchanged(bindingRevision))continue;

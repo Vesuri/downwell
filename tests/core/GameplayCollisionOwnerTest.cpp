@@ -532,6 +532,10 @@ int main(){
                 return ms==30&&speed==30&&record->sourceId==id&&record->alarms.get(0)==2&&
                     record->alarms.get(1)==2&&published&&published->x.bits==0x43704000u&&published->y.bits==0x43308000u;
             });};
+        // Warm an empty combat capture/mask before admitting new alarm
+        // columns. Later inactive/active transitions and Retry must rebuild
+        // that plan, while unchanged captures retain immediate countdowns.
+        for(unsigned tick=0;tick<3;++tick){world->step(0);assert(world->effectsSucceeded()&&owner->valid());}
         assert(create(105187));
         const auto old=owner->timeChanges().handle(1);InstanceHandle shared;
         assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::timeChange,old,shared));

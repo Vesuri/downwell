@@ -95,6 +95,11 @@ without admitting newborns into the current phase. Attaching a world also
 invalidates the cache. Reuse omits only capture and sorting, never the live
 per-callback checks or alarm countdowns. Explicit caller-snapshot dispatch still
 captures fresh; the cache belongs exclusively to the bound combat owner.
+The union of present alarm columns is prepared with that capture and retained
+alongside it. An unchanged capture does not rescan its object IDs to rebuild
+the union. Recapture recomputes it, including empty captures. A binding change
+during a callback still disables absent-column skipping for subsequent alarms;
+the retained union never replaces live eligibility or current-object checks.
 
 `ObjectAlarmMetadata::bind` prepares all inherited alarm handlers before
 gameplay. Each object has a 12-bit presence mask and a sparse-row offset;
