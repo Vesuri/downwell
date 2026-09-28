@@ -331,11 +331,13 @@ public:
                 // room order. Unchanged terrain has no animation dispatch in
                 // this adapter and already retains the identical snapshot.
                 if(shared.slot>=View::terrainBase&&shared.slot<View::timeFieldBase){
+                    DW_PROFILE_COUNT(counterTerrainSnapshots);
                     const auto* terrain=self.world_->terrainInstances();
                     return terrain&&terrain->find({shared.slot-View::terrainBase,shared.generation})&&
                         self.owner_.capturePrevious(shared);
                 }
                 View::Kind kind;InstanceHandle local;
+                DW_PROFILE_COUNT(counterActorSnapshots);
                 if(!View::decode(shared,kind,local)||!View(*self.world_).contains(shared)||
                     !self.owner_.capturePrevious(shared))return false;
                 switch(kind){

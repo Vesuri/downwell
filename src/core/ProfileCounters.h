@@ -7,6 +7,9 @@ enum DownwellProfileCounter {
     counterLandingFallback, counterBreakableFallback,
     counterSegmentIndexed, counterSegmentCells, counterSegmentFallback,
     counterSpriteHeaderOnly, counterSpritePayloadCopies, counterSpritePayloadWords,
+    counterAnimationFullPass, counterAnimationProjectedPass, counterAnimationProjectionBuild,
+    counterTerrainSnapshots, counterActorSnapshots,
+    counterSnapshotEqualMoves, counterSnapshotChangedMoves,
     profileCounterCount
 };
 #ifdef DOWNWELL_PROBES

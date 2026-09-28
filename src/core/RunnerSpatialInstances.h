@@ -248,6 +248,13 @@ public:
         if(!valid()||!live(h))return false;
         if(snapshotDirty_&&h.slot>=snapshotFirst_&&h.slot<snapshotLast_)*snapshotDirty_=true;
         auto& s=entries_[h.slot].state;
+#ifdef DOWNWELL_PROBES
+        if(snapshotDirty_&&h.slot>=snapshotFirst_&&h.slot<snapshotLast_){
+            if(!s.special&&Math::equal(s.x,x)&&Math::equal(s.y,y)){
+                DW_PROFILE_COUNT(counterSnapshotEqualMoves);
+            }else{DW_PROFILE_COUNT(counterSnapshotChangedMoves);}
+        }
+#endif
         return checked(RunnerSpatialPosition::assign(h.slot,s.x,s.y,s.flags,x,y,
             s.special,true,objectFlags,spatial_,collision_));
     }

@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_RUNNER_ROOM_MEMBERSHIP_H
 #define DOWNWELL_CORE_RUNNER_ROOM_MEMBERSHIP_H
 #include "RunnerSpatialSplit.h"
+#include "ProfileCounters.h"
 namespace downwell {
 // Room lists in 0x48d630. Requests change external flags; reconciliation scans
 // inactive order first, then active order, never the request queue's order.
@@ -48,8 +49,11 @@ public:
         unsigned first,unsigned last,bool& dirty,Visit visit)const{
         if(first>last||last>Capacity)return false;
         bool full=dirty;dirty=false;
+        if(full){DW_PROFILE_COUNT(counterAnimationFullPass);}
+        else{DW_PROFILE_COUNT(counterAnimationProjectedPass);}
         if(!full&&(projection.owner!=this||projection.revision!=revision_||
             projection.first!=first||projection.last!=last)){
+            DW_PROFILE_COUNT(counterAnimationProjectionBuild);
             unsigned next=End;
             for(unsigned slot=tail_[0];slot!=End;slot=entries_[slot].previous){
                 if(slot<first||slot>=last)next=slot;
