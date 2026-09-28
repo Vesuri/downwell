@@ -33,8 +33,31 @@ Consequently, all eligible instances' Alarm 0 processing precedes Alarm 1,
 and so on. An event's write to a later alarm is seen during this same phase;
 a write to an already-visited alarm waits until the next phase. Countdown of
 zero retires it to -1 without dispatch. Negative values are left unchanged.
-This audit does not yet establish every instance-list ordering or mutation
-rule; those require further inspection before replacing the global owner.
+### Object and instance traversal
+
+Alarm table construction at `0x47a57c` passes event type 2 and subtype upper
+bound 12 to `0x47a330`, the same ascending-resource-ID builder used by Step.
+The common table addressing selects count base `0x942540` and object-array
+base `0x93b544`; the dispatcher loads these at `0x509d97`. Construction's
+inclusive upper bound does not add a thirteenth runtime alarm: this phase
+still ends after the twelve slots described above.
+
+Each array entry is resolved through the object map. The successful lookup
+at `0x509e51` loads the object pointer and branches to `0x509de6`, which reads
+its **exact-object** list head at offset `0x38`, not ancestor-family head
+`0x44`. The shared insertion/removal routines reviewed for Step therefore
+also establish registration order within each exact object for alarms.
+An instance is read from node offset 8 at `0x509df4`; the next node is saved
+at `0x509e02` before filtering and dispatch. This is not Draw order or native
+array-slot order.
+
+The static audit now establishes alarm-index / ascending-object-ID /
+exact-object-registration ordering. It does not establish all list-mutation
+or same-phase birth cases: the saved-next walk and creation timestamp filter
+still need to be preserved when replacing it with snapshots. In particular,
+do not infer that every object born during Alarm 0 may run Alarm 1, or that
+recapturing all lifetimes at every alarm index is equivalent. The verifier
+guards these alarm instructions and reuses the Step builder/list guards.
 
 ## Skeleton consequence
 
