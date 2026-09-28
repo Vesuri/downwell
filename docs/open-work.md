@@ -73,6 +73,9 @@ behavior, both backend integrations and relevant original-game verification.
   both schedulers. Wire fractional/mirrored player and shard contacts, transition
   pacing and audio. Preserve moving shards while gravity/animation are paused,
   and the separate alarm cooldown rules.
+  Connect the native time-change registration to the complete global numeric-ID
+  stream before enabling automatic player transitions; its explicit-ID entry
+  point is not a substitute for source-ordered allocation.
 
 ### C. Connect damage effects and actors
 

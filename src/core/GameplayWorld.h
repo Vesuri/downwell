@@ -21,6 +21,7 @@
 #include "core/GameplayExitControllers.h"
 #include "core/GameplayScriptSpawnInstances.h"
 #include "core/GameplayDebrisInstances.h"
+#include "core/GameplayTimeChangeRegistration.h"
 #include "core/ScriptSpawnOperations.h"
 #include "core/EffectSpawnScript.h"
 #include "core/AreaOneBuilder.h"
@@ -70,6 +71,10 @@ struct GameplayFrame {
 // Portable fixed-point world extracted from the native runtime. Terrain and
 // generation are callbacks; no renderer, OS, DMA or platform types are owned.
 // Ring-origin bookkeeping remains for compatibility during SDL migration.
+namespace downwell {
+class GameplayCollisionOwner;
+using NativeTimeChangeRegistration=GameplayTimeChangeRegistration<8,GameplayCollisionOwner>;
+}
 class GameplayWorld {
 public:
     static constexpr unsigned ringHeight = 320;
@@ -227,6 +232,19 @@ public:
     const downwell::GameplayTerrainInstances* terrainInstances()const{return terrainInstances_;}
     const downwell::GameplayScriptSpawnInstances* scriptSpawnInstances()const{return scriptSpawnInstances_;}
     const downwell::GameplayDebrisInstances* debrisInstances()const{return debrisInstances_;}
+    const downwell::NativeTimeChangeRegistration* timeChangeInstances()const{return timeChangeInstances_;}
+    bool bindTimeChangeInstances(downwell::NativeTimeChangeRegistration& registry);
+    template<class Pause> bool createTimeChange(downwell::TimeChangeEffects<8>& effects,
+        downwell::MotionBinary64 x,downwell::MotionBinary64 y,int& speed,Pause pause){
+        if(!run_.effectsSucceeded)return false;
+        if(!timeChangeInstances_||!effects.boundTo(*timeChangeInstances_)||
+           (timeChangeInstances_->size()&&(timeChangeEffects_!=&effects||timeChangeSpeed_!=&speed)))
+            return run_.effectsSucceeded=false;
+        timeChangeEffects_=&effects;timeChangeSpeed_=&speed;
+        return run_.effectsSucceeded=effects.createAt(x,y,speed,pause);
+    }
+    bool advanceTimeChangeRoomAlarm(downwell::InstanceHandle key,unsigned index);
+    bool retireTimeChangeRoomEffect(downwell::InstanceHandle key);
     const downwell::DebrisEffects<downwell::debrisEffectCapacity>& debrisEffects()const{return ownedDebrisEffects_;}
     bool spawnDebris(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int area,downwell::InstanceHandle& result){
         return spawnDebris(ownedDebrisEffects_,x,y,area,result);
@@ -870,6 +888,10 @@ private:
     downwell::GameplayTerrainInstances* terrainInstances_=nullptr;
     downwell::GameplayScriptSpawnInstances* scriptSpawnInstances_=nullptr;
     downwell::GameplayDebrisInstances* debrisInstances_=nullptr;
+    downwell::NativeTimeChangeRegistration* timeChangeInstances_=nullptr;
+    downwell::TimeChangeEffects<8>* timeChangeEffects_=nullptr;
+    int* timeChangeSpeed_=nullptr; // Borrowed source room-speed global, not PAL catch-up.
+    bool clearRoomTimeChanges();
     bool roomTerrainLoaded_=false;
     PlayerInstance playerInstance_;
     std::uint32_t nextPlayerLifetimeId_=1;

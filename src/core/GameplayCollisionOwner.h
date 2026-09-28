@@ -23,7 +23,7 @@ public:
     using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2>;
 private:
     Owner owner_;
-    RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity> combatAlarmPhase_;
+    RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8> combatAlarmPhase_;
     RunnerRoomMembership<View::capacity> room_;
     InstanceHandle roomKeys_[View::capacity]{};
     Owner::Properties properties_[View::capacity]{};
@@ -74,6 +74,7 @@ private:
             if constexpr(Kind==View::Kind::bullet)return 261;
             if constexpr(Kind==View::Kind::scriptEffect)return 219;
             if constexpr(Kind==View::Kind::debris)return 370;
+            if constexpr(Kind==View::Kind::timeChange)return 211;
             if constexpr(Kind==View::Kind::goalField||Kind==View::Kind::exitController)return r.objectId;
             return Kind==View::Kind::player?35:92;
         }
@@ -95,6 +96,7 @@ private:
             else if constexpr(Kind==View::Kind::bullet)pointer=actual.bullet;
             else if constexpr(Kind==View::Kind::scriptEffect)pointer=actual.scriptEffect;
             else if constexpr(Kind==View::Kind::debris)pointer=actual.debris;
+            else if constexpr(Kind==View::Kind::timeChange)pointer=actual.timeChange;
             else pointer=actual.breakable;
             return parent.check(pointer==&r);
         }
@@ -111,6 +113,8 @@ private:
             }else if constexpr(Kind==View::Kind::debris){
                 if(!r.effect)return parent.check(false);
                 state.x=r.effect->x;state.y=r.effect->y;
+            }else if constexpr(Kind==View::Kind::timeChange){
+                state.x=r.x;state.y=r.y;
             }else{
                 if(r.x>0x7fffffff-ox||r.y>0x7fffffff-oy)return parent.check(false);
                 if(!real(r.x+ox,state.x)||!real(r.y+oy,state.y))return parent.check(false);
@@ -145,6 +149,7 @@ private:
             unsigned sourceId=0;
             if constexpr(Kind==View::Kind::terrain)sourceId=r.sourceInstanceId;
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
+            if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
             constexpr bool projected=Kind==View::Kind::player||Kind==View::Kind::enemy||
                 Kind==View::Kind::bullet||Kind==View::Kind::scriptEffect||Kind==View::Kind::debris;
             {
@@ -206,6 +211,9 @@ private:
     GameplayScriptSpawnInstances scriptEffects_{GameplayScriptSpawnInstances::Binding::bindMaskDestructionDepth(scriptEffectsBinding_)};
     Binding<GameplayDebrisInstances::Record,View::Kind::debris> debrisBinding_{*this};
     GameplayDebrisInstances debris_{GameplayDebrisInstances::Binding::bindDestruction(debrisBinding_)};
+    Binding<NativeTimeChangeRegistration::Record,View::Kind::timeChange> timeChangeBinding_{*this};
+    NativeTimeChangeRegistration timeChanges_{*this};
+    std::uint32_t pendingTimeChangeId_=0;
     GameplayTerrainInstances terrain_;
 public:
     GameplayCollisionOwner(const ObjectPack& objects,const SpriteCollisionPack& sprites,
@@ -222,7 +230,7 @@ public:
     }
     GameplayCollisionOwner(const GameplayCollisionOwner&)=delete;
     GameplayCollisionOwner& operator=(const GameplayCollisionOwner&)=delete;
-    bool valid()const{return good_&&owner_.valid()&&terrain_.valid()&&scriptEffects_.valid()&&debris_.valid()&&layers_.valid();}
+    bool valid()const{return good_&&owner_.valid()&&terrain_.valid()&&scriptEffects_.valid()&&debris_.valid()&&timeChanges_.valid()&&layers_.valid();}
     bool attach(GameplayWorld& world){
         if(!valid()||(world_&&world_!=&world)||(!world_&&
             (!initialPlayer_||world.findPlayer(initialPlayerKey_)!=initialPlayer_)))return false;
@@ -232,6 +240,7 @@ public:
         if(!world_&&!world.bindBulletLifecycle(GameplayWorld::BulletLifecycleBinding::bindMaskDestruction(bullets_)))return check(false);
         if(!world_&&!world.bindScriptSpawnInstances(scriptEffects_))return check(false);
         if(!world_&&!world.bindDebrisInstances(debris_))return check(false);
+        if(!world_&&!world.bindTimeChangeInstances(timeChanges_))return check(false);
         world_=&world;
         world.configureRoomActorDraw([](const void* context,GameplayWorld::DrawActorVisitor visit,void* visitor){
             const auto& self=*static_cast<const GameplayCollisionOwner*>(context);
@@ -338,13 +347,14 @@ public:
                 View::Kind kind;InstanceHandle local;if(!View::decode(h,kind,local))return false;
                 return kind==View::Kind::enemy?self.world_->advanceEnemyRoomAlarm(local,alarm):
                     kind==View::Kind::breakable?self.world_->advanceBoxRoomAlarm(local,alarm):
-                    kind==View::Kind::debris&&self.world_->advanceBoundDebrisRoomAlarm(local,alarm);
+                    kind==View::Kind::debris?self.world_->advanceBoundDebrisRoomAlarm(local,alarm):
+                    kind==View::Kind::timeChange&&self.world_->advanceTimeChangeRoomAlarm(local,alarm);
             });
         },this);
         world.configureDebrisStepOrder([](void* context,GameplayWorld::DebrisStepOrder& phase){
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
             if(!self.valid())return false;
-            return self.check(self.owner_.visitRegistrationRange(View::debrisBase,View::capacity,
+            return self.check(self.owner_.visitRegistrationRange(View::debrisBase,View::timeChangeBase,
                 [&](InstanceHandle h,int object,const Owner::State& state){
                     if(state.flags&0x100003u)return true;
                     View::Kind kind;InstanceHandle local;
@@ -416,6 +426,31 @@ private:
 public:
     GameplayScriptSpawnInstances& scriptEffects(){return scriptEffects_;}
     GameplayDebrisInstances& debris(){return debris_;}
+    NativeTimeChangeRegistration& timeChanges(){return timeChanges_;}
+    // Until every native dynamic family participates in the source ID stream,
+    // this entry point accepts only an explicitly supplied original ID. Never
+    // allocate a family-local substitute. The caller owns effects/speed until
+    // registered lifetimes have been retired or the room has been cleared.
+    template<class Pause> bool createTimeChangeWithSourceId(TimeChangeEffects<8>& effects,
+        std::uint32_t id,MotionBinary64 x,MotionBinary64 y,int& speed,Pause pause){
+        if(!valid()||!world_||pendingTimeChangeId_||!id||id>0x7fffffffu)return check(false);
+        if(!effects.boundTo(timeChanges_)&&!effects.bind(timeChanges_))return check(false);
+        pendingTimeChangeId_=id;
+        const bool ok=world_->createTimeChange(effects,x,y,speed,pause);
+        pendingTimeChangeId_=0;return check(ok);
+    }
+    bool birth(InstanceHandle key,const NativeTimeChangeRegistration::Record& record,std::uint32_t& id){
+        if(!pendingTimeChangeId_)return check(false);
+        id=pendingTimeChangeId_;
+        const bool ok=timeChangeBinding_.birth(key,record);
+        pendingTimeChangeId_=0;return ok;
+    }
+    bool markDestroyed(InstanceHandle key,const NativeTimeChangeRegistration::Record& record){
+        return timeChangeBinding_.markDestroyed(key,record);
+    }
+    bool retire(InstanceHandle key,const NativeTimeChangeRegistration::Record& record){
+        return timeChangeBinding_.retire(key,record);
+    }
     const Owner::State* state(InstanceHandle key)const{return valid()?owner_.resolve(key):nullptr;}
     const Owner::Properties* properties(InstanceHandle key)const{return state(key)?&properties_[key.slot]:nullptr;}
     // These take selected shared collision handles, not box-array indices.
@@ -688,6 +723,7 @@ private:
                 case View::Kind::bullet:return record.bullet==world_->resolveBulletLifetime(local)&&world_->retireMarkedBullet(local);
                 case View::Kind::scriptEffect:return retireEffect(local,record);
                 case View::Kind::debris:return record.debris&&world_->retireDebrisRoomEffect(local);
+                case View::Kind::timeChange:return record.timeChange&&world_->retireTimeChangeRoomEffect(local);
                 default:return false;
             }
         });

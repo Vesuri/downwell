@@ -1,6 +1,12 @@
 #include "core/GameplayCollisionOwner.h"
 #include "core/MachineGunSourceStep.h"
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
+bool nativeRegisteredTimeChange(downwell::GameplayCollisionOwner& owner,
+    downwell::TimeChangeEffects<8>& effects,int& speed,std::uint32_t sourceId){
+    return owner.createTimeChangeWithSourceId(effects,sourceId,
+        downwell::RunnerImageValue{0x43704000u}.promoted(),
+        downwell::RunnerImageValue{0x43308000u}.promoted(),speed,[](unsigned ms){return ms==30;});
+}
 bool nativePlayerTimeField(downwell::GameplayCollisionOwner& owner,downwell::MotionBinary64 x,
     downwell::MotionBinary64 y,const downwell::SpriteMaskPack& masks,bool& hit){
     return owner.playerTimeFieldMeeting(x,y,masks,hit);
@@ -419,6 +425,42 @@ int main(){
     }
     auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
+    {
+        TimeChangeEffects<8> effects;int speed=60;unsigned pauses=0;
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));
+        const auto draws=world->randomDrawCount();
+        auto create=[&](std::uint32_t id){return owner->createTimeChangeWithSourceId(effects,id,
+            RunnerImageValue{0x43704000u}.promoted(),RunnerImageValue{0x43308000u}.promoted(),speed,
+            [&](unsigned ms){
+                ++pauses;const auto key=owner->timeChanges().handle(pauses);
+                const auto* record=owner->timeChanges().find(key);InstanceHandle shared;
+                if(!record||!GameplayCollisionView::encode(GameplayCollisionView::Kind::timeChange,key,shared))return false;
+                const auto* published=owner->state(shared);
+                return ms==30&&speed==30&&record->sourceId==id&&record->alarms.get(0)==2&&
+                    record->alarms.get(1)==2&&published&&published->x.bits==0x43704000u&&published->y.bits==0x43308000u;
+            });};
+        assert(create(105187));
+        const auto old=owner->timeChanges().handle(1);InstanceHandle shared;
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::timeChange,old,shared));
+        for(unsigned tick=1;tick<=14;++tick){
+            world->step(0);
+            assert(world->effectsSucceeded()&&owner->valid());
+            assert(speed==int(tick<12?30+5*(tick/2):60));
+        }
+        assert(effects.size()==0&&owner->timeChanges().size()==1&&owner->state(shared)&&
+            (owner->state(shared)->flags&1u)&&world->randomDrawCount()==draws);
+        assert(owner->prepareDraw()&&!owner->state(shared)&&!owner->timeChanges().find(old));
+        assert(create(105188));const auto beforeRetry=owner->timeChanges().handle(2);
+        assert(beforeRetry.slot==old.slot&&beforeRetry.generation!=old.generation);
+        assert(world->restartFromResults(DeathMenuSequence::Action::Retry,43,300)==ResultsDestination::gameplay);
+        assert(world->effectsSucceeded()&&owner->valid()&&effects.size()==0&&owner->timeChanges().size()==0);
+        assert(!owner->timeChanges().find(beforeRetry)&&create(105189));
+        for(unsigned tick=0;tick<14;++tick)world->step(0);
+        assert(world->effectsSucceeded()&&owner->prepareDraw()&&effects.size()==0&&owner->timeChanges().size()==0);
+    }
     {
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
         auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),

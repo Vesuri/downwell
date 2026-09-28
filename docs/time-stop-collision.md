@@ -161,12 +161,27 @@ a local slot. Registered effects publish Create alarms before the pause callback
 Global alarm dispatch imports the already-decremented record counters, and
 cleanup retires one marked lifetime without sweeping other object families.
 
-The host registration fixture checks these boundaries and stale slot reuse.
-Its `DOWNWELL_NATIVE_QUERY_PROBE` branch is freestanding and can be compiled with
-the Amiga compiler for 68000; this is not an emulator execution or a live-world
-integration claim. Native mixed-family membership, original global numeric-ID
-allocation, room teardown/re-entry and player transition wiring still need to
-attach this adapter before normal gameplay may create these instances.
+The native collision owner attaches this adapter to resource-backed room and
+layer membership. Its mixed combat alarm snapshot includes object 211; the
+shared effect receives each fired event once after decrementing the registered
+counter. Marked instances remain owned until Draw-entry cleanup. Retry and
+next-level teardown clear the registered effects, preserving the external
+effect owner's monotonic local lifetime sequence.
+
+`createTimeChangeWithSourceId` requires an explicit original numeric ID; it does
+not introduce a separate dynamic counter. Native actors with unrecovered IDs
+remain unnumbered. Natural player transitions must not call this API with
+slot-derived or guessed IDs: complete native global ID allocation and player
+Begin Step wiring remain open. The caller must retain the effect owner and
+room-speed variable until room cleanup or explicit retirement. This does not
+change PAL pacing or implement the source synchronous pause in a backend.
+
+The host native-world fixture verifies positioned publication before pause,
+14 ordinary alarm updates, deferred cleanup and Retry with reused slots. The
+shared field-reentry tape verifies registration, source alarm pacing and
+next-level cleanup without inventing additional player movement or RNG calls.
+Its IDs and direct alarm calls are controlled verification inputs, not evidence
+of the complete original game's creation stream or phase ordering.
 
 ## Shard registration contract
 

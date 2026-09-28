@@ -17,6 +17,8 @@ struct GameplayFieldReentryVerification {
     } builder;
     unsigned checks=0,stage=0,gameSteps=0,clearSteps=0;
     unsigned firstGeneration=0,laterGeneration=0,retryGeneration=0;
+    TimeChangeEffects<8> timeChanges;
+    int sourceRoomSpeed=60;
     bool run(GameplayWorld& world,GameplayCollisionOwner& owner,const ObjectPack& objects,unsigned origin){
         checks=0;gameSteps=clearSteps=0;
         unsigned population=0;
@@ -24,6 +26,23 @@ struct GameplayFieldReentryVerification {
         if(!SoundPlayVerification::run())return false;
         if(!CurrencyCreateVerification::run())return false;
         if(!CurrencySpawnVerification::run())return false;
+        // Controlled explicit source IDs exercise registration; this does not
+        // supply the unrecovered global birth stream of a natural run.
+        if(!owner.createTimeChangeWithSourceId(timeChanges,105187,
+            RunnerImageValue{0x43704000u}.promoted(),RunnerImageValue{0x43308000u}.promoted(),
+            sourceRoomSpeed,[&](unsigned ms){return ms==30&&sourceRoomSpeed==30;}))return false;
+        const auto timeKey=owner.timeChanges().handle(timeChanges.beginPhase().newest);
+        InstanceHandle sharedTime;
+        if(!GameplayCollisionView::encode(GameplayCollisionView::Kind::timeChange,timeKey,sharedTime)||
+            !owner.state(sharedTime)||owner.state(sharedTime)->x.bits!=0x43704000u||
+            !owner.population(211,population)||population!=1)return false;
+        for(unsigned tick=1;tick<=14;++tick){
+            for(unsigned index=0;index<2;++index)
+                if(!world.advanceTimeChangeRoomAlarm(timeKey,index))return false;
+            if(sourceRoomSpeed!=int(tick<12?30+5*(tick/2):60))return false;
+        }
+        if(timeChanges.size()||owner.timeChanges().size()!=1||!owner.prepareDraw()||
+            owner.timeChanges().size()||owner.state(sharedTime))return false;
         if(!world.effectsSucceeded()||!owner.valid()||world.runStage().area!=1||world.runStage().level!=1||
             !owner.population(255,population)||population)return false;
         firstGeneration=world.goalFieldInstances().birthSequence();
@@ -67,7 +86,11 @@ struct GameplayFieldReentryVerification {
         if(!marked||!marked->destroyRequested||!owner.state(liveKey)||!owner.state(markedKey))return false;
         const auto debrisNext=world.debrisEffects().birthSequence().next;
         const auto transitionDraws=world.randomDrawCount();
+        if(!owner.createTimeChangeWithSourceId(timeChanges,105188,{},{},sourceRoomSpeed,
+            [](unsigned ms){return ms==30;}))return false;
+        const auto transitionTime=owner.timeChanges().handle(timeChanges.beginPhase().newest);
         if(!world.prepareNextAreaOneLevel({},origin)||world.runStage().level!=2||
+            timeChanges.size()||owner.timeChanges().size()||owner.timeChanges().find(transitionTime)||
             world.debrisInstances()->size()||world.debrisEffects().retained(liveDebris.generation)||
             world.debrisEffects().retained(markedDebris.generation)||owner.state(liveKey)||owner.state(markedKey)||
             world.debrisEffects().birthSequence().next!=debrisNext||world.randomDrawCount()!=transitionDraws||

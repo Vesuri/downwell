@@ -1,4 +1,5 @@
 #include "GameplayWorld.h"
+#include "GameplayCollisionOwner.h"
 #include "PlayerBoxContact.h"
 #include "GameplayPlayerStep.h"
 #include "core/MainRoomLifetime.h"
@@ -37,6 +38,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
         downwell::DeathMenuSequence::Action action, std::uint32_t seed, unsigned initialRingOrigin) {
     const auto destination = downwell::resultsDestination(action);
     if (destination == downwell::ResultsDestination::none) return destination;
+    if(!clearRoomTimeChanges())return downwell::ResultsDestination::none;
     if(!clearRoomDebris())return downwell::ResultsDestination::none;
     if(!clearRoomScriptEffects())return downwell::ResultsDestination::none;
     if(!run_.effectsSucceeded||!clearBulletOwnership())return downwell::ResultsDestination::none;
@@ -48,6 +50,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto terrainInstances=terrainInstances_;
     const auto scriptSpawnInstances=scriptSpawnInstances_;
     const auto debrisInstances=debrisInstances_;
+    const auto timeChangeInstances=timeChangeInstances_;
     const auto phaseBoundary=phaseBoundary_;
     const auto roomAnimation=roomAnimation_;
     const auto roomAlarms=roomAlarms_;void* const roomAlarmsContext=roomAlarmsContext_;
@@ -87,6 +90,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     nextBreakableLifetimeId_=nextBreakableIdentity;
     scriptSpawnInstances_=scriptSpawnInstances;
     debrisInstances_=debrisInstances;
+    timeChangeInstances_=timeChangeInstances;
     configurePhaseBoundary(phaseBoundary,phaseBoundaryContext);
     configureRoomAnimation(roomAnimation,roomAnimationContext);
     configureRoomAlarms(roomAlarms,roomAlarmsContext);
@@ -120,9 +124,33 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     return destination;
 }
 
+bool GameplayWorld::bindTimeChangeInstances(downwell::NativeTimeChangeRegistration& registry){
+    if(timeChangeInstances_||!registry.valid()||registry.size())return false;
+    timeChangeInstances_=&registry;return true;
+}
+bool GameplayWorld::advanceTimeChangeRoomAlarm(downwell::InstanceHandle key,unsigned index){
+    if(!run_.effectsSucceeded)return false;
+    auto* record=timeChangeInstances_?timeChangeInstances_->schedulerRecord(key):nullptr;
+    if(!record||!timeChangeEffects_||!timeChangeSpeed_||index>1)return run_.effectsSucceeded=false;
+    if(!record->active||record->destroyRequested)return true;
+    if(!record->alarms.advanceOne(index))return true;
+    return run_.effectsSucceeded=timeChangeInstances_->dispatchAlarm(key,*timeChangeEffects_,index,*timeChangeSpeed_);
+}
+bool GameplayWorld::retireTimeChangeRoomEffect(downwell::InstanceHandle key){
+    return run_.effectsSucceeded=run_.effectsSucceeded&&timeChangeInstances_&&timeChangeEffects_&&
+        timeChangeInstances_->retireMarked(key,*timeChangeEffects_);
+}
+bool GameplayWorld::clearRoomTimeChanges(){
+    if(!run_.effectsSucceeded)return false;
+    if(timeChangeInstances_&&timeChangeInstances_->size()&&
+       (!timeChangeEffects_||!timeChangeEffects_->clear()))return run_.effectsSucceeded=false;
+    timeChangeEffects_=nullptr;timeChangeSpeed_=nullptr;return true;
+}
+
 bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsigned initialRingOrigin) {
     if (!run_.levelClearActive || !run_.nextLevelRequested ||
         run_.stage.area != 1 || run_.stage.level >= 3) return false;
+    if(!clearRoomTimeChanges())return false;
     if(!clearRoomDebris())return false;
     if(!clearRoomScriptEffects())return false;
     if (!run_.effectsSucceeded || !clearEnemyOwnership() || !clearBreakableOwnership() || !retirePlayerOwnership()) return false;
