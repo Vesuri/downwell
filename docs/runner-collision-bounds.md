@@ -449,7 +449,17 @@ Wall activation and destruction marks publish occupancy changes immediately,
 separately from coalesced presentation damage. The native gameplay Draw entry
 calls the owner's checked cleanup: marked terrain, enemy and box identities survive all phase
 reconciliation, then retire in active-room order followed by inactive-room
-order. A pending-mark flag avoids scanning unchanged rooms. Enemy cleanup
+order. A pending-mark flag avoids scanning unchanged rooms. Mark publication
+also maintains a sparse ordered room-list projection: it searches backward for
+the preceding marked peer, without running retirement callbacks. Reconciliation
+relinks marked peers in their destination list; removal/rebinding clears the
+old mark. Draw entry visits only this projection, revalidating each marked
+generation and typed record before retirement. Unmarked typed lifetimes are
+maintained by their checked birth/retire bindings, not re-audited by each Draw
+sweep. The callback contract permits only current-entry removal, not new marks,
+births or arbitrary membership mutation. Compact projection links cost four
+bytes per room slot; mark publication still has a worst-case room-list search,
+so sparse cleanup alone is not a worst-case frame-budget proof. Enemy cleanup
 compacts the typed store without changing surviving lifetime handles; box
 cleanup invalidates its lifetime without recycling another slot's identity.
 The engine-mark methods run after any game Destroy/CleanUp callbacks and do

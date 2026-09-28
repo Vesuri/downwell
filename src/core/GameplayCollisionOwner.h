@@ -190,6 +190,7 @@ private:
             if(!key(local,r,h))return false;
             const auto* state=parent.owner_.resolve(h);
             if(!state||!parent.check(parent.owner_.setExclusions(h,(state->flags&0x100003u)|1u)))return false;
+            if(!parent.check(parent.room_.mark(h.slot)))return false;
             parent.destructionPending_=true;return true;}
         bool membership(InstanceHandle local,const Record& r,bool member){InstanceHandle h;
             return key(local,r,h)&&parent.check(parent.owner_.registerObject(h,member));}
@@ -752,12 +753,9 @@ public:
         if(!valid()||!world_)return check(false);
         if(!destructionPending_)return true;
         DW_PROFILE_SCOPE(profileDrawCleanup);
-        const bool cleaned=room_.visitCleanupChecked([&](unsigned slot){
+        const bool cleaned=room_.visitMarkedCleanupChecked([&](unsigned slot){
             const auto h=roomKeys_[slot];const auto* state=owner_.resolve(h);
-            if(!state)return false;
-            // Unmarked entries still validate their typed lifetime, but do not
-            // need the wide borrowed-record payload used by retirement.
-            if(!(state->flags&1u))return View(*world_).contains(h);
+            if(!state||!(state->flags&1u))return false;
             View::Record record;
             if(!View(*world_).resolve(h,record))return false;
             if(!retire(h,record)||!valid()||owner_.resolve(h))return false;

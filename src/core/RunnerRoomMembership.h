@@ -5,7 +5,10 @@ namespace downwell {
 // Room lists in 0x48d630. Requests change external flags; reconciliation scans
 // inactive order first, then active order, never the request queue's order.
 template<unsigned Capacity> class RunnerRoomMembership {
-    struct Entry {unsigned next=Capacity,previous=Capacity;int list=-1;RunnerImageValue key;};
+    static_assert(Capacity<65534,"Compact cleanup links require 16-bit slots");
+    static constexpr unsigned Unmarked=Capacity+1;
+    struct Entry {unsigned next=Capacity,previous=Capacity;int list=-1;RunnerImageValue key;
+        std::uint16_t markedNext=Unmarked,markedPrevious=Capacity;};
 public:
     static constexpr unsigned End=Capacity;
     struct AnimationProjection {
@@ -16,6 +19,20 @@ public:
     };
     bool contains(unsigned slot)const{return slot<Capacity && entries_[slot].list>=0;}
     bool active(unsigned slot)const{return slot<Capacity && entries_[slot].list==0;}
+    bool marked(unsigned slot)const{return contains(slot)&&entries_[slot].markedNext!=Unmarked;}
+    // Destruction request order is NOT retirement order. Insert into a sparse
+    // projection of the current room list; callbacks run only at Draw entry.
+    bool mark(unsigned slot){
+        if(!contains(slot))return false;
+        if(marked(slot))return true;
+        auto& e=entries_[slot];unsigned previous=e.previous;
+        while(previous!=End&&!marked(previous))previous=entries_[previous].previous;
+        const unsigned next=previous==End?markedHead_[e.list]:entries_[previous].markedNext;
+        e.markedPrevious=std::uint16_t(previous);e.markedNext=std::uint16_t(next);
+        if(previous==End)markedHead_[e.list]=slot;else entries_[previous].markedNext=std::uint16_t(slot);
+        if(next!=End)entries_[next].markedPrevious=std::uint16_t(slot);
+        return true;
+    }
     // Animation's active-room traversal. Visitor may update instance fields,
     // but must not create/remove/rebind memberships while visiting this list.
     template<class Visit> bool visitAnimationChecked(Visit visit)const{
@@ -69,6 +86,12 @@ public:
     bool remove(unsigned slot){
         if(!contains(slot))return false;
         const auto e=entries_[slot];
+        if(e.markedNext!=Unmarked){
+            if(e.markedPrevious==End)markedHead_[e.list]=e.markedNext;
+            else entries_[e.markedPrevious].markedNext=e.markedNext;
+            if(e.markedNext!=End)entries_[e.markedNext].markedPrevious=e.markedPrevious;
+            entries_[slot].markedNext=Unmarked;entries_[slot].markedPrevious=End;
+        }
         if(e.previous==End)head_[e.list]=e.next;else entries_[e.previous].next=e.next;
         if(e.next==End)tail_[e.list]=e.previous;else entries_[e.next].previous=e.previous;
         entries_[slot].next=entries_[slot].previous=End;entries_[slot].list=-1;++revision_;return true;
@@ -80,6 +103,16 @@ public:
     template<class Visit> bool visitCleanupChecked(Visit visit){
         for(unsigned list=0;list<2;++list)for(unsigned slot=head_[list];slot!=End;){
             const unsigned next=entries_[slot].next;
+            if(!visit(slot))return false;
+            slot=next;
+        }
+        return true;
+    }
+    // Same ordering as visitCleanupChecked filtered by mark(). Visitor may
+    // remove only its current entry, and must not publish new marks or births.
+    template<class Visit> bool visitMarkedCleanupChecked(Visit visit){
+        for(unsigned list=0;list<2;++list)for(unsigned slot=markedHead_[list];slot!=End;){
+            const unsigned next=entries_[slot].markedNext;
             if(!visit(slot))return false;
             slot=next;
         }
@@ -97,7 +130,9 @@ public:
         for(unsigned slot=head_[1];slot!=End;){
             const unsigned next=entries_[slot].next;
             if(!inactive(slot)){
+                const bool wasMarked=marked(slot);
                 remove(slot);insertActive(slot);
+                if(wasMarked&&!mark(slot))return false;
                 if(!publish(slot,true))return false;
             }
             slot=next;
@@ -105,7 +140,9 @@ public:
         for(unsigned slot=head_[0];slot!=End;){
             const unsigned next=entries_[slot].next;
             if(inactive(slot)){
+                const bool wasMarked=marked(slot);
                 remove(slot);appendInactive(slot);
+                if(wasMarked&&!mark(slot))return false;
                 if(!publish(slot,false))return false;
             }
             slot=next;
@@ -129,6 +166,7 @@ private:
     }
     Entry entries_[Capacity?Capacity:1]{};
     unsigned head_[2]={End,End},tail_[2]={End,End};
+    unsigned markedHead_[2]={End,End};
     unsigned revision_=0;
 };
 }

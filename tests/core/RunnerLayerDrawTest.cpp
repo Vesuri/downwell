@@ -111,6 +111,50 @@ void drawBirths(){
             "next Draw includes birth exactly once in link order");
     }
 }
+void cleanupProjection(){
+    RunnerRoomMembership<64> room;
+    bool live[64]{},marks[64]{},inactive[64]{};
+    unsigned seed=0x827513u;
+    auto random=[&](){seed=seed*1664525u+1013904223u;return seed;};
+    auto compare=[&](){
+        std::vector<unsigned> full,sparse;
+        require(room.visitCleanupChecked([&](unsigned slot){
+            require(room.marked(slot)==marks[slot],"mark publication matches model");
+            if(marks[slot])full.push_back(slot);return true;
+        })&&room.visitMarkedCleanupChecked([&](unsigned slot){sparse.push_back(slot);return true;}),"cleanup walks");
+        require(full==sparse,"sparse cleanup preserves active/inactive room ordering");
+    };
+    for(unsigned trial=0;trial<8192;++trial){
+        const unsigned slot=(random()>>16)%64,operation=(random()>>16)%5;
+        if(operation==0){
+            RunnerImageValue key;require(key.assign(MotionBinary64::fromInteger(int((random()>>16)%7)-3)),"cleanup depth");
+            require(room.bind(slot,key),"cleanup birth/rebind");live[slot]=true;marks[slot]=inactive[slot]=false;
+        }else if(operation==1){
+            require(room.mark(slot)==live[slot],"missing lifetime cannot be marked");
+            if(live[slot]){marks[slot]=true;require(room.mark(slot),"mark is idempotent");}
+        }else if(operation==2){
+            require(room.remove(slot)==live[slot],"cleanup removal");live[slot]=marks[slot]=inactive[slot]=false;
+        }else if(operation==3){
+            inactive[slot]=!inactive[slot];
+            require(room.reconcileChecked([&](unsigned i){return inactive[i];},[](unsigned,bool){return true;}),"marked activation reconciliation");
+        }else{
+            compare();
+            require(room.visitMarkedCleanupChecked([&](unsigned i){
+                require(room.remove(i),"retire current marked entry");live[i]=marks[i]=inactive[i]=false;return true;
+            }),"sparse retirement saves successor");
+            require(room.visitMarkedCleanupChecked([](unsigned){return false;}),"retired projection empty");
+        }
+        compare();
+    }
+    room.clear();
+    for(unsigned i=0;i<4;++i)require(room.bind(i,{})&&room.mark(i),"failure fixture");
+    unsigned calls=0;require(!room.visitMarkedCleanupChecked([&](unsigned i){
+        ++calls;if(calls==2)return false;return room.remove(i);
+    })&&calls==2,"cleanup failure stops before later entries");
+    std::vector<unsigned> remaining;require(room.visitMarkedCleanupChecked([&](unsigned i){remaining.push_back(i);return true;})&&
+        remaining==std::vector<unsigned>({1,2,3}),"failed retirement leaves remaining order intact");
+    room.clear();require(room.visitMarkedCleanupChecked([](unsigned){return false;}),"clear removes all marks");
+}
 void animationProjection(){
     RunnerRoomMembership<6> room;
     RunnerRoomMembership<6>::AnimationProjection projection;
@@ -159,4 +203,4 @@ void animationProjection(){
     }
 }
 }
-int main(){dispatch();traversal();roomActivation();drawBirths();animationProjection();std::cout<<"Selected layer Draw order, synchronous births, animation projection and 1024 instance-dispatch cases verified\n";}
+int main(){dispatch();traversal();roomActivation();drawBirths();animationProjection();cleanupProjection();std::cout<<"Selected layer Draw order, synchronous births, animation projection, 8192 cleanup mutations and 1024 instance-dispatch cases verified\n";}
