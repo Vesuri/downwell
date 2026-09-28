@@ -1,5 +1,6 @@
 #ifndef DOWNWELL_CORE_SOLID_COLLISION_H
 #define DOWNWELL_CORE_SOLID_COLLISION_H
+#include "SmallUnsignedDivision.h"
 
 namespace downwell {
 
@@ -121,8 +122,14 @@ struct FixedCollisionMath {
     static Number round(Number value) {
         const bool negative = value < 0;
         const Number magnitude = negative ? -value : value;
-        Number integer = magnitude / unit();
-        const Number remainder = magnitude % unit();
+        Number integer,remainder;
+        if(static_cast<unsigned long>(magnitude)<=0xffffffffUL){
+            const auto divided=SmallUnsignedDivision::full(std::uint32_t(magnitude),1280);
+            integer=divided.quotient;remainder=divided.remainder;
+        }else{
+            // Preserve the host's wider long domain; target long is 32 bits.
+            integer=magnitude/unit();remainder=magnitude%unit();
+        }
         if (remainder > unit() / 2 ||
             (remainder == unit() / 2 && (integer & 1))) ++integer;
         return (negative ? -integer : integer) * unit();

@@ -1,5 +1,6 @@
 #include "core/PlayerCollision.h"
 #include "core/SolidCollision.h"
+#include "core/FixedCollisionRoundingVerification.h"
 #include "core/PlayerBoxContact.h"
 #include <cmath>
 #include <fstream>
@@ -15,6 +16,15 @@ void require(bool condition, const char* message) {
 
 int main() {
     using Math = downwell::FixedCollisionMath;
+    require(downwell::FixedCollisionRoundingVerification::run(),"shared signed fixed-point rounding boundaries");
+    for(long quotient:{0L,1L,2L,127L,128L,32767L,32768L,131071L,1677720L})
+        for(long remainder=0;remainder<1280;++remainder)
+            require(downwell::FixedCollisionRoundingVerification::check(quotient,remainder),
+                "all remainders retain nearest-even rounding on both signs");
+    if constexpr(sizeof(long)>4)
+        for(long remainder=0;remainder<1280;++remainder)
+            require(downwell::FixedCollisionRoundingVerification::check(4000000L,remainder),
+                "wider host magnitudes retain the original long arithmetic");
     constexpr long unit = 1280;
     unsigned boxQueries = 0;
     require(downwell::ceilingResponse<Math>(2 * unit, 10 * unit,

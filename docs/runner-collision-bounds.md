@@ -574,6 +574,19 @@ group-population and minimum-fill tie rules. Node distribution still follows
 original entry-array order, not assignment order. Fractional or oversized
 partitions retain the binary32 reference implementation.
 
+The fixed-point movement adapter (`FixedCollisionMath`, fifths of Q8) retains
+nearest-even rounding at 1280 units per pixel. Its nonnegative 32-bit magnitude
+uses `SmallUnsignedDivision` to obtain quotient and remainder together. The
+portable reference uses ordinary unsigned division/modulo. The 68000 twin uses
+one `DIVU.W` only when the dividend's high word is below the divisor, proving
+the quotient fits in 16 bits. Otherwise it divides the high word first and
+feeds that remainder into a second division; the same bound holds. The divisor
+must be nonzero and at most 65535. This changes neither tie handling nor the
+existing fixed-point input/output range. Wider host `long` magnitudes retain
+the original arithmetic. Shared native verification checks divider overflow
+boundaries, both rounding signs and both tie parities; host tests cover all
+1280 remainders at selected small and large quotients.
+
 `RunnerSpatialVerification.h` supplies the `SPATIAL` result in the host/native
 replay comparison. It checks transform writes (including signed zero, alpha and
 tint dependencies), all 256 low object-flag combinations in both preparation
