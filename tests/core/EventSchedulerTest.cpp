@@ -118,10 +118,24 @@ void testOrderedSnapshotSort() {
         for(unsigned i=0;i<count;++i)
             require(snapshot.handle(i).slot==reference[i].second &&
                     snapshot.handle(i).generation==reference[i].second+1,"bounded heap order matches independent stable sort");
+        for(unsigned repeat=0;repeat<3;++repeat){
+            if(repeat==0)snapshot.sortDenseObjects<43>();
+            else if(repeat==1)snapshot.sortDenseObjects<1>(); // Out-of-range fallback.
+            else snapshot.sort();
+            for(unsigned i=0;i<count;++i)
+                require(snapshot.object(i)==reference[i].first&&snapshot.handle(i).slot==reference[i].second,
+                        "dense, fallback and repeated sort retain original registration order");
+        }
     }
     require(!snapshot.append(0,1,0)&&snapshot.size()==257,"capacity rejection preserves snapshot");
     snapshot.clear();
     require(!snapshot.append(0,0,1)&&!snapshot.append(0,1,-1)&&snapshot.size()==0,"invalid capture entries reject");
+    require(snapshot.append(4,7,2)&&snapshot.append(1,9,1),"capture before incremental sort");
+    snapshot.sort();
+    require(snapshot.append(5,8,2)&&snapshot.append(2,10,1),"append after sort");
+    snapshot.sort();
+    const unsigned slots[]={1,2,4,5};
+    for(unsigned i=0;i<4;++i)require(snapshot.handle(i).slot==slots[i],"post-sort append retains tie order");
 }
 
 void testActiveStateAndMissingAlarmEvent() {
