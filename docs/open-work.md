@@ -12,8 +12,9 @@ on PAL; do not add 60 Hz catch-up.
 
 ## Priority and scope
 
-Next: recover the A500 gameplay frame budget (section 5), especially full-room
-layer, animation/snapshot and alarm-registration traversal. Then finish live
+Next: recover the A500 gameplay frame budget (section 5), prioritizing synchronous
+generation bursts (bounds construction, layer allocation and spatial insertion),
+alongside steady room/event traversal and the garden-to-well transition. Then finish live
 skeleton encounters, following the dependency order in section 1, make
 catacombs playable (section 2), followed by the remaining
 content (section 4). Apply the fidelity, performance, architecture, memory and
@@ -210,6 +211,10 @@ Reference: [upgrade IDs and source entry points](upgrade-coverage.md).
 - Profile generation CPU costs without changing RNG consumption or synchronous
   Create ordering. Shop and exit Create effects must precede the next pattern
   cell's random draw; spreading generation over frames is not behavior-neutral.
+  Remove repeated resource/bounds work and element-allocation scans, and reduce
+  spatial-index construction costs while preserving exact collision traversal.
+  Require longer gameplay tapes that reach generation bursts; early-room average
+  FPS is not evidence that later level population meets the frame budget.
 - Break down ammo HUD costs into geometry, damage scanning and changed-word
   publication. Keep the static rim intact and update only changed pixels.
 - Reduce selection layout/content and transition preparation costs while
