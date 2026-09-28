@@ -60,3 +60,34 @@ payload size, pattern dimensions and ranges, contiguous row spans, source
 indices, and printable cell data before exposing any pattern. The complete-pack
 test pins all 62 fragments, their 737 rows and 8,435 cells, including the
 irregular shop row and four area-one endings.
+
+## Preparation boundary
+
+The pack is immutable; the generated level is not. `AreaOneBuilder::step`
+selects fragments when the camera reaches the generation threshold, using the
+same random stream as live gameplay. `emitPattern` invokes each creation
+callback synchronously. A prepared representation must preserve that schedule:
+
+| Input/work | Safe preparation | Work that must remain at its original execution point |
+| --- | --- | --- |
+| Pattern and row records | Decode ranges, widths and row locations; retain numeric source indices | Select the pattern using the current RNG and generation history |
+| Cell geometry | Precompute normal/mirrored relative positions and fixed object candidates | Translate by the current builder Y; preserve cell and row order |
+| Enemy markers, including empty cells | Classify marker meaning | Consume the per-cell random word even for non-enemy cells; preserve conditional extra draws |
+| Object resource defaults | Resolve immutable sprite/mask/depth values, inherited alarms and unit bounds | Apply current family flags, instance identity, membership and synchronous Create side effects |
+| Reward and shop markers | Decode marker location/type | Consult current health/style and perform the original random choices |
+| Spatial and layer membership | Reserve storage and prepare immutable resource metadata | Publish in creation order against the current population; preserve query and draw ordering |
+
+In particular, the random calls inside a Create callback occur before the
+next cell's random call. Bulk-enqueuing a fragment and executing its callbacks
+later is not equivalent. Callback failure also stops further cells, random
+draws and row advancement; preparation must not advance those effects early.
+Side-room wall coordinates, irregular row widths, the between-row random word
+and the optional three-row pillar tail are part of the schedule, not padding
+that can be silently omitted.
+
+Testing a prepared executor requires comparison with immediate execution while
+interleaving external RNG draws, health changes and callbacks that consume RNG,
+including early callback failures. Comparing only a level generated from one
+initial seed cannot establish equivalence. The decoded views' memory and
+preparation time must also be measured; eliminating pack reads does not remove
+the live spatial-index construction cost.
