@@ -7,6 +7,7 @@
 #include "SmokeTrig.h"
 #include "RunnerCollisionEventContext.h"
 #include "RunnerCollisionDispatch.h"
+#include "BoxDestructionScript.h"
 namespace downwell {
 // Resource-backed owner for the stored world. Construct before the runtime,
 // bind its lifecycle before room births, then attach the runtime before Step.
@@ -90,6 +91,11 @@ public:
         const auto* r=resolve(h);
         if(!valid()||!r||r->objectId!=92)return false;
         health=r->box.wallHp;return true;
+    }
+    bool readBoxDestruction(InstanceHandle h,BoxDestructionScript::Caller& out)const{
+        const auto* r=resolve(h);const auto* position=owner_.resolve(h);
+        if(!valid()||!r||r->objectId!=92||!position)return false;
+        out={r->box,position->x.promoted(),position->y.promoted()};return true;
     }
     bool projectileBoxHealthWrite(StartupRuntime& world,InstanceHandle h,MotionBinary64 health){
         const auto* r=resolve(h);

@@ -18,6 +18,10 @@ bool nativeBoxStep(const downwell::BreakableState& b,downwell::MotionBinary64 x,
                    downwell::MotionBinary64 y,Ops& ops,bool& ok){
     return downwell::BoxDestructionScript::run(b,x,y,ops,ok);
 }
+struct Reader {bool operator()(downwell::BoxDestructionScript::Caller&)const;};
+bool nativeRetainedBoxStep(Reader read,Ops& ops,bool& ok){
+    return downwell::BoxDestructionScript::runRetained(read,ops,ok);
+}
 #else
 #include <cassert>
 #include <cstdio>
@@ -72,7 +76,52 @@ struct Ops {
     bool currency(int amount){assert(destroyed&&(amount==3||amount==10));return event(Currency);}
     bool alarmStop(int a){assert(a==0);return event(Stop);}
 };
+struct MutableCallerOps:Ops {
+    BoxDestructionScript::Caller caller;
+    unsigned reads=0,failRead=0;
+    MutableCallerOps():Ops(false,false,1,0,0){
+        caller.state.wallHp={};caller.state.breakSound=174;caller.state.haveGem=1;
+        caller.x=MotionBinary64::fromInteger(240);caller.y=MotionBinary64::fromInteger(512);
+        assert(caller.y.add({0x3fd00000u,0}));
+    }
+    bool read(BoxDestructionScript::Caller& out){
+        if(++reads==failRead)return false;
+        out=caller;return true;
+    }
+    void move(){assert(caller.x.add(MotionBinary64::fromInteger(1))&&caller.y.add(MotionBinary64::fromInteger(2)));}
+    void positionNow(MotionBinary64 x,MotionBinary64 y,int offset=0){
+        auto expected=caller.y;assert(expected.add(MotionBinary64::fromInteger(offset)));
+        assert(x.high==caller.x.high&&x.low==caller.x.low&&y.high==expected.high&&y.low==expected.low);
+    }
+    bool soundOverlap(int s,int v,int p,int c,const char* group){
+        const bool ok=Ops::soundOverlap(s,v,p,c,group);move();return ok;
+    }
+    bool smoke(MotionBinary64 x,MotionBinary64 y,int,int){positionNow(x,y,4);move();return event(Smoke);}
+    bool flash(MotionBinary64 x,MotionBinary64 y,int,int,int){positionNow(x,y);move();return event(Flash);}
+    bool effect(MotionBinary64 x,MotionBinary64 y,int,MotionBinary64,MotionBinary64,int){
+        positionNow(x,y,12);move();return event(Effect);
+    }
+    bool destroySelf(){const bool ok=Ops::destroySelf();move();return ok;}
+    bool create(int object,MotionBinary64 x,MotionBinary64 y,Handle& h){
+        assert(object==370&&destroyed);positionNow(x,y);move();h=100;return event(Debris);
+    }
+    bool currency(int amount){
+        const bool ok=Ops::currency(amount);
+        if(amount==3)caller.state.haveGem=2;
+        return ok;
+    }
+};
 int main(){
+    MutableCallerOps mutation;bool healthy=true;
+    assert(BoxDestructionScript::runRetained([&](auto& c){return mutation.read(c);},mutation,healthy)&&healthy);
+    assert(mutation.calls==std::vector<Event>({Sound,Smoke,Flash,Effect,Destroy,Debris,Debris,Currency,Currency,Stop}));
+    for(unsigned failure=1;failure<=mutation.reads;++failure){
+        MutableCallerOps rejected;rejected.failRead=failure;bool okay=true;
+        auto read=[&](auto& c){return rejected.read(c);};
+        assert(!BoxDestructionScript::runRetained(read,rejected,okay)&&!okay&&rejected.reads==failure);
+        const auto prefix=rejected.calls;
+        assert(!BoxDestructionScript::runRetained(read,rejected,okay)&&rejected.reads==failure&&rejected.calls==prefix);
+    }
     for(int damage:{9,15}){
         BreakableState state;bool applied=false;
         assert(state.bulletHit(MotionBinary64::fromInteger(damage),applied)&&applied&&state.hit&&state.exhausted());

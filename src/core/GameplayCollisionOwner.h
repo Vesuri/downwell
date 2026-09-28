@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_GAMEPLAY_COLLISION_OWNER_H
 #define DOWNWELL_CORE_GAMEPLAY_COLLISION_OWNER_H
 #include "GameplayCollisionView.h"
+#include "BoxDestructionScript.h"
 #include "RunnerSpatialInstances.h"
 #include "RunnerObjectFamilies.h"
 #include "RunnerRoomMembership.h"
@@ -480,6 +481,11 @@ public:
         View::Record record;
         if(!valid()||!resolves(h)||!View(*world_).resolve(h,record)||!record.breakable)return false;
         health=record.breakable->state.wallHp;return true;
+    }
+    bool readBoxDestruction(InstanceHandle h,BoxDestructionScript::Caller& out)const{
+        View::Record record;const auto* position=state(h);
+        if(!position||!resolves(h)||!View(*world_).resolve(h,record)||!record.breakable)return false;
+        out={record.breakable->state,position->x.promoted(),position->y.promoted()};return true;
     }
     bool projectileBoxHealthWrite(InstanceHandle h,MotionBinary64 health){
         View::Kind kind;InstanceHandle local;

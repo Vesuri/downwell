@@ -88,6 +88,22 @@ The host/native lifecycle tape checks expiry, retained destruction and cleanup;
 native contact tests additionally check the intervening live damaged-box frame
 and failure of destruction publication.
 
+`BoxDestructionScript::runRetained` accepts a caller reader rather than keeping
+one borrowed record/coordinate snapshot across synchronous callbacks. It rereads
+before subsequent emissions, neighbor queries, post-destruction debris births
+and the two independent gem checks. Thus a child that changes the caller's
+coordinates affects later children, and changing `haveGem` from 1 to 2 during
+the first currency script can admit both source branches. Failed reads retain
+the completed prefix and latch failure; the fixed-caller `run` wrapper is for
+scalar fixtures, not a live storage binding.
+
+Both collision owners expose generation-checked readers using published
+binary32 coordinates, including fractional native positions rather than the
+rounded box drawing cache. A destruction mark keeps these fields readable;
+actual retirement or reuse invalidates the caller without changing the output.
+The native lifecycle tape checks that boundary. These adapters still need to
+replace the live removal-only Step together with the full effect/reward owners.
+
 `SoundPlayScript` models the original plain and overlap-aware audio scripts,
 including caller scratch fields and partial-failure ordering. The overlap
 channels are footsteps/gunshot/gunwall/merchant/enemymove/music/waterEnemy/

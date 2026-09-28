@@ -423,11 +423,16 @@ int main(){
         require(owner->nonPreciseLine({},92,insideX.promoted(),insideY.promoted(),insideX.promoted(),insideY.promoted(),false,afterMark)&&
             afterMark.id==-4,"marked box immediately leaves collision selection");
         bool retainedAtCollision=false;
+        BoxDestructionScript::Caller caller;
+        require(owner->readBoxDestruction(selected,caller)&&caller.state.wallHp.high==fractional.high&&
+            caller.x.high==insideX.promoted().high&&caller.y.high==insideY.promoted().high,
+            "destruction reader retains marked caller fields and published coordinates");
         require(world->stepWithCollisionPass({},false,[&]{
             const auto* retained=owner->resolve(selected);
             retainedAtCollision=retained&&retained->destroyRequested;return retainedAtCollision;
         })&&retainedAtCollision,"marked box storage survives through the collision boundary");
-        require(world->effectsSucceeded()&&!world->instance(selectedId)&&!owner->resolve(selected),
+        require(world->effectsSucceeded()&&!world->instance(selectedId)&&!owner->resolve(selected)&&
+            !owner->readBoxDestruction(selected,caller)&&caller.state.wallHp.high==fractional.high,
             "stored frame retires marked box at its pre-Draw cleanup boundary");
         auto wrong=selected;++wrong.generation;hp={0x3ff00000u,0};parent=-123;
         require(!owner->projectileBoxHealth(wrong,hp)&&hp.high==0x3ff00000u&&

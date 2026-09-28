@@ -1152,8 +1152,16 @@ int main(){
             owner->projectileBoxHealth(selected,hp)&&hp.high==fractional.high&&!hp.low&&native->state.hit&&
             native->active&&!native->destroyRequested&&owner->state(selected)->flags==flags&&
             world->randomDrawCount()==draws);
+        BoxDestructionScript::Caller caller;
+        RunnerImageValue preciseX{0x43704000u},preciseY{0x44000800u};
+        assert(owner->breakableBinding().publishedPosition({0,1},*native,preciseX,preciseY)&&
+            owner->readBoxDestruction(selected,caller)&&caller.x.high==preciseX.promoted().high&&
+            caller.x.low==preciseX.promoted().low&&caller.y.high==preciseY.promoted().high&&
+            caller.y.low==preciseY.promoted().low&&caller.state.wallHp.high==fractional.high&&caller.state.hit);
         assert(world->markBreakableDestroyed({0,1})&&owner->projectileBoxHealthWrite(selected,{})&&
-            owner->projectileBoxHit(selected)&&owner->prepareDraw());
+            owner->projectileBoxHit(selected)&&owner->readBoxDestruction(selected,caller)&&caller.state.wallHp.zero());
+        assert(owner->prepareDraw()&&!owner->readBoxDestruction(selected,caller)&&caller.state.wallHp.zero()&&
+            caller.x.high==preciseX.promoted().high&&caller.x.low==preciseX.promoted().low);
         hp={0x3ff00000u,0};parent=-123;
         assert(!owner->projectileBoxHealth(selected,hp)&&hp.high==0x3ff00000u&&
             !owner->projectileWallParent(selected,parent)&&parent==-123&&

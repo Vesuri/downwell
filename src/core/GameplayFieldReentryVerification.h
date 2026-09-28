@@ -138,9 +138,14 @@ struct GameplayFieldReentryVerification {
         // Alarm expires on the fourth tick (the first two were refunded).
         // Its ordinary Step marks destruction; subsequent ticks exclude it.
         if(!liveBox||liveBox->alarm0!=0||!liveBox->state.wallHp.zero()||!liveBox->active||!liveBox->destroyRequested)return false;
+        InstanceHandle sharedBox;BoxDestructionScript::Caller caller;
+        if(!GameplayCollisionView::encode(GameplayCollisionView::Kind::breakable,box,sharedBox)||
+            !owner.readBoxDestruction(sharedBox,caller)||!caller.state.wallHp.zero()||
+            caller.x.high!=MotionBinary64::fromInteger(boxX+240).high||
+            caller.y.high!=MotionBinary64::fromInteger(boxY+176).high)return false;
         if(world.breakableActiveAt(boxX,boxY)||!world.markBreakableDestroyed(box)||
             world.breakableActiveAt(boxX,boxY)||!world.findBreakable(box)||
-            !owner.prepareDraw()||world.findBreakable(box))return false;
+            !owner.prepareDraw()||world.findBreakable(box)||owner.readBoxDestruction(sharedBox,caller))return false;
         if(!world.goalFieldInstances().find(local)||!owner.state(key)||!world.startTimeField()||
             !owner.population(371,population)||population!=1)return false;
         checks|=16;
