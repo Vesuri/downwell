@@ -46,6 +46,7 @@ enum DownwellProfilePhase {
     profileAlarmCapture, profileAlarmSort, profileAlarmScan, profileAlarmCallback,
     profileEnemyWalker, profileEnemyBat, profileEnemyFrog, profileEnemySnail,
     profileEnemyCrawler, profileEnemyFinalize,
+    profileBindingDefinition, profileBindingMembership, profileBindingProperties,
     profilePhaseCount
 };
 

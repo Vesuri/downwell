@@ -99,15 +99,21 @@ public:
                             const Graph& graph,bool allPrepared,std::int32_t* creationDepth=nullptr){
         if(!valid()||!live(h))return false;
         PackedObject definition;
-        if(!objects.valid()||!sprites.valid()||!graph.valid()||object<0||
-           !objects.findObject(object,definition)||!graph.flags(unsigned(object)))return checked(false);
+        {
+            DW_PROFILE_SCOPE(profileBindingDefinition);
+            if(!objects.valid()||!sprites.valid()||!graph.valid()||object<0||
+               !objects.findObject(object,definition)||!graph.flags(unsigned(object)))return checked(false);
+        }
         const auto objectFlags=*graph.flags(unsigned(object));
         const unsigned expected=(definition.solid()?1u:0u)|(definition.visible()?2u:0u)|
             (definition.persistent()?4u:0u)|(definition.managed()?0x80u:0u);
         if((objectFlags&0x87u)!=expected)return checked(false);
         Real depth;
         if(!depth.assignInteger(definition.depth))return checked(false);
-        if(!rebindObjectMembership(h,object,registered))return checked(false);
+        {
+            DW_PROFILE_SCOPE(profileBindingMembership);
+            if(!rebindObjectMembership(h,object,registered))return checked(false);
+        }
         properties.sprite.maskId=definition.textureMaskId;
         properties.depth=depth;
         const bool applied=applyBindingProperties(h,objectFlags,allPrepared,[&](InstanceHandle live){
@@ -192,6 +198,7 @@ public:
     template<class SetSprite>
     bool applyBindingProperties(InstanceHandle h,std::uint32_t objectFlags,
                                 bool allPrepared,SetSprite setSprite){
+        DW_PROFILE_SCOPE(profileBindingProperties);
         if(!valid()||!live(h))return false;
         auto& flags=entries_[h.slot].state.flags;
         if(objectFlags&1u){
