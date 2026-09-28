@@ -137,10 +137,9 @@ Reference: [area-two recovery](area-two-recovery.md).
 - Replace approximate live animation where original float/sequence behavior
   changes observable frames or event timing. Cover relevant sprite/index writes;
   a legacy animation helper is not the selected GMS2 sequence path.
-  In particular, replace the gem exact-tenths counter: the source-backed
-  `verify-currency-animation` comparison demonstrates a visible +0.3-speed
-  discrepancy by update 10. Integrate original animation-phase eligibility and
-  time-stop writes as well as arithmetic; see the currency animation audit.
+  For currency, integrate original animation-phase eligibility and time-stop
+  speed writes with the shared float sequence arithmetic; see the currency
+  animation audit. Arithmetic agreement alone does not close this item.
 - Complete side-room reward objects and omitted title/particle effects.
 - Verify fractional raster positions, draw order, effect surfaces, shaders and
   alternate palettes against original-game captures.

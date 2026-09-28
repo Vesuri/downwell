@@ -6,7 +6,7 @@
 #include <cstring>
 
 // Independent host arithmetic for the selected runner's four-key sequence.
-// The existing live helper is compared diagnostically, never used as oracle.
+// Neither the live helper nor the integer-only evaluator is the scalar oracle.
 static unsigned bits(float value) {
     unsigned result; std::memcpy(&result, &value, sizeof(result)); return result;
 }
@@ -23,7 +23,6 @@ int main() {
         live.initialize(random);
         downwell::RunnerImageValue timeline{}, image{};
         float reference = 0;
-        unsigned firstDifference = 0, differences = 0;
         for (unsigned tick = 1; tick <= 4096; ++tick) {
             reference = float(reference + rates[choice]);
             const bool boundary = reference < 0 || reference >= 4;
@@ -35,21 +34,15 @@ int main() {
             assert(crossed == boundary && timeline.bits == bits(reference));
             assert(image.bits == (bits(reference) & 0x7fffffffu));
             live.advance();
-            if (live.frame() != unsigned(reference)) {
-                if (!firstDifference) {
-                    firstDifference = tick;
-                    std::printf("rate %+.1f: first live frame difference at update %u "
-                                "(live %u, runner %u, image bits %08x)\n",
-                                double(rates[choice]), tick, live.frame(),
-                                unsigned(reference), bits(reference));
-                }
-                ++differences;
-            }
+            assert(live.phaseBits() == image.bits && live.frame() == unsigned(reference));
+            assert(live.speedBits() == bits(rates[choice]));
+            if(choice == 2 && tick == 10)
+                assert(live.phaseBits() == 0x403fffffu && live.frame() == 2);
         }
         assert(random.calls == 1);
-        std::printf("rate %+.1f: %u differing visible frames in 4096 updates\n",
-                    double(rates[choice]), differences);
+        live.initialize(random);
+        assert(random.calls == 2 && live.phaseBits() == 0 && live.frame() == 0);
     }
     std::puts("Currency animation contract: 16384 source-float sequence updates passed; "
-              "live comparison is diagnostic, not a gameplay parity claim");
+              "including live frames, state, RNG count and reuse; not a full gameplay parity claim");
 }

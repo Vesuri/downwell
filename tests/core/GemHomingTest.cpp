@@ -3,6 +3,7 @@
 #include "core/CurrencyStep.h"
 #include "core/AlarmBank.h"
 #include <cmath>
+#include <cstring>
 #include <cstdlib>
 #include <iostream>
 void require(bool value, const char* text) {
@@ -181,15 +182,19 @@ int main() {
         } choiceRandom{choice};
         downwell::GemAnimation animation;
         animation.initialize(choiceRandom);
-        const int rates[] = {-5, -3, 3, 5};
-        require(choiceRandom.calls == 1 && animation.rateTenths == rates[choice] && animation.frame() == 0,
+        const float rates[] = {-.5f, -.3f, .3f, .5f};
+        unsigned speedBits; std::memcpy(&speedBits,&rates[choice],4);
+        require(choiceRandom.calls == 1 && animation.speedBits() == speedBits && animation.frame() == 0,
                 "each source animation choice consumes one draw and starts frame zero");
+        float phase = 0;
         for (int tick = 1; tick <= 400; ++tick) {
             animation.advance();
-            const int phase = ((tick * rates[choice]) % 40 + 40) % 40;
-            require(animation.phaseTenths == static_cast<unsigned>(phase) &&
-                    animation.frame() == static_cast<unsigned>(phase / 10),
-                    "signed animation wraps correctly with no accumulated rounding drift");
+            phase = float(phase + rates[choice]);
+            if(phase<0 || phase>=4)phase=std::fmod(float(std::fmod(phase,4.f)+4.f),4.f);
+            unsigned phaseBits; std::memcpy(&phaseBits,&phase,4);
+            require(animation.phaseBits() == (phaseBits & 0x7fffffffu) &&
+                    animation.frame() == static_cast<unsigned>(phase),
+                    "signed animation retains runner float addition and wrap rounding");
         }
     }
     downwell::GemLifetime loose, attracted;

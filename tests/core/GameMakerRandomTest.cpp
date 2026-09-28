@@ -124,13 +124,13 @@ void testGemCreateChoices() {
         gem.initialize(10, 20, false, actual);
         const long vx = static_cast<long>(reference.random(51200)) - 25600;
         const long vy = static_cast<long>(reference.random(51200)) - 25600;
-        const int rates[] = {-5, -3, 3, 5};
-        const int rate = rates[reference.nextU32() % 4];
+        const unsigned rates[] = {0xbf000000u, 0xbe99999au, 0x3e99999au, 0x3f000000u};
+        const unsigned rate = rates[reference.nextU32() % 4];
         const int second = 170 + reference.irandom(70);
         const int first = static_cast<int>(reference.irandom(70)) - 60;
         const int angle = reference.nextU32() % 2 ? second : first;
         const long direction = ((angle + 360) % 360) * 65536L;
-        require(gem.vx == vx && gem.vy == vy && gem.animation.rateTenths == rate &&
+        require(gem.vx == vx && gem.vy == vy && gem.animation.speedBits() == rate &&
                 gem.homing.direction == direction,
                 "gem Create preserves VM range/choice order and emitted values");
         require(actual.drawCount() == 8 && reference.drawCount() == 8 &&

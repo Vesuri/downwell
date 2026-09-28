@@ -106,8 +106,8 @@ The real SDL renderer test uses a spawned gem and checks ages 0, 188, 189,
 190, 307, 308, 309 and 65536, preserves other gems, and checks that repainting
 changes neither lifetime nor RNG.
 
-The shared gem CPU fixture schema 7 includes visibility, first-Step choice
-and same-phase chained alarms. Its digest is `07f60a863bb3c7dc`, coverage
+The shared gem CPU fixture schema 8 includes visibility, first-Step choice,
+same-phase chained alarms and binary32 animation state. Its digest is `7a84fb46cb3566ad`, coverage
 `3ff`. The fixture requires both visible and hidden disappearing gems to
 remain alive. This CPU-equivalence check does not establish Windows-exact
 currency movement, general time-stop/event scheduling, drawFx palette effects
@@ -123,16 +123,15 @@ wraps with `float(fmod(float(fmod(position,4)+4),4))`.
 
 `make verify-currency-animation` compares the integer-only sequence evaluator
 with independent host float arithmetic for all four Create choices over 4096
-updates each. It also reports differences from the live `GemAnimation` helper;
-that comparison is diagnostic, not an assertion that the current helper is
-correct. At speed +0.3 the first difference is update 10: the source-style
-image index has bits `403fffff` (just below 3), selecting frame 2, whereas
-the live exact-tenths counter selects frame 3. There are 409 differing visible
-frames in this tape. The other three choices select the same visible frames
-over this interval; that does not establish equality of their internal state.
+updates each. The shared live `GemAnimation` helper must agree in both float
+state and visible frame, without consuming update RNG. Resetting it must clear
+the sequence position. At speed +0.3, update 10 has image-index bits `403fffff`
+(just below 3), selecting frame 2, not the frame 3 of exact decimal tenths.
+The helper admits only the four Create speeds and an internally maintained
+four-frame position; arbitrary image-index/speed writes need the full owner.
 
-The live animation still needs replacement and scheduling in the runner's
-animation phase, including birth eligibility and time-stop speed writes.
+The live animation still needs scheduling in the runner's animation phase,
+including birth eligibility and time-stop speed writes.
 The arithmetic test does not prove the Windows process's live FP mode, event
 phase parity, or presentation parity. See the source image-field and FP-mode
 audits before treating the scalar comparison as a complete runtime oracle.

@@ -1885,7 +1885,7 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             for (unsigned i = 0; i < gameplay.gemCapacity; ++i) {
                 const auto& gem = gameplay.gemAt(i);
                 if (gem.active) nativeGems.push_back({static_cast<long>(gem.age), gem.amount,
-                    gem.motion.animation.rateTenths, static_cast<long>(gem.motion.animation.phaseTenths),
+                    static_cast<long>(gem.motion.animation.speedBits()), static_cast<long>(gem.motion.animation.phaseBits()),
                     gem.motion.x, gem.motion.y, gem.motion.vx, gem.motion.vy, gem.motion.attracted,
                     gem.motion.attractorAtBirth,gem.x,gem.y});
             }
@@ -1897,7 +1897,7 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                             "currency Step publishes source-rounded pixels, not fractional motion");
                 }
                 referenceGems.push_back({static_cast<long>(gem.age), gem.amount,
-                    gem.motion.animation.rateTenths, static_cast<long>(gem.motion.animation.phaseTenths),
+                    static_cast<long>(gem.motion.animation.speedBits()), static_cast<long>(gem.motion.animation.phaseBits()),
                     gem.motion.x, gem.motion.y, gem.motion.vx, gem.motion.vy, gem.motion.attracted,
                     gem.motion.attractorAtBirth,static_cast<long>(gem.x-240),static_cast<long>(gem.y-176)});
             }
