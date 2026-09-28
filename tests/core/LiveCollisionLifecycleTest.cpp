@@ -153,6 +153,31 @@ int main(){
     BuilderPatternPack patterns(bb.data(),bb.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     SpriteMaskPack masks(mb.data(),mb.size());
     require(rooms.valid()&&objects.valid()&&patterns.valid()&&sprites.valid()&&masks.valid(),"real collision resources validate");
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach effect-depth world");world->skipToGameForTesting();
+        auto registration=world->scriptSpawnRegistration<2>();ScriptSpawnEffects<2> effects;unsigned id=0;
+        auto frames=[&](int sprite,unsigned& count){PackedSpriteCollision art;
+            if(!sprites.sprite(sprite,art))return false;count=art.frameCount;return true;};
+        require(world->spawnScriptEffect(registration,effects,MotionBinary64::fromInteger(240),
+            MotionBinary64::fromInteger(300),603,{},{},MotionBinary64::fromInteger(-60000),frames,id),
+            "spawn box-impact depth through the stored effect registry");
+        InstanceHandle key;
+        for(std::size_t i=0;i<world->activeInstanceCount();++i)
+            if(world->instanceAt(i).instanceId==id)key=world->instanceHandleAt(i);
+        const auto& layers=world->sourceRoomLayers();
+        const auto* before=layers.lifetimes().resolve(key);require(before,"resolve effect layer lifetime");
+        const auto oldLayer=before->depth.layerId;
+        require(owner->resolve(key)->depth==-60000&&layers.layers().get(layers.layers().find(oldLayer))->depth==0,
+            "stored depth changes before its element leaves the old layer");
+        world->step({},false);
+        const auto* after=layers.lifetimes().resolve(key);
+        require(world->effectsSucceeded()&&after&&after->depth.layerId!=oldLayer&&
+            layers.layers().get(layers.layers().find(after->depth.layerId))->depth==-60000,
+            "normal phase service migrates the impact to its requested depth");
+        require(effects.clear(registration),"retire migrated effect through its live owner");
+    }
     for(bool high:{false,true})for(bool laser:{false,true}){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());

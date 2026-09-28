@@ -42,6 +42,17 @@ public:
     bool publishedDepth(InstanceHandle h,const Record& r,MotionBinary64 value)const{
         return layerDepth_&&layerDepth_(layerContext_,h,r,value);
     }
+    bool hasDepthWrites()const{return layerDepth_!=nullptr;}
+    // Native owners already publish layer births/retirements themselves.
+    // Bind only their depth setter, without installing those observers twice.
+    template<class Owner> static RecordLifecycleBinding bindMaskDestructionDepth(Owner& owner){
+        auto b=bindMaskDestruction(owner);
+        b.layerContext_=&owner;
+        b.layerDepth_=[](void* p,InstanceHandle h,const Record& r,MotionBinary64 value){
+            return static_cast<Owner*>(p)->depth(h,r,value);
+        };
+        return b;
+    }
     template<class Owner> static RecordLifecycleBinding bind(Owner& owner) {
         RecordLifecycleBinding b;
         b.context_=&owner;

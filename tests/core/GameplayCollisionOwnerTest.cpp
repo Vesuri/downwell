@@ -1290,6 +1290,31 @@ int main(){
     auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
     PackedRoom room;assert(rooms.valid()&&rooms.findRoom(11,room));
     {
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
+            GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&rooms);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));InstanceHandle effect;
+        auto frames=[&](int id,unsigned& count){PackedSpriteCollision art;
+            if(!sprites.sprite(id,art))return false;count=art.frameCount;return true;};
+        assert(world->spawnScriptEffect(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(300),
+            603,{},{},MotionBinary64::fromInteger(-60000),frames,effect));
+        InstanceHandle shared;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::scriptEffect,effect,shared));
+        RunnerImageValue requested;assert(requested.assign(MotionBinary64::fromInteger(-60000)));
+        assert(owner->properties(shared)->depth.bits==requested.bits);
+        auto drawDepth=[&](){int depth=123;unsigned seen=0;
+            assert(world->visitRoomActors([&](auto kind,auto key,auto value){
+                if(kind==GameplayWorld::DrawActor::scriptEffect&&key.slot==effect.slot&&key.generation==effect.generation){
+                    ++seen;std::int32_t integer;assert(RunnerDepthService::integerDepth(value,integer));depth=integer;
+                }return true;
+            }));assert(seen==1);return depth;};
+        assert(drawDepth()==0); // Setter publication is not immediate relinking.
+        world->step(0);
+        assert(world->effectsSucceeded()&&drawDepth()==-60000);
+        assert(world->restartFromResults(DeathMenuSequence::Action::Retry,43,300)!=ResultsDestination::none&&
+            !owner->state(shared)&&owner->valid());
+    }
+    {
         auto roomOwner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
             GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&rooms);
         auto roomWorld=std::make_unique<GameplayWorld>(300,true,0,false,roomOwner->enemyBinding(),

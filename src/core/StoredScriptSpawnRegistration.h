@@ -4,6 +4,7 @@
 #include "InstanceLifecycle.h"
 #include "ObjectPack.h"
 #include "ScriptSpawnEffect.h"
+#include "RunnerDepthChanges.h"
 #include <cstring>
 namespace downwell {
 // Borrowed registration for object 219. Keep at a fixed address and clear all
@@ -70,12 +71,17 @@ public:
         if(!r||!lifecycle_.imageIndex(e->key,*r,effect.imageIndex))return fail();
         r->imageIndex=stored(effect.imageIndex);return true;
     }
-    // The admitted muzzle depth is unchanged zero. Nonzero depth needs the
-    // world's pending-depth-list setter; never pretend that is implemented.
+    // Integral effect depths are published now; layer movement stays deferred.
+    // The integer record cache cannot represent general fractional writes.
     bool depth(unsigned local,const ScriptSpawnEffect& effect){
         if(!succeeded_)return false;
         auto* e=entry(local);auto* r=e?record(*e):nullptr;
-        return (r&&r->depth==0&&(effect.depth.bits&0x7fffffffu)==0)||fail();
+        std::int32_t integer;RunnerImageValue exact;
+        if(!r||!RunnerDepthService::integerDepth(effect.depth,integer)||
+           !exact.assign(MotionBinary64::fromInteger(integer))||!RunnerSpatialSplit::equal(exact,effect.depth))return fail();
+        if(r->depth==integer)return true;
+        if(!lifecycle_.publishedDepth(e->key,*r,effect.depth.promoted()))return fail();
+        r->depth=integer;return true;
     }
     bool retire(unsigned local,const ScriptSpawnEffect&){
         if(!succeeded_)return false;

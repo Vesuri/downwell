@@ -387,9 +387,10 @@ the real runtime ID sequence and publishes exact birth coordinates through
 sprite, angle and animation-index changes to the resource collision owner;
 Animation End marks the generation-checked world record and excludes it from
 collision queries without unlinking the room animation traversal. Explicit
-pre-Draw cleanup retires the marked record and its effect together. The admitted muzzle
-depth assignment is unchanged zero; nonzero depth is rejected until source
-pending-depth ordering is implemented. The bridge must outlive its effect
+pre-Draw cleanup retires the marked record and its effect together. Integral
+effect depths publish through the layer observer and enqueue deferred migration;
+unchanged zero remains valid for resource-less fixtures. Fractional depths are
+rejected because the stored record's cache is integer-valued. The bridge must outlive its effect
 owner and retire registrations before room teardown. It does not install an
 automatic Step handler or replace the live gun adapter by itself.
 
@@ -423,8 +424,8 @@ dispatch (`0x50ded1`) and End Step (`0x50defd`). Room entry also calls it at
 at those supported phase boundaries, including empty phases, and the stored
 runtime services its layer queue there. The borrowed lifecycle depth setter
 checks both lifetime and source identity and publishes into that queue;
-it does not modify the legacy animation list. This is maintenance plumbing,
-not admission of nonzero combat-effect depths or complete runner phase coverage.
+it does not modify the legacy animation list. Script-effect registries use this
+path for integral depth writes; this is not complete runner phase coverage.
 
 The resource-backed native actor adapter uses the shared fixed/dynamic layer
 owner, while keeping its animation membership separate. It loads the room's
@@ -456,12 +457,12 @@ if that matches the existing layer depth. Otherwise:
   ID and rewrites the instance's depth to the layer's integer depth.
 
 The -60000 box-impact jump takes the migration case when born at depth zero.
-Selected Draw traversal is described below; layer ownership and migration
-still require live integration. The current renderer's
-room-list order is not proof of selected GMS2 layer order, including unchanged
-equal-depth births. Existing draw-order tests only validate the port's current
-adapter. Nonzero effect-depth admission remains intentionally disabled until
-the selected owner is connected; no legacy re-sorting fallback is enabled.
+Both script-effect registries now publish this jump into their selected layer
+owners. Resource-backed world tests check that setter publication precedes
+relinking and that the normal phase boundary moves the effect from depth zero
+to -60000. Native fixtures without a layer owner still reject changed depths;
+there is no legacy re-sorting fallback. This establishes layer migration, not
+the full mixed terrain/controller/effect composition or natural box event.
 
 #### Layer element and migration contract
 
@@ -953,9 +954,9 @@ legacy room-list Draw. Tests hide a copied rmMain player layer and require
 that production traversal omits only that layer, preserves dynamic actors,
 and stops on callback failure without changing simulation/RNG state.
 This is not full gameplay composition: terrain, shops, fields and standalone
-effect banks still need their source-ordered boundaries, and the native
-gameplay owner still uses its legacy actor traversal. Nonzero script-effect
-depth overrides remain gated until both live depth/migration paths are ready.
+effect banks still need their source-ordered boundaries. Both live actor
+projections use selected layer traversal and support deferred integral
+script-effect depths; that does not prove the omitted composition boundaries.
 
 The native static garden cache likewise separates Create order from painting:
 it consumes RNG in placement order, then reorders scenery in place using

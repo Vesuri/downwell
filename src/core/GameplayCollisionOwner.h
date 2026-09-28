@@ -173,6 +173,12 @@ private:
             parent.activationPending_=true;return true;}
         bool move(InstanceHandle local,const Record& r,RunnerImageValue x,RunnerImageValue y){InstanceHandle h;
             return key(local,r,h)&&parent.check(parent.owner_.move(h,x,y,*parent.families_.flags(object(r))));}
+        bool depth(InstanceHandle local,const Record& r,MotionBinary64 value){InstanceHandle h;RunnerImageValue narrowed;
+            if(!key(local,r,h)||!narrowed.assign(value))return parent.check(false);
+            if(!parent.layers_.enabled())return parent.check(RunnerSpatialSplit::equal(narrowed,parent.properties_[h.slot].depth));
+            if(!parent.check(parent.layers_.writeDepth(h,value)))return false;
+            parent.properties_[h.slot].depth=narrowed;return true;
+        }
         bool sprite(InstanceHandle local,const Record& r,int sprite){InstanceHandle h;
             if(!key(local,r,h))return false;auto& p=parent.properties_[h.slot];
             return parent.check(parent.owner_.changeSpriteFromPack(h,p.sprite,p.timeline,p.cachedFrame,
@@ -196,7 +202,7 @@ private:
     Binding<GameplayExitControllers::Record,View::Kind::exitController> exits_{*this};
     Binding<GameplayWorld::BulletState,View::Kind::bullet> bullets_{*this};
     Binding<GameplayScriptSpawnInstances::Record,View::Kind::scriptEffect> scriptEffectsBinding_{*this};
-    GameplayScriptSpawnInstances scriptEffects_{GameplayScriptSpawnInstances::Binding::bindMaskDestruction(scriptEffectsBinding_)};
+    GameplayScriptSpawnInstances scriptEffects_{GameplayScriptSpawnInstances::Binding::bindMaskDestructionDepth(scriptEffectsBinding_)};
     Binding<GameplayDebrisInstances::Record,View::Kind::debris> debrisBinding_{*this};
     GameplayDebrisInstances debris_{GameplayDebrisInstances::Binding::bindDestruction(debrisBinding_)};
     GameplayTerrainInstances terrain_;

@@ -2,6 +2,7 @@
 #define DOWNWELL_GAMEPLAY_SCRIPT_SPAWN_INSTANCES_H
 #include "InstanceLifecycle.h"
 #include "ScriptSpawnEffect.h"
+#include "RunnerDepthChanges.h"
 namespace downwell {
 // Native registry borrows stable records from ScriptSpawnEffects. Clear that
 // owner through these hooks before room teardown or destroying either owner.
@@ -34,7 +35,12 @@ public:
     }
     bool speed(unsigned local,const ScriptSpawnEffect& effect){return check(local,effect);}
     bool depth(unsigned local,const ScriptSpawnEffect& effect){
-        return good_=check(local,effect)&&(effect.depth.bits&0x7fffffffu)==0;
+        const auto h=handle(local);const auto* r=find(h);std::int32_t integer;RunnerImageValue exact;
+        if(!check(local,effect)||!RunnerDepthService::integerDepth(effect.depth,integer)||
+           !exact.assign(MotionBinary64::fromInteger(integer))||!RunnerSpatialSplit::equal(exact,effect.depth))return good_=false;
+        // Resource-less fixtures retain only the original unchanged-zero path.
+        if(!binding_.hasDepthWrites())return good_=(effect.depth.bits&0x7fffffffu)==0;
+        return good_=r&&binding_.publishedDepth(h,*r,effect.depth.promoted());
     }
     bool angle(unsigned local,const ScriptSpawnEffect& effect){
         const auto h=handle(local);const auto* r=find(h);

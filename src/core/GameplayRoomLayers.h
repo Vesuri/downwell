@@ -71,6 +71,9 @@ public:
     bool activation(InstanceHandle h,bool active){return !enabled()||(valid()&&lifetimes_.publishInactive(h,!active));}
     bool reconcile(InstanceHandle h){return !enabled()||(valid()&&lifetimes_.reconcileActivation(h));}
     bool serviceDepths(){return !enabled()||(valid()&&lifetimes_.serviceDepths());}
+    bool writeDepth(InstanceHandle h,MotionBinary64 value){
+        return enabled()&&valid()&&lifetimes_.writeDepth(h,value);
+    }
     template<class Lookup,class Draw> bool visit(Lookup lookup,Draw draw)const{
         if(!enabled()||!valid()||!prepared_)return false;
         return RunnerLayerDraw::visit(layers_,[&](unsigned slot,const auto&){return visible_[slot];},
