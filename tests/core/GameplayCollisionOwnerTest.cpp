@@ -373,6 +373,35 @@ int main(){
     }
     auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
+    {
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));
+        InstanceHandle shared[3],local[3];
+        const int kinds[]={60,93,99};
+        for(unsigned i=0;i<3;++i){
+            assert(owner->terrain().append(kinds[i],32+int(i)*16,240,true));
+            local[i]=owner->terrain().handle(i);
+            assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,local[i],shared[i]));
+            const auto* state=owner->state(shared[i]);
+            assert(state&&state->previous.x.bits==state->x.bits);
+            // Seed only the snapshot with a sentinel to make the animation
+            // boundary's write observable without moving indexed geometry.
+            const_cast<GameplayCollisionOwner::Owner::State*>(state)->previous={};
+        }
+        assert(owner->terrain().activation(local[1],false)&&owner->reconcileActivation());
+        world->step(0);assert(world->effectsSucceeded()&&owner->valid());
+        for(unsigned i:{0u,2u}){
+            const auto* state=owner->state(shared[i]);
+            assert(state&&state->previous.x.bits==state->x.bits&&state->previous.y.bits==state->y.bits);
+        }
+        assert(owner->state(shared[1])->previous.x.bits==0&&owner->state(shared[1])->previous.y.bits==0);
+        assert(owner->terrain().activation(local[1],true)&&owner->reconcileActivation());
+        world->step(0);assert(world->effectsSucceeded()&&owner->valid());
+        const auto* reactivated=owner->state(shared[1]);
+        assert(reactivated->previous.x.bits==reactivated->x.bits&&reactivated->previous.y.bits==reactivated->y.bits);
+    }
     checkEnemySlotDirectory(objects,sprites);
     const auto mb=read("generated/downwell-sprite-masks.dwsm");SpriteMaskPack masks(mb.data(),mb.size());
     {

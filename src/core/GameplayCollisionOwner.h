@@ -268,6 +268,14 @@ public:
             if(!self.valid())return false;
             return self.check(self.room_.visitAnimationChecked([&](unsigned slot){
                 const auto shared=self.roomKeys_[slot];
+                // Terrain has no animation dispatch in this adapter. Keep its
+                // typed lifetime check and source-position snapshot in the
+                // same room order, without passing through the actor decoder.
+                if(shared.slot>=View::terrainBase&&shared.slot<View::timeFieldBase){
+                    const auto* terrain=self.world_->terrainInstances();
+                    return terrain&&terrain->find({shared.slot-View::terrainBase,shared.generation})&&
+                        self.owner_.capturePrevious(shared);
+                }
                 View::Kind kind;InstanceHandle local;
                 if(!View::decode(shared,kind,local)||!View(*self.world_).contains(shared)||
                     !self.owner_.capturePrevious(shared))return false;
