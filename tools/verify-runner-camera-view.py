@@ -36,6 +36,12 @@ for start, end, digest in (
     (0x50DA30, 0x50DA5D, "d4c959115af54acae9c90cbebeca5f0539125aa49c319bc9899e81faaa38cf2e"),
     (0x491C12, 0x491C17, "5efbebdf12ce610c0afa9cd8bf3350e0a4288f2e5bd596c8885fcd3f91b541f6"),
     (0x495FF0, 0x496046, "08996788f553411485ccf047da2f2230beffa188b98afcf3688efe21e3599048"),
+    (0x48B6E1, 0x48B7F7, "a35cb39fd52c681c4e11b49ff4314ab4f1c189a583bf8b54ba0b73361843235d"),
+    (0x454880, 0x45495E, "2aa742345adfcdf47d1b2f6e00d01cb16245689200818858a2996518c26e01f8"),
+    (0x4881C3, 0x488204, "6e2495488078acaffa4fc4b9df358eed3202c368fd13b05831ce27a6b6cd4c7e"),
+    (0x4543F0, 0x454450, "4c5e861da32116f24076779eff093616e6093ae3d8a65bb295a7e09e23a20ee1"),
+    (0x456CC0, 0x456CC7, "b7f5d0966c39e26e1b0fbd581b9926e2171899f266ea01686257a0a2c989b87f"),
+    (0x50FDF9, 0x50FE16, "0ee0b3e1f354ee642cff3fcdd150ffed9cfe09f6d8ab6d3f570ecd1612464f15"),
 ):
     assert sha256(region(start, end - start)).hexdigest() == digest, hex(start)
 
@@ -62,4 +68,19 @@ call(0x50DEF5, 0x50B7E0)  # End Step
 call(0x50DA58, 0x491960)
 call(0x491C12, 0x495FB0)
 call(0x496032, 0x453EC0)
-print("Pinned cached camera view, dirty-only post-Step follow and pre-Draw follow")
+# Resource initialization passes the serialized view to camera construction.
+# The constructor converts its integer X/Y to the same float cache read above.
+call(0x48B7C3, 0x454880)
+assert region(0x454895, 5) == bytes.fromhex("66 0f 6e 67 04")
+assert region(0x4548A4, 8) == bytes.fromhex("f3 0f 11 a6 84 01 00 00")
+assert region(0x4548AC, 5) == bytes.fromhex("66 0f 6e 57 08")
+assert region(0x4548B4, 8) == bytes.fromhex("f3 0f 11 96 88 01 00 00")
+# New-room loading copies the resource and clones its camera. The clone copies
+# cached coordinates; this is not a follow of the newly created camMain actor.
+call(0x50FE11, 0x487FA0)
+call(0x4881D7, 0x4543F0)
+assert region(0x45441E, 6) == bytes.fromhex("8b 8f 84 01 00 00")
+assert region(0x454426, 6) == bytes.fromhex("89 8e 84 01 00 00")
+assert region(0x45442C, 6) == bytes.fromhex("8b 8f 88 01 00 00")
+assert region(0x454432, 6) == bytes.fromhex("89 8e 88 01 00 00")
+print("Pinned camera resource initialization, room cloning and phase-aware view publication")

@@ -1,5 +1,30 @@
 # Published views versus camera instances
 
+## Resource initialization and room entry
+
+The selected runner's room-resource reader resolves the serialized view table
+at `0x48b6e1` and passes each view record to `0x454880` at `0x48b7c3`.
+That constructor converts integer view X/Y (record offsets 4/8) to binary32
+camera cache fields `+0x184/+0x188`. Width/height come from offsets 12/16.
+It also copies follow settings and builds projection matrices; it does not
+derive the initial cached coordinates from a followed instance.
+
+The new-room branch at `0x50fdf9` obtains the room resource and calls its copy
+routine `0x487fa0`. Inside that copy, `0x4881d7` clones each source camera
+through `0x4543f0`. The clone explicitly copies cached X/Y at
+`0x45441e–0x454432`, before storing the new camera ID in the destination view.
+Thus creating `camMain` is not itself evidence that the cached view has followed
+it. In particular, entry-dither Create must not substitute the actor's Y minus
+half the viewport height for `camera_get_view_y`.
+
+The verifier pins these resource-construction and cloning paths, including
+the individual coordinate loads/stores. This is static evidence, not a complete
+room-entry execution trace: intervening script camera setters, persistent-room
+reentry and the first follow publication still need integration/verification.
+Do not generalize the new-room copy path to all room transitions.
+
+## Frame publication
+
 The followed instance `camMain` (object 64) is not the camera view cache.
 Its Step precedes `objBuilder` (65), but writing its x/y does not itself
 publish new values for `camera_get_view_y`.
