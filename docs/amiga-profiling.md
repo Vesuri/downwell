@@ -385,6 +385,14 @@ The subsequent restoration of damaged background rows remains in phase 15
 these phases with projectile queries and instance births before attributing a
 firing/destruction slowdown to sprite drawing. These scopes compile away in
 ordinary builds and retain painter order and the offline asset representation.
+Phases 134–136 further separate `drawFx` origin visibility/relative placement,
+raster rounding plus sprite-origin subtraction, and masked surface-word
+stamping. These are exclusive children of the producer phases. Placement
+covers currency/smoke/debris `drawFx`, not the different shade/cover placement
+rules; raster and stamping cover all producers. The remaining currency phase
+includes enumeration, frame selection and conversion of published integer
+coordinates to the portable representation. Sum children when comparing with
+older producer totals; none of these phase counts is an effect-instance count.
 
 Record the executable hash, revision, emulator CPU/memory configuration,
 build flags, tape length, field count, worst gaps and probe clock-clamp count.

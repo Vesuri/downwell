@@ -11,6 +11,14 @@
 #include <iterator>
 #include <vector>
 using namespace downwell;
+#ifdef DOWNWELL_PROBES
+static unsigned activePhase=profileControllerComposition;
+static unsigned phaseCalls[profilePhaseCount]{};
+unsigned downwellProfileEnter(unsigned phase){
+    const auto previous=activePhase;activePhase=phase;++phaseCalls[phase];return previous;
+}
+void downwellProfilePhase(unsigned phase){activePhase=phase;}
+#endif
 static MotionBinary64 number(double d){std::uint64_t n;std::memcpy(&n,&d,8);return {std::uint32_t(n>>32),std::uint32_t(n)};}
 static double value(MotionBinary64 n){const std::uint64_t bits=(std::uint64_t(n.high)<<32)|n.low;double d;std::memcpy(&d,&bits,8);return d;}
 int main(int argc,char**argv){
@@ -210,6 +218,11 @@ int main(int argc,char**argv){
         noShades,raster));
     assert(!colored.visible());
     colored.surface().visit([](auto,auto,auto,auto,auto){assert(false);});
+#ifdef DOWNWELL_PROBES
+    assert(activePhase==profileControllerComposition);
+    assert(phaseCalls[profileEffectPlacement] && phaseCalls[profileEffectRaster] &&
+           phaseCalls[profileEffectStamp]);
+#endif
     std::printf("Currency/smoke composition: %u joint color/shade frames match scalar painter\n",frames);
     std::printf("Smoke composition: %u lifecycle/flag/camera frames match scalar masks; direct=%u controller=%u hidden=%u\n",frames,directFrames,controllerFrames,hiddenFrames);
 }

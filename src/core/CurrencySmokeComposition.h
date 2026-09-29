@@ -53,7 +53,8 @@ public:
         auto add=[&](const EffectMaskAssets::Asset* asset,MotionBinary64 x,MotionBinary64 y){
             if(!okay)return;
             EffectSurfacePlacement::Draw draw;
-            okay=EffectSurfacePlacement::fx(x,y,view,false,false,true,draw);
+            { DW_PROFILE_SCOPE(profileEffectPlacement);
+              okay=EffectSurfacePlacement::fx(x,y,view,false,false,true,draw); }
             if(!okay || draw.target==EffectSurfacePlacement::hidden)return;
             okay=asset && stamp(*asset,draw.x,draw.y,false,raster);
             added|=okay;
@@ -103,12 +104,15 @@ private:
     bool stamp(const EffectMaskAssets::Asset& asset,MotionBinary64 x,MotionBinary64 y,
                bool subtract,Raster raster){
         std::int32_t px,py;
+        { DW_PROFILE_SCOPE(profileEffectRaster);
         if(!raster(x,px) || !raster(y,py))return false;
         if((asset.originX>0 && px<(-2147483647-1)+asset.originX) ||
            (asset.originX<0 && px>2147483647+asset.originX) ||
            (asset.originY>0 && py<(-2147483647-1)+asset.originY) ||
            (asset.originY<0 && py>2147483647+asset.originY))return false;
         px-=asset.originX;py-=asset.originY;
+        }
+        DW_PROFILE_SCOPE(profileEffectStamp);
         const auto& m=asset.mask;
         const PaletteEffectSurface<>::Mask mask{m.data,m.bytes,m.width,m.height,m.stride};
         return subtract?surface_.subtract(mask,px,py):surface_.add({mask,asset.low,asset.high},px,py);

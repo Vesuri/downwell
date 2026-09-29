@@ -496,8 +496,12 @@ build/smoke-composition-test: tests/core/SmokeCompositionTest.cpp src/core/GameM
 	@mkdir -p build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ $(filter %.cpp,$^)
 .PHONY: verify-smoke-composition
-verify-smoke-composition: build/smoke-composition-test generate-amiga-game
+build/smoke-composition-probes-test: tests/core/SmokeCompositionTest.cpp src/core/GameMakerRandom.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -DDOWNWELL_PROBES -Isrc -o $@ $(filter %.cpp,$^)
+verify-smoke-composition: build/smoke-composition-test build/smoke-composition-probes-test generate-amiga-game
 	./build/smoke-composition-test generated/amiga-game.dwap
+	./build/smoke-composition-probes-test generated/amiga-game.dwap
 test: verify-smoke-composition
 
 verify-binary-effects: build/binary-effects-test generate-amiga-game
