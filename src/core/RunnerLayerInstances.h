@@ -7,7 +7,10 @@ namespace downwell {
 // Source-instance-ID lookup for type-2 layer elements. Empty serialized
 // entries exist before room instances do (0x413cdc); attachment fills them in
 // place (0x412ab0), independently of instance creation/storage order.
-template<unsigned LayerCapacity,unsigned ElementCapacity> class RunnerLayerInstances {
+// IdentitySlots opts into a bounded, one-live-generation-per-slot owner.
+// Zero keeps the general full-handle hash index (including overlapping
+// generations of one slot). Neither index determines element/Draw order.
+template<unsigned LayerCapacity,unsigned ElementCapacity,unsigned IdentitySlots=0> class RunnerLayerInstances {
 public:
     using Layers=RunnerLayers<LayerCapacity,ElementCapacity>;
     static constexpr unsigned End=ElementCapacity;
@@ -17,6 +20,7 @@ public:
         for(auto& entry:entries_)entry=Entry{};
         for(auto& head:identityHead_)head=0;
         for(auto& next:identityNext_)next=0;
+        for(auto& element:identityElement_)element=0;
         usedEnd_=0;
         return true;
     }
@@ -28,11 +32,17 @@ public:
     }
     unsigned find(InstanceHandle h)const{
         if(!h.generation)return End;
-        for(unsigned link=identityHead_[bucket(h)];link;link=identityNext_[link-1]){
-            const unsigned i=link-1;
-            if(entries_[i].instance.slot==h.slot&&entries_[i].instance.generation==h.generation)return i;
+        if constexpr(IdentitySlots){
+            if(h.slot>=IdentitySlots||!identityElement_[h.slot])return End;
+            const unsigned element=identityElement_[h.slot]-1;
+            return entries_[element].instance.generation==h.generation?element:End;
+        }else{
+            for(unsigned link=identityHead_[bucket(h)];link;link=identityNext_[link-1]){
+                const unsigned i=link-1;
+                if(entries_[i].instance.slot==h.slot&&entries_[i].instance.generation==h.generation)return i;
+            }
+            return End;
         }
-        return End;
     }
     // Call in serialized membership-array order; each placeholder enters at
     // head, so final element order is reversed. No source element ID is
@@ -48,7 +58,7 @@ public:
     bool attach(Layers& layers,unsigned layer,std::uint32_t sourceId,InstanceHandle h,
         RunnerDepthService::Instance& state,bool inactive){
         DW_PROFILE_SCOPE(profileLayerAttach);
-        if(!h.generation||h.slot==0xffffffffu||state.attached||find(h)!=End||!layers.succeeded())return false;
+        if(!h.generation||h.slot==0xffffffffu||state.attached||!identityAvailable(h)||!layers.succeeded())return false;
         const auto* destination=layers.get(layer);if(!destination)return false;
         unsigned element=find(sourceId);const bool reused=element!=End;
         if(reused){
@@ -132,11 +142,12 @@ public:
         if(!lookup(entry.sourceId,h,state))return false;
         if(!state)return true;
         if(!h.generation||h.slot==0xffffffffu)return false;
+        if constexpr(IdentitySlots)if(h.slot>=IdentitySlots)return false;
         const auto id=destination->id;
         if(state->attached&&state->layerId!=-1&&!release(h,*state))return false;
         // A surviving same-room attachment would alias the lifetime. Release
         // must retire it before publication, without retiring the instance.
-        if(find(h)!=End||!get(element)||layers.elementOwner(element)!=layer||
+        if(!identityAvailable(h)||!get(element)||layers.elementOwner(element)!=layer||
             !layers.get(layer)||layers.get(layer)->id!=id)return false;
         entry.instance=h;indexIdentity(element);state->attached=true;state->layerId=id;
         return true;
@@ -199,15 +210,25 @@ private:
     static unsigned bucket(InstanceHandle h){
         return (h.slot+((h.generation<<5)|(h.generation>>27)))&(Buckets-1);
     }
+    bool identityAvailable(InstanceHandle h)const{
+        if constexpr(IdentitySlots)return h.slot<IdentitySlots&&!identityElement_[h.slot];
+        else return find(h)==End;
+    }
     void indexIdentity(unsigned element){
-        const unsigned b=bucket(entries_[element].instance);
-        identityNext_[element]=identityHead_[b];identityHead_[b]=std::uint16_t(element+1);
+        if constexpr(IdentitySlots)identityElement_[entries_[element].instance.slot]=std::uint16_t(element+1);
+        else{
+            const unsigned b=bucket(entries_[element].instance);
+            identityNext_[element]=identityHead_[b];identityHead_[b]=std::uint16_t(element+1);
+        }
     }
     void unindexIdentity(unsigned element){
-        auto* link=&identityHead_[bucket(entries_[element].instance)];
-        while(*link&&*link!=element+1)link=&identityNext_[*link-1];
-        if(*link)*link=identityNext_[element];
-        identityNext_[element]=0;
+        if constexpr(IdentitySlots)identityElement_[entries_[element].instance.slot]=0;
+        else{
+            auto* link=&identityHead_[bucket(entries_[element].instance)];
+            while(*link&&*link!=element+1)link=&identityNext_[*link-1];
+            if(*link)*link=identityNext_[element];
+            identityNext_[element]=0;
+        }
     }
     unsigned free(const Layers& layers){
         DW_PROFILE_SCOPE(profileLayerAllocate);
@@ -220,7 +241,8 @@ private:
     Entry entries_[ElementCapacity?ElementCapacity:1]{};
     // Lookup acceleration only: allocation, source-ID lookup and painter
     // ordering still use the original scans/lists. Zero means no element.
-    std::uint16_t identityHead_[Buckets]{},identityNext_[ElementCapacity?ElementCapacity:1]{};
+    std::uint16_t identityHead_[IdentitySlots?1:Buckets]{},identityNext_[!IdentitySlots&&ElementCapacity?ElementCapacity:1]{};
+    std::uint16_t identityElement_[IdentitySlots?IdentitySlots:1]{};
     // Source-ID search bound: slots below it may be holes or non-instance elements.
     // Allocation and painter order remain governed by the original scans/lists.
     unsigned usedEnd_=0;

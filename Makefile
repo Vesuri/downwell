@@ -2460,4 +2460,12 @@ build/compact-membership-test: tests/core/CompactMembershipTest.cpp $(wildcard s
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
 
+.PHONY: test-direct-layer-identity
+test: test-direct-layer-identity
+test-direct-layer-identity: build/direct-layer-identity-test
+	./build/direct-layer-identity-test
+build/direct-layer-identity-test: tests/core/DirectLayerIdentityTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+
 -include $(DEPS)

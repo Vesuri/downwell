@@ -6,9 +6,9 @@ namespace downwell {
 // Shared lifetime/depth adapter over a room's element registry. Install before
 // births. Room resource preparation and persistent-state transfer remain the
 // room owner's responsibility. Large owners must not live on the Amiga stack.
-template<unsigned L,unsigned E,unsigned I> class RunnerLayerLifetimes {
+template<unsigned L,unsigned E,unsigned I,bool DirectIdentity=false> class RunnerLayerLifetimes {
 public:
-    using Registry=RunnerLayerInstances<L,E>;
+    using Registry=RunnerLayerInstances<L,E,DirectIdentity?I:0>;
     using Layers=typename Registry::Layers;
     struct State {
         InstanceHandle handle;

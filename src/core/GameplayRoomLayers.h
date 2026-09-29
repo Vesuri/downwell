@@ -10,13 +10,13 @@ namespace downwell {
 // Unrecovered dynamic numeric IDs remain unknown, not slot-derived aliases.
 template<unsigned I> class GameplayRoomLayers {
     static constexpr unsigned L=64,E=I+256,B=8;
-    using Registry=RunnerLayerInstances<L,E>;
+    using Registry=RunnerLayerInstances<L,E,I>;
     using Layers=typename Registry::Layers;
     RunnerLayerIds ids_;
     Layers layers_;
     Registry registry_;
     RunnerLayerBackgrounds<L,E,B> backgrounds_;
-    RunnerLayerLifetimes<L,E,I> lifetimes_{layers_,registry_,ids_};
+    RunnerLayerLifetimes<L,E,I,true> lifetimes_{layers_,registry_,ids_};
     const RoomPack* rooms_=nullptr;
     bool visible_[L]{};
     // Actor projection only. Nonprojected scenery/fields still occupy their

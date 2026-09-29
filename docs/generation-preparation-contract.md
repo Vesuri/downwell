@@ -99,6 +99,19 @@ elements: those retain their original generation-bearing handles so reuse cannot
 retarget them. `currentHandle` returns no handle for retired or out-of-range
 slots, but still returns the lifetime of a deregistered/inactive object.
 
+Gameplay layer ownership uses the same bounded lifetime-slot domain for direct
+element lookup. `RunnerLayerLifetimes` rejects a second live generation in an
+occupied slot before attachment; `GameplayRoomLayers` therefore opts into
+`RunnerLayerInstances`' direct index. Each entry stores element+1 (zero means
+unbound), and lookup still checks the element's full generation. Retirement,
+same-room rebind and room uninitialization remove the mapping before reuse.
+This replaces hash-chain lookup only: element allocation, source-ID lookup,
+room initialization/global iteration and Draw order remain unchanged. The
+general registry defaults to its full-handle hash, including support for
+concurrent generations with the same slot. Direct mode explicitly rejects
+out-of-domain slots and overlapping lifetimes; it is not a transparent option
+for owners lacking the bounded, single-live-lifetime invariant.
+
 ## Terrain transaction boundaries
 
 `AreaOneBuilder::emitPattern` reuses one local `DeferredCreateInstance` for
