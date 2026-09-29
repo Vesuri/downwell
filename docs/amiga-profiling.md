@@ -119,6 +119,43 @@ as well as waiting; it is not a CPU-idle duration. Inner
 exclusive with full probes and coarse generation timing. The script rejects
 an unobserved focus frame and restores the playable build with sampling off.
 
+### Cycle-exact instruction traces
+
+For exact attribution with no in-game brackets, record FS-UAE's instruction
+trace (the Barto remote debugger's `monitor profile`) of an FPS-only build:
+
+```sh
+SKIP_TO_GAME=1 PROFILE_CONTACT=1 TRACE_FRAMES=50,250,690,1300 TRACE_FIELDS=100 \
+  VERIFY_TIMEOUT_SECONDS=900 bash amiga/profile.sh trace
+python3 tools/amiga-trace-report.py tmp/trace/run --frames=1300-1338
+```
+
+`TRACE_FRAMES` lists one-based gameplay frames, numbered as in FPS reports.
+Each capture spans `TRACE_FIELDS` PAL fields (at most 100, about 500 MB each).
+Keep listed frames further apart than that. The build adds one
+`downwellTraceFrameMark` call per gameplay frame, and a debugger stop at each
+listed frame before its capture. Neither reads the clock or changes game state.
+Emulated time does not advance while GDB is stopped. Recording starts at the
+next vertical blank, so a capture's first frame lacks only its pre-VBL
+wait/idle service. Its last frame is cut off and excluded. Output goes to
+`TRACE_OUTPUT` (default `tmp/trace/run`) with the matching ELF and GDB log.
+
+Every executed instruction is recorded with its cycle cost and registers.
+The report rebuilds user-mode call stacks from `jsr`/`bsr` pushes and SP, and
+keeps interrupts on a separate stack. It expands every frame through
+addr2line's inline chain, so LTO-inlined functions and lambdas remain visible.
+It prints per-frame totals with their largest parts, self and inclusive time,
+out-of-line call counts and cycles per call, and a call tree. It also splits
+cycles by instruction class: call/return, `movem`, pushes, stack-frame
+operands, other memory operands, helpers and the wait loop. `--causes`
+charges each stack to a cost owner, such as runner bookkeeping, R-tree upkeep
+or a rendering subsystem. The owner patterns are listed in the tool. `--frames`,
+`--min-fields`, `--focus`, `--lines` and `--collapsed` (folded stacks for
+flame graphs) narrow the view. Cycles are 68000 clocks (142,102 per PAL
+field) in the emulated configuration, not wall-clock time. Gameplay must
+still be checked against deterministic replays. The trace describes one run
+of one tape.
+
 The FPS report also prints `PREPARATION terrain`, measured once at owner
 construction before hardware takeover. It reads the OS graphics vertical-blank
 counter directly (no OS call) around the table preparation, with compiler memory

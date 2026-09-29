@@ -125,6 +125,21 @@ __attribute__((noinline, used)) void downwellProfileReady()
     (void)gDownwellSamplePhaseCount;
     __asm__ volatile("" ::: "memory");
 }
+#ifdef DOWNWELL_TRACE_FRAMES
+// Emulator instruction-trace anchors. The debugger starts `monitor profile`
+// at the first; the trace decoder splits game frames at entries to the second.
+// Neither reads the clock or touches game state.
+static const ULONG traceFrames[] = {DOWNWELL_TRACE_FRAMES};
+volatile ULONG gDownwellTraceFrameCount = sizeof traceFrames / sizeof traceFrames[0];
+__attribute__((noinline, used)) void downwellTraceReady(ULONG frame)
+{
+    __asm__ volatile("" :: "d"(frame) : "memory");
+}
+__attribute__((noinline, used)) void downwellTraceFrameMark(ULONG frame)
+{
+    __asm__ volatile("" :: "d"(frame) : "memory");
+}
+#endif
 }
 
 unsigned long downwellTerrainPreparationBegin(){
@@ -237,6 +252,14 @@ void downwellProfileBegin(unsigned scene)
 {
     sceneId = scene < 4 ? scene : 0;
     startField = gDownwellProfileVbi;
+#ifdef DOWNWELL_TRACE_FRAMES
+    if(sceneId==3&&gameplayWarmed&&!gDownwellProfileFrozen){
+        const ULONG frame=gDownwellProfileFrames[3]+1;
+        for(ULONG i=0;i<gDownwellTraceFrameCount;++i)
+            if(traceFrames[i]==frame)downwellTraceReady(frame);
+        downwellTraceFrameMark(frame);
+    }
+#endif
 #ifdef DOWNWELL_PHASE_SAMPLING
     gDownwellSamplePhase=profileOther;
     gDownwellSampleFrame=gDownwellProfileFrames[3]+1;
