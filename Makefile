@@ -377,7 +377,7 @@ verify-runner-depth-changes: build/runner-layer-elements-test build/runner-layer
 	./build/runner-layer-instances-test
 test: verify-runner-depth-changes
 
-build/runner-layer-elements-test: tests/core/RunnerLayerElementsTest.cpp src/core/RunnerLayerElements.h src/core/LowestFreeSlotMap.h
+build/runner-layer-elements-test: tests/core/RunnerLayerElementsTest.cpp src/core/RunnerLayerElements.h src/core/LowestFreeSlotMap.h src/core/SlotIndex.h
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
 
@@ -729,7 +729,7 @@ build/runner-spatial-split-test: tests/core/RunnerSpatialSplitTest.cpp $(wildcar
 	@mkdir -p build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/RunnerSpatialSplitTest.cpp
 
-build/runner-object-membership-test: tests/core/RunnerObjectMembershipTest.cpp src/core/RunnerObjectMembership.h
+build/runner-object-membership-test: tests/core/RunnerObjectMembershipTest.cpp src/core/RunnerObjectMembership.h src/core/SlotIndex.h
 	@mkdir -p build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ tests/core/RunnerObjectMembershipTest.cpp
 
@@ -2451,5 +2451,13 @@ test-phase-sampling: build/phase-sampling-test
 build/phase-sampling-test: tests/core/PhaseSamplingTest.cpp src/core/Profile.h
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_FPSCOUNT -DDOWNWELL_PHASE_SAMPLING -o $@ $<
+
+.PHONY: test-compact-membership
+test: test-compact-membership
+test-compact-membership: build/compact-membership-test
+	./build/compact-membership-test
+build/compact-membership-test: tests/core/CompactMembershipTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
 
 -include $(DEPS)

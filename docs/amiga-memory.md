@@ -103,6 +103,17 @@ block, requested asset bytes and remaining Chip memory after allocations.
 
 ## Ordinary memory
 
+Room, object-registration and layer-element links store internal pool slots,
+not resource IDs or instance generations. `SlotIndex` uses 16-bit links when
+the capacity **including the end sentinel** fits in 65535, and 32-bit links
+otherwise. Layer ownership uses the layer capacity independently of the
+element capacity. Layer counts use the element width so a full pool still fits.
+Room membership already requires capacity below 65534 for its marked-list
+sentinels, so its forward/backward links are always 16-bit. Public indices,
+numeric IDs, generation counters and ordering rules are unchanged. This is
+ordinary owner storage only; it neither reduces DMA allocations nor establishes
+a stock-A500 memory requirement.
+
 The executable is tested with the ordinary 4 KiB AmigaDOS task stack. An
 800-byte automatic menu-Copper verification buffer previously enlarged the
 main frame enough that the gameplay verification build corrupted an asset

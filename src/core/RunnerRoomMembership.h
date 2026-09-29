@@ -8,7 +8,7 @@ namespace downwell {
 template<unsigned Capacity> class RunnerRoomMembership {
     static_assert(Capacity<65534,"Compact cleanup links require 16-bit slots");
     static constexpr unsigned Unmarked=Capacity+1;
-    struct Entry {unsigned next=Capacity,previous=Capacity;int list=-1;RunnerImageValue key;
+    struct Entry {std::uint16_t next=Capacity,previous=Capacity;int list=-1;RunnerImageValue key;
         std::uint16_t markedNext=Unmarked,markedPrevious=Capacity;};
 public:
     static constexpr unsigned End=Capacity;

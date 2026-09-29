@@ -1,13 +1,16 @@
 #ifndef DOWNWELL_CORE_RUNNER_LAYER_ELEMENTS_H
 #define DOWNWELL_CORE_RUNNER_LAYER_ELEMENTS_H
 #include "LowestFreeSlotMap.h"
+#include "SlotIndex.h"
 namespace downwell {
 // Selected GMS2 layer element links, independent of the room animation list.
 // Slots are borrowed identities: their owner must detach before reuse. This
 // primitive does not allocate layers, publish source IDs, or define Draw order.
 template<unsigned Layers,unsigned Elements> class RunnerLayerElements {
-    struct Links {unsigned next=Elements,previous=Elements,layer=Layers;};
-    struct Layer {unsigned head=Elements,tail=Elements,count=0;};
+    using ElementSlot=typename SlotIndex<Elements>::Type;
+    using LayerSlot=typename SlotIndex<Layers>::Type;
+    struct Links {ElementSlot next=Elements,previous=Elements;LayerSlot layer=Layers;};
+    struct Layer {ElementSlot head=Elements,tail=Elements,count=0;};
 public:
     static constexpr unsigned End=Elements,NoLayer=Layers;
     // Storage disposal only; caller has already unpublished all payloads.

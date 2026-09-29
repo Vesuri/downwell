@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_RUNNER_OBJECT_MEMBERSHIP_H
 #define DOWNWELL_CORE_RUNNER_OBJECT_MEMBERSHIP_H
 #include "Profile.h"
+#include "SlotIndex.h"
 #include <cstdint>
 namespace downwell {
 // 0x478380/0x479880: append registration, stable unlink. With an immutable
@@ -136,7 +137,8 @@ public:
         return result;
     }
 private:
-    struct Entry {int object=-1;std::uint32_t identity=0;unsigned next=End,previous=End;};
+    using Slot=typename SlotIndex<Capacity>::Type;
+    struct Entry {int object=-1;std::uint32_t identity=0;Slot next=End,previous=End;};
     Entry entries_[Capacity ? Capacity : 1]{};
     unsigned head_=End,tail_=End,count_=0;
     unsigned revision_=0;
