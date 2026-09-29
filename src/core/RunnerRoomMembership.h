@@ -18,6 +18,16 @@ public:
         const RunnerRoomMembership* owner=nullptr;
         unsigned revision=0,first=0,last=0;
     };
+    // Prepare once at room entry; mutations repair only adjacent omitted runs.
+    // This is owned storage, not a pointer to a caller's temporary projection.
+    bool prepareRetainedAnimation(unsigned first,unsigned last)const{
+        if(first>last||last>Capacity)return false;
+        rebuildAnimation(retainedAnimation_,first,last);return true;
+    }
+    template<class Visit> bool visitAnimationRetainedChecked(
+        unsigned first,unsigned last,bool& dirty,Visit visit)const{
+        return visitAnimationProjectedChecked(retainedAnimation_,first,last,dirty,visit);
+    }
     bool contains(unsigned slot)const{return slot<Capacity && entries_[slot].list>=0;}
     bool active(unsigned slot)const{return slot<Capacity && entries_[slot].list==0;}
     bool marked(unsigned slot)const{return contains(slot)&&entries_[slot].markedNext!=Unmarked;}
@@ -54,13 +64,7 @@ public:
         if(!full&&(projection.owner!=this||projection.revision!=revision_||
             projection.first!=first||projection.last!=last)){
             DW_PROFILE_COUNT(counterAnimationProjectionBuild);
-            unsigned next=End;
-            for(unsigned slot=tail_[0];slot!=End;slot=entries_[slot].previous){
-                if(slot<first||slot>=last)next=slot;
-                projection.next[slot]=std::uint16_t(next);
-            }
-            projection.owner=this;projection.revision=revision_;
-            projection.first=first;projection.last=last;
+            rebuildAnimation(projection,first,last);
         }
         for(unsigned slot=head_[0];slot!=End;){
             if(dirty)full=true;
@@ -90,6 +94,9 @@ public:
     bool remove(unsigned slot){
         if(!contains(slot))return false;
         const auto e=entries_[slot];
+        const bool retained=retainedAnimationReady();
+        if(retained&&e.list==0&&!animationOmitted(slot))
+            repairAnimationBefore(e.previous,e.next==End?End:retainedAnimation_.next[e.next]);
         if(e.markedNext!=Unmarked){
             if(e.markedPrevious==End)markedHead_[e.list]=e.markedNext;
             else entries_[e.markedPrevious].markedNext=e.markedNext;
@@ -98,7 +105,9 @@ public:
         }
         if(e.previous==End)head_[e.list]=e.next;else entries_[e.previous].next=e.next;
         if(e.next==End)tail_[e.list]=e.previous;else entries_[e.next].previous=e.previous;
-        entries_[slot].next=entries_[slot].previous=End;entries_[slot].list=-1;++revision_;return true;
+        entries_[slot].next=entries_[slot].previous=End;entries_[slot].list=-1;++revision_;
+        if(retained)retainedAnimation_.revision=revision_;
+        return true;
     }
     void clear(){for(unsigned list=0;list<2;++list)while(head_[list]!=End)remove(head_[list]);}
     // Marked-record cleanup (0x48bbb0) differs from activation reconciliation:
@@ -154,7 +163,27 @@ public:
         return true;
     }
 private:
+    bool retainedAnimationReady()const{
+        return retainedAnimation_.owner==this&&retainedAnimation_.revision==revision_;
+    }
+    bool animationOmitted(unsigned slot)const{
+        return slot>=retainedAnimation_.first&&slot<retainedAnimation_.last;
+    }
+    void repairAnimationBefore(unsigned previous,unsigned target){
+        for(unsigned slot=previous;slot!=End&&animationOmitted(slot);slot=entries_[slot].previous)
+            retainedAnimation_.next[slot]=std::uint16_t(target);
+    }
+    void rebuildAnimation(AnimationProjection& projection,unsigned first,unsigned last)const{
+        unsigned next=End;
+        for(unsigned slot=tail_[0];slot!=End;slot=entries_[slot].previous){
+            if(slot<first||slot>=last)next=slot;
+            projection.next[slot]=std::uint16_t(next);
+        }
+        projection.owner=this;projection.revision=revision_;
+        projection.first=first;projection.last=last;
+    }
     void insertActive(unsigned slot){
+        const bool retained=retainedAnimationReady();
         ++revision_;
         auto& e=entries_[slot];unsigned previous=tail_[0];
         unsigned forward=head_[0];
@@ -171,6 +200,12 @@ private:
         e.list=0;e.previous=previous;e.next=previous==End?head_[0]:entries_[previous].next;
         if(e.next==End)tail_[0]=slot;else entries_[e.next].previous=slot;
         if(previous==End)head_[0]=slot;else entries_[previous].next=slot;
+        if(retained){
+            retainedAnimation_.next[slot]=std::uint16_t(animationOmitted(slot)?
+                (e.next==End?End:retainedAnimation_.next[e.next]):slot);
+            if(!animationOmitted(slot))repairAnimationBefore(previous,slot);
+            retainedAnimation_.revision=revision_;
+        }
     }
     void appendInactive(unsigned slot){
         auto& e=entries_[slot];e.list=1;e.previous=tail_[1];e.next=End;
@@ -181,6 +216,7 @@ private:
     unsigned head_[2]={End,End},tail_[2]={End,End};
     unsigned markedHead_[2]={End,End};
     unsigned revision_=0;
+    mutable AnimationProjection retainedAnimation_;
 };
 }
 #endif

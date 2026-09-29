@@ -1,3 +1,6 @@
+// Count projection rebuilds without a platform clock. The test must prove
+// maintained links avoid whole-room rebuilds, not merely produce equal output.
+#define DOWNWELL_PROBES
 #include "core/RunnerLayerDraw.h"
 #include "core/RunnerLayers.h"
 #include "core/RunnerRoomMembership.h"
@@ -5,6 +8,9 @@
 #include <algorithm>
 #include <iostream>
 #include <vector>
+volatile unsigned long gDownwellProfileCounters[profileCounterCount]{};
+unsigned downwellProfileEnter(unsigned){return 0;}
+void downwellProfilePhase(unsigned){}
 namespace {
 using namespace downwell;
 void require(bool v,const char* m){if(!v){std::cerr<<m<<'\n';std::exit(1);}}
@@ -198,13 +204,18 @@ void cleanupProjection(){
         remaining==std::vector<unsigned>({1,2,3}),"failed retirement leaves remaining order intact");
     room.clear();require(room.visitMarkedCleanupChecked([](unsigned){return false;}),"clear removes all marks");
 }
-void animationProjection(){
+void animationProjection(bool retained){
     RunnerRoomMembership<6> room;
     RunnerRoomMembership<6>::AnimationProjection projection;
+    if(retained)require(room.prepareRetainedAnimation(1,4),"prepare animation before births");
     for(unsigned i=0;i<6;++i)require(room.bind(i,{}),"animation projection births");
     bool dirty=false;std::vector<unsigned> trace;
+    auto projected=[&](auto visit){
+        return retained?room.visitAnimationRetainedChecked(1,4,dirty,visit):
+            room.visitAnimationProjectedChecked(projection,1,4,dirty,visit);
+    };
     auto run=[&](int writeAt=-1){
-        trace.clear();return room.visitAnimationProjectedChecked(projection,1,4,dirty,[&](unsigned slot){
+        trace.clear();return projected([&](unsigned slot){
             trace.push_back(slot);if(int(slot)==writeAt)dirty=true;return true;
         });
     };
@@ -220,7 +231,7 @@ void animationProjection(){
     require(run()&&trace==std::vector<unsigned>({0,5,4}),"reactivation preserves room insertion order");
     require(room.remove(0)&&room.bind(0,{}),"reuse projection slot");
     require(run()&&trace==std::vector<unsigned>({5,4,0}),"rebound room links invalidate projection");
-    trace.clear();require(!room.visitAnimationProjectedChecked(projection,1,4,dirty,[&](unsigned slot){
+    trace.clear();require(!projected([&](unsigned slot){
         trace.push_back(slot);return false;
     })&&trace==std::vector<unsigned>({5}),"projection callback failure is terminal");
     room.clear();require(run()&&trace.empty(),"empty room resets projection");
@@ -239,11 +250,57 @@ void animationProjection(){
             return true;
         };
         require(room.visitAnimationChecked([&](unsigned slot){return visit(0,slot);})&&
-            room.visitAnimationProjectedChecked(projection,1,4,dirty,[&](unsigned slot){return visit(1,slot);}),
+            projected([&](unsigned slot){return visit(1,slot);}),
             "snapshot differential walks");
         for(unsigned i=0;i<6;++i)require(current[0][i]==current[1][i]&&previous[0][i]==previous[1][i],
             "projected snapshot values match source-order full walk");
     }
 }
+void retainedAnimationMutations(){
+    RunnerRoomMembership<64> reference,retained;
+    unsigned first=16,last=48,random=0x1735486;
+    require(retained.prepareRetainedAnimation(first,last),"prepare retained room order");
+    require(!retained.prepareRetainedAnimation(4,3)&&!retained.prepareRetainedAnimation(0,65),
+        "invalid preparation leaves retained projection unchanged");
+    for(unsigned step=0;step<8192;++step){
+        random=random*1664525u+1013904223u;
+        const unsigned slot=(random>>8)&63u,operation=(random>>18)%5;
+        RunnerImageValue depth;require(depth.assignInteger(int((random>>24)%9)-4),"random room depth");
+        auto mutate=[&](auto& room){
+            if(operation<2)return room.bind(slot,depth);
+            if(operation==2)return room.remove(slot);
+            if(operation==3){
+                unsigned calls=0;
+                return room.reconcileChecked([&](unsigned i){return ((i+step)%7)<3;},
+                    [&](unsigned,bool){return step%13||++calls!=2;});
+            }
+            if(step%31==0)room.clear();
+            return true;
+        };
+        require(mutate(reference)==mutate(retained),"retained mutation preserves failure result");
+        if(step%257==0){
+            first=(step/257)%3==0?0:16;last=(step/257)%3==1?16:64;
+            require(retained.prepareRetainedAnimation(first,last),"change prepared omitted range");
+        }
+        std::vector<unsigned> expected,actual,raw;
+        const bool full=step%11==0;bool dirty=full;
+        require(reference.visitAnimationChecked([&](unsigned i){
+            raw.push_back(i);if(full||i<first||i>=last)expected.push_back(i);return true;
+        }),"raw room oracle");
+        const auto rebuilds=gDownwellProfileCounters[counterAnimationProjectionBuild];
+        require(retained.visitAnimationRetainedChecked(first,last,dirty,[&](unsigned i){actual.push_back(i);return true;})&&
+            expected==actual&&!dirty,"retained links preserve raw order after mutation");
+        require(gDownwellProfileCounters[counterAnimationProjectionBuild]==rebuilds,
+            "prepared mutation path never rebuilds whole-room animation links");
+        actual.clear();
+        require(retained.visitAnimationChecked([&](unsigned i){actual.push_back(i);return true;})&&raw==actual,
+            "projection maintenance never changes room links");
+        if(step%503==0){
+            auto copy=retained;actual.clear();dirty=full;
+            require(copy.visitAnimationRetainedChecked(first,last,dirty,[&](unsigned i){actual.push_back(i);return true;})&&actual==expected,
+                "copied owner rebuilds rather than following another room cache");
+        }
+    }
 }
-int main(){dispatch();traversal();roomActivation();drawBirths();animationProjection();cleanupProjection();std::cout<<"Selected layer Draw order, synchronous births, animation projection, 8192 cleanup mutations and 1024 instance-dispatch cases verified\n";}
+}
+int main(){dispatch();traversal();roomActivation();drawBirths();animationProjection(false);animationProjection(true);retainedAnimationMutations();cleanupProjection();std::cout<<"Selected layer Draw order, synchronous births, both animation projections, 8192 retained animation mutations, 8192 cleanup mutations and 1024 instance-dispatch cases verified\n";}

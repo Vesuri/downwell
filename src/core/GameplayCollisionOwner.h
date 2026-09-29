@@ -32,7 +32,6 @@ private:
     unsigned combatAlarmMask_=0;
     bool combatAlarmCaptureValid_=false;
     RunnerRoomMembership<View::capacity> room_;
-    RunnerRoomMembership<View::capacity>::AnimationProjection animationProjection_;
     bool terrainSnapshotDirty_=true;
     InstanceHandle roomKeys_[View::capacity]{};
     Owner::Properties properties_[View::capacity]{};
@@ -345,10 +344,11 @@ public:
             return self.room_.visitDrawChecked([&](unsigned slot){return draw(self.roomKeys_[slot],self.properties_[slot].depth);});
         },this);
         if(!owner_.watchSnapshotRange(View::terrainBase,View::timeFieldBase,terrainSnapshotDirty_))return check(false);
+        if(!room_.prepareRetainedAnimation(View::terrainBase,View::timeFieldBase))return check(false);
         world.configureRoomAnimation([](void* context){
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
             if(!self.valid())return false;
-            return self.check(self.room_.visitAnimationProjectedChecked(self.animationProjection_,
+            return self.check(self.room_.visitAnimationRetainedChecked(
                 View::terrainBase,View::timeFieldBase,self.terrainSnapshotDirty_,[&](unsigned slot){
                 const auto shared=self.roomKeys_[slot];
                 // The conservative dirty fallback keeps terrain snapshots in

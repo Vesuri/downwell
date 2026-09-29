@@ -26,7 +26,14 @@ terrain-range dirty flag. A dirty pass uses the full room-order walk. A write
 during animation switches the remainder to the full walk at the raw successor
 and also requests a full next pass, preserving already-visited snapshots.
 Reactivation forces a refresh, since an inactive instance can retain an older
-snapshot. Membership mutations rebuild the projected links. Actor animation
+snapshot. The live owner prepares projected links at room entry. Active-list
+insertion computes the new slot's successor and, for a projected actor, repairs
+only its preceding contiguous omitted run. Removing a projected actor redirects
+that run to the next projected slot; removing omitted terrain changes no cached
+target. Activation uses these same removal/insertion operations. No new source
+event is skipped, and the raw room links remain authoritative. The caller-owned
+rebuild-on-mutation projection remains available as a reference; copied owners
+and changed omitted ranges rebuild before reuse. Actor animation
 and terrain End Step are not omitted by this mechanism. Activation and
 retirement remain observable, including the source rule that an inactive
 element terminates its layer's Draw walk.
