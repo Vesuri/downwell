@@ -4,6 +4,12 @@
 #include "RunnerDepthChanges.h"
 #include "RunnerLayers.h"
 namespace downwell {
+template<bool Derived> struct RunnerLayerEntry {
+    std::uint32_t sourceId=0;InstanceHandle instance;bool present=false;
+};
+template<> struct RunnerLayerEntry<true> {
+    std::uint32_t sourceId=0;InstanceHandle instance;
+};
 // Source-instance-ID lookup for type-2 layer elements. Empty serialized
 // entries exist before room instances do (0x413cdc); attachment fills them in
 // place (0x412ab0), independently of instance creation/storage order.
@@ -14,7 +20,7 @@ template<unsigned LayerCapacity,unsigned ElementCapacity,unsigned IdentitySlots=
 public:
     using Layers=RunnerLayers<LayerCapacity,ElementCapacity>;
     static constexpr unsigned End=ElementCapacity;
-    struct Entry {std::uint32_t sourceId=0;InstanceHandle instance;bool present=false;};
+    using Entry=RunnerLayerEntry<(IdentitySlots!=0)>;
     bool discardUninitialized(){
         for(const auto& entry:entries_)if(entry.instance.generation)return false;
         for(auto& entry:entries_)entry=Entry{};
@@ -24,10 +30,10 @@ public:
         usedEnd_=0;
         return true;
     }
-    const Entry* get(unsigned element)const{return element<ElementCapacity&&entries_[element].present?&entries_[element]:nullptr;}
+    const Entry* get(unsigned element)const{return element<ElementCapacity&&present(entries_[element])?&entries_[element]:nullptr;}
     unsigned find(std::uint32_t sourceId)const{
         if(!sourceId)return End; // Unnumbered native lifetimes have no ID lookup.
-        for(unsigned i=0;i<usedEnd_;++i)if(entries_[i].present&&entries_[i].sourceId==sourceId)return i;
+        for(unsigned i=0;i<usedEnd_;++i)if(present(entries_[i])&&entries_[i].sourceId==sourceId)return i;
         return End;
     }
     unsigned find(InstanceHandle h)const{
@@ -51,7 +57,8 @@ public:
         if(!sourceId||find(sourceId)!=End)return false;
         const unsigned element=free(layers);
         if(element==End||!layers.attach(layer,element,true,false,[](unsigned){return false;}))return false;
-        entries_[element]={sourceId,{},true};
+        entries_[element]={sourceId,{}};
+        if constexpr(!IdentitySlots)entries_[element].present=true;
         if(element>=usedEnd_)usedEnd_=element+1;
         return true;
     }
@@ -71,7 +78,7 @@ public:
         entry.sourceId=sourceId;
         entry.instance.slot=h.slot;
         entry.instance.generation=h.generation;
-        entry.present=true;
+        if constexpr(!IdentitySlots)entry.present=true;
         indexIdentity(element);
         if(element>=usedEnd_)usedEnd_=element+1;
         state.attached=true;state.layerId=destination->id;state.depth=depth;
@@ -235,8 +242,15 @@ private:
         // Shared links account for non-instance owners too. Keep the registry
         // presence check for detached/unpublished records, as in the scan.
         for(unsigned slot=layers.firstFreeElement();slot!=End;slot=layers.firstFreeElement(slot+1))
-            if(!entries_[slot].present)return slot;
+            if(!present(entries_[slot]))return slot;
         return End;
+    }
+    static bool present(const Entry& entry){
+        // A placeholder has a nonzero source ID. An unnumbered binding has
+        // a nonzero generation. Retire/rebind clear both; failed attachment
+        // retains the published handle just as the explicit flag did.
+        if constexpr(IdentitySlots)return entry.sourceId||entry.instance.generation;
+        else return entry.present;
     }
     Entry entries_[ElementCapacity?ElementCapacity:1]{};
     // Lookup acceleration only: allocation, source-ID lookup and painter

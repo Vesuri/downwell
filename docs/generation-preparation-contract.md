@@ -220,6 +220,17 @@ concurrent generations with the same slot. Direct mode explicitly rejects
 out-of-domain slots and overlapping lifetimes; it is not a transparent option
 for owners lacking the bounded, single-live-lifetime invariant.
 
+The direct registry's element payload contains only source ID and lifetime
+handle (12 bytes). Presence is derived from a nonzero source ID or generation:
+serialized placeholders retain their source ID when uninitialized, while
+unnumbered bindings retain a live generation. Retirement/rebind release clears
+both. Attachment publishes the handle before attaching links, so a failed
+attachment preserves the same present-but-unattached prefix. There is no
+independent presence flag to write at every birth. The general hash registry
+retains its explicit flag as the reference; the direct/general lifecycle
+witness compares placeholders, initialization, reuse and duplicate rejection.
+This does not eliminate the separate per-element links or lifetime records.
+
 ## Ordered registration runs
 
 The scheduled collision owner uses `RunnerRunMembership` for object

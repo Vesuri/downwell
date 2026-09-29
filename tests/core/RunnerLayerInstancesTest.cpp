@@ -443,6 +443,51 @@ void unnumberedLifetimes(){
             "unrecovered numeric IDs cannot silently survive source room lookup");
     }
 }
+template<bool Direct> std::vector<unsigned> presenceWitness(){
+    using namespace downwell;
+    using R=RunnerLayerInstances<2,32,Direct?24:0>;
+    R registry;typename R::Layers layers;unsigned layer=2;
+    require(layers.insertAfterEquals(17,0,false,layer),"presence layer");
+    RunnerDepthService::Instance states[24];InstanceHandle handles[24];
+    std::vector<unsigned> trace;
+    auto capture=[&](){
+        for(unsigned e=0;e<32;++e){
+            const auto* entry=registry.get(e);trace.push_back(entry!=nullptr);
+            if(entry){trace.push_back(entry->sourceId);trace.push_back(entry->instance.slot);
+                trace.push_back(entry->instance.generation);}
+        }
+        require(layers.visitElements(layer,[&](unsigned e){trace.push_back(e);return true;}),"presence order");
+        trace.push_back(0xffffffffu);
+    };
+    capture();
+    for(unsigned i=0;i<4;++i){require(registry.reserve(layers,layer,101+i),"presence placeholder");capture();}
+    for(unsigned i=0;i<24;++i){
+        handles[i]={i,1};
+        require(registry.attach(layers,layer,i<4?101+i:0,handles[i],states[i],i%3==0),"presence attach");
+        capture();
+    }
+    for(unsigned i=0;i<4;++i){
+        const unsigned element=registry.find(101+i);
+        require(registry.uninitialize(layers,element,[&](unsigned source,InstanceHandle& h,
+            RunnerDepthService::Instance*& state){
+            require(source==101+i,"presence uninitialize ID");h=handles[i];state=&states[i];return true;
+        }),"presence uninitialize");
+        require(registry.get(element)&&!registry.get(element)->instance.generation,
+            "unbound named placeholder stays present");capture();
+        ++handles[i].generation;
+        require(registry.attach(layers,layer,101+i,handles[i],states[i],false),"presence reinitialize");capture();
+    }
+    for(unsigned i=0;i<24;i+=2){
+        const auto old=handles[i];const unsigned source=i<4?101+i:0;
+        require(registry.retire(layers,source,old),"presence retire");capture();
+        require(registry.find(old)==R::End,"presence old generation gone");
+        states[i]={};++handles[i].generation;
+        require(registry.attach(layers,layer,source,handles[i],states[i],false),"presence reuse");capture();
+        RunnerDepthService::Instance duplicate;
+        require(!registry.attach(layers,layer,0,handles[i],duplicate,false),"presence duplicate rejection");capture();
+    }
+    return trace;
+}
 template<bool Compact> std::vector<unsigned> compactLifetimeWitness(){
     using namespace downwell;
     using R=RunnerLayerInstances<8,32,24>;
@@ -501,6 +546,8 @@ template<bool Compact> std::vector<unsigned> compactFailureWitness(){
         unsigned(state->depth.layerId),state->depth.attached,state->depth.append,state->inactive};
 }
 int main(){permutations();lifecycle();identityCollisions();bounds();roomFallback();globalFallbackOrder();serializedInitialization();rebindRelease();roomInitializationFailures();lifetimeDepthIntegration();lifetimeRoomInitialization();roomUninitialization();unnumberedLifetimes();
+    static_assert(sizeof(downwell::RunnerLayerEntry<true>)==12,"derived entry contains only identity fields");
+    require(presenceWitness<true>()==presenceWitness<false>(),"derived/explicit presence lifecycle trace");
     require(compactLifetimeWitness<true>()==compactLifetimeWitness<false>(),"compact/full lifetime mutation trace");
     require(compactFailureWitness<true>()==compactFailureWitness<false>(),"compact/full attachment failure prefix");
     std::cout<<"Serialized layer initialization, rebind release, room fallback and lifetime-checked attachment verified\n";}
