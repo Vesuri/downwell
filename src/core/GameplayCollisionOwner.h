@@ -157,10 +157,17 @@ private:
                 if(local.generation!=r.lifetimeId)return parent.check(false);
             if(birth&&!parent.world_)return parent.check(Kind==View::Kind::player);
             if(!parent.world_)return parent.check(false);
-            const auto* actual=View(*parent.world_).template resolveLocal<Kind>(local);
-            if(!actual||
-                (!birth&&(!parent.owner_.contains(out)||parent.owner_.objectId(out)!=object(r))))return parent.check(false);
-            return parent.check(actual==&r);
+            if(!birth&&(!parent.owner_.contains(out)||parent.owner_.objectId(out)!=object(r)))return parent.check(false);
+#ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+            if constexpr(Kind==View::Kind::terrain){
+                const auto* store=parent.world_->terrainInstances();
+                return parent.check(store&&store->ownsIdentity(local,r));
+            }else
+#endif
+            {
+                const auto* actual=View(*parent.world_).template resolveLocal<Kind>(local);
+                return parent.check(actual==&r);
+            }
         }
         bool birth(InstanceHandle local,const Record& r){
             DW_PROFILE_SCOPE(profileInstanceBirth);

@@ -387,6 +387,18 @@ alone are not evidence of a cheaper complete frame.
 
 ## Terrain transaction boundaries
 
+Terrain lifecycle callbacks borrow values for the duration of the call; their
+record address is not a game identity. `ownsIdentity` validates a live local
+slot/generation and its immutable object, coordinates and authored binding.
+`read` supplies a caller-owned snapshot, leaves output unchanged for a stale
+handle, and remains available for terminal-failure inspection like `find`.
+Mutable Create results must still be read at each callback's original boundary.
+The snapshot verification configuration passes an independent temporary to
+every terrain lifecycle callback and compares the full ownership witness with
+both the normal adapter and the scalar address-based reference. This enables
+run-backed records without requiring permanent per-cell callback addresses;
+it does not itself replace the current record array or defer publication.
+
 Compressing only the deferred bounds journal does not replace terrain
 ownership. Exact encoded-coordinate runs can remove repeated rectangle
 snapshots, but still require per-cell admission, population tracking and

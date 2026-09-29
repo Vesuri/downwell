@@ -136,10 +136,10 @@ struct TerrainAudit {
     GameplayTerrainInstances* store=nullptr;
     unsigned births=0,retires=0,failBirth=0,failRetire=0;
     bool birth(InstanceHandle h,const GameplayTerrainInstances::Record& r){
-        assert(store->find(h)==&r);return ++births!=failBirth;
+        assert(store->ownsIdentity(h,r));return ++births!=failBirth;
     }
     bool retire(InstanceHandle h,const GameplayTerrainInstances::Record& r){
-        assert(store->find(h)==&r);return ++retires!=failRetire;
+        assert(store->ownsIdentity(h,r));return ++retires!=failRetire;
     }
     bool activation(InstanceHandle,const GameplayTerrainInstances::Record&,bool){return true;}
     bool membership(InstanceHandle,const GameplayTerrainInstances::Record&,bool){return true;}
@@ -150,10 +150,10 @@ struct TerrainDestructionAudit:TerrainAudit {
     bool sprite(InstanceHandle,const GameplayTerrainInstances::Record&,int){return true;}
     bool imageIndex(InstanceHandle,const GameplayTerrainInstances::Record&,RunnerImageValue){return true;}
     bool markDestroyed(InstanceHandle h,const GameplayTerrainInstances::Record& r){
-        assert(store->find(h)==&r&&!r.destroyRequested);++destroys;return !rejectDestroy;
+        assert(store->ownsIdentity(h,r)&&!r.destroyRequested);++destroys;return !rejectDestroy;
     }
     bool activation(InstanceHandle h,const GameplayTerrainInstances::Record& r,bool){
-        assert(store->find(h)==&r&&r.destroyRequested&&r.active);++activations;return !rejectActivation;
+        assert(store->ownsIdentity(h,r)&&r.destroyRequested&&r.active);++activations;return !rejectActivation;
     }
 };
 struct GoalAudit {
@@ -469,7 +469,16 @@ int main(){
     {
         auto terrain=std::make_unique<GameplayTerrainInstances>();assert(terrain->append(60,0,0,true));
         const auto h=terrain->handle(0);
+        GameplayTerrainInstances::Record snapshot;
+        assert(terrain->read(h,snapshot)&&terrain->ownsIdentity(h,snapshot));
+        ++snapshot.x;assert(!terrain->ownsIdentity(h,snapshot));--snapshot.x;
+        ++snapshot.lifetimeId;assert(!terrain->ownsIdentity(h,snapshot));--snapshot.lifetimeId;
+        const auto stale=InstanceHandle{h.slot,h.generation+1};
+        snapshot.imageIndex=123;
+        assert(!terrain->read(stale,snapshot)&&snapshot.imageIndex==123&&
+            !terrain->ownsIdentity(stale,snapshot));
         assert(!terrain->requestDestroy(h)&&!terrain->find(h)->destroyRequested&&!terrain->valid());
+        assert(terrain->read(h,snapshot)&&terrain->ownsIdentity(h,snapshot));
     }
     {
         TerrainDestructionAudit audit;

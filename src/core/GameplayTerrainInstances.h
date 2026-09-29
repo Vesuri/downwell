@@ -74,6 +74,18 @@ public:
     const Record* find(InstanceHandle h)const{
         return h.slot<capacity&&h.generation&&records_[h.slot].lifetimeId==h.generation?&records_[h.slot]:nullptr;
     }
+    // Ownership is a lifetime, not a C++ record address. A run-backed store
+    // may provide a caller-owned snapshot for a synchronous callback.
+    bool ownsIdentity(InstanceHandle h,const Record& snapshot)const{
+        const auto* live=find(h);
+        return live&&snapshot.lifetimeId==h.generation&&
+            live->objectId==snapshot.objectId&&live->x==snapshot.x&&live->y==snapshot.y&&
+            live->sourceInstanceId==snapshot.sourceInstanceId&&live->creationCodeId==snapshot.creationCodeId;
+    }
+    bool read(InstanceHandle h,Record& snapshot)const{
+        const auto* live=find(h);if(!live)return false;
+        snapshot=*live;return true;
+    }
     InstanceHandle handle(unsigned index)const{
         return index<count_?InstanceHandle{order_[index],records_[order_[index]].lifetimeId}:InstanceHandle{};
     }
@@ -99,7 +111,7 @@ public:
         // serialized sprite rather than inheriting objWall_n's tile setter.
         if(object==99)r.spriteId=46;
         // Expose the actual record to synchronous birth callbacks.
-        if(!binding_.birth({slot,r.lifetimeId},r))return good_=false;
+        if(!binding_.birth({slot,r.lifetimeId},bindingRecord(r)))return good_=false;
         return true;
     }
     bool appendRoom(const PackedRoomInstance& r){
@@ -119,14 +131,14 @@ public:
         if(r.objectId==99)return true;
         if(!terrainCreateProperties(r.objectId,wallTile,glitch,random,
             [&](int sprite){
-                if(!binding_.sprite(h,r,sprite))return false;
+                if(!binding_.sprite(h,bindingRecord(r),sprite))return false;
                 r.spriteId=sprite;
                 // Unknown art must retain the original uncullable path.
                 if(r.objectId==60&&(wallRadius(sprite)<0||wallRadius(sprite)>16))unboundedWallArt_=true;
                 return true;
             },
             [&](int index){
-                if(!binding_.phaseIndex(h,r,unsigned(index)*256u))return false;
+                if(!binding_.phaseIndex(h,bindingRecord(r),unsigned(index)*256u))return false;
                 r.imageIndex=index;return true;
             },[&](int speed){r.imageSpeed=speed;return true;}))return good_=false;
         if(r.objectId==60&&r.wallNeedsReset){r.wall={};r.wallNeedsReset=false;}
@@ -146,7 +158,7 @@ public:
         if(r.destroyRequested)return true;
         // Publish collision exclusion before marking the local record. Keep
         // its address and identity alive through the remainder of the event.
-        if(!binding_.markDestroyed(h,r))return good_=false;
+        if(!binding_.markDestroyed(h,bindingRecord(r)))return good_=false;
         const int before=drawSprite(r);const bool wasVisible=visible(r);r.destroyRequested=true;
         if(wasVisible&&!collision_.notify(r.x,r.y,false))return good_=false;
         return note(r,before,-1,before>=0);
@@ -155,7 +167,7 @@ public:
         if(!good_||!find(h)||frame<0||frame>15)return good_=false;
         auto& r=records_[h.slot];
         const bool changed=r.imageIndex!=frame;
-        if(!binding_.phaseIndex(h,r,unsigned(frame)*256u))return good_=false;
+        if(!binding_.phaseIndex(h,bindingRecord(r),unsigned(frame)*256u))return good_=false;
         r.imageIndex=frame;return note(r,drawSprite(r),drawSprite(r),changed&&r.wall.checked&&visible(r));
     }
     template<class Ops> bool wallEvent(InstanceHandle h,int area,GameMakerRandom& random,Ops& ops){
@@ -179,7 +191,7 @@ public:
         auto& r=records_[h.slot];
         const int before=drawSprite(r);
         const bool wasVisible=visible(r);
-        if(!binding_.activation(h,r,active))return good_=false;
+        if(!binding_.activation(h,bindingRecord(r),active))return good_=false;
         r.active=active;
         if(wasVisible!=visible(r)&&!collision_.notify(r.x,r.y,visible(r)))return good_=false;
         return note(r,before,drawSprite(r),before!=drawSprite(r));
@@ -190,7 +202,7 @@ public:
         if(!good_||!find(h)||!records_[h.slot].destroyRequested)return good_=false;
         unsigned index=0;while(index<count_&&order_[index]!=h.slot)++index;
         if(index==count_)return good_=false;
-        if(!binding_.retire(h,records_[h.slot]))return good_=false;
+        if(!binding_.retire(h,bindingRecord(records_[h.slot])))return good_=false;
         records_[h.slot].lifetimeId=0;
         if(h.slot<freeHint_)freeHint_=h.slot;
         for(unsigned i=index+1;i<count_;++i){
@@ -206,7 +218,7 @@ public:
         unsigned retired=0;
         for(unsigned i=0;i<count_;++i){
             const auto h=handle(i);auto& r=records_[h.slot];
-            if(!binding_.retire(h,r)){good_=false;break;}
+            if(!binding_.retire(h,bindingRecord(r))){good_=false;break;}
             r.lifetimeId=0;++retired;
             if(h.slot<freeHint_)freeHint_=h.slot;
         }
@@ -219,6 +231,14 @@ public:
         return good_; // Never reset the generation sequence on Retry.
     }
 private:
+    // Verification forces every lifecycle consumer to accept non-resident
+    // records before the backing store is replaced. The normal path remains
+    // borrowed and incurs no snapshot copy.
+#ifdef DOWNWELL_TERRAIN_SNAPSHOT_CALLBACKS
+    static Record bindingRecord(const Record& record){return record;}
+#else
+    static const Record& bindingRecord(const Record& record){return record;}
+#endif
     static constexpr unsigned rowGroupSize=32;
     struct RowRange{int first=0,last=0;};
     void extendRowRange(unsigned index,int y,bool reset){

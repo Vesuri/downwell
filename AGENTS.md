@@ -25,6 +25,10 @@ Downwell to an SDL host reference implementation and then to native Amiga 500
 - Prefer deterministic input/RNG replays and state checks over visual judgment.
 - Establish a portable C/C++ implementation and evidence before adding a
   68000 assembly twin. Keep the portable implementation as its oracle.
+- Prioritize measured architectural wins and eliminated work. For the frame
+  budget, replace duplicated per-block terrain ownership before pursuing
+  isolated arithmetic, copying, or compiler-level micro-optimizations. Keep
+  preparatory changes directly tied to integrating that replacement.
 
 ## Generated and copyrighted material
 
