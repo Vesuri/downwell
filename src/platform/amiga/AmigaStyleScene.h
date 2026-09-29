@@ -14,7 +14,9 @@ public:
                    UBYTE* firstFrame, UBYTE* secondFrame, unsigned frameBytes);
     AmigaStyleScene(const AmigaStyleScene&) = delete;
     AmigaStyleScene& operator=(const AmigaStyleScene&) = delete;
-    bool prepare(const UBYTE* pack, const UBYTE* end);
+    // Preserve only when the caller proves no intervening owner wrote cache_.
+    // Presentation canvases and borrowed Copper slots are always invalidated.
+    bool prepare(const UBYTE* pack, const UBYTE* end, bool borderPreserved = false);
     struct Frame {
         const UBYTE* content = nullptr;
         const UBYTE* border = nullptr;

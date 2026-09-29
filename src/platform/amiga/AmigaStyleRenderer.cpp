@@ -3,9 +3,6 @@
 #include "AmigaProfile.h"
 #include "framework/AmigaHardware.h"
 #include "framework/Bitmap.h"
-extern "C" {
-#include <string.h>
-}
 inline void* operator new(__SIZE_TYPE__, void* address) noexcept { return address; }
 
 namespace {
@@ -141,16 +138,19 @@ bool amigaBuildStyleBorder(const UBYTE* pack, const UBYTE* packEnd,
         const ULONG offset = longword(record + 16);
         if (offset > (ULONG)(packEnd - pack) ||
             stride * 80UL > (ULONG)(packEnd - pack) - offset) return false;
-        UBYTE* mask = masks + exit * amigaStyleMaskBytes;
-        memset(mask, exit ? 0xff : 0, amigaStylePlaneBytes);
-        for (unsigned y = 0; y < 80; ++y) {
-            UBYTE* row = mask + (amigaStyleHeight + y) * amigaStyleBytesPerRow;
-            memcpy(row, pack + offset + y * stride, 20);
-            memset(row + 20, 0, amigaStyleBytesPerRow - 20);
-        }
-        memset(mask + (amigaStyleHeight + 80) * amigaStyleBytesPerRow,
-               exit ? 0 : 0xff, amigaStylePlaneBytes);
+        // The edge is already planar in the offline pack. Stage its three
+        // disjoint regions through the shared Bitmap backend, not 28 KB of
+        // byte-at-a-time CPU writes to Chip RAM at the scene boundary.
+        Bitmap mask(masks + exit * amigaStyleMaskBytes, amigaStyleWidth,
+                    amigaStyleMaskHeight, 1, false);
+        Bitmap edge((void*)(pack + offset), 160, 80, 1, false, false, stride * 8);
+        mask.solidRect(0, 0, amigaStyleWidth, amigaStyleHeight, exit ? 1 : 0);
+        mask.copy(edge, 0, amigaStyleHeight, 0, 0, 160, 80);
+        mask.clear(160, amigaStyleHeight, amigaStyleWidth - 160, 80);
+        mask.solidRect(0, amigaStyleHeight + 80, amigaStyleWidth,
+                       amigaStyleHeight, exit ? 0 : 1);
     }
+    AmigaHardware::blitterDrain(); // No in-flight writer when DMA is published.
     return true;
 }
 

@@ -41,6 +41,20 @@ Callers supply Chip-resident buffers/art. Invalidate after in-place artwork
 replacement unless referenced resources are proven equivalent and explicitly
 rebound. Preserve scene-specific palette, mask and playfield-priority rules.
 
+Style selection's immutable border and two opacity masks occupy a different
+part of the shared cache from its reference-frame scratch area. Garden entry
+prepares them; garden scrolling uses separate menu planes and leaves them
+untouched. Only that direct garden-to-style transition may preserve the border
+cache, and only with the same asset-bank addresses and successful prior
+preparation. Gameplay reuses the storage, so other entries rebuild it.
+Both content canvases and both borrowed Copper slots are invalidated even when
+the border is retained. Cache retention never implies display-buffer retention.
+
+The mask edge comes from offline planar art. Staging fills the two constant
+tails and copies the edge through `Bitmap`, with a separate zero guard word
+for gradient rows. The regions do not overlap; there is no clear-then-redraw
+of the same mask pixels. Drain completion before publishing the mask to DMA.
+
 ## Gameplay presentation boundaries
 
 - `AmigaGameplayGeneration`: synchronous builder registration and generation

@@ -44,7 +44,8 @@ int main() {
     assert(!scene.updateCopper(0,frame,sprite,palette));
     assert(!scene.prepare(nullptr,art+20));
     assert(preparations==0);
-    assert(scene.prepare(art,art+20));
+    assert(scene.prepare(art,art+20,true)); // no existing cache: must build
+    assert(preparations==1);
     assert(!scene.render(2,runtime,frame));
     assert(!scene.updateCopper(2,frame,sprite,palette));
     for(unsigned round=0;round<3;++round) for(unsigned slot=0;slot<2;++slot) {
@@ -64,6 +65,16 @@ int main() {
         assert(scene.updateCopper(slot,frame,sprite,palette));
     }
     assert(freshFrames==4 && builds==4);
+    const unsigned prepared=preparations;
+    assert(scene.prepare(art,art+20,true)&&preparations==prepared);
+    for(unsigned slot=0;slot<2;++slot) {
+        assert(scene.render(slot,runtime,frame));
+        assert(scene.updateCopper(slot,frame,sprite,palette));
+    }
+    assert(freshFrames==6&&builds==6); // cache reuse cannot retain Copper/canvases
+    UBYTE otherArt[20]{};
+    assert(scene.prepare(otherArt,otherArt+20,true)&&preparations==prepared+1);
+    assert(scene.prepare(art,art+20,true)&&preparations==prepared+2);
     renderOK=false;
     assert(!scene.render(0,runtime,frame));
     assert(!frame.content && !frame.border && !frame.mask);
@@ -71,7 +82,8 @@ int main() {
     assert(!scene.prepare(art,art+20));
     assert(!scene.render(0,runtime,frame));
     prepareOK=true;
-    assert(scene.prepare(art,art+20));
+    const unsigned failedPreparations=preparations;
+    assert(scene.prepare(art,art+20,true)&&preparations==failedPreparations+1);
     assert(scene.render(0,runtime,frame));
     copperOK=false;
     assert(!scene.updateCopper(0,frame,sprite,palette));

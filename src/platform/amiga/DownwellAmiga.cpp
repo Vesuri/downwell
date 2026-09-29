@@ -1972,7 +1972,11 @@ __attribute__((noinline)) static int runDownwell(void) {
                 if (presentationChanged && presentedScene == AmigaScene::styleSelect) {
                     // These framebuffers and copper slots may contain gameplay,
                     // even when the new selection matches the last visit exactly.
-                    if (!styleScene.prepare(activeGamePack, activeGamePackEnd))
+                    // Garden prepared the immutable border/masks on entry and
+                    // only uses its separate menu planes thereafter. Other
+                    // predecessors may have overwritten that shared cache.
+                    if (!styleScene.prepare(activeGamePack, activeGamePackEnd,
+                        priorPresentedScene == AmigaScene::menu))
                         break;
                 }
                 if (presentedScene == AmigaScene::splash) {

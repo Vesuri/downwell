@@ -11,13 +11,14 @@ AmigaStyleScene::AmigaStyleScene(UBYTE* cache, unsigned cacheBytes,
       lists_{DownwellStyleCopperList(firstList,listWords,AmigaSelectionLayer::planeBytes),
              DownwellStyleCopperList(secondList,listWords,AmigaSelectionLayer::planeBytes)} {}
 
-bool AmigaStyleScene::prepare(const UBYTE* pack, const UBYTE* end) {
+bool AmigaStyleScene::prepare(const UBYTE* pack, const UBYTE* end, bool borderPreserved) {
+    const bool reuse = borderPreserved && prepared_ && pack_ == pack && end_ == end;
     prepared_ = false;
     layers_[0].invalidate(); layers_[1].invalidate();
     built_[0] = built_[1] = false;
     if (!cache_ || cacheBytes_ < amigaStyleCacheBytes || !pack || !end ||
         !targets_[0] || !targets_[1] || targets_[0]==targets_[1] || frameBytes_<AmigaSelectionLayer::bytes ||
-        !amigaBuildStyleBorder(pack,end,cache_ + amigaStyleFrameBytes*2)) return false;
+        (!reuse && !amigaBuildStyleBorder(pack,end,cache_ + amigaStyleFrameBytes*2))) return false;
     pack_ = pack; end_ = end; prepared_ = true;
     return true;
 }

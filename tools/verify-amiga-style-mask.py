@@ -51,6 +51,16 @@ def main():
         print("Selected-style exit DMA mask matches source opacity and position")
     if args.capture:
         run = ROOT / "amiga/.run"
+        masks = (run / "style-all-masks.bin").read_bytes()
+        assert len(masks) == 2 * 648 * 22
+        for exit in range(2):
+            for y in range(648):
+                for x in range(176):
+                    expected = (bool(exit) if y < 284 else not exit if y >= 364
+                                else x < 160 and strips[exit][(y - 284) * 160 + x])
+                    byte = masks[exit * 648 * 22 + y * 22 + x // 8]
+                    assert bool(byte & (0x80 >> (x & 7))) == expected
+        print("Both complete native masks match source opacity, tails and guard words")
         mask = (run / "style-reveal-mask.bin").read_bytes()
         assert len(mask) == 22 * 284
         for y in range(284):
