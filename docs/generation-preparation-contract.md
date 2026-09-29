@@ -173,6 +173,18 @@ tapes: the purpose of compact ownership is to avoid preparing unobserved state.
 The witness does not cover every query, queue-failure prefix or native timing;
 it complements, rather than replaces, those separate gates.
 
+The witness also has a separate cold-burst phase: 128 mixed terrain births,
+interleaved enemy births and unrelated RNG draws, without per-birth state or
+Draw inspection. Coincident walls make first-hit identity observable. Four
+variants retain active cells, deactivate without reconciliation, reconcile
+deactivation, or request destruction before the first query. Point, excluded-
+self point and line selections record the full selected handle, not only a
+hit boolean. Subsequent temporary placement queries check restoration of
+current/previous coordinates and record resulting flags and bounds. Queries
+must leave all RNG words, index and draw count unchanged. These cases compare
+selected versus scalar ownership, not an independently captured Windows run,
+and do not establish a latency bound for the first observing query.
+
 The prepared binding and collision registry borrow the supplied birth `State`
 until attachment takes its own snapshot. They do not carry aggregate copies
 through both call boundaries or retain a pointer to the builder's local state.

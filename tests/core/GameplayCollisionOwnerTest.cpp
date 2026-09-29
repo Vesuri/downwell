@@ -1700,6 +1700,73 @@ int main(){
         // Compare the whole owner, not just a membership container. Emit full
         // field values (not a hash) so a divergent publication is inspectable.
         std::ofstream trace(path);assert(trace);
+        // Do not warm the representation by resolving every birth. A compact
+        // terrain owner must survive a cold burst before its first observer,
+        // including interleaved actors, coincident geometry and removed cells.
+        for(unsigned mode=0;mode<4;++mode){
+            auto cold=std::make_unique<GameplayCollisionOwner>(objects,sprites,
+                GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&rooms);
+            auto scene=std::make_unique<GameplayWorld>(300,true,0,false,cold->enemyBinding(),
+                cold->breakableBinding(),cold->playerBinding(),&cold->terrain());
+            assert(cold->attach(*scene));
+            for(unsigned i=0;i<128;++i){
+                // Each group contains a coincident wall pair. Preserve first
+                // identity, not merely the set of occupied cells.
+                const int objectsByCell[]={60,60,93,99};
+                const int x=240+int((i/4)%8)*16,y=512+int(i/32)*16;
+                assert(scene->createGeneratedInstance({objectsByCell[i%4],x,y},objects,
+                    [](const auto&){return true;}));
+                if(i%17==0)assert(scene->createGeneratedInstance({112,x,y-32},objects,
+                    [](const auto&){return true;}));
+                auto random=scene->randomState();random.nextU32();scene->configureEnemyRandom(random);
+            }
+            for(unsigned i=0;i<128;i+=8){
+                const auto h=cold->terrain().handle(i);
+                if(mode==1||mode==2)assert(cold->terrain().activation(h,false));
+                if(mode==3)assert(cold->terrain().requestDestroy(h));
+            }
+            if(mode==2)assert(cold->reconcileActivation());
+            const auto random=scene->randomState();
+            trace<<"cold "<<mode<<' '<<random.drawCount()<<' '<<random.stateIndex()<<'\n';
+            for(unsigned probe=0;probe<32;++probe){
+                const auto x=MotionBinary64::fromInteger(240+int(probe%8)*16);
+                const auto y=MotionBinary64::fromInteger(512+int(probe/8)*16);
+                GameplayCollisionOwner::Owner::Result hit;
+                auto record=[&](const char* kind){
+                    trace<<kind<<' '<<probe<<' '<<hit.found<<' '<<hit.handle.slot<<' '<<hit.handle.generation<<'\n';
+                    if(hit.found){
+                        GameplayCollisionView::Kind family;InstanceHandle local;
+                        assert(GameplayCollisionView::decode(hit.handle,family,local)&&
+                            family==GameplayCollisionView::Kind::terrain&&cold->terrain().find(local));
+                    }
+                };
+                assert(cold->terrainCollisionPoint({},60,x,y,false,false,masks,hit));record("cold-point");
+                const auto first=hit.handle;
+                assert(cold->terrainCollisionPoint(first,60,x,y,false,true,masks,hit));record("cold-excluded");
+                assert(!hit.found||hit.handle.slot!=first.slot||hit.handle.generation!=first.generation);
+                assert(cold->terrainNonPreciseLine({},60,x,y,x,y,false,hit));record("cold-line");
+            }
+            for(unsigned i=0;i<128;++i){
+                const auto h=cold->terrain().handle(i);const auto* r=cold->terrain().find(h);assert(r);
+                InstanceHandle shared;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,h,shared));
+                const auto before=*cold->state(shared);
+                bool hit=false;
+                assert(cold->terrainPlaceMeeting(h,60,MotionBinary64::fromInteger(r->x+16),
+                    MotionBinary64::fromInteger(r->y),masks,hit));
+                const auto* after=cold->state(shared);assert(after);
+                assert(before.x.bits==after->x.bits&&before.y.bits==after->y.bits&&
+                    before.previous.x.bits==after->previous.x.bits&&before.previous.y.bits==after->previous.y.bits);
+                trace<<"cold-restore "<<i<<' '<<hit<<' '<<after->x.bits<<' '<<after->y.bits
+                    <<' '<<after->flags<<' '<<after->bounds.left.bits<<' '<<after->bounds.top.bits
+                    <<' '<<after->bounds.right.bits<<' '<<after->bounds.bottom.bits<<'\n';
+            }
+            assert(scene->randomState().drawCount()==random.drawCount()&&
+                scene->randomState().stateIndex()==random.stateIndex());
+            for(unsigned i=0;i<16;++i){
+                assert(scene->randomState().stateWord(i)==random.stateWord(i));
+                trace<<"cold-rng "<<i<<' '<<random.stateWord(i)<<'\n';
+            }
+        }
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
             GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&rooms);
         auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
