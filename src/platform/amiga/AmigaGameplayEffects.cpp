@@ -5,17 +5,40 @@
 #include "framework/AmigaHardware.h"
 
 namespace {
+// The surface is already clipped to 160x284 and starts at a fixed screen X.
+// Resolve the circular row once, not through the general renderer per word.
+static void mergeWord(UBYTE* destination,UWORD mask,UWORD paint) {
+    if(!mask)return;
+#ifdef DOWNWELL_PLATFORM_AMIGA
+    UWORD& word=*reinterpret_cast<UWORD*>(destination);
+    const UWORD value=UWORD((word&~mask)|(paint&mask));
+    if(value!=word)word=value;
+#else
+    const UWORD old=UWORD((unsigned(destination[0])<<8)|destination[1]);
+    const UWORD value=UWORD((old&~mask)|(paint&mask));
+    if(value!=old){destination[0]=UBYTE(value>>8);destination[1]=UBYTE(value);}
+#endif
+}
+static void publishWord(UBYTE* row,unsigned x,UWORD alpha,UWORD low,UWORD high) {
+    constexpr unsigned shift=downwellPlayfieldX%16;
+    UBYTE* word=row+(downwellPlayfieldX/16+x/16)*2;
+    mergeWord(word,UWORD(alpha>>shift),UWORD(low>>shift));
+    mergeWord(word+downwellGameRingPlaneBytes,UWORD(alpha>>shift),UWORD(high>>shift));
+    if constexpr(shift){
+        mergeWord(word+2,UWORD(unsigned(alpha)<<(16-shift)),UWORD(unsigned(low)<<(16-shift)));
+        mergeWord(word+2+downwellGameRingPlaneBytes,UWORD(unsigned(alpha)<<(16-shift)),UWORD(unsigned(high)<<(16-shift)));
+    }
+}
 template<class Surface,class Paint>
 void publish(AmigaRenderer renderer, Bitmap& display,
     unsigned buffer, unsigned origin, const Surface& surface,
     AmigaGameplayRows& rows,Paint paint) {
     DW_PROFILE_SCOPE(profileEffectPublish);
-    renderer.game = renderer.target = static_cast<UBYTE*>(display.data);
-    amigaRendererSetGameOrigin(&renderer, origin);
-    amigaRendererSetClipRect(&renderer, downwellPlayfieldX, 0,
-                            downwellPlayfieldWidth, downwellDisplayHeight);
+    (void)renderer;
     bool started = false;
     unsigned first = 0, end = 0;
+    unsigned cachedY=downwellDisplayHeight;
+    UBYTE* row=nullptr;
     const auto damage = [&] {
         rows.damage(origin, first, end - first, static_cast<UBYTE>(1u << buffer));
     };
@@ -34,7 +57,12 @@ void publish(AmigaRenderer renderer, Bitmap& display,
         } else if (y == end) {
             ++end;
         }
-        paint(&renderer,downwellPlayfieldX+x,y,planes...);
+        if(y!=cachedY){
+            cachedY=y;
+            row=static_cast<UBYTE*>(display.data)+
+                ((origin+y)%downwellGameRingHeight)*downwellBytesPerPlaneLine;
+        }
+        paint(row,x,planes...);
     });
     if (started) damage();
 }
@@ -42,14 +70,14 @@ void publish(AmigaRenderer renderer, Bitmap& display,
 void AmigaGameplayEffects::draw(AmigaRenderer renderer,Bitmap& display,unsigned buffer,
     unsigned origin,const downwell::BinaryEffectSurface<>& surface,AmigaGameplayRows& rows){
     publish(renderer,display,buffer,origin,surface,rows,
-        [](AmigaRenderer* target,int x,int y,std::uint16_t bits){
-            amigaRendererDrawCoverageWord(target,x,y,bits,1);
+        [](UBYTE* row,unsigned x,std::uint16_t bits){
+            publishWord(row,x,bits,bits,0);
         });
 }
 void AmigaGameplayEffects::draw(AmigaRenderer renderer,Bitmap& display,unsigned buffer,
     unsigned origin,const downwell::PaletteEffectSurface<>& surface,AmigaGameplayRows& rows){
     publish(renderer,display,buffer,origin,surface,rows,
-        [](AmigaRenderer* target,int x,int y,std::uint16_t alpha,std::uint16_t low,std::uint16_t high){
-            amigaRendererDrawPlanarWord(target,x,y,alpha,low,high);
+        [](UBYTE* row,unsigned x,std::uint16_t alpha,std::uint16_t low,std::uint16_t high){
+            publishWord(row,x,alpha,low,high);
         });
 }

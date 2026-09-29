@@ -98,6 +98,16 @@ not depend on an operating-system value left in BPLCON2.
 
 ## Vertical ring and buffering
 
+Controller effect surfaces are already clipped to the 160x284 gameplay view.
+Their publisher uses that contract directly: compute a ring-row address once
+per visited row, then merge the two palette words with the fixed horizontal
+alignment. It does not repeat generic renderer clipping and target selection
+per word. Native stores are aligned big-endian word writes; host checks use
+explicit byte order and an independent pixel painter. The first nonempty word
+still drains pending actor blits, and publication retains per-buffer row damage
+and the controller's painter-order boundary. This is not a new DMA bitmap or
+runtime sprite conversion.
+
 PF1 is a single 320-line circular raster. The camera's integer vertical offset
 selects its first physical row by changing the BPL1/BPL3 pointers. If the
 284-line visible span crosses the end of the allocation, the copper waits until
