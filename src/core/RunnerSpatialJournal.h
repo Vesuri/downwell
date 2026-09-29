@@ -28,7 +28,10 @@ public:
     }
     unsigned nodeCount()const{catchUp();return tree_.nodeCount();}
     int height()const{catchUp();return tree_.height();}
-    bool insert(Box box,std::uint32_t instance){
+    // Borrow during admission, then take the journal's own snapshot. Neither
+    // admission nor catch-up mutates caller storage; no temporary value copy
+    // is needed at the API boundary (notably on the 68000 stack).
+    bool insert(const Box& box,std::uint32_t instance){
         if(!valid())return false;
         Math::PixelBox next;
         if(!deferred_ || instance>=Slots || contains(instance) ||
@@ -42,7 +45,7 @@ public:
         present_[instance>>5]|=1u<<(instance&31);++population_;
         bounds_=next;haveBounds_=true;return true;
     }
-    bool remove(Box oldBounds,std::uint32_t instance,bool retry,bool& removed){
+    bool remove(const Box& oldBounds,std::uint32_t instance,bool retry,bool& removed){
         if(!valid())return false;
         // Full-root retry with a unique identity has an unambiguous result.
         // Unbounded IDs, duplicates and no-retry searches use the eager tree.

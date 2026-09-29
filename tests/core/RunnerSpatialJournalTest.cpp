@@ -61,6 +61,22 @@ template<unsigned Nodes,unsigned Pending> static void mutations(){
     if(Nodes==1024)assert(journal.deferred()); // This fixture must exercise the journal, not fallback.
 }
 int main(){
+    {
+        // Borrowed API inputs must still become owned journal snapshots.
+        // Reusing a caller's scratch rectangle cannot rewrite pending work.
+        downwell::RunnerSpatialIndex<128> eager;
+        downwell::RunnerSpatialJournal<128,128,8> journal;
+        Box scratch=box(16,32);
+        assert(eager.insert(scratch,1)&&journal.insert(scratch,1));
+        scratch=box(80,96);
+        assert(eager.insert(scratch,2)&&journal.insert(scratch,2));
+        scratch=box(16,32);bool a=false,b=false;
+        assert(eager.remove(scratch,1,true,a)&&journal.remove(scratch,1,true,b)&&a&&b);
+        scratch=box(128,160);
+        assert(eager.insert(scratch,1)&&journal.insert(scratch,1));
+        scratch={};assert(journal.pending()==4);
+        compare(eager,journal);
+    }
     mutations<1024,32>(); // Wrap, pressure draining, partial background service.
     mutations<16,8>();   // Capacity failures must occur at the original insertion.
     {
