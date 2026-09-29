@@ -31,6 +31,10 @@ int main(){
             assert(RunnerSpatialSplit::decodePixels(reference,decoded));
             assert(pixels.left==decoded.left&&pixels.top==decoded.top&&
                 pixels.right==decoded.right&&pixels.bottom==decoded.bottom);
+            RunnerSpatialSplit::PixelBox dictionary;
+            assert(grid.atReference(object,x,y,px,py,result,precise,&dictionary));
+            assert(pixels.left==dictionary.left&&pixels.top==dictionary.top&&
+                pixels.right==dictionary.right&&pixels.bottom==dictionary.bottom);
             ++checks;
         }
     }
@@ -60,6 +64,11 @@ int main(){
     const auto copied=grid;
     assert(!grid.prepare(defaults,SpriteCollisionPack(nullptr,0)));
     assert(copied.at(60,240,176,a,b,box,precise));
+    RunnerSpatialSplit::PixelBox copiedPixels,referencePixels;
+    assert(copied.at(60,240,176,a,b,box,precise,&copiedPixels)&&
+        copied.atReference(60,240,176,a,b,box,precise,&referencePixels));
+    assert(copiedPixels.left==referencePixels.left&&copiedPixels.top==referencePixels.top&&
+        copiedPixels.right==referencePixels.right&&copiedPixels.bottom==referencePixels.bottom);
     RunnerImageValue x,y;RunnerSpatialSplit::Box missing;bool p;
     assert(!grid.at(60,0,0,x,y,missing,p));
     std::printf("Prepared terrain birth: %u binary32 oracle comparisons, bounds and invalidation passed; storage %zu bytes\n",checks,sizeof(grid));

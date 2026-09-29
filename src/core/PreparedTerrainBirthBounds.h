@@ -10,6 +10,7 @@ class PreparedTerrainBirthBounds {
     static constexpr unsigned rows=528,offsetCapacity=4;
     struct Shape {unsigned char left=0,right=0,top=0,bottom=0;bool ready=false,precise=false;};
     Shape shapes_[3];
+    RunnerSpatialSplit::PixelBox pixelOffsets_[3]{};
     int offsets_[offsetCapacity]{};
     RunnerImageValue values_[rows][offsetCapacity];
     static unsigned shape(int object){return object==60?0:object==93?1:object==99?2:3;}
@@ -48,6 +49,7 @@ public:
             count=used;for(unsigned j=0;j<count;++j)offsets[j]=candidate[j];
             auto& s=shapes_[i];
             s.left=indices[0];s.right=indices[1];s.top=indices[2];s.bottom=indices[3];
+            pixelOffsets_[i]={bounds.left,bounds.top,bounds.right,bounds.bottom};
             s.precise=resource.collisionMode==1;s.ready=true;
         }
         for(unsigned row=0;row<rows;++row)for(unsigned j=0;j<count;++j)
@@ -57,6 +59,16 @@ public:
     }
     bool at(int object,int x,int y,RunnerImageValue& positionX,RunnerImageValue& positionY,
         RunnerSpatialSplit::Box& box,bool& precise,RunnerSpatialSplit::PixelBox* pixels=nullptr)const{
+        return atPrepared<true>(object,x,y,positionX,positionY,box,precise,pixels);
+    }
+    bool atReference(int object,int x,int y,RunnerImageValue& positionX,RunnerImageValue& positionY,
+        RunnerSpatialSplit::Box& box,bool& precise,RunnerSpatialSplit::PixelBox* pixels=nullptr)const{
+        return atPrepared<false>(object,x,y,positionX,positionY,box,precise,pixels);
+    }
+private:
+    template<bool PreparedPixels>
+    bool atPrepared(int object,int x,int y,RunnerImageValue& positionX,RunnerImageValue& positionY,
+        RunnerSpatialSplit::Box& box,bool& precise,RunnerSpatialSplit::PixelBox* pixels)const{
         const unsigned id=shape(object);
         if(id==3||!shapes_[id].ready||x < -256||x>=768||y<0||y>=8192||
             (unsigned(x)&15u)||(unsigned(y)&15u))return false;
@@ -66,8 +78,16 @@ public:
         positionX=horizontal[0];positionY=vertical[0];
         box.left=horizontal[s.left];box.right=horizontal[s.right];
         box.top=vertical[s.top];box.bottom=vertical[s.bottom];
-        if(pixels)*pixels={x+offsets_[s.left],y+offsets_[s.top],
-            x+offsets_[s.right],y+offsets_[s.bottom]};
+        if(pixels){
+            if constexpr(PreparedPixels){
+                // Resource-wide offset selection belongs in prepare(), not
+                // four dictionary lookups for every generated instance.
+                const auto& offset=pixelOffsets_[id];
+                pixels->left=x+offset.left;pixels->top=y+offset.top;
+                pixels->right=x+offset.right;pixels->bottom=y+offset.bottom;
+            }else *pixels={x+offsets_[s.left],y+offsets_[s.top],
+                x+offsets_[s.right],y+offsets_[s.bottom]};
+        }
         precise=s.precise;return true;
     }
 };

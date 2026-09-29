@@ -32,13 +32,19 @@ No lifetime, graph preparation flag, RNG draw, Create setter, room order or
 spatial publication moves earlier. All axes and objects share up to four distinct
 coordinate offsets, including zero for the position. The pinned resources fit
 this dictionary; a changed resource requiring more offsets takes the general
-path without consuming dictionary slots. The table occupies 8,482 bytes of
-ordinary storage per 68000 owner (8,484 on the host, not Chip RAM), owned for
+path without consuming dictionary slots. The table occupies 8,530 bytes of
+ordinary storage per 68000 owner (8,532 on the host, not Chip RAM), owned for
 the same lifetime as its immutable resource defaults. The FPS profiler reports
 startup preparation separately using the OS field counter before takeover;
 gameplay-only FPS does not measure that startup cost.
 
 The four prepared integer offsets are retained alongside their binary32 table.
+Each admitted shape also retains its four selected integer endpoints (48 bytes
+for all three shapes), so live pixel-bound publication adds coordinates to
+those endpoints without repeating dictionary selection. `atReference` retains
+the dictionary-based integer calculation; every prepared grid point is compared
+against it and the binary32 sprite-bound oracle. Repreparation, failed shape
+admission and owner copies keep the same resource-lifetime contract.
 An admitted terrain birth supplies both representations to the collision owner,
 so journal admission need not decode those binary32 endpoints back to integers.
 `refreshPreparedTerrain` retains ordinary bounds/flag publication, normalization,
