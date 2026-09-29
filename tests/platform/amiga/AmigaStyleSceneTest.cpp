@@ -21,7 +21,11 @@ bool DownwellStyleCopperList::build(const UBYTE*,const UBYTE*,const Sprite&,cons
 bool DownwellStyleCopperList::update(const UBYTE*,const UBYTE*,const UBYTE*) {
     ++patches; return copperOK;
 }
-bool amigaBuildStyleBorder(const UBYTE*,const UBYTE*,UBYTE*) { ++preparations; return prepareOK; }
+bool amigaBuildStyleBorderPart(const UBYTE*,const UBYTE*,UBYTE*,AmigaStylePreparation& state) {
+    if(!state.part)++preparations;
+    if(!prepareOK)return false;
+    ++state.part;return true;
+}
 const UBYTE* amigaStyleMask(const UBYTE* cache,const AmigaSceneRuntime&) { return cache+amigaStyleMaskOffset; }
 bool AmigaSelectionLayer::render(UBYTE* target,const UBYTE*,const UBYTE*,const Command*,unsigned,unsigned& painted) {
     if(initialized_) ++retainedFrames; else ++freshFrames;
@@ -44,8 +48,15 @@ int main() {
     assert(!scene.updateCopper(0,frame,sprite,palette));
     assert(!scene.prepare(nullptr,art+20));
     assert(preparations==0);
-    assert(scene.prepare(art,art+20,true)); // no existing cache: must build
+    assert(scene.beginPrepare(art,art+20)&&preparations==0);
+    for(unsigned part=0;part<5;++part){
+        assert(scene.preparePart());
+        assert(!scene.render(0,runtime,frame)); // partial pixels are never publishable
+    }
     assert(preparations==1);
+    assert(scene.prepare(art,art+20,true)); // finish the pending plan, not restart it
+    assert(preparations==1);
+    assert(scene.preparePart()&&preparations==1); // completed service is a no-op
     assert(!scene.render(2,runtime,frame));
     assert(!scene.updateCopper(2,frame,sprite,palette));
     for(unsigned round=0;round<3;++round) for(unsigned slot=0;slot<2;++slot) {
@@ -91,6 +102,13 @@ int main() {
     copperOK=true;
     assert(scene.updateCopper(0,frame,sprite,palette));
     assert(builds==before+1); // failed first build cannot become a patch
+    assert(scene.beginPrepare(art,art+20)&&scene.preparePart());
+    prepareOK=false;
+    assert(!scene.preparePart()&&!scene.render(0,runtime,frame));
+    prepareOK=true;
+    assert(!scene.preparePart()); // failure stays terminal until a new preparation
+    const auto beforeRecovery=preparations;
+    assert(scene.prepare(art,art+20,true)&&preparations==beforeRecovery+1);
     AmigaStyleScene small(cache.data(),cache.size()-1,words[0],words[1],400,
         canvases.data(),canvases.data()+AmigaSelectionLayer::bytes,AmigaSelectionLayer::bytes);
     assert(!small.prepare(art,art+20));

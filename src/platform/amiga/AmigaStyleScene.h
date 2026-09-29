@@ -17,6 +17,10 @@ public:
     // Preserve only when the caller proves no intervening owner wrote cache_.
     // Presentation canvases and borrowed Copper slots are always invalidated.
     bool prepare(const UBYTE* pack, const UBYTE* end, bool borderPreserved = false);
+    // Begin changes bookkeeping only. Service after the previous cache owner
+    // has retired DMA; each call completes/drains one preparation block.
+    bool beginPrepare(const UBYTE* pack, const UBYTE* end);
+    bool preparePart();
     struct Frame {
         const UBYTE* content = nullptr;
         const UBYTE* border = nullptr;
@@ -32,6 +36,8 @@ private:
     const UBYTE* pack_ = nullptr;
     const UBYTE* end_ = nullptr;
     bool prepared_ = false;
+    bool preparing_ = false;
+    AmigaStylePreparation preparation_;
     UBYTE* targets_[2];
     unsigned frameBytes_;
     AmigaSelectionLayer layers_[2];

@@ -2029,7 +2029,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                 }
                 else if (presentedScene == AmigaScene::menu) {
                     if (presentationChanged &&
-                        !styleScene.prepare(activeGamePack, activeGamePackEnd))
+                        !styleScene.beginPrepare(activeGamePack, activeGamePackEnd))
                         break;
                 }
                 else if (presentedScene != AmigaScene::styleSelect &&
@@ -2164,6 +2164,12 @@ __attribute__((noinline)) static int runDownwell(void) {
                     if (presentationChanged &&
                         priorPresentedScene == AmigaScene::splash)
                         platform.waitVblank();
+                    // On later garden frames the previous garden list has
+                    // already run, so splash/gameplay no longer read this
+                    // cache. Prepare immutable style data without delaying
+                    // game-state transitions or overwriting a live DMA source.
+                    if (!presentationChanged && !styleScene.preparePart())
+                        break;
                     if (++menuSpriteFrameCount == 2)
                         downwellMenuSpriteReady();
 #ifdef DOWNWELL_SCENE_VERIFY

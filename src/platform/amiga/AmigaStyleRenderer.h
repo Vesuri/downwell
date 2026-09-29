@@ -37,6 +37,16 @@ enum {
 
 bool amigaBuildStyleBorder(const UBYTE* pack, const UBYTE* packEnd,
                            UBYTE* border);
+struct AmigaStylePreparation {
+    unsigned part = 0;
+    bool repeat = false;
+    const UBYTE* edge = nullptr;
+    bool complete() const { return part == 34; }
+};
+// One bounded block operation (or one pair of tile draws), drained on return.
+// The source bank and destination must remain owned throughout preparation.
+bool amigaBuildStyleBorderPart(const UBYTE* pack, const UBYTE* end,
+                              UBYTE* border, AmigaStylePreparation& state);
 const UBYTE* amigaStyleMask(const UBYTE* cache, const AmigaSceneRuntime& scenes);
 #ifdef DOWNWELL_SCENE_VERIFY
 bool amigaRenderStyleFrame(const UBYTE* pack, const UBYTE* packEnd,

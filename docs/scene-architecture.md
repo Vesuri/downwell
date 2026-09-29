@@ -46,12 +46,19 @@ rebound. Preserve scene-specific palette, mask and playfield-priority rules.
 
 Style selection's immutable border and two opacity masks occupy a different
 part of the shared cache from its reference-frame scratch area. Garden entry
-prepares them; garden scrolling uses separate menu planes and leaves them
-untouched. Only that direct garden-to-style transition may preserve the border
-cache, and only with the same asset-bank addresses and successful prior
-preparation. Gameplay reuses the storage, so other entries rebuild it.
+begins a preparation plan without writing that cache. Starting with the second
+garden frame, after the preceding garden list has replaced splash/gameplay DMA,
+service one drained block operation or tile pair per frame. Garden scrolling
+uses separate menu planes and leaves the preparation destination untouched.
+Only that direct garden-to-style transition may preserve the border
+cache, and only with the same asset-bank addresses and a valid prior
+preparation plan. Gameplay reuses the storage, so other entries rebuild it.
 Both content canvases and both borrowed Copper slots are invalidated even when
 the border is retained. Cache retention never implies display-buffer retention.
+Partial preparation is never renderable. Direct-to-style entry finishes the
+same plan synchronously before publication; an early transition resumes a
+pending plan instead of restarting it. Failure latches until a new preparation.
+This schedules only immutable pixels, never game state, RNG or input decisions.
 
 For the original 16-by-16 border tiles with vertical origin 8, compose two
 anchor rows to establish the first complete 16-row period, then extend it by

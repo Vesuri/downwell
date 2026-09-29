@@ -11,16 +11,35 @@ AmigaStyleScene::AmigaStyleScene(UBYTE* cache, unsigned cacheBytes,
       lists_{DownwellStyleCopperList(firstList,listWords,AmigaSelectionLayer::planeBytes),
              DownwellStyleCopperList(secondList,listWords,AmigaSelectionLayer::planeBytes)} {}
 
-bool AmigaStyleScene::prepare(const UBYTE* pack, const UBYTE* end, bool borderPreserved) {
-    const bool reuse = borderPreserved && prepared_ && pack_ == pack && end_ == end;
-    prepared_ = false;
+bool AmigaStyleScene::beginPrepare(const UBYTE* pack,const UBYTE* end) {
+    prepared_ = preparing_ = false;
     layers_[0].invalidate(); layers_[1].invalidate();
     built_[0] = built_[1] = false;
     if (!cache_ || cacheBytes_ < amigaStyleCacheBytes || !pack || !end ||
-        !targets_[0] || !targets_[1] || targets_[0]==targets_[1] || frameBytes_<AmigaSelectionLayer::bytes ||
-        (!reuse && !amigaBuildStyleBorder(pack,end,cache_ + amigaStyleFrameBytes*2))) return false;
-    pack_ = pack; end_ = end; prepared_ = true;
+        !targets_[0] || !targets_[1] || targets_[0]==targets_[1] || frameBytes_<AmigaSelectionLayer::bytes) return false;
+    pack_ = pack; end_ = end; preparation_ = {}; preparing_ = true;
     return true;
+}
+
+bool AmigaStyleScene::preparePart(){
+    if(prepared_)return true;
+    if(!preparing_)return false;
+    if(!amigaBuildStyleBorderPart(pack_,end_,cache_+amigaStyleFrameBytes*2,preparation_)){
+        preparing_=false;return false;
+    }
+    if(preparation_.complete()){preparing_=false;prepared_=true;}
+    return true;
+}
+
+bool AmigaStyleScene::prepare(const UBYTE* pack,const UBYTE* end,bool borderPreserved){
+    if(!borderPreserved||(!prepared_&&!preparing_)||pack_!=pack||end_!=end){
+        if(!beginPrepare(pack,end))return false;
+    }else{
+        layers_[0].invalidate();layers_[1].invalidate();
+        built_[0]=built_[1]=false;
+    }
+    while(preparing_)if(!preparePart())return false;
+    return prepared_;
 }
 
 bool AmigaStyleScene::render(unsigned slot, const AmigaSceneRuntime& scenes,

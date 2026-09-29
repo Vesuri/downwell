@@ -116,8 +116,12 @@ bool draw(Bitmap& destination, const UBYTE* pack, const UBYTE* end,
 
 } // namespace
 
-bool amigaBuildStyleBorder(const UBYTE* pack, const UBYTE* packEnd,
-                           UBYTE* border) {
+bool amigaBuildStyleBorderPart(const UBYTE* pack, const UBYTE* packEnd,
+                              UBYTE* border, AmigaStylePreparation& state) {
+    if(state.complete())return true;
+    if(state.part>34||!pack||!packEnd||!border)return false;
+    Bitmap bitmap(border, amigaStyleWidth, amigaStyleBorderHeight, 2, false);
+    if(state.part==0){
 #ifdef DOWNWELL_SCENE_VERIFY
     // The independent full-frame oracle owns these wrappers. Production
     // selection rendering uses AmigaSelectionLayer and never reads them.
@@ -128,35 +132,37 @@ bool amigaBuildStyleBorder(const UBYTE* pack, const UBYTE* packEnd,
         new (styleArtStorage + i * sizeof(PreparedStyleArt)) PreparedStyleArt(pack, record);
     }
 #endif
-    Bitmap bitmap(border, amigaStyleWidth, amigaStyleBorderHeight, 2, false);
     const UBYTE* left = find(pack,packEnd,51,13);
     const UBYTE* right = find(pack,packEnd,51,7);
-    const bool repeat = left && right && word(left+8)==16 && word(right+8)==16 &&
+    state.repeat = left && right && word(left+8)==16 && word(right+8)==16 &&
         word(left+10)==16 && word(right+10)==16 && word(left+6)==8 && word(right+6)==8;
-    bitmap.clear(0,0,amigaStyleWidth,repeat?16:amigaStyleBorderHeight);
+    bitmap.clear(0,0,amigaStyleWidth,state.repeat?16:amigaStyleBorderHeight);
+    }else if(state.part<=20){
     // The source anchors split a tile at row zero. Two anchor rows establish a
     // complete 16-row period; all remaining rows are exact planar copies.
     // Keep the general path if replacement resources change that geometry.
-    const int last = repeat ? 1 : amigaStyleBorderHeight / 16 + 1;
-    for (int row = 0; row <= last; ++row) {
+        const unsigned row=state.part-1;
         if (!draw(bitmap, pack, packEnd, 51, 13, 0, row * 16) ||
             !draw(bitmap, pack, packEnd, 51, 7,
-                  amigaStyleVisibleWidth, row * 16))
+                  amigaStyleVisibleWidth, row * 16)) {
+            AmigaHardware::blitterDrain();
             return false;
+        }
     }
-    if(repeat)for(unsigned filled=16;filled<amigaStyleBorderHeight;){
+    else if(state.part<=25){
+        const unsigned filled=16u<<(state.part-21);
         const unsigned remaining=amigaStyleBorderHeight-filled;
         const unsigned rows=filled<remaining?filled:remaining;
         // Disjoint source/destination ranges; queued blits preserve order.
         bitmap.copy(bitmap,0,filled,0,0,amigaStyleWidth,rows);
-        filled+=rows;
     }
-    AmigaHardware::blitterDrain();
+    else {
     // Immutable PF2 opacity masks: transparent/gradient/solid for entry,
     // solid/gradient/transparent for exit. Only DMA pointers move per frame.
     UBYTE* masks = border + amigaStyleBorderBytes;
-    for (unsigned exit = 0; exit < 2; ++exit) {
-        const UBYTE* record = find(pack, packEnd, 65004 + exit, 0);
+        const unsigned exit=(state.part-26)/4, operation=(state.part-26)%4;
+        if(operation==0)state.edge=find(pack,packEnd,65004+exit,0);
+        const UBYTE* record=state.edge;
         if (!record || word(record + 8) != 160 || word(record + 10) != 80)
             return false;
         const unsigned stride = word(record + 12) / 8;
@@ -169,13 +175,22 @@ bool amigaBuildStyleBorder(const UBYTE* pack, const UBYTE* packEnd,
         Bitmap mask(masks + exit * amigaStyleMaskBytes, amigaStyleWidth,
                     amigaStyleMaskHeight, 1, false);
         Bitmap edge((void*)(pack + offset), 160, 80, 1, false, false, stride * 8);
-        mask.solidRect(0, 0, amigaStyleWidth, amigaStyleHeight, exit ? 1 : 0);
-        mask.copy(edge, 0, amigaStyleHeight, 0, 0, 160, 80);
-        mask.clear(160, amigaStyleHeight, amigaStyleWidth - 160, 80);
-        mask.solidRect(0, amigaStyleHeight + 80, amigaStyleWidth,
+        if(operation==0)mask.solidRect(0, 0, amigaStyleWidth, amigaStyleHeight, exit ? 1 : 0);
+        else if(operation==1)mask.copy(edge, 0, amigaStyleHeight, 0, 0, 160, 80);
+        else if(operation==2)mask.clear(160, amigaStyleHeight, amigaStyleWidth - 160, 80);
+        else mask.solidRect(0, amigaStyleHeight + 80, amigaStyleWidth,
                        amigaStyleHeight, exit ? 0 : 1);
     }
     AmigaHardware::blitterDrain(); // No in-flight writer when DMA is published.
+    ++state.part;
+    if(state.repeat&&state.part==3)state.part=21;
+    if(!state.repeat&&state.part==21)state.part=26;
+    return true;
+}
+
+bool amigaBuildStyleBorder(const UBYTE* pack,const UBYTE* end,UBYTE* border){
+    AmigaStylePreparation state;
+    while(!state.complete())if(!amigaBuildStyleBorderPart(pack,end,border,state))return false;
     return true;
 }
 
