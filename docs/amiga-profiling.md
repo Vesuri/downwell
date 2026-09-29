@@ -68,6 +68,23 @@ scene's maximum measured frame.
 Use longer gameplay windows (for example `PROFILE_FRAMES=600 SKIP_TO_GAME=1`)
 as well: a short initial-room sample can miss synchronous generation bursts.
 
+Gameplay FPS/probe reports include a `COVERAGE pre-Step` line. It samples once
+at the start of each measured gameplay frame: first/last world tick, initial,
+last and maximum displayed view Y, maximum room-space player Y in Q8, last
+sampled health, health-nonpositive sample count and maximum allocated enemy
+record count. The latter is not a visible or active enemy count. The last
+sample precedes the last measured Step; do not label it an end-of-frame replay
+checkpoint. GDB rejects a sample-count mismatch. These reads are profiling-only
+and do not alter inputs, RNG or simulation. They add a small measurement cost.
+Coverage discards the first scene-building frame, just like the timing window.
+
+Check this coverage before interpreting FPS. A long tape can stay on a platform
+or spend its tail in death/results; frame count alone does not prove deep-well
+generation or dense-combat coverage. Use the existing `PROFILE_CONTACT=1`
+1800-frame natural-contact tape as a second workload (without `PROFILE_FRAMES`),
+and inspect its coverage too; its damage-birth check alone does not prove depth
+or survival. Keep route/window settings with comparisons.
+
 For a short diagnostic prefix, add `PROFILE_FRAMES=11`. This compiles the
 stop count into the ordinary gameplay profiling build; it does not rely on
 debugger writes to target memory or breakpoints inside measured frames. Zero

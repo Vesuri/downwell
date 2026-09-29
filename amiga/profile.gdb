@@ -40,6 +40,13 @@ printf "Binding detail: 116=definition 117=membership 118=properties; exclusive,
 printf "Layer birth detail: 119=adopt 120=resolve depth/layer 121=attach element 122=allocate slot; exclusive, excluded from 85\n"
 printf "Object population: 123=registration walk to count selector family; exclusive, before query-path selection\n"
 printf "Damage number births: %lu (zero means this tape did not measure a damaging contact)\n", gDownwellProfileDamageBirths
+if $s == 3
+    if gDownwellProfileGameSamples != gDownwellProfileFrames[$s]
+        printf "Gameplay coverage sample count mismatch: samples=%lu frames=%lu\n", gDownwellProfileGameSamples, gDownwellProfileFrames[$s]
+        quit 1
+    end
+    printf "COVERAGE pre-Step: samples=%lu ticks=%lu..%lu view_y=%ld..%ld max_view_y=%ld max_player_y_q8=%ld final_health=%ld dead_samples=%lu max_enemy_slots=%lu\n", gDownwellProfileGameSamples, gDownwellProfileFirstTick, gDownwellProfileLastTick, gDownwellProfileFirstViewY, gDownwellProfileLastViewY, gDownwellProfileMaxViewY, gDownwellProfileMaxPlayerYQ8, gDownwellProfileLastHealth, gDownwellProfileDeadSamples, gDownwellProfileMaxEnemySlots
+end
 if gDownwellProfileRequireDamage && gDownwellProfileDamageBirths == 0
     printf "Damage profiling tape did not reach a damaging contact\n"
     quit 1

@@ -38,6 +38,12 @@ volatile ULONG gDownwellProfileTargetFrames = 180;
 #endif
 volatile ULONG gDownwellProfileVbi;
 volatile ULONG gDownwellProfileDamageBirths;
+// Read-only, pre-Step coverage samples. Enemy slots are allocated records,
+// not an active/on-screen count. Dead samples must not masquerade as combat.
+volatile ULONG gDownwellProfileGameSamples, gDownwellProfileFirstTick, gDownwellProfileLastTick;
+volatile ULONG gDownwellProfileDeadSamples, gDownwellProfileMaxEnemySlots;
+volatile long gDownwellProfileFirstViewY, gDownwellProfileLastViewY, gDownwellProfileMaxViewY;
+volatile long gDownwellProfileMaxPlayerYQ8, gDownwellProfileLastHealth;
 volatile ULONG gDownwellProfileRequireDamage =
 #ifdef DOWNWELL_PROFILE_CONTACT
     1;
@@ -87,6 +93,22 @@ void downwellProfileVblank()
 #ifdef DOWNWELL_PROBES
     gDownwellProfileEpoch += ticksPerField;
 #endif
+}
+
+void downwellProfileGameplay(unsigned tick,long playerYQ8,long viewY,int health,unsigned enemySlots){
+    if(gDownwellProfileFrozen)return;
+    if(!gDownwellProfileGameSamples){
+        gDownwellProfileFirstTick=tick;
+        gDownwellProfileFirstViewY=gDownwellProfileMaxViewY=viewY;
+        gDownwellProfileMaxPlayerYQ8=playerYQ8;
+    }
+    ++gDownwellProfileGameSamples;
+    gDownwellProfileLastTick=tick;gDownwellProfileLastViewY=viewY;
+    gDownwellProfileLastHealth=health;
+    if(health<=0)++gDownwellProfileDeadSamples;
+    if(viewY>gDownwellProfileMaxViewY)gDownwellProfileMaxViewY=viewY;
+    if(playerYQ8>gDownwellProfileMaxPlayerYQ8)gDownwellProfileMaxPlayerYQ8=playerYQ8;
+    if(enemySlots>gDownwellProfileMaxEnemySlots)gDownwellProfileMaxEnemySlots=enemySlots;
 }
 
 #ifdef DOWNWELL_PROBES
@@ -188,6 +210,9 @@ void downwellProfileEnd()
     static bool gameplayWarmed = false;
     if (sceneId == 3 && !gameplayWarmed) {
         gameplayWarmed = true;
+        gDownwellProfileGameSamples=0;
+        gDownwellProfileDeadSamples=0;
+        gDownwellProfileMaxEnemySlots=0;
         for (unsigned phase = 0; phase < profilePhaseCount; ++phase) {
             gDownwellProfileTicks[3][phase] = 0;
             gDownwellProfileCalls[3][phase] = 0;

@@ -57,6 +57,7 @@ void downwellProfileVblank();
 void downwellProfileBegin(unsigned scene);
 void downwellProfileEnd();
 void downwellProfilePhase(unsigned phase);
+void downwellProfileGameplay(unsigned tick,long playerYQ8,long viewY,int health,unsigned enemySlots);
 extern "C" volatile long gDownwellProfileScroll;
 extern "C" volatile long gDownwellProfileCameraChange;
 extern "C" volatile long gDownwellProfileStagedHits;

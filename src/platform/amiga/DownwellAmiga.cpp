@@ -1788,6 +1788,11 @@ __attribute__((noinline)) static int runDownwell(void) {
             break;
         }
         DW_PROFILE_FRAME((unsigned)scenes.scene());
+#if defined(DOWNWELL_PROBES) || defined(DOWNWELL_FPSCOUNT)
+        if(scenes.scene()==AmigaScene::gameplay)
+            downwellProfileGameplay(port.tick(),176L*256+port.player().offsetYFixed(),
+                worldViewY,port.health(),port.enemyCount());
+#endif
         UBYTE packedInput;
         int scrollDelta = 0;
         bool cameraXChanged = false;
