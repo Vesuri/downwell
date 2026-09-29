@@ -39,7 +39,23 @@ lists of up to 65,535 entries. The RNG unit test covers all those counts over
 32 seeds, comparing selection, draw count, index and all sixteen state words.
 A singleton case also pins the next word of the existing WELL test vector.
 
-### Bounded remainder arithmetic
+### 68000 stream and bounded remainder arithmetic
+
+The shared WELL512 stream step has a portable `Well512::reference` and a
+68000 `Well512::step` twin. The latter replaces long left shifts with word
+swaps, short shifts/rotates and masks; it writes the same two state words and
+advances the same ring index. `GameMakerRandom` still owns seed initialization
+and increments its draw counter once per call, including singleton choices.
+The assembly declares the full sixteen-word state as read/write memory, not
+arbitrary application memory. Its index storage is disjoint from that array;
+the wrapper publishes the returned index. Five data registers suffice because
+the previous ring word is loaded only after the mixed word is stored.
+The native replay gate compares every state word, output and index for every
+one-hot input bit at every ring position, then multi-step zero/all-one/bit
+patterns through wraparound (43,008 steps). The portable implementation remains
+compiled in that gate; original runner vectors and mixed random-call tests run
+on the host. A matching stream does not authorize moving draws across Create
+callbacks or preconsuming a future terrain run.
 
 `SmallUnsignedRemainder` keeps `% divisor` as its portable oracle. Its 68000
 twin uses the remainder returned by `DIVU.W`, reducing the high word before

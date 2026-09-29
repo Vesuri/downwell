@@ -1,4 +1,5 @@
 #include "core/GameMakerRandom.h"
+#include "core/Well512Verification.h"
 #include "core/SmallUnsignedRemainderVerification.h"
 #include "core/TitleParticleRandom.h"
 #include "core/GemMotion.h"
@@ -244,6 +245,7 @@ void testSmallScaledRealPath() {
 } // namespace
 
 int main() {
+    require(downwell::verifyWell512()==0,"WELL kernel matches all words and indices of portable reference");
     require(downwell::verifySmallUnsignedRemainder()==0,
             "bounded remainders match portable modulus for every 16-bit divisor");
     testWell512Vector();

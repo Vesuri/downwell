@@ -1,23 +1,10 @@
 #include "GameMakerRandom.h"
 #include "SmallUnsignedRemainder.h"
+#include "Well512.h"
 #include <cassert>
 #include <limits>
 
 namespace downwell {
-
-namespace {
-inline std::uint32_t shiftLeft28(std::uint32_t value) {
-#if defined(__m68k__)
-    // 68000 variable-count LSL takes time proportional to the shift count.
-    // Rotate the low nibble into place, then discard the rotated low bits.
-    // Keep the portable expression as the host/replay oracle.
-    __asm__("ror.l #4,%0\n\tandi.l #0xf0000000,%0" : "+d"(value) : : "cc");
-    return value;
-#else
-    return value << 28U;
-#endif
-}
-}
 
 void GameMakerRandom::setSeed(std::uint32_t seed) {
     seed_ = seed;
@@ -34,19 +21,7 @@ void GameMakerRandom::setSeed(std::uint32_t seed) {
 
 std::uint32_t GameMakerRandom::nextU32() {
     ++drawCount_;
-    const std::uint32_t a = state_[stateIndex_];
-    std::uint32_t c = state_[(stateIndex_ + 13U) & 15U];
-    const std::uint32_t b = a ^ c ^ (a << 16U) ^ (c << 15U);
-    c = state_[(stateIndex_ + 9U) & 15U];
-    c ^= c >> 11U;
-    const std::uint32_t mixed = b ^ c;
-    state_[stateIndex_] = mixed;
-    const std::uint32_t d = mixed ^ ((mixed << 5U) & wellMask);
-    stateIndex_ = (stateIndex_ + 15U) & 15U;
-    const std::uint32_t prior = state_[stateIndex_];
-    state_[stateIndex_] = prior ^ b ^ d ^ (prior << 2U) ^
-                          (b << 18U) ^ shiftLeft28(c);
-    return state_[stateIndex_];
+    return Well512::step(&state_[0],stateIndex_);
 }
 
 double GameMakerRandom::random(double upperExclusive) {

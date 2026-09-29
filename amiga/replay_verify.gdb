@@ -18,6 +18,11 @@ if gSmallRemainderFailures != 0
     quit 1
 end
 printf "Small-divisor remainder: 196605 native/portable comparisons passed\n"
+if gWell512Failures != 0
+    printf "WELL512 kernel failures: %lu\n", gWell512Failures
+    quit 1
+end
+printf "WELL512: 43008 native/portable full-state comparisons passed\n"
 if gDownwellStackGuardReady != 1
     printf "Target could not install the replay task-stack guard\n"
     quit 1
