@@ -254,6 +254,23 @@ not introduce a second representation around the existing attachment path.
 Keep saved-successor Draw insertion, inactive-tail reversal, lowest-free IDs
 and partial-failure state as explicit differential-test boundaries.
 
+### Dirty-queue representation constraint
+
+Compressing only dirty-queue links leaves the repeated birth/property/bounds
+publication calls intact. The common repeated-head mark is already a no-op;
+adding descriptor lookup to that path can cost more than extending consecutive
+terrain runs saves. A unified terrain representation should derive queue
+membership from its own ordered records rather than maintain another run pool.
+
+Queue consumers require exact prepend order, not merely the same set of slots.
+Refresh reads the successor **after** its callback: a callback can move an
+upcoming member to the head, and that member is then skipped by the current
+flush. Excluded members are removed without refresh; failure retains the
+current member and the unprocessed suffix. Full fragmentation and slot reuse
+must not introduce capacity failures absent from the scalar queue. Compare
+these intermediate states as well as generation timing; fewer birth stores
+alone are not evidence of a cheaper complete frame.
+
 ## Terrain transaction boundaries
 
 `AreaOneBuilder::emitPattern` reuses one local `DeferredCreateInstance` for
