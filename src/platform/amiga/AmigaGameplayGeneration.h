@@ -13,13 +13,14 @@ public:
         const downwell::BuilderPatternPack& patterns, const downwell::ObjectPack& objects,
         AmigaTerrainIndex& index, AmigaTerrainTiles& tiles)
         : builder_(builder), patterns_(patterns), objects_(objects), index_(index), tiles_(tiles) {}
-    void bind(AmigaPortRuntime& runtime);
+    void bind(AmigaPortRuntime& runtime,bool terrainRuns=true);
     bool loadRoom(AmigaPortRuntime& runtime,const downwell::RoomPack& rooms,const downwell::PackedRoom& room);
     bool step(downwell::GameMakerRandom& random, int viewBottom);
     unsigned fragmentCount() const { return builder_.fragmentCount(); }
     int dirtyFirst = worldRows, dirtyEnd = 0;
 private:
     static bool create(void*, const downwell::DeferredCreateInstance&);
+    static bool createRun(void*,const downwell::AreaOneBuilder::TerrainRun&);
     AmigaAreaOneTerrainBuilder& builder_;
     const downwell::BuilderPatternPack& patterns_;
     const downwell::ObjectPack& objects_;

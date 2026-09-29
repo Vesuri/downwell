@@ -156,6 +156,9 @@ Reference: [area-two recovery](area-two-recovery.md).
 - Complete side-room reward objects and omitted title/particle effects.
 - Verify fractional raster positions, draw order, effect surfaces, shaders and
   alternate palettes against original-game captures.
+  Resolve the full host scene test's `menu title animation follows decoded
+  runtime` failure before claiming complete intro presentation parity; isolate
+  the title frame/position difference against the VM path.
 - Verify Laser Sight's original collision-line rounding, mask behavior and GPU
   rasterization; host/native agreement alone does not establish these.
 - Fill resource/manifest gaps needed by new features: masks, glyph/kerning data,
@@ -207,10 +210,9 @@ Reference: [upgrade IDs and source entry points](upgrade-coverage.md).
   prepared path against immediate execution with intervening gameplay RNG and
   health changes, not just a fixed initial seed. Follow the
   [generation preparation boundary](generation-preparation-contract.md).
-  Integrate the ordered terrain-run interface with actual shared registration
-  work, rather than repeating the scalar owner pipeline for every cell. Audit
-  observation and failure boundaries across collision, room and layer owners
-  before combining their setup/publication. Preserve per-cell RNG interleaving,
+  Share collision, room and layer registration work across ordered terrain runs,
+  beyond backend row setup and terrain-only dispatch. Audit observation and
+  failure boundaries before combining their setup/publication. Preserve per-cell RNG interleaving,
   equal-depth ordering, lifetime allocation and partial-failure prefixes; keep
   a scalar execution reference for deterministic comparisons.
   Complete the collision-consumer audit as remaining original queries enter

@@ -90,7 +90,7 @@ struct LiveSceneWorld {
             require(port.createRoomStartField(),"native initial checkpoint executes entrance Create before room cleanup");
         }
         generation.dirtyFirst = 0; generation.dirtyEnd = AmigaGameplayGeneration::worldRows;
-        generation.bind(port);
+        generation.bind(port,std::getenv("DOWNWELL_SCALAR_TERRAIN")==nullptr);
         require(generation.dirtyFirst == AmigaGameplayGeneration::worldRows && generation.dirtyEnd == 0,
             "room binding retires previous generation damage");
         port.configureGenerationStep(generate, this);
@@ -593,6 +593,9 @@ void testGeneratedWorldHandoff(const downwell::ObjectPack& objects) {
     downwell::DeferredCreateInstance rejected{111, 248, 192};
     downwell::DeferredCreateInstance fieldCommand{82,240,900};
     fieldCommand.setTimeFieldRadiusWord(0xffffffffu);
+    require(!world.createGeneratedTerrain(fieldCommand,terrain)&&terrainCalls==0&&
+        world.timeFields().size()==0&&world.effectsSucceeded(),
+        "terrain-only transaction rejects unrelated objects without invoking backend or changing world");
     const auto fieldDraws=world.randomDrawCount();
     require(world.createGeneratedInstance(fieldCommand,objects,terrain) && terrainCalls==0 &&
         world.timeFields().size()==1 && world.timeFields().at(0)->x==240 &&

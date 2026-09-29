@@ -597,8 +597,22 @@ public:
     // the next pattern cell draws RNG. The backend owns terrain representation;
     // this world owns breakable and actor registration and coordinate mapping.
     template<class Terrain>
+    bool createGeneratedTerrain(const downwell::DeferredCreateInstance& command,Terrain terrain){
+        if(!run_.effectsSucceeded||(command.objectId!=60&&command.objectId!=93&&command.objectId!=99))return false;
+        if(!terrain(command))return false;
+        if(terrainInstances_&&
+            (!terrainInstances_->append(command.objectId,command.x,command.y,command.active)||
+             !terrainInstances_->createProperties(terrainInstances_->handle(terrainInstances_->size()-1),
+                 downwell::terrainTileForArea(run_.stage.area),false,enemyRandom_))){
+            run_.effectsSucceeded=false;return false;
+        }
+        return true;
+    }
+    template<class Terrain>
     bool createGeneratedInstance(const downwell::DeferredCreateInstance& command,
                                  const downwell::ObjectPack& objects, Terrain terrain) {
+        if(command.objectId==60||command.objectId==93||command.objectId==99)
+            return createGeneratedTerrain(command,terrain);
         if(!run_.effectsSucceeded)return false;
         if (command.objectId == 277) {
             DW_GENERATION_SCOPE(profileGeneratedShop);
@@ -609,12 +623,6 @@ public:
             return run_.adoptTimeField(command.x,command.y,command.timeFieldRadiusWord());
         if (command.objectId == 62) return registerSideCameraLocker(command.x, command.y);
         if (!terrain(command)) return false;
-        if(terrainInstances_&&(command.objectId==60||command.objectId==93||command.objectId==99)&&
-            (!terrainInstances_->append(command.objectId,command.x,command.y,command.active)||
-             !terrainInstances_->createProperties(terrainInstances_->handle(terrainInstances_->size()-1),
-                 downwell::terrainTileForArea(run_.stage.area),false,enemyRandom_))){
-            run_.effectsSucceeded=false;return false;
-        }
         if (command.objectId == 92) {
             DW_GENERATION_SCOPE(profileGeneratedBreakable);
             const int x = command.x - 240, y = command.y - 176;

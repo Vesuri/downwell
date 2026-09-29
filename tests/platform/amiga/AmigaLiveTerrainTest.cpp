@@ -16,6 +16,45 @@ void require(bool value, const char* message) {
     if (!value) { std::cerr << "FAILED: " << message << '\n'; std::exit(1); }
 }
 using Commands = std::vector<downwell::DeferredCreateInstance>;
+void verifyPreparedTerrainRuns(){
+    static AmigaTerrainIndex scalar,prepared;
+    const AmigaTerrainCollisionContext empty{nullptr,nullptr,nullptr,nullptr,0,nullptr};
+    auto compare=[&](int row){
+        require(std::equal(std::begin(scalar.cells),std::end(scalar.cells),std::begin(prepared.cells)),
+            "prepared run preserves every occupancy cell at each publication");
+        require(scalar.wallContacts.size()==prepared.wallContacts.size(),"prepared contact multiplicity");
+        for(unsigned x=0;x<128;++x)for(int y:{0,row,row+1,511})if(y<512)
+            require(scalar.nextLanding.next(x,y)==prepared.nextLanding.next(x,y),"prepared landing candidates");
+    };
+    for(int object:{60,93})for(int step:{-16,16})for(int y:{0,176,8176})for(unsigned count:{1u,7u,128u}){
+        require(amigaBuildTerrainIndex(empty,scalar)&&amigaBuildTerrainIndex(empty,prepared),"run indexes initialize");
+        const int x=step>0?-512:1520;
+        // Overlapping room walls must retain their own occupancy flag.
+        require(amigaAddTerrainObject(scalar,60,x,y,true)&&amigaAddTerrainObject(prepared,60,x,y,true),"run overlap fixture");
+        AmigaTerrainRunIndex run(prepared,object,x,y,step,count);
+        require(run.ready(),"valid run admission");
+        for(unsigned cell=0;cell<count;++cell){
+            require(amigaAddTerrainObject(scalar,object,x+int(cell)*step,y)&&run.append(),"ordered run cell");
+            compare(y/16);
+        }
+        require(!run.ready()&&!run.append(),"exhausted run cannot publish twice");
+    }
+    require(amigaBuildTerrainIndex(empty,scalar)&&amigaBuildTerrainIndex(empty,prepared),"capacity fixtures initialize");
+    for(unsigned i=0;i<4094;++i)
+        require(amigaAddTerrainObject(scalar,60,240,176)&&amigaAddTerrainObject(prepared,60,240,176),"fill contact prefix");
+    AmigaTerrainRunIndex limited(prepared,60,160,192,16,4);
+    for(unsigned i=0;i<3;++i){
+        require(amigaAddTerrainObject(scalar,60,160+int(i)*16,192)==limited.append(),"run fails on same contact-capacity cell");
+        compare(12);
+    }
+    for(auto args:std::vector<std::array<int,5>>{{60,-528,0,16,2},{60,1520,0,16,2},
+        {60,-512,0,-16,2},{93,160,-16,16,2},{93,160,8192,16,2},{60,161,0,16,2},
+        {92,160,0,16,2},{60,160,0,0,2},{60,160,0,16,0}}){
+        AmigaTerrainRunIndex invalid(prepared,args[0],args[1],args[2],args[3],unsigned(args[4]));
+        require(!invalid.ready()&&!invalid.append(),"unsupported run has no publication");
+        compare(12);
+    }
+}
 void verifyWallCollisionLifecycle() {
     static AmigaTerrainIndex index;
     AmigaTerrainCollisionContext context{nullptr,nullptr,nullptr,nullptr,0,nullptr};
@@ -423,6 +462,7 @@ void checkSchedule(const downwell::BuilderPatternPack& patterns, bool interleave
 }
 
 int main(int argc, char** argv) {
+    verifyPreparedTerrainRuns();
     verifyWallCollisionLifecycle();
     verifyWallRemoval();
     verifyTerrainSegments();
@@ -442,6 +482,9 @@ int main(int argc, char** argv) {
         native.resetRoom(240, 704, nativeRandom, setup);
         ShopCreates hostCreates{{},hostRandom,{}}, nativeCreates{{},nativeRandom,{}};
         native.setCreateObserver(ShopCreates::create, &nativeCreates);
+        if(seed&1)native.setTerrainRunObserver([](void* p,const downwell::AreaOneBuilder::TerrainRun& run){
+            return run.execute(ShopCreates::create,p);
+        });
         for (unsigned tick = 0; tick < 100 && !host.endReached(); ++tick) {
             downwell::AreaOneBuilderStep a, b;
             require(host.stepVisible(patterns, hostRandom, 100000, ShopCreates::create, &hostCreates, a) &&

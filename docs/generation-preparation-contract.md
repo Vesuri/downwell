@@ -144,14 +144,33 @@ returns. An optional run emitter can prepare backend lookup/storage from the
 run geometry, then must call `execute` exactly once and propagate its result;
 it must not retain the run or command. Configure the emitter after builder
 reset, which resets all builder state, and explicitly enable terrain runs.
-Runs are opt-in until a backend actually amortizes owner work; the normal
-build retains scalar execution, selected once per pattern rather than adding
-run detection to every scalar cell. Without a run emitter, the original
+The core defaults to scalar execution, selected once per pattern rather than
+adding run detection to every scalar cell. Without a run emitter, the original
 single-instance callback receives the run's cells in order. Disabling terrain
 runs retains the scalar dispatch as the test reference. Neither path changes
-instance publication timing; sharing backend owner work is still unfinished.
+instance publication timing.
 A run rejects a second execution, including after failure, without additional
 RNG or callbacks. Reporting success without completing the run is rejected.
+
+The Amiga generation observer opts into these runs. The shared world's
+`createGeneratedTerrain` transaction performs backend publication, lifetime
+creation and terrain Create without dispatching unrelated shop/actor types;
+the generic creation entry point delegates to the same transaction for terrain.
+It reads the area's tile after the backend callback, retaining that callback's
+observation/mutation boundary. `AmigaTerrainRunIndex`
+admits the complete row geometry without writing anything, sharing object-cell
+flags and row/column setup across its cells. Unsupported geometry takes the
+scalar emitter, rather than failing early and losing a successful prefix. Each
+cell still publishes contacts, occupancy, landing candidates and tile storage
+before its core birth/Create. Contact or tile capacity failures therefore retain
+the same partial state. Dirty-row coverage is published once, after the first
+successful backend cell and before its core Create; subsequent cells share that
+row. The collector's enemy/decorative outputs do not apply to these two terrain
+objects. Reset/import reestablishes the observer configuration at the next step;
+replacing the scalar observer clears the associated run observer. Passing false
+to `AmigaGameplayGeneration::bind` selects the scalar comparison path. Collision,
+room and layer registrations remain per-cell; combining their work is separate
+from this backend setup sharing.
 
 Layer ID and dynamic-depth resolution retain one last-query result each,
 including misses. Consecutive attachments at the same depth can reuse the

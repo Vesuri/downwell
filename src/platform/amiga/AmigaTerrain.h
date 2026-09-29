@@ -85,7 +85,10 @@ public:
                            void* context) {
         observer_ = observer;
         observerContext_ = context;
+        runObserver_ = nullptr;
     }
+    using RunObserver = bool (*)(void*,const downwell::AreaOneBuilder::TerrainRun&);
+    void setTerrainRunObserver(RunObserver observer){runObserver_=observer;}
     void resetInitialCheckpoint(downwell::GameMakerRandom& random);
     void resetInitialCheckpointBeforeEntrance(downwell::GameMakerRandom& random);
     // Import simulation state without replaying Create or consuming RNG.
@@ -109,6 +112,7 @@ public:
 
 private:
     static bool collect(void*, const downwell::DeferredCreateInstance&);
+    static bool collectRun(void*,const downwell::AreaOneBuilder::TerrainRun&,downwell::AreaOneBuilder::EmitFunction);
     downwell::AreaOneBuilder builder_;
     AmigaTerrainFragment* fragments_;
     unsigned fragmentCapacity_;
@@ -122,6 +126,7 @@ private:
     bool failed_ = false;
     downwell::AreaOneBuilder::EmitFunction observer_ = nullptr;
     void* observerContext_ = nullptr;
+    RunObserver runObserver_ = nullptr;
 };
 
 struct AmigaTerrainCollisionContext {
@@ -142,6 +147,18 @@ struct AmigaTerrainIndex {
     bool wallContactsComplete = false;
     // Subtraction is safe only when occupancy came from actual Create events.
     bool mutableWallOccupancy = false;
+};
+// Borrowed same-row backend setup, with no publication during admission.
+// Each append still publishes exactly one cell before that cell's core Create.
+class AmigaTerrainRunIndex {
+public:
+    AmigaTerrainRunIndex(AmigaTerrainIndex&,int object,int x,int y,int stepX,unsigned count);
+    bool ready()const{return remaining_!=0;}
+    bool append();
+private:
+    AmigaTerrainIndex& index_;
+    int object_,x_,y_,step_;
+    unsigned row_=0,column_=0,flags_=0,remaining_=0;
 };
 bool amigaBuildTerrainIndex(const AmigaTerrainCollisionContext& context,
                            AmigaTerrainIndex& index);

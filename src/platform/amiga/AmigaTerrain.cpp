@@ -115,6 +115,16 @@ AmigaAreaOneTerrainBuilder::AmigaAreaOneTerrainBuilder(
       enemies_(enemies), enemyCapacity_(enemyCapacity),
       decorations_(decorations), decorationCapacity_(decorationCapacity) {}
 
+bool AmigaAreaOneTerrainBuilder::collectRun(void* opaque,
+    const downwell::AreaOneBuilder::TerrainRun& run,downwell::AreaOneBuilder::EmitFunction scalar){
+    auto& self=*static_cast<AmigaAreaOneTerrainBuilder*>(opaque);
+    // Runs contain only walls/platforms: collect's enemy and decoration
+    // outputs do not apply. The observer must execute all synchronous births.
+    const bool ok=self.runObserver_?self.runObserver_(self.observerContext_,run):run.execute(scalar,opaque);
+    if(!ok)self.failed_=true;
+    return ok;
+}
+
 void AmigaAreaOneTerrainBuilder::resetInitialCheckpoint(
     downwell::GameMakerRandom& random) {
     resetInitialCheckpointBeforeEntrance(random);
@@ -158,6 +168,9 @@ bool AmigaAreaOneTerrainBuilder::stepVisible(
     downwell::AreaOneBuilderStep& result) {
     result = downwell::AreaOneBuilderStep{};
     if (failed_) return false;
+    // reset/room-state import replaces the core builder, not backend bindings.
+    builder_.enableTerrainRuns(runObserver_!=nullptr);
+    builder_.setTerrainRunEmitter(runObserver_?collectRun:nullptr);
     if (!builder_.stepVisible(patterns, random, viewBottomCeiling,
                               collect, this, result)) {
         failed_ = true;
@@ -386,6 +399,27 @@ bool amigaAddTerrainObject(AmigaTerrainIndex& index, int objectId, int x, int y,
     }
     DW_GENERATION_SCOPE(profileGeneratedLanding);
     index.nextLanding.insert(cell%AmigaTerrainIndex::columns,cell/AmigaTerrainIndex::columns);
+    return true;
+}
+
+AmigaTerrainRunIndex::AmigaTerrainRunIndex(AmigaTerrainIndex& index,int object,
+    int x,int y,int stepX,unsigned count):index_(index),object_(object),x_(x),y_(y),step_(stepX/16){
+    if((object!=60&&object!=93)||!count||count>AmigaTerrainIndex::columns||
+        (stepX!=16&&stepX!=-16)||(x&15)||(y&15)||x<AmigaTerrainIndex::minX||
+        x>=AmigaTerrainIndex::minX+AmigaTerrainIndex::columns*16||
+        y<0||y>=AmigaTerrainIndex::rows*16)return;
+    const int column=(x-AmigaTerrainIndex::minX)/16;
+    const int last=column+int(count-1)*step_;
+    if(last<0||last>=AmigaTerrainIndex::columns)return;
+    column_=unsigned(column);row_=unsigned(y)/16;
+    flags_=object==60?solidCell|landingCell|wallCell:landingCell|platformCell;
+    remaining_=count;
+}
+bool AmigaTerrainRunIndex::append(){
+    if(!remaining_||!index_.wallContacts.append(object_,x_,y_))return false;
+    index_.cells[row_*AmigaTerrainIndex::columns+column_]|=flags_;
+    index_.nextLanding.insert(column_,row_);
+    --remaining_;x_+=step_*16;column_=unsigned(int(column_)+step_);
     return true;
 }
 
