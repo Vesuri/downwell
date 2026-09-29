@@ -1,5 +1,6 @@
 #include "AmigaGameplayEffects.h"
 #include "AmigaGameplayRows.h"
+#include "AmigaProfile.h"
 #include "framework/Bitmap.h"
 #include "framework/AmigaHardware.h"
 
@@ -8,6 +9,7 @@ template<class Surface,class Paint>
 void publish(AmigaRenderer renderer, Bitmap& display,
     unsigned buffer, unsigned origin, const Surface& surface,
     AmigaGameplayRows& rows,Paint paint) {
+    DW_PROFILE_SCOPE(profileEffectPublish);
     renderer.game = renderer.target = static_cast<UBYTE*>(display.data);
     amigaRendererSetGameOrigin(&renderer, origin);
     amigaRendererSetClipRect(&renderer, downwellPlayfieldX, 0,

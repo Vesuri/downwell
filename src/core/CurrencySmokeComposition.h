@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_CURRENCY_SMOKE_COMPOSITION_H
 #include "SmokeComposition.h"
 #include "PaletteEffectSurface.h"
+#include "Profile.h"
 
 namespace downwell {
 // Controller surfaceFx producer order: currency (depth 10000), then smoke
@@ -45,7 +46,8 @@ public:
     bool prepareWithSurfaceProducers(Currency currency,const SmokeOwner& smoke,const EffectMaskAssets& assets,
                  const EffectSurfacePlacement::View& view,Settings settings,
                  LateEffects lateEffects,SurfaceEffects surfaceEffects,Shades shades,Raster raster){
-        surface_.clear();visible_=false;direct_=settings.death||settings.lowSpec;
+        { DW_PROFILE_SCOPE(profileEffectClear); surface_.clear(); }
+        visible_=false;direct_=settings.death||settings.lowSpec;
         if(!settings.effectsExist)return true;
         bool okay=true,added=false;
         auto add=[&](const EffectMaskAssets::Asset* asset,MotionBinary64 x,MotionBinary64 y){
@@ -57,23 +59,32 @@ public:
             added|=okay;
         };
         if(!direct_){
+            { DW_PROFILE_SCOPE(profileEffectCurrency);
             currency([&](bool large,unsigned frame,MotionBinary64 x,MotionBinary64 y){
                 add(assets.currency(large,frame),x,y);
             });
+            }
+            { DW_PROFILE_SCOPE(profileEffectSmoke);
             smoke.visitNewest([&](std::uint32_t,const SmokeEffect& effect){
                 if(!effect.destroyRequested)add(assets.smoke(effect.drawFrame()),effect.x.promoted(),effect.y.promoted());
             });
+            }
+            { DW_PROFILE_SCOPE(profileEffectDebris);
             if(okay)okay=lateEffects([&](const EffectMaskAssets::Asset& asset,MotionBinary64 x,MotionBinary64 y){
                 add(&asset,x,y);return okay;
             })&&okay;
+            }
         }
+        { DW_PROFILE_SCOPE(profileEffectCover);
         if(okay)okay=surfaceEffects([&](const EffectMaskAssets::Asset& asset,MotionBinary64 x,MotionBinary64 y){
             if(!okay)return false;
             EffectSurfacePlacement::Draw draw;
             okay=EffectSurfacePlacement::onSurface(x,y,view,true,draw)&&stamp(asset,draw.x,draw.y,false,raster);
             added|=okay;return okay;
         })&&okay;
+        }
         if(okay && added && !settings.lowSpec && settings.shadeExists && !settings.noControl){
+            DW_PROFILE_SCOPE(profileEffectShade);
             shades([&](MotionBinary64 x,MotionBinary64 y){
                 if(!okay)return;
                 EffectSurfacePlacement::Draw draw;
@@ -83,7 +94,8 @@ public:
             });
         }
         if(!okay){surface_.clear();return false;}
-        visible_=surface_.intersects(0,0,160,284);
+        { DW_PROFILE_SCOPE(profileEffectVisibility);
+          visible_=surface_.intersects(0,0,160,284); }
         return true;
     }
 private:

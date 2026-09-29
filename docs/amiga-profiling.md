@@ -308,6 +308,8 @@ every surviving number's update. Compile-time-disabled hooks change no state.
 
 Controller composition has its own nested phase 79: currency and smoke
 placement/stamping, enemy shade subtraction and final visibility testing.
+With the effect-stage scopes below enabled, these producers have exclusive
+child phases; include 126–132 when comparing against older phase-79 totals.
 It is excluded from phase 42, which measures the surrounding actor-list
 collection. Older traces included both under 42; compare their combined totals
 when reading those traces, allowing for the extra instrumentation overhead.
@@ -372,6 +374,17 @@ brackets add probe overhead, so compare like-for-like instrumented tapes.
 Inner generation probes are opt-in with `GENERATION_DETAIL=1`; frequent phase
 switches can substantially inflate generation bursts. Prefer coarse phases
 for comparisons. The wrapper resets this option when restoring the build.
+
+Effect phases 126–133 split controller composition into scratch clearing,
+currency, smoke, debris, unconditional cover, shade subtraction, visibility,
+and native publication respectively. Producer phases include enumeration,
+placement arithmetic and masked word composition, not just bitmap writes.
+Publication includes the pending-blitter drain and row-damage bookkeeping.
+The subsequent restoration of damaged background rows remains in phase 15
+(game copy); it is not charged to the effect that caused the damage. Compare
+these phases with projectile queries and instance births before attributing a
+firing/destruction slowdown to sprite drawing. These scopes compile away in
+ordinary builds and retain painter order and the offline asset representation.
 
 Record the executable hash, revision, emulator CPU/memory configuration,
 build flags, tape length, field count, worst gaps and probe clock-clamp count.

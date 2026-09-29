@@ -50,6 +50,9 @@ enum DownwellProfilePhase {
     profileLayerAdopt, profileLayerResolve, profileLayerAttach, profileLayerAllocate,
     profileObjectPopulation,
     profileTerrainRecord, profileTerrainCreate,
+    profileEffectClear, profileEffectCurrency, profileEffectSmoke,
+    profileEffectDebris, profileEffectCover, profileEffectShade,
+    profileEffectVisibility, profileEffectPublish,
     profilePhaseCount
 };
 
