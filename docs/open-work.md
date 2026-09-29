@@ -205,7 +205,9 @@ Reference: [upgrade IDs and source entry points](upgrade-coverage.md).
   preconsume the shared RNG or freeze health-dependent rewards: the current
   builder makes these choices during camera-triggered generation. Verify a
   prepared path against immediate execution with intervening gameplay RNG and
-  health changes, not just a fixed initial seed. Decide the remaining collision
+  health changes, not just a fixed initial seed. Follow the
+  [generation preparation boundary](generation-preparation-contract.md).
+  Decide the remaining collision
   and layer ownership work from these dependencies before further micro-tuning.
   Complete the collision-consumer audit as remaining original queries enter
   gameplay. Bound spatial-journal catch-up and pressure drains under natural
