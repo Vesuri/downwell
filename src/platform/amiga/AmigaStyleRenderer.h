@@ -5,6 +5,7 @@
 
 class AmigaSceneRuntime;
 
+#ifdef DOWNWELL_SCENE_VERIFY
 struct AmigaStyleFrameState {
     bool initialized = false;
     int centerY = 0;
@@ -15,6 +16,7 @@ struct AmigaStyleFrameState {
     unsigned runFrame = 0;
     struct Rect { UWORD x, y, width, height; } dirty[8];
 };
+#endif
 
 enum {
     amigaStyleWidth = 176,
@@ -36,13 +38,12 @@ enum {
 bool amigaBuildStyleBorder(const UBYTE* pack, const UBYTE* packEnd,
                            UBYTE* border);
 const UBYTE* amigaStyleMask(const UBYTE* cache, const AmigaSceneRuntime& scenes);
+#ifdef DOWNWELL_SCENE_VERIFY
 bool amigaRenderStyleFrame(const UBYTE* pack, const UBYTE* packEnd,
                            const UBYTE* border,
                            const AmigaSceneRuntime& scenes,
-                           UBYTE* destination, AmigaStyleFrameState& state
-#ifdef DOWNWELL_SCENE_VERIFY
-                           , bool reference = false
+                           UBYTE* destination, AmigaStyleFrameState& state,
+                           bool reference = false);
 #endif
-                           );
 
 #endif

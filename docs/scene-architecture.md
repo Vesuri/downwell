@@ -15,6 +15,9 @@ is tracked in [the queue](open-work.md#6-finish-scene-and-backend-separation).
 Splash scenes share `AmigaSplashCache` and splash Copper machinery.
 Style and upgrade selection share `AmigaSelectionLayer`, but preserve their
 distinct source selection trajectories.
+The independent full-frame style renderer and its eleven prepared artwork
+wrappers exist only in `SCENE_VERIFY` builds. Normal scene preparation must not
+construct verification-only state; playable selection uses `AmigaSelectionLayer`.
 
 ## Display lifecycle
 

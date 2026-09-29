@@ -3,7 +3,9 @@
 #include "AmigaProfile.h"
 #include "framework/AmigaHardware.h"
 #include "framework/Bitmap.h"
+#ifdef DOWNWELL_SCENE_VERIFY
 inline void* operator new(__SIZE_TYPE__, void* address) noexcept { return address; }
+#endif
 
 namespace {
 
@@ -28,6 +30,7 @@ const UBYTE* find(const UBYTE* pack, const UBYTE* end,
     return 0;
 }
 
+#ifdef DOWNWELL_SCENE_VERIFY
 struct PreparedStyleArt {
     int originX, originY;
     Bitmap source, mask;
@@ -58,13 +61,16 @@ bool drawPrepared(Bitmap& destination, unsigned index, int x, int y) {
     }
     return true;
 }
+#endif
 
 bool draw(Bitmap& destination, const UBYTE* pack, const UBYTE* end,
           UWORD sprite, UWORD frame, int anchorX, int anchorY,
           int forcedPen = -1) {
+#ifdef DOWNWELL_SCENE_VERIFY
     if (sprite == 65500 && frame < 8) return drawPrepared(destination, frame, anchorX, anchorY);
     if (sprite >= 65501 && sprite <= 65503)
         return drawPrepared(destination, 8 + sprite - 65501, anchorX, anchorY);
+#endif
     const UBYTE* record = find(pack, end, sprite, frame);
     if (!record) return false;
     const int originX = (WORD)word(record + 4);
@@ -112,12 +118,16 @@ bool draw(Bitmap& destination, const UBYTE* pack, const UBYTE* end,
 
 bool amigaBuildStyleBorder(const UBYTE* pack, const UBYTE* packEnd,
                            UBYTE* border) {
+#ifdef DOWNWELL_SCENE_VERIFY
+    // The independent full-frame oracle owns these wrappers. Production
+    // selection rendering uses AmigaSelectionLayer and never reads them.
     for (unsigned i = 0; i < 11; ++i) {
         const UBYTE* record = find(pack, packEnd, i < 8 ? 65500 : 65501 + i - 8, i < 8 ? i : 0);
         if (!record || longword(record + 16) > (ULONG)(packEnd - pack) ||
             longword(record + 20) > (ULONG)(packEnd - pack) - longword(record + 16)) return false;
         new (styleArtStorage + i * sizeof(PreparedStyleArt)) PreparedStyleArt(pack, record);
     }
+#endif
     Bitmap bitmap(border, amigaStyleWidth, amigaStyleBorderHeight, 2, false);
     const UBYTE* left = find(pack,packEnd,51,13);
     const UBYTE* right = find(pack,packEnd,51,7);
@@ -179,17 +189,12 @@ const UBYTE* amigaStyleMask(const UBYTE* cache, const AmigaSceneRuntime& scenes)
            row * amigaStyleBytesPerRow;
 }
 
+#ifdef DOWNWELL_SCENE_VERIFY
 bool amigaRenderStyleFrame(const UBYTE* pack, const UBYTE* packEnd,
                            const UBYTE* border,
                            const AmigaSceneRuntime& scenes,
-                           UBYTE* destination, AmigaStyleFrameState& state
-#ifdef DOWNWELL_SCENE_VERIFY
-                           , bool reference
-#endif
-                           ) {
-#ifndef DOWNWELL_SCENE_VERIFY
-    const bool reference = false;
-#endif
+                           UBYTE* destination, AmigaStyleFrameState& state,
+                           bool reference) {
     Bitmap output(destination, amigaStyleWidth, amigaStyleHeight, 2, false);
     Bitmap borderBitmap((void*)border, amigaStyleWidth,
                         amigaStyleBorderHeight, 2, false);
@@ -288,3 +293,4 @@ bool amigaRenderStyleFrame(const UBYTE* pack, const UBYTE* packEnd,
     state.runFrame = scenes.styleRunFrame();
     return true;
 }
+#endif
