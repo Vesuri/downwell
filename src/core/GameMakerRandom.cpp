@@ -1,5 +1,6 @@
 #include "GameMakerRandom.h"
 #include "SmallUnsignedRemainder.h"
+#include "Positive63Remainder.h"
 #include "Well512.h"
 #include <cassert>
 #include <limits>
@@ -32,10 +33,12 @@ double GameMakerRandom::random(double upperExclusive) {
 std::uint64_t GameMakerRandom::irandom(std::uint64_t upperInclusive) {
     assert(upperInclusive <=
            static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()));
-    const std::uint64_t low = nextU32();
-    const std::uint64_t high = nextU32() & 0x7fffffffU;
-    const std::uint64_t positive63 = (high << 32U) | low;
-    return positive63 % (upperInclusive + 1U);
+    const std::uint32_t low = nextU32();
+    const std::uint32_t high = nextU32() & 0x7fffffffU;
+    const auto divisor=upperInclusive+1U;
+    const auto remainder=Positive63Remainder::full({high,low},
+        {static_cast<std::uint32_t>(divisor>>32),static_cast<std::uint32_t>(divisor)});
+    return (std::uint64_t(remainder.high)<<32)|remainder.low;
 }
 
 std::uint32_t GameMakerRandom::irandomSmall(

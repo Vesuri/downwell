@@ -226,6 +226,19 @@ Next: regenerate decoded startup checkpoints and rerun affected end-to-end
 routes against the corrected stream, fixing input tapes or actual behavior
 where they fail rather than substituting the former RNG sequence.
 
+## Full-range integer remainder
+
+`irandom` consumes two stream words before any range shortcut, including a
+singleton range. `Positive63Remainder` reduces the unsigned 63-bit numerator
+with divisor `upperInclusive + 1`, supporting divisors through `2^63`.
+Power-of-two divisors use masks; other 16-bit divisors use the existing bounded
+`DIVU` path. The general 68000 path shifts and subtracts two 32-bit limbs,
+without compiler 64-bit division helpers. Its portable limb implementation is
+retained as the native verification oracle; host verification independently
+compares against C++ unsigned 64-bit remainder. Boundary and random cases
+exercise both limb borrows and all dispatch paths. This arithmetic replacement
+does not move RNG draws into preparation or change their order.
+
 ## Regenerated startup checkpoints and natural routes
 
 Decoded `StartupRuntime::skipToGameForTesting` now yields:

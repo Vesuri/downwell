@@ -321,6 +321,7 @@ static inline void checkSceneStack(ULONG){}
 #include "core/GemVerification.h"
 #include "core/MotionBinary64Verification.h"
 #include "core/SmallUnsignedRemainderVerification.h"
+#include "core/Positive63RemainderVerification.h"
 #include "core/Well512Verification.h"
 #include "core/PlayerDeathVerification.h"
 #include "core/MachineGunVerification.h"
@@ -350,6 +351,7 @@ volatile ULONG gWeaponReplayDigestLow;
 volatile ULONG gWeaponReplayCoverage;
 volatile ULONG gMotionReplayDigest, gMotionReplayUpdates, gMotionReplayFailures;
 volatile ULONG gSmallRemainderFailures;
+volatile ULONG gPositive63RemainderFailures;
 volatile ULONG gWell512Failures;
 volatile ULONG gMotionBenchDigest, gMotionBenchFailures, gMotionBenchFields;
 volatile ULONG gBoneReplayDigest, gBoneReplayUpdates, gBoneReplayFailures;
@@ -3454,6 +3456,7 @@ __attribute__((noinline)) static int runDownwell(void) {
             gReplayDigestHigh = (ULONG)(lastPortCheckpoint >> 32);
             gReplayDigestLow = (ULONG)lastPortCheckpoint;
             gSmallRemainderFailures = downwell::verifySmallUnsignedRemainder();
+            gPositive63RemainderFailures = downwell::verifyPositive63Remainder();
             gWell512Failures = downwell::verifyWell512();
             downwellReplayCheckStack(1);
             const auto gems = downwell::verifyGemSimulation();

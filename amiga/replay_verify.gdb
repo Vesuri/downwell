@@ -18,6 +18,11 @@ if gSmallRemainderFailures != 0
     quit 1
 end
 printf "Small-divisor remainder: 196605 native/portable comparisons passed\n"
+if gPositive63RemainderFailures != 0
+    printf "Full-range remainder failures: %lu\n", gPositive63RemainderFailures
+    quit 1
+end
+printf "Full-range remainder: 4352 native/portable comparisons passed\n"
 if gWell512Failures != 0
     printf "WELL512 kernel failures: %lu\n", gWell512Failures
     quit 1

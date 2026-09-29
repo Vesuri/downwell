@@ -287,8 +287,6 @@ changes, then check native timing with the trace and FPS tapes.
   Fail the build if they return, like the existing 64-bit helper audit.
 - Add integer fast paths to the binary64/binary32 emulation, keeping the full
   emulation as fallback and oracle.
-- Complete `irandom`'s 63-bit modulus in 68000 assembly,
-  checked against the portable implementation.
 
 ### E. Re-profile the residue
 

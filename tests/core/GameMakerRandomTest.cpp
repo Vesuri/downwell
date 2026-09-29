@@ -1,6 +1,7 @@
 #include "core/GameMakerRandom.h"
 #include "core/Well512Verification.h"
 #include "core/SmallUnsignedRemainderVerification.h"
+#include "core/Positive63RemainderVerification.h"
 #include "core/TitleParticleRandom.h"
 #include "core/GemMotion.h"
 #include "core/StandardBulletImpact.h"
@@ -242,9 +243,30 @@ void testSmallScaledRealPath() {
     }
 }
 
+void testFullIntegerPath() {
+    constexpr std::uint64_t bounds[]={0,1,65534,65535,65536,
+        0xfffffffeULL,0xffffffffULL,0x100000000ULL,
+        0x3fffffffffffffffULL,0x7ffffffffffffffeULL,0x7fffffffffffffffULL};
+    for(unsigned seed=0;seed<32;++seed) {
+        downwell::GameMakerRandom actual(seed),oracle(seed);
+        for(unsigned sample=0;sample<256;++sample) {
+            const auto bound=bounds[sample%(sizeof(bounds)/sizeof(bounds[0]))];
+            const std::uint64_t low=oracle.nextU32();
+            const std::uint64_t high=oracle.nextU32()&0x7fffffffu;
+            require(actual.irandom(bound)==((high<<32)|low)%(bound+1),
+                    "full-range irandom preserves original unsigned remainder");
+            require(actual.drawCount()==oracle.drawCount() && actual.stateIndex()==oracle.stateIndex(),
+                    "full-range irandom consumes exactly two words including singleton");
+            for(unsigned word=0;word<16;++word)
+                require(actual.stateWord(word)==oracle.stateWord(word),"full-range irandom preserves complete state");
+        }
+    }
+}
+
 } // namespace
 
 int main() {
+    require(downwell::verifyPositive63Remainder()==0,"full-range remainder matches independent host oracle");
     require(downwell::verifyWell512()==0,"WELL kernel matches all words and indices of portable reference");
     require(downwell::verifySmallUnsignedRemainder()==0,
             "bounded remainders match portable modulus for every 16-bit divisor");
@@ -258,6 +280,7 @@ int main() {
     testShopChoiceBoundary();
     testSmallIntegerPath();
     testSmallScaledRealPath();
+    testFullIntegerPath();
     std::cout << "GameMaker random tests passed\n";
     return 0;
 }
