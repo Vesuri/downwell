@@ -25,14 +25,25 @@ namespace downwell {
 class GameplayCollisionOwner {
 public:
     using View=GameplayCollisionView;
+    // Verification builds keep the complete scalar membership pipeline alive,
+    // not just isolated container tests. Spatial journal scheduling is the
+    // same on both sides so query timing is not changed by this comparison.
+#ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+    using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2,true,View::terrainBase,View::timeFieldBase,false>;
+#else
     using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2,true,View::terrainBase,View::timeFieldBase>;
+#endif
 private:
     Owner owner_;
     RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity+GameplayWorld::droneBulletCapacity> combatAlarmPhase_;
     bool combatAlarmCaptureDirty_=true;
     unsigned combatAlarmMask_=0;
     bool combatAlarmCaptureValid_=false;
+#ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+    RunnerRoomMembership<View::capacity> room_;
+#else
     RunnerRunRoomMembership<View::capacity,View::terrainBase,View::timeFieldBase> room_;
+#endif
     bool terrainSnapshotDirty_=true;
     Owner::Properties properties_[View::capacity]{};
     RunnerObjectFamilies<386> families_;

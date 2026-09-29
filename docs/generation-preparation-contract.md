@@ -91,6 +91,33 @@ path may eliminate intermediate stores and redundant lookups within callback-fre
 intervals, but must preserve the next callback's observations and each failure's
 partially published state. Moving Create effects to a later frame is not allowed.
 
+### Whole-owner differential boundary
+
+`make verify-gameplay-collision-owner` compiles the gameplay owner twice:
+its selected run-based room/object membership, and the scalar counterparts
+selected by `DOWNWELL_SCALAR_TERRAIN_OWNERSHIP`. The latter is a verification
+configuration, not a platform fork. Both retain identical spatial scheduling,
+resource defaults, layer ownership, game logic and publication callbacks.
+The complete existing owner assertion suite executes in both configurations.
+
+The additional lifecycle witness compares full textual field values rather
+than only a final hash: terrain handles/records, collision state and previous
+coordinates, sprite properties, full RNG state, family populations, captured
+End Step order and projected actor Draw order. It observes mixed object births,
+inactive writes before reconciliation, reactivation, pending destruction,
+cleanup, slot reuse, and the separate birth/Create boundary. Unrelated RNG
+draws remain between Creates. A rejected backend terrain sink is observed
+before and after rejection; that sink precedes native ownership and Create.
+The ignored `build/ownership-{runs,scalar}.txt` files expose the first divergent
+publication. They are comparison output, not independently captured original
+game trajectories. Existing source-backed fixtures remain necessary.
+
+This gate deliberately reads state at each boundary; it tests any future lazy
+materialization under observation. Those reads must not be added to performance
+tapes: the purpose of compact ownership is to avoid preparing unobserved state.
+The witness does not cover every query, queue-failure prefix or native timing;
+it complements, rather than replaces, those separate gates.
+
 The prepared binding and collision registry borrow the supplied birth `State`
 until attachment takes its own snapshot. They do not carry aggregate copies
 through both call boundaries or retain a pointer to the builder's local state.

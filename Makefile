@@ -964,12 +964,18 @@ test: verify-time-field-wind
 .PHONY: verify-time-field-wind
 test: verify-gameplay-collision-owner
 .PHONY: verify-gameplay-collision-owner
-verify-gameplay-collision-owner: build/gameplay-collision-owner-test
-	./build/gameplay-collision-owner-test
+verify-gameplay-collision-owner: build/gameplay-collision-owner-test build/gameplay-collision-owner-scalar-test
+	DOWNWELL_OWNERSHIP_WITNESS=build/ownership-runs.txt ./build/gameplay-collision-owner-test
+	DOWNWELL_OWNERSHIP_WITNESS=build/ownership-scalar.txt ./build/gameplay-collision-owner-scalar-test
+	cmp build/ownership-runs.txt build/ownership-scalar.txt
 
 build/gameplay-collision-owner-test: tests/core/GameplayCollisionOwnerTest.cpp src/core/GameplayWorld.cpp src/core/PlayerMotion.cpp src/core/Replay.cpp src/core/GameMakerRandom.cpp src/core/ObjectPack.cpp src/core/RoomPack.cpp src/core/AreaOneBuilder.cpp src/core/BuilderPatternPack.cpp $(wildcard src/core/*.h)
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+
+build/gameplay-collision-owner-scalar-test: tests/core/GameplayCollisionOwnerTest.cpp src/core/GameplayWorld.cpp src/core/PlayerMotion.cpp src/core/Replay.cpp src/core/GameMakerRandom.cpp src/core/ObjectPack.cpp src/core/RoomPack.cpp src/core/AreaOneBuilder.cpp src/core/BuilderPatternPack.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_SCALAR_TERRAIN_OWNERSHIP=1 -o $@ $(filter %.cpp,$^)
 
 verify-time-field-wind: verify-sound-play build/time-field-wind-test
 	./build/time-field-wind-test

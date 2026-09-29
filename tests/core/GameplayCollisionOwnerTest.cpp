@@ -108,6 +108,7 @@ bool nativeCollisionQueries(downwell::GameplayCollisionOwner& owner,
 #include <vector>
 #include <cassert>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <cmath>
 using namespace downwell;
@@ -1676,6 +1677,87 @@ int main(){
         }
     }
     auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
+    if(const char* path=std::getenv("DOWNWELL_OWNERSHIP_WITNESS")){
+        // Compare the whole owner, not just a membership container. Emit full
+        // field values (not a hash) so a divergent publication is inspectable.
+        std::ofstream trace(path);assert(trace);
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
+            GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&rooms);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));
+        unsigned checkpoint=0;
+        auto capture=[&](){
+            trace<<"checkpoint "<<checkpoint++<<' '<<owner->valid()<<' '<<world->effectsSucceeded()<<'\n';
+            const auto& random=world->randomState();
+            trace<<"rng "<<random.drawCount()<<' '<<random.stateIndex();
+            for(unsigned i=0;i<16;++i)trace<<' '<<random.stateWord(i);
+            trace<<'\n';
+            for(unsigned i=0;i<owner->terrain().size();++i){
+                const auto h=owner->terrain().handle(i);const auto* r=owner->terrain().find(h);assert(r);
+                InstanceHandle shared;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,h,shared));
+                const auto* s=owner->state(shared);const auto* p=owner->properties(shared);assert(s&&p);
+                trace<<"terrain "<<h.slot<<' '<<h.generation<<' '<<r->objectId<<' '<<r->x<<' '<<r->y
+                    <<' '<<r->active<<' '<<r->sourceInstanceId<<' '<<r->creationCodeId<<' '<<r->spriteId
+                    <<' '<<r->imageIndex<<' '<<r->imageSpeed<<' '<<r->destroyRequested<<'\n';
+                trace<<"state "<<s->x.bits<<' '<<s->y.bits<<' '<<s->previous.x.bits<<' '<<s->previous.y.bits
+                    <<' '<<s->bounds.left.bits<<' '<<s->bounds.top.bits<<' '<<s->bounds.right.bits
+                    <<' '<<s->bounds.bottom.bits<<' '<<s->flags<<' '<<s->kind<<' '<<s->special<<'\n';
+                trace<<"properties "<<p->sprite.spriteId<<' '<<p->sprite.maskId<<' '<<p->sprite.scaleX.bits
+                    <<' '<<p->sprite.scaleY.bits<<' '<<p->sprite.angle.bits<<' '<<p->sprite.imageIndex.bits
+                    <<' '<<p->depth.bits<<' '<<p->timeline.bits<<' '<<p->cachedFrame.bits<<'\n';
+            }
+            for(int object:{35,60,93,99,112}){unsigned count;assert(owner->population(object,count));
+                trace<<"population "<<object<<' '<<count<<'\n';}
+            RunnerStepSnapshot<256> phase;
+            assert(owner->dispatchStepPhase(2,phase,[&](InstanceHandle h,const PackedObjectEvent& event){
+                trace<<"event "<<h.slot<<' '<<h.generation<<' '<<event.ownerObjectId<<' '<<event.codeId<<'\n';
+                return true;
+            }));
+            assert(world->visitRoomActors([&](auto kind,InstanceHandle h,auto depth){
+                trace<<"draw "<<unsigned(kind)<<' '<<h.slot<<' '<<h.generation<<' '<<depth.bits<<'\n';return true;
+            }));
+        };
+        capture();
+        for(unsigned i=0;i<96;++i){
+            const int kinds[]={60,60,93,99,112,60};
+            DeferredCreateInstance next(kinds[i%6],240+int(i%8)*16,512+int(i/8)*16);
+            next.active=i%7!=0;
+            // The terrain sink precedes native ownership and Create. Capture
+            // there as well as after the builder-facing call returns.
+            assert(world->createGeneratedInstance(next,objects,[&](const auto&){capture();return true;}));
+            capture();
+            if(i%5==0&&owner->terrain().size()>2){
+                const auto h=owner->terrain().handle(1);
+                assert(owner->terrain().activation(h,false));capture();
+                assert(owner->reconcileActivation());capture();
+                assert(owner->terrain().activation(h,true));capture();
+                assert(owner->reconcileActivation());capture();
+            }
+            if(i%3==0&&owner->terrain().size()>4){
+                const auto h=owner->terrain().handle(2);
+                assert(owner->terrain().requestDestroy(h));capture();
+                assert(owner->prepareDraw());capture();
+                assert(!owner->terrain().find(h));
+            }
+        }
+        // Observe the birth/Create boundary separately. The complete builder
+        // above cannot expose it through its terrain sink (which runs first).
+        for(unsigned i=0;i<16;++i){
+            assert(owner->terrain().append(60,240+int(i%8)*16,768+int(i/8)*16,true));
+            capture();
+            auto random=world->randomState();
+            assert(owner->terrain().createProperties(owner->terrain().handle(owner->terrain().size()-1),
+                terrainTileForArea(1),false,random));
+            world->configureEnemyRandom(random);capture();
+            // An unrelated gameplay draw must remain between these Creates.
+            random.nextU32();world->configureEnemyRandom(random);capture();
+        }
+        capture();
+        assert(!world->createGeneratedInstance({60,256,832},objects,[](const auto&){return false;}));
+        capture(); // Sink rejection publishes neither lifetime nor RNG draw.
+        assert(trace.good());
+    }
     PackedRoom room;assert(rooms.valid()&&rooms.findRoom(11,room));
     {
         // Cached retained scenery must have the same live termination behavior
