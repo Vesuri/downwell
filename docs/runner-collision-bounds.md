@@ -249,6 +249,21 @@ offset 8. The pinned data contains marker `0x80000000`, version 2 and flags
 both this serialized value and the loader/dispatch machine code. This is a
 static load-path conclusion, not a runtime FP-control-word measurement.
 
+For exact integer positions inside the prepared range, zero angle and scales
+of exactly +1 or -1, `PreparedUnitSpriteBounds` uses resource-local integer
+offsets prepared before gameplay. All intermediate edges remain exactly
+representable in binary32. For an axis with prepared inclusive offsets L/R,
+negative scale gives `[-R-1, -L-1]`, not `[-R, -L]`: the original scales the
+upper endpoint before the compatibility decrement. The same rule applies to
+vertical reflection. It requires no additional mirror tables.
+
+The live owner retains the general geometry path for fractional/out-of-range
+positions, non-unit scales, rotation, unsupported metadata and the special
+missing-mask branch. Tests compare every pinned sprite in all four flip
+combinations with `fromSpriteBinary32`, including coordinate extremes; native
+prepared-resource verification exercises all four orientations as well. This
+does not extend the admitted FP-mode assumptions to other geometry paths.
+
 ## Precise collision dispatch
 
 Instance collision routine `0x464d30` adds one to inclusive upper bounds for

@@ -3,7 +3,7 @@
 #include "RunnerSpriteBounds.h"
 #include "SpriteCollisionPack.h"
 namespace downwell {
-// Compatibility bounds for +1/+1 scale, zero angle and integer positions.
+// Compatibility bounds for +/-1 scales, zero angle and integer positions.
 // Only valid for the runner's integer-preserving roundPixel policy; generic
 // callbacks and other transforms must retain RunnerSpriteBounds's reference.
 struct PreparedUnitSpriteBounds {
@@ -16,14 +16,20 @@ struct PreparedUnitSpriteBounds {
         axis(r.marginLeft,r.marginRight,r.originX,left,right);
         axis(r.marginTop,r.marginBottom,r.originY,top,bottom);
     }
-    bool at(RunnerImageValue x,RunnerImageValue y,RunnerSpatialSplit::Box& out)const{
+    bool at(RunnerImageValue x,RunnerImageValue y,RunnerSpatialSplit::Box& out,
+        bool mirrorX=false,bool mirrorY=false)const{
         std::int32_t px,py;
         if(!available||!position(x,px)||!position(y,py))return false;
         // All intermediates stay inside +/-2^22 and are exact binary32
         // integers. Translation commutes with sorting and far-edge decrement.
         RunnerSpatialSplit::Box next;
-        if(!next.left.assignInteger(px+left)||!next.right.assignInteger(px+right)||
-           !next.top.assignInteger(py+top)||!next.bottom.assignInteger(py+bottom))return false;
+        // Stored far edges already include the compatibility decrement. Undo
+        // it before negating/swapping, then decrement the new far edge. This
+        // reflects source endpoints, not pixel centers or inclusive bounds.
+        const int l=mirrorX?-right-1:left,r=mirrorX?-left-1:right;
+        const int t=mirrorY?-bottom-1:top,b=mirrorY?-top-1:bottom;
+        if(!next.left.assignInteger(px+l)||!next.right.assignInteger(px+r)||
+           !next.top.assignInteger(py+t)||!next.bottom.assignInteger(py+b))return false;
         out=next;return true;
     }
 private:
@@ -56,8 +62,9 @@ public:
         }
         count_=sprites.spriteCount();return true;
     }
-    bool at(int id,RunnerImageValue x,RunnerImageValue y,RunnerSpatialSplit::Box& out)const{
-        return id>=0&&unsigned(id)<count_&&entries_[id].at(x,y,out);
+    bool at(int id,RunnerImageValue x,RunnerImageValue y,RunnerSpatialSplit::Box& out,
+        bool mirrorX=false,bool mirrorY=false)const{
+        return id>=0&&unsigned(id)<count_&&entries_[id].at(x,y,out,mirrorX,mirrorY);
     }
 };
 }

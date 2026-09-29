@@ -64,15 +64,16 @@ int main() {
             "prepared descriptors and copied views preserve every original field");
         downwell::PreparedUnitSpriteBounds geometry;geometry.prepare(resource);
         require(geometry.available,"all pinned sprite margins fit prepared unit geometry");
-        for(int position:{-2097151,-32,0,32,2097151}){
+        for(int position:{-2097151,-32,0,32,2097151})for(unsigned flip=0;flip<4;++flip){
             downwell::RunnerImageValue x,y;x.assignInteger(position);y.assignInteger(-position);
             downwell::RunnerSpatialSplit::Box cached,reference;
-            require(geometry.at(x,y,cached)&&downwell::RunnerSpriteBounds::fromSpriteBinary32(
-                resource,x,y,{0x3f800000u},{0x3f800000u},false,{},{},true,
+            require(geometry.at(x,y,cached,flip&1,flip&2)&&downwell::RunnerSpriteBounds::fromSpriteBinary32(
+                resource,x,y,{(flip&1)?0xbf800000u:0x3f800000u},
+                {(flip&2)?0xbf800000u:0x3f800000u},false,{},{},true,
                 [](auto v,std::int32_t& p){return v.roundPixel(p);},reference)&&
                 cached.left.bits==reference.left.bits&&cached.right.bits==reference.right.bits&&
                 cached.top.bits==reference.top.bits&&cached.bottom.bits==reference.bottom.bits,
-                "prepared geometry matches original arithmetic at domain extremes and zero");
+                "prepared signed-unit geometry matches original arithmetic at domain extremes and zero");
         }
         downwell::RunnerSpatialSplit::Box rejected;
         require(!geometry.at({0x3f000000u},{},rejected)&&

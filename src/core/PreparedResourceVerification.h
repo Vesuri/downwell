@@ -50,12 +50,13 @@ struct PreparedResourceVerification {
             PackedSpriteCollision sprite;if(!sprites.sprite(id,sprite))return false;
             PreparedUnitSpriteBounds prepared;prepared.prepare(sprite);
             const int positions[]={-2048,0,32768};
-            for(int position:positions){
+            for(int position:positions)for(unsigned flip=0;flip<4;++flip){
                 RunnerImageValue x,y;
                 if(!x.assignInteger(position)||!y.assignInteger(position+17))return false;
                 RunnerSpatialSplit::Box cached{},direct{};
-                if(!prepared.at(x,y,cached)||!RunnerSpriteBounds::fromSpriteBinary32(sprite,x,y,
-                    {0x3f800000u},{0x3f800000u},false,{},{},true,
+                if(!prepared.at(x,y,cached,flip&1,flip&2)||!RunnerSpriteBounds::fromSpriteBinary32(sprite,x,y,
+                    {(flip&1)?0xbf800000u:0x3f800000u},
+                    {(flip&2)?0xbf800000u:0x3f800000u},false,{},{},true,
                     [](RunnerImageValue v,std::int32_t& p){return v.roundPixel(p);},direct)||
                     cached.left.bits!=direct.left.bits||cached.right.bits!=direct.right.bits||
                     cached.top.bits!=direct.top.bits||cached.bottom.bits!=direct.bottom.bits)return false;

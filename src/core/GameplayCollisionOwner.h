@@ -75,12 +75,14 @@ private:
         if(flags&&state){
             const auto& sprite=properties_[key.slot].sprite;
             if(!(state->special&&sprite.maskId<0)&&!(sprite.angle.bits&0x7fffffffu)&&
-               sprite.scaleX.bits==0x3f800000u&&sprite.scaleY.bits==0x3f800000u){
+               (sprite.scaleX.bits&0x7fffffffu)==0x3f800000u&&
+               (sprite.scaleY.bits&0x7fffffffu)==0x3f800000u){
                 const int id=sprite.maskId<0?sprite.spriteId:sprite.maskId;
                 Owner::Box bounds;bool prepared;
                 {
                     DW_PROFILE_SCOPE(profileBoundsGeometry);
-                    prepared=spriteGeometry_.at(id,state->x,state->y,bounds);
+                    prepared=spriteGeometry_.at(id,state->x,state->y,bounds,
+                        (sprite.scaleX.bits>>31)!=0,(sprite.scaleY.bits>>31)!=0);
                 }
                 if(prepared)return owner_.refresh(key,*flags,false,&bounds,
                     preparedSprites_[id].collisionMode==1,publish);
