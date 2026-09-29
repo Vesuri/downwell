@@ -114,6 +114,24 @@ RNG must retain their source boundaries. No bulk publication path is enabled by
 this audit; safe publication/failure preflight still requires implementation
 and equivalence tests against the existing immediate executor.
 
+`AreaOneBuilder::TerrainRun` exposes a borrowed same-row sequence of ordinary
+walls (`1`/`|`) or thin platforms (`-`) in normal cavern levels 1–3. Runs never
+cross another symbol or a row boundary. `execute` consumes the per-cell RNG
+word immediately before invoking that cell's synchronous emitter, and stops
+at its first failure. The callback's command remains borrowed only until it
+returns. An optional run emitter can prepare backend lookup/storage from the
+run geometry, then must call `execute` exactly once and propagate its result;
+it must not retain the run or command. Configure the emitter after builder
+reset, which resets all builder state, and explicitly enable terrain runs.
+Runs are opt-in until a backend actually amortizes owner work; the normal
+build retains scalar execution, selected once per pattern rather than adding
+run detection to every scalar cell. Without a run emitter, the original
+single-instance callback receives the run's cells in order. Disabling terrain
+runs retains the scalar dispatch as the test reference. Neither path changes
+instance publication timing; sharing backend owner work is still unfinished.
+A run rejects a second execution, including after failure, without additional
+RNG or callbacks. Reporting success without completing the run is rejected.
+
 Layer ID and dynamic-depth resolution retain one last-query result each,
 including misses. Consecutive attachments at the same depth can reuse the
 lookup, but still execute their own lifetime/element publication. The dynamic

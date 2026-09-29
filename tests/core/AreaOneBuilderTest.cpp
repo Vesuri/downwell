@@ -177,6 +177,77 @@ int main(int argc, char** argv) {
         (std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
     BuilderPatternPack pack(bytes.data(), bytes.size());
     require(pack.valid(), "builder pack validates");
+    unsigned runs=0,runCells=0;
+    for(unsigned seed=1;seed<=8;++seed)for(unsigned level=1;level<=3;++level)
+    for(unsigned failAt:{0u,1u,17u,101u,701u}){
+        AreaOneBuilder scalar,grouped;GameMakerRandom a(seed),b(seed);
+        scalar.reset(240,704,a,{level,seed%5,true,false});
+        grouped.reset(240,704,b,{level,seed%5,true,false});
+        scalar.enableTerrainRuns(false);
+        grouped.enableTerrainRuns(true);
+        struct RunProbe {
+            GameMakerRandom& random;
+            Commands commands;
+            std::vector<GameMakerRandom> observations;
+            unsigned count=0,failAt,runs=0,cells=0;
+        } left{a,{}, {},0,failAt},right{b,{}, {},0,failAt};
+        const auto emit=[](void* context,const DeferredCreateInstance& command){
+            auto& p=*static_cast<RunProbe*>(context);
+            p.commands.push_back(command);p.observations.push_back(p.random);
+            ++p.count;
+            for(unsigned i=0;i<p.count%4;++i)p.random.nextU32();
+            return !p.failAt||p.count!=p.failAt;
+        };
+        grouped.setTerrainRunEmitter([](void* context,const AreaOneBuilder::TerrainRun& run,AreaOneBuilder::EmitFunction emit){
+            auto& p=*static_cast<RunProbe*>(context);++p.runs;p.cells+=run.count;
+            require(run.count>1&&(run.objectId==60||run.objectId==93)&&
+                (run.stepX==16||run.stepX==-16),"admitted terrain run geometry");
+            const bool ok=run.execute(emit,context);
+            require(run.completed()==ok,"run completion tracks callback failure");
+            const auto after=p.random;const unsigned calls=p.count;
+            require(!run.execute(emit,context)&&sameRandom(after,p.random)&&calls==p.count,
+                "run cannot be replayed after completion or failure");
+            return ok;
+        });
+        bool terminated=false;
+        for(unsigned tick=0;tick<128&&!terminated;++tick){
+            for(unsigned j=0;j<tick%5;++j){a.nextU32();b.nextU32();}
+            scalar.setPlayerHealth(1+tick%6);grouped.setPlayerHealth(1+tick%6);
+            AreaOneBuilderStep x{},y{};
+            const bool ok=scalar.stepVisible(pack,a,tick%3?100000:scalar.y()-128,emit,&left,x);
+            require(grouped.stepVisible(pack,b,tick%3?100000:grouped.y()-128,emit,&right,y)==ok&&
+                sameRandom(a,b)&&left.commands.size()==right.commands.size(),"terrain run preserves terminal status/RNG/emission count");
+            for(unsigned j=0;j<left.commands.size();++j)
+                require(sameCommand(left.commands[j],right.commands[j])&&sameRandom(left.observations[j],right.observations[j]),
+                    "terrain run preserves command and full RNG state at EACH Create");
+            require(scalar.y()==grouped.y()&&scalar.rowsGenerated()==grouped.rowsGenerated()&&
+                scalar.generationCount()==grouped.generationCount()&&scalar.chunkOrCrate()==grouped.chunkOrCrate()&&
+                x.patternGenerated==y.patternGenerated&&x.patternIndex==y.patternIndex&&
+                x.family==y.family&&x.patternY==y.patternY&&x.reversed==y.reversed&&
+                x.sideRoom==y.sideRoom&&x.appendPillars==y.appendPillars&&x.advancedRows==y.advancedRows,
+                "terrain run preserves partial builder state");
+            left.commands.clear();right.commands.clear();left.observations.clear();right.observations.clear();
+            terminated=!ok||scalar.endReached();
+        }
+        require(terminated,"terrain run tape bounded");runs+=right.runs;runCells+=right.cells;
+    }
+    require(runs>100&&runCells>runs*2,"terrain run corpus covers repeated wall/platform spans");
+    std::cout<<"ordered terrain runs "<<runs<<", candidate cells "<<runCells<<'\n';
+    {
+        AreaOneBuilder invalid;GameMakerRandom random(1);
+        invalid.reset(240,704,random,{1,0,true,false});invalid.enableTerrainRuns(true);
+        unsigned ignoredRuns=0;
+        invalid.setTerrainRunEmitter([](void* context,const AreaOneBuilder::TerrainRun&,AreaOneBuilder::EmitFunction){
+            ++*static_cast<unsigned*>(context);return true; // Invalid: never executes the run.
+        });
+        bool ok=true;
+        for(unsigned tick=0;tick<128&&ok;++tick){
+            AreaOneBuilderStep step;
+            ok=invalid.stepVisible(pack,random,100000,
+                [](void*,const DeferredCreateInstance&){return true;},&ignoredRuns,step);
+        }
+        require(!ok&&ignoredRuns==1,"a run emitter cannot silently drop the span");
+    }
     // Preparation must not move shared RNG or health-dependent decisions to
     // level entry. Pin live interleaving, including the state at failed Create.
     // This is an immediate-executor regression tape, not a Windows capture.

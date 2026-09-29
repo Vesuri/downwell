@@ -192,6 +192,15 @@ bool AreaOneBuilder::emitPattern(
     const BuilderPatternPack& patterns, const PackedBuilderPattern& pattern,
     bool reversed, bool appendPillars, GameMakerRandom& random,
     EmitFunction emit, void* context, std::uint32_t& advancedRows) {
+    return terrainRunsEnabled_?
+        emitPatternMode<true>(patterns,pattern,reversed,appendPillars,random,emit,context,advancedRows):
+        emitPatternMode<false>(patterns,pattern,reversed,appendPillars,random,emit,context,advancedRows);
+}
+
+template<bool Runs> bool AreaOneBuilder::emitPatternMode(
+    const BuilderPatternPack& patterns, const PackedBuilderPattern& pattern,
+    bool reversed, bool appendPillars, GameMakerRandom& random,
+    EmitFunction emit, void* context, std::uint32_t& advancedRows) {
     // Plain wall/platform Create commands have identical defaults and no
     // local RNG effects. Initialize their actor-sized payload once per pattern,
     // retaining synchronous callbacks and the exact emitted field values.
@@ -213,6 +222,21 @@ bool AreaOneBuilder::emitPattern(
             return false;
         for (std::uint16_t column = 0; column < width; ++column) {
             const char symbol = static_cast<char>(cells[column]);
+            if constexpr(Runs)if(levelLength_>=16&&levelLength_<=18&&
+                (symbol=='1'||symbol=='|'||symbol=='-')){
+                const int object=symbol=='-'?93:60;
+                unsigned end=column+1;
+                while(end<width&&(object==93?cells[end]=='-':(cells[end]=='1'||cells[end]=='|')))++end;
+                if(end-column>1){
+                    terrainCommand.objectId=object;
+                    const TerrainRun run(random,terrainCommand,
+                        reversed?320-int(column+1)*16:160+int(column+1)*16,
+                        rowY,reversed?-16:16,end-column);
+                    if(!(terrainRunEmitter_?terrainRunEmitter_(context,run,emit):run.execute(emit,context))||
+                        !run.completed())return false;
+                    column=std::uint16_t(end-1);continue;
+                }
+            }
             const int ordinal = column + 1;
             const int buildX = reversed ? 320 - ordinal * 16
                                         : 160 + ordinal * 16;

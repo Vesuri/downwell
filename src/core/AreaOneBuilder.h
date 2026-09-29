@@ -25,6 +25,39 @@ struct AreaOneBuilderStep {
 class AreaOneBuilder {
 public:
     using EmitFunction = bool (*)(void*, const DeferredCreateInstance&);
+    // A borrowed, deterministic same-row run. Setup may inspect its geometry,
+    // but execute() alone advances the live random stream, one cell immediately
+    // before its synchronous Create callback. Never retain this view.
+    class TerrainRun {
+        friend class AreaOneBuilder;
+        GameMakerRandom& random_;
+        DeferredCreateInstance& command_;
+        mutable bool started_=false,completed_=false;
+        TerrainRun(GameMakerRandom& random,DeferredCreateInstance& command,
+            int first,int row,int stride,unsigned length):random_(random),command_(command),
+            x(first),y(row),stepX(stride),count(length),objectId(command.objectId){}
+    public:
+        const int x,y,stepX;
+        const unsigned count;
+        const int objectId;
+        bool completed()const{return completed_;}
+        bool execute(EmitFunction emit,void* context)const{
+            if(started_)return false;
+            started_=true;
+            for(unsigned cell=0;cell<count;++cell){
+                // Normal-mode builderCavern draws even for non-enemy symbols.
+                random_.nextU32();
+                command_.objectId=objectId;command_.x=x+int(cell)*stepX;command_.y=y;
+                if(!emit||!emit(context,command_))return false;
+            }
+            completed_=true;return true;
+        }
+    };
+    using TerrainRunFunction=bool (*)(void*,const TerrainRun&,EmitFunction);
+    void setTerrainRunEmitter(TerrainRunFunction emit){terrainRunEmitter_=emit;}
+    // Opt-in until a backend uses the run to amortize owner setup. Reset clears
+    // this setting and the optional run emitter. Scalar remains the oracle.
+    void enableTerrainRuns(bool enabled){terrainRunsEnabled_=enabled;}
 
     void reset(int x, int y, GameMakerRandom& random);
     struct Setup {
@@ -74,10 +107,17 @@ public:
     }
 
 private:
+    TerrainRunFunction terrainRunEmitter_=nullptr;
+    bool terrainRunsEnabled_=false;
     bool emitObject(std::int32_t objectId, int x, int y,
                     GameMakerRandom& random, EmitFunction emit,
                     void* context);
     bool emitPattern(const BuilderPatternPack& patterns,
+                     const PackedBuilderPattern& pattern, bool reversed,
+                     bool appendPillars, GameMakerRandom& random,
+                     EmitFunction emit, void* context,
+                     std::uint32_t& advancedRows);
+    template<bool Runs> bool emitPatternMode(const BuilderPatternPack& patterns,
                      const PackedBuilderPattern& pattern, bool reversed,
                      bool appendPillars, GameMakerRandom& random,
                      EmitFunction emit, void* context,
