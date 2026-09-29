@@ -37,7 +37,8 @@ template<bool Scheduled,unsigned Nodes> static void preparedTerrainPublication()
                 // Retain unsorted cached endpoints while publishing sorted
                 // index geometry, including subsequent remove/reinsert calls.
                 Math::PixelBox pixels{int(i)*16,32,int(i)*16+15,47};
-                if(repeat==1){auto left=pixels.left;pixels.left=pixels.right;pixels.right=left;}
+                if((repeat==1)!=bool(i&1)){auto left=pixels.left;pixels.left=pixels.right;pixels.right=left;}
+                if(i&2){auto top=pixels.top;pixels.top=pixels.bottom;pixels.bottom=top;}
                 const auto bounds=Math::encodePixels(pixels);
                 const bool publish=repeat!=2,precise=repeat==1;
                 ok=ordinary.refresh(h,flags,false,&bounds,precise,publish);
@@ -84,6 +85,54 @@ int main(){
     }
     preparedTerrainPublication<false,128>();preparedTerrainPublication<true,128>();
     preparedTerrainPublication<false,1>();preparedTerrainPublication<true,1>();
+    {
+        using Owner=RunnerSpatialInstances<32,128,true>;
+        Owner ordinary,prepared;Graph aGraph,bGraph;
+        aGraph.values[1]=bGraph.values[1]=0x18;
+        for(unsigned i=0;i<32;++i){
+            const InstanceHandle h{i,i+1};
+            assert(ordinary.attach(h,1,{})&&prepared.attach(h,1,{}));
+            RunnerSpatialSplit::PixelBox pixels{int(i%4)*16,32,int(i%4)*16+64,96};
+            if(i&1){auto x=pixels.left;pixels.left=pixels.right;pixels.right=x;}
+            if(i&2){auto y=pixels.top;pixels.top=pixels.bottom;pixels.bottom=y;}
+            const auto bounds=RunnerSpatialSplit::encodePixels(pixels);
+            assert(ordinary.refresh(h,0x18,false,&bounds,false,true)&&
+                prepared.refreshPreparedTerrain(h,0x18,bounds,pixels,false,true));
+        }
+        assert(ordinary.pendingSpatialIndex()==32&&prepared.pendingSpatialIndex()==32);
+        for(int x=-16;x<144;x+=4)for(bool stop:{false,true}){
+            RunnerImageValue px,py;px.assignInteger(x);py.assignInteger(64);
+            std::vector<unsigned> a,b;bool ah=false,bh=false;
+            auto query=[&](auto& owner,auto& graph,auto& order,bool& hit){
+                return owner.point(1,px,py,true,true,graph,[](auto,bool){assert(false);return false;},
+                    [&](InstanceHandle h,auto,auto,bool& found){order.push_back(h.slot);found=stop;return true;},hit);
+            };
+            assert(query(ordinary,aGraph,a,ah)&&query(prepared,bGraph,b,bh)&&a==b&&ah==bh);
+        }
+        assert(!ordinary.pendingSpatialIndex()&&!prepared.pendingSpatialIndex());
+    }
+    {
+        // Fresh prepared publication keeps cache/flag writes before failure,
+        // and does not reject unobserved invalid bounds earlier.
+        using Owner=RunnerSpatialInstances<1,1,true>;
+        for(unsigned old=0;old<3;++old)for(unsigned bad=0;bad<2;++bad)
+            for(bool publish:{false,true})for(unsigned flags:{0u,0x18u}){
+                Owner ordinary,prepared;Owner::State state;
+                if(old==1)state.bounds.left.bits=0x80000000u;
+                if(old==2)state.bounds.left.bits=0x7fc00000u;
+                assert(ordinary.attach({0,1},1,state)&&prepared.attach({0,1},1,state));
+                RunnerSpatialSplit::PixelBox pixels{31,47,16,32};
+                auto bounds=RunnerSpatialSplit::encodePixels(pixels);
+                if(bad)bounds.left.bits=0x7fc00000u;
+                assert(ordinary.refresh({0,1},flags,false,&bounds,true,publish)==
+                    prepared.refreshPreparedTerrain({0,1},flags,bounds,pixels,true,publish));
+                const auto* a=ordinary.resolve({0,1});const auto* b=prepared.resolve({0,1});
+                assert(a&&b&&a->flags==b->flags&&ordinary.valid()==prepared.valid());
+                assert(a->bounds.left.bits==b->bounds.left.bits&&a->bounds.right.bits==b->bounds.right.bits&&
+                    a->bounds.top.bits==b->bounds.top.bits&&a->bounds.bottom.bits==b->bounds.bottom.bits);
+                assert(ordinary.pendingSpatialIndex()==prepared.pendingSpatialIndex());
+            }
+    }
     {
         RunnerSpatialInstances<2,4> owner;
         assert(!owner.currentHandle(0).generation&&!owner.currentHandle(2).generation);

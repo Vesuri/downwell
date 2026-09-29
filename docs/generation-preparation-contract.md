@@ -54,6 +54,14 @@ binary32 operation snapshot, so later tree servicing/query order and eager
 fallback remain unchanged. No lifetime, query-preparation flag, Create effect
 or random draw moves into preparation.
 
+A prepared first publication with an all-positive-zero cached rectangle and no
+index-membership bit skips old-rectangle normalization and removal. It writes
+the original cache and flags at the same point, validates new bounds only when
+publication is admitted, and normalizes the tree copy using its already decoded
+integer endpoints. It never normalizes the stored cache. Nonzero/signed-zero
+caches and re-publications use the ordinary wrapper. Invalid-input, suppressed-
+publication and capacity-failure prefixes are compared against that wrapper.
+
 ## Birth publication
 
 The terrain pool constructor prepares every unused record's default state.

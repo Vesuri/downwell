@@ -405,14 +405,37 @@ public:
             objectFlags,s.flags,allPrepared,s.bounds,bounds,s.x,s.y,precise,publish));
     }
     // The terrain preparation owns both representations of these bounds.
-    // Keep the ordinary publication wrapper (including normalization/removal)
-    // and only remove the redundant float-to-pixel decoding at admission.
+    // Fresh zero-cache births need no old-rectangle normalization/removal.
+    // Later refreshes retain the ordinary wrapper. Integer endpoints are the
+    // exact decoded geometry supplied by the immutable terrain preparer.
     bool refreshPreparedTerrain(InstanceHandle h,std::uint32_t objectFlags,
         const Box& bounds,Math::PixelBox pixels,bool precise,bool publish){
         if constexpr(!ScheduledIndex)return refresh(h,objectFlags,false,&bounds,precise,publish);
         else{
             DW_PROFILE_SCOPE(profileBoundsPublication);
             if(!valid()||!live(h))return false;
+            auto& s=entries_[h.slot].state;
+            if(!(s.flags&0x8000u)&&!(s.bounds.left.bits|s.bounds.top.bits|s.bounds.right.bits|s.bounds.bottom.bits)){
+                s.bounds=bounds;
+                s.flags=(s.flags&~0x208u)|(precise?0x200u:0u);
+                if(!publish||!Queue::shouldPublishBounds(objectFlags,s.flags,false))return true;
+                // Keep the reference's invalid-input failure after cache/flag
+                // publication. The old +0 rectangle is already known valid.
+                if(!Math::valid(bounds.left)||!Math::valid(bounds.top)||
+                   !Math::valid(bounds.right)||!Math::valid(bounds.bottom))return checked(false);
+                Box normalized=bounds;
+                if(pixels.right<pixels.left){
+                    auto p=pixels.left;pixels.left=pixels.right;pixels.right=p;
+                    auto b=normalized.left;normalized.left=normalized.right;normalized.right=b;
+                }
+                if(pixels.bottom<pixels.top){
+                    auto p=pixels.top;pixels.top=pixels.bottom;pixels.bottom=p;
+                    auto b=normalized.top;normalized.top=normalized.bottom;normalized.bottom=b;
+                }
+                DW_PROFILE_COUNT(counterSpatialFirstPublication);
+                if(!checked(index_.insertPrepared(normalized,h.slot,&pixels)))return false;
+                s.flags|=0x8000u;return true;
+            }
             if(pixels.right<pixels.left){auto a=pixels.left;pixels.left=pixels.right;pixels.right=a;}
             if(pixels.bottom<pixels.top){auto a=pixels.top;pixels.top=pixels.bottom;pixels.bottom=a;}
             struct PreparedIndex {
@@ -423,7 +446,6 @@ public:
                     return index.remove(box,id,retry,removed);
                 }
             } prepared{index_,pixels};
-            auto& s=entries_[h.slot].state;
             return checked(RunnerSpatialBoundsUpdate::finishRefresh(prepared,h.slot,
                 objectFlags,s.flags,false,s.bounds,&bounds,s.x,s.y,precise,publish));
         }
