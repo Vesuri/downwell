@@ -10,6 +10,23 @@ spec = importlib.util.spec_from_file_location("pack", root / "tools/generate-ami
 pack = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(pack)
 rng = random.Random(84)
+# Independent exhaustive oracle for word-aligned overlap, including repeated
+# prefixes, no overlap, complete containment and empty streams.
+words = [b""] + [bytes(97 + ((bits >> i) & 1) for i in range(length))
+                   for length in (2, 4, 6) for bits in range(1 << length)]
+for left in words:
+    for right in words:
+        expected_overlap = max([0] + [n for n in range(2, min(len(left), len(right)) + 1, 2)
+                                      if left[-n:] == right[:n]])
+        assert pack.planar_overlap(left, right) == expected_overlap
+# A later stream may span two original blocks without being contained in
+# either one. Only even offsets may be shared.
+joined, joined_blocks = bytearray(), {}
+assert pack.intern_planar(b"abcd", joined, joined_blocks) == 0
+assert pack.intern_planar(b"efgh", joined, joined_blocks) == 4
+assert pack.intern_planar(b"cdef", joined, joined_blocks) == 2
+assert len(joined) == 8
+assert pack.intern_planar(b"bcde", joined, joined_blocks) == 8
 ordering_samples = [b"abcdef", b"efgh", b"ghij", b"cd", b"bc", b"abcdef"]
 order = pack.planar_payload_order(ordering_samples)
 assert order == pack.planar_payload_order(reversed(ordering_samples))

@@ -77,10 +77,14 @@ bytes. Writable garden sprite DMA records are explicitly excluded from sharing;
 inactive position headers must never alias the displayed sprite.
 
 Immutable payload placement is an offline operation. The packer removes duplicate
-streams, defers word-aligned substrings, then greedily chooses the next stream
-with the longest word-aligned overlap with the existing payload tail. Ties use
-descending stream size and lexical byte order, independent of input iteration
-order. The directory remains sorted by resource/frame ID; each complete planar
+streams and defers word-aligned substrings. It compares a greedy growing-tail
+layout with disjoint paths selected by descending suffix/prefix overlap;
+cycles are rejected and the smaller actually packed result wins. Containment
+can also span joins between earlier immutable streams. Ties use stable ranks
+from descending stream size and lexical byte order, independent of input
+iteration order. This is a heuristic, not a minimum-size guarantee. The
+`.packing.json` sidecar records layout version, extractor and input/output hashes.
+The directory remains sorted by resource/frame ID; each complete planar
 and mask stream remains contiguous. No target decompression, extra copies or
 runtime asset conversion are introduced. Writable DMA records bypass sharing
 and retain separate storage. `tests/planar-packing-test.py` compares directory

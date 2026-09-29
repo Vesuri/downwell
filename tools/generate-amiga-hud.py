@@ -260,6 +260,20 @@ def flash_palette_canvas(canvas):
     return mapped
 
 
+def planar_overlap(left, right):
+    """Largest word-aligned suffix/prefix match, without copying every length."""
+    limit = min(len(left), len(right)) & ~1
+    if not limit:
+        return 0
+    at = left.find(right[:2], len(left) - limit)
+    while at >= 0:
+        size = len(left) - at
+        if not (size & 1) and left[at:] == right[:size]:
+            return size
+        at = left.find(right[:2], at + 1)
+    return 0
+
+
 def planar_payload_order(streams):
     """Deterministic offline overlap ordering; no target decompression needed."""
     unique = sorted(set(streams), key=lambda data: (-len(data), data))
@@ -274,20 +288,57 @@ def planar_payload_order(streams):
                 break
         else:
             standalone.append(data)
+    originals = standalone[:]
     payload = bytearray()
     ordered = []
     while standalone:
         best_overlap, best_index = -1, 0
         for index, data in enumerate(standalone):
-            overlap = min(len(payload), len(data)) & ~1
-            while overlap and payload[-overlap:] != data[:overlap]:
-                overlap -= 2
+            overlap = planar_overlap(payload, data)
             # Stable ties favor larger streams, then lexical byte order.
             if overlap > best_overlap:
                 best_overlap, best_index = overlap, index
         data = standalone.pop(best_index)
         payload.extend(data[best_overlap:])
         ordered.append(data)
+    # A single growing tail can consume a useful successor too early. Select
+    # disjoint overlap paths globally; each stream has at most one predecessor
+    # and successor, and union/find rejects cycles. Stable source ranks break
+    # ties, independently of input iteration order.
+    count = len(originals)
+    parent = list(range(count))
+    before, after = [-1] * count, [-1] * count
+    def root(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+    edges = []
+    for i, left in enumerate(originals):
+        for j, right in enumerate(originals):
+            if i != j:
+                overlap = planar_overlap(left, right)
+                if overlap:
+                    edges.append((-overlap, i, j))
+    for _, i, j in sorted(edges):
+        if after[i] == -1 and before[j] == -1 and root(i) != root(j):
+            after[i], before[j] = j, i
+            parent[root(j)] = root(i)
+    paths = []
+    for i in range(count):
+        if before[i] == -1:
+            while i != -1:
+                paths.append(originals[i])
+                i = after[i]
+    def packed_size(order):
+        data, blocks = bytearray(), {}
+        for stream in order + contained:
+            intern_planar(stream, data, blocks)
+        return len(data)
+    # Path selection is a heuristic, not a minimum-superstring claim. Retain
+    # the earlier tail ordering whenever its actual packed result is smaller.
+    if packed_size(paths) < packed_size(ordered):
+        ordered = paths
     return {data: index for index, data in enumerate(ordered + contained)}
 
 
@@ -295,17 +346,16 @@ def intern_planar(data, payload, blocks):
     """Share only word-aligned immutable regions, never writable DMA records."""
     if data in blocks:
         return blocks[data]
-    for previous, offset in blocks.items():
-        at = previous.find(data)
-        while at >= 0:
-            if at % 2 == 0:
-                return offset + at
-            at = previous.find(data, at + 1)
+    # A stream can also span the join between two earlier immutable streams.
+    at = payload.find(data)
+    while at >= 0:
+        if at % 2 == 0:
+            blocks[data] = at
+            return at
+        at = payload.find(data, at + 1)
     # All calls precede writable DMA payloads. Reuse a matching tail while
     # keeping each asset's complete planar/mask stream contiguous.
-    overlap = min(len(payload), len(data)) & ~1
-    while overlap and payload[-overlap:] != data[:overlap]:
-        overlap -= 2
+    overlap = planar_overlap(payload, data)
     offset = len(payload) - overlap
     payload.extend(data[overlap:])
     blocks[data] = offset
@@ -1008,6 +1058,18 @@ def main():
     else:
         atomic_write(args.output, data)
         print(f"Amiga {args.profile} pack written: {len(data)} bytes sha256 {digest}")
+    packing_path = args.output.with_suffix(".packing.json")
+    packing_provenance = json.dumps({
+        "schemaVersion": 1, "generator": "generate-amiga-hud.py/planar-layout-v2",
+        "extractor": manifest["extractor"], "sourceSha256": SOURCE_SHA256,
+        "profile": args.profile, "packSha256": digest,
+        "languageSha256": hashlib.sha256(args.language.read_bytes()).hexdigest(),
+        "layout": "word-aligned-tail-or-disjoint-paths-with-joined-containment",
+    }, indent=2).encode() + b"\n"
+    if args.check:
+        require(packing_path.read_bytes() == packing_provenance, "packing provenance differs")
+    else:
+        atomic_write(packing_path, packing_provenance)
     if args.profile == "game":
         entry_mask = build_entry_mask(data)
         entry_path = args.output.with_suffix(".entry-mask")
