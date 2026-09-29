@@ -47,6 +47,24 @@ thin = instructions("gml_Object_objThinPlatform_Create_0")
 assert thin == ['push.s "thin"@775', "pop.v.s self.material",
                 "pushglb.v global.wallTile", "pop.v.v self.sprite_index",
                 "pushi.e 23", "pop.v.i self.image_index", "pushi.e 0", "pop.v.i self.image_speed"]
+
+# The enemy probability draw precedes enemy-symbol dispatch for EVERY cell.
+# Plain terrain is not a draw-free span: buffering those draws before Create
+# changes the stream seen by glitch walls and any synchronous child callback.
+cavern_text = (export / "Assembly/gml_GlobalScript_builderCavern.asm").read_text()
+def cavern_block(number):
+    body = cavern_text.split(f":[{number}]\n", 1)[1].split("\n:[", 1)[0]
+    return [line.strip() for line in body.splitlines() if line.strip()]
+assert cavern_block(12) == ["popz.v", "pushglb.v global.level", "pushi.e 2",
+    "add.i.v", "call.i random(argc=1)", "pushglb.v global.level", "cmp.v.v LTE", "bt [17]"]
+assert cavern_block(13) == ["pushglb.v global.hardMode", "conv.v.b", "bf [15]"]
+assert cavern_block(14) == ["pushi.e 5", "conv.i.v", "call.i random(argc=1)",
+    "pushi.e 1", "cmp.i.v GT", "b [16]"]
+assert cavern_block(15) == ["push.e 0"]
+assert cavern_block(16) == ["b [18]"]
+assert cavern_block(17) == ["push.e 1"]
+assert cavern_block(18) == ["bf [38]"]
+assert cavern_block(19)[:3] == ["push.v self.i", "push.v self.levelStr", "call.i string_char_at(argc=2)"]
 init = instructions("gml_GlobalScript_scrInitialize")
 table = []
 for i, op in enumerate(init):
@@ -106,3 +124,4 @@ assert re.search(r"tiles\[\]=\{76,51,74,72,70,55\}", header)
 assert re.search(r"choices\[\]=\{51,52,53,55,57\}", header)
 print("Pinned VM terrain Create: tile table, glitch choice order, platform frame and stopped animation verified")
 print("Terrain local-event audit: ancestry, explicit End Step stores/calls and Draw calls verified; external mutations not proven")
+print("Terrain batching boundary: per-cell probability RNG precedes symbol dispatch; hard mode has an additional conditional draw")

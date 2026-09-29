@@ -89,6 +89,31 @@ each consumer's observable publication and terminal-failure prefix while
 eliminating intermediate calculation/lookup inside callback-free intervals.
 Preparing default command payloads alone does not eliminate this owner work.
 
+### Batching admission
+
+Ordinary wall/platform Create bodies contain local property stores only; wall
+glitch mode adds `choose`. That does **not** make consecutive plain cells a
+draw-free run. `builderCavern` block 12 consumes `random(level+2)` before the
+symbol dispatch at block 19 for every cell, including `1`, `|` and `-`.
+Hard mode can consume an additional word in block 14. The pinned terrain
+verifier checks these blocks as well as the Create bodies.
+
+A future batch interface must retain **cell RNG -> complete that birth/Create
+-> next cell RNG**, even if its backend shares resource lookups and reserves
+storage once for the run. It must not first materialize random choices for the
+whole span. The terrain test includes an eager-span counterexample: final RNG
+state and total draw count agree, but glitch-wall artwork differs. Per-birth
+outputs/observations, not just end-of-span RNG state, are required evidence.
+
+The generic emitter remains synchronous and may consume RNG, change health or
+fail after partial effects. A batching API therefore needs an explicit ordered
+per-cell execution contract, with scalar fallback for unsupported cases. Do not
+reinterpret the current borrowed single-command callback as a buffered queue.
+Room creation code, shops/exits, actors, conditional cell choices and row-edge
+RNG must retain their source boundaries. No bulk publication path is enabled by
+this audit; safe publication/failure preflight still requires implementation
+and equivalence tests against the existing immediate executor.
+
 Layer ID and dynamic-depth resolution retain one last-query result each,
 including misses. Consecutive attachments at the same depth can reuse the
 lookup, but still execute their own lifetime/element publication. The dynamic

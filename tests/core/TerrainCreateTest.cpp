@@ -1,4 +1,5 @@
 #include "core/TerrainCreate.h"
+#include "core/CavernEnemyChoice.h"
 #include <cassert>
 #include <vector>
 #include <cstdio>
@@ -28,5 +29,31 @@ int main(){
             assert(failed.drawCount()==unsigned(object==60&&glitch&&fail>1));
         }
     }
+    // Counterexample for an eager span: total RNG draws and final WELL state
+    // can agree even though the generated artwork is observably different.
+    // A future bulk owner must keep cell draw -> completed Create interleaved.
+    unsigned differentArt=0;
+    for(unsigned seed=0;seed<128;++seed){
+        GameMakerRandom immediate(seed),eager(seed);
+        std::vector<int> sourceArt,eagerArt;
+        constexpr unsigned walls=8;
+        for(unsigned cell=0;cell<walls;++cell){
+            assert(cavernEnemyChoice('1',1,immediate)==-1);
+            assert(terrainCreateProperties(60,51,true,immediate,
+                [&](int value){sourceArt.push_back(value);return true;},
+                [](int){return true;},[](int){return true;}));
+        }
+        for(unsigned cell=0;cell<walls;++cell)assert(cavernEnemyChoice('1',1,eager)==-1);
+        for(unsigned cell=0;cell<walls;++cell)
+            assert(terrainCreateProperties(60,51,true,eager,
+                [&](int value){eagerArt.push_back(value);return true;},
+                [](int){return true;},[](int){return true;}));
+        assert(immediate.drawCount()==2*walls&&immediate.drawCount()==eager.drawCount()&&
+            immediate.stateIndex()==eager.stateIndex());
+        for(unsigned word=0;word<16;++word)assert(immediate.stateWord(word)==eager.stateWord(word));
+        differentArt+=sourceArt!=eagerArt;
+    }
+    assert(differentArt>0);
+    std::printf("Terrain batching: %u/128 eager spans change artwork despite identical final RNG state\n",differentArt);
     std::puts("Terrain Create: tile table, ordered property writes, glitch RNG and terminal prefixes passed");
 }
