@@ -179,7 +179,7 @@ int main(int argc, char** argv) {
     require(pack.valid(), "builder pack validates");
     unsigned runs=0,runCells=0;
     for(unsigned seed=1;seed<=8;++seed)for(unsigned level=1;level<=3;++level)
-    for(unsigned failAt:{0u,1u,17u,101u,701u}){
+    for(bool reference:{false,true})for(unsigned failAt:{0u,1u,17u,101u,701u}){
         AreaOneBuilder scalar,grouped;GameMakerRandom a(seed),b(seed);
         scalar.reset(240,704,a,{level,seed%5,true,false});
         grouped.reset(240,704,b,{level,seed%5,true,false});
@@ -190,11 +190,20 @@ int main(int argc, char** argv) {
             Commands commands;
             std::vector<GameMakerRandom> observations;
             unsigned count=0,failAt,runs=0,cells=0;
+            bool reference=false;
+            const AreaOneBuilder::TerrainRun* active=nullptr;
         } left{a,{}, {},0,failAt},right{b,{}, {},0,failAt};
+        right.reference=reference;
         const auto emit=[](void* context,const DeferredCreateInstance& command){
             auto& p=*static_cast<RunProbe*>(context);
             p.commands.push_back(command);p.observations.push_back(p.random);
             ++p.count;
+            if(p.active){
+                const auto before=p.random;
+                require(!p.active->execute(nullptr,nullptr)&&
+                    !p.active->executeReference(nullptr,nullptr)&&sameRandom(before,p.random),
+                    "both executors reject reentry before consuming RNG");
+            }
             for(unsigned i=0;i<p.count%4;++i)p.random.nextU32();
             return !p.failAt||p.count!=p.failAt;
         };
@@ -202,10 +211,13 @@ int main(int argc, char** argv) {
             auto& p=*static_cast<RunProbe*>(context);++p.runs;p.cells+=run.count;
             require(run.count>1&&(run.objectId==60||run.objectId==93)&&
                 (run.stepX==16||run.stepX==-16),"admitted terrain run geometry");
-            const bool ok=run.execute(emit,context);
+            p.active=&run;
+            const bool ok=p.reference?run.executeReference(emit,context):run.execute(emit,context);
+            p.active=nullptr;
             require(run.completed()==ok,"run completion tracks callback failure");
             const auto after=p.random;const unsigned calls=p.count;
-            require(!run.execute(emit,context)&&sameRandom(after,p.random)&&calls==p.count,
+            require(!run.execute(emit,context)&&!run.executeReference(emit,context)&&
+                sameRandom(after,p.random)&&calls==p.count,
                 "run cannot be replayed after completion or failure");
             return ok;
         });

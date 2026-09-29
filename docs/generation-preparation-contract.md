@@ -453,6 +453,12 @@ runs retains the scalar dispatch as the test reference. Neither path changes
 instance publication timing.
 A run rejects a second execution, including after failure, without additional
 RNG or callbacks. Reporting success without completing the run is rejected.
+The live executor advances an integer X coordinate by the admitted stride
+after each successful callback, except the final cell. It does not derive the
+next coordinate from borrowed command storage. `executeReference` retains
+the indexed `x + cell * stepX` calculation; both share the single-execution
+guard, including recursive execution and retries after partial failure.
+This changes coordinate arithmetic only, not the per-cell birth transaction.
 
 The Amiga generation observer opts into these runs. The shared world's
 `createGeneratedTerrain` transaction performs backend publication, lifetime

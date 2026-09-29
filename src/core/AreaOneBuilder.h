@@ -42,13 +42,25 @@ public:
         const int objectId;
         bool completed()const{return completed_;}
         bool execute(EmitFunction emit,void* context)const{
+            return executeMode<true>(emit,context);
+        }
+        bool executeReference(EmitFunction emit,void* context)const{
+            return executeMode<false>(emit,context);
+        }
+    private:
+        template<bool Incremental> bool executeMode(EmitFunction emit,void* context)const{
             if(started_)return false;
             started_=true;
+            int position=x;
             for(unsigned cell=0;cell<count;++cell){
                 // Normal-mode builderCavern draws even for non-enemy symbols.
                 random_.nextU32();
-                command_.objectId=objectId;command_.x=x+int(cell)*stepX;command_.y=y;
+                command_.objectId=objectId;
+                command_.x=Incremental?position:x+int(cell)*stepX;command_.y=y;
                 if(!emit||!emit(context,command_))return false;
+                // Advance only after synchronous Create, never from its borrowed
+                // command storage, and never beyond the admitted run endpoint.
+                if(Incremental&&cell+1<count)position+=stepX;
             }
             completed_=true;return true;
         }
