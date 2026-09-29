@@ -8,7 +8,7 @@
 #include <cstdio>
 #include <climits>
 using Surface=downwell::PaletteEffectSurface<>;
-static_assert(sizeof(Surface)<=18200,"palette effect scratch must stay outside Chip RAM/task stack");
+static_assert(sizeof(Surface)<=18300,"portable scratch and backend bindings must stay outside the task stack");
 static unsigned word(const unsigned char* p){return unsigned(p[0])*256+p[1];}
 static unsigned dword(const unsigned char* p){return word(p)*65536u+word(p+2);}
 struct Asset {Surface::Asset image;int ox,oy;};
@@ -35,6 +35,16 @@ int main(int argc,char**argv){
         std::abort();
     };
     Surface surface;
+    // Borrowed padded storage: declined acceleration still uses the exact CPU
+    // path and must respect guards. Native tests exercise successful DMA.
+    std::array<std::uint16_t,12*284*3> external;external.fill(0x5a5a);
+    assert(surface.bindStorage(external.data()+1,external.data()+12*284+1,
+        external.data()+12*284*2+1,12,{external.data(),
+            [](void*,const Surface::Mask&,const std::uint8_t*,const std::uint8_t*,int,int){return false;},
+            [](void* p,unsigned first,unsigned end){auto* data=static_cast<std::uint16_t*>(p);
+                for(unsigned plane=0;plane<3;++plane)for(unsigned y=first;y<end;++y)
+                    for(unsigned x=1;x<=10;++x)data[plane*12*284+y*12+x]=0;
+            },[](void*){}}));
     // -1 is transparency; 0 is opaque black and must not be confused with it.
     std::array<int,160*284> expected{},actual{};
     auto clear=[&](){surface.clear();expected.fill(-1);};
@@ -103,4 +113,6 @@ int main(int argc,char**argv){
         clear();clear();verify();
     }
     std::puts("Palette effects: 256 source gem/smoke/shade frames plus 760 shifted all-pen overwrite cases passed");
+    for(unsigned plane=0;plane<3;++plane)for(unsigned y=0;y<284;++y)
+        assert(external[plane*12*284+y*12]==0x5a5a&&external[plane*12*284+y*12+11]==0x5a5a);
 }

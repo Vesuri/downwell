@@ -12,6 +12,7 @@ class CurrencySmokeComposition {
 public:
     using Settings=SmokeComposition::Settings;
     const PaletteEffectSurface<>& surface()const{return surface_;}
+    PaletteEffectSurface<>& surface(){return surface_;}
     bool visible()const{return visible_;}
     bool directRequired()const{return direct_;}
 

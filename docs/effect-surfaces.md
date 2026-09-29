@@ -270,8 +270,9 @@ not a captured execution of Windows rendering.
 ## Binary coverage staging
 
 `PaletteEffectSurface` extends the opaque/binary-alpha composition to colored
-producers such as currency. It keeps separate alpha and two color planes in
-ordinary RAM (at most 18,200 bytes including dirty-row bounds). An incoming
+producers such as currency. Its default storage keeps separate alpha and two
+color planes in ordinary RAM (at most 18,300 bytes including row bounds and
+optional backend bindings). An incoming
 mask replaces the old colors under that mask; colors are not ORed together.
 Opaque black is distinct from transparent coverage. Shade removes alpha only,
 and publication exposes color bits only under surviving alpha. Mask, low and
@@ -280,7 +281,7 @@ mask byte length available. No source payload is mutated or converted.
 
 Stamping resolves the destination row once and accumulates its touched word
 range locally before publishing row bounds. Fully transparent source words
-need no color reads or destination work. Only surviving, in-bounds alpha
+need no color reads or destination work. In the scalar path, surviving in-bounds alpha
 expands these ranges; shade subtraction never expands them. Clearing and
 publication therefore retain the same sparse coverage contract, including
 rows whose alpha has subsequently been erased completely.
@@ -293,9 +294,38 @@ The white-only API uses the same primitive. Neither path reconstructs separate
 colour passes or allocates a bitmap. Per-buffer physical-row debt is unchanged.
 It preserves terrain backing,
 HUD and untouched pixels; neither variant changes display pointers or allocates
-Chip RAM. `verify-palette-effects` exercises original gem/smoke/shade art and
-all pens, including opaque-black overlap. The live scene still needs joint
-currency/smoke binding, source visibility and painter-boundary integration.
+Chip RAM itself. `verify-palette-effects` exercises original gem/smoke/shade art
+and all pens, including opaque-black overlap and borrowed padded storage.
+
+### Native planar composition
+
+`AmigaEffectSurface` binds a separate 20,448-byte Chip workspace at startup:
+three 192x284 planes, with one guard word on each side of the 160-pixel view.
+The ordinary-RAM owner retains row metadata and its scalar fallback storage.
+The workspace follows the resident asset pack in the same allocation and is
+released with it; allocation failure retains the return-code-20 path.
+
+Immutable Chip-resident artwork uses the shared framework's masked Bitmap
+copies for both color planes and masked pattern writes for alpha. Shade clears
+alpha without reconstructing color. Clipping changes source/destination
+rectangles, not artwork. Guard words accommodate shifted fetch spans. Queued
+operations preserve producer order; CPU fallback, overlap queries and final
+publication drain the queue before touching storage. Unsupported masks use the
+same scalar stamping into that storage, not a second displayed representation.
+
+DMA stamps conservatively expand row bounds to their clipped rectangles.
+Clearing uses the prior vertical extent and includes guard words; alpha still
+decides visibility, overlap and publication. The controller painter boundary,
+ring addressing and per-display restoration debt remain unchanged. Overlap
+testing and final publication are still CPU operations, not blitter-zero tests
+or a DMA transfer to the display ring.
+
+The native BOB verifier mirrors every requested stamp into an independent
+ordinary-RAM scalar surface and compares final alpha and covered color bits.
+Its startup fixtures include all shifts, viewport edges, overlapping gem/smoke
+art and shade holes, followed by live-frame comparisons. They establish
+backend equivalence for those paths, not original Windows shader fidelity or
+the complete frame budget.
 
 `EffectMaskAssets` borrows all nine sprite-84 smoke frames, sprite-117 shade,
 and all four frames of each currency sprite (133/134) directly from the immutable

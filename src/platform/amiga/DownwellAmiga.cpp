@@ -31,6 +31,7 @@ __attribute__((noinline,used)) void downwellFieldReentryReady(){__asm__ volatile
 #include "AmigaGameplayActors.h"
 #include "AmigaGameplayDrawList.h"
 #include "AmigaGameplayEffects.h"
+#include "AmigaEffectSurface.h"
 #include "core/CurrencySmokeComposition.h"
 #include "AmigaTerrainRaster.h"
 #include "AmigaWallDamage.h"
@@ -1431,7 +1432,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                          bulletSpriteBytes * bulletSpriteBufferCount,
                          enemySpriteBytes,
                          sceneCacheBytes,
-                         gamePackBytes)) {
+                         gamePackBytes+AmigaEffectSurface::bytes)) {
         platform.restore();
         FreeMem(startupCopperWords, 4 * sizeof(UWORD));
         gDownwellStartupFailure = 4;
@@ -1563,7 +1564,9 @@ __attribute__((noinline)) static int runDownwell(void) {
     alignas(downwell::CurrencySmokeComposition) static UBYTE effectStorage[sizeof(downwell::CurrencySmokeComposition)];
     auto& controllerEffects = *new (effectStorage) downwell::CurrencySmokeComposition;
     if (!effectAssets.bind(activeGamePack,gamePackBytes)||
-        !effectAssets.bindEntryMask(amiga_entry_mask,amiga_entry_mask_end-amiga_entry_mask)) {
+        !effectAssets.bindEntryMask(amiga_entry_mask,amiga_entry_mask_end-amiga_entry_mask)||
+        !AmigaEffectSurface::bind(controllerEffects.surface(),memory.assets()+gamePackBytes)||
+        !AmigaEffectSurface::fixtures(controllerEffects.surface(),effectAssets)) {
         platform.restore();
         FreeMem(startupCopperWords,4*sizeof(UWORD));
         memory.release();
@@ -3009,6 +3012,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     exitCode=20;break;
                 }
             }
+            if(compositeEffects&&!AmigaEffectSurface::verify(controllerEffects.surface())){exitCode=20;break;}
             const GameplayBob* actors = actorList.actors;
             const unsigned actorCount = actorList.count;
             const auto& rayLine = actorList.rayLine;
