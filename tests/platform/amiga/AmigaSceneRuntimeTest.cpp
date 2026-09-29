@@ -166,8 +166,21 @@ void compareMenu(const AmigaSceneRuntime& amiga,
     }
     require(amiga.menuTeleportActive() == reference.menuTeleportActive(),
             "menu teleport follows decoded runtime");
-    const downwell::InstanceRecord* title = reference.instance(105192);
+    // objWell Create emits four object-98 children before object 317. A
+    // guessed dynamic ID can therefore name a wall, not the title. Resource
+    // identity is fixed by the VM; this comparison must not guess numeric IDs.
+    const downwell::InstanceRecord* title = nullptr;
+    for(std::size_t i=0;i<reference.activeInstanceCount();++i){
+        const auto& candidate=reference.instanceAt(i);
+        if(candidate.roomId==downwell::StartupRuntime::menuRoomId&&candidate.objectId==317){
+            require(title==nullptr,"exactly one decoded garden title exists");
+            title=&candidate;
+        }
+    }
     require(title != nullptr, "decoded menu title instance remains available");
+    if(amiga.menuTitleFrame()!=static_cast<int>(title->imageIndex)||amiga.menuTitleY()!=title->y)
+        std::cerr<<"TITLE native_frame="<<amiga.menuTitleFrame()<<" native_y="<<amiga.menuTitleY()
+            <<" host_index="<<title->imageIndex<<" host_y="<<title->y<<" tick="<<amiga.tick()<<'\n';
     require(amiga.menuTitleFrame() ==
                 static_cast<int>(title->imageIndex) &&
             amiga.menuTitleY() == title->y,

@@ -156,9 +156,6 @@ Reference: [area-two recovery](area-two-recovery.md).
 - Complete side-room reward objects and omitted title/particle effects.
 - Verify fractional raster positions, draw order, effect surfaces, shaders and
   alternate palettes against original-game captures.
-  Resolve the full host scene test's `menu title animation follows decoded
-  runtime` failure before claiming complete intro presentation parity; isolate
-  the title frame/position difference against the VM path.
 - Verify Laser Sight's original collision-line rounding, mask behavior and GPU
   rasterization; host/native agreement alone does not establish these.
 - Fill resource/manifest gaps needed by new features: masks, glyph/kerning data,

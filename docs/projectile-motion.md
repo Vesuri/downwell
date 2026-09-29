@@ -998,6 +998,11 @@ waking caches. `verify-amiga-garden-frames` captures wake, final title and first
 well-entry frames in one bounded run, checking both garden planes and the tall
 entry cache against source atlas pixels. Title placement uses objWell Create
 and objTitle Step's final-frame offset, at the dynamic depth-zero boundary.
+`objWell` Create emits four object-98 children before the object-317 title.
+The scene comparison locates the unique menu-room object 317, rather than
+guessing its dynamic instance ID: an ID from an incomplete child-creation path
+can instead resolve to one of the wall children. This resource-based selection
+does not establish original global numeric-ID allocation parity.
 The continuity check also requires identical foreground world pixels across
 the cache switch and a still-visible parallax background. Neither check proves
 the entire title animation, omitted particles or gameplay layering. All these
