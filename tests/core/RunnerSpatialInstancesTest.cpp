@@ -62,6 +62,45 @@ template<bool Scheduled,unsigned Nodes> static void preparedTerrainPublication()
 }
 int main(){
     {
+        // Eligibility is an identity/flag observation, not a request for
+        // geometry. Compare it with full resolution through lifecycle changes,
+        // including readable partial state after a terminal owner failure.
+        using Owner=RunnerSpatialInstances<8,32,true,1,7>;
+        Owner owner;const unsigned order[]={4,1,2,6,0};
+        for(unsigned slot:order){Owner::State state;state.flags=8u|(slot&1?2u:0u);
+            assert(owner.attach({slot,1},int(slot%2),state));
+        }
+        for(unsigned phase=0;phase<5;++phase){
+            if(phase==1)assert(owner.setExclusions({2,1},1));
+            if(phase==2)assert(owner.registerObject({1,1},false));
+            if(phase==3){assert(owner.retire({4,1}));assert(owner.attach({4,2},3,{}));}
+            if(phase==4){Owner::Sprite sprite;
+                assert(!owner.writeImageIndex({4,2},sprite,{0x7fc00000u})&&!owner.valid());
+            }
+            for(unsigned slot=0;slot<=8;++slot)for(unsigned generation=0;generation<4;++generation){
+                const InstanceHandle h{slot,generation};const auto* state=owner.resolve(h);
+                std::uint32_t flags=0xabcdef01u;
+                assert(owner.contains(h)==bool(state)&&owner.instanceFlags(h,flags)==bool(state));
+                if(state)assert(flags==state->flags);else assert(flags==0xabcdef01u);
+            }
+            for(unsigned limit=1;limit<7;++limit){
+                std::vector<unsigned> full,narrow;unsigned a=0,b=0;
+                const bool fullOk=owner.visitRegistrations([&](auto h,int object,const auto& state){
+                    full.insert(full.end(),{h.slot,h.generation,unsigned(object),state.flags});return ++a<limit;
+                });
+                const bool narrowOk=owner.visitRegistrationFlags([&](auto h,int object,std::uint32_t flags){
+                    narrow.insert(narrow.end(),{h.slot,h.generation,unsigned(object),flags});return ++b<limit;
+                });
+                assert(fullOk==narrowOk&&full==narrow);
+            }
+        }
+        owner.clear();
+        for(unsigned slot=0;slot<8;++slot){std::uint32_t flags;
+            assert(!owner.contains({slot,1})&&!owner.instanceFlags({slot,2},flags));
+        }
+        assert(owner.attach({4,3},0,{})&&owner.contains({4,3})&&!owner.contains({4,2}));
+    }
+    {
         using Owner=RunnerSpatialInstances<4,16>;
         Owner owner;
         Owner::State borrowed;

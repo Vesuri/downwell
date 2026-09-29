@@ -75,6 +75,34 @@ publication and capacity-failure prefixes are compared against that wrapper.
 
 ## Birth publication
 
+### Eligibility is not geometry observation
+
+The collision registry exposes generation-checked `contains`, value-based
+`instanceFlags`, and ordered `visitRegistrationFlags` separately from full
+`resolve`. A failed flag read leaves its output unchanged. Like full resolution,
+individual lifetime/flag reads remain available after terminal failure for
+inspection of partial publication; ordered traversal still requires a valid
+owner. Membership and ancestry cannot change inside a registration visitor.
+
+Scheduler consumers must request only what they observe:
+
+| Consumer | Required state |
+| --- | --- |
+| Typed binding validation and post-retirement check | Lifetime presence and object identity |
+| Step/alarm eligibility, Draw exclusion, activation reconciliation, cleanup | Live generation and current flags |
+| Bounds refresh and collision candidates | Position, geometry and relevant flags |
+| Time-field contact result and box time-stop position | Published coordinates |
+| Explicit state witness | Complete source-visible record |
+
+Flag values are read again at the same callback boundaries as before; they
+are not cached across callbacks. Returning a value rather than a flag pointer
+allows a future terrain run to combine common flags with per-cell exclusion
+bits without materializing a full spatial record. The scalar ownership build
+retains full-state resolution for eligibility as a differential reference.
+This API separation does not yet defer or remove any stored terrain state.
+
+### Terrain record and ownership publication
+
 The terrain pool constructor prepares every unused record's default state.
 First use writes only the birth-specific identity, coordinates, activation and
 source binding before synchronous publication; `objectId == 0` identifies these

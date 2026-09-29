@@ -82,7 +82,24 @@ private:
         return terrainFamilies_[object==60?0:1];
     }
     bool resolves(InstanceHandle h)const{
-        return world_&&owner_.resolve(h)&&View(*world_).contains(h);
+        return world_&&owner_.contains(h)&&View(*world_).contains(h);
+    }
+    bool eligibilityFlags(InstanceHandle h,std::uint32_t& out)const{
+#ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+        const auto* state=owner_.resolve(h);if(!state)return false;
+        out=state->flags;return true;
+#else
+        return owner_.instanceFlags(h,out);
+#endif
+    }
+    template<class Visit> bool visitEligibility(Visit visit)const{
+#ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+        return owner_.visitRegistrations([&](InstanceHandle h,int object,const Owner::State& state){
+            return visit(h,object,state.flags);
+        });
+#else
+        return owner_.visitRegistrationFlags(visit);
+#endif
     }
     static bool inverseTrig(RunnerImageValue angle,RunnerImageValue& cosine,RunnerImageValue& sine){
         angle.bits^=0x80000000u;
@@ -142,7 +159,7 @@ private:
             if(!parent.world_)return parent.check(false);
             const auto* actual=View(*parent.world_).template resolveLocal<Kind>(local);
             if(!actual||
-                (!birth&&(!parent.owner_.resolve(out)||parent.owner_.objectId(out)!=object(r))))return parent.check(false);
+                (!birth&&(!parent.owner_.contains(out)||parent.owner_.objectId(out)!=object(r))))return parent.check(false);
             return parent.check(actual==&r);
         }
         bool birth(InstanceHandle local,const Record& r){
@@ -236,8 +253,8 @@ private:
             return parent.check(parent.room_.remove(h.slot)&&parent.layers_.retire(h));}
         bool markDestroyed(InstanceHandle local,const Record& r){InstanceHandle h;
             if(!key(local,r,h))return false;
-            const auto* state=parent.owner_.resolve(h);
-            if(!state||!parent.check(parent.owner_.setExclusions(h,(state->flags&0x100003u)|1u)))return false;
+            std::uint32_t flags;
+            if(!parent.eligibilityFlags(h,flags)||!parent.check(parent.owner_.setExclusions(h,(flags&0x100003u)|1u)))return false;
             if(!parent.check(parent.room_.mark(h.slot)))return false;
             parent.destructionPending_=true;return true;}
         bool membership(InstanceHandle local,const Record& r,bool member){InstanceHandle h;
@@ -349,9 +366,9 @@ public:
                 // Retained terrain/field composition is not part of this
                 // visitor. Do not resolve or copy their records per frame.
                 if(kind!=View::Kind::enemy&&kind!=View::Kind::bullet&&kind!=View::Kind::scriptEffect&&kind!=View::Kind::debris&&kind!=View::Kind::player&&kind!=View::Kind::entryDither)return true;
-                const auto* state=self.owner_.resolve(shared);
-                if(!state||!View(*self.world_).contains(shared))return false;
-                if(state->flags&0x100003u)return true;
+                std::uint32_t flags;
+                if(!self.eligibilityFlags(shared,flags)||!View(*self.world_).contains(shared))return false;
+                if(flags&0x100003u)return true;
                 switch(kind){
                     case View::Kind::player:return visit(visitor,GameplayWorld::DrawActor::player,local,depth);
                     case View::Kind::enemy:return visit(visitor,GameplayWorld::DrawActor::enemy,local,depth);
@@ -363,8 +380,7 @@ public:
                 }
             };
             if(self.layers_.enabled())return self.layers_.visit([&](InstanceHandle h,RunnerLayerDraw::Element& out){
-                const auto* state=self.owner_.resolve(h);if(!state)return false;
-                out.flags=state->flags;
+                if(!self.eligibilityFlags(h,out.flags))return false;
                 View::Kind kind;InstanceHandle local;if(!View::decode(h,kind,local))return false;
                 // Retained scenery/field passes own these draws. Preserve the
                 // inactive flag (which terminates a layer), but avoid event
@@ -520,17 +536,17 @@ public:
     bool dispatchStepPhase(unsigned subtype,RunnerStepSnapshot<Capacity>& snapshot,Execute execute){
         if(!valid()||!world_||subtype>2)return check(false);
         snapshot.clear();
-        if(!check(owner_.visitRegistrations([&](InstanceHandle h,int object,const Owner::State& state){
-            return resolves(h)&&((state.flags&0x100003u)||snapshot.append(h.slot,h.generation,object));
+        if(!check(visitEligibility([&](InstanceHandle h,int object,std::uint32_t flags){
+            return resolves(h)&&((flags&0x100003u)||snapshot.append(h.slot,h.generation,object));
         })))return false;
         snapshot.sort();
         const unsigned count=snapshot.size();
         for(unsigned i=0;i<count;++i){
             const auto h=snapshot.handle(i);
-            const auto* current=owner_.resolve(h);
+            std::uint32_t flags;
             // Destruction/retirement by a preceding callback suppresses this
             // lifetime; a new occupant of the slot cannot inherit its turn.
-            if(!current||(current->flags&0x100003u))continue;
+            if(!eligibilityFlags(h,flags)||(flags&0x100003u))continue;
             if(!check(resolves(h)))return false;
             PackedObjectEvent event;
             if(!objects_.findEvent(owner_.objectId(h),3,int(subtype),event))continue;
@@ -551,8 +567,8 @@ public:
         DW_PROFILE_SCOPE(profileAlarmCapture);
         if(!valid()||!world_)return check(false);
         snapshot.clear();
-        if(!check(owner_.visitRegistrations([&](InstanceHandle h,int object,const Owner::State& state){
-            return resolves(h)&&((state.flags&0x100003u)||snapshot.append(h.slot,h.generation,object));
+        if(!check(visitEligibility([&](InstanceHandle h,int object,std::uint32_t flags){
+            return resolves(h)&&((flags&0x100003u)||snapshot.append(h.slot,h.generation,object));
         })))return false;
         return dispatchCapturedAlarms(snapshot,advanceAndDispatch);
     }
@@ -611,14 +627,14 @@ private:
           PackedObjectEvent event;bool eventCached=false,eventFound=false;
           for(unsigned i=0;i<count;++i){
             const auto h=snapshot.handle(i);
-            const Owner::State* current=nullptr;
+            bool haveFlags=false;std::uint32_t flags;
             int object=snapshot.object(i);
             // A captured object's absent event needs no instance lookup while
             // bindings are unchanged. Any birth, retire, rebind or clear makes
             // the rest of this pass use live lookup, including later alarms.
             if(!owner_.bindingsUnchanged(bindingRevision)){
-                current=owner_.resolve(h);
-                if(!current||(current->flags&0x100003u))continue;
+                haveFlags=eligibilityFlags(h,flags);
+                if(!haveFlags||(flags&0x100003u))continue;
                 object=owner_.objectId(h);
             }
             if(object!=cachedObject){
@@ -632,8 +648,8 @@ private:
                 if(owner_.bindingsUnchanged(bindingRevision))i=snapshot.objectGroupEnd(i)-1;
                 continue;
             }
-            if(!current)current=owner_.resolve(h);
-            if(!current||(current->flags&0x100003u))continue;
+            if(!haveFlags)haveFlags=eligibilityFlags(h,flags);
+            if(!haveFlags||(flags&0x100003u))continue;
             // Capture validated every admitted lifetime. Revalidate the typed
             // store before each real event, not for absent event-table entries.
             if constexpr(SkipInactive){
@@ -883,9 +899,9 @@ public:
         if(!valid()||!world_)return check(false);
         if(!activationPending_)return true;
         const bool result=room_.reconcileChecked([&](unsigned slot){
-            const auto* state=owner_.resolve(owner_.currentHandle(slot));
-            if(!state){good_=false;return true;}
-            return (state->flags&2u)!=0;
+            std::uint32_t flags;
+            if(!eligibilityFlags(owner_.currentHandle(slot),flags)){good_=false;return true;}
+            return (flags&2u)!=0;
         },[&](unsigned slot,bool registered){
             // Writes while inactive may have been consumed by an intervening
             // active-room pass. Promotion must refresh that retained snapshot.
@@ -933,11 +949,11 @@ public:
         if(!destructionPending_)return true;
         DW_PROFILE_SCOPE(profileDrawCleanup);
         const bool cleaned=room_.visitMarkedCleanupChecked([&](unsigned slot){
-            const auto h=owner_.currentHandle(slot);const auto* state=owner_.resolve(h);
-            if(!state||!(state->flags&1u))return false;
+            const auto h=owner_.currentHandle(slot);std::uint32_t flags;
+            if(!eligibilityFlags(h,flags)||!(flags&1u))return false;
             View::Record record;
             if(!View(*world_).resolve(h,record))return false;
-            if(!retire(h,record)||!valid()||owner_.resolve(h))return false;
+            if(!retire(h,record)||!valid()||owner_.contains(h))return false;
             return !View(*world_).contains(h);
         });
         if(!check(cleaned))return false;

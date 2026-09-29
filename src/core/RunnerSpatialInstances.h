@@ -295,6 +295,14 @@ public:
     const State* resolve(InstanceHandle h)const{
         return live(h)?&entries_[h.slot].state:nullptr;
     }
+    // Lifetime/eligibility observations do not require geometry or previous
+    // coordinates. Like resolve(), these remain readable after terminal
+    // failure for partial-publication inspection; they do not imply valid().
+    bool contains(InstanceHandle h)const{return live(h);}
+    bool instanceFlags(InstanceHandle h,std::uint32_t& out)const{
+        if(!live(h))return false;
+        out=entries_[h.slot].state.flags;return true;
+    }
     // For a synchronous owner-controlled slot walk only. Deferred consumers
     // must retain the returned generation, never look it up again after reuse.
     InstanceHandle currentHandle(unsigned slot)const{
@@ -855,6 +863,13 @@ public:
     // membership. The scheduler supplies phase-specific exclusion flags.
     template<class Visit> bool visitRegistrations(Visit visit)const{
         return visitRegistrationRange(0,Capacity,visit);
+    }
+    template<class Visit> bool visitRegistrationFlags(Visit visit)const{
+        return valid()&&membership_.visitRegistrationRange(0,Capacity,
+            [&](unsigned slot,std::uint32_t generation,int object){
+                const InstanceHandle h{slot,generation};std::uint32_t flags;
+                return instanceFlags(h,flags)&&visit(h,object,flags);
+            });
     }
     // Narrow a phase snapshot to a disjoint owner domain before resolving
     // records. Selected lifetimes remain checked; no slot-order iteration.

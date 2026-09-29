@@ -46,6 +46,10 @@ struct RunnerSpatialVerification {
         const bool fast=sprite.scaleX.bits==0x3f800000u&&sprite.scaleY.bits==0x3f800000u&&
             !(sprite.angle.bits&0x7fffffffu)&&!tinted&&!faded;
         const auto* state=owner.resolve(h);
+        std::uint32_t eligibility=0xabcdef01u;
+        result.check(owner.contains(h)&&owner.instanceFlags(h,eligibility)&&state&&eligibility==state->flags);
+        eligibility=0xabcdef01u;
+        result.check(!owner.contains({0,2})&&!owner.instanceFlags({0,2},eligibility)&&eligibility==0xabcdef01u);
         result.check(state&&target.bits==bits&&state->flags==(changed?(8u|(fast?0x4000u:0u)):0u));
         result.check(owner.pendingSpatial()==unsigned(changed)&&owner.pendingCollision()==unsigned(changed));
         result.word(target.bits);result.word(state?state->flags:0xffffffffu);
