@@ -17,6 +17,7 @@ __attribute__((noinline,used)) void downwellFieldReentryReady(){__asm__ volatile
 #include <hardware/dmabits.h>
 #include <hardware/intbits.h>
 #include "AmigaInput.h"
+#include "core/SceneDescentVerification.h"
 #include "AmigaProfile.h"
 #include "AmigaTerrainProfile.h"
 #include "DownwellCopperLists.h"
@@ -563,11 +564,16 @@ static downwell::Input sceneVerificationInput(
             input.fire = true;
     }
     else if (scenes.scene() == AmigaScene::gameplay && gameplayLanded) {
+#ifdef DOWNWELL_SCENE_DESCENT_VERIFY
+        input = downwell::sceneDescentVerificationInput(port.tick(),
+            240L * 256 + port.player().offsetXFixed());
+#else
         const unsigned movementPhase = (port.tick() / 120u) & 1u;
         input.right = movementPhase == 0;
         input.left = movementPhase != 0;
         const unsigned firePhase = port.tick() % 16u;
         input.fire = firePhase == 0 || firePhase == 3;
+#endif
     }
     return input;
 }

@@ -6,6 +6,7 @@
 #include "core/BuilderPatternPack.h"
 #include "core/SpritePack.h"
 #include "core/FontPack.h"
+#include "core/SceneDescentVerification.h"
 #include "platform/sdl/PlatformSDL.h"
 #include <fstream>
 #include <iterator>
@@ -55,6 +56,7 @@ int main(int argc, char** argv) {
     const bool gemHighFixture = std::getenv("DOWNWELL_CAPTURE_GEM_HIGH") != nullptr;
     const bool laserFixture = std::getenv("DOWNWELL_CAPTURE_LASER") != nullptr;
     bool gemHighInjected = false;
+    const bool descentRoute = std::getenv("DOWNWELL_CAPTURE_DESCENT") != nullptr;
     unsigned mainTicks = 0;
 #ifdef DOWNWELL_SKIP_TO_GAME
     // The constructor has already completed the room-creation transition,
@@ -79,6 +81,9 @@ int main(int argc, char** argv) {
             input.left = !input.right;
             const unsigned firePhase = simulationTick % 16u;
             input.fire = firePhase == 0 || firePhase == 3;
+            if (descentRoute)
+                input = downwell::sceneDescentVerificationInput(simulationTick,
+                    static_cast<long>(state.mainPlayerX() * 256));
         }
         if (laserFixture && landed && !state.upgrades().levels[12])
             const_cast<downwell::StartupRuntime&>(state).grantUpgrade(12);

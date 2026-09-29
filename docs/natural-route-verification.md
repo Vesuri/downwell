@@ -1,5 +1,27 @@
 # Natural cavern route verification
 
+## Full startup scene gate
+
+`make verify-amiga-scenes` builds `SCENE_DESCENT_VERIFY=1`, starts at the
+publisher sequence and drives garden, well entry and style selection. After
+the first gameplay landing, `SceneDescentVerification.h` seeks room X=240
+with a two-pixel dead band and the existing two-tap firing cadence. This is
+test input, not game behavior. It does not edit terrain, move the player,
+grant health or alter RNG. The older alternating movement tape remains in
+other scene/capture fixtures so their checkpoints do not silently change.
+
+The gate still requires 256 pixels of camera descent beyond the first landing
+and an awake enemy, as well as splash intervals, style composition, Copper
+patch consistency and the stack guard. It compares all three initial frame
+hashes. The emulator deadline defaults to 180 seconds and the build is restored
+on either success or failure. Progress markers identify a stalled stage;
+reaching a stage does not substitute for the final assertions.
+
+For the same post-landing inputs on SDL, build `build/capture-sdl-landing` and
+run it with `DOWNWELL_CAPTURE_DESCENT=1`, an output directory and a simulation
+tick (for example 600). The capture reports position, health, jumps and shots;
+it is a diagnostic capture, not an independent original-game oracle.
+
 ## Paired host gate
 
 `make verify-natural-exit` runs both runtime adapters against decoded room,
