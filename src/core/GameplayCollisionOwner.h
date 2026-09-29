@@ -928,7 +928,7 @@ public:
         struct Ops {
             GameplayCollisionOwner& owner;InstanceHandle local;const SpriteMaskPack& masks;Effects& effects;
             bool coordinates(int dx,int dy,MotionBinary64& x,MotionBinary64& y){
-                const auto* r=owner.terrain_.find(local);if(!r)return false;
+                const auto r=owner.terrain_.find(local);if(!r)return false;
                 x=MotionBinary64::fromInteger(r->x);y=MotionBinary64::fromInteger(r->y);
                 return x.add(MotionBinary64::fromInteger(dx))&&y.add(MotionBinary64::fromInteger(dy));
             }

@@ -26,7 +26,7 @@ public:
         const GameplayWorld::PlayerInstance* player=nullptr;
         const GameplayWorld::EnemyState* enemy=nullptr;
         const GameplayWorld::Breakable* breakable=nullptr;
-        const GameplayTerrainInstances::Record* terrain=nullptr;
+        decltype(static_cast<const GameplayTerrainInstances*>(nullptr)->find(InstanceHandle{})) terrain=nullptr;
         const OrdinaryTimeField* timeField=nullptr;
         const GameplayGoalFields::Record* goalField=nullptr;
         const GameplayExitControllers::Record* exitController=nullptr;

@@ -13,11 +13,16 @@ spec.loader.exec_module(report)
 class CostOwners(unittest.TestCase):
     def test_scalar_and_run_owners(self):
         for owner in ("RunnerRoomMembership", "RunnerRunRoomMembership",
-                      "RunnerObjectMembership", "RunnerRunMembership"):
+                      "RunnerObjectMembership", "RunnerRunMembership", "TerrainOwnershipRuns"):
             with self.subTest(owner=owner):
                 frame = f"downwell::{owner}<3067u, 8u, 2056u>::bind"
                 self.assertEqual(report.cause(["runDownwell", frame]), "runner bookkeeping")
                 self.assertEqual(report.cause(["runDownwell", frame, "memcpy"]), "runner bookkeeping")
+
+    def test_terrain_store_variants(self):
+        for owner in ("GameplayTerrainInstances", "GameplayTerrainInstancesScalar", "GameplayTerrainInstancesRuns"):
+            self.assertEqual(report.cause(["runDownwell", f"downwell::{owner}::append"]),
+                             "runner bookkeeping")
 
     def test_innermost_owner_still_wins(self):
         frames = ["runDownwell", "downwell::RunnerRunRoomMembership<64u,8u,56u>::bind"]

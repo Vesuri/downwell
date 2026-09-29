@@ -273,7 +273,7 @@ CAUSES = [
      r'RunnerSpatialPosition|RunnerStepSnapshot|RunnerObjectFamilies|RecordLifecycle|'
      r'GameplayCollisionOwner::(Binding|valid|refresh|reconcile|combatAlarm|dispatchCaptured|'
      r'cleanupDestroyed|prepareDraw|resolves)|GameplayCollisionView|Prepared(Terrain|UnitSprite)'
-     r'\w*Bounds|PreparedSpriteGeometry|GameplayTerrainInstances::(append|createProperties)|'
+     r'\w*Bounds|PreparedSpriteGeometry|GameplayTerrainInstances(?:Scalar|Runs)?::(append|createProperties)|TerrainOwnershipRuns|'
      r'captureEnemyStepOrder|resolve(Enemy|Bullet)Lifetime|publish(Enemy|Player|Bullet)|'
      r'ProjectilePublication|visitRoomActors|InstanceLifecycle|DeferredInstanceQueue|'
      r'terrainCreateProperties'),

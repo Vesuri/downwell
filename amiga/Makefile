@@ -25,6 +25,7 @@ CLEAR_VERIFY ?= 0
 NATURAL_VERIFY ?= 0
 SKIP_INTRO ?= 0
 SKIP_TO_GAME ?= 0
+TERRAIN_RUN_STORE ?= 0
 SKIP_LEVEL ?= 0
 PROBES ?= 0
 GENERATION_DETAIL ?= 0
@@ -145,6 +146,9 @@ endif
 ifeq ($(SKIP_INTRO),1)
 CFLAGS += -DDOWNWELL_SKIP_INTRO
 endif
+ifeq ($(TERRAIN_RUN_STORE),1)
+CFLAGS += -DDOWNWELL_TERRAIN_RUN_STORE
+endif
 ifneq ($(filter 1,$(SKIP_TO_GAME) $(SKIP_LEVEL)),)
 CFLAGS += -DDOWNWELL_SKIP_TO_GAME
 endif
@@ -232,7 +236,7 @@ all: check $(OUT).exe
 .PHONY: FORCE_STARTUP_OPTIONS
 obj/startup-options: FORCE_STARTUP_OPTIONS
 	@mkdir -p obj
-	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(SKIP_LEVEL)' '$(AMIGA_OPTIMIZATION)' '$(LASER_VERIFY)' '$(PROFILE_LASER)' > $@.tmp
+	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(SKIP_LEVEL)' '$(TERRAIN_RUN_STORE)' '$(AMIGA_OPTIMIZATION)' '$(LASER_VERIFY)' '$(PROFILE_LASER)' > $@.tmp
 	@cmp -s $@.tmp $@ || cp $@.tmp $@
 
 $(OBJECTS): obj/startup-options

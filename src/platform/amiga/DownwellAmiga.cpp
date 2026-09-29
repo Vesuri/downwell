@@ -1508,7 +1508,7 @@ __attribute__((noinline)) static int runDownwell(void) {
             downwell::GameplayCollisionView::Kind kind;downwell::InstanceHandle local;
             if(!downwell::GameplayCollisionView::decode(shared,kind,local)||
                 kind!=downwell::GameplayCollisionView::Kind::terrain)return false;
-            const auto* wall=collisionOwner.terrain().find(local);
+            const auto wall=collisionOwner.terrain().find(local);
             if(!wall||wall->objectId!=60||!wall->active)return false;
             bool hit=false;
             if(!collisionOwner.terrainPositionMeeting(60,downwell::MotionBinary64::fromInteger(wall->x),

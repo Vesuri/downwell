@@ -36,7 +36,7 @@ if [[ ${SKIP_LEVEL:-0} == 1 && $mode != trace ]]; then script=profile_clear.gdb;
 # Always leave the playable binary behind, including after a timeout/failure.
 restore() {
   make clean > .run/profile-restore.log 2>&1
-  make -j4 SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_LASER=0 PROFILE_CONTACT=0 PROFILE_FRAMES=0 PROFILE_TRANSITION=0 GENERATION_DETAIL=0 GENERATION_TIMING=0 PHASE_SAMPLING=0 TRACE_FRAMES= >> .run/profile-restore.log 2>&1
+  make -j4 TERRAIN_RUN_STORE=0 SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_LASER=0 PROFILE_CONTACT=0 PROFILE_FRAMES=0 PROFILE_TRANSITION=0 GENERATION_DETAIL=0 GENERATION_TIMING=0 PHASE_SAMPLING=0 TRACE_FRAMES= >> .run/profile-restore.log 2>&1
 }
 mkdir -p .run
 if [[ ${PROFILE_CONTACT:-0} == 1 ]]; then

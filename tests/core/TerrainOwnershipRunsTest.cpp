@@ -1,4 +1,5 @@
 #include "core/TerrainOwnershipRuns.h"
+#include "core/GameplayTerrainInstancesRuns.h"
 #include <vector>
 #include <cstdio>
 #include <cstdlib>
@@ -17,6 +18,25 @@ int main(){
         require(runs.visit([&](const auto& r){require(count<scalar.size()&&same(r,scalar[count++]));return true;}));
         require(count==scalar.size());
         require(runs.handle(count).generation==0);
+        // Compare run-level row selection with the scalar predicate after
+        // every insertion/removal, including fragmented runs and slot reuse.
+        for(int first: {-2147483647-1,-16,16,32,48,64,2048,2147483646}){
+            const int end=first==2147483646?2147483647:first+1;
+            std::vector<Store::Identity> expected;
+            for(const auto& r:scalar)
+                if(!((r.y<first&&unsigned(first)-unsigned(r.y)>=16u)||
+                    (r.y>=end&&unsigned(r.y)-unsigned(end)>=16u)))expected.push_back(r);
+            unsigned selected=0;
+            require(runs.visitRows(first,end,[&](const auto& r){
+                require(selected<expected.size()&&same(r,expected[selected++]));return true;
+            }));
+            require(selected==expected.size());
+            unsigned stopped=0;
+            require(runs.visitRows(first,end,[&](const auto&){++stopped;return false;})==expected.empty());
+            require(stopped==(expected.empty()?0u:1u));
+        }
+        require(runs.visitRows(32,32,[&](const auto&){require(false);return false;}));
+        require(runs.visitRows(64,32,[&](const auto&){require(false);return false;}));
         for(unsigned i=0;i<count;++i){const auto h=runs.handle(i);
             require(h.slot==scalar[i].handle.slot&&h.generation==scalar[i].handle.generation);
         }
@@ -70,4 +90,6 @@ int main(){
     append(1,1,60,(-2147483647-1),0); // No signed coordinate/generation wrap merge.
     append(64,1,60,0,0);append(2,0,60,0,0);append(2,1,35,0,0);
     std::printf("Terrain identity/geometry/order runs: %u scalar comparisons passed\n",comparisons);
+    std::printf("Terrain store bytes (host): scalar=%zu runs=%zu\n",
+        sizeof(downwell::GameplayTerrainInstancesScalar),sizeof(downwell::GameplayTerrainInstancesRuns));
 }

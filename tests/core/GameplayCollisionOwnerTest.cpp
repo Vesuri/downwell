@@ -452,14 +452,14 @@ int main(){
         TerrainDestructionAudit audit;audit.rejectDestroy=failure==1;audit.rejectActivation=failure==2;
         auto terrain=std::make_unique<GameplayTerrainInstances>(GameplayTerrainInstances::Binding::bindDestruction(audit));
         audit.store=terrain.get();assert(terrain->append(60,32,48,true));
-        const auto h=terrain->handle(0);const auto* record=terrain->find(h);
+        const auto h=terrain->handle(0);const auto record=terrain->find(h);
         assert(terrain->requestDestroy(h)==(failure!=1)&&audit.destroys==1);
         if(failure!=1){
             assert(terrain->requestDestroy(h)&&audit.destroys==1);
             assert(terrain->activation(h,false)==(failure==0)&&audit.activations==1);
         }
-        assert(terrain->find(h)==record&&terrain->size()==1&&record->destroyRequested==(failure!=1));
-        assert(record->active==(failure!=0)&&terrain->valid()==(failure==0));
+        assert(terrain->find(h)==record&&terrain->size()==1&&terrain->find(h)->destroyRequested==(failure!=1));
+        assert(terrain->find(h)->active==(failure!=0)&&terrain->valid()==(failure==0));
         if(failure){
             assert(!terrain->requestDestroy(h)&&!terrain->activation(h,false)&&audit.destroys==1);
         }else{
@@ -487,7 +487,7 @@ int main(){
         for(unsigned i=0;i<32;++i)assert(store->append(60,int(i),0,true));
         for(unsigned i=0;i<4096;++i){
             const unsigned index=(i*13u)%32u;const auto old=store->handle(index);
-            InstanceHandle survivors[31];const GameplayTerrainInstances::Record* pointers[31];unsigned n=0;
+            InstanceHandle survivors[31];decltype(store->find(InstanceHandle{})) pointers[31];unsigned n=0;
             for(unsigned j=0;j<32;++j)if(j!=index){survivors[n]=store->handle(j);pointers[n]=store->find(survivors[n]);++n;}
             assert(store->requestDestroy(old)&&store->retireMarked(old)&&!store->find(old)&&store->size()==31);
             assert(store->append(60,int(i),0,true));const auto fresh=store->handle(31);
@@ -1491,7 +1491,7 @@ int main(){
         }));
         assert(wallEvents==9);
         assert(damage.cells.size()==9&&damage.size()==1);damage.cells.clear();damage.clear();
-        const auto middle=owner->terrain().handle(4);const auto* record=owner->terrain().find(middle);
+        const auto middle=owner->terrain().handle(4);const auto record=owner->terrain().find(middle);
         assert(record->wall.surrounded&&record->wall.checked==1&&record->wall.lights==0&&record->imageIndex==15&&
             !record->destroyRequested&&effects.tiles==0&&scene->wallBackgroundTiles().size()==0);
         unsigned drawn=0;
@@ -1504,8 +1504,8 @@ int main(){
             assert(damage.cells[0].first==256&&damage.cells[0].second==528&&damage.size()==1);
             assert(damage.visit([](int first,int end){return first==520&&end==536;}));
         }
-        assert(random.drawCount()==draws&&record->destroyRequested==!rejectTile&&owner->terrain().find(middle)==record);
-        if(!rejectTile)assert(drawWallPresentation(*record,[]{assert(false);return 0u;},
+        assert(random.drawCount()==draws&&owner->terrain().find(middle)->destroyRequested==!rejectTile&&owner->terrain().find(middle)==record);
+        if(!rejectTile)assert(drawWallPresentation(*owner->terrain().find(middle),[]{assert(false);return 0u;},
             [](int,unsigned){assert(false);}));
         if(rejectTile){
             assert(!owner->valid()&&scene->wallBackgroundTiles().size()==0);
@@ -1538,7 +1538,7 @@ int main(){
         for(int y=492;y<=548;++y)for(int x=220;x<=276;++x){
             bool expected=false,boxHit=false;
             for(unsigned i=0;i<3;++i){
-                const auto local=queries->terrain().handle(i);const auto* r=queries->terrain().find(local);
+                const auto local=queries->terrain().handle(i);const auto r=queries->terrain().find(local);
                 InstanceHandle key;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,local,key));
                 const auto& p=queries->properties(key)->sprite;PackedSpriteCollision resource;
                 assert(sprites.collisionSprite(p.spriteId,p.maskId,resource));
@@ -1603,7 +1603,7 @@ int main(){
                 bool found=false;
                 assert(queries->terrainPlaceMeeting(caller,60,x,y,masks,found));
                 const auto* restored=queries->state(callerKey);
-                const auto* terrain=queries->terrain().find(caller);
+                const auto terrain=queries->terrain().find(caller);
                 assert(restored&&terrain&&restored->x.bits==original.x.bits&&restored->y.bits==original.y.bits);
                 assert(restored->previous.x.bits==original.previous.x.bits&&restored->previous.y.bits==original.previous.y.bits);
                 assert(terrain->x==record.x&&terrain->y==record.y&&terrain->lifetimeId==record.lifetimeId);
@@ -1756,7 +1756,7 @@ int main(){
                 assert(cold->terrainNonPreciseLine({},60,x,y,x,y,false,hit));record("cold-line");
             }
             for(unsigned i=0;i<128;++i){
-                const auto h=cold->terrain().handle(i);const auto* r=cold->terrain().find(h);assert(r);
+                const auto h=cold->terrain().handle(i);const auto r=cold->terrain().find(h);assert(r);
                 InstanceHandle shared;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,h,shared));
                 const auto before=*cold->state(shared);
                 bool hit=false;
@@ -1790,7 +1790,7 @@ int main(){
             for(unsigned i=0;i<16;++i)trace<<' '<<random.stateWord(i);
             trace<<'\n';
             for(unsigned i=0;i<owner->terrain().size();++i){
-                const auto h=owner->terrain().handle(i);const auto* r=owner->terrain().find(h);assert(r);
+                const auto h=owner->terrain().handle(i);const auto r=owner->terrain().find(h);assert(r);
                 InstanceHandle shared;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,h,shared));
                 const auto* s=owner->state(shared);const auto* p=owner->properties(shared);assert(s&&p);
                 trace<<"terrain "<<h.slot<<' '<<h.generation<<' '<<r->objectId<<' '<<r->x<<' '<<r->y
@@ -2176,7 +2176,7 @@ int main(){
             PackedRoomInstance r;assert(rooms.roomInstance(room,i,r));
             if(r.objectId!=60&&r.objectId!=93)continue;
             const auto local=roomOwner->terrain().handle(ordinal++);
-            const auto* stored=roomOwner->terrain().find(local);InstanceHandle shared;
+            const auto stored=roomOwner->terrain().find(local);InstanceHandle shared;
             assert(stored&&stored->sourceInstanceId==r.instanceId&&stored->creationCodeId==r.creationCodeId&&
                 stored->x==r.x&&stored->y==r.y&&stored->objectId==r.objectId&&
                 GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,local,shared));
@@ -2554,14 +2554,14 @@ int main(){
     assert(owner->population(60,count)&&count==2);
     GameplayCollisionView::Record terrainRecord;
     assert(GameplayCollisionView(*world).resolve(wall,terrainRecord)&&terrainRecord.terrain==owner->terrain().find(wallLocal));
-    const auto* dying=terrainRecord.terrain;
-    assert(owner->terrain().requestDestroy(wallLocal)&&dying->destroyRequested&&
+    const auto dying=terrainRecord.terrain;
+    assert(owner->terrain().requestDestroy(wallLocal)&&owner->terrain().find(wallLocal)->destroyRequested&&
         owner->terrain().size()==3&&owner->terrain().find(wallLocal)==dying&&
         (owner->state(wall)->flags&1u)&&!(owner->state(otherWall)->flags&1u));
     assert(owner->terrain().requestDestroy(wallLocal)); // repeated request retains the same lifetime
-    assert(owner->terrain().activation(wallLocal,false)&&!dying->active&&
+    assert(owner->terrain().activation(wallLocal,false)&&!owner->terrain().find(wallLocal)->active&&
         (owner->state(wall)->flags&3u)==3u&&owner->terrain().find(wallLocal)==dying);
-    const auto* survivor=owner->terrain().find(owner->terrain().handle(1));
+    const auto survivor=owner->terrain().find(owner->terrain().handle(1));
     const auto survivorHandle=owner->terrain().handle(1);
     assert(owner->reconcileActivation()&&owner->terrain().find(wallLocal)==dying);
     assert(owner->prepareDraw()&&!owner->terrain().find(wallLocal)&&!owner->state(wall));

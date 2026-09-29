@@ -399,6 +399,16 @@ both the normal adapter and the scalar address-based reference. This enables
 run-backed records without requiring permanent per-cell callback addresses;
 it does not itself replace the current record array or defer publication.
 
+`TERRAIN_RUN_STORE=1` selects the run-backed terrain store; the scalar store
+remains the default and reference. Its `find` result owns a value snapshot, not
+a pointer to mutable storage. Re-read the handle after a setter or event to
+observe changed fields. Snapshot equality identifies the owner and lifetime,
+not equality of captured fields. Row traversal rejects whole runs before
+expanding live cells, using the same conservative 16-pixel artwork margin;
+unbounded artwork requires full traversal. Neither traversal permits structural
+mutation. Host option tracking rebuilds the SDL objects when this flag changes;
+native comparison runs use clean builds and restore the default afterward.
+
 Compressing only the deferred bounds journal does not replace terrain
 ownership. Exact encoded-coordinate runs can remove repeated rectangle
 snapshots, but still require per-cell admission, population tracking and

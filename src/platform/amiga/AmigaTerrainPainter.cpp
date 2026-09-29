@@ -80,9 +80,9 @@ bool AmigaTerrainPainter::paint(AmigaRenderer* renderer,
 #ifdef DOWNWELL_SCENE_VERIFY
         // Independent full-order selection oracle; never benchmark this scan.
         unsigned referenceIndex=0;
-        auto nextReference=[&]()->const downwell::GameplayTerrainInstances::Record*{
+        auto nextReference=[&]()->decltype(records->find(downwell::InstanceHandle{})){
             while(referenceIndex<records->size()){
-                const auto* r=records->find(records->handle(referenceIndex++));
+                const auto r=records->find(records->handle(referenceIndex++));
                 const int sprite=r->wall.checked?r->spriteId:51;
                 if(downwell::wallIntersectsRows(sprite,r->y,firstWorldY,finalWorldY))return r;
             }
@@ -94,7 +94,11 @@ bool AmigaTerrainPainter::paint(AmigaRenderer* renderer,
             const int sprite=r.wall.checked?r.spriteId:51;
             if(!downwell::wallIntersectsRows(sprite,r.y,firstWorldY,finalWorldY))return true;
 #ifdef DOWNWELL_SCENE_VERIFY
-            if(nextReference()!=&r)return false;
+            const auto reference=nextReference();
+            if(!reference||reference->lifetimeId!=r.lifetimeId||reference->objectId!=r.objectId||
+                reference->x!=r.x||reference->y!=r.y||reference->active!=r.active||
+                reference->destroyRequested!=r.destroyRequested||reference->spriteId!=r.spriteId||
+                reference->imageIndex!=r.imageIndex||reference->wall.checked!=r.wall.checked)return false;
 #endif
             DW_PROFILE_COUNT(counterTerrainWallRowCandidates);
             if(!downwell::drawWallPresentation(r,[&]{return mainWallFrame(terrainIndex,rooms,room,r.x,r.y);},

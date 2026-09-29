@@ -90,9 +90,14 @@ public:
         }
         return true;
     }
-    template<class Visit> bool visit(Visit visit)const{
+private:
+    template<bool Rows,class Visit> bool visitSelected(int first,int end,Visit visit)const{
         // No structural mutation during this borrowed traversal.
         for(unsigned n=head_;n!=End;n=runs_[n].next){const auto& r=runs_[n];
+            // Select geometry before expanding identities: every cell in a run
+            // shares Y. The margin admits the bounded wall artwork overhang.
+            if(Rows&&((r.y<first&&unsigned(first)-unsigned(r.y)>=16u)||
+                (r.y>=end&&unsigned(r.y)-unsigned(end)>=16u)))continue;
             int x=r.x;
             for(unsigned i=0;i<r.count;++i){const unsigned slot=r.first+i;
                 if(locator_[slot]==n+1&&!visit(Identity{{slot,r.generation+i},r.object,x,r.y,r.creationCode,r.source}))return false;
@@ -100,6 +105,11 @@ public:
             }
         }
         return true;
+    }
+public:
+    template<class Visit> bool visit(Visit visit)const{return visitSelected<false>(0,0,visit);}
+    template<class Visit> bool visitRows(int first,int end,Visit visit)const{
+        return first>=end||visitSelected<true>(first,end,visit);
     }
     unsigned runCount()const{unsigned count=0;for(unsigned n=head_;n!=End;n=runs_[n].next)++count;return count;}
 };
