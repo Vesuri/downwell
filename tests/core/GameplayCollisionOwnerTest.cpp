@@ -2776,6 +2776,7 @@ int main(){
         if(!retire)assert(world->findBreakable(box)->alarm0==5);
         assert(!world->stopBoxAlarm0(box,[&](bool&){++queries;return true;})&&queries==1);
     }
+    std::printf("Gameplay collision owner bytes (host): %zu\n",sizeof(GameplayCollisionOwner));
     std::puts("Native collision owner: actor/terrain births, dormant flags, movement, compaction, retirement, Retry and terminal failure passed");
 }
 #endif

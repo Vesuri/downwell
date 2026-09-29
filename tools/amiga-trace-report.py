@@ -269,11 +269,11 @@ CAUSES = [
     ('software float emulation', r'MotionBinary64|RunnerImageValue|[mM]ultiplyBinary64|'
      r'[dD]ivideBinary64|roundGameMaker'),
     ('runner bookkeeping', r'RunnerRoomMembership|RunnerRun(?:Room)?Membership|RunnerLayer|GameplayRoomLayers|'
-     r'RunnerObjectMembership|RunnerSpatialInstances|RunnerSpatialDirty|RunnerSpatialBounds|'
+     r'RunnerObjectMembership|RunnerSpatialInstances|RunnerSpatialLifetimes|RunnerSpatialDirty|RunnerSpatialBounds|'
      r'RunnerSpatialPosition|RunnerStepSnapshot|RunnerObjectFamilies|RecordLifecycle|'
      r'GameplayCollisionOwner::(Binding|valid|refresh|reconcile|combatAlarm|dispatchCaptured|'
      r'cleanupDestroyed|prepareDraw|resolves)|GameplayCollisionView|Prepared(Terrain|UnitSprite)'
-     r'\w*Bounds|PreparedSpriteGeometry|GameplayTerrainInstances(?:Scalar|Runs)?::(append|createProperties)|TerrainOwnershipRuns|'
+     r'\w*Bounds|PreparedSpriteGeometry|GameplayTerrainInstances(?:Scalar|Runs)?::(append|createProperties|spatial)|TerrainOwnershipRuns|'
      r'captureEnemyStepOrder|resolve(Enemy|Bullet)Lifetime|publish(Enemy|Player|Bullet)|'
      r'ProjectilePublication|visitRoomActors|InstanceLifecycle|DeferredInstanceQueue|'
      r'terrainCreateProperties'),

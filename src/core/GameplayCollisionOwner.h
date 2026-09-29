@@ -30,6 +30,9 @@ public:
     // same on both sides so query timing is not changed by this comparison.
 #ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
     using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2,true,View::terrainBase,View::timeFieldBase,false>;
+#elif defined(DOWNWELL_TERRAIN_RUN_STORE)
+    using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2,true,View::terrainBase,View::timeFieldBase,true,
+        RunnerSpatialLifetimes<View::capacity,View::terrainBase,View::timeFieldBase,GameplayTerrainInstances>>;
 #else
     using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2,true,View::terrainBase,View::timeFieldBase>;
 #endif
@@ -318,6 +321,9 @@ public:
         GameplayTerrainInstances::Presentation presentation={},GameplayTerrainInstances::WallCollision collision={},
         const RoomPack* rooms=nullptr):objects_(objects),sprites_(sprites),layers_(rooms),
         terrain_(GameplayTerrainInstances::Binding::bindDestruction(terrainBinding_),presentation,collision){
+#if defined(DOWNWELL_TERRAIN_RUN_STORE) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
+        if(!owner_.bindTerrainLifetimes(terrain_))return;
+#endif
         good_=sprites_.prepare(preparedSprites_,741)&&objectDefaults_.prepare(objects,sprites_)&&
             spriteGeometry_.prepare(sprites_)&&
             terrainBirthBounds_.prepare(objectDefaults_,sprites_)&&

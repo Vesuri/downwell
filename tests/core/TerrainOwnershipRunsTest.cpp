@@ -1,16 +1,64 @@
 #include "core/TerrainOwnershipRuns.h"
 #include "core/GameplayTerrainInstancesRuns.h"
+#include "core/RunnerSpatialLifetimes.h"
 #include <vector>
 #include <cstdio>
 #include <cstdlib>
 #include <algorithm>
 using Store=downwell::TerrainOwnershipRuns<64>;
-static void require(bool ok){if(!ok)std::abort();}
+static void requireAt(bool ok,unsigned line){if(!ok){std::fprintf(stderr,"terrain check failed at line %u\n",line);std::abort();}}
+#define require(ok) requireAt((ok),__LINE__)
 static bool same(const Store::Identity& a,const Store::Identity& b){
     return a.handle.slot==b.handle.slot&&a.handle.generation==b.handle.generation&&
         a.object==b.object&&a.x==b.x&&a.y==b.y&&a.creationCode==b.creationCode&&a.source==b.source;
 }
+struct TerrainObserver {
+    template<class... A> bool birth(const A&...){return true;}
+    template<class... A> bool retire(const A&...){return true;}
+    template<class... A> bool activation(const A&...){return true;}
+    template<class... A> bool membership(const A&...){return true;}
+    template<class... A> bool move(const A&...){return true;}
+    template<class... A> bool sprite(const A&...){return true;}
+    template<class... A> bool imageIndex(const A&...){return true;}
+    template<class... A> bool markDestroyed(const A&...){return true;}
+};
+static void spatialIdentity(){
+    using Terrain=downwell::GameplayTerrainInstancesRuns;
+    using Shared=downwell::RunnerSpatialLifetimes<2052,2,2050,Terrain>;
+    static_assert(sizeof(Shared)<128,"No spatial identity array for terrain");
+    TerrainObserver observer;
+    Terrain terrain(Terrain::Binding::bindDestruction(observer));Shared spatial;
+    require(!spatial.canAttach({2,1},60));
+    require(spatial.bind(terrain)&&!spatial.bind(terrain));
+    for(unsigned iteration=0;iteration<8;++iteration){
+        require(terrain.append(60,32,48,true));const auto local=terrain.handle(0);
+        const downwell::InstanceHandle h{local.slot+2,local.generation};
+        require(terrain.find(local)&&!spatial.contains(h));
+        require(!spatial.canAttach({h.slot,h.generation+1},60)&&!spatial.canAttach(h,93));
+        require(spatial.canAttach(h,60));spatial.publish(h,60);
+        require(spatial.contains(h)&&spatial.object(h.slot)==60&&spatial.handle(h.slot).generation==h.generation);
+        require(!spatial.canAttach(h,60)&&spatial.rebind(h.slot,60)&&!spatial.rebind(h.slot,93));
+        require(terrain.requestDestroy(local));
+        require(spatial.contains(h)); // A destruction mark is not retirement.
+        if(iteration&1)spatial.clear();else spatial.retire(h.slot);
+        require(!spatial.contains(h)&&spatial.object(h.slot)==-1&&!spatial.canAttach(h,60));
+        require(bool(terrain.find(local))); // Spatial retirement precedes typed retirement.
+        require(terrain.retireMarked(local)&&!spatial.contains(h));
+    }
+    // The actor ranges on both sides retain the ordinary generation high-water
+    // marks, including after clear. Terrain cannot alias either compressed slot.
+    for(unsigned slot:{0u,1u,2050u,2051u}){
+        require(spatial.canAttach({slot,17},35));spatial.publish({slot,17},35);
+        require(spatial.contains({slot,17})&&spatial.rebind(slot,92)&&spatial.object(slot)==92);
+        spatial.retire(slot);require(!spatial.canAttach({slot,17},35)&&spatial.canAttach({slot,18},35));
+        spatial.publish({slot,18},35);
+    }
+    spatial.clear();
+    for(unsigned slot:{0u,1u,2050u,2051u})require(!spatial.contains({slot,18})&&!spatial.canAttach({slot,18},35));
+    require(!spatial.canAttach({2052,1},35)&&!spatial.contains({2052,1}));
+}
 int main(){
+    spatialIdentity();
     Store runs;std::vector<Store::Identity> scalar;
     unsigned comparisons=0;
     auto compare=[&](){
@@ -43,6 +91,9 @@ int main(){
         for(unsigned s=0;s<64;++s){
             auto found=std::find_if(scalar.begin(),scalar.end(),[&](const auto& r){return r.handle.slot==s;});
             require(runs.occupied(s)==(found!=scalar.end()));
+            require(runs.object(s)==(found==scalar.end()?-1:found->object));
+            const auto current=runs.currentHandle(s);
+            require(current.generation==(found==scalar.end()?0:found->handle.generation));
             if(found!=scalar.end()){
                 Store::Identity actual;
                 require(runs.contains(found->handle)&&runs.read(found->handle,actual)&&same(actual,*found));

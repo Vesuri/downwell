@@ -28,7 +28,10 @@ private:
     struct Mutable {
         int spriteId=-1,imageIndex=0,imageSpeed=1;
         WallEndStepState wall{};
-        bool active=true,destroyRequested=false,wallNeedsReset=false,used=false;
+        bool active=true,destroyRequested=false,wallNeedsReset=false;
+        // Replaces the old ever-used byte: pristine, allocated, published,
+        // spatially retired. Typed slot reuse resets all mutable state.
+        std::uint8_t allocation=0;
     };
     using Ids=TerrainOwnershipRuns<capacity>;
     using Identity=typename Ids::Identity;
@@ -58,6 +61,18 @@ public:
     GameplayTerrainInstancesRuns& operator=(const GameplayTerrainInstancesRuns&)=delete;
     bool valid()const{return good_;}
     unsigned size()const{return identities_.size();}
+    bool spatialCanAttach(InstanceHandle h,int object)const{
+        return identities_.contains(h)&&mutable_[h.slot].allocation==1&&identities_.object(h.slot)==object;
+    }
+    void spatialPublish(unsigned slot){mutable_[slot].allocation=2;}
+    void spatialRetire(unsigned slot){mutable_[slot].allocation=3;}
+    void spatialClear(){for(auto& m:mutable_)if(m.allocation==2)m.allocation=3;}
+    int spatialObject(unsigned slot)const{
+        return slot<capacity&&mutable_[slot].allocation==2?identities_.object(slot):-1;
+    }
+    InstanceHandle spatialHandle(unsigned slot)const{
+        return spatialObject(slot)>=0?identities_.currentHandle(slot):InstanceHandle{};
+    }
     InstanceHandle handle(unsigned ordinal)const{return identities_.handle(ordinal);}
     bool read(InstanceHandle h,Record& out)const{
         Identity id;if(!identities_.read(h,id))return false;out=record(id);return true;
@@ -81,8 +96,8 @@ public:
         const InstanceHandle h{slot,next_};
         if(!identities_.append(h,object,x,y,source,code))return good_=false;
         ++next_;freeHint_=slot+1;
-        auto& m=mutable_[slot];if(m.used)m=Mutable{};
-        m.used=true;m.active=active;if(object==99)m.spriteId=46;
+        auto& m=mutable_[slot];if(m.allocation)m=Mutable{};
+        m.allocation=1;m.active=active;if(object==99)m.spriteId=46;
         if(!binding_.birth(h,record({h,object,x,y,code,source})))return good_=false;
         return true;
     }

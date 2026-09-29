@@ -33,6 +33,11 @@ public:
         return h.generation==r.generation+h.slot-r.first;
     }
     bool occupied(unsigned slot)const{return slot<Capacity&&locator_[slot]!=0;}
+    InstanceHandle currentHandle(unsigned slot)const{
+        if(!occupied(slot))return {};
+        const auto& r=runs_[locator_[slot]-1];return {slot,r.generation+slot-r.first};
+    }
+    int object(unsigned slot)const{return occupied(slot)?runs_[locator_[slot]-1].object:-1;}
     InstanceHandle handle(unsigned ordinal)const{
         if(ordinal>=population_)return {};
         // Live generation immediately reads the newest birth for Create.

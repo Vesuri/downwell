@@ -13,7 +13,8 @@ spec.loader.exec_module(report)
 class CostOwners(unittest.TestCase):
     def test_scalar_and_run_owners(self):
         for owner in ("RunnerRoomMembership", "RunnerRunRoomMembership",
-                      "RunnerObjectMembership", "RunnerRunMembership", "TerrainOwnershipRuns"):
+                      "RunnerObjectMembership", "RunnerRunMembership", "TerrainOwnershipRuns",
+                      "RunnerSpatialLifetimes"):
             with self.subTest(owner=owner):
                 frame = f"downwell::{owner}<3067u, 8u, 2056u>::bind"
                 self.assertEqual(report.cause(["runDownwell", frame]), "runner bookkeeping")
@@ -32,6 +33,11 @@ class CostOwners(unittest.TestCase):
                          "R-tree upkeep")
         self.assertEqual(report.cause(["runDownwell", "AmigaPlatform::waitVblank"]),
                          "wait for vertical blank")
+
+    def test_shared_identity_publication(self):
+        for method in ("spatialCanAttach", "spatialObject", "spatialHandle", "spatialPublish", "spatialRetire"):
+            self.assertEqual(report.cause(["runDownwell", f"downwell::GameplayTerrainInstancesRuns::{method}"]),
+                             "runner bookkeeping")
 
 
 if __name__ == "__main__":

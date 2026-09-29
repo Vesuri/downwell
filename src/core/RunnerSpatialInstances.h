@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_RUNNER_SPATIAL_INSTANCES_H
 #define DOWNWELL_CORE_RUNNER_SPATIAL_INSTANCES_H
 #include "InstanceHandle.h"
+#include "RunnerSpatialLifetimes.h"
 #include "RunnerCollisionPairs.h"
 #include "RunnerCollisionMotion.h"
 #include "RunnerTransformField.h"
@@ -40,7 +41,7 @@ template<unsigned Capacity,unsigned Nodes> struct RunnerSpatialIndexStorage<Capa
 // scheduler must attach every relevant birth before Create, publish its bounds,
 // and retire it before reusing its slot. This is not an activation scheduler.
 // No platform types or asset residency decisions belong here.
-template<unsigned Capacity,unsigned Nodes,bool ScheduledIndex=false,unsigned RetainedFirst=0,unsigned RetainedLast=0,bool RunRegistration=ScheduledIndex> class RunnerSpatialInstances {
+template<unsigned Capacity,unsigned Nodes,bool ScheduledIndex=false,unsigned RetainedFirst=0,unsigned RetainedLast=0,bool RunRegistration=ScheduledIndex,class Lifetimes=RunnerSpatialLifetimes<Capacity>> class RunnerSpatialInstances {
     static_assert(Capacity>0,"Spatial instances need stable slots");
     using Queue=RunnerSpatialDirtyQueue<Capacity>;
     using Math=RunnerSpatialSplit;
@@ -188,8 +189,7 @@ public:
                 (*flags&0x87u)==definition->propertyFlags&&
                 (state.flags&~2u)==8u&&!state.special&&
                 (definition->spriteId==-1||definition->frames<=65535u)&&
-                valid()&&h.slot<Capacity&&h.generation&&object>=0&&
-                entries_[h.slot].object<0&&h.generation>entries_[h.slot].generation&&
+                valid()&&lifetimes_.canAttach(h,object)&&
                 Math::valid(state.x)&&Math::valid(state.y)){
                 auto& e=entries_[h.slot];
                 // Store semantic fields directly; do not copy padding or the
@@ -198,7 +198,7 @@ public:
                 e.state.bounds.left=state.bounds.left;e.state.bounds.top=state.bounds.top;
                 e.state.bounds.right=state.bounds.right;e.state.bounds.bottom=state.bounds.bottom;
                 e.state.flags=state.flags;e.state.kind=state.kind;e.state.special=false;
-                e.state.previous={state.x,state.y};e.object=object;e.generation=h.generation;
+                e.state.previous={state.x,state.y};lifetimes_.publish(h,object);
                 if(!membership_.bind(h.slot,object,h.generation)){
                     changedBinding(h.slot);return false;
                 }
@@ -258,6 +258,7 @@ public:
         if(creationDepth)*creationDepth=definition->creationDepth;
         return true;
     }
+    template<class Terrain> bool bindTerrainLifetimes(Terrain& terrain){return lifetimes_.bind(terrain);}
     bool valid()const{return good_ && index_.valid();}
     // No logical instance work happens here. Reads force completion themselves.
     bool serviceSpatialIndex(unsigned budget){
@@ -289,7 +290,7 @@ public:
     void clear(){
         changedBinding();
         membership_.clear();spatial_.clear();collision_.clear();index_.clear();
-        for(auto& entry:entries_)entry.object=-1;
+        lifetimes_.clear();
         good_=true;
     }
     const State* resolve(InstanceHandle h)const{
@@ -306,17 +307,16 @@ public:
     // For a synchronous owner-controlled slot walk only. Deferred consumers
     // must retain the returned generation, never look it up again after reuse.
     InstanceHandle currentHandle(unsigned slot)const{
-        return slot<Capacity&&entries_[slot].object>=0?handle(slot):InstanceHandle{};
+        return slot<Capacity&&lifetimes_.object(slot)>=0?handle(slot):InstanceHandle{};
     }
-    int objectId(InstanceHandle h)const{return live(h)?entries_[h.slot].object:-1;}
+    int objectId(InstanceHandle h)const{return live(h)?lifetimes_.object(h.slot):-1;}
     // Borrow until the registry takes its own snapshot. Birth wrappers must
     // not copy the complete state through each ownership boundary.
     bool attach(InstanceHandle h,int object,const State& state){
-        if(!valid() || h.slot>=Capacity || !h.generation || object<0 ||
-            entries_[h.slot].object>=0 || h.generation<=entries_[h.slot].generation ||
+        if(!valid() || !lifetimes_.canAttach(h,object) ||
             (state.flags&0x8000u) || !Math::valid(state.x)||!Math::valid(state.y))return false;
         auto& e=entries_[h.slot];e.state=state;e.state.previous={state.x,state.y};
-        e.object=object;e.generation=h.generation;
+        lifetimes_.publish(h,object);
         changedBinding(h.slot);
         return membership_.bind(h.slot,object,h.generation);
     }
@@ -338,7 +338,7 @@ public:
         if(!valid()||!live(h))return false;
         if(membership_.contains(h.slot)!=registered)changedCapture(h.slot);
         if(!registered)membership_.unbind(h.slot);
-        else if(!membership_.contains(h.slot))membership_.bind(h.slot,entries_[h.slot].object,h.generation);
+        else if(!membership_.contains(h.slot))membership_.bind(h.slot,lifetimes_.object(h.slot),h.generation);
         auto& flags=entries_[h.slot].state.flags;
         if(registered)flags&=~0x80000u;else flags|=0x80000u;
         return true;
@@ -349,7 +349,7 @@ public:
     // separately apply the resource/flag/queue effects at 0x46b8b2..0x46b968.
     bool rebindObjectMembership(InstanceHandle h,int object,bool registered){
         if(!valid()||!live(h)||object<0)return false;
-        entries_[h.slot].object=object;
+        if(!lifetimes_.rebind(h.slot,object))return false;
         changedBinding(h.slot);
         if(registered)membership_.bind(h.slot,object,h.generation);
         else membership_.unbind(h.slot);
@@ -403,7 +403,7 @@ public:
     template<class Graph,class Refresh>
     bool publishBirth(InstanceHandle h,Graph& graph,Refresh refreshBounds){
         if(!valid()||!live(h)||!graph.valid())return false;
-        const auto object=unsigned(entries_[h.slot].object);
+        const auto object=unsigned(lifetimes_.object(h.slot));
         if(!graph.flags(object))return false;
         if(!checked(graph.prepareBirth(object)&&refreshBounds(h,true)))return false;
         if(*graph.flags(object)&8u)collision_.mark(h.slot);
@@ -673,7 +673,7 @@ public:
     bool retire(InstanceHandle h){
         if(!removeSpatialMembership(h))return false;
         membership_.unbind(h.slot);
-        entries_[h.slot].object=-1;changedBinding(h.slot);return true;
+        lifetimes_.retire(h.slot);changedBinding(h.slot);return true;
     }
     unsigned pendingSpatial()const{return spatial_.size();}
     unsigned pendingCollision()const{return collision_.size();}
@@ -711,7 +711,7 @@ public:
                     if(!checked(normalize(box)))return false;
                     bool callbacks=true;
                     const bool queried=index_.query(box,[&](unsigned candidate){
-                        if(candidate>=Capacity||entries_[candidate].object<0){callbacks=false;return false;}
+                        if(candidate>=Capacity||lifetimes_.object(candidate)<0){callbacks=false;return false;}
                         callbacks=pairs.candidate(self,handle(candidate),hasEvent);
                         return callbacks;
                     });
@@ -774,11 +774,11 @@ public:
         if(indexed&&!checked(flush(refreshBounds)))return false;
         bool good=true,result=false;
         auto visit=[&](unsigned slot){
-            if(slot>=Capacity||entries_[slot].object<0){good=false;return false;}
+            if(slot>=Capacity||lifetimes_.object(slot)<0){good=false;return false;}
             const auto& entry=entries_[slot];
             // 0x501e40 is an unconditional false stub in the pinned runner.
             if((entry.state.flags&0x100003u)||
-               (indexed&&(entry.state.kind!=1||!isA(entry.object,object))))return true;
+               (indexed&&(entry.state.kind!=1||!isA(lifetimes_.object(slot),object))))return true;
             if(!candidate(handle(slot),x,y,result)){good=false;return false;}
             return !result;
         };
@@ -821,10 +821,10 @@ public:
         if(indexed&&!checked(flush(refreshBounds)))return false;
         Result next;bool good=true;
         auto visit=[&](unsigned slot){
-            if(slot>=Capacity||entries_[slot].object<0){good=false;return false;}
+            if(slot>=Capacity||lifetimes_.object(slot)<0){good=false;return false;}
             const auto h=handle(slot);const auto& entry=entries_[slot];
             if((entry.state.flags&0x100003u)||(notMe&&h.slot==self.slot&&h.generation==self.generation)||
-               (indexed&&(entry.state.kind!=1||!isA(entry.object,object))))return true;
+               (indexed&&(entry.state.kind!=1||!isA(lifetimes_.object(slot),object))))return true;
             bool hit=false;if(!candidate(h,args,hit)){good=false;return false;}
             if(hit){next={true,h};return false;}return true;
         };
@@ -920,7 +920,7 @@ public:
     bool place(InstanceHandle self,int object,Real x,Real y,bool allPrepared,
         Graph& graph,Refresh refreshBounds,Precise precise,Result& result){
         if(!valid()||!live(self)||object<0||!graph.valid()||!graph.flags(unsigned(object))||
-            !graph.flags(unsigned(entries_[self.slot].object)))return false;
+            !graph.flags(unsigned(lifetimes_.object(self.slot))))return false;
         auto isA=[&](int child,int parent){return graph.isA(child,parent);};
         auto prepare=[&]{
             using Prep=RunnerSpatialObjectPreparation;
@@ -934,15 +934,15 @@ public:
                 [&](Box box,unsigned slot){return index_.insert(box,slot);});
         };
         auto eligible=[&](unsigned slot,bool spatial){
-            return slot<Capacity && slot!=self.slot && entries_[slot].object>=0 &&
+            return slot<Capacity && slot!=self.slot && lifetimes_.object(slot)>=0 &&
                 !(entries_[slot].state.flags&0x100003u) &&
-                (!spatial || (entries_[slot].state.kind==1 && isA(entries_[slot].object,object)));
+                (!spatial || (entries_[slot].state.kind==1 && isA(lifetimes_.object(slot),object)));
         };
         auto& s=entries_[self.slot].state;
         RunnerPlaceQuery::Result hit;
         const bool success=RunnerPlaceQuery::run(s.x,s.y,s.flags,s.bounds,x,y,prepare,
             [&]{return flush(refreshBounds);},[&](bool publish){return refreshBounds(self,publish);},
-            [&](Real nx,Real ny){return move(self,nx,ny,*graph.flags(unsigned(entries_[self.slot].object)));},
+            [&](Real nx,Real ny){return move(self,nx,ny,*graph.flags(unsigned(lifetimes_.object(self.slot))));},
             [&](auto visit){membership_.visit(object,isA,[&](unsigned slot,std::uint32_t){
                 return !eligible(slot,false)||visit(slot);
             });return true;},
@@ -954,7 +954,8 @@ public:
         result={hit.found,hit.found?handle(hit.identity):InstanceHandle{}};return true;
     }
 private:
-    struct Entry {State state{};int object=-1;std::uint32_t generation=0;};
+    struct Entry {State state{};};
+    Lifetimes lifetimes_;
     Entry entries_[Capacity]{};
     Membership membership_;
     Queue spatial_,collision_;
@@ -988,9 +989,8 @@ private:
             if(objectFlags&8u)collision_.mark(slot);
         }
     }
-    bool live(InstanceHandle h)const{return h.slot<Capacity && h.generation &&
-        entries_[h.slot].object>=0 && entries_[h.slot].generation==h.generation;}
-    InstanceHandle handle(unsigned slot)const{return {slot,entries_[slot].generation};}
+    bool live(InstanceHandle h)const{return lifetimes_.contains(h);}
+    InstanceHandle handle(unsigned slot)const{return lifetimes_.handle(slot);}
     static bool normalize(Box& b){
         if(!Math::valid(b.left)||!Math::valid(b.top)||!Math::valid(b.right)||!Math::valid(b.bottom))return false;
         if(Math::less(b.right,b.left)){auto n=b.left;b.left=b.right;b.right=n;}

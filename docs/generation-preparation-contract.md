@@ -409,6 +409,19 @@ unbounded artwork requires full traversal. Neither traversal permits structural
 mutation. Host option tracking rebuilds the SDL objects when this flag changes;
 native comparison runs use clean builds and restore the default afterward.
 
+In that configuration, the spatial owner obtains terrain object IDs and
+generations directly from the typed run store. Its ordinary identity array
+excludes the terrain slot range. The typed allocation byte distinguishes
+pristine, allocated-but-unpublished, spatially published and spatially retired
+records; it also retains the old first-use/reuse distinction. Destruction marks
+do not retire identities. Spatial retirement precedes typed retirement during
+the callback, and clearing the spatial owner must not permit reattaching the
+same typed lifetime. Only a new typed allocation resets that admission state.
+The external identity adapter is for immutable typed terrain families: a
+different object family requires a different typed lifetime, not mutation of
+an independent spatial object ID. Ordinary actor owners retain their mutable
+object binding and per-slot generation high-water marks.
+
 Compressing only the deferred bounds journal does not replace terrain
 ownership. Exact encoded-coordinate runs can remove repeated rectangle
 snapshots, but still require per-cell admission, population tracking and
