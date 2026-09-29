@@ -33,12 +33,13 @@ printf 'Profile Laser Sight fixture: %s\n' "${PROFILE_LASER:-0}"
 printf 'Profile natural contact tape: %s\n' "${PROFILE_CONTACT:-0}"
 printf 'Profile inner generation probes: %s (only active in probes mode)\n' "${GENERATION_DETAIL:-0}"
 printf 'Profile coarse generation timing: %s (FPS mode only)\n' "${GENERATION_TIMING:-0}"
+printf 'Profile coarse timing stage: %s\n' "${GENERATION_TIMING_PHASE:-profileGeneration}"
 shasum -a 256 out/Downwell.exe
 VERIFY_TIMEOUT_SECONDS="${VERIFY_TIMEOUT_SECONDS:-60}" \
 GDB_SOURCE="$script" READY_MARKER=DOWNWELL_PROFILE_READY \
 READY_DESCRIPTION="bounded scene profile" bash verify_startup.sh
 cp .run/gdb-startup.log ".run/profile-${mode}.log"
-if [[ ${GENERATION_TIMING:-0} == 1 ]] && ! grep -q '^GENERATION coarse:' ".run/profile-${mode}.log"; then
+if [[ ${GENERATION_TIMING:-0} == 1 ]] && ! grep -q '^PHASE coarse:' ".run/profile-${mode}.log"; then
   echo "Requested coarse generation measurement was not produced" >&2
   exit 1
 fi

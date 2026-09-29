@@ -80,6 +80,22 @@ Compare with the same FPS tape without this opt-in flag: coarse timing still
 has overhead, and its inclusive total must not be added to nested probe totals.
 The script restores the ordinary build with this flag disabled.
 
+To isolate a stage without enabling every nested probe, also set
+`GENERATION_TIMING_PHASE=profileGeneratedRegistration` (the complete generated
+instance callback), `profileInstanceBirth`, or `profileBoundsPublication`.
+The default is `profileGeneration`; names come from `DownwellProfilePhase`.
+Only the selected `DW_PROFILE_SCOPE` reads the clock. Nested scopes of the
+same selected stage are included once, not double-counted. Measurements cover
+all occurrences in the gameplay window, not only occurrences inside generation.
+`PHASE coarse` reports the numeric phase, call count, total and mean per-call
+time, maximum per-frame sum, its frame, and selected-stage time in the worst
+PAL-gap frame. Only the default generation stage requires exactly one call per
+gameplay frame; other stages require nonzero coverage. Zero coverage fails the
+run rather than presenting an empty measurement as evidence. This option does
+not enable `DW_GENERATION_SCOPE` detail-only brackets. Each selected-stage run
+still has its own clock overhead; compare against plain FPS and do not add
+inclusive results from separately selected parent/child stages.
+
 Probe `segments` (the legacy `gDownwellProfileCalls` counters) include parent
 resumption after nested scopes: they are not function invocation counts.
 `scope_entries` counts only `DW_PROFILE_SCOPE` construction, with both the

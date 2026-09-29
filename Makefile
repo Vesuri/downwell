@@ -2419,9 +2419,17 @@ build/replay-frame-trace-test: tests/core/ReplayFrameTraceTest.cpp src/core/Repl
 
 .PHONY: test-generation-timing
 test: test-generation-timing
-test-generation-timing: build/generation-timing-test build/generation-timing-disabled-test
+test-generation-timing: build/generation-timing-test build/generation-timing-disabled-test build/generation-timing-birth-test build/generation-timing-layer-test
 	./build/generation-timing-test
 	./build/generation-timing-disabled-test
+	./build/generation-timing-birth-test
+	./build/generation-timing-layer-test
+build/generation-timing-birth-test: tests/core/GenerationTimingTest.cpp src/core/Profile.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_FPSCOUNT -DDOWNWELL_GENERATION_TIMING -DDOWNWELL_GENERATION_TIMING_PHASE=profileInstanceBirth -o $@ $<
+build/generation-timing-layer-test: tests/core/GenerationTimingTest.cpp src/core/Profile.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_FPSCOUNT -DDOWNWELL_GENERATION_TIMING -DDOWNWELL_GENERATION_TIMING_PHASE=profileInstanceLayerAttach -o $@ $<
 build/generation-timing-test: tests/core/GenerationTimingTest.cpp src/core/Profile.h
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_FPSCOUNT -DDOWNWELL_GENERATION_TIMING -o $@ $<

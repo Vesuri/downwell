@@ -83,12 +83,18 @@ public:
 #define DW_PROFILE_PHASE(phase) downwellProfilePhase(phase)
 #else
 #ifdef DOWNWELL_GENERATION_TIMING
-// Opt-in coarse timing: only the outer generation transaction reads a clock.
-// All inner birth/geometry/registration brackets still compile away.
+// Opt-in inclusive timing of one selected stage; every other bracket compiles
+// away. The backend ignores nested entries of the same stage to avoid counting
+// recursive work twice. Default remains the complete generation transaction.
+#ifndef DOWNWELL_GENERATION_TIMING_PHASE
+#define DOWNWELL_GENERATION_TIMING_PHASE profileGeneration
+#endif
+static_assert(DOWNWELL_GENERATION_TIMING_PHASE>=profileGeneration&&
+    DOWNWELL_GENERATION_TIMING_PHASE<profilePhaseCount,"Invalid coarse timing stage");
 bool downwellProfileGenerationEnter(unsigned long& start);
 void downwellProfileGenerationLeave(unsigned long start);
 template<unsigned Phase> class DownwellGenerationScope {};
-template<> class DownwellGenerationScope<profileGeneration> {
+template<> class DownwellGenerationScope<DOWNWELL_GENERATION_TIMING_PHASE> {
     unsigned long start_;
     bool active_;
 public:

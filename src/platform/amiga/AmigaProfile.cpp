@@ -77,6 +77,12 @@ volatile ULONG gDownwellProfileGenerationTiming =
     0;
 #endif
 volatile ULONG gDownwellProfileGenerationCalls, gDownwellProfileGenerationTicks;
+volatile ULONG gDownwellProfileGenerationPhase =
+#ifdef DOWNWELL_GENERATION_TIMING
+    DOWNWELL_GENERATION_TIMING_PHASE;
+#else
+    profileGeneration;
+#endif
 volatile ULONG gDownwellProfileGenerationMax, gDownwellProfileGenerationMaxFrame;
 volatile ULONG gDownwellProfileGenerationWorstGapTicks;
 volatile ULONG gDownwellProfileSection;
@@ -96,6 +102,7 @@ __attribute__((noinline, used)) void downwellProfileReady()
     // Keep this debugger gate reachable through LTO/section collection.
     (void)gDownwellProfileRequireDamage;
     (void)gDownwellProfileGenerationTiming;
+    (void)gDownwellProfileGenerationPhase;
     __asm__ volatile("" ::: "memory");
 }
 }
@@ -156,12 +163,15 @@ static bool frameActive;
 #endif
 #ifdef DOWNWELL_GENERATION_TIMING
 static ULONG generationFrameTicks;
+static bool generationScopeActive;
 bool downwellProfileGenerationEnter(unsigned long& start){
-    if(!frameActive||sceneId!=3)return false;
+    if(!frameActive||sceneId!=3||generationScopeActive)return false;
+    generationScopeActive=true;
     start=beamTick();return true;
 }
 void downwellProfileGenerationLeave(unsigned long start){
     const ULONG elapsed=beamTick()-start;
+    generationScopeActive=false;
     generationFrameTicks+=elapsed;
     gDownwellProfileGenerationTicks+=elapsed;
     ++gDownwellProfileGenerationCalls;
