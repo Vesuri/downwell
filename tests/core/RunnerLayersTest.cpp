@@ -11,6 +11,18 @@ auto inactive=[](unsigned){return false;};
 unsigned add(Owner& o,int id,int depth,bool dynamic=true){
     unsigned slot=99;require(o.insertAfterEquals(id,depth,dynamic,slot),"add layer");return slot;
 }
+void lookup(const Owner& o,int id,int depth){
+    unsigned byId=Owner::End,byDepth=Owner::End;
+    o.visitLayers([&](unsigned slot,const auto& layer){
+        if(layer.id==id){byId=slot;return false;}return true;
+    });
+    o.visitLayers([&](unsigned slot,const auto& layer){
+        if(layer.depth>depth)return false;
+        if(layer.depth==depth&&layer.dynamic){byDepth=slot;return false;}return true;
+    });
+    for(unsigned repeat=0;repeat<2;++repeat)
+        require(o.find(id)==byId&&o.findDynamic(depth)==byDepth,"cold/hot lookups match raw source traversal");
+}
 void order(const Owner& o,std::vector<int> expected){
     std::vector<int> ids;unsigned previous=Owner::End;
     require(o.visitLayers([&](unsigned slot,const auto& layer){
@@ -18,8 +30,10 @@ void order(const Owner& o,std::vector<int> expected){
         downwell::RunnerImageValue expected;
         require(expected.assign(downwell::MotionBinary64::fromInteger(layer.depth))&&
             expected.bits==layer.encodedDepth.bits,"prepared layer depth matches original conversion");
+        lookup(o,layer.id,layer.depth);
         previous=slot;ids.push_back(layer.id);return ids.size()<=6;
     }),"bounded layer traversal");require(ids==expected,"layer order");
+    lookup(o,123456,-123456);
 }
 void elements(const Owner& o,unsigned layer,std::vector<unsigned> expected){
     std::vector<unsigned> actual;
@@ -190,4 +204,32 @@ void preparedDepths(){
     },inactive),"failed prepared merge");
     require(failed.get(from)->encodedDepth.bits==0x4b800000u,"failed merge retains prepared depth");
 }
-int main(){movement();merging();failure();exhaustiveMoves();activation();sourceIds();roomNormalization();preparedDepths();std::cout<<"Layer identities, depth movement, ownership and merge publication verified (3840 movement cases, 256 room normalization cases, 10000 prepared depths)\n";}
+void lookupMutations(){
+    Owner owner;
+    lookup(owner,1,0); // Cache misses must not survive insertion.
+    const auto a=add(owner,1,0),b=add(owner,2,10),c=add(owner,3,10,false);
+    lookup(owner,2,10);
+    require(owner.attach(a,0,true,true,inactive),"lookup merge seed");
+    require(owner.move(a,10,true,[&](unsigned,int){
+        lookup(owner,1,0);lookup(owner,2,10);return true;
+    },inactive),"lookup during merge publication");
+    lookup(owner,1,0);lookup(owner,2,10);
+    require(owner.detach(0),"delete dynamic merge destination");
+    require(!owner.get(b)&&owner.get(c),"fixed equal-depth layer survives deletion");
+    lookup(owner,2,10);
+    const auto reused=add(owner,4,10);
+    lookup(owner,4,10);
+    require(owner.findDynamic(10)==reused,"reused slot must not inherit cached identity");
+    auto copy=owner;
+    require(owner.discardUninitialized(),"clear original lookup owner");
+    lookup(owner,4,10);lookup(copy,4,10);
+    require(copy.move(reused,0,false,publish,inactive),"independent copied lookup cache");
+    lookup(copy,4,10);lookup(copy,4,0);
+    Owner failed;const auto from=add(failed,1,0);add(failed,2,10);
+    failed.attach(from,0,true,true,inactive);lookup(failed,1,0);
+    require(!failed.move(from,10,true,[&](unsigned,int){
+        lookup(failed,1,10);return false;
+    },inactive),"failed merge preserves observable partial lookup state");
+    lookup(failed,1,10);
+}
+int main(){movement();merging();failure();exhaustiveMoves();activation();sourceIds();roomNormalization();preparedDepths();lookupMutations();std::cout<<"Layer identities, depth movement, ownership and merge publication verified (3840 movement cases, 256 room normalization cases, 10000 prepared depths)\n";}

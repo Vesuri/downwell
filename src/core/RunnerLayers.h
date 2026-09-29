@@ -22,19 +22,24 @@ public:
     bool succeeded()const{return !failed_;}
     bool discardUninitialized(){
         if(failed_)return false;
+        invalidateLookups();
         for(auto& layer:layers_)layer=Layer{};
         elements_.clear();head_=tail_=End;return true;
     }
     unsigned find(std::int32_t id)const{
-        for(unsigned i=head_;i!=End;i=layers_[i].next)if(layers_[i].id==id)return i;
-        return End;
+        if(idLookup_.valid&&idLookup_.key==id)return idLookup_.slot;
+        unsigned slot=End;
+        for(unsigned i=head_;i!=End;i=layers_[i].next)if(layers_[i].id==id){slot=i;break;}
+        idLookup_.key=id;idLookup_.slot=slot;idLookup_.valid=true;return slot;
     }
     unsigned findDynamic(std::int32_t depth)const{
+        if(depthLookup_.valid&&depthLookup_.key==depth)return depthLookup_.slot;
+        unsigned slot=End;
         for(unsigned i=head_;i!=End;i=layers_[i].next){
             if(layers_[i].depth>depth)break;
-            if(layers_[i].depth==depth&&layers_[i].dynamic)return i;
+            if(layers_[i].depth==depth&&layers_[i].dynamic){slot=i;break;}
         }
-        return End;
+        depthLookup_.key=depth;depthLookup_.slot=slot;depthLookup_.valid=true;return slot;
     }
     // 0x412820 dynamic creation and 0x4143f6 serialized room-layer insertion:
     // after all equal-depth layers. Call in source creation/serialized order.
@@ -100,6 +105,7 @@ public:
         if(failed_||!get(slot))return false;
         auto& layer=layers_[slot];const auto old=layer.depth;
         if(depth==old)return true;
+        invalidateLookups();
         layer.depth=depth;
         layer.encodedDepth.assignInteger(depth);
         if(depth<old){
@@ -145,13 +151,21 @@ public:
         return get(layer)&&elements_.visitBackward(layer,visit);
     }
 private:
+    // Last-query caches accelerate repeated births at one prepared depth.
+    // Invalidate before depth publication (callbacks can query mid-move) and
+    // on every topology change. Slot numbers are private storage, not IDs.
+    struct Lookup {std::int32_t key=0;unsigned slot=End;bool valid=false;};
+    mutable Lookup idLookup_,depthLookup_;
+    void invalidateLookups(){idLookup_.valid=depthLookup_.valid=false;}
     void eraseEmpty(unsigned slot){unlink(slot);layers_[slot]=Layer{};}
     void unlink(unsigned slot){
+        invalidateLookups();
         const auto& l=layers_[slot];
         if(l.previous==End)head_=l.next;else layers_[l.previous].next=l.next;
         if(l.next==End)tail_=l.previous;else layers_[l.next].previous=l.previous;
     }
     void linkAfter(unsigned slot,unsigned previous){
+        invalidateLookups();
         auto& l=layers_[slot];l.previous=previous;l.next=previous==End?head_:layers_[previous].next;
         if(l.next==End)tail_=slot;else layers_[l.next].previous=slot;
         if(previous==End)head_=slot;else layers_[previous].next=slot;

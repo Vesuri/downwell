@@ -71,6 +71,18 @@ each consumer's observable publication and terminal-failure prefix while
 eliminating intermediate calculation/lookup inside callback-free intervals.
 Preparing default command payloads alone does not eliminate this owner work.
 
+Layer ID and dynamic-depth resolution retain one last-query result each,
+including misses. Consecutive attachments at the same depth can reuse the
+lookup, but still execute their own lifetime/element publication. The dynamic
+result is the first matching dynamic layer in source traversal order, never
+an arbitrary equal-depth peer. Layer insertion, unlinking, room discard and
+depth publication invalidate these results. Invalidation precedes a changed
+depth because a merge-publication callback can inspect the partially updated
+owner; subsequent relinking invalidates anything queried by that callback.
+Failed merges keep the same observable partial state as the uncached walk.
+The two key/slot/valid records use no per-instance storage and do not prepare
+future layer identities early.
+
 Generation profiling must include these callbacks, not just `emitObject`:
 ordinary pattern walls/platforms bypass that command-construction bracket.
 `GENERATION_DETAIL=1` separates backend cell, landing and tile work from the
