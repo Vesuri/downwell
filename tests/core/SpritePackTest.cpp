@@ -148,6 +148,28 @@ void testGeneratedPack(const char* path,const char* maskPath,const char* objectP
                 reference.bindingRevision()==materialized.bindingRevision()&&
                 reference.captureRevision()==materialized.captureRevision(),
                 "prepared construction preserves fields, flags, queues and membership revisions");
+            if(flags==8u||flags==10u){
+                Owner positioned;Owner::Properties p;Owner::Real positionedDepth;
+                for(unsigned generation=1;generation<=2;++generation){
+                    require(positioned.attachObjectPrepared({0,generation},int(id),initial,
+                        registered,p,preparedDefaults,families,&positionedDepth),
+                        "prepared birth on fresh and recycled storage");
+                    const auto& s=*positioned.resolve({0,generation});
+                    require(s.x.bits==initial.x.bits&&s.y.bits==initial.y.bits&&
+                        s.previous.x.bits==initial.x.bits&&s.previous.y.bits==initial.y.bits&&
+                        !s.bounds.left.bits&&!s.bounds.top.bits&&!s.bounds.right.bits&&!s.bounds.bottom.bits&&
+                        s.kind==1&&!s.special&&s.flags==materialized.resolve({0,1})->flags&&
+                        p.sprite.spriteId==b.sprite.spriteId&&p.sprite.maskId==b.sprite.maskId&&
+                        p.sprite.scaleX.bits==b.sprite.scaleX.bits&&p.sprite.scaleY.bits==b.sprite.scaleY.bits&&
+                        p.sprite.angle.bits==b.sprite.angle.bits&&p.sprite.imageIndex.bits==b.sprite.imageIndex.bits&&
+                        p.depth.bits==b.depth.bits&&p.timeline.bits==b.timeline.bits&&
+                        p.cachedFrame.bits==b.cachedFrame.bits&&positionedDepth.bits==preparedDepth.bits,
+                        "recycled birth equals fresh prepared state and properties");
+                    Owner::Box changed{{0x3f800000u},{0x40000000u},{0x40400000u},{0x40800000u}};
+                    require(positioned.refresh({0,generation},*families.flags(id),false,&changed,true,false)&&
+                        positioned.retire({0,generation}),"recycled birth discards previous cached bounds");
+                }
+            }
         }
         Owner incomplete;Owner::Properties unchanged;
         require(incomplete.attach({0,1},0,{}),"attach incomplete-graph fixture");
