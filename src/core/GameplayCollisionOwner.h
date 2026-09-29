@@ -14,6 +14,7 @@
 #include "ObjectAlarmMetadata.h"
 #include "Profile.h"
 #include "PreparedUnitSpriteBounds.h"
+#include "PreparedTerrainBirthBounds.h"
 namespace downwell {
 // Resource-backed ownership at the native world's existing publication points.
 // Terrain-only queries retain their explicit resource-family gate. Projectile
@@ -42,6 +43,7 @@ private:
     SpriteCollisionPack sprites_;
     PreparedObjectDefaults<386> objectDefaults_;
     PreparedSpriteGeometry<741> spriteGeometry_;
+    PreparedTerrainBirthBounds terrainBirthBounds_;
     GameplayRoomLayers<View::capacity> layers_;
     ObjectDrawMetadata<386> drawMetadata_;
     ObjectAlarmMetadata<386> alarmMetadata_;
@@ -128,6 +130,10 @@ private:
             constexpr bool roomCoordinates=Kind==View::Kind::player||Kind==View::Kind::terrain||Kind==View::Kind::timeField||Kind==View::Kind::goalField||Kind==View::Kind::exitController;
             constexpr int ox=roomCoordinates?0:240,oy=roomCoordinates?0:176;
             Owner::State state;
+            Owner::Box terrainBounds;bool preparedTerrain=false,terrainPrecise=false;
+            if constexpr(Kind==View::Kind::terrain)
+                preparedTerrain=parent.terrainBirthBounds_.at(r.objectId,r.x,r.y,
+                    state.x,state.y,terrainBounds,terrainPrecise);
             if constexpr(Kind==View::Kind::scriptEffect){
                 if(!r.effect||!r.effect->valid)return parent.check(false);
                 state.x=r.effect->x;state.y=r.effect->y;
@@ -138,7 +144,7 @@ private:
                 state.x=r.x;state.y=r.y;
             }else{
                 if(r.x>0x7fffffff-ox||r.y>0x7fffffff-oy)return parent.check(false);
-                if(!real(r.x+ox,state.x)||!real(r.y+oy,state.y))return parent.check(false);
+                if(!preparedTerrain&&(!real(r.x+ox,state.x)||!real(r.y+oy,state.y)))return parent.check(false);
             }
             if constexpr(Kind!=View::Kind::timeField)if(!r.active)state.flags|=2u;
             auto& p=parent.properties_[h.slot];
@@ -174,7 +180,12 @@ private:
                 if(!real(r.scaleX,p.sprite.scaleX))return parent.check(false);
             }
             if(!parent.check(parent.owner_.publishBirth(h,parent.families_,
-                [&](InstanceHandle live,bool publish){return parent.refresh(live,publish);})))return false;
+                [&](InstanceHandle live,bool publish){
+                    if constexpr(Kind==View::Kind::terrain)if(preparedTerrain)
+                        return parent.owner_.refresh(live,*parent.families_.flags(object(r)),false,
+                            &terrainBounds,terrainPrecise,publish);
+                    return parent.refresh(live,publish);
+                })))return false;
             unsigned sourceId=0;
             if constexpr(Kind==View::Kind::terrain)sourceId=r.sourceInstanceId;
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
@@ -263,6 +274,7 @@ public:
         terrain_(GameplayTerrainInstances::Binding::bindDestruction(terrainBinding_),presentation,collision){
         good_=sprites_.prepare(preparedSprites_,741)&&objectDefaults_.prepare(objects,sprites_)&&
             spriteGeometry_.prepare(sprites_)&&
+            terrainBirthBounds_.prepare(objectDefaults_,sprites_)&&
             families_.bindInstanceFlags(objects)&&drawMetadata_.bind(objects)&&alarmMetadata_.bind(objects);
         if(good_)for(unsigned selector=0;selector<2;++selector){
             terrainFamilies_[selector]=true;

@@ -2418,6 +2418,13 @@ build/replay-frame-trace-test: tests/core/ReplayFrameTraceTest.cpp src/core/Repl
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
 
 .PHONY: test-generation-timing
+test: test-prepared-terrain-birth
+.PHONY: test-prepared-terrain-birth
+test-prepared-terrain-birth: build/prepared-terrain-birth-test
+	./build/prepared-terrain-birth-test
+build/prepared-terrain-birth-test: tests/core/PreparedTerrainBirthBoundsTest.cpp src/core/PreparedTerrainBirthBounds.h src/core/ObjectPack.cpp
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/PreparedTerrainBirthBoundsTest.cpp src/core/ObjectPack.cpp
 test: test-generation-timing
 test-generation-timing: build/generation-timing-test build/generation-timing-disabled-test build/generation-timing-birth-test build/generation-timing-layer-test
 	./build/generation-timing-test
