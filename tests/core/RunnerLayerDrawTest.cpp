@@ -2,6 +2,7 @@
 #include "core/RunnerLayers.h"
 #include "core/RunnerRoomMembership.h"
 #include <cstdlib>
+#include <algorithm>
 #include <iostream>
 #include <vector>
 namespace {
@@ -112,6 +113,29 @@ void drawBirths(){
     }
 }
 void cleanupProjection(){
+    {
+        RunnerRoomMembership<64> room;
+        RunnerImageValue keys[64];std::vector<unsigned> expected,actual;
+        unsigned seed=0x98315u;
+        for(unsigned trial=0;trial<8192;++trial){
+            seed=seed*1664525u+1013904223u;const unsigned slot=(seed>>16)%64;
+            auto old=std::find(expected.begin(),expected.end(),slot);
+            if(old!=expected.end())expected.erase(old);
+            if(trial%13==0){room.remove(slot);}
+            else{
+                // Repeated interior depths, signed-zero ties, and arbitrary
+                // rebinding invalidate stale insertion positions naturally.
+                const unsigned bits[]={0,0x80000000u,0x3f800000u,0xbf800000u,0x40000000u};
+                keys[slot].bits=bits[(trial/7)%5];
+                auto pos=expected.begin();
+                while(pos!=expected.end()&&!RunnerSpatialSplit::less(keys[slot],keys[*pos]))++pos;
+                expected.insert(pos,slot);require(room.bind(slot,keys[slot]),"room insertion rebind");
+            }
+            actual.clear();require(room.visitAnimationChecked([&](unsigned s){actual.push_back(s);return true;})&&
+                actual==expected,"room insertion equals independent stable upper bound after reuse");
+            if(trial%127==0){room.clear();expected.clear();}
+        }
+    }
     {
         // Binary32 upper-bound insertion: signed zeros tie; fractional and
         // extreme normal values must preserve the source's tail-scan order.
