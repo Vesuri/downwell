@@ -309,16 +309,25 @@ Immutable Chip-resident artwork uses the shared framework's masked Bitmap
 copies for both color planes and masked pattern writes for alpha. Shade clears
 alpha without reconstructing color. Clipping changes source/destination
 rectangles, not artwork. Guard words accommodate shifted fetch spans. Queued
-operations preserve producer order; CPU fallback, overlap queries and final
-publication drain the queue before touching storage. Unsupported masks use the
+operations preserve producer order; CPU fallback and overlap queries
+drain the queue before touching storage. Unsupported masks use the
 same scalar stamping into that storage, not a second displayed representation.
 
 DMA stamps conservatively expand row bounds to their clipped rectangles.
 Clearing uses the prior vertical extent and includes guard words; alpha still
 decides visibility, overlap and publication. The controller painter boundary,
 ring addressing and per-display restoration debt remain unchanged. Overlap
-testing and final publication are still CPU operations, not blitter-zero tests
-or a DMA transfer to the display ring.
+testing is still a CPU operation, not a blitter-zero test.
+
+Final publication uses the same queued Bitmap masked copies, with the alpha
+plane shared by the two color planes. Producer metadata supplies conservative
+rectangles: contiguous occupied row bands share their horizontal union, while
+gaps remain undamaged. Each rectangle splits at the circular display wrap and
+marks only that display buffer's restoration debt. No CPU planar scan or
+intermediate asset conversion is needed. Alpha, including shade holes and
+opaque black, controls the final writes. The CPU word publisher remains the
+fallback for surfaces not bound to the native workspace and the verification
+oracle. This changes neither the controller's ordering nor the terrain backing.
 
 The native BOB verifier mirrors every requested stamp into an independent
 ordinary-RAM scalar surface and compares final alpha and covered color bits.
@@ -326,6 +335,13 @@ Its startup fixtures include all shifts, viewport edges, overlapping gem/smoke
 art and shade holes, followed by live-frame comparisons. They establish
 backend equivalence for those paths, not original Windows shader fidelity or
 the complete frame budget.
+
+The native verifier also snapshots the display immediately before effect
+publication, applies the old CPU publisher to that snapshot, then compares the
+entire two-plane ring after DMA drains. The oracle storage exists only in the
+verification build. This detects changes outside the effect rectangles as well
+as mismatched effect pixels; it does not prove every possible dense encounter
+or eliminate the need for separate timing tapes.
 
 `EffectMaskAssets` borrows all nine sprite-84 smoke frames, sprite-117 shade,
 and all four frames of each currency sprite (133/134) directly from the immutable

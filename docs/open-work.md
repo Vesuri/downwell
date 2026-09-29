@@ -260,9 +260,8 @@ changes, then check native timing with the trace and FPS tapes.
 
 ### C. Render with the blitter and precomputation
 
-- Currency/smoke: masked-replace and shade-clear blits into the effect planes
-  in painter order, blitter zero-flag tests for final-alpha overlap, and
-  rectangle damage. Profile overlap-aware sprite assignment on dense gem/smoke
+- Currency/smoke: use blitter zero-flag tests for final-alpha overlap.
+  Profile overlap-aware sprite assignment on dense gem/smoke
   scenes. Verify the mixed DMA/planar frame against original captures,
   preserving controller priority.
 - Actors: blitter bobs or hardware sprites instead of CPU planar stamping.

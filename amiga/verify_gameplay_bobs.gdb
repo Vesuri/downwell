@@ -4,7 +4,7 @@ target remote 127.0.0.1:2345
 break downwellEffectSurfaceFailed
 commands
     silent
-    printf "DMA effect pixel mismatch: stamps=%u checks=%u\n", gDownwellEffectDmaStamps, gDownwellEffectDmaChecks
+    printf "DMA effect pixel mismatch: stamps=%u checks=%u publication=%u/%u\n", gDownwellEffectDmaStamps, gDownwellEffectDmaChecks, gDownwellEffectPublishChecks, gDownwellEffectPublishFailures
     quit 1
 end
 break downwellStartupFailed
@@ -34,6 +34,12 @@ if gDownwellEffectDmaStamps < 1 || gDownwellEffectDmaChecks < 129 || gDownwellEf
     quit 1
 end
 printf "DMA effects verified: %u pixel comparisons, %u stamps\n", gDownwellEffectDmaChecks, gDownwellEffectDmaStamps
+# The actor-ready breakpoint precedes effect publication on frame 100.
+if gDownwellEffectPublishChecks < 99 || gDownwellEffectPublishFailures != 0
+    printf "DMA effect publication failed: checks=%u failures=%u\n", gDownwellEffectPublishChecks, gDownwellEffectPublishFailures
+    quit 1
+end
+printf "DMA effect publication verified: %u full-ring comparisons\n", gDownwellEffectPublishChecks
 printf "DOWNWELL_GAMEPLAY_BOBS_READY\n"
 shell touch .run/gdb-ready.marker
 detach

@@ -2,11 +2,14 @@
 #include <exec/types.h>
 #include "framework/Bitmap.h"
 #include "framework/AmigaHardware.h"
+#include "AmigaGameplayRows.h"
 inline void* operator new(__SIZE_TYPE__,void* address)noexcept{return address;}
 extern "C" { volatile unsigned gDownwellEffectDmaStamps,gDownwellEffectDmaChecks,gDownwellEffectDmaFailures; }
 extern "C" __attribute__((noinline)) void downwellEffectSurfaceFailed(){__asm__ volatile("":::"memory");}
 namespace {
 using Surface=downwell::PaletteEffectSurface<>;
+const Surface* boundSurface=nullptr;
+UBYTE* boundStorage=nullptr;
 #ifdef DOWNWELL_BOB_VERIFY
 alignas(Surface) UBYTE referenceStorage[sizeof(Surface)];
 Surface* reference=nullptr;
@@ -62,9 +65,28 @@ bool AmigaEffectSurface::bind(downwell::PaletteEffectSurface<>& surface,void* st
 #ifdef DOWNWELL_BOB_VERIFY
     reference=new(referenceStorage) Surface;
 #endif
-    return surface.bindStorage(reinterpret_cast<UWORD*>(data+2),
+    if(!surface.bindStorage(reinterpret_cast<UWORD*>(data+2),
         reinterpret_cast<UWORD*>(data+planeBytes+2),reinterpret_cast<UWORD*>(data+planeBytes*2+2),
-        rowBytes/2,{storage,stamp,clear,wait});
+        rowBytes/2,{storage,stamp,clear,wait}))return false;
+    boundSurface=&surface;boundStorage=data;return true;
+}
+bool AmigaEffectSurface::publish(const Surface& surface,Bitmap& display,
+    unsigned buffer,unsigned origin,AmigaGameplayRows& rows){
+    if(&surface!=boundSurface)return false;
+    Bitmap mask(boundStorage,192,284,1,false,false,192);
+    Bitmap colors(boundStorage+planeBytes,192,284,2,false,false,192);
+    surface.visitRectangles([&](unsigned x,unsigned y,unsigned width,unsigned height){
+        rows.damage(origin,y,height,static_cast<UBYTE>(1u<<buffer));
+        unsigned destination=(origin+y)%downwellGameRingHeight;
+        while(height){
+            const unsigned count=height<downwellGameRingHeight-destination?
+                height:downwellGameRingHeight-destination;
+            display.copyWithMask(colors,mask,downwellPlayfieldX+x,destination,
+                16+x,y,16+x,y,width,count);
+            height-=count;y+=count;destination=0;
+        }
+    });
+    return true;
 }
 bool AmigaEffectSurface::verify(const downwell::PaletteEffectSurface<>& surface){
 #ifdef DOWNWELL_BOB_VERIFY

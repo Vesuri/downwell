@@ -3,6 +3,14 @@
 #include "AmigaProfile.h"
 #include "framework/Bitmap.h"
 #include "framework/AmigaHardware.h"
+#ifdef DOWNWELL_PLATFORM_AMIGA
+#include "AmigaEffectSurface.h"
+#endif
+#ifdef DOWNWELL_BOB_VERIFY
+#include <cstring>
+extern "C" { volatile unsigned gDownwellEffectPublishChecks,gDownwellEffectPublishFailures; }
+extern "C" void downwellEffectSurfaceFailed();
+#endif
 
 namespace {
 // The surface is already clipped to 160x284 and starts at a fixed screen X.
@@ -76,6 +84,31 @@ void AmigaGameplayEffects::draw(AmigaRenderer renderer,Bitmap& display,unsigned 
 }
 void AmigaGameplayEffects::draw(AmigaRenderer renderer,Bitmap& display,unsigned buffer,
     unsigned origin,const downwell::PaletteEffectSurface<>& surface,AmigaGameplayRows& rows){
+#ifdef DOWNWELL_PLATFORM_AMIGA
+    DW_PROFILE_SCOPE(profileEffectPublish);
+#ifdef DOWNWELL_BOB_VERIFY
+    alignas(UWORD) static UBYTE expected[downwellGameRingBytes];
+    AmigaHardware::blitterDrain();
+    std::memcpy(expected,display.data,sizeof(expected));
+    Bitmap oracle(expected,downwellDmaWidth,downwellGameRingHeight,2,false,false,downwellDmaWidth);
+    AmigaGameplayRows oracleRows;
+    publish(renderer,oracle,buffer,origin,surface,oracleRows,
+        [](UBYTE* row,unsigned x,std::uint16_t alpha,std::uint16_t low,std::uint16_t high){
+            publishWord(row,x,alpha,low,high);
+        });
+#endif
+    if(AmigaEffectSurface::publish(surface,display,buffer,origin,rows)){
+#ifdef DOWNWELL_BOB_VERIFY
+        AmigaHardware::blitterDrain();++gDownwellEffectPublishChecks;
+        const auto* actual=static_cast<const UWORD*>(display.data);
+        const auto* wanted=reinterpret_cast<const UWORD*>(expected);
+        for(unsigned i=0;i<sizeof(expected)/sizeof(UWORD);++i)if(actual[i]!=wanted[i]){
+            ++gDownwellEffectPublishFailures;downwellEffectSurfaceFailed();break;
+        }
+#endif
+        return;
+    }
+#endif
     publish(renderer,display,buffer,origin,surface,rows,
         [](UBYTE* row,unsigned x,std::uint16_t alpha,std::uint16_t low,std::uint16_t high){
             publishWord(row,x,alpha,low,high);

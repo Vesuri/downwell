@@ -49,6 +49,15 @@ int main(int argc,char**argv){
     std::array<int,160*284> expected{},actual{};
     auto clear=[&](){surface.clear();expected.fill(-1);};
     auto verify=[&](){
+        std::array<bool,160*284> covered{};
+        unsigned previousEnd=0;
+        surface.visitRectangles([&](unsigned x,unsigned y,unsigned width,unsigned height){
+            assert(width&&height&&x+width<=160&&y+height<=284&&y>=previousEnd);
+            assert(!(x%16)&&!(width%16));previousEnd=y+height;
+            for(unsigned row=y;row<y+height;++row)for(unsigned col=x;col<x+width;++col)
+                covered[row*160+col]=true;
+        });
+        for(unsigned i=0;i<expected.size();++i)assert(expected[i]<0||covered[i]);
         actual.fill(-1);
         surface.visit([&](unsigned x,unsigned y,std::uint16_t mask,std::uint16_t low,std::uint16_t high){
             assert(!(low&~mask) && !(high&~mask));

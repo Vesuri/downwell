@@ -75,6 +75,24 @@ public:
             if(a)emit(x*16,y,a,std::uint16_t(low_[at]&a),std::uint16_t(high_[at]&a));
         }
     }
+    // Conservative rectangles over producer metadata, without reading planar
+    // storage. A queued backend can consume these after its preceding stamps.
+    // Subtraction may leave transparent rows/words inside a rectangle; alpha
+    // remains authoritative. Disjoint row bands never damage their gaps.
+    template<class Emit> void visitRectangles(Emit emit)const{
+        unsigned y=firstRow_;
+        while(y<lastRow_){
+            if(first_[y]>=last_[y]){++y;continue;}
+            const unsigned top=y;
+            unsigned left=first_[y],right=last_[y];
+            do{
+                if(first_[y]<left)left=first_[y];
+                if(last_[y]>right)right=last_[y];
+                ++y;
+            }while(y<lastRow_&&first_[y]<last_[y]);
+            emit(left*16,top,(right-left)*16,y-top);
+        }
+    }
     bool samePixels(const PaletteEffectSurface& other)const{
         synchronize();other.synchronize();
         for(unsigned y=0;y<Height;++y)for(unsigned x=0;x<words;++x){
