@@ -178,6 +178,51 @@ public:
     bool attachObjectPrepared(InstanceHandle h,int object,const State& state,bool registered,
         Properties& properties,const PreparedObjectDefaults<Resources>& defaults,
         const Graph& graph,Real* creationDepth=nullptr){
+        if constexpr(RunRegistration){
+            const auto* definition=defaults.get(object);
+            const auto* flags=graph.flags(unsigned(object));
+            // No callbacks occur between attach and application of immutable
+            // defaults. Unsupported inputs retain the exact original failure
+            // prefix, including attachment before resource validation.
+            if(registered&&definition&&graph.valid()&&flags&&
+                (*flags&0x87u)==definition->propertyFlags&&
+                (state.flags&~2u)==8u&&!state.special&&
+                (definition->spriteId==-1||definition->frames<=65535u)&&
+                valid()&&h.slot<Capacity&&h.generation&&object>=0&&
+                entries_[h.slot].object<0&&h.generation>entries_[h.slot].generation&&
+                Math::valid(state.x)&&Math::valid(state.y)){
+                auto& e=entries_[h.slot];
+                // Store semantic fields directly; do not copy padding or the
+                // caller's previous-position fields which attach overwrites.
+                e.state.x=state.x;e.state.y=state.y;
+                e.state.bounds.left=state.bounds.left;e.state.bounds.top=state.bounds.top;
+                e.state.bounds.right=state.bounds.right;e.state.bounds.bottom=state.bounds.bottom;
+                e.state.flags=state.flags;e.state.kind=state.kind;e.state.special=false;
+                e.state.previous={state.x,state.y};e.object=object;e.generation=h.generation;
+                if(!membership_.bind(h.slot,object,h.generation)){
+                    changedBinding(h.slot);return false;
+                }
+                // The old attach/rebind pair advances both revisions twice.
+                // Nothing can observe their intermediate values here.
+                changedFreshBinding(h.slot);membership_.repeatFreshTailBinding();
+                properties.sprite.spriteId=definition->spriteId;
+                properties.sprite.maskId=definition->maskId;
+                properties.sprite.scaleX.bits=properties.sprite.scaleY.bits=0x3f800000u;
+                properties.sprite.angle.bits=properties.sprite.imageIndex.bits=0;
+                properties.depth=definition->depth;properties.timeline.bits=0;
+                properties.cachedFrame.bits=0xbf800000u;
+                e.state.flags=definition->initialFlags|(state.flags&2u);
+                markSpatialChange(h.slot,*flags);
+                if(creationDepth)*creationDepth=definition->creationDepth;
+                return true;
+            }
+        }
+        return attachObjectPreparedReference(h,object,state,registered,properties,defaults,graph,creationDepth);
+    }
+    template<unsigned Resources,class Graph>
+    bool attachObjectPreparedReference(InstanceHandle h,int object,const State& state,bool registered,
+        Properties& properties,const PreparedObjectDefaults<Resources>& defaults,
+        const Graph& graph,Real* creationDepth=nullptr){
         {
             DW_PROFILE_SCOPE(profileBirthRegistration);
             if(!attach(h,object,state))return false;
@@ -912,6 +957,12 @@ private:
     void changedBinding(unsigned slot=Capacity){
         if(bindingRevision_!=0xffffffffu)++bindingRevision_;
         changedCapture(slot);
+    }
+    void changedFreshBinding(unsigned slot){
+        bindingRevision_=bindingRevision_>=0xfffffffeu?0xffffffffu:bindingRevision_+2u;
+        captureRevision_=captureRevision_>=0xfffffffeu?0xffffffffu:captureRevision_+2u;
+        if(captureDirty_&&((slot>=captureFirst_&&slot<captureLast_)||
+            (slot>=captureSecond_&&slot<captureEnd_))) *captureDirty_=true;
     }
     bool* snapshotDirty_=nullptr;
     unsigned snapshotFirst_=0,snapshotLast_=0;

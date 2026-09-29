@@ -103,6 +103,22 @@ and invalid-resource failure prefixes retain the ordinary path. The scalar
 whole-owner configuration also retains that path for comparison. This does not
 merge separate births, advance Create, or defer an observable mutation.
 
+The admitted ordinary path also consolidates collision-state/property
+initialization inside that interval. It copies semantic state fields once,
+overrides previous position with the constructor position, and installs final
+resource defaults without first clearing properties that are immediately
+overwritten. Both logical owner revision increments are combined with
+saturation, and capture observers are notified once. The membership revision
+still records the complete append/rebind sequence.
+
+Admission reads only immutable defaults and current graph flags. Unsupported
+states, invalid resources, unregistered construction and invalid handles use
+`attachObjectPreparedReference`, preserving failure prefixes such as an
+attached lifetime with reset properties after resource-validation failure.
+Registration failure retains the first revision increment and incoming state,
+without publishing defaults. No new cache or pool is introduced; this does not
+remove the separate terrain, room, layer or bounds records.
+
 ### Derived static layer lifetime state
 
 The selected gameplay layer owner can leave an unnumbered, nonprojected static

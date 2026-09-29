@@ -134,6 +134,12 @@ void testGeneratedPack(const char* path,const char* maskPath,const char* objectP
         for(unsigned flags:{8u,10u,0u,0x200078u})for(bool registered:{false,true}){
             Owner reference,materialized;Owner::Properties a,b;Owner::State initial;initial.flags=flags;
             initial.x={0x43800000u};initial.y={0x44000000u};
+            initial.bounds={{0x3f800000u},{0x40000000u},{0x40400000u},{0x40800000u}};
+            initial.previous={{0x41800000u},{0x42000000u}};initial.kind=3;
+            bool referenceDirty=false,materializedDirty=false;
+            require(reference.watchCaptureRanges(0,1,1,2,referenceDirty)&&
+                materialized.watchCaptureRanges(0,1,1,2,materializedDirty),"watch newborn capture changes");
+            referenceDirty=materializedDirty=false;
             std::int32_t depth;Owner::Real preparedDepth,expectedDepth;
             require(reference.attach({0,1},int(id),initial)&&
                 reference.bindObjectFromPacks({0,1},int(id),registered,a,objects,compact,families,false,&depth)&&
@@ -148,7 +154,7 @@ void testGeneratedPack(const char* path,const char* maskPath,const char* objectP
                 reference.pendingSpatial()==materialized.pendingSpatial()&&
                 reference.pendingCollision()==materialized.pendingCollision()&&
                 reference.bindingRevision()==materialized.bindingRevision()&&
-                reference.captureRevision()==materialized.captureRevision(),
+                reference.captureRevision()==materialized.captureRevision()&&referenceDirty&&materializedDirty,
                 "prepared construction preserves fields, flags, queues and membership revisions");
             if(flags==8u||flags==10u){
                 Owner positioned;Owner::Properties p;Owner::Real positionedDepth;
@@ -159,8 +165,9 @@ void testGeneratedPack(const char* path,const char* maskPath,const char* objectP
                     const auto& s=*positioned.resolve({0,generation});
                     require(s.x.bits==initial.x.bits&&s.y.bits==initial.y.bits&&
                         s.previous.x.bits==initial.x.bits&&s.previous.y.bits==initial.y.bits&&
-                        !s.bounds.left.bits&&!s.bounds.top.bits&&!s.bounds.right.bits&&!s.bounds.bottom.bits&&
-                        s.kind==1&&!s.special&&s.flags==materialized.resolve({0,1})->flags&&
+                        s.bounds.left.bits==initial.bounds.left.bits&&s.bounds.top.bits==initial.bounds.top.bits&&
+                        s.bounds.right.bits==initial.bounds.right.bits&&s.bounds.bottom.bits==initial.bounds.bottom.bits&&
+                        s.kind==initial.kind&&!s.special&&s.flags==materialized.resolve({0,1})->flags&&
                         p.sprite.spriteId==b.sprite.spriteId&&p.sprite.maskId==b.sprite.maskId&&
                         p.sprite.scaleX.bits==b.sprite.scaleX.bits&&p.sprite.scaleY.bits==b.sprite.scaleY.bits&&
                         p.sprite.angle.bits==b.sprite.angle.bits&&p.sprite.imageIndex.bits==b.sprite.imageIndex.bits&&
