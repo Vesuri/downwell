@@ -7,6 +7,7 @@ dump binary memory .run/style-reveal-mask.bin gDownwellStyleMask gDownwellStyleM
 # At this gate the gradient starts at display row 128: source row 284.
 # Verify both complete immutable masks, including the hidden guard word.
 set $masks = gDownwellStyleMask - 156*22
+dump binary memory .run/style-border.bin $masks-2*300*22 $masks
 dump binary memory .run/style-all-masks.bin $masks $masks+2*648*22
 dump binary memory .run/style-reveal-copper.bin gDownwellStyleCopper gDownwellStyleCopper+400
 printf "DOWNWELL_STYLE_REVEAL_READY\n"

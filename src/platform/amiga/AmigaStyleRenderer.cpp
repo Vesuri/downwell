@@ -119,12 +119,27 @@ bool amigaBuildStyleBorder(const UBYTE* pack, const UBYTE* packEnd,
         new (styleArtStorage + i * sizeof(PreparedStyleArt)) PreparedStyleArt(pack, record);
     }
     Bitmap bitmap(border, amigaStyleWidth, amigaStyleBorderHeight, 2, false);
-    bitmap.clear();
-    for (int row = 0; row <= amigaStyleBorderHeight / 16 + 1; ++row) {
+    const UBYTE* left = find(pack,packEnd,51,13);
+    const UBYTE* right = find(pack,packEnd,51,7);
+    const bool repeat = left && right && word(left+8)==16 && word(right+8)==16 &&
+        word(left+10)==16 && word(right+10)==16 && word(left+6)==8 && word(right+6)==8;
+    bitmap.clear(0,0,amigaStyleWidth,repeat?16:amigaStyleBorderHeight);
+    // The source anchors split a tile at row zero. Two anchor rows establish a
+    // complete 16-row period; all remaining rows are exact planar copies.
+    // Keep the general path if replacement resources change that geometry.
+    const int last = repeat ? 1 : amigaStyleBorderHeight / 16 + 1;
+    for (int row = 0; row <= last; ++row) {
         if (!draw(bitmap, pack, packEnd, 51, 13, 0, row * 16) ||
             !draw(bitmap, pack, packEnd, 51, 7,
                   amigaStyleVisibleWidth, row * 16))
             return false;
+    }
+    if(repeat)for(unsigned filled=16;filled<amigaStyleBorderHeight;){
+        const unsigned remaining=amigaStyleBorderHeight-filled;
+        const unsigned rows=filled<remaining?filled:remaining;
+        // Disjoint source/destination ranges; queued blits preserve order.
+        bitmap.copy(bitmap,0,filled,0,0,amigaStyleWidth,rows);
+        filled+=rows;
     }
     AmigaHardware::blitterDrain();
     // Immutable PF2 opacity masks: transparent/gradient/solid for entry,

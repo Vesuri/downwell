@@ -50,6 +50,13 @@ preparation. Gameplay reuses the storage, so other entries rebuild it.
 Both content canvases and both borrowed Copper slots are invalidated even when
 the border is retained. Cache retention never implies display-buffer retention.
 
+For the original 16-by-16 border tiles with vertical origin 8, compose two
+anchor rows to establish the first complete 16-row period, then extend it by
+disjoint planar copies. Clear only the seed strip: copies write every remaining
+pixel, including guard words. Changed tile geometry takes the general drawing
+path. The native capture verifier compares all 300 border rows against original
+texture pixels, independently of the repeated-strip implementation.
+
 The mask edge comes from offline planar art. Staging fills the two constant
 tails and copies the edge through `Bitmap`, with a separate zero guard word
 for gradient rows. The regions do not overlap; there is no clear-then-redraw

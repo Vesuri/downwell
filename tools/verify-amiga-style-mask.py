@@ -51,6 +51,24 @@ def main():
         print("Selected-style exit DMA mask matches source opacity and position")
     if args.capture:
         run = ROOT / "amiga/.run"
+        border = (run / "style-border.bin").read_bytes()
+        assert len(border) == 2 * 300 * 22
+        sprite = resources["sprites"][51]
+        tiles = [canvas_for(sprite, sprite["frames"][frame],
+                            resources["texturePageItems"], pages) for frame in (13, 7)]
+        for y in range(300):
+            for x in range(176):
+                expected = 0
+                if x < 8 or 152 <= x < 160:
+                    rgba = tiles[0 if x < 8 else 1].getpixel(
+                        (x + 8 if x < 8 else x - 152, (y + 8) % 16))
+                    if rgba[3]:
+                        expected = {(255, 255, 255): 1, (255, 0, 0): 2, (0, 0, 0): 3}[rgba[:3]]
+                bit = 0x80 >> (x & 7)
+                index = y * 22 + x // 8
+                actual = int(bool(border[index] & bit)) + 2 * int(bool(border[index + 300 * 22] & bit))
+                assert actual == expected, ("border", x, y, actual, expected)
+        print("Complete native border matches original tiles, clipped anchors and guard words")
         masks = (run / "style-all-masks.bin").read_bytes()
         assert len(masks) == 2 * 648 * 22
         for exit in range(2):
