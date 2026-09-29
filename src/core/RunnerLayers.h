@@ -140,6 +140,7 @@ public:
     }
     unsigned firstDrawElement(unsigned layer)const{return elements_.first(layer);}
     unsigned nextDrawElement(unsigned element)const{return elements_.successor(element);}
+    unsigned previousDrawElement(unsigned element)const{return elements_.predecessor(element);}
     template<class Visit> bool visitElementsBackward(unsigned layer,Visit visit)const{
         return get(layer)&&elements_.visitBackward(layer,visit);
     }

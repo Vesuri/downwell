@@ -101,6 +101,7 @@ bool nativeCollisionQueries(downwell::GameplayCollisionOwner& owner,
 #include "core/ProjectilePublication.h"
 #include "core/WallPresentation.h"
 #include "platform/amiga/AmigaWallDamage.h"
+#include <algorithm>
 #include <fstream>
 #include <iterator>
 #include <memory>
@@ -1717,6 +1718,54 @@ int main(){
         inactive=true;assert(cached->activation({0,2},false)&&oracle->activation({0,2},false));compare();
         for(auto h:{InstanceHandle{0,2},InstanceHandle{1,1},InstanceHandle{2,1}})
             assert(cached->retire(h)&&oracle->retire(h));
+        assert(cached->prepare()&&oracle->prepare());compare();
+    }
+    for(unsigned removed=0;removed<8;++removed)for(unsigned mode=0;mode<4;++mode){
+        // Interior retirement repairs only the preceding skipped run. Cover
+        // actor/scenery/head/tail removal, inactive termination, cold/warm
+        // projections and reuse of the freed element by a different kind.
+        auto cached=std::make_unique<GameplayRoomLayers<8>>(&rooms);
+        auto oracle=std::make_unique<GameplayRoomLayers<8>>(&rooms);
+        assert(cached->prepare()&&oracle->prepare());
+        RunnerImageValue depth;assert(depth.assignInteger(-321));
+        bool scenery[8]={false,false,true,true,false,true,true,false};
+        bool live[8]={true,true,true,true,true,true,true,true};
+        bool inactive[8]={false,false,bool(mode&2),false,false,false,false,false};
+        unsigned generation[8]={1,1,1,1,1,1,1,1};
+        auto birth=[&](unsigned slot){
+            assert(cached->birth({slot,generation[slot]},0,depth,inactive[slot],!scenery[slot]));
+            assert(oracle->birth({slot,generation[slot]},0,depth,inactive[slot],true));
+        };
+        std::vector<unsigned> rawOrder;
+        for(unsigned slot=0;slot<8;++slot){birth(slot);rawOrder.insert(rawOrder.begin(),slot);}
+        auto compare=[&](){
+            std::vector<unsigned> expected;
+            for(auto slot:rawOrder)if(live[slot]){
+                if(inactive[slot])break;
+                if(!scenery[slot])expected.push_back(slot);
+            }
+            for(unsigned side=0;side<2;++side){
+                std::vector<unsigned> actual;
+                assert((side?oracle:cached)->visit([&](InstanceHandle h,RunnerLayerDraw::Element& out){
+                    assert(live[h.slot]&&h.generation==generation[h.slot]);
+                    assert(side||!scenery[h.slot]);
+                    out.instance=true;out.flags=0x10|(inactive[h.slot]?2:0);
+                    out.object=!scenery[h.slot];out.drawEvent=true;return true;
+                },[&](InstanceHandle h,int){actual.push_back(h.slot);return true;}));
+                assert(actual==expected);
+            }
+        };
+        if(mode&1)compare();
+        assert(cached->retire({removed,1})&&oracle->retire({removed,1}));live[removed]=false;
+        compare();
+        rawOrder.erase(std::find(rawOrder.begin(),rawOrder.end(),removed));
+        scenery[removed]=!scenery[removed];inactive[removed]=false;
+        generation[removed]=2;live[removed]=true;birth(removed);
+        rawOrder.insert(rawOrder.begin(),removed);compare();
+        for(auto slot:rawOrder){
+            assert(cached->retire({slot,generation[slot]})&&oracle->retire({slot,generation[slot]}));
+            live[slot]=false;compare();
+        }
         assert(cached->prepare()&&oracle->prepare());compare();
     }
     for(unsigned mode=0;mode<5;++mode){

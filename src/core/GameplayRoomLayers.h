@@ -115,13 +115,23 @@ public:
         if(!valid()||!live_)return fail();
         const unsigned element=registry_.find(h);
         const unsigned layer=layers_.elementOwner(element);
-        const bool head=layer!=Layers::End&&layers_.firstDrawElement(layer)==element;
+        const unsigned previous=layers_.previousDrawElement(element);
+        const unsigned next=layers_.nextDrawElement(element);
+        const bool skipped=element!=Registry::End&&retainedDraw_[element]==1;
         if(element==Registry::End||layer==Layers::End||!lifetimes_.retire(h))return fail();
         retainedDraw_[element]=0;
         projected_[h.slot>>3]&=~(1u<<(h.slot&7));
-        // No surviving forward skip link can point back to the removed head.
-        // Invalidate a disposed dynamic layer before its slot can be reused.
-        if(!head||!layers_.get(layer))projectionValid_[layer]=false;
+        // Removing skipped scenery changes no cached target. Removing a
+        // relevant element changes only the preceding contiguous scenery run;
+        // repair that run instead of invalidating every retained wall in the
+        // layer. A cold projection remains cold. Disposed dynamic slots must
+        // be invalidated before reuse, even when this was the last element.
+        if(!layers_.get(layer))projectionValid_[layer]=false;
+        else if(projectionValid_[layer]&&!skipped){
+            const auto target=std::uint16_t(next==Registry::End?Registry::End:nextRelevant_[next]);
+            for(unsigned e=previous;e!=Registry::End&&retainedDraw_[e]==1;e=layers_.previousDrawElement(e))
+                nextRelevant_[e]=target;
+        }
         --live_;return true;
     }
     bool activation(InstanceHandle h,bool active){

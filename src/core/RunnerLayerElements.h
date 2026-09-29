@@ -17,6 +17,7 @@ public:
     unsigned count(unsigned layer)const{return layer<Layers?layers_[layer].count:0;}
     unsigned first(unsigned layer)const{return layer<Layers?layers_[layer].head:End;}
     unsigned successor(unsigned element)const{return element<Elements?links_[element].next:End;}
+    unsigned predecessor(unsigned element)const{return element<Elements?links_[element].previous:End;}
     // 0x4128d0: explicit append wins; otherwise type-2 elements enter at
     // head, other types follow only the contiguous active-instance prefix.
     // activeInstance must reject non-type-2 and null instance references.
