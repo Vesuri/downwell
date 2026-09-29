@@ -949,9 +949,57 @@ unsigned amigaRendererHardwareSpritePartCount(
     return (unsigned)(right - left + 16) / 16u;
 }
 
-ULONG amigaRendererChipPackBytes(const UBYTE* pack, const UBYTE* packEnd) {
-    const UBYTE* first = findAsset(pack, packEnd, 63000, 0);
-    return first ? readLong(first + 16) : (ULONG)(packEnd - pack);
+/* Gameplay part streams stay in ordinary RAM; garden DMA records (flag 4,
+   no part count) remain resident. Compact only their unused directory entries,
+   never the bytes/relative layout of the retained planar and garden payload. */
+static int chipPackLayout(const UBYTE* pack,const UBYTE* end,ULONG* count,
+                         ULONG* retained,ULONG* payload,ULONG* cutoff) {
+    ULONG i,size,previous=0;
+    if(!pack||!end||end-pack<20)return 0;
+    size=(ULONG)(end-pack);
+    if(readLong(pack)!=0x44574150UL||readWord(pack+4)!=2||readWord(pack+6)!=20)return 0;
+    *count=readLong(pack+8);
+    if(*count>(size-20)/24)return 0;
+    *payload=20+*count*24;*cutoff=size;*retained=0;
+    for(i=0;i<*count;++i){
+        const UBYTE* r=pack+20+i*24;
+        const ULONG key=readLong(r),offset=readLong(r+16),length=readLong(r+20);
+        const UWORD flags=readWord(r+14);
+        if((i&&key<=previous)||offset<*payload||(offset&1)||offset>size||length>size-offset)return 0;
+        previous=key;
+        if((flags&4)&&(flags>>8)){if(offset<*cutoff)*cutoff=offset;}
+        else ++*retained;
+    }
+    for(i=0;i<*count;++i){
+        const UBYTE* r=pack+20+i*24;const UWORD flags=readWord(r+14);
+        if(!((flags&4)&&(flags>>8))&&
+           (readLong(r+16)>*cutoff||readLong(r+20)>*cutoff-readLong(r+16)))return 0;
+    }
+    return 1;
+}
+ULONG amigaRendererChipPackBytes(const UBYTE* pack, const UBYTE* end) {
+    ULONG count,retained,payload,cutoff;
+    return chipPackLayout(pack,end,&count,&retained,&payload,&cutoff)
+        ?20+retained*24+cutoff-payload:0;
+}
+int amigaRendererCopyChipPack(const UBYTE* pack,const UBYTE* end,UBYTE* destination,ULONG bytes){
+    ULONG count,retained,payload,cutoff,i,j,out=20,shift,size;
+    if(!destination||!chipPackLayout(pack,end,&count,&retained,&payload,&cutoff))return 0;
+    shift=(count-retained)*24;size=cutoff-shift;
+    if(bytes<size)return 0;
+    for(i=0;i<20;++i)destination[i]=pack[i];
+    writeWord(destination+8,(UWORD)(retained>>16));writeWord(destination+10,(UWORD)retained);
+    for(i=0;i<count;++i){
+        const UBYTE* r=pack+20+i*24;const UWORD flags=readWord(r+14);
+        ULONG offset;
+        if((flags&4)&&(flags>>8))continue;
+        for(j=0;j<24;++j)destination[out+j]=r[j];
+        offset=readLong(r+16)-shift;
+        writeWord(destination+out+16,(UWORD)(offset>>16));writeWord(destination+out+18,(UWORD)offset);
+        out+=24;
+    }
+    for(i=payload;i<cutoff;++i)destination[i-shift]=pack[i];
+    return 1;
 }
 
 static int buildHardwareSpritePart(

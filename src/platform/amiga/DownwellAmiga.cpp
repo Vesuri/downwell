@@ -1547,8 +1547,9 @@ __attribute__((noinline)) static int runDownwell(void) {
         port.configureGenerationStep(generateLiveTerrain, &liveGeneration);
     }
 #endif
-    for (ULONG byte = 0; byte < gamePackBytes; ++byte)
-        memory.assets()[byte] = amiga_game_pack[byte];
+    if(!amigaRendererCopyChipPack(amiga_game_pack,amiga_game_pack_end,memory.assets(),gamePackBytes)){
+        platform.restore();FreeMem(startupCopperWords,4*sizeof(UWORD));memory.release();return 20;
+    }
     activeGamePack = memory.assets();
     activeGamePackEnd = activeGamePack + gamePackBytes;
     static downwell::EffectMaskAssets effectAssets;

@@ -331,9 +331,6 @@ Reference: [scene architecture](scene-architecture.md).
 
 ## 7. Establish memory fit and failure handling
 
-- Bring resident game art back within the renderer's 278,000-byte gate;
-  the current generated pack requires 278,940 bytes. Preserve the hard gate
-  while reducing residency, then repeat the native allocation check.
 - Measure Chip/Fast RAM, task stack, asset residency and peak transition usage.
   Establish the A500 memory requirement; expanded-emulator runs do not prove
   stock-machine fit.

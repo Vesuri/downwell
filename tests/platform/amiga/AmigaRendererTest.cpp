@@ -8,6 +8,7 @@
 #include "platform/amiga/AmigaExitMask.h"
 #include "core/ShopFixtures.h"
 #include "core/DamageNumberText.h"
+#include "core/EffectMaskAssets.h"
 #include "platform/amiga/AmigaShopMenu.h"
 
 #include <cstdlib>
@@ -738,6 +739,43 @@ int main(int argc, char** argv) {
     auto word = [](const UBYTE* p) { return unsigned(p[0]) * 256 + p[1]; };
     const unsigned records = (word(gamePack.data() + 8) << 16) |
                              word(gamePack.data() + 10);
+    {
+        auto longword=[&](const UBYTE* p){return (word(p)<<16)|word(p+2);};
+        const auto bytes=amigaRendererChipPackBytes(gamePack.data(),gamePack.data()+gamePack.size());
+        require(bytes>20&&bytes<gamePack.size(),"compact resident pack size");
+        std::vector<UBYTE> compact(bytes,0x5a);
+        require(!amigaRendererCopyChipPack(gamePack.data(),gamePack.data()+gamePack.size(),compact.data(),bytes-1),
+            "short destination rejects before writing");
+        for(auto value:compact)require(value==0x5a,"failed resident copy leaves destination untouched");
+        auto malformed=gamePack;
+        putLong(malformed.data(),8,0xffffffffu);
+        require(amigaRendererChipPackBytes(malformed.data(),malformed.data()+malformed.size())==0&&
+                !amigaRendererCopyChipPack(malformed.data(),malformed.data()+malformed.size(),compact.data(),bytes),
+                "invalid directory count rejects without overflow");
+        malformed=gamePack;putLong(malformed.data(),36,0xffffffffu);
+        require(!amigaRendererCopyChipPack(malformed.data(),malformed.data()+malformed.size(),compact.data(),bytes),
+                "invalid payload offset rejects before copying");
+        for(auto value:compact)require(value==0x5a,"malformed pack leaves destination untouched");
+        require(amigaRendererCopyChipPack(gamePack.data(),gamePack.data()+gamePack.size(),compact.data(),bytes),
+            "compact resident copy");
+        unsigned keptRecords=0,omitted=0;
+        for(unsigned i=0;i<records;++i){
+            const auto* source=gamePack.data()+20+i*24;const unsigned flags=word(source+14);
+            if((flags&4)&&(flags>>8)){++omitted;continue;}
+            const auto* target=compact.data()+20+keptRecords++*24;
+            require(std::memcmp(source,target,16)==0&&longword(source+20)==longword(target+20),
+                "resident metadata preserves IDs, frames, origins, dimensions and flags");
+            const auto offset=longword(target+16),length=longword(target+20);
+            require(offset<=bytes&&length<=bytes-offset&&!(offset&1),"resident payload bounds/alignment");
+            require(std::memcmp(gamePack.data()+longword(source+16),compact.data()+offset,length)==0,
+                "every resident planar/garden payload remains byte-identical");
+        }
+        require(omitted>0&&keptRecords==longword(compact.data()+8),"only gameplay DMA directory omitted");
+        require(amigaRendererChipPackBytes(compact.data(),compact.data()+bytes)==bytes,"resident copy is idempotent");
+        downwell::EffectMaskAssets effectAssets;
+        require(effectAssets.bind(compact.data(),compact.size()),"effect masks resolve compact resident directory");
+        std::cout<<"Resident directory: "<<omitted<<" CPU-only records removed, "<<omitted*24<<" Chip bytes saved\n";
+    }
     unsigned kept = 0;
     for (unsigned i = 0; i < records; ++i) {
         const auto* record = gamePack.data() + 20 + i * 24;

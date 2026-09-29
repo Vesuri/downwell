@@ -90,6 +90,16 @@ coverage and backing changes.
 
 ## Sprites
 
+The complete DWAP remains in ordinary memory for gameplay hardware-sprite
+lookup. Its Chip copy omits directory entries with hardware-part counts, as
+those immutable streams are copied into separate DMA slots. Planar records and
+garden DMA records remain, in the same key order. Startup rebases their offsets
+after compacting the directory and copies the unchanged resident payload prefix.
+No pixels are converted, no gameplay asset is removed, and writable garden
+headers retain distinct storage. `amigaRendererChipPackBytes` validates and sizes
+this layout; `amigaRendererCopyChipPack` checks capacity before writing. Source
+and destination must be separate allocations. No such packing occurs per frame.
+
 Hardware sprites sit in front of both playfields. Initial channel allocation:
 
 - player: one attached pair when four colours are insufficient, otherwise one

@@ -105,6 +105,7 @@ typedef struct AmigaResolvedSpritePart {
 int amigaRendererResolveSpritePart(AmigaResolvedSpritePart*, const UBYTE*, const UBYTE*, UWORD, UWORD, unsigned, int);
 int amigaRendererDrawResolvedSpritePart(const AmigaResolvedSpritePart*, int, int, UWORD*, unsigned);
 ULONG amigaRendererChipPackBytes(const UBYTE* pack, const UBYTE* packEnd);
+int amigaRendererCopyChipPack(const UBYTE* pack,const UBYTE* end,UBYTE* destination,ULONG bytes);
 int amigaRendererBuildHardwareSpritePart(
     const UBYTE* pack, const UBYTE* packEnd,
     UWORD sprite, UWORD frame, unsigned part,
