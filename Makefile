@@ -2409,4 +2409,16 @@ build/replay-frame-trace-test: tests/core/ReplayFrameTraceTest.cpp src/core/Repl
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
 
+.PHONY: test-generation-timing
+test: test-generation-timing
+test-generation-timing: build/generation-timing-test build/generation-timing-disabled-test
+	./build/generation-timing-test
+	./build/generation-timing-disabled-test
+build/generation-timing-test: tests/core/GenerationTimingTest.cpp src/core/Profile.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_FPSCOUNT -DDOWNWELL_GENERATION_TIMING -o $@ $<
+build/generation-timing-disabled-test: tests/core/GenerationTimingTest.cpp src/core/Profile.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_FPSCOUNT -o $@ $<
+
 -include $(DEPS)

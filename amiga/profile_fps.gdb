@@ -21,6 +21,18 @@ if $s == 3
         quit 1
     end
     printf "COVERAGE pre-Step: samples=%lu ticks=%lu..%lu view_y=%ld..%ld max_view_y=%ld max_player_y_q8=%ld final_health=%ld dead_samples=%lu max_enemy_slots=%lu\n", gDownwellProfileGameSamples, gDownwellProfileFirstTick, gDownwellProfileLastTick, gDownwellProfileFirstViewY, gDownwellProfileLastViewY, gDownwellProfileMaxViewY, gDownwellProfileMaxPlayerYQ8, gDownwellProfileLastHealth, gDownwellProfileDeadSamples, gDownwellProfileMaxEnemySlots
+    if gDownwellProfileGenerationTiming
+        if gDownwellProfileGenerationCalls != gDownwellProfileFrames[3] || gDownwellProfileGenerationMaxFrame == 0 || gDownwellProfileGenerationMaxFrame > gDownwellProfileFrames[3]
+            printf "Invalid coarse generation coverage\n"
+            quit 1
+        end
+        set $tick_ms = 20.0/(313*256)
+        printf "GENERATION coarse: calls=%lu total_ms=%.3f mean_ms=%.3f max_ms=%.3f max_frame=%lu worst_gap_generation_ms=%.3f clock_clamps=%lu\n", gDownwellProfileGenerationCalls, gDownwellProfileGenerationTicks*$tick_ms, gDownwellProfileGenerationTicks*$tick_ms/gDownwellProfileGenerationCalls, gDownwellProfileGenerationMax*$tick_ms, gDownwellProfileGenerationMaxFrame, gDownwellProfileGenerationWorstGapTicks*$tick_ms, gDownwellProfileClockClamps
+        if gDownwellProfileGenerationWorstGapTicks > (gDownwellProfileMaxGap[3]+1)*313*256
+            printf "Generation bracket exceeds worst frame's PAL interval\n"
+            quit 1
+        end
+    end
 end
 if gDownwellProfileRequireDamage && gDownwellProfileDamageBirths == 0
     printf "Damage profiling tape did not reach a damaging contact\n"

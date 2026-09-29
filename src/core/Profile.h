@@ -82,7 +82,23 @@ public:
 #define DW_PROFILE_SCOPE(phase) DownwellProfileScope profileScope(phase)
 #define DW_PROFILE_PHASE(phase) downwellProfilePhase(phase)
 #else
+#ifdef DOWNWELL_GENERATION_TIMING
+// Opt-in coarse timing: only the outer generation transaction reads a clock.
+// All inner birth/geometry/registration brackets still compile away.
+bool downwellProfileGenerationEnter(unsigned long& start);
+void downwellProfileGenerationLeave(unsigned long start);
+template<unsigned Phase> class DownwellGenerationScope {};
+template<> class DownwellGenerationScope<profileGeneration> {
+    unsigned long start_;
+    bool active_;
+public:
+    DownwellGenerationScope():active_(downwellProfileGenerationEnter(start_)){}
+    ~DownwellGenerationScope(){if(active_)downwellProfileGenerationLeave(start_);}
+};
+#define DW_PROFILE_SCOPE(phase) [[maybe_unused]] DownwellGenerationScope<phase> profileScope
+#else
 #define DW_PROFILE_SCOPE(phase) ((void)0)
+#endif
 #define DW_PROFILE_PHASE(phase) ((void)0)
 #endif
 #else

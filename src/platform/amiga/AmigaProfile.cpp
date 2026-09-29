@@ -70,6 +70,15 @@ volatile ULONG gDownwellProfileMax[4][profilePhaseCount];
 volatile ULONG gDownwellProfileFrameMax[4];
 volatile ULONG gDownwellProfileFrozen;
 volatile ULONG gDownwellProfileClockClamps;
+volatile ULONG gDownwellProfileGenerationTiming =
+#ifdef DOWNWELL_GENERATION_TIMING
+    1;
+#else
+    0;
+#endif
+volatile ULONG gDownwellProfileGenerationCalls, gDownwellProfileGenerationTicks;
+volatile ULONG gDownwellProfileGenerationMax, gDownwellProfileGenerationMaxFrame;
+volatile ULONG gDownwellProfileGenerationWorstGapTicks;
 volatile ULONG gDownwellProfileSection;
 volatile ULONG gDownwellSectionFrames[7], gDownwellSectionFields[7], gDownwellSectionMaxGap[7];
 volatile ULONG gDownwellSectionTicks[7][profilePhaseCount], gDownwellSectionMax[7][profilePhaseCount];
@@ -86,6 +95,7 @@ __attribute__((noinline, used)) void downwellProfileReady()
 {
     // Keep this debugger gate reachable through LTO/section collection.
     (void)gDownwellProfileRequireDamage;
+    (void)gDownwellProfileGenerationTiming;
     __asm__ volatile("" ::: "memory");
 }
 }
@@ -93,7 +103,7 @@ __attribute__((noinline, used)) void downwellProfileReady()
 void downwellProfileVblank()
 {
     ++gDownwellProfileVbi;
-#ifdef DOWNWELL_PROBES
+#if defined(DOWNWELL_PROBES) || defined(DOWNWELL_GENERATION_TIMING)
     gDownwellProfileEpoch += ticksPerField;
 #endif
 }
@@ -114,7 +124,7 @@ void downwellProfileGameplay(unsigned tick,long playerYQ8,long viewY,int health,
     if(enemySlots>gDownwellProfileMaxEnemySlots)gDownwellProfileMaxEnemySlots=enemySlots;
 }
 
-#ifdef DOWNWELL_PROBES
+#if defined(DOWNWELL_PROBES) || defined(DOWNWELL_GENERATION_TIMING)
 static ULONG beamTick()
 {
     volatile UWORD* const vp = (volatile UWORD*)0xdff004;
@@ -141,9 +151,24 @@ static ULONG beamTick()
 
 static unsigned sceneId;
 static ULONG startField;
+#if defined(DOWNWELL_PROBES) || defined(DOWNWELL_GENERATION_TIMING)
+static bool frameActive;
+#endif
+#ifdef DOWNWELL_GENERATION_TIMING
+static ULONG generationFrameTicks;
+bool downwellProfileGenerationEnter(unsigned long& start){
+    if(!frameActive||sceneId!=3)return false;
+    start=beamTick();return true;
+}
+void downwellProfileGenerationLeave(unsigned long start){
+    const ULONG elapsed=beamTick()-start;
+    generationFrameTicks+=elapsed;
+    gDownwellProfileGenerationTicks+=elapsed;
+    ++gDownwellProfileGenerationCalls;
+}
+#endif
 #ifdef DOWNWELL_PROBES
 static unsigned phaseId;
-static bool frameActive;
 static ULONG phaseStart, frameStart;
 static ULONG frameTicks[profilePhaseCount];
 static ULONG frameScopeEntries[profilePhaseCount];
@@ -161,8 +186,13 @@ void downwellProfileBegin(unsigned scene)
 {
     sceneId = scene < 4 ? scene : 0;
     startField = gDownwellProfileVbi;
-#ifdef DOWNWELL_PROBES
+#if defined(DOWNWELL_PROBES) || defined(DOWNWELL_GENERATION_TIMING)
     frameActive = true;
+#endif
+#ifdef DOWNWELL_GENERATION_TIMING
+    generationFrameTicks=0;
+#endif
+#ifdef DOWNWELL_PROBES
     terrainSpanCount = 0;
     for (unsigned phase = 0; phase < profilePhaseCount; ++phase) {
         frameTicks[phase] = 0;
@@ -195,7 +225,11 @@ void downwellProfileEnd()
 {
 #ifdef DOWNWELL_PROBES
     downwellProfilePhase(profileOther);
+#endif
+#if defined(DOWNWELL_PROBES) || defined(DOWNWELL_GENERATION_TIMING)
     frameActive = false;
+#endif
+#ifdef DOWNWELL_PROBES
     const ULONG elapsed = phaseStart - frameStart;
     if (elapsed > gDownwellProfileFrameMax[sceneId]) {
         gDownwellProfileFrameMax[sceneId] = elapsed;
@@ -228,6 +262,11 @@ void downwellProfileEnd()
             gDownwellProfileMax[3][phase] = 0;
         }
         gDownwellProfileFrameMax[3] = 0;
+#ifdef DOWNWELL_GENERATION_TIMING
+        gDownwellProfileGenerationCalls=gDownwellProfileGenerationTicks=0;
+        gDownwellProfileGenerationMax=gDownwellProfileGenerationMaxFrame=0;
+        gDownwellProfileGenerationWorstGapTicks=0;
+#endif
 #ifdef DOWNWELL_PROBES
         gDownwellProfileWorstFrame[3] = 0;
         gDownwellProfileWorstSpanCount[3] = 0;
@@ -241,6 +280,12 @@ void downwellProfileEnd()
 #endif
         return;
     }
+#ifdef DOWNWELL_GENERATION_TIMING
+    if(sceneId==3&&generationFrameTicks>gDownwellProfileGenerationMax){
+        gDownwellProfileGenerationMax=generationFrameTicks;
+        gDownwellProfileGenerationMaxFrame=gDownwellProfileFrames[3]+1;
+    }
+#endif
     const ULONG fields = gDownwellProfileVbi - startField;
     const unsigned section = gDownwellProfileSection < 7 ? gDownwellProfileSection : 0;
     ++gDownwellSectionFrames[section];
@@ -267,6 +312,9 @@ void downwellProfileEnd()
     if (fields > gDownwellProfileMaxGap[sceneId]) {
         gDownwellProfileMaxGap[sceneId] = fields;
         gDownwellProfileMaxGapFrame[sceneId] = gDownwellProfileFrames[sceneId];
+#ifdef DOWNWELL_GENERATION_TIMING
+        if(sceneId==3)gDownwellProfileGenerationWorstGapTicks=generationFrameTicks;
+#endif
     }
 #ifdef DOWNWELL_PROFILE_AUTORUN
     // Freeze only at a completed frame boundary, outside the measured window.

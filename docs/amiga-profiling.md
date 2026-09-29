@@ -68,6 +68,18 @@ scene's maximum measured frame.
 Use longer gameplay windows (for example `PROFILE_FRAMES=600 SKIP_TO_GAME=1`)
 as well: a short initial-room sample can miss synchronous generation bursts.
 
+For an inclusive generation measurement without inner per-birth probes, use
+`GENERATION_TIMING=1 SKIP_TO_GAME=1 PROFILE_CONTACT=1 VERIFY_TIMEOUT_SECONDS=180 bash amiga/profile.sh fps`.
+This adds two beam-clock reads around each complete generation callback, not
+around every instance or suboperation. It reports total/mean/max generation
+time, the maximum's frame and generation time within the worst PAL-gap frame.
+The initial setup frame is discarded just as in the FPS window. The live
+gameplay tape must execute one generation callback per measured frame; the
+debugger rejects incomplete coverage or a bracket exceeding its frame interval.
+Compare with the same FPS tape without this opt-in flag: coarse timing still
+has overhead, and its inclusive total must not be added to nested probe totals.
+The script restores the ordinary build with this flag disabled.
+
 Probe `segments` (the legacy `gDownwellProfileCalls` counters) include parent
 resumption after nested scopes: they are not function invocation counts.
 `scope_entries` counts only `DW_PROFILE_SCOPE` construction, with both the

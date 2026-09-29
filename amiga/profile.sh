@@ -19,7 +19,7 @@ if [[ ${SKIP_LEVEL:-0} == 1 ]]; then script=profile_clear.gdb; fi
 # Always leave the playable binary behind, including after a timeout/failure.
 restore() {
   make clean > .run/profile-restore.log 2>&1
-  make -j4 SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_LASER=0 PROFILE_CONTACT=0 PROFILE_FRAMES=0 PROFILE_TRANSITION=0 GENERATION_DETAIL=0 >> .run/profile-restore.log 2>&1
+  make -j4 SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_LASER=0 PROFILE_CONTACT=0 PROFILE_FRAMES=0 PROFILE_TRANSITION=0 GENERATION_DETAIL=0 GENERATION_TIMING=0 >> .run/profile-restore.log 2>&1
 }
 mkdir -p .run
 if [[ ${PROFILE_CONTACT:-0} == 1 ]]; then
@@ -32,9 +32,14 @@ printf 'Profile optimization: %s\n' "${AMIGA_OPTIMIZATION:--O3}"
 printf 'Profile Laser Sight fixture: %s\n' "${PROFILE_LASER:-0}"
 printf 'Profile natural contact tape: %s\n' "${PROFILE_CONTACT:-0}"
 printf 'Profile inner generation probes: %s (only active in probes mode)\n' "${GENERATION_DETAIL:-0}"
+printf 'Profile coarse generation timing: %s (FPS mode only)\n' "${GENERATION_TIMING:-0}"
 shasum -a 256 out/Downwell.exe
 VERIFY_TIMEOUT_SECONDS="${VERIFY_TIMEOUT_SECONDS:-60}" \
 GDB_SOURCE="$script" READY_MARKER=DOWNWELL_PROFILE_READY \
 READY_DESCRIPTION="bounded scene profile" bash verify_startup.sh
 cp .run/gdb-startup.log ".run/profile-${mode}.log"
+if [[ ${GENERATION_TIMING:-0} == 1 ]] && ! grep -q '^GENERATION coarse:' ".run/profile-${mode}.log"; then
+  echo "Requested coarse generation measurement was not produced" >&2
+  exit 1
+fi
 sed -n '/PROFILE/,$p' ".run/profile-${mode}.log"
