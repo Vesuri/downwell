@@ -4,6 +4,7 @@
 #include "RoomPack.h"
 #include "TerrainCreate.h"
 #include "WallEndStep.h"
+#include "WallFootprint.h"
 #include <cstring>
 namespace downwell {
 // Optional identity store, separate from backend occupancy/drawing caches.
@@ -51,6 +52,21 @@ public:
     GameplayTerrainInstances& operator=(const GameplayTerrainInstances&)=delete;
     bool valid()const{return good_;}
     unsigned size()const{return count_;}
+    // Conservative presentation candidates, in unchanged birth order. The
+    // caller still tests the current sprite footprint/visibility. Coordinates
+    // are immutable for these terrain lifetimes; callbacks must not mutate us.
+    template<class Visit> bool visitWallRows(int first,int end,Visit visit)const{
+        if(first>=end)return true;
+        for(unsigned base=0;base<count_;base+=rowGroupSize){
+            const auto& range=rowRanges_[base/rowGroupSize];
+            if(!unboundedWallArt_ &&
+                ((range.last<first&&unsigned(first)-unsigned(range.last)>=16u)||
+                 (range.first>=end&&unsigned(range.first)-unsigned(end)>=16u)))continue;
+            const unsigned limit=base+rowGroupSize<count_?base+rowGroupSize:count_;
+            for(unsigned i=base;i<limit;++i)if(!visit(records_[order_[i]]))return false;
+        }
+        return true;
+    }
     const Record* find(InstanceHandle h)const{
         return h.slot<capacity&&h.generation&&records_[h.slot].lifetimeId==h.generation?&records_[h.slot]:nullptr;
     }
@@ -65,6 +81,7 @@ public:
         if(slot==capacity)return good_=false;
         freeHint_=slot+1;order_[count_++]=slot;
         auto& r=records_[slot];r={object,x,y,active,next_++,sourceId,creationCode};
+        extendRowRange(count_-1,y,(count_-1)%rowGroupSize==0);
         // Object 99 overrides Create with an empty event, retaining its
         // serialized sprite rather than inheriting objWall_n's tile setter.
         if(object==99)r.spriteId=46;
@@ -87,7 +104,13 @@ public:
         auto& r=records_[h.slot];
         if(r.objectId==99)return true;
         if(!terrainCreateProperties(r.objectId,wallTile,glitch,random,
-            [&](int sprite){if(!binding_.sprite(h,r,sprite))return false;r.spriteId=sprite;return true;},
+            [&](int sprite){
+                if(!binding_.sprite(h,r,sprite))return false;
+                r.spriteId=sprite;
+                // Unknown art must retain the original uncullable path.
+                if(r.objectId==60&&(wallRadius(sprite)<0||wallRadius(sprite)>16))unboundedWallArt_=true;
+                return true;
+            },
             [&](int index){
                 if(!binding_.phaseIndex(h,r,unsigned(index)*256u))return false;
                 r.imageIndex=index;return true;
@@ -154,7 +177,12 @@ public:
         if(!binding_.retire(h,records_[h.slot]))return good_=false;
         records_[h.slot].lifetimeId=0;
         if(h.slot<freeHint_)freeHint_=h.slot;
-        for(unsigned i=index+1;i<count_;++i)order_[i-1]=order_[i];
+        for(unsigned i=index+1;i<count_;++i){
+            order_[i-1]=order_[i];
+            // Only a group boundary can bring a new coordinate into a range.
+            // Leaving stale extremes is conservative and avoids rescanning.
+            if(i%rowGroupSize==0)extendRowRange(i-1,records_[order_[i]].y,false);
+        }
         --count_;return true;
     }
     bool clear(){
@@ -168,9 +196,20 @@ public:
         }
         for(unsigned i=retired;i<count_;++i)order_[i-retired]=order_[i];
         count_-=retired;
+        if(!count_)unboundedWallArt_=false;
+        // A failed clear retains a compacted suffix. Preserve readable ranges
+        // even for that terminal state, without changing teardown callbacks.
+        for(unsigned i=0;i<count_;++i)extendRowRange(i,records_[order_[i]].y,i%rowGroupSize==0);
         return good_; // Never reset the generation sequence on Retry.
     }
 private:
+    static constexpr unsigned rowGroupSize=32;
+    struct RowRange{int first=0,last=0;};
+    void extendRowRange(unsigned index,int y,bool reset){
+        auto& range=rowRanges_[index/rowGroupSize];
+        if(reset)range.first=range.last=y;
+        else{if(y<range.first)range.first=y;if(y>range.last)range.last=y;}
+    }
     static bool visible(const Record& r){return r.objectId==60&&r.active&&!r.destroyRequested;}
     static int drawSprite(const Record& r){return visible(r)?(r.wall.checked?r.spriteId:51):-1;}
     bool note(const Record& r,int before,int after,bool changed){
@@ -189,6 +228,8 @@ private:
     WallCollision collision_;
     Record records_[capacity]{};
     unsigned order_[capacity]{}; // Birth order, independent of reusable identity slots.
+    RowRange rowRanges_[(capacity+rowGroupSize-1)/rowGroupSize]{};
+    bool unboundedWallArt_=false;
     unsigned count_=0;
     unsigned freeHint_=0;
     std::uint32_t next_=1;

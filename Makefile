@@ -708,6 +708,14 @@ test-spatial-journal: build/runner-spatial-journal-test
 	./build/runner-spatial-journal-test
 test: test-spatial-journal
 
+build/terrain-row-selection-test: tests/core/TerrainRowSelectionTest.cpp src/core/GameMakerRandom.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+.PHONY: test-terrain-row-selection
+test-terrain-row-selection: build/terrain-row-selection-test
+	./build/terrain-row-selection-test
+test: test-terrain-row-selection
+
 build/runner-spatial-split-test: tests/core/RunnerSpatialSplitTest.cpp $(wildcard src/core/*.h)
 	@mkdir -p build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/RunnerSpatialSplitTest.cpp

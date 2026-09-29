@@ -54,3 +54,29 @@ animation, establish the selected runner's one-frame sequence semantics rather
 than assuming invisibility makes its state irrelevant. Wall End Step behavior
 has a separate VM comparison in `verify-wall-end-step`; the local call whitelist
 here is not a proof of its callees' side effects or their ordering.
+
+## Retained wall row selection
+
+`GameplayTerrainInstances::visitWallRows` is a conservative presentation
+accelerator, not collision lookup or a new Draw order. Groups of 32 consecutive
+birth-order records retain their minimum/maximum center Y. Creation prepares
+the group before exposing the new record to the birth callback. Painting skips
+groups outside the requested interval expanded by the maximum supported wall
+radius (16 pixels), then applies the existing per-sprite row and visibility
+checks in unchanged order. Coincident walls remain separate records.
+
+Retirement preserves stable compaction. Only records crossing a group boundary
+expand the destination range; obsolete extremes may remain, producing harmless
+extra candidates. Appending into an empty group resets its range. Clear rebuilds
+the remaining suffix even on terminal partial failure. Coordinates are immutable
+in this store: any future position setter must maintain these ranges too.
+
+Unknown wall art disables group rejection until a complete clear, preserving
+the original uncullable fallback. Signed coordinate extremes use ordered
+unsigned differences rather than overflowing expanded endpoints. Traversal
+callbacks must not mutate the store. The range table costs 512 bytes for 2048
+records; it allocates no Chip RAM and changes neither raster invalidation nor
+circular bitplane scrolling.
+
+Scene-verification builds compare the selected sequence with an independent
+full-record scan before drawing; normal and profiling builds omit that oracle.

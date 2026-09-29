@@ -76,16 +76,37 @@ bool AmigaTerrainPainter::paint(AmigaRenderer* renderer,
     const auto* records=runtime?runtime->terrainInstances():nullptr;
     if(records){
         DW_PROFILE_COUNT(counterTerrainWallPasses);
-        DW_PROFILE_ADD(counterTerrainWallRecords,records->size());
-        for(unsigned i=0;i<records->size();++i){
-            const auto& r=*records->find(records->handle(i));
+        unsigned examined=0;
+#ifdef DOWNWELL_SCENE_VERIFY
+        // Independent full-order selection oracle; never benchmark this scan.
+        unsigned referenceIndex=0;
+        auto nextReference=[&]()->const downwell::GameplayTerrainInstances::Record*{
+            while(referenceIndex<records->size()){
+                const auto* r=records->find(records->handle(referenceIndex++));
+                const int sprite=r->wall.checked?r->spriteId:51;
+                if(downwell::wallIntersectsRows(sprite,r->y,firstWorldY,finalWorldY))return r;
+            }
+            return nullptr;
+        };
+#endif
+        const bool painted=records->visitWallRows(firstWorldY,finalWorldY,[&](const auto& r){
+            ++examined;
             const int sprite=r.wall.checked?r.spriteId:51;
-            if(!downwell::wallIntersectsRows(sprite,r.y,firstWorldY,finalWorldY))continue;
+            if(!downwell::wallIntersectsRows(sprite,r.y,firstWorldY,finalWorldY))return true;
+#ifdef DOWNWELL_SCENE_VERIFY
+            if(nextReference()!=&r)return false;
+#endif
             DW_PROFILE_COUNT(counterTerrainWallRowCandidates);
             if(!downwell::drawWallPresentation(r,[&]{return mainWallFrame(terrainIndex,rooms,room,r.x,r.y);},
                 [&](int sprite,unsigned frame){drawGameAsset(renderer,UWORD(sprite),UWORD(frame),
-                    downwellPlayfieldX+r.x-viewX,r.y-viewY,0);})){amigaRendererClearClipRect(renderer);return false;}
-        }
+                    downwellPlayfieldX+r.x-viewX,r.y-viewY,0);}))return false;
+            return true;
+        });
+        DW_PROFILE_ADD(counterTerrainWallRecords,examined);
+        if(!painted){amigaRendererClearClipRect(renderer);return false;}
+#ifdef DOWNWELL_SCENE_VERIFY
+        if(nextReference()){amigaRendererClearClipRect(renderer);return false;}
+#endif
     }
     if (!records&&terrainIndex)
         drawIndexedWalls(renderer, rooms, room, viewX, viewY,
