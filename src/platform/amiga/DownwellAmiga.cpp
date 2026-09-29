@@ -862,7 +862,7 @@ static void redrawResultsChoices(AmigaRenderer* renderer, const AmigaPortRuntime
 // Each display ring independently owes modified rows of the private backing.
 static AmigaGameplayRows gameplayRows;
 static AmigaLaserSight gameplayRays[2];
-static AmigaTimeFields gameplayFields[2];
+static AmigaTimeFieldPair gameplayFields;
 static Bitmap* terrainCopyTarget;
 static const Bitmap* terrainCopyBacking;
 static unsigned terrainCopyBuffer;

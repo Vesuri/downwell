@@ -292,6 +292,45 @@ int main(int argc, char** argv) {
         std::cout << "65 dense ordinary/exit field retention and painter-order comparisons passed\n";
     }
     {
+        // Two retained banks and one work bank may rotate in either order.
+        // Compare against the copying implementation, including pending draws
+        // surviving preparation for the other display and target replacement.
+        AmigaTimeFieldPair exchanged;
+        AmigaTimeFields reference[2];
+        std::vector<UBYTE> actual[2],expected[2],replacement[2],replacementReference[2];
+        for(unsigned b=0;b<2;++b){
+            actual[b].resize(downwellGameRingBytes);
+            for(unsigned i=0;i<actual[b].size();++i)actual[b][i]=i*19+b*53;
+            expected[b]=actual[b];replacement[b]=actual[b];replacementReference[b]=actual[b];
+        }
+        for(unsigned frame=0;frame<256;++frame){
+            const unsigned first=frame&1;
+            for(unsigned n=0;n<2;++n){
+                const unsigned b=first^n;
+                downwell::TimeFieldOutlines shape;
+                shape.count=frame%13?2:0;shape.visible=shape.count!=0;
+                shape.circles[0]={190+int(frame%17)-8,130-int(frame%71),128*256+int(frame%512)};
+                shape.circles[1]={120+int(frame%113),240-int(frame%89),24*256+int(frame*7%512)};
+                const unsigned origin=frame*11%downwellGameRingHeight;
+                const bool changed=frame%7==0;
+                auto dirty=[&](unsigned row){return changed&&row%11==frame%11;};
+                auto* a=frame<128?actual[b].data():replacement[b].data();
+                auto* e=frame<128?expected[b].data():replacementReference[b].data();
+                require(exchanged[b].prepare(a,origin,shape,changed,dirty),"exchange preparation");
+                require(reference[b].prepare(e,origin,shape,changed,dirty),"reference preparation");
+            }
+            for(unsigned n=0;n<2;++n){
+                const unsigned b=first^n^1;
+                exchanged[b].draw();reference[b].draw();
+                require(actual[b]==expected[b]&&replacement[b]==replacementReference[b],
+                    "bank exchange preserves pending geometry, underlay and target replacement");
+                require(exchanged[b].lastWordWrites==reference[b].lastWordWrites,"same planar writes");
+            }
+            if(frame%31==0)for(unsigned b=0;b<2;++b){exchanged[b].discard();reference[b].discard();}
+        }
+        std::cout << "512 exchanged field banks match copying reference with reverse draw and target changes\n";
+    }
+    {
         std::vector<UBYTE> base(downwellGameRingBytes,0x69),actual=base,expected=base;
         AmigaTimeFields retained;
         constexpr unsigned origin=319;

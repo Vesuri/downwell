@@ -8,20 +8,27 @@
 // Per-display sparse word overlay. Restore only departing coverage; publish
 // final colours directly, never clearing continuing pixels. Drain DMA first.
 // Shared scratch lives only inside prepare(), so pending draws are independent.
-template<class Shape = downwell::GoalFieldOutline> class AmigaFieldOverlay {
+template<class T,unsigned Capacity,bool External> struct AmigaFieldStorage { T words[Capacity]; };
+template<class T,unsigned Capacity> struct AmigaFieldStorage<T,Capacity,true> {};
+template<class Shape = downwell::GoalFieldOutline,bool ExchangeStorage=false> class AmigaFieldOverlay {
+public:
     struct Word { UWORD offset, mask, under[2], paint[2], kept; };
     // Every word touched by the clipped viewport, including partial edge words.
     static constexpr unsigned capacity = ((downwellPlayfieldWidth + 30) / 16) * downwellDisplayHeight;
-    Word saved_[capacity];
+    struct Scratch {
+        Word bank[capacity];
+        Word* words=bank;
+        UWORD index[downwellGameRingPlaneBytes / 2] = {};
+        unsigned count = 0;
+    };
+private:
+    AmigaFieldStorage<Word,capacity,ExchangeStorage> storage_;
+    Word* saved_=nullptr;
+    Scratch* workspace_=nullptr;
     unsigned count_ = 0, origin_ = 0;
     UBYTE* target_ = nullptr;
     bool valid_ = false, pending_ = false;
     Shape shape_;
-    struct Scratch {
-        Word words[capacity];
-        UWORD index[downwellGameRingPlaneBytes / 2] = {};
-        unsigned count = 0;
-    };
     static Scratch& scratch() { static Scratch value{}; return value; }
     static UWORD read(const UBYTE* p) { return (UWORD(p[0]) << 8) | p[1]; }
     void publish(unsigned offset, UWORD value) {
@@ -31,6 +38,15 @@ template<class Shape = downwell::GoalFieldOutline> class AmigaFieldOverlay {
         ++lastWordWrites;
     }
 public:
+    AmigaFieldOverlay(){
+        static_assert(!ExchangeStorage,"Exchanged overlays require externally owned banks");
+        saved_=storage_.words;
+    }
+    AmigaFieldOverlay(Word* bank,Scratch& workspace):saved_(bank),workspace_(&workspace){
+        static_assert(ExchangeStorage,"External banks require exchange mode");
+    }
+    AmigaFieldOverlay(const AmigaFieldOverlay&)=delete;
+    AmigaFieldOverlay& operator=(const AmigaFieldOverlay&)=delete;
     unsigned lastWordWrites = 0;
     bool present() const { return valid_ || pending_; }
     bool matches(UBYTE* target, unsigned origin, const Shape& shape) const {
@@ -43,7 +59,10 @@ public:
         lastWordWrites = 0;
         if (target != target_) { discard(); target_ = target; }
         if (matches(target, origin, shape) && !underlyingChanged) return true;
-        auto& next = scratch();
+        auto& next = [&]() -> Scratch& {
+            if constexpr(ExchangeStorage)return *workspace_;
+            else return scratch();
+        }();
         for (unsigned i = 0; i < next.count; ++i) next.index[next.words[i].offset / 2] = 0;
         next.count = 0;
         bool overflow = false;
@@ -80,7 +99,13 @@ public:
             if (keep) next.words[slot - 1].kept = keep;
         }
         count_ = next.count;
-        for (unsigned i = 0; i < count_; ++i) saved_[i] = next.words[i];
+        if constexpr(ExchangeStorage){
+            // Clear the lookup while it still describes the completed bank.
+            // The next prepare borrows the departing saved bank, whose offsets
+            // need not match this frame's geometry. Pending draws own saved_.
+            for(unsigned i=0;i<next.count;++i)next.index[next.words[i].offset/2]=0;
+            Word* old=saved_;saved_=next.words;next.words=old;next.count=0;
+        }else for (unsigned i = 0; i < count_; ++i) saved_[i] = next.words[i];
         shape_ = shape; origin_ = origin; valid_ = false; pending_ = shape.visible;
         return true;
     }
@@ -100,4 +125,17 @@ public:
 };
 using AmigaGoalField = AmigaFieldOverlay<>;
 using AmigaTimeFields = AmigaFieldOverlay<downwell::TimeFieldOutlines>;
+// Three banks total, just like two retained overlays plus their shared scratch.
+// All banks outlive both overlays; no shared pointer can escape into a destroyed
+// stack object. Either overlay may prepare first, or prepare again before draw.
+class AmigaTimeFieldPair {
+    using Overlay=AmigaFieldOverlay<downwell::TimeFieldOutlines,true>;
+    Overlay::Word first_[Overlay::capacity],second_[Overlay::capacity];
+    Overlay::Scratch scratch_;
+    Overlay overlays_[2]={{first_,scratch_},{second_,scratch_}};
+public:
+    Overlay& operator[](unsigned index){return overlays_[index];}
+    Overlay* begin(){return overlays_;}
+    Overlay* end(){return overlays_+2;}
+};
 #endif

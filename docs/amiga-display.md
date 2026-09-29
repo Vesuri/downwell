@@ -63,6 +63,25 @@ This is the hardware counterpart of the SDL renderer contract: room, menu,
 style, enemy, and shop drawing is clipped to the centred 160x284 aperture;
 the clip is released only for 4:3 HUD drawing.
 
+## Retained field-overlay word banks
+
+Gameplay's two `AmigaFieldOverlay` instances share an `AmigaTimeFieldPair`
+workspace. The pair owns three ordinary-memory word banks: one retained by
+each display and one for preparing the next sparse overlay. Preparation restores
+departing coverage and carries the underlying pixels of continuing coverage into
+the work bank, then exchanges bank pointers instead of copying the completed
+list. It clears the work index before exchange because the departing bank can
+have different offsets. A pending draw keeps exclusive ownership of its bank
+even while the other display prepares or draws. All three banks have the pair's
+lifetime; neither overlay is copyable.
+
+This uses the same three large banks as the copying path, with only pointer and
+workspace bookkeeping added. It changes no Chip allocation, field RNG, painter
+order, palette or hardware scrolling. The standalone copying implementation
+remains the comparison path for tests. Offline shape tables still supply the
+geometry; runtime restoration and final word writes remain conditional on actual
+coverage and backing changes.
+
 ## Sprites
 
 Hardware sprites sit in front of both playfields. Initial channel allocation:
