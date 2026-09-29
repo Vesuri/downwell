@@ -103,6 +103,8 @@ entry and restores its parent on exit. The existing VBlank handler counts the
 innermost marked phase once per field, both for the full gameplay window and
 for `SAMPLE_FRAME` (default 701, one-based after the discarded setup frame).
 `SAMPLE phase` numbers follow `DownwellProfilePhase` in `src/core/Profile.h`.
+`profileTerrainRecord` covers terrain-pool append outside nested birth scopes;
+`profileTerrainCreate` covers the following source Create property writes.
 No gameplay callbacks or RNG consumption are moved. The scope markers still
 have overhead; compare the same tape with plain FPS. Samples are not precise
 phase durations: periodic sampling can alias repeated work and short phases

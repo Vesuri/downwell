@@ -49,6 +49,7 @@ enum DownwellProfilePhase {
     profileBindingDefinition, profileBindingMembership, profileBindingProperties,
     profileLayerAdopt, profileLayerResolve, profileLayerAttach, profileLayerAllocate,
     profileObjectPopulation,
+    profileTerrainRecord, profileTerrainCreate,
     profilePhaseCount
 };
 

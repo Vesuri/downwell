@@ -5,6 +5,7 @@
 #include "TerrainCreate.h"
 #include "WallEndStep.h"
 #include "WallFootprint.h"
+#include "Profile.h"
 #include <cstring>
 namespace downwell {
 // Optional identity store, separate from backend occupancy/drawing caches.
@@ -77,6 +78,7 @@ public:
         return index<count_?InstanceHandle{order_[index],records_[order_[index]].lifetimeId}:InstanceHandle{};
     }
     bool append(int object,int x,int y,bool active,std::uint32_t sourceId=0,int creationCode=-1){
+        DW_PROFILE_SCOPE(profileTerrainRecord);
         if(!good_)return false;
         if((object!=60&&object!=93&&object!=99)||count_==capacity||!next_)return good_=false;
         unsigned slot=freeHint_;
@@ -111,6 +113,7 @@ public:
         return append(r.objectId,r.x,r.y,true,r.instanceId,r.creationCodeId);
     }
     bool createProperties(InstanceHandle h,int wallTile,bool glitch,GameMakerRandom& random){
+        DW_PROFILE_SCOPE(profileTerrainCreate);
         if(!good_||!find(h))return good_=false;
         auto& r=records_[h.slot];
         if(r.objectId==99)return true;
