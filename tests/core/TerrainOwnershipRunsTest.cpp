@@ -2,6 +2,8 @@
 #include "core/GameplayTerrainInstancesRuns.h"
 #include "core/RunnerSpatialLifetimes.h"
 #include "core/RunnerObservedRegistration.h"
+#include "core/RunnerObservedRoomMembership.h"
+#include "core/RunnerRoomMembership.h"
 #include <tuple>
 #include <vector>
 #include <cstdio>
@@ -157,7 +159,57 @@ static void observedRegistration(){
     require(order.low==0&&order.high==8&&order.present());
     std::puts("Observed terrain registration: mixed order, rebind, retirement and reuse passed");
 }
+static void observedRoom(){
+    using Terrain=downwell::GameplayTerrainInstancesRuns;
+    TerrainObserver observer;Terrain terrain(Terrain::Binding::bindDestruction(observer));
+    downwell::RunnerObservedRoomMembership<2052,2,2050,Terrain> room;
+    downwell::RunnerRoomMembership<2052> scalar;
+    require(room.bindTerrain(terrain));
+    std::vector<unsigned> slots{0,1,2050,2051};
+    for(unsigned i=0;i<64;++i){require(terrain.append(60,int(i)*16,32,true));slots.push_back(terrain.handle(i).slot+2);}
+    auto compare=[&](){
+        for(unsigned s:slots)require(room.contains(s)==scalar.contains(s)&&room.active(s)==scalar.active(s)&&room.marked(s)==scalar.marked(s));
+        for(unsigned mode=0;mode<6;++mode){
+            std::vector<unsigned> a,b;
+            auto run=[&](auto& owner,auto& out){
+                auto visit=[&](unsigned s){out.push_back(s);return true;};
+                if(mode==0)return owner.visitAnimationChecked(visit);
+                if(mode==1)return owner.visitDrawChecked(visit);
+                if(mode==2)return owner.visitCleanupChecked(visit);
+                if(mode==3)return owner.visitMarkedCleanupChecked(visit);
+                bool dirty=false;
+                bool ok=owner.visitAnimationRetainedChecked(2,2050,dirty,[&](unsigned s){
+                    out.push_back(s);if(mode==5&&out.size()==1)dirty=true;return true;
+                });out.push_back(dirty?1:0);return ok;
+            };
+            require(run(room,a)==run(scalar,b)&&a==b);
+        }
+    };
+    unsigned random=71413;
+    for(unsigned round=0;round<8;++round){
+        room.clear();scalar.clear();compare();
+        for(unsigned s:slots){require(room.bind(s,{})&&scalar.bind(s,{}));compare();}
+        for(unsigned step=0;step<512;++step){
+            random=random*1664525u+1013904223u;
+            const unsigned slot=slots[(random>>8)%slots.size()],op=(random>>20)%6;
+            std::vector<unsigned> a,b;
+            auto mutate=[&](auto& owner,auto& log){
+                if(op==0){downwell::RunnerImageValue key;key.assignInteger(int((random>>24)%7)-3);return owner.bind(slot,key);}
+                if(op==1)return owner.remove(slot);
+                if(op==2)return owner.mark(slot);
+                unsigned calls=0;
+                if(op==3)return owner.reconcileChecked([&](unsigned s){log.push_back(s);return ((s+step)%7)<3;},
+                    [&](unsigned s,bool active){log.push_back(4096+s+4096*active);return step%13||++calls!=2;});
+                auto visit=[&](unsigned s){log.push_back(s);if(step%17==0&&++calls==2)return false;return owner.remove(s);};
+                return op==4?owner.visitMarkedCleanupChecked(visit):owner.visitCleanupChecked(visit);
+            };
+            require(mutate(room,a)==mutate(scalar,b)&&a==b);compare();
+        }
+    }
+    std::puts("Observed terrain room order: animation, Draw, activation, cleanup and failure prefixes passed");
+}
 int main(){
+    observedRoom();
     observedRegistration();
     initializedBoundary();
     spatialIdentity();

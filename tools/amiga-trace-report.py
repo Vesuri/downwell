@@ -268,7 +268,7 @@ CAUSES = [
     ('R-tree upkeep', r'RunnerSpatial(Index|Journal|Split|NodeStorage)|serviceSpatialIndex'),
     ('software float emulation', r'MotionBinary64|RunnerImageValue|[mM]ultiplyBinary64|'
      r'[dD]ivideBinary64|roundGameMaker'),
-    ('runner bookkeeping', r'RunnerRoomMembership|RunnerRun(?:Room)?Membership|RunnerLayer|GameplayRoomLayers|'
+    ('runner bookkeeping', r'RunnerRoomMembership|RunnerObservedRoomMembership|RunnerRun(?:Room)?Membership|RunnerLayer|GameplayRoomLayers|'
      r'RunnerObjectMembership|RunnerObservedRegistration|RunnerSpatialInstances|RunnerSpatialLifetimes|RunnerSpatialDirty|RunnerSpatialBounds|'
      r'RunnerSpatialPosition|RunnerStepSnapshot|RunnerObjectFamilies|RecordLifecycle|'
      r'GameplayCollisionOwner::(Binding|valid|refresh|reconcile|combatAlarm|dispatchCaptured|'

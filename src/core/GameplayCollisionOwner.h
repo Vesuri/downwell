@@ -4,6 +4,7 @@
 #include "BoxDestructionScript.h"
 #include "RunnerSpatialInstances.h"
 #include "RunnerObservedRegistration.h"
+#include "RunnerObservedRoomMembership.h"
 #include "RunnerObjectFamilies.h"
 #include "RunnerRoomMembership.h"
 #include "RunnerRunRoomMembership.h"
@@ -53,6 +54,8 @@ private:
     bool combatAlarmCaptureValid_=false;
 #ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
     RunnerRoomMembership<View::capacity> room_;
+#elif defined(DOWNWELL_TERRAIN_RUN_STORE)
+    RunnerObservedRoomMembership<View::capacity,View::terrainBase,View::timeFieldBase,GameplayTerrainInstances> room_;
 #else
     RunnerRunRoomMembership<View::capacity,View::terrainBase,View::timeFieldBase> room_;
 #endif
@@ -352,6 +355,7 @@ public:
         terrain_(GameplayTerrainInstances::Binding::bindDestruction(terrainBinding_),presentation,collision){
 #if defined(DOWNWELL_TERRAIN_RUN_STORE) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
         if(!owner_.bindTerrainLifetimes(terrain_))return;
+        if(!room_.bindTerrain(terrain_))return;
 #endif
 #ifdef DOWNWELL_TERRAIN_RUN_STORE
         if(!terrain_.bindInitializedBirth(terrainBinding_))return;

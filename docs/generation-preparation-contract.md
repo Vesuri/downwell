@@ -434,6 +434,23 @@ retained visitors detect it across both the actor facade and typed terrain.
 The projection is derived state: generation cost must include its first
 observation when measuring this representation, not just cheap stamp writes.
 
+Room membership uses separate authoritative depth, insertion/deactivation order,
+active/inactive membership and cleanup-mark fields. These are not object
+registration stamps or layer element order. Actor and terrain room projections
+are independently invalidated and merged at observation: active order is depth
+then insertion order, inactive order is deactivation order. Reconciliation
+observes inactive first, then the updated active order; cleanup observes active
+first. Each move is visible before its publication callback, retaining terminal
+failure prefixes. Cleanup callbacks may remove their current member only.
+Marked cleanup sorts only its sparse pending slots by these same keys; it does
+not materialize complete room order for a single destruction. Removing the
+current slot leaves a hole until the pass ends, keeping successors stable.
+Both successful and failed passes compact those holes before returning, so
+later retirement never searches an accumulated history of dead entries.
+Clean retained-animation passes observe actors alone. If a callback dirties
+terrain positions, the remaining mixed order resumes after that actor, without
+resnapshotting earlier terrain. No game callback is deferred by these projections.
+
 Generated terrain may bind one initialized-birth transaction. The run store
 allocates the typed identity first, and the built-in collision owner completes
 ordinary birth publication before executing `terrainCreateProperties`. Create

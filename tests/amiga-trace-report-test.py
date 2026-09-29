@@ -12,7 +12,7 @@ spec.loader.exec_module(report)
 
 class CostOwners(unittest.TestCase):
     def test_scalar_and_run_owners(self):
-        for owner in ("RunnerRoomMembership", "RunnerRunRoomMembership",
+        for owner in ("RunnerRoomMembership", "RunnerRunRoomMembership", "RunnerObservedRoomMembership",
                       "RunnerObjectMembership", "RunnerRunMembership", "TerrainOwnershipRuns",
                       "RunnerSpatialLifetimes", "RunnerObservedRegistration"):
             with self.subTest(owner=owner):

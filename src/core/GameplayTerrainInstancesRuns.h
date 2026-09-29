@@ -3,6 +3,7 @@
 #include "GameplayTerrainInstancesScalar.h"
 #include "TerrainOwnershipRuns.h"
 #include "RunnerRegistrationOrder.h"
+#include "RunnerRoomOrderState.h"
 #include <cstddef>
 namespace downwell {
 class GameplayTerrainInstancesRuns {
@@ -29,6 +30,7 @@ public:
 private:
     struct Mutable:CreateValues {
         RunnerRegistrationOrder registration;
+        RunnerRoomOrderState room;
         WallEndStepState wall{};
         bool active=true,destroyRequested=false,wallNeedsReset=false;
         // Replaces the old ever-used byte: pristine, allocated, published,
@@ -44,6 +46,7 @@ private:
     Mutable mutable_[capacity]{};
     unsigned freeHint_=0;std::uint32_t next_=1;
     unsigned registered_[3]{},registrationRevision_=0;
+    unsigned roomRevision_=0;
     static unsigned family(int object){return object==60?0:object==93?1:2;}
     bool good_=true,dispatching_=false,unboundedWallArt_=false;
     Record record(const Identity& id)const{
@@ -78,6 +81,19 @@ public:
         return true;
     }
     unsigned size()const{return identities_.size();}
+    unsigned roomRevision()const{return roomRevision_;}
+    RunnerRoomOrderState* roomState(unsigned slot){
+        return identities_.occupied(slot)?&mutable_[slot].room:nullptr;
+    }
+    const RunnerRoomOrderState* roomState(unsigned slot)const{
+        return identities_.occupied(slot)?&mutable_[slot].room:nullptr;
+    }
+    void roomChanged(){++roomRevision_;}
+    template<class Visit> bool visitRoomSlots(Visit visit)const{
+        return identities_.visit([&](const Identity& id){
+            return mutable_[id.handle.slot].room.list<0||visit(id.handle.slot);
+        });
+    }
     unsigned registrationRevision()const{return registrationRevision_;}
     unsigned registeredCount()const{return registered_[0]+registered_[1]+registered_[2];}
     bool registered(unsigned slot)const{
@@ -230,6 +246,7 @@ public:
         Identity id;if(!admitted(h,id)||!mutable_[h.slot].destroyRequested)return good_=false;
         if(!binding_.retire(h,record(id)))return good_=false;
         unregisterInstance(h.slot);
+        ++roomRevision_;
         if(!identities_.retire(h))return good_=false;
         if(h.slot<freeHint_)freeHint_=h.slot;return true;
     }
@@ -239,6 +256,7 @@ public:
             const auto h=handle(0);Identity id;identities_.read(h,id);
             if(!binding_.retire(h,record(id)))return good_=false;
             unregisterInstance(h.slot);
+            ++roomRevision_;
             if(!identities_.retire(h))return good_=false;
             if(h.slot<freeHint_)freeHint_=h.slot;
         }
