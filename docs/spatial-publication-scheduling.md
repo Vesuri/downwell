@@ -54,26 +54,25 @@ order. Duplicate insertions, unbounded IDs, no-retry removal, inadmissible
 geometry and invalid inputs first catch up and use the original eager API.
 The caller's failure result/output semantics remain those of that API.
 
-The log contains 512 records. Pressure drains it synchronously rather than
-dropping operations or inventing a queue-full game failure. The 68000 layout
-adds 11,680 bytes to the collision owner's ordinary program storage; it requires
-no Chip-only allocation. Both pressure drains
+The gameplay owner's log contains 4096 records (the generic journal's default
+remains 512 for reference users). Pressure drains it synchronously rather than
+dropping operations or inventing a queue-full game failure. The larger log adds
+78,848 bytes over the 512-record 68000 layout (22 bytes per operation), in
+ordinary program storage, not Chip RAM. This capacity accommodates a level's
+2048 terrain slots plus churn, but is not an unbounded lifetime history.
+Both pressure drains
 and observation catch-up can be expensive: deferral alone is not a frame-budget
 guarantee.
 
 ## Backend scheduling
 
-The Amiga services one operation at a time during its existing PAL vertical-
-blank wait, stopping when fewer than 128 scanlines remain. A stable high/low/high
-beam sample handles the 255/256 boundary; rechecking the VBI count prevents a
-wrapped beam from becoming a new budget. If an operation crosses VBI, the wait
-does not accidentally wait an additional field.
-
-The scanline margin is conservative scheduling, not preemption or a proof of a
-maximum operation duration. Profiling must cover service overruns, queue pressure,
-query catch-up and natural query-bearing gameplay, not just a selector-free
-generation tape. A backend may omit background service without changing query
-results, but reads then bear the catch-up cost.
+The Amiga does not service the journal during its vertical-blank wait. Reads,
+queue pressure and eager fallback are its materialization boundaries. This
+avoids running an unneeded tree operation across VBI, but reads then bear the
+catch-up cost. The explicit service API remains available for reference tests.
+Profiling must cover queue pressure, query catch-up and natural query-bearing
+gameplay, not just a selector-free generation tape. Removing idle service alone
+does not establish bounded first-query latency or a 20 ms frame budget.
 
 Tests compare exact box/line hit order, first-hit stops, height and node counts
 against eager execution while varying partial service and buffer pressure.

@@ -27,7 +27,7 @@ template<class A,class B> static void compare(A& eager,B& journal){
     }
     assert(eager.height()==journal.height()&&eager.nodeCount()==journal.nodeCount()&&!journal.pending());
 }
-template<unsigned Nodes,unsigned Pending,bool Prepared=false> static void mutations(){
+template<unsigned Nodes,unsigned Pending,bool Prepared=false,bool Background=true> static void mutations(){
     downwell::RunnerSpatialIndex<Nodes> eager;
     downwell::RunnerSpatialJournal<Nodes,128,Pending> journal;
     bool present[128]{};Box previous[128]{};
@@ -52,7 +52,7 @@ template<unsigned Nodes,unsigned Pending,bool Prepared=false> static void mutati
             assert(a==b);present[id]=a;
             if(!a){assert(!journal.valid());eager.clear();journal.clear();for(auto& live:present)live=false;}
         }
-        if(step%11==0){
+        if(Background && step%11==0){
             const auto pending=journal.pending();
             assert(journal.service(2));
             assert(journal.pending()==(pending>2?pending-2:0));
@@ -63,6 +63,26 @@ template<unsigned Nodes,unsigned Pending,bool Prepared=false> static void mutati
     if(Nodes==1024)assert(journal.deferred()); // This fixture must exercise the journal, not fallback.
 }
 int main(){
+    {
+        // A selector-free level must retain more than the old 512 records.
+        // The first real query replays history, including retirement/reuse,
+        // and must return exactly the eager tree's ordered identities.
+        downwell::RunnerSpatialIndex<4096> eager;
+        downwell::RunnerSpatialJournal<4096,2048,4096> journal;
+        for(unsigned i=0;i<1024;++i){
+            const auto b=box(int(i%32)*16,int(i/32)*16);
+            assert(eager.insert(b,i)&&journal.insert(b,i));
+        }
+        for(unsigned i=0;i<256;++i){
+            const auto b=box(int(i%32)*16,int(i/32)*16);
+            bool a=false,c=false;
+            assert(eager.remove(b,i,true,a)&&journal.remove(b,i,true,c)&&a&&c);
+            const auto moved=box(int(i%32)*16,int(i/32)*16+1024);
+            assert(eager.insert(moved,i)&&journal.insert(moved,i));
+        }
+        assert(journal.pending()==1536&&journal.deferred());
+        compare(eager,journal);
+    }
     {
         // Borrowed API inputs must still become owned journal snapshots.
         // Reusing a caller's scratch rectangle cannot rewrite pending work.
@@ -83,6 +103,8 @@ int main(){
     mutations<16,8>();   // Capacity failures must occur at the original insertion.
     mutations<1024,32,true>(); // Identical ordered history using prepared integer bounds.
     mutations<16,8,true>(); // Including the same capacity-failure prefix.
+    mutations<1024,32,true,false>(); // Query/pressure-only replay, no idle servicing.
+    mutations<16,8,true,false>(); // Preserve failures without background servicing.
     for(unsigned mode=0;mode<4;++mode){
         downwell::RunnerSpatialIndex<128> eager;
         downwell::RunnerSpatialJournal<128,32,8> journal;
@@ -153,5 +175,5 @@ int main(){
         assert(!journal.deferred()&&!journal.pending());compare(eager,journal);
         journal.clear();assert(journal.valid()&&journal.deferred()&&!journal.pending());
     }
-    std::printf("spatial journal: ordered reads, 56000 mutations, prepared bounds, background work, pressure and eager fallbacks passed\n");
+    std::printf("spatial journal: ordered reads, 80000 mutations, prepared bounds, query-only/background work, pressure and eager fallbacks passed\n");
 }

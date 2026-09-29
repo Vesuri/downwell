@@ -24,7 +24,10 @@ template<unsigned Capacity,unsigned Nodes,bool Scheduled> struct RunnerSpatialIn
     using Type=RunnerSpatialIndex<Nodes>;
 };
 template<unsigned Capacity,unsigned Nodes> struct RunnerSpatialIndexStorage<Capacity,Nodes,true> {
-    using Type=RunnerSpatialJournal<Nodes,Capacity>;
+    // Hold a level's terrain births plus actor churn without forcing the old
+    // 512-operation drain during ordinary descent. Pressure still drains in
+    // order; no finite log replaces testing the first observing query.
+    using Type=RunnerSpatialJournal<Nodes,Capacity,4096>;
 };
 // Shared collision ownership for externally allocated instance handles. The
 // scheduler must attach every relevant birth before Create, publish its bounds,

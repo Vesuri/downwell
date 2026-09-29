@@ -1813,10 +1813,10 @@ __attribute__((noinline)) static int runDownwell(void) {
         int destroyedBlockX[AmigaPortRuntime::destroyedCapacity] = {0};
         int destroyedBlockY[AmigaPortRuntime::destroyedCapacity] = {0};
         DW_PROFILE_PHASE(profileWait);
-        platform.waitVblank([](void* context){
-            auto& owner=*static_cast<downwell::GameplayCollisionOwner*>(context);
-            return owner.pendingSpatialIndex()&&owner.serviceSpatialIndex(1);
-        },&collisionOwner,128);
+        // The spatial tree is derived state. Only observing queries (or log
+        // pressure) should materialize it; even idle-time service can overrun
+        // VBI and spends cycles on state this gameplay path never reads.
+        platform.waitVblank();
         if(!collisionOwner.valid()){exitCode=20;break;}
         // The preceding detached list has crossed the publication boundary.
         // Only now may another overlay overwrite an entry cover's DMA bank.
