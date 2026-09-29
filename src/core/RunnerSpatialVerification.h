@@ -20,6 +20,19 @@ struct RunnerSpatialVerification {
 [[gnu::noinline]] inline RunnerSpatialVerification verifyRunnerSpatialMutations(){
     RunnerSpatialVerification result;
     {
+        std::uint32_t random=73191;
+        for(unsigned i=0;i<1024;++i){
+            random=random*1664525u+1013904223u;
+            const unsigned bits=(i%512u)<<23|(random&0x7fffffu);
+            const unsigned frames=(random>>8)&65535u;
+            RunnerSpriteChange::Result actual{true,false,true},reference=actual;
+            result.check(RunnerSpriteChange::plan(1,2,{bits},frames,actual)==
+                RunnerSpriteChange::planReference(1,2,{bits},frames,reference));
+            result.check(actual.changed==reference.changed&&actual.resetIndex==reference.resetIndex&&
+                actual.resetTimeline==reference.resetTimeline);
+        }
+    }
+    {
         const std::uint32_t bits[]={0u,0x80000000u,1u,0x80000001u,0x00800000u,0x80800000u,
             0x3f800000u,0xbf800000u,0x7f7fffffu,0xff7fffffu,0x7f800000u,0xff800000u,0x7fc00000u};
         for(auto a:bits)for(auto b:bits){

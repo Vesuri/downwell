@@ -262,10 +262,15 @@ sprite fields unchanged and invalidates the collision owner. The admitted domain
 is normal/zero binary32 indices convertible to signed 32-bit integers and counts
 through 65,535; unsupported FP conversions and special sprite state are not
 silently approximated. Callers must resolve resource/frame metadata correctly.
-Positive frame-count thresholds use direct integer-to-binary32 conversion:
-every admitted count is exactly representable, so no binary64 intermediate is
-needed. Tests compare below/at/above thresholds for all 65,535 positive counts
-against the retained binary64 conversion, without changing reset decisions.
+Positive frame-count thresholds use the binary32 exponent and significand
+directly. Negative indices and magnitudes below one cannot reach a positive
+count; nonnegative indices at least 65,536 exceed every admitted count. Between
+these limits, truncating the positive significand to an integer and comparing
+with the count is exact. No floating-point threshold is constructed per setter.
+`planReference` retains the integer-to-binary32 threshold conversion. Tests
+compare below/at/above thresholds for all 65,535 positive counts against that
+path and the independent binary64 conversion, plus arbitrary mantissas across
+every exponent/sign, rejected inputs and same-ID early exits.
 Tests combine this setter with object-property updates and queue publication;
 production resource ownership and live collision installation remain unfinished.
 

@@ -19,8 +19,27 @@ int main() {
             downwell::RunnerSpriteChange::Result result;
             check(downwell::RunnerSpriteChange::plan(1,2,{bound.bits+delta},frames,result));
             check(result.changed&&result.resetIndex==(delta>=0)&&result.resetTimeline==(delta>=0));
+            downwell::RunnerSpriteChange::Result reference;
+            check(downwell::RunnerSpriteChange::planReference(1,2,{bound.bits+delta},frames,reference));
+            check(result.changed==reference.changed&&result.resetIndex==reference.resetIndex&&
+                result.resetTimeline==reference.resetTimeline);
             ++changes;
         }
+    }
+    // Exercise every exponent and sign, including rejected values, with
+    // arbitrary mantissas/counts and unchanged-ID early exits.
+    std::uint32_t random=73191;
+    for(unsigned i=0;i<262144;++i){
+        random=random*1664525u+1013904223u;
+        const unsigned bits=(i%512u)<<23|(random&0x7fffffu);
+        const unsigned frames=(random>>8)%65538u;
+        downwell::RunnerSpriteChange::Result actual{true,false,true},reference=actual;
+        const int next=i%17?2:1;
+        check(downwell::RunnerSpriteChange::plan(1,next,{bits},frames,actual)==
+            downwell::RunnerSpriteChange::planReference(1,next,{bits},frames,reference));
+        check(actual.changed==reference.changed&&actual.resetIndex==reference.resetIndex&&
+            actual.resetTimeline==reference.resetTimeline);
+        ++changes;
     }
     for(unsigned frames:{0u,1u,6u,8u,65535u})for(int eighth=-1024;eighth<=2048;++eighth){
         const float value=float(eighth)/8;

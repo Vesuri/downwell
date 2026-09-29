@@ -9,6 +9,13 @@ namespace downwell {
 struct RunnerSpriteChange {
     struct Result {bool changed=false,resetIndex=false,resetTimeline=false;};
     static bool plan(int current,int next,RunnerImageValue index,unsigned frames,Result& out){
+        return planMode<true>(current,next,index,frames,out);
+    }
+    static bool planReference(int current,int next,RunnerImageValue index,unsigned frames,Result& out){
+        return planMode<false>(current,next,index,frames,out);
+    }
+private:
+    template<bool Integer> static bool planMode(int current,int next,RunnerImageValue index,unsigned frames,Result& out){
         if(current==next){out={};return true;}
         const auto magnitude=index.bits&0x7fffffffu;
         const bool negative=(index.bits&0x80000000u)!=0;
@@ -19,6 +26,14 @@ struct RunnerSpriteChange {
            magnitude>0x4f000000u || (!negative&&magnitude==0x4f000000u))return false;
         bool reset;
         if(!frames)reset=!(negative&&magnitude>=0x3f800000u);
+        else if constexpr(Integer){
+            // For positive integer frame counts, floor(index)>=frames is
+            // equivalent to index>=frames. Avoid constructing a float bound
+            // for every sprite setter; zero/fractional indices need no shift.
+            if(negative||exponent<127)reset=false;
+            else if(exponent>=143)reset=true; // index>=65536, frames<=65535.
+            else reset=(((magnitude&0x7fffffu)|0x800000u)>>(150-exponent))>=frames;
+        }
         else{
             RunnerImageValue bound;
             // The admitted frame count is <=65535: it is exactly representable
