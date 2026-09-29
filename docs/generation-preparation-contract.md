@@ -49,6 +49,11 @@ An admitted terrain birth supplies both representations to the collision owner,
 so journal admission need not decode those binary32 endpoints back to integers.
 `refreshPreparedTerrain` retains ordinary bounds/flag publication, normalization,
 and removal before insertion; nonscheduled owners use the reference refresh.
+Neither normalization nor deferred servicing may write caller storage. The
+journal owns its operation snapshot, and the instance cache retains the
+source's unnormalized rectangle. Tests overwrite caller scratch immediately
+after publication, then compare ordered queries after deferred replay with
+the ordinary wrapper, including both ordered and reversed endpoints.
 `RunnerSpatialJournal::insertPrepared` borrows the exact decoded endpoints of
 the supplied rectangle. This is a trusted geometry contract, not a general
 unvalidated-coordinate entry point: the terrain preparer admits only exact

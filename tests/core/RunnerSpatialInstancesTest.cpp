@@ -40,9 +40,12 @@ template<bool Scheduled,unsigned Nodes> static void preparedTerrainPublication()
                 if((repeat==1)!=bool(i&1)){auto left=pixels.left;pixels.left=pixels.right;pixels.right=left;}
                 if(i&2){auto top=pixels.top;pixels.top=pixels.bottom;pixels.bottom=top;}
                 const auto bounds=Math::encodePixels(pixels);
+                const auto initialPixels=pixels;
                 const bool publish=repeat!=2,precise=repeat==1;
                 ok=ordinary.refresh(h,flags,false,&bounds,precise,publish);
                 assert(ok==prepared.refreshPreparedTerrain(h,flags,bounds,pixels,precise,publish));
+                assert(pixels.left==initialPixels.left&&pixels.top==initialPixels.top&&
+                    pixels.right==initialPixels.right&&pixels.bottom==initialPixels.bottom);
                 assert(ordinary.valid()==prepared.valid());
                 const auto* a=ordinary.resolve(h);const auto* b=prepared.resolve(h);
                 assert(bool(a)==bool(b));
@@ -95,9 +98,12 @@ int main(){
             RunnerSpatialSplit::PixelBox pixels{int(i%4)*16,32,int(i%4)*16+64,96};
             if(i&1){auto x=pixels.left;pixels.left=pixels.right;pixels.right=x;}
             if(i&2){auto y=pixels.top;pixels.top=pixels.bottom;pixels.bottom=y;}
-            const auto bounds=RunnerSpatialSplit::encodePixels(pixels);
+            auto bounds=RunnerSpatialSplit::encodePixels(pixels);
             assert(ordinary.refresh(h,0x18,false,&bounds,false,true)&&
                 prepared.refreshPreparedTerrain(h,0x18,bounds,pixels,false,true));
+            // Caller storage is reusable after publication returns. The
+            // deferred journal must own its normalized operation snapshot.
+            bounds={};pixels={-900,-800,-700,-600};
         }
         assert(ordinary.pendingSpatialIndex()==32&&prepared.pendingSpatialIndex()==32);
         for(int x=-16;x<144;x+=4)for(bool stop:{false,true}){
