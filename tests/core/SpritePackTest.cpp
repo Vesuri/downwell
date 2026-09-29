@@ -168,6 +168,12 @@ void testGeneratedPack(const char* path,const char* maskPath,const char* objectP
                     Owner::Box changed{{0x3f800000u},{0x40000000u},{0x40400000u},{0x40800000u}};
                     require(positioned.refresh({0,generation},*families.flags(id),false,&changed,true,false)&&
                         positioned.retire({0,generation}),"recycled birth discards previous cached bounds");
+                    // Reuse must rebuild every property, not just position and
+                    // resource IDs. None of these stores is a live setter.
+                    p.sprite.spriteId=-999;p.sprite.maskId=597;
+                    p.sprite.scaleX={0x40000000u};p.sprite.scaleY={0x3f000000u};
+                    p.sprite.angle={0x42b40000u};p.sprite.imageIndex={0x41000000u};
+                    p.depth={0x42f60000u};p.timeline={0x41000000u};p.cachedFrame={0x40800000u};
                 }
             }
         }
@@ -178,6 +184,17 @@ void testGeneratedPack(const char* path,const char* maskPath,const char* objectP
         require(!incomplete.bindObjectFromPacks({0,1},0,true,unchanged,objects,compact,spatialOnly,false,&failedDepth)&&
                 !incomplete.valid()&&unchanged.sprite.spriteId==-1,"reject missing property flags before mutation");
         require(failedDepth==0x12345678,"failed binding does not publish compatibility depth");
+        Owner rejectedBirth;Owner::Properties rejectedProperties;
+        rejectedProperties.sprite.spriteId=51;rejectedProperties.sprite.maskId=585;
+        rejectedProperties.sprite.scaleX={0x40000000u};rejectedProperties.timeline={0x41000000u};
+        Owner::Real unpublishedDepth{0x12345678u};
+        require(!rejectedBirth.attachObjectPrepared({0,1},60,{},true,rejectedProperties,
+                preparedDefaults,spatialOnly,&unpublishedDepth)&&!rejectedBirth.valid()&&
+            rejectedBirth.resolve({0,1})&&rejectedBirth.resolve({0,1})->flags==8&&
+            rejectedProperties.sprite.spriteId==-1&&rejectedProperties.sprite.maskId==-1&&
+            rejectedProperties.sprite.scaleX.bits==0x3f800000u&&!rejectedProperties.timeline.bits&&
+            unpublishedDepth.bits==0x12345678u&&!rejectedBirth.pendingSpatial()&&!rejectedBirth.pendingCollision(),
+            "failed prepared construction retains attached lifetime and reset-property prefix without publishing depth or queues");
         using StoredOwner=downwell::RunnerSpatialInstances<4,8>;
         StoredOwner storedOwner;StoredOwner::Properties properties[4];
         downwell::InstanceStore<4> records;

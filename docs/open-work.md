@@ -207,8 +207,12 @@ Reference: [upgrade IDs and source entry points](upgrade-coverage.md).
   prepared path against immediate execution with intervening gameplay RNG and
   health changes, not just a fixed initial seed. Follow the
   [generation preparation boundary](generation-preparation-contract.md).
-  Decide the remaining collision
-  and layer ownership work from these dependencies before further micro-tuning.
+  Integrate the ordered terrain-run interface with actual shared registration
+  work, rather than repeating the scalar owner pipeline for every cell. Audit
+  observation and failure boundaries across collision, room and layer owners
+  before combining their setup/publication. Preserve per-cell RNG interleaving,
+  equal-depth ordering, lifetime allocation and partial-failure prefixes; keep
+  a scalar execution reference for deterministic comparisons.
   Complete the collision-consumer audit as remaining original queries enter
   gameplay. Bound spatial-journal catch-up and pressure drains under natural
   query-bearing workloads, including idle-service overruns; a selector-free
