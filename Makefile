@@ -1611,7 +1611,7 @@ generated/downwell-field-spans.h: build/generate-field-spans
 	@mkdir -p generated
 	./build/generate-field-spans $@
 
-$(AMIGA_RENDERER_TEST_TARGET): generated/downwell-field-spans.h src/platform/amiga/AmigaFieldSpans.h
+$(AMIGA_RENDERER_TEST_TARGET): generated/downwell-field-spans.h src/platform/amiga/AmigaFieldSpans.h src/platform/amiga/AmigaFieldWords.h src/platform/amiga/AmigaGoalField.h
 
 $(TARGET): $(OBJECTS)
 	@mkdir -p $(@D)

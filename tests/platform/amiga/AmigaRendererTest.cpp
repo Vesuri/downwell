@@ -217,9 +217,25 @@ int main(int argc, char** argv) {
                     for(int px=first;px<end;++px)spans[(row-top)*(right-left)+px-left]=pen;
                 });
                 require(spans==pixels,"offline field rows preserve final coverage and pen priority");
+                for(int phase=0;phase<(clip==3?16:1);++phase){
+                    std::fill(spans.begin(),spans.end(),0);
+                    cached.circles[0].x=x+phase;
+                    amigaFieldWords(cached,left+phase,top,right+phase,bottom,
+                        [&](int wx,int wy,unsigned mask,unsigned low,unsigned high){
+                            require(!(wx&15)&&mask&&!(mask&~0xffffu)&&!(low&~mask)&&!(high&~mask),
+                                "cached words have aligned coordinates and bounded planar masks");
+                            for(unsigned bit=0;bit<16;++bit)if(mask&(0x8000u>>bit)){
+                                const int px=wx+int(bit)-phase;
+                                require(px>=left&&px<right&&wy>=top&&wy<bottom,"cached words obey partial-word clipping");
+                                spans[(wy-top)*(right-left)+px-left]=
+                                    ((low&(0x8000u>>bit))?1:0)|((high&(0x8000u>>bit))?2:0);
+                            }
+                        });
+                    require(spans==pixels,"offline planar words preserve all radii, shifts and final pens");
+                }
             }
         }
-        std::cout << "1024 outline radii and 4096 clipping/cache comparisons passed\n";
+        std::cout << "1024 outline radii, 4096 span clips and 19456 planar-word shift/clip comparisons passed\n";
     }
     {
         std::vector<UBYTE> base(downwellGameRingBytes), actual(base.size()), expected(base.size());
@@ -1143,7 +1159,9 @@ int main(int argc, char** argv) {
     std::cout << "Amiga renderer pixel comparisons passed\n";
     // Run the raster checks even when asset growth violates the residency gate.
     // Keep the budget a hard failure, not an automatically growing allowance.
-    require(amigaRendererChipPackBytes(gamePack.data(), gamePack.data() + gamePack.size()) <= 278000,
+    const auto residentBytes = amigaRendererChipPackBytes(gamePack.data(), gamePack.data() + gamePack.size());
+    std::cout << "Resident game art: " << residentBytes << " bytes (budget 278000)\n";
+    require(residentBytes <= 278000,
             "resident game art stays within the tested 512 KiB A500 budget");
     std::cout << "Amiga renderer tests passed\n";
     return 0;

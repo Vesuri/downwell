@@ -3,7 +3,7 @@
 #include "AmigaRenderer.h"
 #include "core/GoalFieldOutline.h"
 #include "core/TimeFieldOutlines.h"
-#include "AmigaFieldSpans.h"
+#include "AmigaFieldWords.h"
 
 // Per-display sparse word overlay. Restore only departing coverage; publish
 // final colours directly, never clearing continuing pixels. Drain DMA first.
@@ -47,29 +47,22 @@ public:
         for (unsigned i = 0; i < next.count; ++i) next.index[next.words[i].offset / 2] = 0;
         next.count = 0;
         bool overflow = false;
-        amigaFieldSpans(shape,downwellPlayfieldX,0,downwellPlayfieldX+downwellPlayfieldWidth,
-                          downwellDisplayHeight,[&](int first,int end,int y,int pen) {
+        amigaFieldWords(shape,downwellPlayfieldX,0,downwellPlayfieldX+downwellPlayfieldWidth,
+                          downwellDisplayHeight,[&](int x,int y,unsigned mask,unsigned low,unsigned high) {
             unsigned row = origin + static_cast<unsigned>(y);
             if (row >= downwellGameRingHeight) row -= downwellGameRingHeight;
             const unsigned rowOffset = row * downwellBytesPerPlaneLine;
-            for(int x=first;x<end;){
-                const int wordEnd=(x|15)+1;
-                const int nextX=wordEnd<end?wordEnd:end;
-                const unsigned offset = rowOffset + (x / 16) * 2;
-                auto& slot = next.index[offset / 2];
-                if (!slot) {
-                    if (next.count == capacity) { overflow = true; return; }
-                    slot = ++next.count;
-                    next.words[slot - 1] = {static_cast<UWORD>(offset),0,{0,0},{0,0},0};
-                }
-                auto& word = next.words[slot - 1];
-                const UWORD mask = (0xffffu >> (x&15)) & (0xffffu << (15-((nextX-1)&15)));
-                word.mask |= mask;
-                for (unsigned plane = 0; plane < 2; ++plane)
-                    word.paint[plane] = (pen & (1u << plane)) ? word.paint[plane] | mask
-                        : word.paint[plane] & static_cast<UWORD>(~mask);
-                x=nextX;
+            const unsigned offset = rowOffset + (x / 16) * 2;
+            auto& slot = next.index[offset / 2];
+            if (!slot) {
+                if (next.count == capacity) { overflow = true; return; }
+                slot = ++next.count;
+                next.words[slot - 1] = {static_cast<UWORD>(offset),0,{0,0},{0,0},0};
             }
+            auto& word = next.words[slot - 1];
+            word.mask |= mask;
+            word.paint[0]=(word.paint[0]&static_cast<UWORD>(~mask))|low;
+            word.paint[1]=(word.paint[1]&static_cast<UWORD>(~mask))|high;
         });
         if (overflow) return false;
         for (unsigned i = 0; i < count_; ++i) {
