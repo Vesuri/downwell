@@ -129,6 +129,9 @@ int main(int argc, char** argv) {
                   << " player=" << state.mainPlayerX() << ',' << state.mainPlayerY()
                   << " view=" << state.mainCameraViewX() << ',' << state.mainCameraViewY()
                   << " render_view=" << state.mainCameraRenderViewX() << ',' << state.mainCameraRenderViewY()
+                  << " grounded=" << state.mainPlayerGrounded()
+                  << " health=" << state.mainPlayerHealth()
+                  << " jumps=" << state.mainJumps() << " shots=" << state.mainShotsFired()
                   << " sprite=" << state.mainPlayerSpriteId() << ',' << state.mainPlayerImageIndex() << '\n';
         game.render(platform);
         // Exercise target restoration as well as direct framebuffer readback.

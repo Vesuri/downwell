@@ -214,9 +214,12 @@ Reference: [upgrade IDs and source entry points](upgrade-coverage.md).
   first-hit identity, query-preparation side effects and failure timing. See
   [derived-tree scheduling](spatial-publication-scheduling.md).
 - Complete the full startup-to-gameplay scene verification with idle spatial
-  servicing enabled. Resolve the bounded verifier timeout before treating the
-  garden/style transition and its timing checks as verified; matching initial
-  splash captures alone is insufficient.
+  servicing enabled. Investigate why the current post-landing input tape remains
+  at Y=1200 on both backends rather than satisfying the 256-pixel descent and
+  awake-enemy gate. Distinguish a route limitation from shared collision or
+  destruction behavior; do not weaken the gate or treat matching positions as
+  original-game validation. Complete the transition timing and presentation
+  checks once progression is resolved.
 - Reduce full-room bookkeeping in layer projection, animation/previous-position
   snapshots and alarm registration capture. Preserve inactive layer termination,
   callback order, generation checks and synchronous mutation visibility. Measure

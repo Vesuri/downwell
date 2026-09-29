@@ -107,6 +107,7 @@ if kill -0 "$GDB_PID" 2>/dev/null; then
   kill "$GDB_PID" 2>/dev/null || true
   wait "$GDB_PID" 2>/dev/null || true
   echo "debugger did not reach ${READY_DESCRIPTION} within ${VERIFY_TIMEOUT_SECONDS}s"
+  tail -80 "$RUN/gdb-startup.log"
   exit 1
 fi
 wait "$GDB_PID" 2>/dev/null || true
