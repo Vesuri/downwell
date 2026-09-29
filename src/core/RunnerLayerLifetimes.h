@@ -6,7 +6,7 @@ namespace downwell {
 // Shared lifetime/depth adapter over a room's element registry. Install before
 // births. Room resource preparation and persistent-state transfer remain the
 // room owner's responsibility. Large owners must not live on the Amiga stack.
-template<unsigned L,unsigned E,unsigned I,bool DirectIdentity=false> class RunnerLayerLifetimes {
+template<unsigned L,unsigned E,unsigned I,bool DirectIdentity=false,bool CompactUnnumbered=false> class RunnerLayerLifetimes {
 public:
     using Registry=RunnerLayerInstances<L,E,DirectIdentity?I:0>;
     using Layers=typename Registry::Layers;
@@ -22,7 +22,24 @@ public:
     RunnerLayerLifetimes& operator=(const RunnerLayerLifetimes&)=delete;
     bool succeeded()const{return good_&&layers_.succeeded()&&pending_.succeeded();}
     const State* resolve(InstanceHandle h)const{
+        if constexpr(CompactUnnumbered)if(h.slot<I&&compact_[h.slot]){
+            const unsigned element=registry_.find(h);
+            const auto* entry=registry_.get(element);
+            const auto* layer=layers_.get(layers_.elementOwner(element));
+            if(!entry||entry->sourceId||!layer)return nullptr;
+            // Publish stable ordinary storage on first observation.
+            states_[h.slot]={h,0,{layer->encodedDepth,layer->id,true,false},compact_[h.slot]==2};
+            compact_[h.slot]=0;
+        }
         return h.slot<I&&h.generation&&states_[h.slot].handle.generation==h.generation?&states_[h.slot]:nullptr;
+    }
+    bool attachedLayer(InstanceHandle h,int& id)const{
+        if constexpr(CompactUnnumbered)if(h.slot<I&&compact_[h.slot]){
+            const auto* layer=layers_.get(layers_.elementOwner(registry_.find(h)));
+            if(!layer)return false;id=layer->id;return true;
+        }
+        const auto* state=resolve(h);if(!state)return false;
+        id=state->depth.layerId;return true;
     }
     // Adopt surviving instance fields before serialized room initialization.
     // This is not Create: do not attach, truncate depth, or invent/reset the
@@ -38,6 +55,7 @@ private:
         const auto h=state.handle;
         if(!succeeded()||h.slot>=I||!h.generation||states_[h.slot].handle.generation||
             !RunnerSpatialSplit::valid(state.depth.depth))return fail();
+        if constexpr(CompactUnnumbered)if(compact_[h.slot])return fail();
         for(unsigned i=0;i<I;++i)
             if(state.sourceId&&states_[i].handle.generation&&states_[i].sourceId==state.sourceId)return fail();
         // Scalar stores avoid bytewise aggregate construction in the 68000
@@ -85,7 +103,18 @@ public:
     // Native actors whose original global numeric ID is not recovered yet.
     // Ownership/migration use handles; no synthetic source ID is allocated.
     // Such lifetimes must be retired, never carried through room ID lookup.
-    bool birthUnnumbered(InstanceHandle h,RunnerImageValue depth,bool inactive){
+    bool birthUnnumbered(InstanceHandle h,RunnerImageValue depth,bool inactive,bool compact=false){
+        if constexpr(CompactUnnumbered)if(compact){
+            if(!succeeded()||h.slot>=I||!h.generation||compact_[h.slot]||
+                states_[h.slot].handle.generation||!RunnerSpatialSplit::valid(depth))return fail();
+            RunnerDepthService::Instance attachment{depth,-1,false,false};
+            if(!registry_.attachRoomFallback(layers_,0,h,attachment,inactive,
+                [&](int value,unsigned& slot){return ids_.createDynamic(layers_,value,slot);})){
+                // Preserve adoption and partial attachment on failure.
+                states_[h.slot]={h,0,attachment,inactive};return fail();
+            }
+            compact_[h.slot]=inactive?2:1;return true;
+        }
         return birthState(h,0,depth,inactive);
     }
 private:
@@ -103,10 +132,16 @@ public:
     // Publish flags when source activation changes, but relink only at its
     // separate reconciliation phase (not at the flag-write boundary).
     bool publishInactive(InstanceHandle h,bool inactive){
+        if constexpr(CompactUnnumbered)if(h.slot<I&&compact_[h.slot]){
+            if(!succeeded()||registry_.find(h)==Registry::End)return fail();
+            compact_[h.slot]=inactive?2:1;return true;
+        }
         if(!succeeded()||!resolve(h))return fail();
         states_[h.slot].inactive=inactive;return true;
     }
     bool reconcileActivation(InstanceHandle h){
+        if constexpr(CompactUnnumbered)if(h.slot<I&&compact_[h.slot])
+            return (succeeded()&&layers_.reconcileInstanceActivation(registry_.find(h),compact_[h.slot]==2))||fail();
         const auto* state=resolve(h);
         return (succeeded()&&state&&layers_.reconcileInstanceActivation(registry_.find(h),state->inactive))||fail();
     }
@@ -127,16 +162,25 @@ public:
                 [&](int depth,unsigned& out){return ids_.createDynamic(layers_,depth,out);},
                 [&](unsigned e,int id){
                     const auto* entry=registry_.get(e);if(!entry||!entry->instance.generation)return true;
+                    if constexpr(CompactUnnumbered)if(entry->instance.slot<I&&compact_[entry->instance.slot])
+                        return registry_.find(entry->instance)==e;
                     const auto* live=resolve(entry->instance);if(!live)return false;
                     states_[entry->instance.slot].depth.layerId=id;return true;
                 },[&](unsigned e){
                     const auto* entry=registry_.get(e);
+                    if constexpr(CompactUnnumbered)if(entry&&entry->instance.slot<I&&compact_[entry->instance.slot])
+                        return compact_[entry->instance.slot]==2;
                     const auto* live=entry?resolve(entry->instance):nullptr;
                     return live&&live->inactive;
                 });
         })||fail();
     }
     bool retire(InstanceHandle h){
+        if constexpr(CompactUnnumbered)if(h.slot<I&&compact_[h.slot]){
+            if(!succeeded()||registry_.find(h)==Registry::End||!pending_.retire(h.slot)||
+                !registry_.retire(layers_,0,h))return fail();
+            compact_[h.slot]=0;return true;
+        }
         const auto* state=resolve(h);
         if(!succeeded()||!state)return fail();
         if(!pending_.retire(h.slot))return fail();
@@ -170,7 +214,10 @@ public:
 private:
     bool fail(){good_=false;return false;}
     Layers& layers_;Registry& registry_;RunnerLayerIds& ids_;
-    State states_[I?I:1]{};
+    mutable State states_[I?I:1]{};
+    // Enabled only by owners routing all depth/attachment mutations here.
+    // 0 = ordinary/absent, 1 = compact active, 2 = compact inactive.
+    mutable std::uint8_t compact_[CompactUnnumbered&&I?I:1]{};
     RunnerDepthChanges<I> pending_;
     bool good_=true;
 };

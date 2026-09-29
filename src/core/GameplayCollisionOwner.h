@@ -55,7 +55,11 @@ private:
     PreparedObjectDefaults<386> objectDefaults_;
     PreparedSpriteGeometry<741> spriteGeometry_;
     PreparedTerrainBirthBounds terrainBirthBounds_;
+#ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
     GameplayRoomLayers<View::capacity> layers_;
+#else
+    GameplayRoomLayers<View::capacity,true> layers_;
+#endif
     ObjectDrawMetadata<386> drawMetadata_;
     ObjectAlarmMetadata<386> alarmMetadata_;
     GameplayWorld* world_=nullptr;

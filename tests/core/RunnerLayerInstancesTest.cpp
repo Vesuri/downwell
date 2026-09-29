@@ -443,4 +443,64 @@ void unnumberedLifetimes(){
             "unrecovered numeric IDs cannot silently survive source room lookup");
     }
 }
-int main(){permutations();lifecycle();identityCollisions();bounds();roomFallback();globalFallbackOrder();serializedInitialization();rebindRelease();roomInitializationFailures();lifetimeDepthIntegration();lifetimeRoomInitialization();roomUninitialization();unnumberedLifetimes();std::cout<<"Serialized layer initialization, rebind release, room fallback and lifetime-checked attachment verified\n";}
+template<bool Compact> std::vector<unsigned> compactLifetimeWitness(){
+    using namespace downwell;
+    using R=RunnerLayerInstances<8,32,24>;
+    R registry;R::Layers layers;RunnerLayerIds ids;
+    RunnerLayerLifetimes<8,32,24,true,Compact> owner(layers,registry,ids);
+    std::vector<unsigned> trace;
+    InstanceHandle handles[24];
+    auto capture=[&](){
+        trace.push_back(owner.succeeded());trace.push_back(ids.dynamicMaximum);
+        require(layers.visitLayers([&](unsigned layer,const auto& record){
+            trace.push_back(layer);trace.push_back(record.id);trace.push_back(record.depth);
+            require(layers.visitElements(layer,[&](unsigned e){
+                const auto* entry=registry.get(e);require(entry,"live entry");
+                trace.push_back(e);trace.push_back(entry->instance.slot);trace.push_back(entry->instance.generation);
+                return true;
+            }),"compact element order");trace.push_back(0xffffffffu);return true;
+        }),"compact layer order");
+    };
+    for(unsigned i=0;i<24;++i){
+        handles[i]={i,1};RunnerImageValue depth;depth.assignInteger(int(i%3)*16);
+        require(owner.birthUnnumbered(handles[i],depth,i%5==0,true),"compact birth");capture();
+    }
+    // Keep most lifetimes unobserved while activation and merges change links.
+    for(unsigned i=0;i<24;i+=3){
+        require(owner.publishInactive(handles[i],true)&&owner.reconcileActivation(handles[i]),"compact inactive");capture();
+        require(owner.publishInactive(handles[i],false)&&owner.reconcileActivation(handles[i]),"compact active");capture();
+    }
+    for(unsigned i=1;i<24;i+=4){
+        require(owner.writeDepth(handles[i],MotionBinary64::fromInteger(int((i+1)%3)*16))&&owner.serviceDepths(),"compact depth migration");capture();
+    }
+    for(unsigned i=0;i<24;i+=2){
+        require(owner.retire(handles[i])&&!owner.resolve(handles[i]),"compact retirement");capture();
+        const auto old=handles[i];++handles[i].generation;
+        require(owner.birthUnnumbered(handles[i],{},false,true)&&!owner.resolve(old),"compact generation reuse");capture();
+    }
+    for(unsigned i=0;i<24;++i){
+        int layer;require(owner.attachedLayer(handles[i],layer),"derived layer lookup");trace.push_back(layer);
+        const auto* state=owner.resolve(handles[i]);require(state,"materialized lifetime");
+        trace.push_back(state->sourceId);trace.push_back(state->depth.depth.bits);trace.push_back(state->depth.layerId);
+        trace.push_back(state->depth.attached);trace.push_back(state->depth.append);trace.push_back(state->inactive);
+        require(owner.publishInactive(handles[i],!state->inactive)&&owner.resolve(handles[i])==state,"materialized pointer stays stable");
+        trace.push_back(state->inactive);
+    }
+    for(auto h:handles)require(owner.retire(h),"materialized retirement");capture();
+    return trace;
+}
+template<bool Compact> std::vector<unsigned> compactFailureWitness(){
+    using namespace downwell;
+    using R=RunnerLayerInstances<1,1,2>;
+    R registry;R::Layers layers;RunnerLayerIds ids;
+    RunnerLayerLifetimes<1,1,2,true,Compact> owner(layers,registry,ids);
+    require(owner.birthUnnumbered({0,1},{},false,true),"fill compact attachment capacity");
+    require(!owner.birthUnnumbered({1,1},{},true,true)&&!owner.succeeded(),"failed compact attachment");
+    const auto* state=owner.resolve({1,1});require(state,"failure keeps adopted lifetime");
+    return {state->handle.slot,state->handle.generation,state->sourceId,state->depth.depth.bits,
+        unsigned(state->depth.layerId),state->depth.attached,state->depth.append,state->inactive};
+}
+int main(){permutations();lifecycle();identityCollisions();bounds();roomFallback();globalFallbackOrder();serializedInitialization();rebindRelease();roomInitializationFailures();lifetimeDepthIntegration();lifetimeRoomInitialization();roomUninitialization();unnumberedLifetimes();
+    require(compactLifetimeWitness<true>()==compactLifetimeWitness<false>(),"compact/full lifetime mutation trace");
+    require(compactFailureWitness<true>()==compactFailureWitness<false>(),"compact/full attachment failure prefix");
+    std::cout<<"Serialized layer initialization, rebind release, room fallback and lifetime-checked attachment verified\n";}

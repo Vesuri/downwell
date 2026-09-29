@@ -103,6 +103,33 @@ and invalid-resource failure prefixes retain the ordinary path. The scalar
 whole-owner configuration also retains that path for comparison. This does not
 merge separate births, advance Create, or defer an observable mutation.
 
+### Derived static layer lifetime state
+
+The selected gameplay layer owner can leave an unnumbered, nonprojected static
+lifetime compact. Its registry entry already holds the exact handle and source
+ID, and its attached layer holds the published integer depth and layer ID.
+Only active/inactive state needs separate publication. This avoids adopting a
+second full lifetime record at birth. Named instances and projected actors keep
+ordinary records. A failed compact attachment still publishes the same adopted
+state and partial attachment prefix as the scalar path.
+
+`RunnerLayerLifetimes::resolve` materializes compact state into the existing
+per-slot record on first observation, yielding the same stable borrowed pointer
+as the ordinary owner. A depth write also materializes before entering the
+pending-depth queue. Activation/reconciliation and retirement do not require
+materialization. Layer merges derive compact layer IDs from the updated links.
+This opt-in contract requires all depth/attachment mutations to go through the
+lifetime owner: an unobserved compact element cannot be moved by direct external
+`RunnerLayers` writes. In gameplay, whole-layer depth movement requires a
+singleton, whose depth request has already materialized its only instance;
+other migrations detach the requesting element, leaving compact peers' depths
+unchanged. Room teardown still rejects surviving unnumbered lifetimes.
+
+The compact marker costs one byte per lifetime slot (3,067 slots in gameplay),
+plus alignment. Existing full-record capacity remains reserved for observation
+and mutation fallback; this removes repeated publication, not reserved storage.
+The scalar configuration retains eager lifetime adoption as its oracle.
+
 ### Whole-owner differential boundary
 
 `make verify-gameplay-collision-owner` compiles the gameplay owner twice:

@@ -8,7 +8,7 @@ namespace downwell {
 // Native room layer ownership, separate from the animation/membership list.
 // Current gameplay rooms have no surviving native actors between entries.
 // Unrecovered dynamic numeric IDs remain unknown, not slot-derived aliases.
-template<unsigned I> class GameplayRoomLayers {
+template<unsigned I,bool CompactUnnumbered=false> class GameplayRoomLayers {
     static constexpr unsigned L=64,E=I+256,B=8;
     using Registry=RunnerLayerInstances<L,E,I>;
     using Layers=typename Registry::Layers;
@@ -16,7 +16,7 @@ template<unsigned I> class GameplayRoomLayers {
     Layers layers_;
     Registry registry_;
     RunnerLayerBackgrounds<L,E,B> backgrounds_;
-    RunnerLayerLifetimes<L,E,I,true> lifetimes_{layers_,registry_,ids_};
+    RunnerLayerLifetimes<L,E,I,true,CompactUnnumbered> lifetimes_{layers_,registry_,ids_};
     const RoomPack* rooms_=nullptr;
     bool visible_[L]{};
     // Actor projection only. Nonprojected scenery/fields still occupy their
@@ -91,7 +91,7 @@ public:
     bool birth(InstanceHandle h,unsigned sourceId,RunnerImageValue depth,bool inactive,bool projected=true){
         if(!enabled())return true;
         if(!valid()||!prepared_||!(sourceId?lifetimes_.birth(h,sourceId,depth,inactive):
-            lifetimes_.birthUnnumbered(h,depth,inactive)))return fail();
+            lifetimes_.birthUnnumbered(h,depth,inactive,!projected)))return fail();
         const unsigned bit=1u<<(h.slot&7);
         if(projected)projected_[h.slot>>3]|=bit;
         else projected_[h.slot>>3]&=~bit;
@@ -153,8 +153,8 @@ public:
     bool reconcile(InstanceHandle h){
         if(!enabled())return true;
         if(!valid())return false;
-        const auto* state=lifetimes_.resolve(h);
-        const unsigned layer=state?layers_.find(state->depth.layerId):Layers::End;
+        int id;
+        const unsigned layer=lifetimes_.attachedLayer(h,id)?layers_.find(id):Layers::End;
         if(layer==Layers::End)return fail();
         projectionValid_[layer]=false;return lifetimes_.reconcileActivation(h);
     }
