@@ -146,6 +146,18 @@ plus alignment. Existing full-record capacity remains reserved for observation
 and mutation fallback; this removes repeated publication, not reserved storage.
 The scalar configuration retains eager lifetime adoption as its oracle.
 
+Successful compact births also avoid constructing a temporary ordinary
+attachment record. `attachFreshUnnumbered` resolves or creates the same dynamic
+layer, allocates the same lowest free element, publishes its identity and
+inserts it at the same head. There is no named placeholder or saved layer ID
+on this path. Inactive births still enter at the head until reconciliation.
+On failure it publishes the ordinary adopted/partially attached record, with
+the source depth before attachment and the layer's encoded depth afterward.
+The general `attachRoomFallback` remains the reference. Direct fixtures compare
+layer topology, registry entries and failure-state fields, including failed or
+malformed layer creation, duplicate/out-of-range identities and full capacity.
+This removes discarded attachment state, not the persistent per-cell element.
+
 ### Whole-owner differential boundary
 
 `make verify-gameplay-collision-owner` compiles the gameplay owner twice:

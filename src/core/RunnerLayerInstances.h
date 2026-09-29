@@ -85,6 +85,34 @@ public:
         if(!reused)return layers.attach(layer,element,true,state.append,[](unsigned){return false;});
         return !inactive||layers.reconcileInstanceActivation(element,true);
     }
+    // Fresh unnumbered compact lifetime: the attached depth/ID are derived
+    // from the owning layer until observed. Do not build a disposable ordinary
+    // attachment record on success. Failure must publish exactly the record
+    // which attachRoomFallback would have left before returning false.
+    template<class CreateLayer,class Failure>
+    bool attachFreshUnnumbered(Layers& layers,InstanceHandle h,RunnerImageValue depth,
+        CreateLayer create,Failure failure){
+        auto unattached=[&]{failure(depth,-1,false);return false;};
+        if(!layers.succeeded())return unattached();
+        std::int32_t integer;
+        if(!RunnerDepthService::integerDepth(depth,integer))return unattached();
+        unsigned layer=layers.findDynamic(integer);
+        if(layer==Layers::End){
+            if(!create(integer,layer))return unattached();
+            const auto* created=layers.get(layer);
+            if(!created||!created->dynamic||created->depth!=integer)return unattached();
+        }
+        if(!h.generation||h.slot==0xffffffffu||!identityAvailable(h)||!layers.succeeded())return unattached();
+        const auto* destination=layers.get(layer);if(!destination)return unattached();
+        const unsigned element=free(layers);if(element==End)return unattached();
+        auto& entry=entries_[element];
+        entry.sourceId=0;entry.instance.slot=h.slot;entry.instance.generation=h.generation;
+        if constexpr(!IdentitySlots)entry.present=true;
+        indexIdentity(element);
+        if(element>=usedEnd_)usedEnd_=element+1;
+        if(layers.attach(layer,element,true,false,[](unsigned){return false;}))return true;
+        failure(destination->encodedDepth,destination->id,true);return false;
+    }
     bool retire(Layers& layers,std::uint32_t sourceId,InstanceHandle h){
         const unsigned element=find(h);
         if(element==End||entries_[element].sourceId!=sourceId||!layers.detach(element))return false;

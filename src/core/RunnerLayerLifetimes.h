@@ -107,12 +107,12 @@ public:
         if constexpr(CompactUnnumbered)if(compact){
             if(!succeeded()||h.slot>=I||!h.generation||compact_[h.slot]||
                 states_[h.slot].handle.generation||!RunnerSpatialSplit::valid(depth))return fail();
-            RunnerDepthService::Instance attachment{depth,-1,false,false};
-            if(!registry_.attachRoomFallback(layers_,0,h,attachment,inactive,
-                [&](int value,unsigned& slot){return ids_.createDynamic(layers_,value,slot);})){
-                // Preserve adoption and partial attachment on failure.
-                states_[h.slot]={h,0,attachment,inactive};return fail();
-            }
+            if(!registry_.attachFreshUnnumbered(layers_,h,depth,
+                [&](int value,unsigned& slot){return ids_.createDynamic(layers_,value,slot);},
+                [&](RunnerImageValue publishedDepth,int layer,bool attached){
+                    // Preserve adoption and partial attachment on failure.
+                    states_[h.slot]={h,0,{publishedDepth,layer,attached,false},inactive};
+                }))return fail();
             compact_[h.slot]=inactive?2:1;return true;
         }
         return birthState(h,0,depth,inactive);

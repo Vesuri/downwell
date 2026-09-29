@@ -545,9 +545,53 @@ template<bool Compact> std::vector<unsigned> compactFailureWitness(){
     return {state->handle.slot,state->handle.generation,state->sourceId,state->depth.depth.bits,
         unsigned(state->depth.layerId),state->depth.attached,state->depth.append,state->inactive};
 }
+template<bool Fast> std::vector<unsigned> freshAttachmentWitness(unsigned mode){
+    using namespace downwell;
+    using R=RunnerLayerInstances<3,4,5>;
+    R registry;R::Layers layers;
+    const RunnerImageValue depth{mode==3?0x7fc00000u:0x41780000u}; // NaN or 15.5.
+    InstanceHandle h{mode==2?5u:mode==8?4u:0u,1};
+    unsigned calls=0,failureCalls=0;
+    auto create=[&](int value,unsigned& slot){
+        ++calls;if(mode==4)return false;
+        const bool made=layers.insertAfterEquals(100+calls,value+(mode==6),mode!=5,slot);
+        return mode==7?false:made;
+    };
+    if(mode==8||mode==9||mode==10){
+        unsigned layer;require(layers.insertAfterEquals(50,15,true,layer),"prepare existing dynamic layer");
+        if(mode==8)for(unsigned s=0;s<4;++s){
+            RunnerDepthService::Instance state;
+            require(registry.attach(layers,layer,0,{s,1},state,false),"fill compact element registry");
+        }
+        if(mode==9){
+            RunnerDepthService::Instance state;
+            require(registry.attach(layers,layer,0,h,state,false),"pre-existing compact identity");
+        }
+    }
+    if(mode==11){unsigned layer;require(layers.insertAfterEquals(50,15,false,layer),"fixed equal-depth layer");}
+    RunnerDepthService::Instance state{depth,-1,false,false};
+    bool ok;
+    if constexpr(Fast)ok=registry.attachFreshUnnumbered(layers,h,depth,create,
+        [&](RunnerImageValue d,int id,bool attached){++failureCalls;state={d,id,attached,false};});
+    else ok=registry.attachRoomFallback(layers,0,h,state,mode==1,create);
+    if constexpr(Fast)require(failureCalls==unsigned(!ok),"compact failure published exactly once, never on success");
+    std::vector<unsigned> trace{unsigned(ok),calls};
+    if(!ok)trace.insert(trace.end(),{state.depth.bits,unsigned(state.layerId),unsigned(state.attached),unsigned(state.append)});
+    require(layers.visitLayers([&](unsigned l,const auto& value){
+        trace.insert(trace.end(),{l,unsigned(value.id),unsigned(value.depth),unsigned(value.dynamic)});
+        return layers.visitElements(l,[&](unsigned e){trace.push_back(e);return true;});
+    }),"capture compact layer topology");
+    for(unsigned e=0;e<4;++e){const auto* entry=registry.get(e);
+        trace.push_back(bool(entry));
+        if(entry)trace.insert(trace.end(),{entry->sourceId,entry->instance.slot,entry->instance.generation});
+    }
+    return trace;
+}
 int main(){permutations();lifecycle();identityCollisions();bounds();roomFallback();globalFallbackOrder();serializedInitialization();rebindRelease();roomInitializationFailures();lifetimeDepthIntegration();lifetimeRoomInitialization();roomUninitialization();unnumberedLifetimes();
     static_assert(sizeof(downwell::RunnerLayerEntry<true>)==12,"derived entry contains only identity fields");
     require(presenceWitness<true>()==presenceWitness<false>(),"derived/explicit presence lifecycle trace");
     require(compactLifetimeWitness<true>()==compactLifetimeWitness<false>(),"compact/full lifetime mutation trace");
     require(compactFailureWitness<true>()==compactFailureWitness<false>(),"compact/full attachment failure prefix");
+    for(unsigned mode=0;mode<12;++mode)
+        require(freshAttachmentWitness<true>(mode)==freshAttachmentWitness<false>(mode),"fresh compact/full attachment publication prefix");
     std::cout<<"Serialized layer initialization, rebind release, room fallback and lifetime-checked attachment verified\n";}
