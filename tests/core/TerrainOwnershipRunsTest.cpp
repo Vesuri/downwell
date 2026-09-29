@@ -22,6 +22,44 @@ struct TerrainObserver {
     template<class... A> bool imageIndex(const A&...){return true;}
     template<class... A> bool markDestroyed(const A&...){return true;}
 };
+struct InitializedObserver {
+    using Terrain=downwell::GameplayTerrainInstancesRuns;
+    Terrain* store=nullptr;
+    unsigned failure=0,calls=0;
+    bool initializedTerrainBirth(downwell::InstanceHandle h,const Terrain::Record& r,int tile,
+        downwell::GameMakerRandom&,Terrain::CreateValues& values,bool&){
+        ++calls;require(store->ownsIdentity(h,r)&&store->size()==1&&r.spriteId==-1);
+        if(failure==1)return false;
+        values.spriteId=tile;
+        require(store->find(h)->spriteId==tile); // Writes are live, not committed at return.
+        if(failure==2)return false;
+        values.imageSpeed=0;return true;
+    }
+};
+static void initializedBoundary(){
+    using Terrain=downwell::GameplayTerrainInstancesRuns;
+    for(unsigned failure=0;failure<3;++failure){
+        Terrain store;InitializedObserver observer{&store,failure};downwell::GameMakerRandom random;
+        require(store.bindInitializedBirth(observer)&&!store.bindInitializedBirth(observer));
+        require(store.appendInitialized(60,16,32,true,51,random)==(failure==0));
+        require(observer.calls==1&&store.size()==1&&store.valid()==(failure==0));
+        const auto record=store.find(store.handle(0));
+        require(record&&record->spriteId==(failure==1?-1:51)&&record->imageSpeed==(failure?1:0));
+        if(failure)require(!store.appendInitialized(60,32,32,true,51,random)&&observer.calls==1);
+    }
+    TerrainObserver observer;
+    for(int object:{60,93,99})for(int tile:{-1,51,100000}){
+        Terrain runs(Terrain::Binding::bindDestruction(observer));
+        downwell::GameplayTerrainInstancesScalar scalar;
+        downwell::GameMakerRandom a,b;
+        require(runs.appendInitialized(object,32,48,false,tile,a));
+        require(scalar.append(object,32,48,false)&&scalar.createProperties(scalar.handle(0),tile,false,b));
+        const auto x=runs.find(runs.handle(0));const auto* y=scalar.find(scalar.handle(0));
+        require(x->spriteId==y->spriteId&&x->imageIndex==y->imageIndex&&x->imageSpeed==y->imageSpeed&&
+            x->active==y->active&&x->lifetimeId==y->lifetimeId&&a.drawCount()==b.drawCount());
+        for(unsigned i=0;i<16;++i)require(a.stateWord(i)==b.stateWord(i));
+    }
+}
 static void spatialIdentity(){
     using Terrain=downwell::GameplayTerrainInstancesRuns;
     using Shared=downwell::RunnerSpatialLifetimes<2052,2,2050,Terrain>;
@@ -58,6 +96,7 @@ static void spatialIdentity(){
     require(!spatial.canAttach({2052,1},35)&&!spatial.contains({2052,1}));
 }
 int main(){
+    initializedBoundary();
     spatialIdentity();
     Store runs;std::vector<Store::Identity> scalar;
     unsigned comparisons=0;

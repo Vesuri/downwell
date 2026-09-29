@@ -11,6 +11,7 @@ public:
     using Binding=RecordLifecycleBinding<Record>;
     using Presentation=GameplayTerrainInstancesScalar::Presentation;
     using WallCollision=GameplayTerrainInstancesScalar::WallCollision;
+    struct CreateValues {int spriteId=-1,imageIndex=0,imageSpeed=1;};
     class Read {
         const GameplayTerrainInstancesRuns* owner_=nullptr;
         InstanceHandle handle_{};Record value_{};
@@ -25,8 +26,7 @@ public:
         bool operator!=(const Read& b)const{return !(*this==b);}
     };
 private:
-    struct Mutable {
-        int spriteId=-1,imageIndex=0,imageSpeed=1;
+    struct Mutable:CreateValues {
         WallEndStepState wall{};
         bool active=true,destroyRequested=false,wallNeedsReset=false;
         // Replaces the old ever-used byte: pristine, allocated, published,
@@ -36,6 +36,8 @@ private:
     using Ids=TerrainOwnershipRuns<capacity>;
     using Identity=typename Ids::Identity;
     Binding binding_;Presentation presentation_;WallCollision collision_;
+    void* initializedContext_=nullptr;
+    bool (*initializedBirth_)(void*,InstanceHandle,const Record&,int,GameMakerRandom&,CreateValues&,bool&)=nullptr;
     Ids identities_;
     Mutable mutable_[capacity]{};
     unsigned freeHint_=0;std::uint32_t next_=1;
@@ -60,6 +62,17 @@ public:
     GameplayTerrainInstancesRuns(const GameplayTerrainInstancesRuns&)=delete;
     GameplayTerrainInstancesRuns& operator=(const GameplayTerrainInstancesRuns&)=delete;
     bool valid()const{return good_;}
+    // The built-in collision owner can own the entire generated birth/Create
+    // transaction. Arbitrary lifecycle observers retain the separate callbacks.
+    template<class Owner> bool bindInitializedBirth(Owner& owner){
+        if(initializedBirth_||size())return false;
+        initializedContext_=&owner;
+        initializedBirth_=[](void* p,InstanceHandle h,const Record& r,int tile,GameMakerRandom& random,
+            CreateValues& values,bool& unbounded){
+            return static_cast<Owner*>(p)->initializedTerrainBirth(h,r,tile,random,values,unbounded);
+        };
+        return true;
+    }
     unsigned size()const{return identities_.size();}
     bool spatialCanAttach(InstanceHandle h,int object)const{
         return identities_.contains(h)&&mutable_[h.slot].allocation==1&&identities_.object(h.slot)==object;
@@ -87,8 +100,8 @@ public:
         const auto expand=[&](const Identity& id){return visit(record(id));};
         return unboundedWallArt_?identities_.visit(expand):identities_.visitRows(first,end,expand);
     }
-    bool append(int object,int x,int y,bool active,std::uint32_t source=0,int code=-1){
-        DW_PROFILE_SCOPE(profileTerrainRecord);
+private:
+    bool allocate(int object,int x,int y,bool active,std::uint32_t source,int code,Identity& id){
         if(!good_)return false;
         if((object!=60&&object!=93&&object!=99)||size()==capacity||!next_)return good_=false;
         unsigned slot=freeHint_;while(slot<capacity&&identities_.occupied(slot))++slot;
@@ -98,8 +111,23 @@ public:
         ++next_;freeHint_=slot+1;
         auto& m=mutable_[slot];if(m.allocation)m=Mutable{};
         m.allocation=1;m.active=active;if(object==99)m.spriteId=46;
-        if(!binding_.birth(h,record({h,object,x,y,code,source})))return good_=false;
+        id={h,object,x,y,code,source};
         return true;
+    }
+public:
+    bool append(int object,int x,int y,bool active,std::uint32_t source=0,int code=-1){
+        DW_PROFILE_SCOPE(profileTerrainRecord);
+        Identity id;
+        if(!allocate(object,x,y,active,source,code,id))return false;
+        return binding_.birth(id.handle,record(id))?true:(good_=false);
+    }
+    bool appendInitialized(int object,int x,int y,bool active,int tile,GameMakerRandom& random){
+        if(!initializedBirth_)return append(object,x,y,active)&&createProperties(handle(size()-1),tile,false,random);
+        DW_PROFILE_SCOPE(profileTerrainRecord);
+        Identity id;
+        if(!allocate(object,x,y,active,0,-1,id))return false;
+        return initializedBirth_(initializedContext_,id.handle,record(id),tile,random,
+            mutable_[id.handle.slot],unboundedWallArt_)?true:(good_=false);
     }
     bool appendRoom(const PackedRoomInstance& r){
         if(!r.instanceId||bits(r.scaleX)!=0x3f800000u||bits(r.scaleY)!=0x3f800000u||

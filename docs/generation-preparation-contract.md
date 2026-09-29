@@ -422,6 +422,18 @@ different object family requires a different typed lifetime, not mutation of
 an independent spatial object ID. Ordinary actor owners retain their mutable
 object binding and per-slot generation high-water marks.
 
+Generated terrain may bind one initialized-birth transaction. The run store
+allocates the typed identity first, and the built-in collision owner completes
+ordinary birth publication before executing `terrainCreateProperties`. Create
+writes borrow the live mutable values, so an early failure leaves the allocated
+identity and the completed write prefix intact. The admitted handle cannot be
+retired or reused between those built-in operations; sprite publication can
+therefore use the established ownership without another typed-record lookup.
+No callback, RNG draw, or later pattern cell is deferred or preconsumed. This
+entry point uses the existing generated-cell non-glitch Create path; standalone
+Create, authored-room creation and custom lifecycle observers retain their
+separate callback path. Binding the transaction is only allowed before births.
+
 Compressing only the deferred bounds journal does not replace terrain
 ownership. Exact encoded-coordinate runs can remove repeated rectangle
 snapshots, but still require per-cell admission, population tracking and

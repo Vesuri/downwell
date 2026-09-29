@@ -282,10 +282,37 @@ private:
             parent.properties_[h.slot].depth=narrowed;return true;
         }
         bool sprite(InstanceHandle local,const Record& r,int sprite){InstanceHandle h;
-            if(!key(local,r,h))return false;auto& p=parent.properties_[h.slot];
+            return key(local,r,h)&&publishSprite(h,object(r),sprite);
+        }
+        bool publishSprite(InstanceHandle h,int object,int sprite){
+            auto& p=parent.properties_[h.slot];
             if(p.sprite.spriteId!=sprite)parent.drawOrderValid_=false;
             return parent.check(parent.owner_.changeSpriteFromPack(h,p.sprite,p.timeline,p.cachedFrame,
-                sprite,parent.sprites_,*parent.families_.flags(object(r))));}
+                sprite,parent.sprites_,*parent.families_.flags(object)));}
+#ifdef DOWNWELL_TERRAIN_RUN_STORE
+        bool initializedTerrainBirth(InstanceHandle local,const Record& r,int tile,GameMakerRandom& random,
+            GameplayTerrainInstances::CreateValues& values,bool& unbounded){
+            static_assert(Kind==View::Kind::terrain,"Generated terrain transaction only");
+            // birth admits the typed identity and synchronously publishes every
+            // original ownership boundary. No callbacks can retire/reuse it
+            // between that success and these source Create property writes.
+            if(!birth(local,r))return false;
+            DW_PROFILE_SCOPE(profileTerrainCreate);
+            if(r.objectId==99)return true;
+            const InstanceHandle h{View::terrainBase+local.slot,local.generation};
+            return terrainCreateProperties(r.objectId,tile,false,random,[&](int sprite){
+                if(!publishSprite(h,r.objectId,sprite))return false;
+                values.spriteId=sprite;
+                if(r.objectId==60&&(wallRadius(sprite)<0||wallRadius(sprite)>16))unbounded=true;
+                return true;
+            },[&](int index){
+                RunnerImageValue value;
+                if(!value.assignInteger(index)||!parent.check(parent.owner_.writeImageIndex(h,
+                    parent.properties_[h.slot].sprite,value)))return false;
+                values.imageIndex=index;return true;
+            },[&](int speed){values.imageSpeed=speed;return true;});
+        }
+#endif
         bool imageIndex(InstanceHandle local,const Record& r,RunnerImageValue value){InstanceHandle h;
             return key(local,r,h)&&parent.check(parent.owner_.writeImageIndex(h,parent.properties_[h.slot].sprite,value));}
         bool mask(InstanceHandle local,const Record& r,int value){InstanceHandle h;
@@ -323,6 +350,9 @@ public:
         terrain_(GameplayTerrainInstances::Binding::bindDestruction(terrainBinding_),presentation,collision){
 #if defined(DOWNWELL_TERRAIN_RUN_STORE) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
         if(!owner_.bindTerrainLifetimes(terrain_))return;
+#endif
+#ifdef DOWNWELL_TERRAIN_RUN_STORE
+        if(!terrain_.bindInitializedBirth(terrainBinding_))return;
 #endif
         good_=sprites_.prepare(preparedSprites_,741)&&objectDefaults_.prepare(objects,sprites_)&&
             spriteGeometry_.prepare(sprites_)&&

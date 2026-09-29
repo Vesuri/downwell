@@ -614,9 +614,14 @@ public:
         if(!run_.effectsSucceeded||(command.objectId!=60&&command.objectId!=93&&command.objectId!=99))return false;
         if(!terrain(command))return false;
         if(terrainInstances_&&
+#ifdef DOWNWELL_TERRAIN_RUN_STORE
+            !terrainInstances_->appendInitialized(command.objectId,command.x,command.y,command.active,
+                downwell::terrainTileForArea(run_.stage.area),enemyRandom_)){
+#else
             (!terrainInstances_->append(command.objectId,command.x,command.y,command.active)||
              !terrainInstances_->createProperties(terrainInstances_->handle(terrainInstances_->size()-1),
                  downwell::terrainTileForArea(run_.stage.area),false,enemyRandom_))){
+#endif
             run_.effectsSucceeded=false;return false;
         }
         return true;

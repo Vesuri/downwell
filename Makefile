@@ -968,9 +968,9 @@ test: verify-time-field-wind
 .PHONY: verify-time-field-wind
 test: verify-gameplay-collision-owner
 .PHONY: verify-gameplay-collision-owner
-build/terrain-ownership-runs-test: tests/core/TerrainOwnershipRunsTest.cpp $(wildcard src/core/*.h)
+build/terrain-ownership-runs-test: tests/core/TerrainOwnershipRunsTest.cpp src/core/GameMakerRandom.cpp $(wildcard src/core/*.h)
 	@mkdir -p build
-	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
 
 verify-terrain-ownership-runs: build/terrain-ownership-runs-test
 	./build/terrain-ownership-runs-test
