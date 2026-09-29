@@ -170,10 +170,18 @@ int main(){
         };
         unsigned random=19;
         for(unsigned round=0;round<64;++round){
+            auto clearedReference=runs;
+            clearedReference.clearReference();
             scalar.clear();runs.clear();
+            require(!runs.size()&&!runs.runCount(),"whole-run clear empties registration");
+            for(unsigned s=0;s<128;++s)require(!runs.contains(s),"whole-run clear removes locators");
             for(unsigned s=0;s<128;++s){
                 const std::uint32_t id=0xffffffc0u+s; // Includes modulo-32-bit identities.
-                require(scalar.bind(s,60,id)&&runs.bind(s,60,id),"dense run birth");compare();
+                require(scalar.bind(s,60,id)&&runs.bind(s,60,id)&&clearedReference.bind(s,60,id),"dense run birth");compare();
+                std::vector<std::uint32_t> a,b;
+                runs.visitRegistrations([&](auto slot,auto identity,auto object){a.insert(a.end(),{slot,identity,unsigned(object)});return true;});
+                clearedReference.visitRegistrations([&](auto slot,auto identity,auto object){b.insert(b.end(),{slot,identity,unsigned(object)});return true;});
+                require(a==b&&runs.runCount()==clearedReference.runCount(),"run clear and scalar clear refill identically");
             }
             for(unsigned step=0;step<512;++step){
                 random=random*1664525u+1013904223u;const unsigned s=(random>>8)&127;

@@ -79,7 +79,19 @@ public:
         }
         locator_[slot]=0;--count_;++revision_;return true;
     }
-    void clear(){while(head_!=End)unbind(runs_[head_].first);}
+    void clear(){
+        // No callbacks can observe intermediate removals. Release each run
+        // once, retaining the scalar revision and descriptor free-list order.
+        unsigned n=head_;
+        while(n!=End){
+            const unsigned following=runs_[n].next;
+            const unsigned end=unsigned(runs_[n].first)+runs_[n].count;
+            for(unsigned s=runs_[n].first;s<end;++s)locator_[s]=0;
+            release(n);n=following;
+        }
+        revision_+=count_;head_=tail_=End;count_=actorsCount_=0;
+    }
+    void clearReference(){while(head_!=End)unbind(runs_[head_].first);}
     template<class Visit> bool visitRegistrations(Visit visit)const{return visitRegistrationRange(0,Capacity,visit);}
     template<class Visit> bool visitRegistrationRange(unsigned first,unsigned last,Visit visit)const{
         if(first>last||last>Capacity)return false;

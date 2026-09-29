@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_RUNNER_SPATIAL_VERIFICATION_H
 #define DOWNWELL_CORE_RUNNER_SPATIAL_VERIFICATION_H
 #include "RunnerSpatialInstances.h"
+#include "RunnerRunRoomMembership.h"
 #ifndef DOWNWELL_PLATFORM_AMIGA
 #include <new>
 #endif
@@ -258,6 +259,30 @@ struct RunnerSpatialVerification {
                     result.check(actualCount==referenceCount);
                 }
             }
+        }
+    }
+    {
+        using Room=RunnerRunRoomMembership<64,8,56>;
+        alignas(Room) static std::uint8_t fastStorage[sizeof(Room)],referenceStorage[sizeof(Room)];
+        auto& fast=*new (fastStorage) Room;
+        auto& reference=*new (referenceStorage) Room;
+        for(unsigned round=0;round<4;++round){
+            for(unsigned s=0;s<64;++s){
+                const unsigned slot=round&1?63-s:s;
+                result.check(fast.bind(slot,{})&&reference.bind(slot,{}));
+                if(s%3==0)result.check(fast.mark(slot)&&reference.mark(slot));
+            }
+            auto inactive=[&](unsigned s){return (s+round)%4==0;};
+            auto publish=[](unsigned,bool){return true;};
+            result.check(fast.reconcileChecked(inactive,publish)&&reference.reconcileChecked(inactive,publish));
+            for(unsigned s=round;s<64;s+=5)result.check(fast.remove(s)&&reference.remove(s));
+            fast.clear();reference.clearReference();
+            result.check(fast.runCount()==0&&reference.runCount()==0);
+            for(unsigned s=0;s<64;++s)
+                result.check(!fast.contains(s)&&!fast.active(s)&&!fast.marked(s)&&
+                    !reference.contains(s)&&!reference.active(s)&&!reference.marked(s));
+            unsigned visits=0;
+            result.check(fast.visitMarkedCleanupChecked([&](unsigned){++visits;return true;})&&!visits);
         }
     }
     return result;

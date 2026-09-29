@@ -346,6 +346,15 @@ tests for all four walks, fragmentation, reactivation and terminal failure.
 Layer ownership, bounds, dirty queues and terrain lifetimes are still separate
 per-cell structures; room runs do not complete their representation change.
 
+Whole-owner `clear` is different from callback-bearing cleanup: no intermediate
+removal can be observed. Registration and room-run owners invalidate the slot
+locators and release each descriptor once, in the same order as cell-by-cell
+removal. Registration revision advances by the old population, invalidating
+cached projections with the same unsigned wrap behavior. Room marks and both
+active/inactive heads are reset. The retained `clearReference` paths perform
+the original individual removals; fragmentation and subsequent full-capacity
+reuse must agree. Individual retirement and cleanup callbacks are not batched.
+
 ### Layer representation constraint
 
 Replacing only layer-element next/previous links with forward/reverse spans

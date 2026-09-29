@@ -80,7 +80,23 @@ public:
         }
         locator_[s]=0;return true;
     }
-    void clear(){for(unsigned list=0;list<2;++list)while(head_[list]!=End)remove(first(list));}
+    void clear(){
+        // Whole-room teardown has no mutation callbacks. Keep descriptor
+        // release order, but do not shrink/relink each cell of a terrain run.
+        for(unsigned list=0;list<2;++list){
+            unsigned n=head_[list];
+            while(n!=End){
+                const unsigned following=runs_[n].next;
+                const unsigned end=unsigned(runs_[n].first)+runs_[n].count;
+                for(unsigned s=runs_[n].first;s<end;++s)locator_[s]=0;
+                release(n);n=following;
+            }
+            head_[list]=tail_[list]=End;
+        }
+        if(markedCount_)for(auto& word:marks_)word=0;
+        markedCount_=0;
+    }
+    void clearReference(){for(unsigned list=0;list<2;++list)while(head_[list]!=End)remove(first(list));}
     unsigned runCount()const{
         unsigned count=0;
         for(unsigned list=0;list<2;++list){

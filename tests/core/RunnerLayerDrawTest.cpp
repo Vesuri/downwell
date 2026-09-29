@@ -325,8 +325,19 @@ void runRoomMutations(){
         }
     };
     for(unsigned round=0;round<64;++round){
+        auto clearedReference=runs;
+        clearedReference.clearReference();
         scalar.clear();runs.clear();
-        for(unsigned s=0;s<64;++s)require(scalar.bind(s,{})&&runs.bind(s,{}),"contiguous room births");
+        compare();
+        require(!runs.runCount(),"clear releases both room lists");
+        for(unsigned s=0;s<64;++s){
+            require(scalar.bind(s,{})&&runs.bind(s,{})&&clearedReference.bind(s,{}),"contiguous room births");
+            require(!runs.marked(s)&&!clearedReference.marked(s),"clear removes marks before slot reuse");
+            std::vector<unsigned> a,b;
+            runs.visitAnimationChecked([&](unsigned slot){a.push_back(slot);return true;});
+            clearedReference.visitAnimationChecked([&](unsigned slot){b.push_back(slot);return true;});
+            require(a==b&&runs.runCount()==clearedReference.runCount(),"room clear paths refill in identical order");
+        }
         require(runs.runCount()==17,"48 terrain entries share one room run, actors remain singletons");
         for(unsigned step=0;step<512;++step){
             random=random*1664525u+1013904223u;
