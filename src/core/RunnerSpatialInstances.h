@@ -194,7 +194,16 @@ public:
         if((objectFlags&0x87u)!=definition->propertyFlags)return checked(false);
         {
             DW_PROFILE_SCOPE(profileBindingMembership);
-            if(!rebindObjectMembership(h,object,registered))return checked(false);
+            if constexpr(RunRegistration){
+                if(registered){
+                    // attach() just appended this exact lifetime/object. Only
+                    // immutable defaults/graph reads occurred since then.
+                    // Keep both owner and membership revision effects without
+                    // resolving and traversing the unchanged registration.
+                    changedBinding(h.slot);
+                    membership_.repeatFreshTailBinding();
+                }else if(!rebindObjectMembership(h,object,false))return checked(false);
+            }else if(!rebindObjectMembership(h,object,registered))return checked(false);
         }
         properties.sprite.maskId=definition->maskId;
         properties.sprite.spriteId=definition->spriteId;

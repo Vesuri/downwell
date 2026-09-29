@@ -91,6 +91,18 @@ path may eliminate intermediate stores and redundant lookups within callback-fre
 intervals, but must preserve the next callback's observations and each failure's
 partially published state. Moving Create effects to a later frame is not allowed.
 
+Fresh prepared collision binding has one callback-free interval after the
+initial registration append. For an admitted ordinary constructor that remains
+registered, rebinding the same object/lifetime at the same tail cannot change
+registration payload or order. The selected owner therefore records that
+second logical bind through `repeatFreshTailBinding`: both membership revision
+increments and the owner binding/capture revision increment remain, without
+another identity lookup or tail traversal. Only immutable resource/graph reads
+may intervene. General rebinding, deregistration, unusual constructor states
+and invalid-resource failure prefixes retain the ordinary path. The scalar
+whole-owner configuration also retains that path for comparison. This does not
+merge separate births, advance Create, or defer an observable mutation.
+
 ### Whole-owner differential boundary
 
 `make verify-gameplay-collision-owner` compiles the gameplay owner twice:

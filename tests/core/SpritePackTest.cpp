@@ -59,7 +59,9 @@ void testGeneratedPack(const char* path,const char* maskPath,const char* objectP
         const downwell::ObjectPack objects(objectBytes.data(),objectBytes.size());
         downwell::RunnerObjectFamilies<386> families;
         require(families.bindInstanceFlags(objects),"load complete object binding flags");
-        using Owner=downwell::RunnerSpatialInstances<2,8>;
+        // Enable the fused fresh-binding path; the packed binding below still
+        // executes the independent attach/rebind reference sequence.
+        using Owner=downwell::RunnerSpatialInstances<2,8,false,0,0,true>;
         downwell::PreparedObjectDefaults<386> preparedDefaults;
         require(preparedDefaults.prepare(objects,compact),"prepare immutable object defaults before births");
         require(!preparedDefaults.get(-1)&&!preparedDefaults.get(int(objects.objectCount())),

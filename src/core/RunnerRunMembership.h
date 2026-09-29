@@ -36,6 +36,9 @@ public:
     bool contains(unsigned slot)const{return slot<Capacity&&locator_[slot]!=0;}
     unsigned size()const{return count_;}
     unsigned runCount()const{unsigned n=0;for(unsigned r=head_;r!=End;r=runs_[r].next)++n;return n;}
+    // Same contract as the scalar registry: only immediately after a fresh
+    // successful bind, with no intervening membership writes or callbacks.
+    void repeatFreshTailBinding(){revision_+=2;}
     bool bind(unsigned slot,int object,std::uint32_t id){
         if(slot>=Capacity||object<0)return false;
         if(tail_!=End){const auto& t=runs_[tail_];

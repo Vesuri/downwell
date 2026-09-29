@@ -89,6 +89,10 @@ public:
         return true;
     }
     void clear() {while(head_!=End)unbind(head_);}
+    // Trusted fresh-construction interval only: the caller has just bound the
+    // same tail and performed no membership mutation/callback since. Logical
+    // remove+append still invalidates captures twice, but changes no payload.
+    void repeatFreshTailBinding(){revision_+=2;}
     bool bind(unsigned slot,int object,std::uint32_t identity) {
         if(slot>=Capacity || object<0)return false;
         if(slot==tail_&&entries_[slot].object==object&&entries_[slot].identity==identity){
