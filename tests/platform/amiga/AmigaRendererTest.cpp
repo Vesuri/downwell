@@ -351,6 +351,11 @@ int main(int argc, char** argv) {
             });
             require(actual==expected,"stationary field matches fresh source-radius pixel oracle");
             const unsigned dirty=trial*13%320;
+            require(retained.touchesDirtyRows([&](unsigned row){return row==dirty;})==covered[dirty],
+                "retained physical footprint matches pixel-raster dirty-row detection");
+            if(trial%64==0)for(unsigned checkRow=0;checkRow<320;++checkRow)
+                require(retained.touchesDirtyRows([&](unsigned row){return row==checkRow;})==covered[checkRow],
+                    "every physical row agrees across ring wrap and both circle sizes");
             require(retained.prepare(actual.data(),origin,shape,covered[dirty],[&](unsigned row){return row==dirty;}),
                 "dirty backing overrides unchanged snapshot reuse");
             for(unsigned p=0;p<2;++p)for(unsigned x=0;x<48;++x){

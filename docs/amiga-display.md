@@ -65,6 +65,12 @@ the clip is released only for 4:3 HUD drawing.
 
 ## Retained field-overlay word banks
 
+After a field snapshot matches its target, ring origin and shape, dirty backing
+rows are checked against its retained physical word offsets. Do not rasterize
+the circle again for this dependency check: the saved footprint already includes
+viewport clipping and ring wrap. A changed snapshot still takes full preparation;
+this reuse changes no geometry, palette, underlay restoration or Draw ordering.
+
 Gameplay's two `AmigaFieldOverlay` instances share an `AmigaTimeFieldPair`
 workspace. The pair owns three ordinary-memory word banks: one retained by
 each display and one for preparing the next sparse overlay. Preparation restores

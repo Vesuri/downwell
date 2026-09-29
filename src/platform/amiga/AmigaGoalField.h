@@ -52,6 +52,13 @@ public:
     bool matches(UBYTE* target, unsigned origin, const Shape& shape) const {
         return valid_ && target == target_ && origin == origin_ && shape.same(shape_);
     }
+    // Only after matches(): saved words are the authoritative clipped physical
+    // footprint. Do not rasterize the circle again merely to inspect row debt.
+    template<class DirtyRow> bool touchesDirtyRows(DirtyRow dirtyRow) const {
+        for(unsigned i=0;i<count_;++i)
+            if(dirtyRow(saved_[i].offset/downwellBytesPerPlaneLine))return true;
+        return false;
+    }
     void discard() { count_ = 0; valid_ = pending_ = false; }
     template<class DirtyRow>
     bool prepare(UBYTE* target, unsigned origin, const Shape& shape,

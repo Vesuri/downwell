@@ -2933,12 +2933,8 @@ __attribute__((noinline)) static int runDownwell(void) {
             bool fieldChanged = !gameplayFields[back].matches(
                 (UBYTE*)gameDisplay[back].data, port.ringOrigin(), fieldShape);
             if (!fieldChanged && fieldShape.visible)
-                fieldShape.draw([&](int x, int y, int) {
-                    if (x >= downwellPlayfieldX && x < downwellPlayfieldX + downwellPlayfieldWidth &&
-                        y >= 0 && y < downwellDisplayHeight &&
-                        gameplayRows.dirty(AmigaLaserSight::physicalRow(port.ringOrigin(), y), back))
-                        fieldChanged = true;
-                });
+                fieldChanged=gameplayFields[back].touchesDirtyRows(
+                    [&](unsigned row){return gameplayRows.dirty(row,back);});
             DW_PROFILE_PHASE(profileActorCollect);
             bool compositeCurrency = !port.dead();
 #ifdef DOWNWELL_REPLAY_VERIFY
