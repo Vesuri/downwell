@@ -75,6 +75,13 @@ whole-window total and the count in the retained worst frame. Explicit phase
 switches do not increment it. This distinguishes a large birth burst from a
 single expensive operation. These counters exist only in PROBES builds.
 
+Both modes report the first frame attaining the largest PAL-field gap. Compare
+this frame number across FPS and PROBES before attributing an FPS stall to the
+instrumented worst frame: instrumentation can change which event is worst.
+The PROBES exclusive-tick maximum and PAL-field maximum are separate measures.
+Frame numbers are one-based within the measured scene window (gameplay's
+discarded setup frame is excluded).
+
 Gameplay FPS/probe reports include a `COVERAGE pre-Step` line. It samples once
 at the start of each measured gameplay frame: first/last world tick, initial,
 last and maximum displayed view Y, maximum room-space player Y in Q8, last

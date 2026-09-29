@@ -54,6 +54,7 @@ volatile ULONG gDownwellProfileEpoch;
 volatile ULONG gDownwellProfileFrames[4];
 volatile ULONG gDownwellProfileFields[4];
 volatile ULONG gDownwellProfileMaxGap[4];
+volatile ULONG gDownwellProfileMaxGapFrame[4];
 volatile ULONG gDownwellProfileMissCount;
 volatile ULONG gDownwellProfileMissFrame[32];
 volatile ULONG gDownwellProfileMissFields[32];
@@ -263,8 +264,10 @@ void downwellProfileEnd()
         }
     }
     gDownwellProfileFields[sceneId] += fields;
-    if (fields > gDownwellProfileMaxGap[sceneId])
+    if (fields > gDownwellProfileMaxGap[sceneId]) {
         gDownwellProfileMaxGap[sceneId] = fields;
+        gDownwellProfileMaxGapFrame[sceneId] = gDownwellProfileFrames[sceneId];
+    }
 #ifdef DOWNWELL_PROFILE_AUTORUN
     // Freeze only at a completed frame boundary, outside the measured window.
     if (sceneId == gDownwellProfileTargetScene &&

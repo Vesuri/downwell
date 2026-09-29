@@ -9,6 +9,11 @@ if gDownwellProfileFrozen != 1 || gDownwellProfileFrames[$s] != gDownwellProfile
     quit 1
 end
 printf "PROFILE scene=%lu: frames=%lu PAL_fields=%lu FPS=%.2f max_gap=%lu fields\n", $s, gDownwellProfileFrames[$s], gDownwellProfileFields[$s], 50.0*gDownwellProfileFrames[$s]/gDownwellProfileFields[$s], gDownwellProfileMaxGap[$s]
+printf "Worst PAL gap: frame=%lu fields=%lu (first maximum; measured gameplay frame 1 starts at tick 0)\n", gDownwellProfileMaxGapFrame[$s], gDownwellProfileMaxGap[$s]
+if gDownwellProfileMaxGap[$s] > 0 && (gDownwellProfileMaxGapFrame[$s] == 0 || gDownwellProfileMaxGapFrame[$s] > gDownwellProfileFrames[$s])
+    printf "Worst PAL gap frame outside measurement window\n"
+    quit 1
+end
 printf "Damage number births: %lu\n", gDownwellProfileDamageBirths
 if $s == 3
     if gDownwellProfileGameSamples != gDownwellProfileFrames[$s]
