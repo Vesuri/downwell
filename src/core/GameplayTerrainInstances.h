@@ -23,6 +23,9 @@ public:
         int spriteId=-1,imageIndex=0,imageSpeed=1;
         WallEndStepState wall{};
         bool destroyRequested=false;
+        // Owner bookkeeping, not a GML field. Free-slot preparation supplies
+        // zero wall state until a room creation script or End Step writes it.
+        bool wallNeedsReset=false;
     };
     using Binding=RecordLifecycleBinding<Record>;
     struct Presentation {
@@ -80,7 +83,15 @@ public:
         while(slot<capacity&&records_[slot].lifetimeId)++slot;
         if(slot==capacity)return good_=false;
         freeHint_=slot+1;order_[count_++]=slot;
-        auto& r=records_[slot];r={object,x,y,active,next_++,sourceId,creationCode};
+        auto& r=records_[slot];
+        if(!r.objectId){
+            // The pool's constructor already prepared every unused slot.
+            // Only these birth-specific fields differ from Record defaults.
+            // Keep used slots distinguishable after retirement: recycled
+            // records may contain arbitrary Create/End Step state.
+            r.objectId=object;r.x=x;r.y=y;r.active=active;
+            r.lifetimeId=next_++;r.sourceInstanceId=sourceId;r.creationCodeId=creationCode;
+        }else r={object,x,y,active,next_++,sourceId,creationCode};
         extendRowRange(count_-1,y,(count_-1)%rowGroupSize==0);
         // Object 99 overrides Create with an empty event, retaining its
         // serialized sprite rather than inheriting objWall_n's tile setter.
@@ -115,13 +126,14 @@ public:
                 if(!binding_.phaseIndex(h,r,unsigned(index)*256u))return false;
                 r.imageIndex=index;return true;
             },[&](int speed){r.imageSpeed=speed;return true;}))return good_=false;
-        if(r.objectId==60)r.wall={};
+        if(r.objectId==60&&r.wallNeedsReset){r.wall={};r.wallNeedsReset=false;}
         return true;
     }
     bool roomCreation(InstanceHandle h){
         if(!good_||!find(h))return good_=false;
         auto& r=records_[h.slot];
         if(r.creationCodeId==-1)return true;
+        r.wallNeedsReset=true;
         if(r.objectId!=60||!wallRoomCreation(r.creationCodeId,r.wall))return good_=false;
         return true;
     }
@@ -152,6 +164,7 @@ public:
         const bool selected=r.wall.checked!=0;
         const bool wasVisible=visible(r);const int sprite=r.spriteId,frame=r.imageIndex,before=drawSprite(r);
         dispatching_=true;
+        r.wallNeedsReset=true;
         const bool succeeded=wallEndStep(r.wall,area,random,ops);
         dispatching_=false;
         if(!succeeded||!good_)return good_=false;

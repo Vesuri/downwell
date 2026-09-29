@@ -40,6 +40,16 @@ gameplay-only FPS does not measure that startup cost.
 
 ## Birth publication
 
+The terrain pool constructor prepares every unused record's default state.
+First use writes only the birth-specific identity, coordinates, activation and
+source binding before synchronous publication; `objectId == 0` identifies these
+untouched slots because admitted terrain objects are 60, 93 and 99. Retirement
+and room clearing retain the nonzero object ID, so recycled slots take the full
+reset path. Wall state is not cleared again by Create unless room creation or
+End Step has touched it. The dirty marker is set before those callbacks, so a
+repeated or nested Create still resets state at its original completion point.
+This does not preallocate observable lifetimes or advance gameplay callbacks.
+
 `GameplayCollisionOwner::Binding::birth` resolves the generation-checked record,
 establishes room-space coordinates, then performs:
 

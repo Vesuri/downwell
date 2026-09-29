@@ -7,7 +7,14 @@ using namespace downwell;
 struct Lifecycle {
     using H=InstanceHandle;using R=GameplayTerrainInstances::Record;using V=RunnerImageValue;
     int retireRemaining=-1;
-    bool birth(H,const R&){return true;}
+    bool birth(H h,const R& r){
+        assert(h.generation==r.lifetimeId&&r.lifetimeId);
+        assert(r.spriteId==(r.objectId==99?46:-1)&&r.imageIndex==0&&r.imageSpeed==1&&!r.destroyRequested&&!r.wallNeedsReset);
+        const auto& w=r.wall;
+        assert(w.checked==0&&w.pillar==0&&w.neighbors==0&&w.imageIndex==0&&w.checkThing==0&&
+            w.checkDistance==0&&!w.surrounded&&!w.deactivate&&w.lights==0);
+        return true;
+    }
     bool retire(H,const R&){if(!retireRemaining)return false;if(retireRemaining>0)--retireRemaining;return true;}
     bool activation(H,const R&,bool){return true;}bool membership(H,const R&,bool){return true;}
     bool move(H,const R&,V,V){return true;}bool sprite(H,const R&,int){return true;}
@@ -33,6 +40,26 @@ static void check(int first,int end,int sprite=70,const GameplayTerrainInstances
     assert(calls<=1&&completed==(calls==0));
 }
 int main(){
+    // Dirty recycled records must not take the untouched-slot fast path.
+    {
+        static GameplayTerrainInstances reused(GameplayTerrainInstances::Binding::bindDestruction(lifecycle));
+        GameMakerRandom rng(5);
+        for(unsigned i=0;i<96;++i){
+            const int object=i%3==0?60:i%3==1?93:99;
+            assert(reused.append(object,int(i)*16,-int(i)*16,i%2,1000+i,object==60?676:-1));
+            const auto h=reused.handle(0);const auto* r=reused.find(h);
+            assert(h.slot==0&&r&&r->x==int(i)*16&&r->y==-int(i)*16&&r->active==bool(i%2)&&
+                r->sourceInstanceId==1000+i&&r->creationCodeId==(object==60?676:-1));
+            assert(reused.createProperties(h,74,true,rng)&&reused.roomCreation(h)&&reused.imageIndex(h,7));
+            if(object==60){
+                assert(r->wall.pillar==-1&&r->wallNeedsReset);
+                assert(reused.createProperties(h,74,true,rng)&&r->wall.pillar==0&&!r->wallNeedsReset);
+                assert(reused.roomCreation(h)&&r->wall.pillar==-1&&r->wallNeedsReset);
+            }
+            assert(reused.activation(h,false)&&reused.requestDestroy(h)&&reused.retireMarked(h));
+            assert(!reused.find(h)&&reused.size()==0);
+        }
+    }
     for(unsigned i=0;i<1024;++i)assert(terrain.append(i%3==0?93:60,240,int(i/2)*16,true));
     check(2048,2050);
     assert(examined<terrain.size()/4); // Reject whole unrelated birth-order groups.
