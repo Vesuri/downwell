@@ -83,6 +83,12 @@ path may eliminate intermediate stores and redundant lookups within callback-fre
 intervals, but must preserve the next callback's observations and each failure's
 partially published state. Moving Create effects to a later frame is not allowed.
 
+The prepared binding and collision registry borrow the supplied birth `State`
+until attachment takes its own snapshot. They do not carry aggregate copies
+through both call boundaries or retain a pointer to the builder's local state.
+The snapshot still initializes previous coordinates from the initial position;
+the caller's previous-coordinate fields and the source lifetime remain untouched.
+
 Static terrain participates in activation, destruction, room order and layer
 termination even when its bitmap is retained. Removing those records because
 they do not move changes ownership semantics. Unnumbered records have source

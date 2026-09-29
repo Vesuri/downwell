@@ -57,6 +57,31 @@ template<bool Scheduled,unsigned Nodes> static void preparedTerrainPublication()
     }
 }
 int main(){
+    {
+        using Owner=RunnerSpatialInstances<4,16>;
+        Owner owner;
+        Owner::State borrowed;
+        borrowed.x.assignInteger(37);borrowed.y.assignInteger(-19);
+        borrowed.previous.x.assignInteger(100);borrowed.previous.y.assignInteger(200);
+        borrowed.flags=10;borrowed.kind=3;borrowed.special=true;
+        borrowed.bounds.left.assignInteger(31);borrowed.bounds.right.assignInteger(43);
+        borrowed.bounds.top.assignInteger(-24);borrowed.bounds.bottom.assignInteger(-14);
+        assert(owner.attach({0,1},60,borrowed));
+        const auto* stored=owner.resolve({0,1});assert(stored);
+        assert(stored->x.bits==borrowed.x.bits&&stored->y.bits==borrowed.y.bits);
+        assert(stored->previous.x.bits==borrowed.x.bits&&stored->previous.y.bits==borrowed.y.bits);
+        assert(borrowed.previous.x.bits!=stored->previous.x.bits);
+        assert(stored->flags==10&&stored->kind==3&&stored->special);
+        // Another live entry may supply the borrowed source; attachment must
+        // snapshot it without retaining an alias or modifying its fields.
+        assert(owner.attach({1,1},93,*stored));
+        borrowed.x.assignInteger(999);
+        assert(owner.move({0,1},{},{},0));
+        assert(owner.resolve({1,1})->x.bits!=owner.resolve({0,1})->x.bits);
+        assert(owner.resolve({1,1})->bounds.left.bits==borrowed.bounds.left.bits);
+        assert(!owner.attach({1,2},60,borrowed));
+        assert(owner.resolve({1,1})->flags==10);
+    }
     preparedTerrainPublication<false,128>();preparedTerrainPublication<true,128>();
     preparedTerrainPublication<false,1>();preparedTerrainPublication<true,1>();
     {

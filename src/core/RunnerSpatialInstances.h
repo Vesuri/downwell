@@ -164,7 +164,7 @@ public:
     // be observed. Keep attach/rebind order and revision changes; coalesce
     // repeated head-of-queue marks only within this callback-free interval.
     template<unsigned Resources,class Graph>
-    bool attachObjectPrepared(InstanceHandle h,int object,State state,bool registered,
+    bool attachObjectPrepared(InstanceHandle h,int object,const State& state,bool registered,
         Properties& properties,const PreparedObjectDefaults<Resources>& defaults,
         const Graph& graph,Real* creationDepth=nullptr){
         {
@@ -236,7 +236,9 @@ public:
         return slot<Capacity&&entries_[slot].object>=0?handle(slot):InstanceHandle{};
     }
     int objectId(InstanceHandle h)const{return live(h)?entries_[h.slot].object:-1;}
-    bool attach(InstanceHandle h,int object,State state){
+    // Borrow until the registry takes its own snapshot. Birth wrappers must
+    // not copy the complete state through each ownership boundary.
+    bool attach(InstanceHandle h,int object,const State& state){
         if(!valid() || h.slot>=Capacity || !h.generation || object<0 ||
             entries_[h.slot].object>=0 || h.generation<=entries_[h.slot].generation ||
             (state.flags&0x8000u) || !Math::valid(state.x)||!Math::valid(state.y))return false;
