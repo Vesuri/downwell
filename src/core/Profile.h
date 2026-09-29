@@ -96,6 +96,7 @@ public:
     ~DownwellSampleScope(){gDownwellSamplePhase=previous_;}
 };
 #define DW_PROFILE_SCOPE(phase) DownwellSampleScope profileScope(phase)
+#define DW_PROFILE_PHASE(phase) (gDownwellSamplePhase=static_cast<unsigned short>(phase))
 #elif defined(DOWNWELL_GENERATION_TIMING)
 // Opt-in inclusive timing of one selected stage; every other bracket compiles
 // away. The backend ignores nested entries of the same stage to avoid counting
@@ -119,7 +120,9 @@ public:
 #else
 #define DW_PROFILE_SCOPE(phase) ((void)0)
 #endif
+#if !defined(DOWNWELL_PHASE_SAMPLING)
 #define DW_PROFILE_PHASE(phase) ((void)0)
+#endif
 #endif
 #else
 #define DW_PROFILE_SCOPE(phase) ((void)0)

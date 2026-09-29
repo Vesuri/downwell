@@ -17,5 +17,16 @@ int main(){
         nested(true);assert(gDownwellSamplePhase==profileGeneration);
     }
     assert(gDownwellSamplePhase==profileOther);
-    std::puts("Phase sampling: nested phase publication and early-return restoration passed");
+    DW_PROFILE_PHASE(profileWait);
+    nested(true);assert(gDownwellSamplePhase==profileWait);
+    DW_PROFILE_PHASE(profileSimulation);
+    {
+        DW_PROFILE_SCOPE(profileGeneration);
+        DW_PROFILE_PHASE(profileGeneratedRegistration);
+        nested(false);assert(gDownwellSamplePhase==profileGeneratedRegistration);
+    }
+    assert(gDownwellSamplePhase==profileSimulation);
+    DW_PROFILE_PHASE(profileOther);
+    assert(gDownwellSamplePhase==profileOther);
+    std::puts("Phase sampling: manual phases, nested publication and early-return restoration passed");
 }

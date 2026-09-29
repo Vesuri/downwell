@@ -99,7 +99,11 @@ inclusive results from separately selected parent/child stages.
 For statistical attribution with no per-scope clock reads, use
 `PHASE_SAMPLING=1 SKIP_TO_GAME=1 PROFILE_CONTACT=1 VERIFY_TIMEOUT_SECONDS=180 bash amiga/profile.sh fps`.
 This FPS-only mode publishes a word-sized phase marker on `DW_PROFILE_SCOPE`
-entry and restores its parent on exit. The existing VBlank handler counts the
+entry and restores its parent on exit. `DW_PROFILE_PHASE` also publishes the
+current phase, so top-level wait, simulation, rendering and publication work
+are distinguished rather than folded into `profileOther`. Nested scopes restore
+the most recent phase at their entry, including after early returns. The
+existing VBlank handler counts the
 innermost marked phase once per field, both for the full gameplay window and
 for `SAMPLE_FRAME` (default 701, one-based after the discarded setup frame).
 `SAMPLE phase` numbers follow `DownwellProfilePhase` in `src/core/Profile.h`.
@@ -108,8 +112,9 @@ for `SAMPLE_FRAME` (default 701, one-based after the discarded setup frame).
 No gameplay callbacks or RNG consumption are moved. The scope markers still
 have overhead; compare the same tape with plain FPS. Samples are not precise
 phase durations: periodic sampling can alias repeated work and short phases
-can receive no samples. Unscoped work, including phase-only markers and waits,
-is attributed to its enclosing scope or `profileOther`. Inner
+can receive no samples. Unscoped work is attributed to its enclosing scope or
+the most recent phase marker. `profileWait` includes unbracketed idle servicing
+as well as waiting; it is not a CPU-idle duration. Inner
 `DW_GENERATION_SCOPE` detail probes remain disabled. This option is mutually
 exclusive with full probes and coarse generation timing. The script rejects
 an unobserved focus frame and restores the playable build with sampling off.
