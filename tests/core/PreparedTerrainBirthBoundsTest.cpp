@@ -13,6 +13,7 @@ int main(){
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sp.data(),sp.size());
     PreparedObjectDefaults<386> defaults;assert(defaults.prepare(objects,sprites));
     PreparedTerrainBirthBounds grid;assert(grid.prepare(defaults,sprites));
+    static_assert(sizeof(grid)<9000,"Terrain table must share coordinate offsets");
     unsigned checks=0;
     for(int object:{60,93,99}){
         const auto* d=defaults.get(object);assert(d);
@@ -38,8 +39,22 @@ int main(){
             if(!expected)assert(px.bits==123&&py.bits==456&&box.left.bits==1&&box.top.bits==2&&
                 box.right.bits==3&&box.bottom.bits==4&&precise);
         }
+    // A resource with too many distinct offsets declines preparation without
+    // consuming dictionary slots or preventing later shapes from preparing.
+    auto altered=sp;
+    const unsigned resource=SpriteCollisionPack::headerSize+585*SpriteCollisionPack::recordSize;
+    altered[resource+8]=1;altered[resource+12]=2;
+    altered[resource+16]=13;altered[resource+20]=14;
+    SpriteCollisionPack unusual(altered.data(),altered.size());assert(unusual.valid());
+    assert(grid.prepare(defaults,unusual));
+    RunnerImageValue a,b;RunnerSpatialSplit::Box box;bool precise;
+    assert(!grid.at(60,240,176,a,b,box,precise));
+    assert(grid.at(93,240,176,a,b,box,precise)&&grid.at(99,240,176,a,b,box,precise));
+    assert(grid.prepare(defaults,sprites));
+    const auto copied=grid;
     assert(!grid.prepare(defaults,SpriteCollisionPack(nullptr,0)));
-    RunnerImageValue x,y;RunnerSpatialSplit::Box b;bool p;
-    assert(!grid.at(60,0,0,x,y,b,p));
+    assert(copied.at(60,240,176,a,b,box,precise));
+    RunnerImageValue x,y;RunnerSpatialSplit::Box missing;bool p;
+    assert(!grid.at(60,0,0,x,y,missing,p));
     std::printf("Prepared terrain birth: %u binary32 oracle comparisons, bounds and invalidation passed; storage %zu bytes\n",checks,sizeof(grid));
 }

@@ -116,6 +116,22 @@ public:
 
 #include "ProfileCounters.h"
 
+// Startup-only measurement, before hardware takeover. The backend supplies an
+// OS-owned field counter; no clock or platform dependency enters shared logic.
+#if defined(DOWNWELL_PROBES) || defined(DOWNWELL_FPSCOUNT)
+unsigned long downwellTerrainPreparationBegin();
+void downwellTerrainPreparationEnd(unsigned long start);
+class DownwellTerrainPreparationScope {
+    unsigned long start_;
+public:
+    DownwellTerrainPreparationScope():start_(downwellTerrainPreparationBegin()){}
+    ~DownwellTerrainPreparationScope(){downwellTerrainPreparationEnd(start_);}
+};
+#define DW_TERRAIN_PREPARATION_SCOPE DownwellTerrainPreparationScope terrainPreparationScope
+#else
+#define DW_TERRAIN_PREPARATION_SCOPE ((void)0)
+#endif
+
 // Inner generation brackets are deliberately opt-in: hundreds of phase
 // switches per burst can cost more than the operations being measured.
 #if defined(DOWNWELL_PROBES) && defined(DOWNWELL_GENERATION_DETAIL)

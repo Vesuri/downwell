@@ -96,6 +96,15 @@ not enable `DW_GENERATION_SCOPE` detail-only brackets. Each selected-stage run
 still has its own clock overhead; compare against plain FPS and do not add
 inclusive results from separately selected parent/child stages.
 
+The FPS report also prints `PREPARATION terrain`, measured once at owner
+construction before hardware takeover. It reads the OS graphics vertical-blank
+counter directly (no OS call) around the table preparation, with compiler memory
+barriers at the boundaries. This is elapsed emulated PAL time at 20 ms resolution,
+not a CPU-only cycle count; allow one field of quantization uncertainty. It is
+outside the gameplay timing window. Missing or repeated preparation fails the
+FPS coverage check. This counter must not be used after takeover, when the
+framework owns VERTB and the OS counter no longer advances.
+
 Probe `segments` (the legacy `gDownwellProfileCalls` counters) include parent
 resumption after nested scopes: they are not function invocation counts.
 `scope_entries` counts only `DW_PROFILE_SCOPE` construction, with both the

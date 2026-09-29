@@ -4,9 +4,12 @@
 #include <exec/types.h>
 
 #if defined(DOWNWELL_PROBES) || defined(DOWNWELL_FPSCOUNT)
+#include <graphics/gfxbase.h>
+extern struct GfxBase* GfxBase;
 // Revs-style emulated clock: never use host time or stop GDB inside a sample.
 static const ULONG ticksPerField = 313UL * 256UL;
 extern "C" {
+volatile ULONG gDownwellTerrainPreparationCalls, gDownwellTerrainPreparationFields;
 #ifdef DOWNWELL_PROFILE_TRANSITION
 volatile ULONG gDownwellProfileTargetScene = 2;
 volatile ULONG gDownwellProfileTargetFrames = 60;
@@ -103,8 +106,22 @@ __attribute__((noinline, used)) void downwellProfileReady()
     (void)gDownwellProfileRequireDamage;
     (void)gDownwellProfileGenerationTiming;
     (void)gDownwellProfileGenerationPhase;
+    (void)gDownwellTerrainPreparationCalls;
+    (void)gDownwellTerrainPreparationFields;
     __asm__ volatile("" ::: "memory");
 }
+}
+
+unsigned long downwellTerrainPreparationBegin(){
+    const ULONG start=GfxBase?*static_cast<volatile ULONG*>(&GfxBase->VBCounter):0;
+    __asm__ volatile("" ::: "memory");
+    return start;
+}
+void downwellTerrainPreparationEnd(unsigned long start){
+    __asm__ volatile("" ::: "memory");
+    if(!GfxBase)return;
+    gDownwellTerrainPreparationFields+=*static_cast<volatile ULONG*>(&GfxBase->VBCounter)-start;
+    ++gDownwellTerrainPreparationCalls;
 }
 
 void downwellProfileVblank()

@@ -21,7 +21,7 @@ They are not decoded from assets at every birth. Another cache must identify
 additional eliminated work rather than duplicate those tables.
 
 `PreparedTerrainBirthBounds` prepares the three terrain defaults (60, 93, 99)
-at owner construction, before any instance births. Its axis tables contain
+at owner construction, before any instance births. Its shared offset table contains
 binary32 positions and translated default collision bounds for the 16-pixel
 grid, x=-256..752 and y=0..8176. Live birth performs lookup/copy instead of
 integer encoding, float-to-integer position decoding and bounds translation.
@@ -29,9 +29,13 @@ Only initial default geometry uses this table: subsequent sprite/mask changes,
 external moves and collision refreshes keep their ordinary live path. Unsupported
 positions or unavailable default geometry fall back without modifying outputs.
 No lifetime, graph preparation flag, RNG draw, Create setter, room order or
-spatial publication moves earlier. The table occupies 16,134 bytes of ordinary
-storage per 68000 owner (16,140 on the host, not Chip RAM), owned for the same lifetime as its immutable
-resource defaults. Preparation latency still requires native measurement;
+spatial publication moves earlier. All axes and objects share up to four distinct
+coordinate offsets, including zero for the position. The pinned resources fit
+this dictionary; a changed resource requiring more offsets takes the general
+path without consuming dictionary slots. The table occupies 8,466 bytes of
+ordinary storage per 68000 owner (8,468 on the host, not Chip RAM), owned for
+the same lifetime as its immutable resource defaults. The FPS profiler reports
+startup preparation separately using the OS field counter before takeover;
 gameplay-only FPS does not measure that startup cost.
 
 ## Birth publication

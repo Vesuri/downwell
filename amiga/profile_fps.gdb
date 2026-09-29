@@ -15,6 +15,11 @@ if gDownwellProfileMaxGap[$s] > 0 && (gDownwellProfileMaxGapFrame[$s] == 0 || gD
     quit 1
 end
 printf "Damage number births: %lu\n", gDownwellProfileDamageBirths
+printf "PREPARATION terrain: calls=%lu PAL_fields=%lu approximately_ms=%lu (20 ms counter resolution, before takeover)\n", gDownwellTerrainPreparationCalls, gDownwellTerrainPreparationFields, gDownwellTerrainPreparationFields*20
+if gDownwellTerrainPreparationCalls != 1
+    printf "Unexpected terrain preparation coverage\n"
+    quit 1
+end
 if $s == 3
     if gDownwellProfileGameSamples != gDownwellProfileFrames[$s]
         printf "Gameplay coverage sample count mismatch: samples=%lu frames=%lu\n", gDownwellProfileGameSamples, gDownwellProfileFrames[$s]
