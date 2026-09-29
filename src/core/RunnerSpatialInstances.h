@@ -6,6 +6,7 @@
 #include "RunnerTransformField.h"
 #include "RunnerObjectMembership.h"
 #include "RunnerSpatialIndex.h"
+#include "RunnerSpatialJournal.h"
 #include "RunnerSpatialBoundsUpdate.h"
 #include "RunnerSpatialPosition.h"
 #include "RunnerPlaceQuery.h"
@@ -19,11 +20,17 @@
 #include "PreparedObjectDefaults.h"
 #include "Profile.h"
 namespace downwell {
+template<unsigned Capacity,unsigned Nodes,bool Scheduled> struct RunnerSpatialIndexStorage {
+    using Type=RunnerSpatialIndex<Nodes>;
+};
+template<unsigned Capacity,unsigned Nodes> struct RunnerSpatialIndexStorage<Capacity,Nodes,true> {
+    using Type=RunnerSpatialJournal<Nodes,Capacity>;
+};
 // Shared collision ownership for externally allocated instance handles. The
 // scheduler must attach every relevant birth before Create, publish its bounds,
 // and retire it before reusing its slot. This is not an activation scheduler.
 // No platform types or asset residency decisions belong here.
-template<unsigned Capacity,unsigned Nodes> class RunnerSpatialInstances {
+template<unsigned Capacity,unsigned Nodes,bool ScheduledIndex=false> class RunnerSpatialInstances {
     static_assert(Capacity>0,"Spatial instances need stable slots");
     using Queue=RunnerSpatialDirtyQueue<Capacity>;
     using Math=RunnerSpatialSplit;
@@ -186,6 +193,15 @@ public:
         return true;
     }
     bool valid()const{return good_ && index_.valid();}
+    // No logical instance work happens here. Reads force completion themselves.
+    bool serviceSpatialIndex(unsigned budget){
+        if constexpr(ScheduledIndex)return checked(index_.service(budget));
+        return valid();
+    }
+    unsigned pendingSpatialIndex()const{
+        if constexpr(ScheduledIndex)return index_.pending();
+        return 0;
+    }
     std::uint32_t bindingRevision()const{return bindingRevision_;}
     std::uint32_t captureRevision()const{return captureRevision_;}
     bool captureUnchanged(std::uint32_t revision)const{
@@ -793,7 +809,7 @@ private:
     Entry entries_[Capacity]{};
     RunnerObjectMembership<Capacity> membership_;
     Queue spatial_,collision_;
-    RunnerSpatialIndex<Nodes> index_;
+    typename RunnerSpatialIndexStorage<Capacity,Nodes,ScheduledIndex>::Type index_;
     bool good_=true;
     std::uint32_t bindingRevision_=0;
     std::uint32_t captureRevision_=0;

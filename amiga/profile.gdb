@@ -77,6 +77,7 @@ printf "Hardware sprite updates: header_only=%lu payload_copies=%lu payload_word
 printf "Animation snapshots: full_passes=%lu projected_passes=%lu projection_builds=%lu terrain_copies=%lu actor_copies=%lu watched_equal_moves=%lu watched_changed_moves=%lu\n", gDownwellProfileCounters[11], gDownwellProfileCounters[12], gDownwellProfileCounters[13], gDownwellProfileCounters[14], gDownwellProfileCounters[15], gDownwellProfileCounters[16], gDownwellProfileCounters[17]
 printf "Spatial publications: first=%lu reinsert_equal=%lu reinsert_changed=%lu\n", gDownwellProfileCounters[18], gDownwellProfileCounters[19], gDownwellProfileCounters[20]
 printf "Spatial reads: box=%lu line=%lu height=%lu node_count=%lu\n", gDownwellProfileCounters[21], gDownwellProfileCounters[22], gDownwellProfileCounters[23], gDownwellProfileCounters[24]
+printf "Spatial journal: queued=%lu serviced=%lu pressure_drains=%lu eager_fallbacks=%lu\n", gDownwellProfileCounters[25], gDownwellProfileCounters[26], gDownwellProfileCounters[27], gDownwellProfileCounters[28]
 printf "DOWNWELL_PROFILE_READY\n"
 shell touch .run/gdb-ready.marker
 detach

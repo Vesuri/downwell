@@ -109,6 +109,26 @@ void AmigaPlatform::waitVblank() const
     while (vblankCount_ == start) { }
 }
 
+void AmigaPlatform::waitVblank(bool (*idleWork)(void*),void* context,unsigned reserveLines) const
+{
+    const UWORD start=vblankCount_;
+    while(idleWork && vblankCount_==start){
+        // Stable nine-bit vertical position across the 255/256 boundary.
+        // A single longword read can combine the old high bit and new low byte.
+        UWORD high,low;
+        do{
+            high=AmigaHardware::readRegister(vposr);
+            low=AmigaHardware::readRegister(vhposr);
+        }while((high^AmigaHardware::readRegister(vposr))&1u);
+        const unsigned line=((high&1u)<<8)|(low>>8);
+        // 312 is conservative for either PAL field length. Recheck the VBI
+        // after sampling so a wrapped beam never looks like a new work budget.
+        if(vblankCount_!=start || line>=312u || reserveLines>=312u-line || !idleWork(context))break;
+    }
+    // If work crossed the boundary, do not accidentally wait another field.
+    while(vblankCount_==start){}
+}
+
 void AmigaPlatform::restore()
 {
     if (!active_) return;

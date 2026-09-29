@@ -1790,7 +1790,11 @@ __attribute__((noinline)) static int runDownwell(void) {
         int destroyedBlockX[AmigaPortRuntime::destroyedCapacity] = {0};
         int destroyedBlockY[AmigaPortRuntime::destroyedCapacity] = {0};
         DW_PROFILE_PHASE(profileWait);
-        platform.waitVblank();
+        platform.waitVblank([](void* context){
+            auto& owner=*static_cast<downwell::GameplayCollisionOwner*>(context);
+            return owner.pendingSpatialIndex()&&owner.serviceSpatialIndex(1);
+        },&collisionOwner,128);
+        if(!collisionOwner.valid()){exitCode=20;break;}
         // The preceding detached list has crossed the publication boundary.
         // Only now may another overlay overwrite an entry cover's DMA bank.
         if(residentCover==ResidentCover::entry&&gameplayScene.coverDetached())

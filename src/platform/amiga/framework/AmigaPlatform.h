@@ -21,6 +21,10 @@ public:
     void publish(const CopperList& copper);
     const UWORD* publishedCopper() const { return publishedCopper_; }
     void waitVblank() const;
+    // PAL idle work only. A callback performs one bounded unit, returns false
+    // when idle/failed, and must not touch display state or simulation state.
+    // reserveLines is a scheduling margin, not a preemptive execution limit.
+    void waitVblank(bool (*idleWork)(void*),void* context,unsigned reserveLines) const;
     static UWORD vblankCount() { return vblankCount_; }
     void restore();
 

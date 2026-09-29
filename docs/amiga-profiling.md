@@ -116,6 +116,13 @@ or the independent native terrain grid. Like publication counters, their
 window starts with the measured scene; zero reads cannot establish that the
 tree was unused before that window or will remain unused later in the level.
 
+`Spatial journal` separates queued operations from physically serviced ones,
+buffer-pressure drains and eager fallbacks. Serviced operations can exceed
+queued operations inside a scene window because work was queued before that
+window. Source publication counters remain logical publications, not physical
+tree insertions. Compare FPS-only deadlines as well as these instrumented
+counts when assessing [idle-time scheduling](spatial-publication-scheduling.md).
+
 The shared element links maintain a two-level free-slot bitmap. Allocation
 uses it to reproduce the lowest-unowned-element scan, then still checks the
 instance registry's presence flag. All element owners update the same map;

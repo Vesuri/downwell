@@ -207,11 +207,16 @@ Reference: [upgrade IDs and source entry points](upgrade-coverage.md).
   prepared path against immediate execution with intervening gameplay RNG and
   health changes, not just a fixed initial seed. Decide the remaining collision
   and layer ownership work from these dependencies before further micro-tuning.
-  Audit which live consumers require the exact spatial tree versus native
-  terrain queries. Avoid paying for duplicate representations without a live
-  consumer; any deferred construction must preserve historical insertion/removal
-  order, first-hit identity, query-preparation side effects and failure timing.
-  Rebuilding from current positions alone is not an equivalent substitute.
+  Complete the collision-consumer audit as remaining original queries enter
+  gameplay. Bound spatial-journal catch-up and pressure drains under natural
+  query-bearing workloads, including idle-service overruns; a selector-free
+  generation tape is insufficient. Preserve historical insertion/removal order,
+  first-hit identity, query-preparation side effects and failure timing. See
+  [derived-tree scheduling](spatial-publication-scheduling.md).
+- Complete the full startup-to-gameplay scene verification with idle spatial
+  servicing enabled. Resolve the bounded verifier timeout before treating the
+  garden/style transition and its timing checks as verified; matching initial
+  splash captures alone is insufficient.
 - Reduce full-room bookkeeping in layer projection, animation/previous-position
   snapshots and alarm registration capture. Preserve inactive layer termination,
   callback order, generation checks and synchronous mutation visibility. Measure

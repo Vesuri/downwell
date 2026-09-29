@@ -700,6 +700,14 @@ build/runner-place-query-test: tests/core/RunnerPlaceQueryTest.cpp $(wildcard sr
 	@mkdir -p build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ tests/core/RunnerPlaceQueryTest.cpp
 
+build/runner-spatial-journal-test: tests/core/RunnerSpatialJournalTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+.PHONY: test-spatial-journal
+test-spatial-journal: build/runner-spatial-journal-test
+	./build/runner-spatial-journal-test
+test: test-spatial-journal
+
 build/runner-spatial-split-test: tests/core/RunnerSpatialSplitTest.cpp $(wildcard src/core/*.h)
 	@mkdir -p build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/RunnerSpatialSplitTest.cpp

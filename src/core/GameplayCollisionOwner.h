@@ -23,7 +23,7 @@ namespace downwell {
 class GameplayCollisionOwner {
 public:
     using View=GameplayCollisionView;
-    using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2>;
+    using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2,true>;
 private:
     Owner owner_;
     Owner::RegistrationProjection<View::terrainBase,View::timeFieldBase> actorRegistrations_;
@@ -274,6 +274,8 @@ public:
     GameplayCollisionOwner(const GameplayCollisionOwner&)=delete;
     GameplayCollisionOwner& operator=(const GameplayCollisionOwner&)=delete;
     bool valid()const{return good_&&owner_.valid()&&terrain_.valid()&&scriptEffects_.valid()&&debris_.valid()&&timeChanges_.valid()&&entries_.valid()&&drones_.valid()&&layers_.valid();}
+    unsigned pendingSpatialIndex()const{return owner_.pendingSpatialIndex();}
+    bool serviceSpatialIndex(unsigned budget){return check(owner_.serviceSpatialIndex(budget));}
     bool attach(GameplayWorld& world){
         combatAlarmCaptureValid_=false;
         if(!valid()||(world_&&world_!=&world)||(!world_&&
