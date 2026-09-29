@@ -393,6 +393,15 @@ build/runner-layer-draw-test: tests/core/RunnerLayerDrawTest.cpp $(wildcard src/
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
 
+.PHONY: test-amiga-memory-copy
+test: test-amiga-memory-copy
+test-amiga-memory-copy: build/amiga-memory-copy-test
+	./build/amiga-memory-copy-test
+
+build/amiga-memory-copy-test: tests/platform/amiga/AmigaMemoryCopyTest.cpp src/platform/amiga/AmigaMemoryCopy.h src/platform/amiga/AmigaMemoryCopyVerification.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+
 build/runner-layer-instances-test: tests/core/RunnerLayerInstancesTest.cpp $(wildcard src/core/*.h)
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<

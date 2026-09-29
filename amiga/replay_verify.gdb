@@ -3,6 +3,11 @@ set confirm off
 set remotetimeout 30
 tbreak downwellReplayComplete
 continue
+if gMemoryCopyVerifiedCases != 384
+    printf "Native memory-copy alignment/guard corpus failed\n"
+    quit 1
+end
+printf "Native memory copy: 384 alignment/guard cases passed\n"
 if gSmallRemainderFailures != 0
     printf "Small-divisor remainder failures: %lu\n", gSmallRemainderFailures
     quit 1

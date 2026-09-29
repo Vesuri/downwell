@@ -183,7 +183,7 @@ OBJECTS := obj/DownwellAmiga.o obj/AmigaProfile.o obj/AmigaInput.o obj/AmigaPlay
 	obj/AmigaMenuCache.o obj/AmigaGardenScene.o obj/AmigaSplashCache.o obj/AmigaPublisherScene.o obj/AmigaCreditsScene.o obj/AmigaControlsScene.o obj/AmigaStyleRenderer.o obj/AmigaStyleScene.o obj/AmigaUpgradeScene.o obj/AmigaSelectionLayer.o \
 	obj/AmigaRenderer.o obj/AmigaBlitter.o obj/AmigaGameplayRows.o obj/AmigaGameplayEffects.o obj/AmigaGameplayScene.o obj/AmigaGameplayActors.o obj/AmigaGameplaySpriteAssignment.o obj/AmigaGameplayDrawList.o \
 	obj/AmigaHardware.o obj/Bitmap.o obj/Palette.o obj/Sprite.o obj/Util.o \
-	obj/GCCRuntime.o obj/AmigaPlatform.o \
+	obj/GCCRuntime.o obj/AmigaMemoryCopy.o obj/AmigaPlatform.o \
 	obj/AmigaMemory.o obj/CopperList.o obj/RoomPack.o obj/ObjectPack.o \
 	obj/BuilderPatternPack.o obj/AreaOneBuilder.o obj/GameMakerRandom.o \
 	obj/Replay.o \
@@ -480,9 +480,13 @@ obj/AmigaAssets.o: $(AMIGA_SRC)/AmigaAssets.s $(AMIGA_HUD) $(AMIGA_GAME) $(AMIGA
 	@mkdir -p $(@D)
 	$(AS) $(ASFLAGS) -o $@ $<
 
-obj/gcc8_c_support.o: $(SUPPORT)/gcc8_c_support.c
+obj/gcc8_c_support.o: $(SUPPORT)/gcc8_c_support.c Makefile
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) -c -o $@ $<
+	$(CC) $(CFLAGS) -Dmemcpy=downwellToolchainMemcpy -c -o $@ $<
+
+obj/AmigaMemoryCopy.o: $(AMIGA_SRC)/AmigaMemoryCopy.cpp $(AMIGA_SRC)/AmigaMemoryCopy.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -c -o $@ $<
 
 obj/gcc8_a_support.o: $(SUPPORT)/gcc8_a_support.s
 	@mkdir -p $(@D)
