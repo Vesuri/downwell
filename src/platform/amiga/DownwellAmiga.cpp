@@ -1556,6 +1556,9 @@ __attribute__((noinline)) static int runDownwell(void) {
     }
     activeGamePack = memory.assets();
     activeGamePackEnd = activeGamePack + gamePackBytes;
+    if(!AmigaGameplayActors::prepareDamageText(activeGamePack,activeGamePackEnd)){
+        platform.restore();FreeMem(startupCopperWords,4*sizeof(UWORD));memory.release();return 20;
+    }
     static downwell::EffectMaskAssets effectAssets;
     alignas(downwell::CurrencySmokeComposition) static UBYTE effectStorage[sizeof(downwell::CurrencySmokeComposition)];
     auto& controllerEffects = *new (effectStorage) downwell::CurrencySmokeComposition;

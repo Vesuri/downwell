@@ -2,6 +2,7 @@
 #include "AmigaGameplayRows.h"
 #include "AmigaLaserSight.h"
 #include "AmigaProfile.h"
+#include "AmigaDamageText.h"
 #include "core/DamageNumberText.h"
 #include "framework/Bitmap.h"
 #include "framework/AmigaHardware.h"
@@ -9,8 +10,15 @@
 extern "C" { extern volatile ULONG gDownwellGameplayBobChecks, gDownwellGameplayBobFailures; }
 #ifdef DOWNWELL_BOB_VERIFY
 extern "C" void downwellGameplayBobsReady();
+extern "C" { volatile unsigned gDownwellDamageTextChecks; }
 #endif
 #endif
+
+namespace { AmigaDamageGlyphs damageGlyphs; bool damageGlyphsReady; }
+bool AmigaGameplayActors::prepareDamageText(const UBYTE* pack, const UBYTE* end) {
+    damageGlyphsReady=amigaRendererPrepareDamageGlyphs(&damageGlyphs,pack,end)!=0;
+    return damageGlyphsReady;
+}
 
 // Overflow actors are ordinary masked planar blits into the inactive display,
 // never into the pristine terrain backing. Only their touched rows are restored
@@ -43,12 +51,15 @@ void AmigaGameplayActors::draw(AmigaRenderer renderer, Bitmap& display,
             AmigaHardware::blitterDrain();
             AmigaRenderer textRenderer=renderer;textRenderer.blitterEnabled=0;
             downwell::DamageNumberText label;label.formatInteger(bob.flip);
-            label.draw(bob.x,bob.y,[&](unsigned glyph,int x,int y,unsigned pen){
+            if (damageGlyphsReady) AmigaDamageText::draw(textRenderer,damageGlyphs,label,bob.x,bob.y);
+            if (!damageGlyphsReady) label.draw(bob.x,bob.y,[&](unsigned glyph,int x,int y,unsigned pen){
                 amigaRendererDrawAssetPen(&textRenderer,pack,packEnd,glyph,0,x,y,0,pen);
-#ifdef DOWNWELL_SCENE_VERIFY
-                amigaRendererDrawAssetPen(&oracle,pack,packEnd,glyph,0,x,y,0,pen);
-#endif
             });
+#ifdef DOWNWELL_SCENE_VERIFY
+            label.draw(bob.x,bob.y,[&](unsigned glyph,int x,int y,unsigned pen){
+                amigaRendererDrawAssetPen(&oracle,pack,packEnd,glyph,0,x,y,0,pen);
+            });
+#endif
             int top=bob.y-1,bottom=bob.y+11;
             if(top<0)top=0;
             if(bottom>downwellDisplayHeight)bottom=downwellDisplayHeight;
@@ -88,10 +99,30 @@ void AmigaGameplayActors::draw(AmigaRenderer renderer, Bitmap& display,
     }
     AmigaHardware::blitterDrain();
 #ifdef DOWNWELL_SCENE_VERIFY
+#ifdef DOWNWELL_BOB_VERIFY
+    // The short overflow tape need not cause combat damage. Exercise the
+    // prepared text path explicitly without changing simulation or RNG.
+    if (damageGlyphsReady && gDownwellDamageTextChecks<32) {
+        const unsigned sample=gDownwellDamageTextChecks;
+        const int values[]={0,1,8,12,99,123456789,-17,(-2147483647-1)};
+        downwell::DamageNumberText label;label.formatInteger(values[sample&7]);
+        const int x=(sample<16?104:258)+int(sample&15), y=(sample&1)?278:0;
+        const unsigned testOrigin=(sample&2)?319:311;
+        AmigaRenderer actualText=renderer,referenceText=oracle;
+        amigaRendererSetGameOrigin(&actualText,testOrigin);
+        amigaRendererSetGameOrigin(&referenceText,testOrigin);
+        AmigaDamageText::draw(actualText,damageGlyphs,label,x,y);
+        label.draw(x,y,[&](unsigned glyph,int px,int py,unsigned pen){
+            amigaRendererDrawAssetPen(&referenceText,pack,packEnd,glyph,0,px,py,0,pen);
+        });
+        rows.damage(testOrigin,y?y-1:0,y?7:11,(UBYTE)(1u<<buffer));
+        ++gDownwellDamageTextChecks;
+    }
+#endif
     for (unsigned byte = 0; byte < downwellGameRingBytes; ++byte)
         if (expected[byte] != renderer.game[byte]) ++gDownwellGameplayBobFailures;
 #ifdef DOWNWELL_BOB_VERIFY
-    if (gDownwellGameplayBobChecks >= 100) downwellGameplayBobsReady();
+    if (gDownwellGameplayBobChecks >= 100 && gDownwellDamageTextChecks>=32) downwellGameplayBobsReady();
 #endif
 #endif
 }

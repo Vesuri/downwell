@@ -53,6 +53,9 @@ void amigaRendererFillRect(AmigaRenderer* renderer,
 void amigaRendererDrawCoverageWord(AmigaRenderer*,int x,int y,UWORD bits,unsigned pen);
 /* Final planar colours under alpha, MSB first; one placement for both planes. */
 void amigaRendererDrawPlanarWord(AmigaRenderer*,int x,int y,UWORD alpha,UWORD low,UWORD high);
+/* Coverage copied from the existing offline numeric glyph planes at startup. */
+typedef struct AmigaDamageGlyphs { UBYTE rows[11][10]; } AmigaDamageGlyphs;
+int amigaRendererPrepareDamageGlyphs(AmigaDamageGlyphs*, const UBYTE*, const UBYTE*);
 void amigaRendererDrawAsset(AmigaRenderer* renderer,
                             const UBYTE* pack, const UBYTE* packEnd,
                             UWORD sprite, UWORD frame,

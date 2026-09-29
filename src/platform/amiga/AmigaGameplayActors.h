@@ -15,6 +15,7 @@ struct GameplayBob { UWORD sprite, frame; int x, y, flip; };
 class AmigaGameplayActors {
 public:
     static constexpr unsigned regularChannels = 6;
+    static bool prepareDamageText(const UBYTE* pack, const UBYTE* packEnd);
     struct Assignment {
         unsigned bobCount;
         bool ready;

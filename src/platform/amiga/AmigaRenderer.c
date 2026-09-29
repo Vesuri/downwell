@@ -701,6 +701,25 @@ unsigned amigaRendererPublishHudColumn(UBYTE* destination, UBYTE* working,
     return writes;
 }
 
+int amigaRendererPrepareDamageGlyphs(AmigaDamageGlyphs* glyphs, const UBYTE* pack,
+                                     const UBYTE* end) {
+    unsigned digit, row;
+    for (digit = 0; digit < 11; ++digit) {
+        const UBYTE* record = findAsset(pack, end, (UWORD)(65100 + digit), 0);
+        const UBYTE* data;
+        ULONG offset;
+        if (!record || readWord(record+4) != 4 || readWord(record+6) ||
+            readWord(record+8) != 8 || readWord(record+10) != 10 ||
+            readWord(record+12) != 16) return 0;
+        offset = readLong(record+16);
+        if (offset > (ULONG)(end-pack) || (ULONG)(end-pack)-offset < 40) return 0;
+        data = pack + offset;
+        for (row = 0; row < 10; ++row)
+            glyphs->rows[digit][row] = data[row*2] | data[20+row*2];
+    }
+    return 1;
+}
+
 int amigaRendererPrepareWordStamp(AmigaWordStamp* stamp, const UBYTE* pack,
                                   const UBYTE* end, UWORD sprite, UWORD frame) {
     const UBYTE* record = findAsset(pack, end, sprite, frame);

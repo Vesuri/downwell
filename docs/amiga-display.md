@@ -132,6 +132,23 @@ not depend on an operating-system value left in BPLCON2.
 
 ## Vertical ring and buffering
 
+Damage labels retain the shared `DamageNumberText` formatting and eight-pixel
+font advances. At startup, the actor backend copies 110 coverage bytes from
+the existing offline numeric glyph planes, validating their dimensions and
+origins. It does not generate sprite assets or convert pixels on the target.
+The game bank remains immutable throughout their use.
+
+All four black outline passes in the reference precede all white glyphs.
+Their coverage is therefore the union of the four one-pixel translations,
+with the untranslated white coverage taking precedence. `AmigaDamageText`
+forms those rows in 192 bytes of temporary storage and publishes their combined
+coverage in planar words, preserving pixels outside the union. The existing word
+publisher handles viewport clipping and the circular display; the pristine
+terrain and other buffer remain untouched. The five-pass generic renderer
+remains the pixel oracle in scene-verification builds and the fallback for an
+unprepared backend. Production startup treats a failed preparation as an
+initialization error, not permission to omit a label.
+
 Controller effect surfaces are already clipped to the 160x284 gameplay view.
 Their publisher uses that contract directly: compute a ring-row address once
 per visited row, then merge the two palette words with the fixed horizontal
