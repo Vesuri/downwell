@@ -25,6 +25,10 @@ public:
     };
     bool contains(unsigned slot) const {return slot<Capacity && entries_[slot].object>=0;}
     unsigned size() const {return count_;}
+    bool read(unsigned slot,std::uint32_t& identity,int& object)const{
+        if(!contains(slot))return false;
+        identity=entries_[slot].identity;object=entries_[slot].object;return true;
+    }
     // Borrow the current registration sequence without permitting mutation.
     // Exact-object Step ordering is applied after capture, not by traversing
     // ancestor-inclusive collision lists.

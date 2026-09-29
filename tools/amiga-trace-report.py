@@ -269,7 +269,7 @@ CAUSES = [
     ('software float emulation', r'MotionBinary64|RunnerImageValue|[mM]ultiplyBinary64|'
      r'[dD]ivideBinary64|roundGameMaker'),
     ('runner bookkeeping', r'RunnerRoomMembership|RunnerRun(?:Room)?Membership|RunnerLayer|GameplayRoomLayers|'
-     r'RunnerObjectMembership|RunnerSpatialInstances|RunnerSpatialLifetimes|RunnerSpatialDirty|RunnerSpatialBounds|'
+     r'RunnerObjectMembership|RunnerObservedRegistration|RunnerSpatialInstances|RunnerSpatialLifetimes|RunnerSpatialDirty|RunnerSpatialBounds|'
      r'RunnerSpatialPosition|RunnerStepSnapshot|RunnerObjectFamilies|RecordLifecycle|'
      r'GameplayCollisionOwner::(Binding|valid|refresh|reconcile|combatAlarm|dispatchCaptured|'
      r'cleanupDestroyed|prepareDraw|resolves)|GameplayCollisionView|Prepared(Terrain|UnitSprite)'

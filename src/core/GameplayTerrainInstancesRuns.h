@@ -2,6 +2,7 @@
 #define DOWNWELL_GAMEPLAY_TERRAIN_INSTANCES_RUNS_H
 #include "GameplayTerrainInstancesScalar.h"
 #include "TerrainOwnershipRuns.h"
+#include "RunnerRegistrationOrder.h"
 #include <cstddef>
 namespace downwell {
 class GameplayTerrainInstancesRuns {
@@ -27,6 +28,7 @@ public:
     };
 private:
     struct Mutable:CreateValues {
+        RunnerRegistrationOrder registration;
         WallEndStepState wall{};
         bool active=true,destroyRequested=false,wallNeedsReset=false;
         // Replaces the old ever-used byte: pristine, allocated, published,
@@ -41,6 +43,8 @@ private:
     Ids identities_;
     Mutable mutable_[capacity]{};
     unsigned freeHint_=0;std::uint32_t next_=1;
+    unsigned registered_[3]{},registrationRevision_=0;
+    static unsigned family(int object){return object==60?0:object==93?1:2;}
     bool good_=true,dispatching_=false,unboundedWallArt_=false;
     Record record(const Identity& id)const{
         const auto& m=mutable_[id.handle.slot];
@@ -74,6 +78,39 @@ public:
         return true;
     }
     unsigned size()const{return identities_.size();}
+    unsigned registrationRevision()const{return registrationRevision_;}
+    unsigned registeredCount()const{return registered_[0]+registered_[1]+registered_[2];}
+    bool registered(unsigned slot)const{
+        return identities_.occupied(slot)&&mutable_[slot].registration.present();
+    }
+    RunnerRegistrationOrder registrationOrder(unsigned slot)const{return mutable_[slot].registration;}
+    InstanceHandle registrationHandle(unsigned slot)const{return identities_.currentHandle(slot);}
+    int registrationObject(unsigned slot)const{return identities_.object(slot);}
+    bool registerInstance(InstanceHandle h,int object,RunnerRegistrationOrder order){
+        if(!order.present()||!identities_.contains(h)||identities_.object(h.slot)!=object)return false;
+        if(!registered(h.slot))++registered_[family(object)];
+        mutable_[h.slot].registration=order;++registrationRevision_;return true;
+    }
+    bool unregisterInstance(unsigned slot){
+        if(!registered(slot))return false;
+        --registered_[family(identities_.object(slot))];mutable_[slot].registration={};
+        ++registrationRevision_;return true;
+    }
+    void clearRegistrations(){
+        if(!registeredCount())return;
+        for(auto& m:mutable_)m.registration={};
+        registered_[0]=registered_[1]=registered_[2]=0;++registrationRevision_;
+    }
+    template<class IsA> unsigned countRegistered(int object,IsA isA)const{
+        const int objects[]={60,93,99};unsigned count=0;
+        for(unsigned i=0;i<3;++i)if(registered_[i]&&(objects[i]==object||isA(objects[i],object)))count+=registered_[i];
+        return count;
+    }
+    template<class Visit> bool visitRegistrations(Visit visit)const{
+        return identities_.visit([&](const Identity& id){
+            return !mutable_[id.handle.slot].registration.present()||visit(id.handle.slot,id.handle.generation,id.object);
+        });
+    }
     bool spatialCanAttach(InstanceHandle h,int object)const{
         return identities_.contains(h)&&mutable_[h.slot].allocation==1&&identities_.object(h.slot)==object;
     }
@@ -192,6 +229,7 @@ public:
     bool retireMarked(InstanceHandle h){
         Identity id;if(!admitted(h,id)||!mutable_[h.slot].destroyRequested)return good_=false;
         if(!binding_.retire(h,record(id)))return good_=false;
+        unregisterInstance(h.slot);
         if(!identities_.retire(h))return good_=false;
         if(h.slot<freeHint_)freeHint_=h.slot;return true;
     }
@@ -200,6 +238,7 @@ public:
         while(size()){
             const auto h=handle(0);Identity id;identities_.read(h,id);
             if(!binding_.retire(h,record(id)))return good_=false;
+            unregisterInstance(h.slot);
             if(!identities_.retire(h))return good_=false;
             if(h.slot<freeHint_)freeHint_=h.slot;
         }

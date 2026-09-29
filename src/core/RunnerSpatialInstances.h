@@ -41,12 +41,13 @@ template<unsigned Capacity,unsigned Nodes> struct RunnerSpatialIndexStorage<Capa
 // scheduler must attach every relevant birth before Create, publish its bounds,
 // and retire it before reusing its slot. This is not an activation scheduler.
 // No platform types or asset residency decisions belong here.
-template<unsigned Capacity,unsigned Nodes,bool ScheduledIndex=false,unsigned RetainedFirst=0,unsigned RetainedLast=0,bool RunRegistration=ScheduledIndex,class Lifetimes=RunnerSpatialLifetimes<Capacity>> class RunnerSpatialInstances {
+template<unsigned Capacity,unsigned Nodes,bool ScheduledIndex=false,unsigned RetainedFirst=0,unsigned RetainedLast=0,bool RunRegistration=ScheduledIndex,class Lifetimes=RunnerSpatialLifetimes<Capacity>,
+    class Registration=typename RunnerRegistrationStorage<Capacity,RetainedFirst,RetainedLast,
+        RunRegistration&&(RetainedFirst<RetainedLast)>::Type> class RunnerSpatialInstances {
     static_assert(Capacity>0,"Spatial instances need stable slots");
     using Queue=RunnerSpatialDirtyQueue<Capacity>;
     using Math=RunnerSpatialSplit;
-    using Membership=typename RunnerRegistrationStorage<Capacity,RetainedFirst,RetainedLast,
-        RunRegistration&&(RetainedFirst<RetainedLast)>::Type;
+    using Membership=Registration;
 public:
     using Real=RunnerImageValue;
     template<unsigned First,unsigned Last> using RegistrationProjection=
@@ -258,7 +259,7 @@ public:
         if(creationDepth)*creationDepth=definition->creationDepth;
         return true;
     }
-    template<class Terrain> bool bindTerrainLifetimes(Terrain& terrain){return lifetimes_.bind(terrain);}
+    template<class Terrain> bool bindTerrainLifetimes(Terrain& terrain){return lifetimes_.bind(terrain)&&membership_.bindTerrain(terrain);}
     bool valid()const{return good_ && index_.valid();}
     // No logical instance work happens here. Reads force completion themselves.
     bool serviceSpatialIndex(unsigned budget){

@@ -422,6 +422,18 @@ different object family requires a different typed lifetime, not mutation of
 an independent spatial object ID. Ordinary actor owners retain their mutable
 object binding and per-slot generation high-water marks.
 
+Terrain object registration in that configuration is a presence/order stamp in
+the same typed mutable record, not a second linked list or run locator. Actors
+retain their own registration list. Own/ancestor population counts use the
+three terrain-family counters; actor-only walks never expand terrain. A mixed
+walk observes a cached slot projection sorted by publication stamps, including
+rebindings. Typed retirement invalidates this projection even when it bypasses
+the registration facade. Stamps are two-word ordering keys, not numeric game
+instance IDs. Membership mutation is forbidden inside visitors; projected and
+retained visitors detect it across both the actor facade and typed terrain.
+The projection is derived state: generation cost must include its first
+observation when measuring this representation, not just cheap stamp writes.
+
 Generated terrain may bind one initialized-birth transaction. The run store
 allocates the typed identity first, and the built-in collision owner completes
 ordinary birth publication before executing `terrainCreateProperties`. Create

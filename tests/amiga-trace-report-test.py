@@ -14,7 +14,7 @@ class CostOwners(unittest.TestCase):
     def test_scalar_and_run_owners(self):
         for owner in ("RunnerRoomMembership", "RunnerRunRoomMembership",
                       "RunnerObjectMembership", "RunnerRunMembership", "TerrainOwnershipRuns",
-                      "RunnerSpatialLifetimes"):
+                      "RunnerSpatialLifetimes", "RunnerObservedRegistration"):
             with self.subTest(owner=owner):
                 frame = f"downwell::{owner}<3067u, 8u, 2056u>::bind"
                 self.assertEqual(report.cause(["runDownwell", frame]), "runner bookkeeping")

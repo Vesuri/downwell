@@ -3,6 +3,7 @@
 #include "GameplayCollisionView.h"
 #include "BoxDestructionScript.h"
 #include "RunnerSpatialInstances.h"
+#include "RunnerObservedRegistration.h"
 #include "RunnerObjectFamilies.h"
 #include "RunnerRoomMembership.h"
 #include "RunnerRunRoomMembership.h"
@@ -32,7 +33,8 @@ public:
     using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2,true,View::terrainBase,View::timeFieldBase,false>;
 #elif defined(DOWNWELL_TERRAIN_RUN_STORE)
     using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2,true,View::terrainBase,View::timeFieldBase,true,
-        RunnerSpatialLifetimes<View::capacity,View::terrainBase,View::timeFieldBase,GameplayTerrainInstances>>;
+        RunnerSpatialLifetimes<View::capacity,View::terrainBase,View::timeFieldBase,GameplayTerrainInstances>,
+        RunnerObservedRegistration<View::capacity,View::terrainBase,View::timeFieldBase,GameplayTerrainInstances>>;
 #else
     using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2,true,View::terrainBase,View::timeFieldBase>;
 #endif

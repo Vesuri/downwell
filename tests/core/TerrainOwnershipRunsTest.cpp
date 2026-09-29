@@ -1,6 +1,8 @@
 #include "core/TerrainOwnershipRuns.h"
 #include "core/GameplayTerrainInstancesRuns.h"
 #include "core/RunnerSpatialLifetimes.h"
+#include "core/RunnerObservedRegistration.h"
+#include <tuple>
 #include <vector>
 #include <cstdio>
 #include <cstdlib>
@@ -95,7 +97,68 @@ static void spatialIdentity(){
     for(unsigned slot:{0u,1u,2050u,2051u})require(!spatial.contains({slot,18})&&!spatial.canAttach({slot,18},35));
     require(!spatial.canAttach({2052,1},35)&&!spatial.contains({2052,1}));
 }
+static void observedRegistration(){
+    using Terrain=downwell::GameplayTerrainInstancesRuns;
+    TerrainObserver observer;
+    Terrain terrain(Terrain::Binding::bindDestruction(observer));
+    downwell::RunnerObservedRegistration<2052,2,2050,Terrain> observed;
+    downwell::RunnerObjectMembership<2052> scalar;
+    require(observed.bindTerrain(terrain)&&!observed.bindTerrain(terrain));
+    using Entry=std::tuple<unsigned,unsigned,int>;
+    auto isA=[](int child,int parent){return parent==100&&(child==60||child==93);};
+    auto compare=[&](){
+        std::vector<Entry> a,b;
+        require(observed.visitRegistrations([&](unsigned s,unsigned id,int o){a.emplace_back(s,id,o);return true;}));
+        require(scalar.visitRegistrations([&](unsigned s,unsigned id,int o){b.emplace_back(s,id,o);return true;}));
+        require(a==b&&observed.size()==scalar.size());
+        for(int object:{-1,35,60,93,99,100,101}){
+            require(observed.count(object,isA)==scalar.count(object,isA));
+            a.clear();b.clear();
+            observed.visit(object,isA,[&](unsigned s,unsigned id){a.emplace_back(s,id,0);return true;});
+            scalar.visit(object,isA,[&](unsigned s,unsigned id){b.emplace_back(s,id,0);return true;});
+            require(a==b);
+        }
+        for(unsigned first:{0u,2u,2050u}){
+            a.clear();b.clear();const unsigned last=first==0?2:first==2?2050:2052;
+            require(observed.visitRegistrationRange(first,last,[&](unsigned s,unsigned id,int o){a.emplace_back(s,id,o);return true;}));
+            require(scalar.visitRegistrationRange(first,last,[&](unsigned s,unsigned id,int o){b.emplace_back(s,id,o);return true;}));
+            require(a==b);
+        }
+    };
+    auto bind=[&](unsigned s,int object,unsigned id){require(observed.bind(s,object,id)==scalar.bind(s,object,id));compare();};
+    bind(0,35,7);
+    for(unsigned i=0;i<64;++i){
+        int object=i%3==0?60:i%3==1?93:99;
+        require(terrain.append(object,int(i)*16,32,true));const auto h=terrain.handle(i);
+        bind(h.slot+2,object,h.generation);
+        if(i%7==0)bind(2050,35,i+1);
+    }
+    unsigned random=77123;
+    for(unsigned i=0;i<2000;++i){
+        random=random*1664525u+1013904223u;
+        const auto h=terrain.handle((random>>8)%64);const auto r=terrain.find(h);
+        if(random&1)bind(h.slot+2,r->objectId,h.generation);
+        else {require(observed.unbind(h.slot+2)==scalar.unbind(h.slot+2));compare();}
+    }
+    // Direct typed retirement invalidates a previously observed projection.
+    const auto old=terrain.handle(0);bind(old.slot+2,terrain.find(old)->objectId,old.generation);
+    require(terrain.requestDestroy(old)&&terrain.retireMarked(old));require(scalar.unbind(old.slot+2));compare();
+    require(terrain.append(93,0,48,true));const auto fresh=terrain.handle(terrain.size()-1);
+    require(fresh.slot==old.slot&&fresh.generation!=old.generation);bind(fresh.slot+2,93,fresh.generation);
+    require(!observed.bind(old.slot+2,93,old.generation));compare();
+    unsigned calls=0;require(!observed.visitRegistrations([&](auto,auto,auto){++calls;return false;})&&calls==1);
+    using Projection=decltype(observed)::RegistrationProjection<2,2050>;
+    Projection projection;
+    require(!observed.visitRegistrationRange(projection,0,2,[&](auto,auto,auto){observed.repeatFreshTailBinding();return true;}));
+    require(!observed.visitRetainedRegistrationRange(2,3,[](auto,auto,auto){return true;}));
+    observed.clear();scalar.clear();compare();
+    bind(2051,35,0);bind(fresh.slot+2,93,fresh.generation);
+    downwell::RunnerRegistrationOrder order{0xffffffffu,7};order.advance();
+    require(order.low==0&&order.high==8&&order.present());
+    std::puts("Observed terrain registration: mixed order, rebind, retirement and reuse passed");
+}
 int main(){
+    observedRegistration();
     initializedBoundary();
     spatialIdentity();
     Store runs;std::vector<Store::Identity> scalar;
