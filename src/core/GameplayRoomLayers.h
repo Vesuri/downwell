@@ -100,7 +100,14 @@ public:
         const unsigned layer=layers_.elementOwner(element);
         if(layer==Layers::End)return fail();
         retainedDraw_[element]=projected?0:(inactive?2:1);
-        projectionValid_[layer]=false;
+        // A head insertion changes no existing element's forward skip link.
+        // Extend the warmed projection instead of walking all retained terrain
+        // again. Reserved elements elsewhere retain the general rebuild path.
+        if(projectionValid_[layer]&&layers_.firstDrawElement(layer)==element){
+            const unsigned next=layers_.nextDrawElement(element);
+            nextRelevant_[element]=std::uint16_t(retainedDraw_[element]!=1?element:
+                next==Registry::End?Registry::End:nextRelevant_[next]);
+        }else projectionValid_[layer]=false;
         ++live_;return true;
     }
     bool retire(InstanceHandle h){
@@ -108,10 +115,14 @@ public:
         if(!valid()||!live_)return fail();
         const unsigned element=registry_.find(h);
         const unsigned layer=layers_.elementOwner(element);
+        const bool head=layer!=Layers::End&&layers_.firstDrawElement(layer)==element;
         if(element==Registry::End||layer==Layers::End||!lifetimes_.retire(h))return fail();
         retainedDraw_[element]=0;
         projected_[h.slot>>3]&=~(1u<<(h.slot&7));
-        projectionValid_[layer]=false;--live_;return true;
+        // No surviving forward skip link can point back to the removed head.
+        // Invalidate a disposed dynamic layer before its slot can be reused.
+        if(!head||!layers_.get(layer))projectionValid_[layer]=false;
+        --live_;return true;
     }
     bool activation(InstanceHandle h,bool active){
         if(!enabled())return true;

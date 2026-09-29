@@ -1719,7 +1719,7 @@ int main(){
             assert(cached->retire(h)&&oracle->retire(h));
         assert(cached->prepare()&&oracle->prepare());compare();
     }
-    for(unsigned mode=0;mode<3;++mode){
+    for(unsigned mode=0;mode<5;++mode){
         // Warm skip links, then change a later scenery element or insert at
         // the head during Draw. The uncached/all-projected owner walks every
         // raw element and is the ordering oracle for this optimization.
@@ -1739,12 +1739,13 @@ int main(){
             auto& layers=*(side?oracle:cached);std::vector<unsigned> trace;
             assert(layers.visit([&](InstanceHandle h,RunnerLayerDraw::Element& out){
                 out.instance=true;out.flags=0x10;out.object=h.slot!=0&&h.slot!=3;out.drawEvent=true;
+                if(h.slot==4&&mode>=3){out.object=false;if(mode==4)out.flags|=2;}
                 if(h.slot==3&&inactive[side])out.flags|=2;
                 return true;
             },[&](InstanceHandle h,int){
                 trace.push_back(h.slot);
                 if(mutate&&h.slot==2){
-                    if(mode==2)assert(layers.birth({4,1},0,depth,false,true));
+                    if(mode>=2)assert(layers.birth({4,1},0,depth,mode==4,side||mode==2));
                     else{inactive[side]=mode==0;assert(layers.activation({3,1},!inactive[side]));}
                 }
                 return true;
@@ -1754,6 +1755,10 @@ int main(){
         const auto actual=draw(0,true),expected=draw(1,true);
         assert(actual==expected&&actual==(mode==0?std::vector<unsigned>{2}:std::vector<unsigned>{2,1}));
         assert(draw(0,false)==draw(1,false));
+        if(mode>=2){
+            assert(cached->retire({4,1})&&oracle->retire({4,1}));
+            assert(draw(0,false)==draw(1,false));
+        }
     }
     {
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
