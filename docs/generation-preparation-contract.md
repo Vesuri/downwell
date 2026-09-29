@@ -451,6 +451,44 @@ Clean retained-animation passes observe actors alone. If a callback dirties
 terrain positions, the remaining mixed order resumes after that actor, without
 resnapshotting earlier terrain. No game callback is deferred by these projections.
 
+### Retained terrain layer observations
+
+Removing a terrain cell's ordinary layer entry is not equivalent to removing it
+from the logical layer. The replacement must retain these source observations:
+
+- `RunnerLayerDraw::action` observes the live inactive flag before testing
+  whether an instance has an actor Draw operation. An inactive retained cell
+  ends that layer's walk even though an active retained cell draws nothing.
+  An earlier actor's Draw callback can change that flag before the cell is
+  reached. A cutoff captured only at frame entry is therefore insufficient.
+- Flag publication and element reconciliation are separate. The first changes
+  the cutoff at its old position; reconciliation moves that same logical
+  element to the head or tail. Inactive normalization scans backwards and
+  moves entries to the tail, reversing their forward order rather than doing
+  a stable partition. Head/tail order and concatenation must survive grouping.
+- Retained-only dynamic layers remain allocated. Retiring the last actor does
+  not free the layer, and another actor at that depth reuses its existing ID.
+  Only final logical-element retirement disposes it. A later replacement
+  consumes a new process-global ID through `RunnerLayerIds`.
+- `RunnerDepthService::apply` uses **logical element count**, not the number
+  of stored groups, for the singleton small-depth-change branch (0x414660).
+  An actor beside retained terrain must detach and acquire the destination
+  dynamic layer; it must not move the old terrain layer as though alone.
+  Serialized placeholders and non-instance elements also contribute.
+- Increasing-depth merges publish destination layer IDs before concatenation
+  and inactive normalization (0x4147b0). Failure retains the publication prefix.
+  Empty-layer disposal, capacity checks and source-ID consumption must occur at
+  their original boundaries, not at deferred projection construction.
+- Draw saves each raw successor before dispatch (0x4904c6). Any grouped
+  representation must preserve that observation point for births and flag
+  writes during Draw, not merely match a static sorted snapshot.
+
+`retainedLayerBoundaries` in `RunnerLayerDrawTest.cpp` pins the live cutoff,
+retained-only lifetime, logical singleton decision and resulting process-ID
+sequence against the existing source-backed primitives. The surrounding suite
+supplies merge/failure, normalization and Draw-time birth tests. These gates
+do not establish that an unintegrated grouped representation is equivalent.
+
 Generated terrain may bind one initialized-birth transaction. The run store
 allocates the typed identity first, and the built-in collision owner completes
 ordinary birth publication before executing `terrainCreateProperties`. Create

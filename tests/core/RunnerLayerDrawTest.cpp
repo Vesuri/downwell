@@ -5,6 +5,8 @@
 #include "core/RunnerLayers.h"
 #include "core/RunnerRoomMembership.h"
 #include "core/RunnerRunRoomMembership.h"
+#include "core/RunnerDepthChanges.h"
+#include "core/RunnerLayerIds.h"
 #include <cstdlib>
 #include <algorithm>
 #include <iostream>
@@ -63,6 +65,53 @@ void traversal(){
         [](unsigned,const auto&){return false;},lookup,draw,end)&&trace.empty(),"begin failure terminal");
     trace.clear();require(!RunnerLayerDraw::visit(layers,[](unsigned,const auto&){return true;},begin,lookup,draw,
         [](unsigned,const auto&){return false;})&&trace==std::vector<int>({30,105}),"end failure terminal");
+}
+// A retained terrain group is invisible to actor Draw, but is not absent from
+// the source layer. These are observation gates for removing per-cell nodes.
+void retainedLayerBoundaries(){
+    using Layers=RunnerLayers<8,8>;
+    Layers layers;RunnerLayerIds ids;unsigned base=Layers::End;
+    require(ids.createDynamic(layers,0,base),"retained base layer");
+    const int baseId=layers.get(base)->id;
+    // Old actor, two retained terrain cells, then a new actor: [3,2,1,0].
+    for(unsigned e=0;e<4;++e)
+        require(layers.attach(base,e,true,false,[](unsigned){return false;}),"retained mixture");
+    bool inactive[8]{};
+    auto draw=[&](bool mutate){
+        std::vector<unsigned> seen;
+        require(RunnerLayerDraw::visit(layers,[](unsigned,const auto&){return true;},
+            [](unsigned,const auto&){return true;},[&](unsigned e,auto& out){
+                const bool actor=e==0||e==3;
+                out={2,inactive[e]?2u:0x10u,true,actor,actor,false};return true;
+            },[&](unsigned,unsigned e,Action){
+                seen.push_back(e);if(mutate&&e==3)inactive[1]=true;return true;
+            },[](unsigned,const auto&){return true;}),"retained draw");
+        return seen;
+    };
+    require(draw(false)==std::vector<unsigned>({3,0}),"active retained cells draw no actors");
+    require(draw(true)==std::vector<unsigned>({3}),"Draw-time inactive write cuts off later actors immediately");
+    require(layers.reconcileInstanceActivation(1,true)&&draw(false)==std::vector<unsigned>({3,0}),
+        "inactive tail movement is separate from flag publication");
+    // Removing all visible actors must not dispose the retained layer or
+    // consume a new dynamic ID when the next actor uses this depth.
+    require(layers.detach(0)&&layers.detach(3)&&layers.get(base)&&layers.elementCount(base)==2,
+        "retained-only layer remains alive with its logical population");
+    require(layers.findDynamic(0)==base&&ids.dynamicMaximum==baseId,"retained layer ID is not regenerated");
+    require(layers.attach(base,0,true,false,[](unsigned){return false;}),"actor beside retained group");
+    RunnerDepthService::Instance instance;instance.depth.assignInteger(10);
+    instance.layerId=baseId;instance.attached=true;
+    require(RunnerDepthService::apply(layers,instance,0,[](unsigned e){return e==0;},
+        [&](int depth,unsigned& out){return ids.createDynamic(layers,depth,out);},
+        [](unsigned,int){return true;},[&](unsigned e){return inactive[e];}),"retained depth split");
+    require(layers.get(base)&&layers.get(base)->depth==0&&instance.layerId!=baseId&&
+        ids.dynamicMaximum==baseId+1&&layers.elementCount(base)==2,
+        "logical retained population forbids singleton whole-layer depth move");
+    // Final terrain retirement, not final visible-actor retirement, disposes
+    // the old dynamic layer. Its replacement consumes the next process ID.
+    require(layers.detach(1)&&layers.get(base)&&layers.detach(2)&&!layers.get(base),"last retained retirement disposes layer");
+    unsigned replacement=Layers::End;
+    require(ids.createDynamic(layers,0,replacement)&&layers.get(replacement)->id==baseId+2,
+        "replacement layer preserves process-global ID sequence");
 }
 void roomActivation(){
     RunnerRoomMembership<3> room;RunnerLayers<1,3> layers;unsigned layer=1;
@@ -363,4 +412,4 @@ void runRoomMutations(){
     std::cout<<"Room storage (64 slots): scalar="<<sizeof(scalar)<<" runs="<<sizeof(runs)<<'\n';
 }
 }
-int main(){dispatch();traversal();roomActivation();drawBirths();animationProjection(false);animationProjection(true);animationProjection<true>(false);animationProjection<true>(true);retainedAnimationMutations();retainedAnimationMutations<true>();runRoomMutations();cleanupProjection();std::cout<<"Selected layer Draw order, synchronous births, scalar/run animation projections, mutation/cleanup equivalence and 1024 instance-dispatch cases verified\n";}
+int main(){dispatch();traversal();retainedLayerBoundaries();roomActivation();drawBirths();animationProjection(false);animationProjection(true);animationProjection<true>(false);animationProjection<true>(true);retainedAnimationMutations();retainedAnimationMutations<true>();runRoomMutations();cleanupProjection();std::cout<<"Selected layer Draw order, retained-layer observation boundaries, synchronous births, scalar/run animation projections, mutation/cleanup equivalence and 1024 instance-dispatch cases verified\n";}
