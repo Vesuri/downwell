@@ -112,6 +112,25 @@ bool nativeCollisionQueries(downwell::GameplayCollisionOwner& owner,
 #include <cstring>
 #include <cmath>
 using namespace downwell;
+static void checkReadOnlyDraw(const GameplayWorld& world){
+    std::vector<std::array<std::uint32_t,4>> expected;
+    assert(world.visitRoomActors([&](auto kind,InstanceHandle h,auto depth){
+        expected.push_back({unsigned(kind),h.slot,h.generation,depth.bits});return true;
+    }));
+    // Fail before completing a possible cold fill; no later callback may run.
+    if(!expected.empty()){
+        unsigned calls=0;
+        assert(!world.visitRoomActorsReadOnly([&](auto,auto,auto){++calls;return false;}));
+        assert(calls==1);
+    }
+    for(unsigned pass=0;pass<2;++pass){
+        std::vector<std::array<std::uint32_t,4>> actual;
+        assert(world.visitRoomActorsReadOnly([&](auto kind,InstanceHandle h,auto depth){
+            actual.push_back({unsigned(kind),h.slot,h.generation,depth.bits});return true;
+        }));
+        assert(actual==expected);
+    }
+}
 static std::vector<std::uint8_t> read(const char* path){std::ifstream f(path,std::ios::binary);return {std::istreambuf_iterator<char>(f),{}};}
 struct TerrainAudit {
     GameplayTerrainInstances* store=nullptr;
@@ -1688,6 +1707,7 @@ int main(){
         assert(owner->attach(*world));
         unsigned checkpoint=0;
         auto capture=[&](){
+            checkReadOnlyDraw(*world);
             trace<<"checkpoint "<<checkpoint++<<' '<<owner->valid()<<' '<<world->effectsSucceeded()<<'\n';
             const auto& random=world->randomState();
             trace<<"rng "<<random.drawCount()<<' '<<random.stateIndex();
@@ -1928,6 +1948,7 @@ int main(){
             RunnerImageValue expectedY;assert(expectedY.assign(MotionBinary64::fromInteger(16*int(steps))));
             assert(reads==1+steps&&entry->y.bits==expectedY.bits);
             unsigned drawn=0;
+            checkReadOnlyDraw(*world);
             assert(world->visitRoomActors([&](auto kind,auto local,auto depth){
                 if(kind!=GameplayWorld::DrawActor::entryDither)return true;
                 ++drawn;std::int32_t d;assert(depth.promoted().roundPixel(d)&&d==-200000);
@@ -2037,6 +2058,7 @@ int main(){
         RunnerImageValue requested;assert(requested.assign(MotionBinary64::fromInteger(-60000)));
         assert(owner->properties(shared)->depth.bits==requested.bits);
         auto drawDepth=[&](){int depth=123;unsigned seen=0;
+            checkReadOnlyDraw(*world);
             assert(world->visitRoomActors([&](auto kind,auto key,auto value){
                 if(kind==GameplayWorld::DrawActor::scriptEffect&&key.slot==effect.slot&&key.generation==effect.generation){
                     ++seen;std::int32_t integer;assert(RunnerDepthService::integerDepth(value,integer));depth=integer;

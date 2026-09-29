@@ -31,6 +31,8 @@ template<unsigned I,bool CompactUnnumbered=false> class GameplayRoomLayers {
     mutable bool projectionValid_[L]{};
     unsigned live_=0,playerId_=0;
     bool good_=true,prepared_=false;
+    std::uint32_t drawRevision_=0;
+    void changedDraw(){if(drawRevision_!=0xffffffffu)++drawRevision_;}
     bool fail(){good_=false;return false;}
     template<class Visit> bool visitProjectedElements(unsigned layer,Visit visit)const{
         if(!layers_.get(layer))return false;
@@ -63,9 +65,11 @@ public:
         if(rooms_&&!PackedRoomLayerLoader::loadCatalogIds(*rooms_,ids_))good_=false;
     }
     bool enabled()const{return rooms_!=nullptr;}
+    std::uint32_t drawRevision()const{return drawRevision_;}
     bool valid()const{return good_&&lifetimes_.succeeded();}
     // Called before the new native player birth, after old lifetimes retire.
     bool prepare(){
+        changedDraw();
         if(!enabled())return true;
         if(!valid()||live_)return fail();
         for(auto& valid:projectionValid_)valid=false;
@@ -89,6 +93,7 @@ public:
     }
     unsigned playerSourceId()const{return playerId_;}
     bool birth(InstanceHandle h,unsigned sourceId,RunnerImageValue depth,bool inactive,bool projected=true){
+        changedDraw();
         if(!enabled())return true;
         if(!valid()||!prepared_||!(sourceId?lifetimes_.birth(h,sourceId,depth,inactive):
             lifetimes_.birthUnnumbered(h,depth,inactive,!projected)))return fail();
@@ -111,6 +116,7 @@ public:
         ++live_;return true;
     }
     bool retire(InstanceHandle h){
+        changedDraw();
         if(!enabled())return true;
         if(!valid()||!live_)return fail();
         const unsigned element=registry_.find(h);
@@ -135,6 +141,7 @@ public:
         --live_;return true;
     }
     bool activation(InstanceHandle h,bool active){
+        changedDraw();
         if(!enabled())return true;
         if(!valid()||!lifetimes_.publishInactive(h,!active))return false;
         if(!(projected_[h.slot>>3]&(1u<<(h.slot&7)))){
@@ -151,6 +158,7 @@ public:
         return true;
     }
     bool reconcile(InstanceHandle h){
+        changedDraw();
         if(!enabled())return true;
         if(!valid())return false;
         int id;
@@ -161,7 +169,9 @@ public:
     bool serviceDepths(){
         if(!enabled())return true;
         // Depth service can merge whole layers and dispose dynamic IDs.
-        if(lifetimes_.pendingDepths())for(auto& valid:projectionValid_)valid=false;
+        if(lifetimes_.pendingDepths()){
+            changedDraw();for(auto& valid:projectionValid_)valid=false;
+        }
         return valid()&&lifetimes_.serviceDepths();
     }
     bool writeDepth(InstanceHandle h,MotionBinary64 value){

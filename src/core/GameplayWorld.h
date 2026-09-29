@@ -405,10 +405,18 @@ public:
     using RoomActorDraw=bool (*)(const void*,DrawActorVisitor,void*);
     // Borrowed owner traversal, not a snapshot or a family-local birth sort.
     // Drawing must not mutate room membership; failure stops further visits.
-    void configureRoomActorDraw(RoomActorDraw callback,const void* context){roomActorDraw_=callback;roomActorDrawContext_=context;}
+    void configureRoomActorDraw(RoomActorDraw callback,const void* context,RoomActorDraw readOnly=nullptr){roomActorDraw_=callback;roomActorDrawContext_=context;roomActorReadOnlyDraw_=readOnly;}
     bool hasRoomActorDraw()const{return roomActorDraw_!=nullptr;}
     template<class Visit> bool visitRoomActors(Visit visit)const{
         return roomActorDraw_&&roomActorDraw_(roomActorDrawContext_,
+            [](void* p,DrawActor kind,downwell::InstanceHandle key,downwell::RunnerImageValue depth){return (*static_cast<Visit*>(p))(kind,key,depth);},&visit);
+    }
+    // Rendering command collection may retain ordering between ownership
+    // mutations. The visitor must not alter lifetimes, flags, depth or sprites.
+    // Positions and animation frames are still read live by the visitor.
+    template<class Visit> bool visitRoomActorsReadOnly(Visit visit)const{
+        const auto callback=roomActorReadOnlyDraw_?roomActorReadOnlyDraw_:roomActorDraw_;
+        return callback&&callback(roomActorDrawContext_,
             [](void* p,DrawActor kind,downwell::InstanceHandle key,downwell::RunnerImageValue depth){return (*static_cast<Visit*>(p))(kind,key,depth);},&visit);
     }
     template<class Visit> bool visitDebrisDraw(Visit visit)const{
@@ -910,6 +918,7 @@ private:
     bool (*droneEndStep_)(void*,long)=nullptr;
     void* droneEndStepContext_=nullptr;
     RoomActorDraw roomActorDraw_=nullptr;
+    RoomActorDraw roomActorReadOnlyDraw_=nullptr;
     const void* roomActorDrawContext_=nullptr;
     bool (*scriptAnimation_)(void*,downwell::InstanceHandle)=nullptr;
     void* scriptAnimationContext_=nullptr;

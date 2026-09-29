@@ -62,6 +62,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto roomAlarms=roomAlarms_;void* const roomAlarmsContext=roomAlarmsContext_;
     void* const roomAnimationContext=roomAnimationContext_;
     const auto roomActorDraw=roomActorDraw_;
+    const auto roomActorReadOnlyDraw=roomActorReadOnlyDraw_;
     const auto roomActorDrawContext=roomActorDrawContext_;
     const auto enemyOrderCapture=enemyOrderCapture_;
     const auto enemyOrderRevision=enemyOrderRevision_;
@@ -104,7 +105,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     configureRoomAnimation(roomAnimation,roomAnimationContext);
     configureDroneEndStep(droneEndStep,droneEndStepContext);
     configureRoomAlarms(roomAlarms,roomAlarmsContext);
-    configureRoomActorDraw(roomActorDraw,roomActorDrawContext);
+    configureRoomActorDraw(roomActorDraw,roomActorDrawContext,roomActorReadOnlyDraw);
     configureEnemyStepOrder(enemyOrderCapture,enemyOrderContext,enemyOrderRevision);
     configureDebrisStepOrder(debrisOrderCapture,debrisOrderContext);
     nextBulletLifetimeId_=nextBulletIdentity;

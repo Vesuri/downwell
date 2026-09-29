@@ -5,6 +5,10 @@
 #include "core/DamageNumberText.h"
 #include "core/RunnerSpatialSplit.h"
 #include "core/DebrisDraw.h"
+#ifdef DOWNWELL_BOB_VERIFY
+#include "core/ActorDrawOrderVerification.h"
+extern "C" { volatile unsigned gDownwellActorOrderChecks,gDownwellActorOrderFailures; }
+#endif
 
 bool AmigaGameplayDrawList::entryCoverHardwareEligible(const GameplayWorld& world,int viewX,int viewY,bool& eligible)const{
     eligible=false;
@@ -26,6 +30,11 @@ bool AmigaGameplayDrawList::entryCoverHardwareEligible(const GameplayWorld& worl
 bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack,
     const UBYTE* packEnd, int worldViewX, int worldViewY, bool compositeCurrency) {
     count = 0; failedSprite = failedFrame = 0;
+#ifdef DOWNWELL_BOB_VERIFY
+    static downwell::ActorDrawOrderVerification orderOracle;
+    ++gDownwellActorOrderChecks;
+    if(!orderOracle.verify(port)){++gDownwellActorOrderFailures;return false;}
+#endif
     rayLine = {};rayVisible=false;
     entryCoverVisible=false;entryCover={};
 #ifdef DOWNWELL_REPLAY_VERIFY
@@ -136,7 +145,7 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
     if(port.hasRoomActorDraw()) {
         DW_PROFILE_SCOPE(profileActorLayerWalk);
         downwell::RunnerImageValue foregroundDepth;foregroundDepth.assign(downwell::MotionBinary64::fromInteger(-1000));
-        if(!port.visitRoomActors([&](GameplayWorld::DrawActor kind,downwell::InstanceHandle key,downwell::RunnerImageValue depth){
+        if(!port.visitRoomActorsReadOnly([&](GameplayWorld::DrawActor kind,downwell::InstanceHandle key,downwell::RunnerImageValue depth){
             DW_PROFILE_SCOPE(profileActorPreparation);
             if(downwell::RunnerSpatialSplit::less(depth,foregroundDepth)&&!drawForeground())return false;
             if(kind==GameplayWorld::DrawActor::player)return port.findPlayer(key)&&drawPlayer();

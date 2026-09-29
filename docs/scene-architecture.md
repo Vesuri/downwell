@@ -150,6 +150,26 @@ edges. Scene reconstruction invalidates the retained image. Validate optimized
 composition against the complete ordered draw sequence, including clipping,
 capacity changes and every meter offset.
 
+## Read-only actor ordering
+
+`GameplayWorld::visitRoomActors` remains the live layer traversal. Command
+collectors that do not change lifetimes, eligibility, sprites or depth may use
+`visitRoomActorsReadOnly`. Its owner retains ordered actor handles and depths;
+positions, animation frames and Draw side effects are not cached.
+
+Birth, retirement, registration/exclusion changes, activation, layer rebuilding,
+serviced depth changes and sprite changes invalidate the retained order. Cold
+fills invoke callbacks during the original traversal, preserving failure
+prefixes and per-layer inactive cutoffs. Saturated revision counters disable
+reuse. Visitors which mutate ownership must use the live path, not this cache.
+Retry preserves both callback bindings.
+
+The bounded actor array occupies 3,376 bytes plus bookkeeping in ordinary
+memory, not Chip RAM. This avoids unchanged-frame traversal; it does not make
+mutation-time rebuilding incremental or replace terrain ownership. The scalar
+ownership build always uses live traversal. Native actor verification compares
+kind, generation handle and depth before drawing, without consuming Draw RNG.
+
 ## Verification scope
 
 Fresh scalar composition provides a retained-buffer oracle. Host tests do not

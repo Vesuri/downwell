@@ -35,6 +35,13 @@ public:
 #endif
 private:
     Owner owner_;
+    static constexpr unsigned drawCapacity=1+GameplayWorld::enemyCapacity+GameplayWorld::bulletCapacity+
+        GameplayScriptSpawnInstances::capacity+GameplayDebrisInstances::capacity+GameplayEntryDithers::capacity;
+    struct DrawEntry {GameplayWorld::DrawActor kind;InstanceHandle local;RunnerImageValue depth;};
+    mutable DrawEntry drawOrder_[drawCapacity]{};
+    mutable unsigned drawCount_=0;
+    mutable std::uint32_t drawCaptureRevision_=0,drawLayerRevision_=0;
+    mutable bool drawOrderValid_=false;
     RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity+GameplayWorld::droneBulletCapacity> combatAlarmPhase_;
     bool combatAlarmCaptureDirty_=true;
     unsigned combatAlarmMask_=0;
@@ -249,6 +256,7 @@ private:
         }
         bool sprite(InstanceHandle local,const Record& r,int sprite){InstanceHandle h;
             if(!key(local,r,h))return false;auto& p=parent.properties_[h.slot];
+            if(p.sprite.spriteId!=sprite)parent.drawOrderValid_=false;
             return parent.check(parent.owner_.changeSpriteFromPack(h,p.sprite,p.timeline,p.cachedFrame,
                 sprite,parent.sprites_,*parent.families_.flags(object(r))));}
         bool imageIndex(InstanceHandle local,const Record& r,RunnerImageValue value){InstanceHandle h;
@@ -369,7 +377,34 @@ public:
                 out.sprite=self.properties_[h.slot].sprite.spriteId>=0;return true;
             },[&](InstanceHandle h,int depth){RunnerImageValue value;return real(depth,value)&&draw(h,value);});
             return self.room_.visitDrawChecked([&](unsigned slot){return draw(self.owner_.currentHandle(slot),self.properties_[slot].depth);});
-        },this);
+        },this,[](const void* context,GameplayWorld::DrawActorVisitor visit,void* visitor){
+            const auto& self=*static_cast<const GameplayCollisionOwner*>(context);
+            if(!self.valid()||!self.world_)return false;
+#ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+            return self.world_->visitRoomActors([&](auto kind,auto key,auto depth){return visit(visitor,kind,key,depth);});
+#else
+            const auto capture=self.owner_.captureRevision(),layers=self.layers_.drawRevision();
+            if(self.drawOrderValid_&&capture!=0xffffffffu&&layers!=0xffffffffu&&
+               capture==self.drawCaptureRevision_&&layers==self.drawLayerRevision_){
+                for(unsigned i=0;i<self.drawCount_;++i){const auto& e=self.drawOrder_[i];
+                    if(!visit(visitor,e.kind,e.local,e.depth))return false;
+                }
+                return true;
+            }
+            self.drawOrderValid_=false;self.drawCount_=0;
+            // Fill during the original live traversal, not before dispatch:
+            // failed callbacks retain exactly the same successful prefix.
+            const bool ok=self.world_->visitRoomActors([&](auto kind,auto key,auto depth){
+                if(self.drawCount_==drawCapacity)return false;
+                self.drawOrder_[self.drawCount_++]={kind,key,depth};
+                return visit(visitor,kind,key,depth);
+            });
+            self.drawCaptureRevision_=capture;self.drawLayerRevision_=layers;
+            self.drawOrderValid_=ok&&self.valid()&&capture==self.owner_.captureRevision()&&
+                layers==self.layers_.drawRevision();
+            return ok;
+#endif
+        });
         if(!owner_.watchSnapshotRange(View::terrainBase,View::timeFieldBase,terrainSnapshotDirty_))return check(false);
         if(!room_.prepareRetainedAnimation(View::terrainBase,View::timeFieldBase))return check(false);
         world.configureRoomAnimation([](void* context){
