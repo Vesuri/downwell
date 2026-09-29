@@ -8,6 +8,11 @@ if gMemoryCopyVerifiedCases != 384
     quit 1
 end
 printf "Native memory copy: 384 alignment/guard cases passed\n"
+if gCoverageWordVerifiedCases != 80
+    printf "Native planar-word coverage corpus failed\n"
+    quit 1
+end
+printf "Native planar words: 80 pixel-oracle cases passed\n"
 if gSmallRemainderFailures != 0
     printf "Small-divisor remainder failures: %lu\n", gSmallRemainderFailures
     quit 1

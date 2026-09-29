@@ -279,8 +279,12 @@ high source planes share dimensions/stride and must each have the supplied
 mask byte length available. No source payload is mutated or converted.
 
 `AmigaGameplayEffects` accepts both white-only and palette coverage. Its palette
-path divides a word into disjoint pen masks and uses the same CPU masked-word
-publisher and per-buffer physical-row debt. It preserves terrain backing,
+path publishes the final alpha/low/high word directly: clipping, ring addressing
+and horizontal alignment are computed once, then each plane uses masked
+replacement. Opaque black remains covered; colour bits outside alpha are ignored.
+The white-only API uses the same primitive. Neither path reconstructs separate
+colour passes or allocates a bitmap. Per-buffer physical-row debt is unchanged.
+It preserves terrain backing,
 HUD and untouched pixels; neither variant changes display pointers or allocates
 Chip RAM. `verify-palette-effects` exercises original gem/smoke/shade art and
 all pens, including opaque-black overlap. The live scene still needs joint

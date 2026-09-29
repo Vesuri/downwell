@@ -36,7 +36,7 @@ static void writeWord(UBYTE* data, UWORD value) {
 #endif
 }
 
-void amigaRendererDrawCoverageWord(AmigaRenderer* renderer,int x,int y,UWORD bits,unsigned pen) {
+void amigaRendererDrawPlanarWord(AmigaRenderer* renderer,int x,int y,UWORD bits,UWORD low,UWORD high) {
     int left,right,first,last,column,shift,part;
     unsigned row;
     ULONG planeBytes;
@@ -57,6 +57,7 @@ void amigaRendererDrawCoverageWord(AmigaRenderer* renderer,int x,int y,UWORD bit
     }
     for(part=0;part<(shift?2:1);++part){
         unsigned plane;
+        const UWORD colors[2]={low,high};
         const int destination=column+part;
         const UWORD mask=part?(UWORD)((ULONG)bits<<(16-shift)):(UWORD)(bits>>shift);
         UBYTE* word;
@@ -64,11 +65,16 @@ void amigaRendererDrawCoverageWord(AmigaRenderer* renderer,int x,int y,UWORD bit
         word=renderer->target+row*downwellBytesPerPlaneLine+destination*2;
         for(plane=0;plane<2;++plane){
             const UWORD old=readWord(word);
-            const UWORD value=(pen&(1u<<plane))?(old|mask):(old&(UWORD)~mask);
+            const UWORD paint=part?(UWORD)((ULONG)colors[plane]<<(16-shift)):(UWORD)(colors[plane]>>shift);
+            const UWORD value=(old&(UWORD)~mask)|(paint&mask);
             if(value!=old)writeWord(word,value);
             word+=planeBytes;
         }
     }
+}
+
+void amigaRendererDrawCoverageWord(AmigaRenderer* renderer,int x,int y,UWORD bits,unsigned pen) {
+    amigaRendererDrawPlanarWord(renderer,x,y,bits,pen&1u?bits:0,pen&2u?bits:0);
 }
 
 static void setPixel(AmigaRenderer* renderer, int x, int y, unsigned pen) {

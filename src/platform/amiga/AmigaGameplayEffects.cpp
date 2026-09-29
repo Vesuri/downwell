@@ -48,9 +48,6 @@ void AmigaGameplayEffects::draw(AmigaRenderer renderer,Bitmap& display,unsigned 
     unsigned origin,const downwell::PaletteEffectSurface<>& surface,AmigaGameplayRows& rows){
     publish(renderer,display,buffer,origin,surface,rows,
         [](AmigaRenderer* target,int x,int y,std::uint16_t alpha,std::uint16_t low,std::uint16_t high){
-            const UWORD masks[4]={UWORD(alpha&~low&~high),UWORD(alpha&low&~high),
-                                  UWORD(alpha&~low&high),UWORD(alpha&low&high)};
-            for(unsigned pen=0;pen<4;++pen)if(masks[pen])
-                amigaRendererDrawCoverageWord(target,x,y,masks[pen],pen);
+            amigaRendererDrawPlanarWord(target,x,y,alpha,low,high);
         });
 }

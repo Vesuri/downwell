@@ -51,6 +51,8 @@ void amigaRendererFillRect(AmigaRenderer* renderer,
                            unsigned pen);
 /* CPU-only binary coverage, MSB first. Preserves unmasked pixels and padding. */
 void amigaRendererDrawCoverageWord(AmigaRenderer*,int x,int y,UWORD bits,unsigned pen);
+/* Final planar colours under alpha, MSB first; one placement for both planes. */
+void amigaRendererDrawPlanarWord(AmigaRenderer*,int x,int y,UWORD alpha,UWORD low,UWORD high);
 void amigaRendererDrawAsset(AmigaRenderer* renderer,
                             const UBYTE* pack, const UBYTE* packEnd,
                             UWORD sprite, UWORD frame,

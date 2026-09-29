@@ -316,6 +316,7 @@ static inline void checkSceneStack(ULONG){}
 
 #ifdef DOWNWELL_REPLAY_VERIFY
 #include "AmigaMemoryCopyVerification.h"
+#include "AmigaCoverageWordVerification.h"
 #include <cstring>
 #include "core/GemVerification.h"
 #include "core/MotionBinary64Verification.h"
@@ -333,6 +334,7 @@ volatile std::uint32_t gReplayTrace[downwell::ReplayFrameTrace::capacity][downwe
 #endif
 volatile ULONG gReplayComplete;
 volatile unsigned gMemoryCopyVerifiedCases;
+volatile unsigned gCoverageWordVerifiedCases;
 volatile ULONG gReplayFrames;
 volatile ULONG gReplayDigestHigh;
 volatile ULONG gReplayDigestLow;
@@ -1254,6 +1256,8 @@ __attribute__((noinline)) static int runDownwell(void) {
 #ifdef DOWNWELL_REPLAY_VERIFY
     gMemoryCopyVerifiedCases=verifyAmigaMemoryCopy(std::memcpy);
     if(gMemoryCopyVerifiedCases!=384)return 20;
+    gCoverageWordVerifiedCases=verifyAmigaCoverageWords();
+    if(gCoverageWordVerifiedCases!=80)return 20;
 #endif
     AmigaPlatform platform;
     AmigaMemory memory;

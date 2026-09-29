@@ -1751,6 +1751,14 @@ $(AMIGA_RENDERER_TEST_TARGET): $(AMIGA_RENDERER_TEST_SOURCES)
 	@mkdir -p $(@D)
 	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $(AMIGA_RENDERER_TEST_SOURCES)
 
+.PHONY: test-amiga-coverage-word
+test: test-amiga-coverage-word
+test-amiga-coverage-word: build/amiga-coverage-word-test
+	./build/amiga-coverage-word-test
+build/amiga-coverage-word-test: tests/platform/amiga/AmigaCoverageWordTest.cpp src/platform/amiga/AmigaRenderer.c src/platform/amiga/AmigaRenderer.h src/platform/amiga/AmigaCoverageWordVerification.h
+	@mkdir -p $(@D)
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ tests/platform/amiga/AmigaCoverageWordTest.cpp src/platform/amiga/AmigaRenderer.c
+
 $(PORT_REPLAY_REFERENCE_TARGET): $(PORT_REPLAY_REFERENCE_SOURCES) $(wildcard src/core/*.h)
 	@mkdir -p $(@D)
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(PORT_REPLAY_REFERENCE_SOURCES)
