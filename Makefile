@@ -2472,4 +2472,9 @@ build/direct-layer-identity-test: tests/core/DirectLayerIdentityTest.cpp $(wildc
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
 
+.PHONY: test-amiga-trace-report
+test: test-amiga-trace-report
+test-amiga-trace-report:
+	python3 -B tests/amiga-trace-report-test.py
+
 -include $(DEPS)
