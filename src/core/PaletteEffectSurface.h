@@ -47,7 +47,6 @@ public:
     // Half-open viewport rectangle. Test final alpha, including shade holes
     // and opaque black; stale color bits are never evidence of overlap.
     bool intersects(int left,int top,int right,int bottom)const{
-        synchronize();
         if(left<0)left=0;
         if(top<0)top=0;
         if(right>int(Width))right=Width;
@@ -55,6 +54,7 @@ public:
         if(top<int(firstRow_))top=firstRow_;
         if(bottom>int(lastRow_))bottom=lastRow_;
         if(left>=right || top>=bottom)return false;
+        synchronize();
         const unsigned first=unsigned(left)/16,last=unsigned(right-1)/16;
         for(unsigned y=unsigned(top);y<unsigned(bottom);++y){
             unsigned begin=first>first_[y]?first:first_[y];

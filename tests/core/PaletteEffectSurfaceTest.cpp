@@ -12,6 +12,7 @@ static_assert(sizeof(Surface)<=18300,"portable scratch and backend bindings must
 static unsigned word(const unsigned char* p){return unsigned(p[0])*256+p[1];}
 static unsigned dword(const unsigned char* p){return word(p)*65536u+word(p+2);}
 struct Asset {Surface::Asset image;int ox,oy;};
+static unsigned waitCalls;
 int main(int argc,char**argv){
     assert(argc==2);std::ifstream file(argv[1],std::ios::binary);
     const std::vector<unsigned char> pack{std::istreambuf_iterator<char>(file),{}};
@@ -44,7 +45,9 @@ int main(int argc,char**argv){
             [](void* p,unsigned first,unsigned end){auto* data=static_cast<std::uint16_t*>(p);
                 for(unsigned plane=0;plane<3;++plane)for(unsigned y=first;y<end;++y)
                     for(unsigned x=1;x<=10;++x)data[plane*12*284+y*12+x]=0;
-            },[](void*){}}));
+            },[](void*){++waitCalls;}}));
+    const auto boundWaits=waitCalls;
+    assert(!surface.intersects(0,0,160,284)&&waitCalls==boundWaits);
     // -1 is transparency; 0 is opaque black and must not be confused with it.
     std::array<int,160*284> expected{},actual{};
     auto clear=[&](){surface.clear();expected.fill(-1);};
@@ -73,8 +76,10 @@ int main(int argc,char**argv){
                 if(x>=0 && x<160 && y>=0 && y<284 && expected[y*160+x]>=0)hit=true;
             assert(surface.intersects(left,top,right,bottom)==hit);
         }
+        const auto beforeEmptyQueries=waitCalls;
         assert(!surface.intersects(INT_MIN,INT_MIN,0,0));
         assert(!surface.intersects(160,284,INT_MAX,INT_MAX));
+        assert(waitCalls==beforeEmptyQueries);
         bool any=false;for(int pen:expected)any|=pen>=0;
         assert(surface.intersects(INT_MIN,INT_MIN,INT_MAX,INT_MAX)==any);
     };

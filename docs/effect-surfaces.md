@@ -319,6 +319,21 @@ decides visibility, overlap and publication. The controller painter boundary,
 ring addressing and per-display restoration debt remain unchanged. Overlap
 testing is still a CPU operation, not a blitter-zero test.
 
+An overlap query outside the viewport or the producer's retained row extent
+does not read pixels and therefore does not drain queued work. Nonempty
+candidate regions synchronize before reading final alpha. This distinction is
+important with queued clearing/composition: metadata rejection is immediate,
+but a pixel-dependent answer must observe completed stamps and shade clearing.
+
+The [Hardware Reference Manual, Zero Flag](https://www.theflatnet.de/pub/cbm/amiga/AmigaDevDocs/hard_6.html)
+permits read-only zero detection with destination DMA disabled, after the blit
+completes. That does not make rectangle area alone a sufficient dispatch policy.
+`CurrencySmokeComposition` also uses the overlap API for whole-surface visibility,
+where a CPU scan can stop at the first occupied word; a hardware test consumes
+the entire rectangle. Distinguish that consumer from sparse negative-overlap
+tests, account for queue draining/register setup, and measure dense workloads
+before replacing the current scalar scan.
+
 Final publication uses the same queued Bitmap masked copies, with the alpha
 plane shared by the two color planes. Producer metadata supplies conservative
 rectangles: contiguous occupied row bands share their horizontal union, while
