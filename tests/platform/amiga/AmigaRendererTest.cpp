@@ -292,6 +292,42 @@ int main(int argc, char** argv) {
         std::cout << "65 dense ordinary/exit field retention and painter-order comparisons passed\n";
     }
     {
+        std::vector<UBYTE> base(downwellGameRingBytes,0x69),actual=base,expected=base;
+        AmigaTimeFields retained;
+        constexpr unsigned origin=319;
+        for(unsigned trial=0;trial<1024;++trial){
+            downwell::TimeFieldOutlines shape;
+            shape.visible=true;shape.count=1;
+            shape.circles[0]={190,140,int((trial<512?24:128)*256+trial%512)};
+            require(retained.prepare(actual.data(),origin,shape,false,[](unsigned){return false;}),"stationary field prepare");
+            retained.draw();
+            expected=base;
+            bool covered[320]{};
+            AmigaRenderer oracle;amigaRendererInit(&oracle,expected.data(),nullptr);
+            amigaRendererSetGameOrigin(&oracle,origin);
+            amigaRendererSetClipRect(&oracle,110,0,160,284);
+            shape.draw([&](int x,int y,int pen){
+                if(x>=110&&x<270&&y>=0&&y<284)covered[(origin+unsigned(y))%320]=true;
+                amigaRendererFillRect(&oracle,x,y,1,1,pen);
+            });
+            require(actual==expected,"stationary field matches fresh source-radius pixel oracle");
+            const unsigned dirty=trial*13%320;
+            require(retained.prepare(actual.data(),origin,shape,covered[dirty],[&](unsigned row){return row==dirty;}),
+                "dirty backing overrides unchanged snapshot reuse");
+            for(unsigned p=0;p<2;++p)for(unsigned x=0;x<48;++x){
+                const unsigned at=p*downwellGameRingPlaneBytes+dirty*48+x;
+                actual[at]=base[at]^=0x53;
+            }
+            retained.draw();expected=base;
+            shape.draw([&](int x,int y,int pen){amigaRendererFillRect(&oracle,x,y,1,1,pen);});
+            require(actual==expected,"dirty underlay is refreshed under stationary field coverage");
+        }
+        downwell::TimeFieldOutlines absent;
+        require(retained.prepare(actual.data(),origin,absent,false,[](unsigned){return false;})&&actual==base,
+            "retiring stationary field restores the latest changed backing");
+        std::cout<<"1024 stationary-field and changing-backing comparisons passed\n";
+    }
+    {
         std::vector<UBYTE> base(downwellGameRingBytes), actual(base.size()), expected(base.size());
         for (unsigned i = 0; i < base.size(); ++i) base[i] = i * 71 + 13;
         AmigaGoalField retained;
