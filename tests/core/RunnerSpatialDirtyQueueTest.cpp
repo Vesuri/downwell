@@ -8,6 +8,24 @@
 #include <cstdio>
 #include <vector>
 int main(){
+    static_assert(sizeof(downwell::RunnerSpatialDirtyQueue<16>)<=16*4+8,"compact queue links");
+    {
+        // Sentinel fits at 65535; the next capacity must retain wide links.
+        static downwell::RunnerSpatialDirtyQueue<65535> compact;
+        static downwell::RunnerSpatialDirtyQueue<65536> wide;
+        auto boundary=[](auto& queue){
+            const unsigned end=queue.End;
+            assert(!queue.contains(end)&&!queue.mark(end));
+            assert(queue.mark(end-1)&&queue.contains(end-1));
+            assert(queue.mark(0)&&queue.next(0)==end-1);
+            assert(queue.mark(end-1)&&queue.first()==end-1&&queue.next(end-1)==0);
+            assert(queue.remove(0)&&!queue.contains(0)&&queue.size()==1);
+            assert(queue.remove(end-1)&&!queue.contains(end-1)&&queue.size()==0);
+            assert(!queue.remove(end-1)&&queue.mark(end-1));
+            queue.clear();assert(!queue.contains(end-1)&&queue.first()==end);
+        };
+        boundary(compact);boundary(wide);
+    }
     {
         using Prepare=downwell::RunnerSpatialObjectPreparation;
         using Path=Prepare::Path;

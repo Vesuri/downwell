@@ -12,6 +12,13 @@ point. Equal updates are not coalesced. A removed/reused slot retains its two
 separate operations; rebuilding from the currently live objects would lose
 observable tree traversal order.
 
+Dirty-queue links use 16-bit internal indices when the capacity/end sentinel
+fits, and 32-bit indices otherwise. A queued slot is either the head or has a
+predecessor; removal resets both links. No separate membership flag is needed.
+This changes neither remove-and-prepend ordering nor setter admission: resource
+IDs and generation counters remain full width, and dirty queues are still
+updated synchronously, independently of the derived-tree journal.
+
 ## Observation boundaries
 
 Box queries, line queries, tree height and node count first apply every pending

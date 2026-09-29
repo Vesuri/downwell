@@ -1,19 +1,23 @@
 #ifndef DOWNWELL_CORE_RUNNER_SPATIAL_DIRTY_QUEUE_H
 #define DOWNWELL_CORE_RUNNER_SPATIAL_DIRTY_QUEUE_H
 #include <cstdint>
+#include "SlotIndex.h"
 namespace downwell {
 // 0x501e50: remove existing membership, then prepend. Slot indices are owned
 // by the instance registry, not resource IDs. Retire membership before reuse.
 // Refresh callbacks bind this container to the instance registry.
 template<unsigned Capacity> class RunnerSpatialDirtyQueue {
     static_assert(Capacity>0,"Dirty queue needs instance slots");
-    struct Link {unsigned next=Capacity,previous=Capacity;bool queued=false;};
+    using Index=typename SlotIndex<Capacity>::Type;
+    struct Link {Index next=Capacity,previous=Capacity;};
 public:
     static constexpr unsigned End=Capacity;
     unsigned first()const{return head_;}
     unsigned size()const{return count_;}
     unsigned next(unsigned slot)const{return contains(slot)?links_[slot].next:End;}
-    bool contains(unsigned slot)const{return slot<Capacity && links_[slot].queued;}
+    // Only the head may be queued without a predecessor. Removed slots have
+    // both links reset, including the singleton that used to be the head.
+    bool contains(unsigned slot)const{return slot<Capacity && (slot==head_||links_[slot].previous!=End);}
     void clear(){while(head_!=End)remove(head_);}
     bool mark(unsigned slot){
         if(slot>=Capacity)return false;
@@ -21,7 +25,7 @@ public:
         // count unchanged. Consecutive setters need no queue writes here.
         if(slot==head_)return true;
         remove(slot);
-        auto& link=links_[slot];link.next=head_;link.previous=End;link.queued=true;
+        auto& link=links_[slot];link.next=Index(head_);link.previous=End;
         if(head_!=End)links_[head_].previous=slot;
         head_=slot;++count_;return true;
     }
