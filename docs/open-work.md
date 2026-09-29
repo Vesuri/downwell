@@ -12,10 +12,11 @@ on PAL; do not add 60 Hz catch-up.
 
 ## Priority and scope
 
-Next: recover the A500 gameplay frame budget (section 5) through work scheduling
-and precomputation, not compiler tuning. Separate level preparation from live
-generation publication, alongside steady room/event traversal and the
-garden-to-well transition. Then finish live
+Next: recover the A500 gameplay frame budget (section 5) by removing emulated
+runner state that nothing observes, per-element traversal overhead and CPU
+composition, following the [frame-cost audit](amiga-frame-cost.md); compiler
+tuning is not the remedy. Cover the garden-to-well transition as well as
+steady gameplay. Then finish live
 skeleton encounters, following the dependency order in section 1, make
 catacombs playable (section 2), followed by the remaining
 content (section 4). Apply the fidelity, performance, architecture, memory and
@@ -193,77 +194,124 @@ Reference: [upgrade IDs and source entry points](upgrade-coverage.md).
 
 ## 5. Meet the Amiga frame budget
 
-- Fit worst-case gameplay, style/upgrade navigation and transitions into 20 ms.
-  Re-profile after integration changes; average FPS is not the criterion.
-- Move invariant work out of gameplay into offline or pre-level preparation.
-  Audit generation dependencies and classify each operation as asset-wide,
-  level-wide, pattern/variant-wide or dependent on current gameplay state.
-  Prepare native resource descriptors, default property/bounds templates and
-  reusable pattern geometry before their first live use; measure memory and
-  preparation latency as well as gameplay savings. Keep live publication limited
-  to state-dependent decisions and required identity/order updates. Do not
-  preconsume the shared RNG or freeze health-dependent rewards: the current
-  builder makes these choices during camera-triggered generation. Verify a
-  prepared path against immediate execution with intervening gameplay RNG and
-  health changes, not just a fixed initial seed. Follow the
+Fit worst-case gameplay, style/upgrade navigation and transitions into 20 ms.
+Average FPS is not the criterion; re-profile after integration changes. The
+[frame-cost audit](amiga-frame-cost.md) attributes the gameplay budget to
+emulated runner state that no query reads, per-element traversal overhead,
+CPU composition and software arithmetic, not to game rules. Remove work
+rather than tuning it; compiler flags are not a substitute.
+
+Every step keeps the replaced path compiled as the reference. Compare full
+RNG state, numeric instance IDs, creation and event order, positions and draw
+order on deterministic replays with intervening gameplay RNG and health
+changes, then check native timing with the trace and FPS tapes.
+
+### A. Materialize only observed runner state
+
+- Replay the spatial journal only at the first box/line query, height or
+  node-count read. Record operations without idle-time servicing or
+  per-birth normalization beyond what replay needs. Preserve historical
+  insertion/removal order, first-hit identity, query-preparation side effects
+  and failure timing. Size the log for a level and keep the pressure drain.
+  Complete the collision-consumer audit as original queries enter gameplay.
+  Bound replay latency at the first query, and pressure drains, under natural
+  query-bearing workloads; a selector-free generation tape is insufficient.
+  See [derived-tree scheduling](spatial-publication-scheduling.md).
+- Represent generated terrain as ordered run records: numeric-ID range,
+  object, geometry, per-block Create results, and destroyed and inactive
+  bits. These replace per-block lifetime, room-list, layer, object-membership,
+  dirty-queue and bounds entries. Order keys stand in for list positions.
+  Enumerations that include terrain expand runs in place. Inactive scenery
+  that ends a layer's Draw walk becomes a per-layer cutoff. Audit observation
+  and failure boundaries before merging registration across a run. The target
+  is under 1,500 cycles per block, RNG included, down from about 28,000 in
+  `GameplayTerrainInstances::append` alone.
+- Keep each block's Create synchronous. Preserve per-cell RNG interleaving,
+  equal-depth ordering, lifetime allocation and partial-failure prefixes. Shop
+  and exit Create effects must precede the next pattern cell's random draw. Do
+  not preconsume the shared RNG or freeze health-dependent rewards; spreading
+  generation over frames is not behavior-neutral.
+- Prepare native resource descriptors, default property/bounds templates and
+  reusable pattern geometry before their first live use. Classify each
+  operation as asset-wide, level-wide, pattern/variant-wide or dependent on
+  gameplay state. Measure memory and preparation latency as well as gameplay
+  savings. Follow the
   [generation preparation boundary](generation-preparation-contract.md).
-  Share collision, room and layer registration work across ordered terrain runs,
-  beyond backend row setup and terrain-only dispatch. Isolate the outer terrain
-  transaction's record allocation/Create cost from nested registration, then
-  remove repeated setup across those ownership boundaries; phase sampling is
-  available without per-scope beam-clock reads (see [profiling](amiga-profiling.md)).
-  Audit observation and
-  failure boundaries before combining their setup/publication. Preserve per-cell RNG interleaving,
-  equal-depth ordering, lifetime allocation and partial-failure prefixes; keep
-  a scalar execution reference for deterministic comparisons.
-  Complete the collision-consumer audit as remaining original queries enter
-  gameplay. Bound spatial-journal catch-up and pressure drains under natural
-  query-bearing workloads, including idle-service overruns; a selector-free
-  generation tape is insufficient. Preserve historical insertion/removal order,
-  first-hit identity, query-preparation side effects and failure timing. See
-  [derived-tree scheduling](spatial-publication-scheduling.md).
-- Reduce remaining full-room bookkeeping in layer projection and
-  animation/previous-position snapshots. Preserve inactive layer termination,
-  callback order, generation checks and synchronous mutation visibility. Measure
-  both steady gameplay and the garden-to-well transition; a short
+
+### B. Traverse families, not the room
+
+- Run animation and previous-position capture as per-family loops over
+  compact records. Queue Animation End handlers with side effects by order
+  key and dispatch them in room order. Preserve inactive-list semantics,
+  callback order, generation checks and synchronous mutation visibility.
+- Maintain the actor Draw list incrementally, sorted by layer, depth and
+  element order, with per-layer inactive cutoffs, instead of walking every
+  layer element each frame.
+- Count alarms down in family records in captured order. Dispatch only zero
+  crossings, and retire unrearmed zeros to -1 as now.
+- Make position, image and transform setters plain stores with dirty bits.
+  Derive bounds when a query or the spatial log needs them.
+- Validate handles, generations and owner state at birth, retirement and
+  room entry. Per-frame paths carry a sticky failure flag checked at phase
+  boundaries, keeping terminal-failure propagation and full checks in
+  verification builds.
+- Measure steady gameplay and the garden-to-well transition; a short
   `SKIP_TO_GAME=1` sample does not cover the reported worst transition stall.
-- Remove unnecessary terrain recomposition and transfers. Preserve circular
-  hardware scrolling, static terrain backing and incremental restoration.
-  Keep external coordinate writes on the observed publication path used by
-  terrain's snapshot projection; local event evidence and its limits are in
-  [terrain update constraints](terrain-update-contract.md).
-  Reduce speculative side-view preparation for views the player never enters,
-  and cache misses on late direction changes or generation invalidation. Check
-  throughput as well as worst-frame gaps. Extend natural horizontal-shop
-  coverage while preserving ring ownership and both display buffers' debts.
-- Profile generation CPU costs without changing RNG consumption or synchronous
-  Create ordering. Shop and exit Create effects must precede the next pattern
-  cell's random draw; spreading generation over frames is not behavior-neutral.
-  Remove repeated resource/bounds work, and reduce
-  spatial-index construction costs while preserving exact collision traversal.
-  Require longer gameplay tapes that reach generation bursts; early-room average
-  FPS is not evidence that later level population meets the frame budget.
-- Break down ammo HUD costs into geometry, damage scanning and changed-word
-  publication. Keep the static rim intact and update only changed pixels.
+
+### C. Render with the blitter and precomputation
+
+- Currency/smoke: masked-replace and shade-clear blits into the effect planes
+  in painter order, blitter zero-flag tests for final-alpha overlap, and
+  rectangle damage. Profile overlap-aware sprite assignment on dense gem/smoke
+  scenes. Verify the mixed DMA/planar frame against original captures,
+  preserving controller priority.
+- Actors: blitter bobs or hardware sprites instead of CPU planar stamping.
+- Time-field outlines: reuse per-radius and per-subpixel outline masks without
+  changing Draw RNG consumption or source geometry. Measure geometry and word
+  publication separately; changed-only writes alone do not guarantee cheap
+  preparation.
+- Ammo HUD: precomputed gauge columns per fill and animation phase. Publish
+  changed columns only and keep the static rim intact.
+- Terrain rows: blit tiles or prepared wall strips into the ring. Preserve
+  circular hardware scrolling, static terrain backing and incremental
+  restoration. Keep external coordinate writes on the observed publication
+  path; see [terrain update constraints](terrain-update-contract.md). Reduce
+  speculative side-view preparation and cache misses on late direction changes
+  or generation invalidation. Extend natural horizontal-shop coverage while
+  preserving ring ownership and both display buffers' debts.
+
+### D. Use cheaper exact arithmetic
+
+- Remove 32-bit multiply/divide helpers from per-frame paths using shifts,
+  conditional-subtract rings and exhaustively verified reciprocal multiplies.
+  Fail the build if they return, like the existing 64-bit helper audit.
+- Add integer fast paths to the binary64/binary32 emulation, keeping the full
+  emulation as fallback and oracle.
+- Implement the WELL512 step and `irandom`'s 63-bit modulus in 68000 assembly,
+  checked against the portable implementation.
+
+### E. Re-profile the residue
+
+- Repeat the audit's trace windows. Dense combat and generation bursts are
+  expected to remain over budget after A–D. Address per-instance combat
+  simulation next: gems, bullets, and damage numbers, including live contact
+  direction, first-update trigonometry and damage-text drawing. Retain
+  original numeric rounding and painter order, and use the contact tape to
+  separate these from general combat. Then address pattern emission.
+- Measure new actor and effect costs in dense scenes. Keep a portable reference
+  when introducing selected 68000 assembly optimizations.
+- Repeat low-overhead timing tapes and correctness gates after changes, with
+  separate horizontal-shop and dense-encounter cases. Require tapes that reach
+  generation bursts, and distinguish instrumentation overhead from ordinary
+  gameplay cost.
+
+### F. Other scenes
+
 - Reduce selection layout/content and transition preparation costs while
   retaining static layers and pointer-driven movement.
-- Reduce time-field outline coverage construction without changing Draw RNG
-  consumption or source geometry. Measure geometry and word publication
-  separately; changed-only writes alone do not guarantee cheap preparation.
 - Reduce initial selection-canvas and offer-bank preparation stalls. Measure
   asset staging and Chip/Fast residency tradeoffs separately from steady-state
   navigation; preserve original heading, icon and carousel animation.
-- Measure new actor/effect costs in dense scenes. Keep a portable reference
-  when introducing selected 68000 assembly optimizations.
-- Reduce live contact direction, first-update damage-number trigonometry and
-  damage-text drawing costs; retain original numeric rounding and painter order.
-  Use the contact profiling tape to distinguish these from general combat work.
-- Profile controller composition and overlap-aware sprite assignment on dense
-  gem/smoke scenes; verify the resulting mixed DMA/planar frame against original
-  captures while preserving controller priority.
-- Repeat low-overhead timing tapes and correctness gates after changes, with
-  separate horizontal-shop and dense-encounter cases. Distinguish instrumentation
-  overhead from ordinary gameplay cost.
 
 Reference: [profiling procedure](amiga-profiling.md).
 
