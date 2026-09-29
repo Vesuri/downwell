@@ -92,6 +92,13 @@ generation or dense-combat coverage. Use the existing `PROFILE_CONTACT=1`
 and inspect its coverage too; its damage-birth check alone does not prove depth
 or survival. Keep route/window settings with comparisons.
 
+The contact tape's host gate installs a terrain identity store and counts actual
+birth callbacks (not net changes in live population). It reports and pins the
+largest wall/platform burst while retaining the paired state and full-RNG checks.
+This classifies the workload; the lightweight host observer is not the native
+collision/layer owner and supplies no native timing or ownership-equivalence
+proof by itself.
+
 For a short diagnostic prefix, add `PROFILE_FRAMES=11`. This compiles the
 stop count into the ordinary gameplay profiling build; it does not rely on
 debugger writes to target memory or breakpoints inside measured frames. Zero

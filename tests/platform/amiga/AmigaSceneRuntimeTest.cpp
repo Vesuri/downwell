@@ -2368,17 +2368,33 @@ int main(int argc, char** argv) {
         downwell::PackedRoom room;
         require(rooms.valid()&&objects.valid()&&patterns.valid()&&rooms.findRoom(11,room),"contact profile resources");
         const bool search=std::getenv("DOWNWELL_CONTACT_PROFILE_SEARCH")!=nullptr;
+        struct TerrainBirthAudit {
+            unsigned walls=0,platforms=0,other=0;
+            bool birth(downwell::InstanceHandle,const downwell::GameplayTerrainInstances::Record& r){
+                if(r.objectId==60)++walls;else if(r.objectId==93)++platforms;else ++other;
+                return true;
+            }
+            bool retire(downwell::InstanceHandle,const downwell::GameplayTerrainInstances::Record&){return true;}
+            bool activation(downwell::InstanceHandle,const downwell::GameplayTerrainInstances::Record&,bool){return true;}
+            bool membership(downwell::InstanceHandle,const downwell::GameplayTerrainInstances::Record&,bool){return true;}
+            unsigned total()const{return walls+platforms+other;}
+        };
         for(unsigned phase=search?0:downwell::gameplayContactProfilePhase;
             phase<(search?10u:downwell::gameplayContactProfilePhase+1);++phase){
             downwell::StartupRuntime host(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns);
             host.skipToGameForTesting();
-            AmigaPortRuntime game(300,false,1201-176,true);game.initializeEntryInput(false);
+            TerrainBirthAudit births,worstBirths;unsigned worstBirthTick=0;
+            downwell::GameplayTerrainInstances terrain(downwell::GameplayTerrainInstances::Binding::bind(births));
+            AmigaPortRuntime game(300,false,1201-176,true,{},{},{},&terrain);game.initializeEntryInput(false);
             LiveSceneWorld live(patterns,objects);live.bind(game,rooms,room,false,&host);
             unsigned firstDamage=0,damageFrames=0,currencyBirths=0,currencyAdvances=0;
             for(unsigned tick=0;tick<downwell::gameplayContactProfileFrames;++tick){
+                births={};
                 const auto input=downwell::gameplayContactProfileInput(game.tick(),240+game.player().offsetX(),
                     176+game.player().offsetY(),phase);
                 game.step(downwell::packReplayInput(input));
+                require(terrain.valid(),"contact tape terrain identity store remains valid");
+                if(births.total()>worstBirths.total()){worstBirths=births;worstBirthTick=tick+1;}
                 require(game.effectsSucceeded()&&game.generationSucceeded(),"contact tape runtime remains valid");
                 if(game.damageNumbers().size()){if(!firstDamage)firstDamage=tick+1;++damageFrames;}
                 if(!search){
@@ -2433,6 +2449,11 @@ int main(int argc, char** argv) {
             if(!search)require(currencyBirths&&currencyAdvances,"contact tape exercises currency birth and next animation");
             std::cout<<"Contact profile phase="<<phase<<" first_damage="<<firstDamage
                 <<" damage_frames="<<damageFrames<<" health="<<game.health()<<" y="<<176+game.player().offsetY()<<std::endl;
+            std::cout<<"Contact terrain burst frame="<<worstBirthTick<<" walls="<<worstBirths.walls
+                <<" platforms="<<worstBirths.platforms<<" other="<<worstBirths.other<<std::endl;
+            if(!search)require(worstBirthTick==701&&worstBirths.walls==134&&
+                worstBirths.platforms==4&&worstBirths.other==0,
+                "contact benchmark retains the measured 138-terrain-birth generation burst");
             if(!search)require(firstDamage&&damageFrames,"profile input must reach real damage");
         }
         return 0;
