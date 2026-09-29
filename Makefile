@@ -733,7 +733,7 @@ build/runner-spatial-split-test: tests/core/RunnerSpatialSplitTest.cpp $(wildcar
 	@mkdir -p build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/RunnerSpatialSplitTest.cpp
 
-build/runner-object-membership-test: tests/core/RunnerObjectMembershipTest.cpp src/core/RunnerObjectMembership.h src/core/SlotIndex.h
+build/runner-object-membership-test: tests/core/RunnerObjectMembershipTest.cpp src/core/RunnerObjectMembership.h src/core/RunnerRunMembership.h src/core/SlotIndex.h
 	@mkdir -p build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ tests/core/RunnerObjectMembershipTest.cpp
 

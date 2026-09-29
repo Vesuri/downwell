@@ -1,11 +1,14 @@
 #include "core/RunnerObjectMembership.h"
+#include "core/RunnerRunMembership.h"
 #include <cstdlib>
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <type_traits>
 static void require(bool ok,const char* message){if(!ok){std::cerr<<message<<'\n';std::exit(1);}}
-template<bool Retained> void checkRegistry(){
-    using Registry=downwell::RunnerObjectMembership<8,Retained?2:0,Retained?6:0>;
+template<bool Retained,bool Runs=false> void checkRegistry(){
+    using Registry=typename std::conditional<Runs,downwell::RunnerRunMembership<8,Retained?2:0,Retained?6:0>,
+        downwell::RunnerObjectMembership<8,Retained?2:0,Retained?6:0>>::type;
     Registry registry;
     typename Registry::template RegistrationProjection<2,6> projection;
     // Synthetic immutable hierarchy: objects 1/2 derive from 0; 3 is unrelated.
@@ -142,6 +145,47 @@ template<bool Retained> void checkRegistry(){
 }
 int main(){
     checkRegistry<false>();checkRegistry<true>();
+    checkRegistry<false,true>();checkRegistry<true,true>();
+    {
+        // Exercise long runs, all split positions, re-registration order and
+        // identity arithmetic against the original scalar owner.
+        downwell::RunnerObjectMembership<128,8,120> scalar;
+        downwell::RunnerRunMembership<128,8,120> runs;
+        auto compare=[&](){
+            std::vector<std::uint32_t> a,b;
+            scalar.visitRegistrations([&](auto s,auto id,auto object){a.insert(a.end(),{s,id,unsigned(object)});return true;});
+            runs.visitRegistrations([&](auto s,auto id,auto object){b.insert(b.end(),{s,id,unsigned(object)});return true;});
+            require(a==b&&scalar.size()==runs.size(),"expanded run history matches scalar registrations");
+            for(unsigned s=0;s<128;++s)require(scalar.contains(s)==runs.contains(s),"run locator matches membership");
+        };
+        unsigned random=19;
+        for(unsigned round=0;round<64;++round){
+            scalar.clear();runs.clear();
+            for(unsigned s=0;s<128;++s){
+                const std::uint32_t id=0xffffffc0u+s; // Includes modulo-32-bit identities.
+                require(scalar.bind(s,60,id)&&runs.bind(s,60,id),"dense run birth");compare();
+            }
+            for(unsigned step=0;step<512;++step){
+                random=random*1664525u+1013904223u;const unsigned s=(random>>8)&127;
+                if(random&1)require(scalar.unbind(s)==runs.unbind(s),"split removal result");
+                else require(scalar.bind(s,int((random>>16)&3),random)==runs.bind(s,int((random>>16)&3),random),"split rebind result");
+                compare();
+            }
+        }
+        downwell::RunnerRunMembership<0,0,0> empty;
+        require(!empty.bind(0,0,0)&&!empty.unbind(0)&&empty.size()==0,"empty run owner");
+        std::cout<<"Registration storage (128 slots): scalar="<<sizeof(scalar)<<" runs="<<sizeof(runs)<<'\n';
+    }
+    {
+        downwell::RunnerRunMembership<64,8,56> runs;
+        for(unsigned i=8;i<56;++i)require(runs.bind(i,60,100+i),"terrain run append");
+        require(runs.runCount()==1,"48 terrain registrations share one descriptor");
+        for(unsigned i=9;i<56;i+=2)require(runs.unbind(i),"interior removal splits without reordering");
+        require(runs.size()==24&&runs.runCount()==24,"split every remaining terrain cell");
+        for(unsigned i=0;i<64;++i)require(runs.bind(i,60,200+i),"full capacity after fragmentation");
+        require(runs.size()==64,"descriptor reserve preserves full slot capacity");
+        runs.clear();require(runs.size()==0&&runs.runCount()==0,"release fragmented runs");
+    }
     downwell::RunnerObjectMembership<8,0,8> omitted;
     require(omitted.bind(3,0,1)&&omitted.unbind(3),"fully omitted domain needs no retained entries");
     std::cout<<"runner object membership tests passed\n";

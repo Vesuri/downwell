@@ -5,6 +5,7 @@
 #include "RunnerCollisionMotion.h"
 #include "RunnerTransformField.h"
 #include "RunnerObjectMembership.h"
+#include "RunnerRunMembership.h"
 #include "RunnerSpatialIndex.h"
 #include "RunnerSpatialJournal.h"
 #include "RunnerSpatialBoundsUpdate.h"
@@ -20,6 +21,12 @@
 #include "PreparedObjectDefaults.h"
 #include "Profile.h"
 namespace downwell {
+template<unsigned Capacity,unsigned First,unsigned Last,bool Runs> struct RunnerRegistrationStorage {
+    using Type=RunnerObjectMembership<Capacity,First,Last>;
+};
+template<unsigned Capacity,unsigned First,unsigned Last> struct RunnerRegistrationStorage<Capacity,First,Last,true> {
+    using Type=RunnerRunMembership<Capacity,First,Last>;
+};
 template<unsigned Capacity,unsigned Nodes,bool Scheduled> struct RunnerSpatialIndexStorage {
     using Type=RunnerSpatialIndex<Nodes>;
 };
@@ -33,11 +40,12 @@ template<unsigned Capacity,unsigned Nodes> struct RunnerSpatialIndexStorage<Capa
 // scheduler must attach every relevant birth before Create, publish its bounds,
 // and retire it before reusing its slot. This is not an activation scheduler.
 // No platform types or asset residency decisions belong here.
-template<unsigned Capacity,unsigned Nodes,bool ScheduledIndex=false,unsigned RetainedFirst=0,unsigned RetainedLast=0> class RunnerSpatialInstances {
+template<unsigned Capacity,unsigned Nodes,bool ScheduledIndex=false,unsigned RetainedFirst=0,unsigned RetainedLast=0,bool RunRegistration=ScheduledIndex> class RunnerSpatialInstances {
     static_assert(Capacity>0,"Spatial instances need stable slots");
     using Queue=RunnerSpatialDirtyQueue<Capacity>;
     using Math=RunnerSpatialSplit;
-    using Membership=RunnerObjectMembership<Capacity,RetainedFirst,RetainedLast>;
+    using Membership=typename RunnerRegistrationStorage<Capacity,RetainedFirst,RetainedLast,
+        RunRegistration&&(RetainedFirst<RetainedLast)>::Type;
 public:
     using Real=RunnerImageValue;
     template<unsigned First,unsigned Last> using RegistrationProjection=

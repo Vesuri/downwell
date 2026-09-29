@@ -118,6 +118,30 @@ concurrent generations with the same slot. Direct mode explicitly rejects
 out-of-domain slots and overlapping lifetimes; it is not a transparent option
 for owners lacking the bounded, single-live-lifetime invariant.
 
+## Ordered registration runs
+
+The scheduled collision owner uses `RunnerRunMembership` for object
+registration. Adjacent registrations in the terrain slot domain share a run
+only when object, slot sequence and generation sequence agree. The descriptor
+stores the first slot/generation and count; a compact slot locator finds the
+descriptor. Generations are lifetime identities, **not** original numeric
+instance IDs. This does not repair the separate numeric-ID recovery gaps.
+
+Enumerations expand each run at its original registration position, preserving
+own/ancestor selection and first-hit order. Interior retirement splits a run;
+re-registration appends at the tail, including reactivation. Actor registrations
+remain singletons and retain their maintained capture order. The original
+scalar membership remains selectable with `RunRegistration=false` on
+`RunnerSpatialInstances` and is compiled by the differential tests.
+
+Descriptors reserve the full slot capacity so splitting cannot introduce a new
+failure boundary. Consequently this first integration reduces live registration
+payload writes, not reserved memory: it adds six bytes per slot plus eight
+owner bytes versus the retained scalar layout. Room/layer ownership, bounds,
+dirty queues and terrain lifetime records remain distinct per-cell state until
+their own run integration; this change must not be described as completion of
+the compact terrain representation. Create/RNG/publication ordering is unchanged.
+
 ## Terrain transaction boundaries
 
 `AreaOneBuilder::emitPattern` reuses one local `DeferredCreateInstance` for
