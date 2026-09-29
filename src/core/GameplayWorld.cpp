@@ -1386,9 +1386,11 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             publishedX = static_cast<int>(downwell::FixedCollisionMath::round(enemy.snail.x) / 1280);
             publishedY = static_cast<int>(downwell::FixedCollisionMath::round(enemy.snail.y) / 1280);
         }
+        { DW_PROFILE_SCOPE(profileEnemyPositionPublish);
         if(!enemyLifecycle_.integerPosition({enemy.identitySlot,enemy.lifetimeId},enemy,
                                            publishedX+240,publishedY+176)) {
             run_.effectsSucceeded=false;return {};
+        }
         }
         enemy.x=publishedX;enemy.y=publishedY;
         if(enemy.objectId==119 &&
@@ -1400,6 +1402,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
              enemy.frogHit.remaining != 0, enemy.snailHit.stunned},
             enemy.frogPresentation, enemy.batActivity, enemy.batHit,
             enemy.imagePhase, enemy.imageRemainder);
+        { DW_PROFILE_SCOPE(profileEnemyPresentationPublish);
         if(enemy.objectId!=111 && enemy.objectId!=112 &&
            !enemyLifecycle_.sprite({enemy.identitySlot,enemy.lifetimeId},enemy,nextSprite)) {
             run_.effectsSucceeded=false;return {};
@@ -1416,6 +1419,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                 enemy.facing=scale;return true;
             },[&enemy]{enemy.direction=270;enemy.batDirectionFraction=0;enemy.moveSpeed=512;}))return {};
         if(!publishEnemyImage(enemy,enemy.imagePhase))return {};
+        }
         enemy.imageFrame = enemy.imagePhase >> 8;
     }
 

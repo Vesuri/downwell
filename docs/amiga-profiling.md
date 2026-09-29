@@ -393,6 +393,12 @@ rules; raster and stamping cover all producers. The remaining currency phase
 includes enumeration, frame selection and conversion of published integer
 coordinates to the portable representation. Sum children when comparing with
 older producer totals; none of these phase counts is an effect-instance count.
+Phases 137–138 split enemy finalization's integer position publication and
+sprite/mask/scale/image-index publication from phase 115. The latter includes
+bat presentation-field updates. Coordinate rounding, sprite selection and
+crawler angle publication remain in 115. These brackets preserve setter order
+and include validation/ownership work below each callback; they are not render
+timings and do not imply that unchanged setters can be skipped safely.
 
 Record the executable hash, revision, emulator CPU/memory configuration,
 build flags, tape length, field count, worst gaps and probe clock-clamp count.

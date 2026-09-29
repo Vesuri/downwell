@@ -54,6 +54,7 @@ enum DownwellProfilePhase {
     profileEffectDebris, profileEffectCover, profileEffectShade,
     profileEffectVisibility, profileEffectPublish,
     profileEffectPlacement, profileEffectRaster, profileEffectStamp,
+    profileEnemyPositionPublish, profileEnemyPresentationPublish,
     profilePhaseCount
 };
 
