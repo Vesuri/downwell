@@ -28,7 +28,7 @@ private:
     Owner owner_;
     Owner::RegistrationProjection<View::terrainBase,View::timeFieldBase> actorRegistrations_;
     RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity+GameplayWorld::droneBulletCapacity> combatAlarmPhase_;
-    std::uint32_t combatAlarmCaptureRevision_=0;
+    bool combatAlarmCaptureDirty_=true;
     unsigned combatAlarmMask_=0;
     bool combatAlarmCaptureValid_=false;
     RunnerRoomMembership<View::capacity> room_;
@@ -278,6 +278,8 @@ public:
     bool serviceSpatialIndex(unsigned budget){return check(owner_.serviceSpatialIndex(budget));}
     bool attach(GameplayWorld& world){
         combatAlarmCaptureValid_=false;
+        if(!owner_.watchCaptureRanges(View::enemyBase,View::terrainBase,
+            View::debrisBase,View::capacity,combatAlarmCaptureDirty_))return check(false);
         if(!valid()||(world_&&world_!=&world)||(!world_&&
             (!initialPlayer_||world.findPlayer(initialPlayerKey_)!=initialPlayer_)))return false;
         if(!world_&&!world.bindTimeFieldLifecycle(OrdinaryTimeFields<64>::Binding::bind(fields_)))return check(false);
@@ -405,8 +407,7 @@ public:
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
             if(!self.valid())return false;
             auto& phase=self.combatAlarmPhase_;
-            const bool reused=self.combatAlarmCaptureValid_&&
-                self.owner_.captureUnchanged(self.combatAlarmCaptureRevision_);
+            const bool reused=self.combatAlarmCaptureValid_&&!self.combatAlarmCaptureDirty_;
             if(!reused){
                 phase.clear();
                 auto capture=[&](InstanceHandle h,int object,const Owner::State& state){
@@ -418,7 +419,7 @@ public:
                     self.owner_.visitRegistrationRange(self.actorRegistrations_,View::debrisBase,View::capacity,capture)))return false;
                 // Save before callbacks: mutation during dispatch invalidates
                 // reuse next tick without changing this phase's captured set.
-                self.combatAlarmCaptureRevision_=self.owner_.captureRevision();
+                self.combatAlarmCaptureDirty_=false;
                 self.combatAlarmCaptureValid_=true;
             }
             return self.dispatchCapturedAlarms(phase,[&](InstanceHandle h,unsigned alarm,const PackedObjectEvent&){

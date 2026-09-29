@@ -84,17 +84,23 @@ instance/object checks. No callbacks occur inside an absent group, so finding
 its end by binary search preserves callback and countdown order. Present-event
 groups still resolve each lifetime and check live flags before dispatch.
 
-The bound combat path retains its sorted snapshot across ticks only while a
-separate capture revision is unchanged. Attach/retire/rebind/clear, actual
-registration changes, and changes to exclusion bits `0x100003` invalidate it;
-position, image and bounds-dirty writes do not change capture eligibility.
-Repeated no-op activation/registration writes do not invalidate it. Revision
-saturation disables reuse. The saved revision precedes callbacks, so an alarm
-that changes membership or eligibility forces recapture on the next tick,
+The bound combat path retains its sorted snapshot across ticks until a mutation
+affects either of its captured slot ranges: `[enemyBase,terrainBase)` or
+`[debrisBase,capacity)`. Attach/retire/rebind, actual registration changes, and
+changes to exclusion bits `0x100003` within those ranges invalidate it; clear
+always invalidates it. Uncaptured terrain births/retirements do not. Position,
+image and bounds-dirty writes do not change capture eligibility. Repeated no-op
+activation/registration writes do not invalidate it. A sticky dirty flag avoids
+revision wraparound; it is reset after capture but before callbacks, so an alarm
+that changes captured membership or eligibility forces recapture on the next tick,
 without admitting newborns into the current phase. Attaching a world also
 invalidates the cache. Reuse omits only capture and sorting, never the live
 per-callback checks or alarm countdowns. Explicit caller-snapshot dispatch still
 captures fresh; the cache belongs exclusively to the bound combat owner.
+The watched ranges must match the registration ranges used to build that
+capture. Extending admitted families requires updating both. This observer
+does not narrow the global binding revision: any birth, retirement or rebind
+during dispatch still disables its absent-group/column shortcuts.
 The union of present alarm columns is prepared with that capture and retained
 alongside it. An unchanged capture does not rescan its object IDs to rebuild
 the union. Recapture recomputes it, including empty captures. A binding change

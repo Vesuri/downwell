@@ -210,6 +210,14 @@ public:
     bool bindingsUnchanged(std::uint32_t revision)const{
         return revision!=0xffffffffu&&revision==bindingRevision_;
     }
+    // A retained phase may capture only two disjoint slot ranges. Mutations
+    // elsewhere must not invalidate it. The caller owns the flag and resets it
+    // after capture, BEFORE callbacks; a same-phase mutation dirties it again.
+    bool watchCaptureRanges(unsigned first,unsigned last,unsigned second,unsigned end,bool& dirty){
+        if(first>last||last>second||second>end||end>Capacity)return false;
+        captureFirst_=first;captureLast_=last;captureSecond_=second;captureEnd_=end;
+        captureDirty_=&dirty;dirty=true;return true;
+    }
     // Clear retires memberships but preserves generation high-water marks.
     // Replacing the external handle domain requires replacing this owner too.
     void clear(){
@@ -228,7 +236,7 @@ public:
             (state.flags&0x8000u) || !Math::valid(state.x)||!Math::valid(state.y))return false;
         auto& e=entries_[h.slot];e.state=state;e.state.previous={state.x,state.y};
         e.object=object;e.generation=h.generation;
-        changedBinding();
+        changedBinding(h.slot);
         return membership_.bind(h.slot,object,h.generation);
     }
     // 0x50dbf8..0x50dc0a, before this instance's animation in active-room
@@ -247,7 +255,7 @@ public:
     // At source reconciliation boundaries, not when the active flag is written.
     bool registerObject(InstanceHandle h,bool registered){
         if(!valid()||!live(h))return false;
-        if(membership_.contains(h.slot)!=registered)changedCapture();
+        if(membership_.contains(h.slot)!=registered)changedCapture(h.slot);
         if(!registered)membership_.unbind(h.slot);
         else if(!membership_.contains(h.slot))membership_.bind(h.slot,entries_[h.slot].object,h.generation);
         auto& flags=entries_[h.slot].state.flags;
@@ -261,7 +269,7 @@ public:
     bool rebindObjectMembership(InstanceHandle h,int object,bool registered){
         if(!valid()||!live(h)||object<0)return false;
         entries_[h.slot].object=object;
-        changedBinding();
+        changedBinding(h.slot);
         if(registered)membership_.bind(h.slot,object,h.generation);
         else membership_.unbind(h.slot);
         return true;
@@ -298,7 +306,7 @@ public:
     bool setActive(InstanceHandle h,bool active,std::uint32_t objectFlags){
         if(!valid()||!live(h))return false;
         auto& flags=entries_[h.slot].state.flags;
-        if(bool(flags&2u)==active)changedCapture();
+        if(bool(flags&2u)==active)changedCapture(h.slot);
         if(active){
             if((flags&2u)&&Queue::shouldQueue(true,objectFlags,flags)){
                 spatial_.mark(h.slot);
@@ -324,7 +332,7 @@ public:
     bool setExclusions(InstanceHandle h,std::uint32_t exclusions){
         if(!valid()||!live(h)||(exclusions&~0x100003u))return false;
         auto& f=entries_[h.slot].state.flags;
-        if((f&0x100003u)!=exclusions)changedCapture();
+        if((f&0x100003u)!=exclusions)changedCapture(h.slot);
         f=(f&~0x100003u)|exclusions;return true;
     }
     bool move(InstanceHandle h,Real x,Real y,std::uint32_t objectFlags){
@@ -538,7 +546,7 @@ public:
     bool retire(InstanceHandle h){
         if(!removeSpatialMembership(h))return false;
         membership_.unbind(h.slot);
-        entries_[h.slot].object=-1;changedBinding();return true;
+        entries_[h.slot].object=-1;changedBinding(h.slot);return true;
     }
     unsigned pendingSpatial()const{return spatial_.size();}
     unsigned pendingCollision()const{return collision_.size();}
@@ -813,8 +821,17 @@ private:
     bool good_=true;
     std::uint32_t bindingRevision_=0;
     std::uint32_t captureRevision_=0;
-    void changedCapture(){if(captureRevision_!=0xffffffffu)++captureRevision_;}
-    void changedBinding(){if(bindingRevision_!=0xffffffffu)++bindingRevision_;changedCapture();}
+    bool* captureDirty_=nullptr;
+    unsigned captureFirst_=0,captureLast_=0,captureSecond_=0,captureEnd_=0;
+    void changedCapture(unsigned slot=Capacity){
+        if(captureRevision_!=0xffffffffu)++captureRevision_;
+        if(captureDirty_&&(slot==Capacity||(slot>=captureFirst_&&slot<captureLast_)||
+            (slot>=captureSecond_&&slot<captureEnd_))) *captureDirty_=true;
+    }
+    void changedBinding(unsigned slot=Capacity){
+        if(bindingRevision_!=0xffffffffu)++bindingRevision_;
+        changedCapture(slot);
+    }
     bool* snapshotDirty_=nullptr;
     unsigned snapshotFirst_=0,snapshotLast_=0;
     bool checked(bool ok){if(!ok)good_=false;return ok;}

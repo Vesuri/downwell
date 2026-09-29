@@ -26,6 +26,32 @@ struct Graph {
 int main(){
     {
         RunnerSpatialInstances<8,16> owner;bool dirty=false;
+        assert(!owner.watchCaptureRanges(2,5,4,8,dirty));
+        assert(owner.watchCaptureRanges(2,4,6,8,dirty)&&dirty);
+        for(unsigned slot=0;slot<8;++slot){
+            dirty=false;assert(owner.attach({slot,1},0,{}));
+            assert(dirty==(slot==2||slot==3||slot==6||slot==7));
+        }
+        for(unsigned slot=0;slot<8;++slot){
+            const bool watched=slot==2||slot==3||slot==6||slot==7;
+            const InstanceHandle h{slot,1};
+            dirty=false;assert(owner.move(h,{0x3f800000u},{},0)&&!dirty);
+            assert(owner.capturePrevious(h)&&!dirty);
+            assert(owner.setActive(h,false,0)&&dirty==watched);
+            dirty=false;assert(owner.setActive(h,false,0)&&!dirty);
+            assert(owner.setActive(h,true,0)&&dirty==watched);
+            dirty=false;assert(owner.setExclusions(h,1)&&dirty==watched);
+            dirty=false;assert(owner.registerObject(h,false)&&dirty==watched);
+            dirty=false;assert(owner.registerObject(h,false)&&!dirty);
+            assert(owner.registerObject(h,true)&&dirty==watched);
+            dirty=false;assert(owner.rebindObjectMembership(h,0,true)&&dirty==watched);
+            dirty=false;assert(owner.retire(h)&&dirty==watched);
+            dirty=false;assert(owner.attach({slot,2},0,{})&&dirty==watched);
+        }
+        dirty=false;owner.clear();assert(dirty);
+    }
+    {
+        RunnerSpatialInstances<8,16> owner;bool dirty=false;
         assert(owner.watchSnapshotRange(2,4,dirty)&&dirty);dirty=false;
         assert(owner.attach({2,1},0,{})&&owner.attach({4,1},0,{}));
         assert(!dirty); // Birth already initializes the snapshot.
