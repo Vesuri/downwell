@@ -54,18 +54,6 @@ public:
         }
     }
 private:
-    void put(int x,unsigned y,std::uint16_t a,std::uint16_t lo,std::uint16_t hi,bool subtract){
-        if(!a || x<0 || unsigned(x)>=words)return;
-        const unsigned at=y*words+unsigned(x);
-        if(subtract){alpha_[at]&=std::uint16_t(~a);return;}
-        alpha_[at]|=a;
-        low_[at]=std::uint16_t((low_[at]&~a)|(lo&a));
-        high_[at]=std::uint16_t((high_[at]&~a)|(hi&a));
-        if(unsigned(x)<first_[y])first_[y]=unsigned(x);
-        if(unsigned(x)+1>last_[y])last_[y]=unsigned(x)+1;
-        if(y<firstRow_)firstRow_=y;
-        if(y+1>lastRow_)lastRow_=y+1;
-    }
     static std::uint16_t read(const std::uint8_t* row,unsigned sx,unsigned left){
         if(!row)return 0;
         unsigned value=unsigned(row[sx/8])<<8;
@@ -84,14 +72,33 @@ private:
         for(unsigned sy=begin;sy<end;++sy){
             const unsigned dy=unsigned(y+int(sy)),offset=sy*mask.stride;
             if(subtract && first_[dy]==words)continue;
+            const unsigned row=dy*words;
+            unsigned first=words,last=0;
+            auto put=[&](int dx,std::uint16_t a,std::uint16_t l,std::uint16_t h){
+                if(!a || dx<0 || unsigned(dx)>=words)return;
+                const unsigned at=row+unsigned(dx);
+                if(subtract){alpha_[at]&=std::uint16_t(~a);return;}
+                alpha_[at]|=a;
+                low_[at]=std::uint16_t((low_[at]&~a)|(l&a));
+                high_[at]=std::uint16_t((high_[at]&~a)|(h&a));
+                if(unsigned(dx)<first)first=unsigned(dx);
+                if(unsigned(dx)+1>last)last=unsigned(dx)+1;
+            };
             for(unsigned sx=0;sx<mask.width;sx+=16){
                 const unsigned left=mask.width-sx;
                 const auto a=read(mask.data+offset,sx,left);
+                if(!a)continue;
                 const auto l=read(lo?lo+offset:nullptr,sx,left),h=read(hi?hi+offset:nullptr,sx,left);
                 const int dx=column+int(sx/16);
-                put(dx,dy,a>>shift,l>>shift,h>>shift,subtract);
-                if(shift)put(dx+1,dy,std::uint16_t(unsigned(a)<<(16-shift)),
-                    std::uint16_t(unsigned(l)<<(16-shift)),std::uint16_t(unsigned(h)<<(16-shift)),subtract);
+                put(dx,a>>shift,l>>shift,h>>shift);
+                if(shift)put(dx+1,std::uint16_t(unsigned(a)<<(16-shift)),
+                    std::uint16_t(unsigned(l)<<(16-shift)),std::uint16_t(unsigned(h)<<(16-shift)));
+            }
+            if(last){
+                if(first<first_[dy])first_[dy]=first;
+                if(last>last_[dy])last_[dy]=last;
+                if(dy<firstRow_)firstRow_=dy;
+                if(dy+1>lastRow_)lastRow_=dy+1;
             }
         }
         return true;

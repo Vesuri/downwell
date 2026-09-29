@@ -278,6 +278,13 @@ and publication exposes color bits only under surviving alpha. Mask, low and
 high source planes share dimensions/stride and must each have the supplied
 mask byte length available. No source payload is mutated or converted.
 
+Stamping resolves the destination row once and accumulates its touched word
+range locally before publishing row bounds. Fully transparent source words
+need no color reads or destination work. Only surviving, in-bounds alpha
+expands these ranges; shade subtraction never expands them. Clearing and
+publication therefore retain the same sparse coverage contract, including
+rows whose alpha has subsequently been erased completely.
+
 `AmigaGameplayEffects` accepts both white-only and palette coverage. Its palette
 path publishes the final alpha/low/high word directly: clipping, ring addressing
 and horizontal alignment are computed once, then each plane uses masked
