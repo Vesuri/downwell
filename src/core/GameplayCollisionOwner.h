@@ -422,7 +422,7 @@ public:
                 self.combatAlarmCaptureDirty_=false;
                 self.combatAlarmCaptureValid_=true;
             }
-            return self.dispatchCapturedAlarms(phase,[&](InstanceHandle h,unsigned alarm,const PackedObjectEvent&){
+            return self.dispatchCapturedAlarms<true>(phase,[&](InstanceHandle h,unsigned alarm,const PackedObjectEvent&){
                 View::Kind kind;InstanceHandle local;if(!View::decode(h,kind,local))return false;
                 return kind==View::Kind::enemy?self.world_->advanceEnemyRoomAlarm(local,alarm):
                     kind==View::Kind::breakable?self.world_->advanceBoxRoomAlarm(local,alarm):
@@ -492,7 +492,30 @@ public:
         return dispatchCapturedAlarms(snapshot,advanceAndDispatch);
     }
 private:
-    template<unsigned Capacity,class AdvanceAndDispatch>
+    // The original phase leaves negative counters untouched (0x509e15).
+    // Read the live compact stores, not a mask captured before callbacks:
+    // an earlier alarm can arm a later counter in this very phase. Zero is
+    // still work: it must retire to -1. Other families retain their full
+    // adapter path, including effect-owner validity checks.
+    bool combatAlarmPending(InstanceHandle h,unsigned alarm,bool& pending)const{
+        pending=true;
+        if(!world_)return false;
+        if(h.slot>=View::enemyBase&&h.slot<View::breakableBase){
+            const auto* enemy=world_->resolveEnemyLifetime({h.slot-View::enemyBase,h.generation});
+            if(!enemy)return false;
+            if(alarm==0)pending=enemy->alarm0>=0;
+            else if(alarm==1)pending=enemy->alarm1>=0;
+            return true;
+        }
+        if(h.slot>=View::breakableBase&&h.slot<View::terrainBase){
+            const auto* box=world_->findBreakable({h.slot-View::breakableBase,h.generation});
+            if(!box)return false;
+            if(alarm==0)pending=box->alarm0>=0;
+            return true;
+        }
+        return resolves(h);
+    }
+    template<bool SkipInactive=false,unsigned Capacity,class AdvanceAndDispatch>
     bool dispatchCapturedAlarms(RunnerStepSnapshot<Capacity>& snapshot,AdvanceAndDispatch advanceAndDispatch,
         bool alreadySorted=false,unsigned* retainedMask=nullptr){
         DW_PROFILE_SCOPE(profileAlarmScan);
@@ -548,7 +571,11 @@ private:
             if(!current||(current->flags&0x100003u))continue;
             // Capture validated every admitted lifetime. Revalidate the typed
             // store before each real event, not for absent event-table entries.
-            if(!check(resolves(h)))return false;
+            if constexpr(SkipInactive){
+                bool pending;
+                if(!check(combatAlarmPending(h,alarm,pending)))return false;
+                if(!pending)continue;
+            }else if(!check(resolves(h)))return false;
             // Only immutable resource lookup is shared. A callback may retire,
             // deactivate or rebind another captured instance, so all live
             // checks and the current object read remain inside this loop.

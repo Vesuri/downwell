@@ -120,6 +120,16 @@ contains an instance handle, countdown or exclusion flag.
 Dispatch still resolves the current object after binding changes and checks
 each lifetime immediately before invoking its handler.
 
+The bound combat adapter checks the live compact enemy Alarm 0/1 and box
+Alarm 0 counters after lifetime/exclusion checks. Negative values bypass
+handler lookup and the countdown adapter, matching `0x509e15`; zero still
+enters the adapter and retires to -1. This is not a cached armed-alarm mask:
+each read occurs at its original traversal position, so earlier callbacks can
+change a later counter in the same phase. Other alarm indices and effect
+families keep their existing adapter/validity checks. The general caller-owned
+`dispatchAlarmPhase` remains unfiltered because its callback owns countdown
+storage and may use a different representation.
+
 ## Skeleton consequence
 
 Its Alarm 2 sets Alarm 3 to 15. Alarm 3 is then decremented to 14 in the same

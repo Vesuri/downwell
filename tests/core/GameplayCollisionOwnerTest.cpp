@@ -2033,6 +2033,68 @@ int main(){
         assert(rooms.roomInstance(room,0,r));r.scaleX=2;
         assert(!terrain->appendRoom(r)&&!terrain->valid()&&terrain->size()==0);
     }
+    for(int initial:{(-2147483647-1),-2,-1,0,1,2}){
+        // Compare the bound pending-counter path with the original unfiltered
+        // captured traversal. Negative values must remain untouched; zero
+        // still retires, and positive counters retain countdown/RNG order.
+        auto optimized=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto reference=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto a=std::make_unique<GameplayWorld>(300,true,0,false,optimized->enemyBinding(),
+            optimized->breakableBinding(),optimized->playerBinding(),&optimized->terrain());
+        auto b=std::make_unique<GameplayWorld>(300,true,0,false,reference->enemyBinding(),
+            reference->breakableBinding(),reference->playerBinding(),&reference->terrain());
+        assert(optimized->attach(*a)&&reference->attach(*b));
+        for(auto* world:{a.get(),b.get()}){
+            unsigned slot=0;
+            for(int object:{112,113,116,117,119}){
+                PackedObject metadata;assert(objects.findObject(object,metadata));
+                assert(world->configureEnemy(slot,object,metadata.spriteId,int(slot)*16-32,128,
+                    0,0,5,14,0,1,initial,object==113&&initial==1?-1:initial,0,0,true,true,true));
+                ++slot;
+            }
+            assert(world->createGeneratedInstance({92,240,512},objects,[](const auto&){return true;}));
+            auto* box=const_cast<GameplayWorld::Breakable*>(world->findBreakable({0,1}));
+            assert(box);box->alarm0=initial;
+        }
+        RunnerStepSnapshot<32> snapshot;
+        auto unfiltered=[&](){
+            return reference->dispatchAlarmPhase(snapshot,[&](InstanceHandle h,unsigned alarm,const auto&){
+                GameplayCollisionView::Kind kind;InstanceHandle local;
+                if(!GameplayCollisionView::decode(h,kind,local))return false;
+                if(kind==GameplayCollisionView::Kind::enemy)return b->advanceEnemyRoomAlarm(local,alarm);
+                if(kind==GameplayCollisionView::Kind::breakable)return b->advanceBoxRoomAlarm(local,alarm);
+                return true; // Other captured families are not combat alarms.
+            });
+        };
+        b->configureRoomAlarms([](void* p){return (*static_cast<decltype(unfiltered)*>(p))();},&unfiltered);
+        for(unsigned tick=0;tick<24;++tick){
+            if(tick==8)for(auto* world:{a.get(),b.get()}){
+                // A reused capture must observe counters rearmed between ticks.
+                auto& enemy=const_cast<GameplayWorld::EnemyState&>(world->enemyAt(0));
+                enemy.alarm1=1;
+                const_cast<GameplayWorld::Breakable*>(world->findBreakable({0,1}))->alarm0=0;
+            }
+            a->step(0);b->step(0);
+            assert(a->effectsSucceeded()&&b->effectsSucceeded()&&optimized->valid()&&reference->valid());
+            assert(a->enemyCount()==b->enemyCount());
+            for(unsigned i=0;i<a->enemyCount();++i){
+                const auto& x=a->enemyAt(i);const auto& y=b->enemyAt(i);
+                assert(x.objectId==y.objectId&&x.lifetimeId==y.lifetimeId&&x.active==y.active&&
+                    x.alarm0==y.alarm0&&x.alarm1==y.alarm1&&x.health==y.health&&
+                    x.preciseX==y.preciseX&&x.preciseY==y.preciseY&&x.speedX==y.speedX&&x.speedY==y.speedY&&
+                    x.motionState==y.motionState&&x.auxiliaryState==y.auxiliaryState&&
+                    x.spriteId==y.spriteId&&x.imageFrame==y.imageFrame);
+                // Frog Alarm 0 arms the previously negative Alarm 1; that
+                // later index must count down immediately, not next frame.
+                if(!tick&&initial==1&&x.objectId==113)assert(x.alarm1==59);
+            }
+            const auto* x=a->findBreakable({0,1});const auto* y=b->findBreakable({0,1});
+            assert(x&&y&&x->alarm0==y->alarm0&&x->active==y->active);
+            assert(a->randomState().drawCount()==b->randomState().drawCount()&&
+                a->randomState().stateIndex()==b->randomState().stateIndex());
+            for(unsigned w=0;w<16;++w)assert(a->randomState().stateWord(w)==b->randomState().stateWord(w));
+        }
+    }
     {
         auto ordered=std::make_unique<GameplayCollisionOwner>(objects,sprites);
         auto scene=std::make_unique<GameplayWorld>(300,true,0,false,ordered->enemyBinding(),
