@@ -175,6 +175,19 @@ tests for all four walks, fragmentation, reactivation and terminal failure.
 Layer ownership, bounds, dirty queues and terrain lifetimes are still separate
 per-cell structures; room runs do not complete their representation change.
 
+### Layer representation constraint
+
+Replacing only layer-element next/previous links with forward/reverse spans
+does not remove the terrain birth transaction. The lifetime, element registry,
+identity mapping, retained-Draw state and bounds still receive per-cell writes;
+each ordinary successor lookup also acquires a descriptor indirection.
+Reserving enough descriptors for arbitrary fragmentation adds eight bytes per
+element plus allocator state compared with the scalar 16-bit links. A layer-run
+design should therefore replace those associated per-cell publications too,
+not introduce a second representation around the existing attachment path.
+Keep saved-successor Draw insertion, inactive-tail reversal, lowest-free IDs
+and partial-failure state as explicit differential-test boundaries.
+
 ## Terrain transaction boundaries
 
 `AreaOneBuilder::emitPattern` reuses one local `DeferredCreateInstance` for
