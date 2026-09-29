@@ -75,9 +75,8 @@ struct RunnerDepthService {
         const auto* old=layers.get(oldSlot);if(!old)return true;
         std::int32_t depth;if(!integerDepth(instance.depth,depth))return false;
         if(depth==old->depth)return true;
-        RunnerImageValue oldDepth,difference;
-        if(!oldDepth.assign(MotionBinary64::fromInteger(old->depth))||
-           !RunnerSpatialSplit::sub(instance.depth,oldDepth,difference))return false;
+        RunnerImageValue difference;
+        if(!RunnerSpatialSplit::sub(instance.depth,old->encodedDepth,difference))return false;
         if((difference.bits&0x7fffffffu)<0x41a00000u&&old->dynamic&&layers.elementCount(oldSlot)==1){
             bool matches=false;
             if(!layers.visitElements(oldSlot,[&](unsigned e){matches=self(e);return true;}))return false;
@@ -89,8 +88,7 @@ struct RunnerDepthService {
         if(target==Layers::End&&!createLayer(depth,target))return false;
         const auto* layer=layers.get(target);
         if(!layer||!layer->dynamic||layer->depth!=depth)return false;
-        RunnerImageValue assigned;if(!assigned.assign(MotionBinary64::fromInteger(layer->depth)))return false;
-        instance.attached=true;instance.layerId=layer->id;instance.depth=assigned;
+        instance.attached=true;instance.layerId=layer->id;instance.depth=layer->encodedDepth;
         return layers.attach(target,element,true,instance.append,[](unsigned){return false;});
     }
 };

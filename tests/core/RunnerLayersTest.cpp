@@ -15,6 +15,9 @@ void order(const Owner& o,std::vector<int> expected){
     std::vector<int> ids;unsigned previous=Owner::End;
     require(o.visitLayers([&](unsigned slot,const auto& layer){
         require(layer.previous==previous,"previous layer link");
+        downwell::RunnerImageValue expected;
+        require(expected.assign(downwell::MotionBinary64::fromInteger(layer.depth))&&
+            expected.bits==layer.encodedDepth.bits,"prepared layer depth matches original conversion");
         previous=slot;ids.push_back(layer.id);return ids.size()<=6;
     }),"bounded layer traversal");require(ids==expected,"layer order");
 }
@@ -166,4 +169,25 @@ void roomNormalization(){
     require(!failed.move(from,1,true,[](unsigned,int){return false;},inactive),"terminal publication failure");
     require(!failed.normalizeRoomInstances([](unsigned){std::abort();return false;}),"failed owner never calls normalization predicate");
 }
-int main(){movement();merging();failure();exhaustiveMoves();activation();sourceIds();roomNormalization();std::cout<<"Layer identities, depth movement, ownership and merge publication verified (3840 movement cases, 256 room normalization cases)\n";}
+void preparedDepths(){
+    Owner owner;auto slot=add(owner,1,0);
+    std::uint32_t random=91;
+    for(unsigned i=0;i<10000;++i){
+        random=random*1664525u+1013904223u;
+        const std::int32_t value=i==0?(-2147483647-1):i==1?2147483647:
+            static_cast<std::int32_t>(random);
+        require(owner.move(slot,value,false,publish,inactive),"prepare changed depth");
+        order(owner,{1});
+    }
+    require(owner.discardUninitialized(),"clear prepared layers");
+    slot=add(owner,2,-16777217);order(owner,{2});
+    require(slot==0,"prepared depth slot reuse");
+    Owner failed;const auto from=add(failed,1,0);add(failed,2,16777217);
+    require(failed.attach(from,0,true,true,inactive),"prepared failure setup");
+    require(!failed.move(from,16777217,true,[&](unsigned,int){
+        require(failed.get(from)->encodedDepth.bits==0x4b800000u,
+            "prepared depth published before failing merge callback");return false;
+    },inactive),"failed prepared merge");
+    require(failed.get(from)->encodedDepth.bits==0x4b800000u,"failed merge retains prepared depth");
+}
+int main(){movement();merging();failure();exhaustiveMoves();activation();sourceIds();roomNormalization();preparedDepths();std::cout<<"Layer identities, depth movement, ownership and merge publication verified (3840 movement cases, 256 room normalization cases, 10000 prepared depths)\n";}

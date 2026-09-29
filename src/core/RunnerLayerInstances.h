@@ -54,8 +54,7 @@ public:
         if(reused){
             if(entries_[element].instance.generation||layers.elementOwner(element)!=layer)return false;
         }else{element=free(layers);if(element==End)return false;}
-        RunnerImageValue depth;
-        if(!depth.assignInteger(destination->depth))return false;
+        const RunnerImageValue depth=destination->encodedDepth;
         // Keep aligned identity fields as scalar stores on 68000; aggregate
         // construction otherwise expands these into individual byte writes.
         auto& entry=entries_[element];

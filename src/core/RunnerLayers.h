@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_RUNNER_LAYERS_H
 #define DOWNWELL_CORE_RUNNER_LAYERS_H
 #include "RunnerLayerElements.h"
+#include "RunnerImageValue.h"
 #include <cstdint>
 namespace downwell {
 // Selected GMS2 layer storage and integer-depth movement. Source IDs are
@@ -13,6 +14,9 @@ public:
         std::int32_t id=0,depth=0;
         unsigned previous=End,next=End;
         bool dynamic=false,present=false;
+        // Resource/mutation-time preparation; every attachment uses the same
+        // nearest-even binary32 encoding until this layer's depth changes.
+        RunnerImageValue encodedDepth{};
     };
     const Layer* get(unsigned slot)const{return slot<Capacity&&layers_[slot].present?&layers_[slot]:nullptr;}
     bool succeeded()const{return !failed_;}
@@ -40,7 +44,9 @@ public:
         if(free==Capacity)return false;
         unsigned previous=End;
         for(unsigned i=head_;i!=End&&layers_[i].depth<=depth;i=layers_[i].next)previous=i;
-        layers_[free]={id,depth,End,End,dynamic,true};linkAfter(free,previous);slot=free;return true;
+        layers_[free]={id,depth,End,End,dynamic,true};
+        layers_[free].encodedDepth.assignInteger(depth);
+        linkAfter(free,previous);slot=free;return true;
     }
     unsigned elementOwner(unsigned element)const{return elements_.owner(element);}
     unsigned firstFreeElement(unsigned start=0)const{return elements_.firstFree(start);}
@@ -95,6 +101,7 @@ public:
         auto& layer=layers_[slot];const auto old=layer.depth;
         if(depth==old)return true;
         layer.depth=depth;
+        layer.encodedDepth.assignInteger(depth);
         if(depth<old){
             unsigned previous=layer.previous;
             while(previous!=End&&layers_[previous].depth>=depth)previous=layers_[previous].previous;
