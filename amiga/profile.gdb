@@ -10,7 +10,7 @@ if gDownwellProfileFrozen != 1 || gDownwellProfileFrames[$s] != gDownwellProfile
 end
 printf "PROFILE scene=%lu PROBES (instrumented, not shipping FPS): frames=%lu fields=%lu max_gap=%lu\n", $s, gDownwellProfileFrames[$s], gDownwellProfileFields[$s], gDownwellProfileMaxGap[$s]
 printf "Phases: 0=other 1=vblank_wait 2=input 3=simulation 4=title 5=sprite 6=scroll 7=copper 8=publish 9=style_copy 10=style_actors 11=style_text 12=style_drain 13=style_mirror\n"
-printf "phase  calls  total_ms  ms/frame  max_bracket_ms\n"
+printf "phase  segments  total_ms  ms/frame  max_bracket_ms\n"
 printf "Additional phases: 14=terrain_collision 15=game_dirty_copy 16=player 17=bullets 18=enemy_alarms 19=enemy_motion 20=enemy_contact 21=gems 22=terrain_walls 23=terrain_tiles 24=terrain_decorations 25=terrain_asset 26=wall_frame\n"
 set $i = 0
 printf "Ammo phases: 27=base_and_fill 28=rows 29=dividers 30=rim_and_label\n"
@@ -64,6 +64,14 @@ while $i < sizeof(gDownwellProfileWorstTicks[0])/sizeof(gDownwellProfileWorstTic
     set $sum = $sum + $ticks
     if $ticks != 0
         printf "worst_phase %u %.3f\n", $i, $ticks*20.0/80128.0
+    end
+    set $entries = gDownwellProfileWorstScopeEntries[$s][$i]
+    if $entries > gDownwellProfileScopeEntries[$s][$i]
+        printf "Worst-frame scope entry accounting mismatch\n"
+        quit 1
+    end
+    if $entries != 0
+        printf "scope_entries phase=%u worst=%lu total=%lu\n", $i, $entries, gDownwellProfileScopeEntries[$s][$i]
     end
     set $i = $i + 1
 end

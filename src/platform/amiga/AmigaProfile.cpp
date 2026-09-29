@@ -75,6 +75,8 @@ volatile ULONG gDownwellSectionTicks[7][profilePhaseCount], gDownwellSectionMax[
 #ifdef DOWNWELL_PROBES
 volatile unsigned long gDownwellProfileCounters[profileCounterCount];
 volatile ULONG gDownwellProfileWorstTicks[4][profilePhaseCount];
+volatile ULONG gDownwellProfileScopeEntries[4][profilePhaseCount];
+volatile ULONG gDownwellProfileWorstScopeEntries[4][profilePhaseCount];
 volatile ULONG gDownwellProfileWorstFrame[4];
 volatile ULONG gDownwellProfileWorstSpanCount[4];
 volatile AmigaTerrainProfileSpan gDownwellProfileWorstSpans[4][16];
@@ -143,6 +145,7 @@ static unsigned phaseId;
 static bool frameActive;
 static ULONG phaseStart, frameStart;
 static ULONG frameTicks[profilePhaseCount];
+static ULONG frameScopeEntries[profilePhaseCount];
 static unsigned terrainSpanCount;
 static AmigaTerrainProfileSpan terrainSpans[16];
 void downwellProfileTerrainSpan(int viewX, int firstY, int height,
@@ -160,7 +163,10 @@ void downwellProfileBegin(unsigned scene)
 #ifdef DOWNWELL_PROBES
     frameActive = true;
     terrainSpanCount = 0;
-    for (unsigned phase = 0; phase < profilePhaseCount; ++phase) frameTicks[phase] = 0;
+    for (unsigned phase = 0; phase < profilePhaseCount; ++phase) {
+        frameTicks[phase] = 0;
+        frameScopeEntries[phase] = 0;
+    }
     frameStart = phaseStart = beamTick();
     phaseId = profileOther;
 #endif
@@ -201,8 +207,10 @@ void downwellProfileEnd()
             target.height = source.height; target.clipX = source.clipX;
             target.width = source.width; target.kind = source.kind; target.cause = source.cause;
         }
-        for (unsigned phase = 0; phase < profilePhaseCount; ++phase)
+        for (unsigned phase = 0; phase < profilePhaseCount; ++phase) {
             gDownwellProfileWorstTicks[sceneId][phase] = frameTicks[phase];
+            gDownwellProfileWorstScopeEntries[sceneId][phase] = frameScopeEntries[phase];
+        }
     }
 #endif
     // The first gameplay frame builds the scene; measure steady-state work
@@ -222,8 +230,11 @@ void downwellProfileEnd()
 #ifdef DOWNWELL_PROBES
         gDownwellProfileWorstFrame[3] = 0;
         gDownwellProfileWorstSpanCount[3] = 0;
-        for (unsigned phase = 0; phase < profilePhaseCount; ++phase)
+        for (unsigned phase = 0; phase < profilePhaseCount; ++phase) {
             gDownwellProfileWorstTicks[3][phase] = 0;
+            gDownwellProfileScopeEntries[3][phase] = 0;
+            gDownwellProfileWorstScopeEntries[3][phase] = 0;
+        }
         for (unsigned counter = 0; counter < profileCounterCount; ++counter)
             gDownwellProfileCounters[counter] = 0;
 #endif
@@ -267,6 +278,12 @@ void downwellProfileEnd()
 #ifdef DOWNWELL_PROBES
 unsigned downwellProfileEnter(unsigned phase) {
     const unsigned previous = phaseId;
+    // Phase segments include resumed parents after nested scopes. Count only
+    // constructor entries here when measuring actual operation multiplicity.
+    if(frameActive&&phase<profilePhaseCount){
+        ++frameScopeEntries[phase];
+        ++gDownwellProfileScopeEntries[sceneId][phase];
+    }
     downwellProfilePhase(phase);
     return previous;
 }

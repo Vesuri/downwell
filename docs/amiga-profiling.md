@@ -68,6 +68,13 @@ scene's maximum measured frame.
 Use longer gameplay windows (for example `PROFILE_FRAMES=600 SKIP_TO_GAME=1`)
 as well: a short initial-room sample can miss synchronous generation bursts.
 
+Probe `segments` (the legacy `gDownwellProfileCalls` counters) include parent
+resumption after nested scopes: they are not function invocation counts.
+`scope_entries` counts only `DW_PROFILE_SCOPE` construction, with both the
+whole-window total and the count in the retained worst frame. Explicit phase
+switches do not increment it. This distinguishes a large birth burst from a
+single expensive operation. These counters exist only in PROBES builds.
+
 Gameplay FPS/probe reports include a `COVERAGE pre-Step` line. It samples once
 at the start of each measured gameplay frame: first/last world tick, initial,
 last and maximum displayed view Y, maximum room-space player Y in Q8, last
