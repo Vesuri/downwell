@@ -2376,6 +2376,26 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
 }
 
 int main(int argc, char** argv) {
+    {
+        struct Capture {unsigned calls=0;std::uint32_t revision=1;bool okay=true;} capture;
+        static GameplayWorld world(0);
+        const auto read=[](void* p){return static_cast<Capture*>(p)->revision;};
+        const auto collect=[](void* p,GameplayWorld::EnemyStepOrder&){
+            auto& c=*static_cast<Capture*>(p);++c.calls;return c.okay;
+        };
+        world.configureEnemyStepOrder(collect,&capture,read);
+        world.step(0);const auto first=capture.calls;
+        require(first==1,"enemy order captured once across unchanged phase boundaries");
+        world.step(0);require(capture.calls==first,"unchanged enemy order retained across frames");
+        ++capture.revision;world.step(0);
+        require(capture.calls==first+1,"revision mutation rebuilds enemy order");
+        world.configureEnemyStepOrder(collect,&capture,read);world.step(0);
+        require(capture.calls==first+2,"rebinding invalidates retained enemy order");
+        capture.revision=0xffffffffu;world.step(0);const auto saturated=capture.calls;
+        world.step(0);require(capture.calls>saturated,"saturated revision never reuses capture");
+        world.configureEnemyStepOrder(collect,&capture);world.step(0);const auto uncached=capture.calls;
+        world.step(0);require(capture.calls>uncached,"legacy callback always captures");
+    }
     if(argc>=4&&std::getenv("DOWNWELL_VERIFY_CONTACT_PROFILE")){
         const auto roomBytes=readFile(argv[1]),objectBytes=readFile(argv[2]),patternBytes=readFile(argv[3]);
         downwell::RoomPack rooms(roomBytes.data(),roomBytes.size());

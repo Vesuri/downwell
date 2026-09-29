@@ -451,8 +451,13 @@ public:
         return run_.effectsSucceeded&&generationSucceeded_;
     }
     using EnemyStepOrder=downwell::RunnerStepSnapshot<enemyCapacity>;
-    void configureEnemyStepOrder(bool (*capture)(void*,EnemyStepOrder&),void* context){
+    // Optional revision covers capture membership, registration order, object
+    // identity and exclusions. UINT32_MAX disables reuse (including saturation).
+    // Dispatch still resolves current lifetimes/flags; this retains only order.
+    void configureEnemyStepOrder(bool (*capture)(void*,EnemyStepOrder&),void* context,
+        std::uint32_t (*revision)(void*)=nullptr){
         enemyOrderCapture_=capture;enemyOrderContext_=context;
+        enemyOrderRevision_=revision;enemyOrderValid_=false;
     }
     void configurePhaseBoundary(bool (*callback)(void*,PhaseBoundary),void* context){
         phaseBoundary_=callback;phaseBoundaryContext_=context;
@@ -976,6 +981,9 @@ private:
     unsigned bulletSlotEnd_ = 0, gemSlotEnd_ = 0;
     EnemyState enemies_[enemyCapacity];
     EnemyStepOrder enemyStepOrder_; // Owner-resident: never a 68000 stack snapshot.
+    std::uint32_t (*enemyOrderRevision_)(void*)=nullptr;
+    std::uint32_t enemyOrderCapturedRevision_=0;
+    bool enemyOrderValid_=false;
     bool (*enemyOrderCapture_)(void*,EnemyStepOrder&)=nullptr;
     void* enemyOrderContext_=nullptr;
     bool captureEnemyStepOrder();

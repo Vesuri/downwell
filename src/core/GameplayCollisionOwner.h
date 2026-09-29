@@ -412,7 +412,10 @@ public:
                 if(kind!=View::Kind::enemy||(state.flags&0x100003u))return true;
                 return self.world_->resolveEnemyLifetime(local)&&snapshot.append(local.slot,local.generation,object);
             }));
-        },this);
+        },this,[](void* context){
+            const auto& self=*static_cast<GameplayCollisionOwner*>(context);
+            return self.valid()?self.owner_.captureRevision():0xffffffffu;
+        });
         world.configureRoomAlarms([](void* context){
             DW_PROFILE_SCOPE(profileAlarmCapture);
             auto& self=*static_cast<GameplayCollisionOwner*>(context);

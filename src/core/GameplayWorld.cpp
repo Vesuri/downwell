@@ -64,6 +64,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto roomActorDraw=roomActorDraw_;
     const auto roomActorDrawContext=roomActorDrawContext_;
     const auto enemyOrderCapture=enemyOrderCapture_;
+    const auto enemyOrderRevision=enemyOrderRevision_;
     const auto debrisOrderCapture=debrisOrderCapture_;void* const debrisOrderContext=debrisOrderContext_;
     void* const enemyOrderContext=enemyOrderContext_;
     void* const phaseBoundaryContext=phaseBoundaryContext_;
@@ -104,7 +105,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     configureDroneEndStep(droneEndStep,droneEndStepContext);
     configureRoomAlarms(roomAlarms,roomAlarmsContext);
     configureRoomActorDraw(roomActorDraw,roomActorDrawContext);
-    configureEnemyStepOrder(enemyOrderCapture,enemyOrderContext);
+    configureEnemyStepOrder(enemyOrderCapture,enemyOrderContext,enemyOrderRevision);
     configureDebrisStepOrder(debrisOrderCapture,debrisOrderContext);
     nextBulletLifetimeId_=nextBulletIdentity;
     bulletLifecycle_=bulletLifecycle;
@@ -753,6 +754,10 @@ void GameplayWorld::applyFrogAlarm(EnemyState& enemy, const downwell::FrogAlarmE
 }
 
 bool GameplayWorld::captureEnemyStepOrder(){
+    const auto revision=enemyOrderRevision_?enemyOrderRevision_(enemyOrderContext_):0xffffffffu;
+    if(enemyOrderCapture_&&enemyOrderValid_&&revision!=0xffffffffu&&
+       revision==enemyOrderCapturedRevision_)return true;
+    enemyOrderValid_=false;
     enemyStepOrder_.clear();
     if(enemyOrderCapture_){
         if(!enemyOrderCapture_(enemyOrderContext_,enemyStepOrder_))return run_.effectsSucceeded=false;
@@ -762,7 +767,8 @@ bool GameplayWorld::captureEnemyStepOrder(){
             if(e.active&&!enemyStepOrder_.append(e.identitySlot,e.lifetimeId,e.objectId))return run_.effectsSucceeded=false;
         }
     }
-    enemyStepOrder_.sort();return true;
+    enemyStepOrder_.sort();
+    enemyOrderCapturedRevision_=revision;enemyOrderValid_=true;return true;
 }
 
 void GameplayWorld::advanceEnemyAlarms()
