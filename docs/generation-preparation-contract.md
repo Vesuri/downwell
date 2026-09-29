@@ -247,6 +247,21 @@ remain singletons and retain their maintained capture order. The original
 scalar membership remains selectable with `RunRegistration=false` on
 `RunnerSpatialInstances` and is compiled by the differential tests.
 
+Family selection tests ancestry once per run, before expanding matching
+lifetimes. Population reads sum matching run lengths without constructing
+per-cell identities. `RunnerObjectFamilies` supplies immutable parent links;
+query preparation changes only flags, not ancestry. Callbacks can refresh
+instance state but cannot mutate registration or topology during these walks.
+Selected instances still run callbacks individually, in original order, with
+the same early-stop prefix and modulo-32-bit generation arithmetic. The
+expanded `visitReference`/`countReference` paths remain compiled by tests,
+alongside comparisons with scalar ownership. This reduces observation work;
+it does not remove per-block birth transactions or bound tree replay latency.
+The cross-target spatial verification includes a separate run/scalar family
+fixture: full counts and ordered early-stop prefixes after interior removals,
+rebindings and clear. A native gameplay tape without those selectors is not
+evidence of this path's query cost; use the explicit query fixtures as well.
+
 Descriptors reserve the full slot capacity so splitting cannot introduce a new
 failure boundary. Consequently this first integration reduces live registration
 payload writes, not reserved memory: it adds six bytes per slot plus eight

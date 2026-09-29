@@ -207,6 +207,55 @@ struct RunnerSpatialVerification {
             result.check(fast.insert(boxes[0],0)&&reference.insert(boxes[0],0));compare(boxes[0]);
         }
     }
+    {
+        // Family selection must not expand unrelated terrain runs. Compare
+        // both CPUs against scalar registration, including fragmentation,
+        // re-registration, modulo identities and callback stop prefixes.
+        using Runs=RunnerRunMembership<64,0,64>;
+        using Scalar=RunnerObjectMembership<64>;
+        alignas(Runs) static std::uint8_t runStorage[sizeof(Runs)];
+        alignas(Scalar) static std::uint8_t scalarStorage[sizeof(Scalar)];
+        auto& runs=*new (runStorage) Runs;
+        auto& scalar=*new (scalarStorage) Scalar;
+        struct Hit {unsigned slot;std::uint32_t identity;};
+        static Hit expected[64];
+        const int selectors[]={-1,0,1,60,93,99};
+        auto isA=[](int child,int parent){return parent==0&&(child==60||child==93);};
+        for(unsigned phase=0;phase<4;++phase){
+            if(!phase){
+                for(unsigned s=0;s<64;++s)
+                    result.check(runs.bind(s,s<32?60:93,0xffffffe0u+s)&&
+                        scalar.bind(s,s<32?60:93,0xffffffe0u+s));
+            }else if(phase==1){
+                for(unsigned s=0;s<64;s+=3)result.check(runs.unbind(s)&&scalar.unbind(s));
+            }else if(phase==2){
+                for(unsigned s=0;s<64;s+=3)
+                    result.check(runs.bind(s,s&1?1:60,100+s)&&scalar.bind(s,s&1?1:60,100+s));
+            }else{
+                runs.clear();scalar.clear();
+                for(unsigned s=64;s>0;--s)
+                    result.check(runs.bind(s-1,93,200+s)&&scalar.bind(s-1,93,200+s));
+            }
+            for(int selector:selectors){
+                const unsigned count=scalar.count(selector,isA);
+                result.check(runs.count(selector,isA)==count&&runs.countReference(selector,isA)==count);
+                result.word(count);
+                for(unsigned stop=1;stop<=65;stop+=8){
+                    unsigned referenceCount=0,actualCount=0;
+                    scalar.visit(selector,isA,[&](unsigned slot,std::uint32_t identity){
+                        expected[referenceCount++]={slot,identity};return referenceCount<stop;
+                    });
+                    runs.visit(selector,isA,[&](unsigned slot,std::uint32_t identity){
+                        if(actualCount>=referenceCount){result.check(false);return false;}
+                        const auto& hit=expected[actualCount++];
+                        result.check(slot==hit.slot&&identity==hit.identity);
+                        result.word(slot);result.word(identity);return actualCount<stop;
+                    });
+                    result.check(actualCount==referenceCount);
+                }
+            }
+        }
+    }
     return result;
 }
 }

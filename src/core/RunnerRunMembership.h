@@ -119,6 +119,18 @@ public:
         return true;
     }
     template<class IsA,class Visit> void visit(int object,IsA isA,Visit callback)const{
+        // Ancestry is immutable during traversal; callbacks may inspect or
+        // refresh instances, but must not change registration or ancestry.
+        // A run has one object, so rejected families need no per-cell walk.
+        if(object<0)return;
+        for(unsigned n=head_;n!=End;n=runs_[n].next){const auto& r=runs_[n];
+            if(r.object!=object&&!isA(r.object,object))continue;
+            const unsigned end=unsigned(r.first)+r.count;
+            for(unsigned s=r.first;s<end;++s)
+                if(!callback(s,r.identity+s-r.first))return;
+        }
+    }
+    template<class IsA,class Visit> void visitReference(int object,IsA isA,Visit callback)const{
         if(object<0)return;
         visitRegistrations([&](unsigned s,std::uint32_t id,int kind){
             return !(kind==object||isA(kind,object))||callback(s,id);
@@ -126,7 +138,15 @@ public:
     }
     template<class IsA> unsigned count(int object,IsA isA)const{
         DW_PROFILE_SCOPE(profileObjectPopulation);
-        unsigned result=0;visit(object,isA,[&](unsigned,auto){++result;return true;});return result;
+        if(object<0)return 0;
+        unsigned result=0;
+        for(unsigned n=head_;n!=End;n=runs_[n].next){const auto& r=runs_[n];
+            if(r.object==object||isA(r.object,object))result+=r.count;
+        }
+        return result;
+    }
+    template<class IsA> unsigned countReference(int object,IsA isA)const{
+        unsigned result=0;visitReference(object,isA,[&](unsigned,auto){++result;return true;});return result;
     }
 };
 }

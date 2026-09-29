@@ -157,6 +157,16 @@ int main(){
             runs.visitRegistrations([&](auto s,auto id,auto object){b.insert(b.end(),{s,id,unsigned(object)});return true;});
             require(a==b&&scalar.size()==runs.size(),"expanded run history matches scalar registrations");
             for(unsigned s=0;s<128;++s)require(scalar.contains(s)==runs.contains(s),"run locator matches membership");
+            auto isA=[](int child,int parent){return parent==0&&(child==1||child==2||child==60);};
+            for(int object : {-1,0,1,2,3,60,99}){
+                a.clear();b.clear();std::vector<std::uint32_t> c;
+                scalar.visit(object,isA,[&](auto s,auto id){a.insert(a.end(),{s,id});return true;});
+                runs.visit(object,isA,[&](auto s,auto id){b.insert(b.end(),{s,id});return true;});
+                runs.visitReference(object,isA,[&](auto s,auto id){c.insert(c.end(),{s,id});return true;});
+                require(a==b&&b==c,"run-selected family preserves full slot/generation order");
+                require(scalar.count(object,isA)==runs.count(object,isA)&&
+                    runs.count(object,isA)==runs.countReference(object,isA),"run population matches expanded references");
+            }
         };
         unsigned random=19;
         for(unsigned round=0;round<64;++round){
@@ -175,6 +185,29 @@ int main(){
         downwell::RunnerRunMembership<0,0,0> empty;
         require(!empty.bind(0,0,0)&&!empty.unbind(0)&&empty.size()==0,"empty run owner");
         std::cout<<"Registration storage (128 slots): scalar="<<sizeof(scalar)<<" runs="<<sizeof(runs)<<'\n';
+    }
+    {
+        // Cold terrain query: reject unrelated runs without walking cells,
+        // count matching runs without expanding them, and preserve every
+        // possible early-stop prefix (including generation wrap).
+        downwell::RunnerRunMembership<2048,0,2048> runs;
+        for(unsigned s=0;s<2048;++s)require(runs.bind(s,s<1024?60:93,0xfffffc00u+s),"cold query birth");
+        unsigned selectedTests=0,referenceTests=0;
+        auto selected=[&](int child,int parent){++selectedTests;return parent==59&&child==60;};
+        auto reference=[&](int child,int parent){++referenceTests;return parent==59&&child==60;};
+        require(runs.count(59,selected)==1024&&runs.countReference(59,reference)==1024,
+            "ancestor population expands no instances");
+        require(selectedTests==2&&referenceTests==2048,"ancestry checks scale with runs rather than cells");
+        for(unsigned stop=1;stop<=1025;++stop){
+            std::vector<std::uint32_t> a,b;unsigned na=0,nb=0;
+            runs.visit(59,selected,[&](auto s,auto id){a.insert(a.end(),{s,id});return ++na<stop;});
+            runs.visitReference(59,reference,[&](auto s,auto id){b.insert(b.end(),{s,id});return ++nb<stop;});
+            require(a==b,"every ancestor-query stop prefix remains identical");
+        }
+        selectedTests=referenceTests=0;unsigned callbacks=0;
+        runs.visit(99,selected,[&](auto,auto){++callbacks;return true;});
+        runs.visitReference(99,reference,[&](auto,auto){++callbacks;return true;});
+        require(!callbacks&&selectedTests==2&&referenceTests==2048,"unrelated family skips complete terrain runs");
     }
     {
         downwell::RunnerRunMembership<64,8,56> runs;
