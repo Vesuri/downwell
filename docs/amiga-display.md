@@ -88,6 +88,16 @@ remains the comparison path for tests. Offline shape tables still supply the
 geometry; runtime restoration and final word writes remain conditional on actual
 coverage and backing changes.
 
+Retention compares final raster identity for supported time-field radii, not
+the raw Q8 radius. The offline table maps 1,024 radius values to 42 distinct
+rasters; changing radius within one raster needs no geometry reconstruction,
+restoration or publication. Circle positions/order, target and ring origin must
+still match, and dirty underlying rows still force preparation. Unsupported
+radii use strict radius equality so unrelated fallback shapes never alias.
+This adds no storage and changes no source Draw, RNG or collision radius. Tests
+compare every phase against a fresh overlay, including ring wrap and the exact
+982 equivalent adjacent-phase reuses.
+
 ## Sprites
 
 The complete DWAP remains in ordinary memory for gameplay hardware-sprite

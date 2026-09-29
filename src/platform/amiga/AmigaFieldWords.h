@@ -2,6 +2,29 @@
 #define DOWNWELL_AMIGA_FIELD_WORDS_H
 #include "AmigaFieldSpans.h"
 
+// Retention concerns final raster coverage, not the source's continuously
+// varying radius. Never change source Draw/RNG or collision state here.
+template<class Shape> bool amigaFieldSameRaster(const Shape& a,const Shape& b){return a.same(b);}
+inline unsigned amigaFieldRasterId(int radius){
+    int index;
+    if(radius>=24*256&&radius<26*256)index=radius-24*256;
+    else if(radius>=128*256&&radius<130*256)index=radius-128*256+512;
+    else return 0xffffu;
+    return downwell::fieldSpanIndices[index];
+}
+inline bool amigaFieldSameRaster(const downwell::TimeFieldOutlines& a,
+                                const downwell::TimeFieldOutlines& b){
+    if(a.visible!=b.visible||a.count!=b.count)return false;
+    for(unsigned i=0;i<a.count;++i){
+        const auto& x=a.circles[i];const auto& y=b.circles[i];
+        if(x.x!=y.x||x.y!=y.y)return false;
+        if(x.radius==y.radius)continue;
+        const auto id=amigaFieldRasterId(x.radius);
+        if(id==0xffffu||id!=amigaFieldRasterId(y.radius))return false;
+    }
+    return true;
+}
+
 // Callback receives aligned X, Y, coverage and the two final planar colours.
 // Generic/synthetic shapes keep the span oracle, including opaque black.
 template<class Shape,class Word>

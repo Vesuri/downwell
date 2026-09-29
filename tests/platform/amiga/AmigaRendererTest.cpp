@@ -293,6 +293,42 @@ int main(int argc, char** argv) {
         std::cout << "65 dense ordinary/exit field retention and painter-order comparisons passed\n";
     }
     {
+        std::vector<UBYTE> base(downwellGameRingBytes),actual(base.size()),expected(base.size());
+        for(unsigned i=0;i<base.size();++i)base[i]=i*13+9;
+        actual=base;
+        AmigaTimeFields retained;
+        unsigned previous=0xffffu,reused=0;
+        for(int minimum:{24,128})for(int phase=0;phase<512;++phase){
+            downwell::TimeFieldOutlines shape;
+            shape.visible=true;shape.count=1;
+            shape.circles[0]={190,140,minimum*256+phase};
+            const auto raster=amigaFieldRasterId(shape.circles[0].radius);
+            require(retained.matches(actual.data(),270,shape)==(raster==previous),
+                "radius retention follows exact cached raster identity");
+            unsigned inspected=0;
+            require(retained.prepare(actual.data(),270,shape,false,[&](unsigned){++inspected;return false;}),
+                "prepare radius equivalence fixture");
+            retained.draw();
+            if(raster==previous){require(!inspected&&!retained.lastWordWrites,
+                "equivalent radii do no restoration or word publication");++reused;}
+            expected=base;
+            AmigaTimeFields fresh;
+            require(fresh.prepare(expected.data(),270,shape,false,[](unsigned){return false;}),"fresh raster oracle");
+            fresh.draw();
+            require(actual==expected,"radius retention preserves ring-wrapped pixels and underlay");
+            auto moved=shape;++moved.circles[0].x;
+            require(!retained.matches(actual.data(),270,moved)&&!retained.matches(actual.data(),271,shape)&&
+                !retained.matches(expected.data(),270,shape),"position, ring origin and target remain cache keys");
+            previous=raster;
+        }
+        require(reused==982,"all 1024 radius phases collapse to 42 raster changes");
+        downwell::TimeFieldOutlines a,b;a.count=b.count=1;
+        a.circles[0].radius=1;b.circles[0].radius=2;
+        require(!amigaFieldSameRaster(a,b),"unsupported radii never alias through sentinel");
+        b=a;require(amigaFieldSameRaster(a,b),"identical unsupported radius retains reference behavior");
+        std::cout<<"1024 retained radius phases: 982 exact-raster reuses, ring wrap and invalidation passed\n";
+    }
+    {
         // Two retained banks and one work bank may rotate in either order.
         // Compare against the copying implementation, including pending draws
         // surviving preparation for the other display and target replacement.

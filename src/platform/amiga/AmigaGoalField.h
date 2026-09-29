@@ -50,7 +50,7 @@ public:
     unsigned lastWordWrites = 0;
     bool present() const { return valid_ || pending_; }
     bool matches(UBYTE* target, unsigned origin, const Shape& shape) const {
-        return valid_ && target == target_ && origin == origin_ && shape.same(shape_);
+        return valid_ && target == target_ && origin == origin_ && amigaFieldSameRaster(shape,shape_);
     }
     // Only after matches(): saved words are the authoritative clipped physical
     // footprint. Do not rasterize the circle again merely to inspect row debt.
