@@ -301,6 +301,15 @@ alone are not evidence of a cheaper complete frame.
 
 ## Terrain transaction boundaries
 
+Compressing only the deferred bounds journal does not replace terrain
+ownership. Exact encoded-coordinate runs can remove repeated rectangle
+snapshots, but still require per-cell admission, population tracking and
+historical-union checks. The associated lifetime, property, layer and queue
+publications remain. Do not use a smaller live descriptor count as evidence
+of a cheaper generation frame. Preserve operation-count pressure boundaries
+and partial-service behavior when changing the journal's representation;
+descriptor-count pressure would move observable replay/failure timing.
+
 `AreaOneBuilder::emitPattern` reuses one local `DeferredCreateInstance` for
 ordinary walls/platforms. Each callback borrows that command only until it
 returns; subsequent cells overwrite its object and position. A preparation
