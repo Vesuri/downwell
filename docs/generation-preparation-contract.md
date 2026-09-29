@@ -44,6 +44,40 @@ termination even when its bitmap is retained. Removing those records because
 they do not move changes ownership semantics. Unnumbered records have source
 ID zero; indexing serialized source IDs cannot accelerate those births.
 
+## Terrain transaction boundaries
+
+`AreaOneBuilder::emitPattern` reuses one local `DeferredCreateInstance` for
+ordinary walls/platforms. Each callback borrows that command only until it
+returns; subsequent cells overwrite its object and position. A preparation
+queue must own any retained data, not store a pointer to this command. Actor,
+reward and decoration commands still take `emitObject` and its live RNG path.
+
+On Amiga, a terrain callback enters these distinct owners in order:
+
+1. `AmigaGameplayGeneration::create` invokes the shared world transaction.
+2. The backend callback appends contact geometry, updates cell/landing lookup,
+   appends relevant drawable tiles and extends dirty-row coverage.
+3. `GameplayTerrainInstances::append` allocates a lifetime and exposes the
+   actual record to synchronous birth. Its binding attaches collision state,
+   initializes prepared defaults, inserts room order, publishes bounds and
+   attaches the layer element.
+4. `createProperties` executes the source terrain Create setters, including
+   sprite/index publication, before the next pattern cell can execute.
+
+These are not repeated copies of one disposable render object. Their consumers
+include contacts, landing, source collision selection, animation ordering,
+activation, destruction and Draw. A compact terrain birth path must preserve
+each consumer's observable publication and terminal-failure prefix while
+eliminating intermediate calculation/lookup inside callback-free intervals.
+Preparing default command payloads alone does not eliminate this owner work.
+
+Generation profiling must include these callbacks, not just `emitObject`:
+ordinary pattern walls/platforms bypass that command-construction bracket.
+`GENERATION_DETAIL=1` separates backend cell, landing and tile work from the
+outer registration scope; ordinary `PROBES` does not. Compare exclusive
+brackets without adding nested inclusive totals, and use coarse generation
+timing/ordinary FPS separately to check instrumentation distortion.
+
 ## Equivalence and measurement
 
 `AreaOneBuilderTest` interleaves gameplay RNG and health changes with generation,
