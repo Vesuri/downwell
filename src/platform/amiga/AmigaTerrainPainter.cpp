@@ -75,10 +75,13 @@ bool AmigaTerrainPainter::paint(AmigaRenderer* renderer,
     DW_PROFILE_SCOPE(profileTerrainWalls);
     const auto* records=runtime?runtime->terrainInstances():nullptr;
     if(records){
+        DW_PROFILE_COUNT(counterTerrainWallPasses);
+        DW_PROFILE_ADD(counterTerrainWallRecords,records->size());
         for(unsigned i=0;i<records->size();++i){
             const auto& r=*records->find(records->handle(i));
             const int sprite=r.wall.checked?r.spriteId:51;
             if(!downwell::wallIntersectsRows(sprite,r.y,firstWorldY,finalWorldY))continue;
+            DW_PROFILE_COUNT(counterTerrainWallRowCandidates);
             if(!downwell::drawWallPresentation(r,[&]{return mainWallFrame(terrainIndex,rooms,room,r.x,r.y);},
                 [&](int sprite,unsigned frame){drawGameAsset(renderer,UWORD(sprite),UWORD(frame),
                     downwellPlayfieldX+r.x-viewX,r.y-viewY,0);})){amigaRendererClearClipRect(renderer);return false;}

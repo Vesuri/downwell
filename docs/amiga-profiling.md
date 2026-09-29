@@ -231,6 +231,14 @@ test; do not leave it running after the measurement.
 Fine-grained instrumentation changes execution cost: do not report its FPS as
 shipping performance or subtract its timings from an uninstrumented run.
 
+Terrain wall-selection counters measure retained-record passes, records
+examined and records passing the vertical footprint filter. The examined count
+is added once per pass, avoiding an instrumentation write for every rejected
+record. Row candidates are not actual blits: hidden/inactive/non-wall records,
+horizontal clipping and presentation validation can still suppress drawing.
+These counters isolate selection cost from the exposed-row raster policy;
+a large examined count does not mean the whole level is being repainted.
+
 Phase 96 isolates pending destroyed-instance sweeps at Draw entry from phase 4
 (the historical `title` label also covers gameplay HUD/overlay updates). It
 excludes nested spatial removals; frames without a pending sweep do not enter

@@ -16,6 +16,8 @@ enum DownwellProfileCounter {
     counterSpatialHeightRead, counterSpatialNodeCountRead,
     counterSpatialJournalQueued, counterSpatialJournalServiced,
     counterSpatialJournalPressure, counterSpatialJournalFallback,
+    counterTerrainWallPasses, counterTerrainWallRecords,
+    counterTerrainWallRowCandidates,
     profileCounterCount
 };
 #ifdef DOWNWELL_PROBES
