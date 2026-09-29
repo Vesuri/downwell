@@ -25,6 +25,19 @@ struct Graph {
 };
 int main(){
     {
+        RunnerSpatialInstances<2,4> owner;
+        assert(!owner.currentHandle(0).generation&&!owner.currentHandle(2).generation);
+        assert(owner.attach({0,1},0,{}));
+        const auto old=owner.currentHandle(0);
+        assert(old.slot==0&&old.generation==1&&owner.resolve(old));
+        assert(owner.registerObject(old,false));
+        assert(owner.currentHandle(0).generation==1); // Dormant is still alive.
+        assert(owner.retire(old)&&!owner.currentHandle(0).generation);
+        assert(owner.attach({0,2},0,{}));
+        assert(!owner.resolve(old)&&owner.currentHandle(0).generation==2);
+        assert(owner.currentHandle(0).slot==0&&!owner.currentHandle(1).generation);
+    }
+    {
         RunnerSpatialInstances<8,16> owner;bool dirty=false;
         assert(!owner.watchCaptureRanges(2,5,4,8,dirty));
         assert(owner.watchCaptureRanges(2,4,6,8,dirty)&&dirty);

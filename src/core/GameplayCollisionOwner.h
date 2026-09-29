@@ -33,7 +33,6 @@ private:
     bool combatAlarmCaptureValid_=false;
     RunnerRoomMembership<View::capacity> room_;
     bool terrainSnapshotDirty_=true;
-    InstanceHandle roomKeys_[View::capacity]{};
     Owner::Properties properties_[View::capacity]{};
     RunnerObjectFamilies<386> families_;
     const ObjectPack& objects_;
@@ -168,7 +167,6 @@ private:
                 DW_PROFILE_SCOPE(profileBirthRoomOrder);
                 if(!parent.check(parent.room_.bind(h.slot,p.depth)))return false;
             }
-            parent.roomKeys_[h.slot]=h;
             if constexpr(Kind!=View::Kind::timeField)if(!r.active)parent.activationPending_=true;
             if constexpr(Kind==View::Kind::enemy){
                 p.sprite.spriteId=r.spriteId;p.sprite.maskId=r.maskId;
@@ -211,7 +209,6 @@ private:
         bool retire(InstanceHandle local,const Record& r){InstanceHandle h;
             if(!key(local,r,h)||!parent.check(parent.room_.contains(h.slot)))return false;
             if(!parent.check(parent.owner_.retire(h)))return false;
-            parent.roomKeys_[h.slot]={};
             return parent.check(parent.room_.remove(h.slot)&&parent.layers_.retire(h));}
         bool markDestroyed(InstanceHandle local,const Record& r){InstanceHandle h;
             if(!key(local,r,h))return false;
@@ -354,7 +351,7 @@ public:
                 out.drawEvent=(metadata&ObjectDrawMetadata<386>::drawEvent)!=0;
                 out.sprite=self.properties_[h.slot].sprite.spriteId>=0;return true;
             },[&](InstanceHandle h,int depth){RunnerImageValue value;return real(depth,value)&&draw(h,value);});
-            return self.room_.visitDrawChecked([&](unsigned slot){return draw(self.roomKeys_[slot],self.properties_[slot].depth);});
+            return self.room_.visitDrawChecked([&](unsigned slot){return draw(self.owner_.currentHandle(slot),self.properties_[slot].depth);});
         },this);
         if(!owner_.watchSnapshotRange(View::terrainBase,View::timeFieldBase,terrainSnapshotDirty_))return check(false);
         if(!room_.prepareRetainedAnimation(View::terrainBase,View::timeFieldBase))return check(false);
@@ -363,7 +360,7 @@ public:
             if(!self.valid())return false;
             return self.check(self.room_.visitAnimationRetainedChecked(
                 View::terrainBase,View::timeFieldBase,self.terrainSnapshotDirty_,[&](unsigned slot){
-                const auto shared=self.roomKeys_[slot];
+                const auto shared=self.owner_.currentHandle(slot);
                 // The conservative dirty fallback keeps terrain snapshots in
                 // room order. Unchanged terrain has no animation dispatch in
                 // this adapter and already retains the identical snapshot.
@@ -831,14 +828,15 @@ public:
         if(!valid()||!world_)return check(false);
         if(!activationPending_)return true;
         const bool result=room_.reconcileChecked([&](unsigned slot){
-            const auto* state=owner_.resolve(roomKeys_[slot]);
+            const auto* state=owner_.resolve(owner_.currentHandle(slot));
             if(!state){good_=false;return true;}
             return (state->flags&2u)!=0;
         },[&](unsigned slot,bool registered){
             // Writes while inactive may have been consumed by an intervening
             // active-room pass. Promotion must refresh that retained snapshot.
             if(registered&&slot>=View::terrainBase&&slot<View::timeFieldBase)terrainSnapshotDirty_=true;
-            return good_&&owner_.registerObject(roomKeys_[slot],registered)&&layers_.reconcile(roomKeys_[slot]);
+            const auto h=owner_.currentHandle(slot);
+            return good_&&owner_.registerObject(h,registered)&&layers_.reconcile(h);
         });
         if(!check(result&&good_))return false;
         activationPending_=false;return true;
@@ -880,7 +878,7 @@ public:
         if(!destructionPending_)return true;
         DW_PROFILE_SCOPE(profileDrawCleanup);
         const bool cleaned=room_.visitMarkedCleanupChecked([&](unsigned slot){
-            const auto h=roomKeys_[slot];const auto* state=owner_.resolve(h);
+            const auto h=owner_.currentHandle(slot);const auto* state=owner_.resolve(h);
             if(!state||!(state->flags&1u))return false;
             View::Record record;
             if(!View(*world_).resolve(h,record))return false;

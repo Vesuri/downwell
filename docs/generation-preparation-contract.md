@@ -72,6 +72,17 @@ termination even when its bitmap is retained. Removing those records because
 they do not move changes ownership semantics. Unnumbered records have source
 ID zero; indexing serialized source IDs cannot accelerate those births.
 
+Room traversal obtains the current handle from the collision registry rather
+than maintaining a second per-slot identity array. The gameplay owner privately
+owns both registries: birth attaches collision state before room binding;
+retirement removes collision state before room unlinking. These intervals have
+no external dispatch, and failure prevents further world dispatch. A successful
+room-list visit therefore refers to the same live generation. This applies only
+to synchronous slot walks, not saved event snapshots, query results or layer
+elements: those retain their original generation-bearing handles so reuse cannot
+retarget them. `currentHandle` returns no handle for retired or out-of-range
+slots, but still returns the lifetime of a deregistered/inactive object.
+
 ## Terrain transaction boundaries
 
 `AreaOneBuilder::emitPattern` reuses one local `DeferredCreateInstance` for

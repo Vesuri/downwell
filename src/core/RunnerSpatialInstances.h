@@ -230,6 +230,11 @@ public:
     const State* resolve(InstanceHandle h)const{
         return live(h)?&entries_[h.slot].state:nullptr;
     }
+    // For a synchronous owner-controlled slot walk only. Deferred consumers
+    // must retain the returned generation, never look it up again after reuse.
+    InstanceHandle currentHandle(unsigned slot)const{
+        return slot<Capacity&&entries_[slot].object>=0?handle(slot):InstanceHandle{};
+    }
     int objectId(InstanceHandle h)const{return live(h)?entries_[h.slot].object:-1;}
     bool attach(InstanceHandle h,int object,State state){
         if(!valid() || h.slot>=Capacity || !h.generation || object<0 ||
