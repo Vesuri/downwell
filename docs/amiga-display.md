@@ -65,7 +65,7 @@ the clip is released only for 4:3 HUD drawing.
 
 ## Retained field-overlay word banks
 
-After a field snapshot matches its target, ring origin and shape, dirty backing
+After a field snapshot matches its target and physical coverage, dirty backing
 rows are checked against its retained physical word offsets. Do not rasterize
 the circle again for this dependency check: the saved footprint already includes
 viewport clipping and ring wrap. A changed snapshot still takes full preparation;
@@ -91,12 +91,20 @@ coverage and backing changes.
 Retention compares final raster identity for supported time-field radii, not
 the raw Q8 radius. The offline table maps 1,024 radius values to 42 distinct
 rasters; changing radius within one raster needs no geometry reconstruction,
-restoration or publication. Circle positions/order, target and ring origin must
-still match, and dirty underlying rows still force preparation. Unsupported
-radii use strict radius equality so unrelated fallback shapes never alias.
+restoration or publication. Circle order and target must still match, and dirty
+underlying rows still force preparation. During vertical hardware scrolling,
+wholly visible circles can also reuse coverage when their horizontal position
+and physical ring centre stay unchanged. The radius table supplies their exact
+vertical footprint; entering or leaving a viewport edge forces normal clipping
+and preparation. No screen-space origin is mistaken for a physical buffer row.
+Unsupported radii use strict radius/origin equality so unrelated fallback
+shapes never alias.
 This adds no storage and changes no source Draw, RNG or collision radius. Tests
 compare every phase against a fresh overlay, including ring wrap and the exact
-982 equivalent adjacent-phase reuses.
+982 equivalent adjacent-phase reuses. A second fixture scrolls overlapping
+circles forward and backward through ring wrap and viewport boundaries,
+comparing every frame against a fresh overlay and exercising dirty-backing
+invalidation even when physical coverage is identical.
 
 ## Sprites
 

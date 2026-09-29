@@ -25,6 +25,35 @@ inline bool amigaFieldSameRaster(const downwell::TimeFieldOutlines& a,
     return true;
 }
 
+template<class Shape>
+bool amigaFieldSameCoverage(const Shape& a,unsigned originA,const Shape& b,unsigned originB,
+                            unsigned,unsigned){
+    return originA==originB&&amigaFieldSameRaster(a,b);
+}
+inline bool amigaFieldSameCoverage(const downwell::TimeFieldOutlines& a,unsigned originA,
+                                  const downwell::TimeFieldOutlines& b,unsigned originB,
+                                  unsigned ringHeight,unsigned viewHeight){
+    if(originA==originB)return amigaFieldSameRaster(a,b);
+    if(originA>=ringHeight||originB>=ringHeight||viewHeight>ringHeight||
+       a.visible!=b.visible||a.count!=b.count)return false;
+    for(unsigned i=0;i<a.count;++i){
+        const auto& x=a.circles[i];const auto& y=b.circles[i];
+        const unsigned id=amigaFieldRasterId(x.radius);
+        if(x.x!=y.x||id==0xffffu||id!=amigaFieldRasterId(y.radius))return false;
+        // Only wholly visible vertical footprints can retain all their words
+        // across a view change. Entering/leaving edges take normal preparation.
+        const int first=downwell::fieldShapeFirstRows[id];
+        const int rows=downwell::fieldShapeOffsets[id+1]-downwell::fieldShapeOffsets[id];
+        const int lastCentre=int(viewHeight)-first-rows;
+        if(x.y < -first||y.y < -first||x.y>lastCentre||y.y>lastCentre)return false;
+        unsigned physicalA=originA+unsigned(x.y),physicalB=originB+unsigned(y.y);
+        if(physicalA>=ringHeight)physicalA-=ringHeight;
+        if(physicalB>=ringHeight)physicalB-=ringHeight;
+        if(physicalA!=physicalB)return false;
+    }
+    return true;
+}
+
 // Callback receives aligned X, Y, coverage and the two final planar colours.
 // Generic/synthetic shapes keep the span oracle, including opaque black.
 template<class Shape,class Word>

@@ -329,6 +329,36 @@ int main(int argc, char** argv) {
         std::cout<<"1024 retained radius phases: 982 exact-raster reuses, ring wrap and invalidation passed\n";
     }
     {
+        std::vector<UBYTE> base(downwellGameRingBytes),actual(base.size()),expected(base.size());
+        for(unsigned i=0;i<base.size();++i)base[i]=i*31+5;
+        actual=base;AmigaTimeFields retained;unsigned reused=0,clipped=0;
+        for(unsigned frame=0;frame<322;++frame){
+            const unsigned scroll=frame<=160?frame:321-frame;
+            const unsigned origin=(270+scroll)%downwellGameRingHeight;
+            downwell::TimeFieldOutlines shape;shape.visible=true;shape.count=2;
+            shape.circles[0]={190,180-int(scroll),24*256+int(frame%20)};
+            shape.circles[1]={200,205-int(scroll),24*256};
+            const bool same=retained.matches(actual.data(),origin,shape);
+            unsigned inspected=0;
+            require(retained.prepare(actual.data(),origin,shape,false,[&](unsigned){++inspected;return false;}),
+                "prepare ring-stationary circles during bidirectional scrolling");
+            retained.draw();
+            if(same){++reused;require(!inspected&&!retained.lastWordWrites,
+                "hardware scrolling reuses identical physical field words");}
+            else if(frame)++clipped;
+            expected=base;AmigaTimeFields fresh;
+            require(fresh.prepare(expected.data(),origin,shape,false,[](unsigned){return false;}),"fresh scrolling oracle");
+            fresh.draw();require(actual==expected,"scroll reuse matches fresh clipping, painter order and ring wrap");
+            if(same&&frame==80){
+                require(retained.prepare(actual.data(),origin,shape,true,[&](unsigned){++inspected;return false;}),
+                    "underlying change forces preparation even with identical physical coverage");
+                retained.draw();require(inspected&&actual==expected,"dirty-backing dependency remains observed");
+            }
+        }
+        require(reused>280&&clipped>0,"scroll fixture covers retained and boundary-clipped cases");
+        std::cout<<"322 bidirectional scrolling field frames: "<<reused<<" physical-raster reuses passed\n";
+    }
+    {
         // Two retained banks and one work bank may rotate in either order.
         // Compare against the copying implementation, including pending draws
         // surviving preparation for the other display and target replacement.
