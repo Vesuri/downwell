@@ -173,7 +173,23 @@ int main(){
             assert(!eager.remove(invalid,7,true,a)&&!journal.remove(invalid,7,true,b)&&a&&b);
         }
         assert(!journal.deferred()&&!journal.pending());compare(eager,journal);
+        if(!eager.valid()){
+            bool a=true,b=true;
+            assert(!eager.insert(box(0,0),31)&&!journal.insert(box(0,0),31));
+            assert(!eager.remove(box(0,0),7,true,a)&&!journal.remove(box(0,0),7,true,b)&&a&&b);
+            assert(!journal.service(0));
+            assert(!journal.query(box(0,0),[](unsigned){assert(false);return true;}));
+            assert(!journal.valid());
+        }
         journal.clear();assert(journal.valid()&&journal.deferred()&&!journal.pending());
     }
-    std::printf("spatial journal: ordered reads, 80000 mutations, prepared bounds, query-only/background work, pressure and eager fallbacks passed\n");
+    // Query argument rejection is not a failed mutation; the tree remains
+    // usable after catching up the pending history.
+    downwell::RunnerSpatialJournal<128,32,32> journal;
+    assert(journal.insert(box(0,0),1));
+    auto invalid=box(0,0);invalid.left.bits=0x7fc00000u;
+    assert(!journal.query(invalid,[](unsigned){assert(false);return true;}));
+    assert(journal.valid()&&!journal.pending());
+    assert(journal.insert(box(32,0),2));
+    std::printf("spatial journal: ordered reads, prepared bounds, query-only/background work, pressure, terminal failures and clear passed\n");
 }

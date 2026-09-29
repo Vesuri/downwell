@@ -54,6 +54,15 @@ order. Duplicate insertions, unbounded IDs, no-retry removal, inadmissible
 geometry and invalid inputs first catch up and use the original eager API.
 The caller's failure result/output semantics remain those of that API.
 
+Validity includes both the journal and its private tree. Eager mutation
+fallbacks can poison the tree without setting the journal's own failure flag;
+replay failure sets the latter. Rejected query arguments do not poison an
+otherwise valid tree. Tests distinguish terminal mutation failure (including
+subsequent operation refusal) from recoverable query rejection and check that
+`clear()` resets both owners. The outer instance owner's height reads can
+themselves trigger journal replay, so index validity is not merely an
+immutable precondition of those calls.
+
 The gameplay owner's log contains 4096 records (the generic journal's default
 remains 512 for reference users). Pressure drains it synchronously rather than
 dropping operations or inventing a queue-full game failure. The larger log adds
