@@ -391,6 +391,30 @@ public:
         return checked(RunnerSpatialBoundsUpdate::finishRefresh(index_,h.slot,
             objectFlags,s.flags,allPrepared,s.bounds,bounds,s.x,s.y,precise,publish));
     }
+    // The terrain preparation owns both representations of these bounds.
+    // Keep the ordinary publication wrapper (including normalization/removal)
+    // and only remove the redundant float-to-pixel decoding at admission.
+    bool refreshPreparedTerrain(InstanceHandle h,std::uint32_t objectFlags,
+        const Box& bounds,Math::PixelBox pixels,bool precise,bool publish){
+        if constexpr(!ScheduledIndex)return refresh(h,objectFlags,false,&bounds,precise,publish);
+        else{
+            DW_PROFILE_SCOPE(profileBoundsPublication);
+            if(!valid()||!live(h))return false;
+            if(pixels.right<pixels.left){auto a=pixels.left;pixels.left=pixels.right;pixels.right=a;}
+            if(pixels.bottom<pixels.top){auto a=pixels.top;pixels.top=pixels.bottom;pixels.bottom=a;}
+            struct PreparedIndex {
+                typename RunnerSpatialIndexStorage<Capacity,Nodes,ScheduledIndex>::Type& index;
+                const Math::PixelBox& pixels;
+                bool insert(const Box& box,std::uint32_t id){return index.insertPrepared(box,id,&pixels);}
+                bool remove(const Box& box,std::uint32_t id,bool retry,bool& removed){
+                    return index.remove(box,id,retry,removed);
+                }
+            } prepared{index_,pixels};
+            auto& s=entries_[h.slot].state;
+            return checked(RunnerSpatialBoundsUpdate::finishRefresh(prepared,h.slot,
+                objectFlags,s.flags,false,s.bounds,&bounds,s.x,s.y,precise,publish));
+        }
+    }
     // Ordinary resource adapter for 0x466010. A corrupt/unavailable pack is a
     // port failure, not the source's missing sprite case. An invalid explicit
     // mask ID does NOT fall back to artwork. Trig receives binary32 degrees and

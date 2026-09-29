@@ -32,11 +32,27 @@ No lifetime, graph preparation flag, RNG draw, Create setter, room order or
 spatial publication moves earlier. All axes and objects share up to four distinct
 coordinate offsets, including zero for the position. The pinned resources fit
 this dictionary; a changed resource requiring more offsets takes the general
-path without consuming dictionary slots. The table occupies 8,466 bytes of
-ordinary storage per 68000 owner (8,468 on the host, not Chip RAM), owned for
+path without consuming dictionary slots. The table occupies 8,482 bytes of
+ordinary storage per 68000 owner (8,484 on the host, not Chip RAM), owned for
 the same lifetime as its immutable resource defaults. The FPS profiler reports
 startup preparation separately using the OS field counter before takeover;
 gameplay-only FPS does not measure that startup cost.
+
+The four prepared integer offsets are retained alongside their binary32 table.
+An admitted terrain birth supplies both representations to the collision owner,
+so journal admission need not decode those binary32 endpoints back to integers.
+`refreshPreparedTerrain` retains ordinary bounds/flag publication, normalization,
+and removal before insertion; nonscheduled owners use the reference refresh.
+`RunnerSpatialJournal::insertPrepared` borrows the exact decoded endpoints of
+the supplied rectangle. This is a trusted geometry contract, not a general
+unvalidated-coordinate entry point: the terrain preparer admits only exact
+integer positions/offsets and positive zero. The caller normalizes the integer
+endpoints in the same way as the publication wrapper normalizes the binary32
+rectangle. The journal still evaluates current membership, population limits,
+historical union area and queue pressure at each call. It stores the original
+binary32 operation snapshot, so later tree servicing/query order and eager
+fallback remain unchanged. No lifetime, query-preparation flag, Create effect
+or random draw moves into preparation.
 
 ## Birth publication
 

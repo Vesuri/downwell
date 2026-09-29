@@ -130,9 +130,10 @@ private:
             constexpr int ox=roomCoordinates?0:240,oy=roomCoordinates?0:176;
             Owner::State state;
             Owner::Box terrainBounds;bool preparedTerrain=false,terrainPrecise=false;
+            RunnerSpatialSplit::PixelBox terrainPixels;
             if constexpr(Kind==View::Kind::terrain)
                 preparedTerrain=parent.terrainBirthBounds_.at(r.objectId,r.x,r.y,
-                    state.x,state.y,terrainBounds,terrainPrecise);
+                    state.x,state.y,terrainBounds,terrainPrecise,&terrainPixels);
             if constexpr(Kind==View::Kind::scriptEffect){
                 if(!r.effect||!r.effect->valid)return parent.check(false);
                 state.x=r.effect->x;state.y=r.effect->y;
@@ -180,8 +181,8 @@ private:
             if(!parent.check(parent.owner_.publishBirth(h,parent.families_,
                 [&](InstanceHandle live,bool publish){
                     if constexpr(Kind==View::Kind::terrain)if(preparedTerrain)
-                        return parent.owner_.refresh(live,*parent.families_.flags(object(r)),false,
-                            &terrainBounds,terrainPrecise,publish);
+                        return parent.owner_.refreshPreparedTerrain(live,*parent.families_.flags(object(r)),
+                            terrainBounds,terrainPixels,terrainPrecise,publish);
                     return parent.refresh(live,publish);
                 })))return false;
             unsigned sourceId=0;

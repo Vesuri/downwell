@@ -27,7 +27,7 @@ template<class A,class B> static void compare(A& eager,B& journal){
     }
     assert(eager.height()==journal.height()&&eager.nodeCount()==journal.nodeCount()&&!journal.pending());
 }
-template<unsigned Nodes,unsigned Pending> static void mutations(){
+template<unsigned Nodes,unsigned Pending,bool Prepared=false> static void mutations(){
     downwell::RunnerSpatialIndex<Nodes> eager;
     downwell::RunnerSpatialJournal<Nodes,128,Pending> journal;
     bool present[128]{};Box previous[128]{};
@@ -46,7 +46,9 @@ template<unsigned Nodes,unsigned Pending> static void mutations(){
             else{assert(!journal.valid());eager.clear();journal.clear();for(auto& live:present)live=false;}
         }else{
             previous[id]=box(int((random>>20)%16)*16-32,int((random>>16)%24)*16-32);
-            const bool a=eager.insert(previous[id],id),b=journal.insert(previous[id],id);
+            Math::PixelBox pixels;assert(Math::decodePixels(previous[id],pixels));
+            const bool a=eager.insert(previous[id],id),b=Prepared?
+                journal.insertPrepared(previous[id],id,&pixels):journal.insert(previous[id],id);
             assert(a==b);present[id]=a;
             if(!a){assert(!journal.valid());eager.clear();journal.clear();for(auto& live:present)live=false;}
         }
@@ -79,6 +81,23 @@ int main(){
     }
     mutations<1024,32>(); // Wrap, pressure draining, partial background service.
     mutations<16,8>();   // Capacity failures must occur at the original insertion.
+    mutations<1024,32,true>(); // Identical ordered history using prepared integer bounds.
+    mutations<16,8,true>(); // Including the same capacity-failure prefix.
+    for(unsigned mode=0;mode<4;++mode){
+        downwell::RunnerSpatialIndex<128> eager;
+        downwell::RunnerSpatialJournal<128,32,8> journal;
+        for(unsigned i=0;i<20;++i){
+            const auto b=box(i*8,0);Math::PixelBox p;assert(Math::decodePixels(b,p));
+            assert(eager.insert(b,i)&&journal.insertPrepared(b,i,&p));
+        }
+        const auto b=mode==2?box(65536,65536):box(0,20);
+        Math::PixelBox p;assert(Math::decodePixels(b,p));
+        const unsigned id=mode==0?0:mode==1?32:20;
+        assert(eager.insert(b,id)==journal.insertPrepared(b,id,&p));
+        if(mode<3)assert(!journal.deferred());
+        else assert(journal.deferred());
+        compare(eager,journal);
+    }
     {
         // Keep the population just below the conservative 128-node admission
         // limit, forcing repeated condensation without switching to eager mode.
@@ -134,5 +153,5 @@ int main(){
         assert(!journal.deferred()&&!journal.pending());compare(eager,journal);
         journal.clear();assert(journal.valid()&&journal.deferred()&&!journal.pending());
     }
-    std::printf("spatial journal: ordered reads, 32000 mutations, background work, pressure and eager fallbacks passed\n");
+    std::printf("spatial journal: ordered reads, 56000 mutations, prepared bounds, background work, pressure and eager fallbacks passed\n");
 }

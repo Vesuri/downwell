@@ -32,10 +32,17 @@ public:
     // admission nor catch-up mutates caller storage; no temporary value copy
     // is needed at the API boundary (notably on the 68000 stack).
     bool insert(const Box& box,std::uint32_t instance){
+        return insertPrepared(box,instance,nullptr);
+    }
+    // Optional decoded geometry from the same immutable preparation that
+    // supplies box. Caller must supply the exact integer endpoints (no signed
+    // zero/fractional values); no cached tree membership or admission decision
+    // is accepted here. Population, historical union and pressure stay live.
+    bool insertPrepared(const Box& box,std::uint32_t instance,const Math::PixelBox* pixels){
         if(!valid())return false;
         Math::PixelBox next;
         if(!deferred_ || instance>=Slots || contains(instance) ||
-            population_>=safePopulation || !admit(box,next)){
+            population_>=safePopulation || !(pixels?admitPixels(*pixels,next):admit(box,next))){
             if(!eager())return false;
             return tree_.insert(box,instance);
         }
@@ -107,6 +114,11 @@ private:
         if(box.left.bits==0x80000000u||box.top.bits==0x80000000u||
            box.right.bits==0x80000000u||box.bottom.bits==0x80000000u||
            !Math::decodePixels(box,combined))return false;
+        return admitPixels(combined,combined);
+    }
+    bool admitPixels(const Math::PixelBox& pixels,Math::PixelBox& combined)const{
+        combined=pixels;
+        if(combined.left>combined.right||combined.top>combined.bottom)return false;
         if(haveBounds_){
             if(bounds_.left<combined.left)combined.left=bounds_.left;
             if(bounds_.top<combined.top)combined.top=bounds_.top;

@@ -23,7 +23,42 @@ struct Graph {
         return true;
     }
 };
+template<bool Scheduled,unsigned Nodes> static void preparedTerrainPublication(){
+    using Owner=RunnerSpatialInstances<8,Nodes,Scheduled>;
+    using Math=RunnerSpatialSplit;
+    for(unsigned flags:{0u,0x10u,0x18u,0x30u})for(bool inactive:{false,true}){
+        Owner ordinary,prepared;
+        for(unsigned i=0;i<8;++i){
+            const InstanceHandle h{i,1};typename Owner::State state;
+            if(inactive)state.flags|=2u;
+            assert(ordinary.attach(h,1,state)&&prepared.attach(h,1,state));
+            bool ok=true;
+            for(unsigned repeat=0;repeat<3&&ok;++repeat){
+                // Retain unsorted cached endpoints while publishing sorted
+                // index geometry, including subsequent remove/reinsert calls.
+                Math::PixelBox pixels{int(i)*16,32,int(i)*16+15,47};
+                if(repeat==1){auto left=pixels.left;pixels.left=pixels.right;pixels.right=left;}
+                const auto bounds=Math::encodePixels(pixels);
+                const bool publish=repeat!=2,precise=repeat==1;
+                ok=ordinary.refresh(h,flags,false,&bounds,precise,publish);
+                assert(ok==prepared.refreshPreparedTerrain(h,flags,bounds,pixels,precise,publish));
+                assert(ordinary.valid()==prepared.valid());
+                const auto* a=ordinary.resolve(h);const auto* b=prepared.resolve(h);
+                assert(bool(a)==bool(b));
+                if(a){
+                    assert(a->flags==b->flags&&a->bounds.left.bits==b->bounds.left.bits&&
+                        a->bounds.right.bits==b->bounds.right.bits&&a->bounds.top.bits==b->bounds.top.bits&&
+                        a->bounds.bottom.bits==b->bounds.bottom.bits);
+                }
+                assert(ordinary.pendingSpatialIndex()==prepared.pendingSpatialIndex());
+            }
+            if(!ok)break;
+        }
+    }
+}
 int main(){
+    preparedTerrainPublication<false,128>();preparedTerrainPublication<true,128>();
+    preparedTerrainPublication<false,1>();preparedTerrainPublication<true,1>();
     {
         RunnerSpatialInstances<2,4> owner;
         assert(!owner.currentHandle(0).generation&&!owner.currentHandle(2).generation);
