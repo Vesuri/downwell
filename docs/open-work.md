@@ -208,7 +208,11 @@ Reference: [upgrade IDs and source entry points](upgrade-coverage.md).
   health changes, not just a fixed initial seed. Follow the
   [generation preparation boundary](generation-preparation-contract.md).
   Share collision, room and layer registration work across ordered terrain runs,
-  beyond backend row setup and terrain-only dispatch. Audit observation and
+  beyond backend row setup and terrain-only dispatch. Isolate the outer terrain
+  transaction's record allocation/Create cost from nested registration, then
+  remove repeated setup across those ownership boundaries; phase sampling is
+  available without per-scope beam-clock reads (see [profiling](amiga-profiling.md)).
+  Audit observation and
   failure boundaries before combining their setup/publication. Preserve per-cell RNG interleaving,
   equal-depth ordering, lifetime allocation and partial-failure prefixes; keep
   a scalar execution reference for deterministic comparisons.

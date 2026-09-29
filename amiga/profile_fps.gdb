@@ -53,6 +53,24 @@ while $i < gDownwellProfileMissCount && $i < 32
     printf "Missed deadline: frame=%lu fields=%lu scroll=%ld camera_x_change=%ld\n", gDownwellProfileMissFrame[$i], gDownwellProfileMissFields[$i], gDownwellProfileMissScroll[$i], gDownwellProfileMissCamera[$i]
     set $i = $i + 1
 end
+if gDownwellSampleFocus != 0
+    set $i = 0
+    set $total = 0
+    set $focused = 0
+    while $i < gDownwellSamplePhaseCount
+        set $total = $total + gDownwellPhaseSamples[$i]
+        set $focused = $focused + gDownwellFocusSamples[$i]
+        if gDownwellPhaseSamples[$i] || gDownwellFocusSamples[$i]
+            printf "SAMPLE phase=%u fields=%lu focus_fields=%lu\n", $i, gDownwellPhaseSamples[$i], gDownwellFocusSamples[$i]
+        end
+        set $i = $i + 1
+    end
+    printf "SAMPLE total=%lu focus_frame=%lu focus_total=%lu (statistical, not phase timings)\n", $total, gDownwellSampleFocus, $focused
+    if $total == 0 || $focused == 0
+        printf "Sampling window was not reached\n"
+        quit 1
+    end
+end
 printf "DOWNWELL_PROFILE_READY\n"
 shell touch .run/gdb-ready.marker
 detach

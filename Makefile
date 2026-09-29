@@ -2444,4 +2444,12 @@ build/generation-timing-disabled-test: tests/core/GenerationTimingTest.cpp src/c
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_FPSCOUNT -o $@ $<
 
+.PHONY: test-phase-sampling
+test: test-phase-sampling
+test-phase-sampling: build/phase-sampling-test
+	./build/phase-sampling-test
+build/phase-sampling-test: tests/core/PhaseSamplingTest.cpp src/core/Profile.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_FPSCOUNT -DDOWNWELL_PHASE_SAMPLING -o $@ $<
+
 -include $(DEPS)

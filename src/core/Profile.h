@@ -82,7 +82,20 @@ public:
 #define DW_PROFILE_SCOPE(phase) DownwellProfileScope profileScope(phase)
 #define DW_PROFILE_PHASE(phase) downwellProfilePhase(phase)
 #else
-#ifdef DOWNWELL_GENERATION_TIMING
+#if defined(DOWNWELL_PHASE_SAMPLING)
+// Word-sized phase publication is atomic on 68000. The VBlank sampler reads
+// this marker; no clock read or out-of-line call is needed at scope boundaries.
+extern "C" volatile unsigned short gDownwellSamplePhase;
+class DownwellSampleScope {
+    unsigned short previous_;
+public:
+    explicit DownwellSampleScope(unsigned phase):previous_(gDownwellSamplePhase){
+        gDownwellSamplePhase=static_cast<unsigned short>(phase);
+    }
+    ~DownwellSampleScope(){gDownwellSamplePhase=previous_;}
+};
+#define DW_PROFILE_SCOPE(phase) DownwellSampleScope profileScope(phase)
+#elif defined(DOWNWELL_GENERATION_TIMING)
 // Opt-in inclusive timing of one selected stage; every other bracket compiles
 // away. The backend ignores nested entries of the same stage to avoid counting
 // recursive work twice. Default remains the complete generation transaction.

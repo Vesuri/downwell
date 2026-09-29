@@ -8,7 +8,20 @@
 extern struct GfxBase* GfxBase;
 // Revs-style emulated clock: never use host time or stop GDB inside a sample.
 static const ULONG ticksPerField = 313UL * 256UL;
+static bool gameplayWarmed = false;
 extern "C" {
+volatile UWORD gDownwellSamplePhase;
+volatile UWORD gDownwellSampleActive;
+volatile ULONG gDownwellSampleFrame;
+volatile ULONG gDownwellSampleFocus =
+#ifdef DOWNWELL_PHASE_SAMPLING
+    DOWNWELL_SAMPLE_FRAME;
+#else
+    0;
+#endif
+volatile ULONG gDownwellSamplePhaseCount = profilePhaseCount;
+volatile ULONG gDownwellPhaseSamples[profilePhaseCount];
+volatile ULONG gDownwellFocusSamples[profilePhaseCount];
 volatile ULONG gDownwellTerrainPreparationCalls, gDownwellTerrainPreparationFields;
 #ifdef DOWNWELL_PROFILE_TRANSITION
 volatile ULONG gDownwellProfileTargetScene = 2;
@@ -108,6 +121,8 @@ __attribute__((noinline, used)) void downwellProfileReady()
     (void)gDownwellProfileGenerationPhase;
     (void)gDownwellTerrainPreparationCalls;
     (void)gDownwellTerrainPreparationFields;
+    (void)gDownwellSampleFocus;
+    (void)gDownwellSamplePhaseCount;
     __asm__ volatile("" ::: "memory");
 }
 }
@@ -127,6 +142,15 @@ void downwellTerrainPreparationEnd(unsigned long start){
 void downwellProfileVblank()
 {
     ++gDownwellProfileVbi;
+#ifdef DOWNWELL_PHASE_SAMPLING
+    if(gDownwellSampleActive){
+        const unsigned phase=gDownwellSamplePhase;
+        if(phase<profilePhaseCount){
+            ++gDownwellPhaseSamples[phase];
+            if(gDownwellSampleFrame==gDownwellSampleFocus)++gDownwellFocusSamples[phase];
+        }
+    }
+#endif
 #if defined(DOWNWELL_PROBES) || defined(DOWNWELL_GENERATION_TIMING)
     gDownwellProfileEpoch += ticksPerField;
 #endif
@@ -213,6 +237,11 @@ void downwellProfileBegin(unsigned scene)
 {
     sceneId = scene < 4 ? scene : 0;
     startField = gDownwellProfileVbi;
+#ifdef DOWNWELL_PHASE_SAMPLING
+    gDownwellSamplePhase=profileOther;
+    gDownwellSampleFrame=gDownwellProfileFrames[3]+1;
+    gDownwellSampleActive=sceneId==3&&gameplayWarmed&&!gDownwellProfileFrozen;
+#endif
 #if defined(DOWNWELL_PROBES) || defined(DOWNWELL_GENERATION_TIMING)
     frameActive = true;
 #endif
@@ -250,6 +279,9 @@ void downwellProfilePhase(unsigned phase)
 
 void downwellProfileEnd()
 {
+#ifdef DOWNWELL_PHASE_SAMPLING
+    gDownwellSampleActive=0;
+#endif
 #ifdef DOWNWELL_PROBES
     downwellProfilePhase(profileOther);
 #endif
@@ -277,7 +309,6 @@ void downwellProfileEnd()
 #endif
     // The first gameplay frame builds the scene; measure steady-state work
     // separately rather than averaging this one-time setup into frame cost.
-    static bool gameplayWarmed = false;
     if (sceneId == 3 && !gameplayWarmed) {
         gameplayWarmed = true;
         gDownwellProfileGameSamples=0;

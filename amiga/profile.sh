@@ -19,7 +19,7 @@ if [[ ${SKIP_LEVEL:-0} == 1 ]]; then script=profile_clear.gdb; fi
 # Always leave the playable binary behind, including after a timeout/failure.
 restore() {
   make clean > .run/profile-restore.log 2>&1
-  make -j4 SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_LASER=0 PROFILE_CONTACT=0 PROFILE_FRAMES=0 PROFILE_TRANSITION=0 GENERATION_DETAIL=0 GENERATION_TIMING=0 >> .run/profile-restore.log 2>&1
+  make -j4 SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_LASER=0 PROFILE_CONTACT=0 PROFILE_FRAMES=0 PROFILE_TRANSITION=0 GENERATION_DETAIL=0 GENERATION_TIMING=0 PHASE_SAMPLING=0 >> .run/profile-restore.log 2>&1
 }
 mkdir -p .run
 if [[ ${PROFILE_CONTACT:-0} == 1 ]]; then
@@ -41,6 +41,10 @@ READY_DESCRIPTION="bounded scene profile" bash verify_startup.sh
 cp .run/gdb-startup.log ".run/profile-${mode}.log"
 if [[ ${GENERATION_TIMING:-0} == 1 ]] && ! grep -q '^PHASE coarse:' ".run/profile-${mode}.log"; then
   echo "Requested coarse generation measurement was not produced" >&2
+  exit 1
+fi
+if [[ ${PHASE_SAMPLING:-0} == 1 ]] && ! grep -q '^SAMPLE total=' ".run/profile-${mode}.log"; then
+  echo "Requested phase samples were not produced" >&2
   exit 1
 fi
 sed -n '/PROFILE/,$p' ".run/profile-${mode}.log"
