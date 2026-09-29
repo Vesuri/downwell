@@ -1,6 +1,12 @@
 set pagination off
 set confirm off
 target remote 127.0.0.1:2345
+break downwellSceneStackFailed
+commands
+    silent
+    printf "Actor verifier stack guard failed at stage %lu\n", gDownwellSceneStackFailureStage
+    quit 1
+end
 # BOB_VERIFY=1 exercises overflow for every actor, including the player.
 break downwellGameplayBobsReady
 continue
