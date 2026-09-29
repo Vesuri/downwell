@@ -137,10 +137,35 @@ scalar membership remains selectable with `RunRegistration=false` on
 Descriptors reserve the full slot capacity so splitting cannot introduce a new
 failure boundary. Consequently this first integration reduces live registration
 payload writes, not reserved memory: it adds six bytes per slot plus eight
-owner bytes versus the retained scalar layout. Room/layer ownership, bounds,
-dirty queues and terrain lifetime records remain distinct per-cell state until
-their own run integration; this change must not be described as completion of
-the compact terrain representation. Create/RNG/publication ordering is unchanged.
+owner bytes versus the retained scalar layout. This changes object registration
+only, not the complete terrain representation. Create/RNG/publication ordering
+is unchanged.
+
+## Ordered room runs
+
+`RunnerRunRoomMembership` stores consecutive terrain slots at identical depth
+in one active/inactive room-list descriptor. It replaces per-block room links,
+depth keys, marked-list links and animation skip links. The slot locator only
+identifies a descriptor; destruction is a per-slot bit plus a marked count on
+each run. Actors remain singleton runs. Insertion searches run depths for the
+same stable upper bound as the scalar list; equal-depth order is unchanged.
+
+Removing an interior member splits its run. Activation reconciliation still
+visits inactive order before active order, moving each member and publishing
+its callback synchronously. Failed callbacks retain exactly the moved prefix.
+Cleanup visits active then inactive room order and saves the raw successor
+before allowing retirement of the current member. Mark-free runs are skipped
+without changing cleanup order. No new failure boundary is introduced: the
+descriptor pool reserves enough space for complete fragmentation.
+
+Animation omits the unchanged terrain interval by jumping across run spans.
+An observed coordinate write makes the current remainder and next pass full,
+as with `RunnerRoomMembership`; already visited snapshots are not revisited.
+This removes maintained per-block projection links, not the source previous-
+position publication itself. The scalar owner remains compiled in differential
+tests for all four walks, fragmentation, reactivation and terminal failure.
+Layer ownership, bounds, dirty queues and terrain lifetimes are still separate
+per-cell structures; room runs do not complete their representation change.
 
 ## Terrain transaction boundaries
 

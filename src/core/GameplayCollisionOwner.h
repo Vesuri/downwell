@@ -5,6 +5,7 @@
 #include "RunnerSpatialInstances.h"
 #include "RunnerObjectFamilies.h"
 #include "RunnerRoomMembership.h"
+#include "RunnerRunRoomMembership.h"
 #include "SmokeDirection.h"
 #include "SmokeTrig.h"
 #include "DebrisDraw.h"
@@ -31,7 +32,7 @@ private:
     bool combatAlarmCaptureDirty_=true;
     unsigned combatAlarmMask_=0;
     bool combatAlarmCaptureValid_=false;
-    RunnerRoomMembership<View::capacity> room_;
+    RunnerRunRoomMembership<View::capacity,View::terrainBase,View::timeFieldBase> room_;
     bool terrainSnapshotDirty_=true;
     Owner::Properties properties_[View::capacity]{};
     RunnerObjectFamilies<386> families_;

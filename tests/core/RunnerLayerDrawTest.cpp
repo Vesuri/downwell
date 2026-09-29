@@ -4,10 +4,12 @@
 #include "core/RunnerLayerDraw.h"
 #include "core/RunnerLayers.h"
 #include "core/RunnerRoomMembership.h"
+#include "core/RunnerRunRoomMembership.h"
 #include <cstdlib>
 #include <algorithm>
 #include <iostream>
 #include <vector>
+#include <type_traits>
 volatile unsigned long gDownwellProfileCounters[profileCounterCount]{};
 unsigned downwellProfileEnter(unsigned){return 0;}
 void downwellProfilePhase(unsigned){}
@@ -204,9 +206,10 @@ void cleanupProjection(){
         remaining==std::vector<unsigned>({1,2,3}),"failed retirement leaves remaining order intact");
     room.clear();require(room.visitMarkedCleanupChecked([](unsigned){return false;}),"clear removes all marks");
 }
-void animationProjection(bool retained){
-    RunnerRoomMembership<6> room;
-    RunnerRoomMembership<6>::AnimationProjection projection;
+template<bool Runs=false> void animationProjection(bool retained){
+    using Room=typename std::conditional<Runs,RunnerRunRoomMembership<6,1,4>,RunnerRoomMembership<6>>::type;
+    Room room;
+    typename Room::AnimationProjection projection;
     if(retained)require(room.prepareRetainedAnimation(1,4),"prepare animation before births");
     for(unsigned i=0;i<6;++i)require(room.bind(i,{}),"animation projection births");
     bool dirty=false;std::vector<unsigned> trace;
@@ -256,8 +259,9 @@ void animationProjection(bool retained){
             "projected snapshot values match source-order full walk");
     }
 }
-void retainedAnimationMutations(){
-    RunnerRoomMembership<64> reference,retained;
+template<bool Runs=false> void retainedAnimationMutations(){
+    RunnerRoomMembership<64> reference;
+    typename std::conditional<Runs,RunnerRunRoomMembership<64,16,48>,RunnerRoomMembership<64>>::type retained;
     unsigned first=16,last=48,random=0x1735486;
     require(retained.prepareRetainedAnimation(first,last),"prepare retained room order");
     require(!retained.prepareRetainedAnimation(4,3)&&!retained.prepareRetainedAnimation(0,65),
@@ -302,5 +306,50 @@ void retainedAnimationMutations(){
         }
     }
 }
+void runRoomMutations(){
+    RunnerRoomMembership<64> scalar;
+    RunnerRunRoomMembership<64,8,56> runs;
+    unsigned random=71391;
+    auto compare=[&](){
+        for(unsigned s=0;s<64;++s)require(scalar.contains(s)==runs.contains(s)&&
+            scalar.active(s)==runs.active(s)&&scalar.marked(s)==runs.marked(s),"run room slot state");
+        for(unsigned mode=0;mode<4;++mode){
+            std::vector<unsigned> a,b;
+            auto walk=[&](auto& room,auto& out){auto visit=[&](unsigned s){out.push_back(s);return true;};
+                if(mode==0)return room.visitAnimationChecked(visit);
+                if(mode==1)return room.visitDrawChecked(visit);
+                if(mode==2)return room.visitCleanupChecked(visit);
+                return room.visitMarkedCleanupChecked(visit);
+            };
+            require(walk(scalar,a)&&walk(runs,b)&&a==b,"run room ordered enumeration");
+        }
+    };
+    for(unsigned round=0;round<64;++round){
+        scalar.clear();runs.clear();
+        for(unsigned s=0;s<64;++s)require(scalar.bind(s,{})&&runs.bind(s,{}),"contiguous room births");
+        require(runs.runCount()==17,"48 terrain entries share one room run, actors remain singletons");
+        for(unsigned step=0;step<512;++step){
+            random=random*1664525u+1013904223u;
+            const unsigned slot=(random>>8)&63,operation=(random>>20)%6;
+            std::vector<unsigned> a,b;
+            auto mutate=[&](auto& room,auto& log){
+                if(operation==0){RunnerImageValue key;key.assignInteger(int((random>>24)%7)-3);return room.bind(slot,key);}
+                if(operation==1)return room.remove(slot);
+                if(operation==2)return room.mark(slot);
+                unsigned calls=0;
+                if(operation==3)return room.reconcileChecked([&](unsigned s){log.push_back(s);return ((s+step)%7)<3;},
+                    [&](unsigned s,bool active){log.push_back(128+s+128*active);return step%13||++calls!=2;});
+                auto visit=[&](unsigned s){log.push_back(s);if(step%17==0&&++calls==2)return false;return room.remove(s);};
+                if(operation==4)return room.visitMarkedCleanupChecked(visit);
+                return room.visitCleanupChecked(visit);
+            };
+            require(mutate(scalar,a)==mutate(runs,b)&&a==b,"run room mutation callback order and terminal prefix");
+            compare();
+        }
+    }
+    RunnerImageValue invalid{0x7fc00000u};
+    require(!runs.bind(0,invalid)&&!runs.bind(64,{})&&!runs.mark(64)&&!runs.remove(64),"run room invalid inputs");
+    std::cout<<"Room storage (64 slots): scalar="<<sizeof(scalar)<<" runs="<<sizeof(runs)<<'\n';
 }
-int main(){dispatch();traversal();roomActivation();drawBirths();animationProjection(false);animationProjection(true);retainedAnimationMutations();cleanupProjection();std::cout<<"Selected layer Draw order, synchronous births, both animation projections, 8192 retained animation mutations, 8192 cleanup mutations and 1024 instance-dispatch cases verified\n";}
+}
+int main(){dispatch();traversal();roomActivation();drawBirths();animationProjection(false);animationProjection(true);animationProjection<true>(false);animationProjection<true>(true);retainedAnimationMutations();retainedAnimationMutations<true>();runRoomMutations();cleanupProjection();std::cout<<"Selected layer Draw order, synchronous births, scalar/run animation projections, mutation/cleanup equivalence and 1024 instance-dispatch cases verified\n";}
