@@ -226,6 +226,12 @@ changes, then check native timing with the trace and FPS tapes.
   and failure boundaries before merging registration across a run. The target
   is under 1,500 cycles per block, RNG included, down from about 28,000 in
   `GameplayTerrainInstances::append` alone.
+  Integrate `TerrainOwnershipRuns` as the authoritative identity/geometry/birth
+  order store, removing the replaced record fields and order array rather than
+  maintaining it alongside them. Migrate remaining permanent-record readers to
+  handle-checked snapshots, then derive room/layer/dirty/bounds observations
+  from that same ownership representation. The standalone run-store test is
+  not evidence of live integration or a generation-frame speedup.
 - Keep each block's Create synchronous. Preserve per-cell RNG interleaving,
   equal-depth ordering, lifetime allocation and partial-failure prefixes. Shop
   and exit Create effects must precede the next pattern cell's random draw. Do

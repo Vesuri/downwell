@@ -964,6 +964,15 @@ test: verify-time-field-wind
 .PHONY: verify-time-field-wind
 test: verify-gameplay-collision-owner
 .PHONY: verify-gameplay-collision-owner
+build/terrain-ownership-runs-test: tests/core/TerrainOwnershipRunsTest.cpp src/core/TerrainOwnershipRuns.h src/core/InstanceHandle.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+
+verify-terrain-ownership-runs: build/terrain-ownership-runs-test
+	./build/terrain-ownership-runs-test
+.PHONY: verify-terrain-ownership-runs
+test: verify-terrain-ownership-runs
+
 verify-gameplay-collision-owner: build/gameplay-collision-owner-test build/gameplay-collision-owner-scalar-test build/gameplay-collision-owner-snapshot-test
 	DOWNWELL_OWNERSHIP_WITNESS=build/ownership-runs.txt ./build/gameplay-collision-owner-test
 	DOWNWELL_OWNERSHIP_WITNESS=build/ownership-scalar.txt ./build/gameplay-collision-owner-scalar-test
