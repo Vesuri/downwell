@@ -215,8 +215,8 @@ Reference: [upgrade IDs and source entry points](upgrade-coverage.md).
   generation tape is insufficient. Preserve historical insertion/removal order,
   first-hit identity, query-preparation side effects and failure timing. See
   [derived-tree scheduling](spatial-publication-scheduling.md).
-- Reduce full-room bookkeeping in layer projection, animation/previous-position
-  snapshots and alarm registration capture. Preserve inactive layer termination,
+- Reduce remaining full-room bookkeeping in layer projection and
+  animation/previous-position snapshots. Preserve inactive layer termination,
   callback order, generation checks and synchronous mutation visibility. Measure
   both steady gameplay and the garden-to-well transition; a short
   `SKIP_TO_GAME=1` sample does not cover the reported worst transition stall.

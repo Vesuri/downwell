@@ -4,9 +4,10 @@
 #include <vector>
 #include <algorithm>
 static void require(bool ok,const char* message){if(!ok){std::cerr<<message<<'\n';std::exit(1);}}
-int main(){
-    downwell::RunnerObjectMembership<8> registry;
-    downwell::RunnerObjectMembership<8>::RegistrationProjection<2,6> projection;
+template<bool Retained> void checkRegistry(){
+    using Registry=downwell::RunnerObjectMembership<8,Retained?2:0,Retained?6:0>;
+    Registry registry;
+    typename Registry::template RegistrationProjection<2,6> projection;
     // Synthetic immutable hierarchy: objects 1/2 derive from 0; 3 is unrelated.
     auto isA=[](int child,int parent){return parent==0 && (child==1 || child==2);};
     struct Record {unsigned slot;int object;std::uint32_t identity;};
@@ -48,6 +49,21 @@ int main(){
                 });
             require(projectedOk==eligible&&projected==(eligible?expected:std::vector<std::uint32_t>{}),
                 "cached projection matches raw capture or rejects overlapping request");
+            if constexpr(Retained){
+                std::vector<std::uint32_t> retained;
+                const bool ok=registry.visitRetainedRegistrationRange(first,last,
+                    [&](unsigned s,std::uint32_t id,int object){
+                        auto found=std::find_if(reference.begin(),reference.end(),[&](const Record& r){return r.slot==s;});
+                        require(found!=reference.end()&&found->object==object,"retained identity is live");
+                        retained.push_back(id);return true;
+                    });
+                require(ok==eligible&&retained==projected,"maintained order equals rebuilt projection");
+                if(eligible){
+                    unsigned visits=0;
+                    const bool done=registry.visitRetainedRegistrationRange(first,last,[&](auto,auto,auto){++visits;return false;});
+                    require(done==expected.empty()&&visits==(expected.empty()?0u:1u),"maintained capture stops on failure");
+                }
+            }
             if(eligible){
                 calls=0;
                 const bool done=registry.visitRegistrationRange(projection,first,last,[&](auto,auto,auto){++calls;return false;});
@@ -100,10 +116,33 @@ int main(){
         ++mutations;registry.bind(7,1,777);return true;
     })&&mutations==1,"capture detects forbidden membership mutation");
     downwell::RunnerObjectMembership<0> empty;
-    downwell::RunnerObjectMembership<8>::RegistrationProjection<2,2> unfiltered;
+    typename Registry::template RegistrationProjection<2,2> unfiltered;
     unsigned allCalls=0;
     require(registry.visitRegistrationRange(unfiltered,0,8,[&](auto,auto,auto){++allCalls;return true;})&&
         allCalls==registry.size(),"empty excluded range projects every registration");
     require(!empty.bind(0,0,1) && !empty.count(0,isA),"zero capacity rejects births");
+    if constexpr(Retained){
+        auto copy=registry;
+        registry.clear();
+        std::vector<std::uint32_t> raw,kept;
+        copy.visitRegistrationRange(0,2,[&](auto,auto id,auto){raw.push_back(id);return true;});
+        require(copy.visitRetainedRegistrationRange(0,2,[&](auto,auto id,auto){kept.push_back(id);return true;})&&raw==kept,
+            "copied owner retains independent actor order");
+        unsigned calls=0;
+        require(!copy.visitRetainedRegistrationRange(0,2,[&](auto,auto,auto){
+            ++calls;copy.bind(3,0,99);return true;
+        })&&calls==1,"omitted-domain mutation still invalidates a capture");
+        copy.clear();
+        require(copy.bind(1,0,101)&&copy.bind(0,0,102),"retained owner reusable after clear");
+        calls=0;
+        require(!copy.visitRetainedRegistrationRange(0,2,[&](auto,auto,auto){
+            ++calls;copy.bind(0,0,102);return true;
+        })&&calls==1,"same-tail rebind still invalidates maintained capture");
+    }
+}
+int main(){
+    checkRegistry<false>();checkRegistry<true>();
+    downwell::RunnerObjectMembership<8,0,8> omitted;
+    require(omitted.bind(3,0,1)&&omitted.unbind(3),"fully omitted domain needs no retained entries");
     std::cout<<"runner object membership tests passed\n";
 }

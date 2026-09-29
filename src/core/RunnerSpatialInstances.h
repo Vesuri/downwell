@@ -30,14 +30,15 @@ template<unsigned Capacity,unsigned Nodes> struct RunnerSpatialIndexStorage<Capa
 // scheduler must attach every relevant birth before Create, publish its bounds,
 // and retire it before reusing its slot. This is not an activation scheduler.
 // No platform types or asset residency decisions belong here.
-template<unsigned Capacity,unsigned Nodes,bool ScheduledIndex=false> class RunnerSpatialInstances {
+template<unsigned Capacity,unsigned Nodes,bool ScheduledIndex=false,unsigned RetainedFirst=0,unsigned RetainedLast=0> class RunnerSpatialInstances {
     static_assert(Capacity>0,"Spatial instances need stable slots");
     using Queue=RunnerSpatialDirtyQueue<Capacity>;
     using Math=RunnerSpatialSplit;
+    using Membership=RunnerObjectMembership<Capacity,RetainedFirst,RetainedLast>;
 public:
     using Real=RunnerImageValue;
     template<unsigned First,unsigned Last> using RegistrationProjection=
-        typename RunnerObjectMembership<Capacity>::template RegistrationProjection<First,Last>;
+        typename Membership::template RegistrationProjection<First,Last>;
     using Box=Math::Box;
     struct State {
         Real x{},y{};
@@ -754,6 +755,13 @@ public:
                 return state&&visit(h,object,*state);
             });
     }
+    template<class Visit> bool visitRetainedRegistrationRange(unsigned first,unsigned last,Visit visit)const{
+        return valid()&&membership_.visitRetainedRegistrationRange(first,last,
+            [&](unsigned slot,std::uint32_t generation,int object){
+                const InstanceHandle h{slot,generation};const auto* state=resolve(h);
+                return state&&visit(h,object,*state);
+            });
+    }
     // Object-resource branch of instance_number (0x4fe49b). This is NOT the
     // raw registration count used by collision preparation below. Filtering
     // flags does not unlink membership or alter the selected search strategy.
@@ -815,7 +823,7 @@ public:
 private:
     struct Entry {State state{};int object=-1;std::uint32_t generation=0;};
     Entry entries_[Capacity]{};
-    RunnerObjectMembership<Capacity> membership_;
+    Membership membership_;
     Queue spatial_,collision_;
     typename RunnerSpatialIndexStorage<Capacity,Nodes,ScheduledIndex>::Type index_;
     bool good_=true;

@@ -9,7 +9,10 @@ namespace downwell {
 // Slots belong to an external lifetime registry. The opaque identity is not
 // interpreted as a resource ID. Active flags and phase boundaries are external:
 // deactivation requests must not eagerly unbind before source reconciliation.
-template<unsigned Capacity> class RunnerObjectMembership {
+template<unsigned Capacity,unsigned RetainedFirst=0,unsigned RetainedLast=0> class RunnerObjectMembership {
+    static_assert(RetainedFirst<=RetainedLast&&RetainedLast<=Capacity,"Invalid retained registration domain");
+    static constexpr bool retained=RetainedFirst<RetainedLast;
+    static_assert(!retained||Capacity<65535,"Retained registration slots must fit uint16");
 public:
     static constexpr unsigned End = Capacity;
     template<unsigned First,unsigned Last> struct RegistrationProjection {
@@ -66,6 +69,24 @@ public:
         }
         return true;
     }
+    // Owner-maintained actor order. Births append; retirement removes only
+    // from this compact list. Omitted terrain never invalidates/rebuilds it.
+    // This is a live capture source, not an event snapshot: callbacks must
+    // not mutate ANY membership, including the omitted range.
+    template<class Visit> bool visitRetainedRegistrationRange(unsigned first,unsigned last,Visit visit)const{
+        static_assert(retained,"No retained registration domain configured");
+        if(first>last||last>Capacity)return false;
+        if(first==last)return true;
+        if(first<RetainedLast&&last>RetainedFirst)return false;
+        const unsigned revision=revision_;
+        for(unsigned i=0;i<retainedCount_;++i){
+            const unsigned slot=retainedOrder_[i];
+            if(slot<first||slot>=last)continue;
+            const auto& e=entries_[slot];
+            if(!visit(slot,e.identity,e.object)||revision!=revision_)return false;
+        }
+        return true;
+    }
     void clear() {while(head_!=End)unbind(head_);}
     bool bind(unsigned slot,int object,std::uint32_t identity) {
         if(slot>=Capacity || object<0)return false;
@@ -79,10 +100,19 @@ public:
         auto& entry=entries_[slot];
         entry.object=object;entry.identity=identity;entry.previous=tail_;entry.next=End;
         if(tail_!=End)entries_[tail_].next=slot;else head_=slot;
-        tail_=slot;++count_;++revision_;return true;
+        tail_=slot;++count_;++revision_;
+        if constexpr(retained)if(slot<RetainedFirst||slot>=RetainedLast)
+            retainedOrder_[retainedCount_++]=std::uint16_t(slot);
+        return true;
     }
     bool unbind(unsigned slot) {
         if(!contains(slot))return false;
+        if constexpr(retained)if(slot<RetainedFirst||slot>=RetainedLast){
+            unsigned i=0;while(i<retainedCount_&&retainedOrder_[i]!=slot)++i;
+            if(i==retainedCount_)return false;
+            for(++i;i<retainedCount_;++i)retainedOrder_[i-1]=retainedOrder_[i];
+            --retainedCount_;
+        }
         const auto entry=entries_[slot];
         if(entry.previous==End)head_=entry.next;else entries_[entry.previous].next=entry.next;
         if(entry.next==End)tail_=entry.previous;else entries_[entry.next].previous=entry.previous;
@@ -110,6 +140,8 @@ private:
     Entry entries_[Capacity ? Capacity : 1]{};
     unsigned head_=End,tail_=End,count_=0;
     unsigned revision_=0;
+    std::uint16_t retainedOrder_[retained&&Capacity>RetainedLast-RetainedFirst?Capacity-(RetainedLast-RetainedFirst):1]{};
+    unsigned retainedCount_=0;
 };
 }
 #endif

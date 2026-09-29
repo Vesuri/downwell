@@ -220,6 +220,17 @@ families according to the complete event table.
 Keep the phase cutoff and immediate flag rechecks below when integrating it;
 sorting by resource ID alone does not handle reactivation or new lifetimes.
 
+The gameplay owner's phase-capture source maintains a compact registration list
+excluding the terrain slot domain. It replaces the caller-owned projection
+that rebuilt after every registration revision. Append/remove/rebind update
+the compact list synchronously; terrain mutations do not require a rescan.
+The full registration list remains authoritative for collision families and
+unrestricted snapshots. Requests overlapping the omitted domain fail rather
+than silently dropping entries. Captures read current identities/objects and
+reject any callback membership mutation, including changes to omitted terrain
+and same-identity tail rebinds. This is not a phase snapshot or permission to
+skip terrain events. The rebuilt projection remains as a test oracle.
+
 Read-only inspection of the pinned Windows `Downwell.exe` establishes a
 phase-local creation cutoff, not a whole-frame exclusion rule.
 
