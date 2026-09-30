@@ -2567,3 +2567,12 @@ test-amiga-trace-report:
 	python3 -B tests/amiga-trace-report-test.py
 
 -include $(DEPS)
+
+TERRAIN_OWNERSHIP_TEST_SOURCES := tests/platform/amiga/AmigaTerrainOwnershipTest.cpp src/platform/amiga/AmigaGameplayGeneration.cpp src/platform/amiga/AmigaTerrain.cpp src/core/GameplayWorld.cpp src/core/PlayerMotion.cpp src/core/Replay.cpp src/core/StartupRuntime.cpp src/core/AreaOneBuilder.cpp src/core/GameMakerRandom.cpp src/core/RoomPack.cpp src/core/ObjectPack.cpp src/core/BuilderPatternPack.cpp
+.PHONY: verify-terrain-ownership
+build/amiga-terrain-ownership-test: $(TERRAIN_OWNERSHIP_TEST_SOURCES) $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(TERRAIN_OWNERSHIP_TEST_SOURCES)
+verify-terrain-ownership: build/amiga-terrain-ownership-test generate-room-pack generate-object-pack generate-builder-pattern-pack
+	./build/amiga-terrain-ownership-test generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp generated/downwell-sprites.dwsc
+test: verify-terrain-ownership

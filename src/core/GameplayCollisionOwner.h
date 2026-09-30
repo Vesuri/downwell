@@ -97,8 +97,22 @@ private:
     bool terrainFamilies_[2]={false,false};
     bool check(bool ok){if(!ok)good_=false;return ok;}
     bool terrainQuery(int object)const{
-        if(!valid()||!world_||(object!=60&&object!=93))return false;
+        if(!valid()||!world_||!terrainRegistered_||(object!=60&&object!=93))return false;
         return terrainFamilies_[object==60?0:1];
+    }
+    // Unregistered terrain must not silently vanish from a selector whose
+    // family contains walls or thin platforms (including all/other selectors).
+    bool selectorAvailable(int object)const{
+        if(terrainRegistered_)return true;
+        if(object<0)return false;
+        return !families_.isA(60,object)&&!families_.isA(93,object)&&!families_.isA(99,object);
+    }
+    // Walls share depth 100 (rmMain's placed layer and objWall_n/objThinPlatform
+    // creation depth). An inactive wall ends that layer's Draw, so an actor
+    // there would need registered terrain elements to keep its draw fidelity.
+    bool actorDepthAvailable(RunnerImageValue depth)const{
+        RunnerImageValue terrainDepth;
+        return terrainRegistered_||(terrainDepth.assignInteger(100)&&!RunnerSpatialSplit::equal(depth,terrainDepth));
     }
     bool resolves(InstanceHandle h)const{
         return world_&&owner_.contains(h)&&View(*world_).contains(h);
@@ -322,6 +336,7 @@ private:
             if constexpr(Kind==View::Kind::drone)sourceId=r.sourceId;
             constexpr bool projected=Kind==View::Kind::player||Kind==View::Kind::enemy||
                 Kind==View::Kind::bullet||Kind==View::Kind::scriptEffect||Kind==View::Kind::debris||Kind==View::Kind::entryDither;
+            if(projected&&!parent.actorDepthAvailable(p.depth))return parent.check(false);
             {
                 DW_PROFILE_SCOPE(profileInstanceLayerAttach);
                 if(!parent.check(parent.layers_.birth(h,sourceId,p.depth,(state.flags&2u)!=0,projected)))return false;
@@ -355,7 +370,7 @@ private:
         bool move(InstanceHandle local,const Record& r,RunnerImageValue x,RunnerImageValue y){InstanceHandle h;
             return key(local,r,h)&&parent.check(parent.owner_.template moveDomain<Kind==View::Kind::terrain>(h,x,y,*parent.families_.flags(object(r))));}
         bool depth(InstanceHandle local,const Record& r,MotionBinary64 value){InstanceHandle h;RunnerImageValue narrowed;
-            if(!key(local,r,h)||!narrowed.assign(value))return parent.check(false);
+            if(!key(local,r,h)||!narrowed.assign(value)||!parent.actorDepthAvailable(narrowed))return parent.check(false);
             auto edit=parent.properties_.template editDomain<Kind==View::Kind::terrain>(h.slot);auto& p=edit.get();
             if(!parent.layers_.enabled())return parent.check(RunnerSpatialSplit::equal(narrowed,p.depth));
             if(!parent.check(parent.layers_.writeDepth(h,value)))return false;
@@ -552,12 +567,28 @@ private:
     Binding<GameplayWorld::DroneBullets::Record,View::Kind::drone> droneBinding_{*this};
     GameplayWorld::DroneBullets drones_{GameplayWorld::DroneBullets::Binding::bindPositionedActor(droneBinding_)};
     std::uint32_t pendingTimeChangeId_=0;
+    const bool terrainRegistered_;
     GameplayTerrainInstances terrain_;
 public:
+    // Registered terrain is the complete runner reference: every wall owns a
+    // lifetime, room/layer entry, object membership and spatial history, as
+    // required by wall End Step and terrain-selector queries. Native gameplay
+    // dispatches neither; its occupancy grid answers collision and its painter
+    // draws walls. Terrain is sorted out of every actor ordering that it does
+    // observe (room lists are stable by depth, and object lists are per
+    // object), so unregistered terrain changes no actor order. Queries and
+    // events that would need registered walls fail rather than miss them.
+    enum class TerrainOwnership {registered,unregistered};
     GameplayCollisionOwner(const ObjectPack& objects,const SpriteCollisionPack& sprites,
         GameplayTerrainInstances::Presentation presentation={},GameplayTerrainInstances::WallCollision collision={},
-        const RoomPack* rooms=nullptr):objects_(objects),sprites_(sprites),layers_(rooms),
-        terrain_(GameplayTerrainInstances::Binding::bindDestruction(terrainBinding_),presentation,collision){
+        const RoomPack* rooms=nullptr,TerrainOwnership terrainOwnership=TerrainOwnership::registered):
+        objects_(objects),sprites_(sprites),layers_(rooms),
+        terrainRegistered_(terrainOwnership==TerrainOwnership::registered),
+        terrain_(terrainRegistered_?GameplayTerrainInstances::Binding::bindDestruction(terrainBinding_):
+            GameplayTerrainInstances::Binding{},presentation,collision){
+#ifdef DOWNWELL_TERRAIN_RUN_STORE
+        if(!terrainRegistered_)return;
+#endif
 #if defined(DOWNWELL_TERRAIN_RUN_STORE) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
         if(!owner_.bindTerrainLifetimes(terrain_))return;
         if(!room_.bindTerrain(terrain_))return;
@@ -999,7 +1030,7 @@ public:
         return valid()&&resolves(h)&&View::decode(h,kind,local)&&kind==View::Kind::breakable&&
             world_->publishBoxHit(local);
     }
-    bool population(int object,unsigned& count)const{return valid()&&owner_.instanceNumber(object,families_,count);}
+    bool population(int object,unsigned& count)const{return valid()&&selectorAvailable(object)&&owner_.instanceNumber(object,families_,count);}
     bool terrainPositionMeeting(int object,MotionBinary64 x,MotionBinary64 y,const SpriteMaskPack& masks,bool& hit){
         RunnerImageValue px,py;bool result=false;
         if(!terrainQuery(object)||!masks.valid()||!px.assign(x)||!py.assign(y))return check(false);
@@ -1101,6 +1132,7 @@ private:
     }
     bool registeredPlaceSelection(InstanceHandle self,int object,MotionBinary64 x,MotionBinary64 y,
         const SpriteMaskPack& masks,Owner::Result& result){
+        if(!selectorAvailable(object))return check(false);
         auto update=[&](InstanceHandle h,bool publish){return resolves(h)&&refresh(h,publish);};
         if(!owner_.placeVm(self,object,x,y,false,families_,update,
             [&](InstanceHandle a,InstanceHandle b,bool publish,bool& found){
@@ -1127,7 +1159,7 @@ public:
 private:
     bool registeredCollisionPoint(InstanceHandle self,int object,MotionBinary64 x,MotionBinary64 y,
         bool precise,bool notMe,const SpriteMaskPack& masks,Owner::Result& result){
-        if(!masks.valid())return check(false);
+        if(!masks.valid()||!selectorAvailable(object))return check(false);
         auto update=[&](InstanceHandle h,bool publish){return resolves(h)&&refresh(h,publish);};
         return check(owner_.collisionPointVm(self,object,x,y,notMe,families_,
             [&](InstanceHandle h,RunnerImageValue px,RunnerImageValue py,bool& hit){
@@ -1155,7 +1187,7 @@ private:
     bool registeredNonPreciseLine(InstanceHandle self,int object,MotionBinary64 x1,MotionBinary64 y1,
         MotionBinary64 x2,MotionBinary64 y2,bool notMe,Owner::Result& result){
         RunnerLineArguments args;
-        if(!args.assign(x1,y1,x2,y2))return check(false);
+        if(!selectorAvailable(object)||!args.assign(x1,y1,x2,y2))return check(false);
         auto update=[&](InstanceHandle h,bool publish){return resolves(h)&&refresh(h,publish);};
         return check(owner_.collisionLine(self,object,args,notMe,false,families_,update,
             [&](InstanceHandle h,const RunnerLineArguments& line,bool& hit){
@@ -1187,7 +1219,7 @@ public:
     // policy; none may physically retire this record during the callback.
     template<class Effects> bool wallEndStepEvent(InstanceHandle local,int area,GameMakerRandom& random,
         const SpriteMaskPack& masks,Effects& effects){
-        if(!valid()||!world_||!terrain_.find(local))return check(false);
+        if(!valid()||!world_||!terrainRegistered_||!terrain_.find(local))return check(false);
         struct Ops {
             GameplayCollisionOwner& owner;InstanceHandle local;const SpriteMaskPack& masks;Effects& effects;
             bool coordinates(int dx,int dy,MotionBinary64& x,MotionBinary64& y){

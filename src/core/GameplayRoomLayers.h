@@ -60,7 +60,11 @@ template<unsigned I,bool CompactUnnumbered=false,class Terrain=void> class Gamep
             if(!projectionValid_[layer]){
                 unsigned next=Registry::End;
                 if(!layers_.visitElementsBackward(layer,[&](unsigned element){
-                    if(retainedDraw_[element]!=1)next=element;
+                    // Unborn placed instances (unregistered room terrain) are
+                    // skipped by Draw exactly like active retained scenery.
+                    // A birth invalidates or extends this projection.
+                    const auto* entry=registry_.get(element);
+                    if(retainedDraw_[element]!=1&&!(entry&&!entry->instance.generation))next=element;
                     nextRelevant_[element]=std::uint16_t(next);return true;
                 }))return false;
                 projectionValid_[layer]=true;

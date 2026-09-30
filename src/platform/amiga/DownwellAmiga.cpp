@@ -1282,9 +1282,17 @@ __attribute__((noinline)) static int runDownwell(void) {
     // Ownership precedes player construction and survives in-place run resets.
     // Keep these bounded tables off the AmigaDOS stack, like the world itself.
     alignas(downwell::GameplayCollisionOwner) static UBYTE collisionStorage[sizeof(downwell::GameplayCollisionOwner)];
+    // Gameplay answers wall collision from the occupancy grid and never
+    // dispatches wall End Step, so walls need no runner registration. The
+    // scene and field fixtures still exercise the registered reference.
+#if defined(DOWNWELL_SCENE_VERIFY) || defined(DOWNWELL_FIELD_VERIFY)
+    constexpr auto terrainOwnership=downwell::GameplayCollisionOwner::TerrainOwnership::registered;
+#else
+    constexpr auto terrainOwnership=downwell::GameplayCollisionOwner::TerrainOwnership::unregistered;
+#endif
     auto& collisionOwner=*new(collisionStorage) downwell::GameplayCollisionOwner(objects,collisionSprites,
         downwell::GameplayTerrainInstances::Presentation::bind(wallDamage),
-        downwell::GameplayTerrainInstances::WallCollision::bind(wallCollision),&rooms);
+        downwell::GameplayTerrainInstances::WallCollision::bind(wallCollision),&rooms,terrainOwnership);
     if(!collisionOwner.valid())return 20;
     checkSceneStack(2);
 #ifdef DOWNWELL_REPLAY_VERIFY
