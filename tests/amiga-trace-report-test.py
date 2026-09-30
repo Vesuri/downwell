@@ -10,6 +10,36 @@ report = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(report)
 
 
+class LogicalNames(unittest.TestCase):
+    owner = "downwell::RunnerSpatialInstances<" + "VeryLongOwnershipPolicy<3067u>," * 6 + "6134u>"
+
+    def test_long_owner_methods_remain_distinct(self):
+        birth = report.short(self.owner + "::attachPreparedTerrainBirth(int)")
+        finish = report.short(self.owner + "::finishFreshPreparedTerrain(int)")
+        self.assertGreater(len(birth), 110)
+        self.assertEqual(birth[:110], finish[:110])
+        self.assertNotEqual(birth, finish)
+        self.assertTrue(birth.endswith("::attachPreparedTerrainBirth"))
+        self.assertTrue(finish.endswith("::finishFreshPreparedTerrain"))
+        symbols = report.Symbolizer("unused", {})
+        symbols.chains[1] = [(finish, "owner.h:99"), (birth, "owner.h:55")]
+        self.assertEqual(symbols.frames(1), [birth, finish])
+
+    def test_display_keeps_method_without_changing_key(self):
+        name = report.short(self.owner + "::attachPreparedTerrainBirth<386u, Graph<3u>>(int)")
+        self.assertEqual(report.display_name(name),
+                         "RunnerSpatialInstances<...>::attachPreparedTerrainBirth<...>")
+        self.assertIn("VeryLongOwnershipPolicy", name)
+        self.assertEqual(report.display_name("operator<(int)"), "operator<(int)")
+
+    def test_focus_finds_method_after_long_owner(self):
+        names = [report.short(self.owner + "::attachPreparedTerrainBirth(int)"),
+                 report.short(self.owner + "::finishFreshPreparedTerrain(int)")]
+        self.assertEqual(report.matching_names(names, "attachPreparedTerrainBirth"), names[:1])
+        self.assertEqual(report.matching_names(names, names[1]), names[1:])
+        self.assertEqual(report.matching_names(names, "missing"), [])
+
+
 class CostOwners(unittest.TestCase):
     def test_scalar_and_run_owners(self):
         for owner in ("RunnerRoomMembership", "RunnerRunRoomMembership", "RunnerObservedRoomMembership",

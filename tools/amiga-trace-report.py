@@ -254,7 +254,33 @@ def short(name):
         stripped += '()'
     name = stripped.replace('downwell::', '').replace('(anonymous namespace)::', '')
     name = re.sub(r'::\{lambda#(\d+)\}::operator\(\)$', r'::{lambda#\1}', name)
-    return name if len(name) <= 110 else name[:107] + '...'
+    # This name is an attribution key, not just a label. Never truncate it:
+    # long owner template arguments can otherwise hide the method entirely,
+    # merging unrelated methods and erasing inline stack frames.
+    return name
+
+
+def display_name(name):
+    """Elide template arguments only for display; retain the member name."""
+    result = []
+    depth = 0
+    for char in name:
+        if char == '<':
+            if depth == 0:
+                result.append('<...>')
+            depth += 1
+        elif char == '>' and depth:
+            depth -= 1
+        elif not depth:
+            result.append(char)
+    return ''.join(result) if not depth else name
+
+
+def matching_names(names, requested):
+    """Exact logical name wins; otherwise a substring selects specializations."""
+    if requested in names:
+        return [requested]
+    return sorted(name for name in names if requested in name)
 
 
 GENERIC = re.compile(r'^(operator\(\)|operator\(\)<.*>|operator\(\)\(.*\))$')
@@ -379,7 +405,7 @@ def main():
                         help='hide tree nodes below this share (percent)')
     parser.add_argument('--tree-depth', type=int, default=40)
     parser.add_argument('--focus', action='append', default=[],
-                        help='also print callers/callees of this logical frame')
+                        help='print callers/callees for an exact logical name or matching substring')
     parser.add_argument('--frames', default=None,
                         help='restrict attribution to game frames N or N-M')
     parser.add_argument('--min-fields', type=float, default=0.0,
@@ -454,7 +480,7 @@ def main():
             continue
         folded[names] += cycles
         selected += cycles
-        if args.lines and names[-1] == args.lines:
+        if args.lines and args.lines in names[-1]:
             leaf_lines[sym.line(key[-1])] += cycles
 
     def ms(c):
@@ -469,7 +495,7 @@ def main():
     print('| ---: | ---: | ---: | --- |')
     for f in complete:
         c = frame_cycles[f]
-        parts = ', '.join(f'{name} {ms(v):.1f}' for name, v in per_frame[f].most_common(6))
+        parts = ', '.join(f'{display_name(name)} {ms(v):.1f}' for name, v in per_frame[f].most_common(6))
         print(f'| {f} | {ms(c):.1f} | {c / FIELD_CYCLES:.2f} | {parts} |')
 
     inclusive, exclusive = collections.Counter(), collections.Counter()
@@ -495,13 +521,13 @@ def main():
     print('| self % | ms/frame | function |')
     print('| ---: | ---: | --- |')
     for name, c in exclusive.most_common(args.top):
-        print(f'| {pct(c):.2f} | {ms(c) / count:.2f} | `{name}` |')
+        print(f'| {pct(c):.2f} | {ms(c) / count:.2f} | `{display_name(name)}` |')
 
     print(f'\n## Inclusive time, top {args.top}')
     print('| incl % | ms/frame | self % | function |')
     print('| ---: | ---: | ---: | --- |')
     for name, c in inclusive.most_common(args.top):
-        print(f'| {pct(c):.2f} | {ms(c) / count:.2f} | {pct(exclusive[name]):.2f} | `{name}` |')
+        print(f'| {pct(c):.2f} | {ms(c) / count:.2f} | {pct(exclusive[name]):.2f} | `{display_name(name)}` |')
 
     # What the CPU is doing, by instruction class, over selected frames.
     classes = collections.Counter()
@@ -555,7 +581,7 @@ def main():
     for name, c in symbol_inclusive.most_common(args.top):
         n = symbol_calls[name]
         per = f'{c / n:,.0f}' if n else '-'
-        print(f'| {ms(c) / count:.2f} | {n / count:.1f} | {per} | `{short(name)}` |')
+        print(f'| {ms(c) / count:.2f} | {n / count:.1f} | {per} | `{display_name(short(name))}` |')
 
     tree = {}
     for names, cycles in folded.items():
@@ -571,20 +597,24 @@ def main():
         for name, (c, sub) in sorted(node.items(), key=lambda kv: -kv[1][0]):
             if pct(c) < args.tree_min:
                 continue
-            print(f'{pct(c):6.2f}% {ms(c) / count:6.2f} {"  " * depth}{name}')
+            print(f'{pct(c):6.2f}% {ms(c) / count:6.2f} {"  " * depth}{display_name(name)}')
             walk(sub, depth + 1)
     walk(tree, 0)
     print('```')
 
-    for want in args.focus:
-        print(f'\n## Focus `{want}`: inclusive {pct(inclusive[want]):.2f}%, '
-              f'self {pct(exclusive[want]):.2f}%')
-        print('Callers:')
-        for name, c in parents[want].most_common(15):
-            print(f'  {pct(c):6.2f}%  {name}')
-        print('Callees:')
-        for name, c in children[want].most_common(25):
-            print(f'  {pct(c):6.2f}%  {name}')
+    for requested in args.focus:
+        matches = matching_names(inclusive, requested)
+        if not matches:
+            print(f'\n## Focus `{requested}`: no matching logical frame')
+        for want in matches:
+            print(f'\n## Focus `{want}`: inclusive {pct(inclusive[want]):.2f}%, '
+                  f'self {pct(exclusive[want]):.2f}%')
+            print('Callers:')
+            for name, c in parents[want].most_common(15):
+                print(f'  {pct(c):6.2f}%  {display_name(name)}')
+            print('Callees:')
+            for name, c in children[want].most_common(25):
+                print(f'  {pct(c):6.2f}%  {display_name(name)}')
 
     if args.lines:
         print(f'\n## Self cycles of `{args.lines}` by source line')

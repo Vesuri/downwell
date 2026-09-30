@@ -156,6 +156,17 @@ field) in the emulated configuration, not wall-clock time. Gameplay must
 still be checked against deterministic replays. The trace describes one run
 of one tape.
 
+Logical attribution keys retain untruncated template/owner/member names.
+Tables elide template arguments only when displaying labels; labels must never
+be used to merge stack frames or costs. `--focus` accepts an exact logical name
+or a substring (for example `attachPreparedTerrainBirth`) and prints each
+matching specialization separately. `--lines` accepts a substring and aggregates
+matching leaf frames by source line. Folded-stack exports keep the untruncated
+keys. An older report that shortened keys to 110 characters can merge distinct
+methods of a long templated owner: regenerate such method-level reports from
+their original captures. Raw frame cycles and raw-symbol call counts do not
+depend on those shortened logical keys.
+
 The FPS report also prints `PREPARATION terrain`, measured once at owner
 construction before hardware takeover. It reads the OS graphics vertical-blank
 counter directly (no OS call) around the table preparation, with compiler memory
