@@ -90,6 +90,8 @@ Scheduler consumers must request only what they observe:
 | --- | --- |
 | Typed binding validation and post-retirement check | Lifetime presence and object identity |
 | Step/alarm eligibility, Draw exclusion, activation reconciliation, cleanup | Live generation and current flags |
+| `instanceNumber` | Registration/ancestry and flags masked by `0x140003`; no geometry |
+| `collisionPointVm` candidate admission | Registration order and flags masked by `0x100003`; candidate owns geometry refresh |
 | Bounds refresh and collision candidates | Position, geometry and relevant flags |
 | Time-field contact result and box time-stop position | Published coordinates |
 | Explicit state witness | Complete source-visible record |
@@ -100,6 +102,44 @@ allows a future terrain run to combine common flags with per-cell exclusion
 bits without materializing a full spatial record. The scalar ownership build
 retains full-state resolution for eligibility as a differential reference.
 This API separation does not yet defer or remove any stored terrain state.
+
+`instanceNumberReference` and `collisionPointVmReference` retain the full-state
+read at these two additional boundaries. Neither population counting nor an
+excluded point candidate may force geometry materialization. Point admission
+still reads flags for each registration at its original callback boundary;
+an eligible candidate is not a promise that its geometry is unchanged.
+
+### Constraints on an observation-driven terrain owner
+
+These are distinct observations, not one deferred birth callback:
+
+- `contains`, `currentHandle`, registration counts and eligibility must see
+  each successfully published lifetime immediately. Their representation can
+  be run identity plus current per-cell flags; they must not drain pending
+  geometric work.
+- `resolve` returns a borrowed full-state pointer. Multiple candidate states
+  can be held simultaneously (`collideCompatibility` holds two), so one shared
+  scratch record is not a valid replacement. Mutation and full-state inspection
+  need a stable projection, distinct from flag-only reads.
+- Initial bounds are published **before** terrain Create changes the sprite.
+  `changeSprite` dirties flags/queues but does not replace cached bounds or the
+  old tree rectangle. Deriving historical bounds from the current sprite would
+  change removal, refresh and tree traversal. Record the published geometry
+  separately from current appearance, including when the latter is dirty.
+- A query's family preparation, dirty-queue flush and historical tree replay
+  have different ordering contracts. `point`, `collisionLine` and `place` can
+  read index height while choosing a path; this is already an observing boundary,
+  before candidate callbacks. `collisionPointVm` has no such height read or
+  global flush. Do not insert either into its flag-only admission path.
+- A full-state projection must not replay lifetime allocation, room/layer
+  attachment or Create. Those have already taken effect in the authoritative
+  identity/order records. Replaying the existing birth transaction at the first
+  query both repeats side effects and moves the generation stall to that query.
+
+The compact representation therefore needs immediate identity/flags/order,
+immutable publication history, and independently derived full-state views.
+Tree pressure/failure rules and intervening query callbacks still constrain
+history coalescing; future run cells cannot become visible before their Create.
 
 ### Terrain record and ownership publication
 

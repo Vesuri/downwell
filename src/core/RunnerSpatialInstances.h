@@ -877,6 +877,17 @@ public:
     template<class Graph,class Candidate>
     bool collisionPointVm(InstanceHandle self,int object,MotionBinary64 x,MotionBinary64 y,
         bool notMe,const Graph& graph,Candidate candidate,Result& result){
+        return collisionPointVmMode<false>(self,object,x,y,notMe,graph,candidate,result);
+    }
+    template<class Graph,class Candidate>
+    bool collisionPointVmReference(InstanceHandle self,int object,MotionBinary64 x,MotionBinary64 y,
+        bool notMe,const Graph& graph,Candidate candidate,Result& result){
+        return collisionPointVmMode<true>(self,object,x,y,notMe,graph,candidate,result);
+    }
+private:
+    template<bool FullState,class Graph,class Candidate>
+    bool collisionPointVmMode(InstanceHandle self,int object,MotionBinary64 x,MotionBinary64 y,
+        bool notMe,const Graph& graph,Candidate candidate,Result& result){
         if(!valid()||object<0||object>=100000||!graph.valid()||!graph.flags(unsigned(object)))return false;
         Real nx,ny;
         if(!checked(nx.assign(x)&&ny.assign(y))||(notMe&&!live(self)))return false;
@@ -884,9 +895,9 @@ public:
         membership_.visit(object,[&](int child,int parent){return graph.isA(child,parent);},
             [&](unsigned slot,std::uint32_t generation){
                 const InstanceHandle h{slot,generation};
-                const auto* state=resolve(h);
-                if(!state){good=false;return false;}
-                if((state->flags&0x100003u)||(notMe&&h.slot==self.slot&&h.generation==self.generation))return true;
+                std::uint32_t flags;
+                if(!readEligibility<FullState>(h,flags)){good=false;return false;}
+                if((flags&0x100003u)||(notMe&&h.slot==self.slot&&h.generation==self.generation))return true;
                 bool hit=false;
                 if(!candidate(h,nx,ny,hit)){good=false;return false;}
                 if(hit){next={true,h};return false;}
@@ -895,6 +906,13 @@ public:
         if(!checked(good))return false;
         result=next;return true;
     }
+    template<bool FullState> bool readEligibility(InstanceHandle h,std::uint32_t& flags)const{
+        if constexpr(FullState){
+            const auto* state=resolve(h);if(!state)return false;
+            flags=state->flags;return true;
+        }else return instanceFlags(h,flags);
+    }
+public:
     // Borrow exact registrations for phase snapshots; callbacks cannot mutate
     // membership. The scheduler supplies phase-specific exclusion flags.
     template<class Visit> bool visitRegistrations(Visit visit)const{
@@ -936,18 +954,26 @@ public:
     // flags does not unlink membership or alter the selected search strategy.
     // Special negative/instance-ID selectors are outside this entry point.
     template<class Graph> bool instanceNumber(int object,const Graph& graph,unsigned& result)const{
+        return instanceNumberMode<false>(object,graph,result);
+    }
+    template<class Graph> bool instanceNumberReference(int object,const Graph& graph,unsigned& result)const{
+        return instanceNumberMode<true>(object,graph,result);
+    }
+private:
+    template<bool FullState,class Graph> bool instanceNumberMode(int object,const Graph& graph,unsigned& result)const{
         if(!valid()||object<0||!graph.valid()||!graph.flags(unsigned(object)))return false;
         unsigned count=0;bool good=true;
         membership_.visit(object,[&](int child,int parent){return graph.isA(child,parent);},
             [&](unsigned slot,std::uint32_t generation){
-                const auto* state=resolve({slot,generation});
-                if(!state){good=false;return false;}
-                if(!(state->flags&0x140003u))++count;
+                std::uint32_t flags;
+                if(!readEligibility<FullState>({slot,generation},flags)){good=false;return false;}
+                if(!(flags&0x140003u))++count;
                 return true;
             });
         if(!good)return false;
         result=count;return true;
     }
+public:
     // Graph supplies validated flags/isA/markSpatialFamily. refreshBounds(h,
     // publish) resolves assets and calls refresh above (or handles/rejects a
     // special resource). precise(a,b,publish,hit) owns the exact pair test and

@@ -295,7 +295,7 @@ int main(){
     }
     // collision_point does not share position_meeting's preparation/index
     // branch. Registration order and exclusion flags alone gate candidates.
-    for(unsigned mode=0;mode<6;++mode){
+    for(bool reference:{false,true})for(unsigned mode=0;mode<6;++mode){
         Owner owner;Graph graph;Owner::State state;state.kind=7;
         assert(owner.attach({9,1},1,state)&&owner.attach({4,1},2,state)&&owner.attach({2,1},3,state));
         assert(owner.move({9,1},{0x3f800000},{},0x18));
@@ -305,13 +305,15 @@ int main(){
         const auto pending=owner.pendingSpatial();
         const auto pendingCollision=owner.pendingCollision();
         unsigned calls=0;Owner::Result result{true,{55,99}};
-        const bool ok=owner.collisionPointVm({9,1},0,MotionBinary64{0x3ff00000,1},
-            MotionBinary64{0x80000000,0},mode==3,graph,
-            [&](InstanceHandle h,auto x,auto y,bool& hit){
+        const auto candidate=[&](InstanceHandle h,auto x,auto y,bool& hit){
                 ++calls;assert(x.bits==0x3f800000&&y.bits==0x80000000);
                 assert(h.slot==((mode==1||mode==2||mode==3)?4u:calls==1?9u:4u));
                 hit=mode!=4;return mode!=5;
-            },result);
+            };
+        const bool ok=reference?owner.collisionPointVmReference({9,1},0,MotionBinary64{0x3ff00000,1},
+            MotionBinary64{0x80000000,0},mode==3,graph,candidate,result):
+            owner.collisionPointVm({9,1},0,MotionBinary64{0x3ff00000,1},
+                MotionBinary64{0x80000000,0},mode==3,graph,candidate,result);
         assert(owner.pendingSpatial()==pending&&owner.pendingCollision()==pendingCollision);
         for(auto flags:graph.values)assert(flags==0x10); // No family preparation.
         if(mode==5){assert(!ok&&!owner.valid()&&result.handle.slot==55);continue;}
@@ -428,6 +430,26 @@ int main(){
         assert(owner.registerObject({1,2},false)&&owner.instanceNumber(0,graph,count)&&count==1);
         count=999;assert(!owner.instanceNumber(-3,graph,count)&&count==999);
         assert(!owner.instanceNumber(4,graph,count)&&count==999);
+    }
+    // Population is a flag-only observation even while cached geometry is
+    // dirty. Compare every combination of count exclusions with the retained
+    // full-state reader, before and after registration/lifetime changes.
+    for(unsigned bits=0;bits<32;++bits){
+        Owner owner;Graph graph;Owner::State state;
+        const unsigned masks[]={1u,2u,0x40000u,0x100000u,8u};
+        state.flags=0;
+        for(unsigned i=0;i<5;++i)if(bits&(1u<<i))state.flags|=masks[i];
+        assert(owner.attach({4,1},1,state));
+        const auto compare=[&](){
+            unsigned actual=999,reference=998;
+            assert(owner.instanceNumber(0,graph,actual)&&owner.instanceNumberReference(0,graph,reference));
+            assert(actual==reference);
+        };
+        compare();
+        assert(owner.registerObject({4,1},false));compare();
+        assert(owner.registerObject({4,1},true));compare();
+        assert(owner.retire({4,1}));compare();
+        assert(owner.attach({4,2},1,{}));compare();
     }
     for(unsigned framesCount:{0u,1u,2u}){
         Owner owner;Graph graph;graph.values[1]=0x18;
