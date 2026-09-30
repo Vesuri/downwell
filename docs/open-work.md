@@ -232,6 +232,15 @@ changes, then check native timing with the trace and FPS tapes.
   well as generation cost before enabling it by default. Snapshot compatibility
   and matching ownership witnesses are correctness gates, not evidence of a
   generation-frame speedup.
+  Prioritize replacing the complete generated-terrain spatial birth transaction:
+  ordinary attachment, default-property publication, dirty-queue maintenance,
+  bounds-cache writes and journal insertion must not remain a chain of
+  per-cell runner operations underneath a run-shaped facade. Use authoritative
+  run geometry and captured publication history, expanded only at actual
+  observation boundaries; preserve immediate eligibility/flag observations,
+  queue order, pressure drains and partial-failure prefixes. Reject isolated
+  container substitutions that increase storage without reducing the native
+  generation burst. Keep synchronous Create and intervening RNG draws below.
 - Keep each block's Create synchronous. Preserve per-cell RNG interleaving,
   equal-depth ordering, lifetime allocation and partial-failure prefixes. Shop
   and exit Create effects must precede the next pattern cell's random draw. Do
