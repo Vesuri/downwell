@@ -186,6 +186,39 @@ void testGeneratedPack(const char* path,const char* maskPath,const char* objectP
                 }
             }
         }
+        using BirthOwner=downwell::RunnerSpatialInstances<2,32,true,0,0,true>;
+        for(int object:{60,93,99})for(unsigned mode=0;mode<32;++mode){
+            BirthOwner reference,transaction;BirthOwner::Properties a,b;BirthOwner::State initial;
+            auto referenceFamilies=families,transactionFamilies=families;
+            initial.x.assignInteger(160);initial.y.assignInteger(256);
+            if(mode&1)initial.flags|=2u;
+            if(mode&8)initial.bounds.left.assignInteger(1); // General-state fallback.
+            if(mode&16)initial.flags=0; // Nonordinary initial flags also fall back.
+            downwell::RunnerSpatialSplit::PixelBox pixels{160,256,175,271};
+            auto bounds=downwell::RunnerSpatialSplit::encodePixels(pixels);
+            if(mode&4)bounds.left.bits=0x7f800000u;
+            unsigned callsA=0,callsB=0;BirthOwner::Real depthA,depthB;
+            const bool okA=reference.attachPreparedTerrainBirthReference({0,1},object,initial,a,
+                preparedDefaults,referenceFamilies,bounds,pixels,true,[&](auto depth){++callsA;depthA=depth;return !(mode&2);});
+            const bool okB=transaction.attachPreparedTerrainBirth({0,1},object,initial,b,
+                preparedDefaults,transactionFamilies,bounds,pixels,true,[&](auto depth){++callsB;depthB=depth;return !(mode&2);});
+            require(okA==okB&&callsA==callsB&&depthA.bits==depthB.bits&&reference.valid()==transaction.valid(),
+                "terrain birth transaction preserves callback and failure timing");
+            const auto* sa=reference.resolve({0,1});const auto* sb=transaction.resolve({0,1});
+            require(sa&&sb&&sa->x.bits==sb->x.bits&&sa->y.bits==sb->y.bits&&sa->flags==sb->flags&&
+                sa->previous.x.bits==sb->previous.x.bits&&sa->previous.y.bits==sb->previous.y.bits&&
+                sa->bounds.left.bits==sb->bounds.left.bits&&sa->bounds.top.bits==sb->bounds.top.bits&&
+                sa->bounds.right.bits==sb->bounds.right.bits&&sa->bounds.bottom.bits==sb->bounds.bottom.bits&&
+                sa->kind==sb->kind&&sa->special==sb->special&&
+                !std::memcmp(&a,&b,sizeof(a))&&
+                reference.pendingSpatial()==transaction.pendingSpatial()&&
+                reference.pendingCollision()==transaction.pendingCollision()&&
+                reference.pendingSpatialIndex()==transaction.pendingSpatialIndex()&&
+                reference.bindingRevision()==transaction.bindingRevision()&&
+                reference.captureRevision()==transaction.captureRevision()&&
+                *referenceFamilies.flags(object)==*transactionFamilies.flags(object),
+                "terrain transaction preserves complete fields, queues, revisions and failed prefixes");
+        }
         Owner incomplete;Owner::Properties unchanged;
         require(incomplete.attach({0,1},0,{}),"attach incomplete-graph fixture");
         downwell::RunnerObjectFamilies<386> spatialOnly;require(spatialOnly.bindSpatialFlags(objects),"load deliberately incomplete flags");

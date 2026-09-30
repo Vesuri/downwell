@@ -179,9 +179,21 @@ private:
                 return parent.check(actual==&r);
             }
         }
-        bool birth(InstanceHandle local,const Record& r){
+        bool birth(InstanceHandle local,const Record& r){return birthMode<false>(local,r);}
+        template<bool AllocatedTerrain> bool birthMode(InstanceHandle local,const Record& r){
             DW_PROFILE_SCOPE(profileInstanceBirth);
-            InstanceHandle h;if(!key(local,r,h,true))return false;
+            InstanceHandle h;
+            if constexpr(AllocatedTerrain){
+                static_assert(Kind==View::Kind::terrain,"Owned allocation transaction only");
+                // appendInitialized supplied this record directly from the
+                // allocation it just admitted. The spatial birth still checks
+                // that identity once; do not deserialize the terrain run again
+                // merely to compare the record with its own source.
+                if(parent.world_&&parent.world_->terrainInstances()==&parent.terrain_){
+                    if(!parent.valid()||!View::encode(Kind,local,h)||local.generation!=r.lifetimeId)
+                        return parent.check(false);
+                }else if(!key(local,r,h,true))return false;
+            }else if(!key(local,r,h,true))return false;
             if constexpr(Kind==View::Kind::player)if(!parent.check(parent.layers_.prepare()))return false;
             constexpr bool roomCoordinates=Kind==View::Kind::player||Kind==View::Kind::terrain||Kind==View::Kind::timeField||Kind==View::Kind::goalField||Kind==View::Kind::exitController;
             constexpr int ox=roomCoordinates?0:240,oy=roomCoordinates?0:176;
@@ -205,6 +217,19 @@ private:
             }
             if constexpr(Kind!=View::Kind::timeField)if(!r.active)state.flags|=2u;
             auto& p=parent.properties_[h.slot];
+#if defined(DOWNWELL_TERRAIN_RUN_STORE) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
+            if constexpr(Kind==View::Kind::terrain)if(preparedTerrain){
+                const bool born=parent.owner_.attachPreparedTerrainBirth(h,object(r),state,p,
+                    parent.objectDefaults_,parent.families_,terrainBounds,terrainPixels,terrainPrecise,
+                    [&](RunnerImageValue depth){
+                        if(!parent.check(parent.room_.bind(h.slot,depth)))return false;
+                        if(!r.active)parent.activationPending_=true;
+                        return true;
+                    });
+                if(!parent.check(born))return false;
+                return parent.check(parent.layers_.birth(h,r.sourceInstanceId,p.depth,!r.active,false));
+            }
+#endif
             {
                 DW_PROFILE_SCOPE(profileBirthMetadata);
                 RunnerImageValue creationDepth;
@@ -303,7 +328,7 @@ private:
             // birth admits the typed identity and synchronously publishes every
             // original ownership boundary. No callbacks can retire/reuse it
             // between that success and these source Create property writes.
-            if(!birth(local,r))return false;
+            if(!birthMode<true>(local,r))return false;
             DW_PROFILE_SCOPE(profileTerrainCreate);
             if(r.objectId==99)return true;
             const InstanceHandle h{View::terrainBase+local.slot,local.generation};

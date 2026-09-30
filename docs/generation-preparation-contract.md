@@ -541,6 +541,21 @@ remain allocated in this experimental integration. Matching ownership
 witnesses does not justify enabling it by default: native timing and removal
 of that redundant storage remain required.
 
+`attachPreparedTerrainBirth` is an owner-controlled attachment/publication
+transaction for prepared geometry. Its intervening room-binding callback may
+observe creation depth but must not observe or mutate spatial state. Fresh
+zero bounds are therefore materialized only on a failed prefix; a successful
+transaction writes the final prepared bounds once. Lifetime admission,
+membership revisions, dirty-queue ordering, live family preparation and journal
+admission retain their original ordering. Unsupported initial states use the
+separate-operation reference. The reference remains callable for verification.
+
+The initialized-allocation callback receives its record directly from the
+terrain store. When that store is the world's bound authoritative store, it
+does not deserialize the same run again to compare the record to itself.
+Spatial admission still validates the generation/object identity. Other
+bindings and ownership contexts retain the ordinary record-resolution check.
+
 Generated terrain may bind one initialized-birth transaction. The run store
 allocates the typed identity first, and the built-in collision owner completes
 ordinary birth publication before executing `terrainCreateProperties`. Create

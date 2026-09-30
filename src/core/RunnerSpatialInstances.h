@@ -260,6 +260,59 @@ public:
         return true;
     }
     template<class Terrain> bool bindTerrainLifetimes(Terrain& terrain){return lifetimes_.bind(terrain)&&membership_.bindTerrain(terrain);}
+    // One owner-controlled birth transaction. Between observes only the
+    // creation depth and may publish room ownership; it must not inspect or
+    // mutate this spatial owner. On failure publish the same partial state as
+    // the separate attach/default/room/bounds operations. On success write
+    // final bounds once, instead of constructing a zero cache to overwrite.
+    template<unsigned Resources,class Graph,class Between>
+    bool attachPreparedTerrainBirth(InstanceHandle h,int object,const State& state,
+        Properties& p,const PreparedObjectDefaults<Resources>& defaults,Graph& graph,
+        const Box& bounds,Math::PixelBox pixels,bool precise,Between between){
+        const auto* d=defaults.get(object);const auto* objectFlags=graph.flags(unsigned(object));
+        if constexpr(RunRegistration&&ScheduledIndex){
+            if(d&&graph.valid()&&objectFlags&&(*objectFlags&0x87u)==d->propertyFlags&&
+                (state.flags&~2u)==8u&&!state.special&&
+                !(state.bounds.left.bits|state.bounds.top.bits|state.bounds.right.bits|state.bounds.bottom.bits)&&
+                (d->spriteId==-1||d->frames<=65535u)&&valid()&&lifetimes_.canAttach(h,object)&&
+                Math::valid(state.x)&&Math::valid(state.y)){
+                auto& s=entries_[h.slot].state;
+                s.x=state.x;s.y=state.y;s.previous={state.x,state.y};
+                s.kind=state.kind;s.special=false;s.flags=state.flags;
+                lifetimes_.publish(h,object);
+                if(!membership_.bind(h.slot,object,h.generation)){
+                    s.bounds={};changedBinding(h.slot);return false;
+                }
+                changedFreshBinding(h.slot);membership_.repeatFreshTailBinding();
+                p.sprite.spriteId=d->spriteId;p.sprite.maskId=d->maskId;
+                p.sprite.scaleX.bits=p.sprite.scaleY.bits=0x3f800000u;
+                p.sprite.angle.bits=p.sprite.imageIndex.bits=0;
+                p.depth=d->creationDepth;p.timeline.bits=0;p.cachedFrame.bits=0xbf800000u;
+                s.flags=d->initialFlags|(state.flags&2u);
+                markSpatialChange(h.slot,*objectFlags);
+                if(!between(p.depth)){s.bounds={};return false;}
+                if(!checked(graph.prepareBirth(unsigned(object)))){s.bounds={};return false;}
+                // prepareBirth may change the family's live preparation bits.
+                const auto flags=*graph.flags(unsigned(object));
+                if(!finishFreshPreparedTerrain(h.slot,flags,bounds,pixels,precise,true))return false;
+                if(flags&8u)collision_.mark(h.slot);
+                return true;
+            }
+        }
+        return attachPreparedTerrainBirthReference(h,object,state,p,defaults,graph,bounds,pixels,precise,between);
+    }
+    template<unsigned Resources,class Graph,class Between>
+    bool attachPreparedTerrainBirthReference(InstanceHandle h,int object,const State& state,
+        Properties& p,const PreparedObjectDefaults<Resources>& defaults,Graph& graph,
+        const Box& bounds,Math::PixelBox pixels,bool precise,Between between){
+        Real depth;
+        if(!attachObjectPrepared(h,object,state,true,p,defaults,graph,&depth))return false;
+        p.depth=depth;
+        if(!between(depth))return false;
+        return publishBirth(h,graph,[&](InstanceHandle live,bool publish){
+            return refreshPreparedTerrain(live,*graph.flags(unsigned(object)),bounds,pixels,precise,publish);
+        });
+    }
     bool valid()const{return good_ && index_.valid();}
     // No logical instance work happens here. Reads force completion themselves.
     bool serviceSpatialIndex(unsigned budget){
@@ -479,25 +532,7 @@ public:
             if(!valid()||!live(h))return false;
             auto& s=entries_[h.slot].state;
             if(!(s.flags&0x8000u)&&!(s.bounds.left.bits|s.bounds.top.bits|s.bounds.right.bits|s.bounds.bottom.bits)){
-                s.bounds=bounds;
-                s.flags=(s.flags&~0x208u)|(precise?0x200u:0u);
-                if(!publish||!Queue::shouldPublishBounds(objectFlags,s.flags,false))return true;
-                // Keep the reference's invalid-input failure after cache/flag
-                // publication. The old +0 rectangle is already known valid.
-                if(!Math::valid(bounds.left)||!Math::valid(bounds.top)||
-                   !Math::valid(bounds.right)||!Math::valid(bounds.bottom))return checked(false);
-                Box normalized=bounds;
-                if(pixels.right<pixels.left){
-                    auto p=pixels.left;pixels.left=pixels.right;pixels.right=p;
-                    auto b=normalized.left;normalized.left=normalized.right;normalized.right=b;
-                }
-                if(pixels.bottom<pixels.top){
-                    auto p=pixels.top;pixels.top=pixels.bottom;pixels.bottom=p;
-                    auto b=normalized.top;normalized.top=normalized.bottom;normalized.bottom=b;
-                }
-                DW_PROFILE_COUNT(counterSpatialFirstPublication);
-                if(!checked(index_.insertPrepared(normalized,h.slot,&pixels)))return false;
-                s.flags|=0x8000u;return true;
+                return finishFreshPreparedTerrain(h.slot,objectFlags,bounds,pixels,precise,publish);
             }
             if(pixels.right<pixels.left){auto a=pixels.left;pixels.left=pixels.right;pixels.right=a;}
             if(pixels.bottom<pixels.top){auto a=pixels.top;pixels.top=pixels.bottom;pixels.bottom=a;}
@@ -955,6 +990,26 @@ public:
         result={hit.found,hit.found?handle(hit.identity):InstanceHandle{}};return true;
     }
 private:
+    bool finishFreshPreparedTerrain(unsigned slot,std::uint32_t objectFlags,const Box& bounds,
+        Math::PixelBox pixels,bool precise,bool publish){
+        auto& s=entries_[slot].state;
+        s.bounds=bounds;s.flags=(s.flags&~0x208u)|(precise?0x200u:0u);
+        if(!publish||!Queue::shouldPublishBounds(objectFlags,s.flags,false))return true;
+        if(!Math::valid(bounds.left)||!Math::valid(bounds.top)||
+           !Math::valid(bounds.right)||!Math::valid(bounds.bottom))return checked(false);
+        Box normalized=bounds;
+        if(pixels.right<pixels.left){
+            auto p=pixels.left;pixels.left=pixels.right;pixels.right=p;
+            auto b=normalized.left;normalized.left=normalized.right;normalized.right=b;
+        }
+        if(pixels.bottom<pixels.top){
+            auto p=pixels.top;pixels.top=pixels.bottom;pixels.bottom=p;
+            auto b=normalized.top;normalized.top=normalized.bottom;normalized.bottom=b;
+        }
+        DW_PROFILE_COUNT(counterSpatialFirstPublication);
+        if(!checked(index_.insertPrepared(normalized,slot,&pixels)))return false;
+        s.flags|=0x8000u;return true;
+    }
     struct Entry {State state{};};
     Lifetimes lifetimes_;
     Entry entries_[Capacity]{};
