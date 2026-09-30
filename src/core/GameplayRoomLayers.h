@@ -123,15 +123,22 @@ public:
         prepared_=true;return true;
     }
     unsigned playerSourceId()const{return playerId_;}
+    // Borrow only during one callback-free, same-object generated terrain run.
+    // Resolve/create its layer at the first cell's original attachment point.
+    struct TerrainRunBirth {unsigned layer=Layers::End;};
     // Only generated, unnumbered, nonprojected terrain inside its allocator's
     // fresh-birth transaction. Layer creation and ID allocation stay live.
-    bool birthAllocatedTerrain(InstanceHandle h,RunnerImageValue depth,bool inactive){
+    bool birthAllocatedTerrain(InstanceHandle h,RunnerImageValue depth,bool inactive,TerrainRunBirth* run=nullptr){
         static_assert(Storage::retained,"Owned terrain layers required");
         changedDraw();if(!enabled())return true;
         if(!prepared_)return fail();
-        std::int32_t integer;if(!RunnerDepthService::integerDepth(depth,integer))return fail();
-        unsigned layer=layers_.findDynamic(integer);
-        if(layer==Layers::End&&!ids_.createDynamic(layers_,integer,layer))return fail();
+        unsigned layer=run?run->layer:Layers::End;
+        if(layer==Layers::End){
+            std::int32_t integer;if(!RunnerDepthService::integerDepth(depth,integer))return fail();
+            layer=layers_.findDynamic(integer);
+            if(layer==Layers::End&&!ids_.createDynamic(layers_,integer,layer))return fail();
+            if(run)run->layer=layer;
+        }
         if(!layers_.retainAllocated(terrain_->allocatedLayerState(h.slot-terrainFirst_),layer,inactive))return fail();
         ++live_;return true;
     }

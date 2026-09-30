@@ -341,6 +341,60 @@ private:
             return parent.check(parent.owner_.changeSpriteFromPack(h,p.sprite,p.timeline,p.cachedFrame,
                 sprite,parent.sprites_,*parent.families_.flags(object)));}
 #ifdef DOWNWELL_TERRAIN_RUN_STORE
+        bool initializedTerrainRun(const AreaOneBuilder::TerrainRun& run,int tile,GameMakerRandom& random,
+            AreaOneBuilder::EmitFunction backend,void* context){
+            static_assert(Kind==View::Kind::terrain,"Generated terrain transaction only");
+#ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+            const auto* d=parent.objectDefaults_.get(run.objectId);
+            const auto* flags=parent.families_.flags(unsigned(run.objectId));
+            const auto* create=parent.terrainCreate_.get(run.objectId,tile);
+            PreparedTerrainBirthBounds::Key first,last;
+            // Bound count before computing the endpoint, including malformed
+            // external resource fixtures. Unsupported geometry uses cell birth.
+            const bool geometry=run.count&&run.count<=GameplayTerrainInstances::capacity&&
+                (run.stepX==16||run.stepX==-16)&&
+                parent.terrainBirthBounds_.key(run.objectId,run.x,run.y,first)&&
+                parent.terrainBirthBounds_.key(run.objectId,run.x+int(run.count-1)*run.stepX,run.y,last);
+            if(parent.valid()&&parent.world_&&parent.world_->terrainInstances()==&parent.terrain_&&
+                d&&flags&&create&&(*flags&0x87u)==d->propertyFlags&&
+                (d->spriteId==-1||d->frames<=65535u)&&geometry){
+                typename decltype(parent.layers_)::TerrainRunBirth layer;
+                bool prepared=false;
+                return run.executeEach([&](const DeferredCreateInstance& command){
+                    if(!backend(context,command))return false;
+                    return parent.terrain_.appendInitializedCell(command.objectId,command.x,command.y,command.active,
+                        [&](InstanceHandle local,GameplayTerrainInstances::CreateValues& values,bool& unbounded){
+                            const InstanceHandle h{View::terrainBase+local.slot,local.generation};
+                            Owner::State state;Owner::Box bounds;RunnerSpatialSplit::PixelBox pixels;
+                            bool precise;PreparedTerrainBirthBounds::Key key;
+                            if(!parent.terrainBirthBounds_.at(run.objectId,command.x,command.y,
+                                state.x,state.y,bounds,precise,&pixels,&key))return parent.check(false);
+                            if(!command.active)state.flags|=2u;
+                            auto& p=parent.properties_[h.slot];
+                            if(!parent.check(parent.owner_.attachTerrainRunCell(h,run.objectId,state,p,*d,
+                                parent.families_,flags,bounds,pixels,precise,[&](RunnerImageValue depth){
+                                    parent.room_.bindAllocatedTerrain(h.slot,depth);
+                                    if(!command.active)parent.activationPending_=true;
+                                    return true;
+                                },key,prepared)))return false;
+                            if(!parent.check(parent.layers_.birthAllocatedTerrain(h,p.depth,!command.active,&layer)))return false;
+                            DW_PROFILE_SCOPE(profileTerrainCreate);
+                            if(create->changedSprite)parent.drawOrderValid_=false;
+                            parent.owner_.finishAdmittedTerrainCreate(h,p,*create,*flags);
+                            values.spriteId=create->sprite;
+                            if(create->writeIndex)values.imageIndex=create->index;
+                            values.imageSpeed=0;
+                            if(run.objectId==60&&(wallRadius(create->sprite)<0||wallRadius(create->sprite)>16))unbounded=true;
+                            return true;
+                        });
+                });
+            }
+#endif
+            return run.executeEach([&](const DeferredCreateInstance& command){
+                return backend(context,command)&&parent.terrain_.appendInitialized(command.objectId,
+                    command.x,command.y,command.active,tile,random);
+            });
+        }
         bool initializedTerrainBirth(InstanceHandle local,const Record& r,int tile,GameMakerRandom& random,
             GameplayTerrainInstances::CreateValues& values,bool& unbounded){
             static_assert(Kind==View::Kind::terrain,"Generated terrain transaction only");
@@ -417,7 +471,7 @@ public:
         if(!layers_.bindTerrain(terrain_,View::terrainBase))return;
 #endif
 #ifdef DOWNWELL_TERRAIN_RUN_STORE
-        if(!terrain_.bindInitializedBirth(terrainBinding_))return;
+        if(!terrain_.bindInitializedBirth(terrainBinding_)||!terrain_.bindInitializedRun(terrainBinding_))return;
 #endif
         good_=sprites_.prepare(preparedSprites_,741)&&objectDefaults_.prepare(objects,sprites_)&&
             spriteGeometry_.prepare(sprites_)&&

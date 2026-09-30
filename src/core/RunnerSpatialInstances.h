@@ -325,6 +325,40 @@ public:
             return refreshPreparedTerrain(live,*graph.flags(unsigned(object)),bounds,pixels,precise,publish);
         });
     }
+    // The builder supplies a homogeneous run, and its owner admits immutable
+    // defaults once. No user callbacks, queries, setters, or other births may
+    // intervene between cells. Do not prepublish cells: room, graph, journal
+    // pressure, and failure prefixes still occur synchronously for each cell.
+    template<class Graph,class Between>
+    bool attachTerrainRunCell(InstanceHandle h,int object,const State& state,Properties& p,
+        const PreparedObjectDefault& d,Graph& graph,const std::uint32_t* objectFlags,
+        const Box& bounds,Math::PixelBox pixels,bool precise,Between between,
+        PreparedTerrainBirthBounds::Key geometry,bool& prepared){
+        static_assert(PreparedGeometry&&RunRegistration&&ScheduledIndex,"Owned terrain run only");
+        DW_PROFILE_SCOPE(profileInstanceBirth);
+        auto& s=entries_[h.slot].state;
+        s.x=state.x;s.y=state.y;s.previous={state.x,state.y};
+        s.kind=1;s.special=false;s.flags=state.flags;
+        lifetimes_.publish(h,object);
+        if(!membership_.bindAllocatedTerrain(h.slot,object)){
+            s.bounds={};changedBinding(h.slot);return false;
+        }
+        changedFreshBinding(h.slot);membership_.repeatFreshTailBinding();
+        p.sprite.spriteId=d.spriteId;p.sprite.maskId=d.maskId;
+        p.sprite.scaleX.bits=p.sprite.scaleY.bits=0x3f800000u;
+        p.sprite.angle.bits=p.sprite.imageIndex.bits=0;
+        p.depth=d.creationDepth;p.timeline.bits=0;p.cachedFrame.bits=0xbf800000u;
+        s.flags=d.initialFlags|(state.flags&2u);
+        markSpatialChange(h.slot,*objectFlags);
+        if(!between(p.depth)){s.bounds={};return false;}
+        if(!prepared){
+            if(!checked(graph.prepareBirth(unsigned(object)))){s.bounds={};return false;}
+            prepared=true;
+        }
+        if(!finishFreshPreparedTerrain(h.slot,*objectFlags,bounds,pixels,precise,true,geometry))return false;
+        if(*objectFlags&8u)collision_.mark(h.slot);
+        return true;
+    }
     bool valid()const{return good_ && index_.valid();}
     // No logical instance work happens here. Reads force completion themselves.
     bool serviceSpatialIndex(unsigned budget){

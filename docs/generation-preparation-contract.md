@@ -203,6 +203,38 @@ path may eliminate intermediate stores and redundant lookups within callback-fre
 intervals, but must preserve the next callback's observations and each failure's
 partially published state. Moving Create effects to a later frame is not allowed.
 
+### Borrowed homogeneous builder runs
+
+`AreaOneBuilder::TerrainRun` may enter `GameplayWorld::createGeneratedTerrainRun`
+without being flattened into independent core birth callbacks. This is a trusted
+backend interval, not the general callback API: its sink may update the backend's
+terrain index/tiles/dirty rows and reject a cell, but may not query or mutate core
+ownership, create another instance, or change the stage/area. Arbitrary observers
+use the original per-cell entry point. The Amiga run sink satisfies this contract.
+
+The run executor still consumes the builder RNG immediately before each cell,
+then runs the backend, typed allocation, birth publication and Create in that
+order. It neither reserves future lifetimes nor consumes future RNG. A rejected
+backend cell leaves core allocation and the world's failure flag untouched;
+failure after typed allocation latches failure with its published prefix intact.
+Reentry or reexecution is rejected before consuming RNG. Builder tests compare
+all executors at every callback, including callbacks that consume additional RNG.
+
+Immutable object defaults and the ordinary Create plan are selected once for the
+run. Family preparation occurs at the first cell's original publication point;
+subsequent same-object births cannot change it inside the trusted interval.
+Dynamic layer lookup/creation likewise occurs only when the first cell reaches
+layer attachment, after spatial publication, not at run entry. Each later cell
+still admits its own layer capacity and order key. The typed owner hands the
+fresh identity and live Create outputs directly to this transaction, without
+constructing a complete `Record` for a callback to the same owner.
+
+Unsupported defaults/geometry retain per-cell birth. The run path still owns
+full per-cell spatial state, properties, queue entries and geometry publication;
+sharing setup does **not** constitute their replacement by compact run state.
+Whole-owner witnesses compare run emission, backend-failure prefixes, full
+properties/state and subsequent queries with the retained scalar implementation.
+
 Fresh prepared collision binding has one callback-free interval after the
 initial registration append. For an admitted ordinary constructor that remains
 registered, rebinding the same object/lifetime at the same tail cannot change

@@ -1709,6 +1709,62 @@ int main(){
         // Compare the whole owner, not just a membership container. Emit full
         // field values (not a hash) so a divergent publication is inspectable.
         std::ofstream trace(path);assert(trace);
+        // Feed the real builder's borrowed spans through the core transaction.
+        // The backend can fail at any cell, but may not mutate core ownership
+        // inside this trusted run. Queries follow the run, never prewarm it.
+        auto pb=read("generated/downwell-builder-patterns.dwbp");
+        BuilderPatternPack patterns(pb.data(),pb.size());assert(patterns.valid());
+        for(unsigned seed:{1u,5u,9u})for(unsigned reject:{0u,1u,3u,9u,41u}){
+            auto runOwner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
+                GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&rooms);
+            auto runWorld=std::make_unique<GameplayWorld>(300,true,0,false,runOwner->enemyBinding(),
+                runOwner->breakableBinding(),runOwner->playerBinding(),&runOwner->terrain());
+            assert(runOwner->attach(*runWorld));
+            GameMakerRandom random(seed);AreaOneBuilder builder;
+            builder.reset(240,704,random,{1,0,true,false});builder.enableTerrainRuns(true);
+            struct RunContext{GameplayWorld& world;const ObjectPack& objects;unsigned calls=0,reject=0,runs=0;};
+            RunContext context{*runWorld,objects,0,reject};
+            const auto emit=[](void* opaque,const DeferredCreateInstance& command){
+                auto& c=*static_cast<RunContext*>(opaque);
+                if(command.objectId!=60&&command.objectId!=93&&command.objectId!=99)return true;
+                return c.world.createGeneratedTerrain(command,[&](const auto&){return ++c.calls!=c.reject;});
+            };
+            builder.setTerrainRunEmitter([](void* opaque,const AreaOneBuilder::TerrainRun& run,AreaOneBuilder::EmitFunction){
+                auto& c=*static_cast<RunContext*>(opaque);++c.runs;
+                return c.world.createGeneratedTerrainRun(run,[&](const auto&){return ++c.calls!=c.reject;});
+            });
+            AreaOneBuilderStep step;
+            const bool okay=builder.stepVisible(patterns,random,100000,emit,&context,step);
+            trace<<"builder-run "<<seed<<' '<<reject<<' '<<okay<<' '<<context.calls<<' '<<context.runs
+                <<' '<<runOwner->valid()<<' '<<runWorld->effectsSucceeded()<<' '<<random.drawCount()<<' '<<random.stateIndex()<<'\n';
+            for(unsigned i=0;i<16;++i)trace<<random.stateWord(i)<<' ';
+            trace<<'\n';
+            for(unsigned i=0;i<runOwner->terrain().size();++i){
+                const auto h=runOwner->terrain().handle(i);const auto r=runOwner->terrain().find(h);
+                InstanceHandle shared;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,h,shared));
+                const auto* s=runOwner->state(shared);const auto* p=runOwner->properties(shared);assert(s&&p);
+                trace<<"run-cell "<<h.slot<<' '<<h.generation<<' '<<r->objectId<<' '<<r->x<<' '<<r->y
+                    <<' '<<r->spriteId<<' '<<r->imageIndex<<' '<<r->imageSpeed<<' '<<s->x.bits<<' '<<s->y.bits
+                    <<' '<<s->previous.x.bits<<' '<<s->previous.y.bits<<' '<<s->flags<<' '<<s->kind<<' '<<s->special
+                    <<' '<<s->bounds.left.bits<<' '<<s->bounds.top.bits<<' '<<s->bounds.right.bits<<' '<<s->bounds.bottom.bits
+                    <<' '<<p->sprite.spriteId<<' '<<p->sprite.maskId<<' '<<p->sprite.scaleX.bits<<' '<<p->sprite.scaleY.bits
+                    <<' '<<p->sprite.angle.bits<<' '<<p->sprite.imageIndex.bits<<' '<<p->depth.bits<<' '<<p->timeline.bits
+                    <<' '<<p->cachedFrame.bits<<'\n';
+            }
+            for(int object:{60,93}){unsigned count;assert(runOwner->population(object,count));
+                trace<<"run-count "<<object<<' '<<count<<'\n';}
+            for(unsigned i=0;i<runOwner->terrain().size();i+=7){
+                const auto r=runOwner->terrain().find(runOwner->terrain().handle(i));
+                const auto x=MotionBinary64::fromInteger(r->x),y=MotionBinary64::fromInteger(r->y);
+                GameplayCollisionOwner::Owner::Result result;
+                assert(runOwner->terrainNonPreciseLine({},60,x,y,x,y,false,result));
+                trace<<"run-query "<<result.found<<' '<<result.handle.slot<<' '<<result.handle.generation<<'\n';
+            }
+            assert(runOwner->prepareDraw());
+            assert(runWorld->visitRoomActors([&](auto kind,InstanceHandle h,auto depth){
+                trace<<"run-draw "<<unsigned(kind)<<' '<<h.slot<<' '<<h.generation<<' '<<depth.bits<<'\n';return true;
+            }));
+        }
         // Do not warm the representation by resolving every birth. A compact
         // terrain owner must survive a cold burst before its first observer,
         // including interleaved actors, coincident geometry and removed cells.

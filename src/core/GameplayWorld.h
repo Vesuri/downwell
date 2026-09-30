@@ -609,6 +609,31 @@ public:
     // Synchronous builder handoff. Shop/exit Create effects must occur before
     // the next pattern cell draws RNG. The backend owns terrain representation;
     // this world owns breakable and actor registration and coordinate mapping.
+    // Trusted homogeneous-run sink: it may publish backend terrain and fail,
+    // but must not mutate/query the collision owner, create other instances,
+    // or change stage/area. Those callbacks use createGeneratedTerrain instead.
+    // The core owner borrows this interval to share setup, never future cells.
+    template<class Terrain>
+    bool createGeneratedTerrainRun(const downwell::AreaOneBuilder::TerrainRun& run,Terrain terrain){
+#ifdef DOWNWELL_TERRAIN_RUN_STORE
+        if(terrainInstances_){
+            struct Context{GameplayWorld& world;Terrain& terrain;bool backendFailed=false;};
+            Context context{*this,terrain};
+            const bool ok=terrainInstances_->appendInitializedRun(run,
+                downwell::terrainTileForArea(run_.stage.area),enemyRandom_,
+                [](void* opaque,const downwell::DeferredCreateInstance& command){
+                    auto& c=*static_cast<Context*>(opaque);
+                    const bool okay=c.world.run_.effectsSucceeded&&c.terrain(command);
+                    c.backendFailed=!okay;return okay;
+                },&context);
+            if(!ok&&!context.backendFailed)run_.effectsSucceeded=false;
+            return ok;
+        }
+#endif
+        return run.executeEach([&](const downwell::DeferredCreateInstance& command){
+            return createGeneratedTerrain(command,terrain);
+        });
+    }
     template<class Terrain>
     bool createGeneratedTerrain(const downwell::DeferredCreateInstance& command,Terrain terrain){
         if(!run_.effectsSucceeded||(command.objectId!=60&&command.objectId!=93&&command.objectId!=99))return false;

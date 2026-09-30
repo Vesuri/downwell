@@ -5,6 +5,7 @@
 #include "RunnerRegistrationOrder.h"
 #include "RunnerRoomOrderState.h"
 #include "RunnerLogicalLayerOrder.h"
+#include "AreaOneBuilder.h"
 #include <cstddef>
 namespace downwell {
 class GameplayTerrainInstancesRuns {
@@ -44,6 +45,8 @@ private:
     Binding binding_;Presentation presentation_;WallCollision collision_;
     void* initializedContext_=nullptr;
     bool (*initializedBirth_)(void*,InstanceHandle,const Record&,int,GameMakerRandom&,CreateValues&,bool&)=nullptr;
+    bool (*initializedRun_)(void*,const AreaOneBuilder::TerrainRun&,int,GameMakerRandom&,
+        AreaOneBuilder::EmitFunction,void*)=nullptr;
     Ids identities_;
     Mutable mutable_[capacity]{};
     unsigned freeHint_=0;std::uint32_t next_=1;
@@ -83,6 +86,29 @@ public:
         return true;
     }
     unsigned size()const{return identities_.size();}
+    template<class Owner> bool bindInitializedRun(Owner& owner){
+        if(!initializedBirth_||initializedContext_!=&owner||initializedRun_||size())return false;
+        initializedRun_=[](void* p,const AreaOneBuilder::TerrainRun& run,int tile,GameMakerRandom& random,
+            AreaOneBuilder::EmitFunction backend,void* context){
+            return static_cast<Owner*>(p)->initializedTerrainRun(run,tile,random,backend,context);
+        };return true;
+    }
+    bool appendInitializedRun(const AreaOneBuilder::TerrainRun& run,int tile,GameMakerRandom& random,
+        AreaOneBuilder::EmitFunction backend,void* context){
+        if(initializedRun_)return initializedRun_(initializedContext_,run,tile,random,backend,context);
+        return run.executeEach([&](const DeferredCreateInstance& command){
+            return backend(context,command)&&appendInitialized(command.objectId,command.x,command.y,
+                command.active,tile,random);
+        });
+    }
+    // This callback belongs to the same owner as initializedBirth_. It sees
+    // only the newly allocated identity and live Create outputs, not a copied
+    // actor-sized Record. Allocation and failure still happen one cell at a time.
+    template<class Birth> bool appendInitializedCell(int object,int x,int y,bool active,Birth birth){
+        DW_PROFILE_SCOPE(profileTerrainRecord);
+        Identity id;if(!allocate(object,x,y,active,0,-1,id))return false;
+        return birth(id.handle,mutable_[id.handle.slot],unboundedWallArt_)?true:(good_=false);
+    }
     RunnerRoomOrderState& allocatedRoomState(unsigned slot){return mutable_[slot].room;}
     RunnerRetainedLayerState& allocatedLayerState(unsigned slot){return mutable_[slot].layer;}
     RunnerRetainedLayerState* layerState(unsigned slot){return identities_.occupied(slot)?&mutable_[slot].layer:nullptr;}

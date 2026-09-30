@@ -44,6 +44,18 @@ public:
         bool execute(EmitFunction emit,void* context)const{
             return executeMode<true>(emit,context);
         }
+        template<class Emit> bool executeEach(Emit emit)const{
+            if(started_)return false;
+            started_=true;
+            int position=x;
+            for(unsigned cell=0;cell<count;++cell){
+                random_.nextU32();
+                command_.objectId=objectId;command_.x=position;command_.y=y;
+                if(!emit(command_))return false;
+                if(cell+1<count)position+=stepX;
+            }
+            completed_=true;return true;
+        }
         bool executeReference(EmitFunction emit,void* context)const{
             return executeMode<false>(emit,context);
         }

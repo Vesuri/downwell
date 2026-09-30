@@ -21,26 +21,22 @@ bool AmigaGameplayGeneration::createRun(void* opaque,const downwell::AreaOneBuil
     AmigaTerrainRunIndex index(self.index_,run.objectId,run.x,run.y,run.stepX,run.count);
     // Unsupported geometry retains scalar partial publication/failure timing.
     if(!index.ready())return run.execute(create,opaque);
-    struct Context{AmigaGameplayGeneration& self;AmigaTerrainRunIndex& index;bool dirty=false;};
-    Context context{self,index};
-    return run.execute([](void* opaque,const downwell::DeferredCreateInstance& command){
+    bool dirty=false;
+    return self.runtime_->createGeneratedTerrainRun(run,[&](const downwell::DeferredCreateInstance& command){
         DW_PROFILE_SCOPE(profileGeneratedRegistration);
-        auto& c=*static_cast<Context*>(opaque);
-        return c.self.runtime_->createGeneratedTerrain(command,[&](const auto& command){
-            {
-                DW_PROFILE_SCOPE(profileGeneratedIndex);
-                if(!c.index.append()||!c.self.tiles_.append(command))return false;
-            }
-            // Same row throughout; publish on the first successful backend
-            // cell, before its core Create (also preserving failure prefixes).
-            if(!c.dirty){
-                if(command.y-24<c.self.dirtyFirst)c.self.dirtyFirst=command.y-24;
-                if(command.y+24>c.self.dirtyEnd)c.self.dirtyEnd=command.y+24;
-                c.dirty=true;
-            }
-            return true;
-        });
-    },&context);
+        {
+            DW_PROFILE_SCOPE(profileGeneratedIndex);
+            if(!index.append()||!self.tiles_.append(command))return false;
+        }
+        // Same row throughout; publish on the first successful backend
+        // cell, before its core Create (also preserving failure prefixes).
+        if(!dirty){
+            if(command.y-24<self.dirtyFirst)self.dirtyFirst=command.y-24;
+            if(command.y+24>self.dirtyEnd)self.dirtyEnd=command.y+24;
+            dirty=true;
+        }
+        return true;
+    });
 }
 
 bool AmigaGameplayGeneration::create(void* opaque,
