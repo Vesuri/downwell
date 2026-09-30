@@ -240,7 +240,9 @@ changes, then check native timing with the trace and FPS tapes.
   observation boundaries; preserve immediate eligibility/flag observations,
   queue order, pressure drains and partial-failure prefixes. Reject isolated
   container substitutions that increase storage without reducing the native
-  generation burst. Keep synchronous Create and intervening RNG draws below.
+  generation burst. Capture history directly from builder-supplied run geometry;
+  do not rediscover runs by comparing each inserted rectangle. Keep synchronous
+  Create and intervening RNG draws below.
 - Keep each block's Create synchronous. Preserve per-cell RNG interleaving,
   equal-depth ordering, lifetime allocation and partial-failure prefixes. Shop
   and exit Create effects must precede the next pattern cell's random draw. Do
