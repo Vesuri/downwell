@@ -514,8 +514,32 @@ it still consumes a newly required dynamic layer ID, but leaves the adopted
 lifetime unattached and publishes no element, matching physical exhaustion.
 `logicalCapacityFailure` compares those complete prefixes, and
 `retainedLifetimeIntegration` exercises ordinary depth service and retirement
-against retained logical population. These tests do not yet replace gameplay's
-terrain element publication with unlinked records.
+against retained logical population.
+
+The opt-in run-store gameplay path uses `RunnerLogicalLayerOrder` for generated,
+unnumbered terrain. Its authoritative mutable terrain record holds layer slot,
+published layer ID, inactive flag and order key; birth and retirement bypass
+the ordinary element registry and lifetime records. Authored room instances
+retain the ordinary path. Actor depth service still sees the full logical
+population when deciding whether a layer is a singleton.
+
+Head and tail order keys reproduce insertion and activation order. Only a
+merge or room normalization materializes and sorts the combined logical walk;
+source layer IDs publish in that walk's order before concatenation. Inactive
+terrain supplies a cached per-layer Draw cutoff. A Draw callback's newly born
+head must not retroactively stop an already-started walk, whereas an inactive
+write to an upcoming terrain record must take effect immediately. The walker
+therefore retains the preceding actor's pre-callback order key as its lower
+bound. `RunnerLogicalLayerOrderTest` compares merges, mutations and these live
+callback cases with the physical linked reference.
+
+Live non-instance insertion into a retained layer is not admitted by this
+adapter: resource backgrounds load before terrain. Typed generated terrain
+does not expose a depth setter; attempts through this facade fail rather than
+silently targeting an ordinary lifetime. The ordinary capacity-sized arrays
+remain allocated in this experimental integration. Matching ownership
+witnesses does not justify enabling it by default: native timing and removal
+of that redundant storage remain required.
 
 Generated terrain may bind one initialized-birth transaction. The run store
 allocates the typed identity first, and the built-in collision owner completes

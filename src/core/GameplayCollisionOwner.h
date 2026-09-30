@@ -72,6 +72,8 @@ private:
     PreparedTerrainBirthBounds terrainBirthBounds_;
 #ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
     GameplayRoomLayers<View::capacity> layers_;
+#elif defined(DOWNWELL_TERRAIN_RUN_STORE)
+    GameplayRoomLayers<View::capacity,true,GameplayTerrainInstances> layers_;
 #else
     GameplayRoomLayers<View::capacity,true> layers_;
 #endif
@@ -356,6 +358,7 @@ public:
 #if defined(DOWNWELL_TERRAIN_RUN_STORE) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
         if(!owner_.bindTerrainLifetimes(terrain_))return;
         if(!room_.bindTerrain(terrain_))return;
+        if(!layers_.bindTerrain(terrain_,View::terrainBase))return;
 #endif
 #ifdef DOWNWELL_TERRAIN_RUN_STORE
         if(!terrain_.bindInitializedBirth(terrainBinding_))return;

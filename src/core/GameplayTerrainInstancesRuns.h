@@ -4,6 +4,7 @@
 #include "TerrainOwnershipRuns.h"
 #include "RunnerRegistrationOrder.h"
 #include "RunnerRoomOrderState.h"
+#include "RunnerLogicalLayerOrder.h"
 #include <cstddef>
 namespace downwell {
 class GameplayTerrainInstancesRuns {
@@ -31,6 +32,7 @@ private:
     struct Mutable:CreateValues {
         RunnerRegistrationOrder registration;
         RunnerRoomOrderState room;
+        RunnerRetainedLayerState layer;
         WallEndStepState wall{};
         bool active=true,destroyRequested=false,wallNeedsReset=false;
         // Replaces the old ever-used byte: pristine, allocated, published,
@@ -81,6 +83,15 @@ public:
         return true;
     }
     unsigned size()const{return identities_.size();}
+    RunnerRetainedLayerState* layerState(unsigned slot){return identities_.occupied(slot)?&mutable_[slot].layer:nullptr;}
+    const RunnerRetainedLayerState* layerState(unsigned slot)const{return identities_.occupied(slot)?&mutable_[slot].layer:nullptr;}
+    RunnerRetainedLayerState* layerState(InstanceHandle h){return identities_.contains(h)?&mutable_[h.slot].layer:nullptr;}
+    template<class Visit> bool visitLayerStates(Visit visit){
+        return identities_.visit([&](const Identity& id){return visit(id.handle,mutable_[id.handle.slot].layer);});
+    }
+    template<class Visit> bool visitLayerStates(Visit visit)const{
+        return identities_.visit([&](const Identity& id){return visit(id.handle,mutable_[id.handle.slot].layer);});
+    }
     unsigned roomRevision()const{return roomRevision_;}
     RunnerRoomOrderState* roomState(unsigned slot){
         return identities_.occupied(slot)?&mutable_[slot].room:nullptr;

@@ -4,19 +4,38 @@
 #include "RunnerLayerLifetimes.h"
 #include "RunnerLayerBackgrounds.h"
 #include "RunnerLayerDraw.h"
+#include "RunnerLogicalLayerOrder.h"
 namespace downwell {
+template<unsigned I,class Terrain> struct GameplayLayerStorage {
+    using Type=RunnerLogicalLayerOrder<64,I+256,Terrain>;
+    static constexpr bool retained=true;
+};
+template<unsigned I> struct GameplayLayerStorage<I,void> {
+    using Type=RunnerLayers<64,I+256>;
+    static constexpr bool retained=false;
+};
 // Native room layer ownership, separate from the animation/membership list.
 // Current gameplay rooms have no surviving native actors between entries.
 // Unrecovered dynamic numeric IDs remain unknown, not slot-derived aliases.
-template<unsigned I,bool CompactUnnumbered=false> class GameplayRoomLayers {
+template<unsigned I,bool CompactUnnumbered=false,class Terrain=void> class GameplayRoomLayers {
     static constexpr unsigned L=64,E=I+256,B=8;
-    using Registry=RunnerLayerInstances<L,E,I>;
-    using Layers=typename Registry::Layers;
+    using Storage=GameplayLayerStorage<I,Terrain>;
+    using Layers=typename Storage::Type;
+    using Registry=RunnerLayerInstances<L,E,I,Layers>;
     RunnerLayerIds ids_;
     Layers layers_;
     Registry registry_;
-    RunnerLayerBackgrounds<L,E,B> backgrounds_;
-    RunnerLayerLifetimes<L,E,I,true,CompactUnnumbered> lifetimes_{layers_,registry_,ids_};
+    RunnerLayerBackgrounds<L,E,B,Layers> backgrounds_;
+    RunnerLayerLifetimes<L,E,I,true,CompactUnnumbered,Layers> lifetimes_{layers_,registry_,ids_};
+    Terrain* terrain_=nullptr;
+    unsigned terrainFirst_=0;
+    RunnerRetainedLayerState* retainedState(InstanceHandle h)const{
+        if constexpr(Storage::retained){
+            if(terrain_&&h.slot>=terrainFirst_&&h.slot-terrainFirst_<Terrain::capacity)
+                return terrain_->layerState({h.slot-terrainFirst_,h.generation});
+        }
+        return nullptr;
+    }
     const RoomPack* rooms_=nullptr;
     bool visible_[L]{};
     // Actor projection only. Nonprojected scenery/fields still occupy their
@@ -36,6 +55,7 @@ template<unsigned I,bool CompactUnnumbered=false> class GameplayRoomLayers {
     bool fail(){good_=false;return false;}
     template<class Visit> bool visitProjectedElements(unsigned layer,Visit visit)const{
         if(!layers_.get(layer))return false;
+        RunnerLayerOrderKey after;bool haveAfter=false;
         for(unsigned e=layers_.firstDrawElement(layer);e!=Registry::End;){
             if(!projectionValid_[layer]){
                 unsigned next=Registry::End;
@@ -46,10 +66,16 @@ template<unsigned I,bool CompactUnnumbered=false> class GameplayRoomLayers {
                 projectionValid_[layer]=true;
             }
             e=nextRelevant_[e];if(e==Registry::End)break;
+            RunnerLayerOrderKey key;
+            if constexpr(Storage::retained){
+                key=layers_.physicalOrder(e);
+                if(layers_.cutsOff(layer,haveAfter?&after:nullptr,key))return true;
+            }
             // Save the raw successor, NOT the projected one: a callback can
             // activate scenery or insert after an upcoming skipped element.
             const unsigned next=layers_.nextDrawElement(e);
             if(!visit(e))return false;
+            if constexpr(Storage::retained){after=key;haveAfter=true;}
             e=next;
         }
         return true;
@@ -61,6 +87,11 @@ template<unsigned I,bool CompactUnnumbered=false> class GameplayRoomLayers {
         template<class Visit> bool visitDrawElements(unsigned layer,Visit visit)const{return owner.visitProjectedElements(layer,visit);}
     };
 public:
+    template<class T> bool bindTerrain(T& terrain,unsigned first){
+        static_assert(Storage::retained,"Retained layer storage required");
+        if(terrain_||first>I||Terrain::capacity>I-first||!layers_.bindTerrain(terrain))return false;
+        terrain_=&terrain;terrainFirst_=first;return true;
+    }
     explicit GameplayRoomLayers(const RoomPack* rooms):rooms_(rooms){
         if(rooms_&&!PackedRoomLayerLoader::loadCatalogIds(*rooms_,ids_))good_=false;
     }
@@ -95,6 +126,16 @@ public:
     bool birth(InstanceHandle h,unsigned sourceId,RunnerImageValue depth,bool inactive,bool projected=true){
         changedDraw();
         if(!enabled())return true;
+        if constexpr(Storage::retained)if(!sourceId&&!projected){
+            if(auto* state=retainedState(h)){
+                if(!valid()||!prepared_||state->bound()||!RunnerSpatialSplit::valid(depth))return fail();
+                std::int32_t integer;if(!RunnerDepthService::integerDepth(depth,integer))return fail();
+                unsigned layer=layers_.findDynamic(integer);
+                if(layer==Layers::End&&!ids_.createDynamic(layers_,integer,layer))return fail();
+                if(!layers_.retainInstance({h.slot-terrainFirst_,h.generation},layer,inactive))return fail();
+                ++live_;return true;
+            }
+        }
         if(!valid()||!prepared_||!(sourceId?lifetimes_.birth(h,sourceId,depth,inactive):
             lifetimes_.birthUnnumbered(h,depth,inactive,!projected)))return fail();
         const unsigned bit=1u<<(h.slot&7);
@@ -119,6 +160,10 @@ public:
         changedDraw();
         if(!enabled())return true;
         if(!valid()||!live_)return fail();
+        if constexpr(Storage::retained)if(auto* state=retainedState(h))if(state->bound()){
+            if(!layers_.releaseInstance({h.slot-terrainFirst_,h.generation}))return fail();
+            --live_;return true;
+        }
         const unsigned element=registry_.find(h);
         const unsigned layer=layers_.elementOwner(element);
         const unsigned previous=layers_.previousDrawElement(element);
@@ -143,6 +188,8 @@ public:
     bool activation(InstanceHandle h,bool active){
         changedDraw();
         if(!enabled())return true;
+        if constexpr(Storage::retained)if(auto* state=retainedState(h))if(state->bound())
+            return valid()&&layers_.publishInactive({h.slot-terrainFirst_,h.generation},!active);
         if(!valid()||!lifetimes_.publishInactive(h,!active))return false;
         if(!(projected_[h.slot>>3]&(1u<<(h.slot&7)))){
             const unsigned element=registry_.find(h);
@@ -161,6 +208,8 @@ public:
         changedDraw();
         if(!enabled())return true;
         if(!valid())return false;
+        if constexpr(Storage::retained)if(auto* state=retainedState(h))if(state->bound())
+            return layers_.reconcileRetained({h.slot-terrainFirst_,h.generation});
         int id;
         const unsigned layer=lifetimes_.attachedLayer(h,id)?layers_.find(id):Layers::End;
         if(layer==Layers::End)return fail();
@@ -175,6 +224,9 @@ public:
         return valid()&&lifetimes_.serviceDepths();
     }
     bool writeDepth(InstanceHandle h,MotionBinary64 value){
+        // Generated terrain has no exposed depth setter in the typed owner.
+        // Never route a retained handle into an unrelated physical lifetime.
+        if constexpr(Storage::retained)if(auto* state=retainedState(h))if(state->bound())return fail();
         return enabled()&&valid()&&lifetimes_.writeDepth(h,value);
     }
     template<class Lookup,class Draw> bool visit(Lookup lookup,Draw draw)const{

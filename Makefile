@@ -981,6 +981,16 @@ build/gameplay-collision-owner-run-store-test: tests/core/GameplayCollisionOwner
 
 test: verify-terrain-ownership-runs
 
+build/runner-logical-layer-order-test: tests/core/RunnerLogicalLayerOrderTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+
+.PHONY: verify-logical-layer-order
+verify-logical-layer-order: build/runner-logical-layer-order-test
+	./build/runner-logical-layer-order-test
+
+test: verify-logical-layer-order
+
 verify-gameplay-collision-owner: build/gameplay-collision-owner-test build/gameplay-collision-owner-scalar-test build/gameplay-collision-owner-snapshot-test build/gameplay-collision-owner-run-store-test
 	DOWNWELL_OWNERSHIP_WITNESS=build/ownership-runs.txt ./build/gameplay-collision-owner-test
 	DOWNWELL_OWNERSHIP_WITNESS=build/ownership-scalar.txt ./build/gameplay-collision-owner-scalar-test
