@@ -1,10 +1,16 @@
 #include "core/RunnerLayers.h"
 #include "core/RunnerLayerIds.h"
+#include "core/RunnerLayerLifetimes.h"
 static_assert(sizeof(downwell::RunnerLayers<64,3323,true>)<=
     sizeof(downwell::RunnerLayers<64,3323>)+65*sizeof(unsigned),
     "Retained population adds per-layer counts, never a per-cell array");
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
 using NativeRetainedLayers=downwell::RunnerLayers<64,3323,true>;
+using NativeRetainedLifetimes=downwell::RunnerLayerLifetimes<64,3323,3067,true,true,NativeRetainedLayers>;
+bool nativeRetainedLayerBirth(NativeRetainedLifetimes& lives,downwell::InstanceHandle h,downwell::RunnerImageValue depth){
+    return lives.birthUnnumbered(h,depth,false,true);
+}
+bool nativeRetainedLayerDepths(NativeRetainedLifetimes& lives){return lives.serviceDepths();}
 bool nativeRetainedLayerAdmission(NativeRetainedLayers& layers,unsigned layer,unsigned count){
     return layers.retain(layer,count);
 }

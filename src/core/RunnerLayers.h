@@ -62,7 +62,10 @@ public:
         linkAfter(free,previous);slot=free;return true;
     }
     unsigned elementOwner(unsigned element)const{return elements_.owner(element);}
-    unsigned firstFreeElement(unsigned start=0)const{return elements_.firstFree(start);}
+    unsigned firstFreeElement(unsigned start=0)const{
+        if constexpr(Retained)if(this->logical==Elements)return Elements;
+        return elements_.firstFree(start);
+    }
     unsigned elementCount(unsigned layer)const{
         if constexpr(Retained)return elements_.count(layer)+(layer<Capacity?this->retained[layer]:0);
         else return elements_.count(layer);

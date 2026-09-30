@@ -23,9 +23,9 @@ struct PackedRoomLayerLoader {
         }
         return true;
     }
-    template<unsigned L,unsigned E,unsigned I,class Publish>
-    static bool load(const RoomPack& pack,int roomId,RunnerLayers<L,E>& layers,
-        RunnerLayerInstances<L,E,I>& instances,Publish publish,RunnerLayerIds* ids=nullptr){
+    template<unsigned L,unsigned E,unsigned I,class LayerStorage,class Publish>
+    static bool load(const RoomPack& pack,int roomId,LayerStorage& layers,
+        RunnerLayerInstances<L,E,I,LayerStorage>& instances,Publish publish,RunnerLayerIds* ids=nullptr){
         if(!pack.valid()||!layers.succeeded())return false;
         bool empty=true;layers.visitLayers([&](unsigned,const auto&){empty=false;return false;});
         if(!empty)return false;

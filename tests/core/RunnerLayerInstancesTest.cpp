@@ -587,7 +587,42 @@ template<bool Fast> std::vector<unsigned> freshAttachmentWitness(unsigned mode){
     }
     return trace;
 }
-int main(){permutations();lifecycle();identityCollisions();bounds();roomFallback();globalFallbackOrder();serializedInitialization();rebindRelease();roomInitializationFailures();lifetimeDepthIntegration();lifetimeRoomInitialization();roomUninitialization();unnumberedLifetimes();
+template<bool Retained> std::vector<unsigned> logicalCapacityFailure(){
+    using Storage=RunnerLayers<4,4,Retained>;
+    using R=RunnerLayerInstances<4,4,2,Storage>;
+    using Lifetimes=RunnerLayerLifetimes<4,4,2,true,true,Storage>;
+    Storage layers;R registry;RunnerLayerIds ids;Lifetimes lives(layers,registry,ids);
+    unsigned full=4;require(layers.insertAfterEquals(5,0,true,full)&&ids.observeLoaded(10),"logical capacity fixture");
+    if constexpr(Retained)require(layers.retain(full,4),"retain full logical capacity");
+    else for(unsigned e=0;e<4;++e)require(layers.attach(full,e,true,false,[](unsigned){return false;}),"fill physical reference");
+    RunnerImageValue depth;depth.assignInteger(20);InstanceHandle h{0,17};
+    require(!lives.birthUnnumbered(h,depth,false,true)&&!lives.succeeded(),"capacity failure is terminal");
+    const auto* state=lives.resolve(h);require(state,"failed birth retains adopted lifetime");
+    std::vector<unsigned> out{unsigned(ids.dynamicMaximum),state->handle.slot,state->handle.generation,
+        state->depth.depth.bits,unsigned(state->depth.layerId),unsigned(state->depth.attached),
+        registry.find(h),layers.elementCount(full)};
+    layers.visitLayers([&](unsigned,const auto& layer){out.insert(out.end(),{unsigned(layer.id),unsigned(layer.depth)});return true;});
+    require(ids.dynamicMaximum==11&&!state->depth.attached&&state->depth.layerId==-1&&registry.find(h)==R::End,
+        "logical exhaustion consumes layer ID but publishes no element or attached state");
+    return out;
+}
+void retainedLifetimeIntegration(){
+    using Storage=RunnerLayers<4,8,true>;
+    using R=RunnerLayerInstances<4,8,4,Storage>;
+    using Lifetimes=RunnerLayerLifetimes<4,8,4,true,true,Storage>;
+    Storage layers;R registry;RunnerLayerIds ids;Lifetimes lives(layers,registry,ids);
+    unsigned terrain=4;require(ids.createDynamic(layers,0,terrain)&&layers.retain(terrain,3),"retained-only dynamic layer");
+    const int terrainId=layers.get(terrain)->id;const InstanceHandle actor{0,23};
+    require(lives.birthUnnumbered(actor,{},false,true)&&layers.elementCount(terrain)==4,"actor shares retained layer");
+    require(lives.writeDepth(actor,MotionBinary64::fromInteger(10))&&lives.serviceDepths(),"depth service sees logical population");
+    const auto* state=lives.resolve(actor);
+    require(state&&state->depth.layerId!=terrainId&&layers.get(terrain)->depth==0&&layers.elementCount(terrain)==3,
+        "ordinary lifetime owner cannot move retained terrain as a singleton actor");
+    require(lives.retire(actor)&&layers.get(terrain)&&layers.releaseRetained(terrain,3)&&!layers.get(terrain),
+        "actor and retained retirement dispose only their own empty layers");
+    require(logicalCapacityFailure<true>()==logicalCapacityFailure<false>(),"logical/physical capacity failure witnesses");
+}
+int main(){retainedLifetimeIntegration();permutations();lifecycle();identityCollisions();bounds();roomFallback();globalFallbackOrder();serializedInitialization();rebindRelease();roomInitializationFailures();lifetimeDepthIntegration();lifetimeRoomInitialization();roomUninitialization();unnumberedLifetimes();
     static_assert(sizeof(downwell::RunnerLayerEntry<true>)==12,"derived entry contains only identity fields");
     require(presenceWitness<true>()==presenceWitness<false>(),"derived/explicit presence lifecycle trace");
     require(compactLifetimeWitness<true>()==compactLifetimeWitness<false>(),"compact/full lifetime mutation trace");

@@ -16,9 +16,10 @@ template<> struct RunnerLayerEntry<true> {
 // IdentitySlots opts into a bounded, one-live-generation-per-slot owner.
 // Zero keeps the general full-handle hash index (including overlapping
 // generations of one slot). Neither index determines element/Draw order.
-template<unsigned LayerCapacity,unsigned ElementCapacity,unsigned IdentitySlots=0> class RunnerLayerInstances {
+template<unsigned LayerCapacity,unsigned ElementCapacity,unsigned IdentitySlots=0,
+    class LayerStorage=RunnerLayers<LayerCapacity,ElementCapacity>> class RunnerLayerInstances {
 public:
-    using Layers=RunnerLayers<LayerCapacity,ElementCapacity>;
+    using Layers=LayerStorage;
     static constexpr unsigned End=ElementCapacity;
     using Entry=RunnerLayerEntry<(IdentitySlots!=0)>;
     bool discardUninitialized(){

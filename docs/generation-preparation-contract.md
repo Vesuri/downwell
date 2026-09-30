@@ -506,6 +506,17 @@ it cannot supply those callbacks. This API alone does not route gameplay terrain
 away from ordinary layer entries; that requires the authoritative terrain owner
 to supply ordering and publication, not a no-op callback.
 
+The instance registry, lifetime owner, background owner and packed-room loader
+accept the same layer-storage type. Logical exhaustion must be reflected by
+`firstFreeElement`, not just rejected in `attach`: the compact birth path finds
+a free slot before publishing registry identity and attached state. On exhaustion
+it still consumes a newly required dynamic layer ID, but leaves the adopted
+lifetime unattached and publishes no element, matching physical exhaustion.
+`logicalCapacityFailure` compares those complete prefixes, and
+`retainedLifetimeIntegration` exercises ordinary depth service and retirement
+against retained logical population. These tests do not yet replace gameplay's
+terrain element publication with unlinked records.
+
 Generated terrain may bind one initialized-birth transaction. The run store
 allocates the typed identity first, and the built-in collision owner completes
 ordinary birth publication before executing `terrainCreateProperties`. Create

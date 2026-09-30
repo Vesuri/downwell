@@ -6,9 +6,9 @@ namespace downwell {
 // Bounded background payload owner sharing element slots with instance
 // reservations. Slots are NOT source element IDs; the process-wide source ID
 // allocator must be connected separately. Never copy an owner with live links.
-template<unsigned L,unsigned E,unsigned Capacity> class RunnerLayerBackgrounds {
+template<unsigned L,unsigned E,unsigned Capacity,class LayerStorage=RunnerLayers<L,E>> class RunnerLayerBackgrounds {
 public:
-    using Layers=RunnerLayers<L,E>;
+    using Layers=LayerStorage;
     RunnerLayerBackgrounds()=default;
     RunnerLayerBackgrounds(const RunnerLayerBackgrounds&)=delete;
     RunnerLayerBackgrounds& operator=(const RunnerLayerBackgrounds&)=delete;
