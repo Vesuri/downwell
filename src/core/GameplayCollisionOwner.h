@@ -223,14 +223,29 @@ private:
             auto& p=parent.properties_[h.slot];
 #if defined(DOWNWELL_TERRAIN_RUN_STORE) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
             if constexpr(Kind==View::Kind::terrain)if(preparedTerrain){
-                const bool born=parent.owner_.attachPreparedTerrainBirth(h,object(r),state,p,
-                    parent.objectDefaults_,parent.families_,terrainBounds,terrainPixels,terrainPrecise,
-                    [&](RunnerImageValue depth){
-                        if(!parent.check(parent.room_.bind(h.slot,depth)))return false;
+                const bool admitted=AllocatedTerrain&&parent.world_&&parent.world_->terrainInstances()==&parent.terrain_;
+                auto between=[&](RunnerImageValue depth){
+                        if(admitted)parent.room_.bindAllocatedTerrain(h.slot,depth);
+                        else if(!parent.check(parent.room_.bind(h.slot,depth)))return false;
                         if(!r.active)parent.activationPending_=true;
                         return true;
-                    },terrainGeometry);
+                    };
+                bool born;
+                if constexpr(AllocatedTerrain){
+                    // The typed allocator just admitted and reset this slot.
+                    // Only that exact owner may bypass a second identity walk.
+                    if(admitted)
+                        born=parent.owner_.template attachPreparedTerrainBirth<true>(h,object(r),state,p,
+                            parent.objectDefaults_,parent.families_,terrainBounds,terrainPixels,terrainPrecise,
+                            between,terrainGeometry);
+                    else born=parent.owner_.attachPreparedTerrainBirth(h,object(r),state,p,
+                        parent.objectDefaults_,parent.families_,terrainBounds,terrainPixels,terrainPrecise,
+                        between,terrainGeometry);
+                }else born=parent.owner_.attachPreparedTerrainBirth(h,object(r),state,p,
+                    parent.objectDefaults_,parent.families_,terrainBounds,terrainPixels,terrainPrecise,
+                    between,terrainGeometry);
                 if(!parent.check(born))return false;
+                if(admitted)return parent.check(parent.layers_.birthAllocatedTerrain(h,p.depth,!r.active));
                 return parent.check(parent.layers_.birth(h,r.sourceInstanceId,p.depth,!r.active,false));
             }
 #endif

@@ -132,7 +132,10 @@ static void observedRegistration(){
     for(unsigned i=0;i<64;++i){
         int object=i%3==0?60:i%3==1?93:99;
         require(terrain.append(object,int(i)*16,32,true));const auto h=terrain.handle(i);
-        bind(h.slot+2,object,h.generation);
+        if(i&1){
+            require(observed.bindAllocatedTerrain(h.slot+2,object));
+            require(scalar.bind(h.slot+2,object,h.generation));compare();
+        }else bind(h.slot+2,object,h.generation);
         if(i%7==0)bind(2050,35,i+1);
     }
     unsigned random=77123;
@@ -188,7 +191,11 @@ static void observedRoom(){
     unsigned random=71413;
     for(unsigned round=0;round<8;++round){
         room.clear();scalar.clear();compare();
-        for(unsigned s:slots){require(room.bind(s,{})&&scalar.bind(s,{}));compare();}
+        for(unsigned s:slots){
+            if(s>=2&&s<2050&&(s&1))room.bindAllocatedTerrain(s,{});
+            else require(room.bind(s,{}));
+            require(scalar.bind(s,{}));compare();
+        }
         for(unsigned step=0;step<512;++step){
             random=random*1664525u+1013904223u;
             const unsigned slot=slots[(random>>8)%slots.size()],op=(random>>20)%6;

@@ -83,6 +83,8 @@ public:
         return true;
     }
     unsigned size()const{return identities_.size();}
+    RunnerRoomOrderState& allocatedRoomState(unsigned slot){return mutable_[slot].room;}
+    RunnerRetainedLayerState& allocatedLayerState(unsigned slot){return mutable_[slot].layer;}
     RunnerRetainedLayerState* layerState(unsigned slot){return identities_.occupied(slot)?&mutable_[slot].layer:nullptr;}
     const RunnerRetainedLayerState* layerState(unsigned slot)const{return identities_.occupied(slot)?&mutable_[slot].layer:nullptr;}
     RunnerRetainedLayerState* layerState(InstanceHandle h){return identities_.contains(h)?&mutable_[h.slot].layer:nullptr;}
@@ -117,6 +119,13 @@ public:
         if(!order.present()||!identities_.contains(h)||identities_.object(h.slot)!=object)return false;
         if(!registered(h.slot))++registered_[family(object)];
         mutable_[h.slot].registration=order;++registrationRevision_;return true;
+    }
+    // Only inside appendInitialized's admitted fresh-birth transaction. The
+    // allocator owns slot, family and empty membership; no external observer
+    // or setter may intervene. General registration retains its checks above.
+    void registerAllocated(unsigned slot,int object,RunnerRegistrationOrder order){
+        ++registered_[family(object)];mutable_[slot].registration=order;
+        ++registrationRevision_;
     }
     bool unregisterInstance(unsigned slot){
         if(!registered(slot))return false;

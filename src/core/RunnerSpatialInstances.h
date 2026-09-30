@@ -270,7 +270,7 @@ public:
     // mutate this spatial owner. On failure publish the same partial state as
     // the separate attach/default/room/bounds operations. On success write
     // final bounds once, instead of constructing a zero cache to overwrite.
-    template<unsigned Resources,class Graph,class Between>
+    template<bool AllocatedTerrain=false,unsigned Resources,class Graph,class Between>
     bool attachPreparedTerrainBirth(InstanceHandle h,int object,const State& state,
         Properties& p,const PreparedObjectDefaults<Resources>& defaults,Graph& graph,
         const Box& bounds,Math::PixelBox pixels,bool precise,Between between,
@@ -280,13 +280,19 @@ public:
             if(d&&graph.valid()&&objectFlags&&(*objectFlags&0x87u)==d->propertyFlags&&
                 (state.flags&~2u)==8u&&!state.special&&
                 !(state.bounds.left.bits|state.bounds.top.bits|state.bounds.right.bits|state.bounds.bottom.bits)&&
-                (d->spriteId==-1||d->frames<=65535u)&&valid()&&lifetimes_.canAttach(h,object)&&
+                (d->spriteId==-1||d->frames<=65535u)&&
+                (AllocatedTerrain||(valid()&&lifetimes_.canAttach(h,object)))&&
                 Math::valid(state.x)&&Math::valid(state.y)){
                 auto& s=entries_[h.slot].state;
                 s.x=state.x;s.y=state.y;s.previous={state.x,state.y};
                 s.kind=state.kind;s.special=false;s.flags=state.flags;
                 lifetimes_.publish(h,object);
-                if(!membership_.bind(h.slot,object,h.generation)){
+                if constexpr(AllocatedTerrain){
+                    static_assert(PreparedGeometry,"Admitted native terrain owner only");
+                    if(!membership_.bindAllocatedTerrain(h.slot,object)){
+                        s.bounds={};changedBinding(h.slot);return false;
+                    }
+                }else if(!membership_.bind(h.slot,object,h.generation)){
                     s.bounds={};changedBinding(h.slot);return false;
                 }
                 changedFreshBinding(h.slot);membership_.repeatFreshTailBinding();

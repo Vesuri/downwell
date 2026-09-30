@@ -123,6 +123,18 @@ public:
         prepared_=true;return true;
     }
     unsigned playerSourceId()const{return playerId_;}
+    // Only generated, unnumbered, nonprojected terrain inside its allocator's
+    // fresh-birth transaction. Layer creation and ID allocation stay live.
+    bool birthAllocatedTerrain(InstanceHandle h,RunnerImageValue depth,bool inactive){
+        static_assert(Storage::retained,"Owned terrain layers required");
+        changedDraw();if(!enabled())return true;
+        if(!prepared_)return fail();
+        std::int32_t integer;if(!RunnerDepthService::integerDepth(depth,integer))return fail();
+        unsigned layer=layers_.findDynamic(integer);
+        if(layer==Layers::End&&!ids_.createDynamic(layers_,integer,layer))return fail();
+        if(!layers_.retainAllocated(terrain_->allocatedLayerState(h.slot-terrainFirst_),layer,inactive))return fail();
+        ++live_;return true;
+    }
     bool birth(InstanceHandle h,unsigned sourceId,RunnerImageValue depth,bool inactive,bool projected=true){
         changedDraw();
         if(!enabled())return true;

@@ -69,6 +69,11 @@ public:
     }
     unsigned size()const{return actors_.size()+(terrain_?terrain_->registeredCount():0);}
     void repeatFreshTailBinding(){revision_+=2;}
+    bool bindAllocatedTerrain(unsigned s,int object){
+        auto next=clock_;next.advance();if(!next.present())return false;
+        terrain_->registerAllocated(s-First,object,next);clock_=next;
+        ++revision_;ordered_=false;return true;
+    }
     bool bind(unsigned s,int object,std::uint32_t id){
         if(s>=Capacity||object<0)return false;
         const bool wasRegistered=contains(s);

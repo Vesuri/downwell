@@ -38,6 +38,7 @@ static void merges(){
         for(unsigned e=0;e<8;++e){const unsigned layer=layers[e<split?0:1];
             REQUIRE(reference.attach(layer,e,true,false,[](unsigned){return false;}));
             if(e<4)REQUIRE(logical.attach(layer,e,true,false,[](unsigned){return false;}));
+            else if(e&1)REQUIRE(logical.retainAllocated(terrain.states[e-4],layer,(mask&(1u<<e))!=0));
             else REQUIRE(logical.retainInstance({e-4,1},layer,(mask&(1u<<e))!=0));
         }
         compare(logical,reference);

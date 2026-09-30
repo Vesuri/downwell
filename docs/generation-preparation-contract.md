@@ -626,8 +626,25 @@ separate-operation reference. The reference remains callable for verification.
 The initialized-allocation callback receives its record directly from the
 terrain store. When that store is the world's bound authoritative store, it
 does not deserialize the same run again to compare the record to itself.
-Spatial admission still validates the generation/object identity. Other
-bindings and ownership contexts retain the ordinary record-resolution check.
+The allocator-owned, prepared birth carries that admission through spatial,
+registration, room and retained-layer publication: these owners must not each
+look up the same immutable run identity again. The typed allocation has already
+validated slot/family/capacity and reset reused mutable state; the collision
+owner verifies that it is the world's bound terrain store and that the encoded
+handle matches the callback's generation. Only that callback-free interval can
+use the admitted entry points. Other bindings and ownership contexts retain
+ordinary generation/object and record-resolution checks.
+
+Direct registration still advances its original clock, family count and both
+logical bind revisions, rejecting clock exhaustion before publication. Direct
+room publication advances the room clock/revision and starts active/unmarked;
+it cannot be used for a rebind with old cleanup marks. Retained-layer birth
+still resolves/creates the dynamic layer and allocates its ID at the original
+point, retaining capacity failures, element counts and inactive cutoffs. It
+omits only fresh-slot identity/empty-state rediscovery. No observer can run
+between typed admission and those writes. These entry points neither batch
+separate births nor change their RNG/Create order, and do not remove the
+remaining spatial state, property or dirty-queue storage.
 
 Generated terrain may bind one initialized-birth transaction. The run store
 allocates the typed identity first, and the built-in collision owner completes

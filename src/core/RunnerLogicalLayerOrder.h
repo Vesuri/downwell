@@ -110,6 +110,11 @@ public:
         *s={stamp(false),Base::get(layer)->id,layer,inactive};
         cutoffs_[layer].dirty=true;return true;
     }
+    bool retainAllocated(RunnerRetainedLayerState& s,unsigned layer,bool inactive){
+        if(!Base::retain(layer,1))return false;
+        s={stamp(false),Base::get(layer)->id,layer,inactive};
+        cutoffs_[layer].dirty=true;return true;
+    }
     bool releaseInstance(InstanceHandle h){
         auto* s=terrain_?terrain_->layerState(h):nullptr;
         if(!succeeded()||!s||!s->bound()||!Base::releaseRetained(s->layer,1))return false;

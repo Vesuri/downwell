@@ -144,6 +144,13 @@ public:
         if(p->list<0&&!external(s))liveActors_[actorCount_++]=Slot(s);
         clock_.advance();*p={clock_,key,0,false};changed(s);return true;
     }
+    // Fresh typed allocation owns an empty room state and a validated default
+    // depth. No unmark/search is necessary; retirement already removed old
+    // marks before this slot was reused.
+    void bindAllocatedTerrain(unsigned s,RunnerImageValue key){
+        clock_.advance();terrain_->allocatedRoomState(s-First)={clock_,key,0,false};
+        terrain_->roomChanged();
+    }
     bool remove(unsigned s){
         if(!contains(s))return false;
         unmark(s);
