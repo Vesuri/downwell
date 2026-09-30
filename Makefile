@@ -975,6 +975,46 @@ build/terrain-ownership-runs-test: tests/core/TerrainOwnershipRunsTest.cpp src/c
 verify-terrain-ownership-runs: build/terrain-ownership-runs-test
 	./build/terrain-ownership-runs-test
 .PHONY: verify-terrain-ownership-runs
+build/terrain-appearance-publication-test: tests/core/TerrainAppearancePublicationTest.cpp src/core/ObjectPack.cpp src/core/GameMakerRandom.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+
+.PHONY: verify-terrain-appearance-publication
+verify-terrain-appearance-publication: build/terrain-appearance-publication-test generate-object-pack generate-sprite-pack
+	./build/terrain-appearance-publication-test
+
+test: verify-terrain-appearance-publication
+
+build/terrain-spatial-publication-test: tests/core/TerrainSpatialPublicationTest.cpp src/core/ObjectPack.cpp src/core/GameMakerRandom.cpp $(wildcard src/core/*.h)
+	@mkdir -p $(@D)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ tests/core/TerrainSpatialPublicationTest.cpp src/core/ObjectPack.cpp src/core/GameMakerRandom.cpp
+
+.PHONY: verify-terrain-spatial-publication
+verify-terrain-spatial-publication: build/terrain-spatial-publication-test generate-object-pack generate-sprite-pack
+	./build/terrain-spatial-publication-test
+
+test: verify-terrain-spatial-publication
+
+build/terrain-birth-transaction-test: tests/core/TerrainBirthTransactionTest.cpp src/core/ObjectPack.cpp src/core/GameMakerRandom.cpp $(wildcard src/core/*.h)
+	@mkdir -p $(@D)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ tests/core/TerrainBirthTransactionTest.cpp src/core/ObjectPack.cpp src/core/GameMakerRandom.cpp
+
+.PHONY: verify-terrain-birth-transaction
+verify-terrain-birth-transaction: build/terrain-birth-transaction-test generate-object-pack generate-sprite-pack
+	./build/terrain-birth-transaction-test
+
+test: verify-terrain-birth-transaction
+
+build/runner-observed-dirty-test: tests/core/RunnerObservedDirtyQueueTest.cpp src/core/GameMakerRandom.cpp $(wildcard src/core/*.h)
+	@mkdir -p $(@D)
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/RunnerObservedDirtyQueueTest.cpp src/core/GameMakerRandom.cpp
+
+.PHONY: verify-observed-dirty-queues
+verify-observed-dirty-queues: build/runner-observed-dirty-test
+	./build/runner-observed-dirty-test
+
+test: verify-observed-dirty-queues
+
 build/gameplay-collision-owner-run-store-test: tests/core/GameplayCollisionOwnerTest.cpp src/core/GameplayWorld.cpp src/core/PlayerMotion.cpp src/core/Replay.cpp src/core/GameMakerRandom.cpp src/core/ObjectPack.cpp src/core/RoomPack.cpp src/core/AreaOneBuilder.cpp src/core/BuilderPatternPack.cpp $(wildcard src/core/*.h)
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_TERRAIN_RUN_STORE=1 -o $@ $(filter %.cpp,$^)

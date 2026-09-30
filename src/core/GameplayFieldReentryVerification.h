@@ -146,7 +146,7 @@ struct GameplayFieldReentryVerification {
         laterGeneration=local.generation;
         InstanceHandle key;
         if(laterGeneration<=firstGeneration||!GameplayCollisionView::encode(GameplayCollisionView::Kind::goalField,local,key))return false;
-        const auto* state=owner.state(key);const auto* properties=owner.properties(key);
+        const auto state=owner.state(key);const auto properties=owner.properties(key);
         PackedObject definition;
         if(!objects.findObject(371,definition)||!state||!properties||(state->flags&0x100003u)||
             state->x.bits!=0x43700000u||state->y.bits!=0x43400000u||

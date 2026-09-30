@@ -558,7 +558,7 @@ int main(){
                 ++pauses;const auto key=owner->timeChanges().handle(pauses);
                 const auto* record=owner->timeChanges().find(key);InstanceHandle shared;
                 if(!record||!GameplayCollisionView::encode(GameplayCollisionView::Kind::timeChange,key,shared))return false;
-                const auto* published=owner->state(shared);
+                const auto published=owner->state(shared);
                 return ms==30&&speed==30&&record->sourceId==id&&record->alarms.get(0)==2&&
                     record->alarms.get(1)==2&&published&&published->x.bits==0x43704000u&&published->y.bits==0x43308000u;
             });};
@@ -606,22 +606,26 @@ int main(){
             assert(owner->terrain().append(kinds[i],32+int(i)*16,240,true));
             local[i]=owner->terrain().handle(i);
             assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,local[i],shared[i]));
-            const auto* state=owner->state(shared[i]);
+            const auto state=owner->state(shared[i]);
             assert(state&&state->previous.x.bits==state->x.bits);
             // Seed only the snapshot with a sentinel to make the animation
             // boundary's write observable without moving indexed geometry.
+#if defined(DOWNWELL_TERRAIN_RUN_STORE) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
+            auto seeded=*state;seeded.previous={};owner->terrain().spatialLiteral(local[i].slot,seeded);
+#else
             const_cast<GameplayCollisionOwner::Owner::State*>(state)->previous={};
+#endif
         }
         assert(owner->terrain().activation(local[1],false)&&owner->reconcileActivation());
         world->step(0);assert(world->effectsSucceeded()&&owner->valid());
         for(unsigned i:{0u,2u}){
-            const auto* state=owner->state(shared[i]);
+            const auto state=owner->state(shared[i]);
             assert(state&&state->previous.x.bits==state->x.bits&&state->previous.y.bits==state->y.bits);
         }
         assert(owner->state(shared[1])->previous.x.bits==0&&owner->state(shared[1])->previous.y.bits==0);
         assert(owner->terrain().activation(local[1],true)&&owner->reconcileActivation());
         world->step(0);assert(world->effectsSucceeded()&&owner->valid());
-        const auto* reactivated=owner->state(shared[1]);
+        const auto reactivated=owner->state(shared[1]);
         assert(reactivated->previous.x.bits==reactivated->x.bits&&reactivated->previous.y.bits==reactivated->y.bits);
     }
     checkEnemySlotDirectory(objects,sprites);
@@ -760,7 +764,7 @@ int main(){
         assert(scene->spawnDebris(effects,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(504),area,local));
         assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::debris,local,shared));
         PackedSpriteCollision particle,target;PackedObject definition;
-        const auto* p=collision->properties(shared);
+        const auto p=collision->properties(shared);
         assert(p&&sprites.collisionSprite(p->sprite.spriteId,p->sprite.maskId,particle)&&!particle.collisionMode);
         assert(objects.findObject(object,definition)&&
             sprites.collisionSprite(object==92?definition.spriteId:terrainTileForArea(1),definition.textureMaskId,target)&&!target.collisionMode);
@@ -974,7 +978,7 @@ int main(){
                 bool hit=false;
                 assert(collision->playerTimeFieldMeeting(x,MotionBinary64::fromInteger(512),masks,hit));
                 hit?++hits:++misses;
-                const auto* state=collision->state(player);assert(state);
+                const auto state=collision->state(player);assert(state);
                 assert(state->x.bits==before.x.bits&&state->y.bits==before.y.bits&&
                     state->previous.x.bits==before.previous.x.bits&&state->previous.y.bits==before.previous.y.bits);
             }
@@ -1015,7 +1019,7 @@ int main(){
         assert(GameplayCollisionView::decode(key,kind,decoded)&&kind==GameplayCollisionView::Kind::debris&&
             decoded.slot==local.slot&&decoded.generation==local.generation);
         const auto* record=registry.find(local);assert(record);
-        const auto* state=collision->state(key);const auto* properties=collision->properties(key);
+        const auto state=collision->state(key);const auto properties=collision->properties(key);
         RunnerImageValue depth;assert(depth.assign(MotionBinary64::fromInteger(-1000)));
         assert(state&&state->x.bits==expected.x.bits&&state->y.bits==expected.y.bits&&
             properties&&properties->depth.bits==depth.bits&&properties->sprite.spriteId==expected.spriteId&&
@@ -1065,7 +1069,7 @@ int main(){
         assert(first&&registration.size()==1);
         InstanceHandle key;
         assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::scriptEffect,registration.handle(first),key));
-        const auto* effect=effects.get(first);const auto* state=collision->state(key);
+        const auto* effect=effects.get(first);const auto state=collision->state(key);
         assert(effect&&state&&state->x.bits==effect->x.bits&&state->y.bits==effect->y.bits);
         assert(collision->properties(key)->sprite.spriteId==603&&collision->properties(key)->sprite.angle.bits==0x43870000u);
         unsigned count=0;assert(collision->population(219,count)&&count==1);
@@ -1156,7 +1160,7 @@ int main(){
         assert(motion.commitPosition([&](RunnerImageValue x,RunnerImageValue y){
             assert(writes==0?y.bits==original.y.bits:x.bits==motion.x.bits);
             assert(world->publishBulletCollisionPosition(key,x,y));
-            const auto* state=owner->state(shared);
+            const auto state=owner->state(shared);
             assert(state&&state->x.bits==x.bits&&state->y.bits==y.bits&&(state->flags&1u));
             assert(state->previous.x.bits==original.previous.x.bits&&state->previous.y.bits==original.previous.y.bits);
             ++writes;return true;
@@ -1207,7 +1211,7 @@ int main(){
                     ++writes;
                 }
                 if(!world.publishBulletCollisionPosition(shotKey,x,y))return false;
-                const auto* state=owner.state(shotShared);
+                const auto state=owner.state(shotShared);
                 return state&&state->x.bits==x.bits&&state->y.bits==y.bits;
             }
             bool query(int object,GameplayCollisionOwner::Owner::Result& result){
@@ -1540,7 +1544,8 @@ int main(){
             for(unsigned i=0;i<3;++i){
                 const auto local=queries->terrain().handle(i);const auto r=queries->terrain().find(local);
                 InstanceHandle key;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,local,key));
-                const auto& p=queries->properties(key)->sprite;PackedSpriteCollision resource;
+                const auto appearance=queries->properties(key);
+                const auto& p=appearance->sprite;PackedSpriteCollision resource;
                 assert(sprites.collisionSprite(p.spriteId,p.maskId,resource));
                 const int px=x-r->x+resource.originX,py=y-r->y+resource.originY;
                 if(px<resource.marginLeft||px>resource.marginRight||py<resource.marginTop||py>resource.marginBottom)continue;
@@ -1570,7 +1575,7 @@ int main(){
         for(auto p:{DeferredCreateInstance{0,256,512},DeferredCreateInstance{0,240,528},DeferredCreateInstance{1,240,512},DeferredCreateInstance{1,224,512}}){
             bool hit=false;
             assert(queries->terrainPlaceMeeting(self,60,MotionBinary64::fromInteger(p.x),MotionBinary64::fromInteger(p.y),masks,hit)&&hit==(p.objectId==0));
-            const auto* restored=queries->state(shared);
+            const auto restored=queries->state(shared);
             assert(restored&&restored->x.bits==before.x.bits&&restored->y.bits==before.y.bits);
             assert(restored->previous.x.bits==before.previous.x.bits&&restored->previous.y.bits==before.previous.y.bits);
         }
@@ -1602,7 +1607,7 @@ int main(){
                 assert(x.add({0x3fd00000u,0})&&y.add({0xbfd00000u,0})); // +1/4, -1/4
                 bool found=false;
                 assert(queries->terrainPlaceMeeting(caller,60,x,y,masks,found));
-                const auto* restored=queries->state(callerKey);
+                const auto restored=queries->state(callerKey);
                 const auto terrain=queries->terrain().find(caller);
                 assert(restored&&terrain&&restored->x.bits==original.x.bits&&restored->y.bits==original.y.bits);
                 assert(restored->previous.x.bits==original.previous.x.bits&&restored->previous.y.bits==original.previous.y.bits);
@@ -1742,7 +1747,7 @@ int main(){
             for(unsigned i=0;i<runOwner->terrain().size();++i){
                 const auto h=runOwner->terrain().handle(i);const auto r=runOwner->terrain().find(h);
                 InstanceHandle shared;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,h,shared));
-                const auto* s=runOwner->state(shared);const auto* p=runOwner->properties(shared);assert(s&&p);
+                const auto s=runOwner->state(shared);const auto p=runOwner->properties(shared);assert(s&&p);
                 trace<<"run-cell "<<h.slot<<' '<<h.generation<<' '<<r->objectId<<' '<<r->x<<' '<<r->y
                     <<' '<<r->spriteId<<' '<<r->imageIndex<<' '<<r->imageSpeed<<' '<<s->x.bits<<' '<<s->y.bits
                     <<' '<<s->previous.x.bits<<' '<<s->previous.y.bits<<' '<<s->flags<<' '<<s->kind<<' '<<s->special
@@ -1818,7 +1823,7 @@ int main(){
                 bool hit=false;
                 assert(cold->terrainPlaceMeeting(h,60,MotionBinary64::fromInteger(r->x+16),
                     MotionBinary64::fromInteger(r->y),masks,hit));
-                const auto* after=cold->state(shared);assert(after);
+                const auto after=cold->state(shared);assert(after);
                 assert(before.x.bits==after->x.bits&&before.y.bits==after->y.bits&&
                     before.previous.x.bits==after->previous.x.bits&&before.previous.y.bits==after->previous.y.bits);
                 trace<<"cold-restore "<<i<<' '<<hit<<' '<<after->x.bits<<' '<<after->y.bits
@@ -1848,7 +1853,7 @@ int main(){
             for(unsigned i=0;i<owner->terrain().size();++i){
                 const auto h=owner->terrain().handle(i);const auto r=owner->terrain().find(h);assert(r);
                 InstanceHandle shared;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,h,shared));
-                const auto* s=owner->state(shared);const auto* p=owner->properties(shared);assert(s&&p);
+                const auto s=owner->state(shared);const auto p=owner->properties(shared);assert(s&&p);
                 trace<<"terrain "<<h.slot<<' '<<h.generation<<' '<<r->objectId<<' '<<r->x<<' '<<r->y
                     <<' '<<r->active<<' '<<r->sourceInstanceId<<' '<<r->creationCodeId<<' '<<r->spriteId
                     <<' '<<r->imageIndex<<' '<<r->imageSpeed<<' '<<r->destroyRequested<<'\n';
@@ -1927,17 +1932,17 @@ int main(){
             const auto initial=*boundary->properties(shared);
             const auto birth=*boundary->state(shared);
             auto unchangedDefaults=[&]{
-                const auto& p=*boundary->properties(shared);
+                const auto p=*boundary->properties(shared);
                 assert(p.sprite.maskId==initial.sprite.maskId&&p.depth.bits==initial.depth.bits&&
                     p.sprite.scaleX.bits==0x3f800000u&&p.sprite.scaleY.bits==0x3f800000u&&
                     p.sprite.angle.bits==0&&p.timeline.bits==0&&p.cachedFrame.bits==0xbf800000u);
-                const auto& s=*boundary->state(shared);
+                const auto stateRead=boundary->state(shared);const auto& s=*stateRead;
                 assert(s.x.bits==birth.x.bits&&s.y.bits==birth.y.bits&&
                     s.previous.x.bits==birth.previous.x.bits&&s.previous.y.bits==birth.previous.y.bits&&
                     s.kind==birth.kind&&s.special==birth.special);
             };
             auto unchangedBounds=[&]{
-                const auto& b=boundary->state(shared)->bounds;
+                const auto stateRead=boundary->state(shared);const auto& b=stateRead->bounds;
                 assert(b.left.bits==birth.bounds.left.bits&&b.top.bits==birth.bounds.top.bits&&
                     b.right.bits==birth.bounds.right.bits&&b.bottom.bits==birth.bounds.bottom.bits);
             };
@@ -1956,7 +1961,7 @@ int main(){
                 // the nonnegative index, but wall Create does not subsequently
                 // write the typed presentation index. Platform Create does.
                 assert(boundary->terrain().createProperties(local,-1,false,random));
-                const auto& p=*boundary->properties(shared);
+                const auto p=*boundary->properties(shared);
                 const auto typed=boundary->terrain().find(local);
                 assert(p.sprite.spriteId==-1&&typed->spriteId==-1);
                 assert(p.sprite.imageIndex.bits==(object==60?0u:0x41b80000u));
@@ -2298,7 +2303,7 @@ int main(){
             assert(stored&&stored->sourceInstanceId==r.instanceId&&stored->creationCodeId==r.creationCodeId&&
                 stored->x==r.x&&stored->y==r.y&&stored->objectId==r.objectId&&
                 GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,local,shared));
-            const auto* state=roomOwner->state(shared);std::int32_t x,y;
+            const auto state=roomOwner->state(shared);std::int32_t x,y;
             assert(state&&state->x.promoted().roundPixel(x)&&state->y.promoted().roundPixel(y)&&x==r.x&&y==r.y);
             assert(stored->spriteId==51&&stored->imageSpeed==0&&roomOwner->properties(shared)->sprite.spriteId==51);
             assert(stored->wall.pillar==(r.creationCodeId==677?1:r.creationCodeId==676||r.creationCodeId==678?-1:0));
@@ -2433,7 +2438,7 @@ int main(){
         GameplayCollisionView::Record record;
         assert(GameplayCollisionView(*fieldWorld).resolve(fieldKey,record)&&record.timeField==fieldWorld->timeFields().at(0));
         checkCollisionViewMembership(*fieldWorld);
-        const auto* state=fieldsOwner->state(fieldKey);std::int32_t x,y;
+        const auto state=fieldsOwner->state(fieldKey);std::int32_t x,y;
         assert(state&&state->x.promoted().roundPixel(x)&&x==240&&state->y.promoted().roundPixel(y)&&y==512);
         unsigned population=0;
         assert(fieldsOwner->population(82,population)&&population==1&&
@@ -2444,7 +2449,7 @@ int main(){
         assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::exitController,exitLocal,exitKey)&&
             GameplayCollisionView::encode(GameplayCollisionView::Kind::exitController,fieldWorld->exitControllers().handle(1),setterKey));
         for(auto key:{exitKey,setterKey}){
-            const auto* p=fieldsOwner->properties(key);const auto* s=fieldsOwner->state(key);
+            const auto p=fieldsOwner->properties(key);const auto s=fieldsOwner->state(key);
             PackedObject definition;
             assert(objects.findObject(key.slot==exitKey.slot?306:74,definition)&&p&&s&&!(s->flags&0x100003u)&&
                 p->sprite.spriteId==definition.spriteId&&p->sprite.maskId==definition.textureMaskId&&
@@ -2453,8 +2458,8 @@ int main(){
         const auto goalLocal=fieldWorld->goalFieldInstances().handle(0);
         InstanceHandle goalKey;
         assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::goalField,goalLocal,goalKey));
-        const auto* goal=fieldsOwner->state(goalKey);
-        const auto* goalProperties=fieldsOwner->properties(goalKey);
+        const auto goal=fieldsOwner->state(goalKey);
+        const auto goalProperties=fieldsOwner->properties(goalKey);
         assert(goal&&goalProperties&&goal->x.promoted().roundPixel(x)&&x==240&&
             goal->y.promoted().roundPixel(y)&&y==932&&goalProperties->sprite.scaleX.bits==0x40000000u&&
             goalProperties->sprite.scaleY.bits==0x40000000u&&fieldWorld->randomDrawCount()==draws+1);
@@ -2595,7 +2600,7 @@ int main(){
         for(unsigned i=0;i<2;++i){
             const auto& bullet=world->bulletAt(i);InstanceHandle key;
             assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::bullet,local(bullet),key));
-            const auto* state=owner->state(key);const auto* properties=owner->properties(key);
+            const auto state=owner->state(key);const auto properties=owner->properties(key);
             RunnerImageValue x,y,angle;
             assert(ProjectilePublication::coordinate(bullet.trajectory.x,240,x)&&
                 ProjectilePublication::coordinate(bullet.trajectory.y,176,y)&&
@@ -2725,7 +2730,7 @@ int main(){
         assert(batWorld->effectsSucceeded()&&batWorld->enemyAt(0).health==6&&batWorld->enemyAt(0).batHit.pending);
         for(unsigned frame=0;frame<3;++frame){
             batWorld->step(0);
-            const auto* p=masks->properties(shared);
+            const auto p=masks->properties(shared);
             assert(batWorld->effectsSucceeded()&&p&&p->sprite.spriteId==154&&p->sprite.maskId==154&&
                 batWorld->enemyAt(0).maskId==154);
         }

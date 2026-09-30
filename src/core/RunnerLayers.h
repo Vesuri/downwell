@@ -82,6 +82,10 @@ public:
         if(failed_||!get(layer)||count>Elements-this->logical)return false;
         this->retained[layer]+=count;this->logical+=count;return true;
     }
+    unsigned retainedAvailable(unsigned layer)const{
+        static_assert(Retained,"Retained population is opt-in");
+        return failed_||!get(layer)?0:Elements-this->logical;
+    }
     bool releaseRetained(unsigned layer,unsigned count){
         static_assert(Retained,"Retained population is opt-in");
         if(failed_||!get(layer)||count>this->retained[layer])return false;

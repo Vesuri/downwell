@@ -19,6 +19,28 @@ struct RunnerRetainedLayerState {
     unsigned layer=0xffffffffu;
     bool inactive=false;
     bool bound()const{return layer!=0xffffffffu;}
+    RunnerRetainedLayerState shifted(unsigned offset)const{
+        auto result=*this;
+        if(order.present()){
+            result.order.serial.low+=offset;
+            if(result.order.serial.low<order.serial.low)++result.order.serial.high;
+        }
+        return result;
+    }
+    bool same(const RunnerRetainedLayerState& b)const{
+        return order.serial.low==b.order.serial.low&&order.serial.high==b.order.serial.high&&
+            order.tail==b.order.tail&&publishedId==b.publishedId&&layer==b.layer&&inactive==b.inactive;
+    }
+};
+class RunnerRetainedLayerRead {
+    RunnerRetainedLayerState value_;
+    bool present_=false;
+public:
+    RunnerRetainedLayerRead(decltype(nullptr)=nullptr){}
+    RunnerRetainedLayerRead(const RunnerRetainedLayerState& value):value_(value),present_(true){}
+    explicit operator bool()const{return present_;}
+    const RunnerRetainedLayerState* operator->()const{return &value_;}
+    const RunnerRetainedLayerState& operator*()const{return value_;}
 };
 // Terrain supplies layerState(slot/handle) and visitLayerStates(handle,state).
 // Its records own retained state; this adapter owns only physical order keys,
@@ -37,10 +59,12 @@ template<unsigned L,unsigned E,class Terrain> class RunnerLogicalLayerOrder:publ
     bool good_=true;
     RunnerLayerOrderKey stamp(bool tail){clock_.advance();return {clock_,tail};}
     bool fail(){good_=false;return false;}
-    RunnerRetainedLayerState* state(unsigned token){return terrain_->layerState(token&~Virtual);}
-    const RunnerRetainedLayerState* state(unsigned token)const{return terrain_->layerState(token&~Virtual);}
+    auto state(unsigned token)const{return terrain_->layerState(token&~Virtual);}
     RunnerLayerOrderKey key(unsigned token)const{return token&Virtual?state(token)->order:physical_[token];}
-    void setKey(unsigned token,RunnerLayerOrderKey value){if(token&Virtual)state(token)->order=value;else physical_[token]=value;}
+    void setKey(unsigned token,RunnerLayerOrderKey value){
+        if(token&Virtual){auto s=*state(token);s.order=value;terrain_->setLayerState(token&~Virtual,s);}
+        else physical_[token]=value;
+    }
     bool collect(unsigned layer){
         const unsigned first=count_;
         auto append=[&](unsigned token){if(count_==E||!key(token).present())return false;work_[count_++]=token;return true;};
@@ -105,30 +129,37 @@ public:
         physical_[e]=stamp(inactive);return true;
     }
     bool retainInstance(InstanceHandle h,unsigned layer,bool inactive){
-        auto* s=terrain_?terrain_->layerState(h):nullptr;
+        auto s=terrain_?terrain_->layerState(h):RunnerRetainedLayerRead{};
         if(!succeeded()||!s||s->bound()||!Base::retain(layer,1))return false;
-        *s={stamp(false),Base::get(layer)->id,layer,inactive};
+        terrain_->setLayerState(h.slot,{stamp(false),Base::get(layer)->id,layer,inactive});
         cutoffs_[layer].dirty=true;return true;
     }
-    bool retainAllocated(RunnerRetainedLayerState& s,unsigned layer,bool inactive){
+    bool retainAllocated(unsigned slot,unsigned layer,bool inactive,bool inherited=false){
         if(!Base::retain(layer,1))return false;
-        s={stamp(false),Base::get(layer)->id,layer,inactive};
+        if(inherited){clock_.advance();terrain_->publishInheritedLayer(slot);}
+        else terrain_->setLayerState(slot,{stamp(false),Base::get(layer)->id,layer,inactive});
         cutoffs_[layer].dirty=true;return true;
+    }
+    bool retainInheritedCount(unsigned layer,unsigned count){
+        if(!Base::retain(layer,count))return false;
+        clock_=clock_.shifted(count);cutoffs_[layer].dirty=true;return true;
     }
     bool releaseInstance(InstanceHandle h){
-        auto* s=terrain_?terrain_->layerState(h):nullptr;
+        auto s=terrain_?terrain_->layerState(h):RunnerRetainedLayerRead{};
         if(!succeeded()||!s||!s->bound()||!Base::releaseRetained(s->layer,1))return false;
-        cutoffs_[s->layer].dirty=true;*s={};return true;
+        cutoffs_[s->layer].dirty=true;terrain_->setLayerState(h.slot,{});return true;
     }
     bool publishInactive(InstanceHandle h,bool inactive){
-        auto* s=terrain_?terrain_->layerState(h):nullptr;
+        auto s=terrain_?terrain_->layerState(h):RunnerRetainedLayerRead{};
         if(!succeeded()||!s||!s->bound())return false;
-        if(s->inactive!=inactive){s->inactive=inactive;cutoffs_[s->layer].dirty=true;}return true;
+        if(s->inactive!=inactive){auto changed=*s;changed.inactive=inactive;
+            terrain_->setLayerState(h.slot,changed);cutoffs_[s->layer].dirty=true;}return true;
     }
     bool reconcileRetained(InstanceHandle h){
-        auto* s=terrain_?terrain_->layerState(h):nullptr;
+        auto s=terrain_?terrain_->layerState(h):RunnerRetainedLayerRead{};
         if(!succeeded()||!s||!s->bound())return false;
-        s->order=stamp(s->inactive);cutoffs_[s->layer].dirty=true;return true;
+        auto changed=*s;changed.order=stamp(s->inactive);terrain_->setLayerState(h.slot,changed);
+        cutoffs_[s->layer].dirty=true;return true;
     }
     // after is the last dispatched physical key saved BEFORE its callback.
     // A newly born head cutoff must not be visited retroactively in this pass.
@@ -137,16 +168,16 @@ public:
         auto& c=cutoffs_[layer];
         if(c.dirty){
             c.found=false;
-            terrain_->visitLayerStates([&](InstanceHandle,const RunnerRetainedLayerState& s){
-                if(s.bound()&&s.layer==layer&&s.inactive&&(!c.found||s.order.before(c.first))){c.first=s.order;c.found=true;}
+            terrain_->visitLayerCutoffs(layer,nullptr,[&](RunnerLayerOrderKey order){
+                if(!c.found||order.before(c.first)){c.first=order;c.found=true;}
                 return true;
             });c.dirty=false;
         }
         if(!c.found)return false;
         if(!after||after->before(c.first))return c.first.before(before);
         bool found=false;
-        terrain_->visitLayerStates([&](InstanceHandle,const RunnerRetainedLayerState& s){
-            if(s.bound()&&s.layer==layer&&s.inactive&&after->before(s.order)&&s.order.before(before)){found=true;return false;}
+        terrain_->visitLayerCutoffs(layer,after,[&](RunnerLayerOrderKey order){
+            if(order.before(before)){found=true;return false;}
             return true;
         });return found;
     }
@@ -159,12 +190,13 @@ public:
             const unsigned sourceFirst=count_;
             if(!collect(from))return false;
             for(unsigned i=sourceFirst;i<count_;++i){const unsigned token=work_[i];
-                if(token&Virtual)state(token)->publishedId=id;
+                if(token&Virtual){auto s=*state(token);s.publishedId=id;terrain_->setLayerState(token&~Virtual,s);}
                 else if(!publish(token,id))return false;
             }return true;
         },[&](unsigned to){
             if(to!=destination)return false;
-            for(unsigned i=0;i<count_;++i)if(work_[i]&Virtual)state(work_[i])->layer=to;
+            for(unsigned i=0;i<count_;++i)if(work_[i]&Virtual){auto s=*state(work_[i]);s.layer=to;
+                terrain_->setLayerState(work_[i]&~Virtual,s);}
             cutoffs_[source].dirty=true;
             return normalize(to,inactive);
         });

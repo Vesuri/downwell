@@ -44,6 +44,16 @@ public:
         }
         return true;
     }
+    // Publication history needs integer geometry, not a transient expansion
+    // into runner position/bounds fields. Decode only at span admission;
+    // consecutive builder cells can advance these endpoints by their stride.
+    bool pixels(Key key,RunnerSpatialSplit::PixelBox& out)const{
+        if(!validKey(key))return false;
+        const auto& p=pixelOffsets_[key.value&3u];
+        const int x=int((key.value>>2)&63u)*16-256,y=int(key.value>>8)*16-256;
+        out={x+p.left,y+p.top,x+p.right,y+p.bottom};
+        return true;
+    }
     template<unsigned N> bool prepare(const PreparedObjectDefaults<N>& objects,
         const SpriteCollisionPack& sprites){
         DW_TERRAIN_PREPARATION_SCOPE;

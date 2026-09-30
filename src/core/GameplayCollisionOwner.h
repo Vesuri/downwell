@@ -18,6 +18,7 @@
 #include "Profile.h"
 #include "PreparedUnitSpriteBounds.h"
 #include "PreparedTerrainBirthBounds.h"
+#include "RunnerTerrainProperties.h"
 namespace downwell {
 // Resource-backed ownership at the native world's existing publication points.
 // Terrain-only queries retain their explicit resource-family gate. Projectile
@@ -35,7 +36,7 @@ public:
 #elif defined(DOWNWELL_TERRAIN_RUN_STORE)
     using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2,true,View::terrainBase,View::timeFieldBase,true,
         RunnerSpatialLifetimes<View::capacity,View::terrainBase,View::timeFieldBase,GameplayTerrainInstances>,
-        RunnerObservedRegistration<View::capacity,View::terrainBase,View::timeFieldBase,GameplayTerrainInstances>,true>;
+        RunnerObservedRegistration<View::capacity,View::terrainBase,View::timeFieldBase,GameplayTerrainInstances>,true,GameplayTerrainInstances>;
 #else
     using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2,true,View::terrainBase,View::timeFieldBase>;
 #endif
@@ -60,7 +61,12 @@ private:
     RunnerRunRoomMembership<View::capacity,View::terrainBase,View::timeFieldBase> room_;
 #endif
     bool terrainSnapshotDirty_=true;
-    Owner::Properties properties_[View::capacity]{};
+#if defined(DOWNWELL_TERRAIN_RUN_STORE) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
+    using PropertyStore=RunnerTerrainProperties<Owner::Properties,View::capacity,View::terrainBase,View::timeFieldBase,GameplayTerrainInstances>;
+#else
+    using PropertyStore=RunnerFullProperties<Owner::Properties,View::capacity>;
+#endif
+    PropertyStore properties_;
     RunnerObjectFamilies<386> families_;
     const ObjectPack& objects_;
     // The pinned original has 741 sprite descriptors. Decode once before
@@ -99,7 +105,7 @@ private:
     }
     bool eligibilityFlags(InstanceHandle h,std::uint32_t& out)const{
 #ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
-        const auto* state=owner_.resolve(h);if(!state)return false;
+        const auto state=owner_.resolve(h);if(!state)return false;
         out=state->flags;return true;
 #else
         return owner_.instanceFlags(h,out);
@@ -125,9 +131,10 @@ private:
     bool refresh(InstanceHandle key,bool publish){
         DW_PROFILE_SCOPE(profileInstanceBounds);
         const auto* flags=families_.flags(unsigned(owner_.objectId(key)));
-        const auto* state=owner_.resolve(key);
+        const auto state=owner_.resolve(key);
+        const auto appearance=state?properties_.read(key.slot):typename PropertyStore::Read{};
         if(flags&&state){
-            const auto& sprite=properties_[key.slot].sprite;
+            const auto& sprite=appearance->sprite;
             if(!(state->special&&sprite.maskId<0)&&!(sprite.angle.bits&0x7fffffffu)&&
                (sprite.scaleX.bits&0x7fffffffu)==0x3f800000u&&
                (sprite.scaleY.bits&0x7fffffffu)==0x3f800000u){
@@ -142,7 +149,7 @@ private:
                     preparedSprites_[id].collisionMode==1,publish);
             }
         }
-        return flags&&owner_.refreshSprite(key,*flags,false,sprites_,properties_[key.slot].sprite,true,
+        return flags&&owner_.refreshSprite(key,*flags,false,sprites_,appearance->sprite,true,
             [](auto angle,auto& cosine,auto& sine){
                 DW_PROFILE_SCOPE(profileInstanceBoundsTrig);
                 RunnerImageValue radians;MotionBinary64 c,s;
@@ -200,6 +207,26 @@ private:
             if constexpr(Kind==View::Kind::player)if(!parent.check(parent.layers_.prepare()))return false;
             constexpr bool roomCoordinates=Kind==View::Kind::player||Kind==View::Kind::terrain||Kind==View::Kind::timeField||Kind==View::Kind::goalField||Kind==View::Kind::exitController;
             constexpr int ox=roomCoordinates?0:240,oy=roomCoordinates?0:176;
+#if defined(DOWNWELL_TERRAIN_RUN_STORE) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
+            if constexpr(Kind==View::Kind::terrain&&AllocatedTerrain){
+                const auto* d=parent.objectDefaults_.get(object(r));
+                const auto* flags=parent.families_.flags(unsigned(object(r)));
+                PreparedTerrainBirthBounds::Key geometry;RunnerSpatialSplit::PixelBox pixels;
+                if(parent.world_&&parent.world_->terrainInstances()==&parent.terrain_&&
+                    d&&flags&&(*flags&0x87u)==d->propertyFlags&&(d->spriteId==-1||d->frames<=65535u)&&
+                    parent.terrainBirthBounds_.key(r.objectId,r.x,r.y,geometry)&&
+                    parent.terrainBirthBounds_.pixels(geometry,pixels)){
+                    bool prepared=false;
+                    if(!parent.check(parent.owner_.attachGeneratedTerrainCell(h,object(r),!r.active,*d,
+                        parent.families_,flags,pixels,
+                        [&]{parent.properties_.birth(h.slot);},[&](RunnerImageValue depth){
+                            parent.room_.bindAllocatedTerrain(h.slot,depth);
+                            if(!r.active)parent.activationPending_=true;return true;
+                        },geometry,prepared)))return false;
+                    return parent.check(parent.layers_.birthAllocatedTerrain(h,d->creationDepth,!r.active));
+                }
+            }
+#endif
             Owner::State state;
             Owner::Box terrainBounds;bool preparedTerrain=false,terrainPrecise=false;
             RunnerSpatialSplit::PixelBox terrainPixels;
@@ -220,7 +247,7 @@ private:
                 if(!preparedTerrain&&(!real(r.x+ox,state.x)||!real(r.y+oy,state.y)))return parent.check(false);
             }
             if constexpr(Kind!=View::Kind::timeField)if(!r.active)state.flags|=2u;
-            auto& p=parent.properties_[h.slot];
+            auto edit=parent.properties_.template editDomain<Kind==View::Kind::terrain>(h.slot);auto& p=edit.get();
 #if defined(DOWNWELL_TERRAIN_RUN_STORE) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
             if constexpr(Kind==View::Kind::terrain)if(preparedTerrain){
                 const bool admitted=AllocatedTerrain&&parent.world_&&parent.world_->terrainInstances()==&parent.terrain_;
@@ -279,6 +306,7 @@ private:
             }else if constexpr(Kind==View::Kind::player){
                 if(!real(r.scaleX,p.sprite.scaleX))return parent.check(false);
             }
+            edit.publish();
             if(!parent.check(parent.owner_.publishBirth(h,parent.families_,
                 [&](InstanceHandle live,bool publish){
                     if constexpr(Kind==View::Kind::terrain)if(preparedTerrain)
@@ -325,22 +353,58 @@ private:
             if(!parent.check(parent.layers_.activation(h,active)))return false;
             parent.activationPending_=true;return true;}
         bool move(InstanceHandle local,const Record& r,RunnerImageValue x,RunnerImageValue y){InstanceHandle h;
-            return key(local,r,h)&&parent.check(parent.owner_.move(h,x,y,*parent.families_.flags(object(r))));}
+            return key(local,r,h)&&parent.check(parent.owner_.template moveDomain<Kind==View::Kind::terrain>(h,x,y,*parent.families_.flags(object(r))));}
         bool depth(InstanceHandle local,const Record& r,MotionBinary64 value){InstanceHandle h;RunnerImageValue narrowed;
             if(!key(local,r,h)||!narrowed.assign(value))return parent.check(false);
-            if(!parent.layers_.enabled())return parent.check(RunnerSpatialSplit::equal(narrowed,parent.properties_[h.slot].depth));
+            auto edit=parent.properties_.template editDomain<Kind==View::Kind::terrain>(h.slot);auto& p=edit.get();
+            if(!parent.layers_.enabled())return parent.check(RunnerSpatialSplit::equal(narrowed,p.depth));
             if(!parent.check(parent.layers_.writeDepth(h,value)))return false;
-            parent.properties_[h.slot].depth=narrowed;return true;
+            p.depth=narrowed;return true;
         }
         bool sprite(InstanceHandle local,const Record& r,int sprite){InstanceHandle h;
             return key(local,r,h)&&publishSprite(h,object(r),sprite);
         }
         bool publishSprite(InstanceHandle h,int object,int sprite){
-            auto& p=parent.properties_[h.slot];
+            auto edit=parent.properties_.template editDomain<Kind==View::Kind::terrain>(h.slot);auto& p=edit.get();
             if(p.sprite.spriteId!=sprite)parent.drawOrderValid_=false;
             return parent.check(parent.owner_.changeSpriteFromPack(h,p.sprite,p.timeline,p.cachedFrame,
                 sprite,parent.sprites_,*parent.families_.flags(object)));}
 #ifdef DOWNWELL_TERRAIN_RUN_STORE
+#ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+        bool initializedTerrainIdentity(InstanceHandle local,int object,int x,int y,bool active,int tile,
+            GameplayTerrainInstances::CreateValues& values,bool& unbounded,bool& admitted){
+            static_assert(Kind==View::Kind::terrain,"Generated terrain transaction only");
+            const auto* d=parent.objectDefaults_.get(object);
+            const auto* flags=parent.families_.flags(unsigned(object));
+            const auto* create=parent.terrainCreate_.get(object,tile);
+            PreparedTerrainBirthBounds::Key geometry;RunnerSpatialSplit::PixelBox pixels;
+            if(!parent.world_||parent.world_->terrainInstances()!=&parent.terrain_||!d||!flags||
+                (!create&&object!=99)||(*flags&0x87u)!=d->propertyFlags||
+                (d->spriteId!=-1&&d->frames>65535u)||
+                !parent.terrainBirthBounds_.key(object,x,y,geometry)||
+                !parent.terrainBirthBounds_.pixels(geometry,pixels))return false;
+            // From here even a failed birth is handled; never replay it through
+            // the reference path after publishing a partial constructor.
+            admitted=true;InstanceHandle h;
+            if(!parent.valid()||!View::encode(Kind,local,h))return parent.check(false);
+            bool prepared=false;
+            if(!parent.check(parent.owner_.attachGeneratedTerrainCell(h,object,!active,*d,
+                parent.families_,flags,pixels,[&]{parent.properties_.birth(h.slot);},
+                [&](RunnerImageValue depth){parent.room_.bindAllocatedTerrain(h.slot,depth);
+                    if(!active)parent.activationPending_=true;return true;},geometry,prepared)))return false;
+            if(!parent.check(parent.layers_.birthAllocatedTerrain(h,d->creationDepth,!active)))return false;
+            if(!create)return true;
+            DW_PROFILE_SCOPE(profileTerrainCreate);
+            if(create->changedSprite)parent.drawOrderValid_=false;
+            parent.properties_.created(h.slot,create->sprite,create->imageIndex);
+            parent.owner_.finishAdmittedTerrainCreate(h,*create,*flags);
+            values.spriteId=create->sprite;
+            if(create->writeIndex)values.imageIndex=create->index;
+            values.imageSpeed=0;
+            if(object==60&&(wallRadius(create->sprite)<0||wallRadius(create->sprite)>16))unbounded=true;
+            return true;
+        }
+#endif
         bool initializedTerrainRun(const AreaOneBuilder::TerrainRun& run,int tile,GameMakerRandom& random,
             AreaOneBuilder::EmitFunction backend,void* context){
             static_assert(Kind==View::Kind::terrain,"Generated terrain transaction only");
@@ -359,35 +423,59 @@ private:
                 d&&flags&&create&&(*flags&0x87u)==d->propertyFlags&&
                 (d->spriteId==-1||d->frames<=65535u)&&geometry){
                 typename decltype(parent.layers_)::TerrainRunBirth layer;
-                bool prepared=false;
-                return run.executeEach([&](const DeferredCreateInstance& command){
+                bool prepared=false,firstComplete=false,continueOrders=false;
+                Owner::GeneratedTerrainContinuation continuation;
+                Owner::InheritedTerrainBatch batch;
+                const auto flush=[&]{
+                    parent.owner_.completeInheritedTerrain(run.objectId,batch);
+                    if(batch.count)parent.room_.completeInheritedTerrain(batch.count);
+                    batch={};
+                    return parent.check(parent.layers_.completeInheritedTerrain(layer));
+                };
+                auto key=first;RunnerSpatialSplit::PixelBox pixels;
+                if(!parent.terrainBirthBounds_.pixels(first,pixels))return parent.check(false);
+                const bool result=run.executeEach([&](const DeferredCreateInstance& command){
                     if(!backend(context,command))return false;
                     return parent.terrain_.appendInitializedCell(command.objectId,command.x,command.y,command.active,
-                        [&](InstanceHandle local,GameplayTerrainInstances::CreateValues& values,bool& unbounded){
+                        [&](InstanceHandle local,GameplayTerrainInstances::CreateValues& values,bool& unbounded,bool inherited){
+                            inherited=inherited&&continueOrders;
                             const InstanceHandle h{View::terrainBase+local.slot,local.generation};
-                            Owner::State state;Owner::Box bounds;RunnerSpatialSplit::PixelBox pixels;
-                            bool precise;PreparedTerrainBirthBounds::Key key;
-                            if(!parent.terrainBirthBounds_.at(run.objectId,command.x,command.y,
-                                state.x,state.y,bounds,precise,&pixels,&key))return parent.check(false);
-                            if(!command.active)state.flags|=2u;
-                            auto& p=parent.properties_[h.slot];
-                            if(!parent.check(parent.owner_.attachTerrainRunCell(h,run.objectId,state,p,*d,
-                                parent.families_,flags,bounds,pixels,precise,[&](RunnerImageValue depth){
-                                    parent.room_.bindAllocatedTerrain(h.slot,depth);
+                            if(inherited){
+                                if(!parent.check(parent.owner_.attachInheritedTerrainCell(h,!command.active,
+                                    continuation,pixels,key,batch)))return false;
+                            }else{
+                                if(!flush())return false;
+                                if(!parent.check(parent.owner_.attachGeneratedTerrainCell(h,run.objectId,!command.active,*d,
+                                parent.families_,flags,pixels,[&]{parent.properties_.birth(h.slot);},
+                                [&](RunnerImageValue depth){
+                                    parent.room_.bindAllocatedTerrain(h.slot,depth,inherited);
                                     if(!command.active)parent.activationPending_=true;
                                     return true;
-                                },key,prepared)))return false;
-                            if(!parent.check(parent.layers_.birthAllocatedTerrain(h,p.depth,!command.active,&layer)))return false;
+                                },key,prepared,false)))return false;
+                            }
+                            if(!parent.check(inherited?parent.layers_.birthInheritedTerrain(h,layer):
+                                parent.layers_.birthAllocatedTerrain(h,d->creationDepth,!command.active,&layer,false)))return false;
                             DW_PROFILE_SCOPE(profileTerrainCreate);
                             if(create->changedSprite)parent.drawOrderValid_=false;
-                            parent.owner_.finishAdmittedTerrainCreate(h,p,*create,*flags);
+                            if(inherited)parent.terrain_.publishInheritedAppearance(local.slot);
+                            else parent.properties_.created(h.slot,create->sprite,create->imageIndex);
+                            if(inherited)parent.owner_.finishInheritedTerrainCreate(h,*create);
+                            else parent.owner_.finishAdmittedTerrainCreate(h,*create,*flags);
                             values.spriteId=create->sprite;
                             if(create->writeIndex)values.imageIndex=create->index;
                             values.imageSpeed=0;
                             if(run.objectId==60&&(wallRadius(create->sprite)<0||wallRadius(create->sprite)>16))unbounded=true;
+                            if(!firstComplete){firstComplete=true;
+                                continuation=Owner::generatedTerrainContinuation(*d,*flags,!command.active);
+                                continueOrders=parent.terrain_.canContinuePublication(local,run.count-1,
+                                    (*flags&0x28u)||(d->initialFlags&0x20u),(*flags&8u)!=0);
+                            }
+                            key.value+=run.stepX==16?4u:std::uint32_t(-4);
+                            pixels.left+=run.stepX;pixels.right+=run.stepX;
                             return true;
                         });
                 });
+                const bool published=flush();return result&&published;
             }
 #endif
             return run.executeEach([&](const DeferredCreateInstance& command){
@@ -408,7 +496,8 @@ private:
 #ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
             if(const auto* plan=parent.terrainCreate_.get(r.objectId,tile)){
                 if(plan->changedSprite)parent.drawOrderValid_=false;
-                parent.owner_.finishAdmittedTerrainCreate(h,parent.properties_[h.slot],*plan,
+                parent.properties_.created(h.slot,plan->sprite,plan->imageIndex);
+                parent.owner_.finishAdmittedTerrainCreate(h,*plan,
                     *parent.families_.flags(r.objectId));
                 values.spriteId=plan->sprite;
                 if(plan->writeIndex)values.imageIndex=plan->index;
@@ -424,20 +513,24 @@ private:
                 return true;
             },[&](int index){
                 RunnerImageValue value;
+                auto edit=parent.properties_.template editDomain<Kind==View::Kind::terrain>(h.slot);
                 if(!value.assignInteger(index)||!parent.check(parent.owner_.writeImageIndex(h,
-                    parent.properties_[h.slot].sprite,value)))return false;
+                    edit.get().sprite,value)))return false;
                 values.imageIndex=index;return true;
             },[&](int speed){values.imageSpeed=speed;return true;});
         }
 #endif
         bool imageIndex(InstanceHandle local,const Record& r,RunnerImageValue value){InstanceHandle h;
-            return key(local,r,h)&&parent.check(parent.owner_.writeImageIndex(h,parent.properties_[h.slot].sprite,value));}
+            if(!key(local,r,h))return false;auto edit=parent.properties_.template editDomain<Kind==View::Kind::terrain>(h.slot);
+            return parent.check(parent.owner_.writeImageIndex(h,edit.get().sprite,value));}
         bool mask(InstanceHandle local,const Record& r,int value){InstanceHandle h;
-            return key(local,r,h)&&parent.check(parent.owner_.changeMask(h,parent.properties_[h.slot].sprite,
+            if(!key(local,r,h))return false;auto edit=parent.properties_.template editDomain<Kind==View::Kind::terrain>(h.slot);
+            return parent.check(parent.owner_.changeMask(h,edit.get().sprite,
                 value,*parent.families_.flags(object(r))));}
         bool transform(InstanceHandle local,const Record& r,RunnerTransformField field,RunnerImageValue value,
             RunnerImageValue alpha,std::uint32_t blend){InstanceHandle h;
-            return key(local,r,h)&&parent.check(parent.owner_.changeTransform(h,parent.properties_[h.slot].sprite,
+            if(!key(local,r,h))return false;auto edit=parent.properties_.template editDomain<Kind==View::Kind::terrain>(h.slot);
+            return parent.check(parent.owner_.changeTransform(h,edit.get().sprite,
                 field,value,alpha,blend,*parent.families_.flags(object(r))));}
     };
     Binding<GameplayWorld::PlayerInstance,View::Kind::player> player_{*this};
@@ -469,9 +562,15 @@ public:
         if(!owner_.bindTerrainLifetimes(terrain_))return;
         if(!room_.bindTerrain(terrain_))return;
         if(!layers_.bindTerrain(terrain_,View::terrainBase))return;
+        if(!properties_.bind(terrain_))return;
 #endif
 #ifdef DOWNWELL_TERRAIN_RUN_STORE
-        if(!terrain_.bindInitializedBirth(terrainBinding_)||!terrain_.bindInitializedRun(terrainBinding_))return;
+#ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+        if(!terrain_.bindInitializedBirth(terrainBinding_))return;
+#else
+        if(!terrain_.bindInitializedIdentity(terrainBinding_))return;
+#endif
+        if(!terrain_.bindInitializedRun(terrainBinding_))return;
 #endif
         good_=sprites_.prepare(preparedSprites_,741)&&objectDefaults_.prepare(objects,sprites_)&&
             spriteGeometry_.prepare(sprites_)&&
@@ -480,6 +579,8 @@ public:
 #if defined(DOWNWELL_TERRAIN_RUN_STORE) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
         if(good_)good_=terrainCreate_.prepare(objectDefaults_,sprites_);
         if(good_)good_=owner_.bindTerrainGeometry(terrainBirthBounds_);
+        if(good_)owner_.prepareTerrainStates(objectDefaults_);
+        if(good_)properties_.prepare(objectDefaults_);
 #endif
         if(good_)for(unsigned selector=0;selector<2;++selector){
             terrainFamilies_[selector]=true;
@@ -490,7 +591,7 @@ public:
     }
     GameplayCollisionOwner(const GameplayCollisionOwner&)=delete;
     GameplayCollisionOwner& operator=(const GameplayCollisionOwner&)=delete;
-    bool valid()const{return good_&&owner_.valid()&&terrain_.valid()&&scriptEffects_.valid()&&debris_.valid()&&timeChanges_.valid()&&entries_.valid()&&drones_.valid()&&layers_.valid();}
+    bool valid()const{return good_&&owner_.valid()&&properties_.valid()&&terrain_.valid()&&scriptEffects_.valid()&&debris_.valid()&&timeChanges_.valid()&&entries_.valid()&&drones_.valid()&&layers_.valid();}
     unsigned pendingSpatialIndex()const{return owner_.pendingSpatialIndex();}
     bool serviceSpatialIndex(unsigned budget){return check(owner_.serviceSpatialIndex(budget));}
     bool attach(GameplayWorld& world){
@@ -556,9 +657,9 @@ public:
                 const unsigned metadata=self.drawMetadata_.get(self.owner_.objectId(h));
                 out.object=(metadata&ObjectDrawMetadata<386>::exists)!=0;
                 out.drawEvent=(metadata&ObjectDrawMetadata<386>::drawEvent)!=0;
-                out.sprite=self.properties_[h.slot].sprite.spriteId>=0;return true;
+                out.sprite=self.properties_.read(h.slot)->sprite.spriteId>=0;return true;
             },[&](InstanceHandle h,int depth){RunnerImageValue value;return real(depth,value)&&draw(h,value);});
-            return self.room_.visitDrawChecked([&](unsigned slot){return draw(self.owner_.currentHandle(slot),self.properties_[slot].depth);});
+            return self.room_.visitDrawChecked([&](unsigned slot){return draw(self.owner_.currentHandle(slot),self.properties_.read(slot)->depth);});
         },this,[](const void* context,GameplayWorld::DrawActorVisitor visit,void* visitor){
             const auto& self=*static_cast<const GameplayCollisionOwner*>(context);
             if(!self.valid()||!self.world_)return false;
@@ -868,8 +969,8 @@ public:
     bool retire(InstanceHandle key,const NativeTimeChangeRegistration::Record& record){
         return timeChangeBinding_.retire(key,record);
     }
-    const Owner::State* state(InstanceHandle key)const{return valid()?owner_.resolve(key):nullptr;}
-    const Owner::Properties* properties(InstanceHandle key)const{return state(key)?&properties_[key.slot]:nullptr;}
+    Owner::StateRead state(InstanceHandle key)const{return valid()?owner_.resolve(key):Owner::StateRead{};}
+    typename PropertyStore::Read properties(InstanceHandle key)const{return state(key)?properties_.read(key.slot):typename PropertyStore::Read{};}
     // These take selected shared collision handles, not box-array indices.
     // Game fields can still be written after a destruction mark; only actual
     // room cleanup invalidates the handle. No activation/retirement happens.
@@ -884,7 +985,7 @@ public:
         health=record.breakable->state.wallHp;return true;
     }
     bool readBoxDestruction(InstanceHandle h,BoxDestructionScript::Caller& out)const{
-        View::Record record;const auto* position=state(h);
+        View::Record record;const auto position=state(h);
         if(!position||!resolves(h)||!View(*world_).resolve(h,record)||!record.breakable)return false;
         out={record.breakable->state,position->x.promoted(),position->y.promoted()};return true;
     }
@@ -905,7 +1006,8 @@ public:
         auto update=[&](InstanceHandle h,bool publish){return resolves(h)&&refresh(h,publish);};
         if(!owner_.point(object,px,py,true,false,families_,update,
             [&](InstanceHandle h,RunnerImageValue rawX,RunnerImageValue rawY,bool& found){
-                return resolves(h)&&owner_.pointCandidate(h,properties_[h.slot].sprite,rawX,rawY,
+                const auto p=properties_.read(h.slot);
+                return resolves(h)&&owner_.pointCandidate(h,p->sprite,rawX,rawY,
                     true,true,sprites_,masks,update,inverseTrig,roundPixel,found);
             },result))return check(false);
         hit=result;return true;
@@ -943,7 +1045,7 @@ public:
     bool stopBoxAlarm0(InstanceHandle local,bool pTimeStop,int roomWidth,const SpriteMaskPack& masks){
         InstanceHandle self;
         if(!valid()||!world_||!View::encode(View::Kind::breakable,local,self)||!resolves(self))return check(false);
-        const auto* state=owner_.resolve(self);if(!state)return check(false);
+        const auto state=owner_.resolve(self);if(!state)return check(false);
         return check(world_->stopBoxAlarm0(local,[&](bool& allowed){
             return TimeStopBound::evaluate(pTimeStop,state->x.promoted(),state->y.promoted(),roomWidth,
                 [&](auto x,auto y,bool& hit){return masks.valid()&&registeredPlaceMeeting(self,82,x,y,masks,hit);},allowed);
@@ -972,7 +1074,7 @@ public:
         if(!registeredPlaceSelection(self,82,x,y,masks,selected))return false;
         RegisteredFieldContact next;
         if(selected.found){
-            const auto* state=owner_.resolve(selected.handle);
+            const auto state=owner_.resolve(selected.handle);
             if(!state||!resolves(selected.handle))return check(false);
             next={true,selected.handle,state->x,state->y};
         }
@@ -1003,7 +1105,7 @@ private:
         if(!owner_.placeVm(self,object,x,y,false,families_,update,
             [&](InstanceHandle a,InstanceHandle b,bool publish,bool& found){
                 return resolves(a)&&resolves(b)&&owner_.collideCompatibility(a,b,
-                    properties_[a.slot].sprite,properties_[b.slot].sprite,sprites_,masks,
+                    properties_.read(a.slot)->sprite,properties_.read(b.slot)->sprite,sprites_,masks,
                     RunnerMaskDispatch{},publish,update,inverseTrig,roundPixel,found);
             },result))return check(false);
         return true;
@@ -1029,7 +1131,8 @@ private:
         auto update=[&](InstanceHandle h,bool publish){return resolves(h)&&refresh(h,publish);};
         return check(owner_.collisionPointVm(self,object,x,y,notMe,families_,
             [&](InstanceHandle h,RunnerImageValue px,RunnerImageValue py,bool& hit){
-                return resolves(h)&&owner_.pointCandidate(h,properties_[h.slot].sprite,px,py,
+                const auto p=properties_.read(h.slot);
+                return resolves(h)&&owner_.pointCandidate(h,p->sprite,px,py,
                     true,precise,sprites_,masks,update,inverseTrig,roundPixel,hit);
             },result));
     }
@@ -1056,7 +1159,8 @@ private:
         auto update=[&](InstanceHandle h,bool publish){return resolves(h)&&refresh(h,publish);};
         return check(owner_.collisionLine(self,object,args,notMe,false,families_,update,
             [&](InstanceHandle h,const RunnerLineArguments& line,bool& hit){
-                return resolves(h)&&owner_.nonPreciseLineCandidate(h,properties_[h.slot].sprite,
+                const auto p=properties_.read(h.slot);
+                return resolves(h)&&owner_.nonPreciseLineCandidate(h,p->sprite,
                     line,true,sprites_,update,hit);
             },result));
     }

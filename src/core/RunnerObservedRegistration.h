@@ -69,9 +69,21 @@ public:
     }
     unsigned size()const{return actors_.size()+(terrain_?terrain_->registeredCount():0);}
     void repeatFreshTailBinding(){revision_+=2;}
-    bool bindAllocatedTerrain(unsigned s,int object){
+    RunnerRegistrationOrder nextGeneratedOrder()const{auto next=clock_;next.advance();return next;}
+    bool publishGeneratedConstructor(unsigned slot,int object,bool inactive,
+        RunnerRegistrationOrder order,RunnerRegistrationOrder spatial,RunnerRegistrationOrder collision,unsigned stage=2){
+        clock_=order;revision_+=3;ordered_=false;
+        return terrain_->generatedConstructor(slot-First,object,inactive,order,spatial,collision,stage);
+    }
+    void completeInheritedTerrain(int object,unsigned count){
+        clock_=clock_.shifted(count);revision_+=3u*count;ordered_=false;
+        terrain_->registerInheritedCount(object,count);
+    }
+    bool bindAllocatedTerrain(unsigned s,int object,bool inherited=false){
         auto next=clock_;next.advance();if(!next.present())return false;
-        terrain_->registerAllocated(s-First,object,next);clock_=next;
+        if(inherited)terrain_->registerInherited(s-First,object);
+        else terrain_->registerAllocated(s-First,object,next);
+        clock_=next;
         ++revision_;ordered_=false;return true;
     }
     bool bind(unsigned s,int object,std::uint32_t id){

@@ -27,11 +27,7 @@
 #include "core/BatMotion.h"
 #include "core/Replay.h"
 #include "core/SolidCollision.h"
-#ifdef DOWNWELL_FREESTANDING
-inline void* operator new(__SIZE_TYPE__, void* address) noexcept { return address; }
-#else
-#include <new>
-#endif
+#include "PlacementNew.h"
 #include "core/ProjectilePublication.h"
 
 downwell::ResultsDestination GameplayWorld::restartFromResults(

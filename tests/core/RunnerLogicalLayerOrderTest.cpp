@@ -9,9 +9,15 @@ static void check(bool ok,unsigned line){if(!ok){std::fprintf(stderr,"logical la
 struct Terrain {
     static constexpr unsigned capacity=4;
     RunnerRetainedLayerState states[capacity]{};
-    RunnerRetainedLayerState* layerState(unsigned slot){return slot<capacity?&states[slot]:nullptr;}
-    const RunnerRetainedLayerState* layerState(unsigned slot)const{return slot<capacity?&states[slot]:nullptr;}
-    RunnerRetainedLayerState* layerState(InstanceHandle h){return h.generation==1?layerState(h.slot):nullptr;}
+    RunnerRetainedLayerRead layerState(unsigned slot)const{return slot<capacity?RunnerRetainedLayerRead(states[slot]):nullptr;}
+    RunnerRetainedLayerRead layerState(InstanceHandle h)const{return h.generation==1?layerState(h.slot):nullptr;}
+    void setLayerState(unsigned slot,const RunnerRetainedLayerState& value){states[slot]=value;}
+    void publishInheritedLayer(unsigned){REQUIRE(false);}
+    template<class Visit> bool visitLayerCutoffs(unsigned layer,const RunnerLayerOrderKey* after,Visit visit)const{
+        for(const auto& s:states)if(s.bound()&&s.layer==layer&&s.inactive&&(!after||after->before(s.order)))
+            if(!visit(s.order))return false;
+        return true;
+    }
     template<class Visit> bool visitLayerStates(Visit visit){
         for(unsigned i=0;i<capacity;++i)if(!visit(InstanceHandle{i,1},states[i]))return false;return true;
     }
@@ -29,6 +35,33 @@ static void compare(Logical& logical,const Reference& reference){
         REQUIRE(a==b);
     }
 }
+static void inheritedCapacity(){
+    for(unsigned prefix=0;prefix<4;++prefix){
+        Terrain terrain;Logical logical;Reference reference;REQUIRE(logical.bindTerrain(terrain));
+        unsigned layer,other;REQUIRE(logical.insertAfterEquals(1,0,true,layer));
+        REQUIRE(reference.insertAfterEquals(1,0,true,other)&&layer==other);
+        for(unsigned e=0;e<4;++e){
+            REQUIRE(logical.attach(layer,e,true,false,[](unsigned){return false;}));
+            REQUIRE(reference.attach(layer,e,true,false,[](unsigned){return false;}));
+        }
+        REQUIRE(logical.retainAllocated(0,layer,false));
+        REQUIRE(reference.attach(layer,4,true,false,[](unsigned){return false;}));
+        REQUIRE(logical.retainedAvailable(layer)==3);
+        for(unsigned i=1;i<=prefix;++i){
+            terrain.states[i]=terrain.states[0].shifted(i);
+            REQUIRE(reference.attach(layer,4+i,true,false,[](unsigned){return false;}));
+        }
+        REQUIRE(logical.retainInheritedCount(layer,prefix));compare(logical,reference);
+        const unsigned remaining=3-prefix;
+        REQUIRE(logical.retainedAvailable(layer)==remaining);
+        REQUIRE(!logical.retainInheritedCount(layer,remaining+1));compare(logical,reference);
+        if(remaining){
+            REQUIRE(logical.attach(layer,7,true,false,[](unsigned){return false;}));
+            REQUIRE(reference.attach(layer,7,true,false,[](unsigned){return false;}));
+            compare(logical,reference);
+        }
+    }
+}
 static void merges(){
     for(unsigned split=0;split<=8;++split)for(unsigned mask=0;mask<256;++mask){
         Terrain terrain;Logical logical;Reference reference;REQUIRE(logical.bindTerrain(terrain));
@@ -38,7 +71,7 @@ static void merges(){
         for(unsigned e=0;e<8;++e){const unsigned layer=layers[e<split?0:1];
             REQUIRE(reference.attach(layer,e,true,false,[](unsigned){return false;}));
             if(e<4)REQUIRE(logical.attach(layer,e,true,false,[](unsigned){return false;}));
-            else if(e&1)REQUIRE(logical.retainAllocated(terrain.states[e-4],layer,(mask&(1u<<e))!=0));
+            else if(e&1)REQUIRE(logical.retainAllocated(e-4,layer,(mask&(1u<<e))!=0));
             else REQUIRE(logical.retainInstance({e-4,1},layer,(mask&(1u<<e))!=0));
         }
         compare(logical,reference);
@@ -139,7 +172,7 @@ static void failedPublication(){
         }
     }
 }
-int main(){merges();mutations();failedPublication();
+int main(){inheritedCapacity();merges();mutations();failedPublication();
     REQUIRE(drawMutation(true,true)==drawMutation(false,true));
     REQUIRE(drawMutation(true,false)==drawMutation(false,false));
     REQUIRE(drawMutation(true,true)==std::vector<unsigned>({3,0}));

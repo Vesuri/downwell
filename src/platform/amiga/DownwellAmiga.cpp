@@ -95,9 +95,7 @@ __attribute__((noinline, used)) void downwellShopLiveReady() { __asm__ volatile(
 #include "core/RoomPack.h"
 #include "core/Replay.h"
 
-inline void* operator new(__SIZE_TYPE__, void* address) noexcept {
-    return address;
-}
+#include "core/PlacementNew.h"
 
 extern "C" {
 extern const UBYTE amiga_hud_pack[];

@@ -7,6 +7,12 @@ namespace downwell {
 struct RunnerRegistrationOrder {
     std::uint32_t low=0,high=0;
     bool present()const{return low||high;}
+    RunnerRegistrationOrder shifted(unsigned offset)const{
+        auto result=*this;
+        if(present()){result.low+=offset;if(result.low<low)++result.high;}
+        return result;
+    }
+    bool same(const RunnerRegistrationOrder& b)const{return low==b.low&&high==b.high;}
     void advance(){if(!++low)++high;}
     bool before(const RunnerRegistrationOrder& b)const{
         return high<b.high||(high==b.high&&low<b.low);

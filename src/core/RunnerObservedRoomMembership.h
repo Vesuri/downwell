@@ -34,8 +34,10 @@ class RunnerObservedRoomMembership {
         markedOrder_.count=count;markedCount_=count;
     }
     void unmark(unsigned s){
-        if(!state(s)->marked)return;
-        state(s)->marked=false;--markedCount_;
+        if(!state(s).marked)return;
+        // Both callers immediately replace/remove this membership. Do not
+        // split its authoritative run just to overwrite the result again.
+        --markedCount_;
         // Leave a hole during cleanup: its callback may remove the current
         // member, but must not shift the saved successors underneath the walk.
         for(unsigned i=0;i<markedOrder_.count;++i)if(markedOrder_.slots[i]==s){
@@ -44,17 +46,19 @@ class RunnerObservedRoomMembership {
     }
     static bool external(unsigned s){return s>=First&&s<Last;}
     static unsigned actorSlot(unsigned s){return s<First?s:s-Cells;}
-    State* state(unsigned s){
-        if(s>=Capacity)return nullptr;
-        return external(s)?(terrain_?terrain_->roomState(s-First):nullptr):&actors_[actorSlot(s)];
+    State state(unsigned s)const{
+        if(s>=Capacity)return {};
+        return external(s)?(terrain_?terrain_->roomState(s-First):State{}):actors_[actorSlot(s)];
     }
-    const State* state(unsigned s)const{
-        if(s>=Capacity)return nullptr;
-        return external(s)?(terrain_?terrain_->roomState(s-First):nullptr):&actors_[actorSlot(s)];
+    void put(unsigned s,const State& value){
+        if(external(s))terrain_->setRoomState(s-First,value);else actors_[actorSlot(s)]=value;
     }
     void changed(unsigned s){if(external(s))terrain_->roomChanged();else ++actorRevision_;}
     bool before(unsigned a,unsigned b)const{
-        const auto& x=*state(a);const auto& y=*state(b);
+        const auto x=state(a);const auto y=state(b);
+        return beforeState(x,y);
+    }
+    static bool beforeState(const State& x,const State& y){
         if(x.list!=y.list)return x.list<y.list;
         if(!x.list){
             if(RunnerSpatialSplit::less(x.depth,y.depth))return true;
@@ -81,7 +85,7 @@ class RunnerObservedRoomMembership {
                 p.slots[end]=p.slots[0];p.slots[0]=v;sift(0,end);}
         }
         p.activeEnd=0;
-        while(p.activeEnd<p.count&&state(p.slots[p.activeEnd])->list==0)++p.activeEnd;
+        while(p.activeEnd<p.count&&state(p.slots[p.activeEnd]).list==0)++p.activeEnd;
         p.revision=revision;p.valid=true;
     }
     void observeActors()const{
@@ -96,10 +100,45 @@ class RunnerObservedRoomMembership {
         const unsigned revision=terrain_?terrain_->roomRevision():0;
         if(!terrainOrder_.valid||terrainOrder_.revision!=revision){
             terrainOrder_.count=0;
-            if(terrain_)terrain_->visitRoomSlots([&](unsigned s){
-                terrainOrder_.slots[terrainOrder_.count++]=Slot(First+s);return true;
+            // Every authoritative run has one depth/list and a consecutive
+            // clock interval. A rebind splits that interval at the changed
+            // cell, so different runs cannot interleave at an equal depth.
+            // Sort representatives, then expand backwards in this SAME slot
+            // buffer. Each run contributes at least one slot, so expansion
+            // cannot overwrite an unread representative.
+            unsigned active=0;
+            bool ordered=true,havePrevious=false;State previous;
+            if(terrain_)terrain_->visitRoomRuns([&](const State& basis,auto cells){
+                const unsigned begin=terrainOrder_.count;unsigned first=0,last=0;
+                cells([&](unsigned s,unsigned offset){
+                    if(terrainOrder_.count==begin)first=offset;
+                    last=offset;terrainOrder_.slots[terrainOrder_.count++]=Slot(First+s);return true;
+                });
+                if(terrainOrder_.count==begin)return true;
+                const auto front=basis.shifted(first),back=basis.shifted(last);
+                if((havePrevious&&beforeState(front,previous))||beforeState(back,front))ordered=false;
+                previous=back;havePrevious=true;
+                if(basis.list==0)active+=terrainOrder_.count-begin;
+                return true;
+            });
+            if(ordered){
+                terrainOrder_.activeEnd=active;terrainOrder_.revision=revision;terrainOrder_.valid=true;return;
+            }
+            const unsigned population=terrainOrder_.count;
+            terrainOrder_.count=0;
+            if(terrain_)terrain_->visitRoomRuns([&](const State&,auto cells){
+                cells([&](unsigned slot,unsigned){
+                    terrainOrder_.slots[terrainOrder_.count++]=Slot(First+slot);return false;
+                });return true;
             });
             sort(terrainOrder_,revision);
+            unsigned output=population;
+            for(unsigned i=terrainOrder_.count;i;){const unsigned representative=terrainOrder_.slots[--i];
+                terrain_->visitRoomRunReverse(representative-First,[&](unsigned slot){
+                    terrainOrder_.slots[--output]=Slot(First+slot);return true;
+                });
+            }
+            terrainOrder_.count=population;terrainOrder_.activeEnd=active;
         }
     }
     // Do not observe/rebuild while consuming a pass. Cleanup may remove its
@@ -129,32 +168,39 @@ public:
     static constexpr unsigned End=Capacity;
     struct AnimationProjection {};
     bool bindTerrain(Terrain& terrain){if(terrain_)return false;terrain_=&terrain;return true;}
-    bool contains(unsigned s)const{const auto* p=state(s);return p&&p->list>=0;}
-    bool active(unsigned s)const{const auto* p=state(s);return p&&p->list==0;}
-    bool marked(unsigned s)const{const auto* p=state(s);return p&&p->list>=0&&p->marked;}
+    bool contains(unsigned s)const{return state(s).list>=0;}
+    bool active(unsigned s)const{return state(s).list==0;}
+    bool marked(unsigned s)const{const auto p=state(s);return p.list>=0&&p.marked;}
     bool mark(unsigned s){if(!contains(s))return false;
-        if(!state(s)->marked){
+        auto p=state(s);if(!p.marked){
             if(markedOrder_.count==Capacity)compactMarks();
-            state(s)->marked=true;++markedCount_;
+            p.marked=true;put(s,p);++markedCount_;
             markedOrder_.slots[markedOrder_.count++]=Slot(s);
         }return true;}
     bool bind(unsigned s,RunnerImageValue key){
-        auto* p=state(s);if(!p||!RunnerSpatialSplit::valid(key))return false;
+        if(s>=Capacity||(external(s)&&(!terrain_||!terrain_->registrationHandle(s-First).generation))||
+            !RunnerSpatialSplit::valid(key))return false;
+        const auto p=state(s);
         unmark(s);
-        if(p->list<0&&!external(s))liveActors_[actorCount_++]=Slot(s);
-        clock_.advance();*p={clock_,key,0,false};changed(s);return true;
+        if(p.list<0&&!external(s))liveActors_[actorCount_++]=Slot(s);
+        clock_.advance();put(s,{clock_,key,0,false});changed(s);return true;
     }
     // Fresh typed allocation owns an empty room state and a validated default
     // depth. No unmark/search is necessary; retirement already removed old
     // marks before this slot was reused.
-    void bindAllocatedTerrain(unsigned s,RunnerImageValue key){
-        clock_.advance();terrain_->allocatedRoomState(s-First)={clock_,key,0,false};
+    void bindAllocatedTerrain(unsigned s,RunnerImageValue key,bool inherited=false){
+        clock_.advance();
+        if(inherited)terrain_->publishInheritedRoom(s-First);
+        else terrain_->setAllocatedRoomState(s-First,{clock_,key,0,false});
         terrain_->roomChanged();
+    }
+    void completeInheritedTerrain(unsigned count){
+        clock_=clock_.shifted(count);terrain_->roomChanged(count);
     }
     bool remove(unsigned s){
         if(!contains(s))return false;
         unmark(s);
-        *state(s)=State{};
+        put(s,State{});
         if(!external(s))for(unsigned i=0;i<actorCount_;++i)if(liveActors_[i]==s){
             liveActors_[i]=liveActors_[--actorCount_];break;
         }
@@ -206,7 +252,7 @@ public:
         for(unsigned list=1;;--list){
             if(!walk(list,false,[&](unsigned s){
                 if(bool(inactive(s))==bool(list))return true;
-                auto& p=*state(s);clock_.advance();p.order=clock_;p.list=std::int8_t(1-list);changed(s);
+                auto p=state(s);clock_.advance();p.order=clock_;p.list=std::int8_t(1-list);put(s,p);changed(s);
                 return publish(s,list!=0);
             }))return false;
             if(!list)break;

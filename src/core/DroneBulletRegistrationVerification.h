@@ -12,7 +12,7 @@ struct DroneBulletRegistrationVerification {
         if(!store.create(105190,x.promoted(),y.promoted(),local)||
             !View::encode(View::Kind::drone,local,shared))return false;
         View::Record record;
-        const auto* properties=owner.properties(shared);const auto* state=owner.state(shared);
+        auto properties=owner.properties(shared);auto state=owner.state(shared);
         unsigned count=0;
         if(!View(world).resolve(shared,record)||record.drone!=store.find(local)||!state||!properties||
             state->x.bits!=x.bits||state->y.bits!=y.bits||properties->sprite.spriteId!=459||

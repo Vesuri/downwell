@@ -73,6 +73,10 @@ int main(){
             PreparedTerrainBirthBounds::Key key;
             RunnerSpatialSplit::Box keyed;
             assert(grid.key(object,x,y,key)&&grid.bounds(key,keyed));
+            RunnerSpatialSplit::PixelBox direct;
+            assert(grid.pixels(key,direct));
+            assert(direct.left==pixels.left&&direct.right==pixels.right&&
+                direct.top==pixels.top&&direct.bottom==pixels.bottom);
             assert(keyed.left.bits==result.left.bits&&keyed.top.bits==result.top.bits&&
                 keyed.right.bits==result.right.bits&&keyed.bottom.bits==result.bottom.bits);
             assert(grid.bounds(key,keyed,true));

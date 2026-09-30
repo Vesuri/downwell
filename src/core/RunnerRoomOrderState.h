@@ -10,6 +10,17 @@ struct RunnerRoomOrderState {
     RunnerImageValue depth{};
     std::int8_t list=-1;
     bool marked=false;
+    RunnerRoomOrderState shifted(unsigned offset)const{
+        auto result=*this;
+        if(order.present()){
+            result.order.low+=offset;if(result.order.low<order.low)++result.order.high;
+        }
+        return result;
+    }
+    bool same(const RunnerRoomOrderState& b)const{
+        return order.low==b.order.low&&order.high==b.order.high&&depth.bits==b.depth.bits&&
+            list==b.list&&marked==b.marked;
+    }
 };
 }
 #endif

@@ -110,10 +110,9 @@ Scheduler consumers must request only what they observe:
 
 Flag values are read again at the same callback boundaries as before; they
 are not cached across callbacks. Returning a value rather than a flag pointer
-allows a future terrain run to combine common flags with per-cell exclusion
-bits without materializing a full spatial record. The scalar ownership build
+allows a terrain run to combine common flags with per-cell publication stages
+without materializing a full spatial record. The scalar ownership build
 retains full-state resolution for eligibility as a differential reference.
-This API separation does not yet defer or remove any stored terrain state.
 
 `instanceNumberReference` and `collisionPointVmReference` retain the full-state
 read at these two additional boundaries. Neither population counting nor an
@@ -129,10 +128,11 @@ These are distinct observations, not one deferred birth callback:
   each successfully published lifetime immediately. Their representation can
   be run identity plus current per-cell flags; they must not drain pending
   geometric work.
-- `resolve` returns a borrowed full-state pointer. Multiple candidate states
-  can be held simultaneously (`collideCompatibility` holds two), so one shared
-  scratch record is not a valid replacement. Mutation and full-state inspection
-  need a stable projection, distinct from flag-only reads.
+- `resolve` returns a borrowed pointer in the full-record reference and an
+  owning terrain value view in the experimental run store. Multiple candidate
+  states can be held simultaneously (`collideCompatibility` holds two), so one
+  shared scratch record is not a valid replacement. Keep a value view alive
+  while using a reference into it; an actor view continues to borrow its record.
 - Initial bounds are published **before** terrain Create changes the sprite.
   `changeSprite` dirties flags/queues but does not replace cached bounds or the
   old tree rectangle. Deriving historical bounds from the current sprite would
@@ -152,6 +152,63 @@ The compact representation therefore needs immediate identity/flags/order,
 immutable publication history, and independently derived full-state views.
 Tree pressure/failure rules and intervening query callbacks still constrain
 history coalescing; future run cells cannot become visible before their Create.
+
+### Run-derived spatial publication
+
+The experimental run store keeps ordinary generated coordinates and previous
+coordinates in the authoritative identity geometry, not a second spatial array.
+A per-cell stage distinguishes pristine, attached, default-property, bounded,
+indexed, and post-Create dirty publication. Initial inactivity is retained
+independently. Resource-wide templates supply initial and precise-mask flags.
+Full reads derive constructor bounds from the immutable prepared geometry;
+eligibility reads do not expand positions or bounds. A later sprite change
+cannot change these historical bounds without a bounds-publication operation.
+
+Actual coordinate, bounds, flag or previous-position changes split the owning
+run and preserve exact literal state. A scoped edit registers its projection
+until it returns: nested edits and query callbacks on that cell share the same
+mutable value, while reads own independent snapshots. Edits of other cells do
+not invalidate it. An unchanged edit retains the generated representation.
+Actors and the scalar reference retain full records. Dirty-list order and
+journal history retain their independent observation/failure contracts.
+
+An admitted native constructor may publish its final spatial stage and initial
+memberships once at return. Its property callback only establishes constructor
+appearance; its room callback only binds room order or rejects the birth.
+Neither may inspect this spatial owner, create another instance, or run a
+query. Family preparation reads its own object graph, and journal pressure
+replay reads captured geometry, not the currently constructing instance.
+Thus intermediate constructor stages are not observation boundaries within
+this interval. Room rejection commits stage 2; family-preparation rejection
+also commits stage 2; an initial index-insertion failure commits bounded stage
+3; a successful insertion commits indexed stage 4. Initial dirty memberships
+precede graph preparation, while a newly required collision membership follows
+successful index publication. No Create work is deferred. General callbacks
+and the full-record reference retain their ordinary publication path.
+
+### Run-owned dirty memberships
+
+The experimental owner keeps spatial and collision dirty-order bases in each
+terrain run, with independent per-cell membership bits. Admitted continuation
+publishes a bit and advances the queue clock; it does not maintain terrain
+predecessor/successor links. Inheritance requires the first completed cell to
+have every membership needed by the next cell. In particular, family
+preparation can change queue eligibility, so a missing first-cell membership
+cannot supply a later cell's order base.
+
+Actors retain intrusive queues. Their order keys merge them with terrain at
+traversal boundaries. A terrain successor table is a derived view, rebuilt
+only for traversal or removal that needs an unknown successor. Ordinary birth
+order needs no sort; re-marks use an in-place linked merge sort. Removing cells
+keeps valid links through holes, and a subsequent mark invalidates that view.
+Changing an unrelated run property does not invalidate queue chronology.
+
+Refresh still observes the successor after its callback, not before it. A
+callback that moves another queued cell to the head can leave that cell for
+the next flush; a failing refresh leaves the current membership intact.
+Clock rebasing at complete 64-bit wrap preserves ordering without introducing
+a source-visible failure. None of these queue operations drains the spatial
+journal or changes its pressure/first-query boundaries.
 
 ### Appearance is not a single interchangeable record
 
@@ -738,6 +795,54 @@ publications remain. Do not use a smaller live descriptor count as evidence
 of a cheaper generation frame. Preserve operation-count pressure boundaries
 and partial-service behavior when changing the journal's representation;
 descriptor-count pressure would move observable replay/failure timing.
+
+The run-owned initialized-birth transaction may borrow a singleton descriptor
+as its publication writer. Registration, room, layer, appearance and dirty-order
+stores then initialize that descriptor directly at their original boundaries;
+they do not independently resolve the identity or run the general split-aware
+mutation algorithm. Shared descriptors retain that algorithm. Nested allocation,
+retirement and clear invalidate the writer; leaving the constructor never
+restores an outer borrow that those operations may have invalidated. Failed
+construction retains only its already-published prefix. No borrowed writer
+survives the synchronous constructor call.
+
+For a homogeneous continuation admitted from its first completed cell, the
+constructor hides the inherited appearance and the identical prepared Create
+plan reveals it. It does not rewrite the run's common sprite/index payload.
+Different plans, unrelated births and shared-state mutations retain ordinary
+publication. This changes storage work, not the per-cell RNG/Create sequence.
+
+An admitted homogeneous continuation captures queue eligibility, first-bounds
+publication eligibility and collision membership after the first cell prepares
+the live family flags. The capture is borrowed only for that callback-free run;
+it is not an asset-wide assumption about family state. Bounds-dirty and precise
+bits do not change queue eligibility. Therefore the identical prepared Create
+can set bounds-dirty without repeating marks on the queue heads that this cell's
+birth already established. The initial cell and non-inherited births keep the
+general decision path; journal failure still precedes layer/Create publication.
+
+The trusted `createGeneratedTerrainRun` sink cannot query/mutate collision
+ownership, create other instances or change area inside its borrowed interval.
+After a first completed birth admits homogeneous continuation, the owner may
+accumulate registration, room and dirty-queue counters for that interval.
+Each cell still allocates its identity, exposes constructor state, performs its
+fallible journal insertion and completes Create before the next RNG draw.
+Only the shared counters/order clocks are accumulated. Flush the actual prefix
+on every exit, including backend rejection, allocator/constructor failure and
+a descriptor break before a general birth. Failed journal publication includes
+the current registration/room prefix but not later layer/Create effects or a
+post-bounds collision mark. No observer may run while these counters are pending;
+arbitrary callbacks retain the ordinary synchronous path. Clock-wrap admission
+and distinct spatial/collision prefix counts remain part of the contract.
+
+Layer continuation uses the same observation-free interval. Its capacity
+snapshot is a limit, not an early allocation: each cell consumes one unit at
+its original layer boundary, and the first excess cell fails before Create.
+Flush only successfully retained cells into the layer population/order clock.
+Count Draw-revision attempts separately, including a rejected layer birth;
+disabled room layers still advance that revision without publishing terrain
+layer state. A descriptor break flushes before ordinary layer admission. The
+next actor must observe the same remaining capacity and painter-order clock.
 
 `AreaOneBuilder::emitPattern` reuses one local `DeferredCreateInstance` for
 ordinary walls/platforms. Each callback borrows that command only until it

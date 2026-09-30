@@ -29,7 +29,7 @@ template<unsigned I,bool CompactUnnumbered=false,class Terrain=void> class Gamep
     RunnerLayerLifetimes<L,E,I,true,CompactUnnumbered,Layers> lifetimes_{layers_,registry_,ids_};
     Terrain* terrain_=nullptr;
     unsigned terrainFirst_=0;
-    RunnerRetainedLayerState* retainedState(InstanceHandle h)const{
+    RunnerRetainedLayerRead retainedState(InstanceHandle h)const{
         if constexpr(Storage::retained){
             if(terrain_&&h.slot>=terrainFirst_&&h.slot-terrainFirst_<Terrain::capacity)
                 return terrain_->layerState({h.slot-terrainFirst_,h.generation});
@@ -125,10 +125,33 @@ public:
     unsigned playerSourceId()const{return playerId_;}
     // Borrow only during one callback-free, same-object generated terrain run.
     // Resolve/create its layer at the first cell's original attachment point.
-    struct TerrainRunBirth {unsigned layer=Layers::End;};
+    struct TerrainRunBirth {
+        unsigned layer=Layers::End,available=0,pending=0,drawPending=0;
+        bool admitted=false;
+    };
+    bool birthInheritedTerrain(InstanceHandle h,TerrainRunBirth& run){
+        ++run.drawPending;
+        if(!enabled())return true;
+        if(!run.admitted){run.available=layers_.retainedAvailable(run.layer);run.admitted=true;}
+        // Consume logical capacity one cell at its original layer boundary;
+        // no later Create runs when this cell exhausts the available prefix.
+        if(!prepared_||run.pending==run.available)return fail();
+        ++run.pending;terrain_->publishInheritedLayer(h.slot-terrainFirst_);return true;
+    }
+    bool completeInheritedTerrain(TerrainRunBirth& run){
+        const unsigned count=run.pending,draw=run.drawPending;
+        run.pending=run.drawPending=0;run.admitted=false;
+        drawRevision_=drawRevision_>0xffffffffu-draw?0xffffffffu:drawRevision_+draw;
+        if(count){
+            if(!layers_.retainInheritedCount(run.layer,count))return fail();
+            live_+=count;
+        }
+        return true;
+    }
     // Only generated, unnumbered, nonprojected terrain inside its allocator's
     // fresh-birth transaction. Layer creation and ID allocation stay live.
-    bool birthAllocatedTerrain(InstanceHandle h,RunnerImageValue depth,bool inactive,TerrainRunBirth* run=nullptr){
+    bool birthAllocatedTerrain(InstanceHandle h,RunnerImageValue depth,bool inactive,TerrainRunBirth* run=nullptr,
+                               bool inherited=false){
         static_assert(Storage::retained,"Owned terrain layers required");
         changedDraw();if(!enabled())return true;
         if(!prepared_)return fail();
@@ -139,14 +162,14 @@ public:
             if(layer==Layers::End&&!ids_.createDynamic(layers_,integer,layer))return fail();
             if(run)run->layer=layer;
         }
-        if(!layers_.retainAllocated(terrain_->allocatedLayerState(h.slot-terrainFirst_),layer,inactive))return fail();
+        if(!layers_.retainAllocated(h.slot-terrainFirst_,layer,inactive,inherited))return fail();
         ++live_;return true;
     }
     bool birth(InstanceHandle h,unsigned sourceId,RunnerImageValue depth,bool inactive,bool projected=true){
         changedDraw();
         if(!enabled())return true;
         if constexpr(Storage::retained)if(!sourceId&&!projected){
-            if(auto* state=retainedState(h)){
+            if(auto state=retainedState(h)){
                 if(!valid()||!prepared_||state->bound()||!RunnerSpatialSplit::valid(depth))return fail();
                 std::int32_t integer;if(!RunnerDepthService::integerDepth(depth,integer))return fail();
                 unsigned layer=layers_.findDynamic(integer);
@@ -179,7 +202,7 @@ public:
         changedDraw();
         if(!enabled())return true;
         if(!valid()||!live_)return fail();
-        if constexpr(Storage::retained)if(auto* state=retainedState(h))if(state->bound()){
+        if constexpr(Storage::retained)if(auto state=retainedState(h))if(state->bound()){
             if(!layers_.releaseInstance({h.slot-terrainFirst_,h.generation}))return fail();
             --live_;return true;
         }
@@ -207,7 +230,7 @@ public:
     bool activation(InstanceHandle h,bool active){
         changedDraw();
         if(!enabled())return true;
-        if constexpr(Storage::retained)if(auto* state=retainedState(h))if(state->bound())
+        if constexpr(Storage::retained)if(auto state=retainedState(h))if(state->bound())
             return valid()&&layers_.publishInactive({h.slot-terrainFirst_,h.generation},!active);
         if(!valid()||!lifetimes_.publishInactive(h,!active))return false;
         if(!(projected_[h.slot>>3]&(1u<<(h.slot&7)))){
@@ -227,7 +250,7 @@ public:
         changedDraw();
         if(!enabled())return true;
         if(!valid())return false;
-        if constexpr(Storage::retained)if(auto* state=retainedState(h))if(state->bound())
+        if constexpr(Storage::retained)if(auto state=retainedState(h))if(state->bound())
             return layers_.reconcileRetained({h.slot-terrainFirst_,h.generation});
         int id;
         const unsigned layer=lifetimes_.attachedLayer(h,id)?layers_.find(id):Layers::End;
@@ -245,7 +268,7 @@ public:
     bool writeDepth(InstanceHandle h,MotionBinary64 value){
         // Generated terrain has no exposed depth setter in the typed owner.
         // Never route a retained handle into an unrelated physical lifetime.
-        if constexpr(Storage::retained)if(auto* state=retainedState(h))if(state->bound())return fail();
+        if constexpr(Storage::retained)if(auto state=retainedState(h))if(state->bound())return fail();
         return enabled()&&valid()&&lifetimes_.writeDepth(h,value);
     }
     template<class Lookup,class Draw> bool visit(Lookup lookup,Draw draw)const{

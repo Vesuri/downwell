@@ -3,23 +3,54 @@
 #include "InstanceHandle.h"
 #include <cstdint>
 namespace downwell {
+struct TerrainIdentityOnly {
+    TerrainIdentityOnly shifted(unsigned)const{return {};}
+    bool same(const TerrainIdentityOnly&)const{return true;}
+};
 // Authoritative immutable terrain identities, in birth order. Per-cell mutable
 // Create results belong to the caller; no second identity/order list is needed.
 // Retired cells are holes until their run becomes empty. Slot reuse changes the
 // locator, never the historical geometry of surviving cells in that run.
-template<unsigned Capacity> class TerrainOwnershipRuns {
+template<unsigned Capacity,class Publication=TerrainIdentityOnly> class TerrainOwnershipRuns {
     static_assert(Capacity>0&&Capacity<65535,"Terrain run locator domain");
     using Slot=std::uint16_t;
     static constexpr unsigned End=Capacity;
-    struct Run {
+    struct Run:Publication {
         int object=0,x=0,y=0,step=0,creationCode=-1;
         std::uint32_t generation=0,source=0;
         Slot first=0,count=0,live=0,next=End,previous=End;
     };
     Run runs_[Capacity]{};
+    inline static const Publication initialPublication_{};
     Slot locator_[Capacity]{};
     unsigned head_=End,tail_=End,free_=End,used_=0,population_=0;
     unsigned allocate(){if(free_!=End){unsigned n=free_;free_=runs_[n].next;return n;}return used_++;}
+    // Split only at an actual mutation boundary. Geometry, lifetime and
+    // publication share this descriptor and locator; no parallel per-cell
+    // publication array is needed. Retired holes remain holes in both parts.
+    unsigned split(unsigned n,unsigned offset){
+        auto& left=runs_[n];
+        const unsigned first=left.first+offset,end=left.first+left.count;
+        unsigned rightLive=0;
+        for(unsigned s=first;s<end;++s)if(locator_[s]==n+1)++rightLive;
+        // Callers split around a live cell. An all-hole prefix/suffix can be
+        // trimmed in place and must not consume a descriptor.
+        if(!rightLive){left.count=Slot(offset);return End;}
+        if(rightLive==left.live){
+            static_cast<Publication&>(left)=static_cast<const Publication&>(left).shifted(offset);
+            left.x+=int(offset)*left.step;left.generation+=offset;
+            left.first=Slot(first);left.count=Slot(end-first);return n;
+        }
+        const unsigned right=allocate();
+        auto& r=runs_[right];r=left;
+        static_cast<Publication&>(r)=static_cast<const Publication&>(left).shifted(offset);
+        r.x+=int(offset)*r.step;r.generation+=offset;
+        r.first=Slot(first);r.count=Slot(end-first);r.live=Slot(rightLive);r.previous=Slot(n);
+        if(r.next==End)tail_=right;else runs_[r.next].previous=Slot(right);
+        left.next=Slot(right);left.count=Slot(offset);left.live-=Slot(rightLive);
+        for(unsigned s=first;s<end;++s)if(locator_[s]==n+1)locator_[s]=Slot(right+1);
+        return right;
+    }
 public:
     struct Identity {
         InstanceHandle handle{};
@@ -61,7 +92,43 @@ public:
         const unsigned offset=h.slot-r.first;
         out={h,r.object,r.x+int(offset)*r.step,r.y,r.creationCode,r.source};return true;
     }
-    bool append(InstanceHandle h,int object,int x,int y,std::uint32_t source=0,int creationCode=-1){
+    bool publication(InstanceHandle h,Publication& out)const{
+        if(!contains(h))return false;
+        const auto& r=runs_[locator_[h.slot]-1];
+        out=static_cast<const Publication&>(r).shifted(h.slot-r.first);return true;
+    }
+    // Exclusive constructor writer. Borrow only until the next structural
+    // operation; a shared descriptor must keep the split-aware mutation path.
+    Publication* singletonPublication(InstanceHandle h){
+        if(!contains(h))return nullptr;
+        auto& r=runs_[locator_[h.slot]-1];
+        return r.count==1?static_cast<Publication*>(&r):nullptr;
+    }
+    bool changePublication(InstanceHandle h,const Publication& value){
+        if(!contains(h))return false;
+        unsigned n=locator_[h.slot]-1;
+        const unsigned offset=h.slot-runs_[n].first;
+        if(static_cast<const Publication&>(runs_[n]).shifted(offset).same(value))return true;
+        if(offset)n=split(n,offset);
+        if(runs_[n].count>1)split(n,1);
+        static_cast<Publication&>(runs_[n])=value;return true;
+    }
+    template<class Part> bool publicationPart(InstanceHandle h,Part Publication::* member,Part& out)const{
+        if(!contains(h))return false;
+        const auto& r=runs_[locator_[h.slot]-1];
+        out=(static_cast<const Publication&>(r).*member).shifted(h.slot-r.first);return true;
+    }
+    template<class Part> bool changePublicationPart(InstanceHandle h,Part Publication::* member,const Part& value){
+        if(!contains(h))return false;
+        unsigned n=locator_[h.slot]-1;const unsigned offset=h.slot-runs_[n].first;
+        if((static_cast<const Publication&>(runs_[n]).*member).shifted(offset).same(value))return true;
+        if(offset)n=split(n,offset);
+        if(runs_[n].count>1)split(n,1);
+        static_cast<Publication&>(runs_[n]).*member=value;return true;
+    }
+    bool append(InstanceHandle h,int object,int x,int y,std::uint32_t source=0,int creationCode=-1,
+                const Publication& publication=initialPublication_,bool inheritPublication=false,bool* inherited=nullptr){
+        if(inherited)*inherited=false;
         if(h.slot>=Capacity||!h.generation||occupied(h.slot)||population_==Capacity||
             (object!=60&&object!=93&&object!=99))return false;
         // Only generated, adjacent horizontal cells share a descriptor.
@@ -74,15 +141,25 @@ public:
                 const bool right=last<=0x7fffffff-16&&x==last+16;
                 const bool left=last>=(-2147483647-1)+16&&x==last-16;
                 const int step=right?16:left?-16:0;
-                if(step&&(r.count==1||r.step==step)){
+                if(step&&(r.count==1||r.step==step)&&
+                    (inheritPublication||static_cast<const Publication&>(r).shifted(r.count).same(publication))){
+                    if(inherited)*inherited=inheritPublication;
                     r.step=step;++r.count;++r.live;locator_[h.slot]=Slot(tail_+1);++population_;return true;
                 }
             }
         }
         const unsigned n=allocate();
-        runs_[n]={object,x,y,0,creationCode,h.generation,source,Slot(h.slot),1,1,Slot(End),Slot(tail_)};
+        // Initialize only an actual new descriptor. Do not construct and copy
+        // an actor-sized run temporary for each inherited terrain cell.
+        auto& r=runs_[n];static_cast<Publication&>(r)=publication;
+        r.object=object;r.x=x;r.y=y;r.step=0;r.creationCode=creationCode;
+        r.generation=h.generation;r.source=source;r.first=Slot(h.slot);
+        r.count=r.live=1;r.next=End;r.previous=Slot(tail_);
         if(tail_==End)head_=n;else runs_[tail_].next=Slot(n);
         tail_=n;locator_[h.slot]=Slot(n+1);++population_;return true;
+    }
+    bool appendInherited(InstanceHandle h,int object,int x,int y,std::uint32_t source,int creationCode,bool* inherited){
+        return append(h,object,x,y,source,creationCode,initialPublication_,true,inherited);
     }
     bool retire(InstanceHandle h){
         if(!contains(h))return false;
@@ -112,6 +189,27 @@ private:
         return true;
     }
 public:
+    class PublicationRun {
+        const TerrainOwnershipRuns& owner_;unsigned index_;
+    public:
+        PublicationRun(const TerrainOwnershipRuns& owner,unsigned index):owner_(owner),index_(index){}
+        const Publication& publication()const{return owner_.runs_[index_];}
+        template<bool Reverse=false,class Visit> bool visitSlots(Visit visit)const{
+            const auto& r=owner_.runs_[index_];
+            for(unsigned i=0;i<r.count;++i){const unsigned offset=Reverse?r.count-1-i:i,slot=r.first+offset;
+                if(owner_.locator_[slot]==index_+1&&!visit(slot,offset))return false;
+            }return true;
+        }
+    };
+    template<class Visit> bool visitPublicationRun(unsigned slot,Visit visit)const{
+        return occupied(slot)&&visit(PublicationRun(*this,locator_[slot]-1));
+    }
+    template<class Visit> bool visitPublicationRuns(Visit visit)const{
+        // Borrowed traversal; publication mutations can split runs and must
+        // occur outside this walk, using stable slot/handle projections.
+        for(unsigned n=head_;n!=End;n=runs_[n].next)if(!visit(PublicationRun(*this,n)))return false;
+        return true;
+    }
     template<class Visit> bool visit(Visit visit)const{return visitSelected<false>(0,0,visit);}
     template<class Visit> bool visitRows(int first,int end,Visit visit)const{
         return first>=end||visitSelected<true>(first,end,visit);
