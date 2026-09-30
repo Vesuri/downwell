@@ -29,6 +29,12 @@ Downwell to an SDL host reference implementation and then to native Amiga 500
   budget, replace duplicated per-block terrain ownership before pursuing
   isolated arithmetic, copying, or compiler-level micro-optimizations. Keep
   preparatory changes directly tied to integrating that replacement.
+- Before a performance change, identify the work it removes and estimate the
+  saving from the native profile. Afterwards compare the same deterministic
+  A500 workload, including its worst frame, with the retained reference.
+  Correctness tests and added infrastructure are not performance wins. Revise
+  or discard experiments that miss their target; a better average does not
+  excuse a worse worst-case frame.
 
 ## Generated and copyrighted material
 
