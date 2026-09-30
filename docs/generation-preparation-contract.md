@@ -143,6 +143,27 @@ history coalescing; future run cells cannot become visible before their Create.
 
 ### Terrain record and ownership publication
 
+`PreparedTerrainCreate` compiles ordinary object-60/object-93 Create for the
+six area tiles before gameplay. It evaluates `terrainCreateProperties` with
+glitch disabled and resolves the sprite setter against immutable constructor
+defaults and sprite frame counts. An admitted plan consumes no RNG, ends with
+image speed zero, and optionally writes the platform's index 23. The 12 plans
+occupy 192 bytes on the host; they contain no live instance or family state.
+
+The opt-in run-store's initialized birth applies a plan only after the entire
+birth has succeeded. At this private boundary no external callback has changed
+the constructor's zero index/timeline or cached frame -1. Thus any sprite-setter
+reset would rewrite the same values. Apply only the changed sprite, its dirty
+flag/queue effect using **current** family flags, and an explicit index write.
+Keep initial published bounds and tree history unchanged. Typed image speed,
+wall-art range and Draw-cache invalidation are still published synchronously.
+Failures during birth occur before any of these Create writes, as before.
+
+Glitch Create, non-area tile overrides, failed plan admission and the scalar
+ownership reference retain the script/setter path. The plan is not valid for
+repeated Create on an existing instance or after an arbitrary callback. No
+builder choices, health-dependent values or random choices are prepared here.
+
 The terrain pool constructor prepares every unused record's default state.
 First use writes only the birth-specific identity, coordinates, activation and
 source binding before synchronous publication; `objectId == 0` identifies these

@@ -187,6 +187,45 @@ void testGeneratedPack(const char* path,const char* maskPath,const char* objectP
             }
         }
         using BirthOwner=downwell::RunnerSpatialInstances<2,32,true,0,0,true>;
+        downwell::PreparedTerrainCreate createPlans;
+        require(createPlans.prepare(preparedDefaults,compact),"prepare ordinary terrain Create");
+        require(!createPlans.get(99,51)&&!createPlans.get(60,-1)&&!createPlans.get(60,585),
+            "non-area overrides and non-Create objects retain script path");
+        for(int object:{60,93})for(int area=0;area<6;++area)for(unsigned mode=0;mode<4;++mode){
+            BirthOwner reference,prepared;BirthOwner::Properties a,b;BirthOwner::State initial;
+            auto fa=families,fb=families;
+            if(mode&1)initial.flags|=2u;
+            if(mode&2){require(fa.markSpatialFamily(object)&&fb.markSpatialFamily(object),"prepare live family");}
+            downwell::RunnerSpatialSplit::PixelBox pixels{160,256,175,271};
+            const auto bounds=downwell::RunnerSpatialSplit::encodePixels(pixels);
+            require(reference.attachPreparedTerrainBirth({0,1},object,initial,a,preparedDefaults,fa,
+                bounds,pixels,true,[](auto){return true;})&&
+                prepared.attachPreparedTerrainBirth({0,1},object,initial,b,preparedDefaults,fb,
+                    bounds,pixels,true,[](auto){return true;}),"birth before prepared Create");
+            const int tile=downwell::terrainTileForArea(area);
+            downwell::GameMakerRandom random(123);int speed=1;
+            require(downwell::terrainCreateProperties(object,tile,false,random,[&](int sprite){
+                return reference.changeSpriteFromPack({0,1},a.sprite,a.timeline,a.cachedFrame,
+                    sprite,compact,*fa.flags(object));
+            },[&](int index){downwell::RunnerImageValue v;return v.assignInteger(index)&&
+                reference.writeImageIndex({0,1},a.sprite,v);},[&](int v){speed=v;return true;}),
+                "ordinary source Create reference");
+            const auto* plan=createPlans.get(object,tile);require(plan,"prepared ordinary area plan");
+            prepared.finishAdmittedTerrainCreate({0,1},b,*plan,*fb.flags(object));
+            const auto* x=reference.resolve({0,1});const auto* y=prepared.resolve({0,1});
+            require(!random.drawCount()&&speed==0&&!std::memcmp(&a,&b,sizeof(a))&&
+                x->flags==y->flags&&x->bounds.left.bits==y->bounds.left.bits&&
+                x->bounds.right.bits==y->bounds.right.bits&&x->bounds.top.bits==y->bounds.top.bits&&
+                x->bounds.bottom.bits==y->bounds.bottom.bits&&
+                reference.pendingSpatial()==prepared.pendingSpatial()&&
+                reference.pendingCollision()==prepared.pendingCollision()&&
+                reference.pendingSpatialIndex()==prepared.pendingSpatialIndex()&&
+                reference.captureRevision()==prepared.captureRevision(),
+                "prepared Create preserves appearance, old geometry, queues, RNG and revision");
+        }
+        require(!createPlans.prepare(preparedDefaults,downwell::SpriteCollisionPack(nullptr,0))&&
+            !createPlans.get(60,51)&&!createPlans.get(93,51),"failed preparation invalidates stale Create plans");
+        require(createPlans.prepare(preparedDefaults,compact)&&createPlans.get(60,51),"Create plans can be prepared again");
         for(int object:{60,93,99})for(unsigned mode=0;mode<32;++mode){
             BirthOwner reference,transaction;BirthOwner::Properties a,b;BirthOwner::State initial;
             auto referenceFamilies=families,transactionFamilies=families;

@@ -20,6 +20,7 @@
 #include "RunnerSpriteChange.h"
 #include "ObjectPack.h"
 #include "PreparedObjectDefaults.h"
+#include "PreparedTerrainCreate.h"
 #include "Profile.h"
 namespace downwell {
 template<unsigned Capacity,unsigned First,unsigned Last,bool Runs> struct RunnerRegistrationStorage {
@@ -511,6 +512,20 @@ public:
         std::uint32_t frames=0;
         if(next>=0)pack.frameCount(unsigned(next),frames);
         return changeSprite(h,sprite,timeline,cachedFrame,next,frames,objectFlags);
+    }
+    // Only immediately after successful owner-controlled terrain birth: the
+    // lifetime is admitted, index/timeline are zero and cachedFrame is -1.
+    // No external callback may intervene. The prepared script cannot fail or
+    // draw RNG. Preserve default cached bounds and mark changed appearance for
+    // later refresh, using LIVE family flags rather than preparation-time ones.
+    void finishAdmittedTerrainCreate(InstanceHandle h,Properties& p,
+        const PreparedTerrainCreate::Plan& plan,std::uint32_t objectFlags){
+        if(plan.changedSprite){
+            p.sprite.spriteId=plan.sprite;
+            entries_[h.slot].state.flags|=8u;
+            markSpatialChange(h.slot,objectFlags);
+        }
+        if(plan.writeIndex)p.sprite.imageIndex=plan.imageIndex;
     }
     bool refresh(InstanceHandle h,std::uint32_t objectFlags,bool allPrepared,
         const Box* bounds,bool precise,bool publish){

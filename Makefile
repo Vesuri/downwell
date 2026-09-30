@@ -64,7 +64,7 @@ ROOM_PACK_TEST_SOURCES := tests/core/RoomPackTest.cpp src/core/RoomPack.cpp src/
 OBJECT_PACK_TEST_TARGET := build/object-pack-test
 OBJECT_PACK_TEST_SOURCES := tests/core/ObjectPackTest.cpp src/core/ObjectPack.cpp
 SPRITE_PACK_TEST_TARGET := build/sprite-pack-test
-SPRITE_PACK_TEST_SOURCES := tests/core/SpritePackTest.cpp src/core/SpritePack.cpp src/core/ObjectPack.cpp
+SPRITE_PACK_TEST_SOURCES := tests/core/SpritePackTest.cpp src/core/SpritePack.cpp src/core/ObjectPack.cpp src/core/GameMakerRandom.cpp
 FONT_PACK_TEST_TARGET := build/font-pack-test
 FONT_PACK_TEST_SOURCES := tests/core/FontPackTest.cpp src/core/FontPack.cpp
 BUILDER_PATTERN_PACK_TEST_TARGET := build/builder-pattern-pack-test
@@ -1724,7 +1724,7 @@ $(OBJECT_PACK_TEST_TARGET): $(OBJECT_PACK_TEST_SOURCES)
 	@mkdir -p $(@D)
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(OBJECT_PACK_TEST_SOURCES)
 
-$(SPRITE_PACK_TEST_TARGET): $(SPRITE_PACK_TEST_SOURCES)
+$(SPRITE_PACK_TEST_TARGET): $(SPRITE_PACK_TEST_SOURCES) $(wildcard src/core/*.h)
 	@mkdir -p $(@D)
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(SPRITE_PACK_TEST_SOURCES)
 

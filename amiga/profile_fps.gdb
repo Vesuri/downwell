@@ -16,7 +16,7 @@ if gDownwellProfileMaxGap[$s] > 0 && (gDownwellProfileMaxGapFrame[$s] == 0 || gD
 end
 printf "Damage number births: %lu\n", gDownwellProfileDamageBirths
 printf "PREPARATION terrain: calls=%lu PAL_fields=%lu approximately_ms=%lu (20 ms counter resolution, before takeover)\n", gDownwellTerrainPreparationCalls, gDownwellTerrainPreparationFields, gDownwellTerrainPreparationFields*20
-if gDownwellTerrainPreparationCalls != 1
+if gDownwellTerrainPreparationCalls != gDownwellTerrainPreparationExpectedCalls
     printf "Unexpected terrain preparation coverage\n"
     quit 1
 end

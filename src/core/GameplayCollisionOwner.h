@@ -70,6 +70,9 @@ private:
     PreparedObjectDefaults<386> objectDefaults_;
     PreparedSpriteGeometry<741> spriteGeometry_;
     PreparedTerrainBirthBounds terrainBirthBounds_;
+#if defined(DOWNWELL_TERRAIN_RUN_STORE) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
+    PreparedTerrainCreate terrainCreate_;
+#endif
 #ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
     GameplayRoomLayers<View::capacity> layers_;
 #elif defined(DOWNWELL_TERRAIN_RUN_STORE)
@@ -332,6 +335,18 @@ private:
             DW_PROFILE_SCOPE(profileTerrainCreate);
             if(r.objectId==99)return true;
             const InstanceHandle h{View::terrainBase+local.slot,local.generation};
+#ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+            if(const auto* plan=parent.terrainCreate_.get(r.objectId,tile)){
+                if(plan->changedSprite)parent.drawOrderValid_=false;
+                parent.owner_.finishAdmittedTerrainCreate(h,parent.properties_[h.slot],*plan,
+                    *parent.families_.flags(r.objectId));
+                values.spriteId=plan->sprite;
+                if(plan->writeIndex)values.imageIndex=plan->index;
+                values.imageSpeed=0;
+                if(r.objectId==60&&(wallRadius(plan->sprite)<0||wallRadius(plan->sprite)>16))unbounded=true;
+                return true;
+            }
+#endif
             return terrainCreateProperties(r.objectId,tile,false,random,[&](int sprite){
                 if(!publishSprite(h,r.objectId,sprite))return false;
                 values.spriteId=sprite;
@@ -392,6 +407,9 @@ public:
             spriteGeometry_.prepare(sprites_)&&
             terrainBirthBounds_.prepare(objectDefaults_,sprites_)&&
             families_.bindInstanceFlags(objects)&&drawMetadata_.bind(objects)&&alarmMetadata_.bind(objects);
+#if defined(DOWNWELL_TERRAIN_RUN_STORE) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
+        if(good_)good_=terrainCreate_.prepare(objectDefaults_,sprites_);
+#endif
         if(good_)for(unsigned selector=0;selector<2;++selector){
             terrainFamilies_[selector]=true;
             for(unsigned i=0;i<families_.size();++i)
