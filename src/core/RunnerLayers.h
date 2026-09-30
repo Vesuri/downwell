@@ -4,10 +4,16 @@
 #include "RunnerImageValue.h"
 #include <cstdint>
 namespace downwell {
+template<unsigned Capacity,bool Enabled> struct RunnerRetainedLayerPopulation {};
+template<unsigned Capacity> struct RunnerRetainedLayerPopulation<Capacity,true> {
+    unsigned retained[Capacity?Capacity:1]{};
+    unsigned logical=0;
+};
 // Selected GMS2 layer storage and integer-depth movement. Source IDs are
 // supplied by the room owner, not invented from reusable storage slots.
 // Does not service the pending instance-depth queue or define Draw traversal.
-template<unsigned Capacity,unsigned Elements> class RunnerLayers {
+template<unsigned Capacity,unsigned Elements,bool Retained=false> class RunnerLayers:
+    private RunnerRetainedLayerPopulation<Capacity,Retained> {
 public:
     static constexpr unsigned End=Capacity;
     struct Layer {
@@ -24,7 +30,9 @@ public:
         if(failed_)return false;
         invalidateLookups();
         for(auto& layer:layers_)layer=Layer{};
-        elements_.clear();head_=tail_=End;return true;
+        elements_.clear();head_=tail_=End;
+        if constexpr(Retained){for(auto& count:this->retained)count=0;this->logical=0;}
+        return true;
     }
     unsigned find(std::int32_t id)const{
         if(idLookup_.valid&&idLookup_.key==id)return idLookup_.slot;
@@ -55,9 +63,34 @@ public:
     }
     unsigned elementOwner(unsigned element)const{return elements_.owner(element);}
     unsigned firstFreeElement(unsigned start=0)const{return elements_.firstFree(start);}
-    unsigned elementCount(unsigned layer)const{return elements_.count(layer);}
+    unsigned elementCount(unsigned layer)const{
+        if constexpr(Retained)return elements_.count(layer)+(layer<Capacity?this->retained[layer]:0);
+        else return elements_.count(layer);
+    }
+    // Retained records have logical population but no ordinary element link.
+    // Their authoritative owner supplies order, flags and identity separately.
+    // Admission consumes the SAME bounded population as ordinary elements.
+    unsigned retainedCount(unsigned layer)const{
+        if constexpr(Retained)return layer<Capacity?this->retained[layer]:0;
+        else return 0;
+    }
+    bool retain(unsigned layer,unsigned count){
+        static_assert(Retained,"Retained population is opt-in");
+        if(failed_||!get(layer)||count>Elements-this->logical)return false;
+        this->retained[layer]+=count;this->logical+=count;return true;
+    }
+    bool releaseRetained(unsigned layer,unsigned count){
+        static_assert(Retained,"Retained population is opt-in");
+        if(failed_||!get(layer)||count>this->retained[layer])return false;
+        this->retained[layer]-=count;this->logical-=count;
+        if(count&&layers_[layer].dynamic&&!elementCount(layer))eraseEmpty(layer);
+        return true;
+    }
     template<class Active> bool attach(unsigned layer,unsigned element,bool instance,bool append,Active active){
-        return !failed_&&get(layer)&&elements_.insert(layer,element,instance,append,active);
+        if constexpr(Retained)if(this->logical==Elements)return false;
+        const bool ok=!failed_&&get(layer)&&elements_.insert(layer,element,instance,append,active);
+        if constexpr(Retained)if(ok)++this->logical;
+        return ok;
     }
     // 0x4266e0, called in room reconciliation order: remove/reinsert the SAME
     // element at head (active) or tail (inactive). Do not use detach here:
@@ -75,7 +108,8 @@ public:
         if(failed_)return false;
         const unsigned layer=elements_.owner(element);
         if(!get(layer)||!elements_.remove(element))return false;
-        if(layers_[layer].dynamic&&!elements_.count(layer))eraseEmpty(layer);
+        if constexpr(Retained)--this->logical;
+        if(layers_[layer].dynamic&&!elementCount(layer))eraseEmpty(layer);
         return true;
     }
     // Serialized element rebinding (0x412f32): unlink the old element, but
@@ -83,6 +117,7 @@ public:
     // pending-depth state are deliberately not part of this operation.
     bool detachForRebind(unsigned element){
         if(failed_||!get(elements_.owner(element))||!elements_.remove(element))return false;
+        if constexpr(Retained)--this->logical;
         return true;
     }
     // Room initialization (0x41363e): forward layer traversal, then the same
@@ -92,6 +127,9 @@ public:
     // owners. This is deliberately NOT an idempotent stable partition.
     template<class Inactive> bool normalizeRoomInstances(Inactive inactive){
         if(failed_)return false;
+        // A caller with virtual records must provide their logical ordering;
+        // silently normalizing only physical entries would lose cutoffs.
+        if constexpr(Retained)for(unsigned i=0;i<Capacity;++i)if(this->retained[i])return false;
         for(unsigned i=head_;i!=End;i=layers_[i].next)
             if(!elements_.normalize(i,inactive)){failed_=true;return false;}
         return true;
@@ -102,6 +140,20 @@ public:
     // Failed publication is terminal, preserving already-published changes.
     template<class Publish,class Inactive> bool move(unsigned slot,std::int32_t depth,
         bool merge,Publish publish,Inactive inactive){
+        return moveLogical(slot,depth,merge,[&](unsigned source,int id){
+            if(retainedCount(source))return false;
+            return elements_.visitForward(source,[&](unsigned e){return publish(e,id);});
+        },[&](unsigned destination){
+            if(retainedCount(destination))return false;
+            return elements_.normalize(destination,inactive);
+        });
+    }
+    // A retained owner publishes ALL logical instance IDs in source order,
+    // then normalizes ALL logical elements after concatenation. The callbacks
+    // own retained order/cutoffs; physical entries are exposed by visitElements
+    // and normalizePhysicalInstances. Do not infer order from population alone.
+    template<class PublishLogical,class NormalizeLogical> bool moveLogical(unsigned slot,std::int32_t depth,
+        bool merge,PublishLogical publishLogical,NormalizeLogical normalizeLogical){
         if(failed_||!get(slot))return false;
         auto& layer=layers_[slot];const auto old=layer.depth;
         if(depth==old)return true;
@@ -118,8 +170,10 @@ public:
         while(next!=End&&layers_[next].depth<=depth){
             if(layers_[next].depth==depth&&merge&&layer.dynamic&&layers_[next].dynamic){
                 const auto id=layers_[next].id;
-                if(!elements_.visitForward(slot,[&](unsigned e){return publish(e,id);})){failed_=true;return false;}
-                if(!elements_.concatenate(next,slot)||!elements_.normalize(next,inactive)){failed_=true;return false;}
+                if(!publishLogical(slot,id)){failed_=true;return false;}
+                if(!elements_.concatenate(next,slot)){failed_=true;return false;}
+                if constexpr(Retained){this->retained[next]+=this->retained[slot];this->retained[slot]=0;}
+                if(!normalizeLogical(next)){failed_=true;return false;}
                 eraseEmpty(slot);return true;
             }
             next=layers_[next].next;
@@ -128,6 +182,15 @@ public:
             unlink(slot);
             linkAfter(slot,next==End?tail_:layers_[next].previous);
         }
+        return true;
+    }
+    template<class Inactive> bool normalizePhysicalInstances(unsigned layer,Inactive inactive){
+        return !failed_&&get(layer)&&elements_.normalize(layer,inactive);
+    }
+    template<class NormalizeLogical> bool normalizeRoomLogical(NormalizeLogical normalize){
+        if(failed_)return false;
+        for(unsigned i=head_;i!=End;i=layers_[i].next)
+            if(!normalize(i)){failed_=true;return false;}
         return true;
     }
     template<class Visit> bool visitLayers(Visit visit)const{

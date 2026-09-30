@@ -1,5 +1,21 @@
 #include "core/RunnerLayers.h"
 #include "core/RunnerLayerIds.h"
+static_assert(sizeof(downwell::RunnerLayers<64,3323,true>)<=
+    sizeof(downwell::RunnerLayers<64,3323>)+65*sizeof(unsigned),
+    "Retained population adds per-layer counts, never a per-cell array");
+#ifdef DOWNWELL_NATIVE_QUERY_PROBE
+using NativeRetainedLayers=downwell::RunnerLayers<64,3323,true>;
+bool nativeRetainedLayerAdmission(NativeRetainedLayers& layers,unsigned layer,unsigned count){
+    return layers.retain(layer,count);
+}
+bool nativeRetainedLayerRelease(NativeRetainedLayers& layers,unsigned layer,unsigned count){
+    return layers.releaseRetained(layer,count);
+}
+bool nativeRetainedLayerMove(NativeRetainedLayers& layers,unsigned layer,int depth,
+    bool (*publish)(unsigned,int),bool (*normalize)(unsigned)){
+    return layers.moveLogical(layer,depth,true,publish,normalize);
+}
+#else
 #include <cstdlib>
 #include <iostream>
 #include <vector>
@@ -232,4 +248,55 @@ void lookupMutations(){
     },inactive),"failed merge preserves observable partial lookup state");
     lookup(failed,1,10);
 }
-int main(){movement();merging();failure();exhaustiveMoves();activation();sourceIds();roomNormalization();preparedDepths();lookupMutations();std::cout<<"Layer identities, depth movement, ownership and merge publication verified (3840 movement cases, 256 room normalization cases, 10000 prepared depths)\n";}
+void retainedPopulation(){
+    using Retained=downwell::RunnerLayers<4,8,true>;
+    for(unsigned failure=0;failure<3;++failure){
+        Retained layers;downwell::RunnerLayerIds ids;unsigned a=4,b=4;
+        require(ids.createDynamic(layers,0,a)&&ids.createDynamic(layers,10,b),"retained dynamic layers");
+        require(layers.attach(a,0,true,false,inactive)&&layers.retain(a,3)&&
+            layers.attach(b,1,true,false,inactive)&&layers.retain(b,2),"retained and ordinary admission");
+        require(layers.elementCount(a)==4&&layers.elementCount(b)==3,"logical counts include retained cells");
+        require(layers.retain(a,1)&&!layers.retain(b,1)&&!layers.attach(b,2,true,false,inactive),
+            "virtual cells consume ordinary capacity before physical storage fills");
+        require(!layers.releaseRetained(a,5)&&layers.elementCount(a)==5,"invalid release preserves count");
+        require(layers.releaseRetained(a,1)&&layers.attach(b,2,true,false,inactive)&&layers.detach(2),
+            "released logical capacity admits ordinary element");
+        std::vector<unsigned> published;
+        bool normalized=false;
+        const bool result=layers.moveLogical(a,10,true,[&](unsigned source,int id){
+            require(source==a&&id==2&&layers.get(a)->depth==10&&layers.elementCount(a)==4&&
+                layers.elementCount(b)==3,"logical publication precedes concatenation");
+            // The retained owner, not physical storage, supplies this complete
+            // source order. IDs 4/5/6 stand for three unlinked terrain cells.
+            published={0,4};if(failure==1)return false;
+            published.push_back(5);published.push_back(6);return true;
+        },[&](unsigned destination){
+            require(destination==b&&layers.elementCount(b)==7&&layers.retainedCount(b)==5&&
+                layers.elementCount(a)==0,"logical population transfers before normalization");
+            normalized=true;
+            if(failure==2)return false;
+            return layers.normalizePhysicalInstances(b,inactive);
+        });
+        require(result==(failure==0)&&layers.succeeded()==(failure==0),"logical merge failure latches");
+        if(failure==1){require(published==std::vector<unsigned>({0,4})&&!normalized&&
+            layers.elementCount(a)==4&&layers.elementCount(b)==3,"failed publication preserves prefix and populations");continue;}
+        require(published==std::vector<unsigned>({0,4,5,6})&&normalized,"whole logical source is published");
+        if(failure==2){require(layers.get(a)&&layers.elementCount(a)==0&&layers.elementCount(b)==7,
+            "failed normalization retains concatenation before source disposal");continue;}
+        require(!layers.get(a)&&layers.elementCount(b)==7,"merged source disposed");
+        require(layers.detach(0)&&layers.detach(1)&&layers.get(b)&&layers.elementCount(b)==5,
+            "last physical retirement keeps retained-only layer alive");
+        require(layers.releaseRetained(b,5)&&!layers.get(b),"last logical retirement disposes layer");
+        unsigned next=4;require(ids.createDynamic(layers,0,next)&&layers.get(next)->id==3,"source ID sequence preserved");
+        require(layers.retain(next,8)&&layers.discardUninitialized(),"discard clears retained storage");
+        require(ids.createDynamic(layers,0,next)&&layers.retain(next,8),"discard resets logical capacity");
+    }
+    Retained guarded;unsigned source=4,destination=4;
+    require(guarded.insertAfterEquals(1,0,true,source)&&guarded.insertAfterEquals(2,10,true,destination)&&
+        guarded.retain(source,2),"guarded retained source");
+    require(!guarded.move(source,10,true,publish,inactive)&&!guarded.succeeded()&&
+        guarded.retainedCount(source)==2&&guarded.get(source)->depth==10,
+        "physical-only merge cannot silently omit retained publication");
+}
+int main(){movement();merging();failure();exhaustiveMoves();activation();sourceIds();roomNormalization();preparedDepths();lookupMutations();retainedPopulation();std::cout<<"Layer identities, logical retained population, depth movement, ownership and merge publication verified (3840 movement cases, 256 room normalization cases, 10000 prepared depths)\n";}
+#endif

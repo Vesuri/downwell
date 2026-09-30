@@ -489,6 +489,23 @@ sequence against the existing source-backed primitives. The surrounding suite
 supplies merge/failure, normalization and Draw-time birth tests. These gates
 do not establish that an unintegrated grouped representation is equivalent.
 
+`RunnerLayers<L,E,true>` separates retained logical population from physical
+element links. `retain` and ordinary attachment share the same `E`-element
+admission limit. Retirement disposes a dynamic layer only when both populations
+reach zero. This opt-in storage adds one count per layer and a total, not an
+array per terrain cell. The two-parameter/default type has no retained counters.
+
+A retained owner uses `moveLogical` to publish the entire logical source in its
+actual order, then normalize the combined logical destination after physical
+concatenation and population transfer. Its callbacks must maintain retained
+order and cutoffs as well as physical entries; `normalizePhysicalInstances`
+does only the physical part. Publication failure preserves the source population
+and completed publication prefix; normalization failure preserves concatenation
+before source-layer disposal. Ordinary `move` refuses a retained merge for which
+it cannot supply those callbacks. This API alone does not route gameplay terrain
+away from ordinary layer entries; that requires the authoritative terrain owner
+to supply ordering and publication, not a no-op callback.
+
 Generated terrain may bind one initialized-birth transaction. The run store
 allocates the typed identity first, and the built-in collision owner completes
 ordinary birth publication before executing `terrainCreateProperties`. Create
