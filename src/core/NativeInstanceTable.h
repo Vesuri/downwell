@@ -1,0 +1,113 @@
+#ifndef DOWNWELL_CORE_NATIVE_INSTANCE_TABLE_H
+#define DOWNWELL_CORE_NATIVE_INSTANCE_TABLE_H
+#include "InstanceHandle.h"
+#include "RunnerObjectMembership.h"
+#include <cstdint>
+namespace downwell {
+// The ordering half of the runner instance registry, for owners whose
+// instances are never queried spatially. It keeps each lifetime's object,
+// runner flag word and sprite index (Draw eligibility), and the registration
+// list that orders Step, alarm and End Step capture. Positions, bounds,
+// transforms and the spatial journal are not represented: callers must not
+// answer collision queries from this table.
+//
+// Flag bits follow RunnerSpatialInstances: 1 destroyed, 2 inactive, 0x10
+// visible, 0x80000 unregistered, 0x100000 excluded. The transform-derived
+// fast-draw bit 0x4000 is not tracked: it only selects between two runner
+// draw routines for the same image, which native Draw does not distinguish.
+// Revision rules are conservative supersets of that owner's: every change
+// that can alter a capture advances the capture revision.
+template<unsigned Capacity> class NativeInstanceTable {
+    static_assert(Capacity>0&&Capacity<65535,"Compact native slots");
+    struct Entry {std::uint32_t generation=0,flags=0;int object=-1,sprite=-1;};
+    Entry entries_[Capacity];
+    RunnerObjectMembership<Capacity> registration_;
+    std::uint32_t bindingRevision_=0,captureRevision_=0;
+    unsigned captureFirst_=0,captureLast_=0,captureSecond_=0,captureEnd_=0;
+    bool* captureDirty_=nullptr;
+    static void advance(std::uint32_t& revision){if(revision!=0xffffffffu)++revision;}
+    void changedCapture(unsigned slot){
+        advance(captureRevision_);
+        if(captureDirty_&&((slot>=captureFirst_&&slot<captureLast_)||(slot>=captureSecond_&&slot<captureEnd_)))
+            *captureDirty_=true;
+    }
+    void changedBinding(unsigned slot){advance(bindingRevision_);changedCapture(slot);}
+    bool live(InstanceHandle h)const{return h.slot<Capacity&&h.generation&&entries_[h.slot].generation==h.generation;}
+public:
+    bool contains(InstanceHandle h)const{return live(h);}
+    int objectId(InstanceHandle h)const{return live(h)?entries_[h.slot].object:-1;}
+    bool flags(InstanceHandle h,std::uint32_t& out)const{
+        if(!live(h))return false;
+        out=entries_[h.slot].flags;return true;
+    }
+    int sprite(unsigned slot)const{return slot<Capacity?entries_[slot].sprite:-1;}
+    InstanceHandle currentHandle(unsigned slot)const{
+        return slot<Capacity&&entries_[slot].generation?InstanceHandle{slot,entries_[slot].generation}:InstanceHandle{};
+    }
+    std::uint32_t bindingRevision()const{return bindingRevision_;}
+    std::uint32_t captureRevision()const{return captureRevision_;}
+    bool bindingsUnchanged(std::uint32_t revision)const{return revision!=0xffffffffu&&revision==bindingRevision_;}
+    bool watchCaptureRanges(unsigned first,unsigned last,unsigned second,unsigned end,bool& dirty){
+        if(first>last||last>second||second>end||end>Capacity)return false;
+        captureFirst_=first;captureLast_=last;captureSecond_=second;captureEnd_=end;
+        captureDirty_=&dirty;dirty=true;return true;
+    }
+    // Birth appends the registration, as attachObjectPrepared does.
+    bool birth(InstanceHandle h,int object,std::uint32_t flags,int sprite){
+        if(h.slot>=Capacity||!h.generation||object<0||entries_[h.slot].generation)return false;
+        entries_[h.slot]={h.generation,flags,object,sprite};
+        if(!registration_.bind(h.slot,object,h.generation)){entries_[h.slot]=Entry{};return false;}
+        changedBinding(h.slot);return true;
+    }
+    bool retire(InstanceHandle h){
+        if(!live(h))return false;
+        registration_.unbind(h.slot);entries_[h.slot]=Entry{};
+        changedBinding(h.slot);return true;
+    }
+    // Source reconciliation boundary; re-registration appends anew.
+    bool registerObject(InstanceHandle h,bool registered){
+        if(!live(h))return false;
+        auto& e=entries_[h.slot];
+        if(registration_.contains(h.slot)!=registered)changedCapture(h.slot);
+        if(!registered)registration_.unbind(h.slot);
+        else if(!registration_.contains(h.slot))registration_.bind(h.slot,e.object,h.generation);
+        if(registered)e.flags&=~0x80000u;else e.flags|=0x80000u;
+        return true;
+    }
+    bool setActive(InstanceHandle h,bool active){
+        if(!live(h))return false;
+        auto& flags=entries_[h.slot].flags;
+        if(bool(flags&2u)==active)changedCapture(h.slot);
+        if(active)flags&=~2u;else flags|=2u;
+        return true;
+    }
+    bool setExclusions(InstanceHandle h,std::uint32_t exclusions){
+        if(!live(h)||(exclusions&~0x100003u))return false;
+        auto& flags=entries_[h.slot].flags;
+        if((flags&0x100003u)!=exclusions)changedCapture(h.slot);
+        flags=(flags&~0x100003u)|exclusions;return true;
+    }
+    // Returns whether the sprite index changed (Draw eligibility may differ).
+    bool setSprite(InstanceHandle h,int sprite,bool& changed){
+        if(!live(h))return false;
+        changed=entries_[h.slot].sprite!=sprite;entries_[h.slot].sprite=sprite;
+        if(changed)changedCapture(h.slot);
+        return true;
+    }
+    // Registration order restricted to a slot domain. Callbacks must not
+    // mutate registration; they receive the live flag word.
+    template<class Visit> bool visitRegistrationRange(unsigned first,unsigned last,Visit visit)const{
+        return registration_.visitRegistrationRange(first,last,[&](unsigned slot,std::uint32_t generation,int object){
+            return visit(InstanceHandle{slot,generation},object,entries_[slot].flags);
+        });
+    }
+    void clear(){
+        for(unsigned slot=0;slot<Capacity;++slot)if(entries_[slot].generation){
+            registration_.unbind(slot);entries_[slot]=Entry{};
+        }
+        advance(bindingRevision_);advance(captureRevision_);
+        if(captureDirty_)*captureDirty_=true;
+    }
+};
+}
+#endif

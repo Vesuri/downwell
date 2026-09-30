@@ -19,6 +19,7 @@
 #include "PreparedUnitSpriteBounds.h"
 #include "PreparedTerrainBirthBounds.h"
 #include "RunnerTerrainProperties.h"
+#include "NativeInstanceTable.h"
 namespace downwell {
 // Resource-backed ownership at the native world's existing publication points.
 // Terrain-only queries retain their explicit resource-family gate. Projectile
@@ -103,6 +104,7 @@ private:
     // Unregistered terrain must not silently vanish from a selector whose
     // family contains walls or thin platforms (including all/other selectors).
     bool selectorAvailable(int object)const{
+        if(native_)return false;
         if(terrainRegistered_)return true;
         if(object<0)return false;
         return !families_.isA(60,object)&&!families_.isA(93,object)&&!families_.isA(99,object);
@@ -115,9 +117,28 @@ private:
         return terrainRegistered_||(terrainDepth.assignInteger(100)&&!RunnerSpatialSplit::equal(depth,terrainDepth));
     }
     bool resolves(InstanceHandle h)const{
-        return world_&&owner_.contains(h)&&View(*world_).contains(h);
+        return world_&&(native_?table_.contains(h):owner_.contains(h))&&View(*world_).contains(h);
+    }
+    unsigned animationSkipFirst()const{return native_?View::breakableBase:View::terrainBase;}
+    unsigned animationSkipLast()const{return native_?View::bulletBase:View::timeFieldBase;}
+    int objectOf(InstanceHandle h)const{return native_?table_.objectId(h):owner_.objectId(h);}
+    InstanceHandle handleAt(unsigned slot)const{return native_?table_.currentHandle(slot):owner_.currentHandle(slot);}
+    std::uint32_t captureRevision()const{return native_?table_.captureRevision():owner_.captureRevision();}
+    std::uint32_t bindingRevision()const{return native_?table_.bindingRevision():owner_.bindingRevision();}
+    bool bindingsUnchanged(std::uint32_t revision)const{
+        return native_?table_.bindingsUnchanged(revision):owner_.bindingsUnchanged(revision);
+    }
+    bool capturePrevious(InstanceHandle h){return native_?table_.contains(h):owner_.capturePrevious(h);}
+    int drawSprite(unsigned slot)const{return native_?table_.sprite(slot):properties_.read(slot)->sprite.spriteId;}
+    // Registration order restricted to one owner domain, with live flags.
+    template<class Visit> bool visitRegistered(unsigned first,unsigned last,Visit visit)const{
+        if(native_)return table_.visitRegistrationRange(first,last,visit);
+        return owner_.visitRetainedRegistrationRange(first,last,[&](InstanceHandle h,int object,const Owner::State& state){
+            return visit(h,object,state.flags);
+        });
     }
     bool eligibilityFlags(InstanceHandle h,std::uint32_t& out)const{
+        if(native_)return table_.flags(h,out);
 #ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
         const auto state=owner_.resolve(h);if(!state)return false;
         out=state->flags;return true;
@@ -126,6 +147,7 @@ private:
 #endif
     }
     template<class Visit> bool visitEligibility(Visit visit)const{
+        if(native_)return table_.visitRegistrationRange(0,View::capacity,visit);
 #ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
         return owner_.visitRegistrations([&](InstanceHandle h,int object,const Owner::State& state){
             return visit(h,object,state.flags);
@@ -191,7 +213,7 @@ private:
                 if(local.generation!=r.lifetimeId)return parent.check(false);
             if(birth&&!parent.world_)return parent.check(Kind==View::Kind::player);
             if(!parent.world_)return parent.check(false);
-            if(!birth&&(!parent.owner_.contains(out)||parent.owner_.objectId(out)!=object(r)))return parent.check(false);
+            if(!birth&&parent.objectOf(out)!=object(r))return parent.check(false);
 #ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
             if constexpr(Kind==View::Kind::terrain){
                 const auto* store=parent.world_->terrainInstances();
@@ -219,6 +241,7 @@ private:
                 }else if(!key(local,r,h,true))return false;
             }else if(!key(local,r,h,true))return false;
             if constexpr(Kind==View::Kind::player)if(!parent.check(parent.layers_.prepare()))return false;
+            if constexpr(Kind!=View::Kind::terrain)if(parent.native_)return nativeBirth(local,h,r);
             constexpr bool roomCoordinates=Kind==View::Kind::player||Kind==View::Kind::terrain||Kind==View::Kind::timeField||Kind==View::Kind::goalField||Kind==View::Kind::exitController;
             constexpr int ox=roomCoordinates?0:240,oy=roomCoordinates?0:176;
 #if defined(DOWNWELL_TERRAIN_RUN_STORE) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
@@ -346,6 +369,40 @@ private:
             }
             return true;
         }
+        // The same order publications as the reference birth below, without
+        // positions, bounds or properties: the flag word and depth come from
+        // the prepared object default that attachObjectPrepared applies.
+        bool nativeBirth(InstanceHandle local,InstanceHandle h,const Record& r){
+            const auto* definition=parent.objectDefaults_.get(object(r));
+            if(!definition)return parent.check(false);
+            bool inactive=false;
+            if constexpr(Kind!=View::Kind::timeField)inactive=!r.active;
+            RunnerImageValue depth=definition->creationDepth;
+            int sprite=definition->spriteId;
+            if constexpr(Kind==View::Kind::debris){
+                if(!r.effect||!real(DebrisDraw::sourceDepth,depth))return parent.check(false);
+                sprite=r.effect->spriteId;
+            }
+            if constexpr(Kind==View::Kind::scriptEffect)if(!r.effect||!r.effect->valid)return parent.check(false);
+            if constexpr(Kind==View::Kind::entryDither)if(!real(-200000,depth))return parent.check(false);
+            if constexpr(Kind==View::Kind::enemy)sprite=r.spriteId;
+            if(!parent.check(parent.table_.birth(h,object(r),definition->initialFlags|(inactive?2u:0u),sprite)))return false;
+            if(!parent.check(parent.room_.bind(h.slot,depth)))return false;
+            if(inactive)parent.activationPending_=true;
+            unsigned sourceId=0;
+            if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
+            if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
+            if constexpr(Kind==View::Kind::entryDither)sourceId=r.sourceId;
+            if constexpr(Kind==View::Kind::drone)sourceId=r.sourceId;
+            constexpr bool projected=Kind==View::Kind::player||Kind==View::Kind::enemy||
+                Kind==View::Kind::bullet||Kind==View::Kind::scriptEffect||Kind==View::Kind::debris||Kind==View::Kind::entryDither;
+            if(projected&&!parent.actorDepthAvailable(depth))return parent.check(false);
+            if(!parent.check(parent.layers_.birth(h,sourceId,depth,inactive,projected)))return false;
+            if constexpr(Kind==View::Kind::player){
+                if(!parent.world_){parent.initialPlayer_=&r;parent.initialPlayerKey_=local;}
+            }
+            return true;
+        }
         bool birthAt(InstanceHandle local,const Record& r,RunnerImageValue x,RunnerImageValue y){
             // The store has already published its narrowed constructor fields.
             // Never emulate this as integer birth followed by a move.
@@ -353,31 +410,42 @@ private:
         }
         bool retire(InstanceHandle local,const Record& r){InstanceHandle h;
             if(!key(local,r,h)||!parent.check(parent.room_.contains(h.slot)))return false;
-            if(!parent.check(parent.owner_.retire(h)))return false;
+            if(!parent.check(parent.native_?parent.table_.retire(h):parent.owner_.retire(h)))return false;
             return parent.check(parent.room_.remove(h.slot)&&parent.layers_.retire(h));}
         bool markDestroyed(InstanceHandle local,const Record& r){InstanceHandle h;
             if(!key(local,r,h))return false;
             std::uint32_t flags;
-            if(!parent.eligibilityFlags(h,flags)||!parent.check(parent.owner_.setExclusions(h,(flags&0x100003u)|1u)))return false;
+            if(!parent.eligibilityFlags(h,flags)||!parent.check(parent.native_?parent.table_.setExclusions(h,(flags&0x100003u)|1u):
+                parent.owner_.setExclusions(h,(flags&0x100003u)|1u)))return false;
             if(!parent.check(parent.room_.mark(h.slot)))return false;
             parent.destructionPending_=true;return true;}
         bool membership(InstanceHandle local,const Record& r,bool member){InstanceHandle h;
-            return key(local,r,h)&&parent.check(parent.owner_.registerObject(h,member));}
+            return key(local,r,h)&&parent.check(parent.native_?parent.table_.registerObject(h,member):parent.owner_.registerObject(h,member));}
         bool activation(InstanceHandle local,const Record& r,bool active){InstanceHandle h;
-            if(!key(local,r,h)||!parent.check(parent.owner_.setActive(h,active,*parent.families_.flags(object(r)))))return false;
+            if(!key(local,r,h)||!parent.check(parent.native_?parent.table_.setActive(h,active):
+                parent.owner_.setActive(h,active,*parent.families_.flags(object(r)))))return false;
             if(!parent.check(parent.layers_.activation(h,active)))return false;
             parent.activationPending_=true;return true;}
+        // Native ownership publishes no geometry: nothing queries it.
         bool move(InstanceHandle local,const Record& r,RunnerImageValue x,RunnerImageValue y){InstanceHandle h;
+            if(parent.native_)return true;
             return key(local,r,h)&&parent.check(parent.owner_.template moveDomain<Kind==View::Kind::terrain>(h,x,y,*parent.families_.flags(object(r))));}
         bool depth(InstanceHandle local,const Record& r,MotionBinary64 value){InstanceHandle h;RunnerImageValue narrowed;
             if(!key(local,r,h)||!narrowed.assign(value)||!parent.actorDepthAvailable(narrowed))return parent.check(false);
+            if(parent.native_)return parent.check(parent.layers_.enabled()&&parent.layers_.writeDepth(h,value));
             auto edit=parent.properties_.template editDomain<Kind==View::Kind::terrain>(h.slot);auto& p=edit.get();
             if(!parent.layers_.enabled())return parent.check(RunnerSpatialSplit::equal(narrowed,p.depth));
             if(!parent.check(parent.layers_.writeDepth(h,value)))return false;
             p.depth=narrowed;return true;
         }
         bool sprite(InstanceHandle local,const Record& r,int sprite){InstanceHandle h;
-            return key(local,r,h)&&publishSprite(h,object(r),sprite);
+            if(!key(local,r,h))return false;
+            if(parent.native_){
+                bool changed;if(!parent.check(parent.table_.setSprite(h,sprite,changed)))return false;
+                if(changed)parent.drawOrderValid_=false;
+                return true;
+            }
+            return publishSprite(h,object(r),sprite);
         }
         bool publishSprite(InstanceHandle h,int object,int sprite){
             auto edit=parent.properties_.template editDomain<Kind==View::Kind::terrain>(h.slot);auto& p=edit.get();
@@ -536,14 +604,17 @@ private:
         }
 #endif
         bool imageIndex(InstanceHandle local,const Record& r,RunnerImageValue value){InstanceHandle h;
+            if(parent.native_)return true;
             if(!key(local,r,h))return false;auto edit=parent.properties_.template editDomain<Kind==View::Kind::terrain>(h.slot);
             return parent.check(parent.owner_.writeImageIndex(h,edit.get().sprite,value));}
         bool mask(InstanceHandle local,const Record& r,int value){InstanceHandle h;
+            if(parent.native_)return true;
             if(!key(local,r,h))return false;auto edit=parent.properties_.template editDomain<Kind==View::Kind::terrain>(h.slot);
             return parent.check(parent.owner_.changeMask(h,edit.get().sprite,
                 value,*parent.families_.flags(object(r))));}
         bool transform(InstanceHandle local,const Record& r,RunnerTransformField field,RunnerImageValue value,
             RunnerImageValue alpha,std::uint32_t blend){InstanceHandle h;
+            if(parent.native_)return true;
             if(!key(local,r,h))return false;auto edit=parent.properties_.template editDomain<Kind==View::Kind::terrain>(h.slot);
             return parent.check(parent.owner_.changeTransform(h,edit.get().sprite,
                 field,value,alpha,blend,*parent.families_.flags(object(r))));}
@@ -567,7 +638,9 @@ private:
     Binding<GameplayWorld::DroneBullets::Record,View::Kind::drone> droneBinding_{*this};
     GameplayWorld::DroneBullets drones_{GameplayWorld::DroneBullets::Binding::bindPositionedActor(droneBinding_)};
     std::uint32_t pendingTimeChangeId_=0;
+    const bool native_;
     const bool terrainRegistered_;
+    NativeInstanceTable<View::capacity> table_;
     GameplayTerrainInstances terrain_;
 public:
     // Registered terrain is the complete runner reference: every wall owns a
@@ -578,12 +651,18 @@ public:
     // observe (room lists are stable by depth, and object lists are per
     // object), so unregistered terrain changes no actor order. Queries and
     // events that would need registered walls fail rather than miss them.
-    enum class TerrainOwnership {registered,unregistered};
+    //
+    // Native ownership additionally drops the spatial half for actors. It
+    // never answers a collision query, so positions, bounds, transforms and
+    // the spatial journal are not published at all. A compact table keeps
+    // what the actor orders observe (object, flag word, sprite index and
+    // registration order); room lists and layers remain the order owners.
+    enum class Ownership {reference,nativeTerrain,native};
     GameplayCollisionOwner(const ObjectPack& objects,const SpriteCollisionPack& sprites,
         GameplayTerrainInstances::Presentation presentation={},GameplayTerrainInstances::WallCollision collision={},
-        const RoomPack* rooms=nullptr,TerrainOwnership terrainOwnership=TerrainOwnership::registered):
-        objects_(objects),sprites_(sprites),layers_(rooms),
-        terrainRegistered_(terrainOwnership==TerrainOwnership::registered),
+        const RoomPack* rooms=nullptr,Ownership ownership=Ownership::reference):
+        objects_(objects),sprites_(sprites),layers_(rooms),native_(ownership==Ownership::native),
+        terrainRegistered_(ownership==Ownership::reference),
         terrain_(terrainRegistered_?GameplayTerrainInstances::Binding::bindDestruction(terrainBinding_):
             GameplayTerrainInstances::Binding{},presentation,collision){
 #ifdef DOWNWELL_TERRAIN_RUN_STORE
@@ -622,13 +701,16 @@ public:
     }
     GameplayCollisionOwner(const GameplayCollisionOwner&)=delete;
     GameplayCollisionOwner& operator=(const GameplayCollisionOwner&)=delete;
+    // Registration order with live flags, for differential verification.
+    template<class Visit> bool visitRegistrationOrder(Visit visit)const{return valid()&&visitEligibility(visit);}
     bool valid()const{return good_&&owner_.valid()&&properties_.valid()&&terrain_.valid()&&scriptEffects_.valid()&&debris_.valid()&&timeChanges_.valid()&&entries_.valid()&&drones_.valid()&&layers_.valid();}
     unsigned pendingSpatialIndex()const{return owner_.pendingSpatialIndex();}
     bool serviceSpatialIndex(unsigned budget){return check(owner_.serviceSpatialIndex(budget));}
     bool attach(GameplayWorld& world){
         combatAlarmCaptureValid_=false;
-        if(!owner_.watchCaptureRanges(View::enemyBase,View::terrainBase,
-            View::debrisBase,View::capacity,combatAlarmCaptureDirty_))return check(false);
+        if(!(native_?table_.watchCaptureRanges(View::enemyBase,View::terrainBase,View::debrisBase,View::capacity,combatAlarmCaptureDirty_):
+            owner_.watchCaptureRanges(View::enemyBase,View::terrainBase,View::debrisBase,View::capacity,combatAlarmCaptureDirty_)))
+            return check(false);
         if(!valid()||(world_&&world_!=&world)||(!world_&&
             (!initialPlayer_||world.findPlayer(initialPlayerKey_)!=initialPlayer_)))return false;
         if(!world_&&!world.bindTimeFieldLifecycle(OrdinaryTimeFields<64>::Binding::bind(fields_)))return check(false);
@@ -647,9 +729,9 @@ public:
             if(!self.drones_.size())return true;
             MotionBinary64 top;
             if(!multiplyBinary64(MotionBinary64::fromInteger(topQ12),{0x3f300000u,0},top))return self.check(false);
-            return self.check(self.owner_.visitRetainedRegistrationRange(View::droneBase,View::capacity,
-                [&](InstanceHandle shared,int object,const Owner::State& state){
-                    if(state.flags&0x100003u)return true;
+            return self.check(self.visitRegistered(View::droneBase,View::capacity,
+                [&](InstanceHandle shared,int object,std::uint32_t flags){
+                    if(flags&0x100003u)return true;
                     View::Kind kind;InstanceHandle local;
                     return object==266&&View::decode(shared,kind,local)&&kind==View::Kind::drone&&
                         self.drones_.endStep(local,top,MotionBinary64::fromInteger(284),true);
@@ -685,11 +767,12 @@ public:
                 // and sprite lookups for every terrain tile each frame.
                 if(kind!=View::Kind::enemy&&kind!=View::Kind::bullet&&kind!=View::Kind::scriptEffect&&
                     kind!=View::Kind::debris&&kind!=View::Kind::player&&kind!=View::Kind::entryDither)return true;
-                const unsigned metadata=self.drawMetadata_.get(self.owner_.objectId(h));
+                const unsigned metadata=self.drawMetadata_.get(self.objectOf(h));
                 out.object=(metadata&ObjectDrawMetadata<386>::exists)!=0;
                 out.drawEvent=(metadata&ObjectDrawMetadata<386>::drawEvent)!=0;
-                out.sprite=self.properties_.read(h.slot)->sprite.spriteId>=0;return true;
+                out.sprite=self.drawSprite(h.slot)>=0;return true;
             },[&](InstanceHandle h,int depth){RunnerImageValue value;return real(depth,value)&&draw(h,value);});
+            if(self.native_)return false; // Native ownership requires room layers.
             return self.room_.visitDrawChecked([&](unsigned slot){return draw(self.owner_.currentHandle(slot),self.properties_.read(slot)->depth);});
         },this,[](const void* context,GameplayWorld::DrawActorVisitor visit,void* visitor){
             const auto& self=*static_cast<const GameplayCollisionOwner*>(context);
@@ -697,7 +780,7 @@ public:
 #ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
             return self.world_->visitRoomActors([&](auto kind,auto key,auto depth){return visit(visitor,kind,key,depth);});
 #else
-            const auto capture=self.owner_.captureRevision(),layers=self.layers_.drawRevision();
+            const auto capture=self.captureRevision(),layers=self.layers_.drawRevision();
             if(self.drawOrderValid_&&capture!=0xffffffffu&&layers!=0xffffffffu&&
                capture==self.drawCaptureRevision_&&layers==self.drawLayerRevision_){
                 for(unsigned i=0;i<self.drawCount_;++i){const auto& e=self.drawOrder_[i];
@@ -714,19 +797,23 @@ public:
                 return visit(visitor,kind,key,depth);
             });
             self.drawCaptureRevision_=capture;self.drawLayerRevision_=layers;
-            self.drawOrderValid_=ok&&self.valid()&&capture==self.owner_.captureRevision()&&
+            self.drawOrderValid_=ok&&self.valid()&&capture==self.captureRevision()&&
                 layers==self.layers_.drawRevision();
             return ok;
 #endif
         });
-        if(!owner_.watchSnapshotRange(View::terrainBase,View::timeFieldBase,terrainSnapshotDirty_))return check(false);
-        if(!room_.prepareRetainedAnimation(View::terrainBase,View::timeFieldBase))return check(false);
+        if(!native_&&!owner_.watchSnapshotRange(View::terrainBase,View::timeFieldBase,terrainSnapshotDirty_))return check(false);
+        // Native ownership keeps no previous positions, so boxes, walls, fields
+        // and controllers (contiguous slots, no Animation dispatch) are skipped
+        // entirely instead of being decoded and resolved every frame.
+        if(native_)terrainSnapshotDirty_=false;
+        if(!room_.prepareRetainedAnimation(animationSkipFirst(),animationSkipLast()))return check(false);
         world.configureRoomAnimation([](void* context){
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
             if(!self.valid())return false;
             return self.check(self.room_.visitAnimationRetainedChecked(
-                View::terrainBase,View::timeFieldBase,self.terrainSnapshotDirty_,[&](unsigned slot){
-                const auto shared=self.owner_.currentHandle(slot);
+                self.animationSkipFirst(),self.animationSkipLast(),self.terrainSnapshotDirty_,[&](unsigned slot){
+                const auto shared=self.handleAt(slot);
                 // The conservative dirty fallback keeps terrain snapshots in
                 // room order. Unchanged terrain has no animation dispatch in
                 // this adapter and already retains the identical snapshot.
@@ -739,7 +826,7 @@ public:
                 View::Kind kind;InstanceHandle local;
                 DW_PROFILE_COUNT(counterActorSnapshots);
                 if(!View::decode(shared,kind,local)||!View(*self.world_).contains(shared)||
-                    !self.owner_.capturePrevious(shared))return false;
+                    !self.capturePrevious(shared))return false;
                 switch(kind){
                     case View::Kind::enemy:{
                         DW_PROFILE_SCOPE(profileAnimationDispatch);
@@ -770,16 +857,16 @@ public:
         world.configureEnemyStepOrder([](void* context,GameplayWorld::EnemyStepOrder& snapshot){
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
             if(!self.valid())return false;
-            return self.check(self.owner_.visitRetainedRegistrationRange(View::enemyBase,View::breakableBase,
-                [&](InstanceHandle shared,int object,const Owner::State& state){
+            return self.check(self.visitRegistered(View::enemyBase,View::breakableBase,
+                [&](InstanceHandle shared,int object,std::uint32_t flags){
                 View::Kind kind;InstanceHandle local;
                 if(!View::decode(shared,kind,local))return false;
-                if(kind!=View::Kind::enemy||(state.flags&0x100003u))return true;
+                if(kind!=View::Kind::enemy||(flags&0x100003u))return true;
                 return self.world_->resolveEnemyLifetime(local)&&snapshot.append(local.slot,local.generation,object);
             }));
         },this,[](void* context){
             const auto& self=*static_cast<GameplayCollisionOwner*>(context);
-            return self.valid()?self.owner_.captureRevision():0xffffffffu;
+            return self.valid()?self.captureRevision():0xffffffffu;
         });
         world.configureRoomAlarms([](void* context){
             DW_PROFILE_SCOPE(profileAlarmCapture);
@@ -789,13 +876,13 @@ public:
             const bool reused=self.combatAlarmCaptureValid_&&!self.combatAlarmCaptureDirty_;
             if(!reused){
                 phase.clear();
-                auto capture=[&](InstanceHandle h,int object,const Owner::State& state){
-                    return self.resolves(h)&&((state.flags&0x100003u)||phase.append(h.slot,h.generation,object));
+                auto capture=[&](InstanceHandle h,int object,std::uint32_t flags){
+                    return self.resolves(h)&&((flags&0x100003u)||phase.append(h.slot,h.generation,object));
                 };
                 // Only implemented families are admitted. Avoid scanning every
                 // terrain record for this partial combat alarm traversal.
-                if(!self.check(self.owner_.visitRetainedRegistrationRange(View::enemyBase,View::terrainBase,capture)&&
-                    self.owner_.visitRetainedRegistrationRange(View::debrisBase,View::capacity,capture)))return false;
+                if(!self.check(self.visitRegistered(View::enemyBase,View::terrainBase,capture)&&
+                    self.visitRegistered(View::debrisBase,View::capacity,capture)))return false;
                 // Save before callbacks: mutation during dispatch invalidates
                 // reuse next tick without changing this phase's captured set.
                 self.combatAlarmCaptureDirty_=false;
@@ -814,9 +901,9 @@ public:
         world.configureDebrisStepOrder([](void* context,GameplayWorld::DebrisStepOrder& phase){
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
             if(!self.valid())return false;
-            return self.check(self.owner_.visitRetainedRegistrationRange(View::debrisBase,View::timeChangeBase,
-                [&](InstanceHandle h,int object,const Owner::State& state){
-                    if(state.flags&0x100003u)return true;
+            return self.check(self.visitRegistered(View::debrisBase,View::timeChangeBase,
+                [&](InstanceHandle h,int object,std::uint32_t flags){
+                    if(flags&0x100003u)return true;
                     View::Kind kind;InstanceHandle local;
                     return View::decode(h,kind,local)&&kind==View::Kind::debris&&self.resolves(h)&&
                         phase.append(local.slot,local.generation,object);
@@ -847,7 +934,7 @@ public:
             if(!eligibilityFlags(h,flags)||(flags&0x100003u))continue;
             if(!check(resolves(h)))return false;
             PackedObjectEvent event;
-            if(!objects_.findEvent(owner_.objectId(h),3,int(subtype),event))continue;
+            if(!objects_.findEvent(objectOf(h),3,int(subtype),event))continue;
             if(!check(execute(h,event))||!valid())return false;
         }
         return true;
@@ -900,7 +987,7 @@ private:
         DW_PROFILE_SCOPE(profileAlarmScan);
         if(!alreadySorted){DW_PROFILE_SCOPE(profileAlarmSort);snapshot.sort();}
         const unsigned count=snapshot.size();
-        const auto bindingRevision=owner_.bindingRevision();
+        const auto bindingRevision=this->bindingRevision();
         unsigned capturedAlarms=alreadySorted&&retainedMask?*retainedMask:0;
         // Capture admitted resource-backed objects and sort grouped them.
         // No callbacks occur here, so one lookup per group safely identifies
@@ -920,7 +1007,7 @@ private:
             if(retainedMask)*retainedMask=capturedAlarms;
         }
         for(unsigned alarm=0;alarm<AlarmBank::count;++alarm){
-          if(!(capturedAlarms&(1u<<alarm))&&owner_.bindingsUnchanged(bindingRevision))continue;
+          if(!(capturedAlarms&(1u<<alarm))&&bindingsUnchanged(bindingRevision))continue;
           int cachedObject=-1;unsigned alarmMask=0;
           PackedObjectEvent event;bool eventCached=false,eventFound=false;
           for(unsigned i=0;i<count;++i){
@@ -930,10 +1017,10 @@ private:
             // A captured object's absent event needs no instance lookup while
             // bindings are unchanged. Any birth, retire, rebind or clear makes
             // the rest of this pass use live lookup, including later alarms.
-            if(!owner_.bindingsUnchanged(bindingRevision)){
+            if(!bindingsUnchanged(bindingRevision)){
                 haveFlags=eligibilityFlags(h,flags);
                 if(!haveFlags||(flags&0x100003u))continue;
-                object=owner_.objectId(h);
+                object=objectOf(h);
             }
             if(object!=cachedObject){
                 if(!check(alarmMetadata_.mask(object,alarmMask)))return false;
@@ -943,7 +1030,7 @@ private:
                 // No callbacks occur in an absent event group. While bindings
                 // match capture, every remaining member has the same resource
                 // and can be skipped together. After mutation retain live reads.
-                if(owner_.bindingsUnchanged(bindingRevision))i=snapshot.objectGroupEnd(i)-1;
+                if(bindingsUnchanged(bindingRevision))i=snapshot.objectGroupEnd(i)-1;
                 continue;
             }
             if(!haveFlags)haveFlags=eligibilityFlags(h,flags);
@@ -1007,7 +1094,7 @@ public:
     // room cleanup invalidates the handle. No activation/retirement happens.
     bool projectileWallParent(InstanceHandle h,int& parent)const{
         PackedObject object;
-        if(!valid()||!resolves(h)||!objects_.findObject(owner_.objectId(h),object))return false;
+        if(!valid()||!resolves(h)||!objects_.findObject(objectOf(h),object))return false;
         parent=object.parentId;return true;
     }
     bool projectileBoxHealth(InstanceHandle h,MotionBinary64& health)const{
@@ -1202,14 +1289,14 @@ public:
         if(!activationPending_)return true;
         const bool result=room_.reconcileChecked([&](unsigned slot){
             std::uint32_t flags;
-            if(!eligibilityFlags(owner_.currentHandle(slot),flags)){good_=false;return true;}
+            if(!eligibilityFlags(handleAt(slot),flags)){good_=false;return true;}
             return (flags&2u)!=0;
         },[&](unsigned slot,bool registered){
             // Writes while inactive may have been consumed by an intervening
             // active-room pass. Promotion must refresh that retained snapshot.
             if(registered&&slot>=View::terrainBase&&slot<View::timeFieldBase)terrainSnapshotDirty_=true;
-            const auto h=owner_.currentHandle(slot);
-            return good_&&owner_.registerObject(h,registered)&&layers_.reconcile(h);
+            const auto h=handleAt(slot);
+            return good_&&(native_?table_.registerObject(h,registered):owner_.registerObject(h,registered))&&layers_.reconcile(h);
         });
         if(!check(result&&good_))return false;
         activationPending_=false;return true;
@@ -1251,11 +1338,11 @@ public:
         if(!destructionPending_)return true;
         DW_PROFILE_SCOPE(profileDrawCleanup);
         const bool cleaned=room_.visitMarkedCleanupChecked([&](unsigned slot){
-            const auto h=owner_.currentHandle(slot);std::uint32_t flags;
+            const auto h=handleAt(slot);std::uint32_t flags;
             if(!eligibilityFlags(h,flags)||!(flags&1u))return false;
             View::Record record;
             if(!View(*world_).resolve(h,record))return false;
-            if(!retire(h,record)||!valid()||owner_.contains(h))return false;
+            if(!retire(h,record)||!valid()||(native_?table_.contains(h):owner_.contains(h)))return false;
             return !View(*world_).contains(h);
         });
         if(!check(cleaned))return false;

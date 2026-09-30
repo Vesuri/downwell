@@ -1,7 +1,7 @@
-// Differential gate for unregistered native terrain. The registered
-// collision owner is the reference: both worlds run the same deterministic
-// tape, and every frame must agree on RNG, simulation state and the actor
-// orders that the owner supplies (Draw, and through it Step/alarm dispatch).
+// Differential gate for native ownership. The complete registered collision
+// owner is the reference: every world runs the same deterministic tape, and
+// every frame must agree on RNG, simulation state, actor Draw order, and the
+// registration order and flag words that order Step and alarm dispatch.
 #include "platform/amiga/AmigaPortRuntime.h"
 #include "platform/amiga/AmigaTerrain.h"
 #include "platform/amiga/AmigaGameplayGeneration.h"
@@ -31,7 +31,8 @@ std::vector<std::uint8_t> readFile(const char* path){
     std::ifstream input(path,std::ios::binary);
     return {std::istreambuf_iterator<char>(input),std::istreambuf_iterator<char>()};
 }
-using Ownership=downwell::GameplayCollisionOwner::TerrainOwnership;
+using Ownership=downwell::GameplayCollisionOwner::Ownership;
+using View=downwell::GameplayCollisionView;
 
 struct Scene {
     AmigaTerrainFragment fragments[19];
@@ -89,6 +90,13 @@ struct Scene {
             ++drawn;return true;
         }),"draw order visits");
         d.addU32(drawn);
+        unsigned registered=0;
+        require(owner->visitRegistrationOrder([&](downwell::InstanceHandle h,int object,std::uint32_t flags){
+            if(h.slot>=View::terrainBase&&h.slot<View::timeFieldBase)return true;
+            d.addU32(h.slot);d.addU32(h.generation);d.addI32(object);d.addU32(flags&0x190013u); // Fast-draw 0x4000 is not an order input.
+            ++registered;return true;
+        }),"registration order visits");
+        d.addU32(registered);
         return d.value();
     }
 };
@@ -109,27 +117,34 @@ int main(int argc,char** argv){
         auto host=std::make_unique<downwell::StartupRuntime>(downwell::PlatformProfile::nonDesktop,
             &rooms,&objects,2,&patterns);
         host->skipToGameForTesting();
-        auto reference=std::make_unique<Scene>(patterns,objects,sprites,rooms,room,*host,Ownership::registered);
-        auto native=std::make_unique<Scene>(patterns,objects,sprites,rooms,room,*host,Ownership::unregistered);
+        auto reference=std::make_unique<Scene>(patterns,objects,sprites,rooms,room,*host,Ownership::reference);
+        std::unique_ptr<Scene> others[2]={
+            std::make_unique<Scene>(patterns,objects,sprites,rooms,room,*host,Ownership::nativeTerrain),
+            std::make_unique<Scene>(patterns,objects,sprites,rooms,room,*host,Ownership::native)};
         for(frame=0;frame<downwell::gameplayContactProfileFrames;++frame){
             const auto& player=reference->world->player();
             const auto input=downwell::packReplayInput(downwell::gameplayContactProfileInput(
                 reference->world->tick(),240+player.offsetX(),176+player.offsetY(),phase));
-            reference->world->step(input);native->world->step(input);
+            reference->world->step(input);
             const bool referenceOk=reference->world->effectsSucceeded()&&reference->world->generationSucceeded()&&
                 reference->owner->valid()&&reference->owner->prepareDraw();
-            const bool nativeOk=native->world->effectsSucceeded()&&native->world->generationSucceeded()&&
-                native->owner->valid()&&native->owner->prepareDraw();
-            require(referenceOk==nativeOk,"both ownership modes succeed or fail together");
+            const auto expected=referenceOk?reference->digest():0;
+            for(auto& other:others){
+                other->world->step(input);
+                const bool ok=other->world->effectsSucceeded()&&other->world->generationSucceeded()&&
+                    other->owner->valid()&&other->owner->prepareDraw();
+                require(referenceOk==ok,"every ownership mode succeeds or fails together");
+                if(!ok)continue;
+                require(other->digest()==expected,"simulation state and actor order agree");
+                require(other->owner->terrain().size()==reference->owner->terrain().size(),"terrain identities agree");
+            }
             if(!referenceOk)break;
-            require(reference->digest()==native->digest(),"simulation state and actor order agree");
-            require(reference->owner->terrain().size()==native->owner->terrain().size(),"terrain identities agree");
-            if(native->owner->terrain().size()>maxTerrain)maxTerrain=native->owner->terrain().size();
+            if(reference->owner->terrain().size()>maxTerrain)maxTerrain=reference->owner->terrain().size();
             ++frames;
         }
         ++tapes;
     }
-    std::cout<<"terrain ownership: "<<tapes<<" tapes, "<<frames<<" frames, up to "<<maxTerrain
+    std::cout<<"native ownership: "<<tapes<<" tapes, "<<frames<<" frames, up to "<<maxTerrain
              <<" terrain records agree\n";
     return 0;
 }
