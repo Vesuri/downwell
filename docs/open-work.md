@@ -206,94 +206,65 @@ RNG state, numeric instance IDs, creation and event order, positions and draw
 order on deterministic replays with intervening gameplay RNG and health
 changes, then check native timing with the trace and FPS tapes.
 
-### A. Materialize only observed runner state
+Native gameplay now constructs the collision owner with native ownership
+(`GameplayCollisionOwner::Ownership::native`): terrain lives only in the
+occupancy grid, and actors keep only their order state (object, flag word,
+sprite index, registration, room and layer order), not positions, bounds or
+spatial history. `make verify-terrain-ownership` compares this against the
+complete registered reference every frame. Contact-tape traces at `7f41ce2c`
+measure quiet frames at 47 ms (34 ms of work), combat 95 ms, time-field
+frames 86 ms and the frame-701 generation burst at 247 ms.
 
-- Replay the spatial journal only at the first box/line query, height or
-  node-count read. Record operations without idle-time servicing or
-  per-birth normalization beyond what replay needs. Preserve historical
-  insertion/removal order, first-hit identity, query-preparation side effects
-  and failure timing. Size the log for a level and keep the pressure drain.
-  Complete the collision-consumer audit as original queries enter gameplay.
-  Bound replay latency at the first query, and pressure drains, under natural
-  query-bearing workloads; a selector-free generation tape is insufficient.
-  See [derived-tree scheduling](spatial-publication-scheduling.md).
-- Represent generated terrain as ordered run records: numeric-ID range,
-  object, geometry, per-block Create results, and destroyed and inactive
-  bits. These replace per-block lifetime, room-list, layer, object-membership,
-  dirty-queue and bounds entries. Order keys stand in for list positions.
-  Enumerations that include terrain expand runs in place. Inactive scenery
-  that ends a layer's Draw walk becomes a per-layer cutoff. Audit observation
-  and failure boundaries before merging registration across a run. The target
-  is under 1,500 cycles per block, RNG included, down from about 28,000 in
-  `GameplayTerrainInstances::append` alone.
-  Complete the opt-in `TERRAIN_RUN_STORE=1` integration by deriving
-  room/layer/dirty/bounds observations from the authoritative terrain runs,
-  removing their duplicated per-cell ownership. Reduce worst-case storage as
-  well as generation cost before enabling it by default. Snapshot compatibility
-  and matching ownership witnesses are correctness gates, not evidence of a
-  generation-frame speedup.
-  Prioritize replacing the complete generated-terrain spatial birth transaction:
-  ordinary attachment, default-property publication, dirty-queue maintenance,
-  bounds-cache writes and journal insertion must not remain a chain of
-  per-cell runner operations underneath a run-shaped facade. Use authoritative
-  run geometry and captured publication history, expanded only at actual
-  observation boundaries; preserve immediate eligibility/flag observations,
-  queue order, pressure drains and partial-failure prefixes. Reject isolated
-  container substitutions that increase storage without reducing the native
-  generation burst. Replace singleton and declared-run births through the same
-  prepared transaction: optimizing only inherited run continuations leaves
-  ordinary singleton births and each run's first birth on the expensive path.
-  Admission must cover allocation, publication clocks, layer capacity and
-  spatial-history capacity together, before using a callback-free continuation.
-  Keep backend publication and each cell's RNG/Create boundary synchronous;
-  commit only the successful prefix on backend rejection. Unsupported or
-  potentially failing admissions retain the immediate reference transaction.
-  Capture history directly from builder-supplied run geometry;
-  do not rediscover runs by comparing each inserted rectangle. Keep synchronous
-  Create and intervening RNG draws below.
-- Keep each block's Create synchronous. Preserve per-cell RNG interleaving,
-  equal-depth ordering, lifetime allocation and partial-failure prefixes. Shop
-  and exit Create effects must precede the next pattern cell's random draw. Do
-  not preconsume the shared RNG or freeze health-dependent rewards; spreading
-  generation over frames is not behavior-neutral.
-- Prepare native resource descriptors, default property/bounds templates and
-  reusable pattern geometry before their first live use. Classify each
-  operation as asset-wide, level-wide, pattern/variant-wide or dependent on
-  gameplay state. Measure memory and preparation latency as well as gameplay
-  savings. Follow the
-  [generation preparation boundary](generation-preparation-contract.md).
+### A. Keep native ownership sufficient
 
-### B. Traverse families, not the room
+- Native ownership rejects every collision query and wall End Step. When an
+  original query or wall event enters native gameplay, answer it from native
+  state (the grid for terrain selectors, family records for actors) with the
+  same first-hit identity and order, verified against the registered
+  reference. Do not re-enable per-instance spatial publication for it.
+- Actors at the wall depth (100) are rejected, because an inactive wall ends
+  that layer's Draw. Supporting one needs the layer's wall-order cutoff.
+- The opt-in `TERRAIN_RUN_STORE` representation optimises registered terrain,
+  which native gameplay no longer keeps. Remove it unless the registered
+  reference itself needs it.
 
-- Run animation and previous-position capture as per-family loops over
-  compact records. Queue Animation End handlers with side effects by order
-  key and dispatch them in room order. Preserve inactive-list semantics,
-  callback order, generation checks and synchronous mutation visibility.
-- Maintain the actor Draw list incrementally, sorted by layer, depth and
-  element order, with per-layer inactive cutoffs, instead of walking every
-  layer element each frame.
-- Count alarms down in family records in captured order. Dispatch only zero
-  crossings, and retire unrearmed zeros to -1 as now.
-- Make position, image and transform setters plain stores with dirty bits.
-  Derive bounds when a query or the spatial log needs them.
-- Validate handles, generations and owner state at birth, retirement and
-  room entry. Per-frame paths carry a sticky failure flag checked at phase
-  boundaries, keeping terminal-failure propagation and full checks in
-  verification builds.
+### B. Remove the remaining per-element traversal
+
+- Alarm dispatch (3 ms quiet, 5 ms combat) walks every captured box and enemy
+  for each alarm index. Count alarms down in family records in captured
+  order, dispatching only zero crossings and retiring unrearmed zeros to -1.
+- The animation walk still decodes and revalidates each visited actor; bullet
+  and gem animation phases dominate combat (8 ms). Run per-family loops over
+  compact records where no Animation End handler has cross-instance effects,
+  keeping room order where one does.
+- Draw collection rebuilds through the generic layer walk after every
+  ownership change. Maintain the actor Draw list incrementally, ordered by
+  layer, depth and element order.
+- Validate handles and owner state at birth, retirement and room entry, not in
+  every per-frame visit (`valid()` and view lookups cost 2–3 ms per frame).
+  Keep a sticky failure flag checked at phase boundaries.
+- Generation bursts: frame 701 still spends 123 ms in generation. Each wall
+  writes the grid, a wall-contact record and a landing bit; derive contacts
+  and landing candidates from one grid representation, keeping contact
+  multiplicity for coincident walls. Box and field births pay generic layer
+  attachment (about 1.8 ms each). Keep each cell's Create and RNG draw
+  synchronous; spreading generation over frames changes RNG interleaving.
 - Measure steady gameplay and the garden-to-well transition; a short
   `SKIP_TO_GAME=1` sample does not cover the reported worst transition stall.
 
 ### C. Render with the blitter and precomputation
 
+- Currency/smoke composition still costs 17 ms per combat frame.
 - Currency/smoke: use blitter zero-flag tests for final-alpha overlap.
   Profile overlap-aware sprite assignment on dense gem/smoke
   scenes. Verify the mixed DMA/planar frame against original captures,
   preserving controller priority.
 - Actors: blitter bobs or hardware sprites instead of CPU planar stamping.
-- Time-field outlines: reuse per-radius and per-subpixel outline masks without
-  changing Draw RNG consumption or source geometry. Measure geometry and word
-  publication separately; changed-only writes alone do not guarantee cheap
-  preparation.
+- Time-field outlines cost 33 ms per frame while fields are visible (about
+  16% of contact-tape frames). The overlay re-rasterises and restores every
+  circle's words when any raster or underlying row changes. Keep per-circle
+  word sets and reapply only changed circles and repainted rows, without
+  changing Draw RNG consumption or source geometry.
 - Ammo HUD: precomputed gauge columns per fill and animation phase. Publish
   changed columns only and keep the static rim intact.
 - Terrain rows: blit tiles or prepared wall strips into the ring. Preserve
