@@ -1910,6 +1910,68 @@ int main(){
         capture(); // Sink rejection publishes neither lifetime nor RNG draw.
         assert(trace.good());
     }
+    {
+        // Ownership-replacement gate: typed terrain appearance, runner
+        // appearance and published bounds are three different observations.
+        // A compact owner must not derive all three from the current tile.
+        auto boundary=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto scene=std::make_unique<GameplayWorld>(300,true,0,false,boundary->enemyBinding(),
+            boundary->breakableBinding(),boundary->playerBinding(),&boundary->terrain());
+        assert(boundary->attach(*scene));
+        GameMakerRandom random;const auto draws=random.drawCount();
+        for(int object:{60,93,99}){
+            assert(boundary->terrain().append(object,240,512,true));
+            const auto local=boundary->terrain().handle(boundary->terrain().size()-1);
+            InstanceHandle shared;
+            assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,local,shared));
+            const auto initial=*boundary->properties(shared);
+            const auto birth=*boundary->state(shared);
+            auto unchangedDefaults=[&]{
+                const auto& p=*boundary->properties(shared);
+                assert(p.sprite.maskId==initial.sprite.maskId&&p.depth.bits==initial.depth.bits&&
+                    p.sprite.scaleX.bits==0x3f800000u&&p.sprite.scaleY.bits==0x3f800000u&&
+                    p.sprite.angle.bits==0&&p.timeline.bits==0&&p.cachedFrame.bits==0xbf800000u);
+                const auto& s=*boundary->state(shared);
+                assert(s.x.bits==birth.x.bits&&s.y.bits==birth.y.bits&&
+                    s.previous.x.bits==birth.previous.x.bits&&s.previous.y.bits==birth.previous.y.bits&&
+                    s.kind==birth.kind&&s.special==birth.special);
+            };
+            auto unchangedBounds=[&]{
+                const auto& b=boundary->state(shared)->bounds;
+                assert(b.left.bits==birth.bounds.left.bits&&b.top.bits==birth.bounds.top.bits&&
+                    b.right.bits==birth.bounds.right.bits&&b.bottom.bits==birth.bounds.bottom.bits);
+            };
+            unchangedDefaults();
+            // Marker Create is a no-op, even with an invalid requested tile.
+            if(object==99){
+                assert(boundary->terrain().createProperties(local,-1,false,random));
+                assert(boundary->properties(shared)->sprite.spriteId==initial.sprite.spriteId);
+                unchangedDefaults();unchangedBounds();continue;
+            }
+            for(int area=0;area<6;++area){
+                assert(boundary->terrain().createProperties(local,terrainTileForArea(area),false,random));
+                assert(boundary->terrain().imageIndex(local,15));
+                assert(boundary->properties(shared)->sprite.imageIndex.bits==0x41700000u);
+                // Missing sprite: the original ordinary sprite setter resets
+                // the nonnegative index, but wall Create does not subsequently
+                // write the typed presentation index. Platform Create does.
+                assert(boundary->terrain().createProperties(local,-1,false,random));
+                const auto& p=*boundary->properties(shared);
+                const auto typed=boundary->terrain().find(local);
+                assert(p.sprite.spriteId==-1&&typed->spriteId==-1);
+                assert(p.sprite.imageIndex.bits==(object==60?0u:0x41b80000u));
+                assert(typed->imageIndex==(object==60?15:23));
+                unchangedDefaults();unchangedBounds();
+                // A same-sprite write is a no-op, including its index. It
+                // must not perform another inferred constructor/reset step.
+                const auto savedIndex=p.sprite.imageIndex.bits;
+                assert(boundary->terrain().createProperties(local,-1,false,random));
+                assert(boundary->properties(shared)->sprite.imageIndex.bits==savedIndex);
+                unchangedDefaults();unchangedBounds();
+            }
+        }
+        assert(random.drawCount()==draws&&boundary->valid());
+    }
     PackedRoom room;assert(rooms.valid()&&rooms.findRoom(11,room));
     {
         // Cached retained scenery must have the same live termination behavior

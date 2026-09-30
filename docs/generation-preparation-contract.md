@@ -153,6 +153,46 @@ immutable publication history, and independently derived full-state views.
 Tree pressure/failure rules and intervening query callbacks still constrain
 history coalescing; future run cells cannot become visible before their Create.
 
+### Appearance is not a single interchangeable record
+
+The native terrain lifecycle exposes sprite and integer image-index setters,
+activation, destruction and room/End Step callbacks. It does not expose the
+actor binding's mask, transform or depth setters, nor dispatch terrain animation.
+Consequently the constructor mask/depth and unit transform can be shared by
+object rather than copied into every terrain cell. This restriction belongs to
+the native terrain owner, not to the generic runner/reference implementation.
+
+There are nevertheless three separate observations:
+
+| Observation | Authority and mutation boundary |
+| --- | --- |
+| Presentation sprite/index | `GameplayTerrainInstancesRuns::CreateValues`, after each successful lifecycle callback |
+| Collision sprite/index | The ordinary runner sprite/index setters, including index resets inside the sprite setter |
+| Cached and indexed bounds | The last bounds publication; initially constructor geometry, before Create chooses the area sprite |
+
+These cannot be aliased merely because normal fresh births agree. For example,
+set a wall's image index to 15, then repeat Create with missing sprite -1. The
+runner setter resets its index to zero, while wall Create does not write the
+presentation index, which remains 15. Repeating the same sprite is a setter
+no-op. Platform Create instead explicitly writes 23 after the sprite change.
+Neither Create updates the previously published bounds. Marker (99) Create is
+a no-op. The whole-owner test exercises these boundaries in all four ownership
+variants, across all six area tiles, without consuming RNG.
+
+Therefore a replacement may share immutable appearance defaults, but must
+retain the independent mutable collision index and the historical geometry.
+Expanding a read from the current presentation tile alone is not equivalent.
+The ownership API must also allow two simultaneous property/state observations;
+a single overwritten scratch record cannot replace borrowed pointers in pair
+queries. Temporary `place` queries restore coordinates through setters, while
+only their spatial branch restores the saved bounds cache. Current position is
+not sufficient to reconstruct every historical cache either.
+
+This is a storage/observation contract, not justification for preserving the
+full per-cell runner transaction. Allocation, order publication, eligibility
+and historical geometry must be owned once; constructor-property copies and
+derived-state construction belong at their actual observation boundaries.
+
 ### Terrain record and ownership publication
 
 `PreparedTerrainCreate` compiles ordinary object-60/object-93 Create for the
