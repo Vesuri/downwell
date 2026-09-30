@@ -15,6 +15,35 @@ class PreparedTerrainBirthBounds {
     RunnerImageValue values_[rows][offsetCapacity];
     static unsigned shape(int object){return object==60?0:object==93?1:object==99?2:3;}
 public:
+    // Immutable geometry identity, not an instance ID or a pointer into live
+    // terrain. It can be retained in publication history after that instance
+    // moves, changes sprite, retires or reuses its slot. The prepared resource
+    // table must outlive all keys and must not be re-prepared while they exist.
+    struct Key {std::uint32_t value=0;};
+    bool validKey(Key key)const{
+        const unsigned id=key.value&3u,row=key.value>>8;
+        return id<3&&shapes_[id].ready&&row>=16&&row<rows;
+    }
+    bool key(int object,int x,int y,Key& out)const{
+        const unsigned id=shape(object);
+        if(id==3||!shapes_[id].ready||x < -256||x>=768||y<0||y>=8192||
+            (unsigned(x)&15u)||(unsigned(y)&15u))return false;
+        out.value=(unsigned(y+256)>>4)*256u+(unsigned(x+256)>>4)*4u+id;
+        return true;
+    }
+    bool bounds(Key key,RunnerSpatialSplit::Box& out,bool normalize=false)const{
+        const unsigned id=key.value&3u,column=(key.value>>2)&63u,row=key.value>>8;
+        if(id==3||!shapes_[id].ready||row<16||row>=rows)return false;
+        const auto& s=shapes_[id];
+        const auto* horizontal=values_[column];const auto* vertical=values_[row];
+        out={horizontal[s.left],vertical[s.top],horizontal[s.right],vertical[s.bottom]};
+        if(normalize){
+            const auto& p=pixelOffsets_[id];
+            if(p.right<p.left){const auto v=out.left;out.left=out.right;out.right=v;}
+            if(p.bottom<p.top){const auto v=out.top;out.top=out.bottom;out.bottom=v;}
+        }
+        return true;
+    }
     template<unsigned N> bool prepare(const PreparedObjectDefaults<N>& objects,
         const SpriteCollisionPack& sprites){
         DW_TERRAIN_PREPARATION_SCOPE;
@@ -58,21 +87,22 @@ public:
         return true;
     }
     bool at(int object,int x,int y,RunnerImageValue& positionX,RunnerImageValue& positionY,
-        RunnerSpatialSplit::Box& box,bool& precise,RunnerSpatialSplit::PixelBox* pixels=nullptr)const{
-        return atPrepared<true>(object,x,y,positionX,positionY,box,precise,pixels);
+        RunnerSpatialSplit::Box& box,bool& precise,RunnerSpatialSplit::PixelBox* pixels=nullptr,Key* key=nullptr)const{
+        return atPrepared<true>(object,x,y,positionX,positionY,box,precise,pixels,key);
     }
     bool atReference(int object,int x,int y,RunnerImageValue& positionX,RunnerImageValue& positionY,
         RunnerSpatialSplit::Box& box,bool& precise,RunnerSpatialSplit::PixelBox* pixels=nullptr)const{
-        return atPrepared<false>(object,x,y,positionX,positionY,box,precise,pixels);
+        return atPrepared<false>(object,x,y,positionX,positionY,box,precise,pixels,nullptr);
     }
 private:
     template<bool PreparedPixels>
     bool atPrepared(int object,int x,int y,RunnerImageValue& positionX,RunnerImageValue& positionY,
-        RunnerSpatialSplit::Box& box,bool& precise,RunnerSpatialSplit::PixelBox* pixels)const{
+        RunnerSpatialSplit::Box& box,bool& precise,RunnerSpatialSplit::PixelBox* pixels,Key* key)const{
         const unsigned id=shape(object);
         if(id==3||!shapes_[id].ready||x < -256||x>=768||y<0||y>=8192||
             (unsigned(x)&15u)||(unsigned(y)&15u))return false;
         const unsigned column=unsigned(x+256)>>4,row=unsigned(y+256)>>4;
+        if(key)key->value=row*256u+column*4u+id;
         const auto& s=shapes_[id];
         const auto* horizontal=values_[column];const auto* vertical=values_[row];
         positionX=horizontal[0];positionY=vertical[0];

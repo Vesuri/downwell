@@ -29,14 +29,14 @@ template<unsigned Capacity,unsigned First,unsigned Last,bool Runs> struct Runner
 template<unsigned Capacity,unsigned First,unsigned Last> struct RunnerRegistrationStorage<Capacity,First,Last,true> {
     using Type=RunnerRunMembership<Capacity,First,Last>;
 };
-template<unsigned Capacity,unsigned Nodes,bool Scheduled> struct RunnerSpatialIndexStorage {
+template<unsigned Capacity,unsigned Nodes,bool Scheduled,bool PreparedGeometry=false> struct RunnerSpatialIndexStorage {
     using Type=RunnerSpatialIndex<Nodes>;
 };
-template<unsigned Capacity,unsigned Nodes> struct RunnerSpatialIndexStorage<Capacity,Nodes,true> {
+template<unsigned Capacity,unsigned Nodes,bool PreparedGeometry> struct RunnerSpatialIndexStorage<Capacity,Nodes,true,PreparedGeometry> {
     // Hold a level's terrain births plus actor churn without forcing the old
     // 512-operation drain during ordinary descent. Pressure still drains in
     // order; no finite log replaces testing the first observing query.
-    using Type=RunnerSpatialJournal<Nodes,Capacity,4096>;
+    using Type=RunnerSpatialJournal<Nodes,Capacity,4096,PreparedGeometry>;
 };
 // Shared collision ownership for externally allocated instance handles. The
 // scheduler must attach every relevant birth before Create, publish its bounds,
@@ -44,7 +44,7 @@ template<unsigned Capacity,unsigned Nodes> struct RunnerSpatialIndexStorage<Capa
 // No platform types or asset residency decisions belong here.
 template<unsigned Capacity,unsigned Nodes,bool ScheduledIndex=false,unsigned RetainedFirst=0,unsigned RetainedLast=0,bool RunRegistration=ScheduledIndex,class Lifetimes=RunnerSpatialLifetimes<Capacity>,
     class Registration=typename RunnerRegistrationStorage<Capacity,RetainedFirst,RetainedLast,
-        RunRegistration&&(RetainedFirst<RetainedLast)>::Type> class RunnerSpatialInstances {
+        RunRegistration&&(RetainedFirst<RetainedLast)>::Type,bool PreparedGeometry=false> class RunnerSpatialInstances {
     static_assert(Capacity>0,"Spatial instances need stable slots");
     using Queue=RunnerSpatialDirtyQueue<Capacity>;
     using Math=RunnerSpatialSplit;
@@ -261,6 +261,10 @@ public:
         return true;
     }
     template<class Terrain> bool bindTerrainLifetimes(Terrain& terrain){return lifetimes_.bind(terrain)&&membership_.bindTerrain(terrain);}
+    bool bindTerrainGeometry(const PreparedTerrainBirthBounds& geometry){
+        if constexpr(ScheduledIndex&&PreparedGeometry)return index_.bindGeometry(geometry);
+        else return false;
+    }
     // One owner-controlled birth transaction. Between observes only the
     // creation depth and may publish room ownership; it must not inspect or
     // mutate this spatial owner. On failure publish the same partial state as
@@ -269,7 +273,8 @@ public:
     template<unsigned Resources,class Graph,class Between>
     bool attachPreparedTerrainBirth(InstanceHandle h,int object,const State& state,
         Properties& p,const PreparedObjectDefaults<Resources>& defaults,Graph& graph,
-        const Box& bounds,Math::PixelBox pixels,bool precise,Between between){
+        const Box& bounds,Math::PixelBox pixels,bool precise,Between between,
+        PreparedTerrainBirthBounds::Key geometry={}){
         const auto* d=defaults.get(object);const auto* objectFlags=graph.flags(unsigned(object));
         if constexpr(RunRegistration&&ScheduledIndex){
             if(d&&graph.valid()&&objectFlags&&(*objectFlags&0x87u)==d->propertyFlags&&
@@ -295,7 +300,7 @@ public:
                 if(!checked(graph.prepareBirth(unsigned(object)))){s.bounds={};return false;}
                 // prepareBirth may change the family's live preparation bits.
                 const auto flags=*graph.flags(unsigned(object));
-                if(!finishFreshPreparedTerrain(h.slot,flags,bounds,pixels,precise,true))return false;
+                if(!finishFreshPreparedTerrain(h.slot,flags,bounds,pixels,precise,true,geometry))return false;
                 if(flags&8u)collision_.mark(h.slot);
                 return true;
             }
@@ -552,7 +557,7 @@ public:
             if(pixels.right<pixels.left){auto a=pixels.left;pixels.left=pixels.right;pixels.right=a;}
             if(pixels.bottom<pixels.top){auto a=pixels.top;pixels.top=pixels.bottom;pixels.bottom=a;}
             struct PreparedIndex {
-                typename RunnerSpatialIndexStorage<Capacity,Nodes,ScheduledIndex>::Type& index;
+                typename RunnerSpatialIndexStorage<Capacity,Nodes,ScheduledIndex,PreparedGeometry>::Type& index;
                 const Math::PixelBox& pixels;
                 bool insert(const Box& box,std::uint32_t id){return index.insertPrepared(box,id,&pixels);}
                 bool remove(const Box& box,std::uint32_t id,bool retry,bool& removed){
@@ -1032,10 +1037,20 @@ public:
     }
 private:
     bool finishFreshPreparedTerrain(unsigned slot,std::uint32_t objectFlags,const Box& bounds,
-        Math::PixelBox pixels,bool precise,bool publish){
+        Math::PixelBox pixels,bool precise,bool publish,PreparedTerrainBirthBounds::Key geometry={}){
         auto& s=entries_[slot].state;
         s.bounds=bounds;s.flags=(s.flags&~0x208u)|(precise?0x200u:0u);
         if(!publish||!Queue::shouldPublishBounds(objectFlags,s.flags,false))return true;
+        if constexpr(ScheduledIndex&&PreparedGeometry)if(geometry.value){
+            // The immutable geometry producer supplies exact finite bounds.
+            // Keep the instance cache unnormalized; only journal replay sees
+            // normalized endpoints. No mutable terrain record is borrowed.
+            if(pixels.right<pixels.left){const auto v=pixels.left;pixels.left=pixels.right;pixels.right=v;}
+            if(pixels.bottom<pixels.top){const auto v=pixels.top;pixels.top=pixels.bottom;pixels.bottom=v;}
+            DW_PROFILE_COUNT(counterSpatialFirstPublication);
+            if(!checked(index_.insertGeometry(geometry,slot,pixels)))return false;
+            s.flags|=0x8000u;return true;
+        }
         if(!Math::valid(bounds.left)||!Math::valid(bounds.top)||
            !Math::valid(bounds.right)||!Math::valid(bounds.bottom))return checked(false);
         Box normalized=bounds;
@@ -1056,7 +1071,7 @@ private:
     Entry entries_[Capacity]{};
     Membership membership_;
     Queue spatial_,collision_;
-    typename RunnerSpatialIndexStorage<Capacity,Nodes,ScheduledIndex>::Type index_;
+    typename RunnerSpatialIndexStorage<Capacity,Nodes,ScheduledIndex,PreparedGeometry>::Type index_;
     bool good_=true;
     std::uint32_t bindingRevision_=0;
     std::uint32_t captureRevision_=0;

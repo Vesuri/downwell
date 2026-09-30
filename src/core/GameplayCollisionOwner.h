@@ -35,7 +35,7 @@ public:
 #elif defined(DOWNWELL_TERRAIN_RUN_STORE)
     using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2,true,View::terrainBase,View::timeFieldBase,true,
         RunnerSpatialLifetimes<View::capacity,View::terrainBase,View::timeFieldBase,GameplayTerrainInstances>,
-        RunnerObservedRegistration<View::capacity,View::terrainBase,View::timeFieldBase,GameplayTerrainInstances>>;
+        RunnerObservedRegistration<View::capacity,View::terrainBase,View::timeFieldBase,GameplayTerrainInstances>,true>;
 #else
     using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2,true,View::terrainBase,View::timeFieldBase>;
 #endif
@@ -203,9 +203,10 @@ private:
             Owner::State state;
             Owner::Box terrainBounds;bool preparedTerrain=false,terrainPrecise=false;
             RunnerSpatialSplit::PixelBox terrainPixels;
+            PreparedTerrainBirthBounds::Key terrainGeometry;
             if constexpr(Kind==View::Kind::terrain)
                 preparedTerrain=parent.terrainBirthBounds_.at(r.objectId,r.x,r.y,
-                    state.x,state.y,terrainBounds,terrainPrecise,&terrainPixels);
+                    state.x,state.y,terrainBounds,terrainPrecise,&terrainPixels,&terrainGeometry);
             if constexpr(Kind==View::Kind::scriptEffect){
                 if(!r.effect||!r.effect->valid)return parent.check(false);
                 state.x=r.effect->x;state.y=r.effect->y;
@@ -228,7 +229,7 @@ private:
                         if(!parent.check(parent.room_.bind(h.slot,depth)))return false;
                         if(!r.active)parent.activationPending_=true;
                         return true;
-                    });
+                    },terrainGeometry);
                 if(!parent.check(born))return false;
                 return parent.check(parent.layers_.birth(h,r.sourceInstanceId,p.depth,!r.active,false));
             }
@@ -409,6 +410,7 @@ public:
             families_.bindInstanceFlags(objects)&&drawMetadata_.bind(objects)&&alarmMetadata_.bind(objects);
 #if defined(DOWNWELL_TERRAIN_RUN_STORE) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
         if(good_)good_=terrainCreate_.prepare(objectDefaults_,sprites_);
+        if(good_)good_=owner_.bindTerrainGeometry(terrainBirthBounds_);
 #endif
         if(good_)for(unsigned selector=0;selector<2;++selector){
             terrainFamilies_[selector]=true;

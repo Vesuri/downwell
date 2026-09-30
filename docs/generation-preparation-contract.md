@@ -65,6 +65,18 @@ binary32 operation snapshot, so later tree servicing/query order and eager
 fallback remain unchanged. No lifetime, query-preparation flag, Create effect
 or random draw moves into preparation.
 
+The run-store journal can instead record an immutable terrain geometry key
+(shape, prepared X column and Y row). This captures the initial default bounds,
+not the instance's current sprite or position. The prepared table must outlive
+the journal and must not be re-prepared while keys remain readable. Replay
+expands the key into the normalized rectangle; the ordinary rectangle journal
+remains the reference and fallback. Each key still counts as one operation:
+pressure drains, service budgets, population admission and failure ordering
+are unchanged. The key occupies existing operation storage, so this removes
+rectangle publication work but does not reduce the journal's reserved capacity
+or eliminate the instance bounds cache. Ordered-query tests cover pressure,
+retirement/reuse, scratch overwrites and eager fallback.
+
 A prepared first publication with an all-positive-zero cached rectangle and no
 index-membership bit skips old-rectangle normalization and removal. It writes
 the original cache and flags at the same point, validates new bounds only when

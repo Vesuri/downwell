@@ -1,13 +1,20 @@
 #ifndef DOWNWELL_CORE_RUNNER_SPATIAL_JOURNAL_H
 #define DOWNWELL_CORE_RUNNER_SPATIAL_JOURNAL_H
 #include "RunnerSpatialIndex.h"
+#include "PreparedTerrainBirthBounds.h"
 namespace downwell {
+template<bool Prepared> struct RunnerSpatialGeometrySource {};
+template<> struct RunnerSpatialGeometrySource<true> {
+    const PreparedTerrainBirthBounds* geometry_=nullptr;
+};
 // Derived-tree scheduling only. The caller still publishes instance fields,
 // flags, dirty queues and lifetime changes synchronously. Never collapse equal
 // updates or reconstruct from current positions: tree order depends on history.
 // All reads catch up. service() permits bounded work between publication bursts.
-template<unsigned Nodes,unsigned Slots,unsigned Pending=512> class RunnerSpatialJournal {
+template<unsigned Nodes,unsigned Slots,unsigned Pending=512,bool PreparedGeometry=false>
+class RunnerSpatialJournal:private RunnerSpatialGeometrySource<PreparedGeometry> {
     static_assert(Pending && !(Pending&(Pending-1)),"Journal capacity must be a power of two");
+    static_assert(!PreparedGeometry||Slots<0x80000000u,"Prepared journal identity tag");
     using Math=RunnerSpatialSplit;
     static constexpr unsigned depthLimit=[](){unsigned n=Nodes,bits=0;do{++bits;n>>=1;}while(n);return bits;}();
     // A valid tree has at most N leaves and N-1 internal nodes for N live
@@ -19,6 +26,34 @@ template<unsigned Nodes,unsigned Slots,unsigned Pending=512> class RunnerSpatial
     static constexpr unsigned safePopulation=Nodes>reserve?(Nodes-reserve)/2:0;
 public:
     using Box=typename Math::Box;
+    bool bindGeometry(const PreparedTerrainBirthBounds& geometry){
+        if constexpr(PreparedGeometry){
+            if(this->geometry_||count_||population_||!valid())return false;
+            this->geometry_=&geometry;return true;
+        }else return false;
+    }
+    // Immutable resource key, not a live instance lookup. Pixel endpoints
+    // obey the same trusted/normalized contract as insertPrepared. Preserve
+    // one logical operation per publication, including pressure/service timing.
+    bool insertGeometry(PreparedTerrainBirthBounds::Key key,std::uint32_t instance,
+                        const Math::PixelBox& pixels){
+        static_assert(PreparedGeometry,"Prepared geometry policy required");
+        if(!valid()||!this->geometry_||!this->geometry_->validKey(key))return false;
+        Math::PixelBox next;
+        if(!deferred_||instance>=Slots||contains(instance)||population_>=safePopulation||
+            !admitPixels(pixels,next)){
+            if(!eager())return false;
+            Box box;
+            return this->geometry_->bounds(key,box,true)&&tree_.insert(box,instance);
+        }
+        if(!makeRoom())return false;
+        auto& operation=operations_[(head_+count_)&(Pending-1)];
+        operation.box.left.bits=key.value;
+        operation.instance=instance|0x80000000u;operation.insert=true;++count_;
+        DW_PROFILE_COUNT(counterSpatialJournalQueued);
+        present_[instance>>5]|=1u<<(instance&31);++population_;
+        bounds_=next;haveBounds_=true;return true;
+    }
     bool valid()const{return good_&&tree_.valid();}
     bool deferred()const{return deferred_;}
     unsigned pending()const{return count_;}
@@ -78,8 +113,16 @@ public:
         while(count_&&budget--){
             const auto& operation=operations_[head_];
             bool removed=false;
-            const bool ok=operation.insert?tree_.insert(operation.box,operation.instance):
-                tree_.remove(operation.box,operation.instance,true,removed)&&removed;
+            bool ok;
+            if constexpr(PreparedGeometry){
+                if(operation.instance&0x80000000u){
+                    Box box;
+                    ok=this->geometry_&&this->geometry_->bounds({operation.box.left.bits},box,true)&&
+                        tree_.insert(box,operation.instance&0x7fffffffu);
+                }else ok=operation.insert?tree_.insert(operation.box,operation.instance):
+                    tree_.remove(operation.box,operation.instance,true,removed)&&removed;
+            }else ok=operation.insert?tree_.insert(operation.box,operation.instance):
+                    tree_.remove(operation.box,operation.instance,true,removed)&&removed;
             if(!ok){good_=false;return false;}
             DW_PROFILE_COUNT(counterSpatialJournalServiced);
             head_=(head_+1)&(Pending-1);--count_;

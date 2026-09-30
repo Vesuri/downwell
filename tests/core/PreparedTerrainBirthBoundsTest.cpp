@@ -1,4 +1,5 @@
 #include "core/PreparedTerrainBirthBounds.h"
+#include "core/RunnerSpatialJournal.h"
 #include <cassert>
 #include <fstream>
 #include <vector>
@@ -7,6 +8,50 @@ static std::vector<unsigned char> read(const char* path){
     std::ifstream f(path,std::ios::binary);assert(f);
     return {std::istreambuf_iterator<char>(f),{}};
 }
+template<unsigned Nodes,unsigned Pending>
+static void journalHistory(const downwell::PreparedTerrainBirthBounds& grid){
+    using namespace downwell;
+    using Math=RunnerSpatialSplit;
+    RunnerSpatialJournal<Nodes,64,Pending> reference;
+    RunnerSpatialJournal<Nodes,64,Pending,true> compact;
+    assert(compact.bindGeometry(grid)&&!compact.bindGeometry(grid));
+    assert(!compact.insertGeometry({0xffffffffu},0,{0,0,1,1})&&compact.valid()&&!compact.pending());
+    bool present[64]{};Math::Box previous[64]{};
+    unsigned random=47;
+    for(unsigned step=0;step<2000;++step){
+        random=random*1664525u+1013904223u;
+        const unsigned id=(random>>12)&63u;
+        bool a,b;
+        if(present[id]){
+            bool removedA=false,removedB=false;
+            a=reference.remove(previous[id],id,true,removedA);
+            b=compact.remove(previous[id],id,true,removedB);
+            assert(removedA==removedB);if(a)present[id]=false;
+        }else{
+            const int objects[]={60,93,99};PreparedTerrainBirthBounds::Key key;
+            assert(grid.key(objects[(random>>20)%3],int((random>>4)&31u)*16-128,
+                int((random>>16)&31u)*16,key));
+            assert(grid.bounds(key,previous[id],true));
+            Math::PixelBox pixels;assert(Math::decodePixels(previous[id],pixels));
+            a=reference.insertPrepared(previous[id],id,&pixels);
+            b=compact.insertGeometry(key,id,pixels);
+            // Operation owns a value key, never this caller's scratch.
+            key={};pixels={};present[id]=a;
+        }
+        assert(a==b&&reference.valid()==compact.valid()&&reference.pending()==compact.pending()&&
+            reference.deferred()==compact.deferred());
+        if(!a){reference.clear();compact.clear();for(auto& p:present)p=false;continue;}
+        if(step%11==0){assert(reference.service(2)==compact.service(2));assert(reference.pending()==compact.pending());}
+        if(step%37==0){
+            std::vector<unsigned> orderedA,orderedB;
+            const auto bounds=Math::encodePixels({-256,-16,768,8192});
+            assert(reference.query(bounds,[&](unsigned id){orderedA.push_back(id);return true;}));
+            assert(compact.query(bounds,[&](unsigned id){orderedB.push_back(id);return true;}));
+            assert(orderedA==orderedB&&reference.height()==compact.height()&&reference.nodeCount()==compact.nodeCount());
+        }
+    }
+    assert(reference.height()==compact.height()&&reference.nodeCount()==compact.nodeCount());
+}
 int main(){
     using namespace downwell;
     const auto ob=read("generated/downwell-objects.dwob"),sp=read("generated/downwell-sprites.dwsc");
@@ -14,6 +59,8 @@ int main(){
     PreparedObjectDefaults<386> defaults;assert(defaults.prepare(objects,sprites));
     PreparedTerrainBirthBounds grid;assert(grid.prepare(defaults,sprites));
     static_assert(sizeof(grid)<9000,"Terrain table must share coordinate offsets");
+    journalHistory<512,8>(grid);
+    journalHistory<16,8>(grid);
     unsigned checks=0;
     for(int object:{60,93,99}){
         const auto* d=defaults.get(object);assert(d);
@@ -23,6 +70,18 @@ int main(){
             RunnerSpatialSplit::PixelBox pixels,decoded;
             rx.assignInteger(x);ry.assignInteger(y);
             assert(grid.at(object,x,y,px,py,result,precise,&pixels));
+            PreparedTerrainBirthBounds::Key key;
+            RunnerSpatialSplit::Box keyed;
+            assert(grid.key(object,x,y,key)&&grid.bounds(key,keyed));
+            assert(keyed.left.bits==result.left.bits&&keyed.top.bits==result.top.bits&&
+                keyed.right.bits==result.right.bits&&keyed.bottom.bits==result.bottom.bits);
+            assert(grid.bounds(key,keyed,true));
+            RunnerSpatialSplit::PixelBox keyedPixels;
+            assert(RunnerSpatialSplit::decodePixels(keyed,keyedPixels));
+            assert(keyedPixels.left==(pixels.left<pixels.right?pixels.left:pixels.right)&&
+                keyedPixels.right==(pixels.left<pixels.right?pixels.right:pixels.left)&&
+                keyedPixels.top==(pixels.top<pixels.bottom?pixels.top:pixels.bottom)&&
+                keyedPixels.bottom==(pixels.top<pixels.bottom?pixels.bottom:pixels.top));
             assert(px.bits==rx.bits&&py.bits==ry.bits&&precise==(resource.collisionMode==1));
             assert(RunnerSpriteBounds::fromSpriteBinary32(resource,rx,ry,{0x3f800000u},
                 {0x3f800000u},false,{},{},true,[](auto v,std::int32_t& n){return v.roundPixel(n);},reference));
@@ -45,6 +104,9 @@ int main(){
             const bool expected=(object==60||object==93||object==99)&&x>=-256&&x<768&&y>=0&&y<8192&&
                 !(unsigned(x)&15u)&&!(unsigned(y)&15u);
             assert(grid.at(object,x,y,px,py,box,precise,&pixels)==expected);
+            PreparedTerrainBirthBounds::Key key{0xffffffffu};
+            assert(grid.key(object,x,y,key)==expected);
+            if(!expected)assert(key.value==0xffffffffu);
             if(!expected)assert(px.bits==123&&py.bits==456&&box.left.bits==1&&box.top.bits==2&&
                 box.right.bits==3&&box.bottom.bits==4&&precise);
             if(!expected)assert(pixels.left==11&&pixels.top==22&&pixels.right==33&&pixels.bottom==44);
@@ -62,6 +124,11 @@ int main(){
     assert(grid.at(93,240,176,a,b,box,precise)&&grid.at(99,240,176,a,b,box,precise));
     assert(grid.prepare(defaults,sprites));
     const auto copied=grid;
+    for(unsigned invalid:{0u,1u,2u,3u,4095u,135168u,0xffffffffu}){
+        RunnerSpatialSplit::Box untouched{{1},{2},{3},{4}};
+        assert(!copied.bounds({invalid},untouched));
+        assert(untouched.left.bits==1&&untouched.top.bits==2&&untouched.right.bits==3&&untouched.bottom.bits==4);
+    }
     assert(!grid.prepare(defaults,SpriteCollisionPack(nullptr,0)));
     assert(copied.at(60,240,176,a,b,box,precise));
     RunnerSpatialSplit::PixelBox copiedPixels,referencePixels;
