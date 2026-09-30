@@ -59,3 +59,16 @@ locally under ignored `generated/`; only the generator and format are committed.
 the deterministic `DWBP` format documented in `docs/builder-pattern-pack.md`.
 It verifies the pinned Steam build through the extraction manifest and keeps
 the derived cell payload under ignored `generated/`.
+
+## Original audio
+
+After the UTMT extraction, run `python3 tools/extract-audio.py` to extract all
+361 sound resources from `data.win`, `audiogroup1-6.dat`, and the three loose Ogg
+files into `extracted/audio/`. Original `bgm` resources go into `music/`; other
+sounds go into `sound-effects/`. Filenames retain the numeric sound resource ID
+and resource name. WAV and Ogg payloads are copied without re-encoding.
+
+The extractor verifies the resource metadata against the `data.win` hash,
+checks AUDO boundaries and complete resource coverage, and writes
+`extracted/audio/manifest.json` with source and output hashes, original sound
+settings, group/audio IDs, byte offsets, and extractor versions.
