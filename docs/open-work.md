@@ -240,7 +240,15 @@ changes, then check native timing with the trace and FPS tapes.
   observation boundaries; preserve immediate eligibility/flag observations,
   queue order, pressure drains and partial-failure prefixes. Reject isolated
   container substitutions that increase storage without reducing the native
-  generation burst. Capture history directly from builder-supplied run geometry;
+  generation burst. Replace singleton and declared-run births through the same
+  prepared transaction: optimizing only inherited run continuations leaves
+  ordinary singleton births and each run's first birth on the expensive path.
+  Admission must cover allocation, publication clocks, layer capacity and
+  spatial-history capacity together, before using a callback-free continuation.
+  Keep backend publication and each cell's RNG/Create boundary synchronous;
+  commit only the successful prefix on backend rejection. Unsupported or
+  potentially failing admissions retain the immediate reference transaction.
+  Capture history directly from builder-supplied run geometry;
   do not rediscover runs by comparing each inserted rectangle. Keep synchronous
   Create and intervening RNG draws below.
 - Keep each block's Create synchronous. Preserve per-cell RNG interleaving,
