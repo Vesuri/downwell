@@ -52,8 +52,11 @@ struct Scene {
             downwell::GameplayTerrainInstances::Presentation{},downwell::GameplayTerrainInstances::WallCollision{},
             &rooms,ownership);
         require(owner->valid(),"owner prepares");
+        // Native ownership keeps no terrain identity records: the occupancy
+        // grid is the only terrain representation, as on the Amiga.
         world=std::make_unique<AmigaPortRuntime>(300,false,1201-176,true,owner->enemyBinding(),
-            owner->breakableBinding(),owner->playerBinding(),&owner->terrain(),&rooms);
+            owner->breakableBinding(),owner->playerBinding(),
+            ownership==Ownership::native?nullptr:&owner->terrain(),&rooms);
         require(world->effectsSucceeded()&&owner->attach(*world),"owner attaches");
         world->initializeEntryInput(false);
         tiles.clear();
@@ -102,6 +105,29 @@ struct Scene {
 };
 }
 
+// Walls are painted as sprite 51 at each visible wall position, with a frame
+// derived from the grid. The native painter reads the grid alone, so its
+// output matches the record-driven reference when the sets of positions do.
+void requireWallsMatchGrid(Scene& reference,Scene& native){
+    const auto& records=reference.owner->terrain();
+    unsigned referenceWalls=0;
+    std::vector<std::uint8_t> seen(AmigaTerrainIndex::columns*AmigaTerrainIndex::rows);
+    for(unsigned i=0;i<records.size();++i){
+        const auto* r=records.find(records.handle(i));
+        require(r!=nullptr,"reference terrain record resolves");
+        if(r->objectId!=60||!r->active||r->destroyRequested)continue;
+        require(!r->wall.checked,"native walls never run End Step");
+        require(amigaIndexedWall(native.index,r->x,r->y),"visible reference wall is a native grid wall");
+        const unsigned cell=unsigned((r->y/16)*AmigaTerrainIndex::columns+(r->x-AmigaTerrainIndex::minX)/16);
+        if(!seen[cell]){seen[cell]=1;++referenceWalls;}
+    }
+    unsigned gridWalls=0;
+    for(unsigned row=0;row<AmigaTerrainIndex::rows;++row)
+        for(unsigned column=0;column<AmigaTerrainIndex::columns;++column)
+            if(amigaIndexedWall(native.index,AmigaTerrainIndex::minX+int(column)*16,int(row)*16))++gridWalls;
+    require(gridWalls==referenceWalls,"native grid has no wall without a visible reference record");
+}
+
 int main(int argc,char** argv){
     if(argc<5){std::cerr<<"usage: rooms objects patterns sprites\n";return 2;}
     const auto roomBytes=readFile(argv[1]),objectBytes=readFile(argv[2]),
@@ -136,7 +162,9 @@ int main(int argc,char** argv){
                 require(referenceOk==ok,"every ownership mode succeeds or fails together");
                 if(!ok)continue;
                 require(other->digest()==expected,"simulation state and actor order agree");
-                require(other->owner->terrain().size()==reference->owner->terrain().size(),"terrain identities agree");
+                if(other->world->terrainInstances())
+                    require(other->owner->terrain().size()==reference->owner->terrain().size(),"terrain identities agree");
+                else if(frame%30==0)requireWallsMatchGrid(*reference,*other);
             }
             if(!referenceOk)break;
             if(reference->owner->terrain().size()>maxTerrain)maxTerrain=reference->owner->terrain().size();

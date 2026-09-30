@@ -1301,9 +1301,13 @@ __attribute__((noinline)) static int runDownwell(void) {
         AmigaPortRuntime(initialRingOrigin,true,0,false,collisionOwner.enemyBinding(),
             collisionOwner.breakableBinding(),collisionOwner.playerBinding(),&collisionOwner.terrain(),&rooms);
 #else
+    // Native ownership keeps no per-wall identity records: the occupancy grid
+    // answers collision and paints walls (unchecked walls are sprite 51 with
+    // a grid-derived frame), so terrain births publish to the grid alone.
     AmigaPortRuntime& port = *new (portRuntimeStorage)
         AmigaPortRuntime(initialRingOrigin, false, 1201 - 176, true,collisionOwner.enemyBinding(),
-            collisionOwner.breakableBinding(),collisionOwner.playerBinding(),&collisionOwner.terrain(),&rooms);
+            collisionOwner.breakableBinding(),collisionOwner.playerBinding(),
+            ownership==downwell::GameplayCollisionOwner::Ownership::native?nullptr:&collisionOwner.terrain(),&rooms);
 #endif
     if(!port.effectsSucceeded()||!collisionOwner.attach(port))return 20;
 #ifdef DOWNWELL_ENTRY_WIPE_VERIFY
