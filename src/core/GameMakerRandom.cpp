@@ -25,6 +25,11 @@ std::uint32_t GameMakerRandom::nextU32() {
     return Well512::step(&state_[0],stateIndex_);
 }
 
+void GameMakerRandom::advance(unsigned draws) {
+    drawCount_ += draws;
+    while (draws--) Well512::step(&state_[0],stateIndex_);
+}
+
 double GameMakerRandom::random(double upperExclusive) {
     constexpr double u32Scale = 1.0 / 4294967296.0;
     return static_cast<double>(nextU32()) * u32Scale * upperExclusive;

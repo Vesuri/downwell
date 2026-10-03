@@ -65,6 +65,8 @@ public:
     }
     const Tile& at(unsigned id) const { return tiles_[id - 1]; }
     unsigned size() const { return count_; }
+    // Same records and row order as appending each platform (93) Create.
+    bool appendPlatforms(int x, int y, int stepX, unsigned count);
 private:
     Tile tiles_[capacity];
     std::uint16_t heads_[rows] = {}, tails_[rows] = {};
@@ -159,6 +161,11 @@ public:
     AmigaTerrainRunIndex(AmigaTerrainIndex&,int object,int x,int y,int stepX,unsigned count);
     bool ready()const{return remaining_!=0;}
     bool append();
+    // Whether every remaining cell can publish (overflow contacts included),
+    // so publishSpan cannot fail part-way. Platforms also need tile capacity.
+    bool admitSpan(const AmigaTerrainTiles& tiles)const;
+    // Publishes all remaining cells in order; requires admitSpan.
+    bool publishSpan(AmigaTerrainTiles& tiles);
 private:
     AmigaTerrainIndex& index_;
     int object_,x_,y_,step_;

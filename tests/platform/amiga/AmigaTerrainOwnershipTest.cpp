@@ -13,7 +13,9 @@
 #include "core/RoomPack.h"
 #include "core/SpriteCollisionPack.h"
 #include "core/StartupRuntime.h"
+#include <algorithm>
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <iterator>
@@ -128,6 +130,25 @@ void requireWallsMatchGrid(Scene& reference,Scene& native){
     require(gridWalls==referenceWalls,"native grid has no wall without a visible reference record");
 }
 
+// Backend terrain must not depend on the Create path: native runs publish
+// spans directly, while the reference goes through every world Create.
+void requireSameBackendTerrain(const Scene& reference,const Scene& other){
+    require(std::equal(std::begin(reference.index.cells),std::end(reference.index.cells),std::begin(other.index.cells)),
+        "occupancy cells and contact counts agree");
+    require(!std::memcmp(&reference.index.nextLanding,&other.index.nextLanding,sizeof(AmigaLandingIndex)),
+        "landing candidates agree");
+    require(reference.index.extraContacts.size()==other.index.extraContacts.size(),"overflow contacts agree");
+    require(reference.tiles.size()==other.tiles.size(),"tile counts agree");
+    for(unsigned id=1;id<=reference.tiles.size();++id){
+        const auto &a=reference.tiles.at(id),&b=other.tiles.at(id);
+        require(a.x==b.x&&a.objectId==b.objectId&&a.frame==b.frame&&a.next==b.next,"tile records agree");
+    }
+    for(int row=0;row<AmigaTerrainTiles::rows;++row)
+        require(reference.tiles.first(row*16)==other.tiles.first(row*16),"tile rows agree");
+    require(reference.generation.dirtyFirst==other.generation.dirtyFirst&&
+            reference.generation.dirtyEnd==other.generation.dirtyEnd,"dirty generation rows agree");
+}
+
 int main(int argc,char** argv){
     if(argc<5){std::cerr<<"usage: rooms objects patterns sprites\n";return 2;}
     const auto roomBytes=readFile(argv[1]),objectBytes=readFile(argv[2]),
@@ -162,6 +183,7 @@ int main(int argc,char** argv){
                 require(referenceOk==ok,"every ownership mode succeeds or fails together");
                 if(!ok)continue;
                 require(other->digest()==expected,"simulation state and actor order agree");
+                requireSameBackendTerrain(*reference,*other);
                 if(other->world->terrainInstances())
                     require(other->owner->terrain().size()==reference->owner->terrain().size(),"terrain identities agree");
                 else if(frame%30==0)requireWallsMatchGrid(*reference,*other);

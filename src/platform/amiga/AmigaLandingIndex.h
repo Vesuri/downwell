@@ -11,6 +11,14 @@ public:
     void insert(unsigned column, unsigned row) {
         if (column<128 && row<512) words_[column][row>>4] |= 0x8000u>>(row&15);
     }
+    // One row across count columns stepping by step (±1); all must be valid.
+    void insertSpan(unsigned column, int step, unsigned count, unsigned row) {
+        if (row>=512) return;
+        std::uint16_t* word=&words_[column][row>>4];
+        const std::uint16_t bit=std::uint16_t(0x8000u>>(row&15));
+        const int stride=step<0?-32:32;
+        for (; count; --count, word+=stride) *word|=bit;
+    }
     void remove(unsigned column, unsigned row) {
         if (column<128 && row<512) words_[column][row>>4] &= ~(0x8000u>>(row&15));
     }

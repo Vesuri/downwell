@@ -212,9 +212,10 @@ occupancy grid, and actors keep only their order state (object, flag word,
 sprite index, registration, room and layer order), not positions, bounds or
 spatial history. `make verify-terrain-ownership` compares this against the
 complete registered reference every frame. Wall-contact multiplicity lives in
-the occupancy grid's cells. Contact-tape traces measure quiet frames at 46 ms
-(34 ms of work), combat 95 ms, time-field frames 85 ms and the frame-701
-generation burst at 231 ms.
+the occupancy grid's cells, and native wall/platform runs publish as spans
+after their draws. Contact-tape traces measure quiet frames at 46 ms (34 ms
+of work), combat 95 ms, time-field frames 85 ms and the frame-701 generation
+burst at 207 ms.
 
 ### A. Keep native ownership sufficient
 
@@ -244,13 +245,12 @@ generation burst at 231 ms.
 - Validate handles and owner state at birth, retirement and room entry, not in
   every per-frame visit (`valid()` and view lookups cost 2–3 ms per frame).
   Keep a sticky failure flag checked at phase boundaries.
-- Generation bursts: frame 701 still spends 124 ms in generation, 30 ms of
-  it the per-cell builderCavern RNG draws. Excluding RNG, each run cell costs
-  about 1,400 cycles and each single terrain Create about 1,900 through the
-  generic Create chain; publish a run's cells to the grid, landing bits and
-  tile rows as one span. Box and field births pay generic layer attachment
-  (about 1.8 ms each). Keep each cell's Create and RNG draw synchronous;
-  spreading generation over frames changes RNG interleaving.
+- Generation bursts: frame 701 still spends about 100 ms in generation, 30 ms
+  of it the per-cell builderCavern RNG draws. The two border walls of each
+  pattern row still take the scalar Create chain (about 1,500 cycles each).
+  Box and field births pay generic layer attachment (about 1.8 ms each).
+  Keep each cell's Create and RNG draw synchronous; spreading generation
+  over frames changes RNG interleaving.
 - Measure steady gameplay and the garden-to-well transition; a short
   `SKIP_TO_GAME=1` sample does not cover the reported worst transition stall.
 

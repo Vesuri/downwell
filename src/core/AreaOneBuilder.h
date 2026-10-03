@@ -56,6 +56,19 @@ public:
             }
             completed_=true;return true;
         }
+        // For backends whose run Creates only publish occupancy that nothing
+        // reads before the run returns: draw every cell's value, then publish
+        // the whole span once. Publish must be admitted beforehand; a failure
+        // here leaves more draws than the per-cell prefix would.
+        template<class Publish> bool executeSpan(Publish publish)const{
+            if(started_)return false;
+            started_=true;
+            random_.advance(count);
+            const int span=int(count-1)*16;
+            command_.objectId=objectId;command_.x=stepX<0?x-span:x+span;command_.y=y;
+            if(!publish())return false;
+            completed_=true;return true;
+        }
         bool executeReference(EmitFunction emit,void* context)const{
             return executeMode<false>(emit,context);
         }

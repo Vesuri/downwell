@@ -18,6 +18,8 @@ public:
     void setSeed(std::uint32_t seed);
     std::uint32_t seed() const { return seed_; }
     std::uint32_t nextU32();
+    // Discard draws whose values no caller reads; same stream and count.
+    void advance(unsigned draws);
     double random(double upperExclusive = 1.0);
     std::uint64_t irandom(std::uint64_t upperInclusive);
     // Windows choose builtin: one unsigned WELL word modulo argument count,

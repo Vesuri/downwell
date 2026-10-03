@@ -197,6 +197,22 @@ bool AreaOneBuilder::emitPattern(
         emitPatternMode<false>(patterns,pattern,reversed,appendPillars,random,emit,context,advancedRows);
 }
 
+namespace {
+// A cell whose only effect is builderCavern's enemy-cutoff draw: no enemy,
+// random choice, object or terrain symbol.
+bool plainCavernCell(char symbol) {
+    switch (symbol) {
+    case 'a': case 'b': case 'c': case 'd': case 'e': case 't': case '%':
+    case 'I': case 'J': case '^': case '1': case '|': case '2': case '-':
+    case 'B': case '3': case 'v': case 'O': case '_': case '$': case '\\':
+    case '=': case '@': case '{': case '}':
+        return false;
+    default:
+        return true;
+    }
+}
+}
+
 template<bool Runs> bool AreaOneBuilder::emitPatternMode(
     const BuilderPatternPack& patterns, const PackedBuilderPattern& pattern,
     bool reversed, bool appendPillars, GameMakerRandom& random,
@@ -236,6 +252,12 @@ template<bool Runs> bool AreaOneBuilder::emitPatternMode(
                         !run.completed())return false;
                     column=std::uint16_t(end-1);continue;
                 }
+            }
+            if constexpr(Runs)if(levelLength_>=16&&levelLength_<=18&&plainCavernCell(symbol)){
+                unsigned end=column+1;
+                while(end<width&&plainCavernCell(static_cast<char>(cells[end])))++end;
+                random.advance(end-column);
+                column=std::uint16_t(end-1);continue;
             }
             const int ordinal = column + 1;
             const int buildX = reversed ? 320 - ordinal * 16

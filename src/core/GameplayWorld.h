@@ -236,6 +236,9 @@ public:
                               downwell::GameplayTerrainInstances* terrainInstances = nullptr,
                               const downwell::RoomPack* entryRooms = nullptr);
     const downwell::GameplayTerrainInstances* terrainInstances()const{return terrainInstances_;}
+    // Without terrain instances, wall/platform Creates (60, 93) have no world
+    // state: createGeneratedTerrain reduces to the backend's own publication.
+    bool terrainCreatesBackendOnly()const{return run_.effectsSucceeded&&!terrainInstances_;}
     const downwell::GameplayScriptSpawnInstances* scriptSpawnInstances()const{return scriptSpawnInstances_;}
     const downwell::GameplayDebrisInstances* debrisInstances()const{return debrisInstances_;}
     const downwell::NativeTimeChangeRegistration* timeChangeInstances()const{return timeChangeInstances_;}

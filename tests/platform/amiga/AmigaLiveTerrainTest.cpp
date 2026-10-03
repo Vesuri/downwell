@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <limits>
 #include <random>
+#include <cstring>
 
 namespace {
 void require(bool value, const char* message) {
@@ -39,6 +40,23 @@ void verifyPreparedTerrainRuns(){
             compare(y/16);
         }
         require(!run.ready()&&!run.append(),"exhausted run cannot publish twice");
+        // Whole-span publication matches the per-cell prefix's final state.
+        static AmigaTerrainIndex span;
+        static AmigaTerrainTiles scalarTiles,spanTiles;
+        scalarTiles.clear();spanTiles.clear();
+        require(amigaBuildTerrainIndex(empty,span)&&amigaAddTerrainObject(span,60,x,y,true),"span fixture");
+        for(unsigned cell=0;cell<count;++cell)
+            require(scalarTiles.append(downwell::DeferredCreateInstance{object,x+int(cell)*step,y}),"scalar tiles");
+        AmigaTerrainRunIndex whole(span,object,x,y,step,count);
+        require(whole.admitSpan(spanTiles)&&whole.publishSpan(spanTiles)&&!whole.ready(),"span publishes");
+        require(std::equal(std::begin(span.cells),std::end(span.cells),std::begin(scalar.cells))&&
+                !std::memcmp(&span.nextLanding,&scalar.nextLanding,sizeof(AmigaLandingIndex))&&
+                span.extraContacts.size()==scalar.extraContacts.size(),"span equals per-cell publication");
+        require(spanTiles.size()==scalarTiles.size(),"span tiles");
+        for(unsigned id=1;id<=spanTiles.size();++id)
+            require(spanTiles.at(id).x==scalarTiles.at(id).x&&spanTiles.at(id).frame==scalarTiles.at(id).frame&&
+                    spanTiles.at(id).next==scalarTiles.at(id).next,"span tile order");
+        require(spanTiles.first(y)==scalarTiles.first(y),"span tile row");
     }
     require(amigaBuildTerrainIndex(empty,scalar)&&amigaBuildTerrainIndex(empty,prepared),"capacity fixtures initialize");
     // Saturate the run cells' own counts, then fill all but two overflow records.
@@ -47,6 +65,12 @@ void verifyPreparedTerrainRuns(){
     for(unsigned i=0;i<3+254;++i)
         require(amigaAddTerrainObject(scalar,60,240,176)&&amigaAddTerrainObject(prepared,60,240,176),"fill contact prefix");
     AmigaTerrainRunIndex limited(prepared,60,160,192,16,4);
+    {
+        static AmigaTerrainTiles tiles;tiles.clear();
+        require(!limited.admitSpan(tiles),"span admission rejects a run that would exhaust overflow");
+        AmigaTerrainRunIndex fits(prepared,60,160,192,16,2);
+        require(fits.admitSpan(tiles),"span admission accepts a run within overflow capacity");
+    }
     for(unsigned i=0;i<3;++i){
         require(amigaAddTerrainObject(scalar,60,160+int(i)*16,192)==limited.append(),"run fails on same contact-capacity cell");
         compare(12);

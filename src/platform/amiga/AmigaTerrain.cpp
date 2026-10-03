@@ -59,6 +59,19 @@ int decorationSprite(int objectId) {
 }
 }
 
+bool AmigaTerrainTiles::appendPlatforms(int x, int y, int stepX, unsigned count) {
+    if (count > capacity - count_ || y < 0 || y >= rows * 16 || (y & 15)) return false;
+    const unsigned row = unsigned(y) >> 4;
+    for (unsigned cell = 0; cell < count; ++cell, x += stepX) {
+        if (x < -512 || x >= 1536 || (x & 15)) return false;
+        const unsigned id = ++count_;
+        tiles_[id - 1] = Tile{static_cast<std::int16_t>(x), 93, 23, 0};
+        if (tails_[row]) tiles_[tails_[row] - 1].next = id;
+        else heads_[row] = id;
+        tails_[row] = id;
+    }
+    return true;
+}
 bool AmigaAreaOneTerrainBuilder::collect(
     void* opaque, const downwell::DeferredCreateInstance& command) {
     auto& context = *static_cast<AmigaAreaOneTerrainBuilder*>(opaque);
@@ -485,6 +498,36 @@ bool AmigaTerrainRunIndex::append(){
     cell|=flags_;
     index_.nextLanding.insert(column_,row_);
     --remaining_;x_+=step_*16;column_=unsigned(int(column_)+step_);
+    return true;
+}
+
+bool AmigaTerrainRunIndex::admitSpan(const AmigaTerrainTiles& tiles)const{
+    if(!remaining_)return false;
+    if(object_==93)return remaining_<=AmigaTerrainTiles::capacity-tiles.size();
+    unsigned saturated=0;
+    const unsigned char* cell=&index_.cells[row_*AmigaTerrainIndex::columns+column_];
+    for(unsigned i=0;i<remaining_;++i,cell+=step_)saturated+=(*cell&wallContactMask)==wallContactMask;
+    return saturated<=index_.extraContacts.capacity()-index_.extraContacts.size();
+}
+bool AmigaTerrainRunIndex::publishSpan(AmigaTerrainTiles& tiles){
+    if(!admitSpan(tiles))return false;
+    if(object_==93&&!tiles.appendPlatforms(x_,y_,step_*16,remaining_))return false;
+    // Locals: byte stores through the cell pointer would otherwise reload members.
+    const unsigned count=remaining_;
+    const int step=step_;
+    unsigned char* cell=&index_.cells[row_*AmigaTerrainIndex::columns+column_];
+    const unsigned char flags=static_cast<unsigned char>(flags_);
+    if(object_==60){
+        int x=x_;
+        for(unsigned i=0;i<count;++i,cell+=step,x+=step*16){
+            unsigned char value=*cell;
+            if((value&wallContactMask)!=wallContactMask)value+=wallContactUnit;
+            else index_.extraContacts.append(60,x,y_);
+            *cell=value|flags;
+        }
+    }else for(unsigned i=0;i<count;++i,cell+=step)*cell|=flags;
+    index_.nextLanding.insertSpan(column_,step,count,row_);
+    x_+=step*16*int(count);column_=unsigned(int(column_)+step*int(count));remaining_=0;
     return true;
 }
 
