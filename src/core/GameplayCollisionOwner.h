@@ -1010,7 +1010,18 @@ private:
           if(!(capturedAlarms&(1u<<alarm))&&bindingsUnchanged(bindingRevision))continue;
           int cachedObject=-1;unsigned alarmMask=0;
           PackedObjectEvent event;bool eventCached=false,eventFound=false;
+          unsigned groupEnd=0;
           for(unsigned i=0;i<count;++i){
+            if constexpr(SkipInactive)if(i>=groupEnd){
+                // Captured boxes are live boxes. When none has this alarm set
+                // at group entry, no member is pending and no callback runs.
+                // The reference owner keeps the per-member walk as the oracle.
+                groupEnd=snapshot.objectGroupEnd(i);
+                const unsigned slot=snapshot.handle(i).slot;
+                if(native_&&slot>=View::breakableBase&&slot<View::terrainBase&&!world_->boxAlarmMayDispatch(alarm)){
+                    i=groupEnd-1;continue;
+                }
+            }
             const auto h=snapshot.handle(i);
             bool haveFlags=false;std::uint32_t flags;
             int object=snapshot.object(i);

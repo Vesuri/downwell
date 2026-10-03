@@ -2813,6 +2813,34 @@ int main(){
         const int bx=0,by=336;assert(world->appendBreakables(&bx,&by,1));const InstanceHandle box{0,1};
         assert(BoxSoundVerification::run(*world,box,171,[&](){return &world->findBreakable(box)->sound;},failure));
     }
+#ifdef DOWNWELL_TERRAIN_RUN_STORE
+    for(auto ownership:{GameplayCollisionOwner::Ownership::reference}){ // The run store has no native ownership.
+#else
+    for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native}){
+#endif
+        // Native ownership skips box groups while no live box has Alarm 0
+        // set; an armed box must still count down beside idle ones.
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,ownership);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding());
+        assert(owner->attach(*world));
+        const int xs[]={64,96},ys[]={512,512};
+        assert(world->appendBreakables(xs,ys,2));
+        const InstanceHandle idle{0,world->breakableSlot(0).lifetimeId},armed{1,world->breakableSlot(1).lifetimeId};
+        world->step(0);
+        assert(world->effectsSucceeded()&&world->findBreakable(idle)->alarm0==-1&&world->findBreakable(armed)->alarm0==-1);
+        assert(world->publishBoxAlarm0(armed,2));
+        // Expiry zeroes health; the box's own Step then marks destruction,
+        // which excludes it (still at zero) from later alarm passes.
+        for(int expected:{1,0,0}){
+            world->step(0);
+            assert(world->effectsSucceeded()&&world->findBreakable(idle)->alarm0==-1&&
+                world->findBreakable(armed)->alarm0==expected);
+        }
+        assert(world->findBreakable(armed)->state.wallHp.zero()&&world->findBreakable(armed)->destroyRequested&&
+            !world->findBreakable(idle)->state.wallHp.zero()&&!world->findBreakable(idle)->destroyRequested);
+    }
     for(bool registered:{false,true}){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
         auto world=std::make_unique<GameplayWorld>(300,true,0,false,

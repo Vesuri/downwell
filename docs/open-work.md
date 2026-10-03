@@ -214,7 +214,7 @@ spatial history. `make verify-terrain-ownership` compares this against the
 complete registered reference every frame. Wall-contact multiplicity lives in
 the occupancy grid's cells, and native wall/platform runs publish as spans
 after their draws. Contact-tape traces measure quiet frames at 46 ms (34 ms
-of work), combat 95 ms, time-field frames 85 ms and the frame-701 generation
+of work), combat 94 ms, time-field frames 79 ms and the frame-701 generation
 burst at 207 ms.
 
 ### A. Keep native ownership sufficient
@@ -232,9 +232,11 @@ burst at 207 ms.
 
 ### B. Remove the remaining per-element traversal
 
-- Alarm dispatch (3 ms quiet, 5 ms combat) walks every captured box and enemy
-  for each alarm index. Count alarms down in family records in captured
-  order, dispatching only zero crossings and retiring unrearmed zeros to -1.
+- Alarm dispatch (1.2 ms quiet, 3 ms combat) still walks every captured
+  enemy and effect for each alarm index; native ownership skips box groups
+  while no live box has Alarm 0 set. Count the remaining families' alarms
+  down in their records in captured order, dispatching only zero crossings
+  and retiring unrearmed zeros to -1.
 - The animation walk still decodes and revalidates each visited actor; bullet
   and gem animation phases dominate combat (8 ms). Run per-family loops over
   compact records where no Animation End handler has cross-instance effects,

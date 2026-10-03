@@ -520,6 +520,8 @@ public:
         return handle.slot==0&&handle.generation&&handle.generation==playerInstance_.lifetimeId
             ? &playerInstance_ : nullptr;
     }
+    unsigned breakableSlots() const { return breakableCount_; }
+    const Breakable& breakableSlot(unsigned slot) const { return breakables_[slot]; }
     const Breakable* findBreakable(downwell::InstanceHandle handle) const {
         if(handle.slot>=breakableCount_||!handle.generation)return nullptr;
         const auto& box=breakables_[handle.slot];
@@ -534,6 +536,14 @@ public:
         if(!run_.effectsSucceeded||!findBreakable(h))return run_.effectsSucceeded=false;
         auto& box=breakables_[h.slot];
         return run_.playBoxBreakSound(box.sound,box.state.breakSound,volume,audio);
+    }
+    // False only when no live box counts this alarm down: every box's own
+    // Alarm 0 is unset. Boxes have no other alarm, which stays conservative.
+    bool boxAlarmMayDispatch(unsigned alarm)const{
+        if(alarm!=0)return true;
+        for(unsigned i=0;i<breakableCount_;++i)
+            if(breakables_[i].lifetimeId&&breakables_[i].alarm0>=0)return true;
+        return false;
     }
     bool publishBoxAlarm0(downwell::InstanceHandle h,std::int32_t value){
         if(!run_.effectsSucceeded||!findBreakable(h))return run_.effectsSucceeded=false;

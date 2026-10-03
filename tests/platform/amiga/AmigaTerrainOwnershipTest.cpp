@@ -88,6 +88,9 @@ struct Scene {
         for(unsigned i=0;i<w.gemCapacity;++i){const auto& g=w.gemAt(i);if(!g.active)continue;
             d.addI32(g.x);d.addI32(g.y);d.addU32(g.age);d.addU32(g.lifetimeId);}
         d.addU32(w.damageNumbers().size());
+        d.addU32(w.breakableSlots());
+        for(unsigned i=0;i<w.breakableSlots();++i){const auto& b=w.breakableSlot(i);
+            d.addU32(b.lifetimeId);d.addBool(b.active);d.addBool(b.destroyRequested);d.addI32(b.alarm0);}
         unsigned drawn=0;
         require(w.visitRoomActorsReadOnly([&](GameplayWorld::DrawActor kind,downwell::InstanceHandle key,
             downwell::RunnerImageValue depth){
