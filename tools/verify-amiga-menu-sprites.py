@@ -4,14 +4,21 @@ import struct
 from pathlib import Path
 
 
-def verify(path):
-    pack = path.read_bytes()
+def directory(pack):
     magic, version, start, count, _ = struct.unpack_from(">4sHHI8s", pack)
     assert magic == b"DWAP" and version == 2
     records = {}
     for i in range(count):
         r = struct.unpack_from(">HHhhHHHHII", pack, start + 24 * i)
         records[r[:2]] = r
+    return records
+
+
+def verify(game_path, front_path):
+    # Planar player art is gameplay-resident; the garden DMA copies are in
+    # the front scene bank.
+    pack, front = game_path.read_bytes(), front_path.read_bytes()
+    records, garden = directory(pack), directory(front)
     checked = 0
     for (sprite, frame), r in records.items():
         if sprite not in (12, 27, 31, 37):
@@ -28,10 +35,10 @@ def verify(path):
         for flip in (0, 1):
             low, high = (width - 1 - right, width - 1 - left) if flip else (left, right)
             crop = max(0, min(width - 16, low - (16 - (high - low + 1)) // 2))
-            prepared = records[64000 + sprite, frame * 2 + flip]
+            prepared = garden[64000 + sprite, frame * 2 + flip]
             assert prepared[2:8] == ((width - ox if flip else ox) - crop,
                                       oy, 16, height, 16, 4)
-            data = pack[prepared[8]:prepared[8] + prepared[9]]
+            data = front[prepared[8]:prepared[8] + prepared[9]]
             expected = bytearray(136)
             for y in range(height):
                 for plane in (0, 1):
@@ -48,4 +55,5 @@ def verify(path):
 
 
 if __name__ == "__main__":
-    verify(Path(__file__).resolve().parent.parent / "generated/amiga-game.dwap")
+    root = Path(__file__).resolve().parent.parent
+    verify(root / "generated/amiga-game.dwap", root / "generated/amiga-front.dwap")

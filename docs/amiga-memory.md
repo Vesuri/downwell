@@ -17,8 +17,38 @@ memory requirement.
 | Two channel-seven sprite buffers | 272 |
 | Null sprite | 8 |
 | Shared splash/style cache | 66,704 |
-| Resident game-art pack (directory, planar art, garden sprites) | 273,184 |
-| **Total** | **481,656** |
+| Resident gameplay art pack (directory, planar art) | 115,326 |
+| Effect surface | 20,448 |
+| Shared scene bank (boot or front art; free in gameplay), after 2 alignment bytes | 90,442 |
+| **Total** | **434,690** |
+
+`make verify-amiga-memory` reports 67,888 bytes of Chip RAM free after these
+allocations (previously 8,472).
+
+## Scene banks
+
+Chip RAM holds only the current scene's art. `generate-amiga-hud.py --profile
+game` encodes the former single game pack and splits its records, unchanged,
+into three banks:
+
+- `amiga-game.dwap`, gameplay art, copied into Chip once at startup and
+  resident throughout.
+- `amiga-boot.dwap` (`Downwell.boot`), the publisher logo, controls, credits
+  text and dither fade. Startup composes it into the splash cache, then
+  discards it.
+- `amiga-front.dwap` (`Downwell.front`), garden scenery, the aligned title,
+  garden hardware sprites and style select. The menu prepares style select
+  while the garden is shown, so the two share one bank. Garden scenery keeps
+  only the frames the seed-2 menu creation selects; `amiga-menu-test` checks
+  every draw-list frame against this bank.
+
+The two scene banks are files beside the executable. Each load is a single
+`Open`/`Read`/`Close` of the whole file into the shared Chip region, through
+`AmigaPlatform::loadFile`. During the load the OS gets back its VERTB
+servers, blitter interrupt and multitasking; the display stays owned and the
+copper is re-pointed afterwards. Leaving gameplay for the menu or style select
+reloads the front bank before either scene is prepared. Splash scenes run only
+at boot. During gameplay no bank occupies the region.
 
 A temporary 16-byte startup copper list is also allocated during initialization.
 Immutable planar/mask payloads may share byte-identical word-aligned subregions
@@ -89,14 +119,14 @@ and mask stream remains contiguous. No target decompression, extra copies or
 runtime asset conversion are introduced. Writable DMA records bypass sharing
 and retain separate storage. `tests/planar-packing-test.py` compares directory
 metadata and every payload against an unshared pack and checks writable-record
-isolation. The renderer's residency gate remains 278,000 bytes; passing it is
-not proof of whole-program or peak-transition memory fit.
+isolation. The renderer's residency gate is 120,000 bytes; passing it is not
+proof of whole-program or peak-transition memory fit.
 
 The eight-frame spin animation adds 6,912 resident bytes, including directory
 entries and offline mirrored art. The bounded A500 allocation check passes
 with this pack. Four offline frog damage frames and their mirrored/DMA variants
 add 2,880 resident bytes; the bounded 512 KiB A500 allocation check also passes
-with those assets. The renderer test caps resident game art at 278,000 bytes. Run
+with those assets. The renderer test caps resident game art at 120,000 bytes. Run
 `make verify-amiga-memory` for a bounded target allocation/initialization
 check. Startup diagnostics expose the failed check, initial Chip free/largest
 block, requested asset bytes and remaining Chip memory after allocations.

@@ -30,6 +30,11 @@ public:
     // reserveLines is a scheduling margin, not a preemptive execution limit.
     void waitVblank(bool (*idleWork)(void*),void* context,unsigned reserveLines) const;
     static UWORD vblankCount() { return vblankCount_; }
+    // Scene-boundary file access: one Open/Read/Close of the whole file into
+    // destination (Chip is fine). While it runs the OS gets back its VERTB
+    // servers, interrupts and disk DMA; the display stays owned. Drain the
+    // blitter first. Returns the bytes read, or -1.
+    LONG loadFile(const char* name, UBYTE* destination, ULONG bytes);
     void restore();
 
 private:
@@ -37,6 +42,8 @@ private:
     AmigaPlatform& operator=(const AmigaPlatform&);
 
     static ULONG vblankHandler();
+    void beginIo();
+    void endIo();
     static volatile UWORD vblankCount_;
     const UWORD* publishedCopper_;
     UWORD publishedVblank_;

@@ -21,7 +21,7 @@ def main():
     pages = [Image.open(extracted / "TexturePages" / f"{i}.png").convert("RGBA")
              for i in range(manifest["counts"]["embeddedTextures"])]
     canvas_for = runpy.run_path(str(ROOT / "tools/generate-amiga-hud.py"))["frame_canvas"]
-    pack = (ROOT / "generated/amiga-game.dwap").read_bytes()
+    pack = (ROOT / "generated/amiga-front.dwap").read_bytes()
     start, count = struct.unpack_from(">HI", pack, 6)
     records = {r[:2]: r for i in range(count)
                for r in [struct.unpack_from(">HHhhHHHHII", pack, start + 24 * i)]}

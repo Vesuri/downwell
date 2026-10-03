@@ -207,6 +207,10 @@ AMIGA_GAME := $(REPO)/generated/amiga-game.dwap
 AMIGA_EXIT_MASK := $(REPO)/generated/amiga-game.exit-mask
 AMIGA_ENTRY_MASK := $(REPO)/generated/amiga-game.entry-mask
 AMIGA_SELECTION_MASK := $(REPO)/generated/amiga-game.selection-mask
+# Scene banks are files beside the executable, read whole per scene.
+AMIGA_BOOT_BANK := $(REPO)/generated/amiga-boot.dwap
+AMIGA_FRONT_BANK := $(REPO)/generated/amiga-front.dwap
+AMIGA_SCENE_BANKS := $(REPO)/generated/amiga-scene-banks.h
 AMIGA_RESULTS := $(REPO)/generated/amiga-results.dwap
 AMIGA_SHOP := $(REPO)/generated/amiga-shop.dwap
 AMIGA_CLEAR := $(REPO)/generated/amiga-clear.dwap
@@ -231,7 +235,15 @@ OBJECTS := obj/DownwellAmiga.o obj/AmigaProfile.o obj/AmigaInput.o obj/AmigaPlay
 
 .PHONY: all check clean audit
 
-all: check $(OUT).exe
+all: check $(OUT).exe $(OUT).boot $(OUT).front
+
+$(OUT).boot: $(AMIGA_BOOT_BANK)
+	@mkdir -p $(@D)
+	cp -f $< $@
+
+$(OUT).front: $(AMIGA_FRONT_BANK)
+	@mkdir -p $(@D)
+	cp -f $< $@
 
 .PHONY: FORCE_STARTUP_OPTIONS
 obj/startup-options: FORCE_STARTUP_OPTIONS
@@ -272,7 +284,7 @@ $(OUT).elf: $(OBJECTS)
 	@$(MAKE) --no-print-directory audit
 
 obj/DownwellAmiga.o: $(AMIGA_SRC)/DownwellAmiga.cpp \
-		$(REPO)/src/core/PortReplay.h
+		$(REPO)/src/core/PortReplay.h $(AMIGA_SCENE_BANKS)
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -c -o $@ $<
 
@@ -516,6 +528,9 @@ $(AMIGA_ENTRY_MASK): $(AMIGA_GAME)
 	@test -f $@ || $(MAKE) -C $(REPO) generate-amiga-game
 
 $(AMIGA_SELECTION_MASK): $(AMIGA_GAME)
+	@test -f $@ || $(MAKE) -C $(REPO) generate-amiga-game
+
+$(AMIGA_BOOT_BANK) $(AMIGA_FRONT_BANK) $(AMIGA_SCENE_BANKS): $(AMIGA_GAME)
 	@test -f $@ || $(MAKE) -C $(REPO) generate-amiga-game
 
 obj/AmigaAssets.o: $(AMIGA_SRC)/AmigaAssets.s $(AMIGA_HUD) $(AMIGA_GAME) $(AMIGA_EXIT_MASK) $(AMIGA_ENTRY_MASK) $(AMIGA_SELECTION_MASK) \

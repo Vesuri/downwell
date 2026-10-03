@@ -1,3 +1,4 @@
+#include <proto/dos.h>
 #include <proto/exec.h>
 #include <proto/graphics.h>
 #include <exec/execbase.h>
@@ -12,6 +13,7 @@
 
 extern struct ExecBase* SysBase;
 extern struct GfxBase* GfxBase;
+struct DosLibrary* DOSBase = 0;
 
 volatile UWORD AmigaPlatform::vblankCount_ = 0;
 
@@ -23,6 +25,7 @@ AmigaPlatform::AmigaPlatform()
       active_(false)
 {
     GfxBase = (struct GfxBase*)OpenLibrary((CONST_STRPTR)"graphics.library", 33);
+    DOSBase = (struct DosLibrary*)OpenLibrary((CONST_STRPTR)"dos.library", 36);
 }
 
 AmigaPlatform::~AmigaPlatform()
@@ -32,11 +35,59 @@ AmigaPlatform::~AmigaPlatform()
         CloseLibrary((struct Library*)GfxBase);
         GfxBase = 0;
     }
+    if (DOSBase) {
+        CloseLibrary((struct Library*)DOSBase);
+        DOSBase = 0;
+    }
 }
 
 bool AmigaPlatform::available() const
 {
-    return GfxBase != 0;
+    return GfxBase != 0 && DOSBase != 0;
+}
+
+void AmigaPlatform::beginIo()
+{
+    // Undo exactly what takeover changed for the OS: its VERTB servers, the
+    // blitter interrupt, and multitasking. Disk DMA is never switched off.
+    // Our copper, raster and sprite DMA stay live.
+    Disable();
+    SysBase->IntVects[INTB_VERTB] = savedVblankVector_;
+    AmigaHardware::setInterrupts((UWORD)(savedIntena_ & INTF_BLIT), true);
+    Enable();
+    Permit();
+}
+
+void AmigaPlatform::endIo()
+{
+    Forbid();
+    Disable();
+    SysBase->IntVects[INTB_VERTB].iv_Data = 0;
+    SysBase->IntVects[INTB_VERTB].iv_Code = (void (*)())vblankHandler;
+    SysBase->IntVects[INTB_VERTB].iv_Node = &vblankServer_.is_Node;
+    AmigaHardware::setInterrupts(INTF_BLIT, false);
+    AmigaHardware::clearInterruptRequests(INTF_BLIT);
+    Enable();
+}
+
+LONG AmigaPlatform::loadFile(const char* name, UBYTE* destination, ULONG bytes)
+{
+    if (!DOSBase || !destination) return -1;
+    if (active_) beginIo();
+    LONG read = -1;
+    const BPTR file = Open((CONST_STRPTR)name, MODE_OLDFILE);
+    if (file) {
+        read = Read(file, destination, (LONG)bytes);
+        Close(file);
+    }
+    if (active_) {
+        endIo();
+        // graphics.library's VERTB server may have loaded its own copper
+        // list, and the OS may have left a blit running.
+        AmigaHardware::blitterDrain();
+        if (publishedCopper_) AmigaHardware::setCopperList(publishedCopper_, false);
+    }
+    return read;
 }
 
 ULONG AmigaPlatform::vblankHandler()

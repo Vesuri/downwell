@@ -23,6 +23,8 @@ fsuae_stop_previous
 mkdir -p "$DH0/s" "$DH1" "$RUN/state"
 printf 'Stack 8192\ncd dh1:\nDownwell\n' > "$DH0/s/startup-sequence"
 cp -f "$EXE" "$DH1/Downwell"
+cp -f "${EXE%.exe}.boot" "$DH1/Downwell.boot"
+cp -f "${EXE%.exe}.front" "$DH1/Downwell.front"
 echo "running $EXE"
 rm -f "$RUN"/state/*.uss
 

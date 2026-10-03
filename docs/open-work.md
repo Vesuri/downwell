@@ -282,10 +282,9 @@ bursts at frames 701 and 844 at 183-185 ms.
   row, even as one fused pass in registers. Compose column 18 with the
   blitter from Chip-resident layer columns instead: background and rim at
   the meter offset, the fill, and row art with dividers at four times the
-  meter offset, keeping the CPU for row-art updates and the label. Only
-  about 8.5 KB of Chip RAM remains after startup allocations, so the layers
-  must fit in a few KB (single-row masks with negative modulos, gauge rows
-  only) or free Chip elsewhere.
+  meter offset, keeping the CPU for row-art updates and the label. Build the
+  layers in the 90 KB scene-bank region at gameplay entry; no bank occupies
+  it during gameplay (see [scene banks](amiga-memory.md#scene-banks)).
 - Terrain rows: blit tiles or prepared wall strips into the ring. Preserve
   circular hardware scrolling, static terrain backing and incremental
   restoration. Keep external coordinate writes on the observed publication
@@ -346,6 +345,10 @@ Reference: [scene architecture](scene-architecture.md).
 - Measure Chip/Fast RAM, task stack, asset residency and peak transition usage.
   Establish the A500 memory requirement; expanded-emulator runs do not prove
   stock-machine fit.
+- The gameplay, HUD, results, shop and clear packs and the cover masks are
+  still linked into the executable, so ordinary memory holds them beside any
+  Chip copy. Load them as per-scene files like the boot and front banks, one
+  whole-file read per scene, and keep the startup failure codes meaningful.
 - Exercise allocation/capacity failures and scene teardown/re-entry. Preserve
   meaningful nonzero exit codes for startup failures.
 - Propagate terminal failures through the remaining direct actor, reward and

@@ -36,6 +36,8 @@ fsuae_claim_port
 mkdir -p "$DH0/s" "$DH1" "$RUN/state" "$GDBHOME"
 printf 'Stack %s\ncd dh1:\nDownwell\n' "$VERIFY_STACK_BYTES" > "$DH0/s/startup-sequence"
 cp -f out/Downwell.exe "$DH1/Downwell"
+cp -f out/Downwell.boot "$DH1/Downwell.boot"
+cp -f out/Downwell.front "$DH1/Downwell.front"
 find "$RUN/state" -name '*.uss' -delete
 rm -f "$RUN/gdb-startup.log" "$RUN/fsuae-startup.log" \
   "$RUN/gdb-ready.marker"

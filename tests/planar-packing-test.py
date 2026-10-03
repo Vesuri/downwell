@@ -50,7 +50,6 @@ for offset, data in records:
 
 extracted = root / "extracted/utmt-0.9.2.0"
 manifest = json.loads((extracted / "manifest.json").read_text())
-optimized = (root / "generated/amiga-game.dwap").read_bytes()
 
 def unshared(data, payload, blocks):
     offset = len(payload)
@@ -59,21 +58,26 @@ def unshared(data, payload, blocks):
 
 # Same asset derivation, deliberately no payload sharing in the oracle.
 pack.intern_planar = unshared
-reference = pack.build_pack(manifest, extracted, "game", root / "data/language.ini")
+banks = pack.scene_banks(pack.build_records(manifest, extracted, "game", root / "data/language.ini"))
 
 def directory(data):
     _, _, size, count, _ = pack.HEADER.unpack_from(data)
     return [pack.RECORD.unpack_from(data, size+i*pack.RECORD.size) for i in range(count)]
 
-actual, expected = directory(optimized), directory(reference)
-assert len(actual) == len(expected)
-for a, b in zip(actual, expected):
-    assert a[:8] == b[:8] and a[9] == b[9]
-    assert a[8] % 2 == 0
-    assert optimized[a[8]:a[8]+a[9]] == reference[b[8]:b[8]+b[9]], a[:2]
-    if a[7] == 4:  # Garden DMA headers are writable; no aliasing at all.
-        for other in actual:
-            if other is a:
-                continue
-            assert a[8]+a[9] <= other[8] or other[8]+other[9] <= a[8], (a[:2], other[:2])
-print(f"Lossless packing: {len(records)} synthetic blocks, {len(actual)} source records, writable DMA isolation passed")
+total = 0
+for bank in ("game", "boot", "front"):
+    optimized = (root / f"generated/amiga-{bank}.dwap").read_bytes()
+    reference = pack.pack_records(banks[bank])
+    actual, expected = directory(optimized), directory(reference)
+    assert len(actual) == len(expected)
+    total += len(actual)
+    for a, b in zip(actual, expected):
+        assert a[:8] == b[:8] and a[9] == b[9]
+        assert a[8] % 2 == 0
+        assert optimized[a[8]:a[8]+a[9]] == reference[b[8]:b[8]+b[9]], (bank, a[:2])
+        if a[7] == 4:  # Garden DMA headers are writable; no aliasing at all.
+            for other in actual:
+                if other is a:
+                    continue
+                assert a[8]+a[9] <= other[8] or other[8]+other[9] <= a[8], (a[:2], other[:2])
+print(f"Lossless packing: {len(records)} synthetic blocks, {total} source records in three scene banks, writable DMA isolation passed")

@@ -104,6 +104,34 @@ void buildOpaqueSpritePack(UBYTE* pack, unsigned size) {
     pack[45] = 0xff;
 }
 
+// The title fade's last frame geometry: 128x32 centred at (64,16), opaque
+// over columns 8..119, so the host fallback needs seven sixteen-pixel slices.
+// Targets never convert it; it only exercises multi-part strips.
+std::vector<UBYTE> buildWideTitlePack() {
+    const unsigned stride = 16, height = 32, payload = 44, bytes = stride * height * 3;
+    std::vector<UBYTE> pack(payload + bytes, 0);
+    putLong(pack.data(), 0, 0x44574150UL);
+    putWord(pack.data(), 4, 2);
+    putWord(pack.data(), 6, 20);
+    putLong(pack.data(), 8, 1);
+    putLong(pack.data(), 20, (654UL << 16) | 9);
+    putWord(pack.data(), 24, 64);
+    putWord(pack.data(), 26, 16);
+    putWord(pack.data(), 28, 128);
+    putWord(pack.data(), 30, height);
+    putWord(pack.data(), 32, 128);
+    putWord(pack.data(), 34, 3);
+    putLong(pack.data(), 36, payload);
+    putLong(pack.data(), 40, bytes);
+    for (unsigned y = 0; y < height; ++y)
+        for (unsigned x = 8; x < 120; ++x) {
+            const UBYTE bit = static_cast<UBYTE>(0x80u >> (x & 7));
+            pack[payload + y * stride + x / 8] |= bit;
+            pack[payload + 2 * stride * height + y * stride + x / 8] |= bit;
+        }
+    return pack;
+}
+
 void requireRuntimeSprite(const std::vector<UBYTE>& pack,
                           unsigned spriteId, unsigned frameCount) {
     UWORD sprite[2 + 2 * 256 + 2] = {};
@@ -729,9 +757,7 @@ int main(int argc, char** argv) {
         {163, 4}, {164, 1}, {166, 4}, {168, 2}, {170, 4}, {173, 4},
         {177, 4}, {178, 1}, {186, 4}, {187, 1}, {188, 6}, {278, 2},
         {459, 1}, {485, 4}, {486, 5}, {487, 2}, {496, 4}, {497, 2}, {707, 6},
-        {550, 17}, {568, 3}, {569, 4},
-        {631, 2}, {635, 4}, {636, 4}, {637, 4}, {638, 4},
-        {646, 4}
+        {550, 17}, {568, 3}, {569, 4}
     };
     for (const auto& requirement : runtimeSprites)
         requireRuntimeSprite(gamePack, requirement[0], requirement[1]);
@@ -756,8 +782,9 @@ int main(int argc, char** argv) {
                 gamePack.data(), gamePack.data() + gamePack.size(),
                 186, 0) == 2,
             "wide turtle artwork requests two hardware sprites");
+    const auto titlePack = buildWideTitlePack();
     require(amigaRendererHardwareSpritePartCount(
-                gamePack.data(), gamePack.data() + gamePack.size(),
+                titlePack.data(), titlePack.data() + titlePack.size(),
                 654, 9) == 7,
             "Downwell title artwork requests its seven opaque slices");
     UWORD turtleLeft[2 + 2 * 32 + 2] = {};
@@ -779,11 +806,11 @@ int main(int argc, char** argv) {
     UWORD titleLeft[2 + 2 * 32 + 2] = {};
     UWORD titleRight[2 + 2 * 32 + 2] = {};
     require(amigaRendererBuildHardwareSpritePart(
-                gamePack.data(), gamePack.data() + gamePack.size(),
+                titlePack.data(), titlePack.data() + titlePack.size(),
                 654, 9, 0, downwellPlayfieldX + 80, 40, 0,
                 titleLeft, 32) == 1 &&
             amigaRendererBuildHardwareSpritePart(
-                gamePack.data(), gamePack.data() + gamePack.size(),
+                titlePack.data(), titlePack.data() + titlePack.size(),
                 654, 9, 6, downwellPlayfieldX + 80, 40, 0,
                 titleRight, 32) == 1 &&
             reinterpret_cast<UBYTE*>(titleRight)[1] ==
@@ -792,7 +819,7 @@ int main(int argc, char** argv) {
 
     UWORD clippedTitle[2 + 2 * 32 + 2] = {};
     require(amigaRendererBuildHardwareSpritePart(
-                gamePack.data(), gamePack.data() + gamePack.size(),
+                titlePack.data(), titlePack.data() + titlePack.size(),
                 654, 9, 0, downwellPlayfieldX + 80, 8, 0,
                 clippedTitle, 32) == 1 &&
             reinterpret_cast<UBYTE*>(clippedTitle)[0] ==
@@ -1346,8 +1373,8 @@ int main(int argc, char** argv) {
     // Run the raster checks even when asset growth violates the residency gate.
     // Keep the budget a hard failure, not an automatically growing allowance.
     const auto residentBytes = amigaRendererChipPackBytes(gamePack.data(), gamePack.data() + gamePack.size());
-    std::cout << "Resident game art: " << residentBytes << " bytes (budget 278000)\n";
-    require(residentBytes <= 278000,
+    std::cout << "Resident game art: " << residentBytes << " bytes (budget 120000)\n";
+    require(residentBytes <= 120000,
             "resident game art stays within the tested 512 KiB A500 budget");
     std::cout << "Amiga renderer tests passed\n";
     return 0;

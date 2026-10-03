@@ -26,7 +26,7 @@ std::vector<std::uint8_t> readFile(const char* path) {
 } // namespace
 
 int main(int argc, char** argv) {
-    require(argc == 3, "room and object pack paths are supplied");
+    require(argc == 3 || argc == 4, "room and object pack paths are supplied");
     const std::vector<std::uint8_t> roomBytes = readFile(argv[1]);
     const std::vector<std::uint8_t> objectBytes = readFile(argv[2]);
     const downwell::RoomPack rooms(roomBytes.data(), roomBytes.size());
@@ -36,6 +36,24 @@ int main(int argc, char** argv) {
     AmigaMenuDrawList list{};
     require(amigaBuildMenuDrawList(rooms, objects, list),
             "native menu draw list builds");
+
+    if (argc == 4) {
+        // The front scene bank keeps only the scenery frames this seed-2
+        // reconstruction selects. Every drawn frame must be in that bank.
+        const std::vector<std::uint8_t> front = readFile(argv[3]);
+        auto word = [&](std::size_t at) { return unsigned(front[at]) << 8 | front[at + 1]; };
+        require(front.size() >= 20 && word(0) == 0x4457 && word(2) == 0x4150,
+                "front scene bank is a planar pack");
+        const unsigned count = word(8) << 16 | word(10);
+        require(20 + std::size_t(count) * 24 <= front.size(), "front bank directory fits");
+        for (unsigned i = 0; i < list.count; ++i) {
+            bool found = false;
+            for (unsigned r = 0; r < count && !found; ++r)
+                found = word(20 + r * 24) == unsigned(list.items[i].spriteId) &&
+                        word(22 + r * 24) == list.items[i].frame;
+            require(found, "front scene bank holds every garden draw-list frame");
+        }
+    }
 
     downwell::StartupRuntime reference(
         downwell::PlatformProfile::nonDesktop, &rooms, &objects);

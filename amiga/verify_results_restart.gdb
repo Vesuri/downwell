@@ -27,6 +27,12 @@ if gDownwellLiveGenerationFailed != 0 || gDownwellTerrainRasterFailures != 0 || 
     printf "Scene reentry renderer or generation failure\n"
     quit 1
 end
+# Boot and front banks at startup; style select and surface each reload front.
+if gDownwellSceneBankLoads != 4
+    printf "Unexpected scene bank loads: %lu\n", gDownwellSceneBankLoads
+    quit 1
+end
+printf "Scene bank loads: %lu\n", gDownwellSceneBankLoads
 printf "Three results destinations executed; final gameplay reached 200 updates\n"
 printf "DOWNWELL_RESULTS_RESTART_READY\n"
 shell touch .run/gdb-ready.marker

@@ -226,6 +226,52 @@ MENU_TITLE_ALIGNED_ID = 65400
 MENU_TITLE_LEFT_PADDING = 8
 
 
+# Chip RAM holds only the current scene's art. The "game" profile is split
+# into banks after encoding, so every record keeps its ID, pixels and layout:
+# - boot: splash publisher/controls/credits art and the dither fade. It is
+#   composed into the splash cache once and never needed again.
+# - front: garden scenery, title, garden hardware sprites and style select.
+#   The menu prepares style select while the garden is shown, so both are
+#   resident together. It is loaded again whenever gameplay returns here.
+# - game: everything else, resident throughout.
+# Garden scenery keeps only the frames AmigaMenu's seed-2 creates select;
+# amiga-menu-test checks every draw-list frame against the front bank.
+BOOT_BANK_IDS = {695, 696, 733, *range(65200, 65206)}
+FRONT_BANK_FRAMES = {
+    369: {0}, 631: {1}, 635: {0, 3}, 636: {2, 3}, 637: {0, 1}, 638: {0},
+    640: {0}, 642: {0}, 646: {1}, 729: {0},
+}
+FRONT_BANK_IDS = {43, 44, 65401, 65410, 65411, *range(65000, 65006),
+                  *range(65500, 65504), MENU_TITLE_ALIGNED_ID,
+                  *(64000 + ident for ident in (12, 27, 31, 37))}
+# Copied into front because its scenes read them from the same bank: the
+# garden's well-surface tile, the style border tiles, and the player run
+# frames the verification-only style oracle draws.
+FRONT_SHARED = lambda ident, frame: (ident, frame) in ((76, 0), (51, 7), (51, 13)) or ident == 27
+# The uncropped title fade is a host oracle only; targets use the aligned form.
+DROPPED_IDS = {654}
+
+
+def scene_banks(encoded):
+    banks = {"game": [], "boot": [], "front": []}
+    for item in encoded:
+        ident, frame = item[0]["id"], item[1]
+        if ident in DROPPED_IDS:
+            continue
+        if ident in BOOT_BANK_IDS:
+            banks["boot"].append(item)
+        elif ident in FRONT_BANK_FRAMES:
+            if frame in FRONT_BANK_FRAMES[ident]:
+                banks["front"].append(item)
+        elif ident in FRONT_BANK_IDS:
+            banks["front"].append(item)
+        else:
+            banks["game"].append(item)
+            if FRONT_SHARED(ident, frame):
+                banks["front"].append(item)
+    return banks
+
+
 def require(condition, message):
     if not condition:
         raise ValueError(message)
@@ -551,6 +597,10 @@ def verify_projectile_spread_pixels(canvas, origin_x, origin_y):
 
 
 def build_pack(manifest, extracted, profile, language_path=None):
+    return pack_records(build_records(manifest, extracted, profile, language_path))
+
+
+def build_records(manifest, extracted, profile, language_path=None):
     require(manifest["schemaVersion"] == 3, "unexpected extraction schema")
     require(manifest["source"]["sha256"] == SOURCE_SHA256,
             "manifest does not describe the pinned Steam build")
@@ -927,10 +977,14 @@ def build_pack(manifest, extracted, profile, language_path=None):
                                  bytes(stream) * 2))
         encoded.extend(hardware)
 
+    return encoded
+
+
+def pack_records(encoded):
     # Keep the on-disk directory ordered so the 68000 renderer can locate a
     # frame with a short binary search instead of repeatedly walking records
     # in Chip RAM.
-    encoded.sort(key=lambda item: (item[0]["id"], item[1]))
+    encoded = sorted(encoded, key=lambda item: (item[0]["id"], item[1]))
 
     payload_offset = HEADER.size + RECORD.size * len(encoded)
     records = []
@@ -1048,29 +1102,54 @@ def main():
     manifest = json.loads((args.extracted / "manifest.json").read_text(encoding="utf-8"))
     if args.output is None:
         args.output = root / f"generated/amiga-{args.profile}.dwap"
-    data = build_pack(manifest, args.extracted, args.profile, args.language)
-    digest = hashlib.sha256(data).hexdigest()
-    if args.check:
-        require(args.output.is_file(), f"missing Amiga asset pack: {args.output}")
-        require(args.output.read_bytes() == data,
-                "Amiga asset pack is not reproducible")
-        print(f"Amiga {args.profile} pack verified: {len(data)} bytes sha256 {digest}")
-    else:
-        atomic_write(args.output, data)
-        print(f"Amiga {args.profile} pack written: {len(data)} bytes sha256 {digest}")
-    packing_path = args.output.with_suffix(".packing.json")
-    packing_provenance = json.dumps({
-        "schemaVersion": 1, "generator": "generate-amiga-hud.py/planar-layout-v2",
-        "extractor": manifest["extractor"], "sourceSha256": SOURCE_SHA256,
-        "profile": args.profile, "packSha256": digest,
-        "languageSha256": hashlib.sha256(args.language.read_bytes()).hexdigest(),
-        "layout": "word-aligned-tail-or-disjoint-paths-with-joined-containment",
-    }, indent=2).encode() + b"\n"
-    if args.check:
-        require(packing_path.read_bytes() == packing_provenance, "packing provenance differs")
-    else:
-        atomic_write(packing_path, packing_provenance)
+    def emit(profile, path, data):
+        digest = hashlib.sha256(data).hexdigest()
+        if args.check:
+            require(path.is_file(), f"missing Amiga asset pack: {path}")
+            require(path.read_bytes() == data, "Amiga asset pack is not reproducible")
+            print(f"Amiga {profile} pack verified: {len(data)} bytes sha256 {digest}")
+        else:
+            atomic_write(path, data)
+            print(f"Amiga {profile} pack written: {len(data)} bytes sha256 {digest}")
+        packing_path = path.with_suffix(".packing.json")
+        packing_provenance = json.dumps({
+            "schemaVersion": 1, "generator": "generate-amiga-hud.py/planar-layout-v2",
+            "extractor": manifest["extractor"], "sourceSha256": SOURCE_SHA256,
+            "profile": profile, "packSha256": digest,
+            "languageSha256": hashlib.sha256(args.language.read_bytes()).hexdigest(),
+            "layout": "word-aligned-tail-or-disjoint-paths-with-joined-containment",
+            **({"sceneBanks": "game-boot-front-v1"} if profile in ("game", "boot", "front") else {}),
+        }, indent=2).encode() + b"\n"
+        if args.check:
+            require(packing_path.read_bytes() == packing_provenance, "packing provenance differs")
+        else:
+            atomic_write(packing_path, packing_provenance)
+        return digest
+
     if args.profile == "game":
+        banks = scene_banks(build_records(manifest, args.extracted, args.profile, args.language))
+        data = pack_records(banks["game"])
+        front = pack_records(banks["front"])
+        emit("boot", args.output.with_name("amiga-boot.dwap"), pack_records(banks["boot"]))
+        digest = emit("front", args.output.with_name("amiga-front.dwap"), front)
+        emit("game", args.output, data)
+        # The target sizes its one shared scene-bank allocation before any
+        # file is read, then checks each load against these exact lengths.
+        sizes = (b"// Generated by generate-amiga-hud.py/scene-banks-v1; do not edit.\n"
+                 b"#pragma once\n"
+                 + f"#define DOWNWELL_BOOT_BANK_BYTES {len(pack_records(banks['boot']))}UL\n"
+                   f"#define DOWNWELL_FRONT_BANK_BYTES {len(front)}UL\n".encode())
+        sizes_path = args.output.with_name("amiga-scene-banks.h")
+        if args.check:
+            require(sizes_path.read_bytes() == sizes, "scene bank sizes differ")
+        else:
+            atomic_write(sizes_path, sizes)
+    else:
+        data = build_pack(manifest, args.extracted, args.profile, args.language)
+        digest = emit(args.profile, args.output, data)
+    if args.profile == "game":
+        # The transition edges live in the front bank; their masks follow it.
+        data = front
         entry_mask = build_entry_mask(data)
         entry_path = args.output.with_suffix(".entry-mask")
         entry_manifest = args.output.with_suffix(".entry-mask.json")

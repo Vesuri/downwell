@@ -4,7 +4,7 @@ import struct
 from pathlib import Path
 
 root = Path(__file__).resolve().parent.parent
-pack = (root / "generated/amiga-game.dwap").read_bytes()
+pack = (root / "generated/amiga-front.dwap").read_bytes()
 start, count = struct.unpack_from(">HI", pack, 6)
 records = {r[:2]: r for i in range(count)
            for r in [struct.unpack_from(">HHhhHHHHII", pack, start + i * 24)]}
