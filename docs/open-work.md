@@ -216,8 +216,8 @@ the occupancy grid's cells, and native wall/platform runs publish as spans
 after their draws. A plain gameplay frame's simulation step runs while the
 previous frame's Copper list waits for its VBlank; the frame fences before
 its first display, overlay or Copper write. Contact-tape traces measure quiet
-frames at 32 ms, combat 76 ms, time-field frames 66 ms and the generation
-bursts at frames 701 and 844 at 186 ms.
+frames at 32 ms, combat 74 ms, time-field frames 66 ms and the generation
+bursts at frames 701 and 844 at 185 ms.
 
 ### A. Keep native ownership sufficient
 
@@ -239,8 +239,8 @@ bursts at frames 701 and 844 at 186 ms.
   while no live box has Alarm 0 set. Count the remaining families' alarms
   down in their records in captured order, dispatching only zero crossings
   and retiring unrearmed zeros to -1.
-- The animation walk still decodes and revalidates each visited actor; bullet
-  and gem animation phases dominate combat (8 ms). Run per-family loops over
+- The animation walk (4.7 ms per combat frame) still decodes and revalidates
+  each visited actor; bullet animation is 1.4 ms of it. Run per-family loops over
   compact records where no Animation End handler has cross-instance effects,
   keeping room order where one does.
 - Draw collection rebuilds through the generic layer walk after every
@@ -291,8 +291,8 @@ bursts at frames 701 and 844 at 186 ms.
 - Remove 32-bit multiply/divide helpers from per-frame paths using shifts,
   conditional-subtract rings and exhaustively verified reciprocal multiplies.
   Fail the build if they return, like the existing 64-bit helper audit.
-- Add integer fast paths to the binary64/binary32 emulation, keeping the full
-  emulation as fallback and oracle.
+- Add integer fast paths to the remaining per-frame binary64/binary32
+  emulation, keeping the full emulation as fallback and oracle.
 
 ### E. Re-profile the residue
 

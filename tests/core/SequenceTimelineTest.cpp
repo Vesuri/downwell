@@ -30,6 +30,47 @@ int main() {
         check(result.bits == stored(wrapped(value,length)).bits);
         ++cases;
     }
+    // Integer binary32 sums against the binary64 route and host arithmetic:
+    // exponent gaps 0..9 around the 7-bit fast domain, signs, ties (low
+    // mantissa bits), carries, cancellation and both exponent extremes.
+    unsigned fast = 0;
+    for (unsigned i = 0; i < 2000000; ++i) {
+        rng = rng * 1664525u + 1013904223u; const auto r1 = rng;
+        rng = rng * 1664525u + 1013904223u; const auto r2 = rng;
+        rng = rng * 1664525u + 1013904223u; const auto r3 = rng;
+        int ea = int(1 + r3 % 254);
+        switch (r3 >> 29) { case 0: ea = 1 + (r3 >> 8) % 9; break; case 1: ea = 254 - (r3 >> 8) % 9; break; default: break; }
+        int eb = ea - int((r3 >> 12) % 10);
+        if (eb < 1) eb = 1;
+        std::uint32_t ma = r1 & 0x7fffffu, mb = r2 & 0x7fffffu;
+        if ((r3 >> 16) & 1) mb &= ~0xffu;           // ties after alignment
+        if ((r3 >> 17) & 1) mb = ma;                // equal mantissas: cancellation and carries
+        if ((r3 >> 18) & 3) mb ^= (r3 >> 20) & 7u;  // near-cancellation
+        downwell::RunnerImageValue a{(r1 & 0x80000000u) | (std::uint32_t(ea) << 23) | ma};
+        downwell::RunnerImageValue b{(r2 & 0x80000000u) | (std::uint32_t(eb) << 23) | mb};
+        if ((r3 >> 22) & 1) { const auto t = a; a = b; b = t; }
+        if ((r3 & 0xffu) == 0) a.bits &= 0x80000000u; // signed zeros
+        if ((r3 & 0xffu) == 1) b.bits &= 0x80000000u;
+        float fa, fb; std::memcpy(&fa,&a.bits,4); std::memcpy(&fb,&b.bits,4);
+        const double exact = double(fa) + double(fb);
+        downwell::RunnerImageValue reference, integer, result;
+        auto sum = a.promoted();
+        const bool referenceOk = sum.add(b.promoted()) && reference.assign(sum);
+        const auto host = stored(float(exact)).bits;
+        const unsigned hostField = (host >> 23) & 255u;
+        // The binary64 route rejects subnormal and overflowing results.
+        if (referenceOk) check(reference.bits == host);
+        else check(hostField == 255 || (!hostField && (host & 0x7fffffffu)));
+        if (SequenceTimeline::sumBinary32(a.bits,b.bits,integer.bits)) {
+            check(referenceOk && integer.bits == reference.bits);
+            ++fast;
+        }
+        check(SequenceTimeline::add(a,b,result) == referenceOk);
+        if (referenceOk) check(result.bits == reference.bits);
+        ++cases;
+    }
+    check(fast > 1000000);
+    for (unsigned n = 1; n <= 65535; ++n) check(SequenceTimeline::integerBits(n) == stored(float(n)).bits);
     for (unsigned length : {1u,4u,6u,8u}) for (float speed : {-20.0f,-0.45f,-0.3f,-0.05f,0.0f,0.2f,0.3f,20.0f}) {
         float expected = 0;
         auto position = stored(expected);
@@ -53,5 +94,5 @@ int main() {
     check(SequenceTimeline::wrap(stored(-0.0f),4,result) && result.bits == 0);
     invalid.bits = 1;
     check(!SequenceTimeline::advance(position,invalid,4,crossed) && position.bits == stored(1).bits);
-    std::printf("Sequence timeline: %u signed remainder/wrap/advance cases passed\n",cases);
+    std::printf("Sequence timeline: %u signed remainder/wrap/advance/sum cases passed (%u integer sums)\n",cases,fast);
 }

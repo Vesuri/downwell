@@ -10,8 +10,7 @@ struct UnitSequenceFrames {
     static bool evaluate(RunnerImageValue position, unsigned frames, RunnerImageValue& image) {
         if (!frames || frames > 65535 || !SequenceTimeline::valid(position)) return false;
         if ((position.bits & 0x80000000u) && (position.bits & 0x7fffffffu)) return false;
-        RunnerImageValue bound;
-        if (!bound.assign(MotionBinary64::fromInteger(frames))) return false;
+        const RunnerImageValue bound{SequenceTimeline::integerBits(frames)};
         if ((position.bits & 0x7fffffffu) >= bound.bits) return false;
         // Runner interpolation: i + (position-i)/1 * 1. For consecutive
         // integer keys these operations recover position exactly. Adding +0
