@@ -277,14 +277,24 @@ bursts at frames 701 and 844 at 183-185 ms.
   consumption or source geometry. Scrolling partly visible large circles
   could reuse rows visible in both views; this tape does not exercise it.
 - Ammo HUD: each recharge redraws the whole gauge for four jiggle frames
-  (24-30 ms each on the contact tape) and each shot's row animation costs
-  15, 11, 11 and 5 ms. CPU composition costs about 1,000 cycles per gauge
-  row, even as one fused pass in registers. Compose column 18 with the
-  blitter from Chip-resident layer columns instead: background and rim at
-  the meter offset, the fill, and row art with dividers at four times the
-  meter offset, keeping the CPU for row-art updates and the label. Build the
-  layers in the 90 KB scene-bank region at gameplay entry; no bank occupies
-  it during gameplay (see [scene banks](amiga-memory.md#scene-banks)).
+  (24-30 ms each on the contact tape) and each shot costs 18, 12, 12 and
+  6 ms. Two whole-gauge replacements missed: synchronous word blits from
+  Chip layers in the scene-bank region cut recharge frames to 17 ms but
+  cost about 2,300 cycles per blit, mostly waiting, so the small strips of
+  shot frames got slower and frame 844 took ten fields instead of nine; a
+  fused interior pass that writes each distinct line value once costs
+  about 130 cycles per line in its store loop, no better than the existing
+  passes. Remove work instead:
+  - Shots: `AmmoHudDamage::update` scans all 184 rows (3.2 ms on the first
+    shot frame); bound it by the rows `AmmoGaugeRows::step` actually
+    visited since the last draw. Each ammo change recomposes every divider
+    row (4.1 ms); retain compositions per ammo value for small capacities.
+  - Jiggle: a vertical shift leaves most interior lines unchanged. Diff the
+    old and new constant-line intervals and write only lines whose value
+    changes, rather than recomposing and comparing all 166.
+  - Use the blitter only where a strip is tall enough to repay its setup and
+    wait, such as recharge background and rim strips; keep small strips on
+    the CPU.
 - Terrain rows: blit tiles or prepared wall strips into the ring. Preserve
   circular hardware scrolling, static terrain backing and incremental
   restoration. Keep external coordinate writes on the observed publication
