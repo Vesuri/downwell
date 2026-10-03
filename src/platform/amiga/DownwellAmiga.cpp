@@ -1815,6 +1815,10 @@ __attribute__((noinline)) static int runDownwell(void) {
 #endif
     int exitCode = 20; // Internal loop breaks are failures, not normal quits.
     while ((*ciaaPra & 0x40u) == 0) platform.waitVblank();
+    // After a plain gameplay frame the next simulation step needs no display
+    // memory, so it runs while that frame's list waits for its VBlank.
+    bool overlapNextStep = false;
+    UWORD fencedVblank = AmigaPlatform::vblankCount();
     for (;;) {
         if ((*ciaaPra & 0x40u) == 0) {
             exitCode = 0;
@@ -1837,12 +1841,30 @@ __attribute__((noinline)) static int runDownwell(void) {
         // The spatial tree is derived state. Only observing queries (or log
         // pressure) should materialize it; even idle-time service can overrun
         // VBI and spends cycles on state this gameplay path never reads.
-        platform.waitVblank();
+        const bool overlapStep = overlapNextStep;
+        overlapNextStep = false;
+        bool displayFenced = false;
+        // Precedes every display, overlay, sprite or Copper write of this
+        // iteration: the previously published list is live, so the back
+        // buffers are free, and at most one iteration runs per field.
+        auto fenceDisplay = [&] {
+            if (displayFenced) return;
+            displayFenced = true;
+            if (overlapStep) {
+                DW_PROFILE_SCOPE(profileWait);
+                fencedVblank = platform.waitPublished(fencedVblank);
+            }
+            // The preceding detached list has crossed the publication boundary.
+            // Only now may another overlay overwrite an entry cover's DMA bank.
+            if(residentCover==ResidentCover::entry&&gameplayScene.coverDetached())
+                residentCover=ResidentCover::none;
+        };
+        if (!overlapStep) {
+            platform.waitVblank();
+            fencedVblank = AmigaPlatform::vblankCount();
+            fenceDisplay();
+        }
         if(!collisionOwner.valid()){exitCode=20;break;}
-        // The preceding detached list has crossed the publication boundary.
-        // Only now may another overlay overwrite an entry cover's DMA bank.
-        if(residentCover==ResidentCover::entry&&gameplayScene.coverDetached())
-            residentCover=ResidentCover::none;
         DW_PROFILE_PHASE(profileInput);
 #ifdef DOWNWELL_SCENE_VERIFY
         // Check AFTER the preceding iteration completed, not at its first
@@ -1980,6 +2002,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     scenes.scene() != presentedScene ||
                     scenes.splashStage() != presentedSplash;
                 sceneResetRequested = false;
+                if (presentationChanged || scenes.scene() != AmigaScene::gameplay) fenceDisplay();
                 const AmigaScene priorPresentedScene = presentedScene;
                 const bool splashDitherChanged =
                     scenes.splashDitherFrame() != presentedSplashDither;
@@ -2381,6 +2404,7 @@ __attribute__((noinline)) static int runDownwell(void) {
             }
 #endif
             if (port.levelResultRequested() || port.levelClearActive()) {
+                fenceDisplay();
                 const bool entering = !clear.presented;
                 if (entering) {
                     DW_PROFILE_SCOPE(profileClearEntry);
@@ -2571,6 +2595,7 @@ __attribute__((noinline)) static int runDownwell(void) {
 #endif
             checkSceneStack(6);
             const AmigaPortFrame result = port.step(packedInput);
+            fenceDisplay();
             checkSceneStack(7);
 #ifdef DOWNWELL_CAMERA_VERIFY
             if (!wasSideLocked && port.cameraSideLocked()) ++gDownwellCameraLocks;
@@ -3165,6 +3190,7 @@ __attribute__((noinline)) static int runDownwell(void) {
             /* AmigaPlatform makes the published list live at next VBlank. */
             DW_PROFILE_PHASE(profilePublish);
             platform.publish(gameplayScene.copper(back));
+            overlapNextStep = true;
 #ifdef DOWNWELL_ENTRY_WIPE_VERIFY
             if(gDownwellEntryWipeFrames==27){
                 platform.waitVblank(); // Final detached list is now published.

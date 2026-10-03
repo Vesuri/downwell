@@ -21,6 +21,10 @@ public:
     void publish(const CopperList& copper);
     const UWORD* publishedCopper() const { return publishedCopper_; }
     void waitVblank() const;
+    // Returns once a VBlank has followed both the latest publish (its list
+    // is live, so the previously displayed buffers are free) and `since`.
+    // Returns the count it observed, for the next call's `since`.
+    UWORD waitPublished(UWORD since) const;
     // PAL idle work only. A callback performs one bounded unit, returns false
     // when idle/failed, and must not touch display state or simulation state.
     // reserveLines is a scheduling margin, not a preemptive execution limit.
@@ -35,6 +39,7 @@ private:
     static ULONG vblankHandler();
     static volatile UWORD vblankCount_;
     const UWORD* publishedCopper_;
+    UWORD publishedVblank_;
 
     struct View* savedView_;
     const UWORD* osCopper_;

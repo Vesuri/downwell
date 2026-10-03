@@ -19,7 +19,7 @@ static_assert(__builtin_offsetof(struct ExecBase, IntVects) == 84,
               "ExecBase IntVects layout must match the VERTB takeover");
 
 AmigaPlatform::AmigaPlatform()
-    : publishedCopper_(0), savedView_(0), osCopper_(0), savedDmacon_(0), savedIntena_(0),
+    : publishedCopper_(0), publishedVblank_(0), savedView_(0), osCopper_(0), savedDmacon_(0), savedIntena_(0),
       active_(false)
 {
     GfxBase = (struct GfxBase*)OpenLibrary((CONST_STRPTR)"graphics.library", 33);
@@ -101,12 +101,21 @@ void AmigaPlatform::publish(const CopperList& copper)
 {
     AmigaHardware::setCopperList(copper, false);
     publishedCopper_ = copper.data();
+    // Sample after COP1LC: a VBlank between them only delays waitPublished.
+    publishedVblank_ = vblankCount_;
 }
 
 void AmigaPlatform::waitVblank() const
 {
     const UWORD start = vblankCount_;
     while (vblankCount_ == start) { }
+}
+
+UWORD AmigaPlatform::waitPublished(UWORD since) const
+{
+    UWORD now;
+    while ((now = vblankCount_) == publishedVblank_ || now == since) { }
+    return now;
 }
 
 void AmigaPlatform::waitVblank(bool (*idleWork)(void*),void* context,unsigned reserveLines) const

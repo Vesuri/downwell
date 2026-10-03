@@ -213,9 +213,11 @@ sprite index, registration, room and layer order), not positions, bounds or
 spatial history. `make verify-terrain-ownership` compares this against the
 complete registered reference every frame. Wall-contact multiplicity lives in
 the occupancy grid's cells, and native wall/platform runs publish as spans
-after their draws. Contact-tape traces measure quiet frames at 46 ms (34 ms
-of work), combat 88 ms, time-field frames 74 ms and the frame-701 generation
-burst at 188 ms.
+after their draws. A plain gameplay frame's simulation step runs while the
+previous frame's Copper list waits for its VBlank; the frame fences before
+its first display, overlay or Copper write. Contact-tape traces measure quiet
+frames at 32 ms, combat 76 ms, time-field frames 66 ms and the generation
+bursts at frames 701 and 844 at 186 ms.
 
 ### A. Keep native ownership sufficient
 
