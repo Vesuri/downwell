@@ -26,6 +26,7 @@ NATURAL_VERIFY ?= 0
 SKIP_INTRO ?= 0
 SKIP_TO_GAME ?= 0
 TERRAIN_RUN_STORE ?= 0
+TABLE_CONTACT_ATAN ?= 0
 SKIP_LEVEL ?= 0
 PROBES ?= 0
 GENERATION_DETAIL ?= 0
@@ -149,6 +150,9 @@ endif
 ifeq ($(TERRAIN_RUN_STORE),1)
 CFLAGS += -DDOWNWELL_TERRAIN_RUN_STORE
 endif
+ifeq ($(TABLE_CONTACT_ATAN),1)
+CFLAGS += -DDOWNWELL_TABLE_CONTACT_ATAN
+endif
 ifneq ($(filter 1,$(SKIP_TO_GAME) $(SKIP_LEVEL)),)
 CFLAGS += -DDOWNWELL_SKIP_TO_GAME
 endif
@@ -248,7 +252,7 @@ $(OUT).front: $(AMIGA_FRONT_BANK)
 .PHONY: FORCE_STARTUP_OPTIONS
 obj/startup-options: FORCE_STARTUP_OPTIONS
 	@mkdir -p obj
-	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(SKIP_LEVEL)' '$(TERRAIN_RUN_STORE)' '$(AMIGA_OPTIMIZATION)' '$(LASER_VERIFY)' '$(PROFILE_LASER)' > $@.tmp
+	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(SKIP_LEVEL)' '$(TERRAIN_RUN_STORE)' '$(TABLE_CONTACT_ATAN)' '$(AMIGA_OPTIMIZATION)' '$(LASER_VERIFY)' '$(PROFILE_LASER)' > $@.tmp
 	@cmp -s $@.tmp $@ || cp $@.tmp $@
 
 $(OBJECTS): obj/startup-options
@@ -260,6 +264,11 @@ $(OBJECTS): $(REPO)/generated/downwell-time-field-mask.h
 $(REPO)/generated/downwell-time-field-mask.h: $(REPO)/tools/export-time-stop-masks.csx $(REPO)/tools/verify-time-stop-masks.py $(REPO)/data/data.win
 	$(MAKE) -C $(REPO) generated/downwell-time-field-mask.h
 $(OBJECTS): $(REPO)/generated/smoke-trig.inc
+ifeq ($(TABLE_CONTACT_ATAN),1)
+$(OBJECTS): $(REPO)/generated/atan-q16.inc
+$(REPO)/generated/atan-q16.inc: $(REPO)/tools/generate-atan-table.py
+	$(MAKE) -C $(REPO) generated/atan-q16.inc
+endif
 
 $(REPO)/generated/smoke-trig.inc: $(REPO)/tools/export-smoke-trig.py $(REPO)/data/Downwell.exe
 	$(MAKE) -C $(REPO) generated/smoke-trig.inc

@@ -2434,7 +2434,13 @@ int main(int argc, char** argv) {
                 require(game.effectsSucceeded()&&game.generationSucceeded(),"contact tape runtime remains valid");
                 if(game.damageNumbers().size()){if(!firstDamage)firstDamage=tick+1;++damageFrames;}
                 if(!search){
+#ifdef DOWNWELL_COMPARE_CONTACT_ATAN
+                    downwell::referenceContactAtan=true;
+#endif
                     host.step(input,false);parityFrame=tick;
+#ifdef DOWNWELL_COMPARE_CONTACT_ATAN
+                    downwell::referenceContactAtan=false;
+#endif
                     compareInitialGameplay(game,host);
                     // This tape creates currency through combat after the
                     // engine animation boundary, not as room-start instances.
@@ -2471,9 +2477,15 @@ int main(int argc, char** argv) {
                         auto same=[](downwell::MotionBinary64 x,downwell::MotionBinary64 y){
                             return x.high==y.high&&x.low==y.low;
                         };
-                        require(a.x.bits==b.x.bits&&a.y.bits==b.y.bits&&a.alarm0==b.alarm0&&
-                            a.drawBirth==b.drawBirth&&same(a.amount,b.amount)&&same(a.direction,b.direction)&&
-                            same(a.xSpeed,b.xSpeed)&&same(a.ySpeed,b.ySpeed),
+                        require(
+#ifdef DOWNWELL_COMPARE_CONTACT_ATAN
+                            [](auto x,auto y){float ax,bx;std::memcpy(&ax,&x.bits,4);std::memcpy(&bx,&y.bits,4);
+                                return std::fabs(ax-bx)<1.0F/64;}(a.x,b.x)&&
+#else
+                            a.x.bits==b.x.bits&&same(a.direction,b.direction)&&same(a.xSpeed,b.xSpeed)&&
+#endif
+                            a.y.bits==b.y.bits&&a.alarm0==b.alarm0&&
+                            a.drawBirth==b.drawBirth&&same(a.amount,b.amount)&&same(a.ySpeed,b.ySpeed),
                             "contact tape complete damage-number motion and painter order agree");
                     }
                     require(game.randomDrawCount()==host.randomDrawCount()&&

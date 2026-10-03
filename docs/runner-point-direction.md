@@ -56,9 +56,43 @@ domain after wrapper narrowing and retain the original path outside it.
 The x87 probe includes all seven distinct observed nonvertical contact/laser
 input pairs and 4,096 additional independently varying Q8 offsets, besides
 its existing grid. These are regression cases, not an exhaustive rounding
-proof. An interpolated replacement still needs a conservative error interval
-covering table quantization, interpolation, ratio computation and quadrant
-reconstruction; ambiguous wrapper rounding must use the reference path.
+proof. The presentation-only approximation below deliberately does not preserve
+floating-point rounding bits; the user explicitly chose meaningful visual
+precision for damage-number direction. This exception does not authorize
+approximating collision, damage, RNG, or other gameplay decisions.
+
+## Compact presentation direction
+
+`TABLE_CONTACT_ATAN=1` in the Amiga build selects `TableAtan.h` for contact
+damage-number direction only. The normal reference remains compiled, including
+as fallback for inputs outside the table adapter's admission domain. The
+experimental option is not yet the default. `build/contact-direction-table-test`
+compares this adapter against a host running the retained calculation.
+
+`tools/generate-atan-table.py` generates 257 unsigned Q16-radian samples of
+atan on [0,1], using Decimal arithmetic. The table occupies 514 bytes, plus
+two quadrant constants. Its manifest records the generator hash and precision;
+it contains mathematical constants, not extracted game assets. Magnitude
+ordering reduces atan2 to this interval. Integer division provides a Q24
+ratio; eight bits select a segment and sixteen interpolate its endpoints.
+The adapter admits normal finite binary32 inputs with exponent differences
+at most eight. Axis/unsupported cases use the retained implementation.
+
+The conservative error in Q16 radians is endpoint quantization <=0.5,
+interpolation truncation <1, interpolation curvature <=0.125 (using
+|atan''|<1 and spacing 1/256), ratio truncation <1/256, and at most two
+quadrant constants <=1 in total. Thus error is <2.629 Q16 units, or
+0.00230 degrees. Conversion through the original binary32 degree wrapper
+adds less than 0.0001 degree, leaving the total below 1/256 degree.
+There is no fallback merely to reproduce floating-point rounding bits.
+
+`make probe-table-atan-x86-macos` checks a million finite input pairs against
+the recovered x87 sequence, the complete contact-wrapper grids and observed
+contacts, and the damage-number motion for 60 ticks. Direction has a 1/256
+degree tolerance; horizontal text motion has a 1/64 pixel tolerance; vertical
+motion and lifetime remain exact. Tests do not promise identical raster pixels
+at every quantization boundary. The original direction affects only the
+number's initial horizontal speed, not health or player movement.
 
 ## Reproducible probe and limits
 

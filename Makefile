@@ -925,6 +925,19 @@ build/portable-atan-test: tests/core/PortableAtanTest.cpp $(wildcard src/core/*.
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/PortableAtanTest.cpp src/core/GameMakerRandom.cpp
 
 .PHONY: probe-runner-atan-x86-macos
+generated/atan-q16.inc: tools/generate-atan-table.py
+	python3 $<
+
+.PHONY: probe-table-atan-x86-macos
+probe-table-atan-x86-macos: generated/atan-q16.inc
+	@mkdir -p build
+	clang++ -arch x86_64 -std=c++17 -O2 -ffp-contract=off -Isrc -DDOWNWELL_PROBE_TABLE_ATAN tests/core/RunnerAtanProbe.cpp -o build/table-atan-probe
+	arch -x86_64 build/table-atan-probe
+
+build/contact-direction-table-test: $(AMIGA_SCENE_TEST_SOURCES) $(wildcard src/core/*.h) generated/atan-q16.inc
+	@mkdir -p $(@D)
+	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_TABLE_CONTACT_ATAN -DDOWNWELL_COMPARE_CONTACT_ATAN -o $@ $(AMIGA_SCENE_TEST_SOURCES)
+
 # Optional numeric evidence only; not a portable/default test or Windows run.
 probe-runner-atan-x86-macos:
 	@mkdir -p build

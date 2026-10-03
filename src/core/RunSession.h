@@ -33,6 +33,9 @@
 #include "PlayerDamageNumbers.h"
 #include "RunnerPointDirection.h"
 #include "PortableAtan.h"
+#ifdef DOWNWELL_TABLE_CONTACT_ATAN
+#include "TableAtan.h"
+#endif
 #include "ForcedPlayerJump.h"
 #include "Profile.h"
 #include "SoundPlayScript.h"
@@ -157,6 +160,8 @@ struct RunSession {
                         traceContactDirection(playerX,playerY,callerX,callerY,originX,originY,dx,dy);
                         return portableAtan(dy,dx,result);
                     }
+#elif defined(DOWNWELL_TABLE_CONTACT_ATAN)
+                    tableAtan
 #else
                     portableAtan
 #endif

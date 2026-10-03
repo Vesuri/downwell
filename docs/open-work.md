@@ -231,10 +231,13 @@ Rules for this section:
      binary32 degree results with the existing reference. The
      `probe-runner-atan-x86-macos` x87 sequence is the oracle and
      `portableAtan` the cross-check. At run time the call becomes one lookup.
-   - Otherwise, reduce to one octant and interpolate a precomputed atan table
-     with a proven error bound. Fall back to `portableAtan` only when the
-     result lies within that bound of a binary32 rounding boundary of the
-     final degree value.
+   - Presentation precision is sufficient here (explicit user decision):
+     preserve a bounded visual result, not floating-point rounding bits.
+     The opt-in `TABLE_CONTACT_ATAN=1` candidate must pass the full-tape worst
+     gap gate before becoming the shared default. Its 514-byte table uses
+     a 1/256-degree bound; keep unsupported-input/reference paths compiled.
+     Investigate the 10-field frame-701 gap versus the matched reference's
+     9-field maximum, despite slightly lower instruction-trace time.
 
    Target: under 1 ms. Verify every enumerated input, or the full probe set,
    against the oracle, plus the contact-tape replay digests. See
