@@ -147,7 +147,20 @@ struct RunSession {
             DW_PROFILE_SCOPE(profileContactDirection);
             directed=cx.add(MotionBinary64::fromInteger(originX)) &&
                 cy.add(MotionBinary64::fromInteger(originY)) &&
-                RunnerPointDirection::evaluate(cx,cy,px,py,direction,portableAtan);
+                RunnerPointDirection::evaluate(cx,cy,px,py,direction,
+#ifdef DOWNWELL_TRACE_CONTACT_DIRECTION
+                    [&](MotionBinary64 dy,MotionBinary64 dx,MotionBinary64& result){
+                        // Test-only observation of the actual narrowed inputs;
+                        // no platform dependency or observer in shipping code.
+                        extern void traceContactDirection(std::int32_t,std::int32_t,int,int,int,int,
+                            MotionBinary64,MotionBinary64);
+                        traceContactDirection(playerX,playerY,callerX,callerY,originX,originY,dx,dy);
+                        return portableAtan(dy,dx,result);
+                    }
+#else
+                    portableAtan
+#endif
+                );
         }
         if (!directed) {
             effectsSucceeded = false;

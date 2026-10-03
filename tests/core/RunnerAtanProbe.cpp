@@ -73,5 +73,30 @@ int main(){
         ++contacts;
     }
     std::printf("Contact wrapper: %u integer/fractional world-coordinate comparisons against recovered x87 sequence passed\n",contacts);
+    // Actual contact/laser tape observations, including independent Q8
+    // fractions. The earlier quarter-pixel diagonal grid is not this domain.
+    const int observed[][4]={{12381,364851,38,1418},{0,279846,-6,1107},
+        {2982,348160,0,1360},{-243,940339,3,3689},{3798,1086617,18,4259},
+        {12534,438272,45,1704},{12212,438272,46,1715}};
+    auto contact=[&](int px,int py,int cx,int cy){
+        downwell::MotionBinary64 candidate,original;
+        const auto ax=number(240.0+cx),ay=number(176.0+cy);
+        const auto bx=number(240.0+px/256.0),by=number(176.0+py/256.0);
+        return downwell::RunnerPointDirection::evaluate(ax,ay,bx,by,candidate,downwell::portableAtan)&&
+            downwell::RunnerPointDirection::evaluate(ax,ay,bx,by,original,x87)&&
+            candidate.high==original.high&&candidate.low==original.low;
+    };
+    for(const auto& c:observed)if(!contact(c[0],c[1],c[2],c[3])){
+        std::puts("Observed contact direction differs from x87");return 4;
+    }
+    for(unsigned i=0;i<4096;++i){
+        state=state*1664525u+1013904223u;const int dx=int(state&16383u)-8192;
+        state=state*1664525u+1013904223u;const int dy=int(state&16383u)-8192;
+        const int cx=int(i%161)-80,cy=int(i*17%8192);
+        if(!contact(cx*256+dx,cy*256+dy,cx,cy)){
+            std::printf("Q8 contact direction differs: dx=%d dy=%d\n",dx,dy);return 5;
+        }
+    }
+    std::puts("Contact domain: 7 observed and 4096 independent Q8-offset comparisons passed");
     return mismatch?1:0;
 }

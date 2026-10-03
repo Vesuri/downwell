@@ -28,6 +28,38 @@ This is not the SSE polynomial used for lengthdir's sine and cosine, and the
 existing gameplay CORDIC steering approximation is not its numerical oracle.
 Zero/nonfinite classification paths require separate treatment.
 
+## Live contact input domain
+
+`make trace-contact-direction-domain` runs the contact and laser/combat host
+fixtures with a test-only observer. It prints the Q8 player coordinates,
+integer caller coordinates, world origin, and binary32 dx/dy actually passed
+to atan after the wrapper's argument and difference narrowing. The observer
+is absent from shipping builds. Vertical/coincident differences bypass atan
+and therefore produce no observation. Paired host/native-reference simulation
+can report the same contact twice; the log is not an encounter count.
+
+Do not restrict a replacement to quarter-pixel differences. The Q8 motion
+adapter's horizontal acceleration is 51/256 (`PlayerControls.h`), while
+vertical integration carries fifths of Q8 between updates (`PlayerMotion.cpp`).
+Neither imposes a quarter-pixel lattice. The contact at tape frame 645 has
+dx bits `4125d000` and dy bits `40e66000`: 10.36328125 and 7.19921875 pixels.
+These are observations of the current shared motion adapter, not proof of the
+original runner's complete reachable domain.
+
+Even the illustrative square [-32,+32] on both axes at Q8 precision has
+268,468,225 input pairs: a four-byte result per pair requires 1,073,872,900
+bytes before symmetry/compression. The earlier quarter-pixel probe does not
+justify a smaller complete lookup. Nor do the tapes prove a maximum contact
+radius for every supported caller. Any bounded table must test its admission
+domain after wrapper narrowing and retain the original path outside it.
+
+The x87 probe includes all seven distinct observed nonvertical contact/laser
+input pairs and 4,096 additional independently varying Q8 offsets, besides
+its existing grid. These are regression cases, not an exhaustive rounding
+proof. An interpolated replacement still needs a conservative error interval
+covering table quantization, interpolation, ratio computation and quadrant
+reconstruction; ambiguous wrapper rounding must use the reference path.
+
 ## Reproducible probe and limits
 
 `PortableAtan.h` is a mathematical candidate, not x87 emulation. It reduces

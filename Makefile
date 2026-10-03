@@ -695,6 +695,17 @@ test: verify-runner-spatial-split
 verify-contact-profile: $(AMIGA_SCENE_TEST_TARGET)
 	DOWNWELL_VERIFY_CONTACT_PROFILE=1 ./$(AMIGA_SCENE_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 
+# Domain evidence only: traces actual post-wrapper atan inputs, not a new
+# approximation. This macro and observer are absent from shipping builds.
+build/contact-direction-domain-test: $(AMIGA_SCENE_TEST_SOURCES) tests/core/ContactDirectionTrace.cpp $(wildcard src/core/*.h)
+	@mkdir -p $(@D)
+	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_TRACE_CONTACT_DIRECTION -o $@ $(AMIGA_SCENE_TEST_SOURCES) tests/core/ContactDirectionTrace.cpp
+
+.PHONY: trace-contact-direction-domain
+trace-contact-direction-domain: build/contact-direction-domain-test
+	DOWNWELL_VERIFY_CONTACT_PROFILE=1 ./$< generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
+	DOWNWELL_VERIFY_LASER_SIGHT=1 DOWNWELL_VERIFY_COMBAT=1 ./$< generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
+
 verify-runner-spatial-split: build/runner-spatial-split-test build/runner-spatial-dirty-test build/runner-object-membership-test build/runner-sprite-bounds-test build/runner-place-query-test build/runner-spatial-instances-test
 	./build/runner-spatial-split-test
 	./build/runner-spatial-dirty-test
