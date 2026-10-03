@@ -132,7 +132,10 @@ python3 tools/amiga-trace-report.py tmp/trace/run --frames=1300-1338
 
 `TRACE_FRAMES` lists one-based gameplay frames, numbered as in FPS reports.
 Each capture spans `TRACE_FIELDS` PAL fields (at most 100, about 500 MB each).
-Keep listed frames further apart than that. The build adds one
+Keep listed frames further apart than that. A capture must start a few
+frames before a burst frame (frame 701 is captured from 699 in its own build);
+the [frame-cost audit](amiga-frame-cost.md#configuration-and-reproduction)
+lists the complete command set to repeat it. The build adds one
 `downwellTraceFrameMark` call per gameplay frame, and a debugger stop at each
 listed frame before its capture. Neither reads the clock or changes game state.
 Emulated time does not advance while GDB is stopped. Recording starts at the

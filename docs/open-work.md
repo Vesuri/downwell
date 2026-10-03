@@ -12,10 +12,10 @@ on PAL; do not add 60 Hz catch-up.
 
 ## Priority and scope
 
-Next: recover the A500 gameplay frame budget (section 5) by removing emulated
-runner state that nothing observes, per-element traversal overhead and CPU
-composition, following the [frame-cost audit](amiga-frame-cost.md); compiler
-tuning is not the remedy. Cover the garden-to-well transition as well as
+Next: recover the A500 gameplay frame budget (section 5), taking its ranked
+items in order. Each removes a structure or computation measured by the
+[frame-cost audit](amiga-frame-cost.md); tuning small functions and compiler
+flags is not the remedy. Cover the garden-to-well transition as well as
 steady gameplay. Then finish live
 skeleton encounters, following the dependency order in section 1, make
 catacombs playable (section 2), followed by the remaining
@@ -195,31 +195,152 @@ Reference: [upgrade IDs and source entry points](upgrade-coverage.md).
 ## 5. Meet the Amiga frame budget
 
 Fit worst-case gameplay, style/upgrade navigation and transitions into 20 ms.
-Average FPS is not the criterion; re-profile after integration changes. The
-[frame-cost audit](amiga-frame-cost.md) attributes the gameplay budget to
-emulated runner state that no query reads, per-element traversal overhead,
-CPU composition and software arithmetic, not to game rules. Remove work
-rather than tuning it; compiler flags are not a substitute.
+Average FPS is not the criterion. The [frame-cost audit](amiga-frame-cost.md)
+at `b99c2f69` measures the contact tape at 3,821 fields. Quiet frames take
+31.5 ms, combat 89 ms and time-field frames 67 ms. The worst frames (645,
+701, 844) take about 180 ms (9 fields) each, for different reasons.
 
-Every step keeps the replaced path compiled as the reference. Compare full
-RNG state, numeric instance IDs, creation and event order, positions and draw
-order on deterministic replays with intervening gameplay RNG and health
-changes, then check native timing with the trace and FPS tapes.
+Rules for this section:
+- Take items in the order below unless a repeated audit reorders them.
+- Every change must remove a named structure or computation whose cost the
+  audit measures: at least 3 ms per frame in a window, or 10 ms in a worst
+  frame. Do not tune functions that cost under 1 ms in the audit. That
+  includes rewriting loops, changing types or registers, unrolling, inline
+  assembly, compiler flags and helper substitutions. The quiet frame is flat
+  by construction; tuning its parts cannot reach 20 ms.
+- Before a change, state the work removed and the expected saving from the
+  audit. Afterwards, run the FPS tape (total fields and worst gap) and trace
+  the affected windows. Discard the change if any of the three worst frames
+  gets slower, whatever the average.
+- Keep the replaced path compiled as the reference. Compare full RNG state,
+  numeric instance IDs, creation and event order, positions and draw order on
+  deterministic replays, and pixels where presentation changes.
 
-Native gameplay now constructs the collision owner with native ownership
-(`GameplayCollisionOwner::Ownership::native`): terrain lives only in the
-occupancy grid, and actors keep only their order state (object, flag word,
-sprite index, registration, room and layer order), not positions, bounds or
-spatial history. `make verify-terrain-ownership` compares this against the
-complete registered reference every frame. Wall-contact multiplicity lives in
-the occupancy grid's cells, and native wall/platform runs publish as spans
-after their draws. A plain gameplay frame's simulation step runs while the
-previous frame's Copper list waits for its VBlank; the frame fences before
-its first display, overlay or Copper write. Contact-tape traces measure quiet
-frames at 31 ms, combat 73 ms, time-field frames 66 ms and the generation
-bursts at frames 701 and 844 at 183-185 ms.
+### A. Worst frames (each about 180 ms)
 
-### A. Keep native ownership sufficient
+1. **Contact damage-number direction (frame 645: 34.8 ms in one call).**
+   `RunSession::contactDamageNumber` evaluates `RunnerPointDirection` through
+   the software binary64 `portableAtan`. That is 14 divides and 14
+   multiplies, 246,892 cycles. Replace the runtime series with precomputed
+   tables:
+   - First, establish the input domain: the binary32-narrowed differences
+     reachable in a contact, a bounded box with a known set of subpixel
+     fractions. Log it from the contact and laser tapes, and confirm it
+     against the movement code.
+   - If the domain is enumerable, generate an offline table of the exact
+     binary32 degree results with the existing reference. The
+     `probe-runner-atan-x86-macos` x87 sequence is the oracle and
+     `portableAtan` the cross-check. At run time the call becomes one lookup.
+   - Otherwise, reduce to one octant and interpolate a precomputed atan table
+     with a proven error bound. Fall back to `portableAtan` only when the
+     result lies within that bound of a binary32 rounding boundary of the
+     final degree value.
+
+   Target: under 1 ms. Verify every enumerated input, or the full probe set,
+   against the oracle, plus the contact-tape replay digests. See
+   [point direction](runner-point-direction.md).
+2. **Health HUD on damage (frame 645: 25.7 ms).** `drawHealthNumberLayers`
+   draws each digit as layered CPU assets (14.1 ms), and `redrawHealth`
+   repaints the hearts and meter (11.7 ms): 23 asset draws at 9,000 cycles
+   each.
+   - Precompose each health digit's layers offline into one asset, as the
+     ammo digit's 15 layers already are; `amiga-renderer-test` checks that
+     equivalence for ammo.
+   - Redraw only the rectangles whose glyph or heart state changed.
+
+   Target: under 4 ms on a damage frame.
+3. **Generation births (frame 844: 23.1 ms for 13 `appendBreakables`, 12,636
+   cycles each; frame 701: 11.0 ms for 6).** Each breakable birth attaches
+   a generic runner layer element, lifetime and room membership
+   (`GameplayRoomLayers::birth`, 5,680 cycles each). Give breakables native
+   ownership, as terrain already has: a family record plus grid state, with
+   no per-birth layer, lifetime or membership attachment. Anything that
+   observes a breakable (shots, destruction, draw order) must read the native
+   record. Apply the same to the other generated families that still take
+   the generic birth in frame 701 (seven layer births, 6.7 ms; time-field
+   adoption, 3.1 ms).
+
+   Target: under 2,000 cycles per birth, saving about 20 ms in frame 844 and
+   about 13 ms in frame 701. Verify with a per-frame comparison against the
+   registered reference, as `make verify-terrain-ownership` does for terrain.
+4. **Terrain painting of new rows (frame 844: 28 CPU tile draws, 26.1 ms;
+   3.8 ms per combat frame).** `AmigaTerrainPainter::paint` draws each tile
+   through the generic `amigaRendererDrawAsset` at about 5,500–9,000 cycles.
+   - First, check whether ring tiles are 16-pixel aligned and opaque. If so,
+     paint them from prepared per-tile plane words with direct word stores.
+   - Otherwise, blit each horizontal run of tiles in one blit per plane. Tall
+     strips only: small blits lose to the CPU (see the ammo experiment in the
+     audit).
+
+   Preserve circular hardware scrolling, static backing, incremental
+   restoration and the [terrain update contract](terrain-update-contract.md).
+   Target: under 5 ms in frame 844.
+5. **Ammo gauge (frame 645: 29.9 ms; frame 844: 14.3 ms; 4–7 ms per typical
+   frame).** Its cost is the number of lines rewritten, not how each line is
+   composed (see the audit's experiments).
+   - Jiggle: a recharge shifts the gauge for four frames, and each shift
+     recomposes and compares all 166 interior lines. Represent the column as
+     constant-value line intervals (run middles, fill, dividers). Diff the
+     previous and new interval lists, and write only lines whose final word
+     changes.
+   - Shots: bound `AmmoHudDamage::update`'s 184-row scan (3.2 ms) by the rows
+     `AmmoGaugeRows::step` actually visited since the last draw.
+   - Ammo changes: retain the divider composition per ammo value for small
+     capacities, instead of recomposing all rows (4.1 ms).
+
+   Target: under 8 ms for a recharge frame and under 4 ms for a shot frame.
+6. **Time-field outlines (22.5 ms preparation and 5.6 ms drawing per frame
+   while fields are visible; 23.3 ms in frame 844).** The tape's field is one
+   pulsing 24–26 px circle whose raster changes almost every frame.
+   `amigaFieldWords` costs about 1,000 cycles per outline word. Prepare each
+   small-circle raster's outline image once and blit it with saved backing,
+   without changing Draw RNG consumption or source geometry. Target: under
+   5 ms per field frame.
+
+After A1–A6 the generation bursts remain at roughly 100 ms. That is about
+26 ms of synchronous Well512 draws, 22 ms of run creation (7.1 ms of it
+`publishSpan`) and pattern emission. Moving draws to other frames changes RNG
+interleaving and is not an option. Re-audit before choosing the next
+generation item.
+
+### B. Per-frame runner walks (every gameplay frame)
+
+The per-actor runner walks cost about 7 ms in quiet frames, about 13 ms with
+enemies in view and about 14 ms in combat. Together with the gauge strips
+they are the gap between the 31.5 ms quiet frame and 20 ms.
+
+1. **Draw collection** (2.7 ms quiet, 6.3 combat, 10.7 in frame 701)
+   rebuilds the actor list through the generic layer walk after every
+   ownership change. Maintain the actor Draw list incrementally, ordered by
+   layer, depth and element order.
+2. **Captured alarm dispatch** (1.2 ms quiet, 5.0 enemies) walks every
+   captured enemy and effect for each alarm index. Count each family's
+   alarms down in its records in captured order, dispatch only zero
+   crossings, and retire unrearmed zeros to -1. Native ownership already
+   skips box groups while no live box has Alarm 0 set.
+3. **Animation walk** (2.1 ms quiet, 4.1 combat) decodes and revalidates each
+   visited actor. Run per-family loops over compact records where no
+   Animation End handler has cross-instance effects, keeping room order
+   where one does.
+4. **Activation reconciliation and validation** (1.1 ms quiet). Validate
+   handles and owner state at birth, retirement and room entry, not on every
+   per-frame visit. Keep a sticky failure flag checked at phase boundaries.
+
+### C. Combat composition (combat window, 88.8 ms)
+
+After B, measure combat again. The audit's composition costs are: actor draws
+10.6 ms (damage text 5.5, five or six CPU asset draws at 7,400 cycles);
+currency/smoke 9.7 ms for three stamps at 13,872 cycles each; terrain ring
+sync 6.4 ms; effect-surface publication 2.5 ms.
+- Actors: hardware sprites or blitter bobs instead of CPU planar stamping.
+- Currency/smoke: blitter zero-flag tests for final-alpha overlap instead of
+  per-row bounds and generic queue enqueues.
+- Damage text: prepared glyph words.
+
+Verify the mixed DMA/planar frame against original captures, preserving
+controller priority.
+
+### D. Keep native ownership sufficient
 
 - Native ownership rejects every collision query and wall End Step. When an
   original query or wall event enters native gameplay, answer it from native
@@ -232,99 +353,11 @@ bursts at frames 701 and 844 at 183-185 ms.
   which native gameplay no longer keeps. Remove it unless the registered
   reference itself needs it.
 
-### B. Remove the remaining per-element traversal
+### E. Coverage of the measurement
 
-- Alarm dispatch (1.2 ms quiet, 3 ms combat) still walks every captured
-  enemy and effect for each alarm index; native ownership skips box groups
-  while no live box has Alarm 0 set. Count the remaining families' alarms
-  down in their records in captured order, dispatching only zero crossings
-  and retiring unrearmed zeros to -1.
-- The animation walk (4.7 ms per combat frame) still decodes and revalidates
-  each visited actor; bullet animation is 1.4 ms of it. Run per-family loops over
-  compact records where no Animation End handler has cross-instance effects,
-  keeping room order where one does.
-- Draw collection rebuilds through the generic layer walk after every
-  ownership change. Maintain the actor Draw list incrementally, ordered by
-  layer, depth and element order.
-- Validate handles and owner state at birth, retirement and room entry, not in
-  every per-frame visit (`valid()` and view lookups cost 2–3 ms per frame).
-  Keep a sticky failure flag checked at phase boundaries.
-- Generation bursts: frame 701 still spends about 100 ms in generation, 30 ms
-  of it the per-cell builderCavern RNG draws. The two border walls of each
-  pattern row still take the scalar Create chain (about 1,500 cycles each).
-  Box and field births pay generic layer attachment (about 1.8 ms each).
-  Keep each cell's Create and RNG draw synchronous; spreading generation
-  over frames changes RNG interleaving.
-- Measure steady gameplay and the garden-to-well transition; a short
-  `SKIP_TO_GAME=1` sample does not cover the reported worst transition stall.
-
-### C. Render with the blitter and precomputation
-
-- Currency/smoke composition costs 9 ms per combat frame for about three
-  stamps: each still pays about 14,000 cycles of per-row bounds and three
-  generic blitter-queue enqueues, plus a drain before the final-alpha test.
-- Currency/smoke: use blitter zero-flag tests for final-alpha overlap.
-  Profile overlap-aware sprite assignment on dense gem/smoke
-  scenes. Verify the mixed DMA/planar frame against original captures,
-  preserving controller priority.
-- Actors: blitter bobs or hardware sprites instead of CPU planar stamping.
-- Time-field outlines cost 28 ms per frame while fields are visible (about
-  16% of contact-tape frames). The tape's field is one pulsing 24-26 px
-  circle whose raster changes almost every frame, so no word set can be
-  retained; the CPU spends about 1,000 cycles per outline word on raster,
-  matching, restoration and publication. Blit prepared outline images per
-  small-circle raster with saved backing instead, without changing Draw RNG
-  consumption or source geometry. Scrolling partly visible large circles
-  could reuse rows visible in both views; this tape does not exercise it.
-- Ammo HUD: each recharge redraws the whole gauge for four jiggle frames
-  (24-30 ms each on the contact tape) and each shot costs 18, 12, 12 and
-  6 ms. Two whole-gauge replacements missed: synchronous word blits from
-  Chip layers in the scene-bank region cut recharge frames to 17 ms but
-  cost about 2,300 cycles per blit, mostly waiting, so the small strips of
-  shot frames got slower and frame 844 took ten fields instead of nine; a
-  fused interior pass that writes each distinct line value once costs
-  about 130 cycles per line in its store loop, no better than the existing
-  passes. Remove work instead:
-  - Shots: `AmmoHudDamage::update` scans all 184 rows (3.2 ms on the first
-    shot frame); bound it by the rows `AmmoGaugeRows::step` actually
-    visited since the last draw. Each ammo change recomposes every divider
-    row (4.1 ms); retain compositions per ammo value for small capacities.
-  - Jiggle: a vertical shift leaves most interior lines unchanged. Diff the
-    old and new constant-line intervals and write only lines whose value
-    changes, rather than recomposing and comparing all 166.
-  - Use the blitter only where a strip is tall enough to repay its setup and
-    wait, such as recharge background and rim strips; keep small strips on
-    the CPU.
-- Terrain rows: blit tiles or prepared wall strips into the ring. Preserve
-  circular hardware scrolling, static terrain backing and incremental
-  restoration. Keep external coordinate writes on the observed publication
-  path; see [terrain update constraints](terrain-update-contract.md). Reduce
-  speculative side-view preparation and cache misses on late direction changes
-  or generation invalidation. Extend natural horizontal-shop coverage while
-  preserving ring ownership and both display buffers' debts.
-
-### D. Use cheaper exact arithmetic
-
-- Remove 32-bit multiply/divide helpers from per-frame paths using shifts,
-  conditional-subtract rings and exhaustively verified reciprocal multiplies.
-  Fail the build if they return, like the existing 64-bit helper audit.
-- Add integer fast paths to the remaining per-frame binary64/binary32
-  emulation, keeping the full emulation as fallback and oracle.
-
-### E. Re-profile the residue
-
-- Repeat the audit's trace windows. Dense combat and generation bursts are
-  expected to remain over budget after A–D. Address per-instance combat
-  simulation next: gems, bullets, and damage numbers, including live contact
-  direction, first-update trigonometry and damage-text drawing. Retain
-  original numeric rounding and painter order, and use the contact tape to
-  separate these from general combat. Then address pattern emission.
-- Measure new actor and effect costs in dense scenes. Keep a portable reference
-  when introducing selected 68000 assembly optimizations.
-- Repeat low-overhead timing tapes and correctness gates after changes, with
-  separate horizontal-shop and dense-encounter cases. Require tapes that reach
-  generation bursts, and distinguish instrumentation overhead from ordinary
-  gameplay cost.
+- The contact tape has no horizontal shop, no dense encounter and no
+  garden-to-well transition. Add tapes for each before claiming the budget,
+  and repeat the audit after every A or B item lands.
 
 ### F. Other scenes
 
