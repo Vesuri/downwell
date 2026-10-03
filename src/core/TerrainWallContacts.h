@@ -18,6 +18,13 @@ public:
             if(records_[id-1].object==object&&records_[id-1].x==x)return true;
         return false;
     }
+    unsigned count(int object,int x,int y)const{
+        if(x<-512||x>=1536||y<0||y>=8192||(x&15)||(y&15))return 0;
+        unsigned matches=0;
+        for(unsigned id=heads_[unsigned(y)/16];id;id=records_[id-1].next)
+            matches+=records_[id-1].object==object&&records_[id-1].x==x;
+        return matches;
+    }
     bool append(int object,int x,int y){
         if(object!=60 && object!=92 && object!=293)return true;
         if(count_==Capacity || x<-512 || x>=1536 || y<0 || y>=8192 || (x&15) || (y&15))return false;

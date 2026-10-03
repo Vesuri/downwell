@@ -10,6 +10,7 @@
 #include <array>
 #include <algorithm>
 #include <limits>
+#include <random>
 
 namespace {
 void require(bool value, const char* message) {
@@ -22,7 +23,7 @@ void verifyPreparedTerrainRuns(){
     auto compare=[&](int row){
         require(std::equal(std::begin(scalar.cells),std::end(scalar.cells),std::begin(prepared.cells)),
             "prepared run preserves every occupancy cell at each publication");
-        require(scalar.wallContacts.size()==prepared.wallContacts.size(),"prepared contact multiplicity");
+        require(amigaTerrainContactCount(scalar)==amigaTerrainContactCount(prepared),"prepared contact multiplicity");
         for(unsigned x=0;x<128;++x)for(int y:{0,row,row+1,511})if(y<512)
             require(scalar.nextLanding.next(x,y)==prepared.nextLanding.next(x,y),"prepared landing candidates");
     };
@@ -40,7 +41,10 @@ void verifyPreparedTerrainRuns(){
         require(!run.ready()&&!run.append(),"exhausted run cannot publish twice");
     }
     require(amigaBuildTerrainIndex(empty,scalar)&&amigaBuildTerrainIndex(empty,prepared),"capacity fixtures initialize");
-    for(unsigned i=0;i<4094;++i)
+    // Saturate the run cells' own counts, then fill all but two overflow records.
+    for(int x=160;x<224;x+=16)for(unsigned i=0;i<3;++i)
+        require(amigaAddTerrainObject(scalar,60,x,192)&&amigaAddTerrainObject(prepared,60,x,192),"saturate run cells");
+    for(unsigned i=0;i<3+254;++i)
         require(amigaAddTerrainObject(scalar,60,240,176)&&amigaAddTerrainObject(prepared,60,240,176),"fill contact prefix");
     AmigaTerrainRunIndex limited(prepared,60,160,192,16,4);
     for(unsigned i=0;i<3;++i){
@@ -75,7 +79,7 @@ void verifyWallCollisionLifecycle() {
     const auto h=store.handle(0);
     require(store.activation(h,false) && !amigaIndexedWall(index,240,176),"deactivation excludes cache immediately");
     require(store.activation(h,false) && store.activation(h,true) && store.activation(h,true) &&
-            index.wallContacts.size()==1,"idempotent activation does not duplicate contributions");
+            amigaTerrainContactCount(index)==1,"idempotent activation does not duplicate contributions");
     downwell::GameMakerRandom random;
     require(store.createProperties(h,51,false,random),"wall Create properties");
     struct Ops {
@@ -98,7 +102,7 @@ void verifyWallCollisionLifecycle() {
     } ops{store,h,index,presentation};
     require(store.wallEvent(h,1,random,ops) && store.wallEvent(h,1,random,ops),"surrounded wall two-event lifetime");
     require(store.requestDestroy(h) && store.activation(h,false) && store.activation(h,true) &&
-            index.wallContacts.size()==0,"destroyed wall never reenters cache");
+            amigaTerrainContactCount(index)==0,"destroyed wall never reenters cache");
     require(store.retireMarked(h) && !store.find(h),"cleanup retires identity without removing cache twice");
     require(store.append(60,256,192,false),"inactive birth has no cache contribution");
     const auto inactive=store.handle(0);
@@ -106,6 +110,54 @@ void verifyWallCollisionLifecycle() {
     Store failed(binding, {}, Store::WallCollision::bind(cache));
     require(failed.append(60,272,208,true),"missing contribution fixture");
     require(!failed.requestDestroy(failed.handle(0)) && !failed.valid(),"missing contribution is terminal, not a silent miss");
+}
+// Cell counts plus overflow records must report the same multiplicity as one
+// record per Create, under coincident births, removals and box retirement.
+void verifyContactMultiplicity() {
+    static AmigaTerrainIndex index;
+    static downwell::TerrainWallContacts<4096> reference;
+    AmigaTerrainCollisionContext context{nullptr,nullptr,nullptr,nullptr,0,nullptr};
+    require(amigaBuildTerrainIndex(context,index),"multiplicity index initializes");
+    context.index=&index;reference.clear();
+    AmigaPortRuntime runtime(0);
+    const int boxX[]={208-240,240-240,272-240},boxY[]={160-176,176-176,208-176};
+    runtime.configureBreakables(boxX,boxY,3);
+    std::mt19937 random(5);
+    bool overflowed=false;
+    auto position=[&](int& x,int& y){x=-512+16*int(random()%5)+(random()%4?720:0);y=16*int(random()%4)+(random()%8?160:0);};
+    for(unsigned step=0;step<20000;++step){
+        int x,y;position(x,y);
+        // Alternate growth and decay so cells cross the overflow threshold both ways.
+        const bool room=index.extraContacts.size()<240,growing=step%4000<2000;
+        const unsigned op=random()%1000,walls=room?(growing?450:250):0;
+        if(op<walls){
+            require(amigaAddTerrainObject(index,60,x,y)&&reference.append(60,x,y),"coincident wall birth");
+        }else if(op<walls+5&&room){
+            require(amigaAddTerrainObject(index,92,x,y)&&reference.append(92,x,y),"coincident box birth");
+        }else if(op<walls+10&&room){
+            require(amigaAddTerrainObject(index,293,x,y)&&reference.append(293,x,y),"object 293 birth");
+        }else if(op<walls+30){
+            require(amigaAddTerrainObject(index,93,x,y),"platforms have no contact");
+        }else if(op<800){
+            require(amigaRemoveTerrainWall(index,x,y)==reference.removeOne(60,x,y),"wall removal agrees");
+            require(amigaIndexedWall(index,x,y)==reference.contains(60,x,y),"wall occupancy follows multiplicity");
+        }else{
+            const int left=x-12+int(random()%24),top=y-12+int(random()%24);
+            const downwell::ContactBounds query{left,left+int(random()%40),top,top+int(random()%40)};
+            context.runtime=random()%2?&runtime:nullptr;
+            unsigned expected=0,actual=0;
+            require(reference.visit(query,[&](unsigned object,int bx,int by){
+                return object!=92||!context.runtime||context.runtime->breakableActiveAt(bx-240,by-176);
+            },[&]{++expected;return true;}),"reference query");
+            require(amigaResolveTerrainWallContacts(&context,query,actual)&&actual==expected,
+                "cell counts report every overlapping instance");
+        }
+        for(int object:{60,92,293})
+            require(amigaTerrainContacts(index,object,x,y)==reference.count(object,x,y),"per-position multiplicity");
+        overflowed|=reference.count(60,x,y)>3;
+    }
+    require(amigaTerrainContactCount(index)==reference.size(),"total multiplicity");
+    require(overflowed,"differential reaches the overflow records");
 }
 void verifyWallRemoval() {
     static AmigaTerrainIndex index;
@@ -120,7 +172,7 @@ void verifyWallRemoval() {
         require(amigaAddTerrainObject(index,60,240,192),"next landing candidate");
         const unsigned column=(240-AmigaTerrainIndex::minX)/16;
         index.mutableWallOccupancy=false;
-        require(!amigaRemoveTerrainWall(index,240,176) && index.wallContacts.contains(60,240,176),
+        require(!amigaRemoveTerrainWall(index,240,176) && amigaTerrainContacts(index,60,240,176)==2,
                 "reconstructed occupancy cannot be subtracted");
         index.mutableWallOccupancy=true;
         require(!amigaRemoveTerrainWall(index,241,176) && !amigaRemoveTerrainWall(index,240,-16),
@@ -464,6 +516,7 @@ void checkSchedule(const downwell::BuilderPatternPack& patterns, bool interleave
 int main(int argc, char** argv) {
     verifyPreparedTerrainRuns();
     verifyWallCollisionLifecycle();
+    verifyContactMultiplicity();
     verifyWallRemoval();
     verifyTerrainSegments();
     require(argc == 2, "builder pack path required");
@@ -612,10 +665,13 @@ int main(int argc, char** argv) {
     require(amigaAddTerrainObject(boundary.index, 60, -512, 0, true) &&
                 amigaAddTerrainObject(boundary.index, 113, 5, -9),
             "duplicate terrain and non-terrain Create events are safe");
+    // Bits 6-7 count the duplicate's contact; occupancy flags stay unchanged.
     for (unsigned cell = 0; cell < sizeof(snapshot.cells); ++cell)
-        require(snapshot.cells[cell] == boundary.index.cells[cell] &&
+        require((snapshot.cells[cell] & 63) == (boundary.index.cells[cell] & 63) &&
                     snapshot.nextLanding[cell] == boundary.index.nextLanding[cell],
                 "duplicates do not disturb the collision map");
+    require(amigaTerrainContacts(boundary.index, 60, -512, 0) == 2,
+            "duplicate wall keeps its own contact");
     // Each capacity failure is terminal until reset, including a failure after
     // some objects in the current fragment have already been emitted.
     for (unsigned limit = 0; limit < 3; ++limit) {

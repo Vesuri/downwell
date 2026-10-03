@@ -284,7 +284,30 @@ unsigned amigaCollectTerrainBreakables(
 
 namespace {
 enum { solidCell = 1, landingCell = 2, breakableCell = 4, roomWallCell = 8, wallCell = 16,
-       platformCell = 32 };
+       platformCell = 32, wallContactUnit = 64, wallContactMask = 192 };
+bool contactCell(int x, int y, unsigned& cell) {
+    if ((x & 15) || (y & 15) || x < AmigaTerrainIndex::minX ||
+        x >= AmigaTerrainIndex::minX + AmigaTerrainIndex::columns * 16 ||
+        y < 0 || y >= AmigaTerrainIndex::rows * 16) return false;
+    cell = (unsigned(y) >> 4) * AmigaTerrainIndex::columns +
+        (unsigned(x - AmigaTerrainIndex::minX) >> 4);
+    return true;
+}
+// One contact per actual Create. A box is counted by the breakable flag its
+// own Create sets, unless an earlier box already holds that flag. Fails only
+// when the overflow records are full, before any occupancy changes.
+bool addContact(AmigaTerrainIndex& index, int objectId, int x, int y, bool boxFlag) {
+    if (objectId != 60 && objectId != 92 && objectId != 293) return true;
+    unsigned cell;
+    if (!contactCell(x, y, cell)) return false;
+    auto& flags = index.cells[cell];
+    if (objectId == 60 && (flags & wallContactMask) != wallContactMask) {
+        flags += wallContactUnit;
+        return true;
+    }
+    if (objectId == 92 && boxFlag && !(flags & breakableCell)) return true;
+    return index.extraContacts.append(objectId, x, y);
+}
 bool indexAdd(AmigaTerrainIndex& index, int x, int y, unsigned flags,
               unsigned* addedCell = nullptr) {
     if ((x & 15) || (y & 15) || x < AmigaTerrainIndex::minX ||
@@ -314,7 +337,7 @@ bool indexActive(const AmigaTerrainCollisionContext& context, unsigned cell,
 
 bool amigaBuildTerrainIndex(const AmigaTerrainCollisionContext& context,
                            AmigaTerrainIndex& index) {
-    index.wallContacts.clear();
+    index.extraContacts.clear();
     // Reconstructed pattern occupancy is not evidence of actual Create events.
     index.wallContactsComplete = context.fragmentCount==0;
     index.mutableWallOccupancy = context.fragmentCount==0 && !(context.rooms && context.room);
@@ -323,10 +346,11 @@ bool amigaBuildTerrainIndex(const AmigaTerrainCollisionContext& context,
         for (unsigned i = 0; i < context.room->instanceCount; ++i) {
             downwell::PackedRoomInstance instance;
             if (!context.rooms->roomInstance(*context.room, i, instance)) return false;
+            // Room boxes are solid here, not breakable cells; keep their records.
+            if (!addContact(index, instance.objectId, instance.x, instance.y, false)) return false;
             if ((instance.objectId == 60 || instance.objectId == 92) &&
                 !indexAdd(index, instance.x, instance.y, solidCell |
                     (instance.objectId == 60 ? roomWallCell : 0))) return false;
-            if (!index.wallContacts.append(instance.objectId,instance.x,instance.y))return false;
         }
     }
     for (unsigned f = 0; f < context.fragmentCount; ++f) {
@@ -372,13 +396,49 @@ bool amigaIndexedRoomWall(const AmigaTerrainIndex& index, int x, int y) {
     return (indexCell(index, x, y) & roomWallCell) != 0;
 }
 
+// Counts every overlapping parentWall instance: each cell's coincident walls
+// and flagged box, then the overflow records. Callers need multiplicity only.
 bool amigaResolveTerrainWallContacts(void* opaque,const downwell::ContactBounds& query,unsigned& count){
     count=0;
     const auto& context=*static_cast<const AmigaTerrainCollisionContext*>(opaque);
     if(!context.index || !context.index->wallContactsComplete)return false;
-    return context.index->wallContacts.visit(query,[&](unsigned object,int x,int y){
+    const auto& index=*context.index;
+    auto active=[&](unsigned object,int x,int y){
         return object!=92 || !context.runtime || context.runtime->breakableActiveAt(x-240,y-176);
-    },[&](){++count;return true;});
+    };
+    if(query.left>=query.right || query.top>=query.bottom || query.right<=-521 ||
+       query.left>=1546 || query.bottom<=-8 || query.top>=8201)return true;
+    // Superset of the cells whose 16x16 contact box can overlap; each is tested exactly.
+    const int firstRow=query.top<=9?0:(query.top-9)/16;
+    const int lastRow=query.bottom>=8184?AmigaTerrainIndex::rows-1:(query.bottom+8)/16;
+    const int firstColumn=query.left<=-520?0:(query.left+504)/16;
+    int lastColumn=query.right>=1544?AmigaTerrainIndex::columns-1:(query.right+519)/16;
+    if(lastColumn>=AmigaTerrainIndex::columns)lastColumn=AmigaTerrainIndex::columns-1;
+    const auto local=downwell::contactSpriteBounds(585);
+    for(int row=firstRow;row<=lastRow&&row<AmigaTerrainIndex::rows;++row)
+        for(int column=firstColumn;column<=lastColumn;++column){
+            const unsigned flags=index.cells[row*AmigaTerrainIndex::columns+column];
+            if(!(flags&(wallContactMask|breakableCell)))continue;
+            const int x=AmigaTerrainIndex::minX+column*16,y=row*16;
+            if(!downwell::contactBoundsOverlap(query,{x+local.left,x+local.right,y+local.top,y+local.bottom}))continue;
+            count+=flags/wallContactUnit;
+            if((flags&breakableCell) && active(92,x,y))++count;
+        }
+    return index.extraContacts.visit(query,active,[&](){++count;return true;});
+}
+
+unsigned amigaTerrainContacts(const AmigaTerrainIndex& index, int objectId, int x, int y) {
+    unsigned cell;
+    if (!contactCell(x, y, cell)) return 0;
+    const unsigned flags = index.cells[cell];
+    return index.extraContacts.count(objectId, x, y) +
+        (objectId == 60 ? flags / wallContactUnit : objectId == 92 ? (flags & breakableCell) != 0 : 0);
+}
+
+unsigned amigaTerrainContactCount(const AmigaTerrainIndex& index) {
+    unsigned count = index.extraContacts.size();
+    for (unsigned flags : index.cells) count += flags / wallContactUnit + ((flags & breakableCell) != 0);
+    return count;
 }
 
 bool amigaIndexedWall(const AmigaTerrainIndex& index, int x, int y) {
@@ -387,7 +447,7 @@ bool amigaIndexedWall(const AmigaTerrainIndex& index, int x, int y) {
 
 bool amigaAddTerrainObject(AmigaTerrainIndex& index, int objectId, int x, int y,
                            bool initialRoomWall) {
-    if (!index.wallContacts.append(objectId,x,y))return false;
+    if (!addContact(index, objectId, x, y, true)) return false;
     const unsigned flags = objectId == 60
         ? solidCell | landingCell | wallCell | (initialRoomWall ? roomWallCell : 0)
         : objectId == 92 ? breakableCell : objectId == 93 ? landingCell | platformCell : 0;
@@ -403,33 +463,41 @@ bool amigaAddTerrainObject(AmigaTerrainIndex& index, int objectId, int x, int y,
 }
 
 AmigaTerrainRunIndex::AmigaTerrainRunIndex(AmigaTerrainIndex& index,int object,
-    int x,int y,int stepX,unsigned count):index_(index),object_(object),x_(x),y_(y),step_(stepX/16){
+    int x,int y,int stepX,unsigned count):index_(index),object_(object),x_(x),y_(y),step_(stepX<0?-1:1){
     if((object!=60&&object!=93)||!count||count>AmigaTerrainIndex::columns||
         (stepX!=16&&stepX!=-16)||(x&15)||(y&15)||x<AmigaTerrainIndex::minX||
         x>=AmigaTerrainIndex::minX+AmigaTerrainIndex::columns*16||
         y<0||y>=AmigaTerrainIndex::rows*16)return;
-    const int column=(x-AmigaTerrainIndex::minX)/16;
-    const int last=column+int(count-1)*step_;
+    const int column=(x-AmigaTerrainIndex::minX)>>4;
+    const int last=step_>0?column+int(count-1):column-int(count-1);
     if(last<0||last>=AmigaTerrainIndex::columns)return;
-    column_=unsigned(column);row_=unsigned(y)/16;
+    column_=unsigned(column);row_=unsigned(y)>>4;
     flags_=object==60?solidCell|landingCell|wallCell:landingCell|platformCell;
     remaining_=count;
 }
 bool AmigaTerrainRunIndex::append(){
-    if(!remaining_||!index_.wallContacts.append(object_,x_,y_))return false;
-    index_.cells[row_*AmigaTerrainIndex::columns+column_]|=flags_;
+    if(!remaining_)return false;
+    auto& cell=index_.cells[row_*AmigaTerrainIndex::columns+column_];
+    if(object_==60){
+        if((cell&wallContactMask)!=wallContactMask)cell+=wallContactUnit;
+        else if(!index_.extraContacts.append(60,x_,y_))return false;
+    }
+    cell|=flags_;
     index_.nextLanding.insert(column_,row_);
     --remaining_;x_+=step_*16;column_=unsigned(int(column_)+step_);
     return true;
 }
 
 bool amigaRemoveTerrainWall(AmigaTerrainIndex& index, int x, int y) {
+    unsigned cell;
     if (!index.mutableWallOccupancy || !index.wallContactsComplete ||
-        !index.wallContacts.removeOne(60,x,y)) return false;
-    if (index.wallContacts.contains(60,x,y)) return true;
-    const unsigned cell = (unsigned(y)>>4)*AmigaTerrainIndex::columns +
-        (unsigned(x-AmigaTerrainIndex::minX)>>4);
+        !contactCell(x, y, cell)) return false;
+    // Overflow walls exist only while the cell count is saturated; take them first.
+    if (index.extraContacts.removeOne(60,x,y)) return true;
     auto& flags=index.cells[cell];
+    if (!(flags & wallContactMask)) return false;
+    flags -= wallContactUnit;
+    if (flags & wallContactMask) return true;
     flags &= ~(solidCell | wallCell | roomWallCell);
     if (!(flags & platformCell)) flags &= ~landingCell;
     if (!(flags & (landingCell | breakableCell)))

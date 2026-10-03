@@ -141,9 +141,13 @@ struct AmigaTerrainCollisionContext {
 
 struct AmigaTerrainIndex {
     enum { columns = 128, rows = 512, minX = -512 };
+    // Occupancy flags in bits 0-5. Bits 6-7 count coincident wall (60)
+    // Creates up to three; the breakable flag stands for the first box (92).
     unsigned char cells[columns * rows];
     AmigaLandingIndex nextLanding; // candidate bits; row+1/zero query encoding
-    downwell::TerrainWallContacts<> wallContacts;
+    // Contacts a cell cannot count: further coincident walls and boxes, boxes
+    // without a breakable flag, and every object 293.
+    downwell::TerrainWallContacts<256> extraContacts;
     bool wallContactsComplete = false;
     // Subtraction is safe only when occupancy came from actual Create events.
     bool mutableWallOccupancy = false;
@@ -170,6 +174,10 @@ bool amigaIndexedRoomWall(const AmigaTerrainIndex& index, int x, int y);
 // Remove one collision contribution, not the authoritative instance lifetime.
 bool amigaRemoveTerrainWall(AmigaTerrainIndex& index, int x, int y);
 bool amigaIndexedWall(const AmigaTerrainIndex& index, int x, int y);
+// Contact multiplicity at one Create position, and over the whole index.
+// Diagnostic views that scan; gameplay queries use the contact resolver.
+unsigned amigaTerrainContacts(const AmigaTerrainIndex& index, int objectId, int x, int y);
+unsigned amigaTerrainContactCount(const AmigaTerrainIndex& index);
 
 bool amigaBuildInitialAreaOneTerrain(
     const downwell::BuilderPatternPack& builders,
