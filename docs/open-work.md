@@ -216,8 +216,8 @@ the occupancy grid's cells, and native wall/platform runs publish as spans
 after their draws. A plain gameplay frame's simulation step runs while the
 previous frame's Copper list waits for its VBlank; the frame fences before
 its first display, overlay or Copper write. Contact-tape traces measure quiet
-frames at 32 ms, combat 74 ms, time-field frames 66 ms and the generation
-bursts at frames 701 and 844 at 185 ms.
+frames at 31 ms, combat 73 ms, time-field frames 66 ms and the generation
+bursts at frames 701 and 844 at 183-185 ms.
 
 ### A. Keep native ownership sufficient
 
@@ -276,8 +276,16 @@ bursts at frames 701 and 844 at 185 ms.
   small-circle raster with saved backing instead, without changing Draw RNG
   consumption or source geometry. Scrolling partly visible large circles
   could reuse rows visible in both views; this tape does not exercise it.
-- Ammo HUD: precomputed gauge columns per fill and animation phase. Publish
-  changed columns only and keep the static rim intact.
+- Ammo HUD: each recharge redraws the whole gauge for four jiggle frames
+  (24-30 ms each on the contact tape) and each shot's row animation costs
+  15, 11, 11 and 5 ms. CPU composition costs about 1,000 cycles per gauge
+  row, even as one fused pass in registers. Compose column 18 with the
+  blitter from Chip-resident layer columns instead: background and rim at
+  the meter offset, the fill, and row art with dividers at four times the
+  meter offset, keeping the CPU for row-art updates and the label. Only
+  about 8.5 KB of Chip RAM remains after startup allocations, so the layers
+  must fit in a few KB (single-row masks with negative modulos, gauge rows
+  only) or free Chip elsewhere.
 - Terrain rows: blit tiles or prepared wall strips into the ring. Preserve
   circular hardware scrolling, static terrain backing and incremental
   restoration. Keep external coordinate writes on the observed publication

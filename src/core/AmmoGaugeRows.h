@@ -41,6 +41,10 @@ private:
     // advanced only by step(); renderers observe it without mutation.
     bool settled_ = false;
     bool visualChanged_ = false;
+    // Every row outside [first_, end_) already rests at its target: 4 below
+    // the fill boundary, 0 above it. A boundary move adds the rows whose
+    // target flipped; step() visits and then trims only this interval.
+    std::uint8_t first_ = 0, end_ = 184;
 public:
     AmmoGaugeRows() { for (auto& row : state) row = 3; }
     bool visuallyChanged() const { return visualChanged_; }
@@ -51,6 +55,14 @@ public:
             const unsigned next = ammoGaugeFilledRows(ammo, capacity);
             changed = next != filled;
             visualChanged_ = changed; // The filled/empty sprite family changes.
+            if (changed) {
+                const unsigned low = next < filled ? next : filled, high = next < filled ? filled : next;
+                if (first_ >= end_) { first_ = std::uint8_t(low); end_ = std::uint8_t(high); }
+                else {
+                    if (low < first_) first_ = std::uint8_t(low);
+                    if (high > end_) end_ = std::uint8_t(high);
+                }
+            }
             filled = next;
             lastAmmo = ammo;
             lastCapacity = capacity;
@@ -59,7 +71,7 @@ public:
         // Exhaustive reachable binary64 values from the original initial 3:
         // .6000000000000001, 1.4000000000000001, 2.2, 3, 3.8.
         // Adding/subtracting .8 walks this finite chain; integer frames are 0..3,3.
-        for (unsigned i = 0; i < 184; ++i) {
+        for (unsigned i = first_; i < end_; ++i) {
             const unsigned old = state[i];
             if (i < filled) { if (state[i] < 4) ++state[i]; }
             else if (state[i]) --state[i];
@@ -68,6 +80,9 @@ public:
             // VM progression but do not invalidate identical presentation.
             visualChanged_ = visualChanged_ || (old != state[i] && (old < 3 || state[i] < 3));
         }
+        auto resting = [&](unsigned i) { return state[i] == (i < filled ? 4 : 0); };
+        while (first_ < end_ && resting(first_)) ++first_;
+        while (end_ > first_ && resting(end_ - 1u)) --end_;
         settled_ = !changed;
         return changed;
     }
