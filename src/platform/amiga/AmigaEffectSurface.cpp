@@ -41,18 +41,43 @@ bool stamp(void* context,const Surface::Mask& m,const std::uint8_t* low,const st
     if(width>unsigned(160-x))width=160-x;
     if(height>unsigned(284-y))height=284-y;
     if(!width||!height)return true;
+    // Low, high and alpha all follow the mask's geometry, so one derivation
+    // serves the three blits. Register values equal Bitmap::copyWithMask and
+    // patternWithMask's for these strides (mask rows of m.stride bytes, the
+    // surface's 24-byte rows with a guard word left of x=0).
     auto* data=static_cast<UBYTE*>(context);
-    Bitmap mask(const_cast<std::uint8_t*>(m.data),m.width,m.height,1,false,false,m.stride*8);
-    Bitmap alpha(data,192,284,1,false,false,192);
-    if(low){
-        Bitmap sourceLow(const_cast<std::uint8_t*>(low),m.width,m.height,1,false,false,m.stride*8);
-        Bitmap sourceHigh(const_cast<std::uint8_t*>(high),m.width,m.height,1,false,false,m.stride*8);
-        Bitmap targetLow(data+AmigaEffectSurface::planeBytes,192,284,1,false,false,192);
-        Bitmap targetHigh(data+AmigaEffectSurface::planeBytes*2,192,284,1,false,false,192);
-        targetLow.copyWithMask(sourceLow,mask,x+16,y,sx,sy,sx,sy,width,height);
-        targetHigh.copyWithMask(sourceHigh,mask,x+16,y,sx,sy,sx,sy,width,height);
+    const unsigned sourceWords=m.stride/2,surfaceWords=AmigaEffectSurface::rowBytes/2;
+    const unsigned dx=unsigned(x)+16;
+    const unsigned sourceFirst=sx>>4,destFirst=dx>>4;
+    unsigned span=((dx+width-1)>>4)-destFirst;
+    if(((sx+width-1)>>4)-sourceFirst>span)span=((sx+width-1)>>4)-sourceFirst;
+    const unsigned sourceLast=sourceFirst+span,destLast=destFirst+span,words=span+1;
+    const int16_t sourceModulo=int16_t((sourceWords-words)*2),surfaceModulo=int16_t((surfaceWords-words)*2);
+    const int16_t shift=int16_t(int(dx&15)-int(sx&15));
+    const unsigned trailing=(sourceLast<<4)+16-sx-width;
+    const uint16_t lead=uint16_t(0xffffu>>(sx&15)),edge=trailing>=16?0:uint16_t(0xffffu<<trailing);
+    ULONG source,target;uint16_t first,last;
+    if(shift>=0){
+        source=ULONG(UWORD(sy))*UWORD(m.stride)+sourceFirst*2;
+        target=ULONG(UWORD(y))*AmigaEffectSurface::rowBytes+destFirst*2;
+        first=lead;last=edge;
+    }else{
+        // Descending: start at the last word of the last row.
+        source=ULONG(UWORD(sy+height-1))*UWORD(m.stride)+sourceLast*2;
+        target=ULONG(UWORD(y+int(height)-1))*AmigaEffectSurface::rowBytes+destLast*2;
+        first=edge;last=lead;
     }
-    alpha.patternWithMask(mask,x+16,y,sx,sy,width,height,low?0xffff:0);
+    auto* mask=reinterpret_cast<uint16_t*>(const_cast<std::uint8_t*>(m.data)+source);
+    if(low){
+        AmigaHardware::blitterCopyWithMask(reinterpret_cast<uint16_t*>(const_cast<std::uint8_t*>(low)+source),
+            reinterpret_cast<uint16_t*>(data+AmigaEffectSurface::planeBytes+target),mask,
+            words,height,sourceModulo,surfaceModulo,sourceModulo,shift,shift,first,last,false);
+        AmigaHardware::blitterCopyWithMask(reinterpret_cast<uint16_t*>(const_cast<std::uint8_t*>(high)+source),
+            reinterpret_cast<uint16_t*>(data+AmigaEffectSurface::planeBytes*2+target),mask,
+            words,height,sourceModulo,surfaceModulo,sourceModulo,shift,shift,first,last,false);
+    }
+    AmigaHardware::blitterPatternWithMask(low?0xffff:0,reinterpret_cast<uint16_t*>(data+target),mask,
+        words,height,0,surfaceModulo,sourceModulo,0,shift,first,last,false);
 #ifdef DOWNWELL_BOB_VERIFY
     ++gDownwellEffectDmaStamps;
 #endif

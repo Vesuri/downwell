@@ -3003,7 +3003,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     for(unsigned i=port.gemSlotEnd();i;--i){
                         const auto& gem=port.gemAt(i-1);
                         if(gem.active&&gem.motion.lifetime.visible())
-                            emit(gem.large,gem.motion.animation.frame(),Real::fromInteger(240+gem.x),Real::fromInteger(176+gem.y));
+                            emit(gem.large,gem.motion.animation.frame(),std::int32_t(240+gem.x),std::int32_t(176+gem.y));
                     }
                 },port.smokeEffects(),effectAssets,effectView,settings,[&](auto emit){
                     return port.visitDebrisDraw([&](const downwell::DebrisAnimation& effect){
@@ -3017,7 +3017,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     for(unsigned i=0;i<port.enemyCount();++i){
                         const auto& enemy=port.enemyAt(i);
                         if(enemy.active&&enemy.awake)
-                            emit(Real::fromInteger(240+enemy.x),Real::fromInteger(176+enemy.y));
+                            emit(std::int32_t(240+enemy.x),std::int32_t(176+enemy.y));
                     }
                 },[](Real n,std::int32_t& out){return n.roundPixel(out);})){
                     exitCode=20;break;

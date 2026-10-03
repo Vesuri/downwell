@@ -218,11 +218,55 @@ int main(int argc,char**argv){
         noShades,raster));
     assert(!colored.visible());
     colored.surface().visit([](auto,auto,auto,auto,auto){assert(false);});
+    // Whole-pixel producers bypass binary64 placement and the raster. They
+    // must compose exactly as the same positions emitted as binary64 with the
+    // Amiga's round-to-nearest raster: view edges, odd shade snaps, fractional
+    // views and magnitudes beyond the pixel range (taken through binary64).
+    unsigned pixelChecks=0,pixelStamps=0;
+    {
+        CurrencySmokeComposition pixel;
+        auto rounded=[](MotionBinary64 n,std::int32_t& out){return n.roundPixel(out);};
+        std::uint32_t seed=0x2545f491u;
+        auto next=[&]{seed^=seed<<13;seed^=seed>>17;seed^=seed<<5;return seed;};
+        smoke.clear();
+        for(unsigned trial=0;trial<4000;++trial){
+            const bool fractional=trial%8==7,far=trial%16==3;
+            const int vx=far?(1<<21)+int(next()%8):int(next()%64)-32;
+            const int vy=far?-(1<<21)-int(next()%8):int(next()%64)-32;
+            const EffectSurfacePlacement::View pixelView{number(vx+(fractional?0.5:0)),number(vy),number(160),number(284)};
+            auto pick=[&](int origin,int size){
+                switch(next()%8){
+                case 0:return std::int32_t(origin);
+                case 1:return std::int32_t(origin+size);
+                case 2:return std::int32_t(origin+1+int(next()%2));
+                case 3:return std::int32_t(origin+size-1-int(next()%2));
+                case 4:return std::int32_t((next()&1?1:-1)*((1<<21)-2+int(next()%5)));
+                default:return std::int32_t(origin-24+int(next()%unsigned(size+48)));
+                }
+            };
+            std::int32_t gx[6],gy[6],sx[4],sy[4];
+            for(unsigned i=0;i<6;++i){gx[i]=pick(vx,160);gy[i]=pick(vy,284);}
+            for(unsigned i=0;i<4;++i){sx[i]=pick(vx,160);sy[i]=pick(vy,284);}
+            const unsigned phase=trial%4;
+            auto gemsPixel=[&](auto emit){for(unsigned i=0;i<6;++i)emit(bool(i&1),(phase+i)%4,gx[i],gy[i]);};
+            auto gemsReal=[&](auto emit){for(unsigned i=0;i<6;++i)
+                emit(bool(i&1),(phase+i)%4,MotionBinary64::fromInteger(gx[i]),MotionBinary64::fromInteger(gy[i]));};
+            auto shadesPixel=[&](auto emit){for(unsigned i=0;i<4;++i)emit(sx[i],sy[i]);};
+            auto shadesReal=[&](auto emit){for(unsigned i=0;i<4;++i)
+                emit(MotionBinary64::fromInteger(sx[i]),MotionBinary64::fromInteger(sy[i]));};
+            assert(pixel.prepare(gemsPixel,smoke,assets,pixelView,{},shadesPixel,rounded));
+            assert(colored.prepare(gemsReal,smoke,assets,pixelView,{},shadesReal,rounded));
+            assert(pixel.surface().samePixels(colored.surface())&&pixel.visible()==colored.visible());
+            ++pixelChecks;pixelStamps+=pixel.visible();
+        }
+    }
+    assert(pixelChecks==4000&&pixelStamps>1000);
 #ifdef DOWNWELL_PROBES
     assert(activePhase==profileControllerComposition);
     assert(phaseCalls[profileEffectPlacement] && phaseCalls[profileEffectRaster] &&
            phaseCalls[profileEffectStamp]);
 #endif
     std::printf("Currency/smoke composition: %u joint color/shade frames match scalar painter\n",frames);
+    std::printf("Currency/smoke whole-pixel producers: %u frames (%u visible) match binary64 placement\n",pixelChecks,pixelStamps);
     std::printf("Smoke composition: %u lifecycle/flag/camera frames match scalar masks; direct=%u controller=%u hidden=%u\n",frames,directFrames,controllerFrames,hiddenFrames);
 }

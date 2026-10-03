@@ -214,8 +214,8 @@ spatial history. `make verify-terrain-ownership` compares this against the
 complete registered reference every frame. Wall-contact multiplicity lives in
 the occupancy grid's cells, and native wall/platform runs publish as spans
 after their draws. Contact-tape traces measure quiet frames at 46 ms (34 ms
-of work), combat 94 ms, time-field frames 73 ms and the frame-701 generation
-burst at 207 ms.
+of work), combat 88 ms, time-field frames 74 ms and the frame-701 generation
+burst at 188 ms.
 
 ### A. Keep native ownership sufficient
 
@@ -258,7 +258,9 @@ burst at 207 ms.
 
 ### C. Render with the blitter and precomputation
 
-- Currency/smoke composition still costs 17 ms per combat frame.
+- Currency/smoke composition costs 9 ms per combat frame for about three
+  stamps: each still pays about 14,000 cycles of per-row bounds and three
+  generic blitter-queue enqueues, plus a drain before the final-alpha test.
 - Currency/smoke: use blitter zero-flag tests for final-alpha overlap.
   Profile overlap-aware sprite assignment on dense gem/smoke
   scenes. Verify the mixed DMA/planar frame against original captures,

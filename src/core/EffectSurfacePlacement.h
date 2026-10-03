@@ -96,6 +96,25 @@ struct EffectSurfacePlacement {
         }
         out=next;return true;
     }
+    // Whole-pixel producers (gem and enemy positions). With the view and both
+    // coordinates inside smallPixel, fx and enemyShade take only their
+    // smallInteger branches, which these reproduce without binary64 values:
+    // the result is the pixel their placement would round to. Any input
+    // outside that range must use the binary64 entry points.
+    struct PixelView { std::int32_t x,y,width,height; };
+    static bool pixelView(const View& view,PixelView& out){
+        return smallInteger(view.x,out.x)&&smallInteger(view.y,out.y)&&
+               smallInteger(view.width,out.width)&&smallInteger(view.height,out.height);
+    }
+    static bool smallPixel(std::int32_t n){return n>-(1<<21)&&n<(1<<21);}
+    static bool pixelInView(std::int32_t x,std::int32_t y,const PixelView& v){
+        return x>v.x && x<v.x+v.width && y>v.y && y<v.y+v.height;
+    }
+    static std::int32_t snapShadePixel(std::int32_t integer){
+        unsigned magnitude=static_cast<unsigned>(integer<0?-integer:integer);
+        if(magnitude&1u)magnitude=(magnitude+1u)&~3u;
+        return integer<0?-static_cast<std::int32_t>(magnitude):static_cast<std::int32_t>(magnitude);
+    }
 private:
     static bool smallInteger(MotionBinary64 value,std::int32_t& out){
         if(value.low)return false;

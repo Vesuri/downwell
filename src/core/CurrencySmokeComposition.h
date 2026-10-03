@@ -51,18 +51,33 @@ public:
         visible_=false;direct_=settings.death||settings.lowSpec;
         if(!settings.effectsExist)return true;
         bool okay=true,added=false;
-        auto add=[&](const EffectMaskAssets::Asset* asset,MotionBinary64 x,MotionBinary64 y){
+        using Placement=EffectSurfacePlacement;
+        Placement::PixelView pixels;
+        const bool pixelView=Placement::pixelView(view,pixels);
+        auto addReal=[&](const EffectMaskAssets::Asset* asset,MotionBinary64 x,MotionBinary64 y){
             if(!okay)return;
-            EffectSurfacePlacement::Draw draw;
+            Placement::Draw draw;
             { DW_PROFILE_SCOPE(profileEffectPlacement);
-              okay=EffectSurfacePlacement::fx(x,y,view,false,false,true,draw); }
-            if(!okay || draw.target==EffectSurfacePlacement::hidden)return;
+              okay=Placement::fx(x,y,view,false,false,true,draw); }
+            if(!okay || draw.target==Placement::hidden)return;
             okay=asset && stamp(*asset,draw.x,draw.y,false,raster);
             added|=okay;
         };
+        // Producers may emit whole pixels as std::int32_t. Those are already
+        // raster positions: the raster is not consulted for them.
+        auto add=[&](const EffectMaskAssets::Asset* asset,auto x,auto y){
+            if constexpr(pixel(decltype(x){})){
+                if(!okay)return;
+                if(!pixelView||!Placement::smallPixel(x)||!Placement::smallPixel(y))
+                    return addReal(asset,MotionBinary64::fromInteger(x),MotionBinary64::fromInteger(y));
+                if(!Placement::pixelInView(x,y,pixels))return;
+                okay=asset && stampPixel(*asset,x-pixels.x,y-pixels.y,false);
+                added|=okay;
+            }else addReal(asset,x,y);
+        };
         if(!direct_){
             { DW_PROFILE_SCOPE(profileEffectCurrency);
-            currency([&](bool large,unsigned frame,MotionBinary64 x,MotionBinary64 y){
+            currency([&](bool large,unsigned frame,auto x,auto y){
                 add(assets.currency(large,frame),x,y);
             });
             }
@@ -87,10 +102,19 @@ public:
         }
         if(okay && added && !settings.lowSpec && settings.shadeExists && !settings.noControl){
             DW_PROFILE_SCOPE(profileEffectShade);
-            shades([&](MotionBinary64 x,MotionBinary64 y){
+            shades([&](auto x,auto y){
                 if(!okay)return;
+                if constexpr(pixel(decltype(x){})){
+                    if(pixelView&&Placement::smallPixel(x)&&Placement::smallPixel(y)){
+                        if(Placement::pixelInView(x,y,pixels))
+                            okay=assets.shade() && stampPixel(*assets.shade(),
+                                Placement::snapShadePixel(x)-pixels.x,Placement::snapShadePixel(y)-pixels.y,true);
+                        return;
+                    }
+                }
+                const auto realX=real(x),realY=real(y);
                 EffectSurfacePlacement::Draw draw;
-                okay=EffectSurfacePlacement::enemyShade(x,y,view,false,false,true,draw);
+                okay=EffectSurfacePlacement::enemyShade(realX,realY,view,false,false,true,draw);
                 if(okay && draw.target==EffectSurfacePlacement::shade)
                     okay=assets.shade() && stamp(*assets.shade(),draw.x,draw.y,true,raster);
             });
@@ -101,18 +125,25 @@ public:
         return true;
     }
 private:
+    static constexpr bool pixel(MotionBinary64){return false;}
+    static constexpr bool pixel(std::int32_t){return true;}
+    static MotionBinary64 real(MotionBinary64 n){return n;}
+    static MotionBinary64 real(std::int32_t n){return MotionBinary64::fromInteger(n);}
     template<class Raster>
     bool stamp(const EffectMaskAssets::Asset& asset,MotionBinary64 x,MotionBinary64 y,
                bool subtract,Raster raster){
         std::int32_t px,py;
         { DW_PROFILE_SCOPE(profileEffectRaster);
         if(!raster(x,px) || !raster(y,py))return false;
+        }
+        return stampPixel(asset,px,py,subtract);
+    }
+    bool stampPixel(const EffectMaskAssets::Asset& asset,std::int32_t px,std::int32_t py,bool subtract){
         if((asset.originX>0 && px<(-2147483647-1)+asset.originX) ||
            (asset.originX<0 && px>2147483647+asset.originX) ||
            (asset.originY>0 && py<(-2147483647-1)+asset.originY) ||
            (asset.originY<0 && py>2147483647+asset.originY))return false;
         px-=asset.originX;py-=asset.originY;
-        }
         DW_PROFILE_SCOPE(profileEffectStamp);
         const auto& m=asset.mask;
         const PaletteEffectSurface<>::Mask mask{m.data,m.bytes,m.width,m.height,m.stride};
