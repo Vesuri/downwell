@@ -47,6 +47,13 @@ public:
     }
     AmigaFieldOverlay(const AmigaFieldOverlay&)=delete;
     AmigaFieldOverlay& operator=(const AmigaFieldOverlay&)=delete;
+    // Physical row of an even plane offset: exact multiply-shift for 48-byte
+    // lines throughout the ring (checked exhaustively by the host test).
+    static unsigned rowOf(unsigned offset) {
+        static_assert(downwellBytesPerPlaneLine == 48 && downwellGameRingHeight * 48 <= 65536,
+                      "row reciprocal assumes 48-byte lines in a 16-bit ring");
+        return (static_cast<ULONG>(static_cast<UWORD>(offset)) * 2731u) >> 17;
+    }
     unsigned lastWordWrites = 0;
     bool present() const { return valid_ || pending_; }
     bool matches(UBYTE* target, unsigned origin, const Shape& shape) const {
@@ -57,7 +64,7 @@ public:
     // footprint. Do not rasterize the circle again merely to inspect row debt.
     template<class DirtyRow> bool touchesDirtyRows(DirtyRow dirtyRow) const {
         for(unsigned i=0;i<count_;++i)
-            if(dirtyRow(saved_[i].offset/downwellBytesPerPlaneLine))return true;
+            if(dirtyRow(rowOf(saved_[i].offset)))return true;
         return false;
     }
     void discard() { count_ = 0; valid_ = pending_ = false; }
@@ -95,7 +102,7 @@ public:
         for (unsigned i = 0; i < count_; ++i) {
             const auto& old = saved_[i];
             const unsigned slot = next.index[old.offset / 2];
-            const UWORD keep = slot && !dirtyRow(old.offset / downwellBytesPerPlaneLine)
+            const UWORD keep = slot && !dirtyRow(rowOf(old.offset))
                 ? old.mask & next.words[slot - 1].mask : 0;
             const UWORD restore = old.mask & static_cast<UWORD>(~keep);
             for (unsigned plane = 0; plane < 2; ++plane) {

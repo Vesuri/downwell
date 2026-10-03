@@ -214,7 +214,7 @@ spatial history. `make verify-terrain-ownership` compares this against the
 complete registered reference every frame. Wall-contact multiplicity lives in
 the occupancy grid's cells, and native wall/platform runs publish as spans
 after their draws. Contact-tape traces measure quiet frames at 46 ms (34 ms
-of work), combat 94 ms, time-field frames 79 ms and the frame-701 generation
+of work), combat 94 ms, time-field frames 73 ms and the frame-701 generation
 burst at 207 ms.
 
 ### A. Keep native ownership sufficient
@@ -264,11 +264,14 @@ burst at 207 ms.
   scenes. Verify the mixed DMA/planar frame against original captures,
   preserving controller priority.
 - Actors: blitter bobs or hardware sprites instead of CPU planar stamping.
-- Time-field outlines cost 33 ms per frame while fields are visible (about
-  16% of contact-tape frames). The overlay re-rasterises and restores every
-  circle's words when any raster or underlying row changes. Keep per-circle
-  word sets and reapply only changed circles and repainted rows, without
-  changing Draw RNG consumption or source geometry.
+- Time-field outlines cost 28 ms per frame while fields are visible (about
+  16% of contact-tape frames). The tape's field is one pulsing 24-26 px
+  circle whose raster changes almost every frame, so no word set can be
+  retained; the CPU spends about 1,000 cycles per outline word on raster,
+  matching, restoration and publication. Blit prepared outline images per
+  small-circle raster with saved backing instead, without changing Draw RNG
+  consumption or source geometry. Scrolling partly visible large circles
+  could reuse rows visible in both views; this tape does not exercise it.
 - Ammo HUD: precomputed gauge columns per fill and animation phase. Publish
   changed columns only and keep the static rim intact.
 - Terrain rows: blit tiles or prepared wall strips into the ring. Preserve

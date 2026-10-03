@@ -358,6 +358,8 @@ int main(int argc, char** argv) {
         require(reused>280&&clipped>0,"scroll fixture covers retained and boundary-clipped cases");
         std::cout<<"322 bidirectional scrolling field frames: "<<reused<<" physical-raster reuses passed\n";
     }
+    for(unsigned offset=0;offset<downwellGameRingPlaneBytes;offset+=2)
+        require(AmigaTimeFields::rowOf(offset)==offset/downwellBytesPerPlaneLine,"exact field row reciprocal");
     {
         // Two retained banks and one work bank may rotate in either order.
         // Compare against the copying implementation, including pending draws
