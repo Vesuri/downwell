@@ -5,9 +5,16 @@ target remote 127.0.0.1:2345
 # breakpoint while stopped, so FS-UAE records the requested PAL fields of
 # every instruction without debugger stops inside a capture.
 break downwellTraceReady
+# A capture can run past a later requested marker. Stop at the end of the
+# finite tape instead of waiting for an impossible additional breakpoint.
+break downwellProfileReady
 set $capture = 0
 while $capture < @COUNT@
     continue
+    if gDownwellProfileFrozen != 0
+        printf "Trace tape ended before all markers were captured; separate overlapping windows\n"
+        quit 1
+    end
     set $startFrame = gDownwellProfileFrames[3] + 1
     set $startField = gDownwellProfileVbi
     printf "TRACE start frame=%lu vbi=%lu\n", $startFrame, $startField
