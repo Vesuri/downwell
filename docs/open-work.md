@@ -268,11 +268,16 @@ Rules for this section:
 4. **Terrain painting of new rows (frame 844: 28 CPU tile draws, 26.1 ms;
    3.8 ms per combat frame).** `AmigaTerrainPainter::paint` draws each tile
    through the generic `amigaRendererDrawAsset` at about 5,500–9,000 cycles.
-   - First, check whether ring tiles are 16-pixel aligned and opaque. If so,
-     paint them from prepared per-tile plane words with direct word stores.
-   - Otherwise, blit each horizontal run of tiles in one blit per plane. Tall
-     strips only: small blits lose to the CPU (see the ammo experiment in the
-     audit).
+   - Batch horizontal tile runs for masked transfer, not independent tile
+     placements. Sprite 51 has 26 frames of 16×16 pixels with origin (8,8);
+     ordinary display placement is offset six pixels from a word boundary.
+     Transparency is the union of its two colour planes, including opaque
+     palette-black pen 3. Opaque word copies are not equivalent.
+   - Prepare contiguous run planes and coverage while preserving overlapping
+     tile order, corner highlights and breakable visibility. Transfer tall
+     strips per plane; small independent blits lose to the CPU (see the ammo
+     experiment in the audit). Avoid a large all-phase tile bank that still
+     performs per-tile masked CPU composition.
 
    Preserve circular hardware scrolling, static backing, incremental
    restoration and the [terrain update contract](terrain-update-contract.md).
