@@ -26,24 +26,24 @@ NATURAL_VERIFY ?= 0
 SKIP_INTRO ?= 0
 SKIP_TO_GAME ?= 0
 TERRAIN_RUN_STORE ?= 0
-TABLE_CONTACT_ATAN ?= 0
-RETAIN_HEALTH_HUD ?= 0
-AMMO_DAMAGE_RANGE ?= 0
-PREPARED_AMMO_DIVIDERS ?= 0
+TABLE_CONTACT_ATAN ?= 1
+RETAIN_HEALTH_HUD ?= 1
+AMMO_DAMAGE_RANGE ?= 1
+PREPARED_AMMO_DIVIDERS ?= 1
 DRAW_CACHE_AUDIT ?= 0
 DRAW_ORDER_AUDIT ?= 0
-LOCAL_DRAW_CAPTURE ?= 0
-AMMO_FACTORED ?= 0
+LOCAL_DRAW_CAPTURE ?= 2
+AMMO_FACTORED ?= 2
 AMMO_FACTORED_VERIFY ?= 0
-PREPARED_FIELDS ?= 0
+PREPARED_FIELDS ?= 1
 PREPARED_FIELDS_VERIFY ?= 0
 PROFILE_FIELD_REFERENCE ?= 0
-PREPARED_FIELDS_BACKING ?= 0
-SCENERY_LAYERS ?= 0
+PREPARED_FIELDS_BACKING ?= 5
+SCENERY_LAYERS ?= 1
 NATIVE_BOXES ?= 1
 NATIVE_FIELDS ?= 1
 TERRAIN_BATCH ?= 0
-TERRAIN_DIRECT ?= 0
+TERRAIN_DIRECT ?= 1
 TERRAIN_BATCH_VERIFY ?= 0
 SKIP_LEVEL ?= 0
 PROBES ?= 0
@@ -168,8 +168,8 @@ endif
 ifeq ($(TERRAIN_RUN_STORE),1)
 CFLAGS += -DDOWNWELL_TERRAIN_RUN_STORE
 endif
-ifeq ($(TABLE_CONTACT_ATAN),1)
-CFLAGS += -DDOWNWELL_TABLE_CONTACT_ATAN
+ifeq ($(TABLE_CONTACT_ATAN),0)
+CFLAGS += -DDOWNWELL_PORTABLE_CONTACT_ATAN
 endif
 ifeq ($(RETAIN_HEALTH_HUD),1)
 CFLAGS += -DDOWNWELL_RETAIN_HEALTH_HUD
@@ -374,11 +374,9 @@ $(OBJECTS): $(REPO)/generated/downwell-time-field-mask.h
 $(REPO)/generated/downwell-time-field-mask.h: $(REPO)/tools/export-time-stop-masks.csx $(REPO)/tools/verify-time-stop-masks.py $(REPO)/data/data.win
 	$(MAKE) -C $(REPO) generated/downwell-time-field-mask.h
 $(OBJECTS): $(REPO)/generated/smoke-trig.inc
-ifeq ($(TABLE_CONTACT_ATAN),1)
 $(OBJECTS): $(REPO)/generated/atan-q16.inc
 $(REPO)/generated/atan-q16.inc: $(REPO)/tools/generate-atan-table.py
 	$(MAKE) -C $(REPO) generated/atan-q16.inc
-endif
 
 $(REPO)/generated/smoke-trig.inc: $(REPO)/tools/export-smoke-trig.py $(REPO)/data/Downwell.exe
 	$(MAKE) -C $(REPO) generated/smoke-trig.inc

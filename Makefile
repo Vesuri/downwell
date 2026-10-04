@@ -551,7 +551,7 @@ verify-smoke-trig: build/smoke-trig-test
 	python3 tools/export-smoke-trig.py --check
 	./build/smoke-trig-test
 
-$(OBJECTS) $(TEST_TARGETS) $(PORT_REPLAY_REFERENCE_TARGET): generated/smoke-trig.inc
+$(OBJECTS) $(TEST_TARGETS) $(PORT_REPLAY_REFERENCE_TARGET): generated/smoke-trig.inc generated/atan-q16.inc
 
 generated/smoke-trig.inc: tools/export-smoke-trig.py data/Downwell.exe
 	python3 tools/export-smoke-trig.py
@@ -936,7 +936,7 @@ probe-table-atan-x86-macos: generated/atan-q16.inc
 
 build/contact-direction-table-test: $(AMIGA_SCENE_TEST_SOURCES) $(wildcard src/core/*.h) generated/atan-q16.inc
 	@mkdir -p $(@D)
-	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_TABLE_CONTACT_ATAN -DDOWNWELL_COMPARE_CONTACT_ATAN -o $@ $(AMIGA_SCENE_TEST_SOURCES)
+	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_COMPARE_CONTACT_ATAN -o $@ $(AMIGA_SCENE_TEST_SOURCES)
 
 # Optional numeric evidence only; not a portable/default test or Windows run.
 probe-runner-atan-x86-macos:
@@ -1937,12 +1937,6 @@ build/amiga-coverage-word-test: tests/platform/amiga/AmigaCoverageWordTest.cpp s
 $(PORT_REPLAY_REFERENCE_TARGET): $(PORT_REPLAY_REFERENCE_SOURCES) $(wildcard src/core/*.h)
 	@mkdir -p $(@D)
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(PORT_REPLAY_REFERENCE_SOURCES)
-
-# Cross-CPU equality requires the same presentation precision policy on both
-# sides. The default target deliberately retains the portable atan oracle.
-build/port-replay-reference-table-atan: $(PORT_REPLAY_REFERENCE_SOURCES) $(wildcard src/core/*.h) generated/atan-q16.inc generated/smoke-trig.inc
-	@mkdir -p $(@D)
-	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_TABLE_CONTACT_ATAN -o $@ $(PORT_REPLAY_REFERENCE_SOURCES)
 
 $(AREA_ONE_TRACE_TARGET): $(AREA_ONE_TRACE_SOURCES)
 	@mkdir -p $(@D)

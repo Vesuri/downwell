@@ -63,10 +63,10 @@ approximating collision, damage, RNG, or other gameplay decisions.
 
 ## Compact presentation direction
 
-`TABLE_CONTACT_ATAN=1` in the Amiga build selects `TableAtan.h` for contact
-damage-number direction only. The normal reference remains compiled, including
-as fallback for inputs outside the table adapter's admission domain. The
-experimental option is not yet the default. `build/contact-direction-table-test`
+Both builds use `TableAtan.h` for contact damage-number direction only.
+`DOWNWELL_PORTABLE_CONTACT_ATAN` (Amiga: `TABLE_CONTACT_ATAN=0`) selects the
+retained calculation, which also remains the fallback for inputs outside the
+table adapter's admission domain. `build/contact-direction-table-test`
 compares this adapter against a host running the retained calculation.
 
 `tools/generate-atan-table.py` generates 257 unsigned Q16-radian samples of
