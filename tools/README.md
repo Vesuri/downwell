@@ -87,6 +87,15 @@ This is host-only preparation for further work, **not an enabled optimization**:
 the interior-only native experiment failed its worst-frame timing gate. See
 [the audit](../docs/amiga-frame-cost.md#prepared-gauge-segments).
 
+`make verify-ammo-complete-probe` extends that feasibility check to the gauge's
+caps, red rim, background and single-digit number at every supported offset.
+The separate C++ witness uses the original ordered renderer and compares
+whole-region pixel digests for deterministic row-animation histories. It emits
+ignored bank data and a provenance/cost manifest, **not native assets**. Its
+naive combined bank costs 268–435 KiB, so neither measured layout is suitable
+for adoption; independent shell/number and column states need factoring.
+See the [complete-bank budget](../docs/amiga-frame-cost.md#complete-gauge-representation-budget).
+
 ## Prepared Amiga field images
 
 `make generated/amiga-field-images.bin` rasterizes all 512 small-circle

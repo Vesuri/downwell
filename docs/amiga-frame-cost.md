@@ -305,6 +305,43 @@ The full native patch is preserved only in
 No FPS/replay acceptance is claimed after failing the mandatory timing gate.
 The host probe/oracle remain as preparation, not as a performance win.
 
+### Complete-gauge representation budget
+
+The interior-only experiment leaves roughly 13 ms of the recharge HUD outside
+its prepared column. Before another native implementation,
+`make verify-ammo-complete-probe` measures a representation that also resolves
+the background, caps, red rim and label offline. Its independent witness draws
+the original ordered assets through `AmigaRenderer`, not `AmigaAmmoHud`.
+All **16,596 whole-region pixel digests match**, covering 100 deterministic
+updates at each capacity 1–16, all four meter displacements and all three
+number offsets. Multi-digit ammunition is explicitly excluded; changed-capacity
+row arrays still require the existing uniform-segment qualification/fallback.
+This is evidence for the representation, not a new runtime path.
+
+Combining those independent states is too costly:
+
+| Layout | Packed bytes, excluding file headers |
+| --- | ---: |
+| Final six-word rows represented by runs | 445,012 |
+| Shared eight-row blocks, with row dictionary | 274,350 |
+
+There are 7,497 final tiles and 316 unique six-word rows. Run storage alone
+is 308,766 bytes: the problem is duplicated sequences and selectors, not the
+palette or the number of distinct planar words. The block layout includes
+block directories; it is still about 268 KiB before any transfer staging.
+Do not allocate either bank on the A500 or treat host precomposition as a
+performance win. A next complete replacement must factor the shell/number
+dependencies away from the column animation (or otherwise remove their
+duplication), rather than returning to the rejected interior-only runtime.
+Any further selection/decode/staging work belongs in its native timing budget.
+
+Generator: `tools/probe-ammo-complete.py`; original-renderer witness:
+`tests/platform/amiga/AmigaAmmoCompleteWitness.cpp`. The ignored
+`generated/amiga-ammo-complete-probe.manifest.json` records input pack, source,
+extractor, generator and output hashes and the exact layout cost breakdown.
+Verification output: `build/ammo-complete-verification.log`. Neither layout
+is linked into the game; no new native FPS/replay acceptance is claimed.
+
 ### Draw-capture invalidation domain
 
 A subsequent native contact-tape audit distinguishes cache hits, identical

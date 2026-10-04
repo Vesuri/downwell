@@ -308,6 +308,12 @@ Rules for this section:
      its bank, but its interior-only native use fails the timing gate. Include
      the surrounding gauge/rim/label reconstruction in the replacement, and
      eliminate runtime run-selection work rather than tuning its inner loops.
+     Do not ship the naive full-gauge bank either: the
+     [complete-gauge probe](amiga-frame-cost.md#complete-gauge-representation-budget)
+     verifies its pixels but budgets 268–435 KiB. Factor independent
+     shell/number states away from column animation, and budget selection,
+     transfer staging and changed-region publication together before a native
+     replacement. Preserve the ordered renderer and unsupported-state fallback.
      Take this remaining A5 work before
      A3/A4 and B, without treating the remaining A6 gates as complete. The HUD
      targets remain unchanged.

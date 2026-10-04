@@ -2083,6 +2083,17 @@ build/ammo-segments-test: tests/platform/amiga/AmigaAmmoSegmentsTest.cpp src/pla
 verify-ammo-segment-probe: build/ammo-segments-test
 	./build/ammo-segments-test generated/amiga-hud.dwap
 
+# Host-only full-gauge representation budget; deliberately not a native bank.
+generated/amiga-ammo-complete-probe.json: tools/probe-ammo-complete.py generated/amiga-hud.dwap
+	python3 tools/probe-ammo-complete.py
+build/ammo-complete-witness: tests/platform/amiga/AmigaAmmoCompleteWitness.cpp src/platform/amiga/AmigaRenderer.c $(wildcard src/core/Ammo*.h) src/platform/amiga/AmigaRenderer.h
+	@mkdir -p $(@D)
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ tests/platform/amiga/AmigaAmmoCompleteWitness.cpp src/platform/amiga/AmigaRenderer.c
+.PHONY: verify-ammo-complete-probe
+verify-ammo-complete-probe: build/ammo-complete-witness generated/amiga-ammo-complete-probe.json
+	./build/ammo-complete-witness generated/amiga-hud.dwap > build/ammo-complete-witness.txt
+	python3 tools/probe-ammo-complete.py --verify build/ammo-complete-witness.txt
+
 .PHONY: generate-amiga-results verify-amiga-results
 .PHONY: generate-amiga-shop verify-amiga-shop
 generate-amiga-shop:
