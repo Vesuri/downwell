@@ -1741,6 +1741,12 @@ build/field-columns-test: tests/platform/amiga/AmigaFieldColumnsTest.cpp $(wildc
 verify-field-columns: build/field-columns-test
 	./build/field-columns-test
 
+.PHONY: analyze-field-layouts
+build/analyze-field-layouts: tools/analyze-field-layouts.cpp generated/downwell-field-columns.h
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -o $@ $<
+analyze-field-layouts: build/analyze-field-layouts
+	./build/analyze-field-layouts
+
 build/prepared-time-fields-test: tests/platform/amiga/AmigaPreparedTimeFieldsTest.cpp $(wildcard src/core/*.h) $(wildcard src/platform/amiga/*.h) generated/amiga-field-images.bin generated/downwell-field-columns.h
 	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $<
 verify-prepared-time-fields: build/prepared-time-fields-test

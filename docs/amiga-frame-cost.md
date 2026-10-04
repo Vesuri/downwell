@@ -286,3 +286,40 @@ The matching contact windows 644/699/843 use
 Frames 645/701/844 cost 816,590/1,262,490/901,690 cycles in the reference and
 816,570/1,262,450/901,280 in the column mode. They do not regress, but those
 sub-millisecond differences are not a combat performance win.
+
+## Large-field representation limits
+
+`make analyze-field-layouts` counts geometry work and uncompressed bitmap-bank
+storage using the generated portable rasters; it is not a native timing model.
+For independent, uniformly distributed Q8 radius pairs, excluding identical
+rasters, retaining identical whole columns eliminates only 3.4–4.2% of the
+word visits at circle X positions 110, 190 and 269. Word deltas still require
+42.4–47.4% as many destination-word visits as the current restore-plus-draw
+passes, before dirty rows, mixed-circle ordering, clipping and traversal cost.
+These are full-vertical-extent geometric counts, not observed contact-tape
+frequencies or predictions of equivalent cycle savings.
+
+A vertical-run experiment deduplicated translated colour sequences and moved
+vertical clipping, wrap splitting and interior row-footprint marking out of
+the per-word loop. It added 36,916 ordinary-memory bytes, with no new Chip
+allocation. Exhaustive radius/shift pixels and the existing mixed-field host
+tests passed, but the native result did not justify keeping it. The paired
+2/30 level-exit captures are `tmp/trace/field-runs-reference.h7eIC5` and
+`tmp/trace/field-runs-candidate.dQP6hY`; both text hashes are
+`7a4fbf07f8e3c1b37bf5af7b604de56517edd9daa41c31ded7112ce13c91a8f3`.
+Across selected complete frames 3–36, field transfers fall only from 18.83 to
+16.34 ms, while complete frames average 39.46 versus 39.57 ms. Frame 6 changes
+from 88.42 to 88.66 ms and frame 33 from 19.59 to 22.22 ms; presentation waiting
+absorbs the modest CPU saving. The experiment was removed. Its recoverable
+patch is `tmp/field-runs-rejected.patch`; it is not another production option.
+
+The bitmap counts also rule out blindly expanding every large circle into a
+full masked sprite. Across the 21 distinct rasters, single full-height images
+need 594,084 bytes. Bands of 16 lines reduce that to 87,752 bytes but require
+32 rectangles per unclipped circle on average; 32-line bands need 146,360
+bytes and 16 rectangles. Translation-deduplicated one-word-wide fragments
+need 51,204 bytes of colour/mask pixels and about 33 rectangles per full
+circle. Counts exclude additional placement/index metadata, runtime clipping,
+and DMA setup costs; view clipping can reject many rectangles. A DMA design
+needs an explicit resident-bank or staging budget and native blit measurements,
+not a claim that these host counts already achieve the field budget.

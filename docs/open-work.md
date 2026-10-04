@@ -332,6 +332,13 @@ Rules for this section:
      repeating that traversal
      for restoration and drawing made the level-exit workload slower. See
      the [large-field experiment](amiga-frame-cost.md#large-field-traversal-experiment).
+     Do not pursue another per-word CPU layout rewrite: the vertical-run
+     experiment did not justify its memory or improve complete-frame pacing.
+     Evaluate removing a whole restoration/publication pass or prepared DMA
+     composition, with explicit mixed-field ordering, dirty-row handling and
+     Chip-bank/staging ownership. Use the
+     [representation audit](amiga-frame-cost.md#large-field-representation-limits)
+     to budget bitmap residency and blit count before expanding assets.
    - Explicitly partition the shared scene bank: terrain batching already
      uses its first 44,304 bytes. Field images/backing must not overlap that
      scratch or survive a front-bank reload without rebinding.

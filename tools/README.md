@@ -108,6 +108,12 @@ horizontal-shift phases against independent pixels and physical-row footprints;
 `verify-prepared-time-fields` checks integration and mixed source order. These
 are portable-raster checks, not claims of Windows GPU raster equivalence.
 
+`make analyze-field-layouts` reports unchanged-column/word opportunities and
+deduplicated bitmap-band storage/counts for those large rasters. Its uniform
+radius-pair model is a geometry/storage audit, not a replacement for native
+timing or a measured distribution of gameplay inputs. See the frame-cost
+audit before choosing another large-field representation.
+
 ## Original audio
 
 After the UTMT extraction, run `python3 tools/extract-audio.py` to extract all
