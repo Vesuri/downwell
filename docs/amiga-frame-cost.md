@@ -323,3 +323,50 @@ circle. Counts exclude additional placement/index metadata, runtime clipping,
 and DMA setup costs; view clipping can reject many rectangles. A DMA design
 needs an explicit resident-bank or staging budget and native blit measurements,
 not a claim that these host counts already achieve the field budget.
+
+## Large-field row-restoration experiment
+
+Replacing masked restoration with existing terrain-row DMA did not improve
+complete-frame pacing enough to retain. The experiment retired old field
+ownership transactionally, scheduled at most four physical spans covering at
+most 80 rows, synchronized the pristine terrain, and repainted fields before
+actors. Tall side arcs and larger/more fragmented footprints retained masked
+restoration. It added no Chip allocation.
+
+The first version scanned physical row footprints and queried existing row
+debt, costing 4.0–4.7 ms just to schedule restoration. Preparing exact clipped
+footprints offline reduced that scheduling to about 1.5 ms. Deduplicating
+16-position X blocks required 8,106 ordinary-memory bytes for all 512 radius
+phases and centres -21 through 401. Host checks covered 219,648 X/radius
+footprints, 32,768 clipping/wrap raster cases and transactional row restoration;
+the composition tests also passed address/undefined-behavior sanitizers.
+The earlier scanning version passed the native full-buffer fixture, but the
+offline-footprint variant was rejected on timing before repeating native pixel
+and contact/FPS acceptance gates.
+
+The final matched level-exit traces are
+`tmp/trace/field-row-spans-reference.NXx44p` (masked restoration) and
+`tmp/trace/field-row-spans-candidate.zoHkQ8` (prepared spans plus terrain rows).
+Both executable text hashes are
+`42c8e996bec15f9d2374410823c49059cf1cf0bf5863faf25bad3d869960ddee`.
+Use the prepared-column bundle and 2/30 markers described above; the discarded
+experiment selected its candidate with `PREPARED_FIELDS_BACKING=3` and its
+reference with `=2`. That candidate option is no longer in the build.
+
+| Complete level-exit frame | Masked restore (ms) | Terrain rows (ms) |
+| ---: | ---: | ---: |
+| 3 | 34.93 | 32.82 |
+| 4 | 35.78 | 33.72 |
+| 5 | 39.48 | 41.27 |
+| 6 | 88.40 | 88.20 |
+| 33 | 19.72 | 21.76 |
+| 36 | 18.97 | 20.91 |
+
+Selected complete frames 3–36 total 5,326,870 versus 5,325,730 cycles: about
+39.46 versus 39.45 ms per frame, effectively unchanged. New terrain copies
+cost roughly 4–6 ms on changing-field frames; drawing remains 12–13 ms.
+Average presentation waiting rises from 2.09 to 4.10 ms in the selected window.
+Moving restoration into the row owner alone therefore does not solve the field
+budget. The source and generated-table changes were removed; the recoverable
+patch is `tmp/field-row-restoration-rejected.patch`. Do not revive this as
+another production option or count its host correctness checks as a speedup.

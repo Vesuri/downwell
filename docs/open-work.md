@@ -339,6 +339,12 @@ Rules for this section:
      Chip-bank/staging ownership. Use the
      [representation audit](amiga-frame-cost.md#large-field-representation-limits)
      to budget bitmap residency and blit count before expanding assets.
+     Whole-row retirement alone is also ruled out by the
+     [paired native experiment](amiga-frame-cost.md#large-field-row-restoration-experiment):
+     exact offline spans remove scheduling scans, but copying terrain rows
+     and repainting the outline leaves complete frames effectively unchanged.
+     The next design must address the remaining 12–13 ms drawing pass as well,
+     accounting for source staging and old-mask restoration in the same budget.
    - Explicitly partition the shared scene bank: terrain batching already
      uses its first 44,304 bytes. Field images/backing must not overlap that
      scratch or survive a front-bank reload without rebinding.
