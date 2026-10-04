@@ -46,7 +46,7 @@ std::vector<unsigned> cleanupOrder(const downwell::ObjectPack& objects,
     auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
         owner->breakableBinding(),owner->playerBinding());
     require(owner->attach(*world),"cleanup fixture attaches");
-    for(int object:{112,92,112,92,112,92})
+    for(int object:{112,82,92,112,92,82,112,92})
         require(world->createGeneratedInstance({object,240,512},objects,[](const auto&){return true;}),"mixed births");
     downwell::InstanceHandle enemies[3];
     for(unsigned i=0;i<3;++i)enemies[i]=world->enemyHandle(world->enemyAt(i).lifetimeId);
@@ -80,6 +80,21 @@ std::vector<unsigned> cleanupOrder(const downwell::ObjectPack& objects,
             kind==View::Kind::breakable&&world->retireMarkedBreakable(local);
     }),"ordered cleanup succeeds");
     require(owner->prepareDraw(),"second cleanup is empty");
+    auto registrations=[&](){
+        order.push_back(0xffffffffu);
+        require(owner->visitRegistrationOrder([&](downwell::InstanceHandle h,int object,std::uint32_t flags){
+            order.push_back(h.slot);order.push_back(h.generation);order.push_back(unsigned(object));
+            order.push_back(flags&0x190013u);return true;
+        }),"native field registration order survives cleanup");
+    };
+    registrations();
+    const auto previousField=world->timeFields().identityAt(0);
+    require(world->restartFromResults(downwell::DeathMenuSequence::Action::Retry,42,300)!=
+        downwell::ResultsDestination::none,"native fields retire during Retry");
+    require(owner->valid()&&world->timeFields().size()==0,"Retry clears all fields");
+    require(world->createGeneratedInstance({82,256,600},objects,[](const auto&){return false;}),"field recreated after Retry");
+    require(world->timeFields().identityAt(0)>previousField,"field identity cursor survives Retry");
+    registrations();
     return order;
 }
 
@@ -94,12 +109,13 @@ struct Scene {
     std::unique_ptr<AmigaPortRuntime> world;
     Scene(const downwell::BuilderPatternPack& patterns,const downwell::ObjectPack& objects,
           const downwell::SpriteCollisionPack& sprites,const downwell::RoomPack& rooms,
-          const downwell::PackedRoom& room,const downwell::StartupRuntime& entry,Ownership ownership,bool nativeBoxes=true)
+          const downwell::PackedRoom& room,const downwell::StartupRuntime& entry,Ownership ownership,
+          bool nativeBoxes=true,bool nativeFields=true)
         :collision{nullptr,nullptr,&patterns,nullptr,0,nullptr},
          generation(builder,patterns,objects,index,tiles){
         owner=std::make_unique<downwell::GameplayCollisionOwner>(objects,sprites,
             downwell::GameplayTerrainInstances::Presentation{},downwell::GameplayTerrainInstances::WallCollision{},
-            &rooms,ownership,nativeBoxes);
+            &rooms,ownership,nativeBoxes,nativeFields);
         require(owner->valid(),"owner prepares");
         // Native ownership keeps no terrain identity records: the occupancy
         // grid is the only terrain representation, as on the Amiga.
@@ -137,6 +153,12 @@ struct Scene {
         for(unsigned i=0;i<w.gemCapacity;++i){const auto& g=w.gemAt(i);if(!g.active)continue;
             d.addI32(g.x);d.addI32(g.y);d.addU32(g.age);d.addU32(g.lifetimeId);}
         d.addU32(w.damageNumbers().size());
+        d.addU32(w.timeFields().size());
+        for(unsigned i=0;i<w.timeFields().size();++i){
+            const auto* f=w.timeFields().at(i);require(f!=nullptr,"field record resolves");
+            d.addU32(w.timeFields().identityAt(i));d.addI32(f->x);d.addI32(f->y);
+            d.addU64(f->radius.mantissa);d.addI32(f->radius.exponent);
+        }
         d.addU32(w.breakableSlots());
         for(unsigned i=0;i<w.breakableSlots();++i){const auto& b=w.breakableSlot(i);
             d.addU32(b.lifetimeId);d.addBool(b.active);d.addBool(b.destroyRequested);d.addI32(b.alarm0);}
@@ -222,11 +244,13 @@ int main(int argc,char** argv){
             &rooms,&objects,2,&patterns);
         host->skipToGameForTesting();
         auto reference=std::make_unique<Scene>(patterns,objects,sprites,rooms,room,*host,Ownership::reference);
-        std::unique_ptr<Scene> others[4]={
+        std::unique_ptr<Scene> others[6]={
             std::make_unique<Scene>(patterns,objects,sprites,rooms,room,*host,Ownership::nativeTerrain),
             std::make_unique<Scene>(patterns,objects,sprites,rooms,room,*host,Ownership::native),
             std::make_unique<Scene>(patterns,objects,sprites,rooms,room,*host,Ownership::nativeScenery),
-            std::make_unique<Scene>(patterns,objects,sprites,rooms,room,*host,Ownership::nativeScenery,false)};
+            std::make_unique<Scene>(patterns,objects,sprites,rooms,room,*host,Ownership::nativeScenery,false,false),
+            std::make_unique<Scene>(patterns,objects,sprites,rooms,room,*host,Ownership::nativeScenery,true,false),
+            std::make_unique<Scene>(patterns,objects,sprites,rooms,room,*host,Ownership::nativeScenery,false,true)};
         for(frame=0;frame<downwell::gameplayContactProfileFrames;++frame){
             const auto& player=reference->world->player();
             const auto input=downwell::packReplayInput(downwell::gameplayContactProfileInput(

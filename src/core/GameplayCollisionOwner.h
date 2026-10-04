@@ -117,36 +117,59 @@ private:
         return terrainRegistered_||(terrainDepth.assignInteger(100)&&!RunnerSpatialSplit::equal(depth,terrainDepth));
     }
     bool nativeBoxSlot(unsigned slot)const{return nativeBoxes_&&slot>=View::breakableBase&&slot<View::terrainBase;}
+    bool nativeFieldSlot(unsigned slot)const{return nativeFields_&&slot>=View::timeFieldBase&&slot<View::goalFieldBase;}
     const GameplayWorld::Breakable* nativeBox(InstanceHandle h)const{
         if(!world_||!nativeBoxSlot(h.slot))return nullptr;
         const auto* box=world_->findBreakable({h.slot-View::breakableBase,h.generation});
         return box&&box->nativeRegistration?box:nullptr;
     }
+    const OrdinaryTimeField* nativeField(InstanceHandle h)const{
+        if(!world_||!nativeFieldSlot(h.slot))return nullptr;
+        const auto& fields=world_->timeFields();const unsigned index=h.slot-View::timeFieldBase;
+        if(!h.generation||fields.identityAt(index)!=h.generation)return nullptr;
+        const auto* field=fields.at(index);
+        return field&&field->nativeRegistration?field:nullptr;
+    }
     bool resolves(InstanceHandle h)const{
-        if(nativeBoxSlot(h.slot))return nativeBox(h)!=nullptr;
-        return world_&&(native_?table_.contains(h):owner_.contains(h))&&View(*world_).contains(h);
+        if(!world_)return false;
+        if(native_){
+            // Registered actors take their original path. Only absent keys
+            // need delegation to native families; adding a family must not
+            // turn every actor lookup into a walk of all family predicates.
+            if(table_.contains(h))return View(*world_).contains(h);
+            return nativeBox(h)||nativeField(h);
+        }
+        return owner_.contains(h)&&View(*world_).contains(h);
     }
     unsigned animationSkipFirst()const{return native_?View::breakableBase:View::terrainBase;}
     unsigned animationSkipLast()const{return native_?View::bulletBase:View::timeFieldBase;}
     int objectOf(InstanceHandle h)const{
-        if(nativeBoxSlot(h.slot))return nativeBox(h)?92:-1;
-        return native_?table_.objectId(h):owner_.objectId(h);
+        if(!native_)return owner_.objectId(h);
+        const int object=table_.objectId(h);if(object>=0)return object;
+        return nativeBox(h)?92:nativeField(h)?82:-1;
     }
     InstanceHandle handleAt(unsigned slot)const{
+        if(!native_)return owner_.currentHandle(slot);
+        const auto registered=table_.currentHandle(slot);if(registered.generation)return registered;
         if(nativeBoxSlot(slot)){
             const unsigned index=slot-View::breakableBase;
             if(!world_||index>=world_->breakableSlots())return {};
             const auto& b=world_->breakableSlot(index);
             return b.nativeRegistration?InstanceHandle{slot,b.lifetimeId}:InstanceHandle{};
         }
-        return native_?table_.currentHandle(slot):owner_.currentHandle(slot);
+        if(world_&&nativeFieldSlot(slot)){
+            const unsigned i=slot-View::timeFieldBase;
+            const auto* f=world_->timeFields().at(i);
+            if(f&&f->nativeRegistration)return {slot,world_->timeFields().identityAt(i)};
+        }
+        return {};
     }
     std::uint32_t captureRevision()const{return native_?table_.captureRevision():owner_.captureRevision();}
     std::uint32_t bindingRevision()const{return native_?table_.bindingRevision():owner_.bindingRevision();}
     bool bindingsUnchanged(std::uint32_t revision)const{
         return native_?table_.bindingsUnchanged(revision):owner_.bindingsUnchanged(revision);
     }
-    bool capturePrevious(InstanceHandle h){return native_?resolves(h):owner_.capturePrevious(h);}
+    bool capturePrevious(InstanceHandle h){return native_?(table_.contains(h)||nativeBox(h)||nativeField(h)):owner_.capturePrevious(h);}
     int drawSprite(unsigned slot)const{return native_?table_.sprite(slot):properties_.read(slot)->sprite.spriteId;}
     // Registration order restricted to one owner domain, with live flags.
     template<class Visit> bool visitRegistered(unsigned first,unsigned last,Visit visit)const{
@@ -156,11 +179,12 @@ private:
         });
     }
     bool eligibilityFlags(InstanceHandle h,std::uint32_t& out)const{
-        if(nativeBoxSlot(h.slot)){
-            const auto* b=nativeBox(h);if(!b)return false;
-            out=nativeBoxFlags_|(b->destroyRequested?1u:0u);return true;
+        if(native_){
+            if(table_.flags(h,out))return true;
+            if(const auto* b=nativeBox(h)){out=nativeBoxFlags_|(b->destroyRequested?1u:0u);return true;}
+            if(nativeField(h)){out=nativeFieldFlags_;return true;}
+            return false;
         }
-        if(native_)return table_.flags(h,out);
 #ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
         const auto state=owner_.resolve(h);if(!state)return false;
         out=state->flags;return true;
@@ -179,23 +203,41 @@ private:
 #endif
     }
     template<class Visit> bool visitNativeRegistered(unsigned first,unsigned last,Visit visit)const{
-        if(!nativeBoxes_||last<=View::breakableBase||first>=View::terrainBase)
+        const bool boxes=nativeBoxes_&&last>View::breakableBase&&first<View::terrainBase;
+        const bool fields=nativeFields_&&last>View::timeFieldBase&&first<View::goalFieldBase;
+        if(!boxes&&!fields)
             return table_.visitRegistrationRange(first,last,visit);
         if(!world_||first>last||last>View::capacity)return false;
         unsigned box=first>View::breakableBase?first-View::breakableBase:0;
-        const unsigned end=last<View::terrainBase?last-View::breakableBase:world_->breakableSlots();
-        // Box slots append in birth order and are not compacted. Merge that
-        // native sequence with actor registrations only when a capture asks
-        // for boxes; no per-birth linked-list attachment is needed.
+        const unsigned end=boxes?(last<View::terrainBase?last-View::breakableBase:world_->breakableSlots()):0;
+        unsigned field=first>View::timeFieldBase?first-View::timeFieldBase:0;
+        const unsigned fieldEnd=fields?(last<View::goalFieldBase?last-View::timeFieldBase:world_->timeFields().size()):0;
+        // Both families append in birth order without compaction. Merge their
+        // native sequences with actor registrations only for requested ranges.
         auto emitBefore=[&](std::uint32_t order){
-            while(box<end&&box<world_->breakableSlots()){
-                const auto& b=world_->breakableSlot(box);
-                if(order&&b.nativeRegistration&&b.nativeRegistration>=order)break;
-                const unsigned slot=View::breakableBase+box++;
-                if(b.nativeRegistration&&!visit(InstanceHandle{slot,b.lifetimeId},92,
-                    nativeBoxFlags_|(b.destroyRequested?1u:0u)))return false;
+            for(;;){
+                const GameplayWorld::Breakable* b=nullptr;
+                const OrdinaryTimeField* f=nullptr;
+                while(box<end&&box<world_->breakableSlots()){
+                    b=&world_->breakableSlot(box);if(b->nativeRegistration)break;
+                    b=nullptr;++box;
+                }
+                while(field<fieldEnd){
+                    f=world_->timeFields().at(field);if(f&&f->nativeRegistration)break;
+                    f=nullptr;++field;
+                }
+                if(!b&&!f)return true;
+                const bool fieldFirst=f&&(!b||f->nativeRegistration<b->nativeRegistration);
+                const auto stamp=fieldFirst?f->nativeRegistration:b->nativeRegistration;
+                if(order&&stamp>=order)return true;
+                if(fieldFirst){
+                    const InstanceHandle h{View::timeFieldBase+field,world_->timeFields().identityAt(field)};
+                    ++field;if(!visit(h,82,nativeFieldFlags_))return false;
+                }else{
+                    const InstanceHandle h{View::breakableBase+box++,b->lifetimeId};
+                    if(!visit(h,92,nativeBoxFlags_|(b->destroyRequested?1u:0u)))return false;
+                }
             }
-            return true;
         };
         return table_.visitRegistrationRange(first,last,[&](InstanceHandle h,int object,std::uint32_t flags){
             return emitBefore(table_.registrationOrder(h))&&visit(h,object,flags);
@@ -435,6 +477,10 @@ private:
                 return parent.check(!inactive&&parent.table_.externalBirth(h.slot,r.nativeRegistration)&&
                     parent.layers_.birthScenery(depth));
             }
+            if constexpr(Kind==View::Kind::timeField)if(parent.nativeFields_){
+                return parent.check(parent.table_.externalBirth(h.slot,r.nativeRegistration)&&
+                    parent.layers_.birthScenery(depth));
+            }
             if(!parent.check(parent.table_.birth(h,object(r),definition->initialFlags|(inactive?2u:0u),sprite)))return false;
             if(!parent.check(parent.room_.bind(h.slot,depth)))return false;
             if(inactive)parent.activationPending_=true;
@@ -464,6 +510,12 @@ private:
             return parent.check(r.x.bits==x.bits&&r.y.bits==y.bits)&&birth(local,r);
         }
         bool retire(InstanceHandle local,const Record& r){InstanceHandle h;
+            if constexpr(Kind==View::Kind::timeField)if(parent.nativeFields_){
+                if(!key(local,r,h)||!r.nativeRegistration)return parent.check(false);
+                const auto* d=parent.objectDefaults_.get(82);
+                if(!parent.check(d&&parent.layers_.retireScenery(d->creationDepth)))return false;
+                r.nativeRegistration=0;parent.table_.externalRetire(h.slot);return true;
+            }
             if constexpr(Kind==View::Kind::breakable)if(parent.nativeBoxes_){
                 if(!key(local,r,h)||!r.nativeRegistration)return parent.check(false);
                 const auto* d=parent.objectDefaults_.get(92);
@@ -499,6 +551,8 @@ private:
             if(!parent.check(parent.room_.mark(h.slot)))return false;
             parent.destructionPending_=true;return true;}
         bool membership(InstanceHandle local,const Record& r,bool member){InstanceHandle h;
+            if constexpr(Kind==View::Kind::timeField)if(parent.nativeFields_)
+                return parent.check(member)&&key(local,r,h);
             if constexpr(Kind==View::Kind::breakable)if(parent.nativeBoxes_)
                 return parent.check(member)&&key(local,r,h);
             return key(local,r,h)&&parent.check(parent.native_?parent.table_.registerObject(h,member):parent.owner_.registerObject(h,member));}
@@ -724,9 +778,11 @@ private:
     const bool native_;
     const bool sceneryLayers_;
     const bool nativeBoxes_;
+    const bool nativeFields_;
     const bool terrainRegistered_;
     NativeInstanceTable<View::capacity> table_;
     std::uint32_t nativeBoxFlags_=0;
+    std::uint32_t nativeFieldFlags_=0;
     InstanceHandle markedBoxes_[GameplayWorld::breakableCapacity]{};
     unsigned markedBoxCount_=0;
     GameplayTerrainInstances terrain_;
@@ -748,13 +804,14 @@ public:
     enum class Ownership {reference,nativeTerrain,native,nativeScenery};
     GameplayCollisionOwner(const ObjectPack& objects,const SpriteCollisionPack& sprites,
         GameplayTerrainInstances::Presentation presentation={},GameplayTerrainInstances::WallCollision collision={},
-        const RoomPack* rooms=nullptr,Ownership ownership=Ownership::reference,bool nativeBoxes=true):
+        const RoomPack* rooms=nullptr,Ownership ownership=Ownership::reference,bool nativeBoxes=true,bool nativeFields=true):
         objects_(objects),sprites_(sprites),layers_(rooms),
         native_(ownership==Ownership::native||ownership==Ownership::nativeScenery),
         sceneryLayers_(ownership==Ownership::nativeScenery),
         nativeBoxes_(ownership==Ownership::nativeScenery&&nativeBoxes),
+        nativeFields_(ownership==Ownership::nativeScenery&&nativeFields),
         terrainRegistered_(ownership==Ownership::reference),
-        table_(ownership==Ownership::nativeScenery&&nativeBoxes),
+        table_(ownership==Ownership::nativeScenery&&(nativeBoxes||nativeFields)),
         terrain_(terrainRegistered_?GameplayTerrainInstances::Binding::bindDestruction(terrainBinding_):
             GameplayTerrainInstances::Binding{},presentation,collision){
 #ifdef DOWNWELL_TERRAIN_RUN_STORE
@@ -779,6 +836,7 @@ public:
             terrainBirthBounds_.prepare(objectDefaults_,sprites_)&&
             families_.bindInstanceFlags(objects)&&drawMetadata_.bind(objects)&&alarmMetadata_.bind(objects);
         if(good_){const auto* box=objectDefaults_.get(92);if(!box)good_=false;else nativeBoxFlags_=box->initialFlags;}
+        if(good_){const auto* field=objectDefaults_.get(82);if(!field)good_=false;else nativeFieldFlags_=field->initialFlags;}
 #if defined(DOWNWELL_TERRAIN_RUN_STORE) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
         if(good_)good_=terrainCreate_.prepare(objectDefaults_,sprites_);
         if(good_)good_=owner_.bindTerrainGeometry(terrainBirthBounds_);

@@ -246,28 +246,24 @@ Rules for this section:
      number regions and final-word publication while resolving that gate.
 
    Target: under 4 ms on a damage frame.
-3. **Generation births (frame 844: 23.1 ms for 13 `appendBreakables`, 12,636
-   cycles each; frame 701: 11.0 ms for 6).** Each breakable birth attaches
-   a generic runner layer element, lifetime and room membership
-   (`GameplayRoomLayers::birth`, 5,680 cycles each). Give breakables native
-   ownership, as terrain already has: a family record plus grid state, with
-   no per-birth layer, lifetime or membership attachment. Anything that
-   observes a breakable (shots, destruction, draw order) must read the native
-   record. Apply the same to the other generated families that still take
-   the generic birth in frame 701 (seven layer births, 6.7 ms; time-field
-   adoption, 3.1 ms).
-   - Finish native time-field ownership in `nativeScenery`, removing its
-     remaining table and room-list attachments. Reduce native box birth
-     preparation to the target below without reviving per-instance registry
-     nodes or changing Create timing. Preserve registration order for alarms,
+3. **Finish native-family birth preparation.** Bring box creation below
+   2,000 cycles per birth without reviving per-instance registry nodes or
+   changing Create timing. Prepare invariant construction data before the
+   level rather than tuning individual sub-millisecond helpers. Preserve
+   registration order for alarms,
      active-before-inactive depth order for cleanup, dynamic layer lifetime,
      and the distinction between destruction marking and retirement.
+   - Prioritize A4–A6 before this remaining birth-preparation work, then return
+     here before B. The fresh complete-frame trace measures box births at
+     10.91 ms in frame 844, versus 26.08 ms for generic terrain painting and
+     roughly 23 ms for field outlines; recharge still costs about 30 ms.
+     These are larger architectural work-removal targets. The birth target
+     is deferred, not removed or considered achieved.
    - Enable the accepted native family path in the normal build after its
-     complete timing/fidelity gates; keep `NATIVE_BOXES=0` as the registered
-     comparison path with population-only layers.
+     complete timing/fidelity gates; retain `NATIVE_BOXES=0 NATIVE_FIELDS=0`
+     as the registered comparison path with population-only layers.
 
-   Target: under 2,000 cycles per birth, saving about 20 ms in frame 844 and
-   about 13 ms in frame 701. Verify with a per-frame comparison against the
+   Verify the target with a per-frame comparison against the
    registered reference, as `make verify-terrain-ownership` does for terrain.
 4. **Terrain painting of new rows (frame 844: 28 CPU tile draws, 26.1 ms;
    3.8 ms per combat frame).** `AmigaTerrainPainter::paint` draws each tile
