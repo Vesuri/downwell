@@ -795,6 +795,33 @@ def build_records(manifest, extracted, profile, language_path=None):
             encoded.append((dict(id=65010, width=width, height=height, originX=8-left, originY=8-top),
                             digit, stride, data))
 
+        # drawSpriteHP: three black shadow copies, then the foreground.
+        # Keep each glyph's anchor so the recovered multi-digit layout is unchanged.
+        health_sources = {(sprite["id"], frame):
+                          (sprite, decode_planar(data, sprite["width"], sprite["height"], stride))
+                          for sprite, frame, stride, data in encoded if sprite["id"] in (413, 414)}
+        for glyph in range(11):
+            sprite_id, foreground, shadow = (413, glyph, glyph+20) if glyph < 10 else (414, 0, 2)
+            layers = [(shadow, 1, 0), (shadow, 1, 1), (shadow, 0, 1), (foreground, 0, 0)]
+            pixels = {}
+            for frame, dx, dy in layers:
+                source, pens = health_sources[sprite_id, frame]
+                for y in range(source["height"]):
+                    for x in range(source["width"]):
+                        pen = pens[y*source["width"]+x]
+                        if pen:
+                            pixels[x-source["originX"]+dx, y-source["originY"]+dy] = pen
+            left = min(x for x, y in pixels)
+            top = min(y for x, y in pixels)
+            width = max(x for x, y in pixels)+1-left
+            height = max(y for x, y in pixels)+1-top
+            pens = [pixels.get((x, y), 0) for y in range(top, top+height)
+                    for x in range(left, left+width)]
+            stride, data = encode_planar(pens, width, height)
+            require(decode_planar(data, width, height, stride) == pens, "health glyph round trip")
+            encoded.append((dict(id=65011, width=width, height=height, originX=-left, originY=-top),
+                            glyph, stride, data))
+
     style_text = {}
     if profile == "game":
         glyphs = {glyph["character"]: glyph
@@ -1206,9 +1233,9 @@ def main():
             atomic_write(selection_manifest, selection_provenance)
     if args.profile == "hud":
         provenance = json.dumps({
-            "schemaVersion": 1, "generator": "generate-amiga-hud.py/hud-v2",
+            "schemaVersion": 1, "generator": "generate-amiga-hud.py/hud-v3",
             "extractor": manifest["extractor"], "sourceSha256": SOURCE_SHA256,
-            "packSha256": digest, "derivedAmmoDigitId": 65010,
+            "packSha256": digest, "derivedAmmoDigitId": 65010, "derivedHealthGlyphId": 65011,
         }, sort_keys=True, indent=2).encode("utf-8") + b"\n"
         provenance_path = args.output.with_suffix(".manifest.json")
         if args.check:

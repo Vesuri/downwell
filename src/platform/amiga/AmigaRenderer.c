@@ -720,6 +720,27 @@ int amigaRendererPrepareDamageGlyphs(AmigaDamageGlyphs* glyphs, const UBYTE* pac
     return 1;
 }
 
+int amigaRendererPrepareHudGlyph(AmigaHudGlyph* glyph, const UBYTE* pack,
+                                  const UBYTE* end, UWORD sprite, UWORD frame) {
+    const UBYTE* record = findAsset(pack, end, sprite, frame);
+    unsigned row, height, width;
+    ULONG offset;
+    const UBYTE* data;
+    if (!record || readWord(record+12) != 16) return 0;
+    width = readWord(record+8); height = readWord(record+10);
+    offset = readLong(record+16);
+    if (!width || width > 16 || !height || height > 16 || offset > (ULONG)(end-pack) ||
+        (ULONG)(end-pack)-offset < height*4) return 0;
+    glyph->left = -(WORD)readWord(record+4); glyph->top = -(WORD)readWord(record+6);
+    glyph->width = width; glyph->height = height;
+    data = pack+offset;
+    for (row=0; row<height; ++row) {
+        glyph->low[row] = readWord(data+row*2);
+        glyph->high[row] = readWord(data+height*2+row*2);
+    }
+    return 1;
+}
+
 int amigaRendererPrepareWordStamp(AmigaWordStamp* stamp, const UBYTE* pack,
                                   const UBYTE* end, UWORD sprite, UWORD frame) {
     const UBYTE* record = findAsset(pack, end, sprite, frame);

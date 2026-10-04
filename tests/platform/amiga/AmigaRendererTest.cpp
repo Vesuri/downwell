@@ -1,6 +1,7 @@
 #include "platform/amiga/AmigaRenderer.h"
 #include "platform/amiga/AmigaWallBackground.h"
 #include "platform/amiga/AmigaAmmoHud.h"
+#include "platform/amiga/AmigaHealthHud.h"
 #include "platform/amiga/AmigaLaserSight.h"
 #include "platform/amiga/AmigaGoalField.h"
 #include "platform/amiga/AmigaBufferCompare.h"
@@ -1315,6 +1316,38 @@ int main(int argc, char** argv) {
         amigaRendererDrawAsset(&expectedRenderer, hudPack.data(), hudPack.data() + hudPack.size(),
             413, digit, 290, 239, 0);
         require(actualHud == expectedHud, "offline ammo digits match all fifteen original layers");
+    }
+    {
+        AmigaHealthHud health;
+        auto compare=[&](unsigned hp,unsigned maximum,unsigned pieces,unsigned perHeart){
+            health.draw(&actualRenderer,hudPack.data(),hudPack.data()+hudPack.size(),hp,maximum,pieces,perHeart);
+            AmigaHealthHud::reference(&expectedRenderer,hudPack.data(),hudPack.data()+hudPack.size(),hp,maximum,pieces,perHeart);
+            require(actualHud==expectedHud,"retained health HUD matches complete original layered rendering");
+        };
+        for(unsigned glyph=0;glyph<11;++glyph)for(int offset=0;offset<16;++offset){
+            std::fill(actualHud.begin(),actualHud.end(),0x55);
+            std::fill(expectedHud.begin(),expectedHud.end(),0x55);
+            amigaRendererDrawAsset(&actualRenderer,hudPack.data(),hudPack.data()+hudPack.size(),65011,glyph,32+offset,10,0);
+            const unsigned sprite=glyph<10?413:414,foreground=glyph<10?glyph:0,shadow=glyph<10?glyph+20:2;
+            auto asset=[&](unsigned frame,int x,int y){amigaRendererDrawAsset(&expectedRenderer,
+                hudPack.data(),hudPack.data()+hudPack.size(),sprite,frame,x,y,0);};
+            asset(shadow,33+offset,10);asset(shadow,33+offset,11);asset(shadow,32+offset,11);asset(foreground,32+offset,10);
+            require(actualHud==expectedHud,"offline health glyphs retain all four layers at every word offset");
+        }
+        std::fill(actualHud.begin(),actualHud.end(),0x55);
+        std::fill(expectedHud.begin(),expectedHud.end(),0x55);
+        for(unsigned capacity : {0u,4u,8u,10u,16u,99u}){
+            for(unsigned hp=capacity;hp>0;--hp)compare(hp,capacity,0,4);
+            compare(0,capacity,0,4);
+            for(unsigned hp=0;hp<=capacity;++hp)compare(hp,capacity,hp%4,4);
+        }
+        for(unsigned perHeart : {0u,1u,2u,3u,4u,5u,8u})
+            for(unsigned pieces=0;pieces<=perHeart;++pieces)compare(4,4,pieces,perHeart);
+        compare(4,4,0,4);compare(4,4,0,4);
+        require(health.lastWordWrites==0,"unchanged health does not rewrite any words");
+        compare(3,4,0,4);
+        require(health.lastWordWrites<80,"single damage updates glyph and lost fill only");
+        health.invalidate();compare(3,4,0,4);
     }
     {
         std::ifstream file("generated/amiga-shop.dwap", std::ios::binary);

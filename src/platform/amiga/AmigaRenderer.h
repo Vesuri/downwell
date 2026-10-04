@@ -67,6 +67,13 @@ typedef struct AmigaWordStamp {
     unsigned first, last;
 } AmigaWordStamp;
 int amigaRendererPrepareWordStamp(AmigaWordStamp*, const UBYTE*, const UBYTE*, UWORD, UWORD);
+/* Small offline-composed glyph; copy planar words, never rasterize pixels. */
+typedef struct AmigaHudGlyph {
+    UWORD low[16], high[16];
+    int left, top;
+    unsigned width, height;
+} AmigaHudGlyph;
+int amigaRendererPrepareHudGlyph(AmigaHudGlyph*, const UBYTE*, const UBYTE*, UWORD, UWORD);
 int amigaRendererDrawWordStamp(AmigaRenderer*, const AmigaWordStamp*, int, int);
 int amigaRendererDrawWordStampRun(AmigaRenderer*, const AmigaWordStamp*, int, int, unsigned);
 unsigned amigaRendererCopyHudWords(UBYTE*, const UBYTE*, int, int, int, int, int);

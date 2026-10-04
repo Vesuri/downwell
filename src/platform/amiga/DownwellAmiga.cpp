@@ -17,6 +17,7 @@ __attribute__((noinline,used)) void downwellFieldReentryReady(){__asm__ volatile
 #include <hardware/dmabits.h>
 #include <hardware/intbits.h>
 #include "AmigaInput.h"
+#include "AmigaHealthHud.h"
 #include "core/SceneDescentVerification.h"
 #include "AmigaProfile.h"
 #include "AmigaTerrainProfile.h"
@@ -640,14 +641,6 @@ static void drawGameText(AmigaRenderer* renderer, UWORD text,
     });
 }
 
-static void drawHealthNumber(AmigaRenderer* renderer, int x, int y,
-                             unsigned health, unsigned maximum) {
-    downwell::drawHealthNumberLayers(x, y, health, maximum,
-        [renderer](unsigned sprite, unsigned frame, int px, int py) {
-            drawAsset(renderer, sprite, frame, px, py, 0);
-        });
-}
-
 static void drawCurrencyDigit(AmigaRenderer* renderer, int x, int y,
                               unsigned digit) {
     const int digitX = x - 8;
@@ -677,17 +670,16 @@ static void redrawAmmo(AmigaRenderer* renderer, unsigned ammo, unsigned maximumA
     DW_PROFILE_PHASE(profileTitle);
 }
 
+static AmigaHealthHud healthHud;
 static void redrawHealth(AmigaRenderer* renderer, unsigned health, unsigned maximum,
                           unsigned pieces = 0, unsigned perHeart = 4) {
-    amigaRendererClearClipRect(renderer);
-    amigaRendererFillRect(renderer, 8, 6, 92, 28, 3);
-    drawAsset(renderer, 415, 1, 8, 6, 0);
-    amigaRendererFillRect(renderer, 12, 11, maximum ? (int)(health * 80 / maximum) : 0, 6, 2);
-    downwell::drawHeartPieceMeter(8, 6, pieces, perHeart,
-        [renderer](int x, int y, int w, int h) { amigaRendererFillRect(renderer, x, y, w, h, 1); },
-        [renderer](unsigned sprite, unsigned frame, int x, int y) { drawAsset(renderer, sprite, frame, x, y, 0); });
-    drawAsset(renderer, 415, 0, 8, 6, 0);
-    drawHealthNumber(renderer, 52, 15, health, maximum);
+    healthHud.draw(renderer,activeHudPack,activeHudPackEnd,health,maximum,pieces,perHeart,
+#ifdef DOWNWELL_RETAIN_HEALTH_HUD
+        false
+#else
+        true
+#endif
+    );
 }
 
 static void redrawCurrency(AmigaRenderer* renderer, unsigned currency) {
@@ -1105,6 +1097,7 @@ static void buildReferencePicture(
 
     amigaRendererClear(renderer, 0);
     ammoHud.invalidate();
+    healthHud.invalidate();
     for (auto& ray : gameplayRays) ray.discard();
     for (auto& field : gameplayFields) field.discard();
     dirtyGameRows(0, 0, downwellGameRingHeight);

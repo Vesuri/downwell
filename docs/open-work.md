@@ -246,10 +246,13 @@ Rules for this section:
    draws each digit as layered CPU assets (14.1 ms), and `redrawHealth`
    repaints the hearts and meter (11.7 ms): 23 asset draws at 9,000 cycles
    each.
-   - Precompose each health digit's layers offline into one asset, as the
-     ammo digit's 15 layers already are; `amiga-renderer-test` checks that
-     equivalence for ammo.
-   - Redraw only the rectangles whose glyph or heart state changed.
+   - Finish the acceptance gate for `RETAIN_HEALTH_HUD=1` before enabling it:
+     compare matched native worst-frame captures and the full FPS tape with
+     the retained reference. The candidate's full tape still reports ten
+     fields at frame 844, and its frame-701 trace is slightly above the old
+     audit; do not accept a local HUD saving as proof of no regression.
+   - Preserve the offline glyph composition, retained frame/dividers, changed
+     number regions and final-word publication while resolving that gate.
 
    Target: under 4 ms on a damage frame.
 3. **Generation births (frame 844: 23.1 ms for 13 `appendBreakables`, 12,636
