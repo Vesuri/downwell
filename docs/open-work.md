@@ -317,8 +317,11 @@ Rules for this section:
      Revise the experimental `AMMO_FACTORED=2` complete-column path before
      shipping it: recharge is still 10.6–11.3 ms, and the full-tape maximum
      field-gap gate remains open despite the instruction-trace saving. Remove
-     redundant column publication without runtime sparse-list merges (the
-     independent-low-plane experiment increased recharge cost); preserve red dividers, rim
+     redundant column publication without runtime sparse-list or prepared-run
+     merges (both increased recharge cost). Budget compact staging and a few
+     tall transfers, including CPU preparation and Chip residency, before
+     replacing publication; do not revive the small-strip blitter path.
+     Preserve red dividers, rim
      and fused label. Retain mode 1 as the comparison, qualify inherited row
      groups and changed artwork, then repeat native pixels, replay and both
      complete-frame and presentation-pacing gates. See the

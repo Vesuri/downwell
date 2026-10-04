@@ -38,6 +38,38 @@ Mode 3 is removed; its reference patch is local-only at
 existing pacing and recharge gates open. No emulator rerun is needed to correct
 frame labels: `tools/amiga-trace-report.py` reads the saved binary captures.
 
+### Rejected direct comparison of prepared runs
+
+A second experiment reused the existing complete-column RLE bank, walking old
+and new runs without constructing intervals or resolving sprite overlaps. It
+skipped equal spans and fused the label only in its twelve affected rows. The
+estimate was a 3–5 ms recharge saving from avoiding per-row retained-image
+reads. It added no asset bank or Chip allocation. Host full-HUD pixels and
+ASan/UBSan passed, but cursor traversal and run comparison outweighed the work
+removed. This is not the earlier generic overlap-resolving interval sweep:
+even comparing already-prepared runs failed the native gate.
+
+Matched `tmp/trace/ammo-runs-mode2` and `tmp/trace/ammo-runs-mode3` use the same
+contact bundle and trace windows as above, with shared text hash
+`b7efc4dac7295644c82b3af3fed4451e81fd594d5a2e66b6f01f1a9196b73014`.
+
+| Frame | Retained row comparison (ms) | Prepared-run comparison (ms) |
+| --- | ---: | ---: |
+| 645 | 102.4335 | 104.1139 |
+| 701 | 171.9145 | 172.0806 |
+| 844 | 121.3875 | 123.5605 |
+
+Frame-645 HUD time increased from 12.6 to 14.3 ms; frame-704 shot HUD increased
+from 3.9 to 6.7 ms. The 21-common-frame mean worsened from 76.117 to 77.192 ms.
+Reports: `build/ammo-runs-comparison.log`, `build/ammo-runs-reference-cost.log`,
+and `build/ammo-runs-candidate-cost.log`. The implementation is removed and kept
+only in `tmp/ammo-prepared-run-rejected.patch`. No native pixel/replay/FPS
+acceptance was attempted after this timing failure; the normal executable was
+restored. Further gauge work must remove preparation/publication rather than
+replace row comparison with another runtime merge. Budget compact staging and
+few tall transfers before implementing them; the small-strip blitter failure
+still applies.
+
 This audit records where native A500 gameplay time goes at revision
 `b99c2f69` (2026-10-04), and why. It replaces the 2026-09-29 audit at
 `b89ff875` (5,837 fields on the same tape; see that revision of this file).
