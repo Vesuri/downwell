@@ -16,6 +16,9 @@ case "$mode" in
     flags=(FPSCOUNT=1 PREPARED_FIELDS=1 PREPARED_FIELDS_VERIFY=1)
     script=verify_prepared_fields_clear.gdb
     export SKIP_TO_GAME=1 SKIP_LEVEL=1 PROFILE_CONTACT=0
+    # Exhaustive scalar pixel oracles run at both startup and reentry.
+    # This is a correctness run, not an uninstrumented timing sample.
+    export VERIFY_TIMEOUT_SECONDS="${VERIFY_TIMEOUT_SECONDS:-600}"
     ;;
   trace)
     # Cycle-exact FS-UAE instruction traces of an FPS-only build, each

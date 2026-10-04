@@ -13,7 +13,7 @@ on PAL; do not add 60 Hz catch-up.
 ## Priority and scope
 
 Next: recover the A500 gameplay frame budget (section 5), taking its ranked
-items in order: restore the broken fixtures, then generation bursts, combat
+items in order: generation bursts, combat
 composition and the per-frame runner walks. Each removes a structure or
 computation measured by the [frame-cost audit](amiga-frame-cost.md); tuning
 small functions and compiler flags is not the remedy. Cover gameplay entry
@@ -240,14 +240,6 @@ gauge) and left ten opt-in flags behind. Do not repeat that.
   each 100-field capture is about 450 MB and the disk is nearly full. For
   several queries on one capture, export `--collapsed` stacks once instead of
   re-running `--focus`.
-
-### 0. Restore the broken fixtures (timebox: one day)
-
-A and B rely on these gates. Fix them, but do not count this as frame-budget
-progress.
-- `profile.sh fields-clear`: establish a bounded deadline sufficient for the
-  exhaustive pixel fixtures at startup and reentry, then require the full
-  exit-field coverage and zero mismatches.
 
 ### A. Generation bursts (frames 701 and 844)
 
