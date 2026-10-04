@@ -984,7 +984,14 @@ static bool verifyFieldComposites(UBYTE* terrain,UBYTE* target){
             shape.circles[i]={int(108+(frame%4)*48+index*9),
                 int(8+(frame%3)*128+index*5),int(24*256+(frame*37+index*93)%512)};
         }
-        if(shape.count&&frame%7==0)shape.circles[1].radius=128*256+frame;
+        if(shape.count&&frame%7==0){
+            // Intersect the small rings with the large ring, not merely nest
+            // them inside its empty centre. Alternate which one paints last.
+            shape.circles[1]={190,140,int(128*256+frame)};
+            shape.circles[0]={180,250,int(24*256+frame*3)};
+            shape.circles[2]={200,250,int(24*256+frame*5)};
+            if(frame&1){const auto first=shape.circles[0];shape.circles[0]=shape.circles[1];shape.circles[1]=first;}
+        }
         const unsigned origin=(frame*29)%320;
         ok=overlay.prepare(target,origin,shape,true,[](unsigned){return false;})&&overlay.draw();
         if(ok)ok=amigaFieldVerifyComposite(terrain,target,shape,origin);

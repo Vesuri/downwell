@@ -204,5 +204,23 @@ int main(){
         require(actual[0]==expected[0],"66-field overlap, offscreen and pending replacement pixels");
     }
     std::cout<<"66-field capacity: overlap order, offscreen footprints and pending replacement match\n";
+    for(unsigned frame=0;frame<96;++frame){
+        downwell::TimeFieldOutlines mixed;
+        mixed.count=3;mixed.visible=true;
+        mixed.circles[0]={180,250,int(24*256+frame*3%512)};
+        mixed.circles[1]={190,140,int(128*256+frame*7%512)};
+        mixed.circles[2]={200,250,int(24*256+frame*11%512)};
+        if(frame&1)std::swap(mixed.circles[0],mixed.circles[1]);
+        for(unsigned i=0;i<mixed.count;++i){
+            mixed.circles[i].x+=int(frame%16)-8;
+            mixed.circles[i].y+=int(frame%3)*100-100;
+        }
+        const unsigned origin=frame*37%320;
+        require((*candidate)[0].prepare(actual[0].data(),origin,mixed,true,clean),"mixed prepare");
+        require((*reference)[0].prepare(expected[0].data(),origin,mixed,true,clean),"mixed oracle");
+        require((*candidate)[0].draw(),"mixed draw");(*reference)[0].draw();
+        require(actual[0]==expected[0],"mixed intersections and source order");
+    }
+    std::cout<<"96 mixed-size intersection frames: all X phases, clipping, wrap and source order match\n";
     std::cout<<"3600 double-buffered frames: "<<fast<<" prepared, "<<fallback<<" fallback; pixels match\n";
 }

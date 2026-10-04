@@ -326,6 +326,10 @@ Rules for this section:
      `PREPARED_FIELDS_BACKING=0` for the saved-background comparison and
      `PROFILE_FIELD_REFERENCE=1` for the sparse comparison; selectors change
      initialized data, not executable code.
+     Large-field replacement must remove runtime prepared-row expansion and
+     clipping, not only saved-underlay ownership: repeating that traversal
+     for restoration and drawing made the level-exit workload slower. See
+     the [large-field experiment](amiga-frame-cost.md#large-field-traversal-experiment).
    - Explicitly partition the shared scene bank: terrain batching already
      uses its first 44,304 bytes. Field images/backing must not overlap that
      scratch or survive a front-bank reload without rebinding.

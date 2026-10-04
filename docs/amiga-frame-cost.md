@@ -209,3 +209,36 @@ way each line is composed.
 
 These projections are derived from measured component costs; each change
 needs its own timing tape.
+
+## Large-field traversal experiment
+
+The contact tape does not measure large exit/start circles. Reproduce the
+level-exit window with the prepared-small-field bundle from commit `bcca5bd4`,
+but use `SKIP_LEVEL=1 PROFILE_CONTACT=0 TRACE_FRAMES=2,10,30 TRACE_FIELDS=30`
+with `bash amiga/profile.sh trace`. Exclude partial capture frames as usual.
+The baseline trace is `tmp/trace/field-large-baseline.PKnIdd`; its executable
+text hash is `ed583f6ebda63c30d687500b5795d2eb8b74cfd1a41962be2f6fd862d036566e`.
+
+In complete frames 3–36, large-field preparation costs roughly 56–72 ms and
+drawing 11–17 ms when the raster changes. The prepared-row traversal and its
+callback account for about 38 ms per sampled frame; saved-word construction,
+coverage reconciliation, underlay capture and publication add more. Even
+unchanged-raster dirty-row inspection takes 4.2–4.5 ms in frames 33, 36 and 37.
+
+Simply removing the saved-word banks is insufficient. A tested direct-word
+experiment restored each old mask from pristine terrain, then painted each
+new circle in source order using `amigaFieldWords` again. Its two traversals
+each cost about 40–48 ms. Frame 4 changed from 88.3 to 102.8 ms; frame 6 from
+146.5 to 151.4 ms. It passed pixel tests but was withdrawn, not enabled.
+The experiment patch is retained locally as `tmp/field-direct-words-rejected.patch`;
+its trace is `tmp/trace/field-large-direct.uOVDeH` (text hash
+`3e98ff2171517abd3389061699b302d506cccaf429082a03a0393fb925351e61`).
+These two builds differ in code: use the large phase-cost differences as
+architectural evidence, not sub-millisecond attribution.
+
+Do not replace that traversal with another per-frame expansion or a second
+generic pass. Removing its work requires a prepared representation that can
+be consumed directly. An all-16-shift expansion of the existing 742 row
+patterns would need 175,986 bytes of word payload, 23,744 bytes of phase
+indices and 46,892 bytes of row offsets before other metadata; that naive
+representation also needs a memory-design decision, not blind adoption.
