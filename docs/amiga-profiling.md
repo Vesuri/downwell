@@ -500,19 +500,17 @@ sequence with the preceding captured sequence before replacing it.
 the existing live-layer versus cached Draw-order oracle on every frame,
 without forcing actors into planar rendering. Both modes restore the normal
 build, and their instrumentation is absent from ordinary builds. Use the
-same performance bundle as the timing run; `LOCAL_DRAW_CAPTURE=1/2` selects
-global/local invalidation respectively, with both paths compiled. Do not
+same build as the timing run; `LOCAL_DRAW_CAPTURE=1/2` selects global/local
+(default) invalidation respectively, with both paths compiled. Do not
 change that selector during a run. `make verify-local-draw-capture` exercises
 the matching host lifecycle and ordering tests.
 
-`bash amiga/profile.sh ammo` checks the experimental complete-gauge compositor
-on the bounded contact tape, starting directly in gameplay. Every HUD update
-is compared byte-for-byte with full source-order reconstruction. It requires
-at least 100 prepared-path updates and no mismatches, then restores the normal
-build. Do not use its instrumented timing as performance evidence. The separate
-timing comparison uses `AMMO_FACTORED=1/2` with the same flags and tape, both
-paths compiled. Default zero omits the experiment; its full pacing gate is
-still open.
+`bash amiga/profile.sh ammo` checks the factored gauge compositor on the
+bounded contact tape, starting directly in gameplay. Every HUD update is
+compared byte-for-byte with full source-order reconstruction. It requires at
+least 100 prepared-path updates and no mismatches, then restores the normal
+build. Do not use its instrumented timing as performance evidence;
+`AMMO_FACTORED=1` selects the retained compositor for timing comparisons.
 
 Preserve full RNG state, synchronous Create order, collision order and effect
 ownership while optimizing. Re-run deterministic replay and fresh-versus-retained

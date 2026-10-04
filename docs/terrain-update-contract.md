@@ -90,7 +90,8 @@ full-record scan before drawing; normal and profiling builds omit that oracle.
 
 ## Batched native wall composition
 
-`TERRAIN_BATCH=1` selects an experimental masked-strip backend. It leaves the
+`TERRAIN_BATCH=1` selects the masked-strip backend, which direct composition
+enables by default. It leaves the
 registered wall painter compiled and unchanged. When native terrain has no
 per-wall records, clipped occupancy rows supply the same above/right/below/left
 frame bits as `amigaIndexedWall`. Each row carries a one-cell horizontal halo;
@@ -123,8 +124,8 @@ blitter repaint with a generic CPU repaint from the same prior full-ring bytes,
 stopping immediately on a mismatch. Its reference repaint and buffer comparison
 are verification work; never use that build's frame times as performance results.
 
-`TERRAIN_DIRECT=1` enables a separate experimental transaction for dirty cached
-well/side-room spans. It composes sprite-51 artwork directly into the existing
+Direct composition (the default; `TERRAIN_DIRECT=0` selects the retained
+compositor) is a separate transaction for dirty cached well/side-room spans. It composes sprite-51 artwork directly into the existing
 native-word Fast-RAM rows, retaining the same ordered wall and tile traversal.
 It neither creates a coverage surface nor reads the result back from Chip RAM.
 Only a successful transaction publishes the completed rows through the existing
@@ -142,9 +143,9 @@ scalar compositor and test failed transactions followed by successful retries.
 With `TERRAIN_BATCH_VERIFY=1`, successful native direct spans additionally compare
 against the original painter; the existing full-ring oracle covers batch fallback.
 
-The direct experiment binds a 4,992-byte host-generated bank for phase six:
+Direct composition binds a 4,992-byte host-generated bank for phase six:
 26 frames × 16 rows × three 32-bit words (coverage, low colour, high colour).
-It is immutable ordinary-memory data, linked only for `TERRAIN_DIRECT=1`.
+It is immutable ordinary-memory data.
 The manifest pins the original source, extraction version, input pack and
 generator hashes. Interior two-word placements use these prepared words;
 other alignments and edge placements retain the portable shifting path.

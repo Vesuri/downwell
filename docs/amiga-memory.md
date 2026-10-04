@@ -19,11 +19,12 @@ memory requirement.
 | Shared splash/style cache | 66,704 |
 | Resident gameplay art pack (directory, planar art) | 115,326 |
 | Effect surface | 20,448 |
-| Shared scene bank (boot or front art; free in gameplay), after 2 alignment bytes | 90,442 |
-| **Total** | **434,690** |
+| Shared scene bank (boot or front art; gameplay terrain scratch and field images) | 146,818 |
+| **Total** | **491,066** |
 
-`make verify-amiga-memory` reports 67,888 bytes of Chip RAM free after these
-allocations (previously 8,472).
+`make verify-amiga-memory` reports 11,512 bytes of Chip RAM free after these
+allocations. The resident large-field arc images cost 56,376 of the scene
+bank's bytes; before they shipped, 67,888 bytes were free.
 
 ## Scene banks
 
@@ -50,81 +51,27 @@ copper is re-pointed afterwards. Leaving gameplay for the menu or style select
 reloads the front bank before either scene is prepared. Splash scenes run only
 at boot. During gameplay no front/boot bank occupies the region.
 
-The optional prepared gameplay paths partition this 90,442-byte Chip region:
-terrain batching owns bytes `[0,44304)`; `PREPARED_FIELDS=1` copies the
-29,264-byte immutable field-image pack at byte 44,304, followed by two
-896-byte masked-underlay buffers. Together they occupy 75,360 bytes, without
-another Chip allocation. Field images are linked as ordinary data and copied
-once on gameplay entry, not regenerated per circle or frame. Retire scene
-DMA before binding, and rebind after every front-bank reload. The sparse
-field fallback remains in ordinary memory.
+During gameplay the shared scene bank holds no boot or front art. The gameplay
+renderer partitions it:
 
-With `PREPARED_FIELDS_BACKING=1`, small fields restore their masks directly
-from the existing pristine Chip terrain ring (`AmigaMemory::game()`), rather
-than capturing another underlay. The two 896-byte regions remain reserved for
-the compiled saved-background reference. Each display retains up to 66 small
-field descriptors in ordinary memory; overlapping circles share the immutable
-images and terrain ring, not separate saved-background allocations. Restore
-old field masks before dirty-row synchronization, then paint new fields in
-source order before actors/lasers/effects. Verification builds check that every
-new mask's pixels already equal the pristine terrain before any field paints.
-Large/mixed shapes retain the sparse fallback and its own saved underlay in
-that mode. `PREPARED_FIELDS_BACKING=2` also admits large-circle column packets,
-restoring from the same pristine terrain and painting mixed circles in source
-order. The immutable column bank is 73,024 bytes in ordinary memory: 512
-radius indices, 21 deduplicated frame maps, 214 column offsets and 8,852
-eight-byte row/word-offset/colour records. It has no per-shift expansion and
-adds no Chip allocation. Each display keeps a 40-byte physical-row footprint
-for large fields; the existing small-field descriptor array also records the
-source circle index and large/small kind. All comparison modes in a
-`PREPARED_FIELDS=1` build link this bank, so their executable code is identical.
-These paths remain opt-in pending the full frame-budget and coverage gates.
+| Range | Owner |
+| --- | --- |
+| `[0,44304)` | Terrain batch scratch: two colour planes and a coverage plane, 416×284 |
+| `[44304,73568)` | Small time-field images (29,264 bytes), copied once on gameplay entry |
+| `[73568,75360)` | Two 896-byte masked-underlay buffers for the saved-background reference |
+| `[75360,146816)` | Resident 176-pixel large-field arc images (71,456 bytes): white coverage and total coverage; the blitter derives red as `mask & ~white` |
+| `[146816,146818)` | Readable zero word for the shifted blitter's extra fetch |
 
-The resident large-field experiment (`PREPARED_FIELDS_BACKING=3`) extends the
-shared scene bank to 146,818 bytes. Its region `[75360,146816)` holds 71,456
-bytes of immutable 176-pixel arc images, copied once on gameplay entry after
-retiring front-bank DMA. Each image stores white coverage and total coverage;
-the blitter derives red with `mask & ~white`, without a third resident plane
-or per-frame expansion. All prepared-field comparison modes reserve and load
-the same bank. A final readable zero word covers the shifted blitter's
-zero-masked extra fetch after the last plane. The additional allocation
-versus the normal scene bank is 56,376 bytes; the native pixel verifier
-measures **11,512 bytes Chip free** (including allocation alignment)
-after startup allocation. This narrow headroom needs full scene/reentry
-coverage before enabling the option by default.
-
-Band descriptors and radius maps stay in ordinary memory. Native whole-buffer
-checks cover mixed fields, all supported X shifts, vertical clipping and ring
-wraps. The band renderer supports centres 182 through 198 inclusive; other
-placements retain column packets. The private terrain prefix, small-field
-images and both saved-background reference buffers keep their existing ranges.
-Prepared transfer geometry (`PREPARED_FIELDS_BACKING=4`) adds 34 small
-descriptors in ordinary memory, not Chip images or per-frame staging.
-
-The fused composition experiment (`PREPARED_FIELDS_BACKING=5`) uses the same
-images and allocations. For a stationary single resident-band circle, retire
-only the old mask outside the new arc rectangles, synchronize dirty terrain
-rows, then use pristine terrain as blitter channel C while composing the new
-field. This replaces the former restore-then-paint pair within those rectangles.
-It owns the entire fetched word span (X 96 through 271), including edge words,
-not just pixels covered by the new circle. Actor/effect damage must be recorded
-for the intervening row sync; retained laser pixels must be retired first.
-A pending laser is safe because it draws afterward. A retained laser, multiple
-fields, moved centre or changed ring origin uses the compiled masked path.
-Neither the geometry helper nor being inside an arc grants rectangle ownership;
-the gameplay caller supplies that certificate. This remains opt-in pending the
-full field-cost and broader coverage gates before normal-build integration.
-
-The experimental `TERRAIN_BATCH=1` painter borrows 44,304 bytes of that idle
-region for two colour planes and a coverage plane (416×284). Its immutable tile
-sources remain in ordinary memory. It drains masked transfers before reusing the
-scratch; the existing front-bank reload restores garden/style assets on return.
-This adds no Chip allocation. `TERRAIN_DIRECT=1` composes into the existing
-Fast-RAM raster instead of allocating another surface. Its phase-six prepared
-word bank is 4,992 bytes of immutable ordinary-memory data, linked only for that
-experiment. `TERRAIN_BATCH_VERIFY=1` additionally reserves ordinary-memory
-reference rings for batch and direct-cache pixel comparisons, only in
-verification builds.
+Retire scene DMA before binding, and rebind after every front-bank reload;
+the results, clear-scene and field-reentry fixtures cover that path. Small
+fields restore their masks from the pristine terrain ring
+(`AmigaMemory::game()`); a stationary resident-band circle composes with
+pristine terrain as blitter channel C instead of restoring and repainting.
+Other placements use the large-field column bank: 73,024 bytes of immutable
+ordinary memory (512 radius indices, 21 frame maps, 214 column offsets and
+8,852 row records). Direct terrain composition uses a 4,992-byte phase-six
+word bank in ordinary memory, and `TERRAIN_BATCH_VERIFY=1` adds
+ordinary-memory reference rings only in verification builds.
 
 A temporary 16-byte startup copper list is also allocated during initialization.
 Immutable planar/mask payloads may share byte-identical word-aligned subregions

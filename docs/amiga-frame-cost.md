@@ -1,153 +1,10 @@
 # Amiga gameplay frame-cost audit
 
-## Prepared gauge transfers: recharge target reached, acceptance failed
-
-The staged-transfer experiments used 864 Chip bytes for a complete interleaved
-16-pixel column and two tall framework blits during jiggle. Small shot updates
-remained CPU-published. Source artwork qualification and the original compositor
-remained compiled. The estimated saving was 4–6 ms from removing strided
-row comparison/publication, including staging and DMA waits in the measurement.
-
-Three staging representations were tested:
-
-- Per-row expansion saved only about 1 ms; the tall blits themselves cost
-  about 0.76 ms. Captures: `tmp/trace/ammo-transfer-mode2` and `...-mode3`.
-- Offline repeated-pair payloads added 3,446 bytes, but roughly 75 small copies
-  still dominated preparation. Recharge HUD time remained about 11.8 ms.
-  Captures: `tmp/trace/ammo-bulk-mode2` and `...-mode3`.
-- Offline variable-length phrases reduced dispatch and reached 5.8–6.2 ms
-  recharge HUD time. Payload plus indexes added 39,316 bytes to the existing
-  92,264-byte experimental bank; only 5,836 bytes were literal pixel payload.
-  The bank was reconstructed exactly against every input tile on the host.
-
-The phrase variant passed host full-HUD pixels and ASan/UBSan. Native verification
-completed 1,800 frames with 455 prepared updates and zero byte mismatches against
-full source-order reconstruction (`build/ammo-phrases-native-pixels.log`, executable
-`c73e22f09c40093ddb073cc5fca200dd34c18fca7dd3157280ea0efb47a134b5`).
-However, shot HUD time remained about 4.6 ms and frame 701 regressed slightly.
-
-A final revision copied prepared small-update pixels directly instead of
-comparing retained rows. Host pixels passed, but shots still cost about 4.7 ms.
-Matched original-compositor/final-candidate traces have shared text hash
-`32ce69c1141c87a67418f99738549afc90210bb9ba5f31495e6f20eb093712d6`:
-
-| Frame | Original compositor (ms) | Final transfer revision (ms) |
-| --- | ---: | ---: |
-| 645 | 115.0849 | 96.0310 |
-| 701 | 171.9300 | 172.2397 |
-| 844 | 127.8870 | 121.8969 |
-
-The 19.05 ms improvement at 645 does not excuse the 0.31 ms regression at 701.
-All runtime changes were removed; the final recoverable local patch is
-`tmp/ammo-prepared-transfer-rejected.patch`. The final revision did not receive
-native pixel, full-FPS or cross-replay acceptance after failing timing. The prior
-variant's native pixel result must not be attributed to this final revision.
-Normal-build restoration completed and the retained generated bank was restored.
-
-Evidence: `build/ammo-direct-transfer-comparison.log`,
-`build/ammo-direct-transfer-candidate-cost.log`, and
-`tmp/trace/ammo-direct-transfer-mode1` / `...-mode3`. Reproduction uses the
-contact bundle, `AMMO_FACTORED=1/3`, `TRACE_FRAMES=644,699,843 TRACE_FIELDS=30`,
-and bounded `bash amiga/profile.sh trace`, after applying the local patch.
-
-The accompanying original-compositor re-audit identifies 128.09 ms inside
-`GameplayWorld::step` in frame 701, including 93.32 ms in `generateLiveTerrain`.
-Within generation, `Well512::step` has 23.29 ms self time, collection costs
-26.46 ms inclusive, and run creation 21.94 ms inclusive. These nested costs
-must not be added together. Ammo HUD costs only 0.05 ms in this frame.
-Report: `build/frame701-ownership-audit.log`, generated with
-`tools/amiga-trace-report.py tmp/trace/ammo-direct-transfer-mode1 --frames=701 --causes`.
-This is evidence for selecting the next architectural target, not permission to
-change RNG interleaving or a claim that any section-5 acceptance gate is closed.
-
-## Trace frame identification and rejected independent-plane gauge
-
-Frame-marker arguments, rather than marker counts, are authoritative. A capture
-can include its requested marker or start after it. The original report assumed
-the latter and assigned frames one too high in the former case. The report now
-validates the marker's argument-load ABI against the ELF and reads that argument
-from recorded registers, including interrupted markers. It rejects unsupported
-ABIs and discontinuous numbering. Historical frame-specific comparisons require
-rechecking with this reader; cycle costs themselves are unchanged.
-
-For example, `tmp/trace/ammo-planes-mode1/trace-699.bin` includes marker 699;
-mode 2 and mode 3 start after it. The mode-1 burst previously labelled 702 is
-actually frame 701, costing 171.9033 ms, not the preceding frame's 90.6490 ms.
-
-The rejected mode-3 experiment split the factored gauge's low plane from its
-animated high plane. Offline baseline/exception lists and fused label tails
-added 20,383 payload bytes (112,647 total). Runtime merging was intended to
-remove about 3–4 ms of redundant low-plane work, but recharge HUD time instead
-rose from about 12.6 to 13.7 ms. Host pixel and sanitizer checks passed; no native
-pixel/replay/FPS acceptance was attempted after the trace gate failed.
-
-Matched `tmp/trace/ammo-planes-mode2` and `tmp/trace/ammo-planes-mode3` captures
-have shared text hash `ab1ae18ffdf716fe19848532a7bc43362265fef1adf124230da30e082adcae12`.
-Correctly identified mandatory frames, in milliseconds:
-
-| Frame | Combined planes (2) | Separate low plane (3) |
-| --- | ---: | ---: |
-| 645 | 102.3659 | 103.5369 |
-| 701 | 171.9230 | 172.0482 |
-| 844 | 121.2636 | 121.6999 |
-
-Reproduce with the audit's contact optimization bundle, `AMMO_FACTORED=2` or
-`3`, `TRACE_FRAMES=644,699,843 TRACE_FIELDS=30`, and `bash amiga/profile.sh trace`.
-Mode 3 is removed; its reference patch is local-only at
-`tmp/ammo-independent-plane-rejected.patch`. Mode 2 stays opt-in with its
-existing pacing and recharge gates open. No emulator rerun is needed to correct
-frame labels: `tools/amiga-trace-report.py` reads the saved binary captures.
-
-### Rejected direct comparison of prepared runs
-
-A second experiment reused the existing complete-column RLE bank, walking old
-and new runs without constructing intervals or resolving sprite overlaps. It
-skipped equal spans and fused the label only in its twelve affected rows. The
-estimate was a 3–5 ms recharge saving from avoiding per-row retained-image
-reads. It added no asset bank or Chip allocation. Host full-HUD pixels and
-ASan/UBSan passed, but cursor traversal and run comparison outweighed the work
-removed. This is not the earlier generic overlap-resolving interval sweep:
-even comparing already-prepared runs failed the native gate.
-
-Matched `tmp/trace/ammo-runs-mode2` and `tmp/trace/ammo-runs-mode3` use the same
-contact bundle and trace windows as above, with shared text hash
-`b7efc4dac7295644c82b3af3fed4451e81fd594d5a2e66b6f01f1a9196b73014`.
-
-| Frame | Retained row comparison (ms) | Prepared-run comparison (ms) |
-| --- | ---: | ---: |
-| 645 | 102.4335 | 104.1139 |
-| 701 | 171.9145 | 172.0806 |
-| 844 | 121.3875 | 123.5605 |
-
-Frame-645 HUD time increased from 12.6 to 14.3 ms; frame-704 shot HUD increased
-from 3.9 to 6.7 ms. The 21-common-frame mean worsened from 76.117 to 77.192 ms.
-Reports: `build/ammo-runs-comparison.log`, `build/ammo-runs-reference-cost.log`,
-and `build/ammo-runs-candidate-cost.log`. The implementation is removed and kept
-only in `tmp/ammo-prepared-run-rejected.patch`. No native pixel/replay/FPS
-acceptance was attempted after this timing failure; the normal executable was
-restored. Further gauge work must remove preparation/publication rather than
-replace row comparison with another runtime merge. Budget compact staging and
-few tall transfers before implementing them; the small-strip blitter failure
-still applies.
-
-This audit records where native A500 gameplay time goes at revision
-`b99c2f69` (2026-10-04), and why. It replaces the 2026-09-29 audit at
-`b89ff875` (5,837 fields on the same tape; see that revision of this file).
-The work it implies is queued in
-[section 5 of the work queue](open-work.md#5-meet-the-amiga-frame-budget).
-Do not update this file as that work progresses. Record later measurements in
-the commits that make them, and repeat the audit with the same method when the
-representation changes. The figures are emulated-machine measurements of one
-deterministic tape, not guarantees for other scenes.
-
-Measurement correction: the original report counted each capture's first
-frame as complete. Recording starts at the next VBL, so that frame may omit
-simulation work. The corrected report excludes both boundary frames. The
-historical aggregates below therefore include partial first frames, and the
-frame-844 instruction total is a lower bound, not a complete-frame baseline.
-The FPS-only field counts are unaffected. For new comparisons capture from
-644, 699 and **843**, and compare interior frames 645, 701 and 844; do not
-compare a complete frame against one of the old first-frame fragments.
+Where A500 gameplay time goes, measured on the default build at `b815af63`
+(2026-10-04), with every accepted optimization enabled. The previous audit, at
+`b99c2f69`, is given alongside for comparison. Remaining work is ranked in
+[open-work §5](open-work.md#5-meet-the-amiga-frame-budget); this document holds
+the measurements and the approaches already ruled out.
 
 ## Configuration and reproduction
 
@@ -155,23 +12,30 @@ compare a complete frame against one of the old first-frame fragments.
   3.1; `-O3` with LTO.
 - Tape: `SKIP_TO_GAME=1 PROFILE_CONTACT=1`, 1800 gameplay updates. It covers
   natural descent with one damaging contact, view Y 39 to 1874, at most five
-  allocated enemy records and final health 3.
-- FPS-only build `93110cb8…`: 3,821 PAL fields, 23.55 FPS, 42.5 ms per frame
-  on average. The worst gap is frame 645 at 9 fields. Frames 701 and 844
-  also take 9 fields.
+  allocated enemy records and final health 3. It has no shop, no dense
+  encounter and no garden-to-well transition.
+- FPS-only build `b8eb0341…`: 3,252 PAL fields (previously 3,821), 27.7 FPS.
+  The worst gap is 8 fields at frame 701 (previously 9 at 645).
 - [Instruction traces](amiga-profiling.md#cycle-exact-instruction-traces):
-  build `90588bfd…` captured 100 fields from each of frames 50, 250, 450,
-  644, 690, 844, 900, 1100, 1300, 1500 and 1700 (524 complete frames). A
-  second build captured frame 701, starting at frame 699. The trace builds
-  differ only in their compiled frame list.
+  build `d2a0d2c3…` captured 100 fields from each of frames 50, 250, 450,
+  644, 690, 844, 900, 1100, 1300, 1500 and 1700 (602 complete frames).
+  Frames 701 and 844 come from separate 30-field captures starting at 699 and
+  843, because a capture's first frame is partial and is excluded. The
+  previous audit's frame 844 was such a partial frame, so its 179.7 ms
+  undercounts the frame.
 
 ```sh
 SKIP_TO_GAME=1 PROFILE_CONTACT=1 VERIFY_TIMEOUT_SECONDS=300 bash amiga/profile.sh fps
 SKIP_TO_GAME=1 PROFILE_CONTACT=1 TRACE_FIELDS=100 VERIFY_TIMEOUT_SECONDS=3000 \
-  TRACE_FRAMES=50,250,450,644,690,844,900,1100,1300,1500,1700 bash amiga/profile.sh trace
-SKIP_TO_GAME=1 PROFILE_CONTACT=1 TRACE_FIELDS=30 TRACE_FRAMES=699 \
-  TRACE_OUTPUT=$PWD/tmp/trace/run701 VERIFY_TIMEOUT_SECONDS=900 bash amiga/profile.sh trace
-python3 tools/amiga-trace-report.py tmp/trace/run --frames=1300-1338 --causes
+  TRACE_FRAMES=50,250,450,644,690,844,900,1100,1300,1500,1700 \
+  TRACE_OUTPUT=$PWD/tmp/trace/audit bash amiga/profile.sh trace
+for start in 699 843; do
+  SKIP_TO_GAME=1 PROFILE_CONTACT=1 TRACE_FIELDS=30 TRACE_FRAMES=$start \
+    TRACE_OUTPUT=$PWD/tmp/trace/audit-$start VERIFY_TIMEOUT_SECONDS=900 \
+    bash amiga/profile.sh trace
+done
+python3 tools/amiga-trace-report.py tmp/trace/audit --frames=1300-1338 --causes
+python3 tools/amiga-trace-report.py tmp/trace/audit-699 --frames=701 --causes
 ```
 
 ## Frame cost by scene
@@ -179,17 +43,22 @@ python3 tools/amiga-trace-report.py tmp/trace/run --frames=1300-1338 --causes
 The gameplay step overlaps the previous frame's publication wait, so traced
 frames contain almost no idle time. One PAL field is 20 ms (142,102 cycles).
 
-| Tape frames | Scene | Mean ms | Median | Worst | Over 20 ms |
-| --- | --- | ---: | ---: | ---: | ---: |
-| 50–91 | entrance bowl, firing | 29.9 | 28.1 | 51.0 (84) | 42/42 |
-| 250–303 | open descent | 23.0 | 17.4 | 75.0 (278) | 22/54 |
-| 450–470 | enemies in view | 64.3 | 51.3 | 117.9 (464) | 21/21 |
-| 644–661 | damaging contact | 104.2 | 101.4 | 179.5 (645) | 18/18 |
-| 690–700 | combat with gems and smoke | 88.8 | 84.8 | 116.8 (694) | 11/11 |
-| 701 | pattern generation burst | 184.5 | | | 1/1 |
-| 844–864 | generation burst with a time field | 89.4 | 83.8 | 179.7 (844) | 21/21 |
-| 900–920 | time fields present | 66.6 | 63.9 | 101.6 (907) | 21/21 |
-| 1100–1737 | camera at the level bottom | 32.5 | 25.5 | 69.7 (1544) | 220/223 |
+| Tape frames | Scene | Mean ms | Median | Worst | Over 20 ms | Previous mean |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| 50–91 | entrance bowl, firing | 27.0 | 27.5 | 39.3 (54) | 41/41 | 29.9 |
+| 250–303 | open descent | 21.4 | 18.0 | 69.4 (278) | 19/53 | 23.0 |
+| 450–470 | enemies in view | 60.8 | 53.5 | 101.6 (464) | 20/20 | 64.3 |
+| 644–661 | damaging contact | 96.7 | 97.6 | 121.4 (660) | 17/17 | 104.2 |
+| 690–700 | combat with gems and smoke | 85.4 | 82.9 | 103.4 (694) | 10/10 | 88.8 |
+| 701 | pattern generation burst | 172.2 | | | 1/1 | 184.5 |
+| 844–864 | generation burst with a time field | 50.8 | 46.6 | 120.7 (844) | 21/21 | 89.4 |
+| 900–920 | time fields present | 37.3 | 36.2 | 54.2 (907) | 20/20 | 66.6 |
+| 1100–1737 | camera at the level bottom | 29.1 | 25.0 | 56.8 (1564) | 240/240 | 32.5 |
+
+The contact frame (645) fell from 179.5 to 101.4 ms, and time-field frames
+are about 30 ms cheaper. The generation burst barely moved, and combat and
+quiet frames improved by only about 3 ms: none of the accepted work targeted
+them.
 
 ## Cost by owner
 
@@ -199,871 +68,125 @@ frame:
 
 | Owner | Entrance | Descent | Enemies | Combat | Fields | Quiet 1300–1338 | Frame 645 | Frame 701 | Frame 844 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Game logic | 8.4 | 5.9 | 20.7 | 26.9 | 13.1 | 12.0 | 29.6 | 31.2 | 20.0 |
-| Actors, sprites and display | 4.5 | 4.9 | 10.8 | 25.4 | 4.8 | 3.0 | 49.3 | 21.7 | 28.2 |
-| Generation logic | 0.4 | 1.3 | 1.0 | 1.6 | 0.5 | 0.5 | 1.3 | 82.4 | 51.5 |
-| Runner bookkeeping | 6.0 | 2.7 | 13.2 | 9.9 | 5.4 | 5.7 | 13.2 | 22.8 | 27.4 |
-| Software float emulation | 2.2 | 1.6 | 4.8 | 6.5 | 2.5 | 2.6 | 46.1 | 9.2 | 7.1 |
-| Ammo HUD | 3.6 | 0.1 | 5.5 | 3.3 | 7.5 | 4.0 | 30.5 | 0.1 | 12.5 |
-| Time-field outlines | 0.1 | 0.1 | 0.1 | 0.1 | 28.2 | 0.1 | 0.1 | 0.1 | 23.4 |
-| Terrain rows and scrolling | 0.4 | 1.3 | 2.7 | 6.6 | 1.1 | 0.2 | 4.1 | 8.0 | 5.5 |
-| Effect surface (currency/smoke) | 0.6 | 0.6 | 2.2 | 5.2 | 0.6 | 0.6 | 0.6 | 5.1 | 0.6 |
-| R-tree upkeep | 0.3 | 0.1 | 0.5 | 0.3 | 0.2 | 0.2 | 0.3 | 0.7 | 1.3 |
-| Frame loop and other | 3.6 | 4.3 | 2.7 | 3.1 | 2.8 | 2.6 | 4.3 | 3.1 | 2.3 |
-| Total | 30.0 | 23.0 | 64.3 | 88.8 | 66.6 | 31.5 | 179.4 | 184.5 | 179.7 |
-
-The owner patterns are coarse: health-number drawing counts as actors and
-display, and the per-actor runner walks partly count as game logic. The
-anatomies below use the call trees.
+| Game logic | 8.4 | 6.3 | 21.5 | 28.3 | 13.4 | 12.3 | 30.7 | 31.5 | 22.6 |
+| Actors, sprites and display | 3.7 | 2.4 | 8.9 | 22.0 | 6.5 | 2.1 | 15.9 | 21.9 | 7.5 |
+| Generation logic | 0.3 | 1.3 | 1.0 | 1.6 | 0.5 | 0.5 | 1.3 | 82.6 | 51.6 |
+| Runner bookkeeping | 6.1 | 2.7 | 12.9 | 10.2 | 4.5 | 5.1 | 12.9 | 13.8 | 17.3 |
+| Software float emulation | 2.2 | 1.4 | 5.0 | 6.7 | 2.4 | 2.8 | 12.3 | 5.8 | 6.5 |
+| Ammo HUD | 1.7 | 0.1 | 3.3 | 1.8 | 4.2 | 1.9 | 15.3 | 0.1 | 4.4 |
+| Terrain rows and scrolling | 0.4 | 1.4 | 2.6 | 6.4 | 0.8 | 0.2 | 4.5 | 7.8 | 5.3 |
+| Effect surface (currency/smoke) | 0.6 | 0.6 | 2.2 | 4.8 | 0.6 | 0.6 | 0.6 | 4.9 | 0.6 |
+| Time fields, R-tree, frame loop | 3.5 | 5.2 | 3.4 | 3.6 | 4.4 | 3.0 | 8.0 | 3.8 | 5.0 |
+| Total | 27.0 | 21.3 | 60.8 | 85.4 | 37.3 | 28.4 | 101.4 | 172.2 | 120.7 |
 
 ## The three worst frames
 
-Each takes 9 fields, for a different reason.
-
-**Frame 645, damaging contact (179.5 ms).**
-- 41.8 ms in `RunSession::contactDamageNumber`, almost all of it one
-  `RunnerPointDirection::evaluate`. That call's `portableAtan` costs 246,892
-  cycles (34.8 ms): 14 `divideBinary64` calls (10,265 cycles each) and 14
-  `multiplyBinary64` calls in the software series.
-- 29.9 ms in `redrawAmmo`: the stomp recharges ammo, so the whole gauge is
-  redrawn while it jiggles.
-- 25.7 ms in the health HUD. `drawHealthNumberLayers` draws each digit as
-  layered CPU assets (14.1 ms), and `redrawHealth` takes 11.7 ms. Each of the
-  23 `amigaRendererDrawAsset` calls costs 9,000 cycles.
-- 11.1 ms in `AmigaGameplayActors::draw`, 5.9 ms of it damage text, plus
-  9.1 ms of terrain stage preparation.
-
-**Frame 701, pattern generation burst (184.5 ms).** `generateLiveTerrain`
-takes 100.3 ms:
-- Object creation: 62 `AmigaGameplayGeneration::create` calls cost 33.3 ms in
-  total. Six `appendBreakables` take 11.0 ms and seven generic
-  `GameplayRoomLayers::birth` calls 6.7 ms. Time-field adoption takes 3.1 ms.
-- Run creation: 23 `createRun` calls cost 22.0 ms, including 7.1 ms of
-  `publishSpan` and 7.1 ms of RNG advance.
-- RNG: `GameMakerRandom::advance` outside runs takes 10.8 ms, 81 `nextU32`
-  calls 8.0 ms and 39 `cavernEnemyChoice` calls 5.5 ms. That makes about
-  26 ms of Well512 work in total. These draws are part of the original
+**Frame 701, pattern generation burst (172.2 ms, 8 fields).**
+`generateLiveTerrain` takes 93.3 ms, almost all of it in
+`AreaOneBuilder::emitPatternMode`. These costs nest; do not add them:
+- 62 `AmigaAreaOneTerrainBuilder::collect` calls take 26.4 ms. Inside them,
+  `AmigaGameplayGeneration::create` takes 22.4 ms (2,568 cycles each).
+- 23 `collectRun` calls take 22.9 ms, of which `createRun` is 22.1 ms
+  (6,828 cycles each). That includes 7.2 ms of
+  `AmigaTerrainRunIndex::publishSpan` and 7.1 ms of `GameMakerRandom::advance`.
+- 11 `AreaOneBuilder::emitObject` calls take 17.0 ms.
+- Well512 work: 81 `nextU32` calls take 8.0 ms, `advance` 7.1 ms and 39
+  `cavernEnemyChoice` calls 5.5 ms. The draws are part of the original
   interleaving and must stay synchronous.
 
-The rest of the frame is ordinary combat work: draw collection 10.7, actor
-draws 10.2 and currency/smoke 9.6 ms.
+The rest is ordinary combat work: actor draws 9.9 ms, currency/smoke 9.6,
+row sync 6.2 and draw collection 5.6.
 
-**Frame 844, generation burst with a time field (179.7 ms).**
-- Generation takes 77.5 ms. Thirteen `appendBreakables` cost 23.1 ms (12,636
-  cycles each), and 15 generic layer births inside them 12.0 ms.
-- `AmigaTerrainPainter::paint` paints the new rows with 28 CPU
-  `amigaRendererDrawAsset` tile draws, 26.1 ms in total.
-- Time-field preparation takes 18.5 ms and its drawing 4.8 ms.
-- The ammo gauge takes 14.3 ms.
+**Frame 844, generation burst with a time field (120.7 ms, 6 fields).**
+- Generation takes 65.5 ms: 44 `create` calls cost 27.6 ms (4,460 cycles
+  each), 14 `emitObject` calls 30.1 ms, and 13 `appendBreakables` 11.0 ms
+  (6,034 cycles each, against a 2,000-cycle target).
+- Draw collection takes 8.0 ms, `drawMainWorldSpan` 8.0 and terrain painting
+  6.4.
+- The prepared time field costs 2.4 ms to prepare and 2.0 ms to draw.
+
+**Frame 645, damaging contact (101.4 ms, 5 fields).**
+`GameplayWorld::step` takes 52.2 ms; enemy contacts are 10.1 ms of it and the
+collision owner's attach lambdas about 15 ms. The ammo gauge takes 11.2 ms,
+actor draws 11.2, draw collection 6.6, sprite assignment 4.7 and the health
+HUD 4.0. Contact direction now costs under 1 ms.
 
 ## Typical frames
 
-**Quiet, camera at the level bottom (31.5 ms; 1300–1338).** Nothing exceeds
-14% of the frame.
-- `GameplayWorld::step` takes 18.5 ms. Of that: player 2.8 ms, walking
-  enemies 2.7, the animation walk 2.1, alarm dispatch 1.2, activation
-  reconciliation 1.1 and frog floor division 1.0. The remainder is spread
-  across functions under 0.5 ms each.
-- The ammo HUD takes 4.5 ms: row animation strips after shots, plus 1.2 ms
-  of `AmmoHudDamage::update`. Draw collection takes 2.7 ms.
-- Leaf instructions: memory operands 27%, branches 14%, multiply/divide/mem
-  helpers 12% (3.7 ms), and `movem`, pushes and calls 13%.
+**Quiet, camera at the level bottom (28.4 ms; 1300–1338).**
+- `GameplayWorld::step` takes 18.4 ms: walking enemies 2.8 (tile tests 1.9),
+  the player 2.8, enemy alarms 1.2 and the collision owner's attach lambdas
+  about 6.5 ms.
+- Draw collection takes 2.7 ms, the ammo gauge 1.5 and sprite assignment 0.7.
+- Integer division helpers take 1.7 ms of self time.
 
-The quiet frame has no hot spot. It is the cost of running the emulated
-runner's per-actor walks and redrawing the gauge; it can only reach 20 ms
-by removing those structures, not by tuning the functions in them.
+No function takes more than a tenth of the frame. Only removing the per-actor
+walks can reach 20 ms, not tuning the functions in them.
 
-**Combat with gems and smoke (88.8 ms; 690–700).**
-- `GameplayWorld::step` takes 34.6 ms: currency 4.1, animation walk 4.1,
-  bullets 3.5, player 3.3, snails 2.5 and many smaller parts.
-- `AmigaGameplayActors::draw` takes 10.6 ms. Damage text is 5.5 ms of it,
-  and 5.5 CPU asset draws cost 7,400 cycles each.
-- Currency/smoke composition takes 9.7 ms for three stamps
-  (`stampPixel` 13,872 cycles each).
-- Terrain ring sync takes 6.4 ms (3.9 `Bitmap::copy` calls), draw collection
-  6.3, stage preparation 4.1, the ammo gauge 3.8 and effect-surface
-  publication 2.5.
+**Combat with gems and smoke (85.4 ms; 690–700).**
+- `GameplayWorld::step` takes 37.8 ms, currency collection 4.6 ms of it.
+- Actor draws take 10.7 ms, currency/smoke composition 9.6 (three
+  `stampPixel` calls at 14,038 cycles each), draw collection 6.6, row sync 6.3
+  and effect-surface publication 2.6.
+- The 32-bit division, modulo and multiply helpers take 10.2 ms of self time.
+  `GemMotion::q8`, `rounded` and `pixel` cause about 4 ms of it, by
+  converting fixed-point positions on every access.
 
-**Enemies in view (64.3 ms; 450–470).** `GameplayWorld::step` takes 36.2 ms.
-Captured alarm dispatch is 5.0 ms of it, the animation walk 4.0 and the
-player 4.4. Ammo 5.0, draw collection 4.3 and currency/smoke 3.1 ms make up
-most of the rest.
+**Enemies in view (60.8 ms; 450–470).** Game logic takes 21.5 ms and runner
+bookkeeping 12.9.
 
-**Time fields present (66.6 ms; 900–920).** `AmigaFieldOverlay::prepare`
-takes 22.5 ms per frame, 12.7 ms of it `amigaFieldWords`. Field drawing
-takes 5.6 ms and the ammo gauge 7.2 ms.
-
-## Ammo gauge experiments
-
-Whole-gauge replacements measured on this tape and discarded include:
-- Synchronous word blits from Chip layers cut recharge frames from 24 to
-  17 ms. But each blit cost about 2,300 cycles, mostly waiting, so shot
-  frames became slower and frame 844 took ten fields.
-- A fused interior pass that writes each distinct line value once costs
-  about 130 cycles per line in its store loop, the same as the existing
-  passes.
-- A retained final-column interval sweep, based on `e37042c6`, avoids the
-  intermediate fill/stamp/publish passes and compares final intervals. It
-  passes the HUD pixel oracle, but resolving source overlaps and comparing
-  intervals costs 31.0 ms in frame 645. Total HUD time rises from 25.0 to
-  42.4 ms; frame 645 rises from 115.0 to 132.2 ms and frame 844 from 145.9
-  to 158.3 ms. The implementation is rejected, not a remaining default-off
-  optimization. Evidence: `tmp/trace/ammo-column.IT7CIu`,
-  `build/ammo-column-cost.log`; recoverable source:
-  `tmp/ammo-column-sweep.patch`. The accepted comparison is
-  `tmp/trace/ammo-blocks-sparse.VMxRkg`. Both use starts 644/699/843 with
-  30 PAL fields per capture and the contact profile. Fewer pixel writes do
-  not help when per-frame interval construction costs more than the removed
-  rendering passes.
-
-On this machine the gauge's cost is the number of lines rewritten, not the
-way each line is composed.
-
-### Uniform-middle publication experiment
-
-At `5a96d1f1`, frame 645 still spends 25.26 ms in the ammo HUD. An experiment
-coalesced consecutive equal animation states, composed their non-overlapping
-middles directly from prepared words, and left the existing renderer to paint
-the edges. This removes intermediate fill/stamp passes without constructing
-general interval lists, but still compares and publishes each middle line.
-
-It failed the worst-frame gate: frame 645 changed from 115.110 to 116.250 ms,
-701 from 177.772 to 177.675 ms, and 844 from 127.130 to 131.728 ms. Across 18
-common complete frames, the mean changed from 78.356 to 79.357 ms. The new
-constant-column publisher alone cost 8.20 ms in frame 645. Skipping intermediate
-composition is insufficient when final per-line publication remains expensive.
-
-Evidence: `tmp/trace/ammo-uniform-mode0`, `tmp/trace/ammo-uniform-mode1`,
-`build/ammo-uniform-comparison.log`, and `build/ammo-uniform-645-cost.log`.
-The captures use the contact tape, starts 644/699/843, 30 PAL fields each,
-and the prepared backing-5 field bundle. The rejected source is retained only
-in `tmp/ammo-uniform-rejected.patch`; it is not a default-off implementation.
-Its `AMMO_UNIFORM_RUNS=0/1` selector produced different text hashes
-(`d92e1637acce480aa3a9d977c23f26db0c54d76a3e05fe298187e42939210aa2` and
-`1cc10c85d690c0f2d8a192bddfe914a2231a596e4cf5ab61559c77fafac0cccd`).
-Thus this is not a text-identical timing comparison; use nonzero selector
-values for both arms of future retained-path comparisons to avoid moving a
-zero-initialized selector between BSS and initialized data. The measured
-publisher cost and regression do not justify retaining this implementation.
-
-### Eight-line region certificates
-
-An experiment at `7a635ea6` cached exact final-region identities: uniform
-row-art words, fixed fill, and the prepared divider dictionary indices/phase.
-Equal eight-line regions bypassed painting and publication entirely; all
-other regions used the retained compositor. Full HUD pixel comparisons passed,
-but this did not remove the expensive recharge work. In frame 645 the fill
-loop remained 5.67 ms and blocked publication 3.94 ms, while certificate
-preparation added 4.39 ms. Total HUD time rose from 25.3 to 30.8 ms.
-
-Paired captures have identical text hash
-`a2b5ee9d41cf3350f0a90c15a2e1817ad188b65363a072f21e9511c41bec076c`:
-
-| Frame | Retained (ms) | Certificates (ms) |
-| --- | ---: | ---: |
-| 645 | 115.312 | 120.760 |
-| 701 | 177.768 | 177.824 |
-| 844 | 147.204 | 151.531 |
-
-The 15 common complete frames average 95.059 versus 97.934 ms. Evidence:
-`tmp/trace/ammo-certificates-mode1`, `tmp/trace/ammo-certificates-mode2`,
-`build/ammo-certificates-comparison.log`, and
-`build/ammo-certificates-candidate-cost.log`. Recoverable rejected source:
-`tmp/ammo-certificates-rejected.patch`. No cache implementation remains.
-
-Reproduction uses `AMMO_BLOCK_CACHE=1/2`, `TABLE_CONTACT_ATAN=1`,
-`RETAIN_HEALTH_HUD=1`, `AMMO_DAMAGE_RANGE=1`, `PREPARED_AMMO_DIVIDERS=1`,
-`PREPARED_FIELDS=1`, `PROFILE_FIELD_REFERENCE=1`, `PREPARED_FIELDS_BACKING=5`,
-`SCENERY_LAYERS=1`, `NATIVE_BOXES=1`, `NATIVE_FIELDS=1`, `TERRAIN_DIRECT=1`,
-`SKIP_TO_GAME=1`, `SKIP_LEVEL=0`, `PROFILE_CONTACT=1`, `PROFILE_LASER=0`,
-`TRACE_FRAMES=644,699,843`, `TRACE_FIELDS=30`, `VERIFY_TIMEOUT_SECONDS=300`,
-and `bash amiga/profile.sh trace`, with separate `TRACE_OUTPUT` directories.
-**The reference-field switch overrides backing 5**, so these captures use
-sparse field mode 2, not fused mode 7. They reject the HUD implementation;
-they are not a combined-current-bundle acceptance gate.
-
-This rules out rebuilding uniform-block certificates from all row states
-every update. A recharge changes the certified content, so searching for
-unchanged regions does not replace its actual composition cost. Preparation
-must move off the critical frame, or the changing column itself must become
-a prepared transfer; more elaborate runtime classifiers are not the next step.
-
-### Prepared gauge segments
-
-The host probe at `3c47d140` groups rows by their integer charge thresholds.
-For fixed capacity and equal initial state within each group, every future
-shared producer update preserves that equality. Capacities 1–16 have groups
-at least eight rows wide, so each final segment depends on only its own and
-the preceding group's sprite frame. Capacity changes need recertification;
-this is not a proof for arbitrary edited row arrays.
-
-`make verify-ammo-segment-probe` checks 4,889,600 final row pairs against
-`AmmoGaugeRows::draw`, `AmmoFill` and `AmmoDividerLayout` in original draw order,
-including the two-frame resource-421 wrap. The bank has 2,284 unique tiles and
-469 selector pages. Raw words would cost about 305,000 bytes. Run templates
-reduce this to **64,304 bytes** including source-art validation: 13,166 runs,
-37 word pairs, tile/page/configuration directories. No Chip allocation or
-runtime expansion buffer is needed. The probe's ignored manifest records the
-exact generated costs and input/output hashes.
-
-The native experiment selected final run templates instead of filling the
-interior, stamping row artwork and overlaying dividers. Full HUD comparisons
-and ASan/UBSan passed, but the paired A500 gate failed:
-
-| Frame | Retained (ms) | Prepared interior (ms) |
-| --- | ---: | ---: |
-| 645 | 115.133 | 109.626 |
-| 701 | 176.379 | 177.727 |
-| 844 | 127.676 | 125.254 |
-
-The 20 common complete frames average 78.932 versus 77.382 ms. The recharge
-saving is real, but it misses the projected 10 ms and does not excuse the
-frame-701 regression. Frame 645's HUD still takes 19.8 ms: prepared run
-selection costs 3.10 ms and publication 3.85 ms, with roughly 13 ms remaining
-outside that interior path. An interior-only replacement is insufficient;
-the surrounding gauge/rim/label reconstruction remains material work.
-
-Captures: `tmp/trace/ammo-segments-mode1` and `tmp/trace/ammo-segments-mode2`;
-comparison and attribution: `build/ammo-segments-comparison.log` and
-`build/ammo-segments-candidate-cost.log`. Both have text hash
-`bf61e4caa70c14396d5f4fc3e84030af95e1433bf73c53cda5db71e9e8089871`.
-Use the preceding certificate experiment's contact trace command, replacing
-its selector with `AMMO_SEGMENT_BANK=1/2` and setting
-`PROFILE_FIELD_REFERENCE=0 PREPARED_FIELDS_BACKING=5` (fused mode 7).
-The full native patch is preserved only in
-`tmp/ammo-segments-native-rejected.patch`; runtime changes were removed.
-No FPS/replay acceptance is claimed after failing the mandatory timing gate.
-The host probe/oracle remain as preparation, not as a performance win.
-
-### Complete-gauge representation budget
-
-The interior-only experiment leaves roughly 13 ms of the recharge HUD outside
-its prepared column. Before another native implementation,
-`make verify-ammo-complete-probe` measures a representation that also resolves
-the background, caps, red rim and label offline. Its independent witness draws
-the original ordered assets through `AmigaRenderer`, not `AmigaAmmoHud`.
-All **16,596 whole-region pixel digests match**, covering 100 deterministic
-updates at each capacity 1–16, all four meter displacements and all three
-number offsets. Multi-digit ammunition is explicitly excluded; changed-capacity
-row arrays still require the existing uniform-segment qualification/fallback.
-This is evidence for the representation, not a new runtime path.
-
-Combining those independent states is too costly:
-
-| Layout | Packed bytes, excluding file headers |
-| --- | ---: |
-| Final six-word rows represented by runs | 445,012 |
-| Shared eight-row blocks, with row dictionary | 274,350 |
-
-There are 7,497 final tiles and 316 unique six-word rows. Run storage alone
-is 308,766 bytes: the problem is duplicated sequences and selectors, not the
-palette or the number of distinct planar words. The block layout includes
-block directories; it is still about 268 KiB before any transfer staging.
-Do not allocate either bank on the A500 or treat host precomposition as a
-performance win. A next complete replacement must factor the shell/number
-dependencies away from the column animation (or otherwise remove their
-duplication), rather than returning to the rejected interior-only runtime.
-Any further selection/decode/staging work belongs in its native timing budget.
-
-Generator: `tools/probe-ammo-complete.py`; original-renderer witness:
-`tests/platform/amiga/AmigaAmmoCompleteWitness.cpp`. The ignored
-`generated/amiga-ammo-complete-probe.manifest.json` records input pack, source,
-extractor, generator and output hashes and the exact layout cost breakdown.
-Verification output: `build/ammo-complete-verification.log`. Neither layout
-is linked into the game; no new native FPS/replay acceptance is claimed.
-
-### Factored gauge: pixel-correct experiment, pacing gate open
-
-`AMMO_FACTORED=2` separates a complete prepared centre column from the outer
-rim and the label. The label is fused into final word publication, not erased
-and repainted. Outer-rim movement uses prepared changes rather than rebuilding
-background and foreground layers. The generated bank is **92,264 bytes**, of
-which 6,664 validate the exact source metadata/artwork. It needs no additional
-Chip allocation and reuses the existing Fast-RAM retained image. The source
-renderer remains mode 1 in the same executable; mode 0 (default) omits the
-experiment. Both selectors are initialized data, not compile-time path removal.
-
-Capacities 1–16, single-digit ammo, and qualified shared row-animation
-trajectories use the bank. Changed artwork, wider numbers and nonuniform
-inherited groups fall back. Missed visual updates recertify the groups.
-`make verify-factored-ammo-hud` checks complete HUD pixels, invisible/repeated
-updates, changing capacities, hidden capacity changes, fallback recovery and
-changed artwork. The suite also passes ASan/UBSan. Source animation is not
-advanced by rendering.
-
-Matched contact traces (starts 644/699/843, 30 fields each) use the prepared
-field backing-5 bundle plus `LOCAL_DRAW_CAPTURE=2`, and differ only in
-`AMMO_FACTORED=1/2`. Shared text hash:
-`c117d564d6ebbcbf5b34edea6bbbf386d1a0ba2969d0fc68b2d6f0b9c4ac6f3d`.
-
-| Frame | Original path, whole frame (ms) | Factored path, whole frame (ms) |
-| --- | ---: | ---: |
-| 645 | 115.327 | 101.057 |
-| 701 | 171.882 | 171.881 |
-| 844 | 127.366 | 120.751 |
-
-The projected removal was at least 10 ms on recharge. Frame 645 saves 14.27
-ms; its HUD falls from 25.0 to 11.3 ms. Recharge frames 646–648 use 10.6–10.8
-ms; the shot HUD in frames 704/844 uses about 3.6 ms. The recharge target is
-**not met**. Reports/captures: `build/ammo-factored-comparison.log`,
-`build/ammo-factored-reference-cost.log`, `build/ammo-factored-candidate-cost.log`,
-and `tmp/trace/ammo-factored-mode1` / `...-mode2`.
-
-The full FPS tape is **not a passed pacing gate**: total fields fall from
-3,387 to 3,252 (26.57 to 27.68 FPS), but the largest counted iteration gap at
-frame 701 rises from 8 to 9 PAL fields. These executables share text hash
-`5d9133cbdcfec267e276d1f363b8c74d4c382a17f8900750211d7e9b0fdf15d8`.
-The field counter measures VBlank crossings between profile begin/end;
-the matched instruction traces show effectively unchanged work at 701.
-This suggests a boundary-phase effect but does not establish equivalent
-visible pacing. Do not promote the candidate on average FPS alone. Logs:
-`build/ammo-factored-fps-mode1.log` and `...-mode2.log`.
-
-Native `bash amiga/profile.sh ammo` checks the same 1,800-frame contact tape:
-**455 HUD updates, 455 prepared uses, zero byte mismatches** against full
-source-order reconstruction. This diagnostic is not a timing measurement.
-Cross-target per-frame/component replay passes with the table-angle host
-oracle (native hash
-`4ba4548c7268f0a44587c2ab9058ed562d7f410e9bb9bc26de7dcfdb6613dc4f`).
-Evidence: `build/ammo-factored-native-pixels.log`,
-`build/ammo-factored-cross-replay.log`. The restored normal build passes both
-68000 audits. Retain the experiment for revision/comparison, not as a completed
-A5 or an accepted shipping setting.
-
-The offline generator now proves that **all 461 selector pages have a low
-plane independent of row-animation state**. The current native loop still
-decodes/compares both planes per row. A separate low-plane representation can
-use a baseline and at most 41 sparse exceptions per state; its measured bank
-budget is recorded in `generated/amiga-ammo-factored.manifest.json`. This is
-representation evidence only: no independent-plane runtime or speedup is
-claimed. It identifies the next whole pass to remove, without changing source
-colours or suppressing the red divider/rim.
-
-### Draw-capture invalidation domain
-
-A subsequent native contact-tape audit distinguishes cache hits, identical
-rebuilds and real actor-list changes. Across 1,800 updates it records 1,573
-hits, 27 identical rebuilds and 200 changed rebuilds, with no failures.
-Frame 645 is a hit; frame 844 genuinely changes the list. **Frame 701 rebuilds
-the same five actors solely because the capture revision changes; the layer
-revision is unchanged.** The diagnostic is `bash amiga/profile.sh draw-cache`;
-its counters are in `amiga/.run/profile-draw-cache.log`. Instrumented timing
-is not an acceptance measurement.
-
-`LOCAL_DRAW_CAPTURE=2` separates locally registered actor captures from the
-external box/field chronology. External notifications still update the original
-registration/capture revisions and alarm dirty ranges. Layer order/cutoff
-revisions remain mandatory for Draw reuse. The new revision adds one counter,
-not another actor table. Mode 1 retains global-capture invalidation; mode 0
-(the default) omits the additional counter and selector. Select modes only at
-startup. Future external families with actor Draw participation must not use
-this exclusion unchanged.
-
-The repeated audit justified this narrow B1 intervention before another A5
-experiment: remove the measured redundant layer traversal, preserving actual
-actor callbacks. The projected saving was 6–7 ms in frame 701. Matched traces
-give:
-
-| Frame | Global capture (ms) | Local capture (ms) |
-| --- | ---: | ---: |
-| 645 | 115.029 | 115.023 |
-| 701 | 177.284 | 172.133 |
-| 844 | 127.518 | 127.278 |
-
-Draw collection in frame 701 falls to 5.7 ms. Captures:
-`tmp/trace/local-draw-capture-mode1` and `tmp/trace/local-draw-capture-mode2`;
-shared text hash
-`6112310cc561a9db1de257b6c2831f36feb8e800a209f6fe30be0c9447396e94`.
-Reports: `build/local-draw-capture-comparison.log` and
-`build/local-draw-capture-701-cost.log`. Use the prepared-segment experiment's
-contact trace bundle, replacing its selector with `LOCAL_DRAW_CAPTURE=1/2`.
-Keep both diagnostic options zero for timing.
-
-The marker-free FPS tapes share text hash
-`2895cb5a4e421346f75712b2255d013cd94cd4fa507a40ee1883456ce5c8265a`.
-The worst gap improves **9 → 8 PAL fields** at frame 701, but total fields
-increase **3,390 → 3,394** (26.55 → 26.52 FPS). This is a narrow worst-frame
-improvement, not an average-FPS or all-frame improvement. Logs:
-`build/local-draw-capture-fps-mode1.log` and `...-mode2.log`.
-
-`make verify-local-draw-capture` passes local/global revision, lifecycle,
-callback-failure and live-versus-cached ordering checks. The native
-`draw-order` diagnostic compares live and cached Draw order 1,800 times with
-zero failures (`build/local-draw-capture-native-order.log`). Cross-target
-replay, including per-frame/component digests, passes against the matching
-`build/port-replay-reference-table-atan` host oracle. Its native executable
-hash is `cfd492750299b5acece9d4cf7a072ce29f594a56b3ecc4b98577e77e994f30bc`;
-log: `build/local-draw-capture-cross-replay.log`. Normal build restoration
-passes the 68000 instruction/helper audits.
-
-Keep this measured exclusion opt-in pending normal-build integration. It does
-not replace incremental maintenance for genuinely changed actor lists, solve
-the HUD, or establish the 20 ms budget.
+**Time fields present (37.3 ms; 900–920).** Field preparation and drawing
+take a few milliseconds. The rest of the frame is the ordinary game step plus
+4.2 ms of gauge.
 
 ## Consequences for the budget
 
-- **Worst frames.** Each is roughly 180 ms. The largest removable parts are:
-  - one software atan (35 ms);
-  - layered health digits (26 ms);
-  - whole-gauge recharge redraws (14–30 ms);
-  - generic breakable/layer births (11–23 ms);
-  - CPU terrain tile painting (26 ms);
-  - time-field preparation (18 ms).
+- Generation dominates both remaining burst frames: 93 ms at 701 and 66 ms at
+  844. The targets are object creation, run creation with span publication,
+  and pattern emission; the Well512 draws are fixed.
+- Combat costs 85 ms. Actor and effect composition is about 30 ms of it, and
+  arithmetic helpers about 10 ms.
+- The quiet frame is 28.4 ms. Its gap to 20 ms is the per-actor runner walks:
+  collision-owner attach and dispatch, draw collection, alarms and animation.
 
-  Removing all of them still leaves the generation bursts at about 100 ms,
-  their RNG draws and pattern emission.
-- **Combat.** Combat is dominated by the per-actor simulation walks and CPU
-  composition of actors, damage text, currency and smoke.
-- **Quiet.** Quiet frames need about 11 ms removed. That equals the per-frame
-  runner walks (animation, alarms, reconciliation, draw collection; about
-  7 ms) plus the gauge's row strips (4.5 ms).
+## Rejected approaches
 
-These projections are derived from measured component costs; each change
-needs its own timing tape.
+Each row was measured on the contact tape against its reference and removed.
+Patches are local, ignored copies under `tmp/`; the commit named holds the
+numbers. Do not retry a row without removing the reason in its last column.
 
-## Large-field traversal experiment
+| Area | Approach | Result | Why it lost | Commit, patch |
+| --- | --- | --- | --- | --- |
+| Gauge | Synchronous word blits from Chip layers | Recharge 24 → 17 ms | ~2,300 cycles per small blit, mostly waiting; shot frames slower | d0072b4b, `blitter-gauge.patch` |
+| Gauge | Runtime constant-interval painter | Missed target | Interval bookkeeping costs what it saves | d0072b4b, `interval-gauge.patch` |
+| Gauge | General interval rebuild per frame | Slower | Same; replaced by bounded damage ranges | c2b663b5, `ammo-intervals-v1.patch` |
+| Gauge | Column sweep with ordered overlap solving | 645/844 +17/+12 ms | 31 ms of metadata solving on the 68000 | 997d62ac, `ammo-column-sweep.patch` |
+| Gauge | Per-line uniform-middle publication | 645 and 844 slower | Still visits every line | 65d5c955, `ammo-uniform-rejected.patch` |
+| Gauge | Eight-line region certificates | 645 +5.4 ms, 844 +4.3 ms | Classification adds 4.4 ms and removes no drawing | 3c47d140, `ammo-certificates-rejected.patch` |
+| Gauge | Interior-only prepared segments | 645 −5.5 ms | Surrounding rim and label work remained | 4005f3ea, `ammo-segments-native-rejected.patch` |
+| Gauge | Complete prepared gauge bank | Pixel-exact | 268–435 KiB | c5fa7ab5 (host probe only) |
+| Gauge | Independent low-plane bank | All three worst frames slower | +20 KB, more transfers | 3db26669, `ammo-independent-plane-rejected.patch` |
+| Gauge | Runtime prepared-run comparison | Recharge 12.6 → 14.3 ms | Run selection costs more than it saves | 6cfeb15c, `ammo-prepared-run-rejected.patch` |
+| Gauge | Offline phrase-staged column, two tall blits | 645 −19 ms against the original compositor; shot HUD 4.7 ms; +39 KB | Rejected for a 0.31 ms move in frame 701, which is noise. Against today's factored default it saves only a few ms | 7452dfe0, `ammo-prepared-transfer-rejected.patch` |
+| Fields | Direct pristine-terrain word traversal | Exit frames +5–15 ms | Two full traversals per frame | c086ccea, `field-direct-words-rejected.patch` |
+| Fields | Vertical colour runs | Transfers 18.8 → 16.3 ms, frames unchanged | 37 KB for no frame gain | 9fde3a40, `field-runs-rejected.patch` |
+| Fields | Whole-row restoration from offline spans | Frames unchanged | Copying rows and repainting moves the cost | d19ce3e8, `field-row-restoration-rejected.patch` |
+| Fields | Chained adjacent-raster XOR packets | 32.2 → 39.3 ms | Packet traversal on the CPU | 3de03179, `field-delta-rejected.patch` |
+| Fields | Prepared transfer-list batches | 32.4 → 40.0 ms | Queue scheduling overhead | e558b6a3, `field-batch-rejected.patch` |
+| Terrain | All-phase CPU tile bank (80 KB) | 844 painting 26 → 15 ms | Superseded by direct run composition | 947e8004, `terrain-words-experiment.patch` |
 
-The contact tape does not measure large exit/start circles. Reproduce the
-level-exit window with the prepared-small-field bundle from commit `bcca5bd4`,
-but use `SKIP_LEVEL=1 PROFILE_CONTACT=0 TRACE_FRAMES=2,10,30 TRACE_FIELDS=30`
-with `bash amiga/profile.sh trace`. Exclude partial capture frames as usual.
-The baseline trace is `tmp/trace/field-large-baseline.PKnIdd`; its executable
-text hash is `ed583f6ebda63c30d687500b5795d2eb8b74cfd1a41962be2f6fd862d036566e`.
+## Measurement notes
 
-In complete frames 3–36, large-field preparation costs roughly 56–72 ms and
-drawing 11–17 ms when the raster changes. The prepared-row traversal and its
-callback account for about 38 ms per sampled frame; saved-word construction,
-coverage reconciliation, underlay capture and publication add more. Even
-unchanged-raster dirty-row inspection takes 4.2–4.5 ms in frames 33, 36 and 37.
-
-Simply removing the saved-word banks is insufficient. A tested direct-word
-experiment restored each old mask from pristine terrain, then painted each
-new circle in source order using `amigaFieldWords` again. Its two traversals
-each cost about 40–48 ms. Frame 4 changed from 88.3 to 102.8 ms; frame 6 from
-146.5 to 151.4 ms. It passed pixel tests but was withdrawn, not enabled.
-The experiment patch is retained locally as `tmp/field-direct-words-rejected.patch`;
-its trace is `tmp/trace/field-large-direct.uOVDeH` (text hash
-`3e98ff2171517abd3389061699b302d506cccaf429082a03a0393fb925351e61`).
-These two builds differ in code: use the large phase-cost differences as
-architectural evidence, not sub-millisecond attribution.
-
-Do not replace that traversal with another per-frame expansion or a second
-generic pass. Removing its work requires a prepared representation that can
-be consumed directly. An all-16-shift expansion of the existing 742 row
-patterns would need 175,986 bytes of word payload, 23,744 bytes of phase
-indices and 46,892 bytes of row offsets before other metadata; that naive
-representation also needs a memory-design decision, not blind adoption.
-
-## Prepared large-field columns
-
-The opt-in `PREPARED_FIELDS=1 PREPARED_FIELDS_BACKING=2` path replaces runtime
-row expansion, sparse coverage-map construction and saved-word reconciliation
-with offline column packets. It restores old masks from the pristine terrain
-ring and consumes prepared colour words in source order. Its ordinary-memory
-bank is 73,024 bytes, deduplicated across radius phases, with no per-X-shift
-expansion or additional Chip allocation. The portable raster remains the pixel
-oracle; this measurement does not establish Windows GPU raster equivalence.
-
-Reproduce the matched level-exit comparison with the same bundle described
-above and `TRACE_FRAMES=2,30 TRACE_FIELDS=30`; use
-`PREPARED_FIELDS_BACKING=1` for the sparse-large reference and `=2` for columns.
-The captures are `tmp/trace/field-columns-reference.GgLmuV` and
-`tmp/trace/field-columns-candidate.XIRhwg`; both executable text hashes are
-`7c56e06215ce1aa1a5951d24c9c284563c2430780fb237b59b92587fac72052b`.
-The earlier 2/10/30 markers overlap with the faster renderer: use separated
-windows, not an incomplete capture set.
-
-| Complete level-exit frame | Sparse large (ms) | Columns (ms) |
-| ---: | ---: | ---: |
-| 3 | 90.17 | 34.86 |
-| 4 | 88.13 | 35.57 |
-| 5 | 106.68 | 39.81 |
-| 6 | 146.46 | 88.39 |
-| 31 | 102.12 | 39.40 |
-| 33 (unchanged raster) | 19.19 | 19.46 |
-| 36 (unchanged raster) | 21.22 | 18.73 |
-
-Changing-raster preparation falls from roughly 56–71 ms to 8–10 ms, but
-drawing still costs 12–13 ms. The 48.5 ms `selectExitMaskBank` operation in
-frame 6 is unchanged. Row-footprint inspection falls from about 4.3 ms to
-1.4 ms, but whole unchanged-raster frames can still vary with other row work
-and display synchronization; frame 33 is not a whole-frame improvement.
-These remaining costs still miss the 5 ms field and 20 ms whole-frame targets.
-
-The matching contact windows 644/699/843 use
-`tmp/trace/field-columns-contact-reference.BjQUfk` and
-`tmp/trace/field-columns-contact-candidate.FeBaHF`, with shared text hash
-`9531cba7be3e8e446338f670b5eeae6e94e3213f194f638ee739efbf57a89f72`.
-Frames 645/701/844 cost 816,590/1,262,490/901,690 cycles in the reference and
-816,570/1,262,450/901,280 in the column mode. They do not regress, but those
-sub-millisecond differences are not a combat performance win.
-
-## Large-field representation limits
-
-`make analyze-field-layouts` counts geometry work and uncompressed bitmap-bank
-storage using the generated portable rasters; it is not a native timing model.
-For independent, uniformly distributed Q8 radius pairs, excluding identical
-rasters, retaining identical whole columns eliminates only 3.4–4.2% of the
-word visits at circle X positions 110, 190 and 269. Word deltas still require
-42.4–47.4% as many destination-word visits as the current restore-plus-draw
-passes, before dirty rows, mixed-circle ordering, clipping and traversal cost.
-These are full-vertical-extent geometric counts, not observed contact-tape
-frequencies or predictions of equivalent cycle savings.
-
-A vertical-run experiment deduplicated translated colour sequences and moved
-vertical clipping, wrap splitting and interior row-footprint marking out of
-the per-word loop. It added 36,916 ordinary-memory bytes, with no new Chip
-allocation. Exhaustive radius/shift pixels and the existing mixed-field host
-tests passed, but the native result did not justify keeping it. The paired
-2/30 level-exit captures are `tmp/trace/field-runs-reference.h7eIC5` and
-`tmp/trace/field-runs-candidate.dQP6hY`; both text hashes are
-`7a4fbf07f8e3c1b37bf5af7b604de56517edd9daa41c31ded7112ce13c91a8f3`.
-Across selected complete frames 3–36, field transfers fall only from 18.83 to
-16.34 ms, while complete frames average 39.46 versus 39.57 ms. Frame 6 changes
-from 88.42 to 88.66 ms and frame 33 from 19.59 to 22.22 ms; presentation waiting
-absorbs the modest CPU saving. The experiment was removed. Its recoverable
-patch is `tmp/field-runs-rejected.patch`; it is not another production option.
-
-The bitmap counts also rule out blindly expanding every large circle into a
-full masked sprite. Across the 21 distinct rasters, single full-height images
-need 594,084 bytes. Bands of 16 lines reduce that to 87,752 bytes but require
-32 rectangles per unclipped circle on average; 32-line bands need 146,360
-bytes and 16 rectangles. Translation-deduplicated one-word-wide fragments
-need 51,204 bytes of colour/mask pixels and about 33 rectangles per full
-circle. Counts exclude additional placement/index metadata, runtime clipping,
-and DMA setup costs; view clipping can reject many rectangles. A DMA design
-needs an explicit resident-bank or staging budget and native blit measurements,
-not a claim that these host counts already achieve the field budget.
-
-## Large-field row-restoration experiment
-
-Replacing masked restoration with existing terrain-row DMA did not improve
-complete-frame pacing enough to retain. The experiment retired old field
-ownership transactionally, scheduled at most four physical spans covering at
-most 80 rows, synchronized the pristine terrain, and repainted fields before
-actors. Tall side arcs and larger/more fragmented footprints retained masked
-restoration. It added no Chip allocation.
-
-The first version scanned physical row footprints and queried existing row
-debt, costing 4.0–4.7 ms just to schedule restoration. Preparing exact clipped
-footprints offline reduced that scheduling to about 1.5 ms. Deduplicating
-16-position X blocks required 8,106 ordinary-memory bytes for all 512 radius
-phases and centres -21 through 401. Host checks covered 219,648 X/radius
-footprints, 32,768 clipping/wrap raster cases and transactional row restoration;
-the composition tests also passed address/undefined-behavior sanitizers.
-The earlier scanning version passed the native full-buffer fixture, but the
-offline-footprint variant was rejected on timing before repeating native pixel
-and contact/FPS acceptance gates.
-
-The final matched level-exit traces are
-`tmp/trace/field-row-spans-reference.NXx44p` (masked restoration) and
-`tmp/trace/field-row-spans-candidate.zoHkQ8` (prepared spans plus terrain rows).
-Both executable text hashes are
-`42c8e996bec15f9d2374410823c49059cf1cf0bf5863faf25bad3d869960ddee`.
-Use the prepared-column bundle and 2/30 markers described above; the discarded
-experiment selected its candidate with `PREPARED_FIELDS_BACKING=3` and its
-reference with `=2`. That candidate option is no longer in the build.
-
-| Complete level-exit frame | Masked restore (ms) | Terrain rows (ms) |
-| ---: | ---: | ---: |
-| 3 | 34.93 | 32.82 |
-| 4 | 35.78 | 33.72 |
-| 5 | 39.48 | 41.27 |
-| 6 | 88.40 | 88.20 |
-| 33 | 19.72 | 21.76 |
-| 36 | 18.97 | 20.91 |
-
-Selected complete frames 3–36 total 5,326,870 versus 5,325,730 cycles: about
-39.46 versus 39.45 ms per frame, effectively unchanged. New terrain copies
-cost roughly 4–6 ms on changing-field frames; drawing remains 12–13 ms.
-Average presentation waiting rises from 2.09 to 4.10 ms in the selected window.
-Moving restoration into the row owner alone therefore does not solve the field
-budget. The source and generated-table changes were removed; the recoverable
-patch is `tmp/field-row-restoration-rejected.patch`. Do not revive this as
-another production option or count its host correctness checks as a speedup.
-
-## Resident large-field bands
-
-`PREPARED_FIELDS=1 PREPARED_FIELDS_BACKING=3` uses resident 176-pixel top/bottom
-arc images for circle centres 182–198. Other placements keep the column path.
-The images contain white coverage and total coverage; the framework Bitmap
-copy path derives red through the complemented-source masked blitter minterm.
-Images are generated offline and copied into Chip once on gameplay entry, not
-converted, copied or expanded for each field. Mixed-circle source order,
-mask-only restoration from pristine terrain, clipping and physical ring wraps
-remain unchanged. See the [memory contract](amiga-memory.md): the bank costs
-71,456 Chip bytes, reusing the unused scene-bank tail before extending it.
-
-The paired level-exit traces use the prepared-column bundle with
-`TRACE_FRAMES=2,60 TRACE_FIELDS=30`, `SKIP_LEVEL=1 PROFILE_CONTACT=0`, and
-`PREPARED_FIELDS_BACKING=2` versus `=3`. Captures:
-`tmp/trace/field-bands-mode2.ppMp7b` and
-`tmp/trace/field-bands-mode3.Na6tNt`. Both text hashes are
-`1187ebd6ca2a38747923a25d33dcbd6f0ac52b7c3140f378674a0bc024fd2ba9`.
-Use the reporter's paired-field DMA-stall accounting; rejecting those boundary
-records or dropping the stalled cycles would invalidate the comparison.
-
-| Complete level-exit frame | Columns (ms) | Resident bands (ms) |
-| ---: | ---: | ---: |
-| 3 | 34.84 | 25.78 |
-| 4 | 35.72 | 32.33 |
-| 5 | 39.67 | 26.59 |
-| 6 | 88.42 | 82.54 |
-| 11 | 37.92 | 38.88 |
-| 70 | 39.53 | 28.06 |
-
-For the intersection of fully captured frames (3–15 and 61–74, 27 frames),
-mean complete-frame cost falls from 41.13 to 33.01 ms. Frame 11 illustrates
-that presentation-phase changes can still make individual non-gate frames
-slower. Preparation plus drawing remains about 11–16 ms, not the 5 ms target;
-the 48.5 ms exit-mask selection in frame 6 is still present.
-
-Matched contact captures are
-`tmp/trace/field-bands-contact-trace-2.xgHHKj` and
-`tmp/trace/field-bands-contact-trace-3.kZsfsH`, with shared text hash
-`e3fb235789fc864e3ea0bad25f0dd8672890178dba5dfa59d3d242b1a027f307`.
-Frames 645, 701 and 844 are cycle-identical between modes at
-817,250 / 1,263,190 / 901,780 cycles. The field improvement is not a claim of
-faster combat or completion of the whole-frame budget.
-
-The marker-free FPS runs (`TRACE_FRAMES=` and `PROFILE_CONTACT=1`, same
-bundle and modes) both take 3,390 PAL fields for 1,800 updates, with a
-nine-field maximum at frame 701. Their shared text hash is
-`159659ca9fb27b7d4d04af414f2bdcef7d1cdf29da34c3959c5828b106f4cac4`.
-Logs are `build/field-bands-pure-fps-2.log` and
-`build/field-bands-pure-fps-3.log`. The earlier 3,391-field runs included
-inert trace markers and are not the marker-free FPS baseline.
-
-The final native pixel verifier compares 1,979 full buffers through 1,800
-contact updates, plus 512 terrain-mask phases and 131 mixed/shifted/wrapped
-composites, with zero failures. Executable hash:
-`5d331a14d0be6a896020026be32673a79d33dd2fb09df8410833b1a84d81095b`;
-text hash `5c1c64ce12c0e6a10b3f29bcd993b0ef86309172208671ca8a15e5e5075873a5`.
-It measures 11,520 Chip bytes free after allocation. Host raster tests cover
-all 8,704 admitted radius/position combinations, clipping and restoration,
-and pass address/undefined-behavior sanitizers. These pixel oracles are the
-shared portable raster, not evidence of original Windows GPU coverage.
-
-The cross-CPU replay also passes with the same optimization bundle and
-`REPLAY_VERIFY=1`, using `build/port-replay-reference-table-atan` as the host
-oracle (matching `TABLE_CONTACT_ATAN=1`). The tested native executable hash is
-`cb6c4c7205721c0553a05d8564b34dc16f9b91c75ea61c8ddaf388c04fbaa30e`;
-the command/result log is `build/field-bands-cross-replay.log`. This checks
-shared state and RNG, separately from the native DMA pixel verifier.
-
-### Resident-band transfer preparation
-
-The first scheduling experiment queued transfers with blitter priority off,
-then enabled priority only while draining. It lost: the 28 common complete
-frames in `tmp/trace/field-batch-mode3.ZDRnaH` and
-`tmp/trace/field-batch-mode4.4MyLJ9` rose from 35.003 to 40.092 ms.
-Both use text hash
-`1e8ed1484a17122905e5613bdc6abe4cee174c5e744fcbf946e78c3895f75b92`.
-That source is removed; `tmp/field-batch-rejected.patch` preserves the rejected
-experiment, not a supported option.
-
-The subsequent prepared-geometry experiment keeps the accepted early-priority
-policy. It removes repeated Bitmap construction and horizontal mask, shift,
-word-count and modulo calculation from band painting/restoration. The native
-audit attributed roughly 4 ms to this repeated setup. `BitmapCopyPlan`
-prepares 17 painting and 17 restoration geometries when binding the band bank;
-only vertical placement and height remain variable at submission. The generic
-Bitmap implementation remains compiled as the comparison.
-
-Here `PREPARED_FIELDS_BACKING=3` selects the generic resident-band path and
-`=4` selects prepared geometry, not the rejected scheduling experiment.
-The paired level-exit captures are `tmp/trace/field-plan-mode3-reference` and
-`tmp/trace/field-plan-mode4-candidate`, using the same optimization bundle,
-`SKIP_LEVEL=1 PROFILE_CONTACT=0 TRACE_FRAMES=2,60 TRACE_FIELDS=30`.
-Their text hash is
-`be7125e90247702794c28757145f23ea82a78ff6e3b1dbbc4b2e578a3f4a8395`.
-Across the 30 common complete frames, mean cost falls from 36.240 to
-31.576 ms. Frame 6 falls from 75.40 to 73.29 ms; individual presentation-phase
-frames can get slower (frame 4: 27.61 to 33.19 ms). This is not a claim of
-meeting either the whole-frame or the under-5-ms field budget.
-
-Native pixel checks pass 1,979 full-buffer comparisons, 512 terrain-mask
-phases and 131 overlapping/shifted/wrapped composites. The verifier executable
-hash is `4f493ead5336dec2f51d8649a54ebc1f1b8270a662dcad264c51ccaad3c8dd44`;
-its text hash is
-`60d56ab9359609e2dff4b6d9d394a5dc4c25858af4dda0c79c5fec49bfbd55fe`.
-`make verify-bitmap-copy-plan` independently models the blitter channels and
-checks 340 paint/restore/shift/height/complement cases, including untouched
-edges; address and undefined-behavior sanitizer checks also pass.
-
-Matched contact captures `tmp/trace/field-plan-contact-reference` and
-`tmp/trace/field-plan-contact-candidate` have the same text hash
-`68ea21a0ae84dd4e5c1a8132c38692c3f3211592eb2c1fc4dbdd26d5fec20b32`.
-All 20 common complete frames are cycle-identical. Mandatory frames
-645 / 701 / 844 remain 817,260 / 1,263,090 / 901,750 cycles respectively.
-
-Marker-free contact FPS runs (`TRACE_FRAMES=`) take 3,390 PAL fields for the
-generic path and 3,389 for prepared geometry, over 1,800 updates; both retain
-the nine-field maximum at frame 701. This one-field tape difference is not
-a meaningful combat improvement. Logs are `build/field-plan-fps-3.log` and
-`build/field-plan-fps-4.log`, with common text hash
-`eff94c9c8379314a436b587d9ffe4ab1e5765fed33b15a944289cd1c12625113`.
-
-Cross-target replay passes with the same optimization bundle,
-`REPLAY_VERIFY=1 TABLE_CONTACT_ATAN=1`, and the matching
-`build/port-replay-reference-table-atan` host oracle. Executable hash:
-`9638a9db16593b41a0b357b1dc3d0ee550c8ec79fd92f05c0ef10e1c762f443e`.
-The result is in `build/field-plan-cross-replay.log`; the normal build is
-restored with clean 68000 instruction/helper audits. Prepared geometry remains
-opt-in pending the full scene coverage and frame-budget gates.
-
-### Rejected adjacent-raster XOR packets
-
-A differential experiment replaced full old-mask restoration and new painting
-when one stationary large circle owned an unchanged terrain footprint. The
-identity per plane was exact:
-
-`target ^= oldColour ^ newColour ^ (terrain & (oldCoverage ^ newCoverage))`.
-
-Offline adjacent-raster packets could compose reversibly in either direction.
-This avoided storing every old/new raster pair: the 21 frames have 226,180
-changed words across all directed pairs (2,261,800 bytes at ten bytes per
-command, before directories), versus 3,282 words / 32,820 bytes for adjacent
-forward edges reused in reverse. The 21-entry offset directory added 42 bytes
-of ordinary memory and no Chip allocation. Reproduce the representation audit
-with `c++ -std=c++17 -O2 tools/audit-field-deltas.cpp -o build/audit-field-deltas`
-and `build/audit-field-deltas`. The visible-word counts are conservative whole
-word bounds before partial viewport-edge masks.
-
-The candidate admitted at most four adjacent edges, required unchanged X/Y
-and ring origin, and rejected dirty old/new arc rows or multiple fields.
-Host checks passed 24,038 reversible placements and 3,400 ownership lifecycle
-frames (3,196 admitted updates), alongside existing mixed-size, dirty-row and
-double-buffer cases and address/undefined-behavior sanitizers. Those checks
-did not establish speed.
-
-Paired native captures `tmp/trace/field-delta-mode4` and
-`tmp/trace/field-delta-mode5` used the resident prepared-transfer bundle with
-`SKIP_LEVEL=1 PROFILE_CONTACT=0 TRACE_FRAMES=2,60 TRACE_FIELDS=30`.
-Their common text hash is
-`8ea4f7cad773183c13cf46a4d03e671df0f12665f14db88a9946d2c1654317de`.
-The 29 common complete frames worsened from **32.175 to 39.314 ms**.
-Frame 61 rose from 33.01 to 68.17 ms; frame 70 from 27.14 to 66.92 ms.
-The differential routine itself averaged 5.72 ms over all captured frames,
-including frames that did not use it. Dirty-footprint checks added work too.
-Eliminating full painting did not compensate for chained per-word CPU updates.
-
-The candidate, generator extension and experimental tests are removed; the
-recoverable patch is `tmp/field-delta-rejected.patch`. Native pixel/contact/FPS
-acceptance gates were not pursued after this timing failure. Do not revive
-this as a renderer option, hide it behind a narrower current-tape special
-case, or count its host checks as an A6 performance gain.
-
-### Rejected prepared transfer-list batch
-
-This experiment prepared hardware controls at bank binding, described all
-field transfers before DMA, and executed the list synchronously through the
-framework. It removed per-transfer generic queue construction and IRQ-state
-writes, while retaining the same coverage/pixel buffers, masks and blit sizes.
-The estimate targeted about 3–4 ms of repeated submission/setup in the native
-audit; DMA waiting itself was not assumed removable.
-
-Native pixel verification passed 1,979 full-buffer comparisons, 512 mask phases
-and 131 overlap/wrap composites; free Chip remained 11,512 bytes. Verifier
-executable hash: `6ec1c784c47aa561d135582414777002df10d587c411a93e3f10ac94c4295c98`;
-text hash `50378251b7d35bd3ad8e09ab2110ab04636aafe3d04778048481db98625ac47e`.
-Host job decoding and sanitizer checks also passed all 340 transfer cases.
-
-Paired captures `tmp/trace/field-jobs-mode4` and
-`tmp/trace/field-jobs-mode5` use `SKIP_LEVEL=1 PROFILE_CONTACT=0`,
-`TRACE_FRAMES=2,60 TRACE_FIELDS=30`, and the same prepared-field optimization
-bundle as above. Their shared text hash is
-`c583b959f1263793554d2af127bd6fc0b945da426da88e740f4ff58fa25a5031`.
-The 28 common complete frames worsen from **32.360 to 40.040 ms**.
-The candidate spends 8.62 ms/frame in `blitterWait` and 9.09 ms/frame in
-presentation waiting; field preparation plus drawing averages about 14.2 ms.
-Prebuilding the list did not eliminate DMA occupancy or improve complete-frame
-pacing. The implementation is removed, with a recoverable ignored patch at
-`tmp/field-jobs-rejected.patch`. Contact/FPS/replay acceptance gates were not
-pursued after the timing failure.
-
-`tools/audit-field-band-tiles.cpp` measures another possible tradeoff without
-changing runtime code. Build with
-`c++ -std=c++17 -O2 tools/audit-field-band-tiles.cpp -o build/audit-field-band-tiles`
-and run `build/audit-field-band-tiles`. It bounds subrectangles over the existing
-resident images, so no new Chip image bank is needed. Counts cover 42 arc
-images and all 17 admitted horizontal phases, before vertical clipping/wrap:
-
-| Horizontal pieces | Fetched words | Transfers | Words saved per extra transfer |
-| ---: | ---: | ---: | ---: |
-| Existing whole arc | 303,688 | 714 | — |
-| 2 | 323,226 | 1,428 | -27.36 |
-| 3 | 222,818 | 2,142 | 56.63 |
-| 4 | 190,530 | 2,856 | 52.83 |
-| 6 | 153,800 | 4,242 | 42.49 |
-| 11 | 126,588 | 7,770 | 25.10 |
-
-These are geometry counts, not a timing win. Edge-word fetches make a two-piece
-split worse even before setup. Finer splits reduce transparent DMA but sharply
-increase transfer count. They must not be implemented on the assumption that
-less fetched area alone makes them faster.
-
-### Fused terrain/large-field composition experiment
-
-`PREPARED_FIELDS_BACKING=5` combines pristine terrain and the new field in one
-blitter pass. It replaces the old restore-then-paint pair inside new arc
-rectangles; only departing old-mask strips are retired separately. The estimate
-targets the previous 4–7 ms restoration pass, not sub-millisecond submission
-helpers. It uses the existing resident bank and compiled mode-4 comparison,
-without additional Chip allocations. The rectangle-ownership contract is in
-[Amiga memory](amiga-memory.md); overlapping fields, moved centres/origins and
-retained laser pixels retain the masked path.
-
-Host geometry checks cover 34,816 stationary old/new combinations, retiring
-6,635 of 1,086,268 old rectangle rows. The lifecycle suite includes 2,040
-ownership frames (1,649 fused compositions), dirty terrain, denied ownership,
-mixed shapes, 128 pending replacements and fallback transitions. Both suites pass ASan/UBSan, and the
-renderer suite checks pending versus retained laser ownership.
-
-The bounded native `fields-clear` run with `PROFILE_LASER=1` completed 480
-gameplay updates with 4,090 whole-buffer checks, 583 fused transfers and zero
-pixel failures. The stricter report separates **510 fixture transfers** across
-two scene-bank bindings from **73 actual exit transfers**. It subtracts 255
-transfers per complete 437-composite fixture and requires at least 20 real exit
-transfers. Log: `build/field-composite-clear-laser-final.log`. Native executable:
-`5f34bd7e04a1b94e2a02521f12443208a482838e9859354985aef06eb2a0d538`;
-text: `ec5f1c895f35977b0f95032b24b9abaa512aaf159e2885e4c3fcc19958051a39`.
-
-Matched marker traces `tmp/trace/field-composite-final-mode4` and
-`tmp/trace/field-composite-final-mode5` use the optimization bundle above,
-`SKIP_LEVEL=1 PROFILE_CONTACT=0 PROFILE_LASER=0`,
-`TRACE_FRAMES=2,60 TRACE_FIELDS=30`, and shared text hash
-`407938d9242ee2fd4972233a7b9cc2b91d6730b8ee322602c2e1a9b0da167357`.
-Across 37 common complete frames the mean improves **31.441 → 28.553 ms**.
-The worst captured frame, frame 6, remains **73.784 ms** in both modes;
-`selectExitMaskBank` accounts for 48.5 ms of it. Individual wait-phase-shifted
-frames can worsen (frame 73: 27.114 → 34.315 ms), so this mean is not a
-worst-frame or 20 ms success claim. Stationary fused preparation generally
-takes 1.1–2.6 ms, with drawing still around 5.3–7 ms.
-
-The mandatory contact captures (`tmp/trace/field-composite-contact-mode4` and
-`tmp/trace/field-composite-contact-mode5`, `SKIP_LEVEL=0 PROFILE_CONTACT=1`,
-`TRACE_FRAMES=644,699,843 TRACE_FIELDS=30`) have shared text hash
-`d93fd99d8f5427600a8f6d41584dd3d70be41b82994549841993a5362975f511`.
-All 19 common complete frames are cycle-identical, including frame 645
-(817,270 cycles / 115.026 ms), 701 (1,260,870 / 177.460 ms), and 844
-(905,010 / 127.375 ms). This is a no-regression result, not a combat gain:
-that workload does not admit stationary large-field fusion.
-
-Marker-free contact tapes in both modes complete 1,800 updates in **3,392 PAL
-fields** (26.53 FPS), with the same worst gap of nine fields at frame 701.
-Logs are `build/field-composite-fps-mode4.log` and
-`build/field-composite-fps-mode5.log`; the shared text hash is
-`8a87bdab95b0724327aeb7ad7f7f951f58d6b4eb79f851a97ca27b279127f945`.
-
-Cross-target replay passes against `build/port-replay-reference-table-atan`,
-including the per-frame trace and component digests. Native replay executable:
-`6a9f439cbf1413f016832b5615e38d2e04f56b5d1059e3ad8770358411fcd290`;
-log: `build/field-composite-cross-replay.log`. The matching compact-angle host
-oracle is intentional; no shared simulation code changed in this experiment.
-The normal playable executable was restored, with clean 68000 instruction and
-64-bit helper audits.
-
-Retain this measured pass elimination as an opt-in improvement, not completion
-of A6 or permission to enable it by default. The under-5-ms field target and
-broader placement/coverage gates remain open.
+- A capture's first frame is partial, because FS-UAE starts recording at the
+  VBL after the marker. Start a capture at least one frame before the frame of
+  interest.
+- Frames whose call tree does not contain the changed code still move by up
+  to about 0.5 ms between builds (memory layout, interrupt phase). Do not
+  treat that as a regression.
+- The FPS tape's worst gap is quantized to whole fields and moves by one field
+  between builds. Report it, but judge worst frames by traced cycles.
+- Small blits lose to the CPU: a synchronous word blit costs about 2,300
+  cycles, mostly waiting. Use the blitter for tall strips only.
+- Memory dumps (`profile.sh frames`) show what was drawn, not what the beam
+  showed. DMA faults, such as the sprite-7 stripes fixed in `b815af63`, only
+  appear in the per-field screenshots embedded in instruction traces.
