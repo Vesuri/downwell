@@ -36,6 +36,53 @@ std::vector<std::uint8_t> readFile(const char* path){
 using Ownership=downwell::GameplayCollisionOwner::Ownership;
 using View=downwell::GameplayCollisionView;
 
+// Exercise room cleanup directly: a final-state digest alone cannot detect
+// reordered callbacks when all marked records ultimately disappear.
+std::vector<unsigned> cleanupOrder(const downwell::ObjectPack& objects,
+    const downwell::SpriteCollisionPack& sprites,Ownership ownership,unsigned scenario){
+    auto owner=std::make_unique<downwell::GameplayCollisionOwner>(objects,sprites,
+        downwell::GameplayTerrainInstances::Presentation{},downwell::GameplayTerrainInstances::WallCollision{},
+        nullptr,ownership);
+    auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+        owner->breakableBinding(),owner->playerBinding());
+    require(owner->attach(*world),"cleanup fixture attaches");
+    for(int object:{112,92,112,92,112,92})
+        require(world->createGeneratedInstance({object,240,512},objects,[](const auto&){return true;}),"mixed births");
+    downwell::InstanceHandle enemies[3];
+    for(unsigned i=0;i<3;++i)enemies[i]=world->enemyHandle(world->enemyAt(i).lifetimeId);
+    if(scenario==1||scenario==2){
+        require(owner->enemyBinding().activation(enemies[0],world->enemyAt(0),false)&&
+            owner->reconcileActivation(),"fixture deactivation");
+        if(scenario==2)require(owner->enemyBinding().activation(enemies[0],world->enemyAt(0),true)&&
+            owner->reconcileActivation(),"fixture reactivation");
+    }
+    if(scenario==3){
+        // Registration append is NOT room reactivation. Cleanup retains the
+        // old room position, even though the alarm registration moves later.
+        require(owner->enemyBinding().membership(enemies[0],world->enemyAt(0),false)&&
+            owner->enemyBinding().membership(enemies[0],world->enemyAt(0),true),"fixture re-registration");
+    }
+    if(scenario==4){
+        const downwell::InstanceHandle old{0,world->breakableSlot(0).lifetimeId};
+        require(world->markBreakableDestroyed(old),"old slot marked");
+        const int x=0,y=336;world->configureBreakables(&x,&y,1);
+        require(world->effectsSucceeded(),"box slots reset before pending cleanup");
+    }
+    for(unsigned i=world->breakableSlots();i;--i)
+        require(world->markBreakableDestroyed({i-1,world->breakableSlot(i-1).lifetimeId}),"reverse box marking");
+    for(unsigned i=3;i;--i)require(world->markEnemyDestroyed(enemies[i-1]),"reverse enemy marking");
+    std::vector<unsigned> order;
+    require(owner->cleanupDestroyed([&](downwell::InstanceHandle shared,const View::Record&){
+        View::Kind kind;downwell::InstanceHandle local;
+        if(!View::decode(shared,kind,local))return false;
+        order.push_back(shared.slot);order.push_back(shared.generation);
+        return kind==View::Kind::enemy?world->retireMarkedEnemy(local):
+            kind==View::Kind::breakable&&world->retireMarkedBreakable(local);
+    }),"ordered cleanup succeeds");
+    require(owner->prepareDraw(),"second cleanup is empty");
+    return order;
+}
+
 struct Scene {
     AmigaTerrainFragment fragments[19];
     AmigaTerrainIndex index;
@@ -47,12 +94,12 @@ struct Scene {
     std::unique_ptr<AmigaPortRuntime> world;
     Scene(const downwell::BuilderPatternPack& patterns,const downwell::ObjectPack& objects,
           const downwell::SpriteCollisionPack& sprites,const downwell::RoomPack& rooms,
-          const downwell::PackedRoom& room,const downwell::StartupRuntime& entry,Ownership ownership)
+          const downwell::PackedRoom& room,const downwell::StartupRuntime& entry,Ownership ownership,bool nativeBoxes=true)
         :collision{nullptr,nullptr,&patterns,nullptr,0,nullptr},
          generation(builder,patterns,objects,index,tiles){
         owner=std::make_unique<downwell::GameplayCollisionOwner>(objects,sprites,
             downwell::GameplayTerrainInstances::Presentation{},downwell::GameplayTerrainInstances::WallCollision{},
-            &rooms,ownership);
+            &rooms,ownership,nativeBoxes);
         require(owner->valid(),"owner prepares");
         // Native ownership keeps no terrain identity records: the occupancy
         // grid is the only terrain representation, as on the Amiga.
@@ -164,16 +211,22 @@ int main(int argc,char** argv){
     downwell::SpriteCollisionPack sprites(spriteBytes.data(),spriteBytes.size());
     downwell::PackedRoom room;
     require(rooms.valid()&&objects.valid()&&patterns.valid()&&sprites.valid()&&rooms.findRoom(11,room),"resources");
+    for(unsigned scenario=0;scenario<5;++scenario){
+        const auto expected=cleanupOrder(objects,sprites,Ownership::reference,scenario);
+        require(cleanupOrder(objects,sprites,Ownership::nativeScenery,scenario)==expected,
+            "native family destruction callback order matches the registered room");
+    }
     unsigned tapes=0,frames=0,maxTerrain=0;
     for(unsigned phase=0;phase<10;++phase){
         auto host=std::make_unique<downwell::StartupRuntime>(downwell::PlatformProfile::nonDesktop,
             &rooms,&objects,2,&patterns);
         host->skipToGameForTesting();
         auto reference=std::make_unique<Scene>(patterns,objects,sprites,rooms,room,*host,Ownership::reference);
-        std::unique_ptr<Scene> others[3]={
+        std::unique_ptr<Scene> others[4]={
             std::make_unique<Scene>(patterns,objects,sprites,rooms,room,*host,Ownership::nativeTerrain),
             std::make_unique<Scene>(patterns,objects,sprites,rooms,room,*host,Ownership::native),
-            std::make_unique<Scene>(patterns,objects,sprites,rooms,room,*host,Ownership::nativeScenery)};
+            std::make_unique<Scene>(patterns,objects,sprites,rooms,room,*host,Ownership::nativeScenery),
+            std::make_unique<Scene>(patterns,objects,sprites,rooms,room,*host,Ownership::nativeScenery,false)};
         for(frame=0;frame<downwell::gameplayContactProfileFrames;++frame){
             const auto& player=reference->world->player();
             const auto input=downwell::packReplayInput(downwell::gameplayContactProfileInput(

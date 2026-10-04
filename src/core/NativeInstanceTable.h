@@ -19,12 +19,14 @@ namespace downwell {
 // that can alter a capture advances the capture revision.
 template<unsigned Capacity> class NativeInstanceTable {
     static_assert(Capacity>0&&Capacity<65535,"Compact native slots");
-    struct Entry {std::uint32_t generation=0,flags=0;int object=-1,sprite=-1;};
+    struct Entry {std::uint32_t generation=0,flags=0;int object=-1,sprite=-1;std::uint32_t order=0,roomOrder=0;};
     Entry entries_[Capacity];
     RunnerObjectMembership<Capacity> registration_;
     std::uint32_t bindingRevision_=0,captureRevision_=0;
     unsigned captureFirst_=0,captureLast_=0,captureSecond_=0,captureEnd_=0;
     bool* captureDirty_=nullptr;
+    const bool externalOrder_;
+    std::uint32_t nextOrder_=1;
     static void advance(std::uint32_t& revision){if(revision!=0xffffffffu)++revision;}
     void changedCapture(unsigned slot){
         advance(captureRevision_);
@@ -34,6 +36,21 @@ template<unsigned Capacity> class NativeInstanceTable {
     void changedBinding(unsigned slot){advance(bindingRevision_);changedCapture(slot);}
     bool live(InstanceHandle h)const{return h.slot<Capacity&&h.generation&&entries_[h.slot].generation==h.generation;}
 public:
+    explicit NativeInstanceTable(bool externalOrder=false):externalOrder_(externalOrder){}
+    // Native families share chronology, not registry entries. Their records
+    // own lifetime/flags; these notifications only invalidate captures.
+    bool externalBirth(unsigned slot,std::uint32_t& order){
+        if(!externalOrder_||slot>=Capacity||!nextOrder_||order)return false;
+        order=nextOrder_++;changedBinding(slot);return true;
+    }
+    void externalRetire(unsigned slot){changedBinding(slot);}
+    void externalFlagsChanged(unsigned slot){changedCapture(slot);}
+    std::uint32_t registrationOrder(InstanceHandle h)const{return live(h)?entries_[h.slot].order:0;}
+    std::uint32_t roomOrder(InstanceHandle h)const{return live(h)?entries_[h.slot].roomOrder:0;}
+    bool roomReactivated(InstanceHandle h){
+        if(!live(h))return false;
+        entries_[h.slot].roomOrder=entries_[h.slot].order;return true;
+    }
     bool contains(InstanceHandle h)const{return live(h);}
     int objectId(InstanceHandle h)const{return live(h)?entries_[h.slot].object:-1;}
     bool flags(InstanceHandle h,std::uint32_t& out)const{
@@ -54,8 +71,10 @@ public:
     }
     // Birth appends the registration, as attachObjectPrepared does.
     bool birth(InstanceHandle h,int object,std::uint32_t flags,int sprite){
-        if(h.slot>=Capacity||!h.generation||object<0||entries_[h.slot].generation)return false;
-        entries_[h.slot]={h.generation,flags,object,sprite};
+        if(h.slot>=Capacity||!h.generation||object<0||entries_[h.slot].generation||
+            (externalOrder_&&!nextOrder_))return false;
+        entries_[h.slot]={h.generation,flags,object,sprite,externalOrder_?nextOrder_++:0};
+        entries_[h.slot].roomOrder=entries_[h.slot].order;
         if(!registration_.bind(h.slot,object,h.generation)){entries_[h.slot]=Entry{};return false;}
         changedBinding(h.slot);return true;
     }
@@ -70,7 +89,11 @@ public:
         auto& e=entries_[h.slot];
         if(registration_.contains(h.slot)!=registered)changedCapture(h.slot);
         if(!registered)registration_.unbind(h.slot);
-        else if(!registration_.contains(h.slot))registration_.bind(h.slot,e.object,h.generation);
+        else if(!registration_.contains(h.slot)){
+            if(externalOrder_&&!nextOrder_)return false;
+            if(externalOrder_)e.order=nextOrder_++;
+            registration_.bind(h.slot,e.object,h.generation);
+        }
         if(registered)e.flags&=~0x80000u;else e.flags|=0x80000u;
         return true;
     }

@@ -695,6 +695,7 @@ bool GameplayWorld::appendBreakables(const int* x, const int* y, unsigned count,
         breakables_[index].alarm0=-1;
         breakables_[index].myFx={};
         breakables_[index].sound={};
+        breakables_[index].nativeRegistration=0;
         breakables_[index].lifetimeId = nextBreakableLifetimeId_++;
         if(!breakableLifecycle_.birth({index,breakables_[index].lifetimeId},breakables_[index])) {
             run_.effectsSucceeded=false;return false;

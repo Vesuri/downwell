@@ -212,6 +212,9 @@ public:
         std::int32_t alarm0=-1;
         downwell::InstanceHandle myFx{}; // Internal lifetime, never a VM numeric ID.
         downwell::SoundPlayState sound{};
+        // Native ownership chronology only; simulation identity remains
+        // lifetimeId. Mutable because lifecycle observers receive const data.
+        mutable std::uint32_t nativeRegistration=0;
     };
     using BreakableLifecycleBinding = downwell::RecordLifecycleBinding<Breakable>;
     struct PlayerInstance {

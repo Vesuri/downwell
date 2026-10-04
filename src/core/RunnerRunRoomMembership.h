@@ -137,12 +137,18 @@ public:
         return true;
     }
     template<class Visit> bool visitMarkedCleanupChecked(Visit visit){
+        return visitMarkedCleanupOrdered([&](unsigned slot,RunnerImageValue,bool){return visit(slot);});
+    }
+    // Include the source room sort key and active-list boundary so native
+    // family records can be merged without constructing room nodes at birth.
+    template<class Visit> bool visitMarkedCleanupOrdered(Visit visit){
         if(!markedCount_)return true;
         for(unsigned list=0;list<2;++list){
             for(unsigned s=first(list);s!=End;){
                 const unsigned n=locator_[s]-1;
                 if(!runs_[n].marks){s=after(n);continue;}
-                const unsigned following=next(s);if(marked(s)&&!visit(s))return false;s=following;
+                const unsigned following=next(s);
+                if(marked(s)&&!visit(s,runs_[n].key,list==0))return false;s=following;
             }
         }
         return true;

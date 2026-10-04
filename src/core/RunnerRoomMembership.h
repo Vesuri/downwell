@@ -124,9 +124,12 @@ public:
     // Same ordering as visitCleanupChecked filtered by mark(). Visitor may
     // remove only its current entry, and must not publish new marks or births.
     template<class Visit> bool visitMarkedCleanupChecked(Visit visit){
+        return visitMarkedCleanupOrdered([&](unsigned slot,RunnerImageValue,bool){return visit(slot);});
+    }
+    template<class Visit> bool visitMarkedCleanupOrdered(Visit visit){
         for(unsigned list=0;list<2;++list)for(unsigned slot=markedHead_[list];slot!=End;){
             const unsigned next=entries_[slot].markedNext;
-            if(!visit(slot))return false;
+            if(!visit(slot,entries_[slot].key,list==0))return false;
             slot=next;
         }
         return true;

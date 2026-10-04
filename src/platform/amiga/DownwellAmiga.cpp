@@ -1319,7 +1319,7 @@ __attribute__((noinline)) static int runDownwell(void) {
 #endif
     auto& collisionOwner=*new(collisionStorage) downwell::GameplayCollisionOwner(objects,collisionSprites,
         downwell::GameplayTerrainInstances::Presentation::bind(wallDamage),
-        downwell::GameplayTerrainInstances::WallCollision::bind(wallCollision),&rooms,ownership);
+        downwell::GameplayTerrainInstances::WallCollision::bind(wallCollision),&rooms,ownership,DOWNWELL_NATIVE_BOXES!=0);
     if(!collisionOwner.valid())return 20;
     checkSceneStack(2);
 #ifdef DOWNWELL_REPLAY_VERIFY

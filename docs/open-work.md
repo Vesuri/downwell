@@ -256,11 +256,15 @@ Rules for this section:
    record. Apply the same to the other generated families that still take
    the generic birth in frame 701 (seven layer births, 6.7 ms; time-field
    adoption, 3.1 ms).
-   - Replace the remaining native table and room-list attachments in
-     `nativeScenery`; population-only layer ownership is not the complete
-     family ownership replacement. Preserve registration order for alarms,
+   - Finish native time-field ownership in `nativeScenery`, removing its
+     remaining table and room-list attachments. Reduce native box birth
+     preparation to the target below without reviving per-instance registry
+     nodes or changing Create timing. Preserve registration order for alarms,
      active-before-inactive depth order for cleanup, dynamic layer lifetime,
      and the distinction between destruction marking and retirement.
+   - Enable the accepted native family path in the normal build after its
+     complete timing/fidelity gates; keep `NATIVE_BOXES=0` as the registered
+     comparison path with population-only layers.
 
    Target: under 2,000 cycles per birth, saving about 20 ms in frame 844 and
    about 13 ms in frame 701. Verify with a per-frame comparison against the

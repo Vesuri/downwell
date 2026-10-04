@@ -10,6 +10,15 @@ the commits that make them, and repeat the audit with the same method when the
 representation changes. The figures are emulated-machine measurements of one
 deterministic tape, not guarantees for other scenes.
 
+Measurement correction: the original report counted each capture's first
+frame as complete. Recording starts at the next VBL, so that frame may omit
+simulation work. The corrected report excludes both boundary frames. The
+historical aggregates below therefore include partial first frames, and the
+frame-844 instruction total is a lower bound, not a complete-frame baseline.
+The FPS-only field counts are unaffected. For new comparisons capture from
+644, 699 and **843**, and compare interior frames 645, 701 and 844; do not
+compare a complete frame against one of the old first-frame fragments.
+
 ## Configuration and reproduction
 
 - FS-UAE A500: cycle-exact 68000, 512 KiB Chip, 8 MiB Fast, PAL, Kickstart
