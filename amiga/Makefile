@@ -33,6 +33,8 @@ PREPARED_AMMO_DIVIDERS ?= 0
 DRAW_CACHE_AUDIT ?= 0
 DRAW_ORDER_AUDIT ?= 0
 LOCAL_DRAW_CAPTURE ?= 0
+AMMO_FACTORED ?= 0
+AMMO_FACTORED_VERIFY ?= 0
 PREPARED_FIELDS ?= 0
 PREPARED_FIELDS_VERIFY ?= 0
 PROFILE_FIELD_REFERENCE ?= 0
@@ -193,6 +195,18 @@ endif
 ifneq ($(LOCAL_DRAW_CAPTURE),0)
 CFLAGS += -DDOWNWELL_LOCAL_DRAW_CAPTURE=$(LOCAL_DRAW_CAPTURE)
 endif
+ifneq ($(AMMO_FACTORED),0)
+CFLAGS += -DDOWNWELL_AMMO_FACTORED=$(AMMO_FACTORED)
+endif
+ifeq ($(AMMO_FACTORED_VERIFY),1)
+ifneq ($(AMMO_FACTORED),2)
+$(error AMMO_FACTORED_VERIFY requires AMMO_FACTORED=2)
+endif
+ifeq ($(filter 1,$(FPSCOUNT) $(PROBES)),)
+$(error AMMO_FACTORED_VERIFY requires FPSCOUNT=1 or PROBES=1)
+endif
+CFLAGS += -DDOWNWELL_AMMO_FACTORED_VERIFY
+endif
 ifeq ($(PREPARED_FIELDS),1)
 CFLAGS += -DDOWNWELL_PREPARED_FIELDS
 ifeq ($(PROFILE_FIELD_REFERENCE),1)
@@ -337,6 +351,8 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
 	@printf '%s\n' '$(DRAW_CACHE_AUDIT)' >> $@.tmp
 	@printf '%s\n' '$(DRAW_ORDER_AUDIT)' >> $@.tmp
 	@printf '%s\n' '$(LOCAL_DRAW_CAPTURE)' >> $@.tmp
+	@printf '%s\n' '$(AMMO_FACTORED)' >> $@.tmp
+	@printf '%s\n' '$(AMMO_FACTORED_VERIFY)' >> $@.tmp
 	@cmp -s $@.tmp $@ || cp $@.tmp $@
 
 $(OBJECTS): obj/startup-options
@@ -344,6 +360,11 @@ ifeq ($(PREPARED_AMMO_DIVIDERS),1)
 $(OBJECTS): $(REPO)/generated/amiga-ammo-dividers.h
 $(REPO)/generated/amiga-ammo-dividers.h: $(REPO)/tools/generate-ammo-dividers.py $(AMIGA_HUD)
 	$(MAKE) -C $(REPO) generated/amiga-ammo-dividers.h
+ifneq ($(AMMO_FACTORED),0)
+obj/DownwellAmiga.o: $(REPO)/generated/amiga-ammo-factored.h
+$(REPO)/generated/amiga-ammo-factored.h: $(REPO)/tools/probe-ammo-complete.py $(AMIGA_HUD)
+	$(MAKE) -C $(REPO) generated/amiga-ammo-factored.h
+endif
 endif
 $(OBJECTS): $(REPO)/generated/downwell-field-spans.h
 $(REPO)/generated/downwell-field-spans.h: $(REPO)/tools/generate-field-spans.cpp $(wildcard $(REPO)/src/core/*.h)

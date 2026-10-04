@@ -496,6 +496,15 @@ global/local invalidation respectively, with both paths compiled. Do not
 change that selector during a run. `make verify-local-draw-capture` exercises
 the matching host lifecycle and ordering tests.
 
+`bash amiga/profile.sh ammo` checks the experimental complete-gauge compositor
+on the bounded contact tape, starting directly in gameplay. Every HUD update
+is compared byte-for-byte with full source-order reconstruction. It requires
+at least 100 prepared-path updates and no mismatches, then restores the normal
+build. Do not use its instrumented timing as performance evidence. The separate
+timing comparison uses `AMMO_FACTORED=1/2` with the same flags and tape, both
+paths compiled. Default zero omits the experiment; its full pacing gate is
+still open.
+
 Preserve full RNG state, synchronous Create order, collision order and effect
 ownership while optimizing. Re-run deterministic replay and fresh-versus-retained
 render comparisons for the affected path, then check the restored build's

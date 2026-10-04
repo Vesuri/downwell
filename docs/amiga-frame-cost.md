@@ -342,6 +342,73 @@ extractor, generator and output hashes and the exact layout cost breakdown.
 Verification output: `build/ammo-complete-verification.log`. Neither layout
 is linked into the game; no new native FPS/replay acceptance is claimed.
 
+### Factored gauge: pixel-correct experiment, pacing gate open
+
+`AMMO_FACTORED=2` separates a complete prepared centre column from the outer
+rim and the label. The label is fused into final word publication, not erased
+and repainted. Outer-rim movement uses prepared changes rather than rebuilding
+background and foreground layers. The generated bank is **92,264 bytes**, of
+which 6,664 validate the exact source metadata/artwork. It needs no additional
+Chip allocation and reuses the existing Fast-RAM retained image. The source
+renderer remains mode 1 in the same executable; mode 0 (default) omits the
+experiment. Both selectors are initialized data, not compile-time path removal.
+
+Capacities 1–16, single-digit ammo, and qualified shared row-animation
+trajectories use the bank. Changed artwork, wider numbers and nonuniform
+inherited groups fall back. Missed visual updates recertify the groups.
+`make verify-factored-ammo-hud` checks complete HUD pixels, invisible/repeated
+updates, changing capacities, hidden capacity changes, fallback recovery and
+changed artwork. The suite also passes ASan/UBSan. Source animation is not
+advanced by rendering.
+
+Matched contact traces (starts 644/699/843, 30 fields each) use the prepared
+field backing-5 bundle plus `LOCAL_DRAW_CAPTURE=2`, and differ only in
+`AMMO_FACTORED=1/2`. Shared text hash:
+`c117d564d6ebbcbf5b34edea6bbbf386d1a0ba2969d0fc68b2d6f0b9c4ac6f3d`.
+
+| Frame | Original path, whole frame (ms) | Factored path, whole frame (ms) |
+| --- | ---: | ---: |
+| 645 | 115.327 | 101.057 |
+| 701 | 171.882 | 171.881 |
+| 844 | 127.366 | 120.751 |
+
+The projected removal was at least 10 ms on recharge. Frame 645 saves 14.27
+ms; its HUD falls from 25.0 to 11.3 ms. Recharge frames 646–648 use 10.6–10.8
+ms; the shot HUD in frames 704/844 uses about 3.6 ms. The recharge target is
+**not met**. Reports/captures: `build/ammo-factored-comparison.log`,
+`build/ammo-factored-reference-cost.log`, `build/ammo-factored-candidate-cost.log`,
+and `tmp/trace/ammo-factored-mode1` / `...-mode2`.
+
+The full FPS tape is **not a passed pacing gate**: total fields fall from
+3,387 to 3,252 (26.57 to 27.68 FPS), but the largest counted iteration gap at
+frame 701 rises from 8 to 9 PAL fields. These executables share text hash
+`5d9133cbdcfec267e276d1f363b8c74d4c382a17f8900750211d7e9b0fdf15d8`.
+The field counter measures VBlank crossings between profile begin/end;
+the matched instruction traces show effectively unchanged work at 701.
+This suggests a boundary-phase effect but does not establish equivalent
+visible pacing. Do not promote the candidate on average FPS alone. Logs:
+`build/ammo-factored-fps-mode1.log` and `...-mode2.log`.
+
+Native `bash amiga/profile.sh ammo` checks the same 1,800-frame contact tape:
+**455 HUD updates, 455 prepared uses, zero byte mismatches** against full
+source-order reconstruction. This diagnostic is not a timing measurement.
+Cross-target per-frame/component replay passes with the table-angle host
+oracle (native hash
+`4ba4548c7268f0a44587c2ab9058ed562d7f410e9bb9bc26de7dcfdb6613dc4f`).
+Evidence: `build/ammo-factored-native-pixels.log`,
+`build/ammo-factored-cross-replay.log`. The restored normal build passes both
+68000 audits. Retain the experiment for revision/comparison, not as a completed
+A5 or an accepted shipping setting.
+
+The offline generator now proves that **all 461 selector pages have a low
+plane independent of row-animation state**. The current native loop still
+decodes/compares both planes per row. A separate low-plane representation can
+use a baseline and at most 41 sparse exceptions per state; its measured bank
+budget is recorded in `generated/amiga-ammo-factored.manifest.json`. This is
+representation evidence only: no independent-plane runtime or speedup is
+claimed. It identifies the next whole pass to remove, without changing source
+colours or suppressing the red divider/rim.
+
 ### Draw-capture invalidation domain
 
 A subsequent native contact-tape audit distinguishes cache hits, identical

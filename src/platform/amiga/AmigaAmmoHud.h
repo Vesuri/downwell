@@ -6,6 +6,12 @@
 #include "core/AmmoDividerLayout.h"
 #include "core/AmmoFill.h"
 #include "core/HudNumbers.h"
+#ifdef DOWNWELL_AMMO_FACTORED
+#include "AmigaAmmoFactored.h"
+#endif
+#ifdef DOWNWELL_AMMO_FACTORED_VERIFY
+extern "C" { extern volatile ULONG gDownwellAmmoFactoredUses; }
+#endif
 #ifdef DOWNWELL_PREPARED_AMMO_DIVIDERS
 #include "AmigaPreparedDividers.h"
 #endif
@@ -18,6 +24,10 @@ class AmigaAmmoHud {
     unsigned fillTop_ = 0, fillHeight_ = 0;
     AmigaWordStamp stamps_[10];
     bool stampsReady_ = false;
+#ifdef DOWNWELL_AMMO_FACTORED
+    AmigaAmmoFactored factored_;
+    bool sharedRowProducer_ = false;
+#endif
     const UBYTE* stampPack_ = nullptr;
     alignas(UWORD) UBYTE working_[downwellLayerBytes]; // Fast RAM, never displayed/DMA fetched.
     UWORD background_[downwellDisplayHeight*6], rim_[downwellDisplayHeight*6];
@@ -29,12 +39,37 @@ class AmigaAmmoHud {
 #endif
 public:
     unsigned lastWordWrites = 0;
-    void invalidate() { damage_.valid = false; }
+#if defined(DOWNWELL_AMMO_FACTORED) && !defined(DOWNWELL_PLATFORM_AMIGA)
+    unsigned factoredDraws = 0;
+#endif
+    void invalidate() {
+        damage_.valid = false;
+#ifdef DOWNWELL_AMMO_FACTORED
+        factored_.invalidate();
+#endif
+    }
+#ifdef DOWNWELL_AMMO_FACTORED
+    void sharedRowProducer(bool enabled) { if(enabled!=sharedRowProducer_)invalidate();sharedRowProducer_=enabled; }
+#endif
     void draw(AmigaRenderer* renderer, const UBYTE* pack, const UBYTE* end,
               unsigned ammo, unsigned capacity, unsigned offset,
               const downwell::AmmoGaugeRows* rows, unsigned meter, bool forceFull = false) {
         DW_PROFILE_PHASE(profileAmmoBase);
         if (ammo > capacity) ammo = capacity;
+#ifdef DOWNWELL_AMMO_FACTORED
+        if(amigaAmmoFactoredMode==2 && sharedRowProducer_ && !forceFull && oldDigits_==1 && !previousWideClear_ &&
+           factored_.draw(renderer,working_,pack,end,ammo,capacity,offset,rows,meter,lastWordWrites)){
+#ifndef DOWNWELL_PLATFORM_AMIGA
+            ++factoredDraws;
+#endif
+#ifdef DOWNWELL_AMMO_FACTORED_VERIFY
+            ++gDownwellAmmoFactoredUses;
+#endif
+            damage_.valid=false; // A later fallback must resynchronize its retained composition.
+            return;
+        }
+        factored_.invalidate();
+#endif
         if (destination_ != renderer->hud || stampPack_ != pack || forceFull) invalidate();
         destination_ = renderer->hud;
         AmigaRenderer* display = renderer;

@@ -792,9 +792,33 @@ static void drawAmmoDigit(AmigaRenderer* renderer, int x, int y,
 }
 
 static AmigaAmmoHud ammoHud;
+#ifdef DOWNWELL_AMMO_FACTORED
+volatile unsigned amigaAmmoFactoredMode=DOWNWELL_AMMO_FACTORED;
+#endif
+#ifdef DOWNWELL_AMMO_FACTORED_VERIFY
+extern "C" {
+volatile ULONG gDownwellAmmoChecks,gDownwellAmmoFailures,gDownwellAmmoFactoredUses;
+}
+alignas(2) static UBYTE ammoExpected[downwellLayerBytes];
+static AmigaAmmoHud ammoOriginal;
+#endif
 static void redrawAmmo(AmigaRenderer* renderer, unsigned ammo, unsigned maximumAmmo, unsigned offset = 0,
                        const downwell::AmmoGaugeRows* rows = nullptr, unsigned meterOffset = 0) {
+#ifdef DOWNWELL_AMMO_FACTORED_VERIFY
+    for(unsigned i=0;i<downwellLayerBytes;++i)ammoExpected[i]=renderer->hud[i];
+#endif
+#ifdef DOWNWELL_AMMO_FACTORED
+    ammoHud.sharedRowProducer(true);
+#endif
     ammoHud.draw(renderer, activeHudPack, activeHudPackEnd, ammo, maximumAmmo, offset, rows, meterOffset);
+#ifdef DOWNWELL_AMMO_FACTORED_VERIFY
+    AmigaRenderer oracle=*renderer;
+    oracle.target=oracle.hud=ammoExpected;oracle.blitterEnabled=0;
+    ammoOriginal.draw(&oracle,activeHudPack,activeHudPackEnd,ammo,maximumAmmo,offset,rows,meterOffset,true);
+    ++gDownwellAmmoChecks;
+    for(unsigned i=0;i<downwellLayerBytes;++i)
+        if(ammoExpected[i]!=renderer->hud[i])++gDownwellAmmoFailures;
+#endif
     DW_PROFILE_PHASE(profileTitle);
 }
 

@@ -96,6 +96,16 @@ naive combined bank costs 268–435 KiB, so neither measured layout is suitable
 for adoption; independent shell/number and column states need factoring.
 See the [complete-bank budget](../docs/amiga-frame-cost.md#complete-gauge-representation-budget).
 
+`tools/probe-ammo-complete.py --factored` generates the experimental complete
+column, independent outer-rim patches, and labels into ignored files. Exact
+source metadata/bytes qualify its native use. `make verify-factored-ammo-hud`
+checks full HUD pixels and fallback transitions; `bash amiga/profile.sh ammo`
+runs a separate original-renderer oracle on the A500. The generator additionally
+proves low-plane independence from row animation and budgets a future sparse
+representation. `AMMO_FACTORED=1/2` compares the retained/factored implementation;
+zero is the normal default. The recharge and full-pacing gates remain open;
+see the [native evidence](../docs/amiga-frame-cost.md#factored-gauge-pixel-correct-experiment-pacing-gate-open).
+
 ## Prepared Amiga field images
 
 `make generated/amiga-field-images.bin` rasterizes all 512 small-circle

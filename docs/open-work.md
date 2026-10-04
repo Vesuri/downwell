@@ -314,6 +314,15 @@ Rules for this section:
      shell/number states away from column animation, and budget selection,
      transfer staging and changed-region publication together before a native
      replacement. Preserve the ordered renderer and unsupported-state fallback.
+     Revise the experimental `AMMO_FACTORED=2` complete-column path before
+     shipping it: recharge is still 10.6–11.3 ms, and the full-tape maximum
+     field-gap gate remains open despite the instruction-trace saving. Remove
+     the redundant low-plane animation pass using the generator's proven
+     independence/sparse-state representation; preserve its red dividers, rim
+     and fused label. Retain mode 1 as the comparison, qualify inherited row
+     groups and changed artwork, then repeat native pixels, replay and both
+     complete-frame and presentation-pacing gates. See the
+     [factored experiment](amiga-frame-cost.md#factored-gauge-pixel-correct-experiment-pacing-gate-open).
      Take this remaining A5 work before
      A3/A4 and B, without treating the remaining A6 gates as complete. The HUD
      targets remain unchanged.

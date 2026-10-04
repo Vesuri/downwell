@@ -8,6 +8,7 @@ the original renderer; the segment-state invariant has the same scope as the
 existing segment probe.
 """
 import hashlib
+import collections
 import json
 import math
 import struct
@@ -54,13 +55,15 @@ def verify(path):
     print(f"{checks} complete-gauge pixel digests match the original ordered renderer")
 
 
-def main():
+def main(factored=False):
     pack = (ROOT / "generated/amiga-hud.dwap").read_bytes()
     provenance = json.loads((ROOT / "generated/amiga-hud.packing.json").read_text())
     assert sha(pack) == provenance["packSha256"]
     magic, version, directory, count = struct.unpack_from(">4sHHI", pack)
     assert (magic, version) == (b"DWAP", 2)
     assets = {}
+    source_records = []
+    source_bytes = []
     for i in range(count):
         sprite, frame, ox, oy, width, height, stride, flags, offset, size = struct.unpack_from(
             ">HHhhHHHHII", pack, directory + 24*i)
@@ -76,6 +79,8 @@ def main():
                 if pen:
                     pixels.append((x-ox, y-oy, pen))
         assets[sprite, frame] = pixels
+        source_records.append((sprite, frame, ox, oy, width, height, stride, flags, len(source_bytes), size))
+        source_bytes.extend(pack[offset:offset+size])
 
     def stamp(sprite, frame, x, y):
         # Plane words cover x=272..319. Outside the original single-digit
@@ -144,7 +149,7 @@ def main():
                             overlay(divider, row_art[421, frame], math.floor(y+dy))
                     elif level == fill or level == 1.0:
                         overlay(divider, row_art[421, 1], math.floor(y+1))
-                for offset in range(3):
+                for offset in range(1 if factored else 3):
                     for segment, (lo, hi) in enumerate(zip(bounds, bounds[1:])):
                         first = 40 if segment == cap-1 else base_y-hi+8
                         last = 256 if not segment else base_y-lo+8
@@ -161,8 +166,9 @@ def main():
                                     overlay(column, row_art[sprite, frame % 2 if sprite == 421 else frame], y-first)
                                 overlay(column, divider, -first)
                                 overlay(column, rims[meter], -first)
-                                overlay(column, labels[ammo, offset], -first)
-                                tile = tuple(tuple(row) for row in column)
+                                if not factored:
+                                    overlay(column, labels[ammo, offset], -first)
+                                tile = tuple((row[1], row[4]) if factored else tuple(row) for row in column)
                                 if tile not in tile_ids:
                                     tile_ids[tile] = len(tiles)
                                     tiles.append(tile)
@@ -189,6 +195,102 @@ def main():
         directory.append((len(runs), len(encoded)))
         runs.extend(encoded)
     assert max(len(tiles), len(pages), len(pairs)) < 65536
+    if factored:
+        assert len(runs) < 65536 and len(pairs) <= 256
+        low_tiles = [tuple(row[0] for row in tile) for tile in tiles]
+        assert all(len({low_tiles[tile] for tile in page}) == 1 for page in pages)
+        low_frames = []
+        for cap in range(1, 17):
+            for ammo in range(min(cap, 9)+1):
+                for meter in range(4):
+                    image = [None]*216
+                    for segment in range(cap):
+                        config = starts[cap-1]+(ammo*4+meter)*cap+segment
+                        tile = pages[configurations[config]][0]
+                        first = 40 if segment == cap-1 else 229+4*meter-bounds_all[cap-1][segment+1]+8
+                        image[first-40:first-40+len(low_tiles[tile])] = low_tiles[tile]
+                    assert None not in image
+                    low_frames.append(tuple(image))
+        low_base = tuple(collections.Counter(frame[y] for frame in low_frames).most_common(1)[0][0]
+                         for y in range(216))
+        unique_low_frames = set(low_frames)
+        exception_counts = [sum(value != low_base[y] for y,value in enumerate(frame))
+                            for frame in unique_low_frames]
+        low_words = {word for frame in low_frames for word in frame}
+        assert len(low_words) <= 256
+        low_budget = dict(baseline=432,words=len(low_words)*2,starts=32,
+                          selectors=len(low_frames)*2,directory=len(unique_low_frames)*4,
+                          exceptions=sum(exception_counts)*2)
+        outer_rows, outer_ids, outer_frames = [], {}, []
+        for meter in range(4):
+            image = [list(row) for row in bases[meter]]
+            overlay(image, rims[meter])
+            frame = []
+            for row in image[40:256]:
+                value = (row[0]&0x003f, row[2]&0xc000, row[3]&0x003f, row[5]&0xc000)
+                if value not in outer_ids:
+                    outer_ids[value] = len(outer_rows)
+                    outer_rows.append(value)
+                frame.append(outer_ids[value])
+            outer_frames.append(frame)
+        assert len(outer_rows) <= 256
+        patches, patch_directory = [], []
+        for old in range(4):
+            for new in range(4):
+                first = len(patches)
+                for y in range(216):
+                    a, b = outer_rows[outer_frames[old][y]], outer_rows[outer_frames[new][y]]
+                    for word in range(4):
+                        if a[word] != b[word]:
+                            address = (y+40)*48+(34 if word%2==0 else 38)+(13632 if word>=2 else 0)
+                            patches.append((address, 0x003f if word%2==0 else 0xc000, b[word]))
+                patch_directory.append((first, len(patches)-first))
+        label_words = []
+        for ammo in range(10):
+            for offset in range(3):
+                art = labels[ammo, offset]
+                assert all(not (row[0]|row[2]|row[3]|row[5]) for row in art)
+                assert all(not (row[1]|row[4]) for y,row in enumerate(art) if not 238<=y<250)
+                label_words.append([(row[1],row[4]) for row in art[238:250]])
+        def array(name, typename, data, columns=None):
+            suffix = f"[{columns}]" if columns else ""
+            values = ["{"+",".join(map(str, row))+"}" if isinstance(row,(list,tuple)) else str(row) for row in data]
+            return f"static const {typename} {name}[]{suffix} = {{\n"+",\n".join(values)+"\n};\n"
+        text = "// Generated asset-derived tables; do not commit.\nnamespace downwell_ammo_factored {\n"
+        text += array("starts","unsigned short",starts)
+        text += array("bounds","unsigned char",[b+[0]*(17-len(b)) for b in bounds_all],17)
+        text += array("configurations","unsigned short",configurations)
+        text += array("pages","unsigned short",pages,16)
+        text += array("tiles","unsigned short",directory,2)
+        text += array("runs","unsigned char",runs,2)
+        text += array("pairs","unsigned short",pairs,2)
+        text += array("outerRows","unsigned short",outer_rows,4)
+        text += array("outerFrames","unsigned char",outer_frames,216)
+        text += array("patchDirectory","unsigned short",patch_directory,2)
+        text += array("patches","unsigned short",patches,3)
+        text += array("labels","unsigned short",[[w for row in label for w in row] for label in label_words],24)
+        text += array("sourceRecords","int",source_records,10)
+        text += array("sourceBytes","unsigned char",source_bytes)
+        text += "}\n"
+        output = text.encode()
+        costs = dict(starts=len(starts)*2,bounds=16*17,configurations=len(configurations)*2,
+                     pages=len(pages)*32,tiles=len(tiles)*4,runs=len(runs)*2,pairs=len(pairs)*4,
+                     outerRows=len(outer_rows)*8,outerFrames=4*216,patchDirectory=16*4,
+                     patches=len(patches)*6,labels=30*24*2,
+                     sourceRecords=len(source_records)*40,sourceBytes=len(source_bytes))
+        manifest = dict(schemaVersion=1,generator="probe-ammo-complete.py/factored-v1",
+                        generatorSha256=sha(Path(__file__).read_bytes()),
+                        sourceSha256=provenance["sourceSha256"],extractor=provenance["extractor"],
+                        inputPackSha256=sha(pack),outputSha256=sha(output),
+                        costs=costs,totalBytes=sum(costs.values()),runtimeEnabled=False,
+                        animationIndependentLowPlanePages=len(pages),
+                        independentLowPlaneBudget=low_budget,
+                        independentLowPlaneTotalBytes=sum(low_budget.values()),
+                        independentLowPlaneMaxExceptions=max(exception_counts))
+        (ROOT/"generated/amiga-ammo-factored.h").write_bytes(output)
+        (ROOT/"generated/amiga-ammo-factored.manifest.json").write_text(json.dumps(manifest,indent=2)+"\n")
+        print(json.dumps(manifest,indent=2))
+        return
     # Packed records, no implied C struct padding. Decode cost is NOT free.
     costs = dict(runs=len(runs)*3, directory=len(tiles)*6, rows=len(pairs)*12,
                  pages=len(pages)*32, configurations=len(configurations)*2,
@@ -219,6 +321,8 @@ def main():
 if __name__ == "__main__":
     if len(sys.argv) == 3 and sys.argv[1] == "--verify":
         verify(sys.argv[2])
+    elif sys.argv[1:] == ["--factored"]:
+        main(True)
     else:
         assert len(sys.argv) == 1
         main()

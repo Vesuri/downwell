@@ -1,6 +1,9 @@
 #include "platform/amiga/AmigaRenderer.h"
 #include "platform/amiga/AmigaWallBackground.h"
 #include "platform/amiga/AmigaAmmoHud.h"
+#ifdef DOWNWELL_AMMO_FACTORED
+volatile unsigned amigaAmmoFactoredMode=DOWNWELL_AMMO_FACTORED;
+#endif
 #include "platform/amiga/AmigaHealthHud.h"
 #include "platform/amiga/AmigaLaserSight.h"
 #include "platform/amiga/AmigaGoalField.h"
@@ -1261,6 +1264,9 @@ int main(int argc, char** argv) {
     }
     {
         AmigaAmmoHud retained;
+#ifdef DOWNWELL_AMMO_FACTORED
+        retained.sharedRowProducer(true);
+#endif
         downwell::AmmoGaugeRows rows;
         unsigned previousDigits = 1;
         auto fullRedraw = [&](unsigned ammo, unsigned cap, unsigned offset, unsigned meter) {
@@ -1360,6 +1366,46 @@ int main(int argc, char** argv) {
         // Isolate every artwork transition, including the special bottom row
         // and both sides of the fill boundary. Adjacent overlays can conceal
         // changed pixels, but damage must never omit a surviving difference.
+#ifdef DOWNWELL_AMMO_FACTORED
+        require(retained.factoredDraws>1000,"prepared complete gauge is exercised, not only fallback");
+        // Capacity changes hidden between rendered frames must not inherit an
+        // obsolete uniform-group certificate when the old capacity returns.
+        rows=downwell::AmmoGaugeRows{};
+        retained.invalidate();
+        rows.step(7,8);
+        retained.draw(&actualRenderer,hudPack.data(),hudPack.data()+hudPack.size(),7,8,0,&rows,0);
+        fullRedraw(7,8,0,0);
+        rows.step(4,15);rows.step(6,8);
+        retained.draw(&actualRenderer,hudPack.data(),hudPack.data()+hudPack.size(),6,8,2,&rows,3);
+        fullRedraw(6,8,2,3);
+        require(actualHud==expectedHud,"missed capacity changes recertify prepared groups");
+        const auto beforeRecovery=retained.factoredDraws;
+        for(unsigned tick=0;tick<8;++tick){
+            rows.step(8,8);
+            retained.draw(&actualRenderer,hudPack.data(),hudPack.data()+hudPack.size(),8,8,tick%3,&rows,tick%4);
+            fullRedraw(8,8,tick%3,tick%4);
+            require(actualHud==expectedHud,"prepared path recovers after nonuniform fallback");
+        }
+        require(retained.factoredDraws>beforeRecovery,"settled groups reenter prepared path");
+        {
+            AmigaAmmoFactored probe;
+            std::vector<UBYTE> altered=hudPack, scratch(downwellLayerBytes);
+            // Change one byte of relevant art without changing its metadata.
+            auto read16=[&](unsigned at){return unsigned(altered[at])*256+altered[at+1];};
+            auto read32=[&](unsigned at){return read16(at)*65536+read16(at+2);};
+            bool alteredAsset=false;
+            const auto count=read32(8),directory=read16(6);
+            for(unsigned i=0;i<count;++i){
+                const auto record=directory+i*24;
+                if(read16(record)==416){altered[read32(record+16)]^=1;alteredAsset=true;break;}
+            }
+            require(alteredAsset,"source artwork mutation fixture exists");
+            unsigned writes=0;
+            require(!probe.draw(&actualRenderer,scratch.data(),altered.data(),altered.data()+altered.size(),8,8,0,&rows,0,writes),
+                    "changed source bytes use original renderer rather than prepared art");
+        }
+        retained.sharedRowProducer(false); // These cases edit rows outside the shared producer.
+#endif
         rows.filled = 92;
         // Settle the three-digit-to-one-digit backing transition from the
         // preceding capacity-127 sweep before isolating row-only changes.

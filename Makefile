@@ -2094,6 +2094,15 @@ verify-ammo-complete-probe: build/ammo-complete-witness generated/amiga-ammo-com
 	./build/ammo-complete-witness generated/amiga-hud.dwap > build/ammo-complete-witness.txt
 	python3 tools/probe-ammo-complete.py --verify build/ammo-complete-witness.txt
 
+generated/amiga-ammo-factored.h: tools/probe-ammo-complete.py generated/amiga-hud.dwap
+	python3 tools/probe-ammo-complete.py --factored
+build/factored-ammo-renderer-test: $(AMIGA_RENDERER_TEST_SOURCES) $(wildcard src/platform/amiga/*.h) $(wildcard src/core/*.h) generated/amiga-ammo-dividers.h generated/downwell-field-spans.h generated/amiga-ammo-factored.h
+	@mkdir -p $(@D)
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -DDOWNWELL_AMMO_DAMAGE_RANGE -DDOWNWELL_PREPARED_AMMO_DIVIDERS -DDOWNWELL_AMMO_FACTORED=2 -o $@ $(AMIGA_RENDERER_TEST_SOURCES)
+.PHONY: verify-factored-ammo-hud
+verify-factored-ammo-hud: build/factored-ammo-renderer-test
+	./build/factored-ammo-renderer-test generated/amiga-game.dwap generated/amiga-hud.dwap
+
 .PHONY: generate-amiga-results verify-amiga-results
 .PHONY: generate-amiga-shop verify-amiga-shop
 generate-amiga-shop:
