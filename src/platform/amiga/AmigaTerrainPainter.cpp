@@ -1,12 +1,66 @@
 #include "AmigaTerrainPainter.h"
 #include "AmigaWallBackground.h"
+#include "AmigaTerrainRunSurface.h"
 #include "core/GameplayWorld.h"
 #include "core/Profile.h"
 #include "core/ShopFixtures.h"
 #include "core/WallPresentation.h"
 #include "core/WallFootprint.h"
+#ifdef DOWNWELL_TERRAIN_BATCH_VERIFY
+#include "framework/AmigaHardware.h"
+#include "AmigaBufferCompare.h"
+#include <cstring>
+extern "C" {
+volatile ULONG gDownwellTerrainBatchChecks=0,gDownwellTerrainBatchFailures=0;
+volatile ULONG gDownwellTerrainDirectChecks=0;
+__attribute__((noinline)) void downwellTerrainBatchMismatch(){
+    ++gDownwellTerrainBatchFailures;
+    __asm__ volatile("" ::: "memory");
+}
+}
+#endif
 
 namespace {
+AmigaTerrainBatch terrainBatch{};
+const UBYTE* preparedTerrain=nullptr;
+AmigaTerrainRunSurface* directSurface=nullptr;
+bool directFailed=false;
+#ifdef DOWNWELL_TERRAIN_BATCH
+#ifdef DOWNWELL_TERRAIN_BATCH_VERIFY
+bool useTerrainBatch=true;
+#else
+constexpr bool useTerrainBatch=true;
+#endif
+static ULONG wallRowBits(const AmigaTerrainIndex& index,int row,int column,unsigned count){
+    if(row<0 || row>=AmigaTerrainIndex::rows)return 0;
+    ULONG bits=0,bit=1;
+    for(unsigned i=0;i<count;++i,++column,bit<<=1)
+        if(column>=0 && column<AmigaTerrainIndex::columns &&
+            (index.cells[row*AmigaTerrainIndex::columns+column]&AmigaTerrainIndex::wallAppearanceFlags))bits|=bit;
+    return bits;
+}
+static void paintIndexedBatch(const AmigaTerrainIndex& index,int viewX,int viewY){
+    if(terrainBatch.left>=terrainBatch.right || terrainBatch.top>=terrainBatch.bottom)return;
+    const int firstX=(viewX+terrainBatch.left-downwellPlayfieldX+8)&~15;
+    const int lastX=(viewX+terrainBatch.right-downwellPlayfieldX+7)&~15;
+    const int firstY=(viewY+terrainBatch.top+8)&~15;
+    const int lastY=(viewY+terrainBatch.bottom+7)&~15;
+    const unsigned columns=unsigned(lastX-firstX)/16+1;
+    const int column=(firstX-AmigaTerrainIndex::minX)/16-1;
+    int row=firstY/16;
+    ULONG above=wallRowBits(index,row-1,column,columns+2);
+    ULONG middle=wallRowBits(index,row,column,columns+2);
+    for(int y=firstY;y<=lastY;y+=16,++row){
+        const ULONG below=wallRowBits(index,row+1,column,columns+2);
+        if(directSurface){
+            directSurface->wallRow(downwellPlayfieldX+firstX-viewX,y-viewY,
+                above,middle,below,columns);
+        }else amigaRendererBatchTerrainWallRow(&terrainBatch,
+            downwellPlayfieldX+firstX-viewX,y-viewY,above,middle,below,columns);
+        above=middle;middle=below;
+    }
+}
+#endif
 static bool roomHasMainWall(const downwell::RoomPack& rooms,
                             const downwell::PackedRoom& room,
                             int x, int y) {
@@ -41,23 +95,105 @@ static UWORD mainWallFrame(const AmigaTerrainIndex* terrainIndex,
 }
 }
 
+bool AmigaTerrainPainter::bindBatch(const UBYTE* pack,const UBYTE* end,UBYTE* scratch,unsigned bytes) {
+    return amigaRendererBindTerrainBatch(&terrainBatch,pack,end,scratch,bytes)!=0;
+}
+bool AmigaTerrainPainter::bindPrepared(const UBYTE* data,unsigned bytes){
+    preparedTerrain=bytes==4992?data:nullptr;
+    return preparedTerrain!=nullptr;
+}
+
+bool AmigaTerrainPainter::paintCached(UWORD* rows,AmigaRenderer* renderer,
+    const downwell::RoomPack& rooms,const downwell::PackedRoom& room,
+    const AmigaTerrainIndex* index,const AmigaTerrainTiles& tiles,
+    const AmigaTerrainDecoration* decorations,unsigned decorationCount,
+    const GameplayWorld* runtime,const UBYTE* pack,const UBYTE* end,
+    int viewX,int viewY,int clipY,int clipHeight){
+#ifndef DOWNWELL_TERRAIN_BATCH
+    return false;
+#else
+    if(!rows||!terrainBatch.scratch||clipY<0||clipHeight<=0||
+        clipY+clipHeight>downwellDisplayHeight||directSurface)return false;
+    AmigaTerrainRunSurface surface(rows,clipY,clipHeight,downwellPlayfieldX,
+        downwellPlayfieldWidth,terrainBatch.tiles,preparedTerrain);
+    AmigaRenderer local=*renderer;
+    directSurface=&surface;directFailed=false;
+    surface.clear();
+    const bool ok=paint(&local,rooms,room,index,tiles,decorations,decorationCount,
+        runtime,pack,end,viewX,viewY,downwellPlayfieldX,clipY,downwellPlayfieldWidth,clipHeight);
+    directSurface=nullptr;
+#ifdef DOWNWELL_TERRAIN_BATCH_VERIFY
+    if(ok&&!directFailed){
+        alignas(UWORD) static UBYTE expected[downwellGameRingBytes];
+        std::memset(expected,0,sizeof expected);
+        AmigaRenderer oracle=*renderer;
+        oracle.game=oracle.target=expected;oracle.blitterEnabled=0;
+        useTerrainBatch=false;
+        const bool referenceOK=paint(&oracle,rooms,room,index,tiles,decorations,decorationCount,
+            runtime,pack,end,viewX,viewY,downwellPlayfieldX,clipY,downwellPlayfieldWidth,clipHeight);
+        useTerrainBatch=true;
+        bool equal=referenceOK;
+        for(int y=0;y<clipHeight;++y)for(unsigned p=0;p<2;++p)for(unsigned w=0;w<11;++w){
+            const unsigned physical=(renderer->gameOrigin+clipY+y)%downwellGameRingHeight;
+            const UWORD* source=reinterpret_cast<const UWORD*>(expected+p*downwellGameRingPlaneBytes+
+                physical*downwellBytesPerPlaneLine+12);
+            if(rows[y*22+p*11+w]!=source[w])equal=false;
+        }
+        ++gDownwellTerrainDirectChecks;
+        if(!equal){downwellTerrainBatchMismatch();return false;}
+    }
+#endif
+    return ok&&!directFailed;
+#endif
+}
+
 bool AmigaTerrainPainter::paint(AmigaRenderer* renderer,
     const downwell::RoomPack& rooms, const downwell::PackedRoom& room,
     const AmigaTerrainIndex* terrainIndex, const AmigaTerrainTiles& terrainTiles,
     const AmigaTerrainDecoration* decorations, unsigned decorationCount,
     const GameplayWorld* runtime, const UBYTE* pack, const UBYTE* end,
     int viewX, int viewY, int clipX, int clipY, int clipWidth, int clipHeight) {
+#ifdef DOWNWELL_TERRAIN_BATCH_VERIFY
+    alignas(UWORD) static UBYTE expected[downwellGameRingBytes];
+    AmigaRenderer oracle=*renderer;
+    if(useTerrainBatch&&!directSurface){
+        AmigaHardware::blitterDrain();
+        std::memcpy(expected,renderer->game,sizeof expected);
+        oracle.game=oracle.target=expected;
+        oracle.blitterEnabled=0;
+    }
+#endif
     unsigned index;
     const int firstWorldY = viewY + clipY;
     const int finalWorldY = firstWorldY + clipHeight;
     const auto drawGameAsset = [pack, end](AmigaRenderer* target, UWORD sprite,
         UWORD frame, int x, int y, int flip) {
         DW_PROFILE_SCOPE(profileTerrainAsset);
+        if(directSurface){
+            if(sprite==51&&!flip&&directSurface->tile(frame,x,y))return;
+            // The normal renderer does nothing for missing or wholly clipped
+            // art. Such a command must not abort a completed cache span.
+            int left,top,width,height;
+            if(amigaRendererAssetBounds(pack,end,sprite,frame,x,y,flip,&left,&top,&width,&height)&&
+                left<target->clipX+target->clipWidth&&left+width>target->clipX&&
+                top<target->clipY+target->clipHeight&&top+height>target->clipY)
+                directFailed=true;
+            return;
+        }
+#ifdef DOWNWELL_TERRAIN_BATCH
+        if(useTerrainBatch){
+            if(sprite==51 && !flip && amigaRendererBatchTerrainTile(&terrainBatch,frame,x,y))return;
+            amigaRendererFlushTerrainBatch(&terrainBatch);
+        }
+#endif
         amigaRendererDrawAsset(target, pack, end, sprite, frame, x, y, flip);
     };
     auto drawIndexedWalls = [&](AmigaRenderer* renderer,
         const downwell::RoomPack& rooms, const downwell::PackedRoom& room,
         int viewX, int viewY, int clipX, int clipY, int width, int height) {
+#ifdef DOWNWELL_TERRAIN_BATCH
+        if(useTerrainBatch&&terrainBatch.scratch){paintIndexedBatch(*terrainIndex,viewX,viewY);return;}
+#endif
         const int firstX = viewX + clipX - downwellPlayfieldX;
         const int firstY = viewY + clipY;
         for (int y = (firstY - 8) & ~15; y < firstY + height + 8; y += 16)
@@ -67,7 +203,17 @@ bool AmigaTerrainPainter::paint(AmigaRenderer* renderer,
                                   downwellPlayfieldX + x - viewX, y - viewY, 0);
     };
     amigaRendererSetClipRect(renderer, clipX, clipY, clipWidth, clipHeight);
-    if(runtime&&!amigaPaintWallBackground(renderer,runtime->wallBackgroundTiles(),
+#ifdef DOWNWELL_TERRAIN_BATCH
+    if(useTerrainBatch){
+        if(directSurface){
+            terrainBatch.left=clipX;terrainBatch.right=clipX+clipWidth;
+            terrainBatch.top=clipY;terrainBatch.bottom=clipY+clipHeight;
+        }else amigaRendererBeginTerrainBatch(&terrainBatch,renderer,viewX,viewY);
+    }
+#endif
+    // A fresh direct-cache span is already black. All wall-background
+    // rectangles are black and precede every wall/tile/decoration.
+    if(!directSurface&&runtime&&!amigaPaintWallBackground(renderer,runtime->wallBackgroundTiles(),
         viewX,viewY,clipX,clipY,clipWidth,clipHeight)){
         amigaRendererClearClipRect(renderer);return false;
     }
@@ -158,6 +304,22 @@ bool AmigaTerrainPainter::paint(AmigaRenderer* renderer,
         if (y + 24 >= firstWorldY && y - 24 < finalWorldY)
             drawGameAsset(renderer, sprite, frame, downwellPlayfieldX + x - viewX, y - viewY, 0);
     });
+#ifdef DOWNWELL_TERRAIN_BATCH
+    if(useTerrainBatch&&!directSurface)amigaRendererFlushTerrainBatch(&terrainBatch);
+#endif
     amigaRendererClearClipRect(renderer);
+#ifdef DOWNWELL_TERRAIN_BATCH_VERIFY
+    if(useTerrainBatch&&!directSurface){
+        AmigaHardware::blitterDrain();
+        useTerrainBatch=false;
+        const bool ok=paint(&oracle,rooms,room,terrainIndex,terrainTiles,decorations,
+            decorationCount,runtime,pack,end,viewX,viewY,clipX,clipY,clipWidth,clipHeight);
+        useTerrainBatch=true;
+        ++gDownwellTerrainBatchChecks;
+        if(!ok || amigaBufferDifferences(expected,renderer->game,sizeof expected)){
+            downwellTerrainBatchMismatch();return false;
+        }
+    }
+#endif
     return true;
 }

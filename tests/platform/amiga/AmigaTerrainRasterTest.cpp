@@ -45,6 +45,7 @@ int main() {
     std::printf("Terrain raster: %u mixed-span partitions repaint only dirty rows\n",partitions);
     unsigned stagedCases = 0;
     raster->ready = true;
+    for (bool directlyCached : {false,true})
     for (unsigned column=0; column<3; ++column)
     for (unsigned origin : {0u, 309u}) for (unsigned mask=0; mask<32; ++mask) {
         std::vector<UBYTE> stage(downwellGameRingBytes, 0xa5), expected(stage);
@@ -74,10 +75,12 @@ int main() {
                         assert(raster->dirty(column,8000+done+y));
                         for (unsigned p=0;p<2;++p) {
                             const unsigned at=p*320*48+((origin+done+y)%320)*48+12;
-                            std::memcpy(stage.data()+at,expected.data()+at,22);
+                            if(directlyCached)
+                                std::memcpy(raster->row(column,8000+done+y)+p*11,expected.data()+at,22);
+                            else std::memcpy(stage.data()+at,expected.data()+at,22);
                         }
                     }
-                    return true;
+                    return directlyCached?AmigaTerrainRaster::stageInCache:AmigaTerrainRaster::stageInBacking;
                 });
             assert(prepared>0 && unsigned(prepared)<=48-done && batchPainted<=16);
             for (int y=0;y<prepared;++y) assert(!raster->dirty(column,8000+done+y));

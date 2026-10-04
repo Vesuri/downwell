@@ -31,6 +31,9 @@ RETAIN_HEALTH_HUD ?= 0
 SCENERY_LAYERS ?= 0
 NATIVE_BOXES ?= 1
 NATIVE_FIELDS ?= 1
+TERRAIN_BATCH ?= 0
+TERRAIN_DIRECT ?= 0
+TERRAIN_BATCH_VERIFY ?= 0
 SKIP_LEVEL ?= 0
 PROBES ?= 0
 GENERATION_DETAIL ?= 0
@@ -165,6 +168,15 @@ CFLAGS += -DDOWNWELL_SCENERY_LAYERS
 endif
 CFLAGS += -DDOWNWELL_NATIVE_BOXES=$(NATIVE_BOXES)
 CFLAGS += -DDOWNWELL_NATIVE_FIELDS=$(NATIVE_FIELDS)
+ifneq ($(filter 1,$(TERRAIN_BATCH) $(TERRAIN_BATCH_VERIFY) $(TERRAIN_DIRECT)),)
+CFLAGS += -DDOWNWELL_TERRAIN_BATCH
+endif
+ifeq ($(TERRAIN_DIRECT),1)
+CFLAGS += -DDOWNWELL_TERRAIN_DIRECT
+endif
+ifeq ($(TERRAIN_BATCH_VERIFY),1)
+CFLAGS += -DDOWNWELL_TERRAIN_BATCH_VERIFY
+endif
 ifneq ($(filter 1,$(SKIP_TO_GAME) $(SKIP_LEVEL)),)
 CFLAGS += -DDOWNWELL_SKIP_TO_GAME
 endif
@@ -248,6 +260,9 @@ OBJECTS := obj/DownwellAmiga.o obj/AmigaProfile.o obj/AmigaInput.o obj/AmigaPlay
 	obj/Replay.o \
 	obj/AmigaAssets.o \
 	obj/gcc8_c_support.o obj/gcc8_a_support.o
+ifeq ($(TERRAIN_DIRECT),1)
+OBJECTS += obj/AmigaTerrainPrepared.o
+endif
 
 .PHONY: all check clean audit
 
@@ -264,7 +279,7 @@ $(OUT).front: $(AMIGA_FRONT_BANK)
 .PHONY: FORCE_STARTUP_OPTIONS
 obj/startup-options: FORCE_STARTUP_OPTIONS
 	@mkdir -p obj
-	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(SKIP_LEVEL)' '$(TERRAIN_RUN_STORE)' '$(TABLE_CONTACT_ATAN)' '$(RETAIN_HEALTH_HUD)' '$(SCENERY_LAYERS)' '$(NATIVE_BOXES)' '$(NATIVE_FIELDS)' '$(AMIGA_OPTIMIZATION)' '$(LASER_VERIFY)' '$(PROFILE_LASER)' > $@.tmp
+	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(SKIP_LEVEL)' '$(TERRAIN_RUN_STORE)' '$(TABLE_CONTACT_ATAN)' '$(RETAIN_HEALTH_HUD)' '$(SCENERY_LAYERS)' '$(NATIVE_BOXES)' '$(NATIVE_FIELDS)' '$(TERRAIN_BATCH)' '$(TERRAIN_DIRECT)' '$(TERRAIN_BATCH_VERIFY)' '$(AMIGA_OPTIMIZATION)' '$(LASER_VERIFY)' '$(PROFILE_LASER)' > $@.tmp
 	@cmp -s $@.tmp $@ || cp $@.tmp $@
 
 $(OBJECTS): obj/startup-options
@@ -556,6 +571,13 @@ $(AMIGA_BOOT_BANK) $(AMIGA_FRONT_BANK) $(AMIGA_SCENE_BANKS): $(AMIGA_GAME)
 
 obj/AmigaAssets.o: $(AMIGA_SRC)/AmigaAssets.s $(AMIGA_HUD) $(AMIGA_GAME) $(AMIGA_EXIT_MASK) $(AMIGA_ENTRY_MASK) $(AMIGA_SELECTION_MASK) \
 		$(AMIGA_RESULTS) $(AMIGA_SHOP) $(AMIGA_CLEAR) $(ROOM_PACK) $(OBJECT_PACK) $(COLLISION_PACK) $(COLLISION_MASK_PACK) $(BUILDER_PACK)
+	@mkdir -p $(@D)
+	$(AS) $(ASFLAGS) -o $@ $<
+
+$(REPO)/generated/amiga-terrain-phase6.bin: $(AMIGA_GAME) $(REPO)/tools/generate-terrain-phase.py
+	python3 $(REPO)/tools/generate-terrain-phase.py
+
+obj/AmigaTerrainPrepared.o: $(AMIGA_SRC)/AmigaTerrainPrepared.s $(REPO)/generated/amiga-terrain-phase6.bin
 	@mkdir -p $(@D)
 	$(AS) $(ASFLAGS) -o $@ $<
 

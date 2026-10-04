@@ -268,16 +268,22 @@ Rules for this section:
 4. **Terrain painting of new rows (frame 844: 28 CPU tile draws, 26.1 ms;
    3.8 ms per combat frame).** `AmigaTerrainPainter::paint` draws each tile
    through the generic `amigaRendererDrawAsset` at about 5,500–9,000 cycles.
-   - Batch horizontal tile runs for masked transfer, not independent tile
-     placements. Sprite 51 has 26 frames of 16×16 pixels with origin (8,8);
-     ordinary display placement is offset six pixels from a word boundary.
-     Transparency is the union of its two colour planes, including opaque
-     palette-black pen 3. Opaque word copies are not equivalent.
-   - Prepare contiguous run planes and coverage while preserving overlapping
-     tile order, corner highlights and breakable visibility. Transfer tall
-     strips per plane; small independent blits lose to the CPU (see the ammo
-     experiment in the audit). Avoid a large all-phase tile bank that still
-     performs per-tile masked CPU composition.
+   - Bring `TERRAIN_DIRECT`'s approximately 6.5 ms cache composition below the
+     5 ms target, including fallback and staging coverage. Keep the scalar
+     painter and native pixel oracles compiled. Measure the complete
+     compose-and-publish cost as well as the painter; moving work outside a
+     profiling scope is not a saving.
+   - Prioritize the remaining large A5/A6 work before this smaller terrain gap,
+     then return to A3/A4 before B. Do not chase sub-millisecond helpers to
+     close it. The terrain target is deferred, not achieved or relaxed.
+   - Finish normal-build integration and combined timing/fidelity gates for
+     prepared cache composition and its batched fallback. Keep the options
+     off by default until those gates pass; retain `TERRAIN_DIRECT=0
+     TERRAIN_BATCH=0` as the original compositor comparison.
+   - Preserve ordered transparent/opaque-black overlap, decorations,
+     registered wall presentation, partial invalidation, ring wrapping and
+     transactional fallback. Do not reintroduce an all-phase asset bank or
+     the intermediate surface/readback for ordinary direct-cache runs.
 
    Preserve circular hardware scrolling, static backing, incremental
    restoration and the [terrain update contract](terrain-update-contract.md).

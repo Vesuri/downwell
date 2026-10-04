@@ -455,6 +455,8 @@ unsigned amigaTerrainContactCount(const AmigaTerrainIndex& index) {
 }
 
 bool amigaIndexedWall(const AmigaTerrainIndex& index, int x, int y) {
+    static_assert((wallCell|roomWallCell)==AmigaTerrainIndex::wallAppearanceFlags,
+        "appearance row mask follows indexed-wall occupancy");
     return (indexCell(index, x, y) & (wallCell | roomWallCell)) != 0;
 }
 

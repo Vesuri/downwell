@@ -87,3 +87,74 @@ circular bitplane scrolling.
 
 Scene-verification builds compare the selected sequence with an independent
 full-record scan before drawing; normal and profiling builds omit that oracle.
+
+## Batched native wall composition
+
+`TERRAIN_BATCH=1` selects an experimental masked-strip backend. It leaves the
+registered wall painter compiled and unchanged. When native terrain has no
+per-wall records, clipped occupancy rows supply the same above/right/below/left
+frame bits as `amigaIndexedWall`. Each row carries a one-cell horizontal halo;
+the previous/current/next row windows share their occupancy reads. A static
+assertion pins the occupancy flags used by that projection.
+
+The renderer binds the 26 original sprite-51 frames once, checking their 16×16
+geometry, (8,8) origin and planar layout. Sources stay in the immutable ordinary
+memory game pack. No shifted asset bank or runtime pixel conversion is involved.
+The batch places those words on a world-aligned scratch lattice. Coverage is the
+union of the two colour planes: pen 3 remains opaque black, not transparent.
+Coincident tiles retain painter order, and repeating the last identical tile is
+idempotent. Unsupported frames, off-lattice placements, mirrored art and other
+sprites flush the pending strip before using the generic renderer.
+
+The scratch uses 44,304 bytes of the scene bank that is otherwise idle during
+gameplay: three 416×284 planes for colour and coverage. It is never a displayed
+buffer. The existing Bitmap masked-copy path shifts and clips the combined strip
+into the private terrain ring; physical wrapping splits the transfer. Each
+transfer drains before its source can be reused. Returning to garden/style
+reloads the front bank through the existing scene-owner transition. No additional
+Chip allocation or change to static backing/display ownership is required.
+
+`make test-amiga-terrain-batch` checks ordered overlapping tiles, the transfer
+coordinate contract, both render targets, clipping and circular wrapping, and
+full occupancy windows at map boundaries against the retained scalar painter.
+`bash amiga/profile.sh terrain` is the separate native pixel oracle (use the
+same gameplay/tape environment as the timing run). It compares every actual
+blitter repaint with a generic CPU repaint from the same prior full-ring bytes,
+stopping immediately on a mismatch. Its reference repaint and buffer comparison
+are verification work; never use that build's frame times as performance results.
+
+`TERRAIN_DIRECT=1` enables a separate experimental transaction for dirty cached
+well/side-room spans. It composes sprite-51 artwork directly into the existing
+native-word Fast-RAM rows, retaining the same ordered wall and tile traversal.
+It neither creates a coverage surface nor reads the result back from Chip RAM.
+Only a successful transaction publishes the completed rows through the existing
+cache-to-backing transfer and clears their dirty flags. It allocates no additional
+production storage. Circular display scrolling and both display-buffer debts
+remain owned by the existing row/raster classes.
+
+The direct attempt admits the ordinary 160-pixel viewport and 16×16 unmirrored
+sprite-51 frames. Other artwork aborts the transaction without modifying Chip
+buffers; the caller then recomposes the entire dirty span with the retained
+painter. Black wall-background rectangles precede all artwork and are redundant
+in the newly cleared cache span. Transparent pixels and opaque palette-black
+pixels remain distinct. The host tests compare native row words against the
+scalar compositor and test failed transactions followed by successful retries.
+With `TERRAIN_BATCH_VERIFY=1`, successful native direct spans additionally compare
+against the original painter; the existing full-ring oracle covers batch fallback.
+
+The direct experiment binds a 4,992-byte host-generated bank for phase six:
+26 frames × 16 rows × three 32-bit words (coverage, low colour, high colour).
+It is immutable ordinary-memory data, linked only for `TERRAIN_DIRECT=1`.
+The manifest pins the original source, extraction version, input pack and
+generator hashes. Interior two-word placements use these prepared words;
+other alignments and edge placements retain the portable shifting path.
+The host oracle checks all 26 frames independently against the original
+planar artwork, in addition to ordered terrain/viewport tests.
+
+Side-view staging uses the same transaction. `prepareStage` distinguishes
+`stageInBacking` (copy finished Chip rows into the cache) from `stageInCache`
+(publish finished cache rows into retired staging storage). It must not read
+stale staging data over a directly composed cache span. Both producer kinds
+share the 16-row repaint budget, dirty-run partitioning and physical wrap;
+neither acknowledges live display-buffer debts. A failed producer leaves its
+run dirty and does not publish it.

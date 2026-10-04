@@ -13,6 +13,7 @@ public:
     static constexpr unsigned rows = 8192, words = AmigaGameplayRows::terrainWords;
     static constexpr unsigned x = AmigaGameplayRows::terrainX;
     static constexpr unsigned stagePaintRows = 16;
+    enum StagePaint { stageFailed=0, stageInBacking=1, stageInCache=2 };
     bool ready = false;
     UWORD* row(unsigned column, unsigned y) { return &pixels_[column][y][0][0]; }
     bool& dirty(unsigned column, unsigned y) { return dirty_[column][y]; }
@@ -28,7 +29,10 @@ public:
     void invalidate(int first, int end);
     void invalidateShops(const downwell::ShopWorld& shops);
     // Populate retired staging storage only. Paint must finish all DMA before
-    // returning; failed paint leaves that run dirty. Never acknowledge either
+    // returning; failed paint leaves that run dirty. A producer may return
+    // stageInCache to publish directly composed raster rows without reading
+    // stale staging pixels back over them. Legacy bool producers retain the
+    // stageInBacking contract. Never acknowledge either
     // live display's debts or use its pipelined copy target here.
     template<class Paint>
     int prepareStage(AmigaRenderer* renderer, unsigned column, unsigned worldY,
@@ -40,13 +44,15 @@ public:
             const unsigned first = worldY + done;
             unsigned count = runEnd(column, first, worldY + height) - first;
             const bool repaint = dirty_[column][first];
+            int painted=stageInBacking;
             if (repaint) {
                 if (!budget) break;
                 if (count > budget) count = budget;
-                if (!paint(done, count)) return -1;
+                painted=paint(done,count);
+                if(painted!=stageInBacking&&painted!=stageInCache)return -1;
                 budget -= count;
             }
-            transfer(renderer, column, first, done, count, repaint,
+            transfer(renderer, column, first, done, count, repaint&&painted==stageInBacking,
                      nullptr, nullptr, 0, debts);
             if (repaint)
                 for (unsigned y = first; y < first + count; ++y) dirty_[column][y] = false;

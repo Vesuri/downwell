@@ -1860,6 +1860,19 @@ $(AMIGA_RENDERER_TEST_TARGET): $(AMIGA_RENDERER_TEST_SOURCES)
 	@mkdir -p $(@D)
 	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $(AMIGA_RENDERER_TEST_SOURCES)
 
+.PHONY: test-amiga-terrain-batch
+test: test-amiga-terrain-batch
+test-amiga-terrain-batch: generate-amiga-game build/amiga-terrain-batch-test build/amiga-terrain-painter-test
+	python3 tools/generate-terrain-phase.py
+	./build/amiga-terrain-batch-test generated/amiga-game.dwap
+	./build/amiga-terrain-painter-test generated/amiga-game.dwap generated/amiga-terrain-phase6.bin
+build/amiga-terrain-batch-test: tests/platform/amiga/AmigaTerrainBatchTest.cpp src/platform/amiga/AmigaRenderer.c $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $(filter %.cpp %.c,$^)
+build/amiga-terrain-painter-test: tests/platform/amiga/AmigaTerrainPainterTest.cpp src/platform/amiga/AmigaTerrainPainter.cpp src/platform/amiga/AmigaRenderer.c $(filter-out tests/platform/amiga/AmigaLiveTerrainTest.cpp,$(AMIGA_LIVE_TERRAIN_TEST_SOURCES)) $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -DDOWNWELL_TERRAIN_BATCH -o $@ $(filter %.cpp %.c,$^)
+
 .PHONY: test-amiga-coverage-word
 test: test-amiga-coverage-word
 test-amiga-coverage-word: build/amiga-coverage-word-test

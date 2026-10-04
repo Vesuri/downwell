@@ -104,6 +104,9 @@ extern const UBYTE amiga_hud_pack[];
 extern const UBYTE amiga_hud_pack_end[];
 extern const UBYTE amiga_game_pack[];
 extern const UBYTE amiga_game_pack_end[];
+#ifdef DOWNWELL_TERRAIN_DIRECT
+extern const UBYTE amiga_terrain_phase6[],amiga_terrain_phase6_end[];
+#endif
 extern const UBYTE amiga_results_pack[];
 extern const UBYTE amiga_exit_mask[];
 extern const UBYTE amiga_exit_mask_end[];
@@ -1013,6 +1016,16 @@ static void drawMainWorldSpan(
 #endif
             return;
         }
+#ifdef DOWNWELL_TERRAIN_DIRECT
+        if(clipX==downwellPlayfieldX&&clipWidth==downwellPlayfieldWidth&&
+            AmigaTerrainPainter::paintCached(terrainRaster.row(column,firstWorldY),renderer,
+                rooms,room,terrainCollision.index,terrainTiles,decorations,decorationCount,
+                runtime,activeGamePack,activeGamePackEnd,viewX,viewY,clipY,clipHeight)){
+            transferTerrainRows(renderer,viewX,firstWorldY,clipY,clipHeight,false);
+            for(int y=firstWorldY;y<finalWorldY;++y)terrainRaster.dirty(column,y)=false;
+            return;
+        }
+#endif
         amigaRendererClearGameRows(renderer, clipY, clipHeight, 0);
     }
     if (terrainRaster.ready && !cacheable && !refresh)
@@ -1597,6 +1610,16 @@ __attribute__((noinline)) static int runDownwell(void) {
     }
     activeGamePack = memory.assets();
     activeGamePackEnd = activeGamePack + gamePackBytes;
+#ifdef DOWNWELL_TERRAIN_DIRECT
+    if(!AmigaTerrainPainter::bindPrepared(amiga_terrain_phase6,amiga_terrain_phase6_end-amiga_terrain_phase6)){
+        platform.restore();FreeMem(startupCopperWords,4*sizeof(UWORD));memory.release();return 20;
+    }
+#endif
+#ifdef DOWNWELL_TERRAIN_BATCH
+    if(!AmigaTerrainPainter::bindBatch(amiga_game_pack,amiga_game_pack_end,sceneBank,sceneBankBytes)){
+        platform.restore();FreeMem(startupCopperWords,4*sizeof(UWORD));memory.release();return 20;
+    }
+#endif
     if(!AmigaGameplayActors::prepareDamageText(activeGamePack,activeGamePackEnd)){
         platform.restore();FreeMem(startupCopperWords,4*sizeof(UWORD));memory.release();return 20;
     }
@@ -2993,20 +3016,29 @@ __attribute__((noinline)) static int runDownwell(void) {
                         while (origin < 0) origin += downwellGameRingHeight;
                         stage.gameOrigin = origin % downwellGameRingHeight;
                         const int prepared = terrainRaster.prepareStage(&stage, column, first, count,
-                            gameplayRows, [&](unsigned top, unsigned height) {
+                            gameplayRows, [&](unsigned top, unsigned height) -> AmigaTerrainRaster::StagePaint {
 #ifdef DOWNWELL_SCENE_VERIFY
                                 gDownwellColdStageRows += height;
 #endif
                                 downwellProfileTerrainSpan(targetX, first + top, height,
                                     downwellPlayfieldX, downwellPlayfieldWidth, 1, 4);
+#ifdef DOWNWELL_TERRAIN_DIRECT
+                                if(AmigaTerrainPainter::paintCached(terrainRaster.row(column,first+top),
+                                    &stage,rooms,mainRoom,terrainCollision.index,terrainTiles,
+                                    generatedDecorations,liveBuilder.decorationCount(),&port,
+                                    activeGamePack,activeGamePackEnd,targetX,first,top,height))
+                                    return AmigaTerrainRaster::stageInCache;
+#endif
                                 amigaRendererClearGameRows(&stage, top, height, 0);
                                 if(!AmigaTerrainPainter::paint(&stage, rooms, mainRoom, terrainCollision.index,
                                     terrainTiles, generatedDecorations, liveBuilder.decorationCount(), &port,
                                     activeGamePack, activeGamePackEnd, targetX, first,
-                                    downwellPlayfieldX, top, downwellPlayfieldWidth, height))
-                                    return terrainPaintSucceeded=false;
+                                    downwellPlayfieldX, top, downwellPlayfieldWidth, height)){
+                                    terrainPaintSucceeded=false;
+                                    return AmigaTerrainRaster::stageFailed;
+                                }
                                 AmigaHardware::blitterDrain();
-                                return true;
+                                return AmigaTerrainRaster::stageInBacking;
                             });
                         if (prepared >= 0)
                             gameplayScene.staged({first, prepared}, downwellGameRingHeight);

@@ -1,5 +1,6 @@
 #include "AmigaRenderer.h"
 #include "AmigaProfileCounters.h"
+#include <string.h>
 
 extern int amigaBlitterDrawPlanarMasked(
     const UBYTE* source, const UBYTE* mask,
@@ -699,6 +700,166 @@ unsigned amigaRendererPublishHudColumn(UBYTE* destination, UBYTE* working,
         source += 2;
     }
     return writes;
+}
+
+int amigaRendererBindTerrainBatch(AmigaTerrainBatch* batch, const UBYTE* pack,
+    const UBYTE* end, UBYTE* scratch, unsigned bytes) {
+    unsigned frame;
+    batch->scratch=0; batch->active=0;
+    if (!scratch || bytes<downwellTerrainBatchBytes) return 0;
+    for(frame=0; frame<26; ++frame) {
+        const UBYTE* record=findAsset(pack,end,51,frame);
+        ULONG offset;
+        if(!record || readWord(record+4)!=8 || readWord(record+6)!=8 ||
+            readWord(record+8)!=16 || readWord(record+10)!=16 ||
+            readWord(record+12)!=16 || readWord(record+14)!=3) return 0;
+        offset=readLong(record+16);
+        if(offset>(ULONG)(end-pack) || (ULONG)(end-pack)-offset<64) return 0;
+        batch->tiles[frame]=pack+offset;
+    }
+    batch->scratch=scratch;
+    return 1;
+}
+
+static void resetTerrainBatch(AmigaTerrainBatch* batch) {
+    if(batch->bottom>batch->top)memset(batch->scratch+2*downwellTerrainBatchPlane+
+        batch->top*downwellTerrainBatchStride,0,(batch->bottom-batch->top)*downwellTerrainBatchStride);
+    memset(batch->occupied,0,sizeof batch->occupied);
+}
+
+void amigaRendererBeginTerrainBatch(AmigaTerrainBatch* batch, AmigaRenderer* renderer,
+    int viewX, int viewY) {
+    unsigned row;
+    batch->renderer=renderer;
+    batch->phaseX=(downwellPlayfieldX-viewX-8)&15;
+    batch->phaseY=(-viewY-8)&15;
+    batch->active=0; /* Scratch is initialized only when the first tile arrives. */
+    batch->left=renderer->clipX>0?renderer->clipX:0;
+    batch->right=renderer->clipX+renderer->clipWidth;
+    if(batch->right>downwellVisibleWidth)batch->right=downwellVisibleWidth;
+    batch->top=renderer->clipY>0?renderer->clipY:0;
+    batch->bottom=renderer->clipY+renderer->clipHeight;
+    if(batch->bottom>downwellDisplayHeight)batch->bottom=downwellDisplayHeight;
+    if(!batch->scratch || batch->left>=batch->right || batch->top>=batch->bottom){
+        batch->firstColumn=1;batch->lastColumn=0;
+        for(row=0;row<20;++row)batch->rows[row].count=0;
+        return;
+    }
+    batch->firstColumn=(batch->left+16-batch->phaseX)/16;
+    batch->lastColumn=(batch->right+15-batch->phaseX)/16;
+    for(row=0;row<20;++row){
+        const int tileTop=(int)row*16-16+batch->phaseY;
+        const int top=tileTop>batch->top?tileTop:batch->top;
+        const int bottom=tileTop+16<batch->bottom?tileTop+16:batch->bottom;
+        batch->rows[row].count=bottom>top?(unsigned)(bottom-top):0;
+        if(bottom>top){
+            batch->rows[row].destination=batch->scratch+top*downwellTerrainBatchStride;
+            batch->rows[row].sourceOffset=(top-tileTop)*2;
+        }
+    }
+}
+
+int amigaRendererBatchTerrainTile(AmigaTerrainBatch* batch,unsigned frame,int x,int y) {
+    const int left=x-8, top=y-8;
+    int column,row,duplicate;
+    unsigned count;
+    UBYTE* target;
+    const UBYTE* source;
+    if(!batch->scratch || frame>=26 || (left&15)!=batch->phaseX ||
+        (top&15)!=batch->phaseY) return 0;
+    column=(left+16-batch->phaseX)>>4;
+    row=(top+16-batch->phaseY)>>4;
+    if(column<batch->firstColumn || column>batch->lastColumn || row<0 || row>=20)return 1;
+    count=batch->rows[row].count;
+    if(!count)return 1;
+    if(!batch->active){resetTerrainBatch(batch);batch->active=1;}
+    duplicate=(batch->occupied[row]&(1UL<<column))!=0;
+    if(duplicate && batch->lastFrame[row][column]==frame)return 1;
+    batch->occupied[row]|=1UL<<column;
+    batch->lastFrame[row][column]=frame;
+    source=batch->tiles[frame]+batch->rows[row].sourceOffset;
+    target=batch->rows[row].destination+column*2;
+    while(count--){
+        const UWORD low=readWord(source),high=readWord(source+32),mask=low|high;
+        if(duplicate){
+            writeWord(target,(readWord(target)&(UWORD)~mask)|low);
+            writeWord(target+downwellTerrainBatchPlane,
+                (readWord(target+downwellTerrainBatchPlane)&(UWORD)~mask)|high);
+            writeWord(target+2*downwellTerrainBatchPlane,
+                readWord(target+2*downwellTerrainBatchPlane)|mask);
+        }else{
+            writeWord(target,low);writeWord(target+downwellTerrainBatchPlane,high);
+            writeWord(target+2*downwellTerrainBatchPlane,mask);
+        }
+        source+=2;target+=downwellTerrainBatchStride;
+    }
+    return 1;
+}
+
+void amigaRendererFlushTerrainBatch(AmigaTerrainBatch* batch) {
+    AmigaRenderer* r=batch->renderer;
+    int y,height;
+    unsigned physical, targetHeight;
+    if(!batch->active)return;
+    y=batch->top;
+    targetHeight=r->target==r->game?downwellGameRingHeight:downwellDisplayHeight;
+    physical=(r->target==r->game?r->gameOrigin:0)+(unsigned)y;
+    if(physical>=targetHeight)physical-=targetHeight;
+    while(y<batch->bottom){
+        height=batch->bottom-y;
+        if(height>(int)(targetHeight-physical))height=targetHeight-physical;
+        if(!r->blitterEnabled || !amigaBlitterDrawPlanarMasked(batch->scratch,
+            batch->scratch+2*downwellTerrainBatchPlane,416,downwellDisplayHeight,416,
+            r->target,targetHeight,batch->left,physical,
+            batch->left+16-batch->phaseX,y,batch->right-batch->left,height,-1)) {
+            int row,column;
+            const int first=(batch->left+16-batch->phaseX)/16;
+            const int last=(batch->right+15-batch->phaseX)/16;
+            for(row=y;row<y+height;++row)
+                for(column=first;column<=last;++column){
+                    const UBYTE* s=batch->scratch+row*downwellTerrainBatchStride+column*2;
+                    amigaRendererDrawPlanarWord(r,column*16-16+batch->phaseX,row,
+                        readWord(s+2*downwellTerrainBatchPlane),readWord(s),
+                        readWord(s+downwellTerrainBatchPlane));
+                }
+        }
+        y+=height;physical=0;
+    }
+    batch->active=0;
+}
+
+/* A native occupancy row is already clipped and on the tile lattice. Resolve
+   adjacency and paint the row together, not four generic queries and another
+   geometry/clipping dispatch for each cell. Bit zero is the left halo. */
+void amigaRendererBatchTerrainWallRow(AmigaTerrainBatch* batch,int x,int y,
+    ULONG above,ULONG middle,ULONG below,unsigned columns) {
+    const unsigned row=(y+8-batch->phaseY)>>4;
+    unsigned column=(x+8-batch->phaseX)>>4;
+    unsigned cell;
+    if(!batch->scratch || row>=20 || !batch->rows[row].count)return;
+    for(cell=0;cell<columns;++cell,++column){
+        const ULONG bit=2UL<<cell;
+        unsigned frame,count;
+        const UBYTE* source;
+        UBYTE* destination;
+        if(!(middle&bit))continue;
+        if(column>=26 || column<(unsigned)batch->firstColumn || column>(unsigned)batch->lastColumn)continue;
+        if(!batch->active){resetTerrainBatch(batch);batch->active=1;}
+        frame=((above&bit)?1:0)|((middle&(bit<<1))?2:0)|
+              ((below&bit)?4:0)|((middle&(bit>>1))?8:0);
+        source=batch->tiles[frame]+batch->rows[row].sourceOffset;
+        destination=batch->rows[row].destination+column*2;
+        count=batch->rows[row].count;
+        batch->occupied[row]|=1UL<<column;
+        batch->lastFrame[row][column]=frame;
+        while(count--){
+            const UWORD low=readWord(source),high=readWord(source+32);
+            writeWord(destination,low);
+            writeWord(destination+downwellTerrainBatchPlane,high);
+            writeWord(destination+2*downwellTerrainBatchPlane,low|high);
+            source+=2;destination+=downwellTerrainBatchStride;
+        }
+    }
 }
 
 int amigaRendererPrepareDamageGlyphs(AmigaDamageGlyphs* glyphs, const UBYTE* pack,

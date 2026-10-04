@@ -142,7 +142,7 @@ struct AmigaTerrainCollisionContext {
 };
 
 struct AmigaTerrainIndex {
-    enum { columns = 128, rows = 512, minX = -512 };
+    enum { columns = 128, rows = 512, minX = -512, wallAppearanceFlags = 24 };
     // Occupancy flags in bits 0-5. Bits 6-7 count coincident wall (60)
     // Creates up to three; the breakable flag stands for the first box (92).
     unsigned char cells[columns * rows];

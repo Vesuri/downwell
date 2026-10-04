@@ -50,6 +50,17 @@ copper is re-pointed afterwards. Leaving gameplay for the menu or style select
 reloads the front bank before either scene is prepared. Splash scenes run only
 at boot. During gameplay no bank occupies the region.
 
+The experimental `TERRAIN_BATCH=1` painter borrows 44,304 bytes of that idle
+region for two colour planes and a coverage plane (416×284). Its immutable tile
+sources remain in ordinary memory. It drains masked transfers before reusing the
+scratch; the existing front-bank reload restores garden/style assets on return.
+This adds no Chip allocation. `TERRAIN_DIRECT=1` composes into the existing
+Fast-RAM raster instead of allocating another surface. Its phase-six prepared
+word bank is 4,992 bytes of immutable ordinary-memory data, linked only for that
+experiment. `TERRAIN_BATCH_VERIFY=1` additionally reserves ordinary-memory
+reference rings for batch and direct-cache pixel comparisons, only in
+verification builds.
+
 A temporary 16-byte startup copper list is also allocated during initialization.
 Immutable planar/mask payloads may share byte-identical word-aligned subregions
 and matching tails. Every record still describes one contiguous stream with its

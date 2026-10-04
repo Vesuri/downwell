@@ -60,6 +60,26 @@ void amigaRendererDrawAsset(AmigaRenderer* renderer,
                             const UBYTE* pack, const UBYTE* packEnd,
                             UWORD sprite, UWORD frame,
                             int anchorX, int anchorY, int flipX);
+/* Gameplay-only scratch in the retired scene bank; original planar tile art. */
+enum { downwellTerrainBatchStride = 52,
+       downwellTerrainBatchPlane = downwellTerrainBatchStride * downwellDisplayHeight,
+       downwellTerrainBatchBytes = downwellTerrainBatchPlane * 3 };
+typedef struct AmigaTerrainBatch {
+    const UBYTE* tiles[26];
+    UBYTE* scratch;
+    AmigaRenderer* renderer;
+    ULONG occupied[20];
+    UBYTE lastFrame[20][26];
+    struct { UBYTE* destination; unsigned sourceOffset, count; } rows[20];
+    int firstColumn,lastColumn;
+    int phaseX, phaseY, left, right, top, bottom, active;
+} AmigaTerrainBatch;
+int amigaRendererBindTerrainBatch(AmigaTerrainBatch*, const UBYTE*, const UBYTE*, UBYTE*, unsigned);
+void amigaRendererBeginTerrainBatch(AmigaTerrainBatch*, AmigaRenderer*, int viewX, int viewY);
+int amigaRendererBatchTerrainTile(AmigaTerrainBatch*, unsigned frame, int x, int y);
+void amigaRendererBatchTerrainWallRow(AmigaTerrainBatch*,int x,int y,
+    ULONG above,ULONG middle,ULONG below,unsigned columns);
+void amigaRendererFlushTerrainBatch(AmigaTerrainBatch*);
 /* Native words copied from an offline planar asset, not pixel conversion. */
 typedef struct AmigaWordStamp {
     UWORD low[8], high[8], mask[8];
