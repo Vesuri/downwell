@@ -2062,6 +2062,16 @@ build/prepared-ammo-renderer-test: $(AMIGA_RENDERER_TEST_SOURCES) $(wildcard src
 verify-prepared-ammo-dividers: build/prepared-ammo-renderer-test generate-amiga-game
 	./build/prepared-ammo-renderer-test generated/amiga-game.dwap generated/amiga-hud.dwap
 
+# Host-only feasibility/oracle for a rejected native interior-only experiment.
+generated/amiga-ammo-segments-probe.h: tools/probe-ammo-segments.py generated/amiga-hud.dwap
+	python3 tools/probe-ammo-segments.py
+build/ammo-segments-test: tests/platform/amiga/AmigaAmmoSegmentsTest.cpp src/platform/amiga/AmigaRenderer.c $(wildcard src/core/Ammo*.h) src/platform/amiga/AmigaRenderer.h generated/amiga-ammo-segments-probe.h
+	@mkdir -p $(@D)
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ tests/platform/amiga/AmigaAmmoSegmentsTest.cpp src/platform/amiga/AmigaRenderer.c
+.PHONY: verify-ammo-segment-probe
+verify-ammo-segment-probe: build/ammo-segments-test
+	./build/ammo-segments-test generated/amiga-hud.dwap
+
 .PHONY: generate-amiga-results verify-amiga-results
 .PHONY: generate-amiga-shop verify-amiga-shop
 generate-amiga-shop:

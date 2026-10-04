@@ -304,6 +304,10 @@ Rules for this section:
      Move preparation off the critical frame or represent the changing column
      as a prepared transfer, with an explicit memory budget and the existing
      ordered compositor as fallback. Do not add another per-frame classifier.
+     The host segment probe proves a fixed-capacity representation and measures
+     its bank, but its interior-only native use fails the timing gate. Include
+     the surrounding gauge/rim/label reconstruction in the replacement, and
+     eliminate runtime run-selection work rather than tuning its inner loops.
      Take this remaining A5 work before
      A3/A4 and B, without treating the remaining A6 gates as complete. The HUD
      targets remain unchanged.

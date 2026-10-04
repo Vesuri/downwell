@@ -75,6 +75,18 @@ The Amiga comparison switch is `PREPARED_AMMO_DIVIDERS=1`; zero retains the
 original compositor. Changed source artwork and capacities above 16 use that
 compositor even when the switch is enabled.
 
+`make verify-ammo-segment-probe` measures a host-precomposed gauge segment bank
+and checks its final words against ordered original drawing. At a fixed capacity,
+rows between adjacent charge thresholds share a target history; equal initial
+states remain equal. A segment needs its own and the preceding segment's frame
+because the artwork overlaps by eight rows. A capacity change requires a fresh
+uniformity check: arbitrary inherited row state is not covered by that proof.
+The ignored header and manifest include capacities 1–16, all charge/meter/frame
+combinations, deduplicated run templates, memory costs and source/tool hashes.
+This is host-only preparation for further work, **not an enabled optimization**:
+the interior-only native experiment failed its worst-frame timing gate. See
+[the audit](../docs/amiga-frame-cost.md#prepared-gauge-segments).
+
 ## Prepared Amiga field images
 
 `make generated/amiga-field-images.bin` rasterizes all 512 small-circle

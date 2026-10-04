@@ -258,6 +258,53 @@ unchanged regions does not replace its actual composition cost. Preparation
 must move off the critical frame, or the changing column itself must become
 a prepared transfer; more elaborate runtime classifiers are not the next step.
 
+### Prepared gauge segments
+
+The host probe at `3c47d140` groups rows by their integer charge thresholds.
+For fixed capacity and equal initial state within each group, every future
+shared producer update preserves that equality. Capacities 1–16 have groups
+at least eight rows wide, so each final segment depends on only its own and
+the preceding group's sprite frame. Capacity changes need recertification;
+this is not a proof for arbitrary edited row arrays.
+
+`make verify-ammo-segment-probe` checks 4,889,600 final row pairs against
+`AmmoGaugeRows::draw`, `AmmoFill` and `AmmoDividerLayout` in original draw order,
+including the two-frame resource-421 wrap. The bank has 2,284 unique tiles and
+469 selector pages. Raw words would cost about 305,000 bytes. Run templates
+reduce this to **64,304 bytes** including source-art validation: 13,166 runs,
+37 word pairs, tile/page/configuration directories. No Chip allocation or
+runtime expansion buffer is needed. The probe's ignored manifest records the
+exact generated costs and input/output hashes.
+
+The native experiment selected final run templates instead of filling the
+interior, stamping row artwork and overlaying dividers. Full HUD comparisons
+and ASan/UBSan passed, but the paired A500 gate failed:
+
+| Frame | Retained (ms) | Prepared interior (ms) |
+| --- | ---: | ---: |
+| 645 | 115.133 | 109.626 |
+| 701 | 176.379 | 177.727 |
+| 844 | 127.676 | 125.254 |
+
+The 20 common complete frames average 78.932 versus 77.382 ms. The recharge
+saving is real, but it misses the projected 10 ms and does not excuse the
+frame-701 regression. Frame 645's HUD still takes 19.8 ms: prepared run
+selection costs 3.10 ms and publication 3.85 ms, with roughly 13 ms remaining
+outside that interior path. An interior-only replacement is insufficient;
+the surrounding gauge/rim/label reconstruction remains material work.
+
+Captures: `tmp/trace/ammo-segments-mode1` and `tmp/trace/ammo-segments-mode2`;
+comparison and attribution: `build/ammo-segments-comparison.log` and
+`build/ammo-segments-candidate-cost.log`. Both have text hash
+`bf61e4caa70c14396d5f4fc3e84030af95e1433bf73c53cda5db71e9e8089871`.
+Use the preceding certificate experiment's contact trace command, replacing
+its selector with `AMMO_SEGMENT_BANK=1/2` and setting
+`PROFILE_FIELD_REFERENCE=0 PREPARED_FIELDS_BACKING=5` (fused mode 7).
+The full native patch is preserved only in
+`tmp/ammo-segments-native-rejected.patch`; runtime changes were removed.
+No FPS/replay acceptance is claimed after failing the mandatory timing gate.
+The host probe/oracle remain as preparation, not as a performance win.
+
 ## Consequences for the budget
 
 - **Worst frames.** Each is roughly 180 ms. The largest removable parts are:
