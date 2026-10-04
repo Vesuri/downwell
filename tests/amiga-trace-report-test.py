@@ -3,6 +3,8 @@
 import importlib.util
 from pathlib import Path
 import unittest
+from unittest import mock
+from collections import Counter
 
 spec = importlib.util.spec_from_file_location(
     "trace_report", Path(__file__).resolve().parents[1] / "tools/amiga-trace-report.py")
@@ -68,6 +70,22 @@ class CostOwners(unittest.TestCase):
         for method in ("spatialCanAttach", "spatialObject", "spatialHandle", "spatialPublish", "spatialRetire"):
             self.assertEqual(report.cause(["runDownwell", f"downwell::GameplayTerrainInstancesRuns::{method}"]),
                              "runner bookkeeping")
+
+
+class FrameBoundaries(unittest.TestCase):
+    def test_pre_mark_execution_is_not_a_complete_frame(self):
+        stacks, entries, cycles = Counter(), Counter(), Counter()
+        # Recording starts during frame 843, then sees complete frame 844
+        # and only the beginning of 845. The first fragment is not idle.
+        instructions = [(0, 10, 100, 4096, 0), (0, 20, 200, 4096, 0),
+                        (0, 99, 20, 4096, 0), (1, 30, 400, 4096, 0),
+                        (1, 99, 20, 4096, 0), (1, 40, 70, 4096, 0)]
+        with mock.patch.object(report, 'records', return_value=iter(instructions)):
+            fields, last = report.attribute('unused', 843, {}, 99, stacks, cycles, entries)
+        self.assertEqual((fields, last), (2, 845))
+        self.assertEqual(cycles, {843: 300, 844: 420, 845: 90})
+        self.assertEqual(report.complete_frame_numbers(cycles, {843, last}), [844])
+        self.assertEqual(report.complete_frame_numbers({843: 300}, {843}), [])
 
 
 if __name__ == "__main__":

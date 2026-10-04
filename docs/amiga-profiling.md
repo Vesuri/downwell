@@ -139,8 +139,10 @@ lists the complete command set to repeat it. The build adds one
 `downwellTraceFrameMark` call per gameplay frame, and a debugger stop at each
 listed frame before its capture. Neither reads the clock or changes game state.
 Emulated time does not advance while GDB is stopped. Recording starts at the
-next vertical blank, so a capture's first frame lacks only its pre-VBL
-wait/idle service. Its last frame is cut off and excluded. Output goes to
+next vertical blank, after the first frame has already begun executing.
+Simulation work can occur before that blank: the first frame is partial,
+not merely missing idle time. Both first and last frames are excluded from
+the report. Start captures before the frame being measured. Output goes to
 `TRACE_OUTPUT` (default `tmp/trace/run`) with the matching ELF and GDB log.
 
 Every executed instruction is recorded with its cycle cost and registers.

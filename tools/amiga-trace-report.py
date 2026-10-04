@@ -15,8 +15,9 @@ inlined by LTO appear as their own logical frames.
 
 Game frames are split at entries to downwellTraceFrameMark (TRACE_FRAMES
 builds). Recording starts at the VBL ending the requested frame's wait, so a
-capture's first frame lacks only its pre-VBL wait; its last frame is cut off
-and excluded. Cycles are 68000 clocks; a PAL field is 142,102 of them.
+capture's first frame has already begun executing before that VBL. Both its
+first and last frames are partial and excluded. Cycles are 68000 clocks; a
+PAL field is 142,102 of them.
 
   python3 tools/amiga-trace-report.py tmp/trace/run [--frames=N|N-M]
       [--min-fields=F] [--top=60] [--tree-min=0.5] [--focus=name]
@@ -358,9 +359,9 @@ def attribute(path, start_frame, calls, mark, stacks, frame_cycles, entries):
     user, supervisor = [], []  # frames: (call-site pc, sp after the push)
     prev_user = prev_super = None  # (pc, sp)
     # FS-UAE starts recording at the vertical blank after the debugger stop,
-    # i.e. after start_frame's mark and inside its waitVblank. Instructions
-    # before the first recorded mark are start_frame's work (only its pre-VBL
-    # wait/idle service is missing); the first recorded mark is start_frame+1.
+    # i.e. after start_frame's mark. Simulation may already have executed;
+    # this is not necessarily an idle wait. The partial first frame must be
+    # excluded, like the last. Its next recorded mark is start_frame+1.
     frame = start_frame
     fields = 0
     for field, pc, cost, sp, sr in records(path):
@@ -394,6 +395,10 @@ def attribute(path, start_frame, calls, mark, stacks, frame_cycles, entries):
         stacks[(frame,) + key] += cost
         frame_cycles[frame] += cost
     return fields, frame
+
+
+def complete_frame_numbers(frame_cycles, partial_frames):
+    return [f for f in sorted(frame_cycles) if f not in partial_frames]
 
 
 def main():
@@ -436,20 +441,22 @@ def main():
     stacks = collections.Counter()  # (frame, call sites..., leaf) -> cycles
     entries = collections.Counter()  # (frame, callee entry pc) -> user-mode calls
     frame_cycles = collections.Counter()
-    last_frames = set()  # each cut off by the end of its capture
+    partial_frames = set()  # recording starts/ends inside a game frame
     total_fields = 0
     for start_frame, path in traces:
         fields, last = attribute(path, start_frame, calls, mark, stacks,
                                  frame_cycles, entries)
         total_fields += fields
-        last_frames.add(last)
+        partial_frames.update((start_frame, last))
 
-    complete = [f for f in sorted(frame_cycles) if f not in last_frames]
+    complete = complete_frame_numbers(frame_cycles, partial_frames)
     if not complete:
         sys.exit('captures contain no complete game frame')
     lo, hi = parse_range(args.frames, min(complete), max(complete))
     chosen = {f for f in complete if lo <= f <= hi and
               frame_cycles[f] >= args.min_fields * FIELD_CYCLES}
+    if not chosen:
+        sys.exit('no complete frames match the selection; capture before the requested frame')
     sym = Symbolizer(elf, symbols)
     sym.resolve(p for key in stacks for p in key[1:] if isinstance(p, int))
 
