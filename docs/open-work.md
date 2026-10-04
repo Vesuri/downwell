@@ -298,8 +298,13 @@ Rules for this section:
      changes.
      Do not rebuild general interval lists or solve ordered row overlaps on
      the 68000 every frame; the [native experiments](amiga-frame-cost.md#ammo-gauge-experiments)
-     rule out those implementations. Take A6 next, then return to this
-     remaining A5 work before A3/A4 and B. The HUD targets remain unchanged.
+     rule out those implementations. Likewise, replacing the middle with a
+     per-line final-word publisher is insufficient. Cache final-region identity
+     so unchanged blocks can bypass composition and comparison altogether;
+     retain exact ordered edge composition and invalidate that cache when an
+     overlapping draw changes its pixels. Take this remaining A5 work before
+     A3/A4 and B, without treating the remaining A6 gates as complete. The HUD
+     targets remain unchanged.
    - Finish normal-build integration of `AMMO_DAMAGE_RANGE=1` and
      `PREPARED_AMMO_DIVIDERS=1` after the combined HUD timing/fidelity gates.
      Retain full-scan and sprite-compositor comparisons, nonconsecutive

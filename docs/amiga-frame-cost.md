@@ -189,6 +189,33 @@ Whole-gauge replacements measured on this tape and discarded include:
 On this machine the gauge's cost is the number of lines rewritten, not the
 way each line is composed.
 
+### Uniform-middle publication experiment
+
+At `5a96d1f1`, frame 645 still spends 25.26 ms in the ammo HUD. An experiment
+coalesced consecutive equal animation states, composed their non-overlapping
+middles directly from prepared words, and left the existing renderer to paint
+the edges. This removes intermediate fill/stamp passes without constructing
+general interval lists, but still compares and publishes each middle line.
+
+It failed the worst-frame gate: frame 645 changed from 115.110 to 116.250 ms,
+701 from 177.772 to 177.675 ms, and 844 from 127.130 to 131.728 ms. Across 18
+common complete frames, the mean changed from 78.356 to 79.357 ms. The new
+constant-column publisher alone cost 8.20 ms in frame 645. Skipping intermediate
+composition is insufficient when final per-line publication remains expensive.
+
+Evidence: `tmp/trace/ammo-uniform-mode0`, `tmp/trace/ammo-uniform-mode1`,
+`build/ammo-uniform-comparison.log`, and `build/ammo-uniform-645-cost.log`.
+The captures use the contact tape, starts 644/699/843, 30 PAL fields each,
+and the prepared backing-5 field bundle. The rejected source is retained only
+in `tmp/ammo-uniform-rejected.patch`; it is not a default-off implementation.
+Its `AMMO_UNIFORM_RUNS=0/1` selector produced different text hashes
+(`d92e1637acce480aa3a9d977c23f26db0c54d76a3e05fe298187e42939210aa2` and
+`1cc10c85d690c0f2d8a192bddfe914a2231a596e4cf5ab61559c77fafac0cccd`).
+Thus this is not a text-identical timing comparison; use nonzero selector
+values for both arms of future retained-path comparisons to avoid moving a
+zero-initialized selector between BSS and initialized data. The measured
+publisher cost and regression do not justify retaining this implementation.
+
 ## Consequences for the budget
 
 - **Worst frames.** Each is roughly 180 ms. The largest removable parts are:
