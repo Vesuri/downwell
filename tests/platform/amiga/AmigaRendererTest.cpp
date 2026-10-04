@@ -1304,6 +1304,26 @@ int main(int argc, char** argv) {
             require(actualHud == expectedHud, "skipping invisible row-state changes preserves all HUD pixels");
         }
         require(skipped > 500, "stable and invisible animation updates bypass retained HUD composition");
+        // The white fill is fixed at y=53 when full, while row artwork moves
+        // by four times the jiggle. An ammo change at the same nonzero jiggle
+        // must retire that unshifted fill too (the next case empties it).
+        rows.step(8,8);
+        retained.draw(&actualRenderer,hudPack.data(),hudPack.data()+hudPack.size(),8,8,0,&rows,3);
+        fullRedraw(8,8,0,3);
+        require(actualHud==expectedHud,"full gauge at nonzero jiggle matches source artwork");
+        for(unsigned cap : {1u,8u,15u,64u,127u})
+          for(unsigned meter=0;meter<4;++meter)
+            for(unsigned before=0;before<=(cap<8?cap:8);++before)
+                for(unsigned after=0;after<=(cap<8?cap:8);++after){
+                    rows.step(before,cap);
+                    retained.draw(&actualRenderer,hudPack.data(),hudPack.data()+hudPack.size(),before,cap,0,&rows,meter);
+                    fullRedraw(before,cap,0,meter);
+                    require(actualHud==expectedHud,"fixed-fill transition starts at source pixels");
+                    rows.step(after,cap);
+                    retained.draw(&actualRenderer,hudPack.data(),hudPack.data()+hudPack.size(),after,cap,0,&rows,meter);
+                    fullRedraw(after,cap,0,meter);
+                    require(actualHud==expectedHud,"same-jiggle ammo changes retire unshifted fill pixels");
+                }
         for (unsigned cap : {8u, 15u, 1u, 64u, 127u}) {
             for (unsigned tick = 0; tick < (cap+1)*10; ++tick) {
                 const unsigned ammo = (tick / 5) % (cap + 1);

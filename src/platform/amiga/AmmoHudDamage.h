@@ -28,6 +28,14 @@ struct AmmoHudDamage {
                 // 8-row artwork, +/-1 shadows and the low-charge positive fill.
                 include(229 + 4 * nextMeter - static_cast<int>(high) - 2,
                         229 + 4 * nextMeter - static_cast<int>(low) + 10);
+                // The white fill does not follow that shifted artwork. Its
+                // positive-charge rectangle starts at 237 - 184*ammo/capacity;
+                // include both old/new fixed boundaries (and rounding margin).
+                // At meter=3, the shifted envelope alone misses the top of a
+                // full fill when ammo changes without another jiggle change.
+                const int fixedTop=235-static_cast<int>(high);
+                // Very low charge uses the source's positive fill at y=232.
+                include(fixedTop<232?fixedTop:232,239-static_cast<int>(low));
             }
             const int base = 229 + 4 * nextMeter;
             const unsigned firstVisible = base >= 232 ? base - 231 : 0;
