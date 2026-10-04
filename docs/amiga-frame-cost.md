@@ -1,5 +1,65 @@
 # Amiga gameplay frame-cost audit
 
+## Prepared gauge transfers: recharge target reached, acceptance failed
+
+The staged-transfer experiments used 864 Chip bytes for a complete interleaved
+16-pixel column and two tall framework blits during jiggle. Small shot updates
+remained CPU-published. Source artwork qualification and the original compositor
+remained compiled. The estimated saving was 4–6 ms from removing strided
+row comparison/publication, including staging and DMA waits in the measurement.
+
+Three staging representations were tested:
+
+- Per-row expansion saved only about 1 ms; the tall blits themselves cost
+  about 0.76 ms. Captures: `tmp/trace/ammo-transfer-mode2` and `...-mode3`.
+- Offline repeated-pair payloads added 3,446 bytes, but roughly 75 small copies
+  still dominated preparation. Recharge HUD time remained about 11.8 ms.
+  Captures: `tmp/trace/ammo-bulk-mode2` and `...-mode3`.
+- Offline variable-length phrases reduced dispatch and reached 5.8–6.2 ms
+  recharge HUD time. Payload plus indexes added 39,316 bytes to the existing
+  92,264-byte experimental bank; only 5,836 bytes were literal pixel payload.
+  The bank was reconstructed exactly against every input tile on the host.
+
+The phrase variant passed host full-HUD pixels and ASan/UBSan. Native verification
+completed 1,800 frames with 455 prepared updates and zero byte mismatches against
+full source-order reconstruction (`build/ammo-phrases-native-pixels.log`, executable
+`c73e22f09c40093ddb073cc5fca200dd34c18fca7dd3157280ea0efb47a134b5`).
+However, shot HUD time remained about 4.6 ms and frame 701 regressed slightly.
+
+A final revision copied prepared small-update pixels directly instead of
+comparing retained rows. Host pixels passed, but shots still cost about 4.7 ms.
+Matched original-compositor/final-candidate traces have shared text hash
+`32ce69c1141c87a67418f99738549afc90210bb9ba5f31495e6f20eb093712d6`:
+
+| Frame | Original compositor (ms) | Final transfer revision (ms) |
+| --- | ---: | ---: |
+| 645 | 115.0849 | 96.0310 |
+| 701 | 171.9300 | 172.2397 |
+| 844 | 127.8870 | 121.8969 |
+
+The 19.05 ms improvement at 645 does not excuse the 0.31 ms regression at 701.
+All runtime changes were removed; the final recoverable local patch is
+`tmp/ammo-prepared-transfer-rejected.patch`. The final revision did not receive
+native pixel, full-FPS or cross-replay acceptance after failing timing. The prior
+variant's native pixel result must not be attributed to this final revision.
+Normal-build restoration completed and the retained generated bank was restored.
+
+Evidence: `build/ammo-direct-transfer-comparison.log`,
+`build/ammo-direct-transfer-candidate-cost.log`, and
+`tmp/trace/ammo-direct-transfer-mode1` / `...-mode3`. Reproduction uses the
+contact bundle, `AMMO_FACTORED=1/3`, `TRACE_FRAMES=644,699,843 TRACE_FIELDS=30`,
+and bounded `bash amiga/profile.sh trace`, after applying the local patch.
+
+The accompanying original-compositor re-audit identifies 128.09 ms inside
+`GameplayWorld::step` in frame 701, including 93.32 ms in `generateLiveTerrain`.
+Within generation, `Well512::step` has 23.29 ms self time, collection costs
+26.46 ms inclusive, and run creation 21.94 ms inclusive. These nested costs
+must not be added together. Ammo HUD costs only 0.05 ms in this frame.
+Report: `build/frame701-ownership-audit.log`, generated with
+`tools/amiga-trace-report.py tmp/trace/ammo-direct-transfer-mode1 --frames=701 --causes`.
+This is evidence for selecting the next architectural target, not permission to
+change RNG interleaving or a claim that any section-5 acceptance gate is closed.
+
 ## Trace frame identification and rejected independent-plane gauge
 
 Frame-marker arguments, rather than marker counts, are authoritative. A capture

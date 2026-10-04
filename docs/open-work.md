@@ -321,6 +321,11 @@ Rules for this section:
      merges (both increased recharge cost). Budget compact staging and a few
      tall transfers, including CPU preparation and Chip residency, before
      replacing publication; do not revive the small-strip blitter path.
+     The [prepared-transfer experiments](amiga-frame-cost.md#prepared-gauge-transfers-recharge-target-reached-acceptance-failed)
+     reached the recharge target but failed shot/worst-frame acceptance and
+     were removed. Any revision must solve both remaining gates, not simply
+     reintroduce the rejected runtime path. Use the updated frame-701 generation
+     attribution when re-auditing the next architectural target.
      Preserve red dividers, rim
      and fused label. Retain mode 1 as the comparison, qualify inherited row
      groups and changed artwork, then repeat native pixels, replay and both
