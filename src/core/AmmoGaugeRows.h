@@ -45,9 +45,17 @@ private:
     // the fill boundary, 0 above it. A boundary move adds the rows whose
     // target flipped; step() visits and then trims only this interval.
     std::uint8_t first_ = 0, end_ = 184;
+    // Presentation observer cache. Count visible changes rather than steps:
+    // 3 -> 4 selects the same artwork and need not be drawn. Saturating the
+    // serial makes stale observers fall back instead of aliasing after wrap.
+    std::uint32_t visualSerial_ = 0;
+    std::uint8_t visualFirst_ = 0, visualEnd_ = 184;
 public:
     AmmoGaugeRows() { for (auto& row : state) row = 3; }
     bool visuallyChanged() const { return visualChanged_; }
+    std::uint32_t visualSerial() const { return visualSerial_; }
+    unsigned visualFirst() const { return visualFirst_; }
+    unsigned visualEnd() const { return visualEnd_; }
     bool step(std::uint32_t ammo, std::uint32_t capacity) {
         bool changed = false;
         visualChanged_ = false;
@@ -71,6 +79,7 @@ public:
         // Exhaustive reachable binary64 values from the original initial 3:
         // .6000000000000001, 1.4000000000000001, 2.2, 3, 3.8.
         // Adding/subtracting .8 walks this finite chain; integer frames are 0..3,3.
+        const auto visitedFirst = first_, visitedEnd = end_;
         for (unsigned i = first_; i < end_; ++i) {
             const unsigned old = state[i];
             if (i < filled) { if (state[i] < 4) ++state[i]; }
@@ -84,6 +93,11 @@ public:
         while (first_ < end_ && resting(first_)) ++first_;
         while (end_ > first_ && resting(end_ - 1u)) --end_;
         settled_ = !changed;
+        if (visualChanged_) {
+            if (visualSerial_ != 0xffffffffu) ++visualSerial_;
+            visualFirst_ = visitedFirst;
+            visualEnd_ = visitedEnd;
+        }
         return changed;
     }
     template<class Draw>

@@ -13,7 +13,8 @@ struct AmmoHudDamage {
         if (last > bottom) bottom = last;
     }
     void update(unsigned nextAmmo, unsigned nextCapacity, unsigned nextOffset,
-                unsigned nextMeter, const downwell::AmmoGaugeRows* rows) {
+                unsigned nextMeter, const downwell::AmmoGaugeRows* rows,
+                bool useVisitedRange = true) {
         top = 256; bottom = 0;
         label = !valid || ammo != nextAmmo || offset != nextOffset;
         if (!valid || !rows || capacity != nextCapacity || meter != nextMeter) include(40,256);
@@ -45,9 +46,19 @@ struct AmmoHudDamage {
                 return a != b && (a < 3 || b < 3); // states 3 and 4 both draw frame 3
             };
             unsigned first = firstVisible;
-            while (first < 184 && !changed(first)) ++first;
-            if (first < 184) {
-                unsigned last = 183;
+            unsigned end = 184;
+            // Only a consecutive visual update has a complete producer range.
+            // Missed draws or unadvanced externally edited test state retain
+            // the full scan. Production state advances via step(); replacing
+            // its timeline requires invalidating this observer as usual.
+            if (useVisitedRange && rows->visualSerial() != 0xffffffffu &&
+                rows->visualSerial() == previous.visualSerial() + 1u) {
+                if (first < rows->visualFirst()) first = rows->visualFirst();
+                end = rows->visualEnd();
+            }
+            while (first < end && !changed(first)) ++first;
+            if (first < end) {
+                unsigned last = end - 1u;
                 while (last > first && !changed(last)) --last;
                 include(base - static_cast<int>(last), base - static_cast<int>(first) + 8);
             }

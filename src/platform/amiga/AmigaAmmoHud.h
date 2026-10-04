@@ -43,7 +43,13 @@ public:
         const unsigned previousAmmo = damage_.ammo, previousOffset = damage_.offset;
         {
             DW_PROFILE_SCOPE(profileAmmoDamage);
-            damage_.update(ammo, capacity, offset, meter, rows);
+            damage_.update(ammo, capacity, offset, meter, rows,
+#ifdef DOWNWELL_AMMO_DAMAGE_RANGE
+                           true
+#else
+                           false
+#endif
+            );
         }
         if (stampPack_ != pack) {
             dividerAmmo_ = dividerCapacity_ = ~0u;

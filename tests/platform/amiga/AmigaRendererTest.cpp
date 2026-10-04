@@ -82,6 +82,34 @@ void verifyDamageEndpoints() {
     }
 }
 
+void verifyVisitedDamage() {
+    downwell::AmmoGaugeRows rows;
+    AmmoHudDamage bounded, reference;
+    unsigned random = 0x793fab12u, ammo = 8, cap = 8;
+    unsigned boundedUpdates = 0, skippedUpdates = 0;
+    for (unsigned tick = 0; tick < 60000; ++tick) {
+        random = random * 1664525u + 1013904223u;
+        if (tick % 43 == 0) cap = 1 + (random >> 24) % 64;
+        if (tick % 7 == 0) ammo = (random >> 16) % (cap + 1);
+        if (ammo > cap) ammo = cap;
+        if (tick % 251 == 0) rows = downwell::AmmoGaugeRows{};
+        rows.step(ammo, cap);
+        // Renderer can omit settled/invisible updates, or miss visible ones.
+        if (!rows.visuallyChanged() || tick % 5 == 0) continue;
+        const auto serial = rows.visualSerial();
+        if (serial == bounded.previous.visualSerial() + 1u) ++boundedUpdates;
+        else ++skippedUpdates;
+        const unsigned meter = (tick / 17) % 4, offset = (tick / 37) % 3;
+        bounded.update(ammo, cap, offset, meter, &rows, true);
+        reference.update(ammo, cap, offset, meter, &rows, false);
+        require(bounded.top == reference.top && bounded.bottom == reference.bottom &&
+                bounded.label == reference.label,
+                "visited row bounds equal full reference through missed draws and resets");
+    }
+    require(boundedUpdates > 1000 && skippedUpdates > 1000,
+            "natural gauge test exercises consecutive and skipped observations");
+}
+
 void putLong(UBYTE* bytes, unsigned offset, unsigned long value) {
     putWord(bytes, offset, static_cast<unsigned>(value >> 16));
     putWord(bytes, offset + 2, static_cast<unsigned>(value));
@@ -618,6 +646,7 @@ int main(int argc, char** argv) {
         require(overlay.lastByteWrites == 0, "already-red pixels need no restoration");
     }
     verifyDamageEndpoints();
+    verifyVisitedDamage();
     {
         UWORD overlay[downwellDisplayHeight*2];
         for (unsigned i = 0; i < downwellDisplayHeight*2; ++i)

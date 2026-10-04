@@ -296,8 +296,9 @@ Rules for this section:
      constant-value line intervals (run middles, fill, dividers). Diff the
      previous and new interval lists, and write only lines whose final word
      changes.
-   - Shots: bound `AmmoHudDamage::update`'s 184-row scan (3.2 ms) by the rows
-     `AmmoGaugeRows::step` actually visited since the last draw.
+   - Shots: finish normal-build integration of `AMMO_DAMAGE_RANGE=1` after
+     the combined HUD timing/fidelity gates. Retain the full-scan comparison
+     and fallback for nonconsecutive animation observations.
    - Ammo changes: retain the divider composition per ammo value for small
      capacities, instead of recomposing all rows (4.1 ms).
 
