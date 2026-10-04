@@ -34,13 +34,37 @@ case "$mode" in
       profile_trace.gdb > .run/trace/profile_trace.gdb
     script=.run/trace/profile_trace.gdb
     ;;
+  frames)
+    # Save the published gameplay buffer at each listed tick (decode with
+    # tools/decode-amiga-gameplay-frame.py); for presentation regressions.
+    dump_ticks="${DUMP_TICKS:-640}"
+    [[ "$dump_ticks" =~ ^[0-9]+(,[0-9]+)*$ ]] || { echo "DUMP_TICKS must be a comma list of ticks" >&2; exit 1; }
+    flags=(FPSCOUNT=1 FRAME_DUMP=1)
+    dump_out="${DUMP_OUTPUT:-$PWD/../tmp/frames}"
+    mkdir -p "$dump_out" .run/frames
+    dump_out="$(cd "$dump_out" && pwd)"
+    {
+      printf 'set pagination off\nset confirm off\ntarget remote 127.0.0.1:2345\n'
+      for tick in $(tr ',' '\n' <<< "$dump_ticks" | sort -un); do
+        printf 'tbreak downwellFrameDump if gDownwellDumpTick == %s\ncontinue\n' "$tick"
+        printf 'dump binary memory %s/frame-%s.bin &gDownwellDumpRingOrigin &gDownwellDumpRingOrigin+1\n' "$dump_out" "$tick"
+        printf 'append binary memory %s/frame-%s.bin gDownwellDumpGame gDownwellDumpGame+30720\n' "$dump_out" "$tick"
+        printf 'append binary memory %s/frame-%s.bin gDownwellDumpHud gDownwellDumpHud+27264\n' "$dump_out" "$tick"
+        printf 'append binary memory %s/frame-%s.bin gDownwellDumpPlayerSprite gDownwellDumpPlayerSprite+68\n' "$dump_out" "$tick"
+        printf 'append binary memory %s/frame-%s.bin gDownwellDumpActorSprites gDownwellDumpActorSprites+408\n' "$dump_out" "$tick"
+        printf 'append binary memory %s/frame-%s.bin gDownwellDumpOverflowSprite gDownwellDumpOverflowSprite+68\n' "$dump_out" "$tick"
+      done
+      printf 'printf "DOWNWELL_PROFILE_READY\\n"\nshell touch .run/gdb-ready.marker\ndetach\nquit\n'
+    } > .run/frames/dump.gdb
+    script=.run/frames/dump.gdb
+    ;;
   transition)
     transition=1
     flags=(PROBES=1); script=profile_transition.gdb
     export SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_FRAMES=0
     export PROFILE_CONTACT=0 PROFILE_LASER=0 PROFILE_NAVIGATE=0
     ;;
-  *) echo "usage: bash amiga/profile.sh [probes|fps|trace|draw-cache|draw-order|ammo|transition|terrain|fields|fields-clear]" >&2; exit 1 ;;
+  *) echo "usage: bash amiga/profile.sh [probes|fps|trace|frames|draw-cache|draw-order|ammo|transition|terrain|fields|fields-clear]" >&2; exit 1 ;;
 esac
 if [[ $mode == draw-cache || $mode == draw-order || $mode == ammo ]]; then
   export SKIP_TO_GAME=1 SKIP_LEVEL=0 PROFILE_CONTACT="${PROFILE_CONTACT:-1}"
@@ -90,6 +114,11 @@ fi
 if [[ ${PHASE_SAMPLING:-0} == 1 ]] && ! grep -q '^SAMPLE total=' ".run/profile-${mode}.log"; then
   echo "Requested phase samples were not produced" >&2
   exit 1
+fi
+if [[ $mode == frames ]]; then
+  for bin in "$dump_out"/frame-*.bin; do python3 ../tools/decode-amiga-gameplay-frame.py "$bin" "${bin%.bin}.png"; done
+  echo "Frames: $dump_out"
+  exit 0
 fi
 if [[ $mode == trace ]]; then
   ls "$trace_out"/trace-*.bin > /dev/null 2>&1 || { echo "FS-UAE wrote no trace" >&2; exit 1; }

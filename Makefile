@@ -107,7 +107,7 @@ AMIGA_CREDITS_FRAME_SHA256 := 9e7137cae00e1925f0a61c045f23ed1571358e9e02451b2acf
 AMIGA_MENU_WAKE_FRAME_SHA256 := d616f4469720f60a3f18bdbc55a8851422b923e62ec7c75547edcce08fe8b449
 AMIGA_MENU_TITLE_FRAME_SHA256 := 5b1a054fc5edb1a8adf96a81cc07942bf5ef863e6cbbfbbfedd5bdf4304c0791
 AMIGA_MENU_ENTRY_FRAME_SHA256 := 21e58d135d92be921bbfa40245e7d074505fecf0b1d7b1c0fb47f92ef0fa61fe
-AMIGA_GAMEPLAY_FRAME_SHA256 := 8a94f47718ac0e5685d37da5c9413921a3d1f7e708f1c7ec506e36ee60a9d78b
+AMIGA_GAMEPLAY_FRAME_SHA256 := ac1ce0c2494d731bf8bca49240464b28c92d9ebbf1c3917214f18921f91203ce
 AMIGA_GAMEPLAY_ACTIVE_FRAME_SHA256 := 99df9f0d8470151c8499d741b544e804571b918a9d95d9ebbebfdd15efba24f2
 AREA_ONE_TRACE_TARGET := build/trace-area-one
 AREA_ONE_TRACE_SOURCES := tools/trace-area-one.cpp src/core/StartupRuntime.cpp src/core/PlayerMotion.cpp src/core/AreaOneBuilder.cpp src/core/GameMakerRandom.cpp src/core/RoomPack.cpp src/core/ObjectPack.cpp src/core/BuilderPatternPack.cpp
@@ -2475,7 +2475,7 @@ verify-amiga-gameplay-ammo-frame: build/capture-sdl-game
 
 verify-amiga-gameplay-active-frame: build/capture-sdl-game
 	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga SCENE_VERIFY=1 SKIP_TO_GAME=1'
-	bash -c '. amiga/env.sh && GDB_SOURCE=verify_gameplay_active_frame.gdb READY_MARKER=DOWNWELL_GAMEPLAY_ACTIVE_FRAME_READY READY_DESCRIPTION="scrolled gameplay raster with an awake enemy" amiga/verify_startup.sh'
+	bash -c '. amiga/env.sh && GDB_SOURCE=verify_gameplay_active_frame.gdb READY_MARKER=DOWNWELL_GAMEPLAY_ACTIVE_FRAME_READY READY_DESCRIPTION="scrolled gameplay raster with an awake enemy" VERIFY_TIMEOUT_SECONDS=$${VERIFY_TIMEOUT_SECONDS:-120} amiga/verify_startup.sh'
 	printf '%s  %s\n' '$(AMIGA_GAMEPLAY_ACTIVE_FRAME_SHA256)' 'amiga/.run/gameplay-active-frame.bin' | shasum -a 256 -c -
 	python3 tools/decode-amiga-gameplay-frame.py amiga/.run/gameplay-active-frame.bin build/amiga-gameplay-active-frame.png
 	@capture_tick=$$(sed -n 's/^CAPTURE_STATE tick=\([0-9]*\).*/\1/p' amiga/.run/gdb-startup.log); \

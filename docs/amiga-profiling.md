@@ -40,6 +40,12 @@ be paired with the same choice on the other CPU. Comparing the two policies
 intentionally changes the damage-number presentation digest; keep the separate
 angular-error and gameplay-state checks against portable atan.
 
+To see what a gameplay frame contains, `DUMP_TICKS=600,640 bash amiga/profile.sh
+frames` (with the usual tape variables) saves the published buffer and sprites
+at each tick as `tmp/frames/frame-<tick>.png`. That is memory, not the beam:
+DMA-level faults (a sprite that never reaches its stop line, a wrong fetch
+window) only show in the per-field screenshots embedded in instruction traces.
+
 For entrance-field lifecycle correctness (not timing), run
 `bash amiga/verify_field_reentry.sh`. It uses a 45-second emulator deadline
 (configurable up to 60), then restores the ordinary build. The same tape runs

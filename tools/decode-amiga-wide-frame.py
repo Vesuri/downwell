@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Decode a 384-pixel-backed, 352-pixel-wide A500 two-plane frame."""
+"""Decode a 384-pixel-backed, 336-pixel-wide A500 two-plane frame."""
 
 import argparse
 from pathlib import Path
@@ -9,7 +9,7 @@ from PIL import Image
 
 DMA_WIDTH = 384
 DISPLAY_X = 16
-DISPLAY_WIDTH = 352
+DISPLAY_WIDTH = 336
 HEIGHT = 284
 ROW_BYTES = DMA_WIDTH // 8
 PLANE_BYTES = ROW_BYTES * HEIGHT

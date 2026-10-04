@@ -125,7 +125,7 @@ UWORD* amigaMenuHardwareSprite(const UBYTE* pack, const UBYTE* end,
         return 0;
     UWORD* data = (UWORD*)(payload + buffer * bytes);
     Sprite prepared(data, (UWORD)height);
-    prepared.setX((UWORD)(downwellDisplayHStart + x - (WORD)word(record + 4)));
+    prepared.setX((UWORD)(downwellMenuSpriteHStart + x - (WORD)word(record + 4)));
     prepared.setY((UWORD)(downwellDisplayVStart + y - (WORD)word(record + 6)));
     return data;
 }

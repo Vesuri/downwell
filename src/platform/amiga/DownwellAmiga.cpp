@@ -769,6 +769,10 @@ static void drawGameText(AmigaRenderer* renderer, UWORD text,
     });
 }
 
+// The eight-sprite window ends at logical x=351, so the gem counter sits
+// 16 pixels left of the original's top-right corner.
+enum { currencyShift = 16 };
+
 static void drawCurrencyDigit(AmigaRenderer* renderer, int x, int y,
                               unsigned digit) {
     const int digitX = x - 8;
@@ -843,12 +847,12 @@ static void redrawCurrency(AmigaRenderer* renderer, unsigned currency) {
         ++digits;
     }
     amigaRendererClearClipRect(renderer);
-    amigaRendererFillRect(renderer, 316, 4, 64, 30, 3);
-    drawAsset(renderer, 376, 0, 362, 18, 0);
+    amigaRendererFillRect(renderer, 316 - currencyShift, 4, 64, 30, 3);
+    drawAsset(renderer, 376, 0, 362 - currencyShift, 18, 0);
     for (index = 0; index < digits; ++index) {
         const unsigned digit = (currency / divisor) % 10;
         drawCurrencyDigit(renderer,
-                          354 - (int)(digits - index - 1) * 8,
+                          354 - currencyShift - (int)(digits - index - 1) * 8,
                           18, digit);
         divisor /= 10;
     }
@@ -1351,8 +1355,8 @@ static void buildReferencePicture(
     drawAsset(renderer, 416, 0, 284, 43, 0);
     amigaRendererFillRect(renderer, 289, 49, 10, 184, 1);
     drawAsset(renderer, 416, 1, 284, 43, 0);
-    drawAsset(renderer, 376, 0, 362, 18, 0);
-    drawCurrencyDigit(renderer, 354, 18, 0);
+    drawAsset(renderer, 376, 0, 362 - currencyShift, 18, 0);
+    drawCurrencyDigit(renderer, 354 - currencyShift, 18, 0);
     drawAmmoDigit(renderer, 290, 239, 8);
     // Prepare retained HUD geometry/artwork with the level's initial picture,
     // not on the first shot. Subsequent frames only update changed strips.
@@ -1492,6 +1496,21 @@ static void exposeGameplayFrame(const AmigaMemory& memory, const Bitmap& display
             (bulletSpriteBytes / sizeof(UWORD));
     gDownwellGameplayOverflowSprite = memory.enemySprite(buffer);
     gDownwellGameplayRingOrigin = (UWORD)port.ringOrigin();
+}
+#endif
+
+#ifdef DOWNWELL_FRAME_DUMP
+// Debugger hook: amiga/dump_frames.sh breaks here at chosen ticks and saves
+// the published gameplay buffer in the decode-amiga-gameplay-frame format.
+extern "C" {
+volatile const UBYTE* gDownwellDumpGame;
+volatile const UBYTE* gDownwellDumpHud;
+volatile const UWORD* gDownwellDumpPlayerSprite;
+volatile const UWORD* gDownwellDumpActorSprites;
+volatile const UWORD* gDownwellDumpOverflowSprite;
+volatile UWORD gDownwellDumpRingOrigin;
+volatile ULONG gDownwellDumpTick;
+__attribute__((noinline, used)) void downwellFrameDump(void) { __asm__ volatile("" ::: "memory"); }
 }
 #endif
 
@@ -3510,6 +3529,16 @@ __attribute__((noinline)) static int runDownwell(void) {
             DW_PROFILE_PHASE(profilePublish);
             platform.publish(gameplayScene.copper(back));
             overlapNextStep = true;
+#ifdef DOWNWELL_FRAME_DUMP
+            gDownwellDumpGame=(const UBYTE*)gameDisplay[back].data;
+            gDownwellDumpHud=memory.hud();
+            gDownwellDumpPlayerSprite=memory.playerSprite(back);
+            gDownwellDumpActorSprites=memory.bulletSprite()+back*gameplayRegularSpriteCount*(bulletSpriteBytes/sizeof(UWORD));
+            gDownwellDumpOverflowSprite=memory.enemySprite(back);
+            gDownwellDumpRingOrigin=(UWORD)port.ringOrigin();
+            gDownwellDumpTick=port.tick();
+            downwellFrameDump();
+#endif
 #ifdef DOWNWELL_ENTRY_WIPE_VERIFY
             if(gDownwellEntryWipeFrames==27){
                 platform.waitVblank(); // Final detached list is now published.

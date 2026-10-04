@@ -332,16 +332,16 @@ bool DownwellSplashCopperList::buildWide(
 static_assert((unsigned)amigaSplashPlaneBytes ==
                   (unsigned)amigaStylePlaneBytes,
               "narrow screens must share one copper plane stride");
-static_assert(downwellDisplayHStartCropped == 0x71,
+static_assert(downwellDisplayHStartCropped == 0x81,
               "cropped display starts at logical x=16");
 static_assert(downwellDisplayHStopCropped == 0x1d1,
-              "352-pixel cropped display window");
+              "336-pixel cropped display window");
 static_assert(downwellDisplayVStopCropped == 0x12e,
               "284-line display window");
 static_assert(downwellFetchStop == 0xd8,
-              "22-word lores fetch at hardware limit");
-static_assert(downwellFetchModulo == 4,
-              "skip two bytes on each side per row");
+              "21-word lores fetch at hardware limit");
+static_assert(downwellFetchModulo == 6,
+              "skip two bytes left and four right per row");
 static_assert(downwellFetchStart ==
                   (downwellDisplayHStartCropped >> 1) - 8,
               "lores fetch/display alignment");

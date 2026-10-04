@@ -14,7 +14,7 @@ struct AmigaMenuScrollState;
 enum {
     downwellCopperWords = 400,
     downwellFetchCropBytes = 2,
-    downwellFetchWords = 22,
+    downwellFetchWords = 21,
     downwellFetchWidth = downwellFetchWords * 16,
     downwellDisplayHStartCropped = downwellDisplayHStart +
                                    downwellFetchCropBytes * 8,
@@ -23,7 +23,11 @@ enum {
     downwellDisplayVStartCropped = downwellDisplayVStart,
     downwellDisplayVStopCropped = downwellDisplayVStartCropped +
                                   downwellDisplayHeight,
-    downwellFetchStart = 0x30,
+    // A fetch starting before $38 takes sprite 7's DMA slots: its control
+    // words still arm it in the blank lines, then its stale data latch
+    // repeats down the screen. $38-$D8 is the widest lores fetch that keeps
+    // all eight channels: 21 words, logical x=16..351.
+    downwellFetchStart = 0x38,
     downwellFetchStop = downwellFetchStart + 8 * (downwellFetchWords - 1),
     downwellFetchModulo = downwellBytesPerPlaneLine -
                            downwellFetchWords * 2

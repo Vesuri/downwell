@@ -18,8 +18,12 @@ enum {
     downwellGameRingPlaneBytes =
         downwellBytesPerPlaneLine * downwellGameRingHeight,
     downwellGameRingBytes = downwellGameRingPlaneBytes * 2,
-    /* Beam-space origin for logical x=0 after the 16-pixel left crop. */
-    downwellDisplayHStart = 0x61,
+    /* Beam-space origin for logical x=0 of the gameplay window. Its first
+       fetched word (logical x=16) appears at $81, the earliest start that
+       keeps all eight sprite DMA channels (DDFSTRT $38). */
+    downwellDisplayHStart = 0x71,
+    /* Menu scenes keep their own fetch; their sprites use this origin. */
+    downwellMenuSpriteHStart = 0x61,
     downwellDisplayVStart = 0x12,
     downwellPlayfieldX = 110,
     downwellPlayfieldWidth = 160

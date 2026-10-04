@@ -46,6 +46,7 @@ TERRAIN_BATCH ?= 0
 TERRAIN_DIRECT ?= 1
 TERRAIN_BATCH_VERIFY ?= 0
 SKIP_LEVEL ?= 0
+FRAME_DUMP ?= 0
 PROBES ?= 0
 GENERATION_DETAIL ?= 0
 GENERATION_TIMING ?= 0
@@ -134,6 +135,9 @@ CFLAGS += -DDOWNWELL_REPLAY_VERIFY
 ifeq ($(REPLAY_FRAME_TRACE),1)
 CFLAGS += -DDOWNWELL_REPLAY_FRAME_TRACE
 endif
+endif
+ifeq ($(FRAME_DUMP),1)
+CFLAGS += -DDOWNWELL_FRAME_DUMP
 endif
 ifeq ($(SCENE_VERIFY),1)
 CFLAGS += -DDOWNWELL_SCENE_VERIFY
@@ -353,6 +357,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
 	@printf '%s\n' '$(LOCAL_DRAW_CAPTURE)' >> $@.tmp
 	@printf '%s\n' '$(AMMO_FACTORED)' >> $@.tmp
 	@printf '%s\n' '$(AMMO_FACTORED_VERIFY)' >> $@.tmp
+	@printf '%s\n' '$(FRAME_DUMP)' >> $@.tmp
 	@cmp -s $@.tmp $@ || cp $@.tmp $@
 
 $(OBJECTS): obj/startup-options
