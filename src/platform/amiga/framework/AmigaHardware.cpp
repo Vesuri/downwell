@@ -354,6 +354,84 @@ void AmigaHardware::blitterCopyWithMaskOperation(uint16_t* source, uint16_t* des
     AmigaHardware::setInterrupts(INTF_BLIT, false);
 }
 
+void AmigaHardware::blitterCopyWithMaskBackgroundOperation(uint16_t* source, uint16_t* destination, uint16_t* mask, uint16_t* background, uint16_t width, uint16_t height, int16_t sourceModulo, int16_t destinationModulo, int16_t maskModulo, int16_t sourceShift, int16_t maskShift, uint16_t firstWordMask, uint16_t lastWordMask, bool clearMasked, bool invertSource)
+{
+    const uint16_t operation=(invertSource?0x30:0xc0)|(clearMasked?0:0x0a);
+    // Cookie-cut mask must use A, the only channel with first/last-word
+    // masking. Route pixels to B. Keep the existing queue layout below.
+    const bool reverse = sourceShift < 0 || maskShift < 0;
+    uint16_t* pixels = source;
+    source = mask;
+    mask = pixels;
+    const int16_t pixelModulo = sourceModulo;
+    sourceModulo = maskModulo;
+    maskModulo = pixelModulo;
+    const int16_t pixelShift = sourceShift;
+    sourceShift = maskShift;
+    maskShift = pixelShift;
+    AmigaHardware::setInterrupts(INTF_BLIT, false);
+    if (!isBlitterBusy() && !hasQueuedBlits) {
+        *bltafwmPointer = firstWordMask;
+        *bltalwmPointer = lastWordMask;
+        *bltcon1Pointer = (uint16_t)((reverse ? BLITREVERSE : 0) | ((maskShift < 0 ? -maskShift : maskShift) << 12));
+        *bltcon0Pointer = (uint16_t)(BC0F_SRCA | BC0F_SRCB | BC0F_SRCC | BC0F_DEST | operation | ((sourceShift < 0 ? -sourceShift : sourceShift) << 12));
+        *bltamodPointer = sourceModulo;
+        *bltbmodPointer = maskModulo;
+        *bltcmodPointer = destinationModulo;
+        *bltdmodPointer = destinationModulo;
+        *bltaptPointer = source;
+        *bltbptPointer = mask;
+        *bltcptPointer = background;
+        *bltdptPointer = destination;
+        *bltsizePointer = (uint16_t)((height << 6) | width);
+#ifdef DEBUG
+        *color00Pointer = 0xf00;
+#endif
+    } else {
+        *blitterQueueAddPosition++ = 17;
+        if (blitterQueueAddPosition + 34 >= blitterQueueBufferEnd) {
+            blitterQueueAddPosition = blitterQueueBuffer;
+        }
+        *blitterQueueAddPosition++ = bltafwm;
+        *blitterQueueAddPosition++ = firstWordMask;
+        *blitterQueueAddPosition++ = bltalwm;
+        *blitterQueueAddPosition++ = lastWordMask;
+        *blitterQueueAddPosition++ = bltcon1;
+        *blitterQueueAddPosition++ = (uint16_t)((reverse ? BLITREVERSE : 0) | ((maskShift < 0 ? -maskShift : maskShift) << 12));
+        *blitterQueueAddPosition++ = bltcon0;
+        *blitterQueueAddPosition++ = (uint16_t)(BC0F_SRCA | BC0F_SRCB | BC0F_SRCC | BC0F_DEST | operation | ((sourceShift < 0 ? -sourceShift : sourceShift) << 12));
+        *blitterQueueAddPosition++ = bltamod;
+        *blitterQueueAddPosition++ = sourceModulo;
+        *blitterQueueAddPosition++ = bltbmod;
+        *blitterQueueAddPosition++ = maskModulo;
+        *blitterQueueAddPosition++ = bltcmod;
+        *blitterQueueAddPosition++ = destinationModulo;
+        *blitterQueueAddPosition++ = bltdmod;
+        *blitterQueueAddPosition++ = destinationModulo;
+        *blitterQueueAddPosition++ = bltapth;
+        *blitterQueueAddPosition++ = (uint16_t)((uint32_t)(source) >> 16);
+        *blitterQueueAddPosition++ = bltaptl;
+        *blitterQueueAddPosition++ = (uint16_t)((uint32_t)source);
+        *blitterQueueAddPosition++ = bltbpth;
+        *blitterQueueAddPosition++ = (uint16_t)((uint32_t)(mask) >> 16);
+        *blitterQueueAddPosition++ = bltbptl;
+        *blitterQueueAddPosition++ = (uint16_t)((uint32_t)mask);
+        *blitterQueueAddPosition++ = bltcpth;
+        *blitterQueueAddPosition++ = (uint16_t)((uint32_t)(background) >> 16);
+        *blitterQueueAddPosition++ = bltcptl;
+        *blitterQueueAddPosition++ = (uint16_t)((uint32_t)background);
+        *blitterQueueAddPosition++ = bltdpth;
+        *blitterQueueAddPosition++ = (uint16_t)((uint32_t)(destination) >> 16);
+        *blitterQueueAddPosition++ = bltdptl;
+        *blitterQueueAddPosition++ = (uint16_t)((uint32_t)destination);
+        *blitterQueueAddPosition++ = bltsize;
+        *blitterQueueAddPosition++ = (uint16_t)((height << 6) | width);
+        hasQueuedBlits = true;
+        processBlitterQueue();
+    }
+    AmigaHardware::setInterrupts(INTF_BLIT, false);
+}
+
 void AmigaHardware::blitterLine(uint16_t* data, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t bytesPerRow, bool singleBitPerRow)
 {
     if (singleBitPerRow && y1 == y2) {

@@ -629,8 +629,16 @@ int main(int argc, char** argv) {
             }
         }
         const downwell::LaserSightLine line{190,0,190,283};
-        overlay.prepare(pixels.data(), 319, &line, false); overlay.draw();
+        overlay.prepare(pixels.data(), 319, &line, false);
+        require(overlay.present() && !overlay.retainsPixels(),
+                "pending ray grants underlying rectangle ownership before draw");
+        overlay.draw();
+        require(overlay.retainsPixels(), "drawn ray retains bitmap pixels");
+        overlay.prepare(pixels.data(), 319, &line, false);
+        require(overlay.retainsPixels(), "unchanged ray retains rectangle ownership");
         overlay.prepare(pixels.data(), 319, &line, true);
+        require(overlay.present() && !overlay.retainsPixels(),
+                "changed underlying pixels retire the ray before field composition");
         require(pixels == pristine, "underlying updates see the original pixels before painting");
         // Simulate new terrain arriving after restoration, before ray draw.
         pixels[319*48+190/8] ^= 0xff;

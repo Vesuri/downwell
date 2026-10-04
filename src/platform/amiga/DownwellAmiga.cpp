@@ -51,6 +51,8 @@ __attribute__((noinline,used)) void downwellFieldReentryReady(){__asm__ volatile
 extern "C" { volatile unsigned gDownwellPreparedFieldMode=DOWNWELL_FIELD_MODE; }
 extern "C" void amigaBlitterBindFieldBands(UBYTE*);
 extern "C" int amigaBlitterFieldBands(const UBYTE*,UBYTE*,const downwell::TimeFieldOutlines::Circle&,unsigned,bool,UWORD*);
+extern "C" int amigaBlitterRetireFieldBands(const UBYTE*,UBYTE*,const downwell::TimeFieldOutlines::Circle&,const downwell::TimeFieldOutlines::Circle&,unsigned);
+extern "C" int amigaBlitterComposeFieldBands(const UBYTE*,UBYTE*,const downwell::TimeFieldOutlines::Circle&,unsigned,UWORD*);
 extern "C" int amigaBlitterCaptureField(UBYTE*,const UBYTE*,const UBYTE*,UWORD,UWORD,UWORD,UWORD,UWORD,UWORD);
 extern "C" int amigaBlitterRestoreField(const UBYTE*,const UBYTE*,UBYTE*,UWORD,UWORD,UWORD,UWORD,UWORD,UWORD);
 extern "C" int amigaBlitterDrawPlanarMasked(const UBYTE*,const UBYTE*,UWORD,UWORD,UWORD,
@@ -65,6 +67,7 @@ extern "C" void amigaFieldVerifyCompositeBegin(UBYTE*,UBYTE*);
 extern "C" void amigaFieldVerifyCompositeEnd(UBYTE*,UBYTE*);
 extern "C" bool amigaFieldVerifyComposite(const UBYTE*,const UBYTE*,const downwell::TimeFieldOutlines&,unsigned);
 extern "C" void amigaFieldVerifyColumn(const UBYTE*,const UBYTE*,const downwell::TimeFieldOutlines::Circle&,unsigned,bool);
+extern "C" void amigaFieldVerifyCompositeTransfer(const UBYTE*,const UBYTE*,const downwell::TimeFieldOutlines::Circle&,const downwell::TimeFieldOutlines::Circle&,unsigned);
 #endif
 struct PreparedFieldOps {
 #ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
@@ -75,6 +78,22 @@ struct PreparedFieldOps {
     static bool enabled(){return gDownwellPreparedFieldMode!=2;}
     static bool staticEnabled(){return gDownwellPreparedFieldMode>=3;}
     static bool columnsEnabled(){return gDownwellPreparedFieldMode>=4;}
+    static bool compositeEnabled(){return gDownwellPreparedFieldMode>=7;}
+    static bool retireOutside(const UBYTE* terrain,UBYTE* target,const downwell::TimeFieldOutlines::Circle& old,
+        const downwell::TimeFieldOutlines::Circle& next,unsigned origin){return amigaBlitterRetireFieldBands(terrain,target,old,next,origin);}
+    static bool compose(const UBYTE* terrain,UBYTE* target,const downwell::TimeFieldOutlines::Circle& old,
+        const downwell::TimeFieldOutlines::Circle& next,unsigned origin,UWORD* rows){
+#ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
+        amigaFieldVerifyCompositeTransfer(terrain,target,old,next,origin);
+#else
+        (void)old;
+#endif
+        const bool ok=amigaBlitterComposeFieldBands(terrain,target,next,origin,rows);
+#ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
+        if(ok)amigaFieldVerifyFinish(target);
+#endif
+        return ok;
+    }
     static bool columns(const UBYTE* terrain,UBYTE* target,const downwell::TimeFieldOutlines::Circle& circle,
         unsigned origin,bool restore,UWORD* rows){
 #ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
@@ -1042,6 +1061,17 @@ static bool verifyFieldComposites(UBYTE* terrain,UBYTE* target){
             int(128*256+(phase*73)%512)};
         const unsigned origin=(phase*37)%320;
         ok=overlay.prepare(target,origin,shape,true,[](unsigned){return false;})&&overlay.draw();
+        if(ok)ok=amigaFieldVerifyComposite(terrain,target,shape,origin);
+    }
+    overlay.discard();
+    for(unsigned i=0;i<downwellGameRingBytes;++i)target[i]=terrain[i];
+    gDownwellPreparedFieldMode=7;
+    for(unsigned phase=0;phase<306&&ok;++phase){
+        downwell::TimeFieldOutlines shape;shape.visible=true;shape.count=1;
+        shape.circles[0]={182+int((phase/6)%17),phase<102?0:phase<204?140:283,
+            int(128*256+(phase*19)%512)};
+        const unsigned origin=287;
+        ok=overlay.prepare(target,origin,shape,true,[](unsigned){return false;},true)&&overlay.draw();
         if(ok)ok=amigaFieldVerifyComposite(terrain,target,shape,origin);
     }
     overlay.discard();gDownwellPreparedFieldMode=mode;
@@ -2182,6 +2212,9 @@ __attribute__((noinline)) static int runDownwell(void) {
             else if (scenes.scene() == AmigaScene::menu)
                 liveInput.right = ++profileMenuFrames > 40;
             else if (scenes.scene() == AmigaScene::gameplay) {
+#ifdef DOWNWELL_PROFILE_LASER
+                if (!port.upgrades().levels[12]) port.grantUpgrade(12);
+#endif
 #ifdef DOWNWELL_SKIP_LEVEL
                 static unsigned clearProfileFrames = 0;
                 if (port.levelClearActive()) {
@@ -2192,9 +2225,6 @@ __attribute__((noinline)) static int runDownwell(void) {
                         clearProfileFrames >= 160 ? 4 : port.levelClearFrame().choices ? 3 : 2;
                 } else gDownwellProfileSection = clearProfileFrames ? 6 : 0;
 #else
-#ifdef DOWNWELL_PROFILE_LASER
-                if (!port.upgrades().levels[12]) port.grantUpgrade(12);
-#endif
                 liveInput.right = ((port.tick() / 120) & 1) == 0;
                 liveInput.left = !liveInput.right;
                 liveInput.fire = (port.tick() % 16) == 0 || (port.tick() % 16) == 3;
@@ -3360,7 +3390,14 @@ __attribute__((noinline)) static int runDownwell(void) {
                 DW_PROFILE_SCOPE(profileGoalFieldPrepare);
                 AmigaHardware::blitterDrain();
                 if (!gameplayFields[back].prepare((UBYTE*)gameDisplay[back].data, port.ringOrigin(), fieldShape, fieldChanged,
-                        [&](unsigned row) { return gameplayRows.dirty(row, back); })) {
+                        [&](unsigned row) { return gameplayRows.dirty(row, back); }
+#ifdef DOWNWELL_PREPARED_FIELDS
+                        // Actors/effects mark rows for the sync below. Laser
+                        // prepare has retired its pixels when the field changed;
+                        // a pending ray will draw after the new field.
+                        , !gameplayRays[back].retainsPixels()
+#endif
+                        )) {
                     exitCode = 20; break;
                 }
             }

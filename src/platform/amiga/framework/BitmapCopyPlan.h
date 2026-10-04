@@ -60,5 +60,14 @@ public:
             mask+maskY*maskStride_+maskWord_,words_,height,sourceModulo_,targetModulo_,maskModulo_,
             sourceShift_,maskShift_,first_,last_,false,invert);
     }
+    void compose(uint16_t* source,uint16_t* mask,uint16_t* background,uint16_t* target,
+                 unsigned sourceY,unsigned maskY,unsigned targetY,unsigned height,bool invert=false) const {
+        if(!words_||!height)return;
+        if(reverse_){sourceY+=height-1;maskY+=height-1;targetY+=height-1;}
+        const unsigned at=targetY*targetStride_+targetWord_;
+        AmigaHardware::blitterCopyWithMaskBackgroundOperation(
+            source+sourceY*sourceStride_+sourceWord_,target+at,mask+maskY*maskStride_+maskWord_,background+at,
+            words_,height,sourceModulo_,targetModulo_,maskModulo_,sourceShift_,maskShift_,first_,last_,false,invert);
+    }
 };
 #endif

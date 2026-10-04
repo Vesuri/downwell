@@ -37,6 +37,8 @@ public:
         return row >= downwellGameRingHeight ? row - downwellGameRingHeight : row;
     }
     bool present() const { return valid_ || pending_; }
+    // Pending Draw has no pixels yet; prepare() has retired the old ray.
+    bool retainsPixels() const { return valid_; }
     const downwell::LaserSightLine* line() const { return valid_ ? &line_ : nullptr; }
     unsigned origin() const { return origin_; }
     bool matches(UBYTE* target, unsigned origin, const downwell::LaserSightLine& line) const {

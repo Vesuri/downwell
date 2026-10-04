@@ -2,6 +2,7 @@
 #include "framework/Bitmap.h"
 #ifdef DOWNWELL_PREPARED_FIELDS
 #include "AmigaFieldBands.h"
+#include "AmigaFieldComposite.h"
 #include "framework/BitmapCopyPlan.h"
 static UWORD* residentFieldBands;
 static BitmapCopyPlan fieldPaintPlans[17],fieldRestorePlans[17];
@@ -55,6 +56,33 @@ extern "C" int amigaBlitterFieldBands(const UBYTE* terrain,UBYTE* target,
     AmigaHardware::setBlitterNasty(false);
     return admitted;
 }
+extern "C" int amigaBlitterRetireFieldBands(const UBYTE* terrain,UBYTE* target,
+    const downwell::TimeFieldOutlines::Circle& old,const downwell::TimeFieldOutlines::Circle& next,unsigned origin){
+    if(!residentFieldBands)return 0;
+    AmigaHardware::setBlitterNasty(true);
+    const bool ok=amigaFieldRetireOutside(old,next,origin,
+        [&](unsigned id,unsigned y,unsigned sx,unsigned sy,unsigned height){
+            const auto& image=downwell::fieldBandImages[id];
+            UWORD* mask=residentFieldBands+image.wordOffset+11*image.height;
+            for(unsigned p=0;p<2;++p)fieldRestorePlans[sx].copy((UWORD*)terrain+p*7680,mask,
+                (UWORD*)target+p*7680,y,sy,y,height);
+            return true;
+        });
+    AmigaHardware::blitterDrain();AmigaHardware::setBlitterNasty(false);return ok;
+}
+extern "C" int amigaBlitterComposeFieldBands(const UBYTE* terrain,UBYTE* target,
+    const downwell::TimeFieldOutlines::Circle& circle,unsigned origin,UWORD* rows){
+    if(!residentFieldBands)return 0;
+    AmigaHardware::setBlitterNasty(true);
+    const bool ok=amigaFieldBandParts(circle,origin,[&](unsigned id,unsigned y,unsigned sx,unsigned sy,unsigned height){
+        const auto& image=downwell::fieldBandImages[id];
+        UWORD* pixels=residentFieldBands+image.wordOffset;UWORD* mask=pixels+11*image.height;
+        for(unsigned p=0;p<2;++p)fieldPaintPlans[sx].compose(pixels,mask,(UWORD*)terrain+p*7680,
+            (UWORD*)target+p*7680,sy,sy,y,height,p!=0);
+        if(rows)for(unsigned row=y;row<y+height;++row)rows[row/16]|=UWORD(1u<<(row&15));
+    });
+    AmigaHardware::blitterDrain();AmigaHardware::setBlitterNasty(false);return ok;
+}
 #endif
 #ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
 #include "core/TimeFieldOutlines.h"
@@ -77,6 +105,7 @@ bool artReady[64];
 #ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
 extern "C" {
 volatile unsigned gDownwellPreparedFieldChecks,gDownwellPreparedFieldFailures;
+volatile unsigned gDownwellPreparedFieldFusedChecks;
 volatile unsigned gDownwellPreparedFieldFixtureChecks;
 volatile unsigned gDownwellPreparedFieldCompositeChecks;
 volatile unsigned gDownwellPreparedFieldMismatchOffset,gDownwellPreparedFieldExpectedByte,
@@ -120,6 +149,7 @@ extern "C" void amigaFieldVerifyMask(const UBYTE* source,const UBYTE* mask,const
 }
 extern "C" void amigaFieldVerifyFinish(const UBYTE* actual){
     ++gDownwellPreparedFieldChecks;
+    if(gDownwellPreparedFieldOperation==10)++gDownwellPreparedFieldFusedChecks;
     for(unsigned i=0;i<fieldExpectedBytes;++i)if(actual[i]!=fieldExpected[i]){
         gDownwellPreparedFieldMismatchOffset=i;gDownwellPreparedFieldExpectedByte=fieldExpected[i];
         gDownwellPreparedFieldActualByte=actual[i];
@@ -275,6 +305,16 @@ extern "C" void amigaFieldVerifyColumn(const UBYTE* terrain,const UBYTE* target,
         const unsigned row=(origin+unsigned(y))%320;
         for(unsigned p=0;p<2;++p)fieldPut(fieldExpected+p*15360,48,x,row,
             restore?fieldPixel(terrain+p*15360,48,x,row):(pen>>p)&1);
+    });
+}
+extern "C" void amigaFieldVerifyCompositeTransfer(const UBYTE* terrain,const UBYTE* target,
+    const downwell::TimeFieldOutlines::Circle& old,const downwell::TimeFieldOutlines::Circle& next,unsigned origin){
+    amigaFieldVerifyColumn(terrain,target,old,origin,true);
+    gDownwellPreparedFieldOperation=10;
+    downwell::GoalFieldOutline shape;shape.setRasterCircle(next.x,next.y,next.radius);
+    shape.drawClipped(110,0,270,284,[&](int x,int y,unsigned pen){
+        const unsigned row=(origin+unsigned(y))%320;
+        for(unsigned p=0;p<2;++p)fieldPut(fieldExpected+p*15360,48,x,row,(pen>>p)&1);
     });
 }
 #endif

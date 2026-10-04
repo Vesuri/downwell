@@ -9,6 +9,11 @@ case "$mode" in
   fps) flags=(FPSCOUNT=1); script=profile_fps.gdb ;;
   terrain) flags=(FPSCOUNT=1 TERRAIN_BATCH=1 TERRAIN_BATCH_VERIFY=1); script=verify_terrain_batch.gdb ;;
   fields) flags=(FPSCOUNT=1 PREPARED_FIELDS=1 PREPARED_FIELDS_VERIFY=1); script=verify_prepared_fields.gdb ;;
+  fields-clear)
+    flags=(FPSCOUNT=1 PREPARED_FIELDS=1 PREPARED_FIELDS_VERIFY=1)
+    script=verify_prepared_fields_clear.gdb
+    export SKIP_TO_GAME=1 SKIP_LEVEL=1 PROFILE_CONTACT=0
+    ;;
   trace)
     # Cycle-exact FS-UAE instruction traces of an FPS-only build, each
     # starting at a listed gameplay frame (one-based, as in FPS reports).
@@ -32,9 +37,9 @@ case "$mode" in
     export SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_FRAMES=0
     export PROFILE_CONTACT=0 PROFILE_LASER=0 PROFILE_NAVIGATE=0
     ;;
-  *) echo "usage: bash amiga/profile.sh [probes|fps|trace|transition|terrain|fields]" >&2; exit 1 ;;
+  *) echo "usage: bash amiga/profile.sh [probes|fps|trace|transition|terrain|fields|fields-clear]" >&2; exit 1 ;;
 esac
-if [[ ${SKIP_LEVEL:-0} == 1 && $mode != trace ]]; then script=profile_clear.gdb; fi
+if [[ ${SKIP_LEVEL:-0} == 1 && $mode != trace && $mode != fields-clear ]]; then script=profile_clear.gdb; fi
 # Always leave the playable binary behind, including after a timeout/failure.
 restore() {
   unset PREPARED_FIELDS_VERIFY PROFILE_FIELD_REFERENCE PREPARED_FIELDS_BACKING

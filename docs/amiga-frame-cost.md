@@ -591,3 +591,68 @@ These are geometry counts, not a timing win. Edge-word fetches make a two-piece
 split worse even before setup. Finer splits reduce transparent DMA but sharply
 increase transfer count. They must not be implemented on the assumption that
 less fetched area alone makes them faster.
+
+### Fused terrain/large-field composition experiment
+
+`PREPARED_FIELDS_BACKING=5` combines pristine terrain and the new field in one
+blitter pass. It replaces the old restore-then-paint pair inside new arc
+rectangles; only departing old-mask strips are retired separately. The estimate
+targets the previous 4–7 ms restoration pass, not sub-millisecond submission
+helpers. It uses the existing resident bank and compiled mode-4 comparison,
+without additional Chip allocations. The rectangle-ownership contract is in
+[Amiga memory](amiga-memory.md); overlapping fields, moved centres/origins and
+retained laser pixels retain the masked path.
+
+Host geometry checks cover 34,816 stationary old/new combinations, retiring
+6,635 of 1,086,268 old rectangle rows. The lifecycle suite includes 2,040
+ownership frames (1,649 fused compositions), dirty terrain, denied ownership,
+mixed shapes, 128 pending replacements and fallback transitions. Both suites pass ASan/UBSan, and the
+renderer suite checks pending versus retained laser ownership.
+
+The bounded native `fields-clear` run with `PROFILE_LASER=1` completed 480
+gameplay updates with 4,090 whole-buffer checks, 583 fused transfers and zero
+pixel failures. The stricter report separates **510 fixture transfers** across
+two scene-bank bindings from **73 actual exit transfers**. It subtracts 255
+transfers per complete 437-composite fixture and requires at least 20 real exit
+transfers. Log: `build/field-composite-clear-laser-final.log`. Native executable:
+`5f34bd7e04a1b94e2a02521f12443208a482838e9859354985aef06eb2a0d538`;
+text: `ec5f1c895f35977b0f95032b24b9abaa512aaf159e2885e4c3fcc19958051a39`.
+
+Matched marker traces `tmp/trace/field-composite-final-mode4` and
+`tmp/trace/field-composite-final-mode5` use the optimization bundle above,
+`SKIP_LEVEL=1 PROFILE_CONTACT=0 PROFILE_LASER=0`,
+`TRACE_FRAMES=2,60 TRACE_FIELDS=30`, and shared text hash
+`407938d9242ee2fd4972233a7b9cc2b91d6730b8ee322602c2e1a9b0da167357`.
+Across 37 common complete frames the mean improves **31.441 → 28.553 ms**.
+The worst captured frame, frame 6, remains **73.784 ms** in both modes;
+`selectExitMaskBank` accounts for 48.5 ms of it. Individual wait-phase-shifted
+frames can worsen (frame 73: 27.114 → 34.315 ms), so this mean is not a
+worst-frame or 20 ms success claim. Stationary fused preparation generally
+takes 1.1–2.6 ms, with drawing still around 5.3–7 ms.
+
+The mandatory contact captures (`tmp/trace/field-composite-contact-mode4` and
+`tmp/trace/field-composite-contact-mode5`, `SKIP_LEVEL=0 PROFILE_CONTACT=1`,
+`TRACE_FRAMES=644,699,843 TRACE_FIELDS=30`) have shared text hash
+`d93fd99d8f5427600a8f6d41584dd3d70be41b82994549841993a5362975f511`.
+All 19 common complete frames are cycle-identical, including frame 645
+(817,270 cycles / 115.026 ms), 701 (1,260,870 / 177.460 ms), and 844
+(905,010 / 127.375 ms). This is a no-regression result, not a combat gain:
+that workload does not admit stationary large-field fusion.
+
+Marker-free contact tapes in both modes complete 1,800 updates in **3,392 PAL
+fields** (26.53 FPS), with the same worst gap of nine fields at frame 701.
+Logs are `build/field-composite-fps-mode4.log` and
+`build/field-composite-fps-mode5.log`; the shared text hash is
+`8a87bdab95b0724327aeb7ad7f7f951f58d6b4eb79f851a97ca27b279127f945`.
+
+Cross-target replay passes against `build/port-replay-reference-table-atan`,
+including the per-frame trace and component digests. Native replay executable:
+`6a9f439cbf1413f016832b5615e38d2e04f56b5d1059e3ad8770358411fcd290`;
+log: `build/field-composite-cross-replay.log`. The matching compact-angle host
+oracle is intentional; no shared simulation code changed in this experiment.
+The normal playable executable was restored, with clean 68000 instruction and
+64-bit helper audits.
+
+Retain this measured pass elimination as an opt-in improvement, not completion
+of A6 or permission to enable it by default. The under-5-ms field target and
+broader placement/coverage gates remain open.

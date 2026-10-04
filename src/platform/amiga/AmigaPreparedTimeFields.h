@@ -25,6 +25,8 @@ public:
         bool multiple_=false;
         downwell::TimeFieldOutlines shape_;
         bool fast_=false,valid_=false,pending_=false,staticUnderlay_=false;
+        bool composite_=false;
+        downwell::TimeFieldOutlines::Circle compositeOld_{};
         // Two transfers at most: the physical ring can wrap within the image.
         bool transfer(bool capture,const UBYTE* source) {
             unsigned physical=origin_+rect_.y;
@@ -77,7 +79,7 @@ public:
         void bind(const UBYTE* pack,UBYTE* backing,const UBYTE* terrain) {
             discard();pack_=pack;backing_=backing;terrain_=terrain;
         }
-        void discard() { fast_=valid_=pending_=multiple_=false;entryCount_=0;target_=nullptr;reference_.discard(); }
+        void discard() { fast_=valid_=pending_=multiple_=composite_=false;entryCount_=0;target_=nullptr;reference_.discard(); }
         bool present() const { return fast_ ? valid_||pending_ : reference_.present(); }
         bool matches(UBYTE* target,unsigned origin,const downwell::TimeFieldOutlines& shape) const {
             if(!fast_)return reference_.matches(target,origin,shape);
@@ -103,10 +105,18 @@ public:
             return false;
         }
         template<class DirtyRow> bool prepare(UBYTE* target,unsigned origin,
-            const downwell::TimeFieldOutlines& shape,bool underlyingChanged,DirtyRow dirty) {
+            const downwell::TimeFieldOutlines& shape,bool underlyingChanged,DirtyRow dirty,
+            bool staticRectangleOwned=false) {
             if(origin>=downwellGameRingHeight)return false;
             if(target!=target_){discard();target_=target;}
+            if(composite_&&pending_&&!draw())return false;
             if(matches(target,origin,shape)&&!underlyingChanged)return true;
+            if(staticRectangleOwned&&fast_&&valid_&&multiple_&&entryCount_==1&&entries_[0].large&&
+               shape_.count==1&&shape.visible&&shape.count==1&&origin==origin_&&Ops::compositeEnabled()&&
+               Ops::retireOutside(terrain_,target_,shape_.circles[0],shape.circles[0],origin)){
+                compositeOld_=shape_.circles[0];shape_.circles[0]=shape.circles[0];
+                composite_=pending_=true;valid_=false;return true;
+            }
             // The sparse reference owns kept bits after prepare. Materialize a
             // pending fallback before replacing it so its underlay is captured.
             if(!fast_)reference_.draw();
@@ -164,6 +174,11 @@ public:
         bool draw() {
             if(!fast_){reference_.draw();return true;}
             if(!pending_)return true;
+            if(composite_){
+                for(auto& rows:largeRows_)rows=0;
+                if(!Ops::compose(terrain_,target_,compositeOld_,shape_.circles[0],origin_,largeRows_))return false;
+                composite_=pending_=false;valid_=true;return true;
+            }
             if(multiple_){
                 // Validate all footprints before any earlier circle paints
                 // over a later one's (legitimate) overlapping underlay.

@@ -317,13 +317,14 @@ Rules for this section:
      as the compiled oracle/fallback. Verify mask-only background restoration,
      actor/laser ordering, overlapping fields, clipping, circular-buffer wraps,
      repeated prepare calls, and switching between optimized and fallback paths.
-   - Finish `PREPARED_FIELDS=1` with `PREPARED_FIELDS_BACKING=4`: bring the
+   - Finish `PREPARED_FIELDS=1` with `PREPARED_FIELDS_BACKING=5`: bring the
      resident large-field bands and noncentral column fallback below the
      under-5-ms target, measure
      wrapped and overlapping small-field workloads against that target, then
      complete normal-build integration and the combined timing/fidelity gates. Do not
      count the single-circle improvement as completion of A6 or replace the
      native pixel checks with host-only copies. Use
+     `PREPARED_FIELDS_BACKING=4` for separate prepared restore/paint comparison,
      `PREPARED_FIELDS_BACKING=3` for generic resident-band transfer comparison,
      `PREPARED_FIELDS_BACKING=2` for pristine-small/column-large comparison,
      `PREPARED_FIELDS_BACKING=1` for pristine-small/sparse-large comparison,
@@ -363,11 +364,14 @@ Rules for this section:
      Prepared whole-operation transfer lists also lost in
      [paired native timing](amiga-frame-cost.md#rejected-prepared-transfer-list-batch).
      Prioritize eliminating a transfer pass over another queue-scheduling
-     variant. Evaluate combining pristine terrain and the new field directly
-     into the destination in one pass; prove ownership of the whole replaced
-     rectangle, retire any departing old extent, and preserve dirty-row sync,
-     mixed-field order, laser/actor ordering and fallback transitions. Do not
-     overwrite retained content merely because it lies inside an arc rectangle.
+     variant. Build on the opt-in fused terrain/field pass elimination
+     (`PREPARED_FIELDS_BACKING=5`). Keep the
+     full-rectangle ownership contract, departing-extent retirement, dirty-row
+     sync, mixed-field order, laser/actor order and fallback transitions.
+     The [native fusion measurements](amiga-frame-cost.md#fused-terrainlarge-field-composition-experiment)
+     do not yet meet the under-5-ms field target; reduce the remaining
+     composition work before closing A6. Do not overwrite retained content merely
+     because it lies inside an arc rectangle.
    - Explicitly partition the shared scene bank: terrain batching already
      uses its first 44,304 bytes. Field images/backing must not overlap that
      scratch or survive a front-bank reload without rebinding.

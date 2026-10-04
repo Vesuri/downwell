@@ -1745,6 +1745,11 @@ build/field-columns-test: tests/platform/amiga/AmigaFieldColumnsTest.cpp $(wildc
 	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $<
 verify-field-columns: build/field-columns-test
 	./build/field-columns-test
+build/field-composite-test: tests/platform/amiga/AmigaFieldCompositeTest.cpp $(wildcard src/core/*.h) $(wildcard src/platform/amiga/*.h) generated/downwell-field-columns.h
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $<
+.PHONY: verify-field-composite
+verify-field-composite: build/field-composite-test
+	./build/field-composite-test
 
 .PHONY: analyze-field-layouts
 build/analyze-field-layouts: tools/analyze-field-layouts.cpp generated/downwell-field-columns.h

@@ -1,5 +1,6 @@
 #include "platform/amiga/AmigaPreparedTimeFields.h"
 #include "platform/amiga/AmigaFieldColumns.h"
+#include "platform/amiga/AmigaFieldComposite.h"
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -15,9 +16,35 @@ struct Pixels {
     inline static bool usePrepared=true;
     inline static bool useStatic=false;
     inline static bool useColumns=true;
+    inline static unsigned compositeCalls=0;
     static bool enabled(){return usePrepared;}
     static bool staticEnabled(){return useStatic;}
     static bool columnsEnabled(){return useColumns&&useStatic&&usePrepared;}
+    static bool compositeEnabled(){return useColumns&&useStatic&&usePrepared;}
+    static void band(const UBYTE* terrain,UBYTE* target,unsigned id,unsigned y,unsigned sx,unsigned sy,unsigned h,bool restore){
+        const auto& image=downwell::fieldBandImages[id];
+        const auto* low=downwell::fieldBandPixels+image.wordOffset;const auto* mask=low+11*image.height;
+        for(unsigned row=0;row<h;++row)for(unsigned x=0;x<160;++x){
+            const unsigned at=(sy+row)*11+(sx+x)/16,bit=0x8000u>>((sx+x)&15);
+            const bool cover=(mask[at]&bit)!=0;if(restore&&!cover)continue;
+            const unsigned pen=(low[at]&bit)?1:2;
+            for(unsigned p=0;p<2;++p)put(target+p*15360,48,110+x,y+row,
+                restore||!cover?get(terrain+p*15360,48,110+x,y+row):(pen>>p)&1);
+        }
+    }
+    static bool retireOutside(const UBYTE* terrain,UBYTE* target,const downwell::TimeFieldOutlines::Circle& old,
+        const downwell::TimeFieldOutlines::Circle& next,unsigned origin){
+        return amigaFieldRetireOutside(old,next,origin,[&](unsigned id,unsigned y,unsigned sx,unsigned sy,unsigned h){
+            band(terrain,target,id,y,sx,sy,h,true);return true;});
+    }
+    static bool compose(const UBYTE* terrain,UBYTE* target,const downwell::TimeFieldOutlines::Circle&,
+        const downwell::TimeFieldOutlines::Circle& next,unsigned origin,UWORD* rows){
+        ++compositeCalls;
+        return amigaFieldBandParts(next,origin,[&](unsigned id,unsigned y,unsigned sx,unsigned sy,unsigned h){
+            band(terrain,target,id,y,sx,sy,h,false);
+            for(unsigned r=y;r<y+h;++r)rows[r/16]|=UWORD(1u<<(r&15));
+        });
+    }
     static bool columns(const UBYTE* terrain,UBYTE* target,const downwell::TimeFieldOutlines::Circle& circle,
         unsigned origin,bool restore,UWORD* rows){return amigaFieldColumns(terrain,target,circle,origin,restore,rows);}
     static void validateColumns(const UBYTE* terrain,UBYTE* target,const downwell::TimeFieldOutlines::Circle& circle,
@@ -237,5 +264,64 @@ int main(){
         require(actual[0]==expected[0],"mixed intersections and source order");
     }
     std::cout<<"96 mixed-size intersection frames: all X phases, clipping, wrap and source order match\n";
+    Pixels::usePrepared=Pixels::useStatic=Pixels::useColumns=true;
+    for(int x=182;x<=198;++x){
+        (*candidate)[0].discard();(*reference)[0].discard();actual[0]=expected[0]=terrain;
+        for(unsigned frame=0;frame<120;++frame){
+            downwell::TimeFieldOutlines shape;shape.visible=true;shape.count=frame%23==0?2:1;
+            shape.circles[0]={x,frame<60?140:0,int(128*256+(frame*19)%512)};
+            shape.circles[1]={190,120,24*256};
+            const unsigned origin=frame<60?291:103,row=(origin+15)%320;
+            const bool changed=frame%7==0;
+            auto dirty=[&](unsigned r){return changed&&r==row;};
+            if(changed)for(unsigned p=0;p<2;++p)for(unsigned col=12;col<34;++col)
+                terrain[p*15360+row*48+col]=next()>>24;
+            // A retained transparent-corner foreground denies rectangle ownership.
+            const bool owned=frame%11!=0;
+            if(!owned){
+                Pixels::put(actual[0].data(),48,112,(origin+25)%320,1);
+                Pixels::put(expected[0].data(),48,112,(origin+25)%320,1);
+            }
+            require((*candidate)[0].prepare(actual[0].data(),origin,shape,true,dirty,owned),"composite prepare");
+            require((*reference)[0].prepare(expected[0].data(),origin,shape,true,dirty),"composite oracle prepare");
+            if(changed)for(unsigned p=0;p<2;++p)for(unsigned col=12;col<34;++col){
+                const unsigned at=p*15360+row*48+col;actual[0][at]=expected[0][at]=terrain[at];
+            }
+            require((*candidate)[0].draw(),"composite draw");(*reference)[0].draw();
+            require(actual[0]==expected[0],"composite preserves dirty sync, mixed-field order and denied ownership");
+            // Retire the synthetic foreground before granting ownership again.
+            if(!owned)for(unsigned p=0;p<2;++p){
+                const unsigned at=p*15360+((origin+25)%320)*48+112/8;
+                actual[0][at]=expected[0][at]=terrain[at];
+            }
+        }
+    }
+    require(Pixels::compositeCalls>1000,"fused path was not exercised");
+    std::cout<<"2040 fused ownership frames: "<<Pixels::compositeCalls<<" compositions; pixels match\n";
+    for(unsigned frame=0;frame<128;++frame){
+        (*candidate)[0].discard();(*reference)[0].discard();actual[0]=expected[0]=terrain;
+        downwell::TimeFieldOutlines shape;shape.visible=true;shape.count=1;
+        shape.circles[0]={182+int(frame%17),int(frame%3)*140,int(128*256+(frame*19)%512)};
+        const unsigned origin=(frame*37)%320;
+        auto clean=[](unsigned){return false;};
+        require((*candidate)[0].prepare(actual[0].data(),origin,shape,true,clean,true),"initial fused replacement prepare");
+        require((*candidate)[0].draw(),"initial fused replacement draw");
+        require((*reference)[0].prepare(expected[0].data(),origin,shape,true,clean),"initial replacement oracle");
+        (*reference)[0].draw();
+        shape.circles[0].radius=128*256+(frame*19+101)%512;
+        require((*candidate)[0].prepare(actual[0].data(),origin,shape,true,clean,true),"pending fused replacement");
+        require((*reference)[0].prepare(expected[0].data(),origin,shape,true,clean),"pending replacement oracle");
+        (*reference)[0].draw();
+        // A second prepare must retire/materialize the pending fused owner,
+        // including when the replacement selects the masked fallback.
+        if(frame%3==0){shape.visible=false;shape.count=0;}
+        else if(frame%3==1){shape.count=2;shape.circles[1]={190,120,24*256};}
+        else shape.circles[0].radius=128*256+(frame*19+233)%512;
+        require((*candidate)[0].prepare(actual[0].data(),origin,shape,true,clean,true),"repeated fused prepare");
+        require((*reference)[0].prepare(expected[0].data(),origin,shape,true,clean),"repeated oracle prepare");
+        require((*candidate)[0].draw(),"repeated fused draw");(*reference)[0].draw();
+        require(actual[0]==expected[0],"pending fused replacement preserves pixels and fallback ownership");
+    }
+    std::cout<<"128 pending fused replacements preserve pixels and fallback ownership\n";
     std::cout<<"3600 double-buffered frames: "<<fast<<" prepared, "<<fallback<<" fallback; pixels match\n";
 }

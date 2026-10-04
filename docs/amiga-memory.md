@@ -101,6 +101,20 @@ images and both saved-background reference buffers keep their existing ranges.
 Prepared transfer geometry (`PREPARED_FIELDS_BACKING=4`) adds 34 small
 descriptors in ordinary memory, not Chip images or per-frame staging.
 
+The fused composition experiment (`PREPARED_FIELDS_BACKING=5`) uses the same
+images and allocations. For a stationary single resident-band circle, retire
+only the old mask outside the new arc rectangles, synchronize dirty terrain
+rows, then use pristine terrain as blitter channel C while composing the new
+field. This replaces the former restore-then-paint pair within those rectangles.
+It owns the entire fetched word span (X 96 through 271), including edge words,
+not just pixels covered by the new circle. Actor/effect damage must be recorded
+for the intervening row sync; retained laser pixels must be retired first.
+A pending laser is safe because it draws afterward. A retained laser, multiple
+fields, moved centre or changed ring origin uses the compiled masked path.
+Neither the geometry helper nor being inside an arc grants rectangle ownership;
+the gameplay caller supplies that certificate. This remains opt-in pending the
+full field-cost and broader coverage gates before normal-build integration.
+
 The experimental `TERRAIN_BATCH=1` painter borrows 44,304 bytes of that idle
 region for two colour planes and a coverage plane (416×284). Its immutable tile
 sources remain in ordinary memory. It drains masked transfers before reusing the
