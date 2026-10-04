@@ -2,12 +2,22 @@
 #include "framework/Bitmap.h"
 #ifdef DOWNWELL_PREPARED_FIELDS
 #include "AmigaFieldBands.h"
+#include "framework/BitmapCopyPlan.h"
 static UWORD* residentFieldBands;
+static BitmapCopyPlan fieldPaintPlans[17],fieldRestorePlans[17];
+extern "C" volatile unsigned gDownwellPreparedFieldMode;
 extern "C" void amigaBlitterBindFieldBands(UBYTE* bank){
     AmigaHardware::blitterDrain();
     residentFieldBands=reinterpret_cast<UWORD*>(bank);
     for(unsigned i=0;i<sizeof(downwell::fieldBandPixels)/sizeof(UWORD);++i)
         residentFieldBands[i]=downwell::fieldBandPixels[i];
+    residentFieldBands[sizeof(downwell::fieldBandPixels)/sizeof(UWORD)]=0;
+    for(unsigned x=0;x<=16;++x){
+        if(!fieldPaintPlans[x].prepare(11,11,24,110,x,x,160)||
+           !fieldRestorePlans[x].prepare(24,11,24,110,110,x,160)){
+            residentFieldBands=nullptr;return;
+        }
+    }
 }
 extern "C" int amigaBlitterFieldBands(const UBYTE* terrain,UBYTE* target,
     const downwell::TimeFieldOutlines::Circle& circle,unsigned origin,bool restore,UWORD* rows){
@@ -18,18 +28,28 @@ extern "C" int amigaBlitterFieldBands(const UBYTE* terrain,UBYTE* target,
     const bool admitted=amigaFieldBandParts(circle,origin,[&](unsigned id,unsigned y,unsigned sx,unsigned sy,unsigned height){
         const auto& image=downwell::fieldBandImages[id];
         UWORD* pixels=residentFieldBands+image.wordOffset;
-        Bitmap source(pixels,176,image.height,1,false),mask(pixels+11*image.height,176,image.height,1,false);
-        if(restore){
+        if(gDownwellPreparedFieldMode>=6){
+            auto* mask=pixels+11*image.height;
+            auto* destination=reinterpret_cast<UWORD*>(target);
+            if(restore)for(unsigned plane=0;plane<2;++plane)
+                fieldRestorePlans[sx].copy((UWORD*)terrain+plane*7680,mask,destination+plane*7680,y,sy,y,height);
+            else{
+                fieldPaintPlans[sx].copy(pixels,mask,destination,sy,sy,y,height);
+                fieldPaintPlans[sx].copy(pixels,mask,destination+7680,sy,sy,y,height,true);
+            }
+        }else if(restore){
+            Bitmap mask(pixels+11*image.height,176,image.height,1,false);
             Bitmap background((void*)terrain,380,320,2,false,false,384);
             Bitmap destination(target,380,320,2,false,false,384);
             destination.copyWithMask(background,mask,110,y,110,y,sx,sy,160,height,false);
         }else{
+            Bitmap source(pixels,176,image.height,1,false),mask(pixels+11*image.height,176,image.height,1,false);
             Bitmap low(target,380,320,1,false,false,384);
             Bitmap high(target+15360,380,320,1,false,false,384);
             low.copyWithMask(source,mask,110,y,sx,sy,sx,sy,160,height,false);
             high.copyInvertedWithMask(source,mask,110,y,sx,sy,sx,sy,160,height);
-            if(rows)for(unsigned row=y;row<y+height;++row)rows[row/16]|=UWORD(1u<<(row&15));
         }
+        if(!restore&&rows)for(unsigned row=y;row<y+height;++row)rows[row/16]|=UWORD(1u<<(row&15));
     });
     if(admitted)AmigaHardware::blitterDrain();
     AmigaHardware::setBlitterNasty(false);

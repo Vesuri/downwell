@@ -80,7 +80,7 @@ struct PreparedFieldOps {
 #ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
         amigaFieldVerifyColumn(terrain,target,circle,origin,restore);
 #endif
-        const bool ok=(gDownwellPreparedFieldMode==5&&amigaBlitterFieldBands(terrain,target,circle,origin,restore,rows)) ||
+        const bool ok=(gDownwellPreparedFieldMode>=5&&amigaBlitterFieldBands(terrain,target,circle,origin,restore,rows)) ||
             amigaFieldColumns(terrain,target,circle,origin,restore,rows);
 #ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
         amigaFieldVerifyFinish(target);
@@ -292,8 +292,8 @@ static const ULONG baseSceneBankBytes = DOWNWELL_FRONT_BANK_BYTES > DOWNWELL_BOO
     ? DOWNWELL_FRONT_BANK_BYTES : DOWNWELL_BOOT_BANK_BYTES;
 #ifdef DOWNWELL_PREPARED_FIELDS
 static const ULONG fieldBandOffset=75360;
-static const ULONG sceneBankBytes=fieldBandOffset+sizeof(downwell::fieldBandPixels)>baseSceneBankBytes?
-    fieldBandOffset+sizeof(downwell::fieldBandPixels):baseSceneBankBytes;
+static const ULONG sceneBankBytes=fieldBandOffset+sizeof(downwell::fieldBandPixels)+sizeof(UWORD)>baseSceneBankBytes?
+    fieldBandOffset+sizeof(downwell::fieldBandPixels)+sizeof(UWORD):baseSceneBankBytes;
 #else
 static const ULONG sceneBankBytes=baseSceneBankBytes;
 #endif
@@ -1005,7 +1005,7 @@ static bool verifyFieldComposites(UBYTE* terrain,UBYTE* target){
     for(unsigned frame=0;frame<48&&ok;++frame){
         // Captured, pristine, and sparse paths must exchange ownership without
         // retaining pixels from an earlier field. No gameplay RNG is consumed.
-        gDownwellPreparedFieldMode=frame%13==0?2:frame%11==0?1:frame%5==0?3:5;
+        gDownwellPreparedFieldMode=frame%13==0?2:frame%11==0?1:frame%5==0?3:6;
         downwell::TimeFieldOutlines shape;
         shape.count=frame%12==11?0:3;shape.visible=shape.count!=0;
         for(unsigned i=0;i<shape.count;++i){
@@ -1035,7 +1035,7 @@ static bool verifyFieldComposites(UBYTE* terrain,UBYTE* target){
         ok=overlay.prepare(target,origin,shape,true,[](unsigned){return false;})&&overlay.draw();
         if(ok)ok=amigaFieldVerifyComposite(terrain,target,shape,origin);
     }
-    gDownwellPreparedFieldMode=5;
+    gDownwellPreparedFieldMode=6;
     for(unsigned phase=0;phase<51&&ok;++phase){
         downwell::TimeFieldOutlines shape;shape.visible=true;shape.count=1;
         shape.circles[0]={182+int(phase%17),phase<17?0:phase<34?140:283,

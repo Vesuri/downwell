@@ -1736,6 +1736,11 @@ generated/downwell-field-columns.h: build/generate-field-columns tools/generate-
 	python3 tools/generate-field-columns.py
 
 .PHONY: verify-field-columns
+build/bitmap-copy-plan-test: tests/platform/amiga/BitmapCopyPlanTest.cpp src/platform/amiga/framework/BitmapCopyPlan.h
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+.PHONY: verify-bitmap-copy-plan
+verify-bitmap-copy-plan: build/bitmap-copy-plan-test
+	./build/bitmap-copy-plan-test
 build/field-columns-test: tests/platform/amiga/AmigaFieldColumnsTest.cpp $(wildcard src/core/*.h) $(wildcard src/platform/amiga/*.h) generated/downwell-field-columns.h
 	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $<
 verify-field-columns: build/field-columns-test

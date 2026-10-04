@@ -439,3 +439,64 @@ oracle (matching `TABLE_CONTACT_ATAN=1`). The tested native executable hash is
 `cb6c4c7205721c0553a05d8564b34dc16f9b91c75ea61c8ddaf388c04fbaa30e`;
 the command/result log is `build/field-bands-cross-replay.log`. This checks
 shared state and RNG, separately from the native DMA pixel verifier.
+
+### Resident-band transfer preparation
+
+The first scheduling experiment queued transfers with blitter priority off,
+then enabled priority only while draining. It lost: the 28 common complete
+frames in `tmp/trace/field-batch-mode3.ZDRnaH` and
+`tmp/trace/field-batch-mode4.4MyLJ9` rose from 35.003 to 40.092 ms.
+Both use text hash
+`1e8ed1484a17122905e5613bdc6abe4cee174c5e744fcbf946e78c3895f75b92`.
+That source is removed; `tmp/field-batch-rejected.patch` preserves the rejected
+experiment, not a supported option.
+
+The subsequent prepared-geometry experiment keeps the accepted early-priority
+policy. It removes repeated Bitmap construction and horizontal mask, shift,
+word-count and modulo calculation from band painting/restoration. The native
+audit attributed roughly 4 ms to this repeated setup. `BitmapCopyPlan`
+prepares 17 painting and 17 restoration geometries when binding the band bank;
+only vertical placement and height remain variable at submission. The generic
+Bitmap implementation remains compiled as the comparison.
+
+Here `PREPARED_FIELDS_BACKING=3` selects the generic resident-band path and
+`=4` selects prepared geometry, not the rejected scheduling experiment.
+The paired level-exit captures are `tmp/trace/field-plan-mode3-reference` and
+`tmp/trace/field-plan-mode4-candidate`, using the same optimization bundle,
+`SKIP_LEVEL=1 PROFILE_CONTACT=0 TRACE_FRAMES=2,60 TRACE_FIELDS=30`.
+Their text hash is
+`be7125e90247702794c28757145f23ea82a78ff6e3b1dbbc4b2e578a3f4a8395`.
+Across the 30 common complete frames, mean cost falls from 36.240 to
+31.576 ms. Frame 6 falls from 75.40 to 73.29 ms; individual presentation-phase
+frames can get slower (frame 4: 27.61 to 33.19 ms). This is not a claim of
+meeting either the whole-frame or the under-5-ms field budget.
+
+Native pixel checks pass 1,979 full-buffer comparisons, 512 terrain-mask
+phases and 131 overlapping/shifted/wrapped composites. The verifier executable
+hash is `4f493ead5336dec2f51d8649a54ebc1f1b8270a662dcad264c51ccaad3c8dd44`;
+its text hash is
+`60d56ab9359609e2dff4b6d9d394a5dc4c25858af4dda0c79c5fec49bfbd55fe`.
+`make verify-bitmap-copy-plan` independently models the blitter channels and
+checks 340 paint/restore/shift/height/complement cases, including untouched
+edges; address and undefined-behavior sanitizer checks also pass.
+
+Matched contact captures `tmp/trace/field-plan-contact-reference` and
+`tmp/trace/field-plan-contact-candidate` have the same text hash
+`68ea21a0ae84dd4e5c1a8132c38692c3f3211592eb2c1fc4dbdd26d5fec20b32`.
+All 20 common complete frames are cycle-identical. Mandatory frames
+645 / 701 / 844 remain 817,260 / 1,263,090 / 901,750 cycles respectively.
+
+Marker-free contact FPS runs (`TRACE_FRAMES=`) take 3,390 PAL fields for the
+generic path and 3,389 for prepared geometry, over 1,800 updates; both retain
+the nine-field maximum at frame 701. This one-field tape difference is not
+a meaningful combat improvement. Logs are `build/field-plan-fps-3.log` and
+`build/field-plan-fps-4.log`, with common text hash
+`eff94c9c8379314a436b587d9ffe4ab1e5765fed33b15a944289cd1c12625113`.
+
+Cross-target replay passes with the same optimization bundle,
+`REPLAY_VERIFY=1 TABLE_CONTACT_ATAN=1`, and the matching
+`build/port-replay-reference-table-atan` host oracle. Executable hash:
+`9638a9db16593b41a0b357b1dc3d0ee550c8ec79fd92f05c0ef10e1c762f443e`.
+The result is in `build/field-plan-cross-replay.log`; the normal build is
+restored with clean 68000 instruction/helper audits. Prepared geometry remains
+opt-in pending the full scene coverage and frame-budget gates.
