@@ -216,6 +216,48 @@ values for both arms of future retained-path comparisons to avoid moving a
 zero-initialized selector between BSS and initialized data. The measured
 publisher cost and regression do not justify retaining this implementation.
 
+### Eight-line region certificates
+
+An experiment at `7a635ea6` cached exact final-region identities: uniform
+row-art words, fixed fill, and the prepared divider dictionary indices/phase.
+Equal eight-line regions bypassed painting and publication entirely; all
+other regions used the retained compositor. Full HUD pixel comparisons passed,
+but this did not remove the expensive recharge work. In frame 645 the fill
+loop remained 5.67 ms and blocked publication 3.94 ms, while certificate
+preparation added 4.39 ms. Total HUD time rose from 25.3 to 30.8 ms.
+
+Paired captures have identical text hash
+`a2b5ee9d41cf3350f0a90c15a2e1817ad188b65363a072f21e9511c41bec076c`:
+
+| Frame | Retained (ms) | Certificates (ms) |
+| --- | ---: | ---: |
+| 645 | 115.312 | 120.760 |
+| 701 | 177.768 | 177.824 |
+| 844 | 147.204 | 151.531 |
+
+The 15 common complete frames average 95.059 versus 97.934 ms. Evidence:
+`tmp/trace/ammo-certificates-mode1`, `tmp/trace/ammo-certificates-mode2`,
+`build/ammo-certificates-comparison.log`, and
+`build/ammo-certificates-candidate-cost.log`. Recoverable rejected source:
+`tmp/ammo-certificates-rejected.patch`. No cache implementation remains.
+
+Reproduction uses `AMMO_BLOCK_CACHE=1/2`, `TABLE_CONTACT_ATAN=1`,
+`RETAIN_HEALTH_HUD=1`, `AMMO_DAMAGE_RANGE=1`, `PREPARED_AMMO_DIVIDERS=1`,
+`PREPARED_FIELDS=1`, `PROFILE_FIELD_REFERENCE=1`, `PREPARED_FIELDS_BACKING=5`,
+`SCENERY_LAYERS=1`, `NATIVE_BOXES=1`, `NATIVE_FIELDS=1`, `TERRAIN_DIRECT=1`,
+`SKIP_TO_GAME=1`, `SKIP_LEVEL=0`, `PROFILE_CONTACT=1`, `PROFILE_LASER=0`,
+`TRACE_FRAMES=644,699,843`, `TRACE_FIELDS=30`, `VERIFY_TIMEOUT_SECONDS=300`,
+and `bash amiga/profile.sh trace`, with separate `TRACE_OUTPUT` directories.
+**The reference-field switch overrides backing 5**, so these captures use
+sparse field mode 2, not fused mode 7. They reject the HUD implementation;
+they are not a combined-current-bundle acceptance gate.
+
+This rules out rebuilding uniform-block certificates from all row states
+every update. A recharge changes the certified content, so searching for
+unchanged regions does not replace its actual composition cost. Preparation
+must move off the critical frame, or the changing column itself must become
+a prepared transfer; more elaborate runtime classifiers are not the next step.
+
 ## Consequences for the budget
 
 - **Worst frames.** Each is roughly 180 ms. The largest removable parts are:

@@ -299,10 +299,12 @@ Rules for this section:
      Do not rebuild general interval lists or solve ordered row overlaps on
      the 68000 every frame; the [native experiments](amiga-frame-cost.md#ammo-gauge-experiments)
      rule out those implementations. Likewise, replacing the middle with a
-     per-line final-word publisher is insufficient. Cache final-region identity
-     so unchanged blocks can bypass composition and comparison altogether;
-     retain exact ordered edge composition and invalidate that cache when an
-     overlapping draw changes its pixels. Take this remaining A5 work before
+     per-line final-word publisher is insufficient, and rebuilding uniform
+     eight-line certificates adds work without removing recharge composition.
+     Move preparation off the critical frame or represent the changing column
+     as a prepared transfer, with an explicit memory budget and the existing
+     ordered compositor as fallback. Do not add another per-frame classifier.
+     Take this remaining A5 work before
      A3/A4 and B, without treating the remaining A6 gates as complete. The HUD
      targets remain unchanged.
    - Finish normal-build integration of `AMMO_DAMAGE_RANGE=1` and
