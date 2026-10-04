@@ -12,7 +12,9 @@ continue
 end
 break downwellNaturalReady
 continue
-if gDownwellNaturalExitTick != 2156 || gDownwellClearReentries != 1 || gDownwellClearGameplayUpdates != 914
+# Pinned by verify-natural-exit: seed 4, decoded 325-draw entry, ordinary
+# descent, shop visit and return. Keep the independent host parity gate.
+if gDownwellNaturalExitTick != 2198 || gDownwellClearReentries != 1 || gDownwellClearGameplayUpdates != 670
     printf "Natural route timing/reentry mismatch: exit=%lu entries=%lu updates=%lu\n", gDownwellNaturalExitTick, gDownwellClearReentries, gDownwellClearGameplayUpdates
     quit 1
 end

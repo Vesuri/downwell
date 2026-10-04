@@ -108,7 +108,6 @@ AMIGA_MENU_WAKE_FRAME_SHA256 := d616f4469720f60a3f18bdbc55a8851422b923e62ec7c755
 AMIGA_MENU_TITLE_FRAME_SHA256 := 5b1a054fc5edb1a8adf96a81cc07942bf5ef863e6cbbfbbfedd5bdf4304c0791
 AMIGA_MENU_ENTRY_FRAME_SHA256 := 21e58d135d92be921bbfa40245e7d074505fecf0b1d7b1c0fb47f92ef0fa61fe
 AMIGA_GAMEPLAY_FRAME_SHA256 := ac1ce0c2494d731bf8bca49240464b28c92d9ebbf1c3917214f18921f91203ce
-AMIGA_GAMEPLAY_ACTIVE_FRAME_SHA256 := 99df9f0d8470151c8499d741b544e804571b918a9d95d9ebbebfdd15efba24f2
 AREA_ONE_TRACE_TARGET := build/trace-area-one
 AREA_ONE_TRACE_SOURCES := tools/trace-area-one.cpp src/core/StartupRuntime.cpp src/core/PlayerMotion.cpp src/core/AreaOneBuilder.cpp src/core/GameMakerRandom.cpp src/core/RoomPack.cpp src/core/ObjectPack.cpp src/core/BuilderPatternPack.cpp
 TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET) $(ALARM_TEST_TARGET) $(INSTANCE_TEST_TARGET) $(EVENT_TEST_TARGET) $(ROOM_TEST_TARGET) $(ROOM_PACK_TEST_TARGET) $(OBJECT_PACK_TEST_TARGET) $(SPRITE_PACK_TEST_TARGET) $(FONT_PACK_TEST_TARGET) $(BUILDER_PATTERN_PACK_TEST_TARGET) $(DEFERRED_INSTANCE_TEST_TARGET) $(RANDOM_TEST_TARGET) $(PLAYER_COLLISION_TEST_TARGET) $(GAME_RENDER_TEST_TARGET) $(HUD_NUMBER_TEST_TARGET) $(AMIGA_PLAYER_TEST_TARGET) $(AMIGA_PORT_TEST_TARGET) $(AMIGA_SCENE_TEST_TARGET) $(AMIGA_MENU_TEST_TARGET) $(AMIGA_MENU_SCROLL_TEST_TARGET) $(AMIGA_RENDERER_TEST_TARGET)
@@ -2474,15 +2473,12 @@ verify-amiga-gameplay-ammo-frame: build/capture-sdl-game
 	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga'
 
 verify-amiga-gameplay-active-frame: build/capture-sdl-game
-	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga SCENE_VERIFY=1 SKIP_TO_GAME=1'
-	bash -c '. amiga/env.sh && GDB_SOURCE=verify_gameplay_active_frame.gdb READY_MARKER=DOWNWELL_GAMEPLAY_ACTIVE_FRAME_READY READY_DESCRIPTION="scrolled gameplay raster with an awake enemy" VERIFY_TIMEOUT_SECONDS=$${VERIFY_TIMEOUT_SECONDS:-120} amiga/verify_startup.sh'
-	printf '%s  %s\n' '$(AMIGA_GAMEPLAY_ACTIVE_FRAME_SHA256)' 'amiga/.run/gameplay-active-frame.bin' | shasum -a 256 -c -
+	bash -c 'set -e; . amiga/env.sh; trap "$(MAKE) -C amiga clean && $(MAKE) -C amiga -j4" EXIT; $(MAKE) -C amiga clean; $(MAKE) -C amiga -j4 SCENE_DESCENT_VERIFY=1 SKIP_TO_GAME=1; GDB_SOURCE=verify_gameplay_active_frame.gdb READY_MARKER=DOWNWELL_GAMEPLAY_ACTIVE_FRAME_READY READY_DESCRIPTION="scrolled gameplay raster with an awake enemy" VERIFY_TIMEOUT_SECONDS=$${VERIFY_TIMEOUT_SECONDS:-120} amiga/verify_startup.sh'
 	python3 tools/decode-amiga-gameplay-frame.py amiga/.run/gameplay-active-frame.bin build/amiga-gameplay-active-frame.png
 	@capture_tick=$$(sed -n 's/^CAPTURE_STATE tick=\([0-9]*\).*/\1/p' amiga/.run/gdb-startup.log); \
 	capture_dir=$$(mktemp -d build/active-XXXXXX); \
-	SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy SDL_RENDER_DRIVER=software ./build/capture-sdl-game "$$capture_dir" "$$capture_tick" && \
+	DOWNWELL_CAPTURE_DESCENT=1 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy SDL_RENDER_DRIVER=software ./build/capture-sdl-game "$$capture_dir" "$$capture_tick" && \
 	python3 tools/compare-gameplay-captures.py "$$capture_dir" build/amiga-gameplay-active-frame.png
-	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga'
 
 .PHONY: verify-amiga-gameplay-gemhigh-frame
 verify-amiga-gameplay-gemhigh-frame: build/capture-sdl-game

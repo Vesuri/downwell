@@ -243,14 +243,16 @@ gauge) and left ten opt-in flags behind. Do not repeat that.
 
 ### 0. Restore the broken fixtures (timebox: one day)
 
-These time out before their checks run, at unmodified `HEAD` as well. A and B
-rely on them. Fix them, but do not count this as frame-budget progress.
-- `verify-amiga-natural-route` stalls after its reentry at tick 3060 (already
-  at `7452dfe0`).
-- `verify-amiga-gameplay-active-frame` never reaches its awake-enemy frame
-  (already at `d0072b4b`).
-- `profile.sh fields-clear` never reaches its profile marker (already at
-  `7452dfe0`).
+A and B rely on these gates. Fix them, but do not count this as frame-budget
+progress.
+- Re-run `verify-amiga-natural-route` with the host-pinned exit/reentry
+  assertions; require all shop, pixel and stack checks, not just route timing.
+- `verify-amiga-gameplay-active-frame`: resolve the 17-pixel actor mismatch at
+  the upper-right playfield edge on the shared descent tape (tick 303).
+  Keep the full SDL/native comparison strict.
+- `profile.sh fields-clear`: establish a bounded deadline sufficient for the
+  exhaustive pixel fixtures at startup and reentry, then require the full
+  exit-field coverage and zero mismatches.
 
 ### A. Generation bursts (frames 701 and 844)
 
