@@ -296,6 +296,10 @@ Rules for this section:
      constant-value line intervals (run middles, fill, dividers). Diff the
      previous and new interval lists, and write only lines whose final word
      changes.
+     Do not rebuild general interval lists or solve ordered row overlaps on
+     the 68000 every frame; the [native experiments](amiga-frame-cost.md#ammo-gauge-experiments)
+     rule out those implementations. Take A6 next, then return to this
+     remaining A5 work before A3/A4 and B. The HUD targets remain unchanged.
    - Finish normal-build integration of `AMMO_DAMAGE_RANGE=1` and
      `PREPARED_AMMO_DIVIDERS=1` after the combined HUD timing/fidelity gates.
      Retain full-scan and sprite-compositor comparisons, nonconsecutive
@@ -309,6 +313,13 @@ Rules for this section:
    small-circle raster's outline image once and blit it with saved backing,
    without changing Draw RNG consumption or source geometry. Target: under
    5 ms per field frame.
+   - Reuse the platform Bitmap/blitter backend and retain the sparse overlay
+     as the compiled oracle/fallback. Verify mask-only background restoration,
+     actor/laser ordering, overlapping fields, clipping, circular-buffer wraps,
+     repeated prepare calls, and switching between optimized and fallback paths.
+   - Explicitly partition the shared scene bank: terrain batching already
+     uses its first 44,304 bytes. Field images/backing must not overlap that
+     scratch or survive a front-bank reload without rebinding.
 
 After A1–A6 the generation bursts remain at roughly 100 ms. That is about
 26 ms of synchronous Well512 draws, 22 ms of run creation (7.1 ms of it

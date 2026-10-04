@@ -165,13 +165,26 @@ takes 5.6 ms and the ammo gauge 7.2 ms.
 
 ## Ammo gauge experiments
 
-Two whole-gauge replacements were measured on this tape and discarded:
+Whole-gauge replacements measured on this tape and discarded include:
 - Synchronous word blits from Chip layers cut recharge frames from 24 to
   17 ms. But each blit cost about 2,300 cycles, mostly waiting, so shot
   frames became slower and frame 844 took ten fields.
 - A fused interior pass that writes each distinct line value once costs
   about 130 cycles per line in its store loop, the same as the existing
   passes.
+- A retained final-column interval sweep, based on `e37042c6`, avoids the
+  intermediate fill/stamp/publish passes and compares final intervals. It
+  passes the HUD pixel oracle, but resolving source overlaps and comparing
+  intervals costs 31.0 ms in frame 645. Total HUD time rises from 25.0 to
+  42.4 ms; frame 645 rises from 115.0 to 132.2 ms and frame 844 from 145.9
+  to 158.3 ms. The implementation is rejected, not a remaining default-off
+  optimization. Evidence: `tmp/trace/ammo-column.IT7CIu`,
+  `build/ammo-column-cost.log`; recoverable source:
+  `tmp/ammo-column-sweep.patch`. The accepted comparison is
+  `tmp/trace/ammo-blocks-sparse.VMxRkg`. Both use starts 644/699/843 with
+  30 PAL fields per capture and the contact profile. Fewer pixel writes do
+  not help when per-frame interval construction costs more than the removed
+  rendering passes.
 
 On this machine the gauge's cost is the number of lines rewritten, not the
 way each line is composed.
