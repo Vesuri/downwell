@@ -73,6 +73,21 @@ class CostOwners(unittest.TestCase):
 
 
 class FrameBoundaries(unittest.TestCase):
+    def test_dma_stall_crossing_field_is_not_lost_or_invented(self):
+        pending = report.field_cycle_carry(140718, 142102, 4)
+        self.assertEqual(pending, 1384)
+        self.assertEqual(report.field_cycle_carry(143480, 142102, 3436, pending), 0)
+        self.assertEqual(report.field_cycle_carry(143958, 142102, 3796,
+                         report.field_cycle_carry(140242, 142102, 10)), 0)
+
+    def test_unexplained_cycles_still_fail(self):
+        for accounted, first, pending in ((143480, 3436, 0), (142102, 3436, 1384),
+                                           (143480, 100, 1384), (140718, 3436, 1384),
+                                           (70000, 10, 0)):
+            with self.subTest(accounted=accounted, first=first, pending=pending):
+                with self.assertRaises(ValueError):
+                    report.field_cycle_carry(accounted, 142102, first, pending)
+
     def test_pre_mark_execution_is_not_a_complete_frame(self):
         stacks, entries, cycles = Counter(), Counter(), Counter()
         # Recording starts during frame 843, then sees complete frame 844

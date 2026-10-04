@@ -173,6 +173,14 @@ field) in the emulated configuration, not wall-clock time. Gameplay must
 still be checked against deterministic replays. The trace describes one run
 of one tape.
 
+With blitter priority enabled, a stalled instruction can cross VBlank and
+FS-UAE records its entire cost in the following field. The reporter keeps
+those cycles attached to that instruction. It accepts a field deficit only
+when the next field's first instruction covers it and the two field totals
+reconcile within the existing trace tolerance. An unexplained surplus,
+consecutive deficits, or an unresolved deficit at capture end still fails.
+No cycles are added, dropped, or reassigned to manufacture a timing gain.
+
 Logical attribution keys retain untruncated template/owner/member names.
 Tables elide template arguments only when displaying labels; labels must never
 be used to merge stack frames or costs. `--focus` accepts an exact logical name

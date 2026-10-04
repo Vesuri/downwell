@@ -110,6 +110,27 @@ def instruction_class(mnemonic, operands, symbol):
     return 'register-only'
 
 
+def field_cycle_carry(accounted, elapsed, first_cost, pending=0):
+    """Validate whole-instruction accounting across one PAL boundary.
+
+    DMA priority can stall an instruction across VBlank. FS-UAE puts that
+    instruction and its entire cost in the following field. Keep those cycles
+    attached to the instruction; accept a deficit only when the next field's
+    first instruction covers it and the paired totals reconcile.
+    """
+    tolerance = max(100, elapsed // 1000)
+    delta = accounted - elapsed
+    if pending:
+        if first_cost < pending or abs(delta - pending) > tolerance:
+            raise ValueError('unreconciled instruction crossing a field boundary')
+        return 0
+    if abs(delta) <= tolerance:
+        return 0
+    if -65535 <= delta < 0:
+        return -delta
+    raise ValueError('unexplained field cycle mismatch')
+
+
 def records(path):
     """Yield (field, pc|None, cycles, sp, sr) for every traced instruction."""
     with open(path, 'rb') as source:
@@ -131,6 +152,7 @@ def records(path):
         offset += size
     word(), word()  # base clock, cycle unit
     unpack_regs = struct.Struct('<17I').unpack_from
+    pending_cycles = 0
     for field in range(fields):
         custom = word()
         if custom != 520:
@@ -146,6 +168,7 @@ def records(path):
         cycles, _idle, count = word(), word(), word()
         end = offset + 4 * count
         accounted = 0
+        first_cost = None
         while offset < end:
             pc = None
             while True:
@@ -156,18 +179,24 @@ def records(path):
                 if pc is None:
                     pc = value
             cost = 0xffffffff - value
+            if first_cost is None:
+                first_cost = cost
             regs = unpack_regs(data, offset)
             offset += 68
             accounted += cost
             yield field, pc, cost, regs[15], regs[16]
         if offset != end:
             raise ValueError('instruction record boundary mismatch')
-        if abs(accounted - cycles) > max(100, cycles // 1000):
-            raise ValueError(f'field {field}: {accounted} cycles traced, {cycles} elapsed')
+        try:
+            pending_cycles = field_cycle_carry(accounted, cycles, first_cost or 0, pending_cycles)
+        except ValueError as error:
+            raise ValueError(f'field {field}: {accounted} cycles traced, {cycles} elapsed: {error}') from error
         size, _kind = word(), word()
         offset += size  # screenshot
     if offset != len(data):
         raise ValueError('unexpected trailing trace data')
+    if pending_cycles:
+        raise ValueError('capture ends before a field cycle deficit can be reconciled')
 
 
 class Symbolizer:
