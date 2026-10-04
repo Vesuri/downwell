@@ -223,21 +223,13 @@ Rules for this section:
    the software binary64 `portableAtan`. That is 14 divides and 14
    multiplies, 246,892 cycles. Replace the runtime series with precomputed
    tables:
-   - First, establish the input domain: the binary32-narrowed differences
-     reachable in a contact, a bounded box with a known set of subpixel
-     fractions. Log it from the contact and laser tapes, and confirm it
-     against the movement code.
-   - If the domain is enumerable, generate an offline table of the exact
-     binary32 degree results with the existing reference. The
-     `probe-runner-atan-x86-macos` x87 sequence is the oracle and
-     `portableAtan` the cross-check. At run time the call becomes one lookup.
    - Presentation precision is sufficient here (explicit user decision):
      preserve a bounded visual result, not floating-point rounding bits.
-     The opt-in `TABLE_CONTACT_ATAN=1` candidate must pass the full-tape worst
-     gap gate before becoming the shared default. Its 514-byte table uses
-     a 1/256-degree bound; keep unsupported-input/reference paths compiled.
-     Investigate the 10-field frame-701 gap versus the matched reference's
-     9-field maximum, despite slightly lower instruction-trace time.
+     Finish shared-default integration of `TABLE_CONTACT_ATAN=1`, including
+     the SDL build, and rerun the combined full-tape/worst-frame gates after
+     the remaining ownership changes. Keep the 514-byte table's
+     1/256-degree bound and compiled unsupported-input/reference paths;
+     do not restore a large exact-floating-point lookup.
 
    Target: under 1 ms. Verify every enumerated input, or the full probe set,
    against the oracle, plus the contact-tape replay digests. See
@@ -246,11 +238,10 @@ Rules for this section:
    draws each digit as layered CPU assets (14.1 ms), and `redrawHealth`
    repaints the hearts and meter (11.7 ms): 23 asset draws at 9,000 cycles
    each.
-   - Finish the acceptance gate for `RETAIN_HEALTH_HUD=1` before enabling it:
-     compare matched native worst-frame captures and the full FPS tape with
-     the retained reference. The candidate's full tape still reports ten
-     fields at frame 844, and its frame-701 trace is slightly above the old
-     audit; do not accept a local HUD saving as proof of no regression.
+   - Finish default integration of `RETAIN_HEALTH_HUD=1`: compare matched
+     native worst-frame captures and the full FPS tape with the retained
+     reference after the remaining ownership changes. Do not accept a local
+     HUD saving as proof of no regression in the shipping configuration.
    - Preserve the offline glyph composition, retained frame/dividers, changed
      number regions and final-word publication while resolving that gate.
 
@@ -265,6 +256,11 @@ Rules for this section:
    record. Apply the same to the other generated families that still take
    the generic birth in frame 701 (seven layer births, 6.7 ms; time-field
    adoption, 3.1 ms).
+   - Replace the remaining native table and room-list attachments in
+     `nativeScenery`; population-only layer ownership is not the complete
+     family ownership replacement. Preserve registration order for alarms,
+     active-before-inactive depth order for cleanup, dynamic layer lifetime,
+     and the distinction between destruction marking and retirement.
 
    Target: under 2,000 cycles per birth, saving about 20 ms in frame 844 and
    about 13 ms in frame 701. Verify with a per-frame comparison against the

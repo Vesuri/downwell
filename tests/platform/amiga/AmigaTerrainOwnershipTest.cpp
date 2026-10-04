@@ -79,7 +79,9 @@ struct Scene {
         downwell::StateDigest d;
         const auto& w=*world;
         d.addU64(w.checkpoint());d.addU64(w.randomDrawCount());
-        auto random=w.randomState();for(unsigned i=0;i<4;++i)d.addU32(random.nextU32());
+        const auto& random=w.randomState();
+        d.addU32(random.seed());d.addU32(unsigned(random.stateIndex()));
+        for(unsigned i=0;i<16;++i)d.addU32(random.stateWord(i));
         d.addI32(w.health());d.addI32(w.player().offsetXFixed());d.addI32(w.player().offsetYFixed());
         d.addU32(w.enemyCount());
         for(unsigned i=0;i<w.enemyCount();++i){const auto& e=w.enemyAt(i);
@@ -177,22 +179,27 @@ int main(int argc,char** argv){
             const auto input=downwell::packReplayInput(downwell::gameplayContactProfileInput(
                 reference->world->tick(),240+player.offsetX(),176+player.offsetY(),phase));
             reference->world->step(input);
-            const bool referenceOk=reference->world->effectsSucceeded()&&reference->world->generationSucceeded()&&
-                reference->owner->valid()&&reference->owner->prepareDraw();
-            const auto expected=referenceOk?reference->digest():0;
+            require(reference->world->effectsSucceeded()&&reference->world->generationSucceeded()&&
+                reference->owner->valid(),"reference Step succeeds for the complete tape");
+            // Marked lifetimes still exist before Draw cleanup. Comparing
+            // only afterwards misses early retirement and stale flag words.
+            const auto beforeCleanup=reference->digest();
             for(auto& other:others){
                 other->world->step(input);
-                const bool ok=other->world->effectsSucceeded()&&other->world->generationSucceeded()&&
-                    other->owner->valid()&&other->owner->prepareDraw();
-                require(referenceOk==ok,"every ownership mode succeeds or fails together");
-                if(!ok)continue;
+                require(other->world->effectsSucceeded()&&other->world->generationSucceeded()&&
+                    other->owner->valid(),"native Step succeeds for the complete tape");
+                require(other->digest()==beforeCleanup,"pre-cleanup state, flags and order agree");
+            }
+            require(reference->owner->prepareDraw(),"reference Draw cleanup succeeds");
+            const auto expected=reference->digest();
+            for(auto& other:others){
+                require(other->owner->prepareDraw(),"native Draw cleanup succeeds");
                 require(other->digest()==expected,"simulation state and actor order agree");
                 requireSameBackendTerrain(*reference,*other);
                 if(other->world->terrainInstances())
                     require(other->owner->terrain().size()==reference->owner->terrain().size(),"terrain identities agree");
                 else if(frame%30==0)requireWallsMatchGrid(*reference,*other);
             }
-            if(!referenceOk)break;
             if(reference->owner->terrain().size()>maxTerrain)maxTerrain=reference->owner->terrain().size();
             ++frames;
         }
