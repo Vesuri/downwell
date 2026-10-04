@@ -75,6 +75,27 @@ The Amiga comparison switch is `PREPARED_AMMO_DIVIDERS=1`; zero retains the
 original compositor. Changed source artwork and capacities above 16 use that
 compositor even when the switch is enabled.
 
+## Prepared Amiga field images
+
+`make generated/amiga-field-images.bin` rasterizes all 512 small-circle
+radius phases with the retained portable geometry. It deduplicates them into
+21 immutable 64×56 low/high/mask images. The 29,264-byte ignored pack starts
+with a 16-byte big-endian header and 512 two-byte image indices. Its JSON
+manifest pins the generator, geometry inputs and output hash. This verifies
+the portable raster, not equivalence to the original Windows GPU raster.
+
+`make verify-prepared-time-fields` exercises independent pixel copies against
+the retained sparse overlay, including clipping, double buffering, wrap,
+target replacement, pending draws and fallback transitions. The native
+comparison switch is `PREPARED_FIELDS=1`; multiple/large circles retain the
+sparse renderer. `bash amiga/profile.sh fields` checks native backing capture
+and masked publication against a full-buffer pixel oracle; its timings are
+not performance measurements. Use the normal `fps`/`trace` modes for timing.
+With `PREPARED_FIELDS=1`, `PROFILE_FIELD_REFERENCE=1` selects the compiled
+sparse oracle by changing only the initial selector data. The profile prints
+the executable text-section hash so code identity can be checked between
+the two builds; both reserve and load the same scene-bank images.
+
 ## Original audio
 
 After the UTMT extraction, run `python3 tools/extract-audio.py` to extract all

@@ -30,6 +30,9 @@ TABLE_CONTACT_ATAN ?= 0
 RETAIN_HEALTH_HUD ?= 0
 AMMO_DAMAGE_RANGE ?= 0
 PREPARED_AMMO_DIVIDERS ?= 0
+PREPARED_FIELDS ?= 0
+PREPARED_FIELDS_VERIFY ?= 0
+PROFILE_FIELD_REFERENCE ?= 0
 SCENERY_LAYERS ?= 0
 NATIVE_BOXES ?= 1
 NATIVE_FIELDS ?= 1
@@ -171,6 +174,17 @@ endif
 ifeq ($(PREPARED_AMMO_DIVIDERS),1)
 CFLAGS += -DDOWNWELL_PREPARED_AMMO_DIVIDERS
 endif
+ifeq ($(PREPARED_FIELDS),1)
+CFLAGS += -DDOWNWELL_PREPARED_FIELDS
+ifeq ($(PROFILE_FIELD_REFERENCE),1)
+CFLAGS += -DDOWNWELL_FIELD_MODE=2
+else
+CFLAGS += -DDOWNWELL_FIELD_MODE=1
+endif
+endif
+ifeq ($(PREPARED_FIELDS_VERIFY),1)
+CFLAGS += -DDOWNWELL_PREPARED_FIELDS_VERIFY
+endif
 ifeq ($(SCENERY_LAYERS),1)
 CFLAGS += -DDOWNWELL_SCENERY_LAYERS
 endif
@@ -271,6 +285,9 @@ OBJECTS := obj/DownwellAmiga.o obj/AmigaProfile.o obj/AmigaInput.o obj/AmigaPlay
 ifeq ($(TERRAIN_DIRECT),1)
 OBJECTS += obj/AmigaTerrainPrepared.o
 endif
+ifeq ($(PREPARED_FIELDS),1)
+OBJECTS += obj/AmigaFieldPrepared.o
+endif
 
 .PHONY: all check clean audit
 
@@ -287,7 +304,7 @@ $(OUT).front: $(AMIGA_FRONT_BANK)
 .PHONY: FORCE_STARTUP_OPTIONS
 obj/startup-options: FORCE_STARTUP_OPTIONS
 	@mkdir -p obj
-	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(SKIP_LEVEL)' '$(TERRAIN_RUN_STORE)' '$(TABLE_CONTACT_ATAN)' '$(RETAIN_HEALTH_HUD)' '$(AMMO_DAMAGE_RANGE)' '$(PREPARED_AMMO_DIVIDERS)' '$(SCENERY_LAYERS)' '$(NATIVE_BOXES)' '$(NATIVE_FIELDS)' '$(TERRAIN_BATCH)' '$(TERRAIN_DIRECT)' '$(TERRAIN_BATCH_VERIFY)' '$(AMIGA_OPTIMIZATION)' '$(LASER_VERIFY)' '$(PROFILE_LASER)' > $@.tmp
+	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(SKIP_LEVEL)' '$(TERRAIN_RUN_STORE)' '$(TABLE_CONTACT_ATAN)' '$(RETAIN_HEALTH_HUD)' '$(AMMO_DAMAGE_RANGE)' '$(PREPARED_AMMO_DIVIDERS)' '$(PREPARED_FIELDS)' '$(PREPARED_FIELDS_VERIFY)' '$(PROFILE_FIELD_REFERENCE)' '$(SCENERY_LAYERS)' '$(NATIVE_BOXES)' '$(NATIVE_FIELDS)' '$(TERRAIN_BATCH)' '$(TERRAIN_DIRECT)' '$(TERRAIN_BATCH_VERIFY)' '$(AMIGA_OPTIMIZATION)' '$(LASER_VERIFY)' '$(PROFILE_LASER)' > $@.tmp
 	@cmp -s $@.tmp $@ || cp $@.tmp $@
 
 $(OBJECTS): obj/startup-options
@@ -591,6 +608,12 @@ $(REPO)/generated/amiga-terrain-phase6.bin: $(AMIGA_GAME) $(REPO)/tools/generate
 	python3 $(REPO)/tools/generate-terrain-phase.py
 
 obj/AmigaTerrainPrepared.o: $(AMIGA_SRC)/AmigaTerrainPrepared.s $(REPO)/generated/amiga-terrain-phase6.bin
+	@mkdir -p $(@D)
+	$(AS) $(ASFLAGS) -o $@ $<
+
+$(REPO)/generated/amiga-field-images.bin: $(REPO)/tools/generate-field-images.cpp $(REPO)/tools/generate-field-images.py $(REPO)/generated/downwell-field-spans.h $(wildcard $(REPO)/src/core/*.h)
+	$(MAKE) -C $(REPO) generated/amiga-field-images.bin
+obj/AmigaFieldPrepared.o: $(AMIGA_SRC)/AmigaFieldPrepared.s $(REPO)/generated/amiga-field-images.bin
 	@mkdir -p $(@D)
 	$(AS) $(ASFLAGS) -o $@ $<
 

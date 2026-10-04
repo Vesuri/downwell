@@ -48,7 +48,16 @@ The two scene banks are files beside the executable. Each load is a single
 servers, blitter interrupt and multitasking; the display stays owned and the
 copper is re-pointed afterwards. Leaving gameplay for the menu or style select
 reloads the front bank before either scene is prepared. Splash scenes run only
-at boot. During gameplay no bank occupies the region.
+at boot. During gameplay no front/boot bank occupies the region.
+
+The optional prepared gameplay paths partition this 90,442-byte Chip region:
+terrain batching owns bytes `[0,44304)`; `PREPARED_FIELDS=1` copies the
+29,264-byte immutable field-image pack at byte 44,304, followed by two
+896-byte masked-underlay buffers. Together they occupy 75,360 bytes, without
+another Chip allocation. Field images are linked as ordinary data and copied
+once on gameplay entry, not regenerated per circle or frame. Retire scene
+DMA before binding, and rebind after every front-bank reload. The sparse
+field fallback remains in ordinary memory.
 
 The experimental `TERRAIN_BATCH=1` painter borrows 44,304 bytes of that idle
 region for two colour planes and a coverage plane (416×284). Its immutable tile

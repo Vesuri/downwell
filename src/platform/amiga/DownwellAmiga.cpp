@@ -43,6 +43,46 @@ __attribute__((noinline,used)) void downwellFieldReentryReady(){__asm__ volatile
 #include "core/ShopFixtures.h"
 #include "AmigaRenderer.h"
 #include "AmigaAmmoHud.h"
+#ifdef DOWNWELL_PREPARED_FIELDS
+#include "AmigaPreparedTimeFields.h"
+// Change only initialized data for identical-code comparisons.
+// Both modes load the same images and reserve the same scene-bank partition.
+extern "C" { volatile unsigned gDownwellPreparedFieldMode=DOWNWELL_FIELD_MODE; }
+extern "C" int amigaBlitterCaptureField(UBYTE*,const UBYTE*,const UBYTE*,UWORD,UWORD,UWORD,UWORD,UWORD,UWORD);
+extern "C" int amigaBlitterDrawPlanarMasked(const UBYTE*,const UBYTE*,UWORD,UWORD,UWORD,
+    UBYTE*,UWORD,UWORD,UWORD,UWORD,UWORD,UWORD,UWORD,int);
+#ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
+extern "C" void amigaFieldVerifyCapture(const UBYTE*,const UBYTE*,const UBYTE*,unsigned,unsigned,unsigned,unsigned,unsigned,unsigned);
+extern "C" void amigaFieldVerifyMask(const UBYTE*,const UBYTE*,const UBYTE*,unsigned,unsigned,unsigned,unsigned,unsigned,unsigned);
+extern "C" void amigaFieldVerifyFinish(const UBYTE*);
+#endif
+struct PreparedFieldOps {
+    static bool enabled(){return gDownwellPreparedFieldMode==1;}
+    static bool capture(UBYTE* saved,const UBYTE* target,const UBYTE* mask,unsigned x,unsigned y,
+        unsigned sx,unsigned sy,unsigned w,unsigned h){
+#ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
+        amigaFieldVerifyCapture(saved,target,mask,x,y,sx,sy,w,h);
+#endif
+        const bool ok=amigaBlitterCaptureField(saved,target,mask,x,y,sx,sy,w,h)!=0;
+#ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
+        amigaFieldVerifyFinish(saved);
+#endif
+        return ok;
+    }
+    static bool masked(const UBYTE* source,const UBYTE* mask,UBYTE* target,
+        unsigned x,unsigned y,unsigned sx,unsigned sy,unsigned w,unsigned h){
+#ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
+        amigaFieldVerifyMask(source,mask,target,x,y,sx,sy,w,h);
+#endif
+        const bool ok=amigaBlitterDrawPlanarMasked(source,mask,64,56,64,target,
+            downwellGameRingHeight,x,y,sx,sy,w,h,-1)!=0;
+#ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
+        amigaFieldVerifyFinish(target);
+#endif
+        return ok;
+    }
+};
+#endif
 #include "AmigaLaserSight.h"
 #include "AmigaGoalField.h"
 #include "AmigaBufferCompare.h"
@@ -104,6 +144,9 @@ extern const UBYTE amiga_hud_pack[];
 extern const UBYTE amiga_hud_pack_end[];
 extern const UBYTE amiga_game_pack[];
 extern const UBYTE amiga_game_pack_end[];
+#ifdef DOWNWELL_PREPARED_FIELDS
+extern const UBYTE amiga_field_images[],amiga_field_images_end[];
+#endif
 #ifdef DOWNWELL_TERRAIN_DIRECT
 extern const UBYTE amiga_terrain_phase6[],amiga_terrain_phase6_end[];
 #endif
@@ -891,7 +934,11 @@ static void redrawResultsChoices(AmigaRenderer* renderer, const AmigaPortRuntime
 // Each display ring independently owes modified rows of the private backing.
 static AmigaGameplayRows gameplayRows;
 static AmigaLaserSight gameplayRays[2];
+#ifdef DOWNWELL_PREPARED_FIELDS
+static AmigaPreparedTimeFieldPair<PreparedFieldOps> gameplayFields;
+#else
 static AmigaTimeFieldPair gameplayFields;
+#endif
 static Bitmap* terrainCopyTarget;
 static const Bitmap* terrainCopyBacking;
 static unsigned terrainCopyBuffer;
@@ -2167,6 +2214,16 @@ __attribute__((noinline)) static int runDownwell(void) {
                     splashBlankList.finish();
                     platform.publish(splashBlankList);
                     platform.waitVblank();
+#ifdef DOWNWELL_PREPARED_FIELDS
+                    // Terrain batching owns the prefix. Rebind after every
+                    // front-bank reload, only after retiring its DMA.
+                    AmigaHardware::blitterDrain();
+                    if(sceneBankBytes<downwellTerrainBatchBytes || !gameplayFields.bind(
+                        sceneBank+downwellTerrainBatchBytes,sceneBankBytes-downwellTerrainBatchBytes,
+                        amiga_field_images,amiga_field_images_end-amiga_field_images)){
+                        exitCode=20;break;
+                    }
+#endif
                     if (newRunWorldPending) {
                         AmigaHardware::blitterDrain();
                         amigaBuildTerrainIndex(emptyTerrain, terrainIndex);
@@ -3190,7 +3247,11 @@ __attribute__((noinline)) static int runDownwell(void) {
             if (fieldShape.visible) {
                 DW_PROFILE_SCOPE(profileGoalFieldDraw);
                 AmigaHardware::blitterDrain();
+#ifdef DOWNWELL_PREPARED_FIELDS
+                if(!gameplayFields[back].draw()){exitCode=20;break;}
+#else
                 gameplayFields[back].draw();
+#endif
 #ifdef DOWNWELL_CLEAR_VERIFY
                 // Compare the retained field before BOB damage can exclude rows.
                 exposeGameplayFrame(memory, gameDisplay[back], back, port);

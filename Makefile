@@ -1720,6 +1720,19 @@ generated/downwell-field-spans.h: build/generate-field-spans
 	@mkdir -p generated
 	./build/generate-field-spans $@
 
+build/generate-field-images: tools/generate-field-images.cpp generated/downwell-field-spans.h $(wildcard src/core/*.h)
+	@mkdir -p $(@D)
+	$(CXX) -Isrc -std=c++17 -O2 -ffp-contract=off -o $@ $<
+
+generated/amiga-field-images.bin: build/generate-field-images tools/generate-field-images.py
+	python3 tools/generate-field-images.py
+
+.PHONY: verify-prepared-time-fields
+build/prepared-time-fields-test: tests/platform/amiga/AmigaPreparedTimeFieldsTest.cpp $(wildcard src/core/*.h) $(wildcard src/platform/amiga/*.h) generated/amiga-field-images.bin
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $<
+verify-prepared-time-fields: build/prepared-time-fields-test
+	./build/prepared-time-fields-test
+
 $(AMIGA_RENDERER_TEST_TARGET): generated/downwell-field-spans.h src/platform/amiga/AmigaFieldSpans.h src/platform/amiga/AmigaFieldWords.h src/platform/amiga/AmigaGoalField.h
 
 $(TARGET): $(OBJECTS)
