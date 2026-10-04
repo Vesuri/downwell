@@ -1143,6 +1143,47 @@ int main(int argc, char** argv) {
     }
     std::ifstream hudInput(argv[2], std::ios::binary);
     const std::vector<UBYTE> hudPack{std::istreambuf_iterator<char>(hudInput), {}};
+#ifdef DOWNWELL_PREPARED_AMMO_DIVIDERS
+    {
+        AmigaWordStamp stamps[2];
+        for (unsigned frame = 0; frame < 2; ++frame)
+            require(amigaRendererPrepareWordStamp(stamps + frame, hudPack.data(),
+                hudPack.data() + hudPack.size(), 421, frame), "prepare divider oracle stamps");
+        require(amigaPreparedDividersMatch(stamps), "prepared bank accepts exact source artwork");
+        stamps[0].mask[2] ^= 1;
+        require(!amigaPreparedDividersMatch(stamps), "prepared bank rejects changed coverage");
+        stamps[0].mask[2] ^= 1;
+        UWORD actual[568] = {};
+        // Sweep empty/short/tall compositions, including their transparent
+        // rows and every dictionary-block boundary, in both directions.
+        for (unsigned pass = 0; pass < 2; ++pass)
+            for (unsigned c = 0; c <= 16; ++c) {
+                const unsigned cap = pass ? 16-c : c;
+                for (unsigned a = 0; a <= cap; ++a) {
+                    const unsigned ammo = pass ? cap-a : a;
+                    UWORD expected[568] = {};
+                    downwell::drawAmmoDividers(ammo, cap, 1, 288, 229,
+                        [&](unsigned, unsigned frame, int, unsigned y) {
+                            const auto& stamp = stamps[frame];
+                            for (unsigned row = stamp.first; row < stamp.last; ++row) {
+                                if (y+row >= 284) continue;
+                                const UWORD mask = stamp.mask[row];
+                                auto* target = expected + (y+row)*2;
+                                target[0] = (target[0] & UWORD(~mask)) | (stamp.low[row] & mask);
+                                target[1] = (target[1] & UWORD(~mask)) | (stamp.high[row] & mask);
+                            }
+                        });
+                    const auto prepared = amigaPreparedDividers(ammo, cap);
+                    for (unsigned row = 0; row < 284; ++row) {
+                        const auto* source = prepared.blocks + prepared.indices[row/8]*16 + (row%8)*2;
+                        actual[row*2] = source[0]; actual[row*2+1] = source[1];
+                    }
+                    require(std::memcmp(actual, expected, sizeof(actual)) == 0,
+                            "offline divider composition equals source binary64 ordered draws");
+                }
+            }
+    }
+#endif
     require(!hudPack.empty(), "HUD pack can be read");
     // Force the established byte-span path for the oracle by giving its
     // destination neither the HUD nor game identity (ordinary planar stride).

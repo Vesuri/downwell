@@ -702,6 +702,105 @@ unsigned amigaRendererPublishHudColumn(UBYTE* destination, UBYTE* working,
     return writes;
 }
 
+unsigned amigaRendererPublishHudBlockedColumn(UBYTE* destination, UBYTE* working,
+    const AmigaHudBlockedColumn* overlay, unsigned word, int top, int bottom,
+    int shiftY, UWORD clip) {
+    unsigned writes = 0;
+    int first = top > shiftY ? top : shiftY;
+    int last = bottom < downwellDisplayHeight+shiftY ? bottom : downwellDisplayHeight+shiftY;
+    int y;
+    UBYTE *target, *input;
+    if (word >= downwellVisibleWidth/16 || top < 0 ||
+        bottom > downwellDisplayHeight || top >= bottom) return 0;
+    if (first >= last)
+        return amigaRendererCopyHudWords(destination, working, word*16, top, word*16+16, bottom, 1);
+    if (first > top) writes += amigaRendererCopyHudWords(destination, working,
+        word*16, top, word*16+16, first, 1);
+    if (last < bottom) writes += amigaRendererCopyHudWords(destination, working,
+        word*16, last, word*16+16, bottom, 1);
+    target = destination + first*downwellBytesPerPlaneLine + word*2;
+    input = working + first*downwellBytesPerPlaneLine + word*2;
+    y = first;
+    while (y < last) {
+        const unsigned sourceY = y-shiftY, row = sourceY & 7;
+        const unsigned block = overlay->indices[sourceY >> 3];
+        const UWORD* source = overlay->blocks + block*16 + row*2;
+        int end = y+8-row;
+        if (end > last) end = last;
+        if (!block) {
+            // Dictionary block zero is wholly transparent. Publish backing
+            // without reading/compositing eight known-empty overlay rows.
+            for (; y < end; ++y) {
+                const UWORD low = readWord(input), high = readWord(input+downwellPlaneBytes);
+                if (readWord(target) != low) { writeWord(target, low); ++writes; }
+                if (readWord(target+downwellPlaneBytes) != high) {
+                    writeWord(target+downwellPlaneBytes, high); ++writes;
+                }
+                target += downwellBytesPerPlaneLine; input += downwellBytesPerPlaneLine;
+            }
+            continue;
+        }
+        for (; y < end; ++y) {
+            UWORD low = readWord(input), high = readWord(input+downwellPlaneBytes);
+            const UWORD a = source[0], b = source[1], mask = (a|b) & clip;
+            if (mask) {
+                low = (low & (UWORD)~mask) | (a & mask);
+                high = (high & (UWORD)~mask) | (b & mask);
+                writeWord(input, low); writeWord(input+downwellPlaneBytes, high);
+            }
+            if (readWord(target) != low) { writeWord(target, low); ++writes; }
+            if (readWord(target+downwellPlaneBytes) != high) {
+                writeWord(target+downwellPlaneBytes, high); ++writes;
+            }
+            target += downwellBytesPerPlaneLine; input += downwellBytesPerPlaneLine; source += 2;
+        }
+    }
+    return writes;
+}
+
+void amigaRendererApplyHudBlockedColumn(AmigaRenderer* renderer, const AmigaHudBlockedColumn* overlay,
+    unsigned word, int shiftY, int top, int bottom) {
+    const int x = word*16;
+    int left = renderer->clipX > x ? renderer->clipX-x : 0;
+    int right = renderer->clipX+renderer->clipWidth-x;
+    int y;
+    UWORD clip;
+    UBYTE* target;
+    if (right > 16) right = 16;
+    if (left >= right || x >= downwellVisibleWidth) return;
+    clip = (UWORD)((0xffffu >> left) & (0xffffu << (16-right)));
+    if (top < renderer->clipY) top = renderer->clipY;
+    if (bottom > renderer->clipY+renderer->clipHeight) bottom = renderer->clipY+renderer->clipHeight;
+    if (top < shiftY) top = shiftY;
+    if (top < 0) top = 0;
+    if (bottom > downwellDisplayHeight) bottom = downwellDisplayHeight;
+    if (bottom > downwellDisplayHeight+shiftY) bottom = downwellDisplayHeight+shiftY;
+    if (top >= bottom) return;
+    target = renderer->hud + top*downwellBytesPerPlaneLine + word*2;
+    y = top;
+    while (y < bottom) {
+        const unsigned sourceY = y-shiftY, row = sourceY & 7;
+        const unsigned block = overlay->indices[sourceY >> 3];
+        const UWORD* source = overlay->blocks + block*16 + row*2;
+        int end = y+8-row;
+        if (end > bottom) end = bottom;
+        if (!block) {
+            target += (end-y)*downwellBytesPerPlaneLine;
+            y = end;
+            continue;
+        }
+        for (; y < end; ++y) {
+            const UWORD a = source[0], b = source[1], mask = (a|b) & clip;
+            if (mask) {
+                writeWord(target, (readWord(target) & (UWORD)~mask) | (a & mask));
+                writeWord(target+downwellPlaneBytes,
+                    (readWord(target+downwellPlaneBytes) & (UWORD)~mask) | (b & mask));
+            }
+            target += downwellBytesPerPlaneLine; source += 2;
+        }
+    }
+}
+
 int amigaRendererBindTerrainBatch(AmigaTerrainBatch* batch, const UBYTE* pack,
     const UBYTE* end, UBYTE* scratch, unsigned bytes) {
     unsigned frame;

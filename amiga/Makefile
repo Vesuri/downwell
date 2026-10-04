@@ -29,6 +29,7 @@ TERRAIN_RUN_STORE ?= 0
 TABLE_CONTACT_ATAN ?= 0
 RETAIN_HEALTH_HUD ?= 0
 AMMO_DAMAGE_RANGE ?= 0
+PREPARED_AMMO_DIVIDERS ?= 0
 SCENERY_LAYERS ?= 0
 NATIVE_BOXES ?= 1
 NATIVE_FIELDS ?= 1
@@ -167,6 +168,9 @@ endif
 ifeq ($(AMMO_DAMAGE_RANGE),1)
 CFLAGS += -DDOWNWELL_AMMO_DAMAGE_RANGE
 endif
+ifeq ($(PREPARED_AMMO_DIVIDERS),1)
+CFLAGS += -DDOWNWELL_PREPARED_AMMO_DIVIDERS
+endif
 ifeq ($(SCENERY_LAYERS),1)
 CFLAGS += -DDOWNWELL_SCENERY_LAYERS
 endif
@@ -283,10 +287,15 @@ $(OUT).front: $(AMIGA_FRONT_BANK)
 .PHONY: FORCE_STARTUP_OPTIONS
 obj/startup-options: FORCE_STARTUP_OPTIONS
 	@mkdir -p obj
-	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(SKIP_LEVEL)' '$(TERRAIN_RUN_STORE)' '$(TABLE_CONTACT_ATAN)' '$(RETAIN_HEALTH_HUD)' '$(AMMO_DAMAGE_RANGE)' '$(SCENERY_LAYERS)' '$(NATIVE_BOXES)' '$(NATIVE_FIELDS)' '$(TERRAIN_BATCH)' '$(TERRAIN_DIRECT)' '$(TERRAIN_BATCH_VERIFY)' '$(AMIGA_OPTIMIZATION)' '$(LASER_VERIFY)' '$(PROFILE_LASER)' > $@.tmp
+	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(SKIP_LEVEL)' '$(TERRAIN_RUN_STORE)' '$(TABLE_CONTACT_ATAN)' '$(RETAIN_HEALTH_HUD)' '$(AMMO_DAMAGE_RANGE)' '$(PREPARED_AMMO_DIVIDERS)' '$(SCENERY_LAYERS)' '$(NATIVE_BOXES)' '$(NATIVE_FIELDS)' '$(TERRAIN_BATCH)' '$(TERRAIN_DIRECT)' '$(TERRAIN_BATCH_VERIFY)' '$(AMIGA_OPTIMIZATION)' '$(LASER_VERIFY)' '$(PROFILE_LASER)' > $@.tmp
 	@cmp -s $@.tmp $@ || cp $@.tmp $@
 
 $(OBJECTS): obj/startup-options
+ifeq ($(PREPARED_AMMO_DIVIDERS),1)
+$(OBJECTS): $(REPO)/generated/amiga-ammo-dividers.h
+$(REPO)/generated/amiga-ammo-dividers.h: $(REPO)/tools/generate-ammo-dividers.py $(AMIGA_HUD)
+	$(MAKE) -C $(REPO) generated/amiga-ammo-dividers.h
+endif
 $(OBJECTS): $(REPO)/generated/downwell-field-spans.h
 $(REPO)/generated/downwell-field-spans.h: $(REPO)/tools/generate-field-spans.cpp $(wildcard $(REPO)/src/core/*.h)
 	$(MAKE) -C $(REPO) generated/downwell-field-spans.h

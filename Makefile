@@ -2001,6 +2001,19 @@ verify-builder-pattern-pack: $(BUILDER_PATTERN_PACK_TEST_TARGET)
 generate-amiga-hud:
 	tools/generate-amiga-hud.py
 
+generated/amiga-ammo-dividers.h: tools/generate-ammo-dividers.py generated/amiga-hud.dwap
+	python3 tools/generate-ammo-dividers.py
+
+generated/amiga-hud.dwap: tools/generate-amiga-hud.py
+	tools/generate-amiga-hud.py
+
+.PHONY: verify-prepared-ammo-dividers
+build/prepared-ammo-renderer-test: $(AMIGA_RENDERER_TEST_SOURCES) $(wildcard src/platform/amiga/*.h) $(wildcard src/core/*.h) generated/amiga-ammo-dividers.h generated/downwell-field-spans.h
+	@mkdir -p $(@D)
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -DDOWNWELL_AMMO_DAMAGE_RANGE -DDOWNWELL_PREPARED_AMMO_DIVIDERS -o $@ $(AMIGA_RENDERER_TEST_SOURCES)
+verify-prepared-ammo-dividers: build/prepared-ammo-renderer-test generate-amiga-game
+	./build/prepared-ammo-renderer-test generated/amiga-game.dwap generated/amiga-hud.dwap
+
 .PHONY: generate-amiga-results verify-amiga-results
 .PHONY: generate-amiga-shop verify-amiga-shop
 generate-amiga-shop:

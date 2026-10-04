@@ -6,6 +6,9 @@
 #include "core/AmmoDividerLayout.h"
 #include "core/AmmoFill.h"
 #include "core/HudNumbers.h"
+#ifdef DOWNWELL_PREPARED_AMMO_DIVIDERS
+#include "AmigaPreparedDividers.h"
+#endif
 class AmigaAmmoHud {
     AmmoHudDamage damage_;
     downwell::AmmoDividerLayout layout_;
@@ -21,6 +24,9 @@ class AmigaAmmoHud {
     UWORD dividers_[downwellDisplayHeight*2];
     unsigned dividerAmmo_ = ~0u, dividerCapacity_ = ~0u;
     int bodyTop_ = 0, bodyBottom_ = 0;
+#ifdef DOWNWELL_PREPARED_AMMO_DIVIDERS
+    bool preparedDividersMatch_ = false;
+#endif
 public:
     unsigned lastWordWrites = 0;
     void invalidate() { damage_.valid = false; }
@@ -58,6 +64,9 @@ public:
                 if (!amigaRendererPrepareWordStamp(&stamps_[i], pack, end,
                     i < 4 ? 418 : i < 8 ? 419 : 421, i < 8 ? i % 4 : i-8)) stampsReady_ = false;
             stampPack_ = pack;
+#ifdef DOWNWELL_PREPARED_AMMO_DIVIDERS
+            preparedDividersMatch_ = stampsReady_ && amigaPreparedDividersMatch(stamps_ + 8);
+#endif
             amigaRendererClearClipRect(renderer);
             amigaRendererFillRect(renderer, 272, 0, 48, 284, 3);
             amigaRendererDrawAsset(renderer, pack, end, 416, 0, 284, 43, 0);
@@ -175,6 +184,15 @@ public:
             DW_PROFILE_PHASE(profileAmmoDividers);
             const bool cachedDividers = stampsReady_ && !forceFull && capacity <= 64 && meter <= 3;
             const bool fusedPublish = interior && cachedDividers;
+#ifdef DOWNWELL_PREPARED_AMMO_DIVIDERS
+            const bool prepared = cachedDividers && preparedDividersMatch_ && capacity <= 16;
+            AmigaHudBlockedColumn preparedColumn = {};
+            if (prepared) {
+                preparedColumn = amigaPreparedDividers(ammo, capacity);
+                if (!fusedPublish) amigaRendererApplyHudBlockedColumn(renderer, &preparedColumn,
+                    18, 4*meter, top, bottom);
+            } else
+#endif
             if (cachedDividers) {
                 // Retain the ordered divider composition, not just positions.
                 // Animation strips reuse it; jiggle only shifts its row origin.
@@ -211,6 +229,12 @@ public:
             }
             {
                 DW_PROFILE_SCOPE(profileAmmoWordPublish);
+#ifdef DOWNWELL_PREPARED_AMMO_DIVIDERS
+                if (prepared && fusedPublish)
+                    lastWordWrites += amigaRendererPublishHudBlockedColumn(display->hud, working_,
+                        &preparedColumn, 18, top, bottom, 4*meter, 0xfff0);
+                else
+#endif
                 if (fusedPublish)
                     lastWordWrites += amigaRendererPublishHudColumn(display->hud, working_,
                         dividers_, 18, top, bottom, 4 * meter, 0xfff0);

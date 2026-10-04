@@ -100,6 +100,17 @@ unsigned amigaRendererCopyHudWords(UBYTE*, const UBYTE*, int, int, int, int, int
 // Compose one retained masked column and publish only changed plane words.
 unsigned amigaRendererPublishHudColumn(UBYTE*, UBYTE*, const UWORD*, unsigned,
                                       int, int, int, UWORD);
+/* Host-composed column: byte dictionary index per eight interleaved planar rows.
+   Dictionary block zero must be entirely transparent (all words zero).
+   Readers consume the blocks directly; no runtime expansion or composition. */
+typedef struct AmigaHudBlockedColumn {
+    const UBYTE* indices;
+    const UWORD* blocks;
+} AmigaHudBlockedColumn;
+unsigned amigaRendererPublishHudBlockedColumn(UBYTE*, UBYTE*, const AmigaHudBlockedColumn*,
+                                             unsigned, int, int, int, UWORD);
+void amigaRendererApplyHudBlockedColumn(AmigaRenderer*, const AmigaHudBlockedColumn*,
+                                       unsigned, int, int, int);
 /* One aligned HUD column, already clipped by caller; masked planar words. */
 void amigaRendererFillHudWordColumn(UBYTE*, unsigned, unsigned, unsigned, UWORD, UWORD, UWORD);
 void amigaRendererCacheHudColumns(UWORD*, const UBYTE*, unsigned, unsigned);

@@ -296,11 +296,10 @@ Rules for this section:
      constant-value line intervals (run middles, fill, dividers). Diff the
      previous and new interval lists, and write only lines whose final word
      changes.
-   - Shots: finish normal-build integration of `AMMO_DAMAGE_RANGE=1` after
-     the combined HUD timing/fidelity gates. Retain the full-scan comparison
-     and fallback for nonconsecutive animation observations.
-   - Ammo changes: retain the divider composition per ammo value for small
-     capacities, instead of recomposing all rows (4.1 ms).
+   - Finish normal-build integration of `AMMO_DAMAGE_RANGE=1` and
+     `PREPARED_AMMO_DIVIDERS=1` after the combined HUD timing/fidelity gates.
+     Retain full-scan and sprite-compositor comparisons, nonconsecutive
+     animation handling, and larger-capacity/changed-artwork fallbacks.
 
    Target: under 8 ms for a recharge frame and under 4 ms for a shot frame.
 6. **Time-field outlines (22.5 ms preparation and 5.6 ms drawing per frame

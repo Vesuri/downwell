@@ -60,6 +60,21 @@ the deterministic `DWBP` format documented in `docs/builder-pattern-pack.md`.
 It verifies the pinned Steam build through the extraction manifest and keeps
 the derived cell payload under ignored `generated/`.
 
+## Prepared Amiga ammo dividers
+
+`make generated/amiga-ammo-dividers.h` composes resource 421's ordered divider
+draws for capacities 0–16 and each ammo value. The ignored generated header
+contains a dictionary of eight-row planar blocks and per-image byte indices;
+block zero is transparent. The renderer reads these blocks directly, without
+runtime expansion or layered sprite composition. The companion JSON records
+generator, source, extractor, input-pack and output hashes.
+
+`make verify-prepared-ammo-dividers` compares every composition with the
+portable binary64 draw sequence and runs the complete HUD pixel suite.
+The Amiga comparison switch is `PREPARED_AMMO_DIVIDERS=1`; zero retains the
+original compositor. Changed source artwork and capacities above 16 use that
+compositor even when the switch is enabled.
+
 ## Original audio
 
 After the UTMT extraction, run `python3 tools/extract-audio.py` to extract all
