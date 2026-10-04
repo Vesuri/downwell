@@ -2504,6 +2504,12 @@ int main(int argc, char** argv) {
                 "contact benchmark retains the measured 138-terrain-birth generation burst");
             if(!search)require(firstDamage&&damageFrames,"profile input must reach real damage");
         }
+#ifdef DOWNWELL_AUDIT_RANDOM
+        require(downwell::GameMakerRandom::auditedDraws > 1000,
+                "contact replay exercised the per-draw ring state oracle");
+        std::cout << "RNG replay: " << downwell::GameMakerRandom::auditedDraws
+                  << " consumed draws checked against all 16 oracle words\n";
+#endif
         return 0;
     }
     if(argc>=4 && std::getenv("DOWNWELL_VERIFY_GENERATED_HANDOFF")){

@@ -313,6 +313,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
                                   bool anyInput) {
     if (run_.levelClearActive || !run_.effectsSucceeded ||
         !roomLoadSucceeded_ || !deferredCommandsSucceeded_) return; // Result owner uses stepLevelClear.
+    GameMakerRandom::FrameRefill refill{random_};
     // Previous Draw's follow publication remains visible throughout ordinary
     // Step, even after camMain's own Step changes the followed instance.
     ordinaryStepViewTopQ12_ = mainCameraMotion_.viewTopQ12();
@@ -2391,6 +2392,7 @@ void StartupRuntime::gotoRoom(int roomId) {
 
 void StartupRuntime::loadRoom(int roomId, bool firstGameRoom) {
     if(!deferredCommandsSucceeded_ || !run_.effectsSucceeded){roomLoadSucceeded_=false;return;}
+    if (roomId == mainRoomId) random_.prepareLookahead(randomLookahead_);
     if(!ownedEntryRegistration_.clear()){roomLoadSucceeded_=false;return;}
     if(!clearRoomDebris()){roomLoadSucceeded_=false;return;}
     if(!clearRoomScriptEffects()){roomLoadSucceeded_=false;return;}

@@ -621,6 +621,7 @@ public:
                         bool awake = false);
     void configureEnemyRandom(const downwell::GameMakerRandom& random) {
         enemyRandom_ = random;
+        enemyRandom_.prepareLookahead(randomLookahead_);
     }
     // Synchronous builder handoff. Shop/exit Create effects must occur before
     // the next pattern cell draws RNG. The backend owns terrain representation;
@@ -911,6 +912,7 @@ public:
     bool initializeAreaOneBuilder(Builder& builder, int x, int y, unsigned style = 0) {
         if(!run_.effectsSucceeded)return false;
         if (run_.stage.area != 1 || run_.stage.level < 1 || run_.stage.level > 3 || style > 4) return false;
+        enemyRandom_.prepareLookahead(randomLookahead_);
         downwell::AreaOneBuilder::Setup setup;
         setup.level = unsigned(run_.stage.level);
         setup.style = style;
@@ -1048,6 +1050,7 @@ private:
     unsigned short enemySlotIndex_[enemyCapacity]{};
     GemState gems_[gemCapacity];
     unsigned enemyCount_;
+    downwell::GameMakerRandom::Lookahead randomLookahead_;
     downwell::GameMakerRandom enemyRandom_;
     int health_;
     unsigned invulnerability_;

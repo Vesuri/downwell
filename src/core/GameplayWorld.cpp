@@ -234,6 +234,7 @@ GameplayWorld::GameplayWorld(unsigned initialRingOrigin,
 {
     unsigned index;
     run_.reset();
+    enemyRandom_.prepareLookahead(randomLookahead_);
     entryRooms_=entryRooms;
     // The selected runner copies serialized views before instance events.
     // This adapter enters rmMain; following the camera is a separate phase.
@@ -871,6 +872,7 @@ bool GameplayWorld::advanceBulletRoomAnimation(downwell::InstanceHandle key){
 GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
 {
     if (run_.levelClearActive || !run_.effectsSucceeded || !generationSucceeded_) return {}; // Result owner uses stepLevelClear.
+    downwell::GameMakerRandom::FrameRefill refill{enemyRandom_};
     if(scriptSpawnInstances_&&scriptSpawnInstances_->size())scriptEffectsBinding_.beginAnimation();
     else scriptEffectsBinding_={};
     if(debrisInstances_&&debrisInstances_->size())debrisBinding_.beginAnimation();

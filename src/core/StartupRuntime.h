@@ -1071,6 +1071,7 @@ private:
     static_assert(AlarmBank::count < 16, "Alarm cache reserves negative values for misses");
     const BuilderPatternPack* builderPatternPack_ = nullptr;
     std::uint32_t randomSeed_ = defaultRandomSeed;
+    GameMakerRandom::Lookahead randomLookahead_;
     GameMakerRandom random_;
     PlatformProfile profile_ = PlatformProfile::desktop;
     int initTimes_ = 0;

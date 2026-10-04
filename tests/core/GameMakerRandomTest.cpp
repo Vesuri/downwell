@@ -263,6 +263,63 @@ void testFullIntegerPath() {
     }
 }
 
+void testLookahead() {
+    using Random = downwell::GameMakerRandom;
+    static_assert(sizeof(Random) < 256, "stack RNG snapshots must not contain the ring");
+    const auto equal = [](const Random& actual, const Random& oracle) {
+        require(actual.seed() == oracle.seed() && actual.drawCount() == oracle.drawCount() &&
+                actual.stateIndex() == oracle.stateIndex(), "lookahead consumer cursor matches reference");
+        for (unsigned i = 0; i < 16; ++i)
+            require(actual.stateWord(i) == oracle.stateWord(i), "lookahead preserves every consumer state word");
+    };
+    constexpr unsigned skips[] = {0, 1, 15, 16, 17, 495, 496, 497, 1000};
+    for (unsigned seed = 0; seed < 32; ++seed) {
+        Random::Lookahead storage, replacement;
+        Random actual(seed), oracle(seed);
+        actual.bindLookahead(storage);
+        actual.refill(Random::Lookahead::aheadCapacity);
+        require(storage.available == Random::Lookahead::aheadCapacity, "test exercises populated ring, not fallback");
+        equal(actual, oracle);
+        for (unsigned tick = 0; tick < 1800; ++tick) {
+            require(actual.nextU32() == oracle.nextU32(), "buffered draw matches direct WELL output");
+            equal(actual, oracle);
+            if (tick % 37 == 0) {
+                const auto count = skips[(tick / 37) % 9];
+                actual.advance(count);
+                for (unsigned i = 0; i < count; ++i) oracle.nextU32();
+                equal(actual, oracle);
+            }
+            actual.refill(tick % 3 ? 4 : Random::Lookahead::aheadCapacity);
+            equal(actual, oracle); // Producer progress is not a consumed draw.
+            if (tick % 211 == 0) {
+                Random snapshot(actual), expected(oracle);
+                actual.refill(Random::Lookahead::aheadCapacity);
+                for (unsigned i = 0; i < 40; ++i)
+                    require(snapshot.nextU32() == expected.nextU32(), "snapshot never borrows producer storage");
+                equal(snapshot, expected);
+                equal(actual, oracle);
+                actual.bindLookahead(replacement);
+                equal(actual, oracle);
+            }
+        }
+        actual.setSeed(seed + 99); oracle.setSeed(seed + 99);
+        equal(actual, oracle);
+        actual.refill(Random::Lookahead::aheadCapacity);
+        for (unsigned i = 0; i < 100; ++i) {
+            require(actual.irandomSmall(5) == oracle.irandomSmall(5), "reseeded buffered integer draw matches");
+            equal(actual, oracle);
+        }
+        Random source(1234);
+        source.advance(177);
+        actual = source; oracle = source;
+        actual.refill(Random::Lookahead::aheadCapacity);
+        for (unsigned i = 0; i < 100; ++i) {
+            require(actual.nextU32() == oracle.nextU32(), "assignment resets destination producer from consumer");
+            equal(actual, oracle);
+        }
+    }
+}
+
 } // namespace
 
 int main() {
@@ -281,6 +338,7 @@ int main() {
     testSmallIntegerPath();
     testSmallScaledRealPath();
     testFullIntegerPath();
+    testLookahead();
     std::cout << "GameMaker random tests passed\n";
     return 0;
 }

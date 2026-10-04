@@ -248,36 +248,15 @@ builder pattern is emitted synchronously, as in the original; the draws and
 creations must stay in that order. What can go is the per-cell work around
 them.
 
-1. **Precomputed Well512 ring.** `Well512::step` costs 23.2 ms at 701 and
-   12.6 ms at 844, all inside generation: about 300 and 165 steps at roughly
-   540 cycles each (already hand-written assembly). `GameMakerRandom::advance`
-   alone, the draws no caller reads, is 17.8 ms of that at 701. Elsewhere on
-   the tape the generator costs under 0.3 ms per frame. The output stream
-   depends only on the seed, so precomputing it changes no value or order.
-   - Keep a ring in `GameMakerRandom` (512 entries is enough for one pattern)
-     of each step's output and the `mixed` word it stores. Refill a small
-     fixed number of steps per frame at the end of the frame (about four:
-     0.3 ms), plus fully at run start and level entry. When a burst empties the
-     ring, fall back to stepping synchronously.
-   - `nextU32` becomes a ring read and `advance(n)` an index add.
-   - `stateIndex()`, `stateWord()` and `drawCount()` must still describe the
-     consumer position. The 16 words are the last 15 `mixed` words plus the
-     latest output, placed by index, so keep at least 16 consumed entries
-     behind the read position.
-   - Portable code in `src/core`, used by SDL and Amiga alike. The existing
-     per-step path is the oracle: compare full state after every draw on a
-     replay.
-   - Target: Well512 under 2 ms in both burst frames, with nothing added to
-     any other frame beyond the refill.
 2. **Prepared pattern terrain.** At 701, per-cell terrain publication and cell
    classification cost about 50 ms:
    - 60 single wall/platform cells through
      `AmigaAreaOneTerrainBuilder::collect` → `AmigaGameplayGeneration::create`
      (`amigaAddTerrainObject`, `AmigaTerrainTiles::append`) take 15.3 ms,
      about 1,800 cycles each.
-   - 23 runs through `createRun` take 22.1 ms: `publishSpan` 7.2, RNG 7.1 (A1
-     removes it), the `AmigaTerrainRunIndex` constructor 2.7 and `admitSpan`
-     1.6.
+   - 23 runs through `createRun` take 22.1 ms: `publishSpan` 7.2, RNG 7.1,
+     the `AmigaTerrainRunIndex` constructor 2.7 and `admitSpan`
+     1.6. Exclude the old RNG cost from this item's saving estimate.
    - The cell loop in `AreaOneBuilder::emitPatternMode` itself costs 7.5 ms,
      plus `plainCavernCell` 2.9 and `BuilderPatternPack::rowData` 2.5.
 
@@ -292,7 +271,7 @@ them.
        that precede it in the row.
    - Emission then does three things per row, in source order:
      - ORs in the row's prepared terrain;
-     - advances the RNG by the stored counts (cheap after A1);
+     - advances the RNG ring by the stored counts;
      - calls the existing code only for event cells.
    - Publish terrain row by row before that row's event cells, so a Create can
      see no terrain that the original had not yet created.
@@ -300,7 +279,7 @@ them.
      generator against `BuilderPatternPack`.
    - The current builder stays as the reference selector, compared per frame
      by the ownership digests.
-   - Target: generation at 701 under 30 ms together with A1, and the cell loop
+   - Target: generation at 701 under 30 ms, and the cell loop
      under 3 ms.
 3. **Native breakables.** At 844, 13 `GameplayWorld::appendBreakables` births
    take 11.0 ms (6,000 cycles each; 5.2 ms at 701):

@@ -13,7 +13,39 @@ namespace downwell {
 // models the 32-bit Windows runner rather than a generic host RNG.
 class GameMakerRandom {
 public:
+    // Runtime-owned Fast/host storage; temporary RNG snapshots stay small.
+    // Sixteen consumed entries remain behind the cursor for stateWord().
+    struct Lookahead {
+        static constexpr unsigned capacity = 512, aheadCapacity = capacity - 16;
+        struct Entry { std::uint32_t output, mixed; } entries[capacity]{};
+        std::array<std::uint32_t, 16> producer{};
+        std::size_t producerIndex = 0;
+        unsigned read = 0, available = 0, history = 0;
+#ifdef DOWNWELL_AUDIT_RANDOM
+        std::array<std::uint32_t, 16> oracle{};
+        std::size_t oracleIndex = 0;
+#endif
+    };
     explicit GameMakerRandom(std::uint32_t seed = 0) { setSeed(seed); }
+    GameMakerRandom(const GameMakerRandom& other);
+    GameMakerRandom& operator=(const GameMakerRandom& other);
+
+    // Storage must outlive this RNG and be exclusively owned by it. Binding
+    // and filling do not consume a draw. Copies never borrow another cache.
+    void bindLookahead(Lookahead& storage);
+    void refill(unsigned steps = 4);
+    void prepareLookahead(Lookahead& storage) {
+#ifndef DOWNWELL_REFERENCE_RANDOM
+        bindLookahead(storage);
+        refill(Lookahead::aheadCapacity);
+#else
+        (void)storage; // Retained per-step oracle, including native profiles.
+#endif
+    }
+    struct FrameRefill {
+        GameMakerRandom& random;
+        ~FrameRefill() { random.refill(); }
+    };
 
     void setSeed(std::uint32_t seed);
     std::uint32_t seed() const { return seed_; }
@@ -47,8 +79,11 @@ public:
     std::uint32_t randomIntegerSmall(std::uint32_t upperExclusive);
 
     std::size_t stateIndex() const { return stateIndex_; }
-    std::uint32_t stateWord(std::size_t index) const { return state_[index]; }
+    std::uint32_t stateWord(std::size_t index) const;
     std::uint64_t drawCount() const { return drawCount_; }
+#ifdef DOWNWELL_AUDIT_RANDOM
+    static std::uint64_t auditedDraws;
+#endif
 
 private:
     static constexpr std::uint32_t wellMask = 0xda442d24U;
@@ -57,6 +92,9 @@ private:
     std::size_t stateIndex_ = 0;
     std::uint32_t seed_ = 0;
     std::uint64_t drawCount_ = 0;
+    Lookahead* lookahead_ = nullptr;
+    void resetLookahead();
+    void consumeLookahead(unsigned draws);
 };
 
 } // namespace downwell

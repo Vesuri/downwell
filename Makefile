@@ -6,6 +6,7 @@ SKIP_INTRO ?= 0
 SKIP_TO_GAME ?= 0
 SKIP_LEVEL ?= 0
 TERRAIN_RUN_STORE ?= 0
+REFERENCE_RANDOM ?= 0
 export SKIP_INTRO SKIP_TO_GAME SKIP_LEVEL
 
 SDL_CFLAGS  := $(shell pkg-config --cflags sdl2 SDL2_image)
@@ -26,6 +27,9 @@ CPPFLAGS += -DDOWNWELL_SKIP_LEVEL
 endif
 HOST_OPT ?= -O2
 CXXFLAGS := -std=c++17 -g $(HOST_OPT) -ffp-contract=off -Wall -Wextra -Wpedantic -MMD -MP
+ifeq ($(REFERENCE_RANDOM),1)
+CXXFLAGS += -DDOWNWELL_REFERENCE_RANDOM
+endif
 LDFLAGS  := $(SDL_LDFLAGS)
 
 SOURCES := \
@@ -693,6 +697,14 @@ test: verify-runner-spatial-split
 .PHONY: verify-contact-profile
 verify-contact-profile: $(AMIGA_SCENE_TEST_TARGET)
 	DOWNWELL_VERIFY_CONTACT_PROFILE=1 ./$(AMIGA_SCENE_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
+
+.PHONY: verify-random-replay
+verify-random-replay: build/random-replay-test
+	DOWNWELL_VERIFY_CONTACT_PROFILE=1 ./build/random-replay-test generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
+
+build/random-replay-test: $(AMIGA_SCENE_TEST_SOURCES) $(wildcard src/core/*.h)
+	@mkdir -p $(@D)
+	$(CXX) -Isrc $(CXXFLAGS) -UNDEBUG -DDOWNWELL_AUDIT_RANDOM -o $@ $(AMIGA_SCENE_TEST_SOURCES)
 
 # Domain evidence only: traces actual post-wrapper atan inputs, not a new
 # approximation. This macro and observer are absent from shipping builds.

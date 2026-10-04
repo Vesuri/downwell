@@ -75,6 +75,7 @@ fi
 if [[ ${SKIP_LEVEL:-0} == 1 && $mode != trace && $mode != fields-clear ]]; then script=profile_clear.gdb; fi
 # Always leave the playable binary behind, including after a timeout/failure.
 restore() {
+  unset REFERENCE_RANDOM
   unset DRAW_CACHE_AUDIT
   unset DRAW_ORDER_AUDIT
   unset LOCAL_DRAW_CAPTURE
