@@ -245,11 +245,6 @@ gauge) and left ten opt-in flags behind. Do not repeat that.
 
 A and B rely on these gates. Fix them, but do not count this as frame-budget
 progress.
-- Re-run `verify-amiga-natural-route` with the host-pinned exit/reentry
-  assertions; require all shop, pixel and stack checks, not just route timing.
-- `verify-amiga-gameplay-active-frame`: resolve the 17-pixel actor mismatch at
-  the upper-right playfield edge on the shared descent tape (tick 303).
-  Keep the full SDL/native comparison strict.
 - `profile.sh fields-clear`: establish a bounded deadline sufficient for the
   exhaustive pixel fixtures at startup and reentry, then require the full
   exit-field coverage and zero mismatches.

@@ -41,7 +41,14 @@ int main(int argc, char** argv) {
     downwell::PlatformSDL platform;
     if (!platform.ready() || !platform.loadSpriteAssets(sprites, "extracted/utmt-0.9.2.0/TexturePages") ||
         !platform.loadFontAssets(fonts)) return 4;
-    downwell::Game game(&rooms, &objects, &builders);
+    // Match the playable SDL renderer: without these assets Game falls back
+    // to direct gem/smoke drawing instead of the recovered effects surface.
+    const auto effectBytes = read("generated/amiga-game.dwap");
+    const auto entryBytes = read("generated/amiga-game.entry-mask");
+    downwell::EffectMaskAssets effectAssets;
+    if (!effectAssets.bind(effectBytes.data(), effectBytes.size()) ||
+        !effectAssets.bindEntryMask(entryBytes.data(), entryBytes.size())) return 4;
+    downwell::Game game(&rooms, &objects, &builders, &effectAssets);
     bool styleSeen = false, lockedSeen = false, landed = false;
     // Optional garden-frame capture along the same unmodified startup tape.
     // Count updates in rmMenu rather than relying on publisher timing.
