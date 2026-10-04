@@ -27,7 +27,7 @@ struct PackedBuilderPattern {
 
 class BuilderPatternPack {
 public:
-    static constexpr std::uint16_t formatVersion = 3;
+    static constexpr std::uint16_t formatVersion = 4;
     static constexpr std::uint32_t manifestSchema = 3;
     static constexpr std::uint64_t sourceHashPrefix = 0xe00a94be5faf7dc0ULL;
     static constexpr std::size_t headerSize = 32;
@@ -50,10 +50,18 @@ public:
     // Validated immutable row view; lifetime is that of the backing pack.
     bool rowData(const PackedBuilderPattern& pattern, std::uint16_t y,
                  const std::uint8_t*& output, std::uint32_t& width) const;
+    // Validated source-ordered program. 0 introduces a fixed terrain segment,
+    // ASCII introduces one event cell, 255 terminates the row. Views remain
+    // valid for the immutable pack's lifetime. Pillars are the last two rows.
+    const std::uint8_t* preparedRow(const PackedBuilderPattern& pattern,
+                                  unsigned row, bool reversed) const;
+    const std::uint8_t* preparedPillars(bool reversed) const;
 
 private:
     const std::uint8_t* bytes_ = nullptr;
     std::size_t patternsOffset_ = 0, rowsOffset_ = 0, cellsOffset_ = 0;
+    const std::uint8_t* preparedOffsets_ = nullptr;
+    const std::uint8_t* preparedPrograms_ = nullptr;
     std::uint32_t patternCount_ = 0, rowCount_ = 0, cellCount_ = 0;
     BuilderPatternPackError error_ = BuilderPatternPackError::tooShort;
 };

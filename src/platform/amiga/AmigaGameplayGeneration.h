@@ -21,6 +21,7 @@ public:
 private:
     static bool create(void*, const downwell::DeferredCreateInstance&);
     static bool createRun(void*,const downwell::AreaOneBuilder::TerrainRun&);
+    static bool createPrepared(void*,const downwell::AreaOneBuilder::PreparedTerrain&);
     AmigaAreaOneTerrainBuilder& builder_;
     const downwell::BuilderPatternPack& patterns_;
     const downwell::ObjectPack& objects_;

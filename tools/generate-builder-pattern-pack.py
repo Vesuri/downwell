@@ -12,7 +12,7 @@ from pathlib import Path
 
 
 MAGIC = b"DWBP"
-VERSION = 3
+VERSION = 4
 MANIFEST_SCHEMA = 3
 SOURCE_SHA256 = "c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8"
 AREA_ONE_START = 1
@@ -32,6 +32,75 @@ EXPECTED_CELLS = 8435
 HEADER = struct.Struct("<4sHHIIIQI")
 PATTERN = struct.Struct("<HHHHIII")
 ROW = struct.Struct("<II")
+
+# Every other symbol has only the unconditional cavern cutoff draw. Event
+# cells retain the runtime VM-derived implementation and exact draw order.
+EVENT_CELLS = set("abcdet%IJ^2B3vO_$\\=@")
+
+
+def prepared_row(text, family, reversed, edge_walls):
+    output = bytearray()
+    creates, pending, draws, special = [], 0, 0, 0
+
+    def create(x, platform=False, border=False):
+        nonlocal pending, special
+        column = (x + 512) // 16
+        require(0 <= column < 128, "prepared terrain column outside grid")
+        require(pending < 128, "prepared draw span too long")
+        creates.append((column | (128 if platform else 0), pending | (128 if border else 0)))
+        pending = 0
+        special += border
+
+    def flush():
+        nonlocal creates, pending, draws, special
+        if not draws and not creates:
+            return
+        cells = {}
+        for item, _ in creates:
+            column = item & 127
+            flags, walls = cells.get(column, (0, 0))
+            cells[column] = (flags | (34 if item & 128 else 19), walls + (not item & 128))
+        words = {}
+        for column, (flags, walls) in sorted(cells.items()):
+            require(walls <= 3, "prepared word contact count exceeds packed field")
+            word = words.setdefault(column & ~1, [0, 0])
+            word[column & 1] = flags | (walls << 6)
+        require(max(draws, special, len(creates), len(words)) < 255, "prepared segment too large")
+        output.extend((0, draws, special, len(creates), len(words), sum(bool(c & 128) for c, _ in creates)))
+        for item in creates:
+            output.extend(item)
+        for column, pair in sorted(words.items()):
+            output.extend((column, bool(pair[0]) | (bool(pair[1]) << 1), *pair))
+        creates, pending, draws, special = [], 0, 0, 0
+
+    for column, symbol in enumerate(text):
+        x = 320 - (column + 1) * 16 if reversed else 160 + (column + 1) * 16
+        if symbol in EVENT_CELLS:
+            flush()
+            output.extend((ord(symbol), (x + 512) // 16))
+            continue
+        draws += 1
+        pending += 1
+        if symbol in "1|-":
+            create(x, symbol == "-")
+        elif symbol in "{}":
+            create(16 if reversed else 464, border=True)
+    if edge_walls:
+        draws += 1
+        pending += 1
+        side = family in (AREA_ONE_RIGHT, AREA_ONE_SHOP)
+        create((0 if reversed else 480) if side else (160 if reversed else 320))
+        create(320 if reversed else 160)
+    flush()
+    output.append(255)
+    return output
+
+
+def prepared_pillars(reversed):
+    # No RNG at all for the appended pillar pair. Same wire format as rows.
+    columns = (42, 52) if reversed else (52, 42)
+    return bytes((0, 0, 0, 2, 2, 0, columns[0], 0, columns[1], 0,
+                  42, 1, 83, 0, 52, 1, 83, 0, 255))
 
 
 def require(condition, message):
@@ -102,6 +171,7 @@ def build_pack(manifest, start_source, main_source, right_source, shop_source,
     records = []
     row_records = []
     cells = bytearray()
+    prepared = []
     families = (
         (AREA_ONE_START, parse_patterns(
             start_source, "partStart", EXPECTED_START_PATTERNS, 9)),
@@ -119,11 +189,13 @@ def build_pack(manifest, start_source, main_source, right_source, shop_source,
         for source_index, width, rows in patterns:
             first_row = len(row_records)
             first_cell = len(cells)
-            for row in rows:
+            for row_index, row in enumerate(rows):
                 encoded = row.encode("ascii")
                 row_records.append(ROW.pack(len(cells), len(encoded)))
                 cells.extend(encoded)
                 row_count += 1
+                for reversed in (False, True):
+                    prepared.append(prepared_row(row, family, reversed, row_index + 1 < len(rows)))
             records.append(PATTERN.pack(
                 family, source_index, width, len(rows),
                 first_row, first_cell, len(cells) - first_cell))
@@ -135,7 +207,14 @@ def build_pack(manifest, start_source, main_source, right_source, shop_source,
     header = HEADER.pack(MAGIC, VERSION, HEADER.size, MANIFEST_SCHEMA,
                          len(records), len(cells), source_hash_prefix,
                          len(row_records))
-    return b"".join((header, b"".join(records), b"".join(row_records), cells))
+    prepared.extend(prepared_pillars(reversed) for reversed in (False, True))
+    offsets, programs = [], bytearray()
+    for program in prepared:
+        offsets.append(struct.pack("<I", len(programs)))
+        programs.extend(program)
+    offsets.append(struct.pack("<I", len(programs)))
+    return b"".join((header, b"".join(records), b"".join(row_records), cells,
+                     b"DWPR", b"".join(offsets), programs))
 
 
 def atomic_write(path, payload):

@@ -248,39 +248,19 @@ builder pattern is emitted synchronously, as in the original; the draws and
 creations must stay in that order. What can go is the per-cell work around
 them.
 
-2. **Prepared pattern terrain.** At 701, per-cell terrain publication and cell
-   classification cost about 50 ms:
-   - 60 single wall/platform cells through
-     `AmigaAreaOneTerrainBuilder::collect` → `AmigaGameplayGeneration::create`
-     (`amigaAddTerrainObject`, `AmigaTerrainTiles::append`) take 15.3 ms,
-     about 1,800 cycles each.
-   - 23 runs through `createRun` take 22.1 ms: `publishSpan` 7.2, RNG 7.1,
-     the `AmigaTerrainRunIndex` constructor 2.7 and `admitSpan`
-     1.6. Exclude the old RNG cost from this item's saving estimate.
-   - The cell loop in `AreaOneBuilder::emitPatternMode` itself costs 7.5 ms,
-     plus `plainCavernCell` 2.9 and `BuilderPatternPack::rowData` 2.5.
-
-   At 844 the same paths cost about 16 ms. Every `1`, `|` and `-` cell, the
-   two row-edge walls, the `{`/`}` borders and the appended pillars are fixed
-   by (family, pattern, reversed). Only `2`, `3`, `^`, `@`, enemy and object
-   cells are random.
-   - Generate offline, per pattern and orientation:
-     - the fixed terrain as per-row grid/landing/contact/tile words and run
-       records;
-     - the list of event cells in column order, each with the number of draws
-       that precede it in the row.
-   - Emission then does three things per row, in source order:
-     - ORs in the row's prepared terrain;
-     - advances the RNG ring by the stored counts;
-     - calls the existing code only for event cells.
-   - Publish terrain row by row before that row's event cells, so a Create can
-     see no terrain that the original had not yet created.
-   - Keep any instance IDs that terrain consumes. Check the manifest-pinned
-     generator against `BuilderPatternPack`.
-   - The current builder stays as the reference selector, compared per frame
-     by the ownership digests.
-   - Target: generation at 701 under 30 ms, and the cell loop
-     under 3 ms.
+2. **Finish prepared pattern publication.** Keep the offline row programs;
+   the remaining work is the per-segment collector/execution dispatch and
+   separate occupancy and landing publication walks. Consolidate that work
+   into one admitted publication path rather than tuning its small helpers.
+   - Preserve source-ordered terrain segments separated by event cells: never
+     expose later terrain to an earlier Create. Retain the scalar reference
+     for registered terrain, instance IDs, and capacity/failure prefixes.
+   - Keep coincident-wall counts, landing candidates, platform record order,
+     dirty rows, RNG interleaving and the optional pillar tail exact.
+   - Recheck full-state/ownership replay and native terrain pixel oracles.
+     `REFERENCE_PATTERNS=1` selects the retained cell interpreter.
+   - Target remains generation at 701 under 30 ms and the cell loop under
+     3 ms. Prepared-data correctness alone does not close this item.
 3. **Native breakables.** At 844, 13 `GameplayWorld::appendBreakables` births
    take 11.0 ms (6,000 cycles each; 5.2 ms at 701):
    - 7.4 ms is the collision-owner binding: `RecordLifecycleBinding::birth` →

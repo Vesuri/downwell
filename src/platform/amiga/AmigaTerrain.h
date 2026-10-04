@@ -67,6 +67,7 @@ public:
     unsigned size() const { return count_; }
     // Same records and row order as appending each platform (93) Create.
     bool appendPlatforms(int x, int y, int stepX, unsigned count);
+    bool appendPrepared(const downwell::AreaOneBuilder::PreparedTerrain&);
 private:
     Tile tiles_[capacity];
     std::uint16_t heads_[rows] = {}, tails_[rows] = {};
@@ -88,9 +89,12 @@ public:
         observer_ = observer;
         observerContext_ = context;
         runObserver_ = nullptr;
+        preparedObserver_ = nullptr;
     }
     using RunObserver = bool (*)(void*,const downwell::AreaOneBuilder::TerrainRun&);
     void setTerrainRunObserver(RunObserver observer){runObserver_=observer;}
+    using PreparedObserver=bool (*)(void*,const downwell::AreaOneBuilder::PreparedTerrain&);
+    void setPreparedTerrainObserver(PreparedObserver observer){preparedObserver_=observer;}
     void resetInitialCheckpoint(downwell::GameMakerRandom& random);
     void resetInitialCheckpointBeforeEntrance(downwell::GameMakerRandom& random);
     // Import simulation state without replaying Create or consuming RNG.
@@ -115,6 +119,7 @@ public:
 private:
     static bool collect(void*, const downwell::DeferredCreateInstance&);
     static bool collectRun(void*,const downwell::AreaOneBuilder::TerrainRun&,downwell::AreaOneBuilder::EmitFunction);
+    static bool collectPrepared(void*,const downwell::AreaOneBuilder::PreparedTerrain&,downwell::AreaOneBuilder::EmitFunction);
     downwell::AreaOneBuilder builder_;
     AmigaTerrainFragment* fragments_;
     unsigned fragmentCapacity_;
@@ -129,6 +134,7 @@ private:
     downwell::AreaOneBuilder::EmitFunction observer_ = nullptr;
     void* observerContext_ = nullptr;
     RunObserver runObserver_ = nullptr;
+    PreparedObserver preparedObserver_ = nullptr;
 };
 
 struct AmigaTerrainCollisionContext {
@@ -177,6 +183,10 @@ bool amigaBuildTerrainIndex(const AmigaTerrainCollisionContext& context,
 // Requires an initialized index. Candidate insertion does not scan earlier rows.
 bool amigaAddTerrainObject(AmigaTerrainIndex& index, int objectId, int x, int y,
                            bool initialRoomWall = false);
+bool amigaAdmitPreparedTerrain(const AmigaTerrainIndex&,const AmigaTerrainTiles&,
+                              const downwell::AreaOneBuilder::PreparedTerrain&);
+bool amigaPublishPreparedTerrain(AmigaTerrainIndex&,AmigaTerrainTiles&,
+                                const downwell::AreaOneBuilder::PreparedTerrain&);
 bool amigaIndexedRoomWall(const AmigaTerrainIndex& index, int x, int y);
 // Remove one collision contribution, not the authoritative instance lifetime.
 bool amigaRemoveTerrainWall(AmigaTerrainIndex& index, int x, int y);

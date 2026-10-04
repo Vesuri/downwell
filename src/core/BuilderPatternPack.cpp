@@ -44,8 +44,61 @@ BuilderPatternPack::BuilderPatternPack(const std::uint8_t* bytes,
     rowsOffset_ = patternsOffset_ + patternCount_ * patternRecordSize;
     if (rowCount_ > (size - rowsOffset_) / rowRecordSize) return;
     cellsOffset_ = rowsOffset_ + rowCount_ * rowRecordSize;
-    if (cellCount_ != size - cellsOffset_) {
+    if (cellCount_ > size - cellsOffset_) {
         error_ = BuilderPatternPackError::wrongSize; return;
+    }
+    const std::size_t extension = cellsOffset_ + cellCount_;
+    const std::size_t tableBytes = (std::size_t(rowCount_) * 2 + 3) * 4;
+    if (size-extension < 4 || tableBytes > size-extension-4 ||
+        bytes[extension]!='D' || bytes[extension+1]!='W' ||
+        bytes[extension+2]!='P' || bytes[extension+3]!='R') {
+        error_ = BuilderPatternPackError::wrongSize; return;
+    }
+    preparedOffsets_ = bytes + extension + 4;
+    preparedPrograms_ = preparedOffsets_ + tableBytes;
+    const std::size_t programBytes = size - (preparedPrograms_ - bytes);
+    if (u32(preparedOffsets_ + tableBytes - 4) != programBytes) {
+        error_ = BuilderPatternPackError::wrongSize; return;
+    }
+    if (u32(preparedOffsets_)) {
+        error_ = BuilderPatternPackError::badPattern; return;
+    }
+    for (unsigned row=0; row<rowCount_*2+2; ++row) {
+        const unsigned start=u32(preparedOffsets_+row*4), end=u32(preparedOffsets_+(row+1)*4);
+        if (start>=end || end>programBytes) { error_=BuilderPatternPackError::badPattern; return; }
+        const auto* p=preparedPrograms_+start;
+        const auto* limit=preparedPrograms_+end;
+        while(p<limit && *p!=255) {
+            if (*p) {
+                if (limit-p<2 || p[0]<32 || p[0]>126 || p[1]>=128) break;
+                p+=2;
+            } else {
+                if (limit-p<6) break;
+                const unsigned creates=p[3], words=p[4], length=6+creates*2+words*4;
+                if (unsigned(limit-p)<length) break;
+                unsigned draws=0, borders=0, platforms=0;
+                for(unsigned i=0;i<creates;++i){
+                    draws+=p[6+i*2+1]&127;
+                    borders+=p[6+i*2+1]>>7;
+                    platforms+=p[6+i*2]>>7;
+                }
+                if(draws>p[1] || borders!=p[2] || platforms!=p[5]) break;
+                bool good=true;
+                for(unsigned i=0;i<words;++i){
+                    const auto* word=p+6+creates*2+i*4;
+                    if(word[0]>=128 || (word[0]&1) || !word[1] || word[1]>3)good=false;
+                    for(unsigned half=0;half<2;++half){
+                        const unsigned value=word[2+half],flags=value&63,walls=value>>6;
+                        if(bool(value)!=bool(word[1]&(1<<half)) ||
+                           (value && flags!=19 && flags!=34 && flags!=51) ||
+                           ((walls!=0)!=((flags&1)!=0)) || walls>creates)good=false;
+                    }
+                }
+                if(!good)break;
+                p+=length;
+            }
+        }
+        if(p!=limit-1 || *p!=255){error_=BuilderPatternPackError::badPattern;return;}
     }
     error_ = BuilderPatternPackError::none;
     std::uint16_t nextStartIndex = 0;
@@ -160,6 +213,16 @@ bool BuilderPatternPack::rowData(const PackedBuilderPattern& value,
     out = bytes_ + cellsOffset_ + first;
     width = count;
     return true;
+}
+
+const std::uint8_t* BuilderPatternPack::preparedRow(const PackedBuilderPattern& value,
+                                                   unsigned row, bool reversed) const {
+    if (!valid() || row>=value.rowCount || !range(value.firstRow,value.rowCount,rowCount_)) return nullptr;
+    return preparedPrograms_+u32(preparedOffsets_+((value.firstRow+row)*2+unsigned(reversed))*4);
+}
+
+const std::uint8_t* BuilderPatternPack::preparedPillars(bool reversed) const {
+    return valid()?preparedPrograms_+u32(preparedOffsets_+(rowCount_*2+unsigned(reversed))*4):nullptr;
 }
 
 } // namespace downwell

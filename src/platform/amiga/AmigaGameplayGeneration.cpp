@@ -14,6 +14,20 @@ void AmigaGameplayGeneration::bind(AmigaPortRuntime& runtime,bool terrainRuns) {
     dirtyFirst = worldRows; dirtyEnd = 0;
     builder_.setCreateObserver(create, this);
     if(terrainRuns)builder_.setTerrainRunObserver(createRun);
+#ifndef DOWNWELL_REFERENCE_PATTERNS
+    if(terrainRuns)builder_.setPreparedTerrainObserver(createPrepared);
+#endif
+}
+
+bool AmigaGameplayGeneration::createPrepared(void* opaque,const downwell::AreaOneBuilder::PreparedTerrain& batch){
+    auto& self=*static_cast<AmigaGameplayGeneration*>(opaque);
+    if(!self.runtime_->terrainCreatesBackendOnly() || !amigaAdmitPreparedTerrain(self.index_,self.tiles_,batch))
+        return batch.executeReference(create,opaque);
+    if(batch.count()){
+        if(batch.y-24<self.dirtyFirst)self.dirtyFirst=batch.y-24;
+        if(batch.y+24>self.dirtyEnd)self.dirtyEnd=batch.y+24;
+    }
+    return batch.executeSpan([&]{return amigaPublishPreparedTerrain(self.index_,self.tiles_,batch);});
 }
 
 bool AmigaGameplayGeneration::createRun(void* opaque,const downwell::AreaOneBuilder::TerrainRun& run){

@@ -179,7 +179,7 @@ int main(int argc, char** argv) {
     require(pack.valid(), "builder pack validates");
     unsigned runs=0,runCells=0;
     for(unsigned seed=1;seed<=8;++seed)for(unsigned level=1;level<=3;++level)
-    for(unsigned executor:{0u,1u,2u})for(unsigned failAt:{0u,1u,17u,101u,701u}){
+    for(unsigned executor:{0u,1u,2u,3u})for(unsigned failAt:{0u,1u,17u,101u,701u}){
         AreaOneBuilder scalar,grouped;GameMakerRandom a(seed),b(seed);
         scalar.reset(240,704,a,{level,seed%5,true,false});
         grouped.reset(240,704,b,{level,seed%5,true,false});
@@ -224,6 +224,16 @@ int main(int argc, char** argv) {
                 "run cannot be replayed after completion or failure");
             return ok;
         });
+        if(executor==3)grouped.setPreparedTerrainEmitter([](void* context,const AreaOneBuilder::PreparedTerrain& batch,
+                                                          AreaOneBuilder::EmitFunction emit){
+            auto& p=*static_cast<RunProbe*>(context);++p.runs;p.cells+=batch.count();
+            const bool ok=batch.executeReference(emit,context);
+            require(batch.completed()==ok,"prepared segment completion tracks callback failure");
+            const auto after=p.random;const unsigned calls=p.count;
+            require(!batch.executeReference(emit,context)&&!batch.executeSpan([]{return true;})&&
+                    sameRandom(after,p.random)&&calls==p.count,"prepared segment cannot be replayed");
+            return ok;
+        });
         bool terminated=false;
         for(unsigned tick=0;tick<128&&!terminated;++tick){
             for(unsigned j=0;j<tick%5;++j){a.nextU32();b.nextU32();}
@@ -237,6 +247,7 @@ int main(int argc, char** argv) {
                     "terrain run preserves command and full RNG state at EACH Create");
             require(scalar.y()==grouped.y()&&scalar.rowsGenerated()==grouped.rowsGenerated()&&
                 scalar.generationCount()==grouped.generationCount()&&scalar.chunkOrCrate()==grouped.chunkOrCrate()&&
+                scalar.specialObjectsGenerated()==grouped.specialObjectsGenerated()&&
                 x.patternGenerated==y.patternGenerated&&x.patternIndex==y.patternIndex&&
                 x.family==y.family&&x.patternY==y.patternY&&x.reversed==y.reversed&&
                 x.sideRoom==y.sideRoom&&x.appendPillars==y.appendPillars&&x.advancedRows==y.advancedRows,

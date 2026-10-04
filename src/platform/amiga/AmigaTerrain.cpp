@@ -72,6 +72,21 @@ bool AmigaTerrainTiles::appendPlatforms(int x, int y, int stepX, unsigned count)
     }
     return true;
 }
+bool AmigaTerrainTiles::appendPrepared(const downwell::AreaOneBuilder::PreparedTerrain& batch){
+    if(!batch.platforms())return true;
+    if(batch.platforms()>capacity-count_ || batch.y<0 || batch.y>=rows*16 || (batch.y&15))return false;
+    const unsigned row=unsigned(batch.y)>>4;
+    unsigned tail=tails_[row];
+    const auto* p=batch.creates();
+    for(unsigned i=0;i<batch.count();++i,p+=2)if(p[0]&128){
+        const unsigned id=++count_;
+        tiles_[id-1]=Tile{std::int16_t((int(p[0]&127)-32)*16),93,23,0};
+        if(tail)tiles_[tail-1].next=id;else heads_[row]=id;
+        tail=id;
+    }
+    tails_[row]=tail;
+    return true;
+}
 bool AmigaAreaOneTerrainBuilder::collect(
     void* opaque, const downwell::DeferredCreateInstance& command) {
     auto& context = *static_cast<AmigaAreaOneTerrainBuilder*>(opaque);
@@ -137,6 +152,13 @@ bool AmigaAreaOneTerrainBuilder::collectRun(void* opaque,
     if(!ok)self.failed_=true;
     return ok;
 }
+bool AmigaAreaOneTerrainBuilder::collectPrepared(void* opaque,
+    const downwell::AreaOneBuilder::PreparedTerrain& batch,downwell::AreaOneBuilder::EmitFunction scalar){
+    auto& self=*static_cast<AmigaAreaOneTerrainBuilder*>(opaque);
+    const bool ok=self.preparedObserver_?self.preparedObserver_(self.observerContext_,batch):batch.executeReference(scalar,opaque);
+    if(!ok)self.failed_=true;
+    return ok;
+}
 
 void AmigaAreaOneTerrainBuilder::resetInitialCheckpoint(
     downwell::GameMakerRandom& random) {
@@ -184,6 +206,7 @@ bool AmigaAreaOneTerrainBuilder::stepVisible(
     // reset/room-state import replaces the core builder, not backend bindings.
     builder_.enableTerrainRuns(runObserver_!=nullptr);
     builder_.setTerrainRunEmitter(runObserver_?collectRun:nullptr);
+    builder_.setPreparedTerrainEmitter(preparedObserver_?collectPrepared:nullptr);
     if (!builder_.stepVisible(patterns, random, viewBottomCeiling,
                               collect, this, result)) {
         failed_ = true;
@@ -475,6 +498,43 @@ bool amigaAddTerrainObject(AmigaTerrainIndex& index, int objectId, int x, int y,
     DW_GENERATION_SCOPE(profileGeneratedLanding);
     index.nextLanding.insert(cell%AmigaTerrainIndex::columns,cell/AmigaTerrainIndex::columns);
     return true;
+}
+
+bool amigaAdmitPreparedTerrain(const AmigaTerrainIndex& index,const AmigaTerrainTiles& tiles,
+    const downwell::AreaOneBuilder::PreparedTerrain& batch){
+    // Conservative admission avoids a cell scan. Even if every wall overlaps
+    // a saturated cell, the reserved contact space suffices. Otherwise retain
+    // the scalar prefix/failure behavior rather than partially publishing.
+    return batch.y>=0 && batch.y<AmigaTerrainIndex::rows*16 && !(batch.y&15) &&
+        batch.platforms()<=AmigaTerrainTiles::capacity-tiles.size() &&
+        batch.count()-batch.platforms()<=index.extraContacts.capacity()-index.extraContacts.size();
+}
+
+bool amigaPublishPreparedTerrain(AmigaTerrainIndex& index,AmigaTerrainTiles& tiles,
+    const downwell::AreaOneBuilder::PreparedTerrain& batch){
+    static_assert(solidCell==1 && landingCell==2 && wallCell==16 && platformCell==32,
+                  "prepared occupancy resource contract");
+    const unsigned row=unsigned(batch.y)>>4;
+    auto* destination=index.cells+row*AmigaTerrainIndex::columns;
+    const auto* word=batch.words();
+    for(unsigned i=0;i<batch.wordCount();++i,word+=4){
+        auto* target=destination+word[0];
+        if(!(target[0]|target[1])){
+            // Newly generated space already has its occupancy and contact
+            // counts composed offline. No runtime cell classification/merge.
+            target[0]=word[2];target[1]=word[3];
+        }else for(unsigned half=0;half<2;++half){
+            const unsigned old=target[half], prepared=word[2+half];
+            unsigned walls=(old>>6)+(prepared>>6);
+            while(walls>3){
+                if(!index.extraContacts.append(60,(int(word[0]+half)-32)*16,batch.y))return false;
+                --walls;
+            }
+            target[half]=((old|prepared)&63)|(walls<<6);
+        }
+    }
+    index.nextLanding.insertPreparedWords(batch.words(),batch.wordCount(),row);
+    return tiles.appendPrepared(batch);
 }
 
 AmigaTerrainRunIndex::AmigaTerrainRunIndex(AmigaTerrainIndex& index,int object,

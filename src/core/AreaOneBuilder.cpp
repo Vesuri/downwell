@@ -192,9 +192,78 @@ bool AreaOneBuilder::emitPattern(
     const BuilderPatternPack& patterns, const PackedBuilderPattern& pattern,
     bool reversed, bool appendPillars, GameMakerRandom& random,
     EmitFunction emit, void* context, std::uint32_t& advancedRows) {
+    if(preparedTerrainEmitter_ && levelLength_>=16 && levelLength_<=18)
+        return emitPreparedPattern(patterns,pattern,reversed,appendPillars,random,emit,context,advancedRows);
     return terrainRunsEnabled_?
         emitPatternMode<true>(patterns,pattern,reversed,appendPillars,random,emit,context,advancedRows):
         emitPatternMode<false>(patterns,pattern,reversed,appendPillars,random,emit,context,advancedRows);
+}
+
+bool AreaOneBuilder::emitPreparedPattern(const BuilderPatternPack& patterns,
+    const PackedBuilderPattern& pattern,bool reversed,bool appendPillars,
+    GameMakerRandom& random,EmitFunction emit,void* context,std::uint32_t& advancedRows){
+    DeferredCreateInstance terrainCommand{60,0,0};
+    auto row=[&](const std::uint8_t* p,int rowY){
+        if(!p)return false;
+        while(*p!=255){
+            if(*p){
+                if(!emitEventCell(char(p[0]),(int(p[1])-32)*16,rowY,reversed,
+                                  random,emit,context,terrainCommand))return false;
+                p+=2;
+            }else{
+                const PreparedTerrain batch(p,rowY,random,specialObjectsGenerated_);
+                if(!preparedTerrainEmitter_(context,batch,emit)||!batch.completed())return false;
+                p=batch.end();
+            }
+        }
+        return true;
+    };
+    for(unsigned i=0;i<pattern.rowCount;++i)
+        if(!row(patterns.preparedRow(pattern,i,reversed),y_+int(i)*16))return false;
+    advancedRows=pattern.rowCount-1;
+    y_+=int(advancedRows)*16;
+    if(appendPillars)for(unsigned i=0;i<3;++i){
+        if(!row(patterns.preparedPillars(reversed),y_))return false;
+        y_+=16;++advancedRows;
+    }
+    return true;
+}
+
+bool AreaOneBuilder::emitEventCell(char symbol,int buildX,int rowY,bool reversed,
+    GameMakerRandom& random,EmitFunction emit,void* context,DeferredCreateInstance& terrainCommand){
+    auto emitCell=[&](int object,int x){
+        if(object!=60 && object!=93)return emitObject(object,x,rowY,random,emit,context);
+        terrainCommand.objectId=object;terrainCommand.x=x;terrainCommand.y=rowY;
+        return emit && emit(context,terrainCommand);
+    };
+    if((symbol=='I'||symbol=='J')&&!emitObject(296,buildX,rowY,random,emit,context))return false;
+    if(symbol=='^'&&random.chooseIndexSmall(5)!=0&&
+       !emitObject(289,buildX,rowY,random,emit,context))return false;
+    const int enemyId=cavernEnemyChoice(symbol,levelLength_-15,random);
+    if(enemyId>=0&&!emitObject(enemyId,buildX,rowY,random,emit,context))return false;
+    int objectId=-1;
+    switch(symbol){
+    case '1':case '|':objectId=60;break;
+    case '2':if(random.chooseIndexSmall(2)!=0)objectId=60;break;
+    case '-':objectId=93;break;
+    case 'B':objectId=92;break;
+    case '3':if(random.chooseIndexSmall(2)!=0)objectId=92;break;
+    case 'v':objectId=376;break;
+    case 'O':objectId=82;break;
+    case '_':objectId=62;break;
+    case '$':objectId=277;break;
+    case '\\':objectId=285;break;
+    case '=':objectId=306;break;
+    case '@':chunkOrCrate_=builderRewardChoice(chunkOrCrate_,playerHealth_,style_,random);objectId=chunkOrCrate_;break;
+    case '{':case '}':
+        if(!emitCell(60,reversed?16:464))return false;
+        ++specialObjectsGenerated_;break;
+    default:break;
+    }
+    if(objectId>=0&&!emitCell(objectId,buildX))return false;
+    if(symbol=='I'||symbol=='J'||symbol=='v'||symbol=='O'||symbol=='_'||symbol=='$'||symbol=='\\'||symbol=='@')
+        ++specialObjectsGenerated_;
+    return true;
 }
 
 namespace {

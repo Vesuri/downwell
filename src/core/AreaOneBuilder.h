@@ -25,6 +25,58 @@ struct AreaOneBuilderStep {
 class AreaOneBuilder {
 public:
     using EmitFunction = bool (*)(void*, const DeferredCreateInstance&);
+    // One immutable fixed segment, bounded by a source event/row. Creates
+    // encode column (grid origin -512, spacing 16; high bit = platform),
+    // then preceding draw count (high bit = special border). Prepared words
+    // encode even column, two landing bits and two occupancy/contact bytes
+    // (solid 1, landing 2, wall 16, platform 32, contacts in bits 6-7).
+    // Backends may publish together only if they have
+    // no terrain Create handlers/readers within the segment.
+    class PreparedTerrain {
+        friend class AreaOneBuilder;
+        GameMakerRandom& random_;
+        std::uint32_t& special_;
+        mutable bool started_=false, completed_=false;
+        PreparedTerrain(const std::uint8_t* p,int row,GameMakerRandom& random,std::uint32_t& special)
+            :random_(random),special_(special),data(p),y(row){}
+    public:
+        const std::uint8_t* const data;
+        const int y;
+        unsigned draws()const{return data[1];}
+        unsigned count()const{return data[3];}
+        unsigned wordCount()const{return data[4];}
+        unsigned platforms()const{return data[5];}
+        const std::uint8_t* creates()const{return data+6;}
+        const std::uint8_t* words()const{return creates()+count()*2;}
+        const std::uint8_t* end()const{return words()+wordCount()*4;}
+        bool completed()const{return completed_;}
+        bool executeReference(EmitFunction emit,void* context)const{
+            if(started_)return false;
+            started_=true;
+            DeferredCreateInstance command{60,0,y};
+            unsigned consumed=0;
+            const auto* p=creates();
+            for(unsigned i=0;i<count();++i,p+=2){
+                const unsigned n=p[1]&127;
+                random_.advance(n);consumed+=n;
+                command.objectId=(p[0]&128)?93:60;
+                command.x=(int(p[0]&127)-32)*16;
+                if(!emit || !emit(context,command))return false;
+                special_+=p[1]>>7;
+            }
+            random_.advance(draws()-consumed);
+            completed_=true;return true;
+        }
+        template<class Publish> bool executeSpan(Publish publish)const{
+            if(started_)return false;
+            started_=true;
+            random_.advance(draws());
+            if(!publish())return false;
+            special_+=data[2];completed_=true;return true;
+        }
+    };
+    using PreparedTerrainFunction=bool (*)(void*,const PreparedTerrain&,EmitFunction);
+    void setPreparedTerrainEmitter(PreparedTerrainFunction emit){preparedTerrainEmitter_=emit;}
     // A borrowed, deterministic same-row run. Setup may inspect its geometry,
     // but execute() alone advances the live random stream, one cell immediately
     // before its synchronous Create callback. Never retain this view.
@@ -145,6 +197,11 @@ public:
 
 private:
     TerrainRunFunction terrainRunEmitter_=nullptr;
+    PreparedTerrainFunction preparedTerrainEmitter_=nullptr;
+    bool emitPreparedPattern(const BuilderPatternPack&,const PackedBuilderPattern&,bool,bool,
+                             GameMakerRandom&,EmitFunction,void*,std::uint32_t&);
+    bool emitEventCell(char symbol,int buildX,int rowY,bool reversed,GameMakerRandom&,
+                       EmitFunction,void*,DeferredCreateInstance&);
     bool terrainRunsEnabled_=false;
     bool emitObject(std::int32_t objectId, int x, int y,
                     GameMakerRandom& random, EmitFunction emit,

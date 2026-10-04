@@ -5,8 +5,8 @@ level fragments recovered from GameMaker GML. The generated payload is
 copyrighted derived game data and remains ignored under `generated/`; only the
 generator, reader, tests, and format specification are committed.
 
-Format revision 3 contains the entrance, regular, right-room, and shop
-fragments recovered for area one. It preserves row lengths individually;
+Format revision 4 contains the entrance, regular, right-room, shop and ending
+fragments recovered for area one, plus prepared row programs. It preserves row lengths individually;
 notably, one recovered shop row is 21 cells wide while its neighbours are 19.
 
 Run:
@@ -24,7 +24,7 @@ mapping native structures over the bytes. No compiler padding is present.
 | Offset | Type | Meaning |
 | ---: | --- | --- |
 | 0 | char[4] | `DWBP` magic |
-| 4 | u16 | Format version, currently 3 |
+| 4 | u16 | Format version, currently 4 |
 | 6 | u16 | Header size, 32 |
 | 8 | u32 | Source manifest schema, currently 3 |
 | 12 | u32 | Pattern count |
@@ -33,7 +33,7 @@ mapping native structures over the bytes. No compiler padding is present.
 | 28 | u32 | Total row count |
 
 Pattern records immediately follow the header, then row records, then raw
-printable ASCII cells. Newlines and indentation are removed.
+printable ASCII cells, then the prepared-row extension. Newlines and indentation are removed.
 
 ## Pattern record — 20 bytes
 
@@ -41,7 +41,7 @@ printable ASCII cells. Newlines and indentation are removed.
 
 Family 1 is the area-one entrance family populated by `scrStartPat1`; family 2
 is the regular area-one family populated by `scrLevelPat1`; family 3 is the
-right-room family and family 4 is the shop family.
+right-room family, family 4 is the shop family and family 5 is the ending family.
 `sourceIndex` preserves the array index consumed by GameMaker's random choice.
 `firstCell` is relative to the beginning of the cell payload.
 
@@ -51,6 +51,37 @@ right-room family and family 4 is the shop family.
 
 Each row points into the shared cell payload. This makes irregular source rows
 lossless while retaining a compact, endian-explicit representation.
+
+## Prepared row extension
+
+`DWPR` follows the last ASCII cell, then `u32 offsets[rowCount*2+3]`, then
+byte-coded programs. Offsets are relative to the program payload and include
+an end offset. Each source row has normal/mirrored programs at indices
+`2*row` and `2*row+1`. The last two programs are the normal/mirrored pillar
+pair, executed at each of the three optional tail rows.
+
+An ASCII opcode followed by one column byte invokes the existing event-cell
+logic. Columns encode `(worldX+512)/16`. Opcode 255 ends the row. Opcode zero
+introduces a fixed segment with six header bytes:
+`0, draws, specialBorders, createCount, wordCount, platformCount`.
+It is followed by `createCount` two-byte records and `wordCount` four-byte
+records:
+
+- Create: column (high bit means platform 93, otherwise wall 60), preceding
+  draw count (high bit means increment the special-border count after Create).
+- Word: even column, two landing bits (bit 0 for the even column, bit 1 for
+  the odd column), then the two columns' composed occupancy/contact bytes.
+  Each byte has solid 1, landing 2, wall 16, platform 32 and wall-contact
+  multiplicity in bits 6–7. Every occupied column is a landing candidate.
+
+Draws left after the last Create belong to empty cells before the next event.
+Words are composed only within a fixed segment, never across an event or row.
+Platform records retain Create order for presentation. The native publisher
+combines prepared occupancy with existing cells and preserves coincident-wall
+counts; it does not overwrite an already populated row. Registered terrain
+uses ordered scalar Creates, retaining instance IDs, callbacks and failure
+prefixes. `REFERENCE_PATTERNS=1` retains the original cell interpreter for
+paired native/host verification. Both executors consume the same raw patterns.
 
 ## Portable reader
 

@@ -11,6 +11,18 @@ public:
     void insert(unsigned column, unsigned row) {
         if (column<128 && row<512) words_[column][row>>4] |= 0x8000u>>(row&15);
     }
+    // Prepared row publication: one address/mask setup, not one checked
+    // insertion per terrain cell. Each record is even column, landing bits,
+    // then two occupancy bytes (unused here).
+    void insertPreparedWords(const std::uint8_t* source,unsigned count,unsigned row){
+        const unsigned group=row>>4;
+        const std::uint16_t bit=std::uint16_t(0x8000u>>(row&15));
+        for(unsigned i=0;i<count;++i,source+=4){
+            auto* word=&words_[source[0]][group];
+            if(source[1]&1)*word|=bit;
+            if(source[1]&2)word[32]|=bit;
+        }
+    }
     // One row across count columns stepping by step (±1); all must be valid.
     void insertSpan(unsigned column, int step, unsigned count, unsigned row) {
         if (row>=512) return;

@@ -4,6 +4,7 @@
 #include <iostream>
 #include <iterator>
 #include <vector>
+#include <string>
 
 namespace {
 void require(bool condition, const char* message) {
@@ -119,6 +120,59 @@ int main(int argc, char** argv) {
             for (unsigned x = 0; x < width; ++x)
                 require(pack.cell(pattern, x, y, cell) && row[x] == static_cast<std::uint8_t>(cell),
                         "row view equals individual cell reads");
+            for(bool reversed:{false,true}){
+                // Expand the offline program to the original ordered draws,
+                // Creates and event cells; validate every prepared grid word.
+                std::vector<unsigned> expected,actual;
+                auto create=[&](int x,bool platform,bool border){
+                    expected.push_back(0x20000u|unsigned((x+512)/16)|(platform?128u:0u));
+                    if(border)expected.push_back(0x30000u);
+                };
+                for(unsigned x=0;x<width;++x){
+                    const char symbol=char(row[x]);
+                    const int worldX=reversed?320-int(x+1)*16:160+int(x+1)*16;
+                    if(std::string("abcdet%IJ^2B3vO_$\\=@").find(symbol)!=std::string::npos){
+                        expected.push_back(0x10000u|(unsigned(symbol)<<8)|unsigned((worldX+512)/16));continue;
+                    }
+                    expected.push_back(0);
+                    if(symbol=='1'||symbol=='|'||symbol=='-')create(worldX,symbol=='-',false);
+                    if(symbol=='{'||symbol=='}')create(reversed?16:464,false,true);
+                }
+                if(y+1<pattern.rowCount){
+                    expected.push_back(0);
+                    const bool side=pattern.family==downwell::BuilderPatternFamily::areaOneRight||
+                        pattern.family==downwell::BuilderPatternFamily::areaOneShop;
+                    create(side?(reversed?0:480):(reversed?160:320),false,false);
+                    create(reversed?320:160,false,false);
+                }
+                const auto* p=pack.preparedRow(pattern,y,reversed);
+                require(p,"prepared row exists");
+                while(*p!=255){
+                    if(*p){actual.push_back(0x10000u|(unsigned(p[0])<<8)|p[1]);p+=2;continue;}
+                    unsigned consumed=0, flags[128]={},walls[128]={},seen[128]={};
+                    for(unsigned i=0;i<p[3];++i){
+                        const unsigned item=p[6+i*2],n=p[7+i*2]&127;
+                        actual.insert(actual.end(),n,0);consumed+=n;
+                        actual.push_back(0x20000u|item);
+                        if(p[7+i*2]&128)actual.push_back(0x30000u);
+                        flags[item&127]|=(item&128)?34:19;
+                        walls[item&127]+=(item&128)?0:1;
+                    }
+                    actual.insert(actual.end(),p[1]-consumed,0);
+                    const auto* words=p+6+p[3]*2;
+                    for(unsigned i=0;i<p[4];++i){
+                        for(unsigned half=0;half<2;++half){
+                            const unsigned col=words[i*4]+half,value=words[i*4+2+half];
+                            if(!value)continue;
+                            require(!seen[col]++ && flags[col]==(value&63)&&walls[col]==(value>>6),
+                                    "prepared occupancy/contact words exactly match ordered Creates");
+                        }
+                    }
+                    for(unsigned col=0;col<128;++col)require(bool(flags[col])==bool(seen[col]),"every landing column prepared once");
+                    p=words+p[4]*4;
+                }
+                require(actual==expected,"prepared row preserves source order, draw counts and border effects");
+            }
         }
         const std::uint8_t* row = nullptr;
         std::uint32_t width = 123;
