@@ -360,6 +360,14 @@ Rules for this section:
      they reduce pixel coverage but worsen complete frames. Any differential
      replacement must avoid repeated CPU packet traversal and budget its
      representation up front; the all-pairs word table exceeds 2 MiB.
+     Prepared whole-operation transfer lists also lost in
+     [paired native timing](amiga-frame-cost.md#rejected-prepared-transfer-list-batch).
+     Prioritize eliminating a transfer pass over another queue-scheduling
+     variant. Evaluate combining pristine terrain and the new field directly
+     into the destination in one pass; prove ownership of the whole replaced
+     rectangle, retire any departing old extent, and preserve dirty-row sync,
+     mixed-field order, laser/actor ordering and fallback transitions. Do not
+     overwrite retained content merely because it lies inside an arc rectangle.
    - Explicitly partition the shared scene bank: terrain batching already
      uses its first 44,304 bytes. Field images/backing must not overlap that
      scratch or survive a front-bank reload without rebinding.

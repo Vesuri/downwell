@@ -542,3 +542,52 @@ recoverable patch is `tmp/field-delta-rejected.patch`. Native pixel/contact/FPS
 acceptance gates were not pursued after this timing failure. Do not revive
 this as a renderer option, hide it behind a narrower current-tape special
 case, or count its host checks as an A6 performance gain.
+
+### Rejected prepared transfer-list batch
+
+This experiment prepared hardware controls at bank binding, described all
+field transfers before DMA, and executed the list synchronously through the
+framework. It removed per-transfer generic queue construction and IRQ-state
+writes, while retaining the same coverage/pixel buffers, masks and blit sizes.
+The estimate targeted about 3–4 ms of repeated submission/setup in the native
+audit; DMA waiting itself was not assumed removable.
+
+Native pixel verification passed 1,979 full-buffer comparisons, 512 mask phases
+and 131 overlap/wrap composites; free Chip remained 11,512 bytes. Verifier
+executable hash: `6ec1c784c47aa561d135582414777002df10d587c411a93e3f10ac94c4295c98`;
+text hash `50378251b7d35bd3ad8e09ab2110ab04636aafe3d04778048481db98625ac47e`.
+Host job decoding and sanitizer checks also passed all 340 transfer cases.
+
+Paired captures `tmp/trace/field-jobs-mode4` and
+`tmp/trace/field-jobs-mode5` use `SKIP_LEVEL=1 PROFILE_CONTACT=0`,
+`TRACE_FRAMES=2,60 TRACE_FIELDS=30`, and the same prepared-field optimization
+bundle as above. Their shared text hash is
+`c583b959f1263793554d2af127bd6fc0b945da426da88e740f4ff58fa25a5031`.
+The 28 common complete frames worsen from **32.360 to 40.040 ms**.
+The candidate spends 8.62 ms/frame in `blitterWait` and 9.09 ms/frame in
+presentation waiting; field preparation plus drawing averages about 14.2 ms.
+Prebuilding the list did not eliminate DMA occupancy or improve complete-frame
+pacing. The implementation is removed, with a recoverable ignored patch at
+`tmp/field-jobs-rejected.patch`. Contact/FPS/replay acceptance gates were not
+pursued after the timing failure.
+
+`tools/audit-field-band-tiles.cpp` measures another possible tradeoff without
+changing runtime code. Build with
+`c++ -std=c++17 -O2 tools/audit-field-band-tiles.cpp -o build/audit-field-band-tiles`
+and run `build/audit-field-band-tiles`. It bounds subrectangles over the existing
+resident images, so no new Chip image bank is needed. Counts cover 42 arc
+images and all 17 admitted horizontal phases, before vertical clipping/wrap:
+
+| Horizontal pieces | Fetched words | Transfers | Words saved per extra transfer |
+| ---: | ---: | ---: | ---: |
+| Existing whole arc | 303,688 | 714 | — |
+| 2 | 323,226 | 1,428 | -27.36 |
+| 3 | 222,818 | 2,142 | 56.63 |
+| 4 | 190,530 | 2,856 | 52.83 |
+| 6 | 153,800 | 4,242 | 42.49 |
+| 11 | 126,588 | 7,770 | 25.10 |
+
+These are geometry counts, not a timing win. Edge-word fetches make a two-piece
+split worse even before setup. Finer splits reduce transparent DMA but sharply
+increase transfer count. They must not be implemented on the assumption that
+less fetched area alone makes them faster.
