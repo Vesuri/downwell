@@ -14,9 +14,9 @@ the leaf PC are expanded through addr2line's inline chain, so functions
 inlined by LTO appear as their own logical frames.
 
 Game frames are split at entries to downwellTraceFrameMark (TRACE_FRAMES
-builds). Recording starts at the VBL ending the requested frame's wait, so a
-capture's first frame has already begun executing before that VBL. Both its
-first and last frames are partial and excluded. Cycles are 68000 clocks; a
+builds), using the marker's recorded argument, not a count of marker entries.
+Recording may include the requested marker or begin after it. Conservatively,
+both the requested first and final frames are excluded. Cycles are 68000 clocks; a
 PAL field is 142,102 of them.
 
   python3 tools/amiga-trace-report.py tmp/trace/run [--frames=N|N-M]
@@ -42,6 +42,21 @@ def tool(name):
     return shutil.which(name) or os.path.join(BIN, name)
 
 
+class CallSites(dict):
+    """Call successors plus the validated frame-marker argument reader."""
+    marker = None
+
+
+def marker_reader(text, mark):
+    addresses = sorted(text)
+    following = addresses[addresses.index(mark) + 1:][:1]
+    mnemonic, operands = text[mark]
+    match = re.fullmatch(r'4\(sp\),d([0-7])', operands.replace(' ', ''))
+    if mnemonic != 'move.l' or not match or not following or text[following[0]][0] != 'rts':
+        raise ValueError('unsupported frame marker ABI; cannot identify game frames safely')
+    return following[0], int(match.group(1))
+
+
 def load_code(elf):
     """Function symbols and call-instruction successors from the ELF."""
     table = subprocess.run([tool('m68k-amiga-elf-objdump'), '-t', elf],
@@ -61,7 +76,7 @@ def load_code(elf):
     disassembly = subprocess.run(
         [tool('m68k-amiga-elf-objdump'), '-d', '--no-show-raw-insn', elf],
         capture_output=True, text=True, check=True).stdout
-    calls, text = {}, {}
+    calls, text = CallSites(), {}
     pending = None
     for line in disassembly.split('\n'):
         m = re.match(r'^\s*([0-9a-f]+):\s+(\S+)\s*(.*)$', line)
@@ -75,6 +90,9 @@ def load_code(elf):
         text[address] = (mnemonic, m.group(3))
         if mnemonic == 'jsr' or mnemonic.startswith('bsr'):
             pending = address
+    for address, name in symbols.items():
+        if name == 'downwellTraceFrameMark':
+            calls.marker = marker_reader(text, address)
     return symbols, calls, text
 
 
@@ -131,7 +149,7 @@ def field_cycle_carry(accounted, elapsed, first_cost, pending=0):
     raise ValueError('unexplained field cycle mismatch')
 
 
-def records(path):
+def records(path, include_registers=False):
     """Yield (field, pc|None, cycles, sp, sr) for every traced instruction."""
     with open(path, 'rb') as source:
         data = memoryview(source.read())
@@ -184,7 +202,8 @@ def records(path):
             regs = unpack_regs(data, offset)
             offset += 68
             accounted += cost
-            yield field, pc, cost, regs[15], regs[16]
+            item = (field, pc, cost, regs[15], regs[16])
+            yield item + (regs,) if include_registers else item
         if offset != end:
             raise ValueError('instruction record boundary mismatch')
         try:
@@ -381,22 +400,50 @@ def parse_range(text, first, last):
     return int(text), int(text)
 
 
+def frame_markers(path, start_frame, calls, mark):
+    """Read actual arguments, whether capture includes the requested marker or not."""
+    if getattr(calls, 'marker', None) is None:
+        raise ValueError('missing validated frame marker ABI')
+    ready, register = calls.marker
+    pending = None
+    previous = None
+    result = {}
+    for index, (_, pc, _, sp, sr, regs) in enumerate(records(path, include_registers=True)):
+        if sr & 0x2000:
+            continue
+        if pc == mark:
+            if pending is not None:
+                raise ValueError('nested frame markers')
+            pending = index, sp
+        elif pc == ready and pending is not None:
+            if pending[1] != sp:
+                raise ValueError('frame marker stack changed')
+            frame = regs[register]
+            if ((previous is None and frame not in (start_frame, start_frame + 1)) or
+                    (previous is not None and frame != previous + 1)):
+                raise ValueError(f'unexpected frame marker argument {frame} after {previous}')
+            result[pending[0]] = frame
+            previous, pending = frame, None
+    if pending is not None:
+        raise ValueError('capture ends inside frame marker')
+    return result
+
+
 def attribute(path, start_frame, calls, mark, stacks, frame_cycles, entries):
     """Rebuild call stacks for one capture; accumulate cycles per raw stack.
 
     Returns the number of fields and the last (incomplete) frame number."""
     user, supervisor = [], []  # frames: (call-site pc, sp after the push)
     prev_user = prev_super = None  # (pc, sp)
-    # FS-UAE starts recording at the vertical blank after the debugger stop,
-    # i.e. after start_frame's mark. Simulation may already have executed;
-    # this is not necessarily an idle wait. The partial first frame must be
-    # excluded, like the last. Its next recorded mark is start_frame+1.
+    # The VBL capture may include the requested marker or start after it.
+    # Decode its argument instead of assuming the next marker is start+1.
+    markers = frame_markers(path, start_frame, calls, mark)
     frame = start_frame
     fields = 0
-    for field, pc, cost, sp, sr in records(path):
+    for index, (field, pc, cost, sp, sr) in enumerate(records(path)):
         fields = field + 1
-        if pc == mark:
-            frame += 1
+        if index in markers:
+            frame = markers[index]
         if pc == IRQ_PC or sr & 0x2000:
             if prev_super is None:
                 supervisor.clear()

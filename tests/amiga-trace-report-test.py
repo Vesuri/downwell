@@ -92,15 +92,47 @@ class FrameBoundaries(unittest.TestCase):
         stacks, entries, cycles = Counter(), Counter(), Counter()
         # Recording starts during frame 843, then sees complete frame 844
         # and only the beginning of 845. The first fragment is not idle.
-        instructions = [(0, 10, 100, 4096, 0), (0, 20, 200, 4096, 0),
-                        (0, 99, 20, 4096, 0), (1, 30, 400, 4096, 0),
-                        (1, 99, 20, 4096, 0), (1, 40, 70, 4096, 0)]
-        with mock.patch.object(report, 'records', return_value=iter(instructions)):
-            fields, last = report.attribute('unused', 843, {}, 99, stacks, cycles, entries)
+        instructions = [(0, 10, 100, 4096, 0, 0), (0, 20, 200, 4096, 0, 0),
+                        (0, 99, 20, 4096, 0, 0), (0, 103, 16, 4096, 0, 844),
+                        (1, 30, 384, 4096, 0, 0),
+                        (1, 99, 20, 4096, 0, 0), (1, 103, 16, 4096, 0, 845),
+                        (1, 40, 54, 4096, 0, 0)]
+        fields, last = self.attribute(instructions, stacks, cycles, entries)
         self.assertEqual((fields, last), (2, 845))
         self.assertEqual(cycles, {843: 300, 844: 420, 845: 90})
         self.assertEqual(report.complete_frame_numbers(cycles, {843, last}), [844])
         self.assertEqual(report.complete_frame_numbers({843: 300}, {843}), [])
+
+    def attribute(self, instructions, stacks=None, cycles=None, entries=None):
+        calls = report.CallSites()
+        calls.marker = report.marker_reader({99: ('move.l', '4(sp),d0'), 103: ('rts', '')}, 99)
+        def records(path, include_registers=False):
+            for item in instructions:
+                yield item[:5] + ((item[5],) + (0,) * 16,) if include_registers else item[:5]
+        with mock.patch.object(report, 'records', side_effect=records):
+            return report.attribute('unused', 843, calls, 99,
+                                    stacks if stacks is not None else Counter(),
+                                    cycles if cycles is not None else Counter(),
+                                    entries if entries is not None else Counter())
+
+    def test_capture_includes_requested_marker_and_interrupt(self):
+        cycles = Counter()
+        self.attribute([(0, 99, 20, 4096, 0, 0),
+                        (0, 77, 100, 2048, 0x2000, 999),
+                        (0, 103, 16, 4096, 0, 843),
+                        (1, 99, 20, 4096, 0, 0),
+                        (1, 103, 16, 4096, 0, 844)], cycles=cycles)
+        self.assertEqual(cycles, {843: 136, 844: 36})
+
+    def test_invalid_argument_and_truncated_marker_fail(self):
+        for instructions in ([(0, 99, 20, 4096, 0, 0)],
+                             [(0, 99, 20, 4096, 0, 0), (0, 103, 16, 4096, 0, 845)]):
+            with self.assertRaises(ValueError):
+                self.attribute(instructions)
+
+    def test_unsupported_abi_fails(self):
+        with self.assertRaises(ValueError):
+            report.marker_reader({99: ('nop', ''), 103: ('rts', '')}, 99)
 
 
 if __name__ == "__main__":

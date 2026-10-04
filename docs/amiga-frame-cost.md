@@ -1,5 +1,43 @@
 # Amiga gameplay frame-cost audit
 
+## Trace frame identification and rejected independent-plane gauge
+
+Frame-marker arguments, rather than marker counts, are authoritative. A capture
+can include its requested marker or start after it. The original report assumed
+the latter and assigned frames one too high in the former case. The report now
+validates the marker's argument-load ABI against the ELF and reads that argument
+from recorded registers, including interrupted markers. It rejects unsupported
+ABIs and discontinuous numbering. Historical frame-specific comparisons require
+rechecking with this reader; cycle costs themselves are unchanged.
+
+For example, `tmp/trace/ammo-planes-mode1/trace-699.bin` includes marker 699;
+mode 2 and mode 3 start after it. The mode-1 burst previously labelled 702 is
+actually frame 701, costing 171.9033 ms, not the preceding frame's 90.6490 ms.
+
+The rejected mode-3 experiment split the factored gauge's low plane from its
+animated high plane. Offline baseline/exception lists and fused label tails
+added 20,383 payload bytes (112,647 total). Runtime merging was intended to
+remove about 3–4 ms of redundant low-plane work, but recharge HUD time instead
+rose from about 12.6 to 13.7 ms. Host pixel and sanitizer checks passed; no native
+pixel/replay/FPS acceptance was attempted after the trace gate failed.
+
+Matched `tmp/trace/ammo-planes-mode2` and `tmp/trace/ammo-planes-mode3` captures
+have shared text hash `ab1ae18ffdf716fe19848532a7bc43362265fef1adf124230da30e082adcae12`.
+Correctly identified mandatory frames, in milliseconds:
+
+| Frame | Combined planes (2) | Separate low plane (3) |
+| --- | ---: | ---: |
+| 645 | 102.3659 | 103.5369 |
+| 701 | 171.9230 | 172.0482 |
+| 844 | 121.2636 | 121.6999 |
+
+Reproduce with the audit's contact optimization bundle, `AMMO_FACTORED=2` or
+`3`, `TRACE_FRAMES=644,699,843 TRACE_FIELDS=30`, and `bash amiga/profile.sh trace`.
+Mode 3 is removed; its reference patch is local-only at
+`tmp/ammo-independent-plane-rejected.patch`. Mode 2 stays opt-in with its
+existing pacing and recharge gates open. No emulator rerun is needed to correct
+frame labels: `tools/amiga-trace-report.py` reads the saved binary captures.
+
 This audit records where native A500 gameplay time goes at revision
 `b99c2f69` (2026-10-04), and why. It replaces the 2026-09-29 audit at
 `b89ff875` (5,837 fields on the same tape; see that revision of this file).
