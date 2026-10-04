@@ -21,6 +21,13 @@
 #include "RunnerTerrainProperties.h"
 #include "NativeInstanceTable.h"
 namespace downwell {
+#ifdef DOWNWELL_DRAW_CACHE_AUDIT
+// Optional diagnostic observer; absent from normal code and simulation state.
+void auditActorDrawCache(unsigned outcome,unsigned actors,bool captureChanged,bool layersChanged);
+#endif
+#ifdef DOWNWELL_LOCAL_DRAW_CAPTURE
+extern volatile unsigned localDrawCaptureMode;
+#endif
 // Resource-backed ownership at the native world's existing publication points.
 // Terrain-only queries retain their explicit resource-family gate. Projectile
 // line queries cover the currently registered solid/enemy lifetimes; other
@@ -50,6 +57,9 @@ private:
     mutable unsigned drawCount_=0;
     mutable std::uint32_t drawCaptureRevision_=0,drawLayerRevision_=0;
     mutable bool drawOrderValid_=false;
+#ifdef DOWNWELL_DRAW_CACHE_AUDIT
+    mutable bool drawAuditHasSnapshot_=false;
+#endif
     RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity+GameplayWorld::droneBulletCapacity> combatAlarmPhase_;
     bool combatAlarmCaptureDirty_=true;
     unsigned combatAlarmMask_=0;
@@ -931,25 +941,55 @@ public:
 #ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
             return self.world_->visitRoomActors([&](auto kind,auto key,auto depth){return visit(visitor,kind,key,depth);});
 #else
-            const auto capture=self.captureRevision(),layers=self.layers_.drawRevision();
+            const auto capture=
+#ifdef DOWNWELL_LOCAL_DRAW_CAPTURE
+                self.native_&&localDrawCaptureMode==2?self.table_.localCaptureRevision():
+#endif
+                self.captureRevision();
+            const auto layers=self.layers_.drawRevision();
             if(self.drawOrderValid_&&capture!=0xffffffffu&&layers!=0xffffffffu&&
                capture==self.drawCaptureRevision_&&layers==self.drawLayerRevision_){
+#ifdef DOWNWELL_DRAW_CACHE_AUDIT
+                auditActorDrawCache(0,self.drawCount_,false,false);
+#endif
                 for(unsigned i=0;i<self.drawCount_;++i){const auto& e=self.drawOrder_[i];
                     if(!visit(visitor,e.kind,e.local,e.depth))return false;
                 }
                 return true;
             }
+#ifdef DOWNWELL_DRAW_CACHE_AUDIT
+            const unsigned previousCount=self.drawCount_;
+            bool same=self.drawAuditHasSnapshot_;
+            const bool captureChanged=capture!=self.drawCaptureRevision_;
+            const bool layersChanged=layers!=self.drawLayerRevision_;
+#endif
             self.drawOrderValid_=false;self.drawCount_=0;
             // Fill during the original live traversal, not before dispatch:
             // failed callbacks retain exactly the same successful prefix.
             const bool ok=self.world_->visitRoomActors([&](auto kind,auto key,auto depth){
                 if(self.drawCount_==drawCapacity)return false;
+#ifdef DOWNWELL_DRAW_CACHE_AUDIT
+                if(self.drawCount_>=previousCount)same=false;
+                else {
+                    const auto& old=self.drawOrder_[self.drawCount_];
+                    if(old.kind!=kind||old.local.slot!=key.slot||old.local.generation!=key.generation||old.depth.bits!=depth.bits)same=false;
+                }
+#endif
                 self.drawOrder_[self.drawCount_++]={kind,key,depth};
                 return visit(visitor,kind,key,depth);
             });
             self.drawCaptureRevision_=capture;self.drawLayerRevision_=layers;
-            self.drawOrderValid_=ok&&self.valid()&&capture==self.captureRevision()&&
+            self.drawOrderValid_=ok&&self.valid()&&capture==(
+#ifdef DOWNWELL_LOCAL_DRAW_CAPTURE
+                self.native_&&localDrawCaptureMode==2?self.table_.localCaptureRevision():
+#endif
+                self.captureRevision())&&
                 layers==self.layers_.drawRevision();
+#ifdef DOWNWELL_DRAW_CACHE_AUDIT
+            auditActorDrawCache(!self.drawOrderValid_?3:same&&previousCount==self.drawCount_?1:2,
+                               self.drawCount_,captureChanged,layersChanged);
+            self.drawAuditHasSnapshot_=self.drawOrderValid_;
+#endif
             return ok;
 #endif
         });

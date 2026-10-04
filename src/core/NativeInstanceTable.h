@@ -23,17 +23,25 @@ template<unsigned Capacity> class NativeInstanceTable {
     Entry entries_[Capacity];
     RunnerObjectMembership<Capacity> registration_;
     std::uint32_t bindingRevision_=0,captureRevision_=0;
+#ifdef DOWNWELL_LOCAL_DRAW_CAPTURE
+    std::uint32_t localCaptureRevision_=0;
+#endif
     unsigned captureFirst_=0,captureLast_=0,captureSecond_=0,captureEnd_=0;
     bool* captureDirty_=nullptr;
     const bool externalOrder_;
     std::uint32_t nextOrder_=1;
     static void advance(std::uint32_t& revision){if(revision!=0xffffffffu)++revision;}
-    void changedCapture(unsigned slot){
+    void changedCapture(unsigned slot,bool local=true){
         advance(captureRevision_);
+#ifdef DOWNWELL_LOCAL_DRAW_CAPTURE
+        if(local)advance(localCaptureRevision_);
+#else
+        (void)local;
+#endif
         if(captureDirty_&&((slot>=captureFirst_&&slot<captureLast_)||(slot>=captureSecond_&&slot<captureEnd_)))
             *captureDirty_=true;
     }
-    void changedBinding(unsigned slot){advance(bindingRevision_);changedCapture(slot);}
+    void changedBinding(unsigned slot,bool local=true){advance(bindingRevision_);changedCapture(slot,local);}
     bool live(InstanceHandle h)const{return h.slot<Capacity&&h.generation&&entries_[h.slot].generation==h.generation;}
 public:
     explicit NativeInstanceTable(bool externalOrder=false):externalOrder_(externalOrder){}
@@ -41,10 +49,10 @@ public:
     // own lifetime/flags; these notifications only invalidate captures.
     bool externalBirth(unsigned slot,std::uint32_t& order){
         if(!externalOrder_||slot>=Capacity||!nextOrder_||order)return false;
-        order=nextOrder_++;changedBinding(slot);return true;
+        order=nextOrder_++;changedBinding(slot,false);return true;
     }
-    void externalRetire(unsigned slot){changedBinding(slot);}
-    void externalFlagsChanged(unsigned slot){changedCapture(slot);}
+    void externalRetire(unsigned slot){changedBinding(slot,false);}
+    void externalFlagsChanged(unsigned slot){changedCapture(slot,false);}
     std::uint32_t registrationOrder(InstanceHandle h)const{return live(h)?entries_[h.slot].order:0;}
     std::uint32_t roomOrder(InstanceHandle h)const{return live(h)?entries_[h.slot].roomOrder:0;}
     bool roomReactivated(InstanceHandle h){
@@ -63,6 +71,14 @@ public:
     }
     std::uint32_t bindingRevision()const{return bindingRevision_;}
     std::uint32_t captureRevision()const{return captureRevision_;}
+    // External families participate in chronology/alarms but have no local
+    // entry or sprite. Actor-only observers may ignore their notifications;
+    // they must still observe independent layer order/cutoff revisions.
+    // If an external family gains actor Draw participation, it must join this
+    // observer domain too; this is not a general-purpose registration revision.
+#ifdef DOWNWELL_LOCAL_DRAW_CAPTURE
+    std::uint32_t localCaptureRevision()const{return localCaptureRevision_;}
+#endif
     bool bindingsUnchanged(std::uint32_t revision)const{return revision!=0xffffffffu&&revision==bindingRevision_;}
     bool watchCaptureRanges(unsigned first,unsigned last,unsigned second,unsigned end,bool& dirty){
         if(first>last||last>second||second>end||end>Capacity)return false;
@@ -129,6 +145,9 @@ public:
             registration_.unbind(slot);entries_[slot]=Entry{};
         }
         advance(bindingRevision_);advance(captureRevision_);
+#ifdef DOWNWELL_LOCAL_DRAW_CAPTURE
+        advance(localCaptureRevision_);
+#endif
         if(captureDirty_)*captureDirty_=true;
     }
 };

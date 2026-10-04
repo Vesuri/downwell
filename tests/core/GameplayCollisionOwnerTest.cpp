@@ -1,4 +1,7 @@
 #include "core/GameplayCollisionOwner.h"
+#ifdef DOWNWELL_LOCAL_DRAW_CAPTURE
+namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_CAPTURE; }
+#endif
 #include "core/RunnerBindingRevisionVerification.h"
 #include "core/MachineGunSourceStep.h"
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE

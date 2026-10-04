@@ -403,6 +403,12 @@ they are the gap between the 31.5 ms quiet frame and 20 ms.
    rebuilds the actor list through the generic layer walk after every
    ownership change. Maintain the actor Draw list incrementally, ordered by
    layer, depth and element order.
+   Finish normal-build integration of `LOCAL_DRAW_CAPTURE=2` after combined
+   shipping-configuration timing/fidelity gates. Retain mode 1 as the global
+   capture reference, the separate layer order/cutoff guard, and original
+   registration/alarm revisions. External families gaining actor Draw must
+   join the Draw invalidation domain. This exclusion does not replace
+   incremental maintenance for genuine list changes.
 2. **Captured alarm dispatch** (1.2 ms quiet, 5.0 enemies) walks every
    captured enemy and effect for each alarm index. Count each family's
    alarms down in its records in captured order, dispatch only zero

@@ -480,6 +480,22 @@ separately from steady-state updates and distinguish waits from useful work.
 
 ## Pair timing with correctness
 
+`bash amiga/profile.sh draw-cache` is a diagnostic, not a timing comparison.
+It starts directly in gameplay and defaults to the contact tape, counting
+cache hits, identical rebuilds and changed actor lists. Counters distinguish
+capture and layer invalidation for the full tape, frames 645/701/844, early
+gameplay, and the contact window. It compares each rebuilt kind/handle/depth
+sequence with the preceding captured sequence before replacing it.
+
+`bash amiga/profile.sh draw-order` runs the same bounded gameplay tape with
+the existing live-layer versus cached Draw-order oracle on every frame,
+without forcing actors into planar rendering. Both modes restore the normal
+build, and their instrumentation is absent from ordinary builds. Use the
+same performance bundle as the timing run; `LOCAL_DRAW_CAPTURE=1/2` selects
+global/local invalidation respectively, with both paths compiled. Do not
+change that selector during a run. `make verify-local-draw-capture` exercises
+the matching host lifecycle and ordering tests.
+
 Preserve full RNG state, synchronous Create order, collision order and effect
 ownership while optimizing. Re-run deterministic replay and fresh-versus-retained
 render comparisons for the affected path, then check the restored build's

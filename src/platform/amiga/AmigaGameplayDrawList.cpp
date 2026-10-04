@@ -5,7 +5,7 @@
 #include "core/DamageNumberText.h"
 #include "core/RunnerSpatialSplit.h"
 #include "core/DebrisDraw.h"
-#ifdef DOWNWELL_BOB_VERIFY
+#if defined(DOWNWELL_BOB_VERIFY) || defined(DOWNWELL_DRAW_ORDER_AUDIT)
 #include "core/ActorDrawOrderVerification.h"
 extern "C" { volatile unsigned gDownwellActorOrderChecks,gDownwellActorOrderFailures; }
 #endif
@@ -30,7 +30,7 @@ bool AmigaGameplayDrawList::entryCoverHardwareEligible(const GameplayWorld& worl
 bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack,
     const UBYTE* packEnd, int worldViewX, int worldViewY, bool compositeCurrency) {
     count = 0; failedSprite = failedFrame = 0;
-#ifdef DOWNWELL_BOB_VERIFY
+#if defined(DOWNWELL_BOB_VERIFY) || defined(DOWNWELL_DRAW_ORDER_AUDIT)
     static downwell::ActorDrawOrderVerification orderOracle;
     ++gDownwellActorOrderChecks;
     if(!orderOracle.verify(port)){++gDownwellActorOrderFailures;return false;}

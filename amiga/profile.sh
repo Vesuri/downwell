@@ -7,6 +7,8 @@ transition=0
 case "$mode" in
   probes) flags=(PROBES=1); script=profile.gdb ;;
   fps) flags=(FPSCOUNT=1); script=profile_fps.gdb ;;
+  draw-cache) flags=(FPSCOUNT=1 DRAW_CACHE_AUDIT=1); script=profile_draw_cache.gdb ;;
+  draw-order) flags=(FPSCOUNT=1 DRAW_ORDER_AUDIT=1); script=profile_draw_order.gdb ;;
   terrain) flags=(FPSCOUNT=1 TERRAIN_BATCH=1 TERRAIN_BATCH_VERIFY=1); script=verify_terrain_batch.gdb ;;
   fields) flags=(FPSCOUNT=1 PREPARED_FIELDS=1 PREPARED_FIELDS_VERIFY=1); script=verify_prepared_fields.gdb ;;
   fields-clear)
@@ -37,11 +39,17 @@ case "$mode" in
     export SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_FRAMES=0
     export PROFILE_CONTACT=0 PROFILE_LASER=0 PROFILE_NAVIGATE=0
     ;;
-  *) echo "usage: bash amiga/profile.sh [probes|fps|trace|transition|terrain|fields|fields-clear]" >&2; exit 1 ;;
+  *) echo "usage: bash amiga/profile.sh [probes|fps|trace|draw-cache|draw-order|transition|terrain|fields|fields-clear]" >&2; exit 1 ;;
 esac
+if [[ $mode == draw-cache || $mode == draw-order ]]; then
+  export SKIP_TO_GAME=1 SKIP_LEVEL=0 PROFILE_CONTACT="${PROFILE_CONTACT:-1}"
+fi
 if [[ ${SKIP_LEVEL:-0} == 1 && $mode != trace && $mode != fields-clear ]]; then script=profile_clear.gdb; fi
 # Always leave the playable binary behind, including after a timeout/failure.
 restore() {
+  unset DRAW_CACHE_AUDIT
+  unset DRAW_ORDER_AUDIT
+  unset LOCAL_DRAW_CAPTURE
   unset PREPARED_FIELDS_VERIFY PROFILE_FIELD_REFERENCE PREPARED_FIELDS_BACKING
   make clean > .run/profile-restore.log 2>&1
   make -j4 TERRAIN_RUN_STORE=0 TABLE_CONTACT_ATAN=0 RETAIN_HEALTH_HUD=0 AMMO_DAMAGE_RANGE=0 PREPARED_AMMO_DIVIDERS=0 PREPARED_FIELDS=0 SCENERY_LAYERS=0 NATIVE_BOXES=1 NATIVE_FIELDS=1 TERRAIN_BATCH=0 TERRAIN_DIRECT=0 TERRAIN_BATCH_VERIFY=0 SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_LASER=0 PROFILE_CONTACT=0 PROFILE_FRAMES=0 PROFILE_TRANSITION=0 GENERATION_DETAIL=0 GENERATION_TIMING=0 PHASE_SAMPLING=0 TRACE_FRAMES= >> .run/profile-restore.log 2>&1
@@ -86,4 +94,10 @@ if [[ $mode == trace ]]; then
   echo "Traces: $trace_out (report: python3 tools/amiga-trace-report.py $trace_out)"
   exit 0
 fi
-sed -n '/PROFILE/,$p' ".run/profile-${mode}.log"
+if [[ $mode == draw-cache ]]; then
+  grep '^DRAW_CACHE' ".run/profile-${mode}.log"
+elif [[ $mode == draw-order ]]; then
+  grep '^DRAW_ORDER' ".run/profile-${mode}.log"
+else
+  sed -n '/PROFILE/,$p' ".run/profile-${mode}.log"
+fi

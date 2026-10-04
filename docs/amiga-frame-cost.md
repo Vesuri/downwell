@@ -305,6 +305,67 @@ The full native patch is preserved only in
 No FPS/replay acceptance is claimed after failing the mandatory timing gate.
 The host probe/oracle remain as preparation, not as a performance win.
 
+### Draw-capture invalidation domain
+
+A subsequent native contact-tape audit distinguishes cache hits, identical
+rebuilds and real actor-list changes. Across 1,800 updates it records 1,573
+hits, 27 identical rebuilds and 200 changed rebuilds, with no failures.
+Frame 645 is a hit; frame 844 genuinely changes the list. **Frame 701 rebuilds
+the same five actors solely because the capture revision changes; the layer
+revision is unchanged.** The diagnostic is `bash amiga/profile.sh draw-cache`;
+its counters are in `amiga/.run/profile-draw-cache.log`. Instrumented timing
+is not an acceptance measurement.
+
+`LOCAL_DRAW_CAPTURE=2` separates locally registered actor captures from the
+external box/field chronology. External notifications still update the original
+registration/capture revisions and alarm dirty ranges. Layer order/cutoff
+revisions remain mandatory for Draw reuse. The new revision adds one counter,
+not another actor table. Mode 1 retains global-capture invalidation; mode 0
+(the default) omits the additional counter and selector. Select modes only at
+startup. Future external families with actor Draw participation must not use
+this exclusion unchanged.
+
+The repeated audit justified this narrow B1 intervention before another A5
+experiment: remove the measured redundant layer traversal, preserving actual
+actor callbacks. The projected saving was 6–7 ms in frame 701. Matched traces
+give:
+
+| Frame | Global capture (ms) | Local capture (ms) |
+| --- | ---: | ---: |
+| 645 | 115.029 | 115.023 |
+| 701 | 177.284 | 172.133 |
+| 844 | 127.518 | 127.278 |
+
+Draw collection in frame 701 falls to 5.7 ms. Captures:
+`tmp/trace/local-draw-capture-mode1` and `tmp/trace/local-draw-capture-mode2`;
+shared text hash
+`6112310cc561a9db1de257b6c2831f36feb8e800a209f6fe30be0c9447396e94`.
+Reports: `build/local-draw-capture-comparison.log` and
+`build/local-draw-capture-701-cost.log`. Use the prepared-segment experiment's
+contact trace bundle, replacing its selector with `LOCAL_DRAW_CAPTURE=1/2`.
+Keep both diagnostic options zero for timing.
+
+The marker-free FPS tapes share text hash
+`2895cb5a4e421346f75712b2255d013cd94cd4fa507a40ee1883456ce5c8265a`.
+The worst gap improves **9 → 8 PAL fields** at frame 701, but total fields
+increase **3,390 → 3,394** (26.55 → 26.52 FPS). This is a narrow worst-frame
+improvement, not an average-FPS or all-frame improvement. Logs:
+`build/local-draw-capture-fps-mode1.log` and `...-mode2.log`.
+
+`make verify-local-draw-capture` passes local/global revision, lifecycle,
+callback-failure and live-versus-cached ordering checks. The native
+`draw-order` diagnostic compares live and cached Draw order 1,800 times with
+zero failures (`build/local-draw-capture-native-order.log`). Cross-target
+replay, including per-frame/component digests, passes against the matching
+`build/port-replay-reference-table-atan` host oracle. Its native executable
+hash is `cfd492750299b5acece9d4cf7a072ce29f594a56b3ecc4b98577e77e994f30bc`;
+log: `build/local-draw-capture-cross-replay.log`. Normal build restoration
+passes the 68000 instruction/helper audits.
+
+Keep this measured exclusion opt-in pending normal-build integration. It does
+not replace incremental maintenance for genuinely changed actor lists, solve
+the HUD, or establish the 20 ms budget.
+
 ## Consequences for the budget
 
 - **Worst frames.** Each is roughly 180 ms. The largest removable parts are:

@@ -149,6 +149,29 @@ __attribute__((noinline, used)) void downwellTraceFrameMark(ULONG frame)
 #endif
 }
 
+#ifdef DOWNWELL_DRAW_CACHE_AUDIT
+extern "C" { volatile ULONG gDownwellDrawCacheAudit[6][8]; }
+namespace downwell {
+void auditActorDrawCache(unsigned outcome,unsigned actors,bool captureChanged,bool layersChanged){
+    if(!gameplayWarmed||gDownwellProfileFrozen)return;
+    const unsigned frame=gDownwellProfileFrames[3]+1;
+    auto record=[&](unsigned bucket){
+        auto* counts=gDownwellDrawCacheAudit[bucket];
+        ++counts[outcome];counts[4]+=actors;
+        if(captureChanged)++counts[5];
+        if(layersChanged)++counts[6];
+        if(outcome==1)counts[7]+=actors;
+    };
+    record(0);
+    if(frame==645)record(1);
+    if(frame==701)record(2);
+    if(frame==844)record(3);
+    if(frame<=300)record(4);
+    if(frame>=600&&frame<=660)record(5);
+}
+}
+#endif
+
 unsigned long downwellTerrainPreparationBegin(){
     const ULONG start=GfxBase?*static_cast<volatile ULONG*>(&GfxBase->VBCounter):0;
     __asm__ volatile("" ::: "memory");

@@ -1068,6 +1068,17 @@ build/gameplay-collision-owner-test: tests/core/GameplayCollisionOwnerTest.cpp s
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
 
+build/gameplay-local-draw-capture-test: tests/core/GameplayCollisionOwnerTest.cpp src/core/GameplayWorld.cpp src/core/PlayerMotion.cpp src/core/Replay.cpp src/core/GameMakerRandom.cpp src/core/ObjectPack.cpp src/core/RoomPack.cpp src/core/AreaOneBuilder.cpp src/core/BuilderPatternPack.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_LOCAL_DRAW_CAPTURE=2 -o $@ $(filter %.cpp,$^)
+build/native-draw-capture-test: tests/core/NativeDrawCaptureTest.cpp src/core/NativeInstanceTable.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_LOCAL_DRAW_CAPTURE=2 -o $@ $<
+.PHONY: verify-local-draw-capture
+verify-local-draw-capture: build/native-draw-capture-test build/gameplay-local-draw-capture-test
+	./build/native-draw-capture-test
+	./build/gameplay-local-draw-capture-test
+
 build/gameplay-collision-owner-scalar-test: tests/core/GameplayCollisionOwnerTest.cpp src/core/GameplayWorld.cpp src/core/PlayerMotion.cpp src/core/Replay.cpp src/core/GameMakerRandom.cpp src/core/ObjectPack.cpp src/core/RoomPack.cpp src/core/AreaOneBuilder.cpp src/core/BuilderPatternPack.cpp $(wildcard src/core/*.h)
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_SCALAR_TERRAIN_OWNERSHIP=1 -o $@ $(filter %.cpp,$^)

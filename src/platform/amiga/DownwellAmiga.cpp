@@ -204,6 +204,9 @@ __attribute__((noinline, used)) void downwellShopLiveReady() { __asm__ volatile(
 #include "core/BuilderPatternPack.h"
 #include "core/ObjectPack.h"
 #include "core/GameplayCollisionOwner.h"
+#ifdef DOWNWELL_LOCAL_DRAW_CAPTURE
+namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_CAPTURE; }
+#endif
 #include "core/PortCheckpoint.h"
 #include "core/PortReplay.h"
 #include "core/RoomPack.h"
