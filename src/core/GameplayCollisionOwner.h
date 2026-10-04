@@ -389,6 +389,12 @@ private:
             if(!parent.check(parent.table_.birth(h,object(r),definition->initialFlags|(inactive?2u:0u),sprite)))return false;
             if(!parent.check(parent.room_.bind(h.slot,depth)))return false;
             if(inactive)parent.activationPending_=true;
+            if constexpr(Kind==View::Kind::breakable||Kind==View::Kind::timeField)
+                if(parent.sceneryLayers_){
+                    // These native stores only birth active scenery and
+                    // retire it; they expose no source depth/activation writes.
+                    return parent.check(!inactive&&parent.layers_.birthScenery(depth));
+                }
             unsigned sourceId=0;
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
             if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
@@ -411,7 +417,13 @@ private:
         bool retire(InstanceHandle local,const Record& r){InstanceHandle h;
             if(!key(local,r,h)||!parent.check(parent.room_.contains(h.slot)))return false;
             if(!parent.check(parent.native_?parent.table_.retire(h):parent.owner_.retire(h)))return false;
-            return parent.check(parent.room_.remove(h.slot)&&parent.layers_.retire(h));}
+            if(!parent.check(parent.room_.remove(h.slot)))return false;
+            if constexpr(Kind==View::Kind::breakable||Kind==View::Kind::timeField)
+                if(parent.sceneryLayers_){
+                    const auto* d=parent.objectDefaults_.get(object(r));
+                    return parent.check(d&&parent.layers_.retireScenery(d->creationDepth));
+                }
+            return parent.check(parent.layers_.retire(h));}
         bool markDestroyed(InstanceHandle local,const Record& r){InstanceHandle h;
             if(!key(local,r,h))return false;
             std::uint32_t flags;
@@ -422,6 +434,8 @@ private:
         bool membership(InstanceHandle local,const Record& r,bool member){InstanceHandle h;
             return key(local,r,h)&&parent.check(parent.native_?parent.table_.registerObject(h,member):parent.owner_.registerObject(h,member));}
         bool activation(InstanceHandle local,const Record& r,bool active){InstanceHandle h;
+            if constexpr(Kind==View::Kind::breakable||Kind==View::Kind::timeField)
+                if(parent.sceneryLayers_)return parent.check(active)&&key(local,r,h);
             if(!key(local,r,h)||!parent.check(parent.native_?parent.table_.setActive(h,active):
                 parent.owner_.setActive(h,active,*parent.families_.flags(object(r)))))return false;
             if(!parent.check(parent.layers_.activation(h,active)))return false;
@@ -639,6 +653,7 @@ private:
     GameplayWorld::DroneBullets drones_{GameplayWorld::DroneBullets::Binding::bindPositionedActor(droneBinding_)};
     std::uint32_t pendingTimeChangeId_=0;
     const bool native_;
+    const bool sceneryLayers_;
     const bool terrainRegistered_;
     NativeInstanceTable<View::capacity> table_;
     GameplayTerrainInstances terrain_;
@@ -657,11 +672,13 @@ public:
     // the spatial journal are not published at all. A compact table keeps
     // what the actor orders observe (object, flag word, sprite index and
     // registration order); room lists and layers remain the order owners.
-    enum class Ownership {reference,nativeTerrain,native};
+    enum class Ownership {reference,nativeTerrain,native,nativeScenery};
     GameplayCollisionOwner(const ObjectPack& objects,const SpriteCollisionPack& sprites,
         GameplayTerrainInstances::Presentation presentation={},GameplayTerrainInstances::WallCollision collision={},
         const RoomPack* rooms=nullptr,Ownership ownership=Ownership::reference):
-        objects_(objects),sprites_(sprites),layers_(rooms),native_(ownership==Ownership::native),
+        objects_(objects),sprites_(sprites),layers_(rooms),
+        native_(ownership==Ownership::native||ownership==Ownership::nativeScenery),
+        sceneryLayers_(ownership==Ownership::nativeScenery),
         terrainRegistered_(ownership==Ownership::reference),
         terrain_(terrainRegistered_?GameplayTerrainInstances::Binding::bindDestruction(terrainBinding_):
             GameplayTerrainInstances::Binding{},presentation,collision){

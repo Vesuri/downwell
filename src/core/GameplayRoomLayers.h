@@ -11,7 +11,7 @@ template<unsigned I,class Terrain> struct GameplayLayerStorage {
     static constexpr bool retained=true;
 };
 template<unsigned I> struct GameplayLayerStorage<I,void> {
-    using Type=RunnerLayers<64,I+256>;
+    using Type=RunnerLayers<64,I+256,true>;
     static constexpr bool retained=false;
 };
 // Native room layer ownership, separate from the animation/membership list.
@@ -127,6 +127,32 @@ public:
         prepared_=true;return true;
     }
     unsigned playerSourceId()const{return playerId_;}
+    // Always-active scenery has no projected Draw and never moves depth.
+    // Keep its logical population (capacity and dynamic-layer lifetime), not
+    // one physical element and lifetime object for every box/time field.
+    bool birthScenery(RunnerImageValue depth){
+        if(!enabled())return true;
+        if(!valid()||!prepared_)return fail();
+        std::int32_t integer;
+        if(!RunnerDepthService::integerDepth(depth,integer))return fail();
+        unsigned layer=layers_.findDynamic(integer);
+        if(layer==Layers::End){
+            if(!ids_.createDynamic(layers_,integer,layer))return fail();
+            projectionValid_[layer]=false;
+        }
+        if(!layers_.retain(layer,1))return fail();
+        ++live_;return true;
+    }
+    bool retireScenery(RunnerImageValue depth){
+        if(!enabled())return true;
+        if(!valid()||!prepared_||!live_)return fail();
+        std::int32_t integer;
+        if(!RunnerDepthService::integerDepth(depth,integer))return fail();
+        const unsigned layer=layers_.findDynamic(integer);
+        if(layer==Layers::End||!layers_.releaseRetained(layer,1))return fail();
+        if(!layers_.get(layer))projectionValid_[layer]=false;
+        --live_;return true;
+    }
     // Borrow only during one callback-free, same-object generated terrain run.
     // Resolve/create its layer at the first cell's original attachment point.
     struct TerrainRunBirth {

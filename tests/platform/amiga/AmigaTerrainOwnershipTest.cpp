@@ -58,7 +58,7 @@ struct Scene {
         // grid is the only terrain representation, as on the Amiga.
         world=std::make_unique<AmigaPortRuntime>(300,false,1201-176,true,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),
-            ownership==Ownership::native?nullptr:&owner->terrain(),&rooms);
+            (ownership==Ownership::native||ownership==Ownership::nativeScenery)?nullptr:&owner->terrain(),&rooms);
         require(world->effectsSucceeded()&&owner->attach(*world),"owner attaches");
         world->initializeEntryInput(false);
         tiles.clear();
@@ -168,9 +168,10 @@ int main(int argc,char** argv){
             &rooms,&objects,2,&patterns);
         host->skipToGameForTesting();
         auto reference=std::make_unique<Scene>(patterns,objects,sprites,rooms,room,*host,Ownership::reference);
-        std::unique_ptr<Scene> others[2]={
+        std::unique_ptr<Scene> others[3]={
             std::make_unique<Scene>(patterns,objects,sprites,rooms,room,*host,Ownership::nativeTerrain),
-            std::make_unique<Scene>(patterns,objects,sprites,rooms,room,*host,Ownership::native)};
+            std::make_unique<Scene>(patterns,objects,sprites,rooms,room,*host,Ownership::native),
+            std::make_unique<Scene>(patterns,objects,sprites,rooms,room,*host,Ownership::nativeScenery)};
         for(frame=0;frame<downwell::gameplayContactProfileFrames;++frame){
             const auto& player=reference->world->player();
             const auto input=downwell::packReplayInput(downwell::gameplayContactProfileInput(

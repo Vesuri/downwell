@@ -1312,6 +1312,8 @@ __attribute__((noinline)) static int runDownwell(void) {
     // exercise the complete registered reference.
 #if defined(DOWNWELL_SCENE_VERIFY) || defined(DOWNWELL_FIELD_VERIFY) || defined(DOWNWELL_ENTRY_WIPE_VERIFY)
     constexpr auto ownership=downwell::GameplayCollisionOwner::Ownership::reference;
+#elif defined(DOWNWELL_SCENERY_LAYERS)
+    constexpr auto ownership=downwell::GameplayCollisionOwner::Ownership::nativeScenery;
 #else
     constexpr auto ownership=downwell::GameplayCollisionOwner::Ownership::native;
 #endif
@@ -1331,7 +1333,8 @@ __attribute__((noinline)) static int runDownwell(void) {
     AmigaPortRuntime& port = *new (portRuntimeStorage)
         AmigaPortRuntime(initialRingOrigin, false, 1201 - 176, true,collisionOwner.enemyBinding(),
             collisionOwner.breakableBinding(),collisionOwner.playerBinding(),
-            ownership==downwell::GameplayCollisionOwner::Ownership::native?nullptr:&collisionOwner.terrain(),&rooms);
+            (ownership==downwell::GameplayCollisionOwner::Ownership::native||
+             ownership==downwell::GameplayCollisionOwner::Ownership::nativeScenery)?nullptr:&collisionOwner.terrain(),&rooms);
 #endif
     if(!port.effectsSucceeded()||!collisionOwner.attach(port))return 20;
 #ifdef DOWNWELL_ENTRY_WIPE_VERIFY
