@@ -355,6 +355,11 @@ Rules for this section:
      tuning sub-millisecond helpers. Preserve the column fallback until broader
      placements have equivalent pixel and timing coverage, and verify full
      scene/reentry memory behavior with the remaining 11,512 Chip bytes.
+     Chained adjacent-raster CPU XOR packets are also ruled out by the
+     [paired native timing](amiga-frame-cost.md#rejected-adjacent-raster-xor-packets):
+     they reduce pixel coverage but worsen complete frames. Any differential
+     replacement must avoid repeated CPU packet traversal and budget its
+     representation up front; the all-pairs word table exceeds 2 MiB.
    - Explicitly partition the shared scene bank: terrain batching already
      uses its first 44,304 bytes. Field images/backing must not overlap that
      scratch or survive a front-bank reload without rebinding.

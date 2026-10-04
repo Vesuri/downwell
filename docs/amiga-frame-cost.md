@@ -500,3 +500,45 @@ Cross-target replay passes with the same optimization bundle,
 The result is in `build/field-plan-cross-replay.log`; the normal build is
 restored with clean 68000 instruction/helper audits. Prepared geometry remains
 opt-in pending the full scene coverage and frame-budget gates.
+
+### Rejected adjacent-raster XOR packets
+
+A differential experiment replaced full old-mask restoration and new painting
+when one stationary large circle owned an unchanged terrain footprint. The
+identity per plane was exact:
+
+`target ^= oldColour ^ newColour ^ (terrain & (oldCoverage ^ newCoverage))`.
+
+Offline adjacent-raster packets could compose reversibly in either direction.
+This avoided storing every old/new raster pair: the 21 frames have 226,180
+changed words across all directed pairs (2,261,800 bytes at ten bytes per
+command, before directories), versus 3,282 words / 32,820 bytes for adjacent
+forward edges reused in reverse. The 21-entry offset directory added 42 bytes
+of ordinary memory and no Chip allocation. Reproduce the representation audit
+with `c++ -std=c++17 -O2 tools/audit-field-deltas.cpp -o build/audit-field-deltas`
+and `build/audit-field-deltas`. The visible-word counts are conservative whole
+word bounds before partial viewport-edge masks.
+
+The candidate admitted at most four adjacent edges, required unchanged X/Y
+and ring origin, and rejected dirty old/new arc rows or multiple fields.
+Host checks passed 24,038 reversible placements and 3,400 ownership lifecycle
+frames (3,196 admitted updates), alongside existing mixed-size, dirty-row and
+double-buffer cases and address/undefined-behavior sanitizers. Those checks
+did not establish speed.
+
+Paired native captures `tmp/trace/field-delta-mode4` and
+`tmp/trace/field-delta-mode5` used the resident prepared-transfer bundle with
+`SKIP_LEVEL=1 PROFILE_CONTACT=0 TRACE_FRAMES=2,60 TRACE_FIELDS=30`.
+Their common text hash is
+`8ea4f7cad773183c13cf46a4d03e671df0f12665f14db88a9946d2c1654317de`.
+The 29 common complete frames worsened from **32.175 to 39.314 ms**.
+Frame 61 rose from 33.01 to 68.17 ms; frame 70 from 27.14 to 66.92 ms.
+The differential routine itself averaged 5.72 ms over all captured frames,
+including frames that did not use it. Dirty-footprint checks added work too.
+Eliminating full painting did not compensate for chained per-word CPU updates.
+
+The candidate, generator extension and experimental tests are removed; the
+recoverable patch is `tmp/field-delta-rejected.patch`. Native pixel/contact/FPS
+acceptance gates were not pursued after this timing failure. Do not revive
+this as a renderer option, hide it behind a narrower current-tape special
+case, or count its host checks as an A6 performance gain.
