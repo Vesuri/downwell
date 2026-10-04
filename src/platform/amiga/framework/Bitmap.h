@@ -33,6 +33,12 @@ public:
     void polygon(const Polygon& polygon, uint16_t color = 1, bool fillMode = false);
     void combineWithMask(const Bitmap& background, const Bitmap& source, const Bitmap& mask, uint16_t destX = 0, uint16_t destY = 0, uint16_t backgroundX = 0, uint16_t backgroundY = 0, uint16_t sourceX = 0, uint16_t sourceY = 0, uint16_t maskX = 0, uint16_t maskY = 0, uint16_t width = 0, uint16_t height = 0, bool clearMasked = false);
     void patternWithMask(const Bitmap& mask, uint16_t destX = 0, uint16_t destY = 0, uint16_t maskX = 0, uint16_t maskY = 0, uint16_t width = 0, uint16_t height = 0, uint16_t pattern = 0xffff);
+#ifndef ASSEMBLER
+    // Same clipping/shift path as copyWithMask, but complement source pixels
+    // inside the mask. Used by resident two-colour images storing low+mask.
+    void copyInvertedWithMask(const Bitmap& source, const Bitmap& mask, uint16_t destX, uint16_t destY, uint16_t sourceX, uint16_t sourceY, uint16_t maskX, uint16_t maskY, uint16_t width, uint16_t height);
+    void copyWithMaskOperation(const Bitmap& source, const Bitmap& mask, uint16_t destX, uint16_t destY, uint16_t sourceX, uint16_t sourceY, uint16_t maskX, uint16_t maskY, uint16_t width, uint16_t height, bool clearMasked, bool invertSource);
+#endif
 
     static Bitmap* allocate(uint16_t width, uint16_t height, uint16_t bitplanes, bool interleaved, uint16_t dataWidth = 0);
     static Bitmap* generateMask(const Bitmap& source, void* data = 0, bool singleBitplane = true, bool takeOwnership = false);

@@ -49,6 +49,8 @@ __attribute__((noinline,used)) void downwellFieldReentryReady(){__asm__ volatile
 // Change only initialized data for identical-code comparisons.
 // Both modes load the same images and reserve the same scene-bank partition.
 extern "C" { volatile unsigned gDownwellPreparedFieldMode=DOWNWELL_FIELD_MODE; }
+extern "C" void amigaBlitterBindFieldBands(UBYTE*);
+extern "C" int amigaBlitterFieldBands(const UBYTE*,UBYTE*,const downwell::TimeFieldOutlines::Circle&,unsigned,bool,UWORD*);
 extern "C" int amigaBlitterCaptureField(UBYTE*,const UBYTE*,const UBYTE*,UWORD,UWORD,UWORD,UWORD,UWORD,UWORD);
 extern "C" int amigaBlitterRestoreField(const UBYTE*,const UBYTE*,UBYTE*,UWORD,UWORD,UWORD,UWORD,UWORD,UWORD);
 extern "C" int amigaBlitterDrawPlanarMasked(const UBYTE*,const UBYTE*,UWORD,UWORD,UWORD,
@@ -72,13 +74,14 @@ struct PreparedFieldOps {
 #endif
     static bool enabled(){return gDownwellPreparedFieldMode!=2;}
     static bool staticEnabled(){return gDownwellPreparedFieldMode>=3;}
-    static bool columnsEnabled(){return gDownwellPreparedFieldMode==4;}
+    static bool columnsEnabled(){return gDownwellPreparedFieldMode>=4;}
     static bool columns(const UBYTE* terrain,UBYTE* target,const downwell::TimeFieldOutlines::Circle& circle,
         unsigned origin,bool restore,UWORD* rows){
 #ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
         amigaFieldVerifyColumn(terrain,target,circle,origin,restore);
 #endif
-        const bool ok=amigaFieldColumns(terrain,target,circle,origin,restore,rows);
+        const bool ok=(gDownwellPreparedFieldMode==5&&amigaBlitterFieldBands(terrain,target,circle,origin,restore,rows)) ||
+            amigaFieldColumns(terrain,target,circle,origin,restore,rows);
 #ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
         amigaFieldVerifyFinish(target);
 #endif
@@ -285,8 +288,15 @@ static const UBYTE* activeHudPackEnd = amiga_hud_pack_end;
 // Gameplay leaves the region unused by any bank.
 static const char bootBankName[] = "PROGDIR:Downwell.boot";
 static const char frontBankName[] = "PROGDIR:Downwell.front";
-static const ULONG sceneBankBytes = DOWNWELL_FRONT_BANK_BYTES > DOWNWELL_BOOT_BANK_BYTES
+static const ULONG baseSceneBankBytes = DOWNWELL_FRONT_BANK_BYTES > DOWNWELL_BOOT_BANK_BYTES
     ? DOWNWELL_FRONT_BANK_BYTES : DOWNWELL_BOOT_BANK_BYTES;
+#ifdef DOWNWELL_PREPARED_FIELDS
+static const ULONG fieldBandOffset=75360;
+static const ULONG sceneBankBytes=fieldBandOffset+sizeof(downwell::fieldBandPixels)>baseSceneBankBytes?
+    fieldBandOffset+sizeof(downwell::fieldBandPixels):baseSceneBankBytes;
+#else
+static const ULONG sceneBankBytes=baseSceneBankBytes;
+#endif
 static UBYTE* sceneBank;
 static const UBYTE* frontPack;
 static const UBYTE* frontPackEnd;
@@ -995,7 +1005,7 @@ static bool verifyFieldComposites(UBYTE* terrain,UBYTE* target){
     for(unsigned frame=0;frame<48&&ok;++frame){
         // Captured, pristine, and sparse paths must exchange ownership without
         // retaining pixels from an earlier field. No gameplay RNG is consumed.
-        gDownwellPreparedFieldMode=frame%13==0?2:frame%11==0?1:frame%5==0?3:4;
+        gDownwellPreparedFieldMode=frame%13==0?2:frame%11==0?1:frame%5==0?3:5;
         downwell::TimeFieldOutlines shape;
         shape.count=frame%12==11?0:3;shape.visible=shape.count!=0;
         for(unsigned i=0;i<shape.count;++i){
@@ -1022,6 +1032,15 @@ static bool verifyFieldComposites(UBYTE* terrain,UBYTE* target){
         shape.circles[0]={int((phase<16?110:254)+(phase&15)),phase%2?283:0,
             int(128*256+(phase<16?0:511))};
         const unsigned origin=(phase*19)%320;
+        ok=overlay.prepare(target,origin,shape,true,[](unsigned){return false;})&&overlay.draw();
+        if(ok)ok=amigaFieldVerifyComposite(terrain,target,shape,origin);
+    }
+    gDownwellPreparedFieldMode=5;
+    for(unsigned phase=0;phase<51&&ok;++phase){
+        downwell::TimeFieldOutlines shape;shape.visible=true;shape.count=1;
+        shape.circles[0]={182+int(phase%17),phase<17?0:phase<34?140:283,
+            int(128*256+(phase*73)%512)};
+        const unsigned origin=(phase*37)%320;
         ok=overlay.prepare(target,origin,shape,true,[](unsigned){return false;})&&overlay.draw();
         if(ok)ok=amigaFieldVerifyComposite(terrain,target,shape,origin);
     }
@@ -2312,11 +2331,12 @@ __attribute__((noinline)) static int runDownwell(void) {
                     // Terrain batching owns the prefix. Rebind after every
                     // front-bank reload, only after retiring its DMA.
                     AmigaHardware::blitterDrain();
-                    if(sceneBankBytes<downwellTerrainBatchBytes || !gameplayFields.bind(
-                        sceneBank+downwellTerrainBatchBytes,sceneBankBytes-downwellTerrainBatchBytes,
+                    if(fieldBandOffset<downwellTerrainBatchBytes || !gameplayFields.bind(
+                        sceneBank+downwellTerrainBatchBytes,fieldBandOffset-downwellTerrainBatchBytes,
                         amiga_field_images,amiga_field_images_end-amiga_field_images,memory.game())){
                         exitCode=20;break;
                     }
+                    amigaBlitterBindFieldBands(sceneBank+fieldBandOffset);
 #ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
                     if(!amigaFieldVerifyTerrainFixture(memory.game(),(UBYTE*)gameDisplay[0].data,
                         sceneBank+sceneBankBytes-448)||

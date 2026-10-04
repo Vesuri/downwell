@@ -370,3 +370,72 @@ Moving restoration into the row owner alone therefore does not solve the field
 budget. The source and generated-table changes were removed; the recoverable
 patch is `tmp/field-row-restoration-rejected.patch`. Do not revive this as
 another production option or count its host correctness checks as a speedup.
+
+## Resident large-field bands
+
+`PREPARED_FIELDS=1 PREPARED_FIELDS_BACKING=3` uses resident 176-pixel top/bottom
+arc images for circle centres 182–198. Other placements keep the column path.
+The images contain white coverage and total coverage; the framework Bitmap
+copy path derives red through the complemented-source masked blitter minterm.
+Images are generated offline and copied into Chip once on gameplay entry, not
+converted, copied or expanded for each field. Mixed-circle source order,
+mask-only restoration from pristine terrain, clipping and physical ring wraps
+remain unchanged. See the [memory contract](amiga-memory.md): the bank costs
+71,456 Chip bytes, reusing the unused scene-bank tail before extending it.
+
+The paired level-exit traces use the prepared-column bundle with
+`TRACE_FRAMES=2,60 TRACE_FIELDS=30`, `SKIP_LEVEL=1 PROFILE_CONTACT=0`, and
+`PREPARED_FIELDS_BACKING=2` versus `=3`. Captures:
+`tmp/trace/field-bands-mode2.ppMp7b` and
+`tmp/trace/field-bands-mode3.Na6tNt`. Both text hashes are
+`1187ebd6ca2a38747923a25d33dcbd6f0ac52b7c3140f378674a0bc024fd2ba9`.
+Use the reporter's paired-field DMA-stall accounting; rejecting those boundary
+records or dropping the stalled cycles would invalidate the comparison.
+
+| Complete level-exit frame | Columns (ms) | Resident bands (ms) |
+| ---: | ---: | ---: |
+| 3 | 34.84 | 25.78 |
+| 4 | 35.72 | 32.33 |
+| 5 | 39.67 | 26.59 |
+| 6 | 88.42 | 82.54 |
+| 11 | 37.92 | 38.88 |
+| 70 | 39.53 | 28.06 |
+
+For the intersection of fully captured frames (3–15 and 61–74, 27 frames),
+mean complete-frame cost falls from 41.13 to 33.01 ms. Frame 11 illustrates
+that presentation-phase changes can still make individual non-gate frames
+slower. Preparation plus drawing remains about 11–16 ms, not the 5 ms target;
+the 48.5 ms exit-mask selection in frame 6 is still present.
+
+Matched contact captures are
+`tmp/trace/field-bands-contact-trace-2.xgHHKj` and
+`tmp/trace/field-bands-contact-trace-3.kZsfsH`, with shared text hash
+`e3fb235789fc864e3ea0bad25f0dd8672890178dba5dfa59d3d242b1a027f307`.
+Frames 645, 701 and 844 are cycle-identical between modes at
+817,250 / 1,263,190 / 901,780 cycles. The field improvement is not a claim of
+faster combat or completion of the whole-frame budget.
+
+The marker-free FPS runs (`TRACE_FRAMES=` and `PROFILE_CONTACT=1`, same
+bundle and modes) both take 3,390 PAL fields for 1,800 updates, with a
+nine-field maximum at frame 701. Their shared text hash is
+`159659ca9fb27b7d4d04af414f2bdcef7d1cdf29da34c3959c5828b106f4cac4`.
+Logs are `build/field-bands-pure-fps-2.log` and
+`build/field-bands-pure-fps-3.log`. The earlier 3,391-field runs included
+inert trace markers and are not the marker-free FPS baseline.
+
+The final native pixel verifier compares 1,979 full buffers through 1,800
+contact updates, plus 512 terrain-mask phases and 131 mixed/shifted/wrapped
+composites, with zero failures. Executable hash:
+`5d331a14d0be6a896020026be32673a79d33dd2fb09df8410833b1a84d81095b`;
+text hash `5c1c64ce12c0e6a10b3f29bcd993b0ef86309172208671ca8a15e5e5075873a5`.
+It measures 11,520 Chip bytes free after allocation. Host raster tests cover
+all 8,704 admitted radius/position combinations, clipping and restoration,
+and pass address/undefined-behavior sanitizers. These pixel oracles are the
+shared portable raster, not evidence of original Windows GPU coverage.
+
+The cross-CPU replay also passes with the same optimization bundle and
+`REPLAY_VERIFY=1`, using `build/port-replay-reference-table-atan` as the host
+oracle (matching `TABLE_CONTACT_ATAN=1`). The tested native executable hash is
+`cb6c4c7205721c0553a05d8564b34dc16f9b91c75ea61c8ddaf388c04fbaa30e`;
+the command/result log is `build/field-bands-cross-replay.log`. This checks
+shared state and RNG, separately from the native DMA pixel verifier.

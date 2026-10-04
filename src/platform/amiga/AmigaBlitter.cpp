@@ -1,5 +1,41 @@
 #include "framework/AmigaHardware.h"
 #include "framework/Bitmap.h"
+#ifdef DOWNWELL_PREPARED_FIELDS
+#include "AmigaFieldBands.h"
+static UWORD* residentFieldBands;
+extern "C" void amigaBlitterBindFieldBands(UBYTE* bank){
+    AmigaHardware::blitterDrain();
+    residentFieldBands=reinterpret_cast<UWORD*>(bank);
+    for(unsigned i=0;i<sizeof(downwell::fieldBandPixels)/sizeof(UWORD);++i)
+        residentFieldBands[i]=downwell::fieldBandPixels[i];
+}
+extern "C" int amigaBlitterFieldBands(const UBYTE* terrain,UBYTE* target,
+    const downwell::TimeFieldOutlines::Circle& circle,unsigned origin,bool restore,UWORD* rows){
+    if(!residentFieldBands)return 0;
+    // As with terrain publication, give queued DMA priority while this phase
+    // has no useful concurrent CPU work. Do not contend with our own wait loop.
+    AmigaHardware::setBlitterNasty(true);
+    const bool admitted=amigaFieldBandParts(circle,origin,[&](unsigned id,unsigned y,unsigned sx,unsigned sy,unsigned height){
+        const auto& image=downwell::fieldBandImages[id];
+        UWORD* pixels=residentFieldBands+image.wordOffset;
+        Bitmap source(pixels,176,image.height,1,false),mask(pixels+11*image.height,176,image.height,1,false);
+        if(restore){
+            Bitmap background((void*)terrain,380,320,2,false,false,384);
+            Bitmap destination(target,380,320,2,false,false,384);
+            destination.copyWithMask(background,mask,110,y,110,y,sx,sy,160,height,false);
+        }else{
+            Bitmap low(target,380,320,1,false,false,384);
+            Bitmap high(target+15360,380,320,1,false,false,384);
+            low.copyWithMask(source,mask,110,y,sx,sy,sx,sy,160,height,false);
+            high.copyInvertedWithMask(source,mask,110,y,sx,sy,sx,sy,160,height);
+            if(rows)for(unsigned row=y;row<y+height;++row)rows[row/16]|=UWORD(1u<<(row&15));
+        }
+    });
+    if(admitted)AmigaHardware::blitterDrain();
+    AmigaHardware::setBlitterNasty(false);
+    return admitted;
+}
+#endif
 #ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
 #include "core/TimeFieldOutlines.h"
 #endif

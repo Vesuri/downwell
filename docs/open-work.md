@@ -317,12 +317,14 @@ Rules for this section:
      as the compiled oracle/fallback. Verify mask-only background restoration,
      actor/laser ordering, overlapping fields, clipping, circular-buffer wraps,
      repeated prepare calls, and switching between optimized and fallback paths.
-   - Finish `PREPARED_FIELDS=1` with `PREPARED_FIELDS_BACKING=2`: bring the
-     large/mixed column-packet path below the under-5-ms target, measure
+   - Finish `PREPARED_FIELDS=1` with `PREPARED_FIELDS_BACKING=3`: bring the
+     resident large-field bands and noncentral column fallback below the
+     under-5-ms target, measure
      wrapped and overlapping small-field workloads against that target, then
      complete normal-build integration and the combined timing/fidelity gates. Do not
      count the single-circle improvement as completion of A6 or replace the
      native pixel checks with host-only copies. Use
+     `PREPARED_FIELDS_BACKING=2` for pristine-small/column-large comparison,
      `PREPARED_FIELDS_BACKING=1` for pristine-small/sparse-large comparison,
      `PREPARED_FIELDS_BACKING=0` for the saved-background comparison and
      `PROFILE_FIELD_REFERENCE=1` for the sparse comparison; selectors change
@@ -343,8 +345,14 @@ Rules for this section:
      [paired native experiment](amiga-frame-cost.md#large-field-row-restoration-experiment):
      exact offline spans remove scheduling scans, but copying terrain rows
      and repainting the outline leaves complete frames effectively unchanged.
-     The next design must address the remaining 12–13 ms drawing pass as well,
-     accounting for source staging and old-mask restoration in the same budget.
+     Account for source staging, old-mask restoration and drawing in the same
+     budget; moving work into row copying is not sufficient. For centres
+     182–198 the resident bands avoid per-word drawing, but combined
+     preparation/drawing still costs about 11–16 ms in the exit window. Eliminate
+     another measured composition pass or repeated transfer setup, rather than
+     tuning sub-millisecond helpers. Preserve the column fallback until broader
+     placements have equivalent pixel and timing coverage, and verify full
+     scene/reentry memory behavior with the remaining 11,520 Chip bytes.
    - Explicitly partition the shared scene bank: terrain batching already
      uses its first 44,304 bytes. Field images/backing must not overlap that
      scratch or survive a front-bank reload without rebinding.

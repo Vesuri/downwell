@@ -80,6 +80,23 @@ source circle index and large/small kind. All comparison modes in a
 `PREPARED_FIELDS=1` build link this bank, so their executable code is identical.
 These paths remain opt-in pending the full frame-budget and coverage gates.
 
+The resident large-field experiment (`PREPARED_FIELDS_BACKING=3`) extends the
+shared scene bank to 146,816 bytes. Its region `[75360,146816)` holds 71,456
+bytes of immutable 176-pixel arc images, copied once on gameplay entry after
+retiring front-bank DMA. Each image stores white coverage and total coverage;
+the blitter derives red with `mask & ~white`, without a third resident plane
+or per-frame expansion. All prepared-field comparison modes reserve and load
+the same bank. The additional allocation versus the normal scene bank is
+56,374 bytes; the native pixel verifier measures **11,520 bytes Chip free**
+after startup allocation. This narrow headroom needs full scene/reentry
+coverage before enabling the option by default.
+
+Band descriptors and radius maps stay in ordinary memory. Native whole-buffer
+checks cover mixed fields, all supported X shifts, vertical clipping and ring
+wraps. The band renderer supports centres 182 through 198 inclusive; other
+placements retain column packets. The private terrain prefix, small-field
+images and both saved-background reference buffers keep their existing ranges.
+
 The experimental `TERRAIN_BATCH=1` painter borrows 44,304 bytes of that idle
 region for two colour planes and a coverage plane (416×284). Its immutable tile
 sources remain in ordinary memory. It drains masked transfers before reusing the

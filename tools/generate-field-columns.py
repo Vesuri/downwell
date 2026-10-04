@@ -12,9 +12,10 @@ subprocess.run([str(root / "build/generate-field-columns"), str(output)], check=
 sha = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
 inputs = [root / "tools/generate-field-columns.cpp", *sorted((root / "src/core").glob("*.h"))]
 output.with_suffix(".json").write_text(json.dumps(dict(
-    schemaVersion=1, generator="generate-field-columns/v1",
+    schemaVersion=2, generator="generate-field-columns/v2",
     generatorSha256=sha(Path(__file__)),
     inputs={str(p.relative_to(root)): sha(p) for p in inputs},
     outputSha256=sha(output), radii=512, nativeWordBytes=8,
     layout="deduplicated columns of signed row/word offsets and two planar colour words",
+    bands="176-pixel top/bottom arcs; white and coverage planes; supported centres 182..198",
     oracle="GoalFieldOutline portable raster; not a Windows GPU pixel oracle"), indent=2)+"\n")

@@ -328,6 +328,14 @@ void Bitmap::copy(const Bitmap& source, uint16_t destX, uint16_t destY, uint16_t
 
 void Bitmap::copyWithMask(const Bitmap& source, const Bitmap& mask, uint16_t destX, uint16_t destY, uint16_t sourceX, uint16_t sourceY, uint16_t maskX, uint16_t maskY, uint16_t width, uint16_t height, bool clearMasked)
 {
+    copyWithMaskOperation(source,mask,destX,destY,sourceX,sourceY,maskX,maskY,width,height,clearMasked,false);
+}
+void Bitmap::copyInvertedWithMask(const Bitmap& source, const Bitmap& mask, uint16_t destX, uint16_t destY, uint16_t sourceX, uint16_t sourceY, uint16_t maskX, uint16_t maskY, uint16_t width, uint16_t height)
+{
+    copyWithMaskOperation(source,mask,destX,destY,sourceX,sourceY,maskX,maskY,width,height,false,true);
+}
+void Bitmap::copyWithMaskOperation(const Bitmap& source, const Bitmap& mask, uint16_t destX, uint16_t destY, uint16_t sourceX, uint16_t sourceY, uint16_t maskX, uint16_t maskY, uint16_t width, uint16_t height, bool clearMasked, bool invertSource)
+{
     if (width == 0) {
         width = source.width;
     }
@@ -414,9 +422,9 @@ void Bitmap::copyWithMask(const Bitmap& source, const Bitmap& mask, uint16_t des
         ((maskX + width) & 15) && ((destX + width) & 15);
     auto copyMasked = [&](uint16_t* pixels,uint16_t* destination,uint16_t* coverage,uint16_t rows) {
         if (!repairRight) {
-            AmigaHardware::blitterCopyWithMask(pixels,destination,coverage,widthWords,rows,
+            AmigaHardware::blitterCopyWithMaskOperation(pixels,destination,coverage,widthWords,rows,
                 sourceRowModulo*2,destRowModulo*2,maskRowModulo*2,
-                sourceShift,maskShift,firstWordMask,lastWordMask,clearMasked);
+                sourceShift,maskShift,firstWordMask,lastWordMask,clearMasked,invertSource);
             return;
         }
         const uint16_t keep = (uint16_t)(0xffffu >> ((destX + width) & 15));
@@ -429,9 +437,9 @@ void Bitmap::copyWithMask(const Bitmap& source, const Bitmap& mask, uint16_t des
             const unsigned count=rows-first<64?rows-first:64;
             AmigaHardware::blitterDrain();
             for(unsigned row=0;row<count;++row)edges[row]=destination[(first+row)*targetStride+right];
-            AmigaHardware::blitterCopyWithMask(pixels+first*sourceStride,destination+first*targetStride,
+            AmigaHardware::blitterCopyWithMaskOperation(pixels+first*sourceStride,destination+first*targetStride,
                 coverage+first*maskStride,widthWords,count,sourceRowModulo*2,destRowModulo*2,
-                maskRowModulo*2,sourceShift,maskShift,firstWordMask,lastWordMask,clearMasked);
+                maskRowModulo*2,sourceShift,maskShift,firstWordMask,lastWordMask,clearMasked,invertSource);
             AmigaHardware::blitterDrain();
             for(unsigned row=0;row<count;++row){
                 auto& word=destination[(first+row)*targetStride+right];
