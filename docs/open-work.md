@@ -13,11 +13,11 @@ on PAL; do not add 60 Hz catch-up.
 ## Priority and scope
 
 Next: recover the A500 gameplay frame budget (section 5), taking its ranked
-items in order: generation bursts, then the per-frame runner walks, then
-combat composition. Each removes a structure or computation measured by the
-[frame-cost audit](amiga-frame-cost.md); tuning small functions and compiler
-flags is not the remedy. Cover the garden-to-well transition as well as
-steady gameplay. Then finish live
+items in order: restore the broken fixtures, then generation bursts, combat
+composition and the per-frame runner walks. Each removes a structure or
+computation measured by the [frame-cost audit](amiga-frame-cost.md); tuning
+small functions and compiler flags is not the remedy. Cover gameplay entry
+from the well as well as steady gameplay. Then finish live
 skeleton encounters, following the dependency order in section 1, make
 catacombs playable (section 2), followed by the remaining
 content (section 4). Apply the fidelity, performance, architecture, memory and
@@ -197,113 +197,226 @@ Reference: [upgrade IDs and source entry points](upgrade-coverage.md).
 
 Fit worst-case gameplay, style/upgrade navigation and transitions into 20 ms.
 Average FPS is not the criterion. The [frame-cost audit](amiga-frame-cost.md)
-at `b815af63` measures the contact tape at 3,252 PAL fields. Quiet frames take
-28.4 ms, combat 85 ms, and time-field frames 37 ms. The worst frames are 701
-(172 ms, generation), 844 (121 ms, generation) and 645 (101 ms, contact).
+measures the shipped build (code unchanged since `b815af63`) on the contact
+tape: 3,252 PAL fields. Quiet frames take 28.4 ms, combat 85.4 ms and
+time-field frames 37.3 ms. The worst frames are 701 (172.2 ms: generation on
+top of combat), 844 (120.7 ms: generation) and 645 (101.4 ms: contact). Menu
+scenes (`profile.sh transition`) peak at two fields; gameplay entry from the
+well is not covered by any tape.
 
-Rules for this section:
-- Take items in the order below unless a repeated audit reorders them.
-- Every change must remove a named structure or computation whose cost the
-  audit measures: at least 3 ms per frame in a window, or 10 ms in a worst
-  frame. Do not tune functions that cost under 1 ms. That includes rewriting
-  loops, changing types or registers, unrolling, inline assembly, compiler
-  flags and helper substitutions.
-- Before a change, state the work removed and the expected saving from the
-  audit. Afterwards, trace the affected windows, starting each capture one
-  frame early (644, 699 and 843 for the worst frames), and run the FPS tape.
-- Reject the change if a frame that runs the changed code gets slower.
-  Frames that do not run it move by up to about 0.5 ms between builds; that is
-  noise, not a regression. The FPS tape's worst gap is quantized to whole
-  fields: report it, but do not use it as the gate.
-- An accepted change is enabled in the normal build in the same commit. Keep
-  the replaced path compiled as a reference selector for oracles, never as an
-  opt-in experiment. Compare full RNG state, numeric instance IDs, creation
-  and event order, positions and draw order on deterministic replays, and
-  pixels where presentation changes.
-- After two rejected attempts at one item, move to the next item. Record each
-  rejected approach as one row in the audit's
-  [rejected approaches](amiga-frame-cost.md#rejected-approaches) table, with
-  its commit and patch. Measurements and history belong in commit messages,
-  not in this queue.
+### How to work this section
+
+The previous round spent most of its commits on one parked item (the ammo
+gauge) and left ten opt-in flags behind. Do not repeat that.
+
+- Work the items below in order. Each names the structure to remove, its
+  measured cost and a target. Implement the whole structural change in one
+  attempt; do not sweep variants, modes or parameters.
+- Do not touch code that costs under 1 ms in the windows it runs in. That
+  includes loop rewrites, type/register changes, unrolling, inline assembly,
+  compiler flags and helper substitutions. If a profile shows nothing of 3 ms
+  or more in the target, the item is done: move on.
+- Before starting, write in the commit message the work removed and the
+  expected saving from the numbers here. Afterwards trace only the affected
+  windows (start a capture one frame early: 644, 699, 843) and run the FPS
+  tape. Repeat the full audit only after each lettered group lands.
+- Gate: reject the change only if a frame that runs the changed code gets
+  slower. Untouched frames move by up to about 0.5 ms between builds; that is
+  noise. The tape's worst gap is quantized to whole fields: report it, never
+  gate on it.
+- An accepted change is the default in the same commit. Keep the replaced path
+  only as a reference selector for oracles. Do not add experiment flags, mode
+  numbers or parallel candidate implementations to the tree.
+- Two rejected attempts at an item end it: record one row each in the audit's
+  [rejected approaches](amiga-frame-cost.md#rejected-approaches) table (commit
+  and patch), then take the next item. Measurements belong in commit messages.
+  Do not add narrative or per-experiment results to this file or the audit.
+- Verify each change with the full RNG state, numeric instance IDs, creation
+  and event order, positions and draw order on deterministic replays
+  (`make verify-cross-replay`, `make verify-terrain-ownership`, the per-frame
+  ownership digests), plus the native pixel oracles (`profile.sh terrain`,
+  `profile.sh fields`, `profile.sh ammo`) when presentation changes.
+- Delete your own traces under `tmp/trace/` once their numbers are in a commit;
+  each 100-field capture is about 450 MB and the disk is nearly full. For
+  several queries on one capture, export `--collapsed` stacks once instead of
+  re-running `--focus`.
+
+### 0. Restore the broken fixtures (timebox: one day)
+
+These time out before their checks run, at unmodified `HEAD` as well. A and B
+rely on them. Fix them, but do not count this as frame-budget progress.
+- `verify-amiga-natural-route` stalls after its reentry at tick 3060 (already
+  at `7452dfe0`).
+- `verify-amiga-gameplay-active-frame` never reaches its awake-enemy frame
+  (already at `d0072b4b`).
+- `profile.sh fields-clear` never reaches its profile marker (already at
+  `7452dfe0`).
 
 ### A. Generation bursts (frames 701 and 844)
 
-`generateLiveTerrain` takes 93 ms at 701 and 66 ms at 844. Moving Well512 draws
-to other frames changes RNG interleaving and is not an option.
+`generateLiveTerrain` costs 93.3 ms at 701 and 65.5 ms at 844. A whole
+builder pattern is emitted synchronously, as in the original; the draws and
+creations must stay in that order. What can go is the per-cell work around
+them.
 
-1. **Object creation.** `AmigaGameplayGeneration::create` costs 2,568 cycles
-   per object at 701 (62 objects, 22.4 ms) and 4,460 at 844 (44 objects,
-   27.6 ms). `appendBreakables` still costs 6,034 cycles per breakable.
-   Prepare each generated object type's invariant construction data (defaults,
-   alarms, layer, depth, sprite bounds, family record template) before the
-   level. A birth then becomes a record copy plus position and registration,
-   in the original creation order. Target: under 1,500 cycles per object and
-   under 2,000 per breakable, about 15 ms saved at 701 and 20 ms at 844.
-2. **Run creation.** 23 `createRun` calls take 22.1 ms at 701 (6,828 cycles
-   each), including 7.2 ms of `AmigaTerrainRunIndex::publishSpan`; 7.1 ms of
-   that is RNG advance and stays. Publish a pattern's spans once per pattern,
-   not once per run, and build run records from prepared pattern data.
-   Target: under 2,500 cycles per run excluding RNG, about 8 ms saved.
-3. **Pattern emission.** 11 `AreaOneBuilder::emitObject` calls take 17 ms at
-   701 and 14 take 30 ms at 844 (11,000–15,000 cycles each, including the
-   creations above). After A1 and A2, trace again with
-   `--focus=AreaOneBuilder::emitObject` and remove the largest remaining
-   per-object structure; do not tune the builder's arithmetic.
+1. **Precomputed Well512 ring.** `Well512::step` costs 23.2 ms at 701 and
+   12.6 ms at 844, all inside generation: about 300 and 165 steps at roughly
+   540 cycles each (already hand-written assembly). `GameMakerRandom::advance`
+   alone, the draws no caller reads, is 17.8 ms of that at 701. Elsewhere on
+   the tape the generator costs under 0.3 ms per frame. The output stream
+   depends only on the seed, so precomputing it changes no value or order.
+   - Keep a ring in `GameMakerRandom` (512 entries is enough for one pattern)
+     of each step's output and the `mixed` word it stores. Refill a small
+     fixed number of steps per frame at the end of the frame (about four:
+     0.3 ms), plus fully at run start and level entry. When a burst empties the
+     ring, fall back to stepping synchronously.
+   - `nextU32` becomes a ring read and `advance(n)` an index add.
+   - `stateIndex()`, `stateWord()` and `drawCount()` must still describe the
+     consumer position. The 16 words are the last 15 `mixed` words plus the
+     latest output, placed by index, so keep at least 16 consumed entries
+     behind the read position.
+   - Portable code in `src/core`, used by SDL and Amiga alike. The existing
+     per-step path is the oracle: compare full state after every draw on a
+     replay.
+   - Target: Well512 under 2 ms in both burst frames, with nothing added to
+     any other frame beyond the refill.
+2. **Prepared pattern terrain.** At 701, per-cell terrain publication and cell
+   classification cost about 50 ms:
+   - 60 single wall/platform cells through
+     `AmigaAreaOneTerrainBuilder::collect` → `AmigaGameplayGeneration::create`
+     (`amigaAddTerrainObject`, `AmigaTerrainTiles::append`) take 15.3 ms,
+     about 1,800 cycles each.
+   - 23 runs through `createRun` take 22.1 ms: `publishSpan` 7.2, RNG 7.1 (A1
+     removes it), the `AmigaTerrainRunIndex` constructor 2.7 and `admitSpan`
+     1.6.
+   - The cell loop in `AreaOneBuilder::emitPatternMode` itself costs 7.5 ms,
+     plus `plainCavernCell` 2.9 and `BuilderPatternPack::rowData` 2.5.
 
-Verify every item with per-frame digest comparisons against the registered
-reference, as `make verify-terrain-ownership` does for terrain, plus the
-cross-CPU replay and the native field/terrain oracles.
+   At 844 the same paths cost about 16 ms. Every `1`, `|` and `-` cell, the
+   two row-edge walls, the `{`/`}` borders and the appended pillars are fixed
+   by (family, pattern, reversed). Only `2`, `3`, `^`, `@`, enemy and object
+   cells are random.
+   - Generate offline, per pattern and orientation:
+     - the fixed terrain as per-row grid/landing/contact/tile words and run
+       records;
+     - the list of event cells in column order, each with the number of draws
+       that precede it in the row.
+   - Emission then does three things per row, in source order:
+     - ORs in the row's prepared terrain;
+     - advances the RNG by the stored counts (cheap after A1);
+     - calls the existing code only for event cells.
+   - Publish terrain row by row before that row's event cells, so a Create can
+     see no terrain that the original had not yet created.
+   - Keep any instance IDs that terrain consumes. Check the manifest-pinned
+     generator against `BuilderPatternPack`.
+   - The current builder stays as the reference selector, compared per frame
+     by the ownership digests.
+   - Target: generation at 701 under 30 ms together with A1, and the cell loop
+     under 3 ms.
+3. **Native breakables.** At 844, 13 `GameplayWorld::appendBreakables` births
+   take 11.0 ms (6,000 cycles each; 5.2 ms at 701):
+   - 7.4 ms is the collision-owner binding: `RecordLifecycleBinding::birth` →
+     `Binding::birthMode` → `nativeBirth`. Within it:
+     - `GameplayRoomLayers::birthScenery` 2.1 ms;
+     - `Binding::key` validation, including `GameplayCollisionOwner::valid`,
+       2.4 ms;
+     - `NativeInstanceTable::externalBirth` 1.4 ms.
+   - 3.7 ms is initialising the record.
 
-### B. Per-frame runner walks (every gameplay frame)
+   Breakables are static grid-aligned blocks, already indexed in
+   `breakableIndex_`. Give them the treatment native terrain got:
+   - a compact record plus the grid flag;
+   - one prepared record template copied at birth;
+   - room-layer and owner registration only when an original query or Draw
+     needs the instance (see E).
 
-The quiet frame takes 28.4 ms, and no function takes more than a tenth of it.
-Its gap to 20 ms is the per-actor walks.
+   Time-field adoption (1.8 ms at 701) and `configureEnemy` (3.1 ms at 844)
+   follow the same pattern, if they are still over 3 ms afterwards. Target:
+   under 1,500 cycles per breakable.
 
-1. **Room visits through the collision owner.** The
-   `GameplayCollisionOwner::attach` visit hooks cost about 6.5 ms quiet and
-   15 ms at 645. In the quiet window they are the animation walk
-   (`visitAnimationRetainedChecked`, 1.1 ms), room-layer visits (1.0 ms),
-   activation reconciliation (0.6 ms), depth servicing (0.3 ms) and per-visit
-   validation (0.2 ms), each entered once per actor per phase. Run per-family
-   loops over compact records where no handler has cross-instance effects,
-   keeping room order where one does. Reconcile activation and service depths
-   at birth, retirement and room entry, not on every visit, and replace
-   per-visit validation with a sticky failure flag checked at phase
-   boundaries.
-2. **Draw collection** (2.7 ms quiet, 6.6 combat, 8.0 at 844) walks the room
-   layers after ownership changes. Maintain the actor Draw list incrementally,
-   ordered by layer, depth and element order. Local Draw capture already
-   skips the walk when nothing changed; this item covers genuine changes.
-3. **Captured alarm dispatch** (1.2 ms quiet, 2.4 combat) walks every captured
-   enemy and effect for each alarm index. Count each family's alarms down in
-   its records in captured order, dispatch only zero crossings, and retire
-   unrearmed zeros to -1.
+### B. Combat composition (85.4 ms; also 645 and 701)
 
-### C. Combat composition (85.4 ms)
+1. **Damage-number text.** `AmigaDamageText::draw` costs 5.5 ms in every
+   combat frame and 5.9 ms at 645, which is half of the "actor drawing" cost.
+   - Each frame it rebuilds the outlined label from glyph rows. It then issues
+     about nine `amigaRendererDrawPlanarWord` calls, each about 2,000 cycles
+     including a modulo and a multiply for ring addressing.
+   - Build the label's white/outline words once, when the number's text
+     changes, and keep them with the number record.
+   - Each frame, publish them with one masked copy per label, or put the
+     label on a free hardware sprite.
+   - Target: under 1 ms for typical label counts.
+2. **Gem positions in reader units.** `GemMotion` stores positions in
+   1/12800 pixel. `pixel`, `rounded` and `q8` therefore divide by 12800 or 50
+   on every read. Through the 32-bit library helpers that costs 4.4 ms of the
+   combat frame's 10.2 ms of division/multiply helpers.
+   - Store whole pixels plus a fraction in [0,12800), normalised once after
+     each velocity add. Reads then need no division.
+   - Gravity, bounce and homing must stay exactly as now. The existing
+     representation is the oracle.
+   - Target: under 0.5 ms of helpers from gems.
+3. **Currency/smoke composition** (9.6 ms at 690–700 and 701):
+   - three `CurrencySmokeComposition::stampPixel` calls at 14,000 cycles each
+     (`PaletteEffectSurface::stamp` → `blitterCopyWithMask` /
+     `blitterPatternWithMask`);
+   - `intersects` → `synchronize` waiting on the blitter, 1.8 ms;
+   - `clear` 0.9 ms.
 
-1. **Actor drawing** (10.7 ms): CPU planar stamping of actors that did not
-   get a hardware sprite. All eight sprite channels are usable since
-   `b815af63`; assign sprites before falling back to bobs, and blit the bobs
-   that remain from prepared masks.
-2. **Currency/smoke composition** (9.6 ms; three `stampPixel` calls at 14,038
-   cycles each): use blitter zero-flag tests for final-alpha overlap instead of
-   per-row bounds and generic queue enqueues.
-3. **Fixed-point conversion on access** (about 10 ms of 32-bit division,
-   modulo and multiply helpers; `GemMotion::q8`, `rounded` and `pixel` cause
-   about 4 ms). Store positions in the representation their readers need, and
-   convert once per step, not per access.
+   Make the surface's occupancy decisions from CPU-side bounds, so composition
+   does not wait for the blitter. Issue each stamp as one prepared-mask blit,
+   not per-row queue entries. Target: under 4 ms.
+4. **Software actor drawing.** `amigaRendererDrawAsset` costs 3.2 ms in
+   combat, about two actors at 10,000 cycles each that got no hardware sprite.
+   At 645, `buildHardwareSpritePart` spends 2.8 ms building sprite DMA words
+   on the CPU. All eight channels are usable since `b815af63`:
+   - find out why those actors fall back, and assign them channels before
+     falling back to the CPU;
+   - bind prepared sprite-format frames instead of building DMA words each
+     frame.
+
+   Do this only if the two together are still over 3 ms after B1–B3.
 
 Verify the mixed DMA/planar frame against original captures, preserving
 controller priority.
 
-### D. HUD and terrain residuals (only after A–C)
+### C. Per-frame runner walks (quiet frames, 28.4 ms)
 
-- The ammo gauge costs 11.2 ms at 645 and 1.5–4 ms in typical frames; its
-  targets are under 8 ms on a recharge frame and under 4 ms on a shot frame.
-  The rejected-approaches table rules out every runtime classifier. If the
-  gauge is reopened, start from the staged-transfer patch listed there and
-  measure it against the factored default.
-- Terrain painting costs 6.4 ms at 844 against a 5 ms target.
+The quiet frame has no function over 1.7 ms of self time. Its gap to 20 ms is
+the walks that `GameplayCollisionOwner::attach` installs, entered once per
+actor per phase. The costs are quiet / combat / 645:
+
+| Walk | Quiet | Combat | 645 |
+| --- | ---: | ---: | ---: |
+| Animation (`visitAnimationRetainedChecked`) | 1.4 ms | 4.1 ms | 4.7 ms |
+| `reconcilePhase` (activation and depth servicing) | 1.2 ms | 1.3 ms | 1.2 ms |
+| Captured alarm dispatch (`dispatchCapturedAlarms`) | 1.2 ms | 2.4 ms | 4.9 ms |
+| Draw collection (`AmigaGameplayDrawList::collect`) | 2.7 ms | 6.6 ms | 6.6 ms |
+
+1. **Draw collection.** Keep the actor Draw list incrementally, ordered by
+   layer, depth and element order. Update it at birth, retirement, depth
+   change and sprite change, instead of walking the room layers and
+   projecting each actor every frame.
+2. **Alarms.** Count each family's alarms down in its records, in captured
+   order. Dispatch only the zero crossings, and retire unrearmed zeros to -1.
+3. **Activation, depth and validation.** Reconcile activation and service
+   depths at birth, retirement and room entry, not on every visit. Replace
+   per-visit `GameplayCollisionOwner::valid`/`Binding::key` validation with a
+   sticky failure flag checked at phase boundaries.
+4. **Animation.** Advance animation per family over compact records where no
+   handler has cross-instance effects. Keep room order where one does.
+
+Target: quiet frames under 22 ms. The remaining distance is player and
+walking-enemy motion, about 5.6 ms together.
+
+### D. Parked until A–C are done
+
+- Ammo gauge: 11.2 ms at 645, 1.5–4 ms in typical frames. Every runtime
+  classifier is ruled out (rejected-approaches table). If reopened, start from
+  the staged-transfer patch listed there, measured against the factored
+  default.
+- Contact damage number at 645: 8.1 ms, of which `RunnerPointDirection::evaluate`
+  is 4.3 ms (binary64 arithmetic around the 0.9 ms table atan).
+- Health HUD at 645 (4.0 ms); terrain painting at 844 (6.4 ms against 5 ms).
 
 ### E. Keep native ownership sufficient
 
@@ -318,27 +431,20 @@ controller priority.
   native gameplay no longer keeps. Remove it unless the registered reference
   itself needs it.
 
-### F. Coverage of the measurement
+### F. Coverage
 
-- Three native fixtures time out before their checks run. Restore them before
-  relying on them:
-  - `verify-amiga-gameplay-active-frame` never reaches its awake-enemy frame
-    (already at `d0072b4b`).
-  - `verify-amiga-natural-route` stalls after its reentry at tick 3060
-    (already at `7452dfe0`).
-  - `profile.sh fields-clear` never reaches its profile marker (already at
-    `7452dfe0`).
-- The contact tape has no horizontal shop, no dense encounter and no
-  garden-to-well transition. Add tapes for each before claiming the budget,
-  and repeat the audit after every A or B item lands.
+The contact tape has no horizontal shop, no dense encounter and no gameplay
+entry from the well. Add a tape for each before claiming the budget, and
+repeat the audit after each lettered group lands.
 
 ### G. Other scenes
 
-- Reduce selection layout/content and transition preparation costs while
-  retaining static layers and pointer-driven movement.
-- Reduce initial selection-canvas and offer-bank preparation stalls. Measure
-  asset staging and Chip/Fast residency tradeoffs separately from steady-state
-  navigation; preserve original heading, icon and carousel animation.
+Menu scenes peak at two fields (splash 34.7 ms, garden 40.5 ms, style
+34.5 ms, instrumented). Reduce selection layout/content and transition
+preparation costs, keeping static layers and pointer-driven movement. Reduce
+the initial selection-canvas and offer-bank preparation stalls. Measure asset
+staging and Chip/Fast residency separately from steady-state navigation.
+Preserve the original heading, icon and carousel animation.
 
 Reference: [profiling procedure](amiga-profiling.md).
 

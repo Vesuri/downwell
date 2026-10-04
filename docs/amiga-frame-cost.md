@@ -55,6 +55,9 @@ frames contain almost no idle time. One PAL field is 20 ms (142,102 cycles).
 | 900–920 | time fields present | 37.3 | 36.2 | 54.2 (907) | 20/20 | 66.6 |
 | 1100–1737 | camera at the level bottom | 29.1 | 25.0 | 56.8 (1564) | 240/240 | 32.5 |
 
+Menu scenes, from the instrumented `profile.sh transition` run, peak at two
+fields: splash 34.7 ms, garden 40.5 ms and style select 34.5 ms.
+
 The contact frame (645) fell from 179.5 to 101.4 ms, and time-field frames
 are about 30 ms cheaper. The generation burst barely moved, and combat and
 quiet frames improved by only about 3 ms: none of the accepted work targeted
@@ -90,17 +93,21 @@ frame:
   (6,828 cycles each). That includes 7.2 ms of
   `AmigaTerrainRunIndex::publishSpan` and 7.1 ms of `GameMakerRandom::advance`.
 - 11 `AreaOneBuilder::emitObject` calls take 17.0 ms.
-- Well512 work: 81 `nextU32` calls take 8.0 ms, `advance` 7.1 ms and 39
-  `cavernEnemyChoice` calls 5.5 ms. The draws are part of the original
-  interleaving and must stay synchronous.
+- `Well512::step` takes 23.2 ms in all, about 300 steps at roughly 540
+  cycles each; 17.8 ms of it is `GameMakerRandom::advance` (draws no caller
+  reads). The draw order is fixed, but the stream depends only on the seed.
+- The cell loop in `emitPatternMode` costs 7.5 ms of self time, plus
+  `plainCavernCell` 2.9 and `BuilderPatternPack::rowData` 2.5.
 
 The rest is ordinary combat work: actor draws 9.9 ms, currency/smoke 9.6,
 row sync 6.2 and draw collection 5.6.
 
 **Frame 844, generation burst with a time field (120.7 ms, 6 fields).**
 - Generation takes 65.5 ms: 44 `create` calls cost 27.6 ms (4,460 cycles
-  each), 14 `emitObject` calls 30.1 ms, and 13 `appendBreakables` 11.0 ms
-  (6,034 cycles each, against a 2,000-cycle target).
+  each), 14 `emitObject` calls 30.1 ms, and `Well512::step` 12.6 ms.
+- 13 `appendBreakables` take 11.0 ms (6,034 cycles each): 7.4 ms in the
+  collision-owner binding (`birthScenery` 2.1, `Binding::key` validation 2.4,
+  `externalBirth` 1.4) and 3.7 ms initialising the record.
 - Draw collection takes 8.0 ms, `drawMainWorldSpan` 8.0 and terrain painting
   6.4.
 - The prepared time field costs 2.4 ms to prepare and 2.0 ms to draw.
@@ -109,7 +116,10 @@ row sync 6.2 and draw collection 5.6.
 `GameplayWorld::step` takes 52.2 ms; enemy contacts are 10.1 ms of it and the
 collision owner's attach lambdas about 15 ms. The ammo gauge takes 11.2 ms,
 actor draws 11.2, draw collection 6.6, sprite assignment 4.7 and the health
-HUD 4.0. Contact direction now costs under 1 ms.
+HUD 4.0. `contactDamageNumber` costs 8.1 ms, of which
+`RunnerPointDirection::evaluate` is 4.3 (binary64 arithmetic around the
+0.9 ms table atan). Sprite assignment spends 2.8 ms building DMA words in
+`buildHardwareSpritePart`.
 
 ## Typical frames
 
@@ -125,12 +135,16 @@ walks can reach 20 ms, not tuning the functions in them.
 
 **Combat with gems and smoke (85.4 ms; 690–700).**
 - `GameplayWorld::step` takes 37.8 ms, currency collection 4.6 ms of it.
-- Actor draws take 10.7 ms, currency/smoke composition 9.6 (three
-  `stampPixel` calls at 14,038 cycles each), draw collection 6.6, row sync 6.3
-  and effect-surface publication 2.6.
+- Actor draws take 10.7 ms: damage-number text 5.5 (`AmigaDamageText::draw`,
+  about nine CPU planar-word writes), CPU-drawn actors 3.2 (about two at
+  10,000 cycles) and row damage 0.9.
+- Currency/smoke composition takes 9.6 ms: three `stampPixel` calls at 14,038
+  cycles each, 1.8 ms waiting on the blitter in `intersects`, and `clear` 0.9.
+- Draw collection takes 6.6 ms, row sync 6.3 and effect-surface publication
+  2.6.
 - The 32-bit division, modulo and multiply helpers take 10.2 ms of self time.
-  `GemMotion::q8`, `rounded` and `pixel` cause about 4 ms of it, by
-  converting fixed-point positions on every access.
+  `GemMotion::q8`, `rounded` and `pixel` cause 4.4 ms of it, by dividing
+  1/12800-pixel positions on every read; no other caller exceeds 1 ms.
 
 **Enemies in view (60.8 ms; 450–470).** Game logic takes 21.5 ms and runner
 bookkeeping 12.9.
@@ -142,8 +156,11 @@ take a few milliseconds. The rest of the frame is the ordinary game step plus
 ## Consequences for the budget
 
 - Generation dominates both remaining burst frames: 93 ms at 701 and 66 ms at
-  844. The targets are object creation, run creation with span publication,
-  and pattern emission; the Well512 draws are fixed.
+  844. Generator steps (23 and 13 ms), per-cell terrain publication and
+  classification (about 50 ms at 701) and breakable births (11 ms at 844) are
+  the removable parts.
+- Without generation, frame 701 would still be an 80 ms combat frame:
+  generation and combat must both fall.
 - Combat costs 85 ms. Actor and effect composition is about 30 ms of it, and
   arithmetic helpers about 10 ms.
 - The quiet frame is 28.4 ms. Its gap to 20 ms is the per-actor runner walks:
