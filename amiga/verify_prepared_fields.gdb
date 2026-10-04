@@ -15,7 +15,7 @@ if gDownwellProfileFrozen != 1 || gDownwellProfileGameSamples != gDownwellProfil
     printf "Prepared field verification did not finish the gameplay tape\n"
     quit 1
 end
-if gDownwellPreparedFieldChecks < 700 || gDownwellPreparedFieldFixtureChecks < 512 || gDownwellPreparedFieldCompositeChecks < 48 || gDownwellPreparedFieldFailures != 0
+if gDownwellPreparedFieldChecks < 700 || gDownwellPreparedFieldFixtureChecks < 512 || gDownwellPreparedFieldCompositeChecks < 80 || gDownwellPreparedFieldFailures != 0
     printf "Prepared field verification has insufficient coverage or failures\n"
     quit 1
 end

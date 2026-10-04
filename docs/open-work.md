@@ -317,17 +317,19 @@ Rules for this section:
      as the compiled oracle/fallback. Verify mask-only background restoration,
      actor/laser ordering, overlapping fields, clipping, circular-buffer wraps,
      repeated prepare calls, and switching between optimized and fallback paths.
-   - Finish `PREPARED_FIELDS=1` with `PREPARED_FIELDS_BACKING=1`: measure
-     wrapped and overlapping small-field workloads against the under-5-ms
-     target, replace the large/mixed-field sparse fallback, then complete
-     normal-build integration and the combined timing/fidelity gates. Do not
+   - Finish `PREPARED_FIELDS=1` with `PREPARED_FIELDS_BACKING=2`: bring the
+     large/mixed column-packet path below the under-5-ms target, measure
+     wrapped and overlapping small-field workloads against that target, then
+     complete normal-build integration and the combined timing/fidelity gates. Do not
      count the single-circle improvement as completion of A6 or replace the
      native pixel checks with host-only copies. Use
+     `PREPARED_FIELDS_BACKING=1` for pristine-small/sparse-large comparison,
      `PREPARED_FIELDS_BACKING=0` for the saved-background comparison and
      `PROFILE_FIELD_REFERENCE=1` for the sparse comparison; selectors change
      initialized data, not executable code.
-     Large-field replacement must remove runtime prepared-row expansion and
-     clipping, not only saved-underlay ownership: repeating that traversal
+     Further large-field work must eliminate repeated coverage restoration
+     and publication, not reintroduce runtime prepared-row expansion:
+     repeating that traversal
      for restoration and drawing made the level-exit workload slower. See
      the [large-field experiment](amiga-frame-cost.md#large-field-traversal-experiment).
    - Explicitly partition the shared scene bank: terrain batching already

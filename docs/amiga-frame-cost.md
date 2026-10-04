@@ -242,3 +242,47 @@ be consumed directly. An all-16-shift expansion of the existing 742 row
 patterns would need 175,986 bytes of word payload, 23,744 bytes of phase
 indices and 46,892 bytes of row offsets before other metadata; that naive
 representation also needs a memory-design decision, not blind adoption.
+
+## Prepared large-field columns
+
+The opt-in `PREPARED_FIELDS=1 PREPARED_FIELDS_BACKING=2` path replaces runtime
+row expansion, sparse coverage-map construction and saved-word reconciliation
+with offline column packets. It restores old masks from the pristine terrain
+ring and consumes prepared colour words in source order. Its ordinary-memory
+bank is 73,024 bytes, deduplicated across radius phases, with no per-X-shift
+expansion or additional Chip allocation. The portable raster remains the pixel
+oracle; this measurement does not establish Windows GPU raster equivalence.
+
+Reproduce the matched level-exit comparison with the same bundle described
+above and `TRACE_FRAMES=2,30 TRACE_FIELDS=30`; use
+`PREPARED_FIELDS_BACKING=1` for the sparse-large reference and `=2` for columns.
+The captures are `tmp/trace/field-columns-reference.GgLmuV` and
+`tmp/trace/field-columns-candidate.XIRhwg`; both executable text hashes are
+`7c56e06215ce1aa1a5951d24c9c284563c2430780fb237b59b92587fac72052b`.
+The earlier 2/10/30 markers overlap with the faster renderer: use separated
+windows, not an incomplete capture set.
+
+| Complete level-exit frame | Sparse large (ms) | Columns (ms) |
+| ---: | ---: | ---: |
+| 3 | 90.17 | 34.86 |
+| 4 | 88.13 | 35.57 |
+| 5 | 106.68 | 39.81 |
+| 6 | 146.46 | 88.39 |
+| 31 | 102.12 | 39.40 |
+| 33 (unchanged raster) | 19.19 | 19.46 |
+| 36 (unchanged raster) | 21.22 | 18.73 |
+
+Changing-raster preparation falls from roughly 56–71 ms to 8–10 ms, but
+drawing still costs 12–13 ms. The 48.5 ms `selectExitMaskBank` operation in
+frame 6 is unchanged. Row-footprint inspection falls from about 4.3 ms to
+1.4 ms, but whole unchanged-raster frames can still vary with other row work
+and display synchronization; frame 33 is not a whole-frame improvement.
+These remaining costs still miss the 5 ms field and 20 ms whole-frame targets.
+
+The matching contact windows 644/699/843 use
+`tmp/trace/field-columns-contact-reference.BjQUfk` and
+`tmp/trace/field-columns-contact-candidate.FeBaHF`, with shared text hash
+`9531cba7be3e8e446338f670b5eeae6e94e3213f194f638ee739efbf57a89f72`.
+Frames 645/701/844 cost 816,590/1,262,490/901,690 cycles in the reference and
+816,570/1,262,450/901,280 in the column mode. They do not regress, but those
+sub-millisecond differences are not a combat performance win.

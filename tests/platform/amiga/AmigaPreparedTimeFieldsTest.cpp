@@ -1,4 +1,5 @@
 #include "platform/amiga/AmigaPreparedTimeFields.h"
+#include "platform/amiga/AmigaFieldColumns.h"
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -13,8 +14,21 @@ struct Pixels {
     static constexpr bool verify=true;
     inline static bool usePrepared=true;
     inline static bool useStatic=false;
+    inline static bool useColumns=true;
     static bool enabled(){return usePrepared;}
     static bool staticEnabled(){return useStatic;}
+    static bool columnsEnabled(){return useColumns&&useStatic&&usePrepared;}
+    static bool columns(const UBYTE* terrain,UBYTE* target,const downwell::TimeFieldOutlines::Circle& circle,
+        unsigned origin,bool restore,UWORD* rows){return amigaFieldColumns(terrain,target,circle,origin,restore,rows);}
+    static void validateColumns(const UBYTE* terrain,UBYTE* target,const downwell::TimeFieldOutlines::Circle& circle,
+        unsigned origin){
+        downwell::GoalFieldOutline shape;shape.setRasterCircle(circle.x,circle.y,circle.radius);
+        shape.drawClipped(110,0,270,284,[&](int x,int y,unsigned){
+            const unsigned row=(origin+unsigned(y))%320;
+            for(unsigned p=0;p<2;++p)require(get(terrain+p*15360,48,x,row)==get(target+p*15360,48,x,row),
+                "large field has pristine underlay");
+        });
+    }
     static unsigned get(const UBYTE* p,unsigned stride,unsigned x,unsigned y){
         return (p[y*stride+x/8]>>(7-(x&7)))&1;
     }
@@ -155,6 +169,7 @@ int main(){
     bool rowDebt[2][320]={};
     for(unsigned frame=0;frame<2400;++frame){
         Pixels::useStatic=frame%41!=0;
+        Pixels::useColumns=frame%31!=0;
         const unsigned b=frame&1,origin=(frame*11)%320;
         const unsigned changed=next()%320;
         for(unsigned p=0;p<2;++p)for(unsigned x=0;x<48;++x)

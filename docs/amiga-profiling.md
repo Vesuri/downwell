@@ -28,6 +28,15 @@ have not changed the replay. Presentation time includes display synchronization.
 
 ### Amiga checks
 
+Cross-CPU replay digests must use the same contact-direction precision policy.
+For a verification executable built with `TABLE_CONTACT_ATAN=1`, build
+`make build/port-replay-reference-table-atan` and pass
+`../build/port-replay-reference-table-atan` to `amiga/verify_replay.sh`.
+The default host reference retains portable atan. Comparing that reference
+with the table mode intentionally changes the damage-number presentation
+digest; it is not a floating-point-bit-equivalence requirement. Keep the
+separate angular-error and gameplay-state checks against portable atan.
+
 For entrance-field lifecycle correctness (not timing), run
 `bash amiga/verify_field_reentry.sh`. It uses a 45-second emulator deadline
 (configurable up to 60), then restores the ordinary build. The same tape runs

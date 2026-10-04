@@ -19,7 +19,8 @@ public:
         const UBYTE* terrain_=nullptr;
         unsigned origin_=0;
         struct Rect { unsigned x,y,sx,sy,width,height; } rect_{};
-        struct Entry { Rect rect;const UBYTE* image; } entries_[66];
+        struct Entry { Rect rect;const UBYTE* image;unsigned circle;bool large; } entries_[66];
+        UWORD largeRows_[downwellGameRingHeight/16]{};
         unsigned entryCount_=0;
         bool multiple_=false;
         downwell::TimeFieldOutlines shape_;
@@ -54,6 +55,11 @@ public:
             return pack_+headerBytes+word(pack_+16+(circle.radius-24*256)*2)*imageBytes;
         }
         void select(unsigned i){rect_=entries_[i].rect;image_=entries_[i].image;}
+        bool transferEntry(unsigned i,bool restore){
+            if(entries_[i].large)return Ops::columns(terrain_,target_,shape_.circles[entries_[i].circle],
+                origin_,restore,restore?nullptr:largeRows_);
+            select(i);return transfer(false,restore?backing_:image_);
+        }
         void validate(){
             if constexpr(Ops::verify){
                 unsigned row=origin_+rect_.y;
@@ -80,7 +86,12 @@ public:
         }
         template<class DirtyRow> bool touchesDirtyRows(DirtyRow dirty) const {
             if(!fast_)return reference_.touchesDirtyRows(dirty);
+            if(multiple_)for(unsigned chunk=0;chunk<downwellGameRingHeight/16;++chunk){
+                unsigned bits=largeRows_[chunk];
+                for(unsigned row=chunk*16;bits;++row,bits>>=1)if((bits&1)&&dirty(row))return true;
+            }
             for(unsigned e=0;e<(multiple_?entryCount_:1);++e){
+                if(multiple_&&entries_[e].large)continue;
                 const auto& rect=multiple_?entries_[e].rect:rect_;
                 unsigned row=origin_+rect.y;
                 if(row>=downwellGameRingHeight)row-=downwellGameRingHeight;
@@ -111,10 +122,17 @@ public:
                     image=describe(circle,next);
                 }
             }
+            if(!image&&!many&&pack_&&terrain_&&shape.visible&&shape.count&&shape.count<=66&&Ops::columnsEnabled()){
+                many=true;
+                for(unsigned i=0;i<shape.count;++i){
+                    const int radius=shape.circles[i].radius;
+                    if(!((radius>=24*256&&radius<26*256)||(radius>=128*256&&radius<130*256))){many=false;break;}
+                }
+            }
             if(fast_){
                 if(valid_){
                     if(multiple_){
-                        for(unsigned i=0;i<entryCount_;++i){select(i);if(!transfer(false,backing_))return false;}
+                        for(unsigned i=0;i<entryCount_;++i)if(!transferEntry(i,true))return false;
                     }else if(!transfer(false,backing_))return false;
                 }
                 fast_=valid_=pending_=false;
@@ -131,6 +149,8 @@ public:
             multiple_=many;
             if(many)for(unsigned i=0;i<shape.count;++i){
                 auto& entry=entries_[entryCount_];
+                entry.circle=i;entry.large=shape.circles[i].radius>=128*256;
+                if(entry.large){entry.image=nullptr;++entryCount_;continue;}
                 entry.image=describe(shape.circles[i],entry.rect);
                 if(entry.image)++entryCount_;
             }
@@ -147,8 +167,12 @@ public:
             if(multiple_){
                 // Validate all footprints before any earlier circle paints
                 // over a later one's (legitimate) overlapping underlay.
-                if constexpr(Ops::verify)for(unsigned i=0;i<entryCount_;++i){select(i);validate();}
-                for(unsigned i=0;i<entryCount_;++i){select(i);if(!transfer(false,image_))return false;}
+                if constexpr(Ops::verify)for(unsigned i=0;i<entryCount_;++i){
+                    if(entries_[i].large)Ops::validateColumns(terrain_,target_,shape_.circles[entries_[i].circle],origin_);
+                    else{select(i);validate();}
+                }
+                for(auto& rows:largeRows_)rows=0;
+                for(unsigned i=0;i<entryCount_;++i)if(!transferEntry(i,false))return false;
             }else{
                 if(staticUnderlay_)validate();
                 if((!staticUnderlay_&&!transfer(true,nullptr))||!transfer(false,image_))return false;

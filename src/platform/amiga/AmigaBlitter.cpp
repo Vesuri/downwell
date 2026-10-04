@@ -209,6 +209,18 @@ extern "C" bool amigaFieldVerifyComposite(const UBYTE* terrain,const UBYTE* targ
     amigaFieldVerifyFinish(target);++gDownwellPreparedFieldCompositeChecks;
     return !gDownwellPreparedFieldFailures;
 }
+extern "C" void amigaFieldVerifyColumn(const UBYTE* terrain,const UBYTE* target,
+    const downwell::TimeFieldOutlines::Circle& circle,unsigned origin,bool restore){
+    fieldExpectedBytes=30720;gDownwellPreparedFieldOperation=restore?7:8;
+    for(unsigned i=0;i<30720;++i)fieldExpected[i]=target[i];
+    downwell::GoalFieldOutline shape;
+    shape.setRasterCircle(circle.x,circle.y,circle.radius);
+    shape.drawClipped(110,0,270,284,[&](int x,int y,unsigned pen){
+        const unsigned row=(origin+unsigned(y))%320;
+        for(unsigned p=0;p<2;++p)fieldPut(fieldExpected+p*15360,48,x,row,
+            restore?fieldPixel(terrain+p*15360,48,x,row):(pen>>p)&1);
+    });
+}
 #endif
 
 extern "C" int amigaBlitterSolidRect(UBYTE* destination, UWORD targetHeight,

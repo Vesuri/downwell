@@ -45,6 +45,7 @@ __attribute__((noinline,used)) void downwellFieldReentryReady(){__asm__ volatile
 #include "AmigaAmmoHud.h"
 #ifdef DOWNWELL_PREPARED_FIELDS
 #include "AmigaPreparedTimeFields.h"
+#include "AmigaFieldColumns.h"
 // Change only initialized data for identical-code comparisons.
 // Both modes load the same images and reserve the same scene-bank partition.
 extern "C" { volatile unsigned gDownwellPreparedFieldMode=DOWNWELL_FIELD_MODE; }
@@ -61,6 +62,7 @@ extern "C" int amigaFieldVerifyTerrainFixture(UBYTE*,UBYTE*,UBYTE*);
 extern "C" void amigaFieldVerifyCompositeBegin(UBYTE*,UBYTE*);
 extern "C" void amigaFieldVerifyCompositeEnd(UBYTE*,UBYTE*);
 extern "C" bool amigaFieldVerifyComposite(const UBYTE*,const UBYTE*,const downwell::TimeFieldOutlines&,unsigned);
+extern "C" void amigaFieldVerifyColumn(const UBYTE*,const UBYTE*,const downwell::TimeFieldOutlines::Circle&,unsigned,bool);
 #endif
 struct PreparedFieldOps {
 #ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
@@ -69,8 +71,25 @@ struct PreparedFieldOps {
     static constexpr bool verify=false;
 #endif
     static bool enabled(){return gDownwellPreparedFieldMode!=2;}
-    static bool staticEnabled(){return gDownwellPreparedFieldMode==3;}
+    static bool staticEnabled(){return gDownwellPreparedFieldMode>=3;}
+    static bool columnsEnabled(){return gDownwellPreparedFieldMode==4;}
+    static bool columns(const UBYTE* terrain,UBYTE* target,const downwell::TimeFieldOutlines::Circle& circle,
+        unsigned origin,bool restore,UWORD* rows){
 #ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
+        amigaFieldVerifyColumn(terrain,target,circle,origin,restore);
+#endif
+        const bool ok=amigaFieldColumns(terrain,target,circle,origin,restore,rows);
+#ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
+        amigaFieldVerifyFinish(target);
+#endif
+        return ok;
+    }
+#ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
+    static void validateColumns(const UBYTE* terrain,UBYTE* target,const downwell::TimeFieldOutlines::Circle& circle,
+        unsigned origin){
+        amigaFieldVerifyColumn(terrain,target,circle,origin,true);
+        amigaFieldVerifyFinish(target);
+    }
     static void validateTerrain(const UBYTE* source,const UBYTE* mask,UBYTE* target,
         unsigned x,unsigned y,unsigned sx,unsigned sy,unsigned w,unsigned h){
         amigaFieldVerifyTerrain(source,mask,target,x,y,sx,sy,w,h);
@@ -976,7 +995,7 @@ static bool verifyFieldComposites(UBYTE* terrain,UBYTE* target){
     for(unsigned frame=0;frame<48&&ok;++frame){
         // Captured, pristine, and sparse paths must exchange ownership without
         // retaining pixels from an earlier field. No gameplay RNG is consumed.
-        gDownwellPreparedFieldMode=frame%13==0?2:frame%11==0?1:3;
+        gDownwellPreparedFieldMode=frame%13==0?2:frame%11==0?1:frame%5==0?3:4;
         downwell::TimeFieldOutlines shape;
         shape.count=frame%12==11?0:3;shape.visible=shape.count!=0;
         for(unsigned i=0;i<shape.count;++i){
@@ -993,6 +1012,16 @@ static bool verifyFieldComposites(UBYTE* terrain,UBYTE* target){
             if(frame&1){const auto first=shape.circles[0];shape.circles[0]=shape.circles[1];shape.circles[1]=first;}
         }
         const unsigned origin=(frame*29)%320;
+        ok=overlay.prepare(target,origin,shape,true,[](unsigned){return false;})&&overlay.draw();
+        if(ok)ok=amigaFieldVerifyComposite(terrain,target,shape,origin);
+    }
+    gDownwellPreparedFieldMode=4;
+    for(unsigned phase=0;phase<32&&ok;++phase){
+        downwell::TimeFieldOutlines shape;
+        shape.visible=true;shape.count=1;
+        shape.circles[0]={int((phase<16?110:254)+(phase&15)),phase%2?283:0,
+            int(128*256+(phase<16?0:511))};
+        const unsigned origin=(phase*19)%320;
         ok=overlay.prepare(target,origin,shape,true,[](unsigned){return false;})&&overlay.draw();
         if(ok)ok=amigaFieldVerifyComposite(terrain,target,shape,origin);
     }

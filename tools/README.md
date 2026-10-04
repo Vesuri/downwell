@@ -87,14 +87,26 @@ the portable raster, not equivalence to the original Windows GPU raster.
 `make verify-prepared-time-fields` exercises independent pixel copies against
 the retained sparse overlay, including clipping, double buffering, wrap,
 target replacement, pending draws and fallback transitions. The native
-comparison switch is `PREPARED_FIELDS=1`; multiple/large circles retain the
-sparse renderer. `bash amiga/profile.sh fields` checks native backing capture
+comparison switch is `PREPARED_FIELDS=1`; `PREPARED_FIELDS_BACKING=1` admits
+multiple small circles using the pristine terrain underlay, and
+`PREPARED_FIELDS_BACKING=2` additionally admits large/mixed circles.
+`bash amiga/profile.sh fields` checks native backing capture
 and masked publication against a full-buffer pixel oracle; its timings are
 not performance measurements. Use the normal `fps`/`trace` modes for timing.
 With `PREPARED_FIELDS=1`, `PROFILE_FIELD_REFERENCE=1` selects the compiled
 sparse oracle by changing only the initial selector data. The profile prints
 the executable text-section hash so code identity can be checked between
 the two builds; both reserve and load the same scene-bank images.
+
+`make generated/downwell-field-columns.h` prepares the 512 large-circle radius
+phases as deduplicated columns of planar words and destination offsets. The
+73,024-byte bank avoids runtime row expansion and whole offscreen-column
+traversal; horizontal shifting, viewport clipping and ring wrapping are still
+performed when consuming it. Its manifest pins the generator, portable
+geometry inputs and output. `make verify-field-columns` checks all radius and
+horizontal-shift phases against independent pixels and physical-row footprints;
+`verify-prepared-time-fields` checks integration and mixed source order. These
+are portable-raster checks, not claims of Windows GPU raster equivalence.
 
 ## Original audio
 

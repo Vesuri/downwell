@@ -179,6 +179,8 @@ ifeq ($(PREPARED_FIELDS),1)
 CFLAGS += -DDOWNWELL_PREPARED_FIELDS
 ifeq ($(PROFILE_FIELD_REFERENCE),1)
 CFLAGS += -DDOWNWELL_FIELD_MODE=2
+else ifeq ($(PREPARED_FIELDS_BACKING),2)
+CFLAGS += -DDOWNWELL_FIELD_MODE=4
 else ifeq ($(PREPARED_FIELDS_BACKING),1)
 CFLAGS += -DDOWNWELL_FIELD_MODE=3
 else
@@ -616,6 +618,11 @@ obj/AmigaTerrainPrepared.o: $(AMIGA_SRC)/AmigaTerrainPrepared.s $(REPO)/generate
 
 $(REPO)/generated/amiga-field-images.bin: $(REPO)/tools/generate-field-images.cpp $(REPO)/tools/generate-field-images.py $(REPO)/generated/downwell-field-spans.h $(wildcard $(REPO)/src/core/*.h)
 	$(MAKE) -C $(REPO) generated/amiga-field-images.bin
+$(REPO)/generated/downwell-field-columns.h: $(REPO)/tools/generate-field-columns.cpp $(REPO)/tools/generate-field-columns.py $(wildcard $(REPO)/src/core/*.h)
+	$(MAKE) -C $(REPO) generated/downwell-field-columns.h
+ifeq ($(PREPARED_FIELDS),1)
+obj/DownwellAmiga.o: $(REPO)/generated/downwell-field-columns.h
+endif
 obj/AmigaFieldPrepared.o: $(AMIGA_SRC)/AmigaFieldPrepared.s $(REPO)/generated/amiga-field-images.bin
 	@mkdir -p $(@D)
 	$(AS) $(ASFLAGS) -o $@ $<

@@ -1728,7 +1728,20 @@ generated/amiga-field-images.bin: build/generate-field-images tools/generate-fie
 	python3 tools/generate-field-images.py
 
 .PHONY: verify-prepared-time-fields
-build/prepared-time-fields-test: tests/platform/amiga/AmigaPreparedTimeFieldsTest.cpp $(wildcard src/core/*.h) $(wildcard src/platform/amiga/*.h) generated/amiga-field-images.bin
+build/generate-field-columns: tools/generate-field-columns.cpp $(wildcard src/core/*.h)
+	@mkdir -p $(@D)
+	$(CXX) -Isrc -std=c++17 -O2 -ffp-contract=off -o $@ $<
+
+generated/downwell-field-columns.h: build/generate-field-columns tools/generate-field-columns.py
+	python3 tools/generate-field-columns.py
+
+.PHONY: verify-field-columns
+build/field-columns-test: tests/platform/amiga/AmigaFieldColumnsTest.cpp $(wildcard src/core/*.h) $(wildcard src/platform/amiga/*.h) generated/downwell-field-columns.h
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $<
+verify-field-columns: build/field-columns-test
+	./build/field-columns-test
+
+build/prepared-time-fields-test: tests/platform/amiga/AmigaPreparedTimeFieldsTest.cpp $(wildcard src/core/*.h) $(wildcard src/platform/amiga/*.h) generated/amiga-field-images.bin generated/downwell-field-columns.h
 	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $<
 verify-prepared-time-fields: build/prepared-time-fields-test
 	./build/prepared-time-fields-test
@@ -1897,6 +1910,12 @@ build/amiga-coverage-word-test: tests/platform/amiga/AmigaCoverageWordTest.cpp s
 $(PORT_REPLAY_REFERENCE_TARGET): $(PORT_REPLAY_REFERENCE_SOURCES) $(wildcard src/core/*.h)
 	@mkdir -p $(@D)
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(PORT_REPLAY_REFERENCE_SOURCES)
+
+# Cross-CPU equality requires the same presentation precision policy on both
+# sides. The default target deliberately retains the portable atan oracle.
+build/port-replay-reference-table-atan: $(PORT_REPLAY_REFERENCE_SOURCES) $(wildcard src/core/*.h) generated/atan-q16.inc generated/smoke-trig.inc
+	@mkdir -p $(@D)
+	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_TABLE_CONTACT_ATAN -o $@ $(PORT_REPLAY_REFERENCE_SOURCES)
 
 $(AREA_ONE_TRACE_TARGET): $(AREA_ONE_TRACE_SOURCES)
 	@mkdir -p $(@D)

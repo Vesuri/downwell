@@ -68,7 +68,17 @@ images and terrain ring, not separate saved-background allocations. Restore
 old field masks before dirty-row synchronization, then paint new fields in
 source order before actors/lasers/effects. Verification builds check that every
 new mask's pixels already equal the pristine terrain before any field paints.
-Large/mixed shapes retain the sparse fallback and its own saved underlay.
+Large/mixed shapes retain the sparse fallback and its own saved underlay in
+that mode. `PREPARED_FIELDS_BACKING=2` also admits large-circle column packets,
+restoring from the same pristine terrain and painting mixed circles in source
+order. The immutable column bank is 73,024 bytes in ordinary memory: 512
+radius indices, 21 deduplicated frame maps, 214 column offsets and 8,852
+eight-byte row/word-offset/colour records. It has no per-shift expansion and
+adds no Chip allocation. Each display keeps a 40-byte physical-row footprint
+for large fields; the existing small-field descriptor array also records the
+source circle index and large/small kind. All comparison modes in a
+`PREPARED_FIELDS=1` build link this bank, so their executable code is identical.
+These paths remain opt-in pending the full frame-budget and coverage gates.
 
 The experimental `TERRAIN_BATCH=1` painter borrows 44,304 bytes of that idle
 region for two colour planes and a coverage plane (416×284). Its immutable tile
