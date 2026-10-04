@@ -1,5 +1,8 @@
 #include "framework/AmigaHardware.h"
 #include "framework/Bitmap.h"
+#ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
+#include "core/TimeFieldOutlines.h"
+#endif
 
 #include <exec/types.h>
 inline void* operator new(__SIZE_TYPE__, void* address) noexcept { return address; }
@@ -18,6 +21,8 @@ bool artReady[64];
 #ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
 extern "C" {
 volatile unsigned gDownwellPreparedFieldChecks,gDownwellPreparedFieldFailures;
+volatile unsigned gDownwellPreparedFieldFixtureChecks;
+volatile unsigned gDownwellPreparedFieldCompositeChecks;
 volatile unsigned gDownwellPreparedFieldMismatchOffset,gDownwellPreparedFieldExpectedByte,
     gDownwellPreparedFieldActualByte,gDownwellPreparedFieldOperation;
 volatile unsigned gDownwellPreparedFieldRect[6];
@@ -25,6 +30,7 @@ __attribute__((noinline,used)) void downwellPreparedFieldMismatch(){__asm__ vola
 }
 namespace {
 UBYTE fieldExpected[30720];
+UBYTE savedFieldTerrain[30720],savedFieldTarget[30720];
 unsigned fieldExpectedBytes;
 unsigned fieldPixel(const UBYTE* bytes,unsigned stride,unsigned x,unsigned y){
     return (bytes[y*stride+x/8]>>(7-(x&7)))&1;
@@ -63,6 +69,16 @@ extern "C" void amigaFieldVerifyFinish(const UBYTE* actual){
         gDownwellPreparedFieldActualByte=actual[i];
         ++gDownwellPreparedFieldFailures;downwellPreparedFieldMismatch();return;
     }
+}
+extern "C" void amigaFieldVerifyTerrain(const UBYTE* source,const UBYTE* mask,const UBYTE* target,
+    unsigned x,unsigned y,unsigned sx,unsigned sy,unsigned width,unsigned height){
+    fieldExpectedBytes=30720;gDownwellPreparedFieldOperation=3;
+    const unsigned rect[6]={x,y,sx,sy,width,height};
+    for(unsigned i=0;i<6;++i)gDownwellPreparedFieldRect[i]=rect[i];
+    for(unsigned i=0;i<fieldExpectedBytes;++i)fieldExpected[i]=target[i];
+    for(unsigned row=0;row<height;++row)for(unsigned col=0;col<width;++col)
+        if(fieldPixel(mask,8,sx+col,sy+row))for(unsigned p=0;p<2;++p)
+            fieldPut(fieldExpected+p*15360,48,x+col,y+row,fieldPixel(source+p*15360,48,x+col,y+row));
 }
 #endif
 
@@ -134,6 +150,66 @@ extern "C" int amigaBlitterCaptureField(UBYTE* saved,const UBYTE* target,const U
     AmigaHardware::blitterDrain();
     return 1;
 }
+
+extern "C" int amigaBlitterRestoreField(const UBYTE* terrain,const UBYTE* mask,UBYTE* target,
+    UWORD x,UWORD y,UWORD sx,UWORD sy,UWORD width,UWORD height)
+{
+    if((ULONG)terrain>=0x200000UL||(ULONG)target>=0x200000UL||(ULONG)mask>=0x200000UL||
+       !width||!height||x+width>384||y+height>320||sx+width>64||sy+height>56)return 0;
+    Bitmap source((void*)terrain,380,320,2,false,false,384);
+    Bitmap destination(target,380,320,2,false,false,384);
+    Bitmap coverage((void*)mask,64,56,1,false,false,64);
+    destination.copyWithMask(source,coverage,x,y,x,y,sx,sy,width,height,false);
+    AmigaHardware::blitterDrain();
+    return 1;
+}
+
+#ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
+extern "C" int amigaFieldVerifyTerrainFixture(UBYTE* terrain,UBYTE* target,UBYTE* mask){
+    UBYTE savedMask[448];
+    AmigaHardware::blitterDrain();
+    for(unsigned i=0;i<448;++i){savedMask[i]=mask[i];mask[i]=(i*73u+(i>>4)+29)&255u;}
+    for(unsigned i=0;i<30720;++i){
+        savedFieldTerrain[i]=terrain[i];savedFieldTarget[i]=target[i];
+        terrain[i]=(i*37u+(i>>7))&255u;target[i]=(i*53u+(i>>9)+71)&255u;
+    }
+    bool ok=true;
+    for(unsigned xPhase=0;xPhase<16&&ok;++xPhase)for(unsigned maskPhase=0;maskPhase<16&&ok;++maskPhase)
+        for(unsigned size=0;size<2&&ok;++size){
+            const unsigned width=size?48:2;
+            amigaFieldVerifyTerrain(terrain,mask,target,112+xPhase,12,maskPhase,0,width,56);
+            ok=amigaBlitterRestoreField(terrain,mask,target,112+xPhase,12,maskPhase,0,width,56)!=0;
+            amigaFieldVerifyFinish(target);++gDownwellPreparedFieldFixtureChecks;
+            ok=ok&&!gDownwellPreparedFieldFailures;
+        }
+    for(unsigned i=0;i<30720;++i){terrain[i]=savedFieldTerrain[i];target[i]=savedFieldTarget[i];}
+    for(unsigned i=0;i<448;++i)mask[i]=savedMask[i];
+    return ok?1:0;
+}
+extern "C" void amigaFieldVerifyCompositeBegin(UBYTE* terrain,UBYTE* target){
+    AmigaHardware::blitterDrain();
+    for(unsigned i=0;i<30720;++i){
+        savedFieldTerrain[i]=terrain[i];savedFieldTarget[i]=target[i];
+        terrain[i]=target[i]=(i*37u+(i>>7))&255u;
+    }
+}
+extern "C" void amigaFieldVerifyCompositeEnd(UBYTE* terrain,UBYTE* target){
+    AmigaHardware::blitterDrain();
+    for(unsigned i=0;i<30720;++i){terrain[i]=savedFieldTerrain[i];target[i]=savedFieldTarget[i];}
+}
+extern "C" bool amigaFieldVerifyComposite(const UBYTE* terrain,const UBYTE* target,
+    const downwell::TimeFieldOutlines& shape,unsigned origin){
+    fieldExpectedBytes=30720;gDownwellPreparedFieldOperation=4;
+    for(unsigned i=0;i<30720;++i)fieldExpected[i]=terrain[i];
+    // Independent portable per-pixel raster, not the Bitmap transfer oracle.
+    shape.drawClipped(110,0,270,284,[&](int x,int y,unsigned pen){
+        const unsigned row=(origin+unsigned(y))%320;
+        for(unsigned p=0;p<2;++p)fieldPut(fieldExpected+p*15360,48,x,row,(pen>>p)&1);
+    });
+    amigaFieldVerifyFinish(target);++gDownwellPreparedFieldCompositeChecks;
+    return !gDownwellPreparedFieldFailures;
+}
+#endif
 
 extern "C" int amigaBlitterSolidRect(UBYTE* destination, UWORD targetHeight,
     UWORD x, UWORD y, UWORD width, UWORD height, UWORD pen)

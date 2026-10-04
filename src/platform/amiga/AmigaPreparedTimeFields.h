@@ -16,10 +16,14 @@ public:
         const UBYTE* image_=nullptr;
         UBYTE* backing_=nullptr;
         UBYTE* target_=nullptr;
+        const UBYTE* terrain_=nullptr;
         unsigned origin_=0;
         struct Rect { unsigned x,y,sx,sy,width,height; } rect_{};
+        struct Entry { Rect rect;const UBYTE* image; } entries_[66];
+        unsigned entryCount_=0;
+        bool multiple_=false;
         downwell::TimeFieldOutlines shape_;
-        bool fast_=false,valid_=false,pending_=false;
+        bool fast_=false,valid_=false,pending_=false,staticUnderlay_=false;
         // Two transfers at most: the physical ring can wrap within the image.
         bool transfer(bool capture,const UBYTE* source) {
             unsigned physical=origin_+rect_.y;
@@ -27,6 +31,9 @@ public:
             unsigned first=downwellGameRingHeight-physical;
             if(first>rect_.height)first=rect_.height;
             auto part=[&](unsigned row,unsigned sy,unsigned height){
+                if(!capture&&source==backing_&&staticUnderlay_)
+                    return Ops::restoreTerrain(terrain_,image_+2*planeBytes,target_,
+                        rect_.x,row,rect_.sx,sy,rect_.width,height);
                 if(capture)return Ops::capture(backing_,target_,image_+2*planeBytes,
                     rect_.x,row,rect_.sx,sy,rect_.width,height);
                 return Ops::masked(source,image_+2*planeBytes,target_,rect_.x,row,
@@ -35,10 +42,36 @@ public:
             return part(physical,rect_.sy,first) && (first==rect_.height ||
                 part(0,rect_.sy+first,rect_.height-first));
         }
+        const UBYTE* describe(const downwell::TimeFieldOutlines::Circle& circle,Rect& rect) const {
+            const int left=circle.x-32,top=circle.y-28;
+            const int x=left<downwellPlayfieldX?downwellPlayfieldX:left;
+            const int y=top<0?0:top;
+            const int right=left+64>downwellPlayfieldX+downwellPlayfieldWidth?
+                downwellPlayfieldX+downwellPlayfieldWidth:left+64;
+            const int bottom=top+56>downwellDisplayHeight?downwellDisplayHeight:top+56;
+            if(x>=right||y>=bottom)return nullptr;
+            rect={unsigned(x),unsigned(y),unsigned(x-left),unsigned(y-top),unsigned(right-x),unsigned(bottom-y)};
+            return pack_+headerBytes+word(pack_+16+(circle.radius-24*256)*2)*imageBytes;
+        }
+        void select(unsigned i){rect_=entries_[i].rect;image_=entries_[i].image;}
+        void validate(){
+            if constexpr(Ops::verify){
+                unsigned row=origin_+rect_.y;
+                if(row>=downwellGameRingHeight)row-=downwellGameRingHeight;
+                unsigned first=downwellGameRingHeight-row;
+                if(first>rect_.height)first=rect_.height;
+                Ops::validateTerrain(terrain_,image_+2*planeBytes,target_,rect_.x,row,
+                    rect_.sx,rect_.sy,rect_.width,first);
+                if(first<rect_.height)Ops::validateTerrain(terrain_,image_+2*planeBytes,target_,rect_.x,0,
+                    rect_.sx,rect_.sy+first,rect_.width,rect_.height-first);
+            }
+        }
     public:
         explicit Overlay(Reference& reference):reference_(reference) {}
-        void bind(const UBYTE* pack,UBYTE* backing) { discard();pack_=pack;backing_=backing; }
-        void discard() { fast_=valid_=pending_=false;target_=nullptr;reference_.discard(); }
+        void bind(const UBYTE* pack,UBYTE* backing,const UBYTE* terrain) {
+            discard();pack_=pack;backing_=backing;terrain_=terrain;
+        }
+        void discard() { fast_=valid_=pending_=multiple_=false;entryCount_=0;target_=nullptr;reference_.discard(); }
         bool present() const { return fast_ ? valid_||pending_ : reference_.present(); }
         bool matches(UBYTE* target,unsigned origin,const downwell::TimeFieldOutlines& shape) const {
             if(!fast_)return reference_.matches(target,origin,shape);
@@ -47,11 +80,14 @@ public:
         }
         template<class DirtyRow> bool touchesDirtyRows(DirtyRow dirty) const {
             if(!fast_)return reference_.touchesDirtyRows(dirty);
-            unsigned row=origin_+rect_.y;
-            if(row>=downwellGameRingHeight)row-=downwellGameRingHeight;
-            for(unsigned i=0;i<rect_.height;++i){
-                if(dirty(row))return true;
-                if(++row==downwellGameRingHeight)row=0;
+            for(unsigned e=0;e<(multiple_?entryCount_:1);++e){
+                const auto& rect=multiple_?entries_[e].rect:rect_;
+                unsigned row=origin_+rect.y;
+                if(row>=downwellGameRingHeight)row-=downwellGameRingHeight;
+                for(unsigned i=0;i<rect.height;++i){
+                    if(dirty(row))return true;
+                    if(++row==downwellGameRingHeight)row=0;
+                }
             }
             return false;
         }
@@ -65,43 +101,58 @@ public:
             if(!fast_)reference_.draw();
             Rect next{};
             const UBYTE* image=nullptr;
+            bool many=pack_&&terrain_&&shape.visible&&shape.count>1&&shape.count<=66&&Ops::staticEnabled();
+            if(many)for(unsigned i=0;i<shape.count;++i)
+                if(shape.circles[i].radius<24*256||shape.circles[i].radius>=26*256){many=false;break;}
             if(pack_&&shape.visible&&shape.count==1){
                 const auto& circle=shape.circles[0];
                 const int phase=circle.radius-24*256;
                 if(phase>=0&&phase<512&&Ops::enabled()){
-                    const int left=circle.x-32,top=circle.y-28;
-                    const int x=left<downwellPlayfieldX?downwellPlayfieldX:left;
-                    const int y=top<0?0:top;
-                    const int right=left+64>downwellPlayfieldX+downwellPlayfieldWidth?
-                        downwellPlayfieldX+downwellPlayfieldWidth:left+64;
-                    const int bottom=top+56>downwellDisplayHeight?downwellDisplayHeight:top+56;
-                    if(x<right&&y<bottom){
-                        next={unsigned(x),unsigned(y),unsigned(x-left),unsigned(y-top),
-                              unsigned(right-x),unsigned(bottom-y)};
-                        image=pack_+headerBytes+word(pack_+16+phase*2)*imageBytes;
-                    }
+                    image=describe(circle,next);
                 }
             }
             if(fast_){
-                if(valid_&&!transfer(false,backing_))return false;
+                if(valid_){
+                    if(multiple_){
+                        for(unsigned i=0;i<entryCount_;++i){select(i);if(!transfer(false,backing_))return false;}
+                    }else if(!transfer(false,backing_))return false;
+                }
                 fast_=valid_=pending_=false;
             }
-            if(!image)return reference_.prepare(target,origin,shape,underlyingChanged,dirty);
+            multiple_=false;entryCount_=0;
+            if(!image&&!many)return reference_.prepare(target,origin,shape,underlyingChanged,dirty);
             if(reference_.present()){
                 downwell::TimeFieldOutlines empty;
                 if(!reference_.prepare(target,origin,empty,true,dirty))return false;
                 reference_.discard();
             }
             image_=image;rect_=next;origin_=origin;
-            // Only the admitted circle is needed; do not copy 65 unused slots.
-            shape_.visible=true;shape_.count=1;shape_.circles[0]=shape.circles[0];
+            staticUnderlay_=terrain_&&Ops::staticEnabled();
+            multiple_=many;
+            if(many)for(unsigned i=0;i<shape.count;++i){
+                auto& entry=entries_[entryCount_];
+                entry.image=describe(shape.circles[i],entry.rect);
+                if(entry.image)++entryCount_;
+            }
+            // Preserve source order; do not copy unused slots or capture a
+            // different saved underlay for every overlapping circle.
+            shape_.visible=true;shape_.count=shape.count;
+            for(unsigned i=0;i<shape.count;++i)shape_.circles[i]=shape.circles[i];
             fast_=pending_=true;
             return true;
         }
         bool draw() {
             if(!fast_){reference_.draw();return true;}
             if(!pending_)return true;
-            if(!transfer(true,nullptr)||!transfer(false,image_))return false;
+            if(multiple_){
+                // Validate all footprints before any earlier circle paints
+                // over a later one's (legitimate) overlapping underlay.
+                if constexpr(Ops::verify)for(unsigned i=0;i<entryCount_;++i){select(i);validate();}
+                for(unsigned i=0;i<entryCount_;++i){select(i);if(!transfer(false,image_))return false;}
+            }else{
+                if(staticUnderlay_)validate();
+                if((!staticUnderlay_&&!transfer(true,nullptr))||!transfer(false,image_))return false;
+            }
             pending_=false;valid_=true;return true;
         }
         bool preparedImage() const { return fast_; }
@@ -111,7 +162,7 @@ private:
     Overlay overlays_[2]={Overlay(reference_[0]),Overlay(reference_[1])};
 public:
     static unsigned storageBytes(unsigned packBytes) { return ((packBytes+3)&~3u)+2*backingBytes; }
-    bool bind(UBYTE* region,unsigned bytes,const UBYTE* pack,unsigned packBytes) {
+    bool bind(UBYTE* region,unsigned bytes,const UBYTE* pack,unsigned packBytes,const UBYTE* terrain=nullptr) {
         if(!region||!pack||packBytes<headerBytes||packBytes>headerBytes+65535u*imageBytes||
             bytes<storageBytes(packBytes)||
             pack[0]!='D'||pack[1]!='W'||pack[2]!='F'||pack[3]!='I'||word(pack+4)!=1||
@@ -122,7 +173,7 @@ public:
         for(auto& overlay:overlays_)overlay.discard();
         for(unsigned i=0;i<packBytes;++i)region[i]=pack[i];
         UBYTE* backing=region+((packBytes+3)&~3u);
-        overlays_[0].bind(region,backing);overlays_[1].bind(region,backing+backingBytes);
+        overlays_[0].bind(region,backing,terrain);overlays_[1].bind(region,backing+backingBytes,terrain);
         return true;
     }
     Overlay& operator[](unsigned i) { return overlays_[i]; }

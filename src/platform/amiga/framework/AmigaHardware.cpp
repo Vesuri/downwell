@@ -275,7 +275,7 @@ void AmigaHardware::blitterCopyWithMask(uint16_t* source, uint16_t* destination,
 {
     // Cookie-cut mask must use A, the only channel with first/last-word
     // masking. Route pixels to B. Keep the existing queue layout below.
-    const bool reverse = sourceShift < 0;
+    const bool reverse = sourceShift < 0 || maskShift < 0;
     uint16_t* pixels = source;
     source = mask;
     mask = pixels;

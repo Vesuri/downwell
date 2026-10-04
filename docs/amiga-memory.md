@@ -59,6 +59,17 @@ once on gameplay entry, not regenerated per circle or frame. Retire scene
 DMA before binding, and rebind after every front-bank reload. The sparse
 field fallback remains in ordinary memory.
 
+With `PREPARED_FIELDS_BACKING=1`, small fields restore their masks directly
+from the existing pristine Chip terrain ring (`AmigaMemory::game()`), rather
+than capturing another underlay. The two 896-byte regions remain reserved for
+the compiled saved-background reference. Each display retains up to 66 small
+field descriptors in ordinary memory; overlapping circles share the immutable
+images and terrain ring, not separate saved-background allocations. Restore
+old field masks before dirty-row synchronization, then paint new fields in
+source order before actors/lasers/effects. Verification builds check that every
+new mask's pixels already equal the pristine terrain before any field paints.
+Large/mixed shapes retain the sparse fallback and its own saved underlay.
+
 The experimental `TERRAIN_BATCH=1` painter borrows 44,304 bytes of that idle
 region for two colour planes and a coverage plane (416×284). Its immutable tile
 sources remain in ordinary memory. It drains masked transfers before reusing the

@@ -10,8 +10,11 @@ static void require(bool ok,const char* message){
     if(!ok){std::cerr<<message<<'\n';std::exit(1);}
 }
 struct Pixels {
+    static constexpr bool verify=true;
     inline static bool usePrepared=true;
+    inline static bool useStatic=false;
     static bool enabled(){return usePrepared;}
+    static bool staticEnabled(){return useStatic;}
     static unsigned get(const UBYTE* p,unsigned stride,unsigned x,unsigned y){
         return (p[y*stride+x/8]>>(7-(x&7)))&1;
     }
@@ -34,6 +37,20 @@ struct Pixels {
             if(get(mask,8,sx+col,sy+row))for(unsigned p=0;p<2;++p)
                 put(target+p*15360,48,x+col,y+row,get(source+p*448,8,sx+col,sy+row));
         return true;
+    }
+    static bool restoreTerrain(const UBYTE* source,const UBYTE* mask,UBYTE* target,
+                       unsigned x,unsigned y,unsigned sx,unsigned sy,unsigned w,unsigned h){
+        for(unsigned row=0;row<h;++row)for(unsigned col=0;col<w;++col)
+            if(get(mask,8,sx+col,sy+row))for(unsigned p=0;p<2;++p)
+                put(target+p*15360,48,x+col,y+row,get(source+p*15360,48,x+col,y+row));
+        return true;
+    }
+    static void validateTerrain(const UBYTE* source,const UBYTE* mask,UBYTE* target,
+                       unsigned x,unsigned y,unsigned sx,unsigned sy,unsigned w,unsigned h){
+        for(unsigned row=0;row<h;++row)for(unsigned col=0;col<w;++col)
+            if(get(mask,8,sx+col,sy+row))for(unsigned p=0;p<2;++p)
+                require(get(target+p*15360,48,x+col,y+row)==get(source+p*15360,48,x+col,y+row),
+                    "new field has pristine underlay");
     }
 };
 int main(){
@@ -131,5 +148,61 @@ int main(){
     require((*reference)[0].prepare(expected[1].data(),0,steady,true,clean),"target oracle");
     require((*candidate)[0].draw(),"target draw");(*reference)[0].draw();
     require(actual[1]==expected[1],"target replacement pixels");
+    std::vector<UBYTE> terrain(downwellGameRingBytes);
+    for(auto& byte:terrain)byte=next()>>24;
+    require(candidate->bind(storage.data(),storage.size(),pack.data(),pack.size(),terrain.data()),"terrain bind");
+    for(unsigned b=0;b<2;++b){(*reference)[b].discard();actual[b]=expected[b]=terrain;}
+    bool rowDebt[2][320]={};
+    for(unsigned frame=0;frame<2400;++frame){
+        Pixels::useStatic=frame%41!=0;
+        const unsigned b=frame&1,origin=(frame*11)%320;
+        const unsigned changed=next()%320;
+        for(unsigned p=0;p<2;++p)for(unsigned x=0;x<48;++x)
+            terrain[p*15360+changed*48+x]=next()>>24;
+        rowDebt[0][changed]=rowDebt[1][changed]=true;
+        downwell::TimeFieldOutlines shape;
+        shape.visible=frame%19!=0;shape.count=shape.visible?(frame%17==0?2:1):0;
+        for(unsigned i=0;i<shape.count;++i)shape.circles[i]={int(94+next()%196),int(next()%336)-26,
+            int((frame%23==0?128:24)*256+next()%512)};
+        auto dirty=[&](unsigned row){return rowDebt[b][row];};
+        require((*candidate)[b].prepare(actual[b].data(),origin,shape,true,dirty),"terrain prepare");
+        require((*reference)[b].prepare(expected[b].data(),origin,shape,true,dirty),"terrain oracle prepare");
+        for(unsigned row=0;row<320;++row)if(rowDebt[b][row]){
+            for(unsigned p=0;p<2;++p)for(unsigned x=0;x<48;++x){
+                const unsigned offset=p*15360+row*48+x;
+                actual[b][offset]=expected[b][offset]=terrain[offset];
+            }
+            rowDebt[b][row]=false;
+        }
+        require((*candidate)[b].draw(),"terrain draw");(*reference)[b].draw();
+        require(actual[b]==expected[b],"pristine terrain equals captured-underlay pixels");
+        // Moving objects are drawn after fields and owe their row next frame.
+        const unsigned row=next()%320,x=next()%384;
+        Pixels::put(actual[b].data(),48,x,row,1);Pixels::put(expected[b].data(),48,x,row,1);
+        rowDebt[b][row]=true;
+    }
+    std::cout<<"2400 pristine-terrain frames match captured underlay, including dirty rows and BOB damage\n";
+    (*candidate)[0].discard();(*reference)[0].discard();
+    actual[0]=expected[0]=terrain;Pixels::usePrepared=Pixels::useStatic=true;
+    for(unsigned frame=0;frame<13;++frame){
+        downwell::TimeFieldOutlines crowded;
+        crowded.count=frame==12?0:66;crowded.visible=crowded.count!=0;
+        for(unsigned i=0;i<crowded.count;++i){
+            const unsigned index=frame&1?65-i:i;
+            crowded.circles[i]={frame%3==0?-100:190+int(index%11)-5,
+                frame%3==1?4:270,int(24*256+(index*97+frame*13)%512)};
+        }
+        const unsigned origin=frame*23%320;
+        require((*candidate)[0].prepare(actual[0].data(),origin,crowded,true,clean),"capacity prepare");
+        require((*reference)[0].prepare(expected[0].data(),origin,crowded,true,clean),"capacity oracle");
+        // Replace an undrawn transaction; no per-field captured state exists.
+        (*reference)[0].draw();
+        if(crowded.count)crowded.circles[0].radius=24*256+(frame*41)%512;
+        require((*candidate)[0].prepare(actual[0].data(),origin,crowded,true,clean),"capacity reprepare");
+        require((*reference)[0].prepare(expected[0].data(),origin,crowded,true,clean),"capacity oracle reprepare");
+        require((*candidate)[0].draw(),"capacity draw");(*reference)[0].draw();
+        require(actual[0]==expected[0],"66-field overlap, offscreen and pending replacement pixels");
+    }
+    std::cout<<"66-field capacity: overlap order, offscreen footprints and pending replacement match\n";
     std::cout<<"3600 double-buffered frames: "<<fast<<" prepared, "<<fallback<<" fallback; pixels match\n";
 }

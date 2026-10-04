@@ -349,6 +349,9 @@ void Bitmap::copyWithMask(const Bitmap& source, const Bitmap& mask, uint16_t des
         destLastWord = (uint16_t)(destFirstWord + widthWords);
     }
     uint16_t maskFirstWord = maskX >> 4;
+    const uint16_t maskWords = ((maskX + width - 1) >> 4) - maskFirstWord;
+    if (maskWords > widthWords) widthWords = maskWords;
+    destLastWord = (uint16_t)(destFirstWord + widthWords);
     uint16_t maskLastWord = (uint16_t)(maskFirstWord + widthWords);
     // Include the extra fetch word when an unaligned destination spans
     // more words than the source. It must be zero-masked before shifting.
@@ -374,7 +377,9 @@ void Bitmap::copyWithMask(const Bitmap& source, const Bitmap& mask, uint16_t des
     uint16_t* sourceData = (uint16_t*)source.data;
     uint16_t* maskData = (uint16_t*)mask.data;
     uint16_t* destData = (uint16_t*)data;
-    if (sourceShift >= 0) {
+    // Aligned terrain pixels can still require a left-shifted mask. Both
+    // channels must then traverse backwards, even though B's shift is zero.
+    if (sourceShift >= 0 && !(sourceShift == 0 && maskShift < 0)) {
         // Shift is to the right: blit forward starting from the first word
         sourceData += sourceY * source.rowSizeInWords() + sourceFirstWord;
         maskData += maskY * mask.rowSizeInWords() + maskFirstWord;
@@ -401,23 +406,56 @@ void Bitmap::copyWithMask(const Bitmap& source, const Bitmap& mask, uint16_t des
         }
     }
 
+    // A right-shifted mask can need an extra fetched word. When its logical
+    // last word is partial, BLTALWM applies to the extra word instead: preserve
+    // the destination's trailing pixels explicitly. Process bounded strips,
+    // using the same hardware blitter and a small CPU edge scratch.
+    const bool repairRight = sourceShift >= 0 && maskWords + 1 < widthWords &&
+        ((maskX + width) & 15) && ((destX + width) & 15);
+    auto copyMasked = [&](uint16_t* pixels,uint16_t* destination,uint16_t* coverage,uint16_t rows) {
+        if (!repairRight) {
+            AmigaHardware::blitterCopyWithMask(pixels,destination,coverage,widthWords,rows,
+                sourceRowModulo*2,destRowModulo*2,maskRowModulo*2,
+                sourceShift,maskShift,firstWordMask,lastWordMask,clearMasked);
+            return;
+        }
+        const uint16_t keep = (uint16_t)(0xffffu >> ((destX + width) & 15));
+        const unsigned right = ((destX + width - 1) >> 4) - destFirstWord;
+        const unsigned sourceStride = widthWords + sourceRowModulo;
+        const unsigned targetStride = widthWords + destRowModulo;
+        const unsigned maskStride = widthWords + maskRowModulo;
+        uint16_t edges[64];
+        for (unsigned first=0;first<rows;first+=64) {
+            const unsigned count=rows-first<64?rows-first:64;
+            AmigaHardware::blitterDrain();
+            for(unsigned row=0;row<count;++row)edges[row]=destination[(first+row)*targetStride+right];
+            AmigaHardware::blitterCopyWithMask(pixels+first*sourceStride,destination+first*targetStride,
+                coverage+first*maskStride,widthWords,count,sourceRowModulo*2,destRowModulo*2,
+                maskRowModulo*2,sourceShift,maskShift,firstWordMask,lastWordMask,clearMasked);
+            AmigaHardware::blitterDrain();
+            for(unsigned row=0;row<count;++row){
+                auto& word=destination[(first+row)*targetStride+right];
+                word=(word&~keep)|(edges[row]&keep);
+            }
+        }
+    };
     if (interleaved) {
         if (mask.bitplanes == 1) {
             uint16_t bitplanes = this->bitplanes < source.bitplanes ? this->bitplanes : source.bitplanes;
             sourceRowModulo += source.rowSizeInWords() - sourceWidthWords;
             destRowModulo += this->rowSizeInWords() - destWidthWords;
             for (uint16_t i = 0; i < bitplanes; i++) {
-                AmigaHardware::blitterCopyWithMask(sourceData, destData, maskData, widthWords, height, sourceRowModulo << 1, destRowModulo << 1, maskRowModulo << 1, sourceShift, maskShift, firstWordMask, lastWordMask, clearMasked);
+                copyMasked(sourceData,destData,maskData,height);
                 sourceData += sourceShift >= 0 ? sourceWidthWords : -sourceWidthWords;
                 destData += sourceShift >= 0 ? destWidthWords : -destWidthWords;
             }
         } else {
-            AmigaHardware::blitterCopyWithMask(sourceData, destData, maskData, widthWords, bitplanes * height, sourceRowModulo << 1, destRowModulo << 1, maskRowModulo << 1, sourceShift, maskShift, firstWordMask, lastWordMask, clearMasked);
+            copyMasked(sourceData,destData,maskData,bitplanes*height);
         }
     } else {
         uint16_t bitplanes = this->bitplanes < source.bitplanes ? this->bitplanes : source.bitplanes;
         for (uint16_t i = 0; i < bitplanes; i++) {
-            AmigaHardware::blitterCopyWithMask(sourceData, destData, maskData, widthWords, height, sourceRowModulo << 1, destRowModulo << 1, maskRowModulo << 1, sourceShift, maskShift, firstWordMask, lastWordMask, clearMasked);
+            copyMasked(sourceData,destData,maskData,height);
             sourceData += source.bitplaneSizeInWords();
             destData += this->bitplaneSizeInWords();
         }

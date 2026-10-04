@@ -49,15 +49,46 @@ __attribute__((noinline,used)) void downwellFieldReentryReady(){__asm__ volatile
 // Both modes load the same images and reserve the same scene-bank partition.
 extern "C" { volatile unsigned gDownwellPreparedFieldMode=DOWNWELL_FIELD_MODE; }
 extern "C" int amigaBlitterCaptureField(UBYTE*,const UBYTE*,const UBYTE*,UWORD,UWORD,UWORD,UWORD,UWORD,UWORD);
+extern "C" int amigaBlitterRestoreField(const UBYTE*,const UBYTE*,UBYTE*,UWORD,UWORD,UWORD,UWORD,UWORD,UWORD);
 extern "C" int amigaBlitterDrawPlanarMasked(const UBYTE*,const UBYTE*,UWORD,UWORD,UWORD,
     UBYTE*,UWORD,UWORD,UWORD,UWORD,UWORD,UWORD,UWORD,int);
 #ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
 extern "C" void amigaFieldVerifyCapture(const UBYTE*,const UBYTE*,const UBYTE*,unsigned,unsigned,unsigned,unsigned,unsigned,unsigned);
 extern "C" void amigaFieldVerifyMask(const UBYTE*,const UBYTE*,const UBYTE*,unsigned,unsigned,unsigned,unsigned,unsigned,unsigned);
 extern "C" void amigaFieldVerifyFinish(const UBYTE*);
+extern "C" void amigaFieldVerifyTerrain(const UBYTE*,const UBYTE*,const UBYTE*,unsigned,unsigned,unsigned,unsigned,unsigned,unsigned);
+extern "C" int amigaFieldVerifyTerrainFixture(UBYTE*,UBYTE*,UBYTE*);
+extern "C" void amigaFieldVerifyCompositeBegin(UBYTE*,UBYTE*);
+extern "C" void amigaFieldVerifyCompositeEnd(UBYTE*,UBYTE*);
+extern "C" bool amigaFieldVerifyComposite(const UBYTE*,const UBYTE*,const downwell::TimeFieldOutlines&,unsigned);
 #endif
 struct PreparedFieldOps {
-    static bool enabled(){return gDownwellPreparedFieldMode==1;}
+#ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
+    static constexpr bool verify=true;
+#else
+    static constexpr bool verify=false;
+#endif
+    static bool enabled(){return gDownwellPreparedFieldMode!=2;}
+    static bool staticEnabled(){return gDownwellPreparedFieldMode==3;}
+#ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
+    static void validateTerrain(const UBYTE* source,const UBYTE* mask,UBYTE* target,
+        unsigned x,unsigned y,unsigned sx,unsigned sy,unsigned w,unsigned h){
+        amigaFieldVerifyTerrain(source,mask,target,x,y,sx,sy,w,h);
+        // No operation: pixels under the new mask must already be pristine.
+        amigaFieldVerifyFinish(target);
+    }
+#endif
+    static bool restoreTerrain(const UBYTE* source,const UBYTE* mask,UBYTE* target,
+        unsigned x,unsigned y,unsigned sx,unsigned sy,unsigned w,unsigned h){
+#ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
+        amigaFieldVerifyTerrain(source,mask,target,x,y,sx,sy,w,h);
+#endif
+        const bool ok=amigaBlitterRestoreField(source,mask,target,x,y,sx,sy,w,h)!=0;
+#ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
+        amigaFieldVerifyFinish(target);
+#endif
+        return ok;
+    }
     static bool capture(UBYTE* saved,const UBYTE* target,const UBYTE* mask,unsigned x,unsigned y,
         unsigned sx,unsigned sy,unsigned w,unsigned h){
 #ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
@@ -936,6 +967,33 @@ static AmigaGameplayRows gameplayRows;
 static AmigaLaserSight gameplayRays[2];
 #ifdef DOWNWELL_PREPARED_FIELDS
 static AmigaPreparedTimeFieldPair<PreparedFieldOps> gameplayFields;
+#ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
+static bool verifyFieldComposites(UBYTE* terrain,UBYTE* target){
+    amigaFieldVerifyCompositeBegin(terrain,target);
+    const unsigned mode=gDownwellPreparedFieldMode;
+    bool ok=true;
+    auto& overlay=gameplayFields[0];
+    for(unsigned frame=0;frame<48&&ok;++frame){
+        // Captured, pristine, and sparse paths must exchange ownership without
+        // retaining pixels from an earlier field. No gameplay RNG is consumed.
+        gDownwellPreparedFieldMode=frame%13==0?2:frame%11==0?1:3;
+        downwell::TimeFieldOutlines shape;
+        shape.count=frame%12==11?0:3;shape.visible=shape.count!=0;
+        for(unsigned i=0;i<shape.count;++i){
+            const unsigned index=frame&1?2-i:i;
+            shape.circles[i]={int(108+(frame%4)*48+index*9),
+                int(8+(frame%3)*128+index*5),int(24*256+(frame*37+index*93)%512)};
+        }
+        if(shape.count&&frame%7==0)shape.circles[1].radius=128*256+frame;
+        const unsigned origin=(frame*29)%320;
+        ok=overlay.prepare(target,origin,shape,true,[](unsigned){return false;})&&overlay.draw();
+        if(ok)ok=amigaFieldVerifyComposite(terrain,target,shape,origin);
+    }
+    overlay.discard();gDownwellPreparedFieldMode=mode;
+    amigaFieldVerifyCompositeEnd(terrain,target);
+    return ok;
+}
+#endif
 #else
 static AmigaTimeFieldPair gameplayFields;
 #endif
@@ -2220,9 +2278,16 @@ __attribute__((noinline)) static int runDownwell(void) {
                     AmigaHardware::blitterDrain();
                     if(sceneBankBytes<downwellTerrainBatchBytes || !gameplayFields.bind(
                         sceneBank+downwellTerrainBatchBytes,sceneBankBytes-downwellTerrainBatchBytes,
-                        amiga_field_images,amiga_field_images_end-amiga_field_images)){
+                        amiga_field_images,amiga_field_images_end-amiga_field_images,memory.game())){
                         exitCode=20;break;
                     }
+#ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
+                    if(!amigaFieldVerifyTerrainFixture(memory.game(),(UBYTE*)gameDisplay[0].data,
+                        sceneBank+sceneBankBytes-448)||
+                        !verifyFieldComposites(memory.game(),(UBYTE*)gameDisplay[0].data)){
+                        exitCode=20;break;
+                    }
+#endif
 #endif
                     if (newRunWorldPending) {
                         AmigaHardware::blitterDrain();

@@ -317,13 +317,15 @@ Rules for this section:
      as the compiled oracle/fallback. Verify mask-only background restoration,
      actor/laser ordering, overlapping fields, clipping, circular-buffer wraps,
      repeated prepare calls, and switching between optimized and fallback paths.
-   - Finish `PREPARED_FIELDS=1`: bring its roughly 5.6 ms single-circle
-     save/restore/draw below 5 ms, cover the multiple/large-field cases still
-     using the sparse fallback, then complete normal-build integration and
-     the combined timing/fidelity gates. Do not count the single-circle
-     improvement as completion of A6 or replace the native pixel checks with
-     host-only copies. Use `PROFILE_FIELD_REFERENCE=1` for identical-code
-     timing against the compiled sparse path.
+   - Finish `PREPARED_FIELDS=1` with `PREPARED_FIELDS_BACKING=1`: measure
+     wrapped and overlapping small-field workloads against the under-5-ms
+     target, replace the large/mixed-field sparse fallback, then complete
+     normal-build integration and the combined timing/fidelity gates. Do not
+     count the single-circle improvement as completion of A6 or replace the
+     native pixel checks with host-only copies. Use
+     `PREPARED_FIELDS_BACKING=0` for the saved-background comparison and
+     `PROFILE_FIELD_REFERENCE=1` for the sparse comparison; selectors change
+     initialized data, not executable code.
    - Explicitly partition the shared scene bank: terrain batching already
      uses its first 44,304 bytes. Field images/backing must not overlap that
      scratch or survive a front-bank reload without rebinding.
