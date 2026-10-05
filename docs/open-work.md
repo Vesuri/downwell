@@ -294,6 +294,8 @@ The delta-register stamp batch is also closed: it shifts work into queued
 dispatch and regresses the first affected frame. Do not sweep its scheduling.
 Offline shifted CPU stamps into the retained raster are closed too; do not
 retune their word interpreter, layout or CPU/DMA selection.
+The disjoint row-debt range attempt is closed: do not retune its range layout
+or search; any replacement must also remove per-row field/laser debt queries.
 Keep per-producer/presentation state and final pixels as oracles. Do not
 reopen small sprite assignment or gem-position helpers.
 
