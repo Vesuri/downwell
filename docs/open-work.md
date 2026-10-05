@@ -275,16 +275,6 @@ remaining structure, not retune the prepared row program or its helpers.
 
 ### B. Combat composition (85.3 ms; also 645 and 701)
 
-1. **Damage-number text.** `AmigaDamageText::draw` costs 5.5 ms in every
-   combat frame and 5.9 ms at 645, which is half of the "actor drawing" cost.
-   - Each frame it rebuilds the outlined label from glyph rows. It then issues
-     about nine `amigaRendererDrawPlanarWord` calls, each about 2,000 cycles
-     including a modulo and a multiply for ring addressing.
-   - Build the label's white/outline words once, when the number's text
-     changes, and keep them with the number record.
-   - Each frame, publish them with one masked copy per label, or put the
-     label on a free hardware sprite.
-   - Target: under 1 ms for typical label counts.
 2. **Gem positions in reader units.** `GemMotion` stores positions in
    1/12800 pixel. `pixel`, `rounded` and `q8` therefore divide by 12800 or 50
    on every read. Through the 32-bit library helpers that costs 4.4 ms of the

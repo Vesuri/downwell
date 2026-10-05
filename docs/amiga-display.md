@@ -140,11 +140,16 @@ The game bank remains immutable throughout their use.
 
 All four black outline passes in the reference precede all white glyphs.
 Their coverage is therefore the union of the four one-pixel translations,
-with the untranslated white coverage taking precedence. `AmigaDamageText`
-forms those rows in 192 bytes of temporary storage and publishes their combined
-coverage in planar words, preserving pixels outside the union. The existing word
-publisher handles viewport clipping and the circular display; the pristine
-terrain and other buffer remain untouched. The five-pass generic renderer
+with the untranslated white coverage taking precedence. `AmigaDamageTextCache`
+keeps eight integer labels' white and outline words in Fast RAM, invalidated
+when the glyph bank changes. A text miss composes the label once; subsequent
+Draw events only place its prepared rectangle. Placement resolves clipping
+and circular-buffer addressing once, then advances through destination rows.
+The CPU writes only covered black/white bits after outstanding blits drain;
+the pristine terrain and other buffer remain untouched. No new Chip storage,
+hardware sprite allocation or draw-order change is involved.
+`REFERENCE_DAMAGE_TEXT=1` retains the per-frame word compositor.
+The five-pass generic renderer
 remains the pixel oracle in scene-verification builds and the fallback for an
 unprepared backend. Production startup treats a failed preparation as an
 initialization error, not permission to omit a label.

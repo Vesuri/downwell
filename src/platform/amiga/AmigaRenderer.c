@@ -78,6 +78,64 @@ void amigaRendererDrawCoverageWord(AmigaRenderer* renderer,int x,int y,UWORD bit
     amigaRendererDrawPlanarWord(renderer,x,y,bits,pen&1u?bits:0,pen&2u?bits:0);
 }
 
+void amigaRendererDrawTextWords(AmigaRenderer* r,int x,int y,
+    const UWORD* mask,const UWORD* white,unsigned words,unsigned height,unsigned stride) {
+    int left=r->clipX>0?r->clipX:0, right=r->clipX+r->clipWidth;
+    int top=r->clipY>0?r->clipY:0, bottom=r->clipY+r->clipHeight;
+    int base,first,last,shift,column,row,endRow;
+    unsigned physical,ringHeight;
+    ULONG planeBytes;
+    UWORD clips[9];
+    UBYTE* dest;
+    if(!words || words>8 || !height)return;
+    if(right>downwellVisibleWidth)right=downwellVisibleWidth;
+    if(bottom>downwellDisplayHeight)bottom=downwellDisplayHeight;
+    if(x>left)left=x;
+    if(x+(int)words*16<right)right=x+(int)words*16;
+    if(y>top)top=y;
+    if(y+(int)height<bottom)bottom=y+(int)height;
+    if(left>=right || top>=bottom)return;
+    base=x>=0?x/16:-((-x+15)/16);
+    shift=x-base*16;
+    first=left/16;last=(right+15)/16;
+    for(column=first;column<last;++column) {
+        int begin=left-column*16,end=right-column*16;
+        UWORD clip=0xffffu;
+        if(begin>0)clip>>=begin;
+        if(end<16)clip&=(UWORD)(0xffffu<<(16-end));
+        clips[column-first]=clip;
+    }
+    ringHeight=r->target==r->game?downwellGameRingHeight:downwellDisplayHeight;
+    planeBytes=ringHeight*downwellBytesPerPlaneLine;
+    physical=(unsigned)top;
+    if(r->target==r->game)physical=(r->gameOrigin+physical)%ringHeight;
+    dest=r->target+physical*downwellBytesPerPlaneLine+first*2;
+    mask+=(top-y)*stride;white+=(top-y)*stride;
+    endRow=bottom-top;
+    for(row=0;row<endRow;++row) {
+        UBYTE* out=dest;
+        for(column=first;column<last;++column,out+=2) {
+            const int source=column-base;
+            UWORD bits=0,ink=0;
+            if(source>=0 && source<(int)words) {
+                bits=mask[source]>>shift;ink=white[source]>>shift;
+            }
+            if(shift && source>0 && source<=(int)words) {
+                bits|=(UWORD)(mask[source-1]<<(16-shift));
+                ink|=(UWORD)(white[source-1]<<(16-shift));
+            }
+            bits&=clips[column-first];
+            if(bits) {
+                writeWord(out,readWord(out)&(UWORD)~bits);
+                writeWord(out+planeBytes,(readWord(out+planeBytes)&(UWORD)~bits)|(ink&bits));
+            }
+        }
+        mask+=stride;white+=stride;
+        dest+=downwellBytesPerPlaneLine;
+        if(++physical==ringHeight) {physical=0;dest-=planeBytes;}
+    }
+}
+
 static void setPixel(AmigaRenderer* renderer, int x, int y, unsigned pen) {
     UBYTE* row;
     UBYTE mask;

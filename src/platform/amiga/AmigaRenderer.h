@@ -57,6 +57,10 @@ void amigaRendererFillRect(AmigaRenderer* renderer,
 void amigaRendererDrawCoverageWord(AmigaRenderer*,int x,int y,UWORD bits,unsigned pen);
 /* Final planar colours under alpha, MSB first; one placement for both planes. */
 void amigaRendererDrawPlanarWord(AmigaRenderer*,int x,int y,UWORD alpha,UWORD low,UWORD high);
+/* CPU-only prepared black/white rectangle. Native-endian source words;
+   clip and circular destination placement are resolved once per rectangle. */
+void amigaRendererDrawTextWords(AmigaRenderer*,int x,int y,
+    const UWORD* mask,const UWORD* white,unsigned words,unsigned height,unsigned stride);
 /* Coverage copied from the existing offline numeric glyph planes at startup. */
 typedef struct AmigaDamageGlyphs { UBYTE rows[11][10]; } AmigaDamageGlyphs;
 int amigaRendererPrepareDamageGlyphs(AmigaDamageGlyphs*, const UBYTE*, const UBYTE*);

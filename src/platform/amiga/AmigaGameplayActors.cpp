@@ -14,8 +14,9 @@ extern "C" { volatile unsigned gDownwellDamageTextChecks; }
 #endif
 #endif
 
-namespace { AmigaDamageGlyphs damageGlyphs; bool damageGlyphsReady; }
+namespace { AmigaDamageGlyphs damageGlyphs; bool damageGlyphsReady; AmigaDamageTextCache damageText; }
 bool AmigaGameplayActors::prepareDamageText(const UBYTE* pack, const UBYTE* end) {
+    damageText.invalidate();
     damageGlyphsReady=amigaRendererPrepareDamageGlyphs(&damageGlyphs,pack,end)!=0;
     return damageGlyphsReady;
 }
@@ -50,8 +51,19 @@ void AmigaGameplayActors::draw(AmigaRenderer renderer, Bitmap& display,
             DW_PROFILE_SCOPE(profileDamageNumberDraw);
             AmigaHardware::blitterDrain();
             AmigaRenderer textRenderer=renderer;textRenderer.blitterEnabled=0;
-            downwell::DamageNumberText label;label.formatInteger(bob.flip);
-            if (damageGlyphsReady) AmigaDamageText::draw(textRenderer,damageGlyphs,label,bob.x,bob.y);
+            downwell::DamageNumberText label;
+#if defined(DOWNWELL_REFERENCE_DAMAGE_TEXT) || defined(DOWNWELL_SCENE_VERIFY)
+            label.formatInteger(bob.flip);
+#else
+            if(!damageGlyphsReady)label.formatInteger(bob.flip);
+#endif
+            if (damageGlyphsReady) {
+#ifdef DOWNWELL_REFERENCE_DAMAGE_TEXT
+                AmigaDamageText::draw(textRenderer,damageGlyphs,label,bob.x,bob.y);
+#else
+                damageText.draw(textRenderer,damageGlyphs,bob.flip,bob.x,bob.y);
+#endif
+            }
             if (!damageGlyphsReady) label.draw(bob.x,bob.y,[&](unsigned glyph,int x,int y,unsigned pen){
                 amigaRendererDrawAssetPen(&textRenderer,pack,packEnd,glyph,0,x,y,0,pen);
             });
@@ -111,7 +123,7 @@ void AmigaGameplayActors::draw(AmigaRenderer renderer, Bitmap& display,
         AmigaRenderer actualText=renderer,referenceText=oracle;
         amigaRendererSetGameOrigin(&actualText,testOrigin);
         amigaRendererSetGameOrigin(&referenceText,testOrigin);
-        AmigaDamageText::draw(actualText,damageGlyphs,label,x,y);
+        damageText.draw(actualText,damageGlyphs,values[sample&7],x,y);
         label.draw(x,y,[&](unsigned glyph,int px,int py,unsigned pen){
             amigaRendererDrawAssetPen(&referenceText,pack,packEnd,glyph,0,px,py,0,pen);
         });
