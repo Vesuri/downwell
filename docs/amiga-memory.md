@@ -203,5 +203,10 @@ and collision indices still need a separate final memory-reduction pass.
 The retained room-terrain admission plan uses 12,312 bytes of ordinary BSS
 (256 decoded resource records plus identity/count/extent metadata), no Chip
 RAM. Its borrowed room pack must remain immutable; it owns no live instances.
+The initial-room terrain artwork is an 11,548-byte immutable Fast-RAM bank:
+720 rows in each of three columns, referencing 164 unique 44-byte rows. It
+expands into the existing terrain raster, not another full bitmap. No Chip
+allocation is added. The decoder borrows this bank for the executable's
+lifetime and rejects malformed sizes or row references before publishing it.
 Audio will require an explicit additional budget; the current headroom must
 not be assumed sufficient for unmeasured additions.

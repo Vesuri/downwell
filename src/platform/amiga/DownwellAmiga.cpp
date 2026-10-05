@@ -28,6 +28,13 @@ __attribute__((noinline,used)) void downwellFieldReentryReady(){__asm__ volatile
 #include "AmigaGameplayRows.h"
 #include "AmigaGameplayScene.h"
 #include "AmigaGameplayGeneration.h"
+#include "AmigaInitialTerrain.h"
+#ifdef DOWNWELL_TERRAIN_BATCH_VERIFY
+extern "C" {
+volatile ULONG gDownwellInitialTerrainChecks=0,gDownwellInitialTerrainEnabled=0;
+void downwellTerrainBatchMismatch();
+}
+#endif
 #include "AmigaWallCollision.h"
 #include "AmigaGameplayActors.h"
 #include "AmigaGameplayDrawList.h"
@@ -225,6 +232,7 @@ extern const UBYTE amiga_field_images[],amiga_field_images_end[];
 #endif
 #ifdef DOWNWELL_TERRAIN_DIRECT
 extern const UBYTE amiga_terrain_phase6[],amiga_terrain_phase6_end[];
+extern const UBYTE amiga_initial_terrain[],amiga_initial_terrain_end[];
 #endif
 extern const UBYTE amiga_results_pack[];
 extern const UBYTE amiga_exit_mask[];
@@ -1145,6 +1153,7 @@ enum { terrainRasterRows = 8192, terrainRasterWords = AmigaGameplayRows::terrain
        terrainRasterX = AmigaGameplayRows::terrainX };
 static AmigaTerrainRaster terrainRaster{};
 static downwell::PreparedRoomTerrain roomTerrainPlan;
+static AmigaInitialTerrain initialTerrain;
 static AmigaWallDamage<> wallDamage;
 static AmigaWallCollision wallCollision{terrainIndex};
 static void invalidateShopRaster(const downwell::ShopWorld& shops) {
@@ -1294,7 +1303,11 @@ static void prepareTerrainRaster(AmigaRenderer* renderer,
     const downwell::BuilderPatternPack& builders,
     const AmigaTerrainFragment* fragments, unsigned fragmentCount,
     const AmigaTerrainDecoration* decorations, unsigned decorationCount,
-    const AmigaPortRuntime* runtime) {
+    const AmigaPortRuntime* runtime, bool freshlyLoadedRoom) {
+#ifdef DOWNWELL_TERRAIN_BATCH_VERIFY
+    // Keep both oracle diagnostics available in retained-reference builds too.
+    (void)gDownwellInitialTerrainEnabled;(void)gDownwellInitialTerrainChecks;
+#endif
     const bool retainedRoom=roomTerrainPlan.matches(rooms,room);
     int lastY = retainedRoom?roomTerrainPlan.wallEnd():0;
     for (unsigned i = 0; !retainedRoom && i < room.instanceCount; ++i) {
@@ -1309,6 +1322,35 @@ static void prepareTerrainRaster(AmigaRenderer* renderer,
     for (unsigned i = 0; i < decorationCount; ++i)
         if (decorations[i].y + 64 > lastY) lastY = decorations[i].y + 64;
     if (lastY > terrainRasterRows) return; // retain the generic compositor
+#if defined(DOWNWELL_TERRAIN_DIRECT) && !defined(DOWNWELL_REFERENCE_INITIAL_TERRAIN) && !defined(DOWNWELL_REFERENCE_INITIAL_RASTER)
+    bool pristine=freshlyLoadedRoom&&runtime&&!runtime->terrainInstances()&&
+        retainedRoom&&room.roomId==11&&!fragmentCount&&!decorationCount&&!terrainTiles.size()&&
+        initialTerrain.rows()!=0&&initialTerrain.rows()==unsigned(lastY);
+    if(pristine)for(const auto& shop:runtime->shops().instances)if(shop.present)pristine=false;
+    if(pristine){
+        for(unsigned column=0;column<3;++column){
+            if(!initialTerrain.copy(column,terrainRaster.row(column,0))){terrainPaintSucceeded=false;return;}
+#ifdef DOWNWELL_TERRAIN_BATCH_VERIFY
+            // Full native comparison against the retained painter, which also
+            // checks its own output against the scalar compositor in this build.
+            static UWORD oracle[284*22];
+            for(int y=0;y<lastY;y+=284){
+                const int height=lastY-y<284?lastY-y:284;
+                bool equal=AmigaTerrainPainter::paintCached(oracle,renderer,rooms,room,terrainCollision.index,
+                    terrainTiles,decorations,decorationCount,runtime,activeGamePack,activeGamePackEnd,
+                    int(column)*160,y,0,height);
+                for(int word=0;word<height*22&&equal;++word)
+                    equal=oracle[word]==terrainRaster.row(column,y)[word];
+                if(!equal){
+                    terrainPaintSucceeded=false;downwellTerrainBatchMismatch();return;
+                }
+                ++gDownwellInitialTerrainChecks;
+            }
+#endif
+        }
+        terrainRaster.ready=true;return;
+    }
+#endif
     for (int x = mainViewX - 160; x <= mainViewX + 160; x += 160)
         for (int y = 0; y < lastY; y += downwellDisplayHeight) {
             int height = lastY - y;
@@ -1885,6 +1927,17 @@ __attribute__((noinline)) static int runDownwell(void) {
     if(!AmigaTerrainPainter::bindPrepared(amiga_terrain_phase6,amiga_terrain_phase6_end-amiga_terrain_phase6)){
         platform.restore();FreeMem(startupCopperWords,4*sizeof(UWORD));memory.release();return 20;
     }
+#endif
+#if defined(DOWNWELL_TERRAIN_DIRECT) && !defined(DOWNWELL_REFERENCE_INITIAL_TERRAIN) && !defined(DOWNWELL_REFERENCE_INITIAL_RASTER)
+    // Unsupported banks retain the ordinary painter. This admits immutable
+    // pixels only: publication into the live raster still waits for room entry.
+    const bool initialTerrainReady=initialTerrain.bind(amiga_initial_terrain,
+        amiga_initial_terrain_end-amiga_initial_terrain);
+#ifdef DOWNWELL_TERRAIN_BATCH_VERIFY
+    gDownwellInitialTerrainEnabled=initialTerrainReady;
+#else
+    (void)initialTerrainReady;
+#endif
 #endif
 #ifdef DOWNWELL_TERRAIN_BATCH
     if(!AmigaTerrainPainter::bindBatch(amiga_game_pack,amiga_game_pack_end,sceneBank,sceneBankBytes)){
@@ -2484,6 +2537,9 @@ __attribute__((noinline)) static int runDownwell(void) {
 #endif
 #endif
                     DW_PROFILE_PHASE(profileEntryWorld);
+                    // Simulation ticks span levels; freshness is the load
+                    // boundary, not a zero tick on every room entry.
+                    const bool freshlyLoadedRoom=newRunWorldPending||port.tick()==0;
                     if (newRunWorldPending) {
                         AmigaHardware::blitterDrain();
                         amigaBuildTerrainIndex(emptyTerrain, terrainIndex);
@@ -2549,7 +2605,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     if (!terrainRaster.ready)
                         prepareTerrainRaster(&renderer, rooms, mainRoom, builders,
                             fragments, liveBuilder.fragmentCount(),
-                            generatedDecorations, liveBuilder.decorationCount(), &port);
+                            generatedDecorations, liveBuilder.decorationCount(), &port, freshlyLoadedRoom);
                     DW_PROFILE_PHASE(profileEntryBacking);
                     amigaRendererSetGameOrigin(&renderer, port.ringOrigin());
                     buildReferencePicture(

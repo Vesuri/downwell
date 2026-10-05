@@ -599,10 +599,23 @@ Pair generation frames on the contact tape; `REFERENCE_BREAKABLES=1` is the
 separate pool-allocation oracle. Both selectors are unset when profiling
 restores the normal build.
 
+`REFERENCE_INITIAL_TERRAIN=1` retains runtime composition of pristine room
+terrain. The default copies a host-prepared row dictionary into the existing
+Fast raster only at a fresh room-load boundary, before generated terrain,
+decorations or shops exist. The bank owns pixels, not instances; source Create
+effects and RNG remain at entry. Invalid banks and non-pristine terrain use
+the retained painter. `make generate-initial-terrain` compares every generated
+row with the scalar compositor and records input/tool hashes in the ignored
+manifest. `bash amiga/profile.sh terrain-shop` checks native pixels on both
+entries of the source-checked natural shop tape. Pair `profile.sh shop` with
+the reference selector for uninstrumented timing, and `PROBES=1` for entry
+phase attribution. Restoration unsets the selector.
+
 `REFERENCE_INITIAL_RASTER=1` retains initial terrain preparation through
 scratch Chip pixels followed by readback into the retained Fast raster. The
-default uses the runtime direct-cache painter, with the same fallback for
-unsupported artwork. Pair `profile.sh entry` to measure this cold work; the
+default uses the prepared bank when eligible, otherwise the runtime
+direct-cache painter, with the same fallback for unsupported artwork.
+This selector bypasses both optimizations. Pair `profile.sh entry` to measure this cold work; the
 ordinary contact FPS tape excludes initialization. Check initial spans with
 `PROFILE_ENTRY=1 VERIFY_TIMEOUT_SECONDS=300 bash amiga/profile.sh terrain`:
 the input-only entry tape runs with exact terrain pixel comparisons enabled.

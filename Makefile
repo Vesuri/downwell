@@ -1985,6 +1985,14 @@ build/amiga-terrain-painter-test: tests/platform/amiga/AmigaTerrainPainterTest.c
 	@mkdir -p build
 	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -DDOWNWELL_TERRAIN_BATCH -o $@ $(filter %.cpp %.c,$^)
 
+build/prepare-initial-terrain: tools/prepare-initial-terrain.cpp src/platform/amiga/AmigaTerrainPainter.cpp src/platform/amiga/AmigaRenderer.c $(filter-out tests/platform/amiga/AmigaLiveTerrainTest.cpp,$(AMIGA_LIVE_TERRAIN_TEST_SOURCES)) $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -DDOWNWELL_TERRAIN_BATCH -o $@ $(filter %.cpp %.c,$^)
+.PHONY: generate-initial-terrain
+generate-initial-terrain: generate-amiga-game generate-room-pack build/prepare-initial-terrain
+	python3 tools/generate-terrain-phase.py
+	python3 tools/generate-initial-terrain.py
+
 .PHONY: test-amiga-coverage-word
 test: test-amiga-coverage-word
 test-amiga-coverage-word: build/amiga-coverage-word-test

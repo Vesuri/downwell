@@ -43,6 +43,7 @@ REFERENCE_ROOM_PREPARE ?= 0
 REFERENCE_FIELD_BANK ?= 0
 REFERENCE_EMPTY_TERRAIN ?= 0
 REFERENCE_ROOM_TERRAIN ?= 0
+REFERENCE_INITIAL_TERRAIN ?= 0
 TABLE_CONTACT_ATAN ?= 1
 RETAIN_HEALTH_HUD ?= 1
 AMMO_DAMAGE_RANGE ?= 1
@@ -249,6 +250,9 @@ endif
 ifeq ($(REFERENCE_ROOM_TERRAIN),1)
 CFLAGS += -DDOWNWELL_REFERENCE_ROOM_TERRAIN
 endif
+ifeq ($(REFERENCE_INITIAL_TERRAIN),1)
+CFLAGS += -DDOWNWELL_REFERENCE_INITIAL_TERRAIN
+endif
 ifeq ($(TABLE_CONTACT_ATAN),0)
 CFLAGS += -DDOWNWELL_PORTABLE_CONTACT_ATAN
 endif
@@ -445,6 +449,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
 	@printf '%s\n' '$(REFERENCE_FIELD_BANK)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_EMPTY_TERRAIN)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_ROOM_TERRAIN)' >> $@.tmp
+	@printf '%s\n' '$(REFERENCE_INITIAL_TERRAIN)' >> $@.tmp
 	@printf '%s\n' '$(DRAW_ORDER_AUDIT)' >> $@.tmp
 	@printf '%s\n' '$(LOCAL_DRAW_CAPTURE)' >> $@.tmp
 	@printf '%s\n' '$(AMMO_FACTORED)' >> $@.tmp
@@ -761,7 +766,10 @@ obj/AmigaAssets.o: $(AMIGA_SRC)/AmigaAssets.s $(AMIGA_HUD) $(AMIGA_GAME) $(AMIGA
 $(REPO)/generated/amiga-terrain-phase6.bin: $(AMIGA_GAME) $(REPO)/tools/generate-terrain-phase.py
 	python3 $(REPO)/tools/generate-terrain-phase.py
 
-obj/AmigaTerrainPrepared.o: $(AMIGA_SRC)/AmigaTerrainPrepared.s $(REPO)/generated/amiga-terrain-phase6.bin
+$(REPO)/generated/amiga-initial-terrain.bin: $(AMIGA_GAME) $(REPO)/generated/downwell-rooms.dwrm $(REPO)/generated/amiga-terrain-phase6.bin $(REPO)/tools/generate-initial-terrain.py $(REPO)/tools/prepare-initial-terrain.cpp $(AMIGA_SRC)/AmigaTerrainPainter.cpp $(AMIGA_SRC)/AmigaTerrain.cpp $(AMIGA_SRC)/AmigaTerrain.h $(AMIGA_SRC)/AmigaRenderer.c $(AMIGA_SRC)/AmigaRenderer.h $(AMIGA_SRC)/AmigaGameplayRows.h $(REPO)/src/core/RoomPack.cpp $(REPO)/src/core/RoomPack.h $(AMIGA_SRC)/AmigaTerrainRunSurface.h $(AMIGA_SRC)/AmigaInitialTerrain.h
+	$(MAKE) -C $(REPO) generate-initial-terrain
+
+obj/AmigaTerrainPrepared.o: $(AMIGA_SRC)/AmigaTerrainPrepared.s $(REPO)/generated/amiga-terrain-phase6.bin $(REPO)/generated/amiga-initial-terrain.bin
 	@mkdir -p $(@D)
 	$(AS) $(ASFLAGS) -o $@ $<
 

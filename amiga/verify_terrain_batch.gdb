@@ -19,6 +19,11 @@ if gDownwellTerrainBatchChecks + gDownwellTerrainDirectChecks == 0 || gDownwellT
 end
 printf "PROFILE terrain pixels: %lu exact full-ring comparisons in %lu gameplay updates; failures=%lu\n", gDownwellTerrainBatchChecks, gDownwellProfileGameSamples, gDownwellTerrainBatchFailures
 printf "PROFILE terrain direct-cache pixels: %lu exact dirty-span comparisons\n", gDownwellTerrainDirectChecks
+if gDownwellInitialTerrainEnabled && gDownwellInitialTerrainChecks == 0
+    printf "Initial terrain bank was not exercised\n"
+    quit 1
+end
+printf "PROFILE initial terrain pixels: %lu exact prepared-span comparisons\n", gDownwellInitialTerrainChecks
 printf "DOWNWELL_PROFILE_READY\n"
 shell touch .run/gdb-ready.marker
 detach
