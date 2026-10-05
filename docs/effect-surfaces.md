@@ -198,6 +198,15 @@ integer main-room origin (240,176), preserving absolute tie parity. The source
 Step tail is pinned alongside Draw, and live combat comparisons include both
 published coordinates as well as the private motion state.
 
+`GemPosition` retains exact 1/12800-pixel units as a floor pixel and a
+nonnegative fractional remainder. It normalizes at movement writes and caches
+the Q8 reader rounding there; collision and Draw readers do not repeatedly
+divide the full coordinate. Mask publication still rounds ties to even, while
+Q8 conversion retains its signed half-away-from-zero rule. Raw-unit conversion
+is reserved for digests and the scalar oracle. Velocities, gravity, homing,
+bounce and RNG/query order are unchanged. `REFERENCE_GEM_POSITION=1` selects
+the retained raw-coordinate implementation on either platform.
+
 ### Compatibility depths
 
 Do not use the zero `Depth` fields in the GMS2 object records as draw order.

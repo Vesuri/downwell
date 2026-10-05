@@ -9,6 +9,7 @@ TERRAIN_RUN_STORE ?= 0
 REFERENCE_RANDOM ?= 0
 REFERENCE_PATTERNS ?= 0
 REFERENCE_BREAKABLES ?= 0
+REFERENCE_GEM_POSITION ?= 0
 export SKIP_INTRO SKIP_TO_GAME SKIP_LEVEL
 
 SDL_CFLAGS  := $(shell pkg-config --cflags sdl2 SDL2_image)
@@ -37,6 +38,9 @@ CXXFLAGS += -DDOWNWELL_REFERENCE_PATTERNS
 endif
 ifeq ($(REFERENCE_BREAKABLES),1)
 CXXFLAGS += -DDOWNWELL_REFERENCE_BREAKABLES
+endif
+ifeq ($(REFERENCE_GEM_POSITION),1)
+CXXFLAGS += -DDOWNWELL_REFERENCE_GEM_POSITION
 endif
 LDFLAGS  := $(SDL_LDFLAGS)
 
@@ -1450,7 +1454,14 @@ generated/downwell-goal-mask.mask: generated/downwell-goal-mask.h
 	@test -f $@ || python3 tools/generate-goal-mask.py
 $(TEST_TARGETS) $(PORT_REPLAY_REFERENCE_TARGET) $(AREA_ONE_BUILDER_TEST_TARGET) $(AMIGA_LIVE_TERRAIN_TEST_TARGET) build/gem-homing-test build/frog-behavior-test build/bat-motion-test build/enemy-contact-test build/gameplay-player-step-test: $(HOST_CHECK_HEADERS)
 
-test: build/gem-homing-test
+test: build/gem-homing-test test-gem-position
+
+.PHONY: test-gem-position
+test-gem-position: build/gem-position-test
+	./build/gem-position-test
+build/gem-position-test: tests/core/GemPositionTest.cpp $(HOST_CHECK_HEADERS) generated/downwell-goal-mask.h
+	@mkdir -p build
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Isrc -o $@ $<
 test: build/main-camera-test
 test: build/main-room-activation-test
 test: build/player-death-sequence-test build/run-time-parts-test

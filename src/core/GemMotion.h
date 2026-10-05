@@ -5,11 +5,13 @@
 #include "GemAnimation.h"
 #include "EnemyContact.h"
 #include "CurrencyStepSound.h"
+#include "GemPosition.h"
 namespace downwell {
 // Positions in 1/12800 pixels keep .035 gravity exact, with no 64-bit math.
 // Terrain probes remain provisional, not the source sprite-mask solver.
-struct GemMotion {
-    long x = 0, y = 0, vx = 0, vy = 0;
+template<class Position> struct BasicGemMotion {
+    Position x{},y{};
+    long vx = 0, vy = 0;
     long gravity = 448, maximumGravity = 4 * 12800L;
     GemHoming homing;
     GemLifetime lifetime;
@@ -18,6 +20,11 @@ struct GemMotion {
     bool attracted = false;
     bool attractorAtBirth = false;
     static long q8(long value) { return value < 0 ? -((-value + 25) / 50) : (value + 25) / 50; }
+    static long q8(const GemPosition& value){return value.q8();}
+    static int pixel(const GemPosition& value){return static_cast<int>(value.pixel());}
+    static long rounded(const GemPosition& value){return value.rounded();}
+    static void initializePosition(long& value,int pixel){value=pixel*12800L;}
+    static void initializePosition(GemPosition& value,int pixel){value.setPixel(pixel);}
     static int pixel(long value) { return static_cast<int>(value / 12800 - (value % 12800 < 0)); }
     static long rounded(long value) {
         const long whole = value / 12800, fraction = value % 12800;
@@ -39,7 +46,7 @@ struct GemMotion {
         lifetime = {};
         sound = {};
         attractorAtBirth = attractor;
-        x = px * 12800L; y = py * 12800L; attracted = attract;
+        initializePosition(x,px);initializePosition(y,py);attracted = attract;
         vx = static_cast<long>(random.randomIntegerSmall(51200)) - 25600;
         vy = static_cast<long>(random.randomIntegerSmall(51200)) - 25600;
         // objCurrency Create consumes both ordinary velocity draws before
@@ -67,14 +74,16 @@ struct GemMotion {
         }
         if (vy < maximumGravity) vy += gravity;
         else vy = maximumGravity;
-        if (solid(pixel(x + vx), pixel(y))) vx = -vx * 7 / 10;
-        else x += vx;
-        if (vy > 0 && solid(pixel(x), pixel(y + vy) + 4)) {
+        const Position nextX=x+vx;
+        if (solid(pixel(nextX), pixel(y))) vx = -vx * 7 / 10;
+        else x = nextX;
+        const Position nextY=y+vy;
+        if (vy > 0 && solid(pixel(x), pixel(nextY) + 4)) {
             // Existing bounce approximation; source irandom_range with
             // fractional negative endpoints still needs runner verification.
             vy = -6400 - static_cast<long>(random.randomIntegerSmall(8960));
             vx = vx * 7 / 10;
-        } else y += vy;
+        } else y = nextY;
         if (vx > -640 && vx < 640) vx = vx < 0 ? -640 : vx > 0 ? 640 : 0;
         const long radius = (attractorAtBirth ? 48L : 24L) * 256;
         if (lifetime.suckable(attractorAtBirth) && dx > -radius && dx < radius &&
@@ -85,5 +94,11 @@ struct GemMotion {
         return true;
     }
 };
+using ReferenceGemMotion=BasicGemMotion<long>;
+#ifdef DOWNWELL_REFERENCE_GEM_POSITION
+using GemMotion=ReferenceGemMotion;
+#else
+using GemMotion=BasicGemMotion<GemPosition>;
+#endif
 } // namespace downwell
 #endif

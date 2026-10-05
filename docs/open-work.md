@@ -275,15 +275,6 @@ remaining structure, not retune the prepared row program or its helpers.
 
 ### B. Combat composition (85.3 ms; also 645 and 701)
 
-2. **Gem positions in reader units.** `GemMotion` stores positions in
-   1/12800 pixel. `pixel`, `rounded` and `q8` therefore divide by 12800 or 50
-   on every read. Through the 32-bit library helpers that costs 4.4 ms of the
-   combat frame's 10.2 ms of division/multiply helpers.
-   - Store whole pixels plus a fraction in [0,12800), normalised once after
-     each velocity add. Reads then need no division.
-   - Gravity, bounce and homing must stay exactly as now. The existing
-     representation is the oracle.
-   - Target: under 0.5 ms of helpers from gems.
 3. **Currency/smoke composition** (9.6 ms at 690–700 and 701):
    - three `CurrencySmokeComposition::stampPixel` calls at 14,000 cycles each
      (`PaletteEffectSurface::stamp` → `blitterCopyWithMask` /
