@@ -189,6 +189,9 @@ private:
 };
 bool amigaBuildTerrainIndex(const AmigaTerrainCollisionContext& context,
                            AmigaTerrainIndex& index);
+// Retained generic reconstruction oracle, including empty-world scans.
+bool amigaReconstructTerrainIndex(const AmigaTerrainCollisionContext& context,
+                                 AmigaTerrainIndex& index);
 // Add an actual recovered Create event, not a probabilistic pattern symbol.
 // Requires an initialized index. Candidate insertion does not scan earlier rows.
 bool amigaAddTerrainObject(AmigaTerrainIndex& index, int objectId, int x, int y,

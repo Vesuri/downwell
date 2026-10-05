@@ -628,6 +628,16 @@ reports the two entries as uploads/reuses. Use `make verify-prepared-time-fields
 and `bash amiga/profile.sh fields-clear` for image, overwrite-invalidation
 and reentry pixel checks. The selector is unset on profiling restoration.
 
+`REFERENCE_EMPTY_TERRAIN=1` retains generic landing-index reconstruction for
+an empty world. The default resets occupancy, landing candidates, contact
+records and provenance directly when there are no room instances or pattern
+fragments to reconstruct. Later room Creates still publish in source order;
+populated-world reconstruction is unchanged. Compare `profile.sh shop` and
+its `PROBES=1` world-entry phase, not steady-state gameplay, for this change.
+`make verify-terrain-ownership` compares the reset with reconstruction after
+dirty state, every landing query and subsequent Creates. Profiling restoration
+unsets the selector.
+
 `bash amiga/profile.sh ammo` checks the factored gauge compositor on the
 bounded contact tape, starting directly in gameplay. Every HUD update is
 compared byte-for-byte with full source-order reconstruction. It requires at

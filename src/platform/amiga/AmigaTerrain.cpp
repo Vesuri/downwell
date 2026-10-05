@@ -379,6 +379,23 @@ bool indexActive(const AmigaTerrainCollisionContext& context, unsigned cell,
 
 bool amigaBuildTerrainIndex(const AmigaTerrainCollisionContext& context,
                            AmigaTerrainIndex& index) {
+#ifndef DOWNWELL_REFERENCE_EMPTY_TERRAIN
+    if(!context.fragmentCount && !(context.rooms && context.room)){
+        // Empty-world entry has no candidates to reconstruct. Reset the two
+        // owners directly; room Creates will publish their candidates later.
+        index.extraContacts.clear();
+        index.wallContactsComplete=true;
+        index.mutableWallOccupancy=true;
+        for(auto& cell:index.cells)cell=0;
+        index.nextLanding.clear();
+        return true;
+    }
+#endif
+    return amigaReconstructTerrainIndex(context,index);
+}
+
+bool amigaReconstructTerrainIndex(const AmigaTerrainCollisionContext& context,
+                           AmigaTerrainIndex& index) {
     index.extraContacts.clear();
     // Reconstructed pattern occupancy is not evidence of actual Create events.
     index.wallContactsComplete = context.fragmentCount==0;

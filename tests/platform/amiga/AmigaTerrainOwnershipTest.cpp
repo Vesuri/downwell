@@ -237,6 +237,31 @@ void requireSameBackendTerrain(const Scene& reference,const Scene& other){
 }
 
 int main(int argc,char** argv){
+    {
+        auto actual=std::make_unique<AmigaTerrainIndex>();
+        auto oracle=std::make_unique<AmigaTerrainIndex>();
+        for(auto& cell:actual->cells)cell=255;
+        for(unsigned column=0;column<128;++column)
+            for(unsigned row=0;row<512;++row)actual->nextLanding.insert(column,row);
+        require(actual->extraContacts.append(60,160,32),"dirty reset contact");
+        actual->wallContactsComplete=false;actual->mutableWallOccupancy=false;
+        *oracle=*actual;
+        const AmigaTerrainCollisionContext empty{};
+        require(amigaBuildTerrainIndex(empty,*actual)&&amigaReconstructTerrainIndex(empty,*oracle),
+            "empty terrain reset and reconstruction succeed");
+        require(std::memcmp(actual->cells,oracle->cells,sizeof(actual->cells))==0&&
+            actual->extraContacts.size()==oracle->extraContacts.size()&&
+            actual->wallContactsComplete==oracle->wallContactsComplete&&
+            actual->mutableWallOccupancy==oracle->mutableWallOccupancy,"empty terrain ownership agrees");
+        for(unsigned column=0;column<128;++column)for(unsigned row=0;row<512;++row)
+            require(actual->nextLanding.next(column,row)==oracle->nextLanding.next(column,row),
+                "empty terrain landing queries agree after dirty reset");
+        require(amigaAddTerrainObject(*actual,60,160,32)&&amigaAddTerrainObject(*oracle,60,160,32)&&
+            amigaAddTerrainObject(*actual,93,176,48)&&amigaAddTerrainObject(*oracle,93,176,48),
+            "source Creates publish after reset");
+        require(std::memcmp(actual->cells,oracle->cells,sizeof(actual->cells))==0&&
+            actual->nextLanding.next(42,0)==oracle->nextLanding.next(42,0),"reset preserves later publication");
+    }
     if(argc<5){std::cerr<<"usage: rooms objects patterns sprites\n";return 2;}
     const auto roomBytes=readFile(argv[1]),objectBytes=readFile(argv[2]),
         patternBytes=readFile(argv[3]),spriteBytes=readFile(argv[4]);
