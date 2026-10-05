@@ -197,10 +197,10 @@ Reference: [upgrade IDs and source entry points](upgrade-coverage.md).
 
 Fit worst-case gameplay, style/upgrade navigation and transitions into 20 ms.
 Average FPS is not the criterion. The [frame-cost audit](amiga-frame-cost.md)
-measures the shipped build (code unchanged since `b815af63`) on the contact
-tape: 3,252 PAL fields. Quiet frames take 28.4 ms, combat 85.4 ms and
-time-field frames 37.3 ms. The worst frames are 701 (172.2 ms: generation on
-top of combat), 844 (120.7 ms: generation) and 645 (101.4 ms: contact). Menu
+measures `dd0055da` on the contact tape: 3,253 PAL fields. Quiet frames take
+28.4 ms, combat 85.3 ms and time-field frames 37.3 ms. Budget examples are
+701 (122.2 ms: generation on top of combat), 844 (96.6 ms: generation),
+645 (101.2 ms: contact) and 660 (121.6 ms: combat). Menu
 scenes (`profile.sh transition`) peak at two fields; gameplay entry from the
 well is not covered by any tape.
 
@@ -243,15 +243,19 @@ gauge) and left ten opt-in flags behind. Do not repeat that.
 
 ### A. Generation bursts (frames 701 and 844)
 
-`generateLiveTerrain` costs 93.3 ms at 701 and 65.5 ms at 844. A whole
+`generateLiveTerrain` costs 42.95 ms at 701 and 40.74 ms at 844. A whole
 builder pattern is emitted synchronously, as in the original; the draws and
-creations must stay in that order. What can go is the per-cell work around
-them.
+creations must stay in that order. Further changes must remove remaining
+publication or Create machinery, not reorder those effects.
 
-2. **Recheck the generation budget after native breakable ownership (item 3).**
-   Separate synchronous event-Create costs from prepared terrain publication
-   in the new trace before choosing further structural work. Do not sweep
-   additional row-program encodings or tune individual publication helpers.
+**Remaining budget shortfall, not another encoding sweep.** Generation at
+701 still exceeds the 30 ms target. Event cells take 20.31 ms and prepared
+terrain publication 13.92 ms (nested within generation). At 844 these are
+25.98 and 6.87 ms. The next generation attempt must eliminate a named
+remaining structure, not retune the prepared row program or its helpers.
+
+   - Continue with B now that the group-A structural attempts and audit are
+     complete; retain this shortfall for the budget review after C.
    - Preserve source-ordered terrain segments separated by event cells: never
      expose later terrain to an earlier Create. Retain the scalar reference
      for registered terrain, instance IDs, and capacity/failure prefixes.
@@ -259,25 +263,17 @@ them.
      dirty rows, RNG interleaving and the optional pillar tail exact.
    - Recheck full-state/ownership replay and native terrain pixel oracles.
      `REFERENCE_PATTERNS=1` selects the retained cell interpreter.
-   - Target remains generation at 701 under 30 ms and the cell loop under
-     3 ms. Keep this budget check open until measured; publication changes
-     alone do not close it. Implement item 3 next, then re-audit group A.
-3. **Complete the generation-family budget checks.** Re-audit group A with
-   the default native allocation path and `REFERENCE_BREAKABLES=1` as its
-   retained oracle. The breakable target remains under 1,500 cycles per birth;
-   distinguish mandatory input/identity/grid publication from remaining
-   removable ownership work before another change. Do not tune individual
-   counter writes or copy loops to chase that threshold.
+   - Native breakables cost 2,156 cycles per birth, still above 1,500. At 844,
+     input/slot/grid publication is 2.59 ms and chronology/layer metadata
+     1.26 ms. Do not tune individual writes or copy loops for this threshold.
+     Keep `REFERENCE_BREAKABLES=1` as the oracle, including room re-entry and
+     failure prefixes. See the
+     [allocation contract](terrain-update-contract.md#native-breakable-allocation).
+   - Enemy configuration at 844 costs 3.22 ms, but its ownership portion is
+     2.69 ms. Fold ownership changes into C if justified by the whole family
+     walk, rather than a separate sub-3-ms birth optimization.
 
-   Measure time-field adoption and `configureEnemy` in the same windows;
-   replace their ownership structure only if the cost remains over 3 ms.
-   Verify pooled-slot preparation at room entry/re-entry as well as births,
-   including failure prefixes and chronological registration. Keep any
-   unmet generation targets open after the audit rather than claiming the
-   20 ms budget from a faster average. See the
-   [allocation contract](terrain-update-contract.md#native-breakable-allocation).
-
-### B. Combat composition (85.4 ms; also 645 and 701)
+### B. Combat composition (85.3 ms; also 645 and 701)
 
 1. **Damage-number text.** `AmigaDamageText::draw` costs 5.5 ms in every
    combat frame and 5.9 ms at 645, which is half of the "actor drawing" cost.

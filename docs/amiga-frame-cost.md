@@ -1,8 +1,8 @@
 # Amiga gameplay frame-cost audit
 
-Where A500 gameplay time goes, measured on the default build at `b815af63`
-(2026-10-04), with every accepted optimization enabled. The previous audit, at
-`b99c2f69`, is given alongside for comparison. Remaining work is ranked in
+Where A500 gameplay time goes, measured on the default build at `dd0055da`
+(2026-10-05), with every accepted optimization enabled. The previous audit, at
+`b815af63`, is given alongside for comparison. Remaining work is ranked in
 [open-work §5](open-work.md#5-meet-the-amiga-frame-budget); this document holds
 the measurements and the approaches already ruled out.
 
@@ -14,28 +14,22 @@ the measurements and the approaches already ruled out.
   natural descent with one damaging contact, view Y 39 to 1874, at most five
   allocated enemy records and final health 3. It has no shop, no dense
   encounter and no garden-to-well transition.
-- FPS-only build `b8eb0341…`: 3,252 PAL fields (previously 3,821), 27.7 FPS.
-  The worst gap is 8 fields at frame 701 (previously 9 at 645).
+- FPS-only build `7af03c18…`: 3,253 PAL fields (previously 3,252), 27.67 FPS.
+  The worst gap is 7 fields at frame 660 (previously 8 at 701).
 - [Instruction traces](amiga-profiling.md#cycle-exact-instruction-traces):
-  build `d2a0d2c3…` captured 100 fields from each of frames 50, 250, 450,
-  644, 690, 844, 900, 1100, 1300, 1500 and 1700 (602 complete frames).
-  Frames 701 and 844 come from separate 30-field captures starting at 699 and
-  843, because a capture's first frame is partial and is excluded. The
-  previous audit's frame 844 was such a partial frame, so its 179.7 ms
-  undercounts the frame.
+  build `c5ae10e3…` captured 100 fields from each of frames 50, 250, 450,
+  644, 690, 843, 900, 1100, 1300, 1500 and 1700. Frame 701 is complete in
+  the 690 capture; starting at 843 makes 844 complete too. The first frame
+  of each capture is partial and excluded. The older `b99c2f69` audit's
+  frame 844 was partial, so its 179.7 ms undercounts the frame.
 
 ```sh
 SKIP_TO_GAME=1 PROFILE_CONTACT=1 VERIFY_TIMEOUT_SECONDS=300 bash amiga/profile.sh fps
 SKIP_TO_GAME=1 PROFILE_CONTACT=1 TRACE_FIELDS=100 VERIFY_TIMEOUT_SECONDS=3000 \
-  TRACE_FRAMES=50,250,450,644,690,844,900,1100,1300,1500,1700 \
+  TRACE_FRAMES=50,250,450,644,690,843,900,1100,1300,1500,1700 \
   TRACE_OUTPUT=$PWD/tmp/trace/audit bash amiga/profile.sh trace
-for start in 699 843; do
-  SKIP_TO_GAME=1 PROFILE_CONTACT=1 TRACE_FIELDS=30 TRACE_FRAMES=$start \
-    TRACE_OUTPUT=$PWD/tmp/trace/audit-$start VERIFY_TIMEOUT_SECONDS=900 \
-    bash amiga/profile.sh trace
-done
-python3 tools/amiga-trace-report.py tmp/trace/audit --frames=1300-1338 --causes
-python3 tools/amiga-trace-report.py tmp/trace/audit-699 --frames=701 --causes
+python3 tools/amiga-trace-report.py tmp/trace/audit --frames=1301-1338 --causes --collapsed tmp/quiet.folded
+python3 tools/amiga-trace-report.py tmp/trace/audit --frames=701 --causes --collapsed tmp/burst.folded
 ```
 
 ## Frame cost by scene
@@ -45,23 +39,26 @@ frames contain almost no idle time. One PAL field is 20 ms (142,102 cycles).
 
 | Tape frames | Scene | Mean ms | Median | Worst | Over 20 ms | Previous mean |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| 50–91 | entrance bowl, firing | 27.0 | 27.5 | 39.3 (54) | 41/41 | 29.9 |
-| 250–303 | open descent | 21.4 | 18.0 | 69.4 (278) | 19/53 | 23.0 |
-| 450–470 | enemies in view | 60.8 | 53.5 | 101.6 (464) | 20/20 | 64.3 |
-| 644–661 | damaging contact | 96.7 | 97.6 | 121.4 (660) | 17/17 | 104.2 |
-| 690–700 | combat with gems and smoke | 85.4 | 82.9 | 103.4 (694) | 10/10 | 88.8 |
-| 701 | pattern generation burst | 172.2 | | | 1/1 | 184.5 |
-| 844–864 | generation burst with a time field | 50.8 | 46.6 | 120.7 (844) | 21/21 | 89.4 |
-| 900–920 | time fields present | 37.3 | 36.2 | 54.2 (907) | 20/20 | 66.6 |
-| 1100–1737 | camera at the level bottom | 29.1 | 25.0 | 56.8 (1564) | 240/240 | 32.5 |
+| 51–91 | entrance bowl, firing | 27.0 | 27.5 | 39.6 (64) | 41/41 | 27.0 |
+| 251–303 | open descent | 20.6 | 17.6 | 46.5 (278) | 19/53 | 21.4 |
+| 451–470 | enemies in view | 60.8 | 53.6 | 101.9 (464) | 20/20 | 60.8 |
+| 645–661 | damaging contact | 96.8 | 97.8 | 121.6 (660) | 17/17 | 96.7 |
+| 691–700 | combat with gems and smoke | 85.3 | 82.8 | 103.4 (694) | 10/10 | 85.4 |
+| 701 | pattern generation burst | 122.2 | | | 1/1 | 172.2 |
+| 844–864 | generation burst with a time field | 50.0 | 46.7 | 96.6 (844) | 21/21 | —* |
+| 901–920 | time fields present | 37.3 | 36.4 | 54.3 (907) | 20/20 | 37.3 |
+| 1301–1338 | camera at the level bottom | 28.4 | 24.3 | 43.0 (1304) | 38/38 | 28.4 |
 
-Menu scenes, from the instrumented `profile.sh transition` run, peak at two
+*The new window includes complete 844. The previous audit's window mean is
+not used as a matched comparison; compare the separately measured complete
+844 burst (120.7 ms) instead. Additional bottom windows
+1101–1169, 1501–1567 and 1701–1737 average 28.5, 29.5 and 30.0 ms.
+
+Menu scenes, from the earlier instrumented `profile.sh transition` run, peak at two
 fields: splash 34.7 ms, garden 40.5 ms and style select 34.5 ms.
 
-The contact frame (645) fell from 179.5 to 101.4 ms, and time-field frames
-are about 30 ms cheaper. The generation burst barely moved, and combat and
-quiet frames improved by only about 3 ms: none of the accepted work targeted
-them.
+Generation bursts are substantially cheaper; combat, contact, time-field
+and quiet frames are essentially unchanged. The 20 ms budget is not met.
 
 ## Cost by owner
 
@@ -69,55 +66,55 @@ them.
 logical call stack; helpers are charged to their callers. Milliseconds per
 frame:
 
-| Owner | Entrance | Descent | Enemies | Combat | Fields | Quiet 1300–1338 | Frame 645 | Frame 701 | Frame 844 |
+| Owner | Entrance | Descent | Enemies | Combat | Fields | Quiet 1301–1338 | Frame 645 | Frame 701 | Frame 844 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Game logic | 8.4 | 6.3 | 21.5 | 28.3 | 13.4 | 12.3 | 30.7 | 31.5 | 22.6 |
-| Actors, sprites and display | 3.7 | 2.4 | 8.9 | 22.0 | 6.5 | 2.1 | 15.9 | 21.9 | 7.5 |
-| Generation logic | 0.3 | 1.3 | 1.0 | 1.6 | 0.5 | 0.5 | 1.3 | 82.6 | 51.6 |
-| Runner bookkeeping | 6.1 | 2.7 | 12.9 | 10.2 | 4.5 | 5.1 | 12.9 | 13.8 | 17.3 |
-| Software float emulation | 2.2 | 1.4 | 5.0 | 6.7 | 2.4 | 2.8 | 12.3 | 5.8 | 6.5 |
-| Ammo HUD | 1.7 | 0.1 | 3.3 | 1.8 | 4.2 | 1.9 | 15.3 | 0.1 | 4.4 |
-| Terrain rows and scrolling | 0.4 | 1.4 | 2.6 | 6.4 | 0.8 | 0.2 | 4.5 | 7.8 | 5.3 |
-| Effect surface (currency/smoke) | 0.6 | 0.6 | 2.2 | 4.8 | 0.6 | 0.6 | 0.6 | 4.9 | 0.6 |
-| Time fields, R-tree, frame loop | 3.5 | 5.2 | 3.4 | 3.6 | 4.4 | 3.0 | 8.0 | 3.8 | 5.0 |
-| Total | 27.0 | 21.3 | 60.8 | 85.4 | 37.3 | 28.4 | 101.4 | 172.2 | 120.7 |
+| Game logic | 8.4 | 6.2 | 21.4 | 28.2 | 13.5 | 12.3 | 31.0 | 27.1 | 19.4 |
+| Actors, sprites and display | 3.7 | 2.4 | 8.9 | 22.0 | 6.5 | 2.1 | 15.9 | 22.0 | 7.5 |
+| Generation logic | 0.4 | 1.2 | 1.1 | 1.7 | 0.7 | 0.6 | 1.4 | 40.1 | 36.4 |
+| Runner bookkeeping | 6.1 | 2.7 | 12.9 | 10.2 | 4.5 | 5.1 | 12.9 | 10.7 | 11.5 |
+| Software float emulation | 2.2 | 1.5 | 5.0 | 6.6 | 2.4 | 2.8 | 12.1 | 5.8 | 6.6 |
+| Ammo HUD | 1.7 | 0.1 | 3.3 | 1.7 | 4.2 | 1.9 | 15.3 | 0.1 | 4.5 |
+| Terrain rows and scrolling | 0.4 | 1.4 | 2.6 | 6.4 | 0.8 | 0.2 | 4.3 | 7.9 | 5.5 |
+| Effect surface (currency/smoke) | 0.6 | 0.6 | 2.2 | 4.9 | 0.6 | 0.6 | 0.6 | 4.8 | 0.6 |
+| Time fields, R-tree, frame loop | 3.4 | 4.6 | 3.3 | 3.6 | 4.2 | 2.8 | 7.7 | 3.9 | 4.6 |
+| Total | 27.0 | 20.6 | 60.8 | 85.3 | 37.3 | 28.4 | 101.2 | 122.2 | 96.6 |
 
-## The three worst frames
+## Selected expensive frames
 
-**Frame 701, pattern generation burst (172.2 ms, 8 fields).**
-`generateLiveTerrain` takes 93.3 ms, almost all of it in
-`AreaOneBuilder::emitPatternMode`. These costs nest; do not add them:
-- 62 `AmigaAreaOneTerrainBuilder::collect` calls take 26.4 ms. Inside them,
-  `AmigaGameplayGeneration::create` takes 22.4 ms (2,568 cycles each).
-- 23 `collectRun` calls take 22.9 ms, of which `createRun` is 22.1 ms
-  (6,828 cycles each). That includes 7.2 ms of
-  `AmigaTerrainRunIndex::publishSpan` and 7.1 ms of `GameMakerRandom::advance`.
-- 11 `AreaOneBuilder::emitObject` calls take 17.0 ms.
-- `Well512::step` takes 23.2 ms in all, about 300 steps at roughly 540
-  cycles each; 17.8 ms of it is `GameMakerRandom::advance` (draws no caller
-  reads). The draw order is fixed, but the stream depends only on the seed.
-- The cell loop in `emitPatternMode` costs 7.5 ms of self time, plus
-  `plainCavernCell` 2.9 and `BuilderPatternPack::rowData` 2.5.
+**Frame 701, pattern generation burst (122.2 ms; previously 172.2).**
+`generateLiveTerrain` takes 42.95 ms. These costs nest; do not add them:
+
+- `emitPreparedPattern` takes 38.46 ms, with 36.99 in row-program dispatch.
+- Synchronous `emitEventCell` takes 20.31 ms, including 13.15 in
+  `emitObject` and 7.88 in the ordinary generation callback.
+- `createPrepared` takes 13.92 ms, including 6.93 ms self time publishing
+  occupancy, landing candidates and source-ordered terrain records.
+- `nextU32` takes 5.31 ms across the frame, including lookahead consumption;
+  the expensive WELL computation is no longer in the burst.
+- Time-field adoption costs 1.82 ms, below the separate-rewrite threshold.
 
 The rest is ordinary combat work: actor draws 9.9 ms, currency/smoke 9.6,
-row sync 6.2 and draw collection 5.6.
+row sync 6.1 and draw collection 5.7.
 
-**Frame 844, generation burst with a time field (120.7 ms, 6 fields).**
-- Generation takes 65.5 ms: 44 `create` calls cost 27.6 ms (4,460 cycles
-  each), 14 `emitObject` calls 30.1 ms, and `Well512::step` 12.6 ms.
-- 13 `appendBreakables` take 11.0 ms (6,034 cycles each): 7.4 ms in the
-  collision-owner binding (`birthScenery` 2.1, `Binding::key` validation 2.4,
-  `externalBirth` 1.4) and 3.7 ms initialising the record.
-- Draw collection takes 8.0 ms, `drawMainWorldSpan` 8.0 and terrain painting
-  6.4.
+**Frame 844, generation burst with a time field (96.6 ms; previously 120.7).**
+
+- Generation takes 40.74 ms: prepared-pattern dispatch 36.01, event cells
+  25.98 and prepared terrain publication 6.87 (nested costs).
+- 13 native `appendBreakables` take 3.94 ms (2,156 cycles each): 2.59 in
+  slot/input/grid publication and 1.26 in chronological/layer metadata.
+  Unused slot defaults are prepared at room boundaries, not on birth.
+- `configureEnemy` takes 3.22 ms for one birth: 2.69 ms in ownership,
+  including 1.66 in room-layer attachment. Neither ownership nor record
+  initialization alone meets the 3 ms threshold for a separate rewrite.
+- Draw collection takes 8.1 ms and `drawMainWorldSpan` 8.3.
 - The prepared time field costs 2.4 ms to prepare and 2.0 ms to draw.
 
-**Frame 645, damaging contact (101.4 ms, 5 fields).**
-`GameplayWorld::step` takes 52.2 ms; enemy contacts are 10.1 ms of it and the
+**Frame 645, damaging contact (101.2 ms; previously 101.4).**
+`GameplayWorld::step` takes 52.5 ms; enemy contacts are about 10 ms of it and the
 collision owner's attach lambdas about 15 ms. The ammo gauge takes 11.2 ms,
-actor draws 11.2, draw collection 6.6, sprite assignment 4.7 and the health
-HUD 4.0. `contactDamageNumber` costs 8.1 ms, of which
-`RunnerPointDirection::evaluate` is 4.3 (binary64 arithmetic around the
+actor draws 11.0, draw collection 6.5, sprite assignment 4.7 and the health
+HUD 4.0. `contactDamageNumber` costs 8.0 ms, of which
+`RunnerPointDirection::evaluate` is 4.2 (binary64 arithmetic around the
 0.9 ms table atan). Sprite assignment spends 2.8 ms building DMA words in
 `buildHardwareSpritePart`.
 
@@ -133,7 +130,7 @@ HUD 4.0. `contactDamageNumber` costs 8.1 ms, of which
 No function takes more than a tenth of the frame. Only removing the per-actor
 walks can reach 20 ms, not tuning the functions in them.
 
-**Combat with gems and smoke (85.4 ms; 690–700).**
+**Combat with gems and smoke (85.3 ms; 691–700).**
 - `GameplayWorld::step` takes 37.8 ms, currency collection 4.6 ms of it.
 - Actor draws take 10.7 ms: damage-number text 5.5 (`AmigaDamageText::draw`,
   about nine CPU planar-word writes), CPU-drawn actors 3.2 (about two at
@@ -155,10 +152,9 @@ take a few milliseconds. The rest of the frame is the ordinary game step plus
 
 ## Consequences for the budget
 
-- Generation dominates both remaining burst frames: 93 ms at 701 and 66 ms at
-  844. Generator steps (23 and 13 ms), per-cell terrain publication and
-  classification (about 50 ms at 701) and breakable births (11 ms at 844) are
-  the removable parts.
+- Generation still costs 43 ms at 701 and 41 ms at 844, missing the 30 ms
+  target. Synchronous event Creates and prepared publication are now the
+  large remaining structures, not the removed cell interpreter or WELL loop.
 - Without generation, frame 701 would still be an 80 ms combat frame:
   generation and combat must both fall.
 - Combat costs 85 ms. Actor and effect composition is about 30 ms of it, and
