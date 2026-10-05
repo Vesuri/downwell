@@ -262,12 +262,12 @@ remaining structure, not retune the prepared row program or its helpers.
      birth. Establish the removable structure and saving before changing it;
      charge mutation costs in the affected-frame gate. Do not tune `nextU32`,
      constructors or small choice helpers individually.
-   - Fixed-terrain publication remains a shortfall. Any further owner proposal
-     must eliminate materialization without replacing it with full-row copies
-     on event Creates (see the rejection table), and include collision/landing
-     queries and painting in the gate. Do not reopen the prepared row encoding,
-     copy loops or individual publication helpers. No deferred source-visible
-     Create or later terrain exposure is permitted.
+   - Fixed-terrain publication remains a shortfall, but both immutable-row
+     owner attempts are closed (see the rejection table). Do not retry
+     copy-on-write rows, sparse overrides, prepared row encodings, copy loops
+     or individual publication helpers. This owner item has exhausted its
+     two attempts; proceed to the other shared ownership/composition work.
+     No deferred source-visible Create or later terrain exposure is permitted.
    - Preserve source-ordered terrain segments separated by event cells: never
      expose later terrain to an earlier Create. Retain the scalar reference
      for registered terrain, instance IDs, and capacity/failure prefixes.
