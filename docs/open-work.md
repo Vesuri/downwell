@@ -254,8 +254,9 @@ terrain publication 13.92 ms (nested within generation). At 844 these are
 26.35 and 6.87 ms. The next generation attempt must eliminate a named
 remaining structure, not retune the prepared row program or its helpers.
 
-   - Next: remove a measured actor/time-field publication structure as a
-     whole; do not retune the generated-box command path. The audit's event
+   - Further actor/time-field publication work must replace shared ownership
+     as a whole; individual lifetime helpers are below the work threshold.
+     Do not retune the generated-box command path. The audit's event
      Create costs are 20.15 ms at 701 and 26.35 ms at 844. One enemy
      configuration at 844 costs 3.59 ms, including about 3.07 ms in lifecycle
      birth. Establish the removable structure and saving before changing it;
@@ -289,6 +290,8 @@ Review the complete producer/compositor/consumer path, preserving source
 painter order, opaque-black replacement and shade subtraction. The two
 rejected effect approaches remain closed: a new proposal must remove their
 exact-query or CPU source/mask-extraction cost, not repeat either layout.
+The delta-register stamp batch is also closed: it shifts work into queued
+dispatch and regresses the first affected frame. Do not sweep its scheduling.
 Keep per-producer/presentation state and final pixels as oracles. Do not
 reopen small sprite assignment or gem-position helpers.
 
