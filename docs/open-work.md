@@ -352,13 +352,13 @@ discarded either. Separate field binding, asset staging, raster/backing setup
 and source-visible world creation before choosing what can be prepared early.
 Do not move RNG draws or source-visible Create effects ahead of confirmation.
 
-Eliminate repeated empty-room layer/identity setup at level reentry. The
-natural shop tape (`PROBES=1 bash amiga/profile.sh shop`) spends about 12.9 seconds in
-the new player's room-layer preparation; a bounded trace inside that frame
-shows serialized entry lookup and lifetime-slot searches. Replace that
-structure, not its loops. Preserve serialized placeholders, source IDs,
-background initialization order, failure prefixes and later actor attachment;
-retain the generic layer lifecycle as the oracle.
+Reduce remaining mutable room-layer reset/publication at level reentry,
+measured with the natural shop tape (`PROBES=1 bash amiga/profile.sh shop`).
+Keep immutable metadata admission and the no-survivor proof outside repeated
+placeholder searches. A further attempt must remove a measured structure,
+not tune reset loops. Preserve serialized placeholders, source IDs, background
+initialization order, failure prefixes and later actor attachment; retain
+the generic layer lifecycle as the oracle (`REFERENCE_ROOM_PREPARE=1`).
 
 Reference: [profiling procedure](amiga-profiling.md).
 

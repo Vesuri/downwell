@@ -56,6 +56,12 @@ public:
     // fabricated: element slots and source instance IDs are distinct concepts.
     bool reserve(Layers& layers,unsigned layer,std::uint32_t sourceId){
         if(!sourceId||find(sourceId)!=End)return false;
+        return reservePrepared(layers,layer,sourceId);
+    }
+    // Only a validated immutable empty-room plan may omit duplicate lookup.
+    // Allocation, attachment and failure publication stay source ordered.
+    bool reservePrepared(Layers& layers,unsigned layer,std::uint32_t sourceId){
+        if(!sourceId)return false;
         const unsigned element=free(layers);
         if(element==End||!layers.attach(layer,element,true,false,[](unsigned){return false;}))return false;
         entries_[element]={sourceId,{}};

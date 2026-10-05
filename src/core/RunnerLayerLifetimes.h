@@ -102,6 +102,19 @@ public:
         if(!sourceId)return fail();
         return birthState(h,sourceId,depth,inactive);
     }
+    // Gameplay room changes retire all actors; no global instance can bind to
+    // a serialized placeholder. Prove that once, not once per placeholder.
+    template<class Other> bool initializeEmptyRoom(Other other){
+        if(!succeeded())return false;
+        for(unsigned i=0;i<I;++i){
+            if(states_[i].handle.generation)return fail();
+            if constexpr(CompactUnnumbered)if(compact_[i])return fail();
+        }
+        return registry_.initializeRoom(layers_,
+            [](std::uint32_t,InstanceHandle&,RunnerDepthService::Instance*& out){out=nullptr;return true;},
+            [](auto){return true;},[](unsigned){return false;},
+            [&](int depth,unsigned& slot){return ids_.createDynamic(layers_,depth,slot);},other)||fail();
+    }
     // Native actors whose original global numeric ID is not recovered yet.
     // Ownership/migration use handles; no synthetic source ID is allocated.
     // Such lifetimes must be retired, never carried through room ID lookup.

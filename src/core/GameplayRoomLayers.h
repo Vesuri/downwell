@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_GAMEPLAY_ROOM_LAYERS_H
 #define DOWNWELL_CORE_GAMEPLAY_ROOM_LAYERS_H
 #include "PackedRoomLayerLoader.h"
+#include "PreparedEmptyRoomLayers.h"
 #include "RunnerLayerLifetimes.h"
 #include "RunnerLayerBackgrounds.h"
 #include "RunnerLayerDraw.h"
@@ -18,7 +19,13 @@ template<unsigned I> struct GameplayLayerStorage<I,void> {
 // Native room layer ownership, separate from the animation/membership list.
 // Current gameplay rooms have no surviving native actors between entries.
 // Unrecovered dynamic numeric IDs remain unknown, not slot-derived aliases.
-template<unsigned I,bool CompactUnnumbered=false,class Terrain=void> class GameplayRoomLayers {
+#ifdef DOWNWELL_REFERENCE_ROOM_PREPARE
+inline constexpr bool referenceRoomPreparation=true;
+#else
+inline constexpr bool referenceRoomPreparation=false;
+#endif
+template<unsigned I,bool CompactUnnumbered=false,class Terrain=void,
+    bool ReferencePrepare=referenceRoomPreparation> class GameplayRoomLayers {
     static constexpr unsigned L=64,E=I+256,B=8;
     using Storage=GameplayLayerStorage<I,Terrain>;
     using Layers=typename Storage::Type;
@@ -38,6 +45,7 @@ template<unsigned I,bool CompactUnnumbered=false,class Terrain=void> class Gamep
         return nullptr;
     }
     const RoomPack* rooms_=nullptr;
+    PreparedEmptyRoomLayers<L,256> emptyRoom_;
     bool visible_[L]{};
     // Actor projection only. Nonprojected scenery/fields still occupy their
     // original elements and can terminate a layer when inactive.
@@ -116,6 +124,7 @@ public:
     }
     explicit GameplayRoomLayers(const RoomPack* rooms):rooms_(rooms){
         if(rooms_&&!PackedRoomLayerLoader::loadCatalogIds(*rooms_,ids_))good_=false;
+        if constexpr(!ReferencePrepare)if(rooms_&&good_)emptyRoom_.prepare(*rooms_,11,35);
     }
     bool enabled()const{return rooms_!=nullptr;}
     void enablePreparedDraw(){preparedDrawEnabled_=true;}
@@ -151,6 +160,15 @@ public:
         if(!registry_.discardUninitialized()||!backgrounds_.discardUninitialized()||!layers_.discardUninitialized())return fail();
         for(auto& state:retainedDraw_)state=0;
         for(auto& v:visible_)v=true;
+        if constexpr(!ReferencePrepare)if(emptyRoom_.ready()){
+            if(!emptyRoom_.publish(layers_,registry_,[&](unsigned slot,const PackedRoomLayer& layer){
+                visible_[slot]=layer.visible();
+                return layer.type!=1||backgrounds_.create(layers_,slot,layer,[](unsigned){return false;});
+            }))return fail();
+            playerId_=emptyRoom_.playerSourceId();
+            if(!lifetimes_.initializeEmptyRoom([&](unsigned e){return backgrounds_.initialize(e);}))return fail();
+            prepared_=true;return true;
+        }
         if(!PackedRoomLayerLoader::load(*rooms_,11,layers_,registry_,[&](unsigned slot,const PackedRoomLayer& layer){
             visible_[slot]=layer.visible();
             return layer.type!=1||backgrounds_.create(layers_,slot,layer,[](unsigned){return false;});

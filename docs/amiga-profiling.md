@@ -586,6 +586,17 @@ ordinary contact FPS tape excludes initialization. Check initial spans with
 the input-only entry tape runs with exact terrain pixel comparisons enabled.
 The reference selector is unset when profiling restores the normal build.
 
+`REFERENCE_ROOM_PREPARE=1` retains repeated serialized room lookup and generic
+placeholder-to-lifetime binding at room entry. The default admits immutable
+room metadata before display, then publishes the same layers, reservations and
+backgrounds in source order. A single empty-lifetime check proves that no
+survivor can bind to a placeholder. The bounded plan uses 4,368 bytes of ordinary
+RAM, no Chip RAM; malformed or oversized plans use the generic loader and its
+failure prefix. The room pack must remain immutable. Validate with
+`make verify-prepared-empty-room`, cross replay and native scene checks; pair
+`bash amiga/profile.sh shop` and `PROBES=1 bash amiga/profile.sh shop` with the
+reference selector for reentry timing. Profiling restoration unsets it.
+
 `bash amiga/profile.sh ammo` checks the factored gauge compositor on the
 bounded contact tape, starting directly in gameplay. Every HUD update is
 compared byte-for-byte with full source-order reconstruction. It requires at

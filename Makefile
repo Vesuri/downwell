@@ -1849,6 +1849,13 @@ build/room-layer-catalog-test: $(ROOM_LAYER_CATALOG_SOURCES) $(wildcard src/core
 	@mkdir -p $(@D)
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(ROOM_LAYER_CATALOG_SOURCES)
 .PHONY: verify-room-layer-catalog
+build/prepared-empty-room-test: tests/core/PreparedEmptyRoomLayersTest.cpp src/core/RoomPack.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+.PHONY: verify-prepared-empty-room
+verify-prepared-empty-room: build/prepared-empty-room-test
+	./$< generated/downwell-rooms.dwrm
+test: verify-prepared-empty-room
 .PHONY: verify-room-layer-metadata
 verify-room-layer-metadata:
 	bash tools/export-room-layer-metadata.sh
