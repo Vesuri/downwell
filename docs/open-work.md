@@ -292,6 +292,8 @@ rejected effect approaches remain closed: a new proposal must remove their
 exact-query or CPU source/mask-extraction cost, not repeat either layout.
 The delta-register stamp batch is also closed: it shifts work into queued
 dispatch and regresses the first affected frame. Do not sweep its scheduling.
+Offline shifted CPU stamps into the retained raster are closed too; do not
+retune their word interpreter, layout or CPU/DMA selection.
 Keep per-producer/presentation state and final pixels as oracles. Do not
 reopen small sprite assignment or gem-position helpers.
 
