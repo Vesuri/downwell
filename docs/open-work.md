@@ -197,10 +197,10 @@ Reference: [upgrade IDs and source entry points](upgrade-coverage.md).
 
 Fit worst-case gameplay, style/upgrade navigation and transitions into 20 ms.
 Average FPS is not the criterion. The [frame-cost audit](amiga-frame-cost.md)
-measures `dd0055da` on the contact tape: 3,253 PAL fields. Quiet frames take
-28.4 ms, combat 85.3 ms and time-field frames 37.3 ms. Budget examples are
-701 (122.2 ms: generation on top of combat), 844 (96.6 ms: generation),
-645 (101.2 ms: contact) and 660 (121.6 ms: combat). Menu
+measures `11186ab9` on the contact tape: 3,185 PAL fields. Quiet frames take
+28.4 ms, combat 71.3 ms and time-field frames 37.3 ms. Budget examples are
+701 (109.0 ms: generation on top of combat), 844 (96.3 ms: generation),
+645 (97.9 ms: contact) and 660 (109.3 ms: combat). Menu
 scenes (`profile.sh transition`) peak at two fields; gameplay entry from the
 well is not covered by any tape.
 
@@ -243,15 +243,15 @@ gauge) and left ten opt-in flags behind. Do not repeat that.
 
 ### A. Generation bursts (frames 701 and 844)
 
-`generateLiveTerrain` costs 42.95 ms at 701 and 40.74 ms at 844. A whole
+`generateLiveTerrain` costs 42.97 ms at 701 and 40.92 ms at 844. A whole
 builder pattern is emitted synchronously, as in the original; the draws and
 creations must stay in that order. Further changes must remove remaining
 publication or Create machinery, not reorder those effects.
 
 **Remaining budget shortfall, not another encoding sweep.** Generation at
-701 still exceeds the 30 ms target. Event cells take 20.31 ms and prepared
+701 still exceeds the 30 ms target. Event cells take 20.23 ms and prepared
 terrain publication 13.92 ms (nested within generation). At 844 these are
-25.98 and 6.87 ms. The next generation attempt must eliminate a named
+26.22 and 6.87 ms. The next generation attempt must eliminate a named
 remaining structure, not retune the prepared row program or its helpers.
 
    - Retain this shortfall for the budget review after C; do not reopen the
@@ -269,16 +269,9 @@ remaining structure, not retune the prepared row program or its helpers.
      Keep `REFERENCE_BREAKABLES=1` as the oracle, including room re-entry and
      failure prefixes. See the
      [allocation contract](terrain-update-contract.md#native-breakable-allocation).
-   - Enemy configuration at 844 costs 3.22 ms, but its ownership portion is
-     2.69 ms. Fold ownership changes into C if justified by the whole family
+   - Enemy configuration at 844 costs 3.37 ms, but its ownership portion is
+     2.85 ms. Fold ownership changes into C if justified by the whole family
      walk, rather than a separate sub-3-ms birth optimization.
-
-### B. Refresh the combat audit before C
-
-Repeat the full contact-tape audit with the default build, including all quiet,
-combat, contact, generation and field windows. Update the frame-cost reference
-and the queue's baseline from that evidence before the per-frame runner work.
-Do not reopen the two rejected effect-composition approaches or the gauge.
 
 ### C. Per-frame runner walks (quiet frames, 28.4 ms)
 
@@ -288,10 +281,10 @@ actor per phase. The costs are quiet / combat / 645:
 
 | Walk | Quiet | Combat | 645 |
 | --- | ---: | ---: | ---: |
-| Animation (`visitAnimationRetainedChecked`) | 1.4 ms | 4.1 ms | 4.7 ms |
-| `reconcilePhase` (activation and depth servicing) | 1.2 ms | 1.3 ms | 1.2 ms |
-| Captured alarm dispatch (`dispatchCapturedAlarms`) | 1.2 ms | 2.4 ms | 4.9 ms |
-| Draw collection (`AmigaGameplayDrawList::collect`) | 2.7 ms | 6.6 ms | 6.6 ms |
+| Animation (`visitAnimationRetainedChecked`) | 1.1 ms | 3.8 ms | 4.5 ms |
+| `reconcilePhase` (activation and depth servicing) | 1.2 ms | 1.2 ms | 1.2 ms |
+| Captured alarm dispatch (`dispatchCapturedAlarms`) | 1.0 ms | 2.1 ms | 4.6 ms |
+| Draw collection (`AmigaGameplayDrawList::collect`) | 2.7 ms | 6.1 ms | 5.9 ms |
 
 1. **Draw collection.** Keep the actor Draw list incrementally, ordered by
    layer, depth and element order. Update it at birth, retirement, depth
