@@ -285,8 +285,10 @@ actor per phase. The costs are quiet / combat / 645:
 | `reconcilePhase` (activation and depth servicing) | 1.2 ms | 1.2 ms | 1.2 ms |
 | Captured alarm dispatch (`dispatchCapturedAlarms`) | 1.0 ms | 2.1 ms | 4.6 ms |
 
-2. **Alarms.** Count each family's alarms down in its records, in captured
-   order. Dispatch only the zero crossings, and retire unrearmed zeros to -1.
+Alarm capture/dispatch remains a budget shortfall. Its two structural attempts
+are closed in the [rejection table](amiga-frame-cost.md#rejected-approaches);
+do not reopen it before the group-C budget review.
+
 3. **Activation, depth and validation.** Reconcile activation and service
    depths at birth, retirement and room entry, not on every visit. Replace
    per-visit `GameplayCollisionOwner::valid`/`Binding::key` validation with a
