@@ -88,6 +88,19 @@ class FrameBoundaries(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     report.field_cycle_carry(accounted, 142102, first, pending)
 
+    def test_sub_tolerance_deficit_can_explain_the_next_surplus(self):
+        pending=report.field_cycle_carry(142102-138,142102,16)
+        self.assertEqual(pending,138)
+        self.assertEqual(report.field_cycle_carry(142102+146,142102,728,pending),0)
+        for first,previous,surplus in ((137,138,146),(728,0,146),(728,138,281)):
+            with self.subTest(first=first,previous=previous,surplus=surplus):
+                with self.assertRaises(ValueError):
+                    report.field_cycle_carry(142102+surplus,142102,first,previous)
+        # Ordinary small field jitter does not require the next field to be
+        # positive or to start with a long instruction.
+        self.assertEqual(report.field_cycle_carry(142102-8,142102,12),8)
+        self.assertEqual(report.field_cycle_carry(142102,142102,4,8),0)
+
     def test_pre_mark_execution_is_not_a_complete_frame(self):
         stacks, entries, cycles = Counter(), Counter(), Counter()
         # Recording starts during frame 843, then sees complete frame 844

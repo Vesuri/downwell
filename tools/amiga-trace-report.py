@@ -138,14 +138,21 @@ def field_cycle_carry(accounted, elapsed, first_cost, pending=0):
     """
     tolerance = max(100, elapsed // 1000)
     delta = accounted - elapsed
-    if pending:
+    if pending > tolerance:
         if first_cost < pending or abs(delta - pending) > tolerance:
             raise ValueError('unreconciled instruction crossing a field boundary')
         return 0
-    if abs(delta) <= tolerance:
+    if delta > tolerance:
+        # A deficit just below tolerance must not be forgotten: its matching
+        # surplus can land just above it. Require the same instruction and
+        # paired-total evidence as a larger boundary crossing.
+        if not pending or first_cost < pending or abs(delta - pending) > tolerance:
+            raise ValueError('unexplained field cycle mismatch')
         return 0
     if -65535 <= delta < 0:
         return -delta
+    if delta >= 0:
+        return 0
     raise ValueError('unexplained field cycle mismatch')
 
 
@@ -214,7 +221,7 @@ def records(path, include_registers=False):
         offset += size  # screenshot
     if offset != len(data):
         raise ValueError('unexpected trailing trace data')
-    if pending_cycles:
+    if pending_cycles and pending_cycles > max(100, cycles // 1000):
         raise ValueError('capture ends before a field cycle deficit can be reconciled')
 
 
