@@ -90,11 +90,16 @@ public:
         observerContext_ = context;
         runObserver_ = nullptr;
         preparedObserver_ = nullptr;
+        preparedPublisher_ = nullptr;
     }
     using RunObserver = bool (*)(void*,const downwell::AreaOneBuilder::TerrainRun&);
     void setTerrainRunObserver(RunObserver observer){runObserver_=observer;}
     using PreparedObserver=bool (*)(void*,const downwell::AreaOneBuilder::PreparedTerrain&);
     void setPreparedTerrainObserver(PreparedObserver observer){preparedObserver_=observer;}
+    // Fixed terrain has no collected actor/decor outputs. A directly bound
+    // publisher bypasses the collection adapter; stepVisible still latches
+    // any failed publication before another generation step can run.
+    void setPreparedTerrainPublisher(downwell::AreaOneBuilder::PreparedTerrainFunction publisher){preparedPublisher_=publisher;}
     void resetInitialCheckpoint(downwell::GameMakerRandom& random);
     void resetInitialCheckpointBeforeEntrance(downwell::GameMakerRandom& random);
     // Import simulation state without replaying Create or consuming RNG.
@@ -135,6 +140,7 @@ private:
     void* observerContext_ = nullptr;
     RunObserver runObserver_ = nullptr;
     PreparedObserver preparedObserver_ = nullptr;
+    downwell::AreaOneBuilder::PreparedTerrainFunction preparedPublisher_=nullptr;
 };
 
 struct AmigaTerrainCollisionContext {

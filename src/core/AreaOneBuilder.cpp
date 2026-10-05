@@ -212,7 +212,7 @@ bool AreaOneBuilder::emitPreparedPattern(const BuilderPatternPack& patterns,
                 p+=2;
             }else{
                 const PreparedTerrain batch(p,rowY,random,specialObjectsGenerated_);
-                if(!preparedTerrainEmitter_(context,batch,emit)||!batch.completed())return false;
+                if(!preparedTerrainEmitter_(preparedTerrainContext_?preparedTerrainContext_:context,batch,emit)||!batch.completed())return false;
                 p=batch.end();
             }
         }

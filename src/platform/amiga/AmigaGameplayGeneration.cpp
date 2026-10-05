@@ -15,19 +15,47 @@ void AmigaGameplayGeneration::bind(AmigaPortRuntime& runtime,bool terrainRuns) {
     builder_.setCreateObserver(create, this);
     if(terrainRuns)builder_.setTerrainRunObserver(createRun);
 #ifndef DOWNWELL_REFERENCE_PATTERNS
-    if(terrainRuns)builder_.setPreparedTerrainObserver(createPrepared);
+    if(terrainRuns)builder_.setPreparedTerrainPublisher(createPrepared);
 #endif
 }
 
-bool AmigaGameplayGeneration::createPrepared(void* opaque,const downwell::AreaOneBuilder::PreparedTerrain& batch){
+bool AmigaGameplayGeneration::createPrepared(void* opaque,const downwell::AreaOneBuilder::PreparedTerrain& batch,
+    downwell::AreaOneBuilder::EmitFunction){
     auto& self=*static_cast<AmigaGameplayGeneration*>(opaque);
     if(!self.runtime_->terrainCreatesBackendOnly() || !amigaAdmitPreparedTerrain(self.index_,self.tiles_,batch))
         return batch.executeReference(create,opaque);
+    if(!batch.beginPublication())return false;
     if(batch.count()){
         if(batch.y-24<self.dirtyFirst)self.dirtyFirst=batch.y-24;
         if(batch.y+24>self.dirtyEnd)self.dirtyEnd=batch.y+24;
     }
-    return batch.executeSpan([&]{return amigaPublishPreparedTerrain(self.index_,self.tiles_,batch);});
+    // Occupancy and landing candidates are one publication, in the source
+    // segment's order relative to event Creates. No later segment is exposed.
+    const unsigned row=unsigned(batch.y)>>4;
+    auto* destination=self.index_.cells+row*AmigaTerrainIndex::columns;
+    auto* landing=self.index_.nextLanding.publicationRow(row);
+    const std::uint16_t bit=std::uint16_t(0x8000u>>(row&15));
+    const auto* word=batch.words();
+    for(unsigned i=0;i<batch.wordCount();++i,word+=4){
+        auto* target=destination+word[0];
+        if(!(target[0]|target[1])){
+            target[0]=word[2];target[1]=word[3];
+        }else for(unsigned half=0;half<2;++half){
+            const unsigned old=target[half],prepared=word[2+half];
+            unsigned walls=(old>>6)+(prepared>>6);
+            while(walls>3){
+                if(!self.index_.extraContacts.append(60,(int(word[0]+half)-32)*16,batch.y))return false;
+                --walls;
+            }
+            target[half]=((old|prepared)&63)|(walls<<6);
+        }
+        auto* candidate=landing+unsigned(word[0])*32;
+        if(word[1]&1)*candidate|=bit;
+        if(word[1]&2)candidate[32]|=bit;
+    }
+    if(!self.tiles_.appendPrepared(batch))return false;
+    batch.completePublication();
+    return true;
 }
 
 bool AmigaGameplayGeneration::createRun(void* opaque,const downwell::AreaOneBuilder::TerrainRun& run){

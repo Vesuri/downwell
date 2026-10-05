@@ -50,6 +50,15 @@ public:
         const std::uint8_t* words()const{return creates()+count()*2;}
         const std::uint8_t* end()const{return words()+wordCount()*4;}
         bool completed()const{return completed_;}
+        // An admitted backend owns the complete publication transaction.
+        // Consume only after admission; complete only after all indices and
+        // presentation records have been published. The scalar executor is
+        // still required whenever a prefix can fail or a Create has readers.
+        bool beginPublication()const{
+            if(started_)return false;
+            started_=true;random_.advance(draws());return true;
+        }
+        void completePublication()const{special_+=data[2];completed_=true;}
         bool executeReference(EmitFunction emit,void* context)const{
             if(started_)return false;
             started_=true;
@@ -76,7 +85,9 @@ public:
         }
     };
     using PreparedTerrainFunction=bool (*)(void*,const PreparedTerrain&,EmitFunction);
-    void setPreparedTerrainEmitter(PreparedTerrainFunction emit){preparedTerrainEmitter_=emit;}
+    void setPreparedTerrainEmitter(PreparedTerrainFunction emit,void* context=nullptr){
+        preparedTerrainEmitter_=emit;preparedTerrainContext_=context;
+    }
     // A borrowed, deterministic same-row run. Setup may inspect its geometry,
     // but execute() alone advances the live random stream, one cell immediately
     // before its synchronous Create callback. Never retain this view.
@@ -198,6 +209,7 @@ public:
 private:
     TerrainRunFunction terrainRunEmitter_=nullptr;
     PreparedTerrainFunction preparedTerrainEmitter_=nullptr;
+    void* preparedTerrainContext_=nullptr;
     bool emitPreparedPattern(const BuilderPatternPack&,const PackedBuilderPattern&,bool,bool,
                              GameMakerRandom&,EmitFunction,void*,std::uint32_t&);
     bool emitEventCell(char symbol,int buildX,int rowY,bool reversed,GameMakerRandom&,

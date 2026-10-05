@@ -230,7 +230,7 @@ int main(int argc, char** argv) {
             const bool ok=batch.executeReference(emit,context);
             require(batch.completed()==ok,"prepared segment completion tracks callback failure");
             const auto after=p.random;const unsigned calls=p.count;
-            require(!batch.executeReference(emit,context)&&!batch.executeSpan([]{return true;})&&
+            require(!batch.executeReference(emit,context)&&!batch.executeSpan([]{return true;})&&!batch.beginPublication()&&
                     sameRandom(after,p.random)&&calls==p.count,"prepared segment cannot be replayed");
             return ok;
         });

@@ -248,10 +248,10 @@ builder pattern is emitted synchronously, as in the original; the draws and
 creations must stay in that order. What can go is the per-cell work around
 them.
 
-2. **Finish prepared pattern publication.** Keep the offline row programs;
-   the remaining work is the per-segment collector/execution dispatch and
-   separate occupancy and landing publication walks. Consolidate that work
-   into one admitted publication path rather than tuning its small helpers.
+2. **Recheck the generation budget after native breakable ownership (item 3).**
+   Separate synchronous event-Create costs from prepared terrain publication
+   in the new trace before choosing further structural work. Do not sweep
+   additional row-program encodings or tune individual publication helpers.
    - Preserve source-ordered terrain segments separated by event cells: never
      expose later terrain to an earlier Create. Retain the scalar reference
      for registered terrain, instance IDs, and capacity/failure prefixes.
@@ -260,7 +260,8 @@ them.
    - Recheck full-state/ownership replay and native terrain pixel oracles.
      `REFERENCE_PATTERNS=1` selects the retained cell interpreter.
    - Target remains generation at 701 under 30 ms and the cell loop under
-     3 ms. Prepared-data correctness alone does not close this item.
+     3 ms. Keep this budget check open until measured; publication changes
+     alone do not close it. Implement item 3 next, then re-audit group A.
 3. **Native breakables.** At 844, 13 `GameplayWorld::appendBreakables` births
    take 11.0 ms (6,000 cycles each; 5.2 ms at 701):
    - 7.4 ms is the collision-owner binding: `RecordLifecycleBinding::birth` →

@@ -83,6 +83,15 @@ uses ordered scalar Creates, retaining instance IDs, callbacks and failure
 prefixes. `REFERENCE_PATTERNS=1` retains the original cell interpreter for
 paired native/host verification. Both executors consume the same raw patterns.
 
+The native fixed-terrain publisher is bound directly, independently of the
+actor/decor collection callback. A segment is admitted before consuming its
+draws, then occupancy and landing candidates are published together, followed
+by ordered platform records and completion. Completion publishes the special
+border count. A failed builder step latches failure in the outer owner; the
+segment must never be replayed. This transaction is valid only for backend-only
+terrain with no intra-segment Create readers and enough reserved capacity;
+otherwise the ordered scalar executor supplies the exact failure prefix.
+
 ## Portable reader
 
 `src/core/BuilderPatternPack` decodes each field byte-by-byte. Construction

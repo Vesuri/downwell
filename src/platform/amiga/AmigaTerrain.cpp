@@ -206,7 +206,8 @@ bool AmigaAreaOneTerrainBuilder::stepVisible(
     // reset/room-state import replaces the core builder, not backend bindings.
     builder_.enableTerrainRuns(runObserver_!=nullptr);
     builder_.setTerrainRunEmitter(runObserver_?collectRun:nullptr);
-    builder_.setPreparedTerrainEmitter(preparedObserver_?collectPrepared:nullptr);
+    builder_.setPreparedTerrainEmitter(preparedPublisher_?preparedPublisher_:(preparedObserver_?collectPrepared:nullptr),
+                                      preparedPublisher_?observerContext_:nullptr);
     if (!builder_.stepVisible(patterns, random, viewBottomCeiling,
                               collect, this, result)) {
         failed_ = true;

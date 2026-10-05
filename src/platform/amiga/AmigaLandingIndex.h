@@ -7,6 +7,9 @@
 class AmigaLandingIndex {
     std::uint16_t words_[128][32]{};
 public:
+    // Admitted publication uses the same row group for all prepared pairs,
+    // alongside the occupancy write. Column words are 32 entries apart.
+    std::uint16_t* publicationRow(unsigned row){return &words_[0][row>>4];}
     void clear() { for (auto& column : words_) for (auto& word : column) word=0; }
     void insert(unsigned column, unsigned row) {
         if (column<128 && row<512) words_[column][row>>4] |= 0x8000u>>(row&15);
