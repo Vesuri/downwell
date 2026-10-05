@@ -45,6 +45,26 @@ template<unsigned Capacity,unsigned First,unsigned Last> class RunnerRunRoomMemb
 public:
     static constexpr unsigned End=Capacity;
     struct AnimationProjection {}; // Runs themselves supply the skip projection.
+    // A borrowed cursor, not a prepared list. Family consumers may process
+    // consecutive entries without changing room order. Save next before each
+    // handler; skip non-animated runs only after that handler has returned.
+    class AnimationCursor {
+        const RunnerRunRoomMembership& room_;
+        unsigned current_,skipFirst_,skipLast_;
+    public:
+        AnimationCursor(const RunnerRunRoomMembership& room,unsigned first,unsigned last)
+            :room_(room),current_(room.first(0)),skipFirst_(first),skipLast_(last){}
+        unsigned slot(){
+            while(current_!=End&&current_>=skipFirst_&&current_<skipLast_){
+                const auto n=room_.locator_[current_]-1;
+                const auto& run=room_.runs_[n];
+                current_=skipLast_<unsigned(run.first)+run.count?skipLast_:room_.after(n);
+            }
+            return current_;
+        }
+        bool within(unsigned first,unsigned last){const auto s=slot();return s>=first&&s<last;}
+        unsigned take(){const auto s=slot();if(s!=End)current_=room_.next(s);return s;}
+    };
     bool contains(unsigned s)const{return s<Capacity&&locator_[s]!=0;}
     bool active(unsigned s)const{return contains(s)&&runs_[locator_[s]-1].list==0;}
     bool marked(unsigned s)const{return contains(s)&&((marks_[s>>5]>>(s&31))&1u);}

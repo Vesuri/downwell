@@ -273,23 +273,17 @@ remaining structure, not retune the prepared row program or its helpers.
      2.85 ms. Fold ownership changes into C if justified by the whole family
      walk, rather than a separate sub-3-ms birth optimization.
 
-### C. Remaining per-frame runner walks
+### C. Runner-walk budget review
 
-The quiet frame has no function over 1.7 ms of self time. Its gap to 20 ms is
-the walks that `GameplayCollisionOwner::attach` installs, entered once per
-actor per phase. The costs are quiet / combat / 645:
-
-| Walk | Quiet | Combat | 645 |
-| --- | ---: | ---: | ---: |
-| Animation (`visitAnimationRetainedChecked`) | 1.1 ms | 3.8 ms | 4.5 ms |
-| Captured alarm dispatch (`dispatchCapturedAlarms`) | 1.0 ms | 2.1 ms | 4.6 ms |
+Repeat the full contact-tape audit now that the runner-walk queue has been
+worked through. Refresh the cost-by-owner table and identify the remaining
+structures responsible for the quiet-frame gap and generation/combat bursts.
+Use that audit to review the held A and combat-composition shortfalls before
+reopening parked work; do not resume individual helper tuning.
 
 Alarm capture/dispatch remains a budget shortfall. Its two structural attempts
 are closed in the [rejection table](amiga-frame-cost.md#rejected-approaches);
 do not reopen it before the group-C budget review.
-
-4. **Animation.** Advance animation per family over compact records where no
-   handler has cross-instance effects. Keep room order where one does.
 
 Target: quiet frames under 22 ms. The remaining distance is player and
 walking-enemy motion, about 5.6 ms together.

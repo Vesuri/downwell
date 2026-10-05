@@ -345,6 +345,18 @@ template<bool Runs=false> void retainedAnimationMutations(){
             expected==actual&&!dirty,"retained links preserve raw order after mutation");
         require(gDownwellProfileCounters[counterAnimationProjectionBuild]==rebuilds,
             "prepared mutation path never rebuilds whole-room animation links");
+        if constexpr(Runs){
+            using Room=RunnerRunRoomMembership<64,16,48>;
+            typename Room::AnimationCursor cursor(retained,full?0:first,full?0:last);
+            actual.clear();
+            while(cursor.slot()!=Room::End){
+                // Family batches must neither sort nor group nonconsecutive
+                // entries; depth changes/reactivation determine this order.
+                const unsigned begin=(cursor.slot()/8)*8,end=begin+8;
+                do {actual.push_back(cursor.take());}while(cursor.within(begin,end));
+            }
+            require(actual==expected,"borrowed family cursor preserves mutated room order");
+        }
         actual.clear();
         require(retained.visitAnimationChecked([&](unsigned i){actual.push_back(i);return true;})&&raw==actual,
             "projection maintenance never changes room links");
@@ -411,5 +423,30 @@ void runRoomMutations(){
     require(!runs.bind(0,invalid)&&!runs.bind(64,{})&&!runs.mark(64)&&!runs.remove(64),"run room invalid inputs");
     std::cout<<"Room storage (64 slots): scalar="<<sizeof(scalar)<<" runs="<<sizeof(runs)<<'\n';
 }
+void animationCursorCallbacks(){
+    using Room=RunnerRunRoomMembership<12,4,8>;
+    for(unsigned scenario=0;scenario<4;++scenario){
+        Room reference,batches;
+        for(unsigned slot=0;slot<10;++slot)require(reference.bind(slot,{})&&batches.bind(slot,{}),"cursor births");
+        std::vector<unsigned> expected,actual;
+        auto handler=[&](Room& room,std::vector<unsigned>& trace,unsigned slot){
+            trace.push_back(slot);
+            if(slot==1){
+                if(scenario==0)require(room.remove(slot),"retire current entry after saving next");
+                if(scenario==1)require(room.bind(10,{}),"append synchronous later birth");
+                if(scenario==2)require(room.remove(6),"split skipped run during handler");
+                if(scenario==3)return false;
+            }
+            return true;
+        };
+        bool dirty=false;
+        const bool expectedResult=reference.visitAnimationRetainedChecked(4,8,dirty,[&](unsigned slot){return handler(reference,expected,slot);});
+        Room::AnimationCursor cursor(batches,4,8);bool actualResult=true;
+        while(cursor.slot()!=Room::End){
+            if(!handler(batches,actual,cursor.take())){actualResult=false;break;}
+        }
+        require(expectedResult==actualResult&&expected==actual,"cursor callback mutation and failure prefixes match retained walk");
+    }
 }
-int main(){dispatch();traversal();retainedLayerBoundaries();roomActivation();drawBirths();animationProjection(false);animationProjection(true);animationProjection<true>(false);animationProjection<true>(true);retainedAnimationMutations();retainedAnimationMutations<true>();runRoomMutations();cleanupProjection();std::cout<<"Selected layer Draw order, retained-layer observation boundaries, synchronous births, scalar/run animation projections, mutation/cleanup equivalence and 1024 instance-dispatch cases verified\n";}
+}
+int main(){dispatch();traversal();retainedLayerBoundaries();roomActivation();drawBirths();animationProjection(false);animationProjection(true);animationProjection<true>(false);animationProjection<true>(true);retainedAnimationMutations();retainedAnimationMutations<true>();runRoomMutations();animationCursorCallbacks();cleanupProjection();std::cout<<"Selected layer Draw order, retained-layer observation boundaries, synchronous births, scalar/run animation projections, mutation/cleanup equivalence and 1024 instance-dispatch cases verified\n";}

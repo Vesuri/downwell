@@ -64,6 +64,16 @@ active-room entry immediately before its animation dispatch (currently enemies,
 bullets and scoped script effects). Retry preserves the traversal binding.
 Unregistered families and path state remain open.
 
+Native non-spatial ownership has no previous-position snapshots. Its animation
+cursor consumes consecutive enemy/bullet family runs from the same active-room
+links, saving the following slot before each handler. It resolves each current
+lifetime once, updates the authoritative image record using the shared math,
+and omits the native no-op image publisher. The enemy phase-range failure is
+still applied after the image update, before visiting any later entry. Script,
+debris and drone handlers stay in the retained room-order dispatch; no family
+is moved across another family's effects. No record pointer or new per-frame
+list is retained. `REFERENCE_ANIMATION=1` selects the old adapter for comparison.
+
 `StartupRuntime::publishCollisionPosition` publishes exact binary32 x/y through
 the installed lifecycle owner, then updates integer drawing x/y. It must not
 rewrite private actor motion or the legacy `preciseX`/`preciseY` motion caches.

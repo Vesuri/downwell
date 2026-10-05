@@ -320,6 +320,48 @@ static void checkEnemySlotDirectory(const ObjectPack& objects,const SpriteCollis
     flags.activationPending=false;
     assert(!world->findEnemy(dormant)&&world->resolveEnemyLifetime(dormant)==&overwritten);
 }
+#ifndef DOWNWELL_TERRAIN_RUN_STORE
+static void checkNativeAnimationBatches(const ObjectPack& objects,const SpriteCollisionPack& sprites){
+    struct Cursor {
+        std::vector<unsigned> slots;unsigned at=0;
+        unsigned take(){return slots.at(at++);}
+        bool within(unsigned first,unsigned last)const{return at<slots.size()&&slots[at]>=first&&slots[at]<last;}
+    };
+    using View=GameplayCollisionView;
+    for(unsigned scenario=0;scenario<3;++scenario){
+        unsigned phases[2][3]{},remainders[2][3]{};bool results[2]{},healthy[2]{};
+        for(unsigned side=0;side<2;++side){
+            auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+                GameplayTerrainInstances::WallCollision{},nullptr,GameplayCollisionOwner::Ownership::native);
+            auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),owner->breakableBinding(),
+                owner->playerBinding(),&owner->terrain());
+            assert(owner->attach(*world));
+            InstanceHandle keys[3];Cursor cursor;
+            for(unsigned i=0;i<3;++i){
+                assert(world->createGeneratedInstance({112,240+int(i)*16,512},objects,[](const auto&){return true;}));
+                auto& enemy=const_cast<GameplayWorld::EnemyState&>(world->enemyAt(i));
+                keys[i]={enemy.identitySlot,enemy.lifetimeId};cursor.slots.push_back(View::enemyBase+keys[i].slot);
+                enemy.imagePhase=scenario==1&&i==1?0x7fffffffu:17*i;enemy.imageRemainder=i;enemy.imageSpeed=7+i;
+            }
+            if(scenario==2)++keys[1].generation;
+            auto identity=[&](unsigned slot){for(const auto key:keys)if(key.slot+View::enemyBase==slot)return key.generation;return 0u;};
+            if(side)results[side]=world->advanceNativeEnemyAnimations(cursor,identity,View::enemyBase,View::breakableBase);
+            else {
+                results[side]=true;
+                for(const auto key:keys){
+                    // The retained adapter checks the lifetime before entering
+                    // the world method; a stale handle must not alter run state.
+                    if(!world->resolveEnemyLifetime(key)||!world->advanceEnemyRoomAnimation(key)){results[side]=false;break;}
+                }
+            }
+            healthy[side]=world->effectsSucceeded();
+            for(unsigned i=0;i<3;++i){phases[side][i]=world->enemyAt(i).imagePhase;remainders[side][i]=world->enemyAt(i).imageRemainder;}
+        }
+        assert(results[0]==results[1]&&healthy[0]==healthy[1]);
+        for(unsigned i=0;i<3;++i)assert(phases[0][i]==phases[1][i]&&remainders[0][i]==remainders[1][i]);
+    }
+}
+#endif
 int main(){
     assert(downwell::RunnerBindingRevisionVerification::run());
     {
@@ -676,6 +718,9 @@ int main(){
         assert(reactivated->previous.x.bits==reactivated->x.bits&&reactivated->previous.y.bits==reactivated->y.bits);
     }
     checkEnemySlotDirectory(objects,sprites);
+#ifndef DOWNWELL_TERRAIN_RUN_STORE
+    checkNativeAnimationBatches(objects,sprites);
+#endif
     const auto mb=read("generated/downwell-sprite-masks.dwsm");SpriteMaskPack masks(mb.data(),mb.size());
     {
         auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites);

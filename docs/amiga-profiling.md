@@ -517,6 +517,12 @@ tape and trace windows; charge mutation costs as well as phase costs. The
 ordinary typed identity checks and drone callback status remain live in both
 paths. Profiling restores the normal default after either success or failure.
 
+`REFERENCE_ANIMATION=1` retains the generic per-actor snapshot/decode/lifetime
+adapter. The native default consumes consecutive enemy/bullet family runs
+directly from the active room links. Pair the contact tape, including births
+and generation frames; no additional room projection is prepared each frame.
+The selector does not alter animation arithmetic or room order.
+
 `bash amiga/profile.sh ammo` checks the factored gauge compositor on the
 bounded contact tape, starting directly in gameplay. Every HUD update is
 compared byte-for-byte with full source-order reconstruction. It requires at

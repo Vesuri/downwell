@@ -28,6 +28,7 @@
 #include "core/EffectSpawnScript.h"
 #include "core/AreaOneBuilder.h"
 #include "core/EnemyCreateProfile.h"
+#include "core/EnemyPresentation.h"
 #include "core/ObjectPack.h"
 #include "core/RoomEntryViews.h"
 #include "core/PlayerLifeRules.h"
@@ -440,6 +441,32 @@ public:
     bool advanceBoxRoomAlarm(downwell::InstanceHandle key,unsigned alarm);
     void configureRoomAlarms(bool (*callback)(void*),void* context){roomAlarms_=callback;roomAlarmsContext_=context;}
     bool advanceBulletRoomAnimation(downwell::InstanceHandle key);
+    // Only the native room owner uses these: its image publication callbacks
+    // are no-ops and its typed records are the authoritative image state.
+    // Consume room-order family runs, never compact-array order. No borrowed
+    // record survives an iteration or an effect handler between runs.
+    template<class Cursor,class Identity>
+    bool advanceNativeEnemyAnimations(Cursor& cursor,Identity identity,unsigned first,unsigned last){
+        do {
+            const auto slot=cursor.take();
+            auto* enemy=const_cast<EnemyState*>(resolveEnemyLifetime({slot-first,identity(slot)}));
+            if(!enemy||!run_.effectsSucceeded)return false;
+            downwell::advanceEnemyImageQ8(enemy->imagePhase,enemy->imageRemainder,enemy->imageSpeed);
+            // phaseIndex rejects this before the native no-op publisher too.
+            if(enemy->imagePhase>0x7fffffffu)return run_.effectsSucceeded=false;
+        }while(cursor.within(first,last));
+        return true;
+    }
+    template<class Cursor,class Identity>
+    bool advanceNativeBulletAnimations(Cursor& cursor,Identity identity,unsigned first,unsigned last){
+        do {
+            const auto slot=cursor.take();
+            auto* bullet=const_cast<BulletState*>(resolveBulletLifetime({slot-first,identity(slot)}));
+            if(!bullet||!run_.effectsSucceeded)return false;
+            if(!bullet->animation.advance())return run_.effectsSucceeded=false;
+        }while(cursor.within(first,last));
+        return true;
+    }
     bool advanceScriptRoomAnimation(downwell::InstanceHandle key){
         if(!run_.effectsSucceeded)return false;
         const auto* record=scriptSpawnInstances_?scriptSpawnInstances_->find(key):nullptr;

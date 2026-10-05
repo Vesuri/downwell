@@ -1139,8 +1139,7 @@ public:
         world.configureRoomAnimation([](void* context){
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
             if(!self.valid())return false;
-            return self.check(self.room_.visitAnimationRetainedChecked(
-                self.animationSkipFirst(),self.animationSkipLast(),self.terrainSnapshotDirty_,[&](unsigned slot){
+            auto visitOne=[&](unsigned slot){
                 const auto shared=self.handleAt(slot);
                 // The conservative dirty fallback keeps terrain snapshots in
                 // room order. Unchanged terrain has no animation dispatch in
@@ -1175,7 +1174,28 @@ public:
                     case View::Kind::drone:return self.drones_.advanceAnimation(local);
                     default:return true;
                 }
-            }));
+            };
+#if !defined(DOWNWELL_REFERENCE_ANIMATION) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP) && !defined(DOWNWELL_TERRAIN_RUN_STORE)
+            if(self.native_){
+                // There are no native previous-position snapshots. Keep the
+                // existing room links, but let each pure image-state family
+                // consume its consecutive records without the generic adapter.
+                decltype(self.room_)::AnimationCursor cursor(self.room_,self.animationSkipFirst(),self.animationSkipLast());
+                const auto identity=[&](unsigned slot){return self.table_.currentHandle(slot).generation;};
+                while(cursor.slot()!=View::capacity){
+                    if(cursor.within(View::enemyBase,View::breakableBase)){
+                        DW_PROFILE_SCOPE(profileAnimationDispatch);
+                        if(!self.check(self.world_->advanceNativeEnemyAnimations(cursor,identity,View::enemyBase,View::breakableBase)))return false;
+                    }else if(cursor.within(View::bulletBase,View::scriptEffectBase)){
+                        DW_PROFILE_SCOPE(profileAnimationDispatch);
+                        if(!self.check(self.world_->advanceNativeBulletAnimations(cursor,identity,View::bulletBase,View::scriptEffectBase)))return false;
+                    }else if(!self.check(visitOne(cursor.take())))return false;
+                }
+                return true;
+            }
+#endif
+            return self.check(self.room_.visitAnimationRetainedChecked(
+                self.animationSkipFirst(),self.animationSkipLast(),self.terrainSnapshotDirty_,visitOne));
         },this);
         world.configurePhaseBoundary([](void* context,GameplayWorld::PhaseBoundary phase){
             auto& owner=*static_cast<GameplayCollisionOwner*>(context);
