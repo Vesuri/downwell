@@ -1982,6 +1982,66 @@ int main(){
     }
     PackedRoom room;assert(rooms.valid()&&rooms.findRoom(11,room));
     {
+        // Prepared Draw changes only at ownership mutations. Compare the
+        // layer adapter against its live oracle after every intermediate
+        // state, including inactive cutoffs before activation reconciliation.
+        auto layers=std::make_unique<GameplayRoomLayers<16>>(&rooms);
+        layers->enablePreparedDraw();assert(layers->prepare());
+        RunnerLayerDraw::Element states[16]{};
+        unsigned generations[16]{};
+        auto publish=[&](unsigned slot){
+            assert(layers->publishPreparedDraw({slot,generations[slot]},slot,
+                RunnerLayerDraw::action(states[slot])));
+        };
+        auto compare=[&](){
+            std::vector<std::pair<unsigned,std::uint32_t>> expected,actual;
+            assert(layers->visit([&](InstanceHandle h,auto& out){
+                assert(h.generation==generations[h.slot]);out=states[h.slot];return true;
+            },[&](InstanceHandle h,int depth){
+                RunnerImageValue value;assert(value.assignInteger(depth));
+                expected.push_back({h.slot,value.bits});return true;
+            }));
+            assert(layers->visitPreparedDraw([&](unsigned slot,RunnerImageValue depth){
+                actual.push_back({slot,depth.bits});return true;
+            }));
+            assert(actual==expected);
+            if(!expected.empty()){
+                unsigned calls=0;
+                assert(!layers->visitPreparedDraw([&](unsigned,auto){++calls;return false;}));
+                assert(calls==1);
+            }
+        };
+        auto birth=[&](unsigned slot,int depth,bool projected){
+            ++generations[slot];auto& state=states[slot];state={};
+            state.type=2;state.instance=true;state.flags=0x10;
+            state.object=projected;state.sprite=true;
+            RunnerImageValue value;assert(value.assignInteger(depth));
+            assert(layers->birth({slot,generations[slot]},0,value,false,projected));
+            publish(slot);compare();
+        };
+        for(unsigned i=0;i<12;++i)birth(i,i<8?-321:-500,i%3!=0);
+        for(unsigned i=0;i<12;++i){
+            const InstanceHandle h{i,generations[i]};
+            states[i].flags|=2;assert(layers->activation(h,false));publish(i);compare();
+            assert(layers->reconcile(h));compare();
+            states[i].flags&=~2u;assert(layers->activation(h,true));publish(i);compare();
+            assert(layers->reconcile(h));compare();
+            states[i].sprite=false;publish(i);compare();
+            states[i].drawEvent=states[i].object;publish(i);compare();
+            states[i].flags|=1;publish(i);compare();
+            states[i].flags&=~1u;publish(i);compare();
+            assert(layers->writeDepth(h,MotionBinary64::fromInteger(i%2?-600:-200)));
+            compare(); // Pending depth requests have not moved any elements.
+            assert(layers->serviceDepths());compare();
+        }
+        for(unsigned i=0;i<12;++i){
+            assert(layers->retire({i,generations[i]}));compare();
+            birth(i,-321,i%2==0); // Element/identity reuse, different eligibility.
+        }
+        for(unsigned i=0;i<12;++i)assert(layers->retire({i,generations[i]}));
+        compare();assert(layers->prepare());compare();
+    }
+    {
         // Cached retained scenery must have the same live termination behavior
         // as the uncached instance lookup, before and after relinking/reuse.
         auto cached=std::make_unique<GameplayRoomLayers<8>>(&rooms);

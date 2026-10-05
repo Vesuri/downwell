@@ -157,18 +157,32 @@ collectors that do not change lifetimes, eligibility, sprites or depth may use
 `visitRoomActorsReadOnly`. Its owner retains ordered actor handles and depths;
 positions, animation frames and Draw side effects are not cached.
 
-Birth, retirement, registration/exclusion changes, activation, layer rebuilding,
-serviced depth changes and sprite changes invalidate the retained order. Cold
-fills invoke callbacks during the original traversal, preserving failure
-prefixes and per-layer inactive cutoffs. Saturated revision counters disable
-reuse. Visitors which mutate ownership must use the live path, not this cache.
-Retry preserves both callback bindings.
+Native ownership maintains a `RunnerPreparedDrawList` at mutations. Birth and
+retirement splice individual nodes in authoritative layer-element order;
+activation reconciliation repositions the affected node. Serviced depth
+changes relink from the source layer topology, including layer merges and their
+inactive-tail ordering. Registration, exclusions and sprite changes publish
+prepared Draw eligibility. Inactive nodes remain as layer cutoffs; scenery-only
+population leases and unborn serialized placeholders are not drawable nodes.
 
-The bounded actor array occupies 3,376 bytes plus bookkeeping in ordinary
-memory, not Chip RAM. This avoids unchanged-frame traversal; it does not make
-mutation-time rebuilding incremental or replace terrain ownership. The scalar
-ownership build always uses live traversal. Native actor verification compares
-kind, generation handle and depth before drawing, without consuming Draw RNG.
+Each actor token names a prepared family and generation handle, not a borrowed
+record pointer. Enemy compaction therefore cannot invalidate it. Collectors
+reuse the flat actor/depth array until this prepared list changes. A refill
+walks prepared nodes without resolving lifetimes, object metadata or sprites,
+and invokes callbacks as it fills, preserving successful failure prefixes.
+Layer depths use their mutation-time binary32 encoding. No source sorting by
+numeric resource ID, handle or depth alone substitutes for element order.
+
+The original cached layer traversal is retained by `REFERENCE_DRAW_LIST=1`;
+registered ownership also keeps that path, and scalar ownership always uses
+the live traversal. Saturated revision counters disable flat-array reuse.
+Visitors that mutate ownership must use the live path, not the read-only
+projection. Retry preserves both callback bindings and resets the projection.
+
+The flat actor array occupies 3,376 bytes plus bookkeeping. Prepared links and
+identities add about 29 KiB in ordinary memory, with no Chip RAM allocation.
+Native verification compares kind, generation handle and depth against live
+Draw on every tested frame, without consuming Draw RNG.
 
 ## Verification scope
 

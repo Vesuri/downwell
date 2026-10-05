@@ -273,7 +273,7 @@ remaining structure, not retune the prepared row program or its helpers.
      2.85 ms. Fold ownership changes into C if justified by the whole family
      walk, rather than a separate sub-3-ms birth optimization.
 
-### C. Per-frame runner walks (quiet frames, 28.4 ms)
+### C. Remaining per-frame runner walks
 
 The quiet frame has no function over 1.7 ms of self time. Its gap to 20 ms is
 the walks that `GameplayCollisionOwner::attach` installs, entered once per
@@ -284,12 +284,7 @@ actor per phase. The costs are quiet / combat / 645:
 | Animation (`visitAnimationRetainedChecked`) | 1.1 ms | 3.8 ms | 4.5 ms |
 | `reconcilePhase` (activation and depth servicing) | 1.2 ms | 1.2 ms | 1.2 ms |
 | Captured alarm dispatch (`dispatchCapturedAlarms`) | 1.0 ms | 2.1 ms | 4.6 ms |
-| Draw collection (`AmigaGameplayDrawList::collect`) | 2.7 ms | 6.1 ms | 5.9 ms |
 
-1. **Draw collection.** Keep the actor Draw list incrementally, ordered by
-   layer, depth and element order. Update it at birth, retirement, depth
-   change and sprite change, instead of walking the room layers and
-   projecting each actor every frame.
 2. **Alarms.** Count each family's alarms down in its records, in captured
    order. Dispatch only the zero crossings, and retire unrearmed zeros to -1.
 3. **Activation, depth and validation.** Reconcile activation and service

@@ -53,6 +53,8 @@ private:
     static constexpr unsigned drawCapacity=1+GameplayWorld::enemyCapacity+GameplayWorld::bulletCapacity+
         GameplayScriptSpawnInstances::capacity+GameplayDebrisInstances::capacity+GameplayEntryDithers::capacity;
     struct DrawEntry {GameplayWorld::DrawActor kind;InstanceHandle local;RunnerImageValue depth;};
+    struct DrawIdentity {GameplayWorld::DrawActor kind;InstanceHandle local;};
+    DrawIdentity preparedDrawIdentities_[drawCapacity]{};
     mutable DrawEntry drawOrder_[drawCapacity]{};
     mutable unsigned drawCount_=0;
     mutable std::uint32_t drawCaptureRevision_=0,drawLayerRevision_=0;
@@ -107,6 +109,49 @@ private:
     bool destructionPending_=false;
     bool terrainFamilies_[2]={false,false};
     bool check(bool ok){if(!ok)good_=false;return ok;}
+    bool preparedDrawEnabled()const{
+#if defined(DOWNWELL_REFERENCE_DRAW_LIST) || defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
+        return false;
+#else
+        return native_&&layers_.enabled();
+#endif
+    }
+    bool publishPreparedDraw(InstanceHandle h){
+        if(!preparedDrawEnabled())return true;
+        // These always-active native families borrow layer population but
+        // have no physical actor element, including the scalar-family oracle.
+        if(sceneryLayers_&&((h.slot>=View::breakableBase&&h.slot<View::terrainBase)||
+            (h.slot>=View::timeFieldBase&&h.slot<View::goalFieldBase)))return true;
+        View::Kind kind;InstanceHandle local;
+        RunnerLayerDraw::Element element;
+        if(!View::decode(h,kind,local)||!table_.flags(h,element.flags))return check(false);
+        element.type=2;element.instance=true;
+        unsigned token=0;bool actor=true;
+        GameplayWorld::DrawActor drawKind=GameplayWorld::DrawActor::player;
+        switch(kind){
+            case View::Kind::player:break;
+            case View::Kind::enemy:drawKind=GameplayWorld::DrawActor::enemy;token=h.slot;break;
+            case View::Kind::bullet:drawKind=GameplayWorld::DrawActor::bullet;
+                token=1+GameplayWorld::enemyCapacity+local.slot;break;
+            case View::Kind::scriptEffect:drawKind=GameplayWorld::DrawActor::scriptEffect;
+                token=1+GameplayWorld::enemyCapacity+GameplayWorld::bulletCapacity+local.slot;break;
+            case View::Kind::debris:drawKind=GameplayWorld::DrawActor::debris;
+                token=1+GameplayWorld::enemyCapacity+GameplayWorld::bulletCapacity+
+                    GameplayScriptSpawnInstances::capacity+local.slot;break;
+            case View::Kind::entryDither:drawKind=GameplayWorld::DrawActor::entryDither;
+                token=drawCapacity-GameplayEntryDithers::capacity+local.slot;break;
+            default:actor=false;break;
+        }
+        if(actor){
+            if(token>=drawCapacity)return check(false);
+            preparedDrawIdentities_[token]={drawKind,local};
+            const unsigned metadata=drawMetadata_.get(table_.objectId(h));
+            element.object=(metadata&ObjectDrawMetadata<386>::exists)!=0;
+            element.drawEvent=(metadata&ObjectDrawMetadata<386>::drawEvent)!=0;
+            element.sprite=table_.sprite(h.slot)>=0;
+        }
+        return check(layers_.publishPreparedDraw(h,token,RunnerLayerDraw::action(element)));
+    }
     bool terrainQuery(int object)const{
         if(!valid()||!world_||!terrainRegistered_||(object!=60&&object!=93))return false;
         return terrainFamilies_[object==60?0:1];
@@ -518,6 +563,7 @@ private:
                 Kind==View::Kind::bullet||Kind==View::Kind::scriptEffect||Kind==View::Kind::debris||Kind==View::Kind::entryDither;
             if(projected&&!parent.actorDepthAvailable(depth))return parent.check(false);
             if(!parent.check(parent.layers_.birth(h,sourceId,depth,inactive,projected)))return false;
+            if(!parent.publishPreparedDraw(h))return false;
             if constexpr(Kind==View::Kind::player){
                 if(!parent.world_){parent.initialPlayer_=&r;parent.initialPlayerKey_=local;}
             }
@@ -572,20 +618,21 @@ private:
             if(!parent.eligibilityFlags(h,flags)||!parent.check(parent.native_?parent.table_.setExclusions(h,(flags&0x100003u)|1u):
                 parent.owner_.setExclusions(h,(flags&0x100003u)|1u)))return false;
             if(!parent.check(parent.room_.mark(h.slot)))return false;
-            parent.destructionPending_=true;return true;}
+            parent.destructionPending_=true;return parent.publishPreparedDraw(h);}
         bool membership(InstanceHandle local,const Record& r,bool member){InstanceHandle h;
             if constexpr(Kind==View::Kind::timeField)if(parent.nativeFields_)
                 return parent.check(member)&&key(local,r,h);
             if constexpr(Kind==View::Kind::breakable)if(parent.nativeBoxes_)
                 return parent.check(member)&&key(local,r,h);
-            return key(local,r,h)&&parent.check(parent.native_?parent.table_.registerObject(h,member):parent.owner_.registerObject(h,member));}
+            return key(local,r,h)&&parent.check(parent.native_?parent.table_.registerObject(h,member):parent.owner_.registerObject(h,member))&&
+                parent.publishPreparedDraw(h);}
         bool activation(InstanceHandle local,const Record& r,bool active){InstanceHandle h;
             if constexpr(Kind==View::Kind::breakable||Kind==View::Kind::timeField)
                 if(parent.sceneryLayers_)return parent.check(active)&&key(local,r,h);
             if(!key(local,r,h)||!parent.check(parent.native_?parent.table_.setActive(h,active):
                 parent.owner_.setActive(h,active,*parent.families_.flags(object(r)))))return false;
             if(!parent.check(parent.layers_.activation(h,active)))return false;
-            parent.activationPending_=true;return true;}
+            parent.activationPending_=true;return parent.publishPreparedDraw(h);}
         // Native ownership publishes no geometry: nothing queries it.
         bool move(InstanceHandle local,const Record& r,RunnerImageValue x,RunnerImageValue y){InstanceHandle h;
             if(parent.native_)return true;
@@ -602,7 +649,10 @@ private:
             if(!key(local,r,h))return false;
             if(parent.native_){
                 bool changed;if(!parent.check(parent.table_.setSprite(h,sprite,changed)))return false;
-                if(changed)parent.drawOrderValid_=false;
+                if(changed){
+                    if(parent.preparedDrawEnabled())return parent.publishPreparedDraw(h);
+                    parent.drawOrderValid_=false;
+                }
                 return true;
             }
             return publishSprite(h,object(r),sprite);
@@ -839,6 +889,7 @@ public:
         table_(ownership==Ownership::nativeScenery&&(nativeBoxes||nativeFields)),
         terrain_(terrainRegistered_?GameplayTerrainInstances::Binding::bindDestruction(terrainBinding_):
             GameplayTerrainInstances::Binding{},presentation,collision){
+        if(preparedDrawEnabled())layers_.enablePreparedDraw();
 #ifdef DOWNWELL_TERRAIN_RUN_STORE
         if(!terrainRegistered_)return;
 #endif
@@ -967,6 +1018,45 @@ public:
         },this,[](const void* context,GameplayWorld::DrawActorVisitor visit,void* visitor){
             const auto& self=*static_cast<const GameplayCollisionOwner*>(context);
             if(!self.valid()||!self.world_)return false;
+            if(self.preparedDrawEnabled()){
+                const auto revision=self.layers_.preparedDrawRevision();
+                if(self.drawOrderValid_&&revision!=0xffffffffu&&revision==self.drawLayerRevision_){
+#ifdef DOWNWELL_DRAW_CACHE_AUDIT
+                    auditActorDrawCache(0,self.drawCount_,false,false);
+#endif
+                    for(unsigned i=0;i<self.drawCount_;++i){const auto& e=self.drawOrder_[i];
+                        if(!visit(visitor,e.kind,e.local,e.depth))return false;
+                    }
+                    return true;
+                }
+#ifdef DOWNWELL_DRAW_CACHE_AUDIT
+                const unsigned previousCount=self.drawCount_;
+                bool same=self.drawAuditHasSnapshot_;
+                const bool orderChanged=revision!=self.drawLayerRevision_;
+#endif
+                self.drawOrderValid_=false;self.drawCount_=0;
+                const bool ok=self.layers_.visitPreparedDraw([&](unsigned token,RunnerImageValue depth){
+                    if(token>=drawCapacity||self.drawCount_==drawCapacity)return false;
+                    const auto& identity=self.preparedDrawIdentities_[token];
+#ifdef DOWNWELL_DRAW_CACHE_AUDIT
+                    if(self.drawCount_>=previousCount)same=false;
+                    else{const auto& old=self.drawOrder_[self.drawCount_];
+                        if(old.kind!=identity.kind||old.local.slot!=identity.local.slot||
+                            old.local.generation!=identity.local.generation||old.depth.bits!=depth.bits)same=false;
+                    }
+#endif
+                    self.drawOrder_[self.drawCount_++]={identity.kind,identity.local,depth};
+                    return visit(visitor,identity.kind,identity.local,depth);
+                });
+                self.drawLayerRevision_=revision;
+                self.drawOrderValid_=ok&&revision==self.layers_.preparedDrawRevision();
+#ifdef DOWNWELL_DRAW_CACHE_AUDIT
+                auditActorDrawCache(!self.drawOrderValid_?3:same&&previousCount==self.drawCount_?1:2,
+                    self.drawCount_,false,orderChanged);
+                self.drawAuditHasSnapshot_=self.drawOrderValid_;
+#endif
+                return ok;
+            }
 #ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
             return self.world_->visitRoomActors([&](auto kind,auto key,auto depth){return visit(visitor,kind,key,depth);});
 #else
@@ -1534,7 +1624,7 @@ public:
             if(registered&&slot>=View::terrainBase&&slot<View::timeFieldBase)terrainSnapshotDirty_=true;
             const auto h=handleAt(slot);
             return good_&&(native_?table_.registerObject(h,registered):owner_.registerObject(h,registered))&&
-                (!nativeBoxes_||!registered||table_.roomReactivated(h))&&layers_.reconcile(h);
+                (!nativeBoxes_||!registered||table_.roomReactivated(h))&&layers_.reconcile(h)&&publishPreparedDraw(h);
         });
         if(!check(result&&good_))return false;
         activationPending_=false;return true;

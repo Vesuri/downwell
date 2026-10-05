@@ -491,19 +491,24 @@ separately from steady-state updates and distinguish waits from useful work.
 
 `bash amiga/profile.sh draw-cache` is a diagnostic, not a timing comparison.
 It starts directly in gameplay and defaults to the contact tape, counting
-cache hits, identical rebuilds and changed actor lists. Counters distinguish
-capture and layer invalidation for the full tape, frames 645/701/844, early
-gameplay, and the contact window. It compares each rebuilt kind/handle/depth
-sequence with the preceding captured sequence before replacing it.
+cache hits, identical refills and changed actor lists. The default native path
+refills from a mutation-maintained Draw projection: its revision changes are
+reported as layer invalidations, with no generic capture invalidations.
+`REFERENCE_DRAW_LIST=1` retains the original live-layer refills and their
+capture/layer revision counters. Buckets cover the full tape, frames
+645/701/844, early gameplay and contact. Each refill compares its
+kind/handle/depth sequence with the preceding sequence before replacing it.
 
 `bash amiga/profile.sh draw-order` runs the same bounded gameplay tape with
 the existing live-layer versus cached Draw-order oracle on every frame,
 without forcing actors into planar rendering. Both modes restore the normal
 build, and their instrumentation is absent from ordinary builds. Use the
-same build as the timing run; `LOCAL_DRAW_CAPTURE=1/2` selects global/local
-(default) invalidation respectively, with both paths compiled. Do not
-change that selector during a run. `make verify-local-draw-capture` exercises
-the matching host lifecycle and ordering tests.
+same build as the timing run. With `REFERENCE_DRAW_LIST=1`,
+`LOCAL_DRAW_CAPTURE=1/2` selects global/local (default) invalidation; it does
+not select a different mutation-maintained implementation. Do not change
+selectors during a run. `make verify-local-draw-capture` exercises host
+lifecycle and ordering tests, including the prepared projection's activation,
+depth service, retirement, reuse and interrupted callback cases.
 
 `bash amiga/profile.sh ammo` checks the factored gauge compositor on the
 bounded contact tape, starting directly in gameplay. Every HUD update is

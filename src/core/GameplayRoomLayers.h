@@ -4,6 +4,7 @@
 #include "RunnerLayerLifetimes.h"
 #include "RunnerLayerBackgrounds.h"
 #include "RunnerLayerDraw.h"
+#include "RunnerPreparedDrawList.h"
 #include "RunnerLogicalLayerOrder.h"
 namespace downwell {
 template<unsigned I,class Terrain> struct GameplayLayerStorage {
@@ -48,6 +49,23 @@ template<unsigned I,bool CompactUnnumbered=false,class Terrain=void> class Gamep
     static_assert(E<65535,"Compact scenery-run links require 16-bit elements");
     mutable std::uint16_t nextRelevant_[E]{};
     mutable bool projectionValid_[L]{};
+    using PreparedDraw=RunnerPreparedDrawList<L,E>;
+    PreparedDraw preparedDraw_;
+    bool preparedDrawEnabled_=false;
+    unsigned preparedPredecessor(unsigned element)const{
+        unsigned previous=layers_.previousDrawElement(element);
+        while(previous!=Registry::End&&!preparedDraw_.contains(previous))
+            previous=layers_.previousDrawElement(previous);
+        return previous;
+    }
+    bool relinkPreparedDraw(){
+        preparedDraw_.beginRelink();
+        return layers_.visitLayersReverse([&](unsigned layer,const auto&){
+            return layers_.visitElementsBackward(layer,[&](unsigned element){
+                return !preparedDraw_.contains(element)||preparedDraw_.prependExisting(layer,element);
+            });
+        });
+    }
     unsigned live_=0,playerId_=0;
     bool good_=true,prepared_=false;
     std::uint32_t drawRevision_=0;
@@ -100,6 +118,24 @@ public:
         if(rooms_&&!PackedRoomLayerLoader::loadCatalogIds(*rooms_,ids_))good_=false;
     }
     bool enabled()const{return rooms_!=nullptr;}
+    void enablePreparedDraw(){preparedDrawEnabled_=true;}
+    std::uint32_t preparedDrawRevision()const{return preparedDraw_.revision();}
+    bool publishPreparedDraw(InstanceHandle h,unsigned token,RunnerLayerDraw::Action action){
+        if(!preparedDrawEnabled_)return true;
+        const unsigned element=registry_.find(h);
+        const auto prepared=action==RunnerLayerDraw::Action::endLayer?PreparedDraw::endLayer:
+            action==RunnerLayerDraw::Action::drawEvent||action==RunnerLayerDraw::Action::sprite||
+            action==RunnerLayerDraw::Action::alternateSprite?PreparedDraw::draw:PreparedDraw::skip;
+        return preparedDraw_.publish(element,token,prepared);
+    }
+    template<class Draw> bool visitPreparedDraw(Draw draw)const{
+        if(!preparedDrawEnabled_||!enabled()||!valid()||!prepared_)return false;
+        return layers_.visitLayersReverse([&](unsigned slot,const auto& layer){
+            return !visible_[slot]||preparedDraw_.visit(slot,[&](unsigned token){
+                return draw(token,layer.encodedDepth);
+            });
+        });
+    }
     std::uint32_t drawRevision()const{return drawRevision_;}
     bool valid()const{return good_&&lifetimes_.succeeded();}
     // Called before the new native player birth, after old lifetimes retire.
@@ -107,6 +143,7 @@ public:
         changedDraw();
         if(!enabled())return true;
         if(!valid()||live_)return fail();
+        if(preparedDrawEnabled_)preparedDraw_.clear();
         for(auto& valid:projectionValid_)valid=false;
         if(prepared_&&!lifetimes_.uninitializeRoom([&](unsigned e){return backgrounds_.uninitialize(e);}))return fail();
         if(!registry_.discardUninitialized()||!backgrounds_.discardUninitialized()||!layers_.discardUninitialized())return fail();
@@ -259,6 +296,7 @@ public:
         if(element==Registry::End)return fail();
         const unsigned layer=layers_.elementOwner(element);
         if(layer==Layers::End)return fail();
+        if(preparedDrawEnabled_&&!preparedDraw_.attach(layer,element,preparedPredecessor(element)))return fail();
         retainedDraw_[element]=projected?0:(inactive?2:1);
         // A head insertion changes no existing element's forward skip link.
         // Extend the warmed projection instead of walking all retained terrain
@@ -284,6 +322,7 @@ public:
         const unsigned next=layers_.nextDrawElement(element);
         const bool skipped=element!=Registry::End&&retainedDraw_[element]==1;
         if(element==Registry::End||layer==Layers::End||!lifetimes_.retire(h))return fail();
+        if(preparedDrawEnabled_&&!preparedDraw_.detach(layer,element))return fail();
         retainedDraw_[element]=0;
         projected_[h.slot>>3]&=~(1u<<(h.slot&7));
         // Removing skipped scenery changes no cached target. Removing a
@@ -327,15 +366,23 @@ public:
         int id;
         const unsigned layer=lifetimes_.attachedLayer(h,id)?layers_.find(id):Layers::End;
         if(layer==Layers::End)return fail();
-        projectionValid_[layer]=false;return lifetimes_.reconcileActivation(h);
+        projectionValid_[layer]=false;
+        if(!lifetimes_.reconcileActivation(h))return false;
+        if(preparedDrawEnabled_){
+            const unsigned element=registry_.find(h);
+            if(!preparedDraw_.reposition(layer,element,preparedPredecessor(element)))return fail();
+        }
+        return true;
     }
     bool serviceDepths(){
         if(!enabled())return true;
         // Depth service can merge whole layers and dispose dynamic IDs.
-        if(lifetimes_.pendingDepths()){
+        const bool pending=lifetimes_.pendingDepths()!=0;
+        if(pending){
             changedDraw();for(auto& valid:projectionValid_)valid=false;
         }
-        return valid()&&lifetimes_.serviceDepths();
+        return valid()&&lifetimes_.serviceDepths()&&
+            (!pending||!preparedDrawEnabled_||relinkPreparedDraw());
     }
     bool writeDepth(InstanceHandle h,MotionBinary64 value){
         // Generated terrain has no exposed depth setter in the typed owner.
