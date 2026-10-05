@@ -47,12 +47,7 @@ def draw_sprite(pixels, sprite):
                 pixels[destination_y * DISPLAY_WIDTH + destination_x] = pen
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("input", type=Path)
-    parser.add_argument("output", type=Path)
-    args = parser.parse_args()
-    payload = args.input.read_bytes()
+def decode(payload):
     expected_bytes = 2 + RING_PLANE_BYTES * 2 + HUD_PLANE_BYTES * 2 + \
         SPRITE_BYTES * (1 + ACTOR_SPRITES + 1)
     if len(payload) != expected_bytes:
@@ -84,7 +79,9 @@ def main():
             pixels[y * DISPLAY_WIDTH + x] = game_pen
             hud_pixels[y * DISPLAY_WIDTH + x] = hud_pen
 
-    for sprite_index in range(1 + ACTOR_SPRITES + 1):
+    # RKM chapter 4, Sprite Priority: the lowest channel is in front.
+    # https://www.theflatnet.de/pub/cbm/amiga/AmigaDevDocs/hard_4.html
+    for sprite_index in reversed(range(1 + ACTOR_SPRITES + 1)):
         start = offset + sprite_index * SPRITE_BYTES
         draw_sprite(pixels, payload[start:start + SPRITE_BYTES])
 
@@ -98,6 +95,15 @@ def main():
     image.putpalette([component for color in PALETTE for component in color] +
                      [0] * (768 - len(PALETTE) * 3))
     image.putdata(pixels)
+    return image
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("input", type=Path)
+    parser.add_argument("output", type=Path)
+    args = parser.parse_args()
+    image = decode(args.input.read_bytes())
     args.output.parent.mkdir(parents=True, exist_ok=True)
     image.save(args.output)
 

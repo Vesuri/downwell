@@ -2303,6 +2303,9 @@ test-amiga-damage-text: build/amiga-damage-text-test generated/amiga-game.dwap
 test: test-amiga-damage-text
 
 .PHONY: test-amiga-gameplay-sprite-assignment
+.PHONY: test-amiga-frame-decoder
+test-amiga-frame-decoder:
+	python3 tests/amiga-frame-decoder-test.py
 build/amiga-gameplay-sprite-assignment-test: tests/platform/amiga/AmigaGameplaySpriteAssignmentTest.cpp src/platform/amiga/AmigaGameplaySpriteAssignment.cpp $(HOST_CHECK_HEADERS)
 	@mkdir -p build
 	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
