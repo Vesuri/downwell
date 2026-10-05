@@ -254,15 +254,18 @@ terrain publication 13.92 ms (nested within generation). At 844 these are
 26.35 and 6.87 ms. The next generation attempt must eliminate a named
 remaining structure, not retune the prepared row program or its helpers.
 
-   - Next: replace redundant native fixed-terrain materialization rather than
-     reopen the prepared row encoding or individual publication helpers.
-     Evaluate an immutable prepared-row owner with dynamic overlays instead
-     of expanding each segment into occupancy cells, landing bits and platform
-     records. The measured structure is `createPrepared` (13.92 ms at 701).
-     Establish a saving estimate from that subtree before implementing one
-     complete attempt; include all collision/landing queries and painting in
-     the paired gate, not just publication. No deferred source-visible Create
-     or later terrain exposure is permitted.
+   - Next: remove a measured event-cell publication/command structure as a
+     whole. Event Create costs 20.15 ms at 701 and 26.35 ms at 844. One enemy
+     configuration at 844 costs 3.59 ms, including about 3.07 ms in lifecycle
+     birth. Establish the removable structure and saving before changing it;
+     charge mutation costs in the affected-frame gate. Do not tune `nextU32`,
+     constructors or small choice helpers individually.
+   - Fixed-terrain publication remains a shortfall. Any further owner proposal
+     must eliminate materialization without replacing it with full-row copies
+     on event Creates (see the rejection table), and include collision/landing
+     queries and painting in the gate. Do not reopen the prepared row encoding,
+     copy loops or individual publication helpers. No deferred source-visible
+     Create or later terrain exposure is permitted.
    - Preserve source-ordered terrain segments separated by event cells: never
      expose later terrain to an earlier Create. Retain the scalar reference
      for registered terrain, instance IDs, and capacity/failure prefixes.
@@ -276,11 +279,6 @@ remaining structure, not retune the prepared row program or its helpers.
      Keep `REFERENCE_BREAKABLES=1` as the oracle, including room re-entry and
      failure prefixes. See the
      [allocation contract](terrain-update-contract.md#native-breakable-allocation).
-   - Event-cell Create remains a separate shortfall after fixed-terrain
-     publication. Remove a measured publication/command structure as a whole;
-     do not tune `nextU32`, constructors or small choice helpers individually.
-     One enemy configuration at 844 costs 3.59 ms, including about 3.07 ms
-     in lifecycle birth. Charge mutation costs in the affected-frame gate.
 
 ### B. Combat composition shortfall
 
