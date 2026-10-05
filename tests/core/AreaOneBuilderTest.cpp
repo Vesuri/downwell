@@ -179,7 +179,7 @@ int main(int argc, char** argv) {
     require(pack.valid(), "builder pack validates");
     unsigned runs=0,runCells=0;
     for(unsigned seed=1;seed<=8;++seed)for(unsigned level=1;level<=3;++level)
-    for(unsigned executor:{0u,1u,2u,3u})for(unsigned failAt:{0u,1u,17u,101u,701u}){
+    for(unsigned executor:{0u,1u,2u,3u,4u})for(unsigned failAt:{0u,1u,17u,101u,701u}){
         AreaOneBuilder scalar,grouped;GameMakerRandom a(seed),b(seed);
         scalar.reset(240,704,a,{level,seed%5,true,false});
         grouped.reset(240,704,b,{level,seed%5,true,false});
@@ -192,6 +192,7 @@ int main(int argc, char** argv) {
             unsigned count=0,failAt,runs=0,cells=0;
             unsigned executor=0;
             const AreaOneBuilder::TerrainRun* active=nullptr;
+            AreaOneBuilder::EmitFunction callback=nullptr;
         } left{a,{}, {},0,failAt},right{b,{}, {},0,failAt};
         right.executor=executor;
         const auto emit=[](void* context,const DeferredCreateInstance& command){
@@ -224,7 +225,18 @@ int main(int argc, char** argv) {
                 "run cannot be replayed after completion or failure");
             return ok;
         });
-        if(executor==3)grouped.setPreparedTerrainEmitter([](void* context,const AreaOneBuilder::PreparedTerrain& batch,
+        if(executor==4){
+            right.callback=emit;
+            grouped.setBreakableEmitter([](void* context,int x,int y,const GeneratedBreakableCreate& create){
+                auto& p=*static_cast<RunProbe*>(context);
+                DeferredCreateInstance command{92,x,y};
+                command.imageSpeed=0;
+                command.integerImageIndex=create.frame;command.imageIndex=float(create.frame);
+                command.setBoxCreate(create.sound,create.gems);
+                return p.callback(context,command);
+            },&right);
+        }
+        if(executor>=3)grouped.setPreparedTerrainEmitter([](void* context,const AreaOneBuilder::PreparedTerrain& batch,
                                                           AreaOneBuilder::EmitFunction emit){
             auto& p=*static_cast<RunProbe*>(context);++p.runs;p.cells+=batch.count();
             const bool ok=batch.executeReference(emit,context);

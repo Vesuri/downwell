@@ -13,6 +13,9 @@ void AmigaGameplayGeneration::bind(AmigaPortRuntime& runtime,bool terrainRuns) {
     runtime_ = &runtime;
     dirtyFirst = worldRows; dirtyEnd = 0;
     builder_.setCreateObserver(create, this);
+#ifndef DOWNWELL_REFERENCE_GENERATED_BOXES
+    if(runtime.terrainCreatesBackendOnly())builder_.setBreakablePublisher(createBreakable);
+#endif
     if(terrainRuns)builder_.setTerrainRunObserver(createRun);
 #ifndef DOWNWELL_REFERENCE_PATTERNS
     if(terrainRuns)builder_.setPreparedTerrainPublisher(createPrepared);
@@ -87,6 +90,19 @@ bool AmigaGameplayGeneration::createRun(void* opaque,const downwell::AreaOneBuil
         }
         return true;
     });
+}
+
+bool AmigaGameplayGeneration::createBreakable(void* opaque,int x,int y,
+    const downwell::GeneratedBreakableCreate& creation){
+    auto& self=*static_cast<AmigaGameplayGeneration*>(opaque);
+    if(!self.runtime_->effectsSucceeded())return false;
+    // Preserve the original partial-publication sequence: occupancy, tile,
+    // dirty extent, then the family's lifetime/registration and collision grid.
+    if(!amigaAddTerrainObject(self.index_,92,x,y)||
+       !self.tiles_.appendCreatedTile(92,x,y,creation.frame))return false;
+    if(y-24<self.dirtyFirst)self.dirtyFirst=y-24;
+    if(y+24>self.dirtyEnd)self.dirtyEnd=y+24;
+    return self.runtime_->appendGeneratedBreakable(x-240,y-176,creation);
 }
 
 bool AmigaGameplayGeneration::create(void* opaque,

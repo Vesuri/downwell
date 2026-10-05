@@ -168,6 +168,19 @@ room/configuration boundaries reset previously used slots only after successful
 retirement. A live birth writes its actual Create inputs, active flag and new
 lifetime, not another copy of the default sound/alarm/effect state.
 
+The synchronous builder can publish `GeneratedBreakableCreate` directly:
+selected sprite frame, break sound and gem count. Its RNG evaluation happens
+at the same source Create point, before backend publication. The native sink
+publishes occupancy, the ordered tile record and dirty extent before the
+world's lifetime/registration and breakable collision grid. A failure stops
+at that same prefix; no later box is admitted or replayed. The family's unused
+pool slot supplies all other defaults. Registered terrain retains the complete
+deferred-command route, and installing a custom builder observer clears the
+direct publisher. Additional record-lifecycle observers retain the ordinary
+allocation callback. The Amiga selector
+`REFERENCE_GENERATED_BOXES=1` retains that route for paired profiling;
+`REFERENCE_BREAKABLES=1` independently retains the allocation oracle below.
+
 For native scenery, `NativeFamilyBirth` borrows chronology/revision counters
 from `NativeInstanceTable` and a population lease from `GameplayRoomLayers`.
 It creates no registry entry or layer element per breakable. The chronology

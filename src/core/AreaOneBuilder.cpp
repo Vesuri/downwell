@@ -71,6 +71,10 @@ bool AreaOneBuilder::emitObject(std::int32_t objectId, int x, int y,
                                 GameMakerRandom& random,
                                 EmitFunction emit, void* context) {
     DW_GENERATION_SCOPE(profileBuilderCommand);
+    if(objectId==92&&breakableEmitter_){
+        const auto created=GeneratedBreakableCreate::evaluate(random);
+        return breakableEmitter_(breakableContext_,x,y,created);
+    }
     DW_GENERATION_PHASE(profileBuilderInitialize);
     DeferredCreateInstance command{objectId, x, y};
     DW_GENERATION_PHASE(profileBuilderCommand);

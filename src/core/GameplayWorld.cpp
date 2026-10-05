@@ -738,6 +738,34 @@ bool GameplayWorld::appendBreakables(const int* x, const int* y, unsigned count,
     return true;
 }
 
+bool GameplayWorld::appendGeneratedBreakable(int x,int y,const downwell::GeneratedBreakableCreate& creation){
+#ifndef DOWNWELL_REFERENCE_BREAKABLES
+    if(auto* allocation=breakableLifecycle_.nativeAllocation()){
+        if(!run_.effectsSucceeded||breakableCount_==breakableCapacity||!nextBreakableLifetimeId_)return false;
+        const unsigned index=breakableCount_++;
+        auto& record=breakables_[index];
+        record.x=x;record.y=y;record.active=true;
+        record.state.breakSound=static_cast<unsigned short>(creation.sound);
+        record.state.haveGem=static_cast<unsigned char>(creation.gems);
+        record.lifetimeId=nextBreakableLifetimeId_++;
+        if(!allocation->publish(record.nativeRegistration)){
+            run_.effectsSucceeded=false;return false;
+        }
+        if((x&15)||(y&15)||x < -512||x>=512||y<0||y>=8192)breakableIndexReady_=false;
+        else if(breakableIndexReady_){
+            auto& cell=breakableIndex_[(y>>4)*64+((x+512)>>4)];
+            if(cell)breakableIndexReady_=false;
+            cell=index+1;
+        }
+        return true;
+    }
+#endif
+    downwell::BreakableState state;
+    state.breakSound=static_cast<unsigned short>(creation.sound);
+    state.haveGem=static_cast<unsigned char>(creation.gems);
+    return appendBreakables(&x,&y,1,&state);
+}
+
 bool GameplayWorld::breakableActiveAt(int x, int y) const
 {
     if (breakableIndexReady_) {

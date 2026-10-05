@@ -15,14 +15,18 @@ void AmigaTerrainTiles::clear() {
 bool AmigaTerrainTiles::append(const downwell::DeferredCreateInstance& command) {
     DW_GENERATION_SCOPE(profileGeneratedTiles);
     if (command.objectId != 92 && command.objectId != 93) return true;
-    if (count_ == capacity || command.y < 0 || command.y >= rows * 16 ||
-        (command.y & 15) || command.x < -512 || command.x >= 1536 || (command.x & 15))
+    return appendCreatedTile(command.objectId,command.x,command.y,
+        command.objectId==93?23:command.integerImageIndex);
+}
+
+bool AmigaTerrainTiles::appendCreatedTile(int objectId,int x,int y,unsigned frame){
+    if (count_ == capacity || y < 0 || y >= rows * 16 ||
+        (y & 15) || x < -512 || x >= 1536 || (x & 15))
         return false;
-    const unsigned row = command.y / 16;
+    const unsigned row = y / 16;
     const unsigned id = ++count_;
-    tiles_[id - 1] = Tile{static_cast<std::int16_t>(command.x),
-        static_cast<std::uint16_t>(command.objectId),
-        static_cast<std::uint16_t>(command.objectId == 93 ? 23 : command.integerImageIndex), 0};
+    tiles_[id - 1] = Tile{static_cast<std::int16_t>(x),
+        static_cast<std::uint16_t>(objectId),static_cast<std::uint16_t>(frame),0};
     if (tails_[row]) tiles_[tails_[row] - 1].next = id;
     else heads_[row] = id;
     tails_[row] = id;
@@ -205,6 +209,7 @@ bool AmigaAreaOneTerrainBuilder::stepVisible(
     if (failed_) return false;
     // reset/room-state import replaces the core builder, not backend bindings.
     builder_.enableTerrainRuns(runObserver_!=nullptr);
+    builder_.setBreakableEmitter(breakablePublisher_,observerContext_);
     builder_.setTerrainRunEmitter(runObserver_?collectRun:nullptr);
     builder_.setPreparedTerrainEmitter(preparedPublisher_?preparedPublisher_:(preparedObserver_?collectPrepared:nullptr),
                                       preparedPublisher_?observerContext_:nullptr);

@@ -4,6 +4,7 @@
 #include "BuilderPatternPack.h"
 #include "DeferredInstanceQueue.h"
 #include "GameMakerRandom.h"
+#include "GeneratedBreakableCreate.h"
 #include <cstdint>
 
 namespace downwell {
@@ -25,6 +26,10 @@ struct AreaOneBuilderStep {
 class AreaOneBuilder {
 public:
     using EmitFunction = bool (*)(void*, const DeferredCreateInstance&);
+    using BreakableEmitter=bool (*)(void*,int,int,const GeneratedBreakableCreate&);
+    void setBreakableEmitter(BreakableEmitter emit,void* context){
+        breakableEmitter_=emit;breakableContext_=context;
+    }
     // One immutable fixed segment, bounded by a source event/row. Creates
     // encode column (grid origin -512, spacing 16; high bit = platform),
     // then preceding draw count (high bit = special border). Prepared words
@@ -207,6 +212,8 @@ public:
     }
 
 private:
+    BreakableEmitter breakableEmitter_=nullptr;
+    void* breakableContext_=nullptr;
     TerrainRunFunction terrainRunEmitter_=nullptr;
     PreparedTerrainFunction preparedTerrainEmitter_=nullptr;
     void* preparedTerrainContext_=nullptr;

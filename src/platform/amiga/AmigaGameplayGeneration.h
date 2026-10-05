@@ -20,6 +20,7 @@ public:
     int dirtyFirst = worldRows, dirtyEnd = 0;
 private:
     static bool create(void*, const downwell::DeferredCreateInstance&);
+    static bool createBreakable(void*,int,int,const downwell::GeneratedBreakableCreate&);
     static bool createRun(void*,const downwell::AreaOneBuilder::TerrainRun&);
     static bool createPrepared(void*,const downwell::AreaOneBuilder::PreparedTerrain&,downwell::AreaOneBuilder::EmitFunction);
     AmigaAreaOneTerrainBuilder& builder_;

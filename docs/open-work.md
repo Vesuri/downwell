@@ -254,8 +254,9 @@ terrain publication 13.92 ms (nested within generation). At 844 these are
 26.35 and 6.87 ms. The next generation attempt must eliminate a named
 remaining structure, not retune the prepared row program or its helpers.
 
-   - Next: remove a measured event-cell publication/command structure as a
-     whole. Event Create costs 20.15 ms at 701 and 26.35 ms at 844. One enemy
+   - Next: remove a measured actor/time-field publication structure as a
+     whole; do not retune the generated-box command path. The audit's event
+     Create costs are 20.15 ms at 701 and 26.35 ms at 844. One enemy
      configuration at 844 costs 3.59 ms, including about 3.07 ms in lifecycle
      birth. Establish the removable structure and saving before changing it;
      charge mutation costs in the affected-frame gate. Do not tune `nextU32`,

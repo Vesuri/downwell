@@ -523,6 +523,13 @@ directly from the active room links. Pair the contact tape, including births
 and generation frames; no additional room projection is prepared each frame.
 The selector does not alter animation arithmetic or room order.
 
+`REFERENCE_GENERATED_BOXES=1` retains synchronous breakable creation through
+the deferred command and collection/world adapters. The native default emits
+only the selected Create values directly to terrain, tile and family owners.
+Pair generation frames on the contact tape; `REFERENCE_BREAKABLES=1` is the
+separate pool-allocation oracle. Both selectors are unset when profiling
+restores the normal build.
+
 `bash amiga/profile.sh ammo` checks the factored gauge compositor on the
 bounded contact tape, starting directly in gameplay. Every HUD update is
 compared byte-for-byte with full source-order reconstruction. It requires at

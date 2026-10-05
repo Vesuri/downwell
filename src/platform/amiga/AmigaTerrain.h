@@ -59,6 +59,7 @@ public:
     struct Tile { std::int16_t x; std::uint16_t objectId, frame, next; };
     void clear();
     bool append(const downwell::DeferredCreateInstance& command);
+    bool appendCreatedTile(int objectId,int x,int y,unsigned frame);
     unsigned first(int worldY) const {
         return worldY >= 0 && worldY < rows * 16 && !(worldY & 15)
                    ? heads_[worldY / 16] : 0;
@@ -91,6 +92,7 @@ public:
         runObserver_ = nullptr;
         preparedObserver_ = nullptr;
         preparedPublisher_ = nullptr;
+        breakablePublisher_ = nullptr;
     }
     using RunObserver = bool (*)(void*,const downwell::AreaOneBuilder::TerrainRun&);
     void setTerrainRunObserver(RunObserver observer){runObserver_=observer;}
@@ -100,6 +102,7 @@ public:
     // publisher bypasses the collection adapter; stepVisible still latches
     // any failed publication before another generation step can run.
     void setPreparedTerrainPublisher(downwell::AreaOneBuilder::PreparedTerrainFunction publisher){preparedPublisher_=publisher;}
+    void setBreakablePublisher(downwell::AreaOneBuilder::BreakableEmitter publisher){breakablePublisher_=publisher;}
     void resetInitialCheckpoint(downwell::GameMakerRandom& random);
     void resetInitialCheckpointBeforeEntrance(downwell::GameMakerRandom& random);
     // Import simulation state without replaying Create or consuming RNG.
@@ -141,6 +144,7 @@ private:
     RunObserver runObserver_ = nullptr;
     PreparedObserver preparedObserver_ = nullptr;
     downwell::AreaOneBuilder::PreparedTerrainFunction preparedPublisher_=nullptr;
+    downwell::AreaOneBuilder::BreakableEmitter breakablePublisher_=nullptr;
 };
 
 struct AmigaTerrainCollisionContext {

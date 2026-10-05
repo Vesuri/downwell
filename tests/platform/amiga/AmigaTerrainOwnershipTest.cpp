@@ -171,7 +171,10 @@ struct Scene {
         }
         d.addU32(w.breakableSlots());
         for(unsigned i=0;i<w.breakableSlots();++i){const auto& b=w.breakableSlot(i);
-            d.addU32(b.lifetimeId);d.addBool(b.active);d.addBool(b.destroyRequested);d.addI32(b.alarm0);}
+            d.addU32(b.lifetimeId);d.addBool(b.active);d.addBool(b.destroyRequested);d.addI32(b.alarm0);
+            d.addI32(b.x);d.addI32(b.y);d.addU32(b.state.wallHp.high);d.addU32(b.state.wallHp.low);
+            d.addU32(b.state.breakSound);d.addU32(b.state.haveGem);d.addI32(b.state.scriptIndex);
+            d.addBool(b.state.hit);d.addBool(b.state.drilled);d.addBool(b.state.autoTile);d.addBool(b.state.checked);}
         unsigned drawn=0;
         require(w.visitRoomActorsReadOnly([&](GameplayWorld::DrawActor kind,downwell::InstanceHandle key,
             downwell::RunnerImageValue depth){
@@ -250,6 +253,30 @@ int main(int argc,char** argv){
         const auto roomExpected=cleanupOrder(objects,sprites,Ownership::reference,scenario,&rooms);
         require(cleanupOrder(objects,sprites,Ownership::nativeScenery,scenario,&rooms)==roomExpected,
             "native scenery lease preserves room-backed cleanup, reuse and Retry");
+    }
+    {
+        downwell::StartupRuntime entry(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns);
+        entry.skipToGameForTesting();
+        auto reference=std::make_unique<Scene>(patterns,objects,sprites,rooms,room,entry,Ownership::nativeScenery);
+        auto direct=std::make_unique<Scene>(patterns,objects,sprites,rooms,room,entry,Ownership::nativeScenery);
+        for(unsigned round=0;round<2;++round){
+            const int none=0;
+            reference->world->configureBreakables(&none,&none,0);
+            direct->world->configureBreakables(&none,&none,0);
+            for(unsigned i=0;i<=GameplayWorld::breakableCapacity;++i){
+                // Include duplicate and unaligned positions, which disable
+                // the grid accelerator without changing first-hit ownership.
+                const int x=i%3?0:1,y=int(i%128)*16;
+                const downwell::GeneratedBreakableCreate create{16+i%2,171+i%4,i%7?0u:2u};
+                downwell::BreakableState state;state.breakSound=create.sound;state.haveGem=create.gems;
+                const bool expected=reference->world->appendBreakables(&x,&y,1,&state);
+                require(direct->world->appendGeneratedBreakable(x,y,create)==expected,
+                    "direct box capacity prefix equals the retained allocator");
+                require(direct->digest()==reference->digest(),
+                    "direct box state, registration and slot reuse equal command publication");
+                require(expected==(i<GameplayWorld::breakableCapacity),"box fixture reaches capacity failure");
+            }
+        }
     }
     unsigned tapes=0,frames=0,maxTerrain=0;
     for(unsigned phase=0;phase<10;++phase){
