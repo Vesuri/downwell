@@ -2136,6 +2136,7 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
             &rooms, &objects, seed, &patterns);
         reference.skipToGameForTesting();
         AmigaNaturalRouteVerification nativeRoute;
+        std::vector<unsigned> profileInputs[2];
         if (seed == 4) {
             std::cout << "Decoded seed-4 entry draws=" << reference.randomDrawCount()
                 << " rooms=" << reference.mainBuilderState().rightRoom(0) << ','
@@ -2187,6 +2188,7 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
             if (seed == 4 && !sweep)
                 require(downwell::packReplayInput(input) == downwell::packReplayInput(nativeRoute.input(game, live.collision)),
                     "native input controller reproduces host natural route");
+            if(seed==4)profileInputs[0].push_back(downwell::packReplayInput(input));
             game.step(downwell::packReplayInput(input)); reference.step(input, false);
             parityFrame = updates;
             compareInitialGameplay(game, reference);
@@ -2268,6 +2270,7 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
             input.fire = tick < 4;
             if (seed == 4) require(downwell::packReplayInput(input) ==
                 downwell::packReplayInput(nativeRoute.input(game, live.collision, tick)), "native reentry inputs match");
+            if(seed==4)profileInputs[1].push_back(downwell::packReplayInput(input));
             game.step(downwell::packReplayInput(input)); reference.step(input, false);
             parityFrame = tick;
             compareInitialGameplay(game, reference);
@@ -2304,6 +2307,7 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
                 if (noDescent >= 120) input.fire = tick % 12 == 0;
                 require(downwell::packReplayInput(input) == downwell::packReplayInput(nativeRoute.input(game, live.collision, tick + 120)),
                     "native natural shop approach inputs match");
+                profileInputs[1].push_back(downwell::packReplayInput(input));
                 game.step(downwell::packReplayInput(input)); reference.step(input, false);
                 parityFrame = tick;
                 compareInitialGameplay(game, reference);
@@ -2321,6 +2325,7 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
                 downwell::Input input; input.fire = fire; input.left = left;
                 require(downwell::packReplayInput(input) == downwell::packReplayInput(nativeRoute.input(game, live.collision, secondUpdates++)),
                     "native natural shop and return inputs match");
+                profileInputs[1].push_back(downwell::packReplayInput(input));
                 game.step(downwell::packReplayInput(input)); reference.step(input, false);
                 nativeRoute.check(game);
                 require(nativeRoute.failures == 0, "native natural shop assertions pass on host");
@@ -2371,6 +2376,18 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
             std::cout << "Natural route second-level updates=" << secondUpdates << '\n';
             require(nativeRoute.done && nativeRoute.returnFrames == returnUpdates+1,
                 "native natural route completion matches host timing");
+            if(std::getenv("DOWNWELL_EXPORT_SHOP_PROFILE")) {
+                for(unsigned level=0;level<2;++level){
+                    std::cout<<"SHOP_TAPE "<<level+1;
+                    for(auto input:profileInputs[level])std::cout<<' '<<input;
+                    std::cout<<'\n';
+                }
+                std::cout<<"SHOP_FINAL "<<game.health()<<' '<<game.currency()<<' '
+                    <<game.player().offsetX()<<' '<<game.player().offsetY()<<' '
+                    <<game.randomDrawCount()<<' '<<game.randomState().stateIndex();
+                for(unsigned i=0;i<16;++i)std::cout<<' '<<game.randomState().stateWord(i);
+                std::cout<<'\n';
+            }
         }
     }
 }

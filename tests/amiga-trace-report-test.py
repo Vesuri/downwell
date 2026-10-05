@@ -12,6 +12,23 @@ report = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(report)
 
 
+class PartialAttribution(unittest.TestCase):
+    def test_partial_requires_explicit_selection(self):
+        cycles = {2409: 10, 2410: 1000}
+        with self.assertRaisesRegex(ValueError, 'no complete'):
+            report.select_frames(cycles, {2409, 2410})
+        self.assertEqual(report.select_frames(cycles, {2409, 2410}, partial_frame=2410), {2410})
+
+    def test_partial_cannot_be_mislabelled_complete_or_combined(self):
+        cycles = {10: 10, 11: 100, 12: 20}
+        self.assertEqual(report.select_frames(cycles, {10, 12}), {11})
+        for options in ({'partial_frame': 11}, {'partial_frame': 99},
+                        {'partial_frame': 12, 'frames': '12'},
+                        {'partial_frame': 12, 'min_fields': 1}):
+            with self.subTest(options=options), self.assertRaises(ValueError):
+                report.select_frames(cycles, {10, 12}, **options)
+
+
 class LogicalNames(unittest.TestCase):
     owner = "downwell::RunnerSpatialInstances<" + "VeryLongOwnershipPolicy<3067u>," * 6 + "6134u>"
 

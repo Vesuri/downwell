@@ -103,6 +103,36 @@ terrain/HUD brackets remain separate, so sum exclusive phases rather than
 adding inclusive timings. These PROBES measurements include instrumentation;
 they are not shipping FPS. Pre-loop loading remains outside this tape.
 
+Use `bash amiga/profile.sh shop` for the natural seed-4 two-level shop route
+(600-second emulator bound by default). Before building, the host pairs the
+route against the decoded startup adapter and exports only its buttons to
+`generated/shop-profile-input.h`, with resource/tool hashes in the adjacent
+manifest. No target-side route searches, injected shop, currency, health or
+terrain are used. The verified seed-4 room-entry RNG checkpoint replaces the
+usual seed-2 profiling checkpoint. Upgrade input is held fire; gameplay tape
+cursors advance only after a real Step, not display preparation.
+
+The native completion gate requires side-camera and shop-menu coverage,
+return to the shaft alive, and the exported final health/currency/position
+and complete RNG state. Sections are 0 first level, 1 upgrade/room change,
+2 second-level shaft, 3 side camera, 4 shop menu (selected before Step).
+The first cold gameplay setup is excluded, as in the contact tape; subsequent
+upgrade and reentry stalls remain included. These are continuous profiling
+frame numbers, not the per-level input cursors.
+
+`PROBES=1 bash amiga/profile.sh shop` selects exclusive phase measurements,
+including exact worst-frame accounting. Do not compare its instrumented FPS
+with an ordinary build. To trace the same route, use `PROFILE_SHOP=1
+SKIP_TO_GAME=1 TRACE_FRAMES=... TRACE_FIELDS=100 VERIFY_TIMEOUT_SECONDS=600
+bash amiga/profile.sh trace`. All modes restore an uninstrumented normal build.
+
+For a stall longer than the capture limit, the report's explicit
+`--partial-frame=N` option attributes just the captured slice. It rejects
+whole-frame filters and labels every duration as slice time, not frame time.
+This can identify a hot caller, but cannot prove a frame-budget improvement;
+use the full-frame phase measurement for that. Default reports still reject
+incomplete frames.
+
 For an inclusive generation measurement without inner per-birth probes, use
 `GENERATION_TIMING=1 SKIP_TO_GAME=1 PROFILE_CONTACT=1 VERIFY_TIMEOUT_SECONDS=180 bash amiga/profile.sh fps`.
 This adds two beam-clock reads around each complete generation callback, not

@@ -484,6 +484,23 @@ def complete_frame_numbers(frame_cycles, partial_frames):
     return [f for f in sorted(frame_cycles) if f not in partial_frames]
 
 
+def select_frames(frame_cycles, partial_frames, frames=None, min_fields=0.0, partial_frame=None):
+    if partial_frame is not None:
+        if frames is not None or min_fields:
+            raise ValueError('partial attribution cannot be combined with whole-frame filters')
+        if partial_frame not in partial_frames or partial_frame not in frame_cycles:
+            raise ValueError('requested frame is not a captured partial frame')
+        return {partial_frame}
+    complete = complete_frame_numbers(frame_cycles, partial_frames)
+    if not complete:
+        raise ValueError('captures contain no complete game frame')
+    lo, hi = parse_range(frames, min(complete), max(complete))
+    chosen = {f for f in complete if lo <= f <= hi and frame_cycles[f] >= min_fields * FIELD_CYCLES}
+    if not chosen:
+        raise ValueError('no complete frames match the selection; capture before the requested frame')
+    return chosen
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -496,6 +513,8 @@ def main():
                         help='print callers/callees for an exact logical name or matching substring')
     parser.add_argument('--frames', default=None,
                         help='restrict attribution to game frames N or N-M')
+    parser.add_argument('--partial-frame', type=int, default=None,
+                        help='attribute only a captured slice of N; never a frame-duration measurement')
     parser.add_argument('--min-fields', type=float, default=0.0,
                         help='restrict attribution to frames at least this long')
     parser.add_argument('--collapsed', default=None,
@@ -533,13 +552,11 @@ def main():
         partial_frames.update((start_frame, last))
 
     complete = complete_frame_numbers(frame_cycles, partial_frames)
-    if not complete:
-        sys.exit('captures contain no complete game frame')
-    lo, hi = parse_range(args.frames, min(complete), max(complete))
-    chosen = {f for f in complete if lo <= f <= hi and
-              frame_cycles[f] >= args.min_fields * FIELD_CYCLES}
-    if not chosen:
-        sys.exit('no complete frames match the selection; capture before the requested frame')
+    try:
+        chosen = select_frames(frame_cycles, partial_frames, args.frames, args.min_fields, args.partial_frame)
+    except ValueError as error:
+        sys.exit(str(error))
+    unit = 'captured slice' if args.partial_frame is not None else 'frame'
     sym = Symbolizer(elf, symbols)
     sym.resolve(p for key in stacks for p in key[1:] if isinstance(p, int))
 
@@ -577,13 +594,16 @@ def main():
         return c / FIELD_CYCLES * 20.0
 
     print(f'# Downwell instruction trace: {directory}')
+    if args.partial_frame is not None:
+        print('PARTIAL ATTRIBUTION ONLY: not a complete frame, not a frame-budget measurement.\n')
     print(f'{len(traces)} capture(s), {total_fields} PAL fields; '
           f'{len(complete)} complete game frames; selected {len(chosen)} '
-          f'frames, {selected:,} cycles = {ms(selected) / max(1, len(chosen)):.1f} ms/frame\n')
-    print('## Game frames (frame mark to next mark; ms = cycles / 142102 x 20)')
+          f'{unit}(s), {selected:,} cycles = {ms(selected) / max(1, len(chosen)):.1f} ms/{unit}\n')
+    print('## Captured partial frame slice' if args.partial_frame is not None else
+          '## Game frames (frame mark to next mark; ms = cycles / 142102 x 20)')
     print('| frame | ms | fields | largest parts below runDownwell (ms) |')
     print('| ---: | ---: | ---: | --- |')
-    for f in complete:
+    for f in sorted(chosen) if args.partial_frame is not None else complete:
         c = frame_cycles[f]
         parts = ', '.join(f'{display_name(name)} {ms(v):.1f}' for name, v in per_frame[f].most_common(6))
         print(f'| {f} | {ms(c):.1f} | {c / FIELD_CYCLES:.2f} | {parts} |')
@@ -608,13 +628,13 @@ def main():
 
     count = max(1, len(chosen))
     print(f'\n## Self time by logical frame (inlined functions separate), top {args.top}')
-    print('| self % | ms/frame | function |')
+    print(f'| self % | ms/{unit} | function |')
     print('| ---: | ---: | --- |')
     for name, c in exclusive.most_common(args.top):
         print(f'| {pct(c):.2f} | {ms(c) / count:.2f} | `{display_name(name)}` |')
 
     print(f'\n## Inclusive time, top {args.top}')
-    print('| incl % | ms/frame | self % | function |')
+    print(f'| incl % | ms/{unit} | self % | function |')
     print('| ---: | ---: | ---: | --- |')
     for name, c in inclusive.most_common(args.top):
         print(f'| {pct(c):.2f} | {ms(c) / count:.2f} | {pct(exclusive[name]):.2f} | `{display_name(name)}` |')
@@ -635,7 +655,7 @@ def main():
             continue
         classes[instruction_class(mnemonic, operands, re.sub(r'\(.*', '', name))] += cycles
     print('\n## Cycles by instruction class (leaf instruction)')
-    print('| share % | ms/frame | class |')
+    print(f'| share % | ms/{unit} | class |')
     print('| ---: | ---: | --- |')
     for name, c in classes.most_common():
         print(f'| {pct(c):.2f} | {ms(c) / count:.2f} | {name} |')
@@ -645,7 +665,7 @@ def main():
         for names, cycles in folded.items():
             owners[cause(names)] += cycles
         print('\n## Cycles by cost owner (innermost recognised frame; helpers to callers)')
-        print('| share % | ms/frame | owner |')
+        print(f'| share % | ms/{unit} | owner |')
         print('| ---: | ---: | --- |')
         for name, c in owners.most_common():
             print(f'| {pct(c):.2f} | {ms(c) / count:.2f} | {name} |')
@@ -666,7 +686,7 @@ def main():
         if f in chosen:
             symbol_calls[sym.symbol(pc)] += n
     print(f'\n## Out-of-line functions by inclusive time, with call counts, top {args.top}')
-    print('| incl ms/frame | calls/frame | cycles/call | function |')
+    print(f'| incl ms/{unit} | calls/{unit} | cycles/call | function |')
     print('| ---: | ---: | ---: | --- |')
     for name, c in symbol_inclusive.most_common(args.top):
         n = symbol_calls[name]
@@ -680,7 +700,7 @@ def main():
             entry = node.setdefault(name, [0, {}])
             entry[0] += cycles
             node = entry[1]
-    print(f'\n## Call tree (inclusive % and ms/frame, nodes >= {args.tree_min}%)')
+    print(f'\n## Call tree (inclusive % and ms/{unit}, nodes >= {args.tree_min}%)')
     print('```')
 
     def walk(node, depth):

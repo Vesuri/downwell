@@ -26,7 +26,11 @@ volatile ULONG gDownwellFocusSamples[profilePhaseCount];
 volatile ULONG gDownwellTerrainPreparationCalls, gDownwellTerrainPreparationFields;
 volatile ULONG gDownwellTerrainPreparationExpectedCalls =
     1;
-#ifdef DOWNWELL_PROFILE_ENTRY
+#ifdef DOWNWELL_PROFILE_SHOP
+volatile ULONG gDownwellProfileTargetScene = 3;
+// Completion sets the exact boundary; this hard ceiling rejects a stalled tape.
+volatile ULONG gDownwellProfileTargetFrames = 4000;
+#elif defined(DOWNWELL_PROFILE_ENTRY)
 volatile ULONG gDownwellProfileTargetScene = 3;
 volatile ULONG gDownwellProfileTargetFrames = downwell::GameplayEntryProfileInput::gameplayFrames;
 #elif defined(DOWNWELL_PROFILE_TRANSITION)

@@ -332,9 +332,9 @@ combat and 4.39 ms at 645.
 
 ### F. Coverage
 
-The contact tape has no horizontal shop or dense encounter. Add a tape for
-each before claiming the budget, and
-repeat the audit after each lettered group lands.
+Add a dense-encounter tape before claiming the budget. Include the natural
+two-level horizontal shop tape (`profile.sh shop`), not only the contact
+tape, in subsequent audits. Repeat the audit after each lettered group lands.
 
 ### G. Other scenes
 
@@ -351,6 +351,14 @@ The last style frame owns that work; the first gameplay frame must not be
 discarded either. Separate field binding, asset staging, raster/backing setup
 and source-visible world creation before choosing what can be prepared early.
 Do not move RNG draws or source-visible Create effects ahead of confirmation.
+
+Eliminate repeated empty-room layer/identity setup at level reentry. The
+natural shop tape (`PROBES=1 bash amiga/profile.sh shop`) spends about 12.9 seconds in
+the new player's room-layer preparation; a bounded trace inside that frame
+shows serialized entry lookup and lifetime-slot searches. Replace that
+structure, not its loops. Preserve serialized placeholders, source IDs,
+background initialization order, failure prefixes and later actor attachment;
+retain the generic layer lifecycle as the oracle.
 
 Reference: [profiling procedure](amiga-profiling.md).
 

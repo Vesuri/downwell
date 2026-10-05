@@ -718,6 +718,19 @@ test: verify-entry-profile-input
 verify-contact-profile: $(AMIGA_SCENE_TEST_TARGET)
 	DOWNWELL_VERIFY_CONTACT_PROFILE=1 ./$(AMIGA_SCENE_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 
+.PHONY: generate-shop-profile
+build/shop-profile-input-test: tests/core/GameplayShopProfileInputTest.cpp src/core/GameplayShopProfileInput.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+
+.PHONY: verify-shop-profile-input
+verify-shop-profile-input: build/shop-profile-input-test
+	./$<
+test: verify-shop-profile-input
+
+generate-shop-profile: $(AMIGA_SCENE_TEST_TARGET) verify-shop-profile-input
+	python3 tools/generate-shop-profile.py
+
 .PHONY: verify-random-replay
 verify-random-replay: build/random-replay-test
 	DOWNWELL_VERIFY_CONTACT_PROFILE=1 ./build/random-replay-test generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp

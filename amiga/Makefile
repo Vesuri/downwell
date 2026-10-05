@@ -75,6 +75,7 @@ PROFILE_TRANSITION ?= 0
 PROFILE_LASER ?= 0
 PROFILE_CONTACT ?= 0
 PROFILE_ENTRY ?= 0
+PROFILE_SHOP ?= 0
 # Keep the measured default; allow controlled compiler comparisons.
 AMIGA_OPTIMIZATION ?= -O3
 ifneq ($(words $(AMIGA_OPTIMIZATION)),1)
@@ -114,6 +115,14 @@ ifeq ($(PROFILE_CONTACT),1)
 ifneq ($(MAKECMDGOALS),clean)
 ifneq ($(PROFILE_AUTORUN)$(SKIP_TO_GAME)$(SKIP_LEVEL),110)
 $(error PROFILE_CONTACT requires PROFILE_AUTORUN=1 SKIP_TO_GAME=1 SKIP_LEVEL=0)
+endif
+endif
+endif
+
+ifeq ($(PROFILE_SHOP),1)
+ifneq ($(MAKECMDGOALS),clean)
+ifneq ($(PROFILE_AUTORUN)$(SKIP_TO_GAME)$(SKIP_LEVEL)$(PROFILE_CONTACT)$(PROFILE_ENTRY)$(PROFILE_TRANSITION)$(PROFILE_LASER)$(PROFILE_FRAMES),11000000)
+$(error PROFILE_SHOP requires ordinary autorun with SKIP_TO_GAME=1 and no other tape)
 endif
 endif
 endif
@@ -331,6 +340,9 @@ endif
 ifeq ($(PROFILE_CONTACT),1)
 CFLAGS += -DDOWNWELL_PROFILE_CONTACT
 endif
+ifeq ($(PROFILE_SHOP),1)
+CFLAGS += -DDOWNWELL_PROFILE_SHOP
+endif
 ifeq ($(PROFILE_ENTRY),1)
 CFLAGS += -DDOWNWELL_PROFILE_ENTRY
 endif
@@ -418,9 +430,15 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
 	@printf '%s\n' '$(AMMO_FACTORED)' >> $@.tmp
 	@printf '%s\n' '$(AMMO_FACTORED_VERIFY)' >> $@.tmp
 	@printf '%s\n' '$(FRAME_DUMP)' >> $@.tmp
+	@printf '%s\n' '$(PROFILE_SHOP)' >> $@.tmp
 	@cmp -s $@.tmp $@ || cp $@.tmp $@
 
 $(OBJECTS): obj/startup-options
+ifeq ($(PROFILE_SHOP),1)
+obj/DownwellAmiga.o: $(REPO)/generated/shop-profile-input.h
+$(REPO)/generated/shop-profile-input.h:
+	$(MAKE) -C $(REPO) generate-shop-profile
+endif
 ifeq ($(PREPARED_AMMO_DIVIDERS),1)
 $(OBJECTS): $(REPO)/generated/amiga-ammo-dividers.h
 $(REPO)/generated/amiga-ammo-dividers.h: $(REPO)/tools/generate-ammo-dividers.py $(AMIGA_HUD)

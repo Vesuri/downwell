@@ -385,8 +385,22 @@ volatile ULONG gDownwellExitWipeFrames, gDownwellExitWipeFailures;
 __attribute__((noinline, used)) void downwellExitWipeReady() { __asm__ volatile("" ::: "memory"); }
 #endif
 static AmigaShopMenu shopMenuOverlay;
-#ifdef DOWNWELL_NATURAL_VERIFY
+#if defined(DOWNWELL_NATURAL_VERIFY) || defined(DOWNWELL_PROFILE_SHOP)
 #include "AmigaNaturalRouteVerification.h"
+#endif
+#ifdef DOWNWELL_PROFILE_SHOP
+#include "core/GameplayShopProfileInput.h"
+#include "../../../generated/shop-profile-input.h"
+static downwell::GameplayShopProfileInput shopProfileInput(
+    downwell::shopProfileLevel1,sizeof downwell::shopProfileLevel1,
+    downwell::shopProfileLevel2,sizeof downwell::shopProfileLevel2);
+extern "C" {
+extern volatile ULONG gDownwellProfileTargetFrames,gDownwellProfileFrames[4];
+volatile ULONG gDownwellShopProfileFrames[2],gDownwellShopProfileFailures;
+volatile ULONG gDownwellShopProfileSideFrames,gDownwellShopProfileMenuFrames,gDownwellShopProfileDone;
+}
+#endif
+#ifdef DOWNWELL_NATURAL_VERIFY
 static AmigaNaturalRouteVerification naturalRoute;
 volatile ULONG gDownwellNaturalExitTick;
 volatile ULONG gDownwellNaturalFailures, gDownwellNaturalReturnFrames;
@@ -1843,7 +1857,7 @@ __attribute__((noinline)) static int runDownwell(void) {
             return 20;
         }
         enemyRandom=port.randomState();
-#ifdef DOWNWELL_NATURAL_VERIFY
+#if defined(DOWNWELL_NATURAL_VERIFY) || defined(DOWNWELL_PROFILE_SHOP)
         AmigaNaturalRouteVerification::entry(liveBuilder, enemyRandom);
 #endif
         liveGeneration.bind(port);
@@ -2306,6 +2320,13 @@ __attribute__((noinline)) static int runDownwell(void) {
 #ifdef DOWNWELL_PROFILE_ENTRY
             static downwell::GameplayEntryProfileInput entryProfileInput;
             liveInput=entryProfileInput.sample(static_cast<unsigned>(scenes.scene()));
+#endif
+#ifdef DOWNWELL_PROFILE_SHOP
+            liveInput=downwell::unpackReplayInput(shopProfileInput.packed(port.runStage().level,
+                port.levelResultRequested()||port.levelClearActive()));
+            gDownwellProfileSection=port.runStage().level==1?
+                (port.levelResultRequested()||port.levelClearActive()?1:0):
+                port.shops().noControl?4:port.cameraOffsetX()?3:2;
 #endif
 #endif
 #endif
@@ -2792,7 +2813,10 @@ __attribute__((noinline)) static int runDownwell(void) {
                     for (unsigned channel = 0; channel < 8; ++channel) splashBlankList.showSprite(channel, nullSprite);
                     splashBlankList.finish(); platform.publish(splashBlankList); platform.waitVblank();
                     AmigaHardware::blitterDrain();
-                    if (!port.prepareNextAreaOneLevel(liveInput, initialRingOrigin)) { exitCode = 20; break; }
+                    {
+                        DW_PROFILE_SCOPE(profileEntryWorld);
+                        if (!port.prepareNextAreaOneLevel(liveInput, initialRingOrigin)) { exitCode = 20; break; }
+                    }
                     clear.presented = false;
                     newRunWorldPending = true; sceneResetRequested = true;
 #ifdef DOWNWELL_CLEAR_VERIFY
@@ -2939,6 +2963,24 @@ __attribute__((noinline)) static int runDownwell(void) {
 #endif
             checkSceneStack(6);
             const AmigaPortFrame result = port.step(packedInput);
+#ifdef DOWNWELL_PROFILE_SHOP
+            if(!shopProfileInput.advance(port.runStage().level))++gDownwellShopProfileFailures;
+            gDownwellShopProfileFrames[0]=shopProfileInput.frames(1);
+            gDownwellShopProfileFrames[1]=shopProfileInput.frames(2);
+            if(port.cameraOffsetX())++gDownwellShopProfileSideFrames;
+            if(port.shops().noControl)++gDownwellShopProfileMenuFrames;
+            if(shopProfileInput.done()){
+                const long actual[]={port.health(),static_cast<long>(port.currency()),
+                    port.player().offsetX(),port.player().offsetY()};
+                for(unsigned i=0;i<4;++i)if(actual[i]!=downwell::shopProfileFinal[i])++gDownwellShopProfileFailures;
+                if(port.randomDrawCount()!=downwell::shopProfileRandom[0]||
+                    port.randomState().stateIndex()!=downwell::shopProfileRandom[1])++gDownwellShopProfileFailures;
+                for(unsigned i=0;i<16;++i)if(port.randomState().stateWord(i)!=downwell::shopProfileRandom[i+2])++gDownwellShopProfileFailures;
+                if(port.dead()||port.cameraOffsetX()||port.shops().noControl)++gDownwellShopProfileFailures;
+                gDownwellShopProfileDone=1;
+                gDownwellProfileTargetFrames=gDownwellProfileFrames[3]+1;
+            }
+#endif
             fenceDisplay();
             checkSceneStack(7);
 #ifdef DOWNWELL_CAMERA_VERIFY

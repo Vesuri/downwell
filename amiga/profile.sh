@@ -7,6 +7,13 @@ transition=0
 case "$mode" in
   probes) flags=(PROBES=1); script=profile.gdb ;;
   fps) flags=(FPSCOUNT=1); script=profile_fps.gdb ;;
+  shop)
+    flags=(FPSCOUNT=1); script=profile_shop.gdb
+    if [[ ${PROBES:-0} == 1 ]]; then flags=(PROBES=1 FPSCOUNT=0); fi
+    export PROFILE_SHOP=1 SKIP_INTRO=0 SKIP_TO_GAME=1 SKIP_LEVEL=0 PROFILE_FRAMES=0
+    export PROFILE_CONTACT=0 PROFILE_ENTRY=0 PROFILE_TRANSITION=0 PROFILE_LASER=0
+    export VERIFY_TIMEOUT_SECONDS="${VERIFY_TIMEOUT_SECONDS:-600}"
+    ;;
   draw-cache) flags=(FPSCOUNT=1 DRAW_CACHE_AUDIT=1); script=profile_draw_cache.gdb ;;
   draw-order) flags=(FPSCOUNT=1 DRAW_ORDER_AUDIT=1); script=profile_draw_order.gdb ;;
   ammo) flags=(FPSCOUNT=1 AMMO_FACTORED=2 AMMO_FACTORED_VERIFY=1); script=verify_ammo.gdb ;;
@@ -72,7 +79,7 @@ case "$mode" in
     export PROFILE_ENTRY=1 SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_FRAMES=0
     export PROFILE_CONTACT=0 PROFILE_LASER=0 PROFILE_NAVIGATE=0
     ;;
-  *) echo "usage: bash amiga/profile.sh [probes|fps|trace|frames|draw-cache|draw-order|ammo|transition|entry|terrain|fields|fields-clear]" >&2; exit 1 ;;
+  *) echo "usage: bash amiga/profile.sh [probes|fps|shop|trace|frames|draw-cache|draw-order|ammo|transition|entry|terrain|fields|fields-clear]" >&2; exit 1 ;;
 esac
 if [[ $mode == draw-cache || $mode == draw-order || $mode == ammo ]]; then
   export SKIP_TO_GAME=1 SKIP_LEVEL=0 PROFILE_CONTACT="${PROFILE_CONTACT:-1}"
@@ -80,7 +87,9 @@ fi
 if [[ ${SKIP_LEVEL:-0} == 1 && $mode != trace && $mode != fields-clear ]]; then script=profile_clear.gdb; fi
 # Always leave the playable binary behind, including after a timeout/failure.
 restore() {
+  unset PROBES FPSCOUNT
   unset PROFILE_ENTRY
+  unset PROFILE_SHOP
   unset REFERENCE_RANDOM
   unset REFERENCE_PATTERNS
   unset REFERENCE_BREAKABLES
@@ -104,6 +113,9 @@ restore() {
   make -j4 TERRAIN_BATCH_VERIFY=0 SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_LASER=0 PROFILE_CONTACT=0 PROFILE_FRAMES=0 PROFILE_TRANSITION=0 GENERATION_DETAIL=0 GENERATION_TIMING=0 PHASE_SAMPLING=0 TRACE_FRAMES= >> .run/profile-restore.log 2>&1
 }
 mkdir -p .run
+if [[ ${PROFILE_SHOP:-0} == 1 ]]; then
+  make -C .. generate-shop-profile
+fi
 if [[ ${PROFILE_ENTRY:-0} == 1 ]]; then
   make -C .. verify-entry-profile-input
 fi
@@ -157,6 +169,8 @@ elif [[ $mode == draw-order ]]; then
   grep '^DRAW_ORDER' ".run/profile-${mode}.log"
 elif [[ $mode == ammo ]]; then
   grep '^AMMO' ".run/profile-${mode}.log"
+elif [[ $mode == shop ]]; then
+  grep '^SHOP_' ".run/profile-${mode}.log"
 else
   sed -n '/PROFILE/,$p' ".run/profile-${mode}.log"
 fi
