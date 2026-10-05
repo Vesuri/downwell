@@ -73,6 +73,7 @@ PROFILE_NAVIGATE ?= 0
 PROFILE_TRANSITION ?= 0
 PROFILE_LASER ?= 0
 PROFILE_CONTACT ?= 0
+PROFILE_ENTRY ?= 0
 # Keep the measured default; allow controlled compiler comparisons.
 AMIGA_OPTIMIZATION ?= -O3
 ifneq ($(words $(AMIGA_OPTIMIZATION)),1)
@@ -112,6 +113,14 @@ ifeq ($(PROFILE_CONTACT),1)
 ifneq ($(MAKECMDGOALS),clean)
 ifneq ($(PROFILE_AUTORUN)$(SKIP_TO_GAME)$(SKIP_LEVEL),110)
 $(error PROFILE_CONTACT requires PROFILE_AUTORUN=1 SKIP_TO_GAME=1 SKIP_LEVEL=0)
+endif
+endif
+endif
+
+ifeq ($(PROFILE_ENTRY),1)
+ifneq ($(MAKECMDGOALS),clean)
+ifneq ($(PROFILE_AUTORUN)$(SKIP_INTRO)$(SKIP_TO_GAME)$(SKIP_LEVEL)$(PROFILE_CONTACT)$(PROFILE_TRANSITION),100000)
+$(error PROFILE_ENTRY requires autorun without shortcuts, contact or transition mode)
 endif
 endif
 endif
@@ -317,6 +326,9 @@ CFLAGS += -DDOWNWELL_PROFILE_FRAMES=$(PROFILE_FRAMES)
 endif
 ifeq ($(PROFILE_CONTACT),1)
 CFLAGS += -DDOWNWELL_PROFILE_CONTACT
+endif
+ifeq ($(PROFILE_ENTRY),1)
+CFLAGS += -DDOWNWELL_PROFILE_ENTRY
 endif
 ifeq ($(PROFILE_NAVIGATE),1)
 CFLAGS += -DDOWNWELL_PROFILE_NAVIGATE

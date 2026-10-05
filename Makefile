@@ -706,6 +706,15 @@ test: verify-ordinary-time-field
 test: verify-runner-spatial-split
 .PHONY: verify-runner-spatial-split
 .PHONY: verify-contact-profile
+build/entry-profile-input-test: tests/platform/amiga/AmigaEntryProfileInputTest.cpp src/platform/amiga/AmigaSceneRuntime.cpp src/core/GameplayEntryProfileInput.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+
+.PHONY: verify-entry-profile-input
+verify-entry-profile-input: build/entry-profile-input-test
+	./$<
+test: verify-entry-profile-input
+
 verify-contact-profile: $(AMIGA_SCENE_TEST_TARGET)
 	DOWNWELL_VERIFY_CONTACT_PROFILE=1 ./$(AMIGA_SCENE_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 

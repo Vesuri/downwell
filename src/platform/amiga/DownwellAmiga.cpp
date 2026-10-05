@@ -187,6 +187,7 @@ __attribute__((noinline, used)) void downwellShopLiveReady() { __asm__ volatile(
 #include "framework/AmigaHardware.h"
 #include "core/GameMakerRounding.h"
 #include "core/GameplayContactProfileInput.h"
+#include "core/GameplayEntryProfileInput.h"
 #include "core/HudNumbers.h"
 #include "core/AmmoDividers.h"
 #include "core/AmmoFill.h"
@@ -2293,6 +2294,10 @@ __attribute__((noinline)) static int runDownwell(void) {
                 liveInput.left = !liveInput.right;
             }
 #endif
+#ifdef DOWNWELL_PROFILE_ENTRY
+            static downwell::GameplayEntryProfileInput entryProfileInput;
+            liveInput=entryProfileInput.sample(static_cast<unsigned>(scenes.scene()));
+#endif
 #endif
 #endif
             packedInput = downwell::packReplayInput(liveInput);
@@ -2409,6 +2414,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     splashBlankList.finish();
                     platform.publish(splashBlankList);
                     platform.waitVblank();
+                    DW_PROFILE_PHASE(profileEntryFields);
 #ifdef DOWNWELL_PREPARED_FIELDS
                     // Terrain batching owns the prefix. Rebind after every
                     // front-bank reload, only after retiring its DMA.
@@ -2427,6 +2433,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     }
 #endif
 #endif
+                    DW_PROFILE_PHASE(profileEntryWorld);
                     if (newRunWorldPending) {
                         AmigaHardware::blitterDrain();
                         amigaBuildTerrainIndex(emptyTerrain, terrainIndex);
@@ -2455,6 +2462,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                         gameplayScene.resetStage();
                         newRunWorldPending = false;
                     }
+                    DW_PROFILE_PHASE(profileEntryAssets);
                     const unsigned hudBytes = amiga_hud_pack_end - amiga_hud_pack;
                     const auto storage = GameplaySceneStorage::partition(
                         menuPlaneBytes * 2 + amigaMenuEntryPlaneBytes,
@@ -2483,6 +2491,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                         exitCode = 20;
                         break;
                     }
+                    DW_PROFILE_PHASE(profileEntryRaster);
                     Bitmap stageClear(stagedBuffer, downwellVisibleWidth,
                         downwellGameRingHeight, 2, false, false, downwellDmaWidth);
                     stageClear.clear();
@@ -2491,6 +2500,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                         prepareTerrainRaster(&renderer, rooms, mainRoom, builders,
                             fragments, liveBuilder.fragmentCount(),
                             generatedDecorations, liveBuilder.decorationCount(), &port);
+                    DW_PROFILE_PHASE(profileEntryBacking);
                     amigaRendererSetGameOrigin(&renderer, port.ringOrigin());
                     buildReferencePicture(
                         &renderer, rooms, mainRoom, builders,
@@ -2512,6 +2522,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                         syncGameRows(gameDisplay[0], gameBitmap, 0);
                         syncGameRows(gameDisplay[1], gameBitmap, 1);
                     }
+                    DW_PROFILE_PHASE(profileOther);
                 }
                 if (presentedScene == AmigaScene::menu) {
                     if (presentationChanged)

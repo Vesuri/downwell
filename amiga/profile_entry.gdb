@@ -1,0 +1,33 @@
+set pagination off
+set confirm off
+target remote 127.0.0.1:2345
+# No debugger writes or intermediate stops: input-only traversal, cold frame included.
+break downwellProfileReady
+continue
+if gDownwellProfileFrozen != 1 || gDownwellProfileTargetScene != 3 || gDownwellProfileFrames[3] != 120 || gDownwellProfileFrames[0] == 0 || gDownwellProfileFrames[1] == 0 || gDownwellProfileFrames[2] == 0
+    printf "Natural entry tape failed to traverse every startup scene and gameplay\n"
+    quit 1
+end
+printf "PROFILE natural entry PROBES (instrumented); cold gameplay frame retained; clock_clamps=%lu\n", gDownwellProfileClockClamps
+set $s = 0
+while $s < 4
+    printf "SCENE %u frames=%lu fields=%lu max_gap=%lu max_frame_ms=%.3f worst_frame=%lu\n", $s, gDownwellProfileFrames[$s], gDownwellProfileFields[$s], gDownwellProfileMaxGap[$s], gDownwellProfileFrameMax[$s]*20.0/80128.0, gDownwellProfileWorstFrame[$s]
+    set $i = 0
+    set $sum = 0
+    while $i < sizeof(gDownwellProfileTicks[0])/sizeof(gDownwellProfileTicks[0][0])
+        if gDownwellProfileCalls[$s][$i] != 0
+            printf "phase %u %u calls=%lu total_ms=%.3f max_bracket_ms=%.3f worst_frame_ms=%.3f\n", $s, $i, gDownwellProfileCalls[$s][$i], gDownwellProfileTicks[$s][$i]*20.0/80128.0, gDownwellProfileMax[$s][$i]*20.0/80128.0, gDownwellProfileWorstTicks[$s][$i]*20.0/80128.0
+        end
+        set $sum = $sum + gDownwellProfileWorstTicks[$s][$i]
+        set $i = $i + 1
+    end
+    if $sum != gDownwellProfileFrameMax[$s] || gDownwellProfileWorstFrame[$s] == 0
+        printf "Entry worst-frame accounting mismatch\n"
+        quit 1
+    end
+    set $s = $s + 1
+end
+printf "DOWNWELL_PROFILE_READY\n"
+shell touch .run/gdb-ready.marker
+detach
+quit

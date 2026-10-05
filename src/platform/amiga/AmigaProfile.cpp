@@ -1,6 +1,7 @@
 #include "AmigaProfile.h"
 #include "AmigaTerrainProfile.h"
 #include "core/GameplayContactProfileInput.h"
+#include "core/GameplayEntryProfileInput.h"
 #include <exec/types.h>
 
 #if defined(DOWNWELL_PROBES) || defined(DOWNWELL_FPSCOUNT)
@@ -25,7 +26,10 @@ volatile ULONG gDownwellFocusSamples[profilePhaseCount];
 volatile ULONG gDownwellTerrainPreparationCalls, gDownwellTerrainPreparationFields;
 volatile ULONG gDownwellTerrainPreparationExpectedCalls =
     1;
-#ifdef DOWNWELL_PROFILE_TRANSITION
+#ifdef DOWNWELL_PROFILE_ENTRY
+volatile ULONG gDownwellProfileTargetScene = 3;
+volatile ULONG gDownwellProfileTargetFrames = downwell::GameplayEntryProfileInput::gameplayFrames;
+#elif defined(DOWNWELL_PROFILE_TRANSITION)
 volatile ULONG gDownwellProfileTargetScene = 2;
 volatile ULONG gDownwellProfileTargetFrames = 60;
 #elif defined(DOWNWELL_SKIP_TO_GAME)
@@ -358,6 +362,10 @@ void downwellProfileEnd()
 #endif
     // The first gameplay frame builds the scene; measure steady-state work
     // separately rather than averaging this one-time setup into frame cost.
+#ifdef DOWNWELL_PROFILE_ENTRY
+    // Entry profiling explicitly includes cold setup and its first frame.
+    if(sceneId==3)gameplayWarmed=true;
+#else
     if (sceneId == 3 && !gameplayWarmed) {
         gameplayWarmed = true;
         gDownwellProfileGameSamples=0;
@@ -387,6 +395,7 @@ void downwellProfileEnd()
 #endif
         return;
     }
+#endif
 #ifdef DOWNWELL_GENERATION_TIMING
     if(sceneId==3&&generationFrameTicks>gDownwellProfileGenerationMax){
         gDownwellProfileGenerationMax=generationFrameTicks;

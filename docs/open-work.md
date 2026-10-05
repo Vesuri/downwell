@@ -201,8 +201,8 @@ measures `22df6961` on the contact tape: 2,980 PAL fields. Quiet frames take
 26.3 ms, combat 67.4 ms and time-field frames 35.4 ms. Budget examples are
 701 (106.7 ms: generation on top of combat), 844 (92.1 ms: generation),
 645 (94.0 ms: contact) and 660 (106.3 ms: combat). Menu
-scenes (`profile.sh transition`) peak at two fields; gameplay entry from the
-well is not covered by any tape.
+scenes (`profile.sh transition`) peak at two fields; measure the cold gameplay
+handoff separately with `profile.sh entry`.
 
 ### How to work this section
 
@@ -332,18 +332,25 @@ combat and 4.39 ms at 645.
 
 ### F. Coverage
 
-The contact tape has no horizontal shop, no dense encounter and no gameplay
-entry from the well. Add a tape for each before claiming the budget, and
+The contact tape has no horizontal shop or dense encounter. Add a tape for
+each before claiming the budget, and
 repeat the audit after each lettered group lands.
 
 ### G. Other scenes
 
-Menu scenes peak at two fields (splash 34.7 ms, garden 40.5 ms, style
+The earlier style-reveal-only tape peaks at two fields (splash 34.7 ms,
+garden 40.5 ms, style
 34.5 ms, instrumented). Reduce selection layout/content and transition
 preparation costs, keeping static layers and pointer-driven movement. Reduce
 the initial selection-canvas and offer-bank preparation stalls. Measure asset
 staging and Chip/Fast residency separately from steady-state navigation.
 Preserve the original heading, icon and carousel animation.
+
+Remove the synchronous cold gameplay handoff exposed by `profile.sh entry`.
+The last style frame owns that work; the first gameplay frame must not be
+discarded either. Separate field binding, asset staging, raster/backing setup
+and source-visible world creation before choosing what can be prepared early.
+Do not move RNG draws or source-visible Create effects ahead of confirmation.
 
 Reference: [profiling procedure](amiga-profiling.md).
 

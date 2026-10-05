@@ -86,6 +86,23 @@ scene's maximum measured frame.
 Use longer gameplay windows (for example `PROFILE_FRAMES=600 SKIP_TO_GAME=1`)
 as well: a short initial-room sample can miss synchronous generation bursts.
 
+Use `VERIFY_TIMEOUT_SECONDS=180 bash amiga/profile.sh entry` for natural
+gameplay entry. The shared input-only tape advances the splash pages, waits
+40 garden updates before walking right, confirms the default style on its
+120th update, and samples 120 gameplay frames with released controls. The
+host gate (`make verify-entry-profile-input`) checks the route and confirmation;
+the native gate requires all four scene windows and exact worst-frame phase
+accounting. No shortcut or debugger state writes are used.
+
+Unlike steady-state gameplay profiling, this mode retains the cold first
+gameplay frame. The frame that confirms the transition is charged to the
+scene active at frame start: inspect the **last style frame** as well as the
+first gameplay frame. Its handoff brackets distinguish field binding, world
+creation, asset staging, raster preparation and backing construction. Inner
+terrain/HUD brackets remain separate, so sum exclusive phases rather than
+adding inclusive timings. These PROBES measurements include instrumentation;
+they are not shipping FPS. Pre-loop loading remains outside this tape.
+
 For an inclusive generation measurement without inner per-birth probes, use
 `GENERATION_TIMING=1 SKIP_TO_GAME=1 PROFILE_CONTACT=1 VERIFY_TIMEOUT_SECONDS=180 bash amiga/profile.sh fps`.
 This adds two beam-clock reads around each complete generation callback, not
