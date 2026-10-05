@@ -601,15 +601,17 @@ both the normal adapter and the scalar address-based reference. This enables
 run-backed records without requiring permanent per-cell callback addresses;
 it does not itself replace the current record array or defer publication.
 
-`TERRAIN_RUN_STORE=1` selects the run-backed terrain store; the scalar store
-remains the default and reference. Its `find` result owns a value snapshot, not
+The run-backed terrain store is retained only in standalone data-structure
+oracle tests; it is not selectable in SDL, Amiga or the integrated collision
+owner. Registered terrain uses the scalar store, and native gameplay does not
+register fixed terrain. In those standalone tests, the run store's `find`
+result owns a value snapshot, not
 a pointer to mutable storage. Re-read the handle after a setter or event to
 observe changed fields. Snapshot equality identifies the owner and lifetime,
 not equality of captured fields. Row traversal rejects whole runs before
 expanding live cells, using the same conservative 16-pixel artwork margin;
 unbounded artwork requires full traversal. Neither traversal permits structural
-mutation. Host option tracking rebuilds the SDL objects when this flag changes;
-native comparison runs use clean builds and restore the default afterward.
+mutation.
 
 In that configuration, the spatial owner obtains terrain object IDs and
 generations directly from the typed run store. Its ordinary identity array

@@ -320,7 +320,6 @@ static void checkEnemySlotDirectory(const ObjectPack& objects,const SpriteCollis
     flags.activationPending=false;
     assert(!world->findEnemy(dormant)&&world->resolveEnemyLifetime(dormant)==&overwritten);
 }
-#ifndef DOWNWELL_TERRAIN_RUN_STORE
 static void checkNativeAnimationBatches(const ObjectPack& objects,const SpriteCollisionPack& sprites){
     struct Cursor {
         std::vector<unsigned> slots;unsigned at=0;
@@ -361,7 +360,6 @@ static void checkNativeAnimationBatches(const ObjectPack& objects,const SpriteCo
         for(unsigned i=0;i<3;++i)assert(phases[0][i]==phases[1][i]&&remainders[0][i]==remainders[1][i]);
     }
 }
-#endif
 int main(){
     assert(downwell::RunnerBindingRevisionVerification::run());
     {
@@ -564,9 +562,6 @@ int main(){
     auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     for(bool native:{false,true})for(unsigned family=0;family<6;++family){
-#ifdef DOWNWELL_TERRAIN_RUN_STORE
-        if(native)continue;
-#endif
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
             GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},nullptr,
             native?GameplayCollisionOwner::Ownership::native:GameplayCollisionOwner::Ownership::reference);
@@ -699,11 +694,7 @@ int main(){
             assert(state&&state->previous.x.bits==state->x.bits);
             // Seed only the snapshot with a sentinel to make the animation
             // boundary's write observable without moving indexed geometry.
-#if defined(DOWNWELL_TERRAIN_RUN_STORE) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
-            auto seeded=*state;seeded.previous={};owner->terrain().spatialLiteral(local[i].slot,seeded);
-#else
             const_cast<GameplayCollisionOwner::Owner::State*>(state)->previous={};
-#endif
         }
         assert(owner->terrain().activation(local[1],false)&&owner->reconcileActivation());
         world->step(0);assert(world->effectsSucceeded()&&owner->valid());
@@ -718,9 +709,7 @@ int main(){
         assert(reactivated->previous.x.bits==reactivated->x.bits&&reactivated->previous.y.bits==reactivated->y.bits);
     }
     checkEnemySlotDirectory(objects,sprites);
-#ifndef DOWNWELL_TERRAIN_RUN_STORE
     checkNativeAnimationBatches(objects,sprites);
-#endif
     const auto mb=read("generated/downwell-sprite-masks.dwsm");SpriteMaskPack masks(mb.data(),mb.size());
     {
         auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites);
@@ -2972,11 +2961,7 @@ int main(){
         const int bx=0,by=336;assert(world->appendBreakables(&bx,&by,1));const InstanceHandle box{0,1};
         assert(BoxSoundVerification::run(*world,box,171,[&](){return &world->findBreakable(box)->sound;},failure));
     }
-#ifdef DOWNWELL_TERRAIN_RUN_STORE
-    for(auto ownership:{GameplayCollisionOwner::Ownership::reference}){ // The run store has no native ownership.
-#else
     for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native}){
-#endif
         // Native ownership skips box groups while no live box has Alarm 0
         // set; an armed box must still count down beside idle ones.
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},

@@ -3,8 +3,6 @@
 #include "GameplayCollisionView.h"
 #include "BoxDestructionScript.h"
 #include "RunnerSpatialInstances.h"
-#include "RunnerObservedRegistration.h"
-#include "RunnerObservedRoomMembership.h"
 #include "RunnerObjectFamilies.h"
 #include "RunnerRoomMembership.h"
 #include "RunnerRunRoomMembership.h"
@@ -18,7 +16,7 @@
 #include "Profile.h"
 #include "PreparedUnitSpriteBounds.h"
 #include "PreparedTerrainBirthBounds.h"
-#include "RunnerTerrainProperties.h"
+#include "RunnerFullProperties.h"
 #include "NativeInstanceTable.h"
 namespace downwell {
 #ifdef DOWNWELL_DRAW_CACHE_AUDIT
@@ -41,10 +39,6 @@ public:
     // same on both sides so query timing is not changed by this comparison.
 #ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
     using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2,true,View::terrainBase,View::timeFieldBase,false>;
-#elif defined(DOWNWELL_TERRAIN_RUN_STORE)
-    using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2,true,View::terrainBase,View::timeFieldBase,true,
-        RunnerSpatialLifetimes<View::capacity,View::terrainBase,View::timeFieldBase,GameplayTerrainInstances>,
-        RunnerObservedRegistration<View::capacity,View::terrainBase,View::timeFieldBase,GameplayTerrainInstances>,true,GameplayTerrainInstances>;
 #else
     using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2,true,View::terrainBase,View::timeFieldBase>;
 #endif
@@ -68,17 +62,11 @@ private:
     bool combatAlarmCaptureValid_=false;
 #ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
     RunnerRoomMembership<View::capacity> room_;
-#elif defined(DOWNWELL_TERRAIN_RUN_STORE)
-    RunnerObservedRoomMembership<View::capacity,View::terrainBase,View::timeFieldBase,GameplayTerrainInstances> room_;
 #else
     RunnerRunRoomMembership<View::capacity,View::terrainBase,View::timeFieldBase> room_;
 #endif
     bool terrainSnapshotDirty_=true;
-#if defined(DOWNWELL_TERRAIN_RUN_STORE) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
-    using PropertyStore=RunnerTerrainProperties<Owner::Properties,View::capacity,View::terrainBase,View::timeFieldBase,GameplayTerrainInstances>;
-#else
     using PropertyStore=RunnerFullProperties<Owner::Properties,View::capacity>;
-#endif
     PropertyStore properties_;
     RunnerObjectFamilies<386> families_;
     const ObjectPack& objects_;
@@ -89,13 +77,8 @@ private:
     PreparedObjectDefaults<386> objectDefaults_;
     PreparedSpriteGeometry<741> spriteGeometry_;
     PreparedTerrainBirthBounds terrainBirthBounds_;
-#if defined(DOWNWELL_TERRAIN_RUN_STORE) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
-    PreparedTerrainCreate terrainCreate_;
-#endif
 #ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
     GameplayRoomLayers<View::capacity> layers_;
-#elif defined(DOWNWELL_TERRAIN_RUN_STORE)
-    GameplayRoomLayers<View::capacity,true,GameplayTerrainInstances> layers_;
 #else
     GameplayRoomLayers<View::capacity,true> layers_;
 #endif
@@ -368,45 +351,14 @@ private:
                 return parent.check(actual==&r);
             }
         }
-        bool birth(InstanceHandle local,const Record& r){return birthMode<false>(local,r);}
-        template<bool AllocatedTerrain> bool birthMode(InstanceHandle local,const Record& r){
+        bool birth(InstanceHandle local,const Record& r){
             DW_PROFILE_SCOPE(profileInstanceBirth);
             InstanceHandle h;
-            if constexpr(AllocatedTerrain){
-                static_assert(Kind==View::Kind::terrain,"Owned allocation transaction only");
-                // appendInitialized supplied this record directly from the
-                // allocation it just admitted. The spatial birth still checks
-                // that identity once; do not deserialize the terrain run again
-                // merely to compare the record with its own source.
-                if(parent.world_&&parent.world_->terrainInstances()==&parent.terrain_){
-                    if(!parent.valid()||!View::encode(Kind,local,h)||local.generation!=r.lifetimeId)
-                        return parent.check(false);
-                }else if(!key(local,r,h,true))return false;
-            }else if(!key(local,r,h,true))return false;
+            if(!key(local,r,h,true))return false;
             if constexpr(Kind==View::Kind::player)if(!parent.check(parent.layers_.prepare()))return false;
             if constexpr(Kind!=View::Kind::terrain)if(parent.native_)return nativeBirth(local,h,r);
             constexpr bool roomCoordinates=Kind==View::Kind::player||Kind==View::Kind::terrain||Kind==View::Kind::timeField||Kind==View::Kind::goalField||Kind==View::Kind::exitController;
             constexpr int ox=roomCoordinates?0:240,oy=roomCoordinates?0:176;
-#if defined(DOWNWELL_TERRAIN_RUN_STORE) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
-            if constexpr(Kind==View::Kind::terrain&&AllocatedTerrain){
-                const auto* d=parent.objectDefaults_.get(object(r));
-                const auto* flags=parent.families_.flags(unsigned(object(r)));
-                PreparedTerrainBirthBounds::Key geometry;RunnerSpatialSplit::PixelBox pixels;
-                if(parent.world_&&parent.world_->terrainInstances()==&parent.terrain_&&
-                    d&&flags&&(*flags&0x87u)==d->propertyFlags&&(d->spriteId==-1||d->frames<=65535u)&&
-                    parent.terrainBirthBounds_.key(r.objectId,r.x,r.y,geometry)&&
-                    parent.terrainBirthBounds_.pixels(geometry,pixels)){
-                    bool prepared=false;
-                    if(!parent.check(parent.owner_.attachGeneratedTerrainCell(h,object(r),!r.active,*d,
-                        parent.families_,flags,pixels,
-                        [&]{parent.properties_.birth(h.slot);},[&](RunnerImageValue depth){
-                            parent.room_.bindAllocatedTerrain(h.slot,depth);
-                            if(!r.active)parent.activationPending_=true;return true;
-                        },geometry,prepared)))return false;
-                    return parent.check(parent.layers_.birthAllocatedTerrain(h,d->creationDepth,!r.active));
-                }
-            }
-#endif
             Owner::State state;
             Owner::Box terrainBounds;bool preparedTerrain=false,terrainPrecise=false;
             RunnerSpatialSplit::PixelBox terrainPixels;
@@ -428,34 +380,6 @@ private:
             }
             if constexpr(Kind!=View::Kind::timeField)if(!r.active)state.flags|=2u;
             auto edit=parent.properties_.template editDomain<Kind==View::Kind::terrain>(h.slot);auto& p=edit.get();
-#if defined(DOWNWELL_TERRAIN_RUN_STORE) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
-            if constexpr(Kind==View::Kind::terrain)if(preparedTerrain){
-                const bool admitted=AllocatedTerrain&&parent.world_&&parent.world_->terrainInstances()==&parent.terrain_;
-                auto between=[&](RunnerImageValue depth){
-                        if(admitted)parent.room_.bindAllocatedTerrain(h.slot,depth);
-                        else if(!parent.check(parent.room_.bind(h.slot,depth)))return false;
-                        if(!r.active)parent.activationPending_=true;
-                        return true;
-                    };
-                bool born;
-                if constexpr(AllocatedTerrain){
-                    // The typed allocator just admitted and reset this slot.
-                    // Only that exact owner may bypass a second identity walk.
-                    if(admitted)
-                        born=parent.owner_.template attachPreparedTerrainBirth<true>(h,object(r),state,p,
-                            parent.objectDefaults_,parent.families_,terrainBounds,terrainPixels,terrainPrecise,
-                            between,terrainGeometry);
-                    else born=parent.owner_.attachPreparedTerrainBirth(h,object(r),state,p,
-                        parent.objectDefaults_,parent.families_,terrainBounds,terrainPixels,terrainPrecise,
-                        between,terrainGeometry);
-                }else born=parent.owner_.attachPreparedTerrainBirth(h,object(r),state,p,
-                    parent.objectDefaults_,parent.families_,terrainBounds,terrainPixels,terrainPrecise,
-                    between,terrainGeometry);
-                if(!parent.check(born))return false;
-                if(admitted)return parent.check(parent.layers_.birthAllocatedTerrain(h,p.depth,!r.active));
-                return parent.check(parent.layers_.birth(h,r.sourceInstanceId,p.depth,!r.active,false));
-            }
-#endif
             {
                 DW_PROFILE_SCOPE(profileBirthMetadata);
                 RunnerImageValue creationDepth;
@@ -663,157 +587,6 @@ private:
             if(p.sprite.spriteId!=sprite)parent.drawOrderValid_=false;
             return parent.check(parent.owner_.changeSpriteFromPack(h,p.sprite,p.timeline,p.cachedFrame,
                 sprite,parent.sprites_,*parent.families_.flags(object)));}
-#ifdef DOWNWELL_TERRAIN_RUN_STORE
-#ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
-        bool initializedTerrainIdentity(InstanceHandle local,int object,int x,int y,bool active,int tile,
-            GameplayTerrainInstances::CreateValues& values,bool& unbounded,bool& admitted){
-            static_assert(Kind==View::Kind::terrain,"Generated terrain transaction only");
-            const auto* d=parent.objectDefaults_.get(object);
-            const auto* flags=parent.families_.flags(unsigned(object));
-            const auto* create=parent.terrainCreate_.get(object,tile);
-            PreparedTerrainBirthBounds::Key geometry;RunnerSpatialSplit::PixelBox pixels;
-            if(!parent.world_||parent.world_->terrainInstances()!=&parent.terrain_||!d||!flags||
-                (!create&&object!=99)||(*flags&0x87u)!=d->propertyFlags||
-                (d->spriteId!=-1&&d->frames>65535u)||
-                !parent.terrainBirthBounds_.key(object,x,y,geometry)||
-                !parent.terrainBirthBounds_.pixels(geometry,pixels))return false;
-            // From here even a failed birth is handled; never replay it through
-            // the reference path after publishing a partial constructor.
-            admitted=true;InstanceHandle h;
-            if(!parent.valid()||!View::encode(Kind,local,h))return parent.check(false);
-            bool prepared=false;
-            if(!parent.check(parent.owner_.attachGeneratedTerrainCell(h,object,!active,*d,
-                parent.families_,flags,pixels,[&]{parent.properties_.birth(h.slot);},
-                [&](RunnerImageValue depth){parent.room_.bindAllocatedTerrain(h.slot,depth);
-                    if(!active)parent.activationPending_=true;return true;},geometry,prepared)))return false;
-            if(!parent.check(parent.layers_.birthAllocatedTerrain(h,d->creationDepth,!active)))return false;
-            if(!create)return true;
-            DW_PROFILE_SCOPE(profileTerrainCreate);
-            if(create->changedSprite)parent.drawOrderValid_=false;
-            parent.properties_.created(h.slot,create->sprite,create->imageIndex);
-            parent.owner_.finishAdmittedTerrainCreate(h,*create,*flags);
-            values.spriteId=create->sprite;
-            if(create->writeIndex)values.imageIndex=create->index;
-            values.imageSpeed=0;
-            if(object==60&&(wallRadius(create->sprite)<0||wallRadius(create->sprite)>16))unbounded=true;
-            return true;
-        }
-#endif
-        bool initializedTerrainRun(const AreaOneBuilder::TerrainRun& run,int tile,GameMakerRandom& random,
-            AreaOneBuilder::EmitFunction backend,void* context){
-            static_assert(Kind==View::Kind::terrain,"Generated terrain transaction only");
-#ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
-            const auto* d=parent.objectDefaults_.get(run.objectId);
-            const auto* flags=parent.families_.flags(unsigned(run.objectId));
-            const auto* create=parent.terrainCreate_.get(run.objectId,tile);
-            PreparedTerrainBirthBounds::Key first,last;
-            // Bound count before computing the endpoint, including malformed
-            // external resource fixtures. Unsupported geometry uses cell birth.
-            const bool geometry=run.count&&run.count<=GameplayTerrainInstances::capacity&&
-                (run.stepX==16||run.stepX==-16)&&
-                parent.terrainBirthBounds_.key(run.objectId,run.x,run.y,first)&&
-                parent.terrainBirthBounds_.key(run.objectId,run.x+int(run.count-1)*run.stepX,run.y,last);
-            if(parent.valid()&&parent.world_&&parent.world_->terrainInstances()==&parent.terrain_&&
-                d&&flags&&create&&(*flags&0x87u)==d->propertyFlags&&
-                (d->spriteId==-1||d->frames<=65535u)&&geometry){
-                typename decltype(parent.layers_)::TerrainRunBirth layer;
-                bool prepared=false,firstComplete=false,continueOrders=false;
-                Owner::GeneratedTerrainContinuation continuation;
-                Owner::InheritedTerrainBatch batch;
-                const auto flush=[&]{
-                    parent.owner_.completeInheritedTerrain(run.objectId,batch);
-                    if(batch.count)parent.room_.completeInheritedTerrain(batch.count);
-                    batch={};
-                    return parent.check(parent.layers_.completeInheritedTerrain(layer));
-                };
-                auto key=first;RunnerSpatialSplit::PixelBox pixels;
-                if(!parent.terrainBirthBounds_.pixels(first,pixels))return parent.check(false);
-                const bool result=run.executeEach([&](const DeferredCreateInstance& command){
-                    if(!backend(context,command))return false;
-                    return parent.terrain_.appendInitializedCell(command.objectId,command.x,command.y,command.active,
-                        [&](InstanceHandle local,GameplayTerrainInstances::CreateValues& values,bool& unbounded,bool inherited){
-                            inherited=inherited&&continueOrders;
-                            const InstanceHandle h{View::terrainBase+local.slot,local.generation};
-                            if(inherited){
-                                if(!parent.check(parent.owner_.attachInheritedTerrainCell(h,!command.active,
-                                    continuation,pixels,key,batch)))return false;
-                            }else{
-                                if(!flush())return false;
-                                if(!parent.check(parent.owner_.attachGeneratedTerrainCell(h,run.objectId,!command.active,*d,
-                                parent.families_,flags,pixels,[&]{parent.properties_.birth(h.slot);},
-                                [&](RunnerImageValue depth){
-                                    parent.room_.bindAllocatedTerrain(h.slot,depth,inherited);
-                                    if(!command.active)parent.activationPending_=true;
-                                    return true;
-                                },key,prepared,false)))return false;
-                            }
-                            if(!parent.check(inherited?parent.layers_.birthInheritedTerrain(h,layer):
-                                parent.layers_.birthAllocatedTerrain(h,d->creationDepth,!command.active,&layer,false)))return false;
-                            DW_PROFILE_SCOPE(profileTerrainCreate);
-                            if(create->changedSprite)parent.drawOrderValid_=false;
-                            if(inherited)parent.terrain_.publishInheritedAppearance(local.slot);
-                            else parent.properties_.created(h.slot,create->sprite,create->imageIndex);
-                            if(inherited)parent.owner_.finishInheritedTerrainCreate(h,*create);
-                            else parent.owner_.finishAdmittedTerrainCreate(h,*create,*flags);
-                            values.spriteId=create->sprite;
-                            if(create->writeIndex)values.imageIndex=create->index;
-                            values.imageSpeed=0;
-                            if(run.objectId==60&&(wallRadius(create->sprite)<0||wallRadius(create->sprite)>16))unbounded=true;
-                            if(!firstComplete){firstComplete=true;
-                                continuation=Owner::generatedTerrainContinuation(*d,*flags,!command.active);
-                                continueOrders=parent.terrain_.canContinuePublication(local,run.count-1,
-                                    (*flags&0x28u)||(d->initialFlags&0x20u),(*flags&8u)!=0);
-                            }
-                            key.value+=run.stepX==16?4u:std::uint32_t(-4);
-                            pixels.left+=run.stepX;pixels.right+=run.stepX;
-                            return true;
-                        });
-                });
-                const bool published=flush();return result&&published;
-            }
-#endif
-            return run.executeEach([&](const DeferredCreateInstance& command){
-                return backend(context,command)&&parent.terrain_.appendInitialized(command.objectId,
-                    command.x,command.y,command.active,tile,random);
-            });
-        }
-        bool initializedTerrainBirth(InstanceHandle local,const Record& r,int tile,GameMakerRandom& random,
-            GameplayTerrainInstances::CreateValues& values,bool& unbounded){
-            static_assert(Kind==View::Kind::terrain,"Generated terrain transaction only");
-            // birth admits the typed identity and synchronously publishes every
-            // original ownership boundary. No callbacks can retire/reuse it
-            // between that success and these source Create property writes.
-            if(!birthMode<true>(local,r))return false;
-            DW_PROFILE_SCOPE(profileTerrainCreate);
-            if(r.objectId==99)return true;
-            const InstanceHandle h{View::terrainBase+local.slot,local.generation};
-#ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
-            if(const auto* plan=parent.terrainCreate_.get(r.objectId,tile)){
-                if(plan->changedSprite)parent.drawOrderValid_=false;
-                parent.properties_.created(h.slot,plan->sprite,plan->imageIndex);
-                parent.owner_.finishAdmittedTerrainCreate(h,*plan,
-                    *parent.families_.flags(r.objectId));
-                values.spriteId=plan->sprite;
-                if(plan->writeIndex)values.imageIndex=plan->index;
-                values.imageSpeed=0;
-                if(r.objectId==60&&(wallRadius(plan->sprite)<0||wallRadius(plan->sprite)>16))unbounded=true;
-                return true;
-            }
-#endif
-            return terrainCreateProperties(r.objectId,tile,false,random,[&](int sprite){
-                if(!publishSprite(h,r.objectId,sprite))return false;
-                values.spriteId=sprite;
-                if(r.objectId==60&&(wallRadius(sprite)<0||wallRadius(sprite)>16))unbounded=true;
-                return true;
-            },[&](int index){
-                RunnerImageValue value;
-                auto edit=parent.properties_.template editDomain<Kind==View::Kind::terrain>(h.slot);
-                if(!value.assignInteger(index)||!parent.check(parent.owner_.writeImageIndex(h,
-                    edit.get().sprite,value)))return false;
-                values.imageIndex=index;return true;
-            },[&](int speed){values.imageSpeed=speed;return true;});
-        }
-#endif
         bool imageIndex(InstanceHandle local,const Record& r,RunnerImageValue value){InstanceHandle h;
             if(parent.native_)return true;
             if(!key(local,r,h))return false;auto edit=parent.properties_.template editDomain<Kind==View::Kind::terrain>(h.slot);
@@ -891,23 +664,6 @@ public:
         terrain_(terrainRegistered_?GameplayTerrainInstances::Binding::bindDestruction(terrainBinding_):
             GameplayTerrainInstances::Binding{},presentation,collision){
         if(preparedDrawEnabled())layers_.enablePreparedDraw();
-#ifdef DOWNWELL_TERRAIN_RUN_STORE
-        if(!terrainRegistered_)return;
-#endif
-#if defined(DOWNWELL_TERRAIN_RUN_STORE) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
-        if(!owner_.bindTerrainLifetimes(terrain_))return;
-        if(!room_.bindTerrain(terrain_))return;
-        if(!layers_.bindTerrain(terrain_,View::terrainBase))return;
-        if(!properties_.bind(terrain_))return;
-#endif
-#ifdef DOWNWELL_TERRAIN_RUN_STORE
-#ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
-        if(!terrain_.bindInitializedBirth(terrainBinding_))return;
-#else
-        if(!terrain_.bindInitializedIdentity(terrainBinding_))return;
-#endif
-        if(!terrain_.bindInitializedRun(terrainBinding_))return;
-#endif
         good_=sprites_.prepare(preparedSprites_,741)&&objectDefaults_.prepare(objects,sprites_)&&
             spriteGeometry_.prepare(sprites_)&&
             terrainBirthBounds_.prepare(objectDefaults_,sprites_)&&
@@ -917,12 +673,6 @@ public:
             good_=RunnerDepthService::integerDepth(box->creationDepth,boxLayer_.depth);
         }}
         if(good_){const auto* field=objectDefaults_.get(82);if(!field)good_=false;else nativeFieldFlags_=field->initialFlags;}
-#if defined(DOWNWELL_TERRAIN_RUN_STORE) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
-        if(good_)good_=terrainCreate_.prepare(objectDefaults_,sprites_);
-        if(good_)good_=owner_.bindTerrainGeometry(terrainBirthBounds_);
-        if(good_)owner_.prepareTerrainStates(objectDefaults_);
-        if(good_)properties_.prepare(objectDefaults_);
-#endif
         if(good_)for(unsigned selector=0;selector<2;++selector){
             terrainFamilies_[selector]=true;
             for(unsigned i=0;i<families_.size();++i)
@@ -1175,7 +925,7 @@ public:
                     default:return true;
                 }
             };
-#if !defined(DOWNWELL_REFERENCE_ANIMATION) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP) && !defined(DOWNWELL_TERRAIN_RUN_STORE)
+#if !defined(DOWNWELL_REFERENCE_ANIMATION) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
             if(self.native_){
                 // There are no native previous-position snapshots. Keep the
                 // existing room links, but let each pure image-state family
@@ -1720,7 +1470,6 @@ public:
             return !View(*world_).contains(h);
         };
         bool cleaned;
-#if defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP) || !defined(DOWNWELL_TERRAIN_RUN_STORE)
         if(nativeBoxes_){
             unsigned nextBox=0;
             auto before=[&](RunnerImageValue key,std::uint32_t order,bool active){
@@ -1741,7 +1490,6 @@ public:
             })&&before(RunnerImageValue{},0,false);
             if(cleaned)markedBoxCount_=0;
         }else
-#endif
             cleaned=room_.visitMarkedCleanupChecked(cleanup);
         if(!check(cleaned))return false;
         destructionPending_=false;return true;

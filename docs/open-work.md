@@ -329,9 +329,6 @@ combat and 4.39 ms at 645.
   reference. Do not re-enable per-instance spatial publication for it.
 - Actors at the wall depth (100) are rejected, because an inactive wall ends
   that layer's Draw. Supporting one needs the layer's wall-order cutoff.
-- The `TERRAIN_RUN_STORE` representation optimises registered terrain, which
-  native gameplay no longer keeps. Remove it unless the registered reference
-  itself needs it.
 
 ### F. Coverage
 

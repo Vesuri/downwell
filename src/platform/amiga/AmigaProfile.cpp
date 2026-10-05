@@ -24,11 +24,7 @@ volatile ULONG gDownwellPhaseSamples[profilePhaseCount];
 volatile ULONG gDownwellFocusSamples[profilePhaseCount];
 volatile ULONG gDownwellTerrainPreparationCalls, gDownwellTerrainPreparationFields;
 volatile ULONG gDownwellTerrainPreparationExpectedCalls =
-#if defined(DOWNWELL_TERRAIN_RUN_STORE) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
-    2;
-#else
     1;
-#endif
 #ifdef DOWNWELL_PROFILE_TRANSITION
 volatile ULONG gDownwellProfileTargetScene = 2;
 volatile ULONG gDownwellProfileTargetFrames = 60;

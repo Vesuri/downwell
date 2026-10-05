@@ -660,21 +660,6 @@ public:
     // The core owner borrows this interval to share setup, never future cells.
     template<class Terrain>
     bool createGeneratedTerrainRun(const downwell::AreaOneBuilder::TerrainRun& run,Terrain terrain){
-#ifdef DOWNWELL_TERRAIN_RUN_STORE
-        if(terrainInstances_){
-            struct Context{GameplayWorld& world;Terrain& terrain;bool backendFailed=false;};
-            Context context{*this,terrain};
-            const bool ok=terrainInstances_->appendInitializedRun(run,
-                downwell::terrainTileForArea(run_.stage.area),enemyRandom_,
-                [](void* opaque,const downwell::DeferredCreateInstance& command){
-                    auto& c=*static_cast<Context*>(opaque);
-                    const bool okay=c.world.run_.effectsSucceeded&&c.terrain(command);
-                    c.backendFailed=!okay;return okay;
-                },&context);
-            if(!ok&&!context.backendFailed)run_.effectsSucceeded=false;
-            return ok;
-        }
-#endif
         return run.executeEach([&](const downwell::DeferredCreateInstance& command){
             return createGeneratedTerrain(command,terrain);
         });
@@ -684,14 +669,9 @@ public:
         if(!run_.effectsSucceeded||(command.objectId!=60&&command.objectId!=93&&command.objectId!=99))return false;
         if(!terrain(command))return false;
         if(terrainInstances_&&
-#ifdef DOWNWELL_TERRAIN_RUN_STORE
-            !terrainInstances_->appendInitialized(command.objectId,command.x,command.y,command.active,
-                downwell::terrainTileForArea(run_.stage.area),enemyRandom_)){
-#else
             (!terrainInstances_->append(command.objectId,command.x,command.y,command.active)||
              !terrainInstances_->createProperties(terrainInstances_->handle(terrainInstances_->size()-1),
                  downwell::terrainTileForArea(run_.stage.area),false,enemyRandom_))){
-#endif
             run_.effectsSucceeded=false;return false;
         }
         return true;

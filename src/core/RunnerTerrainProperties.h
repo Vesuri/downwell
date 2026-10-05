@@ -3,6 +3,7 @@
 #include "PreparedObjectDefaults.h"
 #include "TerrainRunnerPublication.h"
 #include "RunnerValueRead.h"
+#include "RunnerFullProperties.h"
 namespace downwell {
 // Native terrain appearance belongs to the authoritative identity run. Only
 // actors retain full records here; immutable constructor variants are shared.
@@ -74,16 +75,6 @@ public:
         if(c.model>=8)c.model=static_cast<unsigned char>(2+2*(c.model-8));
         c.sprite=sprite;c.index=index;terrain_->setAppearance(slot-First,c);
     }
-};
-template<class Properties,unsigned Capacity> class RunnerFullProperties {
-    Properties records_[Capacity]{};
-public:
-    using Read=const Properties*;
-    struct Edit {Properties& p;Properties& get(){return p;}void publish(){}};
-    Read read(unsigned slot)const{return &records_[slot];}
-    Edit edit(unsigned slot){return {records_[slot]};}
-    template<bool> Edit editDomain(unsigned slot){return edit(slot);}
-    bool valid()const{return true;}
 };
 }
 #endif

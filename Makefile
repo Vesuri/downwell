@@ -5,7 +5,9 @@ CXX := clang++
 SKIP_INTRO ?= 0
 SKIP_TO_GAME ?= 0
 SKIP_LEVEL ?= 0
-TERRAIN_RUN_STORE ?= 0
+ifneq ($(filter-out 0,$(TERRAIN_RUN_STORE)),)
+$(error TERRAIN_RUN_STORE was removed; use the default registered-terrain reference)
+endif
 REFERENCE_RANDOM ?= 0
 REFERENCE_PATTERNS ?= 0
 REFERENCE_BREAKABLES ?= 0
@@ -16,9 +18,6 @@ SDL_CFLAGS  := $(shell pkg-config --cflags sdl2 SDL2_image)
 SDL_LDFLAGS := $(shell pkg-config --libs sdl2 SDL2_image)
 
 CPPFLAGS := -Isrc $(SDL_CFLAGS)
-ifeq ($(TERRAIN_RUN_STORE),1)
-CPPFLAGS += -DDOWNWELL_TERRAIN_RUN_STORE
-endif
 ifeq ($(SKIP_INTRO),1)
 CPPFLAGS += -DDOWNWELL_SKIP_INTRO
 endif
@@ -1062,10 +1061,6 @@ verify-observed-dirty-queues: build/runner-observed-dirty-test
 
 test: verify-observed-dirty-queues
 
-build/gameplay-collision-owner-run-store-test: tests/core/GameplayCollisionOwnerTest.cpp src/core/GameplayWorld.cpp src/core/PlayerMotion.cpp src/core/Replay.cpp src/core/GameMakerRandom.cpp src/core/ObjectPack.cpp src/core/RoomPack.cpp src/core/AreaOneBuilder.cpp src/core/BuilderPatternPack.cpp $(wildcard src/core/*.h)
-	@mkdir -p build
-	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_TERRAIN_RUN_STORE=1 -o $@ $(filter %.cpp,$^)
-
 test: verify-terrain-ownership-runs
 
 build/runner-logical-layer-order-test: tests/core/RunnerLogicalLayerOrderTest.cpp $(wildcard src/core/*.h)
@@ -1078,14 +1073,12 @@ verify-logical-layer-order: build/runner-logical-layer-order-test
 
 test: verify-logical-layer-order
 
-verify-gameplay-collision-owner: build/gameplay-collision-owner-test build/gameplay-collision-owner-scalar-test build/gameplay-collision-owner-snapshot-test build/gameplay-collision-owner-run-store-test
+verify-gameplay-collision-owner: build/gameplay-collision-owner-test build/gameplay-collision-owner-scalar-test build/gameplay-collision-owner-snapshot-test
 	DOWNWELL_OWNERSHIP_WITNESS=build/ownership-runs.txt ./build/gameplay-collision-owner-test
 	DOWNWELL_OWNERSHIP_WITNESS=build/ownership-scalar.txt ./build/gameplay-collision-owner-scalar-test
 	cmp build/ownership-runs.txt build/ownership-scalar.txt
 	DOWNWELL_OWNERSHIP_WITNESS=build/ownership-snapshots.txt ./build/gameplay-collision-owner-snapshot-test
 	cmp build/ownership-runs.txt build/ownership-snapshots.txt
-	DOWNWELL_OWNERSHIP_WITNESS=build/ownership-run-store.txt ./build/gameplay-collision-owner-run-store-test
-	cmp build/ownership-scalar.txt build/ownership-run-store.txt
 
 build/gameplay-collision-owner-test: tests/core/GameplayCollisionOwnerTest.cpp src/core/GameplayWorld.cpp src/core/PlayerMotion.cpp src/core/Replay.cpp src/core/GameMakerRandom.cpp src/core/ObjectPack.cpp src/core/RoomPack.cpp src/core/AreaOneBuilder.cpp src/core/BuilderPatternPack.cpp $(wildcard src/core/*.h)
 	@mkdir -p build
@@ -1748,7 +1741,7 @@ test-ammo-dividers: build/ammo-dividers-test
 
 build/startup-options: FORCE_STARTUP_OPTIONS
 	@mkdir -p build
-	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(SKIP_LEVEL)' '$(TERRAIN_RUN_STORE)' '$(CXXFLAGS)' > $@.tmp
+	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(SKIP_LEVEL)' '$(CXXFLAGS)' > $@.tmp
 	@cmp -s $@.tmp $@ || cp $@.tmp $@
 
 $(OBJECTS): build/startup-options
