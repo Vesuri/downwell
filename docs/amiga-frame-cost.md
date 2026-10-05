@@ -167,6 +167,7 @@ numbers. Do not retry a row without removing the reason in its last column.
 
 | Area | Approach | Result | Why it lost | Commit, patch |
 | --- | --- | --- | --- | --- |
+| Alarms | Borrow native box prefix instead of copying/sorting box handles | 845 52.7 → 41.0 ms; 661 71.9 → 72.5 ms | Removes the cold rebuild, but fails the affected-frame gate: row restoration at 661 rises 4.1 → 4.6 ms despite faster simulation | This row's introducing commit, `native-box-alarm-prefix-rejected.patch` |
 | Display restoration | Ordered disjoint row-debt ranges replacing the row map | Combat 67.3 → 66.0 ms; 886 34.1 → 34.8 ms | Sync saves 1.29 ms, below the 1.5 ms target; time-field dirty queries rise 1.0 → 1.5 ms and regress an affected frame | This row's introducing commit, `row-debts-rejected.patch` |
 | Effects | Offline shifted CPU word stamps into the retained raster | Combat 67.3 → 66.9 ms; 649 85.3 → 87.3 ms | CPU word painting costs 2.82 ms in combat and requires extra DMA fences; misses the 3 ms target and regresses first-effect composition | This row's introducing commit, `effect-word-stamps-rejected.patch` |
 | Terrain ownership | Immutable prefixes with per-cell overrides, no row copies | 701 105.9 → 111.2 ms; 844 88.8 → 96.0 ms; tape 30.19 → 29.61 FPS | Override lookup/merging outweighs removed materialization; terrain drawing at 844 rises 8.0 → 9.6 ms | This row's introducing commit, `terrain-sparse-owner-rejected.patch` |

@@ -306,6 +306,8 @@ are closed in the [rejection table](amiga-frame-cost.md#rejected-approaches);
 do not retry per-frame capture preparation. Any later proposal must eliminate
 the rebuild itself, including cold birth/retirement frames, rather than change
 its temporary array layout.
+The borrowed native-box prefix attempt is also closed; do not tune its
+sub-millisecond scan or repeat it without resolving the affected-frame loss.
 
 Target: quiet frames under 22 ms; current mean is 26.3 ms. Player and walking
 enemy motion cost about 5.6 ms together, but each is under 3 ms in this window.
