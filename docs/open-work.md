@@ -197,10 +197,10 @@ Reference: [upgrade IDs and source entry points](upgrade-coverage.md).
 
 Fit worst-case gameplay, style/upgrade navigation and transitions into 20 ms.
 Average FPS is not the criterion. The [frame-cost audit](amiga-frame-cost.md)
-measures `11186ab9` on the contact tape: 3,185 PAL fields. Quiet frames take
-28.4 ms, combat 71.3 ms and time-field frames 37.3 ms. Budget examples are
-701 (109.0 ms: generation on top of combat), 844 (96.3 ms: generation),
-645 (97.9 ms: contact) and 660 (109.3 ms: combat). Menu
+measures `22df6961` on the contact tape: 2,980 PAL fields. Quiet frames take
+26.3 ms, combat 67.4 ms and time-field frames 35.4 ms. Budget examples are
+701 (106.7 ms: generation on top of combat), 844 (92.1 ms: generation),
+645 (94.0 ms: contact) and 660 (106.3 ms: combat). Menu
 scenes (`profile.sh transition`) peak at two fields; gameplay entry from the
 well is not covered by any tape.
 
@@ -243,19 +243,26 @@ gauge) and left ten opt-in flags behind. Do not repeat that.
 
 ### A. Generation bursts (frames 701 and 844)
 
-`generateLiveTerrain` costs 42.97 ms at 701 and 40.92 ms at 844. A whole
+`generateLiveTerrain` costs 42.81 ms at 701 and 41.05 ms at 844. A whole
 builder pattern is emitted synchronously, as in the original; the draws and
 creations must stay in that order. Further changes must remove remaining
 publication or Create machinery, not reorder those effects.
 
 **Remaining budget shortfall, not another encoding sweep.** Generation at
-701 still exceeds the 30 ms target. Event cells take 20.23 ms and prepared
+701 still exceeds the 30 ms target. Event cells take 20.15 ms and prepared
 terrain publication 13.92 ms (nested within generation). At 844 these are
-26.22 and 6.87 ms. The next generation attempt must eliminate a named
+26.35 and 6.87 ms. The next generation attempt must eliminate a named
 remaining structure, not retune the prepared row program or its helpers.
 
-   - Retain this shortfall for the budget review after C; do not reopen the
-     prepared row encoding or individual publication helpers.
+   - Next: replace redundant native fixed-terrain materialization rather than
+     reopen the prepared row encoding or individual publication helpers.
+     Evaluate an immutable prepared-row owner with dynamic overlays instead
+     of expanding each segment into occupancy cells, landing bits and platform
+     records. The measured structure is `createPrepared` (13.92 ms at 701).
+     Establish a saving estimate from that subtree before implementing one
+     complete attempt; include all collision/landing queries and painting in
+     the paired gate, not just publication. No deferred source-visible Create
+     or later terrain exposure is permitted.
    - Preserve source-ordered terrain segments separated by event cells: never
      expose later terrain to an earlier Create. Retain the scalar reference
      for registered terrain, instance IDs, and capacity/failure prefixes.
@@ -269,24 +276,37 @@ remaining structure, not retune the prepared row program or its helpers.
      Keep `REFERENCE_BREAKABLES=1` as the oracle, including room re-entry and
      failure prefixes. See the
      [allocation contract](terrain-update-contract.md#native-breakable-allocation).
-   - Enemy configuration at 844 costs 3.37 ms, but its ownership portion is
-     2.85 ms. Fold ownership changes into C if justified by the whole family
-     walk, rather than a separate sub-3-ms birth optimization.
+   - Event-cell Create remains a separate shortfall after fixed-terrain
+     publication. Remove a measured publication/command structure as a whole;
+     do not tune `nextU32`, constructors or small choice helpers individually.
+     One enemy configuration at 844 costs 3.59 ms, including about 3.07 ms
+     in lifecycle birth. Charge mutation costs in the affected-frame gate.
 
-### C. Runner-walk budget review
+### B. Combat composition shortfall
 
-Repeat the full contact-tape audit now that the runner-walk queue has been
-worked through. Refresh the cost-by-owner table and identify the remaining
-structures responsible for the quiet-frame gap and generation/combat bursts.
-Use that audit to review the held A and combat-composition shortfalls before
-reopening parked work; do not resume individual helper tuning.
+Currency/smoke preparation still costs 9.72 ms in combat; Draw collection
+costs 5.03 ms, row synchronization 4.32 ms and effect publication 2.72 ms.
+Review the complete producer/compositor/consumer path, preserving source
+painter order, opaque-black replacement and shade subtraction. The two
+rejected effect approaches remain closed: a new proposal must remove their
+exact-query or CPU source/mask-extraction cost, not repeat either layout.
+Keep per-producer/presentation state and final pixels as oracles. Do not
+reopen small sprite assignment or gem-position helpers.
+
+### C. Quiet-frame and alarm shortfalls
 
 Alarm capture/dispatch remains a budget shortfall. Its two structural attempts
 are closed in the [rejection table](amiga-frame-cost.md#rejected-approaches);
-do not reopen it before the group-C budget review.
+do not retry per-frame capture preparation. Any later proposal must eliminate
+the rebuild itself, including cold birth/retirement frames, rather than change
+its temporary array layout.
 
-Target: quiet frames under 22 ms. The remaining distance is player and
-walking-enemy motion, about 5.6 ms together.
+Target: quiet frames under 22 ms; current mean is 26.3 ms. Player and walking
+enemy motion cost about 5.6 ms together, but each is under 3 ms in this window.
+Leave their individual helpers alone. A quiet-frame proposal needs a shared
+work structure to remove, measured across its callers, not a collection of
+unrelated sub-millisecond edits. Alarm dispatch is 1.02 ms quiet, 2.07 ms in
+combat and 4.39 ms at 645.
 
 ### D. Parked until A–C are done
 
