@@ -28,7 +28,8 @@ bool AmigaGameplayDrawList::entryCoverHardwareEligible(const GameplayWorld& worl
 }
 
 bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack,
-    const UBYTE* packEnd, int worldViewX, int worldViewY, bool compositeCurrency) {
+    const UBYTE* packEnd, int worldViewX, int worldViewY, bool compositeCurrency,
+    const AmigaActorFrames* prepared) {
     count = 0; failedSprite = failedFrame = 0;
 #if defined(DOWNWELL_BOB_VERIFY) || defined(DOWNWELL_DRAW_ORDER_AUDIT)
     static downwell::ActorDrawOrderVerification orderOracle;
@@ -47,7 +48,9 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
         if (x < downwellPlayfieldX - 64 || x > downwellPlayfieldX + downwellPlayfieldWidth + 64 ||
             y < -64 || y > downwellDisplayHeight + 64) return true;
         int left, top, width, height;
-        if (!amigaRendererAssetBounds(pack, packEnd,
+        const auto* binding=prepared?prepared->find(sprite,frame):nullptr;
+        if(binding)binding->bounds(x,y,flip,left,top,width,height);
+        else if (prepared || !amigaRendererAssetBounds(pack, packEnd,
                 sprite, frame, x, y, flip, &left, &top, &width, &height)) {
             failedSprite = sprite;
             failedFrame = frame;
@@ -57,7 +60,7 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
             left + width > downwellPlayfieldX && top < downwellDisplayHeight && top + height > 0)
         {
             if (count == capacity) { failedSprite = sprite; failedFrame = frame; return false; }
-            actors[count++] = {sprite, frame, x, y, flip};
+            actors[count++] = {sprite, frame, x, y, flip, binding};
         }
         return true;
     };

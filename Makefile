@@ -1939,7 +1939,7 @@ $(AMIGA_MENU_SCROLL_TEST_TARGET): $(AMIGA_MENU_SCROLL_TEST_SOURCES)
 	@mkdir -p $(@D)
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(AMIGA_MENU_SCROLL_TEST_SOURCES)
 
-$(AMIGA_RENDERER_TEST_TARGET): $(AMIGA_RENDERER_TEST_SOURCES)
+$(AMIGA_RENDERER_TEST_TARGET): $(AMIGA_RENDERER_TEST_SOURCES) src/platform/amiga/AmigaActorFrames.h
 	@mkdir -p $(@D)
 	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $(AMIGA_RENDERER_TEST_SOURCES)
 
@@ -2306,6 +2306,7 @@ test: test-amiga-damage-text
 .PHONY: test-amiga-frame-decoder
 test-amiga-frame-decoder:
 	python3 tests/amiga-frame-decoder-test.py
+test: test-amiga-frame-decoder
 build/amiga-gameplay-sprite-assignment-test: tests/platform/amiga/AmigaGameplaySpriteAssignmentTest.cpp src/platform/amiga/AmigaGameplaySpriteAssignment.cpp $(HOST_CHECK_HEADERS)
 	@mkdir -p build
 	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $(filter %.cpp,$^)

@@ -1,4 +1,5 @@
 #include "platform/amiga/AmigaRenderer.h"
+#include "platform/amiga/AmigaActorFrames.h"
 #include "platform/amiga/AmigaWallBackground.h"
 #include "platform/amiga/AmigaAmmoHud.h"
 #ifdef DOWNWELL_AMMO_FACTORED
@@ -1545,6 +1546,39 @@ int main(int argc, char** argv) {
             require(retainedHud == freshHud,
                 "unchanged and closing shop restores foreground HUD without erasing underlying panel");
         }
+    }
+    {
+        static AmigaActorFrames prepared;
+        const auto* pack=gamePack.data();const auto* end=pack+gamePack.size();
+        require(prepared.prepare(pack,end),"prepare immutable gameplay actor bindings");
+        const auto word=[](const UBYTE* p){return unsigned(p[0])*256+p[1];};
+        const unsigned count=word(pack+8)*65536+word(pack+10);
+        unsigned checked=0;
+        for(unsigned i=0;i<count;++i){
+            const auto* r=pack+20+i*24;const auto sprite=word(r),frame=word(r+2);
+            if(sprite>=741)continue;
+            const auto* f=prepared.find(sprite,frame);require(f,"every original actor frame indexed");
+            for(int flip:{0,1})for(int x:{-20,110,270})for(int y:{-32,0,284}){
+                int l,t,w,h,rl,rt,rw,rh;f->bounds(x,y,flip,l,t,w,h);
+                require(amigaRendererAssetBounds(pack,end,sprite,frame,x,y,flip,&rl,&rt,&rw,&rh)&&
+                    l==rl&&t==rt&&w==rw&&h==rh,"prepared actor bounds equal scalar pack decoder");
+                for(unsigned p=0;p<5;++p){
+                    AmigaResolvedSpritePart actual{},expected{};
+                    const bool a=f->part(p,flip,actual);
+                    const bool b=p<4&&amigaRendererResolveSpritePart(&expected,pack,end,sprite,frame,p,flip);
+                    require(a==b,"prepared parts retain absent variants and exact multipart count");
+                    if(a)require(actual.pack==expected.pack&&actual.end==expected.end&&
+                        actual.record==expected.record&&actual.partCount==expected.partCount,
+                        "prepared part binds the original immutable DMA payload");
+                }
+                ++checked;
+            }
+        }
+        require(!prepared.find(741,0)&&!prepared.find(1,1024)&&!prepared.find(143,0),
+            "missing sprite, page and sparse frame remain absent");
+        require(!prepared.prepare(pack,pack+19)&&!prepared.find(1,0),"failed preparation invalidates old bindings");
+        require(prepared.prepare(pack,end),"bindings can be prepared again at ownership boundary");
+        std::cout<<"Prepared actor frame cases: "<<checked<<'\n';
     }
     std::cout << "Amiga renderer pixel comparisons passed\n";
     // Run the raster checks even when asset growth violates the residency gate.

@@ -254,8 +254,8 @@ terrain publication 13.92 ms (nested within generation). At 844 these are
 25.98 and 6.87 ms. The next generation attempt must eliminate a named
 remaining structure, not retune the prepared row program or its helpers.
 
-   - Continue with B now that the group-A structural attempts and audit are
-     complete; retain this shortfall for the budget review after C.
+   - Retain this shortfall for the budget review after C; do not reopen the
+     prepared row encoding or individual publication helpers.
    - Preserve source-ordered terrain segments separated by event cells: never
      expose later terrain to an earlier Create. Retain the scalar reference
      for registered terrain, instance IDs, and capacity/failure prefixes.
@@ -273,22 +273,12 @@ remaining structure, not retune the prepared row program or its helpers.
      2.69 ms. Fold ownership changes into C if justified by the whole family
      walk, rather than a separate sub-3-ms birth optimization.
 
-### B. Combat composition (85.3 ms; also 645 and 701)
+### B. Refresh the combat audit before C
 
-4. **Software actor drawing.** `amigaRendererDrawAsset` costs 3.2 ms in
-   combat, about two actors at 10,000 cycles each that got no hardware sprite.
-   At 645, `buildHardwareSpritePart` spends 2.8 ms building sprite DMA words
-   on the CPU. All eight channels are usable since `b815af63`:
-   - find out why those actors fall back, and assign them channels before
-     falling back to the CPU;
-   - bind prepared sprite-format frames instead of copying their payload into
-     channel buffers each frame (conversion is already offline). Preserve
-     independent control words when simultaneous actors use the same frame.
-
-   Do this only if the two together are still over 3 ms after B1–B3.
-
-Verify the mixed DMA/planar frame against original captures, preserving
-controller priority.
+Repeat the full contact-tape audit with the default build, including all quiet,
+combat, contact, generation and field windows. Update the frame-cost reference
+and the queue's baseline from that evidence before the per-frame runner work.
+Do not reopen the two rejected effect-composition approaches or the gauge.
 
 ### C. Per-frame runner walks (quiet frames, 28.4 ms)
 

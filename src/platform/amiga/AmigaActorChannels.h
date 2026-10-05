@@ -1,9 +1,9 @@
 #ifndef DOWNWELL_AMIGA_ACTOR_CHANNELS_H
 #define DOWNWELL_AMIGA_ACTOR_CHANNELS_H
 
-// Call in front-to-back painter order. Low-numbered DMA sprites cover higher
-// channels, and all DMA sprites cover PF1 BOBs. Once an actor falls back to
-// PF1, every actor behind it must also fall back, even if a smaller one fits.
+// Allocate in front-to-back painter order: low-numbered DMA sprites cover
+// higher channels. Capacity failure is sticky. The caller separately enforces
+// planar occlusion before requesting channels for actors behind a PF1 BOB.
 class AmigaActorChannels {
 public:
     explicit AmigaActorChannels(unsigned limit = 8) : limit_(limit > 8 ? 8 : limit) {}

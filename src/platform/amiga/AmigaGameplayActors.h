@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_AMIGA_GAMEPLAY_ACTORS_H
 #define DOWNWELL_AMIGA_GAMEPLAY_ACTORS_H
 #include "AmigaRenderer.h"
+#include "AmigaActorFrames.h"
 #include "core/LaserSightLine.h"
 #include "core/PaletteEffectSurface.h"
 class Bitmap;
@@ -11,7 +12,10 @@ class AmigaLaserSight;
 static constexpr UWORD gameplayRayMarker = 65535;
 // x/y are text anchor, flip stores the signed integer damage, frame is unused.
 static constexpr UWORD gameplayDamageTextMarker = 65534;
-struct GameplayBob { UWORD sprite, frame; int x, y, flip; };
+struct GameplayBob {
+    UWORD sprite, frame; int x, y, flip;
+    const AmigaActorFrames::Frame* prepared=nullptr;
+};
 class AmigaGameplayActors {
 public:
     static constexpr unsigned regularChannels = 6;
@@ -21,11 +25,10 @@ public:
         bool ready;
         UWORD failedSprite, failedFrame;
     };
-    // Channels are player, six regular slots, overflow. Select the frontmost
-    // suffix only: a failed fit or planar ray forbids backfilling behind it.
-    // Final controller alpha overlapping an actor canvas is another planar
-    // boundary. Actors ahead of it remain eligible; holes permit DMA sprites.
-    static Assignment assign(const GameplayBob* actors, unsigned count,
+    // Channels are player, six regular slots, overflow, in front-to-back
+    // priority. Disjoint planar occluders may be passed; overlapping ones
+    // remain boundaries. Compact unassigned actors in stable painter order.
+    static Assignment assign(GameplayBob* actors, unsigned count,
         const UBYTE* pack, const UBYTE* packEnd, Sprite& player,
         Sprite* regular, Sprite& overflow, unsigned height, unsigned limit = 8,
         const downwell::PaletteEffectSurface<>* controller = nullptr);

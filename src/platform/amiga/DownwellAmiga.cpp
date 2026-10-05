@@ -1859,6 +1859,12 @@ __attribute__((noinline)) static int runDownwell(void) {
     if(!AmigaGameplayActors::prepareDamageText(activeGamePack,activeGamePackEnd)){
         platform.restore();FreeMem(startupCopperWords,4*sizeof(UWORD));memory.release();return 20;
     }
+#ifndef DOWNWELL_REFERENCE_ACTOR_PREFIX
+    static AmigaActorFrames actorFrames;
+    if(!actorFrames.prepare(amiga_game_pack,amiga_game_pack_end)){
+        platform.restore();FreeMem(startupCopperWords,4*sizeof(UWORD));memory.release();return 20;
+    }
+#endif
     static downwell::EffectMaskAssets effectAssets;
     alignas(downwell::CurrencySmokeComposition) static UBYTE effectStorage[sizeof(downwell::CurrencySmokeComposition)];
     auto& controllerEffects = *new (effectStorage) downwell::CurrencySmokeComposition;
@@ -3333,7 +3339,11 @@ __attribute__((noinline)) static int runDownwell(void) {
             static_assert(gameplayPlayerStartY == AmigaGameplayDrawList::playerStartY &&
                           gameplayPlayerGroundY == AmigaGameplayDrawList::replayGroundY,
                           "Actor and gameplay camera anchors must agree");
-            if (!actorList.collect(port, activeGamePack, activeGamePackEnd, worldViewX, worldViewY, compositeCurrency)) {
+            if (!actorList.collect(port, activeGamePack, activeGamePackEnd, worldViewX, worldViewY, compositeCurrency
+#ifndef DOWNWELL_REFERENCE_ACTOR_PREFIX
+                , &actorFrames
+#endif
+            )) {
                 gDownwellActorFailureSprite = actorList.failedSprite;
                 gDownwellActorFailureFrame = actorList.failedFrame;
                 frameReady = false;
@@ -3376,7 +3386,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                 }
             }
             if(compositeEffects&&!AmigaEffectSurface::verify(controllerEffects.surface())){exitCode=20;break;}
-            const GameplayBob* actors = actorList.actors;
+            GameplayBob* actors = actorList.actors;
             const unsigned actorCount = actorList.count;
             const auto& rayLine = actorList.rayLine;
             const bool rayVisible = actorList.rayVisible;

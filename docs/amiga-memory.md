@@ -156,6 +156,13 @@ block, requested asset bytes and remaining Chip memory after allocations.
 
 ## Ordinary memory
 
+`AmigaActorFrames` owns 45,138 bytes of static ordinary-memory render bindings
+on the 68000: canvas geometry, immutable sprite-part pointers and a bounded
+sparse frame index. It is prepared once from the linked game bank, before
+gameplay. Actor draw records carry pointers into that bank. It adds no Chip
+allocation; the existing sixteen channel buffers still own DMA control words.
+This is not a second copy of sprite pixels.
+
 Room, object-registration and layer-element links store internal pool slots,
 not resource IDs or instance generations. `SlotIndex` uses 16-bit links when
 the capacity **including the end sentinel** fits in 65535, and 32-bit links

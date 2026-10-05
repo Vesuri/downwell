@@ -118,13 +118,27 @@ headers retain distinct storage. `amigaRendererChipPackBytes` validates and size
 this layout; `amigaRendererCopyChipPack` checks capacity before writing. Source
 and destination must be separate allocations. No such packing occurs per frame.
 
-Hardware sprites sit in front of both playfields. Initial channel allocation:
+Gameplay PF2 (the HUD and opaque black side panels) covers all eight hardware
+sprite channels; the channels cover PF1. Lower-numbered channels cover higher
+ones. Assign actor parts front-to-back in original painter order, with no fixed
+player/enemy channel reservation. PF2 masks horizontal gameplay edges.
 
-- player: one attached pair when four colours are insufficient, otherwise one
-  channel;
-- bullets, gems, and small effects: remaining channels 0..6 where their
-  width, palette, and multiplexing lifetime fit;
-- enemies: candidates only after the playfield implementation is correct.
+`AmigaActorFrames` prepares immutable canvas bounds and every available flipped
+DMA-part binding once from the ordinary-memory game bank. Draw collection puts
+the binding beside the actor position; assignment reuses it without another
+directory search. Sparse variant-frame pages retain absent frames as absent.
+The bank must remain immutable and alive through all uses. Preparation failure
+returns startup code 20. No pixel conversion or additional Chip allocation is
+involved. Existing channel buffers retain independent control words and cache
+unchanged prepared payloads.
+
+A planar ray or exhausted channel capacity ends assignment. A planar damage
+label or controller-covered actor instead adds a conservative canvas occluder:
+actors behind it may use otherwise idle channels only when they overlap neither
+an earlier planar canvas nor opaque controller pixels. At most sixteen planar
+occluders are kept; overflow retains the conservative stop. Stable compaction
+preserves the remaining BOB order. `REFERENCE_ACTOR_PREFIX=1` retains scalar
+frame lookup and the original frontmost-prefix-only channel assignment.
 
 Every unused channel points at an armed-safe null sprite on every frame. Sprite
 priority is programmed explicitly together with PF2-over-PF1 priority; it must
