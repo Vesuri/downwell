@@ -127,6 +127,48 @@ public:
         prepared_=true;return true;
     }
     unsigned playerSourceId()const{return playerId_;}
+    // A native always-active family has no per-instance layer elements.
+    // Its first live birth resolves the layer at the source creation point;
+    // the family population pins that layer until the last retirement. An
+    // empty lease must resolve again: another family may erase/reuse a slot.
+    struct SceneryFamily {
+        unsigned layer=Layers::End,population=0;
+        std::int32_t depth=0;
+    };
+    bool borrowSceneryFamily(SceneryFamily& family,NativeFamilyBirth& birth){
+        if(!enabled()){birth.population={};return true;}
+        if(!valid()||!prepared_)return fail();
+        if(!family.population){
+            family.layer=layers_.findDynamic(family.depth);
+            if(family.layer==Layers::End){
+                if(!ids_.createDynamic(layers_,family.depth,family.layer))return fail();
+                projectionValid_[family.layer]=false;
+            }
+        }
+        if(!layers_.borrowRetainedPopulation(family.layer,birth.population))return fail();
+        birth.population.family=&family.population;birth.population.live=&live_;
+        return true;
+    }
+    bool birthSceneryFamily(SceneryFamily& family){
+        if(!enabled())return true;
+        if(!good_||!prepared_)return fail();
+        if(!family.population){
+            family.layer=layers_.findDynamic(family.depth);
+            if(family.layer==Layers::End){
+                if(!ids_.createDynamic(layers_,family.depth,family.layer))return fail();
+                projectionValid_[family.layer]=false;
+            }
+        }
+        if(!layers_.retain(family.layer,1))return fail();
+        ++family.population;++live_;return true;
+    }
+    bool retireSceneryFamily(SceneryFamily& family){
+        if(!enabled())return true;
+        if(!good_||!prepared_||!family.population||!live_||
+           !layers_.releaseRetained(family.layer,1))return fail();
+        if(!layers_.get(family.layer))projectionValid_[family.layer]=false;
+        --family.population;--live_;return true;
+    }
     // Always-active scenery has no projected Draw and never moves depth.
     // Keep its logical population (capacity and dynamic-layer lifetime), not
     // one physical element and lifetime object for every box/time field.

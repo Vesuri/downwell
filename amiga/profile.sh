@@ -77,6 +77,7 @@ if [[ ${SKIP_LEVEL:-0} == 1 && $mode != trace && $mode != fields-clear ]]; then 
 restore() {
   unset REFERENCE_RANDOM
   unset REFERENCE_PATTERNS
+  unset REFERENCE_BREAKABLES
   unset DRAW_CACHE_AUDIT
   unset DRAW_ORDER_AUDIT
   unset LOCAL_DRAW_CAPTURE

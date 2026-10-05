@@ -159,3 +159,33 @@ stale staging data over a directly composed cache span. Both producer kinds
 share the 16-row repaint budget, dirty-run partitioning and physical wrap;
 neither acknowledges live display-buffer debts. A failed producer leaves its
 run dirty and does not publish it.
+
+## Native breakable allocation
+
+The world's append-only breakable slots own their state, identity and grid
+membership. Unused slots already contain default script state from construction;
+room/configuration boundaries reset previously used slots only after successful
+retirement. A live birth writes its actual Create inputs, active flag and new
+lifetime, not another copy of the default sound/alarm/effect state.
+
+For native scenery, `NativeFamilyBirth` borrows chronology/revision counters
+from `NativeInstanceTable` and a population lease from `GameplayRoomLayers`.
+It creates no registry entry or layer element per breakable. The chronology
+stamp and alarm invalidation precede layer attachment, including failed
+attachment prefixes. Actor-only Draw revisions do not change for these births.
+Other record owners and bindings with additional layer observers retain the
+ordinary lifecycle callback path.
+
+The first live family birth resolves/creates its layer at the source attachment
+point. The retained population pins that layer's lifetime and consumes the same
+bounded logical capacity as ordinary elements. When the last instance retires,
+the next birth must acquire a new lease; a cached slot may have been erased or
+reused. All borrowed owners outlive the world, and only the authoritative
+allocator may use the descriptor. Registration queries, alarms and cleanup
+continue to merge native records using their original chronology stamps.
+
+`REFERENCE_BREAKABLES=1` retains per-birth initialization and generic ownership.
+The native-ownership replay compares both families' state/order against the
+registered reference, including room-backed cleanup, slot reuse and Retry.
+The native Draw-capture unit test also checks shared chronology, alarm versus
+actor-Draw invalidation, layer reacquisition and failed-attachment prefixes.

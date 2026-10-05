@@ -191,6 +191,7 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
     currencyAccount_.playerCreated();
     death_ = {};
     invulnerability_ = 0;
+    prepareBreakableSlotsForReuse();
     enemyCount_ = breakableCount_ = blocksDestroyed_ = 0;
     bulletSlotEnd_ = gemSlotEnd_ = 0;
     for (unsigned i = 0; i < bulletCapacity; ++i) bullets_[i].active = false;
@@ -618,6 +619,7 @@ void GameplayWorld::configureBreakables(const int* x, const int* y,
         return;
     if (count > breakableCapacity) {run_.effectsSucceeded=false;return;}
     if(!clearBreakableOwnership())return;
+    prepareBreakableSlotsForReuse();
     breakableCount_ = 0;
     breakableIndexReady_ = true;
     for (auto& cell : breakableIndex_) cell = 0;
@@ -679,6 +681,17 @@ bool GameplayWorld::clearBreakableOwnership() {
     return true;
 }
 
+void GameplayWorld::prepareBreakableSlotsForReuse(){
+#ifndef DOWNWELL_REFERENCE_BREAKABLES
+    // Append-only slots are constructed once before gameplay. Reused slots
+    // are reset here, at the room/configuration boundary after retirement,
+    // never in a live generation burst. Individual retirement keeps its
+    // observable dead record intact until that boundary.
+    static const Breakable initial{0,0,false,0};
+    for(unsigned i=0;i<breakableCount_;++i)breakables_[i]=initial;
+#endif
+}
+
 bool GameplayWorld::appendBreakables(const int* x, const int* y, unsigned count,
     const downwell::BreakableState* creation)
 {
@@ -688,6 +701,17 @@ bool GameplayWorld::appendBreakables(const int* x, const int* y, unsigned count,
     if(count&&(!nextBreakableLifetimeId_||count-1>0xffffffffu-nextBreakableLifetimeId_))return false;
     for (unsigned source = 0; source < count; ++source) {
         const unsigned index = breakableCount_++;
+#ifndef DOWNWELL_REFERENCE_BREAKABLES
+        // The unused pool slot already holds default script state. Only
+        // actual Create inputs and its new identity are live work.
+        auto& record=breakables_[index];
+        record.x=x[source];record.y=y[source];record.active=true;
+        if(creation)record.state=creation[source];
+        record.lifetimeId=nextBreakableLifetimeId_++;
+        auto* allocation=breakableLifecycle_.nativeAllocation();
+        if(!(allocation?allocation->publish(record.nativeRegistration):
+             breakableLifecycle_.birth({index,record.lifetimeId},record))) {
+#else
         breakables_[index].x = x[source];
         breakables_[index].y = y[source];
         breakables_[index].active = true;
@@ -699,6 +723,7 @@ bool GameplayWorld::appendBreakables(const int* x, const int* y, unsigned count,
         breakables_[index].nativeRegistration=0;
         breakables_[index].lifetimeId = nextBreakableLifetimeId_++;
         if(!breakableLifecycle_.birth({index,breakables_[index].lifetimeId},breakables_[index])) {
+#endif
             run_.effectsSucceeded=false;return false;
         }
         if ((x[source] & 15) || (y[source] & 15) || x[source] < -512 ||

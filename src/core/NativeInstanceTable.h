@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_NATIVE_INSTANCE_TABLE_H
 #include "InstanceHandle.h"
 #include "RunnerObjectMembership.h"
+#include "NativeFamilyBirth.h"
 #include <cstdint>
 namespace downwell {
 // The ordering half of the runner instance registry, for owners whose
@@ -45,6 +46,19 @@ template<unsigned Capacity> class NativeInstanceTable {
     bool live(InstanceHandle h)const{return h.slot<Capacity&&h.generation&&entries_[h.slot].generation==h.generation;}
 public:
     explicit NativeInstanceTable(bool externalOrder=false):externalOrder_(externalOrder){}
+    // Bind once for an append-only external family wholly inside/outside
+    // the watched alarm ranges. Keep chronology/revisions, not slot entries.
+    bool bindExternalFamily(unsigned first,unsigned end,NativeFamilyBirth& birth){
+        if(!externalOrder_||first>=end||end>Capacity)return false;
+        const bool watched=(first>=captureFirst_&&end<=captureLast_)||
+                           (first>=captureSecond_&&end<=captureEnd_);
+        const bool overlap=(end>captureFirst_&&first<captureLast_)||
+                           (end>captureSecond_&&first<captureEnd_);
+        if(overlap&&!watched)return false;
+        birth.nextOrder=&nextOrder_;birth.bindingRevision=&bindingRevision_;
+        birth.captureRevision=&captureRevision_;birth.captureDirty=watched?captureDirty_:nullptr;
+        return true;
+    }
     // Native families share chronology, not registry entries. Their records
     // own lifetime/flags; these notifications only invalidate captures.
     bool externalBirth(unsigned slot,std::uint32_t& order){

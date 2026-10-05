@@ -39,10 +39,11 @@ using View=downwell::GameplayCollisionView;
 // Exercise room cleanup directly: a final-state digest alone cannot detect
 // reordered callbacks when all marked records ultimately disappear.
 std::vector<unsigned> cleanupOrder(const downwell::ObjectPack& objects,
-    const downwell::SpriteCollisionPack& sprites,Ownership ownership,unsigned scenario){
+    const downwell::SpriteCollisionPack& sprites,Ownership ownership,unsigned scenario,
+    const downwell::RoomPack* rooms=nullptr){
     auto owner=std::make_unique<downwell::GameplayCollisionOwner>(objects,sprites,
         downwell::GameplayTerrainInstances::Presentation{},downwell::GameplayTerrainInstances::WallCollision{},
-        nullptr,ownership);
+        rooms,ownership);
     auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
         owner->breakableBinding(),owner->playerBinding());
     require(owner->attach(*world),"cleanup fixture attaches");
@@ -64,9 +65,18 @@ std::vector<unsigned> cleanupOrder(const downwell::ObjectPack& objects,
     }
     if(scenario==4){
         const downwell::InstanceHandle old{0,world->breakableSlot(0).lifetimeId};
+        auto& used=const_cast<GameplayWorld::Breakable&>(world->breakableSlot(0));
+        used.alarm0=17;used.myFx={9,12};used.sound.sndsnd=42;
+        used.state.hit=true;used.state.scriptIndex=7;
         require(world->markBreakableDestroyed(old),"old slot marked");
         const int x=0,y=336;world->configureBreakables(&x,&y,1);
         require(world->effectsSucceeded(),"box slots reset before pending cleanup");
+        const auto& fresh=world->breakableSlot(0);
+        require(!world->findBreakable(old)&&fresh.alarm0==-1&&!fresh.myFx.generation&&
+            fresh.sound.sndsnd==-1&&!fresh.state.hit&&fresh.state.scriptIndex==0&&
+            fresh.state.breakSound==171&&fresh.state.wallHp.high==0x3ff00000u&&
+            fresh.state.wallHp.low==0&&!fresh.destroyRequested,
+            "prepared defaults replace all previous-lifetime script state");
     }
     for(unsigned i=world->breakableSlots();i;--i)
         require(world->markBreakableDestroyed({i-1,world->breakableSlot(i-1).lifetimeId}),"reverse box marking");
@@ -237,6 +247,9 @@ int main(int argc,char** argv){
         const auto expected=cleanupOrder(objects,sprites,Ownership::reference,scenario);
         require(cleanupOrder(objects,sprites,Ownership::nativeScenery,scenario)==expected,
             "native family destruction callback order matches the registered room");
+        const auto roomExpected=cleanupOrder(objects,sprites,Ownership::reference,scenario,&rooms);
+        require(cleanupOrder(objects,sprites,Ownership::nativeScenery,scenario,&rooms)==roomExpected,
+            "native scenery lease preserves room-backed cleanup, reuse and Retry");
     }
     unsigned tapes=0,frames=0,maxTerrain=0;
     for(unsigned phase=0;phase<10;++phase){

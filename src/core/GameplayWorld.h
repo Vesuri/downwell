@@ -1002,6 +1002,7 @@ private:
     bool publishPlayerPosition(int x,int y);
     bool retireBreakable(unsigned index);
     bool clearBreakableOwnership();
+    void prepareBreakableSlotsForReuse();
     std::uint32_t nextBreakableLifetimeId_ = 1;
     bool publishEnemyActivation(const EnemyState& enemy, bool active);
     bool publishEnemyImage(const EnemyState& enemy,unsigned phase);

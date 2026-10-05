@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_RUNNER_LAYERS_H
 #include "RunnerLayerElements.h"
 #include "RunnerImageValue.h"
+#include "NativeFamilyBirth.h"
 #include <cstdint>
 namespace downwell {
 template<unsigned Capacity,bool Enabled> struct RunnerRetainedLayerPopulation {};
@@ -81,6 +82,12 @@ public:
         static_assert(Retained,"Retained population is opt-in");
         if(failed_||!get(layer)||count>Elements-this->logical)return false;
         this->retained[layer]+=count;this->logical+=count;return true;
+    }
+    bool borrowRetainedPopulation(unsigned layer,NativeFamilyBirth::Population& out){
+        static_assert(Retained,"Retained family population requires native layers");
+        if(failed_||!get(layer))return false;
+        out.retained=&this->retained[layer];out.logical=&this->logical;
+        out.capacity=Elements;return true;
     }
     unsigned retainedAvailable(unsigned layer)const{
         static_assert(Retained,"Retained population is opt-in");

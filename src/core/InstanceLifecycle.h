@@ -5,6 +5,7 @@
 #include "RunnerImageValue.h"
 #include "RunnerTransformField.h"
 #include "InstancePlaceResult.h"
+#include "NativeFamilyBirth.h"
 
 namespace downwell {
 
@@ -237,6 +238,9 @@ public:
     bool birth(InstanceHandle h,const Record& r)const{
         return (!birth_||birth_(context_,h,r))&&(!layerBirth_||layerBirth_(layerContext_,h,r));
     }
+    void bindNativeAllocation(NativeFamilyBirth& birth){nativeAllocation_=&birth;}
+    // An additional layer observer requires the complete callback path.
+    NativeFamilyBirth* nativeAllocation()const{return layerBirth_?nullptr:nativeAllocation_;}
     bool retire(InstanceHandle h,const Record& r)const{
         return (!retire_||retire_(context_,h,r))&&(!layerRetire_||layerRetire_(layerContext_,h,r));
     }
@@ -249,6 +253,7 @@ public:
     bool sprite(InstanceHandle h,const Record& r,int next)const{return !sprite_||sprite_(context_,h,r,next);}
 private:
     void* layerContext_=nullptr;
+    NativeFamilyBirth* nativeAllocation_=nullptr;
     bool (*layerBirth_)(void*,InstanceHandle,const Record&)=nullptr;
     bool (*layerRetire_)(void*,InstanceHandle,const Record&)=nullptr;
     bool (*layerActivation_)(void*,InstanceHandle,const Record&,bool)=nullptr;

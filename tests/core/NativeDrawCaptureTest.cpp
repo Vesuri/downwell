@@ -1,7 +1,57 @@
 #include "core/NativeInstanceTable.h"
+#include "core/RunnerLayers.h"
 #include <cassert>
 #include <cstdio>
+static void preparedFamily(){
+    using namespace downwell;
+    NativeInstanceTable<8> direct(true),reference(true);
+    bool dirty=false,referenceDirty=false;
+    assert(direct.watchCaptureRanges(2,4,6,8,dirty));
+    assert(reference.watchCaptureRanges(2,4,6,8,referenceDirty));
+    struct Population {
+        RunnerLayers<4,8,true> layers;
+        unsigned family=0,live=0,layer=4,acquisitions=0;
+        bool good=true;
+    } population;
+    NativeFamilyBirth birth;
+    assert(!direct.bindExternalFamily(1,3,birth)); // No partly watched family.
+    assert(direct.bindExternalFamily(2,4,birth));
+    birth.good=&population.good;birth.active=true;birth.context=&population;
+    birth.acquire=[](void* context,NativeFamilyBirth& b){
+        auto& p=*static_cast<Population*>(context);
+        ++p.acquisitions;
+        assert(p.layers.insertAfterEquals(100+p.acquisitions,0,true,p.layer));
+        assert(p.layers.borrowRetainedPopulation(p.layer,b.population));
+        b.population.family=&p.family;b.population.live=&p.live;
+        return true;
+    };
+    for(unsigned round=0;round<2;++round){
+        for(unsigned n=0;n<8;++n){
+            dirty=referenceDirty=false;
+            std::uint32_t stamp=0,expected=0;
+            assert(reference.externalBirth(2,expected)&&birth.publish(stamp));
+            assert(stamp==expected&&dirty==referenceDirty&&
+                direct.bindingRevision()==reference.bindingRevision()&&
+                direct.captureRevision()==reference.captureRevision()&&
+                direct.localCaptureRevision()==reference.localCaptureRevision());
+            assert(population.layers.retainedCount(population.layer)==n+1&&population.family==n+1);
+        }
+        assert(population.acquisitions==round+1); // No per-birth layer work.
+        for(unsigned n=0;n<8;++n){
+            assert(population.layers.releaseRetained(population.layer,1));
+            --population.family;--population.live;
+        }
+        assert(!population.layers.get(population.layer));
+    }
+    // Failed layer attachment still consumes the original chronology prefix.
+    birth.leased=false;
+    birth.acquire=[](void*,NativeFamilyBirth&){return false;};
+    std::uint32_t stamp=0,expected=0;
+    assert(reference.externalBirth(2,expected)&&!birth.publish(stamp)&&stamp==expected);
+    assert(!population.good&&direct.bindingRevision()==reference.bindingRevision());
+}
 int main(){
+    preparedFamily();
     downwell::NativeInstanceTable<8> table(true);
     bool dirty=false;
     assert(table.watchCaptureRanges(0,4,4,8,dirty));

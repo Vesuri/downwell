@@ -262,26 +262,20 @@ them.
    - Target remains generation at 701 under 30 ms and the cell loop under
      3 ms. Keep this budget check open until measured; publication changes
      alone do not close it. Implement item 3 next, then re-audit group A.
-3. **Native breakables.** At 844, 13 `GameplayWorld::appendBreakables` births
-   take 11.0 ms (6,000 cycles each; 5.2 ms at 701):
-   - 7.4 ms is the collision-owner binding: `RecordLifecycleBinding::birth` →
-     `Binding::birthMode` → `nativeBirth`. Within it:
-     - `GameplayRoomLayers::birthScenery` 2.1 ms;
-     - `Binding::key` validation, including `GameplayCollisionOwner::valid`,
-       2.4 ms;
-     - `NativeInstanceTable::externalBirth` 1.4 ms.
-   - 3.7 ms is initialising the record.
+3. **Complete the generation-family budget checks.** Re-audit group A with
+   the default native allocation path and `REFERENCE_BREAKABLES=1` as its
+   retained oracle. The breakable target remains under 1,500 cycles per birth;
+   distinguish mandatory input/identity/grid publication from remaining
+   removable ownership work before another change. Do not tune individual
+   counter writes or copy loops to chase that threshold.
 
-   Breakables are static grid-aligned blocks, already indexed in
-   `breakableIndex_`. Give them the treatment native terrain got:
-   - a compact record plus the grid flag;
-   - one prepared record template copied at birth;
-   - room-layer and owner registration only when an original query or Draw
-     needs the instance (see E).
-
-   Time-field adoption (1.8 ms at 701) and `configureEnemy` (3.1 ms at 844)
-   follow the same pattern, if they are still over 3 ms afterwards. Target:
-   under 1,500 cycles per breakable.
+   Measure time-field adoption and `configureEnemy` in the same windows;
+   replace their ownership structure only if the cost remains over 3 ms.
+   Verify pooled-slot preparation at room entry/re-entry as well as births,
+   including failure prefixes and chronological registration. Keep any
+   unmet generation targets open after the audit rather than claiming the
+   20 ms budget from a faster average. See the
+   [allocation contract](terrain-update-contract.md#native-breakable-allocation).
 
 ### B. Combat composition (85.4 ms; also 645 and 701)
 

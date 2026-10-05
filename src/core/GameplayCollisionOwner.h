@@ -484,8 +484,17 @@ private:
             if constexpr(Kind==View::Kind::entryDither)if(!real(-200000,depth))return parent.check(false);
             if constexpr(Kind==View::Kind::enemy)sprite=r.spriteId;
             if constexpr(Kind==View::Kind::breakable)if(parent.nativeBoxes_){
+#ifndef DOWNWELL_REFERENCE_BREAKABLES
+                // Ordinary callback births (e.g. an added layer observer)
+                // may reacquire an empty family's layer independently.
+                parent.boxAllocation_.leased=false;
+#endif
                 return parent.check(!inactive&&parent.table_.externalBirth(h.slot,r.nativeRegistration)&&
+#ifndef DOWNWELL_REFERENCE_BREAKABLES
+                    parent.layers_.birthSceneryFamily(parent.boxLayer_));
+#else
                     parent.layers_.birthScenery(depth));
+#endif
             }
             if constexpr(Kind==View::Kind::timeField)if(parent.nativeFields_){
                 return parent.check(parent.table_.externalBirth(h.slot,r.nativeRegistration)&&
@@ -528,8 +537,12 @@ private:
             }
             if constexpr(Kind==View::Kind::breakable)if(parent.nativeBoxes_){
                 if(!key(local,r,h)||!r.nativeRegistration)return parent.check(false);
+#ifndef DOWNWELL_REFERENCE_BREAKABLES
+                if(!parent.check(parent.layers_.retireSceneryFamily(parent.boxLayer_)))return false;
+#else
                 const auto* d=parent.objectDefaults_.get(92);
                 if(!parent.check(d&&parent.layers_.retireScenery(d->creationDepth)))return false;
+#endif
                 r.nativeRegistration=0;parent.table_.externalRetire(h.slot);return true;
             }
             if(!key(local,r,h)||!parent.check(parent.room_.contains(h.slot)))return false;
@@ -795,6 +808,8 @@ private:
     std::uint32_t nativeFieldFlags_=0;
     InstanceHandle markedBoxes_[GameplayWorld::breakableCapacity]{};
     unsigned markedBoxCount_=0;
+    decltype(layers_)::SceneryFamily boxLayer_{};
+    NativeFamilyBirth boxAllocation_{};
     GameplayTerrainInstances terrain_;
 public:
     // Registered terrain is the complete runner reference: every wall owns a
@@ -845,7 +860,10 @@ public:
             spriteGeometry_.prepare(sprites_)&&
             terrainBirthBounds_.prepare(objectDefaults_,sprites_)&&
             families_.bindInstanceFlags(objects)&&drawMetadata_.bind(objects)&&alarmMetadata_.bind(objects);
-        if(good_){const auto* box=objectDefaults_.get(92);if(!box)good_=false;else nativeBoxFlags_=box->initialFlags;}
+        if(good_){const auto* box=objectDefaults_.get(92);if(!box)good_=false;else {
+            nativeBoxFlags_=box->initialFlags;
+            good_=RunnerDepthService::integerDepth(box->creationDepth,boxLayer_.depth);
+        }}
         if(good_){const auto* field=objectDefaults_.get(82);if(!field)good_=false;else nativeFieldFlags_=field->initialFlags;}
 #if defined(DOWNWELL_TERRAIN_RUN_STORE) && !defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
         if(good_)good_=terrainCreate_.prepare(objectDefaults_,sprites_);
@@ -884,6 +902,17 @@ public:
         if(!world_&&!world.bindEntryDithers(entries_))return check(false);
         if(!world_&&!world.bindDroneBullets(drones_))return check(false);
         world_=&world;
+#ifndef DOWNWELL_REFERENCE_BREAKABLES
+        if(nativeBoxes_){
+            if(!table_.bindExternalFamily(View::breakableBase,View::terrainBase,boxAllocation_))return check(false);
+            boxAllocation_.good=&good_;boxAllocation_.context=this;
+            boxAllocation_.acquire=[](void* context,NativeFamilyBirth& birth){
+                auto& self=*static_cast<GameplayCollisionOwner*>(context);
+                return self.check(self.layers_.borrowSceneryFamily(self.boxLayer_,birth));
+            };
+            boxAllocation_.active=true;
+        }
+#endif
         world.configureDroneEndStep([](void* context,long topQ12){
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
             if(!self.valid())return false;
@@ -1104,7 +1133,13 @@ public:
     }
     auto playerBinding(){return GameplayWorld::PlayerLifecycleBinding::bindTransforms(player_);}
     auto enemyBinding(){return GameplayWorld::EnemyLifecycleBinding::bindMaskDestruction(enemies_);}
-    auto breakableBinding(){return GameplayWorld::BreakableLifecycleBinding::bindDestruction(boxes_);}
+    auto breakableBinding(){
+        auto binding=GameplayWorld::BreakableLifecycleBinding::bindDestruction(boxes_);
+#ifndef DOWNWELL_REFERENCE_BREAKABLES
+        if(nativeBoxes_){boxAllocation_.good=&good_;binding.bindNativeAllocation(boxAllocation_);}
+#endif
+        return binding;
+    }
     // Caller owns the phase workspace; a full native snapshot must not live on
     // the 8 KiB task stack. Capture all registered families, then resolve again
     // immediately before each event. An empty own event is still dispatched.
