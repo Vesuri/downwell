@@ -706,6 +706,13 @@ test: verify-ordinary-time-field
 test: verify-runner-spatial-split
 .PHONY: verify-runner-spatial-split
 .PHONY: verify-contact-profile
+build/encounter-coverage-test: tests/platform/amiga/GameplayEncounterCoverageTest.cpp tests/platform/amiga/GameplayEncounterCoverage.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+.PHONY: verify-encounter-coverage
+verify-encounter-coverage: build/encounter-coverage-test
+	./$<
+test: verify-encounter-coverage
 build/entry-profile-input-test: tests/platform/amiga/AmigaEntryProfileInputTest.cpp src/platform/amiga/AmigaSceneRuntime.cpp src/core/GameplayEntryProfileInput.h
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
@@ -1949,7 +1956,7 @@ $(AMIGA_PORT_TEST_TARGET): $(AMIGA_PORT_TEST_SOURCES)
 	@mkdir -p $(@D)
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(AMIGA_PORT_TEST_SOURCES)
 
-$(AMIGA_SCENE_TEST_TARGET): $(AMIGA_SCENE_TEST_SOURCES)
+$(AMIGA_SCENE_TEST_TARGET): $(AMIGA_SCENE_TEST_SOURCES) tests/platform/amiga/GameplayEncounterCoverage.h
 	@mkdir -p $(@D)
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(AMIGA_SCENE_TEST_SOURCES)
 

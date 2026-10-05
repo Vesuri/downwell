@@ -11,6 +11,7 @@
 #include "core/StartupRuntime.h"
 #include "core/GameMakerRounding.h"
 #include "core/GameplayContactProfileInput.h"
+#include "GameplayEncounterCoverage.h"
 #include <cmath>
 #include <cstdlib>
 #include <fstream>
@@ -2420,7 +2421,8 @@ int main(int argc, char** argv) {
         downwell::BuilderPatternPack patterns(patternBytes.data(),patternBytes.size());
         downwell::PackedRoom room;
         require(rooms.valid()&&objects.valid()&&patterns.valid()&&rooms.findRoom(11,room),"contact profile resources");
-        const bool search=std::getenv("DOWNWELL_CONTACT_PROFILE_SEARCH")!=nullptr;
+        const bool encounterSearch=std::getenv("DOWNWELL_ENCOUNTER_PROFILE_SEARCH")!=nullptr;
+        const bool search=encounterSearch||std::getenv("DOWNWELL_CONTACT_PROFILE_SEARCH")!=nullptr;
         struct TerrainBirthAudit {
             unsigned walls=0,platforms=0,other=0;
             bool birth(downwell::InstanceHandle,const downwell::GameplayTerrainInstances::Record& r){
@@ -2433,7 +2435,7 @@ int main(int argc, char** argv) {
             unsigned total()const{return walls+platforms+other;}
         };
         for(unsigned phase=search?0:downwell::gameplayContactProfilePhase;
-            phase<(search?10u:downwell::gameplayContactProfilePhase+1);++phase){
+            phase<(encounterSearch?64u:search?10u:downwell::gameplayContactProfilePhase+1);++phase){
             downwell::StartupRuntime host(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns);
             host.skipToGameForTesting();
             TerrainBirthAudit births,worstBirths;unsigned worstBirthTick=0;
@@ -2441,16 +2443,30 @@ int main(int argc, char** argv) {
             AmigaPortRuntime game(300,false,1201-176,true,{},{},{},&terrain);game.initializeEntryInput(false);
             LiveSceneWorld live(patterns,objects);live.bind(game,rooms,room,false,&host);
             unsigned firstDamage=0,damageFrames=0,currencyBirths=0,currencyAdvances=0;
+            GameplayEncounterCoverage coverage;
             for(unsigned tick=0;tick<downwell::gameplayContactProfileFrames;++tick){
                 births={};
-                const auto input=downwell::gameplayContactProfileInput(game.tick(),240+game.player().offsetX(),
+                auto input=downwell::gameplayContactProfileInput(game.tick(),240+game.player().offsetX(),
                     176+game.player().offsetY(),phase);
+                if(encounterSearch){
+                    // Search input routes only. Neither owner nor gameplay RNG
+                    // is altered. Keep the source entry checkpoint unchanged.
+                    const unsigned periods[]={30,60,120,240,360,480,720,1800};
+                    const unsigned firePeriods[]={2,4,6,10,16,24,40,60};
+                    const unsigned movement=periods[phase/8],fire=firePeriods[phase%8];
+                    input.right=(tick/movement)%2==0;input.left=!input.right;
+                    input.fire=tick%fire<fire/2;
+                    if(176+game.player().offsetY()<1264){
+                        input.left=game.player().offsetX()>2;input.right=game.player().offsetX()<-2;
+                    }
+                }
                 game.step(downwell::packReplayInput(input));
                 require(terrain.valid(),"contact tape terrain identity store remains valid");
                 if(births.total()>worstBirths.total()){worstBirths=births;worstBirthTick=tick+1;}
                 require(game.effectsSucceeded()&&game.generationSucceeded(),"contact tape runtime remains valid");
+                require(coverage.sample(game,tick+1),"contact encounter census remains valid");
                 if(game.damageNumbers().size()){if(!firstDamage)firstDamage=tick+1;++damageFrames;}
-                if(!search){
+                if(!search||encounterSearch){
 #ifdef DOWNWELL_COMPARE_CONTACT_ATAN
                     downwell::referenceContactAtan=true;
 #endif
@@ -2514,6 +2530,7 @@ int main(int argc, char** argv) {
             if(!search)require(currencyBirths&&currencyAdvances,"contact tape exercises currency birth and next animation");
             std::cout<<"Contact profile phase="<<phase<<" first_damage="<<firstDamage
                 <<" damage_frames="<<damageFrames<<" health="<<game.health()<<" y="<<176+game.player().offsetY()<<std::endl;
+            coverage.report();
             std::cout<<"Contact terrain burst frame="<<worstBirthTick<<" walls="<<worstBirths.walls
                 <<" platforms="<<worstBirths.platforms<<" other="<<worstBirths.other<<std::endl;
             if(!search)require(worstBirthTick==701&&worstBirths.walls==134&&

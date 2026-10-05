@@ -427,6 +427,28 @@ variable reports the ten fire-phase variants; it does not bypass the normal
 gate's contact requirement. Rebaseline both timing modes after changing inputs;
 old/new FPS values from different trajectories are not optimization evidence.
 
+The host gate also reports a camera-centre census for enemies, bullets,
+currency, smoke and debris. It excludes inactive/destroy-requested records and
+hidden debris. Actor positions are relative to `(240,176)`; particle positions
+are absolute. Counts use the source camera's half-open `160x284` rectangle;
+they are not pixel visibility or occlusion measurements. Family maxima may
+occur on different frames, so use the separate simultaneous peak composition.
+The report includes total frames and longest consecutive run with at least 24
+centres. That reporting threshold alone is not a dense-workload acceptance gate.
+
+For bounded, host-only input exploration:
+
+```sh
+make verify-encounter-coverage
+DOWNWELL_ENCOUNTER_PROFILE_SEARCH=1 make verify-contact-profile
+```
+
+This checks 64 routes of 1,800 updates, retaining the seed-2 entry checkpoint
+and comparing each update and all RNG words with the source-derived runtime.
+Only left/right/fire inputs vary. It reports candidate counts; it does not
+select or install a native profiling tape. The native wrapper clears both
+search variables before running its pinned contact gate.
+
 Damage phases are 75 (contact direction math), 76 (number construction),
 77 (number Step, including empty-owner calls) and 78 (native text drawing,
 including the initial blitter drain). The birth counter records successful
