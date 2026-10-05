@@ -547,6 +547,15 @@ Pair generation frames on the contact tape; `REFERENCE_BREAKABLES=1` is the
 separate pool-allocation oracle. Both selectors are unset when profiling
 restores the normal build.
 
+`REFERENCE_INITIAL_RASTER=1` retains initial terrain preparation through
+scratch Chip pixels followed by readback into the retained Fast raster. The
+default uses the runtime direct-cache painter, with the same fallback for
+unsupported artwork. Pair `profile.sh entry` to measure this cold work; the
+ordinary contact FPS tape excludes initialization. Check initial spans with
+`PROFILE_ENTRY=1 VERIFY_TIMEOUT_SECONDS=300 bash amiga/profile.sh terrain`:
+the input-only entry tape runs with exact terrain pixel comparisons enabled.
+The reference selector is unset when profiling restores the normal build.
+
 `bash amiga/profile.sh ammo` checks the factored gauge compositor on the
 bounded contact tape, starting directly in gameplay. Every HUD update is
 compared byte-for-byte with full source-order reconstruction. It requires at

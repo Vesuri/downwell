@@ -1292,6 +1292,15 @@ static void prepareTerrainRaster(AmigaRenderer* renderer,
             int height = lastY - y;
             if (height > downwellDisplayHeight) height = downwellDisplayHeight;
             amigaRendererSetGameOrigin(renderer, 0);
+#if defined(DOWNWELL_TERRAIN_DIRECT) && !defined(DOWNWELL_REFERENCE_INITIAL_RASTER)
+            // The raster is the destination, not a copy of scratch Chip RAM.
+            // This shares runtime's exact compositor and its unsupported-art
+            // fallback; it neither publishes pixels nor advances game state.
+            const unsigned column=unsigned((x-mainViewX+160)/160);
+            if(AmigaTerrainPainter::paintCached(terrainRaster.row(column,y),renderer,
+                rooms,room,terrainCollision.index,terrainTiles,decorations,decorationCount,
+                runtime,activeGamePack,activeGamePackEnd,x,y,0,height))continue;
+#endif
             amigaRendererClearGameRows(renderer, 0, height, 0);
             drawMainWorldSpan(renderer, rooms, room, builders, fragments, fragmentCount,
                 decorations, decorationCount, runtime, x, y, 0, height);
