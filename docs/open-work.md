@@ -275,31 +275,15 @@ remaining structure, not retune the prepared row program or its helpers.
 
 ### B. Combat composition (85.3 ms; also 645 and 701)
 
-3. **Currency/smoke composition** (9.6 ms at 690–700 and 701):
-   - three `CurrencySmokeComposition::stampPixel` calls at 14,000 cycles each
-     (`PaletteEffectSurface::stamp` → `blitterCopyWithMask` /
-     `blitterPatternWithMask`);
-   - `intersects` → `synchronize` waiting on the blitter, 1.8 ms;
-   - `clear` 0.9 ms.
-
-   The backend already issues whole-height blits; its submissions are per
-   plane, not per row. Bounds alone cannot answer exact shade-hole queries.
-   The remaining structural attempt must eliminate intermediate surface
-   clearing/stamping/publication, rather than tune its submission layout:
-   publish the ordered immutable producers directly at the controller Draw
-   boundary, applying all subsequent shade masks to each producer's alpha.
-   Preserve opaque-black replacement, later re-addition, exact sprite overlap
-   answers and scalar fallback for unprepared producers. Retain the current
-   compositor as the pixel oracle. Target: under 4 ms; after a second rejected
-   attempt, move to B4 without a variant sweep.
 4. **Software actor drawing.** `amigaRendererDrawAsset` costs 3.2 ms in
    combat, about two actors at 10,000 cycles each that got no hardware sprite.
    At 645, `buildHardwareSpritePart` spends 2.8 ms building sprite DMA words
    on the CPU. All eight channels are usable since `b815af63`:
    - find out why those actors fall back, and assign them channels before
      falling back to the CPU;
-   - bind prepared sprite-format frames instead of building DMA words each
-     frame.
+   - bind prepared sprite-format frames instead of copying their payload into
+     channel buffers each frame (conversion is already offline). Preserve
+     independent control words when simultaneous actors use the same frame.
 
    Do this only if the two together are still over 3 ms after B1–B3.
 
