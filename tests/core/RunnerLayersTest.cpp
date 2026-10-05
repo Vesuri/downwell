@@ -2,7 +2,9 @@
 #include "core/RunnerLayerIds.h"
 #include "core/RunnerLayerLifetimes.h"
 static_assert(sizeof(downwell::RunnerLayers<64,3323,true>)<=
-    sizeof(downwell::RunnerLayers<64,3323>)+65*sizeof(unsigned),
+    ((sizeof(downwell::RunnerLayers<64,3323>)+65*sizeof(unsigned)+
+      alignof(downwell::RunnerLayers<64,3323,true>)-1)/
+      alignof(downwell::RunnerLayers<64,3323,true>))*alignof(downwell::RunnerLayers<64,3323,true>),
     "Retained population adds per-layer counts, never a per-cell array");
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
 using NativeRetainedLayers=downwell::RunnerLayers<64,3323,true>;

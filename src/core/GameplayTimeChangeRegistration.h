@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_GAMEPLAY_TIME_CHANGE_REGISTRATION_H
 #define DOWNWELL_CORE_GAMEPLAY_TIME_CHANGE_REGISTRATION_H
 #include "InstanceHandle.h"
+#include "FailureSignal.h"
 #include "TimeChangeEffects.h"
 #include "SequenceTimeline.h"
 namespace downwell {
@@ -22,6 +23,7 @@ public:
     GameplayTimeChangeRegistration(const GameplayTimeChangeRegistration&)=delete;
     GameplayTimeChangeRegistration& operator=(const GameplayTimeChangeRegistration&)=delete;
     bool valid()const{return good_;}
+    void observeFailure(bool& owner){good_.observe(owner);}
     unsigned size()const{return count_;} // Includes deferred destroyed records.
     const Record* find(InstanceHandle key)const{
         return key.generation&&key.slot<Capacity&&records_[key.slot].lifetimeId==key.generation?
@@ -93,7 +95,7 @@ private:
         auto* r=schedulerRecord(handle(local));return r&&r->sourceId==id?r:nullptr;
     }
     bool fail(){good_=false;return false;}
-    Owner& owner_;Record records_[Capacity]{};unsigned count_=0;std::uint32_t newest_=0;bool good_=true;
+    Owner& owner_;Record records_[Capacity]{};unsigned count_=0;std::uint32_t newest_=0;FailureSignal<> good_=true;
 };
 }
 #endif

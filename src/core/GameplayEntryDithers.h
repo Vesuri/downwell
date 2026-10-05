@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_GAMEPLAY_ENTRY_DITHERS_H
 #define DOWNWELL_CORE_GAMEPLAY_ENTRY_DITHERS_H
 #include "EntryDither.h"
+#include "FailureSignal.h"
 #include "InstanceLifecycle.h"
 namespace downwell {
 // Native typed storage for objEnterDither. Numeric IDs come from the room
@@ -19,6 +20,7 @@ public:
     GameplayEntryDithers(const GameplayEntryDithers&)=delete;
     GameplayEntryDithers& operator=(const GameplayEntryDithers&)=delete;
     bool valid()const{return good_;}
+    void observeFailure(bool& owner){good_.observe(owner);}
     unsigned size()const{return count_;}
     const Record* find(InstanceHandle key)const{
         return key.generation&&key.slot<capacity&&records_[key.slot].lifetimeId==key.generation?
@@ -88,7 +90,7 @@ private:
         r.x=x;r.y=y;return true;
     }
     Record records_[capacity]{};
-    Binding binding_;unsigned next_=1,count_=0;bool good_=true;
+    Binding binding_;unsigned next_=1,count_=0;FailureSignal<> good_=true;
 };
 }
 #endif

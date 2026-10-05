@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_GAMEPLAY_SCRIPT_SPAWN_INSTANCES_H
 #define DOWNWELL_GAMEPLAY_SCRIPT_SPAWN_INSTANCES_H
 #include "InstanceLifecycle.h"
+#include "FailureSignal.h"
 #include "ScriptSpawnEffect.h"
 #include "RunnerDepthChanges.h"
 namespace downwell {
@@ -13,6 +14,7 @@ public:
     using Binding=RecordLifecycleBinding<Record>;
     explicit GameplayScriptSpawnInstances(Binding binding={}):binding_(binding){}
     bool valid()const{return good_;}
+    void observeFailure(bool& owner){good_.observe(owner);}
     unsigned size()const{return count_;}
     const Record* find(InstanceHandle h)const{
         return h.generation&&h.slot<capacity&&records_[h.slot].lifetimeId==h.generation?&records_[h.slot]:nullptr;
@@ -74,7 +76,7 @@ private:
     bool check(unsigned local,const ScriptSpawnEffect& effect){
         const auto* r=find(handle(local));return good_=good_&&r&&r->effect==&effect;
     }
-    Record records_[capacity]{};unsigned count_=0,newest_=0;bool good_=true;Binding binding_{};
+    Record records_[capacity]{};unsigned count_=0,newest_=0;FailureSignal<> good_=true;Binding binding_{};
 };
 }
 #endif

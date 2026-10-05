@@ -56,7 +56,7 @@ template<unsigned L,unsigned E,class Terrain> class RunnerLogicalLayerOrder:publ
     mutable Cutoff cutoffs_[L?L:1]{};
     unsigned work_[E?E:1]{},count_=0;
     std::uint8_t inactivePhysical_[(E+7)/8?(E+7)/8:1]{};
-    bool good_=true;
+    FailureSignal<> good_=true;
     RunnerLayerOrderKey stamp(bool tail){clock_.advance();return {clock_,tail};}
     bool fail(){good_=false;return false;}
     auto state(unsigned token)const{return terrain_->layerState(token&~Virtual);}
@@ -106,6 +106,7 @@ template<unsigned L,unsigned E,class Terrain> class RunnerLogicalLayerOrder:publ
 public:
     bool bindTerrain(Terrain& terrain){if(terrain_)return false;terrain_=&terrain;return true;}
     bool succeeded()const{return good_&&Base::succeeded();}
+    void observeFailure(bool& owner){good_.observe(owner);Base::observeFailure(owner);}
     bool discardUninitialized(){
         if(terrain_&&!terrain_->visitLayerStates([](InstanceHandle,const RunnerRetainedLayerState& s){return !s.bound();}))return fail();
         if(!succeeded()||!Base::discardUninitialized())return false;

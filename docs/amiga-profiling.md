@@ -510,6 +510,13 @@ selectors during a run. `make verify-local-draw-capture` exercises host
 lifecycle and ordering tests, including the prepared projection's activation,
 depth service, retirement, reuse and interrupted callback cases.
 
+`REFERENCE_VALIDATION=1` retains recursive child validity polling and
+unconditional phase reconciliation/service for comparison with native
+mutation-propagated failure and pending-work checks. Pair the same contact
+tape and trace windows; charge mutation costs as well as phase costs. The
+ordinary typed identity checks and drone callback status remain live in both
+paths. Profiling restores the normal default after either success or failure.
+
 `bash amiga/profile.sh ammo` checks the factored gauge compositor on the
 bounded contact tape, starting directly in gameplay. Every HUD update is
 compared byte-for-byte with full source-order reconstruction. It requires at

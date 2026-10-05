@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_GAMEPLAY_TERRAIN_INSTANCES_RUNS_H
 #define DOWNWELL_GAMEPLAY_TERRAIN_INSTANCES_RUNS_H
 #include "GameplayTerrainInstancesScalar.h"
+#include "FailureSignal.h"
 #include "TerrainOwnershipRuns.h"
 #include "TerrainRunnerPublication.h"
 #include "RunnerRegistrationOrder.h"
@@ -71,7 +72,7 @@ private:
     unsigned registered_[3]{},registrationRevision_=0;
     unsigned roomRevision_=0;
     static unsigned family(int object){return object==60?0:object==93?1:2;}
-    bool good_=true,dispatching_=false,unboundedWallArt_=false;
+    FailureSignal<> good_=true;bool dispatching_=false,unboundedWallArt_=false;
     Record record(const Identity& id)const{
         const auto& m=mutable_[id.handle.slot];
         Record r{id.object,id.x,id.y,m.active,id.handle.generation,id.source,id.creationCode};
@@ -92,6 +93,7 @@ public:
     GameplayTerrainInstancesRuns(const GameplayTerrainInstancesRuns&)=delete;
     GameplayTerrainInstancesRuns& operator=(const GameplayTerrainInstancesRuns&)=delete;
     bool valid()const{return good_;}
+    void observeFailure(bool& owner){good_.observe(owner);}
     // The built-in collision owner can own the entire generated birth/Create
     // transaction. Arbitrary lifecycle observers retain the separate callbacks.
     template<class Owner> bool bindInitializedBirth(Owner& owner){

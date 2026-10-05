@@ -304,6 +304,25 @@ the inactive tail. Storage compaction and request order are not substitutes.
 The fixed-capacity room lists add 16 bytes per slot plus four list endpoints;
 the decoded host's 2,048 slots therefore add 32 KiB plus endpoint storage.
 
+Native owner validity is mutation-propagated rather than a repeated traversal
+of every child owner. `FailureSignal` retains each component's own status and
+borrows the enclosing terminal-failure flag. Failures through exposed terrain,
+effect, debris, time-change and dither stores notify that flag immediately;
+layer lifetimes also connect their layer and pending-depth owners. Recovering
+a child cannot recover the enclosing owner, and copying a signal never borrows
+the original observer. Replacing an installed observer fails both owners.
+The private spatial/property stores are unused under native ownership and
+validated on setup; guarded operation failures still latch in the owner.
+Drone callbacks expose a mutable `bool&`, so their live status read remains.
+Canonical record, object and generation checks in typed bindings remain too.
+
+Activation/depth mutations publish pending work. Native phase boundaries poll
+failure and service only pending work, without moving reconciliation earlier
+inside a handler. Room entry still prepares Draw. Registered ownership retains
+the recursive validity and phase-service path; `REFERENCE_VALIDATION=1` selects
+that path for native timing comparisons. These are representation changes,
+not evidence that the remaining original event families are implemented.
+
 The host supplies room/layer depth for placed instances and VM compatibility
 depth for dynamic births. This adapter does not yet model
 runtime depth changes, persistent-instance room re-registration, the complete

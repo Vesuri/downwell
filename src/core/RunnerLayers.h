@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_RUNNER_LAYERS_H
 #define DOWNWELL_CORE_RUNNER_LAYERS_H
 #include "RunnerLayerElements.h"
+#include "FailureSignal.h"
 #include "RunnerImageValue.h"
 #include "NativeFamilyBirth.h"
 #include <cstdint>
@@ -27,6 +28,7 @@ public:
     };
     const Layer* get(unsigned slot)const{return slot<Capacity&&layers_[slot].present?&layers_[slot]:nullptr;}
     bool succeeded()const{return !failed_;}
+    void observeFailure(bool& owner){failed_.observe(owner);}
     bool discardUninitialized(){
         if(failed_)return false;
         invalidateLookups();
@@ -250,7 +252,7 @@ private:
     Layer layers_[Capacity?Capacity:1]{};
     RunnerLayerElements<Capacity,Elements> elements_;
     unsigned head_=End,tail_=End;
-    bool failed_=false;
+    FailureSignal<false> failed_=false;
 };
 }
 #endif

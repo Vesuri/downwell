@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_GAMEPLAY_TERRAIN_INSTANCES_SCALAR_H
 #define DOWNWELL_CORE_GAMEPLAY_TERRAIN_INSTANCES_SCALAR_H
 #include "InstanceLifecycle.h"
+#include "FailureSignal.h"
 #include "RoomPack.h"
 #include "TerrainCreate.h"
 #include "WallEndStep.h"
@@ -55,6 +56,7 @@ public:
     GameplayTerrainInstancesScalar(const GameplayTerrainInstancesScalar&)=delete;
     GameplayTerrainInstancesScalar& operator=(const GameplayTerrainInstancesScalar&)=delete;
     bool valid()const{return good_;}
+    void observeFailure(bool& owner){good_.observe(owner);}
     unsigned size()const{return count_;}
     // Conservative presentation candidates, in unchanged birth order. The
     // caller still tests the current sprite footprint/visibility. Coordinates
@@ -269,7 +271,7 @@ private:
     unsigned count_=0;
     unsigned freeHint_=0;
     std::uint32_t next_=1;
-    bool good_=true;
+    FailureSignal<> good_=true;
     bool dispatching_=false;
 };
 }

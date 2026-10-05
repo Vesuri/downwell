@@ -282,17 +282,12 @@ actor per phase. The costs are quiet / combat / 645:
 | Walk | Quiet | Combat | 645 |
 | --- | ---: | ---: | ---: |
 | Animation (`visitAnimationRetainedChecked`) | 1.1 ms | 3.8 ms | 4.5 ms |
-| `reconcilePhase` (activation and depth servicing) | 1.2 ms | 1.2 ms | 1.2 ms |
 | Captured alarm dispatch (`dispatchCapturedAlarms`) | 1.0 ms | 2.1 ms | 4.6 ms |
 
 Alarm capture/dispatch remains a budget shortfall. Its two structural attempts
 are closed in the [rejection table](amiga-frame-cost.md#rejected-approaches);
 do not reopen it before the group-C budget review.
 
-3. **Activation, depth and validation.** Reconcile activation and service
-   depths at birth, retirement and room entry, not on every visit. Replace
-   per-visit `GameplayCollisionOwner::valid`/`Binding::key` validation with a
-   sticky failure flag checked at phase boundaries.
 4. **Animation.** Advance animation per family over compact records where no
    handler has cross-instance effects. Keep room order where one does.
 

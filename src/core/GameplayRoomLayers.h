@@ -67,7 +67,7 @@ template<unsigned I,bool CompactUnnumbered=false,class Terrain=void> class Gamep
         });
     }
     unsigned live_=0,playerId_=0;
-    bool good_=true,prepared_=false;
+    FailureSignal<> good_=true;bool prepared_=false;
     std::uint32_t drawRevision_=0;
     void changedDraw(){if(drawRevision_!=0xffffffffu)++drawRevision_;}
     bool fail(){good_=false;return false;}
@@ -138,6 +138,8 @@ public:
     }
     std::uint32_t drawRevision()const{return drawRevision_;}
     bool valid()const{return good_&&lifetimes_.succeeded();}
+    void observeFailure(bool& owner){good_.observe(owner);lifetimes_.observeFailure(owner);}
+    bool pendingDepths()const{return enabled()&&lifetimes_.pendingDepths()!=0;}
     // Called before the new native player birth, after old lifetimes retire.
     bool prepare(){
         changedDraw();

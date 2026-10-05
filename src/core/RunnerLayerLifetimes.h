@@ -22,6 +22,7 @@ public:
     RunnerLayerLifetimes(const RunnerLayerLifetimes&)=delete;
     RunnerLayerLifetimes& operator=(const RunnerLayerLifetimes&)=delete;
     bool succeeded()const{return good_&&layers_.succeeded()&&pending_.succeeded();}
+    void observeFailure(bool& owner){good_.observe(owner);layers_.observeFailure(owner);pending_.observeFailure(owner);}
     const State* resolve(InstanceHandle h)const{
         if constexpr(CompactUnnumbered)if(h.slot<I&&compact_[h.slot]){
             const unsigned element=registry_.find(h);
@@ -220,7 +221,7 @@ private:
     // 0 = ordinary/absent, 1 = compact active, 2 = compact inactive.
     mutable std::uint8_t compact_[CompactUnnumbered&&I?I:1]{};
     RunnerDepthChanges<I> pending_;
-    bool good_=true;
+    FailureSignal<> good_=true;
 };
 }
 #endif

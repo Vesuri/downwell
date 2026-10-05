@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_RUNNER_DEPTH_CHANGES_H
 #define DOWNWELL_CORE_RUNNER_DEPTH_CHANGES_H
 #include "RunnerSpatialSplit.h"
+#include "FailureSignal.h"
 namespace downwell {
 // 0x431ce0 / 0x50d220 / 0x50d740. Borrowed instance slots must be removed
 // from this queue before retirement/reuse. Service follows activation upkeep.
@@ -8,6 +9,7 @@ template<unsigned Capacity> class RunnerDepthChanges {
 public:
     unsigned size()const{return count_;}
     bool succeeded()const{return !failed_;}
+    void observeFailure(bool& owner){failed_.observe(owner);}
     bool request(unsigned instance,RunnerImageValue& published,MotionBinary64 value){
         if(failed_||servicing_||!RunnerSpatialSplit::valid(published))return false;
         RunnerImageValue next;if(!next.assign(value))return false;
@@ -38,7 +40,7 @@ public:
     }
 private:
     unsigned pending_[Capacity?Capacity:1]{},count_=0;
-    bool failed_=false,servicing_=false;
+    FailureSignal<false> failed_=false;bool servicing_=false;
 };
 
 // Selected 0x414660 service, composed with RunnerLayers. All arithmetic is

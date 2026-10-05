@@ -322,6 +322,24 @@ static void checkEnemySlotDirectory(const ObjectPack& objects,const SpriteCollis
 }
 int main(){
     assert(downwell::RunnerBindingRevisionVerification::run());
+    {
+        bool owner=true,otherOwner=true;
+        FailureSignal<> signal;signal.observe(owner);
+        assert(signal&&owner);signal=false;assert(!signal&&!owner);
+        signal=true;assert(signal&&!owner); // Child recovery cannot recover its owner.
+        FailureSignal<> copy(signal);copy=false;assert(signal&&!copy);
+        FailureSignal<> destination;destination.observe(otherOwner);
+        destination=copy;assert(!destination&&!otherOwner);
+        owner=true;FailureSignal<false> inverted(false);inverted.observe(owner);
+        inverted=true;assert(inverted&&!owner);
+        owner=true;FailureSignal<> failed(false);failed.observe(owner);assert(!owner);
+        owner=otherOwner=true;FailureSignal<> bound;bound.observe(owner);bound.observe(otherOwner);
+        assert(!owner&&!otherOwner);
+        owner=true;RunnerDepthChanges<1> depths;depths.observeFailure(owner);
+        RunnerImageValue a{},b{};
+        assert(depths.request(0,a,MotionBinary64::fromInteger(1))&&owner);
+        assert(!depths.request(1,b,MotionBinary64::fromInteger(2))&&!owner&&!depths.succeeded());
+    }
     for(bool failSmoke:{false,true}){
         auto world=std::make_unique<GameplayWorld>(300,false,1000,false);
         checkBoxBurstWorld(*world,failSmoke);
@@ -503,6 +521,32 @@ int main(){
     }
     auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
+    for(bool native:{false,true})for(unsigned family=0;family<6;++family){
+#ifdef DOWNWELL_TERRAIN_RUN_STORE
+        if(native)continue;
+#endif
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
+            GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},nullptr,
+            native?GameplayCollisionOwner::Ownership::native:GameplayCollisionOwner::Ownership::reference);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world)&&owner->valid());
+        // Fail before any family binding callback: enclosing validation must
+        // observe this immediately, not only at the next simulation boundary.
+        switch(family){
+            case 0:assert(!owner->terrain().append(-1,0,0,true));break;
+            case 1:{ScriptSpawnEffect effect;assert(!owner->scriptEffects().birth(0,effect));break;}
+            case 2:{DebrisAnimation effect;assert(!owner->debris().birth(0,effect));break;}
+            case 3:{std::uint32_t id=0;assert(!owner->timeChanges().birth(0,{},{},id));break;}
+            case 4:{InstanceHandle key;auto camera=[](auto&){assert(false);return false;};
+                assert(!owner->entryDithers().create(0,camera,camera,key));break;}
+            case 5:assert(!owner->droneBullets().advanceAnimation({}));break;
+        }
+        assert(!owner->valid());
+        unsigned callbacks=0;
+        assert(!owner->visitRegistrationOrder([&](auto,auto,auto){++callbacks;return true;})&&callbacks==0);
+        world->step(0);assert(!world->effectsSucceeded());
+    }
     {
         ObjectAlarmMetadata<386> metadata;unsigned mask=0;
         assert(!metadata.mask(0,mask)&&metadata.bind(objects));
@@ -1713,6 +1757,13 @@ int main(){
         }
     }
     auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
+    {
+        auto layers=std::make_unique<GameplayRoomLayers<8>>(&rooms);bool healthy=true;
+        layers->observeFailure(healthy);assert(healthy&&layers->prepare());
+        // The nested lifetime owner, not GameplayRoomLayers' own flag, fails.
+        assert(!layers->writeDepth({0,1},MotionBinary64::fromInteger(2)));
+        assert(!healthy&&!layers->valid());
+    }
     if(const char* path=std::getenv("DOWNWELL_OWNERSHIP_WITNESS")){
         // Compare the whole owner, not just a membership container. Emit full
         // field values (not a hash) so a divergent publication is inspectable.

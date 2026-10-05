@@ -105,6 +105,7 @@ private:
     const GameplayWorld::PlayerInstance* initialPlayer_=nullptr;
     InstanceHandle initialPlayerKey_{};
     bool good_=false;
+    bool failureObserved_=false;
     bool activationPending_=false;
     bool destructionPending_=false;
     bool terrainFamilies_[2]={false,false};
@@ -928,12 +929,29 @@ public:
                 if(families_.isA(int(i),selector==0?60:93)&&i!=60&&i!=93&&i!=99)
                     terrainFamilies_[selector]=false;
         }
+#ifndef DOWNWELL_REFERENCE_VALIDATION
+        if(native_&&valid()){
+            // Native ownership never populates the private spatial/property
+            // stores. Check their initial state once, then observe every
+            // independently mutable family and the nested layer/depth owners.
+            // Child failures remain immediate, including failures through the
+            // public family accessors, not merely the enclosing callbacks.
+            terrain_.observeFailure(good_);scriptEffects_.observeFailure(good_);
+            debris_.observeFailure(good_);timeChanges_.observeFailure(good_);
+            entries_.observeFailure(good_);
+            layers_.observeFailure(good_);failureObserved_=true;
+        }
+#endif
     }
     GameplayCollisionOwner(const GameplayCollisionOwner&)=delete;
     GameplayCollisionOwner& operator=(const GameplayCollisionOwner&)=delete;
     // Registration order with live flags, for differential verification.
     template<class Visit> bool visitRegistrationOrder(Visit visit)const{return valid()&&visitEligibility(visit);}
-    bool valid()const{return good_&&owner_.valid()&&properties_.valid()&&terrain_.valid()&&scriptEffects_.valid()&&debris_.valid()&&timeChanges_.valid()&&entries_.valid()&&drones_.valid()&&layers_.valid();}
+    // Drone dispatch deliberately exposes bool& status to arbitrary callbacks;
+    // retain its live read rather than delaying a callback's failure to return.
+    bool valid()const{return good_&&(failureObserved_?drones_.valid():
+        (owner_.valid()&&properties_.valid()&&terrain_.valid()&&scriptEffects_.valid()&&debris_.valid()&&
+         timeChanges_.valid()&&entries_.valid()&&drones_.valid()&&layers_.valid()));}
     unsigned pendingSpatialIndex()const{return owner_.pendingSpatialIndex();}
     bool serviceSpatialIndex(unsigned budget){return check(owner_.serviceSpatialIndex(budget));}
     bool attach(GameplayWorld& world){
@@ -1161,6 +1179,14 @@ public:
         },this);
         world.configurePhaseBoundary([](void* context,GameplayWorld::PhaseBoundary phase){
             auto& owner=*static_cast<GameplayCollisionOwner*>(context);
+            if(owner.failureObserved_){
+                // Mutations publish pending work; service it only at the
+                // original boundary, never eagerly inside another handler.
+                return owner.check(owner.valid()&&
+                    (!owner.activationPending_||owner.reconcileActivation())&&
+                    (!owner.layers_.pendingDepths()||owner.layers_.serviceDepths())&&
+                    (phase!=GameplayWorld::PhaseBoundary::roomEntry||owner.prepareDraw()));
+            }
             return owner.reconcileActivation()&&owner.layers_.serviceDepths()&&
                 (phase!=GameplayWorld::PhaseBoundary::roomEntry||owner.prepareDraw());
         },this);

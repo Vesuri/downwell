@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_GAMEPLAY_DEBRIS_INSTANCES_H
 #define DOWNWELL_GAMEPLAY_DEBRIS_INSTANCES_H
 #include "InstanceLifecycle.h"
+#include "FailureSignal.h"
 #include "DebrisEffects.h"
 namespace downwell {
 // Borrow stable particle storage. The room must retire these records before
@@ -14,6 +15,7 @@ public:
     GameplayDebrisInstances(const GameplayDebrisInstances&)=delete;
     GameplayDebrisInstances& operator=(const GameplayDebrisInstances&)=delete;
     bool valid()const{return good_;}
+    void observeFailure(bool& owner){good_.observe(owner);}
     unsigned size()const{return count_;}
     const Record* find(InstanceHandle h)const{
         return h.generation&&h.slot<capacity&&records_[h.slot].lifetimeId==h.generation?&records_[h.slot]:nullptr;
@@ -81,7 +83,7 @@ private:
     template<unsigned N> bool owns(InstanceHandle key,const Record& record,const DebrisEffects<N>& effects)const{
         return good_&&find(key)==&record&&effects.retained(key.generation)==record.effect;
     }
-    Record records_[capacity]{};unsigned count_=0,newest_=0;bool good_=true;Binding binding_;
+    Record records_[capacity]{};unsigned count_=0,newest_=0;FailureSignal<> good_=true;Binding binding_;
 };
 }
 #endif
