@@ -12,6 +12,11 @@ if gDownwellProfileFrozen != 1 || gDownwellProfileFrames[3] != gDownwellProfileT
     quit 1
 end
 printf "SHOP_TAPE inputs=%lu/%lu side=%lu menu=%lu final source-state/RNG exact\n", gDownwellShopProfileFrames[0], gDownwellShopProfileFrames[1], gDownwellShopProfileSideFrames, gDownwellShopProfileMenuFrames
+printf "SHOP_FIELD_BANK uploads=%lu reuses=%lu\n", gDownwellFieldBankUploads, gDownwellFieldBankReuses
+if gDownwellFieldBankUploads == 0 || gDownwellFieldBankUploads + gDownwellFieldBankReuses != 2
+    printf "Unexpected field-bank level-entry coverage\n"
+    quit 1
+end
 printf "SHOP_FPS frames=%lu fields=%lu fps=%.2f max_gap=%lu at=%lu\n", gDownwellProfileFrames[3], gDownwellProfileFields[3], 50.0*gDownwellProfileFrames[3]/gDownwellProfileFields[3], gDownwellProfileMaxGap[3], gDownwellProfileMaxGapFrame[3]
 set $s=0
 while $s<5

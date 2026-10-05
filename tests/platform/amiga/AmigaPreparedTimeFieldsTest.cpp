@@ -107,6 +107,21 @@ int main(){
     auto malformed=pack;malformed[16]=0xff;
     require(!candidate->bind(storage.data(),storage.size(),malformed.data(),malformed.size()),"bad index");
     require(!candidate->bind(storage.data(),storage.size(),pack.data(),0xffffffffu),"overflow size");
+    require(candidate->resident(storage.data(),pack.data(),pack.size()),"failed admission preserves resident bank");
+    // A canary proves the resident branch performs no upload; restore it
+    // before pixel tests because the DMA image contract is immutable.
+    storage[Pair::headerBytes]^=0xff;
+    require(candidate->bind(storage.data(),storage.size(),pack.data(),pack.size()),"resident rebind");
+    require(storage[Pair::headerBytes]==UBYTE(pack[Pair::headerBytes]^0xff),"resident rebind must not recopy images");
+    candidate->invalidateBank();
+    require(!candidate->resident(storage.data(),pack.data(),pack.size()),"scene load invalidates resident bank");
+    std::fill(storage.begin(),storage.end(),0x59);
+    require(candidate->bind(storage.data(),storage.size(),pack.data(),pack.size()),"upload after scene overwrite");
+    require(std::equal(pack.begin(),pack.end(),storage.begin()),"reload restores every image byte");
+    auto alternate=storage;
+    require(candidate->bind(alternate.data(),alternate.size(),pack.data(),pack.size()),"different destination admission");
+    require(!candidate->resident(storage.data(),pack.data(),pack.size()),"old region no longer owned");
+    require(candidate->bind(storage.data(),storage.size(),pack.data(),pack.size()),"restore destination");
     std::vector<UBYTE> actual[2],expected[2];
     unsigned random=192387;
     auto next=[&](){random=random*1664525u+1013904223u;return random;};
@@ -117,6 +132,22 @@ int main(){
     }
     unsigned fast=0,fallback=0;
     for(unsigned frame=0;frame<3600;++frame){
+        if(frame&&frame%181==0){
+            // Both a drawn and a pending overlay must be forgotten when a
+            // fresh level reuses the bank. Exercise alternating bank loads.
+            downwell::TimeFieldOutlines pending;pending.visible=true;pending.count=1;
+            pending.circles[0]={190,140,24*256};
+            require((*candidate)[1].prepare(actual[1].data(),0,pending,true,[](unsigned){return false;}),"pending before level rebind");
+            if(frame%362==0){candidate->invalidateBank();std::fill(storage.begin(),storage.end(),0x59);}
+            require(candidate->bind(storage.data(),storage.size(),pack.data(),pack.size()),"level rebind");
+            for(unsigned ring=0;ring<2;++ring){
+                (*reference)[ring].discard();
+                require(!(*candidate)[ring].present(),"level rebind discards both overlays");
+                std::fill(actual[ring].begin(),actual[ring].end(),0);
+                expected[ring]=actual[ring];
+                require((*candidate)[ring].draw()&&actual[ring]==expected[ring],"no stale pending draw after rebind");
+            }
+        }
         Pixels::usePrepared=frame%47!=0;
         const unsigned b=frame&1,origin=(frame*7)%320;
         downwell::TimeFieldOutlines shape;
@@ -324,4 +355,5 @@ int main(){
     }
     std::cout<<"128 pending fused replacements preserve pixels and fallback ownership\n";
     std::cout<<"3600 double-buffered frames: "<<fast<<" prepared, "<<fallback<<" fallback; pixels match\n";
+    std::cout<<"Field bank residency: no repeated upload, explicit overwrite invalidation, destination changes and level rebind pixels match\n";
 }

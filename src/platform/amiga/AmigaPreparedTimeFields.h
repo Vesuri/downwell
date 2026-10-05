@@ -199,9 +199,29 @@ public:
 private:
     AmigaTimeFieldPair reference_;
     Overlay overlays_[2]={Overlay(reference_[0]),Overlay(reference_[1])};
+    UBYTE* residentRegion_=nullptr;
+    const UBYTE* residentPack_=nullptr;
+    unsigned residentBytes_=0;
 public:
     static unsigned storageBytes(unsigned packBytes) { return ((packBytes+3)&~3u)+2*backingBytes; }
+    // The caller owns the shared Chip region. Invalidate before any other
+    // scene writes it, even when that scene's load subsequently fails.
+    void invalidateBank(){
+        residentRegion_=nullptr;residentPack_=nullptr;residentBytes_=0;
+        for(auto& overlay:overlays_)overlay.discard();
+    }
+    bool resident(const UBYTE* region,const UBYTE* pack,unsigned packBytes)const{
+        return residentRegion_&&residentRegion_==region&&residentPack_==pack&&residentBytes_==packBytes;
+    }
     bool bind(UBYTE* region,unsigned bytes,const UBYTE* pack,unsigned packBytes,const UBYTE* terrain=nullptr) {
+        // Source bytes are immutable. Rebinding still discards both overlays:
+        // no underlay or pending draw may survive the level boundary.
+        if(resident(region,pack,packBytes)){
+            if(bytes<storageBytes(packBytes))return false;
+            UBYTE* backing=region+((packBytes+3)&~3u);
+            overlays_[0].bind(region,backing,terrain);overlays_[1].bind(region,backing+backingBytes,terrain);
+            return true;
+        }
         if(!region||!pack||packBytes<headerBytes||packBytes>headerBytes+65535u*imageBytes||
             bytes<storageBytes(packBytes)||
             pack[0]!='D'||pack[1]!='W'||pack[2]!='F'||pack[3]!='I'||word(pack+4)!=1||
@@ -213,6 +233,7 @@ public:
         for(unsigned i=0;i<packBytes;++i)region[i]=pack[i];
         UBYTE* backing=region+((packBytes+3)&~3u);
         overlays_[0].bind(region,backing,terrain);overlays_[1].bind(region,backing+backingBytes,terrain);
+        residentRegion_=region;residentPack_=pack;residentBytes_=packBytes;
         return true;
     }
     Overlay& operator[](unsigned i) { return overlays_[i]; }

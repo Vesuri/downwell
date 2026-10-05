@@ -323,10 +323,12 @@ static const ULONG sceneBankBytes=baseSceneBankBytes;
 static UBYTE* sceneBank;
 static const UBYTE* frontPack;
 static const UBYTE* frontPackEnd;
+static void invalidateGameplayFieldBank();
 extern "C" volatile ULONG gDownwellSceneBankLoads;
 volatile ULONG gDownwellSceneBankLoads;
 static bool loadSceneBank(AmigaPlatform& platform, const char* name, ULONG bytes) {
     AmigaHardware::blitterDrain();
+    invalidateGameplayFieldBank();
     frontPack = frontPackEnd = nullptr;
     if (!sceneBank || bytes > sceneBankBytes ||
         platform.loadFile(name, sceneBank, bytes) != (LONG)bytes ||
@@ -1061,6 +1063,9 @@ static AmigaGameplayRows gameplayRows;
 static AmigaLaserSight gameplayRays[2];
 #ifdef DOWNWELL_PREPARED_FIELDS
 static AmigaPreparedTimeFieldPair<PreparedFieldOps> gameplayFields;
+static void invalidateGameplayFieldBank(){gameplayFields.invalidateBank();}
+extern "C" volatile ULONG gDownwellFieldBankUploads,gDownwellFieldBankReuses;
+volatile ULONG gDownwellFieldBankUploads,gDownwellFieldBankReuses;
 #ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
 static bool verifyFieldComposites(UBYTE* terrain,UBYTE* target){
     amigaFieldVerifyCompositeBegin(terrain,target);
@@ -1127,6 +1132,7 @@ static bool verifyFieldComposites(UBYTE* terrain,UBYTE* target){
 #endif
 #else
 static AmigaTimeFieldPair gameplayFields;
+static void invalidateGameplayFieldBank(){}
 #endif
 static Bitmap* terrainCopyTarget;
 static const Bitmap* terrainCopyBacking;
@@ -2449,12 +2455,21 @@ __attribute__((noinline)) static int runDownwell(void) {
                     // Terrain batching owns the prefix. Rebind after every
                     // front-bank reload, only after retiring its DMA.
                     AmigaHardware::blitterDrain();
+#ifdef DOWNWELL_REFERENCE_FIELD_BANK
+                    gameplayFields.invalidateBank();
+#endif
+                    const bool fieldBankResident=gameplayFields.resident(
+                        sceneBank+downwellTerrainBatchBytes,amiga_field_images,
+                        amiga_field_images_end-amiga_field_images);
                     if(fieldBandOffset<downwellTerrainBatchBytes || !gameplayFields.bind(
                         sceneBank+downwellTerrainBatchBytes,fieldBandOffset-downwellTerrainBatchBytes,
                         amiga_field_images,amiga_field_images_end-amiga_field_images,memory.game())){
                         exitCode=20;break;
                     }
-                    amigaBlitterBindFieldBands(sceneBank+fieldBandOffset);
+                    if(!fieldBankResident){
+                        amigaBlitterBindFieldBands(sceneBank+fieldBandOffset);
+                        ++gDownwellFieldBankUploads;
+                    }else ++gDownwellFieldBankReuses;
 #ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
                     if(!amigaFieldVerifyTerrainFixture(memory.game(),(UBYTE*)gameDisplay[0].data,
                         sceneBank+sceneBankBytes-448)||
@@ -2978,6 +2993,11 @@ __attribute__((noinline)) static int runDownwell(void) {
                 for(unsigned i=0;i<16;++i)if(port.randomState().stateWord(i)!=downwell::shopProfileRandom[i+2])++gDownwellShopProfileFailures;
                 if(port.dead()||port.cameraOffsetX()||port.shops().noControl)++gDownwellShopProfileFailures;
                 gDownwellShopProfileDone=1;
+#ifdef DOWNWELL_PREPARED_FIELDS
+                // Keep both diagnostics in the forced-upload reference too;
+                // LTO otherwise drops its provably unused reuse counter.
+                (void)gDownwellFieldBankUploads;(void)gDownwellFieldBankReuses;
+#endif
                 gDownwellProfileTargetFrames=gDownwellProfileFrames[3]+1;
             }
 #endif

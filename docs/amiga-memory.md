@@ -57,13 +57,19 @@ renderer partitions it:
 | Range | Owner |
 | --- | --- |
 | `[0,44304)` | Terrain batch scratch: two colour planes and a coverage plane, 416×284 |
-| `[44304,73568)` | Small time-field images (29,264 bytes), copied once on gameplay entry |
+| `[44304,73568)` | Resident small time-field images (29,264 bytes) |
 | `[73568,75360)` | Two 896-byte masked-underlay buffers for the saved-background reference |
 | `[75360,146816)` | Resident 176-pixel large-field arc images (71,456 bytes): white coverage and total coverage; the blitter derives red as `mask & ~white` |
 | `[146816,146818)` | Readable zero word for the shifted blitter's extra fetch |
 
-Retire scene DMA before binding, and rebind after every front-bank reload;
-the results, clear-scene and field-reentry fixtures cover that path. Small
+Retire scene DMA before binding. Small images, arc images and their immutable
+blit plans remain resident through level-clear/upgrade and the next level;
+those scenes do not overwrite their ranges. Each entry still resets both
+overlays and rebinds their backing/terrain pointers. Invalidate residency
+before any boot/front bank load, including a failed load, then upload again
+on gameplay entry. Terrain scratch writes are confined to the prefix and
+do not invalidate the field banks. No extra Chip allocation is required.
+The results, clear-scene and field-reentry fixtures cover that path. Small
 fields restore their masks from the pristine terrain ring
 (`AmigaMemory::game()`); a stationary resident-band circle composes with
 pristine terrain as blitter channel C instead of restoring and repainting.

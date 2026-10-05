@@ -597,6 +597,15 @@ failure prefix. The room pack must remain immutable. Validate with
 `bash amiga/profile.sh shop` and `PROBES=1 bash amiga/profile.sh shop` with the
 reference selector for reentry timing. Profiling restoration unsets it.
 
+`REFERENCE_FIELD_BANK=1` forces field-image/arc uploads on every gameplay
+entry. The default retains those immutable Chip ranges across upgrade and
+level reentry, invalidating them before a boot/front bank load. Both paths
+discard per-ring overlays and rebind their underlays. Pair the natural shop
+tape for field-binding phase and full-frame timings; `SHOP_FIELD_BANK`
+reports the two entries as uploads/reuses. Use `make verify-prepared-time-fields`
+and `bash amiga/profile.sh fields-clear` for image, overwrite-invalidation
+and reentry pixel checks. The selector is unset on profiling restoration.
+
 `bash amiga/profile.sh ammo` checks the factored gauge compositor on the
 bounded contact tape, starting directly in gameplay. Every HUD update is
 compared byte-for-byte with full source-order reconstruction. It requires at
