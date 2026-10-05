@@ -638,6 +638,17 @@ its `PROBES=1` world-entry phase, not steady-state gameplay, for this change.
 dirty state, every landing query and subsequent Creates. Profiling restoration
 unsets the selector.
 
+`REFERENCE_ROOM_TERRAIN=1` retains serialized room-instance decoding at each
+terrain handoff and raster-extent calculation. The default admits a bounded,
+source-ordered resource plan before display; source views, player identity,
+terrain Creates and their RNG effects are still published at the handoff.
+The immutable room pack must outlive the plan. Invalid or oversized admission
+falls back to the generic decoder, including partial failures and no-retry
+semantics. The plan has 256 record slots, uses ordinary RAM only, and owns no
+gameplay instances. Pair the natural shop tape and world/raster entry phases;
+`make verify-terrain-ownership` checks resource fields/order, capacity rejection,
+callback failure prefixes and full replay ownership. Restoration unsets it.
+
 `bash amiga/profile.sh ammo` checks the factored gauge compositor on the
 bounded contact tape, starting directly in gameplay. Every HUD update is
 compared byte-for-byte with full source-order reconstruction. It requires at

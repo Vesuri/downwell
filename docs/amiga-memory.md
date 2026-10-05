@@ -200,5 +200,8 @@ Serialized room/object/builder packs, prepared gameplay DMA source words,
 simulation state and the three-column terrain raster cache can reside in Fast
 RAM. Only DMA-read data belongs in Chip RAM. The three-column full-level cache
 and collision indices still need a separate final memory-reduction pass.
+The retained room-terrain admission plan uses 12,312 bytes of ordinary BSS
+(256 decoded resource records plus identity/count/extent metadata), no Chip
+RAM. Its borrowed room pack must remain immutable; it owns no live instances.
 Audio will require an explicit additional budget; the current headroom must
 not be assumed sufficient for unmeasured additions.

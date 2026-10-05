@@ -1144,6 +1144,7 @@ static unsigned terrainCopyBuffer;
 enum { terrainRasterRows = 8192, terrainRasterWords = AmigaGameplayRows::terrainWords,
        terrainRasterX = AmigaGameplayRows::terrainX };
 static AmigaTerrainRaster terrainRaster{};
+static downwell::PreparedRoomTerrain roomTerrainPlan;
 static AmigaWallDamage<> wallDamage;
 static AmigaWallCollision wallCollision{terrainIndex};
 static void invalidateShopRaster(const downwell::ShopWorld& shops) {
@@ -1294,8 +1295,9 @@ static void prepareTerrainRaster(AmigaRenderer* renderer,
     const AmigaTerrainFragment* fragments, unsigned fragmentCount,
     const AmigaTerrainDecoration* decorations, unsigned decorationCount,
     const AmigaPortRuntime* runtime) {
-    int lastY = 0;
-    for (unsigned i = 0; i < room.instanceCount; ++i) {
+    const bool retainedRoom=roomTerrainPlan.matches(rooms,room);
+    int lastY = retainedRoom?roomTerrainPlan.wallEnd():0;
+    for (unsigned i = 0; !retainedRoom && i < room.instanceCount; ++i) {
         downwell::PackedRoomInstance instance;
         if (rooms.roomInstance(room, i, instance) && instance.objectId == 60 && instance.y + 32 > lastY)
             lastY = instance.y + 32;
@@ -1798,13 +1800,16 @@ __attribute__((noinline)) static int runDownwell(void) {
     }
 #ifndef DOWNWELL_REPLAY_VERIFY
     {
+#ifndef DOWNWELL_REFERENCE_ROOM_TERRAIN
+        roomTerrainPlan.prepare(rooms,mainRoom);
+#endif
         terrainCollision.builders = &builders;
         terrainCollision.rooms = &rooms;
         terrainCollision.room = &mainRoom;
         terrainCollision.fragments = fragments;
         terrainCollision.fragmentCount = 0;
         terrainCollision.runtime = &port;
-        if (!liveGeneration.loadRoom(port,rooms,mainRoom)) {
+        if (!liveGeneration.loadRoom(port,rooms,mainRoom,&roomTerrainPlan)) {
             platform.restore();
             FreeMem(startupCopperWords, 4 * sizeof(UWORD));
             gDownwellStartupFailure = 6;
@@ -2484,7 +2489,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                         amigaBuildTerrainIndex(emptyTerrain, terrainIndex);
                         terrainTiles.clear();
                         terrainCollision.fragmentCount = 0;
-                        if (!liveGeneration.loadRoom(port,rooms,mainRoom)) break;
+                        if (!liveGeneration.loadRoom(port,rooms,mainRoom,&roomTerrainPlan)) break;
                         port.confirmFirstStage();
                         if (!port.initializeAreaOneBuilder(liveBuilder, -16, 704, scenes.styleCursor())) break;
                         liveGeneration.bind(port);

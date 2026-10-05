@@ -136,7 +136,10 @@ struct Scene {
         world->initializeEntryInput(false);
         tiles.clear();
         require(amigaBuildTerrainIndex(collision,index),"index initializes");
-        require(generation.loadRoom(*world,rooms,room),"room terrain loads");
+        auto prepared=std::make_unique<downwell::PreparedRoomTerrain>();
+        require(prepared->prepare(rooms,room),"room terrain resource admission");
+        require(generation.loadRoom(*world,rooms,room,
+            ownership==Ownership::reference?nullptr:prepared.get()),"room terrain loads");
         collision.index=&index;collision.runtime=world.get();
         const int none=0;world->configureBreakables(&none,&none,0);
         require(builder.resetFromRoomEntry(entry.mainBuilderState()),"builder imports entry");
@@ -271,6 +274,55 @@ int main(int argc,char** argv){
     downwell::SpriteCollisionPack sprites(spriteBytes.data(),spriteBytes.size());
     downwell::PackedRoom room;
     require(rooms.valid()&&objects.valid()&&patterns.valid()&&sprites.valid()&&rooms.findRoom(11,room),"resources");
+    {
+        auto prepared=std::make_unique<downwell::PreparedRoomTerrain>();
+        require(prepared->prepare(rooms,room)&&prepared->matches(rooms,room),"room terrain plan admits resources");
+        unsigned selected=0;int extent=0;
+        for(unsigned i=0;i<room.instanceCount;++i){
+            downwell::PackedRoomInstance instance;
+            require(rooms.roomInstance(room,i,instance),"room plan scalar record");
+            if(instance.objectId==60)extent=std::max(extent,instance.y+32);
+            if(instance.objectId!=35&&instance.objectId!=60&&instance.objectId!=93&&instance.objectId!=99)continue;
+            require(selected<prepared->count()&&std::memcmp(&instance,&prepared->at(selected),sizeof(instance))==0,
+                "room plan retains every field and serialized order");++selected;
+        }
+        require(selected==prepared->count()&&extent==prepared->wallEnd(),"room terrain extent and count");
+        downwell::RoomPack twin(roomBytes.data(),roomBytes.size());
+        require(!prepared->matches(twin,room),"room plan belongs to the admitted immutable pack");
+        auto other=room;++other.roomId;
+        require(!prepared->matches(rooms,other),"room plan rejects different room identity");
+        other=room;other.firstInstance=0xffffffffu;
+        require(!prepared->prepare(rooms,other)&&!prepared->matches(rooms,room),"failed admission invalidates old room plan");
+        // Deliberately span the global record bank to exceed the bounded plan;
+        // this is an admission fixture, not a room or gameplay-state injection.
+        other=room;other.firstInstance=0;other.instanceCount=rooms.instanceCount();
+        require(!prepared->prepare(rooms,other)&&prepared->count()==256&&
+            !prepared->matches(rooms,room),"oversized admission stays bounded and invalidates old plan");
+        {
+            auto fallback=std::make_unique<AmigaPortRuntime>(300,true,0,false);
+            auto scalar=std::make_unique<AmigaPortRuntime>(300,true,0,false);
+            unsigned a=0,b=0;
+            require(fallback->loadRoomTerrain(rooms,room,[&](const auto&){++a;return true;},prepared.get())&&
+                scalar->loadRoomTerrain(rooms,room,[&](const auto&){++b;return true;}),"rejected plan uses generic loader");
+            require(a==b&&a==240&&fallback->checkpoint()==scalar->checkpoint(),"rejected plan fallback state");
+        }
+        require(prepared->prepare(rooms,room),"room plan can readmit immutable resources");
+        for(unsigned stop:{1u,3u,240u,241u}){
+            auto scalar=std::make_unique<AmigaPortRuntime>(300,true,0,false);
+            auto retained=std::make_unique<AmigaPortRuntime>(300,true,0,false);
+            unsigned a=0,b=0;
+            const bool first=scalar->loadRoomTerrain(rooms,room,[&](const auto&){return ++a<stop;});
+            const bool second=retained->loadRoomTerrain(rooms,room,[&](const auto&){return ++b<stop;},prepared.get());
+            require(first==second&&a==b&&scalar->checkpoint()==retained->checkpoint(),
+                "prepared room retains callback failure prefix and source state");
+            require(scalar->randomDrawCount()==retained->randomDrawCount()&&
+                scalar->randomState().stateIndex()==retained->randomState().stateIndex(),"prepared room RNG cursor");
+            for(unsigned i=0;i<16;++i)require(scalar->randomState().stateWord(i)==retained->randomState().stateWord(i),
+                "prepared room RNG words");
+            require(!retained->loadRoomTerrain(rooms,room,[&](const auto&){++b;return true;},prepared.get())&&a==b,
+                "prepared partial room cannot retry");
+        }
+    }
     for(unsigned scenario=0;scenario<5;++scenario){
         const auto expected=cleanupOrder(objects,sprites,Ownership::reference,scenario);
         require(cleanupOrder(objects,sprites,Ownership::nativeScenery,scenario)==expected,

@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_GAMEPLAY_WORLD_H
 
 #include "PlayerMotion.h"
+#include "PreparedRoomTerrain.h"
 #include "ScriptEffectRuntimeBinding.h"
 #include "Profile.h"
 #include "core/GameMakerRandom.h"
@@ -506,14 +507,18 @@ public:
     // RoomPack serializes instanceCreationOrder, not object/position order.
     // This terrain-only handoff does not execute the complete room lifecycle.
     template<class Terrain>
-    bool loadRoomTerrain(const downwell::RoomPack& rooms,const downwell::PackedRoom& room,Terrain terrain){
+    bool loadRoomTerrain(const downwell::RoomPack& rooms,const downwell::PackedRoom& room,Terrain terrain,
+                         const downwell::PreparedRoomTerrain* prepared=nullptr){
         if(!run_.effectsSucceeded)return false;
         if(roomTerrainLoaded_||!rooms.valid()){run_.effectsSucceeded=false;return false;}
         roomTerrainLoaded_=true; // A partial load cannot be retried.
         if(!roomEntryViews_.load(rooms,room.roomId)){run_.effectsSucceeded=false;return false;}
-        for(unsigned i=0;i<room.instanceCount;++i){
-            downwell::PackedRoomInstance instance;
-            if(!rooms.roomInstance(room,i,instance)){run_.effectsSucceeded=false;return false;}
+        const bool retained=prepared&&prepared->matches(rooms,room);
+        const unsigned count=retained?prepared->count():room.instanceCount;
+        for(unsigned i=0;i<count;++i){
+            downwell::PackedRoomInstance decoded;
+            if(!retained&&!rooms.roomInstance(room,i,decoded)){run_.effectsSucceeded=false;return false;}
+            const auto& instance=retained?prepared->at(i):decoded;
             if(instance.objectId==35){
                 // The native scheduler currently births its player before this
                 // handoff. Retain the authored identity here without replaying

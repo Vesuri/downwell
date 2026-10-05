@@ -3,10 +3,11 @@
 #include "AmigaProfile.h"
 
 bool AmigaGameplayGeneration::loadRoom(AmigaPortRuntime& runtime,
-    const downwell::RoomPack& rooms,const downwell::PackedRoom& room){
+    const downwell::RoomPack& rooms,const downwell::PackedRoom& room,
+    const downwell::PreparedRoomTerrain* prepared){
     return runtime.loadRoomTerrain(rooms,room,[this](const downwell::PackedRoomInstance& instance){
         return amigaAddTerrainObject(index_,instance.objectId,instance.x,instance.y,true);
-    });
+    },prepared);
 }
 
 void AmigaGameplayGeneration::bind(AmigaPortRuntime& runtime,bool terrainRuns) {
