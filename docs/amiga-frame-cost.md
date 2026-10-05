@@ -170,6 +170,7 @@ numbers. Do not retry a row without removing the reason in its last column.
 
 | Area | Approach | Result | Why it lost | Commit, patch |
 | --- | --- | --- | --- | --- |
+| Effects | Offline interleaved alpha/color stamps plus exact mask-command overlap queries | Combat 77.2 → 75.7 ms; frame 649 93.3 → 95.4 ms | Exact queries and interleaved publication make the first affected frame slower | This commit, `effect-interleaved-commands-rejected.patch` |
 | Gauge | Synchronous word blits from Chip layers | Recharge 24 → 17 ms | ~2,300 cycles per small blit, mostly waiting; shot frames slower | d0072b4b, `blitter-gauge.patch` |
 | Gauge | Runtime constant-interval painter | Missed target | Interval bookkeeping costs what it saves | d0072b4b, `interval-gauge.patch` |
 | Gauge | General interval rebuild per frame | Slower | Same; replaced by bounded damage ranges | c2b663b5, `ammo-intervals-v1.patch` |

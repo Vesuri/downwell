@@ -282,9 +282,16 @@ remaining structure, not retune the prepared row program or its helpers.
    - `intersects` → `synchronize` waiting on the blitter, 1.8 ms;
    - `clear` 0.9 ms.
 
-   Make the surface's occupancy decisions from CPU-side bounds, so composition
-   does not wait for the blitter. Issue each stamp as one prepared-mask blit,
-   not per-row queue entries. Target: under 4 ms.
+   The backend already issues whole-height blits; its submissions are per
+   plane, not per row. Bounds alone cannot answer exact shade-hole queries.
+   The remaining structural attempt must eliminate intermediate surface
+   clearing/stamping/publication, rather than tune its submission layout:
+   publish the ordered immutable producers directly at the controller Draw
+   boundary, applying all subsequent shade masks to each producer's alpha.
+   Preserve opaque-black replacement, later re-addition, exact sprite overlap
+   answers and scalar fallback for unprepared producers. Retain the current
+   compositor as the pixel oracle. Target: under 4 ms; after a second rejected
+   attempt, move to B4 without a variant sweep.
 4. **Software actor drawing.** `amigaRendererDrawAsset` costs 3.2 ms in
    combat, about two actors at 10,000 cycles each that got no hardware sprite.
    At 645, `buildHardwareSpritePart` spends 2.8 ms building sprite DMA words
