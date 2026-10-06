@@ -1,0 +1,278 @@
+diff --git a/amiga/Makefile b/amiga/Makefile
+index 36466d49..61f8a2bf 100644
+--- a/amiga/Makefile
++++ b/amiga/Makefile
+@@ -30,6 +30,7 @@ TABLE_CONTACT_ATAN ?= 0
+ RETAIN_HEALTH_HUD ?= 0
+ AMMO_DAMAGE_RANGE ?= 0
+ PREPARED_AMMO_DIVIDERS ?= 0
++AMMO_SEGMENT_BANK ?= 0
+ PREPARED_FIELDS ?= 0
+ PREPARED_FIELDS_VERIFY ?= 0
+ PROFILE_FIELD_REFERENCE ?= 0
+@@ -175,6 +176,9 @@ endif
+ ifeq ($(PREPARED_AMMO_DIVIDERS),1)
+ CFLAGS += -DDOWNWELL_PREPARED_AMMO_DIVIDERS
+ endif
++ifneq ($(AMMO_SEGMENT_BANK),0)
++CFLAGS += -DDOWNWELL_AMMO_SEGMENT_BANK=$(AMMO_SEGMENT_BANK)
++endif
+ ifeq ($(PREPARED_FIELDS),1)
+ CFLAGS += -DDOWNWELL_PREPARED_FIELDS
+ ifeq ($(PROFILE_FIELD_REFERENCE),1)
+@@ -316,6 +320,7 @@ $(OUT).front: $(AMIGA_FRONT_BANK)
+ obj/startup-options: FORCE_STARTUP_OPTIONS
+ 	@mkdir -p obj
+ 	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(SKIP_LEVEL)' '$(TERRAIN_RUN_STORE)' '$(TABLE_CONTACT_ATAN)' '$(RETAIN_HEALTH_HUD)' '$(AMMO_DAMAGE_RANGE)' '$(PREPARED_AMMO_DIVIDERS)' '$(PREPARED_FIELDS)' '$(PREPARED_FIELDS_VERIFY)' '$(PROFILE_FIELD_REFERENCE)' '$(PREPARED_FIELDS_BACKING)' '$(SCENERY_LAYERS)' '$(NATIVE_BOXES)' '$(NATIVE_FIELDS)' '$(TERRAIN_BATCH)' '$(TERRAIN_DIRECT)' '$(TERRAIN_BATCH_VERIFY)' '$(AMIGA_OPTIMIZATION)' '$(LASER_VERIFY)' '$(PROFILE_LASER)' > $@.tmp
++	@printf '%s\n' '$(AMMO_SEGMENT_BANK)' >> $@.tmp
+ 	@cmp -s $@.tmp $@ || cp $@.tmp $@
+ 
+ $(OBJECTS): obj/startup-options
+diff --git a/amiga/profile.sh b/amiga/profile.sh
+index 428c9144..1a860c83 100644
+--- a/amiga/profile.sh
++++ b/amiga/profile.sh
+@@ -42,6 +42,7 @@ esac
+ if [[ ${SKIP_LEVEL:-0} == 1 && $mode != trace && $mode != fields-clear ]]; then script=profile_clear.gdb; fi
+ # Always leave the playable binary behind, including after a timeout/failure.
+ restore() {
++  unset AMMO_SEGMENT_BANK
+   unset PREPARED_FIELDS_VERIFY PROFILE_FIELD_REFERENCE PREPARED_FIELDS_BACKING
+   make clean > .run/profile-restore.log 2>&1
+   make -j4 TERRAIN_RUN_STORE=0 TABLE_CONTACT_ATAN=0 RETAIN_HEALTH_HUD=0 AMMO_DAMAGE_RANGE=0 PREPARED_AMMO_DIVIDERS=0 PREPARED_FIELDS=0 SCENERY_LAYERS=0 NATIVE_BOXES=1 NATIVE_FIELDS=1 TERRAIN_BATCH=0 TERRAIN_DIRECT=0 TERRAIN_BATCH_VERIFY=0 SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_LASER=0 PROFILE_CONTACT=0 PROFILE_FRAMES=0 PROFILE_TRANSITION=0 GENERATION_DETAIL=0 GENERATION_TIMING=0 PHASE_SAMPLING=0 TRACE_FRAMES= >> .run/profile-restore.log 2>&1
+diff --git a/src/platform/amiga/AmigaAmmoHud.h b/src/platform/amiga/AmigaAmmoHud.h
+index 26d4f385..fa5c8175 100644
+--- a/src/platform/amiga/AmigaAmmoHud.h
++++ b/src/platform/amiga/AmigaAmmoHud.h
+@@ -6,6 +6,9 @@
+ #include "core/AmmoDividerLayout.h"
+ #include "core/AmmoFill.h"
+ #include "core/HudNumbers.h"
++#ifdef DOWNWELL_AMMO_SEGMENT_BANK
++#include "AmigaAmmoSegmentBank.h"
++#endif
+ #ifdef DOWNWELL_PREPARED_AMMO_DIVIDERS
+ #include "AmigaPreparedDividers.h"
+ #endif
+@@ -18,6 +21,11 @@ class AmigaAmmoHud {
+     unsigned fillTop_ = 0, fillHeight_ = 0;
+     AmigaWordStamp stamps_[10];
+     bool stampsReady_ = false;
++#ifdef DOWNWELL_AMMO_SEGMENT_BANK
++    AmigaAmmoSegmentBank segmentBank_;
++    bool useSegmentBank_ = false;
++    bool segmentBankMatches_ = false;
++#endif
+     const UBYTE* stampPack_ = nullptr;
+     alignas(UWORD) UBYTE working_[downwellLayerBytes]; // Fast RAM, never displayed/DMA fetched.
+     UWORD background_[downwellDisplayHeight*6], rim_[downwellDisplayHeight*6];
+@@ -29,7 +37,16 @@ class AmigaAmmoHud {
+ #endif
+ public:
+     unsigned lastWordWrites = 0;
+-    void invalidate() { damage_.valid = false; }
++#ifdef DOWNWELL_AMMO_SEGMENT_BANK
++    // Only shared AmmoGaugeRows::step producers satisfy the trajectory contract.
++    void useSegmentBank(bool enable) { if (enable!=useSegmentBank_) invalidate(); useSegmentBank_=enable; }
++#endif
++    void invalidate() {
++        damage_.valid = false;
++#ifdef DOWNWELL_AMMO_SEGMENT_BANK
++        segmentBank_.invalidate();
++#endif
++    }
+     void draw(AmigaRenderer* renderer, const UBYTE* pack, const UBYTE* end,
+               unsigned ammo, unsigned capacity, unsigned offset,
+               const downwell::AmmoGaugeRows* rows, unsigned meter, bool forceFull = false) {
+@@ -64,6 +81,9 @@ public:
+                 if (!amigaRendererPrepareWordStamp(&stamps_[i], pack, end,
+                     i < 4 ? 418 : i < 8 ? 419 : 421, i < 8 ? i % 4 : i-8)) stampsReady_ = false;
+             stampPack_ = pack;
++#ifdef DOWNWELL_AMMO_SEGMENT_BANK
++            segmentBankMatches_ = stampsReady_ && AmigaAmmoSegmentBank::matches(stamps_);
++#endif
+ #ifdef DOWNWELL_PREPARED_AMMO_DIVIDERS
+             preparedDividersMatch_ = stampsReady_ && amigaPreparedDividersMatch(stamps_ + 8);
+ #endif
+@@ -119,7 +139,17 @@ public:
+             fillTop_ = fill.top.floor(); fillHeight_ = fill.height.floor();
+             fillAmmo_ = ammo; fillCapacity_ = capacity;
+         }
++#ifdef DOWNWELL_AMMO_SEGMENT_BANK
++        const bool segmentsReady = useSegmentBank_ && !forceFull && meter<=3 && segmentBankMatches_ &&
++                                   segmentBank_.prepare(rows,capacity);
++#endif
+         auto paint = [&](int top, int bottom, bool interior) {
++#ifdef DOWNWELL_AMMO_SEGMENT_BANK
++            if (interior && segmentsReady && top>=46+int(4*meter) && bottom<=237+int(4*meter)) {
++                lastWordWrites+=segmentBank_.draw(display->hud,working_,*rows,ammo,meter,top,bottom);
++                return;
++            }
++#endif
+             // Record the backing actually painted, not merely a draw request:
+             // repeated unchanged requests must not lose a pending wide clear.
+             if (!interior && top <= 231 && bottom >= 256)
+@@ -251,6 +281,15 @@ public:
+                 const int begin = top > stableTop ? top : stableTop;
+                 const int end = bottom < stableBottom ? bottom : stableBottom;
+                 if (top < begin) paint(top, begin, false);
++#ifdef DOWNWELL_AMMO_SEGMENT_BANK
++                const int bankTop=46+4*meter, bankBottom=237+4*meter;
++                if (segmentsReady && begin<bankBottom && end>bankTop) {
++                    const int a=begin>bankTop ? begin : bankTop, b=end<bankBottom ? end : bankBottom;
++                    if (begin<a) paint(begin,a,true);
++                    paint(a,b,true);
++                    if (b<end) paint(b,end,true);
++                } else
++#endif
+                 paint(begin, end, true);
+                 if (end < bottom) paint(end, bottom, false);
+             } else paint(top, bottom, false);
+diff --git a/src/platform/amiga/AmigaRenderer.c b/src/platform/amiga/AmigaRenderer.c
+index 353c9bb5..3cc1cca2 100644
+--- a/src/platform/amiga/AmigaRenderer.c
++++ b/src/platform/amiga/AmigaRenderer.c
+@@ -702,6 +702,24 @@ unsigned amigaRendererPublishHudColumn(UBYTE* destination, UBYTE* working,
+     return writes;
+ }
+ 
++unsigned amigaRendererPublishPreparedHudRun(UBYTE* destination, UBYTE* working,
++    int top, int bottom, UWORD low, UWORD high) {
++    unsigned writes=0;
++    UBYTE* input=working+top*downwellBytesPerPlaneLine+36;
++    UBYTE* target=destination+top*downwellBytesPerPlaneLine+36;
++    for (;top<bottom;++top) {
++        UWORD old=readWord(input), value=(old&15u)|low;
++        if (old!=value) { writeWord(input,value); writeWord(target,value); ++writes; }
++        old=readWord(input+downwellPlaneBytes); value=(old&15u)|high;
++        if (old!=value) {
++            writeWord(input+downwellPlaneBytes,value);
++            writeWord(target+downwellPlaneBytes,value); ++writes;
++        }
++        input+=downwellBytesPerPlaneLine; target+=downwellBytesPerPlaneLine;
++    }
++    return writes;
++}
++
+ unsigned amigaRendererPublishHudBlockedColumn(UBYTE* destination, UBYTE* working,
+     const AmigaHudBlockedColumn* overlay, unsigned word, int top, int bottom,
+     int shiftY, UWORD clip) {
+diff --git a/src/platform/amiga/AmigaRenderer.h b/src/platform/amiga/AmigaRenderer.h
+index 2bb52a2b..dca96e84 100644
+--- a/src/platform/amiga/AmigaRenderer.h
++++ b/src/platform/amiga/AmigaRenderer.h
+@@ -113,6 +113,7 @@ void amigaRendererApplyHudBlockedColumn(AmigaRenderer*, const AmigaHudBlockedCol
+                                        unsigned, int, int, int);
+ /* One aligned HUD column, already clipped by caller; masked planar words. */
+ void amigaRendererFillHudWordColumn(UBYTE*, unsigned, unsigned, unsigned, UWORD, UWORD, UWORD);
++unsigned amigaRendererPublishPreparedHudRun(UBYTE*, UBYTE*, int, int, UWORD, UWORD);
+ void amigaRendererCacheHudColumns(UWORD*, const UBYTE*, unsigned, unsigned);
+ void amigaRendererApplyHudColumns(AmigaRenderer*, const UWORD*, unsigned, unsigned, int, int, int, int);
+ int amigaRendererAssetBounds(const UBYTE* pack, const UBYTE* packEnd,
+diff --git a/src/platform/amiga/DownwellAmiga.cpp b/src/platform/amiga/DownwellAmiga.cpp
+index a15828d0..0c284f39 100644
+--- a/src/platform/amiga/DownwellAmiga.cpp
++++ b/src/platform/amiga/DownwellAmiga.cpp
+@@ -789,8 +789,14 @@ static void drawAmmoDigit(AmigaRenderer* renderer, int x, int y,
+ }
+ 
+ static AmigaAmmoHud ammoHud;
++#ifdef DOWNWELL_AMMO_SEGMENT_BANK
++volatile unsigned downwellAmmoSegmentBank = DOWNWELL_AMMO_SEGMENT_BANK;
++#endif
+ static void redrawAmmo(AmigaRenderer* renderer, unsigned ammo, unsigned maximumAmmo, unsigned offset = 0,
+                        const downwell::AmmoGaugeRows* rows = nullptr, unsigned meterOffset = 0) {
++#ifdef DOWNWELL_AMMO_SEGMENT_BANK
++    ammoHud.useSegmentBank(downwellAmmoSegmentBank==2);
++#endif
+     ammoHud.draw(renderer, activeHudPack, activeHudPackEnd, ammo, maximumAmmo, offset, rows, meterOffset);
+     DW_PROFILE_PHASE(profileTitle);
+ }
+diff --git a/tests/platform/amiga/AmigaRendererTest.cpp b/tests/platform/amiga/AmigaRendererTest.cpp
+index f35b1da8..dde55f1e 100644
+--- a/tests/platform/amiga/AmigaRendererTest.cpp
++++ b/tests/platform/amiga/AmigaRendererTest.cpp
+@@ -1261,6 +1261,9 @@ int main(int argc, char** argv) {
+     }
+     {
+         AmigaAmmoHud retained;
++#ifdef DOWNWELL_AMMO_SEGMENT_BANK
++        retained.useSegmentBank(true);
++#endif
+         downwell::AmmoGaugeRows rows;
+         unsigned previousDigits = 1;
+         auto fullRedraw = [&](unsigned ammo, unsigned cap, unsigned offset, unsigned meter) {
+@@ -1360,6 +1363,9 @@ int main(int argc, char** argv) {
+         // Isolate every artwork transition, including the special bottom row
+         // and both sides of the fill boundary. Adjacent overlays can conceal
+         // changed pixels, but damage must never omit a surviving difference.
++#ifdef DOWNWELL_AMMO_SEGMENT_BANK
++        retained.useSegmentBank(false); // Following probes deliberately bypass the shared producer.
++#endif
+         rows.filled = 92;
+         // Settle the three-digit-to-one-digit backing transition from the
+         // preceding capacity-127 sweep before isolating row-only changes.
+diff --git a/src/platform/amiga/AmigaAmmoSegmentBank.h b/src/platform/amiga/AmigaAmmoSegmentBank.h
+new file mode 100644
+index 00000000..e83fc556
+--- /dev/null
++++ b/src/platform/amiga/AmigaAmmoSegmentBank.h
+@@ -0,0 +1,58 @@
++#ifndef DOWNWELL_AMIGA_AMMO_SEGMENT_BANK_H
++#define DOWNWELL_AMIGA_AMMO_SEGMENT_BANK_H
++#include "AmigaRenderer.h"
++#include "core/AmmoGaugeRows.h"
++#include "../../../generated/amiga-ammo-segments-probe.h"
++
++// Presentation bank for the shared producer's fixed-capacity trajectories.
++// Capacity changes are admitted only after equal-state groups are verified.
++class AmigaAmmoSegmentBank {
++    unsigned capacity_ = 0;
++    bool uniform_ = false;
++public:
++    static bool matches(const AmigaWordStamp* stamps) {
++        for (unsigned i=0;i<10;++i) for (unsigned y=0;y<8;++y)
++            if (stamps[i].low[y]!=downwell_ammo_segments::sourceStamps[i][y][0] ||
++                stamps[i].high[y]!=downwell_ammo_segments::sourceStamps[i][y][1]) return false;
++        return true;
++    }
++    void invalidate() { capacity_ = 0; uniform_ = false; }
++    bool prepare(const downwell::AmmoGaugeRows* rows, unsigned capacity) {
++        if (!rows || !capacity || capacity > 16) { invalidate(); return false; }
++        if (capacity_ != capacity) { capacity_ = capacity; uniform_ = false; }
++        if (!uniform_) {
++            const auto* bounds = downwell_ammo_segments::boundaries[capacity-1];
++            for (unsigned segment=0;segment<capacity;++segment)
++                for (unsigned row=bounds[segment]+1;row<bounds[segment+1];++row)
++                    if (rows->state[row]!=rows->state[bounds[segment]]) return false;
++            uniform_ = true;
++        }
++        return true;
++    }
++    unsigned draw(UBYTE* destination, UBYTE* working, const downwell::AmmoGaugeRows& rows,
++                  unsigned ammo, unsigned meter, int top, int bottom) const {
++        const auto* bounds=downwell_ammo_segments::boundaries[capacity_-1];
++        const unsigned config=downwell_ammo_segments::configStart[capacity_-1]+(ammo*4+meter)*capacity_;
++        unsigned writes=0;
++        for (unsigned segment=0;segment<capacity_;++segment) {
++            int y=229+4*meter-bounds[segment+1]+(segment==capacity_-1 ? 1 : 8);
++            const int end=229+4*meter-bounds[segment]+8;
++            if (y>=bottom || end<=top) continue;
++            const unsigned own=rows.state[bounds[segment]]<4 ? rows.state[bounds[segment]] : 3;
++            const unsigned previous=segment ? (rows.state[bounds[segment-1]]<4 ? rows.state[bounds[segment-1]] : 3) : 0;
++            const auto page=downwell_ammo_segments::configurations[config+segment];
++            const auto tile=downwell_ammo_segments::pages[page][own*4+previous];
++            const auto* directory=downwell_ammo_segments::tiles[tile];
++            for (unsigned i=0;i<directory[1] && y<bottom;++i) {
++                const auto* run=downwell_ammo_segments::runs[directory[0]+i];
++                const auto* pair=downwell_ammo_segments::pairs[run[1]];
++                const int last=y+run[0];
++                if (last>top) writes+=amigaRendererPublishPreparedHudRun(destination,working,
++                    y>top ? y : top,last<bottom ? last : bottom,pair[0],pair[1]);
++                y=last;
++            }
++        }
++        return writes;
++    }
++};
++#endif

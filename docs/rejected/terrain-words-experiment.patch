@@ -1,0 +1,456 @@
+diff --git a/Makefile b/Makefile
+index 27d0a5c2..0defed5a 100644
+--- a/Makefile
++++ b/Makefile
+@@ -2010,6 +2010,17 @@ generate-amiga-game:
+ 	python3 tests/projectile-art-test.py
+ 	tools/generate-amiga-hud.py --profile game
+ 
++.PHONY: generate-amiga-terrain-words test-amiga-terrain-words
++generate-amiga-terrain-words: generate-amiga-game
++	python3 tools/generate-amiga-terrain-words.py
++test: test-amiga-terrain-words
++test-amiga-terrain-words: generate-amiga-terrain-words build/amiga-terrain-words-test
++	python3 tools/generate-amiga-terrain-words.py --check
++	./build/amiga-terrain-words-test generated/amiga-game.dwap generated/amiga-terrain.words
++build/amiga-terrain-words-test: tests/platform/amiga/AmigaTerrainWordsTest.cpp src/platform/amiga/AmigaRenderer.c src/platform/amiga/AmigaRenderer.h
++	@mkdir -p build
++	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ tests/platform/amiga/AmigaTerrainWordsTest.cpp src/platform/amiga/AmigaRenderer.c
++
+ .PHONY: generate-amiga-clear verify-amiga-clear
+ generate-amiga-clear:
+ 	tools/generate-amiga-hud.py --profile clear
+diff --git a/amiga/Makefile b/amiga/Makefile
+index d7aa13e4..ef717384 100644
+--- a/amiga/Makefile
++++ b/amiga/Makefile
+@@ -31,6 +31,7 @@ RETAIN_HEALTH_HUD ?= 0
+ SCENERY_LAYERS ?= 0
+ NATIVE_BOXES ?= 1
+ NATIVE_FIELDS ?= 1
++TERRAIN_WORDS ?= 0
+ SKIP_LEVEL ?= 0
+ PROBES ?= 0
+ GENERATION_DETAIL ?= 0
+@@ -165,6 +166,9 @@ CFLAGS += -DDOWNWELL_SCENERY_LAYERS
+ endif
+ CFLAGS += -DDOWNWELL_NATIVE_BOXES=$(NATIVE_BOXES)
+ CFLAGS += -DDOWNWELL_NATIVE_FIELDS=$(NATIVE_FIELDS)
++ifeq ($(TERRAIN_WORDS),1)
++CFLAGS += -DDOWNWELL_TERRAIN_WORDS
++endif
+ ifneq ($(filter 1,$(SKIP_TO_GAME) $(SKIP_LEVEL)),)
+ CFLAGS += -DDOWNWELL_SKIP_TO_GAME
+ endif
+@@ -220,6 +224,7 @@ LDFLAGS := -Wl,--emit-relocs,--gc-sections,-Ttext=0,-Map=$(OUT).map
+ 
+ AMIGA_HUD := $(REPO)/generated/amiga-hud.dwap
+ AMIGA_GAME := $(REPO)/generated/amiga-game.dwap
++AMIGA_TERRAIN_WORDS := $(REPO)/generated/amiga-terrain.words
+ AMIGA_EXIT_MASK := $(REPO)/generated/amiga-game.exit-mask
+ AMIGA_ENTRY_MASK := $(REPO)/generated/amiga-game.entry-mask
+ AMIGA_SELECTION_MASK := $(REPO)/generated/amiga-game.selection-mask
+@@ -264,7 +269,7 @@ $(OUT).front: $(AMIGA_FRONT_BANK)
+ .PHONY: FORCE_STARTUP_OPTIONS
+ obj/startup-options: FORCE_STARTUP_OPTIONS
+ 	@mkdir -p obj
+-	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(SKIP_LEVEL)' '$(TERRAIN_RUN_STORE)' '$(TABLE_CONTACT_ATAN)' '$(RETAIN_HEALTH_HUD)' '$(SCENERY_LAYERS)' '$(NATIVE_BOXES)' '$(NATIVE_FIELDS)' '$(AMIGA_OPTIMIZATION)' '$(LASER_VERIFY)' '$(PROFILE_LASER)' > $@.tmp
++	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(SKIP_LEVEL)' '$(TERRAIN_RUN_STORE)' '$(TABLE_CONTACT_ATAN)' '$(RETAIN_HEALTH_HUD)' '$(SCENERY_LAYERS)' '$(NATIVE_BOXES)' '$(NATIVE_FIELDS)' '$(TERRAIN_WORDS)' '$(AMIGA_OPTIMIZATION)' '$(LASER_VERIFY)' '$(PROFILE_LASER)' > $@.tmp
+ 	@cmp -s $@.tmp $@ || cp $@.tmp $@
+ 
+ $(OBJECTS): obj/startup-options
+@@ -515,6 +520,9 @@ $(AMIGA_HUD):
+ $(AMIGA_GAME): $(REPO)/tools/generate-amiga-hud.py
+ 	$(MAKE) -C $(REPO) generate-amiga-game
+ 
++$(AMIGA_TERRAIN_WORDS): $(AMIGA_GAME) $(REPO)/tools/generate-amiga-terrain-words.py
++	cd $(REPO) && python3 tools/generate-amiga-terrain-words.py
++
+ $(AMIGA_RESULTS): $(REPO)/tools/generate-amiga-hud.py
+ 	$(MAKE) -C $(REPO) generate-amiga-results
+ 
+@@ -554,7 +562,7 @@ $(AMIGA_SELECTION_MASK): $(AMIGA_GAME)
+ $(AMIGA_BOOT_BANK) $(AMIGA_FRONT_BANK) $(AMIGA_SCENE_BANKS): $(AMIGA_GAME)
+ 	@test -f $@ || $(MAKE) -C $(REPO) generate-amiga-game
+ 
+-obj/AmigaAssets.o: $(AMIGA_SRC)/AmigaAssets.s $(AMIGA_HUD) $(AMIGA_GAME) $(AMIGA_EXIT_MASK) $(AMIGA_ENTRY_MASK) $(AMIGA_SELECTION_MASK) \
++obj/AmigaAssets.o: $(AMIGA_SRC)/AmigaAssets.s $(AMIGA_HUD) $(AMIGA_GAME) $(AMIGA_TERRAIN_WORDS) $(AMIGA_EXIT_MASK) $(AMIGA_ENTRY_MASK) $(AMIGA_SELECTION_MASK) \
+ 		$(AMIGA_RESULTS) $(AMIGA_SHOP) $(AMIGA_CLEAR) $(ROOM_PACK) $(OBJECT_PACK) $(COLLISION_PACK) $(COLLISION_MASK_PACK) $(BUILDER_PACK)
+ 	@mkdir -p $(@D)
+ 	$(AS) $(ASFLAGS) -o $@ $<
+diff --git a/amiga/profile.sh b/amiga/profile.sh
+index 55723856..acb6287e 100644
+--- a/amiga/profile.sh
++++ b/amiga/profile.sh
+@@ -36,7 +36,7 @@ if [[ ${SKIP_LEVEL:-0} == 1 && $mode != trace ]]; then script=profile_clear.gdb;
+ # Always leave the playable binary behind, including after a timeout/failure.
+ restore() {
+   make clean > .run/profile-restore.log 2>&1
+-  make -j4 TERRAIN_RUN_STORE=0 TABLE_CONTACT_ATAN=0 RETAIN_HEALTH_HUD=0 SCENERY_LAYERS=0 NATIVE_BOXES=1 NATIVE_FIELDS=1 SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_LASER=0 PROFILE_CONTACT=0 PROFILE_FRAMES=0 PROFILE_TRANSITION=0 GENERATION_DETAIL=0 GENERATION_TIMING=0 PHASE_SAMPLING=0 TRACE_FRAMES= >> .run/profile-restore.log 2>&1
++  make -j4 TERRAIN_RUN_STORE=0 TABLE_CONTACT_ATAN=0 RETAIN_HEALTH_HUD=0 SCENERY_LAYERS=0 NATIVE_BOXES=1 NATIVE_FIELDS=1 TERRAIN_WORDS=0 SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_LASER=0 PROFILE_CONTACT=0 PROFILE_FRAMES=0 PROFILE_TRANSITION=0 GENERATION_DETAIL=0 GENERATION_TIMING=0 PHASE_SAMPLING=0 TRACE_FRAMES= >> .run/profile-restore.log 2>&1
+ }
+ mkdir -p .run
+ if [[ ${PROFILE_CONTACT:-0} == 1 ]]; then
+diff --git a/docs/terrain-update-contract.md b/docs/terrain-update-contract.md
+index 3b9c30ee..13bf8988 100644
+--- a/docs/terrain-update-contract.md
++++ b/docs/terrain-update-contract.md
+@@ -87,3 +87,25 @@ circular bitplane scrolling.
+ 
+ Scene-verification builds compare the selected sequence with an independent
+ full-record scan before drawing; normal and profiling builds omit that oracle.
++
++## Prepared terrain placement experiment
++
++`TERRAIN_WORDS=1` selects a host-prepared word bank for unmirrored sprite 51
++only. The retained generic renderer remains the fallback and reference. This
++changes placement, not terrain selection, order, invalidation, or ring ownership.
++All 26 source frames are 16×16 with origin (8,8), but their ordinary display
++position has a six-pixel word offset. They are not opaque: the union of the
++two colour planes is their write mask, including opaque palette-black pen 3.
++
++`generate-amiga-terrain-words.py` prepares mask/low/high words for each of the
++16 horizontal phases, after checking the planar pack and original input hashes.
++The immutable bank costs 79,888 bytes of ordinary executable data, with no
++additional Chip allocation or runtime pixel conversion. Each placement applies
++the viewport edge masks and copies prepared colour words under coverage;
++vertical clipping advances the source rows and ring wrapping resets the
++destination. Non-tile decorations and mirrored assets use the existing path.
++
++`make test-amiga-terrain-words` compares complete plane buffers and guard bytes
++with the generic renderer for every frame and phase, both layer targets, screen
++and viewport edges, one-pixel clips and wrapped origins. This is a pixel and
++memory-boundary gate, not evidence that the experiment meets its timing target.
+diff --git a/src/platform/amiga/AmigaAssets.s b/src/platform/amiga/AmigaAssets.s
+index 091c4315..94d89b78 100644
+--- a/src/platform/amiga/AmigaAssets.s
++++ b/src/platform/amiga/AmigaAssets.s
+@@ -13,6 +13,13 @@ amiga_game_pack:
+ 	.globl amiga_game_pack_end
+ amiga_game_pack_end:
+ 
++	.balign 4
++	.globl amiga_terrain_words
++amiga_terrain_words:
++	.incbin "../generated/amiga-terrain.words"
++	.globl amiga_terrain_words_end
++amiga_terrain_words_end:
++
+ 	.balign 4
+ 	.globl amiga_exit_mask
+ amiga_exit_mask:
+diff --git a/src/platform/amiga/AmigaRenderer.c b/src/platform/amiga/AmigaRenderer.c
+index fb6b0a71..b5df695f 100644
+--- a/src/platform/amiga/AmigaRenderer.c
++++ b/src/platform/amiga/AmigaRenderer.c
+@@ -36,6 +36,58 @@ static void writeWord(UBYTE* data, UWORD value) {
+ #endif
+ }
+ 
++int amigaRendererBindTerrainWords(AmigaTerrainWords* words,const UBYTE* data,const UBYTE* end) {
++    words->data=0;words->frames=0;
++    if(end-data!=16+26*16*192 || readLong(data)!=0x44575457UL ||
++        readWord(data+4)!=1 || readWord(data+6)!=51 || readWord(data+8)!=26 ||
++        readWord(data+10)!=16 || readWord(data+12)!=16 || readWord(data+14)!=16)return 0;
++    words->data=data+16;words->frames=26;return 1;
++}
++
++int amigaRendererDrawTerrainWords(AmigaRenderer* r,const AmigaTerrainWords* words,
++                                  unsigned frame,int x,int y) {
++    int left=x-8,top=y-8,l=r->clipX,t=r->clipY;
++    int right=r->clipX+r->clipWidth,bottom=r->clipY+r->clipHeight;
++    int firstWord,lastWord,column,row;
++    unsigned physical,height,planeBytes;
++    UWORD clips[2];
++    UBYTE* destination;
++    const UBYTE* source;
++    if(!words->data || frame>=words->frames)return 0;
++    if(l<0)l=0;if(t<0)t=0;
++    if(right>downwellVisibleWidth)right=downwellVisibleWidth;
++    if(bottom>downwellDisplayHeight)bottom=downwellDisplayHeight;
++    if(l<left)l=left;if(t<top)t=top;
++    if(right>left+16)right=left+16;if(bottom>top+16)bottom=top+16;
++    if(l>=right||t>=bottom)return 1;
++    firstWord=l>>4;lastWord=(right-1)>>4;
++    for(column=firstWord;column<=lastWord;++column){
++        UWORD mask=0xffff;
++        if(column==firstWord)mask&=(UWORD)(0xffffu>>(l&15));
++        if(column==lastWord)mask&=(UWORD)(0xffffu<<(15-((right-1)&15)));
++        clips[column-firstWord]=mask;
++    }
++    height=r->target==r->game?downwellGameRingHeight:downwellDisplayHeight;
++    planeBytes=height*downwellBytesPerPlaneLine;
++    physical=r->target==r->game?(r->gameOrigin+(unsigned)t)%height:(unsigned)t;
++    destination=r->target+physical*downwellBytesPerPlaneLine+firstWord*2;
++    source=words->data+(frame*16+(left&15))*192+(t-top)*12+(firstWord-(left>>4))*6;
++    for(row=t;row<bottom;++row){
++        for(column=0;column<=lastWord-firstWord;++column){
++            const UBYTE* s=source+column*6;
++            UBYTE* d=destination+column*2;
++            const UWORD mask=readWord(s)&clips[column];
++            if(mask){
++                writeWord(d,(readWord(d)&(UWORD)~mask)|(readWord(s+2)&mask));
++                writeWord(d+planeBytes,(readWord(d+planeBytes)&(UWORD)~mask)|(readWord(s+4)&mask));
++            }
++        }
++        source+=12;destination+=downwellBytesPerPlaneLine;
++        if(++physical==height){physical=0;destination=r->target+firstWord*2;}
++    }
++    return 1;
++}
++
+ void amigaRendererDrawPlanarWord(AmigaRenderer* renderer,int x,int y,UWORD bits,UWORD low,UWORD high) {
+     int left,right,first,last,column,shift,part;
+     unsigned row;
+diff --git a/src/platform/amiga/AmigaRenderer.h b/src/platform/amiga/AmigaRenderer.h
+index cfaa3fb0..143f659a 100644
+--- a/src/platform/amiga/AmigaRenderer.h
++++ b/src/platform/amiga/AmigaRenderer.h
+@@ -60,6 +60,10 @@ void amigaRendererDrawAsset(AmigaRenderer* renderer,
+                             const UBYTE* pack, const UBYTE* packEnd,
+                             UWORD sprite, UWORD frame,
+                             int anchorX, int anchorY, int flipX);
++/* Host-prepared sprite-51 placements, retained in Fast RAM, no Chip copy. */
++typedef struct AmigaTerrainWords { const UBYTE* data; unsigned frames; } AmigaTerrainWords;
++int amigaRendererBindTerrainWords(AmigaTerrainWords*,const UBYTE*,const UBYTE*);
++int amigaRendererDrawTerrainWords(AmigaRenderer*,const AmigaTerrainWords*,unsigned,int,int);
+ /* Native words copied from an offline planar asset, not pixel conversion. */
+ typedef struct AmigaWordStamp {
+     UWORD low[8], high[8], mask[8];
+diff --git a/src/platform/amiga/AmigaTerrainPainter.cpp b/src/platform/amiga/AmigaTerrainPainter.cpp
+index 146e92cb..710e25d2 100644
+--- a/src/platform/amiga/AmigaTerrainPainter.cpp
++++ b/src/platform/amiga/AmigaTerrainPainter.cpp
+@@ -7,6 +7,7 @@
+ #include "core/WallFootprint.h"
+ 
+ namespace {
++AmigaTerrainWords preparedTiles{};
+ static bool roomHasMainWall(const downwell::RoomPack& rooms,
+                             const downwell::PackedRoom& room,
+                             int x, int y) {
+@@ -41,6 +42,10 @@ static UWORD mainWallFrame(const AmigaTerrainIndex* terrainIndex,
+ }
+ }
+ 
++bool AmigaTerrainPainter::bindPreparedTiles(const UBYTE* data, const UBYTE* end) {
++    return amigaRendererBindTerrainWords(&preparedTiles, data, end) != 0;
++}
++
+ bool AmigaTerrainPainter::paint(AmigaRenderer* renderer,
+     const downwell::RoomPack& rooms, const downwell::PackedRoom& room,
+     const AmigaTerrainIndex* terrainIndex, const AmigaTerrainTiles& terrainTiles,
+@@ -53,6 +58,10 @@ bool AmigaTerrainPainter::paint(AmigaRenderer* renderer,
+     const auto drawGameAsset = [pack, end](AmigaRenderer* target, UWORD sprite,
+         UWORD frame, int x, int y, int flip) {
+         DW_PROFILE_SCOPE(profileTerrainAsset);
++#ifdef DOWNWELL_TERRAIN_WORDS
++        if (sprite == 51 && !flip &&
++            amigaRendererDrawTerrainWords(target, &preparedTiles, frame, x, y)) return;
++#endif
+         amigaRendererDrawAsset(target, pack, end, sprite, frame, x, y, flip);
+     };
+     auto drawIndexedWalls = [&](AmigaRenderer* renderer,
+diff --git a/src/platform/amiga/AmigaTerrainPainter.h b/src/platform/amiga/AmigaTerrainPainter.h
+index 79f4759f..a9a49e64 100644
+--- a/src/platform/amiga/AmigaTerrainPainter.h
++++ b/src/platform/amiga/AmigaTerrainPainter.h
+@@ -7,6 +7,7 @@
+ // allocation, simulation, buffer publication or whole-frame redraw policy.
+ class AmigaTerrainPainter {
+ public:
++    static bool bindPreparedTiles(const UBYTE* data, const UBYTE* end);
+     static bool paint(AmigaRenderer* renderer,
+         const downwell::RoomPack& rooms, const downwell::PackedRoom& room,
+         const AmigaTerrainIndex* terrainIndex, const AmigaTerrainTiles& terrainTiles,
+diff --git a/src/platform/amiga/DownwellAmiga.cpp b/src/platform/amiga/DownwellAmiga.cpp
+index b8985c8b..767c5d46 100644
+--- a/src/platform/amiga/DownwellAmiga.cpp
++++ b/src/platform/amiga/DownwellAmiga.cpp
+@@ -104,6 +104,8 @@ extern const UBYTE amiga_hud_pack[];
+ extern const UBYTE amiga_hud_pack_end[];
+ extern const UBYTE amiga_game_pack[];
+ extern const UBYTE amiga_game_pack_end[];
++extern const UBYTE amiga_terrain_words[];
++extern const UBYTE amiga_terrain_words_end[];
+ extern const UBYTE amiga_results_pack[];
+ extern const UBYTE amiga_exit_mask[];
+ extern const UBYTE amiga_exit_mask_end[];
+@@ -1597,6 +1599,11 @@ __attribute__((noinline)) static int runDownwell(void) {
+     }
+     activeGamePack = memory.assets();
+     activeGamePackEnd = activeGamePack + gamePackBytes;
++#ifdef DOWNWELL_TERRAIN_WORDS
++    if (!AmigaTerrainPainter::bindPreparedTiles(amiga_terrain_words, amiga_terrain_words_end)) {
++        platform.restore();FreeMem(startupCopperWords,4*sizeof(UWORD));memory.release();return 20;
++    }
++#endif
+     if(!AmigaGameplayActors::prepareDamageText(activeGamePack,activeGamePackEnd)){
+         platform.restore();FreeMem(startupCopperWords,4*sizeof(UWORD));memory.release();return 20;
+     }
+
+diff --git a/tests/platform/amiga/AmigaTerrainWordsTest.cpp b/tests/platform/amiga/AmigaTerrainWordsTest.cpp
+new file mode 100644
+--- /dev/null
++++ b/tests/platform/amiga/AmigaTerrainWordsTest.cpp
+@@ -0,0 +1,79 @@
++#include "platform/amiga/AmigaRenderer.h"
++#include <cstdlib>
++#include <fstream>
++#include <iostream>
++#include <iterator>
++#include <vector>
++
++int amigaBlitterDrawPlanarMasked(const UBYTE*, const UBYTE*, UWORD, UWORD,
++    UWORD, UBYTE*, UWORD, UWORD, UWORD, UWORD, UWORD, UWORD, UWORD, int) { return 0; }
++int amigaBlitterClearPlanar(UBYTE*, UWORD, UWORD) { return 0; }
++int amigaBlitterSolidRect(UBYTE*, UWORD, UWORD, UWORD, UWORD, UWORD, UWORD) { return 0; }
++
++static void require(bool ok, const char* message) {
++    if (!ok) { std::cerr << message << '\n'; std::exit(1); }
++}
++static std::vector<UBYTE> read(const char* path) {
++    std::ifstream input(path, std::ios::binary);
++    std::vector<UBYTE> result{std::istreambuf_iterator<char>(input), {}};
++    require(!result.empty(), "asset file missing");
++    return result;
++}
++int main(int argc, char** argv) {
++    require(argc == 3, "usage: terrain-words-test game.dwap terrain.words");
++    const auto pack = read(argv[1]);
++    auto bank = read(argv[2]);
++    AmigaTerrainWords words{};
++    require(amigaRendererBindTerrainWords(&words, bank.data(), bank.data()+bank.size()),
++        "valid terrain bank rejected");
++    // All phases/frames, screen edges, row clips, and wrap across both planes.
++    const int clips[][4] = {{0,0,380,284}, {110,0,160,284}, {113,7,1,273},
++        {0,12,380,1}, {117,265,150,13}, {-5,-7,390,300}};
++    unsigned cases = 0;
++    for (unsigned frame=0; frame<26; ++frame)
++    for (int phase=0; phase<16; ++phase)
++    for (unsigned origin : {0u, 307u, 319u})
++    for (bool hud : {false, true})
++    for (int base : {-16, 96, 256, 368})
++    for (int top : {-15, 0, 8, 269, 283})
++    for (const auto& clip : clips) {
++        std::vector<UBYTE> a(downwellGameRingBytes+32), b;
++        std::vector<UBYTE> ha(downwellLayerBytes+32), hb;
++        // Nonzero destinations detect lost transparency and collateral writes.
++        for (unsigned i=0; i<a.size(); ++i) a[i]=(i*37+frame*13+phase)&255;
++        for (unsigned i=0; i<ha.size(); ++i) ha[i]=(i*71+frame*7+phase)&255;
++        b=a; hb=ha;
++        AmigaRenderer reference{}, candidate{};
++        amigaRendererInit(&reference, a.data()+16, ha.data()+16);
++        amigaRendererInit(&candidate, b.data()+16, hb.data()+16);
++        amigaRendererSetGameOrigin(&reference, origin);
++        amigaRendererSetGameOrigin(&candidate, origin);
++        if (hud) { reference.target=reference.hud; candidate.target=candidate.hud; }
++        amigaRendererSetClipRect(&reference, clip[0],clip[1],clip[2],clip[3]);
++        amigaRendererSetClipRect(&candidate, clip[0],clip[1],clip[2],clip[3]);
++        amigaRendererDrawAsset(&reference, pack.data(), pack.data()+pack.size(),
++            51, frame, base+phase+8, top+8, 0);
++        require(amigaRendererDrawTerrainWords(&candidate, &words, frame, base+phase+8,top+8),
++            "valid tile not handled");
++        if (a!=b || ha!=hb) {
++            std::cerr << "mismatch frame=" << frame << " phase=" << phase
++                << " origin=" << origin << " hud=" << hud << " left=" << base+phase
++                << " top=" << top << " clip=" << clip[0] << ',' << clip[1]
++                << ',' << clip[2] << ',' << clip[3] << '\n';
++            return 1;
++        }
++        ++cases;
++    }
++    AmigaRenderer unused{};
++    require(!amigaRendererDrawTerrainWords(&unused,&words,26,0,0), "invalid frame accepted");
++    for (unsigned offset=0; offset<16; ++offset) {
++        bank[offset]^=1;
++        require(!amigaRendererBindTerrainWords(&words,bank.data(),bank.data()+bank.size()),
++            "invalid header accepted");
++        require(!words.data && !words.frames, "invalid binding retained old bank");
++        bank[offset]^=1;
++    }
++    require(!amigaRendererBindTerrainWords(&words,bank.data(),bank.data()+bank.size()-1),
++        "truncated bank accepted");
++    std::cout << cases << " terrain placements match reference pixels and guard bytes\n";
++}
+
+diff --git a/tools/generate-amiga-terrain-words.py b/tools/generate-amiga-terrain-words.py
+new file mode 100644
+--- /dev/null
++++ b/tools/generate-amiga-terrain-words.py
+@@ -0,0 +1,75 @@
++#!/usr/bin/env python3
++"""Prepare all horizontal placements of sprite 51 from offline planar DWAP art."""
++import argparse
++import hashlib
++import json
++import struct
++from pathlib import Path
++
++VERSION = "generate-amiga-terrain-words.py/1"
++SOURCE = "c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8"
++
++
++def build(pack):
++    magic, version, header, count, _ = struct.unpack_from(">4sHHI8s", pack)
++    if magic != b"DWAP" or version != 2 or header + count * 24 > len(pack):
++        raise ValueError("unsupported DWAP directory")
++    tiles = {}
++    for i in range(count):
++        sprite, frame, ox, oy, w, h, dw, flags, offset, size = struct.unpack_from(
++            ">HHhhHHHHII", pack, header + i * 24)
++        if sprite != 51:
++            continue
++        if (ox, oy, w, h, dw, flags) != (8, 8, 16, 16, 16, 3):
++            raise ValueError("unexpected sprite-51 geometry/planes")
++        if size < 64 or offset > len(pack) or size > len(pack) - offset or frame in tiles:
++            raise ValueError("invalid tile payload")
++        tiles[frame] = pack[offset:offset + 64]
++    if sorted(tiles) != list(range(26)):
++        raise ValueError("pinned sprite 51 must have frames 0..25")
++    output = bytearray(struct.pack(">4s6H", b"DWTW", 1, 51, 26, 16, 16, 16))
++    for frame in range(26):
++        tile = tiles[frame]
++        for shift in range(16):
++            for row in range(16):
++                low = struct.unpack_from(">H", tile, row * 2)[0] << (16 - shift)
++                high = struct.unpack_from(">H", tile, 32 + row * 2)[0] << (16 - shift)
++                # Renderer transparency is the union of the two colour planes.
++                # Preserve it, including opaque palette-black (pen 3).
++                for bits in (16, 0):
++                    lo, hi = (low >> bits) & 65535, (high >> bits) & 65535
++                    output.extend(struct.pack(">3H", lo | hi, lo, hi))
++    return bytes(output)
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--input", type=Path, default=Path("generated/amiga-game.dwap"))
++    parser.add_argument("--output", type=Path, default=Path("generated/amiga-terrain.words"))
++    parser.add_argument("--check", action="store_true")
++    args = parser.parse_args()
++    pack = args.input.read_bytes()
++    provenance = json.loads(args.input.with_suffix(".packing.json").read_text())
++    digest = hashlib.sha256(pack).hexdigest()
++    if provenance["sourceSha256"] != SOURCE or provenance["packSha256"] != digest:
++        raise ValueError("source/planar-pack provenance mismatch")
++    output = build(pack)
++    manifest = (json.dumps({"generator": VERSION, "extractor": provenance["extractor"],
++        "sourceSha256": SOURCE, "inputSha256": digest,
++        "outputSha256": hashlib.sha256(output).hexdigest(),
++        "spriteId": 51, "frames": list(range(26)), "horizontalPhases": 16,
++        "bytes": len(output), "layout": "frame/phase/row/column/mask-low-high-be16"}, indent=2) + "\n").encode()
++    for path, data in ((args.output, output), (args.output.with_suffix(".words.json"), manifest)):
++        if args.check:
++            if path.read_bytes() != data:
++                raise ValueError(f"stale output: {path}")
++        else:
++            path.parent.mkdir(parents=True, exist_ok=True)
++            temporary = path.with_name(path.name + ".tmp")
++            temporary.write_bytes(data)
++            temporary.replace(path)
++    print(f"terrain words: 26 frames x 16 phases, {len(output)} bytes")
++
++
++if __name__ == "__main__":
++    main()

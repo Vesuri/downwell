@@ -1,0 +1,608 @@
+diff --git a/Makefile b/Makefile
+index a2ef1fd5..645dafbf 100644
+--- a/Makefile
++++ b/Makefile
+@@ -2149,6 +2149,13 @@ generate-amiga-game:
+ 	python3 tests/projectile-art-test.py
+ 	tools/generate-amiga-hud.py --profile game
+ 
++.PHONY: test-deferred-effects
++build/deferred-effects-test: tests/core/DeferredPaletteEffectsTest.cpp src/core/DeferredPaletteEffects.h src/core/PaletteEffectSurface.h
++	@mkdir -p $(@D)
++	$(CXX) $(CXXFLAGS) -Isrc -o $@ $<
++test-deferred-effects: build/deferred-effects-test
++	./build/deferred-effects-test
++
+ .PHONY: generate-amiga-clear verify-amiga-clear
+ generate-amiga-clear:
+ 	tools/generate-amiga-hud.py --profile clear
+diff --git a/amiga/Makefile b/amiga/Makefile
+index 3c5b14e1..7265a4cf 100644
+--- a/amiga/Makefile
++++ b/amiga/Makefile
+@@ -31,6 +31,7 @@ REFERENCE_PATTERNS ?= 0
+ REFERENCE_BREAKABLES ?= 0
+ REFERENCE_DAMAGE_TEXT ?= 0
+ REFERENCE_GEM_POSITION ?= 0
++REFERENCE_EFFECT_DIRECT ?= 0
+ TABLE_CONTACT_ATAN ?= 1
+ RETAIN_HEALTH_HUD ?= 1
+ AMMO_DAMAGE_RANGE ?= 1
+@@ -192,6 +193,9 @@ endif
+ ifeq ($(REFERENCE_GEM_POSITION),1)
+ CFLAGS += -DDOWNWELL_REFERENCE_GEM_POSITION
+ endif
++ifeq ($(REFERENCE_EFFECT_DIRECT),1)
++CFLAGS += -DDOWNWELL_REFERENCE_EFFECT_DIRECT
++endif
+ ifeq ($(TABLE_CONTACT_ATAN),0)
+ CFLAGS += -DDOWNWELL_PORTABLE_CONTACT_ATAN
+ endif
+diff --git a/amiga/profile.sh b/amiga/profile.sh
+index fb7c3c60..b0fc59be 100644
+--- a/amiga/profile.sh
++++ b/amiga/profile.sh
+@@ -80,6 +80,7 @@ restore() {
+   unset REFERENCE_BREAKABLES
+   unset REFERENCE_DAMAGE_TEXT
+   unset REFERENCE_GEM_POSITION
++  unset REFERENCE_EFFECT_DIRECT
+   unset DRAW_CACHE_AUDIT
+   unset DRAW_ORDER_AUDIT
+   unset LOCAL_DRAW_CAPTURE
+diff --git a/src/core/CurrencySmokeComposition.h b/src/core/CurrencySmokeComposition.h
+index 5a717223..65b480b4 100644
+--- a/src/core/CurrencySmokeComposition.h
++++ b/src/core/CurrencySmokeComposition.h
+@@ -8,11 +8,11 @@ namespace downwell {
+ // Controller surfaceFx producer order: currency (depth 10000), then smoke
+ // (1000), then shade subtraction at controller Draw. Direct fallback cannot be
+ // flattened here: intervening world objects must retain their painter order.
+-class CurrencySmokeComposition {
++template<class Surface=PaletteEffectSurface<>> class BasicCurrencySmokeComposition {
+ public:
+     using Settings=SmokeComposition::Settings;
+-    const PaletteEffectSurface<>& surface()const{return surface_;}
+-    PaletteEffectSurface<>& surface(){return surface_;}
++    const Surface& surface()const{return surface_;}
++    Surface& surface(){return surface_;}
+     bool visible()const{return visible_;}
+     bool directRequired()const{return direct_;}
+ 
+@@ -146,11 +146,12 @@ private:
+         px-=asset.originX;py-=asset.originY;
+         DW_PROFILE_SCOPE(profileEffectStamp);
+         const auto& m=asset.mask;
+-        const PaletteEffectSurface<>::Mask mask{m.data,m.bytes,m.width,m.height,m.stride};
++        const typename Surface::Mask mask{m.data,m.bytes,m.width,m.height,m.stride};
+         return subtract?surface_.subtract(mask,px,py):surface_.add({mask,asset.low,asset.high},px,py);
+     }
+-    PaletteEffectSurface<> surface_;
++    Surface surface_;
+     bool visible_=false,direct_=false;
+ };
++using CurrencySmokeComposition=BasicCurrencySmokeComposition<>;
+ }
+ #endif
+diff --git a/src/core/PaletteEffectSurface.h b/src/core/PaletteEffectSurface.h
+index ad586086..25c9f223 100644
+--- a/src/core/PaletteEffectSurface.h
++++ b/src/core/PaletteEffectSurface.h
+@@ -44,6 +44,8 @@ public:
+         return stamp(asset.alpha,asset.low,asset.high,x,y);
+     }
+     bool subtract(const Mask& mask,int x,int y){return stamp(mask,nullptr,nullptr,x,y);}
++    // A caller lending mutable source bytes may reclaim them after this fence.
++    void finishWrites()const{synchronize();}
+     // Half-open viewport rectangle. Test final alpha, including shade holes
+     // and opaque black; stale color bits are never evidence of overlap.
+     bool intersects(int left,int top,int right,int bottom)const{
+diff --git a/src/platform/amiga/AmigaEffectSurface.cpp b/src/platform/amiga/AmigaEffectSurface.cpp
+index 8748330b..ab0bc070 100644
+--- a/src/platform/amiga/AmigaEffectSurface.cpp
++++ b/src/platform/amiga/AmigaEffectSurface.cpp
+@@ -3,6 +3,7 @@
+ #include "framework/Bitmap.h"
+ #include "framework/AmigaHardware.h"
+ #include "AmigaGameplayRows.h"
++#include "AmigaGameplayEffects.h"
+ inline void* operator new(__SIZE_TYPE__,void* address)noexcept{return address;}
+ extern "C" { volatile unsigned gDownwellEffectDmaStamps,gDownwellEffectDmaChecks,gDownwellEffectDmaFailures; }
+ extern "C" __attribute__((noinline)) void downwellEffectSurfaceFailed(){__asm__ volatile("":::"memory");}
+@@ -84,7 +85,8 @@ bool stamp(void* context,const Surface::Mask& m,const std::uint8_t* low,const st
+     return true;
+ }
+ }
+-bool AmigaEffectSurface::bind(downwell::PaletteEffectSurface<>& surface,void* storage){
++bool AmigaEffectSurface::bind(downwell::PaletteEffectSurface<>& surface,void* storage,
++    const std::uint8_t*,const std::uint8_t*){
+     if(!storage||(reinterpret_cast<ULONG>(storage)&1)||reinterpret_cast<ULONG>(storage)>=0x200000UL)return false;
+     auto* data=static_cast<UBYTE*>(storage);
+ #ifdef DOWNWELL_BOB_VERIFY
+@@ -122,7 +124,8 @@ bool AmigaEffectSurface::verify(const downwell::PaletteEffectSurface<>& surface)
+     (void)surface;return true;
+ #endif
+ }
+-bool AmigaEffectSurface::fixtures(downwell::PaletteEffectSurface<>& surface,const downwell::EffectMaskAssets& assets){
++template<class Canvas,class Publish>
++static bool effectFixtures(Canvas& surface,const downwell::EffectMaskAssets& assets,Publish publish){
+ #ifdef DOWNWELL_BOB_VERIFY
+     for(unsigned i=0;i<64;++i){
+         surface.clear();
+@@ -131,13 +134,88 @@ bool AmigaEffectSurface::fixtures(downwell::PaletteEffectSurface<>& surface,cons
+         const Surface::Asset asset{{m.data,m.bytes,m.width,m.height,m.stride},image.low,image.high};
+         const int x=i<16?int(i)-8:i<32?int(i)+128:int(i%16)+64;
+         const int y=i<32?int(i%8)-4:279-int(i%8);
+-        if(!surface.add(asset,x,y)||!surface.add(asset,x+3,y+2)||!verify(surface))return false;
++        if(!surface.add(asset,x,y)||!surface.add(asset,x+3,y+2)||!AmigaEffectSurface::verify(surface))return false;
++        publish(i*2);
+         const auto& shade=assets.shade()->mask;
+-        if(!surface.subtract({shade.data,shade.bytes,shade.width,shade.height,shade.stride},x-2,y-3)||!verify(surface))return false;
++        if(!surface.subtract({shade.data,shade.bytes,shade.width,shade.height,shade.stride},x-2,y-3)||!AmigaEffectSurface::verify(surface))return false;
++        publish(i*2+1);
+     }
+-    surface.clear();if(!verify(surface))return false;
++    surface.clear();if(!AmigaEffectSurface::verify(surface))return false;
+ #else
+-    (void)surface;(void)assets;
++    (void)surface;(void)assets;(void)publish;
+ #endif
+     return true;
+ }
++bool AmigaEffectSurface::fixtures(Surface& surface,const downwell::EffectMaskAssets& assets,void*){
++    return effectFixtures(surface,assets,[](unsigned){});
++}
++bool AmigaEffectSurface::fixtures(downwell::DeferredPaletteEffects<>& surface,const downwell::EffectMaskAssets& assets,void* ring){
++#if defined(DOWNWELL_BOB_VERIFY) && !defined(DOWNWELL_REFERENCE_EFFECT_DIRECT)
++    if(!ring)return false;
++    Bitmap target(ring,downwellVisibleWidth,downwellGameRingHeight,2,false,false,downwellDmaWidth);
++    const bool okay=effectFixtures(surface,assets,[&](unsigned serial){
++        auto* pixels=static_cast<UWORD*>(ring);
++        for(unsigned i=0;i<downwellGameRingBytes/2;++i)pixels[i]=UWORD(i*219u+serial*719u);
++        AmigaGameplayRows rows;
++        AmigaGameplayEffects::draw({},target,0,(serial*37)%downwellGameRingHeight,surface,rows);
++    });
++    auto* pixels=static_cast<UWORD*>(ring);
++    for(unsigned i=0;i<downwellGameRingBytes/2;++i)pixels[i]=0;
++    return okay;
++#else
++    (void)ring;
++    return effectFixtures(surface,assets,[](unsigned){});
++#endif
++}
++bool AmigaEffectSurface::bind(downwell::DeferredPaletteEffects<>& surface,void* storage,
++    const std::uint8_t* begin,const std::uint8_t* end){
++    surface.bindImmutableRange(begin,end);
++    return bind(surface.rasterForBinding(),storage);
++}
++bool AmigaEffectSurface::verify(const downwell::DeferredPaletteEffects<>& surface){
++#ifdef DOWNWELL_BOB_VERIFY
++    const auto& oracle=surface.raster();
++    if(!verify(oracle))return false;
++    for(unsigned i=0;i<24;++i){
++        const int x=int((gDownwellEffectDmaChecks*29+i*37)%190)-15;
++        const int y=int((gDownwellEffectDmaChecks*17+i*41)%314)-15;
++        if(surface.intersects(x,y,x+31,y+23)!=oracle.intersects(x,y,x+31,y+23)){
++            ++gDownwellEffectDmaFailures;downwellEffectSurfaceFailed();return false;
++        }
++    }
++#else
++    (void)surface;
++#endif
++    return true;
++}
++bool AmigaEffectSurface::publish(const downwell::DeferredPaletteEffects<>& surface,Bitmap& display,
++    unsigned buffer,unsigned origin,AmigaGameplayRows& rows){
++    if(surface.usesRaster())return publish(surface.raster(),display,buffer,origin,rows);
++    bool started=false;
++    unsigned previousY=downwellGameRingHeight;
++    UBYTE* row=nullptr;
++    const auto merge=[](UBYTE* p,UWORD alpha,UWORD paint){
++        UWORD& word=*reinterpret_cast<UWORD*>(p);
++        word=UWORD((word&~alpha)|(paint&alpha));
++    };
++    surface.visitContributions([&](unsigned x,unsigned y,UWORD alpha,UWORD low,UWORD high){
++        if(!started){AmigaHardware::blitterDrain();started=true;}
++        if(y!=previousY){
++            previousY=y;
++            row=static_cast<UBYTE*>(display.data)+((origin+y)%downwellGameRingHeight)*downwellBytesPerPlaneLine;
++        }
++        constexpr unsigned shift=downwellPlayfieldX%16;
++        auto* destination=row+(downwellPlayfieldX/16+x/16)*2;
++        merge(destination,UWORD(alpha>>shift),UWORD(low>>shift));
++        merge(destination+downwellGameRingPlaneBytes,UWORD(alpha>>shift),UWORD(high>>shift));
++        if constexpr(shift){
++            merge(destination+2,UWORD(unsigned(alpha)<<(16-shift)),UWORD(unsigned(low)<<(16-shift)));
++            merge(destination+2+downwellGameRingPlaneBytes,UWORD(unsigned(alpha)<<(16-shift)),UWORD(unsigned(high)<<(16-shift)));
++        }
++        return true;
++    });
++    if(started)surface.visitBounds([&](unsigned y,unsigned height){
++        rows.damage(origin,y,height,static_cast<UBYTE>(1u<<buffer));
++    });
++    return true;
++}
+diff --git a/src/platform/amiga/AmigaEffectSurface.h b/src/platform/amiga/AmigaEffectSurface.h
+index 8d1b7486..38e17a0d 100644
+--- a/src/platform/amiga/AmigaEffectSurface.h
++++ b/src/platform/amiga/AmigaEffectSurface.h
+@@ -2,15 +2,23 @@
+ #define DOWNWELL_AMIGA_EFFECT_SURFACE_H
+ #include "core/PaletteEffectSurface.h"
+ #include "core/EffectMaskAssets.h"
++#include "core/DeferredPaletteEffects.h"
+ class Bitmap;
+ class AmigaGameplayRows;
+ class AmigaEffectSurface {
+ public:
+     // One guard word on each side permits the framework's shifted blits.
+     static constexpr unsigned rowBytes=24,planeBytes=rowBytes*284,bytes=planeBytes*3;
+-    static bool bind(downwell::PaletteEffectSurface<>& surface,void* chipStorage);
++    static bool bind(downwell::PaletteEffectSurface<>& surface,void* chipStorage,
++                     const std::uint8_t* begin=nullptr,const std::uint8_t* end=nullptr);
++    static bool bind(downwell::DeferredPaletteEffects<>& surface,void* chipStorage,
++                     const std::uint8_t* begin,const std::uint8_t* end);
++    static bool verify(const downwell::DeferredPaletteEffects<>& surface);
++    static bool fixtures(downwell::DeferredPaletteEffects<>& surface,const downwell::EffectMaskAssets& assets,void* ring=nullptr);
++    static bool publish(const downwell::DeferredPaletteEffects<>& surface,Bitmap& display,
++                        unsigned buffer,unsigned origin,AmigaGameplayRows& rows);
+     static bool verify(const downwell::PaletteEffectSurface<>& surface);
+-    static bool fixtures(downwell::PaletteEffectSurface<>& surface,const downwell::EffectMaskAssets& assets);
++    static bool fixtures(downwell::PaletteEffectSurface<>& surface,const downwell::EffectMaskAssets& assets,void* ring=nullptr);
+     static bool publish(const downwell::PaletteEffectSurface<>& surface,Bitmap& display,
+                         unsigned buffer,unsigned origin,AmigaGameplayRows& rows);
+ };
+diff --git a/src/platform/amiga/AmigaGameplayActors.h b/src/platform/amiga/AmigaGameplayActors.h
+index 05ef2863..9ae9263c 100644
+--- a/src/platform/amiga/AmigaGameplayActors.h
++++ b/src/platform/amiga/AmigaGameplayActors.h
+@@ -2,7 +2,7 @@
+ #define DOWNWELL_AMIGA_GAMEPLAY_ACTORS_H
+ #include "AmigaRenderer.h"
+ #include "core/LaserSightLine.h"
+-#include "core/PaletteEffectSurface.h"
++#include "AmigaControllerEffects.h"
+ class Bitmap;
+ class Sprite;
+ class AmigaGameplayRows;
+@@ -28,7 +28,7 @@ public:
+     static Assignment assign(const GameplayBob* actors, unsigned count,
+         const UBYTE* pack, const UBYTE* packEnd, Sprite& player,
+         Sprite* regular, Sprite& overflow, unsigned height, unsigned limit = 8,
+-        const downwell::PaletteEffectSurface<>* controller = nullptr);
++        const AmigaControllerSurface* controller = nullptr);
+     // Draw only into the retired display ring, not the terrain backing.
+     static void draw(AmigaRenderer renderer, Bitmap& display,
+         unsigned buffer, unsigned origin, const GameplayBob* bobs, unsigned count,
+diff --git a/src/platform/amiga/AmigaGameplayEffects.cpp b/src/platform/amiga/AmigaGameplayEffects.cpp
+index 8719817d..9b42b818 100644
+--- a/src/platform/amiga/AmigaGameplayEffects.cpp
++++ b/src/platform/amiga/AmigaGameplayEffects.cpp
+@@ -83,7 +83,7 @@ void AmigaGameplayEffects::draw(AmigaRenderer renderer,Bitmap& display,unsigned
+         });
+ }
+ void AmigaGameplayEffects::draw(AmigaRenderer renderer,Bitmap& display,unsigned buffer,
+-    unsigned origin,const downwell::PaletteEffectSurface<>& surface,AmigaGameplayRows& rows){
++    unsigned origin,const AmigaControllerSurface& surface,AmigaGameplayRows& rows){
+ #ifdef DOWNWELL_PLATFORM_AMIGA
+     DW_PROFILE_SCOPE(profileEffectPublish);
+ #ifdef DOWNWELL_BOB_VERIFY
+diff --git a/src/platform/amiga/AmigaGameplayEffects.h b/src/platform/amiga/AmigaGameplayEffects.h
+index c3b39b07..1e62b455 100644
+--- a/src/platform/amiga/AmigaGameplayEffects.h
++++ b/src/platform/amiga/AmigaGameplayEffects.h
+@@ -2,7 +2,7 @@
+ #define DOWNWELL_AMIGA_GAMEPLAY_EFFECTS_H
+ #include "AmigaRenderer.h"
+ #include "core/BinaryEffectSurface.h"
+-#include "core/PaletteEffectSurface.h"
++#include "AmigaControllerEffects.h"
+ class Bitmap;
+ class AmigaGameplayRows;
+ 
+@@ -14,7 +14,7 @@ public:
+                      unsigned origin, const downwell::BinaryEffectSurface<>& surface,
+                      AmigaGameplayRows& rows);
+     static void draw(AmigaRenderer renderer, Bitmap& display, unsigned buffer,
+-                     unsigned origin, const downwell::PaletteEffectSurface<>& surface,
++                     unsigned origin, const AmigaControllerSurface& surface,
+                      AmigaGameplayRows& rows);
+ };
+ #endif
+diff --git a/src/platform/amiga/AmigaGameplaySpriteAssignment.cpp b/src/platform/amiga/AmigaGameplaySpriteAssignment.cpp
+index ed3843ab..c7077d18 100644
+--- a/src/platform/amiga/AmigaGameplaySpriteAssignment.cpp
++++ b/src/platform/amiga/AmigaGameplaySpriteAssignment.cpp
+@@ -6,7 +6,7 @@
+ AmigaGameplayActors::Assignment AmigaGameplayActors::assign(const GameplayBob* actors,
+     unsigned count, const UBYTE* pack, const UBYTE* packEnd, Sprite& player,
+     Sprite* regular, Sprite& overflow, unsigned height, unsigned limit,
+-    const downwell::PaletteEffectSurface<>* controller) {
++    const AmigaControllerSurface* controller) {
+     Assignment result{count, true, 0, 0};
+     AmigaActorChannels channels(limit);
+     auto slot = [&](unsigned channel) -> Sprite& {
+diff --git a/src/platform/amiga/DownwellAmiga.cpp b/src/platform/amiga/DownwellAmiga.cpp
+index b45a7942..3cd330ff 100644
+--- a/src/platform/amiga/DownwellAmiga.cpp
++++ b/src/platform/amiga/DownwellAmiga.cpp
+@@ -1860,12 +1860,14 @@ __attribute__((noinline)) static int runDownwell(void) {
+         platform.restore();FreeMem(startupCopperWords,4*sizeof(UWORD));memory.release();return 20;
+     }
+     static downwell::EffectMaskAssets effectAssets;
+-    alignas(downwell::CurrencySmokeComposition) static UBYTE effectStorage[sizeof(downwell::CurrencySmokeComposition)];
+-    auto& controllerEffects = *new (effectStorage) downwell::CurrencySmokeComposition;
++    using ControllerEffects=downwell::BasicCurrencySmokeComposition<AmigaControllerSurface>;
++    alignas(ControllerEffects) static UBYTE effectStorage[sizeof(ControllerEffects)];
++    auto& controllerEffects = *new (effectStorage) ControllerEffects;
+     if (!effectAssets.bind(activeGamePack,gamePackBytes)||
+         !effectAssets.bindEntryMask(amiga_entry_mask,amiga_entry_mask_end-amiga_entry_mask)||
+-        !AmigaEffectSurface::bind(controllerEffects.surface(),memory.assets()+gamePackBytes)||
+-        !AmigaEffectSurface::fixtures(controllerEffects.surface(),effectAssets)) {
++        !AmigaEffectSurface::bind(controllerEffects.surface(),memory.assets()+gamePackBytes,
++                                 activeGamePack,activeGamePackEnd)||
++        !AmigaEffectSurface::fixtures(controllerEffects.surface(),effectAssets,memory.game())) {
+         platform.restore();
+         FreeMem(startupCopperWords,4*sizeof(UWORD));
+         memory.release();
+diff --git a/src/platform/amiga/compat/cstdint b/src/platform/amiga/compat/cstdint
+index 2b42dec8..bc5612d5 100644
+--- a/src/platform/amiga/compat/cstdint
++++ b/src/platform/amiga/compat/cstdint
+@@ -10,6 +10,7 @@ typedef __INT32_TYPE__ int32_t;
+ typedef __UINT32_TYPE__ uint32_t;
+ typedef __INT64_TYPE__ int64_t;
+ typedef __UINT64_TYPE__ uint64_t;
++typedef __UINTPTR_TYPE__ uintptr_t;
+ }
+ 
+ #endif
+diff --git a/src/core/DeferredPaletteEffects.h b/src/core/DeferredPaletteEffects.h
+new file mode 100644
+index 00000000..2b11c46b
+--- /dev/null
++++ b/src/core/DeferredPaletteEffects.h
+@@ -0,0 +1,140 @@
++#ifndef DOWNWELL_CORE_DEFERRED_PALETTE_EFFECTS_H
++#define DOWNWELL_CORE_DEFERRED_PALETTE_EFFECTS_H
++#include "PaletteEffectSurface.h"
++#include <cstddef>
++#include <cstdint>
++
++namespace downwell {
++// Retain immutable producers, not their intermediate viewport raster. Each
++// contribution loses the alpha of all later subtractions. Publishing the
++// surviving contributions in order is equivalent to the scalar surface,
++// including opaque black and an add following a subtract. Borrowed source
++// ranges must stay alive and immutable until clear(). Everything else is
++// copied immediately through the retained raster path.
++template<unsigned Width=160,unsigned Height=284,unsigned Capacity=128>
++class DeferredPaletteEffects {
++    static_assert(Capacity>0,"producer command capacity must be nonzero");
++public:
++    using Raster=PaletteEffectSurface<Width,Height>;
++    using Mask=typename Raster::Mask;
++    using Asset=typename Raster::Asset;
++    void bindImmutableRange(const std::uint8_t* begin,const std::uint8_t* end){
++        begin_=reinterpret_cast<std::uintptr_t>(begin);
++        end_=reinterpret_cast<std::uintptr_t>(end);
++    }
++    // Startup-only hook for a platform's retained raster backend.
++    Raster& rasterForBinding(){return raster_;}
++    const Raster& raster()const{materialize();return raster_;}
++    bool usesRaster()const{return fallback_;}
++    void clear(){
++        if(materialized_)raster_.clear();
++        count_=0;fallback_=false;materialized_=false;
++    }
++    bool add(const Asset& a,int x,int y){
++        if(!a.low||!a.high)return false;
++        return append(a,x,y,false);
++    }
++    bool subtract(const Mask& m,int x,int y){return append({m,nullptr,nullptr},x,y,true);}
++    bool intersects(int left,int top,int right,int bottom)const{
++        if(fallback_)return raster_.intersects(left,top,right,bottom);
++        bool found=false;
++        contributions<false>(left,top,right,bottom,[&](unsigned,unsigned,std::uint16_t,
++            std::uint16_t,std::uint16_t){found=true;return false;});
++        return found;
++    }
++    // Final composed pixels for a reference consumer. Does not change the
++    // normal direct-publication route; oracle reads must not test the fallback
++    // instead of the implementation they are meant to verify.
++    template<class Emit> void visit(Emit emit)const{raster().visit(emit);}
++    template<class Emit> void visitContributions(Emit emit)const{
++        contributions<true>(0,0,Width,Height,emit);
++    }
++    template<class Emit> void visitBounds(Emit emit)const{
++        for(unsigned i=0;i<count_;++i){
++            const auto& c=commands_[i];if(c.subtract)continue;
++            const int top=c.y<0?0:c.y;
++            const int bottom=c.y+int(c.asset.alpha.height)>int(Height)?Height:c.y+int(c.asset.alpha.height);
++            emit(unsigned(top),unsigned(bottom-top));
++        }
++    }
++private:
++    struct Command{Asset asset;int x,y;bool subtract;};
++    Command commands_[Capacity];
++    unsigned count_=0;
++    std::uintptr_t begin_=0,end_=0;
++    mutable Raster raster_;
++    mutable bool materialized_=false;
++    bool fallback_=false;
++    bool immutable(const std::uint8_t* p,unsigned bytes)const{
++        const auto address=reinterpret_cast<std::uintptr_t>(p);
++        return begin_&&address>=begin_&&address<=end_&&bytes<=end_-address;
++    }
++    void materialize()const{
++        if(materialized_)return;
++        raster_.clear();
++        for(unsigned i=0;i<count_;++i){const auto& c=commands_[i];
++            if(c.subtract)raster_.subtract(c.asset.alpha,c.x,c.y);
++            else raster_.add(c.asset,c.x,c.y);
++        }
++        materialized_=true;
++    }
++    bool append(const Asset& a,int x,int y,bool subtract){
++        const auto& m=a.alpha;
++        if(!m.data||!m.width||m.width>65535||!m.height||m.height>65535||
++           m.stride>8192||m.stride<(m.width+7)/8||m.bytes<m.stride*m.height)return false;
++        if(x>=int(Width)||y>=int(Height)||x<=-int(m.width)||y<=-int(m.height))return true;
++        if(!fallback_&&(count_==Capacity||!immutable(m.data,m.bytes)||
++            (!subtract&&(!immutable(a.low,m.bytes)||!immutable(a.high,m.bytes))))){
++            materialize();fallback_=true;
++        }
++        if(fallback_){
++            const bool okay=subtract?raster_.subtract(m,x,y):raster_.add(a,x,y);
++            raster_.finishWrites();return okay;
++        }
++        commands_[count_++]={a,x,y,subtract};materialized_=false;return true;
++    }
++    static std::uint16_t word(const Command& c,const std::uint8_t* pixels,int x,int y){
++        const auto& m=c.asset.alpha;
++        if(y<c.y||y>=c.y+int(m.height))return 0;
++        const int left=x>c.x?x:c.x;
++        const int right=x+16<c.x+int(m.width)?x+16:c.x+int(m.width);
++        if(left>=right)return 0;
++        const unsigned sx=unsigned(left-c.x),byte=sx/8;
++        const auto* row=pixels+unsigned(y-c.y)*m.stride;
++        std::uint32_t bits=std::uint32_t(row[byte])<<16;
++        if(byte+1<m.stride)bits|=std::uint32_t(row[byte+1])<<8;
++        if(byte+2<m.stride)bits|=row[byte+2];
++        bits=(bits>>(8-sx%8))&0xffffu;
++        bits&=0xffffu<<(16-unsigned(right-left));
++        return std::uint16_t(bits>>unsigned(left-x));
++    }
++    template<bool Colors,class Emit>
++    void contributions(int left,int top,int right,int bottom,Emit emit)const{
++        if(left<0)left=0;
++        if(top<0)top=0;
++        if(right>int(Width))right=Width;
++        if(bottom>int(Height))bottom=Height;
++        if(left>=right||top>=bottom)return;
++        for(unsigned i=0;i<count_;++i){
++            const auto& c=commands_[i];if(c.subtract)continue;
++            const auto& m=c.asset.alpha;
++            const int l=left>c.x?left:c.x,r=right<c.x+int(m.width)?right:c.x+int(m.width);
++            const int t=top>c.y?top:c.y,b=bottom<c.y+int(m.height)?bottom:c.y+int(m.height);
++            if(l>=r||t>=b)continue;
++            for(int y=t;y<b;++y)for(int x=(l/16)*16;x<r;x+=16){
++                std::uint16_t alpha=word(c,m.data,x,y);
++                if(x<l)alpha&=std::uint16_t(0xffffu>>(l-x));
++                if(r-x<16)alpha&=std::uint16_t(0xffffu<<(16-(r-x)));
++                for(unsigned j=i+1;alpha&&j<count_;++j)
++                    if(commands_[j].subtract)
++                        alpha&=std::uint16_t(~word(commands_[j],commands_[j].asset.alpha.data,x,y));
++                if(!alpha)continue;
++                std::uint16_t low=0,high=0;
++                if constexpr(Colors){low=word(c,c.asset.low,x,y)&alpha;high=word(c,c.asset.high,x,y)&alpha;}
++                if(!emit(unsigned(x),unsigned(y),alpha,low,high))return;
++            }
++        }
++    }
++};
++}
++#endif
+diff --git a/src/platform/amiga/AmigaControllerEffects.h b/src/platform/amiga/AmigaControllerEffects.h
+new file mode 100644
+index 00000000..0b29f6e7
+--- /dev/null
++++ b/src/platform/amiga/AmigaControllerEffects.h
+@@ -0,0 +1,10 @@
++#ifndef DOWNWELL_AMIGA_CONTROLLER_EFFECTS_H
++#define DOWNWELL_AMIGA_CONTROLLER_EFFECTS_H
++#include "core/PaletteEffectSurface.h"
++#if defined(DOWNWELL_PLATFORM_AMIGA) && !defined(DOWNWELL_REFERENCE_EFFECT_DIRECT)
++#include "core/DeferredPaletteEffects.h"
++using AmigaControllerSurface=downwell::DeferredPaletteEffects<>;
++#else
++using AmigaControllerSurface=downwell::PaletteEffectSurface<>;
++#endif
++#endif
+diff --git a/tests/core/DeferredPaletteEffectsTest.cpp b/tests/core/DeferredPaletteEffectsTest.cpp
+new file mode 100644
+index 00000000..e9ec093b
+--- /dev/null
++++ b/tests/core/DeferredPaletteEffectsTest.cpp
+@@ -0,0 +1,81 @@
++#include "core/DeferredPaletteEffects.h"
++#include <array>
++#include <cassert>
++#include <climits>
++#include <cstdio>
++using Raster=downwell::PaletteEffectSurface<64,48>;
++using Deferred=downwell::DeferredPaletteEffects<64,48,32>;
++int main(){
++    Deferred surface;Raster reference;
++    std::uint8_t bank[16][120];
++    surface.bindImmutableRange(&bank[0][0],&bank[0][0]+sizeof(bank));
++    std::uint32_t rng=19;auto next=[&](){rng=rng*1664525u+1013904223u;return rng;};
++    unsigned checks=0;
++    const auto compare=[&](){
++        std::array<int,64*48> expected,actual;expected.fill(-1);actual.fill(-1);
++        auto painter=[](auto& output){return [&](unsigned x,unsigned y,std::uint16_t a,
++            std::uint16_t low,std::uint16_t high){
++            for(unsigned bit=0;bit<16;++bit)if(a&(0x8000u>>bit))
++                output[y*64+x+bit]=!!(low&(0x8000u>>bit))+2*!!(high&(0x8000u>>bit));
++            return true;
++        };};
++        reference.visit(painter(expected));
++        if(surface.usesRaster())surface.visit(painter(actual));else surface.visitContributions(painter(actual));
++        assert(actual==expected);
++        assert(reference.samePixels(surface.raster())); // Readback must not disable deferred rendering.
++        for(unsigned q=0;q<64;++q){
++            const int l=int(next()%90)-20,t=int(next()%70)-15;
++            const int r=l+next()%40,b=t+next()%30;
++            assert(surface.intersects(l,t,r,b)==reference.intersects(l,t,r,b));++checks;
++        }
++        assert(surface.intersects(INT_MIN,INT_MIN,INT_MAX,INT_MAX)==reference.intersects(INT_MIN,INT_MIN,INT_MAX,INT_MAX));
++    };
++    for(unsigned trial=0;trial<256;++trial){
++        surface.clear();reference.clear();
++        for(auto& image:bank)for(auto& value:image)value=std::uint8_t(next()>>24);
++        for(unsigned i=0;i<16;++i){
++            const unsigned width=1+next()%29,height=1+next()%10;
++            const Raster::Asset a{{bank[i],40,width,height,4},bank[i]+40,bank[i]+80};
++            const int x=int(next()%90)-20,y=int(next()%70)-15;
++            if(i%3==2){assert(surface.subtract(a.alpha,x,y));assert(reference.subtract(a.alpha,x,y));}
++            else{assert(surface.add(a,x,y));assert(reference.add(a,x,y));}
++            compare();assert(!surface.usesRaster());
++        }
++    }
++    // Mutable unknown sources must be consumed before the caller edits them.
++    std::uint8_t dot[]={0x80,0},black[]={0,0};
++    const Raster::Asset a{{dot,2,1,1,2},black,black};
++    surface.clear();reference.clear();
++    assert(surface.add(a,3,5)&&reference.add(a,3,5));assert(surface.usesRaster());
++    dot[0]=0;compare();dot[0]=0x80;
++    assert(surface.subtract(a.alpha,3,5)&&reference.subtract(a.alpha,3,5));compare();
++    surface.clear();reference.clear();compare();assert(!surface.usesRaster());
++    // Capacity exhaustion materializes the complete prefix in original order.
++    downwell::DeferredPaletteEffects<64,48,4> small;
++    small.bindImmutableRange(&bank[0][0],&bank[0][0]+sizeof(bank));
++    for(unsigned i=0;i<5;++i){
++        const Raster::Asset item{{bank[i],40,29,10,4},bank[i]+40,bank[i]+80};
++        assert(small.add(item,i*3,i));assert(reference.add(item,i*3,i));
++    }
++    assert(small.usesRaster()&&reference.samePixels(small.raster()));
++    auto bad=a;bad.alpha.bytes=0;assert(!surface.add(bad,0,0));
++    assert(surface.add(a,INT_MIN,INT_MAX));
++    // A queued raster backend must consume unknown borrowed data before the
++    // caller can mutate it, not on the subsequent visibility query.
++    struct Queued{
++        std::uint16_t alpha[4*48]{},low[4*48]{},high[4*48]{};
++        const std::uint8_t* pending=nullptr;
++        bool flushed=false;
++    } queue;
++    Deferred borrowed;
++    assert(borrowed.rasterForBinding().bindStorage(queue.alpha,queue.low,queue.high,4,{&queue,
++        [](void* p,const Raster::Mask& m,const std::uint8_t*,const std::uint8_t*,int,int){
++            static_cast<Queued*>(p)->pending=m.data;return true;
++        },[](void* p,unsigned,unsigned){static_cast<Queued*>(p)->pending=nullptr;},
++        [](void* p){auto& q=*static_cast<Queued*>(p);if(q.pending){
++            q.alpha[0]=std::uint16_t(q.pending[0])<<8;q.pending=nullptr;q.flushed=true;
++        }}}));
++    assert(borrowed.add(a,0,0)&&queue.flushed&&!queue.pending);
++    dot[0]=0;assert(borrowed.intersects(0,0,1,1));
++    std::printf("Deferred effects: 4096 ordered color/shade comparisons, %u exact queries, mutable and capacity fallbacks passed\n",checks);
++}

@@ -1,0 +1,83 @@
+diff --git a/amiga/Makefile b/amiga/Makefile
+index 92c0eec5..2b805139 100644
+--- a/amiga/Makefile
++++ b/amiga/Makefile
+@@ -179,6 +179,8 @@ ifeq ($(PREPARED_FIELDS),1)
+ CFLAGS += -DDOWNWELL_PREPARED_FIELDS
+ ifeq ($(PROFILE_FIELD_REFERENCE),1)
+ CFLAGS += -DDOWNWELL_FIELD_MODE=2
++else ifeq ($(PREPARED_FIELDS_BACKING),4)
++CFLAGS += -DDOWNWELL_FIELD_MODE=6
+ else ifeq ($(PREPARED_FIELDS_BACKING),3)
+ CFLAGS += -DDOWNWELL_FIELD_MODE=5
+ else ifeq ($(PREPARED_FIELDS_BACKING),2)
+diff --git a/src/platform/amiga/AmigaBlitter.cpp b/src/platform/amiga/AmigaBlitter.cpp
+index 1fb61200..41f1b8d6 100644
+--- a/src/platform/amiga/AmigaBlitter.cpp
++++ b/src/platform/amiga/AmigaBlitter.cpp
+@@ -3,6 +3,7 @@
+ #ifdef DOWNWELL_PREPARED_FIELDS
+ #include "AmigaFieldBands.h"
+ static UWORD* residentFieldBands;
++extern "C" volatile unsigned gDownwellPreparedFieldMode;
+ extern "C" void amigaBlitterBindFieldBands(UBYTE* bank){
+     AmigaHardware::blitterDrain();
+     residentFieldBands=reinterpret_cast<UWORD*>(bank);
+@@ -12,9 +13,11 @@ extern "C" void amigaBlitterBindFieldBands(UBYTE* bank){
+ extern "C" int amigaBlitterFieldBands(const UBYTE* terrain,UBYTE* target,
+     const downwell::TimeFieldOutlines::Circle& circle,unsigned origin,bool restore,UWORD* rows){
+     if(!residentFieldBands)return 0;
+-    // As with terrain publication, give queued DMA priority while this phase
+-    // has no useful concurrent CPU work. Do not contend with our own wait loop.
+-    AmigaHardware::setBlitterNasty(true);
++    // Retain the fully serialized DMA-priority policy for paired captures.
++    // The batched policy leaves the CPU available to describe later transfers,
++    // then yields bus priority only once all useful preparation is complete.
++    const bool batched=gDownwellPreparedFieldMode>=6;
++    if(!batched)AmigaHardware::setBlitterNasty(true);
+     const bool admitted=amigaFieldBandParts(circle,origin,[&](unsigned id,unsigned y,unsigned sx,unsigned sy,unsigned height){
+         const auto& image=downwell::fieldBandImages[id];
+         UWORD* pixels=residentFieldBands+image.wordOffset;
+@@ -31,7 +34,10 @@ extern "C" int amigaBlitterFieldBands(const UBYTE* terrain,UBYTE* target,
+             if(rows)for(unsigned row=y;row<y+height;++row)rows[row/16]|=UWORD(1u<<(row&15));
+         }
+     });
+-    if(admitted)AmigaHardware::blitterDrain();
++    if(admitted){
++        if(batched)AmigaHardware::setBlitterNasty(true);
++        AmigaHardware::blitterDrain();
++    }
+     AmigaHardware::setBlitterNasty(false);
+     return admitted;
+ }
+diff --git a/src/platform/amiga/DownwellAmiga.cpp b/src/platform/amiga/DownwellAmiga.cpp
+index 600e5f34..3bdf0dd3 100644
+--- a/src/platform/amiga/DownwellAmiga.cpp
++++ b/src/platform/amiga/DownwellAmiga.cpp
+@@ -80,7 +80,7 @@ struct PreparedFieldOps {
+ #ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
+         amigaFieldVerifyColumn(terrain,target,circle,origin,restore);
+ #endif
+-        const bool ok=(gDownwellPreparedFieldMode==5&&amigaBlitterFieldBands(terrain,target,circle,origin,restore,rows)) ||
++        const bool ok=(gDownwellPreparedFieldMode>=5&&amigaBlitterFieldBands(terrain,target,circle,origin,restore,rows)) ||
+             amigaFieldColumns(terrain,target,circle,origin,restore,rows);
+ #ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
+         amigaFieldVerifyFinish(target);
+@@ -1005,7 +1005,7 @@ static bool verifyFieldComposites(UBYTE* terrain,UBYTE* target){
+     for(unsigned frame=0;frame<48&&ok;++frame){
+         // Captured, pristine, and sparse paths must exchange ownership without
+         // retaining pixels from an earlier field. No gameplay RNG is consumed.
+-        gDownwellPreparedFieldMode=frame%13==0?2:frame%11==0?1:frame%5==0?3:5;
++        gDownwellPreparedFieldMode=frame%13==0?2:frame%11==0?1:frame%5==0?3:6;
+         downwell::TimeFieldOutlines shape;
+         shape.count=frame%12==11?0:3;shape.visible=shape.count!=0;
+         for(unsigned i=0;i<shape.count;++i){
+@@ -1035,7 +1035,7 @@ static bool verifyFieldComposites(UBYTE* terrain,UBYTE* target){
+         ok=overlay.prepare(target,origin,shape,true,[](unsigned){return false;})&&overlay.draw();
+         if(ok)ok=amigaFieldVerifyComposite(terrain,target,shape,origin);
+     }
+-    gDownwellPreparedFieldMode=5;
++    gDownwellPreparedFieldMode=6;
+     for(unsigned phase=0;phase<51&&ok;++phase){
+         downwell::TimeFieldOutlines shape;shape.visible=true;shape.count=1;
+         shape.circles[0]={182+int(phase%17),phase<17?0:phase<34?140:283,

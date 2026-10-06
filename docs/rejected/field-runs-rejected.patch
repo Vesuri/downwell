@@ -1,0 +1,245 @@
+diff --git a/amiga/Makefile b/amiga/Makefile
+index a8365d6e..92c0eec5 100644
+--- a/amiga/Makefile
++++ b/amiga/Makefile
+@@ -179,6 +179,8 @@ ifeq ($(PREPARED_FIELDS),1)
+ CFLAGS += -DDOWNWELL_PREPARED_FIELDS
+ ifeq ($(PROFILE_FIELD_REFERENCE),1)
+ CFLAGS += -DDOWNWELL_FIELD_MODE=2
++else ifeq ($(PREPARED_FIELDS_BACKING),3)
++CFLAGS += -DDOWNWELL_FIELD_MODE=5
+ else ifeq ($(PREPARED_FIELDS_BACKING),2)
+ CFLAGS += -DDOWNWELL_FIELD_MODE=4
+ else ifeq ($(PREPARED_FIELDS_BACKING),1)
+diff --git a/src/platform/amiga/DownwellAmiga.cpp b/src/platform/amiga/DownwellAmiga.cpp
+index 59bffc81..797c338e 100644
+--- a/src/platform/amiga/DownwellAmiga.cpp
++++ b/src/platform/amiga/DownwellAmiga.cpp
+@@ -46,6 +46,7 @@ __attribute__((noinline,used)) void downwellFieldReentryReady(){__asm__ volatile
+ #ifdef DOWNWELL_PREPARED_FIELDS
+ #include "AmigaPreparedTimeFields.h"
+ #include "AmigaFieldColumns.h"
++#include "AmigaFieldRuns.h"
+ // Change only initialized data for identical-code comparisons.
+ // Both modes load the same images and reserve the same scene-bank partition.
+ extern "C" { volatile unsigned gDownwellPreparedFieldMode=DOWNWELL_FIELD_MODE; }
+@@ -72,13 +73,15 @@ struct PreparedFieldOps {
+ #endif
+     static bool enabled(){return gDownwellPreparedFieldMode!=2;}
+     static bool staticEnabled(){return gDownwellPreparedFieldMode>=3;}
+-    static bool columnsEnabled(){return gDownwellPreparedFieldMode==4;}
++    static bool columnsEnabled(){return gDownwellPreparedFieldMode>=4;}
+     static bool columns(const UBYTE* terrain,UBYTE* target,const downwell::TimeFieldOutlines::Circle& circle,
+         unsigned origin,bool restore,UWORD* rows){
+ #ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
+         amigaFieldVerifyColumn(terrain,target,circle,origin,restore);
+ #endif
+-        const bool ok=amigaFieldColumns(terrain,target,circle,origin,restore,rows);
++        const bool ok=gDownwellPreparedFieldMode==5?
++            amigaFieldRuns(terrain,target,circle,origin,restore,rows):
++            amigaFieldColumns(terrain,target,circle,origin,restore,rows);
+ #ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
+         amigaFieldVerifyFinish(target);
+ #endif
+@@ -995,7 +998,7 @@ static bool verifyFieldComposites(UBYTE* terrain,UBYTE* target){
+     for(unsigned frame=0;frame<48&&ok;++frame){
+         // Captured, pristine, and sparse paths must exchange ownership without
+         // retaining pixels from an earlier field. No gameplay RNG is consumed.
+-        gDownwellPreparedFieldMode=frame%13==0?2:frame%11==0?1:frame%5==0?3:4;
++        gDownwellPreparedFieldMode=frame%13==0?2:frame%11==0?1:frame%5==0?3:frame%7==0?4:5;
+         downwell::TimeFieldOutlines shape;
+         shape.count=frame%12==11?0:3;shape.visible=shape.count!=0;
+         for(unsigned i=0;i<shape.count;++i){
+@@ -1015,7 +1018,7 @@ static bool verifyFieldComposites(UBYTE* terrain,UBYTE* target){
+         ok=overlay.prepare(target,origin,shape,true,[](unsigned){return false;})&&overlay.draw();
+         if(ok)ok=amigaFieldVerifyComposite(terrain,target,shape,origin);
+     }
+-    gDownwellPreparedFieldMode=4;
++    gDownwellPreparedFieldMode=5;
+     for(unsigned phase=0;phase<32&&ok;++phase){
+         downwell::TimeFieldOutlines shape;
+         shape.visible=true;shape.count=1;
+diff --git a/tests/platform/amiga/AmigaFieldColumnsTest.cpp b/tests/platform/amiga/AmigaFieldColumnsTest.cpp
+index 1ff27c63..258e544c 100644
+--- a/tests/platform/amiga/AmigaFieldColumnsTest.cpp
++++ b/tests/platform/amiga/AmigaFieldColumnsTest.cpp
+@@ -1,4 +1,5 @@
+ #include "platform/amiga/AmigaFieldColumns.h"
++#include "platform/amiga/AmigaFieldRuns.h"
+ #include <array>
+ #include <cstdlib>
+ #include <iostream>
+@@ -32,6 +33,12 @@ int main(){
+         for(unsigned row=0;row<20;++row)require(rows[row]==oracleRows[row],"column row footprint");
+         require(amigaFieldColumns(terrain.data(),actual.data(),circle,origin,true),"restore admission");
+         require(actual==terrain,"column restoration");++cases;
++        for(auto& row:rows)row=0;
++        require(amigaFieldRuns(terrain.data(),actual.data(),circle,origin,false,rows),"run admission");
++        require(actual==expected,"run pixels");
++        for(unsigned row=0;row<20;++row)require(rows[row]==oracleRows[row],"run row footprint");
++        require(amigaFieldRuns(terrain.data(),actual.data(),circle,origin,true),"run restore admission");
++        require(actual==terrain,"run restoration");
+     }
+     std::cout<<cases<<" large-field radius/shift cases match independent pixels, row footprints and restoration\n";
+ }
+diff --git a/tests/platform/amiga/AmigaPreparedTimeFieldsTest.cpp b/tests/platform/amiga/AmigaPreparedTimeFieldsTest.cpp
+index 2cb0404e..c6546c23 100644
+--- a/tests/platform/amiga/AmigaPreparedTimeFieldsTest.cpp
++++ b/tests/platform/amiga/AmigaPreparedTimeFieldsTest.cpp
+@@ -1,5 +1,6 @@
+ #include "platform/amiga/AmigaPreparedTimeFields.h"
+ #include "platform/amiga/AmigaFieldColumns.h"
++#include "platform/amiga/AmigaFieldRuns.h"
+ #include <cstdlib>
+ #include <fstream>
+ #include <iostream>
+@@ -15,11 +16,14 @@ struct Pixels {
+     inline static bool usePrepared=true;
+     inline static bool useStatic=false;
+     inline static bool useColumns=true;
++    inline static bool useRuns=true;
+     static bool enabled(){return usePrepared;}
+     static bool staticEnabled(){return useStatic;}
+     static bool columnsEnabled(){return useColumns&&useStatic&&usePrepared;}
+     static bool columns(const UBYTE* terrain,UBYTE* target,const downwell::TimeFieldOutlines::Circle& circle,
+-        unsigned origin,bool restore,UWORD* rows){return amigaFieldColumns(terrain,target,circle,origin,restore,rows);}
++        unsigned origin,bool restore,UWORD* rows){return useRuns?
++            amigaFieldRuns(terrain,target,circle,origin,restore,rows):
++            amigaFieldColumns(terrain,target,circle,origin,restore,rows);}
+     static void validateColumns(const UBYTE* terrain,UBYTE* target,const downwell::TimeFieldOutlines::Circle& circle,
+         unsigned origin){
+         downwell::GoalFieldOutline shape;shape.setRasterCircle(circle.x,circle.y,circle.radius);
+@@ -170,6 +174,7 @@ int main(){
+     for(unsigned frame=0;frame<2400;++frame){
+         Pixels::useStatic=frame%41!=0;
+         Pixels::useColumns=frame%31!=0;
++        Pixels::useRuns=frame%7!=0;
+         const unsigned b=frame&1,origin=(frame*11)%320;
+         const unsigned changed=next()%320;
+         for(unsigned p=0;p<2;++p)for(unsigned x=0;x<48;++x)
+diff --git a/tools/generate-field-columns.cpp b/tools/generate-field-columns.cpp
+index 2e10d068..795edfa5 100644
+--- a/tools/generate-field-columns.cpp
++++ b/tools/generate-field-columns.cpp
+@@ -59,9 +59,38 @@ int main(int argc,char** argv){
+     out<<"\n};\nstatic const FieldColumnWord fieldColumnWords[]={\n";
+     for(const auto& col:columns)for(const auto& word:col)
+         out<<'{'<<word[0]<<','<<word[0]*24<<','<<word[1]<<','<<word[2]<<"},\n";
+-    out<<"};\n}\n#endif\n";out.close();
++    out<<"};\n";
++    // A run has no per-word geometry. Share translated colour sequences,
++    // retaining separate row origins for each column's disconnected arcs.
++    using Pixels=std::vector<unsigned>;
++    std::map<Pixels,unsigned> pixelIds;
++    std::vector<unsigned> pixels,runOffsets{0};
++    std::vector<std::array<unsigned,3>> runs;
++    for(const auto& col:columns){
++        for(unsigned first=0;first<col.size();){
++            unsigned end=first+1;
++            while(end<col.size()&&col[end][0]==col[end-1][0]+1)++end;
++            Pixels sequence;
++            for(unsigned i=first;i<end;++i){sequence.push_back(col[i][1]);sequence.push_back(col[i][2]);}
++            auto inserted=pixelIds.emplace(sequence,unsigned(pixels.size()));
++            if(inserted.second)pixels.insert(pixels.end(),sequence.begin(),sequence.end());
++            runs.push_back({unsigned(col[first][0]+132),end-first,inserted.first->second});
++            first=end;
++        }
++        runOffsets.push_back(unsigned(runs.size()));
++    }
++    if(pixels.size()>65535||runs.size()>65535)return 20;
++    out<<"static const unsigned short fieldColumnRunOffsets[]={\n";
++    for(auto value:runOffsets)out<<value<<',';
++    out<<"\n};\nstruct FieldColumnRun { short row; unsigned short count,pixels; };\nstatic const FieldColumnRun fieldColumnRuns[]={\n";
++    for(const auto& run:runs)out<<'{'<<int(run[0])-132<<','<<run[1]<<','<<run[2]<<"},\n";
++    out<<"};\nstatic const unsigned short fieldColumnRunPixels[]={\n";
++    for(auto value:pixels)out<<value<<',';
++    out<<"\n};\n}\n#endif\n";out.close();
+     if(!out)return 20;
+     std::cout<<frames.size()<<" frames, "<<columns.size()<<" unique columns, "<<count
+              <<" words; "<<count*8+frames.size()*36+(columns.size()+1)*2+1024<<" payload bytes\n";
++    std::cout<<runs.size()<<" runs, "<<pixelIds.size()<<" translated pixel sequences; "
++             <<pixels.size()*2+runs.size()*6+runOffsets.size()*2<<" additional reference-comparison bytes\n";
+     return 0;
+ }
+diff --git a/src/platform/amiga/AmigaFieldRuns.h b/src/platform/amiga/AmigaFieldRuns.h
+new file mode 100644
+index 00000000..74ff049d
+--- /dev/null
++++ b/src/platform/amiga/AmigaFieldRuns.h
+@@ -0,0 +1,76 @@
++#ifndef DOWNWELL_AMIGA_FIELD_RUNS_H
++#define DOWNWELL_AMIGA_FIELD_RUNS_H
++#include "AmigaFieldColumns.h"
++namespace downwell_field_runs {
++inline void markRows(UWORD* rows,unsigned first,unsigned count){
++    if(!rows)return;
++    while(count){
++        const unsigned bit=first&15,part=count<16-bit?count:16-bit;
++        rows[first/16]|=UWORD(((0xffffu>>(16-part))<<bit));
++        first+=part;count-=part;
++    }
++}
++template<bool Restore> void strip(const UBYTE* terrain,UBYTE* target,
++    const unsigned short* pixels,unsigned offset,unsigned physical,unsigned count,
++    unsigned shift,unsigned leftMask,unsigned rightMask,UWORD* rows){
++    using namespace downwell_field_columns;
++    const bool whole=leftMask==0xffffu&&(!shift||rightMask==0xffffu);
++    // Interior runs contain coverage on every row. Mark once per run, not
++    // once per word (or per colour plane). Edge clipping needs exact pixels.
++    if(whole)markRows(rows,physical,count);
++    for(unsigned i=0;i<count;++i,pixels+=2,offset+=24){
++        bool touched;
++        if(!shift)touched=paint<Restore>(terrain,target,offset,pixels[0],pixels[1],leftMask);
++        else{
++            touched=paint<Restore>(terrain,target,offset,pixels[0]>>shift,pixels[1]>>shift,leftMask);
++            touched=paint<Restore>(terrain,target,offset+1,
++                (unsigned(pixels[0])<<(16-shift))&0xffffu,
++                (unsigned(pixels[1])<<(16-shift))&0xffffu,rightMask)||touched;
++        }
++        if(rows&&!whole&&touched)rows[(physical+i)/16]|=UWORD(1u<<((physical+i)&15));
++    }
++}
++template<bool Restore> void transfer(const UBYTE* terrain,UBYTE* target,
++    const downwell::TimeFieldOutlines::Circle& circle,unsigned origin,UWORD* rows){
++    using namespace downwell;
++    if(circle.x<=downwellPlayfieldX-132||circle.x>=downwellPlayfieldX+downwellPlayfieldWidth+132||
++       circle.y<=-132||circle.y>=downwellDisplayHeight+132)return;
++    int base=(circle.x-14)/16,shift=(circle.x-14)%16;
++    if(shift<0){shift+=16;--base;}
++    int first=6-base-(shift!=0),end=17-base;
++    if(first < -8)first=-8;
++    if(end>10)end=10;
++    if(first>=end)return;
++    static const UWORD clip[24]={0,0,0,0,0,0,0x0003,
++        0xffff,0xffff,0xffff,0xffff,0xffff,0xffff,0xffff,0xffff,0xffff,0xfffc};
++    const auto* frame=fieldColumnFrames[fieldColumnRadii[circle.radius-128*256]];
++    for(int col=first;col<end;++col){
++        const unsigned column=frame[col+8];
++        const int x=base+col;
++        const unsigned left=clip[x],right=shift?clip[x+1]:0;
++        for(unsigned r=fieldColumnRunOffsets[column];r<fieldColumnRunOffsets[column+1];++r){
++            const auto& run=fieldColumnRuns[r];
++            int y=circle.y+run.row,skip=0,count=run.count;
++            if(y<0){skip=-y;count-=skip;y=0;}
++            if(y+count>downwellDisplayHeight)count=downwellDisplayHeight-y;
++            if(count<=0)continue;
++            unsigned physical=origin+unsigned(y);
++            if(physical>=downwellGameRingHeight)physical-=downwellGameRingHeight;
++            const unsigned initial=unsigned(count)<downwellGameRingHeight-physical?
++                unsigned(count):downwellGameRingHeight-physical;
++            const auto* pixels=fieldColumnRunPixels+run.pixels+2*skip;
++            strip<Restore>(terrain,target,pixels,physical*24+x,physical,initial,shift,left,right,rows);
++            if(initial<unsigned(count))strip<Restore>(terrain,target,pixels+2*initial,x,0,
++                unsigned(count)-initial,shift,left,right,rows);
++        }
++    }
++}
++}
++inline bool amigaFieldRuns(const UBYTE* terrain,UBYTE* target,
++    const downwell::TimeFieldOutlines::Circle& circle,unsigned origin,bool restore,UWORD* rows=nullptr){
++    if(origin>=downwellGameRingHeight||circle.radius<128*256||circle.radius>=130*256)return false;
++    if(restore)downwell_field_runs::transfer<true>(terrain,target,circle,origin,nullptr);
++    else downwell_field_runs::transfer<false>(terrain,target,circle,origin,rows);
++    return true;
++}
++#endif

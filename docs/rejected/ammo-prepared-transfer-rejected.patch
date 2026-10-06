@@ -1,0 +1,388 @@
+diff --git a/Makefile b/Makefile
+index 6cd16897..a273d3ab 100644
+--- a/Makefile
++++ b/Makefile
+@@ -2100,6 +2100,12 @@ build/factored-ammo-renderer-test: $(AMIGA_RENDERER_TEST_SOURCES) $(wildcard src
+ 	@mkdir -p $(@D)
+ 	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -DDOWNWELL_AMMO_DAMAGE_RANGE -DDOWNWELL_PREPARED_AMMO_DIVIDERS -DDOWNWELL_AMMO_FACTORED=2 -o $@ $(AMIGA_RENDERER_TEST_SOURCES)
+ .PHONY: verify-factored-ammo-hud
++build/transfer-ammo-renderer-test: $(AMIGA_RENDERER_TEST_SOURCES) $(wildcard src/platform/amiga/*.h) $(wildcard src/core/*.h) generated/amiga-ammo-dividers.h generated/downwell-field-spans.h generated/amiga-ammo-factored.h
++	@mkdir -p $(@D)
++	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -DDOWNWELL_AMMO_DAMAGE_RANGE -DDOWNWELL_PREPARED_AMMO_DIVIDERS -DDOWNWELL_AMMO_FACTORED=3 -o $@ $(AMIGA_RENDERER_TEST_SOURCES)
++.PHONY: verify-transfer-ammo-hud
++verify-transfer-ammo-hud: build/transfer-ammo-renderer-test
++	./build/transfer-ammo-renderer-test generated/amiga-game.dwap generated/amiga-hud.dwap
+ verify-factored-ammo-hud: build/factored-ammo-renderer-test
+ 	./build/factored-ammo-renderer-test generated/amiga-game.dwap generated/amiga-hud.dwap
+ 
+diff --git a/amiga/Makefile b/amiga/Makefile
+index 428d8636..525706e9 100644
+--- a/amiga/Makefile
++++ b/amiga/Makefile
+@@ -199,8 +199,8 @@ ifneq ($(AMMO_FACTORED),0)
+ CFLAGS += -DDOWNWELL_AMMO_FACTORED=$(AMMO_FACTORED)
+ endif
+ ifeq ($(AMMO_FACTORED_VERIFY),1)
+-ifneq ($(AMMO_FACTORED),2)
+-$(error AMMO_FACTORED_VERIFY requires AMMO_FACTORED=2)
++ifeq ($(filter 2 3,$(AMMO_FACTORED)),)
++$(error AMMO_FACTORED_VERIFY requires AMMO_FACTORED=2 or 3)
+ endif
+ ifeq ($(filter 1,$(FPSCOUNT) $(PROBES)),)
+ $(error AMMO_FACTORED_VERIFY requires FPSCOUNT=1 or PROBES=1)
+diff --git a/amiga/profile.sh b/amiga/profile.sh
+index 927de12c..5a1dac6e 100644
+--- a/amiga/profile.sh
++++ b/amiga/profile.sh
+@@ -9,7 +9,7 @@ case "$mode" in
+   fps) flags=(FPSCOUNT=1); script=profile_fps.gdb ;;
+   draw-cache) flags=(FPSCOUNT=1 DRAW_CACHE_AUDIT=1); script=profile_draw_cache.gdb ;;
+   draw-order) flags=(FPSCOUNT=1 DRAW_ORDER_AUDIT=1); script=profile_draw_order.gdb ;;
+-  ammo) flags=(FPSCOUNT=1 AMMO_FACTORED=2 AMMO_FACTORED_VERIFY=1); script=verify_ammo.gdb ;;
++  ammo) flags=(FPSCOUNT=1 AMMO_FACTORED="${AMMO_FACTORED:-2}" AMMO_FACTORED_VERIFY=1); script=verify_ammo.gdb ;;
+   terrain) flags=(FPSCOUNT=1 TERRAIN_BATCH=1 TERRAIN_BATCH_VERIFY=1); script=verify_terrain_batch.gdb ;;
+   fields) flags=(FPSCOUNT=1 PREPARED_FIELDS=1 PREPARED_FIELDS_VERIFY=1); script=verify_prepared_fields.gdb ;;
+   fields-clear)
+diff --git a/src/platform/amiga/AmigaAmmoFactored.h b/src/platform/amiga/AmigaAmmoFactored.h
+index 7f0bd484..2d363cf2 100644
+--- a/src/platform/amiga/AmigaAmmoFactored.h
++++ b/src/platform/amiga/AmigaAmmoFactored.h
+@@ -2,8 +2,12 @@
+ #define DOWNWELL_AMIGA_AMMO_FACTORED_H
+ #include "AmigaRenderer.h"
+ #include "core/AmmoGaugeRows.h"
++#include <cstring>
+ #include "../../../generated/amiga-ammo-factored.h"
+ extern volatile unsigned amigaAmmoFactoredMode;
++#ifdef DOWNWELL_PLATFORM_AMIGA
++extern "C" void amigaBlitterAmmoColumn(const UBYTE*,UBYTE*);
++#endif
+ 
+ // Complete prepared column plus independent outer-rim changes. The labels are
+ // fused into final publication: never erase a label just to draw it again.
+@@ -12,6 +16,7 @@ extern volatile unsigned amigaAmmoFactoredMode;
+ class AmigaAmmoFactored {
+     const UBYTE* pack_ = nullptr;
+     UBYTE* destination_ = nullptr;
++    UBYTE* staging_ = nullptr;
+     bool matches_ = false, valid_ = false, uniform_ = false;
+     unsigned capacity_ = 0, meter_ = 0, label_ = 0;
+     std::uint32_t serial_ = 0;
+@@ -56,6 +61,7 @@ class AmigaAmmoFactored {
+         return true;
+     }
+ public:
++    void bindTransfer(UBYTE* staging) { staging_=staging;invalidate(); }
+     void invalidate() { valid_=uniform_=false;capacity_=0; }
+     bool draw(AmigaRenderer* renderer,UBYTE* retained,const UBYTE* pack,const UBYTE* end,
+               unsigned ammo,unsigned capacity,unsigned offset,const downwell::AmmoGaugeRows* rows,
+@@ -77,6 +83,8 @@ public:
+         }
+         serial_=rows->visualSerial();
+         writes=0;
++        const bool staged=amigaAmmoFactoredMode==3 && staging_;
++        const bool transfer=staged && valid_ && meter_!=meter;
+         if(!valid_){
+             for(unsigned y=40;y<256;++y){
+                 const auto* value=outerRows[outerFrames[meter][y-40]];
+@@ -88,6 +96,10 @@ public:
+                 }
+                 write(retained+y*48+36,read(destination_+y*48+36));
+                 write(retained+y*48+36+downwellPlaneBytes,read(destination_+y*48+36+downwellPlaneBytes));
++                if(staged){
++                    write(staging_+(y-40)*4,read(destination_+y*48+36));
++                    write(staging_+2+(y-40)*4,read(destination_+y*48+36+downwellPlaneBytes));
++                }
+             }
+         }else if(meter_!=meter){
+             const auto* directory=patchDirectory[meter_*4+meter];
+@@ -109,6 +121,45 @@ public:
+             const bool same=valid_ && meter==meter_ && tile==oldTiles_[segment];
+             oldTiles_[segment]=tile;
+             if(same && (label==label_ || y>=250 || bottom<=238))continue;
++            if(transfer){
++                const auto* span=transferTiles[tile];
++                for(unsigned i=0;i<span[1];++i){
++                    const auto* phrase=transferPhrases[transferReferences[span[0]+i]];
++                    const auto* source=transferWords+phrase[0];
++#ifdef DOWNWELL_PLATFORM_AMIGA
++                    std::memcpy(staging_+(y-40)*4,source,phrase[1]*4);
++#else
++                    for(unsigned j=0;j<phrase[1]*2;++j)write(staging_+(y-40)*4+j*2,source[j]);
++#endif
++                    y+=phrase[1];
++                }
++                continue;
++            }
++            if(staged && valid_){
++                // Small updates use the same final prepared pixels directly.
++                // No retained-image reads or per-row source composition;
++                // unchanged tiles were rejected above. The moving label is
++                // the only overlay not part of the offline tile.
++                const auto* span=transferTiles[tile];
++                for(unsigned i=0;i<span[1];++i){
++                    const auto* phrase=transferPhrases[transferReferences[span[0]+i]];
++                    const auto* source=transferWords+phrase[0];
++                    for(unsigned row=0;row<phrase[1];++row,++y){
++                        if(same && (y<238 || y>=250))continue;
++                        UWORD low=source[row*2],high=source[row*2+1];
++                        if(y>=238 && y<250){
++                            const unsigned index=(y-238)*2;
++                            const UWORD a=glyph[index],b=glyph[index+1],mask=a|b;
++                            low=UWORD((low&~mask)|a);high=UWORD((high&~mask)|b);
++                        }
++                        write(staging_+(y-40)*4,low);write(staging_+(y-40)*4+2,high);
++                        write(destination_+y*48+36,low);
++                        write(destination_+y*48+36+downwellPlaneBytes,high);
++                        writes+=2;
++                    }
++                }
++                continue;
++            }
+             const auto* directory=tiles[tile];
+             for(unsigned i=0;i<directory[1];++i){
+                 const auto* run=runs[directory[0]+i];
+@@ -123,14 +174,33 @@ public:
+                         low=UWORD((low&~mask)|a);high=UWORD((high&~mask)|b);
+                     }
+                     const unsigned address=y*48+36;
+-                    if(read(retained+address)!=low){write(retained+address,low);write(destination_+address,low);++writes;}
+-                    if(read(retained+address+downwellPlaneBytes)!=high){
+-                        write(retained+address+downwellPlaneBytes,high);write(destination_+address+downwellPlaneBytes,high);++writes;
++                    UBYTE* lowCache=staged?staging_+(y-40)*4:retained+address;
++                    UBYTE* highCache=staged?staging_+2+(y-40)*4:retained+address+downwellPlaneBytes;
++                    if(read(lowCache)!=low){write(lowCache,low);write(destination_+address,low);++writes;}
++                    if(read(highCache)!=high){
++                        write(highCache,high);write(destination_+address+downwellPlaneBytes,high);++writes;
+                     }
+                 }
+                 y=last;
+             }
+         }
++        if(transfer){
++            // The only runtime composition is the twelve-row moving label.
++            for(unsigned row=0;row<12;++row){
++                const UWORD low=glyph[row*2],high=glyph[row*2+1],mask=low|high;
++                UBYTE* p=staging_+(238-40+row)*4;
++                write(p,UWORD((read(p)&~mask)|low));
++                write(p+2,UWORD((read(p+2)&~mask)|high));
++            }
++#ifdef DOWNWELL_PLATFORM_AMIGA
++            amigaBlitterAmmoColumn(staging_,destination_);
++#else
++            for(unsigned y=40;y<256;++y)for(unsigned plane=0;plane<2;++plane)
++                write(destination_+y*48+36+plane*downwellPlaneBytes,
++                      read(staging_+(y-40)*4+plane*2));
++#endif
++            writes+=432;
++        }
+         valid_=true;meter_=meter;label_=label;
+         amigaRendererClearClipRect(renderer);
+         return true;
+diff --git a/src/platform/amiga/AmigaAmmoHud.h b/src/platform/amiga/AmigaAmmoHud.h
+index aeae7aee..7270f131 100644
+--- a/src/platform/amiga/AmigaAmmoHud.h
++++ b/src/platform/amiga/AmigaAmmoHud.h
+@@ -49,6 +49,7 @@ public:
+ #endif
+     }
+ #ifdef DOWNWELL_AMMO_FACTORED
++    void bindTransfer(UBYTE* staging) { factored_.bindTransfer(staging); }
+     void sharedRowProducer(bool enabled) { if(enabled!=sharedRowProducer_)invalidate();sharedRowProducer_=enabled; }
+ #endif
+     void draw(AmigaRenderer* renderer, const UBYTE* pack, const UBYTE* end,
+@@ -57,7 +58,7 @@ public:
+         DW_PROFILE_PHASE(profileAmmoBase);
+         if (ammo > capacity) ammo = capacity;
+ #ifdef DOWNWELL_AMMO_FACTORED
+-        if(amigaAmmoFactoredMode==2 && sharedRowProducer_ && !forceFull && oldDigits_==1 && !previousWideClear_ &&
++        if(amigaAmmoFactoredMode>=2 && sharedRowProducer_ && !forceFull && oldDigits_==1 && !previousWideClear_ &&
+            factored_.draw(renderer,working_,pack,end,ammo,capacity,offset,rows,meter,lastWordWrites)){
+ #ifndef DOWNWELL_PLATFORM_AMIGA
+             ++factoredDraws;
+diff --git a/src/platform/amiga/AmigaBlitter.cpp b/src/platform/amiga/AmigaBlitter.cpp
+index 5c546660..6b1baecf 100644
+--- a/src/platform/amiga/AmigaBlitter.cpp
++++ b/src/platform/amiga/AmigaBlitter.cpp
+@@ -1,5 +1,17 @@
+ #include "framework/AmigaHardware.h"
+ #include "framework/Bitmap.h"
++#include <exec/types.h>
++#ifdef DOWNWELL_AMMO_FACTORED
++extern "C" void amigaBlitterAmmoColumn(const UBYTE* source,UBYTE* target){
++    AmigaHardware::setBlitterNasty(true);
++    for(unsigned plane=0;plane<2;++plane)
++        AmigaHardware::blitterCopy((UWORD*)(source+plane*2),
++            (UWORD*)(target+40*48+36+plane*13632),1,216,2,46,0,0xffff,0xffff,0xffff);
++    // The staging buffer must not be changed until both queued copies retire.
++    AmigaHardware::blitterDrain();
++    AmigaHardware::setBlitterNasty(false);
++}
++#endif
+ #ifdef DOWNWELL_PREPARED_FIELDS
+ #include "AmigaFieldBands.h"
+ #include "AmigaFieldComposite.h"
+@@ -88,7 +100,6 @@ extern "C" int amigaBlitterComposeFieldBands(const UBYTE* terrain,UBYTE* target,
+ #include "core/TimeFieldOutlines.h"
+ #endif
+ 
+-#include <exec/types.h>
+ inline void* operator new(__SIZE_TYPE__, void* address) noexcept { return address; }
+ 
+ namespace {
+diff --git a/src/platform/amiga/DownwellAmiga.cpp b/src/platform/amiga/DownwellAmiga.cpp
+index 163cfde8..0767ee09 100644
+--- a/src/platform/amiga/DownwellAmiga.cpp
++++ b/src/platform/amiga/DownwellAmiga.cpp
+@@ -320,6 +320,11 @@ static const ULONG sceneBankBytes=fieldBandOffset+sizeof(downwell::fieldBandPixe
+ static const ULONG sceneBankBytes=baseSceneBankBytes;
+ #endif
+ static UBYTE* sceneBank;
++#ifdef DOWNWELL_AMMO_FACTORED
++static const ULONG ammoTransferBytes=864;
++#else
++static const ULONG ammoTransferBytes=0;
++#endif
+ static const UBYTE* frontPack;
+ static const UBYTE* frontPackEnd;
+ extern "C" volatile ULONG gDownwellSceneBankLoads;
+@@ -1701,7 +1706,7 @@ __attribute__((noinline)) static int runDownwell(void) {
+                          bulletSpriteBytes * bulletSpriteBufferCount,
+                          enemySpriteBytes,
+                          sceneCacheBytes,
+-                         ((gamePackBytes+AmigaEffectSurface::bytes+3)&~3UL)+sceneBankBytes)) {
++                         ((gamePackBytes+AmigaEffectSurface::bytes+3)&~3UL)+sceneBankBytes+ammoTransferBytes)) {
+         platform.restore();
+         FreeMem(startupCopperWords, 4 * sizeof(UWORD));
+         gDownwellStartupFailure = 4;
+@@ -1710,6 +1715,9 @@ __attribute__((noinline)) static int runDownwell(void) {
+     }
+     gDownwellStartupChipRemaining = AvailMem(MEMF_CHIP);
+     sceneBank = memory.assets() + ((gamePackBytes+AmigaEffectSurface::bytes+3)&~3UL);
++#ifdef DOWNWELL_AMMO_FACTORED
++    ammoHud.bindTransfer(sceneBank+sceneBankBytes);
++#endif
+     const downwell::BuilderPatternPack builders(
+         amiga_builder_pack,
+         (unsigned long)(amiga_builder_pack_end - amiga_builder_pack));
+diff --git a/tests/platform/amiga/AmigaRendererTest.cpp b/tests/platform/amiga/AmigaRendererTest.cpp
+index 777eb30c..9dab3981 100644
+--- a/tests/platform/amiga/AmigaRendererTest.cpp
++++ b/tests/platform/amiga/AmigaRendererTest.cpp
+@@ -1265,6 +1265,8 @@ int main(int argc, char** argv) {
+     {
+         AmigaAmmoHud retained;
+ #ifdef DOWNWELL_AMMO_FACTORED
++        alignas(UWORD) UBYTE ammoStaging[864];
++        retained.bindTransfer(ammoStaging);
+         retained.sharedRowProducer(true);
+ #endif
+         downwell::AmmoGaugeRows rows;
+diff --git a/tools/probe-ammo-complete.py b/tools/probe-ammo-complete.py
+index 77d7cacf..7feb3b6d 100644
+--- a/tools/probe-ammo-complete.py
++++ b/tools/probe-ammo-complete.py
+@@ -19,6 +19,51 @@ ROOT = Path(__file__).resolve().parents[1]
+ sha = lambda data: hashlib.sha256(data).hexdigest()
+ 
+ 
++def transfer_phrases(tiles, pairs):
++    """Offline repeated-pair compression; runtime copies flat final phrases."""
++    ids = {pair:i for i,pair in enumerate(pairs)}
++    originals = [[ids[row] for row in tile] for tile in tiles]
++    sequences = [list(s) for s in originals]
++    words = [(i,) for i in range(len(pairs))]
++    while True:
++        frequencies = collections.Counter()
++        for sequence in sequences:
++            frequencies.update((a,b) for a,b in zip(sequence,sequence[1:])
++                               if len(words[a])+len(words[b]) <= 32)
++        if not frequencies:
++            break
++        def saving(pair):
++            return frequencies[pair]*2-(len(words[pair[0]])+len(words[pair[1]]))*4-4
++        pair = max(frequencies,key=saving)
++        if saving(pair) <= 0:
++            break
++        token = len(words)
++        words.append(words[pair[0]]+words[pair[1]])
++        for sequence in sequences:
++            out, i = [], 0
++            while i < len(sequence):
++                if i+1 < len(sequence) and (sequence[i],sequence[i+1]) == pair:
++                    out.append(token)
++                    i += 2
++                else:
++                    out.append(sequence[i])
++                    i += 1
++            sequence[:] = out
++    assert all(tuple(p for token in seq for p in words[token]) == tuple(original)
++               for seq,original in zip(sequences,originals))
++    used = sorted({token for seq in sequences for token in seq})
++    remap = {token:i for i,token in enumerate(used)}
++    payload, phrases, references, directory = [], [], [], []
++    for token in used:
++        phrases.append((len(payload),len(words[token])))
++        payload.extend(word for p in words[token] for word in pairs[p])
++    for seq in sequences:
++        directory.append((len(references),len(seq)))
++        references.extend(remap[token] for token in seq)
++    assert max(len(payload),len(references),len(phrases)) < 65536
++    return payload, phrases, references, directory
++
++
+ def verify(path):
+     bank_path = ROOT / "generated/amiga-ammo-complete-probe.json"
+     manifest = json.loads((ROOT / "generated/amiga-ammo-complete-probe.manifest.json").read_text())
+@@ -221,6 +266,18 @@ def main(factored=False):
+         low_budget = dict(baseline=432,words=len(low_words)*2,starts=32,
+                           selectors=len(low_frames)*2,directory=len(unique_low_frames)*4,
+                           exceptions=sum(exception_counts)*2)
++        transfer_block_budgets = {}
++        for height in (8,16,32,64):
++            blocks = set()
++            references = 0
++            for tile in tiles:
++                for first in range(0,len(tile),height):
++                    blocks.add(tile[first:first+height])
++                    references += 1
++            transfer_block_budgets[height] = dict(
++                blocks=len(blocks),payloadBytes=sum(len(block)*4 for block in blocks),
++                referenceBytes=references*2,directoryBytes=len(tiles)*4,
++                totalBytes=sum(len(block)*4 for block in blocks)+references*2+len(tiles)*4)
+         outer_rows, outer_ids, outer_frames = [], {}, []
+         for meter in range(4):
+             image = [list(row) for row in bases[meter]]
+@@ -264,6 +321,11 @@ def main(factored=False):
+         text += array("tiles","unsigned short",directory,2)
+         text += array("runs","unsigned char",runs,2)
+         text += array("pairs","unsigned short",pairs,2)
++        transfer_words, phrases, references, transfer_tiles = transfer_phrases(tiles,pairs)
++        text += array("transferPhrases","unsigned short",phrases,2)
++        text += array("transferReferences","unsigned short",references)
++        text += array("transferTiles","unsigned short",transfer_tiles,2)
++        text += array("transferWords","unsigned short",transfer_words)
+         text += array("outerRows","unsigned short",outer_rows,4)
+         text += array("outerFrames","unsigned char",outer_frames,216)
+         text += array("patchDirectory","unsigned short",patch_directory,2)
+@@ -277,8 +339,10 @@ def main(factored=False):
+                      pages=len(pages)*32,tiles=len(tiles)*4,runs=len(runs)*2,pairs=len(pairs)*4,
+                      outerRows=len(outer_rows)*8,outerFrames=4*216,patchDirectory=16*4,
+                      patches=len(patches)*6,labels=30*24*2,
+-                     sourceRecords=len(source_records)*40,sourceBytes=len(source_bytes))
+-        manifest = dict(schemaVersion=1,generator="probe-ammo-complete.py/factored-v1",
++                     sourceRecords=len(source_records)*40,sourceBytes=len(source_bytes),
++                     transferPhrases=len(phrases)*4,transferReferences=len(references)*2,
++                     transferTiles=len(transfer_tiles)*4,transferWords=len(transfer_words)*2)
++        manifest = dict(schemaVersion=1,generator="probe-ammo-complete.py/factored-transfer-v2",
+                         generatorSha256=sha(Path(__file__).read_bytes()),
+                         sourceSha256=provenance["sourceSha256"],extractor=provenance["extractor"],
+                         inputPackSha256=sha(pack),outputSha256=sha(output),
+@@ -287,6 +351,7 @@ def main(factored=False):
+                         independentLowPlaneBudget=low_budget,
+                         independentLowPlaneTotalBytes=sum(low_budget.values()),
+                         independentLowPlaneMaxExceptions=max(exception_counts))
++        manifest['transferBlockBudgets']=transfer_block_budgets
+         (ROOT/"generated/amiga-ammo-factored.h").write_bytes(output)
+         (ROOT/"generated/amiga-ammo-factored.manifest.json").write_text(json.dumps(manifest,indent=2)+"\n")
+         print(json.dumps(manifest,indent=2))

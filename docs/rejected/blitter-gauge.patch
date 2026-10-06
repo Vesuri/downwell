@@ -1,0 +1,569 @@
+diff --git a/docs/amiga-memory.md b/docs/amiga-memory.md
+index cdf0103b..3ce04d94 100644
+--- a/docs/amiga-memory.md
++++ b/docs/amiga-memory.md
+@@ -19,7 +19,7 @@ memory requirement.
+ | Shared splash/style cache | 66,704 |
+ | Resident gameplay art pack (directory, planar art) | 115,326 |
+ | Effect surface | 20,448 |
+-| Shared scene bank (boot or front art; free in gameplay), after 2 alignment bytes | 90,442 |
++| Shared scene bank (boot or front art; ammo gauge layers in gameplay), after 2 alignment bytes | 90,442 |
+ | **Total** | **434,690** |
+ 
+ `make verify-amiga-memory` reports 67,888 bytes of Chip RAM free after these
+@@ -48,7 +48,10 @@ The two scene banks are files beside the executable. Each load is a single
+ servers, blitter interrupt and multitasking; the display stays owned and the
+ copper is re-pointed afterwards. Leaving gameplay for the menu or style select
+ reloads the front bank before either scene is prepared. Splash scenes run only
+-at boot. During gameplay no bank occupies the region.
++at boot. During gameplay no bank occupies the region; gameplay entry lends
++its first `AmigaAmmoHud::chipBytes` (37,488) to the ammo gauge, whose
++composition layer and column caches the blitter reads and writes there.
++Leaving gameplay takes them back before the front bank reloads.
+ 
+ A temporary 16-byte startup copper list is also allocated during initialization.
+ Immutable planar/mask payloads may share byte-identical word-aligned subregions
+diff --git a/src/platform/amiga/AmigaAmmoHud.h b/src/platform/amiga/AmigaAmmoHud.h
+index 5ca5a22d..43bb42cd 100644
+--- a/src/platform/amiga/AmigaAmmoHud.h
++++ b/src/platform/amiga/AmigaAmmoHud.h
+@@ -19,11 +19,132 @@ class AmigaAmmoHud {
+     alignas(UWORD) UBYTE working_[downwellLayerBytes]; // Fast RAM, never displayed/DMA fetched.
+     UWORD background_[downwellDisplayHeight*6], rim_[downwellDisplayHeight*6];
+     UWORD dividers_[downwellDisplayHeight*2];
++    // Rows the current divider composition occupies; the rest stay zero.
++    UWORD dividerRows_[2][downwellDisplayHeight];
++    unsigned dividerRowCount_ = 0;
++    UBYTE dividerTouched_[downwellDisplayHeight];
+     unsigned dividerAmmo_ = ~0u, dividerCapacity_ = ~0u;
+     int bodyTop_ = 0, bodyBottom_ = 0;
++    // Optional Chip workspace: the composition layer and big-endian copies of
++    // the column caches, so the blitter composes and publishes the gauge.
++    enum : unsigned long {
++        chipBackground = downwellLayerBytes,
++        chipRim = chipBackground + downwellDisplayHeight*12,
++        chipRimMask = chipRim + downwellDisplayHeight*12,
++        chipDividers = chipRimMask + downwellDisplayHeight*6,
++        chipDividerMask = chipDividers + downwellDisplayHeight*4,
++        chipEnd = chipDividerMask + downwellDisplayHeight*2
++    };
++    UBYTE* chip_ = nullptr;
++    AmigaWordBlitter blit_ = nullptr;
++    static void storeWord(UBYTE* at, UWORD value) {
++#ifdef DOWNWELL_PLATFORM_AMIGA
++        *reinterpret_cast<UWORD*>(at) = value; // Big-endian, as the blitter reads it.
++#else
++        at[0] = UBYTE(value >> 8); at[1] = UBYTE(value);
++#endif
++    }
++    void storeDividerRow(unsigned y) {
++        storeWord(chip_ + chipDividers + y*4, dividers_[y*2]);
++        storeWord(chip_ + chipDividers + y*4 + 2, dividers_[y*2+1]);
++        storeWord(chip_ + chipDividerMask + y*2, dividers_[y*2] | dividers_[y*2+1]);
++    }
++    // Below this many rows the CPU loop is cheaper than blit setup.
++    static constexpr int minimumBlitRows = 6;
++    bool blitFill(UBYTE* layer, unsigned word, int top, int bottom, UWORD mask, UWORD low, UWORD high) const {
++        if (top >= bottom) return true;
++        if (!blit_ || bottom - top < minimumBlitRows) return false;
++        AmigaWordBlit blit{};
++        blit.adat = mask; blit.firstMask = blit.lastMask = 0xffff;
++        blit.dmod = downwellBytesPerPlaneLine - 2;
++        blit.words = 1; blit.rows = UWORD(bottom - top); blit.minterm = 0xca; // AB + !AC
++        for (unsigned plane = 0; plane < 2; ++plane) {
++            blit.d = layer + plane*downwellPlaneBytes + top*downwellBytesPerPlaneLine + word*2;
++            blit.bdat = plane ? high : low;
++            if (!blit_(&blit)) return false; // The CPU fill is idempotent.
++        }
++        return true;
++    }
++    // amigaRendererApplyHudColumns from a Chip column cache [row][plane][word],
++    // masked through its [row][word] opacity when given. Same clipping.
++    bool blitColumns(UBYTE* layer, const AmigaRenderer& clip, unsigned long source, long mask,
++                     unsigned firstWord, unsigned words, int shiftY, int top, int bottom) const {
++        if (!blit_) return false;
++        if (top < clip.clipY) top = clip.clipY;
++        if (bottom > clip.clipY + clip.clipHeight) bottom = clip.clipY + clip.clipHeight;
++        if (top < shiftY) top = shiftY;
++        if (bottom > downwellDisplayHeight) bottom = downwellDisplayHeight;
++        if (bottom > downwellDisplayHeight + shiftY) bottom = downwellDisplayHeight + shiftY;
++        if (top < 0) top = 0;
++        if (top >= bottom) return true;
++        if (bottom - top < minimumBlitRows) return false;
++        UWORD clips[3];
++        int first = -1, last = -1;
++        for (unsigned word = 0; word < words; ++word) {
++            const int x = int(firstWord+word)*16;
++            const int left = clip.clipX > x ? clip.clipX-x : 0;
++            int right = clip.clipX+clip.clipWidth-x;
++            if (right > 16) right = 16;
++            clips[word] = left >= right || x >= downwellVisibleWidth ? 0 :
++                UWORD((0xffffu >> left) & (0xffffu << (16-right)));
++            if (clips[word]) { if (first < 0) first = int(word); last = int(word); }
++        }
++        if (first < 0) return true;
++        for (int word = first+1; word < last; ++word) if (clips[word] != 0xffff) return false;
++        const unsigned count = unsigned(last - first + 1);
++        AmigaWordBlit blit{};
++        blit.adat = 0xffff;
++        blit.firstMask = clips[first];
++        blit.lastMask = count == 1 ? 0xffff : clips[last];
++        blit.amod = WORD(words*2 - count*2);
++        blit.bmod = WORD(words*4 - count*2);
++        blit.dmod = WORD(downwellBytesPerPlaneLine - count*2);
++        blit.words = UWORD(count); blit.rows = UWORD(bottom - top); blit.minterm = 0xca;
++        const unsigned long row = static_cast<unsigned long>(top - shiftY);
++        for (unsigned plane = 0; plane < 2; ++plane) {
++            blit.a = mask < 0 ? nullptr : chip_ + mask + row*words*2 + first*2;
++            blit.b = chip_ + source + row*words*4 + plane*words*2 + first*2;
++            blit.d = layer + plane*downwellPlaneBytes + top*downwellBytesPerPlaneLine + (firstWord+first)*2;
++            if (!blit_(&blit)) return false; // Both CPU applications are idempotent.
++        }
++        return true;
++    }
++    // amigaRendererCopyHudWords, copying every word of the clipped rectangle.
++    bool blitCopy(UBYTE* destination, const UBYTE* source, int left, int top, int right, int bottom,
++                  unsigned* writes) const {
++        if (!blit_) return false;
++        if (left < 0) left = 0;
++        if (right > downwellVisibleWidth) right = downwellVisibleWidth;
++        if (top < 0) top = 0;
++        if (bottom > downwellDisplayHeight) bottom = downwellDisplayHeight;
++        if (left >= right || top >= bottom) return true;
++        if (bottom - top < minimumBlitRows) return false;
++        const unsigned first = unsigned(left) >> 4, count = ((unsigned(right)+15) >> 4) - first;
++        AmigaWordBlit blit{};
++        blit.firstMask = blit.lastMask = 0xffff;
++        blit.amod = blit.dmod = WORD(downwellBytesPerPlaneLine - count*2);
++        blit.words = UWORD(count); blit.rows = UWORD(bottom - top); blit.minterm = 0xf0;
++        for (unsigned plane = 0; plane < 2; ++plane) {
++            const unsigned long offset = plane*downwellPlaneBytes + top*downwellBytesPerPlaneLine + first*2;
++            blit.a = source + offset; blit.d = destination + offset;
++            if (!blit_(&blit)) return false;
++        }
++        if (writes) *writes += 2*count*blit.rows;
++        return true;
++    }
+ public:
++    static constexpr unsigned long chipBytes = chipEnd;
+     unsigned lastWordWrites = 0;
+     void invalidate() { damage_.valid = false; }
++    // Compose in this Chip workspace with the given blitter, or (null) in
++    // Fast RAM on the CPU. Its previous contents are never assumed.
++    void useChipLayers(UBYTE* chip, AmigaWordBlitter blit) {
++        if (!chip) blit = nullptr;
++        if (chip == chip_ && blit == blit_) return;
++        chip_ = chip; blit_ = blit;
++        stampPack_ = nullptr;
++        invalidate();
++    }
+     void draw(AmigaRenderer* renderer, const UBYTE* pack, const UBYTE* end,
+               unsigned ammo, unsigned capacity, unsigned offset,
+               const downwell::AmmoGaugeRows* rows, unsigned meter, bool forceFull = false) {
+@@ -33,8 +154,10 @@ public:
+         destination_ = renderer->hud;
+         AmigaRenderer* display = renderer;
+         AmigaRenderer composition = *renderer;
+-        composition.hud = composition.target = working_;
++        UBYTE* const working = chip_ ? chip_ : working_;
++        composition.hud = composition.target = working;
+         composition.blitterEnabled = 0;
++        composition.wordBlit = blit_;
+         renderer = &composition;
+         lastWordWrites = 0;
+         const bool retainEdges = damage_.valid && !previousWideClear_ && !forceFull;
+@@ -52,13 +175,25 @@ public:
+                 if (!amigaRendererPrepareWordStamp(&stamps_[i], pack, end,
+                     i < 4 ? 418 : i < 8 ? 419 : 421, i < 8 ? i % 4 : i-8)) stampsReady_ = false;
+             stampPack_ = pack;
++            for (auto& word : dividers_) word = 0;
++            for (auto& touched : dividerTouched_) touched = 0;
++            dividerRowCount_ = 0;
++            if (chip_) for (unsigned y = 0; y < downwellDisplayHeight; ++y) storeDividerRow(y);
+             amigaRendererClearClipRect(renderer);
+             amigaRendererFillRect(renderer, 272, 0, 48, 284, 3);
+             amigaRendererDrawAsset(renderer, pack, end, 416, 0, 284, 43, 0);
+-            amigaRendererCacheHudColumns(background_, working_, 17, 3);
++            amigaRendererCacheHudColumns(background_, working, 17, 3);
+             amigaRendererFillRect(renderer, 272, 0, 48, 284, 0);
+             amigaRendererDrawAsset(renderer, pack, end, 416, 1, 284, 43, 0);
+-            amigaRendererCacheHudColumns(rim_, working_, 17, 3);
++            amigaRendererCacheHudColumns(rim_, working, 17, 3);
++            if (chip_) for (unsigned y = 0; y < downwellDisplayHeight; ++y)
++                for (unsigned word = 0; word < 3; ++word) {
++                    for (unsigned plane = 0; plane < 2; ++plane) {
++                        storeWord(chip_ + chipBackground + y*12 + plane*6 + word*2, background_[y*6+plane*3+word]);
++                        storeWord(chip_ + chipRim + y*12 + plane*6 + word*2, rim_[y*6+plane*3+word]);
++                    }
++                    storeWord(chip_ + chipRimMask + y*6 + word*2, rim_[y*6+word] | rim_[y*6+3+word]);
++                }
+             // Find a vertically constant span of the complete background and
+             // rim, with black interior and no rim pixels in the row-art column.
+             // Its sides stay unchanged even when the gauge jiggles vertically.
+@@ -80,7 +215,8 @@ public:
+         // Retain the completed off-screen HUD between updates. Other live HUD
+         // components do not overlap this gauge/label region. Scene rebuilds
+         // explicitly invalidate it; never read back Chip RAM on every strip.
+-        if (initialize) amigaRendererCopyHudWords(working_, display->hud, 0, 0, 380, 284, 0);
++        if (initialize && !blitCopy(working, display->hud, 0, 0, 380, 284, nullptr))
++            amigaRendererCopyHudWords(working, display->hud, 0, 0, 380, 284, 0);
+         unsigned digits = 1;
+         for (unsigned value = ammo; value >= 10; value /= 10) ++digits;
+         const unsigned clearDigits = digits > oldDigits_ ? digits : oldDigits_;
+@@ -126,15 +262,20 @@ public:
+                 int begin = fillTop_ > static_cast<unsigned>(top) ? fillTop_ : top;
+                 int end = fillTop_ + fillHeight_ < static_cast<unsigned>(bottom)
+                     ? fillTop_ + fillHeight_ : bottom;
++                auto fill = [&](int from, int to, UWORD high) {
++                    if (!blitFill(working, 18, from, to, 0xfff0, 0xfff0, high))
++                        amigaRendererFillHudWordColumn(working, 18, from, to, 0xfff0, 0xfff0, high);
++                };
+                 if (begin < end) {
+-                    amigaRendererFillHudWordColumn(working_, 18, top, begin, 0xfff0, 0xfff0, 0xfff0);
+-                    amigaRendererFillHudWordColumn(working_, 18, begin, end, 0xfff0, 0xfff0, 0x8010);
+-                    amigaRendererFillHudWordColumn(working_, 18, end, bottom, 0xfff0, 0xfff0, 0xfff0);
+-                } else amigaRendererFillHudWordColumn(working_, 18, top, bottom, 0xfff0, 0xfff0, 0xfff0);
++                    fill(top, begin, 0xfff0);
++                    fill(begin, end, 0x8010);
++                    fill(end, bottom, 0xfff0);
++                } else fill(top, bottom, 0xfff0);
+             }
+             else if (clearDigits == 1 && !forceFull) {
+                 renderer->clipX = 282; renderer->clipWidth = 24;
+-                amigaRendererApplyHudColumns(renderer, background_, 17, 3, meter, 40, 256, 0);
++                if (!blitColumns(working, *renderer, chipBackground, -1, 17, 3, meter, 40, 256))
++                    amigaRendererApplyHudColumns(renderer, background_, 17, 3, meter, 40, 256, 0);
+                 renderer->clipX = left; renderer->clipWidth = right-left;
+             } else {
+                 amigaRendererFillRect(renderer, 282, 40, 24, 216, 3);
+@@ -143,7 +284,16 @@ public:
+                     231, 34 + (clearDigits-1)*8, 26 + clearDigits-1, 0);
+                 asset(416, 0, 284, 43 + meter);
+             }
+-            if (!interior && fillHeight_) amigaRendererFillRect(renderer, 289, fillTop_, 10, fillHeight_, 1);
++            if (!interior && fillHeight_) {
++                // Pen 1 over x 289..298 of word 18, within the strip clip.
++                int from = int(fillTop_), to = int(fillTop_ + fillHeight_);
++                if (from < renderer->clipY) from = renderer->clipY;
++                if (to > renderer->clipY + renderer->clipHeight) to = renderer->clipY + renderer->clipHeight;
++                const bool covered = renderer->clipX <= 289 &&
++                    renderer->clipX + renderer->clipWidth >= 299 && from >= 0 && to <= downwellDisplayHeight;
++                if (!covered || !blitFill(working, 18, from, to, 0x7fe0, 0xffff, 0))
++                    amigaRendererFillRect(renderer, 289, fillTop_, 10, fillHeight_, 1);
++            }
+             DW_PROFILE_PHASE(profileAmmoRows);
+             if (rows) {
+                 const int base = 229 + 4 * meter;
+@@ -173,12 +323,24 @@ public:
+                 // Retain the ordered divider composition, not just positions.
+                 // Animation strips reuse it; jiggle only shifts its row origin.
+                 if (dividerAmmo_ != ammo || dividerCapacity_ != capacity) {
+-                    for (auto& word : dividers_) word = 0;
++                    const UWORD* const previousRows = dividerRows_[0];
++                    UWORD* const rowsNow = dividerRows_[1];
++                    const unsigned previousCount = dividerRowCount_;
++                    unsigned count = 0;
++                    for (unsigned k = 0; k < previousCount; ++k) {
++                        const unsigned y = previousRows[k];
++                        dividers_[y*2] = dividers_[y*2+1] = 0;
++                        dividerTouched_[y] = 0;
++                    }
+                     layout_.draw(ammo, capacity, 1, 288, 229,
+                         [&](unsigned, unsigned frame, int, unsigned y) {
+                             const auto& stamp = stamps_[8 + frame];
+                             for (unsigned row = stamp.first; row < stamp.last; ++row) {
+                                 if (y + row >= downwellDisplayHeight) continue;
++                                if (!dividerTouched_[y + row]) {
++                                    dividerTouched_[y + row] = 1;
++                                    rowsNow[count++] = UWORD(y + row);
++                                }
+                                 UWORD* target = dividers_ + (y + row)*2;
+                                 const UWORD mask = stamp.mask[row];
+                                 target[0] = (target[0] & (UWORD)~mask) | (stamp.low[row] & mask);
+@@ -186,9 +348,17 @@ public:
+                             }
+                         });
+                     dividerAmmo_ = ammo; dividerCapacity_ = capacity;
++                    if (chip_) {
++                        for (unsigned k = 0; k < previousCount; ++k)
++                            if (!dividerTouched_[previousRows[k]]) storeDividerRow(previousRows[k]);
++                        for (unsigned k = 0; k < count; ++k) storeDividerRow(rowsNow[k]);
++                    }
++                    for (unsigned k = 0; k < count; ++k) dividerRows_[0][k] = rowsNow[k];
++                    dividerRowCount_ = count;
+                 }
+-                if (!fusedPublish) amigaRendererApplyHudColumns(renderer, dividers_, 18, 1,
+-                    4 * meter, top, bottom, 1);
++                if (!fusedPublish && !blitColumns(working, *renderer, chipDividers, chipDividerMask,
++                        18, 1, 4 * meter, top, bottom))
++                    amigaRendererApplyHudColumns(renderer, dividers_, 18, 1, 4 * meter, top, bottom, 1);
+             } else layout_.draw(ammo, capacity, 1, 288, 229 + 4 * meter,
+                 [&](unsigned sprite, unsigned frame, int x, unsigned y) {
+                     if (static_cast<int>(y) < bottom && static_cast<int>(y) + 8 > top)
+@@ -196,7 +366,10 @@ public:
+                 });
+             DW_PROFILE_PHASE(profileAmmoLabel);
+             if (interior) { /* The retained red rim is outside this strip. */ }
+-            else if (!forceFull) amigaRendererApplyHudColumns(renderer, rim_, 17, 3, meter, 0, 284, 1);
++            else if (!forceFull) {
++                if (!blitColumns(working, *renderer, chipRim, chipRimMask, 17, 3, meter, 0, 284))
++                    amigaRendererApplyHudColumns(renderer, rim_, 17, 3, meter, 0, 284, 1);
++            }
+             else asset(416, 1, 284, 43 + meter);
+             if (!interior && bottom > 231) {
+                 if (ammo < 10) asset(65010, ammo, 290 + offset, 239 + offset);
+@@ -205,10 +378,17 @@ public:
+             }
+             {
+                 DW_PROFILE_SCOPE(profileAmmoWordPublish);
+-                if (fusedPublish)
+-                    lastWordWrites += amigaRendererPublishHudColumn(display->hud, working_,
++                if (fusedPublish) {
++                    // The interior clip (x 288..299) gives the fused 0xfff0 mask.
++                    AmigaRenderer interiorClip = *renderer;
++                    interiorClip.clipX = 288; interiorClip.clipWidth = 12;
++                    if (blitColumns(working, interiorClip, chipDividers, chipDividerMask,
++                            18, 1, 4 * meter, top, bottom) &&
++                        blitCopy(display->hud, working, 288, top, 304, bottom, &lastWordWrites)) {}
++                    else lastWordWrites += amigaRendererPublishHudColumn(display->hud, working,
+                         dividers_, 18, top, bottom, 4 * meter, 0xfff0);
+-                else lastWordWrites += amigaRendererCopyHudWords(display->hud, working_, stripLeft, top, stripRight, bottom, 1);
++                } else if (!blitCopy(display->hud, working, stripLeft, top, stripRight, bottom, &lastWordWrites))
++                    lastWordWrites += amigaRendererCopyHudWords(display->hud, working, stripLeft, top, stripRight, bottom, 1);
+             }
+             DW_PROFILE_PHASE(profileAmmoBase);
+         };
+diff --git a/src/platform/amiga/AmigaBlitter.cpp b/src/platform/amiga/AmigaBlitter.cpp
+index 8f2ccba7..3ca1c902 100644
+--- a/src/platform/amiga/AmigaBlitter.cpp
++++ b/src/platform/amiga/AmigaBlitter.cpp
+@@ -1,5 +1,7 @@
++#include <hardware/blit.h>
+ #include "framework/AmigaHardware.h"
+ #include "framework/Bitmap.h"
++#include "AmigaRenderer.h"
+ 
+ #include <exec/types.h>
+ inline void* operator new(__SIZE_TYPE__, void* address) noexcept { return address; }
+@@ -77,3 +79,32 @@ extern "C" int amigaBlitterSolidRect(UBYTE* destination, UWORD targetHeight,
+     AmigaHardware::blitterDrain();
+     return 1;
+ }
++
++extern "C" int amigaBlitterWords(const AmigaWordBlit* blit)
++{
++    const UBYTE* const pointers[] = {blit->a, blit->b, blit->d};
++    for (const UBYTE* pointer : pointers)
++        if ((ULONG)pointer >= 0x200000UL || ((ULONG)pointer & 1)) return 0;
++    if (!blit->d || !blit->words || blit->words > 64 || !blit->rows || blit->rows > 1024)
++        return 0;
++    // C is fetched only when the minterm depends on it; D always replaces it.
++    const UWORD minterm = blit->minterm;
++    const bool useC = ((minterm ^ (minterm >> 1)) & 0x55) != 0;
++    AmigaHardware::blitterDrain();
++    *bltcon0Pointer = (uint16_t)((blit->a ? BC0F_SRCA : 0) | (blit->b ? BC0F_SRCB : 0) |
++        (useC ? BC0F_SRCC : 0) | BC0F_DEST | minterm);
++    *bltcon1Pointer = 0;
++    *bltafwmPointer = blit->firstMask;
++    *bltalwmPointer = blit->lastMask;
++    if (blit->a) { *bltamodPointer = blit->amod; *bltaptPointer = (uint16_t*)blit->a; }
++    else *bltadatPointer = blit->adat;
++    if (blit->b) { *bltbmodPointer = blit->bmod; *bltbptPointer = (uint16_t*)blit->b; }
++    else *bltbdatPointer = blit->bdat;
++    *bltcmodPointer = blit->dmod;
++    *bltdmodPointer = blit->dmod;
++    *bltcptPointer = (uint16_t*)blit->d;
++    *bltdptPointer = (uint16_t*)blit->d;
++    *bltsizePointer = (uint16_t)(((blit->rows & 1023) << 6) | (blit->words & 63));
++    AmigaHardware::blitterWait();
++    return 1;
++}
+diff --git a/src/platform/amiga/AmigaRenderer.c b/src/platform/amiga/AmigaRenderer.c
+index ecde9662..c93c2df1 100644
+--- a/src/platform/amiga/AmigaRenderer.c
++++ b/src/platform/amiga/AmigaRenderer.c
+@@ -371,6 +371,7 @@ void amigaRendererInit(AmigaRenderer* renderer, UBYTE* game, UBYTE* hud) {
+     renderer->hud = hud;
+     renderer->gameOrigin = 0;
+     renderer->blitterEnabled = 0;
++    renderer->wordBlit = 0;
+     amigaRendererClearClipRect(renderer);
+ }
+ 
+@@ -760,6 +761,26 @@ int amigaRendererPrepareWordStamp(AmigaWordStamp* stamp, const UBYTE* pack,
+     return 1;
+ }
+ 
++/* Blit setup costs about as much as CPU-filling eight rows of both planes. */
++static int blitHudWordColumn(AmigaRenderer* renderer, unsigned word, int top,
++                             int bottom, UWORD mask, UWORD low, UWORD high) {
++    AmigaWordBlit blit;
++    unsigned plane;
++    if (!renderer->wordBlit || bottom - top < 8 || top < 0 ||
++        bottom > downwellDisplayHeight || word >= downwellBytesPerPlaneLine/2) return 0;
++    /* A is the constant mask, B the constant colour; AB + !AC keeps the rest. */
++    blit.a = 0; blit.b = 0; blit.adat = mask; blit.firstMask = blit.lastMask = 0xffff;
++    blit.amod = blit.bmod = 0; blit.dmod = downwellBytesPerPlaneLine - 2;
++    blit.words = 1; blit.rows = (UWORD)(bottom - top); blit.minterm = 0xca;
++    for (plane = 0; plane < 2; ++plane) {
++        blit.d = renderer->hud + plane*downwellPlaneBytes + top*downwellBytesPerPlaneLine + word*2;
++        blit.bdat = plane ? high : low;
++        /* The CPU fill is idempotent, so it may follow a partial blit. */
++        if (!renderer->wordBlit(&blit)) return 0;
++    }
++    return 1;
++}
++
+ int amigaRendererDrawWordStamp(AmigaRenderer* renderer, const AmigaWordStamp* stamp, int x, int y) {
+     return amigaRendererDrawWordStampRun(renderer, stamp, x, y, 1);
+ }
+@@ -787,8 +808,10 @@ int amigaRendererDrawWordStampRun(AmigaRenderer* renderer, const AmigaWordStamp*
+         if (row <= 0 && row + (int)count - 1 >= 7) {
+             const int end = last-y < 1 ? last-y : 1;
+             const UWORD mask = stamp->runMask[7] & clip;
+-            if (mask) amigaRendererFillHudWordColumn(renderer->hud, x >> 4,
+-                row+y, end+y, mask, stamp->runLow[7], stamp->runHigh[7]);
++            if (mask && !blitHudWordColumn(renderer, x >> 4, row+y, end+y,
++                    mask, stamp->runLow[7], stamp->runHigh[7]))
++                amigaRendererFillHudWordColumn(renderer->hud, x >> 4,
++                    row+y, end+y, mask, stamp->runLow[7], stamp->runHigh[7]);
+             target += (end-row)*downwellBytesPerPlaneLine;
+             row = end-1;
+             continue;
+diff --git a/src/platform/amiga/AmigaRenderer.h b/src/platform/amiga/AmigaRenderer.h
+index 9de182e6..9d5eb9c9 100644
+--- a/src/platform/amiga/AmigaRenderer.h
++++ b/src/platform/amiga/AmigaRenderer.h
+@@ -25,6 +25,23 @@ enum {
+     downwellPlayfieldWidth = 160
+ };
+ 
++/* One aligned blitter operation, D = minterm(A, B, C) with C read from D.
++   A and B are DMA sources when non-null, otherwise the constants adat/bdat.
++   As in hardware, firstMask and lastMask apply to A (both to a one-word
++   row). Modulos are bytes added after each row. Returns 0 when declined. */
++typedef struct AmigaWordBlit {
++    const UBYTE* a;
++    const UBYTE* b;
++    UBYTE* d;
++    UWORD adat, bdat, firstMask, lastMask;
++    WORD amod, bmod, dmod;
++    UWORD words, rows;
++    UBYTE minterm;
++} AmigaWordBlit;
++typedef int (*AmigaWordBlitter)(const AmigaWordBlit*);
++/* Complete before returning. Declines anything outside Chip RAM. */
++int amigaBlitterWords(const AmigaWordBlit*);
++
+ typedef struct AmigaRenderer {
+     UBYTE* game;
+     UBYTE* hud;
+@@ -35,6 +52,8 @@ typedef struct AmigaRenderer {
+     int clipWidth;
+     int clipHeight;
+     int blitterEnabled;
++    /* HUD word-column fills; null keeps them on the CPU. */
++    AmigaWordBlitter wordBlit;
+ } AmigaRenderer;
+ 
+ void amigaRendererInit(AmigaRenderer* renderer, UBYTE* game, UBYTE* hud);
+diff --git a/src/platform/amiga/DownwellAmiga.cpp b/src/platform/amiga/DownwellAmiga.cpp
+index 2eb77560..22a26bb2 100644
+--- a/src/platform/amiga/DownwellAmiga.cpp
++++ b/src/platform/amiga/DownwellAmiga.cpp
+@@ -671,6 +671,8 @@ static void drawAmmoDigit(AmigaRenderer* renderer, int x, int y,
+ }
+ 
+ static AmigaAmmoHud ammoHud;
++static_assert(AmigaAmmoHud::chipBytes <= sceneBankBytes,
++              "gameplay's ammo gauge layers fit the scene-bank region");
+ static void redrawAmmo(AmigaRenderer* renderer, unsigned ammo, unsigned maximumAmmo, unsigned offset = 0,
+                        const downwell::AmmoGaugeRows* rows = nullptr, unsigned meterOffset = 0) {
+     ammoHud.draw(renderer, activeHudPack, activeHudPackEnd, ammo, maximumAmmo, offset, rows, meterOffset);
+@@ -2066,6 +2068,7 @@ __attribute__((noinline)) static int runDownwell(void) {
+                     platform.publish(splashBlankList);
+                     platform.waitVblank();
+                     AmigaHardware::blitterDrain();
++                    ammoHud.useChipLayers(nullptr, nullptr);
+                     if (!loadFrontBank(platform)) break;
+                     if (presentedScene == AmigaScene::menu &&
+                         !gardenScene.prepare(menuDrawList, frontPack, frontPackEnd))
+@@ -2138,8 +2141,10 @@ __attribute__((noinline)) static int runDownwell(void) {
+                 else if (presentedScene != AmigaScene::styleSelect &&
+                          presentationChanged) {
+                     // Retire intro DMA before reusing its cache as display rings.
+-                    // Front art is not resident in gameplay; its region is free.
++                    // Front art is not resident in gameplay; its region is free
++                    // and holds the ammo gauge's blitter layers instead.
+                     frontPack = frontPackEnd = nullptr;
++                    ammoHud.useChipLayers(sceneBank, amigaBlitterWords);
+                     splashBlankList.reset();
+                     splashBlankList.move(bplcon0, 0);
+                     for (unsigned channel = 0; channel < 8; ++channel)
+diff --git a/tests/platform/amiga/AmigaRendererTest.cpp b/tests/platform/amiga/AmigaRendererTest.cpp
+index ab2ca4ed..3bd6ab06 100644
+--- a/tests/platform/amiga/AmigaRendererTest.cpp
++++ b/tests/platform/amiga/AmigaRendererTest.cpp
+@@ -29,6 +29,37 @@ int amigaBlitterClearPlanar(UBYTE*, UWORD, UWORD) {
+ }
+ int amigaBlitterSolidRect(UBYTE*, UWORD, UWORD, UWORD, UWORD, UWORD, UWORD) { return 0; }
+ 
++// Hardware word-blit semantics: per-word minterm over A, B and C (= D), with
++// the first/last word masks applied to A whether it is fetched or constant.
++static unsigned emulatedWordBlits;
++static int emulateWordBlit(const AmigaWordBlit* blit) {
++    auto load = [](const UBYTE* at) { return UWORD((at[0] << 8) | at[1]); };
++    const UBYTE* a = blit->a;
++    const UBYTE* b = blit->b;
++    UBYTE* d = blit->d;
++    for (unsigned row = 0; row < blit->rows; ++row) {
++        for (unsigned word = 0; word < blit->words; ++word) {
++            UWORD av = a ? load(a) : blit->adat;
++            if (word == 0) av &= blit->firstMask;
++            if (word + 1 == blit->words) av &= blit->lastMask;
++            const UWORD bv = b ? load(b) : blit->bdat, cv = load(d);
++            UWORD result = 0;
++            for (unsigned term = 0; term < 8; ++term)
++                if (blit->minterm & (1u << term))
++                    result |= UWORD((term & 4 ? av : ~av) & (term & 2 ? bv : ~bv) & (term & 1 ? cv : ~cv));
++            d[0] = UBYTE(result >> 8); d[1] = UBYTE(result);
++            if (a) a += 2;
++            if (b) b += 2;
++            d += 2;
++        }
++        if (a) a += blit->amod;
++        if (b) b += blit->bmod;
++        d += blit->dmod;
++    }
++    ++emulatedWordBlits;
++    return 1;
++}
++
+ namespace {
+ 
+ void require(bool condition, const char* message) {
+@@ -1180,8 +1211,12 @@ int main(int argc, char** argv) {
+                     }
+             }
+     }
+-    {
+-        AmigaAmmoHud retained;
++    // CPU composition in Fast RAM, then blitter composition in Chip layers.
++    for (unsigned blitter = 0; blitter < 2; ++blitter) {
++        static AmigaAmmoHud retained;
++        std::vector<UBYTE> chipLayers(AmigaAmmoHud::chipBytes, 0xc3);
++        retained.useChipLayers(blitter ? chipLayers.data() : nullptr, emulateWordBlit);
++        const unsigned blitsBefore = emulatedWordBlits;
+         downwell::AmmoGaugeRows rows;
+         unsigned previousDigits = 1;
+         auto fullRedraw = [&](unsigned ammo, unsigned cap, unsigned offset, unsigned meter) {
+@@ -1299,6 +1334,9 @@ int main(int argc, char** argv) {
+                     fullRedraw(ammo, 8, 0, to);
+                     require(actualHud == expectedHud, "all gauge jiggle pairs preserve full reconstruction");
+                 }
++        require(blitter ? emulatedWordBlits > blitsBefore + 1000 : emulatedWordBlits == blitsBefore,
++                "only the Chip-layer gauge composes and publishes with the blitter");
++        retained.useChipLayers(nullptr, nullptr);
+     }
+     amigaRendererClearClipRect(&actualRenderer);
+     amigaRendererClearClipRect(&expectedRenderer);

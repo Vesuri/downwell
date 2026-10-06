@@ -1,0 +1,724 @@
+diff --git a/Makefile b/Makefile
+index 09a698f8..8ebfb06b 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1972,6 +1972,14 @@ $(AMIGA_RENDERER_TEST_TARGET): $(AMIGA_RENDERER_TEST_SOURCES) src/platform/amiga
+ 	@mkdir -p $(@D)
+ 	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $(AMIGA_RENDERER_TEST_SOURCES)
+ 
++.PHONY: test-amiga-terrain-rows
++test: test-amiga-terrain-rows
++test-amiga-terrain-rows: build/amiga-terrain-row-owner-test
++	./build/amiga-terrain-row-owner-test
++build/amiga-terrain-row-owner-test: tests/platform/amiga/AmigaTerrainRowOwnerTest.cpp src/platform/amiga/AmigaTerrainRowOwner.h
++	@mkdir -p build
++	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
++
+ .PHONY: test-amiga-terrain-batch
+ test: test-amiga-terrain-batch
+ test-amiga-terrain-batch: generate-amiga-game build/amiga-terrain-batch-test build/amiga-terrain-painter-test
+diff --git a/amiga/Makefile b/amiga/Makefile
+index 870b8cb8..a2a1db6b 100644
+--- a/amiga/Makefile
++++ b/amiga/Makefile
+@@ -44,6 +44,7 @@ REFERENCE_FIELD_BANK ?= 0
+ REFERENCE_EMPTY_TERRAIN ?= 0
+ REFERENCE_ROOM_TERRAIN ?= 0
+ REFERENCE_INITIAL_TERRAIN ?= 0
++REFERENCE_TERRAIN_ROWS ?= 0
+ TABLE_CONTACT_ATAN ?= 1
+ RETAIN_HEALTH_HUD ?= 1
+ AMMO_DAMAGE_RANGE ?= 1
+@@ -253,6 +254,9 @@ endif
+ ifeq ($(REFERENCE_INITIAL_TERRAIN),1)
+ CFLAGS += -DDOWNWELL_REFERENCE_INITIAL_TERRAIN
+ endif
++ifeq ($(REFERENCE_TERRAIN_ROWS),1)
++CFLAGS += -DDOWNWELL_REFERENCE_TERRAIN_ROWS
++endif
+ ifeq ($(TABLE_CONTACT_ATAN),0)
+ CFLAGS += -DDOWNWELL_PORTABLE_CONTACT_ATAN
+ endif
+@@ -450,6 +454,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
+ 	@printf '%s\n' '$(REFERENCE_EMPTY_TERRAIN)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_ROOM_TERRAIN)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_INITIAL_TERRAIN)' >> $@.tmp
++	@printf '%s\n' '$(REFERENCE_TERRAIN_ROWS)' >> $@.tmp
+ 	@printf '%s\n' '$(DRAW_ORDER_AUDIT)' >> $@.tmp
+ 	@printf '%s\n' '$(LOCAL_DRAW_CAPTURE)' >> $@.tmp
+ 	@printf '%s\n' '$(AMMO_FACTORED)' >> $@.tmp
+diff --git a/amiga/profile.sh b/amiga/profile.sh
+index c285b09a..ef68f621 100644
+--- a/amiga/profile.sh
++++ b/amiga/profile.sh
+@@ -110,6 +110,7 @@ restore() {
+   unset REFERENCE_EMPTY_TERRAIN
+   unset REFERENCE_ROOM_TERRAIN
+   unset REFERENCE_INITIAL_TERRAIN
++  unset REFERENCE_TERRAIN_ROWS
+   unset DRAW_CACHE_AUDIT
+   unset DRAW_ORDER_AUDIT
+   unset LOCAL_DRAW_CAPTURE
+diff --git a/src/core/AreaOneBuilder.cpp b/src/core/AreaOneBuilder.cpp
+index ca15ee9e..9440fa0f 100644
+--- a/src/core/AreaOneBuilder.cpp
++++ b/src/core/AreaOneBuilder.cpp
+@@ -209,14 +209,16 @@ bool AreaOneBuilder::emitPreparedPattern(const BuilderPatternPack& patterns,
+     DeferredCreateInstance terrainCommand{60,0,0};
+     auto row=[&](const std::uint8_t* p,int rowY){
+         if(!p)return false;
++        const std::uint8_t* previous=nullptr;
+         while(*p!=255){
+             if(*p){
+                 if(!emitEventCell(char(p[0]),(int(p[1])-32)*16,rowY,reversed,
+                                   random,emit,context,terrainCommand))return false;
+                 p+=2;
+             }else{
+-                const PreparedTerrain batch(p,rowY,random,specialObjectsGenerated_);
++                const PreparedTerrain batch(p,rowY,random,specialObjectsGenerated_,patterns.preparedOccupancy(p),previous);
+                 if(!preparedTerrainEmitter_(preparedTerrainContext_?preparedTerrainContext_:context,batch,emit)||!batch.completed())return false;
++                previous=batch.occupancy;
+                 p=batch.end();
+             }
+         }
+diff --git a/src/core/AreaOneBuilder.h b/src/core/AreaOneBuilder.h
+index 1f626334..2cb2e52d 100644
+--- a/src/core/AreaOneBuilder.h
++++ b/src/core/AreaOneBuilder.h
+@@ -42,18 +42,21 @@ public:
+         GameMakerRandom& random_;
+         std::uint32_t& special_;
+         mutable bool started_=false, completed_=false;
+-        PreparedTerrain(const std::uint8_t* p,int row,GameMakerRandom& random,std::uint32_t& special)
+-            :random_(random),special_(special),data(p),y(row){}
++        PreparedTerrain(const std::uint8_t* p,int row,GameMakerRandom& random,std::uint32_t& special,
++                        const std::uint8_t* occupancy,const std::uint8_t* previous)
++            :random_(random),special_(special),data(p),y(row),occupancy(occupancy),previous(previous){}
+     public:
+         const std::uint8_t* const data;
+         const int y;
++        const std::uint8_t* const occupancy;
++        const std::uint8_t* const previous;
+         unsigned draws()const{return data[1];}
+         unsigned count()const{return data[3];}
+         unsigned wordCount()const{return data[4];}
+         unsigned platforms()const{return data[5];}
+         const std::uint8_t* creates()const{return data+6;}
+         const std::uint8_t* words()const{return creates()+count()*2;}
+-        const std::uint8_t* end()const{return words()+wordCount()*4;}
++        const std::uint8_t* end()const{return words()+wordCount()*4+2;}
+         bool completed()const{return completed_;}
+         // An admitted backend owns the complete publication transaction.
+         // Consume only after admission; complete only after all indices and
+diff --git a/src/core/BuilderPatternPack.cpp b/src/core/BuilderPatternPack.cpp
+index 8726e914..4a891128 100644
+--- a/src/core/BuilderPatternPack.cpp
++++ b/src/core/BuilderPatternPack.cpp
+@@ -56,10 +56,21 @@ BuilderPatternPack::BuilderPatternPack(const std::uint8_t* bytes,
+     }
+     preparedOffsets_ = bytes + extension + 4;
+     preparedPrograms_ = preparedOffsets_ + tableBytes;
+-    const std::size_t programBytes = size - (preparedPrograms_ - bytes);
+-    if (u32(preparedOffsets_ + tableBytes - 4) != programBytes) {
++    const std::size_t available = size - (preparedPrograms_ - bytes);
++    const std::size_t programBytes = u32(preparedOffsets_ + tableBytes - 4);
++    if (programBytes>available || available-programBytes<8) {
+         error_ = BuilderPatternPackError::wrongSize; return;
+     }
++    const auto* bank=preparedPrograms_+programBytes;
++    const unsigned bankRows=u32(bank+4);
++    if(bank[0]!='D'||bank[1]!='W'||bank[2]!='R'||bank[3]!='B'||
++       !bankRows||bankRows>65535){
++        error_=BuilderPatternPackError::badPattern;return;
++    }
++    if(available-programBytes-8!=std::size_t(bankRows)*128){
++        error_=BuilderPatternPackError::wrongSize;return;
++    }
++    preparedRows_=bank+8;
+     if (u32(preparedOffsets_)) {
+         error_ = BuilderPatternPackError::badPattern; return;
+     }
+@@ -68,13 +79,14 @@ BuilderPatternPack::BuilderPatternPack(const std::uint8_t* bytes,
+         if (start>=end || end>programBytes) { error_=BuilderPatternPackError::badPattern; return; }
+         const auto* p=preparedPrograms_+start;
+         const auto* limit=preparedPrograms_+end;
++        std::uint8_t prefix[128]{};
+         while(p<limit && *p!=255) {
+             if (*p) {
+                 if (limit-p<2 || p[0]<32 || p[0]>126 || p[1]>=128) break;
+                 p+=2;
+             } else {
+                 if (limit-p<6) break;
+-                const unsigned creates=p[3], words=p[4], length=6+creates*2+words*4;
++                const unsigned creates=p[3], words=p[4], length=8+creates*2+words*4;
+                 if (unsigned(limit-p)<length) break;
+                 unsigned draws=0, borders=0, platforms=0;
+                 for(unsigned i=0;i<creates;++i){
+@@ -86,14 +98,20 @@ BuilderPatternPack::BuilderPatternPack(const std::uint8_t* bytes,
+                 bool good=true;
+                 for(unsigned i=0;i<words;++i){
+                     const auto* word=p+6+creates*2+i*4;
+-                    if(word[0]>=128 || (word[0]&1) || !word[1] || word[1]>3)good=false;
++                    if(word[0]>=128 || (word[0]&1) || !word[1] || word[1]>3){good=false;break;}
+                     for(unsigned half=0;half<2;++half){
+                         const unsigned value=word[2+half],flags=value&63,walls=value>>6;
+                         if(bool(value)!=bool(word[1]&(1<<half)) ||
+                            (value && flags!=19 && flags!=34 && flags!=51) ||
+                            ((walls!=0)!=((flags&1)!=0)) || walls>creates)good=false;
++                        const unsigned old=prefix[word[0]+half],combined=(old>>6)+walls;
++                        if(combined>3)good=false;
++                        prefix[word[0]+half]=((old|value)&63)|(combined<<6);
+                     }
+                 }
++                const unsigned rowId=u16(p+length-2);
++                if(rowId>=bankRows)good=false;
++                else for(unsigned i=0;i<128;++i)if(prefix[i]!=preparedRows_[rowId*128+i])good=false;
+                 if(!good)break;
+                 p+=length;
+             }
+diff --git a/src/core/BuilderPatternPack.h b/src/core/BuilderPatternPack.h
+index 8f4e08c2..24265f30 100644
+--- a/src/core/BuilderPatternPack.h
++++ b/src/core/BuilderPatternPack.h
+@@ -27,7 +27,7 @@ struct PackedBuilderPattern {
+ 
+ class BuilderPatternPack {
+ public:
+-    static constexpr std::uint16_t formatVersion = 4;
++    static constexpr std::uint16_t formatVersion = 5;
+     static constexpr std::uint32_t manifestSchema = 3;
+     static constexpr std::uint64_t sourceHashPrefix = 0xe00a94be5faf7dc0ULL;
+     static constexpr std::size_t headerSize = 32;
+@@ -56,12 +56,18 @@ public:
+     const std::uint8_t* preparedRow(const PackedBuilderPattern& pattern,
+                                   unsigned row, bool reversed) const;
+     const std::uint8_t* preparedPillars(bool reversed) const;
++    // Cumulative fixed occupancy through this segment, excluding event cells.
++    const std::uint8_t* preparedOccupancy(const std::uint8_t* segment)const{
++        const auto* id=segment+6+segment[3]*2+segment[4]*4;
++        return preparedRows_+(unsigned(id[0])+(unsigned(id[1])<<8))*128;
++    }
+ 
+ private:
+     const std::uint8_t* bytes_ = nullptr;
+     std::size_t patternsOffset_ = 0, rowsOffset_ = 0, cellsOffset_ = 0;
+     const std::uint8_t* preparedOffsets_ = nullptr;
+     const std::uint8_t* preparedPrograms_ = nullptr;
++    const std::uint8_t* preparedRows_ = nullptr;
+     std::uint32_t patternCount_ = 0, rowCount_ = 0, cellCount_ = 0;
+     BuilderPatternPackError error_ = BuilderPatternPackError::tooShort;
+ };
+diff --git a/src/platform/amiga/AmigaGameplayGeneration.cpp b/src/platform/amiga/AmigaGameplayGeneration.cpp
+index 26861947..97c4d9cf 100644
+--- a/src/platform/amiga/AmigaGameplayGeneration.cpp
++++ b/src/platform/amiga/AmigaGameplayGeneration.cpp
+@@ -36,12 +36,20 @@ bool AmigaGameplayGeneration::createPrepared(void* opaque,const downwell::AreaOn
+     // Occupancy and landing candidates are one publication, in the source
+     // segment's order relative to event Creates. No later segment is exposed.
+     const unsigned row=unsigned(batch.y)>>4;
+-    auto* destination=self.index_.cells+row*AmigaTerrainIndex::columns;
++    if(self.index_.cells.admits(row,batch.previous,batch.words(),batch.wordCount())){
++        // Event changes remain individual overrides, merged with this exact
++        // next prefix without copying or exposing later fixed terrain.
++        if(!self.index_.cells.publish(row,batch.occupancy,batch.previous,batch.words(),batch.wordCount()))return false;
++        self.index_.nextLanding.insertPreparedWords(batch.words(),batch.wordCount(),row);
++        if(!self.tiles_.appendPrepared(batch))return false;
++        batch.completePublication();return true;
++    }
++    auto destination=self.index_.cells.writeRow(row);
+     auto* landing=self.index_.nextLanding.publicationRow(row);
+     const std::uint16_t bit=std::uint16_t(0x8000u>>(row&15));
+     const auto* word=batch.words();
+     for(unsigned i=0;i<batch.wordCount();++i,word+=4){
+-        auto* target=destination+word[0];
++        auto target=destination+word[0];
+         if(!(target[0]|target[1])){
+             target[0]=word[2];target[1]=word[3];
+         }else for(unsigned half=0;half<2;++half){
+diff --git a/src/platform/amiga/AmigaTerrain.cpp b/src/platform/amiga/AmigaTerrain.cpp
+index b4d421dc..eee95245 100644
+--- a/src/platform/amiga/AmigaTerrain.cpp
++++ b/src/platform/amiga/AmigaTerrain.cpp
+@@ -342,7 +342,7 @@ bool addContact(AmigaTerrainIndex& index, int objectId, int x, int y, bool boxFl
+     if (objectId != 60 && objectId != 92 && objectId != 293) return true;
+     unsigned cell;
+     if (!contactCell(x, y, cell)) return false;
+-    auto& flags = index.cells[cell];
++    auto& flags = index.cells.write(cell);
+     if (objectId == 60 && (flags & wallContactMask) != wallContactMask) {
+         flags += wallContactUnit;
+         return true;
+@@ -357,7 +357,7 @@ bool indexAdd(AmigaTerrainIndex& index, int x, int y, unsigned flags,
+         y < 0 || y >= AmigaTerrainIndex::rows * 16) return false;
+     const unsigned cell = (unsigned(y) >> 4) * AmigaTerrainIndex::columns +
+         (unsigned(x - AmigaTerrainIndex::minX) >> 4);
+-    index.cells[cell] |= flags;
++    index.cells.write(cell) |= flags;
+     if (addedCell) *addedCell = cell;
+     return true;
+ }
+@@ -386,7 +386,7 @@ bool amigaBuildTerrainIndex(const AmigaTerrainCollisionContext& context,
+         index.extraContacts.clear();
+         index.wallContactsComplete=true;
+         index.mutableWallOccupancy=true;
+-        for(auto& cell:index.cells)cell=0;
++        index.cells.clear();
+         index.nextLanding.clear();
+         return true;
+     }
+@@ -400,7 +400,7 @@ bool amigaReconstructTerrainIndex(const AmigaTerrainCollisionContext& context,
+     // Reconstructed pattern occupancy is not evidence of actual Create events.
+     index.wallContactsComplete = context.fragmentCount==0;
+     index.mutableWallOccupancy = context.fragmentCount==0 && !(context.rooms && context.room);
+-    for (unsigned i = 0; i < sizeof(index.cells); ++i) index.cells[i] = 0;
++    index.cells.clear();
+     if (context.rooms && context.room) {
+         for (unsigned i = 0; i < context.room->instanceCount; ++i) {
+             downwell::PackedRoomInstance instance;
+@@ -496,7 +496,7 @@ unsigned amigaTerrainContacts(const AmigaTerrainIndex& index, int objectId, int
+ 
+ unsigned amigaTerrainContactCount(const AmigaTerrainIndex& index) {
+     unsigned count = index.extraContacts.size();
+-    for (unsigned flags : index.cells) count += flags / wallContactUnit + ((flags & breakableCell) != 0);
++    for (unsigned i=0;i<index.cells.size();++i){const unsigned flags=index.cells[i];count += flags / wallContactUnit + ((flags & breakableCell) != 0);}
+     return count;
+ }
+ 
+@@ -538,10 +538,10 @@ bool amigaPublishPreparedTerrain(AmigaTerrainIndex& index,AmigaTerrainTiles& til
+     static_assert(solidCell==1 && landingCell==2 && wallCell==16 && platformCell==32,
+                   "prepared occupancy resource contract");
+     const unsigned row=unsigned(batch.y)>>4;
+-    auto* destination=index.cells+row*AmigaTerrainIndex::columns;
++    auto destination=index.cells.writeRow(row);
+     const auto* word=batch.words();
+     for(unsigned i=0;i<batch.wordCount();++i,word+=4){
+-        auto* target=destination+word[0];
++        auto target=destination+word[0];
+         if(!(target[0]|target[1])){
+             // Newly generated space already has its occupancy and contact
+             // counts composed offline. No runtime cell classification/merge.
+@@ -575,7 +575,7 @@ AmigaTerrainRunIndex::AmigaTerrainRunIndex(AmigaTerrainIndex& index,int object,
+ }
+ bool AmigaTerrainRunIndex::append(){
+     if(!remaining_)return false;
+-    auto& cell=index_.cells[row_*AmigaTerrainIndex::columns+column_];
++    auto& cell=index_.cells.write(row_*AmigaTerrainIndex::columns+column_);
+     if(object_==60){
+         if((cell&wallContactMask)!=wallContactMask)cell+=wallContactUnit;
+         else if(!index_.extraContacts.append(60,x_,y_))return false;
+@@ -590,7 +590,7 @@ bool AmigaTerrainRunIndex::admitSpan(const AmigaTerrainTiles& tiles)const{
+     if(!remaining_)return false;
+     if(object_==93)return remaining_<=AmigaTerrainTiles::capacity-tiles.size();
+     unsigned saturated=0;
+-    const unsigned char* cell=&index_.cells[row_*AmigaTerrainIndex::columns+column_];
++    auto cell=index_.cells.readRow(row_)+column_;
+     for(unsigned i=0;i<remaining_;++i,cell+=step_)saturated+=(*cell&wallContactMask)==wallContactMask;
+     return saturated<=index_.extraContacts.capacity()-index_.extraContacts.size();
+ }
+@@ -600,7 +600,7 @@ bool AmigaTerrainRunIndex::publishSpan(AmigaTerrainTiles& tiles){
+     // Locals: byte stores through the cell pointer would otherwise reload members.
+     const unsigned count=remaining_;
+     const int step=step_;
+-    unsigned char* cell=&index_.cells[row_*AmigaTerrainIndex::columns+column_];
++    auto cell=index_.cells.writeRow(row_)+column_;
+     const unsigned char flags=static_cast<unsigned char>(flags_);
+     if(object_==60){
+         int x=x_;
+@@ -622,7 +622,7 @@ bool amigaRemoveTerrainWall(AmigaTerrainIndex& index, int x, int y) {
+         !contactCell(x, y, cell)) return false;
+     // Overflow walls exist only while the cell count is saturated; take them first.
+     if (index.extraContacts.removeOne(60,x,y)) return true;
+-    auto& flags=index.cells[cell];
++    auto& flags=index.cells.write(cell);
+     if (!(flags & wallContactMask)) return false;
+     flags -= wallContactUnit;
+     if (flags & wallContactMask) return true;
+diff --git a/src/platform/amiga/AmigaTerrain.h b/src/platform/amiga/AmigaTerrain.h
+index 8dbc4177..a28dd6cb 100644
+--- a/src/platform/amiga/AmigaTerrain.h
++++ b/src/platform/amiga/AmigaTerrain.h
+@@ -7,6 +7,7 @@
+ #include "core/RoomPack.h"
+ #include "core/TerrainWallContacts.h"
+ #include "AmigaLandingIndex.h"
++#include "AmigaTerrainRowOwner.h"
+ 
+ class GameplayWorld;
+ using AmigaPortRuntime = GameplayWorld;
+@@ -161,7 +162,7 @@ struct AmigaTerrainIndex {
+     enum { columns = 128, rows = 512, minX = -512, wallAppearanceFlags = 24 };
+     // Occupancy flags in bits 0-5. Bits 6-7 count coincident wall (60)
+     // Creates up to three; the breakable flag stands for the first box (92).
+-    unsigned char cells[columns * rows];
++    AmigaTerrainRowOwner cells;
+     AmigaLandingIndex nextLanding; // candidate bits; row+1/zero query encoding
+     // Contacts a cell cannot count: further coincident walls and boxes, boxes
+     // without a breakable flag, and every object 293.
+diff --git a/src/platform/amiga/AmigaTerrainPainter.cpp b/src/platform/amiga/AmigaTerrainPainter.cpp
+index 9e2ccfcb..4515a247 100644
+--- a/src/platform/amiga/AmigaTerrainPainter.cpp
++++ b/src/platform/amiga/AmigaTerrainPainter.cpp
+@@ -33,10 +33,11 @@ constexpr bool useTerrainBatch=true;
+ #endif
+ static ULONG wallRowBits(const AmigaTerrainIndex& index,int row,int column,unsigned count){
+     if(row<0 || row>=AmigaTerrainIndex::rows)return 0;
++    const auto cells=index.cells.readRow(unsigned(row));
+     ULONG bits=0,bit=1;
+     for(unsigned i=0;i<count;++i,++column,bit<<=1)
+         if(column>=0 && column<AmigaTerrainIndex::columns &&
+-            (index.cells[row*AmigaTerrainIndex::columns+column]&AmigaTerrainIndex::wallAppearanceFlags))bits|=bit;
++            (cells[column]&AmigaTerrainIndex::wallAppearanceFlags))bits|=bit;
+     return bits;
+ }
+ static void paintIndexedBatch(const AmigaTerrainIndex& index,int viewX,int viewY){
+diff --git a/tests/core/BuilderPatternPackTest.cpp b/tests/core/BuilderPatternPackTest.cpp
+index c4d29e8a..d70376d7 100644
+--- a/tests/core/BuilderPatternPackTest.cpp
++++ b/tests/core/BuilderPatternPackTest.cpp
+@@ -147,6 +147,7 @@ int main(int argc, char** argv) {
+                 }
+                 const auto* p=pack.preparedRow(pattern,y,reversed);
+                 require(p,"prepared row exists");
++                unsigned prefix[128]={};
+                 while(*p!=255){
+                     if(*p){actual.push_back(0x10000u|(unsigned(p[0])<<8)|p[1]);p+=2;continue;}
+                     unsigned consumed=0, flags[128]={},walls[128]={},seen[128]={};
+@@ -169,7 +170,12 @@ int main(int argc, char** argv) {
+                         }
+                     }
+                     for(unsigned col=0;col<128;++col)require(bool(flags[col])==bool(seen[col]),"every landing column prepared once");
+-                    p=words+p[4]*4;
++                    const auto* prepared=pack.preparedOccupancy(p);
++                    for(unsigned col=0;col<128;++col){
++                        prefix[col]=((prefix[col]|flags[col])&63)|(((prefix[col]>>6)+walls[col])<<6);
++                        require(prepared[col]==prefix[col],"immutable prefix exactly matches fixed Creates before this boundary");
++                    }
++                    p=words+p[4]*4+2;
+                 }
+                 require(actual==expected,"prepared row preserves source order, draw counts and border effects");
+             }
+@@ -197,6 +203,23 @@ int main(int argc, char** argv) {
+     require(badRange.error() == downwell::BuilderPatternPackError::badPattern,
+             "cell ranges are validated before access");
+     checkLookup(badRange);
++    // A bank row is trusted by native readers only after validating both its
++    // index and its complete cumulative contents against the segment words.
++    require(pack.pattern(0,pattern),"first pattern exists for corruption tests");
++    const auto* segment=pack.preparedRow(pattern,0,false);
++    while(*segment && *segment!=255)segment+=2;
++    require(*segment==0,"first row has a fixed segment");
++    const auto indexOffset=segment-bytes.data()+6+segment[3]*2+segment[4]*4;
++    damaged=bytes;
++    damaged[indexOffset]=damaged[indexOffset+1]=255;
++    require(!downwell::BuilderPatternPack(damaged.data(),damaged.size()).valid(),
++            "out-of-bank prefix index rejected");
++    damaged=bytes;
++    damaged[pack.preparedOccupancy(segment)-bytes.data()]^=1;
++    require(!downwell::BuilderPatternPack(damaged.data(),damaged.size()).valid(),
++            "mismatched immutable prefix rejected");
++    require(!downwell::BuilderPatternPack(bytes.data(),bytes.size()-1).valid(),
++            "truncated immutable bank rejected");
+     damaged = bytes;
+     damaged.push_back(0);
+     downwell::BuilderPatternPack trailing(damaged.data(), damaged.size());
+diff --git a/tests/platform/amiga/AmigaLiveTerrainTest.cpp b/tests/platform/amiga/AmigaLiveTerrainTest.cpp
+index f69a3b4e..8b41f37e 100644
+--- a/tests/platform/amiga/AmigaLiveTerrainTest.cpp
++++ b/tests/platform/amiga/AmigaLiveTerrainTest.cpp
+@@ -22,7 +22,7 @@ void verifyPreparedTerrainRuns(){
+     static AmigaTerrainIndex scalar,prepared;
+     const AmigaTerrainCollisionContext empty{nullptr,nullptr,nullptr,nullptr,0,nullptr};
+     auto compare=[&](int row){
+-        require(std::equal(std::begin(scalar.cells),std::end(scalar.cells),std::begin(prepared.cells)),
++        for(unsigned i=0;i<scalar.cells.size();++i)require(scalar.cells[i]==prepared.cells[i],
+             "prepared run preserves every occupancy cell at each publication");
+         require(amigaTerrainContactCount(scalar)==amigaTerrainContactCount(prepared),"prepared contact multiplicity");
+         for(unsigned x=0;x<128;++x)for(int y:{0,row,row+1,511})if(y<512)
+@@ -49,8 +49,8 @@ void verifyPreparedTerrainRuns(){
+             require(scalarTiles.append(downwell::DeferredCreateInstance{object,x+int(cell)*step,y}),"scalar tiles");
+         AmigaTerrainRunIndex whole(span,object,x,y,step,count);
+         require(whole.admitSpan(spanTiles)&&whole.publishSpan(spanTiles)&&!whole.ready(),"span publishes");
+-        require(std::equal(std::begin(span.cells),std::end(span.cells),std::begin(scalar.cells))&&
+-                !std::memcmp(&span.nextLanding,&scalar.nextLanding,sizeof(AmigaLandingIndex))&&
++        for(unsigned i=0;i<scalar.cells.size();++i)require(scalar.cells[i]==span.cells[i],"span occupancy equals scalar");
++        require(!std::memcmp(&span.nextLanding,&scalar.nextLanding,sizeof(AmigaLandingIndex))&&
+                 span.extraContacts.size()==scalar.extraContacts.size(),"span equals per-cell publication");
+         require(spanTiles.size()==scalarTiles.size(),"span tiles");
+         for(unsigned id=1;id<=spanTiles.size();++id)
+@@ -690,7 +690,7 @@ int main(int argc, char** argv) {
+                 amigaAddTerrainObject(boundary.index, 113, 5, -9),
+             "duplicate terrain and non-terrain Create events are safe");
+     // Bits 6-7 count the duplicate's contact; occupancy flags stay unchanged.
+-    for (unsigned cell = 0; cell < sizeof(snapshot.cells); ++cell)
++    for (unsigned cell = 0; cell < snapshot.cells.size(); ++cell)
+         require((snapshot.cells[cell] & 63) == (boundary.index.cells[cell] & 63) &&
+                     snapshot.nextLanding[cell] == boundary.index.nextLanding[cell],
+                 "duplicates do not disturb the collision map");
+diff --git a/tests/platform/amiga/AmigaTerrainOwnershipTest.cpp b/tests/platform/amiga/AmigaTerrainOwnershipTest.cpp
+index fe2a0739..7eb0a711 100644
+--- a/tests/platform/amiga/AmigaTerrainOwnershipTest.cpp
++++ b/tests/platform/amiga/AmigaTerrainOwnershipTest.cpp
+@@ -223,8 +223,8 @@ void requireWallsMatchGrid(Scene& reference,Scene& native){
+ // Backend terrain must not depend on the Create path: native runs publish
+ // spans directly, while the reference goes through every world Create.
+ void requireSameBackendTerrain(const Scene& reference,const Scene& other){
+-    require(std::equal(std::begin(reference.index.cells),std::end(reference.index.cells),std::begin(other.index.cells)),
+-        "occupancy cells and contact counts agree");
++    for(unsigned i=0;i<reference.index.cells.size();++i)
++        require(reference.index.cells[i]==other.index.cells[i],"occupancy cells and contact counts agree");
+     require(!std::memcmp(&reference.index.nextLanding,&other.index.nextLanding,sizeof(AmigaLandingIndex)),
+         "landing candidates agree");
+     require(reference.index.extraContacts.size()==other.index.extraContacts.size(),"overflow contacts agree");
+@@ -243,7 +243,7 @@ int main(int argc,char** argv){
+     {
+         auto actual=std::make_unique<AmigaTerrainIndex>();
+         auto oracle=std::make_unique<AmigaTerrainIndex>();
+-        for(auto& cell:actual->cells)cell=255;
++        for(unsigned i=0;i<actual->cells.size();++i)actual->cells.write(i)=255;
+         for(unsigned column=0;column<128;++column)
+             for(unsigned row=0;row<512;++row)actual->nextLanding.insert(column,row);
+         require(actual->extraContacts.append(60,160,32),"dirty reset contact");
+@@ -252,7 +252,8 @@ int main(int argc,char** argv){
+         const AmigaTerrainCollisionContext empty{};
+         require(amigaBuildTerrainIndex(empty,*actual)&&amigaReconstructTerrainIndex(empty,*oracle),
+             "empty terrain reset and reconstruction succeed");
+-        require(std::memcmp(actual->cells,oracle->cells,sizeof(actual->cells))==0&&
++        bool same=true;for(unsigned i=0;i<actual->cells.size();++i)same&=actual->cells[i]==oracle->cells[i];
++        require(same&&
+             actual->extraContacts.size()==oracle->extraContacts.size()&&
+             actual->wallContactsComplete==oracle->wallContactsComplete&&
+             actual->mutableWallOccupancy==oracle->mutableWallOccupancy,"empty terrain ownership agrees");
+@@ -262,7 +263,8 @@ int main(int argc,char** argv){
+         require(amigaAddTerrainObject(*actual,60,160,32)&&amigaAddTerrainObject(*oracle,60,160,32)&&
+             amigaAddTerrainObject(*actual,93,176,48)&&amigaAddTerrainObject(*oracle,93,176,48),
+             "source Creates publish after reset");
+-        require(std::memcmp(actual->cells,oracle->cells,sizeof(actual->cells))==0&&
++        same=true;for(unsigned i=0;i<actual->cells.size();++i)same&=actual->cells[i]==oracle->cells[i];
++        require(same&&
+             actual->nextLanding.next(42,0)==oracle->nextLanding.next(42,0),"reset preserves later publication");
+     }
+     if(argc<5){std::cerr<<"usage: rooms objects patterns sprites\n";return 2;}
+diff --git a/tests/platform/amiga/AmigaTerrainPainterTest.cpp b/tests/platform/amiga/AmigaTerrainPainterTest.cpp
+index efb6f64a..94e5e628 100644
+--- a/tests/platform/amiga/AmigaTerrainPainterTest.cpp
++++ b/tests/platform/amiga/AmigaTerrainPainterTest.cpp
+@@ -20,7 +20,7 @@ int main(int argc,char** argv){
+     static AmigaTerrainIndex index;
+     unsigned seed=17,cases=0,directCases=0;
+     auto next=[&](){seed=seed*1664525+1013904223;return seed;};
+-    for(auto& cell:index.cells)cell=next()>>24;
++    for(unsigned i=0;i<index.cells.size();++i)index.cells.write(i)=next()>>24;
+     std::vector<UBYTE> scratch(downwellTerrainBatchBytes);
+     downwell::RoomPack rooms(nullptr,0);
+     downwell::PackedRoom room{};
+diff --git a/tools/generate-builder-pattern-pack.py b/tools/generate-builder-pattern-pack.py
+index a893cf75..c7a990d7 100755
+--- a/tools/generate-builder-pattern-pack.py
++++ b/tools/generate-builder-pattern-pack.py
+@@ -12,7 +12,7 @@ from pathlib import Path
+ 
+ 
+ MAGIC = b"DWBP"
+-VERSION = 4
++VERSION = 5
+ MANIFEST_SCHEMA = 3
+ SOURCE_SHA256 = "c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8"
+ AREA_ONE_START = 1
+@@ -209,12 +209,37 @@ def build_pack(manifest, start_source, main_source, right_source, shop_source,
+                          len(row_records))
+     prepared.extend(prepared_pillars(reversed) for reversed in (False, True))
+     offsets, programs = [], bytearray()
++    row_bank, row_ids = [], {}
+     for program in prepared:
+         offsets.append(struct.pack("<I", len(programs)))
+-        programs.extend(program)
++        position, prefix = 0, bytearray(128)
++        while program[position] != 255:
++            if program[position]:
++                programs.extend(program[position:position+2])
++                position += 2
++                continue
++            count, words = program[position+3:position+5]
++            end = position + 6 + count*2 + words*4
++            for i in range(words):
++                column, _, low, high = program[position+6+count*2+i*4:position+10+count*2+i*4]
++                for half, value in enumerate((low, high)):
++                    old = prefix[column+half]
++                    walls = (old >> 6) + (value >> 6)
++                    require(walls <= 3, "prepared row prefix contact count exceeds packed field")
++                    prefix[column+half] = ((old | value) & 63) | (walls << 6)
++            row_bytes = bytes(prefix)
++            if row_bytes not in row_ids:
++                row_ids[row_bytes] = len(row_bank)
++                row_bank.append(row_bytes)
++            programs.extend(program[position:end])
++            programs.extend(struct.pack("<H", row_ids[row_bytes]))
++            position = end
++        programs.append(255)
+     offsets.append(struct.pack("<I", len(programs)))
++    require(len(row_bank) < 65536, "prepared row bank exceeds ID range")
+     return b"".join((header, b"".join(records), b"".join(row_records), cells,
+-                     b"DWPR", b"".join(offsets), programs))
++                     b"DWPR", b"".join(offsets), programs,
++                     b"DWRB", struct.pack("<I", len(row_bank)), b"".join(row_bank)))
+ 
+ 
+ def atomic_write(path, payload):
+diff --git a/src/platform/amiga/AmigaTerrainRowOwner.h b/src/platform/amiga/AmigaTerrainRowOwner.h
+new file mode 100644
+index 00000000..fc8d949a
+--- /dev/null
++++ b/src/platform/amiga/AmigaTerrainRowOwner.h
+@@ -0,0 +1,104 @@
++#ifndef DOWNWELL_AMIGA_TERRAIN_ROW_OWNER_H
++#define DOWNWELL_AMIGA_TERRAIN_ROW_OWNER_H
++#include <cstdint>
++#include <cstring>
++
++// Immutable source-ordered prefixes plus individual mutable cell overrides.
++// Neither an event Create nor a collision mutation copies an entire row.
++// A published prefix is borrowed from an immutable builder pack.
++class AmigaTerrainRowOwner {
++public:
++    static constexpr unsigned columns=128,rows=512;
++    static constexpr unsigned size(){return rows*columns;}
++private:
++    std::uint8_t values_[columns*rows];
++#ifndef DOWNWELL_REFERENCE_TERRAIN_ROWS
++    inline static constexpr std::uint8_t empty_[columns]{};
++    const std::uint8_t* base_[rows];
++    std::uint8_t changed_[rows][columns/8];
++    std::uint8_t order_[rows][columns];
++    std::uint16_t count_[rows];
++    bool changed(unsigned row,unsigned column)const{
++        return (changed_[row][column/8]&(1u<<(column&7)))!=0;
++    }
++    static unsigned addition(unsigned column,const std::uint8_t* words,unsigned count){
++        for(unsigned i=0;i<count;++i,words+=4)
++            if(column>=words[0]&&column<words[0]+2u)return words[2+column-words[0]];
++        return 0;
++    }
++#endif
++public:
++    AmigaTerrainRowOwner(){clear();}
++    void clear(){
++#ifdef DOWNWELL_REFERENCE_TERRAIN_ROWS
++        std::memset(values_,0,sizeof(values_));
++#else
++        for(unsigned y=0;y<rows;++y){base_[y]=empty_;count_[y]=0;}
++        std::memset(changed_,0,sizeof(changed_));
++#endif
++    }
++    std::uint8_t read(unsigned cell)const{
++#ifdef DOWNWELL_REFERENCE_TERRAIN_ROWS
++        return values_[cell];
++#else
++        const unsigned row=cell/columns,column=cell%columns;
++        return changed(row,column)?values_[cell]:base_[row][column];
++#endif
++    }
++    std::uint8_t operator[](unsigned cell)const{return read(cell);}
++    std::uint8_t& write(unsigned cell){
++#ifndef DOWNWELL_REFERENCE_TERRAIN_ROWS
++        const unsigned row=cell/columns,column=cell%columns;
++        if(!changed(row,column)){
++            values_[cell]=base_[row][column];
++            changed_[row][column/8]|=std::uint8_t(1u<<(column&7));
++            order_[row][count_[row]++]=std::uint8_t(column);
++        }
++#endif
++        return values_[cell];
++    }
++    struct ConstRow {
++        const AmigaTerrainRowOwner* owner;unsigned cell;
++        std::uint8_t operator[](unsigned offset)const{return owner->read(cell+offset);}
++        std::uint8_t operator*()const{return owner->read(cell);}
++        ConstRow operator+(int offset)const{return {owner,unsigned(int(cell)+offset)};}
++        ConstRow& operator+=(int offset){cell=unsigned(int(cell)+offset);return *this;}
++    };
++    struct MutableRow {
++        AmigaTerrainRowOwner* owner;unsigned cell;
++        std::uint8_t& operator[](unsigned offset)const{return owner->write(cell+offset);}
++        std::uint8_t& operator*()const{return owner->write(cell);}
++        MutableRow operator+(int offset)const{return {owner,unsigned(int(cell)+offset)};}
++        MutableRow& operator+=(int offset){cell=unsigned(int(cell)+offset);return *this;}
++    };
++    ConstRow readRow(unsigned row)const{return {this,row*columns};}
++    MutableRow writeRow(unsigned row){return {this,row*columns};}
++    bool admits(unsigned row,const std::uint8_t* previous,const std::uint8_t* words,unsigned count)const{
++#ifdef DOWNWELL_REFERENCE_TERRAIN_ROWS
++        (void)row;(void)previous;(void)words;(void)count;return false;
++#else
++        if(row>=rows||base_[row]!=(previous?previous:empty_))return false;
++        // Overflow contacts require the original ordered scalar publisher.
++        // Admission is read-only: no RNG or partial mutation on rejection.
++        for(unsigned i=0;i<count_[row];++i){
++            const unsigned column=order_[row][i];
++            if((values_[row*columns+column]>>6)+(addition(column,words,count)>>6)>3)return false;
++        }
++        return true;
++#endif
++    }
++    bool publish(unsigned row,const std::uint8_t* prepared,const std::uint8_t* previous,
++                 const std::uint8_t* words,unsigned count){
++        if(!prepared||!admits(row,previous,words,count))return false;
++#ifndef DOWNWELL_REFERENCE_TERRAIN_ROWS
++        for(unsigned i=0;i<count_[row];++i){
++            const unsigned column=order_[row][i],delta=addition(column,words,count);
++            auto& value=values_[row*columns+column];
++            value=std::uint8_t(((value|delta)&63)|(((value>>6)+(delta>>6))<<6));
++        }
++        base_[row]=prepared;
++#endif
++        return true;
++    }
++};
++#endif
+diff --git a/tests/platform/amiga/AmigaTerrainRowOwnerTest.cpp b/tests/platform/amiga/AmigaTerrainRowOwnerTest.cpp
+new file mode 100644
+index 00000000..d4b9686a
+--- /dev/null
++++ b/tests/platform/amiga/AmigaTerrainRowOwnerTest.cpp
+@@ -0,0 +1,42 @@
++#include "platform/amiga/AmigaTerrainRowOwner.h"
++#include <array>
++#include <cassert>
++#include <memory>
++#include <iostream>
++int main(){
++    using Owner=AmigaTerrainRowOwner;
++    auto owner=std::make_unique<Owner>();
++    std::array<std::uint8_t,128> first{},second{};
++    const std::uint8_t a[]={42,3,83,34},b[]={42,3,83,34};
++    first[42]=83;first[43]=34;second[42]=147;second[43]=34;
++    assert(owner->publish(7,first.data(),nullptr,a,1));
++    owner->write(7*128+42)|=4; // event box over an existing wall
++    owner->write(7*128+43)=0; // destruction before the next fixed segment
++    owner->write(7*128+99)=7; // event outside the prepared word range
++    assert(owner->publish(7,second.data(),first.data(),b,1));
++    assert(owner->read(7*128+42)==151&&owner->read(7*128+43)==34&&owner->read(7*128+99)==7);
++    assert(first[42]==83&&second[42]==147);
++    auto copy=std::make_unique<Owner>(*owner);
++    owner->write(7*128+42)=255;
++    assert(copy->read(7*128+42)==151);
++    assert(!owner->admits(7,second.data(),b,1)); // scalar overflow path
++    assert(!owner->publish(7,first.data(),second.data(),b,1));
++    assert(owner->read(7*128+42)==255);
++    assert(!owner->admits(7,nullptr,a,1)&&!owner->admits(512,nullptr,a,1));
++    owner->clear();
++    for(unsigned i=0;i<Owner::size();++i)assert(owner->read(i)==0);
++    auto expected=std::make_unique<std::array<std::uint8_t,Owner::size()>>();
++    std::uint32_t rng=19;
++    for(unsigned n=0;n<10000;++n){
++        rng=rng*1664525u+1013904223u;const unsigned at=rng%Owner::size();
++        owner->write(at)=std::uint8_t(rng>>24);(*expected)[at]=std::uint8_t(rng>>24);
++        if(n%97==0){*copy=*owner;*owner=*copy;}
++    }
++    for(unsigned i=0;i<Owner::size();++i)assert(owner->read(i)==(*expected)[i]);
++    // Fully overridden rows remain exact through prefix publication.
++    owner->clear();
++    for(unsigned i=0;i<128;++i)owner->write(i)=4;
++    assert(owner->publish(0,first.data(),nullptr,a,1));
++    for(unsigned i=0;i<128;++i)assert(owner->read(i)==unsigned(first[i]|4));
++    std::cout<<"Sparse terrain prefixes, overrides, copy/reset and overflow admission agree\n";
++}

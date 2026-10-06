@@ -228,9 +228,10 @@ gauge) and left ten opt-in flags behind. Do not repeat that.
   only as a reference selector for oracles. Do not add experiment flags, mode
   numbers or parallel candidate implementations to the tree.
 - Two rejected attempts at an item end it: record one row each in the audit's
-  [rejected approaches](amiga-frame-cost.md#rejected-approaches) table (commit
-  and patch), then take the next item. Measurements belong in commit messages.
-  Do not add narrative or per-experiment results to this file or the audit.
+  [rejected approaches](amiga-frame-cost.md#rejected-approaches) table (commit,
+  and the removed code as a patch in `docs/rejected/`), then take the next
+  item. Measurements belong in commit messages. Do not add narrative or
+  per-experiment results to this file or the audit.
 - Verify each change with the full RNG state, numeric instance IDs, creation
   and event order, positions and draw order on deterministic replays
   (`make verify-cross-replay`, `make verify-terrain-ownership`, the per-frame

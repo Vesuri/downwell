@@ -1,0 +1,212 @@
+diff --git a/amiga/Makefile b/amiga/Makefile
+index 36466d49..bb24236b 100644
+--- a/amiga/Makefile
++++ b/amiga/Makefile
+@@ -30,6 +30,7 @@ TABLE_CONTACT_ATAN ?= 0
+ RETAIN_HEALTH_HUD ?= 0
+ AMMO_DAMAGE_RANGE ?= 0
+ PREPARED_AMMO_DIVIDERS ?= 0
++AMMO_UNIFORM_RUNS ?= 0
+ PREPARED_FIELDS ?= 0
+ PREPARED_FIELDS_VERIFY ?= 0
+ PROFILE_FIELD_REFERENCE ?= 0
+@@ -174,6 +175,7 @@ CFLAGS += -DDOWNWELL_AMMO_DAMAGE_RANGE
+ endif
+ ifeq ($(PREPARED_AMMO_DIVIDERS),1)
+ CFLAGS += -DDOWNWELL_PREPARED_AMMO_DIVIDERS
++CFLAGS += -DDOWNWELL_AMMO_UNIFORM_RUNS=$(AMMO_UNIFORM_RUNS)
+ endif
+ ifeq ($(PREPARED_FIELDS),1)
+ CFLAGS += -DDOWNWELL_PREPARED_FIELDS
+@@ -315,7 +317,7 @@ $(OUT).front: $(AMIGA_FRONT_BANK)
+ .PHONY: FORCE_STARTUP_OPTIONS
+ obj/startup-options: FORCE_STARTUP_OPTIONS
+ 	@mkdir -p obj
+-	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(SKIP_LEVEL)' '$(TERRAIN_RUN_STORE)' '$(TABLE_CONTACT_ATAN)' '$(RETAIN_HEALTH_HUD)' '$(AMMO_DAMAGE_RANGE)' '$(PREPARED_AMMO_DIVIDERS)' '$(PREPARED_FIELDS)' '$(PREPARED_FIELDS_VERIFY)' '$(PROFILE_FIELD_REFERENCE)' '$(PREPARED_FIELDS_BACKING)' '$(SCENERY_LAYERS)' '$(NATIVE_BOXES)' '$(NATIVE_FIELDS)' '$(TERRAIN_BATCH)' '$(TERRAIN_DIRECT)' '$(TERRAIN_BATCH_VERIFY)' '$(AMIGA_OPTIMIZATION)' '$(LASER_VERIFY)' '$(PROFILE_LASER)' > $@.tmp
++	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(SKIP_LEVEL)' '$(TERRAIN_RUN_STORE)' '$(TABLE_CONTACT_ATAN)' '$(RETAIN_HEALTH_HUD)' '$(AMMO_DAMAGE_RANGE)' '$(PREPARED_AMMO_DIVIDERS)' '$(AMMO_UNIFORM_RUNS)' '$(PREPARED_FIELDS)' '$(PREPARED_FIELDS_VERIFY)' '$(PROFILE_FIELD_REFERENCE)' '$(PREPARED_FIELDS_BACKING)' '$(SCENERY_LAYERS)' '$(NATIVE_BOXES)' '$(NATIVE_FIELDS)' '$(TERRAIN_BATCH)' '$(TERRAIN_DIRECT)' '$(TERRAIN_BATCH_VERIFY)' '$(AMIGA_OPTIMIZATION)' '$(LASER_VERIFY)' '$(PROFILE_LASER)' > $@.tmp
+ 	@cmp -s $@.tmp $@ || cp $@.tmp $@
+ 
+ $(OBJECTS): obj/startup-options
+diff --git a/src/platform/amiga/AmigaAmmoHud.h b/src/platform/amiga/AmigaAmmoHud.h
+index 26d4f385..1130810b 100644
+--- a/src/platform/amiga/AmigaAmmoHud.h
++++ b/src/platform/amiga/AmigaAmmoHud.h
+@@ -28,6 +28,8 @@ class AmigaAmmoHud {
+     bool preparedDividersMatch_ = false;
+ #endif
+ public:
++    bool useUniformRuns = false;
++    unsigned lastUniformLines = 0;
+     unsigned lastWordWrites = 0;
+     void invalidate() { damage_.valid = false; }
+     void draw(AmigaRenderer* renderer, const UBYTE* pack, const UBYTE* end,
+@@ -43,6 +45,7 @@ public:
+         composition.blitterEnabled = 0;
+         renderer = &composition;
+         lastWordWrites = 0;
++        lastUniformLines = 0;
+         const bool retainEdges = damage_.valid && !previousWideClear_ && !forceFull;
+         const unsigned previousMeter = damage_.meter;
+         const bool initialize = !damage_.valid;
+@@ -242,6 +245,51 @@ public:
+             }
+             DW_PROFILE_PHASE(profileAmmoBase);
+         };
++        auto interiorPaint = [&](int top,int bottom) {
++#ifdef DOWNWELL_PREPARED_AMMO_DIVIDERS
++            if(useUniformRuns&&rows&&stampsReady_&&preparedDividersMatch_&&capacity<=16&&meter<=3&&bottom-top>=16){
++                const auto divider=amigaPreparedDividers(ammo,capacity);
++                const int base=229+4*meter;
++                const int visible=base>=232?base-231:1;
++                const int first=visible>1?visible:1; // special row zero stays on the reference path
++                int cursor=top;
++                // Scan existing producer states, without constructing interval
++                // lists or solving overlaps. A run's middle [last+7,first]
++                // cannot overlap either neighbor's eight-row artwork.
++                for(int hi=183;hi>=first;){
++                    int lo=hi;
++                    const unsigned frame=rows->state[hi]<4?rows->state[hi]:3;
++                    const bool filled=unsigned(hi)<rows->filled;
++                    while(lo>first&&(unsigned(lo-1)<rows->filled)==filled&&
++                        (rows->state[lo-1]<4?rows->state[lo-1]:3)==frame)--lo;
++                    const int begin=base-hi+7>top?base-hi+7:top;
++                    const int end=base-lo+1<bottom?base-lo+1:bottom;
++                    if(hi-lo>=7&&begin<end){
++                        if(cursor<begin)paint(cursor,begin,true);
++                        const auto& stamp=stamps_[(filled?4:0)+frame];
++                        const UWORD mask=stamp.runMask[7]&0xfff0;
++                        const UWORD low=(0xfff0 & UWORD(~mask))|(stamp.runLow[7]&mask);
++                        auto publish=[&](int a,int b,UWORD background){
++                            if(a>=b)return;
++                            const UWORD high=(background & UWORD(~mask))|(stamp.runHigh[7]&mask);
++                            lastWordWrites+=amigaRendererPublishHudConstantColumn(display->hud,working_,&divider,
++                                18,a,b,4*meter,0xfff0,low,high);
++                            lastUniformLines+=b-a;
++                        };
++                        const int fillBegin=int(fillTop_)>begin?int(fillTop_):begin;
++                        const int fillEnd=int(fillTop_+fillHeight_)<end?int(fillTop_+fillHeight_):end;
++                        if(fillBegin<fillEnd){publish(begin,fillBegin,0xfff0);publish(fillBegin,fillEnd,0x8010);publish(fillEnd,end,0xfff0);}
++                        else publish(begin,end,0xfff0);
++                        cursor=end;
++                    }
++                    hi=lo-1;
++                }
++                if(cursor<bottom)paint(cursor,bottom,true);
++                return;
++            }
++#endif
++            paint(top,bottom,true);
++        };
+         auto strip = [&](int top, int bottom) {
+             // Only the overlap of old/new constant spans has stationary sides.
+             // Caps and the number still follow the original displaced artwork.
+@@ -251,7 +299,7 @@ public:
+                 const int begin = top > stableTop ? top : stableTop;
+                 const int end = bottom < stableBottom ? bottom : stableBottom;
+                 if (top < begin) paint(top, begin, false);
+-                paint(begin, end, true);
++                interiorPaint(begin, end);
+                 if (end < bottom) paint(end, bottom, false);
+             } else paint(top, bottom, false);
+         };
+diff --git a/src/platform/amiga/AmigaRenderer.c b/src/platform/amiga/AmigaRenderer.c
+index 353c9bb5..68e5bd3c 100644
+--- a/src/platform/amiga/AmigaRenderer.c
++++ b/src/platform/amiga/AmigaRenderer.c
+@@ -758,6 +758,33 @@ unsigned amigaRendererPublishHudBlockedColumn(UBYTE* destination, UBYTE* working
+     return writes;
+ }
+ 
++/* A uniform run's final base and stamp are already combined. Publish through
++   the prepared divider without first filling/stamping the working bitmap.
++   Unmasked neighboring pixels stay owned by the retained HUD backing. */
++unsigned amigaRendererPublishHudConstantColumn(UBYTE* destination, UBYTE* working,
++    const AmigaHudBlockedColumn* overlay, unsigned word, int top, int bottom,
++    int shiftY, UWORD clip, UWORD baseLow, UWORD baseHigh) {
++    unsigned writes=0;
++    int y;
++    UBYTE *target,*input;
++    if(word>=downwellVisibleWidth/16 || top<0 || bottom>downwellDisplayHeight ||
++       top>=bottom || top<shiftY || bottom>downwellDisplayHeight+shiftY)return 0;
++    target=destination+top*downwellBytesPerPlaneLine+word*2;
++    input=working+top*downwellBytesPerPlaneLine+word*2;
++    for(y=top;y<bottom;++y){
++        const unsigned sourceY=y-shiftY;
++        const UWORD* source=overlay->blocks+overlay->indices[sourceY>>3]*16+(sourceY&7)*2;
++        const UWORD a=source[0],b=source[1],mask=(a|b)&clip;
++        const UWORD previousLow=readWord(input),previousHigh=readWord(input+downwellPlaneBytes);
++        const UWORD low=(previousLow & (UWORD)~clip) | (((baseLow & (UWORD)~mask)|(a&mask))&clip);
++        const UWORD high=(previousHigh & (UWORD)~clip) | (((baseHigh & (UWORD)~mask)|(b&mask))&clip);
++        if(low!=previousLow){writeWord(input,low);writeWord(target,low);++writes;}
++        if(high!=previousHigh){writeWord(input+downwellPlaneBytes,high);writeWord(target+downwellPlaneBytes,high);++writes;}
++        target+=downwellBytesPerPlaneLine;input+=downwellBytesPerPlaneLine;
++    }
++    return writes;
++}
++
+ void amigaRendererApplyHudBlockedColumn(AmigaRenderer* renderer, const AmigaHudBlockedColumn* overlay,
+     unsigned word, int shiftY, int top, int bottom) {
+     const int x = word*16;
+diff --git a/src/platform/amiga/AmigaRenderer.h b/src/platform/amiga/AmigaRenderer.h
+index 2bb52a2b..f4b8ee5f 100644
+--- a/src/platform/amiga/AmigaRenderer.h
++++ b/src/platform/amiga/AmigaRenderer.h
+@@ -109,6 +109,8 @@ typedef struct AmigaHudBlockedColumn {
+ } AmigaHudBlockedColumn;
+ unsigned amigaRendererPublishHudBlockedColumn(UBYTE*, UBYTE*, const AmigaHudBlockedColumn*,
+                                              unsigned, int, int, int, UWORD);
++unsigned amigaRendererPublishHudConstantColumn(UBYTE*, UBYTE*, const AmigaHudBlockedColumn*,
++                                              unsigned, int, int, int, UWORD, UWORD, UWORD);
+ void amigaRendererApplyHudBlockedColumn(AmigaRenderer*, const AmigaHudBlockedColumn*,
+                                        unsigned, int, int, int);
+ /* One aligned HUD column, already clipped by caller; masked planar words. */
+diff --git a/src/platform/amiga/DownwellAmiga.cpp b/src/platform/amiga/DownwellAmiga.cpp
+index a15828d0..3caa1c99 100644
+--- a/src/platform/amiga/DownwellAmiga.cpp
++++ b/src/platform/amiga/DownwellAmiga.cpp
+@@ -789,9 +789,19 @@ static void drawAmmoDigit(AmigaRenderer* renderer, int x, int y,
+ }
+ 
+ static AmigaAmmoHud ammoHud;
++#ifdef DOWNWELL_AMMO_UNIFORM_RUNS
++extern "C" { volatile unsigned gDownwellAmmoUniformRuns=DOWNWELL_AMMO_UNIFORM_RUNS;
++volatile unsigned gDownwellAmmoUniformLines; }
++#endif
+ static void redrawAmmo(AmigaRenderer* renderer, unsigned ammo, unsigned maximumAmmo, unsigned offset = 0,
+                        const downwell::AmmoGaugeRows* rows = nullptr, unsigned meterOffset = 0) {
++#ifdef DOWNWELL_AMMO_UNIFORM_RUNS
++    ammoHud.useUniformRuns=gDownwellAmmoUniformRuns!=0;
++#endif
+     ammoHud.draw(renderer, activeHudPack, activeHudPackEnd, ammo, maximumAmmo, offset, rows, meterOffset);
++#ifdef DOWNWELL_AMMO_UNIFORM_RUNS
++    gDownwellAmmoUniformLines+=ammoHud.lastUniformLines;
++#endif
+     DW_PROFILE_PHASE(profileTitle);
+ }
+ 
+diff --git a/tests/platform/amiga/AmigaRendererTest.cpp b/tests/platform/amiga/AmigaRendererTest.cpp
+index 38a9ac74..8abd232a 100644
+--- a/tests/platform/amiga/AmigaRendererTest.cpp
++++ b/tests/platform/amiga/AmigaRendererTest.cpp
+@@ -1261,6 +1261,7 @@ int main(int argc, char** argv) {
+     }
+     {
+         AmigaAmmoHud retained;
++        retained.useUniformRuns = std::getenv("DOWNWELL_AMMO_REFERENCE")==nullptr;
+         downwell::AmmoGaugeRows rows;
+         unsigned previousDigits = 1;
+         auto fullRedraw = [&](unsigned ammo, unsigned cap, unsigned offset, unsigned meter) {
+@@ -1304,6 +1305,13 @@ int main(int argc, char** argv) {
+             require(actualHud == expectedHud, "skipping invisible row-state changes preserves all HUD pixels");
+         }
+         require(skipped > 500, "stable and invisible animation updates bypass retained HUD composition");
++#ifdef DOWNWELL_PREPARED_AMMO_DIVIDERS
++        retained.draw(&actualRenderer,hudPack.data(),hudPack.data()+hudPack.size(),8,8,0,&rows,3);
++        fullRedraw(8,8,0,3);
++        if(retained.useUniformRuns)require(retained.lastUniformLines>100,"uniform-run publication was exercised");
++        require(actualHud==expectedHud,"uniform-run middle matches original ordered artwork");
++        std::cout<<retained.lastUniformLines<<" gauge lines used direct uniform publication\n";
++#endif
+         for (unsigned cap : {8u, 15u, 1u, 64u, 127u}) {
+             for (unsigned tick = 0; tick < (cap+1)*10; ++tick) {
+                 const unsigned ammo = (tick / 5) % (cap + 1);

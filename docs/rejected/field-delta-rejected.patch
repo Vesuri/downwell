@@ -1,0 +1,312 @@
+diff --git a/amiga/Makefile b/amiga/Makefile
+index 2b805139..36466d49 100644
+--- a/amiga/Makefile
++++ b/amiga/Makefile
+@@ -179,6 +179,8 @@ ifeq ($(PREPARED_FIELDS),1)
+ CFLAGS += -DDOWNWELL_PREPARED_FIELDS
+ ifeq ($(PROFILE_FIELD_REFERENCE),1)
+ CFLAGS += -DDOWNWELL_FIELD_MODE=2
++else ifeq ($(PREPARED_FIELDS_BACKING),5)
++CFLAGS += -DDOWNWELL_FIELD_MODE=7
+ else ifeq ($(PREPARED_FIELDS_BACKING),4)
+ CFLAGS += -DDOWNWELL_FIELD_MODE=6
+ else ifeq ($(PREPARED_FIELDS_BACKING),3)
+diff --git a/src/platform/amiga/AmigaBlitter.cpp b/src/platform/amiga/AmigaBlitter.cpp
+index f7418599..c5cd6541 100644
+--- a/src/platform/amiga/AmigaBlitter.cpp
++++ b/src/platform/amiga/AmigaBlitter.cpp
+@@ -277,6 +277,16 @@ extern "C" void amigaFieldVerifyColumn(const UBYTE* terrain,const UBYTE* target,
+             restore?fieldPixel(terrain+p*15360,48,x,row):(pen>>p)&1);
+     });
+ }
++extern "C" void amigaFieldVerifyDelta(const UBYTE* terrain,const UBYTE* target,
++    const downwell::TimeFieldOutlines::Circle& old,const downwell::TimeFieldOutlines::Circle& next,unsigned origin){
++    amigaFieldVerifyColumn(terrain,target,old,origin,true);
++    gDownwellPreparedFieldOperation=9;
++    downwell::GoalFieldOutline shape;shape.setRasterCircle(next.x,next.y,next.radius);
++    shape.drawClipped(110,0,270,284,[&](int x,int y,unsigned pen){
++        const unsigned row=(origin+unsigned(y))%320;
++        for(unsigned p=0;p<2;++p)fieldPut(fieldExpected+p*15360,48,x,row,(pen>>p)&1);
++    });
++}
+ #endif
+ 
+ extern "C" int amigaBlitterSolidRect(UBYTE* destination, UWORD targetHeight,
+diff --git a/src/platform/amiga/AmigaPreparedTimeFields.h b/src/platform/amiga/AmigaPreparedTimeFields.h
+index 534616f7..469bdfb1 100644
+--- a/src/platform/amiga/AmigaPreparedTimeFields.h
++++ b/src/platform/amiga/AmigaPreparedTimeFields.h
+@@ -1,6 +1,7 @@
+ #ifndef DOWNWELL_AMIGA_PREPARED_TIME_FIELDS_H
+ #define DOWNWELL_AMIGA_PREPARED_TIME_FIELDS_H
+ #include "AmigaGoalField.h"
++#include "AmigaFieldBands.h"
+ 
+ // Ops captures into a 64x56 two-plane backing and mask-blits from that layout
+ // into a 384x320 game ring. Native Ops uses the shared Bitmap implementation;
+@@ -107,6 +108,23 @@ public:
+             if(origin>=downwellGameRingHeight)return false;
+             if(target!=target_){discard();target_=target;}
+             if(matches(target,origin,shape)&&!underlyingChanged)return true;
++            if(Ops::deltaEnabled()&&fast_&&valid_&&multiple_&&entryCount_==1&&
++               entries_[0].large&&shape_.count==1&&shape.visible&&shape.count==1&&origin==origin_){
++                bool changed=touchesDirtyRows(dirty);
++                const bool admitted=amigaFieldBandParts(shape.circles[0],origin,
++                    [&](unsigned,unsigned row,unsigned,unsigned,unsigned height){
++                        for(unsigned y=row;!changed&&y<row+height;++y)changed=dirty(y);
++                    });
++                if(admitted&&!changed&&Ops::delta(terrain_,target_,shape_.circles[0],shape.circles[0],origin)){
++                    shape_.circles[0]=shape.circles[0];
++                    for(auto& bits:largeRows_)bits=0;
++                    amigaFieldBandParts(shape.circles[0],origin,
++                        [&](unsigned,unsigned row,unsigned,unsigned,unsigned height){
++                            for(unsigned y=row;y<row+height;++y)largeRows_[y/16]|=UWORD(1u<<(y&15));
++                        });
++                    return true;
++                }
++            }
+             // The sparse reference owns kept bits after prepare. Materialize a
+             // pending fallback before replacing it so its underlay is captured.
+             if(!fast_)reference_.draw();
+diff --git a/src/platform/amiga/DownwellAmiga.cpp b/src/platform/amiga/DownwellAmiga.cpp
+index 11827139..7a6d8c2d 100644
+--- a/src/platform/amiga/DownwellAmiga.cpp
++++ b/src/platform/amiga/DownwellAmiga.cpp
+@@ -46,6 +46,7 @@ __attribute__((noinline,used)) void downwellFieldReentryReady(){__asm__ volatile
+ #ifdef DOWNWELL_PREPARED_FIELDS
+ #include "AmigaPreparedTimeFields.h"
+ #include "AmigaFieldColumns.h"
++#include "AmigaFieldDelta.h"
+ // Change only initialized data for identical-code comparisons.
+ // Both modes load the same images and reserve the same scene-bank partition.
+ extern "C" { volatile unsigned gDownwellPreparedFieldMode=DOWNWELL_FIELD_MODE; }
+@@ -65,6 +66,7 @@ extern "C" void amigaFieldVerifyCompositeBegin(UBYTE*,UBYTE*);
+ extern "C" void amigaFieldVerifyCompositeEnd(UBYTE*,UBYTE*);
+ extern "C" bool amigaFieldVerifyComposite(const UBYTE*,const UBYTE*,const downwell::TimeFieldOutlines&,unsigned);
+ extern "C" void amigaFieldVerifyColumn(const UBYTE*,const UBYTE*,const downwell::TimeFieldOutlines::Circle&,unsigned,bool);
++extern "C" void amigaFieldVerifyDelta(const UBYTE*,const UBYTE*,const downwell::TimeFieldOutlines::Circle&,const downwell::TimeFieldOutlines::Circle&,unsigned);
+ #endif
+ struct PreparedFieldOps {
+ #ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
+@@ -75,6 +77,18 @@ struct PreparedFieldOps {
+     static bool enabled(){return gDownwellPreparedFieldMode!=2;}
+     static bool staticEnabled(){return gDownwellPreparedFieldMode>=3;}
+     static bool columnsEnabled(){return gDownwellPreparedFieldMode>=4;}
++    static bool deltaEnabled(){return gDownwellPreparedFieldMode>=7;}
++    static bool delta(const UBYTE* terrain,UBYTE* target,const downwell::TimeFieldOutlines::Circle& old,
++        const downwell::TimeFieldOutlines::Circle& next,unsigned origin){
++#ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
++        amigaFieldVerifyDelta(terrain,target,old,next,origin);
++#endif
++        const bool ok=amigaFieldDelta(terrain,target,old,next,origin);
++#ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
++        if(ok)amigaFieldVerifyFinish(target);
++#endif
++        return ok;
++    }
+     static bool columns(const UBYTE* terrain,UBYTE* target,const downwell::TimeFieldOutlines::Circle& circle,
+         unsigned origin,bool restore,UWORD* rows){
+ #ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
+diff --git a/tests/platform/amiga/AmigaFieldColumnsTest.cpp b/tests/platform/amiga/AmigaFieldColumnsTest.cpp
+index 4e0093c8..66cea9cd 100644
+--- a/tests/platform/amiga/AmigaFieldColumnsTest.cpp
++++ b/tests/platform/amiga/AmigaFieldColumnsTest.cpp
+@@ -1,5 +1,6 @@
+ #include "platform/amiga/AmigaFieldColumns.h"
+ #include "platform/amiga/AmigaFieldBands.h"
++#include "platform/amiga/AmigaFieldDelta.h"
+ #include <array>
+ #include <cstdlib>
+ #include <iostream>
+@@ -68,4 +69,26 @@ int main(){
+     require(!amigaFieldBandParts({181,140,128*256},0,[](unsigned,unsigned,unsigned,unsigned,unsigned){}),"left band fallback");
+     require(!amigaFieldBandParts({199,140,128*256},0,[](unsigned,unsigned,unsigned,unsigned,unsigned){}),"right band fallback");
+     std::cout<<bands<<" resident band phases/placements match draw/restore pixels, clipping and wrap\n";
++    unsigned deltas=0;
++    for(unsigned a=0;a<512;a+=7)for(unsigned b=0;b<512;b+=11)for(int x=182;x<=198;++x){
++        const int y=int((a*71+b*53)%540)-130;
++        const unsigned origin=(a*17+b*23)%320;
++        const downwell::TimeFieldOutlines::Circle old{x,y,int(128*256+a)},next{x,y,int(128*256+b)};
++        actual=expected=terrain;
++        amigaFieldColumns(terrain.data(),actual.data(),old,origin,false);
++        const auto before=actual;
++        if(!amigaFieldDelta(terrain.data(),actual.data(),old,next,origin)){
++            require(actual==before,"rejected delta modified pixels");continue;
++        }
++        downwell::GoalFieldOutline oracle;oracle.setRasterCircle(x,y,next.radius);
++        oracle.drawClipped(110,0,270,284,[&](int px,int py,unsigned pen){
++            const unsigned row=(origin+unsigned(py))%320,bit=0x80u>>(px&7);
++            for(unsigned p=0;p<2;++p){const unsigned at=p*15360+row*48+unsigned(px)/8;
++                expected[at]=(expected[at]&~bit)|((pen&(1u<<p))?bit:0);}
++        });
++        require(actual==expected,"delta differs from full new raster");
++        require(amigaFieldDelta(terrain.data(),actual.data(),next,old,origin)&&actual==before,"reverse delta");
++        ++deltas;
++    }
++    std::cout<<deltas<<" reversible delta placements match scalar pixels and rejected transfers are untouched\n";
+ }
+diff --git a/tests/platform/amiga/AmigaPreparedTimeFieldsTest.cpp b/tests/platform/amiga/AmigaPreparedTimeFieldsTest.cpp
+index 2cb0404e..173ae8f4 100644
+--- a/tests/platform/amiga/AmigaPreparedTimeFieldsTest.cpp
++++ b/tests/platform/amiga/AmigaPreparedTimeFieldsTest.cpp
+@@ -1,5 +1,6 @@
+ #include "platform/amiga/AmigaPreparedTimeFields.h"
+ #include "platform/amiga/AmigaFieldColumns.h"
++#include "platform/amiga/AmigaFieldDelta.h"
+ #include <cstdlib>
+ #include <fstream>
+ #include <iostream>
+@@ -15,9 +16,14 @@ struct Pixels {
+     inline static bool usePrepared=true;
+     inline static bool useStatic=false;
+     inline static bool useColumns=true;
++    inline static unsigned deltaHits=0;
+     static bool enabled(){return usePrepared;}
+     static bool staticEnabled(){return useStatic;}
+     static bool columnsEnabled(){return useColumns&&useStatic&&usePrepared;}
++    static bool deltaEnabled(){return useColumns&&useStatic&&usePrepared;}
++    static bool delta(const UBYTE* terrain,UBYTE* target,const downwell::TimeFieldOutlines::Circle& old,
++        const downwell::TimeFieldOutlines::Circle& next,unsigned origin){
++        const bool ok=amigaFieldDelta(terrain,target,old,next,origin);deltaHits+=ok;return ok;}
+     static bool columns(const UBYTE* terrain,UBYTE* target,const downwell::TimeFieldOutlines::Circle& circle,
+         unsigned origin,bool restore,UWORD* rows){return amigaFieldColumns(terrain,target,circle,origin,restore,rows);}
+     static void validateColumns(const UBYTE* terrain,UBYTE* target,const downwell::TimeFieldOutlines::Circle& circle,
+@@ -237,5 +243,28 @@ int main(){
+         require(actual[0]==expected[0],"mixed intersections and source order");
+     }
+     std::cout<<"96 mixed-size intersection frames: all X phases, clipping, wrap and source order match\n";
++    Pixels::usePrepared=Pixels::useStatic=Pixels::useColumns=true;
++    for(int x=182;x<=198;++x){
++        (*candidate)[0].discard();(*reference)[0].discard();actual[0]=expected[0]=terrain;
++        for(unsigned frame=0;frame<200;++frame){
++            const unsigned origin=frame<100?291:103;
++            downwell::TimeFieldOutlines shape;shape.visible=true;shape.count=1;
++            shape.circles[0]={x,frame<100?140:0,int(128*256+(frame*13)%512)};
++            const unsigned row=(origin+20)%320;
++            const bool changed=frame%17==0;
++            auto dirty=[&](unsigned r){return changed&&r==row;};
++            if(changed)for(unsigned p=0;p<2;++p)for(unsigned col=0;col<48;++col)
++                terrain[p*15360+row*48+col]=next()>>24;
++            require((*candidate)[0].prepare(actual[0].data(),origin,shape,true,dirty),"delta lifecycle prepare");
++            require((*reference)[0].prepare(expected[0].data(),origin,shape,true,dirty),"delta lifecycle oracle");
++            if(changed)for(unsigned p=0;p<2;++p)for(unsigned col=0;col<48;++col){
++                const unsigned at=p*15360+row*48+col;actual[0][at]=expected[0][at]=terrain[at];
++            }
++            require((*candidate)[0].draw(),"delta lifecycle draw");(*reference)[0].draw();
++            require(actual[0]==expected[0],"delta lifecycle pixels with dirty rows, wrap and position changes");
++        }
++    }
++    require(Pixels::deltaHits>100,"differential path must actually run");
++    std::cout<<"3400 differential lifecycle frames: "<<Pixels::deltaHits<<" admitted updates; pixels match\n";
+     std::cout<<"3600 double-buffered frames: "<<fast<<" prepared, "<<fallback<<" fallback; pixels match\n";
+ }
+diff --git a/tools/generate-field-columns.cpp b/tools/generate-field-columns.cpp
+index e3d14522..a4fefb55 100644
+--- a/tools/generate-field-columns.cpp
++++ b/tools/generate-field-columns.cpp
+@@ -82,7 +82,7 @@ int main(int argc,char** argv){
+         bandFrames.push_back(frame);
+     }
+     std::ofstream out(argv[1]);
+-    out<<"// Generated by generate-field-columns/v2; do not edit.\n"
++    out<<"// Generated by generate-field-columns/v3; do not edit.\n"
+            "#ifndef DOWNWELL_FIELD_COLUMNS_GENERATED_H\n#define DOWNWELL_FIELD_COLUMNS_GENERATED_H\n"
+            "namespace downwell {\n"
+            "struct FieldColumnWord { short row,wordOffset; unsigned short low,high; };\n"
+@@ -105,6 +105,25 @@ int main(int argc,char** argv){
+     if(bandWords>65535)return 20;
+     out<<"};\nstatic const unsigned short fieldBandPixels[]={\n";
+     for(const auto& band:bands){for(unsigned i=1;i<band.size();++i)out<<band[i]<<',';out<<'\n';}
++    out<<"};\nstruct FieldDeltaWord { short row,wordOffset; unsigned short low,high,coverage; };\n";
++    std::vector<std::array<int,5>> deltas;
++    std::vector<unsigned> deltaOffsets{0};
++    for(unsigned f=1;f<frames.size();++f){
++        std::map<std::pair<int,int>,std::array<unsigned,4>> paired;
++        for(unsigned side=0;side<2;++side)for(int c=-8;c<10;++c)
++            for(const auto& w:columns[frames[f-1+side][c+8]]){
++                auto& p=paired[{w[0],c}];p[side*2]=w[1];p[side*2+1]=w[2];
++            }
++        for(const auto& [key,p]:paired){
++            const unsigned low=p[0]^p[2],high=p[1]^p[3];
++            if(low|high)deltas.push_back({key.first,key.first*24+key.second,int(low),int(high),int((p[0]|p[1])^(p[2]|p[3]))});
++        }
++        deltaOffsets.push_back(deltas.size());
++    }
++    out<<"static const unsigned short fieldDeltaOffsets[]={";
++    for(auto n:deltaOffsets)out<<n<<',';
++    out<<"};\nstatic const FieldDeltaWord fieldDeltaWords[]={\n";
++    for(const auto& d:deltas){out<<'{';for(auto n:d)out<<n<<',';out<<"},\n";}
+     out<<"};\n}\n#endif\n";out.close();
+     if(!out)return 20;
+     std::cout<<frames.size()<<" frames, "<<columns.size()<<" unique columns, "<<count
+diff --git a/tools/generate-field-columns.py b/tools/generate-field-columns.py
+index f7eec49a..fe6a8b23 100644
+--- a/tools/generate-field-columns.py
++++ b/tools/generate-field-columns.py
+@@ -12,10 +12,11 @@ subprocess.run([str(root / "build/generate-field-columns"), str(output)], check=
+ sha = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
+ inputs = [root / "tools/generate-field-columns.cpp", *sorted((root / "src/core").glob("*.h"))]
+ output.with_suffix(".json").write_text(json.dumps(dict(
+-    schemaVersion=2, generator="generate-field-columns/v2",
++    schemaVersion=3, generator="generate-field-columns/v3",
+     generatorSha256=sha(Path(__file__)),
+     inputs={str(p.relative_to(root)): sha(p) for p in inputs},
+     outputSha256=sha(output), radii=512, nativeWordBytes=8,
+     layout="deduplicated columns of signed row/word offsets and two planar colour words",
+     bands="176-pixel top/bottom arcs; white and coverage planes; supported centres 182..198",
++    deltas="adjacent raster XOR colour/coverage packets; reversible over unchanged terrain",
+     oracle="GoalFieldOutline portable raster; not a Windows GPU pixel oracle"), indent=2)+"\n")
+diff --git a/src/platform/amiga/AmigaFieldDelta.h b/src/platform/amiga/AmigaFieldDelta.h
+new file mode 100644
+index 00000000..3b4e9d1c
+--- /dev/null
++++ b/src/platform/amiga/AmigaFieldDelta.h
+@@ -0,0 +1,48 @@
++#ifndef DOWNWELL_AMIGA_FIELD_DELTA_H
++#define DOWNWELL_AMIGA_FIELD_DELTA_H
++#include "AmigaFieldColumns.h"
++
++// With an unchanged pristine underlay, old->new is reversible:
++// target ^= oldColour ^ newColour ^ (terrain & (oldCoverage ^ newCoverage)).
++// Adjacent offline packets compose in either direction, without intermediate
++// clearing or redrawing unchanged outline words. Caller owns the dirty-row gate.
++inline bool amigaFieldDelta(const UBYTE* terrain,UBYTE* target,
++    const downwell::TimeFieldOutlines::Circle& old,
++    const downwell::TimeFieldOutlines::Circle& next,unsigned origin){
++    using namespace downwell;
++    using namespace downwell_field_columns;
++    if(origin>=320||old.x!=next.x||old.y!=next.y||old.x<182||old.x>198||
++       old.radius<128*256||old.radius>=130*256||next.radius<128*256||next.radius>=130*256)return false;
++    unsigned a=fieldColumnRadii[old.radius-128*256],b=fieldColumnRadii[next.radius-128*256];
++    if(a>b){const auto t=a;a=b;b=t;}
++    if(b-a>4)return false;
++    const int base=(old.x-14)/16,shift=(old.x-14)%16;
++    const int rowBase=(int(origin)+old.y)*24;
++    auto part=[&](int offset,unsigned low,unsigned high,unsigned coverage,unsigned clip){
++        low&=clip;high&=clip;coverage&=clip;
++        if(!(low|high|coverage))return;
++        if(offset>=7680)offset-=7680;
++        for(unsigned plane=0;plane<2;++plane,offset+=7680){
++            const unsigned change=(plane?high:low)^(read(terrain,offset)&coverage);
++            if(change)write(target,offset,read(target,offset)^change);
++        }
++    };
++    static const unsigned short clip[24]={0,0,0,0,0,0,3,
++        65535,65535,65535,65535,65535,65535,65535,65535,65535,65532};
++    for(unsigned i=fieldDeltaOffsets[a];i<fieldDeltaOffsets[b];++i){
++        const auto& w=fieldDeltaWords[i];
++        const int y=old.y+w.row;
++        if(y<0||y>=284)continue;
++        const int col=base+w.wordOffset-w.row*24;
++        if(col<5||col>16)continue;
++        const int offset=rowBase+w.wordOffset+base;
++        if(!shift)part(offset,w.low,w.high,w.coverage,clip[col]);
++        else{
++            part(offset,w.low>>shift,w.high>>shift,w.coverage>>shift,clip[col]);
++            part(offset+1,(unsigned(w.low)<<(16-shift))&65535,
++                (unsigned(w.high)<<(16-shift))&65535,(unsigned(w.coverage)<<(16-shift))&65535,clip[col+1]);
++        }
++    }
++    return true;
++}
++#endif

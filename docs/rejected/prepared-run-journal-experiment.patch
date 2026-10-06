@@ -1,0 +1,267 @@
+diff --git a/src/core/GameplayCollisionOwner.h b/src/core/GameplayCollisionOwner.h
+index 12b899f9..3bd9a68d 100644
+--- a/src/core/GameplayCollisionOwner.h
++++ b/src/core/GameplayCollisionOwner.h
+@@ -35,7 +35,7 @@ public:
+ #elif defined(DOWNWELL_TERRAIN_RUN_STORE)
+     using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2,true,View::terrainBase,View::timeFieldBase,true,
+         RunnerSpatialLifetimes<View::capacity,View::terrainBase,View::timeFieldBase,GameplayTerrainInstances>,
+-        RunnerObservedRegistration<View::capacity,View::terrainBase,View::timeFieldBase,GameplayTerrainInstances>>;
++        RunnerObservedRegistration<View::capacity,View::terrainBase,View::timeFieldBase,GameplayTerrainInstances>,true>;
+ #else
+     using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2,true,View::terrainBase,View::timeFieldBase>;
+ #endif
+diff --git a/src/core/RunnerSpatialInstances.h b/src/core/RunnerSpatialInstances.h
+index 1db18e74..b6be97b7 100644
+--- a/src/core/RunnerSpatialInstances.h
++++ b/src/core/RunnerSpatialInstances.h
+@@ -28,14 +28,14 @@ template<unsigned Capacity,unsigned First,unsigned Last,bool Runs> struct Runner
+ template<unsigned Capacity,unsigned First,unsigned Last> struct RunnerRegistrationStorage<Capacity,First,Last,true> {
+     using Type=RunnerRunMembership<Capacity,First,Last>;
+ };
+-template<unsigned Capacity,unsigned Nodes,bool Scheduled> struct RunnerSpatialIndexStorage {
++template<unsigned Capacity,unsigned Nodes,bool Scheduled,bool PreparedRuns=false> struct RunnerSpatialIndexStorage {
+     using Type=RunnerSpatialIndex<Nodes>;
+ };
+-template<unsigned Capacity,unsigned Nodes> struct RunnerSpatialIndexStorage<Capacity,Nodes,true> {
++template<unsigned Capacity,unsigned Nodes,bool PreparedRuns> struct RunnerSpatialIndexStorage<Capacity,Nodes,true,PreparedRuns> {
+     // Hold a level's terrain births plus actor churn without forcing the old
+     // 512-operation drain during ordinary descent. Pressure still drains in
+     // order; no finite log replaces testing the first observing query.
+-    using Type=RunnerSpatialJournal<Nodes,Capacity,4096>;
++    using Type=RunnerSpatialJournal<Nodes,Capacity,4096,PreparedRuns>;
+ };
+ // Shared collision ownership for externally allocated instance handles. The
+ // scheduler must attach every relevant birth before Create, publish its bounds,
+@@ -43,7 +43,7 @@ template<unsigned Capacity,unsigned Nodes> struct RunnerSpatialIndexStorage<Capa
+ // No platform types or asset residency decisions belong here.
+ template<unsigned Capacity,unsigned Nodes,bool ScheduledIndex=false,unsigned RetainedFirst=0,unsigned RetainedLast=0,bool RunRegistration=ScheduledIndex,class Lifetimes=RunnerSpatialLifetimes<Capacity>,
+     class Registration=typename RunnerRegistrationStorage<Capacity,RetainedFirst,RetainedLast,
+-        RunRegistration&&(RetainedFirst<RetainedLast)>::Type> class RunnerSpatialInstances {
++        RunRegistration&&(RetainedFirst<RetainedLast)>::Type,bool PreparedRuns=false> class RunnerSpatialInstances {
+     static_assert(Capacity>0,"Spatial instances need stable slots");
+     using Queue=RunnerSpatialDirtyQueue<Capacity>;
+     using Math=RunnerSpatialSplit;
+@@ -537,7 +537,7 @@ public:
+             if(pixels.right<pixels.left){auto a=pixels.left;pixels.left=pixels.right;pixels.right=a;}
+             if(pixels.bottom<pixels.top){auto a=pixels.top;pixels.top=pixels.bottom;pixels.bottom=a;}
+             struct PreparedIndex {
+-                typename RunnerSpatialIndexStorage<Capacity,Nodes,ScheduledIndex>::Type& index;
++                typename RunnerSpatialIndexStorage<Capacity,Nodes,ScheduledIndex,PreparedRuns>::Type& index;
+                 const Math::PixelBox& pixels;
+                 bool insert(const Box& box,std::uint32_t id){return index.insertPrepared(box,id,&pixels);}
+                 bool remove(const Box& box,std::uint32_t id,bool retry,bool& removed){
+@@ -1015,7 +1015,7 @@ private:
+     Entry entries_[Capacity]{};
+     Membership membership_;
+     Queue spatial_,collision_;
+-    typename RunnerSpatialIndexStorage<Capacity,Nodes,ScheduledIndex>::Type index_;
++    typename RunnerSpatialIndexStorage<Capacity,Nodes,ScheduledIndex,PreparedRuns>::Type index_;
+     bool good_=true;
+     std::uint32_t bindingRevision_=0;
+     std::uint32_t captureRevision_=0;
+diff --git a/src/core/RunnerSpatialJournal.h b/src/core/RunnerSpatialJournal.h
+index c28c1223..8abb256f 100644
+--- a/src/core/RunnerSpatialJournal.h
++++ b/src/core/RunnerSpatialJournal.h
+@@ -6,7 +6,7 @@ namespace downwell {
+ // flags, dirty queues and lifetime changes synchronously. Never collapse equal
+ // updates or reconstruct from current positions: tree order depends on history.
+ // All reads catch up. service() permits bounded work between publication bursts.
+-template<unsigned Nodes,unsigned Slots,unsigned Pending=512> class RunnerSpatialJournal {
++template<unsigned Nodes,unsigned Slots,unsigned Pending=512,bool PreparedRuns=false> class RunnerSpatialJournal {
+     static_assert(Pending && !(Pending&(Pending-1)),"Journal capacity must be a power of two");
+     using Math=RunnerSpatialSplit;
+     static constexpr unsigned depthLimit=[](){unsigned n=Nodes,bits=0;do{++bits;n>>=1;}while(n);return bits;}();
+@@ -22,8 +22,9 @@ public:
+     bool valid()const{return good_&&tree_.valid();}
+     bool deferred()const{return deferred_;}
+     unsigned pending()const{return count_;}
++    unsigned pendingRecords()const{return PreparedRuns?records_:count_;}
+     void clear(){
+-        tree_.clear();head_=count_=population_=0;good_=deferred_=true;haveBounds_=false;
++        tree_.clear();head_=count_=population_=records_=consumed_=0;good_=deferred_=true;haveBounds_=false;
+         for(auto& word:present_)word=0;
+     }
+     unsigned nodeCount()const{catchUp();return tree_.nodeCount();}
+@@ -47,7 +48,7 @@ public:
+             return tree_.insert(box,instance);
+         }
+         if(!makeRoom())return false;
+-        operations_[(head_+count_)&(Pending-1)]={box,instance,true};++count_;
++        append(box,instance,true,pixels);++count_;
+         DW_PROFILE_COUNT(counterSpatialJournalQueued);
+         present_[instance>>5]|=1u<<(instance&31);++population_;
+         bounds_=next;haveBounds_=true;return true;
+@@ -62,7 +63,7 @@ public:
+         }
+         if(!contains(instance)){removed=false;return true;}
+         if(!makeRoom())return false;
+-        operations_[(head_+count_)&(Pending-1)]={oldBounds,instance,false};++count_;
++        append(oldBounds,instance,false,nullptr);++count_;
+         DW_PROFILE_COUNT(counterSpatialJournalQueued);
+         present_[instance>>5]&=~(1u<<(instance&31));--population_;
+         removed=true;return true;
+@@ -78,24 +79,76 @@ public:
+         while(count_&&budget--){
+             const auto& operation=operations_[head_];
+             bool removed=false;
+-            const bool ok=operation.insert?tree_.insert(operation.box,operation.instance):
+-                tree_.remove(operation.box,operation.instance,true,removed)&&removed;
++            bool ok;
++            if constexpr(PreparedRuns){
++                if(operation.prepared()){
++                    auto pixels=operation.geometry.pixels;
++                    const int offset=int(consumed_)*16*(operation.direction()==-1?-1:1);
++                    pixels.left+=offset;pixels.right+=offset;
++                    ok=tree_.insert(Math::encodePixels(pixels),operation.instance+consumed_);
++                }else ok=operation.insertion()?tree_.insert(operation.geometry.box,operation.instance):
++                    tree_.remove(operation.geometry.box,operation.instance,true,removed)&&removed;
++            }else ok=operation.insertion()?tree_.insert(operation.geometry.box,operation.instance):
++                tree_.remove(operation.geometry.box,operation.instance,true,removed)&&removed;
+             if(!ok){good_=false;return false;}
+             DW_PROFILE_COUNT(counterSpatialJournalServiced);
+-            head_=(head_+1)&(Pending-1);--count_;
++            --count_;
++            if constexpr(PreparedRuns){
++                if(++consumed_==operation.length()){consumed_=0;--records_;head_=(head_+1)&(Pending-1);}
++            }else head_=(head_+1)&(Pending-1);
+         }
+         return true;
+     }
+ private:
+-    struct Operation{Box box;std::uint32_t instance;bool insert;};
++    union Geometry {Box box;Math::PixelBox pixels;Geometry():box{}{};};
++    // Pack length and operation kind into the scalar snapshot's padded flag
++    // word: no per-record growth on either host or 68000. Kinds: removal,
++    // scalar insertion, first prepared cell, rightward run, leftward run.
++    // Journal identities (not GameMaker numeric IDs) remain consecutive.
++    struct Operation {
++        Geometry geometry;std::uint32_t instance=0;std::uint16_t descriptor=8;
++        bool insertion()const{return (descriptor&7u)!=0;}
++        bool prepared()const{return (descriptor&7u)>=2;}
++        int direction()const{return (descriptor&7u)==4?-1:(descriptor&7u)==2?2:1;}
++        unsigned length()const{return descriptor>>3;}
++    };
++    struct ScalarSnapshot {Box box;std::uint32_t instance;bool insert;};
++    static_assert(sizeof(Operation)==sizeof(ScalarSnapshot),"Journal records must not grow");
+     mutable RunnerSpatialIndex<Nodes> tree_;
+     Operation operations_[Pending]{};
+     std::uint32_t present_[(Slots+31)/32? (Slots+31)/32:1]{};
+     mutable unsigned head_=0,count_=0;
++    mutable unsigned records_=0,consumed_=0;
+     unsigned population_=0;
+     mutable bool good_=true;
+     bool deferred_=true,haveBounds_=false;
+     Math::PixelBox bounds_{};
++    void append(const Box& box,std::uint32_t instance,bool insert,const Math::PixelBox* pixels){
++        if constexpr(PreparedRuns){
++            if(insert&&pixels&&records_){
++                auto& tail=operations_[(head_+records_-1)&(Pending-1)];
++                if(tail.prepared()&&tail.length()<8191&&tail.instance+tail.length()==instance){
++                    const auto& base=tail.geometry.pixels;
++                    const unsigned distance=tail.length()*16u;
++                    int step=tail.direction();
++                    if(step==2)step=unsigned(pixels->left)-unsigned(base.left)==16u?1:-1;
++                    const unsigned delta=step==1?distance:0u-distance;
++                    if(pixels->top==base.top&&pixels->bottom==base.bottom&&
++                        unsigned(pixels->left)==unsigned(base.left)+delta&&
++                        unsigned(pixels->right)==unsigned(base.right)+delta){
++                        tail.descriptor=std::uint16_t(((tail.length()+1)<<3)|(step==1?3:4));return;
++                    }
++                }
++            }
++        }
++        auto& operation=operations_[(head_+pendingRecords())&(Pending-1)];
++        operation.instance=instance;operation.descriptor=std::uint16_t(8u+(insert?1u:0u));
++        if constexpr(PreparedRuns){
++            if(insert&&pixels){operation.descriptor=10;operation.geometry.pixels=*pixels;}
++            else operation.geometry.box=box;
++            ++records_;
++        }else operation.geometry.box=box;
++    }
+     bool contains(unsigned instance)const{return (present_[instance>>5]>>(instance&31))&1u;}
+     bool catchUp()const{return service(count_);}
+     bool makeRoom(){
+@@ -125,7 +178,7 @@ private:
+             if(bounds_.right>combined.right)combined.right=bounds_.right;
+             if(bounds_.bottom>combined.bottom)combined.bottom=bounds_.bottom;
+         }
+-        const unsigned width=unsigned(combined.right-combined.left),height=unsigned(combined.bottom-combined.top);
++        const unsigned width=unsigned(combined.right)-unsigned(combined.left),height=unsigned(combined.bottom)-unsigned(combined.top);
+         return width<=65535&&height<=65535&&
+             std::uint32_t(std::uint16_t(width))*std::uint32_t(std::uint16_t(height))<=0x1000000u;
+     }
+diff --git a/tests/core/RunnerSpatialJournalTest.cpp b/tests/core/RunnerSpatialJournalTest.cpp
+index 6df15df7..f408d14b 100644
+--- a/tests/core/RunnerSpatialJournalTest.cpp
++++ b/tests/core/RunnerSpatialJournalTest.cpp
+@@ -27,9 +27,9 @@ template<class A,class B> static void compare(A& eager,B& journal){
+     }
+     assert(eager.height()==journal.height()&&eager.nodeCount()==journal.nodeCount()&&!journal.pending());
+ }
+-template<unsigned Nodes,unsigned Pending,bool Prepared=false,bool Background=true> static void mutations(){
++template<unsigned Nodes,unsigned Pending,bool Prepared=false,bool Background=true,bool Runs=false> static void mutations(){
+     downwell::RunnerSpatialIndex<Nodes> eager;
+-    downwell::RunnerSpatialJournal<Nodes,128,Pending> journal;
++    downwell::RunnerSpatialJournal<Nodes,128,Pending,Runs> journal;
+     bool present[128]{};Box previous[128]{};
+     unsigned random=17;
+     for(unsigned step=0;step<12000;++step){
+@@ -62,7 +62,45 @@ template<unsigned Nodes,unsigned Pending,bool Prepared=false,bool Background=tru
+     compare(eager,journal);
+     if(Nodes==1024)assert(journal.deferred()); // This fixture must exercise the journal, not fallback.
+ }
++static void preparedRuns(){
++    for(int direction:{-1,1})for(unsigned budget=0;budget<5;++budget){
++        downwell::RunnerSpatialJournal<1024,128,8> scalar;
++        downwell::RunnerSpatialJournal<1024,128,8,true> grouped;
++        for(unsigned i=0;i<32;++i){
++            const int x=128+direction*int(i%8)*16,y=int(i/8)*32;
++            Math::PixelBox pixels{x,y,x+15,y+15};const auto b=Math::encodePixels(pixels);
++            assert(scalar.insertPrepared(b,i,&pixels)&&grouped.insertPrepared(b,i,&pixels));
++            assert(scalar.pending()==grouped.pending());
++            assert(grouped.pendingRecords()<=scalar.pendingRecords());
++            // Reuse input storage must not modify captured geometry.
++            pixels={};
++            if(i==3){
++                assert(scalar.service(budget)&&grouped.service(budget));
++                assert(scalar.pending()==grouped.pending());
++            }
++            if(i==7)assert(grouped.pendingRecords()==1);
++        }
++        compare(scalar,grouped);
++        assert(grouped.pendingRecords()==0);
++        grouped.clear();scalar.clear();
++        // A nonprepared insertion and retirement/reuse split otherwise
++        // contiguous geometry: neither may be moved across a terrain run.
++        for(unsigned i=0;i<16;++i){
++            if(i==7)assert(scalar.insert(box(0,200),100)&&grouped.insert(box(0,200),100));
++            auto b=box(int(i)*16,0);Math::PixelBox pixels;assert(Math::decodePixels(b,pixels));
++            assert(scalar.insertPrepared(b,i,&pixels)&&grouped.insertPrepared(b,i,&pixels));
++            if(i==11){
++                bool a=false,c=false;
++                assert(scalar.remove(box(0,0),2,true,a)&&grouped.remove(box(0,0),2,true,c)&&a&&c);
++                assert(scalar.insert(box(0,160),2)&&grouped.insert(box(0,160),2));
++            }
++            assert(scalar.pending()==grouped.pending());
++        }
++        compare(scalar,grouped);
++    }
++}
+ int main(){
++    preparedRuns();
+     {
+         // A selector-free level must retain more than the old 512 records.
+         // The first real query replays history, including retirement/reuse,
+@@ -105,6 +143,10 @@ int main(){
+     mutations<16,8,true>(); // Including the same capacity-failure prefix.
+     mutations<1024,32,true,false>(); // Query/pressure-only replay, no idle servicing.
+     mutations<16,8,true,false>(); // Preserve failures without background servicing.
++    mutations<1024,32,true,true,true>();
++    mutations<16,8,true,true,true>();
++    mutations<1024,32,true,false,true>();
++    mutations<16,8,true,false,true>();
+     for(unsigned mode=0;mode<4;++mode){
+         downwell::RunnerSpatialIndex<128> eager;
+         downwell::RunnerSpatialJournal<128,32,8> journal;

@@ -1,0 +1,334 @@
+diff --git a/Makefile b/Makefile
+index 97804ecb..ae483bc0 100644
+--- a/Makefile
++++ b/Makefile
+@@ -2014,6 +2014,13 @@ build/prepared-ammo-renderer-test: $(AMIGA_RENDERER_TEST_SOURCES) $(wildcard src
+ verify-prepared-ammo-dividers: build/prepared-ammo-renderer-test generate-amiga-game
+ 	./build/prepared-ammo-renderer-test generated/amiga-game.dwap generated/amiga-hud.dwap
+ 
++.PHONY: verify-ammo-column
++build/ammo-column-test: $(AMIGA_RENDERER_TEST_SOURCES) $(wildcard src/platform/amiga/*.h) $(wildcard src/core/*.h) generated/amiga-ammo-dividers.h generated/downwell-field-spans.h
++	@mkdir -p $(@D)
++	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -DDOWNWELL_AMMO_DAMAGE_RANGE -DDOWNWELL_PREPARED_AMMO_DIVIDERS -DDOWNWELL_AMMO_COLUMN -o $@ $(AMIGA_RENDERER_TEST_SOURCES)
++verify-ammo-column: build/ammo-column-test generate-amiga-game
++	./build/ammo-column-test generated/amiga-game.dwap generated/amiga-hud.dwap
++
+ .PHONY: generate-amiga-results verify-amiga-results
+ .PHONY: generate-amiga-shop verify-amiga-shop
+ generate-amiga-shop:
+diff --git a/amiga/Makefile b/amiga/Makefile
+index 4b59faa7..4af384ca 100644
+--- a/amiga/Makefile
++++ b/amiga/Makefile
+@@ -30,6 +30,7 @@ TABLE_CONTACT_ATAN ?= 0
+ RETAIN_HEALTH_HUD ?= 0
+ AMMO_DAMAGE_RANGE ?= 0
+ PREPARED_AMMO_DIVIDERS ?= 0
++AMMO_COLUMN ?= 0
+ SCENERY_LAYERS ?= 0
+ NATIVE_BOXES ?= 1
+ NATIVE_FIELDS ?= 1
+@@ -168,9 +169,12 @@ endif
+ ifeq ($(AMMO_DAMAGE_RANGE),1)
+ CFLAGS += -DDOWNWELL_AMMO_DAMAGE_RANGE
+ endif
+-ifeq ($(PREPARED_AMMO_DIVIDERS),1)
++ifneq ($(filter 1,$(PREPARED_AMMO_DIVIDERS) $(AMMO_COLUMN)),)
+ CFLAGS += -DDOWNWELL_PREPARED_AMMO_DIVIDERS
+ endif
++ifeq ($(AMMO_COLUMN),1)
++CFLAGS += -DDOWNWELL_AMMO_COLUMN
++endif
+ ifeq ($(SCENERY_LAYERS),1)
+ CFLAGS += -DDOWNWELL_SCENERY_LAYERS
+ endif
+@@ -287,11 +291,11 @@ $(OUT).front: $(AMIGA_FRONT_BANK)
+ .PHONY: FORCE_STARTUP_OPTIONS
+ obj/startup-options: FORCE_STARTUP_OPTIONS
+ 	@mkdir -p obj
+-	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(SKIP_LEVEL)' '$(TERRAIN_RUN_STORE)' '$(TABLE_CONTACT_ATAN)' '$(RETAIN_HEALTH_HUD)' '$(AMMO_DAMAGE_RANGE)' '$(PREPARED_AMMO_DIVIDERS)' '$(SCENERY_LAYERS)' '$(NATIVE_BOXES)' '$(NATIVE_FIELDS)' '$(TERRAIN_BATCH)' '$(TERRAIN_DIRECT)' '$(TERRAIN_BATCH_VERIFY)' '$(AMIGA_OPTIMIZATION)' '$(LASER_VERIFY)' '$(PROFILE_LASER)' > $@.tmp
++	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(SKIP_LEVEL)' '$(TERRAIN_RUN_STORE)' '$(TABLE_CONTACT_ATAN)' '$(RETAIN_HEALTH_HUD)' '$(AMMO_DAMAGE_RANGE)' '$(PREPARED_AMMO_DIVIDERS)' '$(AMMO_COLUMN)' '$(SCENERY_LAYERS)' '$(NATIVE_BOXES)' '$(NATIVE_FIELDS)' '$(TERRAIN_BATCH)' '$(TERRAIN_DIRECT)' '$(TERRAIN_BATCH_VERIFY)' '$(AMIGA_OPTIMIZATION)' '$(LASER_VERIFY)' '$(PROFILE_LASER)' > $@.tmp
+ 	@cmp -s $@.tmp $@ || cp $@.tmp $@
+ 
+ $(OBJECTS): obj/startup-options
+-ifeq ($(PREPARED_AMMO_DIVIDERS),1)
++ifneq ($(filter 1,$(PREPARED_AMMO_DIVIDERS) $(AMMO_COLUMN)),)
+ $(OBJECTS): $(REPO)/generated/amiga-ammo-dividers.h
+ $(REPO)/generated/amiga-ammo-dividers.h: $(REPO)/tools/generate-ammo-dividers.py $(AMIGA_HUD)
+ 	$(MAKE) -C $(REPO) generated/amiga-ammo-dividers.h
+diff --git a/amiga/profile.sh b/amiga/profile.sh
+index ac6a99d5..c3c71568 100644
+--- a/amiga/profile.sh
++++ b/amiga/profile.sh
+@@ -37,7 +37,7 @@ if [[ ${SKIP_LEVEL:-0} == 1 && $mode != trace ]]; then script=profile_clear.gdb;
+ # Always leave the playable binary behind, including after a timeout/failure.
+ restore() {
+   make clean > .run/profile-restore.log 2>&1
+-  make -j4 TERRAIN_RUN_STORE=0 TABLE_CONTACT_ATAN=0 RETAIN_HEALTH_HUD=0 AMMO_DAMAGE_RANGE=0 PREPARED_AMMO_DIVIDERS=0 SCENERY_LAYERS=0 NATIVE_BOXES=1 NATIVE_FIELDS=1 TERRAIN_BATCH=0 TERRAIN_DIRECT=0 TERRAIN_BATCH_VERIFY=0 SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_LASER=0 PROFILE_CONTACT=0 PROFILE_FRAMES=0 PROFILE_TRANSITION=0 GENERATION_DETAIL=0 GENERATION_TIMING=0 PHASE_SAMPLING=0 TRACE_FRAMES= >> .run/profile-restore.log 2>&1
++  make -j4 TERRAIN_RUN_STORE=0 TABLE_CONTACT_ATAN=0 RETAIN_HEALTH_HUD=0 AMMO_DAMAGE_RANGE=0 PREPARED_AMMO_DIVIDERS=0 AMMO_COLUMN=0 SCENERY_LAYERS=0 NATIVE_BOXES=1 NATIVE_FIELDS=1 TERRAIN_BATCH=0 TERRAIN_DIRECT=0 TERRAIN_BATCH_VERIFY=0 SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_LASER=0 PROFILE_CONTACT=0 PROFILE_FRAMES=0 PROFILE_TRANSITION=0 GENERATION_DETAIL=0 GENERATION_TIMING=0 PHASE_SAMPLING=0 TRACE_FRAMES= >> .run/profile-restore.log 2>&1
+ }
+ mkdir -p .run
+ if [[ ${PROFILE_CONTACT:-0} == 1 ]]; then
+diff --git a/src/platform/amiga/AmigaAmmoHud.h b/src/platform/amiga/AmigaAmmoHud.h
+index 26d4f385..3c145418 100644
+--- a/src/platform/amiga/AmigaAmmoHud.h
++++ b/src/platform/amiga/AmigaAmmoHud.h
+@@ -27,6 +27,9 @@ class AmigaAmmoHud {
+ #ifdef DOWNWELL_PREPARED_AMMO_DIVIDERS
+     bool preparedDividersMatch_ = false;
+ #endif
++#ifdef DOWNWELL_AMMO_COLUMN
++    AmigaAmmoColumnCache column_ = {};
++#endif
+ public:
+     unsigned lastWordWrites = 0;
+     void invalidate() { damage_.valid = false; }
+@@ -119,7 +122,28 @@ public:
+             fillTop_ = fill.top.floor(); fillHeight_ = fill.height.floor();
+             fillAmmo_ = ammo; fillCapacity_ = capacity;
+         }
++#ifdef DOWNWELL_AMMO_COLUMN
++        const bool useColumn = !forceFull && rows && stampsReady_ && preparedDividersMatch_ &&
++            capacity <= 16 && meter <= 3 && bodyTop_+3 < bodyBottom_;
++        const int columnTop = bodyTop_+3, columnBottom = bodyBottom_;
++        bool columnDrawn = false;
++        if (initialize || !useColumn) column_.valid = 0;
++#endif
+         auto paint = [&](int top, int bottom, bool interior) {
++#ifdef DOWNWELL_AMMO_COLUMN
++            if (interior && useColumn) {
++                if (!columnDrawn) {
++                    const auto dividers = amigaPreparedDividers(ammo, capacity);
++                    DW_PROFILE_SCOPE(profileAmmoRows);
++                    lastWordWrites += amigaRendererPublishAmmoColumn(display->hud, working_, &column_,
++                        rows->state, rows->filled, meter, fillTop_, fillHeight_, stamps_, &dividers,
++                        columnTop, columnBottom);
++                    columnDrawn = true;
++                }
++                return;
++            }
++            if (top < columnBottom && bottom > columnTop) column_.valid = 0;
++#endif
+             // Record the backing actually painted, not merely a draw request:
+             // repeated unchanged requests must not lose a pending wide clear.
+             if (!interior && top <= 231 && bottom >= 256)
+@@ -245,8 +269,16 @@ public:
+         auto strip = [&](int top, int bottom) {
+             // Only the overlap of old/new constant spans has stationary sides.
+             // Caps and the number still follow the original displaced artwork.
+-            const int stableTop = bodyTop_ + (meter > previousMeter ? meter : previousMeter);
+-            const int stableBottom = bodyBottom_ + (meter < previousMeter ? meter : previousMeter);
++            const int stableTop =
++#ifdef DOWNWELL_AMMO_COLUMN
++                useColumn ? columnTop :
++#endif
++                bodyTop_ + (meter > previousMeter ? meter : previousMeter);
++            const int stableBottom =
++#ifdef DOWNWELL_AMMO_COLUMN
++                useColumn ? columnBottom :
++#endif
++                bodyBottom_ + (meter < previousMeter ? meter : previousMeter);
+             if (retainEdges && clearDigits == 1 && bottom > stableTop && top < stableBottom && stableTop < stableBottom) {
+                 const int begin = top > stableTop ? top : stableTop;
+                 const int end = bottom < stableBottom ? bottom : stableBottom;
+diff --git a/src/platform/amiga/AmigaPreparedDividers.h b/src/platform/amiga/AmigaPreparedDividers.h
+index 36ff6e0d..a65fbf45 100644
+--- a/src/platform/amiga/AmigaPreparedDividers.h
++++ b/src/platform/amiga/AmigaPreparedDividers.h
+@@ -16,6 +16,6 @@ inline bool amigaPreparedDividersMatch(const AmigaWordStamp* stamps) {
+ 
+ inline AmigaHudBlockedColumn amigaPreparedDividers(unsigned ammo, unsigned capacity) {
+     return {downwell_ammo_dividers::images[capacity*(capacity+1)/2 + ammo],
+-            &downwell_ammo_dividers::blocks[0][0]};
++            &downwell_ammo_dividers::blocks[0][0], &downwell_ammo_dividers::runStarts[0][0]};
+ }
+ #endif
+diff --git a/src/platform/amiga/AmigaRenderer.c b/src/platform/amiga/AmigaRenderer.c
+index 353c9bb5..5c1ce215 100644
+--- a/src/platform/amiga/AmigaRenderer.c
++++ b/src/platform/amiga/AmigaRenderer.c
+@@ -801,6 +801,118 @@ void amigaRendererApplyHudBlockedColumn(AmigaRenderer* renderer, const AmigaHudB
+     }
+ }
+ 
++/* One monotone sweep, not repeated insertion/overlay into a general RLE list.
++   Repeated source rows have a constant fully overlapped middle; only the seven
++   rows around a group boundary need the source's ordered partial overlaps. */
++unsigned amigaRendererPublishAmmoColumn(UBYTE* destination, UBYTE* working,
++    AmigaAmmoColumnCache* cache, const UBYTE* states, unsigned filled, unsigned meter,
++    unsigned fillTop, unsigned fillHeight, const AmigaWordStamp* stamps,
++    const AmigaHudBlockedColumn* dividers, int top, int bottom) {
++    const int base = 229+4*meter, shift = 4*meter;
++    const unsigned firstVisible = base >= 232 ? base-231 : 0;
++    const unsigned bank = cache->bank ^ 1u;
++    AmigaAmmoColumnSpan* next = cache->spans[bank];
++    const AmigaAmmoColumnSpan* previous = cache->spans[cache->bank];
++    unsigned groups = 0, group = 0, old = 0, count = 0, writes = 0, i;
++    int y = bottom-1;
++    const int retained = cache->valid && cache->top == top && cache->bottom == bottom;
++    if (top < shift || bottom > 284 || top >= bottom || meter > 3 || !dividers->runStarts) return 0;
++    for (i = firstVisible; i < 184; ++i) {
++        const unsigned frame = states[i] < 4 ? states[i] : 3;
++        const unsigned stamp = i < filled ? (i ? 4+frame : 8+frame%2) : frame;
++        if (!groups || stamp != cache->groups[groups-1].stamp) {
++            cache->groups[groups].stamp = stamp;
++            cache->groups[groups++].end = i+1;
++        } else cache->groups[groups-1].end = i+1;
++    }
++    while (y >= top) {
++        int begin = top, start = base-y, stop = start+8;
++        const unsigned fillEnd = fillTop+fillHeight;
++        UWORD low = 0xfff0, high = 0xfff0;
++        if ((unsigned)y >= fillTop && (unsigned)y < fillEnd) {
++            high = 0x8010;
++            if (begin < (int)fillTop) begin = fillTop;
++        } else if ((unsigned)y >= fillEnd && begin < (int)fillEnd) begin = fillEnd;
++        if (start < (int)firstVisible) start = firstVisible;
++        if (stop > 184) stop = 184;
++        while (group < groups && cache->groups[group].end <= start) ++group;
++        if (start < stop && group < groups) {
++            const AmigaWordStamp* stamp = stamps+cache->groups[group].stamp;
++            if (start == base-y && stop == start+8 && stop <= cache->groups[group].end) {
++                const int first = y-(cache->groups[group].end-stop);
++                const UWORD mask = stamp->runMask[7] & 0xfff0u;
++                if (begin < first) begin = first;
++                low = (low & (UWORD)~mask) | (stamp->runLow[7] & mask);
++                high = (high & (UWORD)~mask) | (stamp->runHigh[7] & mask);
++            } else {
++                unsigned g = group;
++                begin = y;
++                while (start < stop) {
++                    const unsigned end = cache->groups[g].end < stop ? cache->groups[g].end : stop;
++                    const unsigned index = (start-(base-y))*8 + end-1-(base-y);
++                    UWORD mask;
++                    stamp = stamps+cache->groups[g].stamp;
++                    mask = stamp->runMask[index] & 0xfff0u;
++                    low = (low & (UWORD)~mask) | (stamp->runLow[index] & mask);
++                    high = (high & (UWORD)~mask) | (stamp->runHigh[index] & mask);
++                    start = end; ++g;
++                }
++            }
++        } else if (base-y+8 <= (int)firstVisible) {
++            const int first = base+8-firstVisible;
++            if (begin < first) begin = first;
++        }
++        {
++            const unsigned sourceY = y-shift, blockY = sourceY >> 3;
++            const unsigned block = dividers->indices[blockY];
++            const UWORD* words = dividers->blocks+block*16+(sourceY&7)*2;
++            const UWORD mask = (words[0] | words[1]) & 0xfff0u;
++            int first;
++            if (!block) {
++                unsigned b = blockY;
++                while (b && !dividers->indices[b-1]) --b;
++                first = b*8+shift;
++            } else first = blockY*8+dividers->runStarts[block*8+(sourceY&7)]+shift;
++            if (begin < first) begin = first;
++            low = (low & (UWORD)~mask) | (words[0] & mask);
++            high = (high & (UWORD)~mask) | (words[1] & mask);
++        }
++        if (count && next[count-1].low == low && next[count-1].high == high)
++            next[count-1].first = begin;
++        else { next[count].first = begin; next[count].low = low; next[count++].high = high; }
++        {
++            int end = y+1;
++            while (end > begin) {
++                int first = begin;
++                unsigned plane;
++                if (retained) {
++                    while (old < cache->count[cache->bank] && previous[old].first >= end) ++old;
++                    if (first < previous[old].first) first = previous[old].first;
++                }
++                for (plane = 0; plane < 2; ++plane) {
++                    const UWORD value = plane ? high : low;
++                    if (!retained || value != (plane ? previous[old].high : previous[old].low)) {
++                        UBYTE* target = destination+plane*downwellPlaneBytes+first*downwellBytesPerPlaneLine+36;
++                        UBYTE* backing = working+plane*downwellPlaneBytes+first*downwellBytesPerPlaneLine+36;
++                        int row;
++                        for (row = first; row < end; ++row) {
++                            writeWord(target, (readWord(target)&0x000fu)|value);
++                            writeWord(backing, (readWord(backing)&0x000fu)|value);
++                            target += downwellBytesPerPlaneLine; backing += downwellBytesPerPlaneLine;
++                            ++writes;
++                        }
++                    }
++                }
++                end = first;
++            }
++        }
++        y = begin-1;
++    }
++    cache->count[bank] = count; cache->bank = bank;
++    cache->top = top; cache->bottom = bottom; cache->valid = 1;
++    return writes;
++}
++
+ int amigaRendererBindTerrainBatch(AmigaTerrainBatch* batch, const UBYTE* pack,
+     const UBYTE* end, UBYTE* scratch, unsigned bytes) {
+     unsigned frame;
+diff --git a/src/platform/amiga/AmigaRenderer.h b/src/platform/amiga/AmigaRenderer.h
+index 2bb52a2b..780f9c08 100644
+--- a/src/platform/amiga/AmigaRenderer.h
++++ b/src/platform/amiga/AmigaRenderer.h
+@@ -106,11 +106,23 @@ unsigned amigaRendererPublishHudColumn(UBYTE*, UBYTE*, const UWORD*, unsigned,
+ typedef struct AmigaHudBlockedColumn {
+     const UBYTE* indices;
+     const UWORD* blocks;
++    const UBYTE* runStarts;
+ } AmigaHudBlockedColumn;
+ unsigned amigaRendererPublishHudBlockedColumn(UBYTE*, UBYTE*, const AmigaHudBlockedColumn*,
+                                              unsigned, int, int, int, UWORD);
+ void amigaRendererApplyHudBlockedColumn(AmigaRenderer*, const AmigaHudBlockedColumn*,
+                                        unsigned, int, int, int);
++typedef struct AmigaAmmoColumnSpan { UWORD first, low, high; } AmigaAmmoColumnSpan;
++typedef struct AmigaAmmoColumnGroup { UWORD end, stamp; } AmigaAmmoColumnGroup;
++typedef struct AmigaAmmoColumnCache {
++    AmigaAmmoColumnSpan spans[2][284];
++    AmigaAmmoColumnGroup groups[184];
++    unsigned count[2], bank;
++    int valid, top, bottom;
++} AmigaAmmoColumnCache;
++unsigned amigaRendererPublishAmmoColumn(UBYTE*, UBYTE*, AmigaAmmoColumnCache*,
++    const UBYTE*, unsigned, unsigned, unsigned, unsigned, const AmigaWordStamp*,
++    const AmigaHudBlockedColumn*, int, int);
+ /* One aligned HUD column, already clipped by caller; masked planar words. */
+ void amigaRendererFillHudWordColumn(UBYTE*, unsigned, unsigned, unsigned, UWORD, UWORD, UWORD);
+ void amigaRendererCacheHudColumns(UWORD*, const UBYTE*, unsigned, unsigned);
+diff --git a/tools/generate-ammo-dividers.py b/tools/generate-ammo-dividers.py
+index bfccbdd2..69112cd0 100644
+--- a/tools/generate-ammo-dividers.py
++++ b/tools/generate-ammo-dividers.py
+@@ -66,7 +66,7 @@ for capacity in range(17):
+             image.append(blocks.index(block))
+         images.append(image)
+ assert len(blocks) <= 256, "block dictionary no longer fits byte indices"
+-lines = ["// Generated by generate-ammo-dividers.py/v2; copyrighted derived data, do not commit.",
++lines = ["// Generated by generate-ammo-dividers.py/v3; copyrighted derived data, do not commit.",
+          "namespace downwell_ammo_dividers {",
+          "static const unsigned short stamps[2][8][2] = {" ]
+ for frame in range(2):
+@@ -75,13 +75,22 @@ lines += ["};", "static const unsigned short blocks[][16] = {"]
+ lines += ["{" + ",".join(str(word) for pair in block for word in pair) + "}," for block in blocks]
+ lines += ["};", "static const unsigned char images[][36] = {"]
+ lines += ["{" + ",".join(map(str, image)) + "}," for image in images]
++lines += ["};", "static const unsigned char runStarts[][8] = {"]
++for block in blocks:
++    starts = []
++    for row in range(8):
++        first = row
++        while first and block[first-1] == block[row]:
++            first -= 1
++        starts.append(first)
++    lines.append("{" + ",".join(map(str, starts)) + "},")
+ lines += ["};", "}", ""]
+ output = "\n".join(lines).encode()
+ path = ROOT / "generated/amiga-ammo-dividers.h"
+ if not path.exists() or path.read_bytes() != output:
+     path.write_bytes(output)
+-size = len(blocks)*32 + len(images)*36 + 64
+-manifest = dict(schemaVersion=1, generator="generate-ammo-dividers.py/v2",
++size = len(blocks)*40 + len(images)*36 + 64
++manifest = dict(schemaVersion=1, generator="generate-ammo-dividers.py/v3",
+     generatorSha256=digest(Path(__file__).read_bytes()), sourceSha256=provenance["sourceSha256"],
+     extractor=provenance["extractor"], inputPackSha256=digest(pack), outputSha256=digest(output),
+     spriteId=421, frames=[0, 1], capacities=[0, 16], images=len(images),

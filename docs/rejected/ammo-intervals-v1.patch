@@ -1,0 +1,384 @@
+diff --git a/Makefile b/Makefile
+index c8962f15..09a41dfa 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1860,6 +1860,17 @@ $(AMIGA_RENDERER_TEST_TARGET): $(AMIGA_RENDERER_TEST_SOURCES)
+ 	@mkdir -p $(@D)
+ 	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $(AMIGA_RENDERER_TEST_SOURCES)
+ 
++.PHONY: test-amiga-ammo-intervals
++build/amiga-ammo-intervals-test: $(AMIGA_RENDERER_TEST_SOURCES) $(HOST_CHECK_HEADERS)
++	@mkdir -p $(@D)
++	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -DDOWNWELL_AMMO_INTERVALS -o $@ $(AMIGA_RENDERER_TEST_SOURCES)
++build/amiga-ammo-interval-model-test: tests/platform/amiga/AmigaAmmoIntervalsTest.cpp $(HOST_CHECK_HEADERS)
++	@mkdir -p $(@D)
++	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $<
++test-amiga-ammo-intervals: build/amiga-ammo-intervals-test build/amiga-ammo-interval-model-test generate-amiga-game generate-amiga-hud
++	./build/amiga-ammo-interval-model-test
++	./build/amiga-ammo-intervals-test generated/amiga-game.dwap generated/amiga-hud.dwap
++
+ .PHONY: test-amiga-terrain-batch
+ test: test-amiga-terrain-batch
+ test-amiga-terrain-batch: generate-amiga-game build/amiga-terrain-batch-test build/amiga-terrain-painter-test
+diff --git a/amiga/Makefile b/amiga/Makefile
+index 0a02e3da..16cdb0e8 100644
+--- a/amiga/Makefile
++++ b/amiga/Makefile
+@@ -34,6 +34,7 @@ NATIVE_FIELDS ?= 1
+ TERRAIN_BATCH ?= 0
+ TERRAIN_DIRECT ?= 0
+ TERRAIN_BATCH_VERIFY ?= 0
++AMMO_INTERVALS ?= 0
+ SKIP_LEVEL ?= 0
+ PROBES ?= 0
+ GENERATION_DETAIL ?= 0
+@@ -163,6 +164,9 @@ endif
+ ifeq ($(RETAIN_HEALTH_HUD),1)
+ CFLAGS += -DDOWNWELL_RETAIN_HEALTH_HUD
+ endif
++ifeq ($(AMMO_INTERVALS),1)
++CFLAGS += -DDOWNWELL_AMMO_INTERVALS
++endif
+ ifeq ($(SCENERY_LAYERS),1)
+ CFLAGS += -DDOWNWELL_SCENERY_LAYERS
+ endif
+@@ -280,6 +284,7 @@ $(OUT).front: $(AMIGA_FRONT_BANK)
+ obj/startup-options: FORCE_STARTUP_OPTIONS
+ 	@mkdir -p obj
+ 	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(SKIP_LEVEL)' '$(TERRAIN_RUN_STORE)' '$(TABLE_CONTACT_ATAN)' '$(RETAIN_HEALTH_HUD)' '$(SCENERY_LAYERS)' '$(NATIVE_BOXES)' '$(NATIVE_FIELDS)' '$(TERRAIN_BATCH)' '$(TERRAIN_DIRECT)' '$(TERRAIN_BATCH_VERIFY)' '$(AMIGA_OPTIMIZATION)' '$(LASER_VERIFY)' '$(PROFILE_LASER)' > $@.tmp
++	@printf '%s\n' '$(AMMO_INTERVALS)' >> $@.tmp
+ 	@cmp -s $@.tmp $@ || cp $@.tmp $@
+ 
+ $(OBJECTS): obj/startup-options
+diff --git a/amiga/profile.sh b/amiga/profile.sh
+index a18bef09..6d1e03bc 100644
+--- a/amiga/profile.sh
++++ b/amiga/profile.sh
+@@ -37,7 +37,7 @@ if [[ ${SKIP_LEVEL:-0} == 1 && $mode != trace ]]; then script=profile_clear.gdb;
+ # Always leave the playable binary behind, including after a timeout/failure.
+ restore() {
+   make clean > .run/profile-restore.log 2>&1
+-  make -j4 TERRAIN_RUN_STORE=0 TABLE_CONTACT_ATAN=0 RETAIN_HEALTH_HUD=0 SCENERY_LAYERS=0 NATIVE_BOXES=1 NATIVE_FIELDS=1 TERRAIN_BATCH=0 TERRAIN_DIRECT=0 TERRAIN_BATCH_VERIFY=0 SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_LASER=0 PROFILE_CONTACT=0 PROFILE_FRAMES=0 PROFILE_TRANSITION=0 GENERATION_DETAIL=0 GENERATION_TIMING=0 PHASE_SAMPLING=0 TRACE_FRAMES= >> .run/profile-restore.log 2>&1
++  make -j4 AMMO_INTERVALS=0 TERRAIN_RUN_STORE=0 TABLE_CONTACT_ATAN=0 RETAIN_HEALTH_HUD=0 SCENERY_LAYERS=0 NATIVE_BOXES=1 NATIVE_FIELDS=1 TERRAIN_BATCH=0 TERRAIN_DIRECT=0 TERRAIN_BATCH_VERIFY=0 SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_LASER=0 PROFILE_CONTACT=0 PROFILE_FRAMES=0 PROFILE_TRANSITION=0 GENERATION_DETAIL=0 GENERATION_TIMING=0 PHASE_SAMPLING=0 TRACE_FRAMES= >> .run/profile-restore.log 2>&1
+ }
+ mkdir -p .run
+ if [[ ${PROFILE_CONTACT:-0} == 1 ]]; then
+diff --git a/src/platform/amiga/AmigaAmmoHud.h b/src/platform/amiga/AmigaAmmoHud.h
+index 5ca5a22d..19a49444 100644
+--- a/src/platform/amiga/AmigaAmmoHud.h
++++ b/src/platform/amiga/AmigaAmmoHud.h
+@@ -6,7 +6,13 @@
+ #include "core/AmmoDividerLayout.h"
+ #include "core/AmmoFill.h"
+ #include "core/HudNumbers.h"
++#ifdef DOWNWELL_AMMO_INTERVALS
++#include "AmigaAmmoIntervals.h"
++#endif
+ class AmigaAmmoHud {
++#ifdef DOWNWELL_AMMO_INTERVALS
++    AmigaAmmoIntervals intervals_;
++#endif
+     AmmoHudDamage damage_;
+     downwell::AmmoDividerLayout layout_;
+     UBYTE* destination_ = nullptr;
+@@ -23,7 +29,11 @@ class AmigaAmmoHud {
+     int bodyTop_ = 0, bodyBottom_ = 0;
+ public:
+     unsigned lastWordWrites = 0;
+-    void invalidate() { damage_.valid = false; }
++    void invalidate() { damage_.valid = false;
++#ifdef DOWNWELL_AMMO_INTERVALS
++        intervals_.invalidate();
++#endif
++    }
+     void draw(AmigaRenderer* renderer, const UBYTE* pack, const UBYTE* end,
+               unsigned ammo, unsigned capacity, unsigned offset,
+               const downwell::AmmoGaugeRows* rows, unsigned meter, bool forceFull = false) {
+@@ -104,7 +114,15 @@ public:
+             fillTop_ = fill.top.floor(); fillHeight_ = fill.height.floor();
+             fillAmmo_ = ammo; fillCapacity_ = capacity;
+         }
++#ifdef DOWNWELL_AMMO_INTERVALS
++        if(!retainEdges||forceFull||!rows||!stampsReady_||capacity>64||meter>3||clearDigits!=1)
++            intervals_.invalidate();
++#endif
+         auto paint = [&](int top, int bottom, bool interior) {
++            bool intervalInterior=false;
++#ifdef DOWNWELL_AMMO_INTERVALS
++            intervalInterior=interior&&!forceFull&&stampsReady_&&rows&&capacity<=64&&meter<=3;
++#endif
+             // Record the backing actually painted, not merely a draw request:
+             // repeated unchanged requests must not lose a pending wide clear.
+             if (!interior && top <= 231 && bottom >= 256)
+@@ -121,6 +139,7 @@ public:
+                 amigaRendererDrawAsset(renderer, pack, end, sprite, frame, x, y, 0);
+             };
+             if (interior) {
++                if(!intervalInterior){
+                 // Black is 11, white is 01. Compose the final background once:
+                 // never clear the white span to black only to fill it again.
+                 int begin = fillTop_ > static_cast<unsigned>(top) ? fillTop_ : top;
+@@ -131,6 +150,7 @@ public:
+                     amigaRendererFillHudWordColumn(working_, 18, begin, end, 0xfff0, 0xfff0, 0x8010);
+                     amigaRendererFillHudWordColumn(working_, 18, end, bottom, 0xfff0, 0xfff0, 0xfff0);
+                 } else amigaRendererFillHudWordColumn(working_, 18, top, bottom, 0xfff0, 0xfff0, 0xfff0);
++                }
+             }
+             else if (clearDigits == 1 && !forceFull) {
+                 renderer->clipX = 282; renderer->clipWidth = 24;
+@@ -145,7 +165,7 @@ public:
+             }
+             if (!interior && fillHeight_) amigaRendererFillRect(renderer, 289, fillTop_, 10, fillHeight_, 1);
+             DW_PROFILE_PHASE(profileAmmoRows);
+-            if (rows) {
++            if (rows&&!intervalInterior) {
+                 const int base = 229 + 4 * meter;
+                 int first = base - bottom + 1, last = base + 8 - top;
+                 if (first < 0) first = 0;
+@@ -186,6 +206,9 @@ public:
+                             }
+                         });
+                     dividerAmmo_ = ammo; dividerCapacity_ = capacity;
++#ifdef DOWNWELL_AMMO_INTERVALS
++                    intervals_.cacheDividers(dividers_);
++#endif
+                 }
+                 if (!fusedPublish) amigaRendererApplyHudColumns(renderer, dividers_, 18, 1,
+                     4 * meter, top, bottom, 1);
+@@ -194,6 +217,17 @@ public:
+                     if (static_cast<int>(y) < bottom && static_cast<int>(y) + 8 > top)
+                         asset(sprite, frame, x, y);
+                 });
++#ifdef DOWNWELL_AMMO_INTERVALS
++            if(intervalInterior){
++                intervals_.draw(stamps_,*rows,fillTop_,fillHeight_,meter,top,bottom,
++                    [&](int first,int end,UWORD low,UWORD high){
++                        amigaRendererFillHudWordColumn(working_,18,first,end,0xfff0,low,high);
++                        lastWordWrites+=amigaRendererCopyHudWords(display->hud,working_,288,first,300,end,1);
++                    });
++                DW_PROFILE_PHASE(profileAmmoBase);
++                return;
++            }
++#endif
+             DW_PROFILE_PHASE(profileAmmoLabel);
+             if (interior) { /* The retained red rim is outside this strip. */ }
+             else if (!forceFull) amigaRendererApplyHudColumns(renderer, rim_, 17, 3, meter, 0, 284, 1);
+diff --git a/src/platform/amiga/AmigaAmmoIntervals.h b/src/platform/amiga/AmigaAmmoIntervals.h
+new file mode 100644
+index 00000000..a65df14c
+--- /dev/null
++++ b/src/platform/amiga/AmigaAmmoIntervals.h
+@@ -0,0 +1,149 @@
++#ifndef DOWNWELL_AMIGA_AMMO_INTERVALS_H
++#define DOWNWELL_AMIGA_AMMO_INTERVALS_H
++#include "AmigaRenderer.h"
++#include "core/AmmoGaugeRows.h"
++
++// Final planar values over constant-height intervals, not a per-scanline
++// damage bitmap. Overlay and comparison operate on boundaries; only changed
++// intervals reach the framebuffer publisher.
++class AmigaHudColumnIntervals {
++public:
++    struct Span { UWORD end,low,high; };
++private:
++    Span spans_[2][downwellDisplayHeight];
++    unsigned bank_=0,count_=1;
++public:
++    void reset(UWORD low,UWORD high){bank_=0;count_=1;spans_[0][0]={downwellDisplayHeight,low,high};}
++    void paint(int first,int end,UWORD mask,UWORD low,UWORD high){
++        if(!mask||first>=end||end<=0||first>=downwellDisplayHeight)return;
++        if(first<0)first=0;
++        if(end>downwellDisplayHeight)end=downwellDisplayHeight;
++        Span* output=spans_[bank_^1u];unsigned used=0;
++        auto append=[&](unsigned bottom,UWORD a,UWORD b){
++            if(used&&output[used-1].low==a&&output[used-1].high==b)output[used-1].end=bottom;
++            else output[used++]={UWORD(bottom),a,b};
++        };
++        int top=0;
++        for(unsigned i=0;i<count_;++i){
++            const Span s=spans_[bank_][i];
++            if(s.end<=first||top>=end)append(s.end,s.low,s.high);
++            else{
++                if(top<first)append(first,s.low,s.high);
++                append(s.end<unsigned(end)?s.end:unsigned(end),
++                    (s.low&UWORD(~mask))|(low&mask),(s.high&UWORD(~mask))|(high&mask));
++                if(s.end>end)append(s.end,s.low,s.high);
++            }
++            top=s.end;
++        }
++        bank_^=1u;count_=used;
++    }
++    void overlay(const Span* source,unsigned count,int offset){
++        Span* output=spans_[bank_^1u];
++        unsigned a=0,b=0,used=0;
++        int top=0;
++        while(top<downwellDisplayHeight){
++            const Span base=spans_[bank_][a];
++            int end=base.end;
++            UWORD mask=0,low=0,high=0;
++            if(top<offset){if(offset<end)end=offset;}
++            else{
++                while(b<count&&int(source[b].end)+offset<=top)++b;
++                if(b<count){
++                    const Span layer=source[b];
++                    if(int(layer.end)+offset<end)end=layer.end+offset;
++                    mask=(layer.low|layer.high)&0xfff0u;low=layer.low;high=layer.high;
++                }
++            }
++            low=(base.low&UWORD(~mask))|(low&mask);
++            high=(base.high&UWORD(~mask))|(high&mask);
++            if(used&&output[used-1].low==low&&output[used-1].high==high)output[used-1].end=end;
++            else output[used++]={UWORD(end),low,high};
++            top=end;if(base.end==end)++a;
++        }
++        bank_^=1u;count_=used;
++    }
++    template<class Publish>
++    unsigned difference(const AmigaHudColumnIntervals* previous,int first,int end,Publish publish)const{
++        if(first<0)first=0;
++        if(end>downwellDisplayHeight)end=downwellDisplayHeight;
++        unsigned a=0,b=0,compared=0;
++        while(a<count_&&spans_[bank_][a].end<=first)++a;
++        if(previous)while(b<previous->count_&&previous->spans_[previous->bank_][b].end<=first)++b;
++        while(first<end){
++            const Span next=spans_[bank_][a];
++            int bottom=next.end<end?next.end:end;
++            bool changed=true;
++            if(previous){
++                const Span old=previous->spans_[previous->bank_][b];
++                if(old.end<bottom)bottom=old.end;
++                changed=old.low!=next.low||old.high!=next.high;
++                if(old.end==bottom)++b;
++            }
++            ++compared;
++            if(changed)publish(first,bottom,next.low,next.high);
++            first=bottom;if(next.end==bottom)++a;
++        }
++        return compared;
++    }
++};
++
++class AmigaAmmoIntervals {
++    AmigaHudColumnIntervals models_[2];
++    AmigaHudColumnIntervals::Span dividers_[downwellDisplayHeight];
++    unsigned dividerCount_=0,previous_=0;
++    bool valid_=false;
++    static void stampRun(AmigaHudColumnIntervals& result,const AmigaWordStamp& stamp,int y,unsigned count){
++        if(!count||stamp.first>=stamp.last)return;
++        const int first=y+int(stamp.first)-int(count)+1,last=y+int(stamp.last);
++        for(int row=first;row<last;){
++            const int relative=row-y;
++            int end=row+1;
++            unsigned index;
++            if(relative<=0&&relative+int(count)-1>=7){
++                end=last<y+1?last:y+1;index=7;
++            }else{
++                const unsigned a=relative<0?0:unsigned(relative);
++                const unsigned b=relative+int(count)-1>7?7:unsigned(relative+int(count)-1);
++                index=a*8+b;
++            }
++            result.paint(row,end,stamp.runMask[index]&0xfff0u,stamp.runLow[index],stamp.runHigh[index]);
++            row=end;
++        }
++    }
++public:
++    unsigned lastComparedIntervals=0,lastPublishedRows=0;
++    void invalidate(){valid_=false;}
++    void cacheDividers(const UWORD* words){
++        dividerCount_=0;
++        for(unsigned y=0;y<downwellDisplayHeight;++y){
++            const UWORD low=words[y*2],high=words[y*2+1];
++            if(dividerCount_&&dividers_[dividerCount_-1].low==low&&dividers_[dividerCount_-1].high==high)
++                dividers_[dividerCount_-1].end=y+1;
++            else dividers_[dividerCount_++]={UWORD(y+1),low,high};
++        }
++    }
++    template<class Publish>
++    void draw(const AmigaWordStamp* stamps,const downwell::AmmoGaugeRows& rows,
++        unsigned fillTop,unsigned fillHeight,unsigned meter,int top,int bottom,Publish publish){
++        auto& next=models_[previous_^1u];
++        next.reset(0xfff0,0xfff0);
++        if(fillHeight)next.paint(fillTop,fillTop+fillHeight,0xfff0,0xfff0,0x8010);
++        const int base=229+4*meter;
++        unsigned i=base>=232?unsigned(base-231):0;
++        while(i<184){
++            const unsigned frame=rows.state[i]<4?rows.state[i]:3;
++            const unsigned index=i<rows.filled?(i?4+frame:8+frame%2):frame;
++            unsigned end=i+1;
++            if(i)while(end<184&&(end<rows.filled)==(i<rows.filled)&&
++                (rows.state[end]<4?rows.state[end]:3)==frame)++end;
++            stampRun(next,stamps[index],base-int(i),end-i);
++            i=end;
++        }
++        next.overlay(dividers_,dividerCount_,4*meter);
++        lastPublishedRows=0;
++        lastComparedIntervals=next.difference(valid_?&models_[previous_]:nullptr,top,bottom,
++            [&](int first,int end,UWORD low,UWORD high){lastPublishedRows+=end-first;publish(first,end,low,high);});
++        previous_^=1u;valid_=true;
++    }
++};
++#endif
+diff --git a/tests/platform/amiga/AmigaAmmoIntervalsTest.cpp b/tests/platform/amiga/AmigaAmmoIntervalsTest.cpp
+new file mode 100644
+index 00000000..d2ed245f
+--- /dev/null
++++ b/tests/platform/amiga/AmigaAmmoIntervalsTest.cpp
+@@ -0,0 +1,58 @@
++#include "platform/amiga/AmigaAmmoIntervals.h"
++#include <array>
++#include <cassert>
++#include <cstdio>
++#include <vector>
++int main(){
++    AmigaHudColumnIntervals models[2];
++    using Pixel=std::array<UWORD,2>;
++    std::array<Pixel,284> expected[2];
++    unsigned random=91;
++    auto next=[&](){random=random*1664525u+1013904223u;return random;};
++    for(unsigned iteration=0;iteration<2000;++iteration){
++        const unsigned bank=iteration&1;
++        auto& model=models[bank];auto& pixels=expected[bank];
++        const Pixel base{UWORD(next()),UWORD(next())};model.reset(base[0],base[1]);pixels.fill(base);
++        // Include the maximum 284 single-row intervals, then arbitrary merges.
++        for(int pass=0;pass<320;++pass){
++            const int top=pass<284?pass:int(next()%340)-28;
++            const int end=top+(pass<284?1:int(next()%85));
++            const UWORD mask=UWORD(next()),low=UWORD(next()),high=UWORD(next());
++            model.paint(top,end,mask,low,high);
++            for(int y=top<0?0:top;y<end&&y<284;++y){
++                pixels[y][0]=(pixels[y][0]&UWORD(~mask))|(low&mask);
++                pixels[y][1]=(pixels[y][1]&UWORD(~mask))|(high&mask);
++            }
++        }
++        std::vector<AmigaHudColumnIntervals::Span> layer;
++        for(unsigned top=0;top<284;){
++            const unsigned end=top+1+next()%15;
++            layer.push_back({UWORD(end<284?end:284),UWORD(next()),UWORD(next())});top=layer.back().end;
++        }
++        const int offset=int(next()%25)-12;
++        model.overlay(layer.data(),layer.size(),offset);
++        int top=offset;
++        for(const auto& span:layer){
++            const int end=span.end+offset;
++            const UWORD mask=(span.low|span.high)&0xfff0u;
++            for(int y=top<0?0:top;y<end&&y<284;++y){
++                pixels[y][0]=(pixels[y][0]&UWORD(~mask))|(span.low&mask);
++                pixels[y][1]=(pixels[y][1]&UWORD(~mask))|(span.high&mask);
++            }
++            top=end;
++        }
++        std::array<bool,284> visited{};
++        model.difference(iteration?&models[bank^1]:nullptr,0,284,[&](int first,int end,UWORD low,UWORD high){
++            assert(first<end);
++            for(int y=first;y<end;++y){
++                assert(!visited[y]);visited[y]=true;
++                assert((pixels[y]==Pixel{low,high}));
++                if(iteration)assert(pixels[y]!=expected[bank^1][y]);
++            }
++        });
++        for(unsigned y=0;y<284;++y)assert(visited[y]==(!iteration||pixels[y]!=expected[bank^1][y]));
++        unsigned writes=0;
++        model.difference(&model,0,284,[&](int,int,UWORD,UWORD){++writes;});assert(!writes);
++    }
++    std::puts("2000 full-height interval overlay/difference cases: exact values, changed rows only");
++}

@@ -1,0 +1,218 @@
+diff --git a/src/platform/amiga/AmigaAmmoHud.h b/src/platform/amiga/AmigaAmmoHud.h
+index 5ca5a22d..237ad541 100644
+--- a/src/platform/amiga/AmigaAmmoHud.h
++++ b/src/platform/amiga/AmigaAmmoHud.h
+@@ -21,6 +21,159 @@ class AmigaAmmoHud {
+     UWORD dividers_[downwellDisplayHeight*2];
+     unsigned dividerAmmo_ = ~0u, dividerCapacity_ = ~0u;
+     int bodyTop_ = 0, bodyBottom_ = 0;
++    // Rows of dividers_ with any opaque pixel, ascending.
++    UWORD dividerLines_[downwellDisplayHeight];
++    unsigned dividerLineCount_ = 0;
++    // Interior row-art lines not covered by one run's constant middle.
++    // Kept all zero between paints.
++    UWORD rowLow_[downwellDisplayHeight] = {}, rowHigh_[downwellDisplayHeight] = {},
++          rowMask_[downwellDisplayHeight] = {};
++    struct Middle { int top, bottom; UWORD low, high, mask; };
++    Middle middles_[32];
++    unsigned middleCount_ = 0;
++    static UWORD load(const UBYTE* at) {
++#ifdef DOWNWELL_PLATFORM_AMIGA
++        return *reinterpret_cast<const UWORD*>(at);
++#else
++        return UWORD((at[0] << 8) | at[1]);
++#endif
++    }
++    static void store(UBYTE* at, UWORD value) {
++#ifdef DOWNWELL_PLATFORM_AMIGA
++        *reinterpret_cast<UWORD*>(at) = value;
++#else
++        at[0] = UBYTE(value >> 8); at[1] = UBYTE(value);
++#endif
++    }
++    void prepareDividers(unsigned ammo, unsigned capacity) {
++        // Retain the ordered divider composition, not just positions.
++        // Animation strips reuse it; jiggle only shifts its row origin.
++        if (dividerAmmo_ == ammo && dividerCapacity_ == capacity) return;
++        for (auto& word : dividers_) word = 0;
++        unsigned low = downwellDisplayHeight, high = 0;
++        layout_.draw(ammo, capacity, 1, 288, 229,
++            [&](unsigned, unsigned frame, int, unsigned y) {
++                const auto& stamp = stamps_[8 + frame];
++                for (unsigned row = stamp.first; row < stamp.last; ++row) {
++                    if (y + row >= downwellDisplayHeight) continue;
++                    if (y + row < low) low = y + row;
++                    if (y + row >= high) high = y + row + 1;
++                    UWORD* target = dividers_ + (y + row)*2;
++                    const UWORD mask = stamp.mask[row];
++                    target[0] = (target[0] & (UWORD)~mask) | (stamp.low[row] & mask);
++                    target[1] = (target[1] & (UWORD)~mask) | (stamp.high[row] & mask);
++                }
++            });
++        dividerLineCount_ = 0;
++        for (unsigned y = low; y < high; ++y)
++            if (dividers_[y*2] | dividers_[y*2+1]) dividerLines_[dividerLineCount_++] = UWORD(y);
++        dividerAmmo_ = ammo; dividerCapacity_ = capacity;
++    }
++    // amigaRendererDrawWordStampRun at x 288 under the interior clip, into the
++    // row-art lines. A constant middle is covered by this run alone.
++    void addRun(const AmigaWordStamp& stamp, int y, unsigned count, int top, int bottom) {
++        if (stamp.first >= stamp.last) return;
++        int first = y + int(stamp.first) - int(count) + 1, last = y + int(stamp.last);
++        if (first < top) first = top;
++        if (last > bottom) last = bottom;
++        for (int row = first - y; row < last - y; ++row) {
++            if (row <= 0 && row + int(count) - 1 >= 7) {
++                const int end = last - y < 1 ? last - y : 1;
++                const UWORD mask = stamp.runMask[7] & 0xfff0;
++                if (mask && middleCount_ < sizeof middles_ / sizeof *middles_)
++                    middles_[middleCount_++] = {row + y, end + y, stamp.runLow[7], stamp.runHigh[7], mask};
++                else if (mask) for (int line = row + y; line < end + y; ++line) {
++                    rowLow_[line] = stamp.runLow[7] & mask; rowHigh_[line] = stamp.runHigh[7] & mask;
++                    rowMask_[line] = mask;
++                }
++                row = end - 1;
++                continue;
++            }
++            const unsigned startRow = row < 0 ? 0 : row;
++            const unsigned endRow = row + int(count) - 1 > 7 ? 7 : row + count - 1;
++            const unsigned index = startRow*8 + endRow;
++            const UWORD mask = stamp.runMask[index] & 0xfff0;
++            if (!mask) continue;
++            const int line = y + row;
++            rowLow_[line] = (rowLow_[line] & (UWORD)~mask) | (stamp.runLow[index] & mask);
++            rowHigh_[line] = (rowHigh_[line] & (UWORD)~mask) | (stamp.runHigh[index] & mask);
++            rowMask_[line] |= mask;
++        }
++    }
++    // The stable interior span of word 18, composed and published in one pass:
++    // background black or fill white, row art, dividers. Each distinct value
++    // is computed once; constant runs of lines only store it.
++    unsigned paintInterior(UBYTE* display, int top, int bottom, unsigned meter,
++                           const downwell::AmmoGaugeRows* rows) {
++        middleCount_ = 0;
++        const int base = 229 + 4 * static_cast<int>(meter);
++        if (rows) {
++            int first = base - bottom + 1, last = base + 8 - top;
++            if (first < 0) first = 0;
++            if (last > 184) last = 184;
++            for (int i = first; i < last; ++i) {
++                const int y = base - i;
++                if (y >= 232) continue;
++                const bool filled = static_cast<unsigned>(i) < rows->filled;
++                const unsigned frame = rows->state[i] < 4 ? rows->state[i] : 3;
++                int end = i + 1;
++                if (i) while (end < last && (static_cast<unsigned>(end) < rows->filled) == filled &&
++                    (rows->state[end] < 4 ? rows->state[end] : 3) == frame) ++end;
++                const unsigned index = !filled ? frame : i ? 4+frame : 8+frame%2;
++                addRun(stamps_[index], y, unsigned(end-i), top, bottom);
++                i = end-1;
++            }
++        }
++        const int shift = 4 * static_cast<int>(meter);
++        const int fillBegin = int(fillTop_), fillEnd = int(fillTop_ + fillHeight_);
++        unsigned divider = 0, writes = 0;
++        while (divider < dividerLineCount_ && dividerLines_[divider] + shift < top) ++divider;
++        int middle = int(middleCount_) - 1; // Recorded bottom-up; walk top-down.
++        for (int line = top; line < bottom;) {
++            while (middle >= 0 && middles_[middle].bottom <= line) --middle;
++            UWORD low = 0xfff0, high = 0xfff0, mask;
++            int end = bottom;
++            if (line < fillBegin) { if (fillBegin < end) end = fillBegin; }
++            else if (line < fillEnd) { high = 0x8010; if (fillEnd < end) end = fillEnd; }
++            if (middle >= 0 && middles_[middle].top <= line) {
++                const auto& run = middles_[middle];
++                mask = run.mask;
++                low = (low & (UWORD)~mask) | (run.low & mask);
++                high = (high & (UWORD)~mask) | (run.high & mask);
++                if (run.bottom < end) end = run.bottom;
++            } else {
++                mask = rowMask_[line];
++                low = (low & (UWORD)~mask) | rowLow_[line];
++                high = (high & (UWORD)~mask) | rowHigh_[line];
++                rowLow_[line] = rowHigh_[line] = rowMask_[line] = 0;
++                end = line + 1;
++            }
++            if (divider < dividerLineCount_) {
++                const int next = dividerLines_[divider] + shift;
++                if (next == line) {
++                    const UWORD a = dividers_[dividerLines_[divider]*2], b = dividers_[dividerLines_[divider]*2+1];
++                    const UWORD overlay = (a | b) & 0xfff0;
++                    low = (low & (UWORD)~overlay) | (a & overlay);
++                    high = (high & (UWORD)~overlay) | (b & overlay);
++                    end = line + 1;
++                    ++divider;
++                } else if (next < end) end = next;
++            }
++            UBYTE* working = working_ + line*downwellBytesPerPlaneLine + 36;
++            UBYTE* target = display + line*downwellBytesPerPlaneLine + 36;
++            for (; line < end; ++line) {
++                const UWORD outLow = (load(working) & 0x000f) | low;
++                const UWORD outHigh = (load(working + downwellPlaneBytes) & 0x000f) | high;
++                store(working, outLow); store(working + downwellPlaneBytes, outHigh);
++                if (load(target) != outLow) { store(target, outLow); ++writes; }
++                if (load(target + downwellPlaneBytes) != outHigh) {
++                    store(target + downwellPlaneBytes, outHigh); ++writes;
++                }
++                working += downwellBytesPerPlaneLine; target += downwellBytesPerPlaneLine;
++            }
++        }
++        return writes;
++    }
+ public:
+     unsigned lastWordWrites = 0;
+     void invalidate() { damage_.valid = false; }
+@@ -109,6 +262,11 @@ public:
+             // repeated unchanged requests must not lose a pending wide clear.
+             if (!interior && top <= 231 && bottom >= 256)
+                 previousWideClear_ = clearDigits > 1;
++            if (interior && stampsReady_ && !forceFull && capacity <= 64 && meter <= 3) {
++                prepareDividers(ammo, capacity);
++                lastWordWrites += paintInterior(display->hud, top, bottom, meter, rows);
++                return;
++            }
+             const int stripLeft = interior ? 288 : left, stripRight = interior ? 300 : right;
+             amigaRendererClearClipRect(renderer);
+             renderer->clipX = stripLeft; renderer->clipWidth = stripRight-stripLeft;
+@@ -168,27 +326,9 @@ public:
+             }
+             DW_PROFILE_PHASE(profileAmmoDividers);
+             const bool cachedDividers = stampsReady_ && !forceFull && capacity <= 64 && meter <= 3;
+-            const bool fusedPublish = interior && cachedDividers;
+             if (cachedDividers) {
+-                // Retain the ordered divider composition, not just positions.
+-                // Animation strips reuse it; jiggle only shifts its row origin.
+-                if (dividerAmmo_ != ammo || dividerCapacity_ != capacity) {
+-                    for (auto& word : dividers_) word = 0;
+-                    layout_.draw(ammo, capacity, 1, 288, 229,
+-                        [&](unsigned, unsigned frame, int, unsigned y) {
+-                            const auto& stamp = stamps_[8 + frame];
+-                            for (unsigned row = stamp.first; row < stamp.last; ++row) {
+-                                if (y + row >= downwellDisplayHeight) continue;
+-                                UWORD* target = dividers_ + (y + row)*2;
+-                                const UWORD mask = stamp.mask[row];
+-                                target[0] = (target[0] & (UWORD)~mask) | (stamp.low[row] & mask);
+-                                target[1] = (target[1] & (UWORD)~mask) | (stamp.high[row] & mask);
+-                            }
+-                        });
+-                    dividerAmmo_ = ammo; dividerCapacity_ = capacity;
+-                }
+-                if (!fusedPublish) amigaRendererApplyHudColumns(renderer, dividers_, 18, 1,
+-                    4 * meter, top, bottom, 1);
++                prepareDividers(ammo, capacity);
++                amigaRendererApplyHudColumns(renderer, dividers_, 18, 1, 4 * meter, top, bottom, 1);
+             } else layout_.draw(ammo, capacity, 1, 288, 229 + 4 * meter,
+                 [&](unsigned sprite, unsigned frame, int x, unsigned y) {
+                     if (static_cast<int>(y) < bottom && static_cast<int>(y) + 8 > top)
+@@ -205,10 +345,7 @@ public:
+             }
+             {
+                 DW_PROFILE_SCOPE(profileAmmoWordPublish);
+-                if (fusedPublish)
+-                    lastWordWrites += amigaRendererPublishHudColumn(display->hud, working_,
+-                        dividers_, 18, top, bottom, 4 * meter, 0xfff0);
+-                else lastWordWrites += amigaRendererCopyHudWords(display->hud, working_, stripLeft, top, stripRight, bottom, 1);
++                lastWordWrites += amigaRendererCopyHudWords(display->hud, working_, stripLeft, top, stripRight, bottom, 1);
+             }
+             DW_PROFILE_PHASE(profileAmmoBase);
+         };

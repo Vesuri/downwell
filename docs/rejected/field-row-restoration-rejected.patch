@@ -1,0 +1,393 @@
+diff --git a/amiga/Makefile b/amiga/Makefile
+index a8365d6e..92c0eec5 100644
+--- a/amiga/Makefile
++++ b/amiga/Makefile
+@@ -179,6 +179,8 @@ ifeq ($(PREPARED_FIELDS),1)
+ CFLAGS += -DDOWNWELL_PREPARED_FIELDS
+ ifeq ($(PROFILE_FIELD_REFERENCE),1)
+ CFLAGS += -DDOWNWELL_FIELD_MODE=2
++else ifeq ($(PREPARED_FIELDS_BACKING),3)
++CFLAGS += -DDOWNWELL_FIELD_MODE=5
+ else ifeq ($(PREPARED_FIELDS_BACKING),2)
+ CFLAGS += -DDOWNWELL_FIELD_MODE=4
+ else ifeq ($(PREPARED_FIELDS_BACKING),1)
+diff --git a/amiga/verify_prepared_fields.gdb b/amiga/verify_prepared_fields.gdb
+index 4264f0e7..b45417d3 100644
+--- a/amiga/verify_prepared_fields.gdb
++++ b/amiga/verify_prepared_fields.gdb
+@@ -15,13 +15,14 @@ if gDownwellProfileFrozen != 1 || gDownwellProfileGameSamples != gDownwellProfil
+     printf "Prepared field verification did not finish the gameplay tape\n"
+     quit 1
+ end
+-if gDownwellPreparedFieldChecks < 700 || gDownwellPreparedFieldFixtureChecks < 512 || gDownwellPreparedFieldCompositeChecks < 80 || gDownwellPreparedFieldFailures != 0
++if gDownwellPreparedFieldChecks < 700 || gDownwellPreparedFieldFixtureChecks < 512 || gDownwellPreparedFieldCompositeChecks < 120 || gDownwellFieldRowRestoreFixtureChecks < 30 || gDownwellPreparedFieldFailures != 0
+     printf "Prepared field verification has insufficient coverage or failures\n"
+     quit 1
+ end
+ printf "PROFILE prepared field pixels: %u full-buffer comparisons in %lu gameplay updates; failures=%u\n", gDownwellPreparedFieldChecks, gDownwellProfileGameSamples, gDownwellPreparedFieldFailures
+ printf "PROFILE terrain-mask phases: %u full-buffer comparisons\n", gDownwellPreparedFieldFixtureChecks
+ printf "PROFILE overlapping field composites: %u full-buffer comparisons\n", gDownwellPreparedFieldCompositeChecks
++printf "PROFILE terrain-row field retirements: %lu\n", gDownwellFieldRowRestoreFixtureChecks
+ printf "DOWNWELL_PROFILE_READY\n"
+ shell touch .run/gdb-ready.marker
+ detach
+diff --git a/src/platform/amiga/AmigaFieldColumns.h b/src/platform/amiga/AmigaFieldColumns.h
+index 4ce2ce60..e45c19ef 100644
+--- a/src/platform/amiga/AmigaFieldColumns.h
++++ b/src/platform/amiga/AmigaFieldColumns.h
+@@ -85,4 +85,25 @@ inline bool amigaFieldColumns(const UBYTE* terrain,UBYTE* target,
+     else downwell_field_columns::transfer<false>(terrain,target,circle,origin,rows);
+     return true;
+ }
++// Exact screen-row spans, prepared offline from the same raster. Translation
++// and vertical clipping are the only runtime work; no word or row scanning.
++template<class Span> inline bool amigaFieldColumnSpans(
++    const downwell::TimeFieldOutlines::Circle& circle,Span span){
++    using namespace downwell;
++    if(circle.radius<128*256||circle.radius>=130*256)return false;
++    if(circle.x < -21||circle.x>=402)return true;
++    const unsigned x=unsigned(circle.x+21);
++    const unsigned frame=fieldColumnRadii[circle.radius-128*256];
++    const unsigned block=fieldFootprintFrames[frame][x/16];
++    const unsigned pattern=fieldFootprintBlocks[block][x%16];
++    const short* p=fieldFootprintSpans+fieldFootprintOffsets[pattern];
++    const short* end=fieldFootprintSpans+fieldFootprintOffsets[pattern+1];
++    for(;p!=end;p+=2){
++        int first=circle.y+p[0],stop=circle.y+p[1];
++        if(first<0)first=0;
++        if(stop>downwellDisplayHeight)stop=downwellDisplayHeight;
++        if(first<stop)span(unsigned(first),unsigned(stop-first));
++    }
++    return true;
++}
+ #endif
+diff --git a/src/platform/amiga/AmigaPreparedTimeFields.h b/src/platform/amiga/AmigaPreparedTimeFields.h
+index 534616f7..92f6e19f 100644
+--- a/src/platform/amiga/AmigaPreparedTimeFields.h
++++ b/src/platform/amiga/AmigaPreparedTimeFields.h
+@@ -1,6 +1,7 @@
+ #ifndef DOWNWELL_AMIGA_PREPARED_TIME_FIELDS_H
+ #define DOWNWELL_AMIGA_PREPARED_TIME_FIELDS_H
+ #include "AmigaGoalField.h"
++#include "AmigaFieldColumns.h"
+ 
+ // Ops captures into a 64x56 two-plane backing and mask-blits from that layout
+ // into a 384x320 game ring. Native Ops uses the shared Bitmap implementation;
+@@ -84,6 +85,57 @@ public:
+             return valid_ && target==target_ && amigaFieldSameCoverage(shape,origin,shape_,origin_,
+                 downwellGameRingHeight,downwellDisplayHeight);
+         }
++        // Retire the entire old overlay through the caller's existing terrain
++        // row-copy phase. No pixels change here: the caller must synchronize
++        // every scheduled physical row before drawing the replacement fields.
++        // All foreground damage must belong to that row owner and be redrawn
++        // afterwards; this is not masked restoration for arbitrary canvases.
++        // Limit extra DMA to short, contiguous footprints; tall side arcs keep
++        // the masked reference restoration instead of copying the whole view.
++        template<class Damage> bool restoreViaRows(UBYTE* target,Damage damage){
++            if(target!=target_||!fast_||!valid_||!multiple_||!staticUnderlay_)return false;
++            bool large=false;
++            for(unsigned i=0;i<entryCount_;++i)large|=entries_[i].large;
++            if(!large)return false;
++            struct Span { unsigned first,end; } spans[4];
++            unsigned count=0;
++            bool admitted=true;
++            auto physical=[&](unsigned first,unsigned height){
++                if(!admitted)return;
++                unsigned end=first+height,pos=0;
++                while(pos<count&&spans[pos].end<first)++pos;
++                unsigned stop=pos;
++                while(stop<count&&spans[stop].first<=end){
++                    if(spans[stop].first<first)first=spans[stop].first;
++                    if(spans[stop].end>end)end=spans[stop].end;
++                    ++stop;
++                }
++                const unsigned next=count-(stop-pos)+1;
++                if(next>4){admitted=false;return;}
++                if(stop==pos)for(unsigned i=count;i>pos;--i)spans[i]=spans[i-1];
++                else for(unsigned i=stop;i<count;++i)spans[pos+1+i-stop]=spans[i];
++                spans[pos]={first,end};count=next;
++            };
++            auto screen=[&](unsigned first,unsigned height){
++                unsigned row=origin_+first;
++                if(row>=downwellGameRingHeight)row-=downwellGameRingHeight;
++                unsigned part=downwellGameRingHeight-row;
++                if(part>height)part=height;
++                physical(row,part);
++                if(part<height)physical(0,height-part);
++            };
++            for(unsigned i=0;i<entryCount_&&admitted;++i){
++                if(entries_[i].large)
++                    admitted=amigaFieldColumnSpans(shape_.circles[entries_[i].circle],screen)&&admitted;
++                else screen(entries_[i].rect.y,entries_[i].rect.height);
++            }
++            unsigned rows=0;
++            for(unsigned i=0;i<count;++i)rows+=spans[i].end-spans[i].first;
++            if(!admitted||rows>80)return false;
++            for(unsigned i=0;i<count;++i)damage(spans[i].first,spans[i].end-spans[i].first);
++            discard();
++            return true;
++        }
+         template<class DirtyRow> bool touchesDirtyRows(DirtyRow dirty) const {
+             if(!fast_)return reference_.touchesDirtyRows(dirty);
+             if(multiple_)for(unsigned chunk=0;chunk<downwellGameRingHeight/16;++chunk){
+diff --git a/src/platform/amiga/DownwellAmiga.cpp b/src/platform/amiga/DownwellAmiga.cpp
+index 59bffc81..00a6cdc4 100644
+--- a/src/platform/amiga/DownwellAmiga.cpp
++++ b/src/platform/amiga/DownwellAmiga.cpp
+@@ -72,7 +72,7 @@ struct PreparedFieldOps {
+ #endif
+     static bool enabled(){return gDownwellPreparedFieldMode!=2;}
+     static bool staticEnabled(){return gDownwellPreparedFieldMode>=3;}
+-    static bool columnsEnabled(){return gDownwellPreparedFieldMode==4;}
++    static bool columnsEnabled(){return gDownwellPreparedFieldMode>=4;}
+     static bool columns(const UBYTE* terrain,UBYTE* target,const downwell::TimeFieldOutlines::Circle& circle,
+         unsigned origin,bool restore,UWORD* rows){
+ #ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
+@@ -987,6 +987,7 @@ static AmigaLaserSight gameplayRays[2];
+ #ifdef DOWNWELL_PREPARED_FIELDS
+ static AmigaPreparedTimeFieldPair<PreparedFieldOps> gameplayFields;
+ #ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
++extern "C" { volatile ULONG gDownwellFieldRowRestoreFixtureChecks; }
+ static bool verifyFieldComposites(UBYTE* terrain,UBYTE* target){
+     amigaFieldVerifyCompositeBegin(terrain,target);
+     const unsigned mode=gDownwellPreparedFieldMode;
+@@ -1025,6 +1026,25 @@ static bool verifyFieldComposites(UBYTE* terrain,UBYTE* target){
+         ok=overlay.prepare(target,origin,shape,true,[](unsigned){return false;})&&overlay.draw();
+         if(ok)ok=amigaFieldVerifyComposite(terrain,target,shape,origin);
+     }
++    overlay.discard();
++    // Exercise the actual terrain row-copy owner and shared Bitmap DMA, not
++    // a fixture-only copy loop. Its display margins are initialized once.
++    Bitmap rowTarget(target,384,320,2,false),rowBacking(terrain,384,320,2,false);
++    AmigaGameplayRows rowDebt;
++    rowDebt.reset();rowDebt.damage(0,0,320,1);rowDebt.sync(rowTarget,rowBacking,0);
++    for(unsigned frame=0;frame<40&&ok;++frame){
++        downwell::TimeFieldOutlines shape;
++        shape.visible=true;shape.count=1;
++        shape.circles[0]={182+int(frame%16),140+int(frame%3),int(128*256+(frame*73)%512)};
++        if(overlay.restoreViaRows(target,
++            [&](unsigned first,unsigned count){rowDebt.damage(0,first,count,1);}))
++            ++gDownwellFieldRowRestoreFixtureChecks;
++        const unsigned origin=frame*37%320;
++        ok=overlay.prepare(target,origin,shape,true,[&](unsigned row){return rowDebt.dirty(row,0);});
++        rowDebt.sync(rowTarget,rowBacking,0);
++        ok=ok&&overlay.draw();
++        if(ok)ok=amigaFieldVerifyComposite(terrain,target,shape,origin);
++    }
+     overlay.discard();gDownwellPreparedFieldMode=mode;
+     amigaFieldVerifyCompositeEnd(terrain,target);
+     return ok;
+@@ -3339,6 +3359,11 @@ __attribute__((noinline)) static int runDownwell(void) {
+             if (fieldShape.visible || gameplayFields[back].present()) {
+                 DW_PROFILE_SCOPE(profileGoalFieldPrepare);
+                 AmigaHardware::blitterDrain();
++#ifdef DOWNWELL_PREPARED_FIELDS
++                if(gDownwellPreparedFieldMode==5&&fieldChanged)
++                    gameplayFields[back].restoreViaRows((UBYTE*)gameDisplay[back].data,
++                        [&](unsigned first,unsigned count){gameplayRows.damage(0,first,count,UBYTE(1u<<back));});
++#endif
+                 if (!gameplayFields[back].prepare((UBYTE*)gameDisplay[back].data, port.ringOrigin(), fieldShape, fieldChanged,
+                         [&](unsigned row) { return gameplayRows.dirty(row, back); })) {
+                     exitCode = 20; break;
+diff --git a/tests/platform/amiga/AmigaFieldColumnsTest.cpp b/tests/platform/amiga/AmigaFieldColumnsTest.cpp
+index 1ff27c63..e304203c 100644
+--- a/tests/platform/amiga/AmigaFieldColumnsTest.cpp
++++ b/tests/platform/amiga/AmigaFieldColumnsTest.cpp
+@@ -16,7 +16,7 @@ int main(){
+             xs[test]+int(phase),test==3?ys[(radius+phase)%5]:140,int(128*256+radius)};
+         const unsigned origin=(radius*17+phase*23)%320;
+         actual=expected=terrain;
+-        UWORD rows[20]={},oracleRows[20]={};
++        UWORD rows[20]={},oracleRows[20]={},preparedRows[20]={};
+         downwell::GoalFieldOutline oracle;
+         oracle.setRasterCircle(circle.x,circle.y,circle.radius);
+         oracle.drawClipped(110,0,270,284,[&](int x,int y,unsigned pen){
+@@ -29,9 +29,30 @@ int main(){
+         });
+         require(amigaFieldColumns(terrain.data(),actual.data(),circle,origin,false,rows),"draw admission");
+         if(actual!=expected){std::cerr<<radius<<' '<<phase<<' '<<circle.x<<' '<<circle.y<<'\n';require(false,"column pixels");}
+-        for(unsigned row=0;row<20;++row)require(rows[row]==oracleRows[row],"column row footprint");
++        require(amigaFieldColumnSpans(circle,[&](unsigned first,unsigned count){
++            for(unsigned y=first;y<first+count;++y){
++                const unsigned row=(origin+y)%320;preparedRows[row/16]|=UWORD(1u<<(row&15));
++            }
++        }),"prepared footprint admission");
++        for(unsigned row=0;row<20;++row){
++            require(rows[row]==oracleRows[row],"column row footprint");
++            require(preparedRows[row]==oracleRows[row],"offline footprint clipping/wrap");
++        }
+         require(amigaFieldColumns(terrain.data(),actual.data(),circle,origin,true),"restore admission");
+         require(actual==terrain,"column restoration");++cases;
+     }
+     std::cout<<cases<<" large-field radius/shift cases match independent pixels, row footprints and restoration\n";
++    unsigned footprints=0;
++    for(unsigned phase=0;phase<512;++phase)for(int x=-24;x<=404;++x){
++        bool expectedRows[284]={},actualRows[284]={};
++        downwell::GoalFieldOutline oracle;
++        oracle.setRasterCircle(x,140,128*256+phase);
++        oracle.drawClipped(110,0,270,284,[&](int,int y,unsigned){expectedRows[y]=true;});
++        require(amigaFieldColumnSpans({x,140,int(128*256+phase)},[&](unsigned first,unsigned count){
++            for(unsigned y=first;y<first+count;++y)actualRows[y]=true;
++        }),"exhaustive footprint admission");
++        for(unsigned y=0;y<284;++y)require(actualRows[y]==expectedRows[y],"exhaustive offline footprint");
++        ++footprints;
++    }
++    std::cout<<footprints<<" exact X/radius footprints match independent raster rows\n";
+ }
+diff --git a/tests/platform/amiga/AmigaPreparedTimeFieldsTest.cpp b/tests/platform/amiga/AmigaPreparedTimeFieldsTest.cpp
+index 2cb0404e..61dbee7c 100644
+--- a/tests/platform/amiga/AmigaPreparedTimeFieldsTest.cpp
++++ b/tests/platform/amiga/AmigaPreparedTimeFieldsTest.cpp
+@@ -167,6 +167,7 @@ int main(){
+     require(candidate->bind(storage.data(),storage.size(),pack.data(),pack.size(),terrain.data()),"terrain bind");
+     for(unsigned b=0;b<2;++b){(*reference)[b].discard();actual[b]=expected[b]=terrain;}
+     bool rowDebt[2][320]={};
++    unsigned rowRestores=0;
+     for(unsigned frame=0;frame<2400;++frame){
+         Pixels::useStatic=frame%41!=0;
+         Pixels::useColumns=frame%31!=0;
+@@ -180,6 +181,8 @@ int main(){
+         for(unsigned i=0;i<shape.count;++i)shape.circles[i]={int(94+next()%196),int(next()%336)-26,
+             int((frame%23==0?128:24)*256+next()%512)};
+         auto dirty=[&](unsigned row){return rowDebt[b][row];};
++        if(frame%5)rowRestores+=(*candidate)[b].restoreViaRows(actual[b].data(),
++            [&](unsigned first,unsigned count){for(unsigned row=first;row<first+count;++row)rowDebt[b][row]=true;});
+         require((*candidate)[b].prepare(actual[b].data(),origin,shape,true,dirty),"terrain prepare");
+         require((*reference)[b].prepare(expected[b].data(),origin,shape,true,dirty),"terrain oracle prepare");
+         for(unsigned row=0;row<320;++row)if(rowDebt[b][row]){
+@@ -197,6 +200,40 @@ int main(){
+         rowDebt[b][row]=true;
+     }
+     std::cout<<"2400 pristine-terrain frames match captured underlay, including dirty rows and BOB damage\n";
++    require(rowRestores>5,"large fields exercised row-copy restoration");
++    std::cout<<rowRestores<<" large-field restorations shared the terrain row-copy phase\n";
++    Pixels::usePrepared=Pixels::useStatic=Pixels::useColumns=true;
++    (*candidate)[0].discard();(*reference)[0].discard();actual[0]=expected[0]=terrain;
++    unsigned admitted=0,rejected=0;
++    for(unsigned frame=0;frame<400;++frame){
++        bool debt[320]={};
++        if(frame%13==0)for(auto& row:debt)row=true;
++        const auto before=actual[0];
++        unsigned scheduled=0;
++        const bool retired=(*candidate)[0].restoreViaRows(actual[0].data(),
++            [&](unsigned first,unsigned count){
++                require(first+count<=320,"physical restoration span");
++                ++scheduled;for(unsigned row=first;row<first+count;++row)debt[row]=true;
++            });
++        require(actual[0]==before,"row retirement schedules copies without touching pixels");
++        if(retired){++admitted;require(!(*candidate)[0].present(),"old field ownership retired");}
++        else{++rejected;require(!scheduled,"rejected retirement schedules no partial copy");}
++        downwell::TimeFieldOutlines shape;
++        shape.visible=frame%17!=0;shape.count=shape.visible?1:0;
++        shape.circles[0]={frame%7==0?110:182+int(frame%16),140,int(128*256+frame*29%512)};
++        auto dirty=[&](unsigned row){return debt[row];};
++        const unsigned origin=frame*71%320;
++        require((*candidate)[0].prepare(actual[0].data(),origin,shape,true,dirty),"row-copy prepare");
++        require((*reference)[0].prepare(expected[0].data(),origin,shape,true,dirty),"row-copy reference");
++        for(unsigned row=0;row<320;++row)if(debt[row])for(unsigned p=0;p<2;++p)
++            for(unsigned x=12;x<34;++x){const unsigned at=p*15360+row*48+x;
++                actual[0][at]=expected[0][at]=terrain[at];}
++        require((*candidate)[0].draw(),"row-copy draw");(*reference)[0].draw();
++        require(actual[0]==expected[0],"row-copy composition preserves every framebuffer byte");
++    }
++    require(admitted>250&&rejected>30,"bounded and tall-arc restoration coverage");
++    std::cout<<"400 row-copy retirements: "<<admitted<<" admitted, "<<rejected
++             <<" fallback; wraps, dirty rows and transactional scheduling match\n";
+     (*candidate)[0].discard();(*reference)[0].discard();
+     actual[0]=expected[0]=terrain;Pixels::usePrepared=Pixels::useStatic=true;
+     for(unsigned frame=0;frame<13;++frame){
+diff --git a/tools/generate-field-columns.cpp b/tools/generate-field-columns.cpp
+index 2e10d068..741575d6 100644
+--- a/tools/generate-field-columns.cpp
++++ b/tools/generate-field-columns.cpp
+@@ -45,8 +45,50 @@ int main(int argc,char** argv){
+     }
+     unsigned count=0;for(const auto& col:columns)count+=col.size();
+     if(count>65535||columns.size()>65535)return 20;
++    // Exact visible-row footprints. Deduplicate both span patterns and blocks
++    // of 16 X positions; runtime needs two indexed reads, not a raster walk.
++    using Spans=std::vector<int>;
++    using Block=std::array<unsigned,16>;
++    std::map<Spans,unsigned> spanIds;
++    std::vector<Spans> spans;
++    std::map<Block,unsigned> blockIds;
++    std::vector<Block> blocks;
++    std::vector<std::array<unsigned,27>> footprintFrames;
++    for(const auto& frame:frames){
++        std::array<unsigned,27> lookup{};
++        Block block{};
++        for(int centre=-21;centre<402;++centre){
++            std::array<bool,264> rows{};
++            for(int col=-8;col<=9;++col){
++                unsigned mask=0;
++                for(int bit=0;bit<16;++bit){
++                    const int x=centre-14+col*16+bit;
++                    if(x>=110&&x<270)mask|=0x8000u>>bit;
++                }
++                if(mask)for(const auto& word:columns[frame[col+8]])
++                    if((word[1]|word[2])&mask)rows[word[0]+132]=true;
++            }
++            Spans data;
++            for(unsigned row=0;row<rows.size();){
++                if(!rows[row]){++row;continue;}
++                const unsigned first=row;while(row<rows.size()&&rows[row])++row;
++                data.push_back(int(first)-132);data.push_back(int(row)-132);
++            }
++            if(data.size()>4)return 20;
++            auto inserted=spanIds.emplace(data,unsigned(spans.size()));
++            if(inserted.second)spans.push_back(data);
++            block[(centre+21)%16]=inserted.first->second;
++            if((centre+21)%16==15||centre==401){
++                auto id=blockIds.emplace(block,unsigned(blocks.size()));
++                if(id.second)blocks.push_back(block);
++                lookup[(centre+21)/16]=id.first->second;
++                block={};
++            }
++        }
++        footprintFrames.push_back(lookup);
++    }
+     std::ofstream out(argv[1]);
+-    out<<"// Generated by generate-field-columns/v1; do not edit.\n"
++    out<<"// Generated by generate-field-columns/v2; do not edit.\n"
+            "#ifndef DOWNWELL_FIELD_COLUMNS_GENERATED_H\n#define DOWNWELL_FIELD_COLUMNS_GENERATED_H\n"
+            "namespace downwell {\n"
+            "struct FieldColumnWord { short row,wordOffset; unsigned short low,high; };\n"
+@@ -59,9 +101,19 @@ int main(int argc,char** argv){
+     out<<"\n};\nstatic const FieldColumnWord fieldColumnWords[]={\n";
+     for(const auto& col:columns)for(const auto& word:col)
+         out<<'{'<<word[0]<<','<<word[0]*24<<','<<word[1]<<','<<word[2]<<"},\n";
+-    out<<"};\n}\n#endif\n";out.close();
++    out<<"};\nstatic const unsigned short fieldFootprintFrames[][27]={\n";
++    for(const auto& frame:footprintFrames){out<<'{';for(auto id:frame)out<<id<<',';out<<"},\n";}
++    out<<"};\nstatic const unsigned short fieldFootprintBlocks[][16]={\n";
++    for(const auto& block:blocks){out<<'{';for(auto id:block)out<<id<<',';out<<"},\n";}
++    out<<"};\nstatic const unsigned short fieldFootprintOffsets[]={\n0,";
++    unsigned spanWords=0;for(const auto& data:spans){spanWords+=data.size();out<<spanWords<<',';}
++    out<<"\n};\nstatic const short fieldFootprintSpans[]={\n";
++    for(const auto& data:spans)for(auto value:data)out<<value<<',';
++    out<<"\n};\n}\n#endif\n";out.close();
+     if(!out)return 20;
+     std::cout<<frames.size()<<" frames, "<<columns.size()<<" unique columns, "<<count
+-             <<" words; "<<count*8+frames.size()*36+(columns.size()+1)*2+1024<<" payload bytes\n";
++             <<" words; "<<count*8+frames.size()*36+(columns.size()+1)*2+1024<<" payload bytes; "
++             <<footprintFrames.size()*54+blocks.size()*32+(spans.size()+1)*2+spanWords*2
++             <<" footprint bytes\n";
+     return 0;
+ }
+diff --git a/tools/generate-field-columns.py b/tools/generate-field-columns.py
+index 5403745a..8bddab04 100644
+--- a/tools/generate-field-columns.py
++++ b/tools/generate-field-columns.py
+@@ -12,9 +12,10 @@ subprocess.run([str(root / "build/generate-field-columns"), str(output)], check=
+ sha = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
+ inputs = [root / "tools/generate-field-columns.cpp", *sorted((root / "src/core").glob("*.h"))]
+ output.with_suffix(".json").write_text(json.dumps(dict(
+-    schemaVersion=1, generator="generate-field-columns/v1",
++    schemaVersion=2, generator="generate-field-columns/v2",
+     generatorSha256=sha(Path(__file__)),
+     inputs={str(p.relative_to(root)): sha(p) for p in inputs},
+     outputSha256=sha(output), radii=512, nativeWordBytes=8,
+     layout="deduplicated columns of signed row/word offsets and two planar colour words",
++    footprints="exact viewport-clipped row spans, deduplicated in 16-position X blocks; centres -21..401",
+     oracle="GoalFieldOutline portable raster; not a Windows GPU pixel oracle"), indent=2)+"\n")

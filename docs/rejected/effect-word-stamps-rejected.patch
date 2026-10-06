@@ -1,0 +1,457 @@
+diff --git a/Makefile b/Makefile
+index 09a698f8..7ea109b0 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1993,6 +1993,16 @@ generate-initial-terrain: generate-amiga-game generate-room-pack build/prepare-i
+ 	python3 tools/generate-terrain-phase.py
+ 	python3 tools/generate-initial-terrain.py
+ 
++.PHONY: generate-effect-words test-effect-words
++generate-effect-words: generate-amiga-game
++	python3 tools/generate-effect-words.py
++build/amiga-effect-words-test: tests/platform/amiga/AmigaEffectWordsTest.cpp src/platform/amiga/AmigaEffectWords.h $(HOST_CHECK_HEADERS)
++	@mkdir -p build
++	$(CXX) $(CXXFLAGS) -Isrc -o $@ $<
++test-effect-words: generate-effect-words build/amiga-effect-words-test
++	./build/amiga-effect-words-test generated/amiga-game.dwap generated/amiga-effect-words.bin
++test: test-effect-words
++
+ .PHONY: test-amiga-coverage-word
+ test: test-amiga-coverage-word
+ test-amiga-coverage-word: build/amiga-coverage-word-test
+diff --git a/amiga/Makefile b/amiga/Makefile
+index 870b8cb8..40f763f7 100644
+--- a/amiga/Makefile
++++ b/amiga/Makefile
+@@ -44,6 +44,7 @@ REFERENCE_FIELD_BANK ?= 0
+ REFERENCE_EMPTY_TERRAIN ?= 0
+ REFERENCE_ROOM_TERRAIN ?= 0
+ REFERENCE_INITIAL_TERRAIN ?= 0
++REFERENCE_EFFECT_WORDS ?= 0
+ TABLE_CONTACT_ATAN ?= 1
+ RETAIN_HEALTH_HUD ?= 1
+ AMMO_DAMAGE_RANGE ?= 1
+@@ -253,6 +254,9 @@ endif
+ ifeq ($(REFERENCE_INITIAL_TERRAIN),1)
+ CFLAGS += -DDOWNWELL_REFERENCE_INITIAL_TERRAIN
+ endif
++ifeq ($(REFERENCE_EFFECT_WORDS),1)
++CFLAGS += -DDOWNWELL_REFERENCE_EFFECT_WORDS
++endif
+ ifeq ($(TABLE_CONTACT_ATAN),0)
+ CFLAGS += -DDOWNWELL_PORTABLE_CONTACT_ATAN
+ endif
+@@ -414,7 +418,7 @@ OBJECTS := obj/DownwellAmiga.o obj/AmigaProfile.o obj/AmigaInput.o obj/AmigaPlay
+ 	obj/AmigaMemory.o obj/CopperList.o obj/RoomPack.o obj/ObjectPack.o \
+ 	obj/BuilderPatternPack.o obj/AreaOneBuilder.o obj/GameMakerRandom.o \
+ 	obj/Replay.o \
+-	obj/AmigaAssets.o \
++	obj/AmigaAssets.o obj/AmigaEffectWords.o \
+ 	obj/gcc8_c_support.o obj/gcc8_a_support.o
+ ifeq ($(TERRAIN_DIRECT),1)
+ OBJECTS += obj/AmigaTerrainPrepared.o
+@@ -450,6 +454,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
+ 	@printf '%s\n' '$(REFERENCE_EMPTY_TERRAIN)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_ROOM_TERRAIN)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_INITIAL_TERRAIN)' >> $@.tmp
++	@printf '%s\n' '$(REFERENCE_EFFECT_WORDS)' >> $@.tmp
+ 	@printf '%s\n' '$(DRAW_ORDER_AUDIT)' >> $@.tmp
+ 	@printf '%s\n' '$(LOCAL_DRAW_CAPTURE)' >> $@.tmp
+ 	@printf '%s\n' '$(AMMO_FACTORED)' >> $@.tmp
+@@ -766,6 +771,13 @@ obj/AmigaAssets.o: $(AMIGA_SRC)/AmigaAssets.s $(AMIGA_HUD) $(AMIGA_GAME) $(AMIGA
+ $(REPO)/generated/amiga-terrain-phase6.bin: $(AMIGA_GAME) $(REPO)/tools/generate-terrain-phase.py
+ 	python3 $(REPO)/tools/generate-terrain-phase.py
+ 
++$(REPO)/generated/amiga-effect-words.bin: $(AMIGA_GAME) $(REPO)/tools/generate-effect-words.py
++	python3 $(REPO)/tools/generate-effect-words.py
++
++obj/AmigaEffectWords.o: $(AMIGA_SRC)/AmigaEffectWords.s $(REPO)/generated/amiga-effect-words.bin
++	@mkdir -p $(@D)
++	$(AS) $(ASFLAGS) -o $@ $<
++
+ $(REPO)/generated/amiga-initial-terrain.bin: $(AMIGA_GAME) $(REPO)/generated/downwell-rooms.dwrm $(REPO)/generated/amiga-terrain-phase6.bin $(REPO)/tools/generate-initial-terrain.py $(REPO)/tools/prepare-initial-terrain.cpp $(AMIGA_SRC)/AmigaTerrainPainter.cpp $(AMIGA_SRC)/AmigaTerrain.cpp $(AMIGA_SRC)/AmigaTerrain.h $(AMIGA_SRC)/AmigaRenderer.c $(AMIGA_SRC)/AmigaRenderer.h $(AMIGA_SRC)/AmigaGameplayRows.h $(REPO)/src/core/RoomPack.cpp $(REPO)/src/core/RoomPack.h $(AMIGA_SRC)/AmigaTerrainRunSurface.h $(AMIGA_SRC)/AmigaInitialTerrain.h
+ 	$(MAKE) -C $(REPO) generate-initial-terrain
+ 
+diff --git a/amiga/profile.sh b/amiga/profile.sh
+index c285b09a..47d39680 100644
+--- a/amiga/profile.sh
++++ b/amiga/profile.sh
+@@ -110,6 +110,7 @@ restore() {
+   unset REFERENCE_EMPTY_TERRAIN
+   unset REFERENCE_ROOM_TERRAIN
+   unset REFERENCE_INITIAL_TERRAIN
++  unset REFERENCE_EFFECT_WORDS
+   unset DRAW_CACHE_AUDIT
+   unset DRAW_ORDER_AUDIT
+   unset LOCAL_DRAW_CAPTURE
+diff --git a/amiga/verify_gameplay_bobs.gdb b/amiga/verify_gameplay_bobs.gdb
+index 810dda07..098a53a3 100644
+--- a/amiga/verify_gameplay_bobs.gdb
++++ b/amiga/verify_gameplay_bobs.gdb
+@@ -34,6 +34,13 @@ if gDownwellEffectDmaStamps < 1 || gDownwellEffectDmaChecks < 129 || gDownwellEf
+     quit 1
+ end
+ printf "DMA effects verified: %u pixel comparisons, %u stamps\n", gDownwellEffectDmaChecks, gDownwellEffectDmaStamps
++# Three second stamps at x=160,161,162 are rejected by surface clipping
++# before either backend; the other 125 fixture submissions must run.
++if gDownwellEffectWordsEnabled && gDownwellEffectWordStamps < 125
++    printf "Prepared CPU effect coverage incomplete: %u stamps\n", gDownwellEffectWordStamps
++    quit 1
++end
++printf "Prepared CPU effect stamps verified: %u\n", gDownwellEffectWordStamps
+ # The actor-ready breakpoint precedes effect publication on frame 100.
+ if gDownwellEffectPublishChecks < 99 || gDownwellEffectPublishFailures != 0
+     printf "DMA effect publication failed: checks=%u failures=%u\n", gDownwellEffectPublishChecks, gDownwellEffectPublishFailures
+diff --git a/src/platform/amiga/AmigaEffectSurface.cpp b/src/platform/amiga/AmigaEffectSurface.cpp
+index 8748330b..599b5cc4 100644
+--- a/src/platform/amiga/AmigaEffectSurface.cpp
++++ b/src/platform/amiga/AmigaEffectSurface.cpp
+@@ -1,15 +1,36 @@
+ #include "AmigaEffectSurface.h"
++#include "AmigaEffectWords.h"
+ #include <exec/types.h>
+ #include "framework/Bitmap.h"
+ #include "framework/AmigaHardware.h"
+ #include "AmigaGameplayRows.h"
+ inline void* operator new(__SIZE_TYPE__,void* address)noexcept{return address;}
+ extern "C" { volatile unsigned gDownwellEffectDmaStamps,gDownwellEffectDmaChecks,gDownwellEffectDmaFailures; }
++extern "C" { volatile unsigned gDownwellEffectWordStamps,gDownwellEffectWordsEnabled; }
++extern "C" const UBYTE amiga_effect_words[],amiga_effect_words_end[];
+ extern "C" __attribute__((noinline)) void downwellEffectSurfaceFailed(){__asm__ volatile("":::"memory");}
+ namespace {
+ using Surface=downwell::PaletteEffectSurface<>;
+ const Surface* boundSurface=nullptr;
+ UBYTE* boundStorage=nullptr;
++#ifndef DOWNWELL_REFERENCE_EFFECT_WORDS
++AmigaEffectWords wordBank;
++struct PreparedStamp {const downwell::EffectMaskAssets::Asset* asset;const UBYTE* record;};
++PreparedStamp prepared[17];
++unsigned preparedCount=0;
++void bindWords(const downwell::EffectMaskAssets* assets){
++    preparedCount=0;
++    if(!assets||!wordBank.bind(amiga_effect_words,amiga_effect_words_end-amiga_effect_words))return;
++    for(unsigned i=0;i<17;++i){
++        const unsigned sprite=i<9?84:i<13?133:134,frame=i<9?i:(i-9)%4;
++        const auto* asset=i<9?assets->smoke(frame):assets->currency(sprite==134,frame);
++        const auto* record=wordBank.find((sprite<<16)|frame);
++        if(!asset||!record)return;
++        prepared[i]={asset,record};
++    }
++    preparedCount=17;
++}
++#endif
+ #ifdef DOWNWELL_BOB_VERIFY
+ alignas(Surface) UBYTE referenceStorage[sizeof(Surface)];
+ Surface* reference=nullptr;
+@@ -28,6 +49,24 @@ void clear(void* context,unsigned first,unsigned end){
+ bool stamp(void* context,const Surface::Mask& m,const std::uint8_t* low,const std::uint8_t* high,int x,int y){
+ #ifdef DOWNWELL_BOB_VERIFY
+     if(low)reference->add({m,low,high},x,y);else reference->subtract(m,x,y);
++#endif
++#ifndef DOWNWELL_REFERENCE_EFFECT_WORDS
++    if(low)for(unsigned i=0;i<preparedCount;++i){
++        const auto& source=*prepared[i].asset;
++        if(m.data!=source.mask.data||low!=source.low||high!=source.high||
++           m.width!=source.mask.width||m.height!=source.mask.height||m.stride!=source.mask.stride)continue;
++        // Clear/previous large stamps may still own the same destination.
++        // Finish them before CPU writes; later DMA observes these writes.
++        AmigaHardware::blitterDrain();
++        auto* data=static_cast<UBYTE*>(context);
++        if(!wordBank.paint(prepared[i].record,x,y,reinterpret_cast<UWORD*>(data+2),
++            reinterpret_cast<UWORD*>(data+AmigaEffectSurface::planeBytes+2),
++            reinterpret_cast<UWORD*>(data+AmigaEffectSurface::planeBytes*2+2),12))return false;
++#ifdef DOWNWELL_BOB_VERIFY
++        ++gDownwellEffectWordStamps;
++#endif
++        return true;
++    }
+ #endif
+     // Immutable DWAP images are word-aligned. Unusual host-style masks and
+     // Fast-RAM entry masks retain the scalar path, after draining queued DMA.
+@@ -84,9 +123,16 @@ bool stamp(void* context,const Surface::Mask& m,const std::uint8_t* low,const st
+     return true;
+ }
+ }
+-bool AmigaEffectSurface::bind(downwell::PaletteEffectSurface<>& surface,void* storage){
++bool AmigaEffectSurface::bind(downwell::PaletteEffectSurface<>& surface,void* storage,
++    const downwell::EffectMaskAssets* assets){
+     if(!storage||(reinterpret_cast<ULONG>(storage)&1)||reinterpret_cast<ULONG>(storage)>=0x200000UL)return false;
+     auto* data=static_cast<UBYTE*>(storage);
++#ifndef DOWNWELL_REFERENCE_EFFECT_WORDS
++    bindWords(assets);
++    gDownwellEffectWordsEnabled=preparedCount!=0;
++#else
++    (void)assets;gDownwellEffectWordsEnabled=0;
++#endif
+ #ifdef DOWNWELL_BOB_VERIFY
+     reference=new(referenceStorage) Surface;
+ #endif
+diff --git a/src/platform/amiga/AmigaEffectSurface.h b/src/platform/amiga/AmigaEffectSurface.h
+index 8d1b7486..4b9c0ff4 100644
+--- a/src/platform/amiga/AmigaEffectSurface.h
++++ b/src/platform/amiga/AmigaEffectSurface.h
+@@ -8,7 +8,8 @@ class AmigaEffectSurface {
+ public:
+     // One guard word on each side permits the framework's shifted blits.
+     static constexpr unsigned rowBytes=24,planeBytes=rowBytes*284,bytes=planeBytes*3;
+-    static bool bind(downwell::PaletteEffectSurface<>& surface,void* chipStorage);
++    static bool bind(downwell::PaletteEffectSurface<>& surface,void* chipStorage,
++                     const downwell::EffectMaskAssets* assets=nullptr);
+     static bool verify(const downwell::PaletteEffectSurface<>& surface);
+     static bool fixtures(downwell::PaletteEffectSurface<>& surface,const downwell::EffectMaskAssets& assets);
+     static bool publish(const downwell::PaletteEffectSurface<>& surface,Bitmap& display,
+diff --git a/src/platform/amiga/DownwellAmiga.cpp b/src/platform/amiga/DownwellAmiga.cpp
+index b75f3a37..6aa4ff2d 100644
+--- a/src/platform/amiga/DownwellAmiga.cpp
++++ b/src/platform/amiga/DownwellAmiga.cpp
+@@ -1958,7 +1958,7 @@ __attribute__((noinline)) static int runDownwell(void) {
+     auto& controllerEffects = *new (effectStorage) downwell::CurrencySmokeComposition;
+     if (!effectAssets.bind(activeGamePack,gamePackBytes)||
+         !effectAssets.bindEntryMask(amiga_entry_mask,amiga_entry_mask_end-amiga_entry_mask)||
+-        !AmigaEffectSurface::bind(controllerEffects.surface(),memory.assets()+gamePackBytes)||
++        !AmigaEffectSurface::bind(controllerEffects.surface(),memory.assets()+gamePackBytes,&effectAssets)||
+         !AmigaEffectSurface::fixtures(controllerEffects.surface(),effectAssets)) {
+         platform.restore();
+         FreeMem(startupCopperWords,4*sizeof(UWORD));
+diff --git a/src/platform/amiga/AmigaEffectWords.h b/src/platform/amiga/AmigaEffectWords.h
+new file mode 100644
+index 00000000..458e9065
+--- /dev/null
++++ b/src/platform/amiga/AmigaEffectWords.h
+@@ -0,0 +1,76 @@
++#ifndef DOWNWELL_AMIGA_EFFECT_WORDS_H
++#define DOWNWELL_AMIGA_EFFECT_WORDS_H
++#include <cstdint>
++
++// Host-shifted, nonzero alpha words for small immutable effect images.
++// Raster layout and painter semantics remain owned by PaletteEffectSurface.
++class AmigaEffectWords {
++    const std::uint8_t* data_=nullptr;
++    unsigned bytes_=0,count_=0;
++    static unsigned word(const std::uint8_t* p){
++#ifdef DOWNWELL_PLATFORM_AMIGA
++        return *reinterpret_cast<const std::uint16_t*>(p);
++#else
++        return unsigned(p[0])*256+p[1];
++#endif
++    }
++    static unsigned longWord(const std::uint8_t* p){return (word(p)<<16)|word(p+2);}
++public:
++    bool bind(const std::uint8_t* data,unsigned bytes){
++        data_=nullptr;bytes_=count_=0;
++        if(!data||bytes<12||data[0]!='D'||data[1]!='W'||data[2]!='E'||data[3]!='S'||
++           word(data+4)!=1||word(data+6)!=12||longWord(data+8)>32)return false;
++        const unsigned count=longWord(data+8),start=12+count*12;
++        if(!count||start>bytes)return false;
++        unsigned previous=0;
++        for(unsigned i=0;i<count;++i){
++            const auto* record=data+12+i*12;
++            const unsigned key=longWord(record),width=word(record+4),height=word(record+6),offset=longWord(record+8);
++            if((i&&key<=previous)||!width||width>32||!height||height>32||offset<start||offset>bytes||bytes-offset<64||(offset&1))return false;
++            previous=key;
++            for(unsigned phase=0;phase<16;++phase){
++                const unsigned at=longWord(data+offset+phase*4);
++                if(at<start||at>bytes||bytes-at<2||(at&1))return false;
++                const unsigned n=word(data+at);
++                if(n>(bytes-at-2)/10)return false;
++                for(unsigned op=0;op<n;++op){
++                    const auto* p=data+at+2+op*10;
++                    const unsigned alpha=word(p+4);
++                    if(word(p)>=height||word(p+2)>=(width+phase+15)/16||!alpha||
++                       ((word(p+6)|word(p+8))&~alpha))return false;
++                }
++            }
++        }
++        data_=data;bytes_=bytes;count_=count;return true;
++    }
++    const std::uint8_t* find(unsigned key)const{
++        for(unsigned i=0;i<count_;++i){
++            const auto* record=data_+12+i*12;
++            if(longWord(record)==key)return record;
++        }
++        return nullptr;
++    }
++    // Descriptor belongs to this bank; caller binds it once with matching
++    // immutable source art. Clipping is to the effect surface, not DMA sprites.
++    bool paint(const std::uint8_t* record,int x,int y,std::uint16_t* alpha,
++               std::uint16_t* low,std::uint16_t* high,unsigned stride)const{
++        if(!data_||!record||record<data_+12||record>=data_+12+count_*12||
++           (record-(data_+12))%12||!alpha||!low||!high||stride<10)return false;
++        const int width=int(word(record+4)),height=int(word(record+6));
++        if(x>=160||x<=-width||y>=284||y<=-height)return true;
++        int column=x/16,shift=x%16;if(shift<0){shift+=16;--column;}
++        const auto* phases=data_+longWord(record+8);
++        const auto* p=data_+longWord(phases+unsigned(shift)*4);
++        unsigned n=word(p);p+=2;
++        for(unsigned i=0;i<n;++i,p+=10){
++            const int dy=y+int(word(p)),dx=column+int(word(p+2));
++            if(dy<0||dy>=284||dx<0||dx>=10)continue;
++            const unsigned at=unsigned(dy)*stride+unsigned(dx),mask=word(p+4);
++            alpha[at]|=std::uint16_t(mask);
++            low[at]=std::uint16_t((low[at]&~mask)|word(p+6));
++            high[at]=std::uint16_t((high[at]&~mask)|word(p+8));
++        }
++        return true;
++    }
++};
++#endif
+diff --git a/src/platform/amiga/AmigaEffectWords.s b/src/platform/amiga/AmigaEffectWords.s
+new file mode 100644
+index 00000000..d82eeae2
+--- /dev/null
++++ b/src/platform/amiga/AmigaEffectWords.s
+@@ -0,0 +1,7 @@
++	.section .rodata
++	.balign 4
++	.globl amiga_effect_words
++amiga_effect_words:
++	.incbin "../generated/amiga-effect-words.bin"
++	.globl amiga_effect_words_end
++amiga_effect_words_end:
+diff --git a/tests/platform/amiga/AmigaEffectWordsTest.cpp b/tests/platform/amiga/AmigaEffectWordsTest.cpp
+new file mode 100644
+index 00000000..caa24be7
+--- /dev/null
++++ b/tests/platform/amiga/AmigaEffectWordsTest.cpp
+@@ -0,0 +1,66 @@
++#include "platform/amiga/AmigaEffectWords.h"
++#include "core/EffectMaskAssets.h"
++#include "core/PaletteEffectSurface.h"
++#include <array>
++#include <vector>
++#include <fstream>
++#include <iterator>
++#include <iostream>
++#include <cstdlib>
++static void require(bool ok,const char* message){if(!ok){std::cerr<<message<<'\n';std::exit(1);}}
++static std::vector<std::uint8_t> read(const char* path){
++    std::ifstream input(path,std::ios::binary);require(bool(input),"missing input");
++    return {std::istreambuf_iterator<char>(input),{}};
++}
++int main(int argc,char** argv){
++    require(argc==3,"usage: effect-words-test game.dwap words.bin");
++    const auto pack=read(argv[1]),bytes=read(argv[2]);
++    downwell::EffectMaskAssets assets;require(assets.bind(pack.data(),pack.size()),"asset bank");
++    AmigaEffectWords bank;require(bank.bind(bytes.data(),bytes.size()),"word bank");
++    using Surface=downwell::PaletteEffectSurface<>;
++    std::array<std::uint16_t,12*284*3> actual;
++    std::array<std::uint16_t,10*284*3> expected;
++    unsigned checks=0;
++    for(unsigned image=0;image<17;++image){
++        const unsigned sprite=image<9?84:image<13?133:134,frame=image<9?image:(image-9)%4;
++        const auto& asset=*(image<9?assets.smoke(frame):assets.currency(sprite==134,frame));
++        const auto* descriptor=bank.find((sprite<<16)|frame);require(descriptor,"missing frame");
++        const auto& mask=asset.mask;
++        Surface::Asset scalar{{mask.data,mask.bytes,mask.width,mask.height,mask.stride},asset.low,asset.high};
++        for(int shift=0;shift<16;++shift)for(unsigned position=0;position<6;++position){
++            const int x=position==0?shift-32:position==1?shift-16:position==2?shift:
++                position==3?shift+64:position==4?shift+144:shift+160;
++            const int y=position%3==0?-8:position%3==1?140:278;
++            actual.fill(0xbeef);expected.fill(0);
++            for(unsigned plane=0;plane<3;++plane)for(unsigned row=0;row<284;++row)
++                for(unsigned word=1;word<=10;++word)actual[plane*12*284+row*12+word]=0;
++            Surface reference;
++            // Two ordered, overlapping opaque replacements from different art.
++            const auto& other=*assets.currency(true,3);
++            const auto& m=other.mask;
++            const auto* otherDescriptor=bank.find((134u<<16)|3u);
++            require(reference.add({{m.data,m.bytes,m.width,m.height,m.stride},other.low,other.high},x+3,y+2),"scalar lower stamp");
++            require(bank.paint(otherDescriptor,x+3,y+2,actual.data()+1,actual.data()+12*284+1,
++                actual.data()+24*284+1,12),"lower stamp");
++            require(reference.add(scalar,x,y)&&bank.paint(descriptor,x,y,actual.data()+1,
++                actual.data()+12*284+1,actual.data()+24*284+1,12),"upper stamp");
++            reference.visit([&](unsigned px,unsigned py,std::uint16_t a,std::uint16_t l,std::uint16_t h){
++                const unsigned at=py*10+px/16;expected[at]=a;expected[2840+at]=l;expected[5680+at]=h;
++            });
++            for(unsigned row=0;row<284;++row)for(unsigned word=0;word<10;++word){
++                const unsigned src=row*10+word,dst=row*12+word+1,alpha=expected[src];
++                require(actual[dst]==alpha,"alpha pixels");
++                require((actual[3408+dst]&alpha)==expected[2840+src]&&
++                    (actual[6816+dst]&alpha)==expected[5680+src],"color pixels");
++            }
++            for(unsigned plane=0;plane<3;++plane)for(unsigned row=0;row<284;++row)
++                require(actual[plane*3408+row*12]==0xbeef&&actual[plane*3408+row*12+11]==0xbeef,"row guards");
++            ++checks;
++        }
++    }
++    require(!bank.find(0),"missing key");
++    require(!bank.bind(bytes.data(),bytes.size()-1)&&!bank.find(84u<<16),"bad size invalidates binding");
++    auto bad=bytes;bad[20]=bad[21]=bad[22]=bad[23]=255;
++    require(!bank.bind(bad.data(),bad.size()),"bad offset");
++    std::cout<<checks<<" shifted/clipped/overlapping effect stamps match scalar pixels and guards\n";
++}
+diff --git a/tools/generate-effect-words.py b/tools/generate-effect-words.py
+new file mode 100644
+index 00000000..7d4f8e8f
+--- /dev/null
++++ b/tools/generate-effect-words.py
+@@ -0,0 +1,69 @@
++#!/usr/bin/env python3
++"""Compile small DWAP effects to shifted alpha/color words; no target conversion."""
++import hashlib
++import json
++import struct
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[1]
++
++
++def main():
++    source = ROOT / "generated/amiga-game.dwap"
++    pack = source.read_bytes()
++    assert pack[:8] == b"DWAP\x00\x02\x00\x14"
++    count = struct.unpack_from(">I", pack, 8)[0]
++    images = []
++    for i in range(count):
++        key, ox, oy, width, height, dma, planes, offset, size = struct.unpack_from(">IhhHHHHII", pack, 20+i*24)
++        if key >> 16 not in (84, 133, 134):
++            continue
++        assert planes == 3 and width <= 32 and height <= 32 and dma % 16 == 0
++        stride, plane = dma//8, dma//8*height
++        assert size == plane*3 and offset+size <= len(pack)
++        images.append((key, width, height, stride, plane, offset))
++    assert len(images) == 17
++    output = bytearray(b"DWES"+struct.pack(">HHI", 1, 12, len(images)))
++    output.extend(bytes(12*len(images)))
++    for i, (key, width, height, stride, plane, offset) in enumerate(images):
++        phases = len(output)
++        output.extend(bytes(64))
++        struct.pack_into(">IHHI", output, 12+i*12, key, width, height, phases)
++        for shift in range(16):
++            struct.pack_into(">I", output, phases+shift*4, len(output))
++            ops = []
++            for y in range(height):
++                row = [[0, 0, 0] for _ in range((width+shift+15)//16)]
++                for x in range(width):
++                    source_bit = 0x80 >> (x&7)
++                    at = offset+y*stride+x//8
++                    if not pack[at+plane*2] & source_bit:
++                        continue
++                    column, bit = (x+shift)//16, 0x8000 >> ((x+shift)&15)
++                    row[column][0] |= bit
++                    if pack[at] & source_bit:
++                        row[column][1] |= bit
++                    if pack[at+plane] & source_bit:
++                        row[column][2] |= bit
++                for column, (alpha, low, high) in enumerate(row):
++                    if alpha:
++                        ops.append((y, column, alpha, low, high))
++            output.extend(struct.pack(">H", len(ops)))
++            for op in ops:
++                output.extend(struct.pack(">HHHHH", *op))
++    path = ROOT / "generated/amiga-effect-words.bin"
++    path.write_bytes(output)
++    provenance = json.loads((ROOT / "generated/amiga-game.packing.json").read_text())
++    digest = hashlib.sha256(pack).hexdigest()
++    assert digest == provenance["packSha256"]
++    manifest = dict(schemaVersion=1, generator="generate-effect-words.py/v1",
++                    sourceSha256=provenance["sourceSha256"], extractor=provenance["extractor"],
++                    packSha256=digest, generatorSha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
++                    resourceIds=[84, 133, 134], frames=len(images), shifts=16,
++                    bytes=len(output), outputSha256=hashlib.sha256(output).hexdigest())
++    path.with_suffix(".json").write_text(json.dumps(manifest, indent=2)+"\n")
++    print(f"Prepared {len(images)} small effects x 16 shifts, {len(output)} bytes")
++
++
++if __name__ == "__main__":
++    main()

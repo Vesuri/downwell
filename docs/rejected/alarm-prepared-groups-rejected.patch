@@ -1,0 +1,357 @@
+diff --git a/amiga/Makefile b/amiga/Makefile
+index 42a78193..25746500 100644
+--- a/amiga/Makefile
++++ b/amiga/Makefile
+@@ -33,6 +33,7 @@ REFERENCE_DAMAGE_TEXT ?= 0
+ REFERENCE_GEM_POSITION ?= 0
+ REFERENCE_ACTOR_PREFIX ?= 0
+ REFERENCE_DRAW_LIST ?= 0
++REFERENCE_ALARMS ?= 0
+ TABLE_CONTACT_ATAN ?= 1
+ RETAIN_HEALTH_HUD ?= 1
+ AMMO_DAMAGE_RANGE ?= 1
+@@ -200,6 +201,9 @@ endif
+ ifeq ($(REFERENCE_DRAW_LIST),1)
+ CFLAGS += -DDOWNWELL_REFERENCE_DRAW_LIST
+ endif
++ifeq ($(REFERENCE_ALARMS),1)
++CFLAGS += -DDOWNWELL_REFERENCE_ALARMS
++endif
+ ifeq ($(TABLE_CONTACT_ATAN),0)
+ CFLAGS += -DDOWNWELL_PORTABLE_CONTACT_ATAN
+ endif
+@@ -382,6 +386,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
+ 	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(SKIP_LEVEL)' '$(TERRAIN_RUN_STORE)' '$(TABLE_CONTACT_ATAN)' '$(RETAIN_HEALTH_HUD)' '$(AMMO_DAMAGE_RANGE)' '$(PREPARED_AMMO_DIVIDERS)' '$(PREPARED_FIELDS)' '$(PREPARED_FIELDS_VERIFY)' '$(PROFILE_FIELD_REFERENCE)' '$(PREPARED_FIELDS_BACKING)' '$(SCENERY_LAYERS)' '$(NATIVE_BOXES)' '$(NATIVE_FIELDS)' '$(TERRAIN_BATCH)' '$(TERRAIN_DIRECT)' '$(TERRAIN_BATCH_VERIFY)' '$(AMIGA_OPTIMIZATION)' '$(LASER_VERIFY)' '$(PROFILE_LASER)' > $@.tmp
+ 	@printf '%s\n' '$(DRAW_CACHE_AUDIT)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_DRAW_LIST)' >> $@.tmp
++	@printf '%s\n' '$(REFERENCE_ALARMS)' >> $@.tmp
+ 	@printf '%s\n' '$(DRAW_ORDER_AUDIT)' >> $@.tmp
+ 	@printf '%s\n' '$(LOCAL_DRAW_CAPTURE)' >> $@.tmp
+ 	@printf '%s\n' '$(AMMO_FACTORED)' >> $@.tmp
+diff --git a/amiga/profile.sh b/amiga/profile.sh
+index a00f72f7..b3e2c2a0 100644
+--- a/amiga/profile.sh
++++ b/amiga/profile.sh
+@@ -82,6 +82,7 @@ restore() {
+   unset REFERENCE_GEM_POSITION
+   unset REFERENCE_ACTOR_PREFIX
+   unset REFERENCE_DRAW_LIST
++  unset REFERENCE_ALARMS
+   unset DRAW_CACHE_AUDIT
+   unset DRAW_ORDER_AUDIT
+   unset LOCAL_DRAW_CAPTURE
+diff --git a/src/core/GameplayCollisionOwner.h b/src/core/GameplayCollisionOwner.h
+index dfe64a2a..60c6b1cc 100644
+--- a/src/core/GameplayCollisionOwner.h
++++ b/src/core/GameplayCollisionOwner.h
+@@ -15,6 +15,7 @@
+ #include "GameplayRoomLayers.h"
+ #include "ObjectDrawMetadata.h"
+ #include "ObjectAlarmMetadata.h"
++#include "GameplayAlarmSchedule.h"
+ #include "Profile.h"
+ #include "PreparedUnitSpriteBounds.h"
+ #include "PreparedTerrainBirthBounds.h"
+@@ -62,7 +63,10 @@ private:
+ #ifdef DOWNWELL_DRAW_CACHE_AUDIT
+     mutable bool drawAuditHasSnapshot_=false;
+ #endif
+-    RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity+GameplayWorld::droneBulletCapacity> combatAlarmPhase_;
++    static constexpr unsigned combatAlarmCapacity=GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+
++        GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity+GameplayWorld::droneBulletCapacity;
++    RunnerStepSnapshot<combatAlarmCapacity> combatAlarmPhase_;
++    GameplayAlarmSchedule<combatAlarmCapacity> nativeAlarmSchedule_;
+     bool combatAlarmCaptureDirty_=true;
+     unsigned combatAlarmMask_=0;
+     bool combatAlarmCaptureValid_=false;
+@@ -1198,6 +1202,56 @@ public:
+                 self.combatAlarmCaptureDirty_=false;
+                 self.combatAlarmCaptureValid_=true;
+             }
++#ifndef DOWNWELL_REFERENCE_ALARMS
++            if(self.native_){
++                if(!reused){
++                    phase.sort();
++                    if(!self.check(self.nativeAlarmSchedule_.prepare(phase,
++                        [](InstanceHandle h,GameplayAlarmFamily& family,InstanceHandle& local){
++                            View::Kind kind;if(!View::decode(h,kind,local))return false;
++                            switch(kind){
++                                case View::Kind::enemy:family=GameplayAlarmFamily::enemy;break;
++                                case View::Kind::breakable:family=GameplayAlarmFamily::breakable;break;
++                                case View::Kind::debris:family=GameplayAlarmFamily::debris;break;
++                                case View::Kind::timeChange:family=GameplayAlarmFamily::timeChange;break;
++                                case View::Kind::entryDither:family=GameplayAlarmFamily::entryDither;break;
++                                case View::Kind::drone:family=GameplayAlarmFamily::drone;break;
++                                default:return false;
++                            }return true;
++                        },[&](int object,unsigned& mask){return self.alarmMetadata_.mask(object,mask);})))return false;
++                }
++                return self.check(self.nativeAlarmSchedule_.visit([&](GameplayAlarmFamily family,
++                    const InstanceHandle* keys,unsigned count,unsigned alarm){
++                    switch(family){
++                        case GameplayAlarmFamily::enemy:
++                            return self.world_->advanceEnemyAlarmGroup(keys,count,alarm)&&self.valid();
++                        case GameplayAlarmFamily::breakable:
++                            return self.world_->advanceBoxAlarmGroup(keys,count,alarm)&&self.valid();
++                        default:break;
++                    }
++                    for(unsigned i=0;i<count;++i){
++                        const auto key=keys[i];
++                        switch(family){
++                            case GameplayAlarmFamily::debris:{const auto* r=self.debris_.find(key);
++                                if(r&&r->active&&!r->destroyRequested&&!self.world_->advanceBoundDebrisRoomAlarm(key,alarm))return false;
++                                break;}
++                            case GameplayAlarmFamily::timeChange:{const auto* r=self.timeChanges_.find(key);
++                                if(r&&r->active&&!r->destroyRequested&&!self.world_->advanceTimeChangeRoomAlarm(key,alarm))return false;
++                                break;}
++                            case GameplayAlarmFamily::entryDither:{const auto* r=self.entries_.find(key);
++                                if(r&&r->active&&!r->destroyRequested&&!self.entries_.advanceAlarm(key,alarm))return false;
++                                break;}
++                            case GameplayAlarmFamily::drone:{const auto* r=self.drones_.find(key);
++                                if(r&&r->active&&!r->destroyRequested&&(alarm!=0||!self.drones_.advanceAlarm(key)))return false;
++                                break;}
++                            default:return false;
++                        }
++                        if(!self.valid())return false;
++                    }
++                    return true;
++                }));
++            }
++#endif
+             return self.dispatchCapturedAlarms<true>(phase,[&](InstanceHandle h,unsigned alarm,const PackedObjectEvent&){
+                 View::Kind kind;InstanceHandle local;if(!View::decode(h,kind,local))return false;
+                 return kind==View::Kind::enemy?self.world_->advanceEnemyRoomAlarm(local,alarm):
+diff --git a/src/core/GameplayWorld.cpp b/src/core/GameplayWorld.cpp
+index 85a4d59d..6cce5a28 100644
+--- a/src/core/GameplayWorld.cpp
++++ b/src/core/GameplayWorld.cpp
+@@ -837,7 +837,38 @@ bool GameplayWorld::advanceEnemyRoomAlarm(downwell::InstanceHandle key,unsigned
+         const unsigned events = downwell::enemyAlarmEvents(enemy.objectId);
+         const bool alarm0Fired = alarm == 0 && downwell::AlarmBank::advanceValue(enemy.alarm0, (events & 1) != 0);
+         const bool alarm1Fired = alarm == 1 && downwell::AlarmBank::advanceValue(enemy.alarm1, (events & 2) != 0);
++        return dispatchEnemyAlarmEvents(enemy,alarm0Fired,alarm1Fired);
++}
++
++bool GameplayWorld::advanceEnemyAlarmGroup(const downwell::InstanceHandle* keys,unsigned count,unsigned alarm){
++    if(!run_.effectsSucceeded||alarm>=downwell::AlarmBank::count||(count&&!keys))return run_.effectsSucceeded=false;
++    // Other resource events retain the current adapter's unimplemented body;
++    // they have no stored counter in EnemyState. Do not invent an Alarm 2.
++    if(alarm>1)return true;
++    for(unsigned i=0;i<count;++i){
++        auto* enemy=const_cast<EnemyState*>(resolveEnemyLifetime(keys[i]));
++        if(!enemy||!enemy->active||enemy->destroyRequested)continue;
++        auto& value=alarm==0?enemy->alarm0:enemy->alarm1;
++        if(downwell::AlarmBank::advanceValue(value,(downwell::enemyAlarmEvents(enemy->objectId)&(1u<<alarm))!=0)&&
++            !dispatchEnemyAlarmEvents(*enemy,alarm==0,alarm==1))return false;
++    }
++    return run_.effectsSucceeded;
++}
++
++bool GameplayWorld::advanceBoxAlarmGroup(const downwell::InstanceHandle* keys,unsigned count,unsigned alarm){
++    if(!run_.effectsSucceeded||alarm>=downwell::AlarmBank::count||(count&&!keys))return run_.effectsSucceeded=false;
++    if(alarm!=0||!boxAlarmMayDispatch(alarm))return true;
++    for(unsigned i=0;i<count;++i){
++        const auto key=keys[i];
++        if(key.slot>=breakableCount_)continue;
++        auto& box=breakables_[key.slot];
++        if(!key.generation||box.lifetimeId!=key.generation||!box.active||box.destroyRequested)continue;
++        if(downwell::AlarmBank::advanceValue(box.alarm0))box.state.alarmZero();
++    }
++    return true;
++}
+ 
++bool GameplayWorld::dispatchEnemyAlarmEvents(EnemyState& enemy,bool alarm0Fired,bool alarm1Fired){
+         if (enemy.objectId == 112 && alarm1Fired) {
+             enemy.auxiliaryState = -enemy.auxiliaryState;
+             enemy.alarm1 = 120 + (int)enemyRandom_.irandomSmall(180);
+diff --git a/src/core/GameplayWorld.h b/src/core/GameplayWorld.h
+index a277960e..5f5ef8d1 100644
+--- a/src/core/GameplayWorld.h
++++ b/src/core/GameplayWorld.h
+@@ -438,6 +438,10 @@ public:
+     bool advanceEnemyRoomAnimation(downwell::InstanceHandle key);
+     bool advanceEnemyRoomAlarm(downwell::InstanceHandle key,unsigned alarm);
+     bool advanceBoxRoomAlarm(downwell::InstanceHandle key,unsigned alarm);
++    // Already captured in source object/registration order. Resolve each
++    // generation afresh; countdowns cannot cache compactable record pointers.
++    bool advanceEnemyAlarmGroup(const downwell::InstanceHandle* keys,unsigned count,unsigned alarm);
++    bool advanceBoxAlarmGroup(const downwell::InstanceHandle* keys,unsigned count,unsigned alarm);
+     void configureRoomAlarms(bool (*callback)(void*),void* context){roomAlarms_=callback;roomAlarmsContext_=context;}
+     bool advanceBulletRoomAnimation(downwell::InstanceHandle key);
+     bool advanceScriptRoomAnimation(downwell::InstanceHandle key){
+@@ -938,6 +942,7 @@ public:
+     std::uint64_t trajectoryDigest() const { return trajectory_.value(); }
+ 
+ private:
++    bool dispatchEnemyAlarmEvents(EnemyState& enemy,bool alarm0Fired,bool alarm1Fired);
+     EnemyLifecycleBinding enemyLifecycle_;
+     downwell::ScriptEffectRuntimeBinding scriptEffectsBinding_;
+     downwell::ScriptEffectRuntimeBinding debrisBinding_;
+diff --git a/tests/core/GameplayCollisionOwnerTest.cpp b/tests/core/GameplayCollisionOwnerTest.cpp
+index 026c5b24..ddb7d99c 100644
+--- a/tests/core/GameplayCollisionOwnerTest.cpp
++++ b/tests/core/GameplayCollisionOwnerTest.cpp
+@@ -322,6 +322,38 @@ static void checkEnemySlotDirectory(const ObjectPack& objects,const SpriteCollis
+ }
+ int main(){
+     assert(downwell::RunnerBindingRevisionVerification::run());
++    {
++        RunnerStepSnapshot<8> captured;
++        // Same object, interleaved families: never regroup across a source
++        // registration boundary merely to make a larger family batch.
++        assert(captured.append(0,1,10)&&captured.append(1,1,10)&&
++            captured.append(2,1,10)&&captured.append(3,1,20));
++        captured.sort();GameplayAlarmSchedule<8> schedule;
++        auto decode=[](InstanceHandle key,GameplayAlarmFamily& family,InstanceHandle& local){
++            family=key.slot==1?GameplayAlarmFamily::breakable:GameplayAlarmFamily::enemy;
++            local=key;return true;
++        };
++        assert(schedule.prepare(captured,decode,[](int object,unsigned& mask){mask=object==10?3:4;return true;}));
++        assert(captured.append(4,1,10)); // Born after phase capture: not admitted.
++        const std::vector<unsigned> expected={0,1,2,100,101,102,203};
++        std::vector<unsigned> actual;
++        assert(schedule.visit([&](auto family,const InstanceHandle* keys,unsigned count,unsigned alarm){
++            for(unsigned i=0;i<count;++i){
++                assert(keys[i].generation==1);
++                assert((family==GameplayAlarmFamily::breakable)==(keys[i].slot==1));
++                actual.push_back(alarm*100+keys[i].slot);
++            }return true;
++        }));assert(actual==expected);
++        for(unsigned stop=0;stop<expected.size();++stop){
++            actual.clear();assert(!schedule.visit([&](auto,const InstanceHandle* keys,unsigned count,unsigned alarm){
++                for(unsigned i=0;i<count;++i){actual.push_back(alarm*100+keys[i].slot);
++                    if(actual.size()==stop+1)return false;
++                }return true;
++            }));assert(std::equal(actual.begin(),actual.end(),expected.begin())&&actual.size()==stop+1);
++        }
++        RunnerStepSnapshot<1> empty;assert(schedule.prepare(empty,decode,[](int,unsigned&){return false;}));
++        assert(schedule.visit([](auto,const auto*,unsigned,unsigned){assert(false);return false;}));
++    }
+     for(bool failSmoke:{false,true}){
+         auto world=std::make_unique<GameplayWorld>(300,false,1000,false);
+         checkBoxBurstWorld(*world,failSmoke);
+@@ -914,8 +946,13 @@ int main(){
+         assert(!collision->dispatchAlarmPhase(snapshot,[&](InstanceHandle,unsigned,const PackedObjectEvent&){++calls;return true;}));
+         assert(calls==1);
+     }
+-    {
+-        auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites);
++    for(bool native:{false,true}){
++#ifdef DOWNWELL_TERRAIN_RUN_STORE
++        if(native)continue;
++#endif
++        auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites,
++            GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},nullptr,
++            native?GameplayCollisionOwner::Ownership::native:GameplayCollisionOwner::Ownership::reference);
+         auto scene=std::make_unique<GameplayWorld>(300,true,0,false,collision->enemyBinding(),
+             collision->breakableBinding(),collision->playerBinding(),&collision->terrain());
+         assert(collision->attach(*scene));InstanceHandle key;
+@@ -2399,11 +2436,51 @@ int main(){
+         assert(rooms.roomInstance(room,0,r));r.scaleX=2;
+         assert(!terrain->appendRoom(r)&&!terrain->valid()&&terrain->size()==0);
+     }
+-    for(int initial:{(-2147483647-1),-2,-1,0,1,2}){
++    for(bool native:{false,true}){
++#ifdef DOWNWELL_TERRAIN_RUN_STORE
++        if(native)continue;
++#endif
++        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
++            GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&rooms,
++            native?GameplayCollisionOwner::Ownership::native:GameplayCollisionOwner::Ownership::reference);
++        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
++            owner->breakableBinding(),owner->playerBinding(),&owner->terrain(),&rooms);
++        assert(owner->attach(*world));
++        TimeChangeEffects<8> changes;int speed=60;InstanceHandle dither,drone;
++        // Isolate countdowns from the separately tested out-of-view lifetime
++        // policy; this offscreen fixture is not a natural drone encounter.
++        world->configureDroneEndStep(nullptr,nullptr);
++        auto camera=[](auto& value){value=MotionBinary64::fromInteger(240);return true;};
++        auto view=[](auto& value){value={};return true;};
++        assert(owner->entryDithers().create(400001,camera,view,dither));
++        assert(owner->droneBullets().create(400002,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(5000),drone));
++        assert(owner->createTimeChangeWithSourceId(changes,400003,{},{},speed,[](unsigned ms){return ms==30;}));
++        const auto time=owner->timeChanges().handle(1);
++        // Deactivation is published before reconciliation. The next phase
++        // excludes it; reactivation later must reprepare the captured plan.
++        assert(owner->timeChanges().activation(time,false));
++        for(unsigned tick=0;tick<4;++tick){world->step(0);assert(world->effectsSucceeded()&&speed==30);}
++        assert(owner->timeChanges().activation(time,true));
++        for(unsigned tick=1;tick<=120;++tick){
++            world->step(0);assert(world->effectsSucceeded()&&owner->valid());
++            assert(speed==int(tick<12?30+5*(tick/2):60));
++            const auto* d=owner->entryDithers().find(dither);
++            assert(d&&d->effect.alarm0==int(tick<116?116-tick:0)&&d->destroyRequested==(tick>=116));
++            const auto* bullet=owner->droneBullets().find(drone);
++            assert(bullet&&bullet->state.alarm0==int(tick<12?12-tick:tick==12?0:-1));
++        }
++        assert(owner->prepareDraw()&&!owner->entryDithers().find(dither)&&!owner->timeChanges().find(time));
++    }
++    for(bool native:{false,true})for(int initial:{(-2147483647-1),-2,-1,0,1,2}){
++#ifdef DOWNWELL_TERRAIN_RUN_STORE
++        if(native)continue; // Registered terrain representation has no native owner.
++#endif
+         // Compare the bound pending-counter path with the original unfiltered
+         // captured traversal. Negative values must remain untouched; zero
+         // still retires, and positive counters retain countdown/RNG order.
+-        auto optimized=std::make_unique<GameplayCollisionOwner>(objects,sprites);
++        auto optimized=std::make_unique<GameplayCollisionOwner>(objects,sprites,
++            GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},nullptr,
++            native?GameplayCollisionOwner::Ownership::native:GameplayCollisionOwner::Ownership::reference);
+         auto reference=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+         auto a=std::make_unique<GameplayWorld>(300,true,0,false,optimized->enemyBinding(),
+             optimized->breakableBinding(),optimized->playerBinding(),&optimized->terrain());
+diff --git a/src/core/GameplayAlarmSchedule.h b/src/core/GameplayAlarmSchedule.h
+new file mode 100644
+index 00000000..4bb73a6d
+--- /dev/null
++++ b/src/core/GameplayAlarmSchedule.h
+@@ -0,0 +1,49 @@
++#ifndef DOWNWELL_CORE_GAMEPLAY_ALARM_SCHEDULE_H
++#define DOWNWELL_CORE_GAMEPLAY_ALARM_SCHEDULE_H
++#include "AlarmBank.h"
++#include "InstanceHandle.h"
++namespace downwell {
++enum class GameplayAlarmFamily {enemy,breakable,debris,timeChange,entryDither,drone};
++// Prepared from the authoritative object/registration-ordered capture. This
++// is a phase snapshot, not a live family scan: new births cannot join it and
++// every countdown resolves the captured generation in its family records.
++// Equal-object families may interleave, so groups may split an object row.
++template<unsigned Capacity> class GameplayAlarmSchedule {
++    struct Group {unsigned first=0,count=0,mask=0;GameplayAlarmFamily family{};};
++    InstanceHandle keys_[Capacity]{};
++    Group groups_[Capacity]{};
++    unsigned groupCount_=0,mask_=0;
++public:
++    template<class Snapshot,class Decode,class Mask>
++    bool prepare(const Snapshot& snapshot,Decode decode,Mask mask){
++        groupCount_=0;mask_=0;
++        if(snapshot.size()>Capacity)return false;
++        int previousObject=-1;
++        GameplayAlarmFamily previousFamily{};
++        for(unsigned i=0;i<snapshot.size();++i){
++            GameplayAlarmFamily family;
++            if(!decode(snapshot.handle(i),family,keys_[i])||!keys_[i].generation)return false;
++            const int object=snapshot.object(i);
++            if(!groupCount_||object!=previousObject||family!=previousFamily){
++                unsigned events;
++                if(!mask(object,events)||(events&~unsigned(AlarmBank::allEvents)))return false;
++                groups_[groupCount_++]={i,0,events,family};mask_|=events;
++                previousObject=object;previousFamily=family;
++            }
++            ++groups_[groupCount_-1].count;
++        }
++        return true;
++    }
++    template<class Visit> bool visit(Visit visit)const{
++        for(unsigned alarm=0;alarm<AlarmBank::count;++alarm){
++            const unsigned bit=1u<<alarm;
++            if(!(mask_&bit))continue;
++            for(unsigned i=0;i<groupCount_;++i){const auto& group=groups_[i];
++                if((group.mask&bit)&&!visit(group.family,keys_+group.first,group.count,alarm))return false;
++            }
++        }
++        return true;
++    }
++};
++}
++#endif

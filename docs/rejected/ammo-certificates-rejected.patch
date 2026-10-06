@@ -1,0 +1,220 @@
+diff --git a/amiga/Makefile b/amiga/Makefile
+index 36466d49..2c52be5e 100644
+--- a/amiga/Makefile
++++ b/amiga/Makefile
+@@ -30,6 +30,7 @@ TABLE_CONTACT_ATAN ?= 0
+ RETAIN_HEALTH_HUD ?= 0
+ AMMO_DAMAGE_RANGE ?= 0
+ PREPARED_AMMO_DIVIDERS ?= 0
++AMMO_BLOCK_CACHE ?= 1
+ PREPARED_FIELDS ?= 0
+ PREPARED_FIELDS_VERIFY ?= 0
+ PROFILE_FIELD_REFERENCE ?= 0
+@@ -172,6 +173,7 @@ endif
+ ifeq ($(AMMO_DAMAGE_RANGE),1)
+ CFLAGS += -DDOWNWELL_AMMO_DAMAGE_RANGE
+ endif
++CFLAGS += -DDOWNWELL_AMMO_BLOCK_CACHE=$(AMMO_BLOCK_CACHE)
+ ifeq ($(PREPARED_AMMO_DIVIDERS),1)
+ CFLAGS += -DDOWNWELL_PREPARED_AMMO_DIVIDERS
+ endif
+@@ -316,6 +318,7 @@ $(OUT).front: $(AMIGA_FRONT_BANK)
+ obj/startup-options: FORCE_STARTUP_OPTIONS
+ 	@mkdir -p obj
+ 	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(SKIP_LEVEL)' '$(TERRAIN_RUN_STORE)' '$(TABLE_CONTACT_ATAN)' '$(RETAIN_HEALTH_HUD)' '$(AMMO_DAMAGE_RANGE)' '$(PREPARED_AMMO_DIVIDERS)' '$(PREPARED_FIELDS)' '$(PREPARED_FIELDS_VERIFY)' '$(PROFILE_FIELD_REFERENCE)' '$(PREPARED_FIELDS_BACKING)' '$(SCENERY_LAYERS)' '$(NATIVE_BOXES)' '$(NATIVE_FIELDS)' '$(TERRAIN_BATCH)' '$(TERRAIN_DIRECT)' '$(TERRAIN_BATCH_VERIFY)' '$(AMIGA_OPTIMIZATION)' '$(LASER_VERIFY)' '$(PROFILE_LASER)' > $@.tmp
++	@printf '%s\n' '$(AMMO_BLOCK_CACHE)' >> $@.tmp
+ 	@cmp -s $@.tmp $@ || cp $@.tmp $@
+ 
+ $(OBJECTS): obj/startup-options
+diff --git a/amiga/profile.sh b/amiga/profile.sh
+index 428c9144..b6cac3bf 100644
+--- a/amiga/profile.sh
++++ b/amiga/profile.sh
+@@ -42,6 +42,7 @@ esac
+ if [[ ${SKIP_LEVEL:-0} == 1 && $mode != trace && $mode != fields-clear ]]; then script=profile_clear.gdb; fi
+ # Always leave the playable binary behind, including after a timeout/failure.
+ restore() {
++  unset AMMO_BLOCK_CACHE
+   unset PREPARED_FIELDS_VERIFY PROFILE_FIELD_REFERENCE PREPARED_FIELDS_BACKING
+   make clean > .run/profile-restore.log 2>&1
+   make -j4 TERRAIN_RUN_STORE=0 TABLE_CONTACT_ATAN=0 RETAIN_HEALTH_HUD=0 AMMO_DAMAGE_RANGE=0 PREPARED_AMMO_DIVIDERS=0 PREPARED_FIELDS=0 SCENERY_LAYERS=0 NATIVE_BOXES=1 NATIVE_FIELDS=1 TERRAIN_BATCH=0 TERRAIN_DIRECT=0 TERRAIN_BATCH_VERIFY=0 SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_LASER=0 PROFILE_CONTACT=0 PROFILE_FRAMES=0 PROFILE_TRANSITION=0 GENERATION_DETAIL=0 GENERATION_TIMING=0 PHASE_SAMPLING=0 TRACE_FRAMES= >> .run/profile-restore.log 2>&1
+diff --git a/src/platform/amiga/AmigaAmmoHud.h b/src/platform/amiga/AmigaAmmoHud.h
+index 26d4f385..04ba17e9 100644
+--- a/src/platform/amiga/AmigaAmmoHud.h
++++ b/src/platform/amiga/AmigaAmmoHud.h
+@@ -3,6 +3,7 @@
+ #include "AmigaRenderer.h"
+ #include "AmigaProfile.h"
+ #include "AmmoHudDamage.h"
++#include "AmigaAmmoBlocks.h"
+ #include "core/AmmoDividerLayout.h"
+ #include "core/AmmoFill.h"
+ #include "core/HudNumbers.h"
+@@ -11,6 +12,8 @@
+ #endif
+ class AmigaAmmoHud {
+     AmmoHudDamage damage_;
++    AmigaAmmoBlocks blocks_;
++    bool retainBlocks_ = false;
+     downwell::AmmoDividerLayout layout_;
+     UBYTE* destination_ = nullptr;
+     unsigned oldDigits_ = 1, fillAmmo_ = ~0u, fillCapacity_ = ~0u;
+@@ -29,7 +32,9 @@ class AmigaAmmoHud {
+ #endif
+ public:
+     unsigned lastWordWrites = 0;
+-    void invalidate() { damage_.valid = false; }
++    unsigned lastSkippedLines = 0;
++    void retainBlocks(bool enable) { if (retainBlocks_ != enable) invalidate(); retainBlocks_ = enable; }
++    void invalidate() { damage_.valid = false; blocks_.invalidate(); }
+     void draw(AmigaRenderer* renderer, const UBYTE* pack, const UBYTE* end,
+               unsigned ammo, unsigned capacity, unsigned offset,
+               const downwell::AmmoGaugeRows* rows, unsigned meter, bool forceFull = false) {
+@@ -43,6 +48,7 @@ public:
+         composition.blitterEnabled = 0;
+         renderer = &composition;
+         lastWordWrites = 0;
++        lastSkippedLines = 0;
+         const bool retainEdges = damage_.valid && !previousWideClear_ && !forceFull;
+         const unsigned previousMeter = damage_.meter;
+         const bool initialize = !damage_.valid;
+@@ -119,6 +125,16 @@ public:
+             fillTop_ = fill.top.floor(); fillHeight_ = fill.height.floor();
+             fillAmmo_ = ammo; fillCapacity_ = capacity;
+         }
++        bool blockCache = false;
++#ifdef DOWNWELL_PREPARED_AMMO_DIVIDERS
++        blockCache = retainBlocks_ && !forceFull && stampsReady_ && preparedDividersMatch_ &&
++                     clearDigits == 1 && capacity <= 16 && meter <= 3;
++        if (blockCache) {
++            const auto column = amigaPreparedDividers(ammo, capacity);
++            blocks_.prepare(rows, stamps_, &column, meter, fillTop_, fillHeight_,
++                            bodyTop_ + meter, bodyBottom_ + meter);
++        } else blocks_.invalidate();
++#endif
+         auto paint = [&](int top, int bottom, bool interior) {
+             // Record the backing actually painted, not merely a draw request:
+             // repeated unchanged requests must not lose a pending wide clear.
+@@ -251,7 +267,14 @@ public:
+                 const int begin = top > stableTop ? top : stableTop;
+                 const int end = bottom < stableBottom ? bottom : stableBottom;
+                 if (top < begin) paint(top, begin, false);
+-                paint(begin, end, true);
++                int pending = begin;
++                if (blockCache) for (int y = (begin + 7) & ~7; y + 8 <= end; y += 8) {
++                    if (!blocks_.unchanged(y >> 3)) continue;
++                    if (pending < y) paint(pending, y, true);
++                    lastSkippedLines += 8;
++                    pending = y + 8;
++                }
++                if (pending < end) paint(pending, end, true);
+                 if (end < bottom) paint(end, bottom, false);
+             } else paint(top, bottom, false);
+         };
+@@ -262,6 +285,7 @@ public:
+                 strip(labelTop, labelBottom);
+         }
+         amigaRendererClearClipRect(display);
++        if (blockCache) blocks_.commit();
+     }
+ };
+ #endif
+diff --git a/src/platform/amiga/DownwellAmiga.cpp b/src/platform/amiga/DownwellAmiga.cpp
+index a15828d0..bc4c42db 100644
+--- a/src/platform/amiga/DownwellAmiga.cpp
++++ b/src/platform/amiga/DownwellAmiga.cpp
+@@ -789,8 +789,12 @@ static void drawAmmoDigit(AmigaRenderer* renderer, int x, int y,
+ }
+ 
+ static AmigaAmmoHud ammoHud;
++// Both nonzero selectors keep the runtime choice in initialized data, so the
++// retained/candidate builds can be checked for identical executable text.
++volatile unsigned downwellAmmoBlockCache = DOWNWELL_AMMO_BLOCK_CACHE;
+ static void redrawAmmo(AmigaRenderer* renderer, unsigned ammo, unsigned maximumAmmo, unsigned offset = 0,
+                        const downwell::AmmoGaugeRows* rows = nullptr, unsigned meterOffset = 0) {
++    ammoHud.retainBlocks(downwellAmmoBlockCache == 2);
+     ammoHud.draw(renderer, activeHudPack, activeHudPackEnd, ammo, maximumAmmo, offset, rows, meterOffset);
+     DW_PROFILE_PHASE(profileTitle);
+ }
+diff --git a/tests/platform/amiga/AmigaRendererTest.cpp b/tests/platform/amiga/AmigaRendererTest.cpp
+index f35b1da8..7f2c0081 100644
+--- a/tests/platform/amiga/AmigaRendererTest.cpp
++++ b/tests/platform/amiga/AmigaRendererTest.cpp
+@@ -1261,6 +1261,7 @@ int main(int argc, char** argv) {
+     }
+     {
+         AmigaAmmoHud retained;
++        retained.retainBlocks(true);
+         downwell::AmmoGaugeRows rows;
+         unsigned previousDigits = 1;
+         auto fullRedraw = [&](unsigned ammo, unsigned cap, unsigned offset, unsigned meter) {
+diff --git a/src/platform/amiga/AmigaAmmoBlocks.h b/src/platform/amiga/AmigaAmmoBlocks.h
+new file mode 100644
+index 00000000..6514d909
+--- /dev/null
++++ b/src/platform/amiga/AmigaAmmoBlocks.h
+@@ -0,0 +1,64 @@
++#ifndef DOWNWELL_AMIGA_AMMO_BLOCKS_H
++#define DOWNWELL_AMIGA_AMMO_BLOCKS_H
++#include "AmigaRenderer.h"
++#include "core/AmmoGaugeRows.h"
++
++// Certificates for final eight-line interiors, not a second compositor.
++// Nonuniform artwork/partial fills retain the ordered drawing path.
++class AmigaAmmoBlocks {
++    struct Block {
++        UWORD low = 0, high = 0, divider = 0;
++        bool valid = false;
++    } previous_[36], next_[36];
++public:
++    void invalidate() { for (auto& b : previous_) b.valid = false; }
++    void prepare(const downwell::AmmoGaugeRows* rows, const AmigaWordStamp* stamps,
++                 const AmigaHudBlockedColumn* dividers, unsigned meter,
++                 unsigned fillTop, unsigned fillHeight, int top, int bottom) {
++        for (auto& b : next_) b.valid = false;
++        if (!rows || !dividers) return;
++        const int base = 229 + 4 * meter;
++        for (unsigned first = base >= 232 ? base - 231 : 1; first < 184;) {
++            const bool filled = first < rows->filled;
++            const unsigned frame = rows->state[first] < 4 ? rows->state[first] : 3;
++            unsigned end = first + 1;
++            while (end < 184 && (end < rows->filled) == filled &&
++                   (rows->state[end] < 4 ? rows->state[end] : 3) == frame) ++end;
++            // All eight source rows overlap only in this run's middle.
++            int low = base - static_cast<int>(end) + 8;
++            int high = base - static_cast<int>(first) + 1;
++            if (low < top) low = top;
++            if (high > bottom) high = bottom;
++            const auto& stamp = stamps[(filled ? 4 : 0) + frame];
++            const UWORD mask = stamp.runMask[7] & 0xfff0;
++            for (int y = (low + 7) & ~7; y + 8 <= high; y += 8) {
++                bool white = fillHeight && y >= static_cast<int>(fillTop) &&
++                             y + 8 <= static_cast<int>(fillTop + fillHeight);
++                if (!white && fillHeight && y < static_cast<int>(fillTop + fillHeight) &&
++                    y + 8 > static_cast<int>(fillTop)) continue;
++                const unsigned source = y - 4 * meter;
++                const unsigned a = dividers->indices[source >> 3];
++                const unsigned phase = source & 7;
++                const unsigned b = phase ? dividers->indices[(source >> 3) + 1] : 0;
++                // Dictionary indices are bytes; reserve two phase bits (0/4)
++                // and one validity bit separately, without hashing collisions.
++                // Current dictionary has fewer than 32 entries. Larger packs
++                // must fall back rather than truncate identity.
++                if (a >= 32 || b >= 32) continue;
++                auto& block = next_[y >> 3];
++                block.low = (0xfff0 & ~mask) | (stamp.runLow[7] & mask);
++                block.high = ((white ? 0x8010 : 0xfff0) & ~mask) | (stamp.runHigh[7] & mask);
++                block.divider = a | (b << 5) | ((a || b) ? phase << 10 : 0);
++                block.valid = true;
++            }
++            first = end;
++        }
++    }
++    bool unchanged(unsigned index) const {
++        const auto& a = previous_[index];
++        const auto& b = next_[index];
++        return a.valid && b.valid && a.low == b.low && a.high == b.high && a.divider == b.divider;
++    }
++    void commit() { for (unsigned i = 0; i < 36; ++i) previous_[i] = next_[i]; }
++};
++#endif

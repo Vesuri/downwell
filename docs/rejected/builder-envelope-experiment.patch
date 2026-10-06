@@ -1,0 +1,520 @@
+diff --git a/src/core/GameplayCollisionOwner.h b/src/core/GameplayCollisionOwner.h
+index 12b899f9..af046c35 100644
+--- a/src/core/GameplayCollisionOwner.h
++++ b/src/core/GameplayCollisionOwner.h
+@@ -35,7 +35,7 @@ public:
+ #elif defined(DOWNWELL_TERRAIN_RUN_STORE)
+     using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2,true,View::terrainBase,View::timeFieldBase,true,
+         RunnerSpatialLifetimes<View::capacity,View::terrainBase,View::timeFieldBase,GameplayTerrainInstances>,
+-        RunnerObservedRegistration<View::capacity,View::terrainBase,View::timeFieldBase,GameplayTerrainInstances>>;
++        RunnerObservedRegistration<View::capacity,View::terrainBase,View::timeFieldBase,GameplayTerrainInstances>,true>;
+ #else
+     using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2,true,View::terrainBase,View::timeFieldBase>;
+ #endif
+@@ -70,6 +70,9 @@ private:
+     PreparedObjectDefaults<386> objectDefaults_;
+     PreparedSpriteGeometry<741> spriteGeometry_;
+     PreparedTerrainBirthBounds terrainBirthBounds_;
++#ifdef DOWNWELL_TERRAIN_RUN_STORE
++    PreparedTerrainBirthBounds::Run terrainBirthRun_;
++#endif
+ #ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+     GameplayRoomLayers<View::capacity> layers_;
+ #elif defined(DOWNWELL_TERRAIN_RUN_STORE)
+@@ -200,9 +203,14 @@ private:
+             Owner::State state;
+             Owner::Box terrainBounds;bool preparedTerrain=false,terrainPrecise=false;
+             RunnerSpatialSplit::PixelBox terrainPixels;
+-            if constexpr(Kind==View::Kind::terrain)
+-                preparedTerrain=parent.terrainBirthBounds_.at(r.objectId,r.x,r.y,
++            if constexpr(Kind==View::Kind::terrain){
++#ifdef DOWNWELL_TERRAIN_RUN_STORE
++                preparedTerrain=parent.terrainBirthRun_.take(r.objectId,r.x,r.y,
++                    state.x,state.y,terrainBounds,terrainPrecise,terrainPixels);
++#endif
++                if(!preparedTerrain)preparedTerrain=parent.terrainBirthBounds_.at(r.objectId,r.x,r.y,
+                     state.x,state.y,terrainBounds,terrainPrecise,&terrainPixels);
++            }
+             if constexpr(Kind==View::Kind::scriptEffect){
+                 if(!r.effect||!r.effect->valid)return parent.check(false);
+                 state.x=r.effect->x;state.y=r.effect->y;
+@@ -322,6 +330,13 @@ private:
+             return parent.check(parent.owner_.changeSpriteFromPack(h,p.sprite,p.timeline,p.cachedFrame,
+                 sprite,parent.sprites_,*parent.families_.flags(object)));}
+ #ifdef DOWNWELL_TERRAIN_RUN_STORE
++        void prepareTerrainRun(int object,int x,int y,int step,unsigned count){
++            parent.owner_.endTerrainEnvelope();
++            parent.terrainBirthBounds_.prepareRun(parent.terrainBirthRun_,object,x,y,step,count);
++            RunnerSpatialSplit::PixelBox envelope;
++            if(parent.terrainBirthRun_.envelope(envelope))parent.owner_.prepareTerrainEnvelope(envelope);
++        }
++        void finishTerrainRun(){parent.terrainBirthRun_.clear();parent.owner_.endTerrainEnvelope();}
+         bool initializedTerrainBirth(InstanceHandle local,const Record& r,int tile,GameMakerRandom& random,
+             GameplayTerrainInstances::CreateValues& values,bool& unbounded){
+             static_assert(Kind==View::Kind::terrain,"Generated terrain transaction only");
+@@ -387,6 +402,7 @@ public:
+ #endif
+ #ifdef DOWNWELL_TERRAIN_RUN_STORE
+         if(!terrain_.bindInitializedBirth(terrainBinding_))return;
++        if(!terrain_.bindRunPreparation(terrainBinding_))return;
+ #endif
+         good_=sprites_.prepare(preparedSprites_,741)&&objectDefaults_.prepare(objects,sprites_)&&
+             spriteGeometry_.prepare(sprites_)&&
+diff --git a/src/core/GameplayTerrainInstancesRuns.h b/src/core/GameplayTerrainInstancesRuns.h
+index efbe7df6..b9dcc3ec 100644
+--- a/src/core/GameplayTerrainInstancesRuns.h
++++ b/src/core/GameplayTerrainInstancesRuns.h
+@@ -44,6 +44,9 @@ private:
+     Binding binding_;Presentation presentation_;WallCollision collision_;
+     void* initializedContext_=nullptr;
+     bool (*initializedBirth_)(void*,InstanceHandle,const Record&,int,GameMakerRandom&,CreateValues&,bool&)=nullptr;
++    void* runContext_=nullptr;
++    void (*prepareRun_)(void*,int,int,int,int,unsigned)=nullptr;
++    void (*finishRun_)(void*)=nullptr;
+     Ids identities_;
+     Mutable mutable_[capacity]{};
+     unsigned freeHint_=0;std::uint32_t next_=1;
+@@ -83,6 +86,21 @@ public:
+         return true;
+     }
+     unsigned size()const{return identities_.size();}
++    template<class Owner> bool bindRunPreparation(Owner& owner){
++        if(runContext_||size())return false;
++        runContext_=&owner;
++        prepareRun_=[](void* p,int object,int x,int y,int step,unsigned count){
++            static_cast<Owner*>(p)->prepareTerrainRun(object,x,y,step,count);
++        };
++        finishRun_=[](void* p){static_cast<Owner*>(p)->finishTerrainRun();};
++        return true;
++    }
++    template<class Execute> bool withPreparedRun(int object,int x,int y,int step,unsigned count,Execute execute){
++        if(!prepareRun_)return execute();
++        prepareRun_(runContext_,object,x,y,step,count);
++        struct Finish {GameplayTerrainInstancesRuns& owner;~Finish(){owner.finishRun_(owner.runContext_);}} finish{*this};
++        return execute();
++    }
+     RunnerRetainedLayerState* layerState(unsigned slot){return identities_.occupied(slot)?&mutable_[slot].layer:nullptr;}
+     const RunnerRetainedLayerState* layerState(unsigned slot)const{return identities_.occupied(slot)?&mutable_[slot].layer:nullptr;}
+     RunnerRetainedLayerState* layerState(InstanceHandle h){return identities_.contains(h)?&mutable_[h.slot].layer:nullptr;}
+diff --git a/src/core/GameplayWorld.h b/src/core/GameplayWorld.h
+index 1f9aa02f..c55186b8 100644
+--- a/src/core/GameplayWorld.h
++++ b/src/core/GameplayWorld.h
+@@ -610,6 +610,20 @@ public:
+     // the next pattern cell draws RNG. The backend owns terrain representation;
+     // this world owns breakable and actor registration and coordinate mapping.
+     template<class Terrain>
++    bool createGeneratedTerrainRun(const downwell::AreaOneBuilder::TerrainRun& run,Terrain terrain){
++        struct Context {GameplayWorld& world;Terrain& terrain;} context{*this,terrain};
++        const auto execute=[&](){
++            return run.execute([](void* opaque,const downwell::DeferredCreateInstance& command){
++                auto& c=*static_cast<Context*>(opaque);
++                return c.world.createGeneratedTerrain(command,c.terrain);
++            },&context);
++        };
++#ifdef DOWNWELL_TERRAIN_RUN_STORE
++        if(terrainInstances_)return terrainInstances_->withPreparedRun(run.objectId,run.x,run.y,run.stepX,run.count,execute);
++#endif
++        return execute();
++    }
++    template<class Terrain>
+     bool createGeneratedTerrain(const downwell::DeferredCreateInstance& command,Terrain terrain){
+         if(!run_.effectsSucceeded||(command.objectId!=60&&command.objectId!=93&&command.objectId!=99))return false;
+         if(!terrain(command))return false;
+diff --git a/src/core/PreparedTerrainBirthBounds.h b/src/core/PreparedTerrainBirthBounds.h
+index 63f9ac41..f6b4c25e 100644
+--- a/src/core/PreparedTerrainBirthBounds.h
++++ b/src/core/PreparedTerrainBirthBounds.h
+@@ -15,6 +15,50 @@ class PreparedTerrainBirthBounds {
+     RunnerImageValue values_[rows][offsetCapacity];
+     static unsigned shape(int object){return object==60?0:object==93?1:object==99?2:3;}
+ public:
++    class Run {
++        friend class PreparedTerrainBirthBounds;
++        const RunnerImageValue (*horizontal_)[offsetCapacity]=nullptr;
++        const RunnerImageValue* vertical_=nullptr;
++        const Shape* shape_=nullptr;
++        const RunnerSpatialSplit::PixelBox* offsets_=nullptr;
++        int object_=0,x_=0,y_=0,step_=0;
++        unsigned remaining_=0;
++    public:
++        void clear(){remaining_=0;}
++        bool envelope(RunnerSpatialSplit::PixelBox& out)const{
++            if(!remaining_)return false;
++            const auto& p=*offsets_;
++            out={x_+(p.left<p.right?p.left:p.right),y_+(p.top<p.bottom?p.top:p.bottom),
++                x_+(p.left>p.right?p.left:p.right),y_+(p.top>p.bottom?p.top:p.bottom)};
++            const int span=int(remaining_-1)*step_;
++            if(span<0)out.left+=span;else out.right+=span;
++            return true;
++        }
++        bool take(int object,int x,int y,RunnerImageValue& px,RunnerImageValue& py,
++            RunnerSpatialSplit::Box& bounds,bool& precise,RunnerSpatialSplit::PixelBox& pixels){
++            if(!remaining_||object!=object_||x!=x_||y!=y_){clear();return false;}
++            px=(*horizontal_)[0];py=vertical_[0];
++            bounds={(*horizontal_)[shape_->left],vertical_[shape_->top],
++                (*horizontal_)[shape_->right],vertical_[shape_->bottom]};
++            pixels={x+offsets_->left,y+offsets_->top,x+offsets_->right,y+offsets_->bottom};
++            precise=shape_->precise;
++            if(--remaining_){x_+=step_;horizontal_+=step_==16?1:-1;}
++            return true;
++        }
++    };
++    // Pure preparation: neither identities nor RNG are consumed. A changed
++    // command or unsupported run abandons the hint and uses at() as before.
++    void prepareRun(Run& out,int object,int x,int y,int step,unsigned count)const{
++        out.clear();
++        const unsigned id=shape(object);
++        if(!count||count>64||id==3||!shapes_[id].ready||(step!=16&&step!=-16)||
++            x < -256||x>=768||y<0||y>=8192||(unsigned(x)&15u)||(unsigned(y)&15u))return;
++        const int last=x+int(count-1)*step;
++        if(last < -256||last>=768)return;
++        out.horizontal_=values_+(unsigned(x+256)>>4);out.vertical_=values_[unsigned(y+256)>>4];
++        out.shape_=&shapes_[id];out.offsets_=&pixelOffsets_[id];
++        out.object_=object;out.x_=x;out.y_=y;out.step_=step;out.remaining_=count;
++    }
+     template<unsigned N> bool prepare(const PreparedObjectDefaults<N>& objects,
+         const SpriteCollisionPack& sprites){
+         DW_TERRAIN_PREPARATION_SCOPE;
+diff --git a/src/core/RunnerSpatialInstances.h b/src/core/RunnerSpatialInstances.h
+index 1db18e74..a8f9ce04 100644
+--- a/src/core/RunnerSpatialInstances.h
++++ b/src/core/RunnerSpatialInstances.h
+@@ -28,14 +28,14 @@ template<unsigned Capacity,unsigned First,unsigned Last,bool Runs> struct Runner
+ template<unsigned Capacity,unsigned First,unsigned Last> struct RunnerRegistrationStorage<Capacity,First,Last,true> {
+     using Type=RunnerRunMembership<Capacity,First,Last>;
+ };
+-template<unsigned Capacity,unsigned Nodes,bool Scheduled> struct RunnerSpatialIndexStorage {
++template<unsigned Capacity,unsigned Nodes,bool Scheduled,bool PreparedEnvelope=false> struct RunnerSpatialIndexStorage {
+     using Type=RunnerSpatialIndex<Nodes>;
+ };
+-template<unsigned Capacity,unsigned Nodes> struct RunnerSpatialIndexStorage<Capacity,Nodes,true> {
++template<unsigned Capacity,unsigned Nodes,bool PreparedEnvelope> struct RunnerSpatialIndexStorage<Capacity,Nodes,true,PreparedEnvelope> {
+     // Hold a level's terrain births plus actor churn without forcing the old
+     // 512-operation drain during ordinary descent. Pressure still drains in
+     // order; no finite log replaces testing the first observing query.
+-    using Type=RunnerSpatialJournal<Nodes,Capacity,4096>;
++    using Type=RunnerSpatialJournal<Nodes,Capacity,4096,PreparedEnvelope>;
+ };
+ // Shared collision ownership for externally allocated instance handles. The
+ // scheduler must attach every relevant birth before Create, publish its bounds,
+@@ -43,7 +43,7 @@ template<unsigned Capacity,unsigned Nodes> struct RunnerSpatialIndexStorage<Capa
+ // No platform types or asset residency decisions belong here.
+ template<unsigned Capacity,unsigned Nodes,bool ScheduledIndex=false,unsigned RetainedFirst=0,unsigned RetainedLast=0,bool RunRegistration=ScheduledIndex,class Lifetimes=RunnerSpatialLifetimes<Capacity>,
+     class Registration=typename RunnerRegistrationStorage<Capacity,RetainedFirst,RetainedLast,
+-        RunRegistration&&(RetainedFirst<RetainedLast)>::Type> class RunnerSpatialInstances {
++        RunRegistration&&(RetainedFirst<RetainedLast)>::Type,bool PreparedEnvelope=false> class RunnerSpatialInstances {
+     static_assert(Capacity>0,"Spatial instances need stable slots");
+     using Queue=RunnerSpatialDirtyQueue<Capacity>;
+     using Math=RunnerSpatialSplit;
+@@ -260,6 +260,11 @@ public:
+         return true;
+     }
+     template<class Terrain> bool bindTerrainLifetimes(Terrain& terrain){return lifetimes_.bind(terrain)&&membership_.bindTerrain(terrain);}
++    bool prepareTerrainEnvelope(const Math::PixelBox& bounds){
++        if constexpr(ScheduledIndex)return index_.prepareEnvelope(bounds);
++        else return false;
++    }
++    void endTerrainEnvelope(){if constexpr(ScheduledIndex)index_.endEnvelope();}
+     // One owner-controlled birth transaction. Between observes only the
+     // creation depth and may publish room ownership; it must not inspect or
+     // mutate this spatial owner. On failure publish the same partial state as
+@@ -537,7 +542,7 @@ public:
+             if(pixels.right<pixels.left){auto a=pixels.left;pixels.left=pixels.right;pixels.right=a;}
+             if(pixels.bottom<pixels.top){auto a=pixels.top;pixels.top=pixels.bottom;pixels.bottom=a;}
+             struct PreparedIndex {
+-                typename RunnerSpatialIndexStorage<Capacity,Nodes,ScheduledIndex>::Type& index;
++                typename RunnerSpatialIndexStorage<Capacity,Nodes,ScheduledIndex,PreparedEnvelope>::Type& index;
+                 const Math::PixelBox& pixels;
+                 bool insert(const Box& box,std::uint32_t id){return index.insertPrepared(box,id,&pixels);}
+                 bool remove(const Box& box,std::uint32_t id,bool retry,bool& removed){
+@@ -1015,7 +1020,7 @@ private:
+     Entry entries_[Capacity]{};
+     Membership membership_;
+     Queue spatial_,collision_;
+-    typename RunnerSpatialIndexStorage<Capacity,Nodes,ScheduledIndex>::Type index_;
++    typename RunnerSpatialIndexStorage<Capacity,Nodes,ScheduledIndex,PreparedEnvelope>::Type index_;
+     bool good_=true;
+     std::uint32_t bindingRevision_=0;
+     std::uint32_t captureRevision_=0;
+diff --git a/src/core/RunnerSpatialJournal.h b/src/core/RunnerSpatialJournal.h
+index c28c1223..40f7fa3b 100644
+--- a/src/core/RunnerSpatialJournal.h
++++ b/src/core/RunnerSpatialJournal.h
+@@ -2,11 +2,17 @@
+ #define DOWNWELL_CORE_RUNNER_SPATIAL_JOURNAL_H
+ #include "RunnerSpatialIndex.h"
+ namespace downwell {
++template<bool Enabled> struct RunnerSpatialEnvelope {};
++template<> struct RunnerSpatialEnvelope<true> {
++    RunnerSpatialSplit::PixelBox envelope{};
++    bool haveEnvelope=false;
++};
+ // Derived-tree scheduling only. The caller still publishes instance fields,
+ // flags, dirty queues and lifetime changes synchronously. Never collapse equal
+ // updates or reconstruct from current positions: tree order depends on history.
+ // All reads catch up. service() permits bounded work between publication bursts.
+-template<unsigned Nodes,unsigned Slots,unsigned Pending=512> class RunnerSpatialJournal {
++template<unsigned Nodes,unsigned Slots,unsigned Pending=512,bool PreparedEnvelope=false> class RunnerSpatialJournal:
++    private RunnerSpatialEnvelope<PreparedEnvelope> {
+     static_assert(Pending && !(Pending&(Pending-1)),"Journal capacity must be a power of two");
+     using Math=RunnerSpatialSplit;
+     static constexpr unsigned depthLimit=[](){unsigned n=Nodes,bits=0;do{++bits;n>>=1;}while(n);return bits;}();
+@@ -22,8 +28,18 @@ public:
+     bool valid()const{return good_&&tree_.valid();}
+     bool deferred()const{return deferred_;}
+     unsigned pending()const{return count_;}
++    // A proof about possible geometry, NOT a publication of future cells.
++    // Logical bounds, population, queued history and pressure remain live.
++    bool prepareEnvelope(const Math::PixelBox& future){
++        if constexpr(PreparedEnvelope){
++            this->haveEnvelope=valid()&&deferred_&&admitPixels(future,this->envelope);
++            return this->haveEnvelope;
++        }else return false;
++    }
++    void endEnvelope(){if constexpr(PreparedEnvelope)this->haveEnvelope=false;}
+     void clear(){
+         tree_.clear();head_=count_=population_=0;good_=deferred_=true;haveBounds_=false;
++        endEnvelope();
+         for(auto& word:present_)word=0;
+     }
+     unsigned nodeCount()const{catchUp();return tree_.nodeCount();}
+@@ -41,8 +57,15 @@ public:
+     bool insertPrepared(const Box& box,std::uint32_t instance,const Math::PixelBox* pixels){
+         if(!valid())return false;
+         Math::PixelBox next;
++        bool covered=false;
++        if constexpr(PreparedEnvelope){
++            covered=this->haveEnvelope&&pixels&&pixels->left<=pixels->right&&pixels->top<=pixels->bottom&&
++                pixels->left>=this->envelope.left&&pixels->right<=this->envelope.right&&
++                pixels->top>=this->envelope.top&&pixels->bottom<=this->envelope.bottom;
++            if(!covered)this->haveEnvelope=false;
++        }
+         if(!deferred_ || instance>=Slots || contains(instance) ||
+-            population_>=safePopulation || !(pixels?admitPixels(*pixels,next):admit(box,next))){
++            population_>=safePopulation || !(covered||(pixels?admitPixels(*pixels,next):admit(box,next)))){
+             if(!eager())return false;
+             return tree_.insert(box,instance);
+         }
+@@ -50,7 +73,16 @@ public:
+         operations_[(head_+count_)&(Pending-1)]={box,instance,true};++count_;
+         DW_PROFILE_COUNT(counterSpatialJournalQueued);
+         present_[instance>>5]|=1u<<(instance&31);++population_;
+-        bounds_=next;haveBounds_=true;return true;
++        if(covered){
++            if(!haveBounds_)bounds_=*pixels;
++            else{
++                if(pixels->left<bounds_.left)bounds_.left=pixels->left;
++                if(pixels->top<bounds_.top)bounds_.top=pixels->top;
++                if(pixels->right>bounds_.right)bounds_.right=pixels->right;
++                if(pixels->bottom>bounds_.bottom)bounds_.bottom=pixels->bottom;
++            }
++        }else bounds_=next;
++        haveBounds_=true;return true;
+     }
+     bool remove(const Box& oldBounds,std::uint32_t instance,bool retry,bool& removed){
+         if(!valid())return false;
+@@ -105,6 +137,7 @@ private:
+     }
+     bool eager(){
+         if(!catchUp())return false;
++        endEnvelope();
+         if(deferred_)DW_PROFILE_COUNT(counterSpatialJournalFallback);
+         deferred_=false;return true;
+     }
+diff --git a/src/platform/amiga/AmigaGameplayGeneration.cpp b/src/platform/amiga/AmigaGameplayGeneration.cpp
+index 4f4000a3..0d64b2e1 100644
+--- a/src/platform/amiga/AmigaGameplayGeneration.cpp
++++ b/src/platform/amiga/AmigaGameplayGeneration.cpp
+@@ -21,26 +21,22 @@ bool AmigaGameplayGeneration::createRun(void* opaque,const downwell::AreaOneBuil
+     AmigaTerrainRunIndex index(self.index_,run.objectId,run.x,run.y,run.stepX,run.count);
+     // Unsupported geometry retains scalar partial publication/failure timing.
+     if(!index.ready())return run.execute(create,opaque);
+-    struct Context{AmigaGameplayGeneration& self;AmigaTerrainRunIndex& index;bool dirty=false;};
+-    Context context{self,index};
+-    return run.execute([](void* opaque,const downwell::DeferredCreateInstance& command){
++    bool dirty=false;
++    return self.runtime_->createGeneratedTerrainRun(run,[&](const downwell::DeferredCreateInstance& command){
+         DW_PROFILE_SCOPE(profileGeneratedRegistration);
+-        auto& c=*static_cast<Context*>(opaque);
+-        return c.self.runtime_->createGeneratedTerrain(command,[&](const auto& command){
+-            {
+-                DW_PROFILE_SCOPE(profileGeneratedIndex);
+-                if(!c.index.append()||!c.self.tiles_.append(command))return false;
+-            }
+-            // Same row throughout; publish on the first successful backend
+-            // cell, before its core Create (also preserving failure prefixes).
+-            if(!c.dirty){
+-                if(command.y-24<c.self.dirtyFirst)c.self.dirtyFirst=command.y-24;
+-                if(command.y+24>c.self.dirtyEnd)c.self.dirtyEnd=command.y+24;
+-                c.dirty=true;
+-            }
+-            return true;
+-        });
+-    },&context);
++        {
++            DW_PROFILE_SCOPE(profileGeneratedIndex);
++            if(!index.append()||!self.tiles_.append(command))return false;
++        }
++        // Same row throughout; publish on the first successful backend
++        // cell, before its core Create (also preserving failure prefixes).
++        if(!dirty){
++            if(command.y-24<self.dirtyFirst)self.dirtyFirst=command.y-24;
++            if(command.y+24>self.dirtyEnd)self.dirtyEnd=command.y+24;
++            dirty=true;
++        }
++        return true;
++    });
+ }
+ 
+ bool AmigaGameplayGeneration::create(void* opaque,
+diff --git a/tests/core/GameplayCollisionOwnerTest.cpp b/tests/core/GameplayCollisionOwnerTest.cpp
+index 72c11f74..8f423644 100644
+--- a/tests/core/GameplayCollisionOwnerTest.cpp
++++ b/tests/core/GameplayCollisionOwnerTest.cpp
+@@ -1850,6 +1850,23 @@ int main(){
+             random.nextU32();world->configureEnemyRandom(random);capture();
+         }
+         capture();
++        for(unsigned failure:{0u,4u}){
++            const auto execute=[&](){
++                for(unsigned i=0;i<8;++i){
++                    const bool ok=world->createGeneratedInstance({60,240+int(i)*16,832},objects,[&](const auto&){
++                        capture();return !failure||i+1!=failure;
++                    });
++                    capture();if(!ok)return false;
++                    auto random=world->randomState();random.nextU32();world->configureEnemyRandom(random);
++                }return true;
++            };
++#ifdef DOWNWELL_TERRAIN_RUN_STORE
++            assert(owner->terrain().withPreparedRun(60,240,832,16,8,execute)==!failure);
++#else
++            assert(execute()==!failure);
++#endif
++            capture();
++        }
+         assert(!world->createGeneratedInstance({60,256,832},objects,[](const auto&){return false;}));
+         capture(); // Sink rejection publishes neither lifetime nor RNG draw.
+         assert(trace.good());
+diff --git a/tests/core/PreparedTerrainBirthBoundsTest.cpp b/tests/core/PreparedTerrainBirthBoundsTest.cpp
+index aa4106b6..9fc32eb2 100644
+--- a/tests/core/PreparedTerrainBirthBoundsTest.cpp
++++ b/tests/core/PreparedTerrainBirthBoundsTest.cpp
+@@ -15,6 +15,27 @@ int main(){
+     PreparedTerrainBirthBounds grid;assert(grid.prepare(defaults,sprites));
+     static_assert(sizeof(grid)<9000,"Terrain table must share coordinate offsets");
+     unsigned checks=0;
++    for(int object:{60,93,99})for(int y:{0,176,8176})for(int step:{-16,16})for(unsigned count:{1u,2u,8u,64u}){
++        PreparedTerrainBirthBounds::Run run;
++        int x=step==16?-256:752;
++        grid.prepareRun(run,object,x,y,step,count);
++        RunnerSpatialSplit::PixelBox envelope;assert(run.envelope(envelope));
++        for(unsigned i=0;i<count;++i,x+=step){
++            RunnerImageValue ax,ay,bx,by;RunnerSpatialSplit::Box a,b;bool ap,bp;
++            RunnerSpatialSplit::PixelBox pa,pb;
++            assert(run.take(object,x,y,ax,ay,a,ap,pa)&&grid.at(object,x,y,bx,by,b,bp,&pb));
++            assert(pa.left>=envelope.left&&pa.right<=envelope.right&&pa.top>=envelope.top&&pa.bottom<=envelope.bottom);
++            assert(ax.bits==bx.bits&&ay.bits==by.bits&&ap==bp&&
++                a.left.bits==b.left.bits&&a.right.bits==b.right.bits&&a.top.bits==b.top.bits&&a.bottom.bits==b.bottom.bits&&
++                pa.left==pb.left&&pa.right==pb.right&&pa.top==pb.top&&pa.bottom==pb.bottom);
++        }
++        RunnerImageValue ax,ay;RunnerSpatialSplit::Box a;bool ap;RunnerSpatialSplit::PixelBox pa;
++        assert(!run.take(object,x,y,ax,ay,a,ap,pa));
++        grid.prepareRun(run,object,0,y,step,1);
++        assert(!run.take(object,16,y,ax,ay,a,ap,pa)&&!run.take(object,0,y,ax,ay,a,ap,pa));
++        grid.prepareRun(run,object,0,y,step,0);
++        assert(!run.take(object,0,y,ax,ay,a,ap,pa));
++    }
+     for(int object:{60,93,99}){
+         const auto* d=defaults.get(object);assert(d);
+         PackedSpriteCollision resource;assert(sprites.collisionSprite(d->spriteId,d->maskId,resource));
+diff --git a/tests/core/RunnerSpatialJournalTest.cpp b/tests/core/RunnerSpatialJournalTest.cpp
+index 6df15df7..f8b83781 100644
+--- a/tests/core/RunnerSpatialJournalTest.cpp
++++ b/tests/core/RunnerSpatialJournalTest.cpp
+@@ -27,12 +27,13 @@ template<class A,class B> static void compare(A& eager,B& journal){
+     }
+     assert(eager.height()==journal.height()&&eager.nodeCount()==journal.nodeCount()&&!journal.pending());
+ }
+-template<unsigned Nodes,unsigned Pending,bool Prepared=false,bool Background=true> static void mutations(){
++template<unsigned Nodes,unsigned Pending,bool Prepared=false,bool Background=true,bool Envelope=false> static void mutations(){
+     downwell::RunnerSpatialIndex<Nodes> eager;
+-    downwell::RunnerSpatialJournal<Nodes,128,Pending> journal;
++    downwell::RunnerSpatialJournal<Nodes,128,Pending,Envelope> journal;
+     bool present[128]{};Box previous[128]{};
+     unsigned random=17;
+     for(unsigned step=0;step<12000;++step){
++        if constexpr(Envelope)if(step%37==0)journal.prepareEnvelope({-48,-48,240,400});
+         random=random*1664525u+1013904223u;
+         const unsigned id=(random>>12)%128;
+         if(present[id]){
+@@ -63,6 +64,27 @@ template<unsigned Nodes,unsigned Pending,bool Prepared=false,bool Background=tru
+     if(Nodes==1024)assert(journal.deferred()); // This fixture must exercise the journal, not fallback.
+ }
+ int main(){
++    {
++        downwell::RunnerSpatialJournal<128,32,8> scalar;
++        downwell::RunnerSpatialJournal<128,32,8,true> prepared;
++        assert(prepared.prepareEnvelope({0,0,32768,16}));
++        assert(!prepared.pending()); // Future geometry is not history.
++        for(unsigned i=0;i<20;++i){
++            const auto b=box(0,int(i)*1024);Math::PixelBox pixels;assert(Math::decodePixels(b,pixels));
++            assert(scalar.insertPrepared(b,i,&pixels)==prepared.insertPrepared(b,i,&pixels));
++            // The second rectangle escapes the prepared row. Its actual
++            // history still fits: publishing the entire future row early
++            // would incorrectly trigger eager fallback here.
++            assert(scalar.deferred()==prepared.deferred()&&scalar.pending()==prepared.pending());
++            if(i==1)assert(prepared.deferred());
++        }
++        compare(scalar,prepared);
++        prepared.clear();scalar.clear();
++        assert(!prepared.prepareEnvelope({0,0,65536,65536}));
++        auto b=box(16,32);Math::PixelBox pixels;assert(Math::decodePixels(b,pixels));
++        assert(prepared.insertPrepared(b,1,&pixels)&&scalar.insertPrepared(b,1,&pixels));
++        compare(scalar,prepared);
++    }
+     {
+         // A selector-free level must retain more than the old 512 records.
+         // The first real query replays history, including retirement/reuse,
+@@ -105,6 +127,10 @@ int main(){
+     mutations<16,8,true>(); // Including the same capacity-failure prefix.
+     mutations<1024,32,true,false>(); // Query/pressure-only replay, no idle servicing.
+     mutations<16,8,true,false>(); // Preserve failures without background servicing.
++    mutations<1024,32,true,true,true>();
++    mutations<16,8,true,true,true>();
++    mutations<1024,32,true,false,true>();
++    mutations<16,8,true,false,true>();
+     for(unsigned mode=0;mode<4;++mode){
+         downwell::RunnerSpatialIndex<128> eager;
+         downwell::RunnerSpatialJournal<128,32,8> journal;
+diff --git a/tests/core/TerrainOwnershipRunsTest.cpp b/tests/core/TerrainOwnershipRunsTest.cpp
+index 03ae4ce2..d1c43502 100644
+--- a/tests/core/TerrainOwnershipRunsTest.cpp
++++ b/tests/core/TerrainOwnershipRunsTest.cpp
+@@ -30,9 +30,14 @@ struct InitializedObserver {
+     using Terrain=downwell::GameplayTerrainInstancesRuns;
+     Terrain* store=nullptr;
+     unsigned failure=0,calls=0;
++    unsigned begun=0,ended=0;bool inRun=false;
++    void prepareTerrainRun(int object,int x,int y,int step,unsigned count){
++        require(object==60&&x==16&&y==32&&step==16&&count==1);++begun;inRun=true;
++    }
++    void finishTerrainRun(){require(inRun);++ended;inRun=false;}
+     bool initializedTerrainBirth(downwell::InstanceHandle h,const Terrain::Record& r,int tile,
+         downwell::GameMakerRandom&,Terrain::CreateValues& values,bool&){
+-        ++calls;require(store->ownsIdentity(h,r)&&store->size()==1&&r.spriteId==-1);
++        ++calls;require(inRun&&store->ownsIdentity(h,r)&&store->size()==1&&r.spriteId==-1);
+         if(failure==1)return false;
+         values.spriteId=tile;
+         require(store->find(h)->spriteId==tile); // Writes are live, not committed at return.
+@@ -45,7 +50,9 @@ static void initializedBoundary(){
+     for(unsigned failure=0;failure<3;++failure){
+         Terrain store;InitializedObserver observer{&store,failure};downwell::GameMakerRandom random;
+         require(store.bindInitializedBirth(observer)&&!store.bindInitializedBirth(observer));
+-        require(store.appendInitialized(60,16,32,true,51,random)==(failure==0));
++        require(store.bindRunPreparation(observer)&&!store.bindRunPreparation(observer));
++        require(store.withPreparedRun(60,16,32,16,1,[&](){return store.appendInitialized(60,16,32,true,51,random);})==(failure==0));
++        require(observer.begun==1&&observer.ended==1&&!observer.inRun);
+         require(observer.calls==1&&store.size()==1&&store.valid()==(failure==0));
+         const auto record=store.find(store.handle(0));
+         require(record&&record->spriteId==(failure==1?-1:51)&&record->imageSpeed==(failure?1:0));

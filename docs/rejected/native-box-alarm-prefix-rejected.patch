@@ -1,0 +1,215 @@
+diff --git a/amiga/Makefile b/amiga/Makefile
+index 870b8cb8..e3c9b522 100644
+--- a/amiga/Makefile
++++ b/amiga/Makefile
+@@ -44,6 +44,7 @@ REFERENCE_FIELD_BANK ?= 0
+ REFERENCE_EMPTY_TERRAIN ?= 0
+ REFERENCE_ROOM_TERRAIN ?= 0
+ REFERENCE_INITIAL_TERRAIN ?= 0
++REFERENCE_BOX_ALARMS ?= 0
+ TABLE_CONTACT_ATAN ?= 1
+ RETAIN_HEALTH_HUD ?= 1
+ AMMO_DAMAGE_RANGE ?= 1
+@@ -253,6 +254,9 @@ endif
+ ifeq ($(REFERENCE_INITIAL_TERRAIN),1)
+ CFLAGS += -DDOWNWELL_REFERENCE_INITIAL_TERRAIN
+ endif
++ifeq ($(REFERENCE_BOX_ALARMS),1)
++CFLAGS += -DDOWNWELL_REFERENCE_BOX_ALARMS
++endif
+ ifeq ($(TABLE_CONTACT_ATAN),0)
+ CFLAGS += -DDOWNWELL_PORTABLE_CONTACT_ATAN
+ endif
+@@ -450,6 +454,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
+ 	@printf '%s\n' '$(REFERENCE_EMPTY_TERRAIN)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_ROOM_TERRAIN)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_INITIAL_TERRAIN)' >> $@.tmp
++	@printf '%s\n' '$(REFERENCE_BOX_ALARMS)' >> $@.tmp
+ 	@printf '%s\n' '$(DRAW_ORDER_AUDIT)' >> $@.tmp
+ 	@printf '%s\n' '$(LOCAL_DRAW_CAPTURE)' >> $@.tmp
+ 	@printf '%s\n' '$(AMMO_FACTORED)' >> $@.tmp
+diff --git a/amiga/profile.sh b/amiga/profile.sh
+index c285b09a..885894f5 100644
+--- a/amiga/profile.sh
++++ b/amiga/profile.sh
+@@ -110,6 +110,7 @@ restore() {
+   unset REFERENCE_EMPTY_TERRAIN
+   unset REFERENCE_ROOM_TERRAIN
+   unset REFERENCE_INITIAL_TERRAIN
++  unset REFERENCE_BOX_ALARMS
+   unset DRAW_CACHE_AUDIT
+   unset DRAW_ORDER_AUDIT
+   unset LOCAL_DRAW_CAPTURE
+diff --git a/src/core/GameplayCollisionOwner.h b/src/core/GameplayCollisionOwner.h
+index 8956843c..cdffd98a 100644
+--- a/src/core/GameplayCollisionOwner.h
++++ b/src/core/GameplayCollisionOwner.h
+@@ -60,6 +60,7 @@ private:
+     bool combatAlarmCaptureDirty_=true;
+     unsigned combatAlarmMask_=0;
+     bool combatAlarmCaptureValid_=false;
++    bool nativeBoxAlarmPrefix_=false;
+ #ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+     RunnerRoomMembership<View::capacity> room_;
+ #else
+@@ -673,6 +674,14 @@ public:
+             good_=RunnerDepthService::integerDepth(box->creationDepth,boxLayer_.depth);
+         }}
+         if(good_){const auto* field=objectDefaults_.get(82);if(!field)good_=false;else nativeFieldFlags_=field->initialFlags;}
++#ifndef DOWNWELL_REFERENCE_BOX_ALARMS
++        if(good_&&nativeBoxes_){
++            unsigned mask=0;
++            // The prefix adapter implements the pinned box's Alarm 0 only.
++            // Other resource metadata retains generic captured dispatch.
++            nativeBoxAlarmPrefix_=!(nativeBoxFlags_&0x100003u)&&alarmMetadata_.mask(92,mask)&&mask==1;
++        }
++#endif
+         if(good_)for(unsigned selector=0;selector<2;++selector){
+             terrainFamilies_[selector]=true;
+             for(unsigned i=0;i<families_.size();++i)
+@@ -706,7 +715,7 @@ public:
+     bool serviceSpatialIndex(unsigned budget){return check(owner_.serviceSpatialIndex(budget));}
+     bool attach(GameplayWorld& world){
+         combatAlarmCaptureValid_=false;
+-        if(!(native_?table_.watchCaptureRanges(View::enemyBase,View::terrainBase,View::debrisBase,View::capacity,combatAlarmCaptureDirty_):
++        if(!(native_?table_.watchCaptureRanges(View::enemyBase,nativeBoxAlarmPrefix_?View::breakableBase:View::terrainBase,View::debrisBase,View::capacity,combatAlarmCaptureDirty_):
+             owner_.watchCaptureRanges(View::enemyBase,View::terrainBase,View::debrisBase,View::capacity,combatAlarmCaptureDirty_)))
+             return check(false);
+         if(!valid()||(world_&&world_!=&world)||(!world_&&
+@@ -979,6 +988,7 @@ public:
+             auto& self=*static_cast<GameplayCollisionOwner*>(context);
+             if(!self.valid())return false;
+             auto& phase=self.combatAlarmPhase_;
++            const auto boxes=self.nativeBoxAlarmPrefix_?self.world_->captureBoxAlarms():GameplayWorld::BoxAlarmPrefix{};
+             const bool reused=self.combatAlarmCaptureValid_&&!self.combatAlarmCaptureDirty_;
+             if(!reused){
+                 phase.clear();
+@@ -987,7 +997,7 @@ public:
+                 };
+                 // Only implemented families are admitted. Avoid scanning every
+                 // terrain record for this partial combat alarm traversal.
+-                if(!self.check(self.visitRegistered(View::enemyBase,View::terrainBase,capture)&&
++                if(!self.check(self.visitRegistered(View::enemyBase,self.nativeBoxAlarmPrefix_?View::breakableBase:View::terrainBase,capture)&&
+                     self.visitRegistered(View::debrisBase,View::capacity,capture)))return false;
+                 // Save before callbacks: mutation during dispatch invalidates
+                 // reuse next tick without changing this phase's captured set.
+@@ -1002,7 +1012,7 @@ public:
+                     kind==View::Kind::timeChange?self.world_->advanceTimeChangeRoomAlarm(local,alarm):
+                     kind==View::Kind::drone?(alarm==0&&self.drones_.advanceAlarm(local)):
+                     kind==View::Kind::entryDither&&self.entries_.advanceAlarm(local,alarm);
+-            },reused,&self.combatAlarmMask_);
++            },reused,&self.combatAlarmMask_,boxes);
+         },this);
+         world.configureDebrisStepOrder([](void* context,GameplayWorld::DebrisStepOrder& phase){
+             auto& self=*static_cast<GameplayCollisionOwner*>(context);
+@@ -1095,7 +1105,7 @@ private:
+     }
+     template<bool SkipInactive=false,unsigned Capacity,class AdvanceAndDispatch>
+     bool dispatchCapturedAlarms(RunnerStepSnapshot<Capacity>& snapshot,AdvanceAndDispatch advanceAndDispatch,
+-        bool alreadySorted=false,unsigned* retainedMask=nullptr){
++        bool alreadySorted=false,unsigned* retainedMask=nullptr,GameplayWorld::BoxAlarmPrefix boxes={}){
+         DW_PROFILE_SCOPE(profileAlarmScan);
+         if(!alreadySorted){DW_PROFILE_SCOPE(profileAlarmSort);snapshot.sort();}
+         const unsigned count=snapshot.size();
+@@ -1119,11 +1129,18 @@ private:
+             if(retainedMask)*retainedMask=capturedAlarms;
+         }
+         for(unsigned alarm=0;alarm<AlarmBank::count;++alarm){
+-          if(!(capturedAlarms&(1u<<alarm))&&bindingsUnchanged(bindingRevision))continue;
++          bool boxesPending=alarm==0&&boxes.end;
++          if(!boxesPending&&!(capturedAlarms&(1u<<alarm))&&bindingsUnchanged(bindingRevision))continue;
+           int cachedObject=-1;unsigned alarmMask=0;
+           PackedObjectEvent event;bool eventCached=false,eventFound=false;
+           unsigned groupEnd=0;
+           for(unsigned i=0;i<count;++i){
++            // Resource order, not layer or compact-array order. The native
++            // box family is the sole object-92 owner in this combat phase.
++            if(boxesPending&&snapshot.object(i)>92){
++                if(!check(world_->advanceBoxAlarmPrefix(boxes)))return false;
++                boxesPending=false;
++            }
+             if constexpr(SkipInactive)if(i>=groupEnd){
+                 // Captured boxes are live boxes. When none has this alarm set
+                 // at group entry, no member is pending and no callback runs.
+@@ -1175,6 +1192,7 @@ private:
+             {DW_PROFILE_SCOPE(profileAlarmCallback);
+                 if(!check(advanceAndDispatch(h,alarm,event))||!valid())return false;}
+           }
++          if(boxesPending&&!check(world_->advanceBoxAlarmPrefix(boxes)))return false;
+         }
+         return true;
+     }
+diff --git a/src/core/GameplayWorld.h b/src/core/GameplayWorld.h
+index fa0856b0..f22d6b51 100644
+--- a/src/core/GameplayWorld.h
++++ b/src/core/GameplayWorld.h
+@@ -580,6 +580,21 @@ public:
+             if(breakables_[i].lifetimeId&&breakables_[i].alarm0>=0)return true;
+         return false;
+     }
++    // Native boxes never re-register or compact. A prefix plus generation
++    // ceiling captures the same lifetimes without copying their handles.
++    // The ceiling also excludes replacement slots after a room/config reset.
++    struct BoxAlarmPrefix {unsigned end=0;std::uint32_t lastLifetime=0;};
++    BoxAlarmPrefix captureBoxAlarms()const{return {breakableCount_,nextBreakableLifetimeId_-1};}
++    bool advanceBoxAlarmPrefix(BoxAlarmPrefix phase){
++        if(!run_.effectsSucceeded)return false;
++        const unsigned end=phase.end<breakableCount_?phase.end:breakableCount_;
++        for(unsigned i=0;i<end;++i){
++            auto& box=breakables_[i];
++            if(!box.lifetimeId||box.lifetimeId>phase.lastLifetime||!box.active||box.destroyRequested)continue;
++            if(downwell::AlarmBank::advanceValue(box.alarm0))box.state.alarmZero();
++        }
++        return true;
++    }
+     bool publishBoxAlarm0(downwell::InstanceHandle h,std::int32_t value){
+         if(!run_.effectsSucceeded||!findBreakable(h))return run_.effectsSucceeded=false;
+         breakables_[h.slot].alarm0=value;return true;
+diff --git a/tests/core/GameplayCollisionOwnerTest.cpp b/tests/core/GameplayCollisionOwnerTest.cpp
+index 4997af4a..b309d816 100644
+--- a/tests/core/GameplayCollisionOwnerTest.cpp
++++ b/tests/core/GameplayCollisionOwnerTest.cpp
+@@ -2961,11 +2961,13 @@ int main(){
+         const int bx=0,by=336;assert(world->appendBreakables(&bx,&by,1));const InstanceHandle box{0,1};
+         assert(BoxSoundVerification::run(*world,box,171,[&](){return &world->findBreakable(box)->sound;},failure));
+     }
+-    for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native}){
++    for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
++                       GameplayCollisionOwner::Ownership::nativeScenery}){
+         // Native ownership skips box groups while no live box has Alarm 0
+         // set; an armed box must still count down beside idle ones.
+         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+-            GameplayTerrainInstances::WallCollision{},nullptr,ownership);
++            GameplayTerrainInstances::WallCollision{},
++            ownership==GameplayCollisionOwner::Ownership::nativeScenery?&rooms:nullptr,ownership);
+         auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+             owner->breakableBinding(),owner->playerBinding());
+         assert(owner->attach(*world));
+@@ -2985,6 +2987,27 @@ int main(){
+         assert(world->findBreakable(armed)->state.wallHp.zero()&&world->findBreakable(armed)->destroyRequested&&
+             !world->findBreakable(idle)->state.wallHp.zero()&&!world->findBreakable(idle)->destroyRequested);
+     }
++    {
++        GameplayWorld world(300,true);
++        const int xs[]={64,96,128},ys[]={512,512,512};
++        assert(world.appendBreakables(xs,ys,3));
++        const InstanceHandle a{0,world.breakableSlot(0).lifetimeId},
++            b{1,world.breakableSlot(1).lifetimeId},c{2,world.breakableSlot(2).lifetimeId};
++        assert(world.publishBoxAlarm0(a,1)&&world.publishBoxAlarm0(b,0)&&world.publishBoxAlarm0(c,1));
++        const auto phase=world.captureBoxAlarms();
++        assert(world.markBreakableDestroyed(c));
++        assert(world.appendBreakables(xs,ys,1));
++        const InstanceHandle newborn{3,world.breakableSlot(3).lifetimeId};
++        assert(world.publishBoxAlarm0(newborn,1)&&world.advanceBoxAlarmPrefix(phase));
++        assert(world.findBreakable(a)->alarm0==0&&world.findBreakable(a)->state.wallHp.zero());
++        assert(world.findBreakable(b)->alarm0==-1&&!world.findBreakable(b)->state.wallHp.zero());
++        assert(world.findBreakable(c)->alarm0==1&&world.findBreakable(newborn)->alarm0==1);
++        world.configureBreakables(xs,ys,3);
++        const InstanceHandle replacement{0,world.breakableSlot(0).lifetimeId};
++        assert(replacement.generation>phase.lastLifetime&&world.publishBoxAlarm0(replacement,1));
++        assert(world.advanceBoxAlarmPrefix(phase)&&world.findBreakable(replacement)->alarm0==1);
++        assert(world.advanceBoxAlarmPrefix(world.captureBoxAlarms())&&world.findBreakable(replacement)->alarm0==0);
++    }
+     for(bool registered:{false,true}){
+         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+         auto world=std::make_unique<GameplayWorld>(300,true,0,false,

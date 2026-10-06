@@ -1,0 +1,148 @@
+diff --git a/amiga/Makefile b/amiga/Makefile
+index 09b4a71d..259526ee 100644
+--- a/amiga/Makefile
++++ b/amiga/Makefile
+@@ -36,6 +36,7 @@ REFERENCE_DRAW_LIST ?= 0
+ REFERENCE_VALIDATION ?= 0
+ REFERENCE_ANIMATION ?= 0
+ REFERENCE_GENERATED_BOXES ?= 0
++REFERENCE_EFFECT_STAMPS ?= 0
+ TABLE_CONTACT_ATAN ?= 1
+ RETAIN_HEALTH_HUD ?= 1
+ AMMO_DAMAGE_RANGE ?= 1
+@@ -212,6 +213,9 @@ endif
+ ifeq ($(REFERENCE_GENERATED_BOXES),1)
+ CFLAGS += -DDOWNWELL_REFERENCE_GENERATED_BOXES
+ endif
++ifeq ($(REFERENCE_EFFECT_STAMPS),1)
++CFLAGS += -DDOWNWELL_REFERENCE_EFFECT_STAMPS
++endif
+ ifeq ($(TABLE_CONTACT_ATAN),0)
+ CFLAGS += -DDOWNWELL_PORTABLE_CONTACT_ATAN
+ endif
+@@ -397,6 +401,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
+ 	@printf '%s\n' '$(REFERENCE_VALIDATION)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_ANIMATION)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_GENERATED_BOXES)' >> $@.tmp
++	@printf '%s\n' '$(REFERENCE_EFFECT_STAMPS)' >> $@.tmp
+ 	@printf '%s\n' '$(DRAW_ORDER_AUDIT)' >> $@.tmp
+ 	@printf '%s\n' '$(LOCAL_DRAW_CAPTURE)' >> $@.tmp
+ 	@printf '%s\n' '$(AMMO_FACTORED)' >> $@.tmp
+diff --git a/amiga/profile.sh b/amiga/profile.sh
+index 4f03d22c..35be95ff 100644
+--- a/amiga/profile.sh
++++ b/amiga/profile.sh
+@@ -85,6 +85,7 @@ restore() {
+   unset REFERENCE_VALIDATION
+   unset REFERENCE_ANIMATION
+   unset REFERENCE_GENERATED_BOXES
++  unset REFERENCE_EFFECT_STAMPS
+   unset DRAW_CACHE_AUDIT
+   unset DRAW_ORDER_AUDIT
+   unset LOCAL_DRAW_CAPTURE
+diff --git a/src/platform/amiga/AmigaEffectSurface.cpp b/src/platform/amiga/AmigaEffectSurface.cpp
+index 8748330b..dcdb7c91 100644
+--- a/src/platform/amiga/AmigaEffectSurface.cpp
++++ b/src/platform/amiga/AmigaEffectSurface.cpp
+@@ -68,6 +68,16 @@ bool stamp(void* context,const Surface::Mask& m,const std::uint8_t* low,const st
+         first=edge;last=lead;
+     }
+     auto* mask=reinterpret_cast<uint16_t*>(const_cast<std::uint8_t*>(m.data)+source);
++#if !defined(ASSEMBLER) && !defined(DOWNWELL_REFERENCE_EFFECT_STAMPS)
++    if(low){
++        AmigaHardware::blitterPaletteStamp(
++            reinterpret_cast<uint16_t*>(const_cast<std::uint8_t*>(low)+source),
++            reinterpret_cast<uint16_t*>(const_cast<std::uint8_t*>(high)+source),mask,
++            reinterpret_cast<uint16_t*>(data+target),AmigaEffectSurface::planeBytes,
++            words,height,sourceModulo,surfaceModulo,shift,first,last);
++    }else
++#endif
++    {
+     if(low){
+         AmigaHardware::blitterCopyWithMask(reinterpret_cast<uint16_t*>(const_cast<std::uint8_t*>(low)+source),
+             reinterpret_cast<uint16_t*>(data+AmigaEffectSurface::planeBytes+target),mask,
+@@ -78,6 +88,7 @@ bool stamp(void* context,const Surface::Mask& m,const std::uint8_t* low,const st
+     }
+     AmigaHardware::blitterPatternWithMask(low?0xffff:0,reinterpret_cast<uint16_t*>(data+target),mask,
+         words,height,0,surfaceModulo,sourceModulo,0,shift,first,last,false);
++    }
+ #ifdef DOWNWELL_BOB_VERIFY
+     ++gDownwellEffectDmaStamps;
+ #endif
+diff --git a/src/platform/amiga/framework/AmigaHardware.cpp b/src/platform/amiga/framework/AmigaHardware.cpp
+index 1829e60d..d1d8c939 100644
+--- a/src/platform/amiga/framework/AmigaHardware.cpp
++++ b/src/platform/amiga/framework/AmigaHardware.cpp
+@@ -276,6 +276,55 @@ void AmigaHardware::blitterCopyWithMask(uint16_t* source, uint16_t* destination,
+     blitterCopyWithMaskOperation(source,destination,mask,width,height,sourceModulo,destinationModulo,
+         maskModulo,sourceShift,maskShift,firstWordMask,lastWordMask,clearMasked,false);
+ }
++void AmigaHardware::blitterPaletteStamp(uint16_t* low, uint16_t* high, uint16_t* mask,
++    uint16_t* alpha, uint32_t planeBytes, uint16_t width, uint16_t height,
++    int16_t sourceModulo, int16_t destinationModulo, int16_t shift,
++    uint16_t firstWordMask, uint16_t lastWordMask)
++{
++    auto* lowTarget = reinterpret_cast<uint16_t*>(reinterpret_cast<uint8_t*>(alpha) + planeBytes);
++    auto* highTarget = reinterpret_cast<uint16_t*>(reinterpret_cast<uint8_t*>(lowTarget) + planeBytes);
++    // The first operation establishes every register, including when preceding
++    // unrelated work is queued. Its two successors inherit only that state.
++    blitterCopyWithMask(low, lowTarget, mask, width, height, sourceModulo,
++        destinationModulo, sourceModulo, shift, shift, firstWordMask, lastWordMask, false);
++    const auto begin = [](uint16_t registers) {
++        *blitterQueueAddPosition++ = registers;
++        if (blitterQueueAddPosition + registers * 2 >= blitterQueueBufferEnd)
++            blitterQueueAddPosition = blitterQueueBuffer;
++    };
++    const auto word = [](uint16_t reg, uint16_t value) {
++        *blitterQueueAddPosition++ = reg;
++        *blitterQueueAddPosition++ = value;
++    };
++    const auto pointer = [&](uint16_t reg, const uint16_t* value) {
++        const uint32_t address = reinterpret_cast<uint32_t>(value);
++        word(reg, uint16_t(address >> 16));
++        word(reg + 2, uint16_t(address));
++    };
++    const uint16_t size = uint16_t((height << 6) | width);
++    // Hardware advances all four pointers during the low-plane operation.
++    // Reload them, but not its masks, modulos, shifts or minterm.
++    begin(9);
++    pointer(bltapth, mask);
++    pointer(bltbpth, high);
++    pointer(bltcpth, highTarget);
++    pointer(bltdpth, highTarget);
++    word(bltsize, size);
++    // Alpha uses the same A mask, C/D stride and traversal direction. Disable
++    // B DMA and its shift, and supply all-one B data to OR opacity into C.
++    begin(10);
++    word(bltcon1, shift < 0 ? BLITREVERSE : 0);
++    word(bltcon0, uint16_t(BC0F_SRCA | BC0F_SRCC | BC0F_DEST | 0xca |
++        ((shift < 0 ? -shift : shift) << 12)));
++    word(bltbdat, 0xffff);
++    pointer(bltapth, mask);
++    pointer(bltcpth, alpha);
++    pointer(bltdpth, alpha);
++    word(bltsize, size);
++    hasQueuedBlits = true;
++    processBlitterQueue();
++}
++
+ void AmigaHardware::blitterCopyWithMaskOperation(uint16_t* source, uint16_t* destination, uint16_t* mask, uint16_t width, uint16_t height, int16_t sourceModulo, int16_t destinationModulo, int16_t maskModulo, int16_t sourceShift, int16_t maskShift, uint16_t firstWordMask, uint16_t lastWordMask, bool clearMasked, bool invertSource)
+ {
+     const uint16_t operation=(invertSource?0x30:0xc0)|(clearMasked?0:0x0a);
+diff --git a/src/platform/amiga/framework/AmigaHardware.h b/src/platform/amiga/framework/AmigaHardware.h
+index b88517bc..e55c3269 100644
+--- a/src/platform/amiga/framework/AmigaHardware.h
++++ b/src/platform/amiga/framework/AmigaHardware.h
+@@ -77,6 +77,12 @@ public:
+     static void blitterPatternWithMask(uint16_t pattern, uint16_t* destination, uint16_t* mask, uint16_t width, uint16_t height, int16_t sourceModulo, int16_t destinationModulo, int16_t maskModulo, int16_t sourceShift, int16_t maskShift, uint16_t firstWordMask, uint16_t lastWordMask, bool clearMasked);
+     static void blitterDrain();
+ #ifndef ASSEMBLER
++    // Ordered low/high/opacity stamp. All three operations share mask geometry;
++    // no unrelated command may intervene before their delta register packets.
++    static void blitterPaletteStamp(uint16_t* low, uint16_t* high, uint16_t* mask,
++        uint16_t* alpha, uint32_t planeBytes, uint16_t width, uint16_t height,
++        int16_t sourceModulo, int16_t destinationModulo, int16_t shift,
++        uint16_t firstWordMask, uint16_t lastWordMask);
+     static void blitterCopyWithMaskOperation(uint16_t* source, uint16_t* destination, uint16_t* mask, uint16_t width, uint16_t height, int16_t sourceModulo, int16_t destinationModulo, int16_t maskModulo, int16_t sourceShift, int16_t maskShift, uint16_t firstWordMask, uint16_t lastWordMask, bool clearMasked, bool invertSource);
+     // C comes from an independently owned backing, not the old destination.
+     // All fetched destination words, including masked edges, are replaced.

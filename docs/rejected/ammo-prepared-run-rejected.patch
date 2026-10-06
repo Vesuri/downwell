@@ -1,0 +1,134 @@
+diff --git a/Makefile b/Makefile
+index 6cd16897..e065e70e 100644
+--- a/Makefile
++++ b/Makefile
+@@ -2100,6 +2100,12 @@ build/factored-ammo-renderer-test: $(AMIGA_RENDERER_TEST_SOURCES) $(wildcard src
+ 	@mkdir -p $(@D)
+ 	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -DDOWNWELL_AMMO_DAMAGE_RANGE -DDOWNWELL_PREPARED_AMMO_DIVIDERS -DDOWNWELL_AMMO_FACTORED=2 -o $@ $(AMIGA_RENDERER_TEST_SOURCES)
+ .PHONY: verify-factored-ammo-hud
++build/run-ammo-renderer-test: $(AMIGA_RENDERER_TEST_SOURCES) $(wildcard src/platform/amiga/*.h) $(wildcard src/core/*.h) generated/amiga-ammo-dividers.h generated/downwell-field-spans.h generated/amiga-ammo-factored.h
++	@mkdir -p $(@D)
++	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -DDOWNWELL_AMMO_DAMAGE_RANGE -DDOWNWELL_PREPARED_AMMO_DIVIDERS -DDOWNWELL_AMMO_FACTORED=3 -o $@ $(AMIGA_RENDERER_TEST_SOURCES)
++.PHONY: verify-run-ammo-hud
++verify-run-ammo-hud: build/run-ammo-renderer-test
++	./build/run-ammo-renderer-test generated/amiga-game.dwap generated/amiga-hud.dwap
+ verify-factored-ammo-hud: build/factored-ammo-renderer-test
+ 	./build/factored-ammo-renderer-test generated/amiga-game.dwap generated/amiga-hud.dwap
+ 
+diff --git a/src/platform/amiga/AmigaAmmoFactored.h b/src/platform/amiga/AmigaAmmoFactored.h
+index 7f0bd484..72c0b270 100644
+--- a/src/platform/amiga/AmigaAmmoFactored.h
++++ b/src/platform/amiga/AmigaAmmoFactored.h
+@@ -16,6 +16,24 @@ class AmigaAmmoFactored {
+     unsigned capacity_ = 0, meter_ = 0, label_ = 0;
+     std::uint32_t serial_ = 0;
+     UWORD oldTiles_[16] = {};
++    // Walk offline final-image runs; never reconstruct source overlaps here.
++    struct Cursor {
++        const UWORD* selected;
++        unsigned segment, run, endRun, bottom;
++        const unsigned short* pair;
++        void select() {
++            const auto* entry=downwell_ammo_factored::tiles[selected[segment]];
++            run=entry[0];endRun=run+entry[1];
++        }
++        void advance() {
++            if(run==endRun){--segment;select();}
++            const auto* entry=downwell_ammo_factored::runs[run++];
++            bottom+=entry[0];pair=downwell_ammo_factored::pairs[entry[1]];
++        }
++        Cursor(const UWORD* tiles,unsigned capacity):selected(tiles),segment(capacity-1),bottom(40) {
++            select();advance();
++        }
++    };
+     static UWORD read(const UBYTE* p) {
+ #ifdef DOWNWELL_PLATFORM_AMIGA
+         return *reinterpret_cast<const UWORD*>(p);
+@@ -55,6 +73,40 @@ class AmigaAmmoFactored {
+         }
+         return true;
+     }
++    void publishChanges(UBYTE* retained,const UWORD* selected,unsigned capacity,
++                        unsigned label,unsigned& writes) {
++        Cursor previous(oldTiles_,capacity), next(selected,capacity);
++        const auto* oldGlyph=downwell_ammo_factored::labels[label_];
++        const auto* glyph=downwell_ammo_factored::labels[label];
++        unsigned y=40;
++        while(y<256){
++            unsigned bottom=previous.bottom<next.bottom?previous.bottom:next.bottom;
++            if(y<238 && bottom>238)bottom=238;
++            if(y<250 && bottom>250)bottom=250;
++            const bool labelRows=y>=238 && y<250;
++            for(unsigned plane=0;plane<2;++plane){
++                const UWORD before=previous.pair[plane],after=next.pair[plane];
++                if(before==after && (!labelRows || label==label_))continue;
++                for(unsigned row=y;row<bottom;++row){
++                    UWORD a=before,b=after;
++                    if(labelRows){
++                        const unsigned index=(row-238)*2;
++                        a=UWORD((a&~(oldGlyph[index]|oldGlyph[index+1]))|oldGlyph[index+plane]);
++                        b=UWORD((b&~(glyph[index]|glyph[index+1]))|glyph[index+plane]);
++                    }
++                    if(a!=b){
++                        const unsigned address=row*48+36+plane*downwellPlaneBytes;
++                        write(retained+address,b);write(destination_+address,b);++writes;
++                    }
++                }
++            }
++            y=bottom;
++            if(y<256){
++                if(y==previous.bottom)previous.advance();
++                if(y==next.bottom)next.advance();
++            }
++        }
++    }
+ public:
+     void invalidate() { valid_=uniform_=false;capacity_=0; }
+     bool draw(AmigaRenderer* renderer,UBYTE* retained,const UBYTE* pack,const UBYTE* end,
+@@ -100,14 +152,20 @@ public:
+         const unsigned label=ammo*3+offset;
+         const auto* glyph=labels[label];
+         const unsigned config=starts[capacity-1]+(ammo*4+meter)*capacity;
++        UWORD selected[16];
+         for(unsigned segment=0;segment<capacity;++segment){
+-            unsigned y=segment==capacity-1?40:229+4*meter-boundaries[segment+1]+8;
+-            const unsigned bottom=segment?229+4*meter-boundaries[segment]+8:256;
+             const unsigned own=rows->state[boundaries[segment]]<4?rows->state[boundaries[segment]]:3;
+             const unsigned previous=segment?(rows->state[boundaries[segment-1]]<4?rows->state[boundaries[segment-1]]:3):0;
+-            const auto tile=pages[configurations[config+segment]][own*4+previous];
++            selected[segment]=pages[configurations[config+segment]][own*4+previous];
++        }
++        if(valid_ && amigaAmmoFactoredMode==3){
++            publishChanges(retained,selected,capacity,label,writes);
++        }else{
++        for(unsigned segment=0;segment<capacity;++segment){
++            unsigned y=segment==capacity-1?40:229+4*meter-boundaries[segment+1]+8;
++            const unsigned bottom=segment?229+4*meter-boundaries[segment]+8:256;
++            const auto tile=selected[segment];
+             const bool same=valid_ && meter==meter_ && tile==oldTiles_[segment];
+-            oldTiles_[segment]=tile;
+             if(same && (label==label_ || y>=250 || bottom<=238))continue;
+             const auto* directory=tiles[tile];
+             for(unsigned i=0;i<directory[1];++i){
+@@ -131,6 +189,8 @@ public:
+                 y=last;
+             }
+         }
++        }
++        for(unsigned segment=0;segment<capacity;++segment)oldTiles_[segment]=selected[segment];
+         valid_=true;meter_=meter;label_=label;
+         amigaRendererClearClipRect(renderer);
+         return true;
+diff --git a/src/platform/amiga/AmigaAmmoHud.h b/src/platform/amiga/AmigaAmmoHud.h
+index aeae7aee..d0d857e6 100644
+--- a/src/platform/amiga/AmigaAmmoHud.h
++++ b/src/platform/amiga/AmigaAmmoHud.h
+@@ -57,7 +57,7 @@ public:
+         DW_PROFILE_PHASE(profileAmmoBase);
+         if (ammo > capacity) ammo = capacity;
+ #ifdef DOWNWELL_AMMO_FACTORED
+-        if(amigaAmmoFactoredMode==2 && sharedRowProducer_ && !forceFull && oldDigits_==1 && !previousWideClear_ &&
++        if(amigaAmmoFactoredMode>=2 && sharedRowProducer_ && !forceFull && oldDigits_==1 && !previousWideClear_ &&
+            factored_.draw(renderer,working_,pack,end,ammo,capacity,offset,rows,meter,lastWordWrites)){
+ #ifndef DOWNWELL_PLATFORM_AMIGA
+             ++factoredDraws;

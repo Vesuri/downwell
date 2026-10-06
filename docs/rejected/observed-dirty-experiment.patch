@@ -1,0 +1,327 @@
+diff --git a/Makefile b/Makefile
+index 3b09e641..0492245d 100644
+--- a/Makefile
++++ b/Makefile
+@@ -989,7 +989,15 @@ build/runner-logical-layer-order-test: tests/core/RunnerLogicalLayerOrderTest.cp
+ verify-logical-layer-order: build/runner-logical-layer-order-test
+ 	./build/runner-logical-layer-order-test
+ 
+-test: verify-logical-layer-order
++test: verify-logical-layer-order verify-observed-dirty-queue
++
++.PHONY: verify-observed-dirty-queue
++verify-observed-dirty-queue: build/runner-observed-dirty-queue-test
++	./build/runner-observed-dirty-queue-test
++
++build/runner-observed-dirty-queue-test: tests/core/RunnerObservedDirtyQueueTest.cpp $(wildcard src/core/*.h)
++	@mkdir -p build
++	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ $<
+ 
+ verify-gameplay-collision-owner: build/gameplay-collision-owner-test build/gameplay-collision-owner-scalar-test build/gameplay-collision-owner-snapshot-test build/gameplay-collision-owner-run-store-test
+ 	DOWNWELL_OWNERSHIP_WITNESS=build/ownership-runs.txt ./build/gameplay-collision-owner-test
+diff --git a/docs/generation-preparation-contract.md b/docs/generation-preparation-contract.md
+index 9b252015..eaf2d0aa 100644
+--- a/docs/generation-preparation-contract.md
++++ b/docs/generation-preparation-contract.md
+@@ -541,6 +541,30 @@ remain allocated in this experimental integration. Matching ownership
+ witnesses does not justify enabling it by default: native timing and removal
+ of that redundant storage remain required.
+ 
++### On-demand terrain dirty queues
++
++The run-store path uses `RunnerObservedDirtyQueue` for the spatial-refresh and
++collision queues. The two independent order stamps live in the terrain's
++mutable records. A mark prepends by assigning a new stamp; removal clears it.
++Actor stamps are held separately. No linked dirty-queue record is maintained
++for a terrain cell. Size and membership are synchronous observations.
++
++The first ordered read builds a newest-first projection. Removals leave holes
++in that projection; marks invalidate it. A consuming pass advances past holes
++without sorting again. Following a callback, the successor is read from the
++current order before the current membership is removed, matching the linked
++reference. Newly prepended entries are not retroactively revisited. A failed
++refresh retains the current membership and every completed mutation prefix.
++Queue clear does not reset the monotonic order clock.
++
++Pending stamps must be cleared before typed slot reuse. Source storage is
++enumerated independently of live identity enumeration, so terminal-failure
++observations do not silently omit a pending record. Projection storage is
++bounded and preallocated; this trades linked-list maintenance for materializing
++order at the first read. Native query-bearing timing is required as well as
++selector-free generation timing: the latter cannot prove that the deferred
++work fits the first query's budget.
++
+ Generated terrain may bind one initialized-birth transaction. The run store
+ allocates the typed identity first, and the built-in collision owner completes
+ ordinary birth publication before executing `terrainCreateProperties`. Create
+diff --git a/src/core/GameplayCollisionOwner.h b/src/core/GameplayCollisionOwner.h
+index 388c7fac..60c7ec75 100644
+--- a/src/core/GameplayCollisionOwner.h
++++ b/src/core/GameplayCollisionOwner.h
+@@ -4,6 +4,7 @@
+ #include "BoxDestructionScript.h"
+ #include "RunnerSpatialInstances.h"
+ #include "RunnerObservedRegistration.h"
++#include "RunnerObservedDirtyQueue.h"
+ #include "RunnerObservedRoomMembership.h"
+ #include "RunnerObjectFamilies.h"
+ #include "RunnerRoomMembership.h"
+@@ -35,7 +36,9 @@ public:
+ #elif defined(DOWNWELL_TERRAIN_RUN_STORE)
+     using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2,true,View::terrainBase,View::timeFieldBase,true,
+         RunnerSpatialLifetimes<View::capacity,View::terrainBase,View::timeFieldBase,GameplayTerrainInstances>,
+-        RunnerObservedRegistration<View::capacity,View::terrainBase,View::timeFieldBase,GameplayTerrainInstances>>;
++        RunnerObservedRegistration<View::capacity,View::terrainBase,View::timeFieldBase,GameplayTerrainInstances>,
++        RunnerObservedDirtyQueue<View::capacity,View::terrainBase,View::timeFieldBase,GameplayTerrainInstances,0>,
++        RunnerObservedDirtyQueue<View::capacity,View::terrainBase,View::timeFieldBase,GameplayTerrainInstances,1>>;
+ #else
+     using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2,true,View::terrainBase,View::timeFieldBase>;
+ #endif
+@@ -359,6 +362,7 @@ public:
+         if(!owner_.bindTerrainLifetimes(terrain_))return;
+         if(!room_.bindTerrain(terrain_))return;
+         if(!layers_.bindTerrain(terrain_,View::terrainBase))return;
++        if(!owner_.bindTerrainDirtyQueues(terrain_))return;
+ #endif
+ #ifdef DOWNWELL_TERRAIN_RUN_STORE
+         if(!terrain_.bindInitializedBirth(terrainBinding_))return;
+diff --git a/src/core/GameplayTerrainInstancesRuns.h b/src/core/GameplayTerrainInstancesRuns.h
+index efbe7df6..07b7bfd8 100644
+--- a/src/core/GameplayTerrainInstancesRuns.h
++++ b/src/core/GameplayTerrainInstancesRuns.h
+@@ -33,6 +33,7 @@ private:
+         RunnerRegistrationOrder registration;
+         RunnerRoomOrderState room;
+         RunnerRetainedLayerState layer;
++        RunnerRegistrationOrder dirty[2];
+         WallEndStepState wall{};
+         bool active=true,destroyRequested=false,wallNeedsReset=false;
+         // Replaces the old ever-used byte: pristine, allocated, published,
+@@ -83,6 +84,16 @@ public:
+         return true;
+     }
+     unsigned size()const{return identities_.size();}
++    RunnerRegistrationOrder* dirtyOrder(unsigned slot,unsigned channel){
++        return slot<capacity&&channel<2?&mutable_[slot].dirty[channel]:nullptr;
++    }
++    template<class Visit> bool visitDirtyOrders(unsigned channel,Visit visit){
++        // Queue ownership may outlive an identity during terminal failure.
++        // Inspect source storage, not just currently allocated identities.
++        for(unsigned slot=0;slot<capacity;++slot)
++            if(!visit(slot,mutable_[slot].dirty[channel]))return false;
++        return true;
++    }
+     RunnerRetainedLayerState* layerState(unsigned slot){return identities_.occupied(slot)?&mutable_[slot].layer:nullptr;}
+     const RunnerRetainedLayerState* layerState(unsigned slot)const{return identities_.occupied(slot)?&mutable_[slot].layer:nullptr;}
+     RunnerRetainedLayerState* layerState(InstanceHandle h){return identities_.contains(h)?&mutable_[h.slot].layer:nullptr;}
+diff --git a/src/core/RunnerSpatialInstances.h b/src/core/RunnerSpatialInstances.h
+index d04c4d09..7c68eb88 100644
+--- a/src/core/RunnerSpatialInstances.h
++++ b/src/core/RunnerSpatialInstances.h
+@@ -43,9 +43,11 @@ template<unsigned Capacity,unsigned Nodes> struct RunnerSpatialIndexStorage<Capa
+ // No platform types or asset residency decisions belong here.
+ template<unsigned Capacity,unsigned Nodes,bool ScheduledIndex=false,unsigned RetainedFirst=0,unsigned RetainedLast=0,bool RunRegistration=ScheduledIndex,class Lifetimes=RunnerSpatialLifetimes<Capacity>,
+     class Registration=typename RunnerRegistrationStorage<Capacity,RetainedFirst,RetainedLast,
+-        RunRegistration&&(RetainedFirst<RetainedLast)>::Type> class RunnerSpatialInstances {
++        RunRegistration&&(RetainedFirst<RetainedLast)>::Type,
++    class SpatialQueue=RunnerSpatialDirtyQueue<Capacity>,
++    class CollisionQueue=RunnerSpatialDirtyQueue<Capacity>> class RunnerSpatialInstances {
+     static_assert(Capacity>0,"Spatial instances need stable slots");
+-    using Queue=RunnerSpatialDirtyQueue<Capacity>;
++    using Queue=SpatialQueue;
+     using Math=RunnerSpatialSplit;
+     using Membership=Registration;
+ public:
+@@ -260,6 +262,7 @@ public:
+         return true;
+     }
+     template<class Terrain> bool bindTerrainLifetimes(Terrain& terrain){return lifetimes_.bind(terrain)&&membership_.bindTerrain(terrain);}
++    template<class Terrain> bool bindTerrainDirtyQueues(Terrain& terrain){return spatial_.bindTerrain(terrain)&&collision_.bindTerrain(terrain);}
+     bool valid()const{return good_ && index_.valid();}
+     // No logical instance work happens here. Reads force completion themselves.
+     bool serviceSpatialIndex(unsigned budget){
+@@ -959,7 +962,8 @@ private:
+     Lifetimes lifetimes_;
+     Entry entries_[Capacity]{};
+     Membership membership_;
+-    Queue spatial_,collision_;
++    Queue spatial_;
++    CollisionQueue collision_;
+     typename RunnerSpatialIndexStorage<Capacity,Nodes,ScheduledIndex>::Type index_;
+     bool good_=true;
+     std::uint32_t bindingRevision_=0;
+diff --git a/src/core/RunnerObservedDirtyQueue.h b/src/core/RunnerObservedDirtyQueue.h
+new file mode 100644
+index 00000000..6dcea9c3
+--- /dev/null
++++ b/src/core/RunnerObservedDirtyQueue.h
+@@ -0,0 +1,99 @@
++#ifndef DOWNWELL_RUNNER_OBSERVED_DIRTY_QUEUE_H
++#define DOWNWELL_RUNNER_OBSERVED_DIRTY_QUEUE_H
++#include "RunnerSpatialDirtyQueue.h"
++#include "RunnerRegistrationOrder.h"
++namespace downwell {
++// Terrain owns pending order, not a second linked-list membership. Materialize
++// the mixed order only at a queue read. Removal leaves holes in that projection;
++// a new mark invalidates it, including marks from a refresh callback.
++template<unsigned Capacity,unsigned First,unsigned Last,class Terrain,unsigned Channel>
++class RunnerObservedDirtyQueue {
++    static_assert(First<Last&&Last<=Capacity&&Channel<2,"Dirty queue domain");
++    using Order=RunnerRegistrationOrder;
++    using Index=typename SlotIndex<Capacity>::Type;
++    Terrain* terrain_=nullptr;
++    Order actors_[Capacity-(Last-First)]{},clock_;
++    mutable Index projection_[Capacity]{};
++    mutable unsigned projected_=0,begin_=0;
++    mutable bool dirty_=true;
++    unsigned count_=0,head_=Capacity;
++    Order* state(unsigned slot){
++        if(slot>=Capacity)return nullptr;
++        if(slot>=First&&slot<Last)return terrain_?terrain_->dirtyOrder(slot-First,Channel):nullptr;
++        return &actors_[slot<First?slot:slot-(Last-First)];
++    }
++    const Order* state(unsigned slot)const{return const_cast<RunnerObservedDirtyQueue*>(this)->state(slot);}
++    bool newer(unsigned a,unsigned b)const{return state(b)->before(*state(a));}
++    void materialize()const{
++        if(!dirty_)return;
++        projected_=begin_=0;
++        for(unsigned a=0;a<Capacity-(Last-First);++a)
++            if(actors_[a].present())projection_[projected_++]=Index(a<First?a:a+(Last-First));
++        if(terrain_)terrain_->visitDirtyOrders(Channel,[&](unsigned slot,const Order& order){
++            if(order.present())projection_[projected_++]=Index(First+slot);return true;
++        });
++        // Heapsort ascending by serial, then reverse: source marks prepend.
++        auto sift=[&](unsigned root,unsigned end){
++            const unsigned slot=projection_[root];
++            while(root<end/2){unsigned child=root*2+1;
++                if(child+1<end&&newer(projection_[child+1],projection_[child]))++child;
++                if(!newer(projection_[child],slot))break;
++                projection_[root]=projection_[child];root=child;
++            }projection_[root]=Index(slot);
++        };
++        for(unsigned i=projected_/2;i;--i)sift(i-1,projected_);
++        for(unsigned end=projected_;end>1;){--end;const auto slot=projection_[end];
++            projection_[end]=projection_[0];projection_[0]=slot;sift(0,end);}
++        for(unsigned a=0,b=projected_;a<b&&a<--b;++a){const auto slot=projection_[a];projection_[a]=projection_[b];projection_[b]=slot;}
++        dirty_=false;
++    }
++public:
++    static constexpr unsigned End=Capacity;
++    bool bindTerrain(Terrain& terrain){if(terrain_)return false;terrain_=&terrain;return true;}
++    bool contains(unsigned slot)const{const auto* s=state(slot);return s&&s->present();}
++    unsigned size()const{return count_;}
++    bool mark(unsigned slot){
++        auto* s=state(slot);if(!s)return false;
++        if(slot==head_)return true;
++        if(!s->present())++count_;
++        clock_.advance();*s=clock_;head_=slot;dirty_=true;return true;
++    }
++    bool remove(unsigned slot){
++        auto* s=state(slot);if(!s||!s->present())return false;
++        // A consumed projection entry keeps its key until rebuild, so binary
++        // search cannot use source keys. next() scans cached slots instead.
++        *s={};--count_;if(slot==head_)head_=End;
++        if(!dirty_)while(begin_<projected_&&!contains(projection_[begin_]))++begin_;
++        return true;
++    }
++    unsigned first()const{
++        materialize();while(begin_<projected_&&!contains(projection_[begin_]))++begin_;
++        return begin_<projected_?projection_[begin_]:End;
++    }
++    unsigned next(unsigned slot)const{
++        if(!contains(slot))return End;materialize();
++        unsigned i=begin_;while(i<projected_&&projection_[i]!=slot)++i;
++        while(++i<projected_)if(contains(projection_[i]))return projection_[i];
++        return End;
++    }
++    void clear(){
++        for(auto& s:actors_)s={};
++        if(terrain_)terrain_->visitDirtyOrders(Channel,[&](unsigned slot,const Order&){*terrain_->dirtyOrder(slot,Channel)={};return true;});
++        count_=0;head_=End;projected_=begin_=0;dirty_=false;
++    }
++    template<class Flags,class Refresh> bool flush(Flags flags,Refresh refresh){
++        unsigned slot=first();
++        while(slot!=End){
++            if(shouldRefreshQueued(flags(slot))&&!refresh(slot))return false;
++            if(!contains(slot))return false;
++            const unsigned successor=next(slot);remove(slot);slot=successor;
++            // The common consuming walk advances without scanning old holes.
++            if(!dirty_)while(begin_<projected_&&!contains(projection_[begin_]))++begin_;
++        }return true;
++    }
++    static bool shouldQueue(bool object,std::uint32_t of,std::uint32_t flags){return RunnerSpatialDirtyQueue<Capacity>::shouldQueue(object,of,flags);}
++    static bool shouldRefreshQueued(std::uint32_t flags){return RunnerSpatialDirtyQueue<Capacity>::shouldRefreshQueued(flags);}
++    static bool shouldPublishBounds(std::uint32_t of,std::uint32_t flags,bool all){return RunnerSpatialDirtyQueue<Capacity>::shouldPublishBounds(of,flags,all);}
++};
++}
++#endif
+diff --git a/tests/core/RunnerObservedDirtyQueueTest.cpp b/tests/core/RunnerObservedDirtyQueueTest.cpp
+new file mode 100644
+index 00000000..9d0b70ef
+--- /dev/null
++++ b/tests/core/RunnerObservedDirtyQueueTest.cpp
+@@ -0,0 +1,64 @@
++#include "core/RunnerObservedDirtyQueue.h"
++#include <cassert>
++#include <cstdio>
++#include <vector>
++using namespace downwell;
++struct Terrain {
++    RunnerRegistrationOrder orders[8][2]{};
++    RunnerRegistrationOrder* dirtyOrder(unsigned slot,unsigned channel){return &orders[slot][channel];}
++    template<class Visit> bool visitDirtyOrders(unsigned channel,Visit visit){
++        for(unsigned i=0;i<8;++i)if(!visit(i,orders[i][channel]))return false;return true;
++    }
++};
++using Observed=RunnerObservedDirtyQueue<16,4,12,Terrain,0>;
++using Reference=RunnerSpatialDirtyQueue<16>;
++template<class Queue> std::vector<unsigned> order(const Queue& q){
++    std::vector<unsigned> out;
++    for(unsigned s=q.first();s!=q.End;s=q.next(s)){assert(out.size()<16);out.push_back(s);}
++    return out;
++}
++static void compare(const Observed& a,const Reference& b){
++    assert(a.size()==b.size());assert(order(a)==order(b));
++    for(unsigned s=0;s<=16;++s)assert(a.contains(s)==b.contains(s));
++}
++int main(){
++    Terrain terrain;Observed observed;Reference reference;assert(observed.bindTerrain(terrain));
++    unsigned random=0x19670901u;
++    for(unsigned i=0;i<20000;++i){
++        random=random*1664525u+1013904223u;const unsigned s=(random>>8)%17;
++        switch((random>>20)%5){
++            case 0:assert(observed.remove(s)==reference.remove(s));break;
++            case 1:case 2:assert(observed.mark(s)==reference.mark(s));break;
++            case 3:{
++                std::vector<unsigned> a,b;
++                auto flags=[&](unsigned n){return ((random>>(n&15))&1)?2u:0u;};
++                const unsigned target=(s+5)%16;
++                auto run=[&](auto& queue,auto& calls){bool changed=false;
++                    return queue.flush(flags,[&](unsigned slot){
++                        calls.push_back(slot);
++                        if(!changed){changed=true;queue.mark(target);if(slot!=s)queue.remove(s);}
++                        return slot!=(random%16);
++                    });
++                };
++                assert(run(observed,a)==run(reference,b));assert(a==b);break;
++            }
++            default:if((random&31)==0){observed.clear();reference.clear();}break;
++        }
++        compare(observed,reference);
++    }
++    // Generation can accumulate marks without ever asking for queue order.
++    // Pending counts remain live, and the first eventual read expands exactly
++    // the same list, not a slot-order approximation.
++    observed.clear();reference.clear();
++    for(unsigned i=0;i<10000;++i){
++        random=random*1664525u+1013904223u;const unsigned s=(random>>9)%16;
++        if(random&8)assert(observed.mark(s)==reference.mark(s));
++        else assert(observed.remove(s)==reference.remove(s));
++        assert(observed.size()==reference.size());
++    }
++    compare(observed,reference);
++    // The second channel is independent even though the source records are shared.
++    RunnerObservedDirtyQueue<16,4,12,Terrain,1> second;assert(second.bindTerrain(terrain));
++    assert(second.mark(7));observed.clear();assert(second.contains(7)&&second.size()==1);
++    std::puts("Observed dirty queues: 20000 mutations and callback/failure-prefix comparisons passed");
++}

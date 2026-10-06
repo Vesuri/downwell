@@ -1,0 +1,704 @@
+diff --git a/Makefile b/Makefile
+index a2ef1fd5..56cd4c5b 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1457,6 +1457,13 @@ $(TEST_TARGETS) $(PORT_REPLAY_REFERENCE_TARGET) $(AREA_ONE_BUILDER_TEST_TARGET)
+ test: build/gem-homing-test test-gem-position
+ 
+ .PHONY: test-gem-position
++test: test-effect-coverage-commands
++.PHONY: test-effect-coverage-commands
++test-effect-coverage-commands: build/effect-coverage-commands-test
++	./build/effect-coverage-commands-test
++build/effect-coverage-commands-test: tests/core/EffectCoverageCommandsTest.cpp $(HOST_CHECK_HEADERS)
++	@mkdir -p build
++	$(CXX) $(CXXFLAGS) -Isrc -o $@ $<
+ test-gem-position: build/gem-position-test
+ 	./build/gem-position-test
+ build/gem-position-test: tests/core/GemPositionTest.cpp $(HOST_CHECK_HEADERS) generated/downwell-goal-mask.h
+@@ -2149,6 +2156,13 @@ generate-amiga-game:
+ 	python3 tests/projectile-art-test.py
+ 	tools/generate-amiga-hud.py --profile game
+ 
++.PHONY: generate-effect-stamps test-effect-stamps
++generate-effect-stamps: generate-amiga-game
++	python3 tools/generate-effect-stamps.py
++test-effect-stamps: generate-effect-stamps
++	python3 tools/generate-effect-stamps.py --check
++	python3 tests/effect-stamps-test.py
++
+ .PHONY: generate-amiga-clear verify-amiga-clear
+ generate-amiga-clear:
+ 	tools/generate-amiga-hud.py --profile clear
+diff --git a/amiga/Makefile b/amiga/Makefile
+index 3c5b14e1..1b6f1267 100644
+--- a/amiga/Makefile
++++ b/amiga/Makefile
+@@ -31,6 +31,7 @@ REFERENCE_PATTERNS ?= 0
+ REFERENCE_BREAKABLES ?= 0
+ REFERENCE_DAMAGE_TEXT ?= 0
+ REFERENCE_GEM_POSITION ?= 0
++REFERENCE_EFFECT_COMPOSITION ?= 0
+ TABLE_CONTACT_ATAN ?= 1
+ RETAIN_HEALTH_HUD ?= 1
+ AMMO_DAMAGE_RANGE ?= 1
+@@ -192,6 +193,9 @@ endif
+ ifeq ($(REFERENCE_GEM_POSITION),1)
+ CFLAGS += -DDOWNWELL_REFERENCE_GEM_POSITION
+ endif
++ifeq ($(REFERENCE_EFFECT_COMPOSITION),1)
++CFLAGS += -DDOWNWELL_REFERENCE_EFFECT_COMPOSITION
++endif
+ ifeq ($(TABLE_CONTACT_ATAN),0)
+ CFLAGS += -DDOWNWELL_PORTABLE_CONTACT_ATAN
+ endif
+@@ -321,6 +325,7 @@ LDFLAGS := -Wl,--emit-relocs,--gc-sections,-Ttext=0,-Map=$(OUT).map
+ 
+ AMIGA_HUD := $(REPO)/generated/amiga-hud.dwap
+ AMIGA_GAME := $(REPO)/generated/amiga-game.dwap
++AMIGA_EFFECT_STAMPS := $(REPO)/generated/amiga-effect-stamps.dwef
+ AMIGA_EXIT_MASK := $(REPO)/generated/amiga-game.exit-mask
+ AMIGA_ENTRY_MASK := $(REPO)/generated/amiga-game.entry-mask
+ AMIGA_SELECTION_MASK := $(REPO)/generated/amiga-game.selection-mask
+@@ -636,6 +641,9 @@ $(AMIGA_HUD):
+ $(AMIGA_GAME): $(REPO)/tools/generate-amiga-hud.py
+ 	$(MAKE) -C $(REPO) generate-amiga-game
+ 
++$(AMIGA_EFFECT_STAMPS): $(AMIGA_GAME) $(REPO)/tools/generate-effect-stamps.py
++	cd $(REPO) && python3 tools/generate-effect-stamps.py
++
+ $(AMIGA_RESULTS): $(REPO)/tools/generate-amiga-hud.py
+ 	$(MAKE) -C $(REPO) generate-amiga-results
+ 
+@@ -675,7 +683,7 @@ $(AMIGA_SELECTION_MASK): $(AMIGA_GAME)
+ $(AMIGA_BOOT_BANK) $(AMIGA_FRONT_BANK) $(AMIGA_SCENE_BANKS): $(AMIGA_GAME)
+ 	@test -f $@ || $(MAKE) -C $(REPO) generate-amiga-game
+ 
+-obj/AmigaAssets.o: $(AMIGA_SRC)/AmigaAssets.s $(AMIGA_HUD) $(AMIGA_GAME) $(AMIGA_EXIT_MASK) $(AMIGA_ENTRY_MASK) $(AMIGA_SELECTION_MASK) \
++obj/AmigaAssets.o: $(AMIGA_SRC)/AmigaAssets.s $(AMIGA_HUD) $(AMIGA_GAME) $(AMIGA_EFFECT_STAMPS) $(AMIGA_EXIT_MASK) $(AMIGA_ENTRY_MASK) $(AMIGA_SELECTION_MASK) \
+ 		$(AMIGA_RESULTS) $(AMIGA_SHOP) $(AMIGA_CLEAR) $(ROOM_PACK) $(OBJECT_PACK) $(COLLISION_PACK) $(COLLISION_MASK_PACK) $(BUILDER_PACK)
+ 	@mkdir -p $(@D)
+ 	$(AS) $(ASFLAGS) -o $@ $<
+diff --git a/amiga/profile.sh b/amiga/profile.sh
+index fb7c3c60..dc717276 100644
+--- a/amiga/profile.sh
++++ b/amiga/profile.sh
+@@ -80,6 +80,7 @@ restore() {
+   unset REFERENCE_BREAKABLES
+   unset REFERENCE_DAMAGE_TEXT
+   unset REFERENCE_GEM_POSITION
++  unset REFERENCE_EFFECT_COMPOSITION
+   unset DRAW_CACHE_AUDIT
+   unset DRAW_ORDER_AUDIT
+   unset LOCAL_DRAW_CAPTURE
+diff --git a/docs/open-work.md b/docs/open-work.md
+index 4df8b7da..7dc7a88a 100644
+--- a/docs/open-work.md
++++ b/docs/open-work.md
+@@ -282,9 +282,13 @@ remaining structure, not retune the prepared row program or its helpers.
+    - `intersects` → `synchronize` waiting on the blitter, 1.8 ms;
+    - `clear` 0.9 ms.
+ 
+-   Make the surface's occupancy decisions from CPU-side bounds, so composition
+-   does not wait for the blitter. Issue each stamp as one prepared-mask blit,
+-   not per-row queue entries. Target: under 4 ms.
++   Make the surface's occupancy decisions from CPU-side producer bounds and
++   immutable mask commands, retaining exact shade holes without waiting for
++   DMA. The current backend already submits whole heights, but alpha/low/high
++   are separate blits. Interleave their rows in an offline-prepared stamp and
++   the destination surface so one masked blit replaces all three submissions.
++   Keep scalar/unprepared fallbacks and controller painter order exact.
++   Target: under 4 ms; accept only after paired native pixel/timing checks.
+ 4. **Software actor drawing.** `amigaRendererDrawAsset` costs 3.2 ms in
+    combat, about two actors at 10,000 cycles each that got no hardware sprite.
+    At 645, `buildHardwareSpritePart` spends 2.8 ms building sprite DMA words
+diff --git a/src/core/PaletteEffectSurface.h b/src/core/PaletteEffectSurface.h
+index ad586086..91a5d57b 100644
+--- a/src/core/PaletteEffectSurface.h
++++ b/src/core/PaletteEffectSurface.h
+@@ -19,6 +19,8 @@ public:
+         bool (*stamp)(void*,const Mask&,const std::uint8_t*,const std::uint8_t*,int,int)=nullptr;
+         void (*clear)(void*,unsigned,unsigned)=nullptr;
+         void (*wait)(void*)=nullptr;
++        // Exact immutable-command query, or -1 to request synchronized raster.
++        int (*intersects)(void*,int,int,int,int)=nullptr;
+     };
+     PaletteEffectSurface(){for(unsigned y=0;y<Height;++y)first_[y]=words;}
+     PaletteEffectSurface(const PaletteEffectSurface&)=delete;
+@@ -54,6 +56,10 @@ public:
+         if(top<int(firstRow_))top=firstRow_;
+         if(bottom>int(lastRow_))bottom=lastRow_;
+         if(left>=right || top>=bottom)return false;
++        if(backend_.intersects){
++            const int covered=backend_.intersects(backend_.context,left,top,right,bottom);
++            if(covered>=0)return covered!=0;
++        }
+         synchronize();
+         const unsigned first=unsigned(left)/16,last=unsigned(right-1)/16;
+         for(unsigned y=unsigned(top);y<unsigned(bottom);++y){
+diff --git a/src/platform/amiga/AmigaAssets.s b/src/platform/amiga/AmigaAssets.s
+index 091c4315..db88a354 100644
+--- a/src/platform/amiga/AmigaAssets.s
++++ b/src/platform/amiga/AmigaAssets.s
+@@ -13,6 +13,13 @@ amiga_game_pack:
+ 	.globl amiga_game_pack_end
+ amiga_game_pack_end:
+ 
++	.balign 4
++	.globl amiga_effect_stamps
++amiga_effect_stamps:
++	.incbin "../generated/amiga-effect-stamps.dwef"
++	.globl amiga_effect_stamps_end
++amiga_effect_stamps_end:
++
+ 	.balign 4
+ 	.globl amiga_exit_mask
+ amiga_exit_mask:
+diff --git a/src/platform/amiga/AmigaEffectSurface.cpp b/src/platform/amiga/AmigaEffectSurface.cpp
+index 8748330b..cdb6c306 100644
+--- a/src/platform/amiga/AmigaEffectSurface.cpp
++++ b/src/platform/amiga/AmigaEffectSurface.cpp
+@@ -3,6 +3,7 @@
+ #include "framework/Bitmap.h"
+ #include "framework/AmigaHardware.h"
+ #include "AmigaGameplayRows.h"
++#include "core/EffectCoverageCommands.h"
+ inline void* operator new(__SIZE_TYPE__,void* address)noexcept{return address;}
+ extern "C" { volatile unsigned gDownwellEffectDmaStamps,gDownwellEffectDmaChecks,gDownwellEffectDmaFailures; }
+ extern "C" __attribute__((noinline)) void downwellEffectSurfaceFailed(){__asm__ volatile("":::"memory");}
+@@ -10,24 +11,87 @@ namespace {
+ using Surface=downwell::PaletteEffectSurface<>;
+ const Surface* boundSurface=nullptr;
+ UBYTE* boundStorage=nullptr;
++#ifdef DOWNWELL_REFERENCE_EFFECT_COMPOSITION
++constexpr unsigned storageRowBytes=AmigaEffectSurface::rowBytes,planeOffset=AmigaEffectSurface::planeBytes;
++#else
++constexpr unsigned storageRowBytes=AmigaEffectSurface::rowBytes*3,planeOffset=AmigaEffectSurface::rowBytes;
++downwell::EffectCoverageCommands<> coverage;
++struct Prepared {
++    const downwell::EffectMaskAssets::Asset* asset=nullptr;
++    const UBYTE* pixels=nullptr;
++    const UBYTE* mask=nullptr;
++} prepared[17];
++const downwell::EffectMaskAssets::Asset* shade=nullptr;
++unsigned u16(const UBYTE* p){return (unsigned(p[0])<<8)|p[1];}
++ULONG u32(const UBYTE* p){return (ULONG(u16(p))<<16)|u16(p+2);}
++bool bindPrepared(const downwell::EffectMaskAssets& assets,const UBYTE* bank,unsigned bytes){
++    if(!assets.ready()||!bank||(reinterpret_cast<ULONG>(bank)&1)||
++       reinterpret_cast<ULONG>(bank)>=0x200000UL||bytes<388||u32(bank)!=0x44574546UL||
++       u16(bank+4)!=1||u16(bank+6)!=17||u32(bank+8)!=20||u32(bank+12)!=388)return false;
++    for(unsigned i=0;i<17;++i){
++        const auto* r=bank+48+i*20;
++        const unsigned id=i<9?84:i<13?133:134,frame=i<9?i:(i-9)%4;
++        const auto* a=i<9?assets.smoke(frame):assets.currency(id==134,frame);
++        const unsigned stride=u32(r+8),offset=u32(r+12),mask=u32(r+16);
++        if(u16(r)!=id||u16(r+2)!=frame||u16(r+4)!=a->mask.width||
++           u16(r+6)!=a->mask.height||stride!=a->mask.stride||
++           (offset&1)||(mask&1)||offset<388||mask<388||offset>bytes||mask>bytes||
++           a->mask.bytes*3>bytes-offset||a->mask.bytes*3>bytes-mask)return false;
++        prepared[i]={a,bank+offset,bank+mask};
++    }
++    shade=assets.shade();coverage.clear();return true;
++}
++bool sameMask(const Surface::Mask& m,const downwell::EffectMaskAssets::Asset* a){
++    return a && m.data==a->mask.data && m.bytes==a->mask.bytes && m.width==a->mask.width &&
++        m.height==a->mask.height && m.stride==a->mask.stride;
++}
++#endif
+ #ifdef DOWNWELL_BOB_VERIFY
+ alignas(Surface) UBYTE referenceStorage[sizeof(Surface)];
+ Surface* reference=nullptr;
+ #endif
++int intersects(void*,int left,int top,int right,int bottom){
++#ifdef DOWNWELL_REFERENCE_EFFECT_COMPOSITION
++    (void)left;(void)top;(void)right;(void)bottom;return -1;
++#else
++    const int result=coverage.intersects(left,top,right,bottom);
++#ifdef DOWNWELL_BOB_VERIFY
++    if(result>=0 && (result!=0)!=reference->intersects(left,top,right,bottom)){
++        ++gDownwellEffectDmaFailures;downwellEffectSurfaceFailed();
++    }
++#endif
++    return result;
++#endif
++}
+ void wait(void*){AmigaHardware::blitterDrain();}
+ void clear(void* context,unsigned first,unsigned end){
++#ifndef DOWNWELL_REFERENCE_EFFECT_COMPOSITION
++    coverage.clear();
++#endif
+ #ifdef DOWNWELL_BOB_VERIFY
+     reference->clear();
+ #endif
+     if(first>=end)return;
+     auto* data=static_cast<UBYTE*>(context);
++#ifdef DOWNWELL_REFERENCE_EFFECT_COMPOSITION
+     for(unsigned plane=0;plane<3;++plane)
+         AmigaHardware::blitterClear(reinterpret_cast<UWORD*>(data+plane*AmigaEffectSurface::planeBytes+
+             first*AmigaEffectSurface::rowBytes),12,end-first,0);
++#else
++    AmigaHardware::blitterClear(reinterpret_cast<UWORD*>(data+first*storageRowBytes),36,end-first,0);
++#endif
+ }
+ bool stamp(void* context,const Surface::Mask& m,const std::uint8_t* low,const std::uint8_t* high,int x,int y){
+ #ifdef DOWNWELL_BOB_VERIFY
+     if(low)reference->add({m,low,high},x,y);else reference->subtract(m,x,y);
++#endif
++    // Only the validated immutable bank may outlive a queued stamp as query
++    // metadata. Mutable/unprepared producers retain synchronized raster reads.
++#ifndef DOWNWELL_REFERENCE_EFFECT_COMPOSITION
++    const Prepared* packet=nullptr;
++    for(const auto& p:prepared)if(sameMask(m,p.asset)){packet=&p;break;}
++    if(packet||sameMask(m,shade))coverage.append(m,x,y,!low);else coverage.invalidate();
++    if(packet && (low!=packet->asset->low || high!=packet->asset->high))packet=nullptr;
+ #endif
+     // Immutable DWAP images are word-aligned. Unusual host-style masks and
+     // Fast-RAM entry masks retain the scalar path, after draining queued DMA.
+@@ -46,7 +110,7 @@ bool stamp(void* context,const Surface::Mask& m,const std::uint8_t* low,const st
+     // patternWithMask's for these strides (mask rows of m.stride bytes, the
+     // surface's 24-byte rows with a guard word left of x=0).
+     auto* data=static_cast<UBYTE*>(context);
+-    const unsigned sourceWords=m.stride/2,surfaceWords=AmigaEffectSurface::rowBytes/2;
++    const unsigned sourceWords=m.stride/2,surfaceWords=storageRowBytes/2;
+     const unsigned dx=unsigned(x)+16;
+     const unsigned sourceFirst=sx>>4,destFirst=dx>>4;
+     unsigned span=((dx+width-1)>>4)-destFirst;
+@@ -59,21 +123,38 @@ bool stamp(void* context,const Surface::Mask& m,const std::uint8_t* low,const st
+     ULONG source,target;uint16_t first,last;
+     if(shift>=0){
+         source=ULONG(UWORD(sy))*UWORD(m.stride)+sourceFirst*2;
+-        target=ULONG(UWORD(y))*AmigaEffectSurface::rowBytes+destFirst*2;
++        target=ULONG(UWORD(y))*storageRowBytes+destFirst*2;
+         first=lead;last=edge;
+     }else{
+         // Descending: start at the last word of the last row.
+         source=ULONG(UWORD(sy+height-1))*UWORD(m.stride)+sourceLast*2;
+-        target=ULONG(UWORD(y+int(height)-1))*AmigaEffectSurface::rowBytes+destLast*2;
++        target=ULONG(UWORD(y+int(height)-1))*storageRowBytes+destLast*2;
+         first=edge;last=lead;
+     }
+     auto* mask=reinterpret_cast<uint16_t*>(const_cast<std::uint8_t*>(m.data)+source);
++#ifndef DOWNWELL_REFERENCE_EFFECT_COMPOSITION
++    if(packet){
++        // Three physical rows per image row: alpha, low, high. One masked
++        // rectangle replaces three submissions without changing painter order.
++        const ULONG packetSource=shift>=0?ULONG(UWORD(sy*3))*UWORD(m.stride)+sourceFirst*2:
++            ULONG(UWORD((sy+height)*3-1))*UWORD(m.stride)+sourceLast*2;
++        if(shift<0)target+=AmigaEffectSurface::rowBytes*2;
++        AmigaHardware::blitterCopyWithMask(reinterpret_cast<UWORD*>(const_cast<UBYTE*>(packet->pixels)+packetSource),
++            reinterpret_cast<UWORD*>(data+target),reinterpret_cast<UWORD*>(const_cast<UBYTE*>(packet->mask)+packetSource),
++            words,height*3,sourceModulo,int16_t((AmigaEffectSurface::rowBytes/2-words)*2),sourceModulo,
++            shift,shift,first,last,false);
++#ifdef DOWNWELL_BOB_VERIFY
++        ++gDownwellEffectDmaStamps;
++#endif
++        return true;
++    }
++#endif
+     if(low){
+         AmigaHardware::blitterCopyWithMask(reinterpret_cast<uint16_t*>(const_cast<std::uint8_t*>(low)+source),
+-            reinterpret_cast<uint16_t*>(data+AmigaEffectSurface::planeBytes+target),mask,
++            reinterpret_cast<uint16_t*>(data+planeOffset+target),mask,
+             words,height,sourceModulo,surfaceModulo,sourceModulo,shift,shift,first,last,false);
+         AmigaHardware::blitterCopyWithMask(reinterpret_cast<uint16_t*>(const_cast<std::uint8_t*>(high)+source),
+-            reinterpret_cast<uint16_t*>(data+AmigaEffectSurface::planeBytes*2+target),mask,
++            reinterpret_cast<uint16_t*>(data+planeOffset*2+target),mask,
+             words,height,sourceModulo,surfaceModulo,sourceModulo,shift,shift,first,last,false);
+     }
+     AmigaHardware::blitterPatternWithMask(low?0xffff:0,reinterpret_cast<uint16_t*>(data+target),mask,
+@@ -84,30 +165,49 @@ bool stamp(void* context,const Surface::Mask& m,const std::uint8_t* low,const st
+     return true;
+ }
+ }
+-bool AmigaEffectSurface::bind(downwell::PaletteEffectSurface<>& surface,void* storage){
++bool AmigaEffectSurface::bind(downwell::PaletteEffectSurface<>& surface,void* storage,
++    const downwell::EffectMaskAssets& assets,const std::uint8_t* stamps,unsigned stampBytes){
+     if(!storage||(reinterpret_cast<ULONG>(storage)&1)||reinterpret_cast<ULONG>(storage)>=0x200000UL)return false;
++#ifndef DOWNWELL_REFERENCE_EFFECT_COMPOSITION
++    if(!bindPrepared(assets,stamps,stampBytes))return false;
++#else
++    (void)assets;(void)stamps;(void)stampBytes;
++#endif
+     auto* data=static_cast<UBYTE*>(storage);
+ #ifdef DOWNWELL_BOB_VERIFY
+     reference=new(referenceStorage) Surface;
+ #endif
+     if(!surface.bindStorage(reinterpret_cast<UWORD*>(data+2),
+-        reinterpret_cast<UWORD*>(data+planeBytes+2),reinterpret_cast<UWORD*>(data+planeBytes*2+2),
+-        rowBytes/2,{storage,stamp,clear,wait}))return false;
++        reinterpret_cast<UWORD*>(data+planeOffset+2),reinterpret_cast<UWORD*>(data+planeOffset*2+2),
++        storageRowBytes/2,{storage,stamp,clear,wait,intersects}))return false;
+     boundSurface=&surface;boundStorage=data;return true;
+ }
+ bool AmigaEffectSurface::publish(const Surface& surface,Bitmap& display,
+     unsigned buffer,unsigned origin,AmigaGameplayRows& rows){
+     if(&surface!=boundSurface)return false;
+-    Bitmap mask(boundStorage,192,284,1,false,false,192);
++    Bitmap mask(boundStorage,192,284,1,false,false,storageRowBytes*8);
++#ifdef DOWNWELL_REFERENCE_EFFECT_COMPOSITION
+     Bitmap colors(boundStorage+planeBytes,192,284,2,false,false,192);
++#else
++    Bitmap low(boundStorage+planeOffset,192,284,1,false,false,storageRowBytes*8);
++    Bitmap high(boundStorage+planeOffset*2,192,284,1,false,false,storageRowBytes*8);
++    Bitmap destLow(display.data,display.width,display.height,1,false,false,display.dataWidth);
++    Bitmap destHigh(static_cast<UBYTE*>(display.data)+display.bitplaneSizeInBytes,
++        display.width,display.height,1,false,false,display.dataWidth);
++#endif
+     surface.visitRectangles([&](unsigned x,unsigned y,unsigned width,unsigned height){
+         rows.damage(origin,y,height,static_cast<UBYTE>(1u<<buffer));
+         unsigned destination=(origin+y)%downwellGameRingHeight;
+         while(height){
+             const unsigned count=height<downwellGameRingHeight-destination?
+                 height:downwellGameRingHeight-destination;
++#ifdef DOWNWELL_REFERENCE_EFFECT_COMPOSITION
+             display.copyWithMask(colors,mask,downwellPlayfieldX+x,destination,
+                 16+x,y,16+x,y,width,count);
++#else
++            destLow.copyWithMask(low,mask,downwellPlayfieldX+x,destination,16+x,y,16+x,y,width,count);
++            destHigh.copyWithMask(high,mask,downwellPlayfieldX+x,destination,16+x,y,16+x,y,width,count);
++#endif
+             height-=count;y+=count;destination=0;
+         }
+     });
+@@ -117,6 +217,13 @@ bool AmigaEffectSurface::verify(const downwell::PaletteEffectSurface<>& surface)
+ #ifdef DOWNWELL_BOB_VERIFY
+     ++gDownwellEffectDmaChecks;
+     if(!reference->samePixels(surface)){++gDownwellEffectDmaFailures;downwellEffectSurfaceFailed();return false;}
++    for(unsigned i=0;i<24;++i){
++        const int x=int((gDownwellEffectDmaChecks*29+i*37)%190)-15;
++        const int y=int((gDownwellEffectDmaChecks*17+i*41)%314)-15;
++        if(surface.intersects(x,y,x+31,y+23)!=reference->intersects(x,y,x+31,y+23)){
++            ++gDownwellEffectDmaFailures;downwellEffectSurfaceFailed();return false;
++        }
++    }
+     return true;
+ #else
+     (void)surface;return true;
+diff --git a/src/platform/amiga/AmigaEffectSurface.h b/src/platform/amiga/AmigaEffectSurface.h
+index 8d1b7486..48981516 100644
+--- a/src/platform/amiga/AmigaEffectSurface.h
++++ b/src/platform/amiga/AmigaEffectSurface.h
+@@ -8,7 +8,8 @@ class AmigaEffectSurface {
+ public:
+     // One guard word on each side permits the framework's shifted blits.
+     static constexpr unsigned rowBytes=24,planeBytes=rowBytes*284,bytes=planeBytes*3;
+-    static bool bind(downwell::PaletteEffectSurface<>& surface,void* chipStorage);
++    static bool bind(downwell::PaletteEffectSurface<>& surface,void* chipStorage,
++                     const downwell::EffectMaskAssets& assets,const std::uint8_t* stamps,unsigned stampBytes);
+     static bool verify(const downwell::PaletteEffectSurface<>& surface);
+     static bool fixtures(downwell::PaletteEffectSurface<>& surface,const downwell::EffectMaskAssets& assets);
+     static bool publish(const downwell::PaletteEffectSurface<>& surface,Bitmap& display,
+diff --git a/src/platform/amiga/DownwellAmiga.cpp b/src/platform/amiga/DownwellAmiga.cpp
+index b45a7942..8e1f1123 100644
+--- a/src/platform/amiga/DownwellAmiga.cpp
++++ b/src/platform/amiga/DownwellAmiga.cpp
+@@ -219,6 +219,7 @@ extern const UBYTE amiga_hud_pack[];
+ extern const UBYTE amiga_hud_pack_end[];
+ extern const UBYTE amiga_game_pack[];
+ extern const UBYTE amiga_game_pack_end[];
++extern const UBYTE amiga_effect_stamps[],amiga_effect_stamps_end[];
+ #ifdef DOWNWELL_PREPARED_FIELDS
+ extern const UBYTE amiga_field_images[],amiga_field_images_end[];
+ #endif
+@@ -1710,6 +1711,7 @@ __attribute__((noinline)) static int runDownwell(void) {
+     }
+     const ULONG gamePackBytes =
+         amigaRendererChipPackBytes(amiga_game_pack, amiga_game_pack_end);
++    const ULONG effectStampBytes=amiga_effect_stamps_end-amiga_effect_stamps;
+     gDownwellStartupChipFree = AvailMem(MEMF_CHIP);
+     gDownwellStartupChipLargest = AvailMem(MEMF_CHIP | MEMF_LARGEST);
+     gDownwellStartupAssetBytes = gamePackBytes;
+@@ -1720,7 +1722,7 @@ __attribute__((noinline)) static int runDownwell(void) {
+                          bulletSpriteBytes * bulletSpriteBufferCount,
+                          enemySpriteBytes,
+                          sceneCacheBytes,
+-                         ((gamePackBytes+AmigaEffectSurface::bytes+3)&~3UL)+sceneBankBytes)) {
++                         ((gamePackBytes+AmigaEffectSurface::bytes+effectStampBytes+3)&~3UL)+sceneBankBytes)) {
+         platform.restore();
+         FreeMem(startupCopperWords, 4 * sizeof(UWORD));
+         gDownwellStartupFailure = 4;
+@@ -1728,7 +1730,7 @@ __attribute__((noinline)) static int runDownwell(void) {
+         return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
+     }
+     gDownwellStartupChipRemaining = AvailMem(MEMF_CHIP);
+-    sceneBank = memory.assets() + ((gamePackBytes+AmigaEffectSurface::bytes+3)&~3UL);
++    sceneBank = memory.assets() + ((gamePackBytes+AmigaEffectSurface::bytes+effectStampBytes+3)&~3UL);
+     const downwell::BuilderPatternPack builders(
+         amiga_builder_pack,
+         (unsigned long)(amiga_builder_pack_end - amiga_builder_pack));
+@@ -1860,11 +1862,14 @@ __attribute__((noinline)) static int runDownwell(void) {
+         platform.restore();FreeMem(startupCopperWords,4*sizeof(UWORD));memory.release();return 20;
+     }
+     static downwell::EffectMaskAssets effectAssets;
++    auto* effectStamps=memory.assets()+gamePackBytes+AmigaEffectSurface::bytes;
++    memcpy(effectStamps,amiga_effect_stamps,effectStampBytes);
+     alignas(downwell::CurrencySmokeComposition) static UBYTE effectStorage[sizeof(downwell::CurrencySmokeComposition)];
+     auto& controllerEffects = *new (effectStorage) downwell::CurrencySmokeComposition;
+     if (!effectAssets.bind(activeGamePack,gamePackBytes)||
+         !effectAssets.bindEntryMask(amiga_entry_mask,amiga_entry_mask_end-amiga_entry_mask)||
+-        !AmigaEffectSurface::bind(controllerEffects.surface(),memory.assets()+gamePackBytes)||
++        !AmigaEffectSurface::bind(controllerEffects.surface(),memory.assets()+gamePackBytes,
++                                  effectAssets,effectStamps,effectStampBytes)||
+         !AmigaEffectSurface::fixtures(controllerEffects.surface(),effectAssets)) {
+         platform.restore();
+         FreeMem(startupCopperWords,4*sizeof(UWORD));
+diff --git a/src/core/EffectCoverageCommands.h b/src/core/EffectCoverageCommands.h
+new file mode 100644
+index 00000000..df3de6ba
+--- /dev/null
++++ b/src/core/EffectCoverageCommands.h
+@@ -0,0 +1,66 @@
++#ifndef DOWNWELL_CORE_EFFECT_COVERAGE_COMMANDS_H
++#define DOWNWELL_CORE_EFFECT_COVERAGE_COMMANDS_H
++#include <cstdint>
++namespace downwell {
++// Exact alpha queries over immutable, borrowed masks. Sources must remain
++// alive and unchanged until clear(). This is command metadata, not a second
++// raster: adding opaque black still adds coverage; subtraction only removes
++// earlier coverage. Platforms may decline this route for mutable sources.
++template<unsigned Capacity=128> class EffectCoverageCommands {
++    struct Command {
++        const std::uint8_t* mask;
++        int x,y;
++        unsigned width,height,stride;
++        bool subtract;
++    } commands_[Capacity];
++    unsigned count_=0;
++    bool valid_=true;
++    static std::uint16_t coverage(const Command& c,int x,int y) {
++        if(y<c.y || y>=c.y+int(c.height))return 0;
++        const int left=x>c.x?x:c.x;
++        const int right=x+16<c.x+int(c.width)?x+16:c.x+int(c.width);
++        if(left>=right)return 0;
++        const unsigned sx=unsigned(left-c.x),byte=sx/8;
++        const auto* row=c.mask+unsigned(y-c.y)*c.stride;
++        std::uint32_t bits=std::uint32_t(row[byte])<<16;
++        if(byte+1<c.stride)bits|=std::uint32_t(row[byte+1])<<8;
++        if(byte+2<c.stride)bits|=row[byte+2];
++        bits=(bits>>(8-sx%8))&0xffffu;
++        bits&=0xffffu<<(16-unsigned(right-left));
++        return std::uint16_t(bits>>unsigned(left-x));
++    }
++public:
++    void clear(){count_=0;valid_=true;}
++    void invalidate(){valid_=false;}
++    template<class Mask> void append(const Mask& m,int x,int y,bool subtract) {
++        if(!valid_)return;
++        if(count_==Capacity){valid_=false;return;}
++        commands_[count_++]={m.data,x,y,m.width,m.height,m.stride,subtract};
++    }
++    // Caller clips to the bounded viewport first. -1 requests the retained
++    // raster query (capacity exhaustion or a non-immutable producer).
++    int intersects(int left,int top,int right,int bottom)const {
++        if(!valid_)return -1;
++        if(left>=right || top>=bottom)return 0;
++        for(unsigned i=0;i<count_;++i) {
++            const auto& c=commands_[i];
++            if(c.subtract)continue;
++            const int l=left>c.x?left:c.x,r=right<c.x+int(c.width)?right:c.x+int(c.width);
++            const int t=top>c.y?top:c.y,b=bottom<c.y+int(c.height)?bottom:c.y+int(c.height);
++            if(l>=r || t>=b)continue;
++            for(int y=t;y<b;++y)for(int x=l;x<r;x+=16) {
++                std::uint16_t bits=coverage(c,x,y);
++                if(r-x<16)bits&=std::uint16_t(0xffffu<<(16-(r-x)));
++                // Later adds cannot erase coverage. Each later subtract
++                // removes this add's contribution; later adds get their own
++                // turn, so re-addition after subtraction stays visible.
++                for(unsigned j=i+1;bits && j<count_;++j)
++                    if(commands_[j].subtract)bits&=std::uint16_t(~coverage(commands_[j],x,y));
++                if(bits)return 1;
++            }
++        }
++        return 0;
++    }
++};
++}
++#endif
+diff --git a/tests/core/EffectCoverageCommandsTest.cpp b/tests/core/EffectCoverageCommandsTest.cpp
+new file mode 100644
+index 00000000..23bee4ee
+--- /dev/null
++++ b/tests/core/EffectCoverageCommandsTest.cpp
+@@ -0,0 +1,43 @@
++#include "core/EffectCoverageCommands.h"
++#include "core/PaletteEffectSurface.h"
++#include <cassert>
++#include <cstdio>
++#include <cstdint>
++using Surface=downwell::PaletteEffectSurface<64,48>;
++int main() {
++    Surface reference;
++    downwell::EffectCoverageCommands<32> commands;
++    std::uint8_t masks[16][40],colors[40];
++    for(auto& c:colors)c=0xff;
++    std::uint32_t rng=19;
++    auto next=[&](){rng=rng*1664525u+1013904223u;return rng;};
++    unsigned checks=0;
++    for(unsigned trial=0;trial<256;++trial) {
++        reference.clear();commands.clear();
++        for(unsigned i=0;i<16;++i) {
++            for(auto& c:masks[i])c=std::uint8_t(next()>>24);
++            const unsigned width=1+next()%29,height=1+next()%10;
++            const Surface::Mask mask{masks[i],40,width,height,4};
++            const int x=int(next()%90)-20,y=int(next()%70)-15;
++            const bool subtract=i%3==2;
++            commands.append(mask,x,y,subtract);
++            assert(subtract?reference.subtract(mask,x,y):reference.add({mask,colors,colors},x,y));
++            for(unsigned q=0;q<64;++q) {
++                const int l=next()%64,t=next()%48;
++                const int r=l+next()%(65-l),b=t+next()%(49-t);
++                assert(commands.intersects(l,t,r,b)==int(reference.intersects(l,t,r,b)));++checks;
++            }
++            assert(commands.intersects(0,0,64,48)==int(reference.intersects(0,0,64,48)));++checks;
++        }
++    }
++    const std::uint8_t point[]={0x80,0};
++    const Surface::Mask mask{point,2,1,1,2};
++    commands.clear();commands.append(mask,0,0,false);commands.append(mask,0,0,true);
++    assert(commands.intersects(0,0,1,1)==0);
++    commands.append(mask,0,0,false);assert(commands.intersects(0,0,1,1)==1);
++    for(unsigned i=0;i<33;++i)commands.append(mask,0,0,false);
++    assert(commands.intersects(0,0,1,1)==-1);
++    commands.clear();assert(commands.intersects(0,0,1,1)==0);
++    commands.invalidate();assert(commands.intersects(0,0,1,1)==-1);
++    std::printf("Effect coverage commands: %u exact raster queries plus subtraction/re-add/overflow checks\n",checks);
++}
+diff --git a/tests/effect-stamps-test.py b/tests/effect-stamps-test.py
+new file mode 100644
+index 00000000..fb7048f3
+--- /dev/null
++++ b/tests/effect-stamps-test.py
+@@ -0,0 +1,39 @@
++"""Check each prepared row/plane against the original offline DWAP planes."""
++from pathlib import Path
++import hashlib
++import struct
++
++source = Path("generated/amiga-game.dwap").read_bytes()
++bank = Path("generated/amiga-effect-stamps.dwef").read_bytes()
++magic, version, count, record_size, payload, digest = struct.unpack_from(">4sHHII32s", bank)
++assert (magic, version, record_size, payload) == (b"DWEF", 1, 20, 48 + count * 20)
++assert digest == hashlib.sha256(source).digest()
++assets = {}
++for i in range(struct.unpack_from(">I", source, 8)[0]):
++    r = struct.unpack_from(">8H2I", source, 20 + i * 24)
++    assets[r[:2]] = r
++seen = set()
++checked = 0
++end = payload
++for i in range(count):
++    sprite, frame, width, height, stride, pixels, mask = struct.unpack_from(">HHHHIII", bank, 48 + i * 20)
++    assert (sprite, frame) not in seen
++    seen.add((sprite, frame))
++    r = assets[sprite, frame]
++    assert (width, height, stride * 8, 3) == r[4:8]
++    assert pixels == end and mask == pixels + stride * height * 3
++    end = mask + stride * height * 3
++    assert end <= len(bank)
++    for y in range(height):
++        for x in range(stride * 8):
++            bit = 0x80 >> (x % 8)
++            original = [bool(source[r[8] + plane * stride * height + y * stride + x // 8] & bit)
++                        for plane in range(3)]
++            for plane, expected in enumerate((original[2], original[0], original[1])):
++                at = (y * 3 + plane) * stride + x // 8
++                assert bool(bank[pixels + at] & bit) == expected
++                assert bool(bank[mask + at] & bit) == original[2]
++                checked += 1
++assert end == len(bank)
++assert seen == {(84, f) for f in range(9)} | {(s, f) for s in (133, 134) for f in range(4)}
++print(f"Prepared effect bank: {checked} plane pixels and repeated mask pixels exact")
+diff --git a/tools/generate-effect-stamps.py b/tools/generate-effect-stamps.py
+new file mode 100644
+index 00000000..a6075b6b
+--- /dev/null
++++ b/tools/generate-effect-stamps.py
+@@ -0,0 +1,88 @@
++#!/usr/bin/env python3
++"""Prepare immutable three-row (alpha/low/high) effect blit packets offline."""
++import argparse
++import hashlib
++import json
++from pathlib import Path
++import struct
++
++VERSION = "effect-stamps-v1"
++KEYS = {(84, frame) for frame in range(9)} | {
++    (sprite, frame) for sprite in (133, 134) for frame in range(4)}
++
++
++def prepare(pack):
++    if len(pack) < 20 or struct.unpack_from(">4sHH", pack) != (b"DWAP", 2, 20):
++        raise ValueError("expected DWAP v2")
++    count = struct.unpack_from(">I", pack, 8)[0]
++    if count > (len(pack) - 20) // 24:
++        raise ValueError("truncated DWAP records")
++    images = {}
++    for i in range(count):
++        sprite, frame, ox, oy, width, height, dma, planes, offset, size = struct.unpack_from(">8H2I", pack, 20 + i * 24)
++        if (sprite, frame) not in KEYS:
++            continue
++        stride = dma // 8
++        plane = stride * height
++        if (planes != 3 or not width or not height or dma % 16 or width > dma or
++                offset < 20 + count * 24 or offset % 2 or offset + size > len(pack) or size != plane * 3):
++            raise ValueError("invalid planar effect")
++        if (sprite, frame) in images:
++            raise ValueError("duplicate resource key")
++        low, high, mask = (pack[offset + n * plane:offset + (n + 1) * plane] for n in range(3))
++        pixels, coverage = bytearray(), bytearray()
++        for y in range(height):
++            row = slice(y * stride, (y + 1) * stride)
++            # Destination rows are alpha, low, high. Alpha is masked replace
++            # of its own mask, equivalent to OR, including opaque black.
++            pixels += mask[row] + low[row] + high[row]
++            coverage += mask[row] * 3
++        images[sprite, frame] = width, height, stride, bytes(pixels), bytes(coverage)
++    if set(images) != KEYS:
++        raise ValueError("missing currency/smoke frame")
++    header = struct.pack(">4sHHII32s", b"DWEF", 1, len(images), 20,
++                         48 + len(images) * 20, hashlib.sha256(pack).digest())
++    records, payload = bytearray(), bytearray()
++    for (sprite, frame), (width, height, stride, pixels, mask) in sorted(images.items()):
++        offset = len(header) + 20 * len(images) + len(payload)
++        records += struct.pack(">HHHHIII", sprite, frame, width, height, stride, offset, offset + len(pixels))
++        payload += pixels + mask
++    return header + records + payload
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--input", type=Path, default=Path("generated/amiga-game.dwap"))
++    parser.add_argument("--output", type=Path, default=Path("generated/amiga-effect-stamps.dwef"))
++    parser.add_argument("--check", action="store_true")
++    args = parser.parse_args()
++    source = args.input.read_bytes()
++    output = prepare(source)
++    provenance_path = args.input.with_suffix(".packing.json")
++    provenance_bytes = provenance_path.read_bytes()
++    provenance = json.loads(provenance_bytes)
++    if provenance["packSha256"] != hashlib.sha256(source).hexdigest():
++        raise ValueError("input provenance does not match pack")
++    manifest = {
++        "schemaVersion": 1, "generator": VERSION,
++        "generatorSha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
++        "sourceSha256": provenance["sourceSha256"], "extractor": provenance["extractor"],
++        "inputSha256": hashlib.sha256(source).hexdigest(),
++        "inputManifestSha256": hashlib.sha256(provenance_bytes).hexdigest(),
++        "outputSha256": hashlib.sha256(output).hexdigest(), "bytes": len(output),
++        "resources": [list(key) for key in sorted(KEYS)],
++    }
++    encoded = (json.dumps(manifest, indent=2) + "\n").encode()
++    manifest_path = args.output.with_suffix(".json")
++    if args.check:
++        if args.output.read_bytes() != output or manifest_path.read_bytes() != encoded:
++            raise ValueError("prepared effects differ; regenerate")
++    else:
++        args.output.parent.mkdir(parents=True, exist_ok=True)
++        args.output.write_bytes(output)
++        manifest_path.write_bytes(encoded)
++    print(f"Prepared effect stamps: {len(KEYS)} resources, {len(output)} bytes")
++
++
++if __name__ == "__main__":
++    main()

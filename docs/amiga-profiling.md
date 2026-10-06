@@ -44,7 +44,8 @@ To see what a gameplay frame contains, `DUMP_TICKS=600,640 bash amiga/profile.sh
 frames` (with the usual tape variables) saves the published buffer and sprites
 at each tick as `tmp/frames/frame-<tick>.png`. That is memory, not the beam:
 DMA-level faults (a sprite that never reaches its stop line, a wrong fetch
-window) only show in the per-field screenshots embedded in instruction traces.
+window) only show in the per-field screenshots embedded in instruction traces;
+`tools/extract-trace-screenshots.py` writes them out as JPEGs.
 
 For entrance-field lifecycle correctness (not timing), run
 `bash amiga/verify_field_reentry.sh`. It uses a 45-second emulator deadline

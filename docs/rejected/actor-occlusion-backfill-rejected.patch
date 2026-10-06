@@ -1,0 +1,263 @@
+diff --git a/amiga/Makefile b/amiga/Makefile
+index 3c5b14e1..b29b47e1 100644
+--- a/amiga/Makefile
++++ b/amiga/Makefile
+@@ -31,6 +31,7 @@ REFERENCE_PATTERNS ?= 0
+ REFERENCE_BREAKABLES ?= 0
+ REFERENCE_DAMAGE_TEXT ?= 0
+ REFERENCE_GEM_POSITION ?= 0
++REFERENCE_ACTOR_PREFIX ?= 0
+ TABLE_CONTACT_ATAN ?= 1
+ RETAIN_HEALTH_HUD ?= 1
+ AMMO_DAMAGE_RANGE ?= 1
+@@ -192,6 +193,9 @@ endif
+ ifeq ($(REFERENCE_GEM_POSITION),1)
+ CFLAGS += -DDOWNWELL_REFERENCE_GEM_POSITION
+ endif
++ifeq ($(REFERENCE_ACTOR_PREFIX),1)
++CFLAGS += -DDOWNWELL_REFERENCE_ACTOR_PREFIX
++endif
+ ifeq ($(TABLE_CONTACT_ATAN),0)
+ CFLAGS += -DDOWNWELL_PORTABLE_CONTACT_ATAN
+ endif
+diff --git a/amiga/profile.sh b/amiga/profile.sh
+index fb7c3c60..90fd7c5b 100644
+--- a/amiga/profile.sh
++++ b/amiga/profile.sh
+@@ -80,6 +80,7 @@ restore() {
+   unset REFERENCE_BREAKABLES
+   unset REFERENCE_DAMAGE_TEXT
+   unset REFERENCE_GEM_POSITION
++  unset REFERENCE_ACTOR_PREFIX
+   unset DRAW_CACHE_AUDIT
+   unset DRAW_ORDER_AUDIT
+   unset LOCAL_DRAW_CAPTURE
+diff --git a/src/platform/amiga/AmigaGameplayActors.h b/src/platform/amiga/AmigaGameplayActors.h
+index 05ef2863..3cfa6a55 100644
+--- a/src/platform/amiga/AmigaGameplayActors.h
++++ b/src/platform/amiga/AmigaGameplayActors.h
+@@ -21,11 +21,10 @@ public:
+         bool ready;
+         UWORD failedSprite, failedFrame;
+     };
+-    // Channels are player, six regular slots, overflow. Select the frontmost
+-    // suffix only: a failed fit or planar ray forbids backfilling behind it.
+-    // Final controller alpha overlapping an actor canvas is another planar
+-    // boundary. Actors ahead of it remain eligible; holes permit DMA sprites.
+-    static Assignment assign(const GameplayBob* actors, unsigned count,
++    // Channels are player, six regular slots, overflow, in front-to-back
++    // priority. Disjoint planar occluders may be passed; overlapping ones
++    // remain boundaries. Compact unassigned actors in stable painter order.
++    static Assignment assign(GameplayBob* actors, unsigned count,
+         const UBYTE* pack, const UBYTE* packEnd, Sprite& player,
+         Sprite* regular, Sprite& overflow, unsigned height, unsigned limit = 8,
+         const downwell::PaletteEffectSurface<>* controller = nullptr);
+diff --git a/src/platform/amiga/AmigaGameplaySpriteAssignment.cpp b/src/platform/amiga/AmigaGameplaySpriteAssignment.cpp
+index ed3843ab..bb2c55ce 100644
+--- a/src/platform/amiga/AmigaGameplaySpriteAssignment.cpp
++++ b/src/platform/amiga/AmigaGameplaySpriteAssignment.cpp
+@@ -2,8 +2,9 @@
+ #include "AmigaActorChannels.h"
+ #include "AmigaProfile.h"
+ #include "framework/Sprite.h"
++#include "core/DamageNumberText.h"
+ 
+-AmigaGameplayActors::Assignment AmigaGameplayActors::assign(const GameplayBob* actors,
++AmigaGameplayActors::Assignment AmigaGameplayActors::assign(GameplayBob* actors,
+     unsigned count, const UBYTE* pack, const UBYTE* packEnd, Sprite& player,
+     Sprite* regular, Sprite& overflow, unsigned height, unsigned limit,
+     const downwell::PaletteEffectSurface<>* controller) {
+@@ -12,6 +13,45 @@ AmigaGameplayActors::Assignment AmigaGameplayActors::assign(const GameplayBob* a
+     auto slot = [&](unsigned channel) -> Sprite& {
+         return channel == 0 ? player : channel <= regularChannels ? regular[channel - 1] : overflow;
+     };
++#ifndef DOWNWELL_REFERENCE_ACTOR_PREFIX
++    // Bounded conservative occluders. Overflow and rays retain the original
++    // global boundary, rather than adding an unbounded room-size scan.
++    struct Rect {int left,top,right,bottom;};
++    Rect planar[16];unsigned planarCount=0;
++    unsigned selected[8],selectedCount=0;
++    const auto overlaps=[](const Rect& a,const Rect& b){
++        return a.left<b.right&&b.left<a.right&&a.top<b.bottom&&b.top<a.bottom;
++    };
++    const Rect view{downwellPlayfieldX,0,downwellPlayfieldX+downwellPlayfieldWidth,downwellDisplayHeight};
++    const auto retain=[&](Rect r){
++        if(!overlaps(r,view))return true;
++        if(planarCount==16)return false;
++        planar[planarCount++]=r;return true;
++    };
++    for(unsigned index=count;index;){
++        --index;
++        const auto& actor=actors[index];
++        if(actor.sprite==gameplayRayMarker)break;
++        if(actor.sprite==gameplayDamageTextMarker){
++            downwell::DamageNumberText text;text.formatInteger(actor.flip);
++            const int radius=int(text.length)*4+1;
++            if(!retain({actor.x-radius,actor.y-1,actor.x+radius,actor.y+11}))break;
++            continue;
++        }
++        if(controller||planarCount){
++            int x,y,width,height;
++            if(!amigaRendererAssetBounds(pack,packEnd,actor.sprite,actor.frame,
++                actor.x,actor.y,actor.flip,&x,&y,&width,&height)){
++                result.ready=false;result.failedSprite=actor.sprite;result.failedFrame=actor.frame;break;
++            }
++            const Rect bounds{x,y,x+width,y+height};
++            bool hidden=false;
++            for(unsigned i=0;i<planarCount;++i)if(overlaps(bounds,planar[i])){hidden=true;break;}
++            if(!hidden&&controller)hidden=controller->intersects(x-downwellPlayfieldX,y,
++                x-downwellPlayfieldX+width,y+height);
++            if(hidden){if(!retain(bounds))break;continue;}
++        }
++#else
+     while (result.bobCount > 0) {
+         const auto& actor = actors[result.bobCount - 1];
+         if (actor.sprite == gameplayRayMarker || actor.sprite == gameplayDamageTextMarker) break;
+@@ -27,6 +67,7 @@ AmigaGameplayActors::Assignment AmigaGameplayActors::assign(const GameplayBob* a
+             // would reverse world painter order even outside the effect itself.
+             if (controller->intersects(x-downwellPlayfieldX,y,x-downwellPlayfieldX+width,y+height)) break;
+         }
++#endif
+         AmigaResolvedSpritePart prepared;
+         if (!amigaRendererResolveSpritePart(&prepared, pack, packEnd,
+                 actor.sprite, actor.frame, 0, actor.flip)) {
+@@ -48,8 +89,25 @@ AmigaGameplayActors::Assignment AmigaGameplayActors::assign(const GameplayBob* a
+                 result.failedSprite = actor.sprite; result.failedFrame = actor.frame;
+             }
+         }
++#ifndef DOWNWELL_REFERENCE_ACTOR_PREFIX
++        selected[selectedCount++]=index;
++#else
+         --result.bobCount;
++#endif
++    }
++#ifndef DOWNWELL_REFERENCE_ACTOR_PREFIX
++    // Selected indices are descending, so this is one stable linear pass.
++    // Copy only the suffix whose positions changed, not every actor record.
++    if(selectedCount){
++        unsigned remaining=selectedCount,out=0;
++        for(unsigned i=0;i<count;++i){
++            if(remaining&&selected[remaining-1]==i){--remaining;continue;}
++            if(out!=i)actors[out]=actors[i];
++            ++out;
++        }
++        result.bobCount=out;
+     }
++#endif
+     for (unsigned channel = channels.used(); channel < 8; ++channel) slot(channel).hide();
+     return result;
+ }
+diff --git a/src/platform/amiga/DownwellAmiga.cpp b/src/platform/amiga/DownwellAmiga.cpp
+index b45a7942..7dc69e03 100644
+--- a/src/platform/amiga/DownwellAmiga.cpp
++++ b/src/platform/amiga/DownwellAmiga.cpp
+@@ -3376,7 +3376,7 @@ __attribute__((noinline)) static int runDownwell(void) {
+                 }
+             }
+             if(compositeEffects&&!AmigaEffectSurface::verify(controllerEffects.surface())){exitCode=20;break;}
+-            const GameplayBob* actors = actorList.actors;
++            GameplayBob* actors = actorList.actors;
+             const unsigned actorCount = actorList.count;
+             const auto& rayLine = actorList.rayLine;
+             const bool rayVisible = actorList.rayVisible;
+diff --git a/tests/platform/amiga/AmigaGameplaySpriteAssignmentTest.cpp b/tests/platform/amiga/AmigaGameplaySpriteAssignmentTest.cpp
+index a5151e2a..75b04bfc 100644
+--- a/tests/platform/amiga/AmigaGameplaySpriteAssignmentTest.cpp
++++ b/tests/platform/amiga/AmigaGameplaySpriteAssignmentTest.cpp
+@@ -1,5 +1,7 @@
+ #include "platform/amiga/AmigaGameplayActors.h"
+ #include "platform/amiga/framework/Sprite.h"
++#include "core/DamageNumberText.h"
++#include <array>
+ #include <cassert>
+ #include <cstdio>
+ static UBYTE records[5][4][2];
+@@ -8,7 +10,7 @@ static int failedPart=-1;
+ static bool boundsOK=true;
+ int amigaRendererAssetBounds(const UBYTE*,const UBYTE*,UWORD sprite,UWORD,int,int,int,
+     int* x,int* y,int* width,int* height) {
+-    *x=110+sprite*20;*y=10;*width=16;*height=1;return boundsOK;
++    *x=110+sprite*20;*y=10;*width=16*sprite;*height=1;return boundsOK;
+ }
+ Sprite::Sprite(UWORD* data,UWORD,bool,bool) : data_(data) {}
+ Sprite::~Sprite() {}
+@@ -44,19 +46,52 @@ int main() {
+         unsigned v=pattern;
+         for(unsigned i=0;i<4;++i) {
+             actors[i]={UWORD(1+v%4),17,-20,300,1}; v/=4;
+-            if(i==marker) actors[i].sprite=pattern&1?gameplayRayMarker:gameplayDamageTextMarker;
+-        }
+-        UWORD expected[8]; for(auto& value:expected) value=0xffff;
+-        unsigned remaining=4, used=0;
+-        while(remaining) {
+-            const unsigned parts=actors[remaining-1].sprite;
+-            if(parts==gameplayRayMarker || parts==gameplayDamageTextMarker || (cover&(1u<<(parts-1))) || used+parts>limit) break;
+-            for(unsigned part=0;part<parts;++part) expected[used++]=parts*16+part;
+-            --remaining;
++            if(i==marker){
++                actors[i].sprite=pattern&1?gameplayRayMarker:gameplayDamageTextMarker;
++                actors[i].x=120+int(pattern%5)*20;actors[i].y=pattern&2?32:10;
++            }
+         }
++        // Independent pixel oracle, not a second implementation of assignment.
++        // All synthetic actor pixels occupy scanline10. Parts form contiguous
++        // sixteen-pixel strips, and different sprite colours expose inversion.
++        std::array<unsigned,380> expected{},actual{};
++        const auto span=[](auto& pixels,int left,int right,unsigned pen){
++            for(int x=left;x<right;++x)if(x>=110&&x<270)pixels[x]=pen;
++        };
++        const auto paint=[&](auto& pixels,const GameplayBob& a){
++            if(a.sprite==gameplayRayMarker){span(pixels,110,270,7);return;}
++            if(a.sprite==gameplayDamageTextMarker){
++                if(a.y-1<=10&&a.y+11>10){
++                    downwell::DamageNumberText text;text.formatInteger(a.flip);
++                    span(pixels,a.x-int(text.length)*4-1,a.x+int(text.length)*4+1,9);
++                }
++                return;
++            }
++            span(pixels,110+a.sprite*20,110+a.sprite*20+a.sprite*16,a.sprite);
++        };
++        const auto overlay=[&](auto& pixels){surface.visit([&](unsigned x,unsigned y,
++            std::uint16_t alpha,std::uint16_t,std::uint16_t){
++            if(y==10)for(unsigned bit=0;bit<16;++bit)
++                if(alpha&(0x8000u>>bit))pixels[110+x+bit]=0;
++        });};
++        for(const auto& a:actors)paint(expected,a);
++        overlay(expected);
++        const std::array<GameplayBob,4> original{{actors[0],actors[1],actors[2],actors[3]}};
+         const auto result=AmigaGameplayActors::assign(actors,4,pack,pack+8,player,regular,overflow,32,limit,&surface);
+-        assert(result.ready && result.bobCount==remaining);
+-        for(unsigned i=0;i<8;++i) assert(data[i][0]==expected[i]);
++        assert(result.ready&&result.bobCount<=4);
++        unsigned prior=0;
++        for(unsigned i=0;i<result.bobCount;++i){
++            while(prior<4&&(original[prior].sprite!=actors[i].sprite||
++                original[prior].x!=actors[i].x||original[prior].y!=actors[i].y))++prior;
++            assert(prior<4);++prior;paint(actual,actors[i]);
++        }
++        overlay(actual);
++        for(unsigned i=8;i;){--i;if(data[i][0]==0xffff)continue;
++            const unsigned sprite=data[i][0]/16,part=data[i][0]%16;
++            assert(i<limit&&sprite>=1&&sprite<=4&&part<sprite);
++            span(actual,110+sprite*20+part*16,110+sprite*20+(part+1)*16,sprite);
++        }
++        assert(actual==expected);
+         ++cases;
+     }
+     GameplayBob invalid{999,17,-20,300,1};
+@@ -75,6 +110,15 @@ int main() {
+     result=AmigaGameplayActors::assign(&actor,1,pack,pack+8,player,regular,overflow,32,8,&empty);
+     assert(!result.ready && result.bobCount==1 && result.failedSprite==4);
+     boundsOK=true;
++    GameplayBob separated[]={{1,17,-20,300,1},{1,17,-20,300,1},
++        {gameplayDamageTextMarker,0,250,10,1},{1,17,-20,300,1}};
++    result=AmigaGameplayActors::assign(separated,4,pack,pack+8,player,regular,overflow,32);
++#ifdef DOWNWELL_REFERENCE_ACTOR_PREFIX
++    assert(result.ready&&result.bobCount==3);
++#else
++    assert(result.ready&&result.bobCount==1&&separated[0].sprite==gameplayDamageTextMarker);
++    assert(data[0][0]==16&&data[1][0]==16&&data[2][0]==16&&data[3][0]==0xffff);
++#endif
+     result=AmigaGameplayActors::assign(nullptr,0,pack,pack+8,player,regular,overflow,32);
+     assert(result.ready && result.bobCount==0);
+     for(const auto& slot:data) assert(slot[0]==0xffff);
