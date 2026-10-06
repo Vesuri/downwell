@@ -366,7 +366,8 @@ CAUSES = [
      r'EffectSurfacePlacement|AmigaGameplayEffects'),
     ('time-field outlines', r'AmigaFieldOverlay|amigaFieldWords|AmigaGoalField|TimeFieldOutlines|'
      r'FieldSpans|FieldWords'),
-    ('ammo HUD', r'AmmoHud|redrawAmmo|redrawStreak|AmmoGauge|amigaRenderer\w*Hud|AmmoDivider'),
+    ('HUD redraws', r'AmmoHud|redrawAmmo|redrawStreak|redrawCurrency|redrawHealth|AmigaHudText|'
+     r'AmmoGauge|amigaRenderer\w*Hud|amigaHudStage|AmmoDivider'),
     ('terrain rows and scrolling', r'drawMainWorldSpan|AmigaTerrainPainter|visitWallRows|'
      r'drawWallPresentation|syncGameRows|AmigaGameplayRows|prepareStage|AmigaTerrainRaster'),
     ('actors, sprites and display', r'AmigaGameplayActors|AmigaGameplayDrawList|amigaRenderer|'

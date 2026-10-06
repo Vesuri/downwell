@@ -13,8 +13,8 @@ on PAL; do not add 60 Hz catch-up.
 ## Priority and scope
 
 Next: recover the A500 gameplay frame budget (section 5), taking its ranked
-items in order: generation bursts, combat
-composition and the per-frame runner walks. Each removes a structure or
+items in order: generation bursts, the contact damage number, combat
+composition, HUD text and quiet frames. Each removes a structure or
 computation measured by the [frame-cost audit](amiga-frame-cost.md); tuning
 small functions and compiler flags is not the remedy. Cover gameplay entry
 from the well as well as steady gameplay. Then finish live
@@ -197,16 +197,17 @@ Reference: [upgrade IDs and source entry points](upgrade-coverage.md).
 
 Fit worst-case gameplay, style/upgrade navigation and transitions into 20 ms.
 Average FPS is not the criterion. The [frame-cost audit](amiga-frame-cost.md)
-measures `22df6961` on the contact tape: 2,980 PAL fields. Quiet frames take
-26.3 ms, combat 67.4 ms and time-field frames 35.4 ms. Budget examples are
-701 (106.7 ms: generation on top of combat), 844 (92.1 ms: generation),
-645 (94.0 ms: contact) and 660 (106.3 ms: combat). Menu
-scenes (`profile.sh transition`) peak at two fields; measure the cold gameplay
+measures `36d8a0f2` on the contact tape: 2,950 PAL fields. Quiet frames take
+26.3 ms, combat 67.3 ms and time-field frames 35.7 ms. The worst frames are
+701 (104.2 ms: generation on top of combat), 646 (100.6 ms: the contact damage
+number's first step), 645 (93.6 ms: contact), 660 (90.2 ms: gem counter and
+streak change) and 844 (87.9 ms: generation). Menu scenes
+(`profile.sh transition`) peak at two fields; measure the cold gameplay
 handoff separately with `profile.sh entry`.
 
 ### How to work this section
 
-The previous round spent most of its commits on one parked item (the ammo
+An earlier round spent most of its commits on one parked item (the ammo
 gauge) and left ten opt-in flags behind. Do not repeat that.
 
 - Work the items below in order. Each names the structure to remove, its
@@ -218,16 +219,20 @@ gauge) and left ten opt-in flags behind. Do not repeat that.
   or more in the target, the item is done: move on.
 - Before starting, write in the commit message the work removed and the
   expected saving from the numbers here. Afterwards trace only the affected
-  windows (start a capture one frame early: 644, 699, 843) and run the FPS
-  tape. Repeat the full audit only after each lettered group lands.
+  windows (start a capture one frame early: 644, 659, 699, 843) and run the
+  FPS tape. Repeat the full audit only after each lettered group lands.
 - Gate on the frames the budget is about, not on every frame. Accept when
-  the targeted cost falls, no budget frame (645, 660, 701, 844) or window
+  the targeted cost falls, no budget frame (645, 646, 660, 701, 844) or window
   worst frame gets slower by more than 0.5 ms, and no window mean the change
   runs in gets worse. Another single frame may rise by up to about 1 ms when
   the change saves several times that elsewhere; report it in the commit.
   Untouched frames move by up to about 0.5 ms between builds; that is noise.
   The tape's worst gap is quantized to whole fields: report it, never gate on
   it. Do not reject an 11 ms saving for a 0.6 ms move in a 70 ms frame.
+- Quote frame numbers from the report's per-frame table for the frame you
+  name, and re-check a surprising number with a short capture of that frame
+  before committing it. The `36d8a0f2` message gives 660 as 84.5 ms; the
+  frame measures 90.2 ms (a saving of about 16 ms, not 22).
 - An accepted change is the default in the same commit. Keep the replaced path
   only as a reference selector for oracles. Do not add experiment flags, mode
   numbers or parallel candidate implementations to the tree.
@@ -240,33 +245,31 @@ gauge) and left ten opt-in flags behind. Do not repeat that.
   and event order, positions and draw order on deterministic replays
   (`make verify-cross-replay`, `make verify-terrain-ownership`, the per-frame
   ownership digests), plus the native pixel oracles (`profile.sh terrain`,
-  `profile.sh fields`, `profile.sh ammo`) when presentation changes.
+  `profile.sh fields`, `profile.sh ammo`, native frame dumps against the
+  reference selector) when presentation changes.
 - Delete your own traces under `tmp/trace/` once their numbers are in a commit;
-  each 100-field capture is about 450 MB and the disk is nearly full. For
-  several queries on one capture, export `--collapsed` stacks once instead of
-  re-running `--focus`.
+  each 100-field capture is about 500 MB. For several queries on one capture,
+  export `--collapsed` stacks once instead of re-running `--focus`.
 
 ### A. Generation bursts (frames 701 and 844)
 
-`generateLiveTerrain` costs 42.81 ms at 701 and 41.05 ms at 844. A whole
+`generateLiveTerrain` costs 40.79 ms at 701 and 36.93 ms at 844. A whole
 builder pattern is emitted synchronously, as in the original; the draws and
 creations must stay in that order. Further changes must remove remaining
 publication or Create machinery, not reorder those effects.
 
 **Remaining budget shortfall, not another encoding sweep.** Generation at
-701 still exceeds the 30 ms target. Event cells take 20.15 ms and prepared
-terrain publication 13.92 ms (nested within generation). At 844 these are
-26.35 and 6.87 ms. The next generation attempt must eliminate a named
+701 still exceeds the 30 ms target. Event cells take 18.07 ms and prepared
+terrain publication 14.00 ms (nested within generation). At 844 these are
+22.17 and 6.87 ms. The next generation attempt must eliminate a named
 remaining structure, not retune the prepared row program or its helpers.
 
    - Further actor/time-field publication work must replace shared ownership
      as a whole; individual lifetime helpers are below the work threshold.
-     Do not retune the generated-box command path. The audit's event
-     Create costs are 20.15 ms at 701 and 26.35 ms at 844. One enemy
-     configuration at 844 costs 3.59 ms, including about 3.07 ms in lifecycle
-     birth. Establish the removable structure and saving before changing it;
-     charge mutation costs in the affected-frame gate. Do not tune `nextU32`,
-     constructors or small choice helpers individually.
+     Do not retune the generated-box command path. One enemy configuration
+     at 844 costs 3.59 ms. Establish the removable structure and saving
+     before changing it; charge mutation costs in the affected-frame gate.
+     Do not tune `nextU32`, constructors or small choice helpers individually.
    - Fixed-terrain publication remains a shortfall, but both immutable-row
      owner attempts are closed (see the rejection table). Do not retry
      copy-on-write rows, sparse overrides, prepared row encodings, copy loops
@@ -280,17 +283,40 @@ remaining structure, not retune the prepared row program or its helpers.
      dirty rows, RNG interleaving and the optional pillar tail exact.
    - Recheck full-state/ownership replay and native terrain pixel oracles.
      `REFERENCE_PATTERNS=1` selects the retained cell interpreter.
-   - Native breakables cost 2,156 cycles per birth, still above 1,500. At 844,
-     input/slot/grid publication is 2.59 ms and chronology/layer metadata
-     1.26 ms. Do not tune individual writes or copy loops for this threshold.
-     Keep `REFERENCE_BREAKABLES=1` as the oracle, including room re-entry and
-     failure prefixes. See the
+   - Native breakables cost 1,984 cycles per creation at 844 (thirteen, 3.63
+     ms), still above 1,500. Do not tune individual writes or copy loops for
+     this threshold. Keep `REFERENCE_BREAKABLES=1` as the oracle, including
+     room re-entry and failure prefixes. See the
      [allocation contract](terrain-update-contract.md#native-breakable-allocation).
 
-### B. Combat composition shortfall
+### B. Contact damage number (frames 645 and 646)
 
-Currency/smoke preparation still costs 9.72 ms in combat; Draw collection
-costs 5.03 ms, row synchronization 4.32 ms and effect publication 2.72 ms.
+A damaging contact costs about 36 ms of damage-number arithmetic over two
+frames. At 645, `contactDamageNumber` is 7.97 ms, of which
+`RunnerPointDirection::evaluate` is 4.20 (binary64 around the table atan).
+At 646, the number's first Step evaluates `lengthdir_x(2, direction)`
+through the recovered SSE cosine program: one call, 166,748 cycles
+(23.47 ms), made of 26 binary64 multiplies at 3,461 cycles and 33 additions
+at 2,185. Each later frame spends about 2.1 ms in the number's binary64 motion
+and damping. Target: 646 under 80 ms and the contact pair's damage-number work
+under 10 ms, with bit-identical direction, speed and positions.
+
+- First establish the input domain of the direction and cosine for this
+  call site from the source: what values a contact can produce. Then remove
+  the evaluation that domain makes redundant, for example by an offline table
+  of exact results generated from the portable program, or by evaluating
+  direction and cosine once in the form the Step consumes. Do not substitute
+  trigonometric identities or reduced-precision arithmetic.
+- Keep the portable cosine program as the oracle and verify every admitted
+  input against it on the host; keep a reference selector for native pixel
+  and replay comparison.
+- A faster generic binary64 multiply is a helper substitution, not this item.
+
+### C. Combat composition shortfall
+
+Currency/smoke preparation still costs 9.74 ms in combat (13.88 at 660);
+Draw collection costs 5.00 ms, row synchronization 4.29 ms and effect
+publication 2.71 ms.
 Review the complete producer/compositor/consumer path, preserving source
 painter order, opaque-black replacement and shade subtraction. The two
 rejected effect approaches remain closed: a new proposal must remove their
@@ -304,33 +330,43 @@ or search; any replacement must also remove per-row field/laser debt queries.
 Keep per-producer/presentation state and final pixels as oracles. Do not
 reopen small sprite assignment or gem-position helpers.
 
-### C. Quiet-frame and alarm shortfalls
+### D. Gem counter and streak redraws (frames 488 and 660)
+
+`AmigaHudText` composes both regions in ordinary memory, but a change still
+costs about 22 ms (660: counter 12.88 ms, streak 9.64). Each publication
+rewrites the whole region, 4.97 and 5.20 ms, although only the digit band
+changes; first use of a counter digit composes it for 5.34 ms. Every gem
+pickup and stomp pays this in real play. Target: under 5 ms combined.
+Remove work, not instructions: publish only the words a redraw changes,
+not the unchanged background words. Do not tune the existing loops.
+`REFERENCE_HUD_TEXT=1` and `make test-amiga-hud-text` are the oracles;
+also compare native frame dumps across 640–900 with the reference build.
+
+### E. Quiet-frame and alarm shortfalls
 
 Native boxes no longer enter the captured alarm array: their Alarm 0 runs
-from the append-only box prefix, which removed the cold capture/sort at 845
-(52.7 → 41.0 ms). Enemy and effect alarm capture remains. Its two structural
-attempts are in the [rejection table](amiga-frame-cost.md#rejected-approaches);
-a further proposal must remove the remaining capture the same way, for one
-family at a time, rather than change the temporary array layout.
+from the append-only box prefix. Enemy and effect alarm capture remains. Its
+two structural attempts are in the
+[rejection table](amiga-frame-cost.md#rejected-approaches); a further
+proposal must remove the remaining capture the same way, for one family at a
+time, rather than change the temporary array layout.
 
 Target: quiet frames under 22 ms; current mean is 26.3 ms. Player and walking
 enemy motion cost about 5.6 ms together, but each is under 3 ms in this window.
 Leave their individual helpers alone. A quiet-frame proposal needs a shared
 work structure to remove, measured across its callers, not a collection of
-unrelated sub-millisecond edits. Alarm dispatch is 1.02 ms quiet, 2.07 ms in
-combat and 4.39 ms at 645.
+unrelated sub-millisecond edits. Captured alarm dispatch, including the box
+prefix, is 1.10 ms quiet, 1.87 ms in combat and 3.97 ms at 645.
 
-### D. Parked until A–C are done
+### F. Parked until A–E are done
 
-- Ammo gauge: 11.2 ms at 645, 1.5–4 ms in typical frames. Every runtime
-  classifier is ruled out (rejected-approaches table). If reopened, start from
-  the staged-transfer patch listed there, measured against the factored
-  default.
-- Contact damage number at 645: 8.1 ms, of which `RunnerPointDirection::evaluate`
-  is 4.3 ms (binary64 arithmetic around the 0.9 ms table atan).
-- Health HUD at 645 (4.0 ms); terrain painting at 844 (6.4 ms against 5 ms).
+- Ammo gauge: 11.2 ms at 645 and 646, 1.5–4 ms in typical frames. Every
+  runtime classifier is ruled out (rejected-approaches table). If reopened,
+  start from the staged-transfer patch listed there, measured against the
+  factored default.
+- Health HUD at 645 (4.05 ms); terrain painting at 844 (6.37 ms against 5 ms).
 
-### E. Keep native ownership sufficient
+### G. Keep native ownership sufficient
 
 - Native ownership rejects every collision query and wall End Step. When an
   original query or wall event enters native gameplay, answer it from native
@@ -340,13 +376,13 @@ combat and 4.39 ms at 645.
 - Actors at the wall depth (100) are rejected, because an inactive wall ends
   that layer's Draw. Supporting one needs the layer's wall-order cutoff.
 
-### F. Coverage
+### H. Coverage
 
 Add a dense-encounter tape before claiming the budget. Include the natural
 two-level horizontal shop tape (`profile.sh shop`), not only the contact
 tape, in subsequent audits. Repeat the audit after each lettered group lands.
 
-### G. Other scenes
+### I. Other scenes
 
 The earlier style-reveal-only tape peaks at two fields (splash 34.7 ms,
 garden 40.5 ms, style

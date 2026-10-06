@@ -130,6 +130,16 @@ families keep their existing adapter/validity checks. The general caller-owned
 `dispatchAlarmPhase` remains unfiltered because its callback owns countdown
 storage and may use a different representation.
 
+Native boxes are excluded from that captured array. They never re-register
+or compact, so the phase captures only the box count and the highest issued
+box lifetime ID. Box Alarm 0 then advances over that slot prefix at resource
+92's position within alarm-index order. Newborns, replacement slots after a
+room or configuration reset (lifetime above the ceiling), inactive boxes and
+boxes marked for destruction are skipped, as the snapshot would have done.
+`REFERENCE_BOX_ALARMS=1` (native build) retains the captured snapshot as
+the oracle. `make verify-gameplay-collision-owner` checks the prefix against
+newborn, destroyed and replacement boxes, and armed boxes beside idle ones.
+
 ## Skeleton consequence
 
 Its Alarm 2 sets Alarm 3 to 15. Alarm 3 is then decremented to 14 in the same

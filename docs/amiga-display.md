@@ -191,6 +191,20 @@ published origin, the renderer clears and draws only the rows or complete
 rows provide the update lead. PF2 remains a fixed, single-buffered HUD raster;
 dynamic counters and gauges update only their small dirty regions.
 
+The gem counter and combo streak are composed in ordinary memory and
+published once per redraw (`AmigaHudText`). At gameplay entry the HUD pack's
+30 counter glyphs are prepared and each region's static background (fill and
+icon) is staged as mask/low/high plane words. Counter digits are composed
+lazily per digit and word parity and kept for later redraws; a redraw merges
+them into one overlay band published over the background. The streak keeps
+one coverage row set per digit, verified to share one geometry. Its black
+and red outlines are derived from the white coverage by one-pixel shifts and
+adjacent rows, preserving the reference's pass order. The shop's streak
+overlay still uses the generic path. `REFERENCE_HUD_TEXT=1` retains
+glyph-by-glyph asset drawing. `make test-amiga-hud-text` compares the whole
+PF2 layer with it for values 0–1199 and large counter and streak values,
+and checks rebinding and the fallback on an unusable pack.
+
 The scaffold exercises this contract continuously: every other PAL frame it
 draws one hidden bottom row, advances the ring origin by one, rebuilds the
 inactive copper list with the new top and wrap pointers, and publishes that
