@@ -196,6 +196,7 @@ __attribute__((noinline, used)) void downwellShopLiveReady() { __asm__ volatile(
 #include "core/GameplayContactProfileInput.h"
 #include "core/GameplayEntryProfileInput.h"
 #include "core/HudNumbers.h"
+#include "AmigaHudText.h"
 #include "core/AmmoDividers.h"
 #include "core/AmmoFill.h"
 #include "core/DeathResultsBackdrop.h"
@@ -794,9 +795,7 @@ static void drawGameText(AmigaRenderer* renderer, UWORD text,
     });
 }
 
-// The eight-sprite window ends at logical x=351, so the gem counter sits
-// 16 pixels left of the original's top-right corner.
-enum { currencyShift = 16 };
+enum { currencyShift = AmigaHudText::currencyShift };
 
 static void drawCurrencyDigit(AmigaRenderer* renderer, int x, int y,
                               unsigned digit) {
@@ -863,42 +862,24 @@ static void redrawHealth(AmigaRenderer* renderer, unsigned health, unsigned maxi
     );
 }
 
+static AmigaHudText hudText;
 static void redrawCurrency(AmigaRenderer* renderer, unsigned currency) {
-    unsigned divisor = 1;
-    unsigned digits = 1;
-    unsigned index;
-    while (currency / divisor >= 10 && digits < 5) {
-        divisor *= 10;
-        ++digits;
-    }
-    amigaRendererClearClipRect(renderer);
-    amigaRendererFillRect(renderer, 316 - currencyShift, 4, 64, 30, 3);
-    drawAsset(renderer, 376, 0, 362 - currencyShift, 18, 0);
-    for (index = 0; index < digits; ++index) {
-        const unsigned digit = (currency / divisor) % 10;
-        drawCurrencyDigit(renderer,
-                          354 - currencyShift - (int)(digits - index - 1) * 8,
-                          18, digit);
-        divisor /= 10;
-    }
+#ifndef DOWNWELL_REFERENCE_HUD_TEXT
+    if (hudText.bind(activeHudPack, activeHudPackEnd, activeGamePack, activeGamePackEnd) &&
+        hudText.currency(renderer, currency)) return;
+#endif
+    AmigaHudText::currencyReference(renderer, activeHudPack, activeHudPackEnd, currency);
 }
 
 static void composeStreak(AmigaRenderer* renderer, unsigned streak) {
-    enum { streakTextBase = 65100 };
-    if (streak == 0)
-        return;
-    drawGameAsset(renderer, 133, 0, downwellPlayfieldX + 65, 55, 0);
-    downwell::drawGemmyNumberLayers(downwellPlayfieldX + 81, 51, streak,
-        [&](unsigned digit, int x, int y, downwell::Color color) {
-            const unsigned pen = color.r == 0 ? 3 : color.g == 0 ? 2 : 1;
-            amigaRendererDrawAssetPen(renderer, activeGamePack, activeGamePackEnd,
-                streakTextBase + digit, 0, x, y, 0, pen);
-        });
+    AmigaHudText::composeStreakReference(renderer, activeGamePack, activeGamePackEnd, streak);
 }
 static void redrawStreak(AmigaRenderer* renderer, unsigned streak) {
-    amigaRendererClearClipRect(renderer);
-    amigaRendererFillRect(renderer, 148, 44, 88, 24, 0);
-    composeStreak(renderer, streak);
+#ifndef DOWNWELL_REFERENCE_HUD_TEXT
+    if (hudText.bind(activeHudPack, activeHudPackEnd, activeGamePack, activeGamePackEnd) &&
+        hudText.streak(renderer, streak)) return;
+#endif
+    AmigaHudText::streakReference(renderer, activeGamePack, activeGamePackEnd, streak);
 }
 
 static void composeDeathFlash(AmigaRenderer* renderer, bool visible) {
@@ -2585,6 +2566,10 @@ __attribute__((noinline)) static int runDownwell(void) {
                         hudStorage[byte] = amiga_hud_pack[byte];
                     activeHudPack = hudStorage;
                     activeHudPackEnd = activeHudPack + hudBytes;
+#ifndef DOWNWELL_REFERENCE_HUD_TEXT
+                    // Bind HUD text backgrounds here, not on the first gem.
+                    hudText.bind(activeHudPack, activeHudPackEnd, activeGamePack, activeGamePackEnd);
+#endif
                     overlayAssetStorage = memory.menuForeground() + storage.resultsOffset;
                     overlayAssetCapacity = storage.resultsCapacity;
                     residentCover = ResidentCover::none;

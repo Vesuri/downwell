@@ -1059,6 +1059,117 @@ int amigaRendererPrepareHudGlyph(AmigaHudGlyph* glyph, const UBYTE* pack,
     return 1;
 }
 
+int amigaRendererPrepareHudArt(AmigaHudArt* art, const UBYTE* pack,
+                               const UBYTE* end, UWORD sprite, UWORD frame) {
+    const UBYTE* record = findAsset(pack, end, sprite, frame);
+    unsigned width, height, planeBytes;
+    ULONG offset;
+    if (!record) return 0;
+    width = readWord(record+8); height = readWord(record+10);
+    planeBytes = readWord(record+12) >> 3;
+    offset = readLong(record+16);
+    if (!width || !height || (planeBytes & 1) || planeBytes > 2*amigaHudStageWords ||
+        width > planeBytes*8 || offset > (ULONG)(end-pack) ||
+        (ULONG)(end-pack)-offset < (ULONG)planeBytes*height*2) return 0;
+    art->data = pack + offset;
+    art->left = -(WORD)readWord(record+4);
+    art->top = -(WORD)readWord(record+6);
+    art->width = width; art->height = height; art->planeBytes = planeBytes;
+    return 1;
+}
+
+int amigaHudStageBegin(AmigaHudStage* stage, int x, int y, unsigned words, unsigned rows) {
+    unsigned row, word;
+    if ((x & 15) || words > amigaHudStageWords || rows > amigaHudStageRows) return 0;
+    stage->x = x; stage->y = y; stage->words = words; stage->rows = rows;
+    for (row = 0; row < rows; ++row)
+        for (word = 0; word < words; ++word) stage->mask[row][word] = 0;
+    return 1;
+}
+
+static void hudStageWrite(AmigaHudStage* stage, unsigned row, unsigned word,
+                          UWORD mask, UWORD low, UWORD high) {
+    stage->low[row][word] = (UWORD)((stage->low[row][word] & ~mask) | (low & mask));
+    stage->high[row][word] = (UWORD)((stage->high[row][word] & ~mask) | (high & mask));
+    stage->mask[row][word] |= mask;
+}
+
+int amigaHudStageFill(AmigaHudStage* stage, int x, int y, int width, int height, unsigned pen) {
+    const int left = x - stage->x, top = y - stage->y;
+    const UWORD low = pen & 1 ? 0xffff : 0, high = pen & 2 ? 0xffff : 0;
+    int row, word;
+    if (width <= 0 || height <= 0) return 1;
+    if (left < 0 || top < 0 || left + width > (int)stage->words*16 ||
+        top + height > (int)stage->rows) return 0;
+    for (row = top; row < top + height; ++row)
+        for (word = left >> 4; word <= (left + width - 1) >> 4; ++word) {
+            UWORD mask = 0xffff;
+            if (word == left >> 4) mask &= (UWORD)(0xffffu >> (left & 15));
+            if (word == (left + width - 1) >> 4)
+                mask &= (UWORD)(0xffffu << (15 - ((left + width - 1) & 15)));
+            hudStageWrite(stage, (unsigned)row, (unsigned)word, mask, low, high);
+        }
+    return 1;
+}
+
+int amigaHudStagePlace(AmigaHudStage* stage, const AmigaHudArt* art,
+                       int anchorX, int anchorY, int pen) {
+    const int left = anchorX + art->left - stage->x, top = anchorY + art->top - stage->y;
+    const unsigned shift = (unsigned)left & 15, sourceWords = art->planeBytes >> 1;
+    const ULONG planeBytes = (ULONG)art->planeBytes * art->height;
+    unsigned row, word;
+    if (left < 0 || top < 0 || left + (int)art->width > (int)stage->words*16 ||
+        top + (int)art->height > (int)stage->rows) return 0;
+    for (row = 0; row < art->height; ++row) {
+        const UBYTE* source = art->data + row * art->planeBytes;
+        for (word = 0; word < sourceWords; ++word) {
+            const unsigned destination = ((unsigned)left >> 4) + word;
+            ULONG low = readWord(source + word*2), high = readWord(source + planeBytes + word*2);
+            ULONG mask;
+            if (word*16 + 16 > art->width) {
+                const unsigned visible = art->width > word*16 ? art->width - word*16 : 0;
+                const UWORD clip = visible ? (UWORD)(0xffffu << (16 - visible)) : 0;
+                low &= clip; high &= clip;
+            }
+            mask = low | high;
+            if (!mask) continue;
+            if (pen >= 0) { low = pen & 1 ? mask : 0; high = pen & 2 ? mask : 0; }
+            mask <<= 16 - shift; low <<= 16 - shift; high <<= 16 - shift;
+            if (mask >> 16)
+                hudStageWrite(stage, (unsigned)top + row, destination,
+                              (UWORD)(mask >> 16), (UWORD)(low >> 16), (UWORD)(high >> 16));
+            if ((UWORD)mask)
+                hudStageWrite(stage, (unsigned)top + row, destination + 1,
+                              (UWORD)mask, (UWORD)low, (UWORD)high);
+        }
+    }
+    return 1;
+}
+
+void amigaRendererPublishHudStage(AmigaRenderer* renderer, const AmigaHudStage* stage,
+                                  const AmigaHudStage* overlay) {
+    UBYTE* row = renderer->hud + stage->y * downwellBytesPerPlaneLine + (stage->x >> 3);
+    unsigned y, word;
+    for (y = 0; y < stage->rows; ++y, row += downwellBytesPerPlaneLine) {
+        const int band = overlay ? stage->y + (int)y - overlay->y : -1;
+        const int layered = band >= 0 && band < (int)overlay->rows;
+        for (word = 0; word < stage->words; ++word) {
+            UWORD mask = stage->mask[y][word], low = stage->low[y][word], high = stage->high[y][word];
+            UBYTE* target = row + word*2;
+            if (layered && word < overlay->words) {
+                const UWORD top = overlay->mask[band][word];
+                low = (UWORD)((low & ~top) | (overlay->low[band][word] & top));
+                high = (UWORD)((high & ~top) | (overlay->high[band][word] & top));
+                mask |= top;
+            }
+            if (!mask) continue;
+            writeWord(target, (UWORD)((readWord(target) & ~mask) | (low & mask)));
+            writeWord(target + downwellPlaneBytes,
+                (UWORD)((readWord(target + downwellPlaneBytes) & ~mask) | (high & mask)));
+        }
+    }
+}
+
 int amigaRendererPrepareWordStamp(AmigaWordStamp* stamp, const UBYTE* pack,
                                   const UBYTE* end, UWORD sprite, UWORD frame) {
     const UBYTE* record = findAsset(pack, end, sprite, frame);

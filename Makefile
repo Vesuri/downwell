@@ -2332,6 +2332,14 @@ test-amiga-gameplay-actors: build/amiga-gameplay-actors-test
 test: test-amiga-gameplay-actors
 
 .PHONY: test-amiga-damage-text
+build/amiga-hud-text-test: tests/platform/amiga/AmigaHudTextTest.cpp src/platform/amiga/AmigaRenderer.c src/platform/amiga/AmigaHudText.h $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ tests/platform/amiga/AmigaHudTextTest.cpp src/platform/amiga/AmigaRenderer.c
+.PHONY: test-amiga-hud-text
+test-amiga-hud-text: build/amiga-hud-text-test generated/amiga-hud.dwap generated/amiga-game.dwap
+	./build/amiga-hud-text-test generated/amiga-hud.dwap generated/amiga-game.dwap
+test: test-amiga-hud-text
+
 build/amiga-damage-text-test: tests/platform/amiga/AmigaDamageTextTest.cpp src/platform/amiga/AmigaRenderer.c $(HOST_CHECK_HEADERS)
 	@mkdir -p build
 	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $(filter %.cpp %.c,$^)

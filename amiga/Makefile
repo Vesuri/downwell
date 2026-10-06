@@ -45,6 +45,7 @@ REFERENCE_EMPTY_TERRAIN ?= 0
 REFERENCE_ROOM_TERRAIN ?= 0
 REFERENCE_INITIAL_TERRAIN ?= 0
 REFERENCE_BOX_ALARMS ?= 0
+REFERENCE_HUD_TEXT ?= 0
 TABLE_CONTACT_ATAN ?= 1
 RETAIN_HEALTH_HUD ?= 1
 AMMO_DAMAGE_RANGE ?= 1
@@ -257,6 +258,9 @@ endif
 ifeq ($(REFERENCE_BOX_ALARMS),1)
 CFLAGS += -DDOWNWELL_REFERENCE_BOX_ALARMS
 endif
+ifeq ($(REFERENCE_HUD_TEXT),1)
+CFLAGS += -DDOWNWELL_REFERENCE_HUD_TEXT
+endif
 ifeq ($(TABLE_CONTACT_ATAN),0)
 CFLAGS += -DDOWNWELL_PORTABLE_CONTACT_ATAN
 endif
@@ -455,6 +459,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
 	@printf '%s\n' '$(REFERENCE_ROOM_TERRAIN)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_INITIAL_TERRAIN)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_BOX_ALARMS)' >> $@.tmp
+	@printf '%s\n' '$(REFERENCE_HUD_TEXT)' >> $@.tmp
 	@printf '%s\n' '$(DRAW_ORDER_AUDIT)' >> $@.tmp
 	@printf '%s\n' '$(LOCAL_DRAW_CAPTURE)' >> $@.tmp
 	@printf '%s\n' '$(AMMO_FACTORED)' >> $@.tmp

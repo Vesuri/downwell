@@ -102,6 +102,30 @@ typedef struct AmigaHudGlyph {
     unsigned width, height;
 } AmigaHudGlyph;
 int amigaRendererPrepareHudGlyph(AmigaHudGlyph*, const UBYTE*, const UBYTE*, UWORD, UWORD);
+/* HUD text staging: compose a fixed HUD region's layers in source order in
+   ordinary memory, then publish the result to the HUD layer in one pass.
+   Art references point into the resident pack; nothing is converted. */
+enum { amigaHudStageWords = 6, amigaHudStageRows = 30 };
+typedef struct AmigaHudArt {
+    const UBYTE* data;
+    int left, top;
+    unsigned width, height, planeBytes;
+} AmigaHudArt;
+typedef struct AmigaHudStage {
+    int x, y;
+    unsigned words, rows;
+    UWORD low[amigaHudStageRows][amigaHudStageWords];
+    UWORD high[amigaHudStageRows][amigaHudStageWords];
+    UWORD mask[amigaHudStageRows][amigaHudStageWords];
+} AmigaHudStage;
+int amigaRendererPrepareHudArt(AmigaHudArt*, const UBYTE*, const UBYTE*, UWORD, UWORD);
+/* x must be word aligned. Placements outside the stage return 0. */
+int amigaHudStageBegin(AmigaHudStage*, int x, int y, unsigned words, unsigned rows);
+int amigaHudStageFill(AmigaHudStage*, int x, int y, int width, int height, unsigned pen);
+/* pen < 0 keeps source colours, as amigaRendererDrawAsset; otherwise as DrawAssetPen. */
+int amigaHudStagePlace(AmigaHudStage*, const AmigaHudArt*, int anchorX, int anchorY, int pen);
+/* Publish stage, with overlay (same x, its own rows; may be null) on top. */
+void amigaRendererPublishHudStage(AmigaRenderer*, const AmigaHudStage*, const AmigaHudStage*);
 int amigaRendererDrawWordStamp(AmigaRenderer*, const AmigaWordStamp*, int, int);
 int amigaRendererDrawWordStampRun(AmigaRenderer*, const AmigaWordStamp*, int, int, unsigned);
 unsigned amigaRendererCopyHudWords(UBYTE*, const UBYTE*, int, int, int, int, int);
