@@ -383,6 +383,16 @@ TRANSPARENT = re.compile(r'^(__u?(mul|div|mod)si3|memset|memcpy|downwellMemoryCo
 IDLE_WORK = re.compile(r'serviceSpatialIndex|RunnerSpatial|\{lambda')
 
 
+def bare(name):
+    """Name without template arguments or parameter lists: owner patterns
+    must not match types that merely appear in a signature."""
+    previous = None
+    while previous != name:
+        previous = name
+        name = re.sub(r'<[^<>]*>|\([^()]*\)', '', name)
+    return name
+
+
 def cause(names):
     """Owner of one logical stack for the --causes table."""
     if 'AmigaPlatform::waitVblank' in names:
@@ -392,6 +402,7 @@ def cause(names):
     for name in reversed(names):
         if TRANSPARENT.match(name):
             continue
+        name = bare(name)
         for owner, pattern in CAUSE_PATTERNS:
             if pattern.search(name):
                 return owner
