@@ -580,6 +580,21 @@ public:
             if(breakables_[i].lifetimeId&&breakables_[i].alarm0>=0)return true;
         return false;
     }
+    // Native boxes never re-register or compact. A prefix plus generation
+    // ceiling captures the same lifetimes without copying their handles.
+    // The ceiling also excludes replacement slots after a room/config reset.
+    struct BoxAlarmPrefix {unsigned end=0;std::uint32_t lastLifetime=0;};
+    BoxAlarmPrefix captureBoxAlarms()const{return {breakableCount_,nextBreakableLifetimeId_-1};}
+    bool advanceBoxAlarmPrefix(BoxAlarmPrefix phase){
+        if(!run_.effectsSucceeded)return false;
+        const unsigned end=phase.end<breakableCount_?phase.end:breakableCount_;
+        for(unsigned i=0;i<end;++i){
+            auto& box=breakables_[i];
+            if(!box.lifetimeId||box.lifetimeId>phase.lastLifetime||!box.active||box.destroyRequested)continue;
+            if(downwell::AlarmBank::advanceValue(box.alarm0))box.state.alarmZero();
+        }
+        return true;
+    }
     bool publishBoxAlarm0(downwell::InstanceHandle h,std::int32_t value){
         if(!run_.effectsSucceeded||!findBreakable(h))return run_.effectsSucceeded=false;
         breakables_[h.slot].alarm0=value;return true;

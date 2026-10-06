@@ -60,6 +60,7 @@ private:
     bool combatAlarmCaptureDirty_=true;
     unsigned combatAlarmMask_=0;
     bool combatAlarmCaptureValid_=false;
+    bool nativeBoxAlarmPrefix_=false;
 #ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
     RunnerRoomMembership<View::capacity> room_;
 #else
@@ -673,6 +674,14 @@ public:
             good_=RunnerDepthService::integerDepth(box->creationDepth,boxLayer_.depth);
         }}
         if(good_){const auto* field=objectDefaults_.get(82);if(!field)good_=false;else nativeFieldFlags_=field->initialFlags;}
+#ifndef DOWNWELL_REFERENCE_BOX_ALARMS
+        if(good_&&nativeBoxes_){
+            unsigned mask=0;
+            // The prefix adapter implements the pinned box's Alarm 0 only.
+            // Other resource metadata retains generic captured dispatch.
+            nativeBoxAlarmPrefix_=!(nativeBoxFlags_&0x100003u)&&alarmMetadata_.mask(92,mask)&&mask==1;
+        }
+#endif
         if(good_)for(unsigned selector=0;selector<2;++selector){
             terrainFamilies_[selector]=true;
             for(unsigned i=0;i<families_.size();++i)
@@ -706,7 +715,7 @@ public:
     bool serviceSpatialIndex(unsigned budget){return check(owner_.serviceSpatialIndex(budget));}
     bool attach(GameplayWorld& world){
         combatAlarmCaptureValid_=false;
-        if(!(native_?table_.watchCaptureRanges(View::enemyBase,View::terrainBase,View::debrisBase,View::capacity,combatAlarmCaptureDirty_):
+        if(!(native_?table_.watchCaptureRanges(View::enemyBase,nativeBoxAlarmPrefix_?View::breakableBase:View::terrainBase,View::debrisBase,View::capacity,combatAlarmCaptureDirty_):
             owner_.watchCaptureRanges(View::enemyBase,View::terrainBase,View::debrisBase,View::capacity,combatAlarmCaptureDirty_)))
             return check(false);
         if(!valid()||(world_&&world_!=&world)||(!world_&&
@@ -979,6 +988,7 @@ public:
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
             if(!self.valid())return false;
             auto& phase=self.combatAlarmPhase_;
+            const auto boxes=self.nativeBoxAlarmPrefix_?self.world_->captureBoxAlarms():GameplayWorld::BoxAlarmPrefix{};
             const bool reused=self.combatAlarmCaptureValid_&&!self.combatAlarmCaptureDirty_;
             if(!reused){
                 phase.clear();
@@ -987,7 +997,7 @@ public:
                 };
                 // Only implemented families are admitted. Avoid scanning every
                 // terrain record for this partial combat alarm traversal.
-                if(!self.check(self.visitRegistered(View::enemyBase,View::terrainBase,capture)&&
+                if(!self.check(self.visitRegistered(View::enemyBase,self.nativeBoxAlarmPrefix_?View::breakableBase:View::terrainBase,capture)&&
                     self.visitRegistered(View::debrisBase,View::capacity,capture)))return false;
                 // Save before callbacks: mutation during dispatch invalidates
                 // reuse next tick without changing this phase's captured set.
@@ -1002,7 +1012,7 @@ public:
                     kind==View::Kind::timeChange?self.world_->advanceTimeChangeRoomAlarm(local,alarm):
                     kind==View::Kind::drone?(alarm==0&&self.drones_.advanceAlarm(local)):
                     kind==View::Kind::entryDither&&self.entries_.advanceAlarm(local,alarm);
-            },reused,&self.combatAlarmMask_);
+            },reused,&self.combatAlarmMask_,boxes);
         },this);
         world.configureDebrisStepOrder([](void* context,GameplayWorld::DebrisStepOrder& phase){
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
@@ -1095,7 +1105,7 @@ private:
     }
     template<bool SkipInactive=false,unsigned Capacity,class AdvanceAndDispatch>
     bool dispatchCapturedAlarms(RunnerStepSnapshot<Capacity>& snapshot,AdvanceAndDispatch advanceAndDispatch,
-        bool alreadySorted=false,unsigned* retainedMask=nullptr){
+        bool alreadySorted=false,unsigned* retainedMask=nullptr,GameplayWorld::BoxAlarmPrefix boxes={}){
         DW_PROFILE_SCOPE(profileAlarmScan);
         if(!alreadySorted){DW_PROFILE_SCOPE(profileAlarmSort);snapshot.sort();}
         const unsigned count=snapshot.size();
@@ -1119,11 +1129,18 @@ private:
             if(retainedMask)*retainedMask=capturedAlarms;
         }
         for(unsigned alarm=0;alarm<AlarmBank::count;++alarm){
-          if(!(capturedAlarms&(1u<<alarm))&&bindingsUnchanged(bindingRevision))continue;
+          bool boxesPending=alarm==0&&boxes.end;
+          if(!boxesPending&&!(capturedAlarms&(1u<<alarm))&&bindingsUnchanged(bindingRevision))continue;
           int cachedObject=-1;unsigned alarmMask=0;
           PackedObjectEvent event;bool eventCached=false,eventFound=false;
           unsigned groupEnd=0;
           for(unsigned i=0;i<count;++i){
+            // Resource order, not layer or compact-array order. The native
+            // box family is the sole object-92 owner in this combat phase.
+            if(boxesPending&&snapshot.object(i)>92){
+                if(!check(world_->advanceBoxAlarmPrefix(boxes)))return false;
+                boxesPending=false;
+            }
             if constexpr(SkipInactive)if(i>=groupEnd){
                 // Captured boxes are live boxes. When none has this alarm set
                 // at group entry, no member is pending and no callback runs.
@@ -1175,6 +1192,7 @@ private:
             {DW_PROFILE_SCOPE(profileAlarmCallback);
                 if(!check(advanceAndDispatch(h,alarm,event))||!valid())return false;}
           }
+          if(boxesPending&&!check(world_->advanceBoxAlarmPrefix(boxes)))return false;
         }
         return true;
     }

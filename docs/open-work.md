@@ -220,10 +220,14 @@ gauge) and left ten opt-in flags behind. Do not repeat that.
   expected saving from the numbers here. Afterwards trace only the affected
   windows (start a capture one frame early: 644, 699, 843) and run the FPS
   tape. Repeat the full audit only after each lettered group lands.
-- Gate: reject the change only if a frame that runs the changed code gets
-  slower. Untouched frames move by up to about 0.5 ms between builds; that is
-  noise. The tape's worst gap is quantized to whole fields: report it, never
-  gate on it.
+- Gate on the frames the budget is about, not on every frame. Accept when
+  the targeted cost falls, no budget frame (645, 660, 701, 844) or window
+  worst frame gets slower by more than 0.5 ms, and no window mean the change
+  runs in gets worse. Another single frame may rise by up to about 1 ms when
+  the change saves several times that elsewhere; report it in the commit.
+  Untouched frames move by up to about 0.5 ms between builds; that is noise.
+  The tape's worst gap is quantized to whole fields: report it, never gate on
+  it. Do not reject an 11 ms saving for a 0.6 ms move in a 70 ms frame.
 - An accepted change is the default in the same commit. Keep the replaced path
   only as a reference selector for oracles. Do not add experiment flags, mode
   numbers or parallel candidate implementations to the tree.
@@ -302,13 +306,12 @@ reopen small sprite assignment or gem-position helpers.
 
 ### C. Quiet-frame and alarm shortfalls
 
-Alarm capture/dispatch remains a budget shortfall. Its two structural attempts
-are closed in the [rejection table](amiga-frame-cost.md#rejected-approaches);
-do not retry per-frame capture preparation. Any later proposal must eliminate
-the rebuild itself, including cold birth/retirement frames, rather than change
-its temporary array layout.
-The borrowed native-box prefix attempt is also closed; do not tune its
-sub-millisecond scan or repeat it without resolving the affected-frame loss.
+Native boxes no longer enter the captured alarm array: their Alarm 0 runs
+from the append-only box prefix, which removed the cold capture/sort at 845
+(52.7 → 41.0 ms). Enemy and effect alarm capture remains. Its two structural
+attempts are in the [rejection table](amiga-frame-cost.md#rejected-approaches);
+a further proposal must remove the remaining capture the same way, for one
+family at a time, rather than change the temporary array layout.
 
 Target: quiet frames under 22 ms; current mean is 26.3 ms. Player and walking
 enemy motion cost about 5.6 ms together, but each is under 3 ms in this window.

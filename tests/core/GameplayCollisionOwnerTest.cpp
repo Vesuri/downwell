@@ -2961,11 +2961,13 @@ int main(){
         const int bx=0,by=336;assert(world->appendBreakables(&bx,&by,1));const InstanceHandle box{0,1};
         assert(BoxSoundVerification::run(*world,box,171,[&](){return &world->findBreakable(box)->sound;},failure));
     }
-    for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native}){
+    for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                       GameplayCollisionOwner::Ownership::nativeScenery}){
         // Native ownership skips box groups while no live box has Alarm 0
         // set; an armed box must still count down beside idle ones.
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
-            GameplayTerrainInstances::WallCollision{},nullptr,ownership);
+            GameplayTerrainInstances::WallCollision{},
+            ownership==GameplayCollisionOwner::Ownership::nativeScenery?&rooms:nullptr,ownership);
         auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding());
         assert(owner->attach(*world));
@@ -2984,6 +2986,27 @@ int main(){
         }
         assert(world->findBreakable(armed)->state.wallHp.zero()&&world->findBreakable(armed)->destroyRequested&&
             !world->findBreakable(idle)->state.wallHp.zero()&&!world->findBreakable(idle)->destroyRequested);
+    }
+    {
+        GameplayWorld world(300,true);
+        const int xs[]={64,96,128},ys[]={512,512,512};
+        assert(world.appendBreakables(xs,ys,3));
+        const InstanceHandle a{0,world.breakableSlot(0).lifetimeId},
+            b{1,world.breakableSlot(1).lifetimeId},c{2,world.breakableSlot(2).lifetimeId};
+        assert(world.publishBoxAlarm0(a,1)&&world.publishBoxAlarm0(b,0)&&world.publishBoxAlarm0(c,1));
+        const auto phase=world.captureBoxAlarms();
+        assert(world.markBreakableDestroyed(c));
+        assert(world.appendBreakables(xs,ys,1));
+        const InstanceHandle newborn{3,world.breakableSlot(3).lifetimeId};
+        assert(world.publishBoxAlarm0(newborn,1)&&world.advanceBoxAlarmPrefix(phase));
+        assert(world.findBreakable(a)->alarm0==0&&world.findBreakable(a)->state.wallHp.zero());
+        assert(world.findBreakable(b)->alarm0==-1&&!world.findBreakable(b)->state.wallHp.zero());
+        assert(world.findBreakable(c)->alarm0==1&&world.findBreakable(newborn)->alarm0==1);
+        world.configureBreakables(xs,ys,3);
+        const InstanceHandle replacement{0,world.breakableSlot(0).lifetimeId};
+        assert(replacement.generation>phase.lastLifetime&&world.publishBoxAlarm0(replacement,1));
+        assert(world.advanceBoxAlarmPrefix(phase)&&world.findBreakable(replacement)->alarm0==1);
+        assert(world.advanceBoxAlarmPrefix(world.captureBoxAlarms())&&world.findBreakable(replacement)->alarm0==0);
     }
     for(bool registered:{false,true}){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
