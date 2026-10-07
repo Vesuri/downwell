@@ -1536,6 +1536,15 @@ later work while retaining completed motion-state changes. Collision geometry,
 water behavior, binary64 arithmetic and exact individual hit-field mutation
 timing remain incomplete; this is not the original mask solver.
 
+Frog Step block 37 publishes `x=round(xx)`, `y=round(yy)` directly. Both
+adapters therefore round the full shared Q16 horizontal and fifth-Q8 vertical
+positions, with ties to even; neither rounds its Q8/binary32 presentation
+mirror first. The even world origins (240,176) preserve tie parity when
+publishing relative coordinates. Near-half fractions must survive until this
+publication: 176.500137 is above a tie even if a Q8 mirror reads 176.5.
+This removes a second quantization, not the shared motion approximation
+described above.
+
 Active bat pursuit calls the checked X-scale binding at `xscaleXsp`, after
 blocked velocity components are cleared and before motion integration. The
 original helper only assigns scale for `abs(xsp) > 0.2`; the current Q8 motion

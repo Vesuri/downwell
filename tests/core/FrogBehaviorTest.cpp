@@ -4,6 +4,7 @@
 #include "core/FrogVerticalMotion.h"
 #include "core/FrogHitState.h"
 #include "core/FrogMotion.h"
+#include "core/GameMakerRounding.h"
 #include "core/FrogPresentation.h"
 #include "core/EnemyStepPresentation.h"
 #include "core/EnemyCreateProfile.h"
@@ -16,6 +17,16 @@ void require(bool value, const char* message) {
 }
 
 int main() {
+    // Source round(xx/yy), not round(the lossy public coordinate mirror).
+    for(long unit:{65536L,1280L})for(long whole=-512;whole<=512;++whole)
+        for(long delta=-4;delta<=4;++delta){
+            const long value=whole*unit+unit/2+delta;
+            require(downwell::frogPublishedPixel(value,unit)==
+                downwell::roundGameMakerCoordinate(double(value)/unit),
+                "frog publication retains sub-Q8 fractions around signed half-pixels");
+        }
+    require(240+downwell::frogPublishedPixel(-64*65536L+32768+9,65536)==177,
+        "seed 8 route 50 publishes 176.500137 as 177 rather than 176");
     for(long speed:{-65536L,-1L,0L,1L,65536L})for(bool visible:{false,true})for(bool accept:{false,true}){
         downwell::FrogHorizontalMotion x{0,speed};
         downwell::FrogVerticalMotion y;

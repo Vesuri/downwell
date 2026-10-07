@@ -1126,6 +1126,10 @@ void StartupRuntime::updateMainEnemies() {
         }
         auto publishedX = static_cast<std::int32_t>(roundGameMakerCoordinate(enemy.preciseX));
         auto publishedY = static_cast<std::int32_t>(roundGameMakerCoordinate(enemy.preciseY));
+        if (enemy.objectId == 113 && enemy.frogMotionInitialized) {
+            publishedX = mainPlayerOriginX_ + frogPublishedPixel(enemy.frogHorizontal.position,65536);
+            publishedY = mainPlayerOriginY_ + frogPublishedPixel(enemy.frogVertical.position,1280);
+        }
         if ((enemy.objectId == 111 || enemy.objectId == 112) && enemy.walker.initialized) {
             publishedX = enemy.walker.publishedX;
             publishedY = enemy.walker.publishedY;

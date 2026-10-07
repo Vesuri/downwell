@@ -1433,6 +1433,11 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         // unchanged by storing these positions relative to the origin.
         int publishedX = (int)downwell::roundGameMakerQ8(enemy.preciseX);
         int publishedY = (int)downwell::roundGameMakerQ8(enemy.preciseY);
+        if (enemy.objectId == 113) {
+            publishedX = (int)downwell::frogPublishedPixel(enemy.frogHorizontal.position,65536);
+            publishedY = (int)downwell::frogPublishedPixel(
+                enemy.preciseY*5+enemy.gravityPositionRemainder,1280);
+        }
         if (enemy.objectId == 111 || enemy.objectId == 112) {
             publishedX = enemy.walker.publishedX;
             publishedY = enemy.walker.publishedY;

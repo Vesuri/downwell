@@ -4,6 +4,16 @@
 #include "FrogVerticalMotion.h"
 #include "FrogHitState.h"
 namespace downwell {
+// enmFrog Step block 37 calls round(xx), round(yy) directly. Do not round
+// a Q8/binary32 presentation mirror first: it can manufacture an exact half
+// and change the published pixel. This retains the full shared fixed state;
+// it does not make the existing Q16 rebound approximation binary64-exact.
+inline long frogPublishedPixel(long position, long unit) {
+    const long whole=position/unit, fraction=position%unit, half=unit/2;
+    if(fraction>half||(fraction==half&&whole%2))return whole+1;
+    if(fraction<-half||(fraction==-half&&whole%2))return whole-1;
+    return whole;
+}
 struct NoFrogHit {bool operator()()const{return true;}};
 struct NoFrogScale {bool operator()(int)const{return true;}};
 struct NoFrogLanding {void operator()(bool)const{}};
