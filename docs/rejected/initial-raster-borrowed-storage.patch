@@ -1,0 +1,455 @@
+diff --git a/amiga/Makefile b/amiga/Makefile
+index 279fe4c6..74c8eafb 100644
+--- a/amiga/Makefile
++++ b/amiga/Makefile
+@@ -40,6 +40,7 @@ REFERENCE_VALIDATION ?= 0
+ REFERENCE_ANIMATION ?= 0
+ REFERENCE_GENERATED_BOXES ?= 0
+ REFERENCE_INITIAL_RASTER ?= 0
++REFERENCE_INITIAL_RASTER_STORAGE ?= 0
+ REFERENCE_ROOM_PREPARE ?= 0
+ REFERENCE_FIELD_BANK ?= 0
+ REFERENCE_ENTRY_ASSETS ?= 0
+@@ -248,6 +249,9 @@ endif
+ ifeq ($(REFERENCE_INITIAL_RASTER),1)
+ CFLAGS += -DDOWNWELL_REFERENCE_INITIAL_RASTER
+ endif
++ifeq ($(REFERENCE_INITIAL_RASTER_STORAGE),1)
++CFLAGS += -DDOWNWELL_REFERENCE_INITIAL_RASTER_STORAGE
++endif
+ ifeq ($(REFERENCE_ROOM_PREPARE),1)
+ CFLAGS += -DDOWNWELL_REFERENCE_ROOM_PREPARE
+ endif
+@@ -474,6 +478,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
+ 	@printf '%s\n' '$(REFERENCE_ANIMATION)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_GENERATED_BOXES)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_INITIAL_RASTER)' >> $@.tmp
++	@printf '%s\n' '$(REFERENCE_INITIAL_RASTER_STORAGE)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_ROOM_PREPARE)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_FIELD_BANK)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_ENTRY_ASSETS)' >> $@.tmp
+diff --git a/amiga/profile.sh b/amiga/profile.sh
+index 94356569..77178f3b 100644
+--- a/amiga/profile.sh
++++ b/amiga/profile.sh
+@@ -107,6 +107,7 @@ restore() {
+   unset REFERENCE_ANIMATION
+   unset REFERENCE_GENERATED_BOXES
+   unset REFERENCE_INITIAL_RASTER
++  unset REFERENCE_INITIAL_RASTER_STORAGE
+   unset REFERENCE_ROOM_PREPARE
+   unset REFERENCE_FIELD_BANK
+   unset REFERENCE_ENTRY_ASSETS
+diff --git a/src/platform/amiga/AmigaInitialTerrain.h b/src/platform/amiga/AmigaInitialTerrain.h
+index d58197ec..c2237f42 100644
+--- a/src/platform/amiga/AmigaInitialTerrain.h
++++ b/src/platform/amiga/AmigaInitialTerrain.h
+@@ -14,6 +14,9 @@ public:
+     static constexpr unsigned columns=3,words=22,rowBytes=44;
+     bool bind(const std::uint8_t* data,unsigned bytes){
+         references_=dictionary_=nullptr;rows_=0;
++#ifdef DOWNWELL_PLATFORM_AMIGA
++        if(reinterpret_cast<unsigned long>(data)&1)return false;
++#endif
+         if(!data||bytes<12||data[0]!='D'||data[1]!='W'||data[2]!='I'||data[3]!='T'||
+            word(data+4)!=1||word(data+10))return false;
+         const unsigned rows=word(data+6),count=word(data+8);
+@@ -22,6 +25,20 @@ public:
+         references_=data+12;dictionary_=references_+rows*6;rows_=rows;return true;
+     }
+     unsigned rows()const{return rows_;}
++    // Borrow native words from immutable, word-aligned offline storage. The
++    // host oracle decodes byte order into caller-owned scratch instead.
++    const std::uint16_t* row(unsigned column,unsigned y,std::uint16_t* scratch)const{
++        if(!references_||column>=columns||y>=rows_)return nullptr;
++        const auto* source=dictionary_+word(references_+(column*rows_+y)*2)*rowBytes;
++#ifdef DOWNWELL_PLATFORM_AMIGA
++        (void)scratch;
++        return reinterpret_cast<const std::uint16_t*>(source);
++#else
++        if(!scratch)return nullptr;
++        for(unsigned i=0;i<words;++i)scratch[i]=std::uint16_t(word(source+i*2));
++        return scratch;
++#endif
++    }
+     bool copy(unsigned column,std::uint16_t* destination)const{
+         if(!references_||column>=columns||!destination)return false;
+         const auto* reference=references_+column*rows_*2;
+diff --git a/src/platform/amiga/AmigaTerrainRaster.cpp b/src/platform/amiga/AmigaTerrainRaster.cpp
+index 98954aca..939f57a4 100644
+--- a/src/platform/amiga/AmigaTerrainRaster.cpp
++++ b/src/platform/amiga/AmigaTerrainRaster.cpp
+@@ -6,7 +6,7 @@ void AmigaTerrainRaster::invalidate(int first, int end) {
+     if (first < 0) first = 0;
+     if (end > int(rows)) end = rows;
+     for (unsigned column = 0; column < 3; ++column)
+-        for (int y = first; y < end; ++y) dirty_[column][y] = true;
++        for (int y = first; y < end; ++y) setDirty(column,y,true);
+ }
+ 
+ void AmigaTerrainRaster::invalidateShops(const downwell::ShopWorld& shops) {
+@@ -53,7 +53,7 @@ static void copyTerrainRows68000(const UWORD* sourceWords, UBYTE* plane0,
+ void AmigaTerrainRaster::transfer(AmigaRenderer* renderer, unsigned column,
+     int worldY, int screenY, int height, bool store, Bitmap* terrainCopyTarget,
+     const Bitmap* terrainCopyBacking, unsigned terrainCopyBuffer, AmigaGameplayRows& gameplayRows) {
+-    UWORD* cachedRow = row(column, worldY);
++    UWORD* cachedRow = store?writeRows(column,worldY,height):&pixels_[column][worldY][0][0];
+     unsigned physical = renderer->gameOrigin + screenY;
+     if (physical >= downwellGameRingHeight) physical -= downwellGameRingHeight;
+     if (!store) {
+@@ -64,7 +64,26 @@ void AmigaTerrainRaster::transfer(AmigaRenderer* renderer, unsigned column,
+             if (count > remaining) count = remaining;
+             if (pipeline && count > 128) count = 128;
+             UBYTE* row = renderer->game + physical * downwellBytesPerPlaneLine + x / 8;
+-            copyTerrainRows68000(cachedRow, row, row + downwellGameRingPlaneBytes, count);
++#ifndef DOWNWELL_REFERENCE_INITIAL_RASTER_STORAGE
++            if(initial_&&unsigned(worldY)<initial_->rows()){
++                UWORD scratch[AmigaInitialTerrain::words];
++                unsigned done=0;
++                while(done<count){
++                    if(dirty_[column][worldY+done]&2){
++                        const auto* source=initial_->row(column,worldY+done,scratch);
++                        copyTerrainRows68000(source,row+done*48,
++                            row+downwellGameRingPlaneBytes+done*48,1);
++                        ++done;
++                    }else{
++                        const unsigned first=done;
++                        do{++done;}while(done<count&&!(dirty_[column][worldY+done]&2));
++                        copyTerrainRows68000(cachedRow+first*words*2,row+first*48,
++                            row+downwellGameRingPlaneBytes+first*48,done-first);
++                    }
++                }
++            }else
++#endif
++                copyTerrainRows68000(cachedRow, row, row + downwellGameRingPlaneBytes, count);
+             if (pipeline) {
+                 // These completed rows are immutable while the CPU prepares
+                 // the next disjoint chunk. DMA copies them concurrently.
+@@ -74,6 +93,7 @@ void AmigaTerrainRaster::transfer(AmigaRenderer* renderer, unsigned column,
+             }
+             remaining -= count;
+             cachedRow += count * words * 2;
++            worldY += count;
+             physical += count;
+             if (physical == downwellGameRingHeight) physical = 0;
+         }
+diff --git a/src/platform/amiga/AmigaTerrainRaster.h b/src/platform/amiga/AmigaTerrainRaster.h
+index c992ee61..cfc8404d 100644
+--- a/src/platform/amiga/AmigaTerrainRaster.h
++++ b/src/platform/amiga/AmigaTerrainRaster.h
+@@ -1,13 +1,17 @@
+ #ifndef DOWNWELL_AMIGA_TERRAIN_RASTER_H
+ #define DOWNWELL_AMIGA_TERRAIN_RASTER_H
+ #include "AmigaGameplayRows.h"
++#include "AmigaInitialTerrain.h"
+ #include "core/ShopWorld.h"
+ class Bitmap;
+ // Fast-RAM raster for the left room, well and right room. Transfer only
+ // exposed/invalidated spans into the Chip-RAM circular backing/display rings.
+ class AmigaTerrainRaster {
+     UWORD pixels_[3][8192][2][AmigaGameplayRows::terrainWords];
+-    bool dirty_[3][8192]{};
++    // Bit 0: repaint required. Bit 1: current pixels belong to the immutable
++    // initial-room dictionary, not pixels_. Writes replace a complete row.
++    unsigned char dirty_[3][8192]{};
++    const AmigaInitialTerrain* initial_=nullptr;
+     unsigned shopRevision_[downwell::ShopWorld::capacity]{};
+ public:
+     static constexpr unsigned rows = 8192, words = AmigaGameplayRows::terrainWords;
+@@ -15,15 +19,39 @@ public:
+     static constexpr unsigned stagePaintRows = 16;
+     enum StagePaint { stageFailed=0, stageInBacking=1, stageInCache=2 };
+     bool ready = false;
+-    UWORD* row(unsigned column, unsigned y) { return &pixels_[column][y][0][0]; }
+-    bool& dirty(unsigned column, unsigned y) { return dirty_[column][y]; }
++    UWORD* writeRows(unsigned column,unsigned y,unsigned height){
++#ifndef DOWNWELL_REFERENCE_INITIAL_RASTER_STORAGE
++        for(unsigned i=y;i<y+height;++i)dirty_[column][i]&=1;
++#else
++        (void)height;
++#endif
++        return &pixels_[column][y][0][0];
++    }
++    UWORD* row(unsigned column, unsigned y) { return writeRows(column,y,1); }
++    const UWORD* readRow(unsigned column,unsigned y,UWORD* scratch)const{
++        return (dirty_[column][y]&2)?initial_->row(column,y,scratch):&pixels_[column][y][0][0];
++    }
++    bool borrowInitial(const AmigaInitialTerrain& initial){
++        if(!initial.rows()||initial.rows()>rows)return false;
++        initial_=&initial;
++        for(unsigned c=0;c<3;++c)for(unsigned y=0;y<initial.rows();++y)dirty_[c][y]|=2;
++        return true;
++    }
++    bool dirty(unsigned column, unsigned y)const { return (dirty_[column][y]&1)!=0; }
++    void setDirty(unsigned column,unsigned y,bool value){
++#ifdef DOWNWELL_REFERENCE_INITIAL_RASTER_STORAGE
++        dirty_[column][y]=value;
++#else
++        dirty_[column][y]=(dirty_[column][y]&2)|(value?1:0);
++#endif
++    }
+     // First row after the homogeneous clean/dirty run. Invalid/empty requests
+     // do not advance. Query before repainting: the caller may clear dirty bits.
+     unsigned runEnd(unsigned column, unsigned first, unsigned end) const {
+         if(column>=3 || first>=end || end>rows)return first;
+-        const bool state=dirty_[column][first];
++        const bool state=dirty(column,first);
+         unsigned next=first+1;
+-        while(next<end && dirty_[column][next]==state)++next;
++        while(next<end && dirty(column,next)==state)++next;
+         return next;
+     }
+     void invalidate(int first, int end);
+@@ -43,7 +71,7 @@ public:
+         while (done < height) {
+             const unsigned first = worldY + done;
+             unsigned count = runEnd(column, first, worldY + height) - first;
+-            const bool repaint = dirty_[column][first];
++            const bool repaint = dirty(column,first);
+             int painted=stageInBacking;
+             if (repaint) {
+                 if (!budget) break;
+@@ -55,7 +83,7 @@ public:
+             transfer(renderer, column, first, done, count, repaint&&painted==stageInBacking,
+                      nullptr, nullptr, 0, debts);
+             if (repaint)
+-                for (unsigned y = first; y < first + count; ++y) dirty_[column][y] = false;
++                for (unsigned y = first; y < first + count; ++y) setDirty(column,y,false);
+             done += count;
+         }
+         return int(done);
+diff --git a/src/platform/amiga/DownwellAmiga.cpp b/src/platform/amiga/DownwellAmiga.cpp
+index 2a978f7a..f9bde0f6 100644
+--- a/src/platform/amiga/DownwellAmiga.cpp
++++ b/src/platform/amiga/DownwellAmiga.cpp
+@@ -1299,11 +1299,11 @@ static void drawMainWorldSpan(
+         }
+ #ifdef DOWNWELL_TERRAIN_DIRECT
+         if(clipX==downwellPlayfieldX&&clipWidth==downwellPlayfieldWidth&&
+-            AmigaTerrainPainter::paintCached(terrainRaster.row(column,firstWorldY),renderer,
++            AmigaTerrainPainter::paintCached(terrainRaster.writeRows(column,firstWorldY,clipHeight),renderer,
+                 rooms,room,terrainCollision.index,terrainTiles,decorations,decorationCount,
+                 runtime,activeGamePack,activeGamePackEnd,viewX,viewY,clipY,clipHeight)){
+             transferTerrainRows(renderer,viewX,firstWorldY,clipY,clipHeight,false);
+-            for(int y=firstWorldY;y<finalWorldY;++y)terrainRaster.dirty(column,y)=false;
++            for(int y=firstWorldY;y<finalWorldY;++y)terrainRaster.setDirty(column,y,false);
+             return;
+         }
+ #endif
+@@ -1323,7 +1323,7 @@ static void drawMainWorldSpan(
+         transferTerrainRows(renderer, viewX, firstWorldY, clipY, clipHeight, true);
+         const int column = (viewX - mainViewX + 160) / 160;
+         for (int y = firstWorldY; y < finalWorldY; ++y)
+-            terrainRaster.dirty(column, y) = false;
++            terrainRaster.setDirty(column,y,false);
+     }
+ }
+ 
+@@ -1357,8 +1357,13 @@ static void prepareTerrainRaster(AmigaRenderer* renderer,
+         initialTerrain.rows()!=0&&initialTerrain.rows()==unsigned(lastY);
+     if(pristine)for(const auto& shop:runtime->shops().instances)if(shop.present)pristine=false;
+     if(pristine){
++#ifndef DOWNWELL_REFERENCE_INITIAL_RASTER_STORAGE
++        if(!terrainRaster.borrowInitial(initialTerrain)){terrainPaintSucceeded=false;return;}
++#endif
+         for(unsigned column=0;column<3;++column){
+-            if(!initialTerrain.copy(column,terrainRaster.row(column,0))){terrainPaintSucceeded=false;return;}
++#ifdef DOWNWELL_REFERENCE_INITIAL_RASTER_STORAGE
++            if(!initialTerrain.copy(column,terrainRaster.writeRows(column,0,lastY))){terrainPaintSucceeded=false;return;}
++#endif
+ #ifdef DOWNWELL_TERRAIN_BATCH_VERIFY
+             // Full native comparison against the retained painter, which also
+             // checks its own output against the scalar compositor in this build.
+@@ -1368,8 +1373,12 @@ static void prepareTerrainRaster(AmigaRenderer* renderer,
+                 bool equal=AmigaTerrainPainter::paintCached(oracle,renderer,rooms,room,terrainCollision.index,
+                     terrainTiles,decorations,decorationCount,runtime,activeGamePack,activeGamePackEnd,
+                     int(column)*160,y,0,height);
+-                for(int word=0;word<height*22&&equal;++word)
+-                    equal=oracle[word]==terrainRaster.row(column,y)[word];
++                for(int row=0;row<height&&equal;++row){
++                    UWORD scratch[22];
++                    const UWORD* actual=terrainRaster.readRow(column,y+row,scratch);
++                    for(int word=0;word<22&&equal;++word)
++                        equal=oracle[row*22+word]==actual[word];
++                }
+                 if(!equal){
+                     terrainPaintSucceeded=false;downwellTerrainBatchMismatch();return;
+                 }
+@@ -1390,7 +1399,7 @@ static void prepareTerrainRaster(AmigaRenderer* renderer,
+             // This shares runtime's exact compositor and its unsupported-art
+             // fallback; it neither publishes pixels nor advances game state.
+             const unsigned column=unsigned((x-mainViewX+160)/160);
+-            if(AmigaTerrainPainter::paintCached(terrainRaster.row(column,y),renderer,
++            if(AmigaTerrainPainter::paintCached(terrainRaster.writeRows(column,y,height),renderer,
+                 rooms,room,terrainCollision.index,terrainTiles,decorations,decorationCount,
+                 runtime,activeGamePack,activeGamePackEnd,x,y,0,height))continue;
+ #endif
+@@ -3142,8 +3151,8 @@ __attribute__((noinline)) static int runDownwell(void) {
+                 // Exercise cold staging, not just transfers from a fully
+                 // prepared raster. Production invalidation follows generation.
+                 for (unsigned y=0; y<terrainRasterRows; ++y) {
+-                    terrainRaster.dirty(0,y)=true;
+-                    terrainRaster.dirty(2,y)=true;
++                    terrainRaster.setDirty(0,y,true);
++                    terrainRaster.setDirty(2,y,true);
+                 }
+             }
+             if (!port.tick() && (!port.registerSideCameraLocker(385, 256) ||
+@@ -3380,11 +3389,13 @@ __attribute__((noinline)) static int runDownwell(void) {
+                     const unsigned column = (worldViewX - mainViewX + 160) / 160;
+                     for (unsigned y = 0; y < downwellDisplayHeight; ++y) {
+                         const unsigned physical = (port.ringOrigin() + y) % downwellGameRingHeight;
++                        UWORD scratch[22];
++                        const UWORD* cached=terrainRaster.readRow(column,worldViewY+y,scratch);
+                         for (unsigned plane = 0; plane < 2; ++plane) {
+                             const UWORD* displayed = (const UWORD*)((const UBYTE*)gameDisplay[back].data +
+                                 plane * downwellGameRingPlaneBytes + physical * downwellBytesPerPlaneLine + terrainRasterX / 8);
+                             for (unsigned word = 0; word < terrainRasterWords; ++word)
+-                                if (displayed[word] != terrainRaster.row(column, worldViewY + y)[plane * terrainRasterWords + word])
++                                if (displayed[word] != cached[plane * terrainRasterWords + word])
+                                     ++gDownwellTerrainRasterFailures;
+                         }
+                     }
+@@ -3542,7 +3553,7 @@ __attribute__((noinline)) static int runDownwell(void) {
+                                 downwellProfileTerrainSpan(targetX, first + top, height,
+                                     downwellPlayfieldX, downwellPlayfieldWidth, 1, 4);
+ #ifdef DOWNWELL_TERRAIN_DIRECT
+-                                if(AmigaTerrainPainter::paintCached(terrainRaster.row(column,first+top),
++                                if(AmigaTerrainPainter::paintCached(terrainRaster.writeRows(column,first+top,height),
+                                     &stage,rooms,mainRoom,terrainCollision.index,terrainTiles,
+                                     generatedDecorations,liveBuilder.decorationCount(),&port,
+                                     activeGamePack,activeGamePackEnd,targetX,first,top,height))
+diff --git a/tests/platform/amiga/AmigaTerrainRasterTest.cpp b/tests/platform/amiga/AmigaTerrainRasterTest.cpp
+index 9fb54021..100dd07a 100644
+--- a/tests/platform/amiga/AmigaTerrainRasterTest.cpp
++++ b/tests/platform/amiga/AmigaTerrainRasterTest.cpp
+@@ -18,12 +18,85 @@ void Bitmap::copy(const Bitmap& source,uint16_t x,uint16_t y,uint16_t sx,uint16_
+     }
+ }
+ int main() {
++    // A deliberately non-linear dictionary distinguishes row references from
++    // contiguous mutable storage, including transfers across the pack end.
++    {
++        constexpr unsigned initialRows=137, dictionaryRows=7;
++        std::vector<UBYTE> pack(12+initialRows*6+dictionaryRows*44);
++        std::memcpy(pack.data(),"DWIT",4);
++        auto put=[&](unsigned at,unsigned value){pack[at]=value>>8;pack[at+1]=value;};
++        put(4,1);put(6,initialRows);put(8,dictionaryRows);
++        for(unsigned c=0;c<3;++c)for(unsigned y=0;y<initialRows;++y)
++            put(12+(c*initialRows+y)*2,(y*3+c)%dictionaryRows);
++        for(unsigned r=0;r<dictionaryRows;++r)for(unsigned w=0;w<22;++w)
++            put(12+initialRows*6+r*44+w*2,0x1234+r*941+w*57);
++        AmigaInitialTerrain initial;
++        assert(initial.bind(pack.data(),pack.size()));
++        auto borrowed=std::make_unique<AmigaTerrainRaster>();
++        auto materialized=std::make_unique<AmigaTerrainRaster>();
++        for(unsigned c=0;c<3;++c){
++            std::fill_n(borrowed->writeRows(c,0,320),320*22,0xdead);
++            std::fill_n(materialized->writeRows(c,0,320),320*22,0xdead);
++            assert(initial.copy(c,materialized->writeRows(c,0,initialRows)));
++        }
++        assert(borrowed->borrowInitial(initial));
++        unsigned comparisons=0;
++        auto compare=[&](){
++            for(unsigned c=0;c<3;++c)for(unsigned origin : {0u,91u,319u})
++            for(unsigned height : {1u,96u,137u,284u}){
++                std::vector<UBYTE> a(downwellGameRingBytes,0xa5),b(a);
++                std::vector<UBYTE> displayA(downwellGameRingBytes,0x5a),displayB(displayA);
++                AmigaRenderer ra{},rb{};ra.game=a.data();rb.game=b.data();
++                ra.gameOrigin=rb.gameOrigin=origin;
++                AmigaGameplayRows da,db;
++                da.damage(origin,0,height);db.damage(origin,0,height);
++                Bitmap backingA(a.data(),380,320,2,false,false,384);
++                Bitmap backingB(b.data(),380,320,2,false,false,384);
++                Bitmap targetA(displayA.data(),380,320,2,false,false,384);
++                Bitmap targetB(displayB.data(),380,320,2,false,false,384);
++                borrowed->transfer(&ra,c,0,0,height,false,&targetA,&backingA,0,da);
++                materialized->transfer(&rb,c,0,0,height,false,&targetB,&backingB,0,db);
++                assert(a==b&&displayA==displayB);
++                for(unsigned y=0;y<320;++y)for(unsigned buffer=0;buffer<2;++buffer)
++                    assert(da.dirty(y,buffer)==db.dirty(y,buffer));
++                ++comparisons;
++            }
++        };
++        compare();
++        // Invalidation alone must not change backing pixels before repaint.
++        borrowed->invalidate(20,70);compare();
++        for(unsigned c=0;c<3;++c){
++            std::fill_n(borrowed->writeRows(c,31,37),37*22,0xbeef);
++            std::fill_n(materialized->writeRows(c,31,37),37*22,0xbeef);
++        }
++        compare();
++        // A Chip-to-cache replacement must retire every borrowed row it writes.
++        std::vector<UBYTE> chip(downwellGameRingBytes,0x5a);
++        AmigaRenderer source{};source.game=chip.data();source.gameOrigin=309;
++        AmigaGameplayRows debts;
++        for(unsigned c=0;c<3;++c){
++            borrowed->transfer(&source,c,81,0,40,true,nullptr,nullptr,0,debts);
++            materialized->transfer(&source,c,81,0,40,true,nullptr,nullptr,0,debts);
++        }
++        compare();
++        assert(borrowed->borrowInitial(initial));
++        for(unsigned c=0;c<3;++c){
++            assert(initial.copy(c,materialized->writeRows(c,0,initialRows)));
++            assert(borrowed->dirty(c,20)&&borrowed->dirty(c,69));
++            assert(!borrowed->dirty(c,70));
++            UWORD scratch[22],oracle[22];
++            for(unsigned y=0;y<initialRows;++y)
++                assert(!std::memcmp(borrowed->readRow(c,y,scratch),initial.row(c,y,oracle),44));
++        }
++        compare();
++        std::printf("Borrowed initial raster: %u exact transfers, replacement and reborrow lifecycle\n",comparisons);
++    }
+     auto raster=std::make_unique<AmigaTerrainRaster>();
+     unsigned cases=0;
+     unsigned partitions=0;
+     for(unsigned column=0;column<3;++column)for(unsigned mask=0;mask<256;++mask){
+-        for(unsigned y=0;y<8192;++y)raster->dirty(column,y)=false;
+-        for(unsigned y=0;y<284;++y)raster->dirty(column,7908+y)=((mask>>(y%8))&1)!=0;
++        for(unsigned y=0;y<8192;++y)raster->setDirty(column,y,false);
++        for(unsigned y=0;y<284;++y)raster->setDirty(column,7908+y,((mask>>(y%8))&1)!=0);
+         unsigned first=7908,painted=0,copied=0;
+         while(first<8192){
+             const bool dirty=raster->dirty(column,first);
+@@ -32,7 +105,7 @@ int main() {
+             for(unsigned y=first;y<end;++y){
+                 assert(raster->dirty(column,y)==dirty);
+                 // Simulate the compositor clearing a completed dirty run.
+-                raster->dirty(column,y)=false;
++                raster->setDirty(column,y,false);
+                 if(dirty)++painted;else ++copied;
+             }
+             first=end;
+@@ -54,7 +127,7 @@ int main() {
+         debts.damage(0,0,320);
+         for (unsigned y=0; y<48; ++y) {
+             const bool dirty = (mask >> (y%5)) & 1;
+-            raster->dirty(column,8000+y)=dirty;
++            raster->setDirty(column,8000+y,dirty);
+             expectedPainted += dirty;
+             for (unsigned p=0;p<2;++p) for (unsigned w=0;w<11;++w) {
+                 const UWORD old = UWORD(23*y+57*p+w+column);
+@@ -92,7 +165,7 @@ int main() {
+     }
+     AmigaRenderer failedStage{};
+     AmigaGameplayRows untouchedDebts;
+-    raster->dirty(0,100)=true;
++    raster->setDirty(0,100,true);
+     assert(raster->prepareStage(&failedStage,0,100,1,untouchedDebts,
+         [](unsigned,unsigned){return false;})==-1);
+     assert(raster->dirty(0,100));
+@@ -102,12 +175,12 @@ int main() {
+     downwell::ShopWorld shops{};
+     shops.instances[0].allocated=true;
+     for(int y : {-50, 0, 120, 8190, 8250}) {
+-        for(unsigned c=0;c<3;++c) for(unsigned r=0;r<8192;++r) raster->dirty(c,r)=false;
++        for(unsigned c=0;c<3;++c) for(unsigned r=0;r<8192;++r) raster->setDirty(c,r,false);
+         auto& shop=shops.instances[0]; shop.y=y; ++shop.artRevision;
+         raster->invalidateShops(shops);
+         for(unsigned c=0;c<3;++c) for(int r=0;r<8192;++r)
+             assert(raster->dirty(c,r)==(r>=y-21 && r<y+12));
+-        for(unsigned c=0;c<3;++c) for(unsigned r=0;r<8192;++r) raster->dirty(c,r)=false;
++        for(unsigned c=0;c<3;++c) for(unsigned r=0;r<8192;++r) raster->setDirty(c,r,false);
+         raster->invalidateShops(shops);
+         for(unsigned c=0;c<3;++c) for(unsigned r=0;r<8192;++r) assert(!raster->dirty(c,r));
+     }
