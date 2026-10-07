@@ -384,6 +384,10 @@ prefix, is 1.10 ms quiet, 1.87 ms in combat and 3.97 ms at 645.
 Add a dense-encounter tape before claiming the budget. Include the natural
 two-level horizontal shop tape (`profile.sh shop`), not only the contact
 tape, in subsequent audits. Repeat the audit after each lettered group lands.
+Particle-heavy natural coverage depends on the destruction/effect integration
+in §1: manually emitted smoke/debris fixtures or a bullet-only census do not
+prove that coverage. Keep the input-only seeded search's source/runtime parity
+checks enabled when selecting a tape.
 
 ### I. Other scenes
 

@@ -14,6 +14,7 @@
 #include "GameplayEncounterCoverage.h"
 #include <cmath>
 #include <cstdlib>
+#include <cstdio>
 #include <fstream>
 #include <iostream>
 #include <iterator>
@@ -478,6 +479,11 @@ void compareInitialGameplay(const AmigaPortRuntime& amiga,
                         "paired actor horizontal trajectory agrees across targets");
             requireNear(176 + native.preciseY / 256.0F, enemy.preciseY, 1.0F / 256,
                         "paired actor vertical trajectory agrees within Q8 projection error");
+            if(240 + native.x != enemy.x || 176 + native.y != enemy.y)
+                std::cerr<<"Actor pixel mismatch object="<<enemy.objectId<<" slot="<<native.identitySlot
+                    <<" native="<<240+native.x<<','<<176+native.y<<" host="<<enemy.x<<','<<enemy.y
+                    <<" precise="<<std::hexfloat<<240+native.preciseX/256.0F<<','<<176+native.preciseY/256.0F
+                    <<'/'<<enemy.preciseX<<','<<enemy.preciseY<<std::defaultfloat<<'\n';
             require(240 + native.x == enemy.x && 176 + native.y == enemy.y,
                     "paired actors publish identical pixel positions");
             if (enemy.objectId == 113 && enemy.active && !enemy.enemyStepEligible)
@@ -2425,6 +2431,21 @@ int main(int argc, char** argv) {
         require(rooms.valid()&&objects.valid()&&patterns.valid()&&rooms.findRoom(11,room),"contact profile resources");
         const bool encounterSearch=std::getenv("DOWNWELL_ENCOUNTER_PROFILE_SEARCH")!=nullptr;
         const bool search=encounterSearch||std::getenv("DOWNWELL_CONTACT_PROFILE_SEARCH")!=nullptr;
+        unsigned seedCount=1,seedFirst=2,routeFirst=0,routeEnd=64;
+        if(const char* count=std::getenv("DOWNWELL_ENCOUNTER_SEEDS")){
+            char* end=nullptr;const auto parsed=std::strtoul(count,&end,10);
+            require(encounterSearch&&end!=count&&!*end&&parsed>=1&&parsed<=64,
+                "encounter seed count must be 1..64 in encounter-search mode");
+            seedCount=static_cast<unsigned>(parsed);
+        }
+        if(const char* selected=std::getenv("DOWNWELL_ENCOUNTER_CASE")){
+            char trailing=0;
+            require(encounterSearch&&seedCount==1&&
+                std::sscanf(selected,"%u:%u%c",&seedFirst,&routeFirst,&trailing)==2&&
+                seedFirst>=1&&seedFirst<=65535&&routeFirst<64,
+                "encounter case must be seed:route (seed 1..65535, route 0..63), without a seed sweep");
+            routeEnd=routeFirst+1;
+        }
         struct TerrainBirthAudit {
             unsigned walls=0,platforms=0,other=0;
             bool birth(downwell::InstanceHandle,const downwell::GameplayTerrainInstances::Record& r){
@@ -2436,9 +2457,11 @@ int main(int argc, char** argv) {
             bool membership(downwell::InstanceHandle,const downwell::GameplayTerrainInstances::Record&,bool){return true;}
             unsigned total()const{return walls+platforms+other;}
         };
-        for(unsigned phase=search?0:downwell::gameplayContactProfilePhase;
-            phase<(encounterSearch?64u:search?10u:downwell::gameplayContactProfilePhase+1);++phase){
-            downwell::StartupRuntime host(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns);
+        for(unsigned seed=seedFirst;seed<seedFirst+seedCount;++seed)
+        for(unsigned phase=encounterSearch?routeFirst:search?0:downwell::gameplayContactProfilePhase;
+            phase<(encounterSearch?routeEnd:search?10u:downwell::gameplayContactProfilePhase+1);++phase){
+            if(encounterSearch)std::cout<<"Encounter case seed="<<seed<<" route="<<phase<<std::endl;
+            downwell::StartupRuntime host(downwell::PlatformProfile::nonDesktop,&rooms,&objects,seed,&patterns);
             host.skipToGameForTesting();
             TerrainBirthAudit births,worstBirths;unsigned worstBirthTick=0;
             downwell::GameplayTerrainInstances terrain(downwell::GameplayTerrainInstances::Binding::bind(births));
@@ -2531,7 +2554,8 @@ int main(int argc, char** argv) {
             }
             if(!search)require(currencyBirths&&currencyAdvances,"contact tape exercises currency birth and next animation");
             std::cout<<"Contact profile phase="<<phase<<" first_damage="<<firstDamage
-                <<" damage_frames="<<damageFrames<<" health="<<game.health()<<" y="<<176+game.player().offsetY()<<std::endl;
+                <<" damage_frames="<<damageFrames<<" health="<<game.health()<<" y="<<176+game.player().offsetY()
+                <<" seed="<<seed<<std::endl;
             coverage.report();
             std::cout<<"Contact terrain burst frame="<<worstBirthTick<<" walls="<<worstBirths.walls
                 <<" platforms="<<worstBirths.platforms<<" other="<<worstBirths.other<<std::endl;

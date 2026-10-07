@@ -442,13 +442,23 @@ For bounded, host-only input exploration:
 ```sh
 make verify-encounter-coverage
 DOWNWELL_ENCOUNTER_PROFILE_SEARCH=1 make verify-contact-profile
+DOWNWELL_ENCOUNTER_PROFILE_SEARCH=1 DOWNWELL_ENCOUNTER_SEEDS=16 make verify-contact-profile
+DOWNWELL_ENCOUNTER_PROFILE_SEARCH=1 DOWNWELL_ENCOUNTER_CASE=8:50 make verify-contact-profile
 ```
 
 This checks 64 routes of 1,800 updates, retaining the seed-2 entry checkpoint
 and comparing each update and all RNG words with the source-derived runtime.
 Only left/right/fire inputs vary. It reports candidate counts; it does not
 select or install a native profiling tape. The native wrapper clears both
-search variables before running its pinned contact gate.
+search variables before running its pinned contact gate, plus the seed/case
+selectors. `DOWNWELL_ENCOUNTER_SEEDS=1..64` repeats the 64 routes for consecutive
+ordinary startup seeds beginning at 2. Each seed fast-forwards the usual
+startup and imports its builder/RNG state before generation; it does not
+overwrite an existing level's RNG. `DOWNWELL_ENCOUNTER_CASE=seed:route` selects
+one seed (1..65535) and route (0..63), without a multi-seed sweep. The case is
+printed before simulation so failures can be reproduced without replaying
+earlier routes. Actor pixel mismatches report identity and both precise
+coordinates without relaxing any parity assertion.
 
 Damage phases are 75 (contact direction math), 76 (number construction),
 77 (number Step, including empty-owner calls) and 78 (native text drawing,

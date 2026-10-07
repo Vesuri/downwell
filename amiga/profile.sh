@@ -132,7 +132,8 @@ if [[ ${PROFILE_ENTRY:-0} == 1 ]]; then
   make -C .. verify-entry-profile-input
 fi
 if [[ ${PROFILE_CONTACT:-0} == 1 ]]; then
-  env -u DOWNWELL_CONTACT_PROFILE_SEARCH -u DOWNWELL_ENCOUNTER_PROFILE_SEARCH make -C .. verify-contact-profile
+  env -u DOWNWELL_CONTACT_PROFILE_SEARCH -u DOWNWELL_ENCOUNTER_PROFILE_SEARCH \
+    -u DOWNWELL_ENCOUNTER_SEEDS -u DOWNWELL_ENCOUNTER_CASE make -C .. verify-contact-profile
 fi
 trap restore EXIT
 make clean
