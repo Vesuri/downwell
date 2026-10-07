@@ -129,6 +129,23 @@ derivation about 3.9). Currency/smoke composition is 13.88 ms, including
 - Draw collection: 4.25 ms; `drawMainWorldSpan`: 7.97, including 6.37 in
   cached terrain painting.
 
+The 3.59 ms enemy configuration is not a 3.59 ms registry insertion. Its
+lifecycle callback accounts for 3.07 ms; within native birth, layer attachment
+is 1.805 ms, room membership 0.245 ms and native-table insertion 0.244 ms.
+Across the entire frame, actor layer births total 3.020 ms: 1.805 for the
+enemy and 1.215 for a bullet. Of that total, lifetime adoption is only
+0.221 ms; room-fallback attachment accounts for 1.957 ms. These nested
+figures must not be added together. Removing just the table insertion or
+duplicated lifetime record cannot deliver a threshold-sized saving.
+
+Event-cell time also includes the original box Create random program:
+`GeneratedBreakableCreate::evaluate` spends 3.530 ms in `irandomSmall`,
+2.115 ms in `chooseIndexSmall` and 0.329 ms in its own work at 844.
+At 701 these figures are 1.625, 0.976 and 0.152 ms. This is distinct from
+the 3.63 ms native breakable ownership cost above. Replacing ownership does
+not remove these draws or their arithmetic. All figures in this breakdown
+come from the supplied `36d8a0f2` folded stacks, not a new current-build run.
+
 ## Typical frames
 
 **Quiet, camera at the level bottom (26.3 ms; 1301–1338).**
