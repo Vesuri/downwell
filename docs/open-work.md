@@ -199,11 +199,11 @@ Target <=20 ms frames during active gameplay and smooth style/upgrade navigation
 Scene handoffs are not gameplay frames: judge them by total transition latency
 and visible stalls, not a 20 ms per-frame limit. Average gameplay FPS alone is
 not the criterion. The [frame-cost audit](amiga-frame-cost.md)
-measures `36d8a0f2` on the contact tape: 2,950 PAL fields. Quiet frames take
-26.3 ms, combat 67.3 ms and time-field frames 35.7 ms. The worst frames are
-701 (104.2 ms: generation on top of combat), 646 (100.6 ms: the contact damage
-number's first step), 645 (93.6 ms: contact), 660 (90.2 ms: gem counter and
-streak change) and 844 (87.9 ms: generation). Menu scenes
+measures `7deed269` on the contact tape: 2,792 PAL fields. Quiet frames take
+26.5 ms, combat 53.1 ms and time-field frames 35.8 ms. Budget frames are
+701 (91.1 ms: generation on top of combat), 646 (76.4 ms: the contact damage
+number's first step), 645 (89.6 ms: contact), 660 (53.9 ms: gem counter and
+streak change) and 844 (87.0 ms: generation). Menu scenes
 (`profile.sh transition`) peak at two fields; measure the cold gameplay
 handoff separately with `profile.sh entry`.
 
@@ -264,21 +264,22 @@ gauge) and left ten opt-in flags behind. Do not repeat that.
 
 ### A. Generation bursts (frames 701 and 844)
 
-`generateLiveTerrain` costs 40.79 ms at 701 and 36.93 ms at 844. A whole
+`generateLiveTerrain` costs 40.84 ms at 701 and 35.62 ms at 844. A whole
 builder pattern is emitted synchronously, as in the original; the draws and
 creations must stay in that order. Further changes must remove remaining
 publication or Create machinery, not reorder those effects.
 
 **Remaining budget shortfall, not another encoding sweep.** Generation at
-701 still exceeds the 30 ms target. Event cells take 18.07 ms and prepared
-terrain publication 14.00 ms (nested within generation). At 844 these are
-22.17 and 6.87 ms. The next generation attempt must eliminate a named
+701 still exceeds the 30 ms target. Event cells take 17.00 ms and prepared
+terrain publication 13.92 ms (nested within generation). At 844 these are
+19.81 and 6.87 ms. The next generation attempt must eliminate a named
 remaining structure, not retune the prepared row program or its helpers.
 
    - Further actor/time-field publication work must replace shared ownership
      as a whole; individual lifetime helpers are below the work threshold.
      Do not retune the generated-box command path. One enemy configuration
-     at 844 costs 3.59 ms. Establish the removable structure and saving
+     at 844 costs 3.76 ms, including 3.23 ms in lifecycle publication.
+     Establish the removable structure and saving
      before changing it; charge mutation costs in the affected-frame gate.
      Do not tune `nextU32`, constructors or small choice helpers individually.
    - Fixed-terrain publication remains a shortfall, but both immutable-row
@@ -294,7 +295,7 @@ remaining structure, not retune the prepared row program or its helpers.
      dirty rows, RNG interleaving and the optional pillar tail exact.
    - Recheck full-state/ownership replay and native terrain pixel oracles.
      `REFERENCE_PATTERNS=1` selects the retained cell interpreter.
-   - Native breakables cost 1,984 cycles per creation at 844 (thirteen, 3.63
+   - Native breakables cost about 2,058 cycles per creation at 844 (thirteen, 3.77
      ms), still above 1,500. Do not tune individual writes or copy loops for
      this threshold. Keep `REFERENCE_BREAKABLES=1` as the oracle, including
      room re-entry and failure prefixes. See the
@@ -302,9 +303,9 @@ remaining structure, not retune the prepared row program or its helpers.
 
 ### B. Contact damage number (frames 645 and 646)
 
-The remaining contact-pair damage-number work is about 11 ms, above its
-10 ms target. At 645, creation costs 5.53 ms, including 2.67 ms in the
-retained post-difference direction calculation. At 646, first Step costs about 5.8 ms, including
+The remaining contact-pair damage-number work is 10.84 ms, above its
+10 ms target. At 645, creation costs 5.29 ms. The retained post-difference
+direction calculation is below 3 ms. At 646, first Step costs 5.55 ms, including
 3.39 ms in the certified motion decoder and wrappers. Subsequent motion and
 damping cost about 2.1 ms per frame; leave their individual helpers alone.
 Preserve bit-identical direction, speed and positions and keep frame 646
@@ -330,10 +331,9 @@ cases separately from eligible gem-only frames before another compositor
 attempt. Use the effect-coverage census described in the profiling procedure
 to establish that the chosen window actually exercises each proposed path;
 producer-phase timings alone do not prove smoke/debris or raster coverage.
-The supplied audit's raster preparation/publication costs were
-5.97/3.02 ms in combat (10.4/6.6 at 660). Draw collection costs 4.49 ms and
-row synchronization 4.33 ms in that baseline; remeasure their remaining work
-after hardware promotion before choosing the next structure.
+Current combat draw collection costs 4.48 ms and row synchronization 1.50 ms.
+The supplied baseline's raster preparation/publication costs no longer describe
+this hardware-gem-only workload; do not use them to justify fallback changes.
 Review the complete producer/compositor/consumer path, preserving source
 painter order, opaque-black replacement and shade subtraction. The two
 rejected effect approaches remain closed: a new proposal must remove their
@@ -376,7 +376,7 @@ counter dispatch. The rejected borrowed Step snapshot and generic temporary
 alarm-array layouts remain closed. Any remaining effect-alarm proposal must
 first meet the work threshold in a workload that actually exercises it.
 
-Target: quiet frames under 22 ms; current mean is 26.3 ms. Player and walking
+Target: quiet frames under 22 ms; current mean is 26.5 ms. Player and walking
 enemy motion cost about 5.6 ms together, but each is under 3 ms in this window.
 Leave their individual helpers alone. A quiet-frame proposal needs a shared
 work structure to remove, measured across its callers, not a collection of
