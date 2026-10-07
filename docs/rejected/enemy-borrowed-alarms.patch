@@ -1,0 +1,281 @@
+diff --git a/Makefile b/Makefile
+index 8b0ddbf3..738b9791 100644
+--- a/Makefile
++++ b/Makefile
+@@ -44,6 +44,9 @@ endif
+ ifeq ($(REFERENCE_CONTACT_MOTION),1)
+ CXXFLAGS += -DDOWNWELL_REFERENCE_CONTACT_MOTION
+ endif
++ifeq ($(REFERENCE_ENEMY_ALARMS),1)
++CXXFLAGS += -DDOWNWELL_REFERENCE_ENEMY_ALARMS
++endif
+ LDFLAGS  := $(SDL_LDFLAGS)
+ 
+ SOURCES := \
+diff --git a/amiga/Makefile b/amiga/Makefile
+index e227d166..768c48d1 100644
+--- a/amiga/Makefile
++++ b/amiga/Makefile
+@@ -45,6 +45,7 @@ REFERENCE_EMPTY_TERRAIN ?= 0
+ REFERENCE_ROOM_TERRAIN ?= 0
+ REFERENCE_INITIAL_TERRAIN ?= 0
+ REFERENCE_BOX_ALARMS ?= 0
++REFERENCE_ENEMY_ALARMS ?= 0
+ REFERENCE_HUD_TEXT ?= 0
+ REFERENCE_CONTACT_MOTION ?= 0
+ TABLE_CONTACT_ATAN ?= 1
+@@ -259,6 +260,9 @@ endif
+ ifeq ($(REFERENCE_BOX_ALARMS),1)
+ CFLAGS += -DDOWNWELL_REFERENCE_BOX_ALARMS
+ endif
++ifeq ($(REFERENCE_ENEMY_ALARMS),1)
++CFLAGS += -DDOWNWELL_REFERENCE_ENEMY_ALARMS
++endif
+ ifeq ($(REFERENCE_HUD_TEXT),1)
+ CFLAGS += -DDOWNWELL_REFERENCE_HUD_TEXT
+ endif
+@@ -463,6 +467,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
+ 	@printf '%s\n' '$(REFERENCE_ROOM_TERRAIN)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_INITIAL_TERRAIN)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_BOX_ALARMS)' >> $@.tmp
++	@printf '%s\n' '$(REFERENCE_ENEMY_ALARMS)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_HUD_TEXT)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_CONTACT_MOTION)' >> $@.tmp
+ 	@printf '%s\n' '$(DRAW_ORDER_AUDIT)' >> $@.tmp
+diff --git a/amiga/profile.sh b/amiga/profile.sh
+index 4b2bf1a2..36c36131 100644
+--- a/amiga/profile.sh
++++ b/amiga/profile.sh
+@@ -111,6 +111,7 @@ restore() {
+   unset REFERENCE_ROOM_TERRAIN
+   unset REFERENCE_INITIAL_TERRAIN
+   unset REFERENCE_BOX_ALARMS
++  unset REFERENCE_ENEMY_ALARMS
+   unset REFERENCE_HUD_TEXT
+   unset REFERENCE_CONTACT_MOTION
+   unset DRAW_CACHE_AUDIT
+diff --git a/docs/open-work.md b/docs/open-work.md
+index a01cd6e6..6bc32a1a 100644
+--- a/docs/open-work.md
++++ b/docs/open-work.md
+@@ -343,19 +343,17 @@ composition or derive publication directly from prepared digit transitions.
+ 
+ ### E. Quiet-frame and alarm shortfalls
+ 
+-Native boxes no longer enter the captured alarm array: their Alarm 0 runs
+-from the append-only box prefix. Enemy and effect alarm capture remains. Its
+-two structural attempts are in the
+-[rejection table](amiga-frame-cost.md#rejected-approaches); a further
+-proposal must remove the remaining capture the same way, for one family at a
+-time, rather than change the temporary array layout.
+-
+-Target: quiet frames under 22 ms; current mean is 26.3 ms. Player and walking
++Remaining effect alarm capture/dispatch is below the 3 ms work threshold;
++leave its individual helpers alone. Preserve the borrowed enemy ordering and
++box prefix, live lifetime/eligibility checks and source event order, with
++`REFERENCE_ENEMY_ALARMS=1` and `REFERENCE_BOX_ALARMS=1` as oracles.
++
++Target: quiet frames under 22 ms; current mean is about 26.4 ms. Player and walking
+ enemy motion cost about 5.6 ms together, but each is under 3 ms in this window.
+ Leave their individual helpers alone. A quiet-frame proposal needs a shared
+ work structure to remove, measured across its callers, not a collection of
+-unrelated sub-millisecond edits. Captured alarm dispatch, including the box
+-prefix, is 1.10 ms quiet, 1.87 ms in combat and 3.97 ms at 645.
++unrelated sub-millisecond edits. Alarm dispatch including the borrowed capture
++and box prefix is about 2.45 ms at 645.
+ 
+ ### F. Parked until A–E are done
+ 
+diff --git a/docs/runner-alarms.md b/docs/runner-alarms.md
+index 4c8619db..3111972c 100644
+--- a/docs/runner-alarms.md
++++ b/docs/runner-alarms.md
+@@ -140,6 +140,26 @@ boxes marked for destruction are skipped, as the snapshot would have done.
+ the oracle. `make verify-gameplay-collision-owner` checks the prefix against
+ newborn, destroyed and replacement boxes, and armed boxes beside idle ones.
+ 
++Native enemy alarms borrow `GameplayWorld`'s cached Step ordering, captured
++at the alarm boundary. This removes the second enemy handle capture; it does
++not borrow the compact enemy record array, which can move on retirement.
++Each entry still holds its original identity slot and generation. The merge
++visits enemy entries at their captured resource-ID position among the other
++families, with boxes at object 92, for each alarm index. It reads live flags
++and event-presence metadata before the existing typed countdown adapter.
++That adapter resolves the live lifetime and handles inactive/destruction
++marks and negative counters. Its indices above 1 are unchanged no-ops (this
++does not claim the original game lacks those events).
++
++The borrow lasts only through the bound combat alarm callback. None of its
++implemented enemy, box, debris, time-change, drone or entry-dither handlers
++starts another Step or captures enemy Step order. Birth/retirement invalidates
++the revision without overwriting this snapshot; the later Step capture can
++then refresh it. Arbitrary caller-owned `dispatchAlarmPhase` callbacks retain
++the generic snapshot. `REFERENCE_ENEMY_ALARMS=1` retains the room capture on
++both targets. The alarm fixtures compare all three ownership modes, counter
++rearming, frog chaining, slot reuse/compaction and every RNG state word.
++
+ ## Skeleton consequence
+ 
+ Its Alarm 2 sets Alarm 3 to 15. Alarm 3 is then decremented to 14 in the same
+diff --git a/src/core/GameplayCollisionOwner.h b/src/core/GameplayCollisionOwner.h
+index cdffd98a..f9af80a8 100644
+--- a/src/core/GameplayCollisionOwner.h
++++ b/src/core/GameplayCollisionOwner.h
+@@ -61,6 +61,13 @@ private:
+     unsigned combatAlarmMask_=0;
+     bool combatAlarmCaptureValid_=false;
+     bool nativeBoxAlarmPrefix_=false;
++    bool borrowedEnemyAlarms()const {
++#ifdef DOWNWELL_REFERENCE_ENEMY_ALARMS
++        return false;
++#else
++        return native_;
++#endif
++    }
+ #ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+     RunnerRoomMembership<View::capacity> room_;
+ #else
+@@ -715,7 +722,7 @@ public:
+     bool serviceSpatialIndex(unsigned budget){return check(owner_.serviceSpatialIndex(budget));}
+     bool attach(GameplayWorld& world){
+         combatAlarmCaptureValid_=false;
+-        if(!(native_?table_.watchCaptureRanges(View::enemyBase,nativeBoxAlarmPrefix_?View::breakableBase:View::terrainBase,View::debrisBase,View::capacity,combatAlarmCaptureDirty_):
++        if(!(native_?table_.watchCaptureRanges(borrowedEnemyAlarms()?View::breakableBase:View::enemyBase,nativeBoxAlarmPrefix_?View::breakableBase:View::terrainBase,View::debrisBase,View::capacity,combatAlarmCaptureDirty_):
+             owner_.watchCaptureRanges(View::enemyBase,View::terrainBase,View::debrisBase,View::capacity,combatAlarmCaptureDirty_)))
+             return check(false);
+         if(!valid()||(world_&&world_!=&world)||(!world_&&
+@@ -989,6 +996,8 @@ public:
+             if(!self.valid())return false;
+             auto& phase=self.combatAlarmPhase_;
+             const auto boxes=self.nativeBoxAlarmPrefix_?self.world_->captureBoxAlarms():GameplayWorld::BoxAlarmPrefix{};
++            const auto* enemies=self.borrowedEnemyAlarms()?self.world_->captureEnemyAlarmOrder():nullptr;
++            if(self.borrowedEnemyAlarms()&&!enemies)return self.check(false);
+             const bool reused=self.combatAlarmCaptureValid_&&!self.combatAlarmCaptureDirty_;
+             if(!reused){
+                 phase.clear();
+@@ -997,7 +1006,7 @@ public:
+                 };
+                 // Only implemented families are admitted. Avoid scanning every
+                 // terrain record for this partial combat alarm traversal.
+-                if(!self.check(self.visitRegistered(View::enemyBase,self.nativeBoxAlarmPrefix_?View::breakableBase:View::terrainBase,capture)&&
++                if(!self.check(self.visitRegistered(enemies?View::breakableBase:View::enemyBase,self.nativeBoxAlarmPrefix_?View::breakableBase:View::terrainBase,capture)&&
+                     self.visitRegistered(View::debrisBase,View::capacity,capture)))return false;
+                 // Save before callbacks: mutation during dispatch invalidates
+                 // reuse next tick without changing this phase's captured set.
+@@ -1012,7 +1021,7 @@ public:
+                     kind==View::Kind::timeChange?self.world_->advanceTimeChangeRoomAlarm(local,alarm):
+                     kind==View::Kind::drone?(alarm==0&&self.drones_.advanceAlarm(local)):
+                     kind==View::Kind::entryDither&&self.entries_.advanceAlarm(local,alarm);
+-            },reused,&self.combatAlarmMask_,boxes);
++            },reused,&self.combatAlarmMask_,boxes,enemies);
+         },this);
+         world.configureDebrisStepOrder([](void* context,GameplayWorld::DebrisStepOrder& phase){
+             auto& self=*static_cast<GameplayCollisionOwner*>(context);
+@@ -1105,7 +1114,8 @@ private:
+     }
+     template<bool SkipInactive=false,unsigned Capacity,class AdvanceAndDispatch>
+     bool dispatchCapturedAlarms(RunnerStepSnapshot<Capacity>& snapshot,AdvanceAndDispatch advanceAndDispatch,
+-        bool alreadySorted=false,unsigned* retainedMask=nullptr,GameplayWorld::BoxAlarmPrefix boxes={}){
++        bool alreadySorted=false,unsigned* retainedMask=nullptr,GameplayWorld::BoxAlarmPrefix boxes={},
++        const GameplayWorld::EnemyStepOrder* enemies=nullptr){
+         DW_PROFILE_SCOPE(profileAlarmScan);
+         if(!alreadySorted){DW_PROFILE_SCOPE(profileAlarmSort);snapshot.sort();}
+         const unsigned count=snapshot.size();
+@@ -1130,11 +1140,32 @@ private:
+         }
+         for(unsigned alarm=0;alarm<AlarmBank::count;++alarm){
+           bool boxesPending=alarm==0&&boxes.end;
+-          if(!boxesPending&&!(capturedAlarms&(1u<<alarm))&&bindingsUnchanged(bindingRevision))continue;
++          // The typed enemy implementation owns Alarm 0/1 only; its other
++          // indices are no-ops. Preserve live metadata for those two events.
++          const unsigned enemyEnd=enemies&&alarm<2?enemies->size():0;
++          unsigned enemyIndex=0;
++          auto advanceEnemies=[&](int through){
++            for(;enemyIndex<enemyEnd&&enemies->object(enemyIndex)<=through;++enemyIndex){
++                if(boxesPending&&enemies->object(enemyIndex)>92){
++                    if(!check(world_->advanceBoxAlarmPrefix(boxes)))return false;
++                    boxesPending=false;
++                }
++                const auto local=enemies->handle(enemyIndex);
++                const InstanceHandle h{local.slot+View::enemyBase,local.generation};
++                std::uint32_t flags;
++                if(!eligibilityFlags(h,flags)||(flags&0x100003u))continue;
++                unsigned mask;
++                if(!check(alarmMetadata_.mask(objectOf(h),mask)))return false;
++                if((mask&(1u<<alarm))&&(!check(world_->advanceEnemyRoomAlarm(local,alarm))||!valid()))return false;
++            }
++            return true;
++          };
++          if(!boxesPending&&!enemyEnd&&!(capturedAlarms&(1u<<alarm))&&bindingsUnchanged(bindingRevision))continue;
+           int cachedObject=-1;unsigned alarmMask=0;
+           PackedObjectEvent event;bool eventCached=false,eventFound=false;
+           unsigned groupEnd=0;
+           for(unsigned i=0;i<count;++i){
++            if(!advanceEnemies(snapshot.object(i)))return false;
+             // Resource order, not layer or compact-array order. The native
+             // box family is the sole object-92 owner in this combat phase.
+             if(boxesPending&&snapshot.object(i)>92){
+@@ -1192,6 +1223,7 @@ private:
+             {DW_PROFILE_SCOPE(profileAlarmCallback);
+                 if(!check(advanceAndDispatch(h,alarm,event))||!valid())return false;}
+           }
++          if(!advanceEnemies(0x7fffffff))return false;
+           if(boxesPending&&!check(world_->advanceBoxAlarmPrefix(boxes)))return false;
+         }
+         return true;
+diff --git a/src/core/GameplayWorld.h b/src/core/GameplayWorld.h
+index f22d6b51..42098bba 100644
+--- a/src/core/GameplayWorld.h
++++ b/src/core/GameplayWorld.h
+@@ -493,6 +493,11 @@ public:
+         return run_.effectsSucceeded&&generationSucceeded_;
+     }
+     using EnemyStepOrder=downwell::RunnerStepSnapshot<enemyCapacity>;
++    // Borrow only through the room alarm phase. Its callbacks do not start
++    // another Step; later Step capture may replace this cached ordering.
++    const EnemyStepOrder* captureEnemyAlarmOrder() {
++        return captureEnemyStepOrder() ? &enemyStepOrder_ : nullptr;
++    }
+     // Optional revision covers capture membership, registration order, object
+     // identity and exclusions. UINT32_MAX disables reuse (including saturation).
+     // Dispatch still resolves current lifetimes/flags; this retains only order.
+diff --git a/tests/core/GameplayCollisionOwnerTest.cpp b/tests/core/GameplayCollisionOwnerTest.cpp
+index b309d816..f54efe74 100644
+--- a/tests/core/GameplayCollisionOwnerTest.cpp
++++ b/tests/core/GameplayCollisionOwnerTest.cpp
+@@ -2484,11 +2484,15 @@ int main(){
+         assert(rooms.roomInstance(room,0,r));r.scaleX=2;
+         assert(!terrain->appendRoom(r)&&!terrain->valid()&&terrain->size()==0);
+     }
++    for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
++                       GameplayCollisionOwner::Ownership::nativeScenery})
+     for(int initial:{(-2147483647-1),-2,-1,0,1,2}){
+         // Compare the bound pending-counter path with the original unfiltered
+         // captured traversal. Negative values must remain untouched; zero
+         // still retires, and positive counters retain countdown/RNG order.
+-        auto optimized=std::make_unique<GameplayCollisionOwner>(objects,sprites);
++        auto optimized=std::make_unique<GameplayCollisionOwner>(objects,sprites,
++            GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},
++            ownership==GameplayCollisionOwner::Ownership::nativeScenery?&rooms:nullptr,ownership);
+         auto reference=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+         auto a=std::make_unique<GameplayWorld>(300,true,0,false,optimized->enemyBinding(),
+             optimized->breakableBinding(),optimized->playerBinding(),&optimized->terrain());
+@@ -2525,6 +2529,18 @@ int main(){
+                 enemy.alarm1=1;
+                 const_cast<GameplayWorld::Breakable*>(world->findBreakable({0,1}))->alarm0=0;
+             }
++            if(tick==12)for(auto* world:{a.get(),b.get()}){
++                // Compact the record array and reuse its identity slot. The
++                // borrowed order must refresh, not address a shifted record
++                // or give the replacement the retired registration position.
++                const auto& old=world->enemyAt(0);
++                const InstanceHandle key{old.identitySlot,old.lifetimeId};
++                assert(world->markEnemyDestroyed(key)&&world->retireMarkedEnemy(key));
++                PackedObject metadata;assert(objects.findObject(112,metadata));
++                assert(world->configureEnemy(world->enemyCount(),112,metadata.spriteId,48,128,
++                    0,0,5,14,0,1,-1,1,0,0,true,true,true));
++                assert(!world->resolveEnemyLifetime(key));
++            }
+             a->step(0);b->step(0);
+             assert(a->effectsSucceeded()&&b->effectsSucceeded()&&optimized->valid()&&reference->valid());
+             assert(a->enemyCount()==b->enemyCount());
