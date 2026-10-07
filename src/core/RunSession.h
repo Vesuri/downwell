@@ -143,7 +143,7 @@ struct RunSession {
         const auto px = coordinate(playerX, originX), py = coordinate(playerY, originY);
         auto cx = MotionBinary64::fromInteger(callerX), cy = MotionBinary64::fromInteger(callerY);
         MotionBinary64 direction;
-        bool directed;
+        bool directed,tableDirection=false;
         {
             DW_PROFILE_SCOPE(profileContactDirection);
             directed=cx.add(MotionBinary64::fromInteger(originX)) &&
@@ -161,7 +161,13 @@ struct RunSession {
 #elif defined(DOWNWELL_PORTABLE_CONTACT_ATAN)
                     portableAtan
 #else
-                    tableAtan
+                    [&](MotionBinary64 dy,MotionBinary64 dx,MotionBinary64& result){
+#ifdef DOWNWELL_COMPARE_CONTACT_ATAN
+                        if(referenceContactAtan)return portableAtan(dy,dx,result);
+#endif
+                        tableDirection=tableAtanCandidate(dy,dx,result);
+                        return tableDirection||portableAtan(dy,dx,result);
+                    }
 #endif
                 );
         }
@@ -169,7 +175,9 @@ struct RunSession {
             effectsSucceeded = false;
             return false;
         }
-        return createDamageNumber(px,py,MotionBinary64::fromInteger(1),direction) != 0;
+        const auto child=createDamageNumber(px,py,MotionBinary64::fromInteger(1),direction);
+        if(child&&tableDirection)damageNumbers.get(child)->certifyTableContact();
+        return child!=0;
     }
     template<class LengthdirX> bool stepDamageNumbers(PlayerDamageNumbers<8>::Phase phase,LengthdirX lengthdirX){
         DamageNumberHooks hooks;
@@ -178,12 +186,20 @@ struct RunSession {
     }
     bool stepDamageNumbers(PlayerDamageNumbers<8>::Phase phase){
         DW_PROFILE_SCOPE(profileDamageNumberStep);
-        return stepDamageNumbers(phase,[](MotionBinary64 speed,MotionBinary64 direction,MotionBinary64& x){
+        DamageNumberHooks hooks;
+        if(effectsSucceeded)effectsSucceeded=damageNumbers.step(phase,[](MotionBinary64 speed,MotionBinary64 direction,MotionBinary64& x){
             RunnerImageValue length,angle,radian;
             MotionBinary64 cosine;
             return length.assign(speed)&&angle.assign(direction)&&SmokeDirection::radians(angle,radian)&&
                 smokeCosine(radian.promoted(),cosine)&&SmokeDirection::component(length,cosine,false,x);
-        });
+        },hooks,
+#ifdef DOWNWELL_REFERENCE_CONTACT_MOTION
+            false
+#else
+            true
+#endif
+        );
+        return effectsSucceeded;
     }
     void clearDamageNumbers(){DamageNumberHooks hooks;damageNumbers.clear(hooks);}
     // This effect has no source collision events or external membership in the

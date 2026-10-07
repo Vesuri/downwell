@@ -291,25 +291,21 @@ remaining structure, not retune the prepared row program or its helpers.
 
 ### B. Contact damage number (frames 645 and 646)
 
-A damaging contact costs about 36 ms of damage-number arithmetic over two
-frames. At 645, `contactDamageNumber` is 7.97 ms, of which
-`RunnerPointDirection::evaluate` is 4.20 (binary64 around the table atan).
-At 646, the number's first Step evaluates `lengthdir_x(2, direction)`
-through the recovered SSE cosine program: one call, 166,748 cycles
-(23.47 ms), made of 26 binary64 multiplies at 3,461 cycles and 33 additions
-at 2,185. Each later frame spends about 2.1 ms in the number's binary64 motion
-and damping. Target: 646 under 80 ms and the contact pair's damage-number work
-under 10 ms, with bit-identical direction, speed and positions.
+The remaining contact-pair damage-number work is about 14 ms, above its
+10 ms target. At 645, creation costs 8.30 ms, including 4.25 ms in
+`RunnerPointDirection::evaluate`. At 646, first Step costs 5.64 ms, including
+3.39 ms in the certified motion decoder and wrappers. Subsequent motion and
+damping cost about 2.1 ms per frame; leave their individual helpers alone.
+Preserve bit-identical direction, speed and positions and keep frame 646
+under 80 ms while removing remaining threshold-sized computations.
 
-- First establish the input domain of the direction and cosine for this
-  call site from the source: what values a contact can produce. Then remove
-  the evaluation that domain makes redundant, for example by an offline table
-  of exact results generated from the portable program, or by evaluating
-  direction and cosine once in the form the Step consumes. Do not substitute
-  trigonometric identities or reduced-precision arithmetic.
-- Keep the portable cosine program as the oracle and verify every admitted
-  input against it on the host; keep a reference selector for native pixel
-  and replay comparison.
+- Keep the [finite-domain certificate](runner-point-direction.md#lossless-contact-motion-representation)
+  and portable cosine oracle. `REFERENCE_CONTACT_MOTION=1` selects the retained
+  first-Step program. Mutated, arbitrary and fallback directions must not be
+  silently admitted to the certified domain.
+- A further change must remove a named remaining computation across the
+  contact adapter/first Step, not tune sub-millisecond decoder or arithmetic
+  helpers. Do not substitute trigonometric identities or reduced precision.
 - A faster generic binary64 multiply is a helper substitution, not this item.
 
 ### C. Combat composition shortfall
@@ -444,6 +440,10 @@ Reference: [scene architecture](scene-architecture.md).
 
 ## 8. Broaden end-to-end verification
 
+- Restore the damage-number shared-world capacity-failure/reset regression:
+  `StartupRuntime::reset` must recover a session after number capacity is
+  exhausted. The committed reference also fails this assertion; do not weaken
+  the failure/reset expectation to make the test pass.
 - Isolate the unexplained native main-replay digest mismatch seen without
   per-frame tracing. Spatial/effect subtests matched; adding per-frame capture
   made two subsequent builds pass. Passing traced builds do not establish the

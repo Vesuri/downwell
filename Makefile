@@ -41,6 +41,9 @@ endif
 ifeq ($(REFERENCE_GEM_POSITION),1)
 CXXFLAGS += -DDOWNWELL_REFERENCE_GEM_POSITION
 endif
+ifeq ($(REFERENCE_CONTACT_MOTION),1)
+CXXFLAGS += -DDOWNWELL_REFERENCE_CONTACT_MOTION
+endif
 LDFLAGS  := $(SDL_LDFLAGS)
 
 SOURCES := \
@@ -565,7 +568,27 @@ verify-smoke-trig: build/smoke-trig-test
 	python3 tools/export-smoke-trig.py --check
 	./build/smoke-trig-test
 
-$(OBJECTS) $(TEST_TARGETS) $(PORT_REPLAY_REFERENCE_TARGET): generated/smoke-trig.inc generated/atan-q16.inc
+$(OBJECTS) $(TEST_TARGETS) $(PORT_REPLAY_REFERENCE_TARGET): generated/smoke-trig.inc generated/atan-q16.inc generated/contact-motion.inc
+
+build/generate-contact-motion: tools/generate-contact-motion.cpp src/core/ContactMotionCodec.h src/core/RunnerPointDirection.h src/core/SmokeDirection.h src/core/SmokeTrig.h src/core/MotionBinary64.h src/core/MultiplyBinary64.h src/core/RunnerImageValue.h generated/smoke-trig.inc generated/atan-q16.inc
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -o $@ $<
+
+generated/contact-motion.inc: build/generate-contact-motion tools/generate-contact-motion.py
+	python3 tools/generate-contact-motion.py
+
+# Header-only core tests also need the generated include on a clean parallel
+# build. The generator does not include ContactMotion.h, so this is acyclic.
+src/core/ContactMotion.h: | generated/contact-motion.inc
+
+build/contact-motion-test: tests/core/ContactMotionTest.cpp $(wildcard src/core/*.h) generated/contact-motion.inc
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -Isrc -o $@ $<
+.PHONY: verify-contact-motion
+verify-contact-motion: build/contact-motion-test
+	./build/contact-motion-test
+test: verify-contact-motion
+build/player-damage-number-test build/player-damage-numbers-test build/damage-number-worlds-test: generated/contact-motion.inc
 
 generated/smoke-trig.inc: tools/export-smoke-trig.py data/Downwell.exe
 	python3 tools/export-smoke-trig.py

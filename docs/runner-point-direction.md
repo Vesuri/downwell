@@ -125,6 +125,31 @@ not covered by this finite superset and must retain the portable path unless
 separately proven. A table indexed by rounded integer degrees would change
 the current direction, velocity and subsequent position writes.
 
+### Lossless contact-motion representation
+
+`tools/generate-contact-motion.cpp` encodes the finite superset above as 403
+four-coefficient predictors plus a sorted exact-correction map. Predictor
+coefficients are fitted from evaluations of the retained recovered program,
+not host `cos`. They are only a compression mechanism: the generator evaluates
+all 411776 inputs with both the retained program and the final integer decoder,
+and rejects any differing binary64 speed. Predictor error is never accepted as
+a new precision policy. The current bank has 132 corrections and occupies
+13952 bytes in ordinary memory, with no Chip allocation.
+
+`make generated/contact-motion.inc` generates the ignored bank and a manifest
+with original input, generator and arithmetic-source hashes. The decoder uses
+68000-compatible integer limbs and the original component narrowing/snapping.
+`make verify-contact-motion` additionally checks 2070 complete 60-tick
+trajectories and the mutation/fallback guards.
+
+The contact adapter certifies a direction only when `tableAtanCandidate`
+succeeds. The effect keeps that admission certificate separately from its VM
+variables; a changed direction or a new argument assignment invalidates it.
+Decoding still occurs at the sentinel-controlled first Step, never during
+Create. Non-contact births, axes and portable-atan fallbacks retain the original
+program. `REFERENCE_CONTACT_MOTION=1` on either build (or the matching
+`DOWNWELL_REFERENCE_CONTACT_MOTION` define) forces that program for comparisons.
+
 `PortableAtan.h` is a mathematical candidate, not x87 emulation. It reduces
 the ratio to [0,1], transforms ratios >=1/2 around pi/4, evaluates an alternating
 series with integer-only binary64 operations, and applies quadrant corrections.

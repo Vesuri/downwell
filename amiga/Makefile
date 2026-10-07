@@ -46,6 +46,7 @@ REFERENCE_ROOM_TERRAIN ?= 0
 REFERENCE_INITIAL_TERRAIN ?= 0
 REFERENCE_BOX_ALARMS ?= 0
 REFERENCE_HUD_TEXT ?= 0
+REFERENCE_CONTACT_MOTION ?= 0
 TABLE_CONTACT_ATAN ?= 1
 RETAIN_HEALTH_HUD ?= 1
 AMMO_DAMAGE_RANGE ?= 1
@@ -261,6 +262,9 @@ endif
 ifeq ($(REFERENCE_HUD_TEXT),1)
 CFLAGS += -DDOWNWELL_REFERENCE_HUD_TEXT
 endif
+ifeq ($(REFERENCE_CONTACT_MOTION),1)
+CFLAGS += -DDOWNWELL_REFERENCE_CONTACT_MOTION
+endif
 ifeq ($(TABLE_CONTACT_ATAN),0)
 CFLAGS += -DDOWNWELL_PORTABLE_CONTACT_ATAN
 endif
@@ -460,6 +464,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
 	@printf '%s\n' '$(REFERENCE_INITIAL_TERRAIN)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_BOX_ALARMS)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_HUD_TEXT)' >> $@.tmp
+	@printf '%s\n' '$(REFERENCE_CONTACT_MOTION)' >> $@.tmp
 	@printf '%s\n' '$(DRAW_ORDER_AUDIT)' >> $@.tmp
 	@printf '%s\n' '$(LOCAL_DRAW_CAPTURE)' >> $@.tmp
 	@printf '%s\n' '$(AMMO_FACTORED)' >> $@.tmp
@@ -491,6 +496,10 @@ $(OBJECTS): $(REPO)/generated/downwell-goal-mask.h
 $(OBJECTS): $(REPO)/generated/downwell-time-field-mask.h
 $(REPO)/generated/downwell-time-field-mask.h: $(REPO)/tools/export-time-stop-masks.csx $(REPO)/tools/verify-time-stop-masks.py $(REPO)/data/data.win
 	$(MAKE) -C $(REPO) generated/downwell-time-field-mask.h
+$(OBJECTS): $(REPO)/generated/contact-motion.inc
+$(REPO)/generated/contact-motion.inc: $(REPO)/tools/generate-contact-motion.cpp $(REPO)/tools/generate-contact-motion.py $(REPO)/src/core/ContactMotionCodec.h $(REPO)/generated/smoke-trig.inc $(REPO)/generated/atan-q16.inc
+	$(MAKE) -C $(REPO) generated/contact-motion.inc
+
 $(OBJECTS): $(REPO)/generated/smoke-trig.inc
 $(OBJECTS): $(REPO)/generated/atan-q16.inc
 $(REPO)/generated/atan-q16.inc: $(REPO)/tools/generate-atan-table.py

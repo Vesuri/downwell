@@ -65,11 +65,11 @@ public:
         }
         compact();return true;
     }
-    template<class LengthdirX,class Hooks> bool step(Phase phase,LengthdirX lengthdirX,Hooks& hooks){
+    template<class LengthdirX,class Hooks> bool step(Phase phase,LengthdirX lengthdirX,Hooks& hooks,bool useContactBank=false){
         if(!good_)return false;
         for(unsigned i=0;i<count_;++i){auto& slot=slots_[order_[i]];
             if(slot.handle>phase.newest)continue;
-            if(!slot.effect.step(lengthdirX,[&](bool x,const auto& effect){return hooks.position(slot.handle,x,effect);})){good_=false;return false;}
+            if(!slot.effect.step(lengthdirX,[&](bool x,const auto& effect){return hooks.position(slot.handle,x,effect);},useContactBank)){good_=false;return false;}
         }
         return true;
     }

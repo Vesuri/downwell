@@ -71,7 +71,9 @@ int main(){
         assert(session.contactDamageNumber(128,-128,0,0,240,176));
         auto effect=snapshot(session.damageNumbers);
         assert(effect.x.bits==0x43708000u && effect.y.bits==0x432b8000u); // 240.5, 171.5
-        assert(equal(effect.direction,n(45)) && equal(effect.amount,n(1)));
+        // The default presentation-only Q16 atan is deliberately not exact
+        // floating-point atan. Pin the unchanged wrapper result, not 45.0.
+        assert(equal(effect.direction,MotionBinary64{0x40468004u,0x20000000u}) && equal(effect.amount,n(1)));
     }
     {
         GameplayWorld encounter(0,true,0,false);

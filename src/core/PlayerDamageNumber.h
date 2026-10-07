@@ -3,6 +3,7 @@
 #include "RunnerImageValue.h"
 #include "MultiplyBinary64.h"
 #include "AlarmBank.h"
+#include "ContactMotion.h"
 namespace downwell {
 // Object 221, no parent/sprite/mask. Step has no time-stop guard. Built-in
 // positions narrow on EVERY write; user velocities remain VM binary64 values.
@@ -13,6 +14,11 @@ struct PlayerDamageNumber {
         ySpeed=MotionBinary64::fromInteger(3);
     int alarm0=60;
     bool valid=true,destroyRequested=false;
+    // Admission certificate only: neither a VM variable nor a change to the
+    // first-Step sentinel. Arbitrary creation/mutation keeps the oracle path.
+    MotionBinary64 certifiedDirection{};
+    bool tableContact=false;
+    void certifyTableContact(){certifiedDirection=direction;tableContact=true;}
     bool create(MotionBinary64 px,MotionBinary64 py){
         PlayerDamageNumber next;
         next.valid=next.x.assign(px)&&next.y.assign(py);
@@ -23,19 +29,22 @@ struct PlayerDamageNumber {
     bool assignDamage(MotionBinary64 damage,MotionBinary64 angle){
         if(!valid)return false;
         if(!damage.valid()||!angle.valid()){valid=false;return false;}
-        amount=damage;direction=angle;return true;
+        amount=damage;direction=angle;tableContact=false;return true;
     }
     void advanceAlarm(unsigned index){
         if(valid&&!destroyRequested&&index==0&&AlarmBank::advanceValue(alarm0))destroyRequested=true;
     }
     // lengthdirX(length,angle,result) supplies runner math. publish runs after
     // each built-in position write, Y then X. It may not mutate this instance.
-    template<class LengthdirX,class Publish> bool step(LengthdirX lengthdirX,Publish publish){
+    template<class LengthdirX,class Publish> bool step(LengthdirX lengthdirX,Publish publish,bool useContactBank=false){
         if(!valid)return false;
         if(destroyRequested)return true;
         const auto sentinel=MotionBinary64::fromInteger(999);
         if(xSpeed.high==sentinel.high&&xSpeed.low==sentinel.low){
-            if(!lengthdirX(MotionBinary64::fromInteger(2),direction,xSpeed)){valid=false;return false;}
+            const bool admitted=useContactBank&&tableContact&&direction.high==certifiedDirection.high&&
+                direction.low==certifiedDirection.low;
+            if(!(admitted?contactMotion(direction,xSpeed):
+                lengthdirX(MotionBinary64::fromInteger(2),direction,xSpeed))){valid=false;return false;}
         }
         auto nextY=y.promoted(),negativeSpeed=ySpeed;negativeSpeed.high^=0x80000000u;
         if(!nextY.add(negativeSpeed)||!y.assign(nextY)||!publish(false,*this)){valid=false;return false;}
