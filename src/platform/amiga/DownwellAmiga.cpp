@@ -319,6 +319,8 @@ static const UBYTE* activeHudPack = amiga_hud_pack;
 static const UBYTE* activeHudPackEnd = amiga_hud_pack_end;
 static AmigaImmutableByteUpload entryHudUpload;
 static bool entryHudReady=false;
+static AmigaImmutableUpload entryResultsUpload;
+static bool entryResultsReady=false;
 
 // Chip RAM holds only the current scene's art. Boot (splash) and front
 // (garden and style select) banks are files, each read whole in one load
@@ -664,6 +666,7 @@ volatile LONG gDownwellCaptureViewX, gDownwellCaptureViewY;
 volatile ULONG gDownwellResultsRestartCount;
 volatile ULONG gDownwellResultsRestartMask;
 volatile ULONG gDownwellResultsHudChecks, gDownwellResultsHudFailures;
+volatile ULONG gDownwellResultsBankChecks, gDownwellResultsBankFailures;
 __attribute__((noinline, used)) void downwellResultsRestartReady() { __asm__ volatile("" ::: "memory"); }
 #endif
 #endif
@@ -2526,6 +2529,8 @@ __attribute__((noinline)) static int runDownwell(void) {
                 if (presentationChanged && presentedScene == AmigaScene::styleSelect) {
                     entryHudUpload.invalidate();
                     entryHudReady=false;
+                    entryResultsUpload.invalidate();
+                    entryResultsReady=false;
                     // These framebuffers and copper slots may contain gameplay,
                     // even when the new selection matches the last visit exactly.
                     // Garden prepared the immutable border/masks on entry and
@@ -2718,13 +2723,28 @@ __attribute__((noinline)) static int runDownwell(void) {
                     gDownwellResultsPack = gDownwellShopPack = nullptr;
                     shopMenuOverlay.reset();
                     DW_PROFILE_PHASE(profileEntryResultsCopy);
+#ifndef DOWNWELL_REFERENCE_ENTRY_ASSETS
+                    if(entryResultsReady){
+                        gDownwellResultsPack=overlayAssetStorage;
+                        gDownwellResultsAssetBytes=resultsBytes;
+                        gDownwellShopAssetBytes=0;
+                    }
+#endif
                     if (!selectOverlayAssetBank(false)) {
                         ++gDownwellResultsAssetFailures;
                         exitCode = 20;
                         break;
                     }
+                    entryResultsUpload.invalidate();
+                    entryResultsReady=false;
 #ifdef DOWNWELL_PROFILE_ENTRY
                     ++gDownwellEntryResultsUploads;
+#endif
+#ifdef DOWNWELL_RESULTS_RESTART_VERIFY
+                    for(unsigned byte=0;byte<resultsBytes;++byte)
+                        if(gDownwellResultsPack[byte]!=amiga_results_pack[byte])
+                            ++gDownwellResultsBankFailures;
+                    ++gDownwellResultsBankChecks;
 #endif
                     DW_PROFILE_PHASE(profileEntryRaster);
                     Bitmap stageClear(stagedBuffer, downwellVisibleWidth,
@@ -2927,6 +2947,13 @@ __attribute__((noinline)) static int runDownwell(void) {
                         if (!layout.valid) { exitCode=20; break; }
                         entryHudReady=entryHudUpload.step(memory.menuForeground()+layout.hudOffset,
                             amiga_hud_pack,bytes,256);
+                        const unsigned resultBytes=amiga_results_pack_end-amiga_results_pack;
+                        if(resultBytes>layout.resultsCapacity||(resultBytes&1u)){
+                            exitCode=20;break;
+                        }
+                        entryResultsReady=entryResultsUpload.step(
+                            reinterpret_cast<UWORD*>(memory.menuForeground()+layout.resultsOffset),
+                            reinterpret_cast<const UWORD*>(amiga_results_pack),resultBytes/2,256);
                     }
 #endif
 #if defined(DOWNWELL_PREPARED_FIELDS) && !defined(DOWNWELL_REFERENCE_FIELD_BANK)

@@ -132,14 +132,20 @@ the current gap budget, and renderer tests cover the arithmetic boundaries.
 
 After style selection has retired garden DMA, content-clean style updates
 stage at most 256 HUD bytes into that high-end partition. A completed upload
-certifies only this handoff; entering style and consuming the handoff both
-invalidate the certificate. Short/skipped selection uses the complete
+remains resident through gameplay and upgrade screens, which reserve the same
+high-end region. Garden reuse and fresh style entry invalidate its certificate.
+Short/skipped selection without a resident bank uses the complete
 synchronous copy. No partial pack becomes active, and no extra Chip allocation
 is needed. `REFERENCE_ENTRY_ASSETS=1` retains the synchronous path;
 `profile.sh entry` compares the resident bytes with the offline pack.
 
-The results pack is now linked as ordinary read-only executable data and copied
-once into that gap during gameplay entry, after intro DMA is retired. The loader
+The results pack is linked as ordinary read-only executable data. Content-clean
+style updates stage at most 256 words into the middle gap after garden DMA has
+retired. Gameplay entry consumes the completed certificate, or copies the whole
+pack synchronously if selection was skipped or staging was incomplete. Fresh
+style entry and consumption invalidate this certificate: unlike the HUD,
+results artwork shares storage with shop artwork and transition masks.
+No incomplete upload is exposed to the renderer. The loader
 checks the planar pack's span against the reserved capacity and returns failure
 code 20 if it does not fit or validate. This does not
 increase Chip allocation or destroy an unused-looking
