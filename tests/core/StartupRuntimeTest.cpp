@@ -106,7 +106,14 @@ struct LifecycleAudit {
     const downwell::StartupRuntime* observedRuntime=nullptr;
     unsigned initialViewsSeen=0;
     bool markDestroyed(downwell::InstanceHandle h,const downwell::InstanceRecord& r){
-        require(matches(h,r)&&!r.destroyRequested,"destroy marks a still-live lifetime");return true;
+        ++calls;
+        require(matches(h,r)&&!r.destroyRequested,"destroy marks a still-live lifetime");
+        if(r.objectId==92){
+            require(r.box.exhausted(),"natural box destruction follows exhausted health");
+            ++boxRemovals;
+            if(rejectBoxRemoval){rejectedBoxId=r.instanceId;return false;}
+        }
+        return true;
     }
     struct Entry {std::uint32_t generation=0,id=0;bool live=false;};
     std::array<Entry,downwell::StartupRuntime::instanceCapacity> entries{};
@@ -117,6 +124,7 @@ struct LifecycleAudit {
     unsigned playerMoves=0;
     unsigned boxRemovals=0;
     bool rejectBoxRemoval=false;
+    std::uint32_t rejectedBoxId=0;
     bool rejectBatScale=false;
     bool rejectBatMask=false;
     int rejectBirthObject=-1;
@@ -201,10 +209,6 @@ struct LifecycleAudit {
     }
     bool activation(downwell::InstanceHandle h,const downwell::InstanceRecord& r,bool active){
         ++calls;require(matches(h,r)&&active!=r.active,"activation publication sees the old live flag");
-        if(!active&&r.objectId==92){
-            ++boxRemovals;
-            if(rejectBoxRemoval)return false;
-        }
         if(fail==(active?3u:5u))return false;
         if(active)++activations;else {
             require(!r.activationPending,"dead actor removal must not queue dormant reactivation");
@@ -289,8 +293,15 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
             runtime->step(downwell::gameplayContactProfileInput(tick,runtime->mainPlayerX(),runtime->mainPlayerY()),false);
         require(boxes.boxRemovals>0,"natural contact tape reaches checked box removal");
         require(healthy(*runtime)!=reject,"box publication rejection is terminal");
+        std::cout<<"Natural box requests="<<boxes.boxRemovals<<" rejected="<<reject
+                 <<" destroyed="<<runtime->mainBlocksDestroyed()<<'\n';
+        if(!reject)require(runtime->mainBlocksDestroyed()==boxes.boxRemovals,
+                "successful box destruction requests match the gameplay count");
         if(reject){
             require(runtime->mainBlocksDestroyed()==0,"rejected first box removal does not count a destroyed block");
+            const auto* box=runtime->instance(boxes.rejectedBoxId);
+            require(box&&box->active&&!box->destroyRequested&&box->box.exhausted(),
+                    "rejected destroy retains the exhausted live box without publishing the mark");
             const auto calls=boxes.calls;const auto tick=runtime->tick();
             runtime->step(false);
             require(boxes.calls==calls&&runtime->tick()==tick,"box failure remains latched");
@@ -909,23 +920,42 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         }
         {
             // Isolate projectile/block coverage from later randomized layout.
-            // Replay into an independent heap owner and use a real room instance;
+            // Start an independent resource-backed owner with a real box lifetime;
             // original resources and the main input trajectory stay untouched.
-            auto collisionStorage = runtime.replay();
+            auto collisionStorage=std::make_unique<downwell::StartupRuntime>(
+                downwell::PlatformProfile::nonDesktop,&pack,objects,2,patterns);
             auto& collision = *collisionStorage;
-            std::size_t target = collision.activeInstanceCount();
-            for (std::size_t i = 0; i < collision.activeInstanceCount(); ++i)
-                if (collision.instanceAt(i).objectId == 60) { target = i; break; }
-            require(target < collision.activeInstanceCount(), "projectile fixture has a room wall");
+            collision.skipToGameForTesting();
+            std::size_t target=collision.activeInstanceCount();
+            for(unsigned tick=0;tick<1800;++tick){
+                collision.step(downwell::gameplayContactProfileInput(tick,collision.mainPlayerX(),collision.mainPlayerY()),false);
+                require(collision.effectsSucceeded(),"projectile fixture reaches a live box without runtime failure");
+                target=collision.activeInstanceCount();
+                if(collision.mainBulletCount()==1)for(std::size_t i=0;i<collision.activeInstanceCount();++i){
+                    const auto& r=collision.instanceAt(i);
+                    if(r.objectId==92&&r.active&&!r.destroyRequested&&!r.box.exhausted()){target=i;break;}
+                }
+                if(target<collision.activeInstanceCount())break;
+            }
+            require(target < collision.activeInstanceCount(), "projectile fixture has a generated box");
+            // Isolated collision placement only, not natural encounter coverage:
+            // move the real box and shot outside unrelated generated terrain.
+            auto& projectile=const_cast<downwell::StartupRuntime::MainBulletState&>(collision.mainBulletAt(0));
+            projectile.x=1000;projectile.y=collision.mainCameraRenderViewY()+50;
+            projectile.trajectory.reset(1000,int(projectile.y),false);
             auto& wall = const_cast<downwell::InstanceRecord&>(collision.instanceAt(target));
-            wall.objectId = 92;
+            const auto targetId=wall.instanceId;
             wall.x = collision.mainBulletAt(0).trajectory.x.pixel;
             wall.y = collision.mainBulletAt(0).trajectory.y.pixel + 8;
             const auto before = collision.mainBlocksDestroyed();
             collision.step({}, false);
-            require(!collision.instanceAt(target).active && collision.mainBlocksDestroyed() == before + 1 &&
-                    collision.mainBulletCount() == 0,
-                    "fractional projectile destroys the intersected block and retires on contact");
+            const auto* damaged=collision.instance(targetId);
+            require(collision.effectsSucceeded()&&damaged&&damaged->active&&!damaged->destroyRequested&&
+                    damaged->box.exhausted()&&collision.mainBlocksDestroyed()==before&&collision.mainBulletCount()==0,
+                    "fractional projectile damages the box and retires without running box Step early");
+            collision.step({},false);
+            require(collision.effectsSucceeded()&&!collision.instance(targetId)&&collision.mainBlocksDestroyed()==before+1,
+                    "the next box Step requests destruction and pre-Draw cleanup retires its lifetime");
         }
         const float firstBulletY = runtime.mainBulletAt(0).y;
         for (int tick = 0; tick < 6; ++tick)
@@ -1231,18 +1261,18 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
             downwell::InstanceRecord* ceilingBox = nullptr;
             for (std::size_t i = 0; i < headBoxRuntime.activeInstanceCount(); ++i) {
                 auto& candidate = const_cast<downwell::InstanceRecord&>(headBoxRuntime.instanceAt(i));
-                if (candidate.objectId == 60) { ceilingBox = &candidate; break; }
+                if (candidate.objectId == 92 && candidate.active && !candidate.destroyRequested &&
+                    !candidate.box.exhausted()) { ceilingBox = &candidate; break; }
             }
-            require(ceilingBox != nullptr, "head-box fixture has a terrain instance");
-            ceilingBox->objectId = 92;
-            ceilingBox->active = true;
+            require(ceilingBox != nullptr, "head-box fixture has a live generated box");
+            const auto ceilingId=ceilingBox->instanceId;
             ceilingBox->x = static_cast<int>(headBoxRuntime.mainPlayerX());
             ceilingBox->y = static_cast<int>(groundedY) - 24;
             const auto before = headBoxRuntime.mainBlocksDestroyed();
             headBoxRuntime.step(fireMain, true);
             headBoxRuntime.step(fireMain, false);
             headBoxRuntime.step(fireMain, false);
-            require(!ceilingBox->active &&
+            require(headBoxRuntime.effectsSucceeded()&&!headBoxRuntime.instance(ceilingId) &&
                         headBoxRuntime.mainBlocksDestroyed() == before + 1 &&
                         headBoxRuntime.mainPlayerSpeedY() == 1.0F &&
                         headBoxRuntime.mainPlayerY() == groundedY - 11.0F &&
