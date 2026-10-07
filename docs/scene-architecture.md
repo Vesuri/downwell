@@ -72,6 +72,24 @@ tails and copies the edge through `Bitmap`, with a separate zero guard word
 for gradient rows. The regions do not overlap; there is no clear-then-redraw
 of the same mask pixels. Drain completion before publishing the mask to DMA.
 
+## Canonical level-clear motion
+
+`LevelClearMotion` owns the same source player/camera state on both targets.
+Create sets player Y to zero and camera Y to 142. Alarm 4 exposes choices
+before Step 60, changing the player target/divisor to 302/10 and camera target
+to 340. The recurrence remains the source subtraction, division, then addition.
+
+The offline `generate-clear-motion` program records the first 59 updates and
+the choice sequence through its binary64 fixed point. It compares the portable
+arithmetic with independent host binary64 at every generated step. The table
+contains full states, never rounded pixels; the generated manifest records
+input hashes and extraction provenance. Before each table advance the owner
+checks all state inputs. Altered inputs, noncanonical choice timing and all
+departure updates permanently fall back to the retained arithmetic for that
+motion instance. No RNG, event dispatch, carousel input or rendering is moved
+ahead of its original phase. `REFERENCE_CLEAR_MOTION=1` selects arithmetic
+throughout. The table resides in ordinary executable memory, not Chip RAM.
+
 ## Gameplay presentation boundaries
 
 - `AmigaGameplayGeneration`: synchronous builder registration and generation

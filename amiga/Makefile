@@ -37,6 +37,7 @@ REFERENCE_GEM_POSITION ?= 0
 REFERENCE_EFFECT_COMPOSITION ?= 0
 REFERENCE_STYLE_SPRITES ?= 0
 REFERENCE_SELECTION_BINDINGS ?= 0
+REFERENCE_CLEAR_MOTION ?= 0
 REFERENCE_ACTOR_PREFIX ?= 0
 REFERENCE_DRAW_LIST ?= 0
 REFERENCE_VALIDATION ?= 0
@@ -222,6 +223,9 @@ CFLAGS += -DDOWNWELL_REFERENCE_STYLE_SPRITES
 endif
 ifeq ($(REFERENCE_SELECTION_BINDINGS),1)
 CFLAGS += -DDOWNWELL_REFERENCE_SELECTION_BINDINGS
+endif
+ifeq ($(REFERENCE_CLEAR_MOTION),1)
+CFLAGS += -DDOWNWELL_REFERENCE_CLEAR_MOTION
 endif
 ifeq ($(SKIP_INTRO),1)
 CFLAGS += -DDOWNWELL_SKIP_INTRO
@@ -496,6 +500,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
 	@printf '%s\n' '$(REFERENCE_BOX_RANDOM)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_STYLE_SPRITES)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_SELECTION_BINDINGS)' >> $@.tmp
+	@printf '%s\n' '$(REFERENCE_CLEAR_MOTION)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_INITIAL_RASTER)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_ROOM_PREPARE)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_FIELD_BANK)' >> $@.tmp
@@ -542,6 +547,9 @@ $(OBJECTS): $(REPO)/generated/downwell-time-field-mask.h
 $(REPO)/generated/downwell-time-field-mask.h: $(REPO)/tools/export-time-stop-masks.csx $(REPO)/tools/verify-time-stop-masks.py $(REPO)/data/data.win
 	$(MAKE) -C $(REPO) generated/downwell-time-field-mask.h
 $(OBJECTS): $(REPO)/generated/contact-motion.inc
+$(OBJECTS): $(REPO)/generated/clear-motion.inc
+$(REPO)/generated/clear-motion.inc: $(REPO)/tools/generate-clear-motion.cpp $(REPO)/tools/generate-clear-motion.py $(REPO)/src/core/LevelClearMotion.h $(REPO)/src/core/HudReal.h $(REPO)/data/data.win $(REPO)/data/Downwell.exe $(REPO)/extracted/utmt-0.9.2.0/manifest.json
+	$(MAKE) -C $(REPO) generated/clear-motion.inc
 $(OBJECTS): $(REPO)/generated/amiga-room-terrain-plan.inc
 $(REPO)/generated/amiga-room-terrain-plan.inc: $(REPO)/tools/generate-room-terrain-plan.py $(REPO)/extracted/utmt-0.9.2.0/manifest.json
 	$(MAKE) -C $(REPO) generated/amiga-room-terrain-plan.inc

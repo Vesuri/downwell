@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <cmath>
+#include <initializer_list>
 static void require(bool ok, const char* why) {
     if (!ok) { std::fprintf(stderr, "%s\n", why); std::abort(); }
 }
@@ -47,6 +48,34 @@ int main() {
     }
     require(asDouble(downwell::LevelClearMotion::approach(HudReal::integer(300), HudReal::integer(100), 10)) == 280,
         "downward target correction retains signed source arithmetic");
+    // Exercise the complete stable tail, early/late choice entry, departure
+    // from every part of the sequence, and mutation of each admitted input.
+    for(unsigned shown : {1u,59u,60u,61u,120u})
+      for(unsigned departed : {1u,59u,60u,92u,400u,1400u})
+        for(unsigned mutation=0;mutation<7;++mutation){
+            downwell::LevelClearMotion candidate;
+            double py=0,cy=142,pt=160,ct=142,ac=0;unsigned div=20;
+            for(unsigned tick=1;tick<=1500;++tick){
+                if(tick==shown){candidate.showChoices();pt=302;ct=340;div=10;}
+                if(tick==150){
+                    switch(mutation){
+                    case 1:candidate.playerY=HudReal::integer(200);py=200;break;
+                    case 2:candidate.cameraY=HudReal::integer(200);cy=200;break;
+                    case 3:candidate.playerTarget=HudReal::integer(100);pt=100;break;
+                    case 4:candidate.cameraTarget=HudReal::integer(100);ct=100;break;
+                    case 5:candidate.playerDivisor=7;div=7;break;
+                    case 6:candidate.acceleration=HudReal::integer(1);ac=1;break;
+                    }
+                }
+                const bool leaving=tick>=departed;
+                candidate.step(leaving);
+                if(leaving){pt+=ac;ac+=0.2;}
+                py+=(pt-py)/div;cy+=(ct-cy)/10;
+                require(asDouble(candidate.playerY)==py&&asDouble(candidate.cameraY)==cy&&
+                    asDouble(candidate.playerTarget)==pt&&asDouble(candidate.acceleration)==ac,
+                    "prepared motion and all fallback boundaries remain binary64 exact");
+            }
+        }
     downwell::LevelClearCarousel carousel;
     carousel.create(1);
     double x = 42;
@@ -65,4 +94,5 @@ int main() {
     }
     std::puts("20000 divisions and 10000 level-clear motion updates match binary64");
     std::puts("20000 signed carousel updates and option coordinates match binary64");
+    std::puts("315000 prepared/fallback motion updates match binary64, including stable tails and mutated inputs");
 }

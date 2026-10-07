@@ -145,6 +145,18 @@ radius-pair model is a geometry/storage audit, not a replacement for native
 timing or a measured distribution of gameplay inputs. See the frame-cost
 audit before choosing another large-field representation.
 
+## Prepared level-clear motion
+
+`make generated/clear-motion.inc` builds the host generator and emits the
+canonical Result-room player/camera easing sequence. The generator compiles
+the retained arithmetic path and checks each state against host binary64.
+The `.json` manifest records generator version, extraction version, source
+hashes and output hash. Payload and manifest stay under ignored `generated/`.
+`make test-level-clear-motion` checks canonical, mutated and noncanonical
+states against independent binary64 calculations. `REFERENCE_CLEAR_MOTION=1`
+retains arithmetic throughout on either target; perform a clean rebuild when
+comparing test executables built with different reference flags.
+
 ## Original audio
 
 After the UTMT extraction, run `python3 tools/extract-audio.py` to extract all

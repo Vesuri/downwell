@@ -44,6 +44,9 @@ endif
 ifeq ($(REFERENCE_CONTACT_MOTION),1)
 CXXFLAGS += -DDOWNWELL_REFERENCE_CONTACT_MOTION
 endif
+ifeq ($(REFERENCE_CLEAR_MOTION),1)
+CXXFLAGS += -DDOWNWELL_REFERENCE_CLEAR_MOTION
+endif
 ifeq ($(REFERENCE_CONTACT_COORDINATES),1)
 CXXFLAGS += -DDOWNWELL_REFERENCE_CONTACT_COORDINATES
 endif
@@ -572,7 +575,14 @@ verify-smoke-trig: build/smoke-trig-test
 	python3 tools/export-smoke-trig.py --check
 	./build/smoke-trig-test
 
-$(OBJECTS) $(TEST_TARGETS) $(PORT_REPLAY_REFERENCE_TARGET): generated/smoke-trig.inc generated/atan-q16.inc generated/contact-motion.inc
+$(OBJECTS) $(TEST_TARGETS) $(PORT_REPLAY_REFERENCE_TARGET): generated/smoke-trig.inc generated/atan-q16.inc generated/contact-motion.inc generated/clear-motion.inc
+
+build/generate-clear-motion: tools/generate-clear-motion.cpp src/core/LevelClearMotion.h src/core/HudReal.h
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -o $@ $<
+
+generated/clear-motion.inc: build/generate-clear-motion tools/generate-clear-motion.py data/data.win data/Downwell.exe extracted/utmt-0.9.2.0/manifest.json
+	python3 tools/generate-clear-motion.py
 
 build/generate-contact-motion: tools/generate-contact-motion.cpp src/core/ContactMotionCodec.h src/core/RunnerPointDirection.h src/core/SmokeDirection.h src/core/SmokeTrig.h src/core/MotionBinary64.h src/core/MultiplyBinary64.h src/core/RunnerImageValue.h generated/smoke-trig.inc generated/atan-q16.inc
 	@mkdir -p build
@@ -1507,7 +1517,7 @@ verify-gameplay-death-state: generate-room-pack generate-object-pack generate-bu
 # These executables compile multiple translation units in one command. The
 # compiler's single .d file only describes the final input, so explicitly
 # invalidate them on shared header changes rather than trusting stale tools.
-HOST_CHECK_HEADERS := $(wildcard src/core/*.h src/platform/amiga/*.h)
+HOST_CHECK_HEADERS := $(wildcard src/core/*.h src/platform/amiga/*.h) generated/clear-motion.inc
 $(OBJECTS) $(TEST_TARGETS) $(PORT_REPLAY_REFERENCE_TARGET) $(AREA_ONE_TRACE_TARGET) $(AREA_ONE_BUILDER_TEST_TARGET) $(AMIGA_LIVE_TERRAIN_TEST_TARGET) build/gameplay-player-step-test build/gem-homing-test build/frog-behavior-test build/bat-motion-test build/enemy-contact-test: generated/downwell-goal-mask.h
 build/goal-time-field-test build/shop-world-test build/level-clear-session-test build/combo-state-test: generated/downwell-goal-mask.h
 
