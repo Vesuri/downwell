@@ -43,6 +43,16 @@ into three banks:
   only the frames the seed-2 menu creation selects; `amiga-menu-test` checks
   every draw-list frame against this bank.
 
+The front bank puts its complete directory and all live garden/style payloads
+in a 60,204-byte prefix. Only one-shot garden scenery follows that prefix;
+`AmigaGardenScene::prepare` copies it into the scrolling canvases before any
+staging starts. Writable sprite DMA headers never alias another payload.
+The generator emits `DOWNWELL_FRONT_LIVE_BYTES`, and the target statically
+checks that it ends before byte 75,360. After the first garden frame retires
+the previous scene, each garden update stages at most 256 words of immutable
+large-field arcs at that offset. No live front artwork or canvas is modified.
+This borrows existing Chip storage, rather than allocating another bank.
+
 The two scene banks are files beside the executable. Each load is a single
 `Open`/`Read`/`Close` of the whole file into the shared Chip region, through
 `AmigaPlatform::loadFile`. During the load the OS gets back its VERTB
@@ -66,8 +76,11 @@ Retire scene DMA before binding. Small images, arc images and their immutable
 blit plans remain resident through level-clear/upgrade and the next level;
 those scenes do not overwrite their ranges. Each entry still resets both
 overlays and rebinds their backing/terrain pointers. Invalidate residency
-before any boot/front bank load, including a failed load, then upload again
-on gameplay entry. Terrain scratch writes are confined to the prefix and
+before any boot/front bank load, including a failed load. Entry completes any
+unfinished staged arc upload (including skipped/short garden paths), then
+binds the immutable plans; partially uploaded arcs are never exposed to DMA.
+`REFERENCE_FIELD_BANK=1` retains synchronous entry uploads without garden
+staging. Terrain scratch writes are confined to the prefix and
 do not invalidate the field banks. No extra Chip allocation is required.
 The results, clear-scene and field-reentry fixtures cover that path. Small
 fields restore their masks from the pristine terrain ring

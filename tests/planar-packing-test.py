@@ -69,6 +69,10 @@ for bank in ("game", "boot", "front"):
     optimized = (root / f"generated/amiga-{bank}.dwap").read_bytes()
     reference = pack.pack_records(banks[bank])
     actual, expected = directory(optimized), directory(reference)
+    if bank == "front":
+        # Every still-readable source stays below the field-bank staging area;
+        # only one-shot garden scenery can be overwritten after cache creation.
+        assert max(a[8]+a[9] for a in actual if pack.front_live({"id": a[0]})) <= 75360
     assert len(actual) == len(expected)
     total += len(actual)
     for a, b in zip(actual, expected):

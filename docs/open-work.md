@@ -401,8 +401,10 @@ Preserve the original heading, icon and carousel animation.
 
 Remove the synchronous cold gameplay handoff exposed by `profile.sh entry`.
 The last style frame owns that work; the first gameplay frame must not be
-discarded either. Separate field binding, asset staging, raster/backing setup
-and source-visible world creation before choosing what can be prepared early.
+discarded either. Remaining synchronous work includes the small-field bank
+upload, HUD/results asset staging, initial terrain raster and backing/HUD
+setup. Move immutable preparation out of confirmation without overwriting
+the garden/style display owners or introducing another long frame earlier.
 Do not move RNG draws or source-visible Create effects ahead of confirmation.
 
 Reduce remaining mutable room-layer reset/publication at level reentry,

@@ -57,6 +57,8 @@ void downwellTerrainBatchMismatch();
 // Both modes load the same images and reserve the same scene-bank partition.
 extern "C" { volatile unsigned gDownwellPreparedFieldMode=DOWNWELL_FIELD_MODE; }
 extern "C" void amigaBlitterBindFieldBands(UBYTE*);
+extern "C" void amigaBlitterInvalidateFieldBands();
+extern "C" void amigaBlitterStageFieldBands(UBYTE*);
 extern "C" int amigaBlitterFieldBands(const UBYTE*,UBYTE*,const downwell::TimeFieldOutlines::Circle&,unsigned,bool,UWORD*);
 extern "C" int amigaBlitterRetireFieldBands(const UBYTE*,UBYTE*,const downwell::TimeFieldOutlines::Circle&,const downwell::TimeFieldOutlines::Circle&,unsigned);
 extern "C" int amigaBlitterComposeFieldBands(const UBYTE*,UBYTE*,const downwell::TimeFieldOutlines::Circle&,unsigned,UWORD*);
@@ -1052,7 +1054,10 @@ static AmigaGameplayRows gameplayRows;
 static AmigaLaserSight gameplayRays[2];
 #ifdef DOWNWELL_PREPARED_FIELDS
 static AmigaPreparedTimeFieldPair<PreparedFieldOps> gameplayFields;
-static void invalidateGameplayFieldBank(){gameplayFields.invalidateBank();}
+static void invalidateGameplayFieldBank(){
+    gameplayFields.invalidateBank();
+    amigaBlitterInvalidateFieldBands();
+}
 extern "C" volatile ULONG gDownwellFieldBankUploads,gDownwellFieldBankReuses;
 volatile ULONG gDownwellFieldBankUploads,gDownwellFieldBankReuses;
 #ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
@@ -2496,6 +2501,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     AmigaHardware::blitterDrain();
 #ifdef DOWNWELL_REFERENCE_FIELD_BANK
                     gameplayFields.invalidateBank();
+                    amigaBlitterInvalidateFieldBands();
 #endif
                     const bool fieldBankResident=gameplayFields.resident(
                         sceneBank+downwellTerrainBatchBytes,amiga_field_images,
@@ -2657,6 +2663,15 @@ __attribute__((noinline)) static int runDownwell(void) {
                     // game-state transitions or overwriting a live DMA source.
                     if (!presentationChanged && !styleScene.preparePart())
                         break;
+#if defined(DOWNWELL_PREPARED_FIELDS) && !defined(DOWNWELL_REFERENCE_FIELD_BANK)
+                    // Garden static art is already in its scrolling canvases.
+                    // The offline live prefix retains every title, DMA sprite,
+                    // style asset and oracle record below this upload region.
+                    static_assert(DOWNWELL_FRONT_LIVE_BYTES <= fieldBandOffset,
+                        "live front artwork overlaps the staged field bank");
+                    if (!presentationChanged)
+                        amigaBlitterStageFieldBands(sceneBank+fieldBandOffset);
+#endif
                     if (++menuSpriteFrameCount == 2)
                         downwellMenuSpriteReady();
 #ifdef DOWNWELL_SCENE_VERIFY

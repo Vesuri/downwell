@@ -2447,7 +2447,14 @@ verify-default-shader: generated/default-shader.json
 	python3 tools/verify-default-shader.py
 	python3 tools/verify-runner-vertex-shader.py
 
-verify-amiga-game: generate-amiga-game verify-default-shader
+.PHONY: test-amiga-immutable-upload
+test-amiga-immutable-upload: build/amiga-immutable-upload-test
+	./build/amiga-immutable-upload-test
+build/amiga-immutable-upload-test: tests/platform/amiga/AmigaImmutableUploadTest.cpp src/platform/amiga/AmigaImmutableUpload.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+
+verify-amiga-game: generate-amiga-game verify-default-shader test-amiga-immutable-upload
 	python3 tools/verify-runner-effect-blend.py
 	python3 tools/verify-amiga-menu-sprites.py
 	tools/generate-amiga-hud.py --profile game --check

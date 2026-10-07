@@ -3,15 +3,26 @@
 #ifdef DOWNWELL_PREPARED_FIELDS
 #include "AmigaFieldBands.h"
 #include "AmigaFieldComposite.h"
+#include "AmigaImmutableUpload.h"
 #include "framework/BitmapCopyPlan.h"
 static UWORD* residentFieldBands;
+static AmigaImmutableUpload fieldBandUpload;
 static BitmapCopyPlan fieldPaintPlans[17],fieldRestorePlans[17];
 extern "C" volatile unsigned gDownwellPreparedFieldMode;
+extern "C" void amigaBlitterInvalidateFieldBands(){
+    fieldBandUpload.invalidate();
+    residentFieldBands=nullptr;
+}
+extern "C" void amigaBlitterStageFieldBands(UBYTE* bank){
+    fieldBandUpload.step(reinterpret_cast<UWORD*>(bank),downwell::fieldBandPixels,
+        sizeof(downwell::fieldBandPixels)/sizeof(UWORD),256);
+}
 extern "C" void amigaBlitterBindFieldBands(UBYTE* bank){
     AmigaHardware::blitterDrain();
     residentFieldBands=reinterpret_cast<UWORD*>(bank);
-    for(unsigned i=0;i<sizeof(downwell::fieldBandPixels)/sizeof(UWORD);++i)
-        residentFieldBands[i]=downwell::fieldBandPixels[i];
+    fieldBandUpload.step(residentFieldBands,downwell::fieldBandPixels,
+        sizeof(downwell::fieldBandPixels)/sizeof(UWORD),
+        sizeof(downwell::fieldBandPixels)/sizeof(UWORD));
     residentFieldBands[sizeof(downwell::fieldBandPixels)/sizeof(UWORD)]=0;
     for(unsigned x=0;x<=16;++x){
         if(!fieldPaintPlans[x].prepare(11,11,24,110,x,x,160)||
