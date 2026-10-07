@@ -96,6 +96,35 @@ number's initial horizontal speed, not health or player movement.
 
 ## Reproducible probe and limits
 
+### Damage-number lookup domain
+
+The object-221 Step bytecode calls `lengthdir_x(2, enemydir)` only while
+`xsp == 999`. `scrDmgCalcFxPlayer` assigns its second argument to `enemydir`
+after synchronous Create. Neither instruction stream rounds that argument to
+an integer angle. The current contact adapter supplies the result of
+`RunnerPointDirection`; arbitrary fractional directions also remain legal for
+the effect's standalone creation API.
+
+For the current table-atan admission path, the intermediate signed angle is
+Q16 radians. An exhaustive **superset**, not a tape-derived whitelist, is
+every signed integer magnitude from zero through the generated Q16 pi
+constant, 205887. Passing those 411776 inputs through the retained binary32
+degree wrapper produces 411776 distinct direction encodings (signed zero is
+significant). Passing each through the retained degree-to-radian wrapper,
+portable recovered cosine program and `lengthdir_x` component produces 389145
+distinct binary32 speed encodings. A flat speed table alone would consume
+1647104 bytes, before keys or lookup metadata. Deduplicating speeds does not
+make this a small table.
+
+`make probe-contact-motion-domain` reproduces these counts using the portable
+integer arithmetic, without host trigonometry or floating-point identities.
+It also checks that each returned speed is exactly promoted binary32. The
+ordered direction/speed digest is `87bbbbf9`; the probe exports no asset bank.
+Inputs outside table-atan admission, including its axis/fallback cases, are
+not covered by this finite superset and must retain the portable path unless
+separately proven. A table indexed by rounded integer degrees would change
+the current direction, velocity and subsequent position writes.
+
 `PortableAtan.h` is a mathematical candidate, not x87 emulation. It reduces
 the ratio to [0,1], transforms ratios >=1/2 around pi/4, evaluates an alternating
 series with integer-only binary64 operations, and applies quadrant corrections.

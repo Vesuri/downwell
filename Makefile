@@ -570,6 +570,14 @@ $(OBJECTS) $(TEST_TARGETS) $(PORT_REPLAY_REFERENCE_TARGET): generated/smoke-trig
 generated/smoke-trig.inc: tools/export-smoke-trig.py data/Downwell.exe
 	python3 tools/export-smoke-trig.py
 
+build/probe-contact-motion-domain: tools/probe-contact-motion-domain.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc generated/atan-q16.inc
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -o $@ $<
+
+.PHONY: probe-contact-motion-domain
+probe-contact-motion-domain: build/probe-contact-motion-domain
+	./build/probe-contact-motion-domain
+
 build/smoke-trig-test: tests/core/SmokeTrigTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc
 	@mkdir -p build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/SmokeTrigTest.cpp src/core/GameMakerRandom.cpp
