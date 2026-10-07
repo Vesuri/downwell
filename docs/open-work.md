@@ -406,6 +406,9 @@ validation/binding, results asset staging, initial terrain raster and backing/HU
 setup. Move immutable preparation out of confirmation without overwriting
 the garden/style display owners or introducing another long frame earlier.
 Do not move RNG draws or source-visible Create effects ahead of confirmation.
+The bounded clean-style raster preparation attempt is rejected: do not sweep
+its row budget or scheduling. A replacement must remove the remaining
+synchronous materialization without relying on a long menu dwell.
 
 Reduce remaining mutable room-layer reset/publication at level reentry,
 measured with the natural shop tape (`PROBES=1 bash amiga/profile.sh shop`).

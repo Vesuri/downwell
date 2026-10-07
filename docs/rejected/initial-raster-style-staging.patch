@@ -1,0 +1,147 @@
+diff --git a/amiga/profile_entry.gdb b/amiga/profile_entry.gdb
+index db95fe4f..bdeb2f6f 100644
+--- a/amiga/profile_entry.gdb
++++ b/amiga/profile_entry.gdb
+@@ -10,6 +10,7 @@ if gDownwellProfileFrozen != 1 || gDownwellProfileTargetScene != 3 || gDownwellP
+ end
+ printf "PROFILE natural entry PROBES (instrumented); cold gameplay frame retained; clock_clamps=%lu\n", gDownwellProfileClockClamps
+ printf "ENTRY results bank: eager_uploads=%lu discarded_for_entry=%lu results_frames=%lu\n", gDownwellEntryResultsUploads, gDownwellEntryResultsDiscarded, gDownwellEntryResultsFrames
++printf "ENTRY initial raster: staged_rows=%lu\n", gDownwellEntryInitialRows
+ set $s = 0
+ while $s < 4
+     printf "SCENE %u frames=%lu fields=%lu max_gap=%lu max_frame_ms=%.3f worst_frame=%lu\n", $s, gDownwellProfileFrames[$s], gDownwellProfileFields[$s], gDownwellProfileMaxGap[$s], gDownwellProfileFrameMax[$s]*20.0/80128.0, gDownwellProfileWorstFrame[$s]
+diff --git a/src/platform/amiga/AmigaInitialTerrain.h b/src/platform/amiga/AmigaInitialTerrain.h
+index d58197ec..90ae6a55 100644
+--- a/src/platform/amiga/AmigaInitialTerrain.h
++++ b/src/platform/amiga/AmigaInitialTerrain.h
+@@ -23,9 +23,12 @@ public:
+     }
+     unsigned rows()const{return rows_;}
+     bool copy(unsigned column,std::uint16_t* destination)const{
+-        if(!references_||column>=columns||!destination)return false;
+-        const auto* reference=references_+column*rows_*2;
+-        for(unsigned row=0;row<rows_;++row,reference+=2,destination+=words){
++        return copyRows(column,0,rows_,destination);
++    }
++    bool copyRows(unsigned column,unsigned first,unsigned count,std::uint16_t* destination)const{
++        if(!references_||column>=columns||!destination||first>rows_||count>rows_-first)return false;
++        const auto* reference=references_+(column*rows_+first)*2;
++        for(unsigned row=0;row<count;++row,reference+=2,destination+=words){
+             const auto* source=dictionary_+word(reference)*rowBytes;
+ #ifdef DOWNWELL_PLATFORM_AMIGA
+             std::memcpy(destination,source,rowBytes);
+diff --git a/src/platform/amiga/DownwellAmiga.cpp b/src/platform/amiga/DownwellAmiga.cpp
+index e65d2644..4a4f5171 100644
+--- a/src/platform/amiga/DownwellAmiga.cpp
++++ b/src/platform/amiga/DownwellAmiga.cpp
+@@ -479,6 +479,7 @@ const UBYTE* volatile gDownwellEntryHud=nullptr;
+ volatile ULONG gDownwellEntryHudBytes=0;
+ const UBYTE* volatile gDownwellEntryFields=nullptr;
+ volatile ULONG gDownwellEntryFieldBytes=0;
++volatile ULONG gDownwellEntryInitialRows=0;
+ }
+ #endif
+ static bool selectEntryMaskBank(){
+@@ -1182,6 +1183,7 @@ enum { terrainRasterRows = 8192, terrainRasterWords = AmigaGameplayRows::terrain
+ static AmigaTerrainRaster terrainRaster{};
+ static downwell::PreparedRoomTerrain roomTerrainPlan;
+ static AmigaInitialTerrain initialTerrain;
++static unsigned initialTerrainStagedRows=0;
+ static AmigaWallDamage<> wallDamage;
+ static AmigaWallCollision wallCollision{terrainIndex};
+ static void invalidateShopRaster(const downwell::ShopWorld& shops) {
+@@ -1357,7 +1359,8 @@ static void prepareTerrainRaster(AmigaRenderer* renderer,
+     if(pristine)for(const auto& shop:runtime->shops().instances)if(shop.present)pristine=false;
+     if(pristine){
+         for(unsigned column=0;column<3;++column){
+-            if(!initialTerrain.copy(column,terrainRaster.row(column,0))){terrainPaintSucceeded=false;return;}
++            if(initialTerrainStagedRows!=initialTerrain.rows()*3 &&
++               !initialTerrain.copy(column,terrainRaster.row(column,0))){terrainPaintSucceeded=false;return;}
+ #ifdef DOWNWELL_TERRAIN_BATCH_VERIFY
+             // Full native comparison against the retained painter, which also
+             // checks its own output against the scalar compositor in this build.
+@@ -1969,7 +1972,7 @@ __attribute__((noinline)) static int runDownwell(void) {
+ #endif
+ #if defined(DOWNWELL_TERRAIN_DIRECT) && !defined(DOWNWELL_REFERENCE_INITIAL_TERRAIN) && !defined(DOWNWELL_REFERENCE_INITIAL_RASTER)
+     // Unsupported banks retain the ordinary painter. This admits immutable
+-    // pixels only: publication into the live raster still waits for room entry.
++    // pixels only: using the prepared raster still waits for room admission.
+     const bool initialTerrainReady=initialTerrain.bind(amiga_initial_terrain,
+         amiga_initial_terrain_end-amiga_initial_terrain);
+ #ifdef DOWNWELL_TERRAIN_BATCH_VERIFY
+@@ -2473,6 +2476,7 @@ __attribute__((noinline)) static int runDownwell(void) {
+                     gameplayScene.invalidate();
+                 }
+                 if (presentationChanged && presentedScene == AmigaScene::styleSelect) {
++                    initialTerrainStagedRows=0;
+                     entryHudUpload.invalidate();
+                     entryHudReady=false;
+                     // These framebuffers and copper slots may contain gameplay,
+@@ -2667,6 +2671,9 @@ __attribute__((noinline)) static int runDownwell(void) {
+                     ++gDownwellEntryResultsUploads;
+ #endif
+                     DW_PROFILE_PHASE(profileEntryRaster);
++#ifdef DOWNWELL_PROFILE_ENTRY
++                    gDownwellEntryInitialRows=initialTerrainStagedRows;
++#endif
+                     Bitmap stageClear(stagedBuffer, downwellVisibleWidth,
+                         downwellGameRingHeight, 2, false, false, downwellDmaWidth);
+                     stageClear.clear();
+@@ -2675,6 +2682,7 @@ __attribute__((noinline)) static int runDownwell(void) {
+                         prepareTerrainRaster(&renderer, rooms, mainRoom, builders,
+                             fragments, liveBuilder.fragmentCount(),
+                             generatedDecorations, liveBuilder.decorationCount(), &port, freshlyLoadedRoom);
++                    initialTerrainStagedRows=0;
+                     DW_PROFILE_PHASE(profileEntryBacking);
+                     amigaRendererSetGameOrigin(&renderer, port.ringOrigin());
+                     buildReferencePicture(
+@@ -2877,6 +2885,21 @@ __attribute__((noinline)) static int runDownwell(void) {
+                             fieldBandOffset-downwellTerrainBatchBytes,amiga_field_images,
+                             amiga_field_images_end-amiga_field_images,256);
+ #endif
++#if defined(DOWNWELL_TERRAIN_DIRECT) && !defined(DOWNWELL_REFERENCE_INITIAL_TERRAIN) && !defined(DOWNWELL_REFERENCE_INITIAL_RASTER) && !defined(DOWNWELL_REFERENCE_ENTRY_ASSETS)
++                    // The garden no longer uses this Fast-RAM raster. Prepare
++                    // pixels only; source geometry and pristine admission stay
++                    // at confirmation, and this must not set raster.ready.
++                    if(!presentationChanged&&!style.paintedPixels&&initialTerrain.rows()&&
++                       initialTerrainStagedRows<initialTerrain.rows()*3){
++                        const unsigned column=initialTerrainStagedRows/initialTerrain.rows();
++                        const unsigned row=initialTerrainStagedRows%initialTerrain.rows();
++                        const unsigned count=initialTerrain.rows()-row<16?initialTerrain.rows()-row:16;
++                        if(!initialTerrain.copyRows(column,row,count,terrainRaster.row(column,row))){
++                            exitCode=20;break;
++                        }
++                        initialTerrainStagedRows+=count;
++                    }
++#endif
+ #ifdef DOWNWELL_SCENE_VERIFY
+                     gDownwellStyleMask = style.mask;
+                     gDownwellStyleCopper = styleScene.copper(back).data();
+diff --git a/tools/prepare-initial-terrain.cpp b/tools/prepare-initial-terrain.cpp
+index ddc81ea4..2537d003 100644
+--- a/tools/prepare-initial-terrain.cpp
++++ b/tools/prepare-initial-terrain.cpp
+@@ -72,6 +72,23 @@ int main(int argc,char** argv){
+     for(unsigned column=0;column<3;++column)require(bank.copy(column,actual.data()+1+column*rows*22),"decode initial column");
+     require(std::equal(raster.begin(),raster.end(),actual.begin()+1)&&actual.front()==0xbeef&&actual.back()==0xbeef,"decoded initial raster differs");
+     require(!bank.copy(3,actual.data())&&!bank.copy(0,nullptr),"invalid destination accepted");
++    std::fill(actual.begin(),actual.end(),0xbeef);
++    for(unsigned staged=0;staged<3*unsigned(rows);){
++        const unsigned column=staged/rows,first=staged%rows;
++        const unsigned count=std::min(16u,unsigned(rows)-first);
++        require(bank.copyRows(column,first,count,actual.data()+1+staged*22),"bounded initial staging");
++        staged+=count;
++        require(std::equal(raster.begin(),raster.begin()+staged*22,actual.begin()+1),"staged prefix differs");
++        require(actual.front()==0xbeef&&std::all_of(actual.begin()+1+staged*22,actual.end(),
++            [](UWORD word){return word==0xbeef;}),"staging overwrites untouched suffix");
++    }
++    require(!bank.copyRows(0,rows,1,actual.data())&&!bank.copyRows(0,rows+1,0,actual.data())&&
++        !bank.copyRows(3,0,1,actual.data()),"invalid staging bounds accepted");
++    std::fill(actual.begin(),actual.end(),0xbeef);
++    require(bank.copyRows(0,0,16,actual.data()+1),"short selection staging");
++    for(unsigned column=0;column<3;++column)require(bank.copy(column,actual.data()+1+column*rows*22),"short selection full copy");
++    require(std::equal(raster.begin(),raster.end(),actual.begin()+1)&&actual.front()==0xbeef&&actual.back()==0xbeef,
++        "short selection completion differs");
+     require(!bank.bind(output.data(),output.size()-1)&&!bank.copy(0,actual.data()),"truncation retains stale bank");
+     auto bad=output;bad[12]=bad[13]=255;require(!bank.bind(bad.data(),bad.size()),"invalid row reference accepted");
+     std::ofstream file(argv[4],std::ios::binary);file.write(reinterpret_cast<const char*>(output.data()),output.size());
