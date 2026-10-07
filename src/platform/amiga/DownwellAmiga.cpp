@@ -1432,6 +1432,7 @@ static void buildReferencePicture(
     const AmigaPortRuntime* runtime,
     int viewX, int viewY) {
 
+    DW_PROFILE_SCOPE(profilePictureClear);
     amigaRendererClear(renderer, 0);
     ammoHud.invalidate();
     healthHud.invalidate();
@@ -1439,11 +1440,13 @@ static void buildReferencePicture(
     for (auto& ray : gameplayRays) ray.discard();
     for (auto& field : gameplayFields) field.discard();
     dirtyGameRows(0, 0, downwellGameRingHeight);
+    DW_PROFILE_PHASE(profilePictureTerrain);
     drawMainWorld(renderer, rooms, room, builders,
                   fragments, fragmentCount,
                   decorations, decorationCount, runtime,
                   viewX, viewY);
 
+    DW_PROFILE_PHASE(profilePictureMargins);
     amigaRendererClearClipRect(renderer);
     // PF2 is above all sprites; its nonzero black pen masks the HUD margins.
     amigaRendererFillRect(renderer, 0, 0, downwellPlayfieldX,
@@ -1451,14 +1454,19 @@ static void buildReferencePicture(
     amigaRendererFillRect(renderer, downwellPlayfieldX + downwellPlayfieldWidth,
                           0, downwellVisibleWidth - downwellPlayfieldX - downwellPlayfieldWidth,
                           downwellDisplayHeight, 3);
+    DW_PROFILE_PHASE(profilePictureBorderLeft);
     drawAsset(renderer, 408, 0, 108, 0, 0);
+    DW_PROFILE_PHASE(profilePictureBorderRight);
     drawAsset(renderer, 408, 0, 272, 0, 1);
 
+    DW_PROFILE_PHASE(profilePictureHealth);
     redrawHealth(renderer, 4, 4);
 
+    DW_PROFILE_PHASE(profilePictureAmmoArt);
     drawAsset(renderer, 416, 0, 284, 43, 0);
     amigaRendererFillRect(renderer, 289, 49, 10, 184, 1);
     drawAsset(renderer, 416, 1, 284, 43, 0);
+    DW_PROFILE_PHASE(profilePictureText);
 #if !defined(DOWNWELL_REFERENCE_HUD_WORDS) && !defined(DOWNWELL_REFERENCE_HUD_TEXT)
     // Establish the publisher's ownership with the initial picture. Leaving
     // these on the generic path makes the first pickup redraw static art.
@@ -1469,6 +1477,7 @@ static void buildReferencePicture(
     drawCurrencyDigit(renderer, 354 - currencyShift, 18, 0);
 #endif
     drawAmmoDigit(renderer, 290, 239, 8);
+    DW_PROFILE_PHASE(profilePictureAmmoState);
     // Prepare retained HUD geometry/artwork with the level's initial picture,
     // not on the first shot. Subsequent frames only update changed strips.
     if (runtime) redrawAmmo(renderer, runtime->player().ammo(), runtime->player().ammoCapacity(),

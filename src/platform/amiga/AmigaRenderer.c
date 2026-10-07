@@ -1276,6 +1276,9 @@ void amigaRendererDrawAsset(AmigaRenderer* renderer,
                             UWORD sprite, UWORD frame,
                             int anchorX, int anchorY, int flipX) {
     const UBYTE* record = flipX ? findAsset(pack, packEnd, 62000 + sprite, frame) : 0;
+#ifdef DOWNWELL_REFERENCE_HUD_BORDER
+    if(sprite==408)record=0;
+#endif
     if (record) flipX = 0;
     else record = findAsset(pack, packEnd, sprite, frame);
     const UBYTE* data;

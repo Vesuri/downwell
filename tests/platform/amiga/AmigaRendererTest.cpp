@@ -1155,6 +1155,30 @@ int main(int argc, char** argv) {
     }
     std::ifstream hudInput(argv[2], std::ios::binary);
     const std::vector<UBYTE> hudPack{std::istreambuf_iterator<char>(hudInput), {}};
+    {
+        auto reference=hudPack;
+        auto word=[&](unsigned at){return unsigned(reference[at])*256+reference[at+1];};
+        const unsigned count=word(8)*65536+word(10),directory=word(6);
+        bool found=false;
+        for(unsigned i=0;i<count;++i){
+            const unsigned at=directory+i*24;
+            if(word(at)==62408){
+                // Keep directory ordering while forcing the original reflection.
+                putWord(reference.data(),at,62409);found=true;
+            }
+        }
+        require(found,"offline tablet-border mirror is present");
+        for(int x : {-3,0,108,272,379,384})for(int y : {-17,0,23})
+        for(unsigned background : {0u,0x5au,0xffu}){
+            std::vector<UBYTE> actual(downwellLayerBytes,background),expected(actual);
+            AmigaRenderer a,b;
+            amigaRendererInit(&a,nullptr,actual.data());
+            amigaRendererInit(&b,nullptr,expected.data());
+            amigaRendererDrawAsset(&a,hudPack.data(),hudPack.data()+hudPack.size(),408,0,x,y,1);
+            amigaRendererDrawAsset(&b,reference.data(),reference.data()+reference.size(),408,0,x,y,1);
+            require(actual==expected,"offline border equals runtime reflection, clipped and over existing pixels");
+        }
+    }
 #ifdef DOWNWELL_PREPARED_AMMO_DIVIDERS
     {
         AmigaWordStamp stamps[2];

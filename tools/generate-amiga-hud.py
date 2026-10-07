@@ -706,14 +706,16 @@ def build_records(manifest, extracted, profile, language_path=None):
                                 originX=canvas.height - sprite["originY"],
                                 originY=sprite["originX"])
                 encoded.append((metadata, 768 + frame_index, stride, data))
-            if profile == "game" and sprite_id in (127, 139, 550, 568, 569,
+            if (profile == "hud" and sprite_id == 408) or (profile == "game" and sprite_id in (127, 139, 550, 568, 569,
                     0, 1, 3, 12, 15, 27, 31, 37,
-                    153, 154, 163, 164, 166, 168, 170, 172, 173, 177, 186, 187, 188, 206, 278):
+                    153, 154, 163, 164, 166, 168, 170, 172, 173, 177, 186, 187, 188, 206, 278)):
                 mirrored = canvas.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
                 pixels = [pixel_to_pen(pixel) for pixel in mirrored.get_flattened_data()]
                 stride, data = encode_planar(pixels, mirrored.width, mirrored.height)
                 metadata = dict(sprite, id=62000 + sprite_id,
                                 originX=sprite["width"] - sprite["originX"])
+                require(decode_planar(data, mirrored.width, mirrored.height, stride) == pixels,
+                        "mirrored planar round trip failed")
                 encoded.append((metadata, frame_index, stride, data))
             if profile == "game" and sprite_id in (27, 43, 44):
                 # Style bobs contain large transparent margins. Trim offline
