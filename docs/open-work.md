@@ -401,8 +401,8 @@ Preserve the original heading, icon and carousel animation.
 
 Remove the synchronous cold gameplay handoff exposed by `profile.sh entry`.
 The last style frame owns that work; the first gameplay frame must not be
-discarded either. Remaining synchronous work includes the small-field bank
-upload, results asset staging, initial terrain raster and backing/HUD
+discarded either. Remaining synchronous work includes small-field bank
+validation/binding, results asset staging, initial terrain raster and backing/HUD
 setup. Move immutable preparation out of confirmation without overwriting
 the garden/style display owners or introducing another long frame earlier.
 Do not move RNG draws or source-visible Create effects ahead of confirmation.

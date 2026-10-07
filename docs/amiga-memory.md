@@ -44,7 +44,9 @@ into three banks:
   every draw-list frame against this bank.
 
 The front bank puts its complete directory and all live garden/style payloads
-in a 60,204-byte prefix. Only one-shot garden scenery follows that prefix;
+in a 60,792-byte prefix. Within it, all style-readable resources and the
+complete directory occupy the first 32,886 bytes. Only one-shot garden
+scenery follows the live prefix;
 `AmigaGardenScene::prepare` copies it into the scrolling canvases before any
 staging starts. Writable sprite DMA headers never alias another payload.
 The generator emits `DOWNWELL_FRONT_LIVE_BYTES`, and the target statically
@@ -52,6 +54,12 @@ checks that it ends before byte 75,360. After the first garden frame retires
 the previous scene, each garden update stages at most 256 words of immutable
 large-field arcs at that offset. No live front artwork or canvas is modified.
 This borrows existing Chip storage, rather than allocating another bank.
+After garden DMA retires, clean-content style updates stage at most 256 words
+of small-field images into `[44304,73568)`. The generated
+`DOWNWELL_FRONT_STYLE_BYTES` bound keeps every style source below that range;
+payloads cannot alias across these lifetime boundaries. The complete front
+file is 92,670 bytes. Its retired garden payload is not read again before a
+front-bank reload.
 
 The two scene banks are files beside the executable. Each load is a single
 `Open`/`Read`/`Close` of the whole file into the shared Chip region, through
@@ -77,10 +85,12 @@ blit plans remain resident through level-clear/upgrade and the next level;
 those scenes do not overwrite their ranges. Each entry still resets both
 overlays and rebinds their backing/terrain pointers. Invalidate residency
 before any boot/front bank load, including a failed load. Entry completes any
-unfinished staged arc upload (including skipped/short garden paths), then
-binds the immutable plans; partially uploaded arcs are never exposed to DMA.
-`REFERENCE_FIELD_BANK=1` retains synchronous entry uploads without garden
-staging. Terrain scratch writes are confined to the prefix and
+unfinished staged image upload (including skipped/short garden or style
+paths), then binds the immutable plans; partially uploaded images are never
+exposed to DMA. Upload completion and bound-bank residency are separate:
+preloading small images must not skip first-entry large-field plan setup.
+`REFERENCE_FIELD_BANK=1` retains synchronous entry uploads without garden or
+style staging. Terrain scratch writes are confined to the prefix and
 do not invalidate the field banks. No extra Chip allocation is required.
 The results, clear-scene and field-reentry fixtures cover that path. Small
 fields restore their masks from the pristine terrain ring

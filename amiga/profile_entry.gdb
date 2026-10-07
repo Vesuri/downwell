@@ -29,6 +29,7 @@ while $s < 4
     set $s = $s + 1
 end
 dump binary memory .run/entry-hud.bin gDownwellEntryHud gDownwellEntryHud+gDownwellEntryHudBytes
+dump binary memory .run/entry-fields.bin gDownwellEntryFields gDownwellEntryFields+gDownwellEntryFieldBytes
 printf "DOWNWELL_PROFILE_READY\n"
 shell touch .run/gdb-ready.marker
 detach

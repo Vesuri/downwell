@@ -646,6 +646,11 @@ reference selector for reentry timing. Profiling restoration unsets it.
 `REFERENCE_FIELD_BANK=1` forces field-image/arc uploads on every gameplay
 entry. The default retains those immutable Chip ranges across upgrade and
 level reentry, invalidating them before a boot/front bank load. Both paths
+retain synchronous completion for short/skipped menus; the default stages
+arc images during the garden and small images after garden retirement.
+`profile.sh entry` compares the resident small-image bank byte for byte with
+the offline pack after natural entry. Upload completion does not establish
+bound-bank residency or skip large-field plan initialization. Both paths
 discard per-ring overlays and rebind their underlays. Pair the natural shop
 tape for field-binding phase and full-frame timings; `SHOP_FIELD_BANK`
 reports the two entries as uploads/reuses. Use `make verify-prepared-time-fields`

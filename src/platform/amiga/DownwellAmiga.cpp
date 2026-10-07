@@ -477,6 +477,8 @@ volatile ULONG gDownwellEntryResultsDiscarded=0;
 volatile ULONG gDownwellEntryResultsFrames=0;
 const UBYTE* volatile gDownwellEntryHud=nullptr;
 volatile ULONG gDownwellEntryHudBytes=0;
+const UBYTE* volatile gDownwellEntryFields=nullptr;
+volatile ULONG gDownwellEntryFieldBytes=0;
 }
 #endif
 static bool selectEntryMaskBank(){
@@ -2559,12 +2561,18 @@ __attribute__((noinline)) static int runDownwell(void) {
                     const bool fieldBankResident=gameplayFields.resident(
                         sceneBank+downwellTerrainBatchBytes,amiga_field_images,
                         amiga_field_images_end-amiga_field_images);
+                    DW_PROFILE_PHASE(profileEntrySmallFields);
                     if(fieldBandOffset<downwellTerrainBatchBytes || !gameplayFields.bind(
                         sceneBank+downwellTerrainBatchBytes,fieldBandOffset-downwellTerrainBatchBytes,
                         amiga_field_images,amiga_field_images_end-amiga_field_images,memory.game())){
                         exitCode=20;break;
                     }
+#ifdef DOWNWELL_PROFILE_ENTRY
+                    gDownwellEntryFields=sceneBank+downwellTerrainBatchBytes;
+                    gDownwellEntryFieldBytes=amiga_field_images_end-amiga_field_images;
+#endif
                     if(!fieldBankResident){
+                        DW_PROFILE_PHASE(profileEntryLargeFields);
                         amigaBlitterBindFieldBands(sceneBank+fieldBandOffset);
                         ++gDownwellFieldBankUploads;
                     }else ++gDownwellFieldBankReuses;
@@ -2860,6 +2868,14 @@ __attribute__((noinline)) static int runDownwell(void) {
                         entryHudReady=entryHudUpload.step(memory.menuForeground()+layout.hudOffset,
                             amiga_hud_pack,bytes,256);
                     }
+#endif
+#if defined(DOWNWELL_PREPARED_FIELDS) && !defined(DOWNWELL_REFERENCE_FIELD_BANK)
+                    static_assert(DOWNWELL_FRONT_STYLE_BYTES<=downwellTerrainBatchBytes,
+                        "Small-field staging must not overwrite style sources");
+                    if(!presentationChanged&&!style.paintedPixels)
+                        gameplayFields.stageBank(sceneBank+downwellTerrainBatchBytes,
+                            fieldBandOffset-downwellTerrainBatchBytes,amiga_field_images,
+                            amiga_field_images_end-amiga_field_images,256);
 #endif
 #ifdef DOWNWELL_SCENE_VERIFY
                     gDownwellStyleMask = style.mask;

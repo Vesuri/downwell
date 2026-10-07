@@ -122,6 +122,25 @@ int main(){
     require(candidate->bind(alternate.data(),alternate.size(),pack.data(),pack.size()),"different destination admission");
     require(!candidate->resident(storage.data(),pack.data(),pack.size()),"old region no longer owned");
     require(candidate->bind(storage.data(),storage.size(),pack.data(),pack.size()),"restore destination");
+    candidate->invalidateBank();
+    std::fill(storage.begin(),storage.end(),0x59);
+    require(!candidate->stageBank(storage.data(),storage.size(),malformed.data(),malformed.size(),256),"reject malformed staging");
+    require(std::all_of(storage.begin(),storage.end(),[](UBYTE b){return b==0x59;}),"failed staging writes nothing");
+    for(unsigned copied=0;copied<pack.size();copied+=512){
+        const unsigned end=std::min<unsigned>(copied+512,pack.size());
+        require(candidate->stageBank(storage.data(),storage.size(),pack.data(),pack.size(),256)==(end==pack.size()),"bounded upload completion");
+        require(!candidate->resident(storage.data(),pack.data(),pack.size()),"uploaded is not bound");
+        require(std::equal(pack.begin(),pack.begin()+end,storage.begin()),"staged prefix exact");
+        require(std::all_of(storage.begin()+end,storage.end(),[](UBYTE b){return b==0x59;}),"upload preserves suffix and backing");
+    }
+    storage[Pair::headerBytes]^=0xff;
+    require(candidate->bind(storage.data(),storage.size(),pack.data(),pack.size()),"bind completed upload");
+    require(storage[Pair::headerBytes]==UBYTE(pack[Pair::headerBytes]^0xff),"completed upload is not repeated at bind");
+    candidate->invalidateBank();
+    std::fill(storage.begin(),storage.end(),0x59);
+    require(!candidate->stageBank(storage.data(),storage.size(),pack.data(),pack.size(),1),"short selection upload incomplete");
+    require(candidate->bind(storage.data(),storage.size(),pack.data(),pack.size()),"short selection synchronous completion");
+    require(std::equal(pack.begin(),pack.end(),storage.begin()),"short selection has complete bank");
     std::vector<UBYTE> actual[2],expected[2];
     unsigned random=192387;
     auto next=[&](){random=random*1664525u+1013904223u;return random;};

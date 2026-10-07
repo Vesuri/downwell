@@ -248,6 +248,10 @@ FRONT_BANK_IDS = {43, 44, 65401, 65410, 65411, *range(65000, 65006),
 # garden's well-surface tile, the style border tiles, and the player run
 # frames the verification-only style oracle draws.
 FRONT_SHARED = lambda ident, frame: (ident, frame) in ((76, 0), (51, 7), (51, 13)) or ident == 27
+# Includes the scalar style oracle as well as the retained renderer. Garden
+# title/scenery and its writable hardware sprites retire before this subset.
+FRONT_STYLE_IDS = {27, 43, 44, 51, 65401, 65410, 65411,
+                   *range(65000, 65006), *range(65500, 65504)}
 # The uncropped title fade is a host oracle only; targets use the aligned form.
 DROPPED_IDS = {654}
 
@@ -1013,6 +1017,10 @@ def front_live(sprite):
     return sprite["id"] not in FRONT_BANK_FRAMES and sprite["id"] != 76
 
 
+def front_lifetime(sprite):
+    return 0 if sprite["id"] in FRONT_STYLE_IDS else 1 if front_live(sprite) else 2
+
+
 def pack_records(encoded, live_prefix=False):
     # Keep the on-disk directory ordered so the 68000 renderer can locate a
     # frame with a short binary search instead of repeatedly walking records
@@ -1022,29 +1030,33 @@ def pack_records(encoded, live_prefix=False):
     payload_offset = HEADER.size + RECORD.size * len(encoded)
     records = []
     payload = bytearray()
-    live_payload = b""
-    cold_started = False
+    prior_payload = bytearray()
+    current_group = 0
     offsets = {}
     immutable_payloads = {}
+    def lifetime(item):
+        return front_lifetime(item[0]) if live_prefix else 0
     planar_orders = {group: planar_payload_order(
         item[3] for item in encoded if not item[0].get("hardware") and
-        (not live_prefix or not front_live(item[0])) == group)
-        for group in (False, True)}
+        lifetime(item) == group)
+        for group in range(3 if live_prefix else 1)}
     # Gameplay DMA words are copied into channel slots, not read by DMA here.
     # Keep them at the end so the target can leave this tail in Fast RAM.
     for sprite, frame_index, dma_width, planar in sorted(
             encoded, key=lambda item: (
-                live_prefix and not front_live(item[0]),
+                lifetime(item),
                 2 if item[0].get("hardwareParts") else 1 if item[0].get("hardware") else 0,
                 0 if item[0].get("hardware") else
-                planar_orders[not live_prefix or not front_live(item[0])][item[3]])):
-        if live_prefix and not front_live(sprite) and not cold_started:
-            # Do not let immutable cold bytes alias writable live DMA words.
-            live_payload = bytes(payload)
+                planar_orders[lifetime(item)][item[3]])):
+        group = front_lifetime(sprite) if live_prefix else 0
+        if group != current_group:
+            # No sharing across lifetime boundaries: the next group may be
+            # overwritten while an earlier group is still a live DMA source.
+            prior_payload.extend(payload)
             payload_offset += len(payload)
             payload = bytearray()
             immutable_payloads = {}
-            cold_started = True
+            current_group = group
         # Planar art/masks are immutable. Identical frames and symmetric
         # variants can share bytes without changing any resource/frame ID.
         # Garden DMA records contain writable position headers: never alias
@@ -1065,7 +1077,7 @@ def pack_records(encoded, live_prefix=False):
     source_prefix = bytes.fromhex(SOURCE_SHA256)[:8]
     return b"".join((
         HEADER.pack(MAGIC, VERSION, HEADER.size, len(encoded), source_prefix),
-        b"".join(records), live_payload, bytes(payload)))
+        b"".join(records), bytes(prior_payload), bytes(payload)))
 
 
 def build_exit_mask(pack, stride=48, left=110):
@@ -1164,7 +1176,7 @@ def main():
             "profile": profile, "packSha256": digest,
             "languageSha256": hashlib.sha256(args.language.read_bytes()).hexdigest(),
             "layout": "word-aligned-tail-or-disjoint-paths-with-joined-containment",
-            **({"sceneBanks": "game-boot-front-v2-live-prefix"} if profile in ("game", "boot", "front") else {}),
+            **({"sceneBanks": "game-boot-front-v3-style-prefix"} if profile in ("game", "boot", "front") else {}),
         }, indent=2).encode() + b"\n"
         if args.check:
             require(packing_path.read_bytes() == packing_provenance, "packing provenance differs")
@@ -1179,6 +1191,9 @@ def main():
         live_end = max(r[8] + r[9] for r in
             (RECORD.unpack_from(front, HEADER.size + i * RECORD.size)
              for i in range(len(banks["front"]))) if front_live({"id": r[0]}))
+        style_end = max(r[8] + r[9] for r in
+            (RECORD.unpack_from(front, HEADER.size + i * RECORD.size)
+             for i in range(len(banks["front"]))) if r[0] in FRONT_STYLE_IDS)
         emit("boot", args.output.with_name("amiga-boot.dwap"), pack_records(banks["boot"]))
         digest = emit("front", args.output.with_name("amiga-front.dwap"), front)
         emit("game", args.output, data)
@@ -1188,7 +1203,8 @@ def main():
                  b"#pragma once\n"
                  + f"#define DOWNWELL_BOOT_BANK_BYTES {len(pack_records(banks['boot']))}UL\n"
                    f"#define DOWNWELL_FRONT_BANK_BYTES {len(front)}UL\n"
-                   f"#define DOWNWELL_FRONT_LIVE_BYTES {live_end}UL\n".encode())
+                   f"#define DOWNWELL_FRONT_LIVE_BYTES {live_end}UL\n"
+                   f"#define DOWNWELL_FRONT_STYLE_BYTES {style_end}UL\n".encode())
         sizes_path = args.output.with_name("amiga-scene-banks.h")
         if args.check:
             require(sizes_path.read_bytes() == sizes, "scene bank sizes differ")

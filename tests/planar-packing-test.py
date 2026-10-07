@@ -73,6 +73,13 @@ for bank in ("game", "boot", "front"):
         # Every still-readable source stays below the field-bank staging area;
         # only one-shot garden scenery can be overwritten after cache creation.
         assert max(a[8]+a[9] for a in actual if pack.front_live({"id": a[0]})) <= 75360
+        assert max(a[8]+a[9] for a in actual if a[0] in pack.FRONT_STYLE_IDS) <= 44304
+        retired = bytearray(optimized)
+        retired[44304:75360] = bytes([0xa5]) * (75360-44304)
+        assert retired[:20+len(actual)*24] == optimized[:20+len(actual)*24]
+        for a in actual:
+            if a[0] in pack.FRONT_STYLE_IDS:
+                assert retired[a[8]:a[8]+a[9]] == optimized[a[8]:a[8]+a[9]]
     assert len(actual) == len(expected)
     total += len(actual)
     for a, b in zip(actual, expected):

@@ -58,6 +58,7 @@ enum DownwellProfilePhase {
     profileEntryFields, profileEntryWorld, profileEntryAssets,
     profileEntryRaster, profileEntryBacking,
     profileEntryHudCopy, profileEntryHudBind, profileEntryResultsCopy,
+    profileEntrySmallFields, profileEntryLargeFields,
     profilePhaseCount
 };
 

@@ -1,6 +1,8 @@
 #ifndef DOWNWELL_AMIGA_PREPARED_TIME_FIELDS_H
 #define DOWNWELL_AMIGA_PREPARED_TIME_FIELDS_H
 #include "AmigaGoalField.h"
+#include "AmigaImmutableUpload.h"
+#include <cstdint>
 
 // Ops captures into a 64x56 two-plane backing and mask-blits from that layout
 // into a 384x320 game ring. Native Ops uses the shared Bitmap implementation;
@@ -202,16 +204,45 @@ private:
     UBYTE* residentRegion_=nullptr;
     const UBYTE* residentPack_=nullptr;
     unsigned residentBytes_=0;
+    AmigaImmutableUpload upload_;
+    UBYTE* stagedRegion_=nullptr;
+    const UBYTE* stagedPack_=nullptr;
+    unsigned stagedBytes_=0;
+    bool stagedReady_=false;
+    static bool validPack(const UBYTE* pack,unsigned packBytes){
+        if(!pack||packBytes<headerBytes||packBytes>headerBytes+65535u*imageBytes||
+            pack[0]!='D'||pack[1]!='W'||pack[2]!='F'||pack[3]!='I'||word(pack+4)!=1||
+            word(pack+8)!=64||word(pack+10)!=56||word(pack+12)!=32||word(pack+14)!=28)return false;
+        const unsigned count=word(pack+6);
+        if(!count||packBytes!=headerBytes+count*imageBytes)return false;
+        for(unsigned i=0;i<512;++i)if(word(pack+16+i*2)>=count)return false;
+        return true;
+    }
 public:
     static unsigned storageBytes(unsigned packBytes) { return ((packBytes+3)&~3u)+2*backingBytes; }
     // The caller owns the shared Chip region. Invalidate before any other
     // scene writes it, even when that scene's load subsequently fails.
     void invalidateBank(){
         residentRegion_=nullptr;residentPack_=nullptr;residentBytes_=0;
+        upload_.invalidate();stagedRegion_=nullptr;stagedPack_=nullptr;
+        stagedBytes_=0;stagedReady_=false;
         for(auto& overlay:overlays_)overlay.discard();
     }
     bool resident(const UBYTE* region,const UBYTE* pack,unsigned packBytes)const{
         return residentRegion_&&residentRegion_==region&&residentPack_==pack&&residentBytes_==packBytes;
+    }
+    // An upload is not a bound bank. Entry must still bind the overlays and
+    // initialize the companion large-field plans after all scene DMA retires.
+    bool stageBank(UBYTE* region,unsigned bytes,const UBYTE* pack,unsigned packBytes,unsigned words){
+        if(!region||!pack||packBytes>bytes||bytes<storageBytes(packBytes)||
+            ((reinterpret_cast<unsigned long>(region)|reinterpret_cast<unsigned long>(pack))&1))return false;
+        if(stagedRegion_!=region||stagedPack_!=pack||stagedBytes_!=packBytes){
+            if(!validPack(pack,packBytes))return false;
+            stagedRegion_=region;stagedPack_=pack;stagedBytes_=packBytes;
+            stagedReady_=false;upload_.invalidate();
+        }
+        stagedReady_=upload_.step(reinterpret_cast<UWORD*>(region),reinterpret_cast<const UWORD*>(pack),packBytes/2,words);
+        return stagedReady_;
     }
     bool bind(UBYTE* region,unsigned bytes,const UBYTE* pack,unsigned packBytes,const UBYTE* terrain=nullptr) {
         // Source bytes are immutable. Rebinding still discards both overlays:
@@ -222,15 +253,10 @@ public:
             overlays_[0].bind(region,backing,terrain);overlays_[1].bind(region,backing+backingBytes,terrain);
             return true;
         }
-        if(!region||!pack||packBytes<headerBytes||packBytes>headerBytes+65535u*imageBytes||
-            bytes<storageBytes(packBytes)||
-            pack[0]!='D'||pack[1]!='W'||pack[2]!='F'||pack[3]!='I'||word(pack+4)!=1||
-            word(pack+8)!=64||word(pack+10)!=56||word(pack+12)!=32||word(pack+14)!=28)return false;
-        const unsigned count=word(pack+6);
-        if(!count||packBytes!=headerBytes+count*imageBytes)return false;
-        for(unsigned i=0;i<512;++i)if(word(pack+16+i*2)>=count)return false;
+        if(!region||!validPack(pack,packBytes)||bytes<storageBytes(packBytes))return false;
         for(auto& overlay:overlays_)overlay.discard();
-        for(unsigned i=0;i<packBytes;++i)region[i]=pack[i];
+        if(!stagedReady_||stagedRegion_!=region||stagedPack_!=pack||stagedBytes_!=packBytes)
+            for(unsigned i=0;i<packBytes;++i)region[i]=pack[i];
         UBYTE* backing=region+((packBytes+3)&~3u);
         overlays_[0].bind(region,backing,terrain);overlays_[1].bind(region,backing+backingBytes,terrain);
         residentRegion_=region;residentPack_=pack;residentBytes_=packBytes;

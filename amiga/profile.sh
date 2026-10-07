@@ -159,6 +159,7 @@ GDB_SOURCE="$script" READY_MARKER=DOWNWELL_PROFILE_READY \
 READY_DESCRIPTION="bounded scene profile" bash verify_startup.sh
 if [[ ${PROFILE_ENTRY:-0} == 1 ]]; then
   cmp .run/entry-hud.bin ../generated/amiga-hud.dwap
+  cmp .run/entry-fields.bin ../generated/amiga-field-images.bin
 fi
 cp .run/gdb-startup.log ".run/profile-${mode}.log"
 if [[ ${GENERATION_TIMING:-0} == 1 ]] && ! grep -q '^PHASE coarse:' ".run/profile-${mode}.log"; then
