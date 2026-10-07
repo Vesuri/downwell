@@ -32,6 +32,7 @@
 #include "PlayerDamage.h"
 #include "PlayerDamageNumbers.h"
 #include "RunnerPointDirection.h"
+#include "ContactCoordinates.h"
 #include "PortableAtan.h"
 #include "TableAtan.h"
 #include "ForcedPlayerJump.h"
@@ -140,15 +141,11 @@ struct RunSession {
             result.add(MotionBinary64::fromInteger(origin));
             return result;
         };
-        const auto px = coordinate(playerX, originX), py = coordinate(playerY, originY);
-        auto cx = MotionBinary64::fromInteger(callerX), cy = MotionBinary64::fromInteger(callerY);
-        MotionBinary64 direction;
+        MotionBinary64 px,py,direction;
         bool directed,tableDirection=false;
         {
             DW_PROFILE_SCOPE(profileContactDirection);
-            directed=cx.add(MotionBinary64::fromInteger(originX)) &&
-                cy.add(MotionBinary64::fromInteger(originY)) &&
-                RunnerPointDirection::evaluate(cx,cy,px,py,direction,
+            const auto atan=
 #ifdef DOWNWELL_TRACE_CONTACT_DIRECTION
                     [&](MotionBinary64 dy,MotionBinary64 dx,MotionBinary64& result){
                         // Test-only observation of the actual narrowed inputs;
@@ -169,7 +166,21 @@ struct RunSession {
                         return tableDirection||portableAtan(dy,dx,result);
                     }
 #endif
-                );
+                ;
+#ifndef DOWNWELL_REFERENCE_CONTACT_COORDINATES
+            ContactCoordinates contact;
+            if(contact.prepare(playerX,playerY,callerX,callerY,originX,originY)){
+                px=contact.playerX;py=contact.playerY;
+                directed=RunnerPointDirection::fromDifferences(contact.dx,contact.dy,direction,atan);
+            }else
+#endif
+            {
+                px=coordinate(playerX,originX);py=coordinate(playerY,originY);
+                auto cx=MotionBinary64::fromInteger(callerX),cy=MotionBinary64::fromInteger(callerY);
+                directed=cx.add(MotionBinary64::fromInteger(originX))&&
+                    cy.add(MotionBinary64::fromInteger(originY))&&
+                    RunnerPointDirection::evaluate(cx,cy,px,py,direction,atan);
+            }
         }
         if (!directed) {
             effectsSucceeded = false;

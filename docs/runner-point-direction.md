@@ -63,6 +63,27 @@ approximating collision, damage, RNG, or other gameplay decisions.
 
 ## Compact presentation direction
 
+### Exact contact-coordinate admission
+
+`ContactCoordinates` removes the world-origin addition/subtraction round trip
+only when all four absolute contact coordinates lie in [-65536,65536] on the
+Q8 lattice. Every such coordinate has an integer numerator of magnitude at
+most 2^24, so the wrapper's binary32 argument narrowing changes no bits.
+Subtracting two admitted coordinates is exact in binary64. The difference
+has a signed numerator bounded by 2^25; narrowing that integer and scaling
+by 2^-8 therefore reproduces the wrapper's binary32 difference, including
+nearest-even ties. All values are normal or zero, so scaling introduces no
+underflow/overflow boundary. Admission sums use int64, including caller plus
+origin, before any narrowing. A rejected admission publishes nothing.
+
+The exact absolute player coordinates still feed synchronous damage-number
+creation. Only the already-narrowed differences enter `fromDifferences`, which
+retains the axis cases, atan selection and every subsequent degree rounding
+boundary. This does not extend the table-atan domain or its motion certificate.
+`REFERENCE_CONTACT_COORDINATES=1` selects the full coordinate wrapper on both
+builds. `make verify-contact-coordinates` checks boundary, fractional, signed
+and independently varied origins against that wrapper.
+
 Both builds use `TableAtan.h` for contact damage-number direction only.
 `DOWNWELL_PORTABLE_CONTACT_ATAN` (Amiga: `TABLE_CONTACT_ATAN=0`) selects the
 retained calculation, which also remains the fallback for inputs outside the

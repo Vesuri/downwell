@@ -44,6 +44,9 @@ endif
 ifeq ($(REFERENCE_CONTACT_MOTION),1)
 CXXFLAGS += -DDOWNWELL_REFERENCE_CONTACT_MOTION
 endif
+ifeq ($(REFERENCE_CONTACT_COORDINATES),1)
+CXXFLAGS += -DDOWNWELL_REFERENCE_CONTACT_COORDINATES
+endif
 LDFLAGS  := $(SDL_LDFLAGS)
 
 SOURCES := \
@@ -586,6 +589,13 @@ build/contact-motion-test: tests/core/ContactMotionTest.cpp $(wildcard src/core/
 	@mkdir -p build
 	$(CXX) $(CXXFLAGS) -Isrc -o $@ $<
 .PHONY: verify-contact-motion
+build/contact-coordinates-test: tests/core/ContactCoordinatesTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -Isrc -o $@ $<
+.PHONY: verify-contact-coordinates
+verify-contact-coordinates: build/contact-coordinates-test
+	./build/contact-coordinates-test
+test: verify-contact-coordinates
 verify-contact-motion: build/contact-motion-test
 	./build/contact-motion-test
 test: verify-contact-motion

@@ -291,9 +291,9 @@ remaining structure, not retune the prepared row program or its helpers.
 
 ### B. Contact damage number (frames 645 and 646)
 
-The remaining contact-pair damage-number work is about 14 ms, above its
-10 ms target. At 645, creation costs 8.30 ms, including 4.25 ms in
-`RunnerPointDirection::evaluate`. At 646, first Step costs 5.64 ms, including
+The remaining contact-pair damage-number work is about 11 ms, above its
+10 ms target. At 645, creation costs 5.53 ms, including 2.67 ms in the
+retained post-difference direction calculation. At 646, first Step costs about 5.8 ms, including
 3.39 ms in the certified motion decoder and wrappers. Subsequent motion and
 damping cost about 2.1 ms per frame; leave their individual helpers alone.
 Preserve bit-identical direction, speed and positions and keep frame 646
@@ -307,6 +307,13 @@ under 80 ms while removing remaining threshold-sized computations.
   contact adapter/first Step, not tune sub-millisecond decoder or arithmetic
   helpers. Do not substitute trigonometric identities or reduced precision.
 - A faster generic binary64 multiply is a helper substitution, not this item.
+- Keep exact Q8 coordinate admission and the full-wrapper fallback
+  (`REFERENCE_CONTACT_COORDINATES=1`). Do not tune the sub-millisecond
+  coordinate adapter or the now-under-3-ms direction calculation.
+- Restore the damage-number worlds fixture's reset-after-capacity-failure
+  check (`make verify-damage-number-worlds`, assertion at `host.reset`). It
+  currently fails with both contact-coordinate paths; preserve failure
+  propagation before reset rather than suppressing the assertion.
 
 ### C. Combat composition shortfall
 

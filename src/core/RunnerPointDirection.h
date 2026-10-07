@@ -33,6 +33,12 @@ struct RunnerPointDirection {
         auto x=x2.promoted(),y=y2.promoted(),nx=x1.promoted(),ny=y1.promoted();
         nx.high^=0x80000000u;ny.high^=0x80000000u;
         if(!x.add(nx) || !y.add(ny) || !dx.assign(x) || !dy.assign(y))return false;
+        return fromDifferences(dx,dy,output,atan);
+    }
+    // Already narrowed differences, including their signs, from a proved
+    // coordinate domain. Keep every subsequent runner rounding boundary.
+    template<class Atan> static bool fromDifferences(RunnerImageValue dx,RunnerImageValue dy,
+        MotionBinary64& output,Atan atan){
         if(!(dx.bits&0x7fffffffu)){
             output=MotionBinary64::fromInteger(!(dy.bits&0x7fffffffu)?0:(dy.bits>>31?90:270));
             return true;
