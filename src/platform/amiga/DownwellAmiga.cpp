@@ -416,6 +416,8 @@ extern "C" {
 extern volatile ULONG gDownwellProfileTargetFrames,gDownwellProfileFrames[4];
 volatile ULONG gDownwellShopProfileFrames[2],gDownwellShopProfileFailures;
 volatile ULONG gDownwellShopProfileSideFrames,gDownwellShopProfileMenuFrames,gDownwellShopProfileDone;
+const UBYTE* volatile gDownwellShopHud=nullptr;
+volatile ULONG gDownwellShopHudBytes=0;
 }
 #endif
 #ifdef DOWNWELL_NATURAL_VERIFY
@@ -661,6 +663,7 @@ volatile LONG gDownwellCaptureViewX, gDownwellCaptureViewY;
 #ifdef DOWNWELL_RESULTS_RESTART_VERIFY
 volatile ULONG gDownwellResultsRestartCount;
 volatile ULONG gDownwellResultsRestartMask;
+volatile ULONG gDownwellResultsHudChecks, gDownwellResultsHudFailures;
 __attribute__((noinline, used)) void downwellResultsRestartReady() { __asm__ volatile("" ::: "memory"); }
 #endif
 #endif
@@ -2502,6 +2505,8 @@ __attribute__((noinline)) static int runDownwell(void) {
                 presentedSplashDither = scenes.splashDitherFrame();
                 if (presentationChanged && priorPresentedScene == AmigaScene::gameplay &&
                     presentedScene != AmigaScene::gameplay) {
+                    entryHudUpload.invalidate();
+                    entryHudReady=false;
                     // Gameplay reused the intro storage. Retire all DMA before
                     // rebuilding either destination; never draw over a live ring.
                     splashBlankList.reset();
@@ -2681,12 +2686,21 @@ __attribute__((noinline)) static int runDownwell(void) {
 #endif
                     for (unsigned byte = 0; byte < hudBytes; ++byte)
                         hudStorage[byte] = amiga_hud_pack[byte];
-                    // This certificate covers this handoff only. Later scene
-                    // owners may rewrite the retired garden allocation.
+                    // Gameplay and upgrade banks reserve this same high-end
+                    // region. Keep residency across level handoffs; garden
+                    // reuse and fresh style preparation invalidate it first.
                     entryHudUpload.invalidate();
-                    entryHudReady=false;
+                    entryHudReady=true;
                     activeHudPack = hudStorage;
                     activeHudPackEnd = activeHudPack + hudBytes;
+#ifdef DOWNWELL_RESULTS_RESTART_VERIFY
+                    // Verify residency after the actual presentation handoff,
+                    // including garden/style writers and direct Retry reuse.
+                    for(unsigned byte=0;byte<hudBytes;++byte)
+                        if(activeHudPack[byte]!=amiga_hud_pack[byte])
+                            ++gDownwellResultsHudFailures;
+                    ++gDownwellResultsHudChecks;
+#endif
 #ifdef DOWNWELL_PROFILE_ENTRY
                     gDownwellEntryHud=activeHudPack;
                     gDownwellEntryHudBytes=hudBytes;
@@ -3207,6 +3221,8 @@ __attribute__((noinline)) static int runDownwell(void) {
                 for(unsigned i=0;i<16;++i)if(port.randomState().stateWord(i)!=downwell::shopProfileRandom[i+2])++gDownwellShopProfileFailures;
                 if(port.dead()||port.cameraOffsetX()||port.shops().noControl)++gDownwellShopProfileFailures;
                 gDownwellShopProfileDone=1;
+                gDownwellShopHud=activeHudPack;
+                gDownwellShopHudBytes=activeHudPackEnd-activeHudPack;
 #ifdef DOWNWELL_PREPARED_FIELDS
                 // Keep both diagnostics in the forced-upload reference too;
                 // LTO otherwise drops its provably unused reuse counter.

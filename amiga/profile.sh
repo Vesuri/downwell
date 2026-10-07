@@ -194,6 +194,10 @@ elif [[ $mode == draw-order ]]; then
 elif [[ $mode == ammo ]]; then
   grep '^AMMO' ".run/profile-${mode}.log"
 elif [[ $mode == shop || $mode == terrain-shop ]]; then
+  if [[ $mode == shop ]]; then
+    cmp ../generated/amiga-hud.dwap .run/shop-profile-hud.bin
+    echo "SHOP_HUD resident bank matches offline source byte-for-byte"
+  fi
   grep '^SHOP_' ".run/profile-${mode}.log"
 else
   sed -n '/PROFILE/,$p' ".run/profile-${mode}.log"

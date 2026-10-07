@@ -13,11 +13,31 @@ static std::vector<std::uint8_t> read(const char* path) {
     return {std::istreambuf_iterator<char>(input), {}};
 }
 int main(int argc, char** argv) {
-    require(argc == 3, "clear artwork and mask required");
+    require(argc == 3 || argc == 4, "clear artwork and mask required; optional resident HUD");
     auto art = read(argv[1]), mask = read(argv[2]);
     require(!art.empty() && (mask.size() == AmigaExitMask::bytes ||
         mask.size() == AmigaExitMask::selectionBytes), "read offline assets");
     const auto artOriginal = art, maskOriginal = mask;
+    if(argc==4){
+        const auto hud=read(argv[3]);
+        require(!hud.empty(),"read resident HUD bank");
+        const auto game=GameplaySceneStorage::partition(76800,30720,hud.size());
+        const auto clear=AmigaClearSceneAssets::partition(76800,hud.size());
+        require(game.valid&&clear.valid&&game.hudOffset==clear.hudOffset,
+            "gameplay and upgrades preserve the same resident address");
+        std::vector<std::uint8_t> resident(76800,0xa5);
+        std::memcpy(resident.data()+game.hudOffset,hud.data(),hud.size());
+        AmigaClearSceneAssets scene;
+        for(unsigned level=1;level<=3;++level){
+            const unsigned offers[]={0,6,13,100};
+            require(scene.prepare(resident.data(),resident.size(),hud.size(),art.data(),art.size(),
+                mask.data(),mask.size(),offers,4,1,level),"prepare successive level banks");
+            require(scene.changeOffers(resident.data(),art.data(),art.size(),offers,4,1,level),
+                "replace offers with resident HUD");
+            require(!std::memcmp(resident.data()+game.hudOffset,hud.data(),hud.size()),
+                "every resident HUD byte survives upgrade entry and offer changes");
+        }
+    }
     const auto layout = AmigaClearSceneAssets::partition(76800, 13940);
     require(layout.valid && layout.resultsOffset == 31104 && layout.resultsCapacity == 31756 &&
         layout.hudOffset == 62860, "mask and art coexist without moving relocated HUD");

@@ -12,6 +12,11 @@ if gDownwellProfileFrozen != 1 || gDownwellProfileFrames[3] != gDownwellProfileT
     quit 1
 end
 printf "SHOP_TAPE inputs=%lu/%lu side=%lu menu=%lu final source-state/RNG exact\n", gDownwellShopProfileFrames[0], gDownwellShopProfileFrames[1], gDownwellShopProfileSideFrames, gDownwellShopProfileMenuFrames
+if gDownwellShopHud == 0 || gDownwellShopHudBytes == 0
+    printf "Missing resident HUD bank at next-level shop\n"
+    quit 1
+end
+dump binary memory .run/shop-profile-hud.bin gDownwellShopHud gDownwellShopHud+gDownwellShopHudBytes
 printf "SHOP_FIELD_BANK uploads=%lu reuses=%lu\n", gDownwellFieldBankUploads, gDownwellFieldBankReuses
 if gDownwellFieldBankUploads == 0 || gDownwellFieldBankUploads + gDownwellFieldBankReuses != 2
     printf "Unexpected field-bank level-entry coverage\n"

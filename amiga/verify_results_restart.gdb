@@ -7,6 +7,11 @@ if gDownwellResultsRestartCount != 3 || gDownwellResultsRestartMask != 7
     printf "Not all results destinations executed\n"
     quit 1
 end
+if gDownwellResultsHudChecks != 4 || gDownwellResultsHudFailures != 0
+    printf "HUD residency failed across results destinations: checks=%lu failures=%lu\n", gDownwellResultsHudChecks, gDownwellResultsHudFailures
+    quit 1
+end
+printf "HUD residency: four presentation entries match the offline bank byte-for-byte\n"
 if gDownwellStackGuardReady != 1
     quit 1
 end
