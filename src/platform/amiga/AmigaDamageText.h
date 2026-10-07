@@ -3,6 +3,14 @@
 #include "AmigaRenderer.h"
 #include "core/DamageNumberText.h"
 
+struct AmigaPreparedDamageText {
+    unsigned first,words;
+    UWORD mask[12][3],white[12][3];
+};
+namespace downwell_damage_bank {
+#include "../../../generated/amiga-damage-text.h"
+}
+
 // All four black outline passes precede every white glyph in the source.
 // Their union can therefore be published once, without generic asset lookup
 // or repeated masked writes. No pixels are scaled or converted to planar.
@@ -39,6 +47,7 @@ struct AmigaDamageText {
 // ordering. Eight cached values cover the eight live damage-number slots.
 // Invalidate on glyph-bank replacement; misses never consume game RNG.
 class AmigaDamageTextCache {
+    bool preparedBank_=false;
     struct Entry {
         int value=0;
         bool valid=false;
@@ -75,8 +84,26 @@ class AmigaDamageTextCache {
         entry.valid=true;
     }
 public:
-    void invalidate() {for(auto& entry:entries_)entry.valid=false;next_=0;}
+    void invalidate() {for(auto& entry:entries_)entry.valid=false;next_=0;preparedBank_=false;}
+    // Admit the immutable bank once when assets are bound, never during Draw.
+    // Different glyphs still use the retained compositor, including tests and
+    // future font changes. The caller must invalidate before replacing glyphs.
+    bool bindGlyphs(const AmigaDamageGlyphs& glyphs) {
+        invalidate();
+#ifndef DOWNWELL_REFERENCE_DAMAGE_BANK
+        for(unsigned digit=0;digit<11;++digit)for(unsigned row=0;row<10;++row)
+            if(glyphs.rows[digit][row]!=downwell_damage_bank::preparedDamageGlyphs.rows[digit][row])return false;
+        preparedBank_=true;
+#endif
+        return preparedBank_;
+    }
     void draw(AmigaRenderer& renderer,const AmigaDamageGlyphs& glyphs,int value,int x,int y) {
+        if(preparedBank_&&value>=0&&value<10){
+            const auto& entry=downwell_damage_bank::preparedDamageText[value];
+            if(entry.words)amigaRendererDrawTextWords(&renderer,x-24+int(entry.first)*16,y-1,
+                &entry.mask[0][entry.first],&entry.white[0][entry.first],entry.words,12,3);
+            return;
+        }
         Entry* found=nullptr;
         for(auto& entry:entries_)if(entry.valid && entry.value==value) {found=&entry;break;}
         if(!found) {

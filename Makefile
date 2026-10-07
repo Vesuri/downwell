@@ -2434,11 +2434,14 @@ test-amiga-prepared-hud: build/amiga-prepared-hud-test
 	python3 tools/generate-amiga-hud-text.py --check
 test: test-amiga-prepared-hud
 
-build/amiga-damage-text-test: tests/platform/amiga/AmigaDamageTextTest.cpp src/platform/amiga/AmigaRenderer.c $(HOST_CHECK_HEADERS)
+generated/amiga-damage-text.h: tools/generate-amiga-damage-text.py generated/amiga-game.dwap
+	python3 tools/generate-amiga-damage-text.py
+build/amiga-damage-text-test: tests/platform/amiga/AmigaDamageTextTest.cpp src/platform/amiga/AmigaRenderer.c $(HOST_CHECK_HEADERS) generated/amiga-damage-text.h
 	@mkdir -p build
 	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $(filter %.cpp %.c,$^)
 test-amiga-damage-text: build/amiga-damage-text-test generated/amiga-game.dwap
 	./build/amiga-damage-text-test generated/amiga-game.dwap
+	python3 tools/generate-amiga-damage-text.py --check
 test: test-amiga-damage-text
 
 .PHONY: test-amiga-gameplay-sprite-assignment

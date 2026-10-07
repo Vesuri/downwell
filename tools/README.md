@@ -157,6 +157,23 @@ states against independent binary64 calculations. `REFERENCE_CLEAR_MOTION=1`
 retains arithmetic throughout on either target; perform a clean rebuild when
 comparing test executables built with different reference flags.
 
+## Prepared moving damage text
+
+`make generated/amiga-damage-text.h` composes the common `-0` through `-9`
+labels from the extracted font glyphs on the host. The immutable bank holds
+the final cardinal-outline mask and ink words in ordinary memory, not Chip
+RAM. Its companion JSON pins extraction/generator versions, derived resource
+IDs and input/output hashes; both generated files remain ignored.
+
+`make test-amiga-damage-text` compares complete framebuffers against the
+five-pass glyph renderer, including every horizontal shift, clipping, ring
+wrap, uncommon signed integers and changed-font fallback. The bank is admitted
+only when its glyphs match the bound font. Other integers retain the runtime
+cache; replacing the font requires invalidation/rebinding.
+`REFERENCE_DAMAGE_BANK=1` in the Amiga build retains the old runtime cache for
+matched timing/pixel comparisons. `REFERENCE_DAMAGE_TEXT=1` retains the older
+uncached glyph compositor. The profiling script clears both when restoring.
+
 ## Original audio
 
 After the UTMT extraction, run `python3 tools/extract-audio.py` to extract all

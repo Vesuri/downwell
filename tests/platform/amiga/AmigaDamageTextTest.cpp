@@ -17,7 +17,8 @@ int main(int argc,char** argv) {
     std::vector<UBYTE> actual(downwellGameRingBytes+16),expected(actual.size());
     unsigned cases=0;
     AmigaDamageTextCache cache;
-    for(int value:{0,1,2,7,8,9,10,12,99,100,123456789,-17,2147483647,(-2147483647-1)})
+    assert(cache.bindGlyphs(glyphs));
+    for(int value:{0,1,2,3,4,5,6,7,8,9,10,12,99,100,123456789,-17,2147483647,(-2147483647-1)})
     for(int shift=0;shift<16;++shift)
     for(int base:{-40,-1,0,92,180,265,375,400})
     for(int y:{-3,0,40,278})
@@ -45,7 +46,23 @@ int main(int argc,char** argv) {
         if((cases%7)==0)cache.invalidate();
         cache.draw(renderer,glyphs,value,base+shift,y);
         assert(actual==expected);
+        assert(cache.bindGlyphs(glyphs));
         ++cases;
+    }
+    auto changed=glyphs;changed.rows[1][0]^=0x80;
+    assert(!cache.bindGlyphs(changed));
+    {
+        expected=actual;
+        AmigaRenderer renderer,oracle;
+        amigaRendererInit(&renderer,actual.data()+8,nullptr);
+        amigaRendererInit(&oracle,expected.data()+8,nullptr);
+        amigaRendererSetClipRect(&renderer,110,0,160,284);
+        amigaRendererSetClipRect(&oracle,110,0,160,284);
+        downwell::DamageNumberText label;label.formatInteger(1);
+        cache.draw(renderer,changed,1,190,40);
+        AmigaDamageText::draw(oracle,changed,label,190,40);
+        assert(actual==expected);
+        assert(cache.bindGlyphs(glyphs));
     }
     auto bad=pack;
     bad[0]=0;

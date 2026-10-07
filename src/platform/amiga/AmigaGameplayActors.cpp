@@ -18,6 +18,7 @@ namespace { AmigaDamageGlyphs damageGlyphs; bool damageGlyphsReady; AmigaDamageT
 bool AmigaGameplayActors::prepareDamageText(const UBYTE* pack, const UBYTE* end) {
     damageText.invalidate();
     damageGlyphsReady=amigaRendererPrepareDamageGlyphs(&damageGlyphs,pack,end)!=0;
+    if(damageGlyphsReady)damageText.bindGlyphs(damageGlyphs);
     return damageGlyphsReady;
 }
 

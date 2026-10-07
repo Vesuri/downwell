@@ -33,6 +33,7 @@ REFERENCE_BOX_RANDOM ?= 0
 REFERENCE_PATTERNS ?= 0
 REFERENCE_BREAKABLES ?= 0
 REFERENCE_DAMAGE_TEXT ?= 0
+REFERENCE_DAMAGE_BANK ?= 0
 REFERENCE_GEM_POSITION ?= 0
 REFERENCE_EFFECT_COMPOSITION ?= 0
 REFERENCE_STYLE_SPRITES ?= 0
@@ -246,6 +247,9 @@ CFLAGS += -DDOWNWELL_REFERENCE_BREAKABLES
 endif
 ifeq ($(REFERENCE_DAMAGE_TEXT),1)
 CFLAGS += -DDOWNWELL_REFERENCE_DAMAGE_TEXT
+endif
+ifeq ($(REFERENCE_DAMAGE_BANK),1)
+CFLAGS += -DDOWNWELL_REFERENCE_DAMAGE_BANK
 endif
 ifeq ($(REFERENCE_GEM_POSITION),1)
 CFLAGS += -DDOWNWELL_REFERENCE_GEM_POSITION
@@ -521,6 +525,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
 	@printf '%s\n' '$(REFERENCE_BOX_ALARMS)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_HUD_TEXT)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_HUD_WORDS)' >> $@.tmp
+	@printf '%s\n' '$(REFERENCE_DAMAGE_BANK)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_HUD_BORDER)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_CONTACT_MOTION)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_CONTACT_COORDINATES)' >> $@.tmp
@@ -688,7 +693,10 @@ obj/AmigaGameplayRows.o: $(AMIGA_SRC)/AmigaGameplayRows.cpp $(AMIGA_SRC)/AmigaGa
 obj/AmigaGameplayScene.o: $(AMIGA_SRC)/AmigaGameplayScene.cpp $(AMIGA_SRC)/AmigaGameplayScene.h
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -c -o $@ $<
-obj/AmigaGameplayActors.o: $(AMIGA_SRC)/AmigaGameplayActors.cpp $(AMIGA_SRC)/AmigaGameplayActors.h
+$(REPO)/generated/amiga-damage-text.h: $(REPO)/tools/generate-amiga-damage-text.py $(AMIGA_GAME)
+	$(MAKE) -C $(REPO) generated/amiga-damage-text.h
+
+obj/AmigaGameplayActors.o: $(AMIGA_SRC)/AmigaGameplayActors.cpp $(AMIGA_SRC)/AmigaGameplayActors.h $(AMIGA_SRC)/AmigaDamageText.h $(REPO)/generated/amiga-damage-text.h
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -c -o $@ $<
 obj/AmigaGameplaySpriteAssignment.o: $(AMIGA_SRC)/AmigaGameplaySpriteAssignment.cpp $(AMIGA_SRC)/AmigaGameplayActors.h
