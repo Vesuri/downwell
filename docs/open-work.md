@@ -428,6 +428,9 @@ placeholder searches. A further attempt must remove a measured structure,
 not tune reset loops. Preserve serialized placeholders, source IDs, background
 initialization order, failure prefixes and later actor attachment; retain
 the generic layer lifecycle as the oracle (`REFERENCE_ROOM_PREPARE=1`).
+Mutation-owned occupancy row extents are rejected: tracking during room
+publication consumes most of the removed reset work. Do not tune their range
+updates or partial-clear loops; pursue a different ownership structure.
 
 Reference: [profiling procedure](amiga-profiling.md).
 

@@ -1,0 +1,209 @@
+diff --git a/amiga/Makefile b/amiga/Makefile
+index b4644b3b..31a5ed2d 100644
+--- a/amiga/Makefile
++++ b/amiga/Makefile
+@@ -44,6 +44,7 @@ REFERENCE_ROOM_PREPARE ?= 0
+ REFERENCE_FIELD_BANK ?= 0
+ REFERENCE_ENTRY_ASSETS ?= 0
+ REFERENCE_EMPTY_TERRAIN ?= 0
++REFERENCE_TERRAIN_RESET ?= 0
+ REFERENCE_ROOM_TERRAIN ?= 0
+ REFERENCE_INITIAL_TERRAIN ?= 0
+ REFERENCE_BOX_ALARMS ?= 0
+@@ -261,6 +262,9 @@ endif
+ ifeq ($(REFERENCE_EMPTY_TERRAIN),1)
+ CFLAGS += -DDOWNWELL_REFERENCE_EMPTY_TERRAIN
+ endif
++ifeq ($(REFERENCE_TERRAIN_RESET),1)
++CFLAGS += -DDOWNWELL_REFERENCE_TERRAIN_RESET
++endif
+ ifeq ($(REFERENCE_ROOM_TERRAIN),1)
+ CFLAGS += -DDOWNWELL_REFERENCE_ROOM_TERRAIN
+ endif
+@@ -482,6 +486,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
+ 	@printf '%s\n' '$(REFERENCE_FIELD_BANK)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_ENTRY_ASSETS)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_EMPTY_TERRAIN)' >> $@.tmp
++	@printf '%s\n' '$(REFERENCE_TERRAIN_RESET)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_ROOM_TERRAIN)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_INITIAL_TERRAIN)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_BOX_ALARMS)' >> $@.tmp
+diff --git a/amiga/profile.sh b/amiga/profile.sh
+index ecb25f4c..e8d09a36 100644
+--- a/amiga/profile.sh
++++ b/amiga/profile.sh
+@@ -111,6 +111,7 @@ restore() {
+   unset REFERENCE_FIELD_BANK
+   unset REFERENCE_ENTRY_ASSETS
+   unset REFERENCE_EMPTY_TERRAIN
++  unset REFERENCE_TERRAIN_RESET
+   unset REFERENCE_ROOM_TERRAIN
+   unset REFERENCE_INITIAL_TERRAIN
+   unset REFERENCE_BOX_ALARMS
+diff --git a/src/platform/amiga/AmigaGameplayGeneration.cpp b/src/platform/amiga/AmigaGameplayGeneration.cpp
+index 26861947..576966bf 100644
+--- a/src/platform/amiga/AmigaGameplayGeneration.cpp
++++ b/src/platform/amiga/AmigaGameplayGeneration.cpp
+@@ -41,6 +41,7 @@ bool AmigaGameplayGeneration::createPrepared(void* opaque,const downwell::AreaOn
+     const std::uint16_t bit=std::uint16_t(0x8000u>>(row&15));
+     const auto* word=batch.words();
+     for(unsigned i=0;i<batch.wordCount();++i,word+=4){
++        self.index_.noteWrite(row,word[0],unsigned(word[0])+2);
+         auto* target=destination+word[0];
+         if(!(target[0]|target[1])){
+             target[0]=word[2];target[1]=word[3];
+diff --git a/src/platform/amiga/AmigaTerrain.cpp b/src/platform/amiga/AmigaTerrain.cpp
+index b4d421dc..3c80bbc5 100644
+--- a/src/platform/amiga/AmigaTerrain.cpp
++++ b/src/platform/amiga/AmigaTerrain.cpp
+@@ -344,6 +344,8 @@ bool addContact(AmigaTerrainIndex& index, int objectId, int x, int y, bool boxFl
+     if (!contactCell(x, y, cell)) return false;
+     auto& flags = index.cells[cell];
+     if (objectId == 60 && (flags & wallContactMask) != wallContactMask) {
++        index.noteWrite(cell/AmigaTerrainIndex::columns,cell%AmigaTerrainIndex::columns,
++            cell%AmigaTerrainIndex::columns+1);
+         flags += wallContactUnit;
+         return true;
+     }
+@@ -357,6 +359,8 @@ bool indexAdd(AmigaTerrainIndex& index, int x, int y, unsigned flags,
+         y < 0 || y >= AmigaTerrainIndex::rows * 16) return false;
+     const unsigned cell = (unsigned(y) >> 4) * AmigaTerrainIndex::columns +
+         (unsigned(x - AmigaTerrainIndex::minX) >> 4);
++    index.noteWrite(cell/AmigaTerrainIndex::columns,cell%AmigaTerrainIndex::columns,
++        cell%AmigaTerrainIndex::columns+1);
+     index.cells[cell] |= flags;
+     if (addedCell) *addedCell = cell;
+     return true;
+@@ -386,7 +390,7 @@ bool amigaBuildTerrainIndex(const AmigaTerrainCollisionContext& context,
+         index.extraContacts.clear();
+         index.wallContactsComplete=true;
+         index.mutableWallOccupancy=true;
+-        for(auto& cell:index.cells)cell=0;
++        index.clearOccupancy();
+         index.nextLanding.clear();
+         return true;
+     }
+@@ -400,7 +404,7 @@ bool amigaReconstructTerrainIndex(const AmigaTerrainCollisionContext& context,
+     // Reconstructed pattern occupancy is not evidence of actual Create events.
+     index.wallContactsComplete = context.fragmentCount==0;
+     index.mutableWallOccupancy = context.fragmentCount==0 && !(context.rooms && context.room);
+-    for (unsigned i = 0; i < sizeof(index.cells); ++i) index.cells[i] = 0;
++    index.clearOccupancy();
+     if (context.rooms && context.room) {
+         for (unsigned i = 0; i < context.room->instanceCount; ++i) {
+             downwell::PackedRoomInstance instance;
+@@ -541,6 +545,7 @@ bool amigaPublishPreparedTerrain(AmigaTerrainIndex& index,AmigaTerrainTiles& til
+     auto* destination=index.cells+row*AmigaTerrainIndex::columns;
+     const auto* word=batch.words();
+     for(unsigned i=0;i<batch.wordCount();++i,word+=4){
++        index.noteWrite(row,word[0],unsigned(word[0])+2);
+         auto* target=destination+word[0];
+         if(!(target[0]|target[1])){
+             // Newly generated space already has its occupancy and contact
+@@ -575,6 +580,7 @@ AmigaTerrainRunIndex::AmigaTerrainRunIndex(AmigaTerrainIndex& index,int object,
+ }
+ bool AmigaTerrainRunIndex::append(){
+     if(!remaining_)return false;
++    index_.noteWrite(row_,column_,column_+1);
+     auto& cell=index_.cells[row_*AmigaTerrainIndex::columns+column_];
+     if(object_==60){
+         if((cell&wallContactMask)!=wallContactMask)cell+=wallContactUnit;
+@@ -600,6 +606,8 @@ bool AmigaTerrainRunIndex::publishSpan(AmigaTerrainTiles& tiles){
+     // Locals: byte stores through the cell pointer would otherwise reload members.
+     const unsigned count=remaining_;
+     const int step=step_;
++    index_.noteWrite(row_,step<0?column_-count+1:column_,
++        step<0?column_+1:column_+count);
+     unsigned char* cell=&index_.cells[row_*AmigaTerrainIndex::columns+column_];
+     const unsigned char flags=static_cast<unsigned char>(flags_);
+     if(object_==60){
+diff --git a/src/platform/amiga/AmigaTerrain.h b/src/platform/amiga/AmigaTerrain.h
+index 8dbc4177..c6109037 100644
+--- a/src/platform/amiga/AmigaTerrain.h
++++ b/src/platform/amiga/AmigaTerrain.h
+@@ -7,6 +7,7 @@
+ #include "core/RoomPack.h"
+ #include "core/TerrainWallContacts.h"
+ #include "AmigaLandingIndex.h"
++#include <cstring>
+ 
+ class GameplayWorld;
+ using AmigaPortRuntime = GameplayWorld;
+@@ -162,6 +163,32 @@ struct AmigaTerrainIndex {
+     // Occupancy flags in bits 0-5. Bits 6-7 count coincident wall (60)
+     // Creates up to three; the breakable flag stands for the first box (92).
+     unsigned char cells[columns * rows];
++    // Reset ownership only: readers still use the ordinary complete grid.
++    // End is exclusive; an empty interval has end zero. First admission must
++    // clear arbitrary caller storage before intervals can certify zero bytes.
++    unsigned char writtenFirst[rows]{};
++    unsigned char writtenEnd[rows]{};
++    bool resetAdmitted=false;
++    void noteWrite(unsigned row,unsigned first,unsigned end){
++#ifndef DOWNWELL_REFERENCE_TERRAIN_RESET
++        if(!writtenEnd[row] || first<writtenFirst[row])writtenFirst[row]=first;
++        if(end>writtenEnd[row])writtenEnd[row]=end;
++#else
++        (void)row;(void)first;(void)end;
++#endif
++    }
++    void clearOccupancy(){
++#ifdef DOWNWELL_REFERENCE_TERRAIN_RESET
++        std::memset(cells,0,sizeof(cells));
++#else
++        if(!resetAdmitted)std::memset(cells,0,sizeof(cells));
++        else for(unsigned row=0;row<rows;++row)
++            if(writtenEnd[row])std::memset(cells+row*columns+writtenFirst[row],0,
++                writtenEnd[row]-writtenFirst[row]);
++        std::memset(writtenEnd,0,sizeof(writtenEnd));
++        resetAdmitted=true;
++#endif
++    }
+     AmigaLandingIndex nextLanding; // candidate bits; row+1/zero query encoding
+     // Contacts a cell cannot count: further coincident walls and boxes, boxes
+     // without a breakable flag, and every object 293.
+diff --git a/tests/platform/amiga/AmigaLiveTerrainTest.cpp b/tests/platform/amiga/AmigaLiveTerrainTest.cpp
+index f69a3b4e..d1046f00 100644
+--- a/tests/platform/amiga/AmigaLiveTerrainTest.cpp
++++ b/tests/platform/amiga/AmigaLiveTerrainTest.cpp
+@@ -18,6 +18,32 @@ void require(bool value, const char* message) {
+     if (!value) { std::cerr << "FAILED: " << message << '\n'; std::exit(1); }
+ }
+ using Commands = std::vector<downwell::DeferredCreateInstance>;
++void verifyOccupancyReset(){
++    AmigaTerrainIndex index;
++    std::memset(index.cells,0xa5,sizeof(index.cells));
++    const AmigaTerrainCollisionContext empty{nullptr,nullptr,nullptr,nullptr,0,nullptr};
++    for(unsigned round=0;round<12;++round){
++        require(amigaBuildTerrainIndex(empty,index),"reset occupancy owner");
++        require(std::all_of(std::begin(index.cells),std::end(index.cells),
++            [](unsigned char c){return c==0;}),"reset clears entire observable grid");
++        for(unsigned row=0;row<512;++row){
++            const unsigned column=(row*37+round*11)%128;
++            require(amigaAddTerrainObject(index,60,-512+16*int(column),16*int(row)),
++                "full-domain reset fixture publication");
++            if(row%3==0)require(amigaRemoveTerrainWall(index,-512+16*int(column),16*int(row)),
++                "removal does not discard reset ownership");
++        }
++        AmigaTerrainTiles tiles;
++        AmigaTerrainRunIndex all(index,60,-512,8176,16,128);
++        require(all.publishSpan(tiles),"full-width row retains exclusive end 128");
++        for(unsigned overlap=0;overlap<260;++overlap)
++            (void)amigaAddTerrainObject(index,60,-512,0);
++        require(!amigaAddTerrainObject(index,60,-512,0),"overflow fixture reaches failed publication");
++    }
++    require(amigaBuildTerrainIndex(empty,index),"final reset after failed publication");
++    require(std::all_of(std::begin(index.cells),std::end(index.cells),
++        [](unsigned char c){return c==0;}),"failed prefix resets exactly");
++}
+ void verifyPreparedTerrainRuns(){
+     static AmigaTerrainIndex scalar,prepared;
+     const AmigaTerrainCollisionContext empty{nullptr,nullptr,nullptr,nullptr,0,nullptr};
+@@ -538,6 +564,7 @@ void checkSchedule(const downwell::BuilderPatternPack& patterns, bool interleave
+ }
+ 
+ int main(int argc, char** argv) {
++    verifyOccupancyReset();
+     verifyPreparedTerrainRuns();
+     verifyWallCollisionLifecycle();
+     verifyContactMultiplicity();
