@@ -337,6 +337,9 @@ Remove work, not instructions: publish only the words a redraw changes,
 not the unchanged background words. Do not tune the existing loops.
 `REFERENCE_HUD_TEXT=1` and `make test-amiga-hud-text` are the oracles;
 also compare native frame dumps across 640–900 with the reference build.
+The retained final-word comparison attempt is closed (rejection table).
+Do not tune its cache/scan loops; a further attempt must eliminate runtime
+composition or derive publication directly from prepared digit transitions.
 
 ### E. Quiet-frame and alarm shortfalls
 
