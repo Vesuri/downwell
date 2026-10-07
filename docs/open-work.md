@@ -433,11 +433,10 @@ validation/binding, initial terrain raster and backing/HUD
 setup. Move immutable preparation out of confirmation without overwriting
 the garden/style display owners or introducing another long frame earlier.
 Do not move RNG draws or source-visible Create effects ahead of confirmation.
-Initial-raster preparation has exhausted two attempts: bounded clean-style
-preparation and borrowed immutable dictionary rows. Do not sweep their row
-budgets, scheduling, gather loops or encodings. Proceed to remaining backing/
-HUD setup and room publication structures; do not count relocated copy work
-as eliminated work.
+Do not retry bounded clean-style raster preparation or sweep row budgets,
+scheduling, dictionary gather loops or encodings. Proceed to remaining
+backing/HUD setup and room publication structures; do not count relocated
+copy work as eliminated work.
 
 Reduce remaining mutable room-layer reset/publication at level reentry,
 measured with the natural shop tape (`PROBES=1 bash amiga/profile.sh shop`).

@@ -652,6 +652,16 @@ ordinary contact FPS tape excludes initialization. Check initial spans with
 the input-only entry tape runs with exact terrain pixel comparisons enabled.
 The reference selector is unset when profiling restores the normal build.
 
+`REFERENCE_INITIAL_RASTER_STORAGE=1` keeps the prepared bank but expands it
+into mutable Fast raster storage at entry. The default borrows immutable
+dictionary rows until they are repainted. Compare both sides of the handoff
+with `profile.sh entry`, then early descent transfers with the contact tape;
+the entry saving must include the extra dictionary-gather cost in backing
+setup. `test-amiga-terrain-raster` covers borrowed-row replacement, re-entry,
+ring wrap and pipelined display copies. Native `terrain` and `terrain-shop`
+oracles compare the borrowed pixels with the retained painter. The selector
+is unset during normal-build restoration.
+
 `REFERENCE_ROOM_PREPARE=1` retains repeated serialized room lookup and generic
 placeholder-to-lifetime binding at room entry. The default admits immutable
 room metadata before display, then publishes the same layers, reservations and

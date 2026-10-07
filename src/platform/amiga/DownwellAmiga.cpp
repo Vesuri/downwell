@@ -1314,11 +1314,11 @@ static void drawMainWorldSpan(
         }
 #ifdef DOWNWELL_TERRAIN_DIRECT
         if(clipX==downwellPlayfieldX&&clipWidth==downwellPlayfieldWidth&&
-            AmigaTerrainPainter::paintCached(terrainRaster.row(column,firstWorldY),renderer,
+            AmigaTerrainPainter::paintCached(terrainRaster.writeRows(column,firstWorldY,clipHeight),renderer,
                 rooms,room,terrainCollision.index,terrainTiles,decorations,decorationCount,
                 runtime,activeGamePack,activeGamePackEnd,viewX,viewY,clipY,clipHeight)){
             transferTerrainRows(renderer,viewX,firstWorldY,clipY,clipHeight,false);
-            for(int y=firstWorldY;y<finalWorldY;++y)terrainRaster.dirty(column,y)=false;
+            for(int y=firstWorldY;y<finalWorldY;++y)terrainRaster.setDirty(column,y,false);
             return;
         }
 #endif
@@ -1338,7 +1338,7 @@ static void drawMainWorldSpan(
         transferTerrainRows(renderer, viewX, firstWorldY, clipY, clipHeight, true);
         const int column = (viewX - mainViewX + 160) / 160;
         for (int y = firstWorldY; y < finalWorldY; ++y)
-            terrainRaster.dirty(column, y) = false;
+            terrainRaster.setDirty(column,y,false);
     }
 }
 
@@ -1372,8 +1372,13 @@ static void prepareTerrainRaster(AmigaRenderer* renderer,
         initialTerrain.rows()!=0&&initialTerrain.rows()==unsigned(lastY);
     if(pristine)for(const auto& shop:runtime->shops().instances)if(shop.present)pristine=false;
     if(pristine){
+#ifndef DOWNWELL_REFERENCE_INITIAL_RASTER_STORAGE
+        if(!terrainRaster.borrowInitial(initialTerrain)){terrainPaintSucceeded=false;return;}
+#endif
         for(unsigned column=0;column<3;++column){
-            if(!initialTerrain.copy(column,terrainRaster.row(column,0))){terrainPaintSucceeded=false;return;}
+#ifdef DOWNWELL_REFERENCE_INITIAL_RASTER_STORAGE
+            if(!initialTerrain.copy(column,terrainRaster.writeRows(column,0,lastY))){terrainPaintSucceeded=false;return;}
+#endif
 #ifdef DOWNWELL_TERRAIN_BATCH_VERIFY
             // Full native comparison against the retained painter, which also
             // checks its own output against the scalar compositor in this build.
@@ -1383,8 +1388,12 @@ static void prepareTerrainRaster(AmigaRenderer* renderer,
                 bool equal=AmigaTerrainPainter::paintCached(oracle,renderer,rooms,room,terrainCollision.index,
                     terrainTiles,decorations,decorationCount,runtime,activeGamePack,activeGamePackEnd,
                     int(column)*160,y,0,height);
-                for(int word=0;word<height*22&&equal;++word)
-                    equal=oracle[word]==terrainRaster.row(column,y)[word];
+                for(int row=0;row<height&&equal;++row){
+                    UWORD scratch[22];
+                    const UWORD* actual=terrainRaster.readRow(column,y+row,scratch);
+                    for(int word=0;word<22&&equal;++word)
+                        equal=oracle[row*22+word]==actual[word];
+                }
                 if(!equal){
                     terrainPaintSucceeded=false;downwellTerrainBatchMismatch();return;
                 }
@@ -1405,7 +1414,7 @@ static void prepareTerrainRaster(AmigaRenderer* renderer,
             // This shares runtime's exact compositor and its unsupported-art
             // fallback; it neither publishes pixels nor advances game state.
             const unsigned column=unsigned((x-mainViewX+160)/160);
-            if(AmigaTerrainPainter::paintCached(terrainRaster.row(column,y),renderer,
+            if(AmigaTerrainPainter::paintCached(terrainRaster.writeRows(column,y,height),renderer,
                 rooms,room,terrainCollision.index,terrainTiles,decorations,decorationCount,
                 runtime,activeGamePack,activeGamePackEnd,x,y,0,height))continue;
 #endif
@@ -3264,8 +3273,8 @@ __attribute__((noinline)) static int runDownwell(void) {
                 // Exercise cold staging, not just transfers from a fully
                 // prepared raster. Production invalidation follows generation.
                 for (unsigned y=0; y<terrainRasterRows; ++y) {
-                    terrainRaster.dirty(0,y)=true;
-                    terrainRaster.dirty(2,y)=true;
+                    terrainRaster.setDirty(0,y,true);
+                    terrainRaster.setDirty(2,y,true);
                 }
             }
             if (!port.tick() && (!port.registerSideCameraLocker(385, 256) ||
@@ -3504,11 +3513,13 @@ __attribute__((noinline)) static int runDownwell(void) {
                     const unsigned column = (worldViewX - mainViewX + 160) / 160;
                     for (unsigned y = 0; y < downwellDisplayHeight; ++y) {
                         const unsigned physical = (port.ringOrigin() + y) % downwellGameRingHeight;
+                        UWORD scratch[22];
+                        const UWORD* cached=terrainRaster.readRow(column,worldViewY+y,scratch);
                         for (unsigned plane = 0; plane < 2; ++plane) {
                             const UWORD* displayed = (const UWORD*)((const UBYTE*)gameDisplay[back].data +
                                 plane * downwellGameRingPlaneBytes + physical * downwellBytesPerPlaneLine + terrainRasterX / 8);
                             for (unsigned word = 0; word < terrainRasterWords; ++word)
-                                if (displayed[word] != terrainRaster.row(column, worldViewY + y)[plane * terrainRasterWords + word])
+                                if (displayed[word] != cached[plane * terrainRasterWords + word])
                                     ++gDownwellTerrainRasterFailures;
                         }
                     }
@@ -3666,7 +3677,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                                 downwellProfileTerrainSpan(targetX, first + top, height,
                                     downwellPlayfieldX, downwellPlayfieldWidth, 1, 4);
 #ifdef DOWNWELL_TERRAIN_DIRECT
-                                if(AmigaTerrainPainter::paintCached(terrainRaster.row(column,first+top),
+                                if(AmigaTerrainPainter::paintCached(terrainRaster.writeRows(column,first+top,height),
                                     &stage,rooms,mainRoom,terrainCollision.index,terrainTiles,
                                     generatedDecorations,liveBuilder.decorationCount(),&port,
                                     activeGamePack,activeGamePackEnd,targetX,first,top,height))

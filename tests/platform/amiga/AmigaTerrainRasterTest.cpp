@@ -18,12 +18,85 @@ void Bitmap::copy(const Bitmap& source,uint16_t x,uint16_t y,uint16_t sx,uint16_
     }
 }
 int main() {
+    // A deliberately non-linear dictionary distinguishes row references from
+    // contiguous mutable storage, including transfers across the pack end.
+    {
+        constexpr unsigned initialRows=137, dictionaryRows=7;
+        std::vector<UBYTE> pack(12+initialRows*6+dictionaryRows*44);
+        std::memcpy(pack.data(),"DWIT",4);
+        auto put=[&](unsigned at,unsigned value){pack[at]=value>>8;pack[at+1]=value;};
+        put(4,1);put(6,initialRows);put(8,dictionaryRows);
+        for(unsigned c=0;c<3;++c)for(unsigned y=0;y<initialRows;++y)
+            put(12+(c*initialRows+y)*2,(y*3+c)%dictionaryRows);
+        for(unsigned r=0;r<dictionaryRows;++r)for(unsigned w=0;w<22;++w)
+            put(12+initialRows*6+r*44+w*2,0x1234+r*941+w*57);
+        AmigaInitialTerrain initial;
+        assert(initial.bind(pack.data(),pack.size()));
+        auto borrowed=std::make_unique<AmigaTerrainRaster>();
+        auto materialized=std::make_unique<AmigaTerrainRaster>();
+        for(unsigned c=0;c<3;++c){
+            std::fill_n(borrowed->writeRows(c,0,320),320*22,0xdead);
+            std::fill_n(materialized->writeRows(c,0,320),320*22,0xdead);
+            assert(initial.copy(c,materialized->writeRows(c,0,initialRows)));
+        }
+        assert(borrowed->borrowInitial(initial));
+        unsigned comparisons=0;
+        auto compare=[&](){
+            for(unsigned c=0;c<3;++c)for(unsigned origin : {0u,91u,319u})
+            for(unsigned height : {1u,96u,137u,284u}){
+                std::vector<UBYTE> a(downwellGameRingBytes,0xa5),b(a);
+                std::vector<UBYTE> displayA(downwellGameRingBytes,0x5a),displayB(displayA);
+                AmigaRenderer ra{},rb{};ra.game=a.data();rb.game=b.data();
+                ra.gameOrigin=rb.gameOrigin=origin;
+                AmigaGameplayRows da,db;
+                da.damage(origin,0,height);db.damage(origin,0,height);
+                Bitmap backingA(a.data(),380,320,2,false,false,384);
+                Bitmap backingB(b.data(),380,320,2,false,false,384);
+                Bitmap targetA(displayA.data(),380,320,2,false,false,384);
+                Bitmap targetB(displayB.data(),380,320,2,false,false,384);
+                borrowed->transfer(&ra,c,0,0,height,false,&targetA,&backingA,0,da);
+                materialized->transfer(&rb,c,0,0,height,false,&targetB,&backingB,0,db);
+                assert(a==b&&displayA==displayB);
+                for(unsigned y=0;y<320;++y)for(unsigned buffer=0;buffer<2;++buffer)
+                    assert(da.dirty(y,buffer)==db.dirty(y,buffer));
+                ++comparisons;
+            }
+        };
+        compare();
+        // Invalidation alone must not change backing pixels before repaint.
+        borrowed->invalidate(20,70);compare();
+        for(unsigned c=0;c<3;++c){
+            std::fill_n(borrowed->writeRows(c,31,37),37*22,0xbeef);
+            std::fill_n(materialized->writeRows(c,31,37),37*22,0xbeef);
+        }
+        compare();
+        // A Chip-to-cache replacement must retire every borrowed row it writes.
+        std::vector<UBYTE> chip(downwellGameRingBytes,0x5a);
+        AmigaRenderer source{};source.game=chip.data();source.gameOrigin=309;
+        AmigaGameplayRows debts;
+        for(unsigned c=0;c<3;++c){
+            borrowed->transfer(&source,c,81,0,40,true,nullptr,nullptr,0,debts);
+            materialized->transfer(&source,c,81,0,40,true,nullptr,nullptr,0,debts);
+        }
+        compare();
+        assert(borrowed->borrowInitial(initial));
+        for(unsigned c=0;c<3;++c){
+            assert(initial.copy(c,materialized->writeRows(c,0,initialRows)));
+            assert(borrowed->dirty(c,20)&&borrowed->dirty(c,69));
+            assert(!borrowed->dirty(c,70));
+            UWORD scratch[22],oracle[22];
+            for(unsigned y=0;y<initialRows;++y)
+                assert(!std::memcmp(borrowed->readRow(c,y,scratch),initial.row(c,y,oracle),44));
+        }
+        compare();
+        std::printf("Borrowed initial raster: %u exact transfers, replacement and reborrow lifecycle\n",comparisons);
+    }
     auto raster=std::make_unique<AmigaTerrainRaster>();
     unsigned cases=0;
     unsigned partitions=0;
     for(unsigned column=0;column<3;++column)for(unsigned mask=0;mask<256;++mask){
-        for(unsigned y=0;y<8192;++y)raster->dirty(column,y)=false;
-        for(unsigned y=0;y<284;++y)raster->dirty(column,7908+y)=((mask>>(y%8))&1)!=0;
+        for(unsigned y=0;y<8192;++y)raster->setDirty(column,y,false);
+        for(unsigned y=0;y<284;++y)raster->setDirty(column,7908+y,((mask>>(y%8))&1)!=0);
         unsigned first=7908,painted=0,copied=0;
         while(first<8192){
             const bool dirty=raster->dirty(column,first);
@@ -32,7 +105,7 @@ int main() {
             for(unsigned y=first;y<end;++y){
                 assert(raster->dirty(column,y)==dirty);
                 // Simulate the compositor clearing a completed dirty run.
-                raster->dirty(column,y)=false;
+                raster->setDirty(column,y,false);
                 if(dirty)++painted;else ++copied;
             }
             first=end;
@@ -54,7 +127,7 @@ int main() {
         debts.damage(0,0,320);
         for (unsigned y=0; y<48; ++y) {
             const bool dirty = (mask >> (y%5)) & 1;
-            raster->dirty(column,8000+y)=dirty;
+            raster->setDirty(column,8000+y,dirty);
             expectedPainted += dirty;
             for (unsigned p=0;p<2;++p) for (unsigned w=0;w<11;++w) {
                 const UWORD old = UWORD(23*y+57*p+w+column);
@@ -92,7 +165,7 @@ int main() {
     }
     AmigaRenderer failedStage{};
     AmigaGameplayRows untouchedDebts;
-    raster->dirty(0,100)=true;
+    raster->setDirty(0,100,true);
     assert(raster->prepareStage(&failedStage,0,100,1,untouchedDebts,
         [](unsigned,unsigned){return false;})==-1);
     assert(raster->dirty(0,100));
@@ -102,12 +175,12 @@ int main() {
     downwell::ShopWorld shops{};
     shops.instances[0].allocated=true;
     for(int y : {-50, 0, 120, 8190, 8250}) {
-        for(unsigned c=0;c<3;++c) for(unsigned r=0;r<8192;++r) raster->dirty(c,r)=false;
+        for(unsigned c=0;c<3;++c) for(unsigned r=0;r<8192;++r) raster->setDirty(c,r,false);
         auto& shop=shops.instances[0]; shop.y=y; ++shop.artRevision;
         raster->invalidateShops(shops);
         for(unsigned c=0;c<3;++c) for(int r=0;r<8192;++r)
             assert(raster->dirty(c,r)==(r>=y-21 && r<y+12));
-        for(unsigned c=0;c<3;++c) for(unsigned r=0;r<8192;++r) raster->dirty(c,r)=false;
+        for(unsigned c=0;c<3;++c) for(unsigned r=0;r<8192;++r) raster->setDirty(c,r,false);
         raster->invalidateShops(shops);
         for(unsigned c=0;c<3;++c) for(unsigned r=0;r<8192;++r) assert(!raster->dirty(c,r));
     }

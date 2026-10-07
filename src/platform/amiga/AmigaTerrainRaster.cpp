@@ -6,7 +6,7 @@ void AmigaTerrainRaster::invalidate(int first, int end) {
     if (first < 0) first = 0;
     if (end > int(rows)) end = rows;
     for (unsigned column = 0; column < 3; ++column)
-        for (int y = first; y < end; ++y) dirty_[column][y] = true;
+        for (int y = first; y < end; ++y) setDirty(column,y,true);
 }
 
 void AmigaTerrainRaster::invalidateShops(const downwell::ShopWorld& shops) {
@@ -53,7 +53,7 @@ static void copyTerrainRows68000(const UWORD* sourceWords, UBYTE* plane0,
 void AmigaTerrainRaster::transfer(AmigaRenderer* renderer, unsigned column,
     int worldY, int screenY, int height, bool store, Bitmap* terrainCopyTarget,
     const Bitmap* terrainCopyBacking, unsigned terrainCopyBuffer, AmigaGameplayRows& gameplayRows) {
-    UWORD* cachedRow = row(column, worldY);
+    UWORD* cachedRow = store?writeRows(column,worldY,height):&pixels_[column][worldY][0][0];
     unsigned physical = renderer->gameOrigin + screenY;
     if (physical >= downwellGameRingHeight) physical -= downwellGameRingHeight;
     if (!store) {
@@ -64,7 +64,26 @@ void AmigaTerrainRaster::transfer(AmigaRenderer* renderer, unsigned column,
             if (count > remaining) count = remaining;
             if (pipeline && count > 128) count = 128;
             UBYTE* row = renderer->game + physical * downwellBytesPerPlaneLine + x / 8;
-            copyTerrainRows68000(cachedRow, row, row + downwellGameRingPlaneBytes, count);
+#ifndef DOWNWELL_REFERENCE_INITIAL_RASTER_STORAGE
+            if(initial_&&unsigned(worldY)<initial_->rows()){
+                UWORD scratch[AmigaInitialTerrain::words];
+                unsigned done=0;
+                while(done<count){
+                    if(dirty_[column][worldY+done]&2){
+                        const auto* source=initial_->row(column,worldY+done,scratch);
+                        copyTerrainRows68000(source,row+done*48,
+                            row+downwellGameRingPlaneBytes+done*48,1);
+                        ++done;
+                    }else{
+                        const unsigned first=done;
+                        do{++done;}while(done<count&&!(dirty_[column][worldY+done]&2));
+                        copyTerrainRows68000(cachedRow+first*words*2,row+first*48,
+                            row+downwellGameRingPlaneBytes+first*48,done-first);
+                    }
+                }
+            }else
+#endif
+                copyTerrainRows68000(cachedRow, row, row + downwellGameRingPlaneBytes, count);
             if (pipeline) {
                 // These completed rows are immutable while the CPU prepares
                 // the next disjoint chunk. DMA copies them concurrently.
@@ -74,6 +93,7 @@ void AmigaTerrainRaster::transfer(AmigaRenderer* renderer, unsigned column,
             }
             remaining -= count;
             cachedRow += count * words * 2;
+            worldY += count;
             physical += count;
             if (physical == downwellGameRingHeight) physical = 0;
         }

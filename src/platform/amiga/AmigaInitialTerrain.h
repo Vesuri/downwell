@@ -14,6 +14,9 @@ public:
     static constexpr unsigned columns=3,words=22,rowBytes=44;
     bool bind(const std::uint8_t* data,unsigned bytes){
         references_=dictionary_=nullptr;rows_=0;
+#ifdef DOWNWELL_PLATFORM_AMIGA
+        if(reinterpret_cast<unsigned long>(data)&1)return false;
+#endif
         if(!data||bytes<12||data[0]!='D'||data[1]!='W'||data[2]!='I'||data[3]!='T'||
            word(data+4)!=1||word(data+10))return false;
         const unsigned rows=word(data+6),count=word(data+8);
@@ -22,6 +25,20 @@ public:
         references_=data+12;dictionary_=references_+rows*6;rows_=rows;return true;
     }
     unsigned rows()const{return rows_;}
+    // Borrow native words from immutable, word-aligned offline storage. The
+    // host oracle decodes byte order into caller-owned scratch instead.
+    const std::uint16_t* row(unsigned column,unsigned y,std::uint16_t* scratch)const{
+        if(!references_||column>=columns||y>=rows_)return nullptr;
+        const auto* source=dictionary_+word(references_+(column*rows_+y)*2)*rowBytes;
+#ifdef DOWNWELL_PLATFORM_AMIGA
+        (void)scratch;
+        return reinterpret_cast<const std::uint16_t*>(source);
+#else
+        if(!scratch)return nullptr;
+        for(unsigned i=0;i<words;++i)scratch[i]=std::uint16_t(word(source+i*2));
+        return scratch;
+#endif
+    }
     bool copy(unsigned column,std::uint16_t* destination)const{
         if(!references_||column>=columns||!destination)return false;
         const auto* reference=references_+column*rows_*2;

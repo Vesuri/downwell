@@ -1,13 +1,17 @@
 #ifndef DOWNWELL_AMIGA_TERRAIN_RASTER_H
 #define DOWNWELL_AMIGA_TERRAIN_RASTER_H
 #include "AmigaGameplayRows.h"
+#include "AmigaInitialTerrain.h"
 #include "core/ShopWorld.h"
 class Bitmap;
 // Fast-RAM raster for the left room, well and right room. Transfer only
 // exposed/invalidated spans into the Chip-RAM circular backing/display rings.
 class AmigaTerrainRaster {
     UWORD pixels_[3][8192][2][AmigaGameplayRows::terrainWords];
-    bool dirty_[3][8192]{};
+    // Bit 0: repaint required. Bit 1: current pixels belong to the immutable
+    // initial-room dictionary, not pixels_. Writes replace a complete row.
+    unsigned char dirty_[3][8192]{};
+    const AmigaInitialTerrain* initial_=nullptr;
     unsigned shopRevision_[downwell::ShopWorld::capacity]{};
 public:
     static constexpr unsigned rows = 8192, words = AmigaGameplayRows::terrainWords;
@@ -15,15 +19,39 @@ public:
     static constexpr unsigned stagePaintRows = 16;
     enum StagePaint { stageFailed=0, stageInBacking=1, stageInCache=2 };
     bool ready = false;
-    UWORD* row(unsigned column, unsigned y) { return &pixels_[column][y][0][0]; }
-    bool& dirty(unsigned column, unsigned y) { return dirty_[column][y]; }
+    UWORD* writeRows(unsigned column,unsigned y,unsigned height){
+#ifndef DOWNWELL_REFERENCE_INITIAL_RASTER_STORAGE
+        for(unsigned i=y;i<y+height;++i)dirty_[column][i]&=1;
+#else
+        (void)height;
+#endif
+        return &pixels_[column][y][0][0];
+    }
+    UWORD* row(unsigned column, unsigned y) { return writeRows(column,y,1); }
+    const UWORD* readRow(unsigned column,unsigned y,UWORD* scratch)const{
+        return (dirty_[column][y]&2)?initial_->row(column,y,scratch):&pixels_[column][y][0][0];
+    }
+    bool borrowInitial(const AmigaInitialTerrain& initial){
+        if(!initial.rows()||initial.rows()>rows)return false;
+        initial_=&initial;
+        for(unsigned c=0;c<3;++c)for(unsigned y=0;y<initial.rows();++y)dirty_[c][y]|=2;
+        return true;
+    }
+    bool dirty(unsigned column, unsigned y)const { return (dirty_[column][y]&1)!=0; }
+    void setDirty(unsigned column,unsigned y,bool value){
+#ifdef DOWNWELL_REFERENCE_INITIAL_RASTER_STORAGE
+        dirty_[column][y]=value;
+#else
+        dirty_[column][y]=(dirty_[column][y]&2)|(value?1:0);
+#endif
+    }
     // First row after the homogeneous clean/dirty run. Invalid/empty requests
     // do not advance. Query before repainting: the caller may clear dirty bits.
     unsigned runEnd(unsigned column, unsigned first, unsigned end) const {
         if(column>=3 || first>=end || end>rows)return first;
-        const bool state=dirty_[column][first];
+        const bool state=dirty(column,first);
         unsigned next=first+1;
-        while(next<end && dirty_[column][next]==state)++next;
+        while(next<end && dirty(column,next)==state)++next;
         return next;
     }
     void invalidate(int first, int end);
@@ -43,7 +71,7 @@ public:
         while (done < height) {
             const unsigned first = worldY + done;
             unsigned count = runEnd(column, first, worldY + height) - first;
-            const bool repaint = dirty_[column][first];
+            const bool repaint = dirty(column,first);
             int painted=stageInBacking;
             if (repaint) {
                 if (!budget) break;
@@ -55,7 +83,7 @@ public:
             transfer(renderer, column, first, done, count, repaint&&painted==stageInBacking,
                      nullptr, nullptr, 0, debts);
             if (repaint)
-                for (unsigned y = first; y < first + count; ++y) dirty_[column][y] = false;
+                for (unsigned y = first; y < first + count; ++y) setDirty(column,y,false);
             done += count;
         }
         return int(done);
