@@ -3,11 +3,13 @@ target remote 127.0.0.1:2345
 break downwellMenuWakeFrameReady
 continue
 if gDownwellMenuCopperPatchFailures != 0
+    printf "Garden wake Copper mismatches: %lu\n", gDownwellMenuCopperPatchFailures
     quit 1
 end
 set $i = 0
 while $i < 68
     if gDownwellMenuPlayerSprite[$i] != gDownwellMenuSpriteOracle[$i]
+        printf "Garden wake sprite word %u: actual=%04x oracle=%04x\n", $i, gDownwellMenuPlayerSprite[$i], gDownwellMenuSpriteOracle[$i]
         quit 1
     end
     set $i = $i + 1

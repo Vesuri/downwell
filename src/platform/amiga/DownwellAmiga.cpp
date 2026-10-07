@@ -2665,13 +2665,16 @@ __attribute__((noinline)) static int runDownwell(void) {
                         scenes.menuPlayerVisible() &&
                         scenes.menuPlayerSprite() == 27) {
                         sceneMenuWakeFrameReported = true;
-                        // Test-only portable oracle; never used for presentation.
+                        // Test-only oracle; never used for presentation. The
+                        // generic builder uses the gameplay beam origin, while
+                        // garden DMA retains its independent fetch geometry.
                         amigaRendererBuildHardwareSprite(
                             amiga_game_pack, amiga_game_pack_end,
                             (UWORD)scenes.menuPlayerSprite(),
                             (UWORD)scenes.menuPlayerFrame(),
                             downwellPlayfieldX + scenes.menuPlayerX() -
-                                (scenes.menuCameraX() - 80),
+                                (scenes.menuCameraX() - 80) +
+                                downwellMenuSpriteHStart - downwellDisplayHStart,
                             scenes.menuPlayerY() - (scenes.menuCameraY() - 142),
                             scenes.menuPlayerFacing() < 0,
                             memory.playerSprite(back), playerSpriteHeight);
@@ -2701,8 +2704,12 @@ __attribute__((noinline)) static int runDownwell(void) {
                         gDownwellMenuFrameCapture.titlePartCount = 0;
                         gDownwellMenuForeground = memory.menuForeground();
                         gDownwellMenuBackground = memory.menuBackground();
-                        gDownwellMenuPlayerSprite =
-                            menuPlayerData;
+                        // The DMA null sprite is only four words. Fixed-size
+                        // captures must not read 64 more words from its next
+                        // allocation when the garden player is hidden.
+                        static const UWORD hiddenPlayerCapture[68] = {};
+                        gDownwellMenuPlayerSprite = menuPlayerData == nullSprite.data()
+                            ? hiddenPlayerCapture : menuPlayerData;
                         downwellMenuTitleFrameReady();
                         /* Retain the old verification breakpoint name. */
                         downwellMenuTitleSpriteReady();
