@@ -32,10 +32,16 @@ bool AmigaSelectionLayer::render(UBYTE* target, const UBYTE* pack, const UBYTE* 
         if (i == count) return true;
     }
     const UBYTE* records[capacity];
+    const bool boundBank = bindingsValid_ && initialized_ && target_ == target &&
+        pack_ == pack && end_ == end;
     for (unsigned i = 0; i < count; ++i) {
         const auto& c = commands[i];
         if (c.id > 65535 || c.frame > 65535 || c.pen < -1 || c.pen > 3) return false;
-        const auto* r = records[i] = find(pack, end, c.id, c.frame);
+        bool bound = boundBank && i < count_ && previous_[i].id == c.id && previous_[i].frame == c.frame;
+#ifdef DOWNWELL_REFERENCE_SELECTION_BINDINGS
+        bound = false;
+#endif
+        const auto* r = records[i] = bound ? records_[i] : find(pack, end, c.id, c.frame);
         if (!r || word(r+14) != 3) return false;
         const unsigned w = word(r+8), h = word(r+10), dma = word(r+12);
         const unsigned offset = longword(r+16), length = longword(r+20);
@@ -108,7 +114,10 @@ bool AmigaSelectionLayer::render(UBYTE* target, const UBYTE* pack, const UBYTE* 
             }
         }
     }
-    for (unsigned i = 0; i < count; ++i) { previous_[i] = commands[i]; bounds_[i] = next_[i]; }
+    for (unsigned i = 0; i < count; ++i) {
+        previous_[i] = commands[i]; bounds_[i] = next_[i]; records_[i] = records[i];
+    }
     count_ = count; target_ = target; pack_ = pack; end_ = end; initialized_ = true;
+    bindingsValid_ = true;
     return true;
 }

@@ -15,12 +15,13 @@ public:
     using Command = AmigaClearOverlay::Command;
     using Rect = AmigaClearOverlay::Rect;
     static constexpr unsigned capacity = 80; // includes both border loops (76 commands)
-    void invalidate() { initialized_ = false; }
+    void invalidate() { initialized_ = false; bindingsValid_ = false; }
     // Caller has proved every resource referenced by this layer has identical
     // geometry and pixels in the replacement bank. Directory offsets may
-    // change: no record/payload pointers are retained across render() calls.
+    // change: retire record bindings while preserving the displayed pixels.
     void rebindEquivalentArtwork(const UBYTE* pack, const UBYTE* end) {
         pack_ = pack; end_ = end;
+        bindingsValid_ = false;
     }
     const UBYTE* view(unsigned top) const {
         return target_ && top <= height - 284 ? target_ + top * stride : nullptr;
@@ -32,6 +33,10 @@ private:
     const UBYTE* pack_ = nullptr;
     const UBYTE* end_ = nullptr;
     bool initialized_ = false;
+    // Asset admission belongs to the immutable bank lifetime, not to every
+    // moving command. Publish bindings only after the entire list validates.
+    bool bindingsValid_ = false;
+    const UBYTE* records_[capacity] = {};
     unsigned count_ = 0;
     Command previous_[capacity];
     Rect bounds_[capacity], next_[capacity], dirty_[capacity * 2];

@@ -166,6 +166,15 @@ and body words, compares them with the scalar style renderer, and checks
 all eight programmed pointers, their distinct live headers and PF priority.
 The offline test also proves opaque-black coverage and retained-bank bounds.
 
+Selection canvases retain admitted artwork records alongside their successful
+command list. Moving a command changes its damage bounds, not its immutable
+resource binding. A changed resource/frame key is resolved afresh, and a failed
+list publishes neither pixels nor new bindings. `invalidate()` and equivalent
+artwork rebinding retire all record pointers, including when a replacement
+bank occupies the same address with different directory offsets. The latter
+may retain existing pixels but must resolve records before the next repaint.
+`REFERENCE_SELECTION_BINDINGS=1` retains per-frame directory admission.
+
 ## Vertical ring and buffering
 
 Damage labels retain the shared `DamageNumberText` formatting and eight-pixel

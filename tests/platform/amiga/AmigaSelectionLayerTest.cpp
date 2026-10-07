@@ -49,6 +49,11 @@ int main(int argc,char** argv) {
     commands[0].id=65535;
     assert(!layer.render(canvas.data(),pack.data(),pack.data()+pack.size(),commands,3,paint) && canvas==before);
     commands[0].id=64500;
+    // A failed list must not publish the new first command's binding. The
+    // next valid movement still uses the last successfully rendered keys.
+    commands[0].id=64001; commands[1].id=65535;
+    assert(!layer.render(canvas.data(),pack.data(),pack.data()+pack.size(),commands,3,paint) && canvas==before);
+    commands[0].id=64500; commands[1].id=64500;
     for(unsigned tick=0;tick<100;++tick) {
         commands[0].x=70+int(tick%16); commands[1].y=90+int(tick%9);
         assert(layer.render(canvas.data(),pack.data(),pack.data()+pack.size(),commands,3,paint));
@@ -131,6 +136,15 @@ int main(int argc,char** argv) {
             oracle.invalidate();
             assert(oracle.render(fresh.data(),bank.data(),bank.data()+bytes,borders,count,paint));
             assert(canvas==preserved && canvas==fresh && cached==canvas);
+            // Directory offsets have changed in place. A subsequent moving
+            // command must re-admit records even though the bank pointer did
+            // not change and the preceding frame needed no repaint.
+            borders[0].y += 3;
+            assert(layer.render(canvas.data(),bank.data(),bank.data()+bytes,borders,count,paint));
+            oracle.invalidate();
+            assert(oracle.render(fresh.data(),bank.data(),bank.data()+bytes,borders,count,paint) && canvas==fresh);
+            borders[0].y -= 3;
+            assert(layer.render(canvas.data(),bank.data(),bank.data()+bytes,borders,count,paint) && canvas==preserved);
             ++replacements;
         }
         borders[0].y += 3;
