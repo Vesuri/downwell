@@ -125,6 +125,17 @@ Side-room wall coordinates, irregular row widths, the between-row random word
 and the optional three-row pillar tail are part of the schedule, not padding
 that can be silently omitted.
 
+The box Create's callback-free random prefix may consume four consecutive
+words as one transaction: sound choice, frame choice, then the low and high
+words of `irandom(50)`. Only after those values are evaluated may the rare
+gem branch consume its fifth word. No callback or failure boundary lies
+inside that prefix. `GameMakerRandom::nextWords` returns the same words and
+publishes the same full WELL state, index and draw count as scalar calls;
+it does not select future cells or move draws across another Create.
+`REFERENCE_BOX_RANDOM=1` retains scalar box-Create consumption. Lookahead
+wrap, exhausted/partial caches, reseeding and copied RNG states must retain
+this contract. Other random consumers may interleave between Creates.
+
 Testing a prepared executor requires comparison with immediate execution while
 interleaving external RNG draws, health changes and callbacks that consume RNG,
 including early callback failures. Comparing only a level generated from one

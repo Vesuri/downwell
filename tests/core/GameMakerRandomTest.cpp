@@ -1,4 +1,5 @@
 #include "core/GameMakerRandom.h"
+#include "core/GeneratedBreakableCreate.h"
 #include "core/Well512Verification.h"
 #include "core/SmallUnsignedRemainderVerification.h"
 #include "core/Positive63RemainderVerification.h"
@@ -323,6 +324,39 @@ void testLookahead() {
 } // namespace
 
 int main() {
+    unsigned gemCases=0;
+    for(unsigned seed=0;seed<64;++seed){
+        downwell::GameMakerRandom candidate(seed),reference(seed);
+        downwell::GameMakerRandom::Lookahead ring;
+        candidate.bindLookahead(ring);
+        candidate.refill(seed%5);
+        for(unsigned step=0;step<1024;++step){
+            if(step%19==0){candidate.refill(23);}
+            if(step%113==0){candidate.setSeed(seed+step);reference.setSeed(seed+step);}
+            if(step%97==0){auto copy=reference;candidate=copy;}
+            const auto a=downwell::GeneratedBreakableCreate::evaluate(candidate);
+            const auto b=downwell::GeneratedBreakableCreate::evaluateReference(reference);
+            require(a.frame==b.frame&&a.sound==b.sound&&a.gems==b.gems,"box Create prefix preserves all outputs");
+            gemCases+=a.gems!=0;
+            require(candidate.stateIndex()==reference.stateIndex()&&candidate.drawCount()==reference.drawCount(),
+                "box Create preserves stream position and conditional draw");
+            for(unsigned i=0;i<16;++i)require(candidate.stateWord(i)==reference.stateWord(i),"box Create preserves full WELL state");
+            require(candidate.nextU32()==reference.nextU32(),"other consumers interleave after Create");
+        }
+    }
+    require(gemCases>100,"rare fifth draw exercised");
+    for(unsigned cached=0;cached<2;++cached){
+        downwell::GameMakerRandom candidate(42),reference(42);
+        downwell::GameMakerRandom::Lookahead ring;
+        if(cached)candidate.bindLookahead(ring);
+        for(unsigned count: {0u,1u,4u,495u,496u,511u,512u,1025u}){
+            std::vector<std::uint32_t> values(count);
+            candidate.nextWords(values.data(),count);
+            for(auto value:values)require(value==reference.nextU32(),"bulk RNG matches each scalar output across wrap/refill");
+            require(candidate.stateIndex()==reference.stateIndex()&&candidate.drawCount()==reference.drawCount(),"bulk RNG state index/count");
+            for(unsigned i=0;i<16;++i)require(candidate.stateWord(i)==reference.stateWord(i),"bulk RNG full state");
+        }
+    }
     require(downwell::verifyPositive63Remainder()==0,"full-range remainder matches independent host oracle");
     require(downwell::verifyWell512()==0,"WELL kernel matches all words and indices of portable reference");
     require(downwell::verifySmallUnsignedRemainder()==0,

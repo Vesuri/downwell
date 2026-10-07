@@ -132,6 +132,23 @@ void GameMakerRandom::advance(unsigned draws) {
     while (draws--) Well512::step(&state_[0],stateIndex_);
 }
 
+void GameMakerRandom::nextWords(std::uint32_t* output, unsigned count) {
+    if (!lookahead_) {
+        while (count--) *output++ = nextU32();
+        return;
+    }
+    drawCount_ += count;
+    while (count) {
+        if (!lookahead_->available) refill(count);
+        const unsigned take = count < lookahead_->available ? count : lookahead_->available;
+        const unsigned first = lookahead_->read;
+        for (unsigned i = 0; i < take; ++i)
+            *output++ = lookahead_->entries[(first + i) & (Lookahead::capacity - 1)].output;
+        consumeLookahead(take);
+        count -= take;
+    }
+}
+
 double GameMakerRandom::random(double upperExclusive) {
     constexpr double u32Scale = 1.0 / 4294967296.0;
     return static_cast<double>(nextU32()) * u32Scale * upperExclusive;

@@ -50,6 +50,10 @@ public:
     void setSeed(std::uint32_t seed);
     std::uint32_t seed() const { return seed_; }
     std::uint32_t nextU32();
+    // One callback-free source operation may consume a consecutive prefix.
+    // Values and final state equal count nextU32 calls; no caller can observe
+    // intermediate consumer states inside this operation.
+    void nextWords(std::uint32_t* output, unsigned count);
     // Discard draws whose values no caller reads; same stream and count.
     void advance(unsigned draws);
     double random(double upperExclusive = 1.0);

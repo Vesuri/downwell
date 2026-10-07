@@ -29,6 +29,7 @@ ifneq ($(filter-out 0,$(TERRAIN_RUN_STORE)),)
 $(error TERRAIN_RUN_STORE was removed; use the default native terrain owner)
 endif
 REFERENCE_RANDOM ?= 0
+REFERENCE_BOX_RANDOM ?= 0
 REFERENCE_PATTERNS ?= 0
 REFERENCE_BREAKABLES ?= 0
 REFERENCE_DAMAGE_TEXT ?= 0
@@ -219,6 +220,9 @@ CFLAGS += -DDOWNWELL_SKIP_INTRO
 endif
 ifeq ($(REFERENCE_RANDOM),1)
 CFLAGS += -DDOWNWELL_REFERENCE_RANDOM
+endif
+ifeq ($(REFERENCE_BOX_RANDOM),1)
+CFLAGS += -DDOWNWELL_REFERENCE_BOX_RANDOM
 endif
 ifeq ($(REFERENCE_PATTERNS),1)
 CFLAGS += -DDOWNWELL_REFERENCE_PATTERNS
@@ -481,6 +485,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
 	@printf '%s\n' '$(REFERENCE_VALIDATION)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_ANIMATION)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_GENERATED_BOXES)' >> $@.tmp
+	@printf '%s\n' '$(REFERENCE_BOX_RANDOM)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_INITIAL_RASTER)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_ROOM_PREPARE)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_FIELD_BANK)' >> $@.tmp
