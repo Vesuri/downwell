@@ -5,12 +5,15 @@
 #include "platform/amiga/AmigaGameplayDrawList.h"
 #include "core/CurrencySmokeComposition.h"
 #include "core/DebrisDraw.h"
+#include <cstring>
 
 int amigaBlitterDrawPlanarMasked(const UBYTE*,const UBYTE*,UWORD,UWORD,UWORD,UBYTE*,UWORD,UWORD,UWORD,UWORD,UWORD,UWORD,UWORD,int){return 0;}
 int amigaBlitterClearPlanar(UBYTE*,UWORD,UWORD){return 0;}
 int amigaBlitterSolidRect(UBYTE*,UWORD,UWORD,UWORD,UWORD,UWORD,UWORD){return 0;}
 
-int main(){
+int main(int argc,char** argv){
+    const bool census=argc==2&&std::strcmp(argv[1],"--census")==0;
+    require(argc==1||census,"usage: amiga-currency-promotion-test [--census]");
     const auto rb=readFile("generated/downwell-rooms.dwrm"),ob=readFile("generated/downwell-objects.dwob"),
         pb=readFile("generated/downwell-builder-patterns.dwbp"),ab=readFile("generated/amiga-game.dwap");
     downwell::RoomPack rooms(rb.data(),rb.size());downwell::ObjectPack objects(ob.data(),ob.size());
@@ -54,6 +57,8 @@ int main(){
     }
     AmigaGameplayDrawList list;downwell::CurrencySmokeComposition oracle;
     downwell::PaletteEffectSurface<> projected;unsigned promoted=0;
+    unsigned empty=0,raster=0,mixed=0,overflow=0,covered=0,maxSmoke=0,maxDebris=0;
+    if(census)std::puts("frame,visible_gems,smoke,debris,entry,promoted,parts");
     for(unsigned tick=1;tick<=1800;++tick){
         const auto input=downwell::gameplayContactProfileInput(game.tick(),240+game.player().offsetX(),
             176+game.player().offsetY(),downwell::gameplayContactProfilePhase);
@@ -61,12 +66,33 @@ int main(){
         compareInitialGameplay(game,host);
         require(game.effectsSucceeded()&&game.generationSucceeded(),"runtime");
         const int vx=160+game.cameraOffsetX(),vy=34+game.cameraOffsetY();
-        list.count=0;list.entryCoverVisible=false;
-        const auto checkpoint=game.checkpoint();
-        if(!list.promoteCurrency(game,vx,vy,assets,frames)){
-            require(list.count==0,"fallback is transactional");continue;
+        require(list.collect(game,ab.data(),ab.data()+ab.size(),vx,vy,true,&frames),"native draw-list census");
+        const unsigned firstCurrency=list.count;
+        unsigned visible=0,parts=0,debris=0;
+        for(unsigned i=0;i<game.gemSlotEnd();++i){const auto& g=game.gemAt(i);
+            if(!g.active||!g.motion.lifetime.visible()||
+                !downwell::EffectSurfacePlacement::pixelInView(240+g.x,176+g.y,{vx,vy,160,284}))continue;
+            ++visible;const auto* art=frames.find(g.large?134:133,g.motion.animation.frame());
+            require(art,"census currency frame");parts+=art->partCount[0];
         }
-        ++promoted;require(game.checkpoint()==checkpoint,"promotion is read-only");
+        require(game.visitDebrisDraw([&](const auto&){++debris;return true;}),"debris census");
+        const unsigned smoke=game.smokeEffects().size();
+        if(smoke>maxSmoke)maxSmoke=smoke;if(debris>maxDebris)maxDebris=debris;
+        const auto checkpoint=game.checkpoint();
+        const bool hardware=list.promoteCurrency(game,vx,vy,assets,frames);
+        if(census)std::printf("%u,%u,%u,%u,%u,%u,%u\n",tick,visible,smoke,debris,
+            unsigned(list.entryCoverVisible),unsigned(hardware),parts);
+        require(game.checkpoint()==checkpoint,"promotion is read-only, including fallback");
+        if(!hardware){
+            require(list.count==firstCurrency,"fallback preserves the existing actor prefix");
+            if(!visible&&!smoke&&!debris&&!list.entryCoverVisible)++empty;
+            else ++raster;
+            if(smoke||debris)++mixed;
+            if(parts>8)++overflow;
+            if(list.entryCoverVisible)++covered;
+            continue;
+        }
+        ++promoted;
         using Real=downwell::MotionBinary64;
         const downwell::EffectSurfacePlacement::View view{Real::fromInteger(vx),Real::fromInteger(vy),
             Real::fromInteger(160),Real::fromInteger(284)};
@@ -81,7 +107,7 @@ int main(){
             if(e.active&&e.awake)emit(std::int32_t(240+e.x),std::int32_t(176+e.y));}
         },[](Real n,std::int32_t& out){return n.roundPixel(out);}),"compositor oracle");
         projected.clear();unsigned channels=0;
-        for(unsigned i=0;i<list.count;++i){const auto& bob=list.actors[i];
+        for(unsigned i=firstCurrency;i<list.count;++i){const auto& bob=list.actors[i];
             const auto& a=*assets.currency(bob.sprite==134,bob.frame);channels+=bob.prepared->partCount[0];
             projected.add({{a.mask.data,a.mask.bytes,a.mask.width,a.mask.height,a.mask.stride},a.low,a.high},
                 bob.x-downwellPlayfieldX-a.originX,bob.y-a.originY);
@@ -95,4 +121,7 @@ int main(){
     }
     require(promoted>50,"contact tape exercises promotion");
     std::printf("Currency promotion: %u exact frames in 1800-frame source-backed replay\n",promoted);
+    require(promoted+empty+raster==1800,"every frame has a presentation class");
+    std::printf("Effect coverage: hardware=%u empty=%u raster=%u; fallback mixed=%u overflow=%u entry=%u; max live smoke=%u debris=%u\n",
+        promoted,empty,raster,mixed,overflow,covered,maxSmoke,maxDebris);
 }

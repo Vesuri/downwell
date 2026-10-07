@@ -564,6 +564,17 @@ rules; raster and stamping cover all producers. The remaining currency phase
 includes enumeration, frame selection and conversion of published integer
 coordinates to the portable representation. Sum children when comparing with
 older producer totals; none of these phase counts is an effect-instance count.
+Before selecting another compositor trace window, run
+`make test-amiga-currency-promotion`. Its source-backed contact replay builds
+the actual native actor prefix and reports hardware, empty and raster-fallback
+frames, plus smoke/debris, entry-cover and channel-overflow coverage. Run
+`./build/amiga-currency-promotion-test --census` for per-frame CSV rows followed
+by the verification summary. Raster fallback is not itself evidence of shade
+subtraction: establish that producer/mask intersection separately. This is a
+coverage check, not a timing measurement or a dense-encounter substitute.
+The replay keeps its source/runtime state comparisons enabled and compares
+every promoted currency suffix with the scalar surface, independently of the
+earlier actor commands.
 Phases 137–138 split enemy finalization's integer position publication and
 sprite/mask/scale/image-index publication from phase 115. The latter includes
 bat presentation-field updates. Coordinate rounding, sprite selection and

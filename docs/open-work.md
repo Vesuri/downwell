@@ -327,7 +327,10 @@ under 80 ms while removing remaining threshold-sized computations.
 Remaining effect work is the raster fallback for mixed producers, actual
 shade subtraction, entry cover and sprite-channel overflow. Measure those
 cases separately from eligible gem-only frames before another compositor
-attempt. The supplied audit's raster preparation/publication costs were
+attempt. Use the effect-coverage census described in the profiling procedure
+to establish that the chosen window actually exercises each proposed path;
+producer-phase timings alone do not prove smoke/debris or raster coverage.
+The supplied audit's raster preparation/publication costs were
 5.97/3.02 ms in combat (10.4/6.6 at 660). Draw collection costs 4.49 ms and
 row synchronization 4.33 ms in that baseline; remeasure their remaining work
 after hardware promotion before choosing the next structure.
