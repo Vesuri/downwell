@@ -14,6 +14,13 @@ amiga_game_pack:
 amiga_game_pack_end:
 
 	.balign 4
+	.globl amiga_effect_stamps
+amiga_effect_stamps:
+	.incbin "../generated/amiga-effect-stamps.dwef"
+	.globl amiga_effect_stamps_end
+amiga_effect_stamps_end:
+
+	.balign 4
 	.globl amiga_exit_mask
 amiga_exit_mask:
 	.incbin "../generated/amiga-game.exit-mask"

@@ -310,9 +310,9 @@ under 80 ms while removing remaining threshold-sized computations.
 
 ### C. Combat composition shortfall
 
-Currency/smoke preparation still costs 9.74 ms in combat (13.88 at 660);
-Draw collection costs 5.00 ms, row synchronization 4.29 ms and effect
-publication 2.71 ms.
+Currency/smoke preparation still costs 5.97 ms in combat (10.4 at 660);
+Draw collection costs 4.49 ms, row synchronization 4.33 ms and effect
+publication 3.02 ms (6.6 at 660).
 Review the complete producer/compositor/consumer path, preserving source
 painter order, opaque-black replacement and shade subtraction. The two
 rejected effect approaches remain closed: a new proposal must remove their
@@ -325,6 +325,10 @@ The disjoint row-debt range attempt is closed: do not retune its range layout
 or search; any replacement must also remove per-row field/laser debt queries.
 Keep per-producer/presentation state and final pixels as oracles. Do not
 reopen small sprite assignment or gem-position helpers.
+Keep `REFERENCE_EFFECT_COMPOSITION=1` as the separate-plane oracle. Further
+composition work must remove a threshold-sized structure, not tune stamp
+lookup, row geometry or the sub-millisecond bitmap setup. Preserve the
+retained alpha raster's exact queries and uncommon-mask fallback.
 
 ### D. Gem counter and streak redraws (frames 488 and 660)
 

@@ -19,11 +19,15 @@ memory requirement.
 | Shared splash/style cache | 66,704 |
 | Resident gameplay art pack (directory, planar art) | 115,326 |
 | Effect surface | 20,448 |
+| Offline interleaved smoke/gem stamps | 5,320 |
 | Shared scene bank (boot or front art; gameplay terrain scratch and field images) | 146,818 |
-| **Total** | **491,066** |
+| **Total** | **496,386** |
 
-`make verify-amiga-memory` reports 11,512 bytes of Chip RAM free after these
-allocations. The resident large-field arc images cost 56,376 of the scene
+`make verify-amiga-memory` reports 6,192 bytes of Chip RAM remaining after
+these allocations.
+The interleaved stamps reuse no live scene storage. Before that bank, the
+same allocation set left 11,512 bytes free. The resident large-field arc
+images cost 56,376 of the scene
 bank's bytes; before they shipped, 67,888 bytes were free.
 
 ## Scene banks

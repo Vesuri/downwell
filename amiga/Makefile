@@ -33,6 +33,7 @@ REFERENCE_PATTERNS ?= 0
 REFERENCE_BREAKABLES ?= 0
 REFERENCE_DAMAGE_TEXT ?= 0
 REFERENCE_GEM_POSITION ?= 0
+REFERENCE_EFFECT_COMPOSITION ?= 0
 REFERENCE_ACTOR_PREFIX ?= 0
 REFERENCE_DRAW_LIST ?= 0
 REFERENCE_VALIDATION ?= 0
@@ -206,6 +207,9 @@ CFLAGS += -DDOWNWELL_RESULTS_RESTART_VERIFY -DDOWNWELL_SCENE_VERIFY
 endif
 ifeq ($(BOB_VERIFY),1)
 CFLAGS += -DDOWNWELL_BOB_VERIFY -DDOWNWELL_SCENE_VERIFY
+endif
+ifeq ($(REFERENCE_EFFECT_COMPOSITION),1)
+CFLAGS += -DDOWNWELL_REFERENCE_EFFECT_COMPOSITION
 endif
 ifeq ($(SKIP_INTRO),1)
 CFLAGS += -DDOWNWELL_SKIP_INTRO
@@ -408,6 +412,7 @@ LDFLAGS := -Wl,--emit-relocs,--gc-sections,-Ttext=0,-Map=$(OUT).map
 
 AMIGA_HUD := $(REPO)/generated/amiga-hud.dwap
 AMIGA_GAME := $(REPO)/generated/amiga-game.dwap
+AMIGA_EFFECT_STAMPS := $(REPO)/generated/amiga-effect-stamps.dwef
 AMIGA_EXIT_MASK := $(REPO)/generated/amiga-game.exit-mask
 AMIGA_ENTRY_MASK := $(REPO)/generated/amiga-game.entry-mask
 AMIGA_SELECTION_MASK := $(REPO)/generated/amiga-game.selection-mask
@@ -790,7 +795,10 @@ $(AMIGA_SELECTION_MASK): $(AMIGA_GAME)
 $(AMIGA_BOOT_BANK) $(AMIGA_FRONT_BANK) $(AMIGA_SCENE_BANKS): $(AMIGA_GAME)
 	@test -f $@ || $(MAKE) -C $(REPO) generate-amiga-game
 
-obj/AmigaAssets.o: $(AMIGA_SRC)/AmigaAssets.s $(AMIGA_HUD) $(AMIGA_GAME) $(AMIGA_EXIT_MASK) $(AMIGA_ENTRY_MASK) $(AMIGA_SELECTION_MASK) \
+$(AMIGA_EFFECT_STAMPS): $(AMIGA_GAME) $(REPO)/tools/generate-effect-stamps.py
+	cd $(REPO) && python3 tools/generate-effect-stamps.py
+
+obj/AmigaAssets.o: $(AMIGA_SRC)/AmigaAssets.s $(AMIGA_HUD) $(AMIGA_GAME) $(AMIGA_EFFECT_STAMPS) $(AMIGA_EXIT_MASK) $(AMIGA_ENTRY_MASK) $(AMIGA_SELECTION_MASK) \
 		$(AMIGA_RESULTS) $(AMIGA_SHOP) $(AMIGA_CLEAR) $(ROOM_PACK) $(OBJECT_PACK) $(COLLISION_PACK) $(COLLISION_MASK_PACK) $(BUILDER_PACK)
 	@mkdir -p $(@D)
 	$(AS) $(ASFLAGS) -o $@ $<

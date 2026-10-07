@@ -14,7 +14,7 @@ static unsigned dword(const unsigned char* p){return word(p)*65536u+word(p+2);}
 struct Asset {Surface::Asset image;int ox,oy;};
 static unsigned waitCalls;
 int main(int argc,char**argv){
-    assert(argc==2);std::ifstream file(argv[1],std::ios::binary);
+    assert(argc==2||argc==3);std::ifstream file(argv[1],std::ios::binary);
     const std::vector<unsigned char> pack{std::istreambuf_iterator<char>(file),{}};
     downwell::EffectMaskAssets shared;
     assert(shared.bind(pack.data(),pack.size()));
@@ -38,13 +38,15 @@ int main(int argc,char**argv){
     Surface surface;
     // Borrowed padded storage: declined acceleration still uses the exact CPU
     // path and must respect guards. Native tests exercise successful DMA.
-    std::array<std::uint16_t,12*284*3> external;external.fill(0x5a5a);
-    assert(surface.bindStorage(external.data()+1,external.data()+12*284+1,
-        external.data()+12*284*2+1,12,{external.data(),
+    struct Storage {std::array<std::uint16_t,12*284*3> data;unsigned stride,plane;};
+    Storage storage{{},argc==3?36u:12u,argc==3?12u:12u*284};
+    auto& external=storage.data;external.fill(0x5a5a);
+    assert(surface.bindStorage(external.data()+1,external.data()+storage.plane+1,
+        external.data()+storage.plane*2+1,storage.stride,{&storage,
             [](void*,const Surface::Mask&,const std::uint8_t*,const std::uint8_t*,int,int){return false;},
-            [](void* p,unsigned first,unsigned end){auto* data=static_cast<std::uint16_t*>(p);
+            [](void* p,unsigned first,unsigned end){auto& s=*static_cast<Storage*>(p);
                 for(unsigned plane=0;plane<3;++plane)for(unsigned y=first;y<end;++y)
-                    for(unsigned x=1;x<=10;++x)data[plane*12*284+y*12+x]=0;
+                    for(unsigned x=1;x<=10;++x)s.data[plane*s.plane+y*s.stride+x]=0;
             },[](void*){++waitCalls;}}));
     const auto boundWaits=waitCalls;
     assert(!surface.intersects(0,0,160,284)&&waitCalls==boundWaits);
@@ -128,5 +130,5 @@ int main(int argc,char**argv){
     }
     std::puts("Palette effects: 256 source gem/smoke/shade frames plus 760 shifted all-pen overwrite cases passed");
     for(unsigned plane=0;plane<3;++plane)for(unsigned y=0;y<284;++y)
-        assert(external[plane*12*284+y*12]==0x5a5a&&external[plane*12*284+y*12+11]==0x5a5a);
+        assert(external[plane*storage.plane+y*storage.stride]==0x5a5a&&external[plane*storage.plane+y*storage.stride+11]==0x5a5a);
 }

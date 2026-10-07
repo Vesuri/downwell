@@ -511,6 +511,7 @@ build/palette-effects-test: tests/core/PaletteEffectSurfaceTest.cpp src/core/Pal
 .PHONY: verify-palette-effects
 verify-palette-effects: build/palette-effects-test generate-amiga-game
 	./build/palette-effects-test generated/amiga-game.dwap
+	./build/palette-effects-test generated/amiga-game.dwap interleaved
 test: verify-palette-effects
 
 build/smoke-composition-test: tests/core/SmokeCompositionTest.cpp src/core/GameMakerRandom.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc
@@ -2460,6 +2461,18 @@ generated/default-shader.json: tools/export-default-shader.sh tools/export-defau
 verify-default-shader: generated/default-shader.json
 	python3 tools/verify-default-shader.py
 	python3 tools/verify-runner-vertex-shader.py
+
+.PHONY: generate-effect-stamps test-effect-stamps
+test: test-effect-stamps
+generate-effect-stamps: generate-amiga-game
+	python3 tools/generate-effect-stamps.py
+test-effect-stamps: generate-effect-stamps build/amiga-effect-stamp-bank-test
+	python3 tools/generate-effect-stamps.py --check
+	python3 tests/effect-stamps-test.py
+	./build/amiga-effect-stamp-bank-test
+build/amiga-effect-stamp-bank-test: tests/platform/amiga/AmigaEffectStampBankTest.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -Isrc -o $@ $<
 
 .PHONY: test-amiga-immutable-upload
 test-amiga-immutable-upload: build/amiga-immutable-upload-test

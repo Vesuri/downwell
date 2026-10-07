@@ -231,6 +231,7 @@ extern "C" {
 extern const UBYTE amiga_hud_pack[];
 extern const UBYTE amiga_hud_pack_end[];
 extern const UBYTE amiga_game_pack[];
+extern const UBYTE amiga_effect_stamps[],amiga_effect_stamps_end[];
 extern const UBYTE amiga_game_pack_end[];
 #ifdef DOWNWELL_PREPARED_FIELDS
 extern const UBYTE amiga_field_images[],amiga_field_images_end[];
@@ -1823,6 +1824,8 @@ __attribute__((noinline)) static int runDownwell(void) {
     }
     const ULONG gamePackBytes =
         amigaRendererChipPackBytes(amiga_game_pack, amiga_game_pack_end);
+    const ULONG effectStampBytes=amiga_effect_stamps_end-amiga_effect_stamps;
+    const ULONG effectStampOffset=(gamePackBytes+AmigaEffectSurface::bytes+3)&~3UL;
     gDownwellStartupChipFree = AvailMem(MEMF_CHIP);
     gDownwellStartupChipLargest = AvailMem(MEMF_CHIP | MEMF_LARGEST);
     gDownwellStartupAssetBytes = gamePackBytes;
@@ -1833,7 +1836,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                          bulletSpriteBytes * bulletSpriteBufferCount,
                          enemySpriteBytes,
                          sceneCacheBytes,
-                         ((gamePackBytes+AmigaEffectSurface::bytes+3)&~3UL)+sceneBankBytes)) {
+                         ((effectStampOffset+effectStampBytes+3)&~3UL)+sceneBankBytes)) {
         platform.restore();
         FreeMem(startupCopperWords, 4 * sizeof(UWORD));
         gDownwellStartupFailure = 4;
@@ -1841,7 +1844,9 @@ __attribute__((noinline)) static int runDownwell(void) {
         return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
     }
     gDownwellStartupChipRemaining = AvailMem(MEMF_CHIP);
-    sceneBank = memory.assets() + ((gamePackBytes+AmigaEffectSurface::bytes+3)&~3UL);
+    sceneBank = memory.assets() + ((effectStampOffset+effectStampBytes+3)&~3UL);
+    UBYTE* effectStamps=memory.assets()+effectStampOffset;
+    memcpy(effectStamps,amiga_effect_stamps,effectStampBytes);
     const downwell::BuilderPatternPack builders(
         amiga_builder_pack,
         (unsigned long)(amiga_builder_pack_end - amiga_builder_pack));
@@ -1997,7 +2002,8 @@ __attribute__((noinline)) static int runDownwell(void) {
     auto& controllerEffects = *new (effectStorage) downwell::CurrencySmokeComposition;
     if (!effectAssets.bind(activeGamePack,gamePackBytes)||
         !effectAssets.bindEntryMask(amiga_entry_mask,amiga_entry_mask_end-amiga_entry_mask)||
-        !AmigaEffectSurface::bind(controllerEffects.surface(),memory.assets()+gamePackBytes)||
+        !AmigaEffectSurface::bind(controllerEffects.surface(),memory.assets()+gamePackBytes,
+            effectStamps,effectStampBytes,effectAssets)||
         !AmigaEffectSurface::fixtures(controllerEffects.surface(),effectAssets)) {
         platform.restore();
         FreeMem(startupCopperWords,4*sizeof(UWORD));

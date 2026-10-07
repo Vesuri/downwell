@@ -547,6 +547,15 @@ The subsequent restoration of damaged background rows remains in phase 15
 these phases with projectile queries and instance births before attributing a
 firing/destruction slowdown to sprite drawing. These scopes compile away in
 ordinary builds and retain painter order and the offline asset representation.
+`REFERENCE_EFFECT_COMPOSITION=1` retains separate-plane effect stamps and
+publication. The default surface uses interleaved alpha/low/high rows and
+offline repeated-mask smoke/gem assets for one masked blit per stamp.
+It still owns a complete alpha raster: overlap and visibility queries do not
+replay producer commands. Uncommon masks retain the scalar or separate-plane
+fallback with the same row stride. `make test-effect-stamps` checks assets and
+identity admission; `make verify-palette-effects` checks both storage layouts.
+The native BOB oracle compares DMA composition and completed publication
+against scalar pixels, and reference/candidate frame dumps check live play.
 Phases 134–136 further separate `drawFx` origin visibility/relative placement,
 raster rounding plus sprite-origin subtraction, and masked surface-word
 stamping. These are exclusive children of the producer phases. Placement

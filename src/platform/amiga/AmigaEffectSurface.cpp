@@ -1,4 +1,5 @@
 #include "AmigaEffectSurface.h"
+#include "AmigaEffectStampBank.h"
 #include <exec/types.h>
 #include "framework/Bitmap.h"
 #include "framework/AmigaHardware.h"
@@ -10,6 +11,7 @@ namespace {
 using Surface=downwell::PaletteEffectSurface<>;
 const Surface* boundSurface=nullptr;
 UBYTE* boundStorage=nullptr;
+AmigaEffectStampBank stampBank;
 #ifdef DOWNWELL_BOB_VERIFY
 alignas(Surface) UBYTE referenceStorage[sizeof(Surface)];
 Surface* reference=nullptr;
@@ -21,6 +23,11 @@ void clear(void* context,unsigned first,unsigned end){
 #endif
     if(first>=end)return;
     auto* data=static_cast<UBYTE*>(context);
+    if constexpr(AmigaEffectSurface::interleaved){
+        AmigaHardware::blitterClear(reinterpret_cast<UWORD*>(data+first*AmigaEffectSurface::rowBytes*3),
+            12,(end-first)*3,0);
+        return;
+    }
     for(unsigned plane=0;plane<3;++plane)
         AmigaHardware::blitterClear(reinterpret_cast<UWORD*>(data+plane*AmigaEffectSurface::planeBytes+
             first*AmigaEffectSurface::rowBytes),12,end-first,0);
@@ -41,12 +48,21 @@ bool stamp(void* context,const Surface::Mask& m,const std::uint8_t* low,const st
     if(width>unsigned(160-x))width=160-x;
     if(height>unsigned(284-y))height=284-y;
     if(!width||!height)return true;
-    // Low, high and alpha all follow the mask's geometry, so one derivation
-    // serves the three blits. Register values equal Bitmap::copyWithMask and
+    const auto* combined=AmigaEffectSurface::interleaved&&low?stampBank.find(m,low,high):nullptr;
+    const unsigned sourceY=combined?sy*3:sy;
+    const unsigned targetY=combined?unsigned(y)*3:unsigned(y);
+    const unsigned blitHeight=combined?height*3:height;
+    const unsigned destinationStride=AmigaEffectSurface::rowBytes*
+        (AmigaEffectSurface::interleaved&&!combined?3:1);
+    const unsigned planeOffset=AmigaEffectSurface::interleaved?AmigaEffectSurface::rowBytes:AmigaEffectSurface::planeBytes;
+    // Common offline stamps flatten alpha/low/high into consecutive physical
+    // rows. The repeated mask makes one masked copy preserve all three planes.
+    // Other assets retain separate plane writes with an interleaved row stride.
+    // Register values equal Bitmap::copyWithMask and
     // patternWithMask's for these strides (mask rows of m.stride bytes, the
     // surface's 24-byte rows with a guard word left of x=0).
     auto* data=static_cast<UBYTE*>(context);
-    const unsigned sourceWords=m.stride/2,surfaceWords=AmigaEffectSurface::rowBytes/2;
+    const unsigned sourceWords=m.stride/2,surfaceWords=destinationStride/2;
     const unsigned dx=unsigned(x)+16;
     const unsigned sourceFirst=sx>>4,destFirst=dx>>4;
     unsigned span=((dx+width-1)>>4)-destFirst;
@@ -58,46 +74,76 @@ bool stamp(void* context,const Surface::Mask& m,const std::uint8_t* low,const st
     const uint16_t lead=uint16_t(0xffffu>>(sx&15)),edge=trailing>=16?0:uint16_t(0xffffu<<trailing);
     ULONG source,target;uint16_t first,last;
     if(shift>=0){
-        source=ULONG(UWORD(sy))*UWORD(m.stride)+sourceFirst*2;
-        target=ULONG(UWORD(y))*AmigaEffectSurface::rowBytes+destFirst*2;
+        source=ULONG(UWORD(sourceY))*UWORD(m.stride)+sourceFirst*2;
+        target=ULONG(UWORD(targetY))*destinationStride+destFirst*2;
         first=lead;last=edge;
     }else{
         // Descending: start at the last word of the last row.
-        source=ULONG(UWORD(sy+height-1))*UWORD(m.stride)+sourceLast*2;
-        target=ULONG(UWORD(y+int(height)-1))*AmigaEffectSurface::rowBytes+destLast*2;
+        source=ULONG(UWORD(sourceY+blitHeight-1))*UWORD(m.stride)+sourceLast*2;
+        target=ULONG(UWORD(targetY+blitHeight-1))*destinationStride+destLast*2;
         first=edge;last=lead;
     }
-    auto* mask=reinterpret_cast<uint16_t*>(const_cast<std::uint8_t*>(m.data)+source);
+    auto* mask=reinterpret_cast<uint16_t*>(const_cast<std::uint8_t*>(combined?combined->mask:m.data)+source);
+    if(combined){
+        AmigaHardware::blitterCopyWithMask(reinterpret_cast<uint16_t*>(const_cast<unsigned char*>(combined->pixels)+source),
+            reinterpret_cast<uint16_t*>(data+target),mask,words,blitHeight,
+            sourceModulo,surfaceModulo,sourceModulo,shift,shift,first,last,false);
+    }else{
     if(low){
         AmigaHardware::blitterCopyWithMask(reinterpret_cast<uint16_t*>(const_cast<std::uint8_t*>(low)+source),
-            reinterpret_cast<uint16_t*>(data+AmigaEffectSurface::planeBytes+target),mask,
+            reinterpret_cast<uint16_t*>(data+planeOffset+target),mask,
             words,height,sourceModulo,surfaceModulo,sourceModulo,shift,shift,first,last,false);
         AmigaHardware::blitterCopyWithMask(reinterpret_cast<uint16_t*>(const_cast<std::uint8_t*>(high)+source),
-            reinterpret_cast<uint16_t*>(data+AmigaEffectSurface::planeBytes*2+target),mask,
+            reinterpret_cast<uint16_t*>(data+planeOffset*2+target),mask,
             words,height,sourceModulo,surfaceModulo,sourceModulo,shift,shift,first,last,false);
     }
     AmigaHardware::blitterPatternWithMask(low?0xffff:0,reinterpret_cast<uint16_t*>(data+target),mask,
         words,height,0,surfaceModulo,sourceModulo,0,shift,first,last,false);
+    }
 #ifdef DOWNWELL_BOB_VERIFY
     ++gDownwellEffectDmaStamps;
 #endif
     return true;
 }
 }
-bool AmigaEffectSurface::bind(downwell::PaletteEffectSurface<>& surface,void* storage){
+bool AmigaEffectSurface::bind(downwell::PaletteEffectSurface<>& surface,void* storage,
+    const unsigned char* stamps,unsigned stampBytes,const downwell::EffectMaskAssets& assets){
     if(!storage||(reinterpret_cast<ULONG>(storage)&1)||reinterpret_cast<ULONG>(storage)>=0x200000UL)return false;
+    const ULONG stampAddress=reinterpret_cast<ULONG>(stamps);
+    if(!stamps||(stampAddress&1)||stampAddress>=0x200000UL||stampBytes>0x200000UL-stampAddress)return false;
     auto* data=static_cast<UBYTE*>(storage);
+    if(!stampBank.bind(stamps,stampBytes,assets))return false;
 #ifdef DOWNWELL_BOB_VERIFY
     reference=new(referenceStorage) Surface;
 #endif
+    constexpr unsigned planeOffset=interleaved?rowBytes:planeBytes;
     if(!surface.bindStorage(reinterpret_cast<UWORD*>(data+2),
-        reinterpret_cast<UWORD*>(data+planeBytes+2),reinterpret_cast<UWORD*>(data+planeBytes*2+2),
-        rowBytes/2,{storage,stamp,clear,wait}))return false;
+        reinterpret_cast<UWORD*>(data+planeOffset+2),reinterpret_cast<UWORD*>(data+planeOffset*2+2),
+        rowBytes/2*(interleaved?3:1),{storage,stamp,clear,wait}))return false;
     boundSurface=&surface;boundStorage=data;return true;
 }
 bool AmigaEffectSurface::publish(const Surface& surface,Bitmap& display,
     unsigned buffer,unsigned origin,AmigaGameplayRows& rows){
     if(&surface!=boundSurface)return false;
+    if constexpr(interleaved){
+        Bitmap mask(boundStorage,192,284,1,false,false,576);
+        Bitmap low(boundStorage+rowBytes,192,284,1,false,false,576);
+        Bitmap high(boundStorage+rowBytes*2,192,284,1,false,false,576);
+        Bitmap targetLow(display.data,downwellDmaWidth,downwellGameRingHeight,1,false,false,downwellDmaWidth);
+        Bitmap targetHigh(static_cast<UBYTE*>(display.data)+downwellGameRingPlaneBytes,
+            downwellDmaWidth,downwellGameRingHeight,1,false,false,downwellDmaWidth);
+        surface.visitRectangles([&](unsigned x,unsigned y,unsigned width,unsigned height){
+            rows.damage(origin,y,height,static_cast<UBYTE>(1u<<buffer));
+            unsigned destination=(origin+y)%downwellGameRingHeight;
+            while(height){
+                const unsigned count=height<downwellGameRingHeight-destination?height:downwellGameRingHeight-destination;
+                targetLow.copyWithMask(low,mask,downwellPlayfieldX+x,destination,16+x,y,16+x,y,width,count);
+                targetHigh.copyWithMask(high,mask,downwellPlayfieldX+x,destination,16+x,y,16+x,y,width,count);
+                height-=count;y+=count;destination=0;
+            }
+        });
+        return true;
+    }
     Bitmap mask(boundStorage,192,284,1,false,false,192);
     Bitmap colors(boundStorage+planeBytes,192,284,2,false,false,192);
     surface.visitRectangles([&](unsigned x,unsigned y,unsigned width,unsigned height){
