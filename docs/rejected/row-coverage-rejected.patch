@@ -1,0 +1,444 @@
+diff --git a/amiga/Makefile b/amiga/Makefile
+index 279fe4c6..01b45799 100644
+--- a/amiga/Makefile
++++ b/amiga/Makefile
+@@ -34,6 +34,7 @@ REFERENCE_BREAKABLES ?= 0
+ REFERENCE_DAMAGE_TEXT ?= 0
+ REFERENCE_GEM_POSITION ?= 0
+ REFERENCE_EFFECT_COMPOSITION ?= 0
++REFERENCE_ROW_COVERAGE ?= 0
+ REFERENCE_ACTOR_PREFIX ?= 0
+ REFERENCE_DRAW_LIST ?= 0
+ REFERENCE_VALIDATION ?= 0
+@@ -212,6 +213,9 @@ endif
+ ifeq ($(REFERENCE_EFFECT_COMPOSITION),1)
+ CFLAGS += -DDOWNWELL_REFERENCE_EFFECT_COMPOSITION
+ endif
++ifeq ($(REFERENCE_ROW_COVERAGE),1)
++CFLAGS += -DDOWNWELL_REFERENCE_ROW_COVERAGE
++endif
+ ifeq ($(SKIP_INTRO),1)
+ CFLAGS += -DDOWNWELL_SKIP_INTRO
+ endif
+diff --git a/amiga/profile.sh b/amiga/profile.sh
+index 94356569..d19558ca 100644
+--- a/amiga/profile.sh
++++ b/amiga/profile.sh
+@@ -101,6 +101,7 @@ restore() {
+   unset REFERENCE_DAMAGE_TEXT
+   unset REFERENCE_GEM_POSITION
+   unset REFERENCE_EFFECT_COMPOSITION
++  unset REFERENCE_ROW_COVERAGE
+   unset REFERENCE_ACTOR_PREFIX
+   unset REFERENCE_DRAW_LIST
+   unset REFERENCE_VALIDATION
+diff --git a/src/platform/amiga/AmigaGameplayRows.cpp b/src/platform/amiga/AmigaGameplayRows.cpp
+index 933664c0..028ceb20 100644
+--- a/src/platform/amiga/AmigaGameplayRows.cpp
++++ b/src/platform/amiga/AmigaGameplayRows.cpp
+@@ -9,7 +9,11 @@ void AmigaGameplayRows::reset() {
+         first_[buffer] = downwellGameRingHeight;
+         end_[buffer] = 0;
+     }
++#ifdef DOWNWELL_REFERENCE_ROW_COVERAGE
+     for (auto& row : dirty_) row = 3;
++#else
++    for(auto& rows:dirty_)rows.fill();
++#endif
+ }
+ 
+ void AmigaGameplayRows::damage(unsigned origin, unsigned y, unsigned height, unsigned char buffers) {
+@@ -21,28 +25,38 @@ void AmigaGameplayRows::damage(unsigned origin, unsigned y, unsigned height, uns
+         pending_[buffer] = true;
+         if (first < first_[buffer]) first_[buffer] = first;
+         if (end > end_[buffer]) end_[buffer] = end;
++#ifndef DOWNWELL_REFERENCE_ROW_COVERAGE
++        dirty_[buffer].span((origin+y)%downwellGameRingHeight,height);
++#endif
+     }
++#ifdef DOWNWELL_REFERENCE_ROW_COVERAGE
+     unsigned physical = (origin + y) % downwellGameRingHeight;
+     for (unsigned row = 0; row < height; ++row) {
+         dirty_[physical] |= buffers;
+         if (++physical == downwellGameRingHeight) physical = 0;
+     }
++#endif
+ }
+ 
+ void AmigaGameplayRows::copied(unsigned first, unsigned count, unsigned buffer) {
++#ifdef DOWNWELL_REFERENCE_ROW_COVERAGE
+     const unsigned char keep = static_cast<unsigned char>(~(1u << buffer));
+     for (unsigned row = first; row < first + count; ++row) dirty_[row] &= keep;
++#else
++    dirty_[buffer].span(first,count,false);
++#endif
+ }
+ 
+ void AmigaGameplayRows::sync(Bitmap& destination, const Bitmap& backing, unsigned buffer) {
+     DW_PROFILE_SCOPE(profileGameCopy);
+     if (!pending_[buffer]) return;
+     pending_[buffer] = false;
+-    const unsigned char bit = static_cast<unsigned char>(1u << buffer);
+     unsigned row = first_[buffer];
+     const unsigned end = end_[buffer];
+     first_[buffer] = downwellGameRingHeight;
+     end_[buffer] = 0;
++#ifdef DOWNWELL_REFERENCE_ROW_COVERAGE
++    const unsigned char bit = static_cast<unsigned char>(1u << buffer);
+     while (row < end) {
+         if (!(dirty_[row] & bit)) { ++row; continue; }
+         const unsigned first = row;
+@@ -52,6 +66,14 @@ void AmigaGameplayRows::sync(Bitmap& destination, const Bitmap& backing, unsigne
+         const unsigned width = initialized_[buffer] ? terrainWords * 16 : downwellDmaWidth;
+         destination.copy(backing, x, first, x, first, width, row - first);
+     }
++#else
++    const unsigned x=initialized_[buffer]?terrainX:0;
++    const unsigned width=initialized_[buffer]?terrainWords*16:downwellDmaWidth;
++    dirty_[buffer].runs(row,end,[&](unsigned first,unsigned height){
++        destination.copy(backing,x,first,x,first,width,height);
++    });
++    dirty_[buffer].span(row,end-row,false);
++#endif
+     AmigaHardware::setBlitterNasty(true);
+     AmigaHardware::blitterDrain();
+     AmigaHardware::setBlitterNasty(false);
+diff --git a/src/platform/amiga/AmigaGameplayRows.h b/src/platform/amiga/AmigaGameplayRows.h
+index 50197190..d14abea5 100644
+--- a/src/platform/amiga/AmigaGameplayRows.h
++++ b/src/platform/amiga/AmigaGameplayRows.h
+@@ -1,12 +1,17 @@
+ #ifndef DOWNWELL_AMIGA_GAMEPLAY_ROWS_H
+ #define DOWNWELL_AMIGA_GAMEPLAY_ROWS_H
+ #include "AmigaRenderer.h"
++#include "AmigaRowCoverage.h"
+ class Bitmap;
+ 
+ // Independent debts to the private terrain backing for two display rings.
+ // Physical row coordinates are used here, never camera/world coordinates.
+ class AmigaGameplayRows {
++#ifdef DOWNWELL_REFERENCE_ROW_COVERAGE
+     unsigned char dirty_[downwellGameRingHeight]{};
++#else
++    AmigaRowCoverage dirty_[2];
++#endif
+     bool pending_[2]{}, initialized_[2]{};
+     unsigned first_[2]{downwellGameRingHeight, downwellGameRingHeight};
+     unsigned end_[2]{};
+@@ -16,7 +21,16 @@ public:
+     // must damage its completed rows before sync (reset alone schedules no DMA).
+     void reset();
+     void damage(unsigned origin, unsigned y, unsigned height, unsigned char buffers = 3);
+-    bool dirty(unsigned row, unsigned buffer) const { return (dirty_[row] & (1u << buffer)) != 0; }
++    bool dirty(unsigned row, unsigned buffer) const {
++#ifdef DOWNWELL_REFERENCE_ROW_COVERAGE
++        return (dirty_[row] & (1u << buffer)) != 0;
++#else
++        return dirty_[buffer].test(row);
++#endif
++    }
++#ifndef DOWNWELL_REFERENCE_ROW_COVERAGE
++    const AmigaRowCoverage& coverage(unsigned buffer)const{return dirty_[buffer];}
++#endif
+     // Nonwrapping physical span already copied by the pipelined terrain path.
+     // The pending range may
+     // remain conservative; sync skips these rows without copying them again.
+diff --git a/src/platform/amiga/AmigaLaserSight.h b/src/platform/amiga/AmigaLaserSight.h
+index 138c6266..58480eb3 100644
+--- a/src/platform/amiga/AmigaLaserSight.h
++++ b/src/platform/amiga/AmigaLaserSight.h
+@@ -1,6 +1,7 @@
+ #ifndef DOWNWELL_AMIGA_LASER_SIGHT_H
+ #define DOWNWELL_AMIGA_LASER_SIGHT_H
+ #include "AmigaRenderer.h"
++#include "AmigaRowCoverage.h"
+ #include "core/LaserSightLine.h"
+ 
+ // One instance per display buffer. prepare() must run before any underlying
+@@ -18,6 +19,9 @@ class AmigaLaserSight {
+     UBYTE* target_ = nullptr;
+     downwell::LaserSightLine line_{};
+     bool valid_ = false, pending_ = false;
++#ifndef DOWNWELL_REFERENCE_ROW_COVERAGE
++    AmigaRowCoverage coverage_;
++#endif
+     static bool same(const downwell::LaserSightLine& a, const downwell::LaserSightLine& b) {
+         return a.x0 == b.x0 && a.y0 == b.y0 && a.x1 == b.x1 && a.y1 == b.y1;
+     }
+@@ -39,6 +43,9 @@ public:
+     bool present() const { return valid_ || pending_; }
+     // Pending Draw has no pixels yet; prepare() has retired the old ray.
+     bool retainsPixels() const { return valid_; }
++#ifndef DOWNWELL_REFERENCE_ROW_COVERAGE
++    bool touchesDirtyRows(const AmigaRowCoverage& dirty)const{return valid_&&coverage_.intersects(dirty);}
++#endif
+     const downwell::LaserSightLine* line() const { return valid_ ? &line_ : nullptr; }
+     unsigned origin() const { return origin_; }
+     bool matches(UBYTE* target, unsigned origin, const downwell::LaserSightLine& line) const {
+@@ -83,9 +90,16 @@ public:
+         if (!pending_) return;
+         auto* const begin = saved_ + count_;
+         auto* next = begin;
++#ifndef DOWNWELL_REFERENCE_ROW_COVERAGE
++        unsigned firstRow=downwellDisplayHeight,lastRow=0;
++#endif
+         line_.draw([&](int x, int y) {
+             if (x < downwellPlayfieldX || x >= downwellPlayfieldX + downwellPlayfieldWidth ||
+                 y < 0 || y >= downwellDisplayHeight) return;
++#ifndef DOWNWELL_REFERENCE_ROW_COVERAGE
++            if(unsigned(y)<firstRow)firstRow=unsigned(y);
++            if(unsigned(y)+1>lastRow)lastRow=unsigned(y)+1;
++#endif
+             const unsigned row = physicalRow(origin_, static_cast<unsigned>(y));
+             const UWORD offset = row * downwellBytesPerPlaneLine + (x >> 3);
+             const UBYTE mask = 0x80u >> (x & 7);
+@@ -108,6 +122,12 @@ public:
+         // publication. Publish bookkeeping once, not for every plane/pixel.
+         count_ = static_cast<unsigned>(next - saved_);
+         lastByteWrites += static_cast<unsigned>(next - begin);
++#ifndef DOWNWELL_REFERENCE_ROW_COVERAGE
++        // A clipped monotonic integer line visits every row between its ends,
++        // including pixels already red (which still depend on the underlay).
++        coverage_.clear();
++        if(firstRow<lastRow)coverage_.span(physicalRow(origin_,firstRow),lastRow-firstRow);
++#endif
+         pending_ = false; valid_ = true;
+     }
+ };
+diff --git a/src/platform/amiga/AmigaPreparedTimeFields.h b/src/platform/amiga/AmigaPreparedTimeFields.h
+index c54e3a96..235d5fc7 100644
+--- a/src/platform/amiga/AmigaPreparedTimeFields.h
++++ b/src/platform/amiga/AmigaPreparedTimeFields.h
+@@ -2,6 +2,7 @@
+ #define DOWNWELL_AMIGA_PREPARED_TIME_FIELDS_H
+ #include "AmigaGoalField.h"
+ #include "AmigaImmutableUpload.h"
++#include "AmigaRowCoverage.h"
+ #include <cstdint>
+ 
+ // Ops captures into a 64x56 two-plane backing and mask-blits from that layout
+@@ -23,6 +24,21 @@ public:
+         struct Rect { unsigned x,y,sx,sy,width,height; } rect_{};
+         struct Entry { Rect rect;const UBYTE* image;unsigned circle;bool large; } entries_[66];
+         UWORD largeRows_[downwellGameRingHeight/16]{};
++#ifndef DOWNWELL_REFERENCE_ROW_COVERAGE
++        AmigaRowCoverage coverage_;
++        void retainCoverage(){
++            coverage_.clear();
++            if(multiple_)for(unsigned i=0;i<AmigaRowCoverage::count;++i)
++                coverage_.words[i]=largeRows_[i];
++            for(unsigned e=0;e<(multiple_?entryCount_:1);++e){
++                if(multiple_&&entries_[e].large)continue;
++                const auto& rect=multiple_?entries_[e].rect:rect_;
++                unsigned row=origin_+rect.y;
++                if(row>=downwellGameRingHeight)row-=downwellGameRingHeight;
++                coverage_.span(row,rect.height);
++            }
++        }
++#endif
+         unsigned entryCount_=0;
+         bool multiple_=false;
+         downwell::TimeFieldOutlines shape_;
+@@ -106,6 +122,12 @@ public:
+             }
+             return false;
+         }
++#ifndef DOWNWELL_REFERENCE_ROW_COVERAGE
++        bool touchesDirtyRows(const AmigaRowCoverage& dirty)const{
++            if(!fast_)return reference_.touchesDirtyRows([&](unsigned row){return dirty.test(row);});
++            return coverage_.intersects(dirty);
++        }
++#endif
+         template<class DirtyRow> bool prepare(UBYTE* target,unsigned origin,
+             const downwell::TimeFieldOutlines& shape,bool underlyingChanged,DirtyRow dirty,
+             bool staticRectangleOwned=false) {
+@@ -179,6 +201,9 @@ public:
+             if(composite_){
+                 for(auto& rows:largeRows_)rows=0;
+                 if(!Ops::compose(terrain_,target_,compositeOld_,shape_.circles[0],origin_,largeRows_))return false;
++#ifndef DOWNWELL_REFERENCE_ROW_COVERAGE
++                retainCoverage();
++#endif
+                 composite_=pending_=false;valid_=true;return true;
+             }
+             if(multiple_){
+@@ -194,6 +219,9 @@ public:
+                 if(staticUnderlay_)validate();
+                 if((!staticUnderlay_&&!transfer(true,nullptr))||!transfer(false,image_))return false;
+             }
++#ifndef DOWNWELL_REFERENCE_ROW_COVERAGE
++            retainCoverage();
++#endif
+             pending_=false;valid_=true;return true;
+         }
+         bool preparedImage() const { return fast_; }
+diff --git a/src/platform/amiga/DownwellAmiga.cpp b/src/platform/amiga/DownwellAmiga.cpp
+index 2a978f7a..a050a3e9 100644
+--- a/src/platform/amiga/DownwellAmiga.cpp
++++ b/src/platform/amiga/DownwellAmiga.cpp
+@@ -3573,7 +3573,11 @@ __attribute__((noinline)) static int runDownwell(void) {
+                 (UBYTE*)gameDisplay[back].data, port.ringOrigin(), fieldShape);
+             if (!fieldChanged && fieldShape.visible)
+                 fieldChanged=gameplayFields[back].touchesDirtyRows(
++#if defined(DOWNWELL_PREPARED_FIELDS) && !defined(DOWNWELL_REFERENCE_ROW_COVERAGE)
++                    gameplayRows.coverage(back));
++#else
+                     [&](unsigned row){return gameplayRows.dirty(row,back);});
++#endif
+             DW_PROFILE_PHASE(profileActorCollect);
+             bool compositeCurrency = !port.dead();
+ #ifdef DOWNWELL_REPLAY_VERIFY
+@@ -3675,12 +3679,16 @@ __attribute__((noinline)) static int runDownwell(void) {
+                 bool changed = fieldChanged && (fieldShape.visible || gameplayFields[back].present());
+                 if (rayVisible && gameplayRays[back].matches(
+                         (UBYTE*)gameDisplay[back].data, port.ringOrigin(), rayLine)) {
++#ifdef DOWNWELL_REFERENCE_ROW_COVERAGE
+                     rayLine.draw([&](int x, int y) {
+                         if (x >= downwellPlayfieldX && x < downwellPlayfieldX + downwellPlayfieldWidth &&
+                             y >= 0 && y < downwellDisplayHeight &&
+                             gameplayRows.dirty(AmigaLaserSight::physicalRow(port.ringOrigin(), y), back))
+                             changed = true;
+                     });
++#else
++                    changed=changed||gameplayRays[back].touchesDirtyRows(gameplayRows.coverage(back));
++#endif
+                     const int left = rayLine.x0 < rayLine.x1 ? rayLine.x0 : rayLine.x1;
+                     const int right = rayLine.x0 > rayLine.x1 ? rayLine.x0 : rayLine.x1;
+                     const int top = rayLine.y0 < rayLine.y1 ? rayLine.y0 : rayLine.y1;
+diff --git a/tests/platform/amiga/AmigaGameplayRowsTest.cpp b/tests/platform/amiga/AmigaGameplayRowsTest.cpp
+index 901e36a0..18a95838 100644
+--- a/tests/platform/amiga/AmigaGameplayRowsTest.cpp
++++ b/tests/platform/amiga/AmigaGameplayRowsTest.cpp
+@@ -49,6 +49,22 @@ int main() {
+         }
+     };
+     initialize();
++    // Every possible bounded scan must preserve run boundaries, including a
++    // clipped first/last mask word and holes at word boundaries.
++    for(unsigned pattern:{0u,0xffffu,0xaaaau,0x8001u,0x7ffeu}){
++        AmigaRowCoverage coverage;
++        for(unsigned i=0;i<coverage.count;++i)coverage.words[i]=pattern;
++        for(unsigned first=0;first<rows;++first)for(unsigned end=first;end<=rows;++end){
++            unsigned cursor=first;
++            coverage.runs(first,end,[&](unsigned start,unsigned height){
++                assert(start>=cursor&&start+height<=end&&height);
++                for(;cursor<start;++cursor)assert(!coverage.test(cursor));
++                for(;cursor<start+height;++cursor)assert(coverage.test(cursor));
++                if(cursor<end)assert(!coverage.test(cursor));
++            });
++            for(;cursor<end;++cursor)assert(!coverage.test(cursor));
++        }
++    }
+     unsigned random=17;
+     auto next=[&] { random=random*1664525u+1013904223u; return random; };
+     for(unsigned tick=0;tick<10000;++tick) {
+diff --git a/tests/platform/amiga/AmigaPreparedTimeFieldsTest.cpp b/tests/platform/amiga/AmigaPreparedTimeFieldsTest.cpp
+index 5d13be33..c806d9bf 100644
+--- a/tests/platform/amiga/AmigaPreparedTimeFieldsTest.cpp
++++ b/tests/platform/amiga/AmigaPreparedTimeFieldsTest.cpp
+@@ -192,6 +192,14 @@ int main(){
+             for(unsigned x=0;x<48;++x){const unsigned offset=p*15360+row*48+x;
+                 actual[b][offset]=expected[b][offset]=next()>>24;}
+         require((*candidate)[b].draw(),"draw");(*reference)[b].draw();
++#ifndef DOWNWELL_REFERENCE_ROW_COVERAGE
++        if(shape.visible)for(unsigned row=0;row<320;++row){
++            AmigaRowCoverage debt;debt.span(row,1);
++            require((*candidate)[b].touchesDirtyRows(debt)==
++                (*candidate)[b].touchesDirtyRows([&](unsigned r){return r==row;}),
++                "retained field coverage equals original physical row queries");
++        }
++#endif
+         if(actual[b]!=expected[b]){
+             std::cerr<<"frame "<<frame<<" origin "<<origin<<" count "<<shape.count<<'\n';
+             for(unsigned i=0;i<shape.count;++i)std::cerr<<shape.circles[i].x<<','<<shape.circles[i].y<<','<<shape.circles[i].radius<<'\n';
+@@ -267,6 +275,14 @@ int main(){
+             rowDebt[b][row]=false;
+         }
+         require((*candidate)[b].draw(),"terrain draw");(*reference)[b].draw();
++#ifndef DOWNWELL_REFERENCE_ROW_COVERAGE
++        if(shape.visible)for(unsigned row=0;row<320;++row){
++            AmigaRowCoverage debt;debt.span(row,1);
++            require((*candidate)[b].touchesDirtyRows(debt)==
++                (*candidate)[b].touchesDirtyRows([&](unsigned r){return r==row;}),
++                "prepared large/small coverage equals original queries");
++        }
++#endif
+         require(actual[b]==expected[b],"pristine terrain equals captured-underlay pixels");
+         // Moving objects are drawn after fields and owe their row next frame.
+         const unsigned row=next()%320,x=next()%384;
+diff --git a/tests/platform/amiga/AmigaRendererTest.cpp b/tests/platform/amiga/AmigaRendererTest.cpp
+index 3f207530..ce3057cd 100644
+--- a/tests/platform/amiga/AmigaRendererTest.cpp
++++ b/tests/platform/amiga/AmigaRendererTest.cpp
+@@ -612,6 +612,19 @@ int main(int argc, char** argv) {
+                 require(overlay.prepare(pixels.data(), origin, &line, false), "new ray requires drawing");
+                 overlay.draw();
+                 auto expected = pristine;
++#ifndef DOWNWELL_REFERENCE_ROW_COVERAGE
++                for(unsigned row=0;row<320;++row){
++                    bool touched=false;
++                    line.draw([&](int x,int y){
++                        if(x>=downwellPlayfieldX&&x<downwellPlayfieldX+downwellPlayfieldWidth&&
++                           y>=0&&y<downwellDisplayHeight&&
++                           AmigaLaserSight::physicalRow(origin,y)==row)touched=true;
++                    });
++                    AmigaRowCoverage debt;debt.span(row,1);
++                    require(overlay.touchesDirtyRows(debt)==touched,
++                        "retained ray row footprint equals clipped line traversal");
++                }
++#endif
+                 require(overlay.matches(pixels.data(), origin, line), "drawn ray is eligible for retention");
+                 require(!overlay.matches(pixels.data(), (origin+1)%320, line), "scroll changes physical coverage");
+                 auto moved = line; ++moved.x0;
+diff --git a/src/platform/amiga/AmigaRowCoverage.h b/src/platform/amiga/AmigaRowCoverage.h
+new file mode 100644
+index 00000000..c1eafb65
+--- /dev/null
++++ b/src/platform/amiga/AmigaRowCoverage.h
+@@ -0,0 +1,46 @@
++#ifndef DOWNWELL_AMIGA_ROW_COVERAGE_H
++#define DOWNWELL_AMIGA_ROW_COVERAGE_H
++#include "AmigaRenderer.h"
++
++// Physical rows, independent of camera position and plane storage. Producers
++// publish whole spans; consumers share the same footprint without rerasterizing.
++struct AmigaRowCoverage {
++    static constexpr unsigned count=downwellGameRingHeight/16;
++    static_assert(downwellGameRingHeight%16==0,"whole coverage words");
++    UWORD words[count]{};
++    void clear(){for(auto& word:words)word=0;}
++    void fill(){for(auto& word:words)word=0xffff;}
++    bool test(unsigned row)const{return (words[row/16]&(1u<<(row%16)))!=0;}
++    bool intersects(const AmigaRowCoverage& other)const{
++        for(unsigned i=0;i<count;++i)if(words[i]&other.words[i])return true;
++        return false;
++    }
++    void span(unsigned first,unsigned height,bool present=true){
++        while(height){
++            const unsigned bit=first%16;
++            const unsigned length=height<16-bit?height:16-bit;
++            const UWORD mask=static_cast<UWORD>(((1u<<length)-1)<<bit);
++            auto& word=words[first/16];
++            if(present)word|=mask;else word&=static_cast<UWORD>(~mask);
++            first+=length;height-=length;
++            if(first==downwellGameRingHeight)first=0;
++        }
++    }
++    template<class Visit> void runs(unsigned first,unsigned end,Visit visit)const{
++        unsigned start=end;
++        for(unsigned chunk=first/16;chunk<(end+15)/16;++chunk){
++            unsigned bits=words[chunk];
++            const unsigned base=chunk*16;
++            unsigned lo=first>base?first-base:0;
++            const unsigned hi=end<base+16?end-base:16;
++            if(!bits){if(start!=end){visit(start,base-start);start=end;}continue;}
++            if(bits==0xffff){if(start==end)start=base+lo;continue;}
++            for(unsigned bit=lo;bit<hi;++bit){
++                if(bits&(1u<<bit)){if(start==end)start=base+bit;}
++                else if(start!=end){visit(start,base+bit-start);start=end;}
++            }
++        }
++        if(start!=end)visit(start,end-start);
++    }
++};
++#endif

@@ -324,8 +324,10 @@ The delta-register stamp batch is also closed: it shifts work into queued
 dispatch and regresses the first affected frame. Do not sweep its scheduling.
 Offline shifted CPU stamps into the retained raster are closed too; do not
 retune their word interpreter, layout or CPU/DMA selection.
-The disjoint row-debt range attempt is closed: do not retune its range layout
-or search; any replacement must also remove per-row field/laser debt queries.
+Row-debt representation has exhausted its two attempts: disjoint ranges and
+shared word coverage with cached field/laser footprints are closed. Do not
+retune their range layout, bit scans or footprint maintenance. Proceed to the
+remaining producer/compositor/consumer structures, not another debt encoding.
 Keep per-producer/presentation state and final pixels as oracles. Do not
 reopen small sprite assignment or gem-position helpers.
 Keep `REFERENCE_EFFECT_COMPOSITION=1` as the separate-plane oracle. Further
