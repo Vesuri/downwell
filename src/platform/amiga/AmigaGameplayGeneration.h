@@ -3,6 +3,7 @@
 #include "AmigaTerrain.h"
 #include "core/ObjectPack.h"
 #include "core/PreparedRoomTerrain.h"
+#include "AmigaRoomTerrainPlan.h"
 
 // Backend registration of synchronous recovered Create commands. Game rules
 // and their RNG effects remain in GameplayWorld; display publication stays
@@ -16,7 +17,7 @@ public:
         : builder_(builder), patterns_(patterns), objects_(objects), index_(index), tiles_(tiles) {}
     void bind(AmigaPortRuntime& runtime,bool terrainRuns=true);
     bool loadRoom(AmigaPortRuntime& runtime,const downwell::RoomPack& rooms,const downwell::PackedRoom& room,
-        const downwell::PreparedRoomTerrain* prepared=nullptr);
+        const downwell::PreparedRoomTerrain* prepared=nullptr,AmigaRoomTerrainPlan* backend=nullptr);
     bool step(downwell::GameMakerRandom& random, int viewBottom);
     unsigned fragmentCount() const { return builder_.fragmentCount(); }
     int dirtyFirst = worldRows, dirtyEnd = 0;

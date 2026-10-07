@@ -247,6 +247,9 @@ static ULONG beamTick()
 #endif
 
 static unsigned sceneId;
+#ifdef DOWNWELL_PROBES
+unsigned long downwellAmigaProfileTimestamp(){return beamTick();}
+#endif
 static ULONG startField;
 #if defined(DOWNWELL_PROBES) || defined(DOWNWELL_GENERATION_TIMING)
 static bool frameActive;

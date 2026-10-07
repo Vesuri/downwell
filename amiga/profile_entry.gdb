@@ -9,6 +9,7 @@ if gDownwellProfileFrozen != 1 || gDownwellProfileTargetScene != 3 || gDownwellP
     quit 1
 end
 printf "PROFILE natural entry PROBES (instrumented); cold gameplay frame retained; clock_clamps=%lu\n", gDownwellProfileClockClamps
+printf "ROOM_PLAN startup bind: ticks=%lu ms=%.3f\n", gDownwellRoomPlanTicks, gDownwellRoomPlanTicks*20.0/80128.0
 printf "ENTRY results bank: eager_uploads=%lu discarded_for_entry=%lu results_frames=%lu\n", gDownwellEntryResultsUploads, gDownwellEntryResultsDiscarded, gDownwellEntryResultsFrames
 set $s = 0
 while $s < 4

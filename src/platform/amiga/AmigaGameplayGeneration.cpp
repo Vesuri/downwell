@@ -4,8 +4,10 @@
 
 bool AmigaGameplayGeneration::loadRoom(AmigaPortRuntime& runtime,
     const downwell::RoomPack& rooms,const downwell::PackedRoom& room,
-    const downwell::PreparedRoomTerrain* prepared){
-    return runtime.loadRoomTerrain(rooms,room,[this](const downwell::PackedRoomInstance& instance){
+    const downwell::PreparedRoomTerrain* prepared,AmigaRoomTerrainPlan* backend){
+    const bool compiled=backend&&prepared&&prepared->matches(rooms,room)&&backend->begin(prepared);
+    return runtime.loadRoomTerrain(rooms,room,[this,backend,compiled](const downwell::PackedRoomInstance& instance){
+        if(compiled)return backend->emit(index_,instance);
         return amigaAddTerrainObject(index_,instance.objectId,instance.x,instance.y,true);
     },prepared);
 }

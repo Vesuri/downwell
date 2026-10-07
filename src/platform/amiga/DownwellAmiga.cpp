@@ -1182,6 +1182,15 @@ enum { terrainRasterRows = 8192, terrainRasterWords = AmigaGameplayRows::terrain
        terrainRasterX = AmigaGameplayRows::terrainX };
 static AmigaTerrainRaster terrainRaster{};
 static downwell::PreparedRoomTerrain roomTerrainPlan;
+// Static lifetime: compiled placement pointers must not consume the 8 KiB
+// task stack or outlive the index/source they reference.
+static AmigaRoomTerrainPlan roomTerrainBackend;
+#if defined(DOWNWELL_PROBES) || defined(DOWNWELL_FPSCOUNT)
+extern "C" { volatile ULONG gDownwellRoomPlanFields; }
+#endif
+#ifdef DOWNWELL_PROBES
+extern "C" { volatile ULONG gDownwellRoomPlanTicks; }
+#endif
 static AmigaInitialTerrain initialTerrain;
 static AmigaWallDamage<> wallDamage;
 static AmigaWallCollision wallCollision{terrainIndex};
@@ -1895,8 +1904,30 @@ __attribute__((noinline)) static int runDownwell(void) {
     }
 #ifndef DOWNWELL_REPLAY_VERIFY
     {
+#if defined(DOWNWELL_PROBES) || defined(DOWNWELL_FPSCOUNT)
+        // Keep the zero-cost reference measurement visible to the debugger.
+        (void)gDownwellRoomPlanFields;
+#endif
+#ifdef DOWNWELL_PROBES
+        (void)gDownwellRoomPlanTicks;
+#endif
 #ifndef DOWNWELL_REFERENCE_ROOM_TERRAIN
         roomTerrainPlan.prepare(rooms,mainRoom);
+#ifndef DOWNWELL_REFERENCE_ROOM_INDEX
+#if defined(DOWNWELL_PROBES) || defined(DOWNWELL_FPSCOUNT)
+        const auto roomPlanStart=AmigaPlatform::vblankCount();
+#endif
+#ifdef DOWNWELL_PROBES
+        const auto roomPlanTick=downwellAmigaProfileTimestamp();
+#endif
+        roomTerrainBackend.prepare(roomTerrainPlan,terrainIndex);
+#ifdef DOWNWELL_PROBES
+        gDownwellRoomPlanTicks=downwellAmigaProfileTimestamp()-roomPlanTick;
+#endif
+#if defined(DOWNWELL_PROBES) || defined(DOWNWELL_FPSCOUNT)
+        gDownwellRoomPlanFields=UWORD(AmigaPlatform::vblankCount()-roomPlanStart);
+#endif
+#endif
 #endif
         terrainCollision.builders = &builders;
         terrainCollision.rooms = &rooms;
@@ -1904,7 +1935,7 @@ __attribute__((noinline)) static int runDownwell(void) {
         terrainCollision.fragments = fragments;
         terrainCollision.fragmentCount = 0;
         terrainCollision.runtime = &port;
-        if (!liveGeneration.loadRoom(port,rooms,mainRoom,&roomTerrainPlan)) {
+        if (!liveGeneration.loadRoom(port,rooms,mainRoom,&roomTerrainPlan,&roomTerrainBackend)) {
             platform.restore();
             FreeMem(startupCopperWords, 4 * sizeof(UWORD));
             gDownwellStartupFailure = 6;
@@ -2608,7 +2639,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                         amigaBuildTerrainIndex(emptyTerrain, terrainIndex);
                         terrainTiles.clear();
                         terrainCollision.fragmentCount = 0;
-                        if (!liveGeneration.loadRoom(port,rooms,mainRoom,&roomTerrainPlan)) break;
+                        if (!liveGeneration.loadRoom(port,rooms,mainRoom,&roomTerrainPlan,&roomTerrainBackend)) break;
                         port.confirmFirstStage();
                         if (!port.initializeAreaOneBuilder(liveBuilder, -16, 704, scenes.styleCursor())) break;
                         liveGeneration.bind(port);

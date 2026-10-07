@@ -62,6 +62,30 @@ than assuming invisibility makes its state irrelevant. Wall End Step behavior
 has a separate VM comparison in `verify-wall-end-step`; the local call whitelist
 here is not a proof of its callees' side effects or their ordering.
 
+## Immutable room index publication
+
+`AmigaRoomTerrainPlan` accelerates only the serialized main-room placements.
+`tools/generate-room-terrain-plan.py` compiles their source-ordered occupancy
+preimages, resulting bytes and landing masks on the host. Its ignored manifest
+records the Steam hash, extractor version/commit and input/output hashes.
+The target validates instance IDs, objects, coordinates and prepared slots,
+then binds the commands to the existing index before first presentation.
+Neither preparation nor binding publishes terrain or consumes RNG.
+
+Each command executes at the original shared room-loader callback. Player
+identity, view initialization, Create order and callback failure prefixes
+remain owned by that loader. An unexpected occupancy preimage or callback
+uses `amigaAddTerrainObject`, retaining coincident-wall/overflow behavior;
+an unrecognized room uses the scalar backend throughout. Object 99 remains
+a backend no-op, not an inherited wall Create. The source and index must
+outlive the plan and must be explicitly rebound if replaced.
+
+`REFERENCE_ROOM_INDEX=1` retains scalar backend publication. The plan is not
+a new terrain owner, does not accelerate generated terrain, and does not
+authorize skipping wall events or collision queries. Prefix tests compare
+the complete occupancy and landing arrays after every callback; the native
+shop oracle checks initial/reentry terrain pixels and source-state/RNG.
+
 ## Retained wall row selection
 
 `GameplayTerrainInstances::visitWallRows` is a conservative presentation

@@ -44,6 +44,7 @@ REFERENCE_ROOM_PREPARE ?= 0
 REFERENCE_FIELD_BANK ?= 0
 REFERENCE_ENTRY_ASSETS ?= 0
 REFERENCE_EMPTY_TERRAIN ?= 0
+REFERENCE_ROOM_INDEX ?= 0
 REFERENCE_ROOM_TERRAIN ?= 0
 REFERENCE_INITIAL_TERRAIN ?= 0
 REFERENCE_BOX_ALARMS ?= 0
@@ -260,6 +261,9 @@ CFLAGS += -DDOWNWELL_REFERENCE_ENTRY_ASSETS
 endif
 ifeq ($(REFERENCE_EMPTY_TERRAIN),1)
 CFLAGS += -DDOWNWELL_REFERENCE_EMPTY_TERRAIN
+endif
+ifeq ($(REFERENCE_ROOM_INDEX),1)
+CFLAGS += -DDOWNWELL_REFERENCE_ROOM_INDEX
 endif
 ifeq ($(REFERENCE_ROOM_TERRAIN),1)
 CFLAGS += -DDOWNWELL_REFERENCE_ROOM_TERRAIN
@@ -482,6 +486,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
 	@printf '%s\n' '$(REFERENCE_FIELD_BANK)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_ENTRY_ASSETS)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_EMPTY_TERRAIN)' >> $@.tmp
+	@printf '%s\n' '$(REFERENCE_ROOM_INDEX)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_ROOM_TERRAIN)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_INITIAL_TERRAIN)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_BOX_ALARMS)' >> $@.tmp
@@ -522,6 +527,9 @@ $(OBJECTS): $(REPO)/generated/downwell-time-field-mask.h
 $(REPO)/generated/downwell-time-field-mask.h: $(REPO)/tools/export-time-stop-masks.csx $(REPO)/tools/verify-time-stop-masks.py $(REPO)/data/data.win
 	$(MAKE) -C $(REPO) generated/downwell-time-field-mask.h
 $(OBJECTS): $(REPO)/generated/contact-motion.inc
+$(OBJECTS): $(REPO)/generated/amiga-room-terrain-plan.inc
+$(REPO)/generated/amiga-room-terrain-plan.inc: $(REPO)/tools/generate-room-terrain-plan.py $(REPO)/extracted/utmt-0.9.2.0/manifest.json
+	$(MAKE) -C $(REPO) generated/amiga-room-terrain-plan.inc
 $(REPO)/generated/contact-motion.inc: $(REPO)/tools/generate-contact-motion.cpp $(REPO)/tools/generate-contact-motion.py $(REPO)/src/core/ContactMotionCodec.h $(REPO)/generated/smoke-trig.inc $(REPO)/generated/atan-q16.inc
 	$(MAKE) -C $(REPO) generated/contact-motion.inc
 

@@ -1962,6 +1962,20 @@ $(AMIGA_LIVE_TERRAIN_TEST_TARGET): $(AMIGA_LIVE_TERRAIN_TEST_SOURCES)
 	@mkdir -p $(@D)
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(AMIGA_LIVE_TERRAIN_TEST_SOURCES)
 
+build/amiga-room-terrain-plan-test: tests/platform/amiga/AmigaRoomTerrainPlanTest.cpp $(filter-out tests/platform/amiga/AmigaLiveTerrainTest.cpp,$(AMIGA_LIVE_TERRAIN_TEST_SOURCES)) $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/platform/amiga/AmigaRoomTerrainPlanTest.cpp $(filter-out tests/platform/amiga/AmigaLiveTerrainTest.cpp,$(AMIGA_LIVE_TERRAIN_TEST_SOURCES))
+.PHONY: verify-amiga-room-terrain-plan
+generated/amiga-room-terrain-plan.inc: tools/generate-room-terrain-plan.py extracted/utmt-0.9.2.0/manifest.json
+	python3 tools/generate-room-terrain-plan.py
+src/platform/amiga/AmigaRoomTerrainPlan.h: | generated/amiga-room-terrain-plan.inc
+build/amiga-room-terrain-plan-test: generated/amiga-room-terrain-plan.inc
+verify-amiga-room-terrain-plan: build/amiga-room-terrain-plan-test generate-room-pack
+	python3 tests/room-terrain-plan-test.py
+	./build/amiga-room-terrain-plan-test generated/downwell-rooms.dwrm
+	python3 tools/generate-room-terrain-plan.py --check
+test: verify-amiga-room-terrain-plan
+
 $(DEFERRED_INSTANCE_TEST_TARGET): $(DEFERRED_INSTANCE_TEST_SOURCES)
 	@mkdir -p $(@D)
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(DEFERRED_INSTANCE_TEST_SOURCES)
