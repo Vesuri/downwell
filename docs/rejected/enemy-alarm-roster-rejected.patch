@@ -1,0 +1,420 @@
+diff --git a/Makefile b/Makefile
+index c2ebe702..4205a771 100644
+--- a/Makefile
++++ b/Makefile
+@@ -47,6 +47,9 @@ endif
+ ifeq ($(REFERENCE_CONTACT_COORDINATES),1)
+ CXXFLAGS += -DDOWNWELL_REFERENCE_CONTACT_COORDINATES
+ endif
++ifeq ($(REFERENCE_ENEMY_ALARM_ROSTER),1)
++CXXFLAGS += -DDOWNWELL_REFERENCE_ENEMY_ALARM_ROSTER
++endif
+ LDFLAGS  := $(SDL_LDFLAGS)
+ 
+ SOURCES := \
+@@ -1085,6 +1088,12 @@ test: verify-time-field-wind
+ .PHONY: verify-time-field-wind
+ test: verify-gameplay-collision-owner
+ .PHONY: verify-gameplay-collision-owner
++.PHONY: verify-native-enemy-alarm-roster
++build/native-enemy-alarm-roster-test: tests/core/NativeEnemyAlarmRosterTest.cpp $(HOST_CHECK_HEADERS)
++	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
++verify-native-enemy-alarm-roster: build/native-enemy-alarm-roster-test
++	./build/native-enemy-alarm-roster-test
++test: verify-native-enemy-alarm-roster
+ build/terrain-ownership-runs-test: tests/core/TerrainOwnershipRunsTest.cpp src/core/GameMakerRandom.cpp $(wildcard src/core/*.h)
+ 	@mkdir -p build
+ 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+diff --git a/amiga/Makefile b/amiga/Makefile
+index 279fe4c6..fdbac1ae 100644
+--- a/amiga/Makefile
++++ b/amiga/Makefile
+@@ -51,6 +51,7 @@ REFERENCE_HUD_TEXT ?= 0
+ REFERENCE_HUD_WORDS ?= 0
+ REFERENCE_CONTACT_MOTION ?= 0
+ REFERENCE_CONTACT_COORDINATES ?= 0
++REFERENCE_ENEMY_ALARM_ROSTER ?= 0
+ TABLE_CONTACT_ATAN ?= 1
+ RETAIN_HEALTH_HUD ?= 1
+ AMMO_DAMAGE_RANGE ?= 1
+@@ -281,6 +282,9 @@ endif
+ ifeq ($(REFERENCE_CONTACT_COORDINATES),1)
+ CFLAGS += -DDOWNWELL_REFERENCE_CONTACT_COORDINATES
+ endif
++ifeq ($(REFERENCE_ENEMY_ALARM_ROSTER),1)
++CFLAGS += -DDOWNWELL_REFERENCE_ENEMY_ALARM_ROSTER
++endif
+ ifeq ($(TABLE_CONTACT_ATAN),0)
+ CFLAGS += -DDOWNWELL_PORTABLE_CONTACT_ATAN
+ endif
+@@ -485,6 +489,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
+ 	@printf '%s\n' '$(REFERENCE_HUD_WORDS)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_CONTACT_MOTION)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_CONTACT_COORDINATES)' >> $@.tmp
++	@printf '%s\n' '$(REFERENCE_ENEMY_ALARM_ROSTER)' >> $@.tmp
+ 	@printf '%s\n' '$(DRAW_ORDER_AUDIT)' >> $@.tmp
+ 	@printf '%s\n' '$(LOCAL_DRAW_CAPTURE)' >> $@.tmp
+ 	@printf '%s\n' '$(AMMO_FACTORED)' >> $@.tmp
+diff --git a/amiga/profile.sh b/amiga/profile.sh
+index 94356569..f4eec7c8 100644
+--- a/amiga/profile.sh
++++ b/amiga/profile.sh
+@@ -118,6 +118,7 @@ restore() {
+   unset REFERENCE_HUD_WORDS
+   unset REFERENCE_CONTACT_MOTION
+   unset REFERENCE_CONTACT_COORDINATES
++  unset REFERENCE_ENEMY_ALARM_ROSTER
+   unset DRAW_CACHE_AUDIT
+   unset DRAW_ORDER_AUDIT
+   unset LOCAL_DRAW_CAPTURE
+diff --git a/src/core/GameplayCollisionOwner.h b/src/core/GameplayCollisionOwner.h
+index cdffd98a..979727a2 100644
+--- a/src/core/GameplayCollisionOwner.h
++++ b/src/core/GameplayCollisionOwner.h
+@@ -18,6 +18,7 @@
+ #include "PreparedTerrainBirthBounds.h"
+ #include "RunnerFullProperties.h"
+ #include "NativeInstanceTable.h"
++#include "NativeEnemyAlarmRoster.h"
+ namespace downwell {
+ #ifdef DOWNWELL_DRAW_CACHE_AUDIT
+ // Optional diagnostic observer; absent from normal code and simulation state.
+@@ -61,6 +62,31 @@ private:
+     unsigned combatAlarmMask_=0;
+     bool combatAlarmCaptureValid_=false;
+     bool nativeBoxAlarmPrefix_=false;
++    using EnemyAlarmRoster=NativeEnemyAlarmRoster<GameplayWorld::enemyCapacity>;
++    EnemyAlarmRoster enemyAlarmRoster_;
++    bool enemyAlarmRosterEligible_=true;
++    bool nativeEnemyAlarms()const{
++#ifdef DOWNWELL_REFERENCE_ENEMY_ALARM_ROSTER
++        return false;
++#else
++        // Only this owner has the shared monotonic registration chronology.
++        // Other ownership modes keep their original captured list.
++        return native_&&sceneryLayers_&&(nativeBoxes_||nativeFields_)&&enemyAlarmRosterEligible_;
++#endif
++    }
++    bool updateEnemyAlarmRoster(InstanceHandle h){
++        if(!nativeEnemyAlarms())return true;
++        std::uint32_t flags;
++        if(!table_.flags(h,flags)||(flags&0x100003u)||!table_.registered(h))return enemyAlarmRoster_.erase(h.slot);
++        const int object=table_.objectId(h);
++        unsigned alarms;
++        // The other implemented alarm families are 73, 92, 211, 266 and
++        // 370. Unsupported objects retain the complete registered capture.
++        if(object<=92||object>=211||!alarmMetadata_.mask(object,alarms)){
++            enemyAlarmRosterEligible_=false;combatAlarmCaptureValid_=false;return true;
++        }
++        return check(enemyAlarmRoster_.put({h,object,table_.registrationOrder(h),alarms}));
++    }
+ #ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+     RunnerRoomMembership<View::capacity> room_;
+ #else
+@@ -472,6 +498,7 @@ private:
+                     parent.layers_.birthScenery(depth));
+             }
+             if(!parent.check(parent.table_.birth(h,object(r),definition->initialFlags|(inactive?2u:0u),sprite)))return false;
++            if constexpr(Kind==View::Kind::enemy)if(!parent.updateEnemyAlarmRoster(h))return false;
+             if(!parent.check(parent.room_.bind(h.slot,depth)))return false;
+             if(inactive)parent.activationPending_=true;
+             if constexpr(Kind==View::Kind::breakable||Kind==View::Kind::timeField)
+@@ -519,6 +546,7 @@ private:
+             }
+             if(!key(local,r,h)||!parent.check(parent.room_.contains(h.slot)))return false;
+             if(!parent.check(parent.native_?parent.table_.retire(h):parent.owner_.retire(h)))return false;
++            if constexpr(Kind==View::Kind::enemy)if(!parent.updateEnemyAlarmRoster(h))return false;
+             if(!parent.check(parent.room_.remove(h.slot)))return false;
+             if constexpr(Kind==View::Kind::breakable||Kind==View::Kind::timeField)
+                 if(parent.sceneryLayers_){
+@@ -543,6 +571,7 @@ private:
+             std::uint32_t flags;
+             if(!parent.eligibilityFlags(h,flags)||!parent.check(parent.native_?parent.table_.setExclusions(h,(flags&0x100003u)|1u):
+                 parent.owner_.setExclusions(h,(flags&0x100003u)|1u)))return false;
++            if constexpr(Kind==View::Kind::enemy)if(!parent.updateEnemyAlarmRoster(h))return false;
+             if(!parent.check(parent.room_.mark(h.slot)))return false;
+             parent.destructionPending_=true;return parent.publishPreparedDraw(h);}
+         bool membership(InstanceHandle local,const Record& r,bool member){InstanceHandle h;
+@@ -550,13 +579,15 @@ private:
+                 return parent.check(member)&&key(local,r,h);
+             if constexpr(Kind==View::Kind::breakable)if(parent.nativeBoxes_)
+                 return parent.check(member)&&key(local,r,h);
+-            return key(local,r,h)&&parent.check(parent.native_?parent.table_.registerObject(h,member):parent.owner_.registerObject(h,member))&&
+-                parent.publishPreparedDraw(h);}
++            if(!key(local,r,h)||!parent.check(parent.native_?parent.table_.registerObject(h,member):parent.owner_.registerObject(h,member)))return false;
++            if constexpr(Kind==View::Kind::enemy)if(!parent.updateEnemyAlarmRoster(h))return false;
++            return parent.publishPreparedDraw(h);}
+         bool activation(InstanceHandle local,const Record& r,bool active){InstanceHandle h;
+             if constexpr(Kind==View::Kind::breakable||Kind==View::Kind::timeField)
+                 if(parent.sceneryLayers_)return parent.check(active)&&key(local,r,h);
+             if(!key(local,r,h)||!parent.check(parent.native_?parent.table_.setActive(h,active):
+                 parent.owner_.setActive(h,active,*parent.families_.flags(object(r)))))return false;
++            if constexpr(Kind==View::Kind::enemy)if(!parent.updateEnemyAlarmRoster(h))return false;
+             if(!parent.check(parent.layers_.activation(h,active)))return false;
+             parent.activationPending_=true;return parent.publishPreparedDraw(h);}
+         // Native ownership publishes no geometry: nothing queries it.
+@@ -989,6 +1020,12 @@ public:
+             if(!self.valid())return false;
+             auto& phase=self.combatAlarmPhase_;
+             const auto boxes=self.nativeBoxAlarmPrefix_?self.world_->captureBoxAlarms():GameplayWorld::BoxAlarmPrefix{};
++            EnemyAlarmRoster::Phase enemies;
++            struct Release {EnemyAlarmRoster* owner=nullptr;~Release(){if(owner)owner->end();}} release;
++            if(self.nativeEnemyAlarms()){
++                if(!self.check(self.enemyAlarmRoster_.begin(enemies)))return false;
++                release.owner=&self.enemyAlarmRoster_;
++            }
+             const bool reused=self.combatAlarmCaptureValid_&&!self.combatAlarmCaptureDirty_;
+             if(!reused){
+                 phase.clear();
+@@ -997,7 +1034,9 @@ public:
+                 };
+                 // Only implemented families are admitted. Avoid scanning every
+                 // terrain record for this partial combat alarm traversal.
+-                if(!self.check(self.visitRegistered(View::enemyBase,self.nativeBoxAlarmPrefix_?View::breakableBase:View::terrainBase,capture)&&
++                const unsigned first=enemies.entries?View::breakableBase:View::enemyBase;
++                const unsigned last=self.nativeBoxAlarmPrefix_?View::breakableBase:View::terrainBase;
++                if(!self.check((first==last||self.visitRegistered(first,last,capture))&&
+                     self.visitRegistered(View::debrisBase,View::capacity,capture)))return false;
+                 // Save before callbacks: mutation during dispatch invalidates
+                 // reuse next tick without changing this phase's captured set.
+@@ -1012,7 +1051,11 @@ public:
+                     kind==View::Kind::timeChange?self.world_->advanceTimeChangeRoomAlarm(local,alarm):
+                     kind==View::Kind::drone?(alarm==0&&self.drones_.advanceAlarm(local)):
+                     kind==View::Kind::entryDither&&self.entries_.advanceAlarm(local,alarm);
+-            },reused,&self.combatAlarmMask_,boxes);
++            },reused,&self.combatAlarmMask_,boxes
++#ifndef DOWNWELL_REFERENCE_ENEMY_ALARM_ROSTER
++            ,enemies
++#endif
++            );
+         },this);
+         world.configureDebrisStepOrder([](void* context,GameplayWorld::DebrisStepOrder& phase){
+             auto& self=*static_cast<GameplayCollisionOwner*>(context);
+@@ -1105,7 +1148,11 @@ private:
+     }
+     template<bool SkipInactive=false,unsigned Capacity,class AdvanceAndDispatch>
+     bool dispatchCapturedAlarms(RunnerStepSnapshot<Capacity>& snapshot,AdvanceAndDispatch advanceAndDispatch,
+-        bool alreadySorted=false,unsigned* retainedMask=nullptr,GameplayWorld::BoxAlarmPrefix boxes={}){
++        bool alreadySorted=false,unsigned* retainedMask=nullptr,GameplayWorld::BoxAlarmPrefix boxes={}
++#ifndef DOWNWELL_REFERENCE_ENEMY_ALARM_ROSTER
++        ,EnemyAlarmRoster::Phase enemies={}
++#endif
++        ){
+         DW_PROFILE_SCOPE(profileAlarmScan);
+         if(!alreadySorted){DW_PROFILE_SCOPE(profileAlarmSort);snapshot.sort();}
+         const unsigned count=snapshot.size();
+@@ -1130,7 +1177,23 @@ private:
+         }
+         for(unsigned alarm=0;alarm<AlarmBank::count;++alarm){
+           bool boxesPending=alarm==0&&boxes.end;
++#ifndef DOWNWELL_REFERENCE_ENEMY_ALARM_ROSTER
++          bool enemiesPending=(enemies.alarms&(1u<<alarm))!=0;
++          const auto dispatchEnemies=[&]{
++              for(unsigned e=0;e<enemies.count;++e){
++                  const auto& entry=enemies.entries[e];
++                  if(!(entry.alarms&(1u<<alarm)))continue;
++                  std::uint32_t flags;
++                  if(!table_.flags(entry.handle,flags)||(flags&0x100003u))continue;
++                  if(!check(world_->advanceEnemyRoomAlarm(
++                      {entry.handle.slot-View::enemyBase,entry.handle.generation},alarm))||!valid())return false;
++              }
++              return true;
++          };
++          if(!boxesPending&&!enemiesPending&&!(capturedAlarms&(1u<<alarm))&&bindingsUnchanged(bindingRevision))continue;
++#else
+           if(!boxesPending&&!(capturedAlarms&(1u<<alarm))&&bindingsUnchanged(bindingRevision))continue;
++#endif
+           int cachedObject=-1;unsigned alarmMask=0;
+           PackedObjectEvent event;bool eventCached=false,eventFound=false;
+           unsigned groupEnd=0;
+@@ -1141,6 +1204,12 @@ private:
+                 if(!check(world_->advanceBoxAlarmPrefix(boxes)))return false;
+                 boxesPending=false;
+             }
++#ifndef DOWNWELL_REFERENCE_ENEMY_ALARM_ROSTER
++            if(enemiesPending&&snapshot.object(i)>210){
++                if(!dispatchEnemies())return false;
++                enemiesPending=false;
++            }
++#endif
+             if constexpr(SkipInactive)if(i>=groupEnd){
+                 // Captured boxes are live boxes. When none has this alarm set
+                 // at group entry, no member is pending and no callback runs.
+@@ -1193,6 +1262,9 @@ private:
+                 if(!check(advanceAndDispatch(h,alarm,event))||!valid())return false;}
+           }
+           if(boxesPending&&!check(world_->advanceBoxAlarmPrefix(boxes)))return false;
++#ifndef DOWNWELL_REFERENCE_ENEMY_ALARM_ROSTER
++          if(enemiesPending&&!dispatchEnemies())return false;
++#endif
+         }
+         return true;
+     }
+@@ -1438,6 +1510,7 @@ public:
+             if(registered&&slot>=View::terrainBase&&slot<View::timeFieldBase)terrainSnapshotDirty_=true;
+             const auto h=handleAt(slot);
+             return good_&&(native_?table_.registerObject(h,registered):owner_.registerObject(h,registered))&&
++                (!(slot>=View::enemyBase&&slot<View::breakableBase)||updateEnemyAlarmRoster(h))&&
+                 (!nativeBoxes_||!registered||table_.roomReactivated(h))&&layers_.reconcile(h)&&publishPreparedDraw(h);
+         });
+         if(!check(result&&good_))return false;
+diff --git a/src/core/NativeInstanceTable.h b/src/core/NativeInstanceTable.h
+index 5ca6a489..f820363b 100644
+--- a/src/core/NativeInstanceTable.h
++++ b/src/core/NativeInstanceTable.h
+@@ -74,6 +74,7 @@ public:
+         entries_[h.slot].roomOrder=entries_[h.slot].order;return true;
+     }
+     bool contains(InstanceHandle h)const{return live(h);}
++    bool registered(InstanceHandle h)const{return live(h)&&registration_.contains(h.slot);}
+     int objectId(InstanceHandle h)const{return live(h)?entries_[h.slot].object:-1;}
+     bool flags(InstanceHandle h,std::uint32_t& out)const{
+         if(!live(h))return false;
+diff --git a/tests/core/GameplayCollisionOwnerTest.cpp b/tests/core/GameplayCollisionOwnerTest.cpp
+index b309d816..c3db8c3a 100644
+--- a/tests/core/GameplayCollisionOwnerTest.cpp
++++ b/tests/core/GameplayCollisionOwnerTest.cpp
+@@ -2484,12 +2484,17 @@ int main(){
+         assert(rooms.roomInstance(room,0,r));r.scaleX=2;
+         assert(!terrain->appendRoom(r)&&!terrain->valid()&&terrain->size()==0);
+     }
++    for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
++                       GameplayCollisionOwner::Ownership::nativeScenery})
+     for(int initial:{(-2147483647-1),-2,-1,0,1,2}){
+         // Compare the bound pending-counter path with the original unfiltered
+         // captured traversal. Negative values must remain untouched; zero
+         // still retires, and positive counters retain countdown/RNG order.
+-        auto optimized=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+-        auto reference=std::make_unique<GameplayCollisionOwner>(objects,sprites);
++        const auto* alarmRooms=ownership==GameplayCollisionOwner::Ownership::nativeScenery?&rooms:nullptr;
++        auto optimized=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
++            GameplayTerrainInstances::WallCollision{},alarmRooms,ownership);
++        auto reference=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
++            GameplayTerrainInstances::WallCollision{},alarmRooms);
+         auto a=std::make_unique<GameplayWorld>(300,true,0,false,optimized->enemyBinding(),
+             optimized->breakableBinding(),optimized->playerBinding(),&optimized->terrain());
+         auto b=std::make_unique<GameplayWorld>(300,true,0,false,reference->enemyBinding(),
+@@ -2546,8 +2551,11 @@ int main(){
+             for(unsigned w=0;w<16;++w)assert(a->randomState().stateWord(w)==b->randomState().stateWord(w));
+         }
+     }
+-    {
+-        auto ordered=std::make_unique<GameplayCollisionOwner>(objects,sprites);
++    for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
++                       GameplayCollisionOwner::Ownership::nativeScenery}){
++        auto ordered=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
++            GameplayTerrainInstances::WallCollision{},
++            ownership==GameplayCollisionOwner::Ownership::nativeScenery?&rooms:nullptr,ownership);
+         auto scene=std::make_unique<GameplayWorld>(300,true,0,false,ordered->enemyBinding(),
+             ordered->breakableBinding(),ordered->playerBinding(),&ordered->terrain());
+         assert(ordered->attach(*scene));
+diff --git a/src/core/NativeEnemyAlarmRoster.h b/src/core/NativeEnemyAlarmRoster.h
+new file mode 100644
+index 00000000..e29769d3
+--- /dev/null
++++ b/src/core/NativeEnemyAlarmRoster.h
+@@ -0,0 +1,65 @@
++#ifndef DOWNWELL_NATIVE_ENEMY_ALARM_ROSTER_H
++#define DOWNWELL_NATIVE_ENEMY_ALARM_ROSTER_H
++#include "InstanceHandle.h"
++#include <cstdint>
++namespace downwell {
++// Native object identity is immutable within a generation. Maintain the alarm
++// phase's exact-object/registration ordering at its mutation points. A phase
++// borrows a bank; only a mutation while that bank is pinned makes a copy.
++template<unsigned Capacity> class NativeEnemyAlarmRoster {
++public:
++    struct Entry {InstanceHandle handle;int object;std::uint32_t order;unsigned alarms;};
++    struct Phase {const Entry* entries=nullptr;unsigned count=0,alarms=0;};
++private:
++    struct Bank {Entry entries[Capacity];unsigned count=0,alarms=0;} banks_[2]{};
++    unsigned current_=0;
++    int pinned_=-1;
++    Bank& writable(){
++        if(pinned_==int(current_)){
++            const unsigned next=current_^1;
++            banks_[next]=banks_[current_];current_=next;
++        }
++        return banks_[current_];
++    }
++    static void mask(Bank& bank){
++        bank.alarms=0;
++        for(unsigned i=0;i<bank.count;++i)bank.alarms|=bank.entries[i].alarms;
++    }
++    static bool before(const Entry& a,const Entry& b){
++        return a.object<b.object||(a.object==b.object&&a.order<b.order);
++    }
++public:
++    bool begin(Phase& out){
++        if(pinned_>=0)return false;
++        pinned_=int(current_);const auto& bank=banks_[current_];
++        out={bank.entries,bank.count,bank.alarms};return true;
++    }
++    void end(){pinned_=-1;}
++    void clear(){auto& bank=writable();bank.count=bank.alarms=0;}
++    bool erase(unsigned slot){
++        const auto& old=banks_[current_];unsigned i=0;
++        while(i<old.count&&old.entries[i].handle.slot!=slot)++i;
++        if(i==old.count)return true;
++        auto& bank=writable();
++        for(unsigned j=i+1;j<bank.count;++j)bank.entries[j-1]=bank.entries[j];
++        --bank.count;mask(bank);return true;
++    }
++    bool put(Entry entry){
++        if(!entry.handle.generation||entry.object<0||!entry.order)return false;
++        const auto& old=banks_[current_];
++        unsigned found=old.count;
++        for(unsigned i=0;i<old.count;++i)if(old.entries[i].handle.slot==entry.handle.slot){
++            const auto& e=old.entries[i];
++            if(e.handle.generation==entry.handle.generation&&e.object==entry.object&&
++               e.order==entry.order&&e.alarms==entry.alarms)return true;
++            found=i;break;
++        }
++        if(found==old.count&&old.count==Capacity)return false;
++        erase(entry.handle.slot);auto& bank=writable();
++        unsigned at=0;while(at<bank.count&&!before(entry,bank.entries[at]))++at;
++        for(unsigned i=bank.count;i>at;--i)bank.entries[i]=bank.entries[i-1];
++        bank.entries[at]=entry;++bank.count;bank.alarms|=entry.alarms;return true;
++    }
++};
++}
++#endif
+diff --git a/tests/core/NativeEnemyAlarmRosterTest.cpp b/tests/core/NativeEnemyAlarmRosterTest.cpp
+new file mode 100644
+index 00000000..063feb43
+--- /dev/null
++++ b/tests/core/NativeEnemyAlarmRosterTest.cpp
+@@ -0,0 +1,33 @@
++#include "core/NativeEnemyAlarmRoster.h"
++#include <cassert>
++#include <cstdio>
++int main(){
++    using Roster=downwell::NativeEnemyAlarmRoster<4>;
++    Roster roster;
++    assert(roster.put({{2,1},116,3,1}));
++    assert(roster.put({{0,1},112,1,2}));
++    assert(roster.put({{1,1},112,2,2}));
++    Roster::Phase phase;
++    assert(roster.begin(phase)&&phase.count==3&&phase.alarms==3);
++    assert(phase.entries[0].handle.slot==0&&phase.entries[1].handle.slot==1&&phase.entries[2].handle.slot==2);
++    Roster::Phase nested;assert(!roster.begin(nested));
++    const auto* original=phase.entries;
++    assert(roster.put({{0,1},112,1,2})); // no-op while pinned
++    assert(roster.erase(0));
++    assert(roster.put({{0,2},112,4,2})); // slot reuse cannot replace captured lifetime
++    assert(roster.put({{3,1},93,5,0}));
++    assert(!roster.put({{4,1},119,6,1})); // capacity failure preserves successful prefix
++    assert(phase.entries==original&&phase.count==3&&phase.entries[0].handle.generation==1);
++    roster.end();
++    assert(roster.begin(phase)&&phase.count==4&&phase.entries[0].object==93);
++    assert(phase.entries[1].handle.slot==1&&phase.entries[2].handle.slot==0);
++    roster.clear();assert(phase.count==4&&phase.entries[2].handle.generation==2);
++    roster.end();assert(roster.begin(phase)&&phase.count==0&&phase.alarms==0);roster.end();
++    for(unsigned generation=1;generation<1000;++generation){
++        assert(roster.put({{0,generation},113,generation,3}));
++        assert(roster.begin(phase)&&phase.count==1&&phase.entries[0].handle.generation==generation);
++        assert(roster.erase(0));assert(phase.entries[0].handle.generation==generation);
++        roster.end();
++    }
++    std::puts("Native enemy alarm roster: ordered registration, pinned mutations, reuse and failure prefixes pass");
++}

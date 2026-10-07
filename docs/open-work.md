@@ -358,10 +358,10 @@ two structural attempts are in the
 [rejection table](amiga-frame-cost.md#rejected-approaches); a further
 proposal must remove the remaining capture the same way, for one family at a
 time, rather than change the temporary array layout.
-Borrowing the enemy Step snapshot with a typed merge is closed too: its
-quiet-frame capture/merge overhead outweighs the removed dispatch. Do not
-retune snapshot caching or the merge loop; any further family replacement
-must remove that quiet work as well.
+Enemy alarm ordering has exhausted its two family-order attempts: the borrowed
+Step snapshot and mutation-owned pinned roster are closed. Do not retune their
+snapshot caching, merge loops, roster insertion or negative-counter dispatch.
+Pursue other shared quiet-frame work, not another enemy alarm-order variant.
 
 Target: quiet frames under 22 ms; current mean is 26.3 ms. Player and walking
 enemy motion cost about 5.6 ms together, but each is under 3 ms in this window.
