@@ -328,18 +328,18 @@ reopen small sprite assignment or gem-position helpers.
 
 ### D. Gem counter and streak redraws (frames 488 and 660)
 
-`AmigaHudText` composes both regions in ordinary memory, but a change still
-costs about 22 ms (660: counter 12.88 ms, streak 9.64). Each publication
-rewrites the whole region, 4.97 and 5.20 ms, although only the digit band
-changes; first use of a counter digit composes it for 5.34 ms. Every gem
-pickup and stomp pays this in real play. Target: under 5 ms combined.
-Remove work, not instructions: publish only the words a redraw changes,
-not the unchanged background words. Do not tune the existing loops.
-`REFERENCE_HUD_TEXT=1` and `make test-amiga-hud-text` are the oracles;
-also compare native frame dumps across 640–900 with the reference build.
-The retained final-word comparison attempt is closed (rejection table).
-Do not tune its cache/scan loops; a further attempt must eliminate runtime
-composition or derive publication directly from prepared digit transitions.
+Counter/streak redraws still exceed the under-5-ms combined target: about
+5.5 ms at 660 and 6.0 ms when the streak first becomes visible at 488.
+Counter publication costs about 2.5 ms; streak publication costs 3.0–3.5 ms.
+A further attempt must remove a threshold-sized structure, not tune the
+prepared word loops, digit arithmetic or sub-millisecond helpers. Do not
+reopen the rejected retained-pixel comparison scan.
+Keep initial-picture ownership, external-overlay invalidation, per-digit
+currency layer order and whole-string streak layer order exact.
+`REFERENCE_HUD_WORDS=1` retains the staged compositor;
+`REFERENCE_HUD_TEXT=1` retains the layered renderer. Use both host HUD tests
+and completed-DMA native frame dumps, including the initial frame, first
+pickup and 640–900; require zero unexpected prepared-path fallbacks.
 
 ### E. Quiet-frame and alarm shortfalls
 

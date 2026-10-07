@@ -68,6 +68,7 @@ case "$mode" in
         printf 'append binary memory %s/frame-%s.bin gDownwellDumpActorSprites gDownwellDumpActorSprites+408\n' "$dump_out" "$tick"
         printf 'append binary memory %s/frame-%s.bin gDownwellDumpOverflowSprite gDownwellDumpOverflowSprite+68\n' "$dump_out" "$tick"
       done
+      printf 'printf "HUD_WORD_FALLBACKS=%%lu\\n", gDownwellHudWordFallbacks\nif gDownwellHudWordFallbacks != 0\nquit 1\nend\n'
       printf 'printf "DOWNWELL_PROFILE_READY\\n"\nshell touch .run/gdb-ready.marker\ndetach\nquit\n'
     } > .run/frames/dump.gdb
     script=.run/frames/dump.gdb
@@ -112,6 +113,7 @@ restore() {
   unset REFERENCE_INITIAL_TERRAIN
   unset REFERENCE_BOX_ALARMS
   unset REFERENCE_HUD_TEXT
+  unset REFERENCE_HUD_WORDS
   unset REFERENCE_CONTACT_MOTION
   unset DRAW_CACHE_AUDIT
   unset DRAW_ORDER_AUDIT

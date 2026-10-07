@@ -2371,6 +2371,20 @@ test-amiga-hud-text: build/amiga-hud-text-test generated/amiga-hud.dwap generate
 	./build/amiga-hud-text-test generated/amiga-hud.dwap generated/amiga-game.dwap
 test: test-amiga-hud-text
 
+build/generate-amiga-hud-text: tools/generate-amiga-hud-text.cpp src/platform/amiga/AmigaHudText.h src/platform/amiga/AmigaRenderer.c $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ tools/generate-amiga-hud-text.cpp src/platform/amiga/AmigaRenderer.c
+generated/amiga-hud-text.h: build/generate-amiga-hud-text tools/generate-amiga-hud-text.py generated/amiga-hud.dwap generated/amiga-game.dwap
+	python3 tools/generate-amiga-hud-text.py
+build/amiga-prepared-hud-test: tests/platform/amiga/AmigaPreparedHudTextTest.cpp src/platform/amiga/AmigaPreparedHudText.h generated/amiga-hud-text.h $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ tests/platform/amiga/AmigaPreparedHudTextTest.cpp src/platform/amiga/AmigaRenderer.c
+.PHONY: test-amiga-prepared-hud
+test-amiga-prepared-hud: build/amiga-prepared-hud-test
+	./build/amiga-prepared-hud-test generated/amiga-hud.dwap generated/amiga-game.dwap
+	python3 tools/generate-amiga-hud-text.py --check
+test: test-amiga-prepared-hud
+
 build/amiga-damage-text-test: tests/platform/amiga/AmigaDamageTextTest.cpp src/platform/amiga/AmigaRenderer.c $(HOST_CHECK_HEADERS)
 	@mkdir -p build
 	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $(filter %.cpp %.c,$^)

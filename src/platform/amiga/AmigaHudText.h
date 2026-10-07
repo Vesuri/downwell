@@ -160,6 +160,7 @@ struct AmigaHudText {
     }
 
 private:
+    friend struct AmigaHudTextTables;
     // The digit's five layers at one of the two word phases a counter
     // position can take (positions are eight pixels apart).
     bool compose(unsigned digit, unsigned parity) {

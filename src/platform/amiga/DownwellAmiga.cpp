@@ -199,6 +199,7 @@ __attribute__((noinline, used)) void downwellShopLiveReady() { __asm__ volatile(
 #include "core/GameplayEntryProfileInput.h"
 #include "core/HudNumbers.h"
 #include "AmigaHudText.h"
+#include "AmigaPreparedHudText.h"
 #include "core/AmmoDividers.h"
 #include "core/AmmoFill.h"
 #include "core/DeathResultsBackdrop.h"
@@ -864,27 +865,50 @@ static void redrawHealth(AmigaRenderer* renderer, unsigned health, unsigned maxi
     );
 }
 
+#if defined(DOWNWELL_REFERENCE_HUD_WORDS) || defined(DOWNWELL_REFERENCE_HUD_TEXT)
 static AmigaHudText hudText;
+#else
+static AmigaPreparedHudText hudText;
+#endif
+static void invalidateHudText(bool all = false) {
+#if !defined(DOWNWELL_REFERENCE_HUD_WORDS) && !defined(DOWNWELL_REFERENCE_HUD_TEXT)
+    if(all) hudText.invalidate();
+    else hudText.invalidateStreak();
+#else
+    (void)all;
+#endif
+}
+#ifdef DOWNWELL_FRAME_DUMP
+extern "C" { volatile ULONG gDownwellHudWordFallbacks=0; }
+#endif
 static void redrawCurrency(AmigaRenderer* renderer, unsigned currency) {
 #ifndef DOWNWELL_REFERENCE_HUD_TEXT
     if (hudText.bind(activeHudPack, activeHudPackEnd, activeGamePack, activeGamePackEnd) &&
         hudText.currency(renderer, currency)) return;
+#if defined(DOWNWELL_FRAME_DUMP) && !defined(DOWNWELL_REFERENCE_HUD_WORDS)
+    ++gDownwellHudWordFallbacks;
+#endif
 #endif
     AmigaHudText::currencyReference(renderer, activeHudPack, activeHudPackEnd, currency);
 }
 
 static void composeStreak(AmigaRenderer* renderer, unsigned streak) {
+    invalidateHudText();
     AmigaHudText::composeStreakReference(renderer, activeGamePack, activeGamePackEnd, streak);
 }
 static void redrawStreak(AmigaRenderer* renderer, unsigned streak) {
 #ifndef DOWNWELL_REFERENCE_HUD_TEXT
     if (hudText.bind(activeHudPack, activeHudPackEnd, activeGamePack, activeGamePackEnd) &&
         hudText.streak(renderer, streak)) return;
+#if defined(DOWNWELL_FRAME_DUMP) && !defined(DOWNWELL_REFERENCE_HUD_WORDS)
+    ++gDownwellHudWordFallbacks;
+#endif
 #endif
     AmigaHudText::streakReference(renderer, activeGamePack, activeGamePackEnd, streak);
 }
 
 static void composeDeathFlash(AmigaRenderer* renderer, bool visible) {
+    invalidateHudText();
     amigaRendererClearClipRect(renderer); // selects the non-scrolling HUD layer
     amigaRendererFillRect(renderer, downwellPlayfieldX, 0, 160, 284, visible ? 1 : 0);
 }
@@ -892,6 +916,7 @@ static void composeDeathFlash(AmigaRenderer* renderer, bool visible) {
 static void composeResultsBackdrop(AmigaRenderer* renderer,
                                     int offset, int viewX, int viewY,
                                     int top = 0, int bottom = 284) {
+    invalidateHudText();
     UBYTE* saved = renderer->target;
     amigaRendererSetClipRect(renderer, downwellPlayfieldX, top, 160, bottom - top);
     renderer->target = renderer->hud;
@@ -1392,6 +1417,7 @@ static void buildReferencePicture(
     amigaRendererClear(renderer, 0);
     ammoHud.invalidate();
     healthHud.invalidate();
+    invalidateHudText(true);
     for (auto& ray : gameplayRays) ray.discard();
     for (auto& field : gameplayFields) field.discard();
     dirtyGameRows(0, 0, downwellGameRingHeight);
@@ -1415,8 +1441,15 @@ static void buildReferencePicture(
     drawAsset(renderer, 416, 0, 284, 43, 0);
     amigaRendererFillRect(renderer, 289, 49, 10, 184, 1);
     drawAsset(renderer, 416, 1, 284, 43, 0);
+#if !defined(DOWNWELL_REFERENCE_HUD_WORDS) && !defined(DOWNWELL_REFERENCE_HUD_TEXT)
+    // Establish the publisher's ownership with the initial picture. Leaving
+    // these on the generic path makes the first pickup redraw static art.
+    redrawCurrency(renderer, 0);
+    redrawStreak(renderer, 0);
+#else
     drawAsset(renderer, 376, 0, 362 - currencyShift, 18, 0);
     drawCurrencyDigit(renderer, 354 - currencyShift, 18, 0);
+#endif
     drawAmmoDigit(renderer, 290, 239, 8);
     // Prepare retained HUD geometry/artwork with the level's initial picture,
     // not on the first shot. Subsequent frames only update changed strips.
@@ -1570,7 +1603,10 @@ volatile const UWORD* gDownwellDumpActorSprites;
 volatile const UWORD* gDownwellDumpOverflowSprite;
 volatile UWORD gDownwellDumpRingOrigin;
 volatile ULONG gDownwellDumpTick;
-__attribute__((noinline, used)) void downwellFrameDump(void) { __asm__ volatile("" ::: "memory"); }
+__attribute__((noinline, used)) void downwellFrameDump(void) {
+    (void)gDownwellHudWordFallbacks; // Retain the witness in reference builds too.
+    __asm__ volatile("" ::: "memory");
+}
 }
 #endif
 
@@ -3690,6 +3726,9 @@ __attribute__((noinline)) static int runDownwell(void) {
             platform.publish(gameplayScene.copper(back));
             overlapNextStep = true;
 #ifdef DOWNWELL_FRAME_DUMP
+            // The last BOB/effect blit may still be finishing when the CPU
+            // publishes. Debugger snapshots must include its completed planes.
+            AmigaHardware::blitterDrain();
             gDownwellDumpGame=(const UBYTE*)gameDisplay[back].data;
             gDownwellDumpHud=memory.hud();
             gDownwellDumpPlayerSprite=memory.playerSprite(back);

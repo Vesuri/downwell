@@ -46,6 +46,7 @@ REFERENCE_ROOM_TERRAIN ?= 0
 REFERENCE_INITIAL_TERRAIN ?= 0
 REFERENCE_BOX_ALARMS ?= 0
 REFERENCE_HUD_TEXT ?= 0
+REFERENCE_HUD_WORDS ?= 0
 REFERENCE_CONTACT_MOTION ?= 0
 TABLE_CONTACT_ATAN ?= 1
 RETAIN_HEALTH_HUD ?= 1
@@ -262,6 +263,9 @@ endif
 ifeq ($(REFERENCE_HUD_TEXT),1)
 CFLAGS += -DDOWNWELL_REFERENCE_HUD_TEXT
 endif
+ifeq ($(REFERENCE_HUD_WORDS),1)
+CFLAGS += -DDOWNWELL_REFERENCE_HUD_WORDS
+endif
 ifeq ($(REFERENCE_CONTACT_MOTION),1)
 CFLAGS += -DDOWNWELL_REFERENCE_CONTACT_MOTION
 endif
@@ -464,6 +468,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
 	@printf '%s\n' '$(REFERENCE_INITIAL_TERRAIN)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_BOX_ALARMS)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_HUD_TEXT)' >> $@.tmp
+	@printf '%s\n' '$(REFERENCE_HUD_WORDS)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_CONTACT_MOTION)' >> $@.tmp
 	@printf '%s\n' '$(DRAW_ORDER_AUDIT)' >> $@.tmp
 	@printf '%s\n' '$(LOCAL_DRAW_CAPTURE)' >> $@.tmp
@@ -528,9 +533,12 @@ $(OUT).elf: $(OBJECTS)
 	@$(MAKE) --no-print-directory audit
 
 obj/DownwellAmiga.o: $(AMIGA_SRC)/DownwellAmiga.cpp \
-		$(REPO)/src/core/PortReplay.h $(AMIGA_SCENE_BANKS)
+		$(REPO)/src/core/PortReplay.h $(AMIGA_SCENE_BANKS) $(REPO)/generated/amiga-hud-text.h
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -c -o $@ $<
+
+$(REPO)/generated/amiga-hud-text.h: $(REPO)/tools/generate-amiga-hud-text.cpp $(REPO)/tools/generate-amiga-hud-text.py $(AMIGA_SRC)/AmigaHudText.h $(AMIGA_SRC)/AmigaRenderer.h $(AMIGA_HUD) $(AMIGA_GAME)
+	$(MAKE) -C $(REPO) generated/amiga-hud-text.h
 
 obj/AmigaInput.o: $(AMIGA_SRC)/AmigaInput.cpp $(AMIGA_SRC)/AmigaInput.h
 	@mkdir -p $(@D)
