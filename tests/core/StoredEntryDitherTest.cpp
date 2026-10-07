@@ -7,9 +7,10 @@
 using namespace downwell;
 struct Owner {
     unsigned moves=0,marks=0,retires=0;bool reject=false,rejectRetire=false;
+    unsigned rejectRetireAt=0;
     int birthRoom=-1;
     bool birth(InstanceHandle,const InstanceRecord& r){birthRoom=r.roomId;return true;}
-    template<class... A> bool retire(A...){++retires;return !rejectRetire;}
+    template<class... A> bool retire(A...){++retires;return !rejectRetire&&retires!=rejectRetireAt;}
     template<class... A> bool activation(A...){return true;}
     template<class... A> bool membership(A...){return true;}
     template<class... A> bool sprite(A...){return true;}
@@ -63,6 +64,35 @@ int main(){
     rejectedOwner.rejectRetire=true;
     assert(!rejected.clear()&&!healthy&&rejectedRecords.resolve(retained)&&rejectedOwner.retires==1);
     assert(!rejected.clear()&&rejectedRecords.resolve(retained)&&rejectedOwner.retires==1);
+    assert(!rejected.clearForReset()&&rejectedRecords.resolve(retained)&&rejectedOwner.retires==1);
+    {
+        InstanceStore<4> local;Owner teardown;bool okay=true;InstanceHandle h;
+        StoredEntryDitherRegistration<4,1> reset(local,&objects,
+            InstanceLifecycleBinding::bindDestruction(teardown),next,room,okay);
+        assert(reset.create(camera,[](auto& out){out={};return true;},h));
+        okay=false; // Another family failed; normal gameplay remains stopped.
+        const auto calls=reads;
+        assert(!reset.step(h,camera)&&reads==calls);
+        assert(!reset.clear()&&local.resolve(h)&&teardown.retires==0);
+        assert(reset.clearForReset()&&!local.resolve(h)&&teardown.retires==1&&!okay);
+        assert(reset.clearForReset()&&teardown.retires==1&&!okay);
+        assert(!reset.create(camera,[](auto& out){out={};return true;},h));
+        okay=true; // Only the caller's completed reset recovers execution.
+        assert(reset.create(camera,[](auto& out){out={};return true;},h));
+        okay=false;teardown.rejectRetire=true;
+        assert(!reset.clearForReset()&&local.resolve(h)&&teardown.retires==2&&!okay);
+        assert(!reset.clearForReset()&&local.resolve(h)&&teardown.retires==2);
+    }
+    {
+        InstanceStore<4> local;Owner teardown;bool okay=true;InstanceHandle first,second;
+        StoredEntryDitherRegistration<4,2> reset(local,&objects,
+            InstanceLifecycleBinding::bindDestruction(teardown),next,room,okay);
+        assert(reset.create(camera,[](auto& out){out={};return true;},first));
+        assert(reset.create(camera,[](auto& out){out={};return true;},second));
+        okay=false;teardown.rejectRetireAt=2;
+        assert(!reset.clearForReset()&&!local.resolve(first)&&local.resolve(second)&&teardown.retires==2);
+        assert(!reset.clearForReset()&&local.resolve(second)&&teardown.retires==2&&!okay);
+    }
     {
         InstanceStore<4> local;bool okay=true;InstanceHandle h;
         StoredEntryDitherRegistration<4,1> strict(local,&objects,{},next,room,okay);

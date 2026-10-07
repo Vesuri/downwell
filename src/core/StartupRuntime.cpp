@@ -70,7 +70,7 @@ StartupRuntime::StartupRuntime(PlatformProfile profile,
 }
 
 void StartupRuntime::reset(PlatformProfile profile) {
-    if(!ownedEntryRegistration_.clear()){roomLoadSucceeded_=false;return;}
+    if(!ownedEntryRegistration_.clearForReset()){roomLoadSucceeded_=false;return;}
     if(!clearRoomDebris()){roomLoadSucceeded_=false;return;}
     if(!clearRoomScriptEffects()){roomLoadSucceeded_=false;return;}
     if(!instances_.clear([this](InstanceHandle h,const InstanceRecord& record){return lifecycle_.retire(h,record);})){

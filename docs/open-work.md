@@ -310,10 +310,6 @@ under 80 ms while removing remaining threshold-sized computations.
 - Keep exact Q8 coordinate admission and the full-wrapper fallback
   (`REFERENCE_CONTACT_COORDINATES=1`). Do not tune the sub-millisecond
   coordinate adapter or the now-under-3-ms direction calculation.
-- Restore the damage-number worlds fixture's reset-after-capacity-failure
-  check (`make verify-damage-number-worlds`, assertion at `host.reset`). It
-  currently fails with both contact-coordinate paths; preserve failure
-  propagation before reset rather than suppressing the assertion.
 
 ### C. Combat composition shortfall
 
@@ -391,6 +387,13 @@ prefix, is 1.10 ms quiet, 1.87 ms in combat and 3.97 ms at 645.
   that layer's Draw. Supporting one needs the layer's wall-order cutoff.
 
 ### H. Coverage
+
+Restore the startup lifecycle fixture's natural box-removal coverage
+(`make verify-native-data`: "natural contact tape reaches checked box removal").
+Determine whether the tape no longer destroys a box or the required lifecycle
+publication is missing. Verify actual removal and its owner-rejection path;
+do not weaken the coverage assertion or inject an
+unrelated synthetic destruction to claim natural coverage.
 
 Add a dense-encounter tape before claiming the budget. Include the natural
 two-level horizontal shop tape (`profile.sh shop`), not only the contact

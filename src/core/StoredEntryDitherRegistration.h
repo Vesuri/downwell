@@ -16,13 +16,19 @@ template<unsigned WorldCapacity,unsigned Capacity> class StoredEntryDitherRegist
     // Unindexed reference worlds explicitly retain local setters/destruction.
     // This never bypasses a configured owner's publication or failure checks.
     bool storeOnly_=false;
-    bool fail(){good_=false;return false;}
+    bool failed_=false;
+    bool fail(){failed_=true;good_=false;return false;}
     Slot* slot(InstanceHandle key){
         for(auto& s:slots_)if(s.id&&s.key.slot==key.slot&&s.key.generation==key.generation)return &s;
         return nullptr;
     }
     InstanceRecord* record(const Slot& s){
         auto* r=records_.resolve(s.key);return r&&r->instanceId==s.id&&r->objectId==73?r:nullptr;
+    }
+    bool retireOwned(Slot& s){
+        if(!record(s))return fail();
+        if(!records_.erase(s.id,[&](auto h,const auto& r){return lifecycle_.retire(h,r);}))return fail();
+        s={};return true;
     }
     static float stored(RunnerImageValue v){float f;std::memcpy(&f,&v.bits,4);return f;}
     bool publish(Slot& s,EntryDither::Write write,const EntryDither& e){
@@ -87,15 +93,22 @@ public:
     }
     bool retire(InstanceHandle key){
         if(!good_)return false;
-        auto* s=slot(key);if(!s||!record(*s))return fail();
-        if(!records_.erase(s->id,[&](auto h,const auto& r){return lifecycle_.retire(h,r);}))return fail();
-        *s={};return true;
+        auto* s=slot(key);return s?retireOwned(*s):fail();
     }
     // Retire through the same owner before the enclosing room erases records.
     // Stop on failure: do not free a registry slot whose owner rejected removal.
     bool clear(){
         if(!good_)return false;
         for(auto& s:slots_)if(s.id&&!retire(s.key))return false;
+        return true;
+    }
+    // Explicit process reset may follow an unrelated family's terminal error.
+    // Keep that shared latch false throughout teardown; only the enclosing
+    // successful reset can recover it. Never retry this registry's own failed
+    // publication/retirement or discard a lifetime rejected by its owner.
+    bool clearForReset(){
+        if(failed_)return false;
+        for(auto& s:slots_)if(s.id&&!retireOwned(s))return false;
         return true;
     }
 };
