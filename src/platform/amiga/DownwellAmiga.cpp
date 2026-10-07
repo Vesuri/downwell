@@ -3698,7 +3698,15 @@ __attribute__((noinline)) static int runDownwell(void) {
             if(!actorList.entryCoverHardwareEligible(port,worldViewX,worldViewY,hardwareEntryCover)){
                 exitCode=20;break;
             }
-            const bool compositeEffects=compositeCurrency||(actorList.entryCoverVisible&&!hardwareEntryCover);
+            bool hardwareCurrency=false;
+#if !defined(DOWNWELL_REFERENCE_EFFECT_COMPOSITION) && !defined(DOWNWELL_BOB_VERIFY) && !defined(DOWNWELL_REPLAY_VERIFY) && !defined(DOWNWELL_REFERENCE_ACTOR_PREFIX)
+            if(compositeCurrency){
+                DW_PROFILE_SCOPE(profileControllerComposition);
+                hardwareCurrency=actorList.promoteCurrency(port,worldViewX,worldViewY,effectAssets,actorFrames);
+            }
+#endif
+            const bool compositeEffects=(compositeCurrency&&!hardwareCurrency)||
+                (actorList.entryCoverVisible&&!hardwareEntryCover);
             if(compositeEffects){
                 DW_PROFILE_SCOPE(profileControllerComposition);
                 downwell::CurrencySmokeComposition::Settings settings;

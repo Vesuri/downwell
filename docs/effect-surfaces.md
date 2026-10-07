@@ -367,6 +367,33 @@ verification build. This detects changes outside the effect rectangles as well
 as mismatched effect pixels; it does not prove every possible dense encounter
 or eliminate the need for separate timing tapes.
 
+### Native gem-only hardware promotion
+
+The Amiga adapter may replace the complete controller surface with its existing
+offline currency DMA sprites. This is a presentation substitution at the
+controller boundary, not the currency object's earlier direct-Draw depth.
+Promotion requires no smoke, debris or entry cover; every visible currency
+part must fit the eight channels; and immutable alpha-mask intersection must
+prove that no source-visible, snapped enemy shade removes a gem pixel. Strict
+source-origin visibility, dflash, cropped origins and newest-to-oldest producer
+order remain unchanged. Unsupported coordinates or missing bindings fall back.
+
+Descriptors are staged before mutating the draw list. They are appended after
+room actors, so reverse channel assignment reserves all gem parts first, in
+the same front-to-back order as controller composition. Ordinary actors use
+remaining channels or the existing planar fallback. PF2 priority still masks
+horizontal viewport edges. The backend bypasses both scratch preparation and
+publication only after complete promotion; existing per-display restoration
+debt is repaid normally. No partially promoted surface is allowed.
+
+This path uses no new Chip allocation, artwork conversion or sprite encoding.
+The offline DMA art must represent every opaque gem pixel with a nonzero pen,
+including opaque black as pen three. `test-amiga-currency-promotion` checks all
+eight DMA frames and compares promoted replay surfaces against the retained
+compositor. Sprite-inclusive native dumps check final channel/foreground order.
+`REFERENCE_EFFECT_COMPOSITION=1`, BOB verification, replay verification and
+the old actor-prefix reference retain the raster path.
+
 `EffectMaskAssets` borrows all nine sprite-84 smoke frames, sprite-117 shade,
 and all four frames of each currency sprite (133/134) directly from the immutable
 offline DWAP pack. Each descriptor exposes both color planes and its coverage

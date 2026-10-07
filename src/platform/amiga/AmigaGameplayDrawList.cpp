@@ -10,6 +10,60 @@
 extern "C" { volatile unsigned gDownwellActorOrderChecks,gDownwellActorOrderFailures; }
 #endif
 
+bool AmigaGameplayDrawList::promoteCurrency(const GameplayWorld& world,int viewX,int viewY,
+    const downwell::EffectMaskAssets& assets,const AmigaActorFrames& frames){
+    using Placement=downwell::EffectSurfacePlacement;
+    if(entryCoverVisible||world.dead()||!assets.ready()||
+        !Placement::smallPixel(viewX)||!Placement::smallPixel(viewY))return false;
+    bool other=false;
+    world.smokeEffects().visitNewest([&](auto,const auto&){other=true;});
+    if(other)return false;
+    if(!world.visitDebrisDraw([&](const auto&){other=true;return true;})||other)return false;
+    const Placement::PixelView view{viewX,viewY,160,284};
+    GameplayBob pending[8];unsigned used=0,channels=0;
+    for(unsigned i=world.gemSlotEnd();i;--i){
+        const auto& gem=world.gemAt(i-1);
+        if(!gem.active||!gem.motion.lifetime.visible())continue;
+        const int x=240+gem.x,y=176+gem.y;
+        if(!Placement::smallPixel(x)||!Placement::smallPixel(y))return false;
+        if(!Placement::pixelInView(x,y,view))continue;
+        const unsigned sprite=gem.large?134:133,frame=gem.motion.animation.frame();
+        const auto* art=assets.currency(gem.large,frame);
+        const auto* prepared=frames.find(sprite,frame);
+        if(!art||!prepared||!prepared->partCount[0]||
+            prepared->partCount[0]>8-channels||used==8)return false;
+        const int gx=x-viewX-art->originX,gy=y-viewY-art->originY;
+        if(!world.shops().noControl)for(unsigned n=0;n<world.enemyCount();++n){
+            const auto& enemy=world.enemyAt(n);
+            if(!enemy.active||!enemy.awake)continue;
+            const int ex=240+enemy.x,ey=176+enemy.y;
+            if(!Placement::smallPixel(ex)||!Placement::smallPixel(ey))return false;
+            if(!Placement::pixelInView(ex,ey,view))continue;
+            const auto& shade=*assets.shade();
+            const int sx=Placement::snapShadePixel(ex)-viewX-shade.originX;
+            const int sy=Placement::snapShadePixel(ey)-viewY-shade.originY;
+            int left=gx>sx?gx:sx,top=gy>sy?gy:sy;
+            int right=gx+int(art->mask.width),bottom=gy+int(art->mask.height);
+            if(right>sx+int(shade.mask.width))right=sx+int(shade.mask.width);
+            if(bottom>sy+int(shade.mask.height))bottom=sy+int(shade.mask.height);
+            if(left<0)left=0;if(top<0)top=0;
+            if(right>160)right=160;if(bottom>284)bottom=284;
+            for(int py=top;py<bottom;++py)for(int px=left;px<right;++px){
+                const unsigned a=px-gx,b=px-sx;
+                if((art->mask.data[(py-gy)*art->mask.stride+a/8]&(128u>>(a&7)))&&
+                    (shade.mask.data[(py-sy)*shade.mask.stride+b/8]&(128u>>(b&7))))return false;
+            }
+        }
+        pending[used++]={UWORD(sprite),UWORD(frame),downwellPlayfieldX+x-viewX,y-viewY,0,prepared};
+        channels+=prepared->partCount[0];
+    }
+    if(!used||used>capacity-count)return false;
+    // Controller Draw is after all room actors. Assignment walks this suffix
+    // backwards, giving every promoted part a channel before ordinary actors.
+    for(unsigned i=0;i<used;++i)actors[count++]=pending[i];
+    return true;
+}
+
 bool AmigaGameplayDrawList::entryCoverHardwareEligible(const GameplayWorld& world,int viewX,int viewY,bool& eligible)const{
     eligible=false;
     if(!entryCoverVisible)return true;

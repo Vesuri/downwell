@@ -324,9 +324,13 @@ under 80 ms while removing remaining threshold-sized computations.
 
 ### C. Combat composition shortfall
 
-Currency/smoke preparation still costs 5.97 ms in combat (10.4 at 660);
-Draw collection costs 4.49 ms, row synchronization 4.33 ms and effect
-publication 3.02 ms (6.6 at 660).
+Remaining effect work is the raster fallback for mixed producers, actual
+shade subtraction, entry cover and sprite-channel overflow. Measure those
+cases separately from eligible gem-only frames before another compositor
+attempt. The supplied audit's raster preparation/publication costs were
+5.97/3.02 ms in combat (10.4/6.6 at 660). Draw collection costs 4.49 ms and
+row synchronization 4.33 ms in that baseline; remeasure their remaining work
+after hardware promotion before choosing the next structure.
 Review the complete producer/compositor/consumer path, preserving source
 painter order, opaque-black replacement and shade subtraction. The two
 rejected effect approaches remain closed: a new proposal must remove their

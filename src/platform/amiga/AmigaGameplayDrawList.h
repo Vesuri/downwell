@@ -3,6 +3,7 @@
 #include "AmigaGameplayActors.h"
 #include "core/GameplayWorld.h"
 #include "core/EntryDitherPlacement.h"
+#include "core/EffectMaskAssets.h"
 class AmigaGameplayDrawList {
 public:
     static constexpr unsigned capacity = 2 + 32 + 32 + 8 + GameplayWorld::bulletCapacity +
@@ -22,5 +23,9 @@ public:
         const UBYTE* packEnd, int worldViewX, int worldViewY, bool compositeCurrency = false,
         const AmigaActorFrames* prepared = nullptr);
     bool entryCoverHardwareEligible(const GameplayWorld& world,int viewX,int viewY,bool& eligible)const;
+    // Promote the complete controller surface, never a partial subset. Failure
+    // leaves the list untouched and retains the shade-aware raster compositor.
+    bool promoteCurrency(const GameplayWorld& world,int viewX,int viewY,
+        const downwell::EffectMaskAssets& assets,const AmigaActorFrames& frames);
 };
 #endif
