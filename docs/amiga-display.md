@@ -144,6 +144,28 @@ Every unused channel points at an armed-safe null sprite on every frame. Sprite
 priority is programmed explicitly together with PF2-over-PF1 priority; it must
 not depend on an operating-system value left in BPLCON2.
 
+## Style carousel hardware ownership
+
+Style keeps static labels on PF1 and the scrolling border on PF2. Eligible
+moving icons use the front bank's offline DMA records 65510–65513, with one
+stream per presentation buffer and independent streams for all four locks.
+Rendering changes only the retired headers and patches changed Copper sprite
+pointers. The body words are never converted, copied or reconstructed on the
+target. Source-order icons are assigned in reverse channel order, so the last
+painted icon is frontmost. Hardware DIW clips their horizontal edges.
+
+`BPLCON2=$0020` places PF1 text and its opaque-black reveal mask above the
+sprites, with PF2 border behind them. The planar reference uses `$0024`.
+A partially vertically clipped icon retains the entire planar icon path for
+that frame; fully hidden icons need no channel. Changes between these paths
+invalidate the retained icon commands naturally and hide unused channels.
+`REFERENCE_STYLE_SPRITES=1` retains the old bitmap carousel.
+
+The native scene verifier reconstructs pixels from the actual DMA headers
+and body words, compares them with the scalar style renderer, and checks
+all eight programmed pointers, their distinct live headers and PF priority.
+The offline test also proves opaque-black coverage and retained-bank bounds.
+
 ## Vertical ring and buffering
 
 Damage labels retain the shared `DamageNumberText` formatting and eight-pixel

@@ -102,11 +102,17 @@ public:
     DownwellStyleCopperList(UWORD* words, unsigned capacityWords,
                            unsigned framePlaneBytes = amigaStylePlaneBytes);
     bool build(const UBYTE* frame, const UBYTE* mask,
-               const Sprite& nullSprite, const Palette& palette, const UBYTE* border = 0);
-    bool update(const UBYTE* frame, const UBYTE* mask, const UBYTE* border = 0);
+               const Sprite& nullSprite, const Palette& palette, const UBYTE* border = 0,
+               const UWORD* const* sprites = nullptr);
+    bool update(const UBYTE* frame, const UBYTE* mask, const UBYTE* border = 0,
+                const UWORD* const* sprites = nullptr);
 private:
     unsigned frame0Offset_, frame1Offset_, maskOffset_, border0Offset_, border1Offset_, modeOffset_;
     unsigned framePlaneBytes_;
+    unsigned spritesOffset_=0,priorityOffset_=0;
+    const UWORD* nullSprite_=nullptr;
+    const UWORD* spritePointers_[8]{};
+    bool spritePriority_=false;
 };
 
 #endif

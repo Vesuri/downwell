@@ -2310,10 +2310,14 @@ test: test-amiga-selection-layer
 .PHONY: test-amiga-style-scene
 build/amiga-style-scene-test: tests/platform/amiga/AmigaStyleSceneTest.cpp src/platform/amiga/AmigaStyleScene.cpp src/platform/amiga/AmigaSceneRuntime.cpp $(HOST_CHECK_HEADERS)
 	@mkdir -p build
-	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -DDOWNWELL_REFERENCE_STYLE_SPRITES -o $@ $(filter %.cpp,$^)
 test-amiga-style-scene: build/amiga-style-scene-test
 	./build/amiga-style-scene-test
 test: test-amiga-style-scene
+.PHONY: test-amiga-style-dma
+test-amiga-style-dma: generate-amiga-game
+	python3 tests/amiga-style-dma-test.py
+test: test-amiga-style-dma
 
 .PHONY: test-amiga-splash-scenes
 build/amiga-splash-scenes-test: tests/platform/amiga/AmigaSplashScenesTest.cpp tests/platform/amiga/SelectionBitmapStub.cpp src/platform/amiga/AmigaPublisherScene.cpp src/platform/amiga/AmigaCreditsScene.cpp src/platform/amiga/AmigaControlsScene.cpp $(HOST_CHECK_HEADERS)

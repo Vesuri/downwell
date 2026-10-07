@@ -48,8 +48,8 @@ into three banks:
   every draw-list frame against this bank.
 
 The front bank puts its complete directory and all live garden/style payloads
-in a 60,792-byte prefix. Within it, all style-readable resources and the
-complete directory occupy the first 32,886 bytes. Only one-shot garden
+in a 64,936-byte prefix. Within it, all style-readable resources and the
+complete directory occupy the first 37,030 bytes. Only one-shot garden
 scenery follows the live prefix;
 `AmigaGardenScene::prepare` copies it into the scrolling canvases before any
 staging starts. Writable sprite DMA headers never alias another payload.
@@ -62,8 +62,15 @@ After garden DMA retires, clean-content style updates stage at most 256 words
 of small-field images into `[44304,73568)`. The generated
 `DOWNWELL_FRONT_STYLE_BYTES` bound keeps every style source below that range;
 payloads cannot alias across these lifetime boundaries. The complete front
-file is 92,670 bytes. Its retired garden payload is not read again before a
+file is 96,814 bytes. Its retired garden payload is not read again before a
 front-bank reload.
+
+Style carousel DMA uses fourteen offline records (eight player frames, four
+independently positioned locks and two arrows). Each holds two separate
+136-byte streams, one per presentation buffer: 3,808 payload bytes plus 336
+directory bytes. Their writable position headers cannot be interned. All
+streams stay below the retained style-prefix bound, including while field
+and results artwork is staged elsewhere in the shared bank.
 
 The two scene banks are files beside the executable. Each load is a single
 `Open`/`Read`/`Close` of the whole file into the shared Chip region, through

@@ -417,7 +417,7 @@ checks enabled when selecting a tape.
 
 The earlier style-reveal-only tape peaks at two fields (splash 34.7 ms,
 garden 40.5 ms, style
-34.5 ms, instrumented). Reduce selection layout/content and transition
+34.5 ms, instrumented). Reduce upgrade-selection layout/content and transition
 preparation costs, keeping static layers and pointer-driven movement. Reduce
 the initial selection-canvas and offer-bank preparation stalls. Measure asset
 staging and Chip/Fast residency separately from steady-state navigation.

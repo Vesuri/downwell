@@ -112,12 +112,14 @@ bool DownwellSelectionCopperList::update(const UBYTE* border,const UBYTE* layer,
 }
 
 bool DownwellStyleCopperList::build(const UBYTE* frame, const UBYTE* mask,
-                                    const Sprite& nullSprite, const Palette& palette, const UBYTE* border)
+                                    const Sprite& nullSprite, const Palette& palette, const UBYTE* border,
+                                    const UWORD* const* sprites)
 {
     // PF1: retained content on BPL1/3, temporary opaque-black high bit on
     // BPL5. PF2: immutable scrolling border on BPL2/4. PF1 has priority.
+    // With carousel sprites, PF1 text and mask are also above all channels.
     if (!border || !beginNarrowDisplay(*this, true) || !move(bplcon0, mask ? 0x5401 : 0x4401) ||
-        !move(bplcon1, 0) || !move(bplcon2, 0x0024) ||
+        !move(bplcon1, 0) || !move(bplcon2, sprites?0x0020:0x0024) ||
         !move(bpl1mod, amigaStyleBytesPerRow - 20) ||
         !move(bpl2mod, amigaStyleBytesPerRow - 20)) return false;
     frame0Offset_ = size();
@@ -131,13 +133,31 @@ bool DownwellStyleCopperList::build(const UBYTE* frame, const UBYTE* mask,
     if (!pointer(bpl2pth, border)) return false;
     border1Offset_ = size();
     if (!pointer(bpl4pth, border + amigaStyleBorderPlaneBytes)) return false;
-    return hideSprites(*this, nullSprite) &&
+    spritesOffset_=size();priorityOffset_=moveOffset(bplcon2);nullSprite_=nullSprite.data();
+    spritePriority_=sprites!=nullptr;
+    for(unsigned i=0;i<8;++i){
+        spritePointers_[i]=sprites&&sprites[i]?sprites[i]:nullSprite_;
+        if(!pointer(UWORD(spr1pth+4*i),spritePointers_[i]))return false;
+    }
+    return
            setPalette(palette) && move(color04, 0) && move(color05, 0) &&
            move(color06, 0) && move(color07, 0) && finish();
 }
 
-bool DownwellStyleCopperList::update(const UBYTE* frame, const UBYTE* mask, const UBYTE* border)
+bool DownwellStyleCopperList::update(const UBYTE* frame, const UBYTE* mask, const UBYTE* border,
+                                     const UWORD* const* sprites)
 {
+    for(unsigned i=0;i<8;++i){
+        const auto* next=sprites&&sprites[i]?sprites[i]:nullSprite_;
+        if(next!=spritePointers_[i]){
+            if(!patchPointer(spritesOffset_+4*i,next))return false;
+            spritePointers_[i]=next;
+        }
+    }
+    if(spritePriority_!=(sprites!=nullptr)){
+        if(!patchMove(priorityOffset_,sprites?0x0020:0x0024))return false;
+        spritePriority_=sprites!=nullptr;
+    }
     return patchPointer(frame0Offset_, frame) &&
            patchPointer(frame1Offset_, frame + framePlaneBytes_) &&
            patchPointer(maskOffset_, mask) &&

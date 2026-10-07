@@ -241,7 +241,7 @@ FRONT_BANK_FRAMES = {
     369: {0}, 631: {1}, 635: {0, 3}, 636: {2, 3}, 637: {0, 1}, 638: {0},
     640: {0}, 642: {0}, 646: {1}, 729: {0},
 }
-FRONT_BANK_IDS = {43, 44, 65401, 65410, 65411, *range(65000, 65006),
+FRONT_BANK_IDS = {43, 44, 65401, 65410, 65411, *range(65000, 65006), *range(65510, 65514),
                   *range(65500, 65504), MENU_TITLE_ALIGNED_ID,
                   *(64000 + ident for ident in (12, 27, 31, 37))}
 # Copied into front because its scenes read them from the same bank: the
@@ -251,7 +251,7 @@ FRONT_SHARED = lambda ident, frame: (ident, frame) in ((76, 0), (51, 7), (51, 13
 # Includes the scalar style oracle as well as the retained renderer. Garden
 # title/scenery and its writable hardware sprites retire before this subset.
 FRONT_STYLE_IDS = {27, 43, 44, 51, 65401, 65410, 65411,
-                   *range(65000, 65006), *range(65500, 65504)}
+                   *range(65000, 65006), *range(65500, 65504), *range(65510, 65514)}
 # The uncropped title fade is a host oracle only; targets use the aligned form.
 DROPPED_IDS = {654}
 
@@ -968,6 +968,36 @@ def build_records(manifest, extracted, profile, language_path=None):
                                     hardware=True, hardwareParts=parts)
                     hardware.append((metadata, frame_index * 8 + flip * 4 + part,
                                      16, bytes(stream)))
+        encoded.extend(hardware)
+
+    # Style carousel: independently writable headers for each lock and both
+    # presentation slots. The art is already cropped; retain its exact anchor.
+    if profile == "game":
+        hardware = []
+        for sprite, frame_index, dma_width, planar in encoded:
+            ident = sprite["id"]
+            if ident not in range(65500, 65504):
+                continue
+            width, height = sprite["width"], sprite["height"]
+            require(width <= 16 and height <= 32, "style icon exceeds one DMA channel")
+            stride = dma_width // 8
+            plane_size = stride * height
+            stream = bytearray(4)
+            for y in range(height):
+                for plane in (0, 1):
+                    bits = 0
+                    for x in range(width):
+                        bits |= int(bool(planar[plane * plane_size + y * stride + x // 8]
+                                         & (0x80 >> (x & 7)))) << (15 - x)
+                    stream.extend(struct.pack(">H", bits))
+            stream.extend(bytes(4))
+            stream.extend(bytes(136 - len(stream)))
+            # Four locked styles can be visible together and must not share
+            # a position header. Payload interning excludes hardware records.
+            for copy in range(4 if ident == 65501 else 1):
+                metadata = dict(sprite, id=ident + 10, width=16, hardware=True)
+                hardware.append((metadata, copy if ident == 65501 else frame_index,
+                                 16, bytes(stream) * 2))
         encoded.extend(hardware)
 
     # Garden hardware sprites: bounds, centering and mirroring are host work.

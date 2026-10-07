@@ -2921,6 +2921,28 @@ __attribute__((noinline)) static int runDownwell(void) {
                         styleComposite[byte + amigaStylePlaneBytes] = styleFrame[byte + AmigaSelectionLayer::planeBytes] |
                             (referenceBorder[byte + amigaStyleBorderPlaneBytes] & ~occupied);
                     }
+                    // Verification-only hardware compositor: read the actual
+                    // DMA headers/art, lower channel first in front, below PF1
+                    // text. The separate reveal mask is checked by captures.
+                    if(style.hardware)for(int channel=7;channel>=0;--channel){
+                        const auto* p=reinterpret_cast<const UBYTE*>(style.sprites[channel]);
+                        if(!p)continue;
+                        const int startY=p[0]+((p[3]&4)<<6),stopY=p[2]+((p[3]&2)<<7);
+                        const int left=p[1]*2+(p[3]&1)-amigaMenuDisplayHStart;
+                        for(int y=0;y<stopY-startY;++y)for(int x=0;x<16;++x){
+                            const unsigned lo=unsigned(p[4+y*4])*256+p[5+y*4];
+                            const unsigned hi=unsigned(p[6+y*4])*256+p[7+y*4];
+                            const unsigned pen=unsigned(bool(lo&(32768u>>x)))+2*unsigned(bool(hi&(32768u>>x)));
+                            const int dx=left+x,dy=startY-downwellDisplayVStart+y;
+                            if(!pen||dx<0||dx>=160||dy<0||dy>=284)continue;
+                            const unsigned at=dy*amigaStyleBytesPerRow+dx/8,bit=128u>>(dx&7);
+                            if((styleFrame[at]|styleFrame[at+AmigaSelectionLayer::planeBytes])&bit)continue;
+                            for(unsigned plane=0;plane<2;++plane){
+                                auto& b=styleComposite[at+plane*amigaStylePlaneBytes];
+                                b=UBYTE((b&~bit)|((pen&(1u<<plane))?bit:0));
+                            }
+                        }
+                    }
                     for (unsigned byte = 0; byte < amigaStyleFrameBytes; ++byte) {
                         if (styleComposite[byte] != memory.sceneCache()[byte]) {
                             ++gDownwellStyleReferenceFailures;
@@ -2931,6 +2953,25 @@ __attribute__((noinline)) static int runDownwell(void) {
                     DW_PROFILE_PHASE(profileCopper);
                     if (!styleScene.updateCopper(back, style, nullSprite, palette))
                         break;
+#ifdef DOWNWELL_SCENE_VERIFY
+                    {
+                        const auto& copper=styleScene.copper(back);
+                        const auto* words=copper.data();
+                        const unsigned priority=copper.moveOffset(bplcon2);
+                        if(words[priority+1]!=(style.hardware?0x0020:0x0024))
+                            ++gDownwellStyleReferenceFailures;
+                        for(unsigned channel=0;channel<8;++channel){
+                            const unsigned reg=spr1pth+channel*4,at=copper.moveOffset(reg);
+                            const auto* expected=style.hardware&&style.sprites[channel]?
+                                style.sprites[channel]:nullSprite.data();
+                            if(words[at]!=reg||words[at+2]!=reg+2||
+                                ((ULONG(words[at+1])<<16)|words[at+3])!=ULONG(expected))
+                                ++gDownwellStyleReferenceFailures;
+                            if(style.hardware&&style.sprites[channel])for(unsigned other=0;other<channel;++other)
+                                if(style.sprites[channel]==style.sprites[other])++gDownwellStyleReferenceFailures;
+                        }
+                    }
+#endif
                     DW_PROFILE_PHASE(profilePublish);
                     platform.publish(styleScene.copper(back));
                     front = back;

@@ -26,6 +26,8 @@ public:
         const UBYTE* border = nullptr;
         const UBYTE* mask = nullptr;
         unsigned paintedPixels = 0;
+        const UWORD* sprites[8]{};
+        bool hardware = false;
     };
     bool render(unsigned slot, const AmigaSceneRuntime& scenes, Frame& frame);
     bool updateCopper(unsigned slot, const Frame& frame,
@@ -45,5 +47,8 @@ private:
     AmigaStyleDrawList drawList_;
     DownwellStyleCopperList lists_[2];
     bool built_[2] = {false, false};
+    struct Icon { UWORD* data[2]{}; int x=0,y=0,height=0; } icons_[14];
+    bool bindIcons();
+    bool prepareIcons(unsigned slot,int top,Frame& frame);
 };
 #endif

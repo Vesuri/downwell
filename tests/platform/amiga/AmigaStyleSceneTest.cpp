@@ -1,24 +1,29 @@
 #include "platform/amiga/AmigaStyleScene.h"
 #include "platform/amiga/AmigaSceneRuntime.h"
 #include "platform/amiga/framework/AmigaHardware.h"
+#include "platform/amiga/framework/Sprite.h"
 #include <cassert>
 #include <cstdio>
 #include <vector>
 
 // Lifecycle doubles only. Native scene verification tests the real rendering
 // and Copper implementation; these counters test ownership and reset policy.
-class Sprite {};
 class Palette {};
+Sprite::Sprite(uint16_t* data,uint16_t h,bool attached,bool ownership)
+    : data_(data),height(h),owner(ownership),attached_(attached) {}
+Sprite::~Sprite() {}
+void Sprite::setX(uint16_t) {}
+void Sprite::setY(uint16_t) {}
 static unsigned preparations, freshFrames, retainedFrames, builds, patches;
 static bool prepareOK=true, renderOK=true, copperOK=true;
 CopperList::CopperList(UWORD* words,unsigned capacity)
     : words_(words),capacity_(capacity),count_(0),valid_(words!=nullptr) {}
 DownwellStyleCopperList::DownwellStyleCopperList(UWORD* words,unsigned capacity,unsigned planeBytes)
     : CopperList(words,capacity),framePlaneBytes_(planeBytes) { assert(planeBytes==AmigaSelectionLayer::planeBytes); }
-bool DownwellStyleCopperList::build(const UBYTE*,const UBYTE*,const Sprite&,const Palette&,const UBYTE*) {
+bool DownwellStyleCopperList::build(const UBYTE*,const UBYTE*,const Sprite&,const Palette&,const UBYTE*,const UWORD* const*) {
     ++builds; return copperOK;
 }
-bool DownwellStyleCopperList::update(const UBYTE*,const UBYTE*,const UBYTE*) {
+bool DownwellStyleCopperList::update(const UBYTE*,const UBYTE*,const UBYTE*,const UWORD* const*) {
     ++patches; return copperOK;
 }
 bool amigaBuildStyleBorderPart(const UBYTE*,const UBYTE*,UBYTE*,AmigaStylePreparation& state) {
@@ -38,7 +43,7 @@ int main() {
     std::vector<UBYTE> canvases(AmigaSelectionLayer::bytes*2);
     UWORD words[2][400]{};
     UBYTE art[20]{};
-    Sprite sprite; Palette palette;
+    UWORD empty[4]{};Sprite sprite(empty,0); Palette palette;
     AmigaSceneRuntime runtime;
     assert(runtime.enterResultsDestination(downwell::ResultsDestination::styleSelect));
     AmigaStyleScene scene(cache.data(),cache.size(),words[0],words[1],400,
