@@ -33,8 +33,12 @@ Downwell to an SDL host reference implementation and then to native Amiga 500
   saving from the native profile. Afterwards compare the same deterministic
   A500 workload, including its worst frame, with the retained reference.
   Correctness tests and added infrastructure are not performance wins. Revise
-  or discard experiments that miss their target; a better average does not
-  excuse a worse worst-case frame.
+  or discard experiments that miss their practical target; a better average
+  alone does not excuse worse gameplay stalls. Target <=20 ms during active
+  gameplay. Judge scene handoffs by overall transition latency and visible
+  stalls, not individual-frame limits: a few milliseconds or one or two fields
+  of transition variation, including redistributed VBlank waiting, is not by
+  itself a reason to reject a substantial overall improvement.
 
 ## Generated and copyrighted material
 

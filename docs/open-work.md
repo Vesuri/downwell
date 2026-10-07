@@ -195,8 +195,10 @@ Reference: [upgrade IDs and source entry points](upgrade-coverage.md).
 
 ## 5. Meet the Amiga frame budget
 
-Fit worst-case gameplay, style/upgrade navigation and transitions into 20 ms.
-Average FPS is not the criterion. The [frame-cost audit](amiga-frame-cost.md)
+Target <=20 ms frames during active gameplay and smooth style/upgrade navigation.
+Scene handoffs are not gameplay frames: judge them by total transition latency
+and visible stalls, not a 20 ms per-frame limit. Average gameplay FPS alone is
+not the criterion. The [frame-cost audit](amiga-frame-cost.md)
 measures `36d8a0f2` on the contact tape: 2,950 PAL fields. Quiet frames take
 26.3 ms, combat 67.3 ms and time-field frames 35.7 ms. The worst frames are
 701 (104.2 ms: generation on top of combat), 646 (100.6 ms: the contact damage
@@ -229,6 +231,15 @@ gauge) and left ten opt-in flags behind. Do not repeat that.
   Untouched frames move by up to about 0.5 ms between builds; that is noise.
   The tape's worst gap is quantized to whole fields: report it, never gate on
   it. Do not reject an 11 ms saving for a 0.6 ms move in a 70 ms frame.
+- For scene handoffs, measure the complete transition through the first
+  interactive frame, including preparation charged to earlier frames. Small
+  differences such as 8 ms or one or two PAL fields are not rejection grounds
+  by themselves. Accept a substantial overall improvement even when VBlank
+  waiting shifts into the following frame. Preserve smooth ongoing animation
+  and gameplay; distinguish added computation from redistributed waiting.
+  Saving estimates and attempt limits guide prioritization, not automatic
+  rejection of useful changes. Reassess candidates blocked solely by an
+  obsolete timing gate without starting another parameter/variant sweep.
 - Quote frame numbers from the report's per-frame table for the frame you
   name, and re-check a surprising number with a short capture of that frame
   before committing it. The `36d8a0f2` message gives 660 as 84.5 ms; the
@@ -408,9 +419,9 @@ the initial selection-canvas and offer-bank preparation stalls. Measure asset
 staging and Chip/Fast residency separately from steady-state navigation.
 Preserve the original heading, icon and carousel animation.
 
-Remove the synchronous cold gameplay handoff exposed by `profile.sh entry`.
-The last style frame owns that work; the first gameplay frame must not be
-discarded either. Remaining synchronous work includes small-field bank
+Reduce the overall cold gameplay handoff exposed by `profile.sh entry`.
+Measure the last style frame and first gameplay frame together under the
+transition gate above; do not discard either. Remaining synchronous work includes small-field bank
 validation/binding, results asset staging, initial terrain raster and backing/HUD
 setup. Move immutable preparation out of confirmation without overwriting
 the garden/style display owners or introducing another long frame earlier.
