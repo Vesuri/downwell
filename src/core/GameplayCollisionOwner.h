@@ -18,6 +18,7 @@
 #include "PreparedTerrainBirthBounds.h"
 #include "RunnerFullProperties.h"
 #include "NativeInstanceTable.h"
+#include "NativeEnemyAlarmRoster.h"
 namespace downwell {
 #ifdef DOWNWELL_DRAW_CACHE_AUDIT
 // Optional diagnostic observer; absent from normal code and simulation state.
@@ -61,6 +62,31 @@ private:
     unsigned combatAlarmMask_=0;
     bool combatAlarmCaptureValid_=false;
     bool nativeBoxAlarmPrefix_=false;
+    using EnemyAlarmRoster=NativeEnemyAlarmRoster<GameplayWorld::enemyCapacity>;
+    EnemyAlarmRoster enemyAlarmRoster_;
+    bool enemyAlarmRosterEligible_=true;
+    bool nativeEnemyAlarms()const{
+#ifdef DOWNWELL_REFERENCE_ENEMY_ALARM_ROSTER
+        return false;
+#else
+        // Only this owner has the shared monotonic registration chronology.
+        // Other ownership modes keep their original captured list.
+        return native_&&sceneryLayers_&&(nativeBoxes_||nativeFields_)&&enemyAlarmRosterEligible_;
+#endif
+    }
+    bool updateEnemyAlarmRoster(InstanceHandle h){
+        if(!nativeEnemyAlarms())return true;
+        std::uint32_t flags;
+        if(!table_.flags(h,flags)||(flags&0x100003u)||!table_.registered(h))return enemyAlarmRoster_.erase(h.slot);
+        const int object=table_.objectId(h);
+        unsigned alarms;
+        // The other implemented alarm families are 73, 92, 211, 266 and
+        // 370. Unsupported objects retain the complete registered capture.
+        if(object<=92||object>=211||!alarmMetadata_.mask(object,alarms)){
+            enemyAlarmRosterEligible_=false;combatAlarmCaptureValid_=false;return true;
+        }
+        return check(enemyAlarmRoster_.put({h,object,table_.registrationOrder(h),alarms}));
+    }
 #ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
     RunnerRoomMembership<View::capacity> room_;
 #else
@@ -472,6 +498,7 @@ private:
                     parent.layers_.birthScenery(depth));
             }
             if(!parent.check(parent.table_.birth(h,object(r),definition->initialFlags|(inactive?2u:0u),sprite)))return false;
+            if constexpr(Kind==View::Kind::enemy)if(!parent.updateEnemyAlarmRoster(h))return false;
             if(!parent.check(parent.room_.bind(h.slot,depth)))return false;
             if(inactive)parent.activationPending_=true;
             if constexpr(Kind==View::Kind::breakable||Kind==View::Kind::timeField)
@@ -519,6 +546,7 @@ private:
             }
             if(!key(local,r,h)||!parent.check(parent.room_.contains(h.slot)))return false;
             if(!parent.check(parent.native_?parent.table_.retire(h):parent.owner_.retire(h)))return false;
+            if constexpr(Kind==View::Kind::enemy)if(!parent.updateEnemyAlarmRoster(h))return false;
             if(!parent.check(parent.room_.remove(h.slot)))return false;
             if constexpr(Kind==View::Kind::breakable||Kind==View::Kind::timeField)
                 if(parent.sceneryLayers_){
@@ -543,6 +571,7 @@ private:
             std::uint32_t flags;
             if(!parent.eligibilityFlags(h,flags)||!parent.check(parent.native_?parent.table_.setExclusions(h,(flags&0x100003u)|1u):
                 parent.owner_.setExclusions(h,(flags&0x100003u)|1u)))return false;
+            if constexpr(Kind==View::Kind::enemy)if(!parent.updateEnemyAlarmRoster(h))return false;
             if(!parent.check(parent.room_.mark(h.slot)))return false;
             parent.destructionPending_=true;return parent.publishPreparedDraw(h);}
         bool membership(InstanceHandle local,const Record& r,bool member){InstanceHandle h;
@@ -550,13 +579,15 @@ private:
                 return parent.check(member)&&key(local,r,h);
             if constexpr(Kind==View::Kind::breakable)if(parent.nativeBoxes_)
                 return parent.check(member)&&key(local,r,h);
-            return key(local,r,h)&&parent.check(parent.native_?parent.table_.registerObject(h,member):parent.owner_.registerObject(h,member))&&
-                parent.publishPreparedDraw(h);}
+            if(!key(local,r,h)||!parent.check(parent.native_?parent.table_.registerObject(h,member):parent.owner_.registerObject(h,member)))return false;
+            if constexpr(Kind==View::Kind::enemy)if(!parent.updateEnemyAlarmRoster(h))return false;
+            return parent.publishPreparedDraw(h);}
         bool activation(InstanceHandle local,const Record& r,bool active){InstanceHandle h;
             if constexpr(Kind==View::Kind::breakable||Kind==View::Kind::timeField)
                 if(parent.sceneryLayers_)return parent.check(active)&&key(local,r,h);
             if(!key(local,r,h)||!parent.check(parent.native_?parent.table_.setActive(h,active):
                 parent.owner_.setActive(h,active,*parent.families_.flags(object(r)))))return false;
+            if constexpr(Kind==View::Kind::enemy)if(!parent.updateEnemyAlarmRoster(h))return false;
             if(!parent.check(parent.layers_.activation(h,active)))return false;
             parent.activationPending_=true;return parent.publishPreparedDraw(h);}
         // Native ownership publishes no geometry: nothing queries it.
@@ -989,6 +1020,12 @@ public:
             if(!self.valid())return false;
             auto& phase=self.combatAlarmPhase_;
             const auto boxes=self.nativeBoxAlarmPrefix_?self.world_->captureBoxAlarms():GameplayWorld::BoxAlarmPrefix{};
+            EnemyAlarmRoster::Phase enemies;
+            struct Release {EnemyAlarmRoster* owner=nullptr;~Release(){if(owner)owner->end();}} release;
+            if(self.nativeEnemyAlarms()){
+                if(!self.check(self.enemyAlarmRoster_.begin(enemies)))return false;
+                release.owner=&self.enemyAlarmRoster_;
+            }
             const bool reused=self.combatAlarmCaptureValid_&&!self.combatAlarmCaptureDirty_;
             if(!reused){
                 phase.clear();
@@ -997,7 +1034,9 @@ public:
                 };
                 // Only implemented families are admitted. Avoid scanning every
                 // terrain record for this partial combat alarm traversal.
-                if(!self.check(self.visitRegistered(View::enemyBase,self.nativeBoxAlarmPrefix_?View::breakableBase:View::terrainBase,capture)&&
+                const unsigned first=enemies.entries?View::breakableBase:View::enemyBase;
+                const unsigned last=self.nativeBoxAlarmPrefix_?View::breakableBase:View::terrainBase;
+                if(!self.check((first==last||self.visitRegistered(first,last,capture))&&
                     self.visitRegistered(View::debrisBase,View::capacity,capture)))return false;
                 // Save before callbacks: mutation during dispatch invalidates
                 // reuse next tick without changing this phase's captured set.
@@ -1012,7 +1051,11 @@ public:
                     kind==View::Kind::timeChange?self.world_->advanceTimeChangeRoomAlarm(local,alarm):
                     kind==View::Kind::drone?(alarm==0&&self.drones_.advanceAlarm(local)):
                     kind==View::Kind::entryDither&&self.entries_.advanceAlarm(local,alarm);
-            },reused,&self.combatAlarmMask_,boxes);
+            },reused,&self.combatAlarmMask_,boxes
+#ifndef DOWNWELL_REFERENCE_ENEMY_ALARM_ROSTER
+            ,enemies
+#endif
+            );
         },this);
         world.configureDebrisStepOrder([](void* context,GameplayWorld::DebrisStepOrder& phase){
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
@@ -1105,7 +1148,11 @@ private:
     }
     template<bool SkipInactive=false,unsigned Capacity,class AdvanceAndDispatch>
     bool dispatchCapturedAlarms(RunnerStepSnapshot<Capacity>& snapshot,AdvanceAndDispatch advanceAndDispatch,
-        bool alreadySorted=false,unsigned* retainedMask=nullptr,GameplayWorld::BoxAlarmPrefix boxes={}){
+        bool alreadySorted=false,unsigned* retainedMask=nullptr,GameplayWorld::BoxAlarmPrefix boxes={}
+#ifndef DOWNWELL_REFERENCE_ENEMY_ALARM_ROSTER
+        ,EnemyAlarmRoster::Phase enemies={}
+#endif
+        ){
         DW_PROFILE_SCOPE(profileAlarmScan);
         if(!alreadySorted){DW_PROFILE_SCOPE(profileAlarmSort);snapshot.sort();}
         const unsigned count=snapshot.size();
@@ -1130,7 +1177,23 @@ private:
         }
         for(unsigned alarm=0;alarm<AlarmBank::count;++alarm){
           bool boxesPending=alarm==0&&boxes.end;
+#ifndef DOWNWELL_REFERENCE_ENEMY_ALARM_ROSTER
+          bool enemiesPending=(enemies.alarms&(1u<<alarm))!=0;
+          const auto dispatchEnemies=[&]{
+              for(unsigned e=0;e<enemies.count;++e){
+                  const auto& entry=enemies.entries[e];
+                  if(!(entry.alarms&(1u<<alarm)))continue;
+                  std::uint32_t flags;
+                  if(!table_.flags(entry.handle,flags)||(flags&0x100003u))continue;
+                  if(!check(world_->advanceEnemyRoomAlarm(
+                      {entry.handle.slot-View::enemyBase,entry.handle.generation},alarm))||!valid())return false;
+              }
+              return true;
+          };
+          if(!boxesPending&&!enemiesPending&&!(capturedAlarms&(1u<<alarm))&&bindingsUnchanged(bindingRevision))continue;
+#else
           if(!boxesPending&&!(capturedAlarms&(1u<<alarm))&&bindingsUnchanged(bindingRevision))continue;
+#endif
           int cachedObject=-1;unsigned alarmMask=0;
           PackedObjectEvent event;bool eventCached=false,eventFound=false;
           unsigned groupEnd=0;
@@ -1141,6 +1204,12 @@ private:
                 if(!check(world_->advanceBoxAlarmPrefix(boxes)))return false;
                 boxesPending=false;
             }
+#ifndef DOWNWELL_REFERENCE_ENEMY_ALARM_ROSTER
+            if(enemiesPending&&snapshot.object(i)>210){
+                if(!dispatchEnemies())return false;
+                enemiesPending=false;
+            }
+#endif
             if constexpr(SkipInactive)if(i>=groupEnd){
                 // Captured boxes are live boxes. When none has this alarm set
                 // at group entry, no member is pending and no callback runs.
@@ -1193,6 +1262,9 @@ private:
                 if(!check(advanceAndDispatch(h,alarm,event))||!valid())return false;}
           }
           if(boxesPending&&!check(world_->advanceBoxAlarmPrefix(boxes)))return false;
+#ifndef DOWNWELL_REFERENCE_ENEMY_ALARM_ROSTER
+          if(enemiesPending&&!dispatchEnemies())return false;
+#endif
         }
         return true;
     }
@@ -1438,6 +1510,7 @@ public:
             if(registered&&slot>=View::terrainBase&&slot<View::timeFieldBase)terrainSnapshotDirty_=true;
             const auto h=handleAt(slot);
             return good_&&(native_?table_.registerObject(h,registered):owner_.registerObject(h,registered))&&
+                (!(slot>=View::enemyBase&&slot<View::breakableBase)||updateEnemyAlarmRoster(h))&&
                 (!nativeBoxes_||!registered||table_.roomReactivated(h))&&layers_.reconcile(h)&&publishPreparedDraw(h);
         });
         if(!check(result&&good_))return false;

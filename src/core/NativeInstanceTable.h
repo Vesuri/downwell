@@ -74,6 +74,7 @@ public:
         entries_[h.slot].roomOrder=entries_[h.slot].order;return true;
     }
     bool contains(InstanceHandle h)const{return live(h);}
+    bool registered(InstanceHandle h)const{return live(h)&&registration_.contains(h.slot);}
     int objectId(InstanceHandle h)const{return live(h)?entries_[h.slot].object:-1;}
     bool flags(InstanceHandle h,std::uint32_t& out)const{
         if(!live(h))return false;

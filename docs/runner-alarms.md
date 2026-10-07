@@ -67,9 +67,10 @@ and dispatches immediately on zero; missing alarm events do not receive a
 countdown. Tests mix real box/enemy/debris registrations, preserve same-object
 registration order, modify a later debris alarm in the same phase, exclude
 newborns from the snapshot, suppress a destroyed later lifetime, and stop after
-callback failure. The ordinary native world now uses the same dispatch body
-for registered boxes, enemies and debris, with a caller-resident snapshot restricted
-to those supported families. Unbound component worlds retain their enemy-only
+callback failure. Registered-reference gameplay uses the same dispatch body
+for boxes, enemies and debris, with a caller-resident snapshot restricted
+to supported families. Native-owned families use the prefix/roster routes
+described below. Unbound component worlds retain their enemy-only
 fallback. Actor alarm bodies are shared between both routes; Retry preserves
 the bound phase callback. A normal-frame test covers debris's thirty-tick
 Alarm 0 expiry and cleanup before and after Retry. This is not a complete
@@ -139,6 +140,26 @@ boxes marked for destruction are skipped, as the snapshot would have done.
 `REFERENCE_BOX_ALARMS=1` (native build) retains the captured snapshot as
 the oracle. `make verify-gameplay-collision-owner` checks the prefix against
 newborn, destroyed and replacement boxes, and armed boxes beside idle ones.
+
+### Mutation-owned native enemy order
+
+The native-scenery combat owner maintains enemy alarm entries at birth,
+retirement, registration and eligibility changes. Entries carry the exact
+object, registration order, handle generation and immutable alarm-event mask;
+they never cache countdown values. Room reconciliation updates this owner too.
+A phase pins the current bank. Mutations copy it only while it is pinned,
+preserving the captured lifetimes without rebuilding or sorting every tick.
+Live flags and generation are checked immediately before each typed callback.
+
+This route admits only enemy resource IDs between 92 and 211, between the
+box prefix and later captured effect families. Dispatch remains alarm-index
+first, then resource and registration order. Unsupported metadata/order
+disables the roster and invalidates the captured-list cache, retaining the
+complete generic path. This does not broaden supported enemy event bodies or
+prove additional original same-phase birth cases. The two 64-entry banks use
+ordinary memory, never Chip RAM. `REFERENCE_ENEMY_ALARM_ROSTER=1` retains the
+original dispatcher on both targets; `verify-native-enemy-alarm-roster` and
+the collision-owner tests cover pinning, reuse, failure prefixes and order.
 
 ## Skeleton consequence
 

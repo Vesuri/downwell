@@ -368,25 +368,19 @@ currency layer order and whole-string streak layer order exact.
 and completed-DMA native frame dumps, including the initial frame, first
 pickup and 640–900; require zero unexpected prepared-path fallbacks.
 
-### E. Quiet-frame and alarm shortfalls
+### E. Quiet-frame shortfall
 
-Native boxes no longer enter the captured alarm array: their Alarm 0 runs
-from the append-only box prefix. Enemy and effect alarm capture remains. Its
-two structural attempts are in the
-[rejection table](amiga-frame-cost.md#rejected-approaches); a further
-proposal must remove the remaining capture the same way, for one family at a
-time, rather than change the temporary array layout.
-Enemy alarm ordering has exhausted its two family-order attempts: the borrowed
-Step snapshot and mutation-owned pinned roster are closed. Do not retune their
-snapshot caching, merge loops, roster insertion or negative-counter dispatch.
-Pursue other shared quiet-frame work, not another enemy alarm-order variant.
+Pursue shared quiet-frame work, not another enemy alarm-order variant. Do not
+retune roster insertion, pinning, snapshot caching, merge loops or negative
+counter dispatch. The rejected borrowed Step snapshot and generic temporary
+alarm-array layouts remain closed. Any remaining effect-alarm proposal must
+first meet the work threshold in a workload that actually exercises it.
 
 Target: quiet frames under 22 ms; current mean is 26.3 ms. Player and walking
 enemy motion cost about 5.6 ms together, but each is under 3 ms in this window.
 Leave their individual helpers alone. A quiet-frame proposal needs a shared
 work structure to remove, measured across its callers, not a collection of
-unrelated sub-millisecond edits. Captured alarm dispatch, including the box
-prefix, is 1.10 ms quiet, 1.87 ms in combat and 3.97 ms at 645.
+unrelated sub-millisecond edits.
 
 ### F. Parked until A–E are done
 

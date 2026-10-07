@@ -2484,12 +2484,17 @@ int main(){
         assert(rooms.roomInstance(room,0,r));r.scaleX=2;
         assert(!terrain->appendRoom(r)&&!terrain->valid()&&terrain->size()==0);
     }
+    for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                       GameplayCollisionOwner::Ownership::nativeScenery})
     for(int initial:{(-2147483647-1),-2,-1,0,1,2}){
         // Compare the bound pending-counter path with the original unfiltered
         // captured traversal. Negative values must remain untouched; zero
         // still retires, and positive counters retain countdown/RNG order.
-        auto optimized=std::make_unique<GameplayCollisionOwner>(objects,sprites);
-        auto reference=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        const auto* alarmRooms=ownership==GameplayCollisionOwner::Ownership::nativeScenery?&rooms:nullptr;
+        auto optimized=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},alarmRooms,ownership);
+        auto reference=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},alarmRooms);
         auto a=std::make_unique<GameplayWorld>(300,true,0,false,optimized->enemyBinding(),
             optimized->breakableBinding(),optimized->playerBinding(),&optimized->terrain());
         auto b=std::make_unique<GameplayWorld>(300,true,0,false,reference->enemyBinding(),
@@ -2546,8 +2551,11 @@ int main(){
             for(unsigned w=0;w<16;++w)assert(a->randomState().stateWord(w)==b->randomState().stateWord(w));
         }
     }
-    {
-        auto ordered=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+    for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                       GameplayCollisionOwner::Ownership::nativeScenery}){
+        auto ordered=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},
+            ownership==GameplayCollisionOwner::Ownership::nativeScenery?&rooms:nullptr,ownership);
         auto scene=std::make_unique<GameplayWorld>(300,true,0,false,ordered->enemyBinding(),
             ordered->breakableBinding(),ordered->playerBinding(),&ordered->terrain());
         assert(ordered->attach(*scene));

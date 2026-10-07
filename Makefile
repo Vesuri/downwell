@@ -50,6 +50,9 @@ endif
 ifeq ($(REFERENCE_CONTACT_COORDINATES),1)
 CXXFLAGS += -DDOWNWELL_REFERENCE_CONTACT_COORDINATES
 endif
+ifeq ($(REFERENCE_ENEMY_ALARM_ROSTER),1)
+CXXFLAGS += -DDOWNWELL_REFERENCE_ENEMY_ALARM_ROSTER
+endif
 LDFLAGS  := $(SDL_LDFLAGS)
 
 SOURCES := \
@@ -1095,6 +1098,13 @@ test: verify-time-field-wind
 .PHONY: verify-time-field-wind
 test: verify-gameplay-collision-owner
 .PHONY: verify-gameplay-collision-owner
+.PHONY: verify-native-enemy-alarm-roster
+build/native-enemy-alarm-roster-test: tests/core/NativeEnemyAlarmRosterTest.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+verify-native-enemy-alarm-roster: build/native-enemy-alarm-roster-test
+	./build/native-enemy-alarm-roster-test
+test: verify-native-enemy-alarm-roster
 build/terrain-ownership-runs-test: tests/core/TerrainOwnershipRunsTest.cpp src/core/GameMakerRandom.cpp $(wildcard src/core/*.h)
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
