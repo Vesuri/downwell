@@ -52,6 +52,7 @@ bool AmigaStyleScene::render(unsigned slot, const AmigaSceneRuntime& scenes,
     DW_PROFILE_PHASE(profileStyleActors);
     unsigned painted=0;
     if (!layers_[slot].render(targets_[slot],pack_,end_,drawList_.commands,drawList_.count,painted)) return false;
+    frame.paintedPixels = painted;
     DW_PROFILE_PHASE(profileStyleDrain);
     AmigaHardware::blitterDrain();
     frame.content = layers_[slot].view(unsigned(top));

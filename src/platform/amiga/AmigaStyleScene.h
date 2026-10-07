@@ -25,6 +25,7 @@ public:
         const UBYTE* content = nullptr;
         const UBYTE* border = nullptr;
         const UBYTE* mask = nullptr;
+        unsigned paintedPixels = 0;
     };
     bool render(unsigned slot, const AmigaSceneRuntime& scenes, Frame& frame);
     bool updateCopper(unsigned slot, const Frame& frame,

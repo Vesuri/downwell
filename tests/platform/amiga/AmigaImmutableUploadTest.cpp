@@ -25,4 +25,19 @@ int main() {
     for(unsigned i=0;i<1031;++i) assert(second[i+1]==source[i]);
     assert(second[0]==0xdead && second[1032]==0xdead);
     assert(!upload.step(nullptr,source,1031,256));
+    unsigned char byteSource[513], byteTarget[515];
+    for(unsigned i=0;i<513;++i) byteSource[i]=static_cast<unsigned char>(i*13);
+    for(auto& byte:byteTarget) byte=0x5a;
+    AmigaImmutableByteUpload bytes;
+    assert(!bytes.step(byteTarget+1,byteSource,513,256));
+    assert(!bytes.step(byteTarget+1,byteSource,513,256));
+    assert(byteTarget[513]==0x5a);
+    assert(bytes.step(byteTarget+1,byteSource,513,256));
+    for(unsigned i=0;i<513;++i) assert(byteTarget[i+1]==byteSource[i]);
+    assert(byteTarget[0]==0x5a && byteTarget[514]==0x5a);
+    bytes.invalidate();
+    byteTarget[1]=0x5a;
+    assert(!bytes.step(byteTarget+1,byteSource,513,0));
+    assert(byteTarget[1]==0x5a);
+    assert(bytes.step(byteTarget+1,byteSource,513,513));
 }

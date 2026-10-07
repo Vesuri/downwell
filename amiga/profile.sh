@@ -108,6 +108,7 @@ restore() {
   unset REFERENCE_INITIAL_RASTER
   unset REFERENCE_ROOM_PREPARE
   unset REFERENCE_FIELD_BANK
+  unset REFERENCE_ENTRY_ASSETS
   unset REFERENCE_EMPTY_TERRAIN
   unset REFERENCE_ROOM_TERRAIN
   unset REFERENCE_INITIAL_TERRAIN
@@ -156,6 +157,9 @@ fi
 VERIFY_TIMEOUT_SECONDS="${VERIFY_TIMEOUT_SECONDS:-60}" \
 GDB_SOURCE="$script" READY_MARKER=DOWNWELL_PROFILE_READY \
 READY_DESCRIPTION="bounded scene profile" bash verify_startup.sh
+if [[ ${PROFILE_ENTRY:-0} == 1 ]]; then
+  cmp .run/entry-hud.bin ../generated/amiga-hud.dwap
+fi
 cp .run/gdb-startup.log ".run/profile-${mode}.log"
 if [[ ${GENERATION_TIMING:-0} == 1 ]] && ! grep -q '^PHASE coarse:' ".run/profile-${mode}.log"; then
   echo "Requested coarse generation measurement was not produced" >&2

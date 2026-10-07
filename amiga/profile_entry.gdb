@@ -9,6 +9,7 @@ if gDownwellProfileFrozen != 1 || gDownwellProfileTargetScene != 3 || gDownwellP
     quit 1
 end
 printf "PROFILE natural entry PROBES (instrumented); cold gameplay frame retained; clock_clamps=%lu\n", gDownwellProfileClockClamps
+printf "ENTRY results bank: eager_uploads=%lu discarded_for_entry=%lu results_frames=%lu\n", gDownwellEntryResultsUploads, gDownwellEntryResultsDiscarded, gDownwellEntryResultsFrames
 set $s = 0
 while $s < 4
     printf "SCENE %u frames=%lu fields=%lu max_gap=%lu max_frame_ms=%.3f worst_frame=%lu\n", $s, gDownwellProfileFrames[$s], gDownwellProfileFields[$s], gDownwellProfileMaxGap[$s], gDownwellProfileFrameMax[$s]*20.0/80128.0, gDownwellProfileWorstFrame[$s]
@@ -27,6 +28,7 @@ while $s < 4
     end
     set $s = $s + 1
 end
+dump binary memory .run/entry-hud.bin gDownwellEntryHud gDownwellEntryHud+gDownwellEntryHudBytes
 printf "DOWNWELL_PROFILE_READY\n"
 shell touch .run/gdb-ready.marker
 detach

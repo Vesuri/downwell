@@ -57,6 +57,7 @@ enum DownwellProfilePhase {
     profileEnemyPositionPublish, profileEnemyPresentationPublish,
     profileEntryFields, profileEntryWorld, profileEntryAssets,
     profileEntryRaster, profileEntryBacking,
+    profileEntryHudCopy, profileEntryHudBind, profileEntryResultsCopy,
     profilePhaseCount
 };
 

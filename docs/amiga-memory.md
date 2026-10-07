@@ -109,17 +109,25 @@ backing restores moving-object damage and supplies newly revealed rows.
 
 During gameplay the 76,800-byte garden allocation is partitioned by
 `GameplaySceneStorage`: bytes 0..30,719 remain the full staging ring (which
-can rotate into a displayed slot); bytes 62,860..76,799 hold the 13,940-byte
+can rotate into a displayed slot); bytes 64,540..76,797 hold the 12,258-byte
 HUD pack, relocated from the entry-shaft base. This leaves a contiguous
-32,140-byte middle gap, enough for the separate 25,820-byte results pack.
+33,820-byte middle gap, enough for the separate 24,010-byte results pack.
 The HUD start is rounded down to a four-byte boundary for future odd sizes;
 overlapping/oversized partitions fail validation. Results packing tests enforce
 the current gap budget, and renderer tests cover the arithmetic boundaries.
 
+After style selection has retired garden DMA, content-clean style updates
+stage at most 256 HUD bytes into that high-end partition. A completed upload
+certifies only this handoff; entering style and consuming the handoff both
+invalidate the certificate. Short/skipped selection uses the complete
+synchronous copy. No partial pack becomes active, and no extra Chip allocation
+is needed. `REFERENCE_ENTRY_ASSETS=1` retains the synchronous path;
+`profile.sh entry` compares the resident bytes with the offline pack.
+
 The results pack is now linked as ordinary read-only executable data and copied
 once into that gap during gameplay entry, after intro DMA is retired. The loader
 checks the planar pack's span against the reserved capacity and returns failure
-code 20 if it does not fit or validate. It is not drawn yet. This does not
+code 20 if it does not fit or validate. This does not
 increase Chip allocation or destroy an unused-looking
 intro cache that is actually serving as live gameplay memory. The splash/style
 allocation remains the two display rings and cannot be reused for results art.

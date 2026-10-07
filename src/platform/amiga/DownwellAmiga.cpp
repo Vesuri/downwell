@@ -169,6 +169,7 @@ struct PreparedFieldOps {
 #include "AmigaBufferCompare.h"
 #include "AmigaSceneRuntime.h"
 #include "GameplaySceneStorage.h"
+#include "AmigaImmutableUpload.h"
 #include "AmigaExitMask.h"
 #include "AmigaEntryMask.h"
 #include "AmigaClearPresenter.h"
@@ -315,6 +316,8 @@ static const UBYTE* activeGamePack = amiga_game_pack;
 static const UBYTE* activeGamePackEnd = amiga_game_pack_end;
 static const UBYTE* activeHudPack = amiga_hud_pack;
 static const UBYTE* activeHudPackEnd = amiga_hud_pack_end;
+static AmigaImmutableByteUpload entryHudUpload;
+static bool entryHudReady=false;
 
 // Chip RAM holds only the current scene's art. Boot (splash) and front
 // (garden and style select) banks are files, each read whole in one load
@@ -467,11 +470,23 @@ static bool selectExitMaskBank() {
     residentCover = ResidentCover::exit;
     return true;
 }
+#ifdef DOWNWELL_PROFILE_ENTRY
+extern "C" {
+volatile ULONG gDownwellEntryResultsUploads=0;
+volatile ULONG gDownwellEntryResultsDiscarded=0;
+volatile ULONG gDownwellEntryResultsFrames=0;
+const UBYTE* volatile gDownwellEntryHud=nullptr;
+volatile ULONG gDownwellEntryHudBytes=0;
+}
+#endif
 static bool selectEntryMaskBank(){
     if(residentCover==ResidentCover::entry)return true;
     if(residentCover!=ResidentCover::none||!overlayAssetStorage||AmigaEntryMask::bytes>overlayAssetCapacity||
        amiga_entry_mask_end-amiga_entry_mask!=AmigaEntryMask::bytes)return false;
     AmigaHardware::blitterDrain();
+#ifdef DOWNWELL_PROFILE_ENTRY
+    if(gDownwellResultsPack)++gDownwellEntryResultsDiscarded;
+#endif
     for(unsigned i=0;i<AmigaEntryMask::bytes;++i)overlayAssetStorage[i]=amiga_entry_mask[i];
     gDownwellResultsPack=gDownwellShopPack=nullptr;
     gDownwellResultsAssetBytes=gDownwellShopAssetBytes=0;
@@ -2456,6 +2471,8 @@ __attribute__((noinline)) static int runDownwell(void) {
                     gameplayScene.invalidate();
                 }
                 if (presentationChanged && presentedScene == AmigaScene::styleSelect) {
+                    entryHudUpload.invalidate();
+                    entryHudReady=false;
                     // These framebuffers and copper slots may contain gameplay,
                     // even when the new selection matches the last visit exactly.
                     // Garden prepared the immutable border/masks on entry and
@@ -2604,10 +2621,23 @@ __attribute__((noinline)) static int runDownwell(void) {
                         break;
                     }
                     UBYTE* hudStorage = memory.menuForeground() + storage.hudOffset;
+                    DW_PROFILE_PHASE(profileEntryHudCopy);
+#ifndef DOWNWELL_REFERENCE_ENTRY_ASSETS
+                    if (!entryHudReady)
+#endif
                     for (unsigned byte = 0; byte < hudBytes; ++byte)
                         hudStorage[byte] = amiga_hud_pack[byte];
+                    // This certificate covers this handoff only. Later scene
+                    // owners may rewrite the retired garden allocation.
+                    entryHudUpload.invalidate();
+                    entryHudReady=false;
                     activeHudPack = hudStorage;
                     activeHudPackEnd = activeHudPack + hudBytes;
+#ifdef DOWNWELL_PROFILE_ENTRY
+                    gDownwellEntryHud=activeHudPack;
+                    gDownwellEntryHudBytes=hudBytes;
+#endif
+                    DW_PROFILE_PHASE(profileEntryHudBind);
 #ifndef DOWNWELL_REFERENCE_HUD_TEXT
                     // Bind HUD text backgrounds here, not on the first gem.
                     hudText.bind(activeHudPack, activeHudPackEnd, activeGamePack, activeGamePackEnd);
@@ -2619,11 +2649,15 @@ __attribute__((noinline)) static int runDownwell(void) {
                     // assets once; never convert or copy them per results frame.
                     gDownwellResultsPack = gDownwellShopPack = nullptr;
                     shopMenuOverlay.reset();
+                    DW_PROFILE_PHASE(profileEntryResultsCopy);
                     if (!selectOverlayAssetBank(false)) {
                         ++gDownwellResultsAssetFailures;
                         exitCode = 20;
                         break;
                     }
+#ifdef DOWNWELL_PROFILE_ENTRY
+                    ++gDownwellEntryResultsUploads;
+#endif
                     DW_PROFILE_PHASE(profileEntryRaster);
                     Bitmap stageClear(stagedBuffer, downwellVisibleWidth,
                         downwellGameRingHeight, 2, false, false, downwellDmaWidth);
@@ -2813,6 +2847,20 @@ __attribute__((noinline)) static int runDownwell(void) {
                     platform.publish(styleScene.copper(back));
                     front = back;
                     DW_PROFILE_PHASE(profileOther);
+#ifndef DOWNWELL_REFERENCE_ENTRY_ASSETS
+                    // A previous style list has already retired garden DMA.
+                    // Copy only on frames whose retained content needed no
+                    // repaint; never add this work to carousel/layout bursts.
+                    if (!presentationChanged && !style.paintedPixels) {
+                        const unsigned bytes = amiga_hud_pack_end-amiga_hud_pack;
+                        const auto layout = GameplaySceneStorage::partition(
+                            menuPlaneBytes*2+amigaMenuEntryPlaneBytes,
+                            downwellGameRingBytes,bytes);
+                        if (!layout.valid) { exitCode=20; break; }
+                        entryHudReady=entryHudUpload.step(memory.menuForeground()+layout.hudOffset,
+                            amiga_hud_pack,bytes,256);
+                    }
+#endif
 #ifdef DOWNWELL_SCENE_VERIFY
                     gDownwellStyleMask = style.mask;
                     gDownwellStyleCopper = styleScene.copper(back).data();
@@ -3228,6 +3276,9 @@ __attribute__((noinline)) static int runDownwell(void) {
             }
 #endif
             if (port.deathResults().active && !port.exitDither().active) {
+#ifdef DOWNWELL_PROFILE_ENTRY
+                ++gDownwellEntryResultsFrames;
+#endif
                 if (!selectOverlayAssetBank(false)) { exitCode = 20; break; }
                 const bool backdropChanged = redrawResultsBackdrop(&renderer, port,
 #ifndef DOWNWELL_REPLAY_VERIFY
