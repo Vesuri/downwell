@@ -102,7 +102,7 @@ behavior, both backend integrations and relevant original-game verification.
   its production scheduling, including the player's live time-stop state.
   Replace the removal-only box Step with the full ordered audio, smoke, flash,
   impact, chain-reaction, debris and reward sequence before lifetime retirement.
-  Complete registered currency reward-caller publication, free motion, Draw and
+  Complete registered currency reward-caller publication, collection, Draw and
   native ownership; establish the unnormalized homing angle domain and original
   atan/trig behavior before admitting natural rewards. See the currency contract
   in [skeleton effects](skeleton-effect-ownership.md).

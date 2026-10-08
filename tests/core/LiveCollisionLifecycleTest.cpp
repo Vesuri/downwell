@@ -309,6 +309,40 @@ int main(){
         }
         require(currency.clear(),"clear attracted currency owner");
     }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach free currency collision world");world->skipToGameForTesting();
+        InstanceHandle box;require(world->spawnBuilderPrimitive(92,240,544,box),"create currency bounce floor");
+        auto currency=world->currencyRegistration<1>();InstanceHandle gem;
+        require(world->createRegisteredCurrency(currency,MotionBinary64::fromInteger(248),MotionBinary64::fromInteger(512),
+            [](auto,int,auto,auto,bool& hit){hit=false;return true;},gem),"create freely moving currency");
+        require(currency.dispatch(gem,[](auto& s,bool&){s.xsp={};s.ysp=MotionBinary64::fromInteger(2);return true;}),"set source bounce fixture velocity");
+        struct Audio {
+            unsigned sounds=0;
+            bool isPlaying(int,bool& playing){playing=false;return true;}
+            bool stop(int){return true;}
+            bool play(int id,int priority,bool loop,int& voice){if(id<168||id>170||priority!=30||loop)return false;voice=700+int(++sounds);return true;}
+            bool getGain(int,MotionBinary64& gain){gain=MotionBinary64::fromInteger(1);return true;}
+            bool setGain(int,MotionBinary64,int){return true;}
+            bool setPitch(int,MotionBinary64){return true;}
+        } audio;
+        CurrencyHomingMath math{portableAtan};bool bounced=false;
+        for(unsigned tick=0;tick<32;++tick){
+            require(world->withCurrencyEvents(currency,[&](auto key,auto&,auto phase,unsigned,auto& random,bool&){
+                if(phase!=StartupRuntime::CurrencyPhase::step)return false;
+                return currency.stepSource(key,random,false,480,MotionBinary64::fromInteger(999),MotionBinary64::fromInteger(999),
+                    math,[](auto& top){top={};return true;},audio,MotionBinary64::fromInteger(1),false);
+            },[&]{return world->stepWithCollisionPass({},false,StartupRuntime::NoCollisionPass{});}),"source currency free motion through registered terrain queries");
+            const auto* state=currency.find(gem);const auto* r=owner->resolve(gem);std::int32_t x,y;
+            require(state&&r&&state->xx.roundPixel(x)&&state->yy.roundPixel(y)&&r->preciseX==float(x)&&r->preciseY==float(y),"free currency publishes rounded position");
+            if(state->yCollision){
+                require(state->ysp.zero()||(state->ysp.high==0xbff00000u&&!state->ysp.low),"source fractional integer bounce is zero or minus one");bounced=true;
+            }
+        }
+        require(bounced&&audio.sounds&&!currency.find(gem)->attracted,"registered currency bounced off real box with source audio");
+        require(currency.clear(),"clear free currency owner");
+    }
     for(unsigned chainCase=0;chainCase<10;++chainCase){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());

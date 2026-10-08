@@ -19,6 +19,12 @@ zero but consumes two words. The subsequent `choose` of animation speed
 consumes one more. Upward/zero vertical collisions instead multiply `ysp` by
 zero and consume only the animation choice.
 
+Currency's ordinary Step uses `irandom_range(-0.5,-1.2)` instead. Truncation
+produces 0 and -1, which are sorted into [-1,0]. Its bounce therefore uses
+`irandomSmall(1)-1`, consuming two words and returning either -1 or 0; it is
+not a continuous draw between the fractional endpoints. An upward/zero
+collision multiplies the existing speed by zero without drawing RNG.
+
 `tools/verify-runner-integer-range.py` pins the reviewed machine-code regions
 and executable hash. This is static runner evidence, not an executed Windows
 encounter test. The portable Step tests independently check arithmetic and

@@ -9,6 +9,8 @@
 #include "CurrencyStepEnvelope.h"
 #include "TimeStopBound.h"
 #include "CurrencyHomingSource.h"
+#include "CurrencyFreeMotion.h"
+#include "PlayerSolidCollisionBinary64.h"
 #include <cstring>
 namespace downwell {
 // Registered object-248 Create and script setters. Borrow at a fixed address
@@ -115,6 +117,35 @@ public:
             bool attractedMotion(CurrencyCreate& state){return CurrencyHomingSource::run(state,x,y,math,good);}
         } motion{free,playerX,playerY,good_,math};
         return step(h,random,stopped,width,motion);
+    }
+    template<class Random,class Math,class View,class Audio>
+    bool stepSource(InstanceHandle h,Random& random,bool stopped,int width,MotionBinary64 playerX,MotionBinary64 playerY,
+        Math& math,View view,Audio& audio,MotionBinary64 volume,bool inWater){
+        auto* e=entry(h);if(!good_||!e||!record(*e))return fail();
+        struct Ops {
+            StoredCurrencyRegistration& owner;Entry& e;Math& math;View& view;Audio& audio;MotionBinary64 volume;bool inWater;
+            bool meeting(int object,MotionBinary64 x,MotionBinary64 y,bool& hit){
+                auto* r=owner.record(e);return r&&owner.lifecycle_.placeMeeting(e.key,*r,object,x,y,hit);
+            }
+            bool collision(int object,CurrencyCreate& state){
+                state.checkTarget=object;SolidCollisionResult result{};
+                const bool ok=PlayerSolidCollisionBinary64::resolve(state.xx,state.yy,state.xsp,state.ysp,
+                    [&](auto x,auto y,bool& hit){return meeting(object,x,y,hit);},result);
+                state.xCollision=result.x;state.yCollision=result.y;return ok;
+            }
+            bool viewTop(MotionBinary64& top){return view(top);}
+            bool pointDirection(MotionBinary64 ax,MotionBinary64 ay,MotionBinary64 bx,MotionBinary64 by,MotionBinary64& out){
+                return math.pointDirection(ax,ay,bx,by,out);
+            }
+            bool sound(int id,int priority,bool loop,bool cut,int& voice){
+                auto* r=owner.record(e);if(!r)return false;
+                SoundPlayEnvironment env;env.gameVolume=volume;env.inWater=inWater;
+                return SoundPlayScript::plain(r->sound,env,audio,id,priority,loop,cut,voice,owner.good_);
+            }
+            bool water(MotionBinary64 x,MotionBinary64 y,bool& hit){return owner.lifecycle_.positionMeeting(88,x,y,hit);}
+        } ops{*this,*e,math,view,audio,volume,inWater};
+        return stepWithHoming(h,random,stopped,width,playerX,playerY,
+            [&](auto& state){return CurrencyFreeMotion::run(state,playerX,playerY,random,ops,good_);},math);
     }
     bool retire(InstanceHandle h){
         auto* e=entry(h);

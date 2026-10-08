@@ -571,8 +571,27 @@ float multiply/truncate/snap wrapper independently of trig evaluation.
 normalized by the VM: an extended orbit exceeds the currently recovered
 [-585,585] degree trig domain and fails explicitly. Neither modulo reduction
 before the runner's rounded radians conversion nor a host-libm fallback is
-admitted. Exact free motion and this larger trig domain remain necessary for
-natural currency admission.
+admitted. This larger trig domain remains necessary for natural currency
+admission.
+
+`CurrencyFreeMotion` supplies ordinary Step's non-attracted branch, separately
+from Alarm 4's different gravity/bounce-gain program. It evaluates gravity
+before thin-wall (87) and wall (57) collision scripts, preserves both ordered
+friction multiplications at combined contacts, and uses the runner's truncated
+[-1,0] integer bounce range. Bounce sound follows the published view-Y test.
+Attraction checks precede water drag; acquisition changes the next Step's path,
+while the acquisition frame still integrates its current velocity. Water is
+a point query at published x/y, not a sprite-mask query at private xx/yy.
+
+The stored `stepSource` adapter joins this branch with homing, the checked
+binary64 collision solver, registered mask/point queries and source sound.
+It retains the collision target and X/Y results; the solver's internal walk
+scratch values are not exposed as caller script fields. Explicit view, volume,
+water and math inputs remain required. Scalar tests compare arithmetic and full
+RNG through thin/wall contacts, drag, attraction, gravity cap/overshoot and every
+callback failure prefix. A registered gem fixture falls onto a real box and
+checks integer bounce, audio and rounded publication. Collection, Draw, complete
+native ownership and natural reward-caller admission are separate requirements.
 
 The shared live reward wrapper now supplies the run's area to `GemMotion`.
 Its fixed-point adapter preserves the area-5 extra RNG draw after both ordinary
