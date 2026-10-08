@@ -148,6 +148,21 @@ combined pattern dispatch with ordered scalar area/common calls and full WELL
 state. Dummy child RNG in these tests exercises interleaving; it does not model
 the still-unimplemented live catacomb actor Create events.
 
+`StartupRuntime::builderPublication()` supplies `StoredBuilderPublication` for
+the post-Create half of a stored-world owner. It resolves generation-safe
+handles and routes mask/image writes through the installed lifecycle before
+changing the record. The wall's dynamic `i` field is distinct from published
+`image_index`; box engine deactivation uses `InstanceStore::requestActivation`
+and leaves membership reconciliation at its existing room-phase boundary.
+Failures latch the world's effects status, retaining earlier writes. Pillar
+comparison uses the child's published binary32 X and the runner epsilon against
+half the room width, and rejects a precise/integer position mismatch (some legacy
+authored-room paths do not initialize the precise field). Generated children
+initialize both views. This adapter does not allocate children or bypass their
+registered family Create handlers. Live collision tests check mask publication
+against source resource bounds through the real `StoredWorldCollision` owner;
+unit tests cover write/activation failures and retired-handle reuse.
+
 ## Actor integration findings
 
 The next actor is not just another entry in `EnemyCreateProfile`: that table's

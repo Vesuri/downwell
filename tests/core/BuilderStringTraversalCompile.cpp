@@ -1,5 +1,6 @@
 #include "core/CatacombBuilderDispatch.h"
 #include "core/GameMakerRandom.h"
+#include "core/StoredBuilderPublication.h"
 // Instantiate the same shared traversal and dispatcher for the freestanding
 // target; this is a compiler check, not a native gameplay integration test.
 bool compileBuilderTraversal(downwell::CatacombBuilderDispatch& dispatch,
@@ -23,3 +24,9 @@ bool compileCompleteBuilderDispatch(downwell::CatacombBuilderDispatch& dispatch,
     CompileBuilderOwner& owner,unsigned id){
     return dispatch.build(pack,id,cursor,common,1,false,4,480,4,0,random,owner);
 }
+bool compileStoredBuilderPublication(downwell::StoredBuilderPublication<2>& publication,
+    downwell::InstanceHandle key,downwell::BuilderChildField field,int value,bool& right){
+    return publication.write(key,field,value)&&publication.rightOfMiddle(key,480,right);
+}
+bool compileStoredBuilderDeactivation(downwell::StoredBuilderPublication<2>& publication,
+    downwell::InstanceHandle key){return publication.deactivate(key);}

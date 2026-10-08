@@ -1534,9 +1534,14 @@ build/skeleton-throw-test: tests/core/SkeletonThrowTest.cpp src/core/SkeletonThr
 	@mkdir -p build
 	$(CXX) $(CXXFLAGS) -ffp-contract=off -Isrc -o $@ tests/core/SkeletonThrowTest.cpp src/core/GameMakerRandom.cpp
 
-verify-catacomb-symbols: build/catacomb-symbols-test build/builder-common-dispatch-test
+verify-catacomb-symbols: build/catacomb-symbols-test build/builder-common-dispatch-test build/stored-builder-publication-test
 	./build/catacomb-symbols-test
 	./build/builder-common-dispatch-test
+	./build/stored-builder-publication-test
+
+build/stored-builder-publication-test: tests/core/StoredBuilderPublicationTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
 
 build/builder-common-dispatch-test: tests/core/BuilderCommonDispatchTest.cpp src/core/BuilderCommonDispatch.h
 	@mkdir -p build

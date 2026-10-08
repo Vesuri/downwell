@@ -3,6 +3,7 @@
 
 #include "AreaOneBuilder.h"
 #include "InstanceStore.h"
+#include "StoredBuilderPublication.h"
 #include "RunnerLayerIds.h"
 #include "ScriptEffectRuntimeBinding.h"
 #include "DeferredInstanceQueue.h"
@@ -236,6 +237,9 @@ public:
         r->destroyRequested=true;return true;
     }
     InstanceHandle instanceHandleAt(std::size_t index)const{return instances_.handleAt(index);}
+    StoredBuilderPublication<instanceCapacity> builderPublication(){
+        return {instances_,lifecycle_,run_.effectsSucceeded};
+    }
     bool publishWallImage(InstanceHandle h,int frame){
         auto* r=instances_.resolve(h);
         if(!run_.effectsSucceeded||!r||r->objectId!=60||frame<0||frame>15)

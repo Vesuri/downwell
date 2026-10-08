@@ -159,6 +159,46 @@ int main(){
     SpriteMaskPack masks(mb.data(),mb.size());
     require(rooms.valid()&&objects.valid()&&patterns.valid()&&sprites.valid()&&masks.valid(),"real collision resources validate");
     {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach builder publication world");world->skipToGameForTesting();
+        InstanceHandle wall{};
+        for(unsigned i=0;i<world->activeInstanceCount();++i)
+            if(world->instanceAt(i).objectId==60){wall=world->instanceHandleAt(i);break;}
+        const auto* record=owner->resolve(wall);require(record,"source room has a registered wall");
+        const int oldMask=record->maskId;
+        auto publication=world->builderPublication();
+        require(publication.write(wall,BuilderChildField::deactivate,1)&&record->active&&record->wall.deactivate,
+                "builder wall flag does not deactivate its collision lifetime");
+        require(publication.write(wall,BuilderChildField::maskIndex,594)&&
+                publication.write(wall,BuilderChildField::indexVariable,15)&&
+                publication.write(wall,BuilderChildField::imageIndex,15)&&
+                publication.write(wall,BuilderChildField::checked,1),"publish boundary wall through actual collision owner");
+        require(record->maskId==594&&record->wall.imageIndex==15&&record->imageIndex==15&&record->wall.checked==1,
+                "stored boundary fields retain all ordered writes");
+        Families families;require(families.bindInstanceFlags(objects),"builder query family metadata");
+        unsigned changed=0;
+        for(int y=record->y-64;y<=record->y+64;y+=8)for(int x=record->x-192;x<=record->x+192;x+=8){
+            bool expected=false,oldExpected=false;
+            for(unsigned i=0;i<world->activeInstanceCount();++i){
+                const auto& r=world->instanceAt(i);
+                if(!r.active||r.destroyRequested||!families.isA(r.objectId,60))continue;
+                auto hit=[&](int mask){
+                    PackedSpriteCollision s;
+                    require(sprites.collisionSprite(r.spriteId,mask,s),"wall has source bounds");
+                    const int px=x-r.x+s.originX,py=y-r.y+s.originY;
+                    return px>=s.marginLeft&&px<=s.marginRight&&py>=s.marginTop&&py<=s.marginBottom;
+                };
+                expected|=hit(r.maskId);oldExpected|=hit(&r==record?oldMask:r.maskId);
+            }
+            InstancePlaceResult selected;
+            require(owner->collisionPoint({},60,MotionBinary64::fromInteger(x),MotionBinary64::fromInteger(y),false,false,selected)&&
+                    (selected.id!=-4)==expected,"post-builder collision query uses new resource mask, not stale cached bounds");
+            changed+=expected!=oldExpected;
+        }
+        require(changed&&world->effectsSucceeded()&&owner->valid(),"boundary mask has observable collision changes");
+    }
+    {
         struct CompanionImages:StoredWorldCollision {
             using StoredWorldCollision::StoredWorldCollision;
             unsigned images=0;
