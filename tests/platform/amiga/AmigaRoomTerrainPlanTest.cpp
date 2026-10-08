@@ -17,6 +17,17 @@ int main(int argc,char** argv){
     check(rooms.findRoom(11,room),"main room");
     downwell::PreparedRoomTerrain source;
     check(source.prepare(rooms,room),"immutable placements");
+    check(source.count()==room.instanceCount&&source.count()==244,"complete authored room sequence");
+    for(unsigned i=0;i<source.count();++i){
+        downwell::PackedRoomInstance decoded;
+        check(rooms.roomInstance(room,i,decoded),"authored instance decodes");
+        const auto& retained=source.at(i);
+        check(retained.instanceId==decoded.instanceId&&retained.objectId==decoded.objectId&&
+            retained.x==decoded.x&&retained.y==decoded.y&&retained.creationCodeId==decoded.creationCodeId,
+            "prepared instance retains serialized order and Create metadata");
+    }
+    check(source.at(0).objectId==65&&source.at(1).objectId==35&&source.at(2).objectId==61&&
+        source.at(147).objectId==371&&source.at(147).instanceId==101097,"controller event boundaries");
     static AmigaTerrainIndex reference,candidate;
     AmigaRoomTerrainPlan plan;
     check(plan.prepare(source,candidate),"compile main room backend");
@@ -36,7 +47,8 @@ int main(int argc,char** argv){
         }
         check(plan.begin(&source),"rewind without recompilation");
         for(unsigned i=0;i<source.count();++i){
-            const auto& r=source.at(i);if(r.objectId==35)continue;
+            const auto& r=source.at(i);
+            if(r.objectId!=60&&r.objectId!=93&&r.objectId!=99)continue;
             const bool expected=amigaAddTerrainObject(reference,r.objectId,r.x,r.y,true);
             check(plan.emit(candidate,r)==expected,"publication result");
             check(!std::memcmp(reference.cells,candidate.cells,sizeof(reference.cells)),"every occupancy prefix");

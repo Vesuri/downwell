@@ -24,12 +24,12 @@ class CompilerTest(unittest.TestCase):
         count, commands = compiler.compile_room(manifest([
             (35, 240, 176), (112, 0, 0), (93, -512, 8176),
             (60, -512, 8176), (99, 1, -9), (60, -512, 8176)]))
-        self.assertEqual(count, 5)
+        self.assertEqual(count, 6)
         self.assertEqual(commands, [
-            (102, 1, 93, -512, 8176, 65408, 1, 0, 34),
-            (103, 2, 60, -512, 8176, 65408, 1, 34, 123),
-            (104, 3, 99, 1, -9, 0, 0, 0, 0),
-            (105, 4, 60, -512, 8176, 65408, 1, 123, 187)])
+            (102, 2, 93, -512, 8176, 65408, 1, 0, 34),
+            (103, 3, 60, -512, 8176, 65408, 1, 34, 123),
+            (104, 4, 99, 1, -9, 0, 0, 0, 0),
+            (105, 5, 60, -512, 8176, 65408, 1, 123, 187)])
 
     def test_overflow(self):
         with self.assertRaises(ValueError):

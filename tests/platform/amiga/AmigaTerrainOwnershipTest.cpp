@@ -282,7 +282,6 @@ int main(int argc,char** argv){
             downwell::PackedRoomInstance instance;
             require(rooms.roomInstance(room,i,instance),"room plan scalar record");
             if(instance.objectId==60)extent=std::max(extent,instance.y+32);
-            if(instance.objectId!=35&&instance.objectId!=60&&instance.objectId!=93&&instance.objectId!=99)continue;
             require(selected<prepared->count()&&std::memcmp(&instance,&prepared->at(selected),sizeof(instance))==0,
                 "room plan retains every field and serialized order");++selected;
         }

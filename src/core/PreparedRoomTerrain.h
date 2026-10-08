@@ -3,6 +3,9 @@
 #include "RoomPack.h"
 namespace downwell {
 // Resource admission only. No instances, views or random state are published.
+// Retain the complete authored creation sequence, including controllers. The
+// terrain consumer filters writes, not this plan: discarding controllers here
+// loses the event boundaries needed by source-ordered room entry.
 // The borrowed pack must remain immutable and outlive this plan. Unsupported
 // resources fall back to the generic loader and its original failure prefix.
 class PreparedRoomTerrain {
@@ -23,8 +26,6 @@ public:
                 if(instance.y>2147483647-32)return false;
                 if(instance.y+32>wallEnd_)wallEnd_=instance.y+32;
             }
-            if(instance.objectId!=35&&instance.objectId!=60&&
-               instance.objectId!=93&&instance.objectId!=99)continue;
             if(count_==capacity)return false;
             instances_[count_++]=instance;
         }

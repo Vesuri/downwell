@@ -90,6 +90,34 @@ Consequently, explicit-ID time-change tests do not establish the natural
 global ID stream. This source check also does not prove original runner room
 phase timing, initial view publication or rendered entry-mask parity.
 
+### Native room-entry boundaries
+
+`PreparedRoomTerrain` retains all 244 authored records in serialized creation
+order, not only the player and 240 walls. Backend terrain commands use indices
+into that complete sequence but emit only objects 60/93/99. Preparation does
+not execute events or publish lifetimes. `loadRoomTerrain` is still a terrain
+handoff: retaining the controller records does not execute their Create events.
+
+There are distinct existing entry inputs, which must not be conflated:
+
+- Ordinary native initial entry restores the builder's seed-2, draw-330
+  checkpoint, then executes entry-field Create (draw 331).
+- Native Retry/next-level entry resets the builder on the world's current RNG
+  and subsequently executes entry-field Create. It must not restore the initial
+  seed/checkpoint.
+- The scene parity/terrain-ownership fixtures can adopt a `StartupRuntime`
+  entry: `mainBuilderState()` and `randomState()` already include synchronous
+  room creation. Replaying builder or field Create after importing that cursor
+  would consume those effects twice. Adopting state is not a new source birth.
+
+The live native call site currently loads terrain before either of the first
+two sequences. The stored adapter instead runs builder Create (code 1002) at
+authored index 0 and field Create (2731) at index 147. A source-ordered entry
+must retain the first-level field's destruction mark until room-entry cleanup;
+cleanup inside the index-147 callback would retire it before later authored
+instances are created. Non-glitch wall Create consumes no RNG, but that does
+not make relocating field lifetime publication or cleanup equivalent.
+
 The native adapter's compatibility entry snapshot includes one camera Step.
 That update runs after successful player birth, not before its callback; the
 callback observes unadvanced camera offsets and the initial ring origin. Retry

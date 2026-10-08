@@ -20,11 +20,9 @@ def compile_room(manifest):
         if ordered["index"] != expected_index or ordered["objectId"] != r["objectId"]:
             raise ValueError("source creation order/identity mismatch")
         obj, x, y = r["objectId"], r["x"], r["y"]
-        if obj not in (35, 60, 93, 99):
-            continue
         current = slot
         slot += 1
-        if obj == 35:
+        if obj not in (60, 93, 99):
             continue
         cell = bit = before = after = 0
         if obj in (60, 93):
