@@ -343,6 +343,48 @@ int main(){
         require(bounced&&audio.sounds&&!currency.find(gem)->attracted,"registered currency bounced off real box with source audio");
         require(currency.clear(),"clear free currency owner");
     }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach currency collection world");world->skipToGameForTesting();
+        InstanceHandle player;RunnerImageValue x,y;
+        for(unsigned i=0;i<world->activeInstanceCount();++i)if(world->instanceAt(i).objectId==35){
+            player=world->instanceHandleAt(i);break;
+        }
+        require(player.generation,"registered collection player exists");
+        require(owner->collisionPosition(player,x,y),"read published collection player position");
+        auto currency=world->currencyRegistration<1>();InstanceHandle gem;
+        require(world->createRegisteredCurrency(currency,x.promoted(),y.promoted(),[](auto,int,auto,auto,bool& hit){hit=false;return true;},gem),"create colliding registered currency");
+        require(currency.dispatch(gem,[](auto& s,bool&){s.obtainable=true;return true;}),"admit currency collision fixture");
+        struct Controls {
+            using Handle=InstanceHandle;unsigned& controllers;unsigned& sounds;
+            bool achievement(int){return false;}bool timerStart(std::uint32_t& timer){timer=300;return true;}
+            bool lessResist(){return false;}bool resetControllers(){++controllers;return true;}
+            bool gemPop(){return false;}bool gemPowered(){return false;}
+            bool playerPosition(MotionBinary64&,MotionBinary64&){return false;}
+            bool effect(MotionBinary64,MotionBinary64,int,MotionBinary64,int,int){return false;}
+            bool create(int,MotionBinary64,MotionBinary64,Handle&){return false;}bool myBullet(Handle){return false;}
+            bool bulletDirection(MotionBinary64){return false;}bool bulletSprite(int){return false;}
+            bool bulletDamage(int){return false;}bool bulletSpeed(int){return false;}bool sound(int,int,bool,bool){return false;}
+            bool soundOverlap(int id,int priority,bool loop,bool cut,const char* channel){
+                require(id==167&&priority==60&&!loop&&cut&&std::strcmp(channel,"UI")==0,"source collection UI sound");++sounds;return false;
+            }
+            bool fxNoLoop(int,MotionBinary64){return false;}bool recharge(){return false;}bool destroy(){return false;}
+        };
+        unsigned controllers=0,sounds=0;auto ops=world->currencyGainOperations(Controls{controllers,sounds});
+        const auto before=world->mainCurrencyTotal();const auto draws=world->randomDrawCount();bool hit=false;
+        require(owner->placeMeeting(gem,*owner->resolve(gem),35,currency.find(gem)->x.promoted(),currency.find(gem)->y.promoted(),hit),"query currency-player overlap");
+        require(hit,"currency actually overlaps the source player mask");
+        RunnerCollisionEventContext context;
+        require(!owner->dispatchCollisionEvent(context,gem,player,{true,false},[&](const auto& frame){
+            require(frame.owner==248&&frame.self.slot==gem.slot&&frame.other.slot==player.slot,"source currency-player event lookup");
+            return world->collectRegisteredCurrency(currency,gem,ops);
+        }),"currency collision propagates source sound failure");
+        require(!world->effectsSucceeded()&&controllers==1&&sounds==1&&world->mainCurrencyTotal()==before+2&&
+            world->mainGameGemTotal()==2&&world->mainGemStreak()==2&&world->mainGemStreakTimer()==300&&world->randomDrawCount()==draws&&
+            currency.find(gem)->gemAmount==2&&!owner->resolve(gem)->destroyRequested,"collection failure retains preceding account writes and live caller");
+        require(currency.clear(),"clear failed collection caller");
+    }
     for(unsigned chainCase=0;chainCase<10;++chainCase){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());

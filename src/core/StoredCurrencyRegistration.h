@@ -11,6 +11,7 @@
 #include "CurrencyHomingSource.h"
 #include "CurrencyFreeMotion.h"
 #include "PlayerSolidCollisionBinary64.h"
+#include "CurrencyGainScript.h"
 #include <cstring>
 namespace downwell {
 // Registered object-248 Create and script setters. Borrow at a fixed address
@@ -90,6 +91,11 @@ public:
         SoundPlayEnvironment env;env.gameVolume=volume;env.inWater=inWater;int voice=-1;
         if(!SoundPlayScript::plain(r->sound,env,audio,166,30,false,true,voice,good_))return false;
         return mark(h);
+    }
+    template<class Random,class Ops> bool collect(InstanceHandle h,Random& random,Ops& ops){
+        auto* e=entry(h);if(!good_||!e||!record(*e))return fail();
+        const int amount=e->state.getAmount;
+        return dispatch(h,[&](auto& state,bool& good){return CurrencyGainScript::run(state,amount,random,ops,good);});
     }
     template<class Random,class Motion> bool step(InstanceHandle h,Random& random,bool stopped,int roomWidth,Motion& motion){
         auto* e=entry(h);if(!good_||!e||!record(*e))return fail();

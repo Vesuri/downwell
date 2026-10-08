@@ -593,6 +593,23 @@ callback failure prefix. A registered gem fixture falls onto a real box and
 checks integer bounce, audio and rounded publication. Collection, Draw, complete
 native ownership and natural reward-caller admission are separate requirements.
 
+`CurrencyGainScript` preserves the object-248 player collision's `scrGainGem`
+sequence: obtainable gate and caller `gemAmount`, currency write and achievement
+thresholds, game/streak/timer writes, original controller reset, Popping Gems or
+UI sound, pickup effect, Gem Powered recharge, and destruction last. Projectile
+Create precedes the single spread draw and its setters. Player coordinates are
+reread after the synchronous muzzle effect. All controller/effect/projectile
+operations remain mandatory callbacks; script success is not a substitute for
+their live implementations.
+`CurrencyGainAccountOperations` exposes the separate writes on either world's
+real account, rejecting values outside its nonnegative uint32 storage domain.
+The stored registry's collection entry retains caller state and source RNG.
+A resource-backed gem/player event fixture deliberately fails at UI sound and
+checks that preceding account updates survive without destroying the caller.
+Controller resets and audio/effects in that fixture are instrumented, not full
+backend implementations. Matrix tests cover both achievement thresholds,
+upgrade branches, unobtainable suppression and ordered failure prefixes.
+
 The shared live reward wrapper now supplies the run's area to `GemMotion`.
 Its fixed-point adapter preserves the area-5 extra RNG draw after both ordinary
 velocity draws, and areas 3/4 use gravity 112/12800 and cap 6400/12800. As in

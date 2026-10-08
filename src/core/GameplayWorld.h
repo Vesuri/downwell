@@ -16,6 +16,7 @@
 #include "core/LaserSightRay.h"
 #include "core/MachineGunEmitter.h"
 #include "core/CurrencyAccount.h"
+#include "core/CurrencyGainAccountOperations.h"
 #include "core/MainCameraMotion.h"
 #include "core/PlayerDeathSequence.h"
 #include "core/RunSession.h"
@@ -977,6 +978,9 @@ public:
         return nullptr;
     }
     unsigned currency() const { return currencyAccount_.currency; }
+    template<class Controls> auto currencyGainOperations(Controls controls){
+        return downwell::CurrencyGainAccountOperations<Controls>(currencyAccount_,controls);
+    }
     unsigned gameGemTotal() const { return currencyAccount_.gameGem; }
     unsigned gemStreak() const { return currencyAccount_.streak; }
     unsigned gemStreakTimer() const { return currencyAccount_.timer; }

@@ -16,6 +16,7 @@
 #include "LaserSightRay.h"
 #include "MachineGunEmitter.h"
 #include "CurrencyAccount.h"
+#include "CurrencyGainAccountOperations.h"
 #include "MainCameraMotion.h"
 #include "PlayerDeathSequence.h"
 #include "RunSession.h"
@@ -688,6 +689,11 @@ public:
         if(!registry.belongsTo(instances_))return run_.effectsSucceeded=false;
         return registry.create(x,y,run_.stage.area,run_.upgrades.levels[10]!=0,random_,tile,output);
     }
+    template<unsigned Capacity,class Ops> bool collectRegisteredCurrency(
+        StoredCurrencyRegistration<instanceCapacity,Capacity>& registry,InstanceHandle gem,Ops& ops){
+        if(!registry.belongsTo(instances_))return run_.effectsSucceeded=false;
+        return registry.collect(gem,random_,ops);
+    }
     template<unsigned Capacity,class Collision> auto boxChainPublication(
         StoredDroneBulletRegistration<instanceCapacity,Capacity>& bullets,Collision& collision,InstanceHandle box){
         return StoredBoxChainPublication<instanceCapacity,Capacity,Collision>(instances_,bullets,collision,box,run_.effectsSucceeded);
@@ -1269,6 +1275,9 @@ public:
         return mainCurrencyItems_[index];
     }
     std::uint32_t mainCurrencyTotal() const { return currencyAccount_.currency; }
+    template<class Controls> auto currencyGainOperations(Controls controls){
+        return CurrencyGainAccountOperations<Controls>(currencyAccount_,controls);
+    }
     std::uint32_t mainGameGemTotal() const { return currencyAccount_.gameGem; }
     std::uint32_t mainGemStreak() const { return currencyAccount_.streak; }
     std::uint32_t mainGemStreakTimer() const { return currencyAccount_.timer; }

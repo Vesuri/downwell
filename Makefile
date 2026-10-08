@@ -255,7 +255,8 @@ test: verify-dead-body-creation
 test: verify-corpse-birth
 test: verify-currency-create
 .PHONY: verify-currency-create
-verify-currency-create: build/currency-create-test build/currency-spawn-script-test build/currency-homing-test build/currency-free-motion-test
+verify-currency-create: build/currency-create-test build/currency-spawn-script-test build/currency-homing-test build/currency-free-motion-test build/currency-gain-test
+	./build/currency-gain-test
 	./build/currency-free-motion-test
 	python3 tools/verify-runner-integer-range.py
 	./build/currency-homing-test
@@ -264,6 +265,10 @@ verify-currency-create: build/currency-create-test build/currency-spawn-script-t
 	python3 tools/verify-runner-alarms.py
 	./build/currency-create-test
 	./build/currency-spawn-script-test
+
+build/currency-gain-test: tests/core/CurrencyGainTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
 
 build/currency-free-motion-test: tests/core/CurrencyFreeMotionTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
 	@mkdir -p build
