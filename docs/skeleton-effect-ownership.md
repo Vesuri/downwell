@@ -678,6 +678,12 @@ scale and angle. Animation End excludes the marked record before retirement.
 The existing Amiga sprite-84 bank serves unrotated smoke; it is not sufficient
 for moving blood's two random angle ranges. Native blood Draw admission still
 requires offline rotated variants and verified raster selection.
+`tests/blood-angle-art-test.py` rejects treating those ranges as unrotated and
+half-turn artwork, and rejects rounding fractional anchors before sampling.
+It uses the same nearest-pixel model as the projectile artwork probes, not a
+Windows GPU oracle. The original CPU vertex path preserves fractional positions;
+the remaining whole-pipeline raster uncertainty is described in
+[projectile motion](projectile-motion.md#original-cpu-vertex-path-and-fractional-anchors).
 
 - Blood emits at published x/y, not the precise xx/yy accumulators. Its two
   angles are `random(20)` and `180-random(20)`, respectively. Object 220's Create

@@ -1347,6 +1347,7 @@ build/blood-owner-test: tests/core/BloodEffectsTest.cpp $(wildcard src/core/*.h)
 .PHONY: verify-blood-effect
 verify-blood-effect: build/blood-effect-test
 	python3 tools/verify-blood-events.py
+	python3 tests/blood-angle-art-test.py
 	./build/blood-effect-test
 
 build/blood-effect-test: tests/core/BloodEffectTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc
