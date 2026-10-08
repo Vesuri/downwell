@@ -578,6 +578,18 @@ surface, independently of the earlier actor commands. Hardware counts include
 partial frames; the separate partial count identifies those that also retain
 a raster prefix. Raster-only frames exclude that partial count.
 
+Currency admission inspects the source-topmost end first. The first shaded
+gem or exhausted sprite channel ends that suffix; it and all older painter
+content remain in the shade-aware raster. The suffix is published in original
+Draw order above that raster and the ordinary actors. Intersection tests read
+the existing packed alpha masks in clipped word slices, without an overlap
+asset bank or a temporary mask. `REFERENCE_SHADE_PARTITION=1` on the Amiga
+retains the earlier whole-surface shade rejection and pixel-scanning admission.
+The host target tests both selectors, checks packed intersections against
+scalar pixels (including row padding and viewport edges), and requires natural
+shaded frames with a promoted suffix. Compare native `frames` captures with
+this selector as well: host composition alone does not prove sprite DMA.
+
 For a natural channel-overflow and shade-subtraction workload, run
 `./build/amiga-currency-promotion-test --overflow --census`. This uses ordinary
 startup seed 8 and encounter input route 4, not injected currency or changed
@@ -598,10 +610,12 @@ for its native 1,800-update window. The wrapper first runs both host renderer
 tapes and verifies the seed-8 entry checkpoint (including all RNG words), then
 restores the ordinary executable on exit. `PROFILE_OVERFLOW=1` also selects
 this tape for `trace` and `frames`; do not combine it with another tape flag.
-For example, capture shade subtraction and nine-channel overflow separately:
+For example, capture all-raster shade subtraction (1303–1312), a shaded
+prefix with an unshaded sprite suffix (1379–1388), and nine-channel overflow
+(1397–1403) separately:
 
 ```sh
-SKIP_TO_GAME=1 PROFILE_OVERFLOW=1 TRACE_FRAMES=1302,1396 TRACE_FIELDS=60 \
+SKIP_TO_GAME=1 PROFILE_OVERFLOW=1 TRACE_FRAMES=1302,1378,1396 TRACE_FIELDS=60 \
   TRACE_OUTPUT="$PWD/tmp/trace/overflow" VERIFY_TIMEOUT_SECONDS=600 \
   bash amiga/profile.sh trace
 ```

@@ -78,7 +78,7 @@ int main(int argc,char** argv){
     AmigaGameplayDrawList list;downwell::CurrencySmokeComposition oracle,remainder;
     downwell::PaletteEffectSurface<> projected;unsigned promoted=0;
     unsigned empty=0,raster=0,mixed=0,overflow=0,covered=0,shaded=0,maxSmoke=0,maxDebris=0;
-    unsigned partial=0;
+    unsigned partial=0,shadePartial=0;
     if(census)std::puts("frame,visible_gems,smoke,debris,entry,promoted,parts,shade_pixels_changed,dead");
     for(unsigned tick=1;tick<=1800;++tick){
         auto input=downwell::gameplayContactProfileInput(game.tick(),240+game.player().offsetX(),
@@ -163,6 +163,7 @@ int main(int argc,char** argv){
         }
         ++promoted;
         if(list.currencyRasterRequired)++partial;
+        if(shadeChanged)++shadePartial;
         compose(remainder,list.currencyRasterFirst);
         unsigned channels=0;
         for(unsigned i=firstCurrency;i<list.count;++i){const auto& bob=list.actors[i];
@@ -209,6 +210,9 @@ int main(int argc,char** argv){
         require(overflow>0,"natural seed-8 route-4 tape exercises sprite-channel overflow");
         require(shaded>0,"natural tape exercises actual shade subtraction");
         require(partial>0,"natural tape exercises partial hardware promotion");
+#ifndef DOWNWELL_REFERENCE_SHADE_PARTITION
+        require(shadePartial>0,"natural tape promotes an unshaded suffix above shaded raster currency");
+#endif
     }
     else require(promoted>50,"contact tape exercises promotion");
     std::printf("Currency promotion: %u exact frames in 1800-frame source-backed replay\n",promoted);
@@ -216,4 +220,5 @@ int main(int argc,char** argv){
     std::printf("Effect coverage: hardware=%u empty=%u raster=%u; fallback mixed=%u overflow=%u entry=%u shade=%u; max live smoke=%u debris=%u\n",
         promoted,empty,raster,mixed,overflow,covered,shaded,maxSmoke,maxDebris);
     std::printf("Partial hardware/raster frames: %u\n",partial);
+    std::printf("Shade-subtracted frames with a hardware suffix: %u\n",shadePartial);
 }

@@ -5,6 +5,7 @@
 #include "core/DamageNumberText.h"
 #include "core/RunnerSpatialSplit.h"
 #include "core/DebrisDraw.h"
+#include "core/PackedMaskIntersection.h"
 #if defined(DOWNWELL_BOB_VERIFY) || defined(DOWNWELL_DRAW_ORDER_AUDIT)
 #include "core/ActorDrawOrderVerification.h"
 extern "C" { volatile unsigned gDownwellActorOrderChecks,gDownwellActorOrderFailures; }
@@ -76,10 +77,19 @@ bool AmigaGameplayDrawList::promoteCurrency(const GameplayWorld& world,int viewX
     const Placement::PixelView view{viewX,viewY,160,284};
     GameplayBob pending[8];unsigned slots[8];
     unsigned used=0,channels=0,first=0;bool dropped=false;
-    // Keep the original back-to-front admission order: early shade rejection
-    // must not become a scan of every frontmost gem's mask. Only channel
-    // exhaustion partitions the surface; a shade still retains it as a whole.
-    for(unsigned i=world.gemSlotEnd();i;--i){
+#ifdef DOWNWELL_REFERENCE_SHADE_PARTITION
+    constexpr bool topmostFirst=false;
+#else
+    constexpr bool topmostFirst=true;
+#endif
+    // Keep a source-topmost suffix. Shade subtraction is after all currency
+    // painting, so every shaded gem and all candidates behind it remain in
+    // the raster. Inspect the topmost end first and stop at its first shaded
+    // gem: no query of the retained prefix is needed. Reverse the admitted
+    // suffix on publication to restore source painter order.
+    const unsigned end=world.gemSlotEnd();
+    for(unsigned cursor=0;cursor<end;++cursor){
+        const unsigned i=topmostFirst?cursor+1:end-cursor;
         const auto& gem=world.gemAt(i-1);
         if(!gem.active||!gem.motion.lifetime.visible())continue;
         const int x=240+gem.x,y=176+gem.y;
@@ -89,6 +99,7 @@ bool AmigaGameplayDrawList::promoteCurrency(const GameplayWorld& world,int viewX
         const auto* art=assets.currency(gem.large,frame);
         const auto* prepared=frames.find(sprite,frame);
         if(!art||!prepared||!prepared->partCount[0]||prepared->partCount[0]>8)return false;
+        bool invalidShade=false;
         const auto shadeFree=[&](){
             if(world.shops().noControl)return true;
             const int gx=x-viewX-art->originX,gy=y-viewY-art->originY;
@@ -96,7 +107,9 @@ bool AmigaGameplayDrawList::promoteCurrency(const GameplayWorld& world,int viewX
                 const auto& enemy=world.enemyAt(n);
                 if(!enemy.active||!enemy.awake)continue;
                 const int ex=240+enemy.x,ey=176+enemy.y;
-                if(!Placement::smallPixel(ex)||!Placement::smallPixel(ey))return false;
+                if(!Placement::smallPixel(ex)||!Placement::smallPixel(ey)){
+                    invalidShade=true;return false;
+                }
                 if(!Placement::pixelInView(ex,ey,view))continue;
                 const auto& shade=*assets.shade();
                 const int sx=Placement::snapShadePixel(ex)-viewX-shade.originX;
@@ -107,15 +120,32 @@ bool AmigaGameplayDrawList::promoteCurrency(const GameplayWorld& world,int viewX
                 if(bottom>sy+int(shade.mask.height))bottom=sy+int(shade.mask.height);
                 if(left<0)left=0;if(top<0)top=0;
                 if(right>160)right=160;if(bottom>284)bottom=284;
+#ifndef DOWNWELL_REFERENCE_SHADE_PARTITION
+                if(downwell::PackedMaskIntersection::intersects(art->mask,gx,gy,shade.mask,sx,sy,
+                    left,top,right,bottom))return false;
+#else
                 for(int py=top;py<bottom;++py)for(int px=left;px<right;++px){
                     const unsigned a=px-gx,b=px-sx;
                     if((art->mask.data[(py-gy)*art->mask.stride+a/8]&(128u>>(a&7)))&&
                         (shade.mask.data[(py-sy)*shade.mask.stride+b/8]&(128u>>(b&7))))return false;
                 }
+#endif
             }
             return true;
         };
-        if(!shadeFree())return false;
+        if(!shadeFree()){
+#ifdef DOWNWELL_REFERENCE_SHADE_PARTITION
+            return false;
+#else
+            if(invalidShade)return false;
+            // The ordinary compositor receives this entire prefix and
+            // applies every shade before sprite publication.
+            dropped=true;break;
+#endif
+        }
+        if(topmostFirst&&(used==capacity-count||prepared->partCount[0]>8-channels)){
+            dropped=true;break;
+        }
         // Retire bottommost candidates, never a hole within the selected
         // painter suffix. Multipart assets consume their actual channel count.
         while(used&&(used==capacity-count||prepared->partCount[0]>8-channels)){
@@ -128,11 +158,12 @@ bool AmigaGameplayDrawList::promoteCurrency(const GameplayWorld& world,int viewX
         channels+=prepared->partCount[0];
     }
     if(!used)return false;
-    currencyRasterFirst=dropped?slots[first]+1:world.gemSlotEnd();
+    currencyRasterFirst=dropped?slots[topmostFirst?used-1:first]+1:end;
     currencyRasterRequired=dropped;currencySpriteCount=used;
     // Keep source Draw order; assignment visits backwards, giving the topmost
     // producer the highest sprite priority above the retained controller.
-    for(unsigned n=0;n<used;++n)actors[count++]=pending[(first+n)%8];
+    for(unsigned n=0;n<used;++n)
+        actors[count++]=pending[topmostFirst?used-1-n:(first+n)%8];
     return true;
 }
 

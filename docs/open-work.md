@@ -333,7 +333,8 @@ attempt. Use the effect-coverage census described in the profiling procedure
 to establish that the chosen window actually exercises each proposed path;
 producer-phase timings alone do not prove smoke/debris or raster coverage.
 Use the seed-8 route-4 tape for shade subtraction and channel overflow. Preserve
-the topmost hardware suffix and controller/ordinary-actor boundary when changing
+the topmost unshaded hardware suffix, shaded raster prefix, and
+controller/ordinary-actor boundary when changing
 the retained raster. Its remaining nine-gem-window composition costs 3.22 ms;
 do not tune sub-millisecond stamp helpers. Mixed producers and entry cover still
 need their own native workload and pixel evidence.
