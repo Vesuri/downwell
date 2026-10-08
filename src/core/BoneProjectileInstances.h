@@ -14,6 +14,9 @@ public:
         int spriteId=460;
         RunnerImageValue x{},y{};
         BoneProjectile state;
+        // ScriptSpawnEffects lifetime, never a VM numeric ID. The stored
+        // bridge additionally retains the actual child's source ID.
+        unsigned myFxLocal=0,myFxSourceId=0;
         bool active=true,destroyRequested=false; // Engine flags, not state.active.
     };
     using Binding=RecordLifecycleBinding<Record>;
@@ -50,6 +53,11 @@ public:
         if(r->destroyRequested)return true;
         if(!binding_.markDestroyed(key,*r))return fail();
         r->destroyRequested=true;r->state.destroyRequested=true;return true;
+    }
+    bool assignEffect(InstanceHandle key,unsigned effectLocal,unsigned sourceId=0){
+        auto* r=resolve(key);
+        if(!r||!effectLocal||sourceId>0x7fffffffu)return fail();
+        r->myFxLocal=effectLocal;r->myFxSourceId=sourceId;return true;
     }
     bool activate(InstanceHandle key,bool active){
         auto* r=resolve(key);

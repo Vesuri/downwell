@@ -374,13 +374,14 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
             const auto& effect=*record->effect;
             failedSprite=effect.spriteId;failedFrame=effect.drawFrame();
             std::int32_t x,y;downwell::RunnerImageValue ix,iy;
-            // The wall impact uses eight unrotated frames. The offline muzzle
+            // Wall/bone impacts use eight/six unrotated frames. The offline muzzle
             // proof covers integer anchors and either no rotation or 267..273
             // degrees. Reject other transforms explicitly;
             // no runtime conversion or silently rounded fractional artwork.
             const bool wallImpact=effect.spriteId==101;
-            if(!effect.valid||(!wallImpact&&effect.spriteId!=602&&effect.spriteId!=603)||
-               effect.drawFrame()>=(wallImpact?8u:1u)||
+            const bool boneImpact=effect.spriteId==85;
+            if(!effect.valid||(!wallImpact&&!boneImpact&&effect.spriteId!=602&&effect.spriteId!=603)||
+               effect.drawFrame()>=(wallImpact?8u:boneImpact?6u:1u)||
                !effect.x.promoted().roundPixel(x)||!effect.y.promoted().roundPixel(y)||
                !ix.assign(downwell::MotionBinary64::fromInteger(x))||
                !iy.assign(downwell::MotionBinary64::fromInteger(y))||
@@ -388,7 +389,7 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
                ((iy.bits!=effect.y.bits)&&((iy.bits|effect.y.bits)&0x7fffffffu)))return false;
             unsigned frame=effect.drawFrame();
             if(effect.angle.bits&0x7fffffffu){
-                if(wallImpact)return false;
+                if(wallImpact||boneImpact)return false;
                 downwell::RunnerImageValue lo,hi;
                 lo.assign(downwell::MotionBinary64::fromInteger(267));
                 hi.assign(downwell::MotionBinary64::fromInteger(273));

@@ -54,6 +54,9 @@ public:
     bool advanceAnimation(InstanceHandle key){return good_&&((store_.advanceAnimation(key)&&sync(key))||fail());}
     bool activate(InstanceHandle key,bool active){return good_&&(store_.activate(key,active)||fail());}
     bool mark(InstanceHandle key){return good_&&(store_.markDestroyed(key)||fail());}
+    bool assignEffect(InstanceHandle key,unsigned effectLocal,unsigned sourceId){
+        return good_&&(store_.assignEffect(key,effectLocal,sourceId)||fail());
+    }
     bool retire(InstanceHandle key){return good_&&(store_.retire(key)||fail());}
     bool clear(){return store_.clear()||fail();}
 

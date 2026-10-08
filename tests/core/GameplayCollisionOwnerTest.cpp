@@ -2822,20 +2822,33 @@ int main(){
             if(ownership==GameplayCollisionOwner::Ownership::reference)
                 assert(owner->properties(shared)->sprite.imageIndex.bits==reference.imageIndex.bits);
         }
-        // Death body runs with registered setters, while this controlled
-        // ownership fixture supplies the effect/view callbacks explicitly.
-        unsigned effects=0;
+        // Death body uses the real registered impact owner; the controlled
+        // fixture still supplies the view decision explicitly.
+        unsigned effects=0,effectLocal=0;
+        auto emit=[&](){
+            const auto before=world->randomDrawCount();
+            assert(world->spawnBoneImpact(local,[&](int sprite,unsigned& frames){return sprites.frameCount(sprite,frames);})&&
+                world->randomDrawCount()==before);
+            const auto* caller=bones.find(local);assert(caller&&caller->myFxLocal&&!caller->myFxSourceId);
+            effectLocal=caller->myFxLocal;
+            const auto* effect=world->scriptEffects().get(effectLocal);
+            const auto child=world->scriptSpawnInstances()->handle(effectLocal);
+            assert(effect&&child.generation&&world->scriptSpawnInstances()->find(child)&&effect->spriteId==85&&
+                effect->frames==6&&effect->imageSpeed.bits==0x3e99999au&&!effect->angle.bits&&!effect->depth.bits&&
+                effect->x.bits==caller->x.bits&&effect->y.bits==caller->y.bits);
+            return true;
+        };
         assert(bones.dispatch(local,[&](auto& state,auto& publish,bool& good){
             state.health=0;
             struct Ops {
-                decltype(publish) publisher;unsigned& effects;
+                decltype(publish) publisher;unsigned& effects;decltype(emit)& spawn;
                 bool imageSpeed(RunnerImageValue v){return publisher.imageSpeed(v);}
                 bool position(RunnerImageValue x,RunnerImageValue y){return publisher.position(x,y);}
                 bool mask(int id){return publisher.mask(id);}
                 bool destroy(){return publisher.destroy();}
-                bool effect(int id,int speed){assert(id==85&&speed==3);++effects;return true;}
+                bool effect(int id,int speed){assert(id==85&&speed==3);++effects;return spawn();}
                 bool inView(int,int,bool& visible){visible=true;return true;}
-            } ops{publish,effects};
+            } ops{publish,effects,emit};
             return state.stepPublished(false,ops,good);
         }));
         assert(effects==1&&bones.find(local)->destroyRequested&&bones.find(local)->active&&
@@ -2843,12 +2856,24 @@ int main(){
         if(ownership==GameplayCollisionOwner::Ownership::reference)
             assert(owner->properties(shared)->sprite.maskId==582&&owner->state(shared)->x.bits==bones.find(local)->x.bits);
         assert(owner->prepareDraw()&&!bones.find(local)&&!GameplayCollisionView(*world).contains(shared));
+        assert(effectLocal&&world->scriptEffects().get(effectLocal));
         InstanceHandle retained;
         assert(world->createBoneWithSourceId(405191,240,990,retained));
         assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)!=ResultsDestination::none);
         assert(world->bones()==&bones&&!bones.find(retained)&&bones.size()==0&&owner->valid());
         InstanceHandle replacement;assert(world->createBoneWithSourceId(405192,240,990,replacement)&&
-            replacement.generation>retained.generation&&!bones.find(local)&&bones.clear());
+            replacement.generation>retained.generation&&!bones.find(local));
+        assert(bones.markDestroyed(replacement));
+        const auto beforeFailureRng=world->randomDrawCount();unsigned lookups=0;
+        auto rejectSprite=[&](int sprite,unsigned&){
+            ++lookups;const auto* caller=bones.find(replacement);
+            assert(sprite==85&&caller&&caller->myFxLocal&&!caller->myFxSourceId&&
+                world->scriptSpawnInstances()->find(world->scriptSpawnInstances()->handle(caller->myFxLocal)));
+            return false;
+        };
+        assert(!world->spawnBoneImpact(replacement,rejectSprite)&&!world->effectsSucceeded()&&
+            world->randomDrawCount()==beforeFailureRng&&world->scriptEffects().size()==1);
+        assert(!world->spawnBoneImpact(replacement,rejectSprite)&&lookups==1&&world->scriptEffects().size()==1);
     }
     {
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);

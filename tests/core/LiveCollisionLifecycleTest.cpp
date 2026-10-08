@@ -216,18 +216,31 @@ int main(){
             "bone Create retains exact shared RNG state");
         require(bones.dispatch(local,[](auto& state,auto&,bool&){return state.motion.launch(240,990,10,-30);})&&
             expected.motion.launch(240,990,10,-30),"throw override follows registered Create");
-        unsigned effects=0,steps=0;bool kill=false;
+        unsigned effects=0,steps=0,effectId=0,effectLocal=0;bool kill=false;
+        auto emit=[&](){
+            const auto before=world->randomDrawCount();
+            const bool ok=world->spawnBoneImpact(bones,local,[&](int id,unsigned& frames){return sprites.frameCount(id,frames);});
+            const auto* caller=bones.instances().find(local);
+            require(ok&&caller&&world->randomDrawCount()==before,"bone impact creates real child without RNG");
+            effectId=caller->myFxSourceId;effectLocal=caller->myFxLocal;
+            const auto* child=world->instance(effectId);const auto* effect=world->scriptEffects().get(effectLocal);
+            require(child&&child->objectId==219&&effect&&effect->spriteId==85&&effect->frames==6&&
+                effect->imageSpeed.bits==0x3e99999au&&!effect->angle.bits&&!effect->depth.bits&&
+                effect->x.bits==caller->x.bits&&effect->y.bits==caller->y.bits,
+                "bone myFx references registered impact at published position with source defaults");
+            return true;
+        };
         auto execute=[&](auto& state,auto& publisher,auto&,bool& good){
             ++steps;if(kill)state.health=0;
             struct Ops {
-                decltype(publisher) publish;unsigned& effects;
+                decltype(publisher) publish;unsigned& effects;decltype(emit)& spawn;
                 bool imageSpeed(RunnerImageValue v){return publish.imageSpeed(v);}
                 bool position(RunnerImageValue x,RunnerImageValue y){return publish.position(x,y);}
                 bool mask(int id){return publish.mask(id);}
                 bool destroy(){return publish.destroy();}
-                bool effect(int id,int speed){require(id==85&&speed==3,"bone death requests source effect");++effects;return true;}
+                bool effect(int id,int speed){require(id==85&&speed==3,"bone death requests source effect");++effects;return spawn();}
                 bool inView(int,int,bool& visible){visible=true;return true;}
-            } ops{publisher,effects};
+            } ops{publisher,effects,emit};
             return state.stepPublished(false,ops,good);
         };
         owner->reject=rejectedMove;
@@ -274,6 +287,8 @@ int main(){
                 "bone health death publishes mask and effect before pre-Draw cleanup");
             require(!bones.instances().find(local)&&!world->instance(sourceId)&&!owner->resolve(key)&&bones.valid(),
                 "bone cleanup retires typed state, numeric ID, collision and layer ownership together");
+            require(effectId&&effectLocal&&world->instance(effectId)&&world->scriptEffects().get(effectLocal),
+                "impact outlives its destroyed bone caller");
             const auto replacementId=world->nextRuntimeInstanceId();InstanceHandle replacement;
             require(world->spawnBone(bones,240,990,replacement)&&replacement.generation!=local.generation&&
                 bones.instances().find(replacement)->sourceId==replacementId&&!bones.instances().find(local),
@@ -286,6 +301,25 @@ int main(){
                 "bone capacity failure cannot consume a source ID or Create RNG");
             require(bones.clear(),"explicit bone teardown before world teardown");
         }
+    }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach bone impact failure world");world->skipToGameForTesting();
+        auto bones=world->boneRegistration<1>();InstanceHandle bone;
+        require(world->spawnBone(bones,240,990,bone)&&bones.mark(bone),"retain destroyed bone before impact");
+        const auto childId=world->nextRuntimeInstanceId();const auto draws=world->randomDrawCount();unsigned lookups=0;
+        auto rejectSprite=[&](int sprite,unsigned&){
+            ++lookups;const auto* caller=bones.instances().find(bone);
+            require(sprite==85&&caller&&caller->myFxSourceId==childId&&caller->myFxLocal&&world->instance(childId),
+                "source myFx assignment precedes failed sprite lookup");return false;
+        };
+        require(!world->spawnBoneImpact(bones,bone,rejectSprite)&&!world->effectsSucceeded()&&
+            world->nextRuntimeInstanceId()==childId+1&&world->randomDrawCount()==draws&&
+            world->instance(childId)&&world->instance(childId)->spriteId==-1,
+            "failed bone impact keeps created child and caller but no later setters");
+        require(!world->spawnBoneImpact(bones,bone,rejectSprite)&&lookups==1&&world->nextRuntimeInstanceId()==childId+1,
+            "failed bone impact does not retry creation");
     }
     for(unsigned reject=1;reject<=3;++reject){
         struct CameraWrites:StoredWorldCollision {

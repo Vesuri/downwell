@@ -36,6 +36,14 @@ for instruction in ordered:
 assert wall.index("instance_destroy") < wall.index("scrFxNol")
 assert player.index("scrTypicalDamage") < player.index("scrFxNol") < player.index("instance_destroy")
 obj = manifest["resources"]["objects"][269]
+fx = (export / "Assembly/gml_GlobalScript_scrFxNol.asm").read_bytes()
+assert sha256(fx).hexdigest() == "fe76a7898f52d717dc47f864c924facf2cea92a5d87e26b3bfd9ba27ce0c2d6c"
+assert fx.index(b"instance_create") < fx.index(b"pop.v.v self.myFx") < fx.index(b"self.sprite_index") < fx.index(b"self.image_speed")
+assert b"self.image_angle" not in fx and b"self.depth" not in fx
+assert len(manifest["resources"]["sprites"][85]["frames"]) == 6
+effect = manifest["resources"]["objects"][219]
+assert effect["parentId"] == -1 and effect["spriteId"] == -1
+assert not any(e["eventType"] in (0,8) for e in effect["events"])
 assert obj["name"] == "bulletEnmBone" and obj["spriteId"] == 460
 assert obj["parentId"] == 90 and obj["textureMaskId"] == -1
 assert len(manifest["resources"]["sprites"][460]["frames"]) == 4

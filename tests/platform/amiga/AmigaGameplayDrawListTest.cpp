@@ -202,6 +202,21 @@ int main() {
         }
         assert(owner->prepareDraw()&&list.collect(*scene,pack,pack+8,160,34));
         for(unsigned i=0;i<list.count;++i)assert(list.actors[i].sprite!=101);
+        downwell::InstanceHandle bone;
+        assert(scene->createBoneWithSourceId(405190,248,128,bone)&&owner->bones().markDestroyed(bone)&&
+            scene->spawnBoneImpact(bone,frames)&&owner->prepareDraw());
+        const auto impactLocal=scene->scriptEffects().birthSequence().next-1;
+        unsigned frameMask=0,ticks=0;
+        while(const auto* effect=scene->scriptEffects().get(impactLocal)){
+            assert(ticks++<24&&list.collect(*scene,pack,pack+8,160,34));unsigned seen=0;
+            for(unsigned i=0;i<list.count;++i)if(list.actors[i].sprite==85){
+                assert(list.actors[i].frame==effect->drawFrame()&&list.actors[i].x==198&&list.actors[i].y==94);
+                frameMask|=1u<<list.actors[i].frame;++seen;
+            }
+            assert(seen==1);scene->step(0);assert(scene->effectsSucceeded()&&owner->prepareDraw());
+        }
+        assert(frameMask==63&&list.collect(*scene,pack,pack+8,160,34));
+        for(unsigned i=0;i<list.count;++i)assert(list.actors[i].sprite!=85);
         downwell::DebrisEffects<2> debris;downwell::InstanceHandle first,last;
         assert(scene->spawnDebris(debris,n(240),n(120),1,first)&&
             scene->spawnDebris(debris,n(244),n(124),4,last));

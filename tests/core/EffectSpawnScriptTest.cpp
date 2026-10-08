@@ -30,6 +30,24 @@ struct Effects {
     bool depth(Handle h,MotionBinary64 v){assert(h==123&&same(v,{}));return next(6);}
 };
 int main(){
+    for(unsigned fail=0;fail<=4;++fail){
+        struct Nol {
+            using Handle=unsigned;
+            unsigned calls=0,fail=0,caller=0;
+            bool next(){return ++calls!=fail;}
+            bool create(int id,MotionBinary64 x,MotionBinary64 y,Handle& h){
+                assert(id==219&&same(x,MotionBinary64::fromInteger(241))&&same(y,MotionBinary64::fromInteger(987)));
+                h=7;return next();
+            }
+            bool myFx(Handle h){assert(h==7);if(!next())return false;caller=h;return true;}
+            bool sprite(Handle h,int id){assert(h==caller&&id==85);return next();}
+            bool imageSpeed(Handle h,MotionBinary64 value){assert(h==caller&&same(value,{0x3fd33333u,0x33333333u}));return next();}
+            // No angle/depth methods: scrFxNol must not require those writes.
+        } ops{0,fail,0};
+        assert(EffectSpawnScript::runNol(ops,MotionBinary64::fromInteger(241),MotionBinary64::fromInteger(987),
+            85,{0x3fd33333u,0x33333333u})==!fail);
+        assert(ops.calls==(fail?fail:4)&&ops.caller==(!fail||fail>2?7u:0u));
+    }
     for(bool high:{false,true})for(unsigned fail=0;fail<=7;++fail){
         MachineGunSourceMotion shot;Sample sample;
         assert(shot.reset({0x406e1000u,0},{0x40bfff40u,0})); // fractional absolute room coordinates

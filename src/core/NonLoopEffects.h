@@ -23,12 +23,13 @@ public:
         return effect.valid&&!effect.destroyRequested?&effect:nullptr;
     }
     Phase beginPhase()const{return {next_?next_-1:0xffffffffu};}
-    Effect* get(Handle h){
-        if(good_&&h)for(unsigned i=0;i<count_;++i){auto& slot=slots_[order_[i]];
+    const Effect* get(Handle h)const{
+        if(good_&&h)for(unsigned i=0;i<count_;++i){const auto& slot=slots_[order_[i]];
             if(slot.handle==h&&slot.effect.valid&&!slot.effect.destroyRequested)return &slot.effect;
         }
         return nullptr;
     }
+    Effect* get(Handle h){return const_cast<Effect*>(static_cast<const NonLoopEffects*>(this)->get(h));}
     template<class Hooks> Handle create(MotionBinary64 x,MotionBinary64 y,Hooks& hooks){
         if(!good_)return 0;
         if(!next_||count_==Capacity){good_=false;return 0;}

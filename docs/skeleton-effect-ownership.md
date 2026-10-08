@@ -64,6 +64,23 @@ numeric ID: it does not fill the missing native global allocator. Automatic
 throwing, ordinary Step/collision dispatch, view/time-stop/effect adapters,
 rendering and replay serialization remain required for natural encounters.
 
+Bone impact adapters use the source `scrFxNol` subset: synchronously create
+object 219 at the bone's currently published coordinates, assign the caller's
+`myFx`, set sprite 85, then set image speed to binary64 0.3 narrowed by the
+builtin setter. They do not call the longer script's angle or depth setters.
+Object 219 has no Create callback/RNG. Its child is independently owned and
+survives bone retirement. The stored caller retains the true numeric child ID
+and effect lifetime; the native caller retains only the typed effect lifetime,
+not a fabricated source ID. Failure after birth keeps the child/reference and
+stops later setters and retries. Both adapters use their existing owned script
+effect bank and room animation/cleanup binding.
+
+The native draw collector accepts the six unrotated sprite-85 frames at the
+integer positions written by bone Step. Planar/cropped variants are exported
+offline with source/tool provenance, using the existing asset path; no runtime
+conversion is added. This is impact-effect admission, not bone-body rendering
+or a claim that natural skeleton collisions now run.
+
 ## Death is not just removal plus a gem reward
 
 `global.killCount` belongs to the run, not the room. The VM assigns zero in

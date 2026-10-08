@@ -644,6 +644,22 @@ public:
                 caller->boxMyFx=child;return true;
             });
     }
+    template<unsigned Capacity,class Frames> bool spawnBoneImpact(
+        StoredBoneRegistration<instanceCapacity,Capacity>& bones,InstanceHandle bone,Frames frames){
+        if(!run_.effectsSucceeded||!bones.belongsTo(instances_)||!bones.valid())return run_.effectsSucceeded=false;
+        const auto* caller=bones.instances().find(bone);
+        if(!caller)return run_.effectsSucceeded=false;
+        const auto x=caller->x.promoted(),y=caller->y.promoted();
+        if(scriptEffectsBinding_.effects!=&ownedScriptEffects_||scriptEffectsBinding_.registry!=&ownedScriptRegistration_){
+            if(hasScriptEffectRecords())return run_.effectsSucceeded=false;
+            scriptEffectsBinding_=ScriptEffectRuntimeBinding::bind<InstanceRecord>(ownedScriptEffects_,ownedScriptRegistration_);
+        }
+        auto ops=scriptSpawnOperations(ownedScriptEffects_,ownedScriptRegistration_,frames,[&](unsigned local){
+            const auto id=ownedScriptRegistration_.sourceId(local);
+            return id&&bones.assignEffect(bone,local,id);
+        },run_.effectsSucceeded);
+        return EffectSpawnScript::runNol(ops,x,y,85,{0x3fd33333u,0x33333333u});
+    }
     template<unsigned Capacity,unsigned Registered>
     bool advanceScriptEffectAnimation(StoredScriptSpawnRegistration<instanceCapacity,Registered>& registration,
         ScriptSpawnEffects<Capacity>& effects,typename ScriptSpawnEffects<Capacity>::Phase phase){

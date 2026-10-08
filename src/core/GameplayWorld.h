@@ -411,6 +411,21 @@ public:
                 breakables_[box.slot].myFx=child;return true;
             });
     }
+    template<class Frames> bool spawnBoneImpact(downwell::InstanceHandle bone,Frames frames){
+        if(!run_.effectsSucceeded||!bones_||!scriptSpawnInstances_)return run_.effectsSucceeded=false;
+        const auto* caller=bones_->find(bone);
+        if(!caller)return run_.effectsSucceeded=false;
+        const auto x=caller->x.promoted(),y=caller->y.promoted();
+        auto& registration=*scriptSpawnInstances_;
+        if(scriptEffectsBinding_.effects!=&ownedScriptEffects_){
+            if(registration.size())return run_.effectsSucceeded=false;
+            scriptEffectsBinding_=downwell::ScriptEffectRuntimeBinding::bind<downwell::GameplayScriptSpawnInstances::Record>(ownedScriptEffects_,registration);
+        }
+        auto ops=downwell::scriptSpawnOperations(ownedScriptEffects_,registration,frames,[&](unsigned local){
+            return registration.handle(local).generation&&bones_->assignEffect(bone,local);
+        },run_.effectsSucceeded);
+        return downwell::EffectSpawnScript::runNol(ops,x,y,85,{0x3fd33333u,0x33333333u});
+    }
     template<class Frames> bool spawnScriptEffect(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int sprite,
         downwell::MotionBinary64 speed,downwell::MotionBinary64 angle,downwell::MotionBinary64 depth,
         Frames frames,downwell::InstanceHandle& myFx){
