@@ -43,6 +43,8 @@ for name, digest in {
     assert b"random" not in payload and b"choose" not in payload
 skeleton_object = manifest["resources"]["objects"][120]
 assert (skeleton_object["parentId"], skeleton_object["spriteId"], skeleton_object["textureMaskId"]) == (83, 208, 208)
+for sprite, frames in ((205, 1), (207, 8), (208, 6)):
+    assert len(manifest["resources"]["sprites"][sprite]["frames"]) == frames
 wall = source("Collision_parentWall", "b90f31393aabda2f26251e4bd4eea283740696ffd91807231b05899e281dc622")
 player = source("Collision_objPlayer_n", "918f6068a1942b503dd74d92a6dff774bf0fa2fa1986b6fb38e0145e0a761df4")
 ordered = ["cmp.v.v NEQ", "pop.v.v self.image_speed", "pop.v.v self.ysp", "pop.v.v self.xx",

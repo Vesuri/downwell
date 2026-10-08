@@ -2845,6 +2845,18 @@ int main(){
             skeletonWorld->step(0);
             assert(skeletonWorld->effectsSucceeded()&&actor->state.alarms[2]==0&&!actor->state.shot&&
                 actor->state.alarms[3]==14&&!actor->state.imageIndex.high&&!actor->state.imageIndex.low);
+            assert(skeletons.dispatchPublished(key,[&](auto& state,auto&,auto& publish,bool&){
+                assert(publish.imageIndex({0x40800000u})&&publish.sprite(205)&&state.sprite==205&&!state.timeline.bits&&
+                    !state.imageIndex.high&&!state.imageIndex.low&&publish.sprite(207)&&publish.facing(-1));
+                assert(publish.position({0x42e00000u},{0x43400000u})&&publish.position({0x42e00000u},{0x43500000u})&&
+                    state.x==112&&state.y==208&&state.facing==-1);
+                if(ownership==GameplayCollisionOwner::Ownership::reference){
+                    const auto* geometry=skeletonOwner->state(sharedKey);const auto* properties=skeletonOwner->properties(sharedKey);
+                    assert(geometry&&properties&&geometry->x.bits==0x42e00000u&&geometry->y.bits==0x43500000u&&
+                        properties->sprite.spriteId==207&&properties->sprite.maskId==208&&properties->sprite.scaleX.bits==0xbf800000u);
+                }
+                return true;
+            }));
             assert(skeletons.markDestroyed(key)&&skeletonOwner->prepareDraw()&&!skeletons.find(key));
             InstanceHandle next;assert(skeletonWorld->createSkeletonWithSourceId(505101,100,200,next)&&
                 next.slot==key.slot&&next.generation!=key.generation&&!GameplayCollisionView(*skeletonWorld).contains(sharedKey));

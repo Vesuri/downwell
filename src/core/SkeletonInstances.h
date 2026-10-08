@@ -13,6 +13,7 @@ public:
         unsigned lifetimeId=0,sourceId=0;
         static constexpr int objectId=120;
         RunnerImageValue x{},y{};
+        int spriteId=208,publishedFacing=1;
         SkeletonActor state;
         RegisteredSkeletonThrow throwing;
         bool active=true,destroyRequested=false;
@@ -67,7 +68,49 @@ public:
         auto* r=resolve(key);if(!r||executing_.generation)return fail();
         if(!r->active||r->destroyRequested)return true;
         executing_=key;const bool ok=event(r->state,r->throwing,good_);
-        executing_={};return good_=good_&&ok;
+        RunnerImageValue x,y;
+        const bool published=r->state.sprite==r->spriteId&&r->state.facing==r->publishedFacing&&
+            x.assignInteger(r->state.x)&&y.assignInteger(r->state.y)&&x.bits==r->x.bits&&y.bits==r->y.bits;
+        executing_={};return good_=good_&&ok&&published;
+    }
+    class Publisher {
+        SkeletonInstances& store_;InstanceHandle key_;
+    public:
+        Publisher(SkeletonInstances& store,InstanceHandle key):store_(store),key_(key){}
+        bool imageIndex(RunnerImageValue value){
+            auto* r=store_.resolve(key_);
+            if(!r||!store_.binding_.imageIndex(key_,*r,value))return store_.fail();
+            r->state.imageIndex=value.promoted();return true;
+        }
+        bool sprite(int sprite){
+            auto* r=store_.resolve(key_);if(!r)return store_.fail();
+            auto next=static_cast<const SkeletonAnimation&>(r->state);
+            if(!next.setSprite(sprite)||!store_.binding_.sprite(key_,*r,sprite))return store_.fail();
+            r->state.sprite=next.sprite;r->state.imageIndex=next.imageIndex;r->state.timeline=next.timeline;
+            r->spriteId=next.sprite;
+            return true;
+        }
+        bool facing(int direction){
+            auto* r=store_.resolve(key_);RunnerImageValue scale;
+            if(!r||direction< -1||direction>1||!scale.assignInteger(direction)||
+               !store_.binding_.transform(key_,*r,RunnerTransformField::scaleX,scale,{0x3f800000u},0xffffffu))return store_.fail();
+            r->state.facing=direction;r->publishedFacing=direction;return true;
+        }
+        bool position(RunnerImageValue x,RunnerImageValue y){
+            auto* r=store_.resolve(key_);std::int32_t px,py;RunnerImageValue integerX,integerY;
+            // These event setters receive round(xx), round(yy). Do not hide
+            // fractional external writes behind SkeletonActor's integer fields.
+            if(!r||!x.promoted().roundPixel(px)||!y.promoted().roundPixel(py)||
+               !integerX.assignInteger(px)||!integerY.assignInteger(py)||integerX.bits!=x.bits||integerY.bits!=y.bits||
+               !store_.publishPosition(key_,*r,x,y))return store_.fail();
+            r->state.x=px;r->state.y=py;return true;
+        }
+        bool destroy(){return store_.markDestroyed(key_);}
+    };
+    template<class Event> bool dispatchPublished(InstanceHandle key,Event event){
+        return dispatch(key,[&](auto& state,auto& throwing,bool& good){
+            Publisher publish(*this,key);return event(state,throwing,publish,good);
+        });
     }
     bool advanceAnimation(InstanceHandle key){
         auto* r=resolve(key);if(!r||executing_.generation)return fail();

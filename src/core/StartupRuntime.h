@@ -325,7 +325,7 @@ public:
     enum class BonePhase {animation,step,cleanup};
     enum class SkeletonPhase {animation,alarm,step,endStep,cleanup};
     template<unsigned Capacity,class Execute,class Tick>
-    bool withSkeletonEvents(StoredSkeletonRegistration<instanceCapacity,Capacity>& registration,
+    bool withSkeletonPublishedEvents(StoredSkeletonRegistration<instanceCapacity,Capacity>& registration,
         Execute execute,Tick tick){
         if(!run_.effectsSucceeded)return false;
         if(skeletonDispatch_||!registration.belongsTo(instances_)||!registration.valid())return run_.effectsSucceeded=false;
@@ -334,8 +334,8 @@ public:
             if(phase==SkeletonPhase::animation)return registration.advanceAnimation(key);
             if(phase==SkeletonPhase::alarm)return registration.alarm(key,index);
             if(phase==SkeletonPhase::cleanup)return registration.retire(key);
-            return registration.dispatch(key,[&](auto& actor,auto& throwing,bool& good){
-                return execute(key,phase,actor,throwing,good);
+            return registration.dispatchPublished(key,[&](auto& actor,auto& throwing,auto& publish,bool& good){
+                return execute(key,phase,actor,throwing,publish,good);
             });
         };
         skeletonContext_=&dispatch;
@@ -344,6 +344,12 @@ public:
         };
         const bool ok=tick();skeletonDispatch_=nullptr;skeletonContext_=nullptr;
         return run_.effectsSucceeded=run_.effectsSucceeded&&ok&&registration.valid();
+    }
+    template<unsigned Capacity,class Execute,class Tick>
+    bool withSkeletonEvents(StoredSkeletonRegistration<instanceCapacity,Capacity>& registration,
+        Execute execute,Tick tick){
+        return withSkeletonPublishedEvents(registration,[&](InstanceHandle key,SkeletonPhase phase,
+            auto& actor,auto& throwing,auto&,bool& good){return execute(key,phase,actor,throwing,good);},tick);
     }
     // Install one bone owner around a single caller-supplied tick. This allows
     // the time-stop and bone families to share the same animation/Begin Step/

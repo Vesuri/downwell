@@ -65,6 +65,14 @@ public:
             return event(state,throwing,good);
         })&&sync(key))||fail();
     }
+    template<class Event> bool dispatchPublished(InstanceHandle key,Event event){
+        auto* e=entry(key);auto* r=e?record(*e):nullptr;
+        if(!good_||!r)return fail();
+        return (store_.dispatchPublished(key,[&](auto& state,auto& throwing,auto& publish,bool& good){
+            for(unsigned i=0;i<4;++i)state.alarms[i]=r->alarms.get(i);
+            return event(state,throwing,publish,good);
+        })&&sync(key))||fail();
+    }
     bool advanceAnimation(InstanceHandle key){
         auto* e=entry(key);auto* r=e?record(*e):nullptr;
         if(!good_||!r)return fail();
@@ -129,8 +137,19 @@ public:
         if(!r||!lifecycle_.imageIndex(e->world,*r,value))return fail();r->imageIndex=stored(value);return true;
     }
     bool mask(InstanceHandle,const Record&,int){return fail();}
-    bool sprite(InstanceHandle,const Record&,int){return fail();}
-    bool transform(InstanceHandle,const Record&,RunnerTransformField,RunnerImageValue,RunnerImageValue,std::uint32_t){return fail();}
+    bool sprite(InstanceHandle key,const Record&,int sprite){
+        auto* e=entry(key);auto* r=e?record(*e):nullptr;RunnerImageValue index;RunnerSpriteChange::Result change;
+        if(!r)return fail();std::memcpy(&index.bits,&r->imageIndex,4);
+        if(!SkeletonAnimation::frames(sprite)||!RunnerSpriteChange::plan(r->spriteId,sprite,index,SkeletonAnimation::frames(sprite),change)||
+           !lifecycle_.sprite(e->world,*r,sprite))return fail();
+        r->spriteId=sprite;if(change.resetIndex)r->imageIndex=0;return true;
+    }
+    bool transform(InstanceHandle key,const Record&,RunnerTransformField field,RunnerImageValue value,
+        RunnerImageValue alpha,std::uint32_t blend){
+        auto* e=entry(key);auto* r=e?record(*e):nullptr;
+        if(!r||field!=RunnerTransformField::scaleX||!lifecycle_.transform(e->world,*r,field,value,alpha,blend))return fail();
+        r->scaleX=stored(value);return true;
+    }
 };
 }
 #endif

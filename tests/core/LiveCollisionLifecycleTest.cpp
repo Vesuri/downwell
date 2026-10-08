@@ -224,6 +224,20 @@ int main(){
         require(tick()&&steps==1&&ends==1&&record->alarms.get(2)==1&&actor->state.shot,"first shared skeleton tick");
         require(tick()&&steps==2&&ends==2&&!actor->state.shot&&record->alarms.get(2)==0&&record->alarms.get(3)==14&&
             record->imageIndex==0,"skeleton alarm decrements once and later slot sees same-phase write");
+        require(world->withSkeletonPublishedEvents(skeletons,[&](InstanceHandle,auto phase,auto& state,auto&,auto& publish,bool&){
+            if(phase!=StartupRuntime::SkeletonPhase::step)return true;
+            require(publish.imageIndex({0x40800000u})&&record->imageIndex==4,"publish source image index immediately");
+            require(publish.sprite(205)&&record->spriteId==205&&record->imageIndex==0&&
+                state.sprite==205&&!state.timeline.bits,"hit sprite applies its sequence reset before another callback");
+            require(publish.sprite(207)&&publish.facing(-1)&&record->spriteId==207&&record->scaleX==-1&&state.facing==-1,
+                "registered sprite and facing are visible before child creation");
+            const auto oldX=state.xx,oldY=state.yy;
+            require(publish.position({0x42e00000u},{0x43400000u})&&record->x==112&&record->y==192&&
+                publish.position({0x42e00000u},{0x43500000u})&&record->y==208&&state.x==112&&state.y==208&&
+                state.xx.high==oldX.high&&state.xx.low==oldX.low&&state.yy.high==oldY.high&&state.yy.low==oldY.low,
+                "position setters do not rewrite private accumulators");
+            return true;
+        },[&]{return world->stepWithCollisionPass(Input{},false,[]{return true;});}),"skeleton setters join actual room Step");
         require(skeletons.mark(key)&&tick()&&!world->instance(id)&&!skeletons.instances().find(key),
             "skeleton marked lifetime retires through normal cleanup");
         InstanceHandle next;require(world->spawnSkeleton(skeletons,100,200,next)&&next.generation!=key.generation&&
@@ -252,6 +266,29 @@ int main(){
             actor->y.bits==0x43480000u,"failed second snap publication retains successful X only");
         require(!world->spawnSkeleton(skeletons,100,200,key)&&world->nextRuntimeInstanceId()==id+1&&
             owner->moves==2,"terminal skeleton Create cannot run twice");
+    }
+    {
+        struct SpriteOwner:StoredWorldCollision {
+            using StoredWorldCollision::StoredWorldCollision;
+            unsigned calls=0;
+            bool sprite(InstanceHandle h,const InstanceRecord& r,int id){
+                if(r.objectId==120){++calls;if(id==205)return false;}
+                return StoredWorldCollision::sprite(h,r,id);
+            }
+        };
+        auto owner=std::make_unique<SpriteOwner>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            InstanceLifecycleBinding::bindPointQueries(*owner));
+        require(owner->attach(*world),"attach failing skeleton sprite owner");world->skipToGameForTesting();
+        auto skeletons=world->skeletonRegistration<1>();InstanceHandle key;
+        require(world->spawnSkeleton(skeletons,100,200,key),"create skeleton before failed setter");
+        const auto* actor=skeletons.instances().find(key);const auto* record=world->instance(actor->sourceId);
+        require(!skeletons.dispatchPublished(key,[&](auto&,auto&,auto& publish,bool&){
+            return publish.sprite(207)&&publish.facing(-1)&&publish.imageIndex({0x40800000u})&&publish.sprite(205);
+        })&&!world->effectsSucceeded()&&owner->calls==2&&record->spriteId==207&&record->scaleX==-1&&record->imageIndex==4&&
+            actor->state.sprite==207&&actor->state.facing==-1,"failed sprite keeps prior publications without installing new art");
+        require(!skeletons.dispatchPublished(key,[](auto&,auto&,auto&,bool&){return true;})&&owner->calls==2,
+            "failed skeleton setter cannot be retried");
     }
     for(unsigned rejectedMove=0;rejectedMove<=2;++rejectedMove){
         struct BoneOwner:StoredWorldCollision {

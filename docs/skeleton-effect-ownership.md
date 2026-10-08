@@ -20,12 +20,23 @@ traversal. Stored alarms import the room's already-decremented values before
 dispatch, so subsequent synchronization cannot rewind their countdowns; Alarm 2's
 Alarm 3 write is visible to the later slot in the same phase.
 
-`withSkeletonEvents` supplies the stored ordinary/End Step handlers explicitly.
-Their motion, sprite/transform publication, collision/death dependencies and both
-renderers remain admission requirements: this ownership path does not enable
-natural generation or silently substitute a no-op event. Unsupported sprite
-changes at the stored synchronization boundary fail rather than bypassing the
-collision setter. Engine activation is separate from custom skeleton `active`.
+`withSkeletonPublishedEvents` supplies stored ordinary/End Step handlers with
+the registered publisher; `withSkeletonEvents` retains its state-only adapter.
+The publisher installs sprites 205/207/208 through the resource owner's sprite
+setter and applies the unit-sequence index/timeline reset. It publishes facing
+through image_xscale and rounded positions without rewriting private xx/yy.
+Stored builtin fields and maintained collision geometry are visible immediately
+to subsequent callbacks, not only after the event. The fixed mask remains 208.
+After dispatch, the shared store rejects mismatches between actor state and its
+published sprite, facing or coordinates instead of silently accepting bypassed
+setters. Fractional external position writes are outside this rounded-event
+adapter's admitted domain and fail before publication. Failure retains previous
+successful writes and does not advance local sprite state after a rejected
+callback or permit a retry; partially completed backend work is not rolled back.
+Complete motion/event execution, collision/death dependencies and both renderers
+remain admission requirements: these entry points do not enable natural
+generation or silently substitute a no-op event. Engine activation is separate
+from custom skeleton `active`.
 
 `BoneProjectile` has checked publication entry points for live owners, while
 its scalar event methods remain the successful-event reference. Step compares
