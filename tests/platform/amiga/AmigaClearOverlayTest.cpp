@@ -118,10 +118,19 @@ int main(int argc, char** argv) {
             outlined.count + (frame.choices ? 8 : 0) == native.count,
             "two outlined labels replace eight redundant passes without changing other commands");
         AmigaClearDrawList fastHeading;
-        require(fastHeading.build(room,frame,inventory,true,true) && fastHeading.count==outlined.count,
-            "specialized heading produces the same command count");
-        for(unsigned i=0;i<outlined.count;++i)
-            require(fastHeading.commands[i]==outlined.commands[i],"specialized heading preserves every source-order command");
+        require(fastHeading.build(room,frame,inventory,true,true) && fastHeading.count<=outlined.count,
+            "specialized heading removes only redundant source passes");
+        std::vector<UBYTE> headingPixels(downwellLayerBytes);
+        AmigaRenderer headingRenderer;
+        amigaRendererInit(&headingRenderer,game.data(),headingPixels.data());
+        headingRenderer.target=headingRenderer.hud;
+        headingRenderer.clipX=110; headingRenderer.clipWidth=160;
+        for(unsigned i=0;i<fastHeading.count;++i) {
+            const auto& c=fastHeading.commands[i];
+            if(c.pen<0) amigaRendererDrawAsset(&headingRenderer,pack.data(),pack.data()+pack.size(),c.id,c.frame,c.x,c.y,0);
+            else amigaRendererDrawAssetPen(&headingRenderer,pack.data(),pack.data()+pack.size(),c.id,c.frame,c.x,c.y,0,c.pen);
+        }
+        require(headingPixels==reference,"offline headings match the original source-order composition");
         AmigaRenderer composed;
         amigaRendererInit(&composed,game.data(),outlinedHud[back].data());
         require(outlinedCaches[back].render(composed,pack.data(),pack.data()+pack.size(),

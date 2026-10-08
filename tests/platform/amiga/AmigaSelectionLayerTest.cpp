@@ -218,6 +218,34 @@ int main(int argc,char** argv) {
         }
     }
     std::printf("%u independent border publications preserve source pixels and displayed memory\n", pairedFrames);
+    // Every exported heading and diagonal extent, including viewport clipping,
+    // must equal the original ordered red masks followed by the white mask.
+    unsigned preparedHeadingCases = 0;
+    for(unsigned title=0;title<13;++title) for(unsigned extent=0;extent<=6;++extent)
+        for(unsigned position=0;position<3;++position) {
+            const unsigned id=title ? 64500+title-1 : 64001;
+            const int x=position==0 ? 80 : position==1 ? 0 : 160;
+            const int y=position==0 ? 60 : position==1 ? -3 : 275;
+            AmigaSelectionLayer::Command composed{id,extent ? extent+1 : 0,x,y,-1};
+            layer.invalidate();
+            assert(layer.render(canvas.data(),pack.data(),pack.data()+pack.size(),&composed,1,paint));
+            std::fill(expected.begin(),expected.end(),0);
+            AmigaRenderer renderer;
+            amigaRendererInit(&renderer,game.data(),expected.data());
+            renderer.target=renderer.hud; renderer.clipX=110; renderer.clipWidth=160;
+            for(unsigned offset=0;offset<extent;++offset)
+                amigaRendererDrawAssetPen(&renderer,pack.data(),pack.data()+pack.size(),id,0,
+                    110+x-int(offset),y-int(offset),0,2);
+            amigaRendererDrawAssetPen(&renderer,pack.data(),pack.data()+pack.size(),id,0,
+                110+x-int(extent),y-int(extent),0,1);
+            for(unsigned p=0;p<2;++p) for(unsigned row=0;row<284;++row) for(unsigned col=0;col<160;++col) {
+                const bool actual=canvas[p*AmigaSelectionLayer::planeBytes+row*22+col/8] & (128u>>(col&7));
+                const bool reference=expected[p*downwellPlaneBytes+row*48+(110+col)/8] & (128u>>((110+col)&7));
+                assert(actual==reference);
+            }
+            ++preparedHeadingCases;
+        }
+    std::printf("%u offline heading/clipping cases match source-order masks\n",preparedHeadingCases);
     unsigned outlinedCases = 0;
     const unsigned records = AmigaClearBank::longword(pack.data()+8);
     for (unsigned i = 0; i < records; ++i) {

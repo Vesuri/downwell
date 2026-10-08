@@ -184,6 +184,26 @@ bank occupies the same address with different directory offsets. The latter
 may retain existing pixels but must resolve records before the next repaint.
 `REFERENCE_SELECTION_BINDINGS=1` retains per-frame directory admission.
 
+Upgrade headings use offline compositions of their source red-shadow passes
+and final white pass. For admitted diagonal integer offsets with unit steps,
+the red masks cover every offset before the final white one; repeated offsets
+are overwritten. A heading therefore needs seven shapes, not seven draws per
+frame. `LevelClearHeadingPixels::composedFrame` admits that exact shape and
+retains the multi-pass fallback for differing X/Y rounding. Frame 0 remains
+the white source glyph mask; generated frames 2–7 contain diagonal extents
+1–6. They keep the original anchor and are drawn through `Bitmap`.
+
+The production clear bank retains all seven shapes for the two current
+headings, but only the precomposed frame 1 for offer names/descriptions. The
+scalar native verifier reads original label frames from the immutable full
+ordinary-memory pack. `REFERENCE_CLEAR_HEADINGS=1` restores the original
+heading passes and both name/description frames in the selected bank. No
+runtime asset conversion or additional Chip allocation is required.
+The full ordinary-memory clear pack retains every source/oracle frame as well
+as the generated shapes. The conservative selected-bank bound, including four
+offers and every area/level, is 23,714 bytes within the existing 31,756-byte
+minimum region; `AmigaClearBankTest` derives this bound from exported records.
+
 ## Vertical ring and buffering
 
 Damage labels retain the shared `DamageNumberText` formatting and eight-pixel

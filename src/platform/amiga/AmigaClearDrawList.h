@@ -87,6 +87,13 @@ struct AmigaClearDrawList {
             downwell::drawLevelClearWithShadows(sink,room,frame,inventory,absoluteSine,
                 [&](unsigned id,int y) {
                     if (y!=96 && y!=278) { valid=false; return; }
+#ifndef DOWNWELL_REFERENCE_CLEAR_HEADINGS
+                    const int composed = heading->composedFrame(y == 278);
+                    if (composed >= 0) {
+                        sink.add(id,unsigned(composed),190,y-sink.viewY,-1);
+                        return;
+                    }
+#endif
                     for (unsigned pass=0;pass<=6;++pass)
                         sink.add(id,0,110+heading->x(pass),
                             (y==96?heading->stageY(pass):heading->choiceY(pass))-sink.viewY,pass==6?1:2);

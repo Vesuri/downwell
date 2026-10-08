@@ -9,6 +9,10 @@ using namespace downwell;
 static void check(std::uint32_t q, bool portable) {
     LevelClearHeadingPixels pixels;
     assert(pixels.compute(q));
+    assert(pixels.composedFrame(false) == (pixels.nearOffset[6] ? pixels.nearOffset[6]+1 : 0));
+    bool diagonal = true;
+    for(unsigned i=0;i<=6;++i) diagonal &= pixels.nearOffset[i]==pixels.farOffset[i];
+    assert(pixels.composedFrame(true) == (diagonal ? pixels.composedFrame(false) : -1));
     const auto amplitude=LevelClearTrig::amplitude(q);
     for(unsigned pass=0;pass<=6;++pass) {
         const int bases[]={80,96,278};
@@ -44,5 +48,11 @@ int main() {
     }
     LevelClearHeadingPixels invalid;
     assert(!invalid.compute((1u<<30)+1));
+    invalid.nearOffset[0]=1;
+    assert(invalid.composedFrame(false)==-1);
+    invalid={}; invalid.nearOffset[3]=2;
+    assert(invalid.composedFrame(false)==-1);
+    invalid={}; invalid.farOffset[3]=1;
+    assert(invalid.composedFrame(true)==-1);
     std::puts("1,000,000 Q30 heading samples, all 360 angles and rounding-boundary neighbours match");
 }

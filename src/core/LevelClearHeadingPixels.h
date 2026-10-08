@@ -28,6 +28,17 @@ struct LevelClearHeadingPixels {
     int x(unsigned pass) const { return 80 - nearOffset[pass]; }
     int stageY(unsigned pass) const { return 96 - nearOffset[pass]; }
     int choiceY(unsigned pass) const { return 278 - farOffset[pass]; }
+    // A diagonal sequence with unit increments covers every integer offset.
+    // The last white mask replaces any red pass at that same offset. Admit
+    // only that shape; mixed X/Y rounding retains the source multi-pass path.
+    int composedFrame(bool choice) const {
+        if (nearOffset[0] != 0) return -1;
+        for (unsigned i = 0; i <= 6; ++i) {
+            if (choice && nearOffset[i] != farOffset[i]) return -1;
+            if (i && (nearOffset[i] < nearOffset[i-1] || nearOffset[i] > nearOffset[i-1]+1)) return -1;
+        }
+        return nearOffset[6] ? nearOffset[6] + 1 : 0;
+    }
 };
 }
 #endif

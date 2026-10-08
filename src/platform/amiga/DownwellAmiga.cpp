@@ -3235,7 +3235,10 @@ __attribute__((noinline)) static int runDownwell(void) {
                 alignas(2) static UBYTE actualGame[downwellGameRingBytes], actualHud[downwellLayerBytes];
                 gDownwellClearActualHud = actualHud; gDownwellClearExpectedHud = expectedHud[back];
                 gDownwellClearActualGame = actualGame; gDownwellClearExpectedGame = expectedGame[back];
-                if (!oracle.render(back, reference, bank, bank + clear.assets.bankBytes, room, snapshot, port.upgrades(), expected))
+                // Production banks omit label frame0 when only its offline
+                // outline is drawn. The scalar oracle reads original frames
+                // from the immutable full source pack in ordinary memory.
+                if (!oracle.render(back, reference, amiga_clear_pack, amiga_clear_pack_end, room, snapshot, port.upgrades(), expected))
                     ++gDownwellClearFailures;
                 // Compare visible pixels, not storage: the new canvases are
                 // world-space narrow planes, the oracle uses a wide ring.

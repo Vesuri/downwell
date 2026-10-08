@@ -120,6 +120,65 @@ int main(int argc, char** argv) {
     }
     require(maximumBase+4*maximumBundle<=31756,"all four-offer combinations fit, without relying on sampled offers");
     std::printf("Conservative all-offer outlined bank bound: %u bytes\n",maximumBase+4*maximumBundle);
+    unsigned preparedBase=0, preparedBundle=0;
+    for(unsigned area=1;area<=4;++area) for(unsigned level=1;level<=3;++level) {
+        unsigned bytes=20+30*24;
+        const unsigned titles[]={downwell::levelClearStageLabel(area,level),64001};
+        for(unsigned id:titles) {
+            bytes+=payload(id,0);
+            for(unsigned frame=2;frame<=7;++frame) bytes+=payload(id,frame);
+        }
+        for(unsigned a=area;a<=area+1;++a)
+            bytes+=payload(downwell::levelBorderSprite(a),7)+payload(downwell::levelBorderSprite(a),13);
+        if(bytes>preparedBase) preparedBase=bytes;
+    }
+    for(unsigned option=0;option<24;++option) for(unsigned owned=0;owned<(option==23?1u:2u);++owned) {
+        const unsigned id=option==23?100:option;
+        const unsigned bytes=payload(downwell::levelUpgradeSprite(id),0)+
+            payload(downwell::levelUpgradeNameLabel(id,owned),1)+payload(64300+id,1);
+        if(bytes>preparedBundle) preparedBundle=bytes;
+    }
+    require(preparedBase+4*preparedBundle<=31756,"all prepared heading/four-offer banks fit the existing Chip region");
+    std::printf("Conservative prepared-heading bank bound: %u bytes\n",preparedBase+4*preparedBundle);
+    unsigned maximumPrepared=0;
+    for(unsigned sample=0;sample<256;++sample) {
+        unsigned offers[4]; unsigned char owned[23];
+        for(unsigned i=0;i<4;++i) {
+            const unsigned id=(sample*(i+1)+i*7)%24;
+            offers[i]=id==23 ? 100 : id;
+        }
+        for(unsigned i=0;i<23;++i) owned[i]=(sample+i)%2;
+        const unsigned area=1+sample%4, level=1+sample%3;
+        std::vector<std::uint8_t> prepared(31756+32,0x69);
+        auto* bank=prepared.data()+16;
+        const unsigned bytes=AmigaClearBank::build(source.data(),source.size(),offers,4,
+            bank,31756,area,level,owned,true,true);
+        require(bytes && bytes<=preparedBase+4*preparedBundle,"prepared selection respects the all-offer bound");
+        if(bytes>maximumPrepared) maximumPrepared=bytes;
+        const unsigned count=AmigaClearBank::longword(bank+8);
+        require(count<=30,"prepared selection fits its bounded record array");
+        unsigned titles=0;
+        for(unsigned i=0;i<count;++i) {
+            const auto* record=bank+20+i*24;
+            const unsigned id=AmigaClearBank::word(record), frame=AmigaClearBank::word(record+2);
+            const bool title=id==64001 || id==downwell::levelClearStageLabel(area,level);
+            if(title) { require(frame==0 || (frame>=2 && frame<=7),"heading uses only admitted prepared frames"); ++titles; }
+            else if(id>=64000) require(frame==1,"production retains only precomposed description/name outlines");
+            const auto key=AmigaClearBank::longword(record);
+            require(!i || AmigaClearBank::longword(record-24)<key,"prepared directory remains strictly sorted");
+            const std::uint8_t* originalRecord=nullptr;
+            for(unsigned j=0;j<AmigaClearBank::longword(source.data()+8);++j)
+                if(AmigaClearBank::longword(source.data()+20+j*24)==key) originalRecord=source.data()+20+j*24;
+            require(originalRecord && std::memcmp(record,originalRecord,16)==0,"prepared geometry matches immutable source record");
+            const unsigned offset=AmigaClearBank::longword(record+16), length=AmigaClearBank::longword(record+20);
+            require(length==AmigaClearBank::longword(originalRecord+20) && offset>=20+count*24 &&
+                offset<=bytes && length<=bytes-offset && std::memcmp(bank+offset,
+                source.data()+AmigaClearBank::longword(originalRecord+16),length)==0,"prepared pixels match source payload exactly");
+        }
+        require(titles==14,"both headings have all seven resident shapes");
+        for(unsigned i=0;i<16;++i) require(prepared[i]==0x69 && prepared[31756+16+i]==0x69,"prepared bank preserves allocation guards");
+    }
+    std::printf("256 prepared heading banks verified; largest sampled bank %u bytes\n",maximumPrepared);
     unsigned char invalidOwned[23] = {};
     invalidOwned[0] = 2;
     const unsigned ownedOffer[] = {0};
