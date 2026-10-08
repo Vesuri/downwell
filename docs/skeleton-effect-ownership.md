@@ -610,6 +610,16 @@ Controller resets and audio/effects in that fixture are instrumented, not full
 backend implementations. Matrix tests cover both achievement thresholds,
 upgrade branches, unobtainable suppression and ordered failure prefixes.
 
+The stored world's `spawnCurrencyPickupEffect` binds `scrFxNol(105, 0.8)` to
+the existing owned object-219 registry. It reads the currency caller's published
+coordinates, stores the child's global numeric ID in `myFx` before sprite
+validation, and leaves constructor angle/depth untouched. Child animation and
+Animation End retirement use the existing world scheduler independently of
+the currency caller's lifetime. A failed sprite lookup retains the birth and
+caller assignment, stops before the speed setter and latches terminal failure.
+This entry point still needs the complete live collection operation binding;
+it does not enable natural rewards or native currency ownership by itself.
+
 The shared live reward wrapper now supplies the run's area to `GemMotion`.
 Its fixed-point adapter preserves the area-5 extra RNG draw after both ordinary
 velocity draws, and areas 3/4 use gravity 112/12800 and cap 6400/12800. As in

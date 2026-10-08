@@ -27,6 +27,7 @@ for index, digest in enumerate((
     assert sha256((export / f"Assembly/gml_Object_objCurrency_Alarm_{index}.asm").read_bytes()).hexdigest() == digest
 obj = manifest["resources"]["objects"][248]
 for name,digest in (
+    ("gml_GlobalScript_scrFxNol","fe76a7898f52d717dc47f864c924facf2cea92a5d87e26b3bfd9ba27ce0c2d6c"),
     ("gml_GlobalScript_scrGainGem","5514c1b786bec32f67950bf7d92a6ca0ed32bb9a8af1f466cd405d21e4739f0f"),
     ("gml_Object_objCurrency_Collision_objPlayer_n","21bd764c6f576791bd20f5a09ab52609b4d232b4fd62a75fc8d470b8193a3af4"),
 ):

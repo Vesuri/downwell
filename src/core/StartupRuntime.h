@@ -853,6 +853,23 @@ public:
         return run_.effectsSucceeded=registration.frozen(key,effect,pTimeStop,width,frozen);
     }
     const ScriptSpawnEffects<scriptSpawnEffectCapacity>& scriptEffects()const{return ownedScriptEffects_;}
+    template<unsigned Capacity,class Frames> bool spawnCurrencyPickupEffect(
+        StoredCurrencyRegistration<instanceCapacity,Capacity>& currency,InstanceHandle gem,Frames frames){
+        if(!run_.effectsSucceeded||!currency.belongsTo(instances_)||!currency.valid())
+            return run_.effectsSucceeded=false;
+        const auto* caller=currency.find(gem);
+        if(!caller)return run_.effectsSucceeded=false;
+        const auto x=caller->x.promoted(),y=caller->y.promoted();
+        if(scriptEffectsBinding_.effects!=&ownedScriptEffects_||scriptEffectsBinding_.registry!=&ownedScriptRegistration_){
+            if(hasScriptEffectRecords())return run_.effectsSucceeded=false;
+            scriptEffectsBinding_=ScriptEffectRuntimeBinding::bind<InstanceRecord>(ownedScriptEffects_,ownedScriptRegistration_);
+        }
+        auto ops=scriptSpawnOperations(ownedScriptEffects_,ownedScriptRegistration_,frames,[&](unsigned local){
+            const auto id=ownedScriptRegistration_.sourceId(local);
+            return id&&currency.dispatch(gem,[&](auto& state,bool&){state.myFx=id;return true;});
+        },run_.effectsSucceeded);
+        return EffectSpawnScript::runNol(ops,x,y,105,{0x3fe99999u,0x9999999au});
+    }
     template<class Frames> bool spawnScriptEffect(MotionBinary64 x,MotionBinary64 y,int sprite,
         MotionBinary64 speed,MotionBinary64 angle,MotionBinary64 depth,Frames frames,std::uint32_t& myFx){
         return spawnScriptEffect(ownedScriptRegistration_,ownedScriptEffects_,x,y,sprite,speed,angle,depth,frames,myFx);

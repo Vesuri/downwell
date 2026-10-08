@@ -22,6 +22,7 @@ struct CurrencyCreate : CurrencyStepSound {
     int scriptIndex=0;
     int checkTarget=0,xCollision=0,yCollision=0;
     int gemAmount=0;
+    std::uint32_t myFx=0;
     bool active=true,suckable=false,obtainable=false,disappearing=false,attracted=false;
     template<class Random,class Queries>
     bool create(MotionBinary64 px,MotionBinary64 py,int area,bool attractor,Random& random,Queries& queries){

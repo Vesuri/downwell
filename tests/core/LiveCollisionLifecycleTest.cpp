@@ -385,6 +385,39 @@ int main(){
             currency.find(gem)->gemAmount==2&&!owner->resolve(gem)->destroyRequested,"collection failure retains preceding account writes and live caller");
         require(currency.clear(),"clear failed collection caller");
     }
+    for(bool accept:{true,false}){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach currency pickup effect world");world->skipToGameForTesting();
+        auto currency=world->currencyRegistration<1>();InstanceHandle gem;
+        require(world->createRegisteredCurrency(currency,{0x406e0800u,0},{0x40800400u,0},
+            [](auto,int,auto,auto,bool& hit){hit=false;return true;},gem),"create pickup caller");
+        const auto x=currency.find(gem)->x.bits,y=currency.find(gem)->y.bits;
+        const auto id=world->nextRuntimeInstanceId();const auto draws=world->randomDrawCount();unsigned lookups=0;
+        auto frames=[&](int sprite,unsigned& count){
+            ++lookups;const auto* child=world->instance(id);
+            require(currency.find(gem)->myFx==id&&child&&child->objectId==219&&child->spriteId==-1,
+                "pickup caller assignment precedes sprite validation");
+            require(sprite==105,"pickup uses source non-loop sprite");
+            return accept&&sprites.frameCount(sprite,count);
+        };
+        require(world->spawnCurrencyPickupEffect(currency,gem,frames)==accept,"pickup effect admission result");
+        const auto* effect=world->scriptEffects().atNewest(0);
+        require(effect&&effect->x.bits==x&&effect->y.bits==y&&effect->angle.bits==0&&effect->depth.bits==0&&
+            currency.find(gem)->myFx==id&&world->nextRuntimeInstanceId()==id+1&&world->randomDrawCount()==draws&&lookups==1,
+            "pickup retains child coordinates, source ID, defaults and unchanged RNG");
+        if(accept){
+            require(effect->spriteId==105&&effect->imageSpeed.bits==0x3f4ccccdu,"pickup publishes source sprite and speed");
+            require(currency.clear(),"retire pickup caller independently of child");
+            for(unsigned tick=0;tick<64&&world->instance(id);++tick)world->step({},false);
+            require(world->effectsSucceeded()&&!world->instance(id),"pickup animation end retires child through world scheduler");
+        }else{
+            require(!world->effectsSucceeded()&&world->instance(id)->spriteId==-1&&effect->imageSpeed.bits==0x3f800000u,
+                "failed sprite lookup retains birth and caller assignment without later speed setter");
+            require(!world->spawnCurrencyPickupEffect(currency,gem,frames)&&lookups==1,"terminal pickup failure cannot duplicate child");
+            require(currency.clear(),"clear failed pickup caller");
+        }
+    }
     for(unsigned chainCase=0;chainCase<10;++chainCase){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
