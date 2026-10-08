@@ -2217,6 +2217,18 @@ int main(){
         const auto local=terrain->handle(0),coincident=terrain->handle(1);
         InstanceHandle shared,other;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,local,shared)&&
             GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,coincident,other));
+        InstanceHandle dither;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::ditherAbove,
+            world->ditherAbove()->handle(),dither));
+        auto queued=[&](bool collision){
+            std::vector<InstanceHandle> result;
+            assert(owner->visitNativeDirty(collision,[&](InstanceHandle h){result.push_back(h);return true;}));
+            return result;
+        };
+        auto same=[](InstanceHandle a,InstanceHandle b){return a.slot==b.slot&&a.generation==b.generation;};
+        for(bool collision:{false,true}){
+            const auto q=queued(collision);assert(q.size()>=3);
+            assert(same(q[0],other)&&same(q[1],dither)&&same(q[2],shared));
+        }
         GameplayCollisionView view(*world);GameplayCollisionView::Record record;
         GameplayWorld::NativeTerrain::Identity id;bool active,destroyed;
         assert(view.contains(shared)&&view.resolve(shared,record)&&record.nativeTerrain&&!record.terrain);
@@ -2224,12 +2236,31 @@ int main(){
             id.x==240&&id.y==160&&active&&!destroyed);
         int parent;assert(owner->projectileWallParent(shared,parent)&&parent==59);
         assert(terrain->markDestroyed(local)&&view.contains(shared)&&view.readTerrain(shared,id,active,destroyed)&&destroyed);
+        for(bool collision:{false,true})assert(same(queued(collision)[2],shared)); // Mark is not retirement or a setter.
         assert(terrain->retire(local)&&!view.contains(shared)&&!owner->projectileWallParent(shared,parent));
+        for(bool collision:{false,true})for(auto h:queued(collision))assert(!same(h,shared));
         assert(view.readTerrain(other,id,active,destroyed)&&id.source==100858&&!active&&!destroyed);
         assert(terrain->append(93,240,160));const auto replacement=terrain->handle(1);
         assert(replacement.slot==local.slot&&replacement.generation!=local.generation&&!view.contains(shared));
+        const auto playerLocal=world->playerHandle();const auto* playerRecord=world->findPlayer(playerLocal);
+        InstanceHandle playerShared;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::player,playerLocal,playerShared));
+        auto playerBinding=owner->playerBinding();
+        // An equal setter does not move the player ahead of intervening births.
+        assert(playerBinding.publishedPosition(playerLocal,*playerRecord,{0x43708000u},{0xc1fa0000u}));
+        for(bool collision:{false,true})assert(queued(collision)[0].slot==shared.slot);
+        assert(playerBinding.publishedPosition(playerLocal,*playerRecord,{0x43710000u},{0xc1fa0000u}));
+        for(bool collision:{false,true})assert(same(queued(collision)[0],playerShared));
+        const int boxX=0,boxY=160;assert(world->appendBreakables(&boxX,&boxY,1));
+        InstanceHandle box;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::breakable,
+            {world->breakableSlots()-1,world->breakableSlot(world->breakableSlots()-1).lifetimeId},box));
+        for(bool collision:{false,true})assert(same(queued(collision)[0],box));
+        assert(playerBinding.activation(playerLocal,*playerRecord,false));
+        for(bool collision:{false,true})assert(same(queued(collision)[0],box));
+        assert(playerBinding.activation(playerLocal,*playerRecord,true));
+        for(bool collision:{false,true})assert(same(queued(collision)[0],playerShared));
         assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)==ResultsDestination::gameplay);
         assert(world->nativeTerrainInstances()==terrain.get()&&!terrain->size()&&!view.contains(other));
+        for(bool collision:{false,true})for(auto h:queued(collision))assert(!same(h,other)&&!same(h,dither)&&!same(h,box));
         assert(terrain->append(60,240,160)&&terrain->handle(0).generation>replacement.generation&&
             terrain->registrationOrder(terrain->handle(0))>firstOrder+2);
     }

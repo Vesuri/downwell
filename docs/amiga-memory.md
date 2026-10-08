@@ -23,6 +23,10 @@ Native actor position publication retains two binary32 words per non-terrain
 collision slot inside the ordinary-memory collision owner. Terrain slots are
 excluded from that array; their coordinates remain run-owned. This storage
 does not allocate Chip RAM, bounds, transforms or another spatial index.
+The native spatial/collision dirty queues each retain two 16-bit links per
+shared collision slot and two counters. These are ordering links only;
+terrain geometry and lifetime identities remain in the run owner. Both
+queues are ordinary memory, with no per-frame allocation.
 
 ## CPU-only HUD artwork
 

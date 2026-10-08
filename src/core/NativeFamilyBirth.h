@@ -16,8 +16,9 @@ struct NativeFamilyBirth {
     bool active=false,leased=false;
     void* context=nullptr;
     bool (*acquire)(void*,NativeFamilyBirth&)=nullptr;
+    bool (*observeBirth)(void*,unsigned)=nullptr;
     bool fail(){if(good)*good=false;return false;}
-    bool publish(std::uint32_t& order){
+    bool publish(std::uint32_t& order,unsigned localSlot=0){
         if(!active||!good||!*good||!nextOrder||!*nextOrder||order)return fail();
         // externalBirth precedes layer attachment in the original native
         // path. Preserve even its failed-attachment chronology prefix.
@@ -25,6 +26,7 @@ struct NativeFamilyBirth {
         if(*bindingRevision!=0xffffffffu)++*bindingRevision;
         if(*captureRevision!=0xffffffffu)++*captureRevision;
         if(captureDirty)*captureDirty=true;
+        if(observeBirth&&!observeBirth(context,localSlot))return fail();
         if(!leased||(population.family&&!*population.family)){
             if(!acquire||!acquire(context,*this))return fail();
             leased=true;

@@ -10,13 +10,17 @@ static void preparedFamily(){
     assert(reference.watchCaptureRanges(2,4,6,8,referenceDirty));
     struct Population {
         RunnerLayers<4,8,true> layers;
-        unsigned family=0,live=0,layer=4,acquisitions=0;
+        unsigned family=0,live=0,layer=4,acquisitions=0,births=0;
         bool good=true;
     } population;
     NativeFamilyBirth birth;
     assert(!direct.bindExternalFamily(1,3,birth)); // No partly watched family.
     assert(direct.bindExternalFamily(2,4,birth));
     birth.good=&population.good;birth.active=true;birth.context=&population;
+    birth.observeBirth=[](void* context,unsigned slot){
+        auto& p=*static_cast<Population*>(context);
+        assert(slot==p.births%8&&p.family==slot);++p.births;return true;
+    };
     birth.acquire=[](void* context,NativeFamilyBirth& b){
         auto& p=*static_cast<Population*>(context);
         ++p.acquisitions;
@@ -29,7 +33,7 @@ static void preparedFamily(){
         for(unsigned n=0;n<8;++n){
             dirty=referenceDirty=false;
             std::uint32_t stamp=0,expected=0;
-            assert(reference.externalBirth(2,expected)&&birth.publish(stamp));
+            assert(reference.externalBirth(2,expected)&&birth.publish(stamp,n));
             assert(stamp==expected&&dirty==referenceDirty&&
                 direct.bindingRevision()==reference.bindingRevision()&&
                 direct.captureRevision()==reference.captureRevision()&&

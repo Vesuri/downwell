@@ -21,7 +21,7 @@ public:
     struct Binding {
         void* context=nullptr;
         bool (*admit)(void*,unsigned)=nullptr;
-        bool (*birth)(void*,unsigned,std::uint32_t&)=nullptr;
+        bool (*birth)(void*,unsigned,int,std::uint32_t&)=nullptr;
         bool (*retire)(void*,unsigned)=nullptr;
         bool (*mark)(void*,unsigned)=nullptr;
     };
@@ -56,7 +56,7 @@ public:
         if(!canAppend(1)||(object!=60&&object!=93&&object!=99))return good_=false;
         unsigned slot=freeHint_;while(slot<Capacity&&runs_.occupied(slot))++slot;
         Order order;
-        if(slot==Capacity||(binding_.birth&&!binding_.birth(binding_.context,slot,order.stamp))||
+        if(slot==Capacity||(binding_.birth&&!binding_.birth(binding_.context,slot,object,order.stamp))||
             !runs_.append({slot,next_},object,x,y,source,creation,order))return good_=false;
         ++next_;freeHint_=slot+1;flags_[slot]=active?0:2;return true;
     }

@@ -760,7 +760,7 @@ bool GameplayWorld::appendBreakables(const int* x, const int* y, unsigned count,
         if(creation)record.state=creation[source];
         record.lifetimeId=nextBreakableLifetimeId_++;
         auto* allocation=breakableLifecycle_.nativeAllocation();
-        if(!(allocation?allocation->publish(record.nativeRegistration):
+        if(!(allocation?allocation->publish(record.nativeRegistration,index):
              breakableLifecycle_.birth({index,record.lifetimeId},record))) {
 #else
         breakables_[index].x = x[source];
@@ -799,7 +799,7 @@ bool GameplayWorld::appendGeneratedBreakable(int x,int y,const downwell::Generat
         record.state.breakSound=static_cast<unsigned short>(creation.sound);
         record.state.haveGem=static_cast<unsigned char>(creation.gems);
         record.lifetimeId=nextBreakableLifetimeId_++;
-        if(!allocation->publish(record.nativeRegistration)){
+        if(!allocation->publish(record.nativeRegistration,index)){
             run_.effectsSucceeded=false;return false;
         }
         if((x&15)||(y&15)||x < -512||x>=512||y<0||y>=8192)breakableIndexReady_=false;

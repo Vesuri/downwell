@@ -45,8 +45,10 @@ behavior, both backend integrations and relevant original-game verification.
   ownership (their synchronous stored Create state is not a complete actor).
   Connect authored `objDitherAbove` (61) native wall-destruction contacts.
   Connect native terrain's identity runs to ordered collision candidates
-  before enabling destruction dispatch there: wire the collision dirty queue
-  and spatial mutation/traversal order; registration stamps alone are not pair
+  before enabling destruction dispatch there: finish dirty-queue setter coverage
+  (including masks/transforms) and spatial mutation/traversal publication;
+  connect queue flushing, candidate collection and post-pass retention.
+  Registration stamps alone are not pair
   order. Occupancy
   alone cannot select a wall. Do not replace it with a row-clear
   heuristic or restore duplicate generic per-cell runner state. Verify mixed
