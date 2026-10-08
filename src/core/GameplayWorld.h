@@ -327,6 +327,16 @@ public:
             return currencyEventDispatch_(currencyEventContext_,key,CurrencyPhase::alarm,index);
         });
     }
+    template<class Ops> bool collectRegisteredCurrency(downwell::InstanceHandle key,Ops& ops){
+        if(!run_.effectsSucceeded||!currencyInstances_)return run_.effectsSucceeded=false;
+        return run_.effectsSucceeded=currencyInstances_->collect(key,enemyRandom_,ops);
+    }
+    template<class Audio> bool playCurrencyPickupSound(downwell::InstanceHandle key,downwell::MotionBinary64 volume,Audio& audio){
+        if(!run_.effectsSucceeded||!currencyInstances_)return run_.effectsSucceeded=false;
+        return run_.effectsSucceeded=currencyInstances_->dispatchSound(key,[&](auto& sound){
+            return run_.playCurrencyPickupSound(sound,volume,audio);
+        });
+    }
     template<class Queries,class Math,class View,class Audio>
     bool stepCurrencyRoomEffect(downwell::InstanceHandle key,bool stopped,int width,
         downwell::MotionBinary64 playerX,downwell::MotionBinary64 playerY,Queries& queries,Math& math,View view,

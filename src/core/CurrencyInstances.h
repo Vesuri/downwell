@@ -11,6 +11,7 @@
 #include "PlayerSolidCollisionBinary64.h"
 #include "SoundPlayScript.h"
 #include "RunnerSpriteChange.h"
+#include "CurrencyGainScript.h"
 namespace downwell {
 // Native currency lifetimes. Numeric source IDs are supplied by the room birth
 // stream; never manufacture them from family-local generation handles.
@@ -100,6 +101,14 @@ public:
         SoundPlayEnvironment env;env.gameVolume=volume;env.inWater=inWater;int voice=-1;
         if(!SoundPlayScript::plain(r->sound,env,audio,166,30,false,true,voice,good_))return false;
         return markDestroyed(key);
+    }
+    template<class Random,class Ops> bool collect(InstanceHandle key,Random& random,Ops& ops){
+        const auto* r=find(key);if(!r)return fail();const int amount=r->state.getAmount;
+        return dispatch(key,[&](auto& state,bool& good){return CurrencyGainScript::run(state,amount,random,ops,good);});
+    }
+    // Sound scripts may execute synchronously inside the collection event.
+    template<class Play> bool dispatchSound(InstanceHandle key,Play play){
+        auto* r=resolve(key);if(!r)return fail();return good_=play(r->sound)&&good_;
     }
     template<class Random,class Queries,class Math,class View,class Audio>
     bool stepSource(InstanceHandle key,Random& random,bool stopped,int width,

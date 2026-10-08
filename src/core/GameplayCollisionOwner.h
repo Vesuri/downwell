@@ -1165,6 +1165,14 @@ public:
            !((event.owner==120&&event.code==1266)||(event.owner==83&&event.code==1066)))return check(false);
         return check(world_->collideSkeletonRoomEffect(local,event.code==1066,makePlayer));
     }
+    template<class Ops> bool dispatchCurrencyCollision(const RunnerCollisionEventContext::Frame& event,Ops& ops){
+        View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;
+        if(!valid()||!world_||!resolves(event.self)||!resolves(event.other)||
+            !View::decode(event.self,kind,local)||kind!=View::Kind::currency||event.type!=4||
+            event.subtype!=objectOf(event.other)||!objects_.collisionEvent(248,event.subtype,found,binding)||!found||
+            event.owner!=248||binding.ownerObjectId!=248||event.code!=2127||binding.codeId!=2127)return check(false);
+        return check(world_->collectRegisteredCurrency(local,ops));
+    }
     template<class Frames,class Damage> bool dispatchBoneCollision(
         const RunnerCollisionEventContext::Frame& event,bool stopped,Frames frames,Damage damage){
         View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;

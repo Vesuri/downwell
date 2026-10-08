@@ -19,6 +19,22 @@ struct NativeCurrencyAudioProbe {
     bool getGain(int,downwell::MotionBinary64&);bool setGain(int,downwell::MotionBinary64,int);
     bool setPitch(int,downwell::MotionBinary64);
 };
+struct NativeCurrencyGainProbe {
+    using Handle=downwell::InstanceHandle;
+    bool add(downwell::CurrencyGainScript::AccountField,int);bool currencyAtLeast(unsigned,bool&);
+    bool achievement(int);bool resetTimer();bool extendTimer(unsigned);bool lessResist();bool resetControllers();
+    bool gemPop();bool gemPowered();bool playerPosition(downwell::MotionBinary64&,downwell::MotionBinary64&);
+    bool effect(downwell::MotionBinary64,downwell::MotionBinary64,int,downwell::MotionBinary64,int,int);
+    bool create(int,downwell::MotionBinary64,downwell::MotionBinary64,Handle&);bool myBullet(Handle);
+    bool bulletDirection(downwell::MotionBinary64);bool bulletSprite(int);bool bulletDamage(int);bool bulletSpeed(int);
+    bool sound(int,int,bool,bool);bool soundOverlap(int,int,bool,bool,const char*);
+    bool fxNoLoop(int,downwell::MotionBinary64);bool recharge();bool destroy();
+};
+bool nativeCurrencyGain(downwell::GameplayCollisionOwner& owner,const downwell::RunnerCollisionEventContext::Frame& event,
+    NativeCurrencyGainProbe& ops){return owner.dispatchCurrencyCollision(event,ops);}
+bool nativeCurrencyPickupAudio(GameplayWorld& world,downwell::InstanceHandle key,NativeCurrencyAudioProbe& audio){
+    return world.playCurrencyPickupSound(key,downwell::MotionBinary64::fromInteger(1),audio);
+}
 bool nativeCurrencyStep(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle key,
     const downwell::SpriteMaskPack& masks,NativeCurrencyAudioProbe& audio){
     downwell::CurrencyHomingMath math{downwell::portableAtan};
@@ -3122,6 +3138,62 @@ int main(){
             animationWorld->step(0);
             assert(animationOwner->currency().find(key)->imageIndex.bits==0x3f000000u&&
                 !animationWorld->effectsSucceeded()); // Animation runs; still-unbound alarms stop the frame.
+        }
+        for(unsigned failure=0;failure<3;++failure){
+            auto collecting=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+                GameplayTerrainInstances::WallCollision{},&rooms,ownership);
+            auto scene=std::make_unique<GameplayWorld>(300,false,1000,false,collecting->enemyBinding(),
+                collecting->breakableBinding(),collecting->playerBinding(),&collecting->terrain());
+            assert(collecting->attach(*scene));
+            struct Queries {
+                bool wall(InstanceHandle,MotionBinary64,MotionBinary64,bool& hit){hit=false;return true;}
+                bool tile(InstanceHandle,int,MotionBinary64,MotionBinary64,bool& hit){hit=false;return true;}
+            } queries;
+            InstanceHandle key,self,player;
+            assert(scene->createCurrencyWithSourceId(605093,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(512),queries,key)&&
+                GameplayCollisionView::encode(GameplayCollisionView::Kind::currency,key,self)&&
+                GameplayCollisionView::encode(GameplayCollisionView::Kind::player,scene->playerHandle(),player));
+            assert(collecting->currency().dispatch(key,[&](auto& state,bool&){state.obtainable=failure!=0;return true;}));
+            struct Audio {
+                GameplayWorld& world;unsigned failure,plays=0,pitches=0;
+                bool isPlaying(int,bool& playing){playing=false;return true;}bool stop(int){return true;}
+                bool play(int id,int priority,bool loop,int& voice){
+                    assert(id==167&&priority==60&&!loop&&world.overlapSound(8)==167);++plays;voice=900;return failure!=1;
+                }
+                bool getGain(int,MotionBinary64& gain){gain=MotionBinary64::fromInteger(1);return true;}
+                bool setGain(int,MotionBinary64,int){return true;}
+                bool setPitch(int voice,MotionBinary64 pitch){assert(voice==900&&pitch.high==0x3ff00000u&&!pitch.low);++pitches;return true;}
+            } audio{*scene,failure};
+            struct Controls {
+                using Handle=InstanceHandle;GameplayWorld& world;InstanceHandle key;Audio& audio;unsigned& resets;unsigned& effects;
+                bool achievement(int){return false;}bool timerStart(std::uint32_t& timer){timer=300;return true;}
+                bool lessResist(){return false;}bool resetControllers(){++resets;return true;}
+                bool gemPop(){return false;}bool gemPowered(){return false;}
+                bool playerPosition(MotionBinary64&,MotionBinary64&){return false;}
+                bool effect(MotionBinary64,MotionBinary64,int,MotionBinary64,int,int){return false;}
+                bool create(int,MotionBinary64,MotionBinary64,Handle&){return false;}bool myBullet(Handle){return false;}
+                bool bulletDirection(MotionBinary64){return false;}bool bulletSprite(int){return false;}
+                bool bulletDamage(int){return false;}bool bulletSpeed(int){return false;}bool sound(int,int,bool,bool){return false;}
+                bool soundOverlap(int id,int priority,bool loop,bool cut,const char* channel){
+                    assert(id==167&&priority==60&&!loop&&cut&&std::strcmp(channel,"UI")==0);
+                    return world.playCurrencyPickupSound(key,MotionBinary64::fromInteger(1),audio);
+                }
+                bool fxNoLoop(int sprite,MotionBinary64 speed){
+                    assert(sprite==105&&speed.high==0x3fe99999u&&speed.low==0x9999999au);++effects;return false;
+                }
+                bool recharge(){return false;}bool destroy(){return false;}
+            };
+            unsigned resets=0,effects=0;auto ops=scene->currencyGainOperations(Controls{*scene,key,audio,resets,effects});
+            const auto draws=scene->randomDrawCount();const auto timer=scene->gemStreakTimer();RunnerCollisionEventContext context;
+            const bool ok=context.dispatch(self,player,{true,false},[&](auto,auto,int& subtype,bool& found,PackedObjectEvent& event){
+                subtype=35;return objects.collisionEvent(248,35,found,event);
+            },[&](const auto& event){return collecting->dispatchCurrencyCollision(event,ops);});
+            assert(ok==(failure==0)&&scene->effectsSucceeded()==ok&&scene->randomDrawCount()==draws);
+            assert(scene->currency()==(failure?2u:0u)&&scene->gameGemTotal()==(failure?2u:0u)&&
+                scene->gemStreak()==(failure?2u:0u)&&scene->gemStreakTimer()==(failure?300u:timer));
+            const auto* caller=collecting->currency().find(key);
+            assert(caller&&!caller->destroyRequested&&resets==(failure?1u:0u)&&audio.plays==(failure?1u:0u)&&
+                effects==(failure==2?1u:0u)&&audio.pitches==(failure==2?1u:0u));
         }
         {
             auto moving=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
