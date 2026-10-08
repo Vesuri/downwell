@@ -49,7 +49,12 @@ private:
     Owner owner_;
     // Published binary32 setters are not the actors' integer drawing positions.
     // Terrain owns immutable coordinates in runs, not duplicate slot records.
-    struct NativePosition {RunnerImageValue x,y;};
+    struct NativePosition {
+        RunnerImageValue x,y;
+        Owner::Sprite sprite;
+        RunnerImageValue timeline{},cachedFrame{0xbf800000u};
+        std::uint32_t appearanceFlags=8u;
+    };
     NativePosition nativePositions_[View::capacity-(View::timeFieldBase-View::terrainBase)]{};
     using NativeDirtyQueue=RunnerSpatialDirtyQueue<View::capacity>;
     NativeDirtyQueue nativeSpatialDirty_,nativeCollisionDirty_;
@@ -75,6 +80,10 @@ private:
         nativeSpatialDirty_.remove(slot);nativeCollisionDirty_.remove(slot);
     }
     NativePosition* nativePosition(unsigned slot){
+        if(slot>=View::capacity||(slot>=View::terrainBase&&slot<View::timeFieldBase))return nullptr;
+        return &nativePositions_[slot<View::terrainBase?slot:slot-(View::timeFieldBase-View::terrainBase)];
+    }
+    const NativePosition* nativePosition(unsigned slot)const{
         if(slot>=View::capacity||(slot>=View::terrainBase&&slot<View::timeFieldBase))return nullptr;
         return &nativePositions_[slot<View::terrainBase?slot:slot-(View::timeFieldBase-View::terrainBase)];
     }
@@ -298,9 +307,13 @@ private:
     }
     bool eligibilityFlags(InstanceHandle h,std::uint32_t& out)const{
         if(native_){
-            if(table_.flags(h,out))return true;
-            if(const auto* b=nativeBox(h)){out=nativeBoxFlags_|(b->destroyRequested?1u:0u);return true;}
-            if(nativeField(h)){out=nativeFieldFlags_;return true;}
+            bool actor=table_.flags(h,out);
+            if(!actor)if(const auto* b=nativeBox(h)){out=nativeBoxFlags_|(b->destroyRequested?1u:0u);actor=true;}
+            if(!actor&&nativeField(h)){out=nativeFieldFlags_;actor=true;}
+            if(actor){
+                const auto* state=nativePosition(h.slot);if(!state)return false;
+                out=(out&~0x4008u)|(state->appearanceFlags&0x4008u);return true;
+            }
             if(world_&&world_->nativeTerrainInstances()){
                 GameplayWorld::NativeTerrain::Identity id;bool active,destroyed;
                 if(View(*world_).readTerrain(h,id,active,destroyed)){
@@ -534,6 +547,25 @@ private:
             }
             return parent.check(RunnerSpatialSplit::valid(position->x)&&RunnerSpatialSplit::valid(position->y));
         }
+        bool nativeAppearance(InstanceHandle h,const Record& r){
+            auto* state=parent.nativePosition(h.slot);const auto* definition=parent.objectDefaults_.get(object(r));
+            if(!state||!definition)return parent.check(false);
+            state->sprite={};state->sprite.spriteId=definition->spriteId;state->sprite.maskId=definition->maskId;
+            state->timeline={};state->cachedFrame={0xbf800000u};state->appearanceFlags=8u;
+            if constexpr(Kind==View::Kind::enemy){
+                state->sprite.spriteId=r.spriteId;state->sprite.maskId=r.maskId;
+                if(!real(r.objectId==117?r.motionState:r.facing,state->sprite.scaleX)||
+                    !real(r.imageScaleY(),state->sprite.scaleY)||r.imagePhase>0x7fffffffu||
+                    !real(int(r.imagePhase),state->sprite.imageIndex))return parent.check(false);
+                if(state->sprite.imageIndex.bits)state->sprite.imageIndex.bits-=8u<<23;
+            }else if constexpr(Kind==View::Kind::player){
+                if(!real(r.scaleX,state->sprite.scaleX))return parent.check(false);
+            }else if constexpr(Kind==View::Kind::debris){
+                if(!r.effect)return parent.check(false);
+                state->sprite.spriteId=r.effect->spriteId;state->sprite.imageIndex=r.effect->imageIndex;
+            }
+            return true;
+        }
         // The same order publications as the reference birth, without
         // bounds or full properties: the flag word and depth come from
         // the prepared object default that attachObjectPrepared applies.
@@ -541,7 +573,7 @@ private:
             const auto* definition=parent.objectDefaults_.get(object(r));
             if(!definition)return parent.check(false);
             auto* position=parent.nativePosition(h.slot);
-            if(!position||!birthPosition(r,*position))return parent.check(false);
+            if(!position||!birthPosition(r,*position)||!nativeAppearance(h,r))return parent.check(false);
             bool inactive=false;
             if constexpr(Kind!=View::Kind::timeField)inactive=!r.active;
             RunnerImageValue depth=definition->creationDepth;
@@ -690,6 +722,7 @@ private:
                 // numeric no-op, just as RunnerSpatialPosition::assign does.
                 if(!RunnerSpatialSplit::equal(position->x,x)||!RunnerSpatialSplit::equal(position->y,y)){
                     position->x=x;position->y=y;
+                    position->appearanceFlags|=8u;
                     std::uint32_t flags;
                     if(!parent.eligibilityFlags(h,flags)||!parent.nativeDirty(h.slot,object(r),flags))return parent.check(false);
                 }
@@ -707,6 +740,14 @@ private:
         bool sprite(InstanceHandle local,const Record& r,int sprite){InstanceHandle h;
             if(!key(local,r,h))return false;
             if(parent.native_){
+                auto* state=parent.nativePosition(h.slot);if(!state)return parent.check(false);
+                if(state->sprite.spriteId==sprite)return true;
+                std::uint32_t frames=0;if(sprite>=0)parent.sprites_.frameCount(unsigned(sprite),frames);
+                RunnerSpriteChange::Result change;
+                if(!parent.check(RunnerSpriteChange::plan(state->sprite.spriteId,sprite,state->sprite.imageIndex,frames,change)))return false;
+                state->sprite.spriteId=sprite;state->cachedFrame={0xbf800000u};state->appearanceFlags|=8u;
+                if(change.resetIndex)state->sprite.imageIndex={};
+                if(change.resetTimeline)state->timeline={};
                 bool changed;if(!parent.check(parent.table_.setSprite(h,sprite,changed)))return false;
                 if(changed){
                     std::uint32_t flags;
@@ -724,17 +765,36 @@ private:
             return parent.check(parent.owner_.changeSpriteFromPack(h,p.sprite,p.timeline,p.cachedFrame,
                 sprite,parent.sprites_,*parent.families_.flags(object)));}
         bool imageIndex(InstanceHandle local,const Record& r,RunnerImageValue value){InstanceHandle h;
-            if(parent.native_)return true;
+            if(parent.native_){
+                if(!key(local,r,h)||!parent.check(RunnerSpatialSplit::valid(value)))return false;
+                auto* state=parent.nativePosition(h.slot);if(!state)return parent.check(false);
+                state->sprite.imageIndex=value;return true;
+            }
             if(!key(local,r,h))return false;auto edit=parent.properties_.template editDomain<Kind==View::Kind::terrain>(h.slot);
             return parent.check(parent.owner_.writeImageIndex(h,edit.get().sprite,value));}
         bool mask(InstanceHandle local,const Record& r,int value){InstanceHandle h;
-            if(parent.native_)return true;
+            if(parent.native_){
+                if(!key(local,r,h))return false;
+                auto* state=parent.nativePosition(h.slot);if(!state)return parent.check(false);
+                if(state->sprite.maskId==value)return true;
+                state->sprite.maskId=value;state->appearanceFlags|=8u;
+                std::uint32_t flags;
+                return parent.eligibilityFlags(h,flags)&&parent.nativeDirty(h.slot,object(r),flags);
+            }
             if(!key(local,r,h))return false;auto edit=parent.properties_.template editDomain<Kind==View::Kind::terrain>(h.slot);
             return parent.check(parent.owner_.changeMask(h,edit.get().sprite,
                 value,*parent.families_.flags(object(r))));}
         bool transform(InstanceHandle local,const Record& r,RunnerTransformField field,RunnerImageValue value,
             RunnerImageValue alpha,std::uint32_t blend){InstanceHandle h;
-            if(parent.native_)return true;
+            if(parent.native_){
+                if(!key(local,r,h))return false;
+                auto* state=parent.nativePosition(h.slot);if(!state)return parent.check(false);
+                bool changed;
+                if(!parent.check(RunnerSpriteSetters::transform(state->sprite,field,value,alpha,blend,state->appearanceFlags,changed)))return false;
+                if(!changed)return true;
+                std::uint32_t flags;
+                return parent.eligibilityFlags(h,flags)&&parent.nativeDirty(h.slot,object(r),flags);
+            }
             if(!key(local,r,h))return false;auto edit=parent.properties_.template editDomain<Kind==View::Kind::terrain>(h.slot);
             return parent.check(parent.owner_.changeTransform(h,edit.get().sprite,
                 field,value,alpha,blend,*parent.families_.flags(object(r))));}
@@ -792,7 +852,7 @@ public:
     // events that would need registered walls fail rather than miss them.
     //
     // Native ownership does not yet answer spatial queries. Published actor
-    // positions are retained separately, but bounds, transforms and the
+    // positions and appearance are retained separately, but bounds and the
     // spatial journal are not published. A compact table keeps
     // what the actor orders observe (object, flag word, sprite index and
     // registration order); room lists and layers remain the order owners.
@@ -859,7 +919,7 @@ public:
     unsigned pendingSpatialIndex()const{return owner_.pendingSpatialIndex();}
     // Diagnostic traversal only: this is not spatial candidate selection.
     // No consumer may flush these queues until bounds/index publication is
-    // connected; mask/transform mutations still need native admission.
+    // connected, including animation's later cached-frame invalidation.
     template<class Visit> bool visitNativeDirty(bool collision,Visit visit)const{
         if(!native_||!valid())return false;
         const auto& queue=collision?nativeCollisionDirty_:nativeSpatialDirty_;
@@ -873,6 +933,11 @@ public:
         if(!native_||!valid()||!table_.contains(h))return false;
         const auto* position=nativePosition(h.slot);if(!position)return false;
         x=position->x;y=position->y;return true;
+    }
+    bool nativePublishedSprite(InstanceHandle h,Owner::Sprite& sprite,std::uint32_t& flags)const{
+        if(!native_||!valid()||!eligibilityFlags(h,flags))return false;
+        const auto* state=nativePosition(h.slot);if(!state)return false;
+        sprite=state->sprite;return true;
     }
     bool serviceSpatialIndex(unsigned budget){return check(owner_.serviceSpatialIndex(budget));}
     bool attach(GameplayWorld& world){
@@ -916,7 +981,10 @@ public:
             boxAllocation_.good=&good_;boxAllocation_.context=this;
             boxAllocation_.observeBirth=[](void* context,unsigned slot){
                 auto& self=*static_cast<GameplayCollisionOwner*>(context);
-                return slot<GameplayWorld::breakableCapacity&&self.nativeBirthQueues(View::breakableBase+slot,92);
+                if(!self.world_||slot>=self.world_->breakableSlots())return false;
+                const auto& r=self.world_->breakableSlot(slot);const InstanceHandle h{View::breakableBase+slot,r.lifetimeId};
+                auto* state=self.nativePosition(h.slot);
+                return state&&self.boxes_.birthPosition(r,*state)&&self.boxes_.nativeAppearance(h,r)&&self.nativeBirthQueues(h.slot,92);
             };
             boxAllocation_.acquire=[](void* context,NativeFamilyBirth& birth){
                 auto& self=*static_cast<GameplayCollisionOwner*>(context);
@@ -1248,7 +1316,7 @@ public:
         });
         return true;
     }
-    auto playerBinding(){return GameplayWorld::PlayerLifecycleBinding::bindTransforms(player_);}
+    auto playerBinding(){return GameplayWorld::PlayerLifecycleBinding::bindMasks(player_);}
     auto enemyBinding(){return GameplayWorld::EnemyLifecycleBinding::bindMaskDestruction(enemies_);}
     auto breakableBinding(){
         auto binding=GameplayWorld::BreakableLifecycleBinding::bindDestruction(boxes_);

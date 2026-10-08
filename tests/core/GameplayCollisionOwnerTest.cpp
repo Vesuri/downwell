@@ -2191,6 +2191,48 @@ int main(){
         }
     }
     auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
+    {
+        using Sprite=GameplayCollisionOwner::Owner::Sprite;
+        std::vector<Sprite> expected;
+        std::vector<std::uint32_t> expectedFlags;
+        for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+            GameplayCollisionOwner::Ownership::nativeScenery}){
+            auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
+                GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&rooms,mode);
+            auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),
+                owner->breakableBinding(),owner->playerBinding(),nullptr,&rooms);
+            assert(owner->attach(*world));
+            const auto local=world->playerHandle();const auto* record=world->findPlayer(local);
+            InstanceHandle h;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::player,local,h));
+            const auto binding=owner->playerBinding();unsigned step=0;
+            auto compare=[&]{
+                Sprite value;std::uint32_t flags;
+                if(mode==GameplayCollisionOwner::Ownership::reference){
+                    value=owner->properties(h)->sprite;flags=owner->state(h)->flags;
+                    expected.push_back(value);expectedFlags.push_back(flags);
+                }else{
+                    assert(owner->nativePublishedSprite(h,value,flags));const auto& e=expected[step];
+                    assert(value.spriteId==e.spriteId&&value.maskId==e.maskId&&value.scaleX.bits==e.scaleX.bits&&
+                        value.scaleY.bits==e.scaleY.bits&&value.angle.bits==e.angle.bits&&value.imageIndex.bits==e.imageIndex.bits&&
+                        (flags&0x4000u)==(expectedFlags[step]&0x4000u));
+                }
+                ++step;
+            };
+            compare();
+            assert(binding.mask(local,*record,-123));compare(); // Missing resources remain stored.
+            if(mode==GameplayCollisionOwner::Ownership::reference)assert(expected.back().maskId==-123);
+            assert(binding.transform(local,*record,RunnerTransformField::scaleX,{0x3f000000u},{0x3f800000u},0xffffffu));compare();
+            assert(binding.transform(local,*record,RunnerTransformField::angle,{0x42340000u},{0x3f800000u},0xffffffu));compare();
+            assert(binding.transform(local,*record,RunnerTransformField::angle,{0},{0x3f800000u},0xffffffu));compare();
+            // Numeric no-op bypasses appearance validation and keeps +0.
+            assert(binding.transform(local,*record,RunnerTransformField::angle,{0x80000000u},{0x7fc00000u},0));compare();
+            assert(binding.transform(local,*record,RunnerTransformField::scaleX,{0x3f800000u},{0x3f800000u},0xffffffu));compare();
+            assert(binding.imageIndex(local,*record,{0x447a0000u}));compare();
+            assert(binding.sprite(local,*record,-1));compare();
+            assert(binding.imageIndex(local,*record,{0xc0200000u}));compare();
+            assert(binding.sprite(local,*record,35));compare();
+        }
+    }
     for(auto ownership:{GameplayCollisionOwner::Ownership::native,GameplayCollisionOwner::Ownership::nativeScenery}){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
             GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&rooms,ownership);
@@ -2254,9 +2296,22 @@ int main(){
         InstanceHandle box;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::breakable,
             {world->breakableSlots()-1,world->breakableSlot(world->breakableSlots()-1).lifetimeId},box));
         for(bool collision:{false,true})assert(same(queued(collision)[0],box));
+        GameplayCollisionOwner::Owner::Sprite published;std::uint32_t publishedFlags;
+        assert(owner->nativePublishedSprite(playerShared,published,publishedFlags));
+        assert(playerBinding.mask(playerLocal,*playerRecord,published.maskId));
+        assert(playerBinding.sprite(playerLocal,*playerRecord,published.spriteId));
+        assert(playerBinding.transform(playerLocal,*playerRecord,RunnerTransformField::angle,published.angle,{0x3f800000u},0xffffffu));
+        assert(playerBinding.imageIndex(playerLocal,*playerRecord,{0x3fc00000u}));
+        for(bool collision:{false,true})assert(same(queued(collision)[0],box));
         assert(playerBinding.activation(playerLocal,*playerRecord,false));
         for(bool collision:{false,true})assert(same(queued(collision)[0],box));
         assert(playerBinding.activation(playerLocal,*playerRecord,true));
+        for(bool collision:{false,true})assert(same(queued(collision)[0],playerShared));
+        assert(world->appendBreakables(&boxX,&boxY,1));
+        assert(playerBinding.mask(playerLocal,*playerRecord,-123));
+        for(bool collision:{false,true})assert(same(queued(collision)[0],playerShared));
+        assert(world->appendBreakables(&boxX,&boxY,1));
+        assert(playerBinding.transform(playerLocal,*playerRecord,RunnerTransformField::angle,{0x42340000u},{0x3f800000u},0xffffffu));
         for(bool collision:{false,true})assert(same(queued(collision)[0],playerShared));
         assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)==ResultsDestination::gameplay);
         assert(world->nativeTerrainInstances()==terrain.get()&&!terrain->size()&&!view.contains(other));
