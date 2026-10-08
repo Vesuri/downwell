@@ -50,6 +50,22 @@ static void compare(const SkeletonActor& a,const SkeletonActor& b){
     for(unsigned i=0;i<4;++i)check(a.alarms[i]==b.alarms[i]);
 }
 int main(){
+    {
+        SkeletonActor actor;check(actor.create(96,192));
+        struct Player {
+            SkeletonActor& actor;unsigned stomps=0,damages=0;
+            MotionBinary64 globalY()const{return MotionBinary64::fromInteger(180);}
+            bool grounded()const{return false;}
+            MotionBinary64 verticalSpeed()const{return MotionBinary64::fromInteger(1);}
+            bool stomp(){++stomps;actor.y=160;return true;}
+            bool damage(int a,int x,int y){++damages;return a==1&&x==3&&y==2;}
+        } player{actor};bool good=true;
+        check(actor.collidePlayerPublished(player,good)&&good&&player.stomps==1&&player.damages==1);
+        check(actor.create(96,192));player.stomps=player.damages=0;
+        check(actor.collidePlayerAt(player)&&player.stomps==1&&player.damages==1);
+        // The second comparison must use the position published by stomp,
+        // not the pre-callback self.y snapshot (192).
+    }
     unsigned prefixes=0;
     for(unsigned mode=0;mode<2048;++mode){
         SkeletonActor initial;check(initial.create(96,192));

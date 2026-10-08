@@ -106,6 +106,19 @@ impact RNG or retire the caller prematurely. These adapters do not choose
 collision candidates or silently implement the missing player-damage script;
 the production paired dispatcher and damage owner must supply those operations.
 
+`dispatchSkeletonCollision` similarly validates the source player handler
+(120/1266) or inherited parent-time-field handler (83/1066), including the
+actual opposite object's subtype. Player handling preserves two independent
+tests: a synchronous stomp is followed by fresh grounded/global-player-Y/self-Y
+reads before deciding whether damage also runs. Failed stomp or damage latches
+the world and stops the event. There is no invented time-stop guard. The field
+handler only sets health to zero when `timefieldImmune` is false; it does not
+run death effects or retire the skeleton. Death remains ordinary Step work.
+Stored dispatch publishes the resulting health through its retained instance
+record. Stomp and damage script owners are explicit dependencies, not no-op
+fallbacks. Controlled player callbacks and real inherited exit-field bindings
+verify these boundaries, not natural pair selection or player damage fidelity.
+
 `BoneProjectileInstances` supplies generation-checked fixed ownership separately
 from the scalar store. Its caller supplies numeric source IDs. Registered birth
 publishes the serialized object-269 geometry and layer membership before the

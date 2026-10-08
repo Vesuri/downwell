@@ -281,6 +281,14 @@ public:
         });
         return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
     }
+    template<class MakePlayer> bool collideSkeletonRoomEffect(downwell::InstanceHandle key,bool timeField,MakePlayer makePlayer){
+        if(!run_.effectsSucceeded||!skeletons_||!skeletons_->valid())return run_.effectsSucceeded=false;
+        const bool ok=skeletons_->dispatch(key,[&](auto& actor,auto&,bool& good){
+            if(timeField){actor.collideTimeField();return true;}
+            auto player=makePlayer(actor);return actor.collidePlayerPublished(player,good);
+        });
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
+    }
     static constexpr unsigned boneCapacity=32;
     const Bones* bones()const{return bones_;}
     bool bindBones(Bones& bones){

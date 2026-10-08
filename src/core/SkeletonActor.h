@@ -40,12 +40,27 @@ struct SkeletonActor : SkeletonDecisions {
         }
         if(player.grounded()) player.damage(1,3,2);
         else {
-            if(!compareRunnerReal(player.globalY(),publishedY,order)) return false;
+            if(!compareRunnerReal(player.globalY(),MotionBinary64::fromInteger(y),order)) return false;
             if(order>0) player.damage(1,3,2);
         }
         return true;
     }
     void collideTimeField() { if(!timefieldImmune) health=0; }
+    // Selected source player event. Stomp is synchronous and can mutate both
+    // actors; the second IF re-reads grounded, global ply and self.y. Preserve
+    // this separately from the scalar successful-event reference above.
+    template<class Player> bool collidePlayerPublished(Player& player,bool& good){
+        if(!good)return false;
+        int order;
+        if(!compareRunnerReal(MotionBinary64::fromInteger(y),player.globalY(),order))return good=false;
+        if(order>0&&!player.grounded()){
+            if(!compareRunnerReal(player.verticalSpeed(),{},order))return good=false;
+            if(order>0&&!player.stomp())return good=false;
+        }
+        if(player.grounded())return player.damage(1,3,2)||(good=false);
+        if(!compareRunnerReal(player.globalY(),MotionBinary64::fromInteger(y),order))return good=false;
+        return order<=0||player.damage(1,3,2)||(good=false);
+    }
     // scrEnemyStomped: callbacks are synchronous, including child Create/RNG.
     // forcedJump implements scrFjump (and its own recharge); the explicit
     // recharge call below is a second source call, not a duplicate to remove.

@@ -330,6 +330,29 @@ int main(){
         require(throws==1&&!hurts&&bones.instances().size()==1&&stop.reset()&&bones.clear()&&skeletons.clear(),
             "animation drives one registered source throw without invented death effects");
     }
+    for(unsigned mode=0;mode<8;++mode){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            InstanceLifecycleBinding::bindPointQueries(*owner));
+        require(owner->attach(*world),"attach skeleton collision world");world->skipToGameForTesting();
+        if(mode>=6)world->registerLevelExit(192);
+        auto skeletons=world->skeletonRegistration<1>();InstanceHandle local,other;
+        require(world->spawnSkeleton(skeletons,240,192,local),"spawn collision skeleton");
+        require(world->visitDrawChecked([&](InstanceHandle key,const InstanceRecord& record){
+            bool found=false;PackedObjectEvent binding{};
+            if(!objects.collisionEvent(120,record.objectId,found,binding))return false;
+            if(found&&binding.codeId==(mode>=6?1066:1266)&&!other.generation)other=key;return true;
+        })&&other.generation,"select live player or inherited time-field binding");
+        if(mode==7)require(skeletons.dispatch(local,[](auto& state,auto&,bool&){state.timefieldImmune=true;return true;}),"immune fixture");
+        RunnerCollisionEventContext context;unsigned stomps=0,damages=0;const auto self=skeletons.worldHandle(local);
+        const bool ok=owner->dispatchCollisionEvent(context,self,other,{true,false},[&](const auto& event){
+            return world->dispatchSkeletonCollision(skeletons,event,[&](auto& actor){return CheckedSkeletonContact{actor,mode,stomps,damages};});
+        });
+        require(ok==(mode!=3&&mode!=5)&&stomps==unsigned(mode>=1&&mode<=3)&&
+            damages==unsigned(mode==2||mode==4||mode==5),"skeleton source independent IFs and callback failures");
+        if(ok){require(skeletons.instances().find(local)->state.health==(mode==6?0:60),"time-field inheritance and immunity");
+            require(skeletons.clear(),"clear skeleton collision fixture");}
+    }
     for(unsigned contact=0;contact<5;++contact){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,

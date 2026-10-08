@@ -42,6 +42,15 @@ for name, digest in {
     assert sha256(payload).hexdigest() == digest
     assert b"random" not in payload and b"choose" not in payload
 skeleton_object = manifest["resources"]["objects"][120]
+for name, digest in (
+    ("enmSkeleton_Collision_objPlayer_n", "b72959eb0f50c30ffbdbfe23302a48bbb6791e19acc540291b861958d87d1f53"),
+    ("subparentEnemy_Collision_parentTimeField", "03d79d845b4e318d58b395ae57c65e519c181cd56c4478fdb86301fcd1168409"),
+):
+    assert sha256((export / "Assembly" / ("gml_Object_" + name + ".asm")).read_bytes()).hexdigest() == digest
+for owner, subtype, code in ((120,35,1266),(83,82,1066)):
+    event = next(e for e in manifest["resources"]["objects"][owner]["events"]
+                 if e["eventType"] == 4 and e["eventSubtype"] == subtype)
+    assert [a["codeId"] for a in event["actions"]] == [code]
 assert (skeleton_object["parentId"], skeleton_object["spriteId"], skeleton_object["textureMaskId"]) == (83, 208, 208)
 for sprite, frames in ((205, 1), (207, 8), (208, 6)):
     assert len(manifest["resources"]["sprites"][sprite]["frames"]) == frames

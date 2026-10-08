@@ -2824,6 +2824,34 @@ int main(){
         auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
         assert(owner->attach(*world));
+        for(unsigned mode=0;mode<8;++mode){
+            auto contacts=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+                GameplayTerrainInstances::WallCollision{},&rooms,ownership);
+            auto scene=std::make_unique<GameplayWorld>(300,false,1000,false,contacts->enemyBinding(),
+                contacts->breakableBinding(),contacts->playerBinding(),&contacts->terrain());
+            assert(contacts->attach(*scene));InstanceHandle local,self,player;
+            assert(scene->createSkeletonWithSourceId(505089,240,192,local)&&
+                GameplayCollisionView::encode(GameplayCollisionView::Kind::skeleton,local,self)&&
+                GameplayCollisionView::encode(GameplayCollisionView::Kind::player,scene->playerHandle(),player));
+            int otherObject=35;
+            if(mode>=6){
+                assert(scene->registerLevelExit(192));player={};
+                assert(contacts->visitRegistrationOrder([&](InstanceHandle key,int object,auto){
+                    bool found=false;PackedObjectEvent binding{};
+                    if(!objects.collisionEvent(120,object,found,binding))return false;
+                    if(found&&binding.codeId==1066&&!player.generation){player=key;otherObject=object;}return true;
+                })&&player.generation);
+            }
+            if(mode==7)assert(contacts->skeletons().dispatch(local,[](auto& actor,auto&,bool&){actor.timefieldImmune=true;return true;}));
+            RunnerCollisionEventContext context;unsigned stomps=0,damages=0;
+            const bool ok=context.dispatch(self,player,{true,false},[&](auto,auto,int& subtype,bool& found,PackedObjectEvent& event){
+                subtype=otherObject;return objects.collisionEvent(120,otherObject,found,event);
+            },[&](const auto& event){return contacts->dispatchSkeletonCollision(event,
+                [&](auto& actor){return CheckedSkeletonContact{actor,mode,stomps,damages};});});
+            assert(ok==(mode!=3&&mode!=5)&&scene->effectsSucceeded()==ok&&contacts->valid()==ok&&
+                stomps==unsigned(mode>=1&&mode<=3)&&damages==unsigned(mode==2||mode==4||mode==5));
+            if(ok)assert(contacts->skeletons().find(local)->state.health==(mode==6?0:60));
+        }
         for(unsigned contact=0;contact<5;++contact){
             auto contacts=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
                 GameplayTerrainInstances::WallCollision{},&rooms,ownership);

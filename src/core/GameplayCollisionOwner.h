@@ -1126,6 +1126,15 @@ public:
     GameplayWorld::DroneBullets& droneBullets(){return drones_;}
     GameplayWorld::Bones& bones(){return bones_;}
     GameplayWorld::Skeletons& skeletons(){return skeletons_;}
+    template<class MakePlayer> bool dispatchSkeletonCollision(const RunnerCollisionEventContext::Frame& event,MakePlayer makePlayer){
+        View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;
+        if(!valid()||!world_||!resolves(event.self)||!resolves(event.other)||
+           !View::decode(event.self,kind,local)||kind!=View::Kind::skeleton||event.type!=4||
+           event.subtype!=objectOf(event.other)||!objects_.collisionEvent(120,event.subtype,found,binding)||!found||
+           event.owner!=binding.ownerObjectId||event.code!=binding.codeId||
+           !((event.owner==120&&event.code==1266)||(event.owner==83&&event.code==1066)))return check(false);
+        return check(world_->collideSkeletonRoomEffect(local,event.code==1066,makePlayer));
+    }
     template<class Frames,class Damage> bool dispatchBoneCollision(
         const RunnerCollisionEventContext::Frame& event,bool stopped,Frames frames,Damage damage){
         View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;

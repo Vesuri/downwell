@@ -850,6 +850,22 @@ public:
             MotionBinary64::fromInteger(mainPlayerMotion_.speedYFifths()),random_);
         return run_.effectsSucceeded;
     }
+    template<unsigned Capacity,class MakePlayer> bool dispatchSkeletonCollision(
+        StoredSkeletonRegistration<instanceCapacity,Capacity>& skeletons,
+        const RunnerCollisionEventContext::Frame& event,MakePlayer makePlayer){
+        if(!run_.effectsSucceeded)return false;
+        const auto* self=instances_.resolve(event.self);const auto* other=instances_.resolve(event.other);
+        PackedObjectEvent binding{};bool found=false;
+        if(!skeletons.belongsTo(instances_)||!skeletons.valid()||!self||!other||!objectPack_||self->objectId!=120||
+           event.type!=4||event.subtype!=other->objectId||
+           !objectPack_->collisionEvent(120,other->objectId,found,binding)||!found||
+           event.owner!=binding.ownerObjectId||event.code!=binding.codeId||
+           !((event.owner==120&&event.code==1266)||(event.owner==83&&event.code==1066)))return run_.effectsSucceeded=false;
+        return run_.effectsSucceeded=skeletons.dispatch(skeletons.handle(*self),[&](auto& actor,auto&,bool& good){
+            if(event.code==1066){actor.collideTimeField();return true;}
+            auto player=makePlayer(actor);return actor.collidePlayerPublished(player,good);
+        })&&run_.effectsSucceeded;
+    }
     template<unsigned Capacity,class Frames,class Damage> bool dispatchBoneCollision(
         StoredBoneRegistration<instanceCapacity,Capacity>& bones,
         const RunnerCollisionEventContext::Frame& event,bool stopped,Frames frames,Damage damage){
