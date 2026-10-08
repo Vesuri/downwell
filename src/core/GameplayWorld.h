@@ -22,6 +22,7 @@
 #include "core/GameplayExitControllers.h"
 #include "core/GameplayEntryDithers.h"
 #include "core/DroneBulletInstances.h"
+#include "core/BoneProjectileInstances.h"
 #include "core/GameplayScriptSpawnInstances.h"
 #include "core/GameplayDebrisInstances.h"
 #include "core/GameplayTimeChangeRegistration.h"
@@ -255,6 +256,19 @@ public:
     bool bindDroneBullets(DroneBullets& bullets){
         if(droneBullets_||!bullets.valid()||bullets.size())return false;
         droneBullets_=&bullets;return true;
+    }
+    using Bones=downwell::BoneProjectileInstances<32>;
+    static constexpr unsigned boneCapacity=32;
+    const Bones* bones()const{return bones_;}
+    bool bindBones(Bones& bones){
+        if(bones_||!bones.valid()||bones.size())return false;
+        bones_=&bones;return true;
+    }
+    // Until the native room allocator includes all controller/effect births,
+    // require an explicit source ID rather than inventing it from a handle.
+    bool createBoneWithSourceId(unsigned id,int x,int y,downwell::InstanceHandle& key){
+        if(!run_.effectsSucceeded||!bones_||!bones_->create(id,x,y,enemyRandom_,key))return run_.effectsSucceeded=false;
+        return true;
     }
     bool bindEntryDithers(downwell::GameplayEntryDithers& entries){
         if(entryDithers_||!entries.valid()||entries.size())return false;
@@ -1025,6 +1039,7 @@ private:
     downwell::NativeTimeChangeRegistration* timeChangeInstances_=nullptr;
     downwell::GameplayEntryDithers* entryDithers_=nullptr;
     DroneBullets* droneBullets_=nullptr;
+    Bones* bones_=nullptr;
     downwell::TimeChangeEffects<8>* timeChangeEffects_=nullptr;
     int* timeChangeSpeed_=nullptr; // Borrowed source room-speed global, not PAL catch-up.
     bool clearRoomTimeChanges();

@@ -57,7 +57,7 @@ private:
 #ifdef DOWNWELL_DRAW_CACHE_AUDIT
     mutable bool drawAuditHasSnapshot_=false;
 #endif
-    RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity+GameplayWorld::droneBulletCapacity> combatAlarmPhase_;
+    RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity+GameplayWorld::droneBulletCapacity+GameplayWorld::boneCapacity> combatAlarmPhase_;
     bool combatAlarmCaptureDirty_=true;
     unsigned combatAlarmMask_=0;
     bool combatAlarmCaptureValid_=false;
@@ -357,6 +357,7 @@ private:
             if constexpr(Kind==View::Kind::timeChange)return 211;
             if constexpr(Kind==View::Kind::entryDither)return 73;
             if constexpr(Kind==View::Kind::drone)return 266;
+            if constexpr(Kind==View::Kind::bone)return 269;
             if constexpr(Kind==View::Kind::goalField||Kind==View::Kind::exitController)return r.objectId;
             return Kind==View::Kind::player?35:92;
         }
@@ -399,7 +400,7 @@ private:
             }else if constexpr(Kind==View::Kind::debris){
                 if(!r.effect)return parent.check(false);
                 state.x=r.effect->x;state.y=r.effect->y;
-            }else if constexpr(Kind==View::Kind::timeChange||Kind==View::Kind::entryDither||Kind==View::Kind::drone){
+            }else if constexpr(Kind==View::Kind::timeChange||Kind==View::Kind::entryDither||Kind==View::Kind::drone||Kind==View::Kind::bone){
                 state.x=r.x;state.y=r.y;
             }else{
                 if(r.x>0x7fffffff-ox||r.y>0x7fffffff-oy)return parent.check(false);
@@ -450,7 +451,7 @@ private:
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
             if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
             if constexpr(Kind==View::Kind::entryDither)sourceId=r.sourceId;
-            if constexpr(Kind==View::Kind::drone)sourceId=r.sourceId;
+            if constexpr(Kind==View::Kind::drone||Kind==View::Kind::bone)sourceId=r.sourceId;
             constexpr bool projected=Kind==View::Kind::player||Kind==View::Kind::enemy||
                 Kind==View::Kind::bullet||Kind==View::Kind::scriptEffect||Kind==View::Kind::debris||Kind==View::Kind::entryDither;
             if(projected&&!parent.actorDepthAvailable(p.depth))return parent.check(false);
@@ -511,7 +512,7 @@ private:
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
             if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
             if constexpr(Kind==View::Kind::entryDither)sourceId=r.sourceId;
-            if constexpr(Kind==View::Kind::drone)sourceId=r.sourceId;
+            if constexpr(Kind==View::Kind::drone||Kind==View::Kind::bone)sourceId=r.sourceId;
             constexpr bool projected=Kind==View::Kind::player||Kind==View::Kind::enemy||
                 Kind==View::Kind::bullet||Kind==View::Kind::scriptEffect||Kind==View::Kind::debris||Kind==View::Kind::entryDither;
             if(projected&&!parent.actorDepthAvailable(depth))return parent.check(false);
@@ -653,6 +654,8 @@ private:
     GameplayEntryDithers entries_{GameplayEntryDithers::Binding::bindDestruction(entryBinding_)};
     Binding<GameplayWorld::DroneBullets::Record,View::Kind::drone> droneBinding_{*this};
     GameplayWorld::DroneBullets drones_{GameplayWorld::DroneBullets::Binding::bindPositionedActor(droneBinding_)};
+    Binding<GameplayWorld::Bones::Record,View::Kind::bone> boneBinding_{*this};
+    GameplayWorld::Bones bones_{GameplayWorld::Bones::Binding::bindPositionedActor(boneBinding_)};
     std::uint32_t pendingTimeChangeId_=0;
     const bool native_;
     const bool sceneryLayers_;
@@ -739,9 +742,9 @@ public:
     template<class Visit> bool visitRegistrationOrder(Visit visit)const{return valid()&&visitEligibility(visit);}
     // Drone dispatch deliberately exposes bool& status to arbitrary callbacks;
     // retain its live read rather than delaying a callback's failure to return.
-    bool valid()const{return good_&&(failureObserved_?drones_.valid():
+    bool valid()const{return good_&&(failureObserved_?(drones_.valid()&&bones_.valid()):
         (owner_.valid()&&properties_.valid()&&terrain_.valid()&&scriptEffects_.valid()&&debris_.valid()&&
-         timeChanges_.valid()&&entries_.valid()&&drones_.valid()&&layers_.valid()));}
+         timeChanges_.valid()&&entries_.valid()&&drones_.valid()&&bones_.valid()&&layers_.valid()));}
     unsigned pendingSpatialIndex()const{return owner_.pendingSpatialIndex();}
     bool serviceSpatialIndex(unsigned budget){return check(owner_.serviceSpatialIndex(budget));}
     bool attach(GameplayWorld& world){
@@ -760,6 +763,7 @@ public:
         if(!world_&&!world.bindTimeChangeInstances(timeChanges_))return check(false);
         if(!world_&&!world.bindEntryDithers(entries_))return check(false);
         if(!world_&&!world.bindDroneBullets(drones_))return check(false);
+        if(!world_&&!world.bindBones(bones_))return check(false);
         world_=&world;
 #ifndef DOWNWELL_REFERENCE_BREAKABLES
         if(nativeBoxes_){
@@ -778,7 +782,7 @@ public:
             if(!self.drones_.size())return true;
             MotionBinary64 top;
             if(!multiplyBinary64(MotionBinary64::fromInteger(topQ12),{0x3f300000u,0},top))return self.check(false);
-            return self.check(self.visitRegistered(View::droneBase,View::capacity,
+            return self.check(self.visitRegistered(View::droneBase,View::boneBase,
                 [&](InstanceHandle shared,int object,std::uint32_t flags){
                     if(flags&0x100003u)return true;
                     View::Kind kind;InstanceHandle local;
@@ -962,6 +966,7 @@ public:
                         return self.world_->advanceDebrisRoomAnimation(local);
                     }
                     case View::Kind::drone:return self.drones_.advanceAnimation(local);
+                    case View::Kind::bone:return self.bones_.advanceAnimation(local);
                     default:return true;
                 }
             };
@@ -1106,6 +1111,7 @@ public:
     }
     GameplayTerrainInstances& terrain(){return terrain_;}
     GameplayWorld::DroneBullets& droneBullets(){return drones_;}
+    GameplayWorld::Bones& bones(){return bones_;}
     // Caller-resident phase snapshot, shared by all twelve alarm indices.
     // advanceAndDispatch owns the actor's alarm storage: decrement once and
     // execute the selected event synchronously only on reaching zero. Objects
@@ -1612,6 +1618,7 @@ private:
                 case View::Kind::timeChange:return record.timeChange&&world_->retireTimeChangeRoomEffect(local);
                 case View::Kind::entryDither:return record.entryDither&&entries_.retire(local);
                 case View::Kind::drone:return record.drone&&drones_.retire(local);
+                case View::Kind::bone:return record.bone&&bones_.retire(local);
                 default:return false;
             }
         });

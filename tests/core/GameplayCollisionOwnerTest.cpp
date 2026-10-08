@@ -250,11 +250,12 @@ static void checkTypedCollisionView(const GameplayCollisionView& view,GameplayCo
         case K::timeChange:assert(view.resolveLocal<K::timeChange>(local)==reference.timeChange);break;
         case K::entryDither:assert(view.resolveLocal<K::entryDither>(local)==reference.entryDither);break;
         case K::drone:assert(view.resolveLocal<K::drone>(local)==reference.drone);break;
+        case K::bone:assert(view.resolveLocal<K::bone>(local)==reference.bone);break;
     }
 }
 static void checkCollisionViewMembership(const GameplayWorld& world){
     const GameplayCollisionView view(world);
-    for(unsigned family=0;family<=unsigned(GameplayCollisionView::Kind::drone);++family)
+    for(unsigned family=0;family<=unsigned(GameplayCollisionView::Kind::bone);++family)
         for(auto local:{InstanceHandle{0,0},InstanceHandle{0xffffffffu,1},InstanceHandle{GameplayCollisionView::capacity,1}})
             checkTypedCollisionView(view,GameplayCollisionView::Kind(family),local);
     for(unsigned slot=0;slot<=GameplayCollisionView::capacity;++slot){
@@ -2793,6 +2794,61 @@ int main(){
         assert(world->droneBullets()==&drones&&!drones.find(retained)&&drones.size()==0&&owner->valid());
         InstanceHandle replacement;
         assert(drones.create(105192,{},{},replacement)&&replacement.generation>retained.generation&&drones.clear());
+    }
+    for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                       GameplayCollisionOwner::Ownership::nativeScenery}){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},
+            ownership==GameplayCollisionOwner::Ownership::nativeScenery?&rooms:nullptr,ownership);
+        auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));
+        auto& bones=owner->bones();InstanceHandle local,shared;
+        const auto before=world->randomDrawCount();auto random=world->randomState();BoneProjectile reference;
+        assert(reference.create(240,990,random)&&world->createBoneWithSourceId(405190,240,990,local)&&
+            GameplayCollisionView::encode(GameplayCollisionView::Kind::bone,local,shared));
+        assert(world->bones()==&bones&&bones.find(local)->sourceId==405190&&GameplayCollisionView(*world).contains(shared)&&
+            world->randomDrawCount()==before+3);
+        for(unsigned i=0;i<16;++i)assert(world->randomState().stateWord(i)==random.stateWord(i));
+        checkTypedCollisionView(GameplayCollisionView(*world),GameplayCollisionView::Kind::bone,local);
+        unsigned population=0;
+        assert(owner->visitRegistrationOrder([&](InstanceHandle h,int object,std::uint32_t){
+            if(object==269){assert(h.slot==shared.slot&&h.generation==shared.generation);++population;}return true;
+        })&&population==1);
+        if(ownership==GameplayCollisionOwner::Ownership::reference)assert(owner->population(269,population)&&population==1);
+        for(unsigned tick=0;tick<8;++tick){
+            world->step(0);bool crossed;assert(reference.advanceImage(crossed));
+            assert(world->effectsSucceeded()&&owner->valid()&&bones.find(local)->state.timeline.bits==reference.timeline.bits);
+            if(ownership==GameplayCollisionOwner::Ownership::reference)
+                assert(owner->properties(shared)->sprite.imageIndex.bits==reference.imageIndex.bits);
+        }
+        // Death body runs with registered setters, while this controlled
+        // ownership fixture supplies the effect/view callbacks explicitly.
+        unsigned effects=0;
+        assert(bones.dispatch(local,[&](auto& state,auto& publish,bool& good){
+            state.health=0;
+            struct Ops {
+                decltype(publish) publisher;unsigned& effects;
+                bool imageSpeed(RunnerImageValue v){return publisher.imageSpeed(v);}
+                bool position(RunnerImageValue x,RunnerImageValue y){return publisher.position(x,y);}
+                bool mask(int id){return publisher.mask(id);}
+                bool destroy(){return publisher.destroy();}
+                bool effect(int id,int speed){assert(id==85&&speed==3);++effects;return true;}
+                bool inView(int,int,bool& visible){visible=true;return true;}
+            } ops{publish,effects};
+            return state.stepPublished(false,ops,good);
+        }));
+        assert(effects==1&&bones.find(local)->destroyRequested&&bones.find(local)->active&&
+            !bones.find(local)->state.active&&GameplayCollisionView(*world).contains(shared));
+        if(ownership==GameplayCollisionOwner::Ownership::reference)
+            assert(owner->properties(shared)->sprite.maskId==582&&owner->state(shared)->x.bits==bones.find(local)->x.bits);
+        assert(owner->prepareDraw()&&!bones.find(local)&&!GameplayCollisionView(*world).contains(shared));
+        InstanceHandle retained;
+        assert(world->createBoneWithSourceId(405191,240,990,retained));
+        assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)!=ResultsDestination::none);
+        assert(world->bones()==&bones&&!bones.find(retained)&&bones.size()==0&&owner->valid());
+        InstanceHandle replacement;assert(world->createBoneWithSourceId(405192,240,990,replacement)&&
+            replacement.generation>retained.generation&&!bones.find(local)&&bones.clear());
     }
     {
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);

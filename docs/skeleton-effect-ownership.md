@@ -51,6 +51,19 @@ automatic skeleton throwing or native admission. The bridge must be cleared
 before room teardown. Capacity failure is a terminal port error before another
 ID or Create RNG word is consumed, not a claim about Windows allocation failure.
 
+The native `GameplayCollisionOwner` also binds the shared store as its own
+object-269 family. Its disjoint slot range does not overlap drone bullets;
+room animation and pre-Draw destruction cleanup resolve the same generation.
+Reference ownership publishes original absolute coordinates, image indices and
+mask writes to the spatial owner. Native ownership retains them in the typed
+bone record and publishes lifetime/layer flags without populating a spatial
+tree that the native queries cannot yet consume. Retry and level teardown
+clear bones before reusing the room and retain the generation stream.
+`createBoneWithSourceId` uses the world's shared RNG but requires the caller's
+numeric ID: it does not fill the missing native global allocator. Automatic
+throwing, ordinary Step/collision dispatch, view/time-stop/effect adapters,
+rendering and replay serialization remain required for natural encounters.
+
 ## Death is not just removal plus a gem reward
 
 `global.killCount` belongs to the run, not the room. The VM assigns zero in

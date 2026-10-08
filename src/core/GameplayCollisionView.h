@@ -8,7 +8,7 @@ namespace downwell {
 // and lifetimeId do not. Borrowed views never cache pointers across a mutation.
 class GameplayCollisionView {
 public:
-    enum class Kind {player,enemy,breakable,terrain,timeField,goalField,exitController,bullet,scriptEffect,debris,timeChange,entryDither,drone};
+    enum class Kind {player,enemy,breakable,terrain,timeField,goalField,exitController,bullet,scriptEffect,debris,timeChange,entryDither,drone,bone};
     static constexpr unsigned enemyBase=1;
     static constexpr unsigned breakableBase=enemyBase+GameplayWorld::enemyCapacity;
     static constexpr unsigned terrainBase=breakableBase+GameplayWorld::breakableCapacity;
@@ -21,7 +21,8 @@ public:
     static constexpr unsigned timeChangeBase=debrisBase+GameplayDebrisInstances::capacity;
     static constexpr unsigned entryDitherBase=timeChangeBase+8;
     static constexpr unsigned droneBase=entryDitherBase+GameplayEntryDithers::capacity;
-    static constexpr unsigned capacity=droneBase+GameplayWorld::droneBulletCapacity;
+    static constexpr unsigned boneBase=droneBase+GameplayWorld::droneBulletCapacity;
+    static constexpr unsigned capacity=boneBase+GameplayWorld::boneCapacity;
     struct Record {
         const GameplayWorld::PlayerInstance* player=nullptr;
         const GameplayWorld::EnemyState* enemy=nullptr;
@@ -36,6 +37,7 @@ public:
         const NativeTimeChangeRegistration::Record* timeChange=nullptr;
         const GameplayEntryDithers::Record* entryDither=nullptr;
         const GameplayWorld::DroneBullets::Record* drone=nullptr;
+        const GameplayWorld::Bones::Record* bone=nullptr;
     };
     explicit GameplayCollisionView(const GameplayWorld& world):world_(world){}
     static bool encode(Kind kind,InstanceHandle local,InstanceHandle& key){
@@ -55,6 +57,7 @@ public:
             case Kind::timeChange:base=timeChangeBase;count=8;break;
             case Kind::entryDither:base=entryDitherBase;count=GameplayEntryDithers::capacity;break;
             case Kind::drone:base=droneBase;count=GameplayWorld::droneBulletCapacity;break;
+            case Kind::bone:base=boneBase;count=GameplayWorld::boneCapacity;break;
             default:return false;
         }
         if(local.slot>=count)return false;
@@ -62,6 +65,7 @@ public:
     }
     static bool decode(InstanceHandle key,Kind& kind,InstanceHandle& local){
         if(!key.generation||key.slot>=capacity)return false;
+        if(key.slot>=boneBase){kind=Kind::bone;local={key.slot-boneBase,key.generation};return true;}
         if(key.slot>=droneBase){kind=Kind::drone;local={key.slot-droneBase,key.generation};return true;}
         if(key.slot>=entryDitherBase){kind=Kind::entryDither;local={key.slot-entryDitherBase,key.generation};return true;}
         if(key.slot>=timeChangeBase){kind=Kind::timeChange;local={key.slot-timeChangeBase,key.generation};return true;}
@@ -93,8 +97,9 @@ public:
             else if constexpr(Family==Kind::debris)return world_.debrisInstances()?world_.debrisInstances()->find(local):nullptr;
             else if constexpr(Family==Kind::timeChange)return world_.timeChangeInstances()?world_.timeChangeInstances()->find(local):nullptr;
             else if constexpr(Family==Kind::entryDither)return world_.entryDithers()?world_.entryDithers()->find(local):nullptr;
-            else {static_assert(Family==Kind::drone,"Unknown collision family");
-                return world_.droneBullets()?world_.droneBullets()->find(local):nullptr;}
+            else if constexpr(Family==Kind::drone)return world_.droneBullets()?world_.droneBullets()->find(local):nullptr;
+            else {static_assert(Family==Kind::bone,"Unknown collision family");
+                return world_.bones()?world_.bones()->find(local):nullptr;}
         };
         using Pointer=decltype(lookup());
         InstanceHandle shared;
@@ -139,6 +144,9 @@ private:
                 break;
             case Kind::drone:
                 if(!world_.droneBullets()||!(next.drone=world_.droneBullets()->find(local)))return false;
+                break;
+            case Kind::bone:
+                if(!world_.bones()||!(next.bone=world_.bones()->find(local)))return false;
                 break;
         }
         if constexpr(Publish)*record=next;
