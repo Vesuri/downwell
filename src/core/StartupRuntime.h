@@ -27,6 +27,7 @@
 #include "StoredEntryDitherRegistration.h"
 #include "StoredDroneBulletRegistration.h"
 #include "StoredBoxChainPublication.h"
+#include "StoredCurrencyRegistration.h"
 #include "StoredBoneRegistration.h"
 #include "StoredBloodRegistration.h"
 #include "StoredSkeletonRegistration.h"
@@ -659,6 +660,15 @@ public:
     }
     template<unsigned Capacity> StoredDroneBulletRegistration<instanceCapacity,Capacity> droneBulletRegistration(){
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
+    }
+    template<unsigned Capacity> StoredCurrencyRegistration<instanceCapacity,Capacity> currencyRegistration(){
+        return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
+    }
+    template<unsigned Capacity,class Tile> bool createRegisteredCurrency(
+        StoredCurrencyRegistration<instanceCapacity,Capacity>& registry,MotionBinary64 x,MotionBinary64 y,
+        Tile tile,InstanceHandle& output){
+        if(!registry.belongsTo(instances_))return run_.effectsSucceeded=false;
+        return registry.create(x,y,run_.stage.area,run_.upgrades.levels[10]!=0,random_,tile,output);
     }
     template<unsigned Capacity,class Collision> auto boxChainPublication(
         StoredDroneBulletRegistration<instanceCapacity,Capacity>& bullets,Collision& collision,InstanceHandle box){

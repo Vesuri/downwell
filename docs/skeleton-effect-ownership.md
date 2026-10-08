@@ -514,6 +514,21 @@ remains approximate: registered currency ownership, reward-script caller
 writes and the exact Step/animation path still need integration before this
 Create event replaces it. These tests are not proof of complete live rewards.
 
+`StoredCurrencyRegistration` supplies fixed-address object-248 Create storage
+and source reward setters for the stored world. It allocates a global numeric
+instance ID and publishes resource-backed membership before executing Create.
+Wall queries use the actual parent-57 collision owner; layer-100 tile queries
+remain an explicit required callback. Separate relocation x/y writes update
+the registered shape and builtin position. Successful Create returns the world
+generation handle; a failed Create retains its consumed ID, partial state and
+membership without assigning a return handle. Capacity exhaustion precedes
+Create RNG. Explicit cleanup also retires failed births.
+Resource-backed fixtures compare complete WELL state for clear placement,
+tile relocation, wall search exhaustion, tile-query failure and capacity
+exhaustion, and check amount/size/attraction writes and global ID allocation.
+This creation binding is not yet a scheduled/rendered currency actor or a
+replacement for the live reward array.
+
 The shared live reward wrapper now supplies the run's area to `GemMotion`.
 Its fixed-point adapter preserves the area-5 extra RNG draw after both ordinary
 velocity draws, and areas 3/4 use gravity 112/12800 and cap 6400/12800. As in

@@ -160,6 +160,52 @@ int main(){
     BuilderPatternPack patterns(bb.data(),bb.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     SpriteMaskPack masks(mb.data(),mb.size());
     require(rooms.valid()&&objects.valid()&&patterns.valid()&&sprites.valid()&&masks.valid(),"real collision resources validate");
+    for(unsigned mode=0;mode<5;++mode){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach currency Create world");world->skipToGameForTesting();
+        auto currency=world->currencyRegistration<1>();
+        const MotionBinary64 x{0x406e0800u,0},y{mode==4?0xc0800400u:0x40800400u,0}; // 240.25, +/-512.5
+        unsigned queries=0;InstanceHandle key,observed;
+        auto tiles=[&](InstanceHandle h,int layer,MotionBinary64,MotionBinary64,bool& hit){
+            const auto* r=owner->resolve(h);observed=h;++queries;
+            require(r&&r->objectId==248&&layer==100&&!key.generation,"currency belongs to collision owner before synchronous Create returns");
+            hit=mode==3&&queries==1;return mode!=2;
+        };
+        auto oracle=world->randomState();CurrencyCreate expected;
+        struct Queries {
+            unsigned mode,calls=0;
+            bool wall(MotionBinary64,MotionBinary64,bool& hit){hit=mode==4;return true;}
+            bool tile(MotionBinary64,MotionBinary64,bool& hit){hit=mode==3&&++calls==1;return mode!=2;}
+            bool publish(RunnerImageValue,RunnerImageValue){return true;}
+        } expectedQueries{mode};
+        require(expected.create(x,y,1,false,oracle,expectedQueries)==(mode!=2),"currency Create oracle result");
+        require(world->createRegisteredCurrency(currency,x,y,tiles,key)==(mode!=2),"registered currency Create result");
+        if(mode==4)observed=key;
+        require(world->randomState().drawCount()==oracle.drawCount()&&world->randomState().stateIndex()==oracle.stateIndex(),"registered currency draw order");
+        for(unsigned i=0;i<16;++i)require(world->randomState().stateWord(i)==oracle.stateWord(i),"registered currency full WELL state");
+        const auto* state=currency.find(observed);const auto* record=owner->resolve(observed);
+        require((queries||mode==4)&&state&&record&&state->x.bits==expected.x.bits&&state->y.bits==expected.y.bits&&
+            record->alarms.get(0)==10&&record->alarms.get(3)==15,"registered currency retains synchronous Create state");
+        std::uint32_t publishedX,publishedY;
+        std::memcpy(&publishedX,&record->preciseX,4);std::memcpy(&publishedY,&record->preciseY,4);
+        require(publishedX==expected.x.bits&&publishedY==expected.y.bits,"currency relocation publishes final builtin coordinates");
+        if(mode==0){
+            const auto currencyId=record->instanceId;InstanceHandle next;
+            require(world->spawnBuilderPrimitive(92,400,512,next)&&owner->resolve(next)->instanceId==currencyId+1,
+                "currency birth participates in global numeric ID stream");
+        }
+        if(mode!=2){
+            require(key.generation&&currency.amount(key,10)&&currency.size(key,1)&&currency.attracted(key,true)&&
+                state->getAmount==10&&state->size==1&&state->attracted,"source reward setters reach registered currency");
+            if(mode==1){
+                const auto before=world->randomDrawCount();InstanceHandle rejected;
+                require(!world->createRegisteredCurrency(currency,x,y,tiles,rejected)&&!rejected.generation&&
+                    world->randomDrawCount()==before,"currency capacity failure precedes Create RNG");
+            }
+        }else require(!key.generation&&!world->effectsSucceeded(),"failed currency Create does not publish its return value");
+        require(currency.clear()&&!owner->resolve(observed),"retire registered currency including failed Create");
+    }
     for(unsigned chainCase=0;chainCase<10;++chainCase){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
