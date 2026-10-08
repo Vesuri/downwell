@@ -113,10 +113,15 @@ false. Full settings/ending owners still need to supply their changes.
 The stored collision handler checks the resource-selected event and marks the
 contacted plain wall through its lifecycle owner, retaining it until cleanup.
 It rejects unsupported target families rather than omitting their Destroy
-events. A collected-pair scheduler fixture dispatches its wall contacts alongside
-shard contacts; this does not verify the original runner's simultaneous-contact
-order. The native controller and normal gameplay collision-pass integration
-remain unimplemented.
+events. SDL's ordinary update installs `StoredDitherCollisionPass` at the
+post-Step/pre-End-Step boundary. It collects the complete owner queue in source
+order, executes only plain-wall/dither pairs through the paired wrapper and
+defers retirement to ordinary frame cleanup. Other collision families remain
+on the existing gameplay adapters; this migration pass must be replaced, not
+run again alongside a complete dispatcher. A collected-pair scheduler fixture
+also dispatches wall contacts alongside shards; neither fixture verifies the
+original runner's simultaneous-contact order. Native controller integration
+remains unimplemented.
 Neither registering an inert native record nor relying on generic
 out-of-view terrain retirement reproduces this source lifecycle. Integration
 must preserve the wall's destruction mark and the subsequent phase's retirement,

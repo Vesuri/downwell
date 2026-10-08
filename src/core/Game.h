@@ -26,6 +26,9 @@ public:
     // Resource-backed owners must attach before a shortcut executes Steps.
     // Idempotent so an explicit initialization cannot replay room creation.
     void applyStartupShortcut();
+    void configureCollisionPass(bool (*pass)(void*,StartupRuntime&),void* context){
+        collisionPass_=pass;collisionContext_=context;
+    }
 
     // Platform entropy for ResetPlayer/randomize; fixed default for replays.
     void update(const Input& input, std::uint32_t restartSeed = 2);
@@ -54,6 +57,8 @@ private:
     bool finished_ = false;
     bool simulationSucceeded_ = true;
     bool startupShortcutApplied_ = false;
+    bool (*collisionPass_)(void*,StartupRuntime&)=nullptr;
+    void* collisionContext_=nullptr;
 };
 
 } // namespace downwell

@@ -114,7 +114,9 @@ void Game::update(const Input& input, std::uint32_t restartSeed) {
             if (!startup_.roomLoadSucceeded()) finished_ = true;
         }
     } else {
-        startup_.step(input, input.fire && !fire_);
+        if(collisionPass_)startup_.stepWithCollisionPass(input,input.fire&&!fire_,
+            [&]{return collisionPass_(collisionContext_,startup_);});
+        else startup_.step(input, input.fire && !fire_);
         if(failed())return;
         if (startup_.levelResultRequested())
             startup_.enterLevelClear(startup_.playStyle(), heartGoal_);

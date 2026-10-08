@@ -5,6 +5,7 @@
 #include "core/RoomPack.h"
 #include "core/SpritePack.h"
 #include "core/StoredWorldCollision.h"
+#include "core/StoredDitherCollisionPass.h"
 #include "platform/sdl/PlatformSDL.h"
 #include <cstdio>
 #include <fstream>
@@ -82,6 +83,12 @@ int main() {
     if(!roomPack.valid()||!builderPatternPack.valid()||!collisionOwner||!collisionOwner->valid())return 20;
     downwell::Game game(&roomPack,&objectPack,&builderPatternPack,&effectAssets,collisionOwner->binding(),true);
     if(!collisionOwner->attach(game.startup()))return 20;
+    std::unique_ptr<downwell::StoredDitherCollisionPass> collisionsPass(
+        new(std::nothrow) downwell::StoredDitherCollisionPass(*collisionOwner));
+    if(!collisionsPass)return 20;
+    game.configureCollisionPass([](void* context,downwell::StartupRuntime& world){
+        return static_cast<downwell::StoredDitherCollisionPass*>(context)->run(world);
+    },collisionsPass.get());
     game.applyStartupShortcut();
     const char* profileOption = std::getenv("DOWNWELL_PROFILE");
     const bool profile = profileOption && std::string(profileOption) == "1";

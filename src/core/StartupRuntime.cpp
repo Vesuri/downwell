@@ -548,7 +548,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
         run_.ammoGauge.step(mainAmmo_, mainPlayerMotion_.ammoCapacity());
         run_.gameplayPresentationStep(random_);
         // This frame adapter finishes at the pre-Draw boundary. Only the
-        // box/projectile families and bound script/debris effects are owned here;
+        // walls/controllers, box/projectile families and bound script/debris effects are owned here;
         // external effect owners retain their
         // separate cleanup dispatch until the full room scheduler is joined.
         if(!cleanupMainOwnedDestroyed())run_.effectsSucceeded=false;
@@ -902,7 +902,7 @@ bool StartupRuntime::publishMainBullet(MainBulletState& bullet,bool angle){
 
 bool StartupRuntime::cleanupMainOwnedDestroyed(){
     return run_.effectsSucceeded&&instances_.cleanupDestroyedIf(
-        [this](const InstanceRecord& r){return r.objectId==92||r.objectId==261||r.objectId==370||
+        [this](const InstanceRecord& r){return r.objectId==60||r.objectId==61||r.objectId==92||r.objectId==261||r.objectId==370||
             (r.objectId==269&&boneDispatch_)||
             (r.objectId==220&&bloodDispatch_)||
             (r.objectId==120&&skeletonDispatch_)||

@@ -44,7 +44,9 @@ behavior, both backend integrations and relevant original-game verification.
   finish the stored companions' event/render integration as well as native
   ownership (their synchronous stored Create state is not a complete actor).
   Connect authored `objDitherAbove` (61) ownership and shared Begin Step to
-  native gameplay, and its wall-destruction contacts to both paths. Wire actual
+  native gameplay, including its wall-destruction contacts. Extend the SDL
+  collision pass beyond the admitted plain-wall/dither pair, preserving mixed
+  event ordering rather than running independent family passes. Wire actual
   settings/ending state into its environment; it is not an inert controller or
   the entry wipe (73).
   Preserve entry-dither's published

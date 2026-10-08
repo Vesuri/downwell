@@ -6,6 +6,7 @@
 #include "core/StoredCollisionLifecycle.h"
 #include "core/StoredLayerLifecycle.h"
 #include "core/StoredWorldCollision.h"
+#include "core/StoredDitherCollisionPass.h"
 #include "core/TimeChangeEffects.h"
 #include "core/EventScheduler.h"
 #include "core/RunnerObjectFamilies.h"
@@ -161,6 +162,39 @@ int main(){
     BuilderPatternPack patterns(bb.data(),bb.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     SpriteMaskPack masks(mb.data(),mb.size());
     require(rooms.valid()&&objects.valid()&&patterns.valid()&&sprites.valid()&&masks.valid(),"real collision resources validate");
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach ordinary dither pass");world->skipToGameForTesting();
+        auto pass=std::make_unique<StoredDitherCollisionPass>(*owner);
+        unsigned retired=0;
+        for(unsigned tick=0;tick<180;++tick){
+            std::vector<InstanceHandle> marked;
+            require(world->stepWithCollisionPass({},false,[&]{
+                if(!pass->run(*world))return false;
+                for(unsigned i=0;i<world->activeInstanceCount();++i){
+                    const auto& record=world->instanceAt(i);
+                    if(record.objectId==60&&record.destroyRequested){
+                        const auto key=world->instanceHandleAt(i);
+                        require(owner->resolve(key),"collision retains marked wall until frame cleanup");
+                        marked.push_back(key);
+                    }
+                }
+                return true;
+            }),"ordinary dither collision pass survives natural room progression");
+            for(auto key:marked){++retired;require(!owner->resolve(key),"ordinary frame cleanup retires contacted wall");}
+            require(world->instance(100854)&&owner->valid(),"dither survives its wall contacts");
+        }
+        require(retired>0,"ordinary pass actually prunes authored walls");
+        world->configureDitherAboveEnvironment(false,true);
+        require(world->stepWithCollisionPass({},false,[&]{return pass->run(*world);})&&
+            !world->instance(100854),"ending retires authored controller at ordinary cleanup");
+        require(world->restartFromResults(DeathMenuSequence::Action::Retry,2),"Retry recreates authored controllers");
+        world->configureDitherAboveEnvironment(false,false);
+        for(unsigned tick=0;tick<10;++tick)
+            require(world->stepWithCollisionPass({},false,[&]{return pass->run(*world);}),
+                "reused collision pass resolves new room generations after Retry");
+    }
     {
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
