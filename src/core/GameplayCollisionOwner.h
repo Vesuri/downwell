@@ -10,6 +10,7 @@
 #include "SmokeTrig.h"
 #include "DebrisDraw.h"
 #include "TimeStopBound.h"
+#include "BloodGoalContact.h"
 #include "GameplayRoomLayers.h"
 #include "ObjectDrawMetadata.h"
 #include "ObjectAlarmMetadata.h"
@@ -1438,6 +1439,44 @@ public:
                 return masks.valid()&&registeredPlaceMeeting(self,82,x,y,masks,hit);
             },allowed))return check(false);
         frozen=!allowed;return true;
+    }
+    // Boolean contact only: no source instance identity or ordering is exposed.
+    // Native field stores admit integral centres, unit ordinary fields and 2x
+    // entry/exit fields. Reject unsupported geometry rather than approximating.
+    bool bloodTimeAllowed(InstanceHandle local,bool pTimeStop,int roomWidth,const SpriteMaskPack& masks,bool& allowed){
+        InstanceHandle self;const auto* child=blood_.find(local);
+        if(!valid()||!world_||!child||child->spriteId!=84||
+           !View::encode(View::Kind::blood,local,self)||!resolves(self))return check(false);
+        return check(TimeStopBound::evaluate(pTimeStop,child->x.promoted(),child->y.promoted(),roomWidth,
+            [&](auto x,auto y,bool& hit){
+                if(!native_)return masks.valid()&&registeredPlaceMeeting(self,82,x,y,masks,hit);
+                bool found=false;
+                const bool ok=visitRegistered(View::timeFieldBase,View::exitControllerBase,
+                    [&](InstanceHandle h,int object,std::uint32_t flags){
+                        if(found||(flags&0x100003u))return true;
+                        View::Kind kind;InstanceHandle key;
+                        if(!View::decode(h,kind,key))return false;
+                        if(object==82&&kind==View::Kind::timeField){
+                            const auto* field=View(*world_).template resolveLocal<View::Kind::timeField>(key);
+                            return field&&BloodGoalContact::query(child->state,*field,found);
+                        }
+                        if((object==255||object==371)&&kind==View::Kind::goalField){
+                            const auto* field=world_->goalFieldInstances().find(key);
+                            if(!field||field->scaleX!=2||field->scaleY!=2)return false;
+                            GoalTimeField shape;shape.x=field->x;shape.y=field->y;
+                            return BloodGoalContact::query(child->state,shape,found);
+                        }
+                        return false;
+                    });
+                if(ok)hit=found;return ok;
+            },allowed));
+    }
+    bool stepBlood(InstanceHandle shared,bool pTimeStop,int roomWidth,const SpriteMaskPack& masks){
+        View::Kind kind;InstanceHandle local;
+        if(!valid()||!world_||!View::decode(shared,kind,local)||kind!=View::Kind::blood||!resolves(shared))return check(false);
+        return check(world_->stepBloodRoomEffect(local,[&](const auto&,bool& allowed){
+            return bloodTimeAllowed(local,pTimeStop,roomWidth,masks,allowed);
+        }));
     }
     // Box Step's final alarmStop(0), including after a destroy request. Use
     // the retained published shape, not a point or a global blanket freeze.

@@ -2817,6 +2817,34 @@ int main(){
         InstanceHandle replacement;
         assert(drones.create(105192,{},{},replacement)&&replacement.generation>retained.generation&&drones.clear());
     }
+    std::vector<bool> bloodContactReference;
+    for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                       GameplayCollisionOwner::Ownership::nativeScenery}){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},&rooms,ownership);
+        auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world)&&world->createRoomStartField()&&world->createGeneratedInstance({82,240,512},objects,[](const auto&){return true;})&&
+            world->registerLevelExit(1024));
+        std::vector<bool> contacts;unsigned id=705000;
+        for(int y:{192,512,1056})for(int angle:{0,14,180})
+            for(int dx:{-130,-128,-126,-26,-24,-22,0,22,24,26,126,128,130}){
+                MotionBinary64 x=MotionBinary64::fromInteger(240+dx),py=MotionBinary64::fromInteger(y);
+                assert(x.add({0x3fd00000u,0})&&py.add({0x3fe00000u,0}));
+                InstanceHandle key,shared;
+                assert(world->createBloodWithSourceId(id++,x,py,MotionBinary64::fromInteger(angle),[](auto){return true;},key)&&
+                    GameplayCollisionView::encode(GameplayCollisionView::Kind::blood,key,shared));
+                // Suppress right-side escape; the source's left-side rule still applies.
+                bool allowed=false;
+                assert(owner->bloodTimeAllowed(key,true,10000,masks,allowed));contacts.push_back(allowed);
+                assert(owner->stepBlood(shared,true,10000,masks)&&
+                    owner->blood().find(key)->state.imageSpeed.bits==(allowed?0x3f000000u:0u));
+                assert(owner->blood().clear());
+            }
+        assert(std::count(contacts.begin(),contacts.end(),true)>0&&std::count(contacts.begin(),contacts.end(),false)>0);
+        if(ownership==GameplayCollisionOwner::Ownership::reference)bloodContactReference=contacts;
+        else assert(contacts==bloodContactReference);
+    }
     for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
                        GameplayCollisionOwner::Ownership::nativeScenery}){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},

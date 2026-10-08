@@ -656,9 +656,19 @@ dispatch. `bloodTimeAllowed` obtains the current room width only when stopped;
 the registration then queries parentTimeField (82) through its resource-backed
 rotated mask before checking the strict side bounds. An unstopped query bypasses
 collision work. The callback must read the source player's current `pTimeStop`;
-this interface does not infer it from goal/shop locks. Native fast ownership
-still rejects generic spatial selectors, so this stored query must not be used
-as evidence of native blood contact support.
+this interface does not infer it from goal/shop locks.
+
+Native `bloodTimeAllowed` uses a bounded boolean-only contact path over live
+registered field records. Ordinary fields have integral centres and unit scale;
+entry/exit fields have integral centres and scale 2. It applies
+`BloodGoalContact` to the registered blood sprite/angle, retaining the precise
+mask samples rather than substituting a bounding-box or centre test. Unsupported
+field geometry is rejected. Reference ownership retains the generic resource
+query for differential verification. This path exposes no selected instance
+identity and does not establish spatial traversal order; it cannot be reused
+for identity-bearing shard-direction queries. `stepBlood` invokes it after
+saved-speed capture. Automatic player `pTimeStop` and mixed-family ordinary
+Step admission remain separate integration requirements.
 
 - Blood emits at published x/y, not the precise xx/yy accumulators. Its two
   angles are `random(20)` and `180-random(20)`, respectively. Object 220's Create
