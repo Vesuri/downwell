@@ -2191,6 +2191,32 @@ int main(){
         }
     }
     auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
+    for(auto ownership:{GameplayCollisionOwner::Ownership::native,GameplayCollisionOwner::Ownership::nativeScenery}){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
+            GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&rooms,ownership);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),nullptr,&rooms);
+        auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
+        assert(owner->attach(*world)&&world->bindNativeTerrain(*terrain)&&world->bindNativeTerrain(*terrain));
+        assert(terrain->append(60,240,160,true,100857)&&terrain->append(60,240,160,false,100858));
+        const auto local=terrain->handle(0),coincident=terrain->handle(1);
+        InstanceHandle shared,other;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,local,shared)&&
+            GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,coincident,other));
+        GameplayCollisionView view(*world);GameplayCollisionView::Record record;
+        GameplayWorld::NativeTerrain::Identity id;bool active,destroyed;
+        assert(view.contains(shared)&&view.resolve(shared,record)&&record.nativeTerrain&&!record.terrain);
+        assert(view.readTerrain(shared,id,active,destroyed)&&id.source==100857&&id.object==60&&
+            id.x==240&&id.y==160&&active&&!destroyed);
+        int parent;assert(owner->projectileWallParent(shared,parent)&&parent==59);
+        assert(terrain->markDestroyed(local)&&view.contains(shared)&&view.readTerrain(shared,id,active,destroyed)&&destroyed);
+        assert(terrain->retire(local)&&!view.contains(shared)&&!owner->projectileWallParent(shared,parent));
+        assert(view.readTerrain(other,id,active,destroyed)&&id.source==100858&&!active&&!destroyed);
+        assert(terrain->append(93,240,160));const auto replacement=terrain->handle(1);
+        assert(replacement.slot==local.slot&&replacement.generation!=local.generation&&!view.contains(shared));
+        assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)==ResultsDestination::gameplay);
+        assert(world->nativeTerrainInstances()==terrain.get()&&!terrain->size()&&!view.contains(other));
+        assert(terrain->append(60,240,160)&&terrain->handle(0).generation>replacement.generation);
+    }
     for(unsigned failure=0;failure<4;++failure){
         struct CollisionNotice {
             unsigned disabled=0;

@@ -212,7 +212,9 @@ private:
             // need delegation to native families; adding a family must not
             // turn every actor lookup into a walk of all family predicates.
             if(table_.contains(h))return View(*world_).contains(h);
-            return nativeBox(h)||nativeField(h);
+            return nativeBox(h)||nativeField(h)||
+                (h.slot>=View::terrainBase&&h.slot<View::timeFieldBase&&world_->nativeTerrainInstances()&&
+                 world_->nativeTerrainInstances()->contains({h.slot-View::terrainBase,h.generation}));
         }
         return owner_.contains(h)&&View(*world_).contains(h);
     }
@@ -221,7 +223,13 @@ private:
     int objectOf(InstanceHandle h)const{
         if(!native_)return owner_.objectId(h);
         const int object=table_.objectId(h);if(object>=0)return object;
-        return nativeBox(h)?92:nativeField(h)?82:-1;
+        if(nativeBox(h))return 92;
+        if(nativeField(h))return 82;
+        if(world_&&world_->nativeTerrainInstances()){
+            GameplayWorld::NativeTerrain::Identity id;bool active,destroyed;
+            if(View(*world_).readTerrain(h,id,active,destroyed))return id.object;
+        }
+        return -1;
     }
     InstanceHandle handleAt(unsigned slot)const{
         if(!native_)return owner_.currentHandle(slot);
@@ -236,6 +244,10 @@ private:
             const unsigned i=slot-View::timeFieldBase;
             const auto* f=world_->timeFields().at(i);
             if(f&&f->nativeRegistration)return {slot,world_->timeFields().identityAt(i)};
+        }
+        if(world_&&world_->nativeTerrainInstances()&&slot>=View::terrainBase&&slot<View::timeFieldBase){
+            const auto local=world_->nativeTerrainInstances()->currentHandle(slot-View::terrainBase);
+            if(local.generation)return {slot,local.generation};
         }
         return {};
     }
@@ -258,6 +270,13 @@ private:
             if(table_.flags(h,out))return true;
             if(const auto* b=nativeBox(h)){out=nativeBoxFlags_|(b->destroyRequested?1u:0u);return true;}
             if(nativeField(h)){out=nativeFieldFlags_;return true;}
+            if(world_&&world_->nativeTerrainInstances()){
+                GameplayWorld::NativeTerrain::Identity id;bool active,destroyed;
+                if(View(*world_).readTerrain(h,id,active,destroyed)){
+                    const auto* definition=objectDefaults_.get(id.object);if(!definition)return false;
+                    out=definition->initialFlags|(active?0u:2u)|(destroyed?1u:0u);return true;
+                }
+            }
             return false;
         }
 #ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP

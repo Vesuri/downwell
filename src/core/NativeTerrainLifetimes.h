@@ -18,11 +18,13 @@ public:
     unsigned size()const{return runs_.size();}
     unsigned runCount()const{return runs_.runCount();}
     unsigned available()const{return Capacity-size();}
+    bool contains(InstanceHandle h)const{return good_&&runs_.contains(h);}
     bool read(InstanceHandle h,Identity& id,bool& active,bool& destroyed)const{
-        if(!runs_.read(h,id))return false;
+        if(!good_||!runs_.read(h,id))return false;
         active=(flags_[h.slot]&2)==0;destroyed=(flags_[h.slot]&1)!=0;return true;
     }
     InstanceHandle handle(unsigned ordinal)const{return runs_.handle(ordinal);}
+    InstanceHandle currentHandle(unsigned slot)const{return good_?runs_.currentHandle(slot):InstanceHandle{};}
     template<class Visit> bool visit(Visit visit)const{
         return good_&&runs_.visit([&](const Identity& id){return visit(id,(flags_[id.handle.slot]&2)==0,
             (flags_[id.handle.slot]&1)!=0);});

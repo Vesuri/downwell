@@ -51,6 +51,8 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     if(!exitControllers_.clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(terrainInstances_&&!terrainInstances_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     const auto terrainInstances=terrainInstances_;
+    if(nativeTerrainInstances_&&!nativeTerrainInstances_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
+    const auto nativeTerrainInstances=nativeTerrainInstances_;
     const auto entryRooms=entryRooms_;
     const auto scriptSpawnInstances=scriptSpawnInstances_;
     const auto debrisInstances=debrisInstances_;
@@ -104,6 +106,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto foregroundBirth=run_.nextForegroundBirth;
     this->~GameplayWorld();
     new (this) GameplayWorld(initialRingOrigin, false, 1201 - 176, true, enemyLifecycle,breakableLifecycle,{},terrainInstances,entryRooms);
+    nativeTerrainInstances_=nativeTerrainInstances;
     run_.gemStreakRise=controllerRise; // Persistent controller survives Retry.
     nextBreakableLifetimeId_=nextBreakableIdentity;
     scriptSpawnInstances_=scriptSpawnInstances;
@@ -199,6 +202,7 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
     if(!exitControllers_.clear()){run_.effectsSucceeded=false;return false;}
     if(terrainInstances_&&!terrainInstances_->clear()){run_.effectsSucceeded=false;return false;}
     roomTerrainLoaded_=false;
+    if(nativeTerrainInstances_&&!nativeTerrainInstances_->clear())return run_.effectsSucceeded=false;
     if (!run_.advanceAfterLevelClear()) return false;
     // Do not reconstruct this large runtime or copy RunSession onto the task
     // stack: its run globals remain in place while old world ownership retires.

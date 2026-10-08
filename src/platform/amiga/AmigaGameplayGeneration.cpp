@@ -13,7 +13,8 @@ bool AmigaGameplayGeneration::birth(int object,int x,int y,bool active){
 bool AmigaGameplayGeneration::loadRoom(AmigaPortRuntime& runtime,
     const downwell::RoomPack& rooms,const downwell::PackedRoom& room,
     const downwell::PreparedRoomTerrain* prepared,AmigaRoomTerrainPlan* backend){
-    if(lifetimes_&&!lifetimes_->clear())return false;
+    if(lifetimes_&&(!lifetimes_->clear()||
+        (runtime.terrainCreatesBackendOnly()&&!runtime.bindNativeTerrain(*lifetimes_))))return false;
     const bool compiled=backend&&prepared&&prepared->matches(rooms,room)&&backend->begin(prepared);
     return runtime.loadRoomTerrain(rooms,room,[this,backend,compiled](const downwell::PackedRoomInstance& instance){
         return (compiled?backend->emit(index_,instance):
@@ -31,7 +32,8 @@ bool AmigaGameplayGeneration::adoptRoom(AmigaPortRuntime& runtime,
 bool AmigaGameplayGeneration::loadRoomWithStartField(AmigaPortRuntime& runtime,
     const downwell::RoomPack& rooms,const downwell::PackedRoom& room,
     const downwell::PreparedRoomTerrain* prepared,AmigaRoomTerrainPlan* backend){
-    if(lifetimes_&&!lifetimes_->clear())return false;
+    if(lifetimes_&&(!lifetimes_->clear()||
+        (runtime.terrainCreatesBackendOnly()&&!runtime.bindNativeTerrain(*lifetimes_))))return false;
     const bool compiled=backend&&prepared&&prepared->matches(rooms,room)&&backend->begin(prepared);
     return runtime.loadRoomTerrainWithStartField(rooms,room,[this,backend,compiled](const downwell::PackedRoomInstance& instance){
         return (compiled?backend->emit(index_,instance):

@@ -58,6 +58,7 @@
 #include "core/InstanceHandle.h"
 #include "core/InstanceLifecycle.h"
 #include "core/GameplayTerrainInstances.h"
+#include "core/NativeTerrainLifetimes.h"
 #include "core/RunnerStepSnapshot.h"
 
 #include <cstdint>
@@ -255,8 +256,15 @@ public:
                               downwell::GameplayTerrainInstances* terrainInstances = nullptr,
                               const downwell::RoomPack* entryRooms = nullptr);
     const downwell::GameplayTerrainInstances* terrainInstances()const{return terrainInstances_;}
-    // Without terrain instances, wall/platform Creates (60, 93) have no world
-    // state: createGeneratedTerrain reduces to the backend's own publication.
+    using NativeTerrain=downwell::NativeTerrainLifetimes<downwell::GameplayTerrainInstances::capacity>;
+    const NativeTerrain* nativeTerrainInstances()const{return nativeTerrainInstances_;}
+    bool bindNativeTerrain(NativeTerrain& terrain){
+        if(!run_.effectsSucceeded||terrainInstances_||!terrain.valid()||
+            (nativeTerrainInstances_&&nativeTerrainInstances_!=&terrain))return run_.effectsSucceeded=false;
+        nativeTerrainInstances_=&terrain;return true;
+    }
+    // Without generic terrain records, the backend publishes both its raster
+    // and any bound native identity runs; do not execute generic Create twice.
     bool terrainCreatesBackendOnly()const{return run_.effectsSucceeded&&!terrainInstances_;}
     const downwell::GameplayScriptSpawnInstances* scriptSpawnInstances()const{return scriptSpawnInstances_;}
     const downwell::GameplayDebrisInstances* debrisInstances()const{return debrisInstances_;}
@@ -1404,6 +1412,7 @@ private:
     BreakableLifecycleBinding breakableLifecycle_;
     PlayerLifecycleBinding playerLifecycle_;
     downwell::GameplayTerrainInstances* terrainInstances_=nullptr;
+    NativeTerrain* nativeTerrainInstances_=nullptr;
     downwell::GameplayScriptSpawnInstances* scriptSpawnInstances_=nullptr;
     downwell::GameplayDebrisInstances* debrisInstances_=nullptr;
     downwell::NativeTimeChangeRegistration* timeChangeInstances_=nullptr;

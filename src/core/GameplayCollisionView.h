@@ -32,6 +32,9 @@ public:
         const GameplayWorld::EnemyState* enemy=nullptr;
         const GameplayWorld::Breakable* breakable=nullptr;
         decltype(static_cast<const GameplayTerrainInstances*>(nullptr)->find(InstanceHandle{})) terrain=nullptr;
+        // Native runs produce values, not stable per-cell Record addresses.
+        // Read them explicitly with readTerrain; never fabricate a pointer.
+        bool nativeTerrain=false;
         const OrdinaryTimeField* timeField=nullptr;
         const GameplayGoalFields::Record* goalField=nullptr;
         const GameplayExitControllers::Record* exitController=nullptr;
@@ -95,6 +98,16 @@ public:
     // The same typed-store/generation validation without constructing a wide
     // borrowed-record result when a caller only needs lifetime membership.
     bool contains(InstanceHandle key)const{return resolveImpl<false>(key,nullptr);}
+    bool readTerrain(InstanceHandle key,GameplayWorld::NativeTerrain::Identity& identity,
+        bool& active,bool& destroyed)const{
+        Kind kind;InstanceHandle local;
+        if(!decode(key,kind,local)||kind!=Kind::terrain)return false;
+        if(const auto* native=world_.nativeTerrainInstances())return native->read(local,identity,active,destroyed);
+        const auto* store=world_.terrainInstances();
+        const auto* r=store?store->find(local):nullptr;if(!r)return false;
+        identity={local,r->objectId,r->x,r->y,r->creationCodeId,r->sourceInstanceId};
+        active=r->active;destroyed=r->destroyRequested;return true;
+    }
     // Typed bindings already know their family. Resolve the same local
     // lifetime without constructing the thirteen-pointer generic record.
     // Nothing is cached across mutation or enemy-store compaction.
@@ -135,7 +148,10 @@ private:
             case Kind::enemy:next.enemy=world_.resolveEnemyLifetime(local);if(!next.enemy)return false;break;
             case Kind::breakable:next.breakable=world_.findBreakable(local);if(!next.breakable)return false;break;
             case Kind::terrain:
-                if(!world_.terrainInstances()||!(next.terrain=world_.terrainInstances()->find(local)))return false;
+                if(const auto* native=world_.nativeTerrainInstances()){
+                    if(!native->contains(local))return false;
+                    next.nativeTerrain=true;
+                }else if(!world_.terrainInstances()||!(next.terrain=world_.terrainInstances()->find(local)))return false;
                 break;
             case Kind::timeField:
                 if(world_.timeFields().identityAt(local.slot)!=local.generation||
