@@ -30,6 +30,7 @@ class PatternTests(unittest.TestCase):
         for family_id, family in enumerate(result["families"], 6):
             for pattern in family["patterns"]:
                 expected.append(f"{family_id} {pattern['sourceIndex']} {max(pattern['rowWidths'])} {len(pattern['rows'])}")
+                expected.append(pattern["text"].encode("ascii").hex())
                 expected.extend(pattern["rows"])
         actual = subprocess.check_output([ROOT / "build/area-two-pattern-pack-test",
                                           ROOT / "generated/downwell-area-two-patterns.dwbp"], text=True)

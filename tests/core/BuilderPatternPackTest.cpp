@@ -19,6 +19,10 @@ int main(int argc, char** argv) {
         (std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
     downwell::BuilderPatternPack pack(bytes.data(), bytes.size());
     require(pack.valid(), "generated builder-pattern pack validates");
+    const std::uint8_t* literal = nullptr;
+    std::uint32_t length = 123;
+    require(!pack.literalData(0, literal, length) && !literal && length == 123,
+            "v4 cannot substitute normalized rows for original literals");
     require(pack.patternCount() == 62 && pack.rowCount() == 737 &&
                 pack.cellCount() == 8435,
             "recovered area-one pattern counts are pinned");

@@ -58,6 +58,10 @@ public:
     // Validated immutable row view; lifetime is that of the backing pack.
     bool rowData(const PackedBuilderPattern& pattern, std::uint16_t y,
                  const std::uint8_t*& output, std::uint32_t& width) const;
+    // Original VM string, including tabs and CR/LF. Version 5 only. Required
+    // for source character traversal: normalized rows omit trailing newlines.
+    bool literalData(std::uint32_t patternId, const std::uint8_t*& output,
+                     std::uint32_t& length) const;
     // Validated source-ordered program. 0 introduces a fixed terrain segment,
     // ASCII introduces one event cell, 255 terminates the row. Views remain
     // valid for the immutable pack's lifetime. Pillars are the last two rows.
@@ -71,6 +75,8 @@ private:
     std::size_t patternsOffset_ = 0, rowsOffset_ = 0, cellsOffset_ = 0;
     const std::uint8_t* preparedOffsets_ = nullptr;
     const std::uint8_t* preparedPrograms_ = nullptr;
+    const std::uint8_t* literalOffsets_ = nullptr;
+    const std::uint8_t* literalBytes_ = nullptr;
     std::uint32_t patternCount_ = 0, rowCount_ = 0, cellCount_ = 0;
     BuilderPatternPackError error_ = BuilderPatternPackError::tooShort;
 };

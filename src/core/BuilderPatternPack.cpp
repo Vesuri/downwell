@@ -50,8 +50,27 @@ BuilderPatternPack::BuilderPatternPack(const std::uint8_t* bytes,
     }
     const std::size_t extension = cellsOffset_ + cellCount_;
     if (literals) {
-        if (extension != size) {
+        const std::size_t offsetsSize = (std::size_t(patternCount_) + 1) * 4;
+        if (size-extension < 4 || offsetsSize > size-extension-4 ||
+            bytes[extension]!='D' || bytes[extension+1]!='W' ||
+            bytes[extension+2]!='T' || bytes[extension+3]!='X') {
             error_ = BuilderPatternPackError::wrongSize; return;
+        }
+        literalOffsets_ = bytes + extension + 4;
+        literalBytes_ = literalOffsets_ + offsetsSize;
+        const std::size_t literalSize = size - (literalBytes_ - bytes);
+        if (u32(literalOffsets_) || u32(literalOffsets_ + patternCount_*4) != literalSize) {
+            error_ = BuilderPatternPackError::wrongSize; return;
+        }
+        for (std::uint32_t id=0; id<patternCount_; ++id) {
+            const auto start=u32(literalOffsets_+id*4), end=u32(literalOffsets_+(id+1)*4);
+            if (start>=end || end>literalSize) { error_=BuilderPatternPackError::badPattern; return; }
+        }
+        for (std::size_t i=0; i<literalSize; ++i) {
+            const auto c=literalBytes_[i];
+            if (c!=9 && c!=10 && c!=13 && (c<32 || c>126)) {
+                error_=BuilderPatternPackError::badPattern; return;
+            }
         }
     } else {
     const std::size_t tableBytes = (std::size_t(rowCount_) * 2 + 3) * 4;
@@ -226,6 +245,15 @@ bool BuilderPatternPack::rowData(const PackedBuilderPattern& value,
         !range(first-value.firstCell, count, value.cellCount)) return false;
     out = bytes_ + cellsOffset_ + first;
     width = count;
+    return true;
+}
+
+bool BuilderPatternPack::literalData(std::uint32_t id, const std::uint8_t*& output,
+                                     std::uint32_t& length) const {
+    if (!valid() || !literalBytes_ || id>=patternCount_) return false;
+    const auto start=u32(literalOffsets_+id*4);
+    output=literalBytes_+start;
+    length=u32(literalOffsets_+(id+1)*4)-start;
     return true;
 }
 

@@ -104,6 +104,7 @@ def runtime_pack(result):
     require(result["source"]["sha256"] == SOURCE_SHA256 and result["area"] == 2,
             "unexpected runtime pack source")
     records, rows, cells = bytearray(), bytearray(), bytearray()
+    literal_offsets, literals = bytearray(), bytearray()
     pattern_count = row_count = 0
     require(len(result["families"]) == len(FAMILIES), "unexpected family count")
     for family_id, (family, (_, array, count)) in enumerate(zip(result["families"], FAMILIES), 6):
@@ -111,6 +112,11 @@ def runtime_pack(result):
                 "unexpected runtime family")
         for index, pattern in enumerate(family["patterns"]):
             require(pattern["sourceIndex"] == index, "nonsequential runtime index")
+            literal_offsets.extend(struct.pack("<I", len(literals)))
+            literal = pattern["text"].encode("ascii")
+            require(literal and all(c in (9, 10, 13) or 32 <= c <= 126 for c in literal),
+                    "invalid runtime literal")
+            literals.extend(literal)
             first_cell = len(cells)
             first_row = row_count
             widths = []
@@ -126,7 +132,8 @@ def runtime_pack(result):
             pattern_count += 1
     header = struct.pack("<4sHHIIIQI", b"DWBP", 5, 32, 3, pattern_count, len(cells),
                          int.from_bytes(bytes.fromhex(SOURCE_SHA256)[:8], "little"), row_count)
-    return header + records + rows + cells
+    literal_offsets.extend(struct.pack("<I", len(literals)))
+    return header + records + rows + cells + b"DWTX" + literal_offsets + literals
 
 
 def publish(path, payload, check):

@@ -42,15 +42,28 @@ generation followed by `--check` verifies deterministic output.
 
 The C++ `BuilderPatternPack` reader accepts the catacomb pack as DWBP version 5.
 It retains the version-4 header/record/row layout, with family identifiers 6--11
-in the table order above. The file ends after literal cells: there is no DWPR
-extension. Version 4 remains restricted to cavern families 1--5 and requires
+in the table order above. After normalized cells, a DWTX extension stores
+`patternCount + 1` little-endian 32-bit offsets followed by the original VM
+strings. Offsets start at zero, increase strictly and end at the string payload
+size; strings are length-delimited, not NUL-terminated. `literalData(id)` exposes
+these immutable bytes including tabs and CR/LF. There is no DWPR extension.
+Version 4 remains restricted to cavern families 1--5 and requires
 its existing prepared programs. The two versions cannot be substituted.
 `preparedRow` and `preparedPillars` return null for literal packs: cavern
 fixed-segment RNG and terrain rules must never run on catacomb symbols.
 The JSON records the binary pack's format, size and hash alongside the input
 provenance. Tests compare every row read by the C++ reader with the VM export,
-check all truncations and malformed family/index/version data, and retain
+check original strings byte-for-byte, all truncations and malformed
+family/index/version/offset/string data, and retain
 the existing cavern prepared-program regression test.
+
+The original strings are essential for execution. In `scrBuilder` VM blocks
+74--84, tabs and the initial CR/LF bypass symbol dispatch; the return value of
+`string_delete` is discarded. Blocks 174--189 process subsequent CR/LF pairs,
+emit the two pillars (when enabled), and increment `y` by 16. Two start patterns
+and one main pattern have a trailing CR/LF/tab, so their final newline performs
+real work even though it adds no printable row. Normalized rows are inspection
+and cell-lookup views, not an equivalent character traversal representation.
 
 ## Builder integration contract
 
