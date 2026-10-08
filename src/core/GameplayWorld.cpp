@@ -333,9 +333,25 @@ bool GameplayWorld::birthPlayerOwnership() {
     if(!run_.effectsSucceeded||!nextPlayerLifetimeId_) {
         run_.effectsSucceeded=false;return false;
     }
+    std::uint32_t sourceId=0;
+    if(entryRooms_){
+        downwell::PackedRoom room;
+        if(!entryRooms_->findRoom(11,room))return run_.effectsSucceeded=false;
+        for(unsigned i=0;i<room.instanceCount;++i){
+            downwell::PackedRoomInstance instance;
+            if(!entryRooms_->roomInstance(room,i,instance))return run_.effectsSucceeded=false;
+            if(instance.objectId!=35)continue;
+            if(sourceId||!instance.instanceId)return run_.effectsSucceeded=false;
+            sourceId=instance.instanceId;
+        }
+        if(!sourceId)return run_.effectsSucceeded=false;
+    }
     playerInstance_={240+int(downwell::roundGameMakerQ8(player_.offsetXFixed())),
                      176+int(downwell::roundGameMakerQ8(player_.offsetYFixed())),
                      true,nextPlayerLifetimeId_++};
+    // Authored room identity precedes the birth callback. This does not
+    // allocate a dynamic ID or stand in for the remaining room Create order.
+    playerInstance_.sourceInstanceId=sourceId;
     if(!playerLifecycle_.birth(playerHandle(),playerInstance_)) {
         run_.effectsSucceeded=false;return false;
     }

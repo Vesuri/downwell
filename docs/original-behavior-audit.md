@@ -73,6 +73,13 @@ Wrapping angles or substituting host trigonometry would not preserve the
 original wrapper's float conversion and argument reduction.
 Native terrain loading retains the
 authored player/wall IDs but is not complete cross-family room creation.
+When supplied the room resource at construction, native player birth resolves
+the unique authored object-35 ID before invoking its lifecycle callback, on
+initial entry and Retry. It consumes no dynamic ID. Later terrain loading
+validates that identity rather than treating it as a fresh assignment. Worlds
+constructed without entry resources retain the explicit late handoff; they do
+not establish source-equivalent player creation. Resolving the ID early does
+not change the still-incomplete builder/player/controller birth order.
 Consequently, explicit-ID time-change tests do not establish the natural
 global ID stream. This source check also does not prove original runner room
 phase timing, initial view publication or rendered entry-mask parity.

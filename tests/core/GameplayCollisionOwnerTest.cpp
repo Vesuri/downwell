@@ -2720,8 +2720,9 @@ int main(){
     {
         struct PlayerViewProbe {
             GameplayWorld* world=nullptr;unsigned births=0;bool reject=false;
-            bool birth(InstanceHandle,const GameplayWorld::PlayerInstance&){
+            bool birth(InstanceHandle,const GameplayWorld::PlayerInstance& player){
                 const auto* view=world->roomEntryView();
+                assert(player.sourceInstanceId==100855);
                 assert(view&&view->enabled&&view->x.bits==0&&view->y.bits==0&&
                     view->width.bits==0x43200000u&&view->height.bits==0x438e0000u);
                 assert(world->cameraOffsetX()==0&&world->cameraOffsetY()==0&&world->ringOrigin()==300);

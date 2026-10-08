@@ -761,18 +761,21 @@ public:
         }
         const bool retained=prepared&&prepared->matches(rooms,room);
         const unsigned count=retained?prepared->count():room.instanceCount;
+        bool playerSeen=false;
         for(unsigned i=0;i<count;++i){
             downwell::PackedRoomInstance decoded;
             if(!retained&&!rooms.roomInstance(room,i,decoded)){run_.effectsSucceeded=false;return false;}
             const auto& instance=retained?prepared->at(i):decoded;
             if(instance.objectId==35){
                 // The native scheduler currently births its player before this
-                // handoff. Retain the authored identity here without replaying
+                // handoff. Validate/retain the authored identity without replaying
                 // Create or inventing a numeric ID from its lifetime handle.
                 // Full serialized cross-family birth ordering is still required.
-                if(!instance.instanceId||!playerInstance_.lifetimeId||playerInstance_.sourceInstanceId){
+                if(playerSeen||!instance.instanceId||!playerInstance_.lifetimeId||
+                    (playerInstance_.sourceInstanceId&&playerInstance_.sourceInstanceId!=instance.instanceId)){
                     run_.effectsSucceeded=false;return false;
                 }
+                playerSeen=true;
                 playerInstance_.sourceInstanceId=instance.instanceId;
                 continue;
             }
