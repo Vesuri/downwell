@@ -678,6 +678,36 @@ public:
         if(!registration.belongsTo(instances_)||!registration.valid())return run_.effectsSucceeded=false;
         return registration.create(x,y,key);
     }
+    // Builder-created terrain uses the same global ID stream and synchronous
+    // resource Create path as room children. Other families must have an owner.
+    bool spawnBuilderTerrain(int object,int x,int y,InstanceHandle& key);
+    template<unsigned Capacity> class BuilderOwner {
+        StartupRuntime& world_;
+        StoredSkeletonRegistration<instanceCapacity,Capacity>& skeletons_;
+        StoredBuilderPublication<instanceCapacity> publication_;
+    public:
+        BuilderOwner(StartupRuntime& world,StoredSkeletonRegistration<instanceCapacity,Capacity>& skeletons)
+            :world_(world),skeletons_(skeletons),publication_(world.builderPublication()){}
+        template<class Post> bool create(int object,int x,int y,Post post){
+            if(!world_.run_.effectsSucceeded)return false;
+            if(!skeletons_.belongsTo(world_.instances_)||!skeletons_.valid())return world_.run_.effectsSucceeded=false;
+            InstanceHandle key;
+            if(object==120){
+                InstanceHandle local;
+                if(!world_.spawnSkeleton(skeletons_,x,y,local))return false;
+                key=skeletons_.worldHandle(local);
+            }else if(!world_.spawnBuilderTerrain(object,x,y,key))return false;
+            if(!world_.instances_.resolve(key))return world_.run_.effectsSucceeded=false;
+            // The callback receives this child's handle, even if Create itself
+            // allocated further children and advanced the numeric allocator.
+            return world_.run_.effectsSucceeded=post(key)&&world_.run_.effectsSucceeded;
+        }
+        bool write(InstanceHandle key,BuilderChildField field,int value){return publication_.write(key,field,value);}
+        bool deactivate(InstanceHandle key){return publication_.deactivate(key);}
+        bool rightOfMiddle(InstanceHandle key,int width,bool& right){return publication_.rightOfMiddle(key,width,right);}
+    };
+    template<unsigned Capacity> BuilderOwner<Capacity> builderOwner(
+        StoredSkeletonRegistration<instanceCapacity,Capacity>& skeletons){return {*this,skeletons};}
     template<unsigned Capacity> bool spawnBone(StoredBoneRegistration<instanceCapacity,Capacity>& registration,
         int x,int y,InstanceHandle& key){
         if(!registration.belongsTo(instances_)||!registration.valid())return run_.effectsSucceeded=false;

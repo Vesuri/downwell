@@ -163,6 +163,26 @@ registered family Create handlers. Live collision tests check mask publication
 against source resource bounds through the real `StoredWorldCollision` owner;
 unit tests cover write/activation failures and retired-handle reuse.
 
+`StartupRuntime::builderOwner(skeletonRegistration)` connects creation to that
+publication adapter. Object 120 is allocated by the registered skeleton owner,
+including inherited grid snapping, before returning its world handle. Walls
+and thin platforms use `spawnBuilderTerrain`, a local one-command transaction
+through resource PreCreate/Create and the same global numeric-ID allocator.
+The ordinary stored cavern builder also uses this terrain entry point. Caller
+continuations run only after successful Create and retain their actual child
+handle, not an inferred `nextId-1`. Unsupported families (including boxes whose
+source Create needs further integration) fail before allocation; they are not
+admitted as generic actors. A failed continuation retains its already-created
+child and stops the world. The owner borrows its world and skeleton registration;
+those must stay at fixed addresses, and registered skeletons must be scheduled
+through the existing shared-world event binding and cleared before room teardown.
+
+Real-owner tests cover mixed terrain/skeleton/platform ID ordering, no-RNG
+Create constants, post-Create state, registered skeleton scheduling on the next
+world tick, unsupported-family rejection and failed-continuation prefixes. This
+is a creation/scheduling-boundary check, not natural catacomb progression or a
+full skeleton Step/death replay.
+
 ## Actor integration findings
 
 The next actor is not just another entry in `EnemyCreateProfile`: that table's

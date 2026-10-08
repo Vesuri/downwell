@@ -1291,6 +1291,10 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
             // builder visits its next cell. Do not defer it with plain tiles.
             if (command.objectId == 277)
                 return runtime->registerShop(command.x, command.y) != nullptr;
+            if(command.objectId==60||command.objectId==93){
+                InstanceHandle child;
+                return runtime->spawnBuilderTerrain(command.objectId,command.x,command.y,child);
+            }
             if (command.objectId == 82 && !runtime->run_.adoptTimeField(
                 command.x,command.y,command.timeFieldRadiusWord()))return false;
             // Publish each child before the builder continues to the next
@@ -2390,6 +2394,30 @@ bool StartupRuntime::createLevelExitChild(LevelExit::Effect effect,int x,int y) 
             }
             return true;
         },lifecycle_)==ApplyInstanceCommandsResult::success;
+}
+
+bool StartupRuntime::spawnBuilderTerrain(int object,int x,int y,InstanceHandle& key){
+    if(!run_.effectsSucceeded)return false;
+    // In particular, do not route boxes or unsupported catacomb actors through
+    // a generic command with guessed/pre-evaluated Create state.
+    if((object!=60&&object!=93)||!objectPack_||!deferredCommandsSucceeded_)
+        return run_.effectsSucceeded=false;
+    DeferredInstanceQueue<1> child;
+    if(!child.enqueueCreate(object,x,y))return run_.effectsSucceeded=false;
+    InstanceHandle created;
+    const auto result=child.applyChecked(instances_,*objectPack_,roomId_,nextRuntimeInstanceId_,
+        [&](InstanceRecord& record){
+            // applyChecked has appended this child; capture its handle before
+            // any PreCreate/Create callback can append a nested child.
+            created=instances_.handleAt(instances_.size()-1);
+            if(instances_.resolve(created)!=&record)return false;
+            dispatchInstancePhase(record,RoomInstancePhase::preCreate);
+            if(!deferredCommandsSucceeded_||!run_.effectsSucceeded)return false;
+            dispatchInstancePhase(record,RoomInstancePhase::create);
+            return deferredCommandsSucceeded_&&run_.effectsSucceeded;
+        },lifecycle_);
+    if(result!=ApplyInstanceCommandsResult::success||!instances_.resolve(created))return run_.effectsSucceeded=false;
+    key=created;return true;
 }
 
 void StartupRuntime::flushDeferredInstances(

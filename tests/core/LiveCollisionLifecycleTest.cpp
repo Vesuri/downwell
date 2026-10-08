@@ -158,6 +158,43 @@ int main(){
     BuilderPatternPack patterns(bb.data(),bb.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     SpriteMaskPack masks(mb.data(),mb.size());
     require(rooms.valid()&&objects.valid()&&patterns.valid()&&sprites.valid()&&masks.valid(),"real collision resources validate");
+    for(bool rejectPost:{false,true}){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach synchronous builder creation world");world->skipToGameForTesting();
+        auto skeletons=world->skeletonRegistration<2>();
+        auto builder=world->builderOwner(skeletons);
+        const auto first=world->nextRuntimeInstanceId();const auto draws=world->randomDrawCount();
+        require(builder.create(60,160,200,[&](InstanceHandle key){
+            const auto* r=owner->resolve(key);
+            require(r&&r->instanceId==first&&r->spriteId==51&&r->imageSpeed==0&&r->preciseX==160,
+                "terrain callback observes completed Create and its actual global ID");
+            return builder.write(key,BuilderChildField::deactivate,1);
+        }),"builder creates registered terrain");
+        InstanceHandle skeleton;
+        require(builder.create(120,100,200,[&](InstanceHandle key){
+            skeleton=key;const auto* r=owner->resolve(key);
+            return r&&r->instanceId==first+1&&r->objectId==120&&r->x==96&&r->y==192&&r->health==60&&r->imageSpeed==0;
+        }),"builder skeleton callback runs after inherited grid snap and source Create");
+        require(builder.create(93,176,224,[&](InstanceHandle key){
+            const auto* r=owner->resolve(key);return r&&r->instanceId==first+2&&r->imageIndex==23&&r->imageSpeed==0;
+        }),"platform joins the same source ID stream");
+        require(world->nextRuntimeInstanceId()==first+3&&world->randomDrawCount()==draws&&skeletons.instances().size()==1,
+                "mixed terrain/skeleton births retain IDs and RNG");
+        unsigned steps=0;
+        require(world->withSkeletonEvents(skeletons,[&](InstanceHandle key,auto phase,auto&,auto&,bool&){
+            require(skeletons.worldHandle(key).generation==skeleton.generation&&skeletons.worldHandle(key).slot==skeleton.slot,
+                    "builder-created skeleton enters the registered room scheduler");
+            if(phase==StartupRuntime::SkeletonPhase::step)++steps;return true;
+        },[&]{return world->stepWithCollisionPass(Input{},false,[]{return true;});})&&steps==1,
+                "one world tick schedules the builder-created skeleton once");
+        const auto before=world->nextRuntimeInstanceId();unsigned callbacks=0;
+        require(!builder.create(rejectPost?120:92,240,240,[&](InstanceHandle){++callbacks;return false;}),
+                "unsupported family or post-Create failure stops the builder owner");
+        require(!world->effectsSucceeded()&&world->nextRuntimeInstanceId()==before+unsigned(rejectPost)&&callbacks==unsigned(rejectPost),
+                "failure preserves only the actually allocated source prefix");
+        require(skeletons.clear(),"retire borrowed skeleton lifetimes before test-world teardown");
+    }
     {
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
