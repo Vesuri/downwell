@@ -83,6 +83,7 @@ struct InstanceRecord {
     WallEndStepState wall{};
     BreakableState box{};
     std::uint32_t boxMyFx=0; // scrEffectSpawn's source numeric child ID on object 92.
+    std::int32_t boxMyBullet=-4,boxTarget=-4; // Source numeric values, never local generation keys.
     SoundPlayState sound{};
 };
 

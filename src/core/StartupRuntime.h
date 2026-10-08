@@ -26,6 +26,7 @@
 #include "StoredTimeChangeRegistration.h"
 #include "StoredEntryDitherRegistration.h"
 #include "StoredDroneBulletRegistration.h"
+#include "StoredBoxChainPublication.h"
 #include "StoredBoneRegistration.h"
 #include "StoredBloodRegistration.h"
 #include "StoredSkeletonRegistration.h"
@@ -424,9 +425,9 @@ public:
     }
     // Scoped dispatch joins the actual room phases. The event adapter must
     // supply Step behavior; main-room End Step uses the phase-published view.
-    template<unsigned Capacity,class Execute>
-    bool stepWithDroneBullets(StoredDroneBulletRegistration<instanceCapacity,Capacity>& registration,
-        const Input& input,Execute execute,bool advancePressed=false){
+    template<unsigned Capacity,class Execute,class Tick>
+    bool withDroneBulletEvents(StoredDroneBulletRegistration<instanceCapacity,Capacity>& registration,
+        Execute execute,Tick tick){
         if(!run_.effectsSucceeded)return false;
         if(droneDispatch_||!registration.belongsTo(instances_)||!registration.valid())
             return run_.effectsSucceeded=false;
@@ -449,9 +450,15 @@ public:
         droneDispatch_=[](void* context,const InstanceRecord& record,DronePhase phase){
             return (*static_cast<decltype(dispatch)*>(context))(record,phase);
         };
-        const bool ok=stepWithCollisionPass(input,advancePressed,NoCollisionPass{});
+        const bool ok=tick();
         droneDispatch_=nullptr;droneContext_=nullptr;
-        return run_.effectsSucceeded=ok&&registration.valid();
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok&&registration.valid();
+    }
+    template<unsigned Capacity,class Execute>
+    bool stepWithDroneBullets(StoredDroneBulletRegistration<instanceCapacity,Capacity>& registration,
+        const Input& input,Execute execute,bool advancePressed=false){
+        return withDroneBulletEvents(registration,execute,
+            [&]{return stepWithCollisionPass(input,advancePressed,NoCollisionPass{});});
     }
     template<class Stopped,class Collisions=NoCollisionPass>
     bool stepWithOwnedDebris(const Input& input,Stopped stopped,bool advancePressed=false,Collisions collisions={}){
@@ -647,6 +654,10 @@ public:
     }
     template<unsigned Capacity> StoredDroneBulletRegistration<instanceCapacity,Capacity> droneBulletRegistration(){
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
+    }
+    template<unsigned Capacity,class Collision> auto boxChainPublication(
+        StoredDroneBulletRegistration<instanceCapacity,Capacity>& bullets,Collision& collision,InstanceHandle box){
+        return StoredBoxChainPublication<instanceCapacity,Capacity,Collision>(instances_,bullets,collision,box,run_.effectsSucceeded);
     }
     template<unsigned Capacity> StoredBloodRegistration<instanceCapacity,Capacity> bloodRegistration(){
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};

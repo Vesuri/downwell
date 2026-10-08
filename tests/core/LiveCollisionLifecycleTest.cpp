@@ -160,6 +160,66 @@ int main(){
     BuilderPatternPack patterns(bb.data(),bb.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     SpriteMaskPack masks(mb.data(),mb.size());
     require(rooms.valid()&&objects.valid()&&patterns.valid()&&sprites.valid()&&masks.valid(),"real collision resources validate");
+    for(unsigned chainCase=0;chainCase<3;++chainCase){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach scheduled chain world");world->skipToGameForTesting();
+        auto bullets=world->droneBulletRegistration<4>();
+        InstanceHandle box,neighbors[4];
+        require(world->spawnBuilderPrimitive(92,240,512,box)&&world->publishBoxHealth(box,{}),"create chain source box");
+        const int xs[]={240,256,240,224},ys[]={496,512,528,512};
+        const unsigned neighborCount=chainCase==2?3:4;
+        for(unsigned i=0;i<neighborCount;++i)require(world->spawnBuilderPrimitive(92,xs[i],ys[i],neighbors[i]),"create chain neighbor");
+        if(chainCase==1)for(unsigned i=0;i<4;++i){
+            InstanceHandle child;require(bullets.create(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(600),child),"fill chain bullet capacity");
+        }
+        require(!owner->resolve(box)->box.haveGem,"chain fixture has no reward");
+        ScheduledBoxCounts counts;unsigned shots=0,steps=0;bool retained=false;
+        BoxSoundVerification::Audio<StartupRuntime> audio{*world,owner->resolve(box)->box.breakSound};
+        const bool completed=world->withBoxDestruction(
+            [&](InstanceHandle h,BoxDestructionScript::Caller& caller){return owner->readBoxDestruction(h,caller);},
+            [&](InstanceHandle h){
+                auto rest=scheduledBoxEffects(*world,h,counts,[&](InstanceHandle key){return world->markBoxDestroyed(key);});
+                rest.verifyDebris=true;rest.sawSound=h.slot==box.slot&&h.generation==box.generation;rest.before=world->randomState();
+                rest.timeQuery=[&](InstanceHandle key,bool& allowed){return owner->boxTimeAllowed(*world,key,false,480,allowed);};
+                auto chain=world->boxChainPublication(bullets,*owner,h);
+                return boxWorldEffects(*world,h,ScheduledBoxChain<decltype(chain),decltype(rest)>(chain,rest,shots),
+                    [&](int id,unsigned& frames){PackedSpriteCollision art;if(!sprites.sprite(id,art))return false;
+                        frames=art.frameCount;return true;},audio,MotionBinary64{0x3fd00000u,0});
+            },[&]{return world->withDroneBulletEvents(bullets,
+                [&](auto&,auto&,auto,auto&,bool&){++steps;return false;},
+                [&]{return world->stepWithOwnedDebris({},[](auto,const auto&,bool& frozen){frozen=false;return true;},false,[&]{
+                    const auto* caller=owner->resolve(box);
+                    if(!caller||!caller->destroyRequested)return false;
+                    const auto* bullet=world->instance(caller->boxMyBullet);
+                    const int lastTarget=neighborCount==4?int(owner->resolve(neighbors[3])->instanceId):-4;
+                    if(!bullet||bullet->objectId!=266||caller->boxTarget!=lastTarget)return false;
+                    const auto local=bullets.handle(*bullet);const auto* shot=bullets.instances().find(local);
+                    if(!shot||shot->state.motion.direction.high!=MotionBinary64::fromInteger(90).high||
+                        shot->state.damage.high!=MotionBinary64::fromInteger(20).high||shot->state.motion.direction.low||
+                        shot->state.damage.low||shot->state.motion.initialized||shot->state.alarm0!=16||shot->spriteId!=459)return false;
+                    for(unsigned i=0;i<neighborCount;++i)if(!owner->resolve(neighbors[i])||owner->resolve(neighbors[i])->alarms.get(0)!=5)return false;
+                    retained=true;return true;
+                });});});
+        if(completed!=(chainCase!=1))std::fprintf(stderr,"chain case %u failed: shots=%u steps=%u mark=%u stop=%u retained=%u\n",
+            chainCase,shots,steps,counts.mark,counts.stop,unsigned(retained));
+        require(completed==(chainCase!=1),"scheduled chain respects projectile capacity");
+        if(chainCase==1){
+            const auto* caller=owner->resolve(box);
+            require(!world->effectsSucceeded()&&caller&&!caller->destroyRequested&&caller->boxMyBullet==-4&&
+                caller->boxTarget==-4&&!shots&&!steps&&!counts.mark&&bullets.instances().size()==4&&
+                world->smokeEffects().size()==1&&world->scriptEffects().size()==1&&!world->debrisEffects().size(),
+                "failed drone Create preserves earlier effects without neighbor writes or destruction");
+            for(unsigned i=0;i<neighborCount;++i)require(owner->resolve(neighbors[i])->alarms.get(0)==-1,"rejected chain leaves neighbors unarmed");
+            require(bullets.clear(),"clear retained failed chain owner");continue;
+        }
+        require(retained&&!steps&&shots==1&&counts.mark==1&&!owner->resolve(box)&&
+            bullets.instances().size()==1&&world->debrisEffects().size()==2,"chain children and phase cutoff survive source cleanup");
+        auto retired=world->boxChainPublication(bullets,*owner,box);
+        require(!retired.targetAlarm(neighbors[0],0,99)&&owner->resolve(neighbors[0])->alarms.get(0)==5,
+            "retired chain caller cannot mutate a surviving neighbor");
+        require(bullets.clear(),"clear borrowed chain projectile owner");
+    }
     for(unsigned mode=0;mode<12;++mode){
         const bool fullEffects=mode!=0;
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);

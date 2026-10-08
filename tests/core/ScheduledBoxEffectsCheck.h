@@ -59,4 +59,12 @@ template<class World,class Mark> struct ScheduledBoxEffects {
 template<class World,class Mark>
 ScheduledBoxEffects<World,Mark> scheduledBoxEffects(World& world,downwell::InstanceHandle box,
     ScheduledBoxCounts& counts,Mark mark){return {world,box,counts,mark};}
+template<class Chain,class Rest> struct ScheduledBoxChain:Chain {
+    Rest rest;unsigned& shots;
+    ScheduledBoxChain(Chain chain,Rest r,unsigned& n):Chain(chain),rest(r),shots(n){}
+    bool chainReaction(){return true;}bool lowSpec(){return rest.lowSpec();}int area(){return rest.area();}
+    bool destroySelf(){return rest.destroySelf();}bool currency(int n){return rest.currency(n);}
+    bool timeAllowed(bool& allowed){return rest.timeAllowed(allowed);}
+    bool sound(int id,int priority,int loop,int cut){assert(id==342&&priority==50&&!loop&&cut==1);++shots;return true;}
+};
 #endif

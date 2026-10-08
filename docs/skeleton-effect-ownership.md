@@ -376,6 +376,24 @@ Scheduled no-chain/no-reward fixtures check the complete WELL state at the end
 of emission, both debris birth states, box cleanup and next-frame survival. They
 provide test audio/time state and are not the ordinary gameplay binding.
 
+`StoredBoxChainPublication` connects the chain branch to the registered stored
+world: object-266 Create consumes the global numeric ID stream, while returned
+generation handles remain lifetime keys. `myBullet` and `target` retain source
+numeric IDs on the box; an empty neighbor query assigns `noone` (-4). Neighbor
+selection uses the collision owner's `instancePlace`, and alarm/checked writes
+require live caller and target generations. Projectile setters operate on the
+registered drone state. Failed Create leaves earlier sound/particles intact but
+does not publish a bullet, arm neighbors or mark destruction. A retired caller
+cannot mutate surviving neighbors.
+
+`withDroneBulletEvents` allows the same tick to borrow box, drone and debris
+dispatch. New chain bullets retain their Create state through their birth Step
+cutoff; their later phases use the existing room scheduler. Scheduled fixtures
+check four neighbors, missing-neighbor assignment, exhausted projectile storage,
+retained caller fields, full emission RNG and retirement. The plain chain-shot
+sound command and global inputs are fixture-provided. This stored-world binding
+does not admit natural chains or supply native global instance identity.
+
 Gunpowder Blocks creates object 266 (`bulletDrone`), not an explosion. Its
 Create overrides the serialized sprite 458 with 459, sets speed 7, damage 4,
 zero spread and alarm 0 to 16; the box subsequently assigns direction 90 and
