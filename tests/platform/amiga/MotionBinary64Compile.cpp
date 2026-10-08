@@ -56,6 +56,28 @@ extern "C" unsigned boneContactCompile(downwell::BoneProjectile* bone,
     else bone->dispatchPlayer(player,stopped,events);
     return events.trace;
 }
+namespace {
+struct BonePublishedEvents {
+    unsigned trace=0;bool accepted;
+    bool record(unsigned n){trace=trace*33u+n;return accepted;}
+    bool imageSpeed(downwell::RunnerImageValue v){return record(v.bits);}
+    bool imageIndex(downwell::RunnerImageValue v){return record(v.bits);}
+    bool position(downwell::RunnerImageValue x,downwell::RunnerImageValue y){return record(x.bits^y.bits);}
+    bool mask(int v){return record(v);}
+    bool destroy(){return record(1);}
+    bool effect(int sprite,int speed){return record(sprite*10+speed);}
+    bool damage(int a,int b,int c){return record(a+b+c);}
+    bool inView(int x,int y,bool& visible){visible=x>0&&x<160&&y>0&&y<284;return record(2);}
+};
+}
+extern "C" unsigned bonePublicationCompile(downwell::BoneProjectile* bone,
+    bool stopped,unsigned event,bool accepted){
+    BonePublishedEvents ops{0,accepted};bool good=true;
+    const bool result=event==0?bone->stepPublished(stopped,ops,good):
+        event==1?bone->collideWallPublished(ops,good):
+        event==2?bone->collidePlayerPublished(stopped,ops,good):bone->advanceImagePublished(ops,good);
+    return result&&good?ops.trace:0xffffffffu;
+}
 extern "C" bool randomBinary64Compile(unsigned word, downwell::MotionBinary64 scale,
     downwell::MotionBinary64* result) {
     return downwell::randomBinary64(word,scale,*result);

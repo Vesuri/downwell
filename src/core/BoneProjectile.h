@@ -4,6 +4,7 @@
 #include "RandomBinary64.h"
 #include "UnitSequenceFrames.h"
 #include "EnemyContact.h"
+#include "RunnerRealComparison.h"
 namespace downwell {
 // Object 269's Create and event state. The owner must call create synchronously
 // before installing the skeleton's velocity overrides.
@@ -106,6 +107,72 @@ struct BoneProjectile {
         if (!active) return;
         if (!timeStopped) events.damage(1, 3, 2);
         events.effect(85, 3); requestDestroy(events);
+    }
+    // Registered-owner entry points. The scalar methods above are retained
+    // as the successful-event reference. Every callback below can fail; a
+    // failed world must never replay an already completed event prefix.
+    template<class Ops> bool destroyPublished(Ops& ops,bool& good){
+        if(!good)return false;
+        if(!ops.destroy())return good=false;
+        destroyRequested=true;return true;
+    }
+    template<class Ops> bool advanceImagePublished(Ops& ops,bool& good){
+        if(!good)return false;
+        auto next=timeline;RunnerImageValue index;bool crossed;
+        if(!UnitSequenceFrames::advance(next,imageSpeed,4,index,crossed)||!ops.imageIndex(index))return good=false;
+        timeline=next;imageIndex=index;return true;
+    }
+    template<class Ops> bool stepPublished(bool stopped,Ops& ops,bool& good){
+        if(!good)return false;
+        const auto speed=[&](RunnerImageValue value){
+            if(!ops.imageSpeed(value))return false;
+            imageSpeed=value;return true;
+        };
+        if(!stopped){
+            int comparison;RunnerImageValue sampled;
+            // Compare before narrowing: imgSp is a custom double, while the
+            // builtin image_speed read promotes its stored float. The VM
+            // comparison uses its real epsilon, not a raw-bit inequality.
+            if(!compareRunnerReal(imageSpeed.promoted(),sampledAnimationRate,comparison))return good=false;
+            if(comparison&&(!sampled.assign(sampledAnimationRate)||!speed(sampled)))return good=false;
+            animation=Animation::sampledRate;
+            // VM writes custom accumulators before either builtin setter.
+            if(!motion.ysp.add({0x3fb99999u,0x9999999au})||!motion.xx.add(motion.xsp)||
+               !motion.yy.add(motion.ysp))return good=false;
+            RunnerImageValue px,py;std::int32_t rounded;
+            if(!px.assignInteger(motion.x)||!py.assignInteger(motion.y)||
+               !motion.xx.roundPixel(rounded)||!px.assignInteger(rounded)||
+               !px.promoted().roundPixel(rounded)||!ops.position(px,py))return good=false;
+            motion.x=rounded;
+            if(!motion.yy.roundPixel(rounded)||!py.assignInteger(rounded)||
+               !py.promoted().roundPixel(rounded)||!ops.position(px,py))return good=false;
+            motion.y=rounded;
+            if(health<=0&&active){
+                if(!speed({}))return good=false;
+                animation=Animation::stopped;
+                if(!ops.mask(582))return good=false;
+                mask=582;
+                motion.xsp={};motion.ysp={};active=false;
+                if(!destroyPublished(ops,good)||!ops.effect(85,3))return good=false;
+            }
+        }else{
+            if(!speed({}))return good=false;
+            animation=Animation::stopped;
+        }
+        bool visible;
+        // Deliberately after destruction/effect, including when health died.
+        if(!ops.inView(motion.x,motion.y,visible))return good=false;
+        if(!visible&&!destroyPublished(ops,good))return false;
+        return true;
+    }
+    template<class Ops> bool collideWallPublished(Ops& ops,bool& good){
+        return destroyPublished(ops,good)&&(ops.effect(85,3)||(good=false));
+    }
+    template<class Ops> bool collidePlayerPublished(bool stopped,Ops& ops,bool& good){
+        if(!good)return false;
+        if(!active)return true;
+        if((!stopped&&!ops.damage(1,3,2))||!ops.effect(85,3))return good=false;
+        return destroyPublished(ops,good);
     }
 };
 }

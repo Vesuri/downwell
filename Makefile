@@ -1465,6 +1465,16 @@ build/skeleton-timing-test: tests/core/SkeletonTimingTest.cpp src/core/SkeletonT
 .PHONY: verify-motion-binary64
 .PHONY: verify-bone-motion
 .PHONY: verify-bone-projectile
+.PHONY: verify-bone-publication
+test: verify-bone-publication
+verify-bone-publication: build/bone-publication-test
+	python3 tools/verify-bone-events.py
+	./build/bone-publication-test
+
+build/bone-publication-test: tests/core/BonePublicationTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -ffp-contract=off -Isrc -o $@ tests/core/BonePublicationTest.cpp src/core/GameMakerRandom.cpp
+
 .PHONY: verify-random-binary64
 verify-random-binary64: build/random-binary64-test
 	./build/random-binary64-test

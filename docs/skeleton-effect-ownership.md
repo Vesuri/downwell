@@ -6,6 +6,30 @@ UTMT 0.9.2.0 export. Resource metadata identifies objects; the corresponding
 `Assembly/gml_*.asm` scripts establish argument evaluation and callback order.
 This is an integration audit, not a claim that these effects are implemented.
 
+## Registered bone event contract
+
+`BoneProjectile` has checked publication entry points for live owners, while
+its scalar event methods remain the successful-event reference. Step compares
+the promoted builtin image speed to custom `imgSp` using the VM real tolerance;
+it does not unconditionally rewrite the speed. It writes `ysp`, `xx`, `yy`,
+then separately publishes rounded X and Y. Failure of the Y publication retains
+the new X and both custom accumulators. Health depletion writes speed zero,
+mask 582, both velocities zero and custom `active=0`, then requests destruction
+and creates effect 85. The subsequent view check still runs after successful
+health destruction and can request destruction again. Custom `active` here is
+not the engine's instance activation flag.
+
+Wall collision requests destruction before its effect. Player collision checks
+custom `active`, conditionally performs damage outside time-stop, then creates
+the effect before requesting destruction. Every publication/query/effect can
+fail. The world-owned success latch preserves completed operations and prevents
+any later operation or retry. Animation publishes its evaluated image index
+before committing the new timeline. The bone has no Animation End event.
+`verify-bone-publication` pins these VM event bodies and checks successful state
+against the retained scalar reference, plus each failed callback prefix. These
+entry points do not by themselves supply registered lifetimes, live selectors,
+player damage, effects, scheduling or backend rendering.
+
 ## Death is not just removal plus a gem reward
 
 `global.killCount` belongs to the run, not the room. The VM assigns zero in
