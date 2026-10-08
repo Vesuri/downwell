@@ -3771,14 +3771,14 @@ __attribute__((noinline)) static int runDownwell(void) {
                 hardwareCurrency=actorList.promoteCurrency(port,worldViewX,worldViewY,effectAssets,actorFrames);
             }
 #endif
-            const bool compositeEffects=(compositeCurrency&&!hardwareCurrency)||
+            const bool compositeEffects=(compositeCurrency&&(!hardwareCurrency||actorList.currencyRasterRequired))||
                 (actorList.entryCoverVisible&&!hardwareEntryCover);
             if(compositeEffects){
                 DW_PROFILE_SCOPE(profileControllerComposition);
                 downwell::CurrencySmokeComposition::Settings settings;
                 settings.noControl=port.shops().noControl;settings.death=!compositeCurrency;
                 if(!controllerEffects.prepareWithSurfaceProducers([&](auto emit){
-                    for(unsigned i=port.gemSlotEnd();i;--i){
+                    for(unsigned i=port.gemSlotEnd();i>(hardwareCurrency?actorList.currencyRasterFirst:0);--i){
                         const auto& gem=port.gemAt(i-1);
                         if(gem.active&&gem.motion.lifetime.visible())
                             emit(gem.large,gem.motion.animation.frame(),std::int32_t(240+gem.x),std::int32_t(176+gem.y));
@@ -3818,7 +3818,8 @@ __attribute__((noinline)) static int runDownwell(void) {
 #else
                 8
 #endif
-                , compositeEffects && controllerEffects.visible() ? &controllerEffects.surface() : nullptr
+                , compositeEffects && controllerEffects.visible() ? &controllerEffects.surface() : nullptr,
+                hardwareCurrency?actorList.currencySpriteCount:0
             );
             const unsigned bobCount = assignment.bobCount;
             if (!assignment.ready) {

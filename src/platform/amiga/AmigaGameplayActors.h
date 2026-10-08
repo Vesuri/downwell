@@ -31,7 +31,8 @@ public:
     static Assignment assign(GameplayBob* actors, unsigned count,
         const UBYTE* pack, const UBYTE* packEnd, Sprite& player,
         Sprite* regular, Sprite& overflow, unsigned height, unsigned limit = 8,
-        const downwell::PaletteEffectSurface<>* controller = nullptr);
+        const downwell::PaletteEffectSurface<>* controller = nullptr,
+        unsigned controllerSuffix = 0);
     // Draw only into the retired display ring, not the terrain backing.
     static void draw(AmigaRenderer renderer, Bitmap& display,
         unsigned buffer, unsigned origin, const GameplayBob* bobs, unsigned count,

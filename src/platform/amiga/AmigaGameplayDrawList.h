@@ -23,9 +23,15 @@ public:
         const UBYTE* packEnd, int worldViewX, int worldViewY, bool compositeCurrency = false,
         const AmigaActorFrames* prepared = nullptr);
     bool entryCoverHardwareEligible(const GameplayWorld& world,int viewX,int viewY,bool& eligible)const;
-    // Promote the complete controller surface, never a partial subset. Failure
-    // leaves the list untouched and retains the shade-aware raster compositor.
+    // Currency Draw walks slots newest to oldest. Promote only its topmost
+    // contiguous suffix, retaining [currencyRasterFirst, gemSlotEnd) in the
+    // shade-aware raster. Ordinary actors remain below both partitions.
+    unsigned currencyRasterFirst=0,currencySpriteCount=0;
+    bool currencyRasterRequired=true;
     bool promoteCurrency(const GameplayWorld& world,int viewX,int viewY,
+        const downwell::EffectMaskAssets& assets,const AmigaActorFrames& frames);
+    // Retained all-or-nothing reference for projection tests.
+    bool promoteCurrencyComplete(const GameplayWorld& world,int viewX,int viewY,
         const downwell::EffectMaskAssets& assets,const AmigaActorFrames& frames);
 };
 #endif

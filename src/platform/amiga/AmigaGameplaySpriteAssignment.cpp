@@ -7,8 +7,9 @@
 AmigaGameplayActors::Assignment AmigaGameplayActors::assign(GameplayBob* actors,
     unsigned count, const UBYTE* pack, const UBYTE* packEnd, Sprite& player,
     Sprite* regular, Sprite& overflow, unsigned height, unsigned limit,
-    const downwell::PaletteEffectSurface<>* controller) {
+    const downwell::PaletteEffectSurface<>* controller,unsigned controllerSuffix) {
     Assignment result{count, true, 0, 0};
+    if(controllerSuffix>count){result.ready=false;return result;}
     AmigaActorChannels channels(limit);
     auto slot = [&](unsigned channel) -> Sprite& {
         return channel == 0 ? player : channel <= regularChannels ? regular[channel - 1] : overflow;
@@ -48,7 +49,7 @@ AmigaGameplayActors::Assignment AmigaGameplayActors::assign(GameplayBob* actors,
             const Rect bounds{x,y,x+width,y+height};
             bool hidden=false;
             for(unsigned i=0;i<planarCount;++i)if(overlaps(bounds,planar[i])){hidden=true;break;}
-            if(!hidden&&controller)hidden=controller->intersects(x-downwellPlayfieldX,y,
+            if(!hidden&&controller&&index<count-controllerSuffix)hidden=controller->intersects(x-downwellPlayfieldX,y,
                 x-downwellPlayfieldX+width,y+height);
             if(hidden){if(!retain(bounds))break;continue;}
         }
@@ -56,7 +57,7 @@ AmigaGameplayActors::Assignment AmigaGameplayActors::assign(GameplayBob* actors,
     while (result.bobCount > 0) {
         const auto& actor = actors[result.bobCount - 1];
         if (actor.sprite == gameplayRayMarker || actor.sprite == gameplayDamageTextMarker) break;
-        if (controller) {
+        if (controller && result.bobCount<=count-controllerSuffix) {
             int x,y,width,height;
             if (!amigaRendererAssetBounds(pack,packEnd,actor.sprite,actor.frame,
                     actor.x,actor.y,actor.flip,&x,&y,&width,&height)) {

@@ -73,9 +73,10 @@ int main(int argc,char** argv){
             require(actual==expected,"offline currency DMA pixels and anchors");
         }
     }
-    AmigaGameplayDrawList list;downwell::CurrencySmokeComposition oracle;
+    AmigaGameplayDrawList list;downwell::CurrencySmokeComposition oracle,remainder;
     downwell::PaletteEffectSurface<> projected;unsigned promoted=0;
     unsigned empty=0,raster=0,mixed=0,overflow=0,covered=0,shaded=0,maxSmoke=0,maxDebris=0;
+    unsigned partial=0;
     if(census)std::puts("frame,visible_gems,smoke,debris,entry,promoted,parts,shade_pixels_changed,dead");
     for(unsigned tick=1;tick<=1800;++tick){
         auto input=downwell::gameplayContactProfileInput(game.tick(),240+game.player().offsetX(),
@@ -99,14 +100,25 @@ int main(int argc,char** argv){
         const unsigned smoke=game.smokeEffects().size();
         if(smoke>maxSmoke)maxSmoke=smoke;if(debris>maxDebris)maxDebris=debris;
         const auto checkpoint=game.checkpoint();
+        AmigaGameplayDrawList complete;
+        require(complete.collect(game,ab.data(),ab.data()+ab.size(),vx,vy,true,&frames),"reference actor prefix");
+        const bool referenceHardware=complete.promoteCurrencyComplete(game,vx,vy,assets,frames);
         const bool hardware=list.promoteCurrency(game,vx,vy,assets,frames);
+        if(referenceHardware)require(hardware&&!list.currencyRasterRequired&&list.count==complete.count,
+            "complete promotion remains admitted with identical suffix length");
+        for(unsigned i=0;i<(referenceHardware?list.count:firstCurrency);++i){
+            const auto& a=list.actors[i];const auto& b=complete.actors[i];
+            require(a.sprite==b.sprite&&a.frame==b.frame&&a.x==b.x&&a.y==b.y&&a.flip==b.flip&&a.prepared==b.prepared,
+                "partition preserves actor prefix and complete-promotion painter order");
+        }
         require(game.checkpoint()==checkpoint,"promotion is read-only, including fallback");
         using Real=downwell::MotionBinary64;
         const downwell::EffectSurfacePlacement::View view{Real::fromInteger(vx),Real::fromInteger(vy),
             Real::fromInteger(160),Real::fromInteger(284)};
         downwell::CurrencySmokeComposition::Settings settings;settings.noControl=game.shops().noControl;
-        require(oracle.prepareWithLateEffects([&](auto emit){
-            for(unsigned i=game.gemSlotEnd();i;--i){const auto& g=game.gemAt(i-1);
+        const auto compose=[&](downwell::CurrencySmokeComposition& target,unsigned first){
+        require(target.prepareWithLateEffects([&](auto emit){
+            for(unsigned i=game.gemSlotEnd();i>first;--i){const auto& g=game.gemAt(i-1);
                 if(g.active&&g.motion.lifetime.visible())emit(g.large,g.motion.animation.frame(),
                     std::int32_t(240+g.x),std::int32_t(176+g.y));}
         },game.smokeEffects(),assets,view,settings,[&](auto emit){return game.visitDebrisDraw([&](const auto& d){
@@ -114,6 +126,8 @@ int main(int argc,char** argv){
         },[&](auto emit){for(unsigned i=0;i<game.enemyCount();++i){const auto& e=game.enemyAt(i);
             if(e.active&&e.awake)emit(std::int32_t(240+e.x),std::int32_t(176+e.y));}
         },[](Real n,std::int32_t& out){return n.roundPixel(out);}),"compositor oracle");
+        };
+        compose(oracle,0);
         // Independently compose the currency before shade subtraction. Only
         // classify changed pixels on gem-only, live frames; rejection alone
         // does not establish that a shade actually erases visible content.
@@ -127,7 +141,8 @@ int main(int argc,char** argv){
         }
         const bool shadeChanged=!game.dead()&&!smoke&&!debris&&!list.entryCoverVisible&&
             !projected.samePixels(oracle.surface());
-        if(shadeChanged){++shaded;require(!hardware,"shade-subtracted currency stays raster");}
+        if(shadeChanged){++shaded;require(!hardware||list.currencyRasterRequired,"shade-subtracted currency stays raster");}
+        if(parts>8)++overflow;
         if(census)std::printf("%u,%u,%u,%u,%u,%u,%u,%u,%u\n",tick,visible,smoke,debris,
             unsigned(list.entryCoverVisible),unsigned(hardware),parts,unsigned(shadeChanged),unsigned(game.dead()));
         if(!hardware){
@@ -135,18 +150,47 @@ int main(int argc,char** argv){
             if(!visible&&!smoke&&!debris&&!list.entryCoverVisible)++empty;
             else ++raster;
             if(smoke||debris)++mixed;
-            if(parts>8)++overflow;
             if(list.entryCoverVisible)++covered;
             continue;
         }
         ++promoted;
-        projected.clear();unsigned channels=0;
+        if(list.currencyRasterRequired)++partial;
+        compose(remainder,list.currencyRasterFirst);
+        unsigned channels=0;
         for(unsigned i=firstCurrency;i<list.count;++i){const auto& bob=list.actors[i];
             const auto& a=*assets.currency(bob.sprite==134,bob.frame);channels+=bob.prepared->partCount[0];
-            projected.add({{a.mask.data,a.mask.bytes,a.mask.width,a.mask.height,a.mask.stride},a.low,a.high},
+            remainder.surface().add({{a.mask.data,a.mask.bytes,a.mask.width,a.mask.height,a.mask.stride},a.low,a.high},
                 bob.x-downwellPlayfieldX-a.originX,bob.y-a.originY);
         }
-        require(channels<=8&&projected.samePixels(oracle.surface()),"promoted final alpha and colours");
+        require(channels<=8&&remainder.surface().samePixels(oracle.surface()),"partitioned final alpha and colours");
+        if(overflowTape&&tick==1397){
+            // Projection-only adversarial fixture, not natural tape coverage:
+            // overlap all visible gems at a clipped, non-word-aligned origin.
+            // Restore published positions before the next source Step.
+            int saved[GameplayWorld::gemCapacity][2];
+            for(unsigned i=0;i<game.gemSlotEnd();++i){
+                auto& g=const_cast<GameplayWorld::GemState&>(game.gemAt(i));
+                saved[i][0]=g.x;saved[i][1]=g.y;
+                if(g.active&&g.motion.lifetime.visible()&&
+                    downwell::EffectSurfacePlacement::pixelInView(240+g.x,176+g.y,{vx,vy,160,284})){
+                    g.x=vx+3-240;g.y=vy+3-176;
+                }
+            }
+            list.count=firstCurrency;
+            require(list.promoteCurrency(game,vx,vy,assets,frames)&&list.currencyRasterRequired&&
+                list.currencySpriteCount==8,"overlapping nine-gem suffix partition");
+            compose(oracle,0);compose(remainder,list.currencyRasterFirst);
+            for(unsigned i=firstCurrency;i<list.count;++i){const auto& bob=list.actors[i];
+                const auto& a=*assets.currency(bob.sprite==134,bob.frame);
+                remainder.surface().add({{a.mask.data,a.mask.bytes,a.mask.width,a.mask.height,a.mask.stride},a.low,a.high},
+                    bob.x-downwellPlayfieldX-a.originX,bob.y-a.originY);
+            }
+            require(remainder.surface().samePixels(oracle.surface()),"overlapping clipped gems preserve alpha, black and painter order");
+            for(unsigned i=0;i<game.gemSlotEnd();++i){
+                auto& g=const_cast<GameplayWorld::GemState&>(game.gemAt(i));
+                g.x=saved[i][0];g.y=saved[i][1];
+            }
+        }
         list.count=AmigaGameplayDrawList::capacity;
         require(!list.promoteCurrency(game,vx,vy,assets,frames)&&list.count==AmigaGameplayDrawList::capacity,
             "full draw list fallback");
@@ -156,10 +200,12 @@ int main(int argc,char** argv){
     if(overflowTape){
         require(overflow>0,"natural seed-8 route-4 tape exercises sprite-channel overflow");
         require(shaded>0,"natural tape exercises actual shade subtraction");
+        require(partial>0,"natural tape exercises partial hardware promotion");
     }
     else require(promoted>50,"contact tape exercises promotion");
     std::printf("Currency promotion: %u exact frames in 1800-frame source-backed replay\n",promoted);
     require(promoted+empty+raster==1800,"every frame has a presentation class");
     std::printf("Effect coverage: hardware=%u empty=%u raster=%u; fallback mixed=%u overflow=%u entry=%u shade=%u; max live smoke=%u debris=%u\n",
         promoted,empty,raster,mixed,overflow,covered,shaded,maxSmoke,maxDebris);
+    std::printf("Partial hardware/raster frames: %u\n",partial);
 }

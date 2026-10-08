@@ -106,11 +106,11 @@ both captures; the following windows contain only complete frames:
 
 These are inclusive costs; publication includes its blitter work. Nine-gem
 composition contains nine `stampPixel` calls costing 14.24 ms together.
-Promotion currently rejects the entire currency surface on channel exhaustion,
+At this baseline promotion rejects the entire currency surface on channel exhaustion,
 so all nine gems are composed and published through the raster. Keeping a
 source-topmost sprite suffix and rasterizing only the remainder could remove
 eight of those stamps (about 12.7 ms before added partitioning costs), plus
-some publication. The assignment layer currently treats the whole controller
+some publication. The baseline assignment layer treats the whole controller
 surface as being above every actor: partial promotion must explicitly preserve
 that boundary for ordinary actors while placing the promoted suffix above it.
 Shade subtraction, opaque black and sprite priority remain authoritative.

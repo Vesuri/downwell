@@ -573,8 +573,10 @@ by the verification summary. Raster fallback is not itself evidence of shade
 subtraction: establish that producer/mask intersection separately. This is a
 coverage check, not a timing measurement or a dense-encounter substitute.
 The replay keeps its source/runtime state comparisons enabled and compares
-every promoted currency suffix with the scalar surface, independently of the
-earlier actor commands.
+the raster remainder plus promoted currency suffix with the complete scalar
+surface, independently of the earlier actor commands. Hardware counts include
+partial frames; the separate partial count identifies those that also retain
+a raster prefix. Raster-only frames exclude that partial count.
 
 For a natural channel-overflow and shade-subtraction workload, run
 `./build/amiga-currency-promotion-test --overflow --census`. This uses ordinary

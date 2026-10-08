@@ -10,7 +10,7 @@
 extern "C" { volatile unsigned gDownwellActorOrderChecks,gDownwellActorOrderFailures; }
 #endif
 
-bool AmigaGameplayDrawList::promoteCurrency(const GameplayWorld& world,int viewX,int viewY,
+bool AmigaGameplayDrawList::promoteCurrencyComplete(const GameplayWorld& world,int viewX,int viewY,
     const downwell::EffectMaskAssets& assets,const AmigaActorFrames& frames){
     using Placement=downwell::EffectSurfacePlacement;
     if(entryCoverVisible||world.dead()||!assets.ready()||
@@ -64,6 +64,78 @@ bool AmigaGameplayDrawList::promoteCurrency(const GameplayWorld& world,int viewX
     return true;
 }
 
+bool AmigaGameplayDrawList::promoteCurrency(const GameplayWorld& world,int viewX,int viewY,
+    const downwell::EffectMaskAssets& assets,const AmigaActorFrames& frames){
+    using Placement=downwell::EffectSurfacePlacement;
+    currencyRasterFirst=currencySpriteCount=0;currencyRasterRequired=true;
+    if(count>=capacity||entryCoverVisible||world.dead()||!assets.ready()||
+        !Placement::smallPixel(viewX)||!Placement::smallPixel(viewY))return false;
+    bool other=false;
+    world.smokeEffects().visitNewest([&](auto,const auto&){other=true;});
+    if(other||!world.visitDebrisDraw([&](const auto&){other=true;return true;})||other)return false;
+    const Placement::PixelView view{viewX,viewY,160,284};
+    GameplayBob pending[8];unsigned slots[8];
+    unsigned used=0,channels=0,first=0;bool dropped=false;
+    // Keep the original back-to-front admission order: early shade rejection
+    // must not become a scan of every frontmost gem's mask. Only channel
+    // exhaustion partitions the surface; a shade still retains it as a whole.
+    for(unsigned i=world.gemSlotEnd();i;--i){
+        const auto& gem=world.gemAt(i-1);
+        if(!gem.active||!gem.motion.lifetime.visible())continue;
+        const int x=240+gem.x,y=176+gem.y;
+        if(!Placement::smallPixel(x)||!Placement::smallPixel(y))return false;
+        if(!Placement::pixelInView(x,y,view))continue;
+        const unsigned sprite=gem.large?134:133,frame=gem.motion.animation.frame();
+        const auto* art=assets.currency(gem.large,frame);
+        const auto* prepared=frames.find(sprite,frame);
+        if(!art||!prepared||!prepared->partCount[0]||prepared->partCount[0]>8)return false;
+        const auto shadeFree=[&](){
+            if(world.shops().noControl)return true;
+            const int gx=x-viewX-art->originX,gy=y-viewY-art->originY;
+            for(unsigned n=0;n<world.enemyCount();++n){
+                const auto& enemy=world.enemyAt(n);
+                if(!enemy.active||!enemy.awake)continue;
+                const int ex=240+enemy.x,ey=176+enemy.y;
+                if(!Placement::smallPixel(ex)||!Placement::smallPixel(ey))return false;
+                if(!Placement::pixelInView(ex,ey,view))continue;
+                const auto& shade=*assets.shade();
+                const int sx=Placement::snapShadePixel(ex)-viewX-shade.originX;
+                const int sy=Placement::snapShadePixel(ey)-viewY-shade.originY;
+                int left=gx>sx?gx:sx,top=gy>sy?gy:sy;
+                int right=gx+int(art->mask.width),bottom=gy+int(art->mask.height);
+                if(right>sx+int(shade.mask.width))right=sx+int(shade.mask.width);
+                if(bottom>sy+int(shade.mask.height))bottom=sy+int(shade.mask.height);
+                if(left<0)left=0;if(top<0)top=0;
+                if(right>160)right=160;if(bottom>284)bottom=284;
+                for(int py=top;py<bottom;++py)for(int px=left;px<right;++px){
+                    const unsigned a=px-gx,b=px-sx;
+                    if((art->mask.data[(py-gy)*art->mask.stride+a/8]&(128u>>(a&7)))&&
+                        (shade.mask.data[(py-sy)*shade.mask.stride+b/8]&(128u>>(b&7))))return false;
+                }
+            }
+            return true;
+        };
+        if(!shadeFree())return false;
+        // Retire bottommost candidates, never a hole within the selected
+        // painter suffix. Multipart assets consume their actual channel count.
+        while(used&&(used==capacity-count||prepared->partCount[0]>8-channels)){
+            channels-=pending[first].prepared->partCount[0];
+            first=(first+1)%8;--used;dropped=true;
+        }
+        const unsigned at=(first+used)%8;
+        pending[at]={UWORD(sprite),UWORD(frame),downwellPlayfieldX+x-viewX,y-viewY,0,prepared};
+        slots[at]=i-1;++used;
+        channels+=prepared->partCount[0];
+    }
+    if(!used)return false;
+    currencyRasterFirst=dropped?slots[first]+1:world.gemSlotEnd();
+    currencyRasterRequired=dropped;currencySpriteCount=used;
+    // Keep source Draw order; assignment visits backwards, giving the topmost
+    // producer the highest sprite priority above the retained controller.
+    for(unsigned n=0;n<used;++n)actors[count++]=pending[(first+n)%8];
+    return true;
+}
+
 bool AmigaGameplayDrawList::entryCoverHardwareEligible(const GameplayWorld& world,int viewX,int viewY,bool& eligible)const{
     eligible=false;
     if(!entryCoverVisible)return true;
@@ -85,6 +157,7 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
     const UBYTE* packEnd, int worldViewX, int worldViewY, bool compositeCurrency,
     const AmigaActorFrames* prepared) {
     count = 0; failedSprite = failedFrame = 0;
+    currencyRasterFirst=currencySpriteCount=0;currencyRasterRequired=true;
 #if defined(DOWNWELL_BOB_VERIFY) || defined(DOWNWELL_DRAW_ORDER_AUDIT)
     static downwell::ActorDrawOrderVerification orderOracle;
     ++gDownwellActorOrderChecks;

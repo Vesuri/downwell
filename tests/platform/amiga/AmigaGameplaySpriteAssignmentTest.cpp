@@ -110,6 +110,20 @@ int main() {
         assert(stopped.ready&&stopped.bobCount==20); // Bounded conservative occluder overflow.
         for(const auto& slot:data)assert(slot[0]==0xffff);
     }
+    {
+        // Same position: ordinary actor < retained controller < promoted gem.
+        // The surface must hide the former but never its own topmost suffix.
+        downwell::PaletteEffectSurface<> surface;
+        const UBYTE opaque[]={0xff,0xff},zero[]={0,0};
+        assert(surface.add({{opaque,2,16,1,2},zero,zero},20,10));
+        GameplayBob partition[]={{1,17,-20,300,1},{1,17,-20,300,1}};
+        auto split=AmigaGameplayActors::assign(partition,2,pack,pack+8,player,regular,overflow,32,8,&surface,1);
+        assert(split.ready&&split.bobCount==1&&partition[0].sprite==1);
+        assert(data[0][0]==16);
+        for(unsigned i=1;i<8;++i)assert(data[i][0]==0xffff);
+        split=AmigaGameplayActors::assign(partition,2,pack,pack+8,player,regular,overflow,32,8,&surface,3);
+        assert(!split.ready);
+    }
     GameplayBob invalid{999,17,-20,300,1};
     auto result=AmigaGameplayActors::assign(&invalid,1,pack,pack+8,player,regular,overflow,32);
     assert(!result.ready && result.bobCount==1 && result.failedSprite==999 && result.failedFrame==17);

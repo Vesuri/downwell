@@ -207,6 +207,37 @@ is reserved for digests and the scalar oracle. Velocities, gravity, homing,
 bounce and RNG/query order are unchanged. `REFERENCE_GEM_POSITION=1` selects
 the retained raw-coordinate implementation on either platform.
 
+### Native currency partition
+
+For a live gem-only controller surface, the Amiga adapter can retain a
+source-topmost currency suffix in hardware sprites and leave the lower prefix
+in the raster. The source currency loop visits slots newest to oldest; channel
+assignment visits the selected suffix backwards, giving its topmost producer
+the lowest-numbered (highest-priority) channel. A bounded eight-record candidate
+queue evicts only bottommost candidates when channels run out. Multipart art
+consumes its actual number of channels. `currencyRasterFirst` separates the
+slot ranges; invisible/inactive gaps do not change painter order.
+
+Admission retains the original newest-to-oldest scan and exact shade-mask
+intersection test. Any shade overlap, smoke, debris, entry cover, death or
+unsupported asset retains the whole raster path. No pixels, RNG, instance
+state or assets are modified by admission. This does not accelerate the
+mixed-producer or shade-subtracted cases by silently dropping their masks.
+
+The retained controller raster remains in front of ordinary actors. Only the
+explicit `controllerSuffix` is above it during sprite assignment; treating all
+sprites as above the surface would incorrectly expose players/enemies through
+effects. The suffix is reserved first and fits the eight hardware channels;
+render failure remains fatal, not a request to draw that suffix underneath the
+controller. Opaque black is retained as an opaque sprite pen.
+
+`promoteCurrencyComplete` retains the previous complete-surface admission as a
+host projection oracle; `REFERENCE_EFFECT_COMPOSITION=1` retains the all-raster
+native reference. The promotion test compares the raster remainder plus sprite
+suffix with the full scalar compositor, checks the unchanged actor prefix and
+complete-promotion order, and separately exercises overlapping clipped gems.
+The latter is an adversarial projection fixture, not natural encounter coverage.
+
 ### Compatibility depths
 
 Do not use the zero `Depth` fields in the GMS2 object records as draw order.
