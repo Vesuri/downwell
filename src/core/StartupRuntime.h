@@ -25,6 +25,7 @@
 #include "StoredEntryDitherRegistration.h"
 #include "StoredDroneBulletRegistration.h"
 #include "StoredBoneRegistration.h"
+#include "RegisteredSkeletonThrow.h"
 #include "BoneViewRetirement.h"
 #include "StoredScriptSpawnRegistration.h"
 #include "StoredDebrisRegistration.h"
@@ -582,6 +583,17 @@ public:
         int x,int y,InstanceHandle& key){
         if(!registration.belongsTo(instances_)||!registration.valid())return run_.effectsSucceeded=false;
         return registration.create(x,y,random_,key);
+    }
+    template<unsigned Capacity,class Sound> bool throwRegisteredBone(
+        StoredBoneRegistration<instanceCapacity,Capacity>& registration,RegisteredSkeletonThrow& caller,
+        int x,int y,bool separated,int facing,bool& shot,Sound sound){
+        if(!registration.belongsTo(instances_)||!registration.valid())return run_.effectsSucceeded=false;
+        return caller.run(x,y,separated,facing,shot,run_.effectsSucceeded,
+            [&](int px,int py,InstanceHandle& key){
+                if(!spawnBone(registration,px,py,key))return false;
+                caller.myBoneSourceId=registration.instances().find(key)->sourceId;return true;
+            },
+            [&](InstanceHandle key,auto event){return registration.dispatch(key,event);},random_,sound);
     }
     template<unsigned Capacity> StoredScriptSpawnRegistration<instanceCapacity,Capacity> scriptSpawnRegistration(){
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};

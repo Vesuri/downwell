@@ -23,6 +23,7 @@
 #include "core/GameplayEntryDithers.h"
 #include "core/DroneBulletInstances.h"
 #include "core/BoneProjectileInstances.h"
+#include "core/RegisteredSkeletonThrow.h"
 #include "core/BoneViewRetirement.h"
 #include "core/GameplayScriptSpawnInstances.h"
 #include "core/GameplayDebrisInstances.h"
@@ -270,6 +271,16 @@ public:
     bool createBoneWithSourceId(unsigned id,int x,int y,downwell::InstanceHandle& key){
         if(!run_.effectsSucceeded||!bones_||!bones_->create(id,x,y,enemyRandom_,key))return run_.effectsSucceeded=false;
         return true;
+    }
+    template<class Sound> bool throwRegisteredBoneWithSourceId(unsigned id,
+        downwell::RegisteredSkeletonThrow& caller,int x,int y,bool separated,int facing,bool& shot,Sound sound){
+        if(!bones_||!bones_->valid())return run_.effectsSucceeded=false;
+        return caller.run(x,y,separated,facing,shot,run_.effectsSucceeded,
+            [&](int px,int py,downwell::InstanceHandle& key){
+                if(!createBoneWithSourceId(id,px,py,key))return false;
+                caller.myBoneSourceId=id;return true;
+            },
+            [&](downwell::InstanceHandle key,auto event){return bones_->dispatch(key,event);},enemyRandom_,sound);
     }
     bool bindEntryDithers(downwell::GameplayEntryDithers& entries){
         if(entryDithers_||!entries.valid()||entries.size())return false;

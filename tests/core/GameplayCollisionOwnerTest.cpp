@@ -1,4 +1,5 @@
 #include "core/GameplayCollisionOwner.h"
+#include "RegisteredSkeletonThrowChecks.h"
 #ifdef DOWNWELL_LOCAL_DRAW_CAPTURE
 namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_CAPTURE; }
 #endif
@@ -2821,6 +2822,14 @@ int main(){
         auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
         assert(owner->attach(*world));
+        auto throwOwner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},&rooms,ownership);
+        auto throwWorld=std::make_unique<GameplayWorld>(300,false,1000,false,throwOwner->enemyBinding(),
+            throwOwner->breakableBinding(),throwOwner->playerBinding(),&throwOwner->terrain());
+        assert(throwOwner->attach(*throwWorld));unsigned throwId=405200;
+        checkRegisteredSkeletonThrows(*throwWorld,[&](auto& caller,bool separated,int facing,bool& shot,auto sound){
+            return throwWorld->throwRegisteredBoneWithSourceId(throwId++,caller,240,200,separated,facing,shot,sound);
+        },[&](InstanceHandle key){return throwOwner->bones().find(key);},[&]{return throwOwner->bones().clear();});
         auto& bones=owner->bones();InstanceHandle local,shared;
         const auto before=world->randomDrawCount();auto random=world->randomState();BoneProjectile reference;
         assert(reference.create(240,990,random)&&world->createBoneWithSourceId(405190,240,990,local)&&

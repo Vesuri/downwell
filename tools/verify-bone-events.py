@@ -24,6 +24,15 @@ assert sha256(parent).hexdigest() == "f5c0c5d89f5db5d6ecc01a01c961592fb0a0e413ed
 assert b"call.i" not in parent
 assert create.count("call.i random_range(argc=2)") == 3
 assert create.index("event_inherited") < create.index("random_range")
+skeleton = (export / "Assembly/gml_Object_enmSkeleton_Step_0.asm").read_bytes()
+assert sha256(skeleton).hexdigest() == "159d57d00e13a2dd00e8aefd5edc246735f47c8988f1ca69839add909865d76a"
+throw = skeleton.decode().split(":[21]", 1)[1].split(":[27]", 1)[0]
+ordered = ["call.i gml_Script_instance_create", "pop.v.v self.myBone",
+           "call.i gml_Script_soundPlayOL", "pop.v.v self.yarc", "pop.v.v self.xarc",
+           "pop.v.v [stacktop]self.ysp", "pop.v.v [stacktop]self.xsp",
+           "pop.i.v [stacktop]self.imgSp", "pop.v.i self.eShotDelay"]
+assert [throw.index(op) for op in ordered] == sorted(throw.index(op) for op in ordered)
+assert throw.count("call.i choose(argc=3)") == 2
 wall = source("Collision_parentWall", "b90f31393aabda2f26251e4bd4eea283740696ffd91807231b05899e281dc622")
 player = source("Collision_objPlayer_n", "918f6068a1942b503dd74d92a6dff774bf0fa2fa1986b6fb38e0145e0a761df4")
 ordered = ["cmp.v.v NEQ", "pop.v.v self.image_speed", "pop.v.v self.ysp", "pop.v.v self.xx",

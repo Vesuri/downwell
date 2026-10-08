@@ -1,4 +1,5 @@
 #include "core/StartupRuntime.h"
+#include "RegisteredSkeletonThrowChecks.h"
 #include "core/TerrainCreate.h"
 #include "core/RoomPack.h"
 #include "core/StoredCollisionLifecycle.h"
@@ -190,6 +191,15 @@ int main(){
             require(world->effectsSucceeded()&&owner->valid(),"companion animation retains valid real collision owner");
         }
         require(owner->images==before+64*3,"each companion animation publishes once through the resource-backed owner");
+    }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach registered skeleton throw world");world->skipToGameForTesting();
+        auto bones=world->boneRegistration<2>();
+        checkRegisteredSkeletonThrows(*world,[&](auto& caller,bool separated,int facing,bool& shot,auto sound){
+            return world->throwRegisteredBone(bones,caller,240,200,separated,facing,shot,sound);
+        },[&](InstanceHandle key){return bones.instances().find(key);},[&]{return bones.clear();});
     }
     for(unsigned rejectedMove=0;rejectedMove<=2;++rejectedMove){
         struct BoneOwner:StoredWorldCollision {

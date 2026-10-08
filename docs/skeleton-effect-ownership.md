@@ -51,6 +51,16 @@ automatic skeleton throwing or native admission. The bridge must be cleared
 before room teardown. Capacity failure is a terminal port error before another
 ID or Create RNG word is consumed, not a claim about Windows allocation failure.
 
+`RegisteredSkeletonThrow` connects the throw block to either registered bone
+owner through `throwRegisteredBone` / `throwRegisteredBoneWithSourceId`.
+It retains the caller's child handle, distinct numeric ID and arc variables, finishes child Create
+before sound 134, consumes the vertical choice before the conditional horizontal
+choice, and writes ysp, xsp and sampled spin without resetting child coordinates
+or changing builtin image speed. Failed sound retains the registered child and
+three Create RNG draws but does not choose arcs or latch the shot. Native callers
+still supply a source numeric ID; the local handle is not a replacement for it.
+This entry point does not itself register skeletons or schedule their throws.
+
 `withBoneEvents` scopes the stored bone dispatch around one caller-supplied tick;
 `stepWithTimeStopAndBones` composes it with the registered time-effect scheduler.
 Bone Step reads `TimeStopEffects::player.stopped` after that tick's player Begin
