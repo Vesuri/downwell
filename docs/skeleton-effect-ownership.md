@@ -620,6 +620,15 @@ the registry's generation handles. Caller fields remain the responsibility of
 the required read/write accessors, not a temporary snapshot copied back at
 script exit. This entry point does not admit natural rewards or supply the
 native world's incomplete cross-family numeric-ID stream.
+The native `GameplayWorld::spawnRegisteredCurrency` uses that same retained
+script and real currency owner. Its mandatory allocator supplies each source
+ID before synchronous Create; allocation is never derived from a pool handle.
+Child setters resolve the numeric ID to the current currency generation, so
+retirement removes the binding. Caller accessors and Create collision/tile
+queries remain required. Allocation or Create failure retains the script's
+preceding writes and any partially created child, without publishing a new
+`myGem` or executing tail setters. This entry point does not fill the missing
+global birth stream or native box caller storage.
 For stored boxes, `spawnBoxCurrency` binds these accessors to the actual
 generation's `boxReward` fields, including after destruction marking. Position
 comes from a required maintained-owner read on each access, never from the

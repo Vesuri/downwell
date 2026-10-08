@@ -34,6 +34,12 @@ public:
     const Record* find(InstanceHandle h)const{
         return h.generation&&h.slot<Capacity&&records_[h.slot].lifetimeId==h.generation?&records_[h.slot]:nullptr;
     }
+    InstanceHandle handleForSourceId(unsigned id)const{
+        if(!id)return {};
+        for(unsigned i=0;i<Capacity;++i)
+            if(records_[i].lifetimeId&&records_[i].sourceId==id)return {i,records_[i].lifetimeId};
+        return {};
+    }
     template<class Random,class Queries> bool create(unsigned sourceId,MotionBinary64 x,MotionBinary64 y,
         int area,bool attractor,Random& random,Queries& queries,InstanceHandle& output){
         if(!good_)return false;

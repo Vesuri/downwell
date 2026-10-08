@@ -612,6 +612,68 @@ int main(){
     }
     auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
+    for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native})
+    for(unsigned failure=0;failure<4;++failure){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,ownership);
+        auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));
+        CurrencySpawnSource<std::uint32_t> caller;
+        caller.objectIndex=92;caller.x=RunnerImageValue{0x43704000u}.promoted();
+        caller.y=RunnerImageValue{0x44482000u}.promoted();
+        struct Queries {
+            unsigned failure,tiles=0;
+            bool wall(InstanceHandle,MotionBinary64,MotionBinary64,bool& hit){hit=false;return true;}
+            bool tile(InstanceHandle,int layer,MotionBinary64,MotionBinary64,bool& hit){
+                assert(layer==100);hit=false;return !(++tiles==2&&failure==2);
+            }
+        } queries{failure};
+        unsigned allocations=0,publications=0;
+        auto expectedRandom=world->randomState();
+        auto spawn=[&]{return world->spawnRegisteredCurrency(objects,
+            [&](auto& out){out=caller;return true;},
+            [&](auto amount){caller.moniAmount=amount;return true;},
+            [&](bool attracted){caller.atrState=attracted;return true;},
+            [&](std::uint32_t id){
+                if(++publications==2&&failure==3)return false;
+                caller.myGem=id;
+                return caller.x.add(MotionBinary64::fromInteger(16));
+            },MotionBinary64::fromInteger(14),
+            [&](std::uint32_t& id){id=805000+allocations++;return !(allocations==2&&failure==1);},queries);};
+        assert(spawn()==(failure==0));
+        const unsigned births=failure==1?1:failure?2:3;
+        assert(owner->currency().size()==births&&world->effectsSucceeded()==(failure==0));
+        struct OracleQueries {
+            bool wall(MotionBinary64,MotionBinary64,bool& hit){hit=false;return true;}
+            bool tile(MotionBinary64,MotionBinary64,bool& hit){hit=false;return true;}
+            bool publish(RunnerImageValue,RunnerImageValue){return true;}
+        } oracleQueries;
+        for(unsigned i=0;i<births;++i){
+            const auto key=owner->currency().handleForSourceId(805000+i);
+            const auto* child=owner->currency().find(key);assert(child&&child->sourceId==805000+i);
+            CurrencyCreate oracle;
+            const auto x=RunnerImageValue{0x43704000u}.promoted();auto birthX=x;
+            assert(birthX.add(MotionBinary64::fromInteger(16*int(i)))&&
+                oracle.create(birthX,caller.y,1,false,expectedRandom,oracleQueries));
+            assert(child->x.promoted().high==birthX.high&&child->x.promoted().low==birthX.low&&
+                child->state.xsp.high==oracle.xsp.high&&child->state.xsp.low==oracle.xsp.low);
+            assert(child->state.getAmount==(i==0?10:2)&&child->state.size==(i==0?1:0));
+        }
+        assert(world->randomState().drawCount()==expectedRandom.drawCount()&&
+            world->randomState().stateIndex()==expectedRandom.stateIndex());
+        for(unsigned word=0;word<16;++word)assert(world->randomState().stateWord(word)==expectedRandom.stateWord(word));
+        assert(caller.myGem==(failure?805000u:805002u)&&!caller.atrState&&
+            caller.moniAmount.high==MotionBinary64::fromInteger(failure?4:0).high&&!caller.moniAmount.low);
+        if(failure){
+            const auto draws=world->randomState().drawCount();
+            assert(!spawn()&&world->randomState().drawCount()==draws&&owner->currency().size()==births);
+        }else{
+            const auto old=owner->currency().handleForSourceId(805000);
+            assert(owner->currency().clear()&&!owner->currency().find(old)&&
+                !owner->currency().handleForSourceId(805000).generation);
+        }
+    }
     for(unsigned mode=0;mode<12;++mode){
         const bool fullEffects=mode!=0;
         const auto roomBytes=read("generated/downwell-rooms.dwrm");RoomPack roomPack(roomBytes.data(),roomBytes.size());

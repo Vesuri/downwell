@@ -28,6 +28,7 @@
 #include "core/SkeletonInstances.h"
 #include "core/BloodInstances.h"
 #include "core/CurrencyInstances.h"
+#include "core/CurrencySpawnScript.h"
 #include "core/CurrencyCollisionBounds.h"
 #include "core/RegisteredSkeletonThrow.h"
 #include "core/BoneViewRetirement.h"
@@ -278,6 +279,36 @@ public:
         downwell::MotionBinary64 y,Queries& queries,downwell::InstanceHandle& key){
         if(!run_.effectsSucceeded||!currencyInstances_)return run_.effectsSucceeded=false;
         return run_.effectsSucceeded=currencyInstances_->create(id,x,y,run_.stage.area,run_.upgrades.levels[10]!=0,enemyRandom_,queries,key);
+    }
+    // The room stream must allocate numeric IDs; never synthesize one from a
+    // currency pool slot. Caller accessors retain their own generation checks
+    // and must read published coordinates, not private movement caches.
+    template<class Read,class WriteAmount,class WriteAttracted,class WriteChild,class Allocate,class Queries>
+    bool spawnRegisteredCurrency(const downwell::ObjectPack& objects,Read read,WriteAmount writeAmount,
+        WriteAttracted writeAttracted,WriteChild writeChild,downwell::MotionBinary64 amount,
+        Allocate allocate,Queries& queries){
+        if(!run_.effectsSucceeded||!currencyInstances_||!currencyInstances_->valid())return run_.effectsSucceeded=false;
+        struct Ops {
+            using Handle=std::uint32_t;
+            GameplayWorld& world;const downwell::ObjectPack& objects;Allocate& allocate;Queries& queries;
+            bool parent(int object,int& value){
+                downwell::PackedObject info;if(!objects.findObject(object,info))return false;
+                value=info.parentId;return true;
+            }
+            bool create(int object,downwell::MotionBinary64 x,downwell::MotionBinary64 y,Handle& id){
+                Handle next=0;downwell::InstanceHandle key;
+                if(object!=248||!allocate(next)||!world.createCurrencyWithSourceId(next,x,y,queries,key))return false;
+                const auto* r=world.currencyInstances_->find(key);if(!r)return false;
+                id=r->sourceId;return true;
+            }
+            bool amount(Handle id,int value){return world.currencyInstances_->dispatch(
+                world.currencyInstances_->handleForSourceId(id),[&](auto& s,bool&){s.getAmount=value;return true;});}
+            bool size(Handle id,int value){return world.currencyInstances_->dispatch(
+                world.currencyInstances_->handleForSourceId(id),[&](auto& s,bool&){s.size=value;return true;});}
+            bool attracted(Handle id,bool value){return world.currencyInstances_->dispatch(
+                world.currencyInstances_->handleForSourceId(id),[&](auto& s,bool&){s.attracted=value;return true;});}
+        } ops{*this,objects,allocate,queries};
+        return downwell::CurrencySpawnScript::runRetained(read,writeAmount,writeAttracted,writeChild,amount,ops,run_.effectsSucceeded);
     }
     static constexpr unsigned bloodCapacity=32;
     bool currencyWallMeeting(downwell::InstanceHandle key,downwell::MotionBinary64 x,
