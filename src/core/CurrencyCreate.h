@@ -16,7 +16,8 @@ struct CurrencyCreate : CurrencyStepSound {
     AlarmBank alarms;
     int unobtime=10,obtime=180,distime=120,stuckKamo=0,bounceGain=1,stepRate=1;
     int size=0,getAmount=2,flash=-1,attractionRadius=24,attractionSpeed=4;
-    int rotationSpeed=5,gemSpeed=1,direction=0;
+    MotionBinary64 rotationSpeed=MotionBinary64::fromInteger(5),gemSpeed=MotionBinary64::fromInteger(1),direction{};
+    MotionBinary64 playerDirection{},directionDifference{};
     int attempts=0,radius=0,maxRadius=0,rx=0,ry=0;
     int scriptIndex=0;
     bool active=true,suckable=false,obtainable=false,disappearing=false,attracted=false;
@@ -43,7 +44,7 @@ struct CurrencyCreate : CurrencyStepSound {
         // Create does not normalize gemdir into 0..360.
         const int second=170+int(random.irandomSmall(70));
         const int first=int(random.irandomSmall(70))-60;
-        direction=random.chooseIndexSmall(2)?second:first;
+        direction=MotionBinary64::fromInteger(random.chooseIndexSmall(2)?second:first);
         bool blocked=false;
         if(!queries.wall(x.promoted(),y.promoted(),blocked))return false;
         if(!blocked&&!queries.tile(x.promoted(),y.promoted(),blocked))return false;

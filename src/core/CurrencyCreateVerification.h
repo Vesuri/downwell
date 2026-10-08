@@ -49,7 +49,7 @@ struct CurrencyCreateVerification {
                 birth.x.bits!=0x42a80000u||birth.y.bits!=0|| // 16+68, 0
                 birth.xsp.high!=0xc0000000u||birth.xsp.low||
                 birth.ysp.high!=(area==5?0x80000000u:0xc0000000u)||birth.ysp.low||
-                birth.direction!=10||birth.imageSpeed.bits!=0xbf000000u||birth.attracted||
+                birth.direction.high!=0x40240000u||birth.direction.low||birth.imageSpeed.bits!=0xbf000000u||birth.attracted||
                 birth.attractionRadius!=48||birth.alarms.get(3)!=30||
                 birth.radius!=68||birth.maxRadius!=32||birth.attempts!=33||
                 queries.walls!=34||queries.tiles||queries.writes!=4||

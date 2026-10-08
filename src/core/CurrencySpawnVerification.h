@@ -46,10 +46,11 @@ struct CurrencySpawnVerification {
                 valid=valid&&source.create(MotionBinary64::fromInteger(12),MotionBinary64::fromInteger(-3),
                     area,false,oracle,queries);
                 const bool slow=area==3||area==4;
+                std::int32_t direction;valid=valid&&source.direction.roundPixel(direction);
                 valid=valid&&birth.amount==(count?2:10)&&birth.large==!count&&
                     birth.motion.gravity==(slow?112:448)&&birth.motion.maximumGravity==(slow?6400:51200)&&
                     birth.motion.animation.speedBits()==source.imageSpeed.bits&&
-                    birth.motion.homing.direction==GemHoming::normalize(source.direction*65536L)&&
+                    birth.motion.homing.direction==GemHoming::normalize(direction*65536L)&&
                     (area!=5||birth.motion.vy<=0);
                 ++count;
             },false,area);

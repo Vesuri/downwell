@@ -52,14 +52,14 @@ int main(){
         Queries queries{oracle,failures,0,0,0,tiles};CurrencyCreate birth;
         assert(birth.create(real(12.25),real(-3.5),area,upgrade,random,queries));
         equal(birth.xsp,vx);equal(birth.ysp,vy);equal(birth.imgSp,rate);equal(birth.imageSpeed.promoted(),double(float(rate)));
-        assert(birth.direction==direction&&birth.size==0&&birth.getAmount==2&&!birth.attracted);
+        equal(birth.direction,direction);assert(birth.size==0&&birth.getAmount==2&&!birth.attracted);
         assert(birth.active&&!birth.allSet&&!birth.suckable&&!birth.obtainable&&!birth.disappearing&&birth.flash==-1);
         equal(birth.gravity,area==3||area==4?.035/4:.035);equal(birth.hardGravity,.2);
         equal(birth.maximumGravity,area==3||area==4?.5:4);
         assert(birth.unobtime==10&&birth.obtime==180&&birth.distime==120&&birth.stuckKamo==0&&birth.bounceGain==1&&birth.stepRate==1);
         assert(birth.attractionRadius==(upgrade?48:24)&&birth.attractionSpeed==(upgrade?6:4));
         assert(birth.alarms.get(0)==10&&birth.alarms.get(3)==(upgrade?30:15)&&birth.alarms.get(1)==-1);
-        assert(birth.rotationSpeed==5&&birth.gemSpeed==1&&birth.bounceSound==14&&birth.maxRadius==32);
+        equal(birth.rotationSpeed,5);equal(birth.gemSpeed,1);assert(birth.bounceSound==14&&birth.maxRadius==32);
         const unsigned attempts=failures<33?failures+1:33;
         assert(queries.wallCalls==attempts+1&&queries.publishes==4);
         assert(birth.attempts==int(failures<33?failures:33)&&birth.radius==queries.radius&&birth.ry<=0);

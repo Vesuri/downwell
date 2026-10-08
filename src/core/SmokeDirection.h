@@ -29,8 +29,10 @@ struct SmokeDirection {
         out.bits=(numerator.bits&0x80000000u)|(unsigned(e)<<23)|(quotient&0x7fffffu);
         return true;
     }
+    template<unsigned MaximumSpeedBits=0x41000000u>
     static bool component(RunnerImageValue speed,MotionBinary64 trig,bool negate,MotionBinary64& out) {
-        if(speed.bits>0x41000000u || ((speed.bits&0x7f800000u)==0 && speed.bits))return false;
+        static_assert(MaximumSpeedBits<=0x41100000u,"component integer extraction verified through speed 9");
+        if(speed.bits>MaximumSpeedBits || ((speed.bits&0x7f800000u)==0 && speed.bits))return false;
         RunnerImageValue narrowed,value;
         MotionBinary64 product;
         if(!narrowed.assign(trig) || (narrowed.bits&0x7fffffffu)>0x3f800000u ||

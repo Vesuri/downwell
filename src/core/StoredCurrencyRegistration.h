@@ -8,6 +8,7 @@
 #include "SoundPlayScript.h"
 #include "CurrencyStepEnvelope.h"
 #include "TimeStopBound.h"
+#include "CurrencyHomingSource.h"
 #include <cstring>
 namespace downwell {
 // Registered object-248 Create and script setters. Borrow at a fixed address
@@ -105,6 +106,15 @@ public:
             bool publish(RunnerImageValue x,RunnerImageValue y){return owner.publish(e,x,y);}
         } ops{*this,*e,stopped,roomWidth,motion};
         return dispatch(h,[&](auto& state,bool& good){return CurrencyStepEnvelope::run(state,random,ops,good);});
+    }
+    template<class Random,class FreeMotion,class Math> bool stepWithHoming(InstanceHandle h,Random& random,bool stopped,int width,
+        MotionBinary64 playerX,MotionBinary64 playerY,FreeMotion free,Math& math){
+        struct Motion {
+            FreeMotion& free;MotionBinary64 x,y;bool& good;Math& math;
+            bool freeMotion(CurrencyCreate& state){return free(state);}
+            bool attractedMotion(CurrencyCreate& state){return CurrencyHomingSource::run(state,x,y,math,good);}
+        } motion{free,playerX,playerY,good_,math};
+        return step(h,random,stopped,width,motion);
     }
     bool retire(InstanceHandle h){
         auto* e=entry(h);

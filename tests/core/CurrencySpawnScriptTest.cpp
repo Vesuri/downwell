@@ -92,7 +92,7 @@ int main(){
             const int second=170+int(oracle.irandomSmall(70)),first=int(oracle.irandomSmall(70))-60;
             const int direction=oracle.chooseIndexSmall(2)?second:first;
             const auto& gem=ops.children[i];
-            assert(equal(gem.xsp,vx)&&equal(gem.ysp,vy)&&equal(gem.imgSp,rate)&&gem.direction==direction);
+            assert(equal(gem.xsp,vx)&&equal(gem.ysp,vy)&&equal(gem.imgSp,rate)&&equal(gem.direction,direction));
             assert(gem.getAmount==amounts[i]&&gem.size==int(amounts[i]==10)&&gem.attracted==attracted);
             assert(equal(gem.xx,12.25)&&equal(gem.yy,-3.5)&&gem.alarms.get(3)==(upgrade?30:15));
         }

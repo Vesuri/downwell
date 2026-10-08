@@ -18,6 +18,7 @@
 #include "core/ScriptSpawnOperations.h"
 #include "core/MachineGunSourceStep.h"
 #include "core/BoxSoundVerification.h"
+#include "core/CurrencyHomingMath.h"
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -285,6 +286,28 @@ int main(){
             state->alarms.get(0)==10&&state->alarms.get(3)==15&&state->flash==1&&r->preciseX==240&&r->preciseY==512&&
             state->xx.high==0x406e0800u&&state->yy.high==0x40800400u,"frozen currency refunds alarms, flashes and rounds only published coordinates");
         require(currency.clear(),"clear frozen currency owner");
+    }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach attracted currency world");world->skipToGameForTesting();
+        auto currency=world->currencyRegistration<1>();InstanceHandle gem;
+        require(world->createRegisteredCurrency(currency,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(512),
+            [](auto,int,auto,auto,bool& hit){hit=false;return true;},gem)&&currency.attracted(gem,true),"create attracted registered currency");
+        auto expected=*currency.find(gem);CurrencyHomingMath math{portableAtan};bool good=true;unsigned freeCalls=0;
+        for(unsigned tick=0;tick<12;++tick){
+            require(CurrencyHomingSource::run(expected,MotionBinary64::fromInteger(250),MotionBinary64::fromInteger(500),math,good),"homing integration oracle");
+            require(world->withCurrencyEvents(currency,[&](auto key,auto&,auto phase,unsigned,auto& random,bool&){
+                if(phase!=StartupRuntime::CurrencyPhase::step)return false;
+                return currency.stepWithHoming(key,random,true,480,MotionBinary64::fromInteger(250),MotionBinary64::fromInteger(500),
+                    [&](auto&){++freeCalls;return false;},math);
+            },[&]{return world->stepWithCollisionPass({},false,StartupRuntime::NoCollisionPass{});}),"registered homing continues while time is stopped");
+            const auto* state=currency.find(gem);const auto* r=owner->resolve(gem);std::int32_t x,y;
+            require(expected.xx.roundPixel(x)&&expected.yy.roundPixel(y)&&state&&r&&!freeCalls&&
+                state->xx.high==expected.xx.high&&state->xx.low==expected.xx.low&&state->yy.high==expected.yy.high&&state->yy.low==expected.yy.low&&
+                r->preciseX==float(x)&&r->preciseY==float(y),"source homing state and separately published rounded coordinates match");
+        }
+        require(currency.clear(),"clear attracted currency owner");
     }
     for(unsigned chainCase=0;chainCase<10;++chainCase){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);

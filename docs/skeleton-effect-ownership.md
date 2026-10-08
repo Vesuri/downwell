@@ -555,6 +555,25 @@ freeze, alarm boundaries, continuation after destruction and failed callbacks.
 Neither a successful no-op mover nor the existing fixed-point gem mover is
 installed as a substitute for the required free/homing source branches.
 
+`CurrencyHomingSource` supplies the attracted branch: binary64 `gemdir`,
+`rotsp`, `gemsp`, `pldir` and `dirdif`, one signed 360-degree difference
+adjustment, turn-before-acceleration, epsilon-aware caps, separate lengthdir
+calls, then private X/Y accumulation. `stepWithHoming` connects it to registered
+currency while requiring explicit player coordinates, math and free-motion
+callbacks. Host-double control-flow tests cover turns, caps and failure prefixes;
+a scheduled twelve-tick fixture checks published positions while time is stopped.
+The lengthdir component's explicit speed-nine entry point retains the original
+speed-eight limit for existing callers. Its arithmetic is compared against the
+float multiply/truncate/snap wrapper independently of trig evaluation.
+
+`CurrencyHomingMath` requires an explicit atan provider. Tests using
+`portableAtan` do not establish original x87 identity. Gem direction is not
+normalized by the VM: an extended orbit exceeds the currently recovered
+[-585,585] degree trig domain and fails explicitly. Neither modulo reduction
+before the runner's rounded radians conversion nor a host-libm fallback is
+admitted. Exact free motion and this larger trig domain remain necessary for
+natural currency admission.
+
 The shared live reward wrapper now supplies the run's area to `GemMotion`.
 Its fixed-point adapter preserves the area-5 extra RNG draw after both ordinary
 velocity draws, and areas 3/4 use gravity 112/12800 and cap 6400/12800. As in
