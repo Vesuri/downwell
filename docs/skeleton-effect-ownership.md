@@ -629,6 +629,16 @@ volume and keeps pitch at one regardless of water. All seven backend-operation
 failure prefixes retain preceding script/channel writes and latch the world
 failure. Instrumented backend tests validate commands, not audible playback.
 
+The stored currency registry's Draw boundary executes the source size-dependent
+sprite write and conditional mask write before testing `dflash`. Both gem
+resources have four frames; the existing runner sprite-change rule preserves
+an in-range index and resets an out-of-range index only on a changed sprite.
+These writes reach the spatial owner, so a medium gem's larger mask is visible
+to subsequent queries. Integer `dflash=-1` is false in the runner and permits
+`drawFx`; positive one suppresses it without suppressing appearance writes.
+The compositor remains a required checked callback: this boundary alone is not
+live shaded currency rendering or native Draw integration.
+
 The shared live reward wrapper now supplies the run's area to `GemMotion`.
 Its fixed-point adapter preserves the area-5 extra RNG draw after both ordinary
 velocity draws, and areas 3/4 use gravity 112/12800 and cap 6400/12800. As in

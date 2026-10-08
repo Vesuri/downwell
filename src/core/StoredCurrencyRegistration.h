@@ -12,6 +12,7 @@
 #include "CurrencyFreeMotion.h"
 #include "PlayerSolidCollisionBinary64.h"
 #include "CurrencyGainScript.h"
+#include "RunnerSpriteChange.h"
 #include <cstring>
 namespace downwell {
 // Registered object-248 Create and script setters. Borrow at a fixed address
@@ -50,6 +51,31 @@ public:
         for(auto& e:entries_)if(e.id==r.instanceId&&record(e)==&r)return e.key;return {};
     }
     const CurrencyCreate* find(InstanceHandle h){auto* e=entry(h);return e&&record(*e)?&e->state:nullptr;}
+    // objCurrency Draw writes sprite/mask before the dflash gate. DrawFx is a
+    // required compositor operation, not an unshaded sprite substitute.
+    template<class DrawFx> bool draw(InstanceHandle h,DrawFx drawFx){
+        auto* e=entry(h);auto* r=e?record(*e):nullptr;
+        if(!good_||!r)return fail();
+        const int size=e->state.size;
+        if(size==0||size==1){
+            const int sprite=size==0?133:134;
+            RunnerImageValue index;std::memcpy(&index.bits,&r->imageIndex,4);
+            RunnerSpriteChange::Result change;
+            // Both resources have four verified unit frame keys.
+            if(!RunnerSpriteChange::plan(r->spriteId,sprite,index,4,change)||
+                !lifecycle_.sprite(h,*r,sprite))return fail();
+            r=record(*e);if(!r)return fail();
+            r->spriteId=sprite;if(change.resetIndex)r->imageIndex=0.0F;
+            if(r->maskId!=r->spriteId){
+                if(!lifecycle_.mask(h,*r,r->spriteId))return fail();
+                r=record(*e);if(!r)return fail();r->maskId=r->spriteId;
+            }
+        }
+        // The admitted source dflash values are -1/+1, with integer zero also
+        // false. GML numeric truth is positive, not C++ nonzero.
+        if(e->state.flash>0)return true;
+        return drawFx(h,*r,e->state)&&good_?true:fail();
+    }
     bool advanceAnimation(InstanceHandle h){
         auto* e=entry(h);auto* r=e?record(*e):nullptr;
         if(!good_||!r||(r->spriteId!=133&&r->spriteId!=134))return fail();

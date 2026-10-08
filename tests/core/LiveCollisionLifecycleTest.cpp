@@ -385,6 +385,38 @@ int main(){
             currency.find(gem)->gemAmount==2&&!owner->resolve(gem)->destroyRequested,"collection failure retains preceding account writes and live caller");
         require(currency.clear(),"clear failed collection caller");
     }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach currency Draw world");world->skipToGameForTesting();
+        auto currency=world->currencyRegistration<1>();InstanceHandle gem;
+        require(world->createRegisteredCurrency(currency,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(512),
+            [](auto,int,auto,auto,bool& hit){hit=false;return true;},gem),"create Draw caller");
+        unsigned draws=0;unsigned hits[2]{};
+        for(int size=0;size<=1;++size){
+            require(currency.size(gem,size),"publish reward size");
+            for(int flash:{-1,0,1}){
+                require(currency.dispatch(gem,[&](auto& s,bool&){s.flash=flash;return true;}),"set source flash gate");
+                const auto before=draws;
+                require(currency.draw(gem,[&](auto key,const auto& record,const auto& state){
+                    ++draws;require(key.slot==gem.slot&&record.spriteId==133+size&&record.maskId==133+size&&state.flash<=0,
+                        "source sprite and mask writes precede drawFx");return true;
+                })&&draws==before+(flash<=0?1:0),"negative dflash draws and positive suppresses");
+            }
+            // Draw's mask write must affect subsequent identity-bearing queries.
+            for(int y=500;y<=524;++y)for(int x=228;x<=252;++x){
+                InstancePlaceResult result;
+                require(owner->collisionPoint({},248,MotionBinary64::fromInteger(x),MotionBinary64::fromInteger(y),true,false,result),
+                    "query Draw-published currency mask");
+                if(result.id!=-4){require(result.handle.slot==gem.slot,"query selects currency lifetime");++hits[size];}
+            }
+        }
+        require(hits[0]&&hits[1]>hits[0],"large gem Draw publishes larger precise collision coverage");
+        require(currency.dispatch(gem,[](auto& s,bool&){s.flash=-1;return true;}),"enable failing compositor fixture");
+        require(!currency.draw(gem,[](auto,const auto&,const auto&){return false;})&&!world->effectsSucceeded(),
+            "drawFx failure is terminal after retained appearance writes");
+        require(currency.clear(),"clear failed Draw caller");
+    }
     for(unsigned failure=0;failure<=7;++failure){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
