@@ -761,7 +761,7 @@ test: verify-ordinary-time-field
 test: verify-runner-spatial-split
 .PHONY: verify-runner-spatial-split
 .PHONY: verify-contact-profile
-build/encounter-coverage-test: tests/platform/amiga/GameplayEncounterCoverageTest.cpp tests/platform/amiga/GameplayEncounterCoverage.h
+build/encounter-coverage-test: tests/platform/amiga/GameplayEncounterCoverageTest.cpp tests/platform/amiga/GameplayEncounterCoverage.h src/core/GameplayContactProfileInput.h src/core/Input.h
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
 .PHONY: verify-encounter-coverage
@@ -2486,6 +2486,7 @@ build/amiga-currency-promotion-test: $(CURRENCY_PROMOTION_TEST_SOURCES) tests/pl
 .PHONY: test-amiga-currency-promotion
 test-amiga-currency-promotion: build/amiga-currency-promotion-test
 	./build/amiga-currency-promotion-test
+	./build/amiga-currency-promotion-test --overflow
 test: test-amiga-currency-promotion
 .PHONY: test-amiga-gameplay-draw-list
 build/amiga-gameplay-draw-list-test: $(GAMEPLAY_DRAW_LIST_TEST_SOURCES) $(HOST_CHECK_HEADERS)

@@ -575,6 +575,22 @@ coverage check, not a timing measurement or a dense-encounter substitute.
 The replay keeps its source/runtime state comparisons enabled and compares
 every promoted currency suffix with the scalar surface, independently of the
 earlier actor commands.
+
+For a natural channel-overflow and shade-subtraction workload, run
+`./build/amiga-currency-promotion-test --overflow --census`. This uses ordinary
+startup seed 8 and encounter input route 4, not injected currency or changed
+RNG state. `make test-amiga-currency-promotion` runs both tapes. Reproduce its
+source replay independently with
+`DOWNWELL_ENCOUNTER_PROFILE_SEARCH=1 DOWNWELL_ENCOUNTER_CASE=8:4 make verify-contact-profile`.
+The shared route helper is checked against the search's original button
+formula, including entrance boundaries. CSV rows include required sprite parts,
+death state and actual shade pixel changes: the latter compares the unshaded
+currency image with the scalar compositor on live gem-only frames, rather than
+inferring subtraction from a failed promotion. Reasons can overlap. This host
+fixture verifies the promoted suffix and unchanged actor prefix on fallback;
+it does not verify native fallback DMA pixels or time its composition. It is
+not evidence of smoke/debris coverage or complete dense-combat coverage.
+
 Phases 137–138 split enemy finalization's integer position publication and
 sprite/mask/scale/image-index publication from phase 115. The latter includes
 bat presentation-field updates. Coordinate rounding, sprite selection and

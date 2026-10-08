@@ -2476,14 +2476,8 @@ int main(int argc, char** argv) {
                 if(encounterSearch){
                     // Search input routes only. Neither owner nor gameplay RNG
                     // is altered. Keep the source entry checkpoint unchanged.
-                    const unsigned periods[]={30,60,120,240,360,480,720,1800};
-                    const unsigned firePeriods[]={2,4,6,10,16,24,40,60};
-                    const unsigned movement=periods[phase/8],fire=firePeriods[phase%8];
-                    input.right=(tick/movement)%2==0;input.left=!input.right;
-                    input.fire=tick%fire<fire/2;
-                    if(176+game.player().offsetY()<1264){
-                        input.left=game.player().offsetX()>2;input.right=game.player().offsetX()<-2;
-                    }
+                    require(downwell::gameplayEncounterProfileInput(tick,240+game.player().offsetX(),
+                        176+game.player().offsetY(),phase,input),"bounded encounter route");
                 }
                 game.step(downwell::packReplayInput(input));
                 require(terrain.valid(),"contact tape terrain identity store remains valid");

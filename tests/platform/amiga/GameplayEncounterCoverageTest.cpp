@@ -1,4 +1,5 @@
 #include "GameplayEncounterCoverage.h"
+#include "core/GameplayContactProfileInput.h"
 #include <cassert>
 #include <vector>
 
@@ -32,6 +33,21 @@ struct World {
 };
 }
 int main(){
+    const unsigned movement[]={30,60,120,240,360,480,720,1800};
+    const unsigned fire[]={2,4,6,10,16,24,40,60};
+    for(unsigned route=0;route<64;++route)for(unsigned tick=0;tick<1800;++tick)
+        for(int y:{1263,1264})for(int x:{237,238,240,242,243}){
+            downwell::Input input;input.quit=input.pause=true;
+            assert(downwell::gameplayEncounterProfileInput(tick,x,y,route,input));
+            const bool right=(tick/movement[route/8])%2==0;
+            assert(input.right==(y<1264?x<238:right));
+            assert(input.left==(y<1264?x>242:!right));
+            assert(input.fire==(tick%fire[route%8]<fire[route%8]/2));
+            assert(!input.quit&&!input.pause);
+        }
+    downwell::Input unchanged;unchanged.quit=unchanged.pause=unchanged.fire=true;
+    assert(!downwell::gameplayEncounterProfileInput(0,240,1200,64,unchanged));
+    assert(unchanged.quit&&unchanged.pause&&unchanged.fire&&!unchanged.left&&!unchanged.right);
     World world;
     // Source camera bounds [160,320)x[34,318); actor coordinates are relative
     // to (240,176), whereas particles are absolute. Boundary pixels matter.
