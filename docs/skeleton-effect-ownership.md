@@ -33,10 +33,28 @@ setters. Fractional external position writes are outside this rounded-event
 adapter's admitted domain and fail before publication. Failure retains previous
 successful writes and does not advance local sprite state after a rejected
 callback or permit a retry; partially completed backend work is not rolled back.
-Complete motion/event execution, collision/death dependencies and both renderers
-remain admission requirements: these entry points do not enable natural
+Collision/death dependencies and both renderers remain admission requirements:
+these entry points do not enable natural
 generation or silently substitute a no-op event. Engine activation is separate
 from custom skeleton `active`.
+
+`SkeletonActor::stepPublished` runs the checked ordinary Step through that
+publisher. Image-speed and alarm writes also reach stored builtin fields before
+sound or child-creation callbacks. It preserves activation, hit-stun writes,
+throw-frame tests, rounded X then Y publication, time-stop's alarm compensation,
+and the death script's ordered callbacks. Death remains outside the time-stop
+guard; the final hit-stun sprite write can run after destruction is requested.
+The effects adapter must complete synchronous child Creates or fail, retaining
+the completed prefix and latching failure rather than retrying it. The scalar
+`stepAtPlayer` remains a successful-event reference, not a backend authority.
+
+The stored scoped Step handler and native captured-Step adapter use this same
+body. Controlled owner fixtures advance the source animation until it throws a
+registered bone, checking parent publication and the five shared RNG draws of
+that throw. These injected, fixed-player-pose encounters establish the adapter
+boundary, not natural generation, complete native cross-family scheduling or
+original-runner parity. Production damage/death dependencies are not replaced
+with the tests' deliberately rejecting effect adapters.
 
 `BoneProjectile` has checked publication entry points for live owners, while
 its scalar event methods remain the successful-event reference. Step compares

@@ -1404,6 +1404,18 @@ build/skeleton-encounter-test: tests/core/SkeletonEncounterTest.cpp $(wildcard s
 verify-skeleton-actor: build/skeleton-actor-test
 	./build/skeleton-actor-test
 
+.PHONY: verify-skeleton-publication
+test: verify-skeleton-publication
+verify-skeleton-publication: build/skeleton-publication-test
+	python3 tools/verify-bone-events.py
+	./build/skeleton-publication-test
+
+build/skeleton-publication-test: tests/core/SkeletonPublicationTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -ffp-contract=off -Isrc -o $@ $<
+
+build/live-collision-lifecycle-test build/gameplay-collision-owner-test build/gameplay-collision-owner-scalar-test build/gameplay-collision-owner-snapshot-test: tests/core/QuietSkeletonEffects.h
+
 build/skeleton-actor-test: tests/core/SkeletonActorTest.cpp src/core/SkeletonActor.h src/core/SkeletonDecisions.h src/core/SkeletonAnimation.h src/core/SkeletonTiming.h src/core/MotionBinary64.h src/core/PlayerMotion.cpp src/core/PlayerMotion.h
 	@mkdir -p build
 	$(CXX) $(CXXFLAGS) -ffp-contract=off -Isrc -o $@ $< src/core/PlayerMotion.cpp

@@ -1,5 +1,6 @@
 #include "core/GameplayCollisionOwner.h"
 #include "RegisteredSkeletonThrowChecks.h"
+#include "QuietSkeletonEffects.h"
 #ifdef DOWNWELL_LOCAL_DRAW_CAPTURE
 namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_CAPTURE; }
 #endif
@@ -2845,8 +2846,19 @@ int main(){
             skeletonWorld->step(0);
             assert(skeletonWorld->effectsSucceeded()&&actor->state.alarms[2]==0&&!actor->state.shot&&
                 actor->state.alarms[3]==14&&!actor->state.imageIndex.high&&!actor->state.imageIndex.low);
+            assert(skeletons.dispatch(key,[](auto& state,auto&,bool&){state.hitPending=true;return true;}));
+            unsigned hurts=0;
+            auto stepPhase=std::make_unique<RunnerStepSnapshot<GameplayCollisionView::capacity>>();
+            assert(skeletonOwner->dispatchStepPhase(0,*stepPhase,[&](InstanceHandle selected,const PackedObjectEvent&){
+                GameplayCollisionView::Kind kind;InstanceHandle local;
+                assert(GameplayCollisionView::decode(selected,kind,local));
+                return kind!=GameplayCollisionView::Kind::skeleton||skeletonOwner->stepSkeleton(selected,false,
+                    MotionBinary64::fromInteger(180),MotionBinary64::fromInteger(300),
+                    [&](auto&,auto&){return QuietSkeletonEffects{hurts};});
+            })&&hurts==1&&actor->state.sprite==205&&actor->state.hitStun&&!actor->state.hitPending&&
+                actor->state.alarms[1]==4&&actor->state.alarms[3]==30);
             assert(skeletons.dispatchPublished(key,[&](auto& state,auto&,auto& publish,bool&){
-                assert(publish.imageIndex({0x40800000u})&&publish.sprite(205)&&state.sprite==205&&!state.timeline.bits&&
+                assert(publish.sprite(207)&&publish.imageIndex({0x40800000u})&&publish.sprite(205)&&state.sprite==205&&!state.timeline.bits&&
                     !state.imageIndex.high&&!state.imageIndex.low&&publish.sprite(207)&&publish.facing(-1));
                 assert(publish.position({0x42e00000u},{0x43400000u})&&publish.position({0x42e00000u},{0x43500000u})&&
                     state.x==112&&state.y==208&&state.facing==-1);
@@ -2868,6 +2880,35 @@ int main(){
         auto throwWorld=std::make_unique<GameplayWorld>(300,false,1000,false,throwOwner->enemyBinding(),
             throwOwner->breakableBinding(),throwOwner->playerBinding(),&throwOwner->terrain());
         assert(throwOwner->attach(*throwWorld));unsigned throwId=405200;
+        {
+            auto encounterOwner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+                GameplayTerrainInstances::WallCollision{},&rooms,ownership);
+            auto encounter=std::make_unique<GameplayWorld>(300,false,0,false,encounterOwner->enemyBinding(),
+                encounterOwner->breakableBinding(),encounterOwner->playerBinding(),&encounterOwner->terrain());
+            assert(encounterOwner->attach(*encounter));InstanceHandle skeleton;
+            assert(encounter->createSkeletonWithSourceId(505200,240,200,skeleton));
+            auto phase=std::make_unique<RunnerStepSnapshot<GameplayCollisionView::capacity>>();unsigned throws=0,hurts=0;
+            for(unsigned frame=0;frame<24;++frame){
+                encounter->step(0);assert(encounter->effectsSucceeded());
+                assert(encounterOwner->dispatchStepPhase(0,*phase,[&](InstanceHandle selected,const PackedObjectEvent&){
+                    GameplayCollisionView::Kind kind;InstanceHandle local;assert(GameplayCollisionView::decode(selected,kind,local));
+                    if(kind==GameplayCollisionView::Kind::bone)return encounterOwner->stepBone(selected,false,
+                        [&](int sprite,unsigned& count){return sprites.frameCount(sprite,count);});
+                    if(kind!=GameplayCollisionView::Kind::skeleton)return true;
+                    return encounterOwner->stepSkeleton(selected,false,MotionBinary64::fromInteger(180),MotionBinary64::fromInteger(300),
+                        [&](auto& actor,auto& throwing){
+                            auto launch=[&](int facing){
+                                const auto before=encounter->randomDrawCount();
+                                const bool ok=encounter->throwRegisteredBoneWithSourceId(505201+throws,throwing,actor.x,actor.y,true,
+                                    facing,actor.shot,[&](int id){return id==134&&actor.sprite==207&&actor.facing==-1;});
+                                assert(ok&&encounter->randomDrawCount()==before+5);++throws;return ok;
+                            };
+                            return ThrowingSkeletonEffects<decltype(launch)>{hurts,launch};
+                        });
+                })&&encounterOwner->prepareDraw());
+            }
+            assert(throws==1&&!hurts&&encounter->bones()->size()==1);
+        }
         checkRegisteredSkeletonThrows(*throwWorld,[&](auto& caller,bool separated,int facing,bool& shot,auto sound){
             return throwWorld->throwRegisteredBoneWithSourceId(throwId++,caller,240,200,separated,facing,shot,sound);
         },[&](InstanceHandle key){return throwOwner->bones().find(key);},[&]{return throwOwner->bones().clear();});

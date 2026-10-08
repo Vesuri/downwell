@@ -1,5 +1,6 @@
 #include "core/StartupRuntime.h"
 #include "RegisteredSkeletonThrowChecks.h"
+#include "QuietSkeletonEffects.h"
 #include "core/TerrainCreate.h"
 #include "core/RoomPack.h"
 #include "core/StoredCollisionLifecycle.h"
@@ -224,9 +225,17 @@ int main(){
         require(tick()&&steps==1&&ends==1&&record->alarms.get(2)==1&&actor->state.shot,"first shared skeleton tick");
         require(tick()&&steps==2&&ends==2&&!actor->state.shot&&record->alarms.get(2)==0&&record->alarms.get(3)==14&&
             record->imageIndex==0,"skeleton alarm decrements once and later slot sees same-phase write");
+        require(skeletons.dispatch(key,[](auto& state,auto&,bool&){state.hitPending=true;return true;}),"hit source skeleton");
+        unsigned hurts=0;QuietSkeletonEffects effects{hurts};
+        require(world->withSkeletonPublishedEvents(skeletons,[&](InstanceHandle,auto phase,auto& state,auto&,auto& publish,bool& good){
+            return phase!=StartupRuntime::SkeletonPhase::step||state.stepPublished(false,MotionBinary64::fromInteger(180),
+                MotionBinary64::fromInteger(300),publish,effects,good);
+        },[&]{return world->stepWithCollisionPass(Input{},false,[]{return true;});})&&hurts==1&&
+            record->spriteId==205&&record->imageSpeed==0&&record->alarms.get(1)==4&&record->alarms.get(3)==30&&
+            actor->state.hitStun&&!actor->state.hitPending,"checked hit Step executes in the stored room scheduler");
         require(world->withSkeletonPublishedEvents(skeletons,[&](InstanceHandle,auto phase,auto& state,auto&,auto& publish,bool&){
             if(phase!=StartupRuntime::SkeletonPhase::step)return true;
-            require(publish.imageIndex({0x40800000u})&&record->imageIndex==4,"publish source image index immediately");
+            require(publish.sprite(207)&&publish.imageIndex({0x40800000u})&&record->imageIndex==4,"publish source image index immediately");
             require(publish.sprite(205)&&record->spriteId==205&&record->imageIndex==0&&
                 state.sprite==205&&!state.timeline.bits,"hit sprite applies its sequence reset before another callback");
             require(publish.sprite(207)&&publish.facing(-1)&&record->spriteId==207&&record->scaleX==-1&&state.facing==-1,
@@ -289,6 +298,37 @@ int main(){
             actor->state.sprite==207&&actor->state.facing==-1,"failed sprite keeps prior publications without installing new art");
         require(!skeletons.dispatchPublished(key,[](auto&,auto&,auto&,bool&){return true;})&&owner->calls==2,
             "failed skeleton setter cannot be retried");
+    }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach animation-driven skeleton encounter");world->skipToGameForTesting();
+        auto skeletons=world->skeletonRegistration<1>();auto bones=world->boneRegistration<4>();InstanceHandle skeleton;
+        require(world->spawnSkeleton(skeletons,240,200,skeleton),"register encounter skeleton");
+        TimeStopEffects<4> stop;auto shards=world->timeShardRegistration<4>();auto changes=world->timeChangeRegistration<8>();
+        require(stop.shards.bindPhases(shards)&&stop.changes.bind(changes),"bind encounter time state");
+        unsigned throws=0,hurts=0;
+        for(unsigned frame=0;frame<24;++frame){
+            require(world->withSkeletonPublishedEvents(skeletons,[&](InstanceHandle,auto phase,auto& actor,auto& throwing,auto& publish,bool& good){
+                if(phase!=StartupRuntime::SkeletonPhase::step)return true;
+                auto launch=[&](int facing){
+                    const auto before=world->randomDrawCount();
+                    const bool ok=world->throwRegisteredBone(bones,throwing,actor.x,actor.y,true,facing,actor.shot,[&](int id){
+                        const auto* r=world->instance(skeletons.instances().find(skeleton)->sourceId);
+                        require(id==134&&r&&r->spriteId==207&&r->scaleX==-1&&throwing.myBoneSourceId,
+                            "source throw observes published parent art and child identity");return true;
+                    });
+                    require(ok&&world->randomDrawCount()==before+5,"source bone Create and arc choices share world RNG");
+                    ++throws;return ok;
+                };
+                ThrowingSkeletonEffects<decltype(launch)> effects{hurts,launch};
+                return actor.stepPublished(false,MotionBinary64::fromInteger(180),MotionBinary64::fromInteger(300),publish,effects,good);
+            },[&]{return world->stepWithTimeStopAndBones(bones,shards,changes,stop,Input{},
+                [&](int sprite,unsigned& count){return sprites.frameCount(sprite,count);},StartupRuntime::NoTimeTransition{});}),
+                "shared skeleton/bone room tick");
+        }
+        require(throws==1&&!hurts&&bones.instances().size()==1&&stop.reset()&&bones.clear()&&skeletons.clear(),
+            "animation drives one registered source throw without invented death effects");
     }
     for(unsigned rejectedMove=0;rejectedMove<=2;++rejectedMove){
         struct BoneOwner:StoredWorldCollision {

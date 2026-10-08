@@ -272,6 +272,15 @@ public:
         if(!run_.effectsSucceeded||!skeletons_||!skeletons_->create(id,x,y,key))return run_.effectsSucceeded=false;
         return true;
     }
+    template<class MakeEffects> bool stepSkeletonRoomEffect(downwell::InstanceHandle key,bool stopped,
+        downwell::MotionBinary64 playerX,downwell::MotionBinary64 playerY,MakeEffects makeEffects){
+        if(!run_.effectsSucceeded||!skeletons_||!skeletons_->valid())return run_.effectsSucceeded=false;
+        const bool ok=skeletons_->dispatchPublished(key,[&](auto& actor,auto& throwing,auto& publish,bool& good){
+            auto effects=makeEffects(actor,throwing);
+            return actor.stepPublished(stopped,playerX,playerY,publish,effects,good);
+        });
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
+    }
     static constexpr unsigned boneCapacity=32;
     const Bones* bones()const{return bones_;}
     bool bindBones(Bones& bones){

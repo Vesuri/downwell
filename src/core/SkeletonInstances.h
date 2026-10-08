@@ -19,7 +19,11 @@ public:
         bool active=true,destroyRequested=false;
     };
     using Binding=RecordLifecycleBinding<Record>;
-    explicit SkeletonInstances(Binding binding):binding_(binding){}
+    struct Builtins {
+        void* context=nullptr;
+        bool (*publish)(void*,InstanceHandle,const Record&)=nullptr;
+    };
+    explicit SkeletonInstances(Binding binding,Builtins builtins={}):binding_(binding),builtins_(builtins){}
     SkeletonInstances(const SkeletonInstances&)=delete;
     SkeletonInstances& operator=(const SkeletonInstances&)=delete;
     bool valid()const{return good_;}
@@ -77,6 +81,14 @@ public:
         SkeletonInstances& store_;InstanceHandle key_;
     public:
         Publisher(SkeletonInstances& store,InstanceHandle key):store_(store),key_(key){}
+        bool imageSpeed(RunnerImageValue value){
+            auto* r=store_.resolve(key_);if(!r)return store_.fail();
+            r->state.imageSpeed=value.promoted();return store_.publishBuiltins(key_,*r);
+        }
+        bool alarm(unsigned index,int value){
+            auto* r=store_.resolve(key_);if(!r||index>=4)return store_.fail();
+            r->state.alarms[index]=value;return store_.publishBuiltins(key_,*r);
+        }
         bool imageIndex(RunnerImageValue value){
             auto* r=store_.resolve(key_);
             if(!r||!store_.binding_.imageIndex(key_,*r,value))return store_.fail();
@@ -141,12 +153,15 @@ public:
         good_=true;return true;
     }
 private:
+    bool publishBuiltins(InstanceHandle key,const Record& r){
+        return (!builtins_.publish||builtins_.publish(builtins_.context,key,r))||fail();
+    }
     bool publishPosition(InstanceHandle key,Record& r,RunnerImageValue x,RunnerImageValue y){
         if(!binding_.publishedPosition(key,r,x,y))return false;r.x=x;r.y=y;return true;
     }
     bool fail(){good_=false;return false;}
     Record* resolve(InstanceHandle key){return good_?const_cast<Record*>(find(key)):nullptr;}
-    Record records_[Capacity]{};Binding binding_;
+    Record records_[Capacity]{};Binding binding_;Builtins builtins_;
     unsigned next_=1,count_=0;bool good_=true;InstanceHandle executing_{};
 };
 }

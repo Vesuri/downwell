@@ -164,6 +164,78 @@ struct SkeletonActor : SkeletonDecisions {
         takenImpact={};
         return finishPresentation();
     }
+    // Checked live Step. Builtin writes publish synchronously; effects complete
+    // their child Creates before returning. Keep step()/stepAtPlayer() above as
+    // the successful-event scalar reference, not the registered event adapter.
+    template<class Publish,class Effects>
+    bool stepPublished(bool stopped,MotionBinary64 playerX,MotionBinary64 playerY,
+                       Publish& publish,Effects& effects,bool& good){
+        if(!good)return false;
+        const auto speed=[&](MotionBinary64 value){
+            RunnerImageValue narrowed;return narrowed.assign(value)&&publish.imageSpeed(narrowed);
+        };
+        int comparison;
+        if(!stopped){
+            if(!compareRunnerReal(imageSpeed,rate,comparison)||(comparison&&!speed(rate)))return good=false;
+            auto activation=yy;
+            if(!activation.add(MotionBinary64::fromInteger(-96))||!compareRunnerReal(playerY,activation,comparison))return good=false;
+            if(comparison>0)active=true;
+            if(hitPending){
+                active=true;hitStun=true;
+                if(alarms[1]>2147483642||!publish.alarm(1,alarms[1]+5)||!publish.imageIndex({})||
+                   !effects.hurtSound(133))return good=false;
+                rate={};
+                if(!publish.alarm(3,30))return good=false;
+                hitPending=false;
+            }
+            if(!active){
+                if(!publish.sprite(208))return good=false;
+                rate={0x3fc99999u,0x9999999au};
+            }else{
+                if(sprite==208){
+                    if(!publish.imageIndex({}))return good=false;
+                    rate=throwRate();
+                }
+                if(!publish.sprite(207)||!compareRunnerReal(imageIndex,MotionBinary64::fromInteger(3),comparison))return good=false;
+                if(comparison<0){
+                    if(!compareRunnerReal(MotionBinary64::fromInteger(x),playerX,comparison)||
+                       !publish.facing(comparison>0?-1:1))return good=false;
+                }
+                if(!compareRunnerReal(imageIndex,MotionBinary64::fromInteger(4),comparison))return good=false;
+                if(comparison>0&&!shot){
+                    if(!effects.throwBone(facing))return good=false;
+                    shot=true;
+                }
+                if(!compareRunnerReal(imageIndex,MotionBinary64::fromInteger(6),comparison))return good=false;
+                if(comparison>0){
+                    if(!compareRunnerReal(rate,{},comparison))return good=false;
+                    if(comparison){rate={};if(!publish.alarm(2,30))return good=false;}
+                }
+            }
+            if(!compareRunnerReal(xsp,{},comparison))return good=false;
+            if(comparison&&!publish.facing(comparison))return good=false;
+            if((!grounded&&!xx.add(xsp))||!yy.add(ysp))return good=false;
+            RunnerImageValue px,py;std::int32_t rounded;
+            if(!px.assignInteger(x)||!py.assignInteger(y)||!xx.roundPixel(rounded)||!px.assignInteger(rounded)||
+               !publish.position(px,py)||!yy.roundPixel(rounded)||!py.assignInteger(rounded)||!publish.position(px,py))return good=false;
+        }else{
+            if(!speed({}))return good=false;
+            if(alarms[0]>0&&(alarms[0]==2147483647||!publish.alarm(0,alarms[0]+1)))return good=false;
+        }
+        if(health<=0)alive=false;
+        if(!alive){
+            if(!effects.enemyDeath()||!effects.blood(10,3)||!effects.smoke(xx,yy,5,1)||
+               !effects.flash(xx,yy,6,2,10)||!effects.currency(money)||!effects.deathSound(132)||
+               !effects.deadBody(206,takenImpact,102))return good=false;
+            for(unsigned i=0;i<2;++i){
+                if(y<(-2147483647-1)+5||!effects.debris(x,y-5))return good=false;
+            }
+            if(!publish.destroy())return good=false;
+        }
+        takenImpact={};
+        if(hitStun&&(!publish.imageIndex({})||!publish.sprite(205)))return good=false;
+        return true;
+    }
     // Predicates must be evaluated from the current source values with the
     // runner comparison tolerance. Re-query after stomp: its script may mutate
     // the player. These are two independent source IFs, not an else-if pair.

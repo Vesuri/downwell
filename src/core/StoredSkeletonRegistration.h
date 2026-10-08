@@ -14,7 +14,9 @@ private:
     Entry entries_[Capacity]{};
     InstanceStore<WorldCapacity>& records_;const ObjectPack* objects_;
     InstanceLifecycleBinding lifecycle_;std::uint32_t& nextId_;const int& room_;bool& good_;
-    Store store_{Store::Binding::bindPositionedActor(*this)};
+    Store store_{Store::Binding::bindPositionedActor(*this),{this,[](void* p,InstanceHandle key,const Record&){
+        return static_cast<StoredSkeletonRegistration*>(p)->sync(key);
+    }}};
     bool fail(){good_=false;return false;}
     static float stored(RunnerImageValue v){float f;std::memcpy(&f,&v.bits,4);return f;}
     Entry* entry(InstanceHandle key){

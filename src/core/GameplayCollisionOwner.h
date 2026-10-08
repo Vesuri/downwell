@@ -1122,6 +1122,13 @@ public:
     GameplayWorld::DroneBullets& droneBullets(){return drones_;}
     GameplayWorld::Bones& bones(){return bones_;}
     GameplayWorld::Skeletons& skeletons(){return skeletons_;}
+    template<class MakeEffects> bool stepSkeleton(InstanceHandle shared,bool stopped,
+        MotionBinary64 playerX,MotionBinary64 playerY,MakeEffects makeEffects){
+        View::Kind kind;InstanceHandle local;
+        if(!valid()||!world_||!View::decode(shared,kind,local)||kind!=View::Kind::skeleton||
+           !resolves(shared))return check(false);
+        return check(world_->stepSkeletonRoomEffect(local,stopped,playerX,playerY,makeEffects));
+    }
     // Called for a selected ordinary Step event, never as a separate family
     // walk. Preserve the shared handle until the resource owner resolves it.
     template<class Frames> bool stepBone(InstanceHandle shared,bool stopped,Frames frames){
