@@ -11,6 +11,15 @@ assert manifest["source"]["sha256"] == sha256((root / "data/data.win").read_byte
     "c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8"
 assert manifest["extractor"]["version"] == "0.9.2.0"
 assert manifest["extractor"]["commit"] == "03c7048438347799e0717b6e57a9358d000472e0"
+for name, digest in (
+    ("gml_Object_parentMovingFx_Create_0", "ee1e21a6d8c86f140da3bed0f2eb66e0828f4d2843c9021ac70dac8823c7f64d"),
+    ("gml_GlobalScript_emitMovingFx", "5971093b936584478f261fa56f1201f3a174b1bb750d9a395008d9e4e6d3b108"),
+):
+    assert sha256((export / "Assembly" / (name + ".asm")).read_bytes()).hexdigest() == digest
+emit = (export / "Assembly/gml_GlobalScript_emitMovingFx.asm").read_text()
+ordered = ["call.i gml_Script_instance_create", "pop.v.v self.myFx", "[stacktop]self.sprite_index",
+           "[stacktop]self.image_speed", "[stacktop]self.image_angle", "[stacktop]self.xsp", "[stacktop]self.ysp"]
+assert [emit.index(op) for op in ordered] == sorted(emit.index(op) for op in ordered)
 payload = (export / "Assembly/gml_Object_parentMovingFx_Step_0.asm").read_bytes()
 assert sha256(payload).hexdigest() == "e2d91724e976a16d0025b17b15b7ab34c824fbb022f5e9c13431b1597e2680a5"
 step = payload.decode()

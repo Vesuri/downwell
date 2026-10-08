@@ -617,8 +617,26 @@ A failed query keeps the prior speed capture; a failed X publication keeps
 the completed Y write and precise accumulators. A failed callback latches the
 event's supplied success flag and prevents retry. `BloodEffects::stepChecked`
 uses this body so queries observe the captured speed; `step(bool)` remains the
-successful-state scalar reference. This does not supply blood's missing world
+successful-state scalar reference. This does not by itself supply blood's world
 registration, mixed-family dispatch or rendering ownership.
+
+`BloodInstances` supplies a separate fixed, generation-checked registered owner
+for the object-220/sprite-84 specialization; `BloodEffects` remains the scalar
+owner reference. Birth registers the serialized sprite-less instance before
+the no-RNG Create. The caller's `myFx` callback then observes completed Create
+state before sprite 84, speed 0.5, angle and velocity assignments. Constructor
+coordinates narrow to binary32, while direction math consumes the original
+angle argument. Failed operations retain the allocated numeric identity and
+completed prefix. Animation publishes its index before marking Animation End
+destruction; retirement cannot reuse an executing lifetime.
+
+`StoredBloodRegistration` binds that owner to real instance records, collision
+geometry and layers, with the room numeric-ID allocator. Sprite, angle, speed,
+ordered position and destruction changes are published through this bridge.
+`bloodRegistration`/`spawnBlood` expose its creation boundary; the borrowed bank
+must be cleared before room teardown. These are not automatic death-script
+births: native ownership, room-phase admission, time-field queries and rendering
+are still required before natural blood effects can use this path.
 
 - Blood emits at published x/y, not the precise xx/yy accumulators. Its two
   angles are `random(20)` and `180-random(20)`, respectively. Object 220's Create

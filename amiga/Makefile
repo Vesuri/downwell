@@ -1007,6 +1007,11 @@ audit:
 		echo "*** instruction newer than 68000 in native executable"; exit 1; \
 	else echo "68000 instruction audit: clean"; fi
 
+.PHONY: verify-blood-compile
+verify-blood-compile:
+	@mkdir -p obj
+	$(CC) $(CPPFLAGS) -c -o obj/BloodInstancesCompile.o $(REPO)/tests/core/BloodInstancesCompile.cpp
+
 # Keep .run: it owns the live FS-UAE pid used by run.sh to replace the
 # previous project emulator safely.  Removing it leaves a stale window.
 clean:

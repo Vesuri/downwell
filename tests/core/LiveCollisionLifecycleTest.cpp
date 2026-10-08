@@ -330,6 +330,59 @@ int main(){
         require(throws==1&&!hurts&&bones.instances().size()==1&&stop.reset()&&bones.clear()&&skeletons.clear(),
             "animation drives one registered source throw without invented death effects");
     }
+    for(unsigned failure=0;failure<6;++failure){
+        struct BloodOwner:StoredWorldCollision {
+            using StoredWorldCollision::StoredWorldCollision;
+            unsigned failure=0,moves=0;
+            bool sprite(InstanceHandle h,const InstanceRecord& r,int id){
+                return !(r.objectId==220&&failure==2)&&StoredWorldCollision::sprite(h,r,id);
+            }
+            bool transform(InstanceHandle h,const InstanceRecord& r,RunnerTransformField field,
+                RunnerImageValue value,RunnerImageValue alpha,std::uint32_t blend){
+                return !(r.objectId==220&&failure==3)&&StoredWorldCollision::transform(h,r,field,value,alpha,blend);
+            }
+            bool move(InstanceHandle h,const InstanceRecord& r,RunnerImageValue x,RunnerImageValue y){
+                if(r.objectId==220&&++moves==failure-3&&failure>=4)return false;
+                return StoredWorldCollision::move(h,r,x,y);
+            }
+        };
+        auto owner=std::make_unique<BloodOwner>(objects,sprites,masks);owner->failure=failure;
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            InstanceLifecycleBinding::bindPointQueries(*owner));
+        require(owner->attach(*world),"attach registered blood world");world->skipToGameForTesting();
+        auto blood=world->bloodRegistration<1>();InstanceHandle key;unsigned calls=0;
+        const auto id=world->nextRuntimeInstanceId();const auto rng=world->randomDrawCount();
+        const RunnerImageValue x{0x43704000u},y{0x43308000u};const MotionBinary64 angle{0x402b8000u,0};
+        const bool created=world->spawnBlood(blood,x.promoted(),y.promoted(),angle,[&](InstanceHandle child){
+            ++calls;const auto* record=blood.instances().find(child);const auto* stored=world->instance(id);
+            require(record&&stored&&record->sourceId==id&&record->spriteId==-1&&stored->spriteId==-1&&
+                record->state.xx.high==x.promoted().high&&record->state.xx.low==x.promoted().low&&
+                !record->state.xsp.high&&record->state.imageSpeed.bits==0x3f800000u,
+                "myFx observes completed no-RNG Create before sprite/speed/angle/velocity");
+            return failure!=1;
+        },key);
+        require(created==(failure==0||failure>=4)&&calls==1&&world->randomDrawCount()==rng&&world->instance(id),
+            "child identity and successful creation prefix survive failed caller/setters");
+        if(!created){require(!world->effectsSucceeded()&&!blood.valid(),"failed creation latches world");continue;}
+        const auto* record=blood.instances().find(key);const auto* stored=world->instance(id);BloodEffect reference;
+        require(reference.create(x.promoted(),y.promoted(),angle)&&record&&stored->spriteId==84&&stored->rotation==13.75f&&
+            stored->imageSpeed==0.5f&&record->state.xsp.high==reference.xsp.high&&record->state.xsp.low==reference.xsp.low,
+            "emitMovingFx properties match scalar source specialization");
+        require(blood.step(key,[](const auto& r,bool& allowed){
+            require(r.state.savedSpeed.bits==0x3f000000u,"query observes captured speed");allowed=true;return true;
+        })==(failure==0),"registered blood publishes movement with checked failure");
+        if(failure){
+            require(owner->moves==failure-3&&!world->effectsSucceeded()&&!blood.valid(),"movement stops at rejected setter");
+            if(failure==5)require(record->x.bits==x.bits&&record->y.bits!=y.bits,"Y completed before failed X publication");
+            continue;
+        }
+        for(unsigned tick=0;tick<18;++tick)require(blood.advanceAnimation(key),"registered animation event");
+        require(record->destroyRequested&&stored->destroyRequested&&blood.retire(key)&&!world->instance(id),
+            "animation end marks both owners before deferred retirement");
+        InstanceHandle reused;
+        require(world->spawnBlood(blood,{}, {},{},[](auto){return true;},reused)&&reused.slot==key.slot&&
+            reused.generation!=key.generation&&!blood.instances().find(key)&&blood.clear(),"reuse preserves generation safety");
+    }
     for(int offset:{-161,-160,3000,3001}){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,

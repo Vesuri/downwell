@@ -25,6 +25,7 @@
 #include "StoredEntryDitherRegistration.h"
 #include "StoredDroneBulletRegistration.h"
 #include "StoredBoneRegistration.h"
+#include "StoredBloodRegistration.h"
 #include "StoredSkeletonRegistration.h"
 #include "RegisteredSkeletonThrow.h"
 #include "BoneViewRetirement.h"
@@ -601,6 +602,14 @@ public:
     }
     template<unsigned Capacity> StoredDroneBulletRegistration<instanceCapacity,Capacity> droneBulletRegistration(){
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
+    }
+    template<unsigned Capacity> StoredBloodRegistration<instanceCapacity,Capacity> bloodRegistration(){
+        return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
+    }
+    template<unsigned Capacity,class Caller> bool spawnBlood(StoredBloodRegistration<instanceCapacity,Capacity>& registration,
+        MotionBinary64 x,MotionBinary64 y,MotionBinary64 angle,Caller caller,InstanceHandle& key){
+        if(!run_.effectsSucceeded||!registration.belongsTo(instances_))return run_.effectsSucceeded=false;
+        return registration.create(x,y,angle,caller,key);
     }
     template<unsigned Capacity> StoredBoneRegistration<instanceCapacity,Capacity> boneRegistration(){
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
