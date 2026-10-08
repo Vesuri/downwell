@@ -124,8 +124,12 @@ original runner's simultaneous-contact order.
 
 The native `GameplayDitherAbove` store is separate from `GameplayEntryDithers`:
 one authored room controller, with source ID 100854 and a distinct lifetime
-generation. Its explicit admission reads the room record instead of consuming
-the dynamic ID stream. All native owner modes retain its object/layer lifetime;
+generation. Fresh room loading admits it at serialized index 2, before the
+first wall, in both prepared and decoded traversal. The audit-only explicit
+admission also reads the room record instead of consuming the dynamic ID
+stream. Terrain-only adoption does not replay this Create; importing the
+already-executed controller state remains necessary there.
+All native owner modes retain its object/layer lifetime;
 the reference owner also publishes collision geometry. Once admitted, the
 ordinary Begin Step executes the shared script against the previous published
 camera position; ending marks it for the owner cleanup boundary, and Retry
@@ -138,8 +142,8 @@ the visible display buffer, and records restoration damage without changing
 the terrain backing. Both commands remain planar occluders during hardware
 sprite assignment. The binary-alpha approximation is the same as the existing
 transition masks, not proof of the original GPU's alpha-1 hole blending.
-Automatic authored-order admission and native wall contacts are not enabled
-yet. The owned controller is not a substitute for those integrations.
+Native wall contacts are not enabled yet. Controller creation/movement/Draw
+does not establish complete room ordering or wall retirement equivalence.
 Neither registering an inert native record nor relying on generic
 out-of-view terrain retirement reproduces this source lifecycle. Integration
 must preserve the wall's destruction mark and the subsequent phase's retirement,

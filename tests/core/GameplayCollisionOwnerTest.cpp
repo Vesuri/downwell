@@ -3199,7 +3199,7 @@ int main(){
         auto world=std::make_unique<GameplayWorld>(300,false,1201-176,true,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain(),&rooms);
         assert(owner->attach(*world));
-        unsigned priorGeneration=0;
+        unsigned priorGeneration=0,priorDitherGeneration=0;
         for(unsigned retry=0;retry<2;++retry){
             world->confirmFirstStage();
             const auto generation=world->goalFieldInstances().birthSequence();
@@ -3209,6 +3209,9 @@ int main(){
             PreparedRoomTerrain plan;assert(plan.prepare(rooms,room));
             unsigned walls=0;
             assert(world->loadRoomTerrainWithStartField(rooms,room,[&](const auto&){
+                const auto above=world->ditherAbove()->handle();
+                const auto* dither=world->ditherAbove()->find(above);
+                assert(dither&&dither->sourceId==100854&&above.generation>priorDitherGeneration);
                 const auto* field=world->goalFieldInstances().find({0,generation});
                 assert(bool(field)==(walls>=144));
                 if(field)assert(field->sourceId==101097&&field->destroyRequested);
@@ -3218,12 +3221,13 @@ int main(){
                 // The native registration projection intentionally excludes
                 // retained terrain; use the complete reference walk here.
                 if(walls==144&&ownership==GameplayCollisionOwner::Ownership::reference){
-                    unsigned precedingWalls=0;bool found=false;
+                    unsigned precedingWalls=0;bool found=false,aboveFound=false;
                     assert(owner->visitRegistrationOrder([&](auto,int object,auto){
+                        if(object==61){assert(precedingWalls==0&&!aboveFound);aboveFound=true;}
                         if(object==371){assert(precedingWalls==144);found=true;}
-                        if(object==60){assert(!found);++precedingWalls;}
+                        if(object==60){assert(!found&&aboveFound);++precedingWalls;}
                         return true;
-                    })&&found);
+                    })&&found&&aboveFound);
                 }
                 ++walls;return true;
             },retry?&plan:nullptr)&&walls==240);
@@ -3233,6 +3237,7 @@ int main(){
             assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::goalField,{0,generation},shared));
             assert(!GameplayCollisionView(*world).contains(shared)&&owner->valid());
             priorGeneration=generation;
+            priorDitherGeneration=world->ditherAbove()->handle().generation;
             assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)!=ResultsDestination::none);
         }
     }

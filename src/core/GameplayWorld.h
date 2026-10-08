@@ -771,18 +771,26 @@ public:
         return loadRoomTerrainCreates(rooms,room,terrain,prepared,[](const auto&){return true;});
     }
     // Fresh room creation, not adoption of an already-executed stored room.
-    // Builder/RNG setup must precede this call. Other controller families still
-    // require integration; this preserves the field's order among terrain.
+    // Builder/RNG setup must precede this call. Admit the authored dither and
+    // field at their serialized boundaries, not after the terrain batch.
+    // Full player-child and builder lifetime ordering still needs integration.
     template<class Terrain>
     bool loadRoomTerrainWithStartField(const downwell::RoomPack& rooms,const downwell::PackedRoom& room,
         Terrain terrain,const downwell::PreparedRoomTerrain* prepared=nullptr){
-        bool seen=false;
+        bool seen=false,aboveSeen=false;
         if(!loadRoomTerrainCreates(rooms,room,terrain,prepared,[&](const auto& instance){
+            if(instance.objectId==61){
+                if(aboveSeen||!instance.instanceId)return false;
+                aboveSeen=true;
+                // Unindexed terrain-only fixtures do not install this owner.
+                // Every native GameplayCollisionOwner binds it before entry.
+                return !ditherAbove_||ditherAbove_->create(instance.instanceId,instance.x,instance.y);
+            }
             if(instance.objectId!=371)return true;
             if(seen||!instance.instanceId||instance.x!=240||instance.y!=192)return false;
             seen=true;return createRoomStartFieldRecord(instance.instanceId);
         }))return false;
-        if(!seen)return run_.effectsSucceeded=false;
+        if(!seen||(ditherAbove_&&!aboveSeen))return run_.effectsSucceeded=false;
         return finishRoomStartField();
     }
 private:
