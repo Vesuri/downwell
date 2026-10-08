@@ -70,5 +70,21 @@ int main() {
         }
         ++cases;
     }
+    for(unsigned origin:{0u,310u,319u})for(unsigned buffer:{0u,1u}){
+        std::vector<UBYTE> pixels(downwellGameRingBytes,0x55),expected=pixels;
+        std::vector<UBYTE> backing(downwellGameRingBytes,0x39),hud(downwellLayerBytes,0x78);
+        Bitmap display(pixels.data(),380,320,2,false,false,384);
+        AmigaRenderer renderer;amigaRendererInit(&renderer,backing.data(),hud.data());renderer.blitterEnabled=0;
+        AmigaGameplayRows rows;AmigaLaserSight laser;
+        GameplayBob cover{gameplayBlackRectMarker,159,111,1,283};
+        AmigaGameplayActors::draw(renderer,display,buffer,origin,&cover,1,pack.data(),pack.data()+pack.size(),rows,laser,nullptr);
+        for(unsigned y=1;y<284;++y)for(unsigned x=111;x<270;++x)for(unsigned p=0;p<2;++p)
+            expected[p*320*48+((origin+y)%320)*48+x/8]|=0x80>>(x%8);
+        assert(pixels==expected);
+        for(unsigned y=0;y<320;++y){
+            const unsigned screen=(y+320-origin)%320;
+            assert(rows.dirty(y,buffer)==(screen>=1&&screen<284)&&!rows.dirty(y,1-buffer));
+        }
+    }
     std::printf("Gameplay actors: %u clipped/wrapped painter-order cases, backing and buffer debts preserved\n",cases);
 }

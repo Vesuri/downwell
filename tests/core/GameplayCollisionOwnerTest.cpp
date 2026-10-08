@@ -2211,6 +2211,7 @@ int main(){
             int actual;assert(r->y.roundPixel(actual)&&actual==y&&r->x.bits==0x43700000u);
             GameplayCollisionView::Record record;
             assert(GameplayCollisionView(*world).resolve(shared,record)&&record.ditherAbove==r);
+            checkReadOnlyDraw(*world);
             if(ownership==GameplayCollisionOwner::Ownership::reference)
                 assert(owner->state(shared)->x.bits==r->x.bits&&owner->state(shared)->y.bits==r->y.bits);
         }

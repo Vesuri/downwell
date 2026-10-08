@@ -44,7 +44,7 @@ behavior, both backend integrations and relevant original-game verification.
   finish the stored companions' event/render integration as well as native
   ownership (their synchronous stored Create state is not a complete actor).
   Admit authored `objDitherAbove` (61) at its native room creation boundary,
-  connect its Draw projection and wall-destruction contacts, and verify mixed
+  connect its wall-destruction contacts, and verify mixed
   Begin Step ordering (the owned, explicitly admitted controller already runs
   the shared event). Extend the SDL
   collision pass beyond the admitted plain-wall/dither pair, preserving mixed

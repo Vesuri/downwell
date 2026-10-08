@@ -130,8 +130,16 @@ the reference owner also publishes collision geometry. Once admitted, the
 ordinary Begin Step executes the shared script against the previous published
 camera position; ending marks it for the owner cleanup boundary, and Retry
 invalidates the old handle without restarting its generation counter.
-Automatic authored-order admission, Draw projection and native wall contacts
-are not enabled yet. The store is not a substitute for those integrations.
+Native Draw projects this controller at its retained world depth, separately
+from the entry/exit transition overlays. The offline pack retains the full
+320-by-80 black edge (65006); generation verifies the other 720 rows are solid
+black. The compositor clips a finite black rectangle and the edge, writes only
+the visible display buffer, and records restoration damage without changing
+the terrain backing. Both commands remain planar occluders during hardware
+sprite assignment. The binary-alpha approximation is the same as the existing
+transition masks, not proof of the original GPU's alpha-1 hole blending.
+Automatic authored-order admission and native wall contacts are not enabled
+yet. The owned controller is not a substitute for those integrations.
 Neither registering an inert native record nor relying on generic
 out-of-view terrain retirement reproduces this source lifecycle. Integration
 must preserve the wall's destruction mark and the subsequent phase's retirement,

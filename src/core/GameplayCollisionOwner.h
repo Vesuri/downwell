@@ -47,7 +47,7 @@ public:
 #endif
 private:
     Owner owner_;
-    static constexpr unsigned drawCapacity=1+GameplayWorld::enemyCapacity+GameplayWorld::bulletCapacity+
+    static constexpr unsigned drawCapacity=2+GameplayWorld::enemyCapacity+GameplayWorld::bulletCapacity+
         GameplayScriptSpawnInstances::capacity+GameplayDebrisInstances::capacity+GameplayEntryDithers::capacity+GameplayWorld::boneCapacity+GameplayWorld::skeletonCapacity;
     struct DrawEntry {GameplayWorld::DrawActor kind;InstanceHandle local;RunnerImageValue depth;};
     struct DrawIdentity {GameplayWorld::DrawActor kind;InstanceHandle local;};
@@ -151,6 +151,9 @@ private:
             case View::Kind::debris:drawKind=GameplayWorld::DrawActor::debris;
                 token=1+GameplayWorld::enemyCapacity+GameplayWorld::bulletCapacity+
                     GameplayScriptSpawnInstances::capacity+local.slot;break;
+            case View::Kind::ditherAbove:drawKind=GameplayWorld::DrawActor::ditherAbove;
+                token=1+GameplayWorld::enemyCapacity+GameplayWorld::bulletCapacity+
+                    GameplayScriptSpawnInstances::capacity+GameplayDebrisInstances::capacity;break;
             case View::Kind::entryDither:drawKind=GameplayWorld::DrawActor::entryDither;
                 token=drawCapacity-GameplayWorld::skeletonCapacity-GameplayWorld::boneCapacity-GameplayEntryDithers::capacity+local.slot;break;
             case View::Kind::bone:drawKind=GameplayWorld::DrawActor::bone;
@@ -463,7 +466,7 @@ private:
             if constexpr(Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::goalField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency)sourceId=r.sourceId;
             constexpr bool projected=Kind==View::Kind::player||Kind==View::Kind::enemy||
-                Kind==View::Kind::bullet||Kind==View::Kind::scriptEffect||Kind==View::Kind::debris||Kind==View::Kind::entryDither||Kind==View::Kind::bone||Kind==View::Kind::skeleton;
+                Kind==View::Kind::bullet||Kind==View::Kind::scriptEffect||Kind==View::Kind::debris||Kind==View::Kind::entryDither||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::ditherAbove;
             if(projected&&!parent.actorDepthAvailable(p.depth))return parent.check(false);
             {
                 DW_PROFILE_SCOPE(profileInstanceLayerAttach);
@@ -524,7 +527,7 @@ private:
             if constexpr(Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::goalField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency)sourceId=r.sourceId;
             constexpr bool projected=Kind==View::Kind::player||Kind==View::Kind::enemy||
-                Kind==View::Kind::bullet||Kind==View::Kind::scriptEffect||Kind==View::Kind::debris||Kind==View::Kind::entryDither||Kind==View::Kind::bone||Kind==View::Kind::skeleton;
+                Kind==View::Kind::bullet||Kind==View::Kind::scriptEffect||Kind==View::Kind::debris||Kind==View::Kind::entryDither||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::ditherAbove;
             if(projected&&!parent.actorDepthAvailable(depth))return parent.check(false);
             if(!parent.check(parent.layers_.birth(h,sourceId,depth,inactive,projected)))return false;
             if(!parent.publishPreparedDraw(h))return false;
@@ -831,7 +834,7 @@ public:
                 if(!View::decode(shared,kind,local))return false;
                 // Retained terrain/field composition is not part of this
                 // visitor. Do not resolve or copy their records per frame.
-                if(kind!=View::Kind::enemy&&kind!=View::Kind::bullet&&kind!=View::Kind::scriptEffect&&kind!=View::Kind::debris&&kind!=View::Kind::player&&kind!=View::Kind::entryDither&&kind!=View::Kind::bone&&kind!=View::Kind::skeleton)return true;
+                if(kind!=View::Kind::enemy&&kind!=View::Kind::bullet&&kind!=View::Kind::scriptEffect&&kind!=View::Kind::debris&&kind!=View::Kind::player&&kind!=View::Kind::entryDither&&kind!=View::Kind::bone&&kind!=View::Kind::skeleton&&kind!=View::Kind::ditherAbove)return true;
                 std::uint32_t flags;
                 if(!self.eligibilityFlags(shared,flags)||!View(*self.world_).contains(shared))return false;
                 if(flags&0x100003u)return true;
@@ -842,6 +845,7 @@ public:
                     case View::Kind::scriptEffect:return visit(visitor,GameplayWorld::DrawActor::scriptEffect,local,depth);
                     case View::Kind::debris:return visit(visitor,GameplayWorld::DrawActor::debris,local,depth);
                     case View::Kind::entryDither:return visit(visitor,GameplayWorld::DrawActor::entryDither,local,depth);
+                    case View::Kind::ditherAbove:return visit(visitor,GameplayWorld::DrawActor::ditherAbove,local,depth);
                     case View::Kind::bone:return visit(visitor,GameplayWorld::DrawActor::bone,local,depth);
                     case View::Kind::skeleton:return visit(visitor,GameplayWorld::DrawActor::skeleton,local,depth);
                     default:return true;
@@ -854,7 +858,7 @@ public:
                 // inactive flag (which terminates a layer), but avoid event
                 // and sprite lookups for every terrain tile each frame.
                 if(kind!=View::Kind::enemy&&kind!=View::Kind::bullet&&kind!=View::Kind::scriptEffect&&
-                    kind!=View::Kind::debris&&kind!=View::Kind::player&&kind!=View::Kind::entryDither&&kind!=View::Kind::bone&&kind!=View::Kind::skeleton)return true;
+                    kind!=View::Kind::debris&&kind!=View::Kind::player&&kind!=View::Kind::entryDither&&kind!=View::Kind::bone&&kind!=View::Kind::skeleton&&kind!=View::Kind::ditherAbove)return true;
                 const unsigned metadata=self.drawMetadata_.get(self.objectOf(h));
                 out.object=(metadata&ObjectDrawMetadata<386>::exists)!=0;
                 out.drawEvent=(metadata&ObjectDrawMetadata<386>::drawEvent)!=0;

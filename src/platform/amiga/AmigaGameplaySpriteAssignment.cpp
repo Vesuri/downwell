@@ -33,6 +33,14 @@ AmigaGameplayActors::Assignment AmigaGameplayActors::assign(GameplayBob* actors,
         --index;
         const auto& actor=actors[index];
         if(actor.sprite==gameplayRayMarker)break;
+        if(actor.sprite==gameplayBlackRectMarker){
+            if(!retain({actor.x,actor.y,actor.x+actor.frame,actor.y+actor.flip}))break;
+            continue;
+        }
+        if(actor.sprite==gameplayDitherEdge){
+            if(!retain({actor.x-160,actor.y,actor.x+160,actor.y+80}))break;
+            continue;
+        }
         if(actor.sprite==gameplayDamageTextMarker){
             downwell::DamageNumberText text;text.formatInteger(actor.flip);
             const int radius=int(text.length)*4+1;
@@ -56,7 +64,8 @@ AmigaGameplayActors::Assignment AmigaGameplayActors::assign(GameplayBob* actors,
 #else
     while (result.bobCount > 0) {
         const auto& actor = actors[result.bobCount - 1];
-        if (actor.sprite == gameplayRayMarker || actor.sprite == gameplayDamageTextMarker) break;
+        if (actor.sprite == gameplayRayMarker || actor.sprite == gameplayDamageTextMarker ||
+            actor.sprite == gameplayBlackRectMarker || actor.sprite == gameplayDitherEdge) break;
         if (controller && result.bobCount<=count-controllerSuffix) {
             int x,y,width,height;
             if (!amigaRendererAssetBounds(pack,packEnd,actor.sprite,actor.frame,

@@ -352,6 +352,32 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
             DW_PROFILE_SCOPE(profileActorPreparation);
             if(downwell::RunnerSpatialSplit::less(depth,foregroundDepth)&&!drawForeground())return false;
             if(kind==GameplayWorld::DrawActor::player)return port.findPlayer(key)&&drawPlayer();
+            if(kind==GameplayWorld::DrawActor::ditherAbove){
+                const auto* record=port.ditherAbove()?port.ditherAbove()->find(key):nullptr;
+                std::int32_t x,y;
+                if(!record||!record->x.roundPixel(x)||!record->y.roundPixel(y))return false;
+                const std::int64_t sx=std::int64_t(x)-worldViewX+downwellPlayfieldX;
+                const std::int64_t sy=std::int64_t(y)-worldViewY;
+                if(sx+160<=downwellPlayfieldX||sx-160>=downwellPlayfieldX+downwellPlayfieldWidth||
+                    sy+80<=0||sy-720>=downwellDisplayHeight)return true;
+                // Entire finite source rectangle, clipped before narrowing.
+                const int left=int(sx-160<downwellPlayfieldX?downwellPlayfieldX:sx-160);
+                const int right=int(sx+160>downwellPlayfieldX+downwellPlayfieldWidth?
+                    downwellPlayfieldX+downwellPlayfieldWidth:sx+160);
+                const int top=int(sy-720<0?0:sy-720);
+                const int bottom=int(sy>downwellDisplayHeight?downwellDisplayHeight:sy);
+                if(bottom>top){
+                    if(count==capacity)return false;
+                    actors[count++]={gameplayBlackRectMarker,UWORD(right-left),left,top,bottom-top};
+                }
+                if(sy<downwellDisplayHeight&&sy+80>0){
+                    int ax,ay,w,h;
+                    if(!amigaRendererAssetBounds(pack,packEnd,gameplayDitherEdge,0,int(sx),int(sy),0,&ax,&ay,&w,&h)||
+                        w!=320||h!=80||count==capacity){failedSprite=gameplayDitherEdge;return false;}
+                    actors[count++]={gameplayDitherEdge,0,int(sx),int(sy),0};
+                }
+                return true;
+            }
             if(kind==GameplayWorld::DrawActor::entryDither){
                 const auto* record=port.entryDithers()?port.entryDithers()->find(key):nullptr;
                 std::int32_t sourceDepth;

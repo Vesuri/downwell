@@ -3901,8 +3901,12 @@ __attribute__((noinline)) static int runDownwell(void) {
                         const auto& actor = actors[i];
                         if (actor.sprite == gameplayRayMarker) continue;
                         int x, y, w, h;
-                        if (amigaRendererAssetBounds(activeGamePack, activeGamePackEnd,
-                            actor.sprite, actor.frame, actor.x, actor.y, actor.flip, &x,&y,&w,&h) &&
+                        bool bounded;
+                        if(actor.sprite==gameplayBlackRectMarker){
+                            x=actor.x;y=actor.y;w=actor.frame;h=actor.flip;bounded=true;
+                        }else bounded=amigaRendererAssetBounds(activeGamePack, activeGamePackEnd,
+                            actor.sprite, actor.frame, actor.x, actor.y, actor.flip, &x,&y,&w,&h);
+                        if (bounded &&
                             x <= right && x+w > left && y <= bottom && y+h > top) changed = true;
                     }
                 }

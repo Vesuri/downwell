@@ -35,6 +35,12 @@ int main() {
     Sprite player(data[0],32), regular[6]={{data[1],32},{data[2],32},{data[3],32},
         {data[4],32},{data[5],32},{data[6],32}}, overflow(data[7],32);
     UBYTE pack[8]{};
+    {
+        GameplayBob covers[]={{gameplayBlackRectMarker,160,110,0,30},
+            {gameplayDitherEdge,0,190,-50,0}};
+        const auto result=AmigaGameplayActors::assign(covers,2,pack,pack+8,player,regular,overflow,32);
+        assert(result.ready&&result.bobCount==2); // No hardware conversion/lookup.
+    }
     AmigaActorFrames::Frame prepared[5]{};
     for(unsigned s=1;s<=4;++s){
         auto& f=prepared[s];f.originX=130+s*36;f.originY=290;f.width=16*s;f.height=1;

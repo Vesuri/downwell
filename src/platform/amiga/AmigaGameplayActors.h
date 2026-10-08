@@ -12,6 +12,9 @@ class AmigaLaserSight;
 static constexpr UWORD gameplayRayMarker = 65535;
 // x/y are text anchor, flip stores the signed integer damage, frame is unused.
 static constexpr UWORD gameplayDamageTextMarker = 65534;
+// Clipped opaque-black rectangle: frame=width, flip=height. Never a sprite.
+static constexpr UWORD gameplayBlackRectMarker = 65533;
+static constexpr UWORD gameplayDitherEdge = 65006;
 struct GameplayBob {
     UWORD sprite, frame; int x, y, flip;
     const AmigaActorFrames::Frame* prepared=nullptr;

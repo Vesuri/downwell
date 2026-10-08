@@ -10,8 +10,9 @@
 #include <cstdio>
 #include <vector>
 static bool boundsOK=true;
-int amigaRendererAssetBounds(const UBYTE*,const UBYTE*,UWORD,UWORD,int x,int y,int,
+int amigaRendererAssetBounds(const UBYTE*,const UBYTE*,UWORD sprite,UWORD,int x,int y,int,
     int* left,int* top,int* width,int* height) {
+    if(sprite==gameplayDitherEdge){*left=x-160;*top=y;*width=320;*height=80;return boundsOK;}
     *left=x-8; *top=y-8; *width=*height=16; return boundsOK;
 }
 int main() {
@@ -22,6 +23,33 @@ int main() {
         downwell::RoomPack rooms(rb.data(),rb.size());
         downwell::ObjectPack objects(ob.data(),ob.size());
         downwell::SpriteCollisionPack sprites(sb.data(),sb.size());
+        for(auto mode:{downwell::GameplayCollisionOwner::Ownership::reference,
+            downwell::GameplayCollisionOwner::Ownership::native,
+            downwell::GameplayCollisionOwner::Ownership::nativeScenery}){
+            auto owner=std::make_unique<downwell::GameplayCollisionOwner>(objects,sprites,
+                downwell::GameplayTerrainInstances::Presentation{},downwell::GameplayTerrainInstances::WallCollision{},&rooms,mode);
+            auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+                owner->breakableBinding(),owner->playerBinding(),&owner->terrain(),&rooms);
+            assert(owner->attach(*world)&&world->createAuthoredDitherAbove());
+            const auto* r=world->ditherAbove()->find(world->ditherAbove()->handle());
+            int sourceX,sourceY;assert(r&&r->x.roundPixel(sourceX)&&r->y.roundPixel(sourceY));
+            for(int x:{-400,-160,-159,0,80,160,319,320,560})
+            for(int y:{-800,-80,-79,-50,0,1,284,720,1004}){
+                UBYTE pack[8]{};AmigaGameplayDrawList list;
+                assert(list.collect(*world,pack,pack+8,sourceX-x,sourceY-y));
+                unsigned rects=0,edges=0;
+                for(unsigned i=0;i<list.count;++i){const auto& a=list.actors[i];
+                    if(a.sprite==gameplayBlackRectMarker){
+                        ++rects;assert(a.x>=110&&a.x+a.frame<=270&&a.y>=0&&a.y+a.flip<=284);
+                    }
+                    if(a.sprite==gameplayDitherEdge){++edges;assert(a.x==110+x&&a.y==y);}
+                }
+                const bool horizontal=x+160>0&&x-160<160;
+                assert(rects==unsigned(horizontal&&y>0&&y-720<284));
+                assert(edges==unsigned(horizontal&&y+80>0&&y<284));
+                assert(!list.entryCoverVisible&&r->x.promoted().roundPixel(sourceX)&&r->y.promoted().roundPixel(sourceY));
+            }
+        }
         {
             auto owner=std::make_unique<downwell::GameplayCollisionOwner>(objects,sprites,
                 downwell::GameplayTerrainInstances::Presentation{},downwell::GameplayTerrainInstances::WallCollision{},&rooms);

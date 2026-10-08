@@ -973,6 +973,24 @@ def build_records(manifest, extracted, profile, language_path=None):
         }
         encoded.append((sprite, 0, dma_width, planar))
 
+    if profile == "game":
+        # objDitherAbove draws at its world depth, unlike the PF2 transition
+        # covers. Retain the full horizontal edge, including side-room motion.
+        sprite = sprites[128]
+        canvas = frame_canvas(sprite, sprite["frames"][0], items, pages)
+        require(canvas.size == (320, 800) and sprite["originX"] == 160 and
+                sprite["originY"] == 720, "authored dither geometry changed")
+        require(all(p[3] >= 128 and pixel_to_pen(p) == 3
+                    for p in canvas.crop((0, 0, 320, 720)).get_flattened_data()),
+                "authored dither upper rectangle is not opaque black")
+        edge = canvas.crop((0, 720, 320, 800))
+        pens = [3 if p[3] >= 128 else 0 for p in edge.get_flattened_data()]
+        require(all(p[3] < 128 or pixel_to_pen(p) == 3 for p in edge.get_flattened_data()),
+                "authored dither edge contains nonblack opaque pixels")
+        dma_width, planar = encode_planar(pens, 320, 80)
+        encoded.append((dict(id=65006, originX=160, originY=0, width=320, height=80),
+                        0, dma_width, planar))
+
     # Gameplay DMA words, including mirrored multi-channel actors, are host work.
     if profile == "game":
         hardware = []
@@ -1251,6 +1269,10 @@ def main():
             "schemaVersion": 1, "generator": "generate-amiga-hud.py/planar-layout-v2",
             "extractor": manifest["extractor"], "sourceSha256": SOURCE_SHA256,
             "profile": profile, "packSha256": digest,
+            **({"worldDitherEdge": {"version": 1, "assetId": 65006,
+                 "sourceSpriteId": 128, "sourceFrame": 0, "sourceRectangle": [0, 720, 320, 80],
+                 "opaquePen": 3, "alphaThreshold": 128}}
+               if profile == "game" else {}),
             "languageSha256": hashlib.sha256(args.language.read_bytes()).hexdigest(),
             "layout": "word-aligned-tail-or-disjoint-paths-with-joined-containment",
             **({"sceneBanks": "game-boot-front-v3-style-prefix"} if profile in ("game", "boot", "front") else {}),
