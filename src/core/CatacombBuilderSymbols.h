@@ -6,7 +6,8 @@ namespace downwell {
 // argument lists (including singleton/identical choices), rather than assuming
 // how the historical Windows runner maps each builtin to random words.
 // Ops: choose(const int*, unsigned), irandom(unsigned), randomFiveBelow(unsigned),
-// create(objectId, x, y). create is synchronous; false aborts emission.
+// spawnChance(value), create(objectId, x, y). Writes and Create are synchronous;
+// false aborts emission and retains the completed source prefix.
 // x/y are the already evaluated buildx and y + 16*k coordinates.
 template<class Ops>
 bool emitCatacombSymbol(char symbol, int x, int y, unsigned level,
@@ -46,10 +47,12 @@ bool emitCatacombSymbol(char symbol, int x, int y, unsigned level,
     case '%': {
         // This overwritten draw precedes the level choice and hard-mode override.
         int chance = ops.irandom(level);
+        if(!ops.spawnChance(chance))return false;
         if (level == 1) chance = ops.choose(levelOne, 3);
         else if (level == 2) chance = ops.choose(coin, 2);
         else chance = ops.choose(levelThree, 5);
-        if (hardMode) chance = 1;
+        if(!ops.spawnChance(chance))return false;
+        if (hardMode) {chance = 1;if(!ops.spawnChance(chance))return false;}
         if (!chance) return true;
         const int object = level <= 2 ? ops.choose(mixed, 3) : ops.choose(skullPair, 2);
         return ops.create(object, x, y);

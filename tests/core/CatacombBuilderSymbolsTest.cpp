@@ -11,7 +11,12 @@ struct Ops {
     std::vector<std::string> calls;
     unsigned first = 0, second = 0, choices = 0;
     unsigned creates = 0, failAt = 0;
+    unsigned writes = 0, failWrite = 0;
     bool below = false;
+    bool spawnChance(int value){
+        calls.push_back("spawnChance:"+std::to_string(value));
+        return ++writes!=failWrite;
+    }
     int choose(const int* values, unsigned count) {
         std::string call = "choose";
         for (unsigned i = 0; i < count; ++i) call += ":" + std::to_string(values[i]);
@@ -96,8 +101,15 @@ int main() {
             const bool spawn = hard || index >= (level == 2 ? 1u : 2u);
             for (unsigned enemy = 0; enemy < (level == 3 ? 2u : 3u); ++enemy) {
                 Ops ops; ops.first = index; ops.second = enemy;
-                Calls expected{"irandom:" + std::to_string(level),
-                    level == 1 ? "choose:0:0:1" : level == 2 ? "choose:0:1" : "choose:0:0:1:1:1"};
+                Calls expected{"irandom:" + std::to_string(level),"spawnChance:"+std::to_string(level),
+                    level == 1 ? "choose:0:0:1" : level == 2 ? "choose:0:1" : "choose:0:0:1:1:1",
+                    "spawnChance:"+std::to_string(index >= (level == 2 ? 1u : 2u)?1:0)};
+                if(hard)expected.push_back("spawnChance:1");
+                for(unsigned write=1;write<=(hard?3u:2u);++write){
+                    Ops failure=ops;failure.failWrite=write;
+                    Calls prefix(expected.begin(),expected.begin()+(write==1?2:write==2?4:5));
+                    check('%',level,hard,failure,prefix,false);
+                }
                 if (spawn) {
                     expected.push_back(level == 3 ? "choose:126:126" : "choose:126:126:111");
                     appendCreate(expected, level < 3 && enemy == 2 ? 111 : 126);

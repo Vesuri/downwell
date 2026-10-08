@@ -56,12 +56,18 @@ dispatch for levels 1--3, transcribed from VM blocks 17--61. It keeps every
 `choose` argument list, the overwritten `%` `irandom(level)` call, the
 hard-mode override order and synchronous right-then-left paired skull Create
 calls. Common terrain/reward symbols remain the common builder's responsibility.
-An emission failure stops immediately; unsupported levels fail before any
-operation. Coordinates are supplied after the common traversal computes them.
+An emission or `spawnChance` publication failure stops immediately; unsupported
+levels fail before any operation. Coordinates are supplied after the common
+traversal computes them. The `%` branch publishes the overwritten `irandom`
+result, the level choice, and the conditional hard-mode override to the builder
+instance in that order, before synchronous child Create. The retained VM input
+`gml_GlobalScript_builderCatacomb.asm` has SHA-256
+`b61ecaf8e7c9297d85aababecc672910a5441edfea35c2731ea525684d716c32`.
 
-`make verify-catacomb-symbols` checks 306 operation-trace cases: every choice
+`make verify-catacomb-symbols` checks operation-trace cases: every choice
 index (including duplicate values), all three levels, both hard-mode states,
-both random-threshold outcomes, object IDs/coordinates and emission failures.
+both random-threshold outcomes, object IDs/coordinates, emission failures and
+each rejected `spawnChance` write.
 The same cases pass AddressSanitizer/UndefinedBehaviorSanitizer. Pattern export
 verification still passes with the unchanged output hash above.
 
@@ -70,8 +76,9 @@ Its operations interface intentionally does not bind `choose` to WELL words:
 in particular, the singleton `choose(126)` is present in the VM but its runner
 word consumption has not been established here. The operation-trace test proves
 dispatch/call ordering, not historical Windows RNG equivalence. Integration
-also needs concrete synchronous actor creation and any observed builder-instance
-state such as `spawnChance`; this helper currently owns only emission decisions.
+also needs concrete synchronous actor creation and an owner for the published
+builder-instance `spawnChance` state; this helper supplies ordered writes, not
+the live builder's storage or phase admission.
 No emulator run or frame-rate improvement is claimed for this isolated change.
 
 **Follow-up:** the singleton uncertainty above is now resolved by direct
