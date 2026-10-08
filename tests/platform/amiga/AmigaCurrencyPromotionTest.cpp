@@ -45,14 +45,15 @@ static void generationCensus(unsigned frame,const downwell::BuilderPatternPack& 
 }
 
 int main(int argc,char** argv){
-    bool census=false,overflowTape=false,witness=false,generation=false,pixelWitness=false;
+    bool census=false,overflowTape=false,witness=false,generation=false,pixelWitness=false,shadeCensus=false;
     for(int i=1;i<argc;++i){
         if(std::strcmp(argv[i],"--census")==0&&!census)census=true;
         else if(std::strcmp(argv[i],"--overflow")==0&&!overflowTape)overflowTape=true;
         else if(std::strcmp(argv[i],"--witness")==0&&!witness)witness=true;
         else if(std::strcmp(argv[i],"--generation-census")==0&&!generation)generation=true;
         else if(std::strcmp(argv[i],"--pixel-witness")==0&&!pixelWitness)pixelWitness=true;
-        else require(false,"usage: amiga-currency-promotion-test [--census] [--overflow] [--witness] [--generation-census] [--pixel-witness]");
+        else if(std::strcmp(argv[i],"--shade-census")==0&&!shadeCensus)shadeCensus=true;
+        else require(false,"usage: amiga-currency-promotion-test [--census] [--overflow] [--witness] [--generation-census] [--pixel-witness] [--shade-census]");
     }
     const auto rb=readFile("generated/downwell-rooms.dwrm"),ob=readFile("generated/downwell-objects.dwob"),
         pb=readFile("generated/downwell-builder-patterns.dwbp"),ab=readFile("generated/amiga-game.dwap");
@@ -220,6 +221,35 @@ int main(int argc,char** argv){
         const bool shadeChanged=!game.dead()&&!smoke&&!debris&&!list.entryCoverVisible&&
             !projected.samePixels(oracle.surface());
         if(shadeChanged){++shaded;require(!hardware||list.currencyRasterRequired,"shade-subtracted currency stays raster");}
+        if(shadeCensus&&shadeChanged){
+            // Diagnostic only: isolate each producer, then apply the same
+            // source shade pass. Counts distinguish fully eliminated work
+            // from partially visible stamps; they are not a runtime culler.
+            unsigned hidden=0,clipped=0,untouched=0,before=0,after=0;
+            downwell::PaletteEffectSurface<> probe;
+            const auto pixels=[&](){unsigned n=0;probe.visit([&](unsigned,unsigned,unsigned a,unsigned,unsigned){
+                while(a){a&=a-1;++n;}
+            });return n;};
+            for(unsigned i=game.gemSlotEnd();i;--i){const auto& g=game.gemAt(i-1);
+                if(!g.active||!g.motion.lifetime.visible()||
+                    !downwell::EffectSurfacePlacement::pixelInView(240+g.x,176+g.y,{vx,vy,160,284}))continue;
+                probe.clear();const auto& a=*assets.currency(g.large,g.motion.animation.frame());
+                require(probe.add({{a.mask.data,a.mask.bytes,a.mask.width,a.mask.height,a.mask.stride},a.low,a.high},
+                    240+g.x-vx-a.originX,176+g.y-vy-a.originY),"shade census producer");
+                const unsigned initial=pixels();if(!initial)continue;
+                if(!settings.noControl)for(unsigned j=0;j<game.enemyCount();++j){const auto& e=game.enemyAt(j);
+                    if(!e.active||!e.awake||!downwell::EffectSurfacePlacement::pixelInView(240+e.x,176+e.y,{vx,vy,160,284}))continue;
+                    const auto& s=*assets.shade();
+                    require(probe.subtract({s.mask.data,s.mask.bytes,s.mask.width,s.mask.height,s.mask.stride},
+                        downwell::EffectSurfacePlacement::snapShadePixel(240+e.x)-vx-s.originX,
+                        downwell::EffectSurfacePlacement::snapShadePixel(176+e.y)-vy-s.originY),"shade census subtraction");
+                }
+                const unsigned remaining=pixels();before+=initial;after+=remaining;
+                if(!remaining)++hidden;else if(remaining<initial)++clipped;else ++untouched;
+            }
+            std::printf("SHADE frame=%u hidden=%u partial=%u untouched=%u pixels_before=%u pixels_after=%u\n",
+                tick,hidden,clipped,untouched,before,after);
+        }
         if(parts>8)++overflow;
         if(census)std::printf("%u,%u,%u,%u,%u,%u,%u,%u,%u\n",tick,visible,smoke,debris,
             unsigned(list.entryCoverVisible),unsigned(hardware),parts,unsigned(shadeChanged),unsigned(game.dead()));

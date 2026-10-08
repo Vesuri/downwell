@@ -627,6 +627,13 @@ The host census uses one-based post-Step frames, as do the trace frame labels.
 Native timing runs retain the ordinary uninstrumented compositor; host
 coverage is not a replacement for native state and completed-DMA pixel checks.
 
+`./build/amiga-currency-promotion-test --overflow --shade-census` isolates each
+visible gem and applies the source shade pass. `SHADE` rows distinguish wholly
+hidden, partly erased and unaffected producers, with summed opaque-pixel counts
+before and after subtraction. Counts include overlapping producers separately;
+they are not final framebuffer occupancy or a runtime culling implementation.
+Use them before proposing removal of hidden producers, alongside native costs.
+
 For source-backed currency pixels, generate a witness with
 `./build/amiga-currency-promotion-test --overflow --pixel-witness > tmp/currency-pixels.txt`.
 Capture ticks `1303,1308,1397,1398,1399,1400,1401,1402,1403,1404` with
