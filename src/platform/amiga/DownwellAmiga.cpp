@@ -1966,9 +1966,17 @@ __attribute__((noinline)) static int runDownwell(void) {
         terrainCollision.fragments = fragments;
         terrainCollision.fragmentCount = 0;
         terrainCollision.runtime = &port;
-        if (!liveGeneration.loadRoom(port,rooms,mainRoom,&roomTerrainPlan,&roomTerrainBackend)) {
+        liveBuilder.resetInitialCheckpointBeforeEntrance(enemyRandom);
+#ifdef DOWNWELL_PROFILE_OVERFLOW
+        if(!amigaOverflowProfileEntry(liveBuilder,enemyRandom)){
+            platform.restore();FreeMem(startupCopperWords,4*sizeof(UWORD));memory.release();return 20;
+        }
+#endif
+        port.configureEnemyRandom(enemyRandom);
+        if (!liveGeneration.loadRoomWithStartField(port,rooms,mainRoom,&roomTerrainPlan,&roomTerrainBackend)) {
             platform.restore();
             FreeMem(startupCopperWords, 4 * sizeof(UWORD));
+            memory.release();
             gDownwellStartupFailure = 6;
             downwellStartupFailed();
             return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
@@ -2014,21 +2022,6 @@ __attribute__((noinline)) static int runDownwell(void) {
                                       &terrainCollision);
         port.configureSolidResolver(amigaResolveTerrainSolid,
                                     &terrainCollision, amigaResolveTerrainSegment, amigaResolveTerrainPlayerMask,amigaResolveTerrainWallContacts,amigaResolveTerrainPlatformContact);
-        liveBuilder.resetInitialCheckpointBeforeEntrance(enemyRandom);
-#ifdef DOWNWELL_PROFILE_OVERFLOW
-        if(!amigaOverflowProfileEntry(liveBuilder,enemyRandom)){
-            platform.restore();FreeMem(startupCopperWords,4*sizeof(UWORD));memory.release();return 20;
-        }
-#endif
-        port.configureEnemyRandom(enemyRandom);
-        if(!port.createRoomStartField()){
-            platform.restore();
-            FreeMem(startupCopperWords,4*sizeof(UWORD));
-            memory.release();
-            gDownwellStartupFailure=6;
-            downwellStartupFailed();
-            return 20;
-        }
         enemyRandom=port.randomState();
 #if defined(DOWNWELL_NATURAL_VERIFY) || defined(DOWNWELL_PROFILE_SHOP)
         AmigaNaturalRouteVerification::entry(liveBuilder, enemyRandom);
@@ -2683,9 +2676,9 @@ __attribute__((noinline)) static int runDownwell(void) {
                         amigaBuildTerrainIndex(emptyTerrain, terrainIndex);
                         terrainTiles.clear();
                         terrainCollision.fragmentCount = 0;
-                        if (!liveGeneration.loadRoom(port,rooms,mainRoom,&roomTerrainPlan,&roomTerrainBackend)) break;
                         port.confirmFirstStage();
-                        if (!port.initializeAreaOneBuilder(liveBuilder, -16, 704, scenes.styleCursor())) break;
+                        if (!port.resetAreaOneBuilder(liveBuilder, -16, 704, scenes.styleCursor())) break;
+                        if (!liveGeneration.loadRoomWithStartField(port,rooms,mainRoom,&roomTerrainPlan,&roomTerrainBackend)) break;
                         liveGeneration.bind(port);
                         port.configureGenerationStep(generateLiveTerrain, &liveGeneration);
                         port.configureLandingResolver(amigaResolveTerrainLanding, &terrainCollision);

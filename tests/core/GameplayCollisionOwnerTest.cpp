@@ -213,10 +213,12 @@ struct GoalAudit {
     unsigned stage=0;
     bool roomBoundary=false;
     unsigned expectedSourceId=0;
+    const unsigned* terrainCalls=nullptr;
     using Record=GameplayGoalFields::Record;
     bool birth(InstanceHandle h,const Record& r){
         assert(world->goalFieldInstances().find(h)==&r&&r.scaleX==1&&r.scaleY==1&&world->randomDrawCount()==draws);
         assert(r.sourceId==expectedSourceId);
+        if(terrainCalls)assert(*terrainCalls==144);
         if(r.objectId==255){
             const auto& exits=world->exitControllers();
             assert(exits.find(exits.handle(0))->objectId==306&&exits.find(exits.handle(1))->objectId==74);
@@ -542,6 +544,36 @@ int main(){
             const auto draws=world->randomDrawCount();
             assert(!world->initializeAreaOneBuilder(builder,0,0)&&!builder.called&&world->randomDrawCount()==draws);
         }
+    }
+    for(bool prepared:{false,true})for(unsigned failure:{0u,144u,145u,240u,241u}){
+        const auto bytes=read("generated/downwell-rooms.dwrm");RoomPack rooms(bytes.data(),bytes.size());
+        PackedRoom room;assert(rooms.findRoom(11,room));
+        PreparedRoomTerrain plan;assert(plan.prepare(rooms,room));
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false);
+        unsigned calls=0;
+        GoalAudit audit{world.get(),0,world->randomDrawCount(),0};
+        audit.expectedSourceId=101097;audit.terrainCalls=&calls;
+        assert(world->bindGoalFieldLifecycle(GameplayGoalFields::Binding::bindMaskDestruction(audit)));
+        world->configurePhaseBoundary([](void* p,GameplayWorld::PhaseBoundary phase){
+            auto& a=*static_cast<GoalAudit*>(p);
+            assert(phase==GameplayWorld::PhaseBoundary::roomEntry&&*a.terrainCalls==240&&
+                a.world->goalFieldInstances().find({0,1})->destroyRequested);
+            a.roomBoundary=true;return a.reject!=241;
+        },&audit);
+        audit.reject=failure==241?241:0;
+        auto terrain=[&](const auto&){
+            if(calls>=144)assert(world->goalFieldInstances().find({0,1})->destroyRequested);
+            return ++calls!=failure;
+        };
+        assert(world->loadRoomTerrainWithStartField(rooms,room,terrain,prepared?&plan:nullptr)==(failure==0));
+        assert(calls==(failure&&failure<241?failure:240));
+        assert(world->randomDrawCount()==audit.draws+(failure==144?0:1));
+        assert(audit.roomBoundary==(failure==0||failure==241));
+        const auto* retained=world->goalFieldInstances().find({0,1});
+        assert(bool(retained)==(failure==145||failure==240||failure==241));
+        if(retained)assert(retained->sourceId==101097&&retained->destroyRequested);
+        const auto oldCalls=calls;
+        assert(!world->loadRoomTerrainWithStartField(rooms,room,terrain,prepared?&plan:nullptr)&&calls==oldCalls);
     }
     for(unsigned failure=1;failure<=4;++failure){
         auto world=std::make_unique<GameplayWorld>(300,true,0,false);
@@ -3138,7 +3170,28 @@ int main(){
             const auto generation=world->goalFieldInstances().birthSequence();
             const auto draws=world->randomDrawCount();
             assert(generation>priorGeneration);
-            assert(world->createRoomStartField());
+            PackedRoom room;assert(rooms.findRoom(11,room));
+            PreparedRoomTerrain plan;assert(plan.prepare(rooms,room));
+            unsigned walls=0;
+            assert(world->loadRoomTerrainWithStartField(rooms,room,[&](const auto&){
+                const auto* field=world->goalFieldInstances().find({0,generation});
+                assert(bool(field)==(walls>=144));
+                if(field)assert(field->sourceId==101097&&field->destroyRequested);
+                if(walls==144){
+                    assert(world->terrainInstances()->size()==144);
+                }
+                // The native registration projection intentionally excludes
+                // retained terrain; use the complete reference walk here.
+                if(walls==144&&ownership==GameplayCollisionOwner::Ownership::reference){
+                    unsigned precedingWalls=0;bool found=false;
+                    assert(owner->visitRegistrationOrder([&](auto,int object,auto){
+                        if(object==371){assert(precedingWalls==144);found=true;}
+                        if(object==60){assert(!found);++precedingWalls;}
+                        return true;
+                    })&&found);
+                }
+                ++walls;return true;
+            },retry?&plan:nullptr)&&walls==240);
             assert(world->randomDrawCount()==draws+1);
             assert(!world->goalFieldInstances().find({0,generation}));
             InstanceHandle shared;

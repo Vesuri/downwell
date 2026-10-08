@@ -12,6 +12,16 @@ bool AmigaGameplayGeneration::loadRoom(AmigaPortRuntime& runtime,
     },prepared);
 }
 
+bool AmigaGameplayGeneration::loadRoomWithStartField(AmigaPortRuntime& runtime,
+    const downwell::RoomPack& rooms,const downwell::PackedRoom& room,
+    const downwell::PreparedRoomTerrain* prepared,AmigaRoomTerrainPlan* backend){
+    const bool compiled=backend&&prepared&&prepared->matches(rooms,room)&&backend->begin(prepared);
+    return runtime.loadRoomTerrainWithStartField(rooms,room,[this,backend,compiled](const downwell::PackedRoomInstance& instance){
+        if(compiled)return backend->emit(index_,instance);
+        return amigaAddTerrainObject(index_,instance.objectId,instance.x,instance.y,true);
+    },prepared);
+}
+
 void AmigaGameplayGeneration::bind(AmigaPortRuntime& runtime,bool terrainRuns) {
     runtime_ = &runtime;
     dirtyFirst = worldRows; dirtyEnd = 0;

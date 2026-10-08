@@ -76,7 +76,6 @@ struct LiveSceneWorld {
         require(amigaBuildTerrainIndex(collision, index), "live scene index initializes empty");
         downwell::PreparedRoomTerrain prepared;
         require(prepared.prepare(rooms,room),"live scene admits immutable room terrain");
-        require(generation.loadRoom(port,rooms,room,&prepared),"ordered room terrain enters live index and optional identity owner");
         collision.index = &index;
         collision.runtime = &port;
         const int emptyBlock = 0;
@@ -85,13 +84,15 @@ struct LiveSceneWorld {
             require(builder.resetFromRoomEntry(entry->mainBuilderState()),
                     "live room entry imports generator before any terrain emission");
             port.configureEnemyRandom(entry->randomState());
+            require(generation.loadRoom(port,rooms,room,&prepared),"adopted entry does not repeat field Create");
         } else if (continuing) {
-            require(port.initializeAreaOneBuilder(builder, -16, 704), "native continuation initializes the current level on its owned RNG");
+            require(port.resetAreaOneBuilder(builder, -16, 704), "native continuation initializes the current level on its owned RNG");
+            require(generation.loadRoomWithStartField(port,rooms,room,&prepared),"continuation field follows authored room order");
         } else {
             downwell::GameMakerRandom random;
             builder.resetInitialCheckpointBeforeEntrance(random);
             port.configureEnemyRandom(random);
-            require(port.createRoomStartField(),"native initial checkpoint executes entrance Create before room cleanup");
+            require(generation.loadRoomWithStartField(port,rooms,room,&prepared),"native initial field Create follows authored room order");
         }
         generation.dirtyFirst = 0; generation.dirtyEnd = AmigaGameplayGeneration::worldRows;
         generation.bind(port,std::getenv("DOWNWELL_SCALAR_TERRAIN")==nullptr);

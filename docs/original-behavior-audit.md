@@ -83,9 +83,10 @@ not change the still-incomplete builder/player/controller birth order.
 The room-entry field likewise resolves authored object 371's ID 101097 before
 its lifecycle birth, scale publications and random-radius Create. Its registered
 layer lifetime retains that ID; first-level destruction and Retry retire the
-old generation before reusing the authored identity. Resource-less fixtures
-remain explicitly unnumbered. This does not move the field to its original
-creation index: native entry still invokes it after terrain loading.
+old generation before reusing the authored identity. Resource-less standalone
+fixtures remain explicitly unnumbered. Fresh native room loading executes the
+field's Create at authored index 147, after 144 walls and before the remaining
+96 walls, retaining its destruction mark until room-entry reconciliation.
 Consequently, explicit-ID time-change tests do not establish the natural
 global ID stream. This source check also does not prove original runner room
 phase timing, initial view publication or rendered entry-mask parity.
@@ -97,6 +98,8 @@ order, not only the player and 240 walls. Backend terrain commands use indices
 into that complete sequence but emit only objects 60/93/99. Preparation does
 not execute events or publish lifetimes. `loadRoomTerrain` is still a terrain
 handoff: retaining the controller records does not execute their Create events.
+`loadRoomTerrainWithStartField` is the fresh native entry path; it dispatches
+the field at its serialized boundary and performs cleanup after the traversal.
 
 There are distinct existing entry inputs, which must not be conflated:
 
@@ -110,13 +113,15 @@ There are distinct existing entry inputs, which must not be conflated:
   room creation. Replaying builder or field Create after importing that cursor
   would consume those effects twice. Adopting state is not a new source birth.
 
-The live native call site currently loads terrain before either of the first
-two sequences. The stored adapter instead runs builder Create (code 1002) at
-authored index 0 and field Create (2731) at index 147. A source-ordered entry
-must retain the first-level field's destruction mark until room-entry cleanup;
-cleanup inside the index-147 callback would retire it before later authored
-instances are created. Non-glitch wall Create consumes no RNG, but that does
-not make relocating field lifetime publication or cleanup equivalent.
+The live native call sites perform builder setup before the fresh traversal.
+The stored adapter runs builder Create (code 1002) at authored index 0 and
+field Create (2731) at index 147. Native builder setup still does not register
+the builder's controller lifetime, and the player is still born earlier during
+world construction. These omissions prevent claiming full room-order parity.
+Non-glitch wall Create consumes no RNG, but that does not make relocating
+field lifetime publication or cleanup equivalent. Terrain failure before the
+field consumes no field RNG; failure afterwards retains its marked lifetime
+and prevents room-entry cleanup and later terrain publication.
 
 The native adapter's compatibility entry snapshot includes one camera Step.
 That update runs after successful player birth, not before its callback; the

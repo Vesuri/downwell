@@ -746,6 +746,27 @@ public:
     template<class Terrain>
     bool loadRoomTerrain(const downwell::RoomPack& rooms,const downwell::PackedRoom& room,Terrain terrain,
                          const downwell::PreparedRoomTerrain* prepared=nullptr){
+        return loadRoomTerrainCreates(rooms,room,terrain,prepared,[](const auto&){return true;});
+    }
+    // Fresh room creation, not adoption of an already-executed stored room.
+    // Builder/RNG setup must precede this call. Other controller families still
+    // require integration; this preserves the field's order among terrain.
+    template<class Terrain>
+    bool loadRoomTerrainWithStartField(const downwell::RoomPack& rooms,const downwell::PackedRoom& room,
+        Terrain terrain,const downwell::PreparedRoomTerrain* prepared=nullptr){
+        bool seen=false;
+        if(!loadRoomTerrainCreates(rooms,room,terrain,prepared,[&](const auto& instance){
+            if(instance.objectId!=371)return true;
+            if(seen||!instance.instanceId||instance.x!=240||instance.y!=192)return false;
+            seen=true;return createRoomStartFieldRecord(instance.instanceId);
+        }))return false;
+        if(!seen)return run_.effectsSucceeded=false;
+        return finishRoomStartField();
+    }
+private:
+    template<class Terrain,class Create>
+    bool loadRoomTerrainCreates(const downwell::RoomPack& rooms,const downwell::PackedRoom& room,Terrain terrain,
+        const downwell::PreparedRoomTerrain* prepared,Create create){
         if(!run_.effectsSucceeded)return false;
         if(roomTerrainLoaded_||!rooms.valid()){run_.effectsSucceeded=false;return false;}
         roomTerrainLoaded_=true; // A partial load cannot be retried.
@@ -766,6 +787,7 @@ public:
             downwell::PackedRoomInstance decoded;
             if(!retained&&!rooms.roomInstance(room,i,decoded)){run_.effectsSucceeded=false;return false;}
             const auto& instance=retained?prepared->at(i):decoded;
+            if(!create(instance))return run_.effectsSucceeded=false;
             if(instance.objectId==35){
                 // The native scheduler currently births its player before this
                 // handoff. Validate/retain the authored identity without replaying
@@ -789,6 +811,7 @@ public:
         }
         return true;
     }
+public:
     const downwell::RoomEntryViews::View* roomEntryView(unsigned slot=0)const{
         return roomEntryViews_.get(slot);
     }
@@ -1211,13 +1234,21 @@ public:
             }
             if(!sourceId)return run_.effectsSucceeded=false;
         }
+        return createRoomStartFieldRecord(sourceId)&&finishRoomStartField();
+    }
+private:
+    bool createRoomStartFieldRecord(unsigned sourceId){
         downwell::InstanceHandle h;
         if(!goalFieldInstances_.create(240,192,371,&h,sourceId))return run_.effectsSucceeded=false;
         if(!run_.createStartField(240,192,enemyRandom_))return false;
         if(!run_.startFieldPresent&&!goalFieldInstances_.requestDestroy(h))return run_.effectsSucceeded=false;
+        return true;
+    }
+    bool finishRoomStartField(){
         if(!reconcilePhase(PhaseBoundary::roomEntry))return false;
         return run_.effectsSucceeded=goalFieldInstances_.cleanupMarked();
     }
+public:
     bool bindGoalFieldLifecycle(downwell::GameplayGoalFields::Binding binding){
         return run_.effectsSucceeded=run_.effectsSucceeded&&goalFieldInstances_.bind(binding);
     }
@@ -1263,6 +1294,10 @@ public:
     bool prepareNextAreaOneLevel(const downwell::Input& input, unsigned initialRingOrigin);
     template<class Builder>
     bool initializeAreaOneBuilder(Builder& builder, int x, int y, unsigned style = 0) {
+        return resetAreaOneBuilder(builder,x,y,style)&&createRoomStartField();
+    }
+    template<class Builder>
+    bool resetAreaOneBuilder(Builder& builder, int x, int y, unsigned style = 0) {
         if(!run_.effectsSucceeded)return false;
         if (run_.stage.area != 1 || run_.stage.level < 1 || run_.stage.level > 3 || style > 4) return false;
         enemyRandom_.prepareLookahead(randomLookahead_);
@@ -1271,7 +1306,7 @@ public:
         setup.style = style;
         setup.member = run_.upgrades.levels[14] != 0;
         builder.resetRoom(x, y, enemyRandom_, setup);
-        return createRoomStartField();
+        return true;
     }
     const downwell::LevelClearController& levelClear() const { return run_.levelClear; }
     const downwell::LevelClearPresentation::Frame& levelClearFrame() const { return run_.levelClearFrame; }
