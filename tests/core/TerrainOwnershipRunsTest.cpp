@@ -1,4 +1,5 @@
 #include "core/TerrainOwnershipRuns.h"
+#include "core/NativeTerrainLifetimes.h"
 #include "core/GameplayTerrainInstancesRuns.h"
 #include "core/RunnerSpatialLifetimes.h"
 #include "core/RunnerObservedRegistration.h"
@@ -478,6 +479,24 @@ static void constructorPublication(){
     require(failed.appearance(0).same(a));
 }
 int main(){
+    {
+        downwell::NativeTerrainLifetimes<8> live;
+        require(live.append(60,240,160,true,100854)&&live.append(60,240,160,false,100855));
+        const auto first=live.handle(0),second=live.handle(1);
+        require(live.append(60,256,176)&&live.append(60,272,176)&&live.append(60,288,176));
+        require(live.size()==5&&live.runCount()==3&&live.canAppend(3)&&!live.canAppend(4));
+        downwell::NativeTerrainLifetimes<8>::Identity id;bool active,destroyed;
+        require(live.read(second,id,active,destroyed)&&!active&&!destroyed&&id.source==100855);
+        require(live.markDestroyed(first)&&live.markDestroyed(first)&&live.read(first,id,active,destroyed)&&destroyed);
+        require(live.retire(first)&&!live.read(first,id,active,destroyed));
+        require(live.append(93,240,160)&&live.handle(4).slot==first.slot&&live.handle(4).generation!=first.generation);
+        require(live.read(second,id,active,destroyed)&&id.source==100855&&!active);
+        const auto latest=live.handle(4);
+        require(live.clear()&&!live.size()&&!live.read(latest,id,active,destroyed));
+        require(live.append(60,240,160)&&live.handle(0).generation>latest.generation);
+        for(unsigned i=1;i<8;++i)require(live.append(60,240+int(i)*16,160));
+        require(live.runCount()==1&&!live.canAppend(1)&&!live.append(60,0,0)&&!live.valid());
+    }
     constructorPublication();
     publicationRuns();
     combinedPublicationBoundaries();

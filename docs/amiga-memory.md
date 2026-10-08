@@ -4,6 +4,19 @@ The CPU target is an A500/68000. The current emulator has 512 KiB Chip RAM and
 8 MiB Fast RAM; the latter remains a development configuration, not a final
 memory requirement.
 
+## Native terrain identities
+
+`nativeTerrainStorage` reserves 83,998 bytes of ordinary BSS on the 68000,
+outside Chip RAM and the task stack. It retains at most 2,048 terrain
+lifetimes in birth order. Adjacent generated cells share identity/geometry
+descriptors; coincident and authored walls remain distinct. The bounded
+descriptor array reserves worst-case singleton capacity, so compression
+reduces live descriptors rather than the allocation size. Per-cell state is
+one flags byte plus the run locator, not a duplicate generic runner record.
+Room teardown preserves the generation counter, preventing old handles from
+addressing replacement walls. Generated numeric VM IDs are not inferred from
+these family-local handles.
+
 ## CPU-only HUD artwork
 
 The immutable counter/streak pair-column tables occupy 49,368 bytes in

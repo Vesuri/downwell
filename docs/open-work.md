@@ -44,9 +44,9 @@ behavior, both backend integrations and relevant original-game verification.
   finish the stored companions' event/render integration as well as native
   ownership (their synchronous stored Create state is not a complete actor).
   Connect authored `objDitherAbove` (61) native wall-destruction contacts.
-  Native terrain currently has backend occupancy but no registered wall
-  identities: retain run-backed lifetimes and ordered collision candidates
-  before enabling destruction dispatch there; do not replace it with a row-clear
+  Connect native terrain's identity runs to shared lifetime lookup and ordered
+  collision candidates before enabling destruction dispatch there; occupancy
+  alone cannot select a wall. Do not replace it with a row-clear
   heuristic or restore duplicate generic per-cell runner state. Verify mixed
   Begin Step ordering (the owned, explicitly admitted controller already runs
   the shared event). Extend the SDL

@@ -21,9 +21,12 @@
 #include <vector>
 #include <array>
 #include <algorithm>
+#include <memory>
 
 namespace {
 int parityFrame = 0;
+downwell::StateDigest nativeTerrainDigest;
+unsigned nativeTerrainPeak=0;
 bool sawExtendedEnemyAnimation = false;
 bool sawPairedFrogAir = false, sawPairedFrogGround = false;
 bool sawPairedFrogHit = false;
@@ -46,13 +49,15 @@ struct LiveSceneWorld {
     const downwell::ObjectPack& objects;
     AmigaPortRuntime* runtime = nullptr;
     AmigaTerrainTiles tiles;
+    std::unique_ptr<AmigaGameplayGeneration::TerrainLifetimes> terrainLifetimes{
+        new AmigaGameplayGeneration::TerrainLifetimes};
     AmigaGameplayGeneration generation;
     downwell::GameplayDitherAbove adoptedDither;
 
     LiveSceneWorld(const downwell::BuilderPatternPack& pack,
                    const downwell::ObjectPack& definitions)
         : collision{nullptr, nullptr, &pack, nullptr, 0, nullptr},
-          patterns(pack), objects(definitions), generation(builder, pack, definitions, index, tiles) {
+          patterns(pack), objects(definitions), generation(builder, pack, definitions, index, tiles,terrainLifetimes.get()) {
         downwell::GameMakerRandom random(31);
         require(!generation.step(random, 8192) && random.drawCount() == 0 &&
             builder.fragmentCount() == 0, "unbound generation rejects without RNG or terrain effects");
@@ -61,12 +66,32 @@ struct LiveSceneWorld {
                          downwell::GameMakerRandom& random, int bottom) {
         auto& world = *static_cast<LiveSceneWorld*>(opaque);
         const bool ok = world.generation.step(random, bottom);
+        if(ok)world.checkTerrainIdentities();
         require(world.generation.dirtyFirst >= 0 &&
             world.generation.dirtyFirst <= AmigaGameplayGeneration::worldRows &&
             world.generation.dirtyEnd >= 0 &&
             world.generation.dirtyEnd <= AmigaGameplayGeneration::worldRows,
             "generation damage stays within the backing raster");
         return ok;
+    }
+    void checkTerrainIdentities()const{
+        require(terrainLifetimes->valid(),"native terrain identity owner stays valid");
+        nativeTerrainPeak=std::max(nativeTerrainPeak,terrainLifetimes->size());
+        nativeTerrainDigest.addU32(terrainLifetimes->size());
+        require(terrainLifetimes->visit([&](const auto& id,bool active,bool destroyed){
+            nativeTerrainDigest.addI32(id.object);nativeTerrainDigest.addI32(id.x);nativeTerrainDigest.addI32(id.y);
+            nativeTerrainDigest.addU32(id.source);nativeTerrainDigest.addI32(id.creationCode);
+            nativeTerrainDigest.addBool(active);nativeTerrainDigest.addBool(destroyed);return true;
+        }),"capture native terrain identity replay");
+        if(const auto* reference=runtime->terrainInstances()){
+            require(reference->size()==terrainLifetimes->size(),"native identities match scalar birth count");
+            unsigned ordinal=0;
+            require(terrainLifetimes->visit([&](const auto& id,bool active,bool destroyed){
+                const auto* r=reference->find(reference->handle(ordinal++));
+                return r&&r->objectId==id.object&&r->x==id.x&&r->y==id.y&&r->sourceInstanceId==id.source&&
+                    r->creationCodeId==id.creationCode&&r->active==active&&r->destroyRequested==destroyed;
+            }),"native run identities preserve scalar source birth order and state");
+        }
     }
     void bind(AmigaPortRuntime& port, const downwell::RoomPack& rooms,
               const downwell::PackedRoom& room, bool continuing = false,
@@ -109,6 +134,7 @@ struct LiveSceneWorld {
             require(generation.loadRoomWithStartField(port,rooms,room,&prepared),"native initial field Create follows authored room order");
         }
         generation.dirtyFirst = 0; generation.dirtyEnd = AmigaGameplayGeneration::worldRows;
+        checkTerrainIdentities();
         generation.bind(port,std::getenv("DOWNWELL_SCALAR_TERRAIN")==nullptr);
         require(generation.dirtyFirst == AmigaGameplayGeneration::worldRows && generation.dirtyEnd == 0,
             "room binding retires previous generation damage");
@@ -2708,6 +2734,7 @@ int main(int argc, char** argv) {
         testDecodedSceneParity(argv[1], argv[2], argv[3]);
         testDecodedSceneParity(argv[1], argv[2], argv[3], true);
     }
+    std::cout << "Native terrain identity peak="<<nativeTerrainPeak<<" digest="<<nativeTerrainDigest.value()<<'\n';
     std::cout << "Amiga scene runtime tests passed\n";
     return 0;
 }

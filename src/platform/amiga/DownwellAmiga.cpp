@@ -1740,9 +1740,9 @@ __attribute__((noinline)) static int runDownwell(void) {
         AmigaPortRuntime(initialRingOrigin,true,0,false,collisionOwner.enemyBinding(),
             collisionOwner.breakableBinding(),collisionOwner.playerBinding(),&collisionOwner.terrain(),&rooms);
 #else
-    // Native ownership keeps no per-wall identity records: the occupancy grid
-    // answers collision and paints walls (unchecked walls are sprite 51 with
-    // a grid-derived frame), so terrain births publish to the grid alone.
+    // Native collision/painting still uses occupancy (unchecked walls are
+    // sprite 51 with a grid-derived frame). Generation separately retains
+    // identity runs; they are not duplicate generic per-wall runner records.
     AmigaPortRuntime& port = *new (portRuntimeStorage)
         AmigaPortRuntime(initialRingOrigin, false, 1201 - 176, true,collisionOwner.enemyBinding(),
             collisionOwner.breakableBinding(),collisionOwner.playerBinding(),
@@ -1910,7 +1910,14 @@ __attribute__((noinline)) static int runDownwell(void) {
     auto& liveBuilder = *new (liveBuilderStorage) AmigaAreaOneTerrainBuilder(fragments,
         amigaInitialTerrainFragmentCount, nullptr, 0,
         generatedDecorations, amigaTerrainDecorationCapacity);
-    AmigaGameplayGeneration liveGeneration{liveBuilder, builders, objects, terrainIndex, terrainTiles};
+    // Retain native identity/geometry in runs without duplicating generic
+    // runner state per wall. Storage must not consume the 8 KiB task stack.
+    alignas(AmigaGameplayGeneration::TerrainLifetimes) static UBYTE nativeTerrainStorage[
+        sizeof(AmigaGameplayGeneration::TerrainLifetimes)];
+    auto* nativeTerrain=port.terrainCreatesBackendOnly()?
+        new(nativeTerrainStorage) AmigaGameplayGeneration::TerrainLifetimes:nullptr;
+    AmigaGameplayGeneration liveGeneration{liveBuilder, builders, objects, terrainIndex, terrainTiles,
+        nativeTerrain};
     downwell::GameMakerRandom enemyRandom(2);
     downwell::PackedRoom mainRoom;
     const AmigaTerrainCollisionContext emptyTerrain{0, 0, &builders, 0, 0, 0};

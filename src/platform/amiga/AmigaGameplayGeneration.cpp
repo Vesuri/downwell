@@ -2,13 +2,22 @@
 #include "AmigaPortRuntime.h"
 #include "AmigaProfile.h"
 
+bool AmigaGameplayGeneration::roomBirth(const downwell::PackedRoomInstance& instance){
+    return !lifetimes_||lifetimes_->append(instance.objectId,instance.x,instance.y,true,
+        instance.instanceId,instance.creationCodeId);
+}
+bool AmigaGameplayGeneration::birth(int object,int x,int y,bool active){
+    return !lifetimes_||lifetimes_->append(object,x,y,active);
+}
+
 bool AmigaGameplayGeneration::loadRoom(AmigaPortRuntime& runtime,
     const downwell::RoomPack& rooms,const downwell::PackedRoom& room,
     const downwell::PreparedRoomTerrain* prepared,AmigaRoomTerrainPlan* backend){
+    if(lifetimes_&&!lifetimes_->clear())return false;
     const bool compiled=backend&&prepared&&prepared->matches(rooms,room)&&backend->begin(prepared);
     return runtime.loadRoomTerrain(rooms,room,[this,backend,compiled](const downwell::PackedRoomInstance& instance){
-        if(compiled)return backend->emit(index_,instance);
-        return amigaAddTerrainObject(index_,instance.objectId,instance.x,instance.y,true);
+        return (compiled?backend->emit(index_,instance):
+            amigaAddTerrainObject(index_,instance.objectId,instance.x,instance.y,true))&&roomBirth(instance);
     },prepared);
 }
 
@@ -22,10 +31,11 @@ bool AmigaGameplayGeneration::adoptRoom(AmigaPortRuntime& runtime,
 bool AmigaGameplayGeneration::loadRoomWithStartField(AmigaPortRuntime& runtime,
     const downwell::RoomPack& rooms,const downwell::PackedRoom& room,
     const downwell::PreparedRoomTerrain* prepared,AmigaRoomTerrainPlan* backend){
+    if(lifetimes_&&!lifetimes_->clear())return false;
     const bool compiled=backend&&prepared&&prepared->matches(rooms,room)&&backend->begin(prepared);
     return runtime.loadRoomTerrainWithStartField(rooms,room,[this,backend,compiled](const downwell::PackedRoomInstance& instance){
-        if(compiled)return backend->emit(index_,instance);
-        return amigaAddTerrainObject(index_,instance.objectId,instance.x,instance.y,true);
+        return (compiled?backend->emit(index_,instance):
+            amigaAddTerrainObject(index_,instance.objectId,instance.x,instance.y,true))&&roomBirth(instance);
     },prepared);
 }
 
@@ -45,7 +55,8 @@ void AmigaGameplayGeneration::bind(AmigaPortRuntime& runtime,bool terrainRuns) {
 bool AmigaGameplayGeneration::createPrepared(void* opaque,const downwell::AreaOneBuilder::PreparedTerrain& batch,
     downwell::AreaOneBuilder::EmitFunction){
     auto& self=*static_cast<AmigaGameplayGeneration*>(opaque);
-    if(!self.runtime_->terrainCreatesBackendOnly() || !amigaAdmitPreparedTerrain(self.index_,self.tiles_,batch))
+    if(!self.runtime_->terrainCreatesBackendOnly() || !amigaAdmitPreparedTerrain(self.index_,self.tiles_,batch)||
+        (self.lifetimes_&&!self.lifetimes_->canAppend(batch.count())))
         return batch.executeReference(create,opaque);
     if(!batch.beginPublication())return false;
     if(batch.count()){
@@ -77,6 +88,11 @@ bool AmigaGameplayGeneration::createPrepared(void* opaque,const downwell::AreaOn
         if(word[1]&2)candidate[32]|=bit;
     }
     if(!self.tiles_.appendPrepared(batch))return false;
+    if(self.lifetimes_){
+        const auto* source=batch.creates();
+        for(unsigned i=0;i<batch.count();++i,source+=2)
+            if(!self.birth((source[0]&128)?93:60,(int(source[0]&127)-32)*16,batch.y))return false;
+    }
     batch.completePublication();
     return true;
 }
@@ -88,11 +104,17 @@ bool AmigaGameplayGeneration::createRun(void* opaque,const downwell::AreaOneBuil
     if(!index.ready())return run.execute(create,opaque);
     // With no world terrain state, the run's Creates are this backend's
     // publication alone: draw every cell, then publish the admitted span.
-    if(self.runtime_->terrainCreatesBackendOnly()&&index.admitSpan(self.tiles_)){
+    if(self.runtime_->terrainCreatesBackendOnly()&&index.admitSpan(self.tiles_)&&
+        (!self.lifetimes_||self.lifetimes_->canAppend(run.count))){
         DW_PROFILE_SCOPE(profileGeneratedRegistration);
         if(run.y-24<self.dirtyFirst)self.dirtyFirst=run.y-24;
         if(run.y+24>self.dirtyEnd)self.dirtyEnd=run.y+24;
-        return run.executeSpan([&]{return index.publishSpan(self.tiles_);});
+        return run.executeSpan([&]{
+            if(!index.publishSpan(self.tiles_))return false;
+            for(unsigned i=0;self.lifetimes_&&i<run.count;++i)
+                if(!self.birth(run.objectId,run.x+int(i)*run.stepX,run.y))return false;
+            return true;
+        });
     }
     bool dirty=false;
     return self.runtime_->createGeneratedTerrainRun(run,[&](const downwell::DeferredCreateInstance& command){
@@ -108,7 +130,7 @@ bool AmigaGameplayGeneration::createRun(void* opaque,const downwell::AreaOneBuil
             if(command.y+24>self.dirtyEnd)self.dirtyEnd=command.y+24;
             dirty=true;
         }
-        return true;
+        return self.birth(command.objectId,command.x,command.y,command.active);
     });
 }
 
@@ -137,7 +159,7 @@ bool AmigaGameplayGeneration::create(void* opaque,
             !self.tiles_.append(command)) return false;
         if (command.y - 24 < self.dirtyFirst) self.dirtyFirst = command.y - 24;
         if (command.y + 24 > self.dirtyEnd) self.dirtyEnd = command.y + 24;
-        return true;
+        return self.birth(command.objectId,command.x,command.y,command.active);
     }
     return self.runtime_->createGeneratedInstance(command, self.objects_,
         [&self](const downwell::DeferredCreateInstance& command) {
@@ -153,7 +175,8 @@ bool AmigaGameplayGeneration::create(void* opaque,
                 if (command.y - 24 < self.dirtyFirst) self.dirtyFirst = command.y - 24;
                 if (command.y + 24 > self.dirtyEnd) self.dirtyEnd = command.y + 24;
             }
-            return true;
+            return (command.objectId!=60&&command.objectId!=93&&command.objectId!=99)||
+                self.birth(command.objectId,command.x,command.y,command.active);
         });
 }
 
