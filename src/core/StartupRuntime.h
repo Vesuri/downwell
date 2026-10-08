@@ -6,6 +6,7 @@
 #include "StoredBuilderPublication.h"
 #include "RunnerLayerIds.h"
 #include "ScriptEffectRuntimeBinding.h"
+#include "BoxStepDispatch.h"
 #include "DeferredInstanceQueue.h"
 #include "GameMakerRandom.h"
 #include "GameplayLimits.h"
@@ -221,6 +222,10 @@ public:
         auto* r=instances_.resolve(h);
         if(!run_.effectsSucceeded||!r||r->objectId!=92)return run_.effectsSucceeded=false;
         r->box.hit=true;return true;
+    }
+    template<class Read,class Operations,class Tick>
+    bool withBoxDestruction(Read read,Operations operations,Tick tick){
+        return boxStepDispatch_.run(run_.effectsSucceeded,read,operations,tick);
     }
     bool markBoxDestroyed(InstanceHandle h){
         auto* r=instances_.resolve(h);
@@ -1327,6 +1332,7 @@ private:
     bool layerBindingSucceeded_;
     InstanceLifecycleBinding lifecycle_;
     ScriptEffectRuntimeBinding scriptEffectsBinding_;
+    BoxStepDispatch boxStepDispatch_;
     ScriptEffectRuntimeBinding debrisBinding_;
     const DebrisAnimation* (*debrisLookup_)(const void*,InstanceHandle,const InstanceRecord&)=nullptr;
     template<class Effects,class Registry> void bindDebrisDraw(Effects& effects,Registry& registry){

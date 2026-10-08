@@ -150,6 +150,7 @@ struct ProjectileFailureOwner:StoredWorldCollision {
     bool retire(InstanceHandle h,const InstanceRecord& r){return allow(r,7)&&StoredWorldCollision::retire(h,r);}
 };
 #include "BoxBurstWorldCheck.h"
+#include "ScheduledBoxEffectsCheck.h"
 int main(){
     const auto rb=read("generated/downwell-rooms.dwrm"),ob=read("generated/downwell-objects.dwob"),
         bb=read("generated/downwell-builder-patterns.dwbp"),sb=read("generated/downwell-sprites.dwsc"),
@@ -158,6 +159,25 @@ int main(){
     BuilderPatternPack patterns(bb.data(),bb.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     SpriteMaskPack masks(mb.data(),mb.size());
     require(rooms.valid()&&objects.valid()&&patterns.valid()&&sprites.valid()&&masks.valid(),"real collision resources validate");
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach scheduled box world");world->skipToGameForTesting();
+        InstanceHandle box;
+        require(world->spawnBuilderPrimitive(92,240,512,box)&&world->publishBoxHealth(box,{}),"create exhausted scheduled box");
+        ScheduledBoxCounts counts;
+        const auto destroyed=world->mainBlocksDestroyed();
+        require(!world->withBoxDestruction(
+            [&](InstanceHandle key,BoxDestructionScript::Caller& caller){return owner->readBoxDestruction(key,caller);},
+            [&](InstanceHandle key){return scheduledBoxEffects(*world,key,counts,
+                [&](InstanceHandle h){return world->markBoxDestroyed(h);});},
+            [&]{return world->stepWithCollisionPass({},false,[]{return true;});}),"scheduled debris failure stops stored tick");
+        require(!world->effectsSucceeded()&&counts.sound==1&&counts.smoke==1&&counts.flash==1&&
+            counts.impact==1&&counts.mark==1&&counts.debris==1&&
+            world->smokeEffects().size()==1&&world->flashEffects().slot(0).handle&&world->scriptEffects().size()==1&&
+            owner->resolve(box)&&owner->resolve(box)->destroyRequested&&
+            world->mainBlocksDestroyed()==destroyed+1,"scheduled source prefix retains child owners and marked caller on failure");
+    }
     for(bool rejectPost:{false,true}){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());

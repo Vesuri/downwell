@@ -1957,8 +1957,18 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
         ++implementedCodeCalls_;
         if(instance!=nullptr)instance->box.alarmZero();
         return;
-    case 1088: // gml_Object_objBox_n_Step_0: destruction boundary only.
+    case 1088: // gml_Object_objBox_n_Step_0
         ++implementedCodeCalls_;
+        if(instance&&boxStepDispatch_.bound()){
+            const auto key=instances_.handleAt(unsigned(instance-&instances_.at(0)));
+            const bool destroyed=instance->destroyRequested;
+            const bool ok=boxStepDispatch_.step(key);
+            // Child callbacks may mutate storage; do not reuse instance here.
+            const auto* retained=instances_.resolve(key);
+            if(retained&&!destroyed&&retained->destroyRequested)++mainBlocksDestroyed_;
+            run_.effectsSucceeded=run_.effectsSucceeded&&ok;
+            return;
+        }
         // Full BoxDestructionScript child effects/rewards and alarmStop remain
         // integration work. Keep removal at the source event, not in queries.
         if(instance&&instance->box.exhausted()){

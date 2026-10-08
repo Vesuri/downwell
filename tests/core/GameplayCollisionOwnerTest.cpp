@@ -1,6 +1,7 @@
 #include "core/GameplayCollisionOwner.h"
 #include "RegisteredSkeletonThrowChecks.h"
 #include "QuietSkeletonEffects.h"
+#include "ScheduledBoxEffectsCheck.h"
 #ifdef DOWNWELL_LOCAL_DRAW_CAPTURE
 namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_CAPTURE; }
 #endif
@@ -567,6 +568,32 @@ int main(){
     }
     auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
+    {
+        const auto roomBytes=read("generated/downwell-rooms.dwrm");RoomPack roomPack(roomBytes.data(),roomBytes.size());
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
+            GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&roomPack);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));
+        const int x=0,y=336;assert(world->appendBreakables(&x,&y,1));
+        const InstanceHandle box{0,1};
+        ScheduledBoxCounts counts;
+        auto tick=[&]{return world->withBoxDestruction(
+            [&](InstanceHandle key,BoxDestructionScript::Caller& caller){
+                InstanceHandle shared;
+                return GameplayCollisionView::encode(GameplayCollisionView::Kind::breakable,key,shared)&&
+                    owner->readBoxDestruction(shared,caller);
+            },[&](InstanceHandle key){return scheduledBoxEffects(*world,key,counts,
+                [&](InstanceHandle h){return world->markBreakableDestroyed(h);});},
+            [&]{world->step(0);return world->effectsSucceeded();});};
+        assert(tick()&&counts.stop==1&&!counts.sound&&world->findBreakable(box));
+        counts={};assert(world->publishBoxHealth(box,{}));
+        assert(!tick());
+        assert(!world->effectsSucceeded()&&counts.sound==1&&counts.smoke==1&&counts.flash==1&&
+            counts.impact==1&&counts.mark==1&&counts.debris==1&&counts.stop==0&&
+            world->smokeEffects().size()==1&&world->flashEffects().slot(0).handle&&world->scriptEffects().size()==1&&
+            world->findBreakable(box)&&world->findBreakable(box)->destroyRequested);
+    }
     for(bool native:{false,true})for(unsigned family=0;family<6;++family){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
             GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},nullptr,

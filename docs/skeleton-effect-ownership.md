@@ -338,6 +338,20 @@ actual retirement or reuse invalidates the caller without changing the output.
 The native lifecycle tape checks that boundary. These adapters still need to
 replace the live removal-only Step together with the full effect/reward owners.
 
+`withBoxDestruction` on both worlds borrows a retained reader and operations
+factory for one tick. `BoxStepDispatch` invokes the shared script at object-92
+ordinary Step, including healthy boxes' `alarmStop`, rather than running an
+extra world tick. The stored reader takes world handles; the native reader
+takes local breakable handles and must encode them for the collision owner.
+The binding rejects nesting and releases its callbacks even when the tick
+fails. Destruction statistics and native terrain damage follow the script's
+actual destruction mark, not exhausted health alone. Callbacks must not retire
+the caller; pre-Draw cleanup owns that boundary. The unbound gameplay path is
+still the removal subset until complete audio/effect/time-stop adapters are
+installed. Scheduled failure-prefix checks use real smoke, flash and impact
+owners, then reject debris creation; they do not prove complete destruction
+or natural encounter parity.
+
 Gunpowder Blocks creates object 266 (`bulletDrone`), not an explosion. Its
 Create overrides the serialized sprite 458 with 459, sets speed 7, damage 4,
 zero spread and alarm 0 to 16; the box subsequently assigns direction 90 and

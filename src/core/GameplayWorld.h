@@ -4,6 +4,7 @@
 #include "PlayerMotion.h"
 #include "PreparedRoomTerrain.h"
 #include "ScriptEffectRuntimeBinding.h"
+#include "BoxStepDispatch.h"
 #include "Profile.h"
 #include "core/GameMakerRandom.h"
 #include "core/StateDigest.h"
@@ -747,6 +748,10 @@ public:
     // Engine destruction mark, after any game Destroy/CleanUp callbacks.
     // Keep the typed record until the owner's Draw-entry cleanup.
     bool markEnemyDestroyed(downwell::InstanceHandle handle);
+    template<class Read,class Operations,class Tick>
+    bool withBoxDestruction(Read read,Operations operations,Tick tick){
+        return boxStepDispatch_.run(run_.effectsSucceeded,read,operations,tick);
+    }
     bool markBreakableDestroyed(downwell::InstanceHandle handle);
     bool retireMarkedEnemy(downwell::InstanceHandle handle);
     bool retireMarkedBreakable(downwell::InstanceHandle handle);
@@ -1224,6 +1229,7 @@ private:
     unsigned invulnerability_;
     downwell::PlayerDeathSequence death_;
     downwell::RunSession run_;
+    downwell::BoxStepDispatch boxStepDispatch_;
     downwell::GameplayGoalFields goalFieldInstances_;
     downwell::GameplayExitControllers exitControllers_;
     downwell::MachineGunEmitter emitter_;

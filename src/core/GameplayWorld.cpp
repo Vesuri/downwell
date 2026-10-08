@@ -1195,11 +1195,26 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     }
 
     // objBox_n (92) observes health after player Begin Step and before bullet
-    // Step (261). Full destruction effects/rewards remain separate integration
-    // work; do not remove collision membership inside the contact query.
+    // Step (261). A bound source adapter also runs healthy boxes' alarmStop.
+    // The unbound path retains the old destruction boundary until all effect,
+    // audio and time-stop owners can be supplied by the gameplay scene.
     for(unsigned i=0;i<breakableCount_;++i){
         auto& box=breakables_[i];
-        if(!box.lifetimeId||!box.active||box.destroyRequested||!box.state.exhausted())continue;
+        if(!box.lifetimeId||!box.active||box.destroyRequested)continue;
+        if(boxStepDispatch_.bound()){
+            const downwell::InstanceHandle key{i,box.lifetimeId};
+            const bool ok=boxStepDispatch_.step(key);
+            const auto* retained=findBreakable(key);
+            if(retained&&retained->destroyRequested){
+                ++blocksDestroyed_;
+                if(destroyedBlockCount==destroyedCapacity){run_.effectsSucceeded=false;return {};}
+                destroyedBlockX[destroyedBlockCount]=retained->x;
+                destroyedBlockY[destroyedBlockCount++]=retained->y;
+            }
+            if(!ok||!run_.effectsSucceeded){run_.effectsSucceeded=false;return {};}
+            continue;
+        }
+        if(!box.state.exhausted())continue;
         if(destroyedBlockCount==destroyedCapacity){run_.effectsSucceeded=false;return {};}
         if(!markBreakableDestroyed({i,box.lifetimeId}))return {};
         destroyedBlockX[destroyedBlockCount]=box.x;

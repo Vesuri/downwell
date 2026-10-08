@@ -1,4 +1,5 @@
 #include "core/BoxDestructionScript.h"
+#include "core/BoxStepDispatch.h"
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
 struct Ops {
     using Handle=unsigned;
@@ -21,6 +22,10 @@ bool nativeBoxStep(const downwell::BreakableState& b,downwell::MotionBinary64 x,
 struct Reader {bool operator()(downwell::BoxDestructionScript::Caller&)const;};
 bool nativeRetainedBoxStep(Reader read,Ops& ops,bool& ok){
     return downwell::BoxDestructionScript::runRetained(read,ops,ok);
+}
+bool nativeScheduledBoxStep(downwell::BoxStepDispatch& binding,Reader read,Ops& ops,bool& ok){
+    return binding.run(ok,[&](downwell::InstanceHandle,auto& caller){return read(caller);},
+        [&](downwell::InstanceHandle)->Ops&{return ops;},[&]{return binding.step({1,2});});
 }
 #else
 #include <cassert>
@@ -112,6 +117,22 @@ struct MutableCallerOps:Ops {
     }
 };
 int main(){
+    {
+        BoxStepDispatch binding;bool good=true;
+        for(unsigned frame=0;frame<2;++frame){
+            MutableCallerOps ops;
+            auto read=[&](InstanceHandle key,auto& caller){assert(key.slot==7&&key.generation==9);return ops.read(caller);};
+            auto factory=[&](InstanceHandle)->MutableCallerOps&{return ops;};
+            assert(binding.run(good,read,factory,[&]{return binding.step({7,9});})&&good&&!binding.bound());
+            assert(ops.destroyed&&ops.calls.back()==Stop);
+        }
+        MutableCallerOps ops;
+        auto read=[&](InstanceHandle,auto& caller){return ops.read(caller);};
+        auto factory=[&](InstanceHandle)->MutableCallerOps&{return ops;};
+        assert(!binding.run(good,read,factory,[&]{return binding.run(good,read,factory,[]{return true;});})&&
+            !good&&!binding.bound()&&ops.calls.empty());
+        assert(!binding.run(good,read,factory,[]{assert(false);return true;}));
+    }
     MutableCallerOps mutation;bool healthy=true;
     assert(BoxDestructionScript::runRetained([&](auto& c){return mutation.read(c);},mutation,healthy)&&healthy);
     assert(mutation.calls==std::vector<Event>({Sound,Smoke,Flash,Effect,Destroy,Debris,Debris,Currency,Currency,Stop}));
