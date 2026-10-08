@@ -2486,14 +2486,18 @@ build/amiga-currency-promotion-test: $(CURRENCY_PROMOTION_TEST_SOURCES) tests/pl
 build/amiga-currency-promotion-reference-test: $(CURRENCY_PROMOTION_TEST_SOURCES) tests/platform/amiga/AmigaSceneRuntimeTest.cpp $(HOST_CHECK_HEADERS)
 	@mkdir -p build
 	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -DDOWNWELL_REFERENCE_SHADE_PARTITION -o $@ $(CURRENCY_PROMOTION_TEST_SOURCES)
+build/amiga-currency-bobs-reference-test: $(CURRENCY_PROMOTION_TEST_SOURCES) tests/platform/amiga/AmigaSceneRuntimeTest.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -DDOWNWELL_REFERENCE_CURRENCY_BOBS -o $@ $(CURRENCY_PROMOTION_TEST_SOURCES)
 .PHONY: test-amiga-currency-promotion
 build/packed-mask-intersection-test: tests/core/PackedMaskIntersectionTest.cpp src/core/PackedMaskIntersection.h src/core/BinaryEffectSurface.h
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
-test-amiga-currency-promotion: build/amiga-currency-promotion-test build/amiga-currency-promotion-reference-test build/packed-mask-intersection-test
+test-amiga-currency-promotion: build/amiga-currency-promotion-test build/amiga-currency-promotion-reference-test build/amiga-currency-bobs-reference-test build/packed-mask-intersection-test
 	./build/packed-mask-intersection-test
 	./build/amiga-currency-promotion-test
 	./build/amiga-currency-promotion-test --overflow
+	./build/amiga-currency-bobs-reference-test --overflow
 	./build/amiga-currency-promotion-reference-test
 	./build/amiga-currency-promotion-reference-test --overflow
 test: test-amiga-currency-promotion

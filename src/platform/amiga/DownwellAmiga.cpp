@@ -1665,6 +1665,10 @@ volatile const UWORD* gDownwellDumpActorSprites;
 volatile const UWORD* gDownwellDumpOverflowSprite;
 volatile UWORD gDownwellDumpRingOrigin;
 volatile ULONG gDownwellDumpTick;
+volatile const GameplayBob* gDownwellDumpBobs;
+volatile ULONG gDownwellDumpBobCount;
+volatile const UBYTE* gDownwellDumpPack;
+volatile ULONG gDownwellDumpPackBytes;
 __attribute__((noinline, used)) void downwellFrameDump(void) {
     (void)gDownwellHudWordFallbacks; // Retain the witness in reference builds too.
     __asm__ volatile("" ::: "memory");
@@ -4008,6 +4012,8 @@ __attribute__((noinline)) static int runDownwell(void) {
             gDownwellDumpOverflowSprite=memory.enemySprite(back);
             gDownwellDumpRingOrigin=(UWORD)port.ringOrigin();
             gDownwellDumpTick=port.tick();
+            gDownwellDumpBobs=actors;gDownwellDumpBobCount=bobCount;
+            gDownwellDumpPack=activeGamePack;gDownwellDumpPackBytes=activeGamePackEnd-activeGamePack;
             downwellFrameDump();
 #endif
 #ifdef DOWNWELL_ENTRY_WIPE_VERIFY

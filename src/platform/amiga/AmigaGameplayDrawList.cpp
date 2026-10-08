@@ -75,8 +75,15 @@ bool AmigaGameplayDrawList::promoteCurrency(const GameplayWorld& world,int viewX
     world.smokeEffects().visitNewest([&](auto,const auto&){other=true;});
     if(other||!world.visitDebrisDraw([&](const auto&){other=true;return true;})||other)return false;
     const Placement::PixelView view{viewX,viewY,160,284};
+#if defined(DOWNWELL_REFERENCE_CURRENCY_BOBS) || defined(DOWNWELL_REFERENCE_SHADE_PARTITION)
+    constexpr bool planarOverflow=false;
     GameplayBob pending[8];unsigned slots[8];
-    unsigned used=0,channels=0,first=0;bool dropped=false;
+#else
+    constexpr bool planarOverflow=true;
+    auto& pending=currencyPending_;auto& slots=currencySlots_;
+#endif
+    constexpr unsigned pendingCapacity=planarOverflow?GameplayWorld::gemCapacity:8;
+    unsigned used=0,channels=0,first=0,hardwareUsed=0;bool dropped=false;
 #ifdef DOWNWELL_REFERENCE_SHADE_PARTITION
     constexpr bool topmostFirst=false;
 #else
@@ -143,27 +150,37 @@ bool AmigaGameplayDrawList::promoteCurrency(const GameplayWorld& world,int viewX
             dropped=true;break;
 #endif
         }
-        if(topmostFirst&&(used==capacity-count||prepared->partCount[0]>8-channels)){
+        if(topmostFirst&&(used==capacity-count||used==pendingCapacity||
+            (!planarOverflow&&prepared->partCount[0]>8-channels))){
             dropped=true;break;
         }
         // Retire bottommost candidates, never a hole within the selected
         // painter suffix. Multipart assets consume their actual channel count.
-        while(used&&(used==capacity-count||prepared->partCount[0]>8-channels)){
+        while(!planarOverflow&&used&&(used==capacity-count||prepared->partCount[0]>8-channels)){
             channels-=pending[first].prepared->partCount[0];
             first=(first+1)%8;--used;dropped=true;
         }
-        const unsigned at=(first+used)%8;
+        const unsigned at=(first+used)%pendingCapacity;
         pending[at]={UWORD(sprite),UWORD(frame),downwellPlayfieldX+x-viewX,y-viewY,0,prepared};
         slots[at]=i-1;++used;
-        channels+=prepared->partCount[0];
+        if(!planarOverflow)channels+=prepared->partCount[0];
+        else if(hardwareUsed==used-1&&prepared->partCount[0]<=8-channels){
+            channels+=prepared->partCount[0];++hardwareUsed;
+        }
     }
+    // A wholly unshaded currency pass is ordinary masked source painting.
+    // Keep it in the existing actor compositor: the topmost parts get DMA
+    // channels and overflow becomes BOBs after every ordinary room actor.
+    // If shade/capacity interrupts admission, only the hardware suffix may
+    // escape the retained surface, which is published after all BOBs.
+    if(planarOverflow&&dropped)used=hardwareUsed;
     if(!used)return false;
     currencyRasterFirst=dropped?slots[topmostFirst?used-1:first]+1:end;
     currencyRasterRequired=dropped;currencySpriteCount=used;
     // Keep source Draw order; assignment visits backwards, giving the topmost
     // producer the highest sprite priority above the retained controller.
     for(unsigned n=0;n<used;++n)
-        actors[count++]=pending[topmostFirst?used-1-n:(first+n)%8];
+        actors[count++]=pending[topmostFirst?used-1-n:(first+n)%pendingCapacity];
     return true;
 }
 

@@ -578,9 +578,12 @@ surface, independently of the earlier actor commands. Hardware counts include
 partial frames; the separate partial count identifies those that also retain
 a raster prefix. Raster-only frames exclude that partial count.
 
-Currency admission inspects the source-topmost end first. The first shaded
-gem or exhausted sprite channel ends that suffix; it and all older painter
-content remain in the shade-aware raster. The suffix is published in original
+Currency admission inspects the source-topmost end first. A wholly unshaded
+pass uses the actor compositor, with BOBs for hardware-channel overflow. When
+shade interrupts admission, only the channel-fitting topmost suffix escapes;
+it and the retained shade-aware raster preserve the controller boundary.
+`REFERENCE_CURRENCY_BOBS=1` retains the channel-limited raster fallback.
+The suffix is published in original
 Draw order above that raster and the ordinary actors. Intersection tests read
 the existing packed alpha masks in clipped word slices, without an overlap
 asset bank or a temporary mask. `REFERENCE_SHADE_PARTITION=1` on the Amiga
@@ -623,6 +626,18 @@ SKIP_TO_GAME=1 PROFILE_OVERFLOW=1 TRACE_FRAMES=1302,1378,1396 TRACE_FIELDS=60 \
 The host census uses one-based post-Step frames, as do the trace frame labels.
 Native timing runs retain the ordinary uninstrumented compositor; host
 coverage is not a replacement for native state and completed-DMA pixel checks.
+
+For source-backed currency pixels, generate a witness with
+`./build/amiga-currency-promotion-test --overflow --pixel-witness > tmp/currency-pixels.txt`.
+Capture ticks `1303,1308,1397,1398,1399,1400,1401,1402,1403,1404` with
+`PROFILE_OVERFLOW=1`, `DUMP_TICKS` and `profile.sh frames`, then run
+`python3 tools/verify-amiga-currency-frames.py tmp/currency-frames tmp/currency-pixels.txt
+--reference tmp/currency-reference-frames` (on one command line). The reference
+directory must contain matching native captures with `REFERENCE_CURRENCY_BOBS=1`.
+The verifier checks opaque source-compositor pixels and, with the reference,
+every visible RGB pixel, including transparent holes and ordinary actors.
+Optional `DUMP_DETAILS=1` saves the submitted BOB records and resident artwork
+bank alongside native frame dumps for diagnosing publication mismatches.
 
 For generation-publication structure rather than effect coverage, run
 `./build/amiga-currency-promotion-test --generation-census` (also accepts

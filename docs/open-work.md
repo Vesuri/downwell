@@ -327,16 +327,15 @@ under 80 ms while removing remaining threshold-sized computations.
 ### C. Combat composition shortfall
 
 Remaining effect work is the raster fallback for mixed producers, actual
-shade subtraction, entry cover and sprite-channel overflow. Measure those
+shade subtraction and entry cover. Measure those
 cases separately from eligible gem-only frames before another compositor
 attempt. Use the effect-coverage census described in the profiling procedure
 to establish that the chosen window actually exercises each proposed path;
 producer-phase timings alone do not prove smoke/debris or raster coverage.
 Use the seed-8 route-4 tape for shade subtraction and channel overflow. Preserve
-the topmost unshaded hardware suffix, shaded raster prefix, and
+the unshaded actor/BOB pass, topmost unshaded hardware suffix, shaded raster prefix, and
 controller/ordinary-actor boundary when changing
-the retained raster. Its remaining nine-gem-window composition costs 3.22 ms;
-do not tune sub-millisecond stamp helpers. Mixed producers and entry cover still
+the retained raster. Do not tune sub-millisecond stamp helpers. Mixed producers and entry cover still
 need their own native workload and pixel evidence.
 Current combat draw collection costs 4.48 ms and row synchronization 1.50 ms.
 The supplied baseline's raster preparation/publication costs no longer describe

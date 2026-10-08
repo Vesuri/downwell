@@ -45,13 +45,14 @@ static void generationCensus(unsigned frame,const downwell::BuilderPatternPack& 
 }
 
 int main(int argc,char** argv){
-    bool census=false,overflowTape=false,witness=false,generation=false;
+    bool census=false,overflowTape=false,witness=false,generation=false,pixelWitness=false;
     for(int i=1;i<argc;++i){
         if(std::strcmp(argv[i],"--census")==0&&!census)census=true;
         else if(std::strcmp(argv[i],"--overflow")==0&&!overflowTape)overflowTape=true;
         else if(std::strcmp(argv[i],"--witness")==0&&!witness)witness=true;
         else if(std::strcmp(argv[i],"--generation-census")==0&&!generation)generation=true;
-        else require(false,"usage: amiga-currency-promotion-test [--census] [--overflow] [--witness] [--generation-census]");
+        else if(std::strcmp(argv[i],"--pixel-witness")==0&&!pixelWitness)pixelWitness=true;
+        else require(false,"usage: amiga-currency-promotion-test [--census] [--overflow] [--witness] [--generation-census] [--pixel-witness]");
     }
     const auto rb=readFile("generated/downwell-rooms.dwrm"),ob=readFile("generated/downwell-objects.dwob"),
         pb=readFile("generated/downwell-builder-patterns.dwbp"),ab=readFile("generated/amiga-game.dwap");
@@ -106,6 +107,32 @@ int main(int argc,char** argv){
             }
             require(actual==expected,"offline currency DMA pixels and anchors");
         }
+        // The same offline artwork must support the ordinary BOB route.
+        // Compare against effect alpha/colour data, not another asset draw.
+        // Nonzero backgrounds expose lost opaque black; the last ring row
+        // and viewport corners exercise clipping and circular publication.
+        for(unsigned origin:{0u,319u})for(unsigned corner=0;corner<3;++corner){
+            std::vector<UBYTE> bitmap(downwellGameRingBytes,0x55),hud(downwellLayerBytes);
+            AmigaRenderer renderer;amigaRendererInit(&renderer,bitmap.data(),hud.data());
+            amigaRendererSetGameOrigin(&renderer,origin);
+            amigaRendererSetClipRect(&renderer,downwellPlayfieldX,0,160,284);
+            const int cx=corner==0?0:corner==1?79:159,cy=corner==0?0:corner==1?141:283;
+            amigaRendererDrawAsset(&renderer,ab.data(),ab.data()+ab.size(),large?134:133,frame,
+                downwellPlayfieldX+cx,cy,0);
+            for(int y=0;y<284;++y)for(int x=0;x<384;++x){
+                unsigned expected=(x&1)?3:0;
+                const int ax=x-downwellPlayfieldX-cx+art.originX,ay=y-cy+art.originY;
+                if(x>=downwellPlayfieldX&&x<downwellPlayfieldX+160&&ax>=0&&ay>=0&&
+                    unsigned(ax)<art.mask.width&&unsigned(ay)<art.mask.height){
+                    const unsigned at=ay*art.mask.stride+ax/8,bit=128u>>(ax&7);
+                    if(art.mask.data[at]&bit)expected=unsigned(bool(art.low[at]&bit))+2*unsigned(bool(art.high[at]&bit));
+                }
+                const unsigned at=((origin+y)%downwellGameRingHeight)*downwellBytesPerPlaneLine+x/8,bit=128u>>(x&7);
+                const unsigned actual=unsigned(bool(bitmap[at]&bit))+
+                    2*unsigned(bool(bitmap[at+downwellGameRingPlaneBytes]&bit));
+                require(actual==expected,"currency BOB colours/alpha, clipped ring placement and untouched margins");
+            }
+        }
     }
     AmigaGameplayDrawList list;downwell::CurrencySmokeComposition oracle,remainder;
     downwell::PaletteEffectSurface<> projected;unsigned promoted=0;
@@ -147,6 +174,10 @@ int main(int argc,char** argv){
         require(complete.collect(game,ab.data(),ab.data()+ab.size(),vx,vy,true,&frames),"reference actor prefix");
         const bool referenceHardware=complete.promoteCurrencyComplete(game,vx,vy,assets,frames);
         const bool hardware=list.promoteCurrency(game,vx,vy,assets,frames);
+        if(pixelWitness&&tick==1397)for(unsigned i=firstCurrency;i<list.count;++i){
+            const auto& b=list.actors[i];
+            std::printf("CURRENCY_BOB %u %u %u %d %d %d\n",tick,b.sprite,b.frame,b.x,b.y,b.flip);
+        }
         if(referenceHardware)require(hardware&&!list.currencyRasterRequired&&list.count==complete.count,
             "complete promotion remains admitted with identical suffix length");
         for(unsigned i=0;i<(referenceHardware?list.count:firstCurrency);++i){
@@ -171,6 +202,10 @@ int main(int argc,char** argv){
         },[](Real n,std::int32_t& out){return n.roundPixel(out);}),"compositor oracle");
         };
         compose(oracle,0);
+        if(pixelWitness&&(tick==1303||tick==1308||(tick>=1397&&tick<=1404)))
+            oracle.surface().visit([&](unsigned x,unsigned y,unsigned alpha,unsigned low,unsigned high){
+                std::printf("PIXELS %u %u %u %04x %04x %04x\n",tick,x,y,alpha,low,high);
+            });
         // Independently compose the currency before shade subtraction. Only
         // classify changed pixels on gem-only, live frames; rejection alone
         // does not establish that a shade actually erases visible content.
@@ -206,7 +241,8 @@ int main(int argc,char** argv){
             remainder.surface().add({{a.mask.data,a.mask.bytes,a.mask.width,a.mask.height,a.mask.stride},a.low,a.high},
                 bob.x-downwellPlayfieldX-a.originX,bob.y-a.originY);
         }
-        require(channels<=8&&remainder.surface().samePixels(oracle.surface()),"partitioned final alpha and colours");
+        require((!list.currencyRasterRequired||channels<=8)&&remainder.surface().samePixels(oracle.surface()),
+            "partitioned final alpha and colours, including planar overflow");
         if(overflowTape&&tick==1397){
             // Projection-only adversarial fixture, not natural tape coverage:
             // overlap all visible gems at a clipped, non-word-aligned origin.
@@ -221,8 +257,12 @@ int main(int argc,char** argv){
                 }
             }
             list.count=firstCurrency;
-            require(list.promoteCurrency(game,vx,vy,assets,frames)&&list.currencyRasterRequired&&
-                list.currencySpriteCount==8,"overlapping nine-gem suffix partition");
+            require(list.promoteCurrency(game,vx,vy,assets,frames),"overlapping nine-gem admission");
+#if defined(DOWNWELL_REFERENCE_CURRENCY_BOBS) || defined(DOWNWELL_REFERENCE_SHADE_PARTITION)
+            require(list.currencyRasterRequired&&list.currencySpriteCount==8,"reference nine-gem suffix partition");
+#else
+            require(!list.currencyRasterRequired&&list.currencySpriteCount==9,"unshaded nine-gem actor composition");
+#endif
             compose(oracle,0);compose(remainder,list.currencyRasterFirst);
             for(unsigned i=firstCurrency;i<list.count;++i){const auto& bob=list.actors[i];
                 const auto& a=*assets.currency(bob.sprite==134,bob.frame);

@@ -10,7 +10,7 @@ public:
         GameplayWorld::enemyCapacity + GameplayWorld::gemCapacity + downwell::scriptSpawnEffectCapacity +
         2 * downwell::ShopWorld::capacity;
     static constexpr int playerStartY = 142, replayGroundY = 200;
-    GameplayBob actors[capacity];
+    GameplayBob actors[capacity]{};
     unsigned count = 0;
     UWORD failedSprite = 0, failedFrame = 0;
     downwell::LaserSightLine rayLine{};
@@ -24,8 +24,10 @@ public:
         const AmigaActorFrames* prepared = nullptr);
     bool entryCoverHardwareEligible(const GameplayWorld& world,int viewX,int viewY,bool& eligible)const;
     // Currency Draw walks slots newest to oldest. Promote only its topmost
-    // contiguous suffix, retaining [currencyRasterFirst, gemSlotEnd) in the
-    // shade-aware raster. Ordinary actors remain below both partitions.
+    // contiguous suffix when shade requires a retained raster. A completely
+    // unshaded pass uses the actor compositor, including BOB channel overflow.
+    // Ordinary actors remain below both partitions. currencySpriteCount is
+    // the admitted controller suffix length before sprite/BOB assignment.
     unsigned currencyRasterFirst=0,currencySpriteCount=0;
     bool currencyRasterRequired=true;
     bool promoteCurrency(const GameplayWorld& world,int viewX,int viewY,
@@ -33,5 +35,12 @@ public:
     // Retained all-or-nothing reference for projection tests.
     bool promoteCurrencyComplete(const GameplayWorld& world,int viewX,int viewY,
         const downwell::EffectMaskAssets& assets,const AmigaActorFrames& frames);
+private:
+    // Admission workspace, never published until the source-ordered pass
+    // succeeds. Keep the full family off the small AmigaDOS stack. This also
+    // avoids the m68k toolchain's incorrect word-member stack displacement
+    // for a large automatic GameplayBob array's aggregate assignments.
+    GameplayBob currencyPending_[GameplayWorld::gemCapacity]{};
+    unsigned currencySlots_[GameplayWorld::gemCapacity]{};
 };
 #endif

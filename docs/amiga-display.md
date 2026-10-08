@@ -140,6 +140,17 @@ occluders are kept; overflow retains the conservative stop. Stable compaction
 preserves the remaining BOB order. `REFERENCE_ACTOR_PREFIX=1` retains scalar
 frame lookup and the original frontmost-prefix-only channel assignment.
 
+A wholly unshaded currency pass joins this same actor list after the room's
+ordinary actors. The source-topmost gem parts receive sprite channels; channel
+overflow remains ordinary BOBs, using the existing offline game-bank assets,
+clipping and per-buffer restoration. This avoids an intermediate effect raster
+and its later publication. Admission must check every visible gem against the
+source shade masks. If shade or list capacity interrupts admission, only the
+channel-fitting topmost suffix is promoted; all earlier gems remain in the
+shade-aware controller raster, which is published after BOBs. Mixed smoke/debris,
+entry cover, death and unsupported coordinates retain that raster path.
+`REFERENCE_CURRENCY_BOBS=1` retains raster publication on channel exhaustion.
+
 Every unused channel points at an armed-safe null sprite on every frame. Sprite
 priority is programmed explicitly together with PF2-over-PF1 priority; it must
 not depend on an operating-system value left in BPLCON2.

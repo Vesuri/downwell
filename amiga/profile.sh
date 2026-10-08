@@ -73,6 +73,10 @@ case "$mode" in
         printf 'append binary memory %s/frame-%s.bin gDownwellDumpPlayerSprite gDownwellDumpPlayerSprite+68\n' "$dump_out" "$tick"
         printf 'append binary memory %s/frame-%s.bin gDownwellDumpActorSprites gDownwellDumpActorSprites+408\n' "$dump_out" "$tick"
         printf 'append binary memory %s/frame-%s.bin gDownwellDumpOverflowSprite gDownwellDumpOverflowSprite+68\n' "$dump_out" "$tick"
+        if [[ ${DUMP_DETAILS:-0} == 1 ]]; then
+          printf 'dump binary memory %s/bobs-%s.bin gDownwellDumpBobs gDownwellDumpBobs+gDownwellDumpBobCount\n' "$dump_out" "$tick"
+          printf 'dump binary memory %s/pack-%s.dwap gDownwellDumpPack gDownwellDumpPack+gDownwellDumpPackBytes\n' "$dump_out" "$tick"
+        fi
       done
       printf 'printf "HUD_WORD_FALLBACKS=%%lu\\n", gDownwellHudWordFallbacks\nif gDownwellHudWordFallbacks != 0\nquit 1\nend\n'
       printf 'printf "DOWNWELL_PROFILE_READY\\n"\nshell touch .run/gdb-ready.marker\ndetach\nquit\n'
@@ -121,6 +125,7 @@ restore() {
   unset REFERENCE_GEM_POSITION
   unset REFERENCE_EFFECT_COMPOSITION
   unset REFERENCE_SHADE_PARTITION
+  unset REFERENCE_CURRENCY_BOBS
   unset REFERENCE_STYLE_SPRITES
   unset REFERENCE_SELECTION_BINDINGS
   unset REFERENCE_SELECTION_BORDER_OWNERSHIP
