@@ -963,6 +963,17 @@ pass. The transition callback still owns the precise player pose and actual
 audio/controller effects; this composition does not supply those missing live
 adapters or the native mixed-family scheduler.
 
+Registered currency can surround that tick with `withCurrencyEvents`; its
+ordinary Step must read `stop.player.stopped` at dispatch, not capture the
+previous tick's value when installing the scope. `stepSource` then freezes
+out-of-field free currency and refunds positive alarms 0–3 after the alarm
+phase, but attracted currency continues homing without that refund. The joint
+lifecycle fixture exercises both branches alongside bones and blood through
+enter/hold/exit, using source free motion rather than a no-op motion callback.
+A failed Begin Step transition prevents currency initialization and its sound
+choice RNG as well as alarm/Step dispatch. This is scoped scheduler evidence;
+the fixture still supplies the player pose and transition services explicitly.
+
 Object 220 is visible, depth 0, has no parent and defines no Draw event. Its
 default Draw therefore belongs in the ordinary layer traversal, not a particle
 overlay or the smoke controller surface. The SDL game renderer admits these

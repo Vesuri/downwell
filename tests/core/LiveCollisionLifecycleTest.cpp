@@ -2505,6 +2505,26 @@ int main(){
         require(world->spawnBlood(blood,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(800),
             MotionBinary64::fromInteger(14),[](auto){return true;},particle),"register blood outside the player's field");
         BloodEffect expectedBlood=blood.instances().find(particle)->state;
+        auto currency=world->currencyRegistration<2>();InstanceHandle gem,homingGem;
+        require(world->createRegisteredCurrency(currency,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(800),
+            [](auto,int,auto,auto,bool& hit){hit=false;return true;},gem),"register currency outside the player's field");
+        require(world->createRegisteredCurrency(currency,MotionBinary64::fromInteger(244),MotionBinary64::fromInteger(800),
+            [](auto,int,auto,auto,bool& hit){hit=false;return true;},homingGem)&&currency.attracted(homingGem,true),
+            "register attracted currency alongside the frozen free currency");
+        CurrencyCreate expectedHoming=*currency.find(homingGem);
+        require(currency.dispatch(gem,[](auto& state,bool&){
+            state.xsp={};state.ysp=MotionBinary64::fromInteger(1);return true;
+        }),"give the currency a nonzero source free-motion velocity");
+        struct CurrencyAudio {
+            bool isPlaying(int,bool& playing){playing=false;return true;}
+            bool stop(int){return true;}
+            bool play(int,int,bool,int&){return false;} // No floor in this fixture.
+            bool getGain(int,MotionBinary64&){return false;}
+            bool setGain(int,MotionBinary64,int){return false;}
+            bool setPitch(int,MotionBinary64){return false;}
+        } currencyAudio;
+        CurrencyHomingMath currencyMath{portableAtan};
+        unsigned currencySteps=0;
         TimeStopEffects<16>::PlayerPose pose{{0x43700000u},{0x43300000u},{},{},
             RunnerImageValue{0x43704000u}.promoted(),RunnerImageValue{0x43308000u}.promoted()};
         unsigned begins=0,collisions=0,pauses=0;std::uint32_t transitionId=0;
@@ -2523,7 +2543,13 @@ int main(){
                 });
         };
         auto frames=[&](int sprite,unsigned& count){return sprites.frameCount(sprite,count);};
-        auto step=[&](){return world->stepWithTimeStopBonesAndBlood(blood,bones,shards,changes,stop,Input{},frames,transition,[&]{
+        auto step=[&](){return world->withCurrencyEvents(currency,
+            [&](auto key,auto&,auto phase,unsigned,auto& random,bool&){
+                if(phase!=StartupRuntime::CurrencyPhase::step)return false;
+                ++currencySteps;
+                return currency.stepSource(key,random,stop.player.stopped,480,pose.x.promoted(),pose.y.promoted(),
+                    currencyMath,[](auto& top){top={};return true;},currencyAudio,MotionBinary64::fromInteger(1),false);
+            },[&]{return world->stepWithTimeStopBonesAndBlood(blood,bones,shards,changes,stop,Input{},frames,transition,[&]{
             ++collisions;
             const auto* actual=bones.instances().find(bone);
             require(actual&&begins==collisions&&actual->state.imageSpeed.bits==expected.imageSpeed.bits&&
@@ -2534,13 +2560,34 @@ int main(){
             require(effect&&effect->state.imageSpeed.bits==expectedBlood.imageSpeed.bits&&
                 effect->state.timeline.bits==expectedBlood.timeline.bits&&effect->x.bits==expectedBlood.x.bits&&
                 effect->y.bits==expectedBlood.y.bits,"blood consumes that same Begin Step state before collision");
+            const auto* money=currency.find(gem);
+            require(money&&currencySteps==2*collisions&&money->allSet,
+                "each registered currency Step ran once before collision in the combined tick");
+            const auto* homing=currency.find(homingGem);
+            require(homing&&homing->xx.high==expectedHoming.xx.high&&homing->xx.low==expectedHoming.xx.low&&
+                homing->yy.high==expectedHoming.yy.high&&homing->yy.low==expectedHoming.yy.low&&
+                homing->alarms.get(0)==10-int(collisions)&&homing->alarms.get(3)==15-int(collisions),
+                "attracted currency bypasses the stop gate while its sibling freezes, without refunding alarms");
+            if(stop.player.stopped){
+                require(money->yy.high==MotionBinary64::fromInteger(800).high&&!money->yy.low&&
+                    !money->imageSpeed.bits&&money->obtainable&&money->alarms.get(0)==10&&money->alarms.get(3)==15,
+                    "currency freezes immediately on entry and refunds only this tick's alarm decrements");
+            }else{
+                auto expectedY=MotionBinary64::fromInteger(801);
+                require(expectedY.add(money->gravity)&&money->yy.high==expectedY.high&&money->yy.low==expectedY.low&&
+                    money->imageSpeed.bits&&money->alarms.get(0)==9&&money->alarms.get(3)==14,
+                    "currency resumes source gravity and alarm countdown in the same exit tick");
+            }
             return true;
-        });};
+        });});};
         struct Events {void destroy(){}void effect(int,int){}} events;
         const auto advanceReference=[&](bool stopped){bool crossed;
             require(expected.advanceImage(crossed)&&expected.step(stopped,[](int,int){return true;},events),
                 "advance the retained source bone event oracle");
             require(expectedBlood.advanceImage()&&expectedBlood.step(!stopped),"advance blood source oracle outside fields");
+            bool good=true;
+            require(CurrencyHomingSource::run(expectedHoming,pose.x.promoted(),pose.y.promoted(),currencyMath,good),
+                "advance attracted source currency even while other actors are frozen");
         };
         advanceReference(true);
         const auto before=world->randomDrawCount();
@@ -2554,6 +2601,8 @@ int main(){
             const auto* untouched=blood.instances().find(particle);
             require(untouched&&untouched->state.savedSpeed.bits==0xbf800000u&&
                 untouched->state.timeline.bits==0x3f000000u,"failed transition retains blood animation but prevents its Step");
+            require(!currencySteps&&!currency.find(gem)->allSet&&currency.find(gem)->alarms.get(0)==10,
+                "failed Begin Step prevents currency initialization, RNG choice and alarm dispatch");
             require(!step()&&begins==1&&world->randomDrawCount()==draws&&world->nextRuntimeInstanceId()==id,
                 "failed combined tick cannot replay the transition prefix");
             continue;
@@ -2571,7 +2620,7 @@ int main(){
             !bones.instances().find(bone)&&world->scriptEffects().size()==1&&
             world->scriptEffects().atNewest(0)->spriteId==85,
             "exit transition resumes bone Step, publishes the real impact and retires its caller");
-        require(stop.reset()&&blood.clear(),"retire transition families before their bridges leave scope");
+        require(stop.reset()&&blood.clear()&&currency.clear(),"retire transition families before their bridges leave scope");
     }
     {
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
