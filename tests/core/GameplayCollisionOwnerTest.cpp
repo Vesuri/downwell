@@ -2824,6 +2824,43 @@ int main(){
         auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
         assert(owner->attach(*world));
+        for(unsigned contact=0;contact<5;++contact){
+            auto contacts=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+                GameplayTerrainInstances::WallCollision{},&rooms,ownership);
+            auto scene=std::make_unique<GameplayWorld>(300,false,1000,false,contacts->enemyBinding(),
+                contacts->breakableBinding(),contacts->playerBinding(),&contacts->terrain());
+            assert(contacts->attach(*scene));InstanceHandle local,self,other;int otherObject=-1;
+            assert(contacts->terrain().append(60,0,200,true));
+            if(contact==0){
+                assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,
+                    contacts->terrain().handle(contacts->terrain().size()-1),other));otherObject=60;
+            }
+            assert(scene->createBoneWithSourceId(505090,240,200,local)&&
+                GameplayCollisionView::encode(GameplayCollisionView::Kind::bone,local,self));
+            assert(contacts->visitRegistrationOrder([&](InstanceHandle key,int object,auto){
+                bool found=false;PackedObjectEvent binding{};
+                if(!objects.collisionEvent(269,object,found,binding))return false;
+                if(found&&binding.codeId==(contact?2292:2291)&&!other.generation){other=key;otherObject=object;}return true;
+            })&&other.generation);
+            if(contact==3)assert(contacts->bones().dispatch(local,[](auto& state,auto&,bool&){state.active=false;return true;}));
+            RunnerCollisionEventContext context;unsigned damages=0;const auto rng=scene->randomDrawCount();
+            const bool ok=context.dispatch(self,other,{true,false},[&](auto,auto,int& subtype,bool& found,PackedObjectEvent& event){
+                subtype=otherObject;return objects.collisionEvent(269,otherObject,found,event);
+            },[&](const auto& event){return contacts->dispatchBoneCollision(event,contact==2,
+                [&](int sprite,unsigned& count){return sprites.frameCount(sprite,count);},
+                [&](int amount,int horizontal,int vertical){
+                    const auto* actor=contacts->bones().find(local);
+                    assert(amount==1&&horizontal==3&&vertical==2&&actor&&!actor->destroyRequested&&!actor->myFxLocal);
+                    ++damages;return contact!=4;
+                });});
+            if(ok!=(contact!=4)||damages!=unsigned(contact==1||contact==4)||scene->randomDrawCount()!=rng)
+                std::fprintf(stderr,"bone contact mismatch ownership=%u contact=%u ok=%d damage=%u rng=%u/%u valid=%d world=%d\n",
+                    unsigned(ownership),contact,int(ok),damages,unsigned(scene->randomDrawCount()),unsigned(rng),int(contacts->valid()),int(scene->effectsSucceeded()));
+            assert(ok==(contact!=4)&&damages==unsigned(contact==1||contact==4)&&scene->randomDrawCount()==rng);
+            assert(scene->effectsSucceeded()==ok&&contacts->valid()==ok);
+            if(ok){const auto* actor=contacts->bones().find(local);
+                assert(actor&&actor->destroyRequested==(contact<3)&&bool(actor->myFxLocal)==(contact<3));}
+        }
         {
             auto skeletonOwner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
                 GameplayTerrainInstances::WallCollision{},&rooms,ownership);

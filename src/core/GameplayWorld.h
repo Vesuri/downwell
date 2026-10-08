@@ -454,6 +454,15 @@ public:
         });
         return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
     }
+    template<class Frames,class Damage> bool collideBoneRoomEffect(downwell::InstanceHandle key,
+        bool player,bool stopped,Frames frames,Damage damage){
+        if(!run_.effectsSucceeded||!bones_||!bones_->valid())return run_.effectsSucceeded=false;
+        const bool ok=bones_->dispatch(key,[&](auto& state,auto& publish,bool& good){
+            return state.collideInWorld(player,stopped,publish,
+                [&]{return spawnBoneImpact(key,frames);},damage,good);
+        });
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
+    }
     template<class Frames> bool spawnBoneImpact(downwell::InstanceHandle bone,Frames frames){
         if(!run_.effectsSucceeded||!bones_||!scriptSpawnInstances_)return run_.effectsSucceeded=false;
         const auto* caller=bones_->find(bone);

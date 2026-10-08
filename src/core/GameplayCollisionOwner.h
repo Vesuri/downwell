@@ -18,6 +18,7 @@
 #include "PreparedTerrainBirthBounds.h"
 #include "RunnerFullProperties.h"
 #include "NativeInstanceTable.h"
+#include "RunnerCollisionEventContext.h"
 #include "NativeEnemyAlarmRoster.h"
 namespace downwell {
 #ifdef DOWNWELL_DRAW_CACHE_AUDIT
@@ -1125,6 +1126,23 @@ public:
     GameplayWorld::DroneBullets& droneBullets(){return drones_;}
     GameplayWorld::Bones& bones(){return bones_;}
     GameplayWorld::Skeletons& skeletons(){return skeletons_;}
+    template<class Frames,class Damage> bool dispatchBoneCollision(
+        const RunnerCollisionEventContext::Frame& event,bool stopped,Frames frames,Damage damage){
+        View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;
+        if(!valid()||!world_)return check(false);
+        View::Record opposite;
+        if(!View(*world_).resolve(event.other,opposite))return check(false);
+        // Retained scenery has a generation-checked run owner, not a duplicate
+        // generic table entry. This validates a selected event, not its query.
+        const int otherObject=!terrainRegistered_&&opposite.terrain?opposite.terrain->objectId:
+            (resolves(event.other)?objectOf(event.other):-1);
+        if(!resolves(event.self)||otherObject<0||
+           !View::decode(event.self,kind,local)||kind!=View::Kind::bone||event.type!=4||
+           event.subtype!=otherObject||!objects_.collisionEvent(269,event.subtype,found,binding)||!found||
+           event.owner!=269||binding.ownerObjectId!=269||event.code!=binding.codeId||
+           (event.code!=2291&&event.code!=2292))return check(false);
+        return check(world_->collideBoneRoomEffect(local,event.code==2292,stopped,frames,damage));
+    }
     template<class MakeEffects> bool stepSkeleton(InstanceHandle shared,bool stopped,
         MotionBinary64 playerX,MotionBinary64 playerY,MakeEffects makeEffects){
         View::Kind kind;InstanceHandle local;

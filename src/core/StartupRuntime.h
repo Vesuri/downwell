@@ -850,6 +850,23 @@ public:
             MotionBinary64::fromInteger(mainPlayerMotion_.speedYFifths()),random_);
         return run_.effectsSucceeded;
     }
+    template<unsigned Capacity,class Frames,class Damage> bool dispatchBoneCollision(
+        StoredBoneRegistration<instanceCapacity,Capacity>& bones,
+        const RunnerCollisionEventContext::Frame& event,bool stopped,Frames frames,Damage damage){
+        if(!run_.effectsSucceeded)return false;
+        const auto* self=instances_.resolve(event.self);const auto* other=instances_.resolve(event.other);
+        PackedObjectEvent binding{};bool found=false;
+        if(!bones.belongsTo(instances_)||!bones.valid()||!self||!other||!objectPack_||self->objectId!=269||
+           event.type!=4||event.subtype!=other->objectId||
+           !objectPack_->collisionEvent(269,other->objectId,found,binding)||!found||
+           binding.ownerObjectId!=269||event.owner!=269||event.code!=binding.codeId||
+           (event.code!=2291&&event.code!=2292))return run_.effectsSucceeded=false;
+        const auto local=bones.handle(*self);
+        return run_.effectsSucceeded=bones.dispatch(local,[&](auto& state,auto& publish,bool& good){
+            return state.collideInWorld(event.code==2292,stopped,publish,
+                [&]{return spawnBoneImpact(bones,local,frames);},damage,good);
+        })&&run_.effectsSucceeded;
+    }
     // Shared voice/channel state outlives room-local fields. Audio is checked
     // and synchronous; event selection must retain the inherited binding.
     template<class Audio> bool dispatchTimeFieldWind(const RunnerCollisionEventContext::Frame& event,

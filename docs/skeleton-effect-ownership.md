@@ -91,6 +91,21 @@ against the retained scalar reference, plus each failed callback prefix. These
 entry points do not by themselves supply registered lifetimes, live selectors,
 player damage, effects, scheduling or backend rendering.
 
+`dispatchBoneCollision` on each world adapter accepts a resolved collision-event
+context, verifies both lifetimes and the resource-selected inherited binding,
+then uses `BoneProjectile::collideInWorld`. Only bone wall/player source handlers
+2291/2292 are admitted. Native retained scenery resolves the opposite wall from
+its generation-checked terrain run, not a fabricated generic instance-table
+entry. The existing registered impact owner creates sprite 85
+at the caller's published position and assigns its returned identity. A wall
+impact follows the destruction mark; player damage and impact precede that mark.
+Player damage is a checked synchronous callback, suppressed by time-stop or the
+bone's custom inactive flag as prescribed by the source. Failure stops subsequent
+operations and latches the owning simulation. Event execution does not consume
+impact RNG or retire the caller prematurely. These adapters do not choose
+collision candidates or silently implement the missing player-damage script;
+the production paired dispatcher and damage owner must supply those operations.
+
 `BoneProjectileInstances` supplies generation-checked fixed ownership separately
 from the scalar store. Its caller supplies numeric source IDs. Registered birth
 publishes the serialized object-269 geometry and layer membership before the

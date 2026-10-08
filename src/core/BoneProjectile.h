@@ -183,6 +183,16 @@ struct BoneProjectile {
     template<class Ops> bool collideWallPublished(Ops& ops,bool& good){
         return destroyPublished(ops,good)&&(ops.effect(85,3)||(good=false));
     }
+    template<class Publish,class Impact,class Damage>
+    bool collideInWorld(bool player,bool stopped,Publish& publish,Impact impact,Damage damage,bool& good){
+        struct Ops {
+            Publish& publish;Impact& impact;Damage& applyDamage;
+            bool destroy(){return publish.destroy();}
+            bool effect(int sprite,int tenths){return sprite==85&&tenths==3&&impact();}
+            bool damage(int amount,int horizontal,int vertical){return applyDamage(amount,horizontal,vertical);}
+        } ops{publish,impact,damage};
+        return player?collidePlayerPublished(stopped,ops,good):collideWallPublished(ops,good);
+    }
     template<class Ops> bool collidePlayerPublished(bool stopped,Ops& ops,bool& good){
         if(!good)return false;
         if(!active)return true;

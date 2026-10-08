@@ -330,6 +330,40 @@ int main(){
         require(throws==1&&!hurts&&bones.instances().size()==1&&stop.reset()&&bones.clear()&&skeletons.clear(),
             "animation drives one registered source throw without invented death effects");
     }
+    for(unsigned contact=0;contact<5;++contact){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            InstanceLifecycleBinding::bindPointQueries(*owner));
+        require(owner->attach(*world),"attach bone collision world");world->skipToGameForTesting();
+        auto bones=world->boneRegistration<1>();InstanceHandle local,other;
+        require(world->spawnBone(bones,240,200,local),"register colliding bone");
+        const auto self=bones.worldHandle(local);
+        require(world->visitDrawChecked([&](InstanceHandle key,const InstanceRecord& record){
+            bool found=false;PackedObjectEvent binding{};
+            if(!objects.collisionEvent(269,record.objectId,found,binding))return false;
+            if(found&&binding.codeId==(contact?2292:2291)&&!other.generation)other=key;
+            return true;
+        })&&other.generation,"select real opposite lifetime with recovered collision binding");
+        if(contact==3)require(bones.dispatch(local,[](auto& state,auto&,bool&){state.active=false;return true;}),"inactive bone");
+        unsigned damages=0;RunnerCollisionEventContext context;
+        const auto rng=world->randomDrawCount();
+        const bool ok=owner->dispatchCollisionEvent(context,self,other,{true,false},[&](const auto& event){
+            return world->dispatchBoneCollision(bones,event,contact==2,
+                [&](int sprite,unsigned& count){return sprites.frameCount(sprite,count);},
+                [&](int amount,int horizontal,int vertical){
+                    require(amount==1&&horizontal==3&&vertical==2&&!bones.instances().find(local)->destroyRequested&&
+                        !bones.instances().find(local)->myFxLocal,"damage precedes impact and destruction");
+                    ++damages;return contact!=4;
+                });
+        });
+        require(ok==(contact!=4)&&damages==unsigned(contact==1||contact==4)&&world->randomDrawCount()==rng,
+            "source contact guards, checked damage and zero impact RNG");
+        const auto* retained=world->resolveInstance(self);
+        require(retained&&retained->destroyRequested==(contact<3),"collision preserves lifetime and destruction prefix");
+        if(ok){const auto* actor=bones.instances().find(local);
+            require(actor&&bool(actor->myFxLocal)==(contact<3),"registered impact assigned only on admitted contact");
+            require(bones.clear(),"clear collision fixture");}
+    }
     for(unsigned rejectedMove=0;rejectedMove<=2;++rejectedMove){
         struct BoneOwner:StoredWorldCollision {
             using StoredWorldCollision::StoredWorldCollision;

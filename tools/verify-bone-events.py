@@ -62,6 +62,9 @@ assert view.count(b"cmp.v.v GT") == 2 and view.count(b"cmp.v.v LT") == 2
 assert view.count(b"call.i gml_Script___view_get(argc=2)") == 6
 assert b"push.v self.marginyBottom\nadd.v.v\ncmp.v.v LT" in view
 obj = manifest["resources"]["objects"][269]
+for subtype, code in ((57,2291),(35,2292)):
+    event = next(e for e in obj["events"] if e["eventType"] == 4 and e["eventSubtype"] == subtype)
+    assert [a["codeId"] for a in event["actions"]] == [code]
 fx = (export / "Assembly/gml_GlobalScript_scrFxNol.asm").read_bytes()
 assert sha256(fx).hexdigest() == "fe76a7898f52d717dc47f864c924facf2cea92a5d87e26b3bfd9ba27ce0c2d6c"
 assert fx.index(b"instance_create") < fx.index(b"pop.v.v self.myFx") < fx.index(b"self.sprite_index") < fx.index(b"self.image_speed")
