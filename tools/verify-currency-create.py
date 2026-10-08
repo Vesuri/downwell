@@ -52,6 +52,12 @@ assert event["actions"][0]["codeName"] == "gml_Object_objCurrency_Create_0"
 # Reviewed literal-index writers, not a general dynamic-call reachability proof.
 # Currency Alarm 4 rearms itself, but its Create/ordinary Step do not start it.
 assembly = {p.stem: p.read_text() for p in (export / "Assembly").glob("*.asm")}
+# Controller Draw uses different world-space bases in the landscape/portrait
+# scripts. Keep the actual operation order, rather than rounding the rise first.
+for script, base in (("scrDrawHud4x3Top",24),("scrDrawHud",50)):
+    hud = assembly["gml_GlobalScript_"+script]
+    assert "push.v self.gemStreakAscend\npushi.e 16\npush.v self.gemStreakAscend\nsub.v.i\npushi.e 8\nconv.i.d\ndiv.d.v\nadd.v.v\npop.v.v self.gemStreakAscend" in hud
+    assert f"push.v self.viewy\npushi.e {base}\nadd.i.v\npushi.e 4\nadd.i.v\npush.v self.gemStreakAscend\nsub.v.v\ncall.i round(argc=1)\npop.v.v self.gemStreakDrawy" in hud
 literal_four = re.compile(r"pushi\.e 4\npop\.[^\n]*\[array\]self\.alarm")
 assert {name for name, text in assembly.items() if literal_four.search(text)} == {
     "gml_Object_FINALBOSS_Alarm_4", "gml_Object_FINALBOSS_Alarm_6",

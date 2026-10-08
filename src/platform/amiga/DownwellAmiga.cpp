@@ -927,19 +927,20 @@ static void redrawCurrency(AmigaRenderer* renderer, unsigned currency) {
     AmigaHudText::currencyReference(renderer, activeHudPack, activeHudPackEnd, currency);
 }
 
+static int streakYOffset=0;
 static void composeStreak(AmigaRenderer* renderer, unsigned streak) {
     invalidateHudText();
-    AmigaHudText::composeStreakReference(renderer, activeGamePack, activeGamePackEnd, streak);
+    AmigaHudText::composeStreakReference(renderer, activeGamePack, activeGamePackEnd, streak,streakYOffset);
 }
 static void redrawStreak(AmigaRenderer* renderer, unsigned streak) {
 #ifndef DOWNWELL_REFERENCE_HUD_TEXT
     if (hudText.bind(activeHudPack, activeHudPackEnd, activeGamePack, activeGamePackEnd) &&
-        hudText.streak(renderer, streak)) return;
+        hudText.streak(renderer, streak,streakYOffset)) return;
 #if defined(DOWNWELL_FRAME_DUMP) && !defined(DOWNWELL_REFERENCE_HUD_WORDS)
     ++gDownwellHudWordFallbacks;
 #endif
 #endif
-    AmigaHudText::streakReference(renderer, activeGamePack, activeGamePackEnd, streak);
+    AmigaHudText::streakReference(renderer, activeGamePack, activeGamePackEnd, streak,streakYOffset);
 }
 
 static void composeDeathFlash(AmigaRenderer* renderer, bool visible) {
@@ -3442,7 +3443,19 @@ __attribute__((noinline)) static int runDownwell(void) {
                              port.healthReserve().pieces, port.healthReserve().piecesPerHeart);
             if (result.currencyChanged)
                 redrawCurrency(&renderer, port.currency());
-            if ((result.streakChanged || wasDead != port.dead()) && !port.deathResults().active)
+            std::int32_t streakWorldY=0;
+            const int streakViewY=mainInitialViewY+port.cameraOffsetY();
+            if(!port.drawGemStreakRise(streakViewY,streakWorldY)){exitCode=20;break;}
+            const int nextStreakOffset=port.gemStreak()&&!port.dead()?streakWorldY-streakViewY-50:streakYOffset;
+            const bool streakMoved=nextStreakOffset!=streakYOffset;
+            const int previousStreakOffset=streakYOffset;
+            if(streakMoved){
+                // Restore the previous footprint only on a position change.
+                redrawStreak(&renderer,0);
+                streakYOffset=nextStreakOffset;
+                invalidateHudText();
+            }
+            if ((result.streakChanged || streakMoved || wasDead != port.dead()) && !port.deathResults().active)
                 redrawStreak(&renderer, port.dead() ? 0 : port.gemStreak());
             if (wasDeathFlash != port.deathSequence().flashVisible()) {
                 // PF2 is above the world AND hardware sprites. Only touch this
@@ -3458,7 +3471,8 @@ __attribute__((noinline)) static int runDownwell(void) {
                 break;
             }
             if (!port.deathResults().active && !port.deathSequence().flashVisible() && gDownwellShopPack) {
-                if (result.streakChanged || wasDead != port.dead()) shopMenuOverlay.invalidateStreak();
+                if (result.streakChanged || streakMoved || wasDead != port.dead())
+                    shopMenuOverlay.invalidateStreak(previousStreakOffset,streakYOffset);
                 unsigned streak = port.dead() ? 0 : port.gemStreak();
                 if (!shopMenuOverlay.draw(&renderer, gDownwellShopPack,
                         gDownwellShopPack + gDownwellShopAssetBytes, activeShop,
@@ -4159,10 +4173,10 @@ __attribute__((noinline)) static int runDownwell(void) {
                         // Actual retained overlay experiences real external HUD
                         // clears; the scalar oracle starts fresh every phase.
                         redrawStreak(&renderer, streak);
-                        shopActual.invalidateStreak();
+                        shopActual.invalidateStreak(streakYOffset,streakYOffset);
                         composeDeathFlash(&resultsOracle, false);
                         shopOracle.reset();
-                        shopOracle.invalidateStreak();
+                        shopOracle.invalidateStreak(streakYOffset,streakYOffset);
                         const auto foreground = [](AmigaRenderer* target, void* context) {
                             composeStreak(target, *static_cast<unsigned*>(context));
                         };

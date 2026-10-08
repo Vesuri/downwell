@@ -106,8 +106,11 @@ behavior, both backend integrations and relevant original-game verification.
   native ownership; establish the unnormalized homing angle domain and original
   atan/trig behavior before admitting natural rewards. See the currency contract
   in [skeleton effects](skeleton-effect-ownership.md).
-  Collection must reset the source controller's `gemStreakAscend` and expose
-  that state to HUD Draw; the fixed-position streak display is not that owner.
+  Complete the controller HUD beyond its shared rise/reset state: streak-bar
+  geometry, Gemhigh animation, timer flashing, leading-space/icon centering,
+  pause/time-stop guards and source-ordered controller Draw dispatch. The
+  admitted singleton controller must join complete controller lifetime/ID
+  ownership rather than stand in for arbitrary controller populations.
 - Implement remaining blood, corpse and blast dependencies. Preserve
   synchronous child Create, RNG consumption and mutation order before rewards
   and retirement.

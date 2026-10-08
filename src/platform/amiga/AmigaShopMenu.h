@@ -18,8 +18,15 @@ struct AmigaShopMenu {
     unsigned previousCount = 0, count = 0;
     bool valid = true;
     bool hudDirty = false;
+    int hudTop=44,hudBottom=68;
     void reset() { previousCount = count = 0; valid = true; hudDirty = false; }
-    void invalidateStreak() { hudDirty = true; }
+    void invalidateStreak(int oldOffset=0,int newOffset=0) {
+        const int top=44+(oldOffset<newOffset?oldOffset:newOffset);
+        const int bottom=68+(oldOffset>newOffset?oldOffset:newOffset);
+        if(!hudDirty||top<hudTop)hudTop=top;
+        if(!hudDirty||bottom>hudBottom)hudBottom=bottom;
+        hudDirty=true;
+    }
     void append(Command command) {
         if (count == capacity) { valid = false; return; }
         current[count++] = command;
@@ -41,7 +48,7 @@ struct AmigaShopMenu {
         if (shop && !downwell::drawShopMenu(*shop, viewX, viewY, 284, currency, *this)) return false;
         if (!valid) return false;
         int left = 160, top = 284, right = 0, bottom = 0;
-        if (hudDirty) { left = 38; top = 44; right = 126; bottom = 68; }
+        if (hudDirty) { left = 38; top = hudTop; right = 126; bottom = hudBottom; }
         auto include = [&](const Command& command) {
             int x, y, w, h;
             if (!amigaRendererAssetBounds(pack, end, command.id, command.frame,

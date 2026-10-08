@@ -1069,7 +1069,11 @@ public:
     }
     unsigned currency() const { return currencyAccount_.currency; }
     template<class Controls> auto currencyGainOperations(Controls controls){
-        return downwell::CurrencyGainAccountOperations<Controls>(currencyAccount_,controls);
+        return downwell::CurrencyGainAccountOperations<Controls>(currencyAccount_,controls,&run_.gemStreakRise);
+    }
+    bool drawGemStreakRise(std::int32_t viewY,std::int32_t& worldY) {
+        return run_.gemStreakRise.draw(currencyAccount_.streak,dead(),
+            downwell::MotionBinary64::fromInteger(viewY),true,worldY);
     }
     unsigned gameGemTotal() const { return currencyAccount_.gameGem; }
     unsigned gemStreak() const { return currencyAccount_.streak; }

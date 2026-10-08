@@ -592,9 +592,12 @@ void Game::renderLandscapeHud(Renderer& renderer) const {
                           startup_.mainCurrencyTotal());
 
     if (startup_.mainGemStreak() > 0 && !startup_.mainDeathSequence().active) {
+        std::int32_t streakWorldY=0;
+        if(!startup_.drawGemStreakRise(streakWorldY))return;
+        const int streakY=streakWorldY-startup_.mainCameraRenderViewY();
         const std::string streak = std::to_string(startup_.mainGemStreak());
-        renderer.drawSprite(133, 0, origin + 65, 55);
-        drawGemmyTextLayers(origin + 81, 51, [&](int x, int y, Color color) {
+        renderer.drawSprite(133, 0, origin + 65, streakY+5);
+        drawGemmyTextLayers(origin + 81, streakY+6, [&](int x, int y, Color color) {
             renderer.drawText(2, streak.c_str(), x, y, color, TextAlign::center);
         });
     }

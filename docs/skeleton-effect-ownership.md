@@ -614,6 +614,23 @@ Controller resets and audio/effects in that fixture are instrumented, not full
 backend implementations. Matrix tests cover both achievement thresholds,
 upgrade branches, unobtainable suppression and ordered failure prefixes.
 
+The controller-local streak rise is separate from account totals and timers.
+`scrDrawHudInitStuff` initializes it to zero; `scrGainGem` and
+`nonGemGainGem` reset it. HUD Draw first tests positive streak and absence of
+death, then evaluates `ascend += (16 - ascend) / 8`. The world-space anchor is
+rounded only after adding 24 and 4 to view Y (landscape), or 50 and 4
+(portrait), and subtracting the new ascent. Room, pause and flash visibility
+checks follow this update; a Step timer or a visibility-gated update differs.
+Landscape text is six pixels below that anchor, and its gem icon five below.
+`GemStreakRise` preserves those binary64 operations and the retained rounding
+contract. Runtime FP-mode assumptions remain subject to the runner audit.
+The admitted singleton controller belongs to each world's run state. Selected
+collection updates it after the required controller callback succeeds; this
+does not replace ordered iteration over a future complete controller registry.
+The Amiga's prepared digit words are translated at publication, with an old/new
+footprint union for shop restoration. Verification repaints reuse the chosen
+position instead of advancing controller Draw again.
+
 The stored world's `spawnCurrencyPickupEffect` binds `scrFxNol(105, 0.8)` to
 the existing owned object-219 registry. It reads the currency caller's published
 coordinates, stores the child's global numeric ID in `myFx` before sprite

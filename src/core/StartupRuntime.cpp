@@ -272,6 +272,7 @@ void StartupRuntime::skipToGameForTesting() {
 }
 
 void StartupRuntime::controllerCreate(PlatformProfile profile) {
+    run_.gemStreakRise.reset(); // scrDrawHudInitStuff, not a room/run reset.
     // objControlerN_Create_0 sets initTimes to zero, then scrInitialize()
     // increments it and establishes the platform profile.
     initTimes_ = 0;

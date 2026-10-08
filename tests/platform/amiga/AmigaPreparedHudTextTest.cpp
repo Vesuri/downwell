@@ -1,4 +1,5 @@
 #include "platform/amiga/AmigaPreparedHudText.h"
+#include "platform/amiga/AmigaShopMenu.h"
 #include <cassert>
 #include <cstdio>
 #include <fstream>
@@ -12,6 +13,13 @@ static std::vector<UBYTE> load(const char* path){
     assert(!b.empty());return b;
 }
 int main(int argc,char** argv){
+    AmigaShopMenu overlap;
+    overlap.invalidateStreak(-24,-25);
+    assert(overlap.hudTop==19&&overlap.hudBottom==44);
+    overlap.invalidateStreak(-38,-24);
+    assert(overlap.hudTop==6&&overlap.hudBottom==44);
+    overlap.reset();overlap.invalidateStreak(-38,-38);
+    assert(overlap.hudTop==6&&overlap.hudBottom==30);
     assert(argc==3);auto hud=load(argv[1]),game=load(argv[2]);
     AmigaPreparedHudText text;
     assert(text.bind(hud.data(),hud.data()+hud.size(),game.data(),game.data()+game.size()));
@@ -59,5 +67,21 @@ int main(int argc,char** argv){
     for(unsigned value=0;value<1200;++value){assert(draw(true,value,false));assert(draw(false,value,false));}
     auto bad=hud;bad[0]=0;assert(!text.bind(bad.data(),bad.data()+bad.size(),game.data(),game.data()+game.size()));
     assert(!text.currency(&r,1)&&!text.streak(&r,1));
+    assert(text.bind(hud.data(),hud.data()+hud.size(),game.data(),game.data()+game.size()));
+    int previous=0;
+    for(unsigned frame=0;frame<200;++frame){
+        // Includes collection resets, upward motion, fixed rounded positions,
+        // expiry, reappearance, and overlapping old/new rectangles.
+        const int offset=-24-int((frame%37)<15?(frame%37):14);
+        const unsigned value=frame%29?frame*17:0;
+        if(offset!=previous){
+            assert(text.streak(&r,0,previous));
+            AmigaHudText::streakReference(&o,game.data(),game.data()+game.size(),0,previous);
+            text.invalidateStreak();
+        }
+        assert(text.streak(&r,value,offset));
+        AmigaHudText::streakReference(&o,game.data(),game.data()+game.size(),value,offset);
+        assert(actual==expected);previous=offset;++cases;
+    }
     std::printf("Prepared HUD: %u full-layer comparisons, resets and continuous digit transitions\n",cases);
 }

@@ -2,12 +2,20 @@
 #define DOWNWELL_CORE_CURRENCY_GAIN_ACCOUNT_OPERATIONS_H
 #include "CurrencyAccount.h"
 #include "CurrencyGainScript.h"
+#include "GemStreakRise.h"
 namespace downwell {
 // Shared account publication for the admitted nonnegative uint32 account
 // domain. Effects/controllers remain mandatory operations on Controls.
 template<class Controls> struct CurrencyGainAccountOperations:Controls {
     CurrencyAccount& account;
-    CurrencyGainAccountOperations(CurrencyAccount& value,Controls controls):Controls(controls),account(value){}
+    GemStreakRise* rise;
+    CurrencyGainAccountOperations(CurrencyAccount& value,Controls controls,GemStreakRise* controller=nullptr)
+        :Controls(controls),account(value),rise(controller){}
+    bool resetControllers(){
+        if(!Controls::resetControllers())return false;
+        if(rise)rise->reset();
+        return true;
+    }
     bool add(CurrencyGainScript::AccountField field,int amount){
         auto& value=field==CurrencyGainScript::AccountField::currency?account.currency:
             field==CurrencyGainScript::AccountField::gameGem?account.gameGem:account.streak;

@@ -17,6 +17,7 @@
 #include "ExitDither.h"
 #include "UpgradeInventory.h"
 #include "CurrencyStep.h"
+#include "GemStreakRise.h"
 #include "MachineGunProfile.h"
 #include "LevelClearController.h"
 #include "FlashBallEffects.h"
@@ -52,6 +53,9 @@ struct RunRecords {
 // World/room instances, player initialization, RNG reseeding and platform
 // effects remain separate; this is not a whole-game restart by itself.
 struct RunSession {
+    // The currently admitted persistent controller. Draw mutates this even
+    // when simulation is paused; replay/verification repaints must not tick it.
+    mutable GemStreakRise gemStreakRise;
     // soundInitialize writes entries 0..10 to zero. Room changes do not
     // reinitialize them; scrInitialize/new-run reset does.
     int overlapSounds[11]{};
@@ -383,8 +387,10 @@ struct RunSession {
             player.frameStartXFixed(), player.frameStartYFixed(),
             player.offsetXFixed(), player.offsetYFixed(), currency, solid, random,
             upgrades.levels[20] != 0);
-        if (result == CurrencyStepResult::collected && upgrades.levels[4])
-            player.rechargeFromGem(amount);
+        if (result == CurrencyStepResult::collected) {
+            gemStreakRise.reset();
+            if(upgrades.levels[4])player.rechargeFromGem(amount);
+        }
         return result;
     }
     // Shop Create snapshots prices from run ownership; acquiring a card later

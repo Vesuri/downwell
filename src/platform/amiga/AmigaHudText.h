@@ -15,7 +15,7 @@ struct AmigaHudText {
     enum { currencyX = 288, currencyY = 4, currencyWords = 5, currencyRows = 30,
            currencyBandY = 12, currencyBandRows = 10,
            streakX = 144, streakY = 44, streakWords = 6, streakRows = 24,
-           streakGlyphRows = 10, streakBandRows = streakGlyphRows + 2, streakY_ = 51 };
+           streakGlyphRows = 10, streakBandRows = streakGlyphRows + 2, streakY_ = 56 };
 
     static void currencyReference(AmigaRenderer* renderer, const UBYTE* hud, const UBYTE* hudEnd,
                                   unsigned currency) {
@@ -35,19 +35,19 @@ struct AmigaHudText {
         }
     }
     static void composeStreakReference(AmigaRenderer* renderer, const UBYTE* game, const UBYTE* gameEnd,
-                                       unsigned streak) {
+                                       unsigned streak, int yOffset=0) {
         if (streak == 0) return;
-        amigaRendererDrawAsset(renderer, game, gameEnd, 133, 0, downwellPlayfieldX + 65, 55, 0);
+        amigaRendererDrawAsset(renderer, game, gameEnd, 133, 0, downwellPlayfieldX + 65, 55+yOffset, 0);
         streakDigits(streak, [&](unsigned digit, int x, int y, unsigned pen) {
-            amigaRendererDrawAssetPen(renderer, game, gameEnd, streakTextBase + digit, 0, x, y, 0, pen);
+            amigaRendererDrawAssetPen(renderer, game, gameEnd, streakTextBase + digit, 0, x, y+yOffset, 0, pen);
             return true;
         });
     }
     static void streakReference(AmigaRenderer* renderer, const UBYTE* game, const UBYTE* gameEnd,
-                                unsigned streak) {
+                                unsigned streak, int yOffset=0) {
         amigaRendererClearClipRect(renderer);
-        amigaRendererFillRect(renderer, 148, 44, 88, 24, 0);
-        composeStreakReference(renderer, game, gameEnd, streak);
+        amigaRendererFillRect(renderer, 148, 44+yOffset, 88, 24, 0);
+        composeStreakReference(renderer, game, gameEnd, streak,yOffset);
     }
 
     // Returns false when the packs cannot be bound; the caller then draws the
@@ -116,8 +116,9 @@ struct AmigaHudText {
         amigaRendererPublishHudStage(renderer, &currencyBackground_, &work_);
         return true;
     }
-    bool streak(AmigaRenderer* renderer, unsigned streak) {
-        if (!valid_) return false;
+    bool streak(AmigaRenderer* renderer, unsigned streak,int yOffset=0) {
+        if (!valid_ || yOffset < -44 || yOffset > 216) return false;
+        streakEmpty_.y=streakBackground_.y=streakY+yOffset;
         if (!streak) { amigaRendererPublishHudStage(renderer, &streakEmpty_, nullptr); return true; }
         // Coverage of the whole string, with a one-row margin above and below.
         UWORD coverage[streakBandRows + 2][streakWords] = {};
@@ -142,7 +143,7 @@ struct AmigaHudText {
         if (!ok) return false;
         // Layer order red (x-1, y-1 offsets), black (x+1, y+1), white: the
         // last layer covering a pixel decides its pen (2, 3, 1).
-        amigaHudStageBegin(&work_, streakX, bandY, streakWords, streakBandRows);
+        amigaHudStageBegin(&work_, streakX, bandY+yOffset, streakWords, streakBandRows);
         for (unsigned row = 0; row < streakBandRows; ++row)
             for (unsigned w = 0; w < streakWords; ++w) {
                 const UWORD* line = coverage[row + 1];
@@ -190,7 +191,7 @@ private:
     template<class Draw>
     static bool streakDigits(unsigned streak, Draw draw) {
         bool ok = true;
-        downwell::drawGemmyNumberLayers(downwellPlayfieldX + 81, 51, streak,
+        downwell::drawGemmyNumberLayers(downwellPlayfieldX + 81, streakY_, streak,
             [&](unsigned digit, int x, int y, downwell::Color color) {
                 const unsigned pen = color.r == 0 ? 3 : color.g == 0 ? 2 : 1;
                 ok = ok && draw(digit, x, y, pen);

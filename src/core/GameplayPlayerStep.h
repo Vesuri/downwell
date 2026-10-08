@@ -45,8 +45,10 @@ inline PlayerMotionDelta stepGameplayPlayer(PlayerMotion& player,
     },&context);
     player.configureComboCompletion([](void* opaque) {
         auto& c = *static_cast<Context*>(opaque);
+        const auto previousGems=c.currency.gameGem;
         c.run.combo.finish(c.player, c.currency, c.health,
                            c.run.upgrades.levels[20] != 0);
+        if(c.currency.gameGem!=previousGems)c.run.gemStreakRise.reset();
     }, &context);
     player.configureMovementBoundary([](void* opaque) {
         auto& c = *static_cast<Context*>(opaque);

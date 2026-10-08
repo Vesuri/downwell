@@ -130,8 +130,10 @@ public:
         }
         retain(currency_,renderer->hud,slots,count,true);return true;
     }
-    bool streak(AmigaRenderer* renderer,unsigned value){
-        if(!valid_||!renderer||!renderer->hud)return false;
+    bool streak(AmigaRenderer* renderer,unsigned value,int yOffset=0){
+        // Position is owned by the scene; moving it requires restoring the old
+        // region and invalidating this retained word cache before publication.
+        if(!valid_||!renderer||!renderer->hud||yOffset < -44||yOffset > 216)return false;
         amigaRendererClearClipRect(renderer);
         unsigned char digits[10];unsigned count=0;
         for(unsigned v=value;v;v/=10)digits[count++]=static_cast<unsigned char>(v%10);
@@ -150,7 +152,7 @@ public:
             unsigned begin=24,end=0;
             if(first){begin=0;end=24;}
             else{
-                if(dirty&(1u<<w)){begin=6;end=18;}
+                if(dirty&(1u<<w)){begin=11;end=23;}
                 if(icon){
                     const auto* rows=downwellHudPrepared::streakIconRows[w];
                     if(rows[0]<rows[1]){
@@ -181,20 +183,20 @@ public:
 #endif
             for(unsigned y=begin;y<end;++y){
                 UWORD low=background[0][y][w],high=background[1][y][w],mask=background[2][y][w];
-                if(y>=6&&y<18){
+                if(y>=11&&y<23){
 #ifdef DOWNWELL_REFERENCE_HUD_COMPOSITION
-                    UWORD white=0,black=0,red=0;const unsigned row=(y-6)*2;
+                    UWORD white=0,black=0,red=0;const unsigned row=(y-11)*2;
                     for(unsigned i=0;i<n;++i){white|=parts[i][0][row];black|=parts[i][1][row];red|=parts[i][2][row];}
                     const UWORD top=UWORD(white|black|red);
                     low=UWORD((low&~top)|white|black);
                     high=UWORD((high&~top)|((black|red)&~white));mask|=top;
 #else
-                    const auto* a=left[y-6];const auto* b=right[y-6];
+                    const auto* a=left[y-11];const auto* b=right[y-11];
                     const UWORD top=a[2]|b[2];
                     low=UWORD((low&~top)|a[0]|b[0]);high=UWORD((high&~top)|a[1]|b[1]);mask|=top;
 #endif
                 }
-                publish(renderer->hud+(y+44)*downwellBytesPerPlaneLine+18+w*2,low,high,mask);
+                publish(renderer->hud+(int(y)+44+yOffset)*downwellBytesPerPlaneLine+18+w*2,low,high,mask);
             }
         }
         retain(streak_,renderer->hud,slots,count,active);return true;
