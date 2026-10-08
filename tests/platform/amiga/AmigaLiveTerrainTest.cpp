@@ -2,6 +2,7 @@
 #include "platform/amiga/AmigaPortRuntime.h"
 #include "platform/amiga/AmigaWallCollision.h"
 #include "core/Replay.h"
+#include "core/CurrencyCollisionBounds.h"
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -175,6 +176,17 @@ void verifyContactMultiplicity() {
             },[&]{++expected;return true;}),"reference query");
             require(amigaResolveTerrainWallContacts(&context,query,actual)&&actual==expected,
                 "cell counts report every overlapping instance");
+            for(int sprite:{133,134}){
+                auto gx=downwell::MotionBinary64::fromInteger(left),gy=downwell::MotionBinary64::fromInteger(top);
+                downwell::ContactBounds gem;
+                require(gx.add({0x3fe00000u,0})&&gy.add({0x3fd00000u,0})&&
+                    downwell::CurrencyCollisionBounds::calculate(sprite,gx,gy,gem),"fractional currency mask bounds");
+                expected=actual=0;
+                require(reference.visit(gem,[&](unsigned object,int bx,int by){
+                    return object!=92||!context.runtime||context.runtime->breakableActiveAt(bx-240,by-176);
+                },[&]{++expected;return true;})&&amigaResolveTerrainWallContacts(&context,gem,actual)&&actual==expected,
+                    "currency queries retain coincident walls and box retirement");
+            }
         }
         for(int object:{60,92,293})
             require(amigaTerrainContacts(index,object,x,y)==reference.count(object,x,y),"per-position multiplicity");

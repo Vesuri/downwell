@@ -10,6 +10,7 @@ namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_
 #include "core/ActorDrawOrderVerification.h"
 #include "core/MachineGunSourceStep.h"
 #include "core/CurrencyHomingMath.h"
+#include "core/TerrainWallContacts.h"
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
 bool nativeRegisteredTimeChange(downwell::GameplayCollisionOwner& owner,
     downwell::TimeChangeEffects<8>& effects,int& speed,std::uint32_t sourceId){
@@ -2941,6 +2942,7 @@ int main(){
         else assert(contacts==bloodContactReference);
     }
     std::vector<bool> currencyContacts;
+    std::vector<bool> currencyWallContacts;
     for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
                        GameplayCollisionOwner::Ownership::nativeScenery}){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
@@ -2953,6 +2955,30 @@ int main(){
             bool wall(InstanceHandle,MotionBinary64,MotionBinary64,bool& hit){hit=false;return true;}
             bool tile(InstanceHandle,int,MotionBinary64,MotionBinary64,bool& hit){hit=false;return true;}
         } queries;
+        TerrainWallContacts<16> walls;
+        for(int x:{224,240,256}){
+            assert(world->createGeneratedInstance({60,x,640},objects,[](const auto&){return true;})&&walls.append(60,x,640));
+        }
+        world->configureSolidResolver(nullptr,&walls,nullptr,nullptr,[](void* context,const ContactBounds& bounds,unsigned& count){
+            count=0;return static_cast<TerrainWallContacts<16>*>(context)->visit(bounds,
+                [](int,int,int){return true;},[&](){++count;return true;});
+        });
+        std::vector<bool> wallHits;
+        for(int size:{0,1}){
+            InstanceHandle key;assert(world->createCurrencyWithSourceId(804900+size,
+                MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(600),queries,key));
+            assert(owner->currency().dispatch(key,[&](auto& state,bool&){state.size=size;return true;})&&
+                owner->currency().draw(key,[](auto,const auto&){return true;}));
+            for(int dx=-32;dx<=32;++dx)for(int dy=-16;dy<=16;++dy)for(int quarter:{0,1,2,3}){
+                auto x=MotionBinary64::fromInteger(240+dx),y=MotionBinary64::fromInteger(640+dy);
+                const MotionBinary64 fractions[]={{},{0x3fd00000u,0},{0x3fe00000u,0},{0x3fe80000u,0}};
+                assert(x.add(fractions[quarter])&&y.add(fractions[quarter]));bool hit=false;
+                assert(owner->currencyWallMeeting(key,x,y,masks,hit));wallHits.push_back(hit);
+            }
+            assert(owner->currency().clear());
+        }
+        if(ownership==GameplayCollisionOwner::Ownership::reference)currencyWallContacts=wallHits;
+        else assert(wallHits==currencyWallContacts);
         std::vector<bool> contacts;unsigned id=805000;
         for(int size:{0,1})for(int cy:{192,512,1056})for(int dx=-136;dx<=136;dx+=4)for(int dy:{-25,-5,0,5,25}){
             auto x=MotionBinary64::fromInteger(240+dx),y=MotionBinary64::fromInteger(cy+dy);

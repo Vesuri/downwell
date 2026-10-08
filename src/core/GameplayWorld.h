@@ -28,6 +28,7 @@
 #include "core/SkeletonInstances.h"
 #include "core/BloodInstances.h"
 #include "core/CurrencyInstances.h"
+#include "core/CurrencyCollisionBounds.h"
 #include "core/RegisteredSkeletonThrow.h"
 #include "core/BoneViewRetirement.h"
 #include "core/GameplayScriptSpawnInstances.h"
@@ -278,6 +279,19 @@ public:
         return run_.effectsSucceeded=currencyInstances_->create(id,x,y,run_.stage.area,run_.upgrades.levels[10]!=0,enemyRandom_,queries,key);
     }
     static constexpr unsigned bloodCapacity=32;
+    bool currencyWallMeeting(downwell::InstanceHandle key,downwell::MotionBinary64 x,
+        downwell::MotionBinary64 y,bool& hit){
+        const auto* r=currencyInstances_?currencyInstances_->find(key):nullptr;
+        downwell::ContactBounds bounds;
+        if(!run_.effectsSucceeded||!r||!wallContactResolver_||
+            !downwell::CurrencyCollisionBounds::calculate(r->maskId<0?r->spriteId:r->maskId,x,y,bounds))
+            return run_.effectsSucceeded=false;
+        unsigned count=0;
+        if(!wallContactResolver_(solidResolverContext_,bounds,count))return run_.effectsSucceeded=false;
+        bool found=count!=0;
+        if(!run_.shops.visitWallContacts(bounds,[&](){found=true;return true;}))return run_.effectsSucceeded=false;
+        hit=found;return true;
+    }
     template<class Queries,class Math,class View,class Audio>
     bool stepCurrencyRoomEffect(downwell::InstanceHandle key,bool stopped,int width,
         downwell::MotionBinary64 playerX,downwell::MotionBinary64 playerY,Queries& queries,Math& math,View view,
