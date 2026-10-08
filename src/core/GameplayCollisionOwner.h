@@ -57,7 +57,7 @@ private:
 #ifdef DOWNWELL_DRAW_CACHE_AUDIT
     mutable bool drawAuditHasSnapshot_=false;
 #endif
-    RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity+GameplayWorld::droneBulletCapacity+GameplayWorld::boneCapacity> combatAlarmPhase_;
+    RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity+GameplayWorld::droneBulletCapacity+GameplayWorld::boneCapacity+GameplayWorld::skeletonCapacity> combatAlarmPhase_;
     bool combatAlarmCaptureDirty_=true;
     unsigned combatAlarmMask_=0;
     bool combatAlarmCaptureValid_=false;
@@ -360,6 +360,7 @@ private:
             if constexpr(Kind==View::Kind::entryDither)return 73;
             if constexpr(Kind==View::Kind::drone)return 266;
             if constexpr(Kind==View::Kind::bone)return 269;
+            if constexpr(Kind==View::Kind::skeleton)return 120;
             if constexpr(Kind==View::Kind::goalField||Kind==View::Kind::exitController)return r.objectId;
             return Kind==View::Kind::player?35:92;
         }
@@ -402,7 +403,7 @@ private:
             }else if constexpr(Kind==View::Kind::debris){
                 if(!r.effect)return parent.check(false);
                 state.x=r.effect->x;state.y=r.effect->y;
-            }else if constexpr(Kind==View::Kind::timeChange||Kind==View::Kind::entryDither||Kind==View::Kind::drone||Kind==View::Kind::bone){
+            }else if constexpr(Kind==View::Kind::timeChange||Kind==View::Kind::entryDither||Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton){
                 state.x=r.x;state.y=r.y;
             }else{
                 if(r.x>0x7fffffff-ox||r.y>0x7fffffff-oy)return parent.check(false);
@@ -453,7 +454,7 @@ private:
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
             if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
             if constexpr(Kind==View::Kind::entryDither)sourceId=r.sourceId;
-            if constexpr(Kind==View::Kind::drone||Kind==View::Kind::bone)sourceId=r.sourceId;
+            if constexpr(Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton)sourceId=r.sourceId;
             constexpr bool projected=Kind==View::Kind::player||Kind==View::Kind::enemy||
                 Kind==View::Kind::bullet||Kind==View::Kind::scriptEffect||Kind==View::Kind::debris||Kind==View::Kind::entryDither||Kind==View::Kind::bone;
             if(projected&&!parent.actorDepthAvailable(p.depth))return parent.check(false);
@@ -514,7 +515,7 @@ private:
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
             if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
             if constexpr(Kind==View::Kind::entryDither)sourceId=r.sourceId;
-            if constexpr(Kind==View::Kind::drone||Kind==View::Kind::bone)sourceId=r.sourceId;
+            if constexpr(Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton)sourceId=r.sourceId;
             constexpr bool projected=Kind==View::Kind::player||Kind==View::Kind::enemy||
                 Kind==View::Kind::bullet||Kind==View::Kind::scriptEffect||Kind==View::Kind::debris||Kind==View::Kind::entryDither||Kind==View::Kind::bone;
             if(projected&&!parent.actorDepthAvailable(depth))return parent.check(false);
@@ -658,6 +659,8 @@ private:
     GameplayWorld::DroneBullets drones_{GameplayWorld::DroneBullets::Binding::bindPositionedActor(droneBinding_)};
     Binding<GameplayWorld::Bones::Record,View::Kind::bone> boneBinding_{*this};
     GameplayWorld::Bones bones_{GameplayWorld::Bones::Binding::bindPositionedActor(boneBinding_)};
+    Binding<GameplayWorld::Skeletons::Record,View::Kind::skeleton> skeletonBinding_{*this};
+    GameplayWorld::Skeletons skeletons_{GameplayWorld::Skeletons::Binding::bindPositionedActor(skeletonBinding_)};
     std::uint32_t pendingTimeChangeId_=0;
     const bool native_;
     const bool sceneryLayers_;
@@ -744,7 +747,7 @@ public:
     template<class Visit> bool visitRegistrationOrder(Visit visit)const{return valid()&&visitEligibility(visit);}
     // Drone dispatch deliberately exposes bool& status to arbitrary callbacks;
     // retain its live read rather than delaying a callback's failure to return.
-    bool valid()const{return good_&&(failureObserved_?(drones_.valid()&&bones_.valid()):
+    bool valid()const{return good_&&skeletons_.valid()&&(failureObserved_?(drones_.valid()&&bones_.valid()):
         (owner_.valid()&&properties_.valid()&&terrain_.valid()&&scriptEffects_.valid()&&debris_.valid()&&
          timeChanges_.valid()&&entries_.valid()&&drones_.valid()&&bones_.valid()&&layers_.valid()));}
     unsigned pendingSpatialIndex()const{return owner_.pendingSpatialIndex();}
@@ -766,6 +769,7 @@ public:
         if(!world_&&!world.bindEntryDithers(entries_))return check(false);
         if(!world_&&!world.bindDroneBullets(drones_))return check(false);
         if(!world_&&!world.bindBones(bones_))return check(false);
+        if(!world_&&!world.bindSkeletons(skeletons_))return check(false);
         world_=&world;
 #ifndef DOWNWELL_REFERENCE_BREAKABLES
         if(nativeBoxes_){
@@ -970,6 +974,7 @@ public:
                     }
                     case View::Kind::drone:return self.drones_.advanceAnimation(local);
                     case View::Kind::bone:return self.bones_.advanceAnimation(local);
+                    case View::Kind::skeleton:return self.skeletons_.advanceAnimation(local);
                     default:return true;
                 }
             };
@@ -1058,6 +1063,7 @@ public:
                     kind==View::Kind::debris?self.world_->advanceBoundDebrisRoomAlarm(local,alarm):
                     kind==View::Kind::timeChange?self.world_->advanceTimeChangeRoomAlarm(local,alarm):
                     kind==View::Kind::drone?(alarm==0&&self.drones_.advanceAlarm(local)):
+                    kind==View::Kind::skeleton?self.skeletons_.advanceAlarm(local,alarm):
                     kind==View::Kind::entryDither&&self.entries_.advanceAlarm(local,alarm);
             },reused,&self.combatAlarmMask_,boxes
 #ifndef DOWNWELL_REFERENCE_ENEMY_ALARM_ROSTER
@@ -1115,6 +1121,7 @@ public:
     GameplayTerrainInstances& terrain(){return terrain_;}
     GameplayWorld::DroneBullets& droneBullets(){return drones_;}
     GameplayWorld::Bones& bones(){return bones_;}
+    GameplayWorld::Skeletons& skeletons(){return skeletons_;}
     // Called for a selected ordinary Step event, never as a separate family
     // walk. Preserve the shared handle until the resource owner resolves it.
     template<class Frames> bool stepBone(InstanceHandle shared,bool stopped,Frames frames){
@@ -1630,6 +1637,7 @@ private:
                 case View::Kind::entryDither:return record.entryDither&&entries_.retire(local);
                 case View::Kind::drone:return record.drone&&drones_.retire(local);
                 case View::Kind::bone:return record.bone&&bones_.retire(local);
+                case View::Kind::skeleton:return record.skeleton&&skeletons_.retire(local);
                 default:return false;
             }
         });

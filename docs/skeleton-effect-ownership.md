@@ -8,6 +8,25 @@ This is an integration audit, not a claim that these effects are implemented.
 
 ## Registered bone event contract
 
+`SkeletonInstances` supplies fixed, generation-checked object-120 ownership.
+The stored bridge allocates from the room's numeric ID stream; native creation
+requires an explicit source ID. Both register constructor geometry before the
+inherited 16-pixel snap, then retain the completed shared Create state without
+consuming RNG. Local handles and source IDs remain distinct. Destruction marks
+retain the record until cleanup; Retry/room teardown preserve native generations.
+The registered room animation pass uses `SkeletonAnimation`, not the older
+generic enemy frame approximation. Native alarms join the captured global alarm
+traversal. Stored alarms import the room's already-decremented values before
+dispatch, so subsequent synchronization cannot rewind their countdowns; Alarm 2's
+Alarm 3 write is visible to the later slot in the same phase.
+
+`withSkeletonEvents` supplies the stored ordinary/End Step handlers explicitly.
+Their motion, sprite/transform publication, collision/death dependencies and both
+renderers remain admission requirements: this ownership path does not enable
+natural generation or silently substitute a no-op event. Unsupported sprite
+changes at the stored synchronization boundary fail rather than bypassing the
+collision setter. Engine activation is separate from custom skeleton `active`.
+
 `BoneProjectile` has checked publication entry points for live owners, while
 its scalar event methods remain the successful-event reference. Step compares
 the promoted builtin image speed to custom `imgSp` using the VM real tolerance;

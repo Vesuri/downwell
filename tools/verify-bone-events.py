@@ -33,6 +33,16 @@ ordered = ["call.i gml_Script_instance_create", "pop.v.v self.myBone",
            "pop.i.v [stacktop]self.imgSp", "pop.v.i self.eShotDelay"]
 assert [throw.index(op) for op in ordered] == sorted(throw.index(op) for op in ordered)
 assert throw.count("call.i choose(argc=3)") == 2
+for name, digest in {
+    "enmSkeleton": "6dfaeddd37bd746f3fcde25d350a6a25ce690df5ac3a9e962e933b1c9bd54615",
+    "subparentEnemy": "575a31b3123128e4ce352c4ee169193583167b76cd0001d4e360f0f4362cd3c0",
+    "parentLife": "19838825dc0e49ada1d670de755ba9942ab622914a87d8d4d2acb51eae4c3c04",
+}.items():
+    payload = (export / "Assembly" / f"gml_Object_{name}_Create_0.asm").read_bytes()
+    assert sha256(payload).hexdigest() == digest
+    assert b"random" not in payload and b"choose" not in payload
+skeleton_object = manifest["resources"]["objects"][120]
+assert (skeleton_object["parentId"], skeleton_object["spriteId"], skeleton_object["textureMaskId"]) == (83, 208, 208)
 wall = source("Collision_parentWall", "b90f31393aabda2f26251e4bd4eea283740696ffd91807231b05899e281dc622")
 player = source("Collision_objPlayer_n", "918f6068a1942b503dd74d92a6dff774bf0fa2fa1986b6fb38e0145e0a761df4")
 ordered = ["cmp.v.v NEQ", "pop.v.v self.image_speed", "pop.v.v self.ysp", "pop.v.v self.xx",

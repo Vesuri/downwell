@@ -23,6 +23,7 @@
 #include "core/GameplayEntryDithers.h"
 #include "core/DroneBulletInstances.h"
 #include "core/BoneProjectileInstances.h"
+#include "core/SkeletonInstances.h"
 #include "core/RegisteredSkeletonThrow.h"
 #include "core/BoneViewRetirement.h"
 #include "core/GameplayScriptSpawnInstances.h"
@@ -260,6 +261,17 @@ public:
         droneBullets_=&bullets;return true;
     }
     using Bones=downwell::BoneProjectileInstances<32>;
+    using Skeletons=downwell::SkeletonInstances<32>;
+    static constexpr unsigned skeletonCapacity=32;
+    const Skeletons* skeletons()const{return skeletons_;}
+    bool bindSkeletons(Skeletons& skeletons){
+        if(skeletons_||!skeletons.valid()||skeletons.size())return false;
+        skeletons_=&skeletons;return true;
+    }
+    bool createSkeletonWithSourceId(unsigned id,int x,int y,downwell::InstanceHandle& key){
+        if(!run_.effectsSucceeded||!skeletons_||!skeletons_->create(id,x,y,key))return run_.effectsSucceeded=false;
+        return true;
+    }
     static constexpr unsigned boneCapacity=32;
     const Bones* bones()const{return bones_;}
     bool bindBones(Bones& bones){
@@ -1085,6 +1097,7 @@ private:
     downwell::GameplayEntryDithers* entryDithers_=nullptr;
     DroneBullets* droneBullets_=nullptr;
     Bones* bones_=nullptr;
+    Skeletons* skeletons_=nullptr;
     downwell::TimeChangeEffects<8>* timeChangeEffects_=nullptr;
     int* timeChangeSpeed_=nullptr; // Borrowed source room-speed global, not PAL catch-up.
     bool clearRoomTimeChanges();

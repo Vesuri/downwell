@@ -25,6 +25,7 @@
 #include "StoredEntryDitherRegistration.h"
 #include "StoredDroneBulletRegistration.h"
 #include "StoredBoneRegistration.h"
+#include "StoredSkeletonRegistration.h"
 #include "RegisteredSkeletonThrow.h"
 #include "BoneViewRetirement.h"
 #include "StoredScriptSpawnRegistration.h"
@@ -322,6 +323,28 @@ public:
     struct NoCollisionPass {bool operator()()const{return true;}};
     enum class DronePhase {animation,alarm,step,endStep};
     enum class BonePhase {animation,step,cleanup};
+    enum class SkeletonPhase {animation,alarm,step,endStep,cleanup};
+    template<unsigned Capacity,class Execute,class Tick>
+    bool withSkeletonEvents(StoredSkeletonRegistration<instanceCapacity,Capacity>& registration,
+        Execute execute,Tick tick){
+        if(!run_.effectsSucceeded)return false;
+        if(skeletonDispatch_||!registration.belongsTo(instances_)||!registration.valid())return run_.effectsSucceeded=false;
+        auto dispatch=[&](const InstanceRecord& record,SkeletonPhase phase,unsigned index){
+            const auto key=registration.handle(record);if(!key.generation)return false;
+            if(phase==SkeletonPhase::animation)return registration.advanceAnimation(key);
+            if(phase==SkeletonPhase::alarm)return registration.alarm(key,index);
+            if(phase==SkeletonPhase::cleanup)return registration.retire(key);
+            return registration.dispatch(key,[&](auto& actor,auto& throwing,bool& good){
+                return execute(key,phase,actor,throwing,good);
+            });
+        };
+        skeletonContext_=&dispatch;
+        skeletonDispatch_=[](void* p,const InstanceRecord& r,SkeletonPhase phase,unsigned index){
+            return (*static_cast<decltype(dispatch)*>(p))(r,phase,index);
+        };
+        const bool ok=tick();skeletonDispatch_=nullptr;skeletonContext_=nullptr;
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok&&registration.valid();
+    }
     // Install one bone owner around a single caller-supplied tick. This allows
     // the time-stop and bone families to share the same animation/Begin Step/
     // ordinary Step/collision pass instead of advancing separate world ticks.
@@ -569,6 +592,14 @@ public:
     }
     template<unsigned Capacity> StoredBoneRegistration<instanceCapacity,Capacity> boneRegistration(){
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
+    }
+    template<unsigned Capacity> StoredSkeletonRegistration<instanceCapacity,Capacity> skeletonRegistration(){
+        return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
+    }
+    template<unsigned Capacity> bool spawnSkeleton(StoredSkeletonRegistration<instanceCapacity,Capacity>& registration,
+        int x,int y,InstanceHandle& key){
+        if(!registration.belongsTo(instances_)||!registration.valid())return run_.effectsSucceeded=false;
+        return registration.create(x,y,key);
     }
     template<unsigned Capacity> bool spawnBone(StoredBoneRegistration<instanceCapacity,Capacity>& registration,
         int x,int y,InstanceHandle& key){
@@ -1178,6 +1209,8 @@ private:
     bool (*droneDispatch_)(void*,const InstanceRecord&,DronePhase)=nullptr;
     bool (*boneDispatch_)(void*,const InstanceRecord&,BonePhase)=nullptr;
     void* boneContext_=nullptr;
+    bool (*skeletonDispatch_)(void*,const InstanceRecord&,SkeletonPhase,unsigned)=nullptr;
+    void* skeletonContext_=nullptr;
     void* droneContext_=nullptr;
     void* timeEffectContext_=nullptr;
     void* entryDitherContext_=nullptr;

@@ -380,6 +380,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
     if(!instances_.visitAnimationChecked([this](InstanceHandle key,InstanceRecord& instance){
         if(!lifecycle_.capturePrevious(key,instance))return false;
         if(instance.objectId==269&&(!boneDispatch_||!boneDispatch_(boneContext_,instance,BonePhase::animation)))return false;
+        if(instance.objectId==120&&(!skeletonDispatch_||!skeletonDispatch_(skeletonContext_,instance,SkeletonPhase::animation,0)))return false;
         if(instance.objectId==249||instance.objectId==256){
             auto* companion=const_cast<PlayerCompanionCreateState*>(companionCreateState(instance.instanceId));
             RunnerImageValue index,speed;
@@ -892,9 +893,11 @@ bool StartupRuntime::cleanupMainOwnedDestroyed(){
     return run_.effectsSucceeded&&instances_.cleanupDestroyedIf(
         [this](const InstanceRecord& r){return r.objectId==92||r.objectId==261||r.objectId==370||
             (r.objectId==269&&boneDispatch_)||
+            (r.objectId==120&&skeletonDispatch_)||
             (r.objectId==73&&ownedEntryRegistration_.handle(r).generation)||(r.objectId==219&&!scriptAnimationDispatch_);},
         [this](InstanceHandle key,const InstanceRecord& r){
             if(r.objectId==269)return boneDispatch_(boneContext_,r,BonePhase::cleanup);
+            if(r.objectId==120)return skeletonDispatch_(skeletonContext_,r,SkeletonPhase::cleanup,0);
             if(r.objectId==73)return ownedEntryRegistration_.retire(key);
             if(r.objectId==219)return scriptEffectsBinding_.retire(key,&r);
             if(r.objectId==370)return debrisBinding_.retire(key,&r);
@@ -1614,6 +1617,12 @@ bool StartupRuntime::dispatchObjectEvent(InstanceRecord& instance,
     if (objectPack_ == nullptr ||
         !objectPack_->findEvent(instance.objectId, eventType, eventSubtype, event))
         return false;
+    if(instance.objectId==120&&(eventType==2||(eventType==3&&(eventSubtype==0||eventSubtype==2)))){
+        ++implementedCodeCalls_;
+        run_.effectsSucceeded=skeletonDispatch_&&skeletonDispatch_(skeletonContext_,instance,
+            eventType==2?SkeletonPhase::alarm:eventSubtype==0?SkeletonPhase::step:SkeletonPhase::endStep,unsigned(eventSubtype));
+        return run_.effectsSucceeded;
+    }
     if(instance.objectId==269&&eventType==3&&eventSubtype==0){
         ++implementedCodeCalls_;
         run_.effectsSucceeded=boneDispatch_&&boneDispatch_(boneContext_,instance,BonePhase::step);

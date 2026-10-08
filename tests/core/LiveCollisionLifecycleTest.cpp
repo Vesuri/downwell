@@ -201,6 +201,58 @@ int main(){
             return world->throwRegisteredBone(bones,caller,240,200,separated,facing,shot,sound);
         },[&](InstanceHandle key){return bones.instances().find(key);},[&]{return bones.clear();});
     }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach registered skeleton world");world->skipToGameForTesting();
+        auto skeletons=world->skeletonRegistration<2>();InstanceHandle key;
+        const auto id=world->nextRuntimeInstanceId();const auto draws=world->randomDrawCount();
+        require(world->spawnSkeleton(skeletons,100,200,key),"create skeleton through real resource owner");
+        const auto* record=world->instance(id);const auto* actor=skeletons.instances().find(key);
+        require(record&&actor&&record->objectId==120&&record->spriteId==208&&record->maskId==208&&
+            record->x==96&&record->y==192&&record->health==60&&record->reward==10&&record->imageSpeed==0&&
+            actor->sourceId==id&&actor->state.x==96&&actor->state.y==192&&world->randomDrawCount()==draws,
+            "skeleton inherited grid snap and Create constants consume no RNG");
+        require(skeletons.dispatch(key,[](auto& state,auto&,bool&){
+            state.imageSpeed=MotionBinary64::fromInteger(1);state.shot=true;state.alarms[2]=2;return true;
+        }),"arm skeleton source alarm");
+        unsigned steps=0,ends=0;
+        auto tick=[&]{return world->withSkeletonEvents(skeletons,[&](InstanceHandle selected,auto phase,auto&,auto&,bool&){
+            require(selected.generation==key.generation,"resolve skeleton generation in each room event");
+            if(phase==StartupRuntime::SkeletonPhase::step)++steps;else ++ends;return true;
+        },[&]{return world->stepWithCollisionPass(Input{},false,[]{return true;});});};
+        require(tick()&&steps==1&&ends==1&&record->alarms.get(2)==1&&actor->state.shot,"first shared skeleton tick");
+        require(tick()&&steps==2&&ends==2&&!actor->state.shot&&record->alarms.get(2)==0&&record->alarms.get(3)==14&&
+            record->imageIndex==0,"skeleton alarm decrements once and later slot sees same-phase write");
+        require(skeletons.mark(key)&&tick()&&!world->instance(id)&&!skeletons.instances().find(key),
+            "skeleton marked lifetime retires through normal cleanup");
+        InstanceHandle next;require(world->spawnSkeleton(skeletons,100,200,next)&&next.generation!=key.generation&&
+            skeletons.clear(),"skeleton reuse does not alias stale generations");
+    }
+    {
+        struct SnapOwner:StoredWorldCollision {
+            using StoredWorldCollision::StoredWorldCollision;
+            unsigned moves=0;
+            bool move(InstanceHandle h,const InstanceRecord& r,RunnerImageValue x,RunnerImageValue y){
+                if(r.objectId==120&&++moves==2)return false;
+                return StoredWorldCollision::move(h,r,x,y);
+            }
+        };
+        auto owner=std::make_unique<SnapOwner>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            InstanceLifecycleBinding::bindPointQueries(*owner));
+        require(owner->attach(*world),"attach failing skeleton snap owner");world->skipToGameForTesting();
+        auto skeletons=world->skeletonRegistration<1>();InstanceHandle key;
+        const auto id=world->nextRuntimeInstanceId();const auto draws=world->randomDrawCount();
+        require(!world->spawnSkeleton(skeletons,100,200,key)&&!world->effectsSucceeded()&&
+            world->nextRuntimeInstanceId()==id+1&&world->randomDrawCount()==draws&&owner->moves==2,
+            "failed snap retains registered birth without RNG or retry");
+        const auto* retained=world->instance(id);const auto* actor=skeletons.instances().find(key);
+        require(retained&&actor&&retained->x==96&&retained->y==200&&actor->x.bits==0x42c00000u&&
+            actor->y.bits==0x43480000u,"failed second snap publication retains successful X only");
+        require(!world->spawnSkeleton(skeletons,100,200,key)&&world->nextRuntimeInstanceId()==id+1&&
+            owner->moves==2,"terminal skeleton Create cannot run twice");
+    }
     for(unsigned rejectedMove=0;rejectedMove<=2;++rejectedMove){
         struct BoneOwner:StoredWorldCollision {
             using StoredWorldCollision::StoredWorldCollision;

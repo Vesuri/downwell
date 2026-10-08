@@ -253,11 +253,12 @@ static void checkTypedCollisionView(const GameplayCollisionView& view,GameplayCo
         case K::entryDither:assert(view.resolveLocal<K::entryDither>(local)==reference.entryDither);break;
         case K::drone:assert(view.resolveLocal<K::drone>(local)==reference.drone);break;
         case K::bone:assert(view.resolveLocal<K::bone>(local)==reference.bone);break;
+        case K::skeleton:assert(view.resolveLocal<K::skeleton>(local)==reference.skeleton);break;
     }
 }
 static void checkCollisionViewMembership(const GameplayWorld& world){
     const GameplayCollisionView view(world);
-    for(unsigned family=0;family<=unsigned(GameplayCollisionView::Kind::bone);++family)
+    for(unsigned family=0;family<=unsigned(GameplayCollisionView::Kind::skeleton);++family)
         for(auto local:{InstanceHandle{0,0},InstanceHandle{0xffffffffu,1},InstanceHandle{GameplayCollisionView::capacity,1}})
             checkTypedCollisionView(view,GameplayCollisionView::Kind(family),local);
     for(unsigned slot=0;slot<=GameplayCollisionView::capacity;++slot){
@@ -2822,6 +2823,34 @@ int main(){
         auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
         assert(owner->attach(*world));
+        {
+            auto skeletonOwner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+                GameplayTerrainInstances::WallCollision{},&rooms,ownership);
+            auto skeletonWorld=std::make_unique<GameplayWorld>(300,false,0,false,skeletonOwner->enemyBinding(),
+                skeletonOwner->breakableBinding(),skeletonOwner->playerBinding(),&skeletonOwner->terrain());
+            assert(skeletonOwner->attach(*skeletonWorld));InstanceHandle key,sharedKey;
+            const auto draws=skeletonWorld->randomDrawCount();
+            assert(skeletonWorld->createSkeletonWithSourceId(505100,100,200,key)&&
+                GameplayCollisionView::encode(GameplayCollisionView::Kind::skeleton,key,sharedKey));
+            auto& skeletons=skeletonOwner->skeletons();const auto* actor=skeletons.find(key);
+            assert(actor&&actor->state.x==96&&actor->state.y==192&&actor->state.health==60&&
+                actor->state.money==10&&actor->state.grounded&&actor->state.alive&&
+                !actor->state.imageSpeed.high&&actor->sourceId==505100&&skeletonWorld->randomDrawCount()==draws);
+            checkTypedCollisionView(GameplayCollisionView(*skeletonWorld),GameplayCollisionView::Kind::skeleton,key);
+            assert(skeletons.dispatch(key,[](auto& state,auto&,bool&){
+                state.imageSpeed=MotionBinary64::fromInteger(1);state.shot=true;state.alarms[2]=2;return true;
+            }));
+            skeletonWorld->step(0);
+            assert(skeletonWorld->effectsSucceeded()&&actor->state.alarms[2]==1&&actor->state.shot);
+            skeletonWorld->step(0);
+            assert(skeletonWorld->effectsSucceeded()&&actor->state.alarms[2]==0&&!actor->state.shot&&
+                actor->state.alarms[3]==14&&!actor->state.imageIndex.high&&!actor->state.imageIndex.low);
+            assert(skeletons.markDestroyed(key)&&skeletonOwner->prepareDraw()&&!skeletons.find(key));
+            InstanceHandle next;assert(skeletonWorld->createSkeletonWithSourceId(505101,100,200,next)&&
+                next.slot==key.slot&&next.generation!=key.generation&&!GameplayCollisionView(*skeletonWorld).contains(sharedKey));
+            assert(skeletonWorld->restartFromResults(DeathMenuSequence::Action::Retry,42,300)!=ResultsDestination::none&&
+                skeletonWorld->skeletons()==&skeletons&&skeletons.size()==0&&skeletonOwner->valid());
+        }
         auto throwOwner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
             GameplayTerrainInstances::WallCollision{},&rooms,ownership);
         auto throwWorld=std::make_unique<GameplayWorld>(300,false,1000,false,throwOwner->enemyBinding(),
