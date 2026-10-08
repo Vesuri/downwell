@@ -610,6 +610,16 @@ and refill ammo to reach capacity; they are fault tests, not natural encounters.
 
 ## Creation contracts that cannot be replaced by an arbitrary RNG skip
 
+`BloodEffect::stepPublished` preserves the moving-effect Step boundaries:
+capture `imgSp` before querying `TimeStopBound`, conditionally publish speed,
+update xx then yy, then call `roundPosition`, which publishes **Y before X**.
+A failed query keeps the prior speed capture; a failed X publication keeps
+the completed Y write and precise accumulators. A failed callback latches the
+event's supplied success flag and prevents retry. `BloodEffects::stepChecked`
+uses this body so queries observe the captured speed; `step(bool)` remains the
+successful-state scalar reference. This does not supply blood's missing world
+registration, mixed-family dispatch or rendering ownership.
+
 - Blood emits at published x/y, not the precise xx/yy accumulators. Its two
   angles are `random(20)` and `180-random(20)`, respectively. Object 220's Create
   initializes motion state without RNG; `emitMovingFx` then assigns sprite,

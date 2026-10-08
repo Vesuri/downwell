@@ -16,9 +16,19 @@
 #include <cmath>
 #include <cstring>
 #include <cstdio>
+#include <vector>
 using namespace downwell;
 static double value(MotionBinary64 n){std::uint64_t bits=(std::uint64_t(n.high)<<32)|n.low;double d;std::memcpy(&d,&bits,8);return d;}
 static unsigned bits(float f){unsigned n;std::memcpy(&n,&f,4);return n;}
+struct PublishedStep {
+    BloodEffect& effect;bool allowed;unsigned fail=0,calls=0;
+    std::vector<int> writes;
+    PublishedStep(BloodEffect& effect,bool allowed,unsigned fail=0):effect(effect),allowed(allowed),fail(fail){}
+    bool call(int id){writes.push_back(id);return ++calls!=fail;}
+    bool timeAllowed(bool& out){assert(effect.savedSpeed.bits!=0xbf800000u);out=allowed;return call(1);}
+    bool speed(RunnerImageValue){return call(2);}
+    bool position(RunnerImageValue,RunnerImageValue){return call(3);}
+};
 int main(){
     unsigned checked=0;
     for(unsigned seed=0;seed<256;++seed){
@@ -40,7 +50,12 @@ int main(){
                 if(!saved)saved=bits(rate);
                 rate=allowed?.5f:0;
                 if(allowed){x+=value(effect.xsp);y+=value(effect.ysp);}
-                assert(effect.step(allowed));
+                auto published=effect;PublishedStep ops{published,allowed};bool good=true;
+                assert(published.stepPublished(ops,good)&&good&&effect.step(allowed));
+                assert(published.xx.high==effect.xx.high&&published.xx.low==effect.xx.low&&
+                    published.yy.high==effect.yy.high&&published.yy.low==effect.yy.low&&
+                    published.x.bits==effect.x.bits&&published.y.bits==effect.y.bits&&
+                    published.imageSpeed.bits==effect.imageSpeed.bits&&published.savedSpeed.bits==effect.savedSpeed.bits);
                 assert(value(effect.xx)==x && value(effect.yy)==y && effect.x.bits==bits(float(std::nearbyint(x))) &&
                     effect.y.bits==bits(float(std::nearbyint(y))) && effect.imageSpeed.bits==bits(rate) &&
                     effect.savedSpeed.bits==saved && effect.drawFrame()==unsigned(phase));
@@ -64,5 +79,21 @@ int main(){
         assert(births==2 && interleaved.drawCount()==ordered.drawCount());
         for(unsigned i=0;i<16;++i)assert(interleaved.stateWord(i)==ordered.stateWord(i));
     }
-    std::printf("Blood effects: %u movement/time-stop frames, 512 births, retirement and RNG failure ordering passed\n",checked);
+    for(bool allowed:{false,true}){
+        BloodEffect initial;
+        assert(initial.create(RunnerImageValue{0x43704000u}.promoted(),RunnerImageValue{0x43308000u}.promoted(),{}));
+        auto complete=initial;PublishedStep ops{complete,allowed};bool good=true;
+        assert(complete.stepPublished(ops,good)&&good);
+        assert(ops.writes==(allowed?std::vector<int>{1,3,3}:std::vector<int>{1,2,3,3}));
+        for(unsigned fail=1;fail<=ops.calls;++fail){
+            auto effect=initial;PublishedStep rejected{effect,allowed,fail};bool valid=true;
+            assert(!effect.stepPublished(rejected,valid)&&!valid&&rejected.calls==fail);
+            assert(effect.savedSpeed.bits==initial.imageSpeed.bits);
+            assert(!effect.stepPublished(rejected,valid)&&rejected.calls==fail);
+            if(fail==ops.calls)assert(effect.y.bits==complete.y.bits&&effect.x.bits==initial.x.bits);
+            if(fail==1)assert(effect.x.bits==initial.x.bits&&effect.y.bits==initial.y.bits);
+            for(unsigned i=0;i<fail;++i)assert(rejected.writes[i]==ops.writes[i]);
+        }
+    }
+    std::printf("Blood effects: %u scalar/checked movement frames, 512 births, checked publication prefixes and RNG failure ordering passed\n",checked);
 }

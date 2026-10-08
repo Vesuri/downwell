@@ -4,6 +4,7 @@
 #include "SmokeTrig.h"
 #include "RandomBinary64.h"
 #include "UnitSequenceFrames.h"
+#include "RunnerRealComparison.h"
 namespace downwell {
 // scrBloodfx's specialization of parentMovingFx (220), sprite 84. Not fxSmoke:
 // constant velocity, TimeStopBound, and no random draws in child Create.
@@ -36,6 +37,28 @@ struct BloodEffect {
         if(!nx.roundPixel(px) || !ny.roundPixel(py) ||
            !bx.assign(MotionBinary64::fromInteger(px)) || !by.assign(MotionBinary64::fromInteger(py)))return false;
         xx=nx;yy=ny;x=bx;y=by;return true;
+    }
+    // The query observes imgSp after its first-Step capture. Publish each
+    // builtin setter at its source boundary; failure retains completed writes.
+    template<class Ops> bool stepPublished(Ops& ops,bool& good){
+        if(!good)return false;
+        if(savedSpeed.bits==0xbf800000u)savedSpeed=imageSpeed;
+        bool allowed=false;
+        if(!ops.timeAllowed(allowed))return good=false;
+        const auto next=allowed?savedSpeed:RunnerImageValue{};
+        int order;
+        if(!compareRunnerReal(imageSpeed.promoted(),next.promoted(),order))return good=false;
+        if(order){
+            if(!ops.speed(next))return good=false;
+            imageSpeed=next;
+        }
+        if(allowed&&(!xx.add(xsp)||!yy.add(ysp)))return good=false;
+        std::int32_t pixel;RunnerImageValue value;
+        // roundPosition publishes Y before X (unlike skeleton's inline code).
+        if(!yy.roundPixel(pixel)||!value.assignInteger(pixel)||!ops.position(x,value))return good=false;
+        y=value;
+        if(!xx.roundPixel(pixel)||!value.assignInteger(pixel)||!ops.position(value,y))return good=false;
+        x=value;return true;
     }
     unsigned drawFrame()const{
         const unsigned exponent=(imageIndex.bits>>23)&255u;

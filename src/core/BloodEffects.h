@@ -62,9 +62,13 @@ public:
         for(unsigned i=0;i<count_;++i){
             auto& slot=slots_[order_[i]];
             if(slot.handle>phase.newest || slot.effect.destroyRequested)continue;
-            bool allowed=false;
-            if(!query(slot.handle,static_cast<const BloodEffect&>(slot.effect),allowed) ||
-               !slot.effect.step(allowed))return false;
+            struct Ops {
+                Query& query;Slot& slot;
+                bool timeAllowed(bool& allowed){return query(slot.handle,static_cast<const BloodEffect&>(slot.effect),allowed);}
+                bool speed(RunnerImageValue){return true;}
+                bool position(RunnerImageValue,RunnerImageValue){return true;}
+            } ops{query,slot};bool good=true;
+            if(!slot.effect.stepPublished(ops,good))return false;
         }
         return true;
     }
