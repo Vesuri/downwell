@@ -300,13 +300,16 @@ GameplayWorld::GameplayWorld(unsigned initialRingOrigin,
 }
 
 void GameplayWorld::initializeMainCameraFrame(){
-    if(!followCamera_)return;
-    // Compatibility entry snapshot includes camMain's first ordinary Step,
-    // but creation callbacks must observe the preceding, unadvanced state.
-    cameraMotion_.step(240 * 256L,176 * 256L);
-    cameraY_=(cameraMotion_.y-176L*4096)/16;
-    cameraPixelY_=cameraMotion_.pixelY()-176;
-    ringOrigin_=(ringOrigin_+(unsigned)cameraPixelY_)%ringHeight;
+    if(followCamera_){
+        // Compatibility entry snapshot includes camMain's first ordinary Step,
+        // but creation callbacks must observe the preceding, unadvanced state.
+        cameraMotion_.step(240 * 256L,176 * 256L);
+        cameraY_=(cameraMotion_.y-176L*4096)/16;
+        cameraPixelY_=cameraMotion_.pixelY()-176;
+        ringOrigin_=(ringOrigin_+(unsigned)cameraPixelY_)%ringHeight;
+    }
+    boneViewLeft_=160+cameraPixelX_;
+    boneViewTopQ8_=34L*256+viewCameraYQ8();
 }
 
 bool GameplayWorld::birthPlayerOwnership() {
@@ -926,9 +929,22 @@ bool GameplayWorld::advanceBulletRoomAnimation(downwell::InstanceHandle key){
     return run_.effectsSucceeded=bullet->animation.advance()&&bulletLifecycle_.imageIndex(key,*bullet,bullet->animation.index);
 }
 
+bool GameplayWorld::boneInView(downwell::InstanceHandle bone,bool& visible){
+    if(!run_.effectsSucceeded||!bones_||!bones_->valid())return run_.effectsSucceeded=false;
+    const auto* caller=bones_->find(bone);
+    if(!caller)return run_.effectsSucceeded=false;
+    auto top=downwell::MotionBinary64::fromInteger(boneViewTopQ8_);
+    if(!top.zero())top.high-=8u<<20; // Exact Q8 conversion, including fixture camera tracks.
+    return run_.effectsSucceeded=downwell::boneInPublishedView(caller->x.promoted(),caller->y.promoted(),
+        downwell::MotionBinary64::fromInteger(boneViewLeft_),top,
+        downwell::MotionBinary64::fromInteger(160),downwell::MotionBinary64::fromInteger(284),visible);
+}
+
 GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
 {
     if (run_.levelClearActive || !run_.effectsSucceeded || !generationSucceeded_) return {}; // Result owner uses stepLevelClear.
+    boneViewLeft_=160+cameraPixelX_;
+    boneViewTopQ8_=34L*256+viewCameraYQ8();
     downwell::GameMakerRandom::FrameRefill refill{enemyRandom_};
     if(scriptSpawnInstances_&&scriptSpawnInstances_->size())scriptEffectsBinding_.beginAnimation();
     else scriptEffectsBinding_={};

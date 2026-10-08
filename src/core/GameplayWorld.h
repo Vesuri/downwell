@@ -23,6 +23,7 @@
 #include "core/GameplayEntryDithers.h"
 #include "core/DroneBulletInstances.h"
 #include "core/BoneProjectileInstances.h"
+#include "core/BoneViewRetirement.h"
 #include "core/GameplayScriptSpawnInstances.h"
 #include "core/GameplayDebrisInstances.h"
 #include "core/GameplayTimeChangeRegistration.h"
@@ -411,6 +412,7 @@ public:
                 breakables_[box.slot].myFx=child;return true;
             });
     }
+    bool boneInView(downwell::InstanceHandle bone,bool& visible);
     template<class Frames> bool spawnBoneImpact(downwell::InstanceHandle bone,Frames frames){
         if(!run_.effectsSucceeded||!bones_||!scriptSpawnInstances_)return run_.effectsSucceeded=false;
         const auto* caller=bones_->find(bone);
@@ -1098,6 +1100,10 @@ private:
     downwell::MainCameraMotion cameraMotion_;
     int cameraPixelY_;
     int cameraPixelX_;
+    // Event-phase snapshot in absolute room coordinates, not the camera
+    // target being updated later in this tick. Normal following is pixelized.
+    int boneViewLeft_=160;
+    long boneViewTopQ8_=34L*256;
     int activationY_;
     BulletState bullets_[bulletCapacity];
     bool bulletIdentitySlots_[bulletCapacity]{};

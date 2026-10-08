@@ -2538,6 +2538,23 @@ int main(){
         assert(rooms.roomInstance(room,0,r));r.scaleX=2;
         assert(!terrain->appendRoom(r)&&!terrain->valid()&&terrain->size()==0);
     }
+    {
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto world=std::make_unique<GameplayWorld>(300,false,1000,true,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));
+        struct ViewProbe {InstanceHandle edge,inside;int previous;unsigned calls=0;} probe;
+        probe.previous=world->cameraOffsetY()+34;
+        assert(world->createBoneWithSourceId(405194,240,probe.previous,probe.edge)&&
+            world->createBoneWithSourceId(405195,240,probe.previous+1,probe.inside));
+        world->configureGenerationStep([](void* p,GameplayWorld& w,GameMakerRandom&,int){
+            auto& probe=*static_cast<ViewProbe*>(p);bool edge=true,inside=false;++probe.calls;
+            return w.cameraOffsetY()+34>probe.previous+1&&w.boneInView(probe.edge,edge)&&
+                w.boneInView(probe.inside,inside)&&!edge&&inside;
+        },&probe);
+        world->step(0);
+        assert(world->effectsSucceeded()&&probe.calls==1&&owner->bones().clear());
+    }
     for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
                        GameplayCollisionOwner::Ownership::nativeScenery})
     for(int initial:{(-2147483647-1),-2,-1,0,1,2}){
@@ -2822,8 +2839,7 @@ int main(){
             if(ownership==GameplayCollisionOwner::Ownership::reference)
                 assert(owner->properties(shared)->sprite.imageIndex.bits==reference.imageIndex.bits);
         }
-        // Death body uses the real registered impact owner; the controlled
-        // fixture still supplies the view decision explicitly.
+        // Death body uses the registered impact owner and published view.
         unsigned effects=0,effectLocal=0;
         auto emit=[&](){
             const auto before=world->randomDrawCount();
@@ -2838,17 +2854,18 @@ int main(){
                 effect->x.bits==caller->x.bits&&effect->y.bits==caller->y.bits);
             return true;
         };
+        auto view=[&](bool& visible){return world->boneInView(local,visible);};
         assert(bones.dispatch(local,[&](auto& state,auto& publish,bool& good){
             state.health=0;
             struct Ops {
-                decltype(publish) publisher;unsigned& effects;decltype(emit)& spawn;
+                decltype(publish) publisher;unsigned& effects;decltype(emit)& spawn;decltype(view)& query;
                 bool imageSpeed(RunnerImageValue v){return publisher.imageSpeed(v);}
                 bool position(RunnerImageValue x,RunnerImageValue y){return publisher.position(x,y);}
                 bool mask(int id){return publisher.mask(id);}
                 bool destroy(){return publisher.destroy();}
                 bool effect(int id,int speed){assert(id==85&&speed==3);++effects;return spawn();}
-                bool inView(int,int,bool& visible){visible=true;return true;}
-            } ops{publish,effects,emit};
+                bool inView(int,int,bool& visible){return query(visible);}
+            } ops{publish,effects,emit,view};
             return state.stepPublished(false,ops,good);
         }));
         assert(effects==1&&bones.find(local)->destroyRequested&&bones.find(local)->active&&

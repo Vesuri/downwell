@@ -207,15 +207,15 @@ int main(){
         auto bones=world->boneRegistration<2>();InstanceHandle local;
         auto expectedRandom=world->randomState();BoneProjectile expected;
         const auto sourceId=world->nextRuntimeInstanceId();const auto draws=world->randomDrawCount();
-        require(expected.create(240,990,expectedRandom)&&world->spawnBone(bones,240,990,local),"synchronous registered bone Create");
+        require(expected.create(240,200,expectedRandom)&&world->spawnBone(bones,240,200,local),"synchronous registered bone Create");
         const auto key=bones.worldHandle(local);
         require(key.generation&&owner->resolve(key)==world->instance(sourceId)&&
             bones.instances().find(local)->sourceId==sourceId&&world->randomDrawCount()==draws+3,
             "bone has real numeric ID, generation and three shared Create RNG draws");
         for(unsigned word=0;word<16;++word)require(world->randomState().stateWord(word)==expectedRandom.stateWord(word),
             "bone Create retains exact shared RNG state");
-        require(bones.dispatch(local,[](auto& state,auto&,bool&){return state.motion.launch(240,990,10,-30);})&&
-            expected.motion.launch(240,990,10,-30),"throw override follows registered Create");
+        require(bones.dispatch(local,[](auto& state,auto&,bool&){return state.motion.launch(240,200,10,-30);})&&
+            expected.motion.launch(240,200,10,-30),"throw override follows registered Create");
         unsigned effects=0,steps=0,effectId=0,effectLocal=0;bool kill=false;
         auto emit=[&](){
             const auto before=world->randomDrawCount();
@@ -230,17 +230,18 @@ int main(){
                 "bone myFx references registered impact at published position with source defaults");
             return true;
         };
+        auto view=[&](bool& visible){return world->boneInView(bones,local,visible);};
         auto execute=[&](auto& state,auto& publisher,auto&,bool& good){
             ++steps;if(kill)state.health=0;
             struct Ops {
-                decltype(publisher) publish;unsigned& effects;decltype(emit)& spawn;
+                decltype(publisher) publish;unsigned& effects;decltype(emit)& spawn;decltype(view)& query;
                 bool imageSpeed(RunnerImageValue v){return publish.imageSpeed(v);}
                 bool position(RunnerImageValue x,RunnerImageValue y){return publish.position(x,y);}
                 bool mask(int id){return publish.mask(id);}
                 bool destroy(){return publish.destroy();}
                 bool effect(int id,int speed){require(id==85&&speed==3,"bone death requests source effect");++effects;return spawn();}
-                bool inView(int,int,bool& visible){visible=true;return true;}
-            } ops{publisher,effects,emit};
+                bool inView(int,int,bool& visible){return query(visible);}
+            } ops{publisher,effects,emit,view};
             return state.stepPublished(false,ops,good);
         };
         owner->reject=rejectedMove;
@@ -249,7 +250,7 @@ int main(){
         RunnerImageValue x,y;
         require(owner->collisionPosition(key,x,y),"bone collision lifetime survives Step");
         if(rejectedMove){
-            require(x.bits==(rejectedMove==1?0x43700000u:0x43710000u)&&y.bits==0x44778000u,
+            require(x.bits==(rejectedMove==1?0x43700000u:0x43710000u)&&y.bits==0x43480000u,
                 "rejected bone setter retains exact preceding coordinate publication");
             const auto calls=owner->moves;
             require(!world->stepWithBones(bones,Input{},execute)&&owner->moves==calls&&steps==1,
@@ -1416,6 +1417,46 @@ int main(){
             "failed transition pause retains first burst and Create but prevents second burst");
         require(!step()&&world->randomDrawCount()==failedDraws+24&&world->nextRuntimeInstanceId()==failedId+4,
             "failed transition cannot restart through a later Begin Step");
+    }
+    for(int inset:{0,1}){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach bone cached-view world");world->skipToGameForTesting();
+        for(unsigned tick=0;tick<60;++tick)world->step(Input{},false);
+        const int oldView=world->mainCameraRenderViewY();
+        auto bones=world->boneRegistration<2>();InstanceHandle local;
+        require(world->spawnBone(bones,240,oldView+inset,local),"create bone on published top edge");
+        const auto sourceId=bones.instances().find(local)->sourceId;
+        if(inset){
+            auto precise=MotionBinary64::fromInteger(oldView);
+            RunnerImageValue published;
+            require(precise.add({0x3fd00000u,0})&&published.assign(precise)&&
+                bones.dispatch(local,[&](auto& state,auto& publish,bool&){
+                    // A collision setter need not update private motion. The
+                    // paused Step must query the actual builtin position.
+                    state.motion.y=oldView-1;
+                    return publish.position({0x43700000u},published);
+                }),"publish a fractional bone position independently of its private accumulator");
+        }
+        unsigned queries=0;
+        auto view=[&](bool& visible){++queries;return world->boneInView(bones,local,visible);};
+        auto execute=[&](auto& state,auto& publisher,auto&,bool& good){
+            struct Ops {
+                decltype(publisher) publish;decltype(view)& query;
+                bool imageSpeed(RunnerImageValue v){return publish.imageSpeed(v);}
+                bool position(RunnerImageValue x,RunnerImageValue y){return publish.position(x,y);}
+                bool mask(int id){return publish.mask(id);}
+                bool destroy(){return publish.destroy();}
+                bool effect(int,int){return false;}
+                bool inView(int,int,bool& visible){return query(visible);}
+            } ops{publisher,view};
+            return state.stepPublished(true,ops,good);
+        };
+        require(world->stepWithBones(bones,Input{},execute)&&queries==1&&
+            world->mainCameraRenderViewY()>oldView+1,"bone reads previous published view despite camera movement");
+        require(bool(bones.instances().find(local))==bool(inset)&&bool(world->instance(sourceId))==bool(inset),
+            "stopped bone retires at equality but survives a quarter pixel inside old view");
+        require(bones.clear(),"clear surviving boundary fixture bone");
     }
     for(int beyond:{0,1}){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);

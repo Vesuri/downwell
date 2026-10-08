@@ -25,6 +25,7 @@
 #include "StoredEntryDitherRegistration.h"
 #include "StoredDroneBulletRegistration.h"
 #include "StoredBoneRegistration.h"
+#include "BoneViewRetirement.h"
 #include "StoredScriptSpawnRegistration.h"
 #include "StoredDebrisRegistration.h"
 #include "StoredRoomLayers.h"
@@ -643,6 +644,19 @@ public:
                 auto* caller=instances_.resolve(box);if(!caller||caller->objectId!=92)return false;
                 caller->boxMyFx=child;return true;
             });
+    }
+    template<unsigned Capacity> bool boneInView(
+        StoredBoneRegistration<instanceCapacity,Capacity>& bones,InstanceHandle bone,bool& visible){
+        if(!run_.effectsSucceeded||roomId_!=mainRoomId||!bones.belongsTo(instances_)||!bones.valid())
+            return run_.effectsSucceeded=false;
+        const auto* caller=bones.instances().find(bone);
+        if(!caller)return run_.effectsSucceeded=false;
+        // Normal Step sees the previous Draw publication, even after camMain
+        // moved. A destroyed caller remains readable until event cleanup.
+        return run_.effectsSucceeded=boneInPublishedView(caller->x.promoted(),caller->y.promoted(),
+            MotionBinary64::fromInteger(ordinaryStepViewLeftQ12_/4096),
+            MotionBinary64::fromInteger(ordinaryStepViewTopQ12_/4096),
+            MotionBinary64::fromInteger(surfaceWidth),MotionBinary64::fromInteger(surfaceHeight),visible);
     }
     template<unsigned Capacity,class Frames> bool spawnBoneImpact(
         StoredBoneRegistration<instanceCapacity,Capacity>& bones,InstanceHandle bone,Frames frames){

@@ -35,6 +35,11 @@ for instruction in ordered:
     offset = step.index(instruction + ("\n" if instruction.startswith("pop.") else ""), offset) + len(instruction)
 assert wall.index("instance_destroy") < wall.index("scrFxNol")
 assert player.index("scrTypicalDamage") < player.index("scrFxNol") < player.index("instance_destroy")
+view = (export / "Assembly/gml_GlobalScript_scrInView.asm").read_bytes()
+assert sha256(view).hexdigest() == "cf66675bc8ea809f5bd42270ceee29d3e50eb9c3aa9d916205006db32e0e3432"
+assert view.count(b"cmp.v.v GT") == 2 and view.count(b"cmp.v.v LT") == 2
+assert view.count(b"call.i gml_Script___view_get(argc=2)") == 6
+assert b"push.v self.marginyBottom\nadd.v.v\ncmp.v.v LT" in view
 obj = manifest["resources"]["objects"][269]
 fx = (export / "Assembly/gml_GlobalScript_scrFxNol.asm").read_bytes()
 assert sha256(fx).hexdigest() == "fe76a7898f52d717dc47f864c924facf2cea92a5d87e26b3bfd9ba27ce0c2d6c"

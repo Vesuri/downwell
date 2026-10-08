@@ -61,8 +61,18 @@ tree that the native queries cannot yet consume. Retry and level teardown
 clear bones before reusing the room and retain the generation stream.
 `createBoneWithSourceId` uses the world's shared RNG but requires the caller's
 numeric ID: it does not fill the missing native global allocator. Automatic
-throwing, ordinary Step/collision dispatch, view/time-stop/effect adapters,
+throwing, ordinary Step/collision dispatch, time-stop/damage adapters,
 rendering and replay serialization remain required for natural encounters.
+
+Bone view queries resolve the retained lifetime's published binary32 x/y and
+apply `scrInView(0,0,0)` with the VM real-comparison tolerance. All four edges
+are excluded, including equality; these are origin checks, not mask bounds.
+Stored and native adapters use the normal ordinary-event camera snapshot,
+not the camera target updated in that frame. Native camera offsets are converted
+to absolute room-view coordinates before testing. Time-stopped bones still query the view, and health
+destruction does not suppress the final query. Explicit dirty-camera setters
+and complete room-entry view publication remain outside these normal-follow
+adapters; this is not a replacement for the camera-manager work queue.
 
 Bone impact adapters use the source `scrFxNol` subset: synchronously create
 object 219 at the bone's currently published coordinates, assign the caller's

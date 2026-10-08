@@ -1,4 +1,5 @@
 #include "core/BoneProjectile.h"
+#include "core/BoneViewRetirement.h"
 #include "core/GameMakerRandom.h"
 #include <cstdio>
 #include <cstdlib>
@@ -27,6 +28,27 @@ static BoneProjectile sample(){
     b.imageSpeed={};b.health=0;return b;
 }
 int main(){
+    {
+        const auto n=[](int x){return MotionBinary64::fromInteger(x);};
+        const auto checkView=[&](MotionBinary64 x,MotionBinary64 y,bool expected){
+            bool visible=!expected;
+            check(boneInPublishedView(x,y,n(160),n(850),n(160),n(284),visible)&&visible==expected);
+        };
+        checkView(n(240),n(990),true);
+        for(int x:{159,160,320,321})checkView(n(x),n(990),false);
+        for(int y:{849,850,1134,1135})checkView(n(240),n(y),false);
+        for(int x:{161,319})for(int y:{851,1133})checkView(n(x),n(y),true);
+        // Strict operators still use the VM epsilon, not raw host < and >.
+        auto x=n(160);check(x.add({0x3ed00000u,0}));checkView(x,n(990),false); // +2^-18
+        x=n(160);check(x.add({0x3f000000u,0}));checkView(x,n(990),true); // +2^-15
+        x=n(320);check(x.add({0xbed00000u,0}));checkView(x,n(990),false);
+        x=n(320);check(x.add({0xbf000000u,0}));checkView(x,n(990),true);
+        // Short-circuited edges do not evaluate invalid later operands.
+        const MotionBinary64 invalid{0x7ff00000u,0};bool visible=true;
+        check(boneInPublishedView(n(160),invalid,n(160),invalid,invalid,invalid,visible)&&!visible);
+        visible=true;
+        check(!boneInPublishedView(n(240),n(990),n(160),n(850),invalid,n(284),visible)&&visible);
+    }
     unsigned comparisons=0;
     for(unsigned seed=0;seed<256;++seed){
         GameMakerRandom random(seed);BoneProjectile b;check(b.create(240,990,random));
