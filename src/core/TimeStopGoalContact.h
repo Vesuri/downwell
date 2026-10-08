@@ -7,11 +7,11 @@
 #include "DivideBinary64.h"
 #include "RunnerMaskDispatch.h"
 namespace downwell {
-// Unrotated sprite 31/91/133/134 versus integral-centred goal or ordinary field.
+// Unrotated sprite 31/91/133/134/585 versus integral-centred goal or ordinary field.
 // Compatibility bounds use nearest-even conversion. Angled masks require a
 // different path; callers must not silently discard an instance's rotation.
 struct TimeStopGoalContact {
-    enum class Mask { Player, Shard, SmallCurrency, MediumCurrency };
+    enum class Mask { Player, Shard, SmallCurrency, MediumCurrency, Box };
     static bool query(Mask mask,RunnerImageValue x,RunnerImageValue y,
                       RunnerImageValue xs,RunnerImageValue ys,
                       const GoalTimeField& field,bool& hit){
@@ -33,9 +33,11 @@ private:
         // Express each solid mask relative to the helper's origin 12.
         // sprGemS origin 8, margins 4..11 becomes 8..15 here; sprGemM
         // already has origin 12 and margins 6..17. End edges are exclusive.
-        const int left=mask==Mask::MediumCurrency?6:8,right=mask==Mask::MediumCurrency?18:16;
-        const int top=mask==Mask::Player?8:mask==Mask::Shard?10:mask==Mask::SmallCurrency?8:6;
-        const int bottom=mask==Mask::Player?20:mask==Mask::Shard?13:mask==Mask::SmallCurrency?16:18;
+        // sprMaskBlock (585) is a solid 16x16 mask with origin (8,8).
+        const int left=mask==Mask::Box?4:mask==Mask::MediumCurrency?6:8;
+        const int right=mask==Mask::Box?20:mask==Mask::MediumCurrency?18:16;
+        const int top=mask==Mask::Box?4:mask==Mask::Player?8:mask==Mask::Shard?10:mask==Mask::SmallCurrency?8:6;
+        const int bottom=mask==Mask::Box?20:mask==Mask::Player?20:mask==Mask::Shard?13:mask==Mask::SmallCurrency?16:18;
         const RunnerMaskDispatch dispatch;
         const auto fieldScale=integer(pixelScale);
         const bool rounded=dispatch.select({xs,ys,{}},{fieldScale,fieldScale,{}})==RunnerMaskDispatch::Path::roundedPosition;

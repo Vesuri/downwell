@@ -1546,8 +1546,18 @@ public:
         if(!valid()||!world_||!child||(mask!=133&&mask!=134)||
             !View::encode(View::Kind::currency,local,self)||!resolves(self)||!px.assign(x)||!py.assign(y))return check(false);
         if(!native_)return masks.valid()&&registeredPlaceMeeting(self,82,x,y,masks,hit);
-        bool found=false;
         const auto shape=mask==133?TimeStopGoalContact::Mask::SmallCurrency:TimeStopGoalContact::Mask::MediumCurrency;
+        return nativeSolidFieldMeeting(self,shape,px,py,hit);
+    }
+    // Boolean-only query over registered field lifetimes. It must not be used
+    // as an identity-bearing instance_place selector.
+    bool nativeSolidFieldMeeting(InstanceHandle self,TimeStopGoalContact::Mask shape,RunnerImageValue px,RunnerImageValue py,bool& hit){
+        std::uint32_t flags=0;
+        if(!valid()||!world_||!native_||!resolves(self)||!eligibilityFlags(self,flags))return check(false);
+        // Pair testing rejects a destroyed caller even when its current Step
+        // continues after instance_destroy (boxes and stuck currency).
+        if(flags&0x100001u){hit=false;return true;}
+        bool found=false;
         const RunnerImageValue unit{0x3f800000u};
         const bool ok=visitRegistered(View::timeFieldBase,View::exitControllerBase,
             [&](InstanceHandle h,int object,std::uint32_t flags){
@@ -1617,9 +1627,13 @@ public:
     bool boxTimeAllowed(InstanceHandle local,bool pTimeStop,int roomWidth,const SpriteMaskPack& masks,bool& allowed){
         InstanceHandle self;
         if(!valid()||!world_||!View::encode(View::Kind::breakable,local,self)||!resolves(self))return check(false);
-        const auto state=owner_.resolve(self);if(!state)return check(false);
-        return check(TimeStopBound::evaluate(pTimeStop,state->x.promoted(),state->y.promoted(),roomWidth,
-                [&](auto x,auto y,bool& hit){return masks.valid()&&registeredPlaceMeeting(self,82,x,y,masks,hit);},allowed));
+        BoxDestructionScript::Caller caller;if(!readBoxDestruction(self,caller))return check(false);
+        return check(TimeStopBound::evaluate(pTimeStop,caller.x,caller.y,roomWidth,
+                [&](auto x,auto y,bool& hit){
+                    if(!native_)return masks.valid()&&registeredPlaceMeeting(self,82,x,y,masks,hit);
+                    RunnerImageValue px,py;
+                    return px.assign(x)&&py.assign(y)&&nativeSolidFieldMeeting(self,TimeStopGoalContact::Mask::Box,px,py,hit);
+                },allowed));
     }
     bool stopBoxAlarm0(InstanceHandle local,bool pTimeStop,int roomWidth,const SpriteMaskPack& masks){
         if(!world_)return check(false);

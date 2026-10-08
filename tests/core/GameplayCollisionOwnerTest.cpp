@@ -739,6 +739,53 @@ int main(){
                     RunnerImageValue{0x43704000u},py)&&!owner->valid());
         }
     }
+    std::vector<bool> boxFieldReference;
+    for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+        GameplayCollisionOwner::Ownership::nativeScenery}){
+        const auto rb=read("generated/downwell-rooms.dwrm"),mb=read("generated/downwell-sprite-masks.dwsm");
+        RoomPack rooms(rb.data(),rb.size());SpriteMaskPack masks(mb.data(),mb.size());
+        PackedObject boxObject;PackedSpriteCollision boxShape;SpriteMaskPack::Mask boxMask;
+        assert(objects.findObject(92,boxObject)&&boxObject.textureMaskId==585&&sprites.sprite(585,boxShape)&&
+            boxShape.originX==8&&boxShape.originY==8&&boxShape.marginLeft==0&&boxShape.marginTop==0&&
+            boxShape.marginRight==15&&boxShape.marginBottom==15&&boxShape.collisionMaskCount==1&&
+            masks.mask(585,0,boxMask)&&boxMask.width==16&&boxMask.height==16);
+        for(int x=0;x<16;++x)for(int y=0;y<16;++y)assert(boxMask.contains(x,y));
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},&rooms,ownership);
+        auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world)&&world->createRoomStartField()&&
+            world->createGeneratedInstance({82,240,512},objects,[](const auto&){return true;})&&world->registerLevelExit(1024));
+        const int offsets[]={-129,-128,-127,-25,-24,-23,0,23,24,25,127,128,129};
+        std::vector<bool> results;
+        for(int centre:{176,512,1024})for(int dx:offsets)for(int dy:offsets){
+            const int x=dx,y=centre+dy-176;assert(world->appendBreakables(&x,&y,1));
+            const unsigned slot=world->breakableSlots()-1;const InstanceHandle box{slot,world->breakableSlot(slot).lifetimeId};
+            bool allowed=false;
+            assert(owner->boxTimeAllowed(box,false,480,masks,allowed)&&allowed);
+            assert(owner->boxTimeAllowed(box,true,480,masks,allowed));results.push_back(allowed);
+            assert(world->publishBoxAlarm0(box,4)&&owner->stopBoxAlarm0(box,true,480,masks)&&
+                world->findBreakable(box)->alarm0==(allowed?4:5));
+            assert(world->markBreakableDestroyed(box));bool retained=!allowed;
+            const bool queried=owner->boxTimeAllowed(box,true,480,masks,retained);
+            const bool outside=dx < -80||dx > 80;
+            assert(queried&&retained==outside);results.push_back(retained);
+            assert(world->publishBoxAlarm0(box,4)&&owner->stopBoxAlarm0(box,true,480,masks)&&
+                world->findBreakable(box)->alarm0==(outside?4:5)&&world->retireMarkedBreakable(box));
+        }
+        if(ownership==GameplayCollisionOwner::Ownership::reference)boxFieldReference=results;
+        else assert(results==boxFieldReference);
+        assert(std::find(results.begin(),results.end(),true)!=results.end()&&
+            std::find(results.begin(),results.end(),false)!=results.end());
+        struct Queries {
+            bool wall(InstanceHandle,MotionBinary64,MotionBinary64,bool& hit){hit=false;return true;}
+            bool tile(InstanceHandle,int,MotionBinary64,MotionBinary64,bool& hit){hit=false;return true;}
+        } queries;
+        InstanceHandle gem;const auto gx=MotionBinary64::fromInteger(240),gy=MotionBinary64::fromInteger(512);
+        assert(world->createCurrencyWithSourceId(806900,gx,gy,queries,gem));bool hit=false;
+        assert(owner->currencyFieldMeeting(gem,gx,gy,masks,hit)&&hit&&owner->currency().markDestroyed(gem)&&
+            owner->currencyFieldMeeting(gem,gx,gy,masks,hit)&&!hit);
+    }
     for(unsigned mode=0;mode<12;++mode){
         const bool fullEffects=mode!=0;
         const auto roomBytes=read("generated/downwell-rooms.dwrm");RoomPack roomPack(roomBytes.data(),roomBytes.size());

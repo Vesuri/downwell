@@ -813,7 +813,11 @@ the still-incomplete natural box Step and its `alarmStop(0)` dependency.
 
 The checked `stopBoxAlarm0` adapters now provide that script operation for an
 explicit Step-boundary call. They query `TimeStopBound` with the box's registered
-published coordinates and mask, including fractional side-boundary positions.
+published coordinates and mask; the reference owner also covers fractional
+side-boundary positions. Native static boxes use their retained integral room
+position and the recovered solid 16×16 mask 585, intersected with the exact
+ordinary/entry/exit field rows. This boolean query does not require a generic
+box geometry record and does not provide instance identity or traversal order.
 Allowed time leaves both the alarm and `self.i` untouched; frozen time writes
 `i=0`, increments only a positive countdown, then writes `i=1`. Zero and negative
 alarms are not revived. Failed queries leave those fields untouched and latch
@@ -830,6 +834,12 @@ compatibility collision rejects flag 1 on either participant. Consequently a
 destroy-marked box inside the room sides can receive a refund despite overlapping
 a field. A retained-lifetime test covers this distinction; do not bypass the
 original collision guard just because the event has not returned yet.
+The native solid-field query applies that same caller-flag guard to currency:
+a gem marked destroyed by its stuck-wall check must not regain field contact
+in the remainder of its Step. The cross-owner fixture compares 507 box positions
+around all three field kinds, alarm refunds before/after destruction, and the
+currency self-exclusion. It verifies the box mask metadata and every stored bit
+before relying on the specialized rectangle.
 
 Both box destruction entry points publish the destruction mark before changing
 the retained record flag; repeated requests do not republish it. The object-92
