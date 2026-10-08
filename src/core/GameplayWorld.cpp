@@ -39,6 +39,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     if(droneBullets_&&!droneBullets_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(bones_&&!bones_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(skeletons_&&!skeletons_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
+    if(blood_&&!blood_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(!clearRoomDebris())return downwell::ResultsDestination::none;
     if(!clearRoomScriptEffects())return downwell::ResultsDestination::none;
     if(!run_.effectsSucceeded||!clearBulletOwnership())return downwell::ResultsDestination::none;
@@ -56,6 +57,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto droneBullets=droneBullets_;
     const auto bones=bones_;
     const auto skeletons=skeletons_;
+    const auto blood=blood_;
     const auto phaseBoundary=phaseBoundary_;
     const auto roomAnimation=roomAnimation_;
     const auto actorEndStep=registeredActorEndStep_;void* const actorEndStepContext=registeredActorEndStepContext_;
@@ -103,6 +105,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     droneBullets_=droneBullets;
     bones_=bones;
     skeletons_=skeletons;
+    blood_=blood;
     configurePhaseBoundary(phaseBoundary,phaseBoundaryContext);
     configureRoomAnimation(roomAnimation,roomAnimationContext);
     configureRegisteredActorEndStep(actorEndStep,actorEndStepContext);
@@ -174,6 +177,7 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
     if(droneBullets_&&!droneBullets_->clear())return run_.effectsSucceeded=false;
     if(bones_&&!bones_->clear())return run_.effectsSucceeded=false;
     if(skeletons_&&!skeletons_->clear())return run_.effectsSucceeded=false;
+    if(blood_&&!blood_->clear())return run_.effectsSucceeded=false;
     if(!clearRoomDebris())return false;
     if(!clearRoomScriptEffects())return false;
     if (!run_.effectsSucceeded || !clearEnemyOwnership() || !clearBreakableOwnership() || !retirePlayerOwnership()) return false;

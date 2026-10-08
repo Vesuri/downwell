@@ -24,6 +24,7 @@
 #include "core/DroneBulletInstances.h"
 #include "core/BoneProjectileInstances.h"
 #include "core/SkeletonInstances.h"
+#include "core/BloodInstances.h"
 #include "core/RegisteredSkeletonThrow.h"
 #include "core/BoneViewRetirement.h"
 #include "core/GameplayScriptSpawnInstances.h"
@@ -259,6 +260,22 @@ public:
     bool bindDroneBullets(DroneBullets& bullets){
         if(droneBullets_||!bullets.valid()||bullets.size())return false;
         droneBullets_=&bullets;return true;
+    }
+    using Blood=downwell::BloodInstances<32>;
+    static constexpr unsigned bloodCapacity=32;
+    const Blood* bloodInstances()const{return blood_;}
+    bool bindBlood(Blood& blood){
+        if(blood_||!blood.valid()||blood.size())return false;
+        blood_=&blood;return true;
+    }
+    template<class Caller> bool createBloodWithSourceId(unsigned id,downwell::MotionBinary64 x,
+        downwell::MotionBinary64 y,downwell::MotionBinary64 angle,Caller caller,downwell::InstanceHandle& key){
+        if(!run_.effectsSucceeded||!blood_||!blood_->create(id,x,y,angle,caller,key))return run_.effectsSucceeded=false;
+        return true;
+    }
+    template<class Query> bool stepBloodRoomEffect(downwell::InstanceHandle key,Query query){
+        if(!run_.effectsSucceeded||!blood_||!blood_->step(key,query))return run_.effectsSucceeded=false;
+        return true;
     }
     using Bones=downwell::BoneProjectileInstances<32>;
     using Skeletons=downwell::SkeletonInstances<32>;
@@ -1132,6 +1149,7 @@ private:
     DroneBullets* droneBullets_=nullptr;
     Bones* bones_=nullptr;
     Skeletons* skeletons_=nullptr;
+    Blood* blood_=nullptr;
     downwell::TimeChangeEffects<8>* timeChangeEffects_=nullptr;
     int* timeChangeSpeed_=nullptr; // Borrowed source room-speed global, not PAL catch-up.
     bool clearRoomTimeChanges();

@@ -635,8 +635,19 @@ geometry and layers, with the room numeric-ID allocator. Sprite, angle, speed,
 ordered position and destruction changes are published through this bridge.
 `bloodRegistration`/`spawnBlood` expose its creation boundary; the borrowed bank
 must be cleared before room teardown. These are not automatic death-script
-births: native ownership, room-phase admission, time-field queries and rendering
-are still required before natural blood effects can use this path.
+births: room-phase admission, time-field queries and rendering are still
+required before natural blood effects can use this path.
+
+The native `GameplayCollisionOwner` binds the same `BloodInstances` store to
+object/layer membership and reference collision geometry. The native identity
+table retains its existing on-demand geometry policy. Explicit source-ID births
+preserve caller and setter order; they do not invent the missing global native
+allocator. Room animation dispatch advances these records and Animation End
+marks them for the normal destruction boundary. Blood has no alarm or End Step
+event and is excluded from those family walks. Room handoff/retry clears the
+bank while preserving its binding and generation history. Ordinary Step still
+requires a checked time-stop query supplied by its caller; automatic death
+births and Draw admission are not enabled by registration alone.
 
 - Blood emits at published x/y, not the precise xx/yy accumulators. Its two
   angles are `random(20)` and `180-random(20)`, respectively. Object 220's Create

@@ -8,7 +8,7 @@ namespace downwell {
 // and lifetimeId do not. Borrowed views never cache pointers across a mutation.
 class GameplayCollisionView {
 public:
-    enum class Kind {player,enemy,breakable,terrain,timeField,goalField,exitController,bullet,scriptEffect,debris,timeChange,entryDither,drone,bone,skeleton};
+    enum class Kind {player,enemy,breakable,terrain,timeField,goalField,exitController,bullet,scriptEffect,debris,timeChange,entryDither,drone,bone,skeleton,blood};
     static constexpr unsigned enemyBase=1;
     static constexpr unsigned breakableBase=enemyBase+GameplayWorld::enemyCapacity;
     static constexpr unsigned terrainBase=breakableBase+GameplayWorld::breakableCapacity;
@@ -23,7 +23,8 @@ public:
     static constexpr unsigned droneBase=entryDitherBase+GameplayEntryDithers::capacity;
     static constexpr unsigned boneBase=droneBase+GameplayWorld::droneBulletCapacity;
     static constexpr unsigned skeletonBase=boneBase+GameplayWorld::boneCapacity;
-    static constexpr unsigned capacity=skeletonBase+GameplayWorld::skeletonCapacity;
+    static constexpr unsigned bloodBase=skeletonBase+GameplayWorld::skeletonCapacity;
+    static constexpr unsigned capacity=bloodBase+GameplayWorld::bloodCapacity;
     struct Record {
         const GameplayWorld::PlayerInstance* player=nullptr;
         const GameplayWorld::EnemyState* enemy=nullptr;
@@ -40,6 +41,7 @@ public:
         const GameplayWorld::DroneBullets::Record* drone=nullptr;
         const GameplayWorld::Bones::Record* bone=nullptr;
         const GameplayWorld::Skeletons::Record* skeleton=nullptr;
+        const GameplayWorld::Blood::Record* blood=nullptr;
     };
     explicit GameplayCollisionView(const GameplayWorld& world):world_(world){}
     static bool encode(Kind kind,InstanceHandle local,InstanceHandle& key){
@@ -61,6 +63,7 @@ public:
             case Kind::drone:base=droneBase;count=GameplayWorld::droneBulletCapacity;break;
             case Kind::bone:base=boneBase;count=GameplayWorld::boneCapacity;break;
             case Kind::skeleton:base=skeletonBase;count=GameplayWorld::skeletonCapacity;break;
+            case Kind::blood:base=bloodBase;count=GameplayWorld::bloodCapacity;break;
             default:return false;
         }
         if(local.slot>=count)return false;
@@ -68,6 +71,7 @@ public:
     }
     static bool decode(InstanceHandle key,Kind& kind,InstanceHandle& local){
         if(!key.generation||key.slot>=capacity)return false;
+        if(key.slot>=bloodBase){kind=Kind::blood;local={key.slot-bloodBase,key.generation};return true;}
         if(key.slot>=skeletonBase){kind=Kind::skeleton;local={key.slot-skeletonBase,key.generation};return true;}
         if(key.slot>=boneBase){kind=Kind::bone;local={key.slot-boneBase,key.generation};return true;}
         if(key.slot>=droneBase){kind=Kind::drone;local={key.slot-droneBase,key.generation};return true;}
@@ -103,6 +107,7 @@ public:
             else if constexpr(Family==Kind::entryDither)return world_.entryDithers()?world_.entryDithers()->find(local):nullptr;
             else if constexpr(Family==Kind::drone)return world_.droneBullets()?world_.droneBullets()->find(local):nullptr;
             else if constexpr(Family==Kind::bone)return world_.bones()?world_.bones()->find(local):nullptr;
+            else if constexpr(Family==Kind::blood)return world_.bloodInstances()?world_.bloodInstances()->find(local):nullptr;
             else {static_assert(Family==Kind::skeleton,"Unknown collision family");
                 return world_.skeletons()?world_.skeletons()->find(local):nullptr;}
         };
@@ -152,6 +157,9 @@ private:
                 break;
             case Kind::bone:
                 if(!world_.bones()||!(next.bone=world_.bones()->find(local)))return false;
+                break;
+            case Kind::blood:
+                if(!world_.bloodInstances()||!(next.blood=world_.bloodInstances()->find(local)))return false;
                 break;
             case Kind::skeleton:
                 if(!world_.skeletons()||!(next.skeleton=world_.skeletons()->find(local)))return false;

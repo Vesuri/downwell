@@ -255,11 +255,12 @@ static void checkTypedCollisionView(const GameplayCollisionView& view,GameplayCo
         case K::drone:assert(view.resolveLocal<K::drone>(local)==reference.drone);break;
         case K::bone:assert(view.resolveLocal<K::bone>(local)==reference.bone);break;
         case K::skeleton:assert(view.resolveLocal<K::skeleton>(local)==reference.skeleton);break;
+        case K::blood:assert(view.resolveLocal<K::blood>(local)==reference.blood);break;
     }
 }
 static void checkCollisionViewMembership(const GameplayWorld& world){
     const GameplayCollisionView view(world);
-    for(unsigned family=0;family<=unsigned(GameplayCollisionView::Kind::skeleton);++family)
+    for(unsigned family=0;family<=unsigned(GameplayCollisionView::Kind::blood);++family)
         for(auto local:{InstanceHandle{0,0},InstanceHandle{0xffffffffu,1},InstanceHandle{GameplayCollisionView::capacity,1}})
             checkTypedCollisionView(view,GameplayCollisionView::Kind(family),local);
     for(unsigned slot=0;slot<=GameplayCollisionView::capacity;++slot){
@@ -2824,6 +2825,34 @@ int main(){
         auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
         assert(owner->attach(*world));
+        {
+            auto& blood=owner->blood();InstanceHandle local,shared;unsigned calls=0;
+            const auto rng=world->randomDrawCount();
+            assert(world->createBloodWithSourceId(605080,MotionBinary64::fromInteger(240),
+                MotionBinary64::fromInteger(990),MotionBinary64::fromInteger(14),[&](InstanceHandle key){
+                    const auto* child=blood.find(key);++calls;
+                    return child&&child->spriteId==-1&&child->state.imageSpeed.bits==0x3f800000u;
+                },local)&&calls==1&&world->randomDrawCount()==rng);
+            assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::blood,local,shared)&&
+                GameplayCollisionView(*world).contains(shared)&&blood.find(local)->sourceId==605080);
+            checkTypedCollisionView(GameplayCollisionView(*world),GameplayCollisionView::Kind::blood,local);
+            assert(world->stepBloodRoomEffect(local,[](const auto& child,bool& allowed){
+                assert(child.state.savedSpeed.bits==0x3f000000u);allowed=false;return true;
+            }));
+            const auto* child=blood.find(local);assert(child&&!child->state.imageSpeed.bits);
+            world->step(0);assert(world->effectsSucceeded()&&owner->valid()&&!child->state.timeline.bits);
+            assert(world->stepBloodRoomEffect(local,[](const auto&,bool& allowed){allowed=true;return true;}));
+            if(ownership==GameplayCollisionOwner::Ownership::reference){
+                assert(owner->properties(shared)->sprite.spriteId==84&&
+                    owner->state(shared)->x.bits==child->x.bits&&owner->state(shared)->y.bits==child->y.bits);
+            }
+            for(unsigned tick=0;tick<18;++tick){world->step(0);assert(world->effectsSucceeded()&&owner->valid());}
+            assert(blood.find(local)&&blood.find(local)->destroyRequested&&owner->prepareDraw());
+            assert(!blood.find(local)&&!GameplayCollisionView(*world).contains(shared));
+            InstanceHandle replacement;
+            assert(world->createBloodWithSourceId(605081,{}, {},{},[](auto){return true;},replacement)&&
+                replacement.slot==local.slot&&replacement.generation!=local.generation&&blood.clear());
+        }
         for(int offset:{-161,-160,3000,3001}){
             auto retired=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
                 GameplayTerrainInstances::WallCollision{},&rooms,ownership);
