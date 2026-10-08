@@ -1156,10 +1156,25 @@ int main(int argc, char** argv) {
     std::ifstream hudInput(argv[2], std::ios::binary);
     const std::vector<UBYTE> hudPack{std::istreambuf_iterator<char>(hudInput), {}};
     {
-        auto reference=hudPack;
+        auto reference=hudPack,narrowed=hudPack;
         auto word=[&](unsigned at){return unsigned(reference[at])*256+reference[at+1];};
         const unsigned count=word(8)*65536+word(10),directory=word(6);
-        bool found=false;
+        bool found=false;unsigned originalWidth=0,mirrorAt=0;
+        for(unsigned i=0;i<count;++i){
+            const unsigned at=directory+i*24;
+            if(word(at)==408)originalWidth=word(at+8);
+            if(word(at)==62408)mirrorAt=at;
+        }
+        require(originalWidth&&mirrorAt,"both tablet border records are present");
+        require(word(mirrorAt+8)==word(mirrorAt+12)&&word(mirrorAt+8)>originalWidth,
+            "mirrored border exposes its transparent DMA extent");
+        putWord(narrowed.data(),mirrorAt+8,originalWidth);
+        const unsigned stride=word(mirrorAt+12)/8,height=word(mirrorAt+10);
+        const unsigned payload=word(mirrorAt+16)*65536+word(mirrorAt+18);
+        for(unsigned plane=0;plane<3;++plane)for(unsigned y=0;y<height;++y)
+        for(unsigned x=originalWidth;x<stride*8;++x)
+            require(!(hudPack[payload+(plane*height+y)*stride+x/8]&(128u>>(x&7))),
+                "exposed border padding has zero colour and alpha bits");
         for(unsigned i=0;i<count;++i){
             const unsigned at=directory+i*24;
             if(word(at)==62408){
@@ -1169,14 +1184,22 @@ int main(int argc, char** argv) {
         }
         require(found,"offline tablet-border mirror is present");
         for(int x : {-3,0,108,272,379,384})for(int y : {-17,0,23})
-        for(unsigned background : {0u,0x5au,0xffu}){
-            std::vector<UBYTE> actual(downwellLayerBytes,background),expected(actual);
-            AmigaRenderer a,b;
+        for(unsigned background : {0u,0x5au,0xffu})for(unsigned clip=0;clip<3;++clip){
+            std::vector<UBYTE> actual(downwellLayerBytes,background),expected(actual),oldExtent(actual);
+            AmigaRenderer a,b,c;
             amigaRendererInit(&a,nullptr,actual.data());
             amigaRendererInit(&b,nullptr,expected.data());
+            amigaRendererInit(&c,nullptr,oldExtent.data());
+            if(clip)for(auto* renderer : {&a,&b,&c}) {
+                amigaRendererSetClipRect(renderer,clip==1?x-2:0,clip==1?y+3:0,
+                    clip==1?5:270,clip==1?271:190);
+                renderer->target=renderer->hud;
+            }
             amigaRendererDrawAsset(&a,hudPack.data(),hudPack.data()+hudPack.size(),408,0,x,y,1);
             amigaRendererDrawAsset(&b,reference.data(),reference.data()+reference.size(),408,0,x,y,1);
+            amigaRendererDrawAsset(&c,narrowed.data(),narrowed.data()+narrowed.size(),408,0,x,y,1);
             require(actual==expected,"offline border equals runtime reflection, clipped and over existing pixels");
+            require(actual==oldExtent,"transparent extent preserves the original mirrored logical rectangle");
         }
     }
 #ifdef DOWNWELL_PREPARED_AMMO_DIVIDERS

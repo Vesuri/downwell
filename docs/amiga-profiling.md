@@ -758,6 +758,15 @@ reports the two entries as uploads/reuses. Use `make verify-prepared-time-fields
 and `bash amiga/profile.sh fields-clear` for image, overwrite-invalidation
 and reentry pixel checks. The selector is unset on profiling restoration.
 
+The offline mirrored HUD border exposes its zero-filled DMA row padding as
+its logical width, without changing its anchor or stored pixels. This avoids
+the Bitmap class's partial-word edge preservation when drawing the tall right
+border. `REFERENCE_HUD_BORDER_EXTENT=1` restores the original logical width
+while retaining the same mirrored payload; compare `profile.sh entry` and
+native frame dumps with this selector. Profiling restoration unsets it.
+The renderer test compares both extents and the runtime-reflection oracle
+over clipped positions and existing pixels, including zero alpha in padding.
+
 `REFERENCE_EMPTY_TERRAIN=1` retains generic landing-index reconstruction for
 an empty world. The default resets occupancy, landing candidates, contact
 records and provenance directly when there are no room instances or pattern

@@ -1297,6 +1297,12 @@ void amigaRendererDrawAsset(AmigaRenderer* renderer,
     width = readWord(record + 8);
     height = readWord(record + 10);
     dataWidth = readWord(record + 12);
+#ifdef DOWNWELL_REFERENCE_HUD_BORDER_EXTENT
+    if (sprite == 408) {
+        const UBYTE* original = findAsset(pack, packEnd, sprite, frame);
+        if (original) width = readWord(original + 8);
+    }
+#endif
     planeBytes = dataWidth >> 3;
     data = pack + readLong(record + 16);
     if (data < pack || data + readLong(record + 20) > packEnd)

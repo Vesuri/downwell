@@ -716,6 +716,16 @@ def build_records(manifest, extracted, profile, language_path=None):
                                 originX=sprite["width"] - sprite["originX"])
                 require(decode_planar(data, mirrored.width, mirrored.height, stride) == pixels,
                         "mirrored planar round trip failed")
+                if profile == "hud" and sprite_id == 408:
+                    # Expose the already-transparent DMA padding, retaining
+                    # the source anchor. A partial logical last word otherwise
+                    # forces Bitmap's per-row edge repair for this tall border.
+                    padded = decode_planar(data, stride, mirrored.height, stride)
+                    require(all(padded[y * stride + x] == 0
+                                for y in range(mirrored.height)
+                                for x in range(mirrored.width, stride)),
+                            "HUD border DMA padding must be transparent")
+                    metadata["width"] = stride
                 encoded.append((metadata, frame_index, stride, data))
             if profile == "game" and sprite_id in (27, 43, 44):
                 # Style bobs contain large transparent margins. Trim offline
@@ -1304,9 +1314,10 @@ def main():
             atomic_write(selection_manifest, selection_provenance)
     if args.profile == "hud":
         provenance = json.dumps({
-            "schemaVersion": 1, "generator": "generate-amiga-hud.py/hud-v3",
+            "schemaVersion": 1, "generator": "generate-amiga-hud.py/hud-v4",
             "extractor": manifest["extractor"], "sourceSha256": SOURCE_SHA256,
             "packSha256": digest, "derivedAmmoDigitId": 65010, "derivedHealthGlyphId": 65011,
+            "transparentDmaExtentSpriteId": 62408,
         }, sort_keys=True, indent=2).encode("utf-8") + b"\n"
         provenance_path = args.output.with_suffix(".manifest.json")
         if args.check:
