@@ -40,6 +40,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     if(bones_&&!bones_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(skeletons_&&!skeletons_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(blood_&&!blood_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
+    if(currencyInstances_&&!currencyInstances_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(!clearRoomDebris())return downwell::ResultsDestination::none;
     if(!clearRoomScriptEffects())return downwell::ResultsDestination::none;
     if(!run_.effectsSucceeded||!clearBulletOwnership())return downwell::ResultsDestination::none;
@@ -178,6 +179,7 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
     if(bones_&&!bones_->clear())return run_.effectsSucceeded=false;
     if(skeletons_&&!skeletons_->clear())return run_.effectsSucceeded=false;
     if(blood_&&!blood_->clear())return run_.effectsSucceeded=false;
+    if(currencyInstances_&&!currencyInstances_->clear())return run_.effectsSucceeded=false;
     if(!clearRoomDebris())return false;
     if(!clearRoomScriptEffects())return false;
     if (!run_.effectsSucceeded || !clearEnemyOwnership() || !clearBreakableOwnership() || !retirePlayerOwnership()) return false;

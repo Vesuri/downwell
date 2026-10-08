@@ -643,6 +643,16 @@ to subsequent queries. Integer `dflash=-1` is false in the runner and permits
 The compositor remains a required checked callback: this boundary alone is not
 live shaded currency rendering or native Draw integration.
 
+The native `CurrencyInstances` owner supplies registered object-248 birth,
+source numeric ID, local generation, synchronous shared Create and checked
+mark/retirement. `GameplayCollisionView` resolves those lifetimes independently
+of provisional gems; room teardown clears them. Its creation entry requires an
+explicit source ID and required wall/tile query callbacks. This is not yet the
+complete global allocation stream or native terrain-query adapter. The native
+animation dispatcher fails explicitly if a currency lifetime reaches it without
+the remaining scheduling integration; normal gameplay still uses provisional
+gems. Native memory residency and capacity admission remain to be measured.
+
 ### Currency Alarm 4 activation audit
 
 Currency Alarm 4 contains a separate motion program: hard gravity while rising,

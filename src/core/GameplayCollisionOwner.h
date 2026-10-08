@@ -366,6 +366,7 @@ private:
             if constexpr(Kind==View::Kind::bone)return 269;
             if constexpr(Kind==View::Kind::skeleton)return 120;
             if constexpr(Kind==View::Kind::blood)return 220;
+            if constexpr(Kind==View::Kind::currency)return 248;
             if constexpr(Kind==View::Kind::goalField||Kind==View::Kind::exitController)return r.objectId;
             return Kind==View::Kind::player?35:92;
         }
@@ -408,7 +409,7 @@ private:
             }else if constexpr(Kind==View::Kind::debris){
                 if(!r.effect)return parent.check(false);
                 state.x=r.effect->x;state.y=r.effect->y;
-            }else if constexpr(Kind==View::Kind::timeChange||Kind==View::Kind::entryDither||Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood){
+            }else if constexpr(Kind==View::Kind::timeChange||Kind==View::Kind::entryDither||Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency){
                 state.x=r.x;state.y=r.y;
             }else{
                 if(r.x>0x7fffffff-ox||r.y>0x7fffffff-oy)return parent.check(false);
@@ -459,7 +460,7 @@ private:
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
             if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
             if constexpr(Kind==View::Kind::entryDither)sourceId=r.sourceId;
-            if constexpr(Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood)sourceId=r.sourceId;
+            if constexpr(Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency)sourceId=r.sourceId;
             constexpr bool projected=Kind==View::Kind::player||Kind==View::Kind::enemy||
                 Kind==View::Kind::bullet||Kind==View::Kind::scriptEffect||Kind==View::Kind::debris||Kind==View::Kind::entryDither||Kind==View::Kind::bone||Kind==View::Kind::skeleton;
             if(projected&&!parent.actorDepthAvailable(p.depth))return parent.check(false);
@@ -520,7 +521,7 @@ private:
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
             if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
             if constexpr(Kind==View::Kind::entryDither)sourceId=r.sourceId;
-            if constexpr(Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood)sourceId=r.sourceId;
+            if constexpr(Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency)sourceId=r.sourceId;
             constexpr bool projected=Kind==View::Kind::player||Kind==View::Kind::enemy||
                 Kind==View::Kind::bullet||Kind==View::Kind::scriptEffect||Kind==View::Kind::debris||Kind==View::Kind::entryDither||Kind==View::Kind::bone||Kind==View::Kind::skeleton;
             if(projected&&!parent.actorDepthAvailable(depth))return parent.check(false);
@@ -668,6 +669,8 @@ private:
     GameplayWorld::Skeletons skeletons_{GameplayWorld::Skeletons::Binding::bindPositionedActor(skeletonBinding_)};
     Binding<GameplayWorld::Blood::Record,View::Kind::blood> bloodBinding_{*this};
     GameplayWorld::Blood blood_{GameplayWorld::Blood::Binding::bindPositionedActor(bloodBinding_)};
+    Binding<GameplayWorld::Currency::Record,View::Kind::currency> currencyBinding_{*this};
+    GameplayWorld::Currency currency_{GameplayWorld::Currency::Binding::bindPositionedActor(currencyBinding_)};
     std::uint32_t pendingTimeChangeId_=0;
     const bool native_;
     const bool sceneryLayers_;
@@ -778,6 +781,7 @@ public:
         if(!world_&&!world.bindBones(bones_))return check(false);
         if(!world_&&!world.bindSkeletons(skeletons_))return check(false);
         if(!world_&&!world.bindBlood(blood_))return check(false);
+        if(!world_&&!world.bindCurrency(currency_))return check(false);
         world_=&world;
 #ifndef DOWNWELL_REFERENCE_BREAKABLES
         if(nativeBoxes_){
@@ -986,6 +990,9 @@ public:
                     case View::Kind::bone:return self.bones_.advanceAnimation(local);
                     case View::Kind::skeleton:return self.skeletons_.advanceAnimation(local);
                     case View::Kind::blood:return self.blood_.advanceAnimation(local);
+                    // Birth/retirement are registered; admitting an eventful
+                    // currency frame still requires the full native scheduler.
+                    case View::Kind::currency:return self.check(false);
                     default:return true;
                 }
             };
@@ -1134,6 +1141,7 @@ public:
     GameplayWorld::Bones& bones(){return bones_;}
     GameplayWorld::Skeletons& skeletons(){return skeletons_;}
     GameplayWorld::Blood& blood(){return blood_;}
+    GameplayWorld::Currency& currency(){return currency_;}
     template<class MakePlayer> bool dispatchSkeletonCollision(const RunnerCollisionEventContext::Frame& event,MakePlayer makePlayer){
         View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;
         if(!valid()||!world_||!resolves(event.self)||!resolves(event.other)||
@@ -1726,6 +1734,7 @@ private:
                 case View::Kind::bone:return record.bone&&bones_.retire(local);
                 case View::Kind::skeleton:return record.skeleton&&skeletons_.retire(local);
                 case View::Kind::blood:return record.blood&&blood_.retire(local);
+                case View::Kind::currency:return record.currency&&currency_.retire(local);
                 default:return false;
             }
         });

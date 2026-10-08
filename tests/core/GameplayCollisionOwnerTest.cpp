@@ -258,11 +258,12 @@ static void checkTypedCollisionView(const GameplayCollisionView& view,GameplayCo
         case K::bone:assert(view.resolveLocal<K::bone>(local)==reference.bone);break;
         case K::skeleton:assert(view.resolveLocal<K::skeleton>(local)==reference.skeleton);break;
         case K::blood:assert(view.resolveLocal<K::blood>(local)==reference.blood);break;
+        case K::currency:assert(view.resolveLocal<K::currency>(local)==reference.currency);break;
     }
 }
 static void checkCollisionViewMembership(const GameplayWorld& world){
     const GameplayCollisionView view(world);
-    for(unsigned family=0;family<=unsigned(GameplayCollisionView::Kind::blood);++family)
+    for(unsigned family=0;family<=unsigned(GameplayCollisionView::Kind::currency);++family)
         for(auto local:{InstanceHandle{0,0},InstanceHandle{0xffffffffu,1},InstanceHandle{GameplayCollisionView::capacity,1}})
             checkTypedCollisionView(view,GameplayCollisionView::Kind(family),local);
     for(unsigned slot=0;slot<=GameplayCollisionView::capacity;++slot){
@@ -2946,6 +2947,34 @@ int main(){
         auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
         assert(owner->attach(*world));
+        {
+            auto& currency=owner->currency();InstanceHandle local,shared;
+            struct Queries {
+                GameplayWorld& world;unsigned calls=0;
+                bool wall(InstanceHandle key,MotionBinary64,MotionBinary64,bool& hit){
+                    const auto* r=world.currencyInstances()->find(key);assert(r&&r->sourceId==605079&&r->spriteId==133);
+                    InstanceHandle shared;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::currency,key,shared)&&
+                        GameplayCollisionView(world).contains(shared));++calls;hit=false;return true;
+                }
+                bool tile(InstanceHandle,int layer,MotionBinary64,MotionBinary64,bool& hit){assert(layer==100);++calls;hit=false;return true;}
+            } queries{*world};
+            auto expectedRandom=world->randomState();CurrencyCreate expected;
+            struct ReferenceQueries {
+                bool wall(MotionBinary64,MotionBinary64,bool& hit){hit=false;return true;}
+                bool tile(MotionBinary64,MotionBinary64,bool& hit){hit=false;return true;}
+                bool publish(RunnerImageValue,RunnerImageValue){return true;}
+            } reference;
+            const auto x=MotionBinary64::fromInteger(240),y=MotionBinary64::fromInteger(512);
+            assert(expected.create(x,y,1,false,expectedRandom,reference));
+            assert(world->createCurrencyWithSourceId(605079,x,y,queries,local)&&queries.calls==2&&
+                GameplayCollisionView::encode(GameplayCollisionView::Kind::currency,local,shared));
+            const auto* r=currency.find(local);assert(r&&r->state.xsp.high==expected.xsp.high&&r->state.xsp.low==expected.xsp.low&&
+                r->state.ysp.high==expected.ysp.high&&r->state.ysp.low==expected.ysp.low&&r->state.alarms.get(0)==10&&r->state.alarms.get(3)==15);
+            assert(world->randomDrawCount()==expectedRandom.drawCount());
+            for(unsigned i=0;i<16;++i)assert(world->randomState().stateWord(i)==expectedRandom.stateWord(i));
+            checkTypedCollisionView(GameplayCollisionView(*world),GameplayCollisionView::Kind::currency,local);
+            assert(currency.markDestroyed(local)&&owner->prepareDraw()&&!currency.find(local)&&!GameplayCollisionView(*world).contains(shared));
+        }
         {
             auto& blood=owner->blood();InstanceHandle local,shared;unsigned calls=0;
             const auto rng=world->randomDrawCount();

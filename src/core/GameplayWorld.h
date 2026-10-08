@@ -27,6 +27,7 @@
 #include "core/BoneProjectileInstances.h"
 #include "core/SkeletonInstances.h"
 #include "core/BloodInstances.h"
+#include "core/CurrencyInstances.h"
 #include "core/RegisteredSkeletonThrow.h"
 #include "core/BoneViewRetirement.h"
 #include "core/GameplayScriptSpawnInstances.h"
@@ -264,6 +265,18 @@ public:
         droneBullets_=&bullets;return true;
     }
     using Blood=downwell::BloodInstances<32>;
+    using Currency=downwell::CurrencyInstances<128>;
+    static constexpr unsigned currencyCapacity=128;
+    const Currency* currencyInstances()const{return currencyInstances_;}
+    bool bindCurrency(Currency& currency){
+        if(currencyInstances_||!currency.valid()||currency.size())return false;
+        currencyInstances_=&currency;return true;
+    }
+    template<class Queries> bool createCurrencyWithSourceId(unsigned id,downwell::MotionBinary64 x,
+        downwell::MotionBinary64 y,Queries& queries,downwell::InstanceHandle& key){
+        if(!run_.effectsSucceeded||!currencyInstances_)return run_.effectsSucceeded=false;
+        return run_.effectsSucceeded=currencyInstances_->create(id,x,y,run_.stage.area,run_.upgrades.levels[10]!=0,enemyRandom_,queries,key);
+    }
     static constexpr unsigned bloodCapacity=32;
     const Blood* bloodInstances()const{return blood_;}
     bool bindBlood(Blood& blood){
@@ -1246,6 +1259,7 @@ private:
     downwell::GameplayExitControllers exitControllers_;
     downwell::MachineGunEmitter emitter_;
     downwell::CurrencyAccount currencyAccount_;
+    Currency* currencyInstances_=nullptr;
     SolidResolver solidResolver_;
     SegmentResolver segmentResolver_ = nullptr;
     SolidResolver maskResolver_ = nullptr;
