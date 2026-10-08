@@ -639,6 +639,16 @@ to subsequent queries. Integer `dflash=-1` is false in the runner and permits
 The compositor remains a required checked callback: this boundary alone is not
 live shaded currency rendering or native Draw integration.
 
+`visitRegisteredCurrencyDraw` enters that boundary through the stored world's
+source layer traversal, preserving its effective depth and active/destroyed
+filtering. `CurrencyDraw` then uses the shared `drawFx` placement rules for the
+admitted default transform: normal draws target the effect surface at fractional
+view-relative positions, while death/low-spec commands retain absolute world
+positions for direct drawing at their layer boundary. The surface emitter
+rejects direct commands and resolves the four-frame currency artwork without
+rounding the published position. Original GPU raster sampling is not established
+by this adapter; callers still own rasterization and cross-family composition.
+
 The shared live reward wrapper now supplies the run's area to `GemMotion`.
 Its fixed-point adapter preserves the area-5 extra RNG draw after both ordinary
 velocity draws, and areas 3/4 use gravity 112/12800 and cap 6400/12800. As in

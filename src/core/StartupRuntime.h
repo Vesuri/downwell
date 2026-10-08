@@ -354,6 +354,16 @@ public:
     struct NoCollisionPass {bool operator()()const{return true;}};
     enum class DronePhase {animation,alarm,step,endStep};
     enum class CurrencyPhase {animation,alarm,step,cleanup};
+    template<unsigned Capacity,class DrawFx>
+    bool visitRegisteredCurrencyDraw(StoredCurrencyRegistration<instanceCapacity,Capacity>& registration,DrawFx drawFx){
+        if(!run_.effectsSucceeded||!registration.belongsTo(instances_)||!registration.valid())
+            return run_.effectsSucceeded=false;
+        const bool ok=visitDrawAtDepthChecked([&](InstanceHandle key,const InstanceRecord& record,int depth){
+            if(record.objectId!=248||!record.active||record.destroyRequested)return true;
+            return registration.draw(key,[&](auto h,const auto& r,const auto& state){return drawFx(h,r,state,depth);});
+        });
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
+    }
     template<unsigned Capacity,class Execute,class Tick>
     bool withCurrencyEvents(StoredCurrencyRegistration<instanceCapacity,Capacity>& registration,Execute execute,Tick tick){
         if(!run_.effectsSucceeded)return false;

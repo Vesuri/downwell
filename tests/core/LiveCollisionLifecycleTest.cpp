@@ -398,8 +398,8 @@ int main(){
             for(int flash:{-1,0,1}){
                 require(currency.dispatch(gem,[&](auto& s,bool&){s.flash=flash;return true;}),"set source flash gate");
                 const auto before=draws;
-                require(currency.draw(gem,[&](auto key,const auto& record,const auto& state){
-                    ++draws;require(key.slot==gem.slot&&record.spriteId==133+size&&record.maskId==133+size&&state.flash<=0,
+                require(world->visitRegisteredCurrencyDraw(currency,[&](auto key,const auto& record,const auto& state,int depth){
+                    ++draws;require(depth==10000&&key.slot==gem.slot&&record.spriteId==133+size&&record.maskId==133+size&&state.flash<=0,
                         "source sprite and mask writes precede drawFx");return true;
                 })&&draws==before+(flash<=0?1:0),"negative dflash draws and positive suppresses");
             }

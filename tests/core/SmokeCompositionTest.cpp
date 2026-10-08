@@ -1,5 +1,6 @@
 #include "core/SmokeComposition.h"
 #include "core/CurrencySmokeComposition.h"
+#include "core/CurrencyDraw.h"
 #include "core/SmokeEffects.h"
 #include "core/GameMakerRandom.h"
 #include <array>
@@ -25,6 +26,19 @@ int main(int argc,char**argv){
     assert(argc==2);std::ifstream file(argv[1],std::ios::binary);
     const std::vector<std::uint8_t> pack{std::istreambuf_iterator<char>(file),{}};
     EffectMaskAssets assets;assert(assets.bind(pack.data(),pack.size()));
+    for(unsigned sprite:{133u,134u})for(unsigned frame=0;frame<4;++frame)for(unsigned flags=0;flags<8;++flags){
+        CurrencyDraw::Command command;RunnerImageValue index;assert(index.assign(number(frame+0.5)));
+        EffectSurfacePlacement::View view{number(160),number(400),number(160),number(284)};
+        assert(CurrencyDraw::prepare(sprite,index,number(240.25),number(512.5),view,flags&1,flags&2,flags&4,command));
+        const auto target=(flags&3)?EffectSurfacePlacement::direct:(flags&4)?EffectSurfacePlacement::effects:EffectSurfacePlacement::hidden;
+        assert(command.placement.target==target);unsigned emitted=0;
+        const bool ok=CurrencyDraw::surface(command,assets,[&](const auto& asset,auto x,auto y){
+            ++emitted;assert(asset.low==assets.currency(sprite==134,frame)->low&&value(x)==80.25&&value(y)==112.5);return true;
+        });
+        assert(ok==(target!=EffectSurfacePlacement::direct)&&emitted==(target==EffectSurfacePlacement::effects?1u:0u));
+        if(target==EffectSurfacePlacement::effects)assert(!CurrencyDraw::surface(command,assets,[](const auto&,auto,auto){return false;}));
+        if(target==EffectSurfacePlacement::direct)assert(value(command.placement.x)==240.25&&value(command.placement.y)==512.5);
+    }
     for(unsigned sprite:{172u,206u})for(bool mirrored:{false,true}){
         EffectMaskAssets::Asset corpse;assert(assets.corpse(sprite,mirrored,corpse));
         assert(corpse.low&&corpse.high&&corpse.mask.data);
