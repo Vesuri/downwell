@@ -157,6 +157,7 @@ private:
     PreparedObjectDefaults<386> objectDefaults_;
     PreparedSpriteGeometry<741> spriteGeometry_;
     PreparedTerrainBirthBounds terrainBirthBounds_;
+    PreparedTerrainCreate nativeTerrainCreate_;
 #ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
     GameplayRoomLayers<View::capacity> layers_;
 #else
@@ -962,6 +963,7 @@ public:
         good_=sprites_.prepare(preparedSprites_,741)&&objectDefaults_.prepare(objects,sprites_)&&
             spriteGeometry_.prepare(sprites_)&&
             terrainBirthBounds_.prepare(objectDefaults_,sprites_)&&
+            nativeTerrainCreate_.prepare(objectDefaults_,sprites_)&&
             families_.bindInstanceFlags(objects)&&drawMetadata_.bind(objects)&&alarmMetadata_.bind(objects);
         if(good_){const auto* box=objectDefaults_.get(92);if(!box)good_=false;else {
             nativeBoxFlags_=box->initialFlags;
@@ -1079,7 +1081,20 @@ public:
                 return self.nativeTerrainRetire(slot);},
             [](void* p,unsigned slot){auto& self=*static_cast<GameplayCollisionOwner*>(p);
                 if(!self.valid())return false;
-                self.table_.externalFlagsChanged(View::terrainBase+slot);return true;}
+                self.table_.externalFlagsChanged(View::terrainBase+slot);return true;},
+            [](void* p,const GameplayWorld::NativeTerrain::Identity& id,int tile,std::uint32_t& flags){
+                auto& self=*static_cast<GameplayCollisionOwner*>(p);
+                const auto* plan=self.nativeTerrainCreate_.get(id.object,tile);
+                if(!self.valid()||!plan||plan->sprite!=tile)return self.check(false);
+                if(plan->changedSprite){
+                    flags|=8u;
+                    if(!self.nativeDirty(View::terrainBase+id.handle.slot,id.object,flags))return false;
+                }
+                // The admitted source Create has no RNG. Image index 23 for
+                // platforms and speed zero are retained by the typed owner;
+                // raw image-index writes do not dirty bounds or queues.
+                return true;
+            }
         }))return check(false);
 #ifndef DOWNWELL_REFERENCE_BREAKABLES
         if(nativeBoxes_){

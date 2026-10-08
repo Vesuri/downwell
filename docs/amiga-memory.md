@@ -6,7 +6,7 @@ memory requirement.
 
 ## Native terrain identities
 
-`nativeTerrainStorage` reserves 92,210 bytes of ordinary BSS on the 68000,
+`nativeTerrainStorage` reserves 96,310 bytes of ordinary BSS on the 68000,
 outside Chip RAM and the task stack. It retains at most 2,048 terrain
 lifetimes in birth order. Adjacent generated cells share identity/geometry
 descriptors; coincident and authored walls remain distinct. The bounded
@@ -19,6 +19,10 @@ The existing per-cell flags byte also packs constructor spatial membership,
 precise-mask and bounds-dirty bits. Constructor bounds are derived from the
 run's object and coordinates for publication and retirement; no per-cell
 rectangle array is allocated.
+A 16-bit sprite value per cell retains the admitted normal wall/platform
+Create result; the flags byte marks Create completion. Platform image index
+23 and stopped animation follow from that typed Create state, without generic
+animation records. This does not replace authored wall creation-script state.
 Room teardown preserves the generation counter, preventing old handles from
 addressing replacement walls. Generated numeric VM IDs are not inferred from
 these family-local handles.

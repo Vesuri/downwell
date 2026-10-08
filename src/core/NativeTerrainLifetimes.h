@@ -16,6 +16,7 @@ template<unsigned Capacity> class NativeTerrainLifetimes {
     Runs runs_;
     unsigned next_=1,freeHint_=0;
     unsigned char flags_[Capacity]{};
+    std::int16_t createSprite_[Capacity]{};
     bool good_=true;
 public:
     using Identity=typename Runs::Identity;
@@ -25,6 +26,7 @@ public:
         bool (*birth)(void*,const Identity&,bool,std::uint32_t&,std::uint32_t&)=nullptr;
         bool (*retire)(void*,unsigned)=nullptr;
         bool (*mark)(void*,unsigned)=nullptr;
+        bool (*create)(void*,const Identity&,int,std::uint32_t&)=nullptr;
     };
     bool spatialFlags(InstanceHandle h,std::uint32_t& out)const{
         if(!contains(h))return false;
@@ -34,9 +36,9 @@ public:
     }
     bool bind(Binding binding){
         if(!good_)return false;
-        if(!binding.context&&(binding.admit||binding.birth||binding.retire||binding.mark))return good_=false;
+        if(!binding.context&&(binding.admit||binding.birth||binding.retire||binding.mark||binding.create))return good_=false;
         if(binding_.context)return binding_.context==binding.context&&binding_.admit==binding.admit&&
-            binding_.birth==binding.birth&&binding_.retire==binding.retire&&binding_.mark==binding.mark;
+            binding_.birth==binding.birth&&binding_.retire==binding.retire&&binding_.mark==binding.mark&&binding_.create==binding.create;
         if(binding.context&&(!binding.admit||!binding.birth||!binding.retire||!binding.mark||size()))return good_=false;
         binding_=binding;return true;
     }
@@ -44,6 +46,24 @@ public:
         Order value;return good_&&runs_.publication(h,value)?value.stamp:0;
     }
     bool valid()const{return good_;}
+    // -2 means constructor defaults, not the runner's missing-sprite value.
+    bool appearance(InstanceHandle h,int& sprite,unsigned& index,bool& created)const{
+        if(!contains(h))return false;
+        created=(flags_[h.slot]&32u)!=0;sprite=createSprite_[h.slot];
+        index=created&&runs_.object(h.slot)==93?23u:0u;return true;
+    }
+    bool createProperties(InstanceHandle h,int tile){
+        Identity id;std::uint32_t spatial;
+        if(!readIdentity(h,id)||!spatialFlags(h,spatial)||(flags_[h.slot]&32u))return good_=false;
+        if(id.object!=99){
+            if(tile<0||tile>32767||(binding_.context&&
+                (!binding_.create||!binding_.create(binding_.context,id,tile,spatial))))return good_=false;
+            createSprite_[h.slot]=static_cast<std::int16_t>(tile);
+        }
+        flags_[h.slot]=(flags_[h.slot]&3u)|32u|((spatial&8u)?4u:0u)|
+            ((spatial&0x200u)?8u:0u)|((spatial&0x8000u)?16u:0u);
+        return true;
+    }
     unsigned size()const{return runs_.size();}
     unsigned runCount()const{return runs_.runCount();}
     unsigned available()const{return Capacity-size();}
@@ -68,6 +88,7 @@ public:
             !runs_.append({slot,next_},object,x,y,source,creation,order))return good_=false;
         ++next_;freeHint_=slot+1;
         flags_[slot]=(active?0:2)|((spatial&8u)?4u:0u)|((spatial&0x200u)?8u:0u)|((spatial&0x8000u)?16u:0u);
+        createSprite_[slot]=-2;
         return true;
     }
     bool canAppend(unsigned count)const{
@@ -94,6 +115,7 @@ public:
         runs_.~Runs();new(&runs_) Runs;freeHint_=0;return true;
     }
 private:
+    bool readIdentity(InstanceHandle h,Identity& id)const{return good_&&runs_.read(h,id);}
     Binding binding_{};
 };
 }

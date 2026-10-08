@@ -7,7 +7,10 @@ bool AmigaGameplayGeneration::roomBirth(const downwell::PackedRoomInstance& inst
         instance.instanceId,instance.creationCodeId);
 }
 bool AmigaGameplayGeneration::birth(int object,int x,int y,bool active){
-    return !lifetimes_||lifetimes_->append(object,x,y,active);
+    if(!lifetimes_)return true;
+    if(!lifetimes_->append(object,x,y,active))return false;
+    return !runtime_||runtime_->nativeTerrainInstances()!=lifetimes_||
+        runtime_->finishNativeTerrainCreate(lifetimes_->handle(lifetimes_->size()-1));
 }
 
 bool AmigaGameplayGeneration::loadRoom(AmigaPortRuntime& runtime,

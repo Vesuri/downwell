@@ -2301,6 +2301,15 @@ int main(){
         assert(terrain->spatialFlags(local,terrainFlags)&&(terrainFlags&0x8000u)&&!(terrainFlags&8u));
         assert(terrain->spatialFlags(coincident,terrainFlags)&&!(terrainFlags&0x8000u)&&(terrainFlags&2u));
         assert(indexed(shared)==1&&indexed(other)==0); // Inactive birth refreshes bounds but does not insert.
+        {
+            int sprite;unsigned frame;bool created;
+            assert(terrain->appearance(coincident,sprite,frame,created)&&!created&&sprite==-2);
+            const auto random=world->randomDrawCount();
+            assert(world->finishNativeTerrainCreate(coincident)&&world->randomDrawCount()==random);
+            assert(terrain->appearance(coincident,sprite,frame,created)&&created&&frame==0&&
+                sprite==terrainTileForArea(world->runStage().area));
+            assert(indexed(shared)==1&&indexed(other)==0); // Create must not immediately republish bounds.
+        }
         for(bool collision:{false,true}){
             const auto q=queued(collision);assert(q.size()>=3);
             assert(same(q[0],other)&&same(q[1],dither)&&same(q[2],shared));
@@ -2320,6 +2329,10 @@ int main(){
         assert(view.readTerrain(other,id,active,destroyed)&&id.source==100858&&!active&&!destroyed);
         assert(terrain->append(93,240,160));const auto replacement=terrain->handle(1);
         assert(replacement.slot==local.slot&&replacement.generation!=local.generation&&!view.contains(shared));
+        assert(world->finishNativeTerrainCreate(replacement));
+        int platformSprite;unsigned platformIndex;bool platformCreated;
+        assert(terrain->appearance(replacement,platformSprite,platformIndex,platformCreated)&&platformCreated&&
+            platformIndex==23&&platformSprite==terrainTileForArea(world->runStage().area));
         const auto playerLocal=world->playerHandle();const auto* playerRecord=world->findPlayer(playerLocal);
         InstanceHandle playerShared;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::player,playerLocal,playerShared));
         auto playerBinding=owner->playerBinding();

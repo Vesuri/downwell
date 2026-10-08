@@ -83,6 +83,14 @@ struct LiveSceneWorld {
             nativeTerrainDigest.addU32(id.source);nativeTerrainDigest.addI32(id.creationCode);
             nativeTerrainDigest.addBool(active);nativeTerrainDigest.addBool(destroyed);return true;
         }),"capture native terrain identity replay");
+        if(runtime->nativeTerrainInstances()==terrainLifetimes.get()){
+            require(terrainLifetimes->visit([&](const auto& id,bool,bool){
+                int sprite;unsigned index;bool created;
+                return terrainLifetimes->appearance(id.handle,sprite,index,created)&&created&&
+                    sprite==(id.object==99?-2:downwell::terrainTileForArea(runtime->runStage().area))&&
+                    index==(id.object==93?23u:0u);
+            }),"native room and generated terrain retain source Create appearance");
+        }
         if(const auto* reference=runtime->terrainInstances()){
             require(reference->size()==terrainLifetimes->size(),"native identities match scalar birth count");
             unsigned ordinal=0;

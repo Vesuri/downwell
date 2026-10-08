@@ -271,6 +271,10 @@ public:
     // Without generic terrain records, the backend publishes both its raster
     // and any bound native identity runs; do not execute generic Create twice.
     bool terrainCreatesBackendOnly()const{return run_.effectsSucceeded&&!terrainInstances_;}
+    bool finishNativeTerrainCreate(downwell::InstanceHandle h){
+        return run_.effectsSucceeded=run_.effectsSucceeded&&nativeTerrainInstances_&&
+            nativeTerrainInstances_->createProperties(h,downwell::terrainTileForArea(run_.stage.area));
+    }
     const downwell::GameplayScriptSpawnInstances* scriptSpawnInstances()const{return scriptSpawnInstances_;}
     const downwell::GameplayDebrisInstances* debrisInstances()const{return debrisInstances_;}
     const downwell::NativeTimeChangeRegistration* timeChangeInstances()const{return timeChangeInstances_;}
@@ -855,6 +859,7 @@ private:
                 !terrainInstances_->roomCreation(terrainInstances_->handle(terrainInstances_->size()-1))))){
                 run_.effectsSucceeded=false;return false;
             }
+            if(nativeTerrainInstances_&&!finishNativeTerrainCreate(nativeTerrainInstances_->handle(nativeTerrainInstances_->size()-1)))return false;
         }
         return true;
     }
