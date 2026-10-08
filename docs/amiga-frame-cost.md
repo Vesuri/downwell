@@ -1,6 +1,6 @@
 # Amiga gameplay frame-cost audit
 
-Default A500 build at `7deed269` (2026-10-08), compared with the supplied
+Default A500 build at `13e08ca2` (2026-10-08), compared with the supplied
 `36d8a0f2` audit. Remaining work is ranked in
 [open-work §5](open-work.md#5-meet-the-amiga-frame-budget). This is a snapshot
 cost audit, not a claim that the 20 ms gameplay budget has been met. Subsequent
@@ -13,28 +13,28 @@ matched measurements and post-group audits are recorded in their commits.
 - Contact tape: `SKIP_TO_GAME=1 PROFILE_CONTACT=1`, 1,800 gameplay updates,
   view Y 39 to 1874, at most five allocated enemy records, final health 3.
   No shop, dense encounter or garden-to-well transition.
-- FPS-only result recorded in `7deed269`: 2,792 PAL fields, 32.23 FPS,
-  maximum five fields at frame 645. Supplied baseline: 2,950 fields,
+- FPS-only result: 2,800 PAL fields, 32.14 FPS,
+  maximum five fields at frame 701. Supplied baseline: 2,950 fields,
   30.51 FPS, maximum six at 701. Quantized gaps are report-only.
-- Natural two-level shop tape, also recorded in `7deed269`: 3,081 updates,
-  5,669 fields, 27.17 FPS; maximum 34 fields at the room transition at 2411.
+- Natural two-level shop tape: 3,081 updates,
+  5,586 fields, 27.58 FPS; maximum 31 fields at the room transition at 2411.
   Source-state/RNG and resident HUD verification pass. This transition is
   not a gameplay-frame budget measurement.
 - Eleven 100-field instruction captures start at 50, 250, 450, 644, 690,
   843, 900, 1100, 1300, 1500 and 1700. First/final partial frames are excluded.
   Use the fixed ranges below, not every frame fitting in a capture.
 - Trace ELF SHA-256:
-  `5102b2995074cddd6ef69d5b88b3338b55820cf6c9c742a129734f35bbf1bf95`.
-  Reports/folded stacks are in `tmp/prof/audit-7deed269/`; the ELF and capture
-  log are in `tmp/trace/audit-7deed269/`. Raw captures are disposable.
+  `26bb4f25411a7d2344342f50447ac567f286e03d26bb44cefc643ab7e06a6e8f`.
+  Reports/folded stacks are in `tmp/prof/audit-13e08ca2/`; the ELF and capture
+  log are in `tmp/trace/audit-13e08ca2/`. Raw captures are disposable.
 
 ```sh
 SKIP_TO_GAME=1 PROFILE_CONTACT=1 VERIFY_TIMEOUT_SECONDS=300 bash amiga/profile.sh fps
 SKIP_TO_GAME=1 PROFILE_CONTACT=1 TRACE_FIELDS=100 VERIFY_TIMEOUT_SECONDS=600 \
   TRACE_FRAMES=50,250,450,644,690,843,900,1100,1300,1500,1700 \
-  TRACE_OUTPUT=$PWD/tmp/trace/audit-7deed269 bash amiga/profile.sh trace
-python3 tools/amiga-trace-report.py tmp/trace/audit-7deed269 --frames=1301-1338 --causes --collapsed tmp/quiet.folded
-python3 tools/amiga-trace-report.py tmp/trace/audit-7deed269 --frames=701 --causes --collapsed tmp/burst.folded
+  TRACE_OUTPUT=$PWD/tmp/trace/audit-13e08ca2 bash amiga/profile.sh trace
+python3 tools/amiga-trace-report.py tmp/trace/audit-13e08ca2 --frames=1301-1338 --causes --collapsed tmp/quiet.folded
+python3 tools/amiga-trace-report.py tmp/trace/audit-13e08ca2 --frames=701 --causes --collapsed tmp/burst.folded
 SKIP_TO_GAME=1 VERIFY_TIMEOUT_SECONDS=600 bash amiga/profile.sh shop
 ```
 
@@ -51,20 +51,19 @@ separately; judge scene handoffs by combined latency and visible stalls.
 
 | Tape frames | Scene | Mean ms | Median | Worst | Over 20 ms | Baseline mean |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| 51–91 | entrance bowl, firing | 23.9 | 22.3 | 35.0 (64) | 28/41 | 23.9 |
-| 251–303 | open descent | 20.6 | 17.9 | 46.5 (278) | 19/53 | 20.6 |
-| 451–470 | enemies in view | 44.5 | 39.6 | 65.8 (463) | 20/20 | 53.6 |
-| 645–661 | damaging contact | 60.2 | 54.0 | 89.6 (645) | 17/17 | 80.1 |
-| 691–700 | combat with gems | 53.1 | 51.3 | 66.4 (694) | 10/10 | 67.3 |
+| 51–91 | entrance bowl, firing | 24.4 | 24.5 | 34.3 (54) | 30/41 | 23.9 |
+| 251–303 | open descent | 20.6 | 17.7 | 46.8 (278) | 19/53 | 20.6 |
+| 451–470 | enemies in view | 44.5 | 39.9 | 65.4 (463) | 20/20 | 53.6 |
+| 645–661 | damaging contact | 59.5 | 53.1 | 86.6 (645) | 17/17 | 80.1 |
+| 691–700 | combat with gems | 53.0 | 51.5 | 65.6 (694) | 10/10 | 67.3 |
 | 701 | pattern generation burst | 91.1 | | | 1/1 | 104.2 |
-| 844–864 | generation with a time field | 45.9 | 42.0 | 87.0 (844) | 21/21 | 45.7 |
-| 901–920 | time fields present | 35.8 | 34.9 | 53.0 (907) | 20/20 | 35.7 |
-| 1301–1338 | camera at level bottom | 26.5 | 22.9 | 38.3 (1304) | 38/38 | 26.3 |
+| 844–864 | generation with a time field | 46.0 | 42.4 | 86.6 (844) | 21/21 | 45.7 |
+| 901–920 | time fields present | 36.1 | 35.2 | 53.3 (907) | 20/20 | 35.7 |
+| 1301–1338 | camera at level bottom | 26.7 | 23.5 | 37.9 (1304) | 38/38 | 26.3 |
 
 Additional matched bottom windows 1101–1169, 1501–1567 and 1701–1737 average
-26.9, 27.8 and 28.4 ms. Budget frames 645/646/660/701/844 measure
-89.6/76.4/53.9/91.1/87.0 ms. These agree with the previous accepted change's
-short captures to within 0.2 ms. Frame 488 measures 54.8 ms.
+27.0, 27.9 and 28.4 ms. Budget frames 645/646/660/701/844 measure
+86.6/76.5/51.9/91.1/86.6 ms. Frame 488 measures 53.6 ms.
 
 ## Cost by owner
 
@@ -74,16 +73,16 @@ callers. Values are rounded ms/frame; this is not a sum of inclusive functions.
 
 | Owner | Entrance | Descent | Enemies | Combat | Fields | Quiet | 645 | 646 | 660 | 701 | 844 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Game logic | 9.1 | 6.9 | 21.3 | 23.1 | 14.2 | 13.0 | 33.8 | 30.1 | 24.7 | 23.9 | 25.5 |
-| Actors, sprites and display | 3.3 | 2.4 | 4.0 | 9.6 | 6.3 | 2.1 | 12.2 | 8.5 | 10.3 | 10.4 | 7.3 |
-| Generation logic | 0.2 | 1.1 | 0.4 | 0.3 | 0.4 | 0.4 | 0.4 | 0.4 | 0.2 | 33.6 | 24.3 |
-| Runner bookkeeping | 4.2 | 1.8 | 7.2 | 6.6 | 3.0 | 3.7 | 7.9 | 7.6 | 4.6 | 7.3 | 10.7 |
-| Software float emulation | 1.5 | 1.2 | 3.7 | 5.4 | 2.0 | 1.9 | 7.3 | 7.7 | 4.9 | 5.3 | 3.0 |
-| HUD redraws | 1.7 | 0.1 | 3.4 | 1.7 | 4.3 | 1.9 | 19.3 | 13.7 | 5.5 | 0.1 | 4.5 |
-| Terrain rows and scrolling | 0.5 | 1.4 | 1.3 | 3.0 | 0.8 | 0.2 | 4.6 | 4.2 | 0.7 | 7.0 | 6.4 |
+| Game logic | 9.0 | 6.9 | 21.3 | 23.0 | 14.2 | 13.0 | 30.4 | 30.0 | 24.4 | 24.1 | 25.0 |
+| Actors, sprites and display | 3.4 | 2.4 | 4.0 | 9.6 | 6.4 | 2.1 | 12.3 | 8.6 | 10.0 | 10.4 | 7.4 |
+| Generation logic | 0.2 | 1.1 | 0.4 | 0.3 | 0.4 | 0.4 | 0.4 | 0.4 | 0.2 | 33.6 | 24.5 |
+| Runner bookkeeping | 4.2 | 1.8 | 7.2 | 6.6 | 3.0 | 3.7 | 7.6 | 7.9 | 4.6 | 7.4 | 10.5 |
+| Software float emulation | 1.5 | 1.2 | 3.7 | 5.5 | 2.0 | 1.9 | 7.4 | 7.6 | 4.9 | 5.3 | 3.0 |
+| HUD redraws | 1.7 | 0.1 | 3.3 | 1.7 | 4.3 | 1.9 | 19.9 | 13.7 | 4.1 | 0.1 | 4.5 |
+| Terrain rows and scrolling | 0.5 | 1.4 | 1.3 | 3.0 | 0.8 | 0.2 | 4.5 | 4.2 | 0.7 | 6.7 | 6.4 |
 | Effect surface | 0.6 | 0.6 | 0.5 | 0.2 | 0.6 | 0.6 | 0.6 | 0.6 | 0.3 | 0.2 | 0.6 |
-| Time fields, R-tree, frame loop | 2.9 | 5.2 | 2.9 | 3.2 | 4.1 | 2.8 | 3.6 | 3.6 | 2.7 | 3.3 | 4.6 |
-| Total | 23.9 | 20.6 | 44.5 | 53.1 | 35.8 | 26.5 | 89.6 | 76.4 | 53.9 | 91.1 | 87.0 |
+| Time fields, R-tree, frame loop | 3.3 | 5.1 | 2.9 | 3.2 | 4.4 | 2.9 | 3.5 | 3.5 | 2.8 | 3.3 | 4.5 |
+| Total | 24.4 | 20.6 | 44.5 | 53.0 | 36.1 | 26.7 | 86.6 | 76.5 | 51.9 | 91.1 | 86.6 |
 
 ## Remaining threshold-sized structures
 
@@ -129,11 +128,11 @@ Inclusive costs below nest: do not add parent and child rows.
 
 | Structure | Frame 701 | Frame 844 |
 | --- | ---: | ---: |
-| Generation | 40.84 | 35.62 |
+| Generation | 40.84 | 35.86 |
 | Prepared-pattern dispatch | 35.23 | 29.92 |
-| Event cells | 17.00 | 19.81 |
+| Event cells | 16.92 | 19.81 |
 | Prepared terrain publication | 13.92 | 6.87 |
-| Draw collection | 4.26 | 3.87 |
+| Draw collection | 4.35 | 3.65 |
 
 At 844, thirteen native breakable creations cost 3.77 ms (about 2,058 cycles
 each). One enemy configuration costs 3.76 ms, including 3.23 ms in the
@@ -143,13 +142,13 @@ generation attempt must remove shared ownership machinery as a whole, not
 retune prepared row encodings, RNG helpers or constructors.
 
 At 645, contact damage-number creation costs 5.29 ms. At 646, its first Step
-costs 5.55 ms, including 3.39 ms in the certified contact-motion adapter;
-2.39 ms is inside the decoder. The old 23.47 ms cosine evaluation no longer
-runs on this admitted contact. The pair still costs about 10.84 ms, so the
+costs 5.56 ms, including 3.31 ms in the certified contact-motion adapter;
+2.31 ms is inside the decoder. The old 23.47 ms cosine evaluation no longer
+runs on this admitted contact. The pair still costs about 10.85 ms, so the
 remaining proposal must eliminate a whole computation rather than tune
 sub-millisecond decoder/arithmetic helpers. Later Step costs about 2.14 ms.
 
-Ammo redraw is still 11.21 ms at 645 and 10.71 ms at 646; health is 3.98 ms
+Ammo redraw is still 11.29 ms at 645 and 10.71 ms at 646; health is 4.51 ms
 at 645. Those remain parked as specified by §5.
 
 Combat draw collection costs 4.48 ms, including artwork/command consumers,
@@ -157,8 +156,8 @@ not merely the room traversal. Row synchronization averages 1.50 ms.
 Hardware promotion removes the old raster-gem composition workload; further
 mixed-effect work requires a tape that actually exercises the fallback.
 
-Quiet `GameplayWorld::step` remains 17.30 ms. Walking-enemy motion and player
-motion cost 2.78/2.77 ms individually. Draw collection is 1.92 ms, ammo redraw
+Quiet `GameplayWorld::step` remains 17.29 ms. Walking-enemy motion and player
+motion cost 2.79/2.73 ms individually. Draw collection is 1.94 ms, ammo redraw
 1.48, captured alarm dispatch 1.09 and reconciliation 0.39. A quiet-frame
 proposal needs a shared structure across callers; these figures do not
 justify tuning unrelated small helpers.

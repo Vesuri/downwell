@@ -199,11 +199,11 @@ Target <=20 ms frames during active gameplay and smooth style/upgrade navigation
 Scene handoffs are not gameplay frames: judge them by total transition latency
 and visible stalls, not a 20 ms per-frame limit. Average gameplay FPS alone is
 not the criterion. The [frame-cost audit](amiga-frame-cost.md)
-measures `7deed269` on the contact tape: 2,792 PAL fields. Quiet frames take
-26.5 ms, combat 53.1 ms and time-field frames 35.8 ms. Budget frames are
-701 (91.1 ms: generation on top of combat), 646 (76.4 ms: the contact damage
-number's first step), 645 (89.6 ms: contact), 660 (53.9 ms: gem counter and
-streak change) and 844 (87.0 ms: generation). Menu scenes
+measures `13e08ca2` on the contact tape: 2,800 PAL fields. Quiet frames take
+26.7 ms, combat 53.0 ms and time-field frames 36.1 ms. Budget frames are
+701 (91.1 ms: generation on top of combat), 646 (76.5 ms: the contact damage
+number's first step), 645 (86.6 ms: contact), 660 (51.9 ms: gem counter and
+streak change) and 844 (86.6 ms: generation). Menu scenes
 (`profile.sh transition`) peak at two fields; measure the cold gameplay
 handoff separately with `profile.sh entry`.
 
@@ -265,13 +265,13 @@ gauge) and left ten opt-in flags behind. Do not repeat that.
 
 ### A. Generation bursts (frames 701 and 844)
 
-`generateLiveTerrain` costs 40.84 ms at 701 and 35.62 ms at 844. A whole
+`generateLiveTerrain` costs 40.84 ms at 701 and 35.86 ms at 844. A whole
 builder pattern is emitted synchronously, as in the original; the draws and
 creations must stay in that order. Further changes must remove remaining
 publication or Create machinery, not reorder those effects.
 
 **Remaining budget shortfall, not another encoding sweep.** Generation at
-701 still exceeds the 30 ms target. Event cells take 17.00 ms and prepared
+701 still exceeds the 30 ms target. Event cells take 16.92 ms and prepared
 terrain publication 13.92 ms (nested within generation). At 844 these are
 19.81 and 6.87 ms. The next generation attempt must eliminate a named
 remaining structure, not retune the prepared row program or its helpers.
@@ -304,10 +304,10 @@ remaining structure, not retune the prepared row program or its helpers.
 
 ### B. Contact damage number (frames 645 and 646)
 
-The remaining contact-pair damage-number work is 10.84 ms, above its
+The remaining contact-pair damage-number work is 10.85 ms, above its
 10 ms target. At 645, creation costs 5.29 ms. The retained post-difference
-direction calculation is below 3 ms. At 646, first Step costs 5.55 ms, including
-3.39 ms in the certified motion decoder and wrappers. Subsequent motion and
+direction calculation is below 3 ms. At 646, first Step costs 5.56 ms, including
+3.31 ms in the certified motion decoder and wrappers. Subsequent motion and
 damping cost about 2.1 ms per frame; leave their individual helpers alone.
 Preserve bit-identical direction, speed and positions and keep frame 646
 under 80 ms while removing remaining threshold-sized computations.
@@ -368,7 +368,7 @@ counter dispatch. The rejected borrowed Step snapshot and generic temporary
 alarm-array layouts remain closed. Any remaining effect-alarm proposal must
 first meet the work threshold in a workload that actually exercises it.
 
-Target: quiet frames under 22 ms; current mean is 26.5 ms. Player and walking
+Target: quiet frames under 22 ms; current mean is 26.7 ms. Player and walking
 enemy motion cost about 5.6 ms together, but each is under 3 ms in this window.
 Leave their individual helpers alone. A quiet-frame proposal needs a shared
 work structure to remove, measured across its callers, not a collection of
@@ -376,11 +376,11 @@ unrelated sub-millisecond edits.
 
 ### F. Parked until A–E are done
 
-- Ammo gauge: 11.2 ms at 645 and 646, 1.5–4 ms in typical frames. Every
+- Ammo gauge: 11.29 ms at 645 and 10.71 ms at 646, 1.5–4 ms in typical frames. Every
   runtime classifier is ruled out (rejected-approaches table). If reopened,
   start from the staged-transfer patch listed there, measured against the
   factored default.
-- Health HUD at 645 (4.05 ms); terrain painting at 844 (6.37 ms against 5 ms).
+- Health HUD at 645 (4.51 ms); terrain painting at 844 (6.41 ms against 5 ms).
 
 ### G. Keep native ownership sufficient
 
