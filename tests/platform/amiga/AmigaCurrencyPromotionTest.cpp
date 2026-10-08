@@ -13,13 +13,45 @@ int amigaBlitterDrawPlanarMasked(const UBYTE*,const UBYTE*,UWORD,UWORD,UWORD,UBY
 int amigaBlitterClearPlanar(UBYTE*,UWORD,UWORD){return 0;}
 int amigaBlitterSolidRect(UBYTE*,UWORD,UWORD,UWORD,UWORD,UWORD,UWORD){return 0;}
 
+// Count publication boundaries on the actual replay-selected programs, without
+// changing execution or consuming RNG. Groups cross row ends, never event cells.
+// This is an upper bound on callback elimination, NOT a performance result or
+// permission to merge failure prefixes. Pillar rows retain their builder-y
+// publication boundaries.
+static void generationCensus(unsigned frame,const downwell::BuilderPatternPack& patterns,
+    const AmigaTerrainFragment& fragment){
+    unsigned segments=0,groups=0,events=0,draws=0,cells=0,words=0,open=0,longest=0;
+    auto barrier=[&]{if(open>longest)longest=open;open=0;};
+    auto row=[&](const std::uint8_t* p){
+        require(p!=nullptr,"generation census prepared row");
+        while(*p!=255){
+            if(*p){++events;barrier();p+=2;}
+            else{
+                if(!open)++groups;
+                ++open;++segments;draws+=p[1];cells+=p[3];words+=p[4];
+                p+=6+unsigned(p[3])*2+unsigned(p[4])*4;
+            }
+        }
+    };
+    for(unsigned y=0;y<fragment.pattern.rowCount;++y)
+        row(patterns.preparedRow(fragment.pattern,y,fragment.reversed));
+    barrier();
+    if(fragment.appendPillars)for(unsigned y=0;y<3;++y){
+        row(patterns.preparedPillars(fragment.reversed));barrier();
+    }
+    std::printf("GENERATION frame=%u family=%u pattern=%u y=%d reversed=%u segments=%u groups=%u events=%u longest=%u discarded_draws=%u cells=%u words=%u\n",
+        frame,unsigned(fragment.pattern.family),fragment.pattern.sourceIndex,fragment.y,
+        unsigned(fragment.reversed),segments,groups,events,longest,draws,cells,words);
+}
+
 int main(int argc,char** argv){
-    bool census=false,overflowTape=false,witness=false;
+    bool census=false,overflowTape=false,witness=false,generation=false;
     for(int i=1;i<argc;++i){
         if(std::strcmp(argv[i],"--census")==0&&!census)census=true;
         else if(std::strcmp(argv[i],"--overflow")==0&&!overflowTape)overflowTape=true;
         else if(std::strcmp(argv[i],"--witness")==0&&!witness)witness=true;
-        else require(false,"usage: amiga-currency-promotion-test [--census] [--overflow] [--witness]");
+        else if(std::strcmp(argv[i],"--generation-census")==0&&!generation)generation=true;
+        else require(false,"usage: amiga-currency-promotion-test [--census] [--overflow] [--witness] [--generation-census]");
     }
     const auto rb=readFile("generated/downwell-rooms.dwrm"),ob=readFile("generated/downwell-objects.dwob"),
         pb=readFile("generated/downwell-builder-patterns.dwbp"),ab=readFile("generated/amiga-game.dwap");
@@ -81,12 +113,15 @@ int main(int argc,char** argv){
     unsigned partial=0,shadePartial=0;
     if(census)std::puts("frame,visible_gems,smoke,debris,entry,promoted,parts,shade_pixels_changed,dead");
     for(unsigned tick=1;tick<=1800;++tick){
+        const unsigned fragmentsBefore=live.builder.fragmentCount();
         auto input=downwell::gameplayContactProfileInput(game.tick(),240+game.player().offsetX(),
             176+game.player().offsetY(),downwell::gameplayContactProfilePhase);
         if(overflowTape)require(downwell::gameplayEncounterProfileInput(game.tick(),240+game.player().offsetX(),
             176+game.player().offsetY(),4,input),"ordinary seed-8 route-4 inputs");
         game.step(downwell::packReplayInput(input));host.step(input,false);parityFrame=tick-1;
         compareInitialGameplay(game,host);
+        if(generation)for(unsigned i=fragmentsBefore;i<live.builder.fragmentCount();++i)
+            generationCensus(tick,patterns,live.fragments[i]);
         require(game.effectsSucceeded()&&game.generationSucceeded(),"runtime");
         if(witness){
             std::uint64_t values[5];amigaOverflowWitness(game,values);

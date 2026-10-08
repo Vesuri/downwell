@@ -624,6 +624,19 @@ The host census uses one-based post-Step frames, as do the trace frame labels.
 Native timing runs retain the ordinary uninstrumented compositor; host
 coverage is not a replacement for native state and completed-DMA pixel checks.
 
+For generation-publication structure rather than effect coverage, run
+`./build/amiga-currency-promotion-test --generation-census` (also accepts
+`--overflow`). Each `GENERATION` row describes a newly emitted fragment on
+the same source-checked replay: resource family/index, orientation, fixed
+terrain segments, event cells, unused RNG draws, terrain creations and paired
+occupancy words. `groups` joins only consecutive fixed segments across row
+ends; every event cell and pillar builder-position boundary ends a group.
+`segments - groups` is an upper bound on removable row-boundary callbacks,
+not evidence that a multi-row admission preserves capacity/failure prefixes.
+The census does not change emission, advance RNG, or time native execution.
+Combine its counts with the matching frame's folded native stacks before
+proposing a publication change; do not treat parser/census work as a frame win.
+
 `bash amiga/profile.sh overflow-state` (180-second emulator limit) checks five
 post-Step observation digests on every one of the 1,800 native updates. The
 wrapper generates expected observations from the host replay with its existing
