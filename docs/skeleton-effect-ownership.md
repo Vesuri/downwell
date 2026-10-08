@@ -683,6 +683,12 @@ requires offline rotated variants and verified raster selection.
   angles are `random(20)` and `180-random(20)`, respectively. Object 220's Create
   initializes motion state without RNG; `emitMovingFx` then assigns sprite,
   animation speed, angle and the direction-derived velocity.
+  `StartupRuntime::spawnBloodBurst` routes these births through the stored
+  room's numeric-ID allocator and blood registry. Its caller callback receives
+  each child identity at the `myFx` write boundary, before child setters. A
+  rejected first/second publication retains the corresponding allocated child,
+  completed prefix and one/two RNG draws, and prevents replay. It does not
+  replace the caller's own `myFx` storage or admit natural death events by itself.
 - Smoke count calls `irandom_range(-vary,vary)`. For each child, the VM draws
   the **Y choice before the X choice**, then immediately calls object 225's
   Create. That Create samples speed, animation multiplier and direction before

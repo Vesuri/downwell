@@ -637,6 +637,19 @@ public:
         if(pTimeStop&&!timeStopRoomWidth(width))return false;
         return run_.effectsSucceeded=registration.timeAllowed(key,pTimeStop,width,allowed);
     }
+    // scrBloodfx ignores its count/vary arguments. Each random angle precedes
+    // that child's synchronous Create and caller myFx assignment, not a batch.
+    template<unsigned Capacity,class Caller> bool spawnBloodBurst(StoredBloodRegistration<instanceCapacity,Capacity>& registration,
+        MotionBinary64 x,MotionBinary64 y,Caller caller){
+        if(!run_.effectsSucceeded||!registration.belongsTo(instances_)||!registration.valid())return run_.effectsSucceeded=false;
+        return run_.effectsSucceeded=bloodBurst(x,y,random_,[&](auto px,auto py,auto angle){
+            InstanceHandle key;
+            return registration.create(px,py,angle,[&](InstanceHandle child){
+                const auto* record=registration.instances().find(child);
+                return record&&caller(child,record->sourceId);
+            },key);
+        });
+    }
     template<unsigned Capacity> StoredBoneRegistration<instanceCapacity,Capacity> boneRegistration(){
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
     }

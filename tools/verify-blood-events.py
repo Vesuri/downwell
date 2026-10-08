@@ -15,6 +15,7 @@ moving = next(obj for obj in manifest["resources"]["objects"] if obj["id"] == 22
 assert moving["Visible"] and moving["parentId"] == -1 and moving["Depth"] == 0
 assert not any(event["eventType"] == 8 for event in moving["events"]), "blood uses default Draw, not an effect surface"
 for name, digest in (
+    ("gml_GlobalScript_scrBloodfx", "84f30940e9d06d69b3cd886a53803106c9418e42a9b7df747e4d75b301cd897f"),
     ("gml_Object_parentMovingFx_Create_0", "ee1e21a6d8c86f140da3bed0f2eb66e0828f4d2843c9021ac70dac8823c7f64d"),
     ("gml_GlobalScript_emitMovingFx", "5971093b936584478f261fa56f1201f3a174b1bb750d9a395008d9e4e6d3b108"),
 ):

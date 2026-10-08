@@ -383,6 +383,37 @@ int main(){
         require(world->spawnBlood(blood,{}, {},{},[](auto){return true;},reused)&&reused.slot==key.slot&&
             reused.generation!=key.generation&&!blood.instances().find(key)&&blood.clear(),"reuse preserves generation safety");
     }
+    for(unsigned failAt:{0u,1u,2u}){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            InstanceLifecycleBinding::bindPointQueries(*owner));
+        require(owner->attach(*world),"attach registered blood burst world");world->skipToGameForTesting();
+        auto blood=world->bloodRegistration<2>();auto random=world->randomState();
+        const auto draws=world->randomDrawCount();const auto firstId=world->nextRuntimeInstanceId();
+        unsigned calls=0,myFx=0;InstanceHandle children[2]{};
+        const bool ok=world->spawnBloodBurst(blood,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(192),
+            [&](InstanceHandle child,unsigned id){
+                const auto* record=blood.instances().find(child);children[calls]=child;++calls;myFx=id;
+                require(record&&record->spriteId==-1&&id==firstId+calls-1&&
+                    world->randomDrawCount()==draws+calls,"burst interleaves each RNG draw, Create and caller publication");
+                if(calls==2)require(blood.instances().find(children[0])->spriteId==84,
+                    "first child setters finish before the second caller write");
+                return calls!=failAt;
+            });
+        require(ok==(failAt==0)&&calls==(failAt?failAt:2)&&blood.instances().size()==calls&&
+            myFx==firstId+calls-1&&world->nextRuntimeInstanceId()==firstId+calls,
+            "burst retains identities and caller prefix after rejection");
+        for(unsigned i=0;i<calls;++i){
+            MotionBinary64 angle;require(randomBinary64(random.nextU32(),MotionBinary64::fromInteger(20),angle),"burst angle oracle");
+            if(i){angle.high^=0x80000000u;require(angle.add(MotionBinary64::fromInteger(180)),"second blood angle oracle");}
+            if(!failAt||i+1<failAt){RunnerImageValue expected;require(expected.assign(angle)&&
+                blood.instances().find(children[i])->state.imageAngle.bits==expected.bits,"burst preserves original random angle");}
+        }
+        for(unsigned i=0;i<16;++i)require(random.stateWord(i)==world->randomState().stateWord(i),"burst full RNG state");
+        if(!ok){const auto before=world->randomDrawCount();require(!world->spawnBloodBurst(blood,{}, {},[](auto,unsigned){return true;})&&
+            world->randomDrawCount()==before,"terminal failure forbids burst replay");}
+        else require(blood.clear(),"successful burst teardown");
+    }
     for(int x:{159,160,240,320,321}){
         struct BloodQueryOwner:StoredWorldCollision {
             using StoredWorldCollision::StoredWorldCollision;
