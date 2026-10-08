@@ -383,6 +383,43 @@ int main(){
         require(world->spawnBlood(blood,{}, {},{},[](auto){return true;},reused)&&reused.slot==key.slot&&
             reused.generation!=key.generation&&!blood.instances().find(key)&&blood.clear(),"reuse preserves generation safety");
     }
+    for(int x:{159,160,240,320,321}){
+        struct BloodQueryOwner:StoredWorldCollision {
+            using StoredWorldCollision::StoredWorldCollision;
+            unsigned queries=0;
+            bool placeMeeting(InstanceHandle key,const InstanceRecord& record,int object,
+                MotionBinary64 x,MotionBinary64 y,bool& hit){
+                if(record.objectId==220){++queries;require(object==82&&record.spriteId==84,
+                    "blood uses its registered rotated sprite against parentTimeField");}
+                return StoredWorldCollision::placeMeeting(key,record,object,x,y,hit);
+            }
+        };
+        auto owner=std::make_unique<BloodQueryOwner>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            InstanceLifecycleBinding::bindPointQueries(*owner));
+        require(owner->attach(*world),"attach blood scheduled world");world->skipToGameForTesting();
+        auto blood=world->bloodRegistration<1>();InstanceHandle key;
+        require(world->spawnBlood(blood,MotionBinary64::fromInteger(x),MotionBinary64::fromInteger(-1000),
+            MotionBinary64::fromInteger(14),[](auto){return true;},key),"scheduled blood birth");
+        unsigned steps=0;bool stopped=true;
+        const auto tick=[&]{return world->withBloodEvents(blood,[&](InstanceHandle selected,const auto& record,bool& allowed){
+            ++steps;require(selected.slot==key.slot&&selected.generation==key.generation&&record.state.savedSpeed.bits==0x3f000000u,
+                "scheduled query follows saved-speed capture");
+            return world->bloodTimeAllowed(blood,selected,stopped,allowed);
+        },[&]{world->step({},false);return world->effectsSucceeded();});};
+        require(tick()&&steps==1&&owner->queries==1,"field query precedes even an outside-side short circuit");
+        const auto* child=blood.instances().find(key);
+        require(child&&child->state.timeline.bits==0x3f000000u&&
+            child->state.imageSpeed.bits==((x<160||x>320)?0x3f000000u:0u),
+            "animation runs before stopped Step, with strict source side bounds");
+        stopped=false;
+        require(tick()&&steps==2&&owner->queries==1,"running Step bypasses field query and restores speed");
+        for(unsigned remaining=0;remaining<18&&blood.instances().find(key);++remaining)
+            require(tick(),"blood expiry through the stored room scheduler");
+        require(!blood.instances().find(key)&&blood.instances().size()==0,
+            "stored Animation End and cleanup retire the registered lifetime");
+        require(blood.clear(),"scheduled blood teardown");
+    }
     for(int offset:{-161,-160,3000,3001}){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,

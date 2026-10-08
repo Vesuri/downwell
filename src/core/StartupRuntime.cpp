@@ -379,6 +379,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
     }
     if(!instances_.visitAnimationChecked([this](InstanceHandle key,InstanceRecord& instance){
         if(!lifecycle_.capturePrevious(key,instance))return false;
+        if(instance.objectId==220&&(!bloodDispatch_||!bloodDispatch_(bloodContext_,instance,BloodPhase::animation)))return false;
         if(instance.objectId==269&&(!boneDispatch_||!boneDispatch_(boneContext_,instance,BonePhase::animation)))return false;
         if(instance.objectId==120&&(!skeletonDispatch_||!skeletonDispatch_(skeletonContext_,instance,SkeletonPhase::animation,0)))return false;
         if(instance.objectId==249||instance.objectId==256){
@@ -893,10 +894,12 @@ bool StartupRuntime::cleanupMainOwnedDestroyed(){
     return run_.effectsSucceeded&&instances_.cleanupDestroyedIf(
         [this](const InstanceRecord& r){return r.objectId==92||r.objectId==261||r.objectId==370||
             (r.objectId==269&&boneDispatch_)||
+            (r.objectId==220&&bloodDispatch_)||
             (r.objectId==120&&skeletonDispatch_)||
             (r.objectId==73&&ownedEntryRegistration_.handle(r).generation)||(r.objectId==219&&!scriptAnimationDispatch_);},
         [this](InstanceHandle key,const InstanceRecord& r){
             if(r.objectId==269)return boneDispatch_(boneContext_,r,BonePhase::cleanup);
+            if(r.objectId==220)return bloodDispatch_(bloodContext_,r,BloodPhase::cleanup);
             if(r.objectId==120)return skeletonDispatch_(skeletonContext_,r,SkeletonPhase::cleanup,0);
             if(r.objectId==73)return ownedEntryRegistration_.retire(key);
             if(r.objectId==219)return scriptEffectsBinding_.retire(key,&r);
@@ -1626,6 +1629,11 @@ bool StartupRuntime::dispatchObjectEvent(InstanceRecord& instance,
     if(instance.objectId==269&&eventType==3&&eventSubtype==0){
         ++implementedCodeCalls_;
         run_.effectsSucceeded=boneDispatch_&&boneDispatch_(boneContext_,instance,BonePhase::step);
+        return run_.effectsSucceeded;
+    }
+    if(instance.objectId==220&&eventType==3&&eventSubtype==0){
+        ++implementedCodeCalls_;
+        run_.effectsSucceeded=bloodDispatch_&&bloodDispatch_(bloodContext_,instance,BloodPhase::step);
         return run_.effectsSucceeded;
     }
     if(instance.objectId==266&&((eventType==2&&eventSubtype==0)||

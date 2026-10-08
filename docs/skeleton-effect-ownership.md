@@ -649,6 +649,17 @@ bank while preserving its binding and generation history. Ordinary Step still
 requires a checked time-stop query supplied by its caller; automatic death
 births and Draw admission are not enabled by registration alone.
 
+`StartupRuntime::withBloodEvents` admits a borrowed blood bank to the stored
+room's animation, ordinary Step and deferred cleanup phases. Its query callback
+runs inside the checked Step after the first `imgSp` capture, not before event
+dispatch. `bloodTimeAllowed` obtains the current room width only when stopped;
+the registration then queries parentTimeField (82) through its resource-backed
+rotated mask before checking the strict side bounds. An unstopped query bypasses
+collision work. The callback must read the source player's current `pTimeStop`;
+this interface does not infer it from goal/shop locks. Native fast ownership
+still rejects generic spatial selectors, so this stored query must not be used
+as evidence of native blood contact support.
+
 - Blood emits at published x/y, not the precise xx/yy accumulators. Its two
   angles are `random(20)` and `180-random(20)`, respectively. Object 220's Create
   initializes motion state without RNG; `emitMovingFx` then assigns sprite,

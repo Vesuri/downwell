@@ -4,6 +4,7 @@
 #include "InstanceStore.h"
 #include "ObjectPack.h"
 #include "RunnerSpriteChange.h"
+#include "TimeStopBound.h"
 #include <cstring>
 namespace downwell {
 template<unsigned WorldCapacity,unsigned Capacity> class StoredBloodRegistration {
@@ -52,6 +53,12 @@ public:
     }
     template<class Query> bool step(InstanceHandle key,Query query){
         return good_&&(store_.step(key,query)||fail());
+    }
+    bool timeAllowed(InstanceHandle key,bool stopped,int roomWidth,bool& allowed){
+        auto* e=entry(key);auto* r=e?record(*e):nullptr;const auto* child=store_.find(key);
+        if(!good_||!store_.valid()||!r||!child)return fail();
+        return TimeStopBound::evaluate(stopped,child->x.promoted(),child->y.promoted(),roomWidth,
+            [&](auto x,auto y,bool& hit){return lifecycle_.placeMeeting(e->world,*r,82,x,y,hit);},allowed)||fail();
     }
     bool advanceAnimation(InstanceHandle key){return good_&&((store_.advanceAnimation(key)&&sync(key))||fail());}
     bool activate(InstanceHandle key,bool active){return good_&&(store_.activate(key,active)||fail());}

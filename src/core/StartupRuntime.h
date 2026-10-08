@@ -324,6 +324,24 @@ public:
     struct NoCollisionPass {bool operator()()const{return true;}};
     enum class DronePhase {animation,alarm,step,endStep};
     enum class BonePhase {animation,step,cleanup};
+    enum class BloodPhase {animation,step,cleanup};
+    template<unsigned Capacity,class Query,class Tick>
+    bool withBloodEvents(StoredBloodRegistration<instanceCapacity,Capacity>& registration,Query query,Tick tick){
+        if(!run_.effectsSucceeded)return false;
+        if(bloodDispatch_||!registration.belongsTo(instances_)||!registration.valid())return run_.effectsSucceeded=false;
+        auto dispatch=[&](const InstanceRecord& record,BloodPhase phase){
+            const auto key=registration.handle(record);if(!key.generation)return false;
+            if(phase==BloodPhase::animation)return registration.advanceAnimation(key);
+            if(phase==BloodPhase::cleanup)return registration.retire(key);
+            return registration.step(key,[&](const auto& child,bool& allowed){return query(key,child,allowed);});
+        };
+        bloodContext_=&dispatch;
+        bloodDispatch_=[](void* p,const InstanceRecord& r,BloodPhase phase){
+            return (*static_cast<decltype(dispatch)*>(p))(r,phase);
+        };
+        const bool ok=tick();bloodDispatch_=nullptr;bloodContext_=nullptr;
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok&&registration.valid();
+    }
     enum class SkeletonPhase {animation,alarm,step,endStep,cleanup};
     template<unsigned Capacity,class Execute,class Tick>
     bool withSkeletonPublishedEvents(StoredSkeletonRegistration<instanceCapacity,Capacity>& registration,
@@ -610,6 +628,14 @@ public:
         MotionBinary64 x,MotionBinary64 y,MotionBinary64 angle,Caller caller,InstanceHandle& key){
         if(!run_.effectsSucceeded||!registration.belongsTo(instances_))return run_.effectsSucceeded=false;
         return registration.create(x,y,angle,caller,key);
+    }
+    template<unsigned Capacity> bool bloodTimeAllowed(StoredBloodRegistration<instanceCapacity,Capacity>& registration,
+        InstanceHandle key,bool pTimeStop,bool& allowed){
+        if(!run_.effectsSucceeded)return false;
+        if(!registration.belongsTo(instances_))return run_.effectsSucceeded=false;
+        int width=0;
+        if(pTimeStop&&!timeStopRoomWidth(width))return false;
+        return run_.effectsSucceeded=registration.timeAllowed(key,pTimeStop,width,allowed);
     }
     template<unsigned Capacity> StoredBoneRegistration<instanceCapacity,Capacity> boneRegistration(){
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
@@ -1275,6 +1301,8 @@ private:
     bool (*droneDispatch_)(void*,const InstanceRecord&,DronePhase)=nullptr;
     bool (*boneDispatch_)(void*,const InstanceRecord&,BonePhase)=nullptr;
     void* boneContext_=nullptr;
+    bool (*bloodDispatch_)(void*,const InstanceRecord&,BloodPhase)=nullptr;
+    void* bloodContext_=nullptr;
     bool (*skeletonDispatch_)(void*,const InstanceRecord&,SkeletonPhase,unsigned)=nullptr;
     void* skeletonContext_=nullptr;
     void* droneContext_=nullptr;
