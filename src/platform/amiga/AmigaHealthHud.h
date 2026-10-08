@@ -3,6 +3,7 @@
 #include "AmigaRenderer.h"
 #include "AmigaHealthArt.h"
 #include "core/HudNumbers.h"
+#include "core/Profile.h"
 
 // Static art is retained as plane words. A damage frame combines only changed
 // glyph/fill rectangles and publishes final words once: no clear-and-repaint.
@@ -122,9 +123,15 @@ public:
             reference(r,pack,end,health,maximum,pieces,perHeart);invalidate();return;
         }
         if(pack_!=pack){
-            preparedArt_=AmigaHealthArt::matches(pack,end);
+            {
+                DW_PROFILE_SCOPE(profileHealthArtAdmission);
+                preparedArt_=AmigaHealthArt::matches(pack,end);
+            }
             artReady_=true;
-            for(unsigned i=0;i<11;++i)if(!amigaRendererPrepareHudGlyph(&glyphs_[i],pack,end,65011,i))artReady_=false;
+            {
+                DW_PROFILE_SCOPE(profileHealthGlyphPreparation);
+                for(unsigned i=0;i<11;++i)if(!amigaRendererPrepareHudGlyph(&glyphs_[i],pack,end,65011,i))artReady_=false;
+            }
             pack_=pack;invalidate();
         }
         if(!artReady_){reference(r,pack,end,health,maximum,pieces,perHeart);invalidate();return;}
