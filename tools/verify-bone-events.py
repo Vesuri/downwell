@@ -51,6 +51,14 @@ assert effect["parentId"] == -1 and effect["spriteId"] == -1
 assert not any(e["eventType"] in (0,8) for e in effect["events"])
 assert obj["name"] == "bulletEnmBone" and obj["spriteId"] == 460
 assert obj["parentId"] == 90 and obj["textureMaskId"] == -1
+draw = source("Draw_0", "f80bec54d3f7e90d0ee349add68771ed6f26c0acd51b80c233edb68ceda536ba")
+assert draw.index("gml_Script_drawShade") < draw.index("draw_self")
+shade = (export / "Assembly/gml_GlobalScript_drawShade.asm").read_bytes()
+assert sha256(shade).hexdigest() == "c0aa27477ef320ed8e7f9bcc38bd4d468d0b84ed9dedd2d7bacd1e1844585c82"
+assert shade.index(b"global.lowSpec") < shade.index(b"scrInView") < shade.index(b"global.noControl") < shade.index(b"surface_exists")
+assert shade.count(b"call.i round(argc=1)") == 2 and b"pushi.e 117" in shade
+parent_object = manifest["resources"]["objects"][90]
+assert parent_object["parentId"] == -1 and not any(e["eventType"] == 8 for e in parent_object["events"])
 assert len(manifest["resources"]["sprites"][460]["frames"]) == 4
 assert not any(e["eventType"] == 7 and e["eventSubtype"] == 7 for e in obj["events"])
 print("Pinned bone Step, collision callback order and four-frame animation metadata")

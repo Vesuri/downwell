@@ -11,11 +11,28 @@
 extern "C" { volatile unsigned gDownwellActorOrderChecks,gDownwellActorOrderFailures; }
 #endif
 
+namespace {
+bool boneShadePresent(const GameplayWorld& world,int viewX,int viewY,bool& present){
+    present=false;
+    if(world.shops().noControl)return true;
+    using Real=downwell::MotionBinary64;
+    const downwell::EffectSurfacePlacement::View view{Real::fromInteger(viewX),Real::fromInteger(viewY),
+        Real::fromInteger(160),Real::fromInteger(284)};
+    return world.visitBoneDraw([&](Real x,Real y){
+        downwell::EffectSurfacePlacement::Draw shade;
+        if(!downwell::EffectSurfacePlacement::enemyShade(x,y,view,false,false,true,shade))return false;
+        present|=shade.target==downwell::EffectSurfacePlacement::shade;return true;
+    });
+}
+}
+
 bool AmigaGameplayDrawList::promoteCurrencyComplete(const GameplayWorld& world,int viewX,int viewY,
     const downwell::EffectMaskAssets& assets,const AmigaActorFrames& frames){
     using Placement=downwell::EffectSurfacePlacement;
     if(entryCoverVisible||world.dead()||!assets.ready()||
         !Placement::smallPixel(viewX)||!Placement::smallPixel(viewY))return false;
+    bool boneShade;
+    if(!boneShadePresent(world,viewX,viewY,boneShade)||boneShade)return false;
     bool other=false;
     world.smokeEffects().visitNewest([&](auto,const auto&){other=true;});
     if(other)return false;
@@ -71,6 +88,11 @@ bool AmigaGameplayDrawList::promoteCurrency(const GameplayWorld& world,int viewX
     currencyRasterFirst=currencySpriteCount=0;currencyRasterRequired=true;
     if(count>=capacity||entryCoverVisible||world.dead()||!assets.ready()||
         !Placement::smallPixel(viewX)||!Placement::smallPixel(viewY))return false;
+    // A bone's drawShade cuts the controller surface too. Until this family
+    // participates in per-gem overlap admission, keep currency on the existing
+    // shaded raster rather than promoting pixels which must be erased later.
+    bool boneShade;
+    if(!boneShadePresent(world,viewX,viewY,boneShade)||boneShade)return false;
     bool other=false;
     world.smokeEffects().visitNewest([&](auto,const auto&){other=true;});
     if(other||!world.visitDebrisDraw([&](const auto&){other=true;return true;})||other)return false;
@@ -187,6 +209,9 @@ bool AmigaGameplayDrawList::promoteCurrency(const GameplayWorld& world,int viewX
 bool AmigaGameplayDrawList::entryCoverHardwareEligible(const GameplayWorld& world,int viewX,int viewY,bool& eligible)const{
     eligible=false;
     if(!entryCoverVisible)return true;
+    bool boneShade;
+    if(!boneShadePresent(world,viewX,viewY,boneShade))return false;
+    if(boneShade)return true;
     using Real=downwell::MotionBinary64;
     const downwell::EffectSurfacePlacement::View view{Real::fromInteger(viewX),Real::fromInteger(viewY),
         Real::fromInteger(160),Real::fromInteger(284)};
@@ -352,6 +377,20 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
                 return bullet&&(!bullet->active||append(downwell::machineGunProfile(bullet->gemHigh).sprite,
                     768+bullet->animation.frame(),downwellPlayfieldX+80+bullet->x-port.cameraOffsetX(),
                     playerStartY+bullet->y-port.cameraOffsetY(),0));
+            }
+            if(kind==GameplayWorld::DrawActor::bone){
+                const auto* record=port.bones()?port.bones()->find(key):nullptr;
+                std::int32_t x,y;downwell::RunnerImageValue ix,iy;
+                failedSprite=460;
+                // Source Step publishes integer room positions. Keep this
+                // admission explicit: do not silently quantize an unsupported
+                // fractional collision-setter result for the planar backend.
+                if(!record||!record->x.promoted().roundPixel(x)||!record->y.promoted().roundPixel(y)||
+                   !ix.assignInteger(x)||!iy.assignInteger(y)||
+                   ((ix.bits!=record->x.bits)&&((ix.bits|record->x.bits)&0x7fffffffu))||
+                   ((iy.bits!=record->y.bits)&&((iy.bits|record->y.bits)&0x7fffffffu)))return false;
+                failedSprite=0;
+                return append(460,record->state.drawFrame(),downwellPlayfieldX+x-worldViewX,y-worldViewY,0);
             }
             if(kind==GameplayWorld::DrawActor::debris){
                 if(compositeCurrency)return true; // Published by surfaceFx, not a second world draw.

@@ -61,8 +61,8 @@ tree that the native queries cannot yet consume. Retry and level teardown
 clear bones before reusing the room and retain the generation stream.
 `createBoneWithSourceId` uses the world's shared RNG but requires the caller's
 numeric ID: it does not fill the missing native global allocator. Automatic
-throwing, ordinary Step/collision dispatch, time-stop/damage adapters,
-rendering and replay serialization remain required for natural encounters.
+throwing, ordinary Step/collision dispatch, time-stop/damage adapters
+and replay serialization remain required for natural encounters.
 
 Bone view queries resolve the retained lifetime's published binary32 x/y and
 apply `scrInView(0,0,0)` with the VM real-comparison tolerance. All four edges
@@ -85,11 +85,26 @@ not a fabricated source ID. Failure after birth keeps the child/reference and
 stops later setters and retries. Both adapters use their existing owned script
 effect bank and room animation/cleanup binding.
 
-The native draw collector accepts the six unrotated sprite-85 frames at the
+Object 269's Draw calls `drawShade` then `draw_self`: sprite 460 uses self drawing
+at the registered layer position. Its shade joins the existing controller-surface
+subtraction, with the same view/low-spec/control guards and even-pixel snapping
+as enemy shades. SDL uses the stored published coordinates,
+image index and transforms. The native owner includes bones in both retained
+and prepared actor traversals with disjoint cache tokens and generation checks;
+engine activation/destruction affects drawing, not the custom damage `active`
+field. The Amiga collector admits the four unrotated frames at integer published
+positions and rejects fractional positions rather than silently rounding them.
+The existing offline planar/cropped and DMA frames supply the artwork. Neither
+backend adds a separate bone overlay or advances animation while drawing.
+Native hardware currency/entry-cover promotion falls back to the ordinary
+surface compositor while an on-screen bone shade is present, so promotion
+cannot bypass its subtraction.
+
+The native draw collector also accepts the six unrotated sprite-85 frames at the
 integer positions written by bone Step. Planar/cropped variants are exported
 offline with source/tool provenance, using the existing asset path; no runtime
-conversion is added. This is impact-effect admission, not bone-body rendering
-or a claim that natural skeleton collisions now run.
+conversion is added. Rendering admission is not a claim that natural skeleton
+collisions now run.
 
 ## Death is not just removal plus a gem reward
 

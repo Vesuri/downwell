@@ -280,6 +280,7 @@ void Game::renderMain(Renderer& renderer) const {
         const EffectSurfacePlacement::View view{Real::fromInteger(int(viewX)),Real::fromInteger(int(viewY)),
             Real::fromInteger(160),Real::fromInteger(284)};
         CurrencySmokeComposition::Settings settings;
+        bool shadesSucceeded=true;
         settings.death = startup_.mainDeathSequence().active;
         settings.noControl = startup_.shops().noControl;
         renderingSucceeded_ = effects_.prepareWithSurfaceProducers([&](auto emit) {
@@ -310,7 +311,9 @@ void Game::renderMain(Renderer& renderer) const {
                 if (instance.active && enemyPresentationSprite(instance.objectId,instance.grounded,instance.auxiliaryState)>=0)
                     emit(Real::fromInteger(instance.x),Real::fromInteger(instance.y));
             }
+            shadesSucceeded=startup_.visitBoneDraw([&](Real x,Real y){emit(x,y);return true;});
         }, [](Real n,std::int32_t& out){return n.roundPixel(out);});
+        renderingSucceeded_=renderingSucceeded_&&shadesSucceeded;
         if (!renderingSucceeded_) return;
     }
     // Direct currency is depth 10000, behind retained wall patches (100) and
@@ -491,11 +494,12 @@ void Game::renderMain(Renderer& renderer) const {
             return false;
         }
         const bool effect=instance.objectId==219;
-        if(effect||enemyPresentationSprite(instance.objectId,instance.grounded,instance.auxiliaryState)>=0){
+        const bool bone=instance.objectId==269;
+        if(effect||bone||enemyPresentationSprite(instance.objectId,instance.grounded,instance.auxiliaryState)>=0){
             if(instance.spriteId<0)return true;
             renderer.drawSpriteTransformed(instance.spriteId,static_cast<unsigned>(instance.imageIndex),
-                (effect?instance.preciseX:float(instance.x))-viewX,
-                (effect?instance.preciseY:float(instance.y))-viewY,
+                (effect||bone?instance.preciseX:float(instance.x))-viewX,
+                (effect||bone?instance.preciseY:float(instance.y))-viewY,
                 instance.scaleX,instance.scaleY,instance.rotation);
         }
         return true;

@@ -203,12 +203,23 @@ int main() {
         assert(owner->prepareDraw()&&list.collect(*scene,pack,pack+8,160,34));
         for(unsigned i=0;i<list.count;++i)assert(list.actors[i].sprite!=101);
         downwell::InstanceHandle bone;
-        assert(scene->createBoneWithSourceId(405190,248,128,bone)&&owner->bones().markDestroyed(bone)&&
+        assert(scene->createBoneWithSourceId(405190,248,128,bone));
+        const auto rngBeforeDraw=scene->randomDrawCount();
+        for(unsigned frame=0;frame<4;++frame){
+            assert(list.collect(*scene,pack,pack+8,160,34));unsigned seen=0;
+            for(unsigned i=0;i<list.count;++i)if(list.actors[i].sprite==460){
+                assert(list.actors[i].frame==frame&&list.actors[i].x==198&&list.actors[i].y==94&&
+                    !list.actors[i].flip);++seen;
+            }
+            assert(seen==1&&scene->randomDrawCount()==rngBeforeDraw&&owner->bones().advanceAnimation(bone));
+        }
+        assert(owner->bones().markDestroyed(bone)&&
             scene->spawnBoneImpact(bone,frames)&&owner->prepareDraw());
         const auto impactLocal=scene->scriptEffects().birthSequence().next-1;
         unsigned frameMask=0,ticks=0;
         while(const auto* effect=scene->scriptEffects().get(impactLocal)){
             assert(ticks++<24&&list.collect(*scene,pack,pack+8,160,34));unsigned seen=0;
+            for(unsigned i=0;i<list.count;++i)assert(list.actors[i].sprite!=460);
             for(unsigned i=0;i<list.count;++i)if(list.actors[i].sprite==85){
                 assert(list.actors[i].frame==effect->drawFrame()&&list.actors[i].x==198&&list.actors[i].y==94);
                 frameMask|=1u<<list.actors[i].frame;++seen;
@@ -228,6 +239,27 @@ int main() {
         })&&ordered==2);
         const auto pixels=read("generated/amiga-game.dwap");downwell::EffectMaskAssets assets;
         assert(assets.bind(pixels.data(),pixels.size()));
+        {
+            downwell::InstanceHandle shadeBone;
+            assert(scene->createBoneWithSourceId(405198,240,120,shadeBone));
+            downwell::CurrencySmokeComposition shaded,unshaded;
+            const downwell::EffectSurfacePlacement::View view{n(160),n(34),n(160),n(284)};
+            const auto currency=[&](auto emit){emit(false,0,n(240),n(120));};
+            const auto raster=[](auto value,std::int32_t& out){return value.roundPixel(out);};
+            bool enumerated=false;
+            assert(unshaded.prepare(currency,scene->smokeEffects(),assets,view,{},[](auto){},raster)&&
+                shaded.prepare(currency,scene->smokeEffects(),assets,view,{},[&](auto emit){
+                    enumerated=scene->visitBoneDraw([&](auto x,auto y){emit(x,y);return true;});
+                },raster)&&enumerated);
+            unsigned before=0,after=0;
+            unshaded.surface().visit([&](auto,auto,auto alpha,auto,auto){for(unsigned b=0;b<16;++b)before+=(alpha>>b)&1u;});
+            shaded.surface().visit([&](auto,auto,auto alpha,auto,auto){for(unsigned b=0;b<16;++b)after+=(alpha>>b)&1u;});
+            assert(before&&after<before);
+            list.entryCoverVisible=true;bool eligible=true;
+            assert(list.entryCoverHardwareEligible(*scene,160,34,eligible)&&!eligible);
+            list.entryCoverVisible=false;
+            assert(owner->bones().markDestroyed(shadeBone)&&owner->prepareDraw());
+        }
         downwell::CurrencySmokeComposition composed;
         const downwell::EffectSurfacePlacement::View view{n(160),n(34),n(160),n(284)};
         auto compose=[&](){return composed.prepareWithLateEffects([](auto){},scene->smokeEffects(),assets,view,{},

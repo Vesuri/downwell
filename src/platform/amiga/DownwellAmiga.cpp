@@ -3821,6 +3821,7 @@ __attribute__((noinline)) static int runDownwell(void) {
             if(compositeEffects){
                 DW_PROFILE_SCOPE(profileControllerComposition);
                 downwell::CurrencySmokeComposition::Settings settings;
+                bool shadesSucceeded=true;
                 settings.noControl=port.shops().noControl;settings.death=!compositeCurrency;
                 if(!controllerEffects.prepareWithSurfaceProducers([&](auto emit){
                     for(unsigned i=port.gemSlotEnd();i>(hardwareCurrency?actorList.currencyRasterFirst:0);--i){
@@ -3842,7 +3843,8 @@ __attribute__((noinline)) static int runDownwell(void) {
                         if(enemy.active&&enemy.awake)
                             emit(std::int32_t(240+enemy.x),std::int32_t(176+enemy.y));
                     }
-                },[](Real n,std::int32_t& out){return n.roundPixel(out);})){
+                    shadesSucceeded=port.visitBoneDraw([&](Real x,Real y){emit(x,y);return true;});
+                },[](Real n,std::int32_t& out){return n.roundPixel(out);})||!shadesSucceeded){
                     exitCode=20;break;
                 }
             }

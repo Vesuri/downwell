@@ -440,7 +440,15 @@ public:
         return run_.effectsSucceeded=scriptSpawnInstances_&&effects.advanceRegistered(phase,*scriptSpawnInstances_);
     }
     enum class PhaseBoundary { beginStep, alarm, step, collision, endStep, roomEntry };
-    enum class DrawActor { enemy, bullet, scriptEffect, debris, player, entryDither };
+    enum class DrawActor { enemy, bullet, scriptEffect, debris, player, entryDither, bone };
+    template<class Visit> bool visitBoneDraw(Visit visit)const{
+        if(!bones_||!bones_->size())return true;
+        return visitRoomActorsReadOnly([&](DrawActor kind,downwell::InstanceHandle key,auto){
+            if(kind!=DrawActor::bone)return true;
+            const auto* record=bones_->find(key);
+            return record&&visit(record->x.promoted(),record->y.promoted());
+        });
+    }
     using DrawActorVisitor=bool (*)(void*,DrawActor,downwell::InstanceHandle,downwell::RunnerImageValue);
     using RoomActorDraw=bool (*)(const void*,DrawActorVisitor,void*);
     // Borrowed owner traversal, not a snapshot or a family-local birth sort.

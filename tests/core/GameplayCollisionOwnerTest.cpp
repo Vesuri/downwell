@@ -3,6 +3,7 @@
 namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_CAPTURE; }
 #endif
 #include "core/RunnerBindingRevisionVerification.h"
+#include "core/ActorDrawOrderVerification.h"
 #include "core/MachineGunSourceStep.h"
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
 bool nativeRegisteredTimeChange(downwell::GameplayCollisionOwner& owner,
@@ -2816,7 +2817,7 @@ int main(){
                        GameplayCollisionOwner::Ownership::nativeScenery}){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
             GameplayTerrainInstances::WallCollision{},
-            ownership==GameplayCollisionOwner::Ownership::nativeScenery?&rooms:nullptr,ownership);
+            &rooms,ownership);
         auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
         assert(owner->attach(*world));
@@ -2833,6 +2834,34 @@ int main(){
             if(object==269){assert(h.slot==shared.slot&&h.generation==shared.generation);++population;}return true;
         })&&population==1);
         if(ownership==GameplayCollisionOwner::Ownership::reference)assert(owner->population(269,population)&&population==1);
+        auto drawOracle=std::make_unique<ActorDrawOrderVerification>();
+        const auto checkBoneDraw=[&](std::initializer_list<InstanceHandle> expected){
+            assert(owner->prepareDraw()&&drawOracle->verify(*world));
+            for(unsigned repeat=0;repeat<2;++repeat){
+                auto next=expected.begin();
+                assert(world->visitRoomActorsReadOnly([&](auto kind,InstanceHandle key,auto depth){
+                    if(kind!=GameplayWorld::DrawActor::bone)return true;
+                    assert(next!=expected.end()&&key.slot==next->slot&&key.generation==next->generation&&
+                        !(depth.bits&0x7fffffffu));++next;return true;
+                })&&next==expected.end());
+            }
+        };
+        checkBoneDraw({local});
+        InstanceHandle newer;
+        assert(world->createBoneWithSourceId(405196,248,994,newer));checkBoneDraw({newer,local});
+        // Engine activation is not the bone's private 'active' damage flag.
+        assert(bones.dispatch(newer,[](auto& state,auto&,bool&){state.active=false;return true;}));
+        checkBoneDraw({newer,local});
+        assert(bones.activate(newer,false)&&owner->reconcileActivation()&&drawOracle->verify(*world));
+        assert(world->visitRoomActorsReadOnly([&](auto kind,InstanceHandle key,auto){
+            return kind!=GameplayWorld::DrawActor::bone||key.slot!=newer.slot;
+        }));
+        assert(bones.activate(newer,true)&&owner->reconcileActivation());checkBoneDraw({newer,local});
+        assert(bones.markDestroyed(newer));checkBoneDraw({local});
+        InstanceHandle reused;
+        assert(world->createBoneWithSourceId(405197,252,998,reused)&&reused.slot==newer.slot&&reused.generation!=newer.generation);
+        checkBoneDraw({reused,local});
+        assert(bones.markDestroyed(reused));checkBoneDraw({local});
         for(unsigned tick=0;tick<8;++tick){
             world->step(0);bool crossed;assert(reference.advanceImage(crossed));
             assert(world->effectsSucceeded()&&owner->valid()&&bones.find(local)->state.timeline.bits==reference.timeline.bits);

@@ -43,6 +43,7 @@
 #include "SmokeTrig.h"
 #include <array>
 #include <cstdint>
+#include <cstring>
 
 namespace downwell {
 
@@ -644,6 +645,19 @@ public:
                 auto* caller=instances_.resolve(box);if(!caller||caller->objectId!=92)return false;
                 caller->boxMyFx=child;return true;
             });
+    }
+    template<class Visit> bool visitBoneDraw(Visit visit)const{
+        bool present=false;
+        for(unsigned i=0;i<instances_.size();++i)if(instances_.at(i).objectId==269){present=true;break;}
+        if(!present)return true;
+        return visitDrawAtDepthChecked([&](InstanceHandle,const InstanceRecord& record,int){
+            if(record.objectId!=269||!record.active||record.destroyRequested)return true;
+            RunnerImageValue x,y;
+            // These are the builtin fields as published by the owner, not
+            // integer draw caches or the bone's private motion accumulators.
+            std::memcpy(&x.bits,&record.preciseX,4);std::memcpy(&y.bits,&record.preciseY,4);
+            return visit(x.promoted(),y.promoted());
+        });
     }
     template<unsigned Capacity> bool boneInView(
         StoredBoneRegistration<instanceCapacity,Capacity>& bones,InstanceHandle bone,bool& visible){

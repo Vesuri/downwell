@@ -6,7 +6,7 @@ namespace downwell {
 // task stack. The callbacks observe ordering only, without executing Draw.
 struct ActorDrawOrderVerification {
     static constexpr unsigned capacity=1+GameplayWorld::enemyCapacity+GameplayWorld::bulletCapacity+
-        GameplayScriptSpawnInstances::capacity+GameplayDebrisInstances::capacity+GameplayEntryDithers::capacity;
+        GameplayScriptSpawnInstances::capacity+GameplayDebrisInstances::capacity+GameplayEntryDithers::capacity+GameplayWorld::boneCapacity;
     struct Entry {GameplayWorld::DrawActor kind;InstanceHandle key;RunnerImageValue depth;};
     Entry expected[capacity]{};
     bool verify(const GameplayWorld& world){

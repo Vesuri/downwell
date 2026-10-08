@@ -46,7 +46,7 @@ public:
 private:
     Owner owner_;
     static constexpr unsigned drawCapacity=1+GameplayWorld::enemyCapacity+GameplayWorld::bulletCapacity+
-        GameplayScriptSpawnInstances::capacity+GameplayDebrisInstances::capacity+GameplayEntryDithers::capacity;
+        GameplayScriptSpawnInstances::capacity+GameplayDebrisInstances::capacity+GameplayEntryDithers::capacity+GameplayWorld::boneCapacity;
     struct DrawEntry {GameplayWorld::DrawActor kind;InstanceHandle local;RunnerImageValue depth;};
     struct DrawIdentity {GameplayWorld::DrawActor kind;InstanceHandle local;};
     DrawIdentity preparedDrawIdentities_[drawCapacity]{};
@@ -150,7 +150,9 @@ private:
                 token=1+GameplayWorld::enemyCapacity+GameplayWorld::bulletCapacity+
                     GameplayScriptSpawnInstances::capacity+local.slot;break;
             case View::Kind::entryDither:drawKind=GameplayWorld::DrawActor::entryDither;
-                token=drawCapacity-GameplayEntryDithers::capacity+local.slot;break;
+                token=drawCapacity-GameplayWorld::boneCapacity-GameplayEntryDithers::capacity+local.slot;break;
+            case View::Kind::bone:drawKind=GameplayWorld::DrawActor::bone;
+                token=drawCapacity-GameplayWorld::boneCapacity+local.slot;break;
             default:actor=false;break;
         }
         if(actor){
@@ -453,7 +455,7 @@ private:
             if constexpr(Kind==View::Kind::entryDither)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::drone||Kind==View::Kind::bone)sourceId=r.sourceId;
             constexpr bool projected=Kind==View::Kind::player||Kind==View::Kind::enemy||
-                Kind==View::Kind::bullet||Kind==View::Kind::scriptEffect||Kind==View::Kind::debris||Kind==View::Kind::entryDither;
+                Kind==View::Kind::bullet||Kind==View::Kind::scriptEffect||Kind==View::Kind::debris||Kind==View::Kind::entryDither||Kind==View::Kind::bone;
             if(projected&&!parent.actorDepthAvailable(p.depth))return parent.check(false);
             {
                 DW_PROFILE_SCOPE(profileInstanceLayerAttach);
@@ -514,7 +516,7 @@ private:
             if constexpr(Kind==View::Kind::entryDither)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::drone||Kind==View::Kind::bone)sourceId=r.sourceId;
             constexpr bool projected=Kind==View::Kind::player||Kind==View::Kind::enemy||
-                Kind==View::Kind::bullet||Kind==View::Kind::scriptEffect||Kind==View::Kind::debris||Kind==View::Kind::entryDither;
+                Kind==View::Kind::bullet||Kind==View::Kind::scriptEffect||Kind==View::Kind::debris||Kind==View::Kind::entryDither||Kind==View::Kind::bone;
             if(projected&&!parent.actorDepthAvailable(depth))return parent.check(false);
             if(!parent.check(parent.layers_.birth(h,sourceId,depth,inactive,projected)))return false;
             if(!parent.publishPreparedDraw(h))return false;
@@ -798,7 +800,7 @@ public:
                 if(!View::decode(shared,kind,local))return false;
                 // Retained terrain/field composition is not part of this
                 // visitor. Do not resolve or copy their records per frame.
-                if(kind!=View::Kind::enemy&&kind!=View::Kind::bullet&&kind!=View::Kind::scriptEffect&&kind!=View::Kind::debris&&kind!=View::Kind::player&&kind!=View::Kind::entryDither)return true;
+                if(kind!=View::Kind::enemy&&kind!=View::Kind::bullet&&kind!=View::Kind::scriptEffect&&kind!=View::Kind::debris&&kind!=View::Kind::player&&kind!=View::Kind::entryDither&&kind!=View::Kind::bone)return true;
                 std::uint32_t flags;
                 if(!self.eligibilityFlags(shared,flags)||!View(*self.world_).contains(shared))return false;
                 if(flags&0x100003u)return true;
@@ -809,6 +811,7 @@ public:
                     case View::Kind::scriptEffect:return visit(visitor,GameplayWorld::DrawActor::scriptEffect,local,depth);
                     case View::Kind::debris:return visit(visitor,GameplayWorld::DrawActor::debris,local,depth);
                     case View::Kind::entryDither:return visit(visitor,GameplayWorld::DrawActor::entryDither,local,depth);
+                    case View::Kind::bone:return visit(visitor,GameplayWorld::DrawActor::bone,local,depth);
                     default:return true;
                 }
             };
@@ -819,7 +822,7 @@ public:
                 // inactive flag (which terminates a layer), but avoid event
                 // and sprite lookups for every terrain tile each frame.
                 if(kind!=View::Kind::enemy&&kind!=View::Kind::bullet&&kind!=View::Kind::scriptEffect&&
-                    kind!=View::Kind::debris&&kind!=View::Kind::player&&kind!=View::Kind::entryDither)return true;
+                    kind!=View::Kind::debris&&kind!=View::Kind::player&&kind!=View::Kind::entryDither&&kind!=View::Kind::bone)return true;
                 const unsigned metadata=self.drawMetadata_.get(self.objectOf(h));
                 out.object=(metadata&ObjectDrawMetadata<386>::exists)!=0;
                 out.drawEvent=(metadata&ObjectDrawMetadata<386>::drawEvent)!=0;

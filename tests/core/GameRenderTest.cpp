@@ -475,6 +475,30 @@ int main() {
         RecordingRenderer ended;scene->render(ended);
         require(std::find(ended.spriteOrder.begin(),ended.spriteOrder.end(),101)==ended.spriteOrder.end(),
             "wall impact retires after sixteen source animation updates");
+        auto bones=world.boneRegistration<2>();downwell::InstanceHandle firstBone,lastBone;
+        require(world.spawnBone(bones,240,120,firstBone)&&world.spawnBone(bones,244,124,lastBone),
+            "register both bones through real source IDs and layer elements");
+        downwell::RunnerImageValue fractionalX{0x43744000u},fractionalY{0x42f90000u}; // 244.25,124.5
+        require(bones.dispatch(lastBone,[&](auto&,auto& publish,bool&){return publish.position(fractionalX,fractionalY);}),
+            "publish fractional collision coordinates without changing private bone motion");
+        for(unsigned tick=0;tick<4;++tick){
+            const auto before=world.stateDigest();const auto draws=world.randomDrawCount();
+            RecordingRenderer frame;frame.recordTransforms=true;scene->render(frame);unsigned count=0;
+            for(const auto& item:frame.transforms)if(item.sprite==460){
+                require(item.frame==tick&&item.sx==1&&item.sy==1&&item.angle==0&&
+                    item.x==110+(count?240.0F:244.25F)-world.mainCameraRenderViewX()&&
+                    item.y==(count?120.0F:124.5F)-world.mainCameraRenderViewY(),
+                    "SDL bone default drawing uses sequence frame, published coordinates and newest-first layer order");
+                ++count;
+            }
+            require(count==2&&scene->renderingSucceeded()&&before==world.stateDigest()&&draws==world.randomDrawCount(),
+                "bone render is read-only and preserves RNG");
+            require(bones.advanceAnimation(firstBone)&&bones.advanceAnimation(lastBone),"advance registered bone artwork");
+        }
+        require(bones.mark(lastBone),"mark bone for deferred retirement");
+        RecordingRenderer marked;marked.recordTransforms=true;scene->render(marked);unsigned count=0;
+        for(const auto& item:marked.transforms)if(item.sprite==460)++count;
+        require(scene->renderingSucceeded()&&count==1&&bones.clear(),"destroyed bone cannot reappear before storage cleanup");
     }
     {
         // A copied fixture hides only rmMain's fixed player layer. Source
@@ -724,6 +748,24 @@ int main() {
         require(effectGame.renderingSucceeded()&&runtime.randomDrawCount()==entryRng&&
             std::all_of(covered.effectPixels.begin(),covered.effectPixels.end(),[](int p){return p==0;}),
             "first gameplay view is covered by opaque-black original entry art, not white or missing alpha");
+        {
+            auto bones=runtime.boneRegistration<1>();downwell::InstanceHandle bone;
+            const int bx=(runtime.mainCameraRenderViewX()+80)&~1,by=(runtime.mainCameraRenderViewY()+140)&~1;
+            require(runtime.spawnBone(bones,bx,by,bone),
+                "bone Draw shade fixture uses a registered actor");
+            RecordingRenderer shaded;shaded.effectPixels.assign(160*284,-1);effectGame.render(shaded);
+            const auto* art=assets.shade();require(art&&effectGame.renderingSucceeded(),"bone shade reaches controller");
+            unsigned holes=0;
+            for(int y=0;y<284;++y)for(int x=0;x<160;++x){
+                const int sx=x-bx+runtime.mainCameraRenderViewX()+art->originX,
+                    sy=y-by+runtime.mainCameraRenderViewY()+art->originY;
+                const bool bit=sx>=0&&sy>=0&&sx<int(art->mask.width)&&sy<int(art->mask.height)&&
+                    (art->mask.data[sy*art->mask.stride+sx/8]&(128u>>(sx&7)));
+                require(shaded.effectPixels[y*160+x]==(bit?-1:0),"bone shade subtracts exact offline mask from entry surface");
+                holes+=bit;
+            }
+            require(holes&&bones.clear(),"bone shade has nonempty verified coverage and retires cleanly");
+        }
         downwell::InstanceHandle entryKey;
         require(runtime.visitEntryDitherDraw([&](auto key,const auto&,int){entryKey=key;return true;})&&entryKey.generation,
             "resolve rendered entry lifetime");
