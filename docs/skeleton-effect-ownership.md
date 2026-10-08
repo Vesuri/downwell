@@ -649,9 +649,13 @@ mark/retirement. `GameplayCollisionView` resolves those lifetimes independently
 of provisional gems; room teardown clears them. Its creation entry requires an
 explicit source ID and required wall/tile query callbacks. This is not yet the
 complete global allocation stream or native terrain-query adapter. The native
-animation dispatcher fails explicitly if a currency lifetime reaches it without
-the remaining scheduling integration; normal gameplay still uses provisional
-gems. Native memory residency and capacity admission remain to be measured.
+animation dispatcher advances registered currency before Begin Step/alarms,
+using the source four-frame sequence, signed speed and separate retained image
+index. Currency has no Animation End callback, so wrapping cannot retire it.
+Later alarm integration still fails explicitly for these lifetimes; normal
+gameplay uses provisional gems. Native memory residency and capacity admission
+remain to be measured. Clearing the typed owner resets its failure state only
+after every retained lifetime has been successfully retired.
 
 ### Currency Alarm 4 activation audit
 

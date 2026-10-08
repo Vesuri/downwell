@@ -2973,7 +2973,34 @@ int main(){
             assert(world->randomDrawCount()==expectedRandom.drawCount());
             for(unsigned i=0;i<16;++i)assert(world->randomState().stateWord(i)==expectedRandom.stateWord(i));
             checkTypedCollisionView(GameplayCollisionView(*world),GameplayCollisionView::Kind::currency,local);
+            RunnerImageValue index{};
+            for(unsigned tick=0;tick<24;++tick){
+                const RunnerImageValue speed=tick<8?RunnerImageValue{0x3f000000u}:tick<16?RunnerImageValue{}:RunnerImageValue{0xbf000000u};
+                assert(currency.dispatch(local,[&](auto& state,bool&){state.imageSpeed=speed;return true;}));
+                bool crossed=false;assert(SequenceTimeline::advance(index,speed,4,crossed));index.bits&=0x7fffffffu;
+                assert(currency.advanceAnimation(local)&&currency.find(local)->imageIndex.bits==index.bits&&!currency.find(local)->destroyRequested);
+                if(ownership==GameplayCollisionOwner::Ownership::reference)
+                    assert(owner->properties(shared)->sprite.imageIndex.bits==index.bits);
+            }
             assert(currency.markDestroyed(local)&&owner->prepareDraw()&&!currency.find(local)&&!GameplayCollisionView(*world).contains(shared));
+        }
+        {
+            auto animationOwner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+                GameplayTerrainInstances::WallCollision{},&rooms,ownership);
+            auto animationWorld=std::make_unique<GameplayWorld>(300,false,1000,false,animationOwner->enemyBinding(),
+                animationOwner->breakableBinding(),animationOwner->playerBinding(),&animationOwner->terrain());
+            assert(animationOwner->attach(*animationWorld));
+            struct Queries {
+                bool wall(InstanceHandle,MotionBinary64,MotionBinary64,bool& hit){hit=false;return true;}
+                bool tile(InstanceHandle,int,MotionBinary64,MotionBinary64,bool& hit){hit=false;return true;}
+            } queries;
+            InstanceHandle key;
+            assert(animationWorld->createCurrencyWithSourceId(605090,MotionBinary64::fromInteger(240),
+                MotionBinary64::fromInteger(512),queries,key));
+            assert(animationOwner->currency().dispatch(key,[](auto& state,bool&){state.imageSpeed={0x3f000000u};return true;}));
+            animationWorld->step(0);
+            assert(animationOwner->currency().find(key)->imageIndex.bits==0x3f000000u&&
+                !animationWorld->effectsSucceeded()); // Animation runs; still-unbound alarms stop the frame.
         }
         {
             auto& blood=owner->blood();InstanceHandle local,shared;unsigned calls=0;

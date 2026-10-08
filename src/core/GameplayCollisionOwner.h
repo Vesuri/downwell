@@ -990,9 +990,7 @@ public:
                     case View::Kind::bone:return self.bones_.advanceAnimation(local);
                     case View::Kind::skeleton:return self.skeletons_.advanceAnimation(local);
                     case View::Kind::blood:return self.blood_.advanceAnimation(local);
-                    // Birth/retirement are registered; admitting an eventful
-                    // currency frame still requires the full native scheduler.
-                    case View::Kind::currency:return self.check(false);
+                    case View::Kind::currency:return self.currency_.advanceAnimation(local);
                     default:return true;
                 }
             };

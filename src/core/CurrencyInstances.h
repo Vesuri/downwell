@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_CURRENCY_INSTANCES_H
 #include "CurrencyCreate.h"
 #include "InstanceLifecycle.h"
+#include "SequenceTimeline.h"
 namespace downwell {
 // Native currency lifetimes. Numeric source IDs are supplied by the room birth
 // stream; never manufacture them from family-local generation handles.
@@ -56,6 +57,15 @@ public:
         auto* r=resolve(key);if(!r||executing_)return fail();executing_=true;
         const bool ok=event(r->state,good_);executing_=false;return good_=good_&&ok;
     }
+    bool advanceAnimation(InstanceHandle key){
+        auto* r=resolve(key);if(!r||executing_||(r->spriteId!=133&&r->spriteId!=134))return fail();
+        if(!r->active||r->destroyRequested)return true;
+        auto next=r->imageIndex;bool crossed=false;
+        if(!SequenceTimeline::advance(next,r->state.imageSpeed,4,crossed))return fail();
+        next.bits&=0x7fffffffu;
+        if(!binding_.imageIndex(key,*r,next))return fail();
+        r->imageIndex=next;return true;
+    }
     bool markDestroyed(InstanceHandle key){
         auto* r=resolve(key);if(!r)return fail();
         if(r->destroyRequested)return true;
@@ -71,7 +81,7 @@ public:
         for(unsigned i=0;i<Capacity;++i)if(records_[i].lifetimeId){
             if(!binding_.retire({i,records_[i].lifetimeId},records_[i]))return fail();records_[i]={};--count_;
         }
-        return true;
+        good_=true;return true;
     }
 private:
     Record* resolve(InstanceHandle h){return good_?const_cast<Record*>(find(h)):nullptr;}
