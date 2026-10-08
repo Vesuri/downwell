@@ -109,4 +109,27 @@ assert "call.i surface_exists(argc=1)" in surface_draw
 assert "call.i draw_sprite_ext(argc=9)" in surface_draw
 assert "scrInView" not in surface_draw and "global.death" not in surface_draw and "global.lowSpec" not in surface_draw
 assert surface_draw.index("push.v self.y") < surface_draw.index("push.v self.x")
+# Authored controller 61 is a wall-destroying actor, not an inert ID holder.
+above = {}
+for suffix, digest in {
+    "Create_0": "0bf94b6a4cb4e3f6a0f562a7daf7408f28844e72305c1f037373df827a8fca2f",
+    "Step_1": "7f21aa839eb0703dd28b2af312bf6ef05521f88fdff1a72571a476e05cb5cfb7",
+    "Collision_objWall_n": "63e3ce6fbd22f939746b1a4f2423f730fba703c57c8dcc6705828e95af015aa1",
+    "Draw_0": "911cbed4afad8a654d071ebc7485c7a8399e1c168762b838ab9a34036071e15e",
+    "PreCreate_0": "4c193a4f963773b2c70b60323cfcdd763b259c208f342702a253d03b3f9e966b",
+}.items():
+    above[suffix] = assembly("gml_Object_objDitherAbove_" + suffix, digest)
+assert objects[61]["parentId"] == 59 and objects[61]["spriteId"] == 128
+events = {(e["eventType"], e["eventSubtype"]): [a["codeId"] for a in e["actions"]]
+          for e in objects[61]["events"]}
+assert events[(3, 1)] == [990] and events[(4, 60)] == [991]
+assert "push.v 63.x\npop.v.v self.x" in above["Step_1"]
+assert "pushi.e 272\ncmp.i.v GTE" in above["Step_1"]
+assert "pushi.e 208\ncmp.i.v GTE" in above["Step_1"]
+assert above["Step_1"].count("pushi.e 16\nadd.i.v\npop.v.v self.y") == 2
+assert above["Step_1"].index("call.i round(argc=1)") < above["Step_1"].index("pushglb.v global.ending")
+assert above["Collision_objWall_n"].index("call.i @@Other@@(argc=0)") < above["Collision_objWall_n"].index("pushenv")
+assert "call.i instance_destroy(argc=0)" in above["Collision_objWall_n"]
+assert "call.i draw_self(argc=0)" in above["Draw_0"]
+print("Pinned authored dither Begin Step and wall-destruction events; an inert controller is not equivalent")
 print("Pinned rmMain's 240 walls/four controllers and player child-birth order; live allocation parity remains unverified")

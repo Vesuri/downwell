@@ -93,6 +93,21 @@ phase timing, initial view publication or rendered entry-mask parity.
 
 ### Native room-entry boundaries
 
+Authored `objDitherAbove` (61, sprite 128, parent 59) is distinct from the
+player-created entry wipe (73). Its Begin Step (990) first publishes camera
+family 63's X. It then compares camera Y minus its own Y with 272 (normal)
+or 208 (low-spec), advances Y by 16 once when the threshold is met, and always
+rounds Y before checking `global.ending` for self-destruction. This is not a
+catch-up loop. Its wall Collision event (991) enters `other` and destroys the
+contacted wall; Draw (992) is `draw_self`, not the entry wipe's effect surface.
+The assembly hashes and event metadata are pinned by the instance-ID verifier.
+The current stored dispatcher has no handlers for these Begin Step/collision
+codes. Neither registering an inert native record nor relying on generic
+out-of-view terrain retirement reproduces this source lifecycle. Integration
+must preserve the wall's destruction mark and the subsequent phase's retirement,
+including ordered simultaneous contacts; an immediate occupancy erase is not
+by itself evidence of equivalent collision ordering.
+
 `PreparedRoomTerrain` retains all 244 authored records in serialized creation
 order, not only the player and 240 walls. Backend terrain commands use indices
 into that complete sequence but emit only objects 60/93/99. Preparation does

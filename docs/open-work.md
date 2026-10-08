@@ -43,6 +43,8 @@ behavior, both backend integrations and relevant original-game verification.
   companion births in the native creation stream, not just visible actors;
   finish the stored companions' event/render integration as well as native
   ownership (their synchronous stored Create state is not a complete actor).
+  Implement authored `objDitherAbove` (61) Begin Step and wall-destruction
+  contacts on both paths; it is not an inert controller or the entry wipe (73).
   Preserve entry-dither's published
   view read and effect-surface Draw. See the
   [main-room birth audit](original-behavior-audit.md#main-room-controller-births-and-numeric-ids).
