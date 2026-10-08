@@ -3,6 +3,7 @@
 #include "CurrencyCreate.h"
 #include "InstanceLifecycle.h"
 #include "SequenceTimeline.h"
+#include "CurrencyAlarmEvents.h"
 namespace downwell {
 // Native currency lifetimes. Numeric source IDs are supplied by the room birth
 // stream; never manufacture them from family-local generation handles.
@@ -65,6 +66,11 @@ public:
         next.bits&=0x7fffffffu;
         if(!binding_.imageIndex(key,*r,next))return fail();
         r->imageIndex=next;return true;
+    }
+    template<class Other> bool advanceAlarm(InstanceHandle key,unsigned index,Other other){
+        auto* r=resolve(key);if(!r||executing_||index>=5)return fail();
+        if(!r->active||r->destroyRequested||!r->state.alarms.advanceOne(index))return true;
+        return dispatch(key,[&](auto& state,bool& good){return CurrencyAlarmEvents::run(state,index,other,good);});
     }
     bool markDestroyed(InstanceHandle key){
         auto* r=resolve(key);if(!r)return fail();

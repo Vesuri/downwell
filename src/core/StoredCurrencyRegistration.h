@@ -12,6 +12,7 @@
 #include "CurrencyFreeMotion.h"
 #include "PlayerSolidCollisionBinary64.h"
 #include "CurrencyGainScript.h"
+#include "CurrencyAlarmEvents.h"
 #include "RunnerSpriteChange.h"
 #include <cstring>
 namespace downwell {
@@ -97,13 +98,7 @@ public:
     }
     template<class Event> bool alarm(InstanceHandle h,unsigned index,Event other){
         return dispatch(h,[&](auto& state,bool& good){
-            if(index>=5||state.alarms.get(index)!=0)return false;
-            if(index==0){state.obtainable=true;state.alarms.set(1,state.obtime);return true;}
-            if(index==1){state.disappearing=true;state.alarms.set(2,state.distime);return true;}
-            if(index==3){state.suckable=true;return true;}
-            // Expiry needs explicit audio/environment inputs; Alarm 4 needs
-            // its movement adapter. Absence is not successful dispatch.
-            return other(state,index,good);
+            return CurrencyAlarmEvents::run(state,index,other,good);
         });
     }
     bool mark(InstanceHandle h){

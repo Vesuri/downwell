@@ -59,6 +59,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto bones=bones_;
     const auto skeletons=skeletons_;
     const auto blood=blood_;
+    const auto currencyInstances=currencyInstances_;
     const auto phaseBoundary=phaseBoundary_;
     const auto roomAnimation=roomAnimation_;
     const auto actorEndStep=registeredActorEndStep_;void* const actorEndStepContext=registeredActorEndStepContext_;
@@ -107,6 +108,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     bones_=bones;
     skeletons_=skeletons;
     blood_=blood;
+    currencyInstances_=currencyInstances;
     configurePhaseBoundary(phaseBoundary,phaseBoundaryContext);
     configureRoomAnimation(roomAnimation,roomAnimationContext);
     configureRegisteredActorEndStep(actorEndStep,actorEndStepContext);

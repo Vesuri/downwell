@@ -2973,6 +2973,22 @@ int main(){
             assert(world->randomDrawCount()==expectedRandom.drawCount());
             for(unsigned i=0;i<16;++i)assert(world->randomState().stateWord(i)==expectedRandom.stateWord(i));
             checkTypedCollisionView(GameplayCollisionView(*world),GameplayCollisionView::Kind::currency,local);
+            // Use the resource-backed global alarm pass: Alarm 0 arms Alarm 1,
+            // whose first decrement must happen in this same pass.
+            RunnerStepSnapshot<32> alarmPhase;
+            auto alarms=[&](){return owner->dispatchAlarmPhase(alarmPhase,[&](InstanceHandle h,unsigned alarm,const auto&){
+                GameplayCollisionView::Kind kind;InstanceHandle key;
+                assert(GameplayCollisionView::decode(h,kind,key));
+                if(kind!=GameplayCollisionView::Kind::currency)return true;
+                return currency.advanceAlarm(key,alarm,[](auto&,unsigned,bool&){return false;});
+            });};
+            for(unsigned tick=1;tick<=15;++tick){
+                assert(alarms());const auto& state=currency.find(local)->state;
+                assert(state.obtainable==(tick>=10)&&state.suckable==(tick>=15));
+                if(tick>=10)assert(state.alarms.get(1)==180-int(tick-9));
+            }
+            assert(currency.dispatch(local,[](auto& state,bool&){state.alarms.set(1,1);return true;}));
+            assert(alarms()&&currency.find(local)->state.disappearing&&currency.find(local)->state.alarms.get(2)==119);
             RunnerImageValue index{};
             for(unsigned tick=0;tick<24;++tick){
                 const RunnerImageValue speed=tick<8?RunnerImageValue{0x3f000000u}:tick<16?RunnerImageValue{}:RunnerImageValue{0xbf000000u};
@@ -2983,6 +2999,18 @@ int main(){
                     assert(owner->properties(shared)->sprite.imageIndex.bits==index.bits);
             }
             assert(currency.markDestroyed(local)&&owner->prepareDraw()&&!currency.find(local)&&!GameplayCollisionView(*world).contains(shared));
+            InstanceHandle old,replacement;
+            assert(world->createCurrencyWithSourceId(605079,x,y,queries,old));
+            assert(world->restartFromResults(DeathMenuSequence::Action::Retry,43,300)==ResultsDestination::gameplay&&
+                world->currencyInstances()==&currency&&!currency.find(old));
+            assert(world->createCurrencyWithSourceId(605079,x,y,queries,replacement)&&
+                replacement.slot==old.slot&&replacement.generation!=old.generation);
+            assert(currency.dispatch(replacement,[](auto& state,bool&){state.alarms.set(2,1);return true;}));
+            unsigned expiryCalls=0;
+            assert(!currency.advanceAlarm(replacement,2,[&](auto&,unsigned index,bool&){
+                assert(index==2);++expiryCalls;return false;
+            })&&expiryCalls==1&&!currency.valid()&&!currency.find(replacement)->destroyRequested);
+            assert(currency.clear()&&currency.valid());
         }
         {
             auto animationOwner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
