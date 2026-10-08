@@ -161,7 +161,8 @@ int main(){
     BuilderPatternPack patterns(bb.data(),bb.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     SpriteMaskPack masks(mb.data(),mb.size());
     require(rooms.valid()&&objects.valid()&&patterns.valid()&&sprites.valid()&&masks.valid(),"real collision resources validate");
-    for(bool rejectCreate:{false,true}){
+    for(unsigned failure=0;failure<3;++failure){
+        const bool rejectCreate=failure==1,rejectPosition=failure==2;
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
         require(owner->attach(*world),"attach box-owned reward fields");world->skipToGameForTesting();
@@ -173,14 +174,23 @@ int main(){
             require(world->markBoxDestroyed(box),"exclude preceding lottery boxes from contacts");
         }
         require(owner->resolve(box)->box.haveGem==2&&world->publishBoxHealth(box,{}),"source-created medium reward box");
+        require(world->publishCollisionPosition(box,RunnerImageValue{0x43704000u},RunnerImageValue{0x44002000u}),
+            "publish fractional runner position independently of private motion caches");
+        require(world->resolveInstance(box)->preciseX==240.0F&&world->resolveInstance(box)->preciseY==512.0F,
+            "reward regression deliberately leaves private coordinates stale");
         auto gems=world->currencyRegistration<2>();ScheduledBoxCounts counts;
         auto controls=scheduledBoxEffects(*world,box,counts,[&](InstanceHandle h){return world->markBoxDestroyed(h);});
         controls.timeQuery=[&](InstanceHandle h,bool& allowed){return owner->boxTimeAllowed(*world,h,false,480,allowed);};
         InstanceHandle created;
         auto rewards=world->boxCurrencyOperations(gems,box,controls,
+            [&](InstanceHandle h,MotionBinary64& x,MotionBinary64& y){
+                BoxDestructionScript::Caller read;
+                if(rejectPosition||!owner->readBoxDestruction(h,read))return false;
+                x=read.x;y=read.y;return true;
+            },
             [&](InstanceHandle h,int layer,MotionBinary64 x,MotionBinary64 y,bool& hit){
-                require(x.high==MotionBinary64::fromInteger(240).high&&!x.low&&
-                    y.high==MotionBinary64::fromInteger(512).high&&!y.low,"reward uses caller published position, not default or local coordinates");
+                require(x.high==0x406e0800u&&!x.low&&y.high==0x40800400u&&!y.low,
+                    "reward uses caller published position, not private motion caches or rounded drawing coordinates");
                 created=h;hit=false;return layer==100&&!rejectCreate;
             });
         BoxSoundVerification::Audio<StartupRuntime> audio{*world,owner->resolve(box)->box.breakSound};
@@ -189,11 +199,16 @@ int main(){
         },audio,MotionBinary64{0x3fd00000u,0},false);
         bool good=true;
         const bool completed=BoxDestructionScript::runRetained([&](auto& out){return owner->readBoxDestruction(box,out);},ops,good);
-        require(completed==!rejectCreate&&good==completed&&world->effectsSucceeded()==completed,
+        require(completed==(failure==0)&&good==completed&&world->effectsSucceeded()==completed,
             "box event reaches real registered rewards after ordered effects and destruction");
         const auto* caller=world->resolveInstance(box);
-        require(caller&&caller->destroyRequested&&caller->boxReward.moniAmount.zero()==!rejectCreate&&!caller->boxReward.atrState,
+        require(caller&&caller->destroyRequested&&caller->boxReward.moniAmount.zero()==(failure==0)&&!caller->boxReward.atrState,
             "real caller retains reward fields after destruction marking");
+        if(rejectPosition){
+            require(!created.generation&&!caller->boxReward.myGem&&!counts.stop&&world->debrisEffects().size()==2,
+                "missing authoritative position cannot silently create a reward from cached coordinates");
+            require(gems.clear(),"clear empty rejected-position registry");continue;
+        }
         if(rejectCreate){
             require(!caller->boxReward.myGem&&caller->boxReward.moniAmount.high==MotionBinary64::fromInteger(10).high&&
                 !caller->boxReward.moniAmount.low&&gems.find(created)&&gems.find(created)->getAmount==2&&

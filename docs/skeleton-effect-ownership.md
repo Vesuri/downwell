@@ -622,7 +622,10 @@ script exit. This entry point does not admit natural rewards or supply the
 native world's incomplete cross-family numeric-ID stream.
 For stored boxes, `spawnBoxCurrency` binds these accessors to the actual
 generation's `boxReward` fields, including after destruction marking. Position
-comes from its published binary32 coordinates on each read. These cold fields
+comes from a required maintained-owner read on each access, never from the
+record's private `preciseX/Y` motion caches or rounded drawing coordinates.
+Missing position ownership fails before child Create; the preceding caller
+amount/attraction writes and destruction effects remain published. These cold fields
 are separate from `BreakableState`, so ordinary box Step snapshots do not copy
 them. `boxCurrencyOperations` supplies the destruction script's currency call
 without replacing its required time-stop, chain or other effect operations.
