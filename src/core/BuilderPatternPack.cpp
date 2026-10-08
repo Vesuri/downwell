@@ -27,7 +27,8 @@ BuilderPatternPack::BuilderPatternPack(const std::uint8_t* bytes,
     if (bytes[0] != 'D' || bytes[1] != 'W' || bytes[2] != 'B' || bytes[3] != 'P') {
         error_ = BuilderPatternPackError::badMagic; return;
     }
-    if (u16(bytes + 4) != formatVersion) {
+    const bool literals = u16(bytes + 4) == literalFormatVersion;
+    if (u16(bytes + 4) != formatVersion && !literals) {
         error_ = BuilderPatternPackError::unsupportedVersion; return;
     }
     if (u16(bytes + 6) != headerSize || u32(bytes + 8) != manifestSchema) {
@@ -48,6 +49,11 @@ BuilderPatternPack::BuilderPatternPack(const std::uint8_t* bytes,
         error_ = BuilderPatternPackError::wrongSize; return;
     }
     const std::size_t extension = cellsOffset_ + cellCount_;
+    if (literals) {
+        if (extension != size) {
+            error_ = BuilderPatternPackError::wrongSize; return;
+        }
+    } else {
     const std::size_t tableBytes = (std::size_t(rowCount_) * 2 + 3) * 4;
     if (size-extension < 4 || tableBytes > size-extension-4 ||
         bytes[extension]!='D' || bytes[extension+1]!='W' ||
@@ -100,16 +106,24 @@ BuilderPatternPack::BuilderPatternPack(const std::uint8_t* bytes,
         }
         if(p!=limit-1 || *p!=255){error_=BuilderPatternPackError::badPattern;return;}
     }
+    }
     error_ = BuilderPatternPackError::none;
     std::uint16_t nextStartIndex = 0;
     std::uint16_t nextMainIndex = 0;
     std::uint16_t nextRightIndex = 0;
     std::uint16_t nextShopIndex = 0;
     std::uint16_t nextEndIndex = 0;
+    std::uint16_t nextAreaTwoIndex[6] = {};
     for (std::uint32_t id = 0; id < patternCount_; ++id) {
         PackedBuilderPattern value;
         pattern(id, value);
         bool ordered = false;
+        const unsigned family = static_cast<unsigned>(value.family);
+        if ((literals && (family < 6 || family > 11)) ||
+            (!literals && (family < 1 || family > 5))) {
+            error_ = BuilderPatternPackError::badPattern; return;
+        }
+        if (literals) ordered = value.sourceIndex == nextAreaTwoIndex[family-6]++;
         if (value.family == BuilderPatternFamily::areaOneStart)
             ordered = value.sourceIndex == nextStartIndex++;
         if (value.family == BuilderPatternFamily::areaOneMain)
@@ -217,12 +231,12 @@ bool BuilderPatternPack::rowData(const PackedBuilderPattern& value,
 
 const std::uint8_t* BuilderPatternPack::preparedRow(const PackedBuilderPattern& value,
                                                    unsigned row, bool reversed) const {
-    if (!valid() || row>=value.rowCount || !range(value.firstRow,value.rowCount,rowCount_)) return nullptr;
+    if (!valid() || !preparedPrograms_ || row>=value.rowCount || !range(value.firstRow,value.rowCount,rowCount_)) return nullptr;
     return preparedPrograms_+u32(preparedOffsets_+((value.firstRow+row)*2+unsigned(reversed))*4);
 }
 
 const std::uint8_t* BuilderPatternPack::preparedPillars(bool reversed) const {
-    return valid()?preparedPrograms_+u32(preparedOffsets_+(rowCount_*2+unsigned(reversed))*4):nullptr;
+    return valid() && preparedPrograms_?preparedPrograms_+u32(preparedOffsets_+(rowCount_*2+unsigned(reversed))*4):nullptr;
 }
 
 } // namespace downwell

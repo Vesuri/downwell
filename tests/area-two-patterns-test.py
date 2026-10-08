@@ -4,6 +4,7 @@ import importlib.util
 import json
 from pathlib import Path
 import re
+import subprocess
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -23,6 +24,17 @@ def fixture():
 
 
 class PatternTests(unittest.TestCase):
+    def test_shared_runtime_reader_matches_all_vm_rows(self):
+        result = exporter.build(ROOT)
+        expected = []
+        for family_id, family in enumerate(result["families"], 6):
+            for pattern in family["patterns"]:
+                expected.append(f"{family_id} {pattern['sourceIndex']} {max(pattern['rowWidths'])} {len(pattern['rows'])}")
+                expected.extend(pattern["rows"])
+        actual = subprocess.check_output([ROOT / "build/area-two-pattern-pack-test",
+                                          ROOT / "generated/downwell-area-two-patterns.dwbp"], text=True)
+        self.assertEqual(actual.splitlines(), expected)
+
     def test_preserves_ids_raw_text_and_irregular_rows(self):
         result = exporter.parse_vm(fixture(), "partMain", 2)
         self.assertEqual([p["stringId"] for p in result], [45, 46])

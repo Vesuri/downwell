@@ -1,9 +1,10 @@
 # Area-two data recovery
 
 Run `make verify-area-two-patterns` to export and verify the catacomb tables.
-The ignored output is `generated/downwell-area-two-patterns.json`. This is
-an auditable intermediate representation, not a native asset pack or a
-playable area-two implementation. The existing area-one pack is unchanged.
+The ignored outputs are `generated/downwell-area-two-patterns.json` and
+`generated/downwell-area-two-patterns.dwbp`: an auditable intermediate
+representation and its shared-runtime literal pack. Neither enables playable
+area two. The existing area-one pack is unchanged.
 
 The exporter reads UTMT 0.9.2.0 VM assembly from the pinned Windows build
 (`c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8`, bytecode 17).
@@ -38,9 +39,18 @@ preservation, irregular row widths and CRLF assembly files. All real VM
 literals are also compared against the independently decoded GML view;
 disagreement fails verification instead of changing the VM export. Repeated
 generation followed by `--check` verifies deterministic output.
-The final gate and a second independent `--check` pass; evidence is in
-`/tmp/downwell-area-two-patterns-final.log`. No emulator run is needed for
-this exporter-only change, and no playable build options were changed.
+
+The C++ `BuilderPatternPack` reader accepts the catacomb pack as DWBP version 5.
+It retains the version-4 header/record/row layout, with family identifiers 6--11
+in the table order above. The file ends after literal cells: there is no DWPR
+extension. Version 4 remains restricted to cavern families 1--5 and requires
+its existing prepared programs. The two versions cannot be substituted.
+`preparedRow` and `preparedPillars` return null for literal packs: cavern
+fixed-segment RNG and terrain rules must never run on catacomb symbols.
+The JSON records the binary pack's format, size and hash alongside the input
+provenance. Tests compare every row read by the C++ reader with the VM export,
+check all truncations and malformed family/index/version data, and retain
+the existing cavern prepared-program regression test.
 
 ## Builder integration contract
 
@@ -68,8 +78,6 @@ instance in that order, before synchronous child Create. The retained VM input
 index (including duplicate values), all three levels, both hard-mode states,
 both random-threshold outcomes, object IDs/coordinates, emission failures and
 each rejected `spawnChance` write.
-The same cases pass AddressSanitizer/UndefinedBehaviorSanitizer. Pattern export
-verification still passes with the unchanged output hash above.
 
 This is shared semantic code, **not yet connected to either live generator**.
 `CatacombBuilderDispatch` supplies the concrete WELL operations and retained

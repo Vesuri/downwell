@@ -1544,7 +1544,11 @@ build/catacomb-symbols-test: tests/core/CatacombBuilderSymbolsTest.cpp src/core/
 generate-area-two-patterns:
 	python3 tools/export-area-two-patterns.py
 
-verify-area-two-patterns: generate-area-two-patterns
+build/area-two-pattern-pack-test: tests/core/AreaTwoPatternPackTest.cpp src/core/BuilderPatternPack.cpp src/core/BuilderPatternPack.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+
+verify-area-two-patterns: generate-area-two-patterns build/area-two-pattern-pack-test
 	python3 tests/area-two-patterns-test.py
 	python3 tools/export-area-two-patterns.py --check
 

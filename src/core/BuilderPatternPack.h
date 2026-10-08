@@ -16,7 +16,13 @@ enum class BuilderPatternFamily : std::uint16_t {
     areaOneMain = 2,
     areaOneRight = 3,
     areaOneShop = 4,
-    areaOneEnd = 5
+    areaOneEnd = 5,
+    areaTwoStart = 6,
+    areaTwoMain = 7,
+    areaTwoEnd = 8,
+    areaTwoLeft = 9,
+    areaTwoRight = 10,
+    areaTwoShop = 11
 };
 
 struct PackedBuilderPattern {
@@ -28,6 +34,8 @@ struct PackedBuilderPattern {
 class BuilderPatternPack {
 public:
     static constexpr std::uint16_t formatVersion = 4;
+    // Catacomb literal rows only; no cavern-specific prepared terrain programs.
+    static constexpr std::uint16_t literalFormatVersion = 5;
     static constexpr std::uint32_t manifestSchema = 3;
     static constexpr std::uint64_t sourceHashPrefix = 0xe00a94be5faf7dc0ULL;
     static constexpr std::size_t headerSize = 32;
@@ -53,6 +61,7 @@ public:
     // Validated source-ordered program. 0 introduces a fixed terrain segment,
     // ASCII introduces one event cell, 255 terminates the row. Views remain
     // valid for the immutable pack's lifetime. Pillars are the last two rows.
+    // Literal-format packs have no prepared programs; both APIs return null.
     const std::uint8_t* preparedRow(const PackedBuilderPattern& pattern,
                                   unsigned row, bool reversed) const;
     const std::uint8_t* preparedPillars(bool reversed) const;
