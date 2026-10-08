@@ -7,9 +7,11 @@ namespace downwell {
 // speed [0,8], angle [-585,585] (also usual-gun projectiles). The original trig implementation is an input;
 // using host sin/cos here does NOT establish original-runner trig identity.
 struct SmokeDirection {
+    template<unsigned MaximumAngleBits=0x44124000u>
     static bool radians(RunnerImageValue angle,RunnerImageValue& out) {
+        static_assert(MaximumAngleBits<=0x44340000u,"verified degree wrapper domain through 720");
         const auto magnitude=angle.bits&0x7fffffffu;
-        if(magnitude>0x44124000u || ((magnitude&0x7f800000u)==0 && magnitude))return false;
+        if(magnitude>MaximumAngleBits || ((magnitude&0x7f800000u)==0 && magnitude))return false;
         MotionBinary64 product;
         RunnerImageValue numerator;
         if(!multiplyBinary64(angle.promoted(),RunnerImageValue{0x40490fdbu}.promoted(),product) ||

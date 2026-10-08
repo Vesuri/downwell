@@ -13,7 +13,7 @@ struct CurrencyHomingMath {
     }
     static bool component(MotionBinary64 length,MotionBinary64 degrees,bool y,MotionBinary64& out){
         RunnerImageValue speed,angle,radians;MotionBinary64 trig;
-        return speed.assign(length)&&angle.assign(degrees)&&SmokeDirection::radians(angle,radians)&&
+        return speed.assign(length)&&angle.assign(degrees)&&SmokeDirection::radians<0x44340000u>(angle,radians)&&
             smokeTrigComponent(radians.promoted(),!y,trig)&&SmokeDirection::component<0x41100000u>(speed,trig,y,out);
     }
     bool lengthdirX(MotionBinary64 length,MotionBinary64 degrees,MotionBinary64& out){return component(length,degrees,false,out);}

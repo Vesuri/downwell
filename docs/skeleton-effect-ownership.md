@@ -568,11 +568,15 @@ float multiply/truncate/snap wrapper independently of trig evaluation.
 
 `CurrencyHomingMath` requires an explicit atan provider. Tests using
 `portableAtan` do not establish original x87 identity. Gem direction is not
-normalized by the VM: an extended orbit exceeds the currently recovered
-[-585,585] degree trig domain and fails explicitly. Neither modulo reduction
-before the runner's rounded radians conversion nor a host-libm fallback is
-admitted. This larger trig domain remains necessary for natural currency
-admission.
+normalized by the VM: an extended orbit exceeds the older [-585,585] degree
+admission limit. The currency wrapper now admits [-720,720] degrees using the
+same rounded multiply/divide and recovered trig program, not modulo reduction
+or a host-libm fallback. The runner's exponent dispatch admits the corresponding
+float radians. A 2,000-step orbit crosses the old limit without normalizing its
+stored heading; source-program comparisons cover the extended wrapper domain.
+Original atan/FP-mode evidence and a complete live input-domain argument remain
+requirements for natural admission; this wider guard is not arbitrary-angle
+support.
 
 `CurrencyFreeMotion` supplies ordinary Step's non-attracted branch, separately
 from Alarm 4's different gravity/bounce-gain program. It evaluates gravity
@@ -1492,11 +1496,12 @@ binary64 bits with the pair result as well as the scalar source-program oracle,
 including signed zero and reduction-boundary neighbors. No lookup approximation,
 precomputed direction quantization or changed rounding is introduced.
 
-The supported contract includes smoke and shard radians in [-11,11] under
+The supported contract includes smoke, shard and currency radians in [-13,13] under
 nearest-even FP mode, with signed-zero results. The runner's entry guards at
 0x74b621 and 0x74b7e1 strip the sign before range testing; the polynomial itself
-receives the signed argument. Direction wrappers admit speed [0,6] and angles
-[-585,585], without normalizing angles before the source float operations.
+receives the signed argument. The default direction wrapper retains speed [0,8]
+and angles [-585,585]; currency explicitly admits speed [0,9] and angles
+[-720,720], without normalizing angles before the source float operations.
 Other tiny/general inputs and the runner's alternate
 FP-environment fallbacks are not implemented. Establishing the original runtime
 FP mode and native execution cost remains necessary before live admission.

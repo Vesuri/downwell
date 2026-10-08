@@ -49,12 +49,17 @@ int main(){
         assert(SmokeDirection::component<0x41100000u>(s,real(trig),negate,actual)&&equal(actual,expected));
     }
     // portableAtan is a candidate, not original-runner proof. A prolonged
-    // orbit can leave the recovered trig domain: reject, never normalize the
-    // stored direction to hide that missing domain.
+    // orbit crosses the old +/-585 degree admission limit. Preserve the
+    // stored direction while using the wider recovered reduction program.
     CurrencyHomingMath math{portableAtan};CurrencyCreate state;state.xx=real(240);state.yy=real(512);state.attracted=true;bool good=true;
-    unsigned ticks=0;for(;ticks<80&&good;++ticks)CurrencyHomingSource::run(state,real(250),real(500),math,good);
-    RunnerImageValue angle;assert(!good&&ticks>12&&angle.assign(state.direction)&&(angle.bits&0x7fffffffu)>0x44124000u);
+    bool crossed=false;unsigned ticks=0;for(;ticks<2000&&good;++ticks){
+        CurrencyHomingSource::run(state,real(250),real(500),math,good);
+        RunnerImageValue angle;assert(angle.assign(state.direction));crossed|=(angle.bits&0x7fffffffu)>0x44124000u;
+        assert((angle.bits&0x7fffffffu)<=0x44340000u);
+    }
+    assert(good&&crossed&&ticks==2000);
+    MotionBinary64 rejected;assert(!math.lengthdirX(real(9),real(721),rejected));
     state={};state.xx=real(240);state.yy=real(512);state.gemSpeed=real(9);state.rotationSpeed=real(32);good=true;
     assert(CurrencyHomingSource::run(state,real(300),real(512),math,good)&&equal(state.gemSpeed,9)&&equal(state.rotationSpeed,32)&&equal(state.xx,249));
-    std::printf("Currency homing: %u turn/cap/failure cases, speed-nine wrapper and explicit trig-domain rejection passed\n",cases);
+    std::printf("Currency homing: %u turn/cap/failure cases, speed-nine wrapper and 2000 unnormalized orbit steps passed\n",cases);
 }
