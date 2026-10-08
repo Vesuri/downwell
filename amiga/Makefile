@@ -1007,6 +1007,11 @@ audit:
 		echo "*** instruction newer than 68000 in native executable"; exit 1; \
 	else echo "68000 instruction audit: clean"; fi
 
+.PHONY: verify-builder-traversal-compile
+verify-builder-traversal-compile:
+	@mkdir -p obj
+	$(CC) $(CPPFLAGS) -c -o obj/BuilderStringTraversalCompile.o $(REPO)/tests/core/BuilderStringTraversalCompile.cpp
+
 .PHONY: verify-blood-compile
 verify-blood-compile:
 	@mkdir -p obj

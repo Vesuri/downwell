@@ -101,8 +101,28 @@ integer bucket test. Child Create runs synchronously against the same RNG before
 later choices. Failure latches the dispatcher and retains completed writes and
 random draws. Tests compare emitted objects, full WELL state and draw counts
 against an independent host arithmetic/call-order transcription, including
-child RNG and terminal failure. Pattern traversal and concrete actor creation
-still need to bind this state to the live builder on both backends.
+child RNG and terminal failure.
+
+`CatacombBuilderDispatch::pattern` connects the packed original strings to
+`BuilderStringTraversal`, the shared character-loop executor. It runs the area
+dispatch before the common symbol callback; newline pillars are synchronous,
+and post-pattern pillars do not call the area script. The caller passes zero
+extra rows when `genCount <= 0`, or `extraColumn + 1` otherwise (four for area 2).
+The traversal publishes its index, column, build X and Y as it proceeds;
+callback failures retain the completed prefix and latch failure. Reentry is
+rejected. Integer coordinates, an immutable string of at most 65,535 bytes,
+and integer padding counts up to 65,535 define this executor's admitted domain.
+All pinned catacomb literals lie inside it.
+
+The verification target compares 800 geometry traces against an independent
+line-based oracle using the original strings: all 50 patterns, both mirror and
+wrap states, pillars enabled/disabled, and zero/four extra rows. Separate checks
+exercise failure prefixes, reentry, and 300 pattern/level/hard-mode dispatches
+with child RNG consumption against scalar cell dispatch. These are traversal
+and dispatch checks, not a complete encounter replay. Live selection, the common
+symbol callback's post-Create writes, concrete actor creation and scheduler
+binding still need integration on both backends. The freestanding compiler check
+is `make -C amiga verify-builder-traversal-compile` after sourcing `amiga/env.sh`.
 
 ## Actor integration findings
 

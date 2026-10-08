@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Synthetic parser checks plus comparison of VM exports with recovered GML."""
 import importlib.util
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -24,6 +25,46 @@ def fixture():
 
 
 class PatternTests(unittest.TestCase):
+    def test_source_character_geometry(self):
+        for script, digest in (
+            ("scrBuilder", "0c95048af06ff612499acd64a717766441b820d19ffc6017c0ff3a95425581f5"),
+            ("scrSetBuildx", "1c3e1cd4eac113d8491e4183654ac8cb5be47f67d41f706eff853c14160119ee"),
+        ):
+            source = ROOT / f"extracted/utmt-0.9.2.0/Assembly/gml_GlobalScript_{script}.asm"
+            self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest(), digest)
+        result = exporter.build(ROOT)
+        expected = []
+        patterns = [p for family in result["families"] for p in family["patterns"]]
+        for index, pattern in enumerate(patterns):
+            self.assertTrue(pattern["text"].startswith("\r\n"))
+            lines = pattern["text"][2:].split("\r\n")
+            for reverse in (0, 1):
+                for wrap in (0, 1):
+                    def x(column):
+                        return ((336 if wrap else 320) - column*16 if reverse else
+                                (144 if wrap else 160) + column*16)
+                    for pillars in (0, 1):
+                        for extra in (0, 4):
+                            expected.append(f"case {index} {reverse} {wrap} {pillars} {extra}")
+                            y = 704
+                            for row_index, line in enumerate(lines):
+                                text = line.replace("\t", "")
+                                for col, char in enumerate(text, 1):
+                                    expected.extend(f"{kind} {ord(char)} {x(col)} {y}" for kind in ("A", "C"))
+                                if row_index+1 < len(lines):
+                                    expected.append(f"A 13 {x(len(text)+1)} {y}")
+                                    if pillars:
+                                        expected.extend(f"P 60 {x(col)} {y}" for col in (len(text)+1, 0))
+                                    y += 16
+                            for _ in range(extra):
+                                if pillars:
+                                    expected.extend(f"P 60 {x(col)} {y}" for col in (0, 10))
+                                y += 16
+                            expected.append(f"end {y}")
+        actual = subprocess.check_output([ROOT / "build/builder-string-traversal-test",
+                                          ROOT / "generated/downwell-area-two-patterns.dwbp"], text=True)
+        self.assertEqual(actual.splitlines(), expected)
+
     def test_shared_runtime_reader_matches_all_vm_rows(self):
         result = exporter.build(ROOT)
         expected = []

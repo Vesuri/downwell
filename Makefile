@@ -1548,7 +1548,11 @@ build/area-two-pattern-pack-test: tests/core/AreaTwoPatternPackTest.cpp src/core
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
 
-verify-area-two-patterns: generate-area-two-patterns build/area-two-pattern-pack-test
+build/builder-string-traversal-test: tests/core/BuilderStringTraversalTest.cpp src/core/BuilderStringTraversal.h src/core/CatacombBuilderDispatch.h src/core/CatacombBuilderSymbols.h src/core/BuilderPatternPack.cpp src/core/BuilderPatternPack.h src/core/GameMakerRandom.cpp src/core/GameMakerRandom.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+
+verify-area-two-patterns: generate-area-two-patterns build/area-two-pattern-pack-test build/builder-string-traversal-test
 	python3 tests/area-two-patterns-test.py
 	python3 tools/export-area-two-patterns.py --check
 
