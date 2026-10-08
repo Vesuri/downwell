@@ -19,6 +19,7 @@ class AmigaHealthHud {
     unsigned health_=0,maximum_=0,pieces_=0,perHeart_=0;
     bool valid_=false,artReady_=false;
     bool preparedArt_=false,borrowedArt_=false;
+    bool borrowedGlyphs_=false;
     static UWORD read(const UBYTE* p){return UWORD(unsigned(p[0])*256+p[1]);}
     static void write(UBYTE* p,UWORD v){p[0]=UBYTE(v>>8);p[1]=UBYTE(v);}
     static UWORD mask(int word,int left,int right){
@@ -39,7 +40,7 @@ class AmigaHealthHud {
         }
     }
     void glyph(unsigned index,int x){
-        const auto& g=glyphs_[index];x+=g.left;
+        const auto& g=(borrowedGlyphs_?AmigaHealthArt::glyphs:glyphs_)[index];x+=g.left;
         const int word=x/16,shift=x%16;
         for(unsigned row=0;row<g.height;++row){
             const int y=10+g.top+int(row)-firstY;
@@ -146,15 +147,17 @@ public:
             reference(r,pack,end,health,maximum,pieces,perHeart);invalidate();return;
         }
         if(pack_!=pack){
+            borrowedGlyphs_=linkedCopy_&&pack==linkedCopy_&&end==linkedCopyEnd_;
             {
                 DW_PROFILE_SCOPE(profileHealthArtAdmission);
-                preparedArt_=(linkedCopy_&&pack==linkedCopy_&&end==linkedCopyEnd_)||
+                preparedArt_=borrowedGlyphs_||
                     AmigaHealthArt::matches(pack,end);
             }
             artReady_=true;
             {
                 DW_PROFILE_SCOPE(profileHealthGlyphPreparation);
-                for(unsigned i=0;i<11;++i)if(!amigaRendererPrepareHudGlyph(&glyphs_[i],pack,end,65011,i))artReady_=false;
+                if(!borrowedGlyphs_)
+                    for(unsigned i=0;i<11;++i)if(!amigaRendererPrepareHudGlyph(&glyphs_[i],pack,end,65011,i))artReady_=false;
             }
             pack_=pack;invalidate();
         }

@@ -41,4 +41,15 @@ int main(int argc,char** argv){
     amigaRendererFillRect(&renderer,8,6,92,28,0);
     downwell::drawHeartPieceMeter(8,6,0,4,[](int,int,int,int){},asset);
     asset(415,0,8,6);emit("rim",pixels);
+    std::printf("static const AmigaHudGlyph glyphs[11]={\n");
+    for(unsigned index=0;index<11;++index){
+        AmigaHudGlyph glyph{};
+        assert(amigaRendererPrepareHudGlyph(&glyph,pack.data(),pack.data()+pack.size(),65011,index));
+        std::printf("{{");
+        for(auto row:glyph.low)std::printf("%u,",unsigned(row));
+        std::printf("},{");
+        for(auto row:glyph.high)std::printf("%u,",unsigned(row));
+        std::printf("},%d,%d,%u,%u},\n",glyph.left,glyph.top,glyph.width,glyph.height);
+    }
+    std::printf("};\n");
 }

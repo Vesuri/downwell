@@ -1488,6 +1488,18 @@ int main(int argc, char** argv) {
     }
     {
         AmigaHealthHud health;
+        for(unsigned index=0;index<11;++index){
+            AmigaHudGlyph prepared{};
+            require(amigaRendererPrepareHudGlyph(&prepared,hudPack.data(),hudPack.data()+hudPack.size(),65011,index),
+                "prepare glyph oracle");
+            const auto& offline=AmigaHealthArt::glyphs[index];
+            require(prepared.left==offline.left&&prepared.top==offline.top&&
+                prepared.width==offline.width&&prepared.height==offline.height,
+                "offline glyph metadata equals renderer preparation");
+            for(unsigned row=0;row<16;++row)
+                require(prepared.low[row]==offline.low[row]&&prepared.high[row]==offline.high[row],
+                    "offline health glyph planes equal runtime preparation");
+        }
         auto compare=[&](unsigned hp,unsigned maximum,unsigned pieces,unsigned perHeart){
             health.draw(&actualRenderer,hudPack.data(),hudPack.data()+hudPack.size(),hp,maximum,pieces,perHeart);
             AmigaHealthHud::reference(&expectedRenderer,hudPack.data(),hudPack.data()+hudPack.size(),hp,maximum,pieces,perHeart);

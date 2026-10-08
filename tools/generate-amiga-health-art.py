@@ -50,9 +50,9 @@ def main():
                 'inline bool linkedSource(const UBYTE* source,const UBYTE* end){\n'
                 f'    return source=={source_symbol} && end==source+{len(pack)};\n'
                 '}\n#endif\n').encode()
-    manifest = {'format': 'amiga-health-art-v1', 'generator_version': 2,
+    manifest = {'format': 'amiga-health-art-v1', 'generator_version': 3,
                 'extractor': json.loads((ROOT/INPUTS[2]).read_text())['extractor'],
-                'resource_ids': [415, 378], 'per_heart': 4,
+                'resource_ids': [415, 378, 65011], 'per_heart': 4,
                 'inputs_sha256': {p: hashlib.sha256((ROOT/p).read_bytes()).hexdigest() for p in INPUTS},
                 'output_sha256': hashlib.sha256(payload).hexdigest(),
                 'source_include_sha256': hashlib.sha256(source_include).hexdigest()}
