@@ -22,13 +22,13 @@ struct Ops {
     int parentId,area;
     bool upgrade;
     unsigned fail=0;
-    bool promoteSmall=false;
+    bool promoteSmall=false,relocateCaller=false;
     Ops(CurrencySpawnSource<Handle>& s,unsigned seed,int p,int a,bool u,unsigned f=0):
         source(s),random(seed),parentId(p),area(a),upgrade(u),fail(f){}
     bool call(int kind,int id,int value){events.push_back({kind,id,value});return events.size()!=fail;}
     bool parent(int object,int& parent){assert(object==92);parent=parentId;return call(0,object,parent);}
     bool create(int object,MotionBinary64 x,MotionBinary64 y,Handle& child){
-        assert(object==248&&equal(x,12.25)&&equal(y,-3.5));
+        assert(object==248&&equal(x,12.25+(relocateCaller?children.size():0))&&equal(y,-3.5));
         const auto previous=source.myGem;
         if(!call(1,int(children.size()+1),248))return false;
         assert(children.size()<64);children.emplace_back();
@@ -40,6 +40,7 @@ struct Ops {
         } queries{source,previous};
         assert(children.back().create(x,y,area,upgrade,random,queries));
         if(promoteSmall&&children.size()==1)source.moniAmount=MotionBinary64::fromInteger(20);
+        if(relocateCaller)source.x=real(12.25+children.size());
         child=children.size();return true;
     }
     bool amount(Handle child,int amount){
@@ -112,6 +113,11 @@ int main(){
         Ops ops(source,9,92,1,false);ops.promoteSmall=true;bool good=true;
         assert(CurrencySpawnScript::run(source,real(1),ops,good)&&ops.children.size()==10);
         for(const auto& gem:ops.children)assert(gem.getAmount==2&&gem.size==0);assert(source.moniAmount.zero());}
+    {CurrencySpawnSource<std::uint32_t> source;source.x=real(12.25);source.y=real(-3.5);source.objectIndex=92;
+        Ops ops(source,9,92,1,false);ops.relocateCaller=true;bool good=true;
+        assert(CurrencySpawnScript::run(source,real(13),ops,good)&&ops.children.size()==3);
+        for(unsigned i=0;i<3;++i)assert(equal(ops.children[i].xx,12.25+i));
+        assert(equal(source.x,15.25));}
     {struct Mutating:Ops {
         using Ops::Ops;
         bool amount(Handle child,int n){if(!Ops::amount(child,n))return false;source.myGem=99;return true;}
@@ -121,5 +127,32 @@ int main(){
         Mutating ops(source,9,83,1,false);bool good=true;
         assert(CurrencySpawnScript::run(source,real(10),ops,good)&&source.myGem==99&&ops.children[0].size==1);
     }
+    // Reject any retained caller lookup/publication (for example a generation
+    // retired by synchronous Create), preserving the exact completed prefix.
+    struct Prefix {CurrencySpawnSource<std::uint32_t> caller;unsigned children;std::uint64_t draws;};
+    std::vector<Prefix> retainedPrefixes;
+    auto retained=[&](unsigned fail){
+        CurrencySpawnSource<std::uint32_t> caller;caller.x=real(12.25);caller.y=real(-3.5);
+        caller.objectIndex=92;caller.stomped=real(1);caller.myGem=77;
+        Ops ops(caller,9,83,1,false);bool good=true;unsigned boundary=0;
+        auto check=[&](){
+            ++boundary;
+            if(!fail)retainedPrefixes.push_back({caller,unsigned(ops.children.size()),ops.random.drawCount()});
+            return boundary!=fail;
+        };
+        const bool ok=CurrencySpawnScript::runRetained(
+            [&](auto& out){if(!check())return false;out=caller;return true;},
+            [&](MotionBinary64 v){if(!check())return false;caller.moniAmount=v;return true;},
+            [&](bool v){if(!check())return false;caller.atrState=v;return true;},
+            [&](std::uint32_t v){if(!check())return false;caller.myGem=v;return true;},real(13),ops,good);
+        assert(ok==!fail&&good==!fail);
+        if(fail){
+            const auto& p=retainedPrefixes[fail-1];assert(boundary==fail);
+            assert(caller.myGem==p.caller.myGem&&caller.atrState==p.caller.atrState&&
+                caller.moniAmount.high==p.caller.moniAmount.high&&caller.moniAmount.low==p.caller.moniAmount.low&&
+                ops.children.size()==p.children&&ops.random.drawCount()==p.draws);
+        }
+    };
+    retained(0);for(unsigned fail=1;fail<=retainedPrefixes.size();++fail)retained(fail);
     std::printf("Currency spawn: %u real Create chains, %u failure prefixes and caller mutation boundaries passed\n",cases,prefixes);
 }

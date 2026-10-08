@@ -605,6 +605,20 @@ Create precedes the single spread draw and its setters. Player coordinates are
 reread after the synchronous muzzle effect. All controller/effect/projectile
 operations remain mandatory callbacks; script success is not a substitute for
 their live implementations.
+
+`CurrencySpawnScript::runRetained` separates caller reads from individual
+`moniAmount`, `atrState` and `myGem` publications. Each live accessor must
+resolve the selected generation, including after destruction marking and
+synchronous child Create. Child amount/size writes keep their selected child;
+the later attraction write rereads the caller's `myGem`. Amount subtraction
+also rereads the caller, and the twos loop never returns to the tens loop.
+The stored world's `spawnRegisteredCurrency` uses this boundary with the real
+room ID allocator, resource parent lookup, collision registration and shared
+RNG. Script-facing child values are numeric IDs; setters resolve them back to
+the registry's generation handles. Caller fields remain the responsibility of
+the required read/write accessors, not a temporary snapshot copied back at
+script exit. This entry point does not admit natural rewards or supply the
+native world's incomplete cross-family numeric-ID stream.
 `CurrencyGainAccountOperations` exposes the separate writes on either world's
 real account, rejecting values outside its nonnegative uint32 storage domain.
 The stored registry's collection entry retains caller state and source RNG.

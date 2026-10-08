@@ -16,6 +16,7 @@
 #include "LaserSightRay.h"
 #include "MachineGunEmitter.h"
 #include "CurrencyAccount.h"
+#include "CurrencySpawnScript.h"
 #include "CurrencyGainAccountOperations.h"
 #include "MainCameraMotion.h"
 #include "PlayerDeathSequence.h"
@@ -711,6 +712,37 @@ public:
         StoredCurrencyRegistration<instanceCapacity,Capacity>& registry,InstanceHandle gem,Ops& ops){
         if(!registry.belongsTo(instances_))return run_.effectsSucceeded=false;
         return registry.collect(gem,random_,ops);
+    }
+    // Source numeric IDs cross this script boundary; the registry's local
+    // generation handles stay private to child creation and setters.
+    template<unsigned Capacity,class Read,class WriteAmount,class WriteAttracted,class WriteChild,class Tile>
+    bool spawnRegisteredCurrency(StoredCurrencyRegistration<instanceCapacity,Capacity>& registry,
+        Read read,WriteAmount writeAmount,WriteAttracted writeAttracted,WriteChild writeChild,
+        MotionBinary64 amount,Tile tile){
+        if(!run_.effectsSucceeded||!registry.belongsTo(instances_)||!registry.valid())
+            return run_.effectsSucceeded=false;
+        struct Ops {
+            using Handle=std::uint32_t;
+            StartupRuntime& world;StoredCurrencyRegistration<instanceCapacity,Capacity>& gems;Tile tile;
+            bool parent(int object,int& value){
+                PackedObject info;
+                if(!world.objectPack_||!world.objectPack_->findObject(object,info))return false;
+                value=info.parentId;return true;
+            }
+            bool create(int object,MotionBinary64 x,MotionBinary64 y,Handle& id){
+                InstanceHandle key;
+                if(object!=248||!world.createRegisteredCurrency(gems,x,y,tile,key))return false;
+                const auto* r=world.instances_.resolve(key);
+                if(!r)return false;id=r->instanceId;return true;
+            }
+            InstanceHandle child(Handle id){
+                const auto* r=world.instances_.find(id);return r?gems.handle(*r):InstanceHandle{};
+            }
+            bool amount(Handle id,int value){return gems.amount(child(id),value);}
+            bool size(Handle id,int value){return gems.size(child(id),value);}
+            bool attracted(Handle id,bool value){return gems.attracted(child(id),value);}
+        } ops{*this,registry,tile};
+        return CurrencySpawnScript::runRetained(read,writeAmount,writeAttracted,writeChild,amount,ops,run_.effectsSucceeded);
     }
     template<unsigned Capacity,class Collision> auto boxChainPublication(
         StoredDroneBulletRegistration<instanceCapacity,Capacity>& bullets,Collision& collision,InstanceHandle box){

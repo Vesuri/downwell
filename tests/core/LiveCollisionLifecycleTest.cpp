@@ -161,6 +161,40 @@ int main(){
     BuilderPatternPack patterns(bb.data(),bb.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     SpriteMaskPack masks(mb.data(),mb.size());
     require(rooms.valid()&&objects.valid()&&patterns.valid()&&sprites.valid()&&masks.valid(),"real collision resources validate");
+    for(unsigned mode=0;mode<4;++mode){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach retained currency reward world");world->skipToGameForTesting();
+        InstanceHandle box;
+        require(world->spawnBuilderPrimitive(92,240,512,box)&&world->markBoxDestroyed(box),"retain destroyed reward caller");
+        auto gems=world->currencyRegistration<2>();
+        CurrencySpawnSource<std::uint32_t> fields;fields.myGem=77;
+        unsigned writes=0,births=0;InstanceHandle first;
+        const auto before=world->randomState().drawCount();
+        auto readCaller=[&](auto& out){
+            const auto* r=world->resolveInstance(box);if(!r||r->objectId!=92)return false;
+            require(r->destroyRequested,"reward runs after destruction mark, before retirement");
+            out=fields;out.objectIndex=r->objectId;
+            out.x=MotionBinary64::fromInteger(r->x);out.y=MotionBinary64::fromInteger(r->y);return true;
+        };
+        const bool ok=world->spawnRegisteredCurrency(gems,readCaller,
+            [&](MotionBinary64 n){fields.moniAmount=n;return true;},
+            [&](bool n){fields.atrState=n;return true;},
+            [&](std::uint32_t id){++writes;if(mode==3)return false;fields.myGem=id;return true;},
+            MotionBinary64::fromInteger(mode==1?5:mode==0?10:3),
+            [&](InstanceHandle h,int layer,MotionBinary64,MotionBinary64,bool& hit){
+                require(layer==100&&owner->resolve(h)&&owner->resolve(h)->objectId==248,"registered reward enters real collision owner during Create");
+                if(!first.generation)first=h;++births;hit=false;return mode!=2;
+            });
+        require(ok==(mode==0)&&world->effectsSucceeded()==ok,"retained reward success/capacity/Create/caller-write boundaries");
+        const auto* gem=gems.find(first);require(gem,"failed reward retains its already-created child");
+        require(gem->getAmount==(mode==0?10:2)&&gem->size==(mode==0?1:0),"reward setters follow Create and caller publication");
+        require(world->randomState().drawCount()==before+(mode==1?16:8),"reward Create shares exact world RNG stream");
+        require(writes==(mode==2?0:mode==1?2:1)&&births==(mode==1?2:1),"no replayed or skipped child publication");
+        if(mode==0)require(fields.moniAmount.zero()&&fields.myGem==owner->resolve(first)->instanceId,"reward publishes global child ID, not family handle");
+        if(mode>=2)require(fields.myGem==77,"failed Create/write preserves previous caller child ID");
+        require(gems.clear(),"release registered reward children before world teardown");
+    }
     for(unsigned mode=0;mode<5;++mode){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
