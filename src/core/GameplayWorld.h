@@ -29,6 +29,7 @@
 #include "core/BloodInstances.h"
 #include "core/CurrencyInstances.h"
 #include "core/CurrencySpawnScript.h"
+#include "core/CurrencyRewardFields.h"
 #include "core/CurrencyCollisionBounds.h"
 #include "core/RegisteredSkeletonThrow.h"
 #include "core/BoneViewRetirement.h"
@@ -807,6 +808,26 @@ public:
         const auto& box=breakables_[handle.slot];
         return box.lifetimeId==handle.generation ? &box : nullptr;
     }
+    const downwell::CurrencyRewardFields* boxReward(downwell::InstanceHandle h)const{
+        return findBreakable(h)?&boxRewards_[h.slot]:nullptr;
+    }
+    template<class Position,class Allocate,class Queries>
+    bool spawnBoxCurrency(const downwell::ObjectPack& objects,downwell::InstanceHandle box,
+        downwell::MotionBinary64 amount,Position position,Allocate allocate,Queries& queries){
+        auto retained=[&]()->downwell::CurrencyRewardFields*{
+            return findBreakable(box)?&boxRewards_[box.slot]:nullptr;
+        };
+        return spawnRegisteredCurrency(objects,[&](downwell::CurrencySpawnSource<std::uint32_t>& out){
+            if(!retained()||!position(box,out.x,out.y))return false;
+            // Position callbacks may synchronously retire or replace a caller.
+            const auto* r=retained();if(!r)return false;
+            out.objectIndex=92;out.moniAmount=r->moniAmount;out.myGem=r->myGem;
+            out.atrState=r->atrState;out.stomped={};return true;
+        },[&](auto value){auto* r=retained();if(!r)return false;r->moniAmount=value;return true;},
+          [&](bool value){auto* r=retained();if(!r)return false;r->atrState=value;return true;},
+          [&](std::uint32_t value){auto* r=retained();if(!r)return false;r->myGem=value;return true;},
+          amount,allocate,queries);
+    }
     bool publishBoxHealth(downwell::InstanceHandle h,downwell::MotionBinary64 health){
         if(!run_.effectsSucceeded||!findBreakable(h)||!health.valid())return run_.effectsSucceeded=false;
         breakables_[h.slot].state.wallHp=health;return true;
@@ -1388,6 +1409,9 @@ private:
     PlayerMotion::LandingResolver landingResolver_ = nullptr;
     void* landingResolverContext_ = nullptr;
     Breakable breakables_[breakableCapacity];
+    // Cold dynamic script variables: do not widen the hot Breakable stride or
+    // copy them into ordinary Step snapshots. Reset at slot-reuse boundaries.
+    downwell::CurrencyRewardFields boxRewards_[breakableCapacity]{};
     unsigned breakableCount_;
     bool breakableIndexReady_ = false;
     std::uint16_t breakableIndex_[64 * 512];

@@ -706,6 +706,7 @@ bool GameplayWorld::clearBreakableOwnership() {
 }
 
 void GameplayWorld::prepareBreakableSlotsForReuse(){
+    for(unsigned i=0;i<breakableCount_;++i)boxRewards_[i]={};
 #ifndef DOWNWELL_REFERENCE_BREAKABLES
     // Append-only slots are constructed once before gameplay. Reused slots
     // are reset here, at the room/configuration boundary after retirement,

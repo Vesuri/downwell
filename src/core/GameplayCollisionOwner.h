@@ -602,7 +602,17 @@ private:
             parent.activationPending_=true;return parent.publishPreparedDraw(h);}
         // Native ownership publishes no geometry: nothing queries it.
         bool move(InstanceHandle local,const Record& r,RunnerImageValue x,RunnerImageValue y){InstanceHandle h;
-            if(parent.native_)return true;
+            if(parent.native_){
+                if constexpr(Kind==View::Kind::breakable){
+                    RunnerImageValue px,py;auto xx=MotionBinary64::fromInteger(r.x),yy=MotionBinary64::fromInteger(r.y);
+                    // The static native box index has no fractional/moving
+                    // geometry. Never report an ignored setter as published.
+                    return key(local,r,h)&&parent.check(xx.add(MotionBinary64::fromInteger(240))&&
+                        yy.add(MotionBinary64::fromInteger(176))&&px.assign(xx)&&py.assign(yy)&&
+                        px.bits==x.bits&&py.bits==y.bits);
+                }
+                return true;
+            }
             return key(local,r,h)&&parent.check(parent.owner_.template moveDomain<Kind==View::Kind::terrain>(h,x,y,*parent.families_.flags(object(r))));}
         bool depth(InstanceHandle local,const Record& r,MotionBinary64 value){InstanceHandle h;RunnerImageValue narrowed;
             if(!key(local,r,h)||!narrowed.assign(value)||!parent.actorDepthAvailable(narrowed))return parent.check(false);
@@ -1415,6 +1425,16 @@ public:
         health=record.breakable->state.wallHp;return true;
     }
     bool readBoxDestruction(InstanceHandle h,BoxDestructionScript::Caller& out)const{
+        if(native_){
+            View::Record record;
+            if(!valid()||!resolves(h)||!View(*world_).resolve(h,record)||!record.breakable)return false;
+            const auto* box=record.breakable;
+            auto x=MotionBinary64::fromInteger(box->x),y=MotionBinary64::fromInteger(box->y);
+            RunnerImageValue px,py;
+            if(!x.add(MotionBinary64::fromInteger(240))||!y.add(MotionBinary64::fromInteger(176))||
+                !px.assign(x)||!py.assign(y))return false;
+            out={box->state,px.promoted(),py.promoted()};return true;
+        }
         View::Record record;const auto position=state(h);
         if(!position||!resolves(h)||!View(*world_).resolve(h,record)||!record.breakable)return false;
         out={record.breakable->state,position->x.promoted(),position->y.promoted()};return true;

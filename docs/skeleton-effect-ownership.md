@@ -628,7 +628,7 @@ retirement removes the binding. Caller accessors and Create collision/tile
 queries remain required. Allocation or Create failure retains the script's
 preceding writes and any partially created child, without publishing a new
 `myGem` or executing tail setters. This entry point does not fill the missing
-global birth stream or native box caller storage.
+global birth stream.
 For stored boxes, `spawnBoxCurrency` binds these accessors to the actual
 generation's `boxReward` fields, including after destruction marking. Position
 comes from a required maintained-owner read on each access, never from the
@@ -638,7 +638,18 @@ amount/attraction writes and destruction effects remain published. These cold fi
 are separate from `BreakableState`, so ordinary box Step snapshots do not copy
 them. `boxCurrencyOperations` supplies the destruction script's currency call
 without replacing its required time-stop, chain or other effect operations.
-Native box reward ownership still requires its numeric-ID allocation adapter.
+The native world's `spawnBoxCurrency` binds the same caller fields to a
+generation-checked cold sidecar, retained after the destruction mark and
+invalidated on retirement. Slot reuse clears it at the room boundary, not in
+the generation loop. This costs 7,168 bytes with the 68000 ABI (512 callers),
+without widening `Breakable` or its ordinary Step snapshots. The native
+collision owner's destruction reader obtains published room coordinates
+from the retained static box record, rather than its absent generic geometry.
+That optimized representation accepts only unchanged position publications;
+fractional/moving setters fail explicitly until full native geometry supports
+them. The reference owner retains fractional setter coverage. Natural native
+rewards still require the complete numeric-ID allocation adapter and event
+composition.
 The stored scheduler composes currency and box dispatch scopes around the same
 owned-debris tick. A reward born in ordinary Step misses that phase's cutoff
 and the preceding animation/alarm passes, but may Draw after the marked box

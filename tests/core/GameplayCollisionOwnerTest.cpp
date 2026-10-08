@@ -674,6 +674,71 @@ int main(){
                 !owner->currency().handleForSourceId(805000).generation);
         }
     }
+    for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+        GameplayCollisionOwner::Ownership::nativeScenery})
+    for(unsigned failure=0;failure<4;++failure){
+        const auto roomBytes=read("generated/downwell-rooms.dwrm");RoomPack rooms(roomBytes.data(),roomBytes.size());
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},&rooms,ownership);
+        auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));
+        const int x=240,y=800;assert(world->appendBreakables(&x,&y,1));
+        const InstanceHandle box{0,world->breakableSlot(0).lifetimeId};
+        RunnerImageValue px{0x43704000u},py{0x44482000u};
+        if(ownership!=GameplayCollisionOwner::Ownership::reference){
+            assert(px.assignInteger(x+240)&&py.assignInteger(y+176));
+        }
+        assert(owner->breakableBinding().publishedPosition(box,*world->findBreakable(box),px,py)&&
+            world->markBreakableDestroyed(box));
+        struct Queries {
+            unsigned failure;
+            bool wall(InstanceHandle,MotionBinary64,MotionBinary64,bool& hit){hit=false;return true;}
+            bool tile(InstanceHandle,int,MotionBinary64,MotionBinary64,bool& hit){hit=false;return failure!=2;}
+        } queries{failure};
+        unsigned births=0;InstanceHandle replacement;
+        const bool completed=world->spawnBoxCurrency(objects,box,MotionBinary64::fromInteger(10),
+            [&](InstanceHandle h,auto& outX,auto& outY){
+                if(failure==1)return false;
+                if(failure==3){
+                    world->configureBreakables(&x,&y,1);
+                    replacement={0,world->breakableSlot(0).lifetimeId};
+                    outX=px.promoted();outY=py.promoted();return true;
+                }
+                InstanceHandle shared;BoxDestructionScript::Caller caller;
+                if(!GameplayCollisionView::encode(GameplayCollisionView::Kind::breakable,h,shared)||
+                    !owner->readBoxDestruction(shared,caller))return false;
+                outX=caller.x;outY=caller.y;return true;
+            },[&](std::uint32_t& id){id=806000+births++;return true;},queries);
+        if(completed!=(failure==0))fprintf(stderr,"box reward failure %d %u %u %d\n",int(ownership),failure,births,int(owner->valid()));
+        assert(completed==(failure==0));
+        if(failure==3){
+            const auto* fresh=world->boxReward(replacement);
+            assert(replacement.generation!=box.generation&&!world->boxReward(box)&&fresh&&
+                fresh->moniAmount.zero()&&!fresh->myGem&&!births);
+            continue;
+        }
+        const auto* reward=world->boxReward(box);
+        assert(reward&&!reward->atrState&&world->findBreakable(box)->destroyRequested);
+        assert(reward->myGem==(failure?0u:806000u)&&
+            reward->moniAmount.high==MotionBinary64::fromInteger(failure?10:0).high&&!reward->moniAmount.low);
+        assert(births==(failure==1?0u:1u));
+        if(births){
+            const auto* gem=owner->currency().find(owner->currency().handleForSourceId(806000));
+            assert(gem&&gem->x.bits==px.bits&&gem->y.bits==py.bits&&
+                gem->state.getAmount==(failure?2:10)&&gem->state.size==(failure?0:1));
+        }
+        if(!failure){
+            assert(world->retireMarkedBreakable(box)&&!world->boxReward(box));
+            world->configureBreakables(&x,&y,1);
+            replacement={0,world->breakableSlot(0).lifetimeId};
+            const auto* fresh=world->boxReward(replacement);
+            assert(fresh&&fresh->moniAmount.zero()&&!fresh->myGem&&!fresh->atrState);
+            if(ownership!=GameplayCollisionOwner::Ownership::reference)
+                assert(!owner->breakableBinding().publishedPosition(replacement,*world->findBreakable(replacement),
+                    RunnerImageValue{0x43704000u},py)&&!owner->valid());
+        }
+    }
     for(unsigned mode=0;mode<12;++mode){
         const bool fullEffects=mode!=0;
         const auto roomBytes=read("generated/downwell-rooms.dwrm");RoomPack roomPack(roomBytes.data(),roomBytes.size());
