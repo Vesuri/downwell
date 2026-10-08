@@ -2191,6 +2191,39 @@ int main(){
         }
     }
     auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
+    for(unsigned failure=0;failure<4;++failure){
+        struct CollisionNotice {
+            unsigned disabled=0;
+            bool changed(int x,int y,bool enabled){assert(x==240&&y==160&&!enabled);++disabled;return true;}
+        } collision;
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
+            GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision::bind(collision),&rooms);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain(),&rooms);
+        assert(owner->attach(*world)&&world->createAuthoredDitherAbove());
+        auto& terrain=owner->terrain();
+        assert(terrain.append(60,240,160,true)&&terrain.append(failure==2?93:60,240,160,true));
+        const auto first=terrain.handle(0),second=terrain.handle(1),above=world->ditherAbove()->handle();
+        InstanceHandle self,other;
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::ditherAbove,above,self)&&
+            GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,second,other));
+        RunnerCollisionEventContext::Frame event{self,other,4,60,61,991};
+        if(failure==1)event.code=990;
+        if(failure==3)++event.other.generation;
+        const auto draws=world->randomDrawCount();
+        assert(owner->dispatchDitherAboveCollision(event)==(failure==0));
+        assert(world->randomDrawCount()==draws&&terrain.find(first)&&!terrain.find(first)->destroyRequested);
+        if(failure){assert(!collision.disabled&&!terrain.find(second)->destroyRequested);continue;}
+        assert(collision.disabled==1&&terrain.find(second)->destroyRequested&&
+            world->ditherAbove()->find(above)&&!world->ditherAbove()->find(above)->destroyRequested);
+        assert(owner->state(other)->flags&1u);
+        assert(owner->dispatchDitherAboveCollision(event)&&collision.disabled==1);
+        assert(owner->prepareDraw()&&!terrain.find(second)&&terrain.find(first)&&world->ditherAbove()->find(above));
+        assert(terrain.append(60,240,160,true));
+        const auto replacement=terrain.handle(1);
+        assert(replacement.slot==second.slot&&replacement.generation!=second.generation);
+        assert(!owner->dispatchDitherAboveCollision(event)&&!terrain.find(replacement)->destroyRequested&&collision.disabled==1);
+    }
     for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
         GameplayCollisionOwner::Ownership::nativeScenery})for(bool low:{false,true}){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,

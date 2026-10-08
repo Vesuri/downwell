@@ -1174,6 +1174,21 @@ public:
     GameplayWorld::Skeletons& skeletons(){return skeletons_;}
     GameplayWorld::Blood& blood(){return blood_;}
     GameplayWorld::Currency& currency(){return currency_;}
+    // Selected code 991 destroys OTHER, not the dither. Pair collection and
+    // wrapper ordering belong to the caller; retain the wall until Draw-entry
+    // cleanup so later event directions can still resolve its identity.
+    bool dispatchDitherAboveCollision(const RunnerCollisionEventContext::Frame& event){
+        View::Kind selfKind,otherKind;InstanceHandle self,other;
+        PackedObjectEvent binding{},destroy{};bool found=false;
+        if(!valid()||!world_||!terrainRegistered_||
+            !View::decode(event.self,selfKind,self)||selfKind!=View::Kind::ditherAbove||
+            !View::decode(event.other,otherKind,other)||otherKind!=View::Kind::terrain||
+            !resolves(event.self)||!resolves(event.other)||objectOf(event.other)!=60||
+            event.type!=4||event.subtype!=60||event.owner!=61||event.code!=991||
+            !objects_.collisionEvent(61,60,found,binding)||!found||
+            binding.ownerObjectId!=61||binding.codeId!=991||objects_.findEvent(60,1,0,destroy))return check(false);
+        return check(terrain_.requestDestroy(other));
+    }
     template<class MakePlayer> bool dispatchSkeletonCollision(const RunnerCollisionEventContext::Frame& event,MakePlayer makePlayer){
         View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;
         if(!valid()||!world_||!resolves(event.self)||!resolves(event.other)||
