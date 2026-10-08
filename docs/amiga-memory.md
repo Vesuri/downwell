@@ -15,6 +15,10 @@ reduces live descriptors rather than the allocation size. Per-cell state is
 one flags byte plus the run locator, not a duplicate generic runner record.
 Each run also retains a shared native registration-clock base. An intervening
 actor birth prevents adjacent walls from merging across that chronology gap.
+The existing per-cell flags byte also packs constructor spatial membership,
+precise-mask and bounds-dirty bits. Constructor bounds are derived from the
+run's object and coordinates for publication and retirement; no per-cell
+rectangle array is allocated.
 Room teardown preserves the generation counter, preventing old handles from
 addressing replacement walls. Generated numeric VM IDs are not inferred from
 these family-local handles.

@@ -18,14 +18,20 @@ template<unsigned Capacity> class NativeTerrainLifetimes {
     unsigned char flags_[Capacity]{};
     bool good_=true;
 public:
+    using Identity=typename Runs::Identity;
     struct Binding {
         void* context=nullptr;
         bool (*admit)(void*,unsigned)=nullptr;
-        bool (*birth)(void*,unsigned,int,std::uint32_t&)=nullptr;
+        bool (*birth)(void*,const Identity&,bool,std::uint32_t&,std::uint32_t&)=nullptr;
         bool (*retire)(void*,unsigned)=nullptr;
         bool (*mark)(void*,unsigned)=nullptr;
     };
-    using Identity=typename Runs::Identity;
+    bool spatialFlags(InstanceHandle h,std::uint32_t& out)const{
+        if(!contains(h))return false;
+        const unsigned value=flags_[h.slot];
+        out=(value&3u)|((value&4u)?8u:0u)|((value&8u)?0x200u:0u)|((value&16u)?0x8000u:0u);
+        return true;
+    }
     bool bind(Binding binding){
         if(!good_)return false;
         if(!binding.context&&(binding.admit||binding.birth||binding.retire||binding.mark))return good_=false;
@@ -56,9 +62,13 @@ public:
         if(!canAppend(1)||(object!=60&&object!=93&&object!=99))return good_=false;
         unsigned slot=freeHint_;while(slot<Capacity&&runs_.occupied(slot))++slot;
         Order order;
-        if(slot==Capacity||(binding_.birth&&!binding_.birth(binding_.context,slot,object,order.stamp))||
+        const Identity identity{{slot,next_},object,x,y,creation,source};
+        std::uint32_t spatial=8u;
+        if(slot==Capacity||(binding_.birth&&!binding_.birth(binding_.context,identity,active,order.stamp,spatial))||
             !runs_.append({slot,next_},object,x,y,source,creation,order))return good_=false;
-        ++next_;freeHint_=slot+1;flags_[slot]=active?0:2;return true;
+        ++next_;freeHint_=slot+1;
+        flags_[slot]=(active?0:2)|((spatial&8u)?4u:0u)|((spatial&0x200u)?8u:0u)|((spatial&0x8000u)?16u:0u);
+        return true;
     }
     bool canAppend(unsigned count)const{
         return good_&&count<=available()&&next_&&(!count||count-1<=0xffffffffu-next_)&&

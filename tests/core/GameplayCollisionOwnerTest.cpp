@@ -2291,6 +2291,16 @@ int main(){
             return result;
         };
         auto same=[](InstanceHandle a,InstanceHandle b){return a.slot==b.slot&&a.generation==b.generation;};
+        auto indexed=[&](InstanceHandle target){
+            GameplayCollisionOwner::Owner::Box all;assert(all.left.assignInteger(-10000)&&all.top.assignInteger(-10000)&&
+                all.right.assignInteger(10000)&&all.bottom.assignInteger(10000));
+            unsigned count=0;assert(owner->inspectNativeIndex(all,[&](InstanceHandle h){if(same(h,target))++count;return true;}));
+            return count;
+        };
+        std::uint32_t terrainFlags;
+        assert(terrain->spatialFlags(local,terrainFlags)&&(terrainFlags&0x8000u)&&!(terrainFlags&8u));
+        assert(terrain->spatialFlags(coincident,terrainFlags)&&!(terrainFlags&0x8000u)&&(terrainFlags&2u));
+        assert(indexed(shared)==1&&indexed(other)==0); // Inactive birth refreshes bounds but does not insert.
         for(bool collision:{false,true}){
             const auto q=queued(collision);assert(q.size()>=3);
             assert(same(q[0],other)&&same(q[1],dither)&&same(q[2],shared));
@@ -2302,8 +2312,10 @@ int main(){
             id.x==240&&id.y==160&&active&&!destroyed);
         int parent;assert(owner->projectileWallParent(shared,parent)&&parent==59);
         assert(terrain->markDestroyed(local)&&view.contains(shared)&&view.readTerrain(shared,id,active,destroyed)&&destroyed);
+        assert(indexed(shared)==1); // Exclusion is immediate, spatial retirement is deferred.
         for(bool collision:{false,true})assert(same(queued(collision)[2],shared)); // Mark is not retirement or a setter.
         assert(terrain->retire(local)&&!view.contains(shared)&&!owner->projectileWallParent(shared,parent));
+        assert(indexed(shared)==0);
         for(bool collision:{false,true})for(auto h:queued(collision))assert(!same(h,shared));
         assert(view.readTerrain(other,id,active,destroyed)&&id.source==100858&&!active&&!destroyed);
         assert(terrain->append(93,240,160));const auto replacement=terrain->handle(1);
@@ -2339,6 +2351,7 @@ int main(){
         for(bool collision:{false,true})assert(same(queued(collision)[0],playerShared));
         assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)==ResultsDestination::gameplay);
         assert(world->nativeTerrainInstances()==terrain.get()&&!terrain->size()&&!view.contains(other));
+        assert(indexed(shared)==0&&indexed(other)==0&&indexed(dither)==0);
         for(bool collision:{false,true})for(auto h:queued(collision))assert(!same(h,other)&&!same(h,dither)&&!same(h,box));
         assert(terrain->append(60,240,160)&&terrain->handle(0).generation>replacement.generation&&
             terrain->registrationOrder(terrain->handle(0))>firstOrder+2);

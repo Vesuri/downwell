@@ -485,7 +485,7 @@ int main(){
         Native live;
         Native::Binding binding{&clock,
             [](void* p,unsigned count){return count<=0xffffffffu-static_cast<Clock*>(p)->next;},
-            [](void* p,unsigned,int,std::uint32_t& order){auto& c=*static_cast<Clock*>(p);order=c.next++;++c.births;return true;},
+            [](void* p,const Native::Identity&,bool,std::uint32_t& order,std::uint32_t&){auto& c=*static_cast<Clock*>(p);order=c.next++;++c.births;return true;},
             [](void* p,unsigned){++static_cast<Clock*>(p)->retired;return true;},
             [](void* p,unsigned){++static_cast<Clock*>(p)->marks;return true;}};
         require(live.bind(binding)&&live.append(60,240,160)&&live.append(60,256,160));

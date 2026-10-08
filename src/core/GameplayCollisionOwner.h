@@ -329,7 +329,9 @@ private:
                 GameplayWorld::NativeTerrain::Identity id;bool active,destroyed;
                 if(View(*world_).readTerrain(h,id,active,destroyed)){
                     const auto* definition=objectDefaults_.get(id.object);if(!definition)return false;
-                    out=definition->initialFlags|(active?0u:2u)|(destroyed?1u:0u);return true;
+                    std::uint32_t spatial;
+                    if(!world_->nativeTerrainInstances()->spatialFlags(id.handle,spatial))return false;
+                    out=(definition->initialFlags&~8u)|spatial;return true;
                 }
             }
             return false;
@@ -454,6 +456,52 @@ private:
                 found?&bounds:nullptr,state->x,state->y,found&&resource.collisionMode==1,publish);
         });
         state->appearanceFlags=flags&0xc208u;return check(okay);
+    }
+    bool nativeTerrainBirthBounds(const GameplayWorld::NativeTerrain::Identity& id,
+        RunnerImageValue& x,RunnerImageValue& y,Owner::Box& bounds,bool& found,bool& precise){
+        if(terrainBirthBounds_.at(id.object,id.x,id.y,x,y,bounds,precise)){found=true;return true;}
+        const auto* definition=objectDefaults_.get(id.object);
+        if(!definition||!x.assignInteger(id.x)||!y.assignInteger(id.y))return check(false);
+        PackedSpriteCollision resource;
+        found=sprites_.collisionSprite(definition->spriteId,definition->maskId,resource);
+        precise=found&&resource.collisionMode==1;
+        return !found||check(RunnerSpriteBounds::fromSprite(resource,x,y,
+            RunnerImageValue{0x3f800000u},RunnerImageValue{0x3f800000u},false,RunnerImageValue{},RunnerImageValue{},true,
+            [](auto value,std::int32_t& pixel){return value.roundPixel(pixel);},bounds));
+    }
+    bool nativeTerrainBirth(const GameplayWorld::NativeTerrain::Identity& id,bool active,
+        std::uint32_t& order,std::uint32_t& flags){
+        const unsigned slot=View::terrainBase+id.handle.slot;
+        if(!valid()||!table_.externalBirth(slot,order)||!nativeBirthQueues(slot,id.object))return check(false);
+        const auto* definition=objectDefaults_.get(id.object);const auto* objectFlags=families_.flags(unsigned(id.object));
+        if(!definition||!objectFlags)return check(false);
+        flags=definition->initialFlags|(active?0u:2u);
+        RunnerImageValue x,y;Owner::Box bounds,cached{};bool found,precise;
+        if(!nativeTerrainBirthBounds(id,x,y,bounds,found,precise))return false;
+        return check(owner_.externalSpatialPublication([&](auto& index){
+            return RunnerSpatialBoundsUpdate::finishRefresh(index,slot,*objectFlags,flags,false,cached,
+                found?&bounds:nullptr,x,y,precise,true);
+        }));
+    }
+    bool nativeTerrainRetire(unsigned local){
+        if(!valid()||!world_||!world_->nativeTerrainInstances())return check(false);
+        const auto* terrain=world_->nativeTerrainInstances();
+        GameplayWorld::NativeTerrain::Identity id;bool active,destroyed;std::uint32_t flags;
+        const auto h=terrain->currentHandle(local);
+        if(!terrain->read(h,id,active,destroyed)||!terrain->spatialFlags(h,flags))return check(false);
+        const unsigned slot=View::terrainBase+local;
+        if(flags&0x8000u){
+            // Until terrain Create/refresh is connected, the retained index
+            // entry is immutable constructor geometry, derived from its run.
+            RunnerImageValue x,y;Owner::Box bounds;bool found,precise;
+            if(!nativeTerrainBirthBounds(id,x,y,bounds,found,precise)||!found)return check(false);
+            if(RunnerSpatialSplit::less(bounds.right,bounds.left)){const auto v=bounds.left;bounds.left=bounds.right;bounds.right=v;}
+            if(RunnerSpatialSplit::less(bounds.bottom,bounds.top)){const auto v=bounds.top;bounds.top=bounds.bottom;bounds.bottom=v;}
+            if(!check(owner_.externalSpatialPublication([&](auto& index){
+                bool removed;return index.remove(bounds,slot,true,removed);
+            })))return false;
+        }
+        table_.externalRetire(slot);return nativeRetireQueues(slot);
     }
     template<class Record,View::Kind Kind> struct Binding {
         GameplayCollisionOwner& parent;
@@ -893,8 +941,8 @@ public:
     //
     // Native ownership does not yet answer spatial queries. Published actor
     // positions, appearance and cached bounds are retained separately. Actor
-    // births publish to the shared journal allocation; terrain publication and
-    // consuming the mixed dirty queue remain separate integration work. A compact table keeps
+    // and terrain constructors publish to the shared journal allocation;
+    // terrain Create and consuming the mixed queue remain integration work. A compact table keeps
     // what the actor orders observe (object, flag word, sprite index and
     // registration order); room lists and layers remain the order owners.
     enum class Ownership {reference,nativeTerrain,native,nativeScenery};
@@ -989,8 +1037,8 @@ public:
         bounds=state->bounds;return true;
     }
     // Inspect already-published entries without flushing the dirty queues.
-    // Deliberately not an instance_place/meeting implementation: terrain and
-    // complete scene population are not yet admitted to native queries.
+    // Deliberately not an instance_place/meeting implementation: terrain
+    // Create and complete scene publication are not yet admitted to queries.
     template<class Visit> bool inspectNativeIndex(Owner::Box box,Visit visit){
         if(!native_||!valid())return false;
         return check(owner_.externalSpatialPublication([&](auto& index){
@@ -1025,12 +1073,10 @@ public:
         if(native_&&!world.configureNativeTerrainBinding({this,
             [](void* p,unsigned count){auto& self=*static_cast<GameplayCollisionOwner*>(p);
                 return self.valid()&&self.table_.canExternalBirth(count);},
-            [](void* p,unsigned slot,int object,std::uint32_t& order){auto& self=*static_cast<GameplayCollisionOwner*>(p);
-                return self.valid()&&self.check(self.table_.externalBirth(View::terrainBase+slot,order)&&
-                    self.nativeBirthQueues(View::terrainBase+slot,object));},
+            [](void* p,const GameplayWorld::NativeTerrain::Identity& id,bool active,std::uint32_t& order,std::uint32_t& flags){
+                return static_cast<GameplayCollisionOwner*>(p)->nativeTerrainBirth(id,active,order,flags);},
             [](void* p,unsigned slot){auto& self=*static_cast<GameplayCollisionOwner*>(p);
-                if(!self.valid())return false;
-                self.table_.externalRetire(View::terrainBase+slot);return self.nativeRetireQueues(View::terrainBase+slot);},
+                return self.nativeTerrainRetire(slot);},
             [](void* p,unsigned slot){auto& self=*static_cast<GameplayCollisionOwner*>(p);
                 if(!self.valid())return false;
                 self.table_.externalFlagsChanged(View::terrainBase+slot);return true;}

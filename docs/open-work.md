@@ -47,6 +47,8 @@ behavior, both backend integrations and relevant original-game verification.
   Connect native terrain's identity runs to ordered collision candidates
   before enabling destruction dispatch there: finish animation/cached-frame and
   dynamic-rebinding publication, plus spatial mutation/traversal publication;
+  connect terrain Create appearance writes and subsequent cached-bound refresh
+  while preserving its constructor publication before those writes;
   connect queue flushing, candidate collection and post-pass retention.
   Registration stamps alone are not pair
   order. Occupancy
