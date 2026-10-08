@@ -385,6 +385,39 @@ int main(){
             currency.find(gem)->gemAmount==2&&!owner->resolve(gem)->destroyRequested,"collection failure retains preceding account writes and live caller");
         require(currency.clear(),"clear failed collection caller");
     }
+    for(unsigned failure=0;failure<=7;++failure){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach currency sound world");world->skipToGameForTesting();
+        auto currency=world->currencyRegistration<1>();InstanceHandle gem;
+        require(world->createRegisteredCurrency(currency,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(512),
+            [](auto,int,auto,auto,bool& hit){hit=false;return true;},gem),"create sound caller");
+        struct Audio {
+            StartupRuntime& world;unsigned failure,calls=0;
+            bool call(int code){const int expected[]={167,1167,2167,3000,4000,5000,900};
+                require(calls<7&&expected[calls]==code,"pickup audio operation order");return ++calls!=failure;}
+            bool isPlaying(int id,bool& playing){playing=true;return call(id);}
+            bool stop(int id){return call(1000+id);}
+            bool play(int id,int priority,bool loop,int& voice){
+                require(world.overlapSound(8)==167&&priority==60&&!loop,"UI publication precedes pickup playback");
+                voice=900;return call(2000+id);}
+            bool getGain(int id,MotionBinary64& gain){require(id==900,"pickup gain voice");gain={0x3fe00000u,0};return call(3000);}
+            bool setGain(int id,MotionBinary64 gain,int duration){
+                require(id==900&&gain.high==0x3fc00000u&&gain.low==0&&!duration,"pickup source volume product");return call(4000);}
+            bool setPitch(int id,MotionBinary64 pitch){
+                require(id==900&&pitch.high==0x3ff00000u&&pitch.low==0,"UI pitch remains one");return call(5000);}
+        } audio{*world,failure};
+        const auto draws=world->randomDrawCount();
+        const auto before=world->overlapSound(8);
+        require(world->playCurrencyPickupSound(currency,gem,{0x3fd00000u,0},audio)==(failure==0),"pickup audio failure result");
+        const auto& sound=owner->resolve(gem)->sound;
+        require(audio.calls==(failure?failure:7)&&world->effectsSucceeded()==(failure==0)&&world->randomDrawCount()==draws&&
+            sound.sfxIndex==167&&sound.soundPriority==60&&!sound.cutPrv&&sound.chanNum==8&&
+            world->overlapSound(8)==((!failure||failure>=3)?167:before),"pickup retains source sound and channel failure prefix");
+        if(failure)require(!world->playCurrencyPickupSound(currency,gem,{0x3fd00000u,0},audio)&&audio.calls==failure,
+            "failed pickup audio cannot retry later operations");
+        require(currency.clear(),"retire pickup sound caller");
+    }
     for(bool accept:{true,false}){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());

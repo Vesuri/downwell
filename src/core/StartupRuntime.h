@@ -196,6 +196,14 @@ public:
         r->box.wallHp=health;return true;
     }
     int overlapSound(unsigned channel)const{return channel<11?run_.overlapSounds[channel]:-1;}
+    template<unsigned Capacity,class Audio> bool playCurrencyPickupSound(
+        StoredCurrencyRegistration<instanceCapacity,Capacity>& currency,InstanceHandle gem,
+        MotionBinary64 volume,Audio& audio){
+        auto* caller=instances_.resolve(gem);
+        if(!run_.effectsSucceeded||!currency.belongsTo(instances_)||!currency.find(gem)||!caller)
+            return run_.effectsSucceeded=false;
+        return run_.playCurrencyPickupSound(caller->sound,volume,audio);
+    }
     template<class Audio> bool playBoxChainSound(InstanceHandle h,MotionBinary64 volume,bool inWater,Audio& audio){
         auto* box=instances_.resolve(h);
         if(!run_.effectsSucceeded||!box||box->objectId!=92)return run_.effectsSucceeded=false;

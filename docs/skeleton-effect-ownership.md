@@ -620,6 +620,15 @@ caller assignment, stops before the speed setter and latches terminal failure.
 This entry point still needs the complete live collection operation binding;
 it does not enable natural rewards or native currency ownership by itself.
 
+`RunSession::playCurrencyPickupSound` retains the source UI overlap channel
+alongside the other run-owned channels. The stored-world entry selects the
+registered currency's actual `SoundPlayState`; it executes sound 167 at priority
+60 through `SoundPlayScript`, not a request counter. Channel 8 stops the sound
+asset's previous playback, publishes its selection before play, applies game
+volume and keeps pitch at one regardless of water. All seven backend-operation
+failure prefixes retain preceding script/channel writes and latch the world
+failure. Instrumented backend tests validate commands, not audible playback.
+
 The shared live reward wrapper now supplies the run's area to `GemMotion`.
 Its fixed-point adapter preserves the area-5 extra RNG draw after both ordinary
 velocity draws, and areas 3/4 use gravity 112/12800 and cap 6400/12800. As in

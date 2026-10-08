@@ -55,6 +55,15 @@ struct RunSession {
     // soundInitialize writes entries 0..10 to zero. Room changes do not
     // reinitialize them; scrInitialize/new-run reset does.
     int overlapSounds[11]{};
+    template<class Audio> bool playCurrencyPickupSound(SoundPlayState& caller,
+        MotionBinary64 volume,Audio& audio){
+        if(!effectsSucceeded)return false;
+        SoundPlayEnvironment env;env.gameVolume=volume;
+        int result=-1;bool returned=false;
+        // UI (channel 8) neither tests the view nor applies underwater pitch.
+        return SoundPlayScript::overlap(caller,env,audio,[]{return false;},overlapSounds[8],
+            167,60,false,true,"UI",result,returned,effectsSucceeded);
+    }
     template<class Audio> bool playBoxChainSound(SoundPlayState& caller,
         MotionBinary64 volume,bool inWater,Audio& audio){
         SoundPlayEnvironment env;env.gameVolume=volume;env.inWater=inWater;
