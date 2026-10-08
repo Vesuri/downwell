@@ -832,6 +832,20 @@ public:
         if(!run_.effectsSucceeded||!findBreakable(h)||!health.valid())return run_.effectsSucceeded=false;
         breakables_[h.slot].state.wallHp=health;return true;
     }
+    template<class Controls,class Position,class Allocate,class Queries>
+    auto boxCurrencyOperations(const downwell::ObjectPack& objects,downwell::InstanceHandle box,
+        Controls controls,Position position,Allocate allocate,Queries& queries){
+        struct Operations:Controls {
+            GameplayWorld& world;const downwell::ObjectPack& objects;downwell::InstanceHandle box;
+            Position position;Allocate allocate;Queries& queries;
+            Operations(GameplayWorld& w,const downwell::ObjectPack& o,downwell::InstanceHandle h,
+                Controls c,Position p,Allocate a,Queries& q)
+                :Controls(c),world(w),objects(o),box(h),position(p),allocate(a),queries(q){}
+            bool currency(int amount){return world.spawnBoxCurrency(objects,box,
+                downwell::MotionBinary64::fromInteger(amount),position,allocate,queries);}
+        };
+        return Operations(*this,objects,box,controls,position,allocate,queries);
+    }
     int overlapSound(unsigned channel)const{return channel<11?run_.overlapSounds[channel]:-1;}
     template<class Audio> bool playBoxChainSound(downwell::InstanceHandle h,downwell::MotionBinary64 volume,bool inWater,Audio& audio){
         if(!run_.effectsSucceeded||!findBreakable(h))return run_.effectsSucceeded=false;

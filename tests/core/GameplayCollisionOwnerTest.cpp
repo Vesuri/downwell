@@ -786,16 +786,20 @@ int main(){
         assert(owner->currencyFieldMeeting(gem,gx,gy,masks,hit)&&hit&&owner->currency().markDestroyed(gem)&&
             owner->currencyFieldMeeting(gem,gx,gy,masks,hit)&&!hit);
     }
-    for(unsigned mode=0;mode<12;++mode){
+    for(unsigned mode=0;mode<16;++mode){
         const bool fullEffects=mode!=0;
+        const bool rewardSuccess=mode==12||mode==14;
         const auto roomBytes=read("generated/downwell-rooms.dwrm");RoomPack roomPack(roomBytes.data(),roomBytes.size());
         const auto maskBytes=read("generated/downwell-sprite-masks.dwsm");SpriteMaskPack boxMasks(maskBytes.data(),maskBytes.size());
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
-            GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&roomPack);
+            GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&roomPack,
+            mode>=14?GameplayCollisionOwner::Ownership::nativeScenery:GameplayCollisionOwner::Ownership::reference);
         auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
         assert(owner->attach(*world));
-        const int x=0,y=336;assert(world->appendBreakables(&x,&y,1));
+        const int x=0,y=336;BreakableState creation;
+        if(mode>=12)creation.haveGem=2;
+        assert(world->appendBreakables(&x,&y,1,&creation));
         const InstanceHandle box{0,1};
         ScheduledBoxCounts counts;
         auto tick=[&]{return world->withBoxDestruction(
@@ -807,10 +811,10 @@ int main(){
                 [&](InstanceHandle h){return world->markBreakableDestroyed(h);});},
             [&]{world->step(0);return world->effectsSucceeded();});};
         assert(tick()&&counts.stop==1&&!counts.sound&&world->findBreakable(box));
-        counts={};assert(world->publishBoxHealth(box,MotionBinary64::fromInteger(mode>=10?1:0)));
-        if(mode>=10)assert(world->publishBoxAlarm0(box,2));
+        counts={};assert(world->publishBoxHealth(box,MotionBinary64::fromInteger(mode==10||mode==11?1:0)));
+        if(mode==10||mode==11)assert(world->publishBoxAlarm0(box,2));
         if(fullEffects){
-            const unsigned soundFailure=mode>=3?mode-2:0;
+            const unsigned soundFailure=mode>=3&&mode<12?mode-2:0;
             BoxSoundVerification::Audio<GameplayWorld> audio{*world,world->findBreakable(box)->state.breakSound,soundFailure};
             GameMakerRandom soundRandom{0};
             bool boxAllowed=false;unsigned queries=0;
@@ -821,24 +825,64 @@ int main(){
             }
             auto stopped=[](auto,const auto&,bool& frozen){frozen=false;return true;};
             auto meeting=[](auto,const auto&,auto,auto,bool& hit){hit=false;return true;};
+            struct RewardQueries {
+                unsigned mode;
+                bool wall(InstanceHandle,MotionBinary64,MotionBinary64,bool& hit){hit=false;return true;}
+                bool tile(InstanceHandle,int,MotionBinary64,MotionBinary64,bool& hit){hit=false;return mode!=13&&mode!=15;}
+            } rewardQueries{mode};
+            unsigned rewardBirths=0;
             const bool completed=world->withBoxDestruction([&](InstanceHandle key,BoxDestructionScript::Caller& caller){
                 InstanceHandle shared;
                 return GameplayCollisionView::encode(GameplayCollisionView::Kind::breakable,key,shared)&&
                     owner->readBoxDestruction(shared,caller);
             },[&](InstanceHandle key){
                 auto callbacks=scheduledBoxEffects(*world,key,counts,[&](InstanceHandle h){return world->markBreakableDestroyed(h);});
-                callbacks.verifyDebris=true;
+                callbacks.verifyDebris=mode<12;
                 callbacks.timeQuery=[&](InstanceHandle h,bool& allowed){
                     ++queries;if(mode==11)return false;
                     const bool ok=owner->boxTimeAllowed(h,mode==10,480,boxMasks,allowed);
                     if(ok)boxAllowed=allowed;return ok;};
                 callbacks.sawSound=mode<10&&key.slot==box.slot&&key.generation==box.generation;callbacks.before=world->randomState();
-                if(callbacks.sawSound)soundRandom=world->randomState();
-                return boxWorldEffects(*world,key,callbacks,
+                if(callbacks.sawSound||mode>=12)soundRandom=world->randomState();
+                auto rewards=world->boxCurrencyOperations(objects,key,callbacks,
+                    [&](InstanceHandle h,auto& px,auto& py){
+                        InstanceHandle shared;BoxDestructionScript::Caller caller;
+                        if(!GameplayCollisionView::encode(GameplayCollisionView::Kind::breakable,h,shared)||
+                            !owner->readBoxDestruction(shared,caller))return false;
+                        px=caller.x;py=caller.y;return true;
+                    },[&](std::uint32_t& id){id=807000+rewardBirths++;return true;},rewardQueries);
+                return boxWorldEffects(*world,key,rewards,
                 [&](int id,unsigned& frames){PackedSpriteCollision art;if(!sprites.sprite(id,art))return false;
                     frames=art.frameCount;return true;},audio,MotionBinary64{0x3fd00000u,0},false);},
                 [&]{return world->stepWithOwnedDebris(0,stopped,meeting);});
-            assert(completed==(mode==1||mode==10));
+            assert(completed==(mode==1||mode==10||rewardSuccess));
+            if(mode>=12){
+                const auto* reward=world->boxReward(box);
+                const auto* gem=owner->currency().find(owner->currency().handleForSourceId(807000));
+                assert(rewardBirths==1&&reward&&gem&&counts.mark==1&&audio.calls==7&&
+                    world->findBreakable(box)->destroyRequested&&world->debrisEffects().size()==2&&
+                    world->smokeEffects().size()==1&&world->scriptEffects().size()==1);
+                assert(reward->myGem==(rewardSuccess?807000u:0u)&&
+                    reward->moniAmount.high==MotionBinary64::fromInteger(rewardSuccess?0:10).high&&
+                    gem->state.getAmount==(rewardSuccess?10:2)&&gem->state.size==(rewardSuccess?1:0)&&
+                    !gem->state.allSet&&gem->state.alarms.get(0)==10&&gem->state.alarms.get(3)==15&&
+                    counts.stop==(rewardSuccess?1u:0u));
+                SmokeEffects<1> smoke;FlashBallEffects<1> flash;DebrisEffects<2> debris;
+                const auto px=MotionBinary64::fromInteger(240),py=MotionBinary64::fromInteger(512);
+                assert(smoke.boxBurst(px,MotionBinary64::fromInteger(516),soundRandom)&&flash.boxBurst(px,py,soundRandom)&&
+                    debris.create(px,py,1,soundRandom)&&debris.create(px,py,1,soundRandom));
+                struct CreateQueries {
+                    bool wall(MotionBinary64,MotionBinary64,bool& hit){hit=false;return true;}
+                    bool tile(MotionBinary64,MotionBinary64,bool& hit){hit=false;return true;}
+                    bool publish(RunnerImageValue,RunnerImageValue){return true;}
+                } createQueries;
+                CurrencyCreate expectedGem;assert(expectedGem.create(px,py,1,false,soundRandom,createQueries));
+                assert(soundRandom.drawCount()==world->randomState().drawCount()&&
+                    soundRandom.stateIndex()==world->randomState().stateIndex());
+                for(unsigned i=0;i<16;++i)assert(soundRandom.stateWord(i)==world->randomState().stateWord(i));
+                if(rewardSuccess)assert(owner->prepareDraw()&&!world->findBreakable(box)&&owner->currency().size()==1);
+                continue;
+            }
             if(mode>=10){
                 if(mode==10)assert(!boxAllowed);
                 const auto* retained=world->findBreakable(box);

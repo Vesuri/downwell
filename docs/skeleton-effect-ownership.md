@@ -650,6 +650,16 @@ fractional/moving setters fail explicitly until full native geometry supports
 them. The reference owner retains fractional setter coverage. Natural native
 rewards still require the complete numeric-ID allocation adapter and event
 composition.
+`GameplayWorld::boxCurrencyOperations` supplies the reward operation to
+`BoxWorldEffects` without replacing its sound, smoke, flash, impact, debris,
+chain or time-stop dependencies. The scheduled native-scenery/reference fixture
+runs the full non-chain destruction event with this adapter: reward Create is
+after both debris births and before alarmStop. It compares the combined RNG
+state, keeps the marked box until Draw-entry cleanup, and excludes the newborn
+currency from the already captured Step phase. Failed reward Create leaves
+the earlier effects and partial child intact and skips alarmStop. This is
+explicit event composition; normal gameplay still needs the complete birth
+stream and live control/time-stop services.
 The stored scheduler composes currency and box dispatch scopes around the same
 owned-debris tick. A reward born in ordinary Step misses that phase's cutoff
 and the preceding animation/alarm passes, but may Draw after the marked box
