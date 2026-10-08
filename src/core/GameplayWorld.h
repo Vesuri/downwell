@@ -302,6 +302,10 @@ public:
             !platformContactResolver_(solidResolverContext_,bounds,found))return run_.effectsSucceeded=false;
         hit=found;return true;
     }
+    bool nativeCurrencyQueriesReady()const{
+        return run_.effectsSucceeded&&currencyOnlyPlatforms_&&currencyEmptyWater_&&wallContactResolver_&&platformContactResolver_;
+    }
+    bool currencyWaterAbsent()const{return run_.effectsSucceeded&&currencyEmptyWater_;}
     template<class Queries,class Math,class View,class Audio>
     bool stepCurrencyRoomEffect(downwell::InstanceHandle key,bool stopped,int width,
         downwell::MotionBinary64 playerX,downwell::MotionBinary64 playerY,Queries& queries,Math& math,View view,
@@ -895,6 +899,14 @@ public:
         if(command.objectId==60||command.objectId==93||command.objectId==99)
             return createGeneratedTerrain(command,terrain);
         if(!run_.effectsSucceeded)return false;
+        // rmMain has no authored water or non-platform thin walls. Retain
+        // attempted unsupported births even when the provisional generator
+        // handoff below has no actor implementation; absence must not be faked.
+        switch(command.objectId){
+            case 87:case 100:case 318:case 320:case 324:currencyOnlyPlatforms_=false;break;
+            case 88:case 94:case 95:case 96:case 103:currencyEmptyWater_=false;break;
+            default:break;
+        }
         if (command.objectId == 277) {
             DW_GENERATION_SCOPE(profileGeneratedShop);
             return registerShop(command.x, command.y) != nullptr;
@@ -1299,6 +1311,7 @@ private:
     SolidResolver maskResolver_ = nullptr;
     WallContactResolver wallContactResolver_ = nullptr;
     PlatformContactResolver platformContactResolver_ = nullptr;
+    bool currencyOnlyPlatforms_=true,currencyEmptyWater_=true;
     void* solidResolverContext_;
     PlayerMotion::LandingResolver landingResolver_ = nullptr;
     void* landingResolverContext_ = nullptr;

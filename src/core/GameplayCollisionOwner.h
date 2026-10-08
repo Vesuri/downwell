@@ -1490,34 +1490,39 @@ public:
         }));
     }
     bool currencyTimeAllowed(InstanceHandle local,bool stopped,int width,const SpriteMaskPack& masks,bool& allowed){
+        const auto* child=currency_.find(local);
+        if(!valid()||!world_||!child)return check(false);
+        return check(TimeStopBound::evaluate(stopped,child->x.promoted(),child->y.promoted(),width,
+            [&](auto x,auto y,bool& hit){return currencyFieldMeeting(local,x,y,masks,hit);},allowed));
+    }
+    bool currencyFieldMeeting(InstanceHandle local,MotionBinary64 x,MotionBinary64 y,const SpriteMaskPack& masks,bool& hit){
         const auto* child=currency_.find(local);InstanceHandle self;
+        RunnerImageValue px,py;
         const int mask=child?(child->maskId<0?child->spriteId:child->maskId):-1;
         if(!valid()||!world_||!child||(mask!=133&&mask!=134)||
-            !View::encode(View::Kind::currency,local,self)||!resolves(self))return check(false);
-        return check(TimeStopBound::evaluate(stopped,child->x.promoted(),child->y.promoted(),width,
-            [&](auto x,auto y,bool& hit){
-                if(!native_)return masks.valid()&&registeredPlaceMeeting(self,82,x,y,masks,hit);
-                bool found=false;
-                const auto shape=mask==133?TimeStopGoalContact::Mask::SmallCurrency:TimeStopGoalContact::Mask::MediumCurrency;
-                const RunnerImageValue unit{0x3f800000u};
-                const bool ok=visitRegistered(View::timeFieldBase,View::exitControllerBase,
-                    [&](InstanceHandle h,int object,std::uint32_t flags){
-                        if(found||(flags&0x100003u))return true;
-                        View::Kind kind;InstanceHandle key;if(!View::decode(h,kind,key))return false;
-                        if(object==82&&kind==View::Kind::timeField){
-                            const auto* field=View(*world_).template resolveLocal<View::Kind::timeField>(key);
-                            return field&&TimeStopGoalContact::query(shape,child->x,child->y,unit,unit,*field,found);
-                        }
-                        if((object==255||object==371)&&kind==View::Kind::goalField){
-                            const auto* field=world_->goalFieldInstances().find(key);
-                            if(!field||field->scaleX!=2||field->scaleY!=2)return false;
-                            GoalTimeField value;value.x=field->x;value.y=field->y;
-                            return TimeStopGoalContact::query(shape,child->x,child->y,unit,unit,value,found);
-                        }
-                        return false;
-                    });
-                if(ok)hit=found;return ok;
-            },allowed));
+            !View::encode(View::Kind::currency,local,self)||!resolves(self)||!px.assign(x)||!py.assign(y))return check(false);
+        if(!native_)return masks.valid()&&registeredPlaceMeeting(self,82,x,y,masks,hit);
+        bool found=false;
+        const auto shape=mask==133?TimeStopGoalContact::Mask::SmallCurrency:TimeStopGoalContact::Mask::MediumCurrency;
+        const RunnerImageValue unit{0x3f800000u};
+        const bool ok=visitRegistered(View::timeFieldBase,View::exitControllerBase,
+            [&](InstanceHandle h,int object,std::uint32_t flags){
+                if(found||(flags&0x100003u))return true;
+                View::Kind kind;InstanceHandle key;if(!View::decode(h,kind,key))return false;
+                if(object==82&&kind==View::Kind::timeField){
+                    const auto* field=View(*world_).template resolveLocal<View::Kind::timeField>(key);
+                    return field&&TimeStopGoalContact::query(shape,px,py,unit,unit,*field,found);
+                }
+                if((object==255||object==371)&&kind==View::Kind::goalField){
+                    const auto* field=world_->goalFieldInstances().find(key);
+                    if(!field||field->scaleX!=2||field->scaleY!=2)return false;
+                    GoalTimeField value;value.x=field->x;value.y=field->y;
+                    return TimeStopGoalContact::query(shape,px,py,unit,unit,value,found);
+                }
+                return false;
+            });
+        if(ok)hit=found;
+        return check(ok);
     }
     bool currencyWallMeeting(InstanceHandle local,MotionBinary64 x,MotionBinary64 y,const SpriteMaskPack& masks,bool& hit){
         InstanceHandle self;
@@ -1533,19 +1538,31 @@ public:
         if(native_)return check(world_->currencyPlatformMeeting(local,x,y,hit));
         return masks.valid()&&registeredPlaceMeeting(self,93,x,y,masks,hit);
     }
-    // Indexed collision adapter for the registered currency owner. Native
-    // selectors remain unavailable: reject before executing any Step/RNG prefix.
+    // Native admission requires both terrain resolvers and a generation stream
+    // with no unsupported thin walls/water. No partial Step/RNG on rejection.
     template<class Math,class ViewTop,class Audio>
     bool stepCurrency(InstanceHandle shared,bool stopped,int width,MotionBinary64 playerX,MotionBinary64 playerY,
         const SpriteMaskPack& masks,Math& math,ViewTop view,Audio& audio,MotionBinary64 volume,bool inWater){
         View::Kind kind;InstanceHandle local;
-        if(!valid()||!world_||native_||!masks.valid()||!View::decode(shared,kind,local)||kind!=View::Kind::currency||!resolves(shared))return check(false);
+        if(!valid()||!world_||(native_&&!world_->nativeCurrencyQueriesReady())||!masks.valid()||
+            !View::decode(shared,kind,local)||kind!=View::Kind::currency||!resolves(shared))return check(false);
         struct Queries {
             GameplayCollisionOwner& owner;InstanceHandle shared;const SpriteMaskPack& masks;
-            bool meeting(InstanceHandle,int object,MotionBinary64 x,MotionBinary64 y,bool& hit){
+            bool meeting(InstanceHandle local,int object,MotionBinary64 x,MotionBinary64 y,bool& hit){
+                if(owner.native_){
+                    if(object==57)return owner.currencyWallMeeting(local,x,y,masks,hit);
+                    if(object==87)return owner.currencyPlatformMeeting(local,x,y,masks,hit);
+                    if(object==82)return owner.currencyFieldMeeting(local,x,y,masks,hit);
+                    return false;
+                }
                 return owner.registeredPlaceMeeting(shared,object,x,y,masks,hit);
             }
             bool water(InstanceHandle,MotionBinary64 x,MotionBinary64 y,bool& hit){
+                if(owner.native_){
+                    RunnerImageValue px,py;
+                    if(!owner.world_->currencyWaterAbsent()||!px.assign(x)||!py.assign(y))return false;
+                    hit=false;return true;
+                }
                 return owner.registeredPositionMeeting(88,x,y,masks,hit);
             }
         } queries{*this,shared,masks};

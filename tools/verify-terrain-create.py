@@ -46,6 +46,19 @@ for code, number, value in ((676, 1, -1), (677, 2, 1), (678, 3, -1)):
 thin = instructions("gml_Object_objThinPlatform_Create_0")
 platform = manifest["resources"]["objects"][93]
 assert platform["parentId"] == 87 and platform["textureMaskId"] == 49
+def family(parent):
+    result = []
+    for obj in manifest["resources"]["objects"]:
+        ancestor = obj["id"]
+        while ancestor >= 0 and ancestor != parent:
+            ancestor = manifest["resources"]["objects"][ancestor]["parentId"]
+        if ancestor == parent:
+            result.append(obj["id"])
+    return result
+assert family(87) == [87, 93, 100, 318, 320, 324]
+assert family(88) == [88, 94, 95, 96, 103]
+main = next(room for room in manifest["resources"]["rooms"] if room["name"] == "rmMain")
+assert not any(instance["objectId"] in family(87) + family(88) for instance in main["instances"])
 mask = manifest["resources"]["sprites"][49]
 assert mask["separateMasks"] == "AxisAlignedRect"
 assert tuple(mask[k] for k in ("originX", "originY", "marginLeft", "marginTop", "marginRight", "marginBottom")) == (12, 12, 4, 4, 19, 5)

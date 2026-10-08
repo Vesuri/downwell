@@ -1,7 +1,9 @@
 #include "core/GameplayCollisionOwner.h"
+#ifndef DOWNWELL_NATIVE_QUERY_PROBE
 #include "RegisteredSkeletonThrowChecks.h"
 #include "QuietSkeletonEffects.h"
 #include "ScheduledBoxEffectsCheck.h"
+#endif
 #include "core/BoxWorldEffects.h"
 #ifdef DOWNWELL_LOCAL_DRAW_CAPTURE
 namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_CAPTURE; }
@@ -12,6 +14,18 @@ namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_
 #include "core/CurrencyHomingMath.h"
 #include "core/TerrainWallContacts.h"
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
+struct NativeCurrencyAudioProbe {
+    bool isPlaying(int,bool&);bool stop(int);bool play(int,int,bool,int&);
+    bool getGain(int,downwell::MotionBinary64&);bool setGain(int,downwell::MotionBinary64,int);
+    bool setPitch(int,downwell::MotionBinary64);
+};
+bool nativeCurrencyStep(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle key,
+    const downwell::SpriteMaskPack& masks,NativeCurrencyAudioProbe& audio){
+    downwell::CurrencyHomingMath math{downwell::portableAtan};
+    return owner.stepCurrency(key,true,480,downwell::MotionBinary64::fromInteger(240),
+        downwell::MotionBinary64::fromInteger(512),masks,math,[](auto& top){top={};return true;},
+        audio,downwell::MotionBinary64::fromInteger(1),false);
+}
 bool nativeRegisteredTimeChange(downwell::GameplayCollisionOwner& owner,
     downwell::TimeChangeEffects<8>& effects,int& speed,std::uint32_t sourceId){
     return owner.createTimeChangeWithSourceId(effects,sourceId,
@@ -2944,6 +2958,7 @@ int main(){
     std::vector<bool> currencyContacts;
     std::vector<bool> currencyWallContacts;
     std::vector<bool> currencyPlatformContacts;
+    std::vector<std::uint32_t> currencyMotionReference;
     for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
                        GameplayCollisionOwner::Ownership::nativeScenery}){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
@@ -3098,12 +3113,15 @@ int main(){
             assert(animationOwner->currency().find(key)->imageIndex.bits==0x3f000000u&&
                 !animationWorld->effectsSucceeded()); // Animation runs; still-unbound alarms stop the frame.
         }
-        if(ownership==GameplayCollisionOwner::Ownership::reference){
+        {
             auto moving=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
                 GameplayTerrainInstances::WallCollision{},&rooms,ownership);
             auto scene=std::make_unique<GameplayWorld>(300,false,1000,false,moving->enemyBinding(),
                 moving->breakableBinding(),moving->playerBinding(),&moving->terrain());
             assert(moving->attach(*scene)&&scene->createGeneratedInstance({92,240,544},objects,[](const auto&){return true;}));
+            scene->configureSolidResolver(nullptr,nullptr,nullptr,nullptr,[](void*,const ContactBounds& bounds,unsigned& count){
+                count=contactBoundsOverlap(bounds,{232,248,536,552})?1:0;return true;
+            },[](void*,const ContactBounds&,bool& hit){hit=false;return true;});
             struct Queries {
                 bool wall(InstanceHandle,MotionBinary64,MotionBinary64,bool& hit){hit=false;return true;}
                 bool tile(InstanceHandle,int,MotionBinary64,MotionBinary64,bool& hit){hit=false;return true;}
@@ -3124,15 +3142,23 @@ int main(){
                 MotionBinary64::fromInteger(512),queries,key)&&GameplayCollisionView::encode(GameplayCollisionView::Kind::currency,key,shared));
             assert(moving->currency().dispatch(key,[](auto& s,bool&){s.xsp={};s.ysp=MotionBinary64::fromInteger(2);return true;}));
             CurrencyHomingMath math{portableAtan};bool bounced=false;
+            std::vector<std::uint32_t> motion;
             for(unsigned tick=0;tick<32;++tick){
                 assert(moving->stepCurrency(shared,false,480,MotionBinary64::fromInteger(999),MotionBinary64::fromInteger(999),
                     masks,math,[](auto& top){top={};return true;},audio,MotionBinary64::fromInteger(1),false));
                 const auto* r=moving->currency().find(key);std::int32_t x,y;
                 assert(r&&r->state.xx.roundPixel(x)&&r->state.yy.roundPixel(y));
-                RunnerImageValue px,py;assert(px.assignInteger(x)&&py.assignInteger(y)&&r->x.bits==px.bits&&r->y.bits==py.bits&&
-                    moving->state(shared)->x.bits==px.bits&&moving->state(shared)->y.bits==py.bits);
+                RunnerImageValue px,py;assert(px.assignInteger(x)&&py.assignInteger(y)&&r->x.bits==px.bits&&r->y.bits==py.bits);
+                if(ownership==GameplayCollisionOwner::Ownership::reference)
+                    assert(moving->state(shared)&&moving->state(shared)->x.bits==px.bits&&moving->state(shared)->y.bits==py.bits);
                 if(r->state.yCollision){assert(r->state.ysp.zero()||(r->state.ysp.high==0xbff00000u&&!r->state.ysp.low));bounced=true;}
+                for(auto value:{r->state.xx,r->state.yy,r->state.xsp,r->state.ysp,r->state.direction}){
+                    motion.push_back(value.high);motion.push_back(value.low);
+                }
+                for(unsigned word=0;word<16;++word)motion.push_back(scene->randomState().stateWord(word));
             }
+            if(ownership==GameplayCollisionOwner::Ownership::reference)currencyMotionReference=motion;
+            else assert(motion==currencyMotionReference);
             assert(bounced&&audio.sounds);
             const auto before=moving->currency().find(key)->state;
             const auto draws=scene->randomDrawCount();
@@ -3151,7 +3177,15 @@ int main(){
                     audio,MotionBinary64::fromInteger(1),false));
             const auto& attracted=moving->currency().find(key)->state;
             assert(attracted.xx.high==expected.xx.high&&attracted.xx.low==expected.xx.low&&
-                attracted.yy.high==expected.yy.high&&attracted.yy.low==expected.yy.low&&moving->currency().clear());
+                attracted.yy.high==expected.yy.high&&attracted.yy.low==expected.yy.low);
+            if(ownership!=GameplayCollisionOwner::Ownership::reference){
+                const int unsupported=ownership==GameplayCollisionOwner::Ownership::native?94:100;
+                assert(scene->createGeneratedInstance({unsupported,240,512},objects,[](const auto&){return true;})&&
+                    !scene->nativeCurrencyQueriesReady());
+                const auto draws=scene->randomDrawCount();
+                assert(!moving->stepCurrency(shared,false,480,targetX,targetY,masks,math,[](auto& top){top={};return true;},
+                    audio,MotionBinary64::fromInteger(1),false)&&scene->randomDrawCount()==draws);
+            }else assert(moving->currency().clear());
         }
         {
             auto& blood=owner->blood();InstanceHandle local,shared;unsigned calls=0;
