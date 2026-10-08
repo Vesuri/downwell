@@ -26,6 +26,16 @@ bool nativeCurrencyStep(downwell::GameplayCollisionOwner& owner,downwell::Instan
         downwell::MotionBinary64::fromInteger(512),masks,math,[](auto& top){top={};return true;},
         audio,downwell::MotionBinary64::fromInteger(1),false);
 }
+bool nativeCurrencyFrame(GameplayWorld& world,downwell::GameplayCollisionOwner& owner,
+    const downwell::SpriteMaskPack& masks,NativeCurrencyAudioProbe& audio){
+    return world.withCurrencyEvents([&](auto key,auto phase,unsigned alarm){
+        if(phase==GameplayWorld::CurrencyPhase::alarm)
+            return alarm==2&&owner.currency().expire(key,downwell::MotionBinary64::fromInteger(1),false,audio);
+        downwell::InstanceHandle shared;
+        return downwell::GameplayCollisionView::encode(downwell::GameplayCollisionView::Kind::currency,key,shared)&&
+            nativeCurrencyStep(owner,shared,masks,audio);
+    },[&](){world.step(0);return world.effectsSucceeded();});
+}
 bool nativeRegisteredTimeChange(downwell::GameplayCollisionOwner& owner,
     downwell::TimeChangeEffects<8>& effects,int& speed,std::uint32_t sourceId){
     return owner.createTimeChangeWithSourceId(effects,sourceId,
@@ -3127,11 +3137,13 @@ int main(){
                 bool tile(InstanceHandle,int,MotionBinary64,MotionBinary64,bool& hit){hit=false;return true;}
             } queries;
             struct Audio {
-                unsigned sounds=0;
+                unsigned sounds=0,expiry=0;
                 bool isPlaying(int,bool& playing){playing=false;return true;}
                 bool stop(int){return true;}
                 bool play(int id,int priority,bool loop,int& voice){
-                    if(id<168||id>170||priority!=30||loop)return false;voice=700+int(++sounds);return true;
+                    if(priority!=30||loop)return false;
+                    if(id==166){++expiry;voice=800;return true;}
+                    if(id<168||id>170)return false;voice=700+int(++sounds);return true;
                 }
                 bool getGain(int,MotionBinary64& gain){gain=MotionBinary64::fromInteger(1);return true;}
                 bool setGain(int,MotionBinary64,int){return true;}
@@ -3178,6 +3190,24 @@ int main(){
             const auto& attracted=moving->currency().find(key)->state;
             assert(attracted.xx.high==expected.xx.high&&attracted.xx.low==expected.xx.low&&
                 attracted.yy.high==expected.yy.high&&attracted.yy.low==expected.yy.low);
+            unsigned scheduledSteps=0;
+            auto events=[&](InstanceHandle current,GameplayWorld::CurrencyPhase phase,unsigned alarm){
+                if(phase==GameplayWorld::CurrencyPhase::alarm)
+                    return alarm==2&&moving->currency().expire(current,MotionBinary64::fromInteger(1),false,audio);
+                ++scheduledSteps;InstanceHandle h;
+                return GameplayCollisionView::encode(GameplayCollisionView::Kind::currency,current,h)&&
+                    moving->stepCurrency(h,false,480,targetX,targetY,masks,math,[](auto& top){top={};return true;},
+                        audio,MotionBinary64::fromInteger(1),false);
+            };
+            assert(moving->currency().dispatch(key,[](auto& state,bool&){
+                state.attracted=false;state.alarms.set(0,1);state.alarms.set(1,-1);return true;
+            }));
+            assert(scene->withCurrencyEvents(events,[&](){scene->step(0);return scene->effectsSucceeded();})&&
+                scheduledSteps==1&&moving->currency().find(key)->state.obtainable&&
+                moving->currency().find(key)->state.alarms.get(1)==179);
+            assert(moving->currency().dispatch(key,[](auto& state,bool&){state.alarms.set(2,1);return true;}));
+            assert(scene->withCurrencyEvents(events,[&](){scene->step(0);return scene->effectsSucceeded();})&&
+                audio.expiry==1&&scheduledSteps==1&&moving->currency().find(key)->destroyRequested);
             if(ownership!=GameplayCollisionOwner::Ownership::reference){
                 const int unsupported=ownership==GameplayCollisionOwner::Ownership::native?94:100;
                 assert(scene->createGeneratedInstance({unsupported,240,512},objects,[](const auto&){return true;})&&

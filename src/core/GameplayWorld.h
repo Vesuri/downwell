@@ -306,6 +306,27 @@ public:
         return run_.effectsSucceeded&&currencyOnlyPlatforms_&&currencyEmptyWater_&&wallContactResolver_&&platformContactResolver_;
     }
     bool currencyWaterAbsent()const{return run_.effectsSucceeded&&currencyEmptyWater_;}
+    enum class CurrencyPhase { alarm, step };
+    using CurrencyStepOrder=downwell::RunnerStepSnapshot<currencyCapacity>;
+    void configureCurrencyStepOrder(bool (*capture)(void*,CurrencyStepOrder&),void* context,
+        bool (*eligible)(void*,downwell::InstanceHandle,bool&)){
+        currencyOrderCapture_=capture;currencyOrderContext_=context;currencyStepEligible_=eligible;
+    }
+    template<class Execute,class Tick> bool withCurrencyEvents(Execute execute,Tick tick){
+        if(!run_.effectsSucceeded||currencyEventDispatch_)return run_.effectsSucceeded=false;
+        currencyEventContext_=&execute;
+        currencyEventDispatch_=[](void* p,downwell::InstanceHandle key,CurrencyPhase phase,unsigned alarm){
+            return (*static_cast<Execute*>(p))(key,phase,alarm);
+        };
+        const bool ok=tick();currencyEventDispatch_=nullptr;currencyEventContext_=nullptr;
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
+    }
+    bool advanceCurrencyRoomAlarm(downwell::InstanceHandle key,unsigned alarm){
+        if(!run_.effectsSucceeded||!currencyInstances_||!currencyEventDispatch_)return run_.effectsSucceeded=false;
+        return run_.effectsSucceeded=currencyInstances_->advanceAlarm(key,alarm,[&](auto&,unsigned index,bool&){
+            return currencyEventDispatch_(currencyEventContext_,key,CurrencyPhase::alarm,index);
+        });
+    }
     template<class Queries,class Math,class View,class Audio>
     bool stepCurrencyRoomEffect(downwell::InstanceHandle key,bool stopped,int width,
         downwell::MotionBinary64 playerX,downwell::MotionBinary64 playerY,Queries& queries,Math& math,View view,
@@ -1312,6 +1333,12 @@ private:
     WallContactResolver wallContactResolver_ = nullptr;
     PlatformContactResolver platformContactResolver_ = nullptr;
     bool currencyOnlyPlatforms_=true,currencyEmptyWater_=true;
+    CurrencyStepOrder currencyStepOrder_;
+    bool (*currencyOrderCapture_)(void*,CurrencyStepOrder&)=nullptr;
+    void* currencyOrderContext_=nullptr;
+    bool (*currencyStepEligible_)(void*,downwell::InstanceHandle,bool&)=nullptr;
+    bool (*currencyEventDispatch_)(void*,downwell::InstanceHandle,CurrencyPhase,unsigned)=nullptr;
+    void* currencyEventContext_=nullptr;
     void* solidResolverContext_;
     PlayerMotion::LandingResolver landingResolver_ = nullptr;
     void* landingResolverContext_ = nullptr;

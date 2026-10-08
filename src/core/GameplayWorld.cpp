@@ -60,6 +60,8 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto skeletons=skeletons_;
     const auto blood=blood_;
     const auto currencyInstances=currencyInstances_;
+    const auto currencyOrderCapture=currencyOrderCapture_;void* const currencyOrderContext=currencyOrderContext_;
+    const auto currencyStepEligible=currencyStepEligible_;
     const auto phaseBoundary=phaseBoundary_;
     const auto roomAnimation=roomAnimation_;
     const auto actorEndStep=registeredActorEndStep_;void* const actorEndStepContext=registeredActorEndStepContext_;
@@ -109,6 +111,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     skeletons_=skeletons;
     blood_=blood;
     currencyInstances_=currencyInstances;
+    configureCurrencyStepOrder(currencyOrderCapture,currencyOrderContext,currencyStepEligible);
     configurePhaseBoundary(phaseBoundary,phaseBoundaryContext);
     configureRoomAnimation(roomAnimation,roomAnimationContext);
     configureRegisteredActorEndStep(actorEndStep,actorEndStepContext);
@@ -1124,6 +1127,9 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     run_.advanceDamageNumberAlarm(damageNumberAlarmPhase,0);
     advanceEnemyAlarms();
     if(!reconcilePhase(PhaseBoundary::alarm))return {};
+    currencyStepOrder_.clear();
+    if(currencyInstances_&&currencyInstances_->size()&&(!currencyOrderCapture_||!currencyEventDispatch_||
+        !currencyOrderCapture_(currencyOrderContext_,currencyStepOrder_))){run_.effectsSucceeded=false;return {};}
     const auto smokeStepPhase=run_.smokeEffects.beginPhase();
     const auto damageNumberStepPhase=run_.damageNumbers.beginPhase();
     // Capture before ordinary Step: later births must not inherit a turn.
@@ -1537,6 +1543,18 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     DW_PROFILE_PHASE(profileEnemyContact);
     run_.stepSmoke(smokeStepPhase,enemyRandom_);
     run_.stepDamageNumbers(damageNumberStepPhase);
+    for(unsigned i=0;i<currencyStepOrder_.size();++i){
+        const auto key=currencyStepOrder_.handle(i);const auto* r=currencyInstances_->find(key);
+        if(!r||!r->active||r->destroyRequested)continue;
+        bool eligible=false;
+        if(!currencyStepEligible_||!currencyStepEligible_(currencyOrderContext_,key,eligible)){
+            run_.effectsSucceeded=false;return {};
+        }
+        if(!eligible)continue;
+        if(!currencyEventDispatch_||!currencyEventDispatch_(currencyEventContext_,key,CurrencyPhase::step,0)){
+            run_.effectsSucceeded=false;return {};
+        }
+    }
     run_.collideSmokeWalls([&](const downwell::ContactBounds& bounds,auto emit){
         unsigned count=0;
         if(wallContactResolver_ && !wallContactResolver_(solidResolverContext_,bounds,count))return false;

@@ -59,7 +59,7 @@ private:
 #ifdef DOWNWELL_DRAW_CACHE_AUDIT
     mutable bool drawAuditHasSnapshot_=false;
 #endif
-    RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity+GameplayWorld::droneBulletCapacity+GameplayWorld::boneCapacity+GameplayWorld::skeletonCapacity> combatAlarmPhase_;
+    RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity+GameplayWorld::droneBulletCapacity+GameplayWorld::boneCapacity+GameplayWorld::skeletonCapacity+GameplayWorld::currencyCapacity> combatAlarmPhase_;
     bool combatAlarmCaptureDirty_=true;
     unsigned combatAlarmMask_=0;
     bool combatAlarmCaptureValid_=false;
@@ -1080,6 +1080,7 @@ public:
                     kind==View::Kind::timeChange?self.world_->advanceTimeChangeRoomAlarm(local,alarm):
                     kind==View::Kind::drone?(alarm==0&&self.drones_.advanceAlarm(local)):
                     kind==View::Kind::skeleton?self.skeletons_.advanceAlarm(local,alarm):
+                    kind==View::Kind::currency?self.world_->advanceCurrencyRoomAlarm(local,alarm):
                     kind==View::Kind::entryDither&&self.entries_.advanceAlarm(local,alarm);
             },reused,&self.combatAlarmMask_,boxes
 #ifndef DOWNWELL_REFERENCE_ENEMY_ALARM_ROSTER
@@ -1098,6 +1099,21 @@ public:
                         phase.append(local.slot,local.generation,object);
                 }));
         },this);
+        world.configureCurrencyStepOrder([](void* context,GameplayWorld::CurrencyStepOrder& phase){
+            auto& self=*static_cast<GameplayCollisionOwner*>(context);
+            if(!self.valid())return false;
+            return self.check(self.visitRegistered(View::currencyBase,View::capacity,
+                [&](InstanceHandle shared,int object,std::uint32_t flags){
+                    if(flags&0x100003u)return true;
+                    View::Kind kind;InstanceHandle local;
+                    return View::decode(shared,kind,local)&&kind==View::Kind::currency&&self.resolves(shared)&&
+                        phase.append(local.slot,local.generation,object);
+                }));
+        },this,[](void* context,InstanceHandle local,bool& eligible){
+            auto& self=*static_cast<GameplayCollisionOwner*>(context);InstanceHandle shared;std::uint32_t flags;
+            if(!self.valid()||!View::encode(View::Kind::currency,local,shared)||!self.eligibilityFlags(shared,flags))return false;
+            eligible=self.resolves(shared)&&!(flags&0x100003u);return true;
+        });
         return true;
     }
     auto playerBinding(){return GameplayWorld::PlayerLifecycleBinding::bindTransforms(player_);}

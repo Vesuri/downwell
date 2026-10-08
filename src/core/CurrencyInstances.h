@@ -94,6 +94,13 @@ public:
         if(!r->active||r->destroyRequested||!r->state.alarms.advanceOne(index))return true;
         return dispatch(key,[&](auto& state,bool& good){return CurrencyAlarmEvents::run(state,index,other,good);});
     }
+    template<class Audio> bool expire(InstanceHandle key,MotionBinary64 volume,bool inWater,Audio& audio){
+        auto* r=resolve(key);if(!r)return fail();
+        if(r->state.attracted)return true;
+        SoundPlayEnvironment env;env.gameVolume=volume;env.inWater=inWater;int voice=-1;
+        if(!SoundPlayScript::plain(r->sound,env,audio,166,30,false,true,voice,good_))return false;
+        return markDestroyed(key);
+    }
     template<class Random,class Queries,class Math,class View,class Audio>
     bool stepSource(InstanceHandle key,Random& random,bool stopped,int width,
         MotionBinary64 playerX,MotionBinary64 playerY,Queries& queries,Math& math,View view,
