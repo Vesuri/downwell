@@ -475,6 +475,29 @@ int main() {
         RecordingRenderer ended;scene->render(ended);
         require(std::find(ended.spriteOrder.begin(),ended.spriteOrder.end(),101)==ended.spriteOrder.end(),
             "wall impact retires after sixteen source animation updates");
+        auto blood=world.bloodRegistration<2>();downwell::InstanceHandle firstBlood,lastBlood;
+        downwell::MotionBinary64 bx=n(248),by=n(128);
+        require(bx.add({0x3fd00000u,0})&&by.add({0x3fe00000u,0}),"fractional blood Draw anchor");
+        require(world.spawnBlood(blood,bx,by,{0x402b8000u,0},[](auto){return true;},firstBlood)&&
+            world.spawnBlood(blood,n(252),n(132),{0x4064c800u,0},[](auto){return true;},lastBlood),
+            "registered blood Draw fixtures");
+        for(unsigned tick=0;tick<18;++tick){
+            RecordingRenderer frame;frame.recordTransforms=true;scene->render(frame);unsigned seen=0;
+            for(const auto& item:frame.transforms)if(item.sprite==84){
+                require(seen<2&&item.frame==tick/2&&item.sx==1&&item.sy==1,
+                    "blood draws every source animation frame once with unit scales");
+                require(item.angle==(seen?13.75f:166.25f)&&
+                    item.x==110+(seen?248.25f:252.0f)-world.mainCameraRenderViewX()&&
+                    item.y==(seen?128.5f:132.0f)-world.mainCameraRenderViewY(),
+                    "blood retains fractional anchors, original angles and equal-depth layer order");
+                ++seen;
+            }
+            require(seen==2&&scene->renderingSucceeded(),"registered blood default Draw is visible");
+            require(blood.advanceAnimation(firstBlood)&&blood.advanceAnimation(lastBlood),"advance blood Draw frames");
+        }
+        RecordingRenderer expiredBlood;scene->render(expiredBlood);
+        require(std::find(expiredBlood.spriteOrder.begin(),expiredBlood.spriteOrder.end(),84)==expiredBlood.spriteOrder.end()&&blood.clear(),
+            "marked blood stops drawing before lifetime cleanup");
         auto skeletons=world.skeletonRegistration<1>();downwell::InstanceHandle skeleton;
         require(world.spawnSkeleton(skeletons,248,128,skeleton),"register skeleton for source inherited Draw");
         for(int sprite:{208,207,205})for(int facing:{-1,1}){

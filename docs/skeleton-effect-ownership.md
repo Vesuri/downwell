@@ -670,6 +670,15 @@ for identity-bearing shard-direction queries. `stepBlood` invokes it after
 saved-speed capture. Automatic player `pTimeStop` and mixed-family ordinary
 Step admission remain separate integration requirements.
 
+Object 220 is visible, depth 0, has no parent and defines no Draw event. Its
+default Draw therefore belongs in the ordinary layer traversal, not a particle
+overlay or the smoke controller surface. The SDL game renderer admits these
+registered records with their published sprite, fractional position, index,
+scale and angle. Animation End excludes the marked record before retirement.
+The existing Amiga sprite-84 bank serves unrotated smoke; it is not sufficient
+for moving blood's two random angle ranges. Native blood Draw admission still
+requires offline rotated variants and verified raster selection.
+
 - Blood emits at published x/y, not the precise xx/yy accumulators. Its two
   angles are `random(20)` and `180-random(20)`, respectively. Object 220's Create
   initializes motion state without RNG; `emitMovingFx` then assigns sprite,

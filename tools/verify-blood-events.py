@@ -11,6 +11,9 @@ assert manifest["source"]["sha256"] == sha256((root / "data/data.win").read_byte
     "c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8"
 assert manifest["extractor"]["version"] == "0.9.2.0"
 assert manifest["extractor"]["commit"] == "03c7048438347799e0717b6e57a9358d000472e0"
+moving = next(obj for obj in manifest["resources"]["objects"] if obj["id"] == 220)
+assert moving["Visible"] and moving["parentId"] == -1 and moving["Depth"] == 0
+assert not any(event["eventType"] == 8 for event in moving["events"]), "blood uses default Draw, not an effect surface"
 for name, digest in (
     ("gml_Object_parentMovingFx_Create_0", "ee1e21a6d8c86f140da3bed0f2eb66e0828f4d2843c9021ac70dac8823c7f64d"),
     ("gml_GlobalScript_emitMovingFx", "5971093b936584478f261fa56f1201f3a174b1bb750d9a395008d9e4e6d3b108"),
