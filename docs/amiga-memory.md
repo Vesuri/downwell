@@ -20,11 +20,12 @@ addressing replacement walls. Generated numeric VM IDs are not inferred from
 these family-local handles.
 
 Native actor publication retains position, sprite/mask IDs, binary32
-scale/angle/image index, timeline/cached frame and appearance flags per
+scale/angle/image index, timeline/cached frame, cached bounds and spatial/appearance flags per
 non-terrain collision slot inside the ordinary-memory collision owner.
 Terrain slots are excluded from that array; their coordinates remain
-run-owned. This storage does not allocate Chip RAM, bounds or another
-spatial index.
+run-owned. This storage does not allocate Chip RAM or another spatial index:
+native publication borrows the otherwise unused reference owner's journal/tree
+allocation, without attaching generic lifetime/property records there.
 The native spatial/collision dirty queues each retain two 16-bit links per
 shared collision slot and two counters. These are ordering links only;
 terrain geometry and lifetime identities remain in the run owner. Both

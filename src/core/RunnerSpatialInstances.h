@@ -501,6 +501,14 @@ public:
         if constexpr(ScheduledIndex)return index_.pending();
         return 0;
     }
+    // Exclusive native ownership may reuse this allocation for its derived
+    // tree without attaching duplicate generic lifetime/property records.
+    // The caller owns lifetime validation, cached bounds and dirty flags.
+    // Never mix this route with registered reference instances.
+    template<class Operation> bool externalSpatialPublication(Operation operation){
+        if(!valid()||membership_.size())return false;
+        return checked(operation(index_));
+    }
     std::uint32_t bindingRevision()const{return bindingRevision_;}
     std::uint32_t captureRevision()const{return captureRevision_;}
     bool captureUnchanged(std::uint32_t revision)const{

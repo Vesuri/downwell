@@ -52,6 +52,7 @@ private:
     struct NativePosition {
         RunnerImageValue x,y;
         Owner::Sprite sprite;
+        Owner::Box bounds{};
         RunnerImageValue timeline{},cachedFrame{0xbf800000u};
         std::uint32_t appearanceFlags=8u;
     };
@@ -76,8 +77,18 @@ private:
         if(*families_.flags(unsigned(object))&8u)nativeCollisionDirty_.mark(slot);
         return true;
     }
-    void nativeRetireQueues(unsigned slot){
+    bool nativeRetireQueues(unsigned slot){
+        if(auto* state=nativePosition(slot))if(state->appearanceFlags&0x8000u){
+            auto box=state->bounds;
+            if(RunnerSpatialSplit::less(box.right,box.left)){const auto v=box.left;box.left=box.right;box.right=v;}
+            if(RunnerSpatialSplit::less(box.bottom,box.top)){const auto v=box.top;box.top=box.bottom;box.bottom=v;}
+            if(!check(owner_.externalSpatialPublication([&](auto& index){
+                bool removed;return index.remove(box,slot,true,removed);
+            })))return false;
+            state->appearanceFlags&=~0x8000u;
+        }
         nativeSpatialDirty_.remove(slot);nativeCollisionDirty_.remove(slot);
+        return true;
     }
     NativePosition* nativePosition(unsigned slot){
         if(slot>=View::capacity||(slot>=View::terrainBase&&slot<View::timeFieldBase))return nullptr;
@@ -312,7 +323,7 @@ private:
             if(!actor&&nativeField(h)){out=nativeFieldFlags_;actor=true;}
             if(actor){
                 const auto* state=nativePosition(h.slot);if(!state)return false;
-                out=(out&~0x4008u)|(state->appearanceFlags&0x4008u);return true;
+                out=(out&~0xc208u)|(state->appearanceFlags&0xc208u);return true;
             }
             if(world_&&world_->nativeTerrainInstances()){
                 GameplayWorld::NativeTerrain::Identity id;bool active,destroyed;
@@ -417,6 +428,32 @@ private:
                 return SmokeDirection::radians(angle,radians)&&smokeTrig(radians.promoted(),c,s)&&
                     cosine.assign(c)&&sine.assign(s);
             },[](auto v,std::int32_t& n){return v.roundPixel(n);},publish);
+    }
+    bool refreshNativeActor(InstanceHandle h,bool publish){
+        if(!native_||!valid())return false;
+        auto* state=nativePosition(h.slot);std::uint32_t flags;
+        if(!state||!eligibilityFlags(h,flags))return check(false);
+        const auto* objectFlags=families_.flags(unsigned(objectOf(h)));if(!objectFlags)return check(false);
+        const auto& sprite=state->sprite;
+        PackedSpriteCollision resource;Owner::Box bounds;
+        const bool found=sprites_.collisionSprite(sprite.spriteId,sprite.maskId,resource);
+        if(found){
+            if(!RunnerSpatialSplit::valid(sprite.angle))return check(false);
+            const bool rotated=(sprite.angle.bits&0x7fffffffu)!=0;
+            RunnerImageValue cosine{},sine{};
+            if(rotated){
+                RunnerImageValue radians;MotionBinary64 c,s;
+                if(!SmokeDirection::radians(sprite.angle,radians)||!smokeTrig(radians.promoted(),c,s)||
+                    !cosine.assign(c)||!sine.assign(s))return check(false);
+            }
+            if(!RunnerSpriteBounds::fromSprite(resource,state->x,state->y,sprite.scaleX,sprite.scaleY,
+                rotated,cosine,sine,true,[](auto v,std::int32_t& n){return v.roundPixel(n);},bounds))return check(false);
+        }
+        const bool okay=owner_.externalSpatialPublication([&](auto& index){
+            return RunnerSpatialBoundsUpdate::finishRefresh(index,h.slot,*objectFlags,flags,false,state->bounds,
+                found?&bounds:nullptr,state->x,state->y,found&&resource.collisionMode==1,publish);
+        });
+        state->appearanceFlags=flags&0xc208u;return check(okay);
     }
     template<class Record,View::Kind Kind> struct Binding {
         GameplayCollisionOwner& parent;
@@ -551,7 +588,7 @@ private:
             auto* state=parent.nativePosition(h.slot);const auto* definition=parent.objectDefaults_.get(object(r));
             if(!state||!definition)return parent.check(false);
             state->sprite={};state->sprite.spriteId=definition->spriteId;state->sprite.maskId=definition->maskId;
-            state->timeline={};state->cachedFrame={0xbf800000u};state->appearanceFlags=8u;
+            state->timeline={};state->cachedFrame={0xbf800000u};state->appearanceFlags=8u;state->bounds={};
             if constexpr(Kind==View::Kind::enemy){
                 state->sprite.spriteId=r.spriteId;state->sprite.maskId=r.maskId;
                 if(!real(r.objectId==117?r.motionState:r.facing,state->sprite.scaleX)||
@@ -591,7 +628,7 @@ private:
                 // may reacquire an empty family's layer independently.
                 parent.boxAllocation_.leased=false;
 #endif
-                return parent.check(!inactive&&parent.table_.externalBirth(h.slot,r.nativeRegistration)&&parent.nativeBirthQueues(h.slot,object(r))&&
+                return parent.check(!inactive&&parent.table_.externalBirth(h.slot,r.nativeRegistration)&&parent.nativeBirthQueues(h.slot,object(r))&&parent.refreshNativeActor(h,true)&&
 #ifndef DOWNWELL_REFERENCE_BREAKABLES
                     parent.layers_.birthSceneryFamily(parent.boxLayer_));
 #else
@@ -599,13 +636,14 @@ private:
 #endif
             }
             if constexpr(Kind==View::Kind::timeField)if(parent.nativeFields_){
-                return parent.check(parent.table_.externalBirth(h.slot,r.nativeRegistration)&&parent.nativeBirthQueues(h.slot,object(r))&&
+                return parent.check(parent.table_.externalBirth(h.slot,r.nativeRegistration)&&parent.nativeBirthQueues(h.slot,object(r))&&parent.refreshNativeActor(h,true)&&
                     parent.layers_.birthScenery(depth));
             }
             if(!parent.check(parent.table_.birth(h,object(r),definition->initialFlags|(inactive?2u:0u),sprite)))return false;
             if(!parent.nativeBirthQueues(h.slot,object(r)))return false;
             if constexpr(Kind==View::Kind::enemy)if(!parent.updateEnemyAlarmRoster(h))return false;
             if(!parent.check(parent.room_.bind(h.slot,depth)))return false;
+            if(!parent.refreshNativeActor(h,true))return false;
             if(inactive)parent.activationPending_=true;
             if constexpr(Kind==View::Kind::breakable||Kind==View::Kind::timeField)
                 if(parent.sceneryLayers_){
@@ -638,7 +676,8 @@ private:
                 if(!key(local,r,h)||!r.nativeRegistration)return parent.check(false);
                 const auto* d=parent.objectDefaults_.get(82);
                 if(!parent.check(d&&parent.layers_.retireScenery(d->creationDepth)))return false;
-                r.nativeRegistration=0;parent.table_.externalRetire(h.slot);parent.nativeRetireQueues(h.slot);return true;
+                if(!parent.nativeRetireQueues(h.slot))return false;
+                r.nativeRegistration=0;parent.table_.externalRetire(h.slot);return true;
             }
             if constexpr(Kind==View::Kind::breakable)if(parent.nativeBoxes_){
                 if(!key(local,r,h)||!r.nativeRegistration)return parent.check(false);
@@ -648,11 +687,12 @@ private:
                 const auto* d=parent.objectDefaults_.get(92);
                 if(!parent.check(d&&parent.layers_.retireScenery(d->creationDepth)))return false;
 #endif
-                r.nativeRegistration=0;parent.table_.externalRetire(h.slot);parent.nativeRetireQueues(h.slot);return true;
+                if(!parent.nativeRetireQueues(h.slot))return false;
+                r.nativeRegistration=0;parent.table_.externalRetire(h.slot);return true;
             }
             if(!key(local,r,h)||!parent.check(parent.room_.contains(h.slot)))return false;
             if(!parent.check(parent.native_?parent.table_.retire(h):parent.owner_.retire(h)))return false;
-            if(parent.native_)parent.nativeRetireQueues(h.slot);
+            if(parent.native_&&!parent.nativeRetireQueues(h.slot))return false;
             if constexpr(Kind==View::Kind::enemy)if(!parent.updateEnemyAlarmRoster(h))return false;
             if(!parent.check(parent.room_.remove(h.slot)))return false;
             if constexpr(Kind==View::Kind::breakable||Kind==View::Kind::timeField)
@@ -852,8 +892,9 @@ public:
     // events that would need registered walls fail rather than miss them.
     //
     // Native ownership does not yet answer spatial queries. Published actor
-    // positions and appearance are retained separately, but bounds and the
-    // spatial journal are not published. A compact table keeps
+    // positions, appearance and cached bounds are retained separately. Actor
+    // births publish to the shared journal allocation; terrain publication and
+    // consuming the mixed dirty queue remain separate integration work. A compact table keeps
     // what the actor orders observe (object, flag word, sprite index and
     // registration order); room lists and layers remain the order owners.
     enum class Ownership {reference,nativeTerrain,native,nativeScenery};
@@ -939,6 +980,25 @@ public:
         const auto* state=nativePosition(h.slot);if(!state)return false;
         sprite=state->sprite;return true;
     }
+    // Explicit publication for integration tests and future lazy collision
+    // refresh. This does not flush the mixed queue or admit native selectors.
+    bool nativeActorBounds(InstanceHandle h,Owner::Box& bounds,bool refreshBounds=false){
+        if(!native_||!valid()||(refreshBounds&&!refreshNativeActor(h,true)))return false;
+        std::uint32_t flags;if(!eligibilityFlags(h,flags))return false;
+        const auto* state=nativePosition(h.slot);if(!state)return false;
+        bounds=state->bounds;return true;
+    }
+    // Inspect already-published entries without flushing the dirty queues.
+    // Deliberately not an instance_place/meeting implementation: terrain and
+    // complete scene population are not yet admitted to native queries.
+    template<class Visit> bool inspectNativeIndex(Owner::Box box,Visit visit){
+        if(!native_||!valid())return false;
+        return check(owner_.externalSpatialPublication([&](auto& index){
+            return index.query(box,[&](unsigned slot){
+                const auto h=handleAt(slot);return h.generation&&visit(h);
+            });
+        }));
+    }
     bool serviceSpatialIndex(unsigned budget){return check(owner_.serviceSpatialIndex(budget));}
     bool attach(GameplayWorld& world){
         combatAlarmCaptureValid_=false;
@@ -970,7 +1030,7 @@ public:
                     self.nativeBirthQueues(View::terrainBase+slot,object));},
             [](void* p,unsigned slot){auto& self=*static_cast<GameplayCollisionOwner*>(p);
                 if(!self.valid())return false;
-                self.table_.externalRetire(View::terrainBase+slot);self.nativeRetireQueues(View::terrainBase+slot);return true;},
+                self.table_.externalRetire(View::terrainBase+slot);return self.nativeRetireQueues(View::terrainBase+slot);},
             [](void* p,unsigned slot){auto& self=*static_cast<GameplayCollisionOwner*>(p);
                 if(!self.valid())return false;
                 self.table_.externalFlagsChanged(View::terrainBase+slot);return true;}
@@ -984,7 +1044,8 @@ public:
                 if(!self.world_||slot>=self.world_->breakableSlots())return false;
                 const auto& r=self.world_->breakableSlot(slot);const InstanceHandle h{View::breakableBase+slot,r.lifetimeId};
                 auto* state=self.nativePosition(h.slot);
-                return state&&self.boxes_.birthPosition(r,*state)&&self.boxes_.nativeAppearance(h,r)&&self.nativeBirthQueues(h.slot,92);
+                return state&&self.boxes_.birthPosition(r,*state)&&self.boxes_.nativeAppearance(h,r)&&
+                    self.nativeBirthQueues(h.slot,92)&&self.refreshNativeActor(h,true);
             };
             boxAllocation_.acquire=[](void* context,NativeFamilyBirth& birth){
                 auto& self=*static_cast<GameplayCollisionOwner*>(context);

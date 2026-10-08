@@ -2195,6 +2195,7 @@ int main(){
         using Sprite=GameplayCollisionOwner::Owner::Sprite;
         std::vector<Sprite> expected;
         std::vector<std::uint32_t> expectedFlags;
+        std::vector<GameplayCollisionOwner::Owner::Box> expectedBounds;
         for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
             GameplayCollisionOwner::Ownership::nativeScenery}){
             auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
@@ -2210,17 +2211,22 @@ int main(){
                 if(mode==GameplayCollisionOwner::Ownership::reference){
                     value=owner->properties(h)->sprite;flags=owner->state(h)->flags;
                     expected.push_back(value);expectedFlags.push_back(flags);
+                    expectedBounds.push_back(owner->state(h)->bounds);
                 }else{
                     assert(owner->nativePublishedSprite(h,value,flags));const auto& e=expected[step];
                     assert(value.spriteId==e.spriteId&&value.maskId==e.maskId&&value.scaleX.bits==e.scaleX.bits&&
                         value.scaleY.bits==e.scaleY.bits&&value.angle.bits==e.angle.bits&&value.imageIndex.bits==e.imageIndex.bits&&
-                        (flags&0x4000u)==(expectedFlags[step]&0x4000u));
+                        (flags&0xc208u)==(expectedFlags[step]&0xc208u));
+                    GameplayCollisionOwner::Owner::Box bounds;assert(owner->nativeActorBounds(h,bounds));
+                    const auto& b=expectedBounds[step];
+                    assert(bounds.left.bits==b.left.bits&&bounds.right.bits==b.right.bits&&
+                        bounds.top.bits==b.top.bits&&bounds.bottom.bits==b.bottom.bits);
                 }
                 ++step;
             };
             compare();
-            assert(binding.mask(local,*record,-123));compare(); // Missing resources remain stored.
-            if(mode==GameplayCollisionOwner::Ownership::reference)assert(expected.back().maskId==-123);
+            assert(binding.mask(local,*record,99999));compare(); // Missing positive resources remain stored; negative IDs fall back to the sprite.
+            if(mode==GameplayCollisionOwner::Ownership::reference)assert(expected.back().maskId==99999);
             assert(binding.transform(local,*record,RunnerTransformField::scaleX,{0x3f000000u},{0x3f800000u},0xffffffu));compare();
             assert(binding.transform(local,*record,RunnerTransformField::angle,{0x42340000u},{0x3f800000u},0xffffffu));compare();
             assert(binding.transform(local,*record,RunnerTransformField::angle,{0},{0x3f800000u},0xffffffu));compare();
@@ -2231,6 +2237,24 @@ int main(){
             assert(binding.sprite(local,*record,-1));compare();
             assert(binding.imageIndex(local,*record,{0xc0200000u}));compare();
             assert(binding.sprite(local,*record,35));compare();
+            if(mode!=GameplayCollisionOwner::Ownership::reference){
+                GameplayCollisionOwner::Owner::Box bounds;
+                assert(owner->nativeActorBounds(h,bounds,true)); // Missing mask refresh caches the position.
+                RunnerImageValue x,y;assert(owner->nativePublishedPosition(h,x,y));
+                assert(bounds.left.bits==x.bits&&bounds.right.bits==x.bits&&bounds.top.bits==y.bits&&bounds.bottom.bits==y.bits);
+                std::uint32_t flags;Sprite value;assert(owner->nativePublishedSprite(h,value,flags)&&!(flags&0x208u)&&(flags&0x8000u));
+                GameplayCollisionOwner::Owner::Box all;assert(all.left.assignInteger(-10000)&&all.top.assignInteger(-10000)&&
+                    all.right.assignInteger(10000)&&all.bottom.assignInteger(10000));
+                unsigned hits=0;assert(owner->inspectNativeIndex(all,[&](InstanceHandle found){
+                    if(found.slot==h.slot&&found.generation==h.generation)++hits;return true;
+                })&&hits==1);
+                // Retirement must retry the tree search: missing-mask cached
+                // bounds no longer describe the old indexed rectangle.
+                assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)==ResultsDestination::gameplay);
+                assert(owner->inspectNativeIndex(all,[&](InstanceHandle found){
+                    assert(found.slot!=h.slot||found.generation!=h.generation);return true;
+                }));
+            }
         }
     }
     for(auto ownership:{GameplayCollisionOwner::Ownership::native,GameplayCollisionOwner::Ownership::nativeScenery}){
