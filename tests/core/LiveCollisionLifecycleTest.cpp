@@ -1766,6 +1766,10 @@ int main(){
             "bind all families before the combined tick");
         BoneProjectile expected=bones.instances().find(bone)->state;
         const auto boneId=bones.instances().find(bone)->sourceId;
+        auto blood=world->bloodRegistration<1>();InstanceHandle particle;
+        require(world->spawnBlood(blood,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(800),
+            MotionBinary64::fromInteger(14),[](auto){return true;},particle),"register blood outside the player's field");
+        BloodEffect expectedBlood=blood.instances().find(particle)->state;
         TimeStopEffects<16>::PlayerPose pose{{0x43700000u},{0x43300000u},{},{},
             RunnerImageValue{0x43704000u}.promoted(),RunnerImageValue{0x43308000u}.promoted()};
         unsigned begins=0,collisions=0,pauses=0;std::uint32_t transitionId=0;
@@ -1784,19 +1788,24 @@ int main(){
                 });
         };
         auto frames=[&](int sprite,unsigned& count){return sprites.frameCount(sprite,count);};
-        auto step=[&](){return world->stepWithTimeStopAndBones(bones,shards,changes,stop,Input{},frames,transition,[&]{
+        auto step=[&](){return world->stepWithTimeStopBonesAndBlood(blood,bones,shards,changes,stop,Input{},frames,transition,[&]{
             ++collisions;
             const auto* actual=bones.instances().find(bone);
             require(actual&&begins==collisions&&actual->state.imageSpeed.bits==expected.imageSpeed.bits&&
                 actual->state.timeline.bits==expected.timeline.bits&&actual->state.motion.x==expected.motion.x&&
                 actual->state.motion.y==expected.motion.y&&actual->state.destroyRequested==expected.destroyRequested,
                 "collision boundary sees bone Step under this tick's player time-stop state");
+            const auto* effect=blood.instances().find(particle);
+            require(effect&&effect->state.imageSpeed.bits==expectedBlood.imageSpeed.bits&&
+                effect->state.timeline.bits==expectedBlood.timeline.bits&&effect->x.bits==expectedBlood.x.bits&&
+                effect->y.bits==expectedBlood.y.bits,"blood consumes that same Begin Step state before collision");
             return true;
         });};
         struct Events {void destroy(){}void effect(int,int){}} events;
         const auto advanceReference=[&](bool stopped){bool crossed;
             require(expected.advanceImage(crossed)&&expected.step(stopped,[](int,int){return true;},events),
                 "advance the retained source bone event oracle");
+            require(expectedBlood.advanceImage()&&expectedBlood.step(!stopped),"advance blood source oracle outside fields");
         };
         advanceReference(true);
         const auto before=world->randomDrawCount();
@@ -1807,6 +1816,9 @@ int main(){
                 world->instance(transitionId)&&bones.instances().find(bone)->state.imageSpeed.bits==0x3f800000u,
                 "failed pause retains prior animation and first burst but prevents bone Step and collision");
             const auto draws=world->randomDrawCount();const auto id=world->nextRuntimeInstanceId();
+            const auto* untouched=blood.instances().find(particle);
+            require(untouched&&untouched->state.savedSpeed.bits==0xbf800000u&&
+                untouched->state.timeline.bits==0x3f000000u,"failed transition retains blood animation but prevents its Step");
             require(!step()&&begins==1&&world->randomDrawCount()==draws&&world->nextRuntimeInstanceId()==id,
                 "failed combined tick cannot replay the transition prefix");
             continue;
@@ -1824,7 +1836,7 @@ int main(){
             !bones.instances().find(bone)&&world->scriptEffects().size()==1&&
             world->scriptEffects().atNewest(0)->spriteId==85,
             "exit transition resumes bone Step, publishes the real impact and retires its caller");
-        require(stop.reset(),"retire transition families before their bridges leave scope");
+        require(stop.reset()&&blood.clear(),"retire transition families before their bridges leave scope");
     }
     {
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);

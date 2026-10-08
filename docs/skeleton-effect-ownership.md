@@ -670,6 +670,16 @@ for identity-bearing shard-direction queries. `stepBlood` invokes it after
 saved-speed capture. Automatic player `pTimeStop` and mixed-family ordinary
 Step admission remain separate integration requirements.
 
+`stepWithTimeStopBonesAndBlood` composes the stored blood dispatch with the
+existing bone/shard/time-change tick, without advancing the world twice. Blood
+reads `stop.player.stopped` inside its ordinary Step query, after the player's
+Begin Step callback. Enter/hold/exit transitions therefore freeze/resume bones
+and out-of-field blood from the same state. A failed synchronous transition
+retains earlier animation but prevents both ordinary Steps and the collision
+pass. The transition callback still owns the precise player pose and actual
+audio/controller effects; this composition does not supply those missing live
+adapters or the native mixed-family scheduler.
+
 Object 220 is visible, depth 0, has no parent and defines no Draw event. Its
 default Draw therefore belongs in the ordinary layer traversal, not a particle
 overlay or the smoke controller surface. The SDL game renderer admits these

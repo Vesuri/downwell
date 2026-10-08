@@ -585,6 +585,19 @@ public:
             return state.stepInWorld(stop.player.stopped,publisher,impact,view,good);
         },[&]{return stepWithTimeStopEffects(shards,changes,stop,input,false,transition,collisions);});
     }
+    // Compose blood into that same room tick. Its query reads the player state
+    // at the particle's ordinary Step, after the player Begin Step transition.
+    template<unsigned Blood,unsigned Bones,unsigned Capacity,unsigned Registered,unsigned Changes,
+        class Frames,class Transition,class Collisions=NoCollisionPass>
+    bool stepWithTimeStopBonesAndBlood(StoredBloodRegistration<instanceCapacity,Blood>& blood,
+        StoredBoneRegistration<instanceCapacity,Bones>& bones,
+        StoredTimeShardRegistration<instanceCapacity,Registered>& shards,
+        StoredTimeChangeRegistration<instanceCapacity,Changes>& changes,TimeStopEffects<Capacity>& stop,
+        const Input& input,Frames frames,Transition transition,Collisions collisions={}){
+        return withBloodEvents(blood,[&](InstanceHandle key,const auto&,bool& allowed){
+            return bloodTimeAllowed(blood,key,stop.player.stopped,allowed);
+        },[&]{return stepWithTimeStopAndBones(bones,shards,changes,stop,input,frames,transition,collisions);});
+    }
     // Explicit Begin Step boundary; the scheduler supplies synchronous audio,
     // shake, pause and oxygen effects. Registrations must
     // outlive the effect owner and be retired before room teardown.
