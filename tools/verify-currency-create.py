@@ -41,6 +41,9 @@ for sprite_id, name in ((133, "sprGemS"), (134, "sprGemM")):
     sprite = manifest["resources"]["sprites"][sprite_id]
     assert sprite["name"] == name and len(sprite["frames"]) == 4
     assert sprite["separateMasks"] == "AxisAlignedRect"
+    origin, first, last = (8, 4, 11) if sprite_id == 133 else (12, 6, 17)
+    assert (sprite["originX"], sprite["originY"]) == (origin, origin)
+    assert (sprite["marginLeft"], sprite["marginTop"], sprite["marginRight"], sprite["marginBottom"]) == (first, first, last, last)
 # The standalone animation traversal must not bypass an inherited or local
 # Animation End handler when a four-frame currency sequence wraps.
 assert not any(e["eventType"] == 7 and e["eventSubtype"] == 7 for e in obj["events"])

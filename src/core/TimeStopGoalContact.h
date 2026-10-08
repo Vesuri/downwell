@@ -7,11 +7,11 @@
 #include "DivideBinary64.h"
 #include "RunnerMaskDispatch.h"
 namespace downwell {
-// Unrotated sprite 31/91 versus integral-centred goal or ordinary field.
+// Unrotated sprite 31/91/133/134 versus integral-centred goal or ordinary field.
 // Compatibility bounds use nearest-even conversion. Angled masks require a
 // different path; callers must not silently discard an instance's rotation.
 struct TimeStopGoalContact {
-    enum class Mask { Player, Shard };
+    enum class Mask { Player, Shard, SmallCurrency, MediumCurrency };
     static bool query(Mask mask,RunnerImageValue x,RunnerImageValue y,
                       RunnerImageValue xs,RunnerImageValue ys,
                       const GoalTimeField& field,bool& hit){
@@ -30,19 +30,24 @@ private:
                           const Rows& rows,bool& hit){
         if(fieldX < -1048576 || fieldX > 1048576 ||
            fieldY < -1048576 || fieldY > 1048576)return false;
-        const int top=mask==Mask::Player?8:10, bottom=mask==Mask::Player?20:13;
+        // Express each solid mask relative to the helper's origin 12.
+        // sprGemS origin 8, margins 4..11 becomes 8..15 here; sprGemM
+        // already has origin 12 and margins 6..17. End edges are exclusive.
+        const int left=mask==Mask::MediumCurrency?6:8,right=mask==Mask::MediumCurrency?18:16;
+        const int top=mask==Mask::Player?8:mask==Mask::Shard?10:mask==Mask::SmallCurrency?8:6;
+        const int bottom=mask==Mask::Player?20:mask==Mask::Shard?13:mask==Mask::SmallCurrency?16:18;
         const RunnerMaskDispatch dispatch;
         const auto fieldScale=integer(pixelScale);
         const bool rounded=dispatch.select({xs,ys,{}},{fieldScale,fieldScale,{}})==RunnerMaskDispatch::Path::roundedPosition;
         Axis horizontal,vertical;
-        if(!horizontal.prepare(x,xs,8,16,rounded) || !vertical.prepare(y,ys,top,bottom,rounded))return false;
+        if(!horizontal.prepare(x,xs,left,right,rounded) || !vertical.prepare(y,ys,top,bottom,rounded))return false;
         const int l=horizontal.low>fieldX-extent?horizontal.low:fieldX-extent;
         const int r=horizontal.high<fieldX+extent?horizontal.high:fieldX+extent;
         const int t=vertical.low>fieldY-extent?vertical.low:fieldY-extent;
         const int b=vertical.high<fieldY+extent?vertical.high:fieldY+extent;
         for(int px=l;px<r;++px){
             bool inside;
-            if(!horizontal.contains(px,8,16,inside))return false;
+            if(!horizontal.contains(px,left,right,inside))return false;
             if(!inside)continue;
             for(int py=t;py<b;++py){
                 if(!vertical.contains(py,top,bottom,inside))return false;

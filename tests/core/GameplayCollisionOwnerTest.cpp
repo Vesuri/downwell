@@ -2940,6 +2940,39 @@ int main(){
         if(ownership==GameplayCollisionOwner::Ownership::reference)bloodContactReference=contacts;
         else assert(contacts==bloodContactReference);
     }
+    std::vector<bool> currencyContacts;
+    for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                       GameplayCollisionOwner::Ownership::nativeScenery}){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},&rooms,ownership);
+        auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world)&&world->createRoomStartField()&&
+            world->createGeneratedInstance({82,240,512},objects,[](const auto&){return true;})&&world->registerLevelExit(1024));
+        struct Queries {
+            bool wall(InstanceHandle,MotionBinary64,MotionBinary64,bool& hit){hit=false;return true;}
+            bool tile(InstanceHandle,int,MotionBinary64,MotionBinary64,bool& hit){hit=false;return true;}
+        } queries;
+        std::vector<bool> contacts;unsigned id=805000;
+        for(int size:{0,1})for(int cy:{192,512,1056})for(int dx=-136;dx<=136;dx+=4)for(int dy:{-25,-5,0,5,25}){
+            auto x=MotionBinary64::fromInteger(240+dx),y=MotionBinary64::fromInteger(cy+dy);
+            assert(x.add({0x3fd00000u,0})&&y.add({0x3fe00000u,0}));InstanceHandle key;
+            assert(world->createCurrencyWithSourceId(id++,x,y,queries,key));bool allowed=false;
+            assert(owner->currency().dispatch(key,[&](auto& state,bool&){state.size=size;state.flash=1;return true;}));
+            unsigned draws=0;
+            assert(owner->currency().draw(key,[&](auto,const auto&){++draws;return true;})&&!draws&&
+                owner->currency().find(key)->spriteId==133+size&&owner->currency().find(key)->maskId==133+size);
+            assert(owner->currencyTimeAllowed(key,true,10000,masks,allowed));contacts.push_back(allowed);
+            assert(owner->currency().dispatch(key,[](auto& state,bool&){state.flash=-1;return true;}));
+            assert(owner->currency().draw(key,[&](auto drawKey,const auto& record){
+                ++draws;return drawKey.generation==key.generation&&record.spriteId==133+size;
+            })&&draws==1);
+            assert(owner->currency().clear());
+        }
+        assert(std::count(contacts.begin(),contacts.end(),true)>0&&std::count(contacts.begin(),contacts.end(),false)>0);
+        if(ownership==GameplayCollisionOwner::Ownership::reference)currencyContacts=contacts;
+        else assert(contacts==currencyContacts);
+    }
     for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
                        GameplayCollisionOwner::Ownership::nativeScenery}){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},

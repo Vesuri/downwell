@@ -1489,6 +1489,36 @@ public:
             return bloodTimeAllowed(local,pTimeStop,roomWidth,masks,allowed);
         }));
     }
+    bool currencyTimeAllowed(InstanceHandle local,bool stopped,int width,const SpriteMaskPack& masks,bool& allowed){
+        const auto* child=currency_.find(local);InstanceHandle self;
+        const int mask=child?(child->maskId<0?child->spriteId:child->maskId):-1;
+        if(!valid()||!world_||!child||(mask!=133&&mask!=134)||
+            !View::encode(View::Kind::currency,local,self)||!resolves(self))return check(false);
+        return check(TimeStopBound::evaluate(stopped,child->x.promoted(),child->y.promoted(),width,
+            [&](auto x,auto y,bool& hit){
+                if(!native_)return masks.valid()&&registeredPlaceMeeting(self,82,x,y,masks,hit);
+                bool found=false;
+                const auto shape=mask==133?TimeStopGoalContact::Mask::SmallCurrency:TimeStopGoalContact::Mask::MediumCurrency;
+                const RunnerImageValue unit{0x3f800000u};
+                const bool ok=visitRegistered(View::timeFieldBase,View::exitControllerBase,
+                    [&](InstanceHandle h,int object,std::uint32_t flags){
+                        if(found||(flags&0x100003u))return true;
+                        View::Kind kind;InstanceHandle key;if(!View::decode(h,kind,key))return false;
+                        if(object==82&&kind==View::Kind::timeField){
+                            const auto* field=View(*world_).template resolveLocal<View::Kind::timeField>(key);
+                            return field&&TimeStopGoalContact::query(shape,child->x,child->y,unit,unit,*field,found);
+                        }
+                        if((object==255||object==371)&&kind==View::Kind::goalField){
+                            const auto* field=world_->goalFieldInstances().find(key);
+                            if(!field||field->scaleX!=2||field->scaleY!=2)return false;
+                            GoalTimeField value;value.x=field->x;value.y=field->y;
+                            return TimeStopGoalContact::query(shape,child->x,child->y,unit,unit,value,found);
+                        }
+                        return false;
+                    });
+                if(ok)hit=found;return ok;
+            },allowed));
+    }
     // Indexed collision adapter for the registered currency owner. Native
     // selectors remain unavailable: reject before executing any Step/RNG prefix.
     template<class Math,class ViewTop,class Audio>

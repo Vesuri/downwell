@@ -10,6 +10,7 @@
 #include "TimeStopBound.h"
 #include "PlayerSolidCollisionBinary64.h"
 #include "SoundPlayScript.h"
+#include "RunnerSpriteChange.h"
 namespace downwell {
 // Native currency lifetimes. Numeric source IDs are supplied by the room birth
 // stream; never manufacture them from family-local generation handles.
@@ -73,6 +74,20 @@ public:
         next.bits&=0x7fffffffu;
         if(!binding_.imageIndex(key,*r,next))return fail();
         r->imageIndex=next;return true;
+    }
+    template<class DrawFx> bool draw(InstanceHandle key,DrawFx drawFx){
+        auto* r=resolve(key);if(!r||executing_)return fail();
+        if(!r->active||r->destroyRequested)return true;
+        const int size=r->state.size;
+        if(size==0||size==1){
+            const int sprite=size==0?133:134;RunnerSpriteChange::Result change;
+            if(!RunnerSpriteChange::plan(r->spriteId,sprite,r->imageIndex,4,change)||
+                !binding_.sprite(key,*r,sprite))return fail();
+            r->spriteId=sprite;if(change.resetIndex)r->imageIndex={};
+            if(r->maskId!=sprite){if(!binding_.mask(key,*r,sprite))return fail();r->maskId=sprite;}
+        }
+        if(r->state.flash>0)return true;
+        return good_=drawFx(key,static_cast<const Record&>(*r))&&good_;
     }
     template<class Other> bool advanceAlarm(InstanceHandle key,unsigned index,Other other){
         auto* r=resolve(key);if(!r||executing_||index>=5)return fail();
