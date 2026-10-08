@@ -569,7 +569,7 @@ int main(){
     }
     auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
-    for(unsigned mode=0;mode<3;++mode){
+    for(unsigned mode=0;mode<10;++mode){
         const bool fullEffects=mode!=0;
         const auto roomBytes=read("generated/downwell-rooms.dwrm");RoomPack roomPack(roomBytes.data(),roomBytes.size());
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
@@ -591,6 +591,9 @@ int main(){
         assert(tick()&&counts.stop==1&&!counts.sound&&world->findBreakable(box));
         counts={};assert(world->publishBoxHealth(box,{}));
         if(fullEffects){
+            const unsigned soundFailure=mode>=3?mode-2:0;
+            BoxSoundVerification::Audio<GameplayWorld> audio{*world,world->findBreakable(box)->state.breakSound,soundFailure};
+            GameMakerRandom soundRandom{0};
             if(mode==2)for(unsigned i=0;i<debrisEffectCapacity;++i){
                 InstanceHandle child;
                 assert(world->spawnDebris(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(512),1,child)&&
@@ -605,21 +608,33 @@ int main(){
             },[&](InstanceHandle key){
                 auto callbacks=scheduledBoxEffects(*world,key,counts,[&](InstanceHandle h){return world->markBreakableDestroyed(h);});
                 callbacks.verifyDebris=true;
+                callbacks.sawSound=key.slot==box.slot&&key.generation==box.generation;callbacks.before=world->randomState();
+                if(callbacks.sawSound)soundRandom=world->randomState();
                 return boxWorldEffects(*world,key,callbacks,
                 [&](int id,unsigned& frames){PackedSpriteCollision art;if(!sprites.sprite(id,art))return false;
-                    frames=art.frameCount;return true;});},
+                    frames=art.frameCount;return true;},audio,MotionBinary64{0x3fd00000u,0});},
                 [&]{return world->stepWithOwnedDebris(0,stopped,meeting);});
             assert(completed==(mode==1));
+            if(soundFailure){
+                assert(!world->effectsSucceeded()&&audio.valid&&audio.calls==soundFailure&&
+                    world->findBreakable(box)&&!world->findBreakable(box)->destroyRequested&&!counts.mark&&counts.stop==0&&
+                    !world->smokeEffects().size()&&!world->flashEffects().slot(0).handle&&!world->scriptEffects().size()&&
+                    !world->debrisEffects().size());
+                assert(soundRandom.drawCount()==world->randomState().drawCount()&&
+                    soundRandom.stateIndex()==world->randomState().stateIndex());
+                for(unsigned i=0;i<16;++i)assert(soundRandom.stateWord(i)==world->randomState().stateWord(i));
+                continue;
+            }
             if(mode==2){
                 assert(!world->effectsSucceeded()&&world->debrisEffects().size()==debrisEffectCapacity&&
                     world->findBreakable(box)&&world->findBreakable(box)->destroyRequested&&
-                    counts.sound==1&&counts.mark==1&&counts.stop==0&&
+                    audio.valid&&audio.calls==7&&counts.mark==1&&counts.stop==0&&
                     world->smokeEffects().size()==1&&world->scriptEffects().size()==1);
                 continue;
             }
             assert(world->effectsSucceeded()&&world->debrisEffects().size()==2&&
                 world->smokeEffects().size()==1&&world->flashEffects().slot(0).handle&&world->scriptEffects().size()==1&&
-                counts.mark==1&&counts.sound==1&&counts.stop==1&&world->findBreakable(box)->destroyRequested);
+                counts.mark==1&&audio.valid&&audio.calls==7&&counts.stop==1&&world->findBreakable(box)->destroyRequested);
             assert(owner->prepareDraw()&&!world->findBreakable(box));
             assert(world->stepWithOwnedDebris(0,stopped,meeting)&&world->debrisEffects().size()==2);
             continue;

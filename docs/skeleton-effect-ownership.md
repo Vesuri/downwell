@@ -352,11 +352,16 @@ installed. Scheduled failure-prefix checks use real smoke, flash and impact
 owners, then reject debris creation; they do not prove complete destruction
 or natural encounter parity.
 
-`BoxWorldEffects` supplies the shared script's concrete smoke, flash, impact
-and object-370 creation calls to either world. Impact creation publishes the
+`BoxWorldEffects` supplies the shared script's overlap sound, smoke, flash, impact
+and object-370 creation calls to either world. Its explicit audio backend and
+game-volume input execute the source `waterThings` script before particle
+creation, retaining caller sound fields and the channel-7 assignment. The
+sound ID is the already-evaluated script argument, not a later reread of box
+state. Failure at any audio call stops subsequent emissions without consuming
+their RNG. Impact creation publishes the
 caller's `myFx`; debris creation returns the actual registered lifetime, with
 stored numeric IDs resolved back to world handles and native generation handles
-kept local. The remaining control operations (audio, globals, chain contacts,
+kept local. The remaining control operations (globals, chain contacts,
 rewards, destruction and time queries) are required from the caller rather than
 successful no-op defaults. The scoped box and owned-debris tick adapters can be
 nested to keep creation, later debris phases and cleanup in one world frame.

@@ -705,6 +705,10 @@ public:
         auto& box=breakables_[h.slot];
         return run_.playBoxBreakSound(box.sound,box.state.breakSound,volume,audio);
     }
+    template<class Audio> bool playBoxBreakSound(downwell::InstanceHandle h,int sound,downwell::MotionBinary64 volume,Audio& audio){
+        if(!run_.effectsSucceeded||!findBreakable(h))return run_.effectsSucceeded=false;
+        return run_.playBoxBreakSound(breakables_[h.slot].sound,sound,volume,audio);
+    }
     // False only when no live box counts this alarm down: every box's own
     // Alarm 0 is unset. Boxes have no other alarm, which stays conservative.
     bool boxAlarmMayDispatch(unsigned alarm)const{

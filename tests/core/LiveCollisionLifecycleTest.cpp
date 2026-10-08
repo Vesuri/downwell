@@ -160,7 +160,7 @@ int main(){
     BuilderPatternPack patterns(bb.data(),bb.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     SpriteMaskPack masks(mb.data(),mb.size());
     require(rooms.valid()&&objects.valid()&&patterns.valid()&&sprites.valid()&&masks.valid(),"real collision resources validate");
-    for(unsigned mode=0;mode<3;++mode){
+    for(unsigned mode=0;mode<10;++mode){
         const bool fullEffects=mode!=0;
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
@@ -174,6 +174,9 @@ int main(){
             [&](InstanceHandle h){return world->markBoxDestroyed(h);});};
         if(fullEffects){
             require(!owner->resolve(box)->box.haveGem,"scheduled no-reward box fixture");
+            const unsigned soundFailure=mode>=3?mode-2:0;
+            BoxSoundVerification::Audio<StartupRuntime> audio{*world,owner->resolve(box)->box.breakSound,soundFailure};
+            GameMakerRandom soundRandom{0};
             if(mode==2)for(unsigned i=0;i<debrisEffectCapacity;++i){
                 InstanceHandle child;
                 require(world->spawnDebris(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(512),1,child)&&
@@ -181,20 +184,33 @@ int main(){
             }
             const bool completed=world->withBoxDestruction(readCaller,[&](InstanceHandle key){
                 auto callbacks=controls(key);callbacks.verifyDebris=true;
+                callbacks.sawSound=key.slot==box.slot&&key.generation==box.generation;callbacks.before=world->randomState();
+                if(callbacks.sawSound)soundRandom=world->randomState();
                 return boxWorldEffects(*world,key,callbacks,[&](int id,unsigned& frames){
-                    PackedSpriteCollision art;if(!sprites.sprite(id,art))return false;frames=art.frameCount;return true;});
+                    PackedSpriteCollision art;if(!sprites.sprite(id,art))return false;frames=art.frameCount;return true;},
+                    audio,MotionBinary64{0x3fd00000u,0});
             },[&]{return world->stepWithOwnedDebris({},[](auto,const auto&,bool& frozen){frozen=false;return true;});});
             require(completed==(mode==1),"stored scheduled source effects honor debris capacity");
+            if(soundFailure){
+                require(!world->effectsSucceeded()&&audio.valid&&audio.calls==soundFailure&&
+                    owner->resolve(box)&&!owner->resolve(box)->destroyRequested&&!counts.mark&&
+                    !world->smokeEffects().size()&&!world->flashEffects().slot(0).handle&&!world->scriptEffects().size()&&
+                    !world->debrisEffects().size(),"audio failure stops before all source particle emissions");
+                require(soundRandom.drawCount()==world->randomState().drawCount()&&
+                    soundRandom.stateIndex()==world->randomState().stateIndex(),"failed box sound consumes no RNG");
+                for(unsigned i=0;i<16;++i)require(soundRandom.stateWord(i)==world->randomState().stateWord(i),"failed sound retains WELL words");
+                continue;
+            }
             if(mode==2){
                 require(!world->effectsSucceeded()&&world->debrisEffects().size()==debrisEffectCapacity&&
-                    owner->resolve(box)&&owner->resolve(box)->destroyRequested&&counts.sound==1&&counts.mark==1&&
+                    owner->resolve(box)&&owner->resolve(box)->destroyRequested&&audio.valid&&audio.calls==7&&counts.mark==1&&
                     world->smokeEffects().size()==1&&world->scriptEffects().size()==1,
                     "real debris exhaustion preserves completed destruction prefix");
                 continue;
             }
             require(world->effectsSucceeded()&&!owner->resolve(box)&&world->debrisEffects().size()==2&&
                 world->smokeEffects().size()==1&&world->flashEffects().slot(0).handle&&world->scriptEffects().size()==1&&
-                counts.mark==1&&counts.sound==1&&counts.stop&&world->mainBlocksDestroyed()==destroyed+1,
+                counts.mark==1&&audio.valid&&audio.calls==7&&counts.stop&&world->mainBlocksDestroyed()==destroyed+1,
                 "stored complete effect sequence retires only the box at Draw cleanup");
             require(world->stepWithOwnedDebris({},[](auto,const auto&,bool& frozen){frozen=false;return true;})&&
                 world->debrisEffects().size()==2,"registered destruction debris survives next stored frame");
