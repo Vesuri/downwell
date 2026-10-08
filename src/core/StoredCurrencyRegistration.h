@@ -6,6 +6,8 @@
 #include "ObjectPack.h"
 #include "SequenceTimeline.h"
 #include "SoundPlayScript.h"
+#include "CurrencyStepEnvelope.h"
+#include "TimeStopBound.h"
 #include <cstring>
 namespace downwell {
 // Registered object-248 Create and script setters. Borrow at a fixed address
@@ -85,6 +87,24 @@ public:
         SoundPlayEnvironment env;env.gameVolume=volume;env.inWater=inWater;int voice=-1;
         if(!SoundPlayScript::plain(r->sound,env,audio,166,30,false,true,voice,good_))return false;
         return mark(h);
+    }
+    template<class Random,class Motion> bool step(InstanceHandle h,Random& random,bool stopped,int roomWidth,Motion& motion){
+        auto* e=entry(h);if(!good_||!e||!record(*e))return fail();
+        struct Ops {
+            StoredCurrencyRegistration& owner;Entry& e;bool stopped;int width;Motion& motion;
+            bool wall(MotionBinary64 x,MotionBinary64 y,bool& hit){
+                auto* r=owner.record(e);return r&&owner.lifecycle_.placeMeeting(e.key,*r,57,x,y,hit);
+            }
+            bool timeAllowed(bool& allowed){
+                return TimeStopBound::evaluate(stopped,e.state.x.promoted(),e.state.y.promoted(),width,
+                    [&](auto x,auto y,bool& hit){auto* r=owner.record(e);return r&&owner.lifecycle_.placeMeeting(e.key,*r,82,x,y,hit);},allowed);
+            }
+            bool destroy(){return owner.mark(e.key);}
+            bool freeMotion(CurrencyCreate& state){return motion.freeMotion(state);}
+            bool attractedMotion(CurrencyCreate& state){return motion.attractedMotion(state);}
+            bool publish(RunnerImageValue x,RunnerImageValue y){return owner.publish(e,x,y);}
+        } ops{*this,*e,stopped,roomWidth,motion};
+        return dispatch(h,[&](auto& state,bool& good){return CurrencyStepEnvelope::run(state,random,ops,good);});
     }
     bool retire(InstanceHandle h){
         auto* e=entry(h);

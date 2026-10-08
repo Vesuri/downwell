@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_CURRENCY_CREATE_VERIFICATION_H
 #define DOWNWELL_CORE_CURRENCY_CREATE_VERIFICATION_H
 #include "CurrencyCreate.h"
+#include "CurrencyStepEnvelope.h"
 namespace downwell {
 // Controlled maximum-range tape for the 68000. Real RNG state/order and the
 // scalar floating-point oracle are covered separately by CurrencyCreateTest.
@@ -18,6 +19,30 @@ struct CurrencyCreateVerification {
         bool publish(RunnerImageValue,RunnerImageValue){++writes;return true;}
     };
     static bool run(){
+        for(unsigned failure=0;failure<6;++failure){
+            CurrencyCreate state;Random random;bool good=true;
+            state.stuckKamo=2;state.disappearing=true;state.xx={0x40290000u,0};state.yy={0xc00c0000u,0}; // 12.5, -3.5
+            state.x.assign(state.xx);state.y.assign(state.yy);state.imageSpeed.bits=0x3f000000u;
+            state.alarms.set(0,1);state.alarms.set(1,0);state.alarms.set(2,-1);state.alarms.set(3,9);state.alarms.set(4,5);
+            struct Ops {
+                unsigned failure,calls=0,writes=0;
+                bool next(){return ++calls!=failure;}
+                bool wall(MotionBinary64,MotionBinary64,bool& hit){hit=true;return next();}
+                bool destroy(){return next();}
+                bool timeAllowed(bool& allowed){allowed=false;return next();}
+                bool freeMotion(CurrencyCreate&){return false;}
+                bool attractedMotion(CurrencyCreate&){return false;}
+                bool publish(RunnerImageValue x,RunnerImageValue y){
+                    if(x.bits!=0x41400000u||y.bits!=(writes?0xc0800000u:0xc0600000u))return false;
+                    ++writes;return next();
+                }
+            } ops{failure};
+            if(CurrencyStepEnvelope::run(state,random,ops,good)!=(failure==0)||good!=(failure==0)||
+                random.choices!=1||ops.calls!=(failure?failure:5))return false;
+            if(!failure&&(state.stuckKamo!=3||!state.obtainable||state.scriptIndex!=4||state.imageSpeed.bits||state.flash!=1||
+                state.alarms.get(0)!=2||state.alarms.get(1)!=0||state.alarms.get(2)!=-1||state.alarms.get(3)!=10||state.alarms.get(4)!=5))return false;
+            if(failure&&(CurrencyStepEnvelope::run(state,random,ops,good)||ops.calls!=failure||random.choices!=1))return false;
+        }
         for(int area=1;area<=5;++area){
             Random random;Queries queries;CurrencyCreate birth;
             if(!birth.create({0x40288000u,0},{0xc00c0000u,0},area,true,random,queries)||

@@ -542,6 +542,19 @@ retirement and terminal audio failure. The motion callback remains a fixture,
 not a complete source implementation. This binding is not yet a
 complete scheduled/rendered actor or replacement for the live reward array.
 
+`CurrencyStepEnvelope` implements the ordinary Step's first sound choice,
+stuck-wall counter/destruction request, time-stop control and final coordinate
+publication around two required motion callbacks. An unattracted frozen gem
+sets image speed to zero, refunds only positive alarms 0–3, leaves caller `i`
+at 4 and becomes obtainable. Attracted gems bypass the wall/time-stop branch.
+The disappearance sign toggle and separate rounded X/Y publications still run
+after a stuck-wall destruction request; private `xx`/`yy` remain fractional.
+The stored registration supplies actual parent-57 and parent-82 mask queries
+and lifecycle publication. Fixtures verify full first-Step sound RNG, repeated
+freeze, alarm boundaries, continuation after destruction and failed callbacks.
+Neither a successful no-op mover nor the existing fixed-point gem mover is
+installed as a substitute for the required free/homing source branches.
+
 The shared live reward wrapper now supplies the run's area to `GemMotion`.
 Its fixed-point adapter preserves the area-5 extra RNG draw after both ordinary
 velocity draws, and areas 3/4 use gravity 112/12800 and cap 6400/12800. As in

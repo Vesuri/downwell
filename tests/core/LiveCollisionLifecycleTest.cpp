@@ -254,6 +254,38 @@ int main(){
         else require(owner->resolve(gem)&&currency.find(gem),"attracted or failed currency keeps its lifetime");
         require(currency.clear(),"clear borrowed currency scheduler owner");
     }
+    for(unsigned mode=0;mode<3;++mode){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach currency time-stop world");world->skipToGameForTesting();
+        auto currency=world->currencyRegistration<1>();InstanceHandle gem;
+        require(world->createRegisteredCurrency(currency,MotionBinary64{0x406e0800u,0},MotionBinary64{0x40800400u,0},
+            [](auto,int,auto,auto,bool& hit){hit=false;return true;},gem),"create frozen currency");
+        require(currency.dispatch(gem,[&](auto& state,bool&){state.disappearing=true;state.attracted=mode==2;return true;}),"configure currency freeze fixture");
+        auto oracle=world->randomState();CurrencyStepSound sound;sound.begin(0,oracle);
+        struct Motion {
+            unsigned free=0,attracted=0;
+            bool freeMotion(CurrencyCreate&){++free;return false;}
+            bool attractedMotion(CurrencyCreate&){++attracted;return false;}
+        } motion;
+        for(unsigned tick=0;tick<(mode?1u:3u);++tick){
+            require(world->withCurrencyEvents(currency,
+                [&](auto key,auto&,auto phase,unsigned,auto& random,bool&){
+                    require(phase==StartupRuntime::CurrencyPhase::step,"frozen currency has no secondary alarm event");
+                    return currency.step(key,random,mode!=1,480,motion);
+                },[&]{return world->stepWithCollisionPass({},false,StartupRuntime::NoCollisionPass{});})==(mode==0),
+                "frozen currency executes source envelope; missing motion fails explicitly");
+        }
+        const auto* state=currency.find(gem);const auto* r=owner->resolve(gem);
+        require(state&&r&&state->allSet&&state->bounceSound==sound.bounceSound&&motion.free==(mode==1)&&motion.attracted==(mode==2),
+            "currency first-Step sound precedes freeze and correct movement branch");
+        require(world->randomState().drawCount()==oracle.drawCount()&&world->randomState().stateIndex()==oracle.stateIndex(),"currency frozen Step consumes sound RNG only once");
+        for(unsigned i=0;i<16;++i)require(world->randomState().stateWord(i)==oracle.stateWord(i),"currency frozen Step full WELL state");
+        if(mode==0)require(state->obtainable&&state->imageSpeed.bits==0&&r->imageSpeed==0&&state->scriptIndex==4&&
+            state->alarms.get(0)==10&&state->alarms.get(3)==15&&state->flash==1&&r->preciseX==240&&r->preciseY==512&&
+            state->xx.high==0x406e0800u&&state->yy.high==0x40800400u,"frozen currency refunds alarms, flashes and rounds only published coordinates");
+        require(currency.clear(),"clear frozen currency owner");
+    }
     for(unsigned chainCase=0;chainCase<10;++chainCase){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
