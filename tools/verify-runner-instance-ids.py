@@ -74,6 +74,18 @@ assert player.index("scrPlayerInit") < player.index("event_inherited") < player.
 assert player.index("pushi.e 66") < player.index("scrSpawnCamera") < player.index("pushi.e 73")
 assert init.count("call.i gml_Script_instance_create(argc=3)") == 3
 assert "pushglb.v global.pugDecoy" in init and "pushglb.v global.pugDrone" in init
+assert init.index("pushi.e 256") < init.index("pushi.e 0\npop.v.i global.droneNum") < init.index("pushi.e 249")
+assert init.index("pushi.e 249") < init.index("pushi.e 1\npop.v.i global.droneNum") < init.rindex("pushi.e 249")
+assert init.rindex("pushi.e 249") < init.index("pop.v.i self.xdir") < init.index("pop.v.i self.ydir")
+drone = assembly("gml_Object_objDrone_Create_0",
+    "6b529f4739e3836ae65bcdafa5049e276edebb106ca5284225884b85ca641847")
+balloon = assembly("gml_Object_decoyBalloon_Create_0",
+    "102112ec0a83ccabf47a904b9b7ed7272ad8b9fb184a663d55ef133a0b5e8c74")
+assert objects[249]["parentId"] == objects[256]["parentId"] == -1
+assert "call.i" not in drone and "call.i" not in balloon
+assert "push.d 0.5\npop.v.d self.image_speed" in drone
+assert "push.d 0.08\npop.v.d self.imgSp" in balloon
+assert "push.v self.x\npop.v.v self.xx\npush.v self.y\npop.v.v self.yy" in balloon
 assert "pushi.e 64" in spawn_camera and "pop.v.v self.myCam" in spawn_camera
 # Camera Create does not publish the view; the entry mask reads the separate
 # view getter, not camera.y minus an assumed centering offset.

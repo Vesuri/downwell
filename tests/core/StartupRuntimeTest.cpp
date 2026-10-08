@@ -129,6 +129,7 @@ struct LifecycleAudit {
     bool rejectBatMask=false;
     int rejectBirthObject=-1;
     int rejectBirthRoom=-1;
+    unsigned rejectBirthOccurrence=1,matchingBirths=0;
     unsigned masks=0;
     bool mask(downwell::InstanceHandle h,const downwell::InstanceRecord& r,int next){
         ++calls;require(matches(h,r)&&r.active&&r.objectId==116&&r.batActivity.flying&&next==r.spriteId,
@@ -197,7 +198,8 @@ struct LifecycleAudit {
                     "rmMain resource camera is ready before player Create and its children");
             ++initialViewsSeen;
         }
-        ++calls;if(fail==1||(r.objectId==rejectBirthObject&&r.roomId==rejectBirthRoom))return false;
+        ++calls;if(fail==1||(r.objectId==rejectBirthObject&&r.roomId==rejectBirthRoom&&
+            ++matchingBirths==rejectBirthOccurrence))return false;
         require(h.slot<entries.size()&&!entries[h.slot].live&&h.generation>entries[h.slot].generation,
                 "live runtime publishes births before reusing generation-checked slots");
         entries[h.slot]={h.generation,r.instanceId,true};++births;return true;
@@ -234,6 +236,70 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
                        const downwell::BuilderPatternPack& patterns){
     using Runtime=downwell::StartupRuntime;
     const auto healthy=[](const Runtime& r){return r.effectsSucceeded()&&r.roomLoadSucceeded()&&r.deferredCommandsSucceeded();};
+    for(unsigned balloon=0;balloon<2;++balloon)for(unsigned drones=0;drones<3;++drones){
+        auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns);
+        if(balloon)require(runtime->grantUpgrade(15),"grant Heart Balloon before player Create");
+        if(drones)require(runtime->grantUpgrade(9),"grant Drone before player Create");
+        // Normal upgrade offers cap at one. Exercise the source's explicit
+        // value-two branch as a controlled global-state input, not a second grant.
+        if(drones==2)const_cast<downwell::UpgradeInventory&>(runtime->upgrades()).levels[9]=2;
+        runtime->skipToGameForTesting();
+        require(healthy(*runtime),"companion player Create enters live main room");
+        unsigned player=0;
+        while(player<runtime->activeInstanceCount()&&runtime->instanceAt(player).objectId!=35)++player;
+        require(player<runtime->activeInstanceCount(),"find companion parent");
+        unsigned child=player+1;std::uint32_t previous=0;
+        const auto inspect=[&](int object){
+            const auto& record=runtime->instanceAt(child++);
+            require(record.objectId==object&&record.roomId==11,"companion children precede camera in source order");
+            if(previous)require(record.instanceId==previous+1,"companion children share numeric allocator");
+            previous=record.instanceId;return &record;
+        };
+        if(balloon){
+            const auto* record=inspect(256);const auto* state=runtime->companionCreateState(record->instanceId);
+            require(state&&record->imageSpeed==0.08F&&state->balloon.noTouch.high==0x3ff00000u&&
+                state->balloon.stringLength.high==0x40340000u&&state->balloon.noHoldTime.high==0x40440000u,
+                "balloon Create stores real child state, not a reserved ID");
+        }
+        for(unsigned i=0;i<drones;++i){
+            const auto* record=inspect(249);const auto* state=runtime->companionCreateState(record->instanceId);
+            const auto angle=downwell::MotionBinary64::fromInteger(i?180:0);
+            require(state&&record->imageSpeed==0.5F&&state->drone.xdir.high==angle.high&&
+                state->drone.xdir.low==angle.low&&state->drone.ydir.high==angle.high&&
+                state->drone.shotDelay.zero()&&state->drone.burstCount.zero()&&state->drone.droneShooting.zero(),
+                "second drone gets post-Create 180-degree fields");
+        }
+        inspect(66);const auto* camera=inspect(64);inspect(73);
+        require(runtime->instanceAt(player).playerCameraId==camera->instanceId&&runtime->droneNumber()==(drones?1u:0u),
+            "player camera and droneNum use source assignments after companion births");
+    }
+    for(unsigned rejected=0;rejected<3;++rejected){
+        LifecycleAudit failure;failure.rejectBirthObject=rejected?249:256;failure.rejectBirthRoom=11;
+        failure.rejectBirthOccurrence=rejected==2?2:1;
+        auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            downwell::InstanceLifecycleBinding::bindMaskDestruction(failure));
+        require(runtime->grantUpgrade(15)&&runtime->grantUpgrade(9),"grant companion failure fixture");
+        const_cast<downwell::UpgradeInventory&>(runtime->upgrades()).levels[9]=2;
+        runtime->skipToGameForTesting();
+        require(!healthy(*runtime)&&runtime->hasInstance(100855)&&!runtime->hasInstance(100854),
+            "companion birth failure retains parent but stops later room creation");
+        unsigned companions=0;
+        for(std::size_t i=0;i<runtime->activeInstanceCount();++i){
+            const auto& record=runtime->instanceAt(i);
+            if(record.roomId!=11)continue;
+            require(record.objectId!=66&&record.objectId!=64,"failed companion prevents camera/depth meter births");
+            if(record.objectId==249||record.objectId==256){
+                ++companions;
+                require((runtime->companionCreateState(record.instanceId)!=nullptr)==(companions<=rejected),
+                    "rejected birth is retained without running its Create; earlier Creates survive");
+            }
+        }
+        require(companions==rejected+1,"failed allocation prefix includes exactly the attempted children");
+        require(runtime->droneNumber()==(rejected==1?0u:1u),
+            "droneNum retains the source prefix: old value before reset, zero before first birth, one before second");
+        const auto calls=failure.calls;runtime->step(false);
+        require(calls==failure.calls,"failed companion Create is not retried");
+    }
     for(int rejectedObject:{66,64}){
         LifecycleAudit failure;failure.rejectBirthObject=rejectedObject;failure.rejectBirthRoom=11;
         auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,

@@ -36,6 +36,7 @@
 #include "TimeShardBurst.h"
 #include "RunnerCollisionEventContext.h"
 #include "TimeFieldWind.h"
+#include "PlayerCompanionCreate.h"
 #include "SmokeDirection.h"
 #include "SmokeTrig.h"
 #include <array>
@@ -819,6 +820,12 @@ public:
             mainPlayerMotion_, mainPlayerHealth_, run_.combo.healthReserve);
     }
     const UpgradeInventory& upgrades() const { return run_.upgrades; }
+    const PlayerCompanionCreateState* companionCreateState(std::uint32_t id)const{
+        if(!instances_.find(id))return nullptr;
+        for(const auto& state:companionCreates_)if(state.sourceId==id)return &state;
+        return nullptr;
+    }
+    unsigned droneNumber()const{return droneNumber_;}
     int mainNextMuzzleOffset() const { return mainEmitter_.leg; }
     const Consumables& consumables() const { return run_.consumables; }
     ShopWorld::Instance* registerShop(int x, int y) {
@@ -1159,6 +1166,11 @@ private:
     int mainPlayerHealth_ = 4;
     PlayerDeathSequence mainDeath_;
     RunSession run_;
+    // One balloon and two drones per implemented player. Recycle only after
+    // the corresponding real instance lifetime has left the room store.
+    std::array<PlayerCompanionCreateState,3> companionCreates_{};
+    unsigned droneNumber_=0;
+    PlayerCompanionCreateState* initializeCompanionCreate(const InstanceRecord& instance);
     int mainPlayerInvulnerability_ = 0;
     MachineGunEmitter mainEmitter_;
     std::uint32_t mainShotsFired_ = 0;

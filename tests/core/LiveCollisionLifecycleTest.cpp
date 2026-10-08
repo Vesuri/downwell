@@ -156,6 +156,25 @@ int main(){
     BuilderPatternPack patterns(bb.data(),bb.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     SpriteMaskPack masks(mb.data(),mb.size());
     require(rooms.valid()&&objects.valid()&&patterns.valid()&&sprites.valid()&&masks.valid(),"real collision resources validate");
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world)&&world->grantUpgrade(9)&&world->grantUpgrade(15),"attach companion creation world");
+        const_cast<UpgradeInventory&>(world->upgrades()).levels[9]=2; // Source value-two branch, not a normal offer.
+        world->skipToGameForTesting();
+        require(world->effectsSucceeded()&&world->roomLoadSucceeded()&&owner->valid(),"real collision owner admits companion births");
+        unsigned drones=0,balloons=0;
+        require(owner->instanceNumber(249,drones)&&owner->instanceNumber(256,balloons)&&drones==2&&balloons==1,
+            "companions occupy actual resource-backed object membership");
+        for(std::size_t i=0;i<world->activeInstanceCount();++i){
+            const auto& record=world->instanceAt(i);
+            if(record.objectId!=249&&record.objectId!=256)continue;
+            const auto key=world->instanceHandleAt(i);RunnerImageValue x,y;
+            require(owner->resolve(key)==&record&&world->companionCreateState(record.instanceId)&&
+                owner->collisionPosition(key,x,y)&&x.bits==0x43700000u&&y.bits==0x43300000u,
+                "companion numeric ID, generation, Create state and published birth coordinates agree");
+        }
+    }
     for(unsigned reject=1;reject<=3;++reject){
         struct CameraWrites:StoredWorldCollision {
             using StoredWorldCollision::StoredWorldCollision;

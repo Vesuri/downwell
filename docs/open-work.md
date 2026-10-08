@@ -40,7 +40,10 @@ behavior, both backend integrations and relevant original-game verification.
   retaining source numeric instance IDs separately from native family-local
   generation handles for serialized bindings and global lookup order.
   Include player-created depth meter/camera/entry-dither and conditional
-  companion births, not just visible actors; preserve entry-dither's published
+  companion births in the native creation stream, not just visible actors;
+  finish the stored companions' event/render integration as well as native
+  ownership (their synchronous stored Create state is not a complete actor).
+  Preserve entry-dither's published
   view read and effect-surface Draw. See the
   [main-room birth audit](original-behavior-audit.md#main-room-controller-births-and-numeric-ids).
 - Replace the usual-gun Q20/Q32 trajectory approximation with original setter

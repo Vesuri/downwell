@@ -50,7 +50,16 @@ and rooms 10/17, and explicitly clears autoScroll in room 11. Stored-state
 digests include these flags. Live menu/main-room tests cover their final values;
 this does not implement the remaining alternate-camera Step paths or prove
 the other rooms' full behavior. Entry-dither 73 has stored-world ownership as
-described below; the full initializer's companion births remain omitted.
+described below. Conditional companion births are synchronous too: Heart
+Balloon (256), then one or two Drones (249), then the depth meter/camera.
+Their actual registered lifetimes own the Create state in a three-entry sparse
+store; no dummy IDs are reserved. `droneNum=1` follows the first Drone's
+successful Create; the second Drone's xdir/ydir become 180 only after its
+Create returns. A failed birth retains prior children and prevents later
+children and authored room instances. The two-drone branch is tested with an
+explicit value-two input, not by bypassing the normal one-upgrade offer cap.
+Companion motion, alarms, Draw, native admission and the rest of player
+initialization remain incomplete; correct child IDs alone do not prove those.
 Native terrain loading retains the
 authored player/wall IDs but is not complete cross-family room creation.
 Consequently, explicit-ID time-change tests do not establish the natural

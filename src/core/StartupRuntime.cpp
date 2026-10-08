@@ -77,6 +77,7 @@ void StartupRuntime::reset(PlatformProfile profile) {
         roomLoadSucceeded_=false;run_.effectsSucceeded=false;return;
     }
     tick_ = 0;
+    companionCreates_={};droneNumber_=0;
     profile_ = profile;
     random_.setSeed(randomSeed_); // Result of the Windows runner's randomize().
     roomId_ = entryRoomId;
@@ -1467,6 +1468,17 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
     instance.imageIndex = mainPlayerImageIndex_;
 }
 
+PlayerCompanionCreateState* StartupRuntime::initializeCompanionCreate(const InstanceRecord& instance){
+    if(!instance.instanceId||(instance.objectId!=249&&instance.objectId!=256))return nullptr;
+    for(auto& state:companionCreates_){
+        if(state.sourceId==instance.instanceId)return nullptr; // No replay of a partial Create.
+    }
+    for(auto& state:companionCreates_)if(!state.sourceId||!instances_.find(state.sourceId)){
+        state={};state.sourceId=instance.instanceId;return &state;
+    }
+    return nullptr;
+}
+
 bool StartupRuntime::readEntryCameraX(int room,MotionBinary64& value)const{
     if(!objectPack_||!run_.effectsSucceeded)return false;
     unsigned count=0;bool okay=true;RunnerImageValue x;
@@ -1779,6 +1791,25 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                     },lifecycle_);
                 return applied==ApplyInstanceCommandsResult::success?childId:0;
             };
+            // scrPlayerInit runs these synchronous births before returning to
+            // objPlayer_n Create (and before its depth meter/camera children).
+            if(run_.upgrades.levels[15]&&!createChild(256,instance->x,instance->y)){
+                deferredCommandsSucceeded_=false;return;
+            }
+            droneNumber_=0; // scrPlayerInit, after balloon Create and before Drone births.
+            if(run_.upgrades.levels[9]){
+                if(!createChild(249,instance->x,instance->y)){
+                    deferredCommandsSucceeded_=false;return;
+                }
+                droneNumber_=1;
+                if(run_.upgrades.levels[9]==2){
+                    const auto id=createChild(249,instance->x,instance->y);
+                    auto* state=const_cast<PlayerCompanionCreateState*>(companionCreateState(id));
+                    if(!id||!state){deferredCommandsSucceeded_=false;return;}
+                    state->drone.xdir=MotionBinary64::fromInteger(180);
+                    state->drone.ydir=MotionBinary64::fromInteger(180);
+                }
+            }
             if (!createChild(66, -100, instance->y)){
                 deferredCommandsSucceeded_=false;return;
             }
@@ -1797,8 +1828,23 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                 (!entryDitherCreate_&&!createOwnedEntryDither(room)))){
                 run_.effectsSucceeded=false;return;
             }
-            // Full initializer companion births and alternate camera motion
-            // remain separate. Unindexed fixtures retain identical lifetimes.
+            // Companion Step/Draw and alternate camera motion remain separate.
+        }
+        return;
+    case 2130: // gml_Object_objDrone_Create_0
+    case 2184: // gml_Object_decoyBalloon_Create_0
+        ++implementedCodeCalls_;
+        if(instance){
+            auto* state=initializeCompanionCreate(*instance);
+            if(!state){run_.effectsSucceeded=false;return;}
+            instance->imageSpeed=instance->objectId==249?0.5F:0.08F;
+            if(instance->objectId==256){
+                instance->imageIndex=0;
+                RunnerImageValue x,y;
+                std::memcpy(&x.bits,&instance->preciseX,4);
+                std::memcpy(&y.bits,&instance->preciseY,4);
+                state->balloon.xx=x.promoted();state->balloon.yy=y.promoted();
+            }
         }
         return;
     case 849: // gml_Object_objPlayer_n_Step_1 (menu/rmMain movement subsets)
@@ -2660,11 +2706,14 @@ std::uint64_t StartupRuntime::stateDigest() const {
         digest.addU64(sideCameraDigest());
     }
     digest.addU32(static_cast<std::uint32_t>(instances_.size()));
+    if(droneNumber_)digest.addU32(droneNumber_);
     run_.wallBackground.appendState(digest);
     for (std::size_t index = 0; index < instances_.size(); ++index) {
         const InstanceRecord& instance = instances_.at(index);
         digest.addU32(instance.instanceId);
         digest.addI32(instance.objectId);
+        if(instance.objectId==249||instance.objectId==256)
+            if(const auto* state=companionCreateState(instance.instanceId))state->appendState(digest,instance.objectId);
         digest.addI32(instance.roomId);
         digest.addI32(instance.x);
         digest.addI32(instance.y);
