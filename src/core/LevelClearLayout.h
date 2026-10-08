@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_LEVEL_CLEAR_LAYOUT_H
 #include "LevelClearController.h"
 #include "LevelUpgradeArt.h"
+#include "LevelClearOptionHeight.h"
 namespace downwell {
 // Source Result Draw layout. Trigonometric samples are supplied by the caller;
 // all subsequent arithmetic and command ordering are shared, integer-only.
@@ -21,10 +22,7 @@ void drawLevelClearWithShadows(Sink& sink, const LevelClearController& room,
     shadow(64001, 278);
     for (unsigned i = 0; i <= room.selection.lastIndex; ++i) {
         const auto x = room.carousel.optionX(i);
-        const auto distance = x.add(C::integer(-80)).magnitude.divideSmall(2);
-        // Preserve the source's order: 310+36+distance, minus bob, plus 8.
-        auto y = HudReal::integer(346).add(distance).subtract(absoluteSine.timesSmall(6)).add(HudReal::integer(8));
-        if (HudReal::integer(354).less(y)) y = HudReal::integer(354);
+        const auto y = levelClearOptionHeight(x.add(C::integer(-80)).magnitude, absoluteSine);
         sink.sprite(levelUpgradeSprite(room.offers.ids[i]), 0, x, C{y, false});
     }
     const unsigned id = room.offers.ids[room.selection.cursor];

@@ -51,6 +51,28 @@ incomplete. Do not hide unsupported upgrades to make a playthrough appear comple
 
 ## Verification contract
 
+### Selection icon curve
+
+`gml_Object_Result_Draw_0.asm`, blocks 36–38, computes the icon height as
+`346 + abs(x - 80)/2 - 6*abs(sin(time/20)) + 8`, then clamps it to 354.
+`LevelClearOptionHeight` preserves that rounded operation order whenever the
+curve is needed. For displacement at least 12 and an absolute sine sample in
+[0,1], distance is at least 6 and bob is at most 6. Monotonic rounding at each
+operation therefore leaves the pre-clamp result at least 354: its final value
+is exactly 354 without evaluating the curve. This is not a trig approximation
+or an easing-state change. The 38-pixel spacing leaves at most one option
+inside the open, 24-pixel-wide potentially unclamped interval. Arbitrary samples outside
+the sine domain use the original arithmetic.
+
+The retained `levelClearOptionHeightReference` is the coordinate oracle;
+`REFERENCE_CLEAR_OPTION_HEIGHT=1` selects it for native comparisons. Tests
+compare normalized binary64 coordinates, including adjacent values at the
+12-pixel boundary, interrupted cursor movement, all four possible options,
+and samples outside the admitted domain. Native composition tests remain
+necessary for the complete presentation, rather than just this arithmetic.
+
+### Gameplay effects
+
 An accepted grant, an icon or a helper test does not prove ongoing gameplay
 behavior. Validate inventory and offer rules separately from live effects.
 Each effect needs deterministic encounter coverage, original-runner evidence

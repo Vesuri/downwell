@@ -1,5 +1,6 @@
 #include "core/LevelClearPresentation.h"
 #include "core/LevelClearLayout.h"
+#include "core/LevelClearTrig.h"
 #include <cstdio>
 #include <cstdlib>
 static void require(bool ok, const char* why) {
@@ -7,6 +8,42 @@ static void require(bool ok, const char* why) {
 }
 int main() {
     using namespace downwell;
+    unsigned curveCases = 0;
+    const auto checkCurve = [&](HudReal displacement, HudReal sine) {
+        const auto actual = levelClearOptionHeight(displacement, sine);
+        const auto expected = levelClearOptionHeightReference(displacement, sine);
+        require(actual.equal(expected), "clamp admission must preserve exact source coordinates");
+        ++curveCases;
+    };
+    // Both sides of the 12-pixel boundary, including adjacent binary64
+    // values, zero/max bob and arbitrary samples outside the sine domain.
+    for (int delta = -64; delta <= 64; ++delta) {
+        auto displacement = HudReal::integer(12);
+        displacement.mantissa += delta;
+        for (unsigned tick = 0; tick < 2048; ++tick)
+            checkCurve(displacement, LevelClearTrig::absoluteSine(tick));
+        checkCurve(displacement, {});
+        checkCurve(displacement, HudReal::integer(1));
+        auto sine = HudReal::integer(1); ++sine.mantissa;
+        checkCurve(displacement, sine);
+        checkCurve(displacement, HudReal::integer(2));
+    }
+    // Real easing, interrupted/reversed cursor movement, every offered slot.
+    for (unsigned options = 1; options <= 4; ++options) {
+        LevelClearCarousel carousel; carousel.create(0);
+        for (unsigned tick = 0; tick < 12000; ++tick) {
+            carousel.step((tick / 17 + tick / 43) % options);
+            const auto sine = LevelClearTrig::absoluteSine(tick);
+            for (unsigned i = 0; i < options; ++i)
+                checkCurve(carousel.optionX(i).add(LevelClearCoordinate::integer(-80)).magnitude, sine);
+        }
+    }
+    for (unsigned i = 0; i <= 512; ++i) {
+        const auto displacement = HudReal::ratio(i, 4);
+        for (unsigned bob = 0; bob <= 64; ++bob)
+            checkCurve(displacement, HudReal::ratio(bob, 32));
+    }
+    std::printf("%u clamped option coordinates match the source arithmetic exactly\n", curveCases);
     for (int area = 1; area <= 4; ++area) {
         for (int level = 1; level <= 3; ++level) {
             LevelClearPresentation state;
