@@ -1158,6 +1158,26 @@ public:
                 [&]{return spawnBoneImpact(bones,local,frames);},damage,good);
         })&&run_.effectsSucceeded;
     }
+    // objDitherAbove Collision objWall_n executes instance_destroy in OTHER.
+    // Pair admission/order belongs to the collision wrapper, not this handler.
+    // Only the admitted plain wall lifetime is supported here; other families
+    // may require synchronous Destroy events before their destruction mark.
+    bool dispatchDitherAboveCollision(const RunnerCollisionEventContext::Frame& event){
+        if(!run_.effectsSucceeded)return false;
+        const auto* self=instances_.resolve(event.self);const auto* other=instances_.resolve(event.other);
+        PackedObjectEvent binding{},destroy{};bool found=false;
+        if(!self||!other||!objectPack_||self->objectId!=61||other->objectId!=60||
+            event.type!=4||event.subtype!=other->objectId||
+            !objectPack_->collisionEvent(self->objectId,other->objectId,found,binding)||!found||
+            binding.ownerObjectId!=61||binding.codeId!=991||event.owner!=61||event.code!=991||
+            objectPack_->findEvent(other->objectId,1,0,destroy))return run_.effectsSucceeded=false;
+        if(other->destroyRequested)return true;
+        if(lifecycle_.hasOwner()&&!lifecycle_.markDestroyed(event.other,*other))return run_.effectsSucceeded=false;
+        auto* marked=instances_.resolve(event.other);
+        if(!run_.effectsSucceeded||!marked)return run_.effectsSucceeded=false;
+        marked->destroyRequested=true;
+        return true;
+    }
     // Shared voice/channel state outlives room-local fields. Audio is checked
     // and synchronous; event selection must retain the inherited binding.
     template<class Audio> bool dispatchTimeFieldWind(const RunnerCollisionEventContext::Frame& event,

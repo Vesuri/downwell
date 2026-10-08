@@ -164,6 +164,61 @@ int main(){
     {
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach dither collision world");world->skipToGameForTesting();
+        InstanceHandle dither{},walls[2]{};unsigned count=0;
+        for(unsigned i=0;i<world->activeInstanceCount();++i){
+            const auto& r=world->instanceAt(i);
+            if(r.objectId==61)dither=world->instanceHandleAt(i);
+            if(r.objectId==60&&count<2)walls[count++]=world->instanceHandleAt(i);
+        }
+        require(count==2&&owner->resolve(dither),"authored room supplies dither and walls");
+        const auto draws=world->randomDrawCount();RunnerCollisionEventContext context;
+        RunnerCollisionEventContext::Frame saved{};
+        for(unsigned i=0;i<2;++i){
+            require(owner->dispatchCollisionEvent(context,dither,walls[i],{true,false},[&](const auto& event){
+                saved=event;return world->dispatchDitherAboveCollision(event);
+            }),"resource-selected dither event marks other");
+            std::uint32_t flags=0;
+            require(owner->resolve(walls[i])&&owner->resolve(walls[i])->destroyRequested&&
+                owner->collisionFlags(walls[i],flags)&&(flags&1u)&&
+                !owner->resolve(dither)->destroyRequested&&!context.current(),
+                "wall mark retains lifetime and leaves self alive");
+            if(!i)require(!owner->resolve(walls[1])->destroyRequested,"other wall untouched before its contact");
+            require(world->dispatchDitherAboveCollision(saved),"repeated destruction mark is idempotent");
+        }
+        require(world->randomDrawCount()==draws,"dither wall events consume no RNG");
+        for(auto h:walls)require(world->retireMarkedWall(h)&&!owner->resolve(h),"wall retires only at explicit cleanup");
+        require(!world->dispatchDitherAboveCollision(saved)&&!world->effectsSucceeded()&&
+            owner->resolve(dither)&&!owner->resolve(dither)->destroyRequested,"stale other fails without destroying self");
+    }
+    {
+        struct RejectWallMark:StoredWorldCollision {
+            using StoredWorldCollision::StoredWorldCollision;
+            unsigned calls=0;
+            bool markDestroyed(InstanceHandle h,const InstanceRecord& r){
+                if(r.objectId==60){++calls;return false;}
+                return StoredWorldCollision::markDestroyed(h,r);
+            }
+        };
+        auto owner=std::make_unique<RejectWallMark>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            InstanceLifecycleBinding::bindPointQueries(*owner));
+        require(owner->attach(*world),"attach rejecting dither collision world");world->skipToGameForTesting();
+        InstanceHandle dither{},wall{};
+        for(unsigned i=0;i<world->activeInstanceCount();++i){
+            if(world->instanceAt(i).objectId==61)dither=world->instanceHandleAt(i);
+            if(world->instanceAt(i).objectId==60)wall=world->instanceHandleAt(i);
+        }
+        RunnerCollisionEventContext::Frame event{dither,wall,4,60,61,991};
+        require(!world->dispatchDitherAboveCollision(event)&&owner->calls==1&&
+            !owner->resolve(wall)->destroyRequested&&!owner->resolve(dither)->destroyRequested,
+            "failed owner mark leaves both records intact");
+        require(!world->dispatchDitherAboveCollision(event)&&owner->calls==1,
+            "failed dither contact latches failure rather than retrying mutations");
+    }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
         require(owner->attach(*world),"attach scheduled reward lifecycle");world->skipToGameForTesting();
         InstanceHandle box;
         for(unsigned attempt=0;attempt<1024;++attempt){
@@ -2084,7 +2139,7 @@ int main(){
         RunnerImageValue expectedX,expectedY;
         std::memcpy(&expectedX.bits,&beforeFrame->preciseX,4);
         std::memcpy(&expectedY.bits,&beforeFrame->preciseY,4);
-        unsigned scheduledPasses=0,scheduledContacts=0;
+        unsigned scheduledPasses=0,scheduledContacts=0,scheduledDitherContacts=0;
         require(world->stepWithCollisionPass(Input{},false,[&]{
             ++scheduledPasses;
             const auto before=world->randomDrawCount();
@@ -2093,12 +2148,13 @@ int main(){
                     []{return RunnerCollisionEventContext::RoomState{true,false};},
                     [&](const RunnerCollisionEventContext::Frame& frame){
                         const auto* self=owner->resolve(frame.self);const auto* other=owner->resolve(frame.other);
+                        if(frame.code==991){++scheduledDitherContacts;return world->dispatchDitherAboveCollision(frame);}
                         if(!self||!other||frame.code!=2081||self->objectId!=238||other->objectId!=35)return false;
                         ++scheduledContacts;
                         return world->dispatchTimeShardContact(registration,shards,frame);
                     })&&world->randomDrawCount()==before;
-        })&&scheduledPasses==1&&scheduledContacts>0,
-            "ordinary scheduler executes live collected contacts once; cooldown consumes no RNG");
+        })&&scheduledPasses==1&&scheduledContacts>0&&scheduledDitherContacts>0,
+            "ordinary scheduler executes collected shard and dither contacts once; cooldown consumes no RNG");
         RunnerCollisionMotion::Previous previous;
         require(world->effectsSucceeded()&&owner->collisionPreviousPosition(tracked,previous)&&
             previous.x.bits==expectedX.bits&&previous.y.bits==expectedY.bits,

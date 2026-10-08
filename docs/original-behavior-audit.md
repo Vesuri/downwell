@@ -110,7 +110,13 @@ or alternate cameras instead of choosing storage order. Low-spec and ending
 inputs are normalized booleans supplied through `configureDitherAboveEnvironment`
 and included in stored replay state; ordinary desktop entry defaults both to
 false. Full settings/ending owners still need to supply their changes.
-The native controller and stored collision dispatcher remain unimplemented.
+The stored collision handler checks the resource-selected event and marks the
+contacted plain wall through its lifecycle owner, retaining it until cleanup.
+It rejects unsupported target families rather than omitting their Destroy
+events. A collected-pair scheduler fixture dispatches its wall contacts alongside
+shard contacts; this does not verify the original runner's simultaneous-contact
+order. The native controller and normal gameplay collision-pass integration
+remain unimplemented.
 Neither registering an inert native record nor relying on generic
 out-of-view terrain retirement reproduces this source lifecycle. Integration
 must preserve the wall's destruction mark and the subsequent phase's retirement,
