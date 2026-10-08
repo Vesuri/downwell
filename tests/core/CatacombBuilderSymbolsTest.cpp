@@ -1,4 +1,7 @@
 #include "core/CatacombBuilderSymbols.h"
+#include "core/CatacombBuilderDispatch.h"
+#include "core/GameMakerRandom.h"
+#include <cmath>
 #include <cstdlib>
 #include <iostream>
 #include <string>
@@ -120,5 +123,45 @@ int main() {
         }
     }
     for (unsigned level : {0u,4u,999u}) check('%',level,true,{}, {},false);
+    unsigned randomCases=0;
+    for(unsigned seed=0;seed<64;++seed)for(unsigned level=1;level<=3;++level)for(bool hard:{false,true}){
+        downwell::GameMakerRandom actual(seed),reference(seed);
+        downwell::CatacombBuilderDispatch state;
+        for(char symbol:std::string("ecjd%JYab")){
+            Calls wanted,seen;int chance=state.spawnChance;
+            const auto choose=[&](std::initializer_list<int> list){return *(list.begin()+reference.nextU32()%list.size());};
+            const auto child=[&](int id,int x){wanted.push_back(std::to_string(id)+":"+std::to_string(x));reference.nextU32();};
+            switch(symbol){
+                case 'e':if(std::ldexp(double(reference.nextU32()),-32)*5-double(level)<-0.00001)child(120,240);break;
+                case 'c':if(choose({0,1}))child(choose({126}),240);break;
+                case 'j':if(choose({0,1}))child(120,240);break;
+                case 'd':if(choose({0,1})){child(126,248);child(126,232);}break;
+                case '%':
+                    reference.irandomSmall(level);
+                    chance=level==1?choose({0,0,1}):level==2?choose({0,1}):choose({0,0,1,1,1});
+                    if(hard)chance=1;
+                    if(chance)child(level<=2?choose({126,126,111}):choose({126,126}),240);break;
+                case 'J':if(choose({0,1,1}))child(296,240);break;
+                case 'Y':if(choose({0,1,1}))child(299,240);break;
+                case 'a':if(choose({0,1}))child(111,240);break;
+                case 'b':if(choose({0,0,0,1}))child(116,240);break;
+            }
+            require(state.cell(symbol,240,720,level,hard,actual,[&](int id,int x,int y){
+                require(y==720&&state.spawnChance==chance);seen.push_back(std::to_string(id)+":"+std::to_string(x));
+                actual.nextU32();return true;
+            })&&seen==wanted&&state.spawnChance==chance&&actual.drawCount()==reference.drawCount());
+            for(unsigned i=0;i<16;++i)require(actual.stateWord(i)==reference.stateWord(i));
+            ++randomCases;
+        }
+    }
+    {
+        downwell::GameMakerRandom random(7);downwell::CatacombBuilderDispatch state;
+        unsigned children=0;
+        require(!state.cell('%',240,720,1,true,random,[&](int,int,int){++children;random.nextU32();return false;})&&
+            children==1&&!state.succeeded&&state.spawnChance==1);
+        const auto draws=random.drawCount();
+        require(!state.cell('e',240,720,1,false,random,[](int,int,int){return true;})&&random.drawCount()==draws);
+    }
     std::cout << cases << " catacomb symbol/call-order cases passed\n";
+    std::cout << randomCases << " WELL-backed cell/Create interleaving cases passed\n";
 }

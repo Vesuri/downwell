@@ -1537,9 +1537,9 @@ build/skeleton-throw-test: tests/core/SkeletonThrowTest.cpp src/core/SkeletonThr
 verify-catacomb-symbols: build/catacomb-symbols-test
 	./build/catacomb-symbols-test
 
-build/catacomb-symbols-test: tests/core/CatacombBuilderSymbolsTest.cpp src/core/CatacombBuilderSymbols.h
+build/catacomb-symbols-test: tests/core/CatacombBuilderSymbolsTest.cpp src/core/CatacombBuilderSymbols.h src/core/CatacombBuilderDispatch.h src/core/GameMakerRandom.cpp src/core/GameMakerRandom.h src/core/RandomBinary64.h src/core/RunnerRealComparison.h
 	@mkdir -p build
-	$(CXX) -std=c++17 -O2 -Wall -Wextra -Wpedantic -Isrc $< -o $@
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -Wpedantic -Isrc $< src/core/GameMakerRandom.cpp -o $@
 
 generate-area-two-patterns:
 	python3 tools/export-area-two-patterns.py

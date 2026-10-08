@@ -72,19 +72,16 @@ The same cases pass AddressSanitizer/UndefinedBehaviorSanitizer. Pattern export
 verification still passes with the unchanged output hash above.
 
 This is shared semantic code, **not yet connected to either live generator**.
-Its operations interface intentionally does not bind `choose` to WELL words:
-in particular, the singleton `choose(126)` is present in the VM but its runner
-word consumption has not been established here. The operation-trace test proves
-dispatch/call ordering, not historical Windows RNG equivalence. Integration
-also needs concrete synchronous actor creation and an owner for the published
-builder-instance `spawnChance` state; this helper supplies ordered writes, not
-the live builder's storage or phase admission.
-No emulator run or frame-rate improvement is claimed for this isolated change.
-
-**Follow-up:** the singleton uncertainty above is now resolved by direct
-inspection of the Windows executable: `choose` consumes one word, even for
-one argument. See `runner-choose.md`. Existing cavern choice translations
-must be corrected before using their RNG checkpoints as integration evidence.
+`CatacombBuilderDispatch` supplies the concrete WELL operations and retained
+`spawnChance` state. `choose` consumes one word modulo the list size, including
+singleton and duplicate lists, following [runner evidence](runner-choose.md).
+`random(5)` uses the binary64 multiply and VM epsilon comparison; it is not an
+integer bucket test. Child Create runs synchronously against the same RNG before
+later choices. Failure latches the dispatcher and retains completed writes and
+random draws. Tests compare emitted objects, full WELL state and draw counts
+against an independent host arithmetic/call-order transcription, including
+child RNG and terminal failure. Pattern traversal and concrete actor creation
+still need to bind this state to the live builder on both backends.
 
 ## Actor integration findings
 
