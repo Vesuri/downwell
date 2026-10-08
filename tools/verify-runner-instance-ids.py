@@ -86,6 +86,11 @@ assert "call.i" not in drone and "call.i" not in balloon
 assert "push.d 0.5\npop.v.d self.image_speed" in drone
 assert "push.d 0.08\npop.v.d self.imgSp" in balloon
 assert "push.v self.x\npop.v.v self.xx\npush.v self.y\npop.v.v self.yy" in balloon
+for object_id, sprite_id, frame_count in ((249,131,2),(256,526,4)):
+    obj=objects[object_id]
+    assert obj["spriteId"]==sprite_id
+    assert len(manifest["resources"]["sprites"][sprite_id]["frames"])==frame_count
+    assert not any(e["eventType"]==7 and e["eventSubtype"]==7 for e in obj["events"])
 assert "pushi.e 64" in spawn_camera and "pop.v.v self.myCam" in spawn_camera
 # Camera Create does not publish the view; the entry mask reads the separate
 # view getter, not camera.y minus an assumed centering offset.

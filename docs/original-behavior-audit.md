@@ -58,8 +58,19 @@ successful Create; the second Drone's xdir/ydir become 180 only after its
 Create returns. A failed birth retains prior children and prevents later
 children and authored room instances. The two-drone branch is tested with an
 explicit value-two input, not by bypassing the normal one-upgrade offer cap.
+The stored scheduler advances their initial two-/four-key sprite sequences in
+the existing active-room animation pass, with binary32 image speeds and
+publication to the collision owner before committing the new timeline. Neither
+object has an Animation End event. Failed publication stops the simulation
+without advancing the local timeline or retrying the write. This covers the
+initial sprites, not the balloon's later sprite changes.
 Companion motion, alarms, Draw, native admission and the rest of player
 initialization remain incomplete; correct child IDs alone do not prove those.
+Drone Step adds two to each custom direction every tick without modulo. Its
+lengthdir inputs therefore exceed the current `SmokeDirection` / `SmokeTrig`
+domain (and its X radius is 24, beyond that helper's length limit of 8).
+Wrapping angles or substituting host trigonometry would not preserve the
+original wrapper's float conversion and argument reduction.
 Native terrain loading retains the
 authored player/wall IDs but is not complete cross-family room creation.
 Consequently, explicit-ID time-change tests do not establish the natural

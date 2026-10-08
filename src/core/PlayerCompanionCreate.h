@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_PLAYER_COMPANION_CREATE_H
 #define DOWNWELL_CORE_PLAYER_COMPANION_CREATE_H
 #include "MotionBinary64.h"
+#include "UnitSequenceFrames.h"
 namespace downwell {
 // Custom reals from objDrone/decoyBalloon Create. Builtin image fields live
 // on the registered instance. These states do not implement subsequent Step.
@@ -19,9 +20,26 @@ struct PlayerCompanionCreateState {
     std::uint32_t sourceId=0;
     DroneCreateState drone;
     BalloonCreateState balloon;
+    RunnerImageValue timeline{};
+    // Original serialized sprites have consecutive, unit-length keys. The
+    // caller owns phase eligibility and collision-index publication.
+    template<class Publish> bool advanceImage(int object,int sprite,RunnerImageValue written,
+        RunnerImageValue speed,Publish publish){
+        const unsigned frames=object==249&&sprite==131?2:object==256&&sprite==526?4:0;
+        RunnerImageValue evaluated;
+        if(!frames||!UnitSequenceFrames::evaluate(timeline,frames,evaluated))return false;
+        bool reconcile;
+        if(!UnitSequenceFrames::needsReconcile(written,evaluated,reconcile))return false;
+        auto next=reconcile?written:timeline;
+        bool crossed;
+        if(!UnitSequenceFrames::advance(next,speed,frames,evaluated,crossed)||!publish(evaluated))return false;
+        timeline=next;
+        return true; // Neither object has an Animation End event.
+    }
     template<class Digest> void appendState(Digest& digest,int object)const{
         const auto add=[&](MotionBinary64 value){digest.addU32(value.high);digest.addU32(value.low);};
         digest.addU32(sourceId);
+        digest.addU32(timeline.bits);
         if(object==249){
             add(drone.xdir);add(drone.ydir);add(drone.shotDelay);add(drone.burstCount);add(drone.droneShooting);
         }else{

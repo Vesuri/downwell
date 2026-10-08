@@ -157,8 +157,18 @@ int main(){
     SpriteMaskPack masks(mb.data(),mb.size());
     require(rooms.valid()&&objects.valid()&&patterns.valid()&&sprites.valid()&&masks.valid(),"real collision resources validate");
     {
-        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
-        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        struct CompanionImages:StoredWorldCollision {
+            using StoredWorldCollision::StoredWorldCollision;
+            unsigned images=0;
+            bool imageIndex(InstanceHandle h,const InstanceRecord& r,RunnerImageValue value){
+                if(!StoredWorldCollision::imageIndex(h,r,value))return false;
+                if(r.objectId==249||r.objectId==256)++images;
+                return true;
+            }
+        };
+        auto owner=std::make_unique<CompanionImages>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            InstanceLifecycleBinding::bindPointQueries(*owner));
         require(owner->attach(*world)&&world->grantUpgrade(9)&&world->grantUpgrade(15),"attach companion creation world");
         const_cast<UpgradeInventory&>(world->upgrades()).levels[9]=2; // Source value-two branch, not a normal offer.
         world->skipToGameForTesting();
@@ -174,6 +184,12 @@ int main(){
                 owner->collisionPosition(key,x,y)&&x.bits==0x43700000u&&y.bits==0x43300000u,
                 "companion numeric ID, generation, Create state and published birth coordinates agree");
         }
+        const auto before=owner->images;
+        for(unsigned tick=0;tick<64;++tick){
+            world->step(false);
+            require(world->effectsSucceeded()&&owner->valid(),"companion animation retains valid real collision owner");
+        }
+        require(owner->images==before+64*3,"each companion animation publishes once through the resource-backed owner");
     }
     for(unsigned reject=1;reject<=3;++reject){
         struct CameraWrites:StoredWorldCollision {

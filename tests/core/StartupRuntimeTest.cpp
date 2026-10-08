@@ -127,6 +127,8 @@ struct LifecycleAudit {
     std::uint32_t rejectedBoxId=0;
     bool rejectBatScale=false;
     bool rejectBatMask=false;
+    bool rejectCompanionImage=false;
+    unsigned companionImages=0;
     int rejectBirthObject=-1;
     int rejectBirthRoom=-1;
     unsigned rejectBirthOccurrence=1,matchingBirths=0;
@@ -164,6 +166,10 @@ struct LifecycleAudit {
         // Animation uses reconciled room membership, not a pending active flag.
         // Lifetime identity and numeric validity are still mandatory.
         ++calls;require(matches(h,r)&&value.promoted().valid(),"animation publication resolves an allocated actor");
+        if(r.objectId==249||r.objectId==256){
+            ++companionImages;
+            if(rejectCompanionImage)return false;
+        }
         if(fail==8)return false;
         ++indices;return true;
     }
@@ -272,6 +278,46 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
         inspect(66);const auto* camera=inspect(64);inspect(73);
         require(runtime->instanceAt(player).playerCameraId==camera->instanceId&&runtime->droneNumber()==(drones?1u:0u),
             "player camera and droneNum use source assignments after companion births");
+        float droneImage=0,balloonImage=0;
+        for(unsigned tick=0;tick<64;++tick){
+            runtime->step(false);
+            droneImage+=0.5F;if(droneImage>=2)droneImage-=2;
+            balloonImage+=0.08F;if(balloonImage>=4)balloonImage-=4;
+            require(healthy(*runtime),"companion animation survives repeated wraps in live scheduler");
+            unsigned count=0;
+            for(unsigned n=0;n<runtime->activeInstanceCount();++n){
+                const auto& r=runtime->instanceAt(n);
+                if(r.objectId!=249&&r.objectId!=256)continue;
+                const auto expected=r.objectId==249?droneImage:balloonImage;
+                require(r.imageIndex==expected,"live companion image follows single-rounded source timeline");
+                const auto* state=runtime->companionCreateState(r.instanceId);
+                std::uint32_t bits;std::memcpy(&bits,&expected,4);
+                require(state&&state->timeline.bits==bits,"companion timeline and published image agree");
+                ++count;
+            }
+            require(count==balloon+drones,"animation does not create or retire companion lifetimes");
+        }
+    }
+    {
+        LifecycleAudit audit;
+        auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            downwell::InstanceLifecycleBinding::bindMaskDestruction(audit));
+        require(runtime->grantUpgrade(9),"grant drone animation failure fixture");
+        runtime->skipToGameForTesting();
+        require(healthy(*runtime),"animation failure fixture enters gameplay");
+        audit.rejectCompanionImage=true;
+        const auto before=audit.companionImages;
+        runtime->step(false);
+        require(!healthy(*runtime)&&audit.companionImages==before+1,
+            "rejected companion image publication stops animation phase");
+        for(unsigned n=0;n<runtime->activeInstanceCount();++n){
+            const auto& r=runtime->instanceAt(n);
+            if(r.objectId!=249)continue;
+            require(r.imageIndex==0&&runtime->companionCreateState(r.instanceId)->timeline.bits==0,
+                "failed publication does not advance companion record or timeline");
+        }
+        runtime->step(false);
+        require(audit.companionImages==before+1,"failed companion animation is not retried");
     }
     for(unsigned rejected=0;rejected<3;++rejected){
         LifecycleAudit failure;failure.rejectBirthObject=rejected?249:256;failure.rejectBirthRoom=11;

@@ -379,6 +379,17 @@ void StartupRuntime::stepInternal(bool advancePressed,
     }
     if(!instances_.visitAnimationChecked([this](InstanceHandle key,InstanceRecord& instance){
         if(!lifecycle_.capturePrevious(key,instance))return false;
+        if(instance.objectId==249||instance.objectId==256){
+            auto* companion=const_cast<PlayerCompanionCreateState*>(companionCreateState(instance.instanceId));
+            RunnerImageValue index,speed;
+            std::memcpy(&index.bits,&instance.imageIndex,4);
+            std::memcpy(&speed.bits,&instance.imageSpeed,4);
+            if(!companion||!companion->advanceImage(instance.objectId,instance.spriteId,index,speed,
+                [&](RunnerImageValue next){
+                    if(!lifecycle_.imageIndex(key,instance,next))return false;
+                    std::memcpy(&instance.imageIndex,&next.bits,4);return true;
+                }))return false;
+        }
         if(instance.objectId==266&&(!droneDispatch_||
             !droneDispatch_(droneContext_,instance,DronePhase::animation)))return false;
         if(instance.objectId==370&&!debrisBinding_.advance(key,&instance))return false;
