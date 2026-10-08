@@ -479,6 +479,29 @@ static void constructorPublication(){
     require(failed.appearance(0).same(a));
 }
 int main(){
+    for(int code:{-1,676,677,678}){
+        downwell::NativeTerrainLifetimes<8> live;
+        require(live.append(60,240,160,true,100900,code));
+        const auto h=live.handle(0);downwell::WallEndStepState state;
+        require(!live.initialWallState(h,state));
+        require(live.createProperties(h,51)&&live.initialWallState(h,state)&&state.pillar==0);
+        require(live.roomCreation(h)&&live.initialWallState(h,state));
+        downwell::WallEndStepState expected;require(downwell::wallRoomCreation(code,expected));
+        require(state.pillar==expected.pillar&&!state.checked&&!state.surrounded);
+        // Spatial refresh must retain the independent room-script stage.
+        require(live.publishRefreshedBounds(h,0x8000)&&live.initialWallState(h,state)&&state.pillar==expected.pillar);
+        require(live.markDestroyed(h)&&live.retire(h)&&live.append(60,240,160));
+        const auto replacement=live.handle(0);
+        require(replacement.slot==h.slot&&replacement.generation!=h.generation&&!live.initialWallState(h,state));
+        require(live.createProperties(replacement,51)&&live.initialWallState(replacement,state)&&!state.pillar);
+    }
+    for(unsigned failure=0;failure<3;++failure){
+        downwell::NativeTerrainLifetimes<8> live;
+        require(live.append(failure==2?93:60,240,160,true,100900,failure==1?679:676));
+        const auto h=live.handle(0);
+        if(failure)require(live.createProperties(h,51));
+        require(!live.roomCreation(h)&&!live.valid());
+    }
     {
         struct Clock {unsigned next=10,births=0,marks=0,retired=0;} clock;
         using Native=downwell::NativeTerrainLifetimes<8>;

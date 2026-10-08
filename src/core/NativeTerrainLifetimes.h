@@ -2,6 +2,7 @@
 #define DOWNWELL_NATIVE_TERRAIN_LIFETIMES_H
 #include "TerrainOwnershipRuns.h"
 #include "PlacementNew.h"
+#include "WallEndStep.h"
 namespace downwell {
 // Identity and birth chronology: no duplicate spatial tree, room list, animation state or
 // raster cache. Generated source IDs remain unknown until the shared global
@@ -61,7 +62,7 @@ public:
     bool publishRefreshedBounds(InstanceHandle h,std::uint32_t spatial){
         if(!contains(h))return good_=false;
         const unsigned previous=flags_[h.slot];
-        flags_[h.slot]=(previous&35u)|((previous&32u)?64u:0u)|((spatial&8u)?4u:0u)|
+        flags_[h.slot]=(previous&163u)|((previous&32u)?64u:0u)|((spatial&8u)?4u:0u)|
             ((spatial&0x200u)?8u:0u)|((spatial&0x8000u)?16u:0u);
         return true;
     }
@@ -76,6 +77,23 @@ public:
         flags_[h.slot]=(flags_[h.slot]&3u)|32u|((spatial&8u)?4u:0u)|
             ((spatial&0x200u)?8u:0u)|((spatial&0x8000u)?16u:0u);
         return true;
+    }
+    // Serialized creation code runs after object Create, before the next
+    // room birth. Keep its application stage in the spare flags bit and its
+    // immutable operand in the existing run identity, not a per-cell record.
+    bool roomCreation(InstanceHandle h){
+        Identity id;WallEndStepState state;
+        if(!readIdentity(h,id)||!(flags_[h.slot]&32u)||
+            (id.creationCode!=-1&&(id.object!=60||!wallRoomCreation(id.creationCode,state))))return good_=false;
+        flags_[h.slot]|=128u;return true;
+    }
+    // Initial event state only. Live End Step mutations must have their own
+    // retained owner; never reconstruct a previously stepped wall with this.
+    bool initialWallState(InstanceHandle h,WallEndStepState& state)const{
+        Identity id;
+        if(!readIdentity(h,id)||id.object!=60||!(flags_[h.slot]&32u))return false;
+        state={};
+        return !(flags_[h.slot]&128u)||wallRoomCreation(id.creationCode,state);
     }
     unsigned size()const{return runs_.size();}
     unsigned runCount()const{return runs_.runCount();}

@@ -86,6 +86,11 @@ struct LiveSceneWorld {
         if(runtime->nativeTerrainInstances()==terrainLifetimes.get()){
             require(terrainLifetimes->visit([&](const auto& id,bool,bool){
                 int sprite;unsigned index;bool created;
+                if(id.object==60){
+                    downwell::WallEndStepState state,expected;
+                    if(!terrainLifetimes->initialWallState(id.handle,state)||
+                        !downwell::wallRoomCreation(id.creationCode,expected)||state.pillar!=expected.pillar)return false;
+                }
                 return terrainLifetimes->appearance(id.handle,sprite,index,created)&&created&&
                     sprite==(id.object==99?-2:downwell::terrainTileForArea(runtime->runStage().area))&&
                     index==(id.object==93?23u:0u);

@@ -863,7 +863,10 @@ private:
                 !terrainInstances_->roomCreation(terrainInstances_->handle(terrainInstances_->size()-1))))){
                 run_.effectsSucceeded=false;return false;
             }
-            if(nativeTerrainInstances_&&!finishNativeTerrainCreate(nativeTerrainInstances_->handle(nativeTerrainInstances_->size()-1)))return false;
+            if(nativeTerrainInstances_){
+                const auto h=nativeTerrainInstances_->handle(nativeTerrainInstances_->size()-1);
+                if(!finishNativeTerrainCreate(h)||!nativeTerrainInstances_->roomCreation(h))return run_.effectsSucceeded=false;
+            }
         }
         return true;
     }

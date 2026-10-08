@@ -23,7 +23,10 @@ per-cell rectangle array is allocated.
 A 16-bit sprite value per cell retains the admitted normal wall/platform
 Create result; the flags byte marks Create completion. Platform image index
 23 and stopped animation follow from that typed Create state, without generic
-animation records. This does not replace authored wall creation-script state.
+animation records. The remaining flags bit marks authored room-script
+application after Create. Its initial pillar value is derived from the
+creation-code ID already retained in the run; no additional per-cell storage
+is required. This initial state is not a substitute for live End Step state.
 Room teardown preserves the generation counter, preventing old handles from
 addressing replacement walls. Generated numeric VM IDs are not inferred from
 these family-local handles.
