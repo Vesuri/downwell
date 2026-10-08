@@ -165,6 +165,59 @@ int main(int argc,char** argv) {
     assert(!cachedBorder.render(rebound.data(),pack.data(),pack.data()+pack.size(),frame,paint));
     frame.borderRow = -1;
     assert(!cachedBorder.render(rebound.data(),pack.data(),pack.data()+pack.size(),frame,paint));
+    // Static borders have their own publication lifetime. Alternating text
+    // buffers must not paint the same border twice. A moving seam must render
+    // in the non-displayed border allocation, including after shared frames.
+    AmigaSelectionBorders pair;
+    std::vector<UBYTE> pairFirst(canvas.size(), 0xa5), pairSecond(canvas.size(), 0x5a);
+    unsigned pairedFrames = 0;
+    for (int area = 1; area <= 4; ++area) {
+        pair.invalidate();
+        const UBYTE* displayed = nullptr;
+        for (int seam = 36; seam >= 0; --seam) {
+            frame.area = area; frame.borderRow = seam;
+            AmigaSelectionLayer::Command borders[AmigaSelectionLayer::capacity];
+            unsigned count = 0;
+            frame.borders([&](int a, int image, int x, int y) {
+                borders[count++] = {downwell::levelBorderSprite(a), unsigned(image), x, y-frame.tileY, -1};
+            });
+            oracle.invalidate();
+            assert(oracle.render(fresh.data(),pack.data(),pack.data()+pack.size(),borders,count,paint));
+            for (unsigned repeat = 0; repeat < 5; ++repeat) {
+                const auto oldFirst = pairFirst, oldSecond = pairSecond;
+                const auto calls = selectionBitmapMaskedCalls;
+                assert(pair.render(pairedFrames%2,pairFirst.data(),pairSecond.data(),
+                    pack.data(),pack.data()+pack.size(),frame,paint));
+                const auto* selected = pair.view(0);
+                assert(selected);
+                assert(std::equal(fresh.begin(),fresh.end(),selected));
+#ifndef DOWNWELL_REFERENCE_SELECTION_BORDER_OWNERSHIP
+                if (repeat) {
+                    assert(!paint && calls == selectionBitmapMaskedCalls);
+                    assert(pairFirst == oldFirst && pairSecond == oldSecond);
+                    assert(selected == displayed);
+                } else if (displayed) {
+                    assert(selected != displayed);
+                    assert(displayed == pairFirst.data() ? pairFirst == oldFirst : pairSecond == oldSecond);
+                }
+#else
+                (void)calls;
+#endif
+                displayed = selected;
+                assert(pair.view(324) == selected + 324*AmigaSelectionLayer::stride);
+                assert(!pair.view(325));
+                ++pairedFrames;
+            }
+            // Invalid input cannot change the published plane or either bank.
+            const auto oldFirst = pairFirst, oldSecond = pairSecond;
+            auto invalid = frame; invalid.borderRow = 37;
+            assert(!pair.render(0,pairFirst.data(),pairSecond.data(),pack.data(),
+                pack.data()+pack.size(),invalid,paint));
+            assert(pair.view(0) == displayed && pairFirst == oldFirst && pairSecond == oldSecond);
+            pair.rebindEquivalentArtwork(pack.data(),pack.data()+pack.size());
+        }
+    }
+    std::printf("%u independent border publications preserve source pixels and displayed memory\n", pairedFrames);
     unsigned outlinedCases = 0;
     const unsigned records = AmigaClearBank::longword(pack.data()+8);
     for (unsigned i = 0; i < records; ++i) {

@@ -3197,7 +3197,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                 target.hud = memory.sceneCache() + back * AmigaSelectionLayer::bytes;
                 const UBYTE* bank = memory.menuForeground() + clear.assets.layout.resultsOffset;
                 AmigaUpgradeScene::Frame frame;
-                if (!clear.render(back, target.game, target.hud, bank,
+                if (!clear.render(back, memory.hud(), memory.game(), target.hud, bank,
                         bank + clear.assets.bankBytes, port, frame)) { exitCode = 20; break; }
                 DW_PROFILE_PHASE(profileClearSprites);
                 for (unsigned channel = 0; channel < 8; ++channel) {

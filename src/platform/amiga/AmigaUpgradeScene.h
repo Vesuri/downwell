@@ -17,7 +17,7 @@ class AmigaUpgradeScene {
     bool left_ = false, right_ = false, heartGoal_ = false;
     const UBYTE* sourceArt_ = nullptr;
     unsigned sourceArtBytes_ = 0, area_ = 0, level_ = 0;
-    AmigaSelectionBorder borders_[2];
+    AmigaSelectionBorders borders_;
     AmigaSelectionLayer layers_[2];
     AmigaClearDrawList drawList_;
     DownwellSelectionCopperList lists_[2] = {{nullptr, 0}, {nullptr, 0}};
@@ -55,7 +55,7 @@ public:
         return displayReady_[back];
     }
     const DownwellSelectionCopperList& copper(unsigned back) const { return lists_[back]; }
-    bool render(unsigned back, UBYTE* border, UBYTE* layer, const UBYTE* pack,
+    bool render(unsigned back, UBYTE* firstBorder, UBYTE* secondBorder, UBYTE* layer, const UBYTE* pack,
         const UBYTE* end, const GameplayWorld& world, Frame& frame);
 };
 #endif

@@ -166,6 +166,15 @@ and body words, compares them with the scalar style renderer, and checks
 all eight programmed pointers, their distinct live headers and PF priority.
 The offline test also proves opaque-black coverage and retained-bank bounds.
 
+Upgrade borders have a publication lifetime independent of the two animated
+overlay slots. Both copper programs may read the same completed border canvas;
+changing camera/tile offsets only changes its view pointer. A changed area/seam
+is rendered into the other border allocation, never the currently published
+one. `AmigaSelectionBorders` selects those owners; invalidate it only after
+display DMA retirement. Offer-bank replacement may rebind equivalent border
+artwork without invalidating its pixels. `REFERENCE_SELECTION_BORDER_OWNERSHIP=1`
+retains the old overlay-indexed border ownership for comparison.
+
 Selection canvases retain admitted artwork records alongside their successful
 command list. Moving a command changes its damage bounds, not its immutable
 resource binding. A changed resource/frame key is resolved afresh, and a failed
