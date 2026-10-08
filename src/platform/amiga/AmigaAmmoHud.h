@@ -49,6 +49,10 @@ public:
 #endif
     }
 #ifdef DOWNWELL_AMMO_FACTORED
+    void bindLinkedCopy(const UBYTE* source,const UBYTE* sourceEnd,
+                        const UBYTE* copy,const UBYTE* copyEnd) {
+        factored_.bindLinkedCopy(source,sourceEnd,copy,copyEnd);
+    }
     void sharedRowProducer(bool enabled) { if(enabled!=sharedRowProducer_)invalidate();sharedRowProducer_=enabled; }
 #endif
     void draw(AmigaRenderer* renderer, const UBYTE* pack, const UBYTE* end,

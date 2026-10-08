@@ -2729,6 +2729,10 @@ __attribute__((noinline)) static int runDownwell(void) {
                     activeHudPackEnd = activeHudPack + hudBytes;
                     healthHud.bindLinkedCopy(amiga_hud_pack,amiga_hud_pack_end,
                                              activeHudPack,activeHudPackEnd);
+#ifdef DOWNWELL_AMMO_FACTORED
+                    ammoHud.bindLinkedCopy(amiga_hud_pack,amiga_hud_pack_end,
+                                           activeHudPack,activeHudPackEnd);
+#endif
 #ifdef DOWNWELL_RESULTS_RESTART_VERIFY
                     // Verify residency after the actual presentation handoff,
                     // including garden/style writers and direct Retry reuse.

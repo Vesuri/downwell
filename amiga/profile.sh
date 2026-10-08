@@ -87,6 +87,11 @@ case "$mode" in
     ;;
   entry)
     flags=(PROBES=1); script=profile_entry.gdb
+    entry_ammo_verify=0
+    if [[ ${AMMO_FACTORED_VERIFY:-0} == 1 ]]; then entry_ammo_verify=1; fi
+    mkdir -p .run/entry
+    sed "s/@VERIFY_AMMO@/$entry_ammo_verify/" profile_entry.gdb > .run/entry/profile_entry.gdb
+    script=.run/entry/profile_entry.gdb
     export PROFILE_ENTRY=1 SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_FRAMES=0
     export PROFILE_CONTACT=0 PROFILE_LASER=0 PROFILE_NAVIGATE=0
     ;;
@@ -112,6 +117,7 @@ restore() {
   unset REFERENCE_DAMAGE_BANK
   unset REFERENCE_HEALTH_ART
   unset REFERENCE_HEALTH_ADMISSION
+  unset REFERENCE_AMMO_ADMISSION
   unset REFERENCE_GEM_POSITION
   unset REFERENCE_EFFECT_COMPOSITION
   unset REFERENCE_STYLE_SPRITES

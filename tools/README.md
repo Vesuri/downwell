@@ -203,6 +203,14 @@ in the Amiga environment verifies both matching and mismatched object pairs.
 `REFERENCE_HEALTH_ADMISSION=1` retains the resident-copy byte scan for timing
 and pixel comparisons; profiling restoration clears this selector as well.
 
+The factored ammo tables also reference that complete-pack identity. Only the
+resident-copy owner can admit its copy without the retained directory/payload
+scan; arbitrary packs still take the exact-byte path. `REFERENCE_AMMO_ADMISSION=1`
+retains that scan, and `verify-health-link` checks both consumers' identities.
+Run `PROBES=1 AMMO_FACTORED_VERIFY=1 bash amiga/profile.sh entry` to compare the
+natural entry gauge against the scalar renderer before accepting a handoff
+change. This is a pixel-oracle run, not a performance measurement.
+
 ## Original audio
 
 After the UTMT extraction, run `python3 tools/extract-audio.py` to extract all

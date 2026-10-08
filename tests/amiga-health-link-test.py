@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the prepared-health/embedded-HUD link-time provenance contract."""
+"""Verify prepared health/ammo tables share the embedded HUD's exact identity."""
 import argparse
 import hashlib
 from pathlib import Path
@@ -13,10 +13,13 @@ parser.add_argument('--assembler', required=True)
 parser.add_argument('--linker', required=True)
 args = parser.parse_args()
 header = (root/'generated/amiga-health-art.h').read_text()
+ammo = (root/'generated/amiga-ammo-factored.h').read_text()
 include = (root/'generated/amiga-health-source.inc').read_text()
 symbol = 'downwell_health_source_' + hashlib.sha256(
     (root/'generated/amiga-hud.dwap').read_bytes()).hexdigest()
 assert re.search(r'extern "C" const UBYTE '+symbol+r'\[\]', header)
+assert re.search(r'extern "C" const unsigned char '+symbol+r'\[\]', ammo)
+assert f'end==source+{(root/"generated/amiga-hud.dwap").stat().st_size}' in ammo
 assert include.startswith(f'.globl {symbol}\n{symbol}:\n')
 assert include.endswith('.incbin "../generated/amiga-hud.dwap"\n')
 with tempfile.TemporaryDirectory(prefix='health-link-', dir=root/'tmp') as work:
@@ -38,4 +41,4 @@ with tempfile.TemporaryDirectory(prefix='health-link-', dir=root/'tmp') as work:
                     str(provider)], cwd=root/'amiga', check=True)
     mismatch = subprocess.run(command, capture_output=True, text=True)
     assert mismatch.returncode != 0 and symbol in mismatch.stderr, mismatch.stderr
-print('Health provenance: matching payload links; mismatched identity rejected')
+print('Health/ammo provenance: matching payload links; mismatched identity rejected')

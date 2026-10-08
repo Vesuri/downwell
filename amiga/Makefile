@@ -36,6 +36,7 @@ REFERENCE_DAMAGE_TEXT ?= 0
 REFERENCE_DAMAGE_BANK ?= 0
 REFERENCE_HEALTH_ART ?= 0
 REFERENCE_HEALTH_ADMISSION ?= 0
+REFERENCE_AMMO_ADMISSION ?= 0
 REFERENCE_GEM_POSITION ?= 0
 REFERENCE_EFFECT_COMPOSITION ?= 0
 REFERENCE_STYLE_SPRITES ?= 0
@@ -273,6 +274,9 @@ CFLAGS += -DDOWNWELL_REFERENCE_HEALTH_ART
 endif
 ifeq ($(REFERENCE_HEALTH_ADMISSION),1)
 CFLAGS += -DDOWNWELL_REFERENCE_HEALTH_ADMISSION
+endif
+ifeq ($(REFERENCE_AMMO_ADMISSION),1)
+CFLAGS += -DDOWNWELL_REFERENCE_AMMO_ADMISSION
 endif
 ifeq ($(REFERENCE_GEM_POSITION),1)
 CFLAGS += -DDOWNWELL_REFERENCE_GEM_POSITION
@@ -561,6 +565,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
 	@printf '%s\n' '$(REFERENCE_DAMAGE_BANK)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_HEALTH_ART)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_HEALTH_ADMISSION)' >> $@.tmp
+	@printf '%s\n' '$(REFERENCE_AMMO_ADMISSION)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_HUD_BORDER)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_CONTACT_MOTION)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_CONTACT_COORDINATES)' >> $@.tmp
@@ -655,7 +660,7 @@ $(REPO)/generated/amiga-health-source.inc: $(REPO)/generated/amiga-health-art.h
 	@test -f $@ || (cd $(REPO) && python3 tools/generate-amiga-health-art.py)
 
 .PHONY: verify-health-link
-verify-health-link: $(REPO)/generated/amiga-health-source.inc
+verify-health-link: $(REPO)/generated/amiga-health-source.inc $(REPO)/generated/amiga-ammo-factored.h
 	python3 $(REPO)/tests/amiga-health-link-test.py --assembler "$$(command -v $(AS))" --linker "$$( $(CC) -print-prog-name=ld )"
 
 obj/AmigaInput.o: $(AMIGA_SRC)/AmigaInput.cpp $(AMIGA_SRC)/AmigaInput.h

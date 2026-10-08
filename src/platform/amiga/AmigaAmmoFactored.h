@@ -2,6 +2,7 @@
 #define DOWNWELL_AMIGA_AMMO_FACTORED_H
 #include "AmigaRenderer.h"
 #include "core/AmmoGaugeRows.h"
+#include "core/Profile.h"
 #include "../../../generated/amiga-ammo-factored.h"
 extern volatile unsigned amigaAmmoFactoredMode;
 
@@ -11,6 +12,8 @@ extern volatile unsigned amigaAmmoFactoredMode;
 // compositor remains the fallback for edited rows, artwork and wider numbers.
 class AmigaAmmoFactored {
     const UBYTE* pack_ = nullptr;
+    const UBYTE* linkedCopy_ = nullptr;
+    const UBYTE* linkedCopyEnd_ = nullptr;
     UBYTE* destination_ = nullptr;
     bool matches_ = false, valid_ = false, uniform_ = false;
     unsigned capacity_ = 0, meter_ = 0, label_ = 0;
@@ -36,6 +39,7 @@ class AmigaAmmoFactored {
         return true;
     }
     static bool matches(const UBYTE* pack,const UBYTE* end) {
+        DW_PROFILE_SCOPE(profileAmmoArtAdmission);
         using namespace downwell_ammo_factored;
         if(!pack || end-pack<12 || !equal(pack,reinterpret_cast<const UBYTE*>("DWAP"),4) || read(pack+4)!=2)return false;
         const unsigned directory=read(pack+6),count=longWord(pack+8);
@@ -56,12 +60,29 @@ class AmigaAmmoFactored {
         return true;
     }
 public:
+    // Called only by the embedded bank's copy/residency owner. The complete
+    // immutable source is link-sealed; arbitrary packs still use matches().
+    void bindLinkedCopy(const UBYTE* source,const UBYTE* sourceEnd,
+                        const UBYTE* copy,const UBYTE* copyEnd) {
+#if defined(DOWNWELL_PLATFORM_AMIGA) && !defined(DOWNWELL_REFERENCE_AMMO_ADMISSION)
+        const bool accepted=downwell_ammo_factored::linkedSource(source,sourceEnd)&&
+            copy&&copyEnd&&copyEnd>=copy&&copyEnd-copy==sourceEnd-source;
+        if(pack_==linkedCopy_||pack_==copy)pack_=nullptr;
+        linkedCopy_=accepted?copy:nullptr;linkedCopyEnd_=accepted?copyEnd:nullptr;
+#else
+        (void)source;(void)sourceEnd;(void)copy;(void)copyEnd;
+#endif
+    }
     void invalidate() { valid_=uniform_=false;capacity_=0; }
     bool draw(AmigaRenderer* renderer,UBYTE* retained,const UBYTE* pack,const UBYTE* end,
               unsigned ammo,unsigned capacity,unsigned offset,const downwell::AmmoGaugeRows* rows,
               unsigned meter,unsigned& writes) {
         using namespace downwell_ammo_factored;
-        if(pack_!=pack){pack_=pack;matches_=matches(pack,end);invalidate();}
+        if(pack_!=pack){
+            pack_=pack;
+            matches_=(pack&&pack==linkedCopy_&&end==linkedCopyEnd_)||matches(pack,end);
+            invalidate();
+        }
         if(destination_!=renderer->hud){destination_=renderer->hud;invalidate();}
         if(!matches_ || !rows || !capacity || capacity>16 || ammo>capacity || ammo>=10 || meter>3 || offset>2){invalidate();return false;}
         const auto* boundaries=bounds[capacity-1];

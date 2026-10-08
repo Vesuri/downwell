@@ -271,6 +271,14 @@ def main(factored=False):
         text += array("labels","unsigned short",[[w for row in label for w in row] for label in label_words],24)
         text += array("sourceRecords","int",source_records,10)
         text += array("sourceBytes","unsigned char",source_bytes)
+        # The health-art generator seals the complete embedded HUD pack with
+        # this SHA-named label. A stale gauge table must fail at link time,
+        # rather than certify a different embedded pack by address alone.
+        source_symbol = "downwell_health_source_" + sha(pack)
+        text += (f'#ifdef DOWNWELL_PLATFORM_AMIGA\nextern "C" const unsigned char {source_symbol}[];\n'
+                 'inline bool linkedSource(const unsigned char* source,const unsigned char* end){\n'
+                 f'    return source=={source_symbol} && end==source+{len(pack)};\n'
+                 '}\n#endif\n')
         text += "}\n"
         output = text.encode()
         costs = dict(starts=len(starts)*2,bounds=16*17,configurations=len(configurations)*2,

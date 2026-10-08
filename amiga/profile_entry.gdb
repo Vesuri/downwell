@@ -11,6 +11,12 @@ end
 printf "PROFILE natural entry PROBES (instrumented); cold gameplay frame retained; clock_clamps=%lu\n", gDownwellProfileClockClamps
 printf "ROOM_PLAN startup bind: ticks=%lu ms=%.3f\n", gDownwellRoomPlanTicks, gDownwellRoomPlanTicks*20.0/80128.0
 printf "ENTRY results bank: eager_uploads=%lu discarded_for_entry=%lu results_frames=%lu\n", gDownwellEntryResultsUploads, gDownwellEntryResultsDiscarded, gDownwellEntryResultsFrames
+if @VERIFY_AMMO@
+    printf "ENTRY ammo pixels: checks=%lu failures=%lu prepared=%lu\n", gDownwellAmmoChecks, gDownwellAmmoFailures, gDownwellAmmoFactoredUses
+    if gDownwellAmmoChecks == 0 || gDownwellAmmoFailures != 0 || gDownwellAmmoFactoredUses == 0
+        quit 1
+    end
+end
 set $s = 0
 while $s < 4
     printf "SCENE %u frames=%lu fields=%lu max_gap=%lu max_frame_ms=%.3f worst_frame=%lu\n", $s, gDownwellProfileFrames[$s], gDownwellProfileFields[$s], gDownwellProfileMaxGap[$s], gDownwellProfileFrameMax[$s]*20.0/80128.0, gDownwellProfileWorstFrame[$s]

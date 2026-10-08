@@ -64,6 +64,7 @@ enum DownwellProfilePhase {
     profilePictureAmmoState,
     profilePictureBorderLeft, profilePictureBorderRight,
     profileHealthArtAdmission, profileHealthGlyphPreparation,
+    profileAmmoArtAdmission,
     profilePhaseCount
 };
 
