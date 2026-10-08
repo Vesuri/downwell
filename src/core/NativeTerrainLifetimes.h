@@ -3,6 +3,7 @@
 #include "TerrainOwnershipRuns.h"
 #include "PlacementNew.h"
 #include "WallEndStep.h"
+#include "PackedWallState.h"
 namespace downwell {
 // Identity and birth chronology: no duplicate spatial tree, room list, animation state or
 // raster cache. Generated source IDs remain unknown until the shared global
@@ -18,6 +19,9 @@ template<unsigned Capacity> class NativeTerrainLifetimes {
     unsigned next_=1,freeHint_=0;
     unsigned char flags_[Capacity]{};
     std::int16_t createSprite_[Capacity]{};
+    PackedWallState walls_[Capacity]{};
+    WallEndStepState* stepping_=nullptr;
+    InstanceHandle steppingHandle_{};
     bool good_=true;
 public:
     using Identity=typename Runs::Identity;
@@ -51,7 +55,9 @@ public:
     bool appearance(InstanceHandle h,int& sprite,unsigned& index,bool& created)const{
         if(!contains(h))return false;
         created=(flags_[h.slot]&32u)!=0;sprite=createSprite_[h.slot];
-        index=created&&runs_.object(h.slot)==93?23u:0u;return true;
+        index=created&&runs_.object(h.slot)==93?23u:0u;
+        if(created&&runs_.object(h.slot)==60){WallEndStepState state;if(!wallState(h,state))return false;index=state.imageIndex;}
+        return true;
     }
     bool cachedSprite(InstanceHandle h,int& sprite)const{
         if(!contains(h))return false;
@@ -76,24 +82,51 @@ public:
         }
         flags_[h.slot]=(flags_[h.slot]&3u)|32u|((spatial&8u)?4u:0u)|
             ((spatial&0x200u)?8u:0u)|((spatial&0x8000u)?16u:0u);
+        walls_[h.slot].store(WallEndStepState{});
         return true;
     }
     // Serialized creation code runs after object Create, before the next
     // room birth. Keep its application stage in the spare flags bit and its
     // immutable operand in the existing run identity, not a per-cell record.
     bool roomCreation(InstanceHandle h){
-        Identity id;WallEndStepState state;
-        if(!readIdentity(h,id)||!(flags_[h.slot]&32u)||
-            (id.creationCode!=-1&&(id.object!=60||!wallRoomCreation(id.creationCode,state))))return good_=false;
+        Identity id;
+        if(stepping_||!readIdentity(h,id)||!(flags_[h.slot]&32u))return good_=false;
+        WallEndStepState state=walls_[h.slot].load();
+        if(id.creationCode!=-1&&(id.object!=60||!wallRoomCreation(id.creationCode,state)))return good_=false;
+        if(!walls_[h.slot].store(state))return good_=false;
         flags_[h.slot]|=128u;return true;
     }
-    // Initial event state only. Live End Step mutations must have their own
-    // retained owner; never reconstruct a previously stepped wall with this.
+    // Initial event state only; wallState exposes retained End Step mutations.
+    // Never reconstruct a previously stepped wall with this initial snapshot.
     bool initialWallState(InstanceHandle h,WallEndStepState& state)const{
         Identity id;
         if(!readIdentity(h,id)||id.object!=60||!(flags_[h.slot]&32u))return false;
         state={};
         return !(flags_[h.slot]&128u)||wallRoomCreation(id.creationCode,state);
+    }
+    // Read-only inspection also exposes the retained failure prefix. Execution
+    // remains terminal after failure; stale handles never read a reused slot.
+    bool wallState(InstanceHandle h,WallEndStepState& state)const{
+        Identity id;if(!runs_.read(h,id)||id.object!=60||!(flags_[h.slot]&32u))return false;
+        state=stepping_&&h.slot==steppingHandle_.slot&&h.generation==steppingHandle_.generation?
+            *stepping_:walls_[h.slot].load();return true;
+    }
+    bool setWallDeactivation(InstanceHandle h,bool value){
+        WallEndStepState state;if(!good_||!wallState(h,state))return good_=false;
+        state.deactivate=value;
+        if(stepping_&&h.slot==steppingHandle_.slot&&h.generation==steppingHandle_.generation)*stepping_=state;
+        return walls_[h.slot].store(state)||(good_=false);
+    }
+    template<class Ops> bool wallEvent(InstanceHandle h,int area,GameMakerRandom& random,Ops& ops){
+        Identity id;WallEndStepState state;
+        if(stepping_||!readIdentity(h,id)||id.object!=60||!wallState(h,state))return good_=false;
+        if(flags_[h.slot]&3u)return true;
+        stepping_=&state;steppingHandle_=h;
+        const bool ok=wallEndStep(state,area,random,ops);
+        stepping_=nullptr;steppingHandle_={};
+        const bool retained=walls_[h.slot].store(state);
+        if(!ok||!retained||!good_)return good_=false;
+        return true;
     }
     unsigned size()const{return runs_.size();}
     unsigned runCount()const{return runs_.runCount();}
@@ -120,6 +153,7 @@ public:
         ++next_;freeHint_=slot+1;
         flags_[slot]=(active?0:2)|((spatial&8u)?4u:0u)|((spatial&0x200u)?8u:0u)|((spatial&0x8000u)?16u:0u);
         createSprite_[slot]=-2;
+        walls_[slot].store(WallEndStepState{});
         return true;
     }
     bool canAppend(unsigned count)const{
@@ -133,7 +167,7 @@ public:
         flags_[h.slot]|=1;return true;
     }
     bool retire(InstanceHandle h){
-        if(!good_||!runs_.contains(h)||!(flags_[h.slot]&1)||
+        if(stepping_||!good_||!runs_.contains(h)||!(flags_[h.slot]&1)||
             (binding_.retire&&!binding_.retire(binding_.context,h.slot))||!runs_.retire(h))return good_=false;
         if(h.slot<freeHint_)freeHint_=h.slot;
         return true;
@@ -141,6 +175,7 @@ public:
     // Room teardown invalidates every old key without resetting generations.
     // No bulk temporary on the Amiga task stack.
     bool clear(){
+        if(stepping_)return good_=false;
         if(!good_)return false;
         if(binding_.retire&&!runs_.visit([&](const Identity& id){return binding_.retire(binding_.context,id.handle.slot);}))return good_=false;
         runs_.~Runs();new(&runs_) Runs;freeHint_=0;return true;

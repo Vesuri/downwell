@@ -159,7 +159,7 @@ test: verify-wall-end-step
 verify-wall-end-step: build/wall-end-step-test
 	./build/wall-end-step-test
 	python3 tools/verify-wall-end-step.py build/wall-end-step-test
-build/wall-end-step-test: tests/core/WallEndStepTest.cpp src/core/GameMakerRandom.cpp src/core/WallEndStep.h
+build/wall-end-step-test: tests/core/WallEndStepTest.cpp src/core/GameMakerRandom.cpp src/core/WallEndStep.h src/core/NativeTerrainLifetimes.h src/core/PackedWallState.h
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
 

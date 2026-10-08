@@ -1,14 +1,32 @@
 #include "core/WallEndStep.h"
+#include "core/NativeTerrainLifetimes.h"
 #include <cassert>
 #include <vector>
 #include <cstdio>
 #include <cstring>
 using namespace downwell;
+using Native=NativeTerrainLifetimes<2>;
+static bool same(const WallEndStepState& a,const WallEndStepState& b){
+    return a.checked==b.checked&&a.pillar==b.pillar&&a.neighbors==b.neighbors&&
+        a.imageIndex==b.imageIndex&&a.checkThing==b.checkThing&&a.checkDistance==b.checkDistance&&
+        a.surrounded==b.surrounded&&a.deactivate==b.deactivate&&a.lights==b.lights;
+}
+static InstanceHandle prepare(Native& owner,int pillar){
+    assert(owner.append(60,240,160,true,100900,pillar<0?676:pillar>0?677:-1));
+    const auto h=owner.handle(0);assert(owner.createProperties(h,51)&&owner.roomCreation(h));return h;
+}
 struct Ops {
     unsigned neighbors=0,diagonals=0,places=0,points=0,flowers=0,tiles=0,destroys=0,deactivations=0;
     unsigned fail=0,calls=0;
     std::vector<int> trace;
-    bool call(int tag){trace.push_back(tag);return ++calls!=fail;}
+    Native* native=nullptr;InstanceHandle handle{};
+    const WallEndStepState* observed=nullptr;
+    std::vector<WallEndStepState> states;
+    bool call(int tag){
+        if(native){WallEndStepState s;assert(native->wallState(handle,s));states.push_back(s);}
+        else if(observed)states.push_back(*observed);
+        trace.push_back(tag);return ++calls!=fail;
+    }
     bool outOfView(){return call(1);}
     bool place(int x,int y,int object,bool& hit){
         const int dx[]={0,16,0,-16},dy[]={-16,0,16,0};
@@ -46,7 +64,7 @@ int main(int argc,char** argv){
     for(int area=0;area<6;++area)for(int pillar=-1;pillar<=1;++pillar)
     for(unsigned neighbors=0;neighbors<16;++neighbors)for(unsigned diagonals=0;diagonals<16;++diagonals){
         WallEndStepState state;state.pillar=pillar;
-        Ops ops;ops.neighbors=neighbors;ops.diagonals=diagonals;
+        Ops ops;ops.neighbors=neighbors;ops.diagonals=diagonals;ops.observed=&state;
         GameMakerRandom random(cases),oracle(cases);
         const int raw=pillar<0?left[neighbors]:pillar>0?right[neighbors]:int(neighbors);
         const bool enclosed=raw==15&&diagonals==15;
@@ -62,6 +80,36 @@ int main(int argc,char** argv){
             ops.flowers==unsigned(flower)&&!ops.tiles&&!ops.destroys);
         assert(random.drawCount()==oracle.drawCount()&&random.stateIndex()==oracle.stateIndex());
         for(unsigned i=0;i<16;++i)assert(random.stateWord(i)==oracle.stateWord(i));
+        Native native;const auto h=prepare(native,pillar);
+        GameMakerRandom nativeRandom(cases);Ops nativeOps;
+        nativeOps.native=&native;nativeOps.handle=h;nativeOps.neighbors=neighbors;nativeOps.diagonals=diagonals;
+        assert(native.wallEvent(h,area,nativeRandom,nativeOps));
+        WallEndStepState retained;assert(native.wallState(h,retained)&&same(retained,state));
+        assert(nativeOps.trace==ops.trace&&nativeOps.states.size()==ops.states.size());
+        for(unsigned i=0;i<ops.states.size();++i)assert(same(nativeOps.states[i],ops.states[i]));
+        for(unsigned i=0;i<16;++i)assert(nativeRandom.stateWord(i)==random.stateWord(i));
+        assert(nativeRandom.stateIndex()==random.stateIndex()&&nativeRandom.drawCount()==random.drawCount());
+        int sprite;unsigned frame;bool created;
+        assert(native.appearance(h,sprite,frame,created)&&created&&sprite==51&&frame==unsigned(state.imageIndex));
+        // A second and third event must consume retained state, not replay
+        // Create or the first four neighbor queries.
+        WallEndStepState following=state;
+        following.deactivate=true;assert(native.setWallDeactivation(h,true));
+        GameMakerRandom followingRandom=random;
+        for(unsigned pass=0;pass<2;++pass){
+            Ops followingOps,nativeFollowing;followingOps.observed=&following;
+            nativeFollowing.native=&native;nativeFollowing.handle=h;
+            assert(wallEndStep(following,area,followingRandom,followingOps)&&
+                native.wallEvent(h,area,nativeRandom,nativeFollowing));
+            assert(native.wallState(h,retained)&&same(retained,following)&&followingOps.trace==nativeFollowing.trace);
+            assert(followingOps.states.size()==nativeFollowing.states.size());
+            for(unsigned i=0;i<followingOps.states.size();++i)assert(same(followingOps.states[i],nativeFollowing.states[i]));
+            assert(nativeRandom.drawCount()==followingRandom.drawCount());
+        }
+        assert(native.markDestroyed(h)&&native.retire(h));
+        const auto replacement=prepare(native,0);
+        assert(replacement.slot==h.slot&&replacement.generation!=h.generation&&!native.wallState(h,retained));
+        assert(native.wallState(replacement,retained)&&same(retained,WallEndStepState{}));
         const auto emit=[&](unsigned phase,const Ops& o){
             if(!dump)return;
             std::printf("[%d,%d,%u,%u,%d,%u,[%d,%d,%d,%d,%d,%u,%u],%u,[",
@@ -88,6 +136,12 @@ int main(int argc,char** argv){
             assert(rejected.trace==std::vector<int>(ops.trace.begin(),ops.trace.begin()+fail));
             assert(r.drawCount()==unsigned(rejected.trace.back()==7));
             if(fail==(area==5?2u:1u))assert(partial.neighbors==0);
+            Native failed;const auto key=prepare(failed,pillar);GameMakerRandom nr(cases);
+            Ops rejectedNative;rejectedNative.neighbors=neighbors;rejectedNative.diagonals=diagonals;rejectedNative.fail=fail;
+            assert(!failed.wallEvent(key,area,nr,rejectedNative)&&!failed.valid());
+            WallEndStepState prefix;assert(failed.wallState(key,prefix)&&same(prefix,partial));
+            assert(rejectedNative.trace==rejected.trace&&nr.drawCount()==r.drawCount()&&nr.stateIndex()==r.stateIndex());
+            for(unsigned i=0;i<16;++i)assert(nr.stateWord(i)==r.stateWord(i));
         }
         ++cases;
     }
