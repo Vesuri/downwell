@@ -74,6 +74,16 @@ the outer failure latch. The source pose/audio/transition callback is still
 supplied explicitly; this does not enable natural player transitions or fill
 the missing native numeric-ID/scheduler dependencies.
 
+`BoneProjectile::stepInWorld` is the common publication/effect/view adapter for
+both worlds. Native `GameplayCollisionOwner::stepBone` resolves the shared
+registered lifetime selected by `dispatchStepPhase`, then calls
+`GameplayWorld::stepBoneRoomEffect`; it does not introduce a per-family walk.
+Health destruction creates the real registered object-219 impact, and leaves
+the bone readable until normal pre-Draw cleanup. Effect failure is terminal in
+both the world and collision owner. The phase caller must still supply the live
+player time-stop state and execute the other selected object families; this
+adapter does not replace the native world's existing mixed phase scheduler.
+
 The native `GameplayCollisionOwner` also binds the shared store as its own
 object-269 family. Its disjoint slot range does not overlap drone bullets;
 room animation and pre-Draw destruction cleanup resolve the same generation.

@@ -424,6 +424,15 @@ public:
             });
     }
     bool boneInView(downwell::InstanceHandle bone,bool& visible);
+    template<class Frames> bool stepBoneRoomEffect(downwell::InstanceHandle key,bool stopped,Frames frames){
+        if(!run_.effectsSucceeded||!bones_||!bones_->valid())return run_.effectsSucceeded=false;
+        const bool ok=bones_->dispatch(key,[&](auto& state,auto& publisher,bool& good){
+            return state.stepInWorld(stopped,publisher,
+                [&]{return spawnBoneImpact(key,frames);},
+                [&](bool& visible){return boneInView(key,visible);},good);
+        });
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
+    }
     template<class Frames> bool spawnBoneImpact(downwell::InstanceHandle bone,Frames frames){
         if(!run_.effectsSucceeded||!bones_||!scriptSpawnInstances_)return run_.effectsSucceeded=false;
         const auto* caller=bones_->find(bone);

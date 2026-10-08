@@ -1115,6 +1115,14 @@ public:
     GameplayTerrainInstances& terrain(){return terrain_;}
     GameplayWorld::DroneBullets& droneBullets(){return drones_;}
     GameplayWorld::Bones& bones(){return bones_;}
+    // Called for a selected ordinary Step event, never as a separate family
+    // walk. Preserve the shared handle until the resource owner resolves it.
+    template<class Frames> bool stepBone(InstanceHandle shared,bool stopped,Frames frames){
+        View::Kind kind;InstanceHandle local;
+        if(!valid()||!world_||!View::decode(shared,kind,local)||kind!=View::Kind::bone||
+           !resolves(shared))return check(false);
+        return check(world_->stepBoneRoomEffect(local,stopped,frames));
+    }
     // Caller-resident phase snapshot, shared by all twelve alarm indices.
     // advanceAndDispatch owns the actor's alarm storage: decrement once and
     // execute the selected event synchronously only on reaching zero. Objects

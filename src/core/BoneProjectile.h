@@ -165,6 +165,21 @@ struct BoneProjectile {
         if(!visible&&!destroyPublished(ops,good))return false;
         return true;
     }
+    // Both world owners use their real publication, impact and view adapters.
+    // The selected room event supplies pTimeStop after player Begin Step.
+    template<class Publisher,class Effect,class View>
+    bool stepInWorld(bool stopped,Publisher& publisher,Effect effect,View view,bool& good){
+        struct Ops {
+            Publisher& publish;Effect& spawn;View& query;
+            bool imageSpeed(RunnerImageValue value){return publish.imageSpeed(value);}
+            bool position(RunnerImageValue x,RunnerImageValue y){return publish.position(x,y);}
+            bool mask(int id){return publish.mask(id);}
+            bool destroy(){return publish.destroy();}
+            bool effect(int sprite,int tenths){return sprite==85&&tenths==3&&spawn();}
+            bool inView(int,int,bool& visible){return query(visible);}
+        } ops{publisher,effect,view};
+        return stepPublished(stopped,ops,good);
+    }
     template<class Ops> bool collideWallPublished(Ops& ops,bool& good){
         return destroyPublished(ops,good)&&(ops.effect(85,3)||(good=false));
     }

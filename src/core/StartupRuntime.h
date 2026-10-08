@@ -528,16 +528,7 @@ public:
         return withBoneEvents(bones,[&](InstanceHandle key,auto& state,auto& publisher,auto&,bool& good){
             auto impact=[&](){return spawnBoneImpact(bones,key,frames);};
             auto view=[&](bool& visible){return boneInView(bones,key,visible);};
-            struct Ops {
-                decltype(publisher) publish;decltype(impact)& spawn;decltype(view)& query;
-                bool imageSpeed(RunnerImageValue value){return publish.imageSpeed(value);}
-                bool position(RunnerImageValue x,RunnerImageValue y){return publish.position(x,y);}
-                bool mask(int id){return publish.mask(id);}
-                bool destroy(){return publish.destroy();}
-                bool effect(int sprite,int tenths){return sprite==85&&tenths==3&&spawn();}
-                bool inView(int,int,bool& visible){return query(visible);}
-            } ops{publisher,impact,view};
-            return state.stepPublished(stop.player.stopped,ops,good);
+            return state.stepInWorld(stop.player.stopped,publisher,impact,view,good);
         },[&]{return stepWithTimeStopEffects(shards,changes,stop,input,false,transition,collisions);});
     }
     // Explicit Begin Step boundary; the scheduler supplies synchronous audio,

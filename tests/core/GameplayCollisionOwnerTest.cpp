@@ -2830,6 +2830,29 @@ int main(){
         checkRegisteredSkeletonThrows(*throwWorld,[&](auto& caller,bool separated,int facing,bool& shot,auto sound){
             return throwWorld->throwRegisteredBoneWithSourceId(throwId++,caller,240,200,separated,facing,shot,sound);
         },[&](InstanceHandle key){return throwOwner->bones().find(key);},[&]{return throwOwner->bones().clear();});
+        {
+            auto stoppedOwner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+                GameplayTerrainInstances::WallCollision{},&rooms,ownership);
+            auto stoppedWorld=std::make_unique<GameplayWorld>(300,false,0,false,stoppedOwner->enemyBinding(),
+                stoppedOwner->breakableBinding(),stoppedOwner->playerBinding(),&stoppedOwner->terrain());
+            assert(stoppedOwner->attach(*stoppedWorld));InstanceHandle bone,selected;
+            assert(stoppedWorld->createBoneWithSourceId(405300,240,100,bone)&&
+                GameplayCollisionView::encode(GameplayCollisionView::Kind::bone,bone,selected));
+            auto& stoppedBones=stoppedOwner->bones();
+            assert(stoppedBones.dispatch(bone,[](auto& state,auto&,bool&){state.health=0;return true;}));
+            const auto countFrames=[&](int sprite,unsigned& count){return sprites.frameCount(sprite,count);};
+            const auto draws=stoppedWorld->randomDrawCount();
+            for(unsigned tick=0;tick<3;++tick){
+                assert(stoppedOwner->stepBone(selected,true,countFrames));
+                const auto* retained=stoppedBones.find(bone);
+                assert(retained&&!retained->destroyRequested&&retained->state.motion.x==240&&
+                    retained->state.motion.y==100&&!retained->state.imageSpeed.bits&&
+                    stoppedWorld->scriptEffects().size()==0&&stoppedWorld->randomDrawCount()==draws);
+            }
+            assert(stoppedOwner->stepBone(selected,false,countFrames)&&stoppedBones.find(bone)->destroyRequested&&
+                stoppedWorld->scriptEffects().size()==1&&stoppedWorld->randomDrawCount()==draws&&
+                stoppedOwner->prepareDraw()&&!stoppedBones.find(bone));
+        }
         auto& bones=owner->bones();InstanceHandle local,shared;
         const auto before=world->randomDrawCount();auto random=world->randomState();BoneProjectile reference;
         assert(reference.create(240,990,random)&&world->createBoneWithSourceId(405190,240,990,local)&&
@@ -2879,10 +2902,7 @@ int main(){
         }
         // Death body uses the registered impact owner and published view.
         unsigned effects=0,effectLocal=0;
-        auto emit=[&](){
-            const auto before=world->randomDrawCount();
-            assert(world->spawnBoneImpact(local,[&](int sprite,unsigned& frames){return sprites.frameCount(sprite,frames);})&&
-                world->randomDrawCount()==before);
+        auto verifyImpact=[&](){
             const auto* caller=bones.find(local);assert(caller&&caller->myFxLocal&&!caller->myFxSourceId);
             effectLocal=caller->myFxLocal;
             const auto* effect=world->scriptEffects().get(effectLocal);
@@ -2892,20 +2912,16 @@ int main(){
                 effect->x.bits==caller->x.bits&&effect->y.bits==caller->y.bits);
             return true;
         };
-        auto view=[&](bool& visible){return world->boneInView(local,visible);};
-        assert(bones.dispatch(local,[&](auto& state,auto& publish,bool& good){
-            state.health=0;
-            struct Ops {
-                decltype(publish) publisher;unsigned& effects;decltype(emit)& spawn;decltype(view)& query;
-                bool imageSpeed(RunnerImageValue v){return publisher.imageSpeed(v);}
-                bool position(RunnerImageValue x,RunnerImageValue y){return publisher.position(x,y);}
-                bool mask(int id){return publisher.mask(id);}
-                bool destroy(){return publisher.destroy();}
-                bool effect(int id,int speed){assert(id==85&&speed==3);++effects;return spawn();}
-                bool inView(int,int,bool& visible){return query(visible);}
-            } ops{publish,effects,emit,view};
-            return state.stepPublished(false,ops,good);
-        }));
+        assert(bones.dispatch(local,[](auto& state,auto&,bool&){state.health=0;return true;}));
+        auto bonePhase=std::make_unique<RunnerStepSnapshot<GameplayCollisionView::capacity>>();
+        const auto beforeStepRng=world->randomDrawCount();
+        assert(owner->dispatchStepPhase(0,*bonePhase,[&](InstanceHandle selected,const PackedObjectEvent&){
+            GameplayCollisionView::Kind kind;InstanceHandle child;
+            assert(GameplayCollisionView::decode(selected,kind,child));
+            if(kind!=GameplayCollisionView::Kind::bone)return true;
+            assert(child.slot==local.slot&&child.generation==local.generation);++effects;
+            return owner->stepBone(selected,false,[&](int sprite,unsigned& count){return sprites.frameCount(sprite,count);});
+        })&&world->randomDrawCount()==beforeStepRng&&verifyImpact());
         assert(effects==1&&bones.find(local)->destroyRequested&&bones.find(local)->active&&
             !bones.find(local)->state.active&&GameplayCollisionView(*world).contains(shared));
         if(ownership==GameplayCollisionOwner::Ownership::reference)
@@ -2918,7 +2934,9 @@ int main(){
         assert(world->bones()==&bones&&!bones.find(retained)&&bones.size()==0&&owner->valid());
         InstanceHandle replacement;assert(world->createBoneWithSourceId(405192,240,990,replacement)&&
             replacement.generation>retained.generation&&!bones.find(local));
-        assert(bones.markDestroyed(replacement));
+        assert(bones.dispatch(replacement,[](auto& state,auto&,bool&){state.health=0;return true;}));
+        InstanceHandle replacementShared;
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::bone,replacement,replacementShared));
         const auto beforeFailureRng=world->randomDrawCount();unsigned lookups=0;
         auto rejectSprite=[&](int sprite,unsigned&){
             ++lookups;const auto* caller=bones.find(replacement);
@@ -2926,9 +2944,9 @@ int main(){
                 world->scriptSpawnInstances()->find(world->scriptSpawnInstances()->handle(caller->myFxLocal)));
             return false;
         };
-        assert(!world->spawnBoneImpact(replacement,rejectSprite)&&!world->effectsSucceeded()&&
+        assert(!owner->stepBone(replacementShared,false,rejectSprite)&&!world->effectsSucceeded()&&
             world->randomDrawCount()==beforeFailureRng&&world->scriptEffects().size()==1);
-        assert(!world->spawnBoneImpact(replacement,rejectSprite)&&lookups==1&&world->scriptEffects().size()==1);
+        assert(!owner->stepBone(replacementShared,false,rejectSprite)&&lookups==1&&world->scriptEffects().size()==1);
     }
     {
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
