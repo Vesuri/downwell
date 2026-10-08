@@ -639,6 +639,24 @@ to subsequent queries. Integer `dflash=-1` is false in the runner and permits
 The compositor remains a required checked callback: this boundary alone is not
 live shaded currency rendering or native Draw integration.
 
+### Currency Alarm 4 activation audit
+
+Currency Alarm 4 contains a separate motion program: hard gravity while rising,
+uncapped gravity otherwise, decaying bounce gain, no water drag, and a final
+`alarm[4]=stepRate` rearm. It must not be substituted for ordinary Step.
+However, the pinned currency Create starts alarms 0 and 3, not 4. Ordinary
+Step's variable-index freeze loop covers only 0 through 3. The complete export's
+literal alarm-4 writers are its own rearm, FINALBOSS, BatteryCharge, Result,
+Credit, and `scrCheckInWater`. The latter has one bytecode call site, in player
+Begin Step; it does not activate currency's alarm. The source verifier checks
+that writer/call-site census so a changed export forces another review.
+
+There is no identified natural activation path for currency Alarm 4 in these
+reviewed sources. This is not a proof for arbitrary variable-index writes or
+external mutation. The checked scheduler therefore continues to require an
+explicit handler if that event is actually reached; do not initialize it or
+route it to ordinary Step merely to supply otherwise-unused behavior.
+
 `visitRegisteredCurrencyDraw` enters that boundary through the stored world's
 source layer traversal, preserving its effective depth and active/destroyed
 filtering. `CurrencyDraw` then uses the shared `drawFx` placement rules for the
