@@ -43,6 +43,7 @@ for name, digest in {
     assert b"random" not in payload and b"choose" not in payload
 skeleton_object = manifest["resources"]["objects"][120]
 for name, digest in (
+    ("enmSkeleton_Step_2", "71aaac10eef02f61e15327032a995fe459f49451cd38b8434e071ec96268b315"),
     ("enmSkeleton_Collision_objPlayer_n", "b72959eb0f50c30ffbdbfe23302a48bbb6791e19acc540291b861958d87d1f53"),
     ("subparentEnemy_Collision_parentTimeField", "03d79d845b4e318d58b395ae57c65e519c181cd56c4478fdb86301fcd1168409"),
 ):

@@ -222,8 +222,8 @@ int main(){
             require(selected.generation==key.generation,"resolve skeleton generation in each room event");
             if(phase==StartupRuntime::SkeletonPhase::step)++steps;else ++ends;return true;
         },[&]{return world->stepWithCollisionPass(Input{},false,[]{return true;});});};
-        require(tick()&&steps==1&&ends==1&&record->alarms.get(2)==1&&actor->state.shot,"first shared skeleton tick");
-        require(tick()&&steps==2&&ends==2&&!actor->state.shot&&record->alarms.get(2)==0&&record->alarms.get(3)==14&&
+        require(tick()&&steps==1&&ends==0&&record->alarms.get(2)==1&&actor->state.shot,"first shared skeleton tick");
+        require(tick()&&steps==2&&ends==0&&!actor->state.shot&&record->alarms.get(2)==0&&record->alarms.get(3)==14&&
             record->imageIndex==0,"skeleton alarm decrements once and later slot sees same-phase write");
         require(skeletons.dispatch(key,[](auto& state,auto&,bool&){state.hitPending=true;return true;}),"hit source skeleton");
         unsigned hurts=0;QuietSkeletonEffects effects{hurts};
@@ -329,6 +329,25 @@ int main(){
         }
         require(throws==1&&!hurts&&bones.instances().size()==1&&stop.reset()&&bones.clear()&&skeletons.clear(),
             "animation drives one registered source throw without invented death effects");
+    }
+    for(int offset:{-161,-160,3000,3001}){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            InstanceLifecycleBinding::bindPointQueries(*owner));
+        require(owner->attach(*world),"attach skeleton End Step world");world->skipToGameForTesting();
+        auto skeletons=world->skeletonRegistration<1>();InstanceHandle key;
+        require(world->spawnSkeleton(skeletons,240,192,key),"register view-retirement skeleton");
+        RunnerImageValue x,y;require(x.assignInteger(240)&&y.assignInteger(world->mainCameraRenderViewY()+offset),"published view boundary");
+        require(skeletons.dispatchPublished(key,[&](auto&,auto&,auto& publish,bool&){return publish.position(x,y);}),"publish End Step position");
+        const auto sourceId=skeletons.instances().find(key)->sourceId;
+        unsigned endCallbacks=0;
+        require(world->withSkeletonPublishedEvents(skeletons,[&](auto,auto phase,auto&,auto&,auto&,bool&){
+            endCallbacks+=phase==StartupRuntime::SkeletonPhase::endStep;return true;
+        },[&]{world->step({});return world->effectsSucceeded();}),"real room tick owns skeleton End Step");
+        const bool retire=offset==-161||offset==3001;
+        require(!endCallbacks&&bool(world->instance(sourceId))==!retire&&skeletons.instances().size()==unsigned(!retire),
+            "strict source view boundaries retire through both owners, not external no-op callbacks");
+        require(skeletons.clear(),"clear view boundary fixture");
     }
     for(unsigned mode=0;mode<8;++mode){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);

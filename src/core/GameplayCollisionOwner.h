@@ -785,18 +785,19 @@ public:
             boxAllocation_.active=true;
         }
 #endif
-        world.configureDroneEndStep([](void* context,long topQ12){
+        world.configureRegisteredActorEndStep([](void* context,long topQ12){
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
             if(!self.valid())return false;
-            if(!self.drones_.size())return true;
+            if(!self.drones_.size()&&!self.skeletons_.size())return true;
             MotionBinary64 top;
             if(!multiplyBinary64(MotionBinary64::fromInteger(topQ12),{0x3f300000u,0},top))return self.check(false);
-            return self.check(self.visitRegistered(View::droneBase,View::boneBase,
+            return self.check(self.visitRegistered(View::droneBase,View::capacity,
                 [&](InstanceHandle shared,int object,std::uint32_t flags){
-                    if(flags&0x100003u)return true;
+                    if((flags&0x100003u)||object==269)return true; // Bones have no End Step.
                     View::Kind kind;InstanceHandle local;
-                    return object==266&&View::decode(shared,kind,local)&&kind==View::Kind::drone&&
-                        self.drones_.endStep(local,top,MotionBinary64::fromInteger(284),true);
+                    if(!View::decode(shared,kind,local))return false;
+                    if(object==120&&kind==View::Kind::skeleton)return self.skeletons_.endStep(local,top,true);
+                    return object==266&&kind==View::Kind::drone&&self.drones_.endStep(local,top,MotionBinary64::fromInteger(284),true);
                 }));
         },this);
         world.configureRoomActorDraw([](const void* context,GameplayWorld::DrawActorVisitor visit,void* visitor){

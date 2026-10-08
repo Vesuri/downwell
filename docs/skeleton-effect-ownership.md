@@ -38,6 +38,18 @@ these entry points do not enable natural
 generation or silently substitute a no-op event. Engine activation is separate
 from custom skeleton `active`.
 
+The registered skeleton owner also implements End Step's sole call,
+`scrOutofview`, from published Y and the previous camera view. The strict bounds
+are view Y minus 160 and plus 3000, gated by room 11. It marks destruction and
+leaves cleanup to the world; it neither sets health to zero nor runs rewards or
+death effects. The stored skeleton scope owns this phase internally rather than
+delegating it to the external ordinary-Step callback. The native registered-actor
+End Step pass includes it beside drone retirement and ignores bones, which have
+no End Step event. Empty stores avoid that pass. Both adapters preserve the
+published Q12 view when converting to the source numeric representation; the
+stored adapter currently admits only the main room. This does not establish full
+cross-family phase ordering or dirty-camera behavior outside the admitted path.
+
 `SkeletonActor::stepPublished` runs the checked ordinary Step through that
 publisher. Image-speed and alarm writes also reach stored builtin fields before
 sound or child-creation callbacks. It preserves activation, hit-stun writes,

@@ -2824,6 +2824,20 @@ int main(){
         auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
         assert(owner->attach(*world));
+        for(int offset:{-161,-160,3000,3001}){
+            auto retired=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+                GameplayTerrainInstances::WallCollision{},&rooms,ownership);
+            auto scene=std::make_unique<GameplayWorld>(300,false,0,false,retired->enemyBinding(),
+                retired->breakableBinding(),retired->playerBinding(),&retired->terrain());
+            assert(retired->attach(*scene));InstanceHandle key;
+            assert(scene->createSkeletonWithSourceId(505080,240,192,key));
+            RunnerImageValue x,y;assert(x.assignInteger(240)&&y.assignInteger(34+scene->cameraOffsetY()+offset));
+            assert(retired->skeletons().dispatchPublished(key,[&](auto&,auto&,auto& publish,bool&){return publish.position(x,y);}));
+            scene->step(0);const auto* actor=retired->skeletons().find(key);
+            const bool destroy=offset==-161||offset==3001;
+            assert(scene->effectsSucceeded()&&actor&&actor->destroyRequested==destroy&&actor->state.health==60);
+            assert(retired->prepareDraw()&&bool(retired->skeletons().find(key))==!destroy);
+        }
         for(unsigned mode=0;mode<8;++mode){
             auto contacts=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
                 GameplayTerrainInstances::WallCollision{},&rooms,ownership);

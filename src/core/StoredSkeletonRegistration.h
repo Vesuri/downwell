@@ -46,6 +46,11 @@ public:
         :records_(records),objects_(objects),lifecycle_(lifecycle),nextId_(nextId),room_(room),good_(good){}
     StoredSkeletonRegistration(const StoredSkeletonRegistration&)=delete;
     bool belongsTo(const InstanceStore<WorldCapacity>& records)const{return &records_==&records;}
+    bool endStep(InstanceHandle key,MotionBinary64 top,bool mainRoom){
+        // End Step only publishes destruction. Do not copy older shared alarm
+        // values back over the room scheduler's already-decremented clocks.
+        return good_&&(store_.endStep(key,top,mainRoom)||fail());
+    }
     bool valid(){
         if(!good_||!store_.valid())return false;
         for(auto& e:entries_)if(e.id&&(!record(e)||!store_.find(e.local)))return false;

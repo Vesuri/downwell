@@ -119,6 +119,13 @@ public:
         }
         bool destroy(){return store_.markDestroyed(key_);}
     };
+    bool endStep(InstanceHandle key,MotionBinary64 viewY,bool mainRoom){
+        return dispatchPublished(key,[&](auto&,auto&,auto& publish,bool& good){
+            const auto* record=find(key);bool retire=false;
+            if(!record||!outOfViewRetirement(record->y.promoted(),viewY,mainRoom,retire))return good=false;
+            return !retire||publish.destroy()||(good=false);
+        });
+    }
     template<class Event> bool dispatchPublished(InstanceHandle key,Event event){
         return dispatch(key,[&](auto& state,auto& throwing,bool& good){
             Publisher publish(*this,key);return event(state,throwing,publish,good);

@@ -334,6 +334,12 @@ public:
             if(phase==SkeletonPhase::animation)return registration.advanceAnimation(key);
             if(phase==SkeletonPhase::alarm)return registration.alarm(key,index);
             if(phase==SkeletonPhase::cleanup)return registration.retire(key);
+            if(phase==SkeletonPhase::endStep){
+                if(roomId_!=mainRoomId)return false;
+                MotionBinary64 top;
+                if(!multiplyBinary64(MotionBinary64::fromInteger(ordinaryStepViewTopQ12_),{0x3f300000u,0},top))return false;
+                return registration.endStep(key,top,true);
+            }
             return registration.dispatchPublished(key,[&](auto& actor,auto& throwing,auto& publish,bool& good){
                 return execute(key,phase,actor,throwing,publish,good);
             });
