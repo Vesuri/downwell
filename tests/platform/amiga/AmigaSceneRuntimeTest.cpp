@@ -47,6 +47,7 @@ struct LiveSceneWorld {
     AmigaPortRuntime* runtime = nullptr;
     AmigaTerrainTiles tiles;
     AmigaGameplayGeneration generation;
+    downwell::GameplayDitherAbove adoptedDither;
 
     LiveSceneWorld(const downwell::BuilderPatternPack& pack,
                    const downwell::ObjectPack& definitions)
@@ -84,7 +85,20 @@ struct LiveSceneWorld {
             require(builder.resetFromRoomEntry(entry->mainBuilderState()),
                     "live room entry imports generator before any terrain emission");
             port.configureEnemyRandom(entry->randomState());
-            require(generation.loadRoom(port,rooms,room,&prepared),"adopted entry does not repeat field Create");
+            downwell::GameplayDitherAbove::Snapshot dither;
+            if(!entry->captureDitherAbove(dither))for(unsigned i=0;i<entry->activeInstanceCount();++i){
+                const auto& r=entry->instanceAt(i);if(r.objectId!=61)continue;
+                std::cerr<<"DITHER adoption rejected: "<<r.instanceId<<" room="<<r.roomId<<" sprite="<<r.spriteId
+                    <<" mask="<<r.maskId<<" depth="<<r.depth<<" scale="<<r.scaleX<<','<<r.scaleY
+                    <<" angle="<<r.rotation<<" pending="<<r.activationPending<<'\n';
+            }
+            require(entry->captureDitherAbove(dither),"capture stored controller builtins");
+            if(!port.ditherAbove())require(port.bindDitherAbove(adoptedDither),"unindexed scene owns adopted controller");
+            require(generation.adoptRoom(port,rooms,room,dither,&prepared),"adopted entry does not repeat field Create");
+            const auto* imported=port.ditherAbove()->find(port.ditherAbove()->handle());
+            require(dither.sourceId?(imported&&imported->sourceId==dither.sourceId&&
+                imported->x.bits==dither.x.bits&&imported->y.bits==dither.y.bits):!imported,
+                "room handoff retains controller presence and published coordinates");
         } else if (continuing) {
             require(port.resetAreaOneBuilder(builder, -16, 704), "native continuation initializes the current level on its owned RNG");
             require(generation.loadRoomWithStartField(port,rooms,room,&prepared),"continuation field follows authored room order");
@@ -783,6 +797,27 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
         }
     }
 
+    {
+        downwell::StartupRuntime entry(downwell::PlatformProfile::nonDesktop,&rooms,&objects,42,&patterns);
+        entry.skipToGameForTesting();
+        entry.configureDitherAboveEnvironment(true,false);
+        for(unsigned tick=0;tick<40;++tick)entry.step(0);
+        downwell::GameplayDitherAbove::Snapshot state;
+        require(entry.captureDitherAbove(state)&&state.sourceId==100854&&state.lowSpec&&!state.ending,
+            "capture advanced dither and normalized environment");
+        downwell::GameplayDitherAbove actor;
+        AmigaPortRuntime imported(300,false,1201-176,true);
+        require(imported.bindDitherAbove(actor)&&imported.adoptDitherAbove(state),"adopt advanced controller");
+        const auto* r=actor.find(actor.handle());
+        require(r&&r->x.bits==state.x.bits&&r->y.bits==state.y.bits&&state.x.bits!=0x44080000u,
+            "advanced published position is not the authored 544,-80 position");
+        entry.configureDitherAboveEnvironment(true,true);
+        entry.step(0);
+        require(entry.captureDitherAbove(state)&&!state.sourceId&&state.ending,
+            "retired controller stays absent in room snapshot");
+        downwell::GameplayDitherAbove absent;
+        require(absent.adopt(state)&&!absent.handle().generation,"adoption does not recreate a retired controller");
+    }
     // Exercise a real room-entry handoff, not only the seed-2 capture used by
     // the native intro. Create and garden RNG consumption belongs to startup;
     // importing it must neither reconstruct nor consume those draws again.

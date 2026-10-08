@@ -27,7 +27,7 @@
 #include "StoredTimeShardRegistration.h"
 #include "StoredTimeChangeRegistration.h"
 #include "StoredEntryDitherRegistration.h"
-#include "DitherAboveStep.h"
+#include "GameplayDitherAbove.h"
 #include "StoredDroneBulletRegistration.h"
 #include "StoredBoxChainPublication.h"
 #include "StoredCurrencyRegistration.h"
@@ -287,6 +287,7 @@ public:
     void configureDitherAboveEnvironment(bool lowSpec,bool ending){
         ditherAboveLowSpec_=lowSpec;ditherAboveEnding_=ending;
     }
+    bool captureDitherAbove(GameplayDitherAbove::Snapshot& snapshot)const;
     bool deactivateWall(InstanceHandle h){
         const auto* r=instances_.resolve(h);
         if(!run_.effectsSucceeded||!r||r->objectId!=60)return run_.effectsSucceeded=false;

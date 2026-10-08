@@ -12,6 +12,13 @@ bool AmigaGameplayGeneration::loadRoom(AmigaPortRuntime& runtime,
     },prepared);
 }
 
+bool AmigaGameplayGeneration::adoptRoom(AmigaPortRuntime& runtime,
+    const downwell::RoomPack& rooms,const downwell::PackedRoom& room,
+    const downwell::GameplayDitherAbove::Snapshot& dither,
+    const downwell::PreparedRoomTerrain* prepared,AmigaRoomTerrainPlan* backend){
+    return runtime.adoptDitherAbove(dither)&&loadRoom(runtime,rooms,room,prepared,backend);
+}
+
 bool AmigaGameplayGeneration::loadRoomWithStartField(AmigaPortRuntime& runtime,
     const downwell::RoomPack& rooms,const downwell::PackedRoom& room,
     const downwell::PreparedRoomTerrain* prepared,AmigaRoomTerrainPlan* backend){

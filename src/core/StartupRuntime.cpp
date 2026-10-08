@@ -1557,6 +1557,27 @@ bool StartupRuntime::publishDitherAboveCoordinate(InstanceHandle key,bool vertic
     return true;
 }
 
+bool StartupRuntime::captureDitherAbove(GameplayDitherAbove::Snapshot& snapshot)const{
+    if(!run_.effectsSucceeded||roomId_!=mainRoomId)return false;
+    GameplayDitherAbove::Snapshot result;
+    result.lowSpec=ditherAboveLowSpec_;result.ending=ditherAboveEnding_;
+    for(unsigned i=0;i<instances_.size();++i){
+        const auto& r=instances_.at(i);
+        if(r.objectId!=61)continue;
+        // The native typed actor supports the authored appearance. Do not
+        // silently discard pending activation or a changed transform/depth.
+        // rmMain places this instance on compatibility layer 32 (-100000),
+        // not the OBJT default depth (0).
+        if(result.sourceId||!r.instanceId||r.roomId!=mainRoomId||r.activationPending||
+            r.spriteId!=128||r.maskId!=-1||r.scaleX!=1||r.scaleY!=1||r.rotation!=0||r.depth!=-100000)
+            return false;
+        result.sourceId=r.instanceId;result.active=r.active;result.destroyRequested=r.destroyRequested;
+        std::memcpy(&result.x.bits,&r.preciseX,4);std::memcpy(&result.y.bits,&r.preciseY,4);
+        if(!SequenceTimeline::valid(result.x)||!SequenceTimeline::valid(result.y))return false;
+    }
+    snapshot=result;return true;
+}
+
 bool StartupRuntime::stepDitherAbove(InstanceRecord& instance){
     if(!run_.effectsSucceeded)return false;
     const auto slot=static_cast<std::size_t>(&instance-&instances_.at(0));

@@ -264,6 +264,10 @@ public:
     const downwell::GameplayEntryDithers* entryDithers()const{return entryDithers_;}
     const downwell::GameplayDitherAbove* ditherAbove()const{return ditherAbove_;}
     void configureDitherAboveEnvironment(bool lowSpec,bool ending){ditherLowSpec_=lowSpec;ditherEnding_=ending;}
+    bool adoptDitherAbove(const downwell::GameplayDitherAbove::Snapshot& snapshot){
+        if(!run_.effectsSucceeded||!ditherAbove_||!ditherAbove_->adopt(snapshot))return run_.effectsSucceeded=false;
+        configureDitherAboveEnvironment(snapshot.lowSpec,snapshot.ending);return true;
+    }
     bool bindDitherAbove(downwell::GameplayDitherAbove& actor){
         if(ditherAbove_||!actor.valid()||actor.handle().generation)return false;
         ditherAbove_=&actor;return true;

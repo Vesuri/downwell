@@ -2225,6 +2225,35 @@ int main(){
         assert(!world->createAuthoredDitherAbove()&&!world->effectsSucceeded()&&
             world->ditherAbove()->find(replacement)->sourceId==100854);
     }
+    for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+        GameplayCollisionOwner::Ownership::nativeScenery})for(unsigned mode=0;mode<4;++mode){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
+            GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&rooms,ownership);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain(),&rooms);
+        assert(owner->attach(*world));
+        GameplayDitherAbove::Snapshot source;
+        source.sourceId=mode==3?0:100854;source.x.bits=0x43708000u;source.y.bits=0xc1fa0000u;
+        source.active=mode!=1;source.destroyRequested=mode==2;source.lowSpec=true;
+        const auto random=world->randomDrawCount();
+        assert(world->adoptDitherAbove(source)&&world->randomDrawCount()==random);
+        const auto key=world->ditherAbove()->handle();
+        const auto* r=world->ditherAbove()->find(key);
+        if(mode==3){assert(!r);continue;}
+        assert(r&&r->sourceId==source.sourceId&&r->x.bits==source.x.bits&&r->y.bits==source.y.bits&&
+            r->active==source.active&&r->destroyRequested==source.destroyRequested);
+        InstanceHandle shared;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::ditherAbove,key,shared));
+        if(ownership==GameplayCollisionOwner::Ownership::reference)
+            assert(owner->state(shared)->x.bits==source.x.bits&&owner->state(shared)->y.bits==source.y.bits);
+        assert(owner->prepareDraw());
+        if(mode==2){assert(!world->ditherAbove()->find(key));continue;}
+        checkReadOnlyDraw(*world);
+        world->step(0);assert(world->effectsSucceeded());
+        r=world->ditherAbove()->find(key);assert(r);
+        // Adoption keeps fractional coordinates until the next eligible
+        // source event. Inactive controllers do not run that event.
+        assert(mode==1?(r->x.bits==source.x.bits&&r->y.bits==source.y.bits):r->y.bits!=source.y.bits);
+    }
     {
         auto layers=std::make_unique<GameplayRoomLayers<8>>(&rooms);bool healthy=true;
         layers->observeFailure(healthy);assert(healthy&&layers->prepare());

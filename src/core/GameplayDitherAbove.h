@@ -14,6 +14,13 @@ public:
         bool active=true,destroyRequested=false;
     };
     using Binding=RecordLifecycleBinding<Record>;
+    // Source numeric identity and published builtins, never a source pool key.
+    // A zero ID denotes an absent (already retired) controller.
+    struct Snapshot {
+        unsigned sourceId=0;
+        RunnerImageValue x{},y{};
+        bool active=true,destroyRequested=false,lowSpec=false,ending=false;
+    };
     explicit GameplayDitherAbove(Binding binding={}):binding_(binding){}
     bool valid()const{return good_;}
     InstanceHandle handle()const{return {0,record_.lifetimeId};}
@@ -27,6 +34,21 @@ public:
         // Create's only script write is material="foliage"; this typed
         // actor has that material invariant and no additional RNG or setters.
         return true;
+    }
+    bool adopt(const Snapshot& source){
+        if(!good_||record_.lifetimeId)return fail();
+        if(!source.sourceId)return true;
+        auto valid=[](RunnerImageValue v){
+            const unsigned e=(v.bits>>23)&255u;
+            return e!=255u&&(e!=0u||!(v.bits&0x7fffffu));
+        };
+        if(!next_||source.sourceId>0x7fffffffu||!valid(source.x)||!valid(source.y))return fail();
+        record_={};record_.sourceId=source.sourceId;record_.lifetimeId=next_++;
+        record_.x=source.x;record_.y=source.y;record_.active=source.active;
+        if(!binding_.birth(handle(),record_))return fail();
+        // Publish destruction through the owner as well as the record. Birth
+        // does not execute Create, setters, audio or RNG.
+        return !source.destroyRequested||mark();
     }
     template<class CameraX,class CameraY>
     bool beginStep(CameraX cameraX,CameraY cameraY,bool lowSpec,bool ending){
@@ -57,11 +79,11 @@ public:
 private:
     bool fail(){good_=false;return false;}
     bool position(RunnerImageValue x,RunnerImageValue y){
-        if(!good_||!binding_.publishedPosition(handle(),record_,x,y))return fail();
+        if(!good_||(binding_.hasOwner()&&!binding_.publishedPosition(handle(),record_,x,y)))return fail();
         record_.x=x;record_.y=y;return true;
     }
     bool mark(){
-        if(!good_||!binding_.markDestroyed(handle(),record_))return fail();
+        if(!good_||(binding_.hasOwner()&&!binding_.markDestroyed(handle(),record_)))return fail();
         record_.destroyRequested=true;return true;
     }
     Record record_{};Binding binding_{};unsigned next_=1;bool good_=true;
