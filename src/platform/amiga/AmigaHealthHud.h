@@ -1,19 +1,21 @@
 #ifndef DOWNWELL_AMIGA_HEALTH_HUD_H
 #define DOWNWELL_AMIGA_HEALTH_HUD_H
 #include "AmigaRenderer.h"
+#include "AmigaHealthArt.h"
 #include "core/HudNumbers.h"
 
 // Static art is retained as plane words. A damage frame combines only changed
 // glyph/fill rectangles and publishes final words once: no clear-and-repaint.
 class AmigaHealthHud {
     enum { firstY=6, rows=28, words=7 };
-    struct Pair { UWORD low,high; };
+    using Pair=AmigaHealthPair;
     Pair background_[rows][words]{}, rim_[rows][words]{}, text_[rows][words]{};
     AmigaHudGlyph glyphs_[11]{};
     const UBYTE* pack_=nullptr;
     UBYTE* destination_=nullptr;
     unsigned health_=0,maximum_=0,pieces_=0,perHeart_=0;
     bool valid_=false,artReady_=false;
+    bool preparedArt_=false,borrowedArt_=false;
     static UWORD read(const UBYTE* p){return UWORD(unsigned(p[0])*256+p[1]);}
     static void write(UBYTE* p,UWORD v){p[0]=UBYTE(v>>8);p[1]=UBYTE(v);}
     static UWORD mask(int word,int left,int right){
@@ -81,13 +83,15 @@ class AmigaHealthHud {
             clips[w]=mask(w,left,right);fills[w]=mask(w,12,12+fill);
             reserves[w]=mask(w,12,12+reserve);
         }
+        const auto* background=borrowedArt_?AmigaHealthArt::background:background_;
+        const auto* rim=borrowedArt_?AmigaHealthArt::rim:rim_;
         for(int y=top;y<bottom;++y)for(int w=first;w<last;++w){
-            Pair value=background_[y-firstY][w];
+            Pair value=background[y-firstY][w];
             if(y>=11&&y<17){const auto m=fills[w];
                 value.low&=UWORD(~m);value.high|=m;}
             if(y>=20&&y<22){const auto m=reserves[w];
                 value.low|=m;value.high&=UWORD(~m);}
-            over(value,rim_[y-firstY][w]);over(value,text_[y-firstY][w]);
+            over(value,rim[y-firstY][w]);over(value,text_[y-firstY][w]);
             const auto clip=clips[w];
             auto* p=hud+y*downwellBytesPerPlaneLine+w*2;
             const auto low=read(p),high=read(p+downwellPlaneBytes);
@@ -118,6 +122,7 @@ public:
             reference(r,pack,end,health,maximum,pieces,perHeart);invalidate();return;
         }
         if(pack_!=pack){
+            preparedArt_=AmigaHealthArt::matches(pack,end);
             artReady_=true;
             for(unsigned i=0;i<11;++i)if(!amigaRendererPrepareHudGlyph(&glyphs_[i],pack,end,65011,i))artReady_=false;
             pack_=pack;invalidate();
@@ -125,7 +130,8 @@ public:
         if(!artReady_){reference(r,pack,end,health,maximum,pieces,perHeart);invalidate();return;}
         if(destination_!=r->hud||perHeart_!=perHeart)invalidate();
         const bool initial=!valid_;
-        if(initial){
+        if(initial)borrowedArt_=preparedArt_&&perHeart==4;
+        if(initial&&!borrowedArt_){
             amigaRendererFillRect(r,8,6,92,28,3);
             amigaRendererDrawAsset(r,pack,end,415,1,8,6,0);capture(background_,r->hud);
             amigaRendererFillRect(r,8,6,92,28,0);

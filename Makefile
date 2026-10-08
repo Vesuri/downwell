@@ -2420,6 +2420,18 @@ test-amiga-hud-text: build/amiga-hud-text-test generated/amiga-hud.dwap generate
 	./build/amiga-hud-text-test generated/amiga-hud.dwap generated/amiga-game.dwap
 test: test-amiga-hud-text
 
+build/generate-amiga-health-art: tools/generate-amiga-health-art.cpp src/platform/amiga/AmigaRenderer.c $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ tools/generate-amiga-health-art.cpp src/platform/amiga/AmigaRenderer.c
+generated/amiga-health-art.h: build/generate-amiga-health-art tools/generate-amiga-health-art.py generated/amiga-hud.dwap
+	python3 tools/generate-amiga-health-art.py
+$(AMIGA_RENDERER_TEST_TARGET): generated/amiga-health-art.h
+.PHONY: test-amiga-health-art
+test-amiga-health-art: $(AMIGA_RENDERER_TEST_TARGET) generated/amiga-game.dwap generated/amiga-hud.dwap
+	./$(AMIGA_RENDERER_TEST_TARGET) generated/amiga-game.dwap generated/amiga-hud.dwap
+	python3 tools/generate-amiga-health-art.py --check
+test: test-amiga-health-art
+
 build/generate-amiga-hud-text: tools/generate-amiga-hud-text.cpp src/platform/amiga/AmigaHudText.h src/platform/amiga/AmigaRenderer.c $(HOST_CHECK_HEADERS)
 	@mkdir -p build
 	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ tools/generate-amiga-hud-text.cpp src/platform/amiga/AmigaRenderer.c

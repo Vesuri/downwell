@@ -174,6 +174,23 @@ cache; replacing the font requires invalidation/rebinding.
 matched timing/pixel comparisons. `REFERENCE_DAMAGE_TEXT=1` retains the older
 uncached glyph compositor. The profiling script clears both when restoring.
 
+## Prepared health-HUD artwork
+
+`make generated/amiga-health-art.h` prepares the background and divider/rim
+layers for the original four-piece heart meter with the retained renderer.
+The native HUD borrows these ordinary-memory words instead of drawing scratch
+layers into Chip RAM and reading them back at entry. Mutable fills, text and
+changed-rectangle publication are unchanged. Other divider counts retain the
+runtime path. Binding compares the exact source directory records and payloads;
+changed packs fall back, and immutable pack replacement requires rebinding.
+
+`make test-amiga-health-art` checks complete HUD pixels, including uncommon
+capacities/dividers, source mutation, rebinding and surrounding pixels, and
+checks generator reproducibility. The ignored JSON manifest records source
+hashes, resource IDs and extraction/generator versions. Amiga
+`REFERENCE_HEALTH_ART=1` retains scratch rendering for matched measurements;
+the profiling script clears it when restoring the normal executable.
+
 ## Original audio
 
 After the UTMT extraction, run `python3 tools/extract-audio.py` to extract all

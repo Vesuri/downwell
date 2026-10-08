@@ -1517,6 +1517,25 @@ int main(int argc, char** argv) {
         compare(3,4,0,4);
         require(health.lastWordWrites<80,"single damage updates glyph and lost fill only");
         health.invalidate();compare(3,4,0,4);
+        require(AmigaHealthArt::matches(hudPack.data(),hudPack.data()+hudPack.size()),
+            "original health art admits offline words");
+        require(!AmigaHealthArt::matches(hudPack.data(),hudPack.data()+19),
+            "truncated health art is not admitted");
+        auto changedPack=hudPack;
+        // Mutate source payload, not glyph data: the offline rim/background
+        // must fall back even though resource IDs and font are unchanged.
+        const auto& sourceSpan=AmigaHealthArt::spans[2];
+        changedPack[sourceSpan.offset]^=0x80;
+        require(!AmigaHealthArt::matches(changedPack.data(),changedPack.data()+changedPack.size()),
+            "changed health source art rejects offline words");
+        const std::vector<UBYTE>* reboundPacks[]={&changedPack,&hudPack};
+        for(const auto* pack : reboundPacks){
+            for(unsigned i=0;i<actualHud.size();++i)
+                actualHud[i]=expectedHud[i]=UBYTE(i*37+19);
+            health.draw(&actualRenderer,pack->data(),pack->data()+pack->size(),2,4,1,4);
+            AmigaHealthHud::reference(&expectedRenderer,pack->data(),pack->data()+pack->size(),2,4,1,4);
+            require(actualHud==expectedHud,"health art rebind/fallback preserves full HUD including outside pixels");
+        }
     }
     {
         std::ifstream file("generated/amiga-shop.dwap", std::ios::binary);

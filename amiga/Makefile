@@ -34,6 +34,7 @@ REFERENCE_PATTERNS ?= 0
 REFERENCE_BREAKABLES ?= 0
 REFERENCE_DAMAGE_TEXT ?= 0
 REFERENCE_DAMAGE_BANK ?= 0
+REFERENCE_HEALTH_ART ?= 0
 REFERENCE_GEM_POSITION ?= 0
 REFERENCE_EFFECT_COMPOSITION ?= 0
 REFERENCE_STYLE_SPRITES ?= 0
@@ -250,6 +251,9 @@ CFLAGS += -DDOWNWELL_REFERENCE_DAMAGE_TEXT
 endif
 ifeq ($(REFERENCE_DAMAGE_BANK),1)
 CFLAGS += -DDOWNWELL_REFERENCE_DAMAGE_BANK
+endif
+ifeq ($(REFERENCE_HEALTH_ART),1)
+CFLAGS += -DDOWNWELL_REFERENCE_HEALTH_ART
 endif
 ifeq ($(REFERENCE_GEM_POSITION),1)
 CFLAGS += -DDOWNWELL_REFERENCE_GEM_POSITION
@@ -526,6 +530,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
 	@printf '%s\n' '$(REFERENCE_HUD_TEXT)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_HUD_WORDS)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_DAMAGE_BANK)' >> $@.tmp
+	@printf '%s\n' '$(REFERENCE_HEALTH_ART)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_HUD_BORDER)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_CONTACT_MOTION)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_CONTACT_COORDINATES)' >> $@.tmp
@@ -599,12 +604,15 @@ $(OUT).elf: $(OBJECTS)
 	@$(MAKE) --no-print-directory audit
 
 obj/DownwellAmiga.o: $(AMIGA_SRC)/DownwellAmiga.cpp \
-		$(REPO)/src/core/PortReplay.h $(AMIGA_SCENE_BANKS) $(REPO)/generated/amiga-hud-text.h
+		$(REPO)/src/core/PortReplay.h $(AMIGA_SCENE_BANKS) $(REPO)/generated/amiga-hud-text.h $(REPO)/generated/amiga-health-art.h
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -c -o $@ $<
 
 $(REPO)/generated/amiga-hud-text.h: $(REPO)/tools/generate-amiga-hud-text.cpp $(REPO)/tools/generate-amiga-hud-text.py $(AMIGA_SRC)/AmigaHudText.h $(AMIGA_SRC)/AmigaRenderer.h $(AMIGA_HUD) $(AMIGA_GAME)
 	$(MAKE) -C $(REPO) generated/amiga-hud-text.h
+
+$(REPO)/generated/amiga-health-art.h: $(REPO)/tools/generate-amiga-health-art.cpp $(REPO)/tools/generate-amiga-health-art.py $(AMIGA_SRC)/AmigaRenderer.h $(AMIGA_SRC)/AmigaRenderer.c $(REPO)/src/core/HudNumbers.h $(AMIGA_HUD)
+	$(MAKE) -C $(REPO) generated/amiga-health-art.h
 
 obj/AmigaInput.o: $(AMIGA_SRC)/AmigaInput.cpp $(AMIGA_SRC)/AmigaInput.h
 	@mkdir -p $(@D)
