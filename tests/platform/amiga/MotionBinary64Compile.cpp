@@ -8,6 +8,7 @@
 #include "core/SkeletonDecisions.h"
 #include "core/SkeletonActor.h"
 #include "core/BoneProjectileStore.h"
+#include "core/BoneProjectileInstances.h"
 #include "core/SkeletonEffectBursts.h"
 #include "core/GameMakerRandom.h"
 #include "core/FlashBallEffects.h"
@@ -77,6 +78,15 @@ extern "C" unsigned bonePublicationCompile(downwell::BoneProjectile* bone,
         event==1?bone->collideWallPublished(ops,good):
         event==2?bone->collidePlayerPublished(stopped,ops,good):bone->advanceImagePublished(ops,good);
     return result&&good?ops.trace:0xffffffffu;
+}
+extern "C" unsigned boneInstancesCreateCompile(downwell::BoneProjectileInstances<32>* bones,
+    unsigned sourceId,int x,int y,downwell::GameMakerRandom* random){
+    downwell::InstanceHandle key;
+    return bones->create(sourceId,x,y,*random,key)?key.generation:0;
+}
+extern "C" bool boneInstancesAnimationCompile(downwell::BoneProjectileInstances<32>* bones,
+    downwell::InstanceHandle key,bool retire){
+    return retire?bones->markDestroyed(key)&&bones->retire(key):bones->advanceAnimation(key);
 }
 extern "C" bool randomBinary64Compile(unsigned word, downwell::MotionBinary64 scale,
     downwell::MotionBinary64* result) {

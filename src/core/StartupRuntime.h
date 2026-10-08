@@ -24,6 +24,7 @@
 #include "StoredTimeChangeRegistration.h"
 #include "StoredEntryDitherRegistration.h"
 #include "StoredDroneBulletRegistration.h"
+#include "StoredBoneRegistration.h"
 #include "StoredScriptSpawnRegistration.h"
 #include "StoredDebrisRegistration.h"
 #include "StoredRoomLayers.h"
@@ -317,6 +318,28 @@ public:
     }
     struct NoCollisionPass {bool operator()()const{return true;}};
     enum class DronePhase {animation,alarm,step,endStep};
+    enum class BonePhase {animation,step,cleanup};
+    template<unsigned Capacity,class Execute,class Collisions=NoCollisionPass>
+    bool stepWithBones(StoredBoneRegistration<instanceCapacity,Capacity>& registration,
+        const Input& input,Execute execute,bool advancePressed=false,Collisions collisions={}){
+        if(boneDispatch_||!registration.belongsTo(instances_)||!registration.valid())return run_.effectsSucceeded=false;
+        auto dispatch=[&](const InstanceRecord& record,BonePhase phase){
+            const auto key=registration.handle(record);
+            if(!key.generation)return false;
+            if(phase==BonePhase::animation)return registration.advanceAnimation(key);
+            if(phase==BonePhase::cleanup)return registration.retire(key);
+            return registration.dispatch(key,[&](auto& state,auto& publisher,bool& good){
+                return execute(state,publisher,random_,good);
+            });
+        };
+        boneContext_=&dispatch;
+        boneDispatch_=[](void* context,const InstanceRecord& record,BonePhase phase){
+            return (*static_cast<decltype(dispatch)*>(context))(record,phase);
+        };
+        const bool ok=stepWithCollisionPass(input,advancePressed,collisions);
+        boneDispatch_=nullptr;boneContext_=nullptr;
+        return run_.effectsSucceeded=ok&&registration.valid();
+    }
     // Scoped dispatch joins the actual room phases. The event adapter must
     // supply Step behavior; main-room End Step uses the phase-published view.
     template<unsigned Capacity,class Execute>
@@ -514,6 +537,14 @@ public:
     }
     template<unsigned Capacity> StoredDroneBulletRegistration<instanceCapacity,Capacity> droneBulletRegistration(){
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
+    }
+    template<unsigned Capacity> StoredBoneRegistration<instanceCapacity,Capacity> boneRegistration(){
+        return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
+    }
+    template<unsigned Capacity> bool spawnBone(StoredBoneRegistration<instanceCapacity,Capacity>& registration,
+        int x,int y,InstanceHandle& key){
+        if(!registration.belongsTo(instances_)||!registration.valid())return run_.effectsSucceeded=false;
+        return registration.create(x,y,random_,key);
     }
     template<unsigned Capacity> StoredScriptSpawnRegistration<instanceCapacity,Capacity> scriptSpawnRegistration(){
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
@@ -1063,6 +1094,8 @@ private:
     void* scriptAnimationContext_=nullptr;
     bool (*scriptAnimationDispatch_)(void*,InstanceHandle,const InstanceRecord&)=nullptr;
     bool (*droneDispatch_)(void*,const InstanceRecord&,DronePhase)=nullptr;
+    bool (*boneDispatch_)(void*,const InstanceRecord&,BonePhase)=nullptr;
+    void* boneContext_=nullptr;
     void* droneContext_=nullptr;
     void* timeEffectContext_=nullptr;
     void* entryDitherContext_=nullptr;

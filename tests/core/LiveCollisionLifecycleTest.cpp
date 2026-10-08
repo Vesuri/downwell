@@ -191,6 +191,102 @@ int main(){
         }
         require(owner->images==before+64*3,"each companion animation publishes once through the resource-backed owner");
     }
+    for(unsigned rejectedMove=0;rejectedMove<=2;++rejectedMove){
+        struct BoneOwner:StoredWorldCollision {
+            using StoredWorldCollision::StoredWorldCollision;
+            unsigned reject=0,moves=0;
+            bool move(InstanceHandle h,const InstanceRecord& r,RunnerImageValue x,RunnerImageValue y){
+                if(r.objectId==269&&++moves==reject)return false;
+                return StoredWorldCollision::move(h,r,x,y);
+            }
+        };
+        auto owner=std::make_unique<BoneOwner>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            InstanceLifecycleBinding::bindPointQueries(*owner));
+        require(owner->attach(*world),"attach registered bone world");world->skipToGameForTesting();
+        auto bones=world->boneRegistration<2>();InstanceHandle local;
+        auto expectedRandom=world->randomState();BoneProjectile expected;
+        const auto sourceId=world->nextRuntimeInstanceId();const auto draws=world->randomDrawCount();
+        require(expected.create(240,990,expectedRandom)&&world->spawnBone(bones,240,990,local),"synchronous registered bone Create");
+        const auto key=bones.worldHandle(local);
+        require(key.generation&&owner->resolve(key)==world->instance(sourceId)&&
+            bones.instances().find(local)->sourceId==sourceId&&world->randomDrawCount()==draws+3,
+            "bone has real numeric ID, generation and three shared Create RNG draws");
+        for(unsigned word=0;word<16;++word)require(world->randomState().stateWord(word)==expectedRandom.stateWord(word),
+            "bone Create retains exact shared RNG state");
+        require(bones.dispatch(local,[](auto& state,auto&,bool&){return state.motion.launch(240,990,10,-30);})&&
+            expected.motion.launch(240,990,10,-30),"throw override follows registered Create");
+        unsigned effects=0,steps=0;bool kill=false;
+        auto execute=[&](auto& state,auto& publisher,auto&,bool& good){
+            ++steps;if(kill)state.health=0;
+            struct Ops {
+                decltype(publisher) publish;unsigned& effects;
+                bool imageSpeed(RunnerImageValue v){return publish.imageSpeed(v);}
+                bool position(RunnerImageValue x,RunnerImageValue y){return publish.position(x,y);}
+                bool mask(int id){return publish.mask(id);}
+                bool destroy(){return publish.destroy();}
+                bool effect(int id,int speed){require(id==85&&speed==3,"bone death requests source effect");++effects;return true;}
+                bool inView(int,int,bool& visible){visible=true;return true;}
+            } ops{publisher,effects};
+            return state.stepPublished(false,ops,good);
+        };
+        owner->reject=rejectedMove;
+        const bool ok=world->stepWithBones(bones,Input{},execute);
+        require(ok==!rejectedMove,"registered bone movement failure is terminal");
+        RunnerImageValue x,y;
+        require(owner->collisionPosition(key,x,y),"bone collision lifetime survives Step");
+        if(rejectedMove){
+            require(x.bits==(rejectedMove==1?0x43700000u:0x43710000u)&&y.bits==0x44778000u,
+                "rejected bone setter retains exact preceding coordinate publication");
+            const auto calls=owner->moves;
+            require(!world->stepWithBones(bones,Input{},execute)&&owner->moves==calls&&steps==1,
+                "failed bone event cannot replay movement or effects");
+        }else{
+            struct NoEffects {void destroy(){} void effect(int,int){}} noEffects;
+            for(unsigned tick=0;tick<8;++tick){
+                if(tick)require(world->stepWithBones(bones,Input{},execute),"normal room phases advance registered bone");
+                bool crossed;require(expected.advanceImage(crossed)&&expected.step(false,[](int,int){return true;},noEffects),
+                    "reference bone advances");
+                const auto* actual=bones.instances().find(local);
+                std::uint32_t imageBits;std::memcpy(&imageBits,&world->instance(sourceId)->imageIndex,4);
+                require(actual&&actual->state.motion.x==expected.motion.x&&actual->state.motion.y==expected.motion.y&&
+                    actual->state.timeline.bits==expected.timeline.bits&&
+                    imageBits==expected.imageIndex.bits,
+                    "registered bone state follows scalar event path");
+                RunnerImageValue expectedX,expectedY;
+                require(expectedX.assignInteger(expected.motion.x)&&expectedY.assignInteger(expected.motion.y)&&
+                    owner->collisionPosition(key,x,y)&&x.bits==expectedX.bits&&y.bits==expectedY.bits&&
+                    world->instance(sourceId)->x==expected.motion.x&&world->instance(sourceId)->y==expected.motion.y,
+                    "bone state, world cache and indexed position stay synchronized");
+            }
+            const auto beforeInactive=bones.instances().find(local)->state.timeline.bits;
+            const auto beforeSteps=steps;
+            require(bones.activate(local,false)&&world->stepWithBones(bones,Input{},execute)&&steps==beforeSteps,
+                "pending bone deactivation excludes ordinary Step");
+            const auto afterInactive=bones.instances().find(local)->state.timeline.bits;
+            require(afterInactive!=beforeInactive&&world->stepWithBones(bones,Input{},execute)&&
+                bones.instances().find(local)->state.timeline.bits==afterInactive&&steps==beforeSteps,
+                "room membership gives deactivated bone one final animation, then none");
+            require(bones.activate(local,true)&&world->stepWithBones(bones,Input{},execute)&&steps==beforeSteps+1&&
+                bones.instances().find(local)->state.timeline.bits==afterInactive,
+                "reactivated bone rejoins Step before the following animation phase");
+            kill=true;require(world->stepWithBones(bones,Input{},execute)&&effects==1,
+                "bone health death publishes mask and effect before pre-Draw cleanup");
+            require(!bones.instances().find(local)&&!world->instance(sourceId)&&!owner->resolve(key)&&bones.valid(),
+                "bone cleanup retires typed state, numeric ID, collision and layer ownership together");
+            const auto replacementId=world->nextRuntimeInstanceId();InstanceHandle replacement;
+            require(world->spawnBone(bones,240,990,replacement)&&replacement.generation!=local.generation&&
+                bones.instances().find(replacement)->sourceId==replacementId&&!bones.instances().find(local),
+                "bone slot reuse cannot alias retired generation or numeric ID");
+            InstanceHandle second,overflow;
+            require(world->spawnBone(bones,240,990,second),"fill registered bone capacity");
+            const auto beforeId=world->nextRuntimeInstanceId();const auto beforeRng=world->randomDrawCount();
+            require(!world->spawnBone(bones,240,990,overflow)&&world->nextRuntimeInstanceId()==beforeId&&
+                world->randomDrawCount()==beforeRng&&bones.instances().size()==2&&!overflow.generation,
+                "bone capacity failure cannot consume a source ID or Create RNG");
+            require(bones.clear(),"explicit bone teardown before world teardown");
+        }
+    }
     for(unsigned reject=1;reject<=3;++reject){
         struct CameraWrites:StoredWorldCollision {
             using StoredWorldCollision::StoredWorldCollision;

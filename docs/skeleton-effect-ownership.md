@@ -30,6 +30,27 @@ against the retained scalar reference, plus each failed callback prefix. These
 entry points do not by themselves supply registered lifetimes, live selectors,
 player damage, effects, scheduling or backend rendering.
 
+`BoneProjectileInstances` supplies generation-checked fixed ownership separately
+from the scalar store. Its caller supplies numeric source IDs. Registered birth
+publishes the serialized object-269 geometry and layer membership before the
+three synchronous Create RNG draws. Engine activation is separate from the
+bone's custom `active` field. A destruction request keeps the lifetime readable
+through the event; cleanup cannot reuse an executing record. Explicit teardown
+does not reset the generation stream.
+
+The stored-world bridge uses that world's real numeric allocator and RNG.
+`stepWithBones` joins the existing room animation/Step/pre-Draw cleanup phases,
+publishing through the resource-backed collision and layer owners rather than
+scanning a private bone list. Both copies retire together, and a rejected second
+position write retains the successful first write. Activation requests use the
+room's pending-membership boundary: deactivation receives the old room list's
+final animation but no Step; reactivation rejoins Step before the next animation
+pass. Its scoped event adapter
+still supplies time-stop, collision/effect/damage/view behavior; this is not yet
+automatic skeleton throwing or native admission. The bridge must be cleared
+before room teardown. Capacity failure is a terminal port error before another
+ID or Create RNG word is consumed, not a claim about Windows allocation failure.
+
 ## Death is not just removal plus a gem reward
 
 `global.killCount` belongs to the run, not the room. The VM assigns zero in
