@@ -161,6 +161,81 @@ int main(){
     BuilderPatternPack patterns(bb.data(),bb.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     SpriteMaskPack masks(mb.data(),mb.size());
     require(rooms.valid()&&objects.valid()&&patterns.valid()&&sprites.valid()&&masks.valid(),"real collision resources validate");
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach scheduled reward lifecycle");world->skipToGameForTesting();
+        InstanceHandle box;
+        for(unsigned attempt=0;attempt<1024;++attempt){
+            require(world->spawnBuilderPrimitive(92,240,512,box),"create scheduled reward lottery box");
+            if(owner->resolve(box)->box.haveGem)break;
+            require(world->markBoxDestroyed(box),"mark unsuccessful lottery box");
+        }
+        require(owner->resolve(box)->box.haveGem==2&&world->publishBoxHealth(box,{}),"arm source reward box destruction");
+        auto gems=world->currencyRegistration<2>();ScheduledBoxCounts counts;
+        BoxSoundVerification::Audio<StartupRuntime> audio{*world,owner->resolve(box)->box.breakSound};
+        auto readBox=[&](InstanceHandle h,BoxDestructionScript::Caller& out){return owner->readBoxDestruction(h,out);};
+        auto operations=[&](InstanceHandle h){
+            auto controls=scheduledBoxEffects(*world,h,counts,[&](InstanceHandle key){return world->markBoxDestroyed(key);});
+            controls.timeQuery=[&](InstanceHandle key,bool& allowed){return owner->boxTimeAllowed(*world,key,false,480,allowed);};
+            auto rewards=world->boxCurrencyOperations(gems,h,controls,
+                [&](InstanceHandle key,MotionBinary64& x,MotionBinary64& y){
+                    BoxDestructionScript::Caller out;if(!readBox(key,out))return false;x=out.x;y=out.y;return true;
+                },[](auto,int layer,auto,auto,bool& hit){hit=false;return layer==100;});
+            return boxWorldEffects(*world,h,rewards,[&](int id,unsigned& frames){
+                PackedSpriteCollision art;if(!sprites.sprite(id,art))return false;frames=art.frameCount;return true;
+            },audio,MotionBinary64{0x3fd00000u,0},false);
+        };
+        unsigned steps=0,draws=0;std::uint32_t childId=0;InstanceHandle gem;
+        bool birthTick=true,retainedCaller=false;
+        auto tick=[&]{return world->withCurrencyEvents(gems,
+            [&](auto key,auto&,auto phase,unsigned,auto& random,bool&){
+                require(!birthTick&&phase==StartupRuntime::CurrencyPhase::step,"Step birth waits until next ordinary Step phase");
+                ++steps;
+                struct Frozen {
+                    bool freeMotion(CurrencyCreate&){return false;}
+                    bool attractedMotion(CurrencyCreate&){return false;}
+                } frozen;
+                // Explicit source time-stop fixture, not a substitute for the
+                // unfinished live player's pTimeStop publication.
+                const auto before=random.drawCount();
+                const bool ok=gems.step(key,random,true,480,frozen);
+                require(ok&&random.drawCount()==before+1,"first reward Step consumes its one-time sound choice before freezing");
+                return ok;
+            },[&]{return world->withBoxDestruction(readBox,operations,[&]{
+                return world->stepWithOwnedDebris({},[](auto,const auto&,bool& frozen){frozen=false;return true;},false,[&]{
+                    if(birthTick){
+                        const auto* r=world->resolveInstance(box);
+                        require(r&&r->destroyRequested&&r->boxReward.moniAmount.zero(),"caller survives through post-Step collision boundary");
+                        childId=r->boxReward.myGem;const auto* child=world->instance(childId);
+                        require(child&&child->objectId==248,"scheduled reward owns source child ID");gem=gems.handle(*child);
+                        retainedCaller=true;
+                    }
+                    return true;
+                });
+            });});};
+        const bool firstTick=tick();
+        if(!firstTick||!retainedCaller||steps||world->resolveInstance(box))
+            std::fprintf(stderr,"reward tick ok=%u effects=%u retained=%u steps=%u box=%u marks=%u stop=%u sound=%u valid=%u child=%u\n",
+                firstTick,world->effectsSucceeded(),retainedCaller,steps,world->resolveInstance(box)!=nullptr,
+                counts.mark,counts.stop,audio.calls,audio.valid,childId);
+        require(firstTick&&retainedCaller&&!steps&&!world->resolveInstance(box),"scheduled reward survives caller cleanup without a same-phase Step");
+        const auto* state=gems.find(gem);const auto* record=world->instance(childId);
+        require(state&&record&&!state->allSet&&record->imageIndex==0&&record->alarms.get(0)==10&&record->alarms.get(3)==15,
+            "newborn reward does not retroactively animate or count down alarms");
+        require(world->visitRegisteredCurrencyDraw(gems,[&](auto key,const auto& r,const auto& s,int depth){
+            require(key.generation==gem.generation&&r.instanceId==childId&&r.spriteId==134&&r.maskId==134&&s.getAmount==10&&depth==10000,
+                "newborn medium reward reaches its registered source Draw layer");++draws;return true;
+        })&&draws==1,"reward Draw survives box retirement");
+        RunnerImageValue expected{};bool wrapped=false;
+        require(SequenceTimeline::advance(expected,state->imageSpeed,4,wrapped),"next-frame reward animation oracle");expected.bits&=0x7fffffffu;
+        birthTick=false;require(tick()&&steps==1,"reward enters following global animation/alarm/Step phases");
+        state=gems.find(gem);record=world->instance(childId);std::uint32_t image;std::memcpy(&image,&record->imageIndex,4);
+        require(state->allSet&&state->obtainable&&record->imageSpeed==0&&image==expected.bits&&
+            record->alarms.get(0)==10&&record->alarms.get(3)==15,"source frozen Step runs after animation/countdowns and refunds its clocks");
+        require(gems.clear(),"retire scheduled reward registry");
+        std::puts("Scheduled box reward: birth-phase cutoff, retained caller, Draw, cleanup and next-frame frozen Step passed");
+    }
     for(unsigned failure=0;failure<3;++failure){
         const bool rejectCreate=failure==1,rejectPosition=failure==2;
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);

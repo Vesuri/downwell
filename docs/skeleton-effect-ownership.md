@@ -630,6 +630,14 @@ are separate from `BreakableState`, so ordinary box Step snapshots do not copy
 them. `boxCurrencyOperations` supplies the destruction script's currency call
 without replacing its required time-stop, chain or other effect operations.
 Native box reward ownership still requires its numeric-ID allocation adapter.
+The stored scheduler composes currency and box dispatch scopes around the same
+owned-debris tick. A reward born in ordinary Step misses that phase's cutoff
+and the preceding animation/alarm passes, but may Draw after the marked box
+is retired. Its first following tick advances animation and countdowns before
+currency Step; a frozen Step still consumes the one-time sound selection and
+refunds the positive source clocks. Draw's medium-sprite/mask publication does
+not grant early Step eligibility. This phase contract is independent of the
+unfinished live player time-stop publisher and currency surface compositor.
 `CurrencyGainAccountOperations` exposes the separate writes on either world's
 real account, rejecting values outside its nonnegative uint32 storage domain.
 The stored registry's collection entry retains caller state and source RNG.
