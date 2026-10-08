@@ -86,6 +86,44 @@ callers. Values are rounded ms/frame; this is not a sum of inclusive functions.
 
 ## Remaining threshold-sized structures
 
+### Natural raster fallback baseline
+
+Seed 8, encounter route 4 at `e5c6ed59`, selected through
+`SKIP_TO_GAME=1 PROFILE_OVERFLOW=1`, supplies an additional workload; it is not
+comparable to the contact tape's FPS. Its 1,800 updates take 4,059 PAL fields
+(22.17 FPS), with a maximum seven-field gap at 1352. The source-backed host
+census identifies shade subtraction in 130 frames and nine-channel overflow
+at 1397–1403; it has no smoke/debris. Native full-state and fallback pixel
+verification remain required before accepting a rendering change.
+
+Two 60-field instruction captures start at 1302 and 1396. The parser validates
+both captures; the following windows contain only complete frames:
+
+| Window | Mean frame ms | Worst ms (frame) | Composition | Publication | Promotion attempt | Row sync |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1303–1312, shade | 78.8 | 91.5 (1304) | 8.13 | 3.88 | 3.07 | 2.41 |
+| 1397–1403, nine gems | 82.6 | 90.4 (1400) | 19.66 | 8.56 | 4.10 | 5.24 |
+
+These are inclusive costs; publication includes its blitter work. Nine-gem
+composition contains nine `stampPixel` calls costing 14.24 ms together.
+Promotion currently rejects the entire currency surface on channel exhaustion,
+so all nine gems are composed and published through the raster. Keeping a
+source-topmost sprite suffix and rasterizing only the remainder could remove
+eight of those stamps (about 12.7 ms before added partitioning costs), plus
+some publication. The assignment layer currently treats the whole controller
+surface as being above every actor: partial promotion must explicitly preserve
+that boundary for ordinary actors while placing the promoted suffix above it.
+Shade subtraction, opaque black and sprite priority remain authoritative.
+
+Reproduce with the overflow trace command in [profiling](amiga-profiling.md),
+then `amiga-trace-report.py --frames=1303-1312` and `--frames=1397-1403`.
+ELF SHA-256: `5e0befc89c52e2005ce88d5468317cedbf3b4607b1eeacc7deddd120a8b1bc36`.
+Compact reports and folded stacks: `tmp/overflow-{shade,channels}-report.txt`
+and `tmp/overflow-{shade,channels}.folded`; capture log and ELF are under
+`tmp/trace/overflow-e5c6ed59/`. Raw captures are disposable.
+
+### Contact tape structures
+
 Inclusive costs below nest: do not add parent and child rows.
 
 | Structure | Frame 701 | Frame 844 |

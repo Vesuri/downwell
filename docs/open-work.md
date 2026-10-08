@@ -331,6 +331,14 @@ cases separately from eligible gem-only frames before another compositor
 attempt. Use the effect-coverage census described in the profiling procedure
 to establish that the chosen window actually exercises each proposed path;
 producer-phase timings alone do not prove smoke/debris or raster coverage.
+The natural seed-8 route-4 tape now identifies a structural overflow cliff:
+all nine gems enter the raster when only eight fit hardware channels. In
+1397–1403, composition costs 19.66 ms and publication 8.56 ms. Attempt a
+source-topmost hardware suffix with only the remaining producers in the raster,
+preserving the controller/ordinary-actor boundary during channel assignment.
+The eight removable stamps account for about 12.7 ms before partition costs.
+Verify native state and final combined pixels, including overlapping gems,
+shade holes and opaque black; host promotion coverage alone is insufficient.
 Current combat draw collection costs 4.48 ms and row synchronization 1.50 ms.
 The supplied baseline's raster preparation/publication costs no longer describe
 this hardware-gem-only workload; do not use them to justify fallback changes.
