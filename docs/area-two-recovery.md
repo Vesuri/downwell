@@ -119,10 +119,34 @@ line-based oracle using the original strings: all 50 patterns, both mirror and
 wrap states, pillars enabled/disabled, and zero/four extra rows. Separate checks
 exercise failure prefixes, reentry, and 300 pattern/level/hard-mode dispatches
 with child RNG consumption against scalar cell dispatch. These are traversal
-and dispatch checks, not a complete encounter replay. Live selection, the common
-symbol callback's post-Create writes, concrete actor creation and scheduler
+and dispatch checks, not a complete encounter replay. Live selection, concrete
+owner adapters for post-Create writes, actor creation and scheduler
 binding still need integration on both backends. The freestanding compiler check
 is `make -C amiga verify-builder-traversal-compile` after sourcing `amiga/env.sh`.
+
+`CatacombBuilderDispatch::build` supplies the common symbol and pillar callbacks
+using `BuilderCommonDispatch`. Common choices consume the same explicitly passed
+WELL stream as area choices; an owner cannot accidentally supply a second RNG
+for those choices. The owner must execute each child Create synchronously and
+then invoke the supplied post-Create continuation on its actual owner handle.
+The common switch retains these distinct operations:
+
+| Source path | After synchronous Create |
+| --- | --- |
+| `1`, selected `2` | Write child `deactivate=1` (not engine deactivation) |
+| `B`, selected `3` | Engine-deactivate the child |
+| `{`, `}` | Write `mask_index=594/595`, `i=15`, `image_index=15`, `checked=1`, in order |
+| Newline/padding pillar | Read child's post-Create X; write `isPillar=1` to the right of room midpoint, otherwise `-1` |
+
+Boundary-wall X is `-16` to the left of the room midpoint, otherwise
+`room_width-144`, using the builder's integral build X for selection. The
+builder retains `sideroomRightmost` before Create. Reward `@` retains
+`chunkOrCrate` before its child; `?` keeps the singleton `choose(Crate)` draw.
+Failures retain completed writes and stop dispatch. Tests check these operation
+traces separately, including every boundary-write failure, and then compare
+combined pattern dispatch with ordered scalar area/common calls and full WELL
+state. Dummy child RNG in these tests exercises interleaving; it does not model
+the still-unimplemented live catacomb actor Create events.
 
 ## Actor integration findings
 

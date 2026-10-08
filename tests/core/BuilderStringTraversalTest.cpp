@@ -8,6 +8,18 @@
 #include <vector>
 using namespace downwell;
 static void require(bool ok){if(!ok)std::abort();}
+struct BuilderOps {
+    GameMakerRandom& random;std::vector<int>& trace;
+    struct Child {int x;};
+    int choose(const int* values,unsigned count){return values[random.chooseIndexSmall(count)];}
+    template<class Post> bool create(int object,int x,int y,Post post){
+        trace.insert(trace.end(),{object,x,y});random.nextU32();
+        return post(Child{x});
+    }
+    bool write(Child,BuilderChildField field,int value){trace.insert(trace.end(),{-1,int(field),value});return true;}
+    bool deactivate(Child){trace.push_back(-2);return true;}
+    bool rightOfMiddle(Child child,int width,bool& right){right=child.x*2>width;return true;}
+};
 int main(int argc,char** argv){
     require(argc==2);
     std::ifstream stream(argv[1],std::ios::binary);
@@ -55,15 +67,19 @@ int main(int argc,char** argv){
     for(unsigned id=0;id<pack.patternCount();++id)for(unsigned level=1;level<=3;++level)for(bool hard:{false,true}){
         GameMakerRandom random(id+1),reference(id+1);
         CatacombBuilderDispatch actual,expected;
+        BuilderCommonDispatch commonActual,commonExpected;
         BuilderStringTraversal cursor,oracle;cursor.y=oracle.y=704;
         std::vector<int> births,wanted;
-        auto create=[&](int object,int x,int y){births.insert(births.end(),{object,x,y});random.nextU32();return true;};
-        auto refCreate=[&](int object,int x,int y){wanted.insert(wanted.end(),{object,x,y});reference.nextU32();return true;};
-        auto common=[](char,int,int){return true;};auto pillar=[](int,int){return true;};
-        require(actual.pattern(pack,id,cursor,level,hard,4,random,create,common,pillar));
+        BuilderOps owner{random,births},refOwner{reference,wanted};
+        auto refCreate=[&](int object,int x,int y){return refOwner.create(object,x,y,[](auto){return true;});};
+        auto common=[&](char c,int x,int y){return commonExpected.cell(c,x,y,480,2,0,refOwner);};
+        auto pillar=[&](int x,int y){return commonExpected.pillar(x,y,480,refOwner);};
+        require(actual.build(pack,id,cursor,commonActual,level,hard,4,480,2,0,random,owner));
         const std::uint8_t* text=nullptr;std::uint32_t length=0;require(pack.literalData(id,text,length));
         require(oracle.run(text,length,4,[&](char c,int x,int y){return expected.cell(c,x,y,level,hard,reference,refCreate);},common,pillar));
         require(births==wanted && actual.spawnChance==expected.spawnChance && cursor.y==oracle.y);
+        require(commonActual.chunkOrCrate==commonExpected.chunkOrCrate &&
+                commonActual.sideroomRightmost==commonExpected.sideroomRightmost);
         require(random.drawCount()==reference.drawCount());
         for(unsigned word=0;word<16;++word)require(random.stateWord(word)==reference.stateWord(word));
     }

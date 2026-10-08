@@ -1534,8 +1534,13 @@ build/skeleton-throw-test: tests/core/SkeletonThrowTest.cpp src/core/SkeletonThr
 	@mkdir -p build
 	$(CXX) $(CXXFLAGS) -ffp-contract=off -Isrc -o $@ tests/core/SkeletonThrowTest.cpp src/core/GameMakerRandom.cpp
 
-verify-catacomb-symbols: build/catacomb-symbols-test
+verify-catacomb-symbols: build/catacomb-symbols-test build/builder-common-dispatch-test
 	./build/catacomb-symbols-test
+	./build/builder-common-dispatch-test
+
+build/builder-common-dispatch-test: tests/core/BuilderCommonDispatchTest.cpp src/core/BuilderCommonDispatch.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
 
 build/catacomb-symbols-test: tests/core/CatacombBuilderSymbolsTest.cpp src/core/CatacombBuilderSymbols.h src/core/CatacombBuilderDispatch.h src/core/GameMakerRandom.cpp src/core/GameMakerRandom.h src/core/RandomBinary64.h src/core/RunnerRealComparison.h
 	@mkdir -p build
@@ -1548,7 +1553,7 @@ build/area-two-pattern-pack-test: tests/core/AreaTwoPatternPackTest.cpp src/core
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
 
-build/builder-string-traversal-test: tests/core/BuilderStringTraversalTest.cpp src/core/BuilderStringTraversal.h src/core/CatacombBuilderDispatch.h src/core/CatacombBuilderSymbols.h src/core/BuilderPatternPack.cpp src/core/BuilderPatternPack.h src/core/GameMakerRandom.cpp src/core/GameMakerRandom.h
+build/builder-string-traversal-test: tests/core/BuilderStringTraversalTest.cpp src/core/BuilderStringTraversal.h src/core/BuilderCommonDispatch.h src/core/CatacombBuilderDispatch.h src/core/CatacombBuilderSymbols.h src/core/BuilderPatternPack.cpp src/core/BuilderPatternPack.h src/core/GameMakerRandom.cpp src/core/GameMakerRandom.h
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
 

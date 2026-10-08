@@ -5,6 +5,7 @@
 #include "RunnerRealComparison.h"
 #include "BuilderPatternPack.h"
 #include "BuilderStringTraversal.h"
+#include "BuilderCommonDispatch.h"
 namespace downwell {
 // Source builder-instance state for area-specific cells. Common terrain and
 // pattern traversal remain with the caller. Child Create uses this same RNG
@@ -12,6 +13,17 @@ namespace downwell {
 struct CatacombBuilderDispatch {
     int spawnChance=0;
     bool succeeded=true;
+    template<class Random,class Ops>
+    bool build(const BuilderPatternPack& pack,unsigned id,BuilderStringTraversal& traversal,
+               BuilderCommonDispatch& common,unsigned level,bool hard,unsigned extraRows,
+               int roomWidth,int playerHp,unsigned style,Random& random,Ops& ops){
+        if(!common.succeeded)return succeeded=false;
+        CommonOps<Random,Ops> shared{random,ops};
+        return pattern(pack,id,traversal,level,hard,extraRows,random,
+            [&](int object,int x,int y){return ops.create(object,x,y,[](auto){return true;});},
+            [&](char c,int x,int y){return common.cell(c,x,y,roomWidth,playerHp,style,shared);},
+            [&](int x,int y){return common.pillar(x,y,roomWidth,shared);});
+    }
     template<class Random,class Create,class Common,class Pillar>
     bool pattern(const BuilderPatternPack& pack,unsigned id,BuilderStringTraversal& traversal,
                  unsigned level,bool hard,unsigned extraRows,Random& random,
@@ -53,6 +65,14 @@ struct CatacombBuilderDispatch {
         executing_=false;return succeeded=succeeded&&ok;
     }
 private:
+    template<class Random,class Owner> struct CommonOps {
+        Random& random;Owner& owner;
+        int choose(const int* values,unsigned count){return values[random.chooseIndexSmall(count)];}
+        template<class Post> bool create(int object,int x,int y,Post post){return owner.create(object,x,y,post);}
+        template<class Child> bool write(Child child,BuilderChildField field,int value){return owner.write(child,field,value);}
+        template<class Child> bool deactivate(Child child){return owner.deactivate(child);}
+        template<class Child> bool rightOfMiddle(Child child,int width,bool& right){return owner.rightOfMiddle(child,width,right);}
+    };
     bool executing_=false;
     bool traversing_=false;
 };
