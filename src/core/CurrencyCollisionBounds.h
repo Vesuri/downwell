@@ -17,8 +17,11 @@ struct CurrencyCollisionBounds {
         auto round=[](RunnerImageValue value,std::int32_t& n){return value.roundPixel(n);};
         if(!RunnerSpriteBounds::unrotated(margins,0,0,px,py,unit,unit,false,round,edges))return false;
         ContactBounds next;
-        if(!edges.left.roundPixel(next.left)||!edges.right.roundPixel(next.right)||
-            !edges.top.roundPixel(next.top)||!edges.bottom.roundPixel(next.bottom))return false;
+        auto pixel=[](RunnerImageValue value,int& out){
+            std::int32_t n;if(!value.roundPixel(n))return false;out=int(n);return true;
+        };
+        if(!pixel(edges.left,next.left)||!pixel(edges.right,next.right)||
+            !pixel(edges.top,next.top)||!pixel(edges.bottom,next.bottom))return false;
         out=next;return true;
     }
 };
