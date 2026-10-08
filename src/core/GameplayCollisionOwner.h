@@ -47,6 +47,14 @@ public:
 #endif
 private:
     Owner owner_;
+    // Published binary32 setters are not the actors' integer drawing positions.
+    // Terrain owns immutable coordinates in runs, not duplicate slot records.
+    struct NativePosition {RunnerImageValue x,y;};
+    NativePosition nativePositions_[View::capacity-(View::timeFieldBase-View::terrainBase)]{};
+    NativePosition* nativePosition(unsigned slot){
+        if(slot>=View::capacity||(slot>=View::terrainBase&&slot<View::timeFieldBase))return nullptr;
+        return &nativePositions_[slot<View::terrainBase?slot:slot-(View::timeFieldBase-View::terrainBase)];
+    }
     static constexpr unsigned drawCapacity=2+GameplayWorld::enemyCapacity+GameplayWorld::bulletCapacity+
         GameplayScriptSpawnInstances::capacity+GameplayDebrisInstances::capacity+GameplayEntryDithers::capacity+GameplayWorld::boneCapacity+GameplayWorld::skeletonCapacity;
     struct DrawEntry {GameplayWorld::DrawActor kind;InstanceHandle local;RunnerImageValue depth;};
@@ -417,8 +425,6 @@ private:
             if(!key(local,r,h,true))return false;
             if constexpr(Kind==View::Kind::player)if(!parent.check(parent.layers_.prepare()))return false;
             if constexpr(Kind!=View::Kind::terrain)if(parent.native_)return nativeBirth(local,h,r);
-            constexpr bool roomCoordinates=Kind==View::Kind::player||Kind==View::Kind::terrain||Kind==View::Kind::timeField||Kind==View::Kind::goalField||Kind==View::Kind::exitController;
-            constexpr int ox=roomCoordinates?0:240,oy=roomCoordinates?0:176;
             Owner::State state;
             Owner::Box terrainBounds;bool preparedTerrain=false,terrainPrecise=false;
             RunnerSpatialSplit::PixelBox terrainPixels;
@@ -426,17 +432,10 @@ private:
             if constexpr(Kind==View::Kind::terrain)
                 preparedTerrain=parent.terrainBirthBounds_.at(r.objectId,r.x,r.y,
                     state.x,state.y,terrainBounds,terrainPrecise,&terrainPixels,&terrainGeometry);
-            if constexpr(Kind==View::Kind::scriptEffect){
-                if(!r.effect||!r.effect->valid)return parent.check(false);
-                state.x=r.effect->x;state.y=r.effect->y;
-            }else if constexpr(Kind==View::Kind::debris){
-                if(!r.effect)return parent.check(false);
-                state.x=r.effect->x;state.y=r.effect->y;
-            }else if constexpr(Kind==View::Kind::timeChange||Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency){
-                state.x=r.x;state.y=r.y;
-            }else{
-                if(r.x>0x7fffffff-ox||r.y>0x7fffffff-oy)return parent.check(false);
-                if(!preparedTerrain&&(!real(r.x+ox,state.x)||!real(r.y+oy,state.y)))return parent.check(false);
+            if(!preparedTerrain){
+                NativePosition position;
+                if(!birthPosition(r,position))return false;
+                state.x=position.x;state.y=position.y;
             }
             if constexpr(Kind!=View::Kind::timeField)if(!r.active)state.flags|=2u;
             auto edit=parent.properties_.template editDomain<Kind==View::Kind::terrain>(h.slot);auto& p=edit.get();
@@ -496,12 +495,30 @@ private:
             }
             return true;
         }
-        // The same order publications as the reference birth below, without
-        // positions, bounds or properties: the flag word and depth come from
+        bool birthPosition(const Record& r,NativePosition& result){
+            auto* position=&result;
+            if constexpr(Kind==View::Kind::scriptEffect)if(!r.effect||!r.effect->valid)return parent.check(false);
+            if constexpr(Kind==View::Kind::scriptEffect||Kind==View::Kind::debris){
+                if(!r.effect)return parent.check(false);
+                position->x=r.effect->x;position->y=r.effect->y;
+            }else if constexpr(Kind==View::Kind::timeChange||Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency){
+                position->x=r.x;position->y=r.y;
+            }else{
+                constexpr bool roomCoordinates=Kind==View::Kind::player||Kind==View::Kind::terrain||Kind==View::Kind::timeField||Kind==View::Kind::goalField||Kind==View::Kind::exitController;
+                constexpr int ox=roomCoordinates?0:240,oy=roomCoordinates?0:176;
+                if(r.x>0x7fffffff-ox||r.y>0x7fffffff-oy||
+                    !real(r.x+ox,position->x)||!real(r.y+oy,position->y))return parent.check(false);
+            }
+            return parent.check(RunnerSpatialSplit::valid(position->x)&&RunnerSpatialSplit::valid(position->y));
+        }
+        // The same order publications as the reference birth, without
+        // bounds or full properties: the flag word and depth come from
         // the prepared object default that attachObjectPrepared applies.
         bool nativeBirth(InstanceHandle local,InstanceHandle h,const Record& r){
             const auto* definition=parent.objectDefaults_.get(object(r));
             if(!definition)return parent.check(false);
+            auto* position=parent.nativePosition(h.slot);
+            if(!position||!birthPosition(r,*position))return parent.check(false);
             bool inactive=false;
             if constexpr(Kind!=View::Kind::timeField)inactive=!r.active;
             RunnerImageValue depth=definition->creationDepth;
@@ -623,7 +640,9 @@ private:
             if constexpr(Kind==View::Kind::enemy)if(!parent.updateEnemyAlarmRoster(h))return false;
             if(!parent.check(parent.layers_.activation(h,active)))return false;
             parent.activationPending_=true;return parent.publishPreparedDraw(h);}
-        // Native ownership publishes no geometry: nothing queries it.
+        // Retain actual narrowed setter values before admitting spatial queries.
+        // Bounds/queue publication remains separate; integer draw positions
+        // cannot establish whether a later source setter changed the position.
         bool move(InstanceHandle local,const Record& r,RunnerImageValue x,RunnerImageValue y){InstanceHandle h;
             if(parent.native_){
                 if constexpr(Kind==View::Kind::breakable){
@@ -633,6 +652,14 @@ private:
                     return key(local,r,h)&&parent.check(xx.add(MotionBinary64::fromInteger(240))&&
                         yy.add(MotionBinary64::fromInteger(176))&&px.assign(xx)&&py.assign(yy)&&
                         px.bits==x.bits&&py.bits==y.bits);
+                }
+                if(!key(local,r,h))return false;
+                auto* position=parent.nativePosition(h.slot);
+                if(!position||!RunnerSpatialSplit::valid(x)||!RunnerSpatialSplit::valid(y))return parent.check(false);
+                // Ordinary setter preserves the existing sign of zero on a
+                // numeric no-op, just as RunnerSpatialPosition::assign does.
+                if(!RunnerSpatialSplit::equal(position->x,x)||!RunnerSpatialSplit::equal(position->y,y)){
+                    position->x=x;position->y=y;
                 }
                 return true;
             }
@@ -730,9 +757,9 @@ public:
     // object), so unregistered terrain changes no actor order. Queries and
     // events that would need registered walls fail rather than miss them.
     //
-    // Native ownership additionally drops the spatial half for actors. It
-    // never answers a collision query, so positions, bounds, transforms and
-    // the spatial journal are not published at all. A compact table keeps
+    // Native ownership does not yet answer spatial queries. Published actor
+    // positions are retained separately, but bounds, transforms and the
+    // spatial journal are not published. A compact table keeps
     // what the actor orders observe (object, flag word, sprite index and
     // registration order); room lists and layers remain the order owners.
     enum class Ownership {reference,nativeTerrain,native,nativeScenery};
@@ -796,6 +823,11 @@ public:
         (owner_.valid()&&properties_.valid()&&terrain_.valid()&&scriptEffects_.valid()&&debris_.valid()&&
          timeChanges_.valid()&&entries_.valid()&&drones_.valid()&&bones_.valid()&&layers_.valid()));}
     unsigned pendingSpatialIndex()const{return owner_.pendingSpatialIndex();}
+    bool nativePublishedPosition(InstanceHandle h,RunnerImageValue& x,RunnerImageValue& y){
+        if(!native_||!valid()||!table_.contains(h))return false;
+        const auto* position=nativePosition(h.slot);if(!position)return false;
+        x=position->x;y=position->y;return true;
+    }
     bool serviceSpatialIndex(unsigned budget){return check(owner_.serviceSpatialIndex(budget));}
     bool attach(GameplayWorld& world){
         combatAlarmCaptureValid_=false;

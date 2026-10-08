@@ -2198,6 +2198,17 @@ int main(){
             owner->breakableBinding(),owner->playerBinding(),nullptr,&rooms);
         auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
         assert(owner->attach(*world)&&world->bindNativeTerrain(*terrain)&&world->bindNativeTerrain(*terrain));
+        {
+            const auto local=world->playerHandle();const auto* record=world->findPlayer(local);
+            InstanceHandle shared;assert(record&&GameplayCollisionView::encode(GameplayCollisionView::Kind::player,local,shared));
+            auto binding=owner->playerBinding();RunnerImageValue x,y;
+            assert(binding.publishedPosition(local,*record,{0},{0}));
+            assert(binding.publishedPosition(local,*record,{0x80000000u},{0x80000000u}));
+            assert(owner->nativePublishedPosition(shared,x,y)&&!x.bits&&!y.bits);
+            assert(binding.publishedPosition(local,*record,{0x43708000u},{0xc1fa0000u}));
+            assert(owner->nativePublishedPosition(shared,x,y)&&x.bits==0x43708000u&&y.bits==0xc1fa0000u);
+            assert(!owner->nativePublishedPosition({shared.slot,shared.generation+1},x,y));
+        }
         assert(terrain->append(60,240,160,true,100857));
         const unsigned firstOrder=terrain->registrationOrder(terrain->handle(0));
         assert(firstOrder&&world->createAuthoredDitherAbove());
@@ -2278,10 +2289,16 @@ int main(){
             checkReadOnlyDraw(*world);
             if(ownership==GameplayCollisionOwner::Ownership::reference)
                 assert(owner->state(shared)->x.bits==r->x.bits&&owner->state(shared)->y.bits==r->y.bits);
+            else {
+                RunnerImageValue x,y;
+                assert(owner->nativePublishedPosition(shared,x,y)&&x.bits==r->x.bits&&y.bits==r->y.bits);
+            }
         }
         world->configureDitherAboveEnvironment(low,true);
         world->step(0);assert(world->effectsSucceeded());
         assert(owner->prepareDraw()&&!world->ditherAbove()->find(key));
+        RunnerImageValue retiredX,retiredY;
+        assert(!owner->nativePublishedPosition(shared,retiredX,retiredY));
         assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)==ResultsDestination::gameplay);
         assert(world->createAuthoredDitherAbove()&&world->ditherAbove()->handle().generation>key.generation&&
             !world->ditherAbove()->find(key));
@@ -2309,6 +2326,10 @@ int main(){
         InstanceHandle shared;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::ditherAbove,key,shared));
         if(ownership==GameplayCollisionOwner::Ownership::reference)
             assert(owner->state(shared)->x.bits==source.x.bits&&owner->state(shared)->y.bits==source.y.bits);
+        else {
+            RunnerImageValue x,y;
+            assert(owner->nativePublishedPosition(shared,x,y)&&x.bits==source.x.bits&&y.bits==source.y.bits);
+        }
         assert(owner->prepareDraw());
         if(mode==2){assert(!world->ditherAbove()->find(key));continue;}
         checkReadOnlyDraw(*world);
