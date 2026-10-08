@@ -139,8 +139,30 @@ int main(){
     candidate->invalidateBank();
     std::fill(storage.begin(),storage.end(),0x59);
     require(!candidate->stageBank(storage.data(),storage.size(),pack.data(),pack.size(),1),"short selection upload incomplete");
+    require(!candidate->bind(storage.data(),storage.size(),malformed.data(),malformed.size()),
+        "staged admission does not admit another source");
+    require(!candidate->bind(storage.data(),storage.size(),pack.data(),pack.size()-2),
+        "staged admission does not admit another source extent");
+    require(!candidate->bind(storage.data(),storage.size()-1,pack.data(),pack.size()),
+        "staged admission does not waive destination capacity");
     require(candidate->bind(storage.data(),storage.size(),pack.data(),pack.size()),"short selection synchronous completion");
     require(std::equal(pack.begin(),pack.end(),storage.begin()),"short selection has complete bank");
+    candidate->invalidateBank();
+    require(!candidate->stageBank(storage.data(),storage.size(),pack.data(),pack.size(),1),
+        "admit source before changing destination");
+    std::fill(alternate.begin(),alternate.end(),0x37);
+    require(candidate->bind(alternate.data(),alternate.size(),pack.data(),pack.size()),
+        "admitted source can bind another destination");
+    require(std::equal(pack.begin(),pack.end(),alternate.begin()),
+        "admission is not evidence of upload to another destination");
+    candidate->invalidateBank();
+    // Source mutation is only permitted after invalidation. Reusing its
+    // address must not keep the retired source's admission certificate.
+    const UBYTE savedIndex=pack[16];pack[16]=0xff;
+    require(!candidate->bind(storage.data(),storage.size(),pack.data(),pack.size()),
+        "invalidation revokes admission even at the same source address");
+    pack[16]=savedIndex;
+    require(candidate->bind(storage.data(),storage.size(),pack.data(),pack.size()),"restore admitted bank");
     std::vector<UBYTE> actual[2],expected[2];
     unsigned random=192387;
     auto next=[&](){random=random*1664525u+1013904223u;return random;};

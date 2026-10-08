@@ -772,6 +772,16 @@ reports the two entries as uploads/reuses. Use `make verify-prepared-time-fields
 and `bash amiga/profile.sh fields-clear` for image, overwrite-invalidation
 and reentry pixel checks. The selector is unset on profiling restoration.
 
+`REFERENCE_FIELD_ADMISSION=1` retains the repeated small-image source
+validation at bind, independently of staging and residency. Normally a
+successful staging admission certifies the immutable source pointer and exact
+byte count until `invalidateBank()`. Binding still checks destination capacity;
+an incomplete upload or changed destination still copies the complete bank.
+A different source/extent is validated normally. Source bytes must not change
+while admitted. The host prepared-field test covers revoked admission and
+changed inputs; the native entry probe verifies all resident bank bytes.
+Profiling restoration unsets this reference selector too.
+
 The offline mirrored HUD border exposes its zero-filled DMA row padding as
 its logical width, without changing its anchor or stored pixels. This avoids
 the Bitmap class's partial-word edge preservation when drawing the tall right

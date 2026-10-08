@@ -253,7 +253,20 @@ public:
             overlays_[0].bind(region,backing,terrain);overlays_[1].bind(region,backing+backingBytes,terrain);
             return true;
         }
-        if(!region||!validPack(pack,packBytes)||bytes<storageBytes(packBytes))return false;
+        // stageBank admits the immutable source before starting its upload.
+        // Completion controls whether bytes need copying, not whether the
+        // same source must be parsed again. A different source/size or an
+        // invalidated scene must still take the full admission path.
+#ifndef DOWNWELL_REFERENCE_FIELD_ADMISSION
+        const bool admitted=stagedPack_==pack&&stagedBytes_==packBytes&&stagedRegion_;
+#endif
+        if(!region||
+#ifdef DOWNWELL_REFERENCE_FIELD_ADMISSION
+            !validPack(pack,packBytes)||
+#else
+            (!admitted&&!validPack(pack,packBytes))||
+#endif
+            bytes<storageBytes(packBytes))return false;
         for(auto& overlay:overlays_)overlay.discard();
         if(!stagedReady_||stagedRegion_!=region||stagedPack_!=pack||stagedBytes_!=packBytes)
             for(unsigned i=0;i<packBytes;++i)region[i]=pack[i];

@@ -414,8 +414,8 @@ Preserve the original heading, icon and carousel animation.
 
 Reduce the overall cold gameplay handoff exposed by `profile.sh entry`.
 Measure the last style frame and first gameplay frame together under the
-transition gate above; do not discard either. Remaining synchronous work includes small-field bank
-validation/binding, initial terrain raster and backing/HUD
+transition gate above; do not discard either. Remaining synchronous work includes
+initial terrain raster and backing/HUD
 setup. Move immutable preparation out of confirmation without overwriting
 the garden/style display owners or introducing another long frame earlier.
 Do not move RNG draws or source-visible Create effects ahead of confirmation.
