@@ -275,6 +275,10 @@ public:
         return run_.effectsSucceeded=run_.effectsSucceeded&&nativeTerrainInstances_&&
             nativeTerrainInstances_->createProperties(h,downwell::terrainTileForArea(run_.stage.area));
     }
+    bool publishNativeTerrainBounds(downwell::InstanceHandle h,std::uint32_t flags){
+        return run_.effectsSucceeded=run_.effectsSucceeded&&nativeTerrainInstances_&&
+            nativeTerrainInstances_->publishRefreshedBounds(h,flags);
+    }
     const downwell::GameplayScriptSpawnInstances* scriptSpawnInstances()const{return scriptSpawnInstances_;}
     const downwell::GameplayDebrisInstances* debrisInstances()const{return debrisInstances_;}
     const downwell::NativeTimeChangeRegistration* timeChangeInstances()const{return timeChangeInstances_;}

@@ -16,9 +16,10 @@ one flags byte plus the run locator, not a duplicate generic runner record.
 Each run also retains a shared native registration-clock base. An intervening
 actor birth prevents adjacent walls from merging across that chronology gap.
 The existing per-cell flags byte also packs constructor spatial membership,
-precise-mask and bounds-dirty bits. Constructor bounds are derived from the
-run's object and coordinates for publication and retirement; no per-cell
-rectangle array is allocated.
+precise-mask and bounds-dirty bits. Another bit distinguishes constructor
+from post-Create cached geometry. Bounds are derived from the run's object,
+coordinates and cached resource stage for publication and retirement; no
+per-cell rectangle array is allocated.
 A 16-bit sprite value per cell retains the admitted normal wall/platform
 Create result; the flags byte marks Create completion. Platform image index
 23 and stopped animation follow from that typed Create state, without generic

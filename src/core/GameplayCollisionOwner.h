@@ -459,16 +459,38 @@ private:
         state->appearanceFlags=flags&0xc208u;return check(okay);
     }
     bool nativeTerrainBirthBounds(const GameplayWorld::NativeTerrain::Identity& id,
-        RunnerImageValue& x,RunnerImageValue& y,Owner::Box& bounds,bool& found,bool& precise){
-        if(terrainBirthBounds_.at(id.object,id.x,id.y,x,y,bounds,precise)){found=true;return true;}
+        RunnerImageValue& x,RunnerImageValue& y,Owner::Box& bounds,bool& found,bool& precise,int sprite=-2){
+        if(sprite==-2&&terrainBirthBounds_.at(id.object,id.x,id.y,x,y,bounds,precise)){found=true;return true;}
         const auto* definition=objectDefaults_.get(id.object);
         if(!definition||!x.assignInteger(id.x)||!y.assignInteger(id.y))return check(false);
         PackedSpriteCollision resource;
-        found=sprites_.collisionSprite(definition->spriteId,definition->maskId,resource);
+        found=sprites_.collisionSprite(sprite==-2?definition->spriteId:sprite,definition->maskId,resource);
         precise=found&&resource.collisionMode==1;
+        if(!found)bounds={x,y,x,y};
         return !found||check(RunnerSpriteBounds::fromSprite(resource,x,y,
             RunnerImageValue{0x3f800000u},RunnerImageValue{0x3f800000u},false,RunnerImageValue{},RunnerImageValue{},true,
             [](auto value,std::int32_t& pixel){return value.roundPixel(pixel);},bounds));
+    }
+    bool refreshNativeTerrain(InstanceHandle h){
+        if(!valid()||!world_||!world_->nativeTerrainInstances()||h.slot<View::terrainBase||h.slot>=View::timeFieldBase)return check(false);
+        const auto* terrain=world_->nativeTerrainInstances();
+        const InstanceHandle local{h.slot-View::terrainBase,h.generation};
+        GameplayWorld::NativeTerrain::Identity id;bool active,destroyed,created;
+        std::uint32_t flags;int current,cached;unsigned imageIndex;
+        if(!terrain->read(local,id,active,destroyed)||!eligibilityFlags(h,flags)||
+            !terrain->appearance(local,current,imageIndex,created)||!terrain->cachedSprite(local,cached))return check(false);
+        const auto* objectFlags=families_.flags(unsigned(id.object));if(!objectFlags)return check(false);
+        RunnerImageValue x,y;Owner::Box oldBounds,newBounds;bool found,precise;
+        if(!nativeTerrainBirthBounds(id,x,y,oldBounds,found,precise,cached)||
+            !nativeTerrainBirthBounds(id,x,y,newBounds,found,precise,current))return false;
+        const bool okay=owner_.externalSpatialPublication([&](auto& index){
+            return RunnerSpatialBoundsUpdate::finishRefresh(index,h.slot,*objectFlags,flags,false,oldBounds,
+                found?&newBounds:nullptr,x,y,precise,true);
+        });
+        // finishRefresh publishes cache/flags before index mutation. Preserve
+        // that prefix even if the journal operation failed terminally.
+        const bool recorded=world_->publishNativeTerrainBounds(local,flags);
+        return check(okay&&recorded);
     }
     bool nativeTerrainBirth(const GameplayWorld::NativeTerrain::Identity& id,bool active,
         std::uint32_t& order,std::uint32_t& flags){
@@ -492,10 +514,11 @@ private:
         if(!terrain->read(h,id,active,destroyed)||!terrain->spatialFlags(h,flags))return check(false);
         const unsigned slot=View::terrainBase+local;
         if(flags&0x8000u){
-            // Until terrain Create/refresh is connected, the retained index
-            // entry is immutable constructor geometry, derived from its run.
+            // Cached geometry may still be constructor state after Create.
+            // Never remove using the current appearance before it is flushed.
             RunnerImageValue x,y;Owner::Box bounds;bool found,precise;
-            if(!nativeTerrainBirthBounds(id,x,y,bounds,found,precise)||!found)return check(false);
+            int cached;if(!terrain->cachedSprite(h,cached)||
+                !nativeTerrainBirthBounds(id,x,y,bounds,found,precise,cached))return check(false);
             if(RunnerSpatialSplit::less(bounds.right,bounds.left)){const auto v=bounds.left;bounds.left=bounds.right;bounds.right=v;}
             if(RunnerSpatialSplit::less(bounds.bottom,bounds.top)){const auto v=bounds.top;bounds.top=bounds.bottom;bounds.bottom=v;}
             if(!check(owner_.externalSpatialPublication([&](auto& index){
@@ -943,7 +966,7 @@ public:
     // Native ownership does not yet answer spatial queries. Published actor
     // positions, appearance and cached bounds are retained separately. Actor
     // and terrain constructors publish to the shared journal allocation;
-    // terrain Create and consuming the mixed queue remain integration work. A compact table keeps
+    // complete animation and collision-pass scheduling remain integration work. A compact table keeps
     // what the actor orders observe (object, flag word, sprite index and
     // registration order); room lists and layers remain the order owners.
     enum class Ownership {reference,nativeTerrain,native,nativeScenery};
@@ -1008,9 +1031,22 @@ public:
         (owner_.valid()&&properties_.valid()&&terrain_.valid()&&scriptEffects_.valid()&&debris_.valid()&&
          timeChanges_.valid()&&entries_.valid()&&drones_.valid()&&bones_.valid()&&layers_.valid()));}
     unsigned pendingSpatialIndex()const{return owner_.pendingSpatialIndex();}
+    // Explicit source dirty pass. It is not yet scheduled as a gameplay
+    // collision pass: complete animation/scene publication remains required.
+    bool flushNativeSpatial(){
+        if(!native_||!valid())return false;
+        return check(nativeSpatialDirty_.flush([&](unsigned slot){
+            std::uint32_t flags=0;
+            if(!eligibilityFlags(handleAt(slot),flags))check(false);
+            return flags;
+        },[&](unsigned slot){
+            const auto h=handleAt(slot);
+            return slot>=View::terrainBase&&slot<View::timeFieldBase?refreshNativeTerrain(h):refreshNativeActor(h,true);
+        }));
+    }
     // Diagnostic traversal only: this is not spatial candidate selection.
-    // No consumer may flush these queues until bounds/index publication is
-    // connected, including animation's later cached-frame invalidation.
+    // Spatial refresh is explicit; collision consumption still requires
+    // complete scene publication and animation's cached-frame invalidation.
     template<class Visit> bool visitNativeDirty(bool collision,Visit visit)const{
         if(!native_||!valid())return false;
         const auto& queue=collision?nativeCollisionDirty_:nativeSpatialDirty_;
@@ -1040,7 +1076,7 @@ public:
     }
     // Inspect already-published entries without flushing the dirty queues.
     // Deliberately not an instance_place/meeting implementation: terrain
-    // Create and complete scene publication are not yet admitted to queries.
+    // and complete scene/animation publication are not yet admitted to queries.
     template<class Visit> bool inspectNativeIndex(Owner::Box box,Visit visit){
         if(!native_||!valid())return false;
         return check(owner_.externalSpatialPublication([&](auto& index){

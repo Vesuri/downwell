@@ -2191,6 +2191,44 @@ int main(){
         }
     }
     auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
+    for(auto mode:{GameplayCollisionOwner::Ownership::native,GameplayCollisionOwner::Ownership::nativeScenery}){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
+            GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&rooms,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),owner->breakableBinding(),owner->playerBinding(),nullptr,&rooms);
+        auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
+        assert(owner->attach(*world)&&world->bindNativeTerrain(*terrain));
+        InstanceHandle walls[4];
+        for(unsigned i=0;i<4;++i){
+            assert(terrain->append(i==1?93:60,240+int(i)*16,160,i!=2));walls[i]=terrain->handle(i);
+            assert(terrain->createProperties(walls[i],51));int cached;
+            assert(terrain->cachedSprite(walls[i],cached)&&cached==-2);
+        }
+        assert(terrain->markDestroyed(walls[3]));
+        const auto player=world->playerHandle();const auto* record=world->findPlayer(player);
+        assert(owner->playerBinding().publishedPosition(player,*record,{0x43708000u},{0x442f9000u}));
+        std::vector<InstanceHandle> collision;
+        assert(owner->visitNativeDirty(true,[&](InstanceHandle h){collision.push_back(h);return true;}));
+        assert(owner->flushNativeSpatial());
+        assert(owner->visitNativeDirty(false,[](InstanceHandle){assert(false);return false;}));
+        unsigned ordinal=0;
+        assert(owner->visitNativeDirty(true,[&](InstanceHandle h){
+            assert(ordinal<collision.size()&&h.slot==collision[ordinal].slot&&h.generation==collision[ordinal].generation);++ordinal;return true;
+        })&&ordinal==collision.size());
+        for(unsigned i=0;i<4;++i){
+            int cached;std::uint32_t flags;
+            assert(terrain->cachedSprite(walls[i],cached)&&cached==(i<2?51:-2)&&terrain->spatialFlags(walls[i],flags));
+            if(i<2)assert(!(flags&8u)&&(flags&0x8000u));
+        }
+        const auto pending=owner->pendingSpatialIndex();
+        assert(owner->flushNativeSpatial()&&owner->pendingSpatialIndex()==pending); // Empty pass emits no mutations.
+        GameplayCollisionOwner::Owner::Box all;assert(all.left.assignInteger(-10000)&&all.top.assignInteger(-10000)&&
+            all.right.assignInteger(10000)&&all.bottom.assignInteger(10000));
+        unsigned hits=0;assert(owner->inspectNativeIndex(all,[&](InstanceHandle){++hits;return true;})&&hits==4);
+        assert(terrain->markDestroyed(walls[0])&&terrain->retire(walls[0]));
+        assert(terrain->markDestroyed(walls[1])&&terrain->retire(walls[1]));
+        assert(terrain->retire(walls[3]));
+        hits=0;assert(owner->inspectNativeIndex(all,[&](InstanceHandle){++hits;return true;})&&hits==1);
+    }
     {
         using Sprite=GameplayCollisionOwner::Owner::Sprite;
         std::vector<Sprite> expected;

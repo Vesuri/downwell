@@ -52,6 +52,19 @@ public:
         created=(flags_[h.slot]&32u)!=0;sprite=createSprite_[h.slot];
         index=created&&runs_.object(h.slot)==93?23u:0u;return true;
     }
+    bool cachedSprite(InstanceHandle h,int& sprite)const{
+        if(!contains(h))return false;
+        sprite=(flags_[h.slot]&64u)?createSprite_[h.slot]:-2;return true;
+    }
+    // Geometry is immutable within either constructor or post-Create state.
+    // One existing flags bit selects which resource produced cached bounds.
+    bool publishRefreshedBounds(InstanceHandle h,std::uint32_t spatial){
+        if(!contains(h))return good_=false;
+        const unsigned previous=flags_[h.slot];
+        flags_[h.slot]=(previous&35u)|((previous&32u)?64u:0u)|((spatial&8u)?4u:0u)|
+            ((spatial&0x200u)?8u:0u)|((spatial&0x8000u)?16u:0u);
+        return true;
+    }
     bool createProperties(InstanceHandle h,int tile){
         Identity id;std::uint32_t spatial;
         if(!readIdentity(h,id)||!spatialFlags(h,spatial)||(flags_[h.slot]&32u))return good_=false;

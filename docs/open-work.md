@@ -47,10 +47,9 @@ behavior, both backend integrations and relevant original-game verification.
   Connect native terrain's identity runs to ordered collision candidates
   before enabling destruction dispatch there: finish animation/cached-frame and
   dynamic-rebinding publication, plus spatial mutation/traversal publication;
-  connect post-Create terrain cached-bound refresh while preserving its
-  constructor publication; retain authored room creation-script state needed
-  by wall events;
-  connect queue flushing, candidate collection and post-pass retention.
+  retain authored room creation-script state needed by wall events;
+  schedule the mixed spatial flush with candidate collection and post-pass
+  retention after the remaining publication paths are connected.
   Registration stamps alone are not pair
   order. Occupancy
   alone cannot select a wall. Do not replace it with a row-clear
