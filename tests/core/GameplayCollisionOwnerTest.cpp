@@ -9,6 +9,7 @@ namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_
 #include "core/RunnerBindingRevisionVerification.h"
 #include "core/ActorDrawOrderVerification.h"
 #include "core/MachineGunSourceStep.h"
+#include "core/CurrencyHomingMath.h"
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
 bool nativeRegisteredTimeChange(downwell::GameplayCollisionOwner& owner,
     downwell::TimeChangeEffects<8>& effects,int& speed,std::uint32_t sourceId){
@@ -3029,6 +3030,61 @@ int main(){
             animationWorld->step(0);
             assert(animationOwner->currency().find(key)->imageIndex.bits==0x3f000000u&&
                 !animationWorld->effectsSucceeded()); // Animation runs; still-unbound alarms stop the frame.
+        }
+        if(ownership==GameplayCollisionOwner::Ownership::reference){
+            auto moving=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+                GameplayTerrainInstances::WallCollision{},&rooms,ownership);
+            auto scene=std::make_unique<GameplayWorld>(300,false,1000,false,moving->enemyBinding(),
+                moving->breakableBinding(),moving->playerBinding(),&moving->terrain());
+            assert(moving->attach(*scene)&&scene->createGeneratedInstance({92,240,544},objects,[](const auto&){return true;}));
+            struct Queries {
+                bool wall(InstanceHandle,MotionBinary64,MotionBinary64,bool& hit){hit=false;return true;}
+                bool tile(InstanceHandle,int,MotionBinary64,MotionBinary64,bool& hit){hit=false;return true;}
+            } queries;
+            struct Audio {
+                unsigned sounds=0;
+                bool isPlaying(int,bool& playing){playing=false;return true;}
+                bool stop(int){return true;}
+                bool play(int id,int priority,bool loop,int& voice){
+                    if(id<168||id>170||priority!=30||loop)return false;voice=700+int(++sounds);return true;
+                }
+                bool getGain(int,MotionBinary64& gain){gain=MotionBinary64::fromInteger(1);return true;}
+                bool setGain(int,MotionBinary64,int){return true;}
+                bool setPitch(int,MotionBinary64){return true;}
+            } audio;
+            InstanceHandle key,shared;
+            assert(scene->createCurrencyWithSourceId(605092,MotionBinary64::fromInteger(248),
+                MotionBinary64::fromInteger(512),queries,key)&&GameplayCollisionView::encode(GameplayCollisionView::Kind::currency,key,shared));
+            assert(moving->currency().dispatch(key,[](auto& s,bool&){s.xsp={};s.ysp=MotionBinary64::fromInteger(2);return true;}));
+            CurrencyHomingMath math{portableAtan};bool bounced=false;
+            for(unsigned tick=0;tick<32;++tick){
+                assert(moving->stepCurrency(shared,false,480,MotionBinary64::fromInteger(999),MotionBinary64::fromInteger(999),
+                    masks,math,[](auto& top){top={};return true;},audio,MotionBinary64::fromInteger(1),false));
+                const auto* r=moving->currency().find(key);std::int32_t x,y;
+                assert(r&&r->state.xx.roundPixel(x)&&r->state.yy.roundPixel(y));
+                RunnerImageValue px,py;assert(px.assignInteger(x)&&py.assignInteger(y)&&r->x.bits==px.bits&&r->y.bits==py.bits&&
+                    moving->state(shared)->x.bits==px.bits&&moving->state(shared)->y.bits==py.bits);
+                if(r->state.yCollision){assert(r->state.ysp.zero()||(r->state.ysp.high==0xbff00000u&&!r->state.ysp.low));bounced=true;}
+            }
+            assert(bounced&&audio.sounds);
+            const auto before=moving->currency().find(key)->state;
+            const auto draws=scene->randomDrawCount();
+            assert(moving->stepCurrency(shared,true,480,MotionBinary64::fromInteger(999),MotionBinary64::fromInteger(999),
+                masks,math,[](auto& top){top={};return true;},audio,MotionBinary64::fromInteger(1),false));
+            const auto& frozen=moving->currency().find(key)->state;
+            assert(!frozen.imageSpeed.bits&&frozen.obtainable&&frozen.xx.high==before.xx.high&&frozen.xx.low==before.xx.low&&
+                frozen.yy.high==before.yy.high&&frozen.yy.low==before.yy.low&&scene->randomDrawCount()==draws);
+            for(unsigned i=0;i<4;++i)assert(frozen.alarms.get(i)==before.alarms.get(i)+(before.alarms.get(i)>0));
+            assert(moving->currency().dispatch(key,[](auto& s,bool&){s.attracted=true;s.gemSpeed=MotionBinary64::fromInteger(4);
+                s.rotationSpeed=MotionBinary64::fromInteger(32);return true;}));
+            auto expected=moving->currency().find(key)->state;bool good=true;
+            const auto targetX=MotionBinary64::fromInteger(260),targetY=MotionBinary64::fromInteger(500);
+            assert(CurrencyHomingSource::run(expected,targetX,targetY,math,good)&&
+                moving->stepCurrency(shared,true,480,targetX,targetY,masks,math,[](auto& top){top={};return true;},
+                    audio,MotionBinary64::fromInteger(1),false));
+            const auto& attracted=moving->currency().find(key)->state;
+            assert(attracted.xx.high==expected.xx.high&&attracted.xx.low==expected.xx.low&&
+                attracted.yy.high==expected.yy.high&&attracted.yy.low==expected.yy.low&&moving->currency().clear());
         }
         {
             auto& blood=owner->blood();InstanceHandle local,shared;unsigned calls=0;

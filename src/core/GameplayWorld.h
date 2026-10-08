@@ -278,6 +278,14 @@ public:
         return run_.effectsSucceeded=currencyInstances_->create(id,x,y,run_.stage.area,run_.upgrades.levels[10]!=0,enemyRandom_,queries,key);
     }
     static constexpr unsigned bloodCapacity=32;
+    template<class Queries,class Math,class View,class Audio>
+    bool stepCurrencyRoomEffect(downwell::InstanceHandle key,bool stopped,int width,
+        downwell::MotionBinary64 playerX,downwell::MotionBinary64 playerY,Queries& queries,Math& math,View view,
+        Audio& audio,downwell::MotionBinary64 volume,bool inWater){
+        if(!run_.effectsSucceeded||!currencyInstances_)return run_.effectsSucceeded=false;
+        return run_.effectsSucceeded=currencyInstances_->stepSource(key,enemyRandom_,stopped,width,
+            playerX,playerY,queries,math,view,audio,volume,inWater);
+    }
     const Blood* bloodInstances()const{return blood_;}
     bool bindBlood(Blood& blood){
         if(blood_||!blood.valid()||blood.size())return false;

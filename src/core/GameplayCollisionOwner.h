@@ -1407,8 +1407,12 @@ public:
     }
     bool population(int object,unsigned& count)const{return valid()&&selectorAvailable(object)&&owner_.instanceNumber(object,families_,count);}
     bool terrainPositionMeeting(int object,MotionBinary64 x,MotionBinary64 y,const SpriteMaskPack& masks,bool& hit){
+        return terrainQuery(object)?registeredPositionMeeting(object,x,y,masks,hit):check(false);
+    }
+private:
+    bool registeredPositionMeeting(int object,MotionBinary64 x,MotionBinary64 y,const SpriteMaskPack& masks,bool& hit){
         RunnerImageValue px,py;bool result=false;
-        if(!terrainQuery(object)||!masks.valid()||!px.assign(x)||!py.assign(y))return check(false);
+        if(!selectorAvailable(object)||!masks.valid()||!px.assign(x)||!py.assign(y))return check(false);
         auto update=[&](InstanceHandle h,bool publish){return resolves(h)&&refresh(h,publish);};
         if(!owner_.point(object,px,py,true,false,families_,update,
             [&](InstanceHandle h,RunnerImageValue rawX,RunnerImageValue rawY,bool& found){
@@ -1418,6 +1422,7 @@ public:
             },result))return check(false);
         hit=result;return true;
     }
+public:
     bool terrainPlaceMeeting(InstanceHandle local,int object,MotionBinary64 x,MotionBinary64 y,
         const SpriteMaskPack& masks,bool& hit){
         InstanceHandle self;
@@ -1483,6 +1488,24 @@ public:
         return check(world_->stepBloodRoomEffect(local,[&](const auto&,bool& allowed){
             return bloodTimeAllowed(local,pTimeStop,roomWidth,masks,allowed);
         }));
+    }
+    // Indexed collision adapter for the registered currency owner. Native
+    // selectors remain unavailable: reject before executing any Step/RNG prefix.
+    template<class Math,class ViewTop,class Audio>
+    bool stepCurrency(InstanceHandle shared,bool stopped,int width,MotionBinary64 playerX,MotionBinary64 playerY,
+        const SpriteMaskPack& masks,Math& math,ViewTop view,Audio& audio,MotionBinary64 volume,bool inWater){
+        View::Kind kind;InstanceHandle local;
+        if(!valid()||!world_||native_||!masks.valid()||!View::decode(shared,kind,local)||kind!=View::Kind::currency||!resolves(shared))return check(false);
+        struct Queries {
+            GameplayCollisionOwner& owner;InstanceHandle shared;const SpriteMaskPack& masks;
+            bool meeting(InstanceHandle,int object,MotionBinary64 x,MotionBinary64 y,bool& hit){
+                return owner.registeredPlaceMeeting(shared,object,x,y,masks,hit);
+            }
+            bool water(InstanceHandle,MotionBinary64 x,MotionBinary64 y,bool& hit){
+                return owner.registeredPositionMeeting(88,x,y,masks,hit);
+            }
+        } queries{*this,shared,masks};
+        return check(world_->stepCurrencyRoomEffect(local,stopped,width,playerX,playerY,queries,math,view,audio,volume,inWater));
     }
     // Box Step's final alarmStop(0), including after a destroy request. Use
     // the retained published shape, not a point or a global blanket freeze.

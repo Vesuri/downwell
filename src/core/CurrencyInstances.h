@@ -4,6 +4,12 @@
 #include "InstanceLifecycle.h"
 #include "SequenceTimeline.h"
 #include "CurrencyAlarmEvents.h"
+#include "CurrencyStepEnvelope.h"
+#include "CurrencyFreeMotion.h"
+#include "CurrencyHomingSource.h"
+#include "TimeStopBound.h"
+#include "PlayerSolidCollisionBinary64.h"
+#include "SoundPlayScript.h"
 namespace downwell {
 // Native currency lifetimes. Numeric source IDs are supplied by the room birth
 // stream; never manufacture them from family-local generation handles.
@@ -14,6 +20,7 @@ public:
         int spriteId=133,maskId=-1;
         RunnerImageValue x{},y{},imageIndex{};
         CurrencyCreate state;
+        SoundPlayState sound;
         bool active=true,destroyRequested=false;
     };
     using Binding=RecordLifecycleBinding<Record>;
@@ -71,6 +78,44 @@ public:
         auto* r=resolve(key);if(!r||executing_||index>=5)return fail();
         if(!r->active||r->destroyRequested||!r->state.alarms.advanceOne(index))return true;
         return dispatch(key,[&](auto& state,bool& good){return CurrencyAlarmEvents::run(state,index,other,good);});
+    }
+    template<class Random,class Queries,class Math,class View,class Audio>
+    bool stepSource(InstanceHandle key,Random& random,bool stopped,int width,
+        MotionBinary64 playerX,MotionBinary64 playerY,Queries& queries,Math& math,View view,
+        Audio& audio,MotionBinary64 volume,bool inWater){
+        auto* r=resolve(key);if(!r||executing_)return fail();
+        if(!r->active||r->destroyRequested)return true;
+        struct Ops {
+            CurrencyInstances& owner;InstanceHandle key;Record& r;Random& random;
+            bool stopped;int width;MotionBinary64 playerX,playerY;
+            Queries& queries;Math& math;View& view;Audio& audio;MotionBinary64 volume;bool inWater;
+            bool meeting(int object,MotionBinary64 x,MotionBinary64 y,bool& hit){return queries.meeting(key,object,x,y,hit);}
+            bool wall(MotionBinary64 x,MotionBinary64 y,bool& hit){return meeting(57,x,y,hit);}
+            bool timeAllowed(bool& allowed){return TimeStopBound::evaluate(stopped,r.state.x.promoted(),r.state.y.promoted(),width,
+                [&](auto x,auto y,bool& hit){return meeting(82,x,y,hit);},allowed);}
+            bool destroy(){return owner.markDestroyed(key);}
+            bool collision(int object,CurrencyCreate& state){
+                state.checkTarget=object;SolidCollisionResult result{};
+                const bool ok=PlayerSolidCollisionBinary64::resolve(state.xx,state.yy,state.xsp,state.ysp,
+                    [&](auto x,auto y,bool& hit){return meeting(object,x,y,hit);},result);
+                state.xCollision=result.x;state.yCollision=result.y;return ok;
+            }
+            bool viewTop(MotionBinary64& top){return view(top);}
+            bool pointDirection(MotionBinary64 ax,MotionBinary64 ay,MotionBinary64 bx,MotionBinary64 by,MotionBinary64& out){
+                return math.pointDirection(ax,ay,bx,by,out);
+            }
+            bool sound(int id,int priority,bool loop,bool cut,int& voice){
+                SoundPlayEnvironment env;env.gameVolume=volume;env.inWater=inWater;
+                return SoundPlayScript::plain(r.sound,env,audio,id,priority,loop,cut,voice,owner.good_);
+            }
+            bool water(MotionBinary64 x,MotionBinary64 y,bool& hit){return queries.water(key,x,y,hit);}
+            bool freeMotion(CurrencyCreate& state){return CurrencyFreeMotion::run(state,playerX,playerY,random,*this,owner.good_);}
+            bool attractedMotion(CurrencyCreate& state){return CurrencyHomingSource::run(state,playerX,playerY,math,owner.good_);}
+            bool publish(RunnerImageValue x,RunnerImageValue y){
+                if(!owner.binding_.publishedPosition(key,r,x,y))return false;r.x=x;r.y=y;return true;
+            }
+        } ops{*this,key,*r,random,stopped,width,playerX,playerY,queries,math,view,audio,volume,inWater};
+        return dispatch(key,[&](auto& state,bool& good){return CurrencyStepEnvelope::run(state,random,ops,good);});
     }
     bool markDestroyed(InstanceHandle key){
         auto* r=resolve(key);if(!r)return fail();
