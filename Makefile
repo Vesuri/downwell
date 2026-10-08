@@ -1256,6 +1256,16 @@ build/time-shard-birth-test: tests/core/TimeShardBirthTest.cpp $(wildcard src/co
 
 .PHONY: verify-time-change
 test: verify-entry-dither
+test: verify-dither-above
+.PHONY: verify-dither-above
+verify-dither-above: build/dither-above-step-test
+	python3 tools/verify-runner-instance-ids.py
+	./build/dither-above-step-test
+
+build/dither-above-step-test: tests/core/DitherAboveStepTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/DitherAboveStepTest.cpp
+
 .PHONY: verify-entry-dither
 verify-entry-dither: build/entry-dither-test
 	python3 tools/verify-runner-instance-ids.py

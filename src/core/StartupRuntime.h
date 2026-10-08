@@ -27,6 +27,7 @@
 #include "StoredTimeShardRegistration.h"
 #include "StoredTimeChangeRegistration.h"
 #include "StoredEntryDitherRegistration.h"
+#include "DitherAboveStep.h"
 #include "StoredDroneBulletRegistration.h"
 #include "StoredBoxChainPublication.h"
 #include "StoredCurrencyRegistration.h"
@@ -280,6 +281,11 @@ public:
         if(r->destroyRequested)return true;
         if(!lifecycle_.markDestroyed(h,*r))return run_.effectsSucceeded=false;
         r->destroyRequested=true;return true;
+    }
+    // Converted global.lowSpec / global.ending values. Default desktop startup
+    // uses false for both; settings and ending owners publish changes here.
+    void configureDitherAboveEnvironment(bool lowSpec,bool ending){
+        ditherAboveLowSpec_=lowSpec;ditherAboveEnding_=ending;
     }
     bool deactivateWall(InstanceHandle h){
         const auto* r=instances_.resolve(h);
@@ -1451,6 +1457,10 @@ private:
     void updateMainCamera(InstanceRecord& instance);
     bool publishMainCameraPosition(InstanceRecord& instance);
     bool readEntryCameraX(int room,MotionBinary64& value)const;
+    bool readEntryCameraCoordinate(int room,bool vertical,MotionBinary64& value)const;
+    bool stepDitherAbove(InstanceRecord& instance);
+    bool publishDitherAboveCoordinate(InstanceHandle key,bool vertical,RunnerImageValue value);
+    bool ditherAboveLowSpec_=false,ditherAboveEnding_=false;
     bool createOwnedEntryDither(int room);
     void updateMainBuilder(InstanceRecord& instance);
     void syncMainBuilderState();

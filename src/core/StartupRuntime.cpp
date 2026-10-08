@@ -125,6 +125,7 @@ void StartupRuntime::reset(PlatformProfile profile) {
 }
 
 void StartupRuntime::resetSceneState() {
+    ditherAboveLowSpec_=ditherAboveEnding_=false;
     menuPlayerInitialized_ = false;
     menuPlayerNapping_ = false;
     menuPlayerX_ = 112.0F;
@@ -301,6 +302,11 @@ bool StartupRuntime::publishCollisionPosition(InstanceHandle h,RunnerImageValue 
         run_.effectsSucceeded=false;return false;
     }
     record->x=drawX;record->y=drawY;
+    if(record->objectId==61){
+        // Unlike player/box motion accumulators, this controller's precise
+        // fields mirror its published builtins, including external setters.
+        std::memcpy(&record->preciseX,&x.bits,4);std::memcpy(&record->preciseY,&y.bits,4);
+    }
     return true;
 }
 
@@ -1510,6 +1516,9 @@ PlayerCompanionCreateState* StartupRuntime::initializeCompanionCreate(const Inst
 }
 
 bool StartupRuntime::readEntryCameraX(int room,MotionBinary64& value)const{
+    return readEntryCameraCoordinate(room,false,value);
+}
+bool StartupRuntime::readEntryCameraCoordinate(int room,bool vertical,MotionBinary64& value)const{
     if(!objectPack_||!run_.effectsSucceeded)return false;
     unsigned count=0;bool okay=true;RunnerImageValue x;
     instances_.visitObject(63,[&](int object,int parent){
@@ -1527,10 +1536,51 @@ bool StartupRuntime::readEntryCameraX(int room,MotionBinary64& value)const{
         // Multiple/alternate cameras require the original object-read selector;
         // do not quietly choose storage order or a rounded display coordinate.
         if(r.objectId!=64||r.roomId!=room){okay=false;return false;}
-        std::memcpy(&x.bits,&r.preciseX,4);return true;
+        std::memcpy(&x.bits,vertical?&r.preciseY:&r.preciseX,4);return true;
     });
     if(!okay||count!=1||!SequenceTimeline::valid(x))return false;
     value=x.promoted();return true;
+}
+
+bool StartupRuntime::publishDitherAboveCoordinate(InstanceHandle key,bool vertical,RunnerImageValue value){
+    auto* r=instances_.resolve(key);std::int32_t pixel;
+    if(!r||r->objectId!=61||!SequenceTimeline::valid(value)||!value.roundPixel(pixel))return false;
+    RunnerImageValue x,y;
+    std::memcpy(&x.bits,&r->preciseX,4);std::memcpy(&y.bits,&r->preciseY,4);
+    if(vertical)y=value;else x=value;
+    if(lifecycle_.hasOwner()&&!lifecycle_.publishedPosition(key,*r,x,y))return false;
+    r=instances_.resolve(key);if(!r||r->objectId!=61||!run_.effectsSucceeded)return false;
+    // For this actor these are published builtin coordinates, not private
+    // motion accumulators. Keep the raster integer alongside the exact field.
+    if(vertical){r->y=pixel;std::memcpy(&r->preciseY,&value.bits,4);}
+    else {r->x=pixel;std::memcpy(&r->preciseX,&value.bits,4);}
+    return true;
+}
+
+bool StartupRuntime::stepDitherAbove(InstanceRecord& instance){
+    if(!run_.effectsSucceeded)return false;
+    const auto slot=static_cast<std::size_t>(&instance-&instances_.at(0));
+    if(slot>=instances_.size()||instance.objectId!=61)return run_.effectsSucceeded=false;
+    struct Operations {
+        StartupRuntime& world;InstanceHandle key;int room;
+        bool cameraX(MotionBinary64& value){return world.readEntryCameraCoordinate(room,false,value);}
+        bool cameraY(MotionBinary64& value){return world.readEntryCameraCoordinate(room,true,value);}
+        bool lowSpec(bool& value){value=world.ditherAboveLowSpec_;return true;}
+        bool ending(bool& value){value=world.ditherAboveEnding_;return true;}
+        bool y(RunnerImageValue& value){
+            const auto* r=world.instances_.resolve(key);if(!r||r->objectId!=61)return false;
+            std::memcpy(&value.bits,&r->preciseY,4);return true;
+        }
+        bool setX(RunnerImageValue value){return world.publishDitherAboveCoordinate(key,false,value);}
+        bool setY(RunnerImageValue value){return world.publishDitherAboveCoordinate(key,true,value);}
+        bool destroySelf(){
+            auto* r=world.instances_.resolve(key);if(!r||r->objectId!=61)return false;
+            if(world.lifecycle_.hasOwner()&&!world.lifecycle_.markDestroyed(key,*r))return false;
+            r=world.instances_.resolve(key);if(!r||!world.run_.effectsSucceeded)return false;
+            r->destroyRequested=true;return true;
+        }
+    } operations{*this,instances_.handleAt(slot),instance.roomId};
+    return run_.effectsSucceeded=DitherAboveStep::run(operations)&&run_.effectsSucceeded;
 }
 
 bool StartupRuntime::createOwnedEntryDither(int room){
@@ -2261,6 +2311,10 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             instance->y = static_cast<std::int32_t>(std::round(enterSequenceY_));
         }
         return;
+    case 990: // objDitherAbove Begin Step, not objEnterDither ordinary Step
+        ++implementedCodeCalls_;
+        if(instance)stepDitherAbove(*instance);
+        return;
     case 994: // gml_Object_sideCamLocker_Create_0
         ++implementedCodeCalls_;
         if (instance != nullptr && instance->roomId == mainRoomId) {
@@ -2646,6 +2700,8 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addU32(soundPlayRequests_);
     digest.addU32(ditherFadeSpawnRequests_);
     digest.addU32(nextRuntimeInstanceId_);
+    digest.addBool(ditherAboveLowSpec_);
+    digest.addBool(ditherAboveEnding_);
     digest.addBool(deferredCommandsSucceeded_);
     digest.addU32(random_.seed());
     digest.addU64(random_.drawCount());

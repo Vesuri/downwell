@@ -5,6 +5,7 @@
 #include "core/RoomPack.h"
 #include "core/GameplayContactProfileInput.h"
 #include "core/EnemyPresentation.h"
+#include "core/GameMakerRounding.h"
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -108,6 +109,7 @@ struct LifecycleAudit {
     bool markDestroyed(downwell::InstanceHandle h,const downwell::InstanceRecord& r){
         ++calls;
         require(matches(h,r)&&!r.destroyRequested,"destroy marks a still-live lifetime");
+        if(r.objectId==61)++ditherMarks;
         if(r.objectId==92){
             require(r.box.exhausted(),"natural box destruction follows exhausted health");
             ++boxRemovals;
@@ -129,6 +131,7 @@ struct LifecycleAudit {
     bool rejectBatMask=false;
     bool rejectCompanionImage=false;
     unsigned companionImages=0;
+    unsigned ditherMoves=0,ditherMarks=0,rejectDitherMove=0;
     int rejectBirthObject=-1;
     int rejectBirthRoom=-1;
     unsigned rejectBirthOccurrence=1,matchingBirths=0;
@@ -184,6 +187,7 @@ struct LifecycleAudit {
         ++calls;require(matches(h,r)&&r.active,"movement resolves an active published lifetime");
         std::int32_t px,py;
         require(x.promoted().roundPixel(px)&&y.promoted().roundPixel(py),"published enemy coordinates are representable");
+        if(r.objectId==61&&++ditherMoves==rejectDitherMove)return false;
         if(r.objectId==111||r.objectId==112||r.objectId==113||r.objectId==116||r.objectId==117||r.objectId==119){
             if(fail==6)return false;
             ++moves;
@@ -242,6 +246,51 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
                        const downwell::BuilderPatternPack& patterns){
     using Runtime=downwell::StartupRuntime;
     const auto healthy=[](const Runtime& r){return r.effectsSucceeded()&&r.roomLoadSucceeded()&&r.deferredCommandsSucceeded();};
+    for(bool low:{false,true}){
+        LifecycleAudit audit;
+        auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            downwell::InstanceLifecycleBinding::bindMaskDestruction(audit));
+        runtime->skipToGameForTesting();
+        runtime->configureDitherAboveEnvironment(low,false);
+        for(std::size_t i=0;i<runtime->activeInstanceCount();++i)if(runtime->instanceAt(i).objectId==61){
+            require(runtime->publishCollisionPosition(runtime->instanceHandleAt(i),
+                {0x44080400u},{0xc2a10000u}),"publish fractional authored dither position"); // 544.0625,-80.5
+        }
+        for(unsigned tick=0;tick<40;++tick){
+            const auto* dither=runtime->instance(100854);
+            const auto* player=runtime->instance(100855);
+            const auto* camera=player?runtime->instance(player->playerCameraId):nullptr;
+            require(dither&&camera&&healthy(*runtime),"source dither/camera lifetimes available");
+            const float expectedX=camera->preciseX;
+            float expectedY=dither->preciseY;
+            const bool advance=double(camera->preciseY)-double(expectedY)>=double(low?208:272);
+            if(advance)expectedY=float(double(expectedY)+16.0);
+            expectedY=float(downwell::roundGameMakerCoordinate(double(expectedY)));
+            const auto moves=audit.ditherMoves;
+            runtime->step(false);
+            dither=runtime->instance(100854);
+            require(healthy(*runtime)&&dither&&dither->preciseX==expectedX&&dither->preciseY==expectedY&&
+                audit.ditherMoves==moves+(advance?3:2),"Begin Step reads previous camera and publishes each source setter");
+        }
+        runtime->configureDitherAboveEnvironment(low,true);
+        runtime->step(false);
+        const auto* dither=runtime->instance(100854);
+        require(healthy(*runtime)&&audit.ditherMarks==1&&(!dither||dither->destroyRequested),
+            "ending marks authored dither through its owner");
+    }
+    for(unsigned reject:{1u,2u}){
+        LifecycleAudit audit;
+        auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            downwell::InstanceLifecycleBinding::bindMaskDestruction(audit));
+        runtime->skipToGameForTesting();
+        audit.rejectDitherMove=audit.ditherMoves+reject;
+        runtime->step(false);
+        require(!runtime->effectsSucceeded()&&audit.ditherMoves==audit.rejectDitherMove,
+            "failed dither setter stops Begin Step");
+        const auto calls=audit.calls;
+        runtime->step(false);
+        require(audit.calls==calls,"failed dither event prefix is not replayed");
+    }
     for(unsigned balloon=0;balloon<2;++balloon)for(unsigned drones=0;drones<3;++drones){
         auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns);
         if(balloon)require(runtime->grantUpgrade(15),"grant Heart Balloon before player Create");

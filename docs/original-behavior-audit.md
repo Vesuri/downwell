@@ -101,8 +101,17 @@ rounds Y before checking `global.ending` for self-destruction. This is not a
 catch-up loop. Its wall Collision event (991) enters `other` and destroys the
 contacted wall; Draw (992) is `draw_self`, not the entry wipe's effect surface.
 The assembly hashes and event metadata are pinned by the instance-ID verifier.
-The current stored dispatcher has no handlers for these Begin Step/collision
-codes. Neither registering an inert native record nor relying on generic
+The stored dispatcher executes Begin Step through `DitherAboveStep`, publishing
+X, optional incremented Y, and rounded Y separately through the lifecycle
+owner. For this controller the precise coordinate fields mirror published
+builtins, including external position writes; they are not motion accumulators.
+Camera reads require one active camMain in the same room and reject ambiguous
+or alternate cameras instead of choosing storage order. Low-spec and ending
+inputs are normalized booleans supplied through `configureDitherAboveEnvironment`
+and included in stored replay state; ordinary desktop entry defaults both to
+false. Full settings/ending owners still need to supply their changes.
+The native controller and stored collision dispatcher remain unimplemented.
+Neither registering an inert native record nor relying on generic
 out-of-view terrain retirement reproduces this source lifecycle. Integration
 must preserve the wall's destruction mark and the subsequent phase's retirement,
 including ordered simultaneous contacts; an immediate occupancy erase is not
