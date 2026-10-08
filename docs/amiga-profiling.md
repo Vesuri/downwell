@@ -610,6 +610,28 @@ The host census uses one-based post-Step frames, as do the trace frame labels.
 Native timing runs retain the ordinary uninstrumented compositor; host
 coverage is not a replacement for native state and completed-DMA pixel checks.
 
+`bash amiga/profile.sh overflow-state` (180-second emulator limit) checks five
+post-Step observation digests on every one of the 1,800 native updates. The
+wrapper generates expected observations from the host replay with its existing
+decoded-source comparisons enabled. A mismatch stops at its first frame/group;
+the groups cover player/camera, all 16 RNG words and position in the stream,
+enemy publication state, currency motion/animation/lifetimes, and published
+live bullets/damage numbers/time fields. Bullet slot holes are excluded because
+native ownership defers retirement until Draw cleanup; their live order and
+lifetime keys are compared. Fields are explicitly serialized, never
+raw struct bytes. The generator records input, source and executable hashes.
+This is a correctness-only build: digest computation and the expected table
+are absent from FPS/trace builds. Its timings must not be reported as game FPS.
+
+These observations are not full runner-state coverage: they do not include
+terrain records, global source instance IDs, all private enemy-family state or
+the native ownership/event-order lists. Local lifetime keys are not source IDs.
+Keep the ownership replays, source comparisons and completed-DMA pixel checks;
+do not replace them with this cross-target witness.
+The native overflow checkpoint uses released entry input, matching the host
+fixture. The first route button is a gameplay input, not a held style-confirm
+button; ordinary interactive scene entry retains its actual held-button state.
+
 Phases 137–138 split enemy finalization's integer position publication and
 sprite/mask/scale/image-index publication from phase 115. The latter includes
 bat presentation-field updates. Coordinate rounding, sprite selection and

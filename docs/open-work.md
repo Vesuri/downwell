@@ -255,7 +255,8 @@ gauge) and left ten opt-in flags behind. Do not repeat that.
 - Verify each change with the full RNG state, numeric instance IDs, creation
   and event order, positions and draw order on deterministic replays
   (`make verify-cross-replay`, `make verify-terrain-ownership`, the per-frame
-  ownership digests), plus the native pixel oracles (`profile.sh terrain`,
+  ownership digests, and `profile.sh overflow-state` for that encounter), plus
+  the native pixel oracles (`profile.sh terrain`,
   `profile.sh fields`, `profile.sh ammo`, native frame dumps against the
   reference selector) when presentation changes.
 - Delete your own traces under `tmp/trace/` once their numbers are in a commit;

@@ -7,6 +7,12 @@ transition=0
 case "$mode" in
   probes) flags=(PROBES=1); script=profile.gdb ;;
   fps) flags=(FPSCOUNT=1); script=profile_fps.gdb ;;
+  overflow-state)
+    flags=(FPSCOUNT=1 OVERFLOW_VERIFY=1); script=verify_overflow.gdb
+    export PROFILE_OVERFLOW=1 SKIP_TO_GAME=1 SKIP_INTRO=0 SKIP_LEVEL=0
+    export PROFILE_CONTACT=0 PROFILE_ENTRY=0 PROFILE_TRANSITION=0 PROFILE_LASER=0 PROFILE_FRAMES=0 PROFILE_SHOP=0
+    export VERIFY_TIMEOUT_SECONDS="${VERIFY_TIMEOUT_SECONDS:-180}"
+    ;;
   shop|terrain-shop)
     flags=(FPSCOUNT=1); script=profile_shop.gdb
     if [[ ${PROBES:-0} == 1 ]]; then flags=(PROBES=1 FPSCOUNT=0); fi
@@ -84,7 +90,7 @@ case "$mode" in
     export PROFILE_ENTRY=1 SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_FRAMES=0
     export PROFILE_CONTACT=0 PROFILE_LASER=0 PROFILE_NAVIGATE=0
     ;;
-  *) echo "usage: bash amiga/profile.sh [probes|fps|shop|terrain-shop|trace|frames|draw-cache|draw-order|ammo|transition|entry|terrain|fields|fields-clear]" >&2; exit 1 ;;
+  *) echo "usage: bash amiga/profile.sh [probes|fps|overflow-state|shop|terrain-shop|trace|frames|draw-cache|draw-order|ammo|transition|entry|terrain|fields|fields-clear]" >&2; exit 1 ;;
 esac
 if [[ $mode == draw-cache || $mode == draw-order || $mode == ammo ]]; then
   export SKIP_TO_GAME=1 SKIP_LEVEL=0 PROFILE_CONTACT="${PROFILE_CONTACT:-1}"
@@ -96,6 +102,7 @@ restore() {
   unset PROFILE_ENTRY
   unset PROFILE_SHOP
   unset PROFILE_OVERFLOW
+  unset OVERFLOW_VERIFY
   unset PROFILE_NAVIGATE
   unset REFERENCE_RANDOM
   unset REFERENCE_BOX_RANDOM
@@ -147,6 +154,7 @@ mkdir -p .run
 if [[ ${PROFILE_OVERFLOW:-0} == 1 ]]; then
   make -C .. test-amiga-currency-promotion
 fi
+if [[ $mode == overflow-state ]]; then make -C .. generate-overflow-witness; fi
 if [[ ${PROFILE_SHOP:-0} == 1 ]]; then
   make -C .. generate-shop-profile
 fi

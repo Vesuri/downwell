@@ -101,6 +101,12 @@ PROFILE_CONTACT ?= 0
 PROFILE_ENTRY ?= 0
 PROFILE_SHOP ?= 0
 PROFILE_OVERFLOW ?= 0
+OVERFLOW_VERIFY ?= 0
+ifeq ($(OVERFLOW_VERIFY),1)
+ifneq ($(PROFILE_OVERFLOW),1)
+$(error OVERFLOW_VERIFY requires PROFILE_OVERFLOW=1)
+endif
+endif
 ifeq ($(PROFILE_OVERFLOW),1)
 ifneq ($(MAKECMDGOALS),clean)
 ifneq ($(PROFILE_AUTORUN)$(SKIP_TO_GAME)$(SKIP_LEVEL)$(PROFILE_CONTACT)$(PROFILE_ENTRY)$(PROFILE_TRANSITION)$(PROFILE_LASER)$(PROFILE_FRAMES)$(PROFILE_SHOP),110000000)
@@ -450,6 +456,9 @@ endif
 ifeq ($(PROFILE_OVERFLOW),1)
 CFLAGS += -DDOWNWELL_PROFILE_OVERFLOW
 endif
+ifeq ($(OVERFLOW_VERIFY),1)
+CFLAGS += -DDOWNWELL_OVERFLOW_VERIFY
+endif
 ifeq ($(PROFILE_ENTRY),1)
 CFLAGS += -DDOWNWELL_PROFILE_ENTRY
 endif
@@ -563,9 +572,15 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
 	@printf '%s\n' '$(FRAME_DUMP)' >> $@.tmp
 	@printf '%s\n' '$(PROFILE_SHOP)' >> $@.tmp
 	@printf '%s\n' '$(PROFILE_OVERFLOW)' >> $@.tmp
+	@printf '%s\n' '$(OVERFLOW_VERIFY)' >> $@.tmp
 	@cmp -s $@.tmp $@ || cp $@.tmp $@
 
 $(OBJECTS): obj/startup-options
+ifeq ($(OVERFLOW_VERIFY),1)
+obj/DownwellAmiga.o: $(REPO)/generated/overflow-witness.h
+$(REPO)/generated/overflow-witness.h:
+	$(MAKE) -C $(REPO) generate-overflow-witness
+endif
 ifeq ($(PROFILE_SHOP),1)
 obj/DownwellAmiga.o: $(REPO)/generated/shop-profile-input.h
 $(REPO)/generated/shop-profile-input.h:

@@ -408,6 +408,14 @@ static AmigaShopMenu shopMenuOverlay;
 #ifdef DOWNWELL_PROFILE_OVERFLOW
 #include "AmigaOverflowProfileEntry.h"
 #endif
+#ifdef DOWNWELL_OVERFLOW_VERIFY
+#include "AmigaOverflowWitness.h"
+#include "../../../generated/overflow-witness.h"
+volatile ULONG gDownwellOverflowChecks,gDownwellOverflowFailureFrame,gDownwellOverflowFailureGroup;
+volatile ULONG gDownwellOverflowActual[2];
+__attribute__((noinline, used)) void downwellOverflowMismatch(){__asm__ volatile("" ::: "memory");}
+__attribute__((noinline, used)) void downwellOverflowProgress(){__asm__ volatile("" ::: "memory");}
+#endif
 #if defined(DOWNWELL_NATURAL_VERIFY) || defined(DOWNWELL_PROFILE_SHOP)
 #include "AmigaNaturalRouteVerification.h"
 #endif
@@ -2789,7 +2797,14 @@ __attribute__((noinline)) static int runDownwell(void) {
                         // Capture the entry frame's input, not the later first
                         // simulation frame: a release between them must unlock.
                         if (port.tick() == 0)
+#ifdef DOWNWELL_PROFILE_OVERFLOW
+                            // The source-backed skip-to-game checkpoint has
+                            // released entry input. Route tick zero is the
+                            // first gameplay input, not a held confirmation.
+                            port.initializeEntryInput(false);
+#else
                             port.initializeEntryInput((packedInput & 4) != 0);
+#endif
                         drawFutureGameBlock(
                             &renderer, rooms, mainRoom, builders,
                             fragments, liveBuilder.fragmentCount(),
@@ -3297,6 +3312,25 @@ __attribute__((noinline)) static int runDownwell(void) {
 #endif
             checkSceneStack(6);
             const AmigaPortFrame result = port.step(packedInput);
+#ifdef DOWNWELL_OVERFLOW_VERIFY
+            {
+                std::uint64_t actual[5];amigaOverflowWitness(port,actual);
+                const unsigned frame=port.tick();
+                bool matched=true;
+                for(unsigned group=0;group<5;++group){
+                    if(frame<1||frame>1800||unsigned(actual[group]>>32)!=overflowWitness[frame-1][group*2]||
+                       unsigned(actual[group])!=overflowWitness[frame-1][group*2+1]){
+                        gDownwellOverflowFailureFrame=frame;gDownwellOverflowFailureGroup=group;
+                        gDownwellOverflowActual[0]=unsigned(actual[group]>>32);
+                        gDownwellOverflowActual[1]=unsigned(actual[group]);
+                        downwellOverflowMismatch();matched=false;exitCode=20;break;
+                    }
+                }
+                if(!matched)break;
+                ++gDownwellOverflowChecks;
+                if((gDownwellOverflowChecks&127u)==0)downwellOverflowProgress();
+            }
+#endif
 #ifdef DOWNWELL_PROFILE_SHOP
             if(!shopProfileInput.advance(port.runStage().level))++gDownwellShopProfileFailures;
             gDownwellShopProfileFrames[0]=shopProfileInput.frames(1);

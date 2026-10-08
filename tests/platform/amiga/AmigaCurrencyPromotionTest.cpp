@@ -6,6 +6,7 @@
 #include "core/CurrencySmokeComposition.h"
 #include "core/DebrisDraw.h"
 #include "platform/amiga/AmigaOverflowProfileEntry.h"
+#include "platform/amiga/AmigaOverflowWitness.h"
 #include <cstring>
 
 int amigaBlitterDrawPlanarMasked(const UBYTE*,const UBYTE*,UWORD,UWORD,UWORD,UBYTE*,UWORD,UWORD,UWORD,UWORD,UWORD,UWORD,UWORD,int){return 0;}
@@ -13,11 +14,12 @@ int amigaBlitterClearPlanar(UBYTE*,UWORD,UWORD){return 0;}
 int amigaBlitterSolidRect(UBYTE*,UWORD,UWORD,UWORD,UWORD,UWORD,UWORD){return 0;}
 
 int main(int argc,char** argv){
-    bool census=false,overflowTape=false;
+    bool census=false,overflowTape=false,witness=false;
     for(int i=1;i<argc;++i){
         if(std::strcmp(argv[i],"--census")==0&&!census)census=true;
         else if(std::strcmp(argv[i],"--overflow")==0&&!overflowTape)overflowTape=true;
-        else require(false,"usage: amiga-currency-promotion-test [--census] [--overflow]");
+        else if(std::strcmp(argv[i],"--witness")==0&&!witness)witness=true;
+        else require(false,"usage: amiga-currency-promotion-test [--census] [--overflow] [--witness]");
     }
     const auto rb=readFile("generated/downwell-rooms.dwrm"),ob=readFile("generated/downwell-objects.dwob"),
         pb=readFile("generated/downwell-builder-patterns.dwbp"),ab=readFile("generated/amiga-game.dwap");
@@ -86,6 +88,12 @@ int main(int argc,char** argv){
         game.step(downwell::packReplayInput(input));host.step(input,false);parityFrame=tick-1;
         compareInitialGameplay(game,host);
         require(game.effectsSucceeded()&&game.generationSucceeded(),"runtime");
+        if(witness){
+            std::uint64_t values[5];amigaOverflowWitness(game,values);
+            std::printf("WITNESS %u",tick);
+            for(auto value:values)std::printf(" %08x %08x",unsigned(value>>32),unsigned(value));
+            std::puts("");
+        }
         const int vx=160+game.cameraOffsetX(),vy=34+game.cameraOffsetY();
         require(list.collect(game,ab.data(),ab.data()+ab.size(),vx,vy,true,&frames),"native draw-list census");
         const unsigned firstCurrency=list.count;

@@ -2488,6 +2488,9 @@ test-amiga-currency-promotion: build/amiga-currency-promotion-test
 	./build/amiga-currency-promotion-test
 	./build/amiga-currency-promotion-test --overflow
 test: test-amiga-currency-promotion
+.PHONY: generate-overflow-witness
+generate-overflow-witness: build/amiga-currency-promotion-test
+	python3 tools/generate-overflow-witness.py
 .PHONY: test-amiga-gameplay-draw-list
 build/amiga-gameplay-draw-list-test: $(GAMEPLAY_DRAW_LIST_TEST_SOURCES) $(HOST_CHECK_HEADERS)
 	@mkdir -p build
