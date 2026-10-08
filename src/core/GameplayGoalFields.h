@@ -11,6 +11,7 @@ public:
     struct Record {
         int x=0,y=0,scaleX=1,scaleY=1,objectId=255;
         unsigned lifetimeId=0;
+        unsigned sourceId=0; // Authored/source identity, never a pool handle.
         bool active=true,destroyRequested=false;
     };
     using Binding=RecordLifecycleBinding<Record>;
@@ -24,10 +25,13 @@ public:
     InstanceHandle handle(unsigned index)const{
         return index>=retired_&&index<count_?InstanceHandle{index,records_[index].lifetimeId}:InstanceHandle{};
     }
-    bool create(int x,int y,int object=255,InstanceHandle* created=nullptr){
-        if(!good_||count_==capacity||!next_||(object!=255&&object!=371))return good_=false;
+    bool create(int x,int y,int object=255,InstanceHandle* created=nullptr,unsigned sourceId=0){
+        if(!good_||count_==capacity||!next_||(object!=255&&object!=371)||sourceId>0x7fffffffu)return good_=false;
+        if(sourceId)for(unsigned i=retired_;i<count_;++i)
+            if(records_[i].lifetimeId&&records_[i].sourceId==sourceId)return good_=false;
         const unsigned slot=count_++;
         auto& r=records_[slot];r={};r.x=x;r.y=y;r.objectId=object;r.lifetimeId=next_++;
+        r.sourceId=sourceId;
         const InstanceHandle h{slot,r.lifetimeId};
         if(!binding_.birth(h,r))return good_=false;
         if(!binding_.integerTransform(h,r,RunnerTransformField::scaleX,2,{0x3f800000u},0xffffffu))return good_=false;

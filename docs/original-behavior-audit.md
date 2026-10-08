@@ -80,6 +80,12 @@ validates that identity rather than treating it as a fresh assignment. Worlds
 constructed without entry resources retain the explicit late handoff; they do
 not establish source-equivalent player creation. Resolving the ID early does
 not change the still-incomplete builder/player/controller birth order.
+The room-entry field likewise resolves authored object 371's ID 101097 before
+its lifecycle birth, scale publications and random-radius Create. Its registered
+layer lifetime retains that ID; first-level destruction and Retry retire the
+old generation before reusing the authored identity. Resource-less fixtures
+remain explicitly unnumbered. This does not move the field to its original
+creation index: native entry still invokes it after terrain loading.
 Consequently, explicit-ID time-change tests do not establish the natural
 global ID stream. This source check also does not prove original runner room
 phase timing, initial view publication or rendered entry-mask parity.

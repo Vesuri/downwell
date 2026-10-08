@@ -1198,8 +1198,21 @@ public:
     // reconciles then sweeps in room order; unindexed fixtures own local cleanup.
     bool createRoomStartField(){
         if(!run_.effectsSucceeded)return false;
+        unsigned sourceId=0;
+        if(entryRooms_){
+            downwell::PackedRoom room;
+            if(!entryRooms_->findRoom(11,room))return run_.effectsSucceeded=false;
+            for(unsigned i=0;i<room.instanceCount;++i){
+                downwell::PackedRoomInstance instance;
+                if(!entryRooms_->roomInstance(room,i,instance))return run_.effectsSucceeded=false;
+                if(instance.objectId!=371)continue;
+                if(sourceId||!instance.instanceId||instance.x!=240||instance.y!=192)return run_.effectsSucceeded=false;
+                sourceId=instance.instanceId;
+            }
+            if(!sourceId)return run_.effectsSucceeded=false;
+        }
         downwell::InstanceHandle h;
-        if(!goalFieldInstances_.create(240,192,371,&h))return run_.effectsSucceeded=false;
+        if(!goalFieldInstances_.create(240,192,371,&h,sourceId))return run_.effectsSucceeded=false;
         if(!run_.createStartField(240,192,enemyRandom_))return false;
         if(!run_.startFieldPresent&&!goalFieldInstances_.requestDestroy(h))return run_.effectsSucceeded=false;
         if(!reconcilePhase(PhaseBoundary::roomEntry))return false;

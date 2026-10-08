@@ -212,9 +212,11 @@ struct GoalAudit {
     std::uint64_t draws=0;
     unsigned stage=0;
     bool roomBoundary=false;
+    unsigned expectedSourceId=0;
     using Record=GameplayGoalFields::Record;
     bool birth(InstanceHandle h,const Record& r){
         assert(world->goalFieldInstances().find(h)==&r&&r.scaleX==1&&r.scaleY==1&&world->randomDrawCount()==draws);
+        assert(r.sourceId==expectedSourceId);
         if(r.objectId==255){
             const auto& exits=world->exitControllers();
             assert(exits.find(exits.handle(0))->objectId==306&&exits.find(exits.handle(1))->objectId==74);
@@ -511,9 +513,14 @@ int main(){
         assert(result==ResultsDestination::gameplay&&audit.retires==2&&!world->exitControllers().find(old));
         assert(world->exitControllers().birthSequence()>old.generation);
     }
-    for(unsigned failure=0;failure<=6;++failure){
-        auto world=std::make_unique<GameplayWorld>(300,true,0,false);
+    for(bool authored:{false,true})for(unsigned failure=0;failure<=6;++failure){
+        const auto roomBytes=read("generated/downwell-rooms.dwrm");
+        RoomPack rooms(roomBytes.data(),roomBytes.size());
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,
+            GameplayWorld::EnemyLifecycleBinding{},GameplayWorld::BreakableLifecycleBinding{},
+            GameplayWorld::PlayerLifecycleBinding{},nullptr,authored?&rooms:nullptr);
         GoalAudit audit{world.get(),failure,world->randomDrawCount(),0};
+        audit.expectedSourceId=authored?101097:0;
         assert(world->bindGoalFieldLifecycle(GameplayGoalFields::Binding::bindMaskDestruction(audit)));
         world->configurePhaseBoundary([](void* p,GameplayWorld::PhaseBoundary phase){
             auto& a=*static_cast<GoalAudit*>(p);
@@ -3013,9 +3020,10 @@ int main(){
         assert(!scene->effectsSucceeded()&&scene->enemyAt(1).alarm1==before);
     }
     {
-        auto fieldsOwner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto fieldsOwner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},&rooms);
         auto fieldWorld=std::make_unique<GameplayWorld>(300,true,0,false,fieldsOwner->enemyBinding(),
-            fieldsOwner->breakableBinding(),fieldsOwner->playerBinding(),&fieldsOwner->terrain());
+            fieldsOwner->breakableBinding(),fieldsOwner->playerBinding(),&fieldsOwner->terrain(),&rooms);
         assert(fieldsOwner->attach(*fieldWorld));
         const auto draws=fieldWorld->randomDrawCount();
         assert(fieldWorld->createGeneratedInstance({82,240,512},objects,[](const auto&){return false;}));
@@ -3104,6 +3112,7 @@ int main(){
         assert(fieldWorld->createRoomStartField()&&fieldWorld->startTimeField()&&
             fieldsOwner->population(371,population)&&population==1&&fieldWorld->randomDrawCount()==startDraws+1);
         const auto startLocal=fieldWorld->goalFieldInstances().handle(0);
+        assert(fieldWorld->goalFieldInstances().find(startLocal)->sourceId==101097);
         checkCollisionViewMembership(*fieldWorld);
         InstanceHandle startKey;
         assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::goalField,startLocal,startKey));
@@ -3116,10 +3125,34 @@ int main(){
             fieldsOwner->population(371,population)&&population==0&&
             !fieldWorld->goalFieldInstances().find({0,firstIdentity})&&fieldsOwner->valid());
     }
-    {
-        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+    for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                       GameplayCollisionOwner::Ownership::nativeScenery}){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},&rooms,ownership);
         auto world=std::make_unique<GameplayWorld>(300,false,1201-176,true,owner->enemyBinding(),
-            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain(),&rooms);
+        assert(owner->attach(*world));
+        unsigned priorGeneration=0;
+        for(unsigned retry=0;retry<2;++retry){
+            world->confirmFirstStage();
+            const auto generation=world->goalFieldInstances().birthSequence();
+            const auto draws=world->randomDrawCount();
+            assert(generation>priorGeneration);
+            assert(world->createRoomStartField());
+            assert(world->randomDrawCount()==draws+1);
+            assert(!world->goalFieldInstances().find({0,generation}));
+            InstanceHandle shared;
+            assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::goalField,{0,generation},shared));
+            assert(!GameplayCollisionView(*world).contains(shared)&&owner->valid());
+            priorGeneration=generation;
+            assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)!=ResultsDestination::none);
+        }
+    }
+    {
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},&rooms);
+        auto world=std::make_unique<GameplayWorld>(300,false,1201-176,true,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain(),&rooms);
         assert(owner->attach(*world));
         auto tape=std::make_unique<GameplayFieldReentryVerification>();
         assert(tape->run(*world,*owner,objects,sprites,300)&&tape->checks==255&&tape->gameSteps==108&&
