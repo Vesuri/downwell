@@ -396,6 +396,8 @@ void StartupRuntime::stepInternal(bool advancePressed,
         }
         if(instance.objectId==266&&(!droneDispatch_||
             !droneDispatch_(droneContext_,instance,DronePhase::animation)))return false;
+        if(instance.objectId==248&&(!currencyDispatch_||
+            !currencyDispatch_(currencyContext_,instance,CurrencyPhase::animation,0)))return false;
         if(instance.objectId==370&&!debrisBinding_.advance(key,&instance))return false;
         if(instance.objectId==219){
             if(scriptAnimationDispatch_){if(!scriptAnimationDispatch_(scriptAnimationContext_,key,instance))return false;}
@@ -897,11 +899,13 @@ bool StartupRuntime::cleanupMainOwnedDestroyed(){
             (r.objectId==269&&boneDispatch_)||
             (r.objectId==220&&bloodDispatch_)||
             (r.objectId==120&&skeletonDispatch_)||
+            (r.objectId==248&&currencyDispatch_)||
             (r.objectId==73&&ownedEntryRegistration_.handle(r).generation)||(r.objectId==219&&!scriptAnimationDispatch_);},
         [this](InstanceHandle key,const InstanceRecord& r){
             if(r.objectId==269)return boneDispatch_(boneContext_,r,BonePhase::cleanup);
             if(r.objectId==220)return bloodDispatch_(bloodContext_,r,BloodPhase::cleanup);
             if(r.objectId==120)return skeletonDispatch_(skeletonContext_,r,SkeletonPhase::cleanup,0);
+            if(r.objectId==248)return currencyDispatch_(currencyContext_,r,CurrencyPhase::cleanup,0);
             if(r.objectId==73)return ownedEntryRegistration_.retire(key);
             if(r.objectId==219)return scriptEffectsBinding_.retire(key,&r);
             if(r.objectId==370)return debrisBinding_.retire(key,&r);
@@ -1629,6 +1633,12 @@ bool StartupRuntime::dispatchObjectEvent(InstanceRecord& instance,
         ++implementedCodeCalls_;
         run_.effectsSucceeded=skeletonDispatch_&&skeletonDispatch_(skeletonContext_,instance,
             eventType==2?SkeletonPhase::alarm:eventSubtype==0?SkeletonPhase::step:SkeletonPhase::endStep,unsigned(eventSubtype));
+        return run_.effectsSucceeded;
+    }
+    if(instance.objectId==248&&(eventType==2||(eventType==3&&eventSubtype==0))){
+        ++implementedCodeCalls_;
+        run_.effectsSucceeded=currencyDispatch_&&currencyDispatch_(currencyContext_,instance,
+            eventType==2?CurrencyPhase::alarm:CurrencyPhase::step,unsigned(eventSubtype));
         return run_.effectsSucceeded;
     }
     if(instance.objectId==269&&eventType==3&&eventSubtype==0){

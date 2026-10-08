@@ -206,6 +206,54 @@ int main(){
         }else require(!key.generation&&!world->effectsSucceeded(),"failed currency Create does not publish its return value");
         require(currency.clear()&&!owner->resolve(observed),"retire registered currency including failed Create");
     }
+    for(unsigned mode=0;mode<3;++mode){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach currency scheduler world");world->skipToGameForTesting();
+        auto currency=world->currencyRegistration<1>();InstanceHandle gem;
+        require(world->createRegisteredCurrency(currency,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(512),
+            [](auto,int,auto,auto,bool& hit){hit=false;return true;},gem),"create scheduled currency");
+        require(currency.dispatch(gem,[&](auto& state,bool&){state.obtime=2;state.distime=2;state.attracted=mode==1;return true;}),
+            "configure shortened source alarm durations");
+        unsigned steps=0,expiry=0;bool retained=false;
+        struct Audio {
+            bool fail;unsigned calls=0;
+            bool isPlaying(int id,bool& yes){++calls;yes=false;return id==166&&!fail;}
+            bool stop(int){return false;}
+            bool play(int id,int priority,bool loop,int& voice){++calls;voice=700;return id==166&&priority==30&&!loop;}
+            bool getGain(int id,MotionBinary64& gain){++calls;gain=MotionBinary64::fromInteger(1);return id==700;}
+            bool setGain(int id,MotionBinary64 gain,int duration){++calls;return id==700&&gain.high==0x3ff00000u&&!gain.low&&!duration;}
+            bool setPitch(int id,MotionBinary64 pitch){++calls;return id==700&&pitch.high==0x3ff00000u&&!pitch.low;}
+        } audio{mode==2};
+        RunnerImageValue image{};const auto speed=currency.find(gem)->imageSpeed;
+        for(unsigned age=1;age<=16;++age){
+            bool wrapped=false;require(SequenceTimeline::advance(image,speed,4,wrapped),"currency animation oracle");image.bits&=0x7fffffffu;
+            const bool ok=world->withCurrencyEvents(currency,
+                [&](auto key,auto& state,auto phase,unsigned alarm,auto&,bool&){
+                    if(phase==StartupRuntime::CurrencyPhase::step){
+                        ++steps;require(state.obtainable==(age>=10)&&state.disappearing==(age>=11)&&
+                            state.suckable==(age>=15),"currency flags follow ascending world alarm pass");
+                        return true; // Motion deliberately supplied by the fixture, not claimed implemented.
+                    }
+                    require(phase==StartupRuntime::CurrencyPhase::alarm&&alarm==2&&age==12,"expiry alarm reaches required event adapter");
+                    ++expiry;return currency.expire(key,MotionBinary64::fromInteger(1),false,audio);
+                },[&]{return world->stepWithCollisionPass({},false,[&]{
+                    const auto* r=owner->resolve(gem);if(mode==0&&age==12)retained=r&&r->destroyRequested;
+                    return true;
+                });});
+            require(ok==(mode!=2||age!=12),"currency event failure propagates to world");
+            if(const auto* r=owner->resolve(gem)){
+                std::uint32_t bits;std::memcpy(&bits,&r->imageIndex,4);
+                require(bits==image.bits,"registered currency advances once in global animation phase");
+            }
+            if(age==12&&mode!=1)break;
+        }
+        require(expiry==1&&steps==(mode==1?16u:11u),"destroyed or failed currency skips ordinary Step");
+        require(audio.calls==(mode==0?5u:mode==1?0u:1u),"currency expiry sound precedes destruction and is suppressed for attracted gems");
+        if(mode==0)require(retained&&!owner->resolve(gem)&&!currency.find(gem),"currency destruction retains caller until cleanup then retires both owners");
+        else require(owner->resolve(gem)&&currency.find(gem),"attracted or failed currency keeps its lifetime");
+        require(currency.clear(),"clear borrowed currency scheduler owner");
+    }
     for(unsigned chainCase=0;chainCase<10;++chainCase){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());

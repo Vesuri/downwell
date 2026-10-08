@@ -526,8 +526,21 @@ Create RNG. Explicit cleanup also retires failed births.
 Resource-backed fixtures compare complete WELL state for clear placement,
 tile relocation, wall search exhaustion, tile-query failure and capacity
 exhaustion, and check amount/size/attraction writes and global ID allocation.
-This creation binding is not yet a scheduled/rendered currency actor or a
-replacement for the live reward array.
+`withCurrencyEvents` borrows this registration for the stored world's actual
+animation, alarm, Step and cleanup phases. Animation advances the four-frame
+133/134 sequence with binary32 speed and publishes its index to the collision
+owner. Alarm dispatch imports the current world bank before each event and
+publishes writes immediately; Alarm 0 starts Alarm 1 and Alarm 1 starts Alarm 2
+in time for the same ascending-index pass to decrement them. Alarm 3 enables
+attraction. The expiry adapter checks attraction, executes plain sound 166 at
+priority 30 with explicit gain/water inputs, then marks destruction. An audio
+failure retains the lifetime. Alarm 4 movement and ordinary Step still require
+explicit event callbacks, not successful defaults. Marked gems remain readable
+until pre-Draw cleanup retires both records. Scheduling fixtures shorten the
+source durations to check chained countdowns, attraction, animation, marked
+retirement and terminal audio failure. The motion callback remains a fixture,
+not a complete source implementation. This binding is not yet a
+complete scheduled/rendered actor or replacement for the live reward array.
 
 The shared live reward wrapper now supplies the run's area to `GemMotion`.
 Its fixed-point adapter preserves the area-5 extra RNG draw after both ordinary

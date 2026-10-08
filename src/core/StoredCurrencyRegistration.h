@@ -4,6 +4,8 @@
 #include "InstanceStore.h"
 #include "InstanceLifecycle.h"
 #include "ObjectPack.h"
+#include "SequenceTimeline.h"
+#include "SoundPlayScript.h"
 #include <cstring>
 namespace downwell {
 // Registered object-248 Create and script setters. Borrow at a fixed address
@@ -37,7 +39,58 @@ public:
     StoredCurrencyRegistration(const StoredCurrencyRegistration&)=delete;
     StoredCurrencyRegistration& operator=(const StoredCurrencyRegistration&)=delete;
     bool belongsTo(const InstanceStore<WorldCapacity>& records)const{return &records_==&records;}
+    bool valid(){if(!good_)return false;for(auto& e:entries_)if(e.id&&!record(e))return false;return true;}
+    InstanceHandle handle(const InstanceRecord& r){
+        for(auto& e:entries_)if(e.id==r.instanceId&&record(e)==&r)return e.key;return {};
+    }
     const CurrencyCreate* find(InstanceHandle h){auto* e=entry(h);return e&&record(*e)?&e->state:nullptr;}
+    bool advanceAnimation(InstanceHandle h){
+        auto* e=entry(h);auto* r=e?record(*e):nullptr;
+        if(!good_||!r||(r->spriteId!=133&&r->spriteId!=134))return fail();
+        RunnerImageValue index,speed;std::memcpy(&index.bits,&r->imageIndex,4);std::memcpy(&speed.bits,&r->imageSpeed,4);
+        bool crossed=false;
+        if(!SequenceTimeline::advance(index,speed,4,crossed))return fail();
+        index.bits&=0x7fffffffu;
+        if(!lifecycle_.imageIndex(h,*r,index))return fail();
+        r=record(*e);if(!r)return fail();r->imageIndex=stored(index);return true;
+    }
+    // The global alarm pass owns countdowns. Import the record bank before
+    // each event so Alarm 0's new Alarm 1 is visible to that same pass.
+    template<class Event> bool dispatch(InstanceHandle h,Event event){
+        auto* e=entry(h);auto* r=e?record(*e):nullptr;
+        if(!good_||!r)return fail();e->state.alarms=r->alarms;
+        const bool ok=event(e->state,good_);
+        r=record(*e);if(!r)return fail();r->alarms=e->state.alarms;r->imageSpeed=stored(e->state.imageSpeed);
+        return (ok&&good_)||fail();
+    }
+    template<class Event> bool alarm(InstanceHandle h,unsigned index,Event other){
+        return dispatch(h,[&](auto& state,bool& good){
+            if(index>=5||state.alarms.get(index)!=0)return false;
+            if(index==0){state.obtainable=true;state.alarms.set(1,state.obtime);return true;}
+            if(index==1){state.disappearing=true;state.alarms.set(2,state.distime);return true;}
+            if(index==3){state.suckable=true;return true;}
+            // Expiry needs explicit audio/environment inputs; Alarm 4 needs
+            // its movement adapter. Absence is not successful dispatch.
+            return other(state,index,good);
+        });
+    }
+    bool mark(InstanceHandle h){
+        auto* e=entry(h);auto* r=e?record(*e):nullptr;
+        if(!good_||!r||!lifecycle_.markDestroyed(h,*r))return fail();r->destroyRequested=true;return true;
+    }
+    template<class Audio> bool expire(InstanceHandle h,MotionBinary64 volume,bool inWater,Audio& audio){
+        auto* e=entry(h);auto* r=e?record(*e):nullptr;
+        if(!good_||!r)return fail();
+        if(e->state.attracted)return true;
+        SoundPlayEnvironment env;env.gameVolume=volume;env.inWater=inWater;int voice=-1;
+        if(!SoundPlayScript::plain(r->sound,env,audio,166,30,false,true,voice,good_))return false;
+        return mark(h);
+    }
+    bool retire(InstanceHandle h){
+        auto* e=entry(h);
+        if(!e||!record(*e)||!records_.erase(e->id,[&](auto key,const auto& r){return lifecycle_.retire(key,r);}))return fail();
+        *e={};return true;
+    }
     template<class Random,class Tile> bool create(MotionBinary64 x,MotionBinary64 y,int area,bool attractor,
         Random& random,Tile tile,InstanceHandle& output){
         if(!good_)return false;

@@ -344,6 +344,24 @@ public:
     }
     struct NoCollisionPass {bool operator()()const{return true;}};
     enum class DronePhase {animation,alarm,step,endStep};
+    enum class CurrencyPhase {animation,alarm,step,cleanup};
+    template<unsigned Capacity,class Execute,class Tick>
+    bool withCurrencyEvents(StoredCurrencyRegistration<instanceCapacity,Capacity>& registration,Execute execute,Tick tick){
+        if(!run_.effectsSucceeded)return false;
+        if(currencyDispatch_||!registration.belongsTo(instances_)||!registration.valid())return run_.effectsSucceeded=false;
+        auto dispatch=[&](const InstanceRecord& record,CurrencyPhase phase,unsigned index){
+            const auto key=registration.handle(record);if(!key.generation)return false;
+            if(phase==CurrencyPhase::animation)return registration.advanceAnimation(key);
+            if(phase==CurrencyPhase::cleanup)return registration.retire(key);
+            if(phase==CurrencyPhase::alarm)return registration.alarm(key,index,[&](auto& state,unsigned alarm,bool& good){
+                return execute(key,state,phase,alarm,random_,good);});
+            return registration.dispatch(key,[&](auto& state,bool& good){return execute(key,state,phase,index,random_,good);});
+        };
+        currencyContext_=&dispatch;
+        currencyDispatch_=[](void* p,const InstanceRecord& r,CurrencyPhase phase,unsigned index){return (*static_cast<decltype(dispatch)*>(p))(r,phase,index);};
+        const bool ok=tick();currencyDispatch_=nullptr;currencyContext_=nullptr;
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok&&registration.valid();
+    }
     enum class BonePhase {animation,step,cleanup};
     enum class BloodPhase {animation,step,cleanup};
     template<unsigned Capacity,class Query,class Tick>
@@ -1403,6 +1421,8 @@ private:
     void* scriptAnimationContext_=nullptr;
     bool (*scriptAnimationDispatch_)(void*,InstanceHandle,const InstanceRecord&)=nullptr;
     bool (*droneDispatch_)(void*,const InstanceRecord&,DronePhase)=nullptr;
+    void* currencyContext_=nullptr;
+    bool (*currencyDispatch_)(void*,const InstanceRecord&,CurrencyPhase,unsigned)=nullptr;
     bool (*boneDispatch_)(void*,const InstanceRecord&,BonePhase)=nullptr;
     void* boneContext_=nullptr;
     bool (*bloodDispatch_)(void*,const InstanceRecord&,BloodPhase)=nullptr;
