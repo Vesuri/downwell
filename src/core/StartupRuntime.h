@@ -713,6 +713,38 @@ public:
         if(!registry.belongsTo(instances_))return run_.effectsSucceeded=false;
         return registry.collect(gem,random_,ops);
     }
+    template<unsigned Capacity,class Tile>
+    bool spawnBoxCurrency(StoredCurrencyRegistration<instanceCapacity,Capacity>& registry,
+        InstanceHandle box,MotionBinary64 amount,Tile tile){
+        auto retained=[&]()->InstanceRecord*{
+            auto* r=instances_.resolve(box);
+            return r&&r->objectId==92?r:nullptr;
+        };
+        return spawnRegisteredCurrency(registry,
+            [&](CurrencySpawnSource<std::uint32_t>& out){
+                const auto* r=retained();if(!r)return false;
+                RunnerImageValue x,y;
+                std::memcpy(&x.bits,&r->preciseX,4);std::memcpy(&y.bits,&r->preciseY,4);
+                out.x=x.promoted();out.y=y.promoted();out.objectIndex=r->objectId;
+                out.moniAmount=r->boxReward.moniAmount;out.myGem=r->boxReward.myGem;
+                out.atrState=r->boxReward.atrState;out.stomped={};return true;
+            },
+            [&](MotionBinary64 value){auto* r=retained();if(!r)return false;r->boxReward.moniAmount=value;return true;},
+            [&](bool value){auto* r=retained();if(!r)return false;r->boxReward.atrState=value;return true;},
+            [&](std::uint32_t value){auto* r=retained();if(!r)return false;r->boxReward.myGem=value;return true;},amount,tile);
+    }
+    template<unsigned Capacity,class Controls,class Tile>
+    auto boxCurrencyOperations(StoredCurrencyRegistration<instanceCapacity,Capacity>& registry,
+        InstanceHandle box,Controls controls,Tile tile){
+        struct Operations:Controls {
+            StartupRuntime& world;StoredCurrencyRegistration<instanceCapacity,Capacity>& gems;
+            InstanceHandle box;Tile tile;
+            Operations(StartupRuntime& w,decltype(gems) g,InstanceHandle h,Controls c,Tile t)
+                :Controls(c),world(w),gems(g),box(h),tile(t){}
+            bool currency(int amount){return world.spawnBoxCurrency(gems,box,MotionBinary64::fromInteger(amount),tile);}
+        };
+        return Operations(*this,registry,box,controls,tile);
+    }
     // Source numeric IDs cross this script boundary; the registry's local
     // generation handles stay private to child creation and setters.
     template<unsigned Capacity,class Read,class WriteAmount,class WriteAttracted,class WriteChild,class Tile>

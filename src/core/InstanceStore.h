@@ -19,6 +19,7 @@
 #include "WallEndStep.h"
 #include "BreakableState.h"
 #include "SoundPlayScript.h"
+#include "CurrencyRewardFields.h"
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -82,6 +83,7 @@ struct InstanceRecord {
     AlarmBank alarms;
     WallEndStepState wall{};
     BreakableState box{};
+    CurrencyRewardFields boxReward{};
     std::uint32_t boxMyFx=0; // scrEffectSpawn's source numeric child ID on object 92.
     std::int32_t boxMyBullet=-4,boxTarget=-4; // Source numeric values, never local generation keys.
     SoundPlayState sound{};

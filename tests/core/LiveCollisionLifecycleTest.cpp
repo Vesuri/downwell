@@ -161,6 +161,54 @@ int main(){
     BuilderPatternPack patterns(bb.data(),bb.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     SpriteMaskPack masks(mb.data(),mb.size());
     require(rooms.valid()&&objects.valid()&&patterns.valid()&&sprites.valid()&&masks.valid(),"real collision resources validate");
+    for(bool rejectCreate:{false,true}){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach box-owned reward fields");world->skipToGameForTesting();
+        InstanceHandle box;
+        // Keep the real Create lottery; do not force haveGem in the fixture.
+        for(unsigned attempt=0;attempt<1024;++attempt){
+            require(world->spawnBuilderPrimitive(92,240,512,box),"source box Create for reward fixture");
+            if(owner->resolve(box)->box.haveGem)break;
+            require(world->markBoxDestroyed(box),"exclude preceding lottery boxes from contacts");
+        }
+        require(owner->resolve(box)->box.haveGem==2&&world->publishBoxHealth(box,{}),"source-created medium reward box");
+        auto gems=world->currencyRegistration<2>();ScheduledBoxCounts counts;
+        auto controls=scheduledBoxEffects(*world,box,counts,[&](InstanceHandle h){return world->markBoxDestroyed(h);});
+        controls.timeQuery=[&](InstanceHandle h,bool& allowed){return owner->boxTimeAllowed(*world,h,false,480,allowed);};
+        InstanceHandle created;
+        auto rewards=world->boxCurrencyOperations(gems,box,controls,
+            [&](InstanceHandle h,int layer,MotionBinary64 x,MotionBinary64 y,bool& hit){
+                require(x.high==MotionBinary64::fromInteger(240).high&&!x.low&&
+                    y.high==MotionBinary64::fromInteger(512).high&&!y.low,"reward uses caller published position, not default or local coordinates");
+                created=h;hit=false;return layer==100&&!rejectCreate;
+            });
+        BoxSoundVerification::Audio<StartupRuntime> audio{*world,owner->resolve(box)->box.breakSound};
+        auto ops=boxWorldEffects(*world,box,rewards,[&](int id,unsigned& frames){
+            PackedSpriteCollision art;if(!sprites.sprite(id,art))return false;frames=art.frameCount;return true;
+        },audio,MotionBinary64{0x3fd00000u,0},false);
+        bool good=true;
+        const bool completed=BoxDestructionScript::runRetained([&](auto& out){return owner->readBoxDestruction(box,out);},ops,good);
+        require(completed==!rejectCreate&&good==completed&&world->effectsSucceeded()==completed,
+            "box event reaches real registered rewards after ordered effects and destruction");
+        const auto* caller=world->resolveInstance(box);
+        require(caller&&caller->destroyRequested&&caller->boxReward.moniAmount.zero()==!rejectCreate&&!caller->boxReward.atrState,
+            "real caller retains reward fields after destruction marking");
+        if(rejectCreate){
+            require(!caller->boxReward.myGem&&caller->boxReward.moniAmount.high==MotionBinary64::fromInteger(10).high&&
+                !caller->boxReward.moniAmount.low&&gems.find(created)&&gems.find(created)->getAmount==2&&
+                gems.find(created)->size==0&&!counts.stop&&world->debrisEffects().size()==2,
+                "failed reward Create retains prior effects and caller amount without myGem/setters/tail alarmStop");
+            require(gems.clear(),"retire failed reward child");continue;
+        }
+        const auto* child=world->instance(caller->boxReward.myGem);
+        require(child&&child->objectId==248,"box myGem stores globally allocated child ID");
+        const auto* gem=gems.find(gems.handle(*child));
+        require(gem&&gem->getAmount==10&&gem->size==1&&!gem->attracted,"source medium reward setters reach registry");
+        require(world->debrisEffects().size()==2&&world->smokeEffects().size()==1&&world->scriptEffects().size()==1&&
+            counts.mark==1&&counts.stop==1&&audio.valid&&audio.calls==7,"reward preserves completed destruction effects and tail alarmStop");
+        require(gems.clear(),"retire box reward registry before teardown");
+    }
     for(unsigned mode=0;mode<4;++mode){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());

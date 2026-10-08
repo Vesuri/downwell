@@ -584,8 +584,9 @@ before thin-wall (87) and wall (57) collision scripts, preserves both ordered
 friction multiplications at combined contacts, and uses the runner's truncated
 [-1,0] integer bounce range. Bounce sound follows the published view-Y test.
 Attraction checks precede water drag; acquisition changes the next Step's path,
-while the acquisition frame still integrates its current velocity. Water is
-a point query at published x/y, not a sprite-mask query at private xx/yy.
+while the acquisition frame still integrates its current velocity. Water uses
+the recovered `position_meeting` wrapper at published x/y (including its
+precise-mask semantics), not private xx/yy or a substituted collision-point call.
 
 The stored `stepSource` adapter joins this branch with homing, the checked
 binary64 collision solver, registered mask/point queries and source sound.
@@ -619,6 +620,13 @@ the registry's generation handles. Caller fields remain the responsibility of
 the required read/write accessors, not a temporary snapshot copied back at
 script exit. This entry point does not admit natural rewards or supply the
 native world's incomplete cross-family numeric-ID stream.
+For stored boxes, `spawnBoxCurrency` binds these accessors to the actual
+generation's `boxReward` fields, including after destruction marking. Position
+comes from its published binary32 coordinates on each read. These cold fields
+are separate from `BreakableState`, so ordinary box Step snapshots do not copy
+them. `boxCurrencyOperations` supplies the destruction script's currency call
+without replacing its required time-stop, chain or other effect operations.
+Native box reward ownership still requires its numeric-ID allocation adapter.
 `CurrencyGainAccountOperations` exposes the separate writes on either world's
 real account, rejecting values outside its nonnegative uint32 storage domain.
 The stored registry's collection entry retains caller state and source RNG.
