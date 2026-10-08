@@ -4,6 +4,17 @@ The CPU target is an A500/68000. The current emulator has 512 KiB Chip RAM and
 8 MiB Fast RAM; the latter remains a development configuration, not a final
 memory requirement.
 
+## CPU-only HUD artwork
+
+The immutable counter/streak pair-column tables occupy 49,368 bytes in
+ordinary read-only memory (14,520 currency; 34,848 streak), not Chip RAM.
+They replace 8,160 bytes of individual digit-layer tables in the default
+renderer: the artwork increase is 41,208 bytes. No additional mutable cache,
+framebuffer or staging allocation is required. The generator certifies the
+two-byte decomposition rather than storing a 279,438-byte three-digit bank.
+`REFERENCE_HUD_COMPOSITION=1` links the retained individual-layer tables
+instead of the pair columns.
+
 ## Current Chip RAM ownership
 
 | Owner | Bytes |

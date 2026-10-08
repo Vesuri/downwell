@@ -660,6 +660,20 @@ separately from steady-state updates and distinguish waits from useful work.
 
 ## Pair timing with correctness
 
+`REFERENCE_HUD_COMPOSITION=1` retains runtime digit-column layer composition
+inside the prepared HUD renderer. The default reads offline pair columns;
+dirty digit identities, background ownership and framebuffer publication are
+unchanged. This is separate from `REFERENCE_HUD_WORDS=1` (the older staged
+compositor) and `REFERENCE_HUD_TEXT=1` (the layered renderer).
+The host generator proves that each word's left byte depends only on its
+tail/middle digits and its right byte on middle/head, for all 3,993
+digit/blank triples and alignment cases. It preserves per-digit currency
+layer order and whole-string streak precedence. `make test-amiga-prepared-hud`
+compares complete layers against source-ordered rendering, including resets,
+external-overlay invalidation and digit-count changes. Pair timing at frames
+488 and 660 with completed-DMA native dumps through 640–900 and require zero
+prepared HUD fallbacks. Profiling restoration unsets the reference selector.
+
 `bash amiga/profile.sh draw-cache` is a diagnostic, not a timing comparison.
 It starts directly in gameplay and defaults to the contact tape, counting
 cache hits, identical refills and changed actor lists. The default native path

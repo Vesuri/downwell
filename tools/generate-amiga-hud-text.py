@@ -21,7 +21,8 @@ def main():
     args = parser.parse_args()
     payload = subprocess.check_output([str(ROOT / "build/generate-amiga-hud-text"),
                                       "generated/amiga-hud.dwap", "generated/amiga-game.dwap"], cwd=ROOT)
-    manifest = {"format": "amiga-hud-prepared-words-v1", "generator_version": 1,
+    manifest = {"format": "amiga-hud-prepared-words-v2", "generator_version": 2,
+                "pair_column_bytes": 49368,
                 "extractor": json.loads((ROOT / "generated/amiga-hud.manifest.json").read_text())["extractor"],
                 "resource_ids": {"currency_digits": 413, "currency_icon": 376,
                                  "streak_icon": 133, "derived_streak_digits": list(range(65100, 65110))},

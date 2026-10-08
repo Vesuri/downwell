@@ -360,21 +360,6 @@ composition work must remove a threshold-sized structure, not tune stamp
 lookup, row geometry or the sub-millisecond bitmap setup. Preserve the
 retained alpha raster's exact queries and uncommon-mask fallback.
 
-### D. Gem counter and streak redraws (frames 488 and 660)
-
-Counter/streak redraws still exceed the under-5-ms combined target: about
-5.5 ms at 660 and 6.0 ms when the streak first becomes visible at 488.
-Counter publication costs about 2.5 ms; streak publication costs 3.0–3.5 ms.
-A further attempt must remove a threshold-sized structure, not tune the
-prepared word loops, digit arithmetic or sub-millisecond helpers. Do not
-reopen the rejected retained-pixel comparison scan.
-Keep initial-picture ownership, external-overlay invalidation, per-digit
-currency layer order and whole-string streak layer order exact.
-`REFERENCE_HUD_WORDS=1` retains the staged compositor;
-`REFERENCE_HUD_TEXT=1` retains the layered renderer. Use both host HUD tests
-and completed-DMA native frame dumps, including the initial frame, first
-pickup and 640–900; require zero unexpected prepared-path fallbacks.
-
 ### E. Quiet-frame shortfall
 
 Pursue shared quiet-frame work, not another enemy alarm-order variant. Do not

@@ -2,8 +2,9 @@
 
 Default A500 build at `7deed269` (2026-10-08), compared with the supplied
 `36d8a0f2` audit. Remaining work is ranked in
-[open-work §5](open-work.md#5-meet-the-amiga-frame-budget). This is a current
-cost audit, not a claim that the 20 ms gameplay budget has been met.
+[open-work §5](open-work.md#5-meet-the-amiga-frame-budget). This is a snapshot
+cost audit, not a claim that the 20 ms gameplay budget has been met. Subsequent
+matched measurements and post-group audits are recorded in their commits.
 
 ## Configuration and reproduction
 
@@ -148,9 +149,6 @@ runs on this admitted contact. The pair still costs about 10.84 ms, so the
 remaining proposal must eliminate a whole computation rather than tune
 sub-millisecond decoder/arithmetic helpers. Later Step costs about 2.14 ms.
 
-At 660, counter/streak redraws cost 2.48/3.03 ms; at 488, 2.47/3.48 ms.
-Their combined under-5-ms target is not met. Old 22-ms HUD text and 14-ms
-raster currency costs are no longer a valid basis for the next change.
 Ammo redraw is still 11.21 ms at 645 and 10.71 ms at 646; health is 3.98 ms
 at 645. Those remain parked as specified by §5.
 
@@ -166,7 +164,7 @@ proposal needs a shared structure across callers; these figures do not
 justify tuning unrelated small helpers.
 
 The current audit therefore still identifies generation publication, combat
-draw-command production and the contact/HUD computations as outstanding
+draw-command production and the contact computations as outstanding
 structures. It does not establish dense-effect coverage or close §5. The
 supplied audit and historical measurements remain available in Git.
 
