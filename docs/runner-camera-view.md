@@ -58,12 +58,15 @@ necessary. Each world retains eight small view records, not camera matrices.
 
 The followed instance `camMain` (object 64) is not the camera view cache.
 
-The stored main-camera adapter publishes its resolved position to the instance's
+The stored main-camera adapter publishes its rounded position to the instance's
 binary32 fields and resource-backed query owner during Create, ordinary Step
 and the side-locker collision correction. Pixel caches remain for existing
 render consumers, but entry-effect readers use the precise fields. Rejected
 owner publication leaves the record's accepted position unchanged and fails the
-world. Tests check fractional positions at the actual entry-effect read and
+world. `camMain` Step ends with `round(xxFinal)`/`round(yyFinal)` setters;
+the fractional easing accumulators must not leak into those published fields.
+The native entry-effect adapter likewise reads rounded instance X, not Q12 X
+or the view's left edge. Tests check rounded positions during movement and
 failure at each of those publication sites. This synchronizes the implemented
 camera-motion adapter; it does not validate all of that adapter's Q12 easing
 against the original VM or replace the separate published-view phase rules.

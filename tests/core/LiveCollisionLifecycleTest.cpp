@@ -2379,7 +2379,7 @@ int main(){
         require(owner->attach(*world),"attach time-change world");
         {
             auto entry=world->entryDitherRegistration<1>();InstanceHandle key;
-            unsigned reads=0;bool fractionalCamera=false;
+            unsigned reads=0;bool movedCamera=false;
             auto camera=[&](MotionBinary64& out){
                 ++reads;unsigned cameras=0;
                 if(reads==1){
@@ -2395,7 +2395,9 @@ int main(){
                     require(owner->collisionPosition(world->instanceHandleAt(i),registeredX,registeredY)&&
                         registeredX.bits==x.bits&&registeredY.bits==y.bits,
                         "entry reader sees the same precise camera fields as the registered owner");
-                    fractionalCamera|=r.preciseY!=float(r.y);
+                    require(r.preciseX==float(r.x)&&r.preciseY==float(r.y),
+                        "camMain publishes rounded builtins, not fractional easing accumulators");
+                    movedCamera|=r.y!=176;
                     out=x.promoted();
                 }
                 require(cameras==1,"entry reads the unique main-room parentCamera descendant");
@@ -2434,7 +2436,7 @@ int main(){
                     "entry Draw keeps offscreen origins until alarm destruction, without scrInView clipping");
             }
             require(reads==120,"one Create and 119 ordinary-Step camera reads");
-            require(fractionalCamera,"camera publication retains fractional positions, not only pixel caches");
+            require(movedCamera,"rounded camera publication is exercised during actual camera movement");
             require(world->cleanupEntryDither(entry,[](auto,const auto&){return false;})&&!world->instance(id),
                     "global cleanup retires marked entry controller and collision/layer ownership");
         }

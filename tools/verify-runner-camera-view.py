@@ -26,6 +26,10 @@ for name, digest in (
     ("gml_Object_fxTimeShard_Step_0.asm", "ffc9df3254393892f836845f420fb92b601704d5419987fb2ce4a795fddd6e3b"),
 ):
     assert sha256((assembly / name).read_bytes()).hexdigest() == digest, name
+camera_step = (assembly / "gml_Object_camMain_Step_0.asm").read_text()
+assert "push.v self.xxFinal\ncall.i round(argc=1)\npop.v.v self.x" in camera_step
+assert "push.v self.yyFinal\ncall.i round(argc=1)\npop.v.v self.y" in camera_step
+assert "pushglb.v global.ending\nconv.v.b\nnot.b\nbf [end]" in camera_step
 for start, end, digest in (
     (0x455E90, 0x455EEC, "d5952ca02d9a2707151f88c13a83bd809ddad321871f2cd35300472b0532eda8"),
     (0x453EC0, 0x454208, "9cd6f92210f8d69f112ea686ee8c3a161d47aa9df7ef7202791d1b7384dcdaa9"),

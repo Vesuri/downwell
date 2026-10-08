@@ -1193,18 +1193,14 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     }
 
     // camMain (64) precedes objEnterDither (73), which precedes the builder.
-    // Publish the existing Q12 camera adapter as binary32 before the VM read;
-    // do not substitute its rounded display-window X. Full source camera
+    // camMain publishes round(xxFinal) to x before this VM read, not its
+    // fractional Q12 easing accumulator (nor the view's left edge). Full source camera
     // arithmetic and source-ordered native controller births remain separate.
     for(unsigned i=0;i<entryStepCount;++i){
         const auto key=entryStep[i];
         if(!entryDithers_->find(key))continue;
         if(!entryDithers_->step(key,[&](downwell::MotionBinary64& x){
-            auto precise=downwell::MotionBinary64::fromInteger(cameraMotion_.x);
-            if(!precise.zero())precise.high-=12u<<20;
-            downwell::RunnerImageValue published;
-            if(!published.assign(precise))return false;
-            x=published.promoted();return true;
+            x=downwell::MotionBinary64::fromInteger(cameraMotion_.pixelX());return true;
         })){run_.effectsSucceeded=false;return {};}
     }
     if(!captureEnemyStepOrder())return {};

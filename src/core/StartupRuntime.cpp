@@ -1594,8 +1594,11 @@ bool StartupRuntime::createOwnedEntryDither(int room){
 bool StartupRuntime::publishMainCameraPosition(InstanceRecord& instance){
     if(!run_.effectsSucceeded)return false;
     RunnerImageValue x,y;
-    std::memcpy(&x.bits,&mainCameraX_,sizeof x.bits);
-    std::memcpy(&y.bits,&mainCameraY_,sizeof y.bits);
+    // camMain Step publishes round(xxFinal/yyFinal), not the fractional
+    // easing accumulators. Create and the supported locker snaps are integral
+    // too. Keep mainCameraX_/Y_ as adapter state, not public instance fields.
+    if(!x.assignInteger(mainCameraMotion_.pixelX())||!y.assignInteger(mainCameraMotion_.pixelY()))
+        return run_.effectsSucceeded=false;
     // Only called with a record supplied by this store's event/room traversal.
     // Resolve its stable handle without another per-frame linear ID search.
     const auto index=static_cast<std::size_t>(&instance-&instances_.at(0));
@@ -1603,7 +1606,8 @@ bool StartupRuntime::publishMainCameraPosition(InstanceRecord& instance){
        (lifecycle_.hasOwner()&&!lifecycle_.publishedPosition(instances_.handleAt(index),instance,x,y)))
         return run_.effectsSucceeded=false;
     instance.x=mainCameraMotion_.pixelX();instance.y=mainCameraMotion_.pixelY();
-    instance.preciseX=mainCameraX_;instance.preciseY=mainCameraY_;
+    std::memcpy(&instance.preciseX,&x.bits,sizeof x.bits);
+    std::memcpy(&instance.preciseY,&y.bits,sizeof y.bits);
     return true;
 }
 

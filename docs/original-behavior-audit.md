@@ -205,8 +205,10 @@ player Create admits the effect after the camera, the normal room scheduler
 dispatches its alarms/Step, and global cleanup retires the destroyed record.
 Reset, Retry and room changes clear that registration before room teardown.
 The default camera read requires one live object-64 parentCamera descendant in
-the destination room and uses its published binary32 X, not its rounded pixel
-cache. Multiple/alternate cameras fail rather than guessing object-read order.
+the destination room and uses its published binary32 X. The supported camMain
+Step publishes `round(xxFinal)` there, not its fractional easing accumulator;
+external setters still publish their supplied binary32 value.
+Multiple/alternate cameras fail rather than guessing object-read order.
 Explicit scoped registrations retain caller-controlled cleanup for audit tests.
 Unindexed reference worlds opt into local-store publication, retaining identical
 IDs and lifetimes; a configured collision owner must still accept every write.
