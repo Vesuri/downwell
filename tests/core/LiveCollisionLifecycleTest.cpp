@@ -151,6 +151,7 @@ struct ProjectileFailureOwner:StoredWorldCollision {
 };
 #include "BoxBurstWorldCheck.h"
 #include "ScheduledBoxEffectsCheck.h"
+#include "core/BoxWorldEffects.h"
 int main(){
     const auto rb=read("generated/downwell-rooms.dwrm"),ob=read("generated/downwell-objects.dwob"),
         bb=read("generated/downwell-builder-patterns.dwbp"),sb=read("generated/downwell-sprites.dwsc"),
@@ -159,7 +160,8 @@ int main(){
     BuilderPatternPack patterns(bb.data(),bb.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     SpriteMaskPack masks(mb.data(),mb.size());
     require(rooms.valid()&&objects.valid()&&patterns.valid()&&sprites.valid()&&masks.valid(),"real collision resources validate");
-    {
+    for(unsigned mode=0;mode<3;++mode){
+        const bool fullEffects=mode!=0;
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
         require(owner->attach(*world),"attach scheduled box world");world->skipToGameForTesting();
@@ -167,10 +169,38 @@ int main(){
         require(world->spawnBuilderPrimitive(92,240,512,box)&&world->publishBoxHealth(box,{}),"create exhausted scheduled box");
         ScheduledBoxCounts counts;
         const auto destroyed=world->mainBlocksDestroyed();
-        require(!world->withBoxDestruction(
-            [&](InstanceHandle key,BoxDestructionScript::Caller& caller){return owner->readBoxDestruction(key,caller);},
-            [&](InstanceHandle key){return scheduledBoxEffects(*world,key,counts,
-                [&](InstanceHandle h){return world->markBoxDestroyed(h);});},
+        auto readCaller=[&](InstanceHandle key,BoxDestructionScript::Caller& caller){return owner->readBoxDestruction(key,caller);};
+        auto controls=[&](InstanceHandle key){return scheduledBoxEffects(*world,key,counts,
+            [&](InstanceHandle h){return world->markBoxDestroyed(h);});};
+        if(fullEffects){
+            require(!owner->resolve(box)->box.haveGem,"scheduled no-reward box fixture");
+            if(mode==2)for(unsigned i=0;i<debrisEffectCapacity;++i){
+                InstanceHandle child;
+                require(world->spawnDebris(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(512),1,child)&&
+                    owner->resolve(child)&&owner->resolve(child)->objectId==370,"fill registered debris capacity with real handles");
+            }
+            const bool completed=world->withBoxDestruction(readCaller,[&](InstanceHandle key){
+                auto callbacks=controls(key);callbacks.verifyDebris=true;
+                return boxWorldEffects(*world,key,callbacks,[&](int id,unsigned& frames){
+                    PackedSpriteCollision art;if(!sprites.sprite(id,art))return false;frames=art.frameCount;return true;});
+            },[&]{return world->stepWithOwnedDebris({},[](auto,const auto&,bool& frozen){frozen=false;return true;});});
+            require(completed==(mode==1),"stored scheduled source effects honor debris capacity");
+            if(mode==2){
+                require(!world->effectsSucceeded()&&world->debrisEffects().size()==debrisEffectCapacity&&
+                    owner->resolve(box)&&owner->resolve(box)->destroyRequested&&counts.sound==1&&counts.mark==1&&
+                    world->smokeEffects().size()==1&&world->scriptEffects().size()==1,
+                    "real debris exhaustion preserves completed destruction prefix");
+                continue;
+            }
+            require(world->effectsSucceeded()&&!owner->resolve(box)&&world->debrisEffects().size()==2&&
+                world->smokeEffects().size()==1&&world->flashEffects().slot(0).handle&&world->scriptEffects().size()==1&&
+                counts.mark==1&&counts.sound==1&&counts.stop&&world->mainBlocksDestroyed()==destroyed+1,
+                "stored complete effect sequence retires only the box at Draw cleanup");
+            require(world->stepWithOwnedDebris({},[](auto,const auto&,bool& frozen){frozen=false;return true;})&&
+                world->debrisEffects().size()==2,"registered destruction debris survives next stored frame");
+            continue;
+        }
+        require(!world->withBoxDestruction(readCaller,controls,
             [&]{return world->stepWithCollisionPass({},false,[]{return true;});}),"scheduled debris failure stops stored tick");
         require(!world->effectsSucceeded()&&counts.sound==1&&counts.smoke==1&&counts.flash==1&&
             counts.impact==1&&counts.mark==1&&counts.debris==1&&

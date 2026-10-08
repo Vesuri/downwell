@@ -2,6 +2,7 @@
 #include "RegisteredSkeletonThrowChecks.h"
 #include "QuietSkeletonEffects.h"
 #include "ScheduledBoxEffectsCheck.h"
+#include "core/BoxWorldEffects.h"
 #ifdef DOWNWELL_LOCAL_DRAW_CAPTURE
 namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_CAPTURE; }
 #endif
@@ -568,7 +569,8 @@ int main(){
     }
     auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
-    {
+    for(unsigned mode=0;mode<3;++mode){
+        const bool fullEffects=mode!=0;
         const auto roomBytes=read("generated/downwell-rooms.dwrm");RoomPack roomPack(roomBytes.data(),roomBytes.size());
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
             GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&roomPack);
@@ -588,6 +590,40 @@ int main(){
             [&]{world->step(0);return world->effectsSucceeded();});};
         assert(tick()&&counts.stop==1&&!counts.sound&&world->findBreakable(box));
         counts={};assert(world->publishBoxHealth(box,{}));
+        if(fullEffects){
+            if(mode==2)for(unsigned i=0;i<debrisEffectCapacity;++i){
+                InstanceHandle child;
+                assert(world->spawnDebris(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(512),1,child)&&
+                    owner->debris().find(child));
+            }
+            auto stopped=[](auto,const auto&,bool& frozen){frozen=false;return true;};
+            auto meeting=[](auto,const auto&,auto,auto,bool& hit){hit=false;return true;};
+            const bool completed=world->withBoxDestruction([&](InstanceHandle key,BoxDestructionScript::Caller& caller){
+                InstanceHandle shared;
+                return GameplayCollisionView::encode(GameplayCollisionView::Kind::breakable,key,shared)&&
+                    owner->readBoxDestruction(shared,caller);
+            },[&](InstanceHandle key){
+                auto callbacks=scheduledBoxEffects(*world,key,counts,[&](InstanceHandle h){return world->markBreakableDestroyed(h);});
+                callbacks.verifyDebris=true;
+                return boxWorldEffects(*world,key,callbacks,
+                [&](int id,unsigned& frames){PackedSpriteCollision art;if(!sprites.sprite(id,art))return false;
+                    frames=art.frameCount;return true;});},
+                [&]{return world->stepWithOwnedDebris(0,stopped,meeting);});
+            assert(completed==(mode==1));
+            if(mode==2){
+                assert(!world->effectsSucceeded()&&world->debrisEffects().size()==debrisEffectCapacity&&
+                    world->findBreakable(box)&&world->findBreakable(box)->destroyRequested&&
+                    counts.sound==1&&counts.mark==1&&counts.stop==0&&
+                    world->smokeEffects().size()==1&&world->scriptEffects().size()==1);
+                continue;
+            }
+            assert(world->effectsSucceeded()&&world->debrisEffects().size()==2&&
+                world->smokeEffects().size()==1&&world->flashEffects().slot(0).handle&&world->scriptEffects().size()==1&&
+                counts.mark==1&&counts.sound==1&&counts.stop==1&&world->findBreakable(box)->destroyRequested);
+            assert(owner->prepareDraw()&&!world->findBreakable(box));
+            assert(world->stepWithOwnedDebris(0,stopped,meeting)&&world->debrisEffects().size()==2);
+            continue;
+        }
         assert(!tick());
         assert(!world->effectsSucceeded()&&counts.sound==1&&counts.smoke==1&&counts.flash==1&&
             counts.impact==1&&counts.mark==1&&counts.debris==1&&counts.stop==0&&

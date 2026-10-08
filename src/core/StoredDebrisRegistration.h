@@ -49,6 +49,10 @@ public:
         return nullptr;
     }
     unsigned sourceId(unsigned local){auto* e=entry(local);return succeeded_&&e&&record(*e)?e->id:0;}
+    InstanceHandle sourceHandle(unsigned id){
+        if(succeeded_&&id)for(const auto& e:entries_)if(e.local&&e.id==id&&record(e))return e.key;
+        return {};
+    }
     bool birth(unsigned local,const DebrisAnimation& effect){
         if(!succeeded_)return false;
         Entry* free=nullptr;for(auto& e:entries_)if(!e.local&&!free)free=&e;

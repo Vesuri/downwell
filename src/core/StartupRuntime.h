@@ -752,6 +752,13 @@ public:
     bool spawnDebris(MotionBinary64 x,MotionBinary64 y,int area,std::uint32_t& id){
         return spawnDebris(ownedDebrisRegistration_,ownedDebrisEffects_,x,y,area,id);
     }
+    bool spawnDebris(MotionBinary64 x,MotionBinary64 y,int area,InstanceHandle& key){
+        std::uint32_t id=0;
+        if(!spawnDebris(x,y,area,id))return false;
+        const auto created=ownedDebrisRegistration_.sourceHandle(id);
+        if(!created.generation)return run_.effectsSucceeded=false;
+        key=created;return true;
+    }
     template<unsigned Capacity,unsigned Registered,class Stopped>
     bool stepDebris(StoredDebrisRegistration<instanceCapacity,Registered>& registration,DebrisEffects<Capacity>& effects,
         InstanceHandle key,typename DebrisEffects<Capacity>::Phase phase,Stopped stopped){

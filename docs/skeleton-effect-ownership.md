@@ -352,6 +352,18 @@ installed. Scheduled failure-prefix checks use real smoke, flash and impact
 owners, then reject debris creation; they do not prove complete destruction
 or natural encounter parity.
 
+`BoxWorldEffects` supplies the shared script's concrete smoke, flash, impact
+and object-370 creation calls to either world. Impact creation publishes the
+caller's `myFx`; debris creation returns the actual registered lifetime, with
+stored numeric IDs resolved back to world handles and native generation handles
+kept local. The remaining control operations (audio, globals, chain contacts,
+rewards, destruction and time queries) are required from the caller rather than
+successful no-op defaults. The scoped box and owned-debris tick adapters can be
+nested to keep creation, later debris phases and cleanup in one world frame.
+Scheduled no-chain/no-reward fixtures check the complete WELL state at the end
+of emission, both debris birth states, box cleanup and next-frame survival. They
+provide test audio/time state and are not the ordinary gameplay binding.
+
 Gunpowder Blocks creates object 266 (`bulletDrone`), not an explosion. Its
 Create overrides the serialized sprite 458 with 459, sets speed 7, damage 4,
 zero spread and alarm 0 to 16; the box subsequently assigns direction 90 and

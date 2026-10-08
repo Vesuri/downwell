@@ -1007,6 +1007,11 @@ audit:
 		echo "*** instruction newer than 68000 in native executable"; exit 1; \
 	else echo "68000 instruction audit: clean"; fi
 
+.PHONY: verify-box-effects-compile
+verify-box-effects-compile:
+	@mkdir -p obj
+	$(CC) $(CPPFLAGS) -c -o obj/BoxWorldEffectsCompile.o $(REPO)/tests/core/BoxWorldEffectsCompile.cpp
+
 .PHONY: verify-builder-traversal-compile
 verify-builder-traversal-compile:
 	@mkdir -p obj
