@@ -1,0 +1,377 @@
+diff --git a/Makefile b/Makefile
+index a2dd404e..490389f1 100644
+--- a/Makefile
++++ b/Makefile
+@@ -2480,7 +2480,9 @@ test: test-amiga-gameplay-sprite-assignment
+ 
+ GAMEPLAY_DRAW_LIST_TEST_SOURCES := tests/platform/amiga/AmigaGameplayDrawListTest.cpp src/platform/amiga/AmigaGameplayDrawList.cpp src/core/GameplayWorld.cpp src/core/PlayerMotion.cpp src/core/Replay.cpp src/core/GameMakerRandom.cpp src/core/ObjectPack.cpp src/core/RoomPack.cpp
+ CURRENCY_PROMOTION_TEST_SOURCES := tests/platform/amiga/AmigaCurrencyPromotionTest.cpp $(filter-out tests/platform/amiga/AmigaSceneRuntimeTest.cpp,$(AMIGA_SCENE_TEST_SOURCES)) src/platform/amiga/AmigaGameplayDrawList.cpp src/platform/amiga/AmigaRenderer.c
+-build/amiga-currency-promotion-test: $(CURRENCY_PROMOTION_TEST_SOURCES) tests/platform/amiga/AmigaSceneRuntimeTest.cpp $(HOST_CHECK_HEADERS)
++generated/amiga-shade-overlap.h: tools/generate-amiga-shade-overlap.py generated/amiga-game.dwap
++	python3 tools/generate-amiga-shade-overlap.py
++build/amiga-currency-promotion-test: $(CURRENCY_PROMOTION_TEST_SOURCES) tests/platform/amiga/AmigaSceneRuntimeTest.cpp $(HOST_CHECK_HEADERS) generated/amiga-shade-overlap.h
+ 	@mkdir -p build
+ 	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $(CURRENCY_PROMOTION_TEST_SOURCES)
+ .PHONY: test-amiga-currency-promotion
+@@ -2492,7 +2494,7 @@ test: test-amiga-currency-promotion
+ generate-overflow-witness: build/amiga-currency-promotion-test
+ 	python3 tools/generate-overflow-witness.py
+ .PHONY: test-amiga-gameplay-draw-list
+-build/amiga-gameplay-draw-list-test: $(GAMEPLAY_DRAW_LIST_TEST_SOURCES) $(HOST_CHECK_HEADERS)
++build/amiga-gameplay-draw-list-test: $(GAMEPLAY_DRAW_LIST_TEST_SOURCES) $(HOST_CHECK_HEADERS) generated/amiga-shade-overlap.h
+ 	@mkdir -p build
+ 	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $(GAMEPLAY_DRAW_LIST_TEST_SOURCES)
+ build/amiga-gameplay-draw-list-replay-test: $(GAMEPLAY_DRAW_LIST_TEST_SOURCES) $(HOST_CHECK_HEADERS)
+diff --git a/amiga/Makefile b/amiga/Makefile
+index 597a607f..4b26f1c2 100644
+--- a/amiga/Makefile
++++ b/amiga/Makefile
+@@ -37,6 +37,7 @@ REFERENCE_DAMAGE_BANK ?= 0
+ REFERENCE_HEALTH_ART ?= 0
+ REFERENCE_HEALTH_ADMISSION ?= 0
+ REFERENCE_AMMO_ADMISSION ?= 0
++REFERENCE_SHADE_OVERLAP ?= 0
+ REFERENCE_GEM_POSITION ?= 0
+ REFERENCE_EFFECT_COMPOSITION ?= 0
+ REFERENCE_STYLE_SPRITES ?= 0
+@@ -278,6 +279,9 @@ endif
+ ifeq ($(REFERENCE_AMMO_ADMISSION),1)
+ CFLAGS += -DDOWNWELL_REFERENCE_AMMO_ADMISSION
+ endif
++ifeq ($(REFERENCE_SHADE_OVERLAP),1)
++CFLAGS += -DDOWNWELL_REFERENCE_SHADE_OVERLAP
++endif
+ ifeq ($(REFERENCE_GEM_POSITION),1)
+ CFLAGS += -DDOWNWELL_REFERENCE_GEM_POSITION
+ endif
+@@ -566,6 +570,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
+ 	@printf '%s\n' '$(REFERENCE_HEALTH_ART)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_HEALTH_ADMISSION)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_AMMO_ADMISSION)' >> $@.tmp
++	@printf '%s\n' '$(REFERENCE_SHADE_OVERLAP)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_HUD_BORDER)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_CONTACT_MOTION)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_CONTACT_COORDINATES)' >> $@.tmp
+@@ -759,7 +764,9 @@ obj/AmigaGameplayActors.o: $(AMIGA_SRC)/AmigaGameplayActors.cpp $(AMIGA_SRC)/Ami
+ obj/AmigaGameplaySpriteAssignment.o: $(AMIGA_SRC)/AmigaGameplaySpriteAssignment.cpp $(AMIGA_SRC)/AmigaGameplayActors.h
+ 	@mkdir -p $(@D)
+ 	$(CC) $(CPPFLAGS) -c -o $@ $<
+-obj/AmigaGameplayDrawList.o: $(AMIGA_SRC)/AmigaGameplayDrawList.cpp $(AMIGA_SRC)/AmigaGameplayDrawList.h
++$(REPO)/generated/amiga-shade-overlap.h: $(REPO)/tools/generate-amiga-shade-overlap.py $(AMIGA_GAME)
++	$(MAKE) -C $(REPO) generated/amiga-shade-overlap.h
++obj/AmigaGameplayDrawList.o: $(AMIGA_SRC)/AmigaGameplayDrawList.cpp $(AMIGA_SRC)/AmigaGameplayDrawList.h $(REPO)/generated/amiga-shade-overlap.h
+ 	@mkdir -p $(@D)
+ 	$(CC) $(CPPFLAGS) -c -o $@ $<
+ obj/AmigaTerrainRaster.o: $(AMIGA_SRC)/AmigaTerrainRaster.cpp $(AMIGA_SRC)/AmigaTerrainRaster.h
+diff --git a/amiga/profile.sh b/amiga/profile.sh
+index df42b20f..be60c8a4 100644
+--- a/amiga/profile.sh
++++ b/amiga/profile.sh
+@@ -118,6 +118,7 @@ restore() {
+   unset REFERENCE_HEALTH_ART
+   unset REFERENCE_HEALTH_ADMISSION
+   unset REFERENCE_AMMO_ADMISSION
++  unset REFERENCE_SHADE_OVERLAP
+   unset REFERENCE_GEM_POSITION
+   unset REFERENCE_EFFECT_COMPOSITION
+   unset REFERENCE_STYLE_SPRITES
+diff --git a/src/platform/amiga/AmigaGameplayDrawList.cpp b/src/platform/amiga/AmigaGameplayDrawList.cpp
+index 0b1a497d..97a87fb4 100644
+--- a/src/platform/amiga/AmigaGameplayDrawList.cpp
++++ b/src/platform/amiga/AmigaGameplayDrawList.cpp
+@@ -5,11 +5,53 @@
+ #include "core/DamageNumberText.h"
+ #include "core/RunnerSpatialSplit.h"
+ #include "core/DebrisDraw.h"
++#include "../../../generated/amiga-shade-overlap.h"
+ #if defined(DOWNWELL_BOB_VERIFY) || defined(DOWNWELL_DRAW_ORDER_AUDIT)
+ #include "core/ActorDrawOrderVerification.h"
+ extern "C" { volatile unsigned gDownwellActorOrderChecks,gDownwellActorOrderFailures; }
+ #endif
+ 
++void AmigaGameplayDrawList::bindShadeOverlap(const downwell::EffectMaskAssets& assets){
++    for(auto& mask:shadeMasks_)mask=nullptr;
++#ifndef DOWNWELL_REFERENCE_SHADE_OVERLAP
++    if(!assets.ready())return;
++    for(unsigned i=0;i<9;++i){
++        const auto* art=i?assets.currency(i>4,(i-1)%4):assets.shade();
++        const auto& m=art->mask;const auto* expected=downwell_shade_overlap::masks[i];
++        if(m.width!=expected[0]||m.height!=expected[1]||m.stride!=expected[2]||m.bytes!=expected[4])return;
++        for(unsigned byte=0;byte<m.bytes;++byte)
++            if(m.data[byte]!=downwell_shade_overlap::source[expected[3]+byte])return;
++    }
++    shadeMasks_[0]=assets.shade()->mask.data;
++    for(unsigned i=0;i<8;++i)shadeMasks_[i+1]=assets.currency(i>=4,i%4)->mask.data;
++#else
++    (void)assets;
++#endif
++}
++
++bool AmigaGameplayDrawList::shadeOverlap(bool large,unsigned frame,
++    const downwell::EffectMaskAssets::Asset& gem,const downwell::EffectMaskAssets::Asset& shade,
++    int gx,int gy,int sx,int sy,bool& result)const{
++#ifdef DOWNWELL_REFERENCE_SHADE_OVERLAP
++    (void)large;(void)frame;(void)gem;(void)shade;(void)gx;(void)gy;(void)sx;(void)sy;(void)result;
++    return false;
++#else
++    const unsigned index=(large?4:0)+frame;
++    if(frame>=4||gem.mask.data!=shadeMasks_[index+1]||shade.mask.data!=shadeMasks_[0])return false;
++    // The table describes full masks. Their intersection is wholly visible
++    // when either canvas is inside the viewport; otherwise retain clipping.
++    const auto contained=[](const auto& mask,int x,int y){
++        return x>=0&&y>=0&&x+int(mask.width)<=160&&y+int(mask.height)<=284;
++    };
++    if(!contained(gem.mask,gx,gy)&&!contained(shade.mask,sx,sy))return false;
++    const int x=sx-gx+95,y=sy-gy+95;
++    const auto* d=downwell_shade_overlap::directory[index];
++    result=x>=0&&y>=0&&unsigned(x)<d[1]&&unsigned(y)<d[2]&&
++        (downwell_shade_overlap::bits[d[0]+unsigned(y)*d[3]+unsigned(x)/8]&(128u>>(x&7)));
++    return true;
++#endif
++}
++
+ bool AmigaGameplayDrawList::promoteCurrencyComplete(const GameplayWorld& world,int viewX,int viewY,
+     const downwell::EffectMaskAssets& assets,const AmigaActorFrames& frames){
+     using Placement=downwell::EffectSurfacePlacement;
+@@ -101,6 +143,11 @@ bool AmigaGameplayDrawList::promoteCurrency(const GameplayWorld& world,int viewX
+                 const auto& shade=*assets.shade();
+                 const int sx=Placement::snapShadePixel(ex)-viewX-shade.originX;
+                 const int sy=Placement::snapShadePixel(ey)-viewY-shade.originY;
++                bool overlaps;
++                if(shadeOverlap(gem.large,frame,*art,shade,gx,gy,sx,sy,overlaps)){
++                    if(overlaps)return false;
++                    continue;
++                }
+                 int left=gx>sx?gx:sx,top=gy>sy?gy:sy;
+                 int right=gx+int(art->mask.width),bottom=gy+int(art->mask.height);
+                 if(right>sx+int(shade.mask.width))right=sx+int(shade.mask.width);
+diff --git a/src/platform/amiga/AmigaGameplayDrawList.h b/src/platform/amiga/AmigaGameplayDrawList.h
+index 0e21b962..65a973c5 100644
+--- a/src/platform/amiga/AmigaGameplayDrawList.h
++++ b/src/platform/amiga/AmigaGameplayDrawList.h
+@@ -5,7 +5,12 @@
+ #include "core/EntryDitherPlacement.h"
+ #include "core/EffectMaskAssets.h"
+ class AmigaGameplayDrawList {
++    const unsigned char* shadeMasks_[9]{};
++    bool shadeOverlap(bool large,unsigned frame,const downwell::EffectMaskAssets::Asset& gem,
++        const downwell::EffectMaskAssets::Asset& shade,int gx,int gy,int sx,int sy,bool& result)const;
+ public:
++    // Immutable-art admission before gameplay; unsupported masks keep scalar queries.
++    void bindShadeOverlap(const downwell::EffectMaskAssets& assets);
+     static constexpr unsigned capacity = 2 + 32 + 32 + 8 + GameplayWorld::bulletCapacity +
+         GameplayWorld::enemyCapacity + GameplayWorld::gemCapacity + downwell::scriptSpawnEffectCapacity +
+         2 * downwell::ShopWorld::capacity;
+diff --git a/src/platform/amiga/DownwellAmiga.cpp b/src/platform/amiga/DownwellAmiga.cpp
+index 53fef1eb..512a1980 100644
+--- a/src/platform/amiga/DownwellAmiga.cpp
++++ b/src/platform/amiga/DownwellAmiga.cpp
+@@ -2069,6 +2069,8 @@ __attribute__((noinline)) static int runDownwell(void) {
+     }
+ #endif
+     static downwell::EffectMaskAssets effectAssets;
++    alignas(AmigaGameplayDrawList) static UBYTE actorListStorage[sizeof(AmigaGameplayDrawList)];
++    auto& actorList=*new(actorListStorage) AmigaGameplayDrawList;
+     alignas(downwell::CurrencySmokeComposition) static UBYTE effectStorage[sizeof(downwell::CurrencySmokeComposition)];
+     auto& controllerEffects = *new (effectStorage) downwell::CurrencySmokeComposition;
+     if (!effectAssets.bind(activeGamePack,gamePackBytes)||
+@@ -2081,6 +2083,7 @@ __attribute__((noinline)) static int runDownwell(void) {
+         memory.release();
+         return 20;
+     }
++    actorList.bindShadeOverlap(effectAssets);
+     alignas(AmigaGardenScene) static UBYTE gardenStorage[sizeof(AmigaGardenScene)];
+     auto& gardenScene=*new(gardenStorage) AmigaGardenScene(memory.menuForeground(), memory.menuBackground(),
+         memory.menuEntry(), memory.copper(), memory.copper() + downwellCopperWords,
+@@ -3766,7 +3769,6 @@ __attribute__((noinline)) static int runDownwell(void) {
+ #ifdef DOWNWELL_REPLAY_VERIFY
+             compositeCurrency = false;
+ #endif
+-            static AmigaGameplayDrawList actorList{};
+ #ifdef DOWNWELL_ENTRY_WIPE_VERIFY
+             // Presentation sweep through real registered Draw records. This
+             // deliberately supplies fixture positions, not natural Step timing.
+diff --git a/tests/platform/amiga/AmigaCurrencyPromotionTest.cpp b/tests/platform/amiga/AmigaCurrencyPromotionTest.cpp
+index 1ac5dbad..52c9003f 100644
+--- a/tests/platform/amiga/AmigaCurrencyPromotionTest.cpp
++++ b/tests/platform/amiga/AmigaCurrencyPromotionTest.cpp
+@@ -76,6 +76,7 @@ int main(int argc,char** argv){
+         }
+     }
+     AmigaGameplayDrawList list;downwell::CurrencySmokeComposition oracle,remainder;
++    list.bindShadeOverlap(assets);
+     downwell::PaletteEffectSurface<> projected;unsigned promoted=0;
+     unsigned empty=0,raster=0,mixed=0,overflow=0,covered=0,shaded=0,maxSmoke=0,maxDebris=0;
+     unsigned partial=0;
+@@ -112,6 +113,17 @@ int main(int argc,char** argv){
+         require(complete.collect(game,ab.data(),ab.data()+ab.size(),vx,vy,true,&frames),"reference actor prefix");
+         const bool referenceHardware=complete.promoteCurrencyComplete(game,vx,vy,assets,frames);
+         const bool hardware=list.promoteCurrency(game,vx,vy,assets,frames);
++        AmigaGameplayDrawList scalar;
++        require(scalar.collect(game,ab.data(),ab.data()+ab.size(),vx,vy,true,&frames),"scalar overlap actor prefix");
++        require(scalar.promoteCurrency(game,vx,vy,assets,frames)==hardware&&
++            scalar.count==list.count&&scalar.currencyRasterFirst==list.currencyRasterFirst&&
++            scalar.currencySpriteCount==list.currencySpriteCount&&
++            scalar.currencyRasterRequired==list.currencyRasterRequired,"exact overlap admission/partition");
++        for(unsigned i=0;i<list.count;++i){
++            const auto& a=list.actors[i];const auto& b=scalar.actors[i];
++            require(a.sprite==b.sprite&&a.frame==b.frame&&a.x==b.x&&a.y==b.y&&a.flip==b.flip&&a.prepared==b.prepared,
++                "exact overlap painter order");
++        }
+         if(referenceHardware)require(hardware&&!list.currencyRasterRequired&&list.count==complete.count,
+             "complete promotion remains admitted with identical suffix length");
+         for(unsigned i=0;i<(referenceHardware?list.count:firstCurrency);++i){
+diff --git a/tools/generate-amiga-shade-overlap.py b/tools/generate-amiga-shade-overlap.py
+new file mode 100644
+index 00000000..eb73f20c
+--- /dev/null
++++ b/tools/generate-amiga-shade-overlap.py
+@@ -0,0 +1,101 @@
++#!/usr/bin/env python3
++"""Prepare exact gem/shade alpha-overlap bits, not pre-shaded sprite images."""
++import hashlib
++import json
++from pathlib import Path
++import struct
++
++ROOT = Path(__file__).resolve().parents[1]
++
++
++def build(pack):
++    magic, version, header, count, _ = struct.unpack_from('>4sHHI8s', pack)
++    assert (magic, version, header) == (b'DWAP', 2, 20)
++    records = {}
++    for i in range(count):
++        record = struct.unpack_from('>HHhhHHHHII', pack, header + 24*i)
++        records[record[:2]] = record
++
++    def mask(key):
++        r = records[key]
++        width, height, dma, flags, offset, size = r[4:]
++        assert flags == 3 and dma % 16 == 0 and dma >= width
++        stride = dma//8
++        assert size == stride*height*3 and offset+size <= len(pack)
++        raw = pack[offset+2*stride*height:offset+size]
++        rows = [int.from_bytes(raw[y*stride:(y+1)*stride], 'big')
++                >> (dma-width) for y in range(height)]
++        return width, height, rows
++
++    sw, sh, shade = mask((117, 0))
++    bits = bytearray()
++    directory = []
++    for sprite in (133, 134):
++        for frame in range(4):
++            width, height, gem = mask((sprite, frame))
++            columns, rows = sw+width-1, sh+height-1
++            stride = (columns+7)//8
++            offset = len(bits)
++            for dy in range(1-sh, height):
++                row = bytearray(stride)
++                for dx in range(1-sw, width):
++                    shift = sw+dx-width
++                    overlaps = any(gem[y] & (shade[y-dy] >> shift if shift >= 0
++                                             else shade[y-dy] << -shift)
++                                   for y in range(max(0, dy), min(height, dy+sh)))
++                    if overlaps:
++                        column = dx+sw-1
++                        row[column//8] |= 128 >> (column % 8)
++                bits.extend(row)
++            directory.append(dict(sprite=sprite, frame=frame, offset=offset,
++                                  columns=columns, rows=rows, stride=stride,
++                                  firstX=1-sw, firstY=1-sh))
++    return directory, bytes(bits)
++
++
++def main():
++    source = ROOT/'generated/amiga-game.dwap'
++    pack = source.read_bytes()
++    provenance = json.loads((ROOT/'generated/amiga-game.packing.json').read_text())
++    assert hashlib.sha256(pack).hexdigest() == provenance['packSha256']
++    directory, bits = build(pack)
++    # This is an exact full-mask predicate. A runtime consumer must retain
++    # the scalar query for viewport-clipped masks, and admit immutable art.
++    output = ROOT/'generated/amiga-shade-overlap.bin'
++    output.write_bytes(bits)
++    records = [struct.unpack_from('>HHhhHHHHII', pack, 20+i*24)
++               for i in range(struct.unpack_from('>I', pack, 8)[0])]
++    expected = bytearray()
++    descriptors = []
++    for key in [(117, 0)]+[(s, f) for s in (133, 134) for f in range(4)]:
++        r = next(r for r in records if r[:2] == key)
++        stride = r[6]//8
++        size = stride*r[5]
++        descriptors.append((r[4], r[5], stride, len(expected), size))
++        expected.extend(pack[r[8]+2*size:r[8]+3*size])
++    def array(name, typename, values, columns=None):
++        rows = ['{'+','.join(map(str, v))+'}' if isinstance(v, tuple) else str(v) for v in values]
++        return ('static const '+typename+' '+name+'[]'+(f'[{columns}]' if columns else '')+
++                '={\n'+',\n'.join(rows)+'\n};\n')
++    header = '// Generated original-asset overlap predicates; do not commit.\nnamespace downwell_shade_overlap {\n'
++    header += array('bits', 'unsigned char', bits)
++    header += array('masks', 'unsigned short', descriptors, 5)
++    header += array('source', 'unsigned char', expected)
++    header += array('directory', 'unsigned short',
++                    [(d['offset'], d['columns'], d['rows'], d['stride']) for d in directory], 4)
++    header += '}\n'
++    (ROOT/'generated/amiga-shade-overlap.h').write_text(header)
++    manifest = dict(schemaVersion=1, generator='amiga-shade-overlap-v1',
++                    extractor=provenance['extractor'], sourceSha256=provenance['sourceSha256'],
++                    generatorSha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
++                    inputPackSha256=hashlib.sha256(pack).hexdigest(),
++                    outputSha256=hashlib.sha256(bits).hexdigest(),
++                    headerSha256=hashlib.sha256(header.encode()).hexdigest(),
++                    bytes=len(bits), directory=directory,
++                    runtimeEnabled=False)
++    (ROOT/'generated/amiga-shade-overlap.json').write_text(json.dumps(manifest, indent=2)+'\n')
++    print(json.dumps(manifest, indent=2))
++
++
++if __name__ == '__main__':
++    main()
+diff --git a/tests/amiga-shade-overlap-test.py b/tests/amiga-shade-overlap-test.py
+new file mode 100644
+index 00000000..18003235
+--- /dev/null
++++ b/tests/amiga-shade-overlap-test.py
+@@ -0,0 +1,41 @@
++#!/usr/bin/env python3
++"""Exhaust the overlap bank against independent per-pixel mask intersections."""
++import hashlib
++import json
++from pathlib import Path
++import struct
++
++root = Path(__file__).resolve().parents[1]
++pack = (root/'generated/amiga-game.dwap').read_bytes()
++bits = (root/'generated/amiga-shade-overlap.bin').read_bytes()
++manifest = json.loads((root/'generated/amiga-shade-overlap.json').read_text())
++assert hashlib.sha256(pack).hexdigest() == manifest['inputPackSha256']
++assert hashlib.sha256(bits).hexdigest() == manifest['outputSha256']
++records = {}
++for i in range(struct.unpack_from('>I', pack, 8)[0]):
++    r = struct.unpack_from('>HHhhHHHHII', pack, 20+24*i)
++    records[r[:2]] = r
++
++
++def pixels(key):
++    r = records[key]
++    width, height, stride = r[4], r[5], r[6]//8
++    base = r[8]+2*height*stride
++    return {(x, y) for y in range(height) for x in range(width)
++            if pack[base+y*stride+x//8] & (128 >> (x % 8))}
++
++
++shade = pixels((117, 0))
++checks = 0
++for entry in manifest['directory']:
++    gem = pixels((entry['sprite'], entry['frame']))
++    for row in range(-1, entry['rows']+1):
++        for column in range(-1, entry['columns']+1):
++            dx, dy = column+entry['firstX'], row+entry['firstY']
++            expected = any((x-dx, y-dy) in shade for x, y in gem)
++            actual = (0 <= row < entry['rows'] and 0 <= column < entry['columns'] and
++                      bool(bits[entry['offset']+row*entry['stride']+column//8] &
++                           (128 >> (column % 8))))
++            assert actual == expected, (entry['sprite'], entry['frame'], dx, dy)
++            checks += 1
++print(f'Exact full-mask overlap: {checks} positions agree; {len(bits)} table bytes')
