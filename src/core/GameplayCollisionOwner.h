@@ -1480,13 +1480,17 @@ public:
     }
     // Box Step's final alarmStop(0), including after a destroy request. Use
     // the retained published shape, not a point or a global blanket freeze.
-    bool stopBoxAlarm0(InstanceHandle local,bool pTimeStop,int roomWidth,const SpriteMaskPack& masks){
+    bool boxTimeAllowed(InstanceHandle local,bool pTimeStop,int roomWidth,const SpriteMaskPack& masks,bool& allowed){
         InstanceHandle self;
         if(!valid()||!world_||!View::encode(View::Kind::breakable,local,self)||!resolves(self))return check(false);
         const auto state=owner_.resolve(self);if(!state)return check(false);
+        return check(TimeStopBound::evaluate(pTimeStop,state->x.promoted(),state->y.promoted(),roomWidth,
+                [&](auto x,auto y,bool& hit){return masks.valid()&&registeredPlaceMeeting(self,82,x,y,masks,hit);},allowed));
+    }
+    bool stopBoxAlarm0(InstanceHandle local,bool pTimeStop,int roomWidth,const SpriteMaskPack& masks){
+        if(!world_)return check(false);
         return check(world_->stopBoxAlarm0(local,[&](bool& allowed){
-            return TimeStopBound::evaluate(pTimeStop,state->x.promoted(),state->y.promoted(),roomWidth,
-                [&](auto x,auto y,bool& hit){return masks.valid()&&registeredPlaceMeeting(self,82,x,y,masks,hit);},allowed);
+            return boxTimeAllowed(local,pTimeStop,roomWidth,masks,allowed);
         }));
     }
     // objPlayer_n Begin Step queries parentTimeField using private xx/yy,

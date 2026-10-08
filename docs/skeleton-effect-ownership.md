@@ -361,8 +361,15 @@ state. Failure at any audio call stops subsequent emissions without consuming
 their RNG. Impact creation publishes the
 caller's `myFx`; debris creation returns the actual registered lifetime, with
 stored numeric IDs resolved back to world handles and native generation handles
-kept local. The remaining control operations (globals, chain contacts,
-rewards, destruction and time queries) are required from the caller rather than
+kept local. The adapter's `alarmStop(0)` invokes the world's retained box alarm
+bookkeeping after the caller's checked `timeAllowed` query. Both resource-backed
+collision owners expose that query separately from alarm mutation, preserving
+the published shape, field-before-side evaluation and post-destruction lifetime.
+Healthy-box scheduling tests cover the positive-alarm refund and terminal query
+failure before the `i`/alarm writes. The source player's live `pTimeStop` input
+remains required; the adapter does not substitute a goal/shop pause flag.
+The remaining control operations (globals, chain contacts,
+rewards, destruction and the time query) are required from the caller rather than
 successful no-op defaults. The scoped box and owned-debris tick adapters can be
 nested to keep creation, later debris phases and cleanup in one world frame.
 Scheduled no-chain/no-reward fixtures check the complete WELL state at the end

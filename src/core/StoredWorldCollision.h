@@ -101,12 +101,15 @@ public:
         const auto* r=resolve(h);
         return valid()&&runtime_==&world&&r&&r->objectId==92&&world.publishBoxHealth(h,health);
     }
+    bool boxTimeAllowed(StartupRuntime& world,InstanceHandle h,bool pTimeStop,int roomWidth,bool& allowed){
+        const auto* r=resolve(h);const auto* state=owner_.resolve(h);
+        return valid()&&runtime_==&world&&r&&state&&r->objectId==92&&
+            TimeStopBound::evaluate(pTimeStop,state->x.promoted(),state->y.promoted(),roomWidth,
+                [&](auto x,auto y,bool& hit){return placeMeeting(h,*r,82,x,y,hit);},allowed);
+    }
     bool stopBoxAlarm0(StartupRuntime& world,InstanceHandle h,bool pTimeStop,int roomWidth){
         return world.stopBoxAlarm0(h,[&](bool& allowed){
-            const auto* r=resolve(h);const auto* state=owner_.resolve(h);
-            return valid()&&runtime_==&world&&r&&state&&r->objectId==92&&
-                TimeStopBound::evaluate(pTimeStop,state->x.promoted(),state->y.promoted(),roomWidth,
-                    [&](auto x,auto y,bool& hit){return placeMeeting(h,*r,82,x,y,hit);},allowed);
+            return boxTimeAllowed(world,h,pTimeStop,roomWidth,allowed);
         });
     }
     bool projectileBoxHit(StartupRuntime& world,InstanceHandle h){

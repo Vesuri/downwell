@@ -7,6 +7,7 @@
 #include "core/SmokeEffects.h"
 #include "core/FlashBallEffects.h"
 #include <cassert>
+#include <functional>
 // A scheduled failure-prefix check, not a complete destruction backend.
 // Smoke, flash and impact use real world owners. Debris deliberately fails
 // after the engine destruction mark, proving the Step cannot retire early or
@@ -18,6 +19,8 @@ template<class World,class Mark> struct ScheduledBoxEffects {
     World& world;Handle box;ScheduledBoxCounts& counts;Mark mark;
     bool verifyDebris=false,sawSound=false;
     downwell::GameMakerRandom before{0};
+    std::function<bool(Handle,bool&)> timeQuery{};
+    bool timeAllowed(bool& allowed){return alarmStop(0)&&timeQuery&&timeQuery(box,allowed);}
     bool soundOverlap(int,int,int,int,const char*){++counts.sound;sawSound=true;before=world.randomState();return true;}
     bool smoke(Real x,Real y,int,int){++counts.smoke;return world.emitBoxSmoke(x,y);}
     bool flash(Real x,Real y,int,int,int){++counts.flash;return world.emitBoxFlash(x,y);}

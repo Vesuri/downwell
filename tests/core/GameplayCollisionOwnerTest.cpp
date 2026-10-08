@@ -569,9 +569,10 @@ int main(){
     }
     auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
-    for(unsigned mode=0;mode<10;++mode){
+    for(unsigned mode=0;mode<12;++mode){
         const bool fullEffects=mode!=0;
         const auto roomBytes=read("generated/downwell-rooms.dwrm");RoomPack roomPack(roomBytes.data(),roomBytes.size());
+        const auto maskBytes=read("generated/downwell-sprite-masks.dwsm");SpriteMaskPack boxMasks(maskBytes.data(),maskBytes.size());
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
             GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&roomPack);
         auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
@@ -589,11 +590,13 @@ int main(){
                 [&](InstanceHandle h){return world->markBreakableDestroyed(h);});},
             [&]{world->step(0);return world->effectsSucceeded();});};
         assert(tick()&&counts.stop==1&&!counts.sound&&world->findBreakable(box));
-        counts={};assert(world->publishBoxHealth(box,{}));
+        counts={};assert(world->publishBoxHealth(box,MotionBinary64::fromInteger(mode>=10?1:0)));
+        if(mode>=10)assert(world->publishBoxAlarm0(box,2));
         if(fullEffects){
             const unsigned soundFailure=mode>=3?mode-2:0;
             BoxSoundVerification::Audio<GameplayWorld> audio{*world,world->findBreakable(box)->state.breakSound,soundFailure};
             GameMakerRandom soundRandom{0};
+            bool boxAllowed=false;unsigned queries=0;
             if(mode==2)for(unsigned i=0;i<debrisEffectCapacity;++i){
                 InstanceHandle child;
                 assert(world->spawnDebris(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(512),1,child)&&
@@ -608,13 +611,25 @@ int main(){
             },[&](InstanceHandle key){
                 auto callbacks=scheduledBoxEffects(*world,key,counts,[&](InstanceHandle h){return world->markBreakableDestroyed(h);});
                 callbacks.verifyDebris=true;
-                callbacks.sawSound=key.slot==box.slot&&key.generation==box.generation;callbacks.before=world->randomState();
+                callbacks.timeQuery=[&](InstanceHandle h,bool& allowed){
+                    ++queries;if(mode==11)return false;
+                    const bool ok=owner->boxTimeAllowed(h,mode==10,480,boxMasks,allowed);
+                    if(ok)boxAllowed=allowed;return ok;};
+                callbacks.sawSound=mode<10&&key.slot==box.slot&&key.generation==box.generation;callbacks.before=world->randomState();
                 if(callbacks.sawSound)soundRandom=world->randomState();
                 return boxWorldEffects(*world,key,callbacks,
                 [&](int id,unsigned& frames){PackedSpriteCollision art;if(!sprites.sprite(id,art))return false;
                     frames=art.frameCount;return true;},audio,MotionBinary64{0x3fd00000u,0});},
                 [&]{return world->stepWithOwnedDebris(0,stopped,meeting);});
-            assert(completed==(mode==1));
+            assert(completed==(mode==1||mode==10));
+            if(mode>=10){
+                if(mode==10)assert(!boxAllowed);
+                const auto* retained=world->findBreakable(box);
+                assert(queries==1&&retained&&!retained->destroyRequested&&!counts.mark&&audio.calls==0&&
+                    !world->debrisEffects().size());
+                assert(retained->alarm0==(mode==10&&!boxAllowed?2:1)&&retained->state.scriptIndex==(mode==10?1:0));
+                continue;
+            }
             if(soundFailure){
                 assert(!world->effectsSucceeded()&&audio.valid&&audio.calls==soundFailure&&
                     world->findBreakable(box)&&!world->findBreakable(box)->destroyRequested&&!counts.mark&&counts.stop==0&&

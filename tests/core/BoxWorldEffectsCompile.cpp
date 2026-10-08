@@ -2,6 +2,7 @@
 #include "core/BoxWorldEffects.h"
 struct Controls {
     int area();
+    bool timeAllowed(bool&);
     bool create(int,downwell::MotionBinary64,downwell::MotionBinary64,downwell::InstanceHandle&);
 };
 struct Audio {
@@ -15,5 +16,5 @@ bool nativeBoxWorldEmissions(GameplayWorld& world,downwell::InstanceHandle box,C
     const auto x=downwell::MotionBinary64::fromInteger(240),y=downwell::MotionBinary64::fromInteger(512);
     return effects.soundOverlap(171,50,0,1,"waterThings")&&effects.smoke(x,y,1,0)&&effects.flash(x,y,1,0,2)&&
         effects.effect(x,y,603,{0x3fe00000u,0},downwell::MotionBinary64::fromInteger(270),-60000)&&
-        effects.create(370,x,y,child);
+        effects.create(370,x,y,child)&&effects.alarmStop(0);
 }

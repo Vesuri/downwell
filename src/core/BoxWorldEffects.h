@@ -18,6 +18,9 @@ struct BoxWorldEffects:Controls {
         return priority==50&&loop==0&&cut==1&&SoundPlayScript::channel(channel)==7&&
             world.playBoxBreakSound(box,sound,volume,audio);
     }
+    bool alarmStop(int alarm){
+        return alarm==0&&world.stopBoxAlarm0(box,[&](bool& allowed){return this->timeAllowed(allowed);});
+    }
     bool smoke(MotionBinary64 x,MotionBinary64 y,int count,int vary){
         return count==1&&vary==0&&world.emitBoxSmoke(x,y);
     }

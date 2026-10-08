@@ -160,13 +160,14 @@ int main(){
     BuilderPatternPack patterns(bb.data(),bb.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     SpriteMaskPack masks(mb.data(),mb.size());
     require(rooms.valid()&&objects.valid()&&patterns.valid()&&sprites.valid()&&masks.valid(),"real collision resources validate");
-    for(unsigned mode=0;mode<10;++mode){
+    for(unsigned mode=0;mode<12;++mode){
         const bool fullEffects=mode!=0;
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
         require(owner->attach(*world),"attach scheduled box world");world->skipToGameForTesting();
         InstanceHandle box;
-        require(world->spawnBuilderPrimitive(92,240,512,box)&&world->publishBoxHealth(box,{}),"create exhausted scheduled box");
+        require(world->spawnBuilderPrimitive(92,240,512,box)&&world->publishBoxHealth(box,MotionBinary64::fromInteger(mode>=10?1:0)),"create scheduled box");
+        if(mode>=10)require(world->publishBoxAlarm0(box,2),"arm scheduled healthy box");
         ScheduledBoxCounts counts;
         const auto destroyed=world->mainBlocksDestroyed();
         auto readCaller=[&](InstanceHandle key,BoxDestructionScript::Caller& caller){return owner->readBoxDestruction(key,caller);};
@@ -177,6 +178,7 @@ int main(){
             const unsigned soundFailure=mode>=3?mode-2:0;
             BoxSoundVerification::Audio<StartupRuntime> audio{*world,owner->resolve(box)->box.breakSound,soundFailure};
             GameMakerRandom soundRandom{0};
+            bool boxAllowed=false;unsigned queries=0;
             if(mode==2)for(unsigned i=0;i<debrisEffectCapacity;++i){
                 InstanceHandle child;
                 require(world->spawnDebris(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(512),1,child)&&
@@ -184,13 +186,28 @@ int main(){
             }
             const bool completed=world->withBoxDestruction(readCaller,[&](InstanceHandle key){
                 auto callbacks=controls(key);callbacks.verifyDebris=true;
-                callbacks.sawSound=key.slot==box.slot&&key.generation==box.generation;callbacks.before=world->randomState();
+                callbacks.timeQuery=[&](InstanceHandle h,bool& allowed){
+                    const bool selected=h.slot==box.slot&&h.generation==box.generation;
+                    if(selected){++queries;if(mode==11)return false;}
+                    const bool ok=owner->boxTimeAllowed(*world,h,mode==10,480,allowed);
+                    if(selected&&ok)boxAllowed=allowed;return ok;
+                };
+                callbacks.sawSound=mode<10&&key.slot==box.slot&&key.generation==box.generation;callbacks.before=world->randomState();
                 if(callbacks.sawSound)soundRandom=world->randomState();
                 return boxWorldEffects(*world,key,callbacks,[&](int id,unsigned& frames){
                     PackedSpriteCollision art;if(!sprites.sprite(id,art))return false;frames=art.frameCount;return true;},
                     audio,MotionBinary64{0x3fd00000u,0});
             },[&]{return world->stepWithOwnedDebris({},[](auto,const auto&,bool& frozen){frozen=false;return true;});});
-            require(completed==(mode==1),"stored scheduled source effects honor debris capacity");
+            require(completed==(mode==1||mode==10),"stored scheduled source effects honor query and child failures");
+            if(mode>=10){
+                if(mode==10)require(!boxAllowed,"healthy scheduled box is outside time fields and refunds its alarm");
+                const auto* retained=owner->resolve(box);
+                require(queries==1&&retained&&!retained->destroyRequested&&!counts.mark&&audio.calls==0&&
+                    !world->debrisEffects().size(),"healthy source box executes only alarmStop");
+                require(retained->alarms.get(0)==(mode==10&&!boxAllowed?2:1)&&
+                    retained->box.scriptIndex==(mode==10?1:0),"scheduled alarm refund and failed-query prefix");
+                continue;
+            }
             if(soundFailure){
                 require(!world->effectsSucceeded()&&audio.valid&&audio.calls==soundFailure&&
                     owner->resolve(box)&&!owner->resolve(box)->destroyRequested&&!counts.mark&&
