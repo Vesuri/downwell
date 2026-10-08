@@ -12,15 +12,13 @@ on PAL; do not add 60 Hz catch-up.
 
 ## Priority and scope
 
-Next: recover the A500 gameplay frame budget (section 5), taking its ranked
-items in order: generation bursts, the contact damage number, combat
-composition, HUD text and quiet frames. Each removes a structure or
-computation measured by the [frame-cost audit](amiga-frame-cost.md); tuning
-small functions and compiler flags is not the remedy. Cover gameplay entry
-from the well as well as steady gameplay. Then finish live
-skeleton encounters, following the dependency order in section 1, make
-catacombs playable (section 2), followed by the remaining
-content (section 4). Apply the fidelity, performance, architecture, memory and
+Next: finish live skeleton encounters (section 1), following its dependency
+order: collision identity and ordering, time-stop state, damage effects and
+actors, then natural encounter verification. The A500 frame-budget work in
+section 5 remains open; use its measured architectural approach rather than
+tuning small functions or compiler flags. Then make catacombs playable
+(section 2), followed by the remaining content (section 4).
+Apply the fidelity, performance, architecture, memory and
 verification requirements in sections 3 and 5–8 to each integration; they are
 not deferred cleanup phases.
 
