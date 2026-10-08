@@ -3,6 +3,7 @@
 #include "InstanceHandle.h"
 #include "RunnerSpatialLifetimes.h"
 #include "RunnerCollisionPairs.h"
+#include "RunnerCollisionCollect.h"
 #include "RunnerCollisionMotion.h"
 #include "RunnerTransformField.h"
 #include "RunnerObjectMembership.h"
@@ -944,46 +945,13 @@ public:
     template<unsigned Pairs,class Refresh,class HasEvent,class MaskFrames>
     bool collectCollisionPairs(RunnerCollisionPairs<Capacity,Pairs>& pairs,
         bool indexAvailable,Refresh refreshBounds,HasEvent hasEvent,MaskFrames maskFrames){
-        if(!valid()||!checked(pairs.beginPass()))return false;
-        unsigned retained[Capacity],count=0;
-        if(indexAvailable){
-            if(!flush(refreshBounds))return false;
-            unsigned slot=collision_.first();
-            while(slot!=Queue::End){
-                const auto self=handle(slot);
-                if(!checked(live(self)))return false;
-                const bool eligible=Queue::shouldRefreshQueued(states_.flags(slot));
-                if(eligible){
-                    Box box=states_.read(slot)->bounds;
-                    if(!checked(normalize(box)))return false;
-                    bool callbacks=true;
-                    const bool queried=index_.query(box,[&](unsigned candidate){
-                        if(candidate>=Capacity||lifetimes_.object(candidate)<0){callbacks=false;return false;}
-                        callbacks=pairs.candidate(self,handle(candidate),hasEvent);
-                        return callbacks;
-                    });
-                    // query's early callback stop is not itself an index error.
-                    if(!checked(queried&&callbacks))return false;
-                }
-                if(!checked(collision_.contains(slot)))return false;
-                const unsigned successor=collision_.next(slot);
-                collision_.remove(slot);
-                if(eligible){
-                    if(states_.flags(slot)&0x200u){
-                        unsigned frames=0;
-                        if(!checked(maskFrames(self,frames)))return false;
-                        if(frames>1)retained[count++]=slot;
-                    }
-                    if(!checked(pairs.finishInstance(self)))return false;
-                }
-                slot=successor;
-            }
-        }
-        collision_.clear();
-        // Source prepends to a temporary list, then prepends back: preserve
-        // query order, rather than reversing animated instances each frame.
-        while(count)collision_.mark(retained[--count]);
-        return checked(pairs.seal());
+        if(!valid())return false;
+        unsigned retained[Capacity];
+        return checked(RunnerCollisionCollect::run(pairs,collision_,retained,indexAvailable,
+            [&]{return flush(refreshBounds);},[&](unsigned slot){return lifetimes_.object(slot)>=0?handle(slot):InstanceHandle{};},
+            [&](InstanceHandle h,std::uint32_t& flags){if(!live(h))return false;flags=states_.flags(h.slot);return true;},
+            [&](InstanceHandle h,Box& box){if(!live(h))return false;box=states_.read(h.slot)->bounds;return true;},
+            [&](Box box,auto visit){return index_.query(box,visit);},hasEvent,maskFrames));
     }
     // VM instance_place wrapper 0x529e50 narrows absolute room coordinates
     // to binary32 before 0x4fe560. Do not round to pixels or narrow a relative

@@ -59,6 +59,7 @@ private:
     NativePosition nativePositions_[View::capacity-(View::timeFieldBase-View::terrainBase)]{};
     using NativeDirtyQueue=RunnerSpatialDirtyQueue<View::capacity>;
     NativeDirtyQueue nativeSpatialDirty_,nativeCollisionDirty_;
+    unsigned nativeCollisionRetained_[View::capacity]{};
     bool nativeDirty(unsigned slot,int object,std::uint32_t flags){
         const auto* objectFlags=families_.flags(unsigned(object));
         if(!objectFlags||slot>=View::capacity)return check(false);
@@ -1043,6 +1044,53 @@ public:
             const auto h=handleAt(slot);
             return slot>=View::terrainBase&&slot<View::timeFieldBase?refreshNativeTerrain(h):refreshNativeActor(h,true);
         }));
+    }
+    // Explicit collection only. Scheduling and precise event execution are
+    // separate: this must not dispatch partial family passes in gameplay.
+    template<unsigned Pairs> bool collectCollisionPairs(
+        RunnerCollisionPairs<View::capacity,Pairs>& pairs,bool indexAvailable=true){
+        if(!valid())return false;
+        if(!native_)return check(owner_.collectCollisionPairs(pairs,indexAvailable,
+            [&](InstanceHandle h,bool publish){return refresh(h,publish);},
+            [&](InstanceHandle self,InstanceHandle other,bool& found){
+                const int a=objectOf(self),b=objectOf(other);
+                return a>=0&&b>=0&&objects_.collisionEventExists(a,b,found);
+            },[&](InstanceHandle h,unsigned& frames){
+                const auto p=properties_.read(h.slot);if(!p)return false;
+                PackedSpriteCollision resource;
+                frames=sprites_.collisionSprite(p->sprite.spriteId,p->sprite.maskId,resource)?resource.frameCount:0;return true;
+            }));
+        return check(RunnerCollisionCollect::run(pairs,nativeCollisionDirty_,nativeCollisionRetained_,indexAvailable,
+            [&]{return flushNativeSpatial();},[&](unsigned slot){return handleAt(slot);},
+            [&](InstanceHandle h,std::uint32_t& flags){return eligibilityFlags(h,flags);},
+            [&](InstanceHandle h,Owner::Box& bounds){
+                if(const auto* actor=nativePosition(h.slot)){bounds=actor->bounds;return true;}
+                if(!world_||!world_->nativeTerrainInstances())return false;
+                const auto* terrain=world_->nativeTerrainInstances();
+                const InstanceHandle local{h.slot-View::terrainBase,h.generation};
+                GameplayWorld::NativeTerrain::Identity id;bool active,destroyed,found,precise;int cached;
+                RunnerImageValue x,y;
+                return terrain->read(local,id,active,destroyed)&&terrain->cachedSprite(local,cached)&&
+                    nativeTerrainBirthBounds(id,x,y,bounds,found,precise,cached);
+            },
+            [&](Owner::Box box,auto visit){return owner_.externalSpatialPublication([&](auto& index){return index.query(box,visit);});},
+            [&](InstanceHandle self,InstanceHandle other,bool& found){
+                const int a=objectOf(self),b=objectOf(other);
+                return a>=0&&b>=0&&objects_.collisionEventExists(a,b,found);
+            },
+            [&](InstanceHandle h,unsigned& frames){
+                int sprite,mask;
+                if(const auto* actor=nativePosition(h.slot)){sprite=actor->sprite.spriteId;mask=actor->sprite.maskId;}
+                else {
+                    if(!world_||!world_->nativeTerrainInstances())return false;
+                    const auto* definition=objectDefaults_.get(objectOf(h));if(!definition)return false;
+                    unsigned index;bool created;
+                    if(!world_->nativeTerrainInstances()->appearance({h.slot-View::terrainBase,h.generation},sprite,index,created))return false;
+                    if(sprite==-2)sprite=definition->spriteId;mask=definition->maskId;
+                }
+                PackedSpriteCollision resource;
+                frames=sprites_.collisionSprite(sprite,mask,resource)?resource.frameCount:0;return true;
+            }));
     }
     // Diagnostic traversal only: this is not spatial candidate selection.
     // Spatial refresh is explicit; collision consumption still requires

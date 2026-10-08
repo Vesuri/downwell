@@ -39,6 +39,10 @@ The native spatial/collision dirty queues each retain two 16-bit links per
 shared collision slot and two counters. These are ordering links only;
 terrain geometry and lifetime identities remain in the run owner. Both
 queues are ordinary memory, with no per-frame allocation.
+Collision collection also reserves one unsigned slot per shared collision
+identity in the owner for animated-mask retention. This scratch lives in
+ordinary memory rather than the Amiga task stack; it holds ordering keys,
+not copied terrain or actor records.
 
 ## CPU-only HUD artwork
 
