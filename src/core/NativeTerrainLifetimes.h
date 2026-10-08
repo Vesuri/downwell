@@ -4,6 +4,7 @@
 #include "PlacementNew.h"
 #include "WallEndStep.h"
 #include "PackedWallState.h"
+#include "WallFootprint.h"
 namespace downwell {
 // Identity and birth chronology: no duplicate spatial tree, room list, animation state or
 // raster cache. Generated source IDs remain unknown until the shared global
@@ -23,6 +24,7 @@ template<unsigned Capacity> class NativeTerrainLifetimes {
     WallEndStepState* stepping_=nullptr;
     InstanceHandle steppingHandle_{};
     bool good_=true;
+    bool wallPresentationState_=false,unboundedWallArt_=false;
 public:
     using Identity=typename Runs::Identity;
     struct Binding {
@@ -82,6 +84,7 @@ public:
             if(tile<0||tile>32767||(binding_.context&&
                 (!binding_.create||!binding_.create(binding_.context,id,tile,spatial))))return good_=false;
             createSprite_[h.slot]=static_cast<std::int16_t>(tile);
+            if(id.object==60&&(wallRadius(tile)<0||wallRadius(tile)>16))unboundedWallArt_=true;
         }
         flags_[h.slot]=(flags_[h.slot]&3u)|32u|((spatial&8u)?4u:0u)|
             ((spatial&0x200u)?8u:0u)|((spatial&0x8000u)?16u:0u);
@@ -130,11 +133,29 @@ public:
         stepping_=nullptr;steppingHandle_={};
         const bool retained=walls_[h.slot].store(state);
         if(!ok||!retained||!good_)return good_=false;
+        wallPresentationState_=true;
         const int after=drawSprite(h);
         return notifyPresentation(id,before,after,before!=after||
             (after>=0&&(checked!=(state.checked!=0)||image!=state.imageIndex)));
     }
     unsigned size()const{return runs_.size();}
+    bool hasWallPresentationState()const{return wallPresentationState_;}
+    struct WallDrawRecord {
+        int objectId,x,y;bool active,destroyRequested;int spriteId,imageIndex;WallEndStepState wall;
+    };
+    template<class Visit> bool visitWallRows(int first,int end,Visit visit)const{
+        if(!good_)return false;
+        const auto emit=[&](const Identity& id){
+            if(id.object!=60)return true;
+            WallEndStepState state;
+            if((flags_[id.handle.slot]&32u)&&!wallState(id.handle,state))return false;
+            const int sprite=state.checked?createSprite_[id.handle.slot]:51;
+            if(!wallIntersectsRows(sprite,id.y,first,end))return true;
+            return visit(WallDrawRecord{id.object,id.x,id.y,!(flags_[id.handle.slot]&2u),
+                (flags_[id.handle.slot]&1u)!=0,createSprite_[id.handle.slot],state.imageIndex,state});
+        };
+        return unboundedWallArt_?runs_.visit(emit):runs_.visitRows(first,end,emit);
+    }
     unsigned runCount()const{return runs_.runCount();}
     unsigned available()const{return Capacity-size();}
     bool contains(InstanceHandle h)const{return good_&&runs_.contains(h);}
@@ -160,6 +181,7 @@ public:
         flags_[slot]=(active?0:2)|((spatial&8u)?4u:0u)|((spatial&0x200u)?8u:0u)|((spatial&0x8000u)?16u:0u);
         createSprite_[slot]=-2;
         walls_[slot].store(WallEndStepState{});
+        if(object==60&&!active)wallPresentationState_=true;
         return true;
     }
     bool canAppend(unsigned count)const{
@@ -172,6 +194,7 @@ public:
         if(binding_.mark&&!binding_.mark(binding_.context,h.slot))return good_=false;
         Identity id;if(!runs_.read(h,id))return good_=false;
         const int before=drawSprite(h);flags_[h.slot]|=1;
+        if(id.object==60)wallPresentationState_=true;
         if(before>=0&&binding_.collision&&!binding_.collision(binding_.context,id,false))return good_=false;
         return stepping_?true:notifyPresentation(id,before,-1,before>=0);
     }
@@ -187,7 +210,7 @@ public:
         if(stepping_)return good_=false;
         if(!good_)return false;
         if(binding_.retire&&!runs_.visit([&](const Identity& id){return binding_.retire(binding_.context,id.handle.slot);}))return good_=false;
-        runs_.~Runs();new(&runs_) Runs;freeHint_=0;return true;
+        runs_.~Runs();new(&runs_) Runs;freeHint_=0;wallPresentationState_=unboundedWallArt_=false;return true;
     }
 private:
     int drawSprite(InstanceHandle h)const{

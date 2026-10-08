@@ -220,6 +220,8 @@ bool AmigaTerrainPainter::paint(AmigaRenderer* renderer,
     {
     DW_PROFILE_SCOPE(profileTerrainWalls);
     const auto* records=runtime?runtime->terrainInstances():nullptr;
+    const auto* native=runtime?runtime->nativeTerrainInstances():nullptr;
+    const bool ownedNative=native&&native->hasWallPresentationState();
     if(records){
         DW_PROFILE_COUNT(counterTerrainWallPasses);
         unsigned examined=0;
@@ -258,10 +260,21 @@ bool AmigaTerrainPainter::paint(AmigaRenderer* renderer,
         if(nextReference()){amigaRendererClearClipRect(renderer);return false;}
 #endif
     }
-    if (!records&&terrainIndex)
+    if(!records&&ownedNative){
+        // Keep run birth order, including coincident walls. Event-selected
+        // frames must not be recomputed from the occupancy grid after a
+        // neighbor dies. Untouched scenes retain the indexed batch path.
+        const bool painted=native->visitWallRows(firstWorldY,finalWorldY,[&](const auto& r){
+            return downwell::drawWallPresentation(r,[&]{return mainWallFrame(terrainIndex,rooms,room,r.x,r.y);},
+                [&](int sprite,unsigned frame){drawGameAsset(renderer,UWORD(sprite),UWORD(frame),
+                    downwellPlayfieldX+r.x-viewX,r.y-viewY,0);});
+        });
+        if(!painted){amigaRendererClearClipRect(renderer);return false;}
+    }
+    if (!records&&!ownedNative&&terrainIndex)
         drawIndexedWalls(renderer, rooms, room, viewX, viewY,
                              clipX, clipY, clipWidth, clipHeight);
-    for (index = 0; !records && !terrainIndex && index < room.instanceCount; ++index) {
+    for (index = 0; !records && !ownedNative && !terrainIndex && index < room.instanceCount; ++index) {
         downwell::PackedRoomInstance instance;
         if (!rooms.roomInstance(room, index, instance) ||
             instance.objectId != 60 || instance.y + 8 < firstWorldY ||

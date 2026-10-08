@@ -6,7 +6,7 @@ memory requirement.
 
 ## Native terrain identities
 
-`nativeTerrainStorage` reserves 104,522 bytes of ordinary BSS on the 68000,
+`nativeTerrainStorage` reserves 104,524 bytes of ordinary BSS on the 68000,
 outside Chip RAM and the task stack. It retains at most 2,048 terrain
 lifetimes in birth order. Adjacent generated cells share identity/geometry
 descriptors; coincident and authored walls remain distinct. The bounded
@@ -33,6 +33,10 @@ to synchronous callbacks; the packed state retains the failure prefix after
 an event returns. No generic property record or duplicate geometry is added.
 The lifetime binding also forwards collision-cache and presentation notices;
 these callbacks add eight bytes on the target, not per-cell storage.
+Two store-wide flags track retained presentation and unbounded artwork.
+The painter visits intersecting identity runs after wall-state mutations;
+untouched scenes retain the indexed batch compositor. No draw-record array is
+retained: each selected wall supplies a temporary value to the painter.
 Room teardown preserves the generation counter, preventing old handles from
 addressing replacement walls. Generated numeric VM IDs are not inferred from
 these family-local handles.

@@ -1,4 +1,7 @@
 #include "platform/amiga/AmigaTerrainPainter.h"
+#include "core/GameplayWorld.h"
+#include <memory>
+#include <algorithm>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -9,6 +12,16 @@ int amigaBlitterDrawPlanarMasked(const UBYTE*,const UBYTE*,UWORD,UWORD,UWORD,UBY
 int amigaBlitterClearPlanar(UBYTE*,UWORD,UWORD){return 0;}
 int amigaBlitterSolidRect(UBYTE*,UWORD,UWORD,UWORD,UWORD,UWORD,UWORD){return 0;}
 static void require(bool ok,const char* message){if(!ok){std::cerr<<message<<'\n';std::exit(1);}}
+struct PaintLifecycle {
+    template<class... A> bool birth(const A&...){return true;}
+    template<class... A> bool retire(const A&...){return true;}
+    template<class... A> bool activation(const A&...){return true;}
+    template<class... A> bool membership(const A&...){return true;}
+    template<class... A> bool move(const A&...){return true;}
+    template<class... A> bool sprite(const A&...){return true;}
+    template<class... A> bool imageIndex(const A&...){return true;}
+    template<class... A> bool markDestroyed(const A&...){return true;}
+};
 int main(int argc,char** argv){
     require(argc==3,"usage: terrain-painter-test game.dwap phase6.bin");
     std::ifstream input(argv[1],std::ios::binary);
@@ -25,6 +38,60 @@ int main(int argc,char** argv){
     downwell::RoomPack rooms(nullptr,0);
     downwell::PackedRoom room{};
     static AmigaTerrainTiles tiles;
+    {
+        // Deliberately use frames unlike adjacency-derived frames, including
+        // coincident walls. Retiring one lifetime must not erase the other or
+        // make a later row rebuild resurrect the retired wall.
+        PaintLifecycle lifecycle;
+        auto records=std::make_unique<downwell::GameplayTerrainInstances>(
+            downwell::GameplayTerrainInstances::Binding::bindDestruction(lifecycle));
+        auto native=std::make_unique<GameplayWorld::NativeTerrain>();
+        auto referenceWorld=std::make_unique<GameplayWorld>(300,true,0,false,
+            GameplayWorld::EnemyLifecycleBinding{},GameplayWorld::BreakableLifecycleBinding{},
+            GameplayWorld::PlayerLifecycleBinding{},records.get());
+        auto nativeWorld=std::make_unique<GameplayWorld>(300,true,0,false);
+        require(nativeWorld->bindNativeTerrain(*native),"bind native painting identities");
+        downwell::GameMakerRandom random;
+        struct Ops {
+            downwell::GameplayTerrainInstances* records;downwell::InstanceHandle key;unsigned n=0,bits;
+            bool place(int,int,int,bool& hit){hit=(bits>>n++)&1;return true;}
+            bool point(int,int,int,bool& hit){hit=false;return true;}
+            bool image(int frame){return !records||records->imageIndex(key,frame);}
+            bool outOfView(){return true;}bool tile(int,int,int,int,int,int,int,int){return true;}
+            bool destroy(){return false;}bool deactivate(){return false;}bool create(int,int,int){return true;}
+        };
+        for(unsigned i=0;i<4;++i){
+            const int x=224+int(i/2)*16,y=192+int(i/3)*16;
+            require(records->append(60,x,y,true)&&native->append(60,x,y),"painting fixture births");
+            const auto r=records->handle(i),n=native->handle(i);
+            require(records->createProperties(r,51,false,random)&&native->createProperties(n,51),"painting fixture Create");
+            Ops ro{records.get(),r,0,i+2},no{nullptr,n,0,i+2};
+            require(records->wallEvent(r,1,random,ro)&&native->wallEvent(n,1,random,no),"select retained frames");
+        }
+        static AmigaTerrainTiles empty;
+        for(unsigned pass=0;pass<3;++pass){
+            if(pass==1)require(records->requestDestroy(records->handle(0))&&native->markDestroyed(native->handle(0)),"mark one coincident wall");
+            if(pass==2)require(native->retire(native->handle(0)),"retire marked native wall");
+            std::vector<UBYTE> a(downwellGameRingBytes),b(a.size()),ha(downwellLayerBytes),hb(ha.size());
+            AmigaRenderer reference{},candidate{};
+            amigaRendererInit(&reference,a.data(),ha.data());amigaRendererInit(&candidate,b.data(),hb.data());
+            require(!AmigaTerrainPainter::bindBatch(pack.data(),pack.data()+pack.size(),nullptr,0),"unbind owned reference");
+            require(AmigaTerrainPainter::paint(&reference,rooms,room,nullptr,empty,nullptr,0,referenceWorld.get(),
+                pack.data(),pack.data()+pack.size(),160,176,110,0,160,48),"owned reference paint");
+            require(AmigaTerrainPainter::bindBatch(pack.data(),pack.data()+pack.size(),scratch.data(),scratch.size()),"bind owned batch");
+            require(AmigaTerrainPainter::paint(&candidate,rooms,room,nullptr,empty,nullptr,0,nativeWorld.get(),
+                pack.data(),pack.data()+pack.size(),160,176,110,0,160,48),"native retained paint");
+            require(a==b&&ha==hb,"native retained wall pixels differ");
+            require(std::any_of(a.begin(),a.end(),[](UBYTE b){return b!=0;}),"empty retained wall fixture");
+            std::vector<UWORD> rows(48*22);
+            require(AmigaTerrainPainter::paintCached(rows.data(),&candidate,rooms,room,nullptr,empty,nullptr,0,
+                nativeWorld.get(),pack.data(),pack.data()+pack.size(),160,176,0,48),"retained direct-cache paint");
+            for(unsigned y=0;y<48;++y)for(unsigned p=0;p<2;++p)for(unsigned w=0;w<11;++w){
+                const unsigned offset=p*downwellGameRingPlaneBytes+y*48+12+w*2;
+                require(rows[y*22+p*11+w]==UWORD((unsigned(a[offset])<<8)|a[offset+1]),"retained cached pixel mismatch");
+            }
+        }
+    }
     for(int y=0;y<8192;y+=16){
         downwell::DeferredCreateInstance command{92,160+int(next()%11)*16,y};
         command.integerImageIndex=next()%26;
