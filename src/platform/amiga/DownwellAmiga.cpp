@@ -405,6 +405,9 @@ volatile ULONG gDownwellExitWipeFrames, gDownwellExitWipeFailures;
 __attribute__((noinline, used)) void downwellExitWipeReady() { __asm__ volatile("" ::: "memory"); }
 #endif
 static AmigaShopMenu shopMenuOverlay;
+#ifdef DOWNWELL_PROFILE_OVERFLOW
+#include "AmigaOverflowProfileEntry.h"
+#endif
 #if defined(DOWNWELL_NATURAL_VERIFY) || defined(DOWNWELL_PROFILE_SHOP)
 #include "AmigaNaturalRouteVerification.h"
 #endif
@@ -1999,6 +2002,11 @@ __attribute__((noinline)) static int runDownwell(void) {
         port.configureSolidResolver(amigaResolveTerrainSolid,
                                     &terrainCollision, amigaResolveTerrainSegment, amigaResolveTerrainPlayerMask,amigaResolveTerrainWallContacts);
         liveBuilder.resetInitialCheckpointBeforeEntrance(enemyRandom);
+#ifdef DOWNWELL_PROFILE_OVERFLOW
+        if(!amigaOverflowProfileEntry(liveBuilder,enemyRandom)){
+            platform.restore();FreeMem(startupCopperWords,4*sizeof(UWORD));memory.release();return 20;
+        }
+#endif
         port.configureEnemyRandom(enemyRandom);
         if(!port.createRoomStartField()){
             platform.restore();
@@ -2471,6 +2479,10 @@ __attribute__((noinline)) static int runDownwell(void) {
 #ifdef DOWNWELL_PROFILE_CONTACT
                 liveInput=downwell::gameplayContactProfileInput(port.tick(),
                     240+port.player().offsetX(),176+port.player().offsetY());
+#endif
+#ifdef DOWNWELL_PROFILE_OVERFLOW
+                downwell::gameplayEncounterProfileInput(port.tick(),
+                    240+port.player().offsetX(),176+port.player().offsetY(),4,liveInput);
 #endif
 #endif
             }

@@ -5,6 +5,7 @@
 #include "platform/amiga/AmigaGameplayDrawList.h"
 #include "core/CurrencySmokeComposition.h"
 #include "core/DebrisDraw.h"
+#include "platform/amiga/AmigaOverflowProfileEntry.h"
 #include <cstring>
 
 int amigaBlitterDrawPlanarMasked(const UBYTE*,const UBYTE*,UWORD,UWORD,UWORD,UBYTE*,UWORD,UWORD,UWORD,UWORD,UWORD,UWORD,UWORD,int){return 0;}
@@ -25,6 +26,19 @@ int main(int argc,char** argv){
     require(rooms.findRoom(11,room),"main room");
     downwell::StartupRuntime host(downwell::PlatformProfile::nonDesktop,&rooms,&objects,overflowTape?8:2,&patterns);
     host.skipToGameForTesting();downwell::GameplayTerrainInstances terrain;
+    if(overflowTape){
+        AmigaAreaOneTerrainBuilder entry(nullptr,0);downwell::GameMakerRandom random;
+        require(amigaOverflowProfileEntry(entry,random),"overflow native checkpoint");
+        random.nextU32(); // Ordinary entrance Create, not an extra gameplay draw.
+        require(random.drawCount()==host.randomDrawCount()&&
+            random.stateIndex()==host.randomState().stateIndex(),"overflow entry RNG position");
+        for(unsigned i=0;i<16;++i)require(random.stateWord(i)==host.randomState().stateWord(i),
+            "overflow entry complete source RNG state");
+        const auto& b=host.mainBuilderState();
+        require(b.y()==704&&b.generationCount()==-30&&b.rightRoomCount()==2&&
+            b.rightRoom(0)==13&&b.rightRoom(1)==4&&!b.rowsGenerated()&&!b.spawnerMade()&&!b.endReached(),
+            "overflow entry source builder checkpoint");
+    }
     AmigaPortRuntime game(300,false,1201-176,true,{},{},{},&terrain);game.initializeEntryInput(false);
     LiveSceneWorld live(patterns,objects);live.bind(game,rooms,room,false,&host);
     downwell::EffectMaskAssets assets;require(assets.bind(ab.data(),ab.size()),"effect assets");

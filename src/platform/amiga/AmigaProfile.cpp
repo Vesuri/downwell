@@ -45,7 +45,7 @@ volatile ULONG gDownwellProfileTargetFrames =
 #endif
     DOWNWELL_PROFILE_FRAMES;
 #else
-#ifdef DOWNWELL_PROFILE_CONTACT
+#if defined(DOWNWELL_PROFILE_CONTACT) || defined(DOWNWELL_PROFILE_OVERFLOW)
     downwell::gameplayContactProfileFrames;
 #else
 #ifdef DOWNWELL_SKIP_LEVEL

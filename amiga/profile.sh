@@ -95,6 +95,7 @@ restore() {
   unset PROBES FPSCOUNT
   unset PROFILE_ENTRY
   unset PROFILE_SHOP
+  unset PROFILE_OVERFLOW
   unset PROFILE_NAVIGATE
   unset REFERENCE_RANDOM
   unset REFERENCE_BOX_RANDOM
@@ -143,6 +144,9 @@ restore() {
   make -j4 TERRAIN_BATCH_VERIFY=0 SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_LASER=0 PROFILE_CONTACT=0 PROFILE_FRAMES=0 PROFILE_TRANSITION=0 GENERATION_DETAIL=0 GENERATION_TIMING=0 PHASE_SAMPLING=0 TRACE_FRAMES= >> .run/profile-restore.log 2>&1
 }
 mkdir -p .run
+if [[ ${PROFILE_OVERFLOW:-0} == 1 ]]; then
+  make -C .. test-amiga-currency-promotion
+fi
 if [[ ${PROFILE_SHOP:-0} == 1 ]]; then
   make -C .. generate-shop-profile
 fi
@@ -160,6 +164,7 @@ printf 'Profile optimization: %s\n' "${AMIGA_OPTIMIZATION:--O3}"
 printf 'Profile prepared field reference: %s\n' "${PROFILE_FIELD_REFERENCE:-0}"
 printf 'Profile Laser Sight fixture: %s\n' "${PROFILE_LASER:-0}"
 printf 'Profile natural contact tape: %s\n' "${PROFILE_CONTACT:-0}"
+printf 'Profile natural overflow tape (seed 8, route 4): %s\n' "${PROFILE_OVERFLOW:-0}"
 printf 'Profile inner generation probes: %s (only active in probes mode)\n' "${GENERATION_DETAIL:-0}"
 printf 'Profile coarse generation timing: %s (FPS mode only)\n' "${GENERATION_TIMING:-0}"
 printf 'Profile coarse timing stage: %s\n' "${GENERATION_TIMING_PHASE:-profileGeneration}"

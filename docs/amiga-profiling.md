@@ -591,6 +591,23 @@ fixture verifies the promoted suffix and unchanged actor prefix on fallback;
 it does not verify native fallback DMA pixels or time its composition. It is
 not evidence of smoke/debris coverage or complete dense-combat coverage.
 
+Use `SKIP_TO_GAME=1 PROFILE_OVERFLOW=1 VERIFY_TIMEOUT_SECONDS=600 bash amiga/profile.sh fps`
+for its native 1,800-update window. The wrapper first runs both host renderer
+tapes and verifies the seed-8 entry checkpoint (including all RNG words), then
+restores the ordinary executable on exit. `PROFILE_OVERFLOW=1` also selects
+this tape for `trace` and `frames`; do not combine it with another tape flag.
+For example, capture shade subtraction and nine-channel overflow separately:
+
+```sh
+SKIP_TO_GAME=1 PROFILE_OVERFLOW=1 TRACE_FRAMES=1302,1396 TRACE_FIELDS=60 \
+  TRACE_OUTPUT="$PWD/tmp/trace/overflow" VERIFY_TIMEOUT_SECONDS=600 \
+  bash amiga/profile.sh trace
+```
+
+The host census uses one-based post-Step frames, as do the trace frame labels.
+Native timing runs retain the ordinary uninstrumented compositor; host
+coverage is not a replacement for native state and completed-DMA pixel checks.
+
 Phases 137–138 split enemy finalization's integer position publication and
 sprite/mask/scale/image-index publication from phase 115. The latter includes
 bat presentation-field updates. Coordinate rounding, sprite selection and
