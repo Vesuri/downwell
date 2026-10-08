@@ -623,6 +623,23 @@ def build_records(manifest, extracted, profile, language_path=None):
             if selected_frames is not None and frame_index not in selected_frames:
                 continue
             canvas = frame_canvas(sprite, frame, items, pages)
+            if profile == "clear" and sprite_id in (51, 74, 72, 70, 55):
+                # The two inclusive Result Draw border loops repeat every
+                # 16 pixels. Preserve overlap painter order for the 32px area
+                # art. Runtime takes n*16 rows, then the original tile's tail:
+                # cropping a longer repeated strip alone would include the
+                # next (not source-visible) tile over that terminal tail.
+                require(frame_index in (7, 13) and canvas.height in (16, 32),
+                        "unexpected selection border geometry")
+                # Eight-row publication blocks plus one leading period fit
+                # every selected bank beside the resident mask and HUD.
+                # Later blocks start at row 16, preserving overlapping art.
+                repeated = Image.new("RGBA", (canvas.width, 9 * 16 + canvas.height - 16))
+                for row in range(9):
+                    repeated.alpha_composite(canvas, (0, row * 16))
+                pens = [pixel_to_pen(pixel) for pixel in repeated.get_flattened_data()]
+                dma_width, planar = encode_planar(pens, repeated.width, repeated.height)
+                encoded.append((dict(sprite, height=repeated.height), 256 + frame_index, dma_width, planar))
             if profile == "game" and sprite_id == 96:
                 canvas = flash_palette_canvas(canvas)
             if profile == "game" and sprite_id in (84, 96, 101, 153, 154, 157, 162, 163, 164,
@@ -1344,12 +1361,14 @@ def main():
     if args.profile in ("shop", "clear"):
         labels = shop_texts(args.language) if args.profile == "shop" else clear_texts(args.language)
         provenance = json.dumps({
-            "schemaVersion": 1, "generator": f"generate-amiga-hud.py/{args.profile}-v{3 if args.profile == 'clear' else 1}",
+            "schemaVersion": 1, "generator": f"generate-amiga-hud.py/{args.profile}-v{4 if args.profile == 'clear' else 1}",
             "extractor": manifest["extractor"], "sourceSha256": SOURCE_SHA256,
             "languageSha256": hashlib.sha256(args.language.read_bytes()).hexdigest(),
             "packSha256": digest, "language": "english",
             "textAssetIds": sorted(labels),
-            **({"outlinedTextFrame": 1, "diagonalHeadingFrames": [0, 2, 3, 4, 5, 6, 7]}
+            **({"outlinedTextFrame": 1, "diagonalHeadingFrames": [0, 2, 3, 4, 5, 6, 7],
+                "borderStripFrames": [263, 269], "borderStripPeriod": 16,
+                "borderStripBlockRows": 128, "borderStripRepetitions": 9}
                if args.profile == "clear" else {}),
         }, sort_keys=True, indent=2).encode("utf-8") + b"\n"
         provenance_path = args.output.with_suffix(".manifest.json")

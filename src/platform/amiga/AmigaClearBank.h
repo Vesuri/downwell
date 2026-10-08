@@ -18,7 +18,7 @@ struct AmigaClearBank {
             const unsigned* offers, unsigned offerCount,
             std::uint8_t* target, unsigned capacity, unsigned area = 1, unsigned level = 1,
             const unsigned char* owned = nullptr, bool outlined = false,
-            bool preparedHeadings = false) { // optional 23-entry source inventory
+            bool preparedHeadings = false, bool preparedBorders = false) { // optional 23-entry source inventory
         if (!source || !target || (offerCount && !offers) || offerCount > 4 || size < 20 ||
             longword(source) != 0x44574150u || word(source + 4) != 2 || word(source + 6) != 20)
             return 0;
@@ -31,7 +31,7 @@ struct AmigaClearBank {
         // for every title, icon and text variant on a 68000.
         for (unsigned i = 1; i < sourceCount; ++i)
             if (longword(source + 20 + (i-1)*24) >= longword(source + 20 + i*24)) return 0;
-        unsigned ids[30] = {stageLabel, 64001}, frames[30] = {}, count = 2;
+        unsigned ids[34] = {stageLabel, 64001}, frames[34] = {}, count = 2;
         if (preparedHeadings) {
             if (!outlined) return 0;
             const unsigned titles[] = {stageLabel, 64001u};
@@ -43,6 +43,10 @@ struct AmigaClearBank {
         for (unsigned selectedArea = area; selectedArea <= area + 1; ++selectedArea) {
             ids[count] = downwell::levelBorderSprite(selectedArea); frames[count++] = 7;
             ids[count] = downwell::levelBorderSprite(selectedArea); frames[count++] = 13;
+            if (preparedBorders) {
+                ids[count] = downwell::levelBorderSprite(selectedArea); frames[count++] = 263;
+                ids[count] = downwell::levelBorderSprite(selectedArea); frames[count++] = 269;
+            }
         }
         for (unsigned i = 0; i < offerCount; ++i) {
             const unsigned sprite = downwell::levelUpgradeSprite(offers[i]);
@@ -70,7 +74,7 @@ struct AmigaClearBank {
             }
             ids[j] = id; frames[j] = frame;
         }
-        const std::uint8_t* records[30] = {};
+        const std::uint8_t* records[34] = {};
         unsigned bytes = 20 + count * 24;
         if (bytes > capacity) return 0;
         unsigned sourceIndex = 0;

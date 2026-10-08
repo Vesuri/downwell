@@ -186,6 +186,15 @@ display DMA retirement. Offer-bank replacement may rebind equivalent border
 artwork without invalidating its pixels. `REFERENCE_SELECTION_BORDER_OWNERSHIP=1`
 retains the old overlay-indexed border ownership for comparison.
 
+The first upgrade border canvas uses host-composed repeating strips, copied
+through the framework `Bitmap` in blocks of at most 128 rows. Derived frames
+263/269 contain nine repetitions of source frames 7/13 at a 16-pixel period.
+The leading block includes the original top edge; subsequent blocks start at
+the next period. A 32-pixel tile's final lower half comes from the original
+tile, preserving the finite source loop's tail and overlap order. The bank
+retains both originals and strips; no additional Chip allocation is needed.
+`REFERENCE_SELECTION_STRIPS=1` retains the original tile-command renderer.
+
 Selection canvases retain admitted artwork records alongside their successful
 command list. Moving a command changes its damage bounds, not its immutable
 resource binding. A changed resource/frame key is resolved afresh, and a failed

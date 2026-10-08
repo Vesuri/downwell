@@ -116,7 +116,7 @@ int main(int argc,char** argv) {
         snapshot.borders([&](int a, int image, int x, int y) {
             borders[count++] = {downwell::levelBorderSprite(a), unsigned(image), x, y, -1};
         });
-        unsigned bytes = AmigaClearBank::build(pack.data(),pack.size(),nullptr,0,bank.data(),bank.size(),area,1);
+        unsigned bytes = AmigaClearBank::build(pack.data(),pack.size(),nullptr,0,bank.data(),bank.size(),area,1,nullptr,false,false,true);
         assert(bytes);
         layer.invalidate();
         assert(layer.render(canvas.data(),bank.data(),bank.data()+bytes,borders,count,paint));
@@ -127,7 +127,7 @@ int main(int argc,char** argv) {
             unsigned offers[] = {sample%23,(sample+6)%23,(sample+13)%23,100};
             unsigned char owned[23];
             for (auto& item : owned) item = sample%2;
-            bytes = AmigaClearBank::build(pack.data(),pack.size(),offers,sample%5,bank.data(),bank.size(),area,1,owned);
+            bytes = AmigaClearBank::build(pack.data(),pack.size(),offers,sample%5,bank.data(),bank.size(),area,1,owned,false,false,true);
             assert(bytes);
             layer.rebindEquivalentArtwork(bank.data(),bank.data()+bytes);
             cachedBorder.rebindEquivalentArtwork(bank.data(),bank.data()+bytes);

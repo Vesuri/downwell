@@ -10,6 +10,11 @@
 // The two world displays and pristine terrain backing live outside this bank;
 // their subsequent ownership is the presenter's responsibility.
 struct AmigaClearSceneAssets {
+#ifdef DOWNWELL_REFERENCE_SELECTION_STRIPS
+    static constexpr bool preparedBorders = false;
+#else
+    static constexpr bool preparedBorders = true;
+#endif
 #ifdef DOWNWELL_REFERENCE_CLEAR_HEADINGS
     static constexpr bool preparedHeadings = false;
 #else
@@ -32,7 +37,7 @@ struct AmigaClearSceneAssets {
         if (!retiredStorage || !proposed.valid || !mask ||
             (maskBytes != AmigaExitMask::bytes && maskBytes != AmigaExitMask::selectionBytes)) return false;
         const unsigned bytes = AmigaClearBank::build(art, artBytes, offers, offerCount,
-            retiredStorage + proposed.resultsOffset, proposed.resultsCapacity, area, level, owned, true, preparedHeadings);
+            retiredStorage + proposed.resultsOffset, proposed.resultsCapacity, area, level, owned, true, preparedHeadings, preparedBorders);
         if (!bytes) return false;
         for (unsigned i = 0; i < maskBytes; ++i) retiredStorage[i] = mask[i];
         layout = proposed; bankBytes = bytes;
@@ -43,7 +48,7 @@ struct AmigaClearSceneAssets {
                       const unsigned char* owned = nullptr) {
         if (!retiredStorage || !layout.valid || !bankBytes) return false;
         const unsigned bytes = AmigaClearBank::build(art, artBytes, offers, offerCount,
-            retiredStorage + layout.resultsOffset, layout.resultsCapacity, area, level, owned, true, preparedHeadings);
+            retiredStorage + layout.resultsOffset, layout.resultsCapacity, area, level, owned, true, preparedHeadings, preparedBorders);
         if (!bytes) return false;
         bankBytes = bytes;
         return true;

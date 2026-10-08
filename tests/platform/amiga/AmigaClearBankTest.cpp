@@ -122,14 +122,15 @@ int main(int argc, char** argv) {
     std::printf("Conservative all-offer outlined bank bound: %u bytes\n",maximumBase+4*maximumBundle);
     unsigned preparedBase=0, preparedBundle=0;
     for(unsigned area=1;area<=4;++area) for(unsigned level=1;level<=3;++level) {
-        unsigned bytes=20+30*24;
+        unsigned bytes=20+34*24;
         const unsigned titles[]={downwell::levelClearStageLabel(area,level),64001};
         for(unsigned id:titles) {
             bytes+=payload(id,0);
             for(unsigned frame=2;frame<=7;++frame) bytes+=payload(id,frame);
         }
         for(unsigned a=area;a<=area+1;++a)
-            bytes+=payload(downwell::levelBorderSprite(a),7)+payload(downwell::levelBorderSprite(a),13);
+            bytes+=payload(downwell::levelBorderSprite(a),7)+payload(downwell::levelBorderSprite(a),13)+
+                payload(downwell::levelBorderSprite(a),263)+payload(downwell::levelBorderSprite(a),269);
         if(bytes>preparedBase) preparedBase=bytes;
     }
     for(unsigned option=0;option<24;++option) for(unsigned owned=0;owned<(option==23?1u:2u);++owned) {
@@ -152,11 +153,11 @@ int main(int argc, char** argv) {
         std::vector<std::uint8_t> prepared(31756+32,0x69);
         auto* bank=prepared.data()+16;
         const unsigned bytes=AmigaClearBank::build(source.data(),source.size(),offers,4,
-            bank,31756,area,level,owned,true,true);
+            bank,31756,area,level,owned,true,true,true);
         require(bytes && bytes<=preparedBase+4*preparedBundle,"prepared selection respects the all-offer bound");
         if(bytes>maximumPrepared) maximumPrepared=bytes;
         const unsigned count=AmigaClearBank::longword(bank+8);
-        require(count<=30,"prepared selection fits its bounded record array");
+        require(count<=34,"prepared selection fits its bounded record array");
         unsigned titles=0;
         for(unsigned i=0;i<count;++i) {
             const auto* record=bank+20+i*24;

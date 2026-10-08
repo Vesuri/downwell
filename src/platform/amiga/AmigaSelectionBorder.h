@@ -3,6 +3,7 @@
 #include "AmigaSelectionLayer.h"
 #include "core/LevelClearPresentation.h"
 #include "core/LevelUpgradeArt.h"
+#include "AmigaSelectionBorderPrepared.h"
 
 // The source's finite border loops depend on area and seam row only once
 // tileY is removed. Ordinary camera/tile movement must not rebuild or compare
@@ -27,18 +28,25 @@ public:
         pack_ = pack; end_ = end;
         layer_.rebindEquivalentArtwork(pack, end);
     }
-    const UBYTE* view(unsigned top) const { return ready_ ? layer_.view(top) : nullptr; }
+    const UBYTE* view(unsigned top) const {
+        return ready_&&top<=AmigaSelectionLayer::height-284?target_+top*AmigaSelectionLayer::stride:nullptr;
+    }
     bool render(UBYTE* target, const UBYTE* pack, const UBYTE* end,
         const downwell::LevelClearPresentation::Frame& frame, unsigned& pixels) {
         pixels = 0;
         if (!target || frame.borderRow < 0 || frame.borderRow > 36) return false;
         if (matches(target, pack, end, frame)) return true;
+#ifndef DOWNWELL_REFERENCE_SELECTION_STRIPS
+        if(!AmigaSelectionBorderPrepared::render(target,pack,end,frame.area,frame.borderRow))return false;
+        pixels=AmigaSelectionLayer::width*AmigaSelectionLayer::height;
+#else
         unsigned count = 0;
         frame.borders([&](int area, int image, int x, int y) {
             commands_[count++] = {downwell::levelBorderSprite(area), unsigned(image),
                                  x, y - frame.tileY, -1};
         });
         if (!layer_.render(target, pack, end, commands_, count, pixels)) return false;
+#endif
         target_ = target; pack_ = pack; end_ = end;
         area_ = frame.area; row_ = frame.borderRow; ready_ = true;
         return true;

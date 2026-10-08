@@ -54,7 +54,7 @@ bool AmigaUpgradeScene::refreshArtwork(const GameplayWorld& world, UBYTE* storag
     for (unsigned i = 0; i < count; ++i) offers_[i] = room.offers.ids[i];
     for (unsigned i = 0; i < 23; ++i) owned_[i] = world.upgrades().levels[i];
     const UBYTE* bank = storage + assets.layout.resultsOffset;
-    // AmigaClearBank always copies the same four border resources for this
+    // AmigaClearBank always copies the same border tiles/strips for this
     // area, independent of offers and inventory. Keep their pixels.
     borders_.rebindEquivalentArtwork(bank, bank + assets.bankBytes);
     for (auto& layer : layers_) layer.invalidate();

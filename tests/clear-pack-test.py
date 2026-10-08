@@ -19,23 +19,60 @@ for i in range(pack.HEADER.unpack_from(data)[3]):
     ident, frame, ox, oy, width, height, stride, flags, offset, length = record
     if ident in (51, 74, 72, 70, 55):
         expected_geometry = (32, 32, 16, 16) if ident == 70 else (16, 16, 8, 8)
+        if frame >= 256:
+            expected_geometry = (expected_geometry[0], 9*16+expected_geometry[1]-16,
+                                 *expected_geometry[2:])
         assert (width, height, ox, oy) == expected_geometry, "circular border cache geometry contract"
     assert flags == 3 and (ident, frame) not in records
     records[ident, frame] = record
     if ident in texts:
-        assert (ox, oy) == (width // 2, 0), "Result text is center/top anchored"
         lines = [pack.render_text(manifest, pages, line) for line in texts[ident].split("\n")]
-        expected = pack.Image.new("RGBA", (width, height))
+        base_width = max(line.width for line in lines)
+        expected = pack.Image.new("RGBA", (base_width, 10+12*(len(lines)-1)))
         for row, line in enumerate(lines):
-            expected.alpha_composite(line, ((width - line.width) // 2, row * 12))
+            expected.alpha_composite(line, ((base_width - line.width) // 2, row * 12))
+        base = expected
+        if frame == 1:
+            assert ident not in (64000, 64001) and not 64500 <= ident < 64512
+            expected = pack.Image.new("RGBA", (base.width+2, base.height+2))
+            black = pack.Image.new("RGBA", base.size, (0, 0, 0, 255))
+            black.putalpha(base.getchannel("A"))
+            for xy in ((0, 1), (2, 1), (1, 0), (1, 2)):
+                expected.alpha_composite(black, xy)
+            expected.alpha_composite(base, (1, 1))
+            assert (ox, oy) == (base.width//2+1, 1)
+        elif frame:
+            assert (ident == 64001 or 64500 <= ident < 64512) and 2 <= frame <= 7
+            extent = frame-1
+            expected = pack.Image.new("RGBA", (base.width+extent, base.height+extent))
+            red = pack.Image.new("RGBA", base.size, (255, 0, 0, 255))
+            red.putalpha(base.getchannel("A"))
+            for shadow_offset in range(extent, 0, -1):
+                expected.alpha_composite(red, (shadow_offset, shadow_offset))
+            expected.alpha_composite(base, (0, 0))
+            assert (ox, oy) == (base.width//2+extent, extent)
+        else:
+            assert (ox, oy) == (base.width//2, 0), "Result text is center/top anchored"
     else:
         sprite = manifest["resources"]["sprites"][ident]
-        expected = pack.frame_canvas(sprite, sprite["frames"][frame],
+        expected = pack.frame_canvas(sprite, sprite["frames"][frame%256],
             manifest["resources"]["texturePageItems"], pages)
+        if frame >= 256:
+            assert ident in (51, 74, 72, 70, 55) and frame in (263, 269)
+            tile = expected
+            expected = pack.Image.new("RGBA", (width, height))
+            for row in range(9):
+                expected.alpha_composite(tile, (0, row*16))
         assert (ox, oy) == (sprite["originX"], sprite["originY"])
+    assert expected.size == (width, height)
     assert pack.decode_planar(data[offset:offset + length], width, height, stride) == [
         pack.pixel_to_pen(pixel) for pixel in expected.get_flattened_data()]
-assert len(records) == 119 and {(ident, 0) for ident in texts} <= records.keys()
+expected_keys = {(ident, frame) for ident, frames in pack.SELECTIONS["clear"].items() for frame in frames}
+expected_keys |= {(ident, frame) for ident in (51, 74, 72, 70, 55) for frame in (263, 269)}
+expected_keys |= {(ident, 0) for ident in texts}
+expected_keys |= {(ident, 1) for ident in texts if ident not in (64000, 64001) and not 64500 <= ident < 64512}
+expected_keys |= {(ident, frame) for ident in (64001, *range(64500, 64512)) for frame in range(2, 8)}
+assert records.keys() == expected_keys
 for upgrade in range(23):
     assert texts[64600 + upgrade] == texts[64100 + upgrade] + " 2"
 for area in range(1, 5):
