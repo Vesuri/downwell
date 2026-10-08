@@ -73,6 +73,9 @@ assert not any(e["eventType"] in (0,8) for e in effect["events"])
 assert obj["name"] == "bulletEnmBone" and obj["spriteId"] == 460
 assert obj["parentId"] == 90 and obj["textureMaskId"] == -1
 draw = source("Draw_0", "f80bec54d3f7e90d0ee349add68771ed6f26c0acd51b80c233edb68ceda536ba")
+enemy_draw = (export / "Assembly/gml_Object_subparentEnemy_Draw_0.asm").read_bytes()
+assert enemy_draw.decode() == draw
+assert not any(e["eventType"] == 8 for e in manifest["resources"]["objects"][120]["events"])
 assert draw.index("gml_Script_drawShade") < draw.index("draw_self")
 shade = (export / "Assembly/gml_GlobalScript_drawShade.asm").read_bytes()
 assert sha256(shade).hexdigest() == "c0aa27477ef320ed8e7f9bcc38bd4d468d0b84ed9dedd2d7bacd1e1844585c82"

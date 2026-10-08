@@ -481,7 +481,15 @@ public:
         return run_.effectsSucceeded=scriptSpawnInstances_&&effects.advanceRegistered(phase,*scriptSpawnInstances_);
     }
     enum class PhaseBoundary { beginStep, alarm, step, collision, endStep, roomEntry };
-    enum class DrawActor { enemy, bullet, scriptEffect, debris, player, entryDither, bone };
+    enum class DrawActor { enemy, bullet, scriptEffect, debris, player, entryDither, bone, skeleton };
+    template<class Visit> bool visitRegisteredEnemyShades(Visit visit)const{
+        if((!bones_||!bones_->size())&&(!skeletons_||!skeletons_->size()))return true;
+        return visitRoomActorsReadOnly([&](DrawActor kind,downwell::InstanceHandle key,auto){
+            if(kind==DrawActor::bone){const auto* r=bones_->find(key);return r&&visit(r->x.promoted(),r->y.promoted());}
+            if(kind==DrawActor::skeleton){const auto* r=skeletons_->find(key);return r&&visit(r->x.promoted(),r->y.promoted());}
+            return true;
+        });
+    }
     template<class Visit> bool visitBoneDraw(Visit visit)const{
         if(!bones_||!bones_->size())return true;
         return visitRoomActorsReadOnly([&](DrawActor kind,downwell::InstanceHandle key,auto){

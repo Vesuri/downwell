@@ -475,6 +475,25 @@ int main() {
         RecordingRenderer ended;scene->render(ended);
         require(std::find(ended.spriteOrder.begin(),ended.spriteOrder.end(),101)==ended.spriteOrder.end(),
             "wall impact retires after sixteen source animation updates");
+        auto skeletons=world.skeletonRegistration<1>();downwell::InstanceHandle skeleton;
+        require(world.spawnSkeleton(skeletons,248,128,skeleton),"register skeleton for source inherited Draw");
+        for(int sprite:{208,207,205})for(int facing:{-1,1}){
+            const unsigned count=downwell::SkeletonAnimation::frames(sprite);
+            for(unsigned index=0;index<count;++index){
+                downwell::RunnerImageValue image;require(image.assignInteger(index),"skeleton frame value");
+                require(skeletons.dispatchPublished(skeleton,[&](auto&,auto&,auto& publish,bool&){
+                    return publish.sprite(sprite)&&publish.imageIndex(image)&&publish.facing(facing);
+                }),"publish skeleton Draw fields");
+                RecordingRenderer frame;frame.recordTransforms=true;scene->render(frame);unsigned seen=0;
+                for(const auto& item:frame.transforms)if(item.sprite==sprite){
+                    require(item.frame==index&&item.sx==facing&&item.sy==1&&item.angle==0&&
+                        item.x==110+256-world.mainCameraRenderViewX()&&item.y==128-world.mainCameraRenderViewY(),
+                        "SDL skeleton uses published snapped position, frame and facing");++seen;
+                }
+                require(seen==1&&scene->renderingSucceeded(),"one source skeleton sprite per Draw");
+            }
+        }
+        require(skeletons.mark(skeleton)&&skeletons.clear(),"retire skeleton Draw fixture");
         auto bones=world.boneRegistration<2>();downwell::InstanceHandle firstBone,lastBone;
         require(world.spawnBone(bones,240,120,firstBone)&&world.spawnBone(bones,244,124,lastBone),
             "register both bones through real source IDs and layer elements");
@@ -748,11 +767,12 @@ int main() {
         require(effectGame.renderingSucceeded()&&runtime.randomDrawCount()==entryRng&&
             std::all_of(covered.effectPixels.begin(),covered.effectPixels.end(),[](int p){return p==0;}),
             "first gameplay view is covered by opaque-black original entry art, not white or missing alpha");
-        {
-            auto bones=runtime.boneRegistration<1>();downwell::InstanceHandle bone;
-            const int bx=(runtime.mainCameraRenderViewX()+80)&~1,by=(runtime.mainCameraRenderViewY()+140)&~1;
-            require(runtime.spawnBone(bones,bx,by,bone),
-                "bone Draw shade fixture uses a registered actor");
+        for(bool skeletonShade:{false,true}){
+            auto bones=runtime.boneRegistration<1>();auto skeletons=runtime.skeletonRegistration<1>();
+            downwell::InstanceHandle actor;
+            const int bx=(runtime.mainCameraRenderViewX()+80)&~15,by=(runtime.mainCameraRenderViewY()+140)&~15;
+            require(skeletonShade?runtime.spawnSkeleton(skeletons,bx,by,actor):runtime.spawnBone(bones,bx,by,actor),
+                "inherited Draw shade fixture uses a registered actor");
             RecordingRenderer shaded;shaded.effectPixels.assign(160*284,-1);effectGame.render(shaded);
             const auto* art=assets.shade();require(art&&effectGame.renderingSucceeded(),"bone shade reaches controller");
             unsigned holes=0;
@@ -764,7 +784,7 @@ int main() {
                 require(shaded.effectPixels[y*160+x]==(bit?-1:0),"bone shade subtracts exact offline mask from entry surface");
                 holes+=bit;
             }
-            require(holes&&bones.clear(),"bone shade has nonempty verified coverage and retires cleanly");
+            require(holes&&bones.clear()&&skeletons.clear(),"actor shade has nonempty verified coverage and retires cleanly");
         }
         downwell::InstanceHandle entryKey;
         require(runtime.visitEntryDitherDraw([&](auto key,const auto&,int){entryKey=key;return true;})&&entryKey.generation,

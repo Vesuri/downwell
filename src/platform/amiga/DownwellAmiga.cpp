@@ -3843,7 +3843,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                         if(enemy.active&&enemy.awake)
                             emit(std::int32_t(240+enemy.x),std::int32_t(176+enemy.y));
                     }
-                    shadesSucceeded=port.visitBoneDraw([&](Real x,Real y){emit(x,y);return true;});
+                    shadesSucceeded=port.visitRegisteredEnemyShades([&](Real x,Real y){emit(x,y);return true;});
                 },[](Real n,std::int32_t& out){return n.roundPixel(out);})||!shadesSucceeded){
                     exitCode=20;break;
                 }

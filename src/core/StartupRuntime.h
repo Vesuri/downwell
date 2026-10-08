@@ -734,6 +734,18 @@ public:
             return visit(x.promoted(),y.promoted());
         });
     }
+    template<class Visit> bool visitRegisteredEnemyShades(Visit visit)const{
+        bool present=false;
+        for(unsigned i=0;i<instances_.size();++i){const int object=instances_.at(i).objectId;
+            if(object==269||object==120){present=true;break;}}
+        if(!present)return true;
+        return visitDrawAtDepthChecked([&](InstanceHandle,const InstanceRecord& record,int){
+            if((record.objectId!=269&&record.objectId!=120)||!record.active||record.destroyRequested)return true;
+            RunnerImageValue x,y;
+            std::memcpy(&x.bits,&record.preciseX,4);std::memcpy(&y.bits,&record.preciseY,4);
+            return visit(x.promoted(),y.promoted());
+        });
+    }
     template<unsigned Capacity> bool boneInView(
         StoredBoneRegistration<instanceCapacity,Capacity>& bones,InstanceHandle bone,bool& visible){
         if(!run_.effectsSucceeded||roomId_!=mainRoomId||!bones.belongsTo(instances_)||!bones.valid())

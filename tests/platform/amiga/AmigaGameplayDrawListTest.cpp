@@ -203,6 +203,27 @@ int main() {
         assert(owner->prepareDraw()&&list.collect(*scene,pack,pack+8,160,34));
         for(unsigned i=0;i<list.count;++i)assert(list.actors[i].sprite!=101);
         downwell::InstanceHandle bone;
+        downwell::InstanceHandle skeleton;
+        assert(scene->createSkeletonWithSourceId(405189,248,128,skeleton));
+        for(int sprite:{208,207,205})for(int facing:{-1,1}){
+            const unsigned count=downwell::SkeletonAnimation::frames(sprite);
+            for(unsigned frame=0;frame<count;++frame){
+                downwell::RunnerImageValue index;assert(index.assignInteger(frame));
+                assert(owner->skeletons().dispatchPublished(skeleton,[&](auto&,auto&,auto& publish,bool&){
+                    return publish.sprite(sprite)&&publish.imageIndex(index)&&publish.facing(facing);
+                }));
+                const auto draws=scene->randomDrawCount();
+                assert(list.collect(*scene,pack,pack+8,160,34));unsigned seen=0;
+                for(unsigned i=0;i<list.count;++i)if(list.actors[i].sprite==sprite){
+                    assert(list.actors[i].frame==frame&&list.actors[i].x==206&&list.actors[i].y==94&&
+                        bool(list.actors[i].flip)==(facing<0));++seen;
+                }
+                assert(seen==1&&scene->randomDrawCount()==draws);
+            }
+        }
+        assert(owner->skeletons().markDestroyed(skeleton)&&owner->prepareDraw());
+        assert(list.collect(*scene,pack,pack+8,160,34));
+        for(unsigned i=0;i<list.count;++i)assert(list.actors[i].sprite!=205);
         assert(scene->createBoneWithSourceId(405190,248,128,bone));
         const auto rngBeforeDraw=scene->randomDrawCount();
         for(unsigned frame=0;frame<4;++frame){
@@ -239,17 +260,18 @@ int main() {
         })&&ordered==2);
         const auto pixels=read("generated/amiga-game.dwap");downwell::EffectMaskAssets assets;
         assert(assets.bind(pixels.data(),pixels.size()));
-        {
+        for(bool skeletonShade:{false,true}){
             downwell::InstanceHandle shadeBone;
-            assert(scene->createBoneWithSourceId(405198,240,120,shadeBone));
+            assert(skeletonShade?scene->createSkeletonWithSourceId(405199,240,112,shadeBone):
+                scene->createBoneWithSourceId(405198,240,112,shadeBone));
             downwell::CurrencySmokeComposition shaded,unshaded;
             const downwell::EffectSurfacePlacement::View view{n(160),n(34),n(160),n(284)};
-            const auto currency=[&](auto emit){emit(false,0,n(240),n(120));};
+            const auto currency=[&](auto emit){emit(false,0,n(240),n(112));};
             const auto raster=[](auto value,std::int32_t& out){return value.roundPixel(out);};
             bool enumerated=false;
             assert(unshaded.prepare(currency,scene->smokeEffects(),assets,view,{},[](auto){},raster)&&
                 shaded.prepare(currency,scene->smokeEffects(),assets,view,{},[&](auto emit){
-                    enumerated=scene->visitBoneDraw([&](auto x,auto y){emit(x,y);return true;});
+                    enumerated=scene->visitRegisteredEnemyShades([&](auto x,auto y){emit(x,y);return true;});
                 },raster)&&enumerated);
             unsigned before=0,after=0;
             unshaded.surface().visit([&](auto,auto,auto alpha,auto,auto){for(unsigned b=0;b<16;++b)before+=(alpha>>b)&1u;});
@@ -258,7 +280,7 @@ int main() {
             list.entryCoverVisible=true;bool eligible=true;
             assert(list.entryCoverHardwareEligible(*scene,160,34,eligible)&&!eligible);
             list.entryCoverVisible=false;
-            assert(owner->bones().markDestroyed(shadeBone)&&owner->prepareDraw());
+            assert((skeletonShade?owner->skeletons().markDestroyed(shadeBone):owner->bones().markDestroyed(shadeBone))&&owner->prepareDraw());
         }
         downwell::CurrencySmokeComposition composed;
         const downwell::EffectSurfacePlacement::View view{n(160),n(34),n(160),n(284)};

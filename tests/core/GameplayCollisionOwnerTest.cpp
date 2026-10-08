@@ -2838,6 +2838,19 @@ int main(){
                 actor->state.money==10&&actor->state.grounded&&actor->state.alive&&
                 !actor->state.imageSpeed.high&&actor->sourceId==505100&&skeletonWorld->randomDrawCount()==draws);
             checkTypedCollisionView(GameplayCollisionView(*skeletonWorld),GameplayCollisionView::Kind::skeleton,key);
+            auto skeletonDraw=std::make_unique<ActorDrawOrderVerification>();
+            const auto visibleSkeletons=[&](){
+                unsigned count=0;
+                assert(skeletonOwner->prepareDraw()&&skeletonDraw->verify(*skeletonWorld));
+                assert(skeletonWorld->visitRoomActorsReadOnly([&](auto kind,InstanceHandle drawKey,auto){
+                    if(kind==GameplayWorld::DrawActor::skeleton){
+                        assert(drawKey.slot==key.slot&&drawKey.generation==key.generation);++count;
+                    }return true;
+                }));return count;
+            };
+            assert(visibleSkeletons()==1&&visibleSkeletons()==1);
+            assert(skeletons.activate(key,false)&&skeletonOwner->reconcileActivation()&&visibleSkeletons()==0);
+            assert(skeletons.activate(key,true)&&skeletonOwner->reconcileActivation()&&visibleSkeletons()==1);
             assert(skeletons.dispatch(key,[](auto& state,auto&,bool&){
                 state.imageSpeed=MotionBinary64::fromInteger(1);state.shot=true;state.alarms[2]=2;return true;
             }));

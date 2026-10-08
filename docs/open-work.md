@@ -108,9 +108,9 @@ behavior, both backend integrations and relevant original-game verification.
 - Connect natural death/stomp/hit events to effect owners, including flash balls.
   Complete death/low-spec direct drawing at original world-depth boundaries,
   rather than flattening those paths into an overlay.
-- Register skeletons and owned bones in shared gameplay: animation, alarms,
-  Step, collision, End Step, player/bullet damage, rewards, capacity failure,
-  out-of-view retirement and both renderers.
+- Complete natural skeleton and owned-bone integration in shared gameplay:
+  source-ordered births and animation/alarm/Step/collision/End Step scheduling,
+  player/bullet damage, rewards, capacity failure and out-of-view retirement.
 
 ### D. Verify natural encounters
 

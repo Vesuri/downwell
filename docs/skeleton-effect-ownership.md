@@ -33,7 +33,7 @@ setters. Fractional external position writes are outside this rounded-event
 adapter's admitted domain and fail before publication. Failure retains previous
 successful writes and does not advance local sprite state after a rejected
 callback or permit a retry; partially completed backend work is not rolled back.
-Collision/death dependencies and both renderers remain admission requirements:
+Collision/death dependencies remain admission requirements:
 these entry points do not enable natural
 generation or silently substitute a no-op event. Engine activation is separate
 from custom skeleton `active`.
@@ -55,6 +55,19 @@ that throw. These injected, fixed-player-pose encounters establish the adapter
 boundary, not natural generation, complete native cross-family scheduling or
 original-runner parity. Production damage/death dependencies are not replaced
 with the tests' deliberately rejecting effect adapters.
+
+The inherited `subparentEnemy` Draw event is byte-identical to the bone Draw:
+`drawShade(); draw_self()`. Neither the skeleton's custom inactive state nor
+hit-stun suppresses it. Registered skeletons occupy native projected layer
+elements, including the prepared Draw cache; engine activation and destruction
+control their eligibility. SDL reads the stored published sprite/index,
+coordinates and transform. Amiga draws the existing offline 205/207/208 frames
+with the published facing and integer room position (fractional external
+positions remain outside that backend's admitted domain). Both submit the
+published shade anchor to controller surface composition. Native hardware-only
+currency/entry-cover paths must decline promotion while a registered enemy's
+shade intersects the view, just as for bones. This draw integration does not
+admit natural births or replace the missing collision and death dependencies.
 
 `BoneProjectile` has checked publication entry points for live owners, while
 its scalar event methods remain the successful-event reference. Step compares
