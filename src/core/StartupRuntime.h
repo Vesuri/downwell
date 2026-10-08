@@ -678,9 +678,9 @@ public:
         if(!registration.belongsTo(instances_)||!registration.valid())return run_.effectsSucceeded=false;
         return registration.create(x,y,key);
     }
-    // Builder-created terrain uses the same global ID stream and synchronous
+    // Builder-created primitives use the same global ID stream and synchronous
     // resource Create path as room children. Other families must have an owner.
-    bool spawnBuilderTerrain(int object,int x,int y,InstanceHandle& key);
+    bool spawnBuilderPrimitive(int object,int x,int y,InstanceHandle& key);
     template<unsigned Capacity> class BuilderOwner {
         StartupRuntime& world_;
         StoredSkeletonRegistration<instanceCapacity,Capacity>& skeletons_;
@@ -696,7 +696,7 @@ public:
                 InstanceHandle local;
                 if(!world_.spawnSkeleton(skeletons_,x,y,local))return false;
                 key=skeletons_.worldHandle(local);
-            }else if(!world_.spawnBuilderTerrain(object,x,y,key))return false;
+            }else if(!world_.spawnBuilderPrimitive(object,x,y,key))return false;
             if(!world_.instances_.resolve(key))return world_.run_.effectsSucceeded=false;
             // The callback receives this child's handle, even if Create itself
             // allocated further children and advanced the numeric allocator.

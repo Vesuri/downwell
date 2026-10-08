@@ -1,6 +1,7 @@
 #include "core/CatacombBuilderDispatch.h"
 #include "core/GameMakerRandom.h"
 #include "core/StoredBuilderPublication.h"
+#include "core/BoxCreateScript.h"
 // Instantiate the same shared traversal and dispatcher for the freestanding
 // target; this is a compiler check, not a native gameplay integration test.
 bool compileBuilderTraversal(downwell::CatacombBuilderDispatch& dispatch,
@@ -30,3 +31,7 @@ bool compileStoredBuilderPublication(downwell::StoredBuilderPublication<2>& publ
 }
 bool compileStoredBuilderDeactivation(downwell::StoredBuilderPublication<2>& publication,
     downwell::InstanceHandle key){return publication.deactivate(key);}
+bool compileBoxCreate(downwell::BreakableState& state,downwell::GameMakerRandom& random,
+    int area,int tile,int room,bool glitch,bool (*sprite)(int),bool (*speed)(int),bool (*index)(int)){
+    return downwell::boxCreateScript(state,area,tile,room,glitch,random,sprite,speed,index);
+}

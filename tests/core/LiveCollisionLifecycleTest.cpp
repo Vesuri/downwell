@@ -181,6 +181,14 @@ int main(){
         }),"platform joins the same source ID stream");
         require(world->nextRuntimeInstanceId()==first+3&&world->randomDrawCount()==draws&&skeletons.instances().size()==1,
                 "mixed terrain/skeleton births retain IDs and RNG");
+        require(builder.create(92,208,224,[&](InstanceHandle key){
+            const auto* r=owner->resolve(key);
+            require(r&&r->objectId==92&&r->spriteId==51&&r->imageSpeed==0&&
+                    (r->imageIndex==16||r->imageIndex==17||r->imageIndex==22)&&
+                    r->box.materialBreakable&&!r->box.groundRoomResult&&r->box.breakSound>=171&&r->box.breakSound<=174,
+                    "box caller observes source Create state rather than a blank generic command");
+            return builder.deactivate(key);
+        }),"builder creates and then engine-deactivates source box");
         unsigned steps=0;
         require(world->withSkeletonEvents(skeletons,[&](InstanceHandle key,auto phase,auto&,auto&,bool&){
             require(skeletons.worldHandle(key).generation==skeleton.generation&&skeletons.worldHandle(key).slot==skeleton.slot,
@@ -189,7 +197,7 @@ int main(){
         },[&]{return world->stepWithCollisionPass(Input{},false,[]{return true;});})&&steps==1,
                 "one world tick schedules the builder-created skeleton once");
         const auto before=world->nextRuntimeInstanceId();unsigned callbacks=0;
-        require(!builder.create(rejectPost?120:92,240,240,[&](InstanceHandle){++callbacks;return false;}),
+        require(!builder.create(rejectPost?120:102,240,240,[&](InstanceHandle){++callbacks;return false;}),
                 "unsupported family or post-Create failure stops the builder owner");
         require(!world->effectsSucceeded()&&world->nextRuntimeInstanceId()==before+unsigned(rejectPost)&&callbacks==unsigned(rejectPost),
                 "failure preserves only the actually allocated source prefix");

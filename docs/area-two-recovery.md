@@ -166,12 +166,11 @@ unit tests cover write/activation failures and retired-handle reuse.
 `StartupRuntime::builderOwner(skeletonRegistration)` connects creation to that
 publication adapter. Object 120 is allocated by the registered skeleton owner,
 including inherited grid snapping, before returning its world handle. Walls
-and thin platforms use `spawnBuilderTerrain`, a local one-command transaction
+and thin platforms, plus boxes, use `spawnBuilderPrimitive`, a local one-command transaction
 through resource PreCreate/Create and the same global numeric-ID allocator.
 The ordinary stored cavern builder also uses this terrain entry point. Caller
 continuations run only after successful Create and retain their actual child
-handle, not an inferred `nextId-1`. Unsupported families (including boxes whose
-source Create needs further integration) fail before allocation; they are not
+handle, not an inferred `nextId-1`. Unsupported families fail before allocation; they are not
 admitted as generic actors. A failed continuation retains its already-created
 child and stops the world. The owner borrows its world and skeleton registration;
 those must stay at fixed addresses, and registered skeletons must be scheduled
@@ -182,6 +181,27 @@ Create constants, post-Create state, registered skeleton scheduling on the next
 world tick, unsupported-family rejection and failed-continuation prefixes. This
 is a creation/scheduling-boundary check, not natural catacomb progression or a
 full skeleton Step/death replay.
+
+`BoxCreateScript` implements object-92 Create (1085) with ordered property
+publication and random consumption. Area 2 chooses break sounds 175--178; area 4
+uses 179--182, areas 1/3 use 171--174, and other areas retain 171 without a draw.
+Glitch sprite choice follows the initial wall-tile publication. Initial frame
+choice precedes health/drilled initialization and `irandom(50)`. Area 3 and
+`groundRoom` suppress gems only after that draw; the ground-room helper retains
+its caller-local result for rooms 20--24. A gem box publishes frame 18/19 before
+setting `haveGem=2` and finally frame 22. A failed setter stops before later
+random draws or writes. The shared implementation accepts explicit tile, area,
+room and glitch context; the current stored runtime supplies its normal-mode
+tile and the instance's destination room.
+
+Raw stored box commands now execute this script through their resource Create
+event before the builder's engine-deactivation continuation. Existing cavern
+commands with a nonzero packed sound/gem payload remain adopted: their emitter
+has already consumed Create RNG. Tests compare both paths' final frame, sound,
+gems and complete WELL state for 4,096 seeds. Ordered/failure tests cover all six
+areas, both glitch states and ground-room boundaries, while real collision-owner
+tests exercise raw creation followed by deactivation. Full box destruction and
+the native raw-creation adapter are separate integration work.
 
 ## Actor integration findings
 

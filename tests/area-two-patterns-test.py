@@ -29,9 +29,13 @@ class PatternTests(unittest.TestCase):
         for script, digest in (
             ("scrBuilder", "0c95048af06ff612499acd64a717766441b820d19ffc6017c0ff3a95425581f5"),
             ("scrSetBuildx", "1c3e1cd4eac113d8491e4183654ac8cb5be47f67d41f706eff853c14160119ee"),
+            ("groundRoom", "9708c07856cb976b1606c27023f8aa1b3fa9370fe38114df9b8361dbce39196d"),
         ):
             source = ROOT / f"extracted/utmt-0.9.2.0/Assembly/gml_GlobalScript_{script}.asm"
             self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest(), digest)
+        box = ROOT / "extracted/utmt-0.9.2.0/Assembly/gml_Object_objBox_n_Create_0.asm"
+        self.assertEqual(hashlib.sha256(box.read_bytes()).hexdigest(),
+                         "fd90ec59a1a3fa6eeaf8f420e4bd7c5b1ecb6e83f18bff62df7c4844cc0320a5")
         result = exporter.build(ROOT)
         expected = []
         patterns = [p for family in result["families"] for p in family["patterns"]]

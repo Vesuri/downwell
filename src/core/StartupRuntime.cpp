@@ -1,5 +1,6 @@
 #include "StartupRuntime.h"
 #include "TerrainCreate.h"
+#include "BoxCreateScript.h"
 #include "RunnerSpatialSplit.h"
 #include "PlayerBoxContact.h"
 #include "GameplayPlayerStep.h"
@@ -1293,7 +1294,7 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
                 return runtime->registerShop(command.x, command.y) != nullptr;
             if(command.objectId==60||command.objectId==93){
                 InstanceHandle child;
-                return runtime->spawnBuilderTerrain(command.objectId,command.x,command.y,child);
+                return runtime->spawnBuilderPrimitive(command.objectId,command.x,command.y,child);
             }
             if (command.objectId == 82 && !runtime->run_.adoptTimeField(
                 command.x,command.y,command.timeFieldRadiusWord()))return false;
@@ -1968,8 +1969,27 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
         return;
     case 1085: // gml_Object_objBox_n_Create_0
         ++implementedCodeCalls_;
-        if (instance != nullptr)
+        if (instance != nullptr && instance->auxiliaryState) {
+            // Existing cavern commands carry a nonzero packed sound/gem
+            // result: their optimized emitter already consumed Create RNG.
             instance->imageSpeed = 0.0F;
+            return;
+        }
+        if(!run_.effectsSucceeded||!instance)return;
+        {
+            const auto key=instances_.handleAt(unsigned(instance-&instances_.at(0)));
+            const bool created=boxCreateScript(instance->box,run_.stage.area,
+                terrainTileForArea(run_.stage.area),instance->roomId,false,random_,
+                [&](int sprite){
+                    if(!lifecycle_.sprite(key,*instance,sprite))return false;
+                    instance->spriteId=sprite;return true;
+                },[&](int speed){instance->imageSpeed=static_cast<float>(speed);return true;},
+                [&](int index){
+                    if(!lifecycle_.phaseIndex(key,*instance,unsigned(index)*256u))return false;
+                    instance->imageIndex=static_cast<float>(index);return true;
+                });
+            run_.effectsSucceeded=run_.effectsSucceeded&&created;
+        }
         return;
     case 1193: // gml_Object_enmSnake_Create_0
         ++implementedCodeCalls_;
@@ -2396,11 +2416,11 @@ bool StartupRuntime::createLevelExitChild(LevelExit::Effect effect,int x,int y) 
         },lifecycle_)==ApplyInstanceCommandsResult::success;
 }
 
-bool StartupRuntime::spawnBuilderTerrain(int object,int x,int y,InstanceHandle& key){
+bool StartupRuntime::spawnBuilderPrimitive(int object,int x,int y,InstanceHandle& key){
     if(!run_.effectsSucceeded)return false;
-    // In particular, do not route boxes or unsupported catacomb actors through
-    // a generic command with guessed/pre-evaluated Create state.
-    if((object!=60&&object!=93)||!objectPack_||!deferredCommandsSucceeded_)
+    // Admit only primitives whose resource Create is implemented. A raw box
+    // command has no precomputed cavern RNG payload and executes full Create.
+    if((object!=60&&object!=93&&object!=92)||!objectPack_||!deferredCommandsSucceeded_)
         return run_.effectsSucceeded=false;
     DeferredInstanceQueue<1> child;
     if(!child.enqueueCreate(object,x,y))return run_.effectsSucceeded=false;
