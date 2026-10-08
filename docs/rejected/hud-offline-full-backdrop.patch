@@ -1,0 +1,240 @@
+diff --git a/amiga/Makefile b/amiga/Makefile
+index 092f8966..19b7b291 100644
+--- a/amiga/Makefile
++++ b/amiga/Makefile
+@@ -36,6 +36,7 @@ REFERENCE_DAMAGE_TEXT ?= 0
+ REFERENCE_DAMAGE_BANK ?= 0
+ REFERENCE_HEALTH_ART ?= 0
+ REFERENCE_HEALTH_ADMISSION ?= 0
++REFERENCE_HUD_BACKDROP ?= 0
+ REFERENCE_GEM_POSITION ?= 0
+ REFERENCE_EFFECT_COMPOSITION ?= 0
+ REFERENCE_STYLE_SPRITES ?= 0
+@@ -259,6 +260,9 @@ endif
+ ifeq ($(REFERENCE_HEALTH_ADMISSION),1)
+ CFLAGS += -DDOWNWELL_REFERENCE_HEALTH_ADMISSION
+ endif
++ifeq ($(REFERENCE_HUD_BACKDROP),1)
++CFLAGS += -DDOWNWELL_REFERENCE_HUD_BACKDROP
++endif
+ ifeq ($(REFERENCE_GEM_POSITION),1)
+ CFLAGS += -DDOWNWELL_REFERENCE_GEM_POSITION
+ endif
+@@ -536,6 +540,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
+ 	@printf '%s\n' '$(REFERENCE_DAMAGE_BANK)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_HEALTH_ART)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_HEALTH_ADMISSION)' >> $@.tmp
++	@printf '%s\n' '$(REFERENCE_HUD_BACKDROP)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_HUD_BORDER)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_CONTACT_MOTION)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_CONTACT_COORDINATES)' >> $@.tmp
+diff --git a/amiga/profile.sh b/amiga/profile.sh
+index 131846d4..aa9b74fd 100644
+--- a/amiga/profile.sh
++++ b/amiga/profile.sh
+@@ -104,6 +104,7 @@ restore() {
+   unset REFERENCE_DAMAGE_BANK
+   unset REFERENCE_HEALTH_ART
+   unset REFERENCE_HEALTH_ADMISSION
++  unset REFERENCE_HUD_BACKDROP
+   unset REFERENCE_GEM_POSITION
+   unset REFERENCE_EFFECT_COMPOSITION
+   unset REFERENCE_STYLE_SPRITES
+diff --git a/src/platform/amiga/DownwellAmiga.cpp b/src/platform/amiga/DownwellAmiga.cpp
+index f22def39..64b9ce02 100644
+--- a/src/platform/amiga/DownwellAmiga.cpp
++++ b/src/platform/amiga/DownwellAmiga.cpp
+@@ -18,6 +18,7 @@ __attribute__((noinline,used)) void downwellFieldReentryReady(){__asm__ volatile
+ #include <hardware/intbits.h>
+ #include "AmigaInput.h"
+ #include "AmigaHealthHud.h"
++#include "AmigaGameplayHudBackdrop.h"
+ #include "core/SceneDescentVerification.h"
+ #include "AmigaProfile.h"
+ #include "AmigaTerrainProfile.h"
+@@ -1457,7 +1458,17 @@ static void buildReferencePicture(
+     int viewX, int viewY) {
+ 
+     DW_PROFILE_SCOPE(profilePictureClear);
+-    amigaRendererClear(renderer, 0);
++    bool preparedBackdrop=false;
++#ifndef DOWNWELL_REFERENCE_HUD_BACKDROP
++    preparedBackdrop=AmigaHealthArt::linkedSource(amiga_hud_pack,amiga_hud_pack_end);
++#endif
++    if(preparedBackdrop){
++        // The prepared picture overwrites every HUD word, including padding.
++        // Only the game ring needs clearing; there is no clear-then-copy HUD.
++        Bitmap initialGame(renderer->game,downwellDmaWidth,downwellGameRingHeight,2,false,false,downwellDmaWidth);
++        initialGame.clear();
++        AmigaHardware::blitterDrain();
++    }else amigaRendererClear(renderer, 0);
+     ammoHud.invalidate();
+     healthHud.invalidate();
+     invalidateHudText(true);
+@@ -1472,6 +1483,10 @@ static void buildReferencePicture(
+ 
+     DW_PROFILE_PHASE(profilePictureMargins);
+     amigaRendererClearClipRect(renderer);
++    if(preparedBackdrop){
++        AmigaHardware::blitterDrain();
++        amigaPublishGameplayHudBackdrop(renderer->hud);
++    }else{
+     // PF2 is above all sprites; its nonzero black pen masks the HUD margins.
+     amigaRendererFillRect(renderer, 0, 0, downwellPlayfieldX,
+                           downwellDisplayHeight, 3);
+@@ -1482,14 +1497,17 @@ static void buildReferencePicture(
+     drawAsset(renderer, 408, 0, 108, 0, 0);
+     DW_PROFILE_PHASE(profilePictureBorderRight);
+     drawAsset(renderer, 408, 0, 272, 0, 1);
++    }
+ 
+     DW_PROFILE_PHASE(profilePictureHealth);
+     redrawHealth(renderer, 4, 4);
+ 
+     DW_PROFILE_PHASE(profilePictureAmmoArt);
++    if(!preparedBackdrop){
+     drawAsset(renderer, 416, 0, 284, 43, 0);
+     amigaRendererFillRect(renderer, 289, 49, 10, 184, 1);
+     drawAsset(renderer, 416, 1, 284, 43, 0);
++    }
+     DW_PROFILE_PHASE(profilePictureText);
+ #if !defined(DOWNWELL_REFERENCE_HUD_WORDS) && !defined(DOWNWELL_REFERENCE_HUD_TEXT)
+     // Establish the publisher's ownership with the initial picture. Leaving
+diff --git a/tests/platform/amiga/AmigaRendererTest.cpp b/tests/platform/amiga/AmigaRendererTest.cpp
+index 4e258dd4..d11fe84d 100644
+--- a/tests/platform/amiga/AmigaRendererTest.cpp
++++ b/tests/platform/amiga/AmigaRendererTest.cpp
+@@ -6,6 +6,7 @@
+ volatile unsigned amigaAmmoFactoredMode=DOWNWELL_AMMO_FACTORED;
+ #endif
+ #include "platform/amiga/AmigaHealthHud.h"
++#include "platform/amiga/AmigaGameplayHudBackdrop.h"
+ #include "platform/amiga/AmigaLaserSight.h"
+ #include "platform/amiga/AmigaGoalField.h"
+ #include "platform/amiga/AmigaBufferCompare.h"
+@@ -1488,6 +1489,21 @@ int main(int argc, char** argv) {
+     }
+     {
+         AmigaHealthHud health;
++        std::fill(actualHud.begin(),actualHud.end(),0x55);
++        std::fill(expectedHud.begin(),expectedHud.end(),0);
++        amigaPublishGameplayHudBackdrop(actualHud.data());
++        auto fixedAsset=[&](unsigned sprite,unsigned frame,int x,int y,int flip){
++            amigaRendererDrawAsset(&expectedRenderer,hudPack.data(),hudPack.data()+hudPack.size(),
++                sprite,frame,x,y,flip);
++        };
++        amigaRendererFillRect(&expectedRenderer,0,0,downwellPlayfieldX,downwellDisplayHeight,3);
++        amigaRendererFillRect(&expectedRenderer,downwellPlayfieldX+downwellPlayfieldWidth,0,
++            downwellVisibleWidth-downwellPlayfieldX-downwellPlayfieldWidth,downwellDisplayHeight,3);
++        fixedAsset(408,0,108,0,0);fixedAsset(408,0,272,0,1);
++        fixedAsset(416,0,284,43,0);
++        amigaRendererFillRect(&expectedRenderer,289,49,10,184,1);
++        fixedAsset(416,1,284,43,0);
++        require(actualHud==expectedHud,"offline fixed HUD backdrop matches complete renderer output including padding");
+         for(unsigned index=0;index<11;++index){
+             AmigaHudGlyph prepared{};
+             require(amigaRendererPrepareHudGlyph(&prepared,hudPack.data(),hudPack.data()+hudPack.size(),65011,index),
+diff --git a/tools/README.md b/tools/README.md
+index aa45c2f5..cea07300 100644
+--- a/tools/README.md
++++ b/tools/README.md
+@@ -197,6 +197,15 @@ that identity after its byte copy (or residency reuse), avoiding another scan
+ of Chip RAM. The same identity permits borrowing the eleven host-prepared
+ health glyph records without runtime directory lookup or planar extraction.
+ A stale artwork object cannot link to a different payload identity.
++The same generator composes the fixed gameplay HUD backdrop (both margins,
++both borders and ammo-bar artwork) into two complete 384-by-284 planar images.
++Gameplay entry publishes these ordinary-memory words once, before mutable
++health/text/ammo updates. It clears only the game ring: every HUD word,
++including padding, is overwritten by the prepared backdrop. No extra Chip
++buffer is allocated. `REFERENCE_HUD_BACKDROP=1` retains the layered initial
++renderer and its HUD clear; the profiling script clears this selector when
++restoring the normal executable. The host pixel test compares both complete
++planes, not only the visible border pixels.
+ Generic packs still use exact byte admission and runtime glyph preparation.
+ `make -C amiga verify-health-link`
+ in the Amiga environment verifies both matching and mismatched object pairs.
+diff --git a/tools/generate-amiga-health-art.cpp b/tools/generate-amiga-health-art.cpp
+index ccbe741b..d4763b75 100644
+--- a/tools/generate-amiga-health-art.cpp
++++ b/tools/generate-amiga-health-art.cpp
+@@ -22,6 +22,34 @@ static void emit(const char* name,const std::vector<UBYTE>& pixels){
+     }
+     std::printf("};\n");
+ }
++static void emitBackdrop(const std::vector<UBYTE>& pack){
++    std::vector<UBYTE> pixels(downwellLayerBytes);
++    AmigaRenderer renderer;
++    amigaRendererInit(&renderer,nullptr,pixels.data());
++    // Fixed gameplay HUD background. Compose once on the host, including the
++    // mirrored non-word-aligned border, rather than reconstructing it on entry.
++    std::fill(pixels.begin(),pixels.end(),0);
++    amigaRendererFillRect(&renderer,0,0,downwellPlayfieldX,downwellDisplayHeight,3);
++    amigaRendererFillRect(&renderer,downwellPlayfieldX+downwellPlayfieldWidth,0,
++        downwellVisibleWidth-downwellPlayfieldX-downwellPlayfieldWidth,downwellDisplayHeight,3);
++    auto fixedAsset=[&](unsigned sprite,unsigned frame,int x,int y,int flip){
++        int left,top,width,height;
++        assert(amigaRendererAssetBounds(pack.data(),pack.data()+pack.size(),sprite,frame,x,y,flip,
++            &left,&top,&width,&height));
++        amigaRendererDrawAsset(&renderer,pack.data(),pack.data()+pack.size(),sprite,frame,x,y,flip);
++    };
++    fixedAsset(408,0,108,0,0);
++    fixedAsset(408,0,272,0,1);
++    fixedAsset(416,0,284,43,0);
++    amigaRendererFillRect(&renderer,289,49,10,184,1);
++    fixedAsset(416,1,284,43,0);
++    std::printf("static const UWORD gameplayBackdrop[downwellLayerBytes/2]={\n");
++    for(unsigned i=0;i<pixels.size();i+=2){
++        std::printf("%u,",word(pixels.data()+i));
++        if(i%48==46)std::printf("\n");
++    }
++    std::printf("};\n");
++}
+ int main(int argc,char** argv){
+     assert(argc==2);
+     std::ifstream file(argv[1],std::ios::binary);
+@@ -52,4 +80,5 @@ int main(int argc,char** argv){
+         std::printf("},%d,%d,%u,%u},\n",glyph.left,glyph.top,glyph.width,glyph.height);
+     }
+     std::printf("};\n");
++    emitBackdrop(pack);
+ }
+diff --git a/tools/generate-amiga-health-art.py b/tools/generate-amiga-health-art.py
+index e0c293eb..d500f62b 100644
+--- a/tools/generate-amiga-health-art.py
++++ b/tools/generate-amiga-health-art.py
+@@ -50,9 +50,9 @@ def main():
+                 'inline bool linkedSource(const UBYTE* source,const UBYTE* end){\n'
+                 f'    return source=={source_symbol} && end==source+{len(pack)};\n'
+                 '}\n#endif\n').encode()
+-    manifest = {'format': 'amiga-health-art-v1', 'generator_version': 3,
++    manifest = {'format': 'amiga-health-art-v1', 'generator_version': 4,
+                 'extractor': json.loads((ROOT/INPUTS[2]).read_text())['extractor'],
+-                'resource_ids': [415, 378, 65011], 'per_heart': 4,
++                'resource_ids': [415, 378, 65011, 408, 416], 'per_heart': 4,
+                 'inputs_sha256': {p: hashlib.sha256((ROOT/p).read_bytes()).hexdigest() for p in INPUTS},
+                 'output_sha256': hashlib.sha256(payload).hexdigest(),
+                 'source_include_sha256': hashlib.sha256(source_include).hexdigest()}
+diff --git a/src/platform/amiga/AmigaGameplayHudBackdrop.h b/src/platform/amiga/AmigaGameplayHudBackdrop.h
+new file mode 100644
+index 00000000..b7a0d55e
+--- /dev/null
++++ b/src/platform/amiga/AmigaGameplayHudBackdrop.h
+@@ -0,0 +1,17 @@
++#ifndef DOWNWELL_AMIGA_GAMEPLAY_HUD_BACKDROP_H
++#define DOWNWELL_AMIGA_GAMEPLAY_HUD_BACKDROP_H
++#include "AmigaHealthArt.h"
++
++// The gameplay-entry owner admits the linked immutable source and retires DMA
++// before calling this. This replaces a whole initial HUD, never a live update.
++inline void amigaPublishGameplayHudBackdrop(UBYTE* hud){
++    for(unsigned i=0;i<downwellLayerBytes/2;++i){
++        const UWORD word=AmigaHealthArt::gameplayBackdrop[i];
++#ifdef DOWNWELL_PLATFORM_AMIGA
++        reinterpret_cast<UWORD*>(hud)[i]=word;
++#else
++        hud[i*2]=UBYTE(word>>8);hud[i*2+1]=UBYTE(word);
++#endif
++    }
++}
++#endif

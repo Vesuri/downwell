@@ -134,12 +134,13 @@ supplied audit and historical measurements remain available in Git.
 
 ## Rejected approaches
 
-Each row was measured on the contact tape against its reference and removed.
+Each row was measured on its affected workload against its reference and removed.
 Each patch, in [`rejected/`](rejected/), holds the removed code; the commit
 named holds the numbers. Do not retry a row without removing the reason in its last column.
 
 | Area | Approach | Result | Why it lost | Commit, patch |
 | --- | --- | --- | --- | --- |
+| Cold HUD backdrop | Host-compose margins, both borders and ammo art; replace HUD clearing and layered entry draws with one full planar publication | Handoff 361.011 → 361.013 ms; publication 39.096 ms; +27,264 ordinary-memory bytes | Full-plane publication consumes all the saved composition/clear time; no meaningful saving, not a transition-frame gate failure | This row's introducing commit, [`hud-offline-full-backdrop.patch`](rejected/hud-offline-full-backdrop.patch) |
 | Reentry reset | Clear occupancy only inside mutation-owned row extents | Reset 74.4 → 47.1 ms; room loading 46.6 → 65.6 ms; handoff 963.2 → 954.8 ms | Misses 40 ms target; extent maintenance consumes 19 ms and the following frame grows 57.0 → 65.4 ms; combined time unchanged | This row's introducing commit, [`terrain-reset-extents.patch`](rejected/terrain-reset-extents.patch) |
 | Cold entry | Decode initial raster in bounded clean-style updates | Confirmation 639.5 → 635.1 ms; raster phase still 180.5 ms | Only 1,008 of 2,160 rows finish, so entry repeats the full copy; misses the 150 ms target and first gameplay rises 38.5 → 43.4 ms | This row's introducing commit, [`initial-raster-style-staging.patch`](rejected/initial-raster-style-staging.patch) |
 | Alarms | Borrow enemy Step snapshot and merge typed alarm dispatch with remaining families | 645 93.9 → 92.3 ms; quiet 26.326 → 26.392 ms | Quiet alarm work rises 1.10 → 1.35 ms; borrowing adds capture/revision and merge work even with inactive counters, violating the window-mean gate | This row's introducing commit, [`enemy-borrowed-alarms.patch`](rejected/enemy-borrowed-alarms.patch) |
