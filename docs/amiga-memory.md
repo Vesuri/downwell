@@ -6,13 +6,15 @@ memory requirement.
 
 ## Native terrain identities
 
-`nativeTerrainStorage` reserves 83,998 bytes of ordinary BSS on the 68000,
+`nativeTerrainStorage` reserves 92,210 bytes of ordinary BSS on the 68000,
 outside Chip RAM and the task stack. It retains at most 2,048 terrain
 lifetimes in birth order. Adjacent generated cells share identity/geometry
 descriptors; coincident and authored walls remain distinct. The bounded
 descriptor array reserves worst-case singleton capacity, so compression
 reduces live descriptors rather than the allocation size. Per-cell state is
 one flags byte plus the run locator, not a duplicate generic runner record.
+Each run also retains a shared native registration-clock base. An intervening
+actor birth prevents adjacent walls from merging across that chronology gap.
 Room teardown preserves the generation counter, preventing old handles from
 addressing replacement walls. Generated numeric VM IDs are not inferred from
 these family-local handles.

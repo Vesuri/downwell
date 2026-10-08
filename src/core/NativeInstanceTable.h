@@ -65,6 +65,9 @@ public:
         if(!externalOrder_||slot>=Capacity||!nextOrder_||order)return false;
         order=nextOrder_++;changedBinding(slot,false);return true;
     }
+    bool canExternalBirth(unsigned count)const{
+        return externalOrder_&&nextOrder_&&(!count||count-1<=0xffffffffu-nextOrder_);
+    }
     void externalRetire(unsigned slot){changedBinding(slot,false);}
     void externalFlagsChanged(unsigned slot){changedCapture(slot,false);}
     std::uint32_t registrationOrder(InstanceHandle h)const{return live(h)?entries_[h.slot].order:0;}

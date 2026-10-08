@@ -745,7 +745,7 @@ public:
         nativeBoxes_(ownership==Ownership::nativeScenery&&nativeBoxes),
         nativeFields_(ownership==Ownership::nativeScenery&&nativeFields),
         terrainRegistered_(ownership==Ownership::reference),
-        table_(ownership==Ownership::nativeScenery&&(nativeBoxes||nativeFields)),
+        table_(ownership==Ownership::native||ownership==Ownership::nativeScenery),
         terrain_(terrainRegistered_?GameplayTerrainInstances::Binding::bindDestruction(terrainBinding_):
             GameplayTerrainInstances::Binding{},presentation,collision){
         if(preparedDrawEnabled())layers_.enablePreparedDraw();
@@ -819,6 +819,18 @@ public:
         if(!world_&&!world.bindBlood(blood_))return check(false);
         if(!world_&&!world.bindCurrency(currency_))return check(false);
         world_=&world;
+        if(native_&&!world.configureNativeTerrainBinding({this,
+            [](void* p,unsigned count){auto& self=*static_cast<GameplayCollisionOwner*>(p);
+                return self.valid()&&self.table_.canExternalBirth(count);},
+            [](void* p,unsigned slot,std::uint32_t& order){auto& self=*static_cast<GameplayCollisionOwner*>(p);
+                return self.valid()&&self.check(self.table_.externalBirth(View::terrainBase+slot,order));},
+            [](void* p,unsigned slot){auto& self=*static_cast<GameplayCollisionOwner*>(p);
+                if(!self.valid())return false;
+                self.table_.externalRetire(View::terrainBase+slot);return true;},
+            [](void* p,unsigned slot){auto& self=*static_cast<GameplayCollisionOwner*>(p);
+                if(!self.valid())return false;
+                self.table_.externalFlagsChanged(View::terrainBase+slot);return true;}
+        }))return check(false);
 #ifndef DOWNWELL_REFERENCE_BREAKABLES
         if(nativeBoxes_){
             if(!table_.bindExternalFamily(View::breakableBase,View::terrainBase,boxAllocation_))return check(false);

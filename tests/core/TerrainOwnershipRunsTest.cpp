@@ -480,6 +480,25 @@ static void constructorPublication(){
 }
 int main(){
     {
+        struct Clock {unsigned next=10,births=0,marks=0,retired=0;} clock;
+        using Native=downwell::NativeTerrainLifetimes<8>;
+        Native live;
+        Native::Binding binding{&clock,
+            [](void* p,unsigned count){return count<=0xffffffffu-static_cast<Clock*>(p)->next;},
+            [](void* p,unsigned,std::uint32_t& order){auto& c=*static_cast<Clock*>(p);order=c.next++;++c.births;return true;},
+            [](void* p,unsigned){++static_cast<Clock*>(p)->retired;return true;},
+            [](void* p,unsigned){++static_cast<Clock*>(p)->marks;return true;}};
+        require(live.bind(binding)&&live.append(60,240,160)&&live.append(60,256,160));
+        require(live.runCount()==1&&live.registrationOrder(live.handle(0))==10&&live.registrationOrder(live.handle(1))==11);
+        ++clock.next; // A different family is born between adjacent walls.
+        require(live.append(60,272,160)&&live.runCount()==2&&live.registrationOrder(live.handle(2))==13);
+        const auto old=live.handle(0);
+        require(live.markDestroyed(old)&&live.markDestroyed(old)&&clock.marks==1);
+        require(live.retire(old)&&clock.retired==1&&live.clear()&&clock.retired==3);
+        require(live.bind(binding)&&live.append(60,240,160)&&live.registrationOrder(live.handle(0))==14);
+        require(!live.contains(old)&&clock.births==4);
+    }
+    {
         downwell::NativeTerrainLifetimes<8> live;
         require(live.append(60,240,160,true,100854)&&live.append(60,240,160,false,100855));
         const auto first=live.handle(0),second=live.handle(1);

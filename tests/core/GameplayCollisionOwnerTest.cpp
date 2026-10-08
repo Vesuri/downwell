@@ -2198,7 +2198,11 @@ int main(){
             owner->breakableBinding(),owner->playerBinding(),nullptr,&rooms);
         auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
         assert(owner->attach(*world)&&world->bindNativeTerrain(*terrain)&&world->bindNativeTerrain(*terrain));
-        assert(terrain->append(60,240,160,true,100857)&&terrain->append(60,240,160,false,100858));
+        assert(terrain->append(60,240,160,true,100857));
+        const unsigned firstOrder=terrain->registrationOrder(terrain->handle(0));
+        assert(firstOrder&&world->createAuthoredDitherAbove());
+        assert(terrain->append(60,240,160,false,100858));
+        assert(terrain->registrationOrder(terrain->handle(1))==firstOrder+2);
         const auto local=terrain->handle(0),coincident=terrain->handle(1);
         InstanceHandle shared,other;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,local,shared)&&
             GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,coincident,other));
@@ -2215,7 +2219,8 @@ int main(){
         assert(replacement.slot==local.slot&&replacement.generation!=local.generation&&!view.contains(shared));
         assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)==ResultsDestination::gameplay);
         assert(world->nativeTerrainInstances()==terrain.get()&&!terrain->size()&&!view.contains(other));
-        assert(terrain->append(60,240,160)&&terrain->handle(0).generation>replacement.generation);
+        assert(terrain->append(60,240,160)&&terrain->handle(0).generation>replacement.generation&&
+            terrain->registrationOrder(terrain->handle(0))>firstOrder+2);
     }
     for(unsigned failure=0;failure<4;++failure){
         struct CollisionNotice {

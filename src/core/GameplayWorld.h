@@ -261,7 +261,12 @@ public:
     bool bindNativeTerrain(NativeTerrain& terrain){
         if(!run_.effectsSucceeded||terrainInstances_||!terrain.valid()||
             (nativeTerrainInstances_&&nativeTerrainInstances_!=&terrain))return run_.effectsSucceeded=false;
+        if(!terrain.bind(nativeTerrainBinding_))return run_.effectsSucceeded=false;
         nativeTerrainInstances_=&terrain;return true;
+    }
+    bool configureNativeTerrainBinding(NativeTerrain::Binding binding){
+        if(!run_.effectsSucceeded||(nativeTerrainInstances_&&!nativeTerrainInstances_->bind(binding)))return run_.effectsSucceeded=false;
+        nativeTerrainBinding_=binding;return true;
     }
     // Without generic terrain records, the backend publishes both its raster
     // and any bound native identity runs; do not execute generic Create twice.
@@ -1413,6 +1418,7 @@ private:
     PlayerLifecycleBinding playerLifecycle_;
     downwell::GameplayTerrainInstances* terrainInstances_=nullptr;
     NativeTerrain* nativeTerrainInstances_=nullptr;
+    NativeTerrain::Binding nativeTerrainBinding_{};
     downwell::GameplayScriptSpawnInstances* scriptSpawnInstances_=nullptr;
     downwell::GameplayDebrisInstances* debrisInstances_=nullptr;
     downwell::NativeTimeChangeRegistration* timeChangeInstances_=nullptr;

@@ -53,6 +53,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto terrainInstances=terrainInstances_;
     if(nativeTerrainInstances_&&!nativeTerrainInstances_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     const auto nativeTerrainInstances=nativeTerrainInstances_;
+    const auto nativeTerrainBinding=nativeTerrainBinding_;
     const auto entryRooms=entryRooms_;
     const auto scriptSpawnInstances=scriptSpawnInstances_;
     const auto debrisInstances=debrisInstances_;
@@ -107,6 +108,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     this->~GameplayWorld();
     new (this) GameplayWorld(initialRingOrigin, false, 1201 - 176, true, enemyLifecycle,breakableLifecycle,{},terrainInstances,entryRooms);
     nativeTerrainInstances_=nativeTerrainInstances;
+    nativeTerrainBinding_=nativeTerrainBinding;
     run_.gemStreakRise=controllerRise; // Persistent controller survives Retry.
     nextBreakableLifetimeId_=nextBreakableIdentity;
     scriptSpawnInstances_=scriptSpawnInstances;
