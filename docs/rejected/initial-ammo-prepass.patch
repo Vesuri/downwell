@@ -1,0 +1,114 @@
+diff --git a/amiga/Makefile b/amiga/Makefile
+index 597a607f..7bcc86b8 100644
+--- a/amiga/Makefile
++++ b/amiga/Makefile
+@@ -37,6 +37,7 @@ REFERENCE_DAMAGE_BANK ?= 0
+ REFERENCE_HEALTH_ART ?= 0
+ REFERENCE_HEALTH_ADMISSION ?= 0
+ REFERENCE_AMMO_ADMISSION ?= 0
++REFERENCE_INITIAL_AMMO ?= 0
+ REFERENCE_GEM_POSITION ?= 0
+ REFERENCE_EFFECT_COMPOSITION ?= 0
+ REFERENCE_STYLE_SPRITES ?= 0
+@@ -278,6 +279,9 @@ endif
+ ifeq ($(REFERENCE_AMMO_ADMISSION),1)
+ CFLAGS += -DDOWNWELL_REFERENCE_AMMO_ADMISSION
+ endif
++ifeq ($(REFERENCE_INITIAL_AMMO),1)
++CFLAGS += -DDOWNWELL_REFERENCE_INITIAL_AMMO
++endif
+ ifeq ($(REFERENCE_GEM_POSITION),1)
+ CFLAGS += -DDOWNWELL_REFERENCE_GEM_POSITION
+ endif
+@@ -566,6 +570,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
+ 	@printf '%s\n' '$(REFERENCE_HEALTH_ART)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_HEALTH_ADMISSION)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_AMMO_ADMISSION)' >> $@.tmp
++	@printf '%s\n' '$(REFERENCE_INITIAL_AMMO)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_HUD_BORDER)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_CONTACT_MOTION)' >> $@.tmp
+ 	@printf '%s\n' '$(REFERENCE_CONTACT_COORDINATES)' >> $@.tmp
+diff --git a/amiga/profile.sh b/amiga/profile.sh
+index df42b20f..0511db54 100644
+--- a/amiga/profile.sh
++++ b/amiga/profile.sh
+@@ -118,6 +118,7 @@ restore() {
+   unset REFERENCE_HEALTH_ART
+   unset REFERENCE_HEALTH_ADMISSION
+   unset REFERENCE_AMMO_ADMISSION
++  unset REFERENCE_INITIAL_AMMO
+   unset REFERENCE_GEM_POSITION
+   unset REFERENCE_EFFECT_COMPOSITION
+   unset REFERENCE_STYLE_SPRITES
+diff --git a/src/platform/amiga/DownwellAmiga.cpp b/src/platform/amiga/DownwellAmiga.cpp
+index 53fef1eb..c50844f0 100644
+--- a/src/platform/amiga/DownwellAmiga.cpp
++++ b/src/platform/amiga/DownwellAmiga.cpp
+@@ -1498,9 +1498,18 @@ static void buildReferencePicture(
+     redrawHealth(renderer, 4, 4);
+ 
+     DW_PROFILE_PHASE(profilePictureAmmoArt);
+-    drawAsset(renderer, 416, 0, 284, 43, 0);
+-    amigaRendererFillRect(renderer, 289, 49, 10, 184, 1);
+-    drawAsset(renderer, 416, 1, 284, 43, 0);
++    // A cold retained gauge publishes the complete artwork and number below.
++    // Only the runtime-free reference picture needs this static approximation.
++#ifdef DOWNWELL_REFERENCE_INITIAL_AMMO
++    const bool staticAmmo=true;
++#else
++    const bool staticAmmo=runtime==nullptr;
++#endif
++    if(staticAmmo){
++        drawAsset(renderer, 416, 0, 284, 43, 0);
++        amigaRendererFillRect(renderer, 289, 49, 10, 184, 1);
++        drawAsset(renderer, 416, 1, 284, 43, 0);
++    }
+     DW_PROFILE_PHASE(profilePictureText);
+ #if !defined(DOWNWELL_REFERENCE_HUD_WORDS) && !defined(DOWNWELL_REFERENCE_HUD_TEXT)
+     // Establish the publisher's ownership with the initial picture. Leaving
+@@ -1511,7 +1520,7 @@ static void buildReferencePicture(
+     drawAsset(renderer, 376, 0, 362 - currencyShift, 18, 0);
+     drawCurrencyDigit(renderer, 354 - currencyShift, 18, 0);
+ #endif
+-    drawAmmoDigit(renderer, 290, 239, 8);
++    if(staticAmmo)drawAmmoDigit(renderer, 290, 239, 8);
+     DW_PROFILE_PHASE(profilePictureAmmoState);
+     // Prepare retained HUD geometry/artwork with the level's initial picture,
+     // not on the first shot. Subsequent frames only update changed strips.
+diff --git a/tests/platform/amiga/AmigaRendererTest.cpp b/tests/platform/amiga/AmigaRendererTest.cpp
+index 4e258dd4..f79f6e91 100644
+--- a/tests/platform/amiga/AmigaRendererTest.cpp
++++ b/tests/platform/amiga/AmigaRendererTest.cpp
+@@ -1323,6 +1323,32 @@ int main(int argc, char** argv) {
+         };
+         std::fill(actualHud.begin(), actualHud.end(), 0x5a);
+         std::fill(expectedHud.begin(), expectedHud.end(), 0x5a);
++        // A cold retained gauge owns the entire static prepass. Starting
++        // from untouched surrounding pixels must equal painting that prepass
++        // first, including the original unadvanced row state and fallbacks.
++        for(unsigned cap:{1u,4u,8u,16u,17u,64u,127u})
++          for(unsigned ammo:{0u,cap<8?cap:8u,cap})
++            for(unsigned meter=0;meter<4;++meter)
++              for(unsigned offset=0;offset<3;++offset){
++                std::fill(actualHud.begin(),actualHud.end(),0x5a);
++                std::fill(expectedHud.begin(),expectedHud.end(),0x5a);
++                amigaRendererClearClipRect(&actualRenderer);
++                amigaRendererClearClipRect(&expectedRenderer);
++                amigaRendererDrawAsset(&expectedRenderer,hudPack.data(),hudPack.data()+hudPack.size(),416,0,284,43,0);
++                amigaRendererFillRect(&expectedRenderer,289,49,10,184,1);
++                amigaRendererDrawAsset(&expectedRenderer,hudPack.data(),hudPack.data()+hudPack.size(),416,1,284,43,0);
++                amigaRendererDrawAsset(&expectedRenderer,hudPack.data(),hudPack.data()+hudPack.size(),65010,8,290,239,0);
++                AmigaAmmoHud once,twice;
++#ifdef DOWNWELL_AMMO_FACTORED
++                once.sharedRowProducer(true);twice.sharedRowProducer(true);
++#endif
++                downwell::AmmoGaugeRows cold;
++                once.draw(&actualRenderer,hudPack.data(),hudPack.data()+hudPack.size(),ammo,cap,offset,&cold,meter);
++                twice.draw(&expectedRenderer,hudPack.data(),hudPack.data()+hudPack.size(),ammo,cap,offset,&cold,meter);
++                require(actualHud==expectedHud,"cold gauge replaces the complete initial artwork/number pass");
++              }
++        std::fill(actualHud.begin(),actualHud.end(),0x5a);
++        std::fill(expectedHud.begin(),expectedHud.end(),0x5a);
+         unsigned oldAmmo = ~0u, skipped = 0;
+         for (unsigned tick = 0; tick < 1000; ++tick) {
+             const unsigned ammo = tick % 31 < 12 ? 8 : 7;
