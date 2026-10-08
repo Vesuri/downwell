@@ -32,6 +32,8 @@ public:
         bool (*retire)(void*,unsigned)=nullptr;
         bool (*mark)(void*,unsigned)=nullptr;
         bool (*create)(void*,const Identity&,int,std::uint32_t&)=nullptr;
+        bool (*collision)(void*,const Identity&,bool)=nullptr;
+        bool (*presentation)(void*,const Identity&,int,int)=nullptr;
     };
     bool spatialFlags(InstanceHandle h,std::uint32_t& out)const{
         if(!contains(h))return false;
@@ -41,9 +43,10 @@ public:
     }
     bool bind(Binding binding){
         if(!good_)return false;
-        if(!binding.context&&(binding.admit||binding.birth||binding.retire||binding.mark||binding.create))return good_=false;
+        if(!binding.context&&(binding.admit||binding.birth||binding.retire||binding.mark||binding.create||binding.collision||binding.presentation))return good_=false;
         if(binding_.context)return binding_.context==binding.context&&binding_.admit==binding.admit&&
-            binding_.birth==binding.birth&&binding_.retire==binding.retire&&binding_.mark==binding.mark&&binding_.create==binding.create;
+            binding_.birth==binding.birth&&binding_.retire==binding.retire&&binding_.mark==binding.mark&&binding_.create==binding.create&&
+            binding_.collision==binding.collision&&binding_.presentation==binding.presentation;
         if(binding.context&&(!binding.admit||!binding.birth||!binding.retire||!binding.mark||size()))return good_=false;
         binding_=binding;return true;
     }
@@ -121,12 +124,15 @@ public:
         Identity id;WallEndStepState state;
         if(stepping_||!readIdentity(h,id)||id.object!=60||!wallState(h,state))return good_=false;
         if(flags_[h.slot]&3u)return true;
+        const int before=drawSprite(h);const bool checked=state.checked!=0;const int image=state.imageIndex;
         stepping_=&state;steppingHandle_=h;
         const bool ok=wallEndStep(state,area,random,ops);
         stepping_=nullptr;steppingHandle_={};
         const bool retained=walls_[h.slot].store(state);
         if(!ok||!retained||!good_)return good_=false;
-        return true;
+        const int after=drawSprite(h);
+        return notifyPresentation(id,before,after,before!=after||
+            (after>=0&&(checked!=(state.checked!=0)||image!=state.imageIndex)));
     }
     unsigned size()const{return runs_.size();}
     unsigned runCount()const{return runs_.runCount();}
@@ -164,7 +170,10 @@ public:
         if(!good_||!runs_.contains(h))return good_=false;
         if(flags_[h.slot]&1)return true;
         if(binding_.mark&&!binding_.mark(binding_.context,h.slot))return good_=false;
-        flags_[h.slot]|=1;return true;
+        Identity id;if(!runs_.read(h,id))return good_=false;
+        const int before=drawSprite(h);flags_[h.slot]|=1;
+        if(before>=0&&binding_.collision&&!binding_.collision(binding_.context,id,false))return good_=false;
+        return stepping_?true:notifyPresentation(id,before,-1,before>=0);
     }
     bool retire(InstanceHandle h){
         if(stepping_||!good_||!runs_.contains(h)||!(flags_[h.slot]&1)||
@@ -181,6 +190,15 @@ public:
         runs_.~Runs();new(&runs_) Runs;freeHint_=0;return true;
     }
 private:
+    int drawSprite(InstanceHandle h)const{
+        if(runs_.object(h.slot)!=60||(flags_[h.slot]&3u))return -1;
+        WallEndStepState state;
+        return wallState(h,state)&&state.checked?createSprite_[h.slot]:51;
+    }
+    bool notifyPresentation(const Identity& id,int before,int after,bool changed){
+        if(changed&&binding_.presentation&&!binding_.presentation(binding_.context,id,before,after))return good_=false;
+        return true;
+    }
     bool readIdentity(InstanceHandle h,Identity& id)const{return good_&&runs_.read(h,id);}
     Binding binding_{};
 };

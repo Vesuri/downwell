@@ -954,6 +954,8 @@ private:
     decltype(layers_)::SceneryFamily boxLayer_{};
     NativeFamilyBirth boxAllocation_{};
     GameplayTerrainInstances terrain_;
+    GameplayTerrainInstances::Presentation nativeTerrainPresentation_;
+    GameplayTerrainInstances::WallCollision nativeTerrainCollision_;
 public:
     // Registered terrain is the complete runner reference: every wall owns a
     // lifetime, room/layer entry, object membership and spatial history, as
@@ -982,7 +984,8 @@ public:
         terrainRegistered_(ownership==Ownership::reference),
         table_(ownership==Ownership::native||ownership==Ownership::nativeScenery),
         terrain_(terrainRegistered_?GameplayTerrainInstances::Binding::bindDestruction(terrainBinding_):
-            GameplayTerrainInstances::Binding{},presentation,collision){
+            GameplayTerrainInstances::Binding{},presentation,collision),
+        nativeTerrainPresentation_(presentation),nativeTerrainCollision_(collision){
         if(preparedDrawEnabled())layers_.enablePreparedDraw();
         good_=sprites_.prepare(preparedSprites_,741)&&objectDefaults_.prepare(objects,sprites_)&&
             spriteGeometry_.prepare(sprites_)&&
@@ -1178,6 +1181,14 @@ public:
                 // platforms and speed zero are retained by the typed owner;
                 // raw image-index writes do not dirty bounds or queues.
                 return true;
+            },
+            [](void* p,const GameplayWorld::NativeTerrain::Identity& id,bool enabled){
+                auto& self=*static_cast<GameplayCollisionOwner*>(p);
+                return self.check(self.nativeTerrainCollision_.notify(id.x,id.y,enabled));
+            },
+            [](void* p,const GameplayWorld::NativeTerrain::Identity& id,int before,int after){
+                auto& self=*static_cast<GameplayCollisionOwner*>(p);
+                return self.check(self.nativeTerrainPresentation_.notify(id.x,id.y,before,after));
             }
         }))return check(false);
 #ifndef DOWNWELL_REFERENCE_BREAKABLES
@@ -1568,14 +1579,14 @@ public:
     bool dispatchDitherAboveCollision(const RunnerCollisionEventContext::Frame& event){
         View::Kind selfKind,otherKind;InstanceHandle self,other;
         PackedObjectEvent binding{},destroy{};bool found=false;
-        if(!valid()||!world_||!terrainRegistered_||
+        if(!valid()||!world_||(!terrainRegistered_&&!(native_&&world_->nativeTerrainInstances()))||
             !View::decode(event.self,selfKind,self)||selfKind!=View::Kind::ditherAbove||
             !View::decode(event.other,otherKind,other)||otherKind!=View::Kind::terrain||
             !resolves(event.self)||!resolves(event.other)||objectOf(event.other)!=60||
             event.type!=4||event.subtype!=60||event.owner!=61||event.code!=991||
             !objects_.collisionEvent(61,60,found,binding)||!found||
             binding.ownerObjectId!=61||binding.codeId!=991||objects_.findEvent(60,1,0,destroy))return check(false);
-        return check(terrain_.requestDestroy(other));
+        return check(native_?world_->destroyNativeTerrain(other):terrain_.requestDestroy(other));
     }
     template<class MakePlayer> bool dispatchSkeletonCollision(const RunnerCollisionEventContext::Frame& event,MakePlayer makePlayer){
         View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;

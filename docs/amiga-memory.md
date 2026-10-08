@@ -6,7 +6,7 @@ memory requirement.
 
 ## Native terrain identities
 
-`nativeTerrainStorage` reserves 104,514 bytes of ordinary BSS on the 68000,
+`nativeTerrainStorage` reserves 104,522 bytes of ordinary BSS on the 68000,
 outside Chip RAM and the task stack. It retains at most 2,048 terrain
 lifetimes in birth order. Adjacent generated cells share identity/geometry
 descriptors; coincident and authored walls remain distinct. The bounded
@@ -31,6 +31,8 @@ is required for those scripts. Live wall End Step fields occupy one packed
 of code 986. One transient pointer and handle expose current event mutations
 to synchronous callbacks; the packed state retains the failure prefix after
 an event returns. No generic property record or duplicate geometry is added.
+The lifetime binding also forwards collision-cache and presentation notices;
+these callbacks add eight bytes on the target, not per-cell storage.
 Room teardown preserves the generation counter, preventing old handles from
 addressing replacement walls. Generated numeric VM IDs are not inferred from
 these family-local handles.

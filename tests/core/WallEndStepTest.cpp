@@ -49,6 +49,33 @@ struct Ops {
 };
 int main(int argc,char** argv){
     {
+        struct Notice {unsigned collision=0,presentation=0;} notice;
+        Native native;
+        assert(native.bind({&notice,
+            [](void*,unsigned){return true;},
+            [](void*,const Native::Identity&,bool,std::uint32_t& order,std::uint32_t&){order=1;return true;},
+            [](void*,unsigned){return true;},[](void*,unsigned){return true;},
+            [](void*,const Native::Identity&,int,std::uint32_t&){return true;},
+            [](void* p,const Native::Identity&,bool enabled){assert(!enabled);++static_cast<Notice*>(p)->collision;return true;},
+            [](void* p,const Native::Identity&,int before,int after){auto& n=*static_cast<Notice*>(p);
+                assert(before==51&&after==(n.presentation? -1:51));++n.presentation;return true;}}));
+        const auto h=prepare(native,0);GameMakerRandom random;
+        Ops first;first.neighbors=first.diagonals=15;
+        assert(native.wallEvent(h,1,random,first)&&notice.presentation==1&&!notice.collision);
+        struct DestroyOps:Ops {
+            Native& owner;InstanceHandle key;Notice& notice;
+            DestroyOps(Native& n,InstanceHandle h,Notice& sink):owner(n),key(h),notice(sink){}
+            bool destroy(){
+                assert(notice.presentation==1&&!notice.collision);
+                assert(owner.markDestroyed(key)&&notice.collision==1&&notice.presentation==1);
+                return true;
+            }
+        } next(native,h,notice);
+        assert(native.wallEvent(h,1,random,next)&&notice.presentation==2&&notice.collision==1);
+        Ops skipped;assert(native.wallEvent(h,1,random,skipped)&&skipped.trace.empty());
+        assert(native.markDestroyed(h)&&notice.presentation==2&&notice.collision==1&&native.retire(h));
+    }
+    {
         WallEndStepState s;s.checked=2;s.imageIndex=14;
         assert(wallRoomCreation(676,s)&&s.pillar==-1&&s.checked==2&&s.imageIndex==14);
         assert(wallRoomCreation(677,s)&&s.pillar==1);

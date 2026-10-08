@@ -43,12 +43,14 @@ behavior, both backend integrations and relevant original-game verification.
   companion births in the native creation stream, not just visible actors;
   finish the stored companions' event/render integration as well as native
   ownership (their synchronous stored Create state is not a complete actor).
-  Connect authored `objDitherAbove` (61) native wall-destruction contacts.
+  Schedule authored `objDitherAbove` (61) native wall-destruction contacts
+  through the complete ordered collision pass, using its bound event handler.
   Connect native terrain's identity runs to ordered collision candidates
   before enabling destruction dispatch there: finish animation/cached-frame and
   dynamic-rebinding publication, plus spatial mutation/traversal publication;
   connect retained native wall End Step state to source spatial queries,
-  activation, tile/flower effects and collision/rendering publication;
+  activation and tile/flower effects; make native raster rebuilding consume
+  retained wall appearance/destruction after the bound presentation notices;
   schedule the mixed spatial flush with candidate collection and post-pass
   retention after the remaining publication paths are connected.
   Registration stamps alone are not pair

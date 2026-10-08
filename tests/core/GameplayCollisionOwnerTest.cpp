@@ -2191,6 +2191,41 @@ int main(){
         }
     }
     auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
+    for(auto mode:{GameplayCollisionOwner::Ownership::native,GameplayCollisionOwner::Ownership::nativeScenery})
+    for(unsigned failure=0;failure<5;++failure){
+        struct Notice {
+            std::vector<int> order;
+            bool changed(int x,int y,bool enabled){assert(x==240&&y==160&&!enabled);order.push_back(1);return true;}
+            bool changed(int x,int y,int before,int after){assert(x==240&&y==160&&before==51&&after==-1);order.push_back(2);return true;}
+        } notice;
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
+            GameplayTerrainInstances::Presentation::bind(notice),GameplayTerrainInstances::WallCollision::bind(notice),&rooms,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),nullptr,&rooms);
+        auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
+        assert(owner->attach(*world)&&world->bindNativeTerrain(*terrain)&&world->createAuthoredDitherAbove());
+        assert(terrain->append(failure==2?93:60,240,160,failure!=4));
+        const auto wall=terrain->handle(0);InstanceHandle self,other;
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::ditherAbove,world->ditherAbove()->handle(),self)&&
+            GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,wall,other));
+        RunnerCollisionEventContext::Frame event{self,other,4,60,61,991};
+        if(failure==1)event.code=990;
+        if(failure==3)++event.other.generation;
+        const auto draws=world->randomDrawCount();
+        const bool accepted=failure==0||failure==4;
+        assert(owner->dispatchDitherAboveCollision(event)==accepted&&world->randomDrawCount()==draws);
+        if(!accepted){assert(notice.order.empty());continue;}
+        GameplayWorld::NativeTerrain::Identity id;bool active,destroyed;
+        assert(terrain->read(wall,id,active,destroyed)&&destroyed&&GameplayCollisionView(*world).contains(other));
+        assert(notice.order==(failure==4?std::vector<int>{}:std::vector<int>{1,2}));
+        assert(owner->dispatchDitherAboveCollision(event)); // Once-only publication.
+        assert(notice.order.size()==(failure==4?0u:2u));
+        std::uint32_t flags;assert(terrain->spatialFlags(wall,flags)&&(flags&1u));
+        if(!failure)assert(flags&0x8000u); // Keep spatial identity until physical cleanup.
+        assert(terrain->retire(wall)&&!GameplayCollisionView(*world).contains(other)&&terrain->append(60,240,160));
+        assert(terrain->handle(0).slot==wall.slot&&terrain->handle(0).generation!=wall.generation);
+        assert(!owner->dispatchDitherAboveCollision(event));
+    }
     {
         using Pairs=RunnerCollisionPairs<GameplayCollisionView::capacity,512>;
         std::vector<std::vector<Pairs::Pair>> expected;
