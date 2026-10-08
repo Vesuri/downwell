@@ -55,6 +55,12 @@ struct RunSession {
     // soundInitialize writes entries 0..10 to zero. Room changes do not
     // reinitialize them; scrInitialize/new-run reset does.
     int overlapSounds[11]{};
+    template<class Audio> bool playBoxChainSound(SoundPlayState& caller,
+        MotionBinary64 volume,bool inWater,Audio& audio){
+        SoundPlayEnvironment env;env.gameVolume=volume;env.inWater=inWater;
+        int result=-1;
+        return SoundPlayScript::plain(caller,env,audio,342,50,false,true,result,effectsSucceeded);
+    }
     template<class Audio> bool playBoxBreakSound(SoundPlayState& caller,int sound,
         MotionBinary64 volume,Audio& audio){
         if(!effectsSucceeded)return false;

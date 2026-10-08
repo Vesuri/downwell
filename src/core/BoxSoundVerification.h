@@ -11,9 +11,11 @@ struct BoxSoundVerification {
         int sound;
         unsigned fail=0,calls=0;
         bool valid=true;
+        bool chain=false,water=false;
         bool call(int op){
-            const int expected[]={sound,1000+sound,2000+sound,3000,4000,5000,900};
-            if(calls>=7||op!=expected[calls])valid=false;
+            const int expected[]={sound,1000+sound,2000+sound,3000,4000,5000,900,
+                342,1342,2342,3000,4000,5000};
+            if(calls>=(chain?13u:7u)||op!=expected[calls])valid=false;
             ++calls;return valid&&calls!=fail;
         }
         bool isPlaying(int id,bool& yes){yes=true;return call(id);}
@@ -27,7 +29,8 @@ struct BoxSoundVerification {
             valid=valid&&id==900&&duration==0&&gain.high==0x3fc00000u&&gain.low==0;return call(4000);
         }
         bool setPitch(int id,MotionBinary64 pitch){
-            valid=valid&&id==900&&pitch.high==0x3ff00000u&&pitch.low==0;return call(5000);
+            const auto expected=calls>=7&&water?MotionBinary64{0x3fe19999u,0x9999999au}:MotionBinary64::fromInteger(1);
+            valid=valid&&id==900&&pitch.high==expected.high&&pitch.low==expected.low;return call(5000);
         }
     };
     template<class World,class Read> static bool run(World& world,InstanceHandle box,int sound,Read read,unsigned failure=0){

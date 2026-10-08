@@ -194,6 +194,11 @@ public:
         r->box.wallHp=health;return true;
     }
     int overlapSound(unsigned channel)const{return channel<11?run_.overlapSounds[channel]:-1;}
+    template<class Audio> bool playBoxChainSound(InstanceHandle h,MotionBinary64 volume,bool inWater,Audio& audio){
+        auto* box=instances_.resolve(h);
+        if(!run_.effectsSucceeded||!box||box->objectId!=92)return run_.effectsSucceeded=false;
+        return run_.playBoxChainSound(box->sound,volume,inWater,audio);
+    }
     template<class Audio> bool playBoxBreakSound(InstanceHandle h,MotionBinary64 volume,Audio& audio){
         auto* box=instances_.resolve(h);
         if(!run_.effectsSucceeded||!box||box->objectId!=92)return run_.effectsSucceeded=false;

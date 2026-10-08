@@ -160,7 +160,7 @@ int main(){
     BuilderPatternPack patterns(bb.data(),bb.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     SpriteMaskPack masks(mb.data(),mb.size());
     require(rooms.valid()&&objects.valid()&&patterns.valid()&&sprites.valid()&&masks.valid(),"real collision resources validate");
-    for(unsigned chainCase=0;chainCase<3;++chainCase){
+    for(unsigned chainCase=0;chainCase<10;++chainCase){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
         require(owner->attach(*world),"attach scheduled chain world");world->skipToGameForTesting();
@@ -174,8 +174,10 @@ int main(){
             InstanceHandle child;require(bullets.create(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(600),child),"fill chain bullet capacity");
         }
         require(!owner->resolve(box)->box.haveGem,"chain fixture has no reward");
-        ScheduledBoxCounts counts;unsigned shots=0,steps=0;bool retained=false;
+        ScheduledBoxCounts counts;unsigned steps=0;bool retained=false;
         BoxSoundVerification::Audio<StartupRuntime> audio{*world,owner->resolve(box)->box.breakSound};
+        audio.chain=true;audio.water=chainCase==3;
+        if(chainCase>=4)audio.fail=chainCase+4;
         const bool completed=world->withBoxDestruction(
             [&](InstanceHandle h,BoxDestructionScript::Caller& caller){return owner->readBoxDestruction(h,caller);},
             [&](InstanceHandle h){
@@ -183,9 +185,9 @@ int main(){
                 rest.verifyDebris=true;rest.sawSound=h.slot==box.slot&&h.generation==box.generation;rest.before=world->randomState();
                 rest.timeQuery=[&](InstanceHandle key,bool& allowed){return owner->boxTimeAllowed(*world,key,false,480,allowed);};
                 auto chain=world->boxChainPublication(bullets,*owner,h);
-                return boxWorldEffects(*world,h,ScheduledBoxChain<decltype(chain),decltype(rest)>(chain,rest,shots),
+                return boxWorldEffects(*world,h,ScheduledBoxChain<decltype(chain),decltype(rest)>(chain,rest),
                     [&](int id,unsigned& frames){PackedSpriteCollision art;if(!sprites.sprite(id,art))return false;
-                        frames=art.frameCount;return true;},audio,MotionBinary64{0x3fd00000u,0});
+                        frames=art.frameCount;return true;},audio,MotionBinary64{0x3fd00000u,0},audio.water);
             },[&]{return world->withDroneBulletEvents(bullets,
                 [&](auto&,auto&,auto,auto&,bool&){++steps;return false;},
                 [&]{return world->stepWithOwnedDebris({},[](auto,const auto&,bool& frozen){frozen=false;return true;},false,[&]{
@@ -201,19 +203,29 @@ int main(){
                     for(unsigned i=0;i<neighborCount;++i)if(!owner->resolve(neighbors[i])||owner->resolve(neighbors[i])->alarms.get(0)!=5)return false;
                     retained=true;return true;
                 });});});
-        if(completed!=(chainCase!=1))std::fprintf(stderr,"chain case %u failed: shots=%u steps=%u mark=%u stop=%u retained=%u\n",
-            chainCase,shots,steps,counts.mark,counts.stop,unsigned(retained));
-        require(completed==(chainCase!=1),"scheduled chain respects projectile capacity");
+        require(audio.valid&&audio.calls==(audio.fail?audio.fail:chainCase==1?7u:13u),"scheduled chain runs source plain sound after overlap sound");
+        require(completed==(chainCase!=1&&!audio.fail),"scheduled chain respects projectile and sound failures");
+        if(audio.fail){
+            const auto* caller=owner->resolve(box);
+            require(!world->effectsSucceeded()&&caller&&!caller->destroyRequested&&caller->boxTarget==-4&&
+                caller->boxMyBullet>=0&&caller->sound.sfxIndex==342&&caller->sound.cutPrv&&caller->sound.chanNum==7&&
+                world->overlapSound(7)==audio.sound&&!steps&&!counts.mark&&!world->debrisEffects().size(),
+                "chain audio failure retains caller fields without activating neighbors or destroying box");
+            const auto* shot=world->instance(caller->boxMyBullet);
+            require(shot&&shot->objectId==266&&bullets.instances().size()==1,"chain audio failure retains already-created projectile");
+            for(unsigned i=0;i<neighborCount;++i)require(owner->resolve(neighbors[i])->alarms.get(0)==-1,"chain audio failure leaves neighbors unarmed");
+            require(bullets.clear(),"clear retained projectile after chain sound failure");continue;
+        }
         if(chainCase==1){
             const auto* caller=owner->resolve(box);
             require(!world->effectsSucceeded()&&caller&&!caller->destroyRequested&&caller->boxMyBullet==-4&&
-                caller->boxTarget==-4&&!shots&&!steps&&!counts.mark&&bullets.instances().size()==4&&
+                caller->boxTarget==-4&&!steps&&!counts.mark&&bullets.instances().size()==4&&
                 world->smokeEffects().size()==1&&world->scriptEffects().size()==1&&!world->debrisEffects().size(),
                 "failed drone Create preserves earlier effects without neighbor writes or destruction");
             for(unsigned i=0;i<neighborCount;++i)require(owner->resolve(neighbors[i])->alarms.get(0)==-1,"rejected chain leaves neighbors unarmed");
             require(bullets.clear(),"clear retained failed chain owner");continue;
         }
-        require(retained&&!steps&&shots==1&&counts.mark==1&&!owner->resolve(box)&&
+        require(retained&&!steps&&counts.mark==1&&!owner->resolve(box)&&
             bullets.instances().size()==1&&world->debrisEffects().size()==2,"chain children and phase cutoff survive source cleanup");
         auto retired=world->boxChainPublication(bullets,*owner,box);
         require(!retired.targetAlarm(neighbors[0],0,99)&&owner->resolve(neighbors[0])->alarms.get(0)==5,
@@ -256,7 +268,7 @@ int main(){
                 if(callbacks.sawSound)soundRandom=world->randomState();
                 return boxWorldEffects(*world,key,callbacks,[&](int id,unsigned& frames){
                     PackedSpriteCollision art;if(!sprites.sprite(id,art))return false;frames=art.frameCount;return true;},
-                    audio,MotionBinary64{0x3fd00000u,0});
+                    audio,MotionBinary64{0x3fd00000u,0},false);
             },[&]{return world->stepWithOwnedDebris({},[](auto,const auto&,bool& frozen){frozen=false;return true;});});
             require(completed==(mode==1||mode==10),"stored scheduled source effects honor query and child failures");
             if(mode>=10){

@@ -700,6 +700,10 @@ public:
         breakables_[h.slot].state.wallHp=health;return true;
     }
     int overlapSound(unsigned channel)const{return channel<11?run_.overlapSounds[channel]:-1;}
+    template<class Audio> bool playBoxChainSound(downwell::InstanceHandle h,downwell::MotionBinary64 volume,bool inWater,Audio& audio){
+        if(!run_.effectsSucceeded||!findBreakable(h))return run_.effectsSucceeded=false;
+        return run_.playBoxChainSound(breakables_[h.slot].sound,volume,inWater,audio);
+    }
     template<class Audio> bool playBoxBreakSound(downwell::InstanceHandle h,downwell::MotionBinary64 volume,Audio& audio){
         if(!run_.effectsSucceeded||!findBreakable(h))return run_.effectsSucceeded=false;
         auto& box=breakables_[h.slot];

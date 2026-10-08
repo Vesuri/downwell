@@ -390,8 +390,14 @@ cannot mutate surviving neighbors.
 dispatch. New chain bullets retain their Create state through their birth Step
 cutoff; their later phases use the existing room scheduler. Scheduled fixtures
 check four neighbors, missing-neighbor assignment, exhausted projectile storage,
-retained caller fields, full emission RNG and retirement. The plain chain-shot
-sound command and global inputs are fixture-provided. This stored-world binding
+retained caller fields, full emission RNG and retirement. `BoxWorldEffects`
+routes the chain shot through plain `soundPlay` on both worlds, preserving its
+caller field writes, previous-sound cut, gain and underwater pitch. Unlike the
+break sound, it does not modify the overlap channel. Water state and volume are
+explicit inputs; no goal/shop flag substitutes for them. The scheduled stored
+chain checks all six plain-audio failure prefixes after projectile creation,
+before neighbor activation or destruction. Audio backends and global inputs
+are fixture-provided. This stored-world binding
 does not admit natural chains or supply native global instance identity.
 
 Gunpowder Blocks creates object 266 (`bulletDrone`), not an explosion. Its

@@ -619,7 +619,7 @@ int main(){
                 if(callbacks.sawSound)soundRandom=world->randomState();
                 return boxWorldEffects(*world,key,callbacks,
                 [&](int id,unsigned& frames){PackedSpriteCollision art;if(!sprites.sprite(id,art))return false;
-                    frames=art.frameCount;return true;},audio,MotionBinary64{0x3fd00000u,0});},
+                    frames=art.frameCount;return true;},audio,MotionBinary64{0x3fd00000u,0},false);},
                 [&]{return world->stepWithOwnedDebris(0,stopped,meeting);});
             assert(completed==(mode==1||mode==10));
             if(mode>=10){
@@ -3494,6 +3494,20 @@ int main(){
         assert(!world->effectsSucceeded()&&second.generation>first.generation&&owner->scriptEffects().find(first)&&
             owner->scriptEffects().find(second)&&world->scriptEffects().size()==2&&lookups==2);
         assert(!world->spawnBoxScriptEffect(box,x,y,603,{},{},{},frames)&&lookups==2&&world->randomDrawCount()==draws);
+    }
+    for(unsigned water=0;water<2;++water)for(unsigned failure=0;failure<=6;++failure){
+        auto world=std::make_unique<GameplayWorld>(300,true);
+        const int bx=0,by=336;assert(world->appendBreakables(&bx,&by,1));const InstanceHandle box{0,1};
+        BoxSoundVerification::Audio<GameplayWorld> audio{*world,171};audio.chain=true;audio.water=water;
+        const auto volume=MotionBinary64{0x3fd00000u,0};const auto draws=world->randomDrawCount();
+        assert(world->playBoxBreakSound(box,volume,audio));
+        audio.fail=failure?7+failure:0;
+        assert(world->playBoxChainSound(box,volume,water,audio)==!failure);
+        const auto& sound=world->findBreakable(box)->sound;
+        assert(audio.valid&&audio.calls==(failure?7+failure:13)&&world->effectsSucceeded()==!failure&&
+            sound.sfxIndex==342&&sound.soundPriority==50&&!sound.loop&&sound.cutPrv&&sound.chanNum==7&&
+            world->overlapSound(7)==171&&world->randomDrawCount()==draws);
+        if(failure)assert(!world->playBoxChainSound(box,volume,water,audio)&&audio.calls==7+failure);
     }
     for(unsigned failure=1;failure<=7;++failure){
         auto world=std::make_unique<GameplayWorld>(300,true);
