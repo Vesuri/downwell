@@ -13,6 +13,8 @@ class AmigaHealthHud {
     Pair background_[rows][words]{}, rim_[rows][words]{}, text_[rows][words]{};
     AmigaHudGlyph glyphs_[11]{};
     const UBYTE* pack_=nullptr;
+    const UBYTE* linkedCopy_=nullptr;
+    const UBYTE* linkedCopyEnd_=nullptr;
     UBYTE* destination_=nullptr;
     unsigned health_=0,maximum_=0,pieces_=0,perHeart_=0;
     bool valid_=false,artReady_=false;
@@ -105,6 +107,27 @@ class AmigaHealthHud {
 public:
     unsigned lastWordWrites=0;
     void invalidate(){valid_=false;}
+#ifdef DOWNWELL_PLATFORM_AMIGA
+    // Only the immutable pack's copy owner calls this, after an exact byte
+    // copy or verified residency reuse. The generated SHA-named symbol makes
+    // mismatched artwork/embedded-source objects a link error. This does not
+    // certify arbitrary file contents, nor permit mutation of the resident copy.
+    void bindLinkedCopy(const UBYTE* source,const UBYTE* sourceEnd,
+                        const UBYTE* copy,const UBYTE* copyEnd){
+#if !defined(DOWNWELL_REFERENCE_HEALTH_ART) && !defined(DOWNWELL_REFERENCE_HEALTH_ADMISSION)
+        if(AmigaHealthArt::linkedSource(source,sourceEnd)&&copy&&copyEnd&&
+           copyEnd>=copy&&copyEnd-copy==sourceEnd-source){
+            linkedCopy_=copy;linkedCopyEnd_=copyEnd;
+            if(pack_==copy&&!preparedArt_)pack_=nullptr;
+        }else{
+            if(pack_==linkedCopy_)pack_=nullptr;
+            linkedCopy_=linkedCopyEnd_=nullptr;
+        }
+#else
+        (void)source;(void)sourceEnd;(void)copy;(void)copyEnd;
+#endif
+    }
+#endif
     static void reference(AmigaRenderer* r,const UBYTE* pack,const UBYTE* end,
                           unsigned health,unsigned maximum,unsigned pieces,unsigned perHeart){
         auto asset=[&](unsigned s,unsigned f,int x,int y){amigaRendererDrawAsset(r,pack,end,s,f,x,y,0);};
@@ -125,7 +148,8 @@ public:
         if(pack_!=pack){
             {
                 DW_PROFILE_SCOPE(profileHealthArtAdmission);
-                preparedArt_=AmigaHealthArt::matches(pack,end);
+                preparedArt_=(linkedCopy_&&pack==linkedCopy_&&end==linkedCopyEnd_)||
+                    AmigaHealthArt::matches(pack,end);
             }
             artReady_=true;
             {

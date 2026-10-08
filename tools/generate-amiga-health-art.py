@@ -22,6 +22,9 @@ def main():
     payload = subprocess.check_output([str(ROOT/'build/generate-amiga-health-art'),
                                        'generated/amiga-hud.dwap'], cwd=ROOT)
     pack = (ROOT/INPUTS[1]).read_bytes()
+    source_symbol = 'downwell_health_source_' + hashlib.sha256(pack).hexdigest()
+    source_include = (f'.globl {source_symbol}\n{source_symbol}:\n'
+                      '.incbin "../generated/amiga-hud.dwap"\n').encode()
     magic, version, header, count, _ = struct.unpack_from('>4sHHI8s', pack)
     assert (magic, version, header) == (b'DWAP', 2, 20)
     wanted = {(415, 0), (415, 1), (378, 2)}
@@ -43,13 +46,19 @@ def main():
     lines += [f'{{{offset},{size},bytes{i}}},' for i, (offset, size) in enumerate(spans)]
     lines += ['};', f'static constexpr unsigned minimumBytes={max(a+b for a,b in spans)};']
     payload += ('\n'.join(lines)+'\n').encode()
-    manifest = {'format': 'amiga-health-art-v1', 'generator_version': 1,
+    payload += (f'#ifdef DOWNWELL_PLATFORM_AMIGA\nextern "C" const UBYTE {source_symbol}[];\n'
+                'inline bool linkedSource(const UBYTE* source,const UBYTE* end){\n'
+                f'    return source=={source_symbol} && end==source+{len(pack)};\n'
+                '}\n#endif\n').encode()
+    manifest = {'format': 'amiga-health-art-v1', 'generator_version': 2,
                 'extractor': json.loads((ROOT/INPUTS[2]).read_text())['extractor'],
                 'resource_ids': [415, 378], 'per_heart': 4,
                 'inputs_sha256': {p: hashlib.sha256((ROOT/p).read_bytes()).hexdigest() for p in INPUTS},
-                'output_sha256': hashlib.sha256(payload).hexdigest()}
+                'output_sha256': hashlib.sha256(payload).hexdigest(),
+                'source_include_sha256': hashlib.sha256(source_include).hexdigest()}
     for path, data in [(OUTPUT, payload), (OUTPUT.with_suffix('.json'),
-                       (json.dumps(manifest, indent=2)+'\n').encode())]:
+                       (json.dumps(manifest, indent=2)+'\n').encode()),
+                       (OUTPUT.with_name('amiga-health-source.inc'), source_include)]:
         if args.check:
             if not path.exists() or path.read_bytes()!=data:
                 raise SystemExit(f'stale health art: {path}')

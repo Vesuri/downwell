@@ -2,7 +2,7 @@
 	.balign 4
 	.globl amiga_hud_pack
 amiga_hud_pack:
-	.incbin "../generated/amiga-hud.dwap"
+	.include "../generated/amiga-health-source.inc"
 	.globl amiga_hud_pack_end
 amiga_hud_pack_end:
 

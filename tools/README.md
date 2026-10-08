@@ -191,6 +191,15 @@ hashes, resource IDs and extraction/generator versions. Amiga
 `REFERENCE_HEALTH_ART=1` retains scratch rendering for matched measurements;
 the profiling script clears it when restoring the normal executable.
 
+For the native embedded HUD, a SHA-256-named symbol marks the exact `.incbin`
+payload used to generate the artwork. The immutable resident-copy owner binds
+that identity after its byte copy (or residency reuse), avoiding another scan
+of Chip RAM. A stale artwork object cannot link to a different payload identity.
+Generic packs still use exact byte admission. `make -C amiga verify-health-link`
+in the Amiga environment verifies both matching and mismatched object pairs.
+`REFERENCE_HEALTH_ADMISSION=1` retains the resident-copy byte scan for timing
+and pixel comparisons; profiling restoration clears this selector as well.
+
 ## Original audio
 
 After the UTMT extraction, run `python3 tools/extract-audio.py` to extract all

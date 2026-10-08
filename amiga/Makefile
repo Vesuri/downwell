@@ -35,6 +35,7 @@ REFERENCE_BREAKABLES ?= 0
 REFERENCE_DAMAGE_TEXT ?= 0
 REFERENCE_DAMAGE_BANK ?= 0
 REFERENCE_HEALTH_ART ?= 0
+REFERENCE_HEALTH_ADMISSION ?= 0
 REFERENCE_GEM_POSITION ?= 0
 REFERENCE_EFFECT_COMPOSITION ?= 0
 REFERENCE_STYLE_SPRITES ?= 0
@@ -254,6 +255,9 @@ CFLAGS += -DDOWNWELL_REFERENCE_DAMAGE_BANK
 endif
 ifeq ($(REFERENCE_HEALTH_ART),1)
 CFLAGS += -DDOWNWELL_REFERENCE_HEALTH_ART
+endif
+ifeq ($(REFERENCE_HEALTH_ADMISSION),1)
+CFLAGS += -DDOWNWELL_REFERENCE_HEALTH_ADMISSION
 endif
 ifeq ($(REFERENCE_GEM_POSITION),1)
 CFLAGS += -DDOWNWELL_REFERENCE_GEM_POSITION
@@ -531,6 +535,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
 	@printf '%s\n' '$(REFERENCE_HUD_WORDS)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_DAMAGE_BANK)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_HEALTH_ART)' >> $@.tmp
+	@printf '%s\n' '$(REFERENCE_HEALTH_ADMISSION)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_HUD_BORDER)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_CONTACT_MOTION)' >> $@.tmp
 	@printf '%s\n' '$(REFERENCE_CONTACT_COORDINATES)' >> $@.tmp
@@ -613,6 +618,13 @@ $(REPO)/generated/amiga-hud-text.h: $(REPO)/tools/generate-amiga-hud-text.cpp $(
 
 $(REPO)/generated/amiga-health-art.h: $(REPO)/tools/generate-amiga-health-art.cpp $(REPO)/tools/generate-amiga-health-art.py $(AMIGA_SRC)/AmigaRenderer.h $(AMIGA_SRC)/AmigaRenderer.c $(REPO)/src/core/HudNumbers.h $(AMIGA_HUD)
 	$(MAKE) -C $(REPO) generated/amiga-health-art.h
+
+$(REPO)/generated/amiga-health-source.inc: $(REPO)/generated/amiga-health-art.h
+	@test -f $@ || (cd $(REPO) && python3 tools/generate-amiga-health-art.py)
+
+.PHONY: verify-health-link
+verify-health-link: $(REPO)/generated/amiga-health-source.inc
+	python3 $(REPO)/tests/amiga-health-link-test.py --assembler "$$(command -v $(AS))" --linker "$$( $(CC) -print-prog-name=ld )"
 
 obj/AmigaInput.o: $(AMIGA_SRC)/AmigaInput.cpp $(AMIGA_SRC)/AmigaInput.h
 	@mkdir -p $(@D)
@@ -865,7 +877,7 @@ $(AMIGA_BOOT_BANK) $(AMIGA_FRONT_BANK) $(AMIGA_SCENE_BANKS): $(AMIGA_GAME)
 $(AMIGA_EFFECT_STAMPS): $(AMIGA_GAME) $(REPO)/tools/generate-effect-stamps.py
 	cd $(REPO) && python3 tools/generate-effect-stamps.py
 
-obj/AmigaAssets.o: $(AMIGA_SRC)/AmigaAssets.s $(AMIGA_HUD) $(AMIGA_GAME) $(AMIGA_EFFECT_STAMPS) $(AMIGA_EXIT_MASK) $(AMIGA_ENTRY_MASK) $(AMIGA_SELECTION_MASK) \
+obj/AmigaAssets.o: $(AMIGA_SRC)/AmigaAssets.s $(AMIGA_HUD) $(REPO)/generated/amiga-health-source.inc $(REPO)/generated/amiga-health-art.h $(AMIGA_GAME) $(AMIGA_EFFECT_STAMPS) $(AMIGA_EXIT_MASK) $(AMIGA_ENTRY_MASK) $(AMIGA_SELECTION_MASK) \
 		$(AMIGA_RESULTS) $(AMIGA_SHOP) $(AMIGA_CLEAR) $(ROOM_PACK) $(OBJECT_PACK) $(COLLISION_PACK) $(COLLISION_MASK_PACK) $(BUILDER_PACK)
 	@mkdir -p $(@D)
 	$(AS) $(ASFLAGS) -o $@ $<
