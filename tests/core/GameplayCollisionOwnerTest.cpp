@@ -2378,18 +2378,41 @@ int main(){
         std::unique_ptr<GameplayWorld> world(new(storage) GameplayWorld(300,false,1025,true,
             {},{},GameplayWorld::PlayerLifecycleBinding::bind(probe),nullptr,&rooms));
         assert(world->effectsSucceeded()&&probe.births==1&&world->cameraOffsetY()==5&&world->ringOrigin()==305);
+        RoomEntryViews expectedViews;assert(expectedViews.load(rooms,11));
+        auto checkViews=[&]{
+            for(unsigned slot=0;slot<RoomPack::viewCount;++slot){
+                const auto* expected=expectedViews.get(slot);const auto* actual=world->roomEntryView(slot);
+                assert(actual&&expected&&actual->x.bits==expected->x.bits&&actual->y.bits==expected->y.bits&&
+                    actual->width.bits==expected->width.bits&&actual->height.bits==expected->height.bits&&
+                    actual->enabled==expected->enabled);
+            }
+        };
+        unsigned terrainCalls=0;
+        assert(world->loadRoomTerrain(rooms,room,[&](const auto&){checkViews();++terrainCalls;return true;}));
+        assert(terrainCalls==240);checkViews();
         assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)==ResultsDestination::gameplay);
         assert(world->effectsSucceeded()&&probe.births==2&&world->roomEntryView()->y.bits==0&&
             world->cameraOffsetY()==5&&world->ringOrigin()==305);
+        terrainCalls=0;
+        assert(!world->loadRoomTerrain(rooms,room,[&](const auto&){checkViews();return ++terrainCalls<3;}));
+        assert(terrainCalls==3&&!world->effectsSucceeded());checkViews();
+        assert(!world->loadRoomTerrain(rooms,room,[&](const auto&){++terrainCalls;return true;}));
+        assert(terrainCalls==3); // Failed source prefix still cannot be retried.
+        assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)==ResultsDestination::none);
+        // Use a fresh healthy world for the remaining failure-path fixture.
+        world.reset();probe.world=static_cast<GameplayWorld*>(::operator new(sizeof(GameplayWorld)));
+        world.reset(new(probe.world) GameplayWorld(300,false,1025,true,
+            {},{},GameplayWorld::PlayerLifecycleBinding::bind(probe),nullptr,&rooms));
+        assert(probe.births==3);
         RoomPack invalid(nullptr,0);
         auto rejected=std::make_unique<GameplayWorld>(300,false,1025,true,
             GameplayWorld::EnemyLifecycleBinding{},GameplayWorld::BreakableLifecycleBinding{},
             GameplayWorld::PlayerLifecycleBinding::bind(probe),nullptr,&invalid);
         assert(!rejected->effectsSucceeded()&&!rejected->roomEntryView()&&
-            !rejected->playerHandle().generation&&probe.births==2);
+            !rejected->playerHandle().generation&&probe.births==3);
         probe.reject=true;
         assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)==ResultsDestination::none);
-        assert(!world->effectsSucceeded()&&probe.births==3&&world->cameraOffsetY()==0&&world->ringOrigin()==300);
+        assert(!world->effectsSucceeded()&&probe.births==4&&world->cameraOffsetY()==0&&world->ringOrigin()==300);
     }
     {
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
@@ -2416,6 +2439,36 @@ int main(){
         assert(world->effectsSucceeded()&&drawDepth()==-60000);
         assert(world->restartFromResults(DeathMenuSequence::Action::Retry,43,300)!=ResultsDestination::none&&
             !owner->state(shared)&&owner->valid());
+    }
+    {
+        // Reuse is tied to the exact immutable constructor pack and rmMain.
+        // Another resource object must publish its own view values instead.
+        auto changed=rb;
+        unsigned mainIndex=0;
+        for(;mainIndex<rooms.roomCount();++mainIndex){
+            PackedRoom candidate;assert(rooms.room(mainIndex,candidate));
+            if(candidate.roomId==11)break;
+        }
+        assert(mainIndex<rooms.roomCount());
+        const auto xOffset=RoomPack::headerSize+mainIndex*RoomPack::roomRecordSize+44;
+        for(unsigned byte=0;byte<4;++byte)changed[xOffset+byte]=std::uint8_t(16777217u>>(byte*8));
+        RoomPack replacement(changed.data(),changed.size());
+        assert(replacement.valid());
+        for(bool missing:{false,true}){
+            auto world=std::make_unique<GameplayWorld>(300,true,0,false,
+                GameplayWorld::EnemyLifecycleBinding{},GameplayWorld::BreakableLifecycleBinding{},
+                GameplayWorld::PlayerLifecycleBinding{},nullptr,&rooms);
+            assert(world->effectsSucceeded()&&world->roomEntryView()->x.bits==0);
+            auto requested=room;if(missing)requested.roomId=-123;
+            unsigned calls=0;
+            const auto& source=missing?rooms:replacement;
+            const bool loaded=world->loadRoomTerrain(source,requested,[&](const auto&){
+                ++calls;assert(world->roomEntryView()->x.bits==0x4b800000u);return true;
+            });
+            assert(loaded!=missing&&calls==(missing?0u:240u));
+            if(missing)assert(!world->roomEntryView()&&!world->effectsSucceeded());
+            else assert(world->roomEntryView()->x.bits==0x4b800000u);
+        }
     }
     {
         auto roomOwner=std::make_unique<GameplayCollisionOwner>(objects,sprites,

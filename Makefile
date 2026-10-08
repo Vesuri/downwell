@@ -1175,6 +1175,16 @@ build/gameplay-collision-owner-test: tests/core/GameplayCollisionOwnerTest.cpp s
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
 
+build/gameplay-room-views-reference-test: tests/core/GameplayCollisionOwnerTest.cpp src/core/GameplayWorld.cpp src/core/PlayerMotion.cpp src/core/Replay.cpp src/core/GameMakerRandom.cpp src/core/ObjectPack.cpp src/core/RoomPack.cpp src/core/AreaOneBuilder.cpp src/core/BuilderPatternPack.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_REFERENCE_ROOM_VIEWS -o $@ $(filter %.cpp,$^)
+.PHONY: verify-room-views
+verify-room-views: build/gameplay-collision-owner-test build/gameplay-room-views-reference-test
+	DOWNWELL_OWNERSHIP_WITNESS=build/room-views-default.txt ./build/gameplay-collision-owner-test
+	DOWNWELL_OWNERSHIP_WITNESS=build/room-views-reference.txt ./build/gameplay-room-views-reference-test
+	cmp build/room-views-default.txt build/room-views-reference.txt
+test: verify-room-views
+
 build/gameplay-local-draw-capture-test: tests/core/GameplayCollisionOwnerTest.cpp src/core/GameplayWorld.cpp src/core/PlayerMotion.cpp src/core/Replay.cpp src/core/GameMakerRandom.cpp src/core/ObjectPack.cpp src/core/RoomPack.cpp src/core/AreaOneBuilder.cpp src/core/BuilderPatternPack.cpp $(wildcard src/core/*.h)
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_LOCAL_DRAW_CAPTURE=2 -o $@ $(filter %.cpp,$^)

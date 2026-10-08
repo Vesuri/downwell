@@ -39,8 +39,16 @@ native GameplayWorld receives a borrowed room pack and loads rmMain's cache
 before player birth, independently of its followed-camera initialization. It
 retains that pack across in-place run recreation. Invalid resources fail before
 publishing a player. Resource-free fixtures can omit the pack; the terrain
-handoff still loads the cache for those callers. This does not establish full
-cross-family room birth ordering. Tests observe the cache from actual
+handoff still loads the cache for those callers. The supplied pack is immutable
+for the world and its run resets. The terrain handoff reuses the constructor's
+initial-view snapshot only for that exact pack and rmMain; a different pack or room takes
+the original decoder path, including invalidation on failure. No snapshot is
+carried across world reconstruction or substituted for live camera state.
+`REFERENCE_ROOM_VIEWS=1` retains the duplicate handoff decode for native timing
+and replay comparison. `make verify-room-views` compares full ownership witnesses
+against that retained path, including alternate resources and failure prefixes.
+This does not establish full cross-family room birth ordering. Tests observe
+the cache from actual
 player-birth callbacks, including retry, and terrain callbacks. These are
 initial snapshots, explicitly not current-frame view getters; connecting them
 to entry-effect creation and the complete camera publication lifecycle remains

@@ -230,7 +230,8 @@ public:
     };
     using PlayerLifecycleBinding = downwell::RecordLifecycleBinding<PlayerInstance>;
     // When supplied, entryRooms is borrowed for this world and its run resets;
-    // it prepares rmMain's initial view cache before player lifecycle callbacks.
+    // it must remain immutable and prepares rmMain's initial view cache before
+    // player lifecycle callbacks. The terrain handoff reuses that same snapshot.
     explicit GameplayWorld(unsigned initialRingOrigin,
                               bool startsGrounded = true,
                               int landingOffset = 0,
@@ -512,7 +513,16 @@ public:
         if(!run_.effectsSucceeded)return false;
         if(roomTerrainLoaded_||!rooms.valid()){run_.effectsSucceeded=false;return false;}
         roomTerrainLoaded_=true; // A partial load cannot be retried.
-        if(!roomEntryViews_.load(rooms,room.roomId)){run_.effectsSucceeded=false;return false;}
+        bool entryViewsReady=false;
+#ifndef DOWNWELL_REFERENCE_ROOM_VIEWS
+        // Construction already published this immutable rmMain snapshot before
+        // player Create. It is not the followed camera or a script-writable
+        // view. Re-decoding it here publishes no additional source state.
+        entryViewsReady=entryRooms_==&rooms&&room.roomId==11&&roomEntryViews_.get(0);
+#endif
+        if(!entryViewsReady&&!roomEntryViews_.load(rooms,room.roomId)){
+            run_.effectsSucceeded=false;return false;
+        }
         const bool retained=prepared&&prepared->matches(rooms,room);
         const unsigned count=retained?prepared->count():room.instanceCount;
         for(unsigned i=0;i<count;++i){
