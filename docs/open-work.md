@@ -43,8 +43,10 @@ behavior, both backend integrations and relevant original-game verification.
   companion births in the native creation stream, not just visible actors;
   finish the stored companions' event/render integration as well as native
   ownership (their synchronous stored Create state is not a complete actor).
-  Connect authored `objDitherAbove` (61) ownership and shared Begin Step to
-  native gameplay, including its wall-destruction contacts. Extend the SDL
+  Admit authored `objDitherAbove` (61) at its native room creation boundary,
+  connect its Draw projection and wall-destruction contacts, and verify mixed
+  Begin Step ordering (the owned, explicitly admitted controller already runs
+  the shared event). Extend the SDL
   collision pass beyond the admitted plain-wall/dither pair, preserving mixed
   event ordering rather than running independent family passes. Wire actual
   settings/ending state into its environment; it is not an inert controller or

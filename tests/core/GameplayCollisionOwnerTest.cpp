@@ -305,11 +305,12 @@ static void checkTypedCollisionView(const GameplayCollisionView& view,GameplayCo
         case K::skeleton:assert(view.resolveLocal<K::skeleton>(local)==reference.skeleton);break;
         case K::blood:assert(view.resolveLocal<K::blood>(local)==reference.blood);break;
         case K::currency:assert(view.resolveLocal<K::currency>(local)==reference.currency);break;
+        case K::ditherAbove:assert(view.resolveLocal<K::ditherAbove>(local)==reference.ditherAbove);break;
     }
 }
 static void checkCollisionViewMembership(const GameplayWorld& world){
     const GameplayCollisionView view(world);
-    for(unsigned family=0;family<=unsigned(GameplayCollisionView::Kind::currency);++family)
+    for(unsigned family=0;family<=unsigned(GameplayCollisionView::Kind::ditherAbove);++family)
         for(auto local:{InstanceHandle{0,0},InstanceHandle{0xffffffffu,1},InstanceHandle{GameplayCollisionView::capacity,1}})
             checkTypedCollisionView(view,GameplayCollisionView::Kind(family),local);
     for(unsigned slot=0;slot<=GameplayCollisionView::capacity;++slot){
@@ -2190,6 +2191,39 @@ int main(){
         }
     }
     auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
+    for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+        GameplayCollisionOwner::Ownership::nativeScenery})for(bool low:{false,true}){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
+            GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&rooms,ownership);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain(),&rooms);
+        assert(owner->attach(*world)&&world->createAuthoredDitherAbove());
+        world->configureDitherAboveEnvironment(low,false);
+        const auto key=world->ditherAbove()->handle();InstanceHandle shared;
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::ditherAbove,key,shared));
+        assert(world->ditherAbove()->find(key)->sourceId==100854);
+        for(unsigned tick=0;tick<40;++tick){
+            const auto* r=world->ditherAbove()->find(key);assert(r);
+            int y;assert(r->y.roundPixel(y));
+            if(world->cameraOffsetY()+176-y>=(low?208:272))y+=16;
+            world->step(0);assert(world->effectsSucceeded()&&owner->valid());
+            r=world->ditherAbove()->find(key);assert(r);
+            int actual;assert(r->y.roundPixel(actual)&&actual==y&&r->x.bits==0x43700000u);
+            GameplayCollisionView::Record record;
+            assert(GameplayCollisionView(*world).resolve(shared,record)&&record.ditherAbove==r);
+            if(ownership==GameplayCollisionOwner::Ownership::reference)
+                assert(owner->state(shared)->x.bits==r->x.bits&&owner->state(shared)->y.bits==r->y.bits);
+        }
+        world->configureDitherAboveEnvironment(low,true);
+        world->step(0);assert(world->effectsSucceeded());
+        assert(owner->prepareDraw()&&!world->ditherAbove()->find(key));
+        assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)==ResultsDestination::gameplay);
+        assert(world->createAuthoredDitherAbove()&&world->ditherAbove()->handle().generation>key.generation&&
+            !world->ditherAbove()->find(key));
+        const auto replacement=world->ditherAbove()->handle();
+        assert(!world->createAuthoredDitherAbove()&&!world->effectsSucceeded()&&
+            world->ditherAbove()->find(replacement)->sourceId==100854);
+    }
     {
         auto layers=std::make_unique<GameplayRoomLayers<8>>(&rooms);bool healthy=true;
         layers->observeFailure(healthy);assert(healthy&&layers->prepare());

@@ -23,6 +23,7 @@
 #include "core/GameplayGoalFields.h"
 #include "core/GameplayExitControllers.h"
 #include "core/GameplayEntryDithers.h"
+#include "core/GameplayDitherAbove.h"
 #include "core/DroneBulletInstances.h"
 #include "core/BoneProjectileInstances.h"
 #include "core/SkeletonInstances.h"
@@ -261,6 +262,27 @@ public:
     const downwell::GameplayDebrisInstances* debrisInstances()const{return debrisInstances_;}
     const downwell::NativeTimeChangeRegistration* timeChangeInstances()const{return timeChangeInstances_;}
     const downwell::GameplayEntryDithers* entryDithers()const{return entryDithers_;}
+    const downwell::GameplayDitherAbove* ditherAbove()const{return ditherAbove_;}
+    void configureDitherAboveEnvironment(bool lowSpec,bool ending){ditherLowSpec_=lowSpec;ditherEnding_=ending;}
+    bool bindDitherAbove(downwell::GameplayDitherAbove& actor){
+        if(ditherAbove_||!actor.valid()||actor.handle().generation)return false;
+        ditherAbove_=&actor;return true;
+    }
+    // Explicit authored-room admission until the complete controller Create,
+    // Draw and collision stream is connected; never allocate a synthetic ID.
+    bool createAuthoredDitherAbove(){
+        if(!run_.effectsSucceeded||!entryRooms_||!ditherAbove_)return run_.effectsSucceeded=false;
+        downwell::PackedRoom room;downwell::PackedRoomInstance source{};bool found=false;
+        if(!entryRooms_->findRoom(11,room))return run_.effectsSucceeded=false;
+        for(unsigned i=0;i<room.instanceCount;++i){
+            downwell::PackedRoomInstance r;
+            if(!entryRooms_->roomInstance(room,i,r))return run_.effectsSucceeded=false;
+            if(r.objectId!=61)continue;
+            if(found)return run_.effectsSucceeded=false;
+            found=true;source=r;
+        }
+        return run_.effectsSucceeded=found&&ditherAbove_->create(source.instanceId,source.x,source.y);
+    }
     using DroneBullets=downwell::DroneBulletInstances<32>;
     static constexpr unsigned droneBulletCapacity=32;
     const DroneBullets* droneBullets()const{return droneBullets_;}
@@ -1374,6 +1396,8 @@ private:
     downwell::GameplayDebrisInstances* debrisInstances_=nullptr;
     downwell::NativeTimeChangeRegistration* timeChangeInstances_=nullptr;
     downwell::GameplayEntryDithers* entryDithers_=nullptr;
+    downwell::GameplayDitherAbove* ditherAbove_=nullptr;
+    bool ditherLowSpec_=false,ditherEnding_=false;
     DroneBullets* droneBullets_=nullptr;
     Bones* bones_=nullptr;
     Skeletons* skeletons_=nullptr;

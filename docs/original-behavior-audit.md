@@ -120,8 +120,18 @@ defers retirement to ordinary frame cleanup. Other collision families remain
 on the existing gameplay adapters; this migration pass must be replaced, not
 run again alongside a complete dispatcher. A collected-pair scheduler fixture
 also dispatches wall contacts alongside shards; neither fixture verifies the
-original runner's simultaneous-contact order. Native controller integration
-remains unimplemented.
+original runner's simultaneous-contact order.
+
+The native `GameplayDitherAbove` store is separate from `GameplayEntryDithers`:
+one authored room controller, with source ID 100854 and a distinct lifetime
+generation. Its explicit admission reads the room record instead of consuming
+the dynamic ID stream. All native owner modes retain its object/layer lifetime;
+the reference owner also publishes collision geometry. Once admitted, the
+ordinary Begin Step executes the shared script against the previous published
+camera position; ending marks it for the owner cleanup boundary, and Retry
+invalidates the old handle without restarting its generation counter.
+Automatic authored-order admission, Draw projection and native wall contacts
+are not enabled yet. The store is not a substitute for those integrations.
 Neither registering an inert native record nor relying on generic
 out-of-view terrain retirement reproduces this source lifecycle. Integration
 must preserve the wall's destruction mark and the subsequent phase's retirement,

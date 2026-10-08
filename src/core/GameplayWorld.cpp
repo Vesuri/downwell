@@ -36,6 +36,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     if (destination == downwell::ResultsDestination::none) return destination;
     if(!clearRoomTimeChanges())return downwell::ResultsDestination::none;
     if(entryDithers_&&!entryDithers_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
+    if(ditherAbove_&&!ditherAbove_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(droneBullets_&&!droneBullets_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(bones_&&!bones_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(skeletons_&&!skeletons_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
@@ -55,6 +56,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto debrisInstances=debrisInstances_;
     const auto timeChangeInstances=timeChangeInstances_;
     const auto entryDithers=entryDithers_;
+    const auto ditherAbove=ditherAbove_;
     const auto droneBullets=droneBullets_;
     const auto bones=bones_;
     const auto skeletons=skeletons_;
@@ -108,6 +110,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     debrisInstances_=debrisInstances;
     timeChangeInstances_=timeChangeInstances;
     entryDithers_=entryDithers;
+    ditherAbove_=ditherAbove;
     droneBullets_=droneBullets;
     bones_=bones;
     skeletons_=skeletons;
@@ -182,6 +185,7 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
         run_.stage.area != 1 || run_.stage.level >= 3) return false;
     if(!clearRoomTimeChanges())return false;
     if(entryDithers_&&!entryDithers_->clear())return run_.effectsSucceeded=false;
+    if(ditherAbove_&&!ditherAbove_->clear())return run_.effectsSucceeded=false;
     if(droneBullets_&&!droneBullets_->clear())return run_.effectsSucceeded=false;
     if(bones_&&!bones_->clear())return run_.effectsSucceeded=false;
     if(skeletons_&&!skeletons_->clear())return run_.effectsSucceeded=false;
@@ -1140,6 +1144,10 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     // Alarms follow Begin Step movement, before builder Step/Create events.
     // Runner 0x50dc89 reconciles pending room membership after the complete
     // Begin Step dispatcher, not after each individual activation request.
+    if(ditherAbove_&&!ditherAbove_->beginStep(
+        [&](downwell::MotionBinary64& x){x=downwell::MotionBinary64::fromInteger(cameraMotion_.pixelX());return true;},
+        [&](downwell::MotionBinary64& y){y=downwell::MotionBinary64::fromInteger(cameraMotion_.pixelY());return true;},
+        ditherLowSpec_,ditherEnding_)){run_.effectsSucceeded=false;return {};}
     if(!reconcilePhase(PhaseBoundary::beginStep))return {};
     const auto damageNumberAlarmPhase=run_.damageNumbers.beginPhase();
     // Object 221 Alarm 0 only destroys itself: no RNG or cross-family effects.

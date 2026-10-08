@@ -362,6 +362,7 @@ private:
             if constexpr(Kind==View::Kind::debris)return 370;
             if constexpr(Kind==View::Kind::timeChange)return 211;
             if constexpr(Kind==View::Kind::entryDither)return 73;
+            if constexpr(Kind==View::Kind::ditherAbove)return 61;
             if constexpr(Kind==View::Kind::drone)return 266;
             if constexpr(Kind==View::Kind::bone)return 269;
             if constexpr(Kind==View::Kind::skeleton)return 120;
@@ -409,7 +410,7 @@ private:
             }else if constexpr(Kind==View::Kind::debris){
                 if(!r.effect)return parent.check(false);
                 state.x=r.effect->x;state.y=r.effect->y;
-            }else if constexpr(Kind==View::Kind::timeChange||Kind==View::Kind::entryDither||Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency){
+            }else if constexpr(Kind==View::Kind::timeChange||Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency){
                 state.x=r.x;state.y=r.y;
             }else{
                 if(r.x>0x7fffffff-ox||r.y>0x7fffffff-oy)return parent.check(false);
@@ -459,7 +460,7 @@ private:
             if constexpr(Kind==View::Kind::terrain)sourceId=r.sourceInstanceId;
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
             if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
-            if constexpr(Kind==View::Kind::entryDither||Kind==View::Kind::goalField)sourceId=r.sourceId;
+            if constexpr(Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::goalField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency)sourceId=r.sourceId;
             constexpr bool projected=Kind==View::Kind::player||Kind==View::Kind::enemy||
                 Kind==View::Kind::bullet||Kind==View::Kind::scriptEffect||Kind==View::Kind::debris||Kind==View::Kind::entryDither||Kind==View::Kind::bone||Kind==View::Kind::skeleton;
@@ -520,7 +521,7 @@ private:
             unsigned sourceId=0;
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
             if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
-            if constexpr(Kind==View::Kind::entryDither||Kind==View::Kind::goalField)sourceId=r.sourceId;
+            if constexpr(Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::goalField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency)sourceId=r.sourceId;
             constexpr bool projected=Kind==View::Kind::player||Kind==View::Kind::enemy||
                 Kind==View::Kind::bullet||Kind==View::Kind::scriptEffect||Kind==View::Kind::debris||Kind==View::Kind::entryDither||Kind==View::Kind::bone||Kind==View::Kind::skeleton;
@@ -671,6 +672,8 @@ private:
     NativeTimeChangeRegistration timeChanges_{*this};
     Binding<GameplayEntryDithers::Record,View::Kind::entryDither> entryBinding_{*this};
     GameplayEntryDithers entries_{GameplayEntryDithers::Binding::bindDestruction(entryBinding_)};
+    Binding<GameplayDitherAbove::Record,View::Kind::ditherAbove> aboveBinding_{*this};
+    GameplayDitherAbove above_{GameplayDitherAbove::Binding::bindDestruction(aboveBinding_)};
     Binding<GameplayWorld::DroneBullets::Record,View::Kind::drone> droneBinding_{*this};
     GameplayWorld::DroneBullets drones_{GameplayWorld::DroneBullets::Binding::bindPositionedActor(droneBinding_)};
     Binding<GameplayWorld::Bones::Record,View::Kind::bone> boneBinding_{*this};
@@ -787,6 +790,7 @@ public:
         if(!world_&&!world.bindDebrisInstances(debris_))return check(false);
         if(!world_&&!world.bindTimeChangeInstances(timeChanges_))return check(false);
         if(!world_&&!world.bindEntryDithers(entries_))return check(false);
+        if(!world_&&!world.bindDitherAbove(above_))return check(false);
         if(!world_&&!world.bindDroneBullets(drones_))return check(false);
         if(!world_&&!world.bindBones(bones_))return check(false);
         if(!world_&&!world.bindSkeletons(skeletons_))return check(false);
@@ -1112,7 +1116,7 @@ public:
         world.configureCurrencyStepOrder([](void* context,GameplayWorld::CurrencyStepOrder& phase){
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
             if(!self.valid())return false;
-            return self.check(self.visitRegistered(View::currencyBase,View::capacity,
+            return self.check(self.visitRegistered(View::currencyBase,View::ditherAboveBase,
                 [&](InstanceHandle shared,int object,std::uint32_t flags){
                     if(flags&0x100003u)return true;
                     View::Kind kind;InstanceHandle local;
@@ -1870,6 +1874,7 @@ private:
                 case View::Kind::debris:return record.debris&&world_->retireDebrisRoomEffect(local);
                 case View::Kind::timeChange:return record.timeChange&&world_->retireTimeChangeRoomEffect(local);
                 case View::Kind::entryDither:return record.entryDither&&entries_.retire(local);
+                case View::Kind::ditherAbove:return record.ditherAbove&&above_.retireMarked(local);
                 case View::Kind::drone:return record.drone&&drones_.retire(local);
                 case View::Kind::bone:return record.bone&&bones_.retire(local);
                 case View::Kind::skeleton:return record.skeleton&&skeletons_.retire(local);
