@@ -321,9 +321,13 @@ public:
     struct NoCollisionPass {bool operator()()const{return true;}};
     enum class DronePhase {animation,alarm,step,endStep};
     enum class BonePhase {animation,step,cleanup};
-    template<unsigned Capacity,class Execute,class Collisions=NoCollisionPass>
-    bool stepWithBones(StoredBoneRegistration<instanceCapacity,Capacity>& registration,
-        const Input& input,Execute execute,bool advancePressed=false,Collisions collisions={}){
+    // Install one bone owner around a single caller-supplied tick. This allows
+    // the time-stop and bone families to share the same animation/Begin Step/
+    // ordinary Step/collision pass instead of advancing separate world ticks.
+    template<unsigned Capacity,class Execute,class Tick>
+    bool withBoneEvents(StoredBoneRegistration<instanceCapacity,Capacity>& registration,
+        Execute execute,Tick tick){
+        if(!run_.effectsSucceeded)return false;
         if(boneDispatch_||!registration.belongsTo(instances_)||!registration.valid())return run_.effectsSucceeded=false;
         auto dispatch=[&](const InstanceRecord& record,BonePhase phase){
             const auto key=registration.handle(record);
@@ -331,16 +335,23 @@ public:
             if(phase==BonePhase::animation)return registration.advanceAnimation(key);
             if(phase==BonePhase::cleanup)return registration.retire(key);
             return registration.dispatch(key,[&](auto& state,auto& publisher,bool& good){
-                return execute(state,publisher,random_,good);
+                return execute(key,state,publisher,random_,good);
             });
         };
         boneContext_=&dispatch;
         boneDispatch_=[](void* context,const InstanceRecord& record,BonePhase phase){
             return (*static_cast<decltype(dispatch)*>(context))(record,phase);
         };
-        const bool ok=stepWithCollisionPass(input,advancePressed,collisions);
+        const bool ok=tick();
         boneDispatch_=nullptr;boneContext_=nullptr;
-        return run_.effectsSucceeded=ok&&registration.valid();
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok&&registration.valid();
+    }
+    template<unsigned Capacity,class Execute,class Collisions=NoCollisionPass>
+    bool stepWithBones(StoredBoneRegistration<instanceCapacity,Capacity>& registration,
+        const Input& input,Execute execute,bool advancePressed=false,Collisions collisions={}){
+        return withBoneEvents(registration,[&](InstanceHandle,auto& state,auto& publisher,auto& random,bool& good){
+            return execute(state,publisher,random,good);
+        },[&]{return stepWithCollisionPass(input,advancePressed,collisions);});
     }
     // Scoped dispatch joins the actual room phases. The event adapter must
     // supply Step behavior; main-room End Step uses the phase-published view.
@@ -503,6 +514,30 @@ public:
         const bool ok=stepWithCollisionPass(input,advancePressed,collisions);
         timeEffectDispatch_=nullptr;timeEffectContext_=nullptr;
         return ok;
+    }
+    // Source bone Step reads the same pTimeStop state just written by player
+    // Begin Step. Transition remains an explicit source player/audio adapter;
+    // this does not infer that global from goalStop or shop control locks.
+    template<unsigned Bones,unsigned Capacity,unsigned Registered,unsigned Changes,class Frames,
+        class Transition,class Collisions=NoCollisionPass>
+    bool stepWithTimeStopAndBones(StoredBoneRegistration<instanceCapacity,Bones>& bones,
+        StoredTimeShardRegistration<instanceCapacity,Registered>& shards,
+        StoredTimeChangeRegistration<instanceCapacity,Changes>& changes,TimeStopEffects<Capacity>& stop,
+        const Input& input,Frames frames,Transition transition,Collisions collisions={}){
+        return withBoneEvents(bones,[&](InstanceHandle key,auto& state,auto& publisher,auto&,bool& good){
+            auto impact=[&](){return spawnBoneImpact(bones,key,frames);};
+            auto view=[&](bool& visible){return boneInView(bones,key,visible);};
+            struct Ops {
+                decltype(publisher) publish;decltype(impact)& spawn;decltype(view)& query;
+                bool imageSpeed(RunnerImageValue value){return publish.imageSpeed(value);}
+                bool position(RunnerImageValue x,RunnerImageValue y){return publish.position(x,y);}
+                bool mask(int id){return publish.mask(id);}
+                bool destroy(){return publish.destroy();}
+                bool effect(int sprite,int tenths){return sprite==85&&tenths==3&&spawn();}
+                bool inView(int,int,bool& visible){return query(visible);}
+            } ops{publisher,impact,view};
+            return state.stepPublished(stop.player.stopped,ops,good);
+        },[&]{return stepWithTimeStopEffects(shards,changes,stop,input,false,transition,collisions);});
     }
     // Explicit Begin Step boundary; the scheduler supplies synchronous audio,
     // shake, pause and oxygen effects. Registrations must

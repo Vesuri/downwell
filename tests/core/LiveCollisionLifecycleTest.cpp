@@ -1418,6 +1418,89 @@ int main(){
         require(!step()&&world->randomDrawCount()==failedDraws+24&&world->nextRuntimeInstanceId()==failedId+4,
             "failed transition cannot restart through a later Begin Step");
     }
+    for(bool rejectPause:{false,true}){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach combined bone/time-stop world");world->skipToGameForTesting();
+        world->registerLevelExit(176);
+        TimeStopEffects<16> stop;
+        auto shards=world->timeShardRegistration<16>();auto changes=world->timeChangeRegistration<8>();
+        auto bones=world->boneRegistration<2>();InstanceHandle bone;
+        require(stop.shards.bindPhases(shards)&&stop.changes.bind(changes)&&world->spawnBone(bones,240,200,bone),
+            "bind all families before the combined tick");
+        BoneProjectile expected=bones.instances().find(bone)->state;
+        const auto boneId=bones.instances().find(bone)->sourceId;
+        TimeStopEffects<16>::PlayerPose pose{{0x43700000u},{0x43300000u},{},{},
+            RunnerImageValue{0x43704000u}.promoted(),RunnerImageValue{0x43308000u}.promoted()};
+        unsigned begins=0,collisions=0,pauses=0;std::uint32_t transitionId=0;
+        auto transition=[&](const auto&,const auto&,int,int){
+            ++begins;
+            return world->beginTimeStop(shards,changes,stop,pose,false,[](auto){return true;},
+                [&](PlayerTimeStop::Effect effect){
+                    if(effect==PlayerTimeStop::Effect::change){
+                        ++pauses;transitionId=world->nextRuntimeInstanceId()-1;
+                        const auto* child=world->instance(transitionId);
+                        require(child&&child->objectId==211&&child->alarms.get(1)==2&&stop.roomSpeed==30,
+                            "time-change Create is synchronous before pause and bone Step");
+                        return !rejectPause;
+                    }
+                    return true;
+                });
+        };
+        auto frames=[&](int sprite,unsigned& count){return sprites.frameCount(sprite,count);};
+        auto step=[&](){return world->stepWithTimeStopAndBones(bones,shards,changes,stop,Input{},frames,transition,[&]{
+            ++collisions;
+            const auto* actual=bones.instances().find(bone);
+            require(actual&&begins==collisions&&actual->state.imageSpeed.bits==expected.imageSpeed.bits&&
+                actual->state.timeline.bits==expected.timeline.bits&&actual->state.motion.x==expected.motion.x&&
+                actual->state.motion.y==expected.motion.y&&actual->state.destroyRequested==expected.destroyRequested,
+                "collision boundary sees bone Step under this tick's player time-stop state");
+            return true;
+        });};
+        struct Events {void destroy(){}void effect(int,int){}} events;
+        const auto advanceReference=[&](bool stopped){bool crossed;
+            require(expected.advanceImage(crossed)&&expected.step(stopped,[](int,int){return true;},events),
+                "advance the retained source bone event oracle");
+        };
+        advanceReference(true);
+        const auto before=world->randomDrawCount();
+        const bool entered=step();
+        if(rejectPause){
+            require(!entered&&!world->effectsSucceeded()&&begins==1&&!collisions&&pauses==1&&
+                stop.player.stopped&&stop.shards.size()==3&&world->randomDrawCount()==before+24&&
+                world->instance(transitionId)&&bones.instances().find(bone)->state.imageSpeed.bits==0x3f800000u,
+                "failed pause retains prior animation and first burst but prevents bone Step and collision");
+            const auto draws=world->randomDrawCount();const auto id=world->nextRuntimeInstanceId();
+            require(!step()&&begins==1&&world->randomDrawCount()==draws&&world->nextRuntimeInstanceId()==id,
+                "failed combined tick cannot replay the transition prefix");
+            continue;
+        }
+        require(entered&&stop.player.stopped&&stop.shards.size()==6&&pauses==1&&begins==1&&collisions==1&&
+            world->instance(boneId)&&bones.instances().find(bone)->state.motion.y==200,
+            "one tick enters the field and freezes bone motion without an extra world step");
+        require(bones.dispatch(bone,[](auto& state,auto&,bool&){state.health=0;return true;}),"damage the paused bone");
+        expected.health=0;advanceReference(true);
+        require(step()&&begins==2&&collisions==2&&pauses==1&&world->instance(boneId),
+            "held time stop defers bone health destruction");
+        pose.y={0x447a0000u};pose.yy=RunnerImageValue{0x447a2000u}.promoted();
+        advanceReference(false);
+        require(step()&&begins==3&&collisions==3&&pauses==2&&!stop.player.stopped&&!world->instance(boneId)&&
+            !bones.instances().find(bone)&&world->scriptEffects().size()==1&&
+            world->scriptEffects().atNewest(0)->spriteId==85,
+            "exit transition resumes bone Step, publishes the real impact and retires its caller");
+        require(stop.reset(),"retire transition families before their bridges leave scope");
+    }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach bone scope recursion world");world->skipToGameForTesting();
+        auto bones=world->boneRegistration<1>();unsigned ticks=0;
+        auto execute=[](InstanceHandle,auto&,auto&,auto&,bool&){return true;};
+        require(!world->withBoneEvents(bones,execute,[&]{
+            require(!world->withBoneEvents(bones,execute,[&]{++ticks;return true;}),"reject nested bone scope");
+            return true; // Ignoring the inner error cannot revive the world.
+        })&&!world->effectsSucceeded()&&!ticks,"bone scope preserves terminal nested failure");
+    }
     for(int inset:{0,1}){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());

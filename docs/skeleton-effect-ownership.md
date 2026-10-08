@@ -51,6 +51,19 @@ automatic skeleton throwing or native admission. The bridge must be cleared
 before room teardown. Capacity failure is a terminal port error before another
 ID or Create RNG word is consumed, not a claim about Windows allocation failure.
 
+`withBoneEvents` scopes the stored bone dispatch around one caller-supplied tick;
+`stepWithTimeStopAndBones` composes it with the registered time-effect scheduler.
+Bone Step reads `TimeStopEffects::player.stopped` after that tick's player Begin
+Step transition, not a sampled prior-frame boolean. Animation still precedes
+the transition, so entry can advance one final frame before image speed becomes
+zero; an exit resumes motion immediately but animation uses the earlier zero
+speed. Paused health destruction is deferred until the first unstopped Step.
+The impact/view adapters are the real world owners, and cleanup follows the
+collision boundary. Nested scopes fail without running another tick or clearing
+the outer failure latch. The source pose/audio/transition callback is still
+supplied explicitly; this does not enable natural player transitions or fill
+the missing native numeric-ID/scheduler dependencies.
+
 The native `GameplayCollisionOwner` also binds the shared store as its own
 object-269 family. Its disjoint slot range does not overlap drone bullets;
 room animation and pre-Draw destruction cleanup resolve the same generation.
