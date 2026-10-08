@@ -100,6 +100,7 @@ public:
     typedef bool (*SolidResolver)(void* context, int x, int y);
     typedef bool (*SegmentResolver)(void* context, const downwell::ProjectileSegment& path);
     using WallContactResolver = bool (*)(void*,const downwell::ContactBounds&,unsigned&);
+    using PlatformContactResolver = bool (*)(void*,const downwell::ContactBounds&,bool&);
     // Called once after existing alarms and camera Step, before bullets and
     // enemy motion. Receives the shared RNG and ceil(world-space view bottom).
     // A false return stops this frame and future steps until explicitly rebound;
@@ -290,6 +291,15 @@ public:
         if(!wallContactResolver_(solidResolverContext_,bounds,count))return run_.effectsSucceeded=false;
         bool found=count!=0;
         if(!run_.shops.visitWallContacts(bounds,[&](){found=true;return true;}))return run_.effectsSucceeded=false;
+        hit=found;return true;
+    }
+    bool currencyPlatformMeeting(downwell::InstanceHandle key,downwell::MotionBinary64 x,
+        downwell::MotionBinary64 y,bool& hit){
+        const auto* r=currencyInstances_?currencyInstances_->find(key):nullptr;
+        downwell::ContactBounds bounds;bool found=false;
+        if(!run_.effectsSucceeded||!r||!platformContactResolver_||
+            !downwell::CurrencyCollisionBounds::calculate(r->maskId<0?r->spriteId:r->maskId,x,y,bounds)||
+            !platformContactResolver_(solidResolverContext_,bounds,found))return run_.effectsSucceeded=false;
         hit=found;return true;
     }
     template<class Queries,class Math,class View,class Audio>
@@ -820,11 +830,13 @@ public:
         const downwell::BreakableState* creation=nullptr);
     bool appendGeneratedBreakable(int x,int y,const downwell::GeneratedBreakableCreate& creation);
     void configureSolidResolver(SolidResolver resolver, void* context, SegmentResolver segment = nullptr,
-                                SolidResolver mask = nullptr,WallContactResolver walls = nullptr) {
+                                SolidResolver mask = nullptr,WallContactResolver walls = nullptr,
+                                PlatformContactResolver platforms = nullptr) {
         solidResolver_ = resolver;
         segmentResolver_ = segment;
         maskResolver_ = mask;
         wallContactResolver_ = walls;
+        platformContactResolver_ = platforms;
         solidResolverContext_ = context;
         player_.configureSolidResolver(resolver ? [](void* opaque, int x, int y) {
             const auto& runtime = *static_cast<GameplayWorld*>(opaque);
@@ -1286,6 +1298,7 @@ private:
     SegmentResolver segmentResolver_ = nullptr;
     SolidResolver maskResolver_ = nullptr;
     WallContactResolver wallContactResolver_ = nullptr;
+    PlatformContactResolver platformContactResolver_ = nullptr;
     void* solidResolverContext_;
     PlayerMotion::LandingResolver landingResolver_ = nullptr;
     void* landingResolverContext_ = nullptr;

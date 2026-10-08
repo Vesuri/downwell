@@ -44,6 +44,11 @@ for code, number, value in ((676, 1, -1), (677, 2, 1), (678, 3, -1)):
     assert manifest["resources"]["code"][code]["name"] == name
     assert instructions(name) == [f"pushi.e {value}", "pop.v.i self.isPillar"]
 thin = instructions("gml_Object_objThinPlatform_Create_0")
+platform = manifest["resources"]["objects"][93]
+assert platform["parentId"] == 87 and platform["textureMaskId"] == 49
+mask = manifest["resources"]["sprites"][49]
+assert mask["separateMasks"] == "AxisAlignedRect"
+assert tuple(mask[k] for k in ("originX", "originY", "marginLeft", "marginTop", "marginRight", "marginBottom")) == (12, 12, 4, 4, 19, 5)
 assert thin == ['push.s "thin"@775', "pop.v.s self.material",
                 "pushglb.v global.wallTile", "pop.v.v self.sprite_index",
                 "pushi.e 23", "pop.v.i self.image_index", "pushi.e 0", "pop.v.i self.image_speed"]

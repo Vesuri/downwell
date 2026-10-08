@@ -149,6 +149,7 @@ void verifyContactMultiplicity() {
     runtime.configureBreakables(boxX,boxY,3);
     std::mt19937 random(5);
     bool overflowed=false;
+    std::vector<std::pair<int,int>> platforms;
     auto position=[&](int& x,int& y){x=-512+16*int(random()%5)+(random()%4?720:0);y=16*int(random()%4)+(random()%8?160:0);};
     for(unsigned step=0;step<20000;++step){
         int x,y;position(x,y);
@@ -163,6 +164,7 @@ void verifyContactMultiplicity() {
             require(amigaAddTerrainObject(index,293,x,y)&&reference.append(293,x,y),"object 293 birth");
         }else if(op<walls+30){
             require(amigaAddTerrainObject(index,93,x,y),"platforms have no contact");
+            platforms.emplace_back(x,y);
         }else if(op<800){
             require(amigaRemoveTerrainWall(index,x,y)==reference.removeOne(60,x,y),"wall removal agrees");
             require(amigaIndexedWall(index,x,y)==reference.contains(60,x,y),"wall occupancy follows multiplicity");
@@ -186,6 +188,10 @@ void verifyContactMultiplicity() {
                     return object!=92||!context.runtime||context.runtime->breakableActiveAt(bx-240,by-176);
                 },[&]{++expected;return true;})&&amigaResolveTerrainWallContacts(&context,gem,actual)&&actual==expected,
                     "currency queries retain coincident walls and box retirement");
+                bool expectedPlatform=false,actualPlatform=false;
+                for(auto p:platforms)expectedPlatform|=downwell::contactBoundsOverlap(gem,{p.first-8,p.first+8,p.second-8,p.second-6});
+                require(amigaResolveTerrainPlatformContact(&context,gem,actualPlatform)&&actualPlatform==expectedPlatform,
+                    "fractional currency contacts use the thin platform mask, retaining shared wall cells");
             }
         }
         for(int object:{60,92,293})

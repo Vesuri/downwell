@@ -2012,7 +2012,7 @@ __attribute__((noinline)) static int runDownwell(void) {
         port.configureLandingResolver(amigaResolveTerrainLanding,
                                       &terrainCollision);
         port.configureSolidResolver(amigaResolveTerrainSolid,
-                                    &terrainCollision, amigaResolveTerrainSegment, amigaResolveTerrainPlayerMask,amigaResolveTerrainWallContacts);
+                                    &terrainCollision, amigaResolveTerrainSegment, amigaResolveTerrainPlayerMask,amigaResolveTerrainWallContacts,amigaResolveTerrainPlatformContact);
         liveBuilder.resetInitialCheckpointBeforeEntrance(enemyRandom);
 #ifdef DOWNWELL_PROFILE_OVERFLOW
         if(!amigaOverflowProfileEntry(liveBuilder,enemyRandom)){
@@ -2689,7 +2689,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                         port.configureGenerationStep(generateLiveTerrain, &liveGeneration);
                         port.configureLandingResolver(amigaResolveTerrainLanding, &terrainCollision);
                         port.configureSolidResolver(amigaResolveTerrainSolid, &terrainCollision,
-                            amigaResolveTerrainSegment, amigaResolveTerrainPlayerMask,amigaResolveTerrainWallContacts);
+                            amigaResolveTerrainSegment, amigaResolveTerrainPlayerMask,amigaResolveTerrainWallContacts,amigaResolveTerrainPlatformContact);
                         terrainRaster.ready = false;
                         wallDamage.clear();
                         terrainCopyTarget = nullptr;

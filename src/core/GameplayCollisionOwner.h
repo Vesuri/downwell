@@ -1525,6 +1525,14 @@ public:
         if(native_)return check(world_->currencyWallMeeting(local,x,y,hit));
         return masks.valid()&&registeredPlaceMeeting(self,57,x,y,masks,hit);
     }
+    // Generated thin platforms only. Parent 87 also contains other objects;
+    // callers must not use this as a complete parent-family selector.
+    bool currencyPlatformMeeting(InstanceHandle local,MotionBinary64 x,MotionBinary64 y,const SpriteMaskPack& masks,bool& hit){
+        InstanceHandle self;
+        if(!valid()||!world_||!View::encode(View::Kind::currency,local,self)||!resolves(self))return check(false);
+        if(native_)return check(world_->currencyPlatformMeeting(local,x,y,hit));
+        return masks.valid()&&registeredPlaceMeeting(self,93,x,y,masks,hit);
+    }
     // Indexed collision adapter for the registered currency owner. Native
     // selectors remain unavailable: reject before executing any Step/RNG prefix.
     template<class Math,class ViewTop,class Audio>

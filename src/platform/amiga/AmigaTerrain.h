@@ -245,5 +245,7 @@ bool amigaResolveTerrainSolid(void* opaque, int offsetX, int offsetY);
 bool amigaResolveTerrainPlayerMask(void* opaque, int offsetX, int offsetY);
 bool amigaResolveTerrainSegment(void* opaque, const downwell::ProjectileSegment& path);
 bool amigaResolveTerrainWallContacts(void* opaque,const downwell::ContactBounds& query,unsigned& count);
+// Object 93 only, not every member of parentThinwall (87).
+bool amigaResolveTerrainPlatformContact(void* opaque,const downwell::ContactBounds& query,bool& hit);
 
 #endif

@@ -219,7 +219,7 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
     for (unsigned i = 0; i < gemCapacity; ++i) gems_[i].active = false;
     generationStep_ = nullptr; generationContext_ = nullptr;
     generationSucceeded_ = true;
-    solidResolver_ = nullptr; solidResolverContext_ = nullptr; wallContactResolver_ = nullptr;
+    solidResolver_ = nullptr; solidResolverContext_ = nullptr; wallContactResolver_ = nullptr; platformContactResolver_ = nullptr;
     segmentResolver_ = nullptr;
     maskResolver_ = nullptr;
     landingResolver_ = nullptr; landingResolverContext_ = nullptr;
@@ -996,7 +996,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     }
     DW_PROFILE_PHASE(profilePlayer);
     // Wrappers own a runtime pointer; rebind after any host-side runtime copy.
-    if (solidResolver_) configureSolidResolver(solidResolver_, solidResolverContext_, segmentResolver_, maskResolver_,wallContactResolver_);
+    if (solidResolver_) configureSolidResolver(solidResolver_, solidResolverContext_, segmentResolver_, maskResolver_,wallContactResolver_,platformContactResolver_);
     if (landingResolver_) configureLandingResolver(landingResolver_, landingResolverContext_);
     // camera_get_view_y reads the runner's published cache, not camMain.y.
     // Normal following refreshes before Draw; post-Step refresh is dirty-only.

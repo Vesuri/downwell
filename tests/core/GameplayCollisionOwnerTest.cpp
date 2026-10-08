@@ -2943,6 +2943,7 @@ int main(){
     }
     std::vector<bool> currencyContacts;
     std::vector<bool> currencyWallContacts;
+    std::vector<bool> currencyPlatformContacts;
     for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
                        GameplayCollisionOwner::Ownership::nativeScenery}){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
@@ -2958,12 +2959,16 @@ int main(){
         TerrainWallContacts<16> walls;
         for(int x:{224,240,256}){
             assert(world->createGeneratedInstance({60,x,640},objects,[](const auto&){return true;})&&walls.append(60,x,640));
+            assert(world->createGeneratedInstance({93,x,640},objects,[](const auto&){return true;}));
         }
         world->configureSolidResolver(nullptr,&walls,nullptr,nullptr,[](void* context,const ContactBounds& bounds,unsigned& count){
             count=0;return static_cast<TerrainWallContacts<16>*>(context)->visit(bounds,
                 [](int,int,int){return true;},[&](){++count;return true;});
+        },[](void*,const ContactBounds& bounds,bool& hit){
+            hit=false;for(int x:{224,240,256})hit|=contactBoundsOverlap(bounds,{x-8,x+8,632,634});return true;
         });
         std::vector<bool> wallHits;
+        std::vector<bool> platformHits;
         for(int size:{0,1}){
             InstanceHandle key;assert(world->createCurrencyWithSourceId(804900+size,
                 MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(600),queries,key));
@@ -2974,11 +2979,14 @@ int main(){
                 const MotionBinary64 fractions[]={{},{0x3fd00000u,0},{0x3fe00000u,0},{0x3fe80000u,0}};
                 assert(x.add(fractions[quarter])&&y.add(fractions[quarter]));bool hit=false;
                 assert(owner->currencyWallMeeting(key,x,y,masks,hit));wallHits.push_back(hit);
+                assert(owner->currencyPlatformMeeting(key,x,y,masks,hit));platformHits.push_back(hit);
             }
             assert(owner->currency().clear());
         }
         if(ownership==GameplayCollisionOwner::Ownership::reference)currencyWallContacts=wallHits;
         else assert(wallHits==currencyWallContacts);
+        if(ownership==GameplayCollisionOwner::Ownership::reference)currencyPlatformContacts=platformHits;
+        else assert(platformHits==currencyPlatformContacts);
         std::vector<bool> contacts;unsigned id=805000;
         for(int size:{0,1})for(int cy:{192,512,1056})for(int dx=-136;dx<=136;dx+=4)for(int dy:{-25,-5,0,5,25}){
             auto x=MotionBinary64::fromInteger(240+dx),y=MotionBinary64::fromInteger(cy+dy);

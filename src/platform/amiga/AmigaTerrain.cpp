@@ -494,6 +494,29 @@ unsigned amigaTerrainContacts(const AmigaTerrainIndex& index, int objectId, int 
         (objectId == 60 ? flags / wallContactUnit : objectId == 92 ? (flags & breakableCell) != 0 : 0);
 }
 
+bool amigaResolveTerrainPlatformContact(void* opaque,const downwell::ContactBounds& query,bool& hit){
+    const auto& context=*static_cast<const AmigaTerrainCollisionContext*>(opaque);
+    if(!context.index||!context.index->wallContactsComplete)return false;
+    const auto& index=*context.index;
+    bool found=false;
+    if(query.left<query.right&&query.top<query.bottom&&query.right>-521&&
+        query.left<1546&&query.bottom>-8&&query.top<8201){
+        const int firstRow=query.top<=9?0:(query.top-9)/16;
+        const int lastRow=query.bottom>=8184?AmigaTerrainIndex::rows-1:(query.bottom+8)/16;
+        const int firstColumn=query.left<=-520?0:(query.left+504)/16;
+        int lastColumn=query.right>=1544?AmigaTerrainIndex::columns-1:(query.right+519)/16;
+        if(lastColumn>=AmigaTerrainIndex::columns)lastColumn=AmigaTerrainIndex::columns-1;
+        for(int row=firstRow;row<=lastRow&&row<AmigaTerrainIndex::rows&&!found;++row)
+            for(int column=firstColumn;column<=lastColumn;++column){
+                if(!(index.cells[row*AmigaTerrainIndex::columns+column]&platformCell))continue;
+                const int x=AmigaTerrainIndex::minX+column*16,y=row*16;
+                // sprThinPlatform mask 49: origin 12,12; margins 4,4..19,5.
+                if(downwell::contactBoundsOverlap(query,{x-8,x+8,y-8,y-6})){found=true;break;}
+            }
+    }
+    hit=found;return true;
+}
+
 unsigned amigaTerrainContactCount(const AmigaTerrainIndex& index) {
     unsigned count = index.extraContacts.size();
     for (unsigned flags : index.cells) count += flags / wallContactUnit + ((flags & breakableCell) != 0);
