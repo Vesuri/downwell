@@ -1031,6 +1031,7 @@ private:
     GameplayWorld::Currency currency_{GameplayWorld::Currency::Binding::bindPositionedActor(currencyBinding_)};
     std::uint32_t pendingTimeChangeId_=0;
     std::uint32_t pendingTimeShardId_=0;
+    const SpriteMaskPack* timeShardStepMasks_=nullptr; // Borrowed only during selected Step.
     const bool native_;
     const bool sceneryLayers_;
     const bool nativeBoxes_;
@@ -2063,6 +2064,22 @@ public:
     bool position(InstanceHandle key,const NativeTimeShardRegistration::Record& record,RunnerImageValue x,RunnerImageValue y){
         return timeShardBinding_.move(key,record,x,y);
     }
+    bool meeting(InstanceHandle key,const NativeTimeShardRegistration::Record& record,
+        MotionBinary64 x,MotionBinary64 y,bool& hit){
+        InstanceHandle shared;
+        if(!timeShardStepMasks_||!timeShardBinding_.key(key,record,shared))return check(false);
+        return registeredPlaceMeeting(shared,56,x,y,*timeShardStepMasks_,hit);
+    }
+    template<class Outside> bool stepTimeShard(InstanceHandle shared,bool stopped,
+        const SpriteMaskPack& masks,Outside outside){
+        View::Kind kind;InstanceHandle local;
+        if(!valid()||!world_||timeShardStepMasks_||!masks.valid()||!resolves(shared)||
+            !View::decode(shared,kind,local)||kind!=View::Kind::timeShard)return check(false);
+        timeShardStepMasks_=&masks;
+        const bool ok=world_->stepTimeShardRoomEffect(local,stopped,outside);
+        timeShardStepMasks_=nullptr;
+        return check(ok);
+    }
     bool animationMember(InstanceHandle key,const NativeTimeShardRegistration::Record& record,bool& eligible){
         InstanceHandle shared;
         if(!timeShardBinding_.key(key,record,shared))return check(false);
@@ -2160,6 +2177,17 @@ private:
                 });
     }
     template<class Visit> bool nativeQueryMembers(int object,Visit visit){
+        if(object==56){
+            // The solid parent spans native boxes, retained walls/platforms
+            // and any other registered descendants. Merge by registration
+            // order before filtering; separate family sweeps change the tree.
+            bool stopped=false;
+            return visitNativeRegistered(0,View::capacity,
+                [&](InstanceHandle h,int child,std::uint32_t){
+                    if(!stopped&&families_.isA(child,object))stopped=!visit(h.slot);
+                    return true;
+                });
+        }
         if(object!=82)return nativeTerrainMembers(object,visit);
         bool stopped=false;
         return visitNativeRegistered(View::timeFieldBase,View::exitControllerBase,
@@ -2171,6 +2199,7 @@ private:
     bool prepareNativeObjectQuery(int object,RunnerSpatialObjectPreparation::Path& path){
         if(!valid()||!world_||!native_)return check(false);
         if(object==82){if(!timeFieldFamily_)return check(false);}
+        else if(object==56){if(!world_->nativeTerrainInstances())return check(false);}
         else if(!world_->nativeTerrainInstances()||(object!=60&&object!=93)||
             !terrainFamilies_[object==93])return check(false);
         auto members=[&](auto visit){return nativeQueryMembers(object,visit);};
@@ -2189,13 +2218,13 @@ private:
                 })&&prepared;
             },[&](unsigned slot,std::uint32_t& flags,Owner::Box& bounds){
                 Owner::State state;Owner::Sprite sprite;
-                if(!(object==82?refreshNativeActor(handleAt(slot),false):refreshNativeTerrain(handleAt(slot),false))||
+                if(!(nativePosition(slot)?refreshNativeActor(handleAt(slot),false):refreshNativeTerrain(handleAt(slot),false))||
                     !nativeCollisionVisual(handleAt(slot),state,sprite))return false;
                 flags=state.flags;bounds=state.bounds;return true;
             },[&](Owner::Box box,unsigned slot){
                 const auto h=handleAt(slot);
                 if(!owner_.externalSpatialPublication([&](auto& index){return index.insert(box,slot);}))return false;
-                if(object==82){auto* state=nativePosition(slot);if(!state)return false;
+                if(auto* state=nativePosition(slot)){
                     state->appearanceFlags|=0x8000u;return true;}
                 return world_->publishNativeTerrainIndexed({slot-View::terrainBase,h.generation});
             });
@@ -2227,6 +2256,12 @@ private:
         hit=result;return true;
     }
 public:
+    // Query all registered sParentSolid descendants. This does not claim that
+    // the scene generator has admitted every original solid actor family.
+    bool actorSolidPlaceMeeting(InstanceHandle self,MotionBinary64 x,MotionBinary64 y,
+        const SpriteMaskPack& masks,bool& hit){
+        return registeredPlaceMeeting(self,56,x,y,masks,hit);
+    }
     // Explicit query over published actor state. Does not admit approximate
     // projectile trajectories or schedule any new actor collision events.
     bool actorTerrainPlaceMeeting(InstanceHandle self,int object,MotionBinary64 x,MotionBinary64 y,
@@ -2519,7 +2554,7 @@ private:
     }
     bool registeredPlaceSelection(InstanceHandle self,int object,MotionBinary64 x,MotionBinary64 y,
         const SpriteMaskPack& masks,Owner::Result& result){
-        if(native_&&object==82)return nativeActorPlaceSelection(self,object,x,y,masks,result);
+        if(native_&&(object==82||object==56))return nativeActorPlaceSelection(self,object,x,y,masks,result);
         if(!selectorAvailable(object))return check(false);
         auto update=[&](InstanceHandle h,bool publish){return resolves(h)&&refresh(h,publish);};
         if(!owner_.placeVm(self,object,x,y,false,families_,update,

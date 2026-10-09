@@ -58,6 +58,10 @@ bool nativeRegisteredTimeChange(downwell::GameplayCollisionOwner& owner,
         downwell::RunnerImageValue{0x43704000u}.promoted(),
         downwell::RunnerImageValue{0x43308000u}.promoted(),speed,[](unsigned ms){return ms==30;});
 }
+bool nativeRegisteredTimeShardStep(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle shared,
+    const downwell::SpriteMaskPack& masks,bool stopped){
+    return owner.stepTimeShard(shared,stopped,masks,[](const auto&,bool& retire){retire=false;return true;});
+}
 bool nativePlayerTimeField(downwell::GameplayCollisionOwner& owner,downwell::MotionBinary64 x,
     downwell::MotionBinary64 y,const downwell::SpriteMaskPack& masks,bool& hit){
     return owner.playerTimeFieldMeeting(x,y,masks,hit);
@@ -1165,6 +1169,54 @@ int main(){
     checkEnemySlotDirectory(objects,sprites);
     checkNativeAnimationBatches(objects,sprites);
     const auto mb=read("generated/downwell-sprite-masks.dwsm");SpriteMaskPack masks(mb.data(),mb.size());
+    for(unsigned layout=0;layout<3;++layout){
+        std::vector<std::uint32_t> expected;
+        for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                      GameplayCollisionOwner::Ownership::nativeScenery}){
+            const bool native=mode!=GameplayCollisionOwner::Ownership::reference;
+            const auto bytes=read("generated/downwell-rooms.dwrm");RoomPack roomPack(bytes.data(),bytes.size());
+            TimeShardEffects<64> effects;
+            auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+                GameplayTerrainInstances::WallCollision{},&roomPack,mode);
+            auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),owner->breakableBinding(),
+                owner->playerBinding(),native?nullptr:&owner->terrain(),&roomPack);
+            auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();GameMakerRandom createRandom;
+            assert(owner->attach(*world)&&(!native||world->bindNativeTerrain(*terrain)));
+            if(layout)for(unsigned i=0;i<9;++i){
+                const int x=224+int(i%3)*16,y=176+int(i/3)*16;
+                if(i==4){assert(world->createGeneratedInstance({92,x,y},objects,[](const auto&){return true;}));continue;}
+                const int object=i==8?93:60;
+                if(native){assert(terrain->append(object,x,y));assert(terrain->createProperties(terrain->handle(terrain->size()-1),51));}
+                else{assert(owner->terrain().append(object,x,y,true));
+                    assert(owner->terrain().createProperties(owner->terrain().handle(owner->terrain().size()-1),51,false,createRandom));}
+            }
+            assert(owner->createTimeShardWithSourceId(effects,205187,MotionBinary64::fromInteger(240),
+                MotionBinary64::fromInteger(layout==2?192:160),false));
+            const auto key=owner->timeShards().handle(1);InstanceHandle shared;
+            assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::timeShard,key,shared));
+            auto* particle=effects.get(1);assert(particle);
+            particle->xsp=MotionBinary64::fromInteger(2);particle->ysp={};
+            std::vector<std::uint32_t> actual;
+            for(unsigned tick=0;tick<8&&effects.get(1);++tick){
+                world->step(0);assert(world->effectsSucceeded());
+                unsigned outsideCalls=0;
+                assert(owner->stepTimeShard(shared,tick<4,masks,[&](const auto& effect,bool& retire){
+                    ++outsideCalls;const auto* published=owner->timeShards().find(key);
+                    assert(published&&published->y.bits==effect.y.bits);retire=false;return true;
+                })&&outsideCalls==1);
+                const auto* r=owner->timeShards().find(key);assert(r);
+                if(layout==0&&tick==0)assert(r->x.bits!=0x43700000u&&r->imageSpeed.bits==0);
+                if(layout==2&&tick==0)assert(r->destroyRequested);
+                actual.insert(actual.end(),{r->x.bits,r->y.bits,r->imageIndex.bits,r->imageSpeed.bits,
+                    std::uint32_t(r->alarms.get(0)),std::uint32_t(r->alarms.get(1)),
+                    std::uint32_t(world->randomDrawCount()),std::uint32_t(r->destroyRequested)});
+                if(r->destroyRequested)assert(owner->prepareDraw()&&!owner->timeShards().find(key));
+            }
+            assert(!actual.empty());
+            if(!native)expected=actual;else assert(actual==expected);
+            assert(effects.clear()&&owner->valid());
+        }
+    }
     {
         auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites);
         auto scene=std::make_unique<GameplayWorld>(300,true,0,false,collision->enemyBinding(),
@@ -2667,6 +2719,13 @@ int main(){
                     if(!native){expected.push_back(hit);hit?++hits:++misses;}
                     else assert(ordinal<expected.size()&&hit==expected[ordinal]);
                     ++ordinal;
+                }
+                {
+                    bool hit=false;
+                    assert(owner->actorSolidPlaceMeeting(player,x.promoted(),y.promoted(),masks,hit));
+                    if(!native){expected.push_back(hit);hit?++hits:++misses;}
+                    else assert(ordinal<expected.size()&&hit==expected[ordinal]);
+                    ++ordinal;compare(false);compare(true);
                 }
                 for(int object:{60,93}){
                     bool hit=false;assert(owner->terrainPositionMeeting(object,x.promoted(),y.promoted(),masks,hit));

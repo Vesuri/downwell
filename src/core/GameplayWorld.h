@@ -552,6 +552,10 @@ public:
     bool advanceTimeShardRoomAnimation(downwell::InstanceHandle key);
     bool retireTimeShardRoomEffect(downwell::InstanceHandle key);
     bool collideTimeShardRoomEffect(downwell::InstanceHandle key);
+    template<class Outside> bool stepTimeShardRoomEffect(downwell::InstanceHandle key,bool stopped,Outside outside){
+        return run_.effectsSucceeded=run_.effectsSucceeded&&timeShardInstances_&&timeShardEffects_&&
+            timeShardInstances_->dispatchStep(key,*timeShardEffects_,stopped,enemyRandom_,outside);
+    }
     template<class Pause> bool createTimeChange(downwell::TimeChangeEffects<8>& effects,
         downwell::MotionBinary64 x,downwell::MotionBinary64 y,int& speed,Pause pause){
         if(!run_.effectsSucceeded)return false;

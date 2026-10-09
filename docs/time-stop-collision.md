@@ -299,8 +299,19 @@ registered effects before reconstructing the world. Animation eligibility reads
 active room-list membership, while population uses the instance-number flag mask
 `0x140003`, excluding destruction marks before physical retirement. Birth accepts
 an explicit source ID; it does not allocate a family-local substitute. This
-boundary does not enable automatic player bursts or supply ordinary Step,
-collision and Draw dispatch; those remain required by the live integration.
+boundary does not enable automatic player bursts or schedule the complete
+Step/collision/Draw sequence; those remain required by the live integration.
+
+`GameplayCollisionOwner::stepTimeShard` accepts one selected shared lifetime and
+borrows the mask pack only for that event. Its solid-parent query merges all
+registered descendants in registration order, including compact box ownership
+and retained terrain, before the normal population/tree-height preparation and
+mask traversal. It does not run separate box/wall/platform collision passes.
+The shared effect Step uses the world RNG and real alarm counters, and publishes
+its final rounded position even after a destruction request. The caller supplies
+the source-published-view retirement predicate; camera publication and global
+Step ordering must be established by the enclosing scheduler. This query covers
+registered lifetimes, not unimplemented solid families in the scene generator.
 
 The explicit registered-player-contact boundary uses the world's RNG and
 publishes the changed alarm-2 cooldown immediately. It checks event eligibility
