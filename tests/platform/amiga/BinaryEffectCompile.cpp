@@ -8,6 +8,9 @@
 #include "core/LevelNumber.h"
 #include "core/LevelNumberInstances.h"
 #include "core/LevelNumberText.h"
+#include "core/FontPack.h"
+bool compileLevelTitleMetrics(const downwell::FontPack& fonts,unsigned font,unsigned length,
+    bool (*read)(unsigned,unsigned&),std::int32_t& width){return fonts.stringWidth(font,length,read,width);}
 bool compileLocalizedLevelNumber(downwell::LevelNumberText<64>& text,downwell::LevelNumber<64>& state,
     const downwell::AreaTitle* titles,unsigned count,const char* language,int area,int level,bool hard,
     bool (*measure)(unsigned,const unsigned*,downwell::MotionBinary64&)){

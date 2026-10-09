@@ -16,6 +16,7 @@ for start, end, digest in (
     (0x45AA40, 0x45AB97, "dc9bccd9e67e85534448222b9cf4f28d10e507da8e934ec0cd434c572bce353d"),
     (0x44A2A0, 0x44A316, "dda7bed6b0480edc1e97d4f0a21f2efafc4fb87cf92acbbc46f34337710acfbf"),
     (0x449830, 0x449903, "b017c9b0bcb5a50dd582c81861621fafb571066378b9597f90127125376cba83"),
+    (0x45ADC0, 0x45B0A0, "bfd0506c9cdffe3d7f59b61d0f6d8a87f817ee442a6e36074873a6e17fada7dc"),
 ):
     assert sha256(region(start, end-start)).hexdigest() == digest
 assert region(0x44A2D4,4) == bytes.fromhex("0f bf 48 0a") # signed glyph advance

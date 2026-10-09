@@ -1,10 +1,13 @@
 #include "core/LevelNumber.h"
 #include "core/LevelNumberInstances.h"
+#include "core/FontPack.h"
 #include "../../generated/downwell-area-titles.h"
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
+#include <fstream>
+#include <iterator>
 using namespace downwell;
 struct Draw {
     bool surface=true;unsigned views=0,ends=0,failCharacter=0;
@@ -39,6 +42,9 @@ struct Lifetime {
     bool retire(InstanceHandle,const Numbers::Record&){++retired;return true;}
 };
 int main(){
+    std::ifstream fontFile("generated/downwell-fonts.dwfn",std::ios::binary);
+    const std::vector<unsigned char> fontBytes{std::istreambuf_iterator<char>(fontFile),{}};
+    FontPack fonts(fontBytes.data(),fontBytes.size());assert(fonts.valid());
     for(const auto& area:area_titles::entries)for(bool hard:{false,true}){
         LevelNumberText<64> text;LevelNumber<64> state;unsigned measures=0;
         assert(text.create(state,area_titles::entries,area_titles::count,area.language,area.area,3,hard,
@@ -51,6 +57,43 @@ int main(){
         for(unsigned i=0;i<area.length;++i)assert(state.characters[i+1].token==area.characters[i]);
         assert(state.characters[area.length+1].token=='-'&&state.characters[state.length].token=='3');
         if(hard)assert(state.characters[area.length+2].token=='H');
+        LevelNumberText<64> measuredText;LevelNumber<64> measured;
+        assert(measuredText.create(measured,area_titles::entries,area_titles::count,area.language,area.area,3,hard,
+            [&](unsigned count,auto at,MotionBinary64& width){
+                std::int32_t pixels;if(!fonts.stringWidth(2,count,at,pixels))return false;
+                width=MotionBinary64::fromInteger(pixels);return true;
+            }));
+        PackedFont font;assert(fonts.font(2,font));int expected=0;
+        for(unsigned i=1;i<=measured.length;++i){
+            PackedGlyph glyph;
+            if(fonts.findGlyph(font,measured.characters[i].token,glyph)||fonts.findGlyph(font,0x25af,glyph))expected+=glyph.shift;
+        }
+        std::int32_t pixels;assert(measured.width.roundPixel(pixels)&&pixels==expected);
+    }
+    {
+        const unsigned chars[]={'A','\r','\n','A','A','\n',0x10ffff};
+        std::int32_t width=-1;PackedFont font;PackedGlyph a,fallback;assert(fonts.font(2,font)&&fonts.findGlyph(font,'A',a));
+        const int missing=fonts.findGlyph(font,0x25af,fallback)?fallback.shift:0;
+        assert(fonts.stringWidth(2,7,[&](unsigned i,unsigned& c){c=chars[i];return true;},width)&&width==(2*a.shift>missing?2*a.shift:missing));
+        width=123;assert(!fonts.stringWidth(999,1,[](unsigned,unsigned&){std::abort();return false;},width)&&width==123);
+    }
+    {
+        unsigned checked=0;
+        for(unsigned f=0;f<fonts.fontCount();++f){
+            PackedFont font;assert(fonts.font(f,font));
+            for(unsigned i=0;i<font.glyphCount;++i){
+                PackedGlyph left;assert(fonts.glyph(font.firstGlyph+i,left));
+                for(unsigned k=0;k<left.kerningCount;++k){
+                    PackedKerning kern;PackedGlyph right;
+                    assert(fonts.kerning(left.firstKerning+k,kern));
+                    if(!kern.shiftModifier||!fonts.findGlyph(font,kern.character,right))continue;
+                    std::int32_t width;assert(fonts.stringWidth(f,2,[&](unsigned index,unsigned& c){
+                        c=index?right.character:left.character;return true;
+                    },width)&&width==left.shift+right.shift);++checked;
+                }
+            }
+        }
+        assert(checked>0);
     }
     {
         const unsigned tokens[]={0x0410,'*',0x30a2};const AreaTitle area{"test",1,tokens,3};

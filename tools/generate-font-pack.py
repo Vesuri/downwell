@@ -41,6 +41,8 @@ def build_pack(manifest):
     page_items = manifest["resources"]["texturePageItems"]
     for font_id, font in enumerate(fonts):
         require(font["id"] == font_id, "font IDs are not contiguous")
+        require(font["scaleX"] == 1 and font["scaleY"] == 1,
+                "font pack v1 requires unit font scales")
         texture_item = font["texturePageItemId"]
         require(0 <= texture_item < len(page_items),
                 f"font {font_id} references an unknown texture item")

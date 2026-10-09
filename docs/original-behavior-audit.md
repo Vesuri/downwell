@@ -107,6 +107,16 @@ comparison. Font scale loading, line splitting and live active-font publication
 still require binding/audit before the measurement callback can be admitted. Do not replace
 this callback with character-count times eight or kerning-aware SDL layout.
 
+The pinned resource manifest gives all eight shipped fonts scaleX=scaleY=1.
+The font-pack v1 generator now rejects any other scale rather than discarding
+it. `FontPack::stringWidth` measures this unit-scale domain: signed glyph
+advances, U+25AF fallback, no kerning, CR/LF line maximum, and NUL termination.
+It rejects cumulative widths outside the exactly representable binary32 integer
+range instead of substituting a wider sum. Localized-title tests use the actual
+pack for all 54 labels and both suffix modes; nonzero kerning pairs are checked
+separately to distinguish width measurement from drawing. Runtime active-font
+binding and font-loader scale publication remain separate requirements.
+
 ## Result-room population and persistent alarms
 
 The exported `objLineToResult` Alarm 1 calls `room_goto(16)` unconditionally.

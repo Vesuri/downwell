@@ -50,6 +50,29 @@ public:
                    PackedGlyph& output) const;
     std::int32_t kerningShift(const PackedGlyph& glyph,
                               std::uint32_t nextCharacter) const;
+    // Pinned pack v1 contains only unit-scale fonts. Within the exact binary32
+    // integer range, original string_width is a sum of advances, not kerning.
+    // Read returns already hash-converted Unicode character tokens.
+    template<class Read> bool stringWidth(std::uint32_t fontId,unsigned length,Read read,std::int32_t& output)const{
+        PackedFont selected;if(!font(fontId,selected))return false;
+        std::int32_t line=0,maximum=0;
+        for(unsigned i=0;i<length;++i){
+            unsigned c;if(!read(i,c))return false;
+            if(!c)break;
+            if(c=='\r'||c=='\n'){if(line>maximum)maximum=line;line=0;continue;}
+            PackedGlyph glyph;
+            const bool present=findGlyph(selected,c,glyph)||findGlyph(selected,0x25af,glyph);
+            if(present){
+                if(glyph.shift < -32768 || glyph.shift > 32767)return false;
+                const auto next=line+glyph.shift;
+                // Reject unsupported long strings instead of quietly replacing
+                // the runner's per-glyph binary32 conversion with wider sums.
+                if(next < -16777216 || next > 16777216)return false;
+                line=next;
+            }
+        }
+        output=line>maximum?line:maximum;return true;
+    }
 
 private:
     const std::uint8_t* bytes_ = nullptr;

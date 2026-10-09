@@ -532,9 +532,9 @@ verify-level-number: build/level-number-test
 	./build/level-number-test
 generated/downwell-area-titles.h: tools/generate-area-titles.py data/language.ini
 	python3 tools/generate-area-titles.py
-build/level-number-test: tests/core/LevelNumberTest.cpp generated/downwell-area-titles.h $(wildcard src/core/*.h)
+build/level-number-test: tests/core/LevelNumberTest.cpp src/core/FontPack.cpp generated/downwell-area-titles.h generated/downwell-fonts.dwfn $(wildcard src/core/*.h)
 	@mkdir -p build
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ $<
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ $< src/core/FontPack.cpp
 .PHONY: verify-enemy-death-worlds
 test: verify-run-controller-instances
 .PHONY: verify-run-controller-instances
