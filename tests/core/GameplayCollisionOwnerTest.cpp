@@ -3058,6 +3058,40 @@ int main(){
         const auto before=world->randomDrawCount();world->step(0);
         assert(!world->effectsSucceeded()&&world->randomDrawCount()==before); // Never silently resume the legacy path.
     }
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                  GameplayCollisionOwner::Ownership::nativeScenery}){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+        auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));
+        struct BeforeFirstStep {
+            GameplayWorld& world;GameplayCollisionOwner& owner;unsigned writes=0;
+            RunnerImageValue x{0x43704000u},y{0x43304000u}; // Absolute 240.25, 176.25.
+            bool boundary(GameplayWorld::PhaseBoundary phase){
+                if(phase==GameplayWorld::PhaseBoundary::beginStep){
+                    assert(world.bulletCount()==1);const auto& bullet=world.bulletAt(0);
+                    assert(!bullet.sourceOwned&&!bullet.sourceMotion.initialized&&!bullet.trajectory.initialized);
+                    assert(world.publishBulletCollisionPosition({bullet.identitySlot,bullet.lifetimeId},x,y));++writes;
+                }
+                return owner.reconcileActivation();
+            }
+        } before{*world,*owner};
+        // Isolated first-admission probe: stop inside the first Step, before
+        // any effect/depth mutation, rather than install a fake game backend.
+        world->configurePhaseBoundary([](void* p,auto phase){return static_cast<BeforeFirstStep*>(p)->boundary(phase);},&before);
+        unsigned steps=0;
+        assert(!world->withSourceBulletSteps([&](InstanceHandle shot,MachineGunSourceMotion& motion){
+            ++steps;assert(before.writes==1&&motion.x.bits==before.x.bits&&motion.y.bits==before.y.bits&&!motion.initialized);
+            InstanceHandle shared;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::bullet,shot,shared));
+            RunnerImageValue x,y;
+            if(mode==GameplayCollisionOwner::Ownership::reference){const auto* state=owner->state(shared);assert(state);x=state->x;y=state->y;}
+            else assert(owner->nativePublishedPosition(shared,x,y));
+            assert(x.bits==motion.x.bits&&y.bits==motion.y.bits);
+            return false; // Intentional terminal stop after observing admission.
+        },[&]{world->step(4);return world->effectsSucceeded();}));
+        assert(steps==1&&!world->effectsSucceeded());
+    }
     std::vector<std::uint32_t> scheduledContacts[2][6];
     const auto sourceRoomBytes=read("generated/downwell-rooms.dwrm");
     RoomPack sourceRooms(sourceRoomBytes.data(),sourceRoomBytes.size());assert(sourceRooms.valid());

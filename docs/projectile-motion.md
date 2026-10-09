@@ -1191,6 +1191,11 @@ emission from the still-approximate live gun trajectory.
 The scoped `withSourceBulletSteps` adapter admits the source body at the
 world's ordinary object-261 Step slot. Exact absolute motion is retained with
 each bullet, not rebuilt from rounded drawing coordinates on each tick.
+The native birth seeds that absolute state before lifecycle publication.
+Setters retain their binary32 values even before source-motion admission, so
+the first source Step cannot overwrite fractional position writes with the
+integer drawing cache. This preserves the existing native birth coordinates;
+it does not by itself prove the enclosing player/muzzle birth arithmetic.
 Published coordinate setters update that state and the backend's drawing
 cache; the SDL renderer uses the published source image angle. End Step
 retirement remains after collision dispatch. The scope disables the legacy

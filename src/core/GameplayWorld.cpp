@@ -596,11 +596,14 @@ bool GameplayWorld::publishBulletCollisionPosition(downwell::InstanceHandle h,
     if(!run_.effectsSucceeded||!bullet||!downwell::RunnerSpatialSplit::valid(x)||
        !downwell::RunnerSpatialSplit::valid(y)||!bulletLifecycle_.publishedPosition(h,*bullet,x,y))
         return run_.effectsSucceeded=false;
-    if(bullet->sourceOwned){
+    // Source setters may run after birth but before the first Step admits
+    // source motion. Keep their absolute binary32 values even in that window.
+    auto* current=const_cast<BulletState*>(resolveBulletLifetime(h));if(!current)return run_.effectsSucceeded=false;
+    current->sourceMotion.x=x;current->sourceMotion.y=y;
+    if(current->sourceOwned){
         std::int32_t px,py;
         if(!x.promoted().roundPixel(px)||!y.promoted().roundPixel(py))return run_.effectsSucceeded=false;
-        auto* current=const_cast<BulletState*>(resolveBulletLifetime(h));if(!current)return run_.effectsSucceeded=false;
-        current->sourceMotion.x=x;current->sourceMotion.y=y;current->x=px-240;current->y=py-176;
+        current->x=px-240;current->y=py-176;
     }
     return true;
 }
@@ -1314,8 +1317,8 @@ bool GameplayWorld::stepBulletEffect(BulletState& bullet,long generationCameraY,
     bulletChanged = true;
     if(sourceBulletDispatch_){
         if(!bullet.sourceOwned){
-            if(bullet.trajectory.initialized||!bullet.sourceMotion.reset(downwell::MotionBinary64::fromInteger(bullet.x+240),
-                downwell::MotionBinary64::fromInteger(bullet.y+176),bullet.trajectory.zeroSpread))return run_.effectsSucceeded=false;
+            if(bullet.trajectory.initialized||!bullet.sourceMotion.reset(bullet.sourceMotion.x.promoted(),
+                bullet.sourceMotion.y.promoted(),bullet.trajectory.zeroSpread))return run_.effectsSucceeded=false;
             bullet.sourceOwned=true;
         }
         const bool ok=sourceBulletDispatch_(sourceBulletContext_,{bullet.identitySlot,bullet.lifetimeId},bullet.sourceMotion);
@@ -1587,7 +1590,9 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         bullet.animation = {};
         bullet.trajectory.reset(bullet.x, bullet.y, run_.upgrades.levels[12] != 0);
         const downwell::InstanceHandle handle{identity,bullet.lifetimeId};
-        if(!bulletLifecycle_.birth(handle,bullet)||
+        if(!bullet.sourceMotion.reset(downwell::MotionBinary64::fromInteger(bullet.x+240),
+                downwell::MotionBinary64::fromInteger(bullet.y+176),bullet.trajectory.zeroSpread)||
+            !bulletLifecycle_.birth(handle,bullet)||
             !bulletLifecycle_.sprite(handle,bullet,downwell::machineGunProfile(bullet.gemHigh).sprite)){
             run_.effectsSucceeded=false;return {};
         }
