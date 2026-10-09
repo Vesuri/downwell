@@ -2449,6 +2449,13 @@ int main(){
                     ++ordinal;
                     compare(false); // Includes the list path's retained temporary bounds.
                     compare(true); // Restored position must refresh to its original shape.
+                    for(const auto delta:std::vector<std::pair<int,int>>{{0,-16},{16,0},{0,16},{-16,0}}){
+                        assert(owner->terrainPlaceMeeting(wall,object,MotionBinary64::fromInteger(240+delta.first),
+                            MotionBinary64::fromInteger(160+delta.second),masks,hit));
+                        if(!native){expected.push_back(hit);hit?++hits:++misses;}
+                        else assert(ordinal<expected.size()&&hit==expected[ordinal]);
+                        ++ordinal;compare(false);compare(true);
+                    }
                 }
             };
             RunnerImageValue queryX,queryY;assert(queryX.assignInteger(240)&&queryY.assignInteger(160));
@@ -2456,7 +2463,7 @@ int main(){
             // A split tree with many walls and one platform exercises spatial
             // traversal for 60 and the population<height list path for 93.
             for(unsigned n=0;n<41;++n){
-                const int object=n==40?93:60,x=n==40?240:2000+int(n)*32;
+                const int object=n==40?93:60,x=n==40?240:n==0?256:2000+int(n)*32;
                 if(native){assert(terrain->append(object,x,160));assert(terrain->createProperties(terrain->handle(n+1),51));}
                 else {assert(owner->terrain().append(object,x,160,true));
                     assert(owner->terrain().createProperties(owner->terrain().handle(n+1),51,false,random));}

@@ -489,9 +489,15 @@ removal and candidate collection reconstruct the cached geometry at that origin
 while retaining the actual instance position. No per-cell rectangle is added.
 Offsets outside this audited domain reject rather than silently approximate.
 
-The temporary wall-query transaction still needs to publish these bits before
-wall End Step can use the complete query pair. Merely restoring position or
-translating a box for one test would discard observable publication state.
+Native `terrainPlaceMeeting` now borrows one non-reentrant transaction record
+for an object-60 caller at these offsets (or its origin). It uses the shared
+family preparation, `RunnerPlaceQuery`, source position setter and precise
+overlap routines. Bounds refresh sees the borrowed position and publishes its
+cached origin; restoration preserves queue changes and retains temporary cache
+state only on the list path. The indexed path restores the cache origin saved
+after flushing, not an earlier stale snapshot. General wall motion and arbitrary
+offsets remain unadmitted. This connects explicit wall queries; automatic mixed
+End Step scheduling and tile/flower effects remain separate work.
 `RunnerSpatialInstances::point` supplies object-family traversal through the
 same preparation/index ownership used by `instance_place`. It filters flags
 `0x100003`, and indexed candidates additionally require kind 1 and matching

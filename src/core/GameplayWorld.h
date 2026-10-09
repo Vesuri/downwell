@@ -279,6 +279,11 @@ public:
         return run_.effectsSucceeded=run_.effectsSucceeded&&nativeTerrainInstances_&&
             nativeTerrainInstances_->publishIndexed(h);
     }
+    bool publishNativeTerrainQueryCache(downwell::InstanceHandle h,int x,int y,bool dirty){
+        return run_.effectsSucceeded=run_.effectsSucceeded&&nativeTerrainInstances_&&
+            nativeTerrainInstances_->publishCachedOffset(h,x,y)&&
+            (!dirty||nativeTerrainInstances_->publishQueryDirty(h));
+    }
     bool publishNativeTerrainBounds(downwell::InstanceHandle h,std::uint32_t flags){
         return run_.effectsSucceeded=run_.effectsSucceeded&&nativeTerrainInstances_&&
             nativeTerrainInstances_->publishRefreshedBounds(h,flags);

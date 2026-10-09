@@ -80,6 +80,10 @@ public:
     bool publishCachedOffset(InstanceHandle h,int x,int y){
         return good_=(good_&&contains(h)&&walls_[h.slot].storeCachedOffset(x,y));
     }
+    bool publishQueryDirty(InstanceHandle h){
+        if(!contains(h))return good_=false;
+        flags_[h.slot]|=4u;return true;
+    }
     bool publishIndexed(InstanceHandle h){
         if(!contains(h))return good_=false;
         flags_[h.slot]|=16u;return true;

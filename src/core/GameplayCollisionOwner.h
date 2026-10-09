@@ -60,6 +60,11 @@ private:
         std::uint32_t appearanceFlags=8u;
     };
     NativePosition nativePositions_[View::capacity-(View::timeFieldBase-View::terrainBase)]{};
+    struct NativeWallQuery {
+        InstanceHandle handle;Owner::State state;Owner::Sprite sprite;
+        int dx=0,dy=0,cacheX=0,cacheY=0;
+    };
+    NativeWallQuery* wallQuery_=nullptr; // Borrowed only inside a non-reentrant query.
     using NativeDirtyQueue=RunnerSpatialDirtyQueue<View::capacity>;
     NativeDirtyQueue nativeSpatialDirty_,nativeCollisionDirty_;
     unsigned nativeCollisionRetained_[View::capacity]{};
@@ -499,6 +504,22 @@ private:
     }
     bool refreshNativeTerrain(InstanceHandle h,bool publish=true){
         if(!valid()||!world_||!world_->nativeTerrainInstances()||h.slot<View::terrainBase||h.slot>=View::timeFieldBase)return check(false);
+        if(wallQuery_&&wallQuery_->handle.slot==h.slot&&wallQuery_->handle.generation==h.generation){
+            auto& q=*wallQuery_;Owner::Box bounds;PackedSpriteCollision resource;
+            const auto* objectFlags=families_.flags(unsigned(objectOf(h)));if(!objectFlags)return check(false);
+            const bool found=sprites_.collisionSprite(q.sprite.spriteId,q.sprite.maskId,resource);
+            if(found&&!RunnerSpriteBounds::fromSprite(resource,q.state.x,q.state.y,q.sprite.scaleX,q.sprite.scaleY,
+                false,{}, {},true,[](auto v,std::int32_t& n){return v.roundPixel(n);},bounds))return check(false);
+            const bool okay=owner_.externalSpatialPublication([&](auto& index){
+                return RunnerSpatialBoundsUpdate::finishRefresh(index,h.slot,*objectFlags,q.state.flags,false,q.state.bounds,
+                    found?&bounds:nullptr,q.state.x,q.state.y,found&&resource.collisionMode==1,publish);
+            });
+            q.cacheX=q.dx;q.cacheY=q.dy;
+            const InstanceHandle local{h.slot-View::terrainBase,h.generation};
+            const bool stored=world_->publishNativeTerrainBounds(local,q.state.flags)&&
+                world_->publishNativeTerrainQueryCache(local,q.cacheX,q.cacheY,false);
+            return check(okay&&stored);
+        }
         const auto* terrain=world_->nativeTerrainInstances();
         const InstanceHandle local{h.slot-View::terrainBase,h.generation};
         GameplayWorld::NativeTerrain::Identity id;bool active,destroyed,created;
@@ -519,6 +540,9 @@ private:
         return check(okay&&recorded);
     }
     bool nativeCollisionVisual(InstanceHandle h,Owner::State& state,Owner::Sprite& sprite){
+        if(wallQuery_&&wallQuery_->handle.slot==h.slot&&wallQuery_->handle.generation==h.generation){
+            state=wallQuery_->state;sprite=wallQuery_->sprite;return true;
+        }
         if(!native_||!resolves(h)||!eligibilityFlags(h,state.flags))return false;
         if(const auto* actor=nativePosition(h.slot)){
             state.x=actor->x;state.y=actor->y;state.bounds=actor->bounds;sprite=actor->sprite;return true;
@@ -2123,11 +2147,61 @@ public:
     }
     bool terrainPlaceMeeting(InstanceHandle local,int object,MotionBinary64 x,MotionBinary64 y,
         const SpriteMaskPack& masks,bool& hit){
+        if(native_)return nativeWallPlaceMeeting(local,object,x,y,masks,hit);
         InstanceHandle self;
         if(!terrainQuery(object)||!masks.valid()||!View::encode(View::Kind::terrain,local,self)||
             !resolves(self))return check(false);
         return registeredPlaceMeeting(self,object,x,y,masks,hit);
     }
+private:
+    bool nativeWallPlaceMeeting(InstanceHandle local,int object,MotionBinary64 x,MotionBinary64 y,
+        const SpriteMaskPack& masks,bool& hit){
+        NativeWallQuery q;RunnerImageValue px,py;
+        if(wallQuery_||!valid()||!world_||!masks.valid()||!View::encode(View::Kind::terrain,local,q.handle)||
+            !resolves(q.handle)||objectOf(q.handle)!=60||!px.assign(x)||!py.assign(y)||
+            !nativeCollisionVisual(q.handle,q.state,q.sprite)||
+            !world_->nativeTerrainInstances()->cachedOffset(local,q.cacheX,q.cacheY))return check(false);
+        const RunnerImageValue originX=q.state.x,originY=q.state.y;
+        const int dx[]={0,0,16,0,-16},dy[]={0,-16,0,16,0};
+        auto offset=[&](RunnerImageValue nx,RunnerImageValue ny,int& ox,int& oy){
+            for(unsigned i=0;i<5;++i){RunnerImageValue ax,ay,tx,ty;
+                if(!ax.assignInteger(-dx[i])||!ay.assignInteger(-dy[i])||
+                    !RunnerSpatialSplit::sub(originX,ax,tx)||!RunnerSpatialSplit::sub(originY,ay,ty))return false;
+                if(RunnerSpatialSplit::equal(nx,tx)&&RunnerSpatialSplit::equal(ny,ty)){ox=dx[i];oy=dy[i];return true;}
+            }return false;
+        };
+        int targetX,targetY;if(!offset(px,py,targetX,targetY))return check(false);
+        const auto* objectFlags=families_.flags(60);if(!objectFlags)return check(false);
+        wallQuery_=&q;
+        struct Release {NativeWallQuery*& slot;~Release(){slot=nullptr;}} release{wallQuery_};
+        RunnerSpatialObjectPreparation::Path path=RunnerSpatialObjectPreparation::Path::failed;
+        int savedX=q.cacheX,savedY=q.cacheY;bool moved=false;
+        auto sync=[&]{return eligibilityFlags(q.handle,q.state.flags);};
+        auto eligible=[&](unsigned slot,bool indexed){
+            const auto h=handleAt(slot);std::uint32_t flags;
+            return slot!=q.handle.slot&&resolves(h)&&eligibilityFlags(h,flags)&&!(flags&0x100003u)&&
+                (!indexed||families_.isA(objectOf(h),object));
+        };
+        RunnerPlaceQuery::Result result;
+        const bool okay=RunnerPlaceQuery::run(q.state.x,q.state.y,q.state.flags,q.state.bounds,px,py,
+            [&]{return prepareNativeTerrainQuery(object,path)&&sync()?path:RunnerSpatialObjectPreparation::Path::failed;},
+            [&]{return flushNativeSpatial()&&sync();},
+            [&](bool publish){return refreshNativeTerrain(q.handle,publish)&&sync();},
+            [&](RunnerImageValue nx,RunnerImageValue ny){
+                if(!moved){savedX=q.cacheX;savedY=q.cacheY;moved=true;}
+                if(!offset(nx,ny,q.dx,q.dy)||!sync()||!RunnerSpatialPosition::assign(q.handle.slot,q.state.x,q.state.y,
+                    q.state.flags,nx,ny,false,true,*objectFlags,nativeSpatialDirty_,nativeCollisionDirty_))return false;
+                return world_->publishNativeTerrainQueryCache(local,q.cacheX,q.cacheY,(q.state.flags&8u)!=0);
+            },[&](auto visit){return nativeTerrainMembers(object,[&](unsigned slot){return !eligible(slot,false)||visit(slot);});},
+            [&](Owner::Box box,auto visit){return owner_.externalSpatialPublication([&](auto& index){
+                return index.query(box,[&](unsigned slot){return !eligible(slot,true)||visit(slot);});});},
+            [&](unsigned slot,bool publish,bool& found){return collisionOverlap(q.handle,handleAt(slot),masks,publish,found)&&sync();},result);
+        const bool restored=!moved||path!=RunnerSpatialObjectPreparation::Path::spatial||
+            world_->publishNativeTerrainQueryCache(local,savedX,savedY,(q.state.flags&8u)!=0);
+        if(!check(okay&&restored))return false;
+        hit=result.found;return true;
+    }
+public:
     // Object 370 uses sParentSolid (56), including thin platforms and boxes.
     // This queries registered lifetimes only; it is not evidence that every
     // member of family 56 is already admitted by the live scene generator.
