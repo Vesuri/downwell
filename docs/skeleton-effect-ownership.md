@@ -305,6 +305,19 @@ must complete each effect's Create synchronously before running the next call.
 Batching all effect creation after currency generation changes the shared RNG
 stream, even when the final list of visible particles looks identical.
 
+`stompPlayerChecked` provides the checked `scrEnemyStomped` sequence alongside
+the successful scalar reference. It uses the attacker's shared forced-jump
+and screen-shake caller storage, retains the two separate recharge calls, and
+passes the full source sound arguments (footsteps overlap and explosion).
+Health subtraction follows successful shake; hit/stomp flags follow successful
+footstep sound and the second recharge. Exploding Knees then creates the blast,
+chooses its sound and emits four smoke calls with fresh player-coordinate reads.
+Failure latches the enclosing status and preserves the completed prefix; a
+second call with failed status performs no work. Its health representation is
+still integral and rejects subtraction overflow. Tests inject failures through
+jump, shake, sounds, recharge, blast, choice and smoke. This entry point does
+not install natural stomp contacts or supply their blood/audio/blast services.
+
 Effect-producing callbacks return success. `SkeletonActor` stops the event on
 failed enemy-death setup, blood, smoke, flash, currency, corpse or debris
 creation; stomp blood and each Exploding Knees smoke emission have the same

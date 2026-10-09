@@ -199,6 +199,20 @@ extern "C" unsigned skeletonStompCompile(downwell::SkeletonActor* state) {
     if(!state->stompPlayer(events)) return 0xffffffffu;
     return events.trace;
 }
+struct CheckedSkeletonStompEvents {
+    bool playerDead(),explodingKnees();int playStyle();
+    bool blood(int,int),recharge(),setGrounded(bool);
+    void setSpinJumping();
+    bool setHorizontal(downwell::MotionBinary64),setVertical(downwell::MotionBinary64);
+    bool shake(int,int),stompSound(int,int,bool,bool,const char*);
+    bool createBlast(int,int,int),explosionSound(int,int,bool,bool);
+    unsigned choose(unsigned);
+    downwell::MotionBinary64 playerX(),playerY();
+    bool emitSmoke(downwell::MotionBinary64,downwell::MotionBinary64,int,int);
+};
+extern "C" bool skeletonCheckedStompCompile(downwell::SkeletonActor* actor,CheckedSkeletonStompEvents& events,bool& good){
+    return actor->stompPlayerChecked(events,good);
+}
 namespace {
 struct SkeletonPlayerCompile {
     downwell::MotionBinary64 y,speed;

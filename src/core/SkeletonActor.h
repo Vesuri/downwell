@@ -108,6 +108,34 @@ struct SkeletonActor : SkeletonDecisions {
         }
         return true;
     }
+    // Checked scrEnemyStomped path for registered collision adapters. Retain
+    // caller-owned jump/shake variables shared with this actor's damage calls.
+    // The successful scalar path above remains the reference, not a fallback.
+    template<class Events> bool stompPlayerChecked(Events& events,bool& good){
+        if(!good)return false;
+        if(events.playerDead())return true;
+        if(!events.blood(3,0))return good=false;
+        const MotionBinary64 vertical=events.playStyle()==2?MotionBinary64{0x3ff80000u,0}:MotionBinary64{0x40040000u,0};
+        if(!damageScripts.jump.execute({},vertical,events)||
+           !damageScripts.shake.execute(2,10,[&](int amount,int duration){return events.shake(amount,duration);}))return good=false;
+        // Admitted ehp storage is integral; never overflow it on subtraction.
+        if(health<(-2147483647-1)+100)return good=false;
+        health-=100;
+        if(!events.stompSound(122,50,false,true,"footsteps")||!events.recharge())return good=false;
+        hitPending=true;stomped=true;
+        if(events.explodingKnees()){
+            if(!events.createBlast(276,x,y))return good=false;
+            const unsigned choice=events.choose(3);
+            if(choice>2||!events.explosionSound(91+choice,60,false,true))return good=false;
+            for(unsigned i=0;i<4;++i){
+                const int directions[]={0,180,15,165};
+                auto py=events.playerY();
+                if(!py.add(MotionBinary64::fromInteger(4))||
+                   !events.emitSmoke(events.playerX(),py,directions[i],i<2?4:3))return good=false;
+            }
+        }
+        return true;
+    }
     // Current machine-gun branch: non-consistent, non-exploding bullet against
     // this non-immune/non-through enemy. Other weapon contracts are not implied.
     // Events owns the bullet's destruction and source point_direction call.

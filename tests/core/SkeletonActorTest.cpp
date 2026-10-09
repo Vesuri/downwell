@@ -124,7 +124,66 @@ struct StompEvents {
         return calls.back()!=int(failAt);
     }
 };
+struct CheckedStompEvents {
+    downwell::SkeletonActor& actor;
+    unsigned fail=0,calls=0,recharges=0,smokes=0;
+    bool dead=false,knees=true;int style=0;
+    bool next(){return ++calls!=fail;}
+    bool playerDead(){return dead;}
+    int playStyle(){return style;}
+    bool blood(int count,int speed){check(count==3&&speed==0);return next();}
+    void setSpinJumping(){check(++calls==2);}
+    bool recharge(){++recharges;check(!actor.hitPending&&!actor.stomped);return next();}
+    bool setGrounded(bool value){check(!value);return next();}
+    bool setHorizontal(downwell::MotionBinary64){check(false);return false;}
+    bool setVertical(downwell::MotionBinary64 value){
+        const auto expected=number(style==2?-1.5:-2.5);
+        check(value.high==expected.high&&value.low==expected.low);return next();
+    }
+    bool shake(int amount,int duration){
+        check(amount==2&&duration==10&&actor.health==60&&actor.damageScripts.shake.shakeAmt==2&&
+            actor.damageScripts.shake.shakeDur==10);return next();
+    }
+    bool stompSound(int id,int priority,bool loop,bool cut,const char* channel){
+        check(actor.health==-40&&id==122&&priority==50&&!loop&&cut&&std::strcmp(channel,"footsteps")==0);return next();
+    }
+    bool explodingKnees(){return knees;}
+    bool createBlast(int object,int x,int y){
+        check(actor.hitPending&&actor.stomped&&object==276&&x==96&&y==192);return next();
+    }
+    unsigned choose(unsigned count){check(count==3);return next()?2:3;}
+    bool explosionSound(int id,int priority,bool loop,bool cut){check(id==93&&priority==60&&!loop&&cut);return next();}
+    downwell::MotionBinary64 playerY(){return number(20.5+smokes);}
+    downwell::MotionBinary64 playerX(){return number(10.25+smokes);}
+    bool emitSmoke(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int direction,int speed){
+        const int directions[]={0,180,15,165};
+        const auto ex=number(10.25+smokes),ey=number(24.5+smokes);
+        check(x.high==ex.high&&x.low==ex.low&&y.high==ey.high&&y.low==ey.low&&
+            direction==directions[smokes]&&speed==(smokes<2?4:3));
+        ++smokes;return next();
+    }
+};
 int main() {
+    for(int style:{0,2})for(unsigned failure:{0u,1u,3u,4u,5u,6u,7u,8u,9u,10u,11u,12u,13u,14u,15u}){
+        downwell::SkeletonActor actor;check(actor.create(96,192));
+        CheckedStompEvents events{actor};events.style=style;events.fail=failure;bool good=true;
+        check(actor.stompPlayerChecked(events,good)==!failure&&good==!failure);
+        check(events.calls==(failure?failure:15)&&actor.health==((failure&&failure<=6)?60:-40));
+        check(actor.hitPending==(!failure||failure>=9)&&actor.stomped==actor.hitPending&&!actor.destroyRequested);
+        check(actor.damageScripts.shake.shakeAmt==((failure&&failure<6)?0:2));
+        if(failure){const auto calls=events.calls;check(!actor.stompPlayerChecked(events,good)&&events.calls==calls);}
+        else check(events.recharges==2&&events.smokes==4);
+    }
+    {
+        downwell::SkeletonActor actor;check(actor.create(96,192));
+        CheckedStompEvents events{actor};events.dead=true;bool good=true;
+        check(actor.stompPlayerChecked(events,good)&&good&&!events.calls&&actor.health==60&&!actor.stomped);
+    }
+    {
+        downwell::SkeletonActor actor;check(actor.create(96,192));
+        CheckedStompEvents events{actor};events.knees=false;bool good=true;
+        check(actor.stompPlayerChecked(events,good)&&good&&events.calls==8&&events.recharges==2&&!events.smokes&&actor.stomped);
+    }
     checkSkeletonSoundContract();
     for(bool stopped:{false,true}) for(unsigned failure:{1u,2u,3u,4u,5u,7u,8u,9u}){
         downwell::SkeletonActor actor;check(actor.create(96,192));
