@@ -310,7 +310,11 @@ mask traversal. It does not run separate box/wall/platform collision passes.
 The shared effect Step uses the world RNG and real alarm counters, and publishes
 its final rounded position even after a destruction request. The caller supplies
 the source-published-view retirement predicate; camera publication and global
-Step ordering must be established by the enclosing scheduler. This query covers
+Step ordering must be established by the enclosing scheduler. The overload
+without a retirement callback uses `GameplayWorld::timeShardOutsideView`: the
+rmMain view snapshot captured before camera movement, with strict `< top` and
+`> top+320` tests on the effect's old published Y. It does not use the newly
+scrolled display coordinates or the private post-integration `yy`. This query covers
 registered lifetimes, not unimplemented solid families in the scene generator.
 
 The explicit registered-player-contact boundary uses the world's RNG and

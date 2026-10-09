@@ -60,7 +60,7 @@ bool nativeRegisteredTimeChange(downwell::GameplayCollisionOwner& owner,
 }
 bool nativeRegisteredTimeShardStep(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle shared,
     const downwell::SpriteMaskPack& masks,bool stopped){
-    return owner.stepTimeShard(shared,stopped,masks,[](const auto&,bool& retire){retire=false;return true;});
+    return owner.stepTimeShard(shared,stopped,masks);
 }
 bool nativePlayerTimeField(downwell::GameplayCollisionOwner& owner,downwell::MotionBinary64 x,
     downwell::MotionBinary64 y,const downwell::SpriteMaskPack& masks,bool& hit){
@@ -1200,10 +1200,12 @@ int main(){
             for(unsigned tick=0;tick<8&&effects.get(1);++tick){
                 world->step(0);assert(world->effectsSucceeded());
                 unsigned outsideCalls=0;
-                assert(owner->stepTimeShard(shared,tick<4,masks,[&](const auto& effect,bool& retire){
+                const auto outside=[&](const auto& effect,bool& retire){
                     ++outsideCalls;const auto* published=owner->timeShards().find(key);
                     assert(published&&published->y.bits==effect.y.bits);retire=false;return true;
-                })&&outsideCalls==1);
+                };
+                assert(layout==0?owner->stepTimeShard(shared,tick<4,masks):
+                    (owner->stepTimeShard(shared,tick<4,masks,outside)&&outsideCalls==1));
                 const auto* r=owner->timeShards().find(key);assert(r);
                 if(layout==0&&tick==0)assert(r->x.bits!=0x43700000u&&r->imageSpeed.bits==0);
                 if(layout==2&&tick==0)assert(r->destroyRequested);
@@ -3984,6 +3986,16 @@ int main(){
             world->createBoneWithSourceId(405195,240,probe.previous+1,probe.inside));
         world->configureGenerationStep([](void* p,GameplayWorld& w,GameMakerRandom&,int){
             auto& probe=*static_cast<ViewProbe*>(p);bool edge=true,inside=false;++probe.calls;
+            for(int offset:{-1,0,1,319,320,321}){
+                RunnerImageValue y;bool retire=false;
+                if(!y.assignInteger(probe.previous+offset)||!w.timeShardOutsideView(y,retire)||
+                   retire!=(offset<0||offset>320))return false;
+            }
+            for(int offset:{-1,1}){
+                auto y=MotionBinary64::fromInteger(probe.previous+(offset>0?320:0));RunnerImageValue published;bool retire=false;
+                if(!y.add(MotionBinary64{offset<0?0xbfd00000u:0x3fd00000u,0})||
+                   !published.assign(y)||!w.timeShardOutsideView(published,retire)||!retire)return false;
+            }
             return w.cameraOffsetY()+34>probe.previous+1&&w.boneInView(probe.edge,edge)&&
                 w.boneInView(probe.inside,inside)&&!edge&&inside;
         },&probe);

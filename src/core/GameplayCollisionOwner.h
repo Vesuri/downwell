@@ -2080,6 +2080,11 @@ public:
         timeShardStepMasks_=nullptr;
         return check(ok);
     }
+    bool stepTimeShard(InstanceHandle shared,bool stopped,const SpriteMaskPack& masks){
+        return stepTimeShard(shared,stopped,masks,[&](const auto& effect,bool& retire){
+            return world_->timeShardOutsideView(effect.y,retire);
+        });
+    }
     bool animationMember(InstanceHandle key,const NativeTimeShardRegistration::Record& record,bool& eligible){
         InstanceHandle shared;
         if(!timeShardBinding_.key(key,record,shared))return check(false);

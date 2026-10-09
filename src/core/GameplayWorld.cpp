@@ -1040,6 +1040,20 @@ bool GameplayWorld::boneInView(downwell::InstanceHandle bone,bool& visible){
         downwell::MotionBinary64::fromInteger(160),downwell::MotionBinary64::fromInteger(284),visible);
 }
 
+bool GameplayWorld::timeShardOutsideView(downwell::RunnerImageValue publishedY,bool& retire){
+    if(!run_.effectsSucceeded)return false;
+    // GameplayWorld owns rmMain. outOfView(0,320) reads the published camera
+    // cache captured at frame entry, not camMain's subsequently updated y.
+    // Keep the caller's old published y, including fractional birth positions.
+    auto top=downwell::MotionBinary64::fromInteger(boneViewTopQ8_/256);
+    int order;
+    if(!downwell::compareRunnerReal(publishedY.promoted(),top,order))return run_.effectsSucceeded=false;
+    if(order<0){retire=true;return true;}
+    if(!top.add(downwell::MotionBinary64::fromInteger(320))||
+       !downwell::compareRunnerReal(publishedY.promoted(),top,order))return run_.effectsSucceeded=false;
+    retire=order>0;return true;
+}
+
 GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
 {
     if(playerBirthPending_){run_.effectsSucceeded=false;return {};}

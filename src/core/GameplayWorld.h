@@ -552,6 +552,7 @@ public:
     bool advanceTimeShardRoomAnimation(downwell::InstanceHandle key);
     bool retireTimeShardRoomEffect(downwell::InstanceHandle key);
     bool collideTimeShardRoomEffect(downwell::InstanceHandle key);
+    bool timeShardOutsideView(downwell::RunnerImageValue publishedY,bool& retire);
     template<class Outside> bool stepTimeShardRoomEffect(downwell::InstanceHandle key,bool stopped,Outside outside){
         return run_.effectsSucceeded=run_.effectsSucceeded&&timeShardInstances_&&timeShardEffects_&&
             timeShardInstances_->dispatchStep(key,*timeShardEffects_,stopped,enemyRandom_,outside);
