@@ -60,8 +60,8 @@ real direction, then non-consistent destruction. It never runs both branches.
 The callbacks own actual target identities, audio, effects and source storage.
 The shared script latches failures and retains completed operations; invoking
 it again on a failed runtime cannot replay damage or creation. It is not yet
-the live gun Step: parent-90 adapters, target writes/effects and collision-event
-dispatch remain prerequisites. `verify-bullet-solid-script` checks 1024 branch
+the live gun Step: complete parent-90 actor admission, target writes/effects and
+collision-event dispatch remain prerequisites. `verify-bullet-solid-script` checks 1024 branch
 combinations and every callback failure boundary against the pinned VM flow.
 
 The existing cavern builder's box choices are retained in
@@ -274,10 +274,27 @@ handles (not terrain-local slots). They retain the completed-family gate for
 60/93. `projectileNonPreciseLine` separately admits the VM's parent selectors
 59/83 across registered native walls, boxes and enemies; `projectileSolidPoint`
 uses parent 59 with precise=false for the approach loop. These selectors do
-not synthesize unimplemented actors, replace collision events, or admit the
-parent-90 shape query. Their targets remain generation-checked across marking,
+not synthesize unimplemented actors or replace collision events. Their targets remain generation-checked across marking,
 retirement and Retry. Point queries accept the original precise flag. Line queries
 explicitly support only precise=false, not an approximation of bitmap lines.
+
+`projectileShootableMeeting` and `projectileShootableSelection` expose the
+separate parent-90 shape queries at the bullet's current coordinates. Native
+ownership merges all registered descendants by registration order before the
+original list/tree choice and mask test; it does not scan only bone storage or
+select the nearest target. Each call queries afresh and restores the temporary
+self position. Stored ownership uses the existing resource-backed
+`placeMeeting`/`instancePlace` adapters. Mixed bone/corpse tests cover changes
+between the boolean and identity queries, deactivation, destruction, retirement
+and slot reuse, with the same selection sequence across native ownership modes.
+
+The serialized direct children of parent 90 are GunModule (109), objDeadBody
+(263), bulletEnmBone (269), shootable_thing_template (287), Clam (288),
+Scattered16 (289), Bottle (290), bubbleDome (291), TorchFire (295) and objGrass
+(313); uniDead (349) inherits via objDeadBody. These registered-population
+queries do not establish natural births or source fields for those omitted
+actors. In particular, enabling the live gun cannot treat them as absent merely
+because the bone/corpse query fixture passes.
 
 `LiveCollisionLifecycleTest` exercises the stored adapters against the loaded
 room and original terrain masks. `GameplayCollisionOwnerTest` exercises native

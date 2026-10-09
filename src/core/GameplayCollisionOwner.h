@@ -2549,10 +2549,12 @@ private:
                 });
     }
     template<class Visit> bool nativeQueryMembers(int object,Visit visit){
-        if(object==56||object==57){
+        if(object==56||object==57||object==90){
             // The solid parent spans native boxes, retained walls/platforms
             // and any other registered descendants. Merge by registration
             // order before filtering; separate family sweeps change the tree.
+            // parentShootableThing likewise spans separate bone/corpse owners;
+            // enumerate its entire registered family, not just bone slots.
             bool stopped=false;
             return visitNativeRegistered(0,View::capacity,
                 [&](InstanceHandle h,int child,std::uint32_t){
@@ -2571,6 +2573,7 @@ private:
     bool prepareNativeObjectQuery(int object,RunnerSpatialObjectPreparation::Path& path){
         if(!valid()||!world_||!native_)return check(false);
         if(object==82){if(!timeFieldFamily_)return check(false);}
+        else if(object==90){/* No terrain descendants; use every registered subtype. */}
         else if(object==56||object==57){if(!world_->nativeTerrainInstances())return check(false);}
         else if(!world_->nativeTerrainInstances()||(object!=60&&object!=93)||
             !terrainFamilies_[object==93])return check(false);
@@ -2976,7 +2979,7 @@ private:
     }
     bool registeredPlaceSelection(InstanceHandle self,int object,MotionBinary64 x,MotionBinary64 y,
         const SpriteMaskPack& masks,Owner::Result& result){
-        if(native_&&(object==82||object==56||object==57))return nativeActorPlaceSelection(self,object,x,y,masks,result);
+        if(native_&&(object==82||object==56||object==57||object==90))return nativeActorPlaceSelection(self,object,x,y,masks,result);
         if(!selectorAvailable(object))return check(false);
         auto update=[&](InstanceHandle h,bool publish){return resolves(h)&&refresh(h,publish);};
         if(!owner_.placeVm(self,object,x,y,false,families_,update,
@@ -2988,6 +2991,22 @@ private:
         return true;
     }
 public:
+    // scrBulCheckSolid makes two distinct shape queries at the current x/y,
+    // not a line query at the endpoint. Each invocation observes current
+    // registered lifetimes/order; a preceding meeting result is not cached.
+    // This does not certify that live scene generation owns every parent-90
+    // descendant (gun modules, scenery, etc.) or enable the source gun Step.
+    bool projectileShootableSelection(InstanceHandle self,MotionBinary64 x,MotionBinary64 y,
+        const SpriteMaskPack& masks,Owner::Result& result){
+        if(!valid()||!world_||!resolves(self)||!masks.valid())return check(false);
+        return registeredPlaceSelection(self,90,x,y,masks,result);
+    }
+    bool projectileShootableMeeting(InstanceHandle self,MotionBinary64 x,MotionBinary64 y,
+        const SpriteMaskPack& masks,bool& hit){
+        Owner::Result result;
+        if(!projectileShootableSelection(self,x,y,masks,result))return false;
+        hit=result.found;return true;
+    }
     // self is a shared collision handle, not a terrain-local storage slot.
     // Keep the completed-family gate: projectile parent families must not be
     // queried until all of their lifetimes and setters are owned here.
@@ -3041,7 +3060,7 @@ public:
     // scrBulCheckSolid uses parent solid 59 and parent enemy 83, not nearest
     // distance or an enemy-first sweep. Query registered wall, box and enemy
     // lifetimes through the original family/list/tree dispatcher. This does
-    // not run impact events or admit parentShootableThing shape queries.
+    // not run impact events; parentShootableThing uses the separate shape path.
     bool projectileNonPreciseLine(InstanceHandle self,int object,MotionBinary64 x1,MotionBinary64 y1,
         MotionBinary64 x2,MotionBinary64 y2,bool notMe,Owner::Result& result){
         if(!valid()||!world_||(object!=59&&object!=83))return check(false);

@@ -39,6 +39,12 @@ bool nativeBoneTarget(downwell::GameplayCollisionOwner& owner,downwell::Instance
     return owner.projectileBoneFields(target,read,effect)&&owner.projectileBoneHealthWrite(target,health)&&
         owner.projectileBoneHit(target);
 }
+bool nativeShootableQuery(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle shot,
+    const downwell::SpriteMaskPack& masks,downwell::GameplayCollisionOwner::Owner::Result& selected){
+    bool hit;
+    return owner.projectileShootableMeeting(shot,{}, {},masks,hit)&&
+        owner.projectileShootableSelection(shot,{}, {},masks,selected);
+}
 struct NativeEnemyDeathAudioProbe { bool isPlaying(int,bool&);bool stop(int); };
 bool nativeRunControllerBirth(downwell::GameplayCollisionOwner& owner,unsigned source,
     bool (*initialize)(downwell::InstanceHandle),downwell::InstanceHandle& key){
@@ -2862,6 +2868,60 @@ int main(){
         }
     }
     assert(masks.valid());
+    std::vector<unsigned> shootableReference;
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+        GameplayCollisionOwner::Ownership::nativeScenery}){
+        const bool native=mode!=GameplayCollisionOwner::Ownership::reference;
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+        auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),owner->breakableBinding(),
+            owner->playerBinding(),native?nullptr:&owner->terrain());
+        auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
+        assert(owner->attach(*world)&&(!native||world->bindNativeTerrain(*terrain))&&owner->configureCorpseMasks(masks));
+        world->step(4);assert(world->effectsSucceeded()&&world->bulletCount()==1);
+        const auto& bullet=world->bulletAt(0);InstanceHandle shot;
+        const InstanceHandle shotLocal{bullet.identitySlot,bullet.lifetimeId};
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::bullet,shotLocal,shot));
+        RunnerImageValue px,py;assert(px.assignInteger(240)&&py.assignInteger(512)&&world->publishBulletCollisionPosition(shotLocal,px,py));
+        std::vector<unsigned> selections;std::vector<InstanceHandle> bones;
+        auto query=[&]{GameplayCollisionOwner::Owner::Result result;
+            assert(owner->projectileShootableSelection(shot,px.promoted(),py.promoted(),masks,result));
+            unsigned id=0;
+            if(result.found){GameplayCollisionView::Record record;assert(GameplayCollisionView(*world).resolve(result.handle,record));
+                assert(record.bone||record.corpse);id=record.bone?record.bone->sourceId:record.corpse->sourceId;}
+            selections.push_back(id);return result;
+        };
+        assert(!query().found);
+        for(unsigned i=0;i<12;++i){
+            InstanceHandle bone;assert(world->createBoneWithSourceId(605200+i,240,512,bone));bones.push_back(bone);
+            if(i==0){
+                assert(query().found);
+                DeadBodySource source{px.promoted(),py.promoted(),{},MotionBinary64::fromInteger(-1)};GameMakerRandom random(2);
+                assert(owner->registeredCorpses().createFromDeath(605300,source,206,{},102,false,random,
+                    [](auto,int,auto,auto,bool& hit){hit=false;return true;}));
+            }
+            assert(query().found);
+        }
+        bool hit=false;assert(owner->projectileShootableMeeting(shot,px.promoted(),py.promoted(),masks,hit)&&hit);
+        // Mutation after the boolean query must be observed by the separate
+        // identity query, including when it switches to another family owner.
+        for(auto bone:bones)assert(owner->bones().activate(bone,false));
+        auto selected=query();GameplayCollisionView::Record record;
+        assert(selected.found&&GameplayCollisionView(*world).resolve(selected.handle,record)&&record.corpse&&record.corpse->sourceId==605300);
+        const auto corpse=owner->registeredCorpses().sourceHandle(605300);
+        assert(owner->registeredCorpses().activate(corpse,false)&&!query().found);
+        assert(owner->bones().activate(bones.front(),true)&&query().found);
+        assert(owner->bones().markDestroyed(bones.front())&&!query().found);
+        assert(owner->prepareDraw()&&!owner->bones().find(bones.front()));
+        InstanceHandle replacement;assert(world->createBoneWithSourceId(605400,240,512,replacement)&&query().found);
+        assert(selections.back()==605400);
+        assert(px.assignInteger(1000)&&!query().found); // Query restores the shooter's published position.
+        RunnerImageValue actualX,actualY;
+        if(native)assert(owner->nativePublishedPosition(shot,actualX,actualY));
+        else {const auto state=owner->state(shot);assert(state);actualX=state->x;actualY=state->y;}
+        assert(actualX.bits==0x43700000u&&actualY.bits==0x44000000u);
+        if(!native)shootableReference=selections;else assert(selections==shootableReference);
+    }
     {
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
         auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),

@@ -2031,6 +2031,51 @@ int main(){
             "normal phase service migrates the impact to its requested depth");
         require(effects.clear(registration),"retire migrated effect through its live owner");
     }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach mixed shootable selector world");world->skipToGameForTesting();
+        InstanceHandle shot;
+        for(unsigned tick=0;tick<1000&&!shot.generation;++tick){
+            world->step(gameplayContactProfileInput(tick,world->mainPlayerX(),world->mainPlayerY()),false);
+            if(world->mainBulletCount())shot=world->mainBulletAt(0).instance;
+        }
+        require(shot.generation&&world->effectsSucceeded(),"natural fired lifetime for parent-90 query");
+        RunnerImageValue x,y;require(x.assignInteger(240)&&y.assignInteger(512)&&world->publishBulletCollisionPosition(shot,x,y),
+            "publish isolated shootable query origin");
+        auto bones=world->boneRegistration<12>();auto corpses=world->corpseRegistration<1>();
+        std::vector<InstanceHandle> children;InstanceHandle corpse;
+        auto query=[&]{InstancePlaceResult result;const auto draws=world->randomDrawCount();
+            require(owner->instancePlace(shot,*world->resolveInstance(shot),90,x.promoted(),y.promoted(),result)&&
+                draws==world->randomDrawCount(),"parent-90 identity query uses real resource shapes without RNG");return result;
+        };
+        require(query().id==-4,"empty registered shootable population");
+        for(unsigned i=0;i<12;++i){InstanceHandle bone;
+            require(world->spawnBone(bones,240,512,bone),"register shootable bone");children.push_back(bone);
+            if(!i){
+                require(query().id==static_cast<std::int32_t>(world->resolveInstance(bones.worldHandle(bone))->instanceId),"single bone selected by numeric identity");
+                DeadBodySource source{x.promoted(),y.promoted(),{},MotionBinary64::fromInteger(-1)};
+                require(world->createRegisteredCorpseFromDeath(corpses,source,206,{},102,
+                    [](auto,int,auto,auto,bool& hit){hit=false;return true;}),"interleave corpse in the shootable family");
+                corpse=corpses.sourceHandle(source.myDeadBody);
+            }
+            const auto selected=query();const auto* record=world->resolveInstance(selected.handle);
+            require(record&&(record->objectId==269||record->objectId==263),"mixed family returns a retained bone or corpse identity");
+        }
+        bool hit=false;require(owner->placeMeeting(shot,*world->resolveInstance(shot),90,x.promoted(),y.promoted(),hit)&&hit,
+            "source boolean shootable query sees overlap");
+        for(auto child:children)require(bones.activate(child,false),"deactivate all bones between separate queries");
+        auto selected=query();require(selected.handle.slot==corpse.slot&&selected.handle.generation==corpse.generation,
+            "fresh identity query sees surviving corpse, not a cached bone");
+        require(bones.activate(children.front(),true)&&bones.mark(children.front()),"retain marked bone beside corpse");
+        selected=query();require(selected.handle.slot==corpse.slot&&selected.handle.generation==corpse.generation,
+            "marked bone is not selected");
+        require(bones.clear()&&corpses.clear()&&query().id==-4,"retired shootables leave no selectable stale identity");
+        require(x.assignInteger(1000)&&query().id==-4,"offscreen temporary query misses");
+        RunnerImageValue actualX,actualY;
+        require(owner->collisionPosition(shot,actualX,actualY)&&actualX.bits==0x43700000u&&actualY.bits==0x44000000u,
+            "place query restores exact published bullet position");
+    }
     for(bool high:{false,true})for(bool laser:{false,true}){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
