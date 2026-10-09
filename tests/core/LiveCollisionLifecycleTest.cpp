@@ -2092,6 +2092,37 @@ int main(){
             if(!box.generation)world->step(gameplayContactProfileInput(tick,world->mainPlayerX(),world->mainPlayerY()),false);
         }
         require(box.generation&&world->effectsSucceeded(),"find box effect caller");
+        unsigned neighbourMask=0;
+        require(world->stepWithCollisionPass({},false,[&]{
+            auto* r=const_cast<InstanceRecord*>(owner->resolve(box));
+            require(r&&r->active&&!r->destroyRequested,"autotile caller remains live at Collision");
+            const int dx[]={0,16,0,-16},dy[]={-16,0,16,0};
+            for(unsigned i=0;i<4;++i){
+                bool hit=false;
+                require(owner->placeMeeting(box,*r,92,MotionBinary64::fromInteger(r->x+dx[i]),
+                    MotionBinary64::fromInteger(r->y+dy[i]),hit),"resource-backed autotile neighbour query");
+                if(hit)neighbourMask|=1u<<i;
+            }
+            r->box.autoTile=true;r->box.checked=false;return true;
+        }),"dispatch box End Step against maintained collision ownership");
+        const auto* tiled=owner->resolve(box);
+        require(tiled&&tiled->box.checked&&!tiled->box.materialBreakable&&
+            unsigned(tiled->box.scriptIndex)==neighbourMask&&tiled->imageIndex==float(neighbourMask),
+            "live box End Step publishes the collision-derived neighbour image");
+        InstanceHandle offscreen{};
+        require(world->stepWithCollisionPass({},false,[&]{
+            for(unsigned i=0;i<world->activeInstanceCount();++i){
+                const auto& r=world->instanceAt(i);
+                if(r.objectId!=92||r.instanceId==owner->resolve(box)->instanceId||!r.active||r.destroyRequested)continue;
+                offscreen=world->instanceHandleAt(i);break;
+            }
+            require(offscreen.generation,"second box for post-destruction neighbour queries");
+            RunnerImageValue x,y;require(x.assignInteger(240)&&y.assignInteger(-10000),"offscreen coordinates");
+            require(world->publishCollisionPosition(offscreen,x,y),"publish offscreen box through spatial ownership");
+            auto* r=const_cast<InstanceRecord*>(owner->resolve(offscreen));
+            r->box.autoTile=true;r->box.checked=false;return true;
+        })&&!owner->resolve(offscreen),
+            "maintained queries/image publication accept a marked box through the remainder of End Step");
         unsigned lookups=0,observed=0;bool accept=true;
         auto frames=[&](int sprite,unsigned& count){
             ++lookups;observed=owner->resolve(box)->boxMyFx;

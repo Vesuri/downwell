@@ -120,8 +120,7 @@ struct LifecycleAudit {
         ++calls;
         require(matches(h,r)&&!r.destroyRequested,"destroy marks a still-live lifetime");
         if(r.objectId==61)++ditherMarks;
-        if(r.objectId==92){
-            require(r.box.exhausted(),"natural box destruction follows exhausted health");
+        if(r.objectId==92&&r.box.exhausted()){
             ++boxRemovals;
             if(rejectBoxRemoval){rejectedBoxId=r.instanceId;return false;}
         }
@@ -271,10 +270,81 @@ struct LifecycleAudit {
     }
 };
 
+struct BoxEndStepAudit:LifecycleAudit {
+    std::uint32_t target=0;
+    unsigned neighbours=0,queries=0,publications=0,reject=0;
+    bool outside=false;
+    bool placeMeeting(downwell::InstanceHandle h,const downwell::InstanceRecord& r,int object,
+                      downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool& hit){
+        if(r.instanceId!=target){
+            require(object==82||object==255,"unrelated fixture queries are player field/goal checks");
+            hit=false;return true;
+        }
+        const int dx[]={0,16,0,-16},dy[]={-16,0,16,0};
+        require(matches(h,r)&&object==92&&queries<4&&r.destroyRequested==outside,
+            "box autotiling retains its caller after optional destruction");
+        const auto ex=downwell::MotionBinary64::fromInteger(r.x+dx[queries]);
+        const auto ey=downwell::MotionBinary64::fromInteger(r.y+dy[queries]);
+        require(x.high==ex.high&&x.low==ex.low&&y.high==ey.high&&y.low==ey.low&&
+            unsigned(r.box.scriptIndex)==(neighbours&((1u<<queries)-1)),
+            "box neighbour queries and script-index writes follow up/right/down/left order");
+        hit=(neighbours&(1u<<queries))!=0;
+        return ++queries!=reject;
+    }
+    bool imageIndex(downwell::InstanceHandle h,const downwell::InstanceRecord& r,downwell::RunnerImageValue value){
+        if(r.instanceId==target){
+            downwell::RunnerImageValue expected;require(expected.assignInteger(neighbours),"fixture image index");
+            require(queries==4&&!r.box.materialBreakable&&!r.box.checked&&value.bits==expected.bits,
+                "material becomes wood before image publication, checked follows it");
+            ++publications;if(reject==5)return false;
+        }
+        return LifecycleAudit::imageIndex(h,r,value);
+    }
+};
+
 void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPack& objects,
                        const downwell::BuilderPatternPack& patterns){
     using Runtime=downwell::StartupRuntime;
     const auto healthy=[](const Runtime& r){return r.effectsSucceeded()&&r.roomLoadSucceeded()&&r.deferredCommandsSucceeded();};
+    for(unsigned mask=0;mask<16;++mask)for(bool outside:{false,true})
+    for(unsigned reject=0;reject<=(mask==15?5u:0u);++reject){
+        BoxEndStepAudit audit;audit.neighbours=mask;audit.outside=outside;audit.reject=reject;
+        auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            downwell::InstanceLifecycleBinding::bindQueryDestruction(audit));
+        runtime->skipToGameForTesting();
+        bool foundBox=false;
+        for(unsigned tick=0;tick<600&&!foundBox;++tick){
+            runtime->step(downwell::gameplayContactProfileInput(tick,runtime->mainPlayerX(),runtime->mainPlayerY()),false);
+            for(unsigned i=0;i<runtime->activeInstanceCount();++i){
+                const auto& r=runtime->instanceAt(i);
+                foundBox|=r.objectId==92&&r.active&&!r.destroyRequested;
+            }
+        }
+        require(foundBox&&healthy(*runtime),"box End Step fixture reaches generated terrain");
+        const bool ok=runtime->stepWithCollisionPass({},false,[&]{
+            for(unsigned i=0;i<runtime->activeInstanceCount();++i){
+                auto& r=const_cast<downwell::InstanceRecord&>(runtime->instanceAt(i));
+                if(r.objectId!=92||!r.active||r.destroyRequested)continue;
+                audit.target=r.instanceId;r.x=240;
+                r.y=outside?-10000:static_cast<int>(runtime->mainCameraViewY())+128;
+                r.box.autoTile=true;r.box.checked=false;r.box.materialBreakable=true;r.box.scriptIndex=99;
+                return true;
+            }
+            require(false,"box End Step fixture has a generated box");return false;
+        });
+        require(audit.target&&ok==!reject&&healthy(*runtime)==!reject&&
+                audit.queries==(reject&&reject<5?reject:4)&&audit.publications==(reject&&reject<5?0u:1u),
+            "live box End Step executes all neighbours or stops at the rejected publication");
+        const auto* r=runtime->instance(audit.target);
+        if(outside&&!reject)require(!r,"out-of-view box completes autotiling before cleanup");
+        else{
+            require(r&&r->destroyRequested==outside&&r->box.checked==!reject,
+                "box event retains destruction and checked state at the exact failure boundary");
+            const unsigned expected=reject&&reject<5?mask&((1u<<(reject-1))-1):mask;
+            require(unsigned(r->box.scriptIndex)==expected&&r->box.materialBreakable==(reject&&reject<5),
+                "box autotile state preserves only the accepted query prefix");
+        }
+    }
     for(unsigned reject:{0u,1u,2u}){
         LifecycleAudit audit;
         auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,

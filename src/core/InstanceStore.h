@@ -53,6 +53,7 @@ struct InstanceRecord {
     bool persistent = false;
     bool active = true;
     bool destroyRequested = false; // Excluded now; storage may survive the current event.
+    bool outOfViewDestroyRequested = false; // Retirement accounting, not a combat death.
     bool activationPending = false;
     std::int32_t health = 0;
     std::int32_t reward = 0;

@@ -10,7 +10,7 @@ struct BreakableState {
     unsigned short breakSound=171;
     unsigned char haveGem=0;
     bool hit=false,drilled=false,autoTile=false,checked=false;
-    bool materialBreakable=true,groundRoomResult=false;
+    bool materialBreakable=true,groundRoomResult=false; // false material denotes End Step's "wood".
     std::int32_t scriptIndex=0; // self.i, shared by alarmStop and autotiling.
     // scrBulCheckSolid [11..13]: positive health only; field writes precede
     // bullet destruction. Box destruction belongs to its later ordinary Step.

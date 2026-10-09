@@ -960,7 +960,7 @@ bool StartupRuntime::cleanupMainOwnedDestroyed(){
             (r.objectId==248&&currencyDispatch_)||
             (r.objectId==73&&ownedEntryRegistration_.handle(r).generation)||(r.objectId==219&&!scriptAnimationDispatch_);},
         [this](InstanceHandle key,const InstanceRecord& r){
-            if(hasSimpleOutOfViewEndStep(r.objectId)){
+            if(r.outOfViewDestroyRequested){
                 if(!instances_.erase(r.instanceId,
                     [this](InstanceHandle h,const InstanceRecord& record){return lifecycle_.retire(h,record);}))return false;
                 ++mainInstancesRetired_;
@@ -1315,7 +1315,7 @@ void StartupRuntime::updateMainLifecycle(bool endStep, long publishedViewTopQ12)
             const auto& instance = instances_.at(i - removed);
             return LifetimeInstance{instance.objectId, instance.y,
                 instance.active&&!instance.destroyRequested&&
-                !(objectPack_&&hasSimpleOutOfViewEndStep(instance.objectId))};
+                !(objectPack_&&(instance.objectId==92||hasSimpleOutOfViewEndStep(instance.objectId)))};
         },
         [this, &removed](unsigned i) {
             const auto id = instances_.at(i - removed).instanceId;
@@ -1827,12 +1827,12 @@ bool StartupRuntime::dispatchObjectEvent(InstanceRecord& instance,
         !objectPack_->findEvent(instance.objectId, eventType, eventSubtype, event))
         return false;
     if(roomId_==mainRoomId&&eventType==3&&eventSubtype==2&&
-       hasSimpleOutOfViewEndStep(instance.objectId)){
+       (instance.objectId==92||hasSimpleOutOfViewEndStep(instance.objectId))){
         ++implementedCodeCalls_;
         // Keep the currently published-coordinate adapter, but run the source
         // event at its selected End Step position. Mark now; retain the record
         // until room cleanup, rather than compacting storage under dispatch.
-        return run_.effectsSucceeded=retireMainRoomObjectsChecked(1,roomId_,1,
+        run_.effectsSucceeded=retireMainRoomObjectsChecked(1,roomId_,1,
             ordinaryStepViewTopQ12_,[&](unsigned){
                 return LifetimeInstance{instance.objectId,instance.y,
                     instance.active&&!instance.destroyRequested};
@@ -1840,8 +1840,32 @@ bool StartupRuntime::dispatchObjectEvent(InstanceRecord& instance,
                 const auto index=static_cast<std::size_t>(&instance-&instances_.at(0));
                 if(lifecycle_.hasOwner()&&!lifecycle_.markDestroyed(instances_.handleAt(index),instance))return false;
                 instance.destroyRequested=true;
+                instance.outOfViewDestroyRequested=true;
                 return true;
             });
+        if(!run_.effectsSucceeded)return false;
+        if(instance.objectId==92&&instance.box.autoTile&&!instance.box.checked){
+            // objBox_n End Step continues after instance_destroy. These
+            // boolean queries are not a selected-neighbour identity lookup.
+            instance.box.scriptIndex=0;
+            const auto key=instances_.handleAt(static_cast<std::size_t>(&instance-&instances_.at(0)));
+            const int dx[]={0,16,0,-16},dy[]={-16,0,16,0};
+            for(unsigned i=0;i<4;++i){
+                auto x=MotionBinary64::fromInteger(instance.x);
+                auto y=MotionBinary64::fromInteger(instance.y);
+                bool hit=false;
+                if(!x.add(MotionBinary64::fromInteger(dx[i]))||
+                   !y.add(MotionBinary64::fromInteger(dy[i]))||
+                   !lifecycle_.placeMeeting(key,instance,92,x,y,hit))return run_.effectsSucceeded=false;
+                if(hit)instance.box.scriptIndex+=1<<i;
+            }
+            instance.box.materialBreakable=false; // self.material = "wood"
+            if(!lifecycle_.phaseIndex(key,instance,unsigned(instance.box.scriptIndex)*256u))
+                return run_.effectsSucceeded=false;
+            instance.imageIndex=static_cast<float>(instance.box.scriptIndex);
+            instance.box.checked=true;
+        }
+        return true;
     }
     if(roomId_==mainRoomId&&eventType==3&&eventSubtype==0&&
         (instance.objectId==111||instance.objectId==112||instance.objectId==113||
@@ -3216,6 +3240,7 @@ std::uint64_t StartupRuntime::stateDigest() const {
         digest.addI32(instance.depth);
         digest.addBool(instance.persistent);
         digest.addBool(instance.active);
+        if(instance.outOfViewDestroyRequested)digest.addU32(0x4f555456); // OUTV: pending retirement cause.
         digest.addBool(instance.activationPending);
         digest.addI32(instance.health);
         digest.addI32(instance.reward);

@@ -391,8 +391,13 @@ An accepted destruction request sets the lifetime flag during the event;
 physical removal waits for pre-Draw room cleanup. Rejected marking leaves the
 flag unchanged; rejected cleanup retains the marked identity and stops the
 tick. The remaining family sweep excludes these objects when resource-backed
-events are available. Box End Step is not included: its autotiling body still
-needs integration. The retained integer-coordinate out-of-view adapter is not
+events are available. Box End Step likewise runs as a selected event, including
+the up/right/down/left `place_meeting` queries, caller `i` writes, material change
+to wood, image publication and final `checked` assignment. A destruction request
+does not skip those statements. Autotiling requires the maintained collision
+query binding; a missing/rejected query stops the tick rather than inventing a
+neighbour result. Destruction cause is retained separately so out-of-view cleanup
+is not counted as combat destruction. The retained integer-coordinate adapter is not
 proof of original fractional-coordinate behavior, nor of native mixed-phase
 retirement ordering.
 
