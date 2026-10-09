@@ -1264,13 +1264,18 @@ hitStun before the second momentDelay. It retains completed writes and latches
 callback failures; a failed event cannot be retried. Its integer damage fields
 cover this admitted profile and reject overflow rather than invoking C++
 undefined behavior. The old helper remains the arithmetic reference.
-`GameplayCollisionOwner::dispatchSkeletonBulletCollision` validates the
-selected bullet/skeleton lifetimes and resource event. Its world binding uses
+`GameplayCollisionOwner::dispatchSkeletonBulletCollision` and the stored
+`StartupRuntime::dispatchSkeletonBulletCollision` validate the selected
+bullet/skeleton lifetimes and resource event. Both world bindings use
 retained source motion, the runner point-direction wrapper, caller SoundPlay
 state and the owned effect pool (including caller myFx publication). Destruction
 does not retire the executing bullet. Controller delay, audio backend and atan
-remain supplied dependencies. The complete mixed collision scheduler and stored
-backend binding are still required before natural encounter admission.
+remain supplied dependencies. The stored path publishes the registered actor's
+health back to its instance record and retains the effect's source numeric ID;
+the native path retains its generation handle. The complete mixed collision
+scheduler and actual controller/audio dependencies are still required before
+natural encounter admission. Controlled contacts after scheduled bullet Step
+verify the bindings, not natural pair selection or Windows-runner equivalence.
 
 Run `make verify-machine-gun-source-motion verify-smoke-direction
 verify-smoke-trig`. The source-motion test covers birth narrowing, raw RNG

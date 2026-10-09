@@ -1270,15 +1270,19 @@ public:
         const bool ok=tick();sourceBulletDispatch_=nullptr;sourceBulletContext_=nullptr;
         return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
     }
-    bool sourceBulletVelocity(InstanceHandle shot,MotionBinary64& x,MotionBinary64& y)const{
-        if(!run_.effectsSucceeded||!instances_.resolve(shot))return false;
+    const MainBulletState* retainedSourceBullet(InstanceHandle shot)const{
+        if(!run_.effectsSucceeded||!instances_.resolve(shot))return nullptr;
         for(std::size_t i=0;i<mainBulletCount_;++i){const auto& bullet=mainBullets_[i];
             if(bullet.instance.slot!=shot.slot||bullet.instance.generation!=shot.generation)continue;
-            const auto& motion=bullet.sourceMotion;
-            if(!bullet.sourceOwned||!motion.initialized||!motion.xsp.valid()||!motion.ysp.valid())return false;
-            x=motion.xsp;y=motion.ysp;return true;
+            return bullet.sourceOwned&&bullet.sourceMotion.initialized?&bullet:nullptr;
         }
-        return false;
+        return nullptr;
+    }
+    bool sourceBulletVelocity(InstanceHandle shot,MotionBinary64& x,MotionBinary64& y)const{
+        const auto* bullet=retainedSourceBullet(shot);if(!bullet)return false;
+        const auto& motion=bullet->sourceMotion;
+        if(!motion.xsp.valid()||!motion.ysp.valid())return false;
+        x=motion.xsp;y=motion.ysp;return true;
     }
     template<class Ops,class Frames>
     bool stepSourceBullet(InstanceHandle shot,MachineGunSourceMotion& motion,Ops& ops,Frames frames){
@@ -1583,6 +1587,50 @@ public:
             if(event.code==1066){actor.collideTimeField();return true;}
             auto player=makePlayer(actor);return actor.collidePlayerPublished(player,good);
         })&&run_.effectsSucceeded;
+    }
+    template<unsigned Capacity,class Frames,class Delay,class Audio,class Atan>
+    bool dispatchSkeletonBulletCollision(StoredSkeletonRegistration<instanceCapacity,Capacity>& skeletons,
+        const RunnerCollisionEventContext::Frame& event,Frames frames,Delay delay,
+        SoundPlayEnvironment& environment,Audio& audio,Atan atan){
+        const auto* self=instances_.resolve(event.self);const auto* other=instances_.resolve(event.other);
+        const auto* bullet=retainedSourceBullet(event.self);PackedObjectEvent binding{};bool found=false;
+        if(!run_.effectsSucceeded||!skeletons.belongsTo(instances_)||!skeletons.valid()||!self||!other||!bullet||
+           !objectPack_||self->objectId!=261||other->objectId!=120||event.type!=4||event.subtype!=120||
+           event.owner!=261||event.code!=2224||!objectPack_->collisionEvent(261,120,found,binding)||!found||
+           binding.ownerObjectId!=261||binding.codeId!=2224)return run_.effectsSucceeded=false;
+        const auto target=skeletons.handle(*other);const auto direction=bullet->sourceMotion.direction;
+        const int damage=machineGunProfile(bullet->gemHigh).damage;
+        const bool ok=skeletons.dispatch(target,[&](auto& actor,auto&,bool& good){
+            struct Events {
+                StartupRuntime& world;StoredSkeletonRegistration<instanceCapacity,Capacity>& skeletons;
+                InstanceHandle shot,target;Frames& frames;Delay& delay;
+                SoundPlayEnvironment& environment;Audio& audio;Atan& atan;bool& good;
+                bool clearHitIgnore(){
+                    auto* caller=world.instances_.resolve(shot);if(!caller)return false;
+                    caller->bulletHitIgnore=false;return true;
+                }
+                bool destroyBullet(){return world.markBulletDestroyed(shot);}
+                bool impactAngle(MotionBinary64& angle){
+                    const auto* caller=world.retainedSourceBullet(shot);const auto* other=skeletons.instances().find(target);
+                    return caller&&other&&RunnerPointDirection::evaluate(caller->sourceMotion.x.promoted(),
+                        caller->sourceMotion.y.promoted(),other->x.promoted(),other->y.promoted(),angle,atan);
+                }
+                bool momentDelay(){return delay();}
+                bool bulletHitSound(int sound,int priority,bool loop,bool cut){
+                    auto* caller=world.instances_.resolve(shot);int voice=0;
+                    return caller&&SoundPlayScript::plain(caller->sound,environment,audio,sound,priority,loop,cut,voice,good);
+                }
+                bool impactEffect(int sprite,MotionBinary64 speed,MotionBinary64 angle,int depth){
+                    const auto* caller=world.retainedSourceBullet(shot);if(!caller)return false;
+                    const auto x=caller->sourceMotion.x.promoted(),y=caller->sourceMotion.y.promoted();
+                    return world.withBulletEffects(shot,frames,[&](auto& effects){
+                        return EffectSpawnScript::run(effects,x,y,sprite,speed,angle,MotionBinary64::fromInteger(depth));
+                    });
+                }
+            } events{*this,skeletons,event.self,target,frames,delay,environment,audio,atan,good};
+            return actor.hitByMachineGunChecked(damage,direction,events,good);
+        });
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
     }
     template<unsigned Capacity,class Frames,class Damage> bool dispatchBoneCollision(
         StoredBoneRegistration<instanceCapacity,Capacity>& bones,

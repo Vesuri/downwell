@@ -2148,7 +2148,8 @@ int main(){
         const auto before=world->randomDrawCount();world->step({},false);
         require(!world->effectsSucceeded()&&world->randomDrawCount()==before,"missing source dispatch fails before any tick mutation");
     }
-    for(bool corpseTarget:{false,true}){
+    for(unsigned contactCase=0;contactCase<3;++contactCase){
+        const bool corpseTarget=contactCase!=0,failSound=contactCase==2;
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
         require(owner->attach(*world),"attach concrete source bullet adapter");world->skipToGameForTesting();
@@ -2192,6 +2193,45 @@ int main(){
         }
         require(calls==1&&(corpseTarget?(owner->resolve(shot)&&!owner->resolve(shot)->destroyRequested):!owner->resolve(shot)),
             "bone impact retires the shot, but zero-health corpse leaves it moving");
+        if(corpseTarget){
+            auto skeletons=world->skeletonRegistration<1>();InstanceHandle target;
+            const auto* bullet=world->retainedSourceBullet(shot);std::int32_t x,y;
+            require(bullet&&bullet->sourceMotion.x.promoted().roundPixel(x)&&bullet->sourceMotion.y.promoted().roundPixel(y)&&
+                world->spawnSkeleton(skeletons,x,y,target),"register skeleton beside retained scheduled bullet");
+            struct HitAudio {
+                bool fail;unsigned calls=0;
+                bool isPlaying(int id,bool& playing){require(++calls==1&&id==29,"damage sound lookup");playing=false;return true;}
+                bool stop(int){return false;}
+                bool play(int id,int priority,bool loop,int& voice){require(++calls==2&&id==29&&priority==90&&!loop,"damage sound start");voice=123;return !fail;}
+                bool getGain(int id,MotionBinary64& gain){require(++calls==3&&id==123,"damage sound gain read");gain=MotionBinary64::fromInteger(1);return true;}
+                bool setGain(int id,MotionBinary64 gain,int duration){require(++calls==4&&id==123&&gain.high==0x3ff00000u&&!gain.low&&!duration,"damage sound gain write");return true;}
+                bool setPitch(int id,MotionBinary64 pitch){require(++calls==5&&id==123&&pitch.high==0x3ff00000u&&!pitch.low,"damage sound pitch");return true;}
+            } audio{failSound};
+            SoundPlayEnvironment environment;unsigned delays=0;RunnerCollisionEventContext context;
+            const auto before=world->randomDrawCount();const auto effects=world->scriptEffects().size();
+            const bool hitOkay=context.dispatch(shot,skeletons.worldHandle(target),{true,false},
+                [&](auto self,auto other,int& subtype,bool& found,PackedObjectEvent& event){
+                    const auto* a=owner->resolve(self);const auto* b=owner->resolve(other);
+                    if(!a||!b)return false;subtype=b->objectId;return objects.collisionEvent(a->objectId,b->objectId,found,event);
+                },[&](const auto& event){return world->dispatchSkeletonBulletCollision(skeletons,event,frames,
+                    [&]{++delays;return owner->resolve(shot)&&owner->resolve(shot)->destroyRequested;},
+                    environment,audio,[](auto dy,auto dx,auto& angle){return portableAtan(dy,dx,angle);});});
+            require(hitOkay==!failSound,"stored enemy collision dispatch preserves backend failure");
+            const auto* victim=skeletons.instances().find(target);const auto* caller=owner->resolve(shot);
+            if(failSound){
+                require(!world->effectsSucceeded()&&victim&&victim->state.health==51&&victim->state.hitDamage==9&&
+                    victim->state.damageStun&&caller&&caller->destroyRequested&&delays==1&&audio.calls==2&&
+                    world->scriptEffects().size()==effects&&world->randomDrawCount()==before,
+                    "failed audio retains damage/destruction prefix and prevents effect and second delay");
+                continue; // Terminal failed simulation: never retry or resume this event.
+            }
+            require(victim&&victim->state.health==51&&victim->state.hitDamage==9&&victim->state.hitPending&&
+                victim->state.damageStun&&delays==2&&audio.calls==5&&caller&&caller->destroyRequested&&!caller->bulletHitIgnore&&
+                caller->bulletMyFx&&world->scriptEffects().size()==effects+1&&world->randomDrawCount()==before,
+                "stored skeleton damage preserves health, delays, sound, effect ownership and RNG");
+            require(owner->resolve(skeletons.worldHandle(target))->health==51,"publish damaged skeleton health to stored instance");
+            require(skeletons.clear(),"clear explicitly registered skeleton contact target");
+        }
         require(bones.clear()&&corpses.clear(),"clear explicitly registered adapter targets");
     }
     for(bool high:{false,true})for(bool laser:{false,true})for(bool boneTarget:{false,true})for(bool worldRandom:{false,true}){

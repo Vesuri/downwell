@@ -90,6 +90,7 @@ struct InstanceRecord {
     CurrencyRewardFields boxReward{};
     std::uint32_t boxMyFx=0; // scrEffectSpawn's source numeric child ID on object 92.
     std::uint32_t bulletMyFx=0; // Last scrEffectSpawn child, retained through destruction requests.
+    bool bulletHitIgnore=false;
     std::int32_t boxMyBullet=-4,boxTarget=-4; // Source numeric values, never local generation keys.
     SoundPlayState sound{};
 };
