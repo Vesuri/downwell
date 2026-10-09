@@ -69,9 +69,11 @@ int main(int argc,char** argv){
             require(records->wallEvent(r,1,random,ro)&&native->wallEvent(n,1,random,no),"select retained frames");
         }
         static AmigaTerrainTiles empty;
-        for(unsigned pass=0;pass<3;++pass){
-            if(pass==1)require(records->requestDestroy(records->handle(0))&&native->markDestroyed(native->handle(0)),"mark one coincident wall");
-            if(pass==2)require(native->retire(native->handle(0)),"retire marked native wall");
+        for(unsigned pass=0;pass<5;++pass){
+            if(pass==1||pass==2)require(records->activation(records->handle(0),pass==2)&&
+                native->activation(native->handle(0),pass==2),"toggle one coincident wall");
+            if(pass==3)require(records->requestDestroy(records->handle(0))&&native->markDestroyed(native->handle(0)),"mark one coincident wall");
+            if(pass==4)require(native->retire(native->handle(0)),"retire marked native wall");
             std::vector<UBYTE> a(downwellGameRingBytes),b(a.size()),ha(downwellLayerBytes),hb(ha.size());
             AmigaRenderer reference{},candidate{};
             amigaRendererInit(&reference,a.data(),ha.data());amigaRendererInit(&candidate,b.data(),hb.data());

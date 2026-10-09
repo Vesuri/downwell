@@ -36,6 +36,7 @@ public:
         bool (*create)(void*,const Identity&,int,std::uint32_t&)=nullptr;
         bool (*collision)(void*,const Identity&,bool)=nullptr;
         bool (*presentation)(void*,const Identity&,int,int)=nullptr;
+        bool (*activation)(void*,const Identity&,bool,std::uint32_t)=nullptr;
     };
     bool spatialFlags(InstanceHandle h,std::uint32_t& out)const{
         if(!contains(h))return false;
@@ -45,10 +46,10 @@ public:
     }
     bool bind(Binding binding){
         if(!good_)return false;
-        if(!binding.context&&(binding.admit||binding.birth||binding.retire||binding.mark||binding.create||binding.collision||binding.presentation))return good_=false;
+        if(!binding.context&&(binding.admit||binding.birth||binding.retire||binding.mark||binding.create||binding.collision||binding.presentation||binding.activation))return good_=false;
         if(binding_.context)return binding_.context==binding.context&&binding_.admit==binding.admit&&
             binding_.birth==binding.birth&&binding_.retire==binding.retire&&binding_.mark==binding.mark&&binding_.create==binding.create&&
-            binding_.collision==binding.collision&&binding_.presentation==binding.presentation;
+            binding_.collision==binding.collision&&binding_.presentation==binding.presentation&&binding_.activation==binding.activation;
         if(binding.context&&(!binding.admit||!binding.birth||!binding.retire||!binding.mark||size()))return good_=false;
         binding_=binding;return true;
     }
@@ -197,6 +198,19 @@ public:
         if(id.object==60)wallPresentationState_=true;
         if(before>=0&&binding_.collision&&!binding_.collision(binding_.context,id,false))return good_=false;
         return stepping_?true:notifyPresentation(id,before,-1,before>=0);
+    }
+    bool activation(InstanceHandle h,bool active){
+        Identity id;std::uint32_t spatial;
+        if(!readIdentity(h,id)||!spatialFlags(h,spatial))return good_=false;
+        const int before=drawSprite(h);
+        if(binding_.activation&&!binding_.activation(binding_.context,id,active,spatial))return good_=false;
+        flags_[h.slot]=active?(flags_[h.slot]&~2u):(flags_[h.slot]|2u);
+        const int after=drawSprite(h);
+        if(before!=after){
+            wallPresentationState_=true;
+            if(binding_.collision&&!binding_.collision(binding_.context,id,after>=0))return good_=false;
+        }
+        return stepping_?true:notifyPresentation(id,before,after,before!=after);
     }
     bool retire(InstanceHandle h){
         if(stepping_||!good_||!runs_.contains(h)||!(flags_[h.slot]&1)||

@@ -2191,6 +2191,39 @@ int main(){
         }
     }
     auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
+    for(auto mode:{GameplayCollisionOwner::Ownership::native,GameplayCollisionOwner::Ownership::nativeScenery}){
+        struct Notice {
+            std::vector<bool> collision;std::vector<int> sprites;
+            bool changed(int x,int y,bool enabled){assert(x==240&&y==160);collision.push_back(enabled);return true;}
+            bool changed(int x,int y,int before,int after){assert(x==240&&y==160);sprites.push_back(before);sprites.push_back(after);return true;}
+        } notice;
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
+            GameplayTerrainInstances::Presentation::bind(notice),GameplayTerrainInstances::WallCollision::bind(notice),&rooms,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),owner->breakableBinding(),
+            owner->playerBinding(),nullptr,&rooms);
+        auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
+        assert(owner->attach(*world)&&world->bindNativeTerrain(*terrain)&&terrain->append(60,240,160));
+        const auto h=terrain->handle(0);assert(terrain->createProperties(h,51));
+        auto pairs=std::make_unique<RunnerCollisionPairs<GameplayCollisionView::capacity,64>>();
+        assert(owner->collectCollisionPairs(*pairs));
+        std::uint32_t flags;assert(terrain->spatialFlags(h,flags)&&!(flags&8u)&&(flags&0x8000u));
+        auto queued=[&](bool collision){unsigned count=0;
+            assert(owner->visitNativeDirty(collision,[&](InstanceHandle item){
+                assert(item.slot==GameplayCollisionView::terrainBase+h.slot&&item.generation==h.generation);++count;return true;}));
+            return count;
+        };
+        assert(world->activateNativeTerrain(h,false)&&world->activateNativeTerrain(h,false));
+        assert(terrain->spatialFlags(h,flags)&&(flags&2u)&&!(flags&8u)&&(flags&0x8000u));
+        assert(!queued(false)&&!queued(true));
+        assert(world->activateNativeTerrain(h,true)&&world->activateNativeTerrain(h,true));
+        assert(terrain->spatialFlags(h,flags)&&!(flags&10u)&&queued(false)==1&&queued(true)==1);
+        assert(owner->flushNativeSpatial()&&!queued(false)&&queued(true)==1);
+        assert(world->destroyNativeTerrain(h)&&world->activateNativeTerrain(h,false)&&world->activateNativeTerrain(h,true));
+        assert(notice.collision==std::vector<bool>({false,true,false}));
+        assert(notice.sprites==std::vector<int>({51,-1,-1,51,51,-1}));
+        assert(terrain->spatialFlags(h,flags)&&(flags&1u)&&!(flags&2u));
+        assert(terrain->retire(h)&&!world->activateNativeTerrain(h,true));
+    }
     for(unsigned transition:{0u,1u,2u,3u}){
         std::vector<unsigned> expected;
         for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,

@@ -1271,6 +1271,17 @@ public:
             [](void* p,const GameplayWorld::NativeTerrain::Identity& id,int before,int after){
                 auto& self=*static_cast<GameplayCollisionOwner*>(p);
                 return self.check(self.nativeTerrainPresentation_.notify(id.x,id.y,before,after));
+            },
+            [](void* p,const GameplayWorld::NativeTerrain::Identity& id,bool active,std::uint32_t flags){
+                auto& self=*static_cast<GameplayCollisionOwner*>(p);
+                if(!self.valid())return false;
+                const unsigned slot=View::terrainBase+id.handle.slot;
+                if(active&&(flags&2u)&&!self.nativeDirty(slot,id.object,flags))return false;
+                if(bool(flags&2u)==active)self.table_.externalFlagsChanged(slot);
+                // Only immediate flags and collision queues are published
+                // here. Native terrain's deferred room/layer membership must
+                // be connected before complete mixed scheduler admission.
+                return true;
             }
         }))return check(false);
 #ifndef DOWNWELL_REFERENCE_BREAKABLES

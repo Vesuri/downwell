@@ -127,6 +127,15 @@ The call targets and Step subtype arguments are asserted directly by the
 field-lookup verifier. This does not establish every alternate frame or
 room-transition path, nor the wrapper's other maintenance operations.
 
+Native run-owned terrain activation publishes immediate flag `2`, cache
+contributions and presentation notices without retiring its identity or
+removing its spatial entry. Reactivation queues spatial/collision work under
+the original object-flag gates, without setting bounds-dirty bit `8`; repeated
+activation is idle for those queues. End Step coalesces presentation notices
+but not collision exclusion, including destruction followed by deactivation.
+This immediate terrain path does not yet publish deferred room/layer requests;
+it must not be mistaken for complete mixed-room reconciliation.
+
 The native `GameplayWorld` calls its borrowed phase-boundary hook after Begin
 Step, alarms, ordinary Step, collisions, and the implemented End Step work.
 Attaching `GameplayCollisionOwner` installs reconciliation at these boundaries.

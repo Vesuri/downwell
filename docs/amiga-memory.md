@@ -6,7 +6,7 @@ memory requirement.
 
 ## Native terrain identities
 
-`nativeTerrainStorage` reserves 104,524 bytes of ordinary BSS on the 68000,
+`nativeTerrainStorage` reserves 104,528 bytes of ordinary BSS on the 68000,
 outside Chip RAM and the task stack. It retains at most 2,048 terrain
 lifetimes in birth order. Adjacent generated cells share identity/geometry
 descriptors; coincident and authored walls remain distinct. The bounded
@@ -32,7 +32,8 @@ of code 986. One transient pointer and handle expose current event mutations
 to synchronous callbacks; the packed state retains the failure prefix after
 an event returns. No generic property record or duplicate geometry is added.
 The lifetime binding also forwards collision-cache and presentation notices;
-these callbacks add eight bytes on the target, not per-cell storage.
+these callbacks add eight bytes on the target, not per-cell storage. A further
+four-byte callback publishes activation changes to the shared collision owner.
 Two store-wide flags track retained presentation and unbounded artwork.
 The painter visits intersecting identity runs after wall-state mutations;
 untouched scenes retain the indexed batch compositor. No draw-record array is

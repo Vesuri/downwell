@@ -62,6 +62,7 @@ int main(int argc,char** argv){
         const auto h=prepare(native,0);GameMakerRandom random;
         Ops first;first.neighbors=first.diagonals=15;
         assert(native.wallEvent(h,1,random,first)&&notice.presentation==1&&!notice.collision);
+        assert(native.setWallDeactivation(h,true));
         struct DestroyOps:Ops {
             Native& owner;InstanceHandle key;Notice& notice;
             DestroyOps(Native& n,InstanceHandle h,Notice& sink):owner(n),key(h),notice(sink){}
@@ -70,8 +71,10 @@ int main(int argc,char** argv){
                 assert(owner.markDestroyed(key)&&notice.collision==1&&notice.presentation==1);
                 return true;
             }
+            bool deactivate(){++deactivations;return owner.activation(key,false);}
         } next(native,h,notice);
         assert(native.wallEvent(h,1,random,next)&&notice.presentation==2&&notice.collision==1);
+        std::uint32_t flags;assert(native.spatialFlags(h,flags)&&(flags&3u)==3u&&next.deactivations==1);
         Ops skipped;assert(native.wallEvent(h,1,random,skipped)&&skipped.trace.empty());
         assert(native.markDestroyed(h)&&notice.presentation==2&&notice.collision==1&&native.retire(h));
     }
