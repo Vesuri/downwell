@@ -472,6 +472,12 @@ bool compilePaletteEffect(downwell::PaletteEffectSurface<>& surface,
 #include "core/SmokeComposition.h"
 #include "core/CurrencySmokeComposition.h"
 #include "core/SmokeEffects.h"
+#include "core/StoredSmokeRegistration.h"
+bool compileRegisteredSmoke(downwell::StoredSmokeRegistration<16,4>& owner,
+    downwell::GameMakerRandom& random,const downwell::InstanceRecord& record,std::uint32_t& id){
+    return owner.create({}, {},random,id)&&owner.step(record,random)&&
+        owner.advanceAnimation(record)&&owner.alarmEvent(record,0)&&owner.wallContact(record)&&owner.clear();
+}
 bool compileSmokePublication(downwell::SmokeMotion& smoke,downwell::GameMakerRandom& random,bool& good){
     struct Publish {
         bool imageSpeed(downwell::RunnerImageValue){return true;}

@@ -27,6 +27,7 @@
 #include "StoredTimeShardRegistration.h"
 #include "StoredCorpseRegistration.h"
 #include "StoredCorpseExpiryRegistration.h"
+#include "StoredSmokeRegistration.h"
 #include "StoredTimeChangeRegistration.h"
 #include "StoredEntryDitherRegistration.h"
 #include "GameplayDitherAbove.h"
@@ -412,6 +413,24 @@ public:
     }
     enum class SkeletonPhase {animation,alarm,step,endStep,cleanup};
     enum class CorpsePhase {animation,alarm,step,endStep,cleanup};
+    enum class SmokePhase {animation,alarm,step,cleanup};
+    template<unsigned Capacity,class Tick>
+    bool withSmokeEvents(StoredSmokeRegistration<instanceCapacity,Capacity>& registration,Tick tick){
+        if(!run_.effectsSucceeded)return false;
+        if(smokeDispatch_||!registration.belongsTo(instances_)||!registration.valid())return run_.effectsSucceeded=false;
+        auto dispatch=[&](const InstanceRecord& record,SmokePhase phase,unsigned index){
+            if(phase==SmokePhase::animation)return registration.advanceAnimation(record);
+            if(phase==SmokePhase::cleanup)return registration.retire(record);
+            if(phase==SmokePhase::alarm)return registration.alarmEvent(record,index);
+            return registration.step(record,random_);
+        };
+        smokeContext_=&dispatch;
+        smokeDispatch_=[](void* p,const InstanceRecord& r,SmokePhase phase,unsigned index){
+            return (*static_cast<decltype(dispatch)*>(p))(r,phase,index);
+        };
+        const bool ok=tick();smokeDispatch_=nullptr;smokeContext_=nullptr;
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok&&registration.valid();
+    }
     template<unsigned Capacity,class Tick>
     bool withCorpseExpiryEvents(StoredCorpseExpiryRegistration<instanceCapacity,Capacity>& registration,Tick tick){
         if(!run_.effectsSucceeded)return false;
@@ -779,6 +798,14 @@ public:
     }
     template<unsigned Capacity> StoredCorpseExpiryRegistration<instanceCapacity,Capacity> corpseExpiryRegistration(){
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
+    }
+    template<unsigned Capacity> StoredSmokeRegistration<instanceCapacity,Capacity> smokeRegistration(){
+        return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
+    }
+    template<unsigned Capacity> bool createRegisteredSmoke(StoredSmokeRegistration<instanceCapacity,Capacity>& registry,
+        MotionBinary64 x,MotionBinary64 y,std::uint32_t& id){
+        if(!registry.belongsTo(instances_))return run_.effectsSucceeded=false;
+        return registry.create(x,y,random_,id);
     }
     template<unsigned Capacity,class Source,class Tile> bool createRegisteredCorpseFromDeath(
         StoredCorpseRegistration<instanceCapacity,Capacity>& registry,Source& source,
@@ -1674,6 +1701,8 @@ private:
     bool (*corpseDispatch_)(void*,const InstanceRecord&,CorpsePhase,unsigned)=nullptr;
     void* corpseContext_=nullptr;
     void* corpseExpiryContext_=nullptr;
+    void* smokeContext_=nullptr;
+    bool (*smokeDispatch_)(void*,const InstanceRecord&,SmokePhase,unsigned)=nullptr;
     bool (*corpseExpiryDispatch_)(void*,const InstanceRecord&,bool)=nullptr;
     void* droneContext_=nullptr;
     void* timeEffectContext_=nullptr;

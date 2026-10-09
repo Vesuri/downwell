@@ -1087,6 +1087,26 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         require(oracle.destroyRequested&&expired==1&&expiry.clear()&&corpses.clear(),
             "expiry chain completes once without leaked room records");
         audit.verify(*runtime);
+        auto smoke=runtime->smokeRegistration<1>();std::uint32_t smokeId=0;
+        require(runtime->createRegisteredSmoke(smoke,downwell::MotionBinary64::fromInteger(240),
+            downwell::MotionBinary64::fromInteger(1200),smokeId),"registered smoke synchronous Create");
+        require(runtime->instance(smokeId)&&smoke.state(*runtime->instance(smokeId))&&
+            !smoke.state(*runtime->instance(smokeId))->allSet,"smoke waits for first room Step");
+        unsigned smokeFrames=0;
+        while(runtime->instance(smokeId)&&smokeFrames<200){
+            require(runtime->withSmokeEvents(smoke,[&]{runtime->step(false);return runtime->effectsSucceeded();}),
+                "registered smoke joins actual room phases");
+            ++smokeFrames;
+            if(const auto* r=runtime->instance(smokeId)){
+                const auto* s=smoke.state(*r);downwell::RunnerImageValue x,y,index;
+                std::memcpy(&x.bits,&r->preciseX,4);std::memcpy(&y.bits,&r->preciseY,4);
+                std::memcpy(&index.bits,&r->imageIndex,4);
+                require(s&&s->allSet&&s->x.bits==x.bits&&s->y.bits==y.bits&&s->imageIndex.bits==index.bits,
+                    "smoke publishes position and animation to real room record");
+            }
+        }
+        require(smokeFrames>1&&smokeFrames<200&&!runtime->instance(smokeId)&&smoke.clear(),
+            "smoke Animation End retires at room cleanup");
         downwell::InstanceHandle failedCaller;
         require(runtime->spawnSkeleton(skeletons,240,1200,failedCaller),"failure-retention caller");
         const auto failedBody=runtime->nextRuntimeInstanceId();unsigned callbacks=0;
