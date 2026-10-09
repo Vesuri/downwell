@@ -1298,6 +1298,12 @@ room-speed binding. This entry replaces the plain migration pass for such a
 world; it must not run as an additional family pass. Combining all remaining
 actor/effect admissions and installing the complete production scheduler remain
 required. No successful placeholder audio backend is installed by this entry.
+The overload accepting smoke and consumption-blood registrations includes their
+225/60 and 223/60 contacts in that same collection and dispatch. It does not
+invoke the effect-only pass afterward: each smoke overlap scales speed once,
+and marked particles remain owned until cleanup. Admission is still restricted
+to these implemented pairs; broader wall families and their reverse handlers
+are not implicitly enabled.
 
 Run `make verify-machine-gun-source-motion verify-smoke-direction
 verify-smoke-trig`. The source-motion test covers birth narrowing, raw RNG

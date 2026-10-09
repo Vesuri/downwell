@@ -2197,6 +2197,8 @@ int main(){
         require(calls==1&&(corpseTarget?(owner->resolve(shot)&&!owner->resolve(shot)->destroyRequested):!owner->resolve(shot)),
             "bone impact retires the shot, but zero-health corpse leaves it moving");
         if(corpseTarget){
+            auto pass=std::make_unique<StoredDitherCollisionPass>(*owner);
+            require(pass->run(*world),"settle dither before new contact participants enter the queue");
             auto skeletons=world->skeletonRegistration<1>();InstanceHandle target;
             const auto* bullet=world->retainedSourceBullet(shot);std::int32_t x,y;
             require(bullet&&bullet->sourceMotion.x.promoted().roundPixel(x)&&bullet->sourceMotion.y.promoted().roundPixel(y)&&
@@ -2211,11 +2213,37 @@ int main(){
                 bool setPitch(int id,MotionBinary64 pitch){require(++calls==5&&id==123&&pitch.high==0x3ff00000u&&!pitch.low,"damage sound pitch");return true;}
             } audio{failSound};
             SoundPlayEnvironment environment;
-            const auto before=world->randomDrawCount();const auto effects=world->scriptEffects().size();
-            auto pass=std::make_unique<StoredDitherCollisionPass>(*owner);
+            const auto effects=world->scriptEffects().size();
+            auto smoke=world->smokeRegistration<1>();auto particles=world->consumptionBloodRegistration<1>();
+            const InstanceRecord* wall=nullptr;
+            for(unsigned i=0;i<world->activeInstanceCount();++i){const auto& r=world->instanceAt(i);
+                if(r.objectId==60&&!r.destroyRequested){wall=&r;break;}}
+            require(wall,"live wall for simultaneous damage/effect contacts");
+            const int wx=wall->x,wy=wall->y;std::uint32_t smokeId=0,particleId=0;
+            require(world->createRegisteredSmoke(smoke,MotionBinary64::fromInteger(wx),MotionBinary64::fromInteger(wy),smokeId),
+                "create smoke beside retained wall during bullet contact fixture");
+            const auto* smokeRecord=world->instance(smokeId);
+            require(smokeRecord&&smoke.alarmEvent(*smokeRecord,0),"enable registered smoke contact");
+            struct ParticleGlobals {
+                MotionBinary64 grav{};
+                bool gravity(MotionBinary64 value){grav=value;return true;}
+                MotionBinary64 gravity(){return grav;}MotionBinary64 fallSpeed(){return {};}
+            } globals;
+            require(world->createRegisteredConsumptionBlood(particles,MotionBinary64::fromInteger(wx+4),
+                MotionBinary64::fromInteger(wy+4),globals,particleId),"create registered particle on retained wall");
+            auto expectedSmoke=*smoke.state(*smokeRecord);unsigned smokeContacts=0;
+            InstanceHandle smokeKey{};
+            for(unsigned i=0;i<world->activeInstanceCount();++i)
+                if(world->instanceAt(i).instanceId==smokeId)smokeKey=world->instanceHandleAt(i);
+            for(unsigned i=0;i<world->activeInstanceCount();++i){const auto& r=world->instanceAt(i);
+                if(r.objectId!=60||r.destroyRequested)continue;
+                bool overlap=false;require(owner->collisionOverlap(smokeKey,world->instanceHandleAt(i),overlap),"count actual smoke overlaps");
+                if(overlap){++smokeContacts;require(expectedSmoke.collideWall(),"source smoke response per wall");}}
+            require(smokeContacts,"mixed pass has overlapping smoke");
+            const auto contactDraws=world->randomDrawCount();
             int roomSpeed=60;
             const bool hitOkay=world->withMomentDelayRoomSpeed(roomSpeed,[&]{
-                return pass->runSkeletonContacts(*world,skeletons,frames,environment,audio,
+                return pass->runSkeletonContacts(*world,skeletons,smoke,particles,frames,environment,audio,
                     [](auto dy,auto dx,auto& angle){return portableAtan(dy,dx,angle);});
             });
             require(hitOkay==!failSound,"stored enemy collision dispatch preserves backend failure");
@@ -2229,15 +2257,20 @@ int main(){
             if(failSound){
                 require(!world->effectsSucceeded()&&victim&&victim->state.health==51&&victim->state.hitDamage==9&&
                     victim->state.damageStun&&caller&&caller->destroyRequested&&audio.calls==2&&
-                    world->scriptEffects().size()==effects&&world->randomDrawCount()==before,
+                    world->scriptEffects().size()==effects&&world->randomDrawCount()==contactDraws,
                     "failed audio retains damage/destruction prefix and prevents effect and second delay");
                 continue; // Terminal failed simulation: never retry or resume this event.
             }
             require(victim&&victim->state.health==51&&victim->state.hitDamage==9&&victim->state.hitPending&&
                 victim->state.damageStun&&audio.calls==5&&caller&&caller->destroyRequested&&!caller->bulletHitIgnore&&
-                caller->bulletMyFx&&world->scriptEffects().size()==effects+1&&world->randomDrawCount()==before,
+                caller->bulletMyFx&&world->scriptEffects().size()==effects+1&&world->randomDrawCount()==contactDraws,
                 "stored skeleton damage preserves health, delays, sound, effect ownership and RNG");
             require(owner->resolve(skeletons.worldHandle(target))->health==51,"publish damaged skeleton health to stored instance");
+            const auto* actualSmoke=smoke.state(*smokeRecord);const auto* particle=world->instance(particleId);
+            require(actualSmoke&&actualSmoke->speed.high==expectedSmoke.speed.high&&actualSmoke->speed.low==expectedSmoke.speed.low&&
+                particle&&particle->destroyRequested&&particles.state(*particle)->destroyRequested,
+                "one combined stream applies every smoke wall response and marks particle beside skeleton damage");
+            require(smoke.clear()&&particles.clear(),"clear registered effects after mixed contact verification");
             require(skeletons.clear(),"clear explicitly registered skeleton contact target");
         }
         require(bones.clear()&&corpses.clear(),"clear explicitly registered adapter targets");

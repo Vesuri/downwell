@@ -24,18 +24,50 @@ public:
     bool runSkeletonContacts(StartupRuntime& world,
         StoredSkeletonRegistration<StartupRuntime::instanceCapacity,Capacity>& skeletons,
         Frames frames,Delay delay,SoundPlayEnvironment& environment,Audio& audio,Atan atan){
+        return runSkeletonContactsSelected(world,skeletons,frames,delay,environment,audio,atan,
+            [](const auto&,const auto&){return false;},
+            [&](const auto& event){return world.dispatchDitherAboveCollision(event);});
+    }
+    // Damage and its registered smoke/consumption particles share collection,
+    // dispatch and deferred destruction with the authored wall controller.
+    template<unsigned Capacity,unsigned SmokeCapacity,unsigned ParticleCapacity,class Frames,class Audio,class Atan>
+    bool runSkeletonContacts(StartupRuntime& world,
+        StoredSkeletonRegistration<StartupRuntime::instanceCapacity,Capacity>& skeletons,
+        StoredSmokeRegistration<StartupRuntime::instanceCapacity,SmokeCapacity>& smoke,
+        StoredConsumptionBloodRegistration<StartupRuntime::instanceCapacity,ParticleCapacity>& particles,
+        Frames frames,SoundPlayEnvironment& environment,Audio& audio,Atan atan){
+        if(!smoke.valid()||!particles.valid())return false;
+        auto effect=[&](const auto& r){return (r.objectId==225&&smoke.state(r))||
+            (r.objectId==223&&particles.state(r));};
+        return runSkeletonContactsSelected(world,skeletons,frames,[&]{return world.requestMomentDelay();},
+            environment,audio,atan,[&](const auto& a,const auto& b){
+                return (b.objectId==60&&effect(a))||(a.objectId==60&&effect(b));
+            },[&](const auto& event){
+                const auto* self=owner_.resolve(event.self);if(!self)return false;
+                if(self->objectId==225)return world.dispatchSmokeCollision(smoke,event);
+                if(self->objectId==223)return world.dispatchConsumptionBloodCollision(particles,event);
+                return world.dispatchDitherAboveCollision(event);
+            });
+    }
+private:
+    template<unsigned Capacity,class Frames,class Delay,class Audio,class Atan,class Admit,class Execute>
+    bool runSkeletonContactsSelected(StartupRuntime& world,
+        StoredSkeletonRegistration<StartupRuntime::instanceCapacity,Capacity>& skeletons,
+        Frames frames,Delay delay,SoundPlayEnvironment& environment,Audio& audio,Atan atan,
+        Admit admit,Execute execute){
         if(!owner_.boundTo(world)||!skeletons.valid())return false;
         auto selected=[&](InstanceHandle key,const auto& bullet,const auto& enemy){
             return bullet.objectId==261&&enemy.objectId==120&&
                 world.retainedSourceBullet(key)&&skeletons.handle(enemy).generation;
         };
-        return runSelected(world,[&](auto ka,auto kb,const auto& a,const auto& b){return selected(ka,a,b)||selected(kb,b,a);},
+        return runSelected(world,[&](auto ka,auto kb,const auto& a,const auto& b){return selected(ka,a,b)||selected(kb,b,a)||admit(a,b);},
             [&](const auto& event){
                 const auto* self=owner_.resolve(event.self);if(!self)return false;
                 return self->objectId==261?world.dispatchSkeletonBulletCollision(skeletons,event,frames,delay,environment,audio,atan):
-                    world.dispatchDitherAboveCollision(event);
+                    execute(event);
             });
     }
+public:
     bool run(StartupRuntime& world){
         return runSelected(world,[](auto,auto,const auto&,const auto&){return false;},
             [&](const auto& event){return world.dispatchDitherAboveCollision(event);});
