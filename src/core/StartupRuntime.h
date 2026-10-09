@@ -47,6 +47,7 @@
 #include "StoredBloodRegistration.h"
 #include "StoredSkeletonRegistration.h"
 #include "StoredBlastRegistration.h"
+#include "BlastSkeletonContact.h"
 #include "RegisteredSkeletonThrow.h"
 #include "RegisteredSkeletonStomp.h"
 #include "BoneViewRetirement.h"
@@ -1844,6 +1845,28 @@ public:
            binding.ownerObjectId!=223||event.owner!=223||event.code!=binding.codeId||
            (event.code!=2007&&event.code!=2008))return run_.effectsSucceeded=false;
         return run_.effectsSucceeded=particles.kill(*self)&&run_.effectsSucceeded;
+    }
+    template<unsigned BlastCapacity,unsigned SkeletonCapacity,class Impact,class Audio>
+    bool dispatchBlastSkeletonCollision(StoredBlastRegistration<instanceCapacity,BlastCapacity>& blasts,
+        StoredSkeletonRegistration<instanceCapacity,SkeletonCapacity>& skeletons,
+        const RunnerCollisionEventContext::Frame& event,Impact impact,SoundPlayEnvironment& environment,Audio& audio){
+        if(!run_.effectsSucceeded)return false;
+        const auto* self=instances_.resolve(event.self);const auto* other=instances_.resolve(event.other);
+        PackedObjectEvent binding{};bool found=false;
+        if(!blasts.belongsTo(instances_)||!blasts.valid()||!skeletons.belongsTo(instances_)||!skeletons.valid()||
+           !self||!other||!objectPack_||self->objectId!=276||other->objectId!=120||
+           event.type!=4||event.subtype!=120||event.owner!=276||event.code!=2331||
+           !objectPack_->collisionEvent(276,120,found,binding)||!found||binding.ownerObjectId!=276||binding.codeId!=2331)
+            return run_.effectsSucceeded=false;
+        const auto local=blasts.handle(*self),target=skeletons.handle(*other);
+        const auto* caller=blasts.instances().find(local);if(!caller)return run_.effectsSucceeded=false;
+        const auto x=caller->x.promoted(),y=caller->y.promoted();const auto id=other->instanceId;
+        return run_.effectsSucceeded=blasts.dispatch(local,[&](auto& blast,auto& publish,bool& good){
+            return skeletons.dispatch(target,[&](auto& actor,auto&,bool& targetGood){
+                const bool ok=blastSkeletonContact(blast,actor,id,x,y,publish,[&]{return requestMomentDelay();},impact,environment,audio,good);
+                return targetGood=targetGood&&ok;
+            });
+        });
     }
     template<unsigned Capacity> bool dispatchSmokeCollision(
         StoredSmokeRegistration<instanceCapacity,Capacity>& smoke,

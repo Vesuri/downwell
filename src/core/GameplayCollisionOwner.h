@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_GAMEPLAY_COLLISION_OWNER_H
 #define DOWNWELL_CORE_GAMEPLAY_COLLISION_OWNER_H
 #include "GameplayCollisionView.h"
+#include "BlastSkeletonContact.h"
 #include "BoxDestructionScript.h"
 #include "MainRoomLifetime.h"
 #include "RunnerSpatialInstances.h"
@@ -2160,6 +2161,25 @@ public:
            !objects_.collisionEvent(261,120,found,binding)||!found||
            binding.ownerObjectId!=261||binding.codeId!=2224)return check(false);
         return check(world_->hitSkeletonWithSourceBullet(shot,target,frames,delay,environment,audio,atan));
+    }
+    template<class Impact,class Audio>
+    bool dispatchBlastSkeletonCollision(const RunnerCollisionEventContext::Frame& event,Impact impact,
+        SoundPlayEnvironment& environment,Audio& audio){
+        View::Kind kind,targetKind;InstanceHandle local,target;PackedObjectEvent binding{};bool found=false;
+        if(!valid()||!world_||!resolves(event.self)||!resolves(event.other)||
+           !View::decode(event.self,kind,local)||kind!=View::Kind::blast||
+           !View::decode(event.other,targetKind,target)||targetKind!=View::Kind::skeleton||
+           event.type!=4||event.subtype!=120||event.owner!=276||event.code!=2331||
+           !objects_.collisionEvent(276,120,found,binding)||!found||binding.ownerObjectId!=276||binding.codeId!=2331)return check(false);
+        const auto* caller=blasts_.find(local);const auto* enemy=skeletons_.find(target);
+        if(!caller||!enemy)return check(false);
+        const auto x=caller->x.promoted(),y=caller->y.promoted();const unsigned id=enemy->sourceId;
+        return check(blasts_.dispatch(local,[&](auto& blast,auto& publish,bool& good){
+            return skeletons_.dispatch(target,[&](auto& actor,auto&,bool& targetGood){
+                const bool ok=blastSkeletonContact(blast,actor,id,x,y,publish,[&]{return requestMomentDelay();},impact,environment,audio,good);
+                return targetGood=targetGood&&ok;
+            });
+        }));
     }
     bool dispatchSmokeCollision(const RunnerCollisionEventContext::Frame& event){
         View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;

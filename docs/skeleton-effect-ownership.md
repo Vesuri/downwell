@@ -387,6 +387,20 @@ planar variants. Blast art uses ordinary default Draw, not the effects surface.
 Natural source-ID allocation and mixed collision dispatch remain required
 before admitting the bound stomp adapter in encounters.
 
+`dispatchBlastSkeletonCollision` validates both current lifetimes and the
+resource-bound object-276 collision code 2331 with subtype 120. Both worlds use
+`blastSkeletonContact` for the target fields: source-ID hit memory precedes hit
+and direction writes, health subtraction, stun, delay, sound, impact and the
+second delay. Skeleton health remains integral; nonintegral or out-of-range
+writes fail instead of being rounded. The specialization uses object 120's
+inherited non-immune/non-through state, not a rule for all enemies.
+The impact callback remains an explicit synchronous source-219 creation and
+caller-`myFx` publication dependency. Event-adapter tests cover live target
+writes, duplicate suppression and failed-impact retention; they do not prove
+mixed spatial collection or natural encounter admission. Native blast wall
+contacts also require original numeric IDs for breakable hit memory; native
+storage slots are not valid substitutes.
+
 Effect-producing callbacks return success. `SkeletonActor` stops the event on
 failed enemy-death setup, blood, smoke, flash, currency, corpse or debris
 creation; stomp blood and each Exploding Knees smoke emission have the same

@@ -15,6 +15,7 @@
 #include "core/StoredDitherCollisionPass.h"
 #include "SkeletonSoundChecks.h"
 #include "RegisteredSkeletonStompChecks.h"
+#include "BlastSkeletonChecks.h"
 #include "core/TimeChangeEffects.h"
 #include "core/EventScheduler.h"
 #include "core/RunnerObjectFamilies.h"
@@ -1656,6 +1657,26 @@ int main(){
             });good=!knees;return good;
         });
         require(ok==!knees&&blood.instances().size()==2,"registered stomp retains both blood births");
+    }
+    for(bool rejectImpact:{false,true}){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach blast contact world");world->skipToGameForTesting();
+        auto blasts=world->blastRegistration<1>();auto skeletons=world->skeletonRegistration<1>();InstanceHandle blast,skeleton;
+        const auto targetId=world->nextRuntimeInstanceId();
+        require(world->spawnSkeleton(skeletons,240,200,skeleton),"birth blast victim");
+        int speed=60;
+        const bool ok=world->withMomentDelayRoomSpeed(speed,[&]{
+            if(!world->spawnBlast(blasts,{0x406e0800u,0},MotionBinary64::fromInteger(200),blast))return false;
+            checkBlastSkeleton(rejectImpact,targetId,[&](auto impact,auto& env,auto& audio){
+                RunnerCollisionEventContext context;
+                return owner->dispatchCollisionEvent(context,blasts.worldHandle(blast),skeletons.worldHandle(skeleton),{true,false},
+                    [&](const auto& event){return world->dispatchBlastSkeletonCollision(blasts,skeletons,event,impact,env,audio);});
+            },[&]()->const auto&{return blasts.instances().find(blast)->state;},
+              [&]()->const auto&{return skeletons.instances().find(skeleton)->state;});
+            return !rejectImpact;
+        });
+        require(ok==!rejectImpact&&world->effectsSucceeded()==!rejectImpact,"blast target event completion");
     }
     for(bool rejectSound:{false,true})for(int style:{0,2}){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
