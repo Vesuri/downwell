@@ -1,4 +1,5 @@
 #include "core/SmokeMotion.h"
+#include "core/SmokeInstances.h"
 #include "core/SmokeDirection.h"
 #include "core/SmokeTrig.h"
 #include "core/GameMakerRandom.h"
@@ -7,12 +8,89 @@
 #include <cstdio>
 #include <cstdlib>
 using downwell::MotionBinary64;
-static void check(bool ok){if(!ok)std::abort();}
+static void checked(bool ok,int line){if(!ok){std::fprintf(stderr,"Smoke check failed at line %d\n",line);std::abort();}}
+#define check(expression) checked(bool(expression),__LINE__)
 static MotionBinary64 number(double x){std::uint64_t b;std::memcpy(&b,&x,8);return {std::uint32_t(b>>32),std::uint32_t(b)};}
 static bool same(MotionBinary64 x,double y){auto n=number(y);return x.high==n.high && x.low==n.low;}
 static bool outside(double sx,double sy,double x,double y){
     const float dx=float(x-sx),dy=float(y-sy),xx=dx*dx,yy=dy*dy,total=xx+yy;
     return double(float(std::sqrt(double(total))))-16>1e-5;
+}
+struct NativeSmokeAudit {
+    using Record=downwell::SmokeInstances<1>::Record;
+    int reject=-1;unsigned moves=0,marks=0,retires=0;
+    bool birth(downwell::InstanceHandle key,const Record& r){
+        check(key.generation==r.lifetimeId&&r.sourceId>=105187&&r.state.imageSpeed.bits==0x3f800000u);
+        return reject!=0;
+    }
+    bool birthAt(downwell::InstanceHandle key,const Record& r,downwell::RunnerImageValue x,downwell::RunnerImageValue y){
+        check(x.bits==r.x.bits&&y.bits==r.y.bits);return birth(key,r);
+    }
+    bool transform(downwell::InstanceHandle,const Record&,downwell::RunnerTransformField,
+        downwell::RunnerImageValue,downwell::RunnerImageValue,std::uint32_t){return true;}
+    bool mask(downwell::InstanceHandle,const Record&,int){return true;}
+    bool retire(downwell::InstanceHandle,const Record&){++retires;return reject!=4;}
+    bool activation(downwell::InstanceHandle,const Record&,bool){return true;}
+    bool membership(downwell::InstanceHandle,const Record&,bool){return true;}
+    bool move(downwell::InstanceHandle,const Record& r,downwell::RunnerImageValue x,downwell::RunnerImageValue y){
+        ++moves;check(x.bits==r.state.x.bits&&y.bits==r.state.y.bits);return reject!=1;
+    }
+    bool sprite(downwell::InstanceHandle,const Record&,int){return true;}
+    bool imageIndex(downwell::InstanceHandle,const Record&,downwell::RunnerImageValue){return reject!=2;}
+    bool markDestroyed(downwell::InstanceHandle,const Record& r){++marks;check(r.state.destroyRequested&&!r.destroyRequested);return reject!=3;}
+};
+static void nativeSmoke(){
+    using Owner=downwell::SmokeInstances<1>;
+    unsigned frames=0;
+    for(unsigned seed=0;seed<64;++seed){
+        NativeSmokeAudit audit;Owner owner(Owner::Binding::bindPositionedActor(audit));
+        downwell::GameMakerRandom random(seed),oracleRandom(seed);downwell::InstanceHandle key;
+        downwell::SmokeEffect oracle;
+        check(owner.create(105187,number(240.25),number(192.5),random,key)&&
+            oracle.create(number(240.25),number(192.5),oracleRandom));
+        check(key.generation!=105187&&owner.sourceHandle(105187).generation==key.generation);
+        check(owner.activate(key,false));const auto draws=random.drawCount();
+        check(owner.step(key,random)&&owner.advanceAnimation(key)&&random.drawCount()==draws&&audit.moves==0);
+        check(owner.activate(key,true));
+        while(!oracle.destroyRequested){
+            check(owner.advanceAnimation(key)&&oracle.advanceImage());
+            if(!oracle.destroyRequested){
+                check(owner.step(key,random)&&oracle.step(oracleRandom,[](auto s,auto d,auto& x,auto& y){
+                    return downwell::SmokeDirection::vector(s,d,x,y,downwell::smokeTrig);
+                }));
+            }
+            const auto* r=owner.find(key);
+            check(r&&r->x.bits==oracle.x.bits&&r->y.bits==oracle.y.bits&&
+                r->state.imageIndex.bits==oracle.imageIndex.bits&&r->destroyRequested==oracle.destroyRequested);
+            check(random.drawCount()==oracleRandom.drawCount());
+            for(unsigned i=0;i<16;++i)check(random.stateWord(i)==oracleRandom.stateWord(i));
+            check(++frames<10000);
+        }
+        check(owner.size()==1&&audit.marks==1&&audit.retires==0&&owner.retire(key)&&!owner.find(key));
+        const auto old=key;
+        check(owner.create(105188,{}, {},random,key)&&key.generation>old.generation&&!owner.find(old)&&owner.clear());
+    }
+    for(int reject=0;reject<5;++reject){
+        NativeSmokeAudit audit;Owner owner(Owner::Binding::bindPositionedActor(audit));
+        downwell::GameMakerRandom random(2);downwell::InstanceHandle key;bool worldGood=true;owner.observeFailure(worldGood);
+        if(reject==0)audit.reject=0;
+        const bool born=owner.create(105187,{}, {},random,key);
+        if(reject==0)check(!born&&random.drawCount()==0&&owner.size()==1);
+        else{
+            check(born);audit.reject=reject;
+            if(reject==1)check(!owner.step(key,random)&&audit.moves==1);
+            else if(reject==2)check(!owner.advanceAnimation(key));
+            else{
+                unsigned limit=0;
+                while(owner.valid()&&!owner.find(key)->destroyRequested){owner.advanceAnimation(key);check(++limit<200);}
+                if(reject==4)check(!owner.retire(key));
+            }
+        }
+        check(!owner.valid()&&!worldGood);const auto draws=random.drawCount();
+        check(!owner.step(key,random)&&random.drawCount()==draws);
+        audit.reject=-1;check(owner.clear()&&owner.size()==0);
+    }
+    std::printf("Native smoke: %u scalar/RNG-matched frames, deferred retirement and five callback failures passed\n",frames);
 }
 static void publishedSteps(){
     for(unsigned seed=0;seed<1024;++seed){
@@ -75,6 +153,7 @@ static void publishedSteps(){
     std::puts("Smoke publication: 40960 scalar/RNG matches and 4096 terminal callback failures passed");
 }
 int main(){
+    nativeSmoke();
     publishedSteps();
     unsigned steps=0,escapes=0;
     for(unsigned seed=0;seed<1024;++seed){

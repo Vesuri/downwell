@@ -473,6 +473,12 @@ bool compilePaletteEffect(downwell::PaletteEffectSurface<>& surface,
 #include "core/CurrencySmokeComposition.h"
 #include "core/SmokeEffects.h"
 #include "core/StoredSmokeRegistration.h"
+#include "core/SmokeInstances.h"
+bool compileNativeSmoke(downwell::SmokeInstances<32>& owner,downwell::GameMakerRandom& random,std::uint32_t id){
+    downwell::InstanceHandle key;
+    return owner.create(id,{}, {},random,key)&&owner.step(key,random)&&owner.advanceAnimation(key)&&
+        owner.alarmEvent(key,0)&&owner.wallContact(key)&&owner.activate(key,false)&&owner.clear();
+}
 bool compileRegisteredSmoke(downwell::StoredSmokeRegistration<16,4>& owner,
     downwell::GameMakerRandom& random,const downwell::InstanceRecord& record,std::uint32_t& id){
     downwell::SmokeBurstCaller caller;
