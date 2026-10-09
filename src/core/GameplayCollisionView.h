@@ -8,7 +8,7 @@ namespace downwell {
 // and lifetimeId do not. Borrowed views never cache pointers across a mutation.
 class GameplayCollisionView {
 public:
-    enum class Kind {player,enemy,breakable,terrain,timeField,goalField,exitController,bullet,scriptEffect,debris,timeChange,entryDither,drone,bone,skeleton,blood,currency,ditherAbove,builder,timeShard};
+    enum class Kind {player,enemy,breakable,terrain,timeField,goalField,exitController,bullet,scriptEffect,debris,timeChange,entryDither,drone,bone,skeleton,blood,currency,ditherAbove,builder,timeShard,playerController};
     static constexpr unsigned enemyBase=1;
     static constexpr unsigned breakableBase=enemyBase+GameplayWorld::enemyCapacity;
     static constexpr unsigned terrainBase=breakableBase+GameplayWorld::breakableCapacity;
@@ -28,7 +28,8 @@ public:
     static constexpr unsigned ditherAboveBase=currencyBase+GameplayWorld::currencyCapacity;
     static constexpr unsigned builderBase=ditherAboveBase+1;
     static constexpr unsigned timeShardBase=builderBase+1;
-    static constexpr unsigned capacity=timeShardBase+64;
+    static constexpr unsigned playerControllerBase=timeShardBase+64;
+    static constexpr unsigned capacity=playerControllerBase+GameplayPlayerControllers::capacity;
     struct Record {
         const GameplayWorld::PlayerInstance* player=nullptr;
         const GameplayWorld::EnemyState* enemy=nullptr;
@@ -53,6 +54,7 @@ public:
         const GameplayWorld::Currency::Record* currency=nullptr;
         const GameplayDitherAbove::Record* ditherAbove=nullptr;
         const GameplayBuilderController::Record* builder=nullptr;
+        const GameplayPlayerControllers::Record* playerController=nullptr;
     };
     explicit GameplayCollisionView(const GameplayWorld& world):world_(world){}
     static bool encode(Kind kind,InstanceHandle local,InstanceHandle& key){
@@ -71,6 +73,7 @@ public:
             case Kind::debris:base=debrisBase;count=GameplayDebrisInstances::capacity;break;
             case Kind::timeChange:base=timeChangeBase;count=8;break;
             case Kind::timeShard:base=timeShardBase;count=64;break;
+            case Kind::playerController:base=playerControllerBase;count=GameplayPlayerControllers::capacity;break;
             case Kind::entryDither:base=entryDitherBase;count=GameplayEntryDithers::capacity;break;
             case Kind::drone:base=droneBase;count=GameplayWorld::droneBulletCapacity;break;
             case Kind::bone:base=boneBase;count=GameplayWorld::boneCapacity;break;
@@ -86,6 +89,7 @@ public:
     }
     static bool decode(InstanceHandle key,Kind& kind,InstanceHandle& local){
         if(!key.generation||key.slot>=capacity)return false;
+        if(key.slot>=playerControllerBase){kind=Kind::playerController;local={key.slot-playerControllerBase,key.generation};return true;}
         if(key.slot>=timeShardBase){kind=Kind::timeShard;local={key.slot-timeShardBase,key.generation};return true;}
         if(key.slot>=builderBase){kind=Kind::builder;local={key.slot-builderBase,key.generation};return true;}
         if(key.slot>=ditherAboveBase){kind=Kind::ditherAbove;local={key.slot-ditherAboveBase,key.generation};return true;}
@@ -141,6 +145,7 @@ public:
             else if constexpr(Family==Kind::currency)return world_.currencyInstances()?world_.currencyInstances()->find(local):nullptr;
             else if constexpr(Family==Kind::ditherAbove)return world_.ditherAbove()?world_.ditherAbove()->find(local):nullptr;
             else if constexpr(Family==Kind::builder)return world_.builderController()?world_.builderController()->find(local):nullptr;
+            else if constexpr(Family==Kind::playerController)return world_.playerControllers()?world_.playerControllers()->find(local):nullptr;
             else {static_assert(Family==Kind::skeleton,"Unknown collision family");
                 return world_.skeletons()?world_.skeletons()->find(local):nullptr;}
         };
@@ -154,6 +159,9 @@ private:
         if(!decode(key,kind,local))return false;
         Record next;
         switch(kind){
+            case Kind::playerController:
+                if(!world_.playerControllers()||!(next.playerController=world_.playerControllers()->find(local)))return false;
+                break;
             case Kind::timeShard:
                 if(!world_.timeShardInstances()||!(next.timeShard=world_.timeShardInstances()->find(local)))return false;
                 break;

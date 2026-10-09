@@ -113,6 +113,14 @@ Already-entered standalone/replay fixtures retain construction-time birth;
 resource-less fixtures retain the explicit late ID handoff. Neither route yet
 owns the complete controller population or synchronous player-child
 sequence, so this does not establish the global dynamic-ID stream.
+`GameplayPlayerControllers` provides native lifetime storage for player-created
+objects 66 and 64. Its resource-backed owner uses supplied source IDs and local
+generation handles separately, retains binary32 position publications, and
+registers activation/layer membership. Retry and next-room teardown retire these
+records before reconstruction; local generations are not rewound. This is an
+explicit-birth boundary, not automatic player Create: controller Create/Step/Draw
+bodies and allocation through the full synchronous child stream must still be
+connected. No invisible placeholder births or fixed ID reservations are used.
 The room-entry field likewise resolves authored object 371's ID 101097 before
 its lifecycle birth, scale publications and random-radius Create. Its registered
 layer lifetime retains that ID; first-level destruction and Retry retire the

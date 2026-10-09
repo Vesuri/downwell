@@ -25,6 +25,7 @@
 #include "core/GameplayEntryDithers.h"
 #include "core/GameplayDitherAbove.h"
 #include "core/GameplayBuilderController.h"
+#include "core/GameplayPlayerControllers.h"
 #include "core/DroneBulletInstances.h"
 #include "core/BoneProjectileInstances.h"
 #include "core/SkeletonInstances.h"
@@ -326,6 +327,11 @@ public:
     const downwell::GameplayEntryDithers* entryDithers()const{return entryDithers_;}
     const downwell::GameplayDitherAbove* ditherAbove()const{return ditherAbove_;}
     const downwell::GameplayBuilderController* builderController()const{return builderController_;}
+    const downwell::GameplayPlayerControllers* playerControllers()const{return playerControllers_;}
+    bool bindPlayerControllers(downwell::GameplayPlayerControllers& records){
+        if(playerControllers_||!records.valid()||records.size())return false;
+        playerControllers_=&records;return true;
+    }
     bool bindBuilderController(downwell::GameplayBuilderController& actor){
         if(builderController_||!actor.valid()||actor.handle().generation)return false;
         builderController_=&actor;return true;
@@ -1577,6 +1583,7 @@ private:
     downwell::GameplayEntryDithers* entryDithers_=nullptr;
     downwell::GameplayDitherAbove* ditherAbove_=nullptr;
     downwell::GameplayBuilderController* builderController_=nullptr;
+    downwell::GameplayPlayerControllers* playerControllers_=nullptr;
     bool ditherLowSpec_=false,ditherEnding_=false;
     DroneBullets* droneBullets_=nullptr;
     Bones* bones_=nullptr;

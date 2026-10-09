@@ -62,6 +62,10 @@ bool nativeFieldWind(downwell::GameplayCollisionOwner& owner,const downwell::Run
     downwell::TimeFieldWind& wind,int& channel,NativeCurrencyAudioProbe& audio){
     return owner.dispatchTimeFieldWind(event,wind,channel,downwell::MotionBinary64::fromInteger(1),audio);
 }
+bool nativePlayerControllerBirth(downwell::GameplayCollisionOwner& owner,unsigned source,
+    downwell::RunnerImageValue x,downwell::RunnerImageValue y,downwell::InstanceHandle& key){
+    return owner.playerControllers().create(64,source,x,y,key);
+}
 bool nativeRegisteredTimeShardStep(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle shared,
     const downwell::SpriteMaskPack& masks,bool stopped){
     return owner.stepTimeShard(shared,stopped,masks);
@@ -308,6 +312,7 @@ static void checkTypedCollisionView(const GameplayCollisionView& view,GameplayCo
         case K::debris:assert(view.resolveLocal<K::debris>(local)==reference.debris);break;
         case K::timeChange:assert(view.resolveLocal<K::timeChange>(local)==reference.timeChange);break;
         case K::timeShard:assert(view.resolveLocal<K::timeShard>(local)==reference.timeShard);break;
+        case K::playerController:assert(view.resolveLocal<K::playerController>(local)==reference.playerController);break;
         case K::entryDither:assert(view.resolveLocal<K::entryDither>(local)==reference.entryDither);break;
         case K::drone:assert(view.resolveLocal<K::drone>(local)==reference.drone);break;
         case K::bone:assert(view.resolveLocal<K::bone>(local)==reference.bone);break;
@@ -1697,6 +1702,41 @@ int main(){
             }
             if(mode==GameplayCollisionOwner::Ownership::reference)expected=actual;else assert(actual==expected);
         }
+    }
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                  GameplayCollisionOwner::Ownership::nativeScenery}){
+        const auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},&rooms,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain(),&rooms);
+        assert(owner->attach(*world));
+        auto& controllers=owner->playerControllers();InstanceHandle meter,camera,shared;
+        RunnerImageValue x,y,negative;x.assignInteger(240);y.assignInteger(176);negative.assignInteger(-100);
+        const auto draws=world->randomDrawCount();
+        assert(controllers.create(66,105187,negative,y,meter)&&controllers.create(64,105188,x,y,camera));
+        assert(controllers.size()==2&&controllers.find(meter)->sourceId==105187&&controllers.find(camera)->sourceId==105188);
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::playerController,camera,shared));
+        checkTypedCollisionView(GameplayCollisionView(*world),GameplayCollisionView::Kind::playerController,camera);
+        PackedObject cameraObject;assert(objects.findObject(64,cameraObject));
+        if(mode==GameplayCollisionOwner::Ownership::reference)
+            assert(owner->state(shared)&&owner->properties(shared)->sprite.spriteId==cameraObject.spriteId);
+        auto flags=[&]{std::uint32_t result=0;unsigned found=0;
+            assert(owner->visitRegistrationOrder([&](auto key,int object,std::uint32_t value){
+                if(key.slot==shared.slot&&key.generation==shared.generation){assert(object==64);result=value;++found;}return true;
+            })&&found==1);return result;};
+        assert(controllers.activation(camera,false)&&!controllers.find(camera)->active&&(flags()&2u));
+        assert(controllers.activation(camera,true)&&!(flags()&2u));
+        x.bits=0x43704000u; // 240.25: no integer position substitute.
+        assert(controllers.position(camera,x,y)&&controllers.find(camera)->x.bits==x.bits);
+        if(mode==GameplayCollisionOwner::Ownership::reference)assert(owner->state(shared)->x.bits==x.bits);
+        unsigned found=0;assert(owner->visitRegistrationOrder([&](auto key,int object,auto){
+            if(key.slot==shared.slot&&key.generation==shared.generation){assert(object==64);++found;}return true;
+        })&&found==1&&world->randomDrawCount()==draws);
+        assert(world->restartFromResults(DeathMenuSequence::Action::Retry,43,300)==ResultsDestination::gameplay);
+        assert(owner->valid()&&world->effectsSucceeded()&&controllers.size()==0&&!controllers.find(camera)&&!owner->state(shared));
+        InstanceHandle next;
+        assert(controllers.create(64,105200,x,y,next)&&next.generation!=camera.generation&&controllers.clear());
     }
     for(int area=1;area<=5;++area){
         auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites);
