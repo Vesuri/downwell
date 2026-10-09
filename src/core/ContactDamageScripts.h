@@ -12,6 +12,13 @@ struct ContactDamageScripts {
     TypicalPlayerDamage typical;
     PlayerDamage player;
     ForcedPlayerJump jump;
+    template<class Events,class CreateField>
+    bool execute(MotionBinary64 amount,MotionBinary64 horizontal,MotionBinary64 vertical,
+        Events& events,CreateField createField){
+        return typical.executeCalls(amount,horizontal,vertical,events,createField,
+            [&](MotionBinary64 value){return player.execute(value,events);},
+            [&](MotionBinary64 x,MotionBinary64 y){return jump.execute(x,y,events);});
+    }
 };
 }
 #endif

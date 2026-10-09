@@ -1876,7 +1876,7 @@ public:
     // Allocation belongs to the complete room creation stream. Request it
     // inside each admitted instance_create, not before immunity/Timeout/stop
     // checks or once for the whole player WITH traversal.
-    template<class Events,class Allocate> bool typicalPlayerDamage(downwell::TypicalPlayerDamage& caller,
+    template<class Caller,class Events,class Allocate> bool typicalPlayerDamage(Caller& caller,
         downwell::MotionBinary64 amount,downwell::MotionBinary64 horizontal,
         downwell::MotionBinary64 vertical,Events& events,Allocate allocate){
         if(!run_.effectsSucceeded)return false;

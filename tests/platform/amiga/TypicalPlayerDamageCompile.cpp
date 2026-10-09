@@ -21,6 +21,8 @@ struct DamageEvents {
     bool damagePlayer(MotionBinary64);
     bool lengthdirX(MotionBinary64,MotionBinary64,MotionBinary64&);
     bool forcedJump(MotionBinary64,MotionBinary64);
+    void setSpinJumping();
+    bool recharge(),setGrounded(bool),setHorizontal(MotionBinary64),setVertical(MotionBinary64);
     bool playerDead(),playerHealthPositive(),timeoutOwned(),timeStopped();
     bool setDamageSourceName(),candleOwned(),subtractHealth(MotionBinary64);
     bool damageNumber(MotionBinary64,MotionBinary64),sound(int,int,int,int),duckMusic(int,MotionBinary64);
@@ -55,7 +57,7 @@ struct NumberDraw {
     void align(int),color(int);
     bool text(MotionBinary64,MotionBinary64,MotionBinary64);
 };
-bool nativeTypicalDamage(GameplayWorld& world,downwell::TypicalPlayerDamage& caller,
+bool nativeTypicalDamage(GameplayWorld& world,downwell::ContactDamageScripts& caller,
     DamageEvents& events,bool (*allocate)(std::uint32_t&)){
     return world.typicalPlayerDamage(caller,MotionBinary64::fromInteger(1),
         MotionBinary64::fromInteger(3),MotionBinary64::fromInteger(2),events,allocate);

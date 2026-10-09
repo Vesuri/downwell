@@ -4,6 +4,7 @@
 #include <cassert>
 #include <cstdio>
 #include <vector>
+#include <algorithm>
 using namespace downwell;
 static auto n(int v){return MotionBinary64::fromInteger(v);}
 static bool equal(MotionBinary64 a,MotionBinary64 b){return a.high==b.high && a.low==b.low;}
@@ -62,7 +63,62 @@ struct Events {
     void clearNoDamage(){record(19);}
     void clearAreaNoDamage(){record(20);}
 };
+struct CombinedEvents:Events {
+    ContactDamageScripts* scripts=nullptr;
+    int health=4,slow=0,roomSpeed=60,playerAlarm=-1,controllerAlarm=-1;
+    bool spin=false,grounded=true,mutateRecharge=false;
+    MotionBinary64 vx{},vy{};
+    bool setDamageSourceName(){return record(21);}
+    bool candleOwned(){record(22);return false;}
+    bool subtractHealth(MotionBinary64 amount){assert(equal(amount,n(1)));--health;return record(23);}
+    bool damageNumber(MotionBinary64 amount,MotionBinary64 direction){
+        assert(health==3&&equal(amount,n(1))&&equal(direction,n(315)));return record(24);
+    }
+    bool sound(int id,int priority,bool loop,bool variation){
+        assert(id==5&&priority==90&&!loop&&!variation);return record(25);
+    }
+    bool duckMusic(int milliseconds,MotionBinary64 gain){
+        assert(milliseconds==500&&equal(gain,{0x3fe66666u,0x66666666u}));return record(26);
+    }
+    void setHit(){record(27);}
+    struct Controller {
+        CombinedEvents& events;
+        void setSlow(int value){events.slow=value;events.record(30);}
+        bool setAlarm(unsigned index,int value){assert(index==0);events.controllerAlarm=value;return events.record(31);}
+    };
+    template<class Visit> bool forEachController(Visit visit){
+        if(!record(28))return false;Controller controller{*this};return visit(controller);
+    }
+    void setRoomSpeed(int value){roomSpeed=value;record(29);}
+    void setPlayerDamaged(){immune=true;record(32);}
+    bool setPlayerAlarm(unsigned index,int value){assert(index==1);playerAlarm=value;return record(33);}
+    void setSpinJumping(){spin=true;record(34);}
+    bool recharge(){if(mutateRecharge)scripts->jump.vertical=n(5);return record(35);}
+    bool setGrounded(bool value){grounded=value;return record(36);}
+    bool setHorizontal(MotionBinary64 value){vx=value;return record(37);}
+    bool setVertical(MotionBinary64 value){vy=value;return record(38);}
+};
 int main(){
+    const std::vector<int> combined{1,2,3,4,5,6,21,22,10,1,23,2,3,4,5,6,24,25,26,27,28,29,30,31,
+        32,33,8,34,35,36,37,38,10,11,12,2,3,13,14,15,16,17,18,39,16,17,18,39,19,20};
+    for(bool mutate:{false,true}){
+        BoneProjectile bone;CombinedEvents events;events.scripts=&bone.damageScripts;events.mutateRecharge=mutate;
+        unsigned fields=0;
+        assert(bone.damageScripts.execute(n(1),n(3),n(2),events,[&](int x,int y){
+            assert(x==200+int(fields)&&y==600+int(fields));++fields;return events.record(39);
+        }));
+        assert(events.log==combined&&events.health==3&&events.immune&&events.playerAlarm==90&&
+            events.roomSpeed==40&&events.slow==23&&events.controllerAlarm==40&&events.spin&&!events.grounded&&
+            equal(events.vx,n(2))&&equal(events.vy,n(mutate?-5:-2))&&fields==2);
+        assert(bone.damageScripts.player.hitInvulnerability==90&&equal(bone.damageScripts.jump.horizontal,n(2)));
+    }
+    for(int failure:{21,23,24,25,26,28,31,33,35,36,37,38,39}){
+        SkeletonActor skeleton;CombinedEvents events;events.scripts=&skeleton.damageScripts;events.fail=failure;
+        assert(!skeleton.damageScripts.execute(n(1),n(3),n(2),events,[&](int,int){return events.record(39);}));
+        assert(events.log.back()==failure);
+        auto end=std::find(combined.begin(),combined.end(),failure);
+        assert(end!=combined.end()&&events.log==std::vector<int>(combined.begin(),end+1));
+    }
     const std::vector<int> expected{1,2,3,4,5,6,7,8,9,10,11,12,2,3,13,14,15,16,17,18,16,17,18,19,20};
     for(unsigned seed=0;seed<256;++seed){
         RunSession run;BoneProjectile bone;auto& caller=bone.damageScripts.typical;

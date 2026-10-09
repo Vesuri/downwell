@@ -2045,7 +2045,7 @@ public:
     // Runtime object-82 creation (Timeout), unlike adoption of a builder's
     // already consumed Create sample. Publish the room identity before RNG.
     bool spawnOrdinaryTimeField(int x,int y,InstanceHandle& child);
-    template<class Events> bool typicalPlayerDamage(TypicalPlayerDamage& caller,
+    template<class Caller,class Events> bool typicalPlayerDamage(Caller& caller,
         MotionBinary64 amount,MotionBinary64 horizontal,MotionBinary64 vertical,Events& events){
         if(!run_.effectsSucceeded)return false;
         return run_.effectsSucceeded=caller.execute(amount,horizontal,vertical,events,

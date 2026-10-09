@@ -7,6 +7,7 @@ struct TimeoutDamageEvents {
     using Number=downwell::MotionBinary64;
     bool immune=false,timeout=true,stopped=false,stopSecond=true;
     unsigned players=0,clears=0;
+    int alarm=-1;bool spin=false,grounded=true;Number vx{},vy{};
     bool playerDamaged(){return immune;}
     Number playerX(){return Number::fromInteger(240);}
     Number playerY(){return Number::fromInteger(40000);}
@@ -16,6 +17,22 @@ struct TimeoutDamageEvents {
     bool damagePlayer(Number){return true;}
     bool lengthdirX(Number speed,Number,Number& out){out=speed;return true;}
     bool forcedJump(Number,Number){return true;}
+    bool setDamageSourceName(){return true;}
+    bool candleOwned(){return false;}
+    bool subtractHealth(Number){return false;}
+    bool damageNumber(Number,Number){return false;}
+    bool sound(int,int,bool,bool){return false;}
+    bool duckMusic(int,Number){return false;}
+    void setHit(){}
+    template<class Visit> bool forEachController(Visit){return false;}
+    void setRoomSpeed(int){}
+    void setPlayerDamaged(){immune=true;}
+    bool setPlayerAlarm(unsigned index,int ticks){alarm=ticks;return index==1;}
+    void setSpinJumping(){spin=true;}
+    bool recharge(){return true;}
+    bool setGrounded(bool value){grounded=value;return true;}
+    bool setHorizontal(Number value){vx=value;return true;}
+    bool setVertical(Number value){vy=value;return true;}
     bool playerDead(){return true;}
     bool shake(int,int){return false;}
     bool playerHealthPositive(){return false;}

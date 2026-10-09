@@ -2628,13 +2628,14 @@ int main(){
             if(scenario==6)id=0;
             return scenario!=4&&!(scenario==5&&allocations==2);
         };
-        const bool okay=scene->typicalPlayerDamage(caller.damageScripts.typical,MotionBinary64::fromInteger(1),
+        const bool okay=scene->typicalPlayerDamage(caller.damageScripts,MotionBinary64::fromInteger(1),
             MotionBinary64::fromInteger(3),MotionBinary64::fromInteger(2),events,allocate);
         const bool failure=scenario>=4&&scenario<=6;
         const unsigned count=scenario==0||scenario==5?1:scenario==7?2:0;
         assert(okay==!failure&&scene->effectsSucceeded()==!failure&&scene->timeFields().size()==count&&
             scene->randomDrawCount()==draws+count&&events.clears==unsigned(!failure&&scenario!=1)*2);
         assert(allocations==(scenario==4||scenario==6?1:scenario==5||scenario==7?2:count));
+        assert(events.spin==(scenario!=1)&&events.grounded==(scenario==1)&&events.alarm==(scenario==1?-1:90));
         if(count){
             const auto* field=scene->timeFields().at(0);
             assert(field->sourceId==210001&&field->x==240&&field->y==40100);
@@ -2642,7 +2643,7 @@ int main(){
                 assert(collision->playerTimeFieldInstance(x,y,masks,result)&&result.id>=210001);}
         }
         if(failure){const auto saved=allocations;
-            assert(!scene->typicalPlayerDamage(caller.damageScripts.typical,{}, {}, {},events,allocate)&&allocations==saved);}
+            assert(!scene->typicalPlayerDamage(caller.damageScripts,{}, {}, {},events,allocate)&&allocations==saved);}
     }
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
                   GameplayCollisionOwner::Ownership::nativeScenery}){

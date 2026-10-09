@@ -1716,11 +1716,11 @@ int main(){
             require(world->playerTimeFieldInstance(x,y,selected)&&selected.id==static_cast<int>(id),
                 "new Timeout field participates in source identity queries immediately");
             TimeoutDamageEvents events;
-            TypicalPlayerDamage damage;owner->before=world->randomDrawCount();
+            ContactDamageScripts damage;owner->before=world->randomDrawCount();
             const auto next=world->nextRuntimeInstanceId();
             require(world->typicalPlayerDamage(damage,MotionBinary64::fromInteger(1),
                 MotionBinary64::fromInteger(3),MotionBinary64::fromInteger(2),events)&&
-                events.players==2&&events.clears==2&&world->timeFields().size()==count+2&&
+                events.players==2&&events.clears==2&&events.spin&&!events.grounded&&events.alarm==90&&world->timeFields().size()==count+2&&
                 world->timeFields().at(count+1)->sourceId==next&&
                 world->timeFields().at(count+1)->y==40100&&world->randomDrawCount()==owner->before+1,
                 "Timeout script uses published player coordinates and rereads stop state for each birth");
