@@ -202,6 +202,10 @@ public:
         r->box.wallHp=health;return true;
     }
     int overlapSound(unsigned channel)const{return channel<11?run_.overlapSounds[channel]:-1;}
+    template<class Audio,class NoKill,class Delay,class Cue>
+    bool recordEnemyDeath(bool cutGunshot,Audio& audio,NoKill clearNoKill,Delay delay,Cue cue){
+        return run_.recordEnemyDeath(cutGunshot,audio,clearNoKill,delay,cue);
+    }
     template<unsigned Capacity,class Audio> bool playCurrencyPickupSound(
         StoredCurrencyRegistration<instanceCapacity,Capacity>& currency,InstanceHandle gem,
         MotionBinary64 volume,Audio& audio){

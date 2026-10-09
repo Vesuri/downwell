@@ -525,6 +525,14 @@ test: verify-smoke-owner
 test: verify-smoke-world
 test: verify-damage-number-worlds
 .PHONY: verify-damage-number-worlds
+test: verify-enemy-death-worlds
+.PHONY: verify-enemy-death-worlds
+verify-enemy-death-worlds: build/enemy-death-worlds-test
+	python3 tools/verify-enemy-death.py
+	./build/enemy-death-worlds-test
+build/enemy-death-worlds-test: tests/core/EnemyDeathWorldsTest.cpp $(filter-out tests/core/StartupRuntimeTest.cpp,$(STARTUP_TEST_SOURCES)) src/core/GameplayWorld.cpp src/core/Replay.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ $(filter %.cpp,$^)
 verify-damage-number-worlds: build/damage-number-worlds-test generate-room-pack generate-object-pack generate-builder-pattern-pack
 	./build/damage-number-worlds-test
 build/damage-number-worlds-test: tests/core/DamageNumberWorldsTest.cpp $(filter-out tests/core/StartupRuntimeTest.cpp,$(STARTUP_TEST_SOURCES)) src/core/GameplayWorld.cpp src/core/Replay.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc

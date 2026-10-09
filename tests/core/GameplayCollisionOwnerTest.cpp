@@ -14,6 +14,12 @@ namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_
 #include "core/CurrencyHomingMath.h"
 #include "core/TerrainWallContacts.h"
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
+struct NativeEnemyDeathAudioProbe { bool isPlaying(int,bool&);bool stop(int); };
+struct NativeEnemyDeathScriptProbe { bool operator()(); };
+bool nativeEnemyDeath(GameplayWorld& world,NativeEnemyDeathAudioProbe& audio,
+    NativeEnemyDeathScriptProbe flag,NativeEnemyDeathScriptProbe delay,NativeEnemyDeathScriptProbe cue){
+    return world.recordEnemyDeath(true,audio,flag,delay,cue);
+}
 struct NativeConsumptionGlobalsProbe {
     bool gravity(downwell::MotionBinary64);
     downwell::MotionBinary64 gravity();downwell::MotionBinary64 fallSpeed();

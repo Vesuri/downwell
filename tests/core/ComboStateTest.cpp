@@ -8,6 +8,29 @@ static void require(bool value, const char* message) {
     if (!value) { std::cerr << message << '\n'; std::exit(1); }
 }
 int main() {
+    for(bool cut:{false,true})for(bool playing:{false,true})for(unsigned failure=0;failure<=5;++failure){
+        downwell::RunSession run;run.combo.state.count=7;run.kills=11;run.overlapSounds[1]=123;
+        unsigned stage=0;bool noKill=true;
+        struct Audio {
+            downwell::RunSession& run;unsigned& stage;unsigned failure;bool playing;
+            bool isPlaying(int sound,bool& out){
+                require(sound==123&&run.combo.state.count==8&&run.kills==11,"combo precedes gunshot query and kills follow it");
+                stage=1;out=playing;run.overlapSounds[1]=456;return failure!=1;
+            }
+            bool stop(int sound){require(sound==456&&stage==1,"gunshot stop rereads current channel handle");stage=2;return failure!=2;}
+        } audio{run,stage,failure,playing};
+        const bool okay=run.recordEnemyDeath(cut,audio,[&]{
+            require(run.kills==12,"kill increment precedes achievement publication");stage=3;noKill=false;return failure!=3;
+        },[&]{require(!noKill&&stage==3,"moment delay follows achievement publication");stage=4;return failure!=4;
+        },[&]{require(stage==4,"level cue follows moment delay");stage=5;return failure!=5;});
+        const unsigned stopped=(cut&&failure==1)?1:(cut&&playing&&failure==2)?2:failure>=3?failure:0;
+        require(okay==!stopped&&run.effectsSucceeded==okay&&run.combo.state.count==8&&
+            run.kills==(stopped&&stopped<3?11u:12u)&&stage==(stopped?stopped:5),"source death retains exact failure prefix");
+        if(!okay){
+            require(!run.recordEnemyDeath(cut,audio,[]{return true;},[]{return true;},[]{return true;})&&
+                run.combo.state.count==8,"terminal failure cannot replay partially completed death");
+        }
+    }
     {
         downwell::RunSession run;
         downwell::CurrencyAccount currency;
@@ -49,7 +72,10 @@ int main() {
         gem.y = static_cast<int>(player.offsetYFixed() * 50);
         gem.lifetime.age = 9;
         run.upgrades.levels[4] = owned;
-        struct Random { unsigned randomIntegerSmall(unsigned) { return 0; } } random;
+        struct Random {
+            unsigned randomIntegerSmall(unsigned) { return 0; }
+            unsigned chooseIndexSmall(unsigned) { return 0; }
+        } random;
         require(run.collectCurrency(gem, false, 2, player, currency,
                 [](int, int) { return false; }, random) == downwell::CurrencyStepResult::collected &&
                 player.ammo() == (owned ? 8 : before),

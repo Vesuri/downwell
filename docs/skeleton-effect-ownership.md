@@ -273,6 +273,15 @@ bookkeeping but stop before blood, currency, retirement and the event tail.
 The actor test covers this boundary with and without time-stop; it does not
 claim that the live worlds yet implement the script or level-title creation.
 
+`RunSession::recordEnemyDeath` publishes combo and kill counters in this order
+and uses overlap channel 1 for checked gunshot audio. It rereads the channel
+after the playing query, as the VM does. Both world entry points delegate to
+this shared implementation. Achievement publication, moment delay and the level
+cue are mandatory checked callbacks; they must observe the completed counter
+prefix and failure stops later callbacks. Counter overflow beyond the current
+unsigned storage is a terminal unsupported state rather than wrapping. The
+entry is not an alternative family-wide death sweep.
+
 Both runtime adapters route flash bursts and pre-Step flash animation through
 `RunSession`'s shared `effectsSucceeded` latch. Failed bursts retain earlier
 children and consumed random words; subsequent effect calls and animation must

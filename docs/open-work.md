@@ -139,6 +139,9 @@ behavior, both backend integrations and relevant original-game verification.
   registered corpse/expiry chain in natural skeleton deaths, not only explicit
   test births.
 - Connect natural death/stomp/hit events to effect owners, including flash balls.
+  Route enemy-death bookkeeping through the shared run-state entry, supplying
+  actual toggleGuncut, achNoKill publication, momentDelay controller events and
+  levelBeginCue creation/audio. Do not use successful placeholder callbacks.
   Complete death/low-spec direct drawing at original world-depth boundaries,
   rather than flattening those paths into an overlay.
 - Complete natural skeleton and owned-bone integration in shared gameplay:

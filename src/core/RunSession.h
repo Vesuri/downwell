@@ -88,6 +88,26 @@ struct RunSession {
     // global.killCount: scrGlobalStuff resets it for a new run, not rmMain
     // entry. DeathMenu/EndMenu display the cumulative total across levels.
     std::uint32_t kills = 0;
+    // scrEnemyDeath's ordered global mutations. The caller must publish the
+    // achievement flag and implement both controller scripts; none are
+    // optional successful defaults. Keep completed prefixes on failure.
+    template<class Audio,class NoKill,class Delay,class Cue>
+    bool recordEnemyDeath(bool cutGunshot,Audio& audio,NoKill clearNoKill,Delay delay,Cue cue){
+        if(!effectsSucceeded)return false;
+        if(combo.state.count==0xffffffffu)return effectsSucceeded=false;
+        ++combo.state.count;
+        if(cutGunshot){
+            bool playing=false;
+            if(!audio.isPlaying(overlapSounds[1],playing)||!effectsSucceeded)return effectsSucceeded=false;
+            // The VM reads OLchannel[1] again after audio_is_playing.
+            if(playing&&(!audio.stop(overlapSounds[1])||!effectsSucceeded))return effectsSucceeded=false;
+        }
+        if(kills==0xffffffffu)return effectsSucceeded=false;
+        ++kills;
+        if(!clearNoKill()||!effectsSucceeded||!delay()||!effectsSucceeded||!cue()||!effectsSucceeded)
+            return effectsSucceeded=false;
+        return true;
+    }
     RunStage stage;
     DeathResults results;
     AmmoHudMotion ammoHud;

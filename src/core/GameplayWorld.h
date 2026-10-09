@@ -1150,6 +1150,10 @@ public:
         return Operations(*this,objects,box,controls,position,allocate,queries);
     }
     int overlapSound(unsigned channel)const{return channel<11?run_.overlapSounds[channel]:-1;}
+    template<class Audio,class NoKill,class Delay,class Cue>
+    bool recordEnemyDeath(bool cutGunshot,Audio& audio,NoKill clearNoKill,Delay delay,Cue cue){
+        return run_.recordEnemyDeath(cutGunshot,audio,clearNoKill,delay,cue);
+    }
     template<class Audio> bool playBoxChainSound(downwell::InstanceHandle h,downwell::MotionBinary64 volume,bool inWater,Audio& audio){
         if(!run_.effectsSucceeded||!findBreakable(h))return run_.effectsSucceeded=false;
         return run_.playBoxChainSound(breakables_[h.slot].sound,volume,inWater,audio);
