@@ -1,4 +1,5 @@
 #include "core/ConsumptionBloodEffect.h"
+#include "core/ConsumptionBloodInstances.h"
 #include "core/GameMakerRandom.h"
 #include <cassert>
 #include <cstring>
@@ -21,7 +22,67 @@ struct Environment {
     }
     bool destroy(){assert(effect.destroyRequested);return accept();}
 };
+struct NativeAudit {
+    using Record=ConsumptionBloodInstances<1>::Record;
+    unsigned calls=0,reject=0,moves=0,marks=0;
+    bool accept(){return ++calls!=reject;}
+    bool birth(InstanceHandle,const Record&){return false;}
+    bool birthAt(InstanceHandle,const Record& r,RunnerImageValue x,RunnerImageValue y){
+        assert(r.sourceId==105187&&r.x.bits==x.bits&&r.y.bits==y.bits&&r.state.alarm0==-1);return accept();
+    }
+    bool imageIndex(InstanceHandle,const Record& r,RunnerImageValue v){assert(r.state.imageIndex.bits==v.bits);return accept();}
+    bool move(InstanceHandle,const Record& r,RunnerImageValue x,RunnerImageValue y){
+        assert(r.state.x.bits==x.bits&&r.state.y.bits==y.bits);++moves;return accept();
+    }
+    bool markDestroyed(InstanceHandle,const Record& r){assert(r.state.destroyRequested&&!r.destroyRequested);++marks;return accept();}
+    bool retire(InstanceHandle,const Record&){return true;}
+    bool activation(InstanceHandle,const Record&,bool){return true;}
+    bool membership(InstanceHandle,const Record&,bool){return true;}
+    bool sprite(InstanceHandle,const Record&,int){return false;}
+    bool mask(InstanceHandle,const Record&,int){return false;}
+    bool transform(InstanceHandle,const Record&,RunnerTransformField,RunnerImageValue,RunnerImageValue,std::uint32_t){return false;}
+};
+struct Globals {
+    MotionBinary64 grav{};
+    bool gravity(MotionBinary64 v){grav=v;return true;}
+    MotionBinary64 gravity(){return grav;}MotionBinary64 fallSpeed(){return real(.125);}
+};
 int main(){
+    for(unsigned seed=0;seed<64;++seed){
+        using Owner=ConsumptionBloodInstances<1>;NativeAudit audit;Owner owner(Owner::Binding::bindPositionedActor(audit));
+        Globals globals;GameMakerRandom random(seed),referenceRandom(seed);InstanceHandle key;
+        ConsumptionBloodEffect reference;Environment env{reference};
+        assert(owner.create(105187,real(240.25),real(192.5),random,globals,key)&&key.generation!=105187&&
+            reference.create(real(240.25),real(192.5),referenceRandom,env));
+        for(unsigned i=0;i<16;++i)assert(random.stateWord(i)==referenceRandom.stateWord(i));
+        assert(owner.activate(key,false)&&owner.advanceAnimation(key)&&owner.advanceAlarm(key,0)&&owner.step(key,globals)&&
+            owner.find(key)->state.alarm0==120&&owner.find(key)->state.timeline.bits==0);
+        assert(owner.activate(key,true));
+        for(unsigned tick=0;tick<120;++tick){
+            assert(owner.advanceAnimation(key)&&reference.advanceImage(env)&&owner.advanceAlarm(key,0));
+            if(tick==119)assert(reference.kill(env));
+            assert(owner.step(key,globals)&&reference.step(env));
+            const auto* r=owner.find(key);
+            assert(r&&r->x.bits==reference.x.bits&&r->y.bits==reference.y.bits&&r->state.imageIndex.bits==reference.imageIndex.bits&&
+                r->state.xsp.high==reference.xsp.high&&r->state.xsp.low==reference.xsp.low&&
+                r->state.ysp.high==reference.ysp.high&&r->state.ysp.low==reference.ysp.low&&r->destroyRequested==reference.destroyRequested);
+        }
+        assert(audit.marks==1&&audit.moves==357&&owner.size()==1&&owner.retire(key)&&!owner.find(key));
+    }
+    for(unsigned failure=1;failure<=7;++failure){
+        using Owner=ConsumptionBloodInstances<1>;NativeAudit audit;audit.reject=failure;
+        Owner owner(Owner::Binding::bindPositionedActor(audit));bool worldGood=true;owner.observeFailure(worldGood);
+        Globals globals;GameMakerRandom random(2);InstanceHandle key;
+        bool okay=owner.create(105187,real(240),real(192),random,globals,key);
+        if(okay)okay=owner.advanceAnimation(key);
+        if(okay)okay=owner.step(key,globals);
+        if(okay)okay=owner.kill(key);
+        assert(!okay&&!owner.valid()&&!worldGood&&audit.calls==failure);
+        const auto retained=owner.sourceHandle(105187);assert(owner.find(retained)&&owner.size()==1);
+        const auto draws=random.drawCount();assert(!owner.step(retained,globals)&&random.drawCount()==draws&&audit.calls==failure);
+        assert(owner.clear()&&!owner.find(retained));
+    }
+    std::puts("Native consumption blood: 7680 lifecycle frames, activation gating and seven retained failures passed");
     for(unsigned seed=0;seed<128;++seed){
         ConsumptionBloodEffect effect;Environment env{effect};GameMakerRandom random(seed),oracle(seed);
         assert(effect.create(real(240.25),real(192.5),random,env));

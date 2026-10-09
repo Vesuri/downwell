@@ -608,10 +608,17 @@ bool compileBinaryEffect(downwell::BinaryEffectSurface<>& surface,
 #include "core/CorpseDraw.h"
 #include "core/CorpseInstances.h"
 #include "core/ConsumptionBloodEffect.h"
+#include "core/ConsumptionBloodInstances.h"
 #include "core/StoredConsumptionBloodRegistration.h"
 struct ConsumptionGlobalsCompile {
     bool gravity(downwell::MotionBinary64);downwell::MotionBinary64 gravity();downwell::MotionBinary64 fallSpeed();
 };
+bool compileNativeConsumptionBlood(downwell::ConsumptionBloodInstances<32>& owner,downwell::GameMakerRandom& random,
+    ConsumptionGlobalsCompile& globals,std::uint32_t id){
+    downwell::InstanceHandle key;
+    return owner.create(id,{}, {},random,globals,key)&&owner.advanceAnimation(key)&&owner.step(key,globals)&&
+        owner.advanceAlarm(key,0)&&owner.kill(key)&&owner.retire(key);
+}
 bool compileRegisteredConsumptionBlood(downwell::StoredConsumptionBloodRegistration<512,32>& registry,
     downwell::GameMakerRandom& random,ConsumptionGlobalsCompile& globals,const downwell::InstanceRecord& record){
     std::uint32_t child=0;
