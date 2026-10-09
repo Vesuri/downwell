@@ -23,6 +23,7 @@ public:
     bool setGain(int id,MotionBinary64 gain,int milliseconds);
     bool setPitch(int id,MotionBinary64 pitch);
 private:
+    friend struct AudioSDLTestAccess;
     struct Sample {std::vector<float> pcm;int rate=0;MotionBinary64 gain{};};
     struct Voice {int id=-1,resource=-1;double cursor=0,pitch=1;MotionBinary64 gain{};bool active=false,loop=false;};
     struct Lock {SDL_AudioDeviceID device;explicit Lock(SDL_AudioDeviceID d):device(d){if(d)SDL_LockAudioDevice(d);}~Lock(){if(device)SDL_UnlockAudioDevice(device);}};

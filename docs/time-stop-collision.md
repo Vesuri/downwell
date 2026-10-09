@@ -98,6 +98,23 @@ of pretending to play. This admission uses the default volume of one (the wind
 script subsequently sets the voice gain to 0.5); settings integration remains
 open. Native device playback and complete native mixed-pass admission remain open.
 
+SDL immediate gain controls use independent resource and voice state. Loaded
+asset gain initializes the resource; each newly played voice starts at one.
+Resource writes affect existing and future voices without changing their
+individual gain values. The mixer multiplies both binary32 controls. Gain
+arguments narrow to binary32 and negative values clamp to zero; unsupported
+subnormal/nonfinite/range inputs still fail explicitly. Timed ramps are not
+silently approximated by immediate writes.
+
+`tools/verify-runner-audio-gain.py` pins the original executable evidence:
+`0x558d70` narrows the gain argument with `fstp dword`; `0x49e340` reads voice
+gain at `+0x24` or resource gain at `+4`; `0x4a0ef0` selects independent gain
+records and clamps negatives; `0x4a3670` multiplies the resource and voice
+gains before device publication. Resource loading at `0x4a2fc9` copies the
+serialized gain, while voice initialization at `0x49f26b` sets one. The timed
+branch records start/end timestamps and separate ramp endpoints; this evidence
+does not establish the ramp update cadence or original device sample output.
+
 The stored registered-skeleton pass also admits skeleton contacts with fields
 82, 255 and 371 in that same collected pair stream. It resolves the inherited
 83/1066 event and sets health to zero unless `timefieldImmune` is set; it does

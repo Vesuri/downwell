@@ -1,4 +1,5 @@
 #include "AudioSDL.h"
+#include "core/RunnerImageValue.h"
 #include <sndfile.h>
 #include <algorithm>
 #include <climits>
@@ -27,7 +28,8 @@ bool AudioSDL::load(int id,const char* path,MotionBinary64 gain){
     std::vector<float> input(std::size_t(info.frames)*info.channels);
     const auto read=sf_readf_float(file,input.data(),info.frames);sf_close(file);
     if(read!=info.frames)return false;
-    Sample sample;sample.rate=info.samplerate;sample.gain=gain;
+    RunnerImageValue storedGain;if(!storedGain.assign(gain))return false;
+    Sample sample;sample.rate=info.samplerate;sample.gain=storedGain.promoted();
     sample.pcm.resize(std::size_t(info.frames)*2);
     for(std::size_t frame=0;frame<std::size_t(info.frames);++frame)
         for(unsigned channel=0;channel<2;++channel){
@@ -44,7 +46,7 @@ bool AudioSDL::play(int resource,int /*priority*/,bool loop,int& id){
     Lock lock(device_);
     if(!device_||resource<0||resource>=int(samples_.size())||samples_[resource].pcm.empty()||nextVoice_==INT_MAX)return false;
     for(auto& voice:voices_)if(!voice.active){
-        voice={};voice.id=nextVoice_++;voice.resource=resource;voice.gain=samples_[resource].gain;
+        voice={};voice.id=nextVoice_++;voice.resource=resource;voice.gain=MotionBinary64::fromInteger(1);
         voice.active=true;voice.loop=loop;id=voice.id;return true;
     }
     return false; // No unverified priority stealing policy.
@@ -55,10 +57,18 @@ bool AudioSDL::isPlaying(int id,bool& playing){
     return device_!=0;
 }
 bool AudioSDL::stop(int id){Lock lock(device_);for(auto& v:voices_)if(v.id==id||v.resource==id)v.active=false;return device_!=0;}
-bool AudioSDL::getGain(int id,MotionBinary64& gain){Lock lock(device_);auto* v=find(id);if(!v)return false;gain=v->gain;return true;}
+bool AudioSDL::getGain(int id,MotionBinary64& gain){
+    Lock lock(device_);
+    if(id>=0&&id<int(samples_.size())&&!samples_[id].pcm.empty()){gain=samples_[id].gain;return true;}
+    auto* v=find(id);if(!v)return false;gain=v->gain;return true;
+}
 bool AudioSDL::setGain(int id,MotionBinary64 gain,int milliseconds){
-    if(milliseconds!=0||!gain.valid()||real(gain)<0)return false;
-    Lock lock(device_);auto* v=find(id);if(!v)return false;v->gain=gain;return true;
+    if(milliseconds!=0||!gain.valid())return false;
+    if(real(gain)<0)gain={}; // Runner clamps negative audio gain to zero.
+    RunnerImageValue stored;if(!stored.assign(gain))return false;
+    Lock lock(device_);
+    if(id>=0&&id<int(samples_.size())&&!samples_[id].pcm.empty()){samples_[id].gain=stored.promoted();return true;}
+    auto* v=find(id);if(!v)return false;v->gain=stored.promoted();return true;
 }
 bool AudioSDL::setPitch(int id,MotionBinary64 pitch){
     if(!pitch.valid()||real(pitch)<=0||real(pitch)>256)return false;
@@ -71,7 +81,9 @@ void AudioSDL::callback(void* self,Uint8* bytes,int count){
 void AudioSDL::mix(float* output,unsigned frames){
     for(auto& v:voices_)if(v.active){
         const auto& sample=samples_[v.resource];const auto length=sample.pcm.size()/2;
-        const double increment=v.pitch*sample.rate/rate_,gain=real(v.gain);
+        const double increment=v.pitch*sample.rate/rate_;
+        // Resource and voice gains are independent binary32 controls.
+        const float gain=float(real(v.gain))*float(real(sample.gain));
         for(unsigned frame=0;frame<frames&&v.active;++frame){
             const auto a=std::size_t(v.cursor);const auto b=a+1<length?a+1:(v.loop?0:a);
             const double fraction=v.cursor-a;

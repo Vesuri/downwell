@@ -1,0 +1,19 @@
+#!/usr/bin/env python3
+"""Pin reviewed gain controls in the untouched Windows runner, not DSP equivalence."""
+from pathlib import Path
+from hashlib import sha256
+import runpy
+
+audit = runpy.run_path(str(Path(__file__).with_name("verify-runner-choose.py")))
+region = audit["region"]
+for start, end, digest in (
+    (0x558d70, 0x558dae, "a1455debdc66129e2b5ce096d68a2827b472f68de819e2858eb49eef37814ade"),
+    (0x49e340, 0x49e39e, "a34bf8cc71f993441d7d3d1964bc564e6c8f8c913ff89b5f23ac1ed9fd8bef7a"),
+    (0x4a0ef0, 0x4a10a6, "3decfaa0b10f4a8df2a4ec11b11e42174ddf1c2c38064f1d196e8998d9ee10ba"),
+    (0x4a3670, 0x4a375b, "afeaac2496db5b3687c9861bdc244634e8c1dc33b64317db36b722883a25847d"),
+    (0x4a2fc9, 0x4a2fd5, "6c8ad6eca6ca17b5fa0d4928f8e9cd91058798173f9ab5007cabfb0c9f33989c"),
+    (0x49f26b, 0x49f27b, "34d80d7393b4e83f6098cddff67b4376366097c6aa5abb693c6c686d55e99e03"),
+):
+    assert sha256(region(start, end-start)).hexdigest() == digest
+assert region(0x795ab8, 4) == bytes.fromhex("0000803f")
+print("Pinned runner gain narrowing, resource/voice separation, initialization and volume multiplication")

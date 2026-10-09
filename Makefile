@@ -1817,6 +1817,7 @@ build/sdl-audio-test: tests/platform/SDLAudioTest.cpp src/platform/sdl/AudioSDL.
 .PHONY: verify-sdl-audio
 test: verify-sdl-audio
 verify-sdl-audio: build/sdl-audio-test
+	python3 tools/verify-runner-audio-gain.py
 	SDL_AUDIODRIVER=dummy ./build/sdl-audio-test
 
 build/sdl-screenshot-test: tests/platform/SDLScreenshotTest.cpp src/platform/sdl/PlatformSDL.cpp src/core/SpritePack.cpp src/core/FontPack.cpp

@@ -6,6 +6,14 @@
 #include <cstdlib>
 #include <unistd.h>
 using namespace downwell;
+namespace downwell {
+struct AudioSDLTestAccess {
+    static float sample(AudioSDL& audio){
+        AudioSDL::Lock lock(audio.device_);float frame[2]{};audio.mix(frame,1);
+        assert(frame[0]==frame[1]);return frame[0];
+    }
+};
+}
 int main(){
     assert(SDL_Init(SDL_INIT_AUDIO)==0);
     char path[]="/tmp/downwell-audio-test-XXXXXX";
@@ -25,7 +33,19 @@ int main(){
         assert(audio.isPlaying(349,playing)&&playing);
         assert(audio.isPlaying(voice,playing)&&playing);
         MotionBinary64 gain;assert(audio.getGain(voice,gain)&&gain.high==one.high);
+        assert(audio.getGain(349,gain)&&gain.high==one.high);
+        assert(audio.setGain(349,half,0)&&audio.getGain(349,gain)&&gain.high==half.high);
+        assert(audio.getGain(voice,gain)&&gain.high==one.high); // Resource gain never overwrites voice gain.
         assert(audio.setGain(voice,half,0));assert(audio.getGain(voice,gain)&&gain.high==half.high);
+        assert(AudioSDLTestAccess::sample(audio)==0.0625f); // .25 PCM * .5 resource * .5 voice.
+        const MotionBinary64 sevenTenths{0x3fe66666u,0x66666666u};
+        assert(audio.setGain(349,sevenTenths,0)&&audio.getGain(349,gain)&&gain.high==0x3fe66666u&&gain.low==0x60000000u);
+        assert(audio.getGain(voice,gain)&&gain.high==half.high);
+        assert(audio.setGain(349,MotionBinary64::fromInteger(-1),0)&&audio.getGain(349,gain)&&gain.zero());
+        assert(audio.setGain(349,one,0));
+        assert(audio.load(348,path,half));int quiet=-1;
+        assert(audio.play(348,90,true,quiet)&&audio.getGain(quiet,gain)&&gain.high==one.high);
+        assert(audio.getGain(348,gain)&&gain.high==half.high&&audio.stop(348));
         assert(!audio.setGain(voice,one,200));assert(!audio.setPitch(voice,{}));
         assert(audio.setPitch(voice,half));SDL_Delay(250);
         assert(audio.isPlaying(voice,playing)&&playing);
