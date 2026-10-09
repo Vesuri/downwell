@@ -153,6 +153,7 @@ build/amiga-wall-damage-test: tests/platform/amiga/AmigaWallDamageTest.cpp src/p
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
 build/gameplay-collision-owner-test: src/platform/amiga/AmigaWallDamage.h
 build/gameplay-collision-owner-test build/live-collision-lifecycle-test: tests/core/TimeoutDamageEvents.h
+build/gameplay-collision-owner-test build/live-collision-lifecycle-test: tests/core/RegisteredSkeletonStompChecks.h tests/core/SkeletonSoundChecks.h
 
 .PHONY: verify-wall-draw-lookup
 .PHONY: verify-terrain-create

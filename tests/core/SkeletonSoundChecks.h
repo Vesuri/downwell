@@ -22,6 +22,20 @@ struct SkeletonSoundAudio {
 };
 inline void checkSkeletonSoundContract(){
     using namespace downwell;
+    // Stomp uses the global footsteps entry, not the enemymove resource-stop
+    // branch: even an offscreen caller replaces the previous footsteps sound.
+    for(bool water:{false,true})for(unsigned failure=0;failure<=7;++failure){
+        RunSession run;SoundPlayState caller;SoundPlayEnvironment env;
+        env.y=MotionBinary64::fromInteger(-1000);env.gameVolume={0x3fd00000u,0};env.inWater=water;
+        run.overlapSounds[0]=777;SkeletonSoundAudio audio;audio.wet=water;audio.failAt=failure;
+        const bool accepted=!failure;
+        SkeletonSoundAudio::check(run.playSkeletonStompSound(caller,env,audio)==accepted&&
+            run.effectsSucceeded==accepted&&audio.calls==(accepted?7:failure)&&audio.ids[0]==777&&
+            caller.sfxIndex==122&&caller.chanNum==0&&caller.cutPrv&&!caller.doNotPlay&&
+            run.overlapSounds[0]==((accepted||failure>=3)?122:777));
+        if(!accepted){const auto before=audio.calls;
+            SkeletonSoundAudio::check(!run.playSkeletonStompSound(caller,env,audio)&&audio.calls==before);}
+    }
     for(int sound=132;sound<=134;++sound)for(int y:{-1,0,100,101})for(bool water:{false,true})
     for(unsigned failure=0;failure<=7;++failure){
         RunSession run;SoundPlayState caller;SoundPlayEnvironment env;

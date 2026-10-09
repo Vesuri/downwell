@@ -316,7 +316,18 @@ Failure latches the enclosing status and preserves the completed prefix; a
 second call with failed status performs no work. Its health representation is
 still integral and rejects subtraction overflow. Tests inject failures through
 jump, shake, sounds, recharge, blast, choice and smoke. This entry point does
-not install natural stomp contacts or supply their blood/audio/blast services.
+not install natural stomp contacts by itself.
+
+Both worlds' `stompSkeleton` adapters supply registered blood emission, the
+live death flag and Exploding Knees inventory entry (upgrade 0), camera shake,
+and the retained attacker's sound state. Footsteps use global overlap channel 0
+and stop its previous resource, without enemymove's view culling. The blast's
+plain sound shares that same caller state. Blood retains synchronous child
+creation, two interleaved RNG draws and the caller's final numeric `myFx` ID.
+The native adapter requires the enclosing source-ID allocator. Precise player
+writes, style, blast creation, sound choice RNG and smoke emission remain
+explicit dependencies; these adapters do not yet install natural encounters.
+World and caller failure statuses both latch after a rejected service.
 
 Effect-producing callbacks return success. `SkeletonActor` stops the event on
 failed enemy-death setup, blood, smoke, flash, currency, corpse or debris

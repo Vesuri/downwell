@@ -44,6 +44,7 @@
 #include "core/CurrencyRewardFields.h"
 #include "core/CurrencyCollisionBounds.h"
 #include "core/RegisteredSkeletonThrow.h"
+#include "core/RegisteredSkeletonStomp.h"
 #include "core/BoneViewRetirement.h"
 #include "core/GameplayScriptSpawnInstances.h"
 #include "core/CorpseExpiryInstances.h"
@@ -1501,6 +1502,18 @@ public:
         return Operations(*this,objects,box,controls,position,allocate,queries);
     }
     int overlapSound(unsigned channel)const{return channel<11?run_.overlapSounds[channel]:-1;}
+    template<class Audio> bool playSkeletonStompSound(downwell::SkeletonActor& actor,
+        downwell::SoundPlayEnvironment& environment,Audio& audio){
+        return run_.playSkeletonStompSound(actor.sound,environment,audio);
+    }
+    template<class Allocate,class Events,class Audio>
+    bool stompSkeleton(downwell::SkeletonActor& actor,Allocate allocate,Events& events,
+        downwell::SoundPlayEnvironment& environment,Audio& audio,bool& good){
+        if(!run_.effectsSucceeded)return good=false;
+        const bool ok=downwell::registeredSkeletonStomp(*this,actor,events,[&]{return emitSkeletonBlood(actor,allocate);},
+            environment,audio,good);
+        return run_.effectsSucceeded=ok;
+    }
     template<class Audio> bool playSkeletonSound(downwell::SkeletonActor& actor,int sound,
         downwell::SoundPlayEnvironment& environment,Audio& audio){
         if(!run_.effectsSucceeded)return false;

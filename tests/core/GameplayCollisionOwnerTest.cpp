@@ -5,6 +5,7 @@
 #include "QuietSkeletonEffects.h"
 #ifndef DOWNWELL_NATIVE_QUERY_PROBE
 #include "SkeletonSoundChecks.h"
+#include "RegisteredSkeletonStompChecks.h"
 #include "BulletWallSoundChecks.h"
 #include "SourceBulletSchedulingChecks.h"
 #include "RegisteredSkeletonThrowChecks.h"
@@ -29,6 +30,18 @@ struct NativeSkeletonAudio {
 bool nativeSkeletonSound(GameplayWorld& world,downwell::SkeletonActor& actor,
     downwell::SoundPlayEnvironment& environment,NativeSkeletonAudio& audio){
     return world.playSkeletonSound(actor,133,environment,audio);
+}
+struct NativeSkeletonStompPlayer {
+    int playStyle();void setSpinJumping();bool recharge();bool setGrounded(bool);
+    bool setHorizontal(downwell::MotionBinary64);bool setVertical(downwell::MotionBinary64);
+    bool createBlast(int,int,int);unsigned choose(unsigned);
+    downwell::MotionBinary64 playerX();downwell::MotionBinary64 playerY();
+    bool emitSmoke(downwell::MotionBinary64,downwell::MotionBinary64,int,int);
+};
+bool nativeRegisteredStomp(GameplayWorld& world,downwell::SkeletonActor& actor,
+    bool (*allocate)(unsigned&),NativeSkeletonStompPlayer& player,
+    downwell::SoundPlayEnvironment& environment,NativeSkeletonAudio& audio,bool& good){
+    return world.stompSkeleton(actor,allocate,player,environment,audio,good);
 }
 bool nativeOwnedLevelCue(GameplayWorld& world,const downwell::TimeStopEffects<64>& stop,
     bool (*allocate)(unsigned&),const downwell::LevelNumberTextContext& text,
@@ -7004,6 +7017,20 @@ int main(){
                 next.slot==key.slot&&next.generation!=key.generation&&!GameplayCollisionView(*skeletonWorld).contains(sharedKey));
             assert(skeletonWorld->restartFromResults(DeathMenuSequence::Action::Retry,42,300)!=ResultsDestination::none&&
                 skeletonWorld->skeletons()==&skeletons&&skeletons.size()==0&&skeletonOwner->valid());
+        }
+        for(bool knees:{false,true})for(int style:{0,2}){
+            auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+                GameplayTerrainInstances::WallCollision{},&rooms,ownership);
+            auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),
+                owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+            assert(owner->attach(*world));if(knees)assert(world->grantUpgrade(0));
+            InstanceHandle skeleton;assert(world->createSkeletonWithSourceId(605200,240,200,skeleton));unsigned id=605201;
+            const bool ok=owner->skeletons().dispatch(skeleton,[&](auto& actor,auto&,bool& good){
+                checkRegisteredSkeletonStomp(*world,actor,knees,style,[&](auto& player,auto& env,auto& audio,bool& accepted){
+                    return world->stompSkeleton(actor,[&](unsigned& source){source=id++;return true;},player,env,audio,accepted);
+                });good=!knees;return good;
+            });
+            assert(ok==!knees&&owner->blood().size()==2&&id==605203);
         }
         auto throwOwner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
             GameplayTerrainInstances::WallCollision{},&rooms,ownership);

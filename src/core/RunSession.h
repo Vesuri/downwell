@@ -63,6 +63,12 @@ struct RunSession {
     // reinitialize them; scrInitialize/new-run reset does.
     int overlapSounds[11]{};
     TimeFieldWind fieldWind; // global.voidWind survives ordinary room changes.
+    template<class Audio> bool playSkeletonStompSound(SoundPlayState& caller,
+        SoundPlayEnvironment& environment,Audio& audio){
+        int result=-1;bool returned=false;
+        return SoundPlayScript::overlap(caller,environment,audio,[]{return false;},overlapSounds[0],
+            122,50,false,true,"footsteps",result,returned,effectsSucceeded);
+    }
     template<class Audio> bool playSkeletonSound(SoundPlayState& caller,int sound,
         SoundPlayEnvironment& environment,Audio& audio){
         if(!effectsSucceeded)return false;

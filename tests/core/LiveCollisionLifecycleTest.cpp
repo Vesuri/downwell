@@ -14,6 +14,7 @@
 #include "core/StoredShootableTargets.h"
 #include "core/StoredDitherCollisionPass.h"
 #include "SkeletonSoundChecks.h"
+#include "RegisteredSkeletonStompChecks.h"
 #include "core/TimeChangeEffects.h"
 #include "core/EventScheduler.h"
 #include "core/RunnerObjectFamilies.h"
@@ -1606,6 +1607,20 @@ int main(){
         InstanceHandle reused;
         require(world->spawnBlood(blood,{}, {},{},[](auto){return true;},reused)&&reused.slot==key.slot&&
             reused.generation!=key.generation&&!blood.instances().find(key)&&blood.clear(),"reuse preserves generation safety");
+    }
+    for(bool knees:{false,true})for(int style:{0,2}){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach stomp world");world->skipToGameForTesting();
+        if(knees)require(world->grantUpgrade(0),"grant Exploding Knees");
+        auto blood=world->bloodRegistration<2>();auto skeletons=world->skeletonRegistration<1>();InstanceHandle skeleton;
+        require(world->spawnSkeleton(skeletons,240,200,skeleton),"register stomp skeleton");
+        const bool ok=skeletons.dispatch(skeleton,[&](auto& actor,auto&,bool& good){
+            checkRegisteredSkeletonStomp(*world,actor,knees,style,[&](auto& player,auto& env,auto& audio,bool& accepted){
+                return world->stompSkeleton(blood,actor,player,env,audio,accepted);
+            });good=!knees;return good;
+        });
+        require(ok==!knees&&blood.instances().size()==2,"registered stomp retains both blood births");
     }
     for(unsigned failAt:{0u,1u,2u}){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);

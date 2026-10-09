@@ -47,6 +47,7 @@
 #include "StoredBloodRegistration.h"
 #include "StoredSkeletonRegistration.h"
 #include "RegisteredSkeletonThrow.h"
+#include "RegisteredSkeletonStomp.h"
 #include "BoneViewRetirement.h"
 #include "StoredScriptSpawnRegistration.h"
 #include "StoredDebrisRegistration.h"
@@ -213,6 +214,18 @@ public:
         r->box.wallHp=health;return true;
     }
     int overlapSound(unsigned channel)const{return channel<11?run_.overlapSounds[channel]:-1;}
+    template<class Audio> bool playSkeletonStompSound(SkeletonActor& actor,
+        SoundPlayEnvironment& environment,Audio& audio){
+        return run_.playSkeletonStompSound(actor.sound,environment,audio);
+    }
+    template<unsigned Capacity,class Events,class Audio>
+    bool stompSkeleton(StoredBloodRegistration<instanceCapacity,Capacity>& blood,
+        SkeletonActor& actor,Events& events,SoundPlayEnvironment& environment,Audio& audio,bool& good){
+        if(!run_.effectsSucceeded)return good=false;
+        const bool ok=registeredSkeletonStomp(*this,actor,events,[&]{return emitSkeletonBlood(blood,actor);},
+            environment,audio,good);
+        return run_.effectsSucceeded=ok;
+    }
     template<class Audio> bool playSkeletonSound(SkeletonActor& actor,int sound,
         SoundPlayEnvironment& environment,Audio& audio){
         if(!run_.effectsSucceeded||roomId_!=mainRoomId||cameraViewHeight_!=surfaceHeight)
