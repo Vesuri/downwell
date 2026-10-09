@@ -1970,6 +1970,17 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             // Companion Step/Draw and alternate camera motion remain separate.
         }
         return;
+    case 2131: // gml_Object_objDrone_Alarm_3 (empty)
+    case 2132: // gml_Object_objDrone_Alarm_2
+    case 2185: // gml_Object_decoyBalloon_Alarm_1
+    case 2186: // gml_Object_decoyBalloon_Alarm_0
+        ++implementedCodeCalls_;
+        if(instance){
+            auto* state=const_cast<PlayerCompanionCreateState*>(companionCreateState(instance->instanceId));
+            const unsigned number=codeId==2131?3:codeId==2132?2:codeId==2185?1:0;
+            if(!state||!state->alarm(instance->objectId,number))run_.effectsSucceeded=false;
+        }
+        return;
     case 2130: // gml_Object_objDrone_Create_0
     case 2184: // gml_Object_decoyBalloon_Create_0
         ++implementedCodeCalls_;

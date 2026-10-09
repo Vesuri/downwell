@@ -4,7 +4,8 @@
 #include "UnitSequenceFrames.h"
 namespace downwell {
 // Custom reals from objDrone/decoyBalloon Create. Builtin image fields live
-// on the registered instance. These states do not implement subsequent Step.
+// on the registered instance. Alarm bodies below are shared; Step remains
+// separate (drone angles are unbounded, unlike the smoke trig domain).
 struct DroneCreateState {
     MotionBinary64 xdir{},ydir{},shotDelay{},burstCount{},droneShooting{};
 };
@@ -21,6 +22,16 @@ struct PlayerCompanionCreateState {
     DroneCreateState drone;
     BalloonCreateState balloon;
     RunnerImageValue timeline{};
+    bool alarm(int object,unsigned number){
+        if(object==249){
+            if(number==3)return true; // Serialized empty event, not a reset.
+            if(number==2){drone.shotDelay={};return true;}
+        }else if(object==256){
+            if(number==0){balloon.noHold={};return true;}
+            if(number==1){balloon.hitStun={};return true;}
+        }
+        return false; // Drone Alarm 0 needs synchronous effect/bullet/audio owners.
+    }
     // Original serialized sprites have consecutive, unit-length keys. The
     // caller owns phase eligibility and collision-index publication.
     template<class Publish> bool advanceImage(int object,int sprite,RunnerImageValue written,

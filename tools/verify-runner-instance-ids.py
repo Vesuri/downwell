@@ -93,6 +93,14 @@ balloon = assembly("gml_Object_decoyBalloon_Create_0",
     "102112ec0a83ccabf47a904b9b7ed7272ad8b9fb184a663d55ef133a0b5e8c74")
 assert objects[249]["parentId"] == objects[256]["parentId"] == -1
 assert "call.i" not in drone and "call.i" not in balloon
+for name,digest,field in (
+    ("gml_Object_objDrone_Alarm_3","e14dac0a7386d3f986e505aa6a23ba025b66de1ae6796ef8eb1e098f17370010",None),
+    ("gml_Object_objDrone_Alarm_2","d24bc9212a9e4e04569c2db8701c73a98781c5b453e2dc4a9ff0487eba11a175","shotDelay"),
+    ("gml_Object_decoyBalloon_Alarm_1","b5f534ec4da2c4f3cf6f841a4fbb21b2b3846c8995fa505c362c2154c1f32047","hitStun"),
+    ("gml_Object_decoyBalloon_Alarm_0","358740a702888fe7f2ef47f57b3d411c37fd270ab5ff4de9870cf7fddddfa32d","noHold")):
+    body=assembly(name,digest)
+    instructions=[line for line in body.splitlines() if line and not line.startswith((".",":"))]
+    assert instructions==(["pushi.e 0",f"pop.v.i self.{field}"] if field else [])
 assert "push.d 0.5\npop.v.d self.image_speed" in drone
 assert "push.d 0.08\npop.v.d self.imgSp" in balloon
 assert "push.v self.x\npop.v.v self.xx\npush.v self.y\npop.v.v self.yy" in balloon

@@ -64,7 +64,12 @@ publication to the collision owner before committing the new timeline. Neither
 object has an Animation End event. Failed publication stops the simulation
 without advancing the local timeline or retrying the write. This covers the
 initial sprites, not the balloon's later sprite changes.
-Companion motion, alarms, Draw, native admission and the rest of player
+The stored alarm dispatcher executes the shared source bodies: Drone Alarm 2
+clears `shotDelay`, Drone Alarm 3 is empty, and Balloon Alarms 0/1 clear
+`noHold`/`hitStun` respectively. They consume no RNG and do not reset other
+companion state. The shared runner countdown owns eligibility and the zero
+value on the firing frame; the bodies do not force the alarm to -1.
+Companion motion, Drone's firing Alarm 0, Draw, native admission and the rest of player
 initialization remain incomplete; correct child IDs alone do not prove those.
 Drone Step adds two to each custom direction every tick without modulo. Its
 lengthdir inputs therefore exceed the current `SmokeDirection` / `SmokeTrig`
@@ -75,7 +80,8 @@ Native terrain loading retains the authored player/wall IDs but is not complete
 cross-family room creation. Ordinary Amiga entry uses `authoredRoom` player-birth
 timing: construction prepares the room views without registering a player, the
 collision owner attaches, and the serialized room walk registers object 35 at
-index 1 before dither/wall creation. Builder setup precedes this walk. Retry and
+index 1 before dither/wall creation. Builder lifetime and setup run at index 0
+as detailed below. Retry and
 subsequent level entry preserve this timing; an attempted gameplay tick before
 the player is born fails rather than simulating an unregistered player. A failed
 birth stops the room walk and cannot be retried. The initial/Retry compatibility
@@ -83,7 +89,7 @@ camera snapshot is advanced only after the birth callback, and the backend then
 rebases its display origin. The source ID is 100855, not a dynamic allocation.
 Already-entered standalone/replay fixtures retain construction-time birth;
 resource-less fixtures retain the explicit late ID handoff. Neither route yet
-owns the builder/controller lifetimes or the complete synchronous player-child
+owns the complete controller population or synchronous player-child
 sequence, so this does not establish the global dynamic-ID stream.
 The room-entry field likewise resolves authored object 371's ID 101097 before
 its lifecycle birth, scale publications and random-radius Create. Its registered

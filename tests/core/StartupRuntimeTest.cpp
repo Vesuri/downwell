@@ -317,6 +317,57 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
         runtime->step(false);
         require(audit.calls==calls,"failed dither event prefix is not replayed");
     }
+    {
+        auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns);
+        auto control=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns);
+        for(auto* world:{runtime.get(),control.get()}){
+            require(world->grantUpgrade(15)&&world->grantUpgrade(9),"grant companion alarm fixture");
+            const_cast<downwell::UpgradeInventory&>(world->upgrades()).levels[9]=2;
+            world->skipToGameForTesting();
+        }
+        unsigned companions=0;
+        const auto pending=downwell::MotionBinary64::fromInteger(7);
+        for(unsigned i=0;i<runtime->activeInstanceCount();++i){
+            auto& record=const_cast<downwell::InstanceRecord&>(runtime->instanceAt(i));
+            if(record.objectId!=249&&record.objectId!=256)continue;
+            ++companions;
+            auto* state=const_cast<downwell::PlayerCompanionCreateState*>(runtime->companionCreateState(record.instanceId));
+            require(state,"alarm fixture resolves child Create state by source ID");
+            if(record.objectId==249){
+                state->drone.shotDelay=state->drone.droneShooting=pending;
+                record.alarms.set(3,1);record.alarms.set(2,2);
+            }else{
+                state->balloon.hitStun=state->balloon.noHold=pending;
+                record.alarms.set(1,1);record.alarms.set(0,2);
+            }
+        }
+        require(companions==3,"both drone lifetimes and balloon are exercised");
+        for(unsigned tick=1;tick<=3;++tick){
+            runtime->step(false);control->step(false);
+            require(healthy(*runtime)&&runtime->randomDrawCount()==control->randomDrawCount()&&
+                runtime->randomState().stateIndex()==control->randomState().stateIndex(),
+                "companion alarm bodies consume no RNG");
+            for(unsigned word=0;word<16;++word)
+                require(runtime->randomState().stateWord(word)==control->randomState().stateWord(word),
+                    "companion alarm dispatch preserves every RNG word");
+            for(unsigned i=0;i<runtime->activeInstanceCount();++i){
+                const auto& record=runtime->instanceAt(i);
+                if(record.objectId!=249&&record.objectId!=256)continue;
+                const auto* state=runtime->companionCreateState(record.instanceId);
+                if(record.objectId==249){
+                    require(state->drone.droneShooting.high==pending.high&&state->drone.droneShooting.low==pending.low&&
+                        (tick==1?state->drone.shotDelay.high==pending.high:state->drone.shotDelay.zero())&&
+                        record.alarms.get(3)==(tick==1?0:-1)&&record.alarms.get(2)==2-int(tick),
+                        "empty drone Alarm 3 preserves shooting/delay; Alarm 2 clears only delay");
+                }else {
+                    require(state->balloon.hitStun.zero()&&
+                    (tick==1?state->balloon.noHold.high==pending.high:state->balloon.noHold.zero())&&
+                    record.alarms.get(1)==(tick==1?0:-1)&&record.alarms.get(0)==2-int(tick),
+                    "balloon alarms release hit stun and no-hold on their own due frames");
+                }
+            }
+        }
+    }
     for(unsigned balloon=0;balloon<2;++balloon)for(unsigned drones=0;drones<3;++drones){
         auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns);
         if(balloon)require(runtime->grantUpgrade(15),"grant Heart Balloon before player Create");
