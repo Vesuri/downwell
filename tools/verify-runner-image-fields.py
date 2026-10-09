@@ -36,8 +36,17 @@ for start, end, digest in (
     (0x50ED87, 0x50EE2A, "ba7a1a811120ba7609b1fb28b6ff38f2231034aa21921042e6970748a7cfee8f"),
     (0x50EC8F, 0x50ED87, "903a0f186d4774881e172f254c2bed348570f319e3c8ed3ff14f76ed6898f1d4"),
     (0x50F9E0, 0x50FA95, "beb50e65c526540b5c7082a3526bc611ce09e8f7fee8b6ff96006f1978197a4c"),
+    (0x468E00, 0x468ED2, "6d441da8d6d0d0bff9cec0c46605cf265715a6cd335a5019c84471045a9ddc98"),
+    (0x46BFF0, 0x46C08C, "855fac40f9d7e1664a2d465f032435017455484f97d99fdecb56b798ad81dbb8"),
 ):
     assert sha256(region(start, end - start)).hexdigest() == digest
+# Ordinary instances have no special sprite state. The image getter bypasses
+# the cached frame-count/rescaling path when that pointer is null. These are
+# branch/field facts, not a claim about the unobserved runtime FP environment.
+assert region(0x4618DB, 7) == bytes.fromhex("c7 46 70 00 00 00 00")
+assert region(0x468E0E, 10) == bytes.fromhex("83 7e 70 00 0f 84 ac 00 00 00")
+assert region(0x468EC4, 6) == bytes.fromhex("d9 86 94 00 00 00")
+assert region(0x46C02F, 9) == bytes.fromhex("83 bf 84 00 00 00 02 75 2f")
 assert region(0x50DB9D, 6) == bytes.fromhex("8b b1 80 00 00 00")
 assert sha256(region(0x5107F4, 0x510825-0x5107F4)).hexdigest() == "743e96b6903a39deab31d92dc324a391cd83c2ad4f8d1c733e61b98ae55a7ad9"
 print("Pinned Windows image fields and active-room-list animation traversal verified")

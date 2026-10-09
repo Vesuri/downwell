@@ -253,7 +253,7 @@ the special skeletal-sprite state.
 
 `RunnerSpriteChange` shares the ordinary/unit-track reset decision with
 `SkeletonAnimation` and `RunnerSpatialInstances::changeSprite`. The collision
-owner installs the new ID, invalidates cached frame `0x180` to -1, applies index/
+owner installs the new ID, invalidates cached frame count `0x180` to -1, applies index/
 timeline resets, and marks bounds plus eligible dirty queues. Same-ID assignments
 perform none of these operations. Missing/empty resources use frame count zero:
 indices in `(-1,0)` truncate to zero and reset, but their sequence position is
@@ -262,6 +262,30 @@ sprite fields unchanged and invalidates the collision owner. The admitted domain
 is normal/zero binary32 indices convertible to signed 32-bit integers and counts
 through 65,535; unsupported FP conversions and special sprite state are not
 silently approximated. Callers must resolve resource/frame metadata correctly.
+
+### Image getter and the frame-count cache
+
+`0x468e00` is not a collision-frame publication routine. For an instance it
+tests the special sprite-state pointer at `+0x70` before reading any cached
+count. A null pointer jumps directly to `0x468ec4`, returning the stored
+binary32 image index at `+0x94` without writes or dirty-queue calls.
+The constructor clears this pointer at `0x4618db`; `0x46bff0` allocates it
+only for sprite type 2. The metadata verifier establishes that all 741 sprites
+in this build are Normal, including the terrain, skeleton and bone artwork.
+Normal texture sequences must not be confused with this special sprite state.
+
+On the special-state path, `+0x180` caches the positive frame count. A changed
+positive count divides the new count by the old one, rescales the stored image
+index with binary32 operations, and rescales/truncates the special state's
+position before saving the count. It does not compare the last collision frame.
+The historic C++ name `cachedFrame` denotes this count cache.
+
+Consequently native ordinary terrain does not need a per-cell cached collision
+frame or a new dirty notification from this getter. This does not discharge
+sequence advancement, image publication by events, collision-mask selection or
+ordered multi-frame-mask retention. Those are separate source paths. The getter,
+allocation gate and constructor initialization are pinned by
+`verify-runner-image-fields.py`; runtime FP mode is still not established.
 Positive frame-count thresholds use the binary32 exponent and significand
 directly. Negative indices and magnitudes below one cannot reach a positive
 count; nonnegative indices at least 65,536 exceed every admitted count. Between

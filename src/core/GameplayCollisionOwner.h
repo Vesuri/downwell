@@ -54,6 +54,8 @@ private:
         RunnerImageValue x,y;
         Owner::Sprite sprite;
         Owner::Box bounds{};
+        // +0x180 caches special-sprite frame count, not the collision frame.
+        // Ordinary sprites bypass its getter path (runner-image-fields.md).
         RunnerImageValue timeline{},cachedFrame{0xbf800000u};
         std::uint32_t appearanceFlags=8u;
     };

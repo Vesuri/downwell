@@ -46,7 +46,7 @@ behavior, both backend integrations and relevant original-game verification.
   Schedule authored `objDitherAbove` (61) native wall-destruction contacts
   through the complete ordered collision pass, using its bound event handler.
   Connect native terrain's identity runs to ordered collision candidates
-  before enabling destruction dispatch there: finish animation/cached-frame and
+  before enabling destruction dispatch there: finish animation/image publication and
   dynamic-rebinding publication, plus spatial mutation/traversal publication;
   connect retained native wall End Step state to source spatial queries,
   tile/flower effects;
