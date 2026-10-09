@@ -9,6 +9,7 @@
 #include "core/RunSession.h"
 #include "core/StateDigest.h"
 #include "core/StoredWorldCollision.h"
+#include "../../generated/downwell-title-glyphs.h"
 #include <algorithm>
 #include <cstring>
 #include <cmath>
@@ -878,6 +879,36 @@ int main() {
         RecordingRenderer missingEntry;effectGame.render(missingEntry);
         require(!effectGame.renderingSucceeded(),"live entry without its mask cannot silently disappear");
         require(assets.bindEntryMask(entryBytes.data(),entryBytes.size())&&entry.clear(),"restore art and retire test entry");
+        {
+            auto titles=runtime.levelNumberRegistration<1>();downwell::InstanceHandle key;
+            require(titles.create({}, {},[](auto,auto& state){
+                return state.create(1,downwell::MotionBinary64::fromInteger(8),[](unsigned,unsigned& token){token='A';return true;});
+            },key),"register title for actual SDL render path");
+            downwell::LevelNumberTextDrawState text{2,0,0,123,downwell::MotionBinary64::fromInteger(1)};
+            RecordingRenderer title;title.effectPixels.assign(160*284,-1);
+            require(runtime.withLevelNumberDraw(titles,[&]{
+                return effectGame.withLevelNumberText(downwell::title_glyphs::bank,text,[&]{
+                    effectGame.render(title);return effectGame.renderingSucceeded();
+                });
+            }),"title paints through Game render and registered Draw owner");
+            require(title.effectWords&&text.color==0xffffff&&titles.state(key)->characters[1].offset==-1,
+                "title surface and original Draw mutation are published together");
+            std::vector<int> expected(160*284,-1);
+            const int dx[]={1,-1,0,0,0},dy[]={0,0,1,-1,0};
+            for(unsigned pass=0;pass<5;++pass){
+                downwell::EffectMaskAssets::Asset glyph;bool ink;
+                require(downwell::title_glyphs::bank.resolve(2,'A',pass==4?0xffffff:0,glyph,ink)&&ink,"title glyph present");
+                for(unsigned y=0;y<glyph.mask.height;++y)for(unsigned x=0;x<glyph.mask.width;++x)
+                    if(glyph.mask.data[y*glyph.mask.stride+x/8]&(0x80>>(x%8)))
+                        expected[(82+dy[pass]+y)*160+76+dx[pass]-glyph.originX+x]=pass==4?1:0;
+            }
+            require(title.effectPixels==expected,"actual Game title pixels match original-art bordered glyph placement");
+            RecordingRenderer unbound;effectGame.render(unbound);
+            require(!effectGame.renderingSucceeded()&&titles.state(key)->characters[1].offset==-1,
+                "scope exit removes title rendering bindings without another Draw");
+            require(titles.clear(),"retire render title fixture");
+            std::puts("Registered title: Game surface pixels, Draw mutation and scoped binding passed");
+        }
         const auto x=downwell::MotionBinary64::fromInteger(runtime.mainCameraRenderViewX()+80);
         const auto y=downwell::MotionBinary64::fromInteger(runtime.mainCameraRenderViewY()+60);
         auto registration=runtime.debrisRegistration<1>();downwell::DebrisEffects<1> debris;unsigned id=0;

@@ -75,6 +75,14 @@ compositor dispatches that pass during death/low-spec rendering, but not when
 the effect surface is absent. The live glyph binding is not yet installed: the Amiga direct
 actor list explicitly rejects titles rather than treating their local handle as
 a script effect. Both backend surface paths reject an unbound live title.
+`Game::renderMain` now paints bound titles through the shared surface adapter:
+`withLevelNumberText` borrows the glyph bank and current text state for an
+enclosing render, independently of the stored actor-registration binding. It
+reads the host world's current camera on each source view access and emits
+surface-local glyph coordinates. The actual Game render test compares published
+surface words to a per-pixel bordered-glyph reference, checks Draw-only letter
+movement/final color, then verifies scope exit rejects further unbound drawing.
+This explicitly supplied state is not automatic admission of natural callers.
 Natural source-ID allocation, localized text, active-font measurement and
 surface-text Draw dispatch remain unconnected; explicit test births do not
 admit the natural level-begin/death caller.

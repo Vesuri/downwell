@@ -537,6 +537,7 @@ generated/downwell-area-titles.h: tools/generate-area-titles.py data/language.in
 build/level-number-test: tests/core/LevelNumberTest.cpp src/core/FontPack.cpp generated/downwell-area-titles.h generated/downwell-title-glyphs.h generated/downwell-fonts.dwfn $(wildcard src/core/*.h)
 	@mkdir -p build
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ $< src/core/FontPack.cpp
+$(GAME_RENDER_TEST_TARGET): generated/downwell-title-glyphs.h
 .PHONY: verify-enemy-death-worlds
 test: verify-run-controller-instances
 .PHONY: verify-run-controller-instances

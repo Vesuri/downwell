@@ -5,6 +5,7 @@
 #include "Renderer.h"
 #include "StartupRuntime.h"
 #include "CurrencySmokeComposition.h"
+#include "LevelNumberSurfaceDraw.h"
 #include <cstdint>
 
 namespace downwell {
@@ -38,6 +39,16 @@ public:
     bool simulationSucceeded() const { return simulationSucceeded_; }
     std::uint64_t tick() const { return tick_; }
     const StartupRuntime& startup() const { return startup_; }
+    // Bind current renderer text state for an enclosing render, never replace
+    // it with title-specific defaults. The actor owner is separately borrowed
+    // through StartupRuntime::withLevelNumberDraw.
+    template<class Render> bool withLevelNumberText(const FontGlyphMasks& glyphs,
+        LevelNumberTextDrawState& state,Render render){
+        if(titleGlyphs_||titleText_)return false;
+        titleGlyphs_=&glyphs;titleText_=&state;
+        const bool okay=render();titleGlyphs_=nullptr;titleText_=nullptr;
+        return okay;
+    }
 
 private:
     void renderMenu(Renderer& renderer) const;
@@ -50,6 +61,8 @@ private:
     StartupRuntime startup_;
     const ObjectPack* objectPack_ = nullptr;
     const EffectMaskAssets* effectAssets_ = nullptr;
+    const FontGlyphMasks* titleGlyphs_=nullptr;
+    LevelNumberTextDrawState* titleText_=nullptr;
     mutable CurrencySmokeComposition effects_;
     mutable bool renderingSucceeded_ = true;
     bool fire_ = false;

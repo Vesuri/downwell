@@ -323,9 +323,21 @@ void Game::renderMain(Renderer& renderer) const {
             });
         }, [&](auto emit) {
             return startup_.visitUnconditionalSurfaceDraw([&](InstanceHandle,const InstanceRecord& record,int depth){
-                // A title requires its live font and mutable registered Draw
-                // binding. Never silently drop it from low-spec/death draws.
-                if(record.objectId==372)return false;
+                if(record.objectId==372){
+                    if(!titleGlyphs_||!titleText_)return false;
+                    struct Target {
+                        const StartupRuntime& world;
+                        bool exists(bool& present){present=true;return true;}
+                        bool begin(){return true;}bool end(){return true;}
+                        bool view(unsigned axis,MotionBinary64& value){
+                            if(axis>1)return false;
+                            value=MotionBinary64::fromInteger(axis?world.mainCameraRenderViewY():world.mainCameraRenderViewX());
+                            return true;
+                        }
+                    } target{startup_};
+                    LevelNumberSurfaceDraw<Target,decltype(emit)> draw(*titleGlyphs_,*titleText_,target,emit);
+                    return startup_.drawLevelNumber(record,draw);
+                }
                 // Compact original-art mask only supports its verified default
                 // transform/depth and centered integer viewport placement.
                 if(depth!=-200000||record.spriteId!=129||record.scaleX!=1||record.scaleY!=1||record.rotation!=0)
