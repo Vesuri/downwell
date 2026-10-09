@@ -2961,6 +2961,21 @@ int main(){
         require(owner->attach(*world),"attach live player-transition world");world->skipToGameForTesting();world->registerLevelExit(176);
         TimeStopEffects<16> state;auto shards=world->timeShardRegistration<16>();auto changes=world->timeChangeRegistration<8>();
         require(state.shards.bindPhases(shards)&&state.changes.bind(changes),"bind player-transition families");
+        auto composedOwner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto composed=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,composedOwner->binding());
+        require(composedOwner->attach(*composed),"attach composed player-transition world");
+        composed->skipToGameForTesting();composed->registerLevelExit(176);
+        TimeStopEffects<16> composedState;
+        auto composedShards=composed->timeShardRegistration<16>();
+        auto composedChanges=composed->timeChangeRegistration<8>();
+        require(composedState.shards.bindPhases(composedShards)&&composedState.changes.bind(composedChanges),
+            "bind composed player-transition families");
+        unsigned composedPauses=0,queries=0;
+        auto composedStep=[&]{
+            return composed->stepWithPlayerTimeStop(composedShards,composedChanges,composedState,Input{},false,
+                [&](PlayerTimeStop::AudioQuery,bool& answer){++queries;answer=false;return true;},
+                [&](auto effect){if(effect==PlayerTimeStop::Effect::change)++composedPauses;return true;});
+        };
         unsigned pauses=0,hooks=0;std::uint32_t first=0;
         auto transition=[&](const InstanceRecord& player,const PlayerMotion& motion,int ox,int oy){
             ++hooks;if(!first)first=world->nextRuntimeInstanceId();
@@ -2987,6 +3002,11 @@ int main(){
         require(world->stepWithTimeStopEffects(shards,changes,state,Input{},false,transition)&&hooks==1&&pauses==1&&
             state.player.stopped&&state.shards.size()==6&&state.changes.sourceId(1)==first+3&&
             state.shards.sourceId(4)==first+4,"normal player Begin Step creates source-ordered transition families");
+        require(composedStep()&&composedPauses==1&&queries>0&&composedState.player.stopped&&
+            composedState.shards.size()==6&&composedState.changes.sourceId(1)==first+3&&
+            composedState.shards.sourceId(4)==first+4&&composed->stateDigest()==world->stateDigest()&&
+            composed->randomDrawCount()==world->randomDrawCount(),
+            "runtime player-pose composition matches explicit transition state, identities and RNG");
         auto camera=[&]() -> const InstanceRecord& {
             for(std::size_t i=0;i<world->activeInstanceCount();++i)
                 if(world->instanceAt(i).objectId==64)return world->instanceAt(i);
@@ -3001,7 +3021,38 @@ int main(){
         require(world->stepWithTimeStopEffects(shards,changes,state,Input{},false,transition)&&hooks==2&&pauses==1,
             "held field does not recreate the transition on the next world tick");
         require(camera().alarms.get(0)==0,"camera Alarm 0 expires on second tick without repeated shake request");
+        require(composedStep()&&composedPauses==1&&composed->stateDigest()==world->stateDigest()&&
+            composed->randomDrawCount()==world->randomDrawCount(),
+            "composed held-field tick preserves mixed phase state without repeating transition");
+        require(composedState.reset(),"retire composed transition fixture before teardown");
         require(state.reset(),"retire live transition fixture before teardown");
+    }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach composed transition audio-failure world");
+        world->skipToGameForTesting();world->registerLevelExit(176);
+        TimeStopEffects<16> state;auto shards=world->timeShardRegistration<16>();auto changes=world->timeChangeRegistration<8>();
+        require(state.shards.bindPhases(shards)&&state.changes.bind(changes),"bind audio-failure families");
+        unsigned queries=0,pauses=0,enters=0;
+        auto tick=[&]{return world->stepWithPlayerTimeStop(shards,changes,state,Input{},false,
+            [&](PlayerTimeStop::AudioQuery query,bool&){
+                ++queries;require(query==PlayerTimeStop::AudioQuery::musicPlaying,"first transition audio guard");
+                return false;
+            },[&](auto effect){
+                if(effect==PlayerTimeStop::Effect::change)++pauses;
+                if(effect==PlayerTimeStop::Effect::enterSound)++enters;
+                return true;
+            });};
+        require(!tick()&&!world->effectsSucceeded()&&queries==1&&pauses==1&&enters==0&&state.shards.size()==3&&
+            state.changes.sourceId(1)!=0,"unavailable audio stops after the first burst and time-change birth");
+        require(world->instance(state.shards.sourceId(1))->alarms.get(2)==30&&
+            world->instance(state.changes.sourceId(1))->alarms.get(1)==2,
+            "failed Begin Step does not advance later alarm phases");
+        const auto draws=world->randomDrawCount();
+        require(!tick()&&queries==1&&world->randomDrawCount()==draws,
+            "failed composed transition cannot replay its partial effects");
+        require(!state.reset(),"terminal transition failure cannot be cleared into a reusable world");
     }
     {
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);

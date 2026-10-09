@@ -8,6 +8,7 @@
 #include "SmokeTrig.h"
 #include "TimeChangeEffects.h"
 #include "TimeStopAudio.h"
+#include "DivideBinary64.h"
 namespace downwell {
 // Shared transition/effect coordination. Backend adapters still supply exact
 // field masks, audio state and synchronous side effects. Emit(change) performs
@@ -25,6 +26,17 @@ template<unsigned Capacity> struct TimeStopEffects {
         RunnerImageValue x,y; // published builtins, not private xx/yy
         MotionBinary64 xsp,ysp;
         MotionBinary64 xx,yy; // private motion coordinates used by time-change Create
+        // Exact conversion of the current portable player's representation,
+        // not a claim that Q8/fifths replace the original VM motion arithmetic.
+        template<class Motion> bool fromPortableMotion(RunnerImageValue publishedX,RunnerImageValue publishedY,
+            const Motion& motion,int originX,int originY){
+            x=publishedX;y=publishedY;
+            return divideBinary64(MotionBinary64::fromInteger(motion.offsetXFixed()),MotionBinary64::fromInteger(256),xx)&&
+                divideBinary64(MotionBinary64::fromInteger(motion.offsetYFixed()),MotionBinary64::fromInteger(256),yy)&&
+                xx.add(MotionBinary64::fromInteger(originX))&&yy.add(MotionBinary64::fromInteger(originY))&&
+                divideBinary64(MotionBinary64::fromInteger(motion.speedXFixed()),MotionBinary64::fromInteger(256),xsp)&&
+                divideBinary64(MotionBinary64::fromInteger(motion.speedYFifths()),MotionBinary64::fromInteger(1280),ysp);
+        }
     };
     template<class Side,class Random,class Field,class Lookup,class Audio,class Emit>
     bool beginStepWithAudio(bool mainRoom,Side side,const PlayerPose& pose,bool lowSpec,

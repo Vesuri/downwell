@@ -649,6 +649,22 @@ public:
         timeEffectDispatch_=nullptr;timeEffectContext_=nullptr;
         return ok;
     }
+    // Compose the actual player Begin Step with the existing mixed room phases.
+    // Audio queries and side effects must be supplied by the runtime service;
+    // absence of audio is not equivalent to answering every query false.
+    template<unsigned Capacity,unsigned Registered,unsigned Changes,class Audio,class Emit,class Collisions=NoCollisionPass>
+    bool stepWithPlayerTimeStop(StoredTimeShardRegistration<instanceCapacity,Registered>& shards,
+        StoredTimeChangeRegistration<instanceCapacity,Changes>& changes,TimeStopEffects<Capacity>& state,
+        const Input& input,bool lowSpec,Audio audio,Emit emit,Collisions collisions={}){
+        auto transition=[&](const InstanceRecord& record,const PlayerMotion& motion,int ox,int oy){
+            RunnerImageValue x,y;
+            std::memcpy(&x.bits,&record.preciseX,4);std::memcpy(&y.bits,&record.preciseY,4);
+            typename TimeStopEffects<Capacity>::PlayerPose pose;
+            if(!pose.fromPortableMotion(x,y,motion,ox,oy))return run_.effectsSucceeded=false;
+            return beginTimeStopAudioChecked(shards,changes,state,pose,lowSpec,audio,emit);
+        };
+        return stepWithTimeStopEffects(shards,changes,state,input,false,transition,collisions);
+    }
     // Source bone Step reads the same pTimeStop state just written by player
     // Begin Step. Transition remains an explicit source player/audio adapter;
     // this does not infer that global from goalStop or shop control locks.

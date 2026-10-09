@@ -1837,6 +1837,17 @@ Camera/interactable queries follow, then the time-stop transition query uses
 private `xx/yy`. `scrTimeShard` performs its own field lookup using the newly
 published `x/y`. These are different positions at the same event boundary.
 
+`StartupRuntime::stepWithPlayerTimeStop` composes this boundary with the stored
+world's mixed animation/alarm/Step/cleanup dispatch. It reads published binary32
+coordinates from the player record, while private coordinates and velocities
+come from the current portable motion representation (Q8 positions/X speed,
+1280 units per pixel of Y speed). This conversion preserves that representation;
+it does not establish equivalence to the original motion arithmetic. Audio
+queries are checked services, not default-false answers. A rejected query keeps
+the already executed birth/effect prefix and fails the tick before subsequent
+phases; it cannot be retried as a fresh transition. Callers still own the bound
+registrations, effect bank and audio/effect services for this scoped entry point.
+
 The clock's earlier field query and the later time-stop query must not be
 merged merely because both use `parentTimeField`. The existing integer goal
 query is not by itself evidence for fractional transition contacts. Remaining
