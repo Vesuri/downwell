@@ -2577,6 +2577,7 @@ public:
         if(kind==View::Kind::bone)return check(bones_.writeHit(local));
         return check(kind==View::Kind::corpse&&corpses_.writeShootableHit(local));
     }
+    bool boundTo(const GameplayWorld& world)const{return valid()&&world_==&world;}
     bool population(int object,unsigned& count)const{return valid()&&selectorAvailable(object)&&owner_.instanceNumber(object,families_,count);}
     bool terrainPositionMeeting(int object,MotionBinary64 x,MotionBinary64 y,const SpriteMaskPack& masks,bool& hit){
         if(native_)return nativeTerrainPositionMeeting(object,x,y,masks,hit);

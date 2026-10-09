@@ -1198,6 +1198,16 @@ post-Step advancement and rejects admission of an already initialized legacy
 trajectory. A later tick without the required source binding fails before
 advancing a live source-owned bullet; it cannot silently resume Q20 motion.
 
+`NativeSourceBulletStep` binds those collision operations to the attached
+resource-backed native owner: fresh wall-line selection, enemy-line suppression,
+point approach, separate parent-90 meeting/selection, retained health/hit writes,
+material sound and destruction marking. It rejects a mismatched world/owner
+before effect creation. The enclosing caller supplies real audio and environment
+state. Scheduled fixtures exercise box, plain-wall and bone impacts with this
+adapter; the selected target positions are controlled test inputs, not a
+natural encounter replay. It covers registered populations only and does not
+authorize omitted actors or incomplete source-ID streams.
+
 The caller must provide complete collision and audio operations. Production
 callers without this scope still use the legacy trajectory: scoped scheduling
 does not establish complete natural collision selection or enable it by

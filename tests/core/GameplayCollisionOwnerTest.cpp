@@ -15,6 +15,7 @@ namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_
 #include "core/RunnerBindingRevisionVerification.h"
 #include "core/ActorDrawOrderVerification.h"
 #include "core/MachineGunSourceStep.h"
+#include "core/NativeSourceBulletStep.h"
 #include "core/CurrencyHomingMath.h"
 #include "core/TerrainWallContacts.h"
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
@@ -41,6 +42,11 @@ bool nativeBulletSound(downwell::GameplayCollisionOwner& owner,GameplayWorld& wo
     return world.playBulletWallSound(shot,env,[&](const char*& material){return owner.projectileWallMaterial(wall,material);},audio);
 }
 struct NativeBulletFrames {bool operator()(int,unsigned&);};
+bool nativeBoundSourceBullet(GameplayWorld& world,downwell::GameplayCollisionOwner& owner,
+    downwell::InstanceHandle shot,downwell::MachineGunSourceMotion& motion,const downwell::SpriteMaskPack& masks,
+    NativeBulletFrames frames,downwell::SoundPlayEnvironment& environment,NativeBulletSoundAudio& audio){
+    return downwell::NativeSourceBulletStep::run(world,owner,shot,motion,masks,frames,environment,audio);
+}
 struct NativeBulletSourceOps {
     bool publishAngle(downwell::RunnerImageValue);bool publishPosition(downwell::RunnerImageValue,downwell::RunnerImageValue);
     bool line(int,bool&);bool selectWall();bool approachSolid();bool wallParent(int&);
@@ -3025,6 +3031,33 @@ int main(){
         }
         const auto before=world->randomDrawCount();world->step(0);
         assert(!world->effectsSucceeded()&&world->randomDrawCount()==before); // Never silently resume the legacy path.
+    }
+    for(unsigned target:{0u,1u,2u}){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));InstanceHandle bone,shot;unsigned calls=0;
+        if(target==2)assert(world->createBoneWithSourceId(605500,240,200,bone));
+        else assert(world->createGeneratedInstance({target==1?60:92,240,512},objects,[](const auto&){return true;}));
+        auto frames=[&](int id,unsigned& count){return sprites.frameCount(id,count);};
+        assert(world->withSourceBulletSteps([&](InstanceHandle key,MachineGunSourceMotion& motion){
+            shot=key;++calls;RunnerImageValue x,y;
+            assert(x.assignInteger(240)&&y.assignInteger(target==2?200:500)&&
+                world->publishBulletCollisionPosition(key,x,y));
+            SoundPlayEnvironment environment;environment.gameVolume={0x3fd00000u,0};environment.inWater=true;
+            BulletWallAudio audio{world->resolveBulletLifetime(key)->sound,world->overlapSound(2),29,true};
+            const auto before=world->randomDrawCount();
+            const bool ok=NativeSourceBulletStep::run(*world,*owner,key,motion,masks,frames,environment,audio);
+            assert(ok&&world->randomDrawCount()==before+(target==1?3u:1u)&&audio.valid&&audio.calls==(target==1?7u:0u));
+            const auto* retained=world->resolveBulletLifetime(key);
+            assert(retained&&retained->sourceOwned&&retained->destroyRequested&&motion.initialized&&!retained->trajectory.initialized);
+            assert(world->scriptEffects().size()==(target==1?2u:1u));
+            return ok;
+        },[&]{world->step(4);return world->effectsSucceeded();}));
+        assert(calls==1);
+        if(target==0){const auto* box=world->findBreakable({0,1});assert(box&&box->state.hit&&box->state.wallHp.high==0xc0200000u);}
+        if(target==2){const auto* victim=owner->bones().find(bone);assert(victim&&victim->state.hit&&victim->state.health.high==0xc0200000u);}
+        assert(owner->prepareDraw()&&!world->resolveBulletLifetime(shot));
     }
     for(bool failSprite:{false,true}){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
