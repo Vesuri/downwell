@@ -1180,9 +1180,12 @@ the remaining whole-pipeline raster uncertainty is described in
   unset alarms before any Create RNG. `DebrisBirth::createPublished` publishes
   the area sprite after two draws, speed after three, index after four, then
   alarms separately. Failed registration or setters retain the completed
-  prefix for terminal teardown. Stored `spawnDebris` uses this path; the native
-  atomic registration remains a legacy path until its source-ID adapter is
-  connected. The atomic `create` behavior remains the arithmetic reference.
+  prefix for terminal teardown. Stored `spawnDebris` and native
+  `spawnDebrisWithSourceId` use this path. Native registry records retain the
+  supplied source ID separately from their local generation, publishing it to
+  layer membership at constructor birth. The enclosing creation stream must
+  supply that ID; the adapter does not infer it from pool slots. The atomic
+  `create`/legacy `spawnDebris` behavior remains the reference.
 
 `createDeadBody` implements the `scrDeadBody` wrapper, not object 263's Create
 or physics. Its adapter must complete inherited Create, random samples and

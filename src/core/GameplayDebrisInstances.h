@@ -9,7 +9,7 @@ namespace downwell {
 class GameplayDebrisInstances {
 public:
     static constexpr unsigned capacity=64;
-    struct Record {const DebrisAnimation* effect=nullptr;unsigned lifetimeId=0;bool active=true,destroyRequested=false;};
+    struct Record {const DebrisAnimation* effect=nullptr;unsigned lifetimeId=0;bool active=true,destroyRequested=false;std::uint32_t sourceId=0;};
     using Binding=RecordLifecycleBinding<Record>;
     explicit GameplayDebrisInstances(Binding binding):binding_(binding){}
     GameplayDebrisInstances(const GameplayDebrisInstances&)=delete;
@@ -25,14 +25,37 @@ public:
         return {};
     }
     bool birth(unsigned local,const DebrisAnimation& effect){
+        return birthRecord(local,effect,0); // Legacy atomic/reference admission.
+    }
+    struct SourceBirth {
+        GameplayDebrisInstances& owner;std::uint32_t id;
+        bool constructed(unsigned local,const DebrisAnimation& effect){
+            if(!id||id>0x7fffffffu)return owner.good_=false;
+            for(const auto& r:owner.records_)if(r.lifetimeId&&r.sourceId==id)return owner.good_=false;
+            return owner.birthRecord(local,effect,id);
+        }
+        bool sprite(unsigned local,const DebrisAnimation& effect,int value){
+            const auto key=owner.handle(local);const auto* r=owner.find(key);
+            return owner.good_=owner.check(local,effect)&&owner.binding_.sprite(key,*r,value);
+        }
+        bool image(unsigned local,const DebrisAnimation& effect){return owner.image(local,effect);}
+        bool imageSpeed(unsigned local,const DebrisAnimation& effect,RunnerImageValue value){
+            return owner.good_=owner.check(local,effect)&&effect.imageSpeed.bits==value.bits;
+        }
+        bool alarm(unsigned local,const DebrisAnimation& effect,unsigned index,int ticks){
+            return owner.good_=owner.check(local,effect)&&index<3&&effect.alarms.get(index)==ticks;
+        }
+    };
+    SourceBirth sourceBirth(std::uint32_t id){return {*this,id};}
+private:
+    bool birthRecord(unsigned local,const DebrisAnimation& effect,std::uint32_t id){
         if(!good_||!binding_.hasOwner()||!local||local<=newest_)return good_=false;
         unsigned i=0;while(i<capacity&&records_[i].lifetimeId)++i;
         if(i==capacity)return good_=false;
-        records_[i]={&effect,local,true,false};newest_=local;++count_;
-        // Create has already completed in stable storage; birth publishes its
-        // final position, sprite and image through the resource-backed owner.
+        records_[i]={&effect,local,true,false,id};newest_=local;++count_;
         return good_=binding_.birth({i,local},records_[i]);
     }
+public:
     bool image(unsigned local,const DebrisAnimation& effect){
         const auto h=handle(local);const auto* r=find(h);
         return good_=check(local,effect)&&binding_.imageIndex(h,*r,effect.imageIndex);

@@ -19,17 +19,30 @@ struct Audit {
     using Record=GameplayDebrisInstances::Record;
     GameplayDebrisInstances* registry=nullptr;
     unsigned births=0,images=0,moves=0,marks=0,retires=0;
+    unsigned sprites=0;bool published=false;GameMakerRandom* createRandom=nullptr;
     bool failMove=false,failImage=false,failMark=false,failRetire=false;
     RunnerImageValue x{},y{},image{};
     bool birth(InstanceHandle h,const Record& r){
         assert(registry->find(h)==&r&&r.effect&&!r.destroyRequested);
+        if(published){
+            assert(createRandom&&createRandom->drawCount()==0);
+            assert(r.sourceId==105999&&r.sourceId!=h.generation);
+            assert(r.effect->spriteId==91&&!r.effect->imageIndex.bits);
+            assert(r.effect->imageSpeed.bits==0x3f800000u);
+            for(unsigned i=0;i<3;++i)assert(r.effect->alarms.get(i)==-1);
+        }
         x=r.effect->x;y=r.effect->y;image=r.effect->imageIndex;++births;return true;
     }
     bool retire(InstanceHandle h,const Record& r){assert(registry->find(h)==&r);++retires;return !failRetire;}
     bool activation(InstanceHandle,const Record&,bool){return true;}
     bool membership(InstanceHandle,const Record&,bool){return true;}
-    bool sprite(InstanceHandle,const Record&,int){return true;}
+    bool sprite(InstanceHandle h,const Record& r,int value){
+        assert(registry->find(h)==&r&&births==1&&!images);
+        if(published)assert(createRandom->drawCount()==2);
+        assert(value==115||value==116||value==91);++sprites;return true;
+    }
     bool imageIndex(InstanceHandle h,const Record& r,RunnerImageValue value){
+        if(published)assert(createRandom->drawCount()==4);
         assert(registry->find(h)==&r);++images;if(failImage)return false;image=value;return true;
     }
     bool move(InstanceHandle h,const Record& r,RunnerImageValue px,RunnerImageValue py){
@@ -42,6 +55,30 @@ struct Audit {
     }
 };
 int main(){
+    for(unsigned seed=0;seed<256;++seed){
+        Audit audit;audit.published=true;
+        GameplayDebrisInstances registry(GameplayDebrisInstances::Binding::bindDestruction(audit));
+        audit.registry=&registry;DebrisEffects<1> effects;GameMakerRandom random(seed),reference(seed);
+        audit.createRandom=&random;
+        auto admission=registry.sourceBirth(105999);
+        const auto h=effects.createPublishedRegistered({}, {},seed%7,random,admission);
+        const auto* r=registry.find(registry.handle(h));DebrisBirth expected;
+        assert(expected.create(seed%7,reference)&&r&&r->sourceId==105999);
+        assert(audit.births==1&&audit.images==1&&audit.sprites==unsigned(seed%7>=1&&seed%7<=5));
+        assert(r->effect->spriteId==expected.spriteId&&r->effect->imageIndex.bits==expected.imageIndex.bits);
+        assert(r->effect->imageSpeed.bits==expected.imageSpeed.bits);
+        assert(r->effect->xsp.high==expected.xsp.high&&r->effect->xsp.low==expected.xsp.low);
+        assert(random.nextU32()==reference.nextU32());
+        assert(effects.clear(registry)&&!registry.size());
+    }
+    for(std::uint32_t id:{0u,0x80000000u,105999u}){
+        Audit audit;GameplayDebrisInstances registry(GameplayDebrisInstances::Binding::bindDestruction(audit));
+        audit.registry=&registry;DebrisAnimation first,second;
+        auto admitted=registry.sourceBirth(105999);assert(admitted.constructed(1,first));
+        auto rejected=registry.sourceBirth(id);assert(!rejected.constructed(2,second));
+        assert(!registry.valid()&&registry.size()==1&&audit.births==1&&!registry.handle(2).generation);
+        assert(registry.retire(1,first)&&!registry.size());
+    }
     for(unsigned seed=0;seed<256;++seed){
         Audit audit;GameplayDebrisInstances registry(GameplayDebrisInstances::Binding::bindDestruction(audit));
         audit.registry=&registry;DebrisEffects<1> effects;GameMakerRandom random(seed);
@@ -102,6 +139,6 @@ int main(){
         // A terminal registry must be reconstructed, never silently reused.
         assert(!registry.valid());
     }
-    std::puts("Debris registry: 256 lifetimes, fractional writes, animation, deferred destruction, stale-owner rejection and failure teardown passed");
+    std::puts("Debris registry: 256 published Creates and 256 legacy lifetimes, source IDs, setter/RNG order, deferred destruction and failure teardown passed");
 }
 #endif

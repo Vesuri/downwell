@@ -302,6 +302,10 @@ bool nativeDebrisOwnership(GameplayWorld& world,downwell::DebrisEffects<2>& effe
     downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle& key){
     return world.spawnDebris(effects,{},{},1,key)&&owner.prepareDraw();
 }
+bool nativePublishedDebrisOwnership(GameplayWorld& world,downwell::GameplayCollisionOwner& owner,
+    downwell::InstanceHandle& key,std::uint32_t sourceId){
+    return world.spawnDebrisWithSourceId(sourceId,{},{},1,key)&&owner.prepareDraw();
+}
 bool nativeDebrisQuery(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle local,
     downwell::MotionBinary64 x,downwell::MotionBinary64 y,const downwell::SpriteMaskPack& masks,bool& hit){
     return owner.debrisPlaceMeeting(local,x,y,masks,hit);
@@ -1928,6 +1932,30 @@ int main(){
     checkEnemySlotDirectory(objects,sprites);
     checkNativeAnimationBatches(objects,sprites);
     const auto mb=read("generated/downwell-sprite-masks.dwsm");SpriteMaskPack masks(mb.data(),mb.size());
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                  GameplayCollisionOwner::Ownership::nativeScenery}){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));world->configureEnemyRandom(GameMakerRandom(91));
+        InstanceHandle local,shared;
+        assert(world->spawnDebrisWithSourceId(105999,MotionBinary64::fromInteger(240),
+            MotionBinary64::fromInteger(40000),2,local));
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::debris,local,shared));
+        GameplayCollisionView view(*world);GameplayCollisionView::Record record;
+        assert(view.resolve(shared,record)&&record.debris==owner->debris().find(local));
+        assert(record.debris->sourceId==105999&&local.generation!=105999);
+        GameMakerRandom random(91);DebrisBirth expected;assert(expected.create(2,random));
+        const auto& effect=*record.debris->effect;
+        assert(effect.spriteId==116&&effect.imageIndex.bits==expected.imageIndex.bits);
+        assert(effect.imageSpeed.bits==expected.imageSpeed.bits&&world->randomDrawCount()==4);
+        assert(owner->prepareDraw());
+        for(unsigned i=0;i<30;++i){
+            world->step(0);assert(world->effectsSucceeded()&&owner->prepareDraw());
+        }
+        assert(!owner->debris().find(local)&&owner->valid());
+    }
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
                   GameplayCollisionOwner::Ownership::nativeScenery}){
         const bool native=mode!=GameplayCollisionOwner::Ownership::reference;

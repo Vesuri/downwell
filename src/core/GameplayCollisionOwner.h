@@ -737,6 +737,7 @@ private:
             if constexpr(Kind==View::Kind::terrain)sourceId=r.sourceInstanceId;
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
             if constexpr(Kind==View::Kind::timeField)sourceId=r.sourceId;
+            if constexpr(Kind==View::Kind::debris)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
             if constexpr(Kind==View::Kind::flashBall||Kind==View::Kind::limboShard||Kind==View::Kind::levelNumber||Kind==View::Kind::result||Kind==View::Kind::runController||Kind==View::Kind::consumptionBlood||Kind==View::Kind::corpse||Kind==View::Kind::corpseExpiry||Kind==View::Kind::smoke)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeShard)sourceId=parent.pendingTimeShardId_;
@@ -840,6 +841,7 @@ private:
             unsigned sourceId=0;
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
             if constexpr(Kind==View::Kind::timeField)sourceId=r.sourceId;
+            if constexpr(Kind==View::Kind::debris)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
             if constexpr(Kind==View::Kind::flashBall||Kind==View::Kind::limboShard||Kind==View::Kind::levelNumber||Kind==View::Kind::result||Kind==View::Kind::runController||Kind==View::Kind::consumptionBlood||Kind==View::Kind::corpse||Kind==View::Kind::corpseExpiry||Kind==View::Kind::smoke)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeShard)sourceId=parent.pendingTimeShardId_;

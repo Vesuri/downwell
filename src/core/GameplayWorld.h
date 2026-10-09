@@ -823,6 +823,11 @@ public:
     bool spawnDebris(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int area,downwell::InstanceHandle& result){
         return spawnDebris(ownedDebrisEffects_,x,y,area,result);
     }
+    bool spawnDebrisWithSourceId(std::uint32_t id,downwell::MotionBinary64 x,downwell::MotionBinary64 y,
+        int area,downwell::InstanceHandle& result){
+        result={};if(!id||id>0x7fffffffu)return run_.effectsSucceeded=false;
+        return spawnDebris(ownedDebrisEffects_,x,y,area,result,id);
+    }
     bool bindDebrisInstances(downwell::GameplayDebrisInstances& instances){
         if(debrisInstances_||!instances.valid()||instances.size())return false;
         debrisInstances_=&instances;return true;
@@ -831,7 +836,7 @@ public:
     // Natural combat admission follows after source Step/Draw integration.
     template<unsigned Capacity>
     bool spawnDebris(downwell::DebrisEffects<Capacity>& effects,downwell::MotionBinary64 x,
-        downwell::MotionBinary64 y,int area,downwell::InstanceHandle& result){
+        downwell::MotionBinary64 y,int area,downwell::InstanceHandle& result,std::uint32_t sourceId=0){
         if(!run_.effectsSucceeded)return false;
         if(!debrisInstances_||!roomAnimation_)return run_.effectsSucceeded=false;
         if(debrisBinding_.effects!=&effects){
@@ -843,7 +848,9 @@ public:
                 return record&&registry.dispatchAlarm(key,*record,bank,bank.beginPhase(),index);
             };
         }
-        const auto h=effects.createRegistered(x,y,area,enemyRandom_,*debrisInstances_);
+        auto lifecycle=debrisInstances_->sourceBirth(sourceId);
+        const auto h=sourceId?effects.createPublishedRegistered(x,y,area,enemyRandom_,lifecycle):
+            effects.createRegistered(x,y,area,enemyRandom_,*debrisInstances_);
         if(!h)return run_.effectsSucceeded=false;
         result=debrisInstances_->handle(h);return run_.effectsSucceeded=result.generation!=0;
     }
