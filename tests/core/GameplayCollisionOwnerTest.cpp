@@ -1054,6 +1054,22 @@ int main(){
         const int alarm=record->alarms.get(0);
         world->step(0);assert(world->effectsSucceeded()&&record->alarms.get(0)==alarm);
         assert(owner->timeShards().activation(key,true));
+        InstanceHandle player;
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::player,world->playerHandle(),player));
+        RunnerCollisionEventContext context;
+        auto contact=[&]{return context.dispatch(shared,player,{true,false},
+            [&](auto,auto,int& subtype,bool& found,PackedObjectEvent& event){
+                subtype=35;return objects.collisionEvent(238,35,found,event);
+            },[&](const auto& event){return owner->dispatchTimeShardCollision(event);});};
+        auto beforeContact=world->randomDrawCount();
+        assert(contact()&&world->randomDrawCount()==beforeContact); // Create cooldown.
+        record->alarms.set(2,1);
+        world->step(0);assert(world->effectsSucceeded()&&!effects.get(1)->noTouch);
+        const auto life=record->alarms.get(0),fade=record->alarms.get(1);
+        beforeContact=world->randomDrawCount();
+        assert(contact()&&world->randomDrawCount()==beforeContact+2&&record->alarms.get(2)==5);
+        assert(record->alarms.get(0)==life&&record->alarms.get(1)==fade);
+        assert(contact()&&world->randomDrawCount()==beforeContact+2);
         // Exercise the real room animation/alarm traversal and selected cleanup.
         record->alarms.set(0,2);
         world->step(0);assert(world->effectsSucceeded()&&record->alarms.get(0)==1);

@@ -96,7 +96,9 @@ static void alarmsAndContact(){
     assert(r->alarms.advanceOne(2)&&registry.dispatchAlarm(key,effects,2));
     assert(!effects.get(local)->noTouch&&r->alarms.get(0)==123&&r->alarms.get(1)==77);
     const auto draws=random.drawCount();
+    r->alarms.set(0,120);r->alarms.set(1,74);
     assert(registry.dispatchContact(key,effects,{}, {},random)&&random.drawCount()==draws+2&&r->alarms.get(2)==5);
+    assert(r->alarms.get(0)==120&&r->alarms.get(1)==74);
     assert(registry.dispatchContact(key,effects,{}, {},random)&&random.drawCount()==draws+2);
     r->alarms.set(0,1);
     assert(r->alarms.advanceOne(0)&&registry.dispatchAlarm(key,effects,0)&&r->destroyRequested&&registry.size()==1);

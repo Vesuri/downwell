@@ -1806,6 +1806,18 @@ public:
             binding.ownerObjectId!=61||binding.codeId!=991||objects_.findEvent(60,1,0,destroy))return check(false);
         return check(native_?world_->destroyNativeTerrain(other):terrain_.requestDestroy(other));
     }
+    bool dispatchTimeShardCollision(const RunnerCollisionEventContext::Frame& event){
+        View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;
+        InstanceHandle player;
+        if(!valid()||!world_||!resolves(event.self)||!resolves(event.other)||
+           !View::decode(event.self,kind,local)||kind!=View::Kind::timeShard||
+           !View::encode(View::Kind::player,world_->playerHandle(),player)||
+           player.slot!=event.other.slot||player.generation!=event.other.generation||
+           event.type!=4||event.subtype!=35||event.owner!=238||event.code!=2081||
+           !objects_.collisionEvent(238,35,found,binding)||!found||
+           binding.ownerObjectId!=238||binding.codeId!=2081)return check(false);
+        return check(world_->collideTimeShardRoomEffect(local));
+    }
     template<class MakePlayer> bool dispatchSkeletonCollision(const RunnerCollisionEventContext::Frame& event,MakePlayer makePlayer){
         View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;
         if(!valid()||!world_||!resolves(event.self)||!resolves(event.other)||

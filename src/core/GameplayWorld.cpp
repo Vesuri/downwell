@@ -202,6 +202,14 @@ bool GameplayWorld::retireTimeShardRoomEffect(downwell::InstanceHandle key){
     return run_.effectsSucceeded=run_.effectsSucceeded&&timeShardInstances_&&timeShardEffects_&&
         timeShardInstances_->retireMarked(key,*timeShardEffects_);
 }
+bool GameplayWorld::collideTimeShardRoomEffect(downwell::InstanceHandle key){
+    // Collision 2081 reads only sign(other.xsp/ysp), not engine hspeed/vspeed.
+    // The private fixed-point numerators preserve those signs exactly.
+    return run_.effectsSucceeded=run_.effectsSucceeded&&timeShardInstances_&&timeShardEffects_&&
+        timeShardInstances_->dispatchContact(key,*timeShardEffects_,
+            downwell::MotionBinary64::fromInteger(player_.speedXFixed()),
+            downwell::MotionBinary64::fromInteger(player_.speedYFifths()),enemyRandom_);
+}
 bool GameplayWorld::clearRoomTimeShards(){
     if(!run_.effectsSucceeded)return false;
     if(timeShardInstances_&&timeShardInstances_->size()&&(!timeShardEffects_||!timeShardEffects_->clear()))

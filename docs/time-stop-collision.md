@@ -369,6 +369,13 @@ checks the real record address, effect handle and numeric source ID; missing
 or recycled effects fail instead of becoming successful no-ops. The current
 entry point is specifically for the main-room player's movement owner.
 
+The native counterpart is `GameplayCollisionOwner::dispatchTimeShardCollision`.
+It validates the resource binding and current player/shard handles before using
+`GameplayWorld`'s private player velocity signs and shared RNG. Both registered
+contact adapters import the current room alarm counters before an eligible
+contact publishes alarm 2; the collision script does not reset alarms 0 or 1.
+This is a selected-event boundary, not a substitute for ordered pair collection.
+
 `gml_Object_fxTimeShard_Collision_objPlayer_n.asm` reads `sign(other.xsp)` and
 `sign(other.ysp)` and multiplies each by a separate `random(2)` draw, then sets
 `noTouch` and alarm 2 to 5. Only signs cross the live motion adapter: horizontal

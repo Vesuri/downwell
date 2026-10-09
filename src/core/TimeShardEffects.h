@@ -179,7 +179,8 @@ public:
         }
         succeeded_=false;return false;
     }
-    template<class Random> bool playerContact(Handle handle,MotionBinary64 xsp,MotionBinary64 ysp,Random& random){
+    template<class Random> bool playerContact(Handle handle,MotionBinary64 xsp,MotionBinary64 ysp,Random& random,
+                                             const AlarmBank* worldAlarms=nullptr){
         if(!succeeded_)return false;
         auto* effect=get(handle);
         if(!effect)return true;
@@ -187,6 +188,12 @@ public:
         const auto id=sourceId(handle);
         if(eligible_&&!eligible_(context_,handle,id,eligible)){succeeded_=false;return false;}
         if(!eligible||effect->noTouch)return true;
+        // Only alarm 2 is assigned by Collision. Preserve the room scheduler's
+        // latest sibling counters when publishing the effect back to its owner.
+        if(worldAlarms){
+            effect->alarm0=worldAlarms->get(0);effect->alarm1=worldAlarms->get(1);
+            effect->alarm2=worldAlarms->get(2);
+        }
         if(!effect->playerContact(xsp,ysp,random)||
            (alarm_&&!alarm_(context_,handle,id,*effect))){succeeded_=false;return false;}
         return true;

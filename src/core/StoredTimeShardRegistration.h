@@ -130,7 +130,7 @@ public:
         if(!effects.phasesBoundTo(*this)||records_.resolve(key)!=&record)return fail();
         for(const auto& e:entries_)if(e.local&&e.key.slot==key.slot&&e.key.generation==key.generation){
             if(resolve(e)!=&record||e.id!=record.instanceId||effects.sourceId(e.local)!=e.id||!effects.get(e.local))return fail();
-            if(!effects.playerContact(e.local,playerXsp,playerYsp,random))return fail();
+            if(!effects.playerContact(e.local,playerXsp,playerYsp,random,&record.alarms))return fail();
             return true;
         }
         return fail();

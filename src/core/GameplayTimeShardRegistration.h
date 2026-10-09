@@ -110,7 +110,7 @@ public:
         const auto* r=find(key);
         if(!good_||!r||!effects.phasesBoundTo(*this)||effects.sourceId(key.generation)!=r->sourceId||
            !effects.get(key.generation))return fail();
-        return effects.playerContact(key.generation,xsp,ysp,random)||fail();
+        return effects.playerContact(key.generation,xsp,ysp,random,&r->alarms)||fail();
     }
     template<unsigned N> bool retireMarked(InstanceHandle key,TimeShardEffects<N>& effects){
         const auto* r=find(key);
