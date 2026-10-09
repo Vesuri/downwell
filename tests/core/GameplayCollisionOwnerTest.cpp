@@ -1665,6 +1665,30 @@ int main(){
         SpriteMaskPack absent(nullptr,0);bool sentinel=true;
         assert(!collision->playerTimeFieldMeeting({},{},absent,sentinel)&&sentinel&&!collision->valid());
     }
+    for(bool rejectMark:{false,true}){
+        using R=GameplayPlayerControllers::Record;
+        struct Reject {
+            bool rejectMark=false;unsigned marks=0,retires=0;
+            bool birth(InstanceHandle,const R&){return true;}
+            bool retire(InstanceHandle,const R& r){assert(r.destroyRequested);++retires;return false;}
+            bool activation(InstanceHandle,const R&,bool){return true;}
+            bool membership(InstanceHandle,const R&,bool){return true;}
+            bool move(InstanceHandle,const R&,RunnerImageValue,RunnerImageValue){return true;}
+            bool sprite(InstanceHandle,const R&,int){return true;}
+            bool imageIndex(InstanceHandle,const R&,RunnerImageValue){return true;}
+            bool markDestroyed(InstanceHandle,const R& r){assert(!r.destroyRequested);++marks;return !rejectMark;}
+        } binding;
+        binding.rejectMark=rejectMark;
+        GameplayPlayerControllers children(GameplayPlayerControllers::Binding::bindDestruction(binding));
+        InstanceHandle balloon;assert(children.createCompanion(256,105187,{},{},balloon));
+        assert(children.balloonEndStep(balloon,true)&&!binding.marks);
+        assert(children.balloonEndStep(balloon,false)==!rejectMark&&binding.marks==1);
+        assert(children.find(balloon)->destroyRequested==!rejectMark);
+        if(!rejectMark)assert(!children.retire(balloon)&&binding.retires==1);
+        assert(!children.valid()&&children.find(balloon)&&children.size()==1);
+        assert(!children.balloonEndStep(balloon,false)&&!children.retire(balloon)&&binding.marks==1&&
+            binding.retires==unsigned(!rejectMark));
+    }
     for(unsigned failure=0;failure<=2;++failure){
         CameraCreateState state;RunnerImageValue x{0x80000000u},y{0x43300000u};
         unsigned calls=0;
@@ -1797,6 +1821,8 @@ int main(){
         auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
         assert(owner->attach(*world));auto& children=owner->playerControllers();
+        auto& companionUpgrades=const_cast<UpgradeInventory&>(world->upgrades());
+        companionUpgrades.levels[15]=1;
         InstanceHandle balloon,first,second;const auto draws=world->randomDrawCount();
         assert(children.createCompanion(256,106001,{0x43704000u},{0x43308000u},balloon)&&
             children.createCompanion(249,106002,{0x43700000u},{0x43300000u},first)&&
@@ -1822,6 +1848,19 @@ int main(){
             assert(b->companion.balloon.noHold.zero()&&d->companion.drone.shotDelay.zero()&&
                 d2->companion.drone.droneShooting.high==MotionBinary64::fromInteger(3).high);
         }
+        assert(!b->destroyRequested);
+        companionUpgrades.levels[15]=0;
+        assert(children.activation(balloon,false));
+        world->step(0);assert(world->effectsSucceeded()&&!b->destroyRequested);
+        assert(children.activation(balloon,true));
+        // Pending activation joins at the normal frame boundary.
+        world->step(0);world->step(0);
+        assert(world->effectsSucceeded()&&children.find(balloon)&&b->destroyRequested);
+        unsigned endCalls=0;
+        assert(owner->dispatchActorEndStep([&](auto,int){++endCalls;return true;})&&!endCalls);
+        assert(owner->prepareDraw()&&!children.find(balloon)&&children.size()==2);
+        InstanceHandle replacement;
+        assert(children.createCompanion(256,106004,{},{},replacement)&&replacement.generation>balloon.generation);
         assert(world->restartFromResults(DeathMenuSequence::Action::Retry,43,300)==ResultsDestination::gameplay&&
             children.size()==0&&!children.find(balloon)&&!children.find(first)&&!children.find(second));
     }
@@ -4651,13 +4690,15 @@ int main(){
         auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
         assert(owner->attach(*world));
-        InstanceHandle drone,first,second,newDrone;
+        InstanceHandle drone,first,second,newDrone,balloon;
         assert(owner->droneBullets().create(605000,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(192),drone));
         assert(world->createSkeletonWithSourceId(605001,240,192,first));
         assert(world->createSkeletonWithSourceId(605002,256,192,second));
+        assert(owner->playerControllers().createCompanion(256,605004,{},{},balloon));
         std::vector<int> objectsSeen;
         assert(owner->dispatchActorEndStep([&](InstanceHandle,int object){objectsSeen.push_back(object);return true;}));
-        assert((objectsSeen==std::vector<int>{120,120,266}));
+        assert((objectsSeen==std::vector<int>{120,120,256,266}));
+        assert(owner->playerControllers().balloonEndStep(balloon,false));
         unsigned calls=0;
         assert(owner->dispatchActorEndStep([&](InstanceHandle shared,int object){
             assert(object==120);GameplayCollisionView::Kind kind;InstanceHandle local;

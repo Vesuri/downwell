@@ -22,6 +22,11 @@ struct PlayerCompanionCreateState {
     DroneCreateState drone;
     BalloonCreateState balloon;
     RunnerImageValue timeline{};
+    // objDecoyBalloon End Step (2187): the upgrade is read at dispatch,
+    // not captured at creation or at phase entry. Destruction is deferred.
+    template<class Destroy> static bool balloonEndStep(bool upgrade,Destroy destroy){
+        return upgrade||destroy();
+    }
     bool alarm(int object,unsigned number){
         if(object==249){
             if(number==3)return true; // Serialized empty event, not a reset.

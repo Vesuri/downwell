@@ -2010,15 +2010,16 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
         return;
     case 2187: // gml_Object_decoyBalloon_Step_2: release lost upgrade's lifetime
         ++implementedCodeCalls_;
-        if(instance&&!run_.upgrades.levels[15]){
+        if(instance)run_.effectsSucceeded=PlayerCompanionCreateState::balloonEndStep(run_.upgrades.levels[15]!=0,[&]{
             const auto slot=static_cast<std::size_t>(instance-&instances_.at(0));
             if(slot>=instances_.size()||instance->objectId!=256||
                !companionCreateState(instance->instanceId)||
                (lifecycle_.hasOwner()&&!lifecycle_.markDestroyed(instances_.handleAt(slot),*instance))){
-                run_.effectsSucceeded=false;return;
+                return false;
             }
             instance->destroyRequested=true;
-        }
+            return true;
+        });
         return;
     case 2131: // gml_Object_objDrone_Alarm_3 (empty)
     case 2132: // gml_Object_objDrone_Alarm_2

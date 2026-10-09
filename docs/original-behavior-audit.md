@@ -101,6 +101,12 @@ simple alarms run in the mixed resource-ordered alarm phase, not an extra family
 tick. Rejected publication or an unsupported fired body fails the owner. Retry
 retires these records with the other player children. This explicit admission
 does not allocate the automatic global birth stream.
+Balloon End Step joins the admitted skeleton/drone-projectile End Step snapshot
+in object-resource order. Both runtimes use the same upgrade guard; the native
+path reads it at event dispatch, publishes the destruction flag before local
+mutation, and retains the lifetime until Draw-entry cleanup. Inactive or already
+destroyed balloons are excluded, and retired slots receive a new generation on
+reuse. This admitted actor phase is not the complete mixed-world End Step pass.
 Companion motion, Drone's firing Alarm 0, Draw, automatic native births and the rest of player
 initialization remain incomplete; correct child IDs alone do not prove those.
 Drone Step adds two to each custom direction every tick without modulo. Its

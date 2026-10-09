@@ -121,6 +121,20 @@ public:
         if(!good_||!r||!binding_.activation(key,*r,active))return fail();
         r->active=active;return true;
     }
+    bool balloonEndStep(InstanceHandle key,bool upgrade){
+        auto* r=const_cast<Record*>(find(key));
+        if(!good_||!r||r->objectId!=256||!r->companionInitialized)return fail();
+        if(!r->active||r->destroyRequested)return true;
+        return PlayerCompanionCreateState::balloonEndStep(upgrade,[&]{
+            if(!binding_.markDestroyed(key,*r))return fail();
+            r->destroyRequested=true;return true;
+        });
+    }
+    bool retire(InstanceHandle key){
+        auto* r=const_cast<Record*>(find(key));
+        if(!good_||!r||!r->destroyRequested||!binding_.retire(key,*r))return fail();
+        *r={};--count_;return true;
+    }
     bool clear(){
         if(!good_)return false;
         for(unsigned slot=0;slot<capacity;++slot){auto& r=records_[slot];

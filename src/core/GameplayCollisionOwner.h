@@ -119,7 +119,7 @@ private:
     mutable bool drawAuditHasSnapshot_=false;
 #endif
     RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity+GameplayWorld::droneBulletCapacity+GameplayWorld::boneCapacity+GameplayWorld::skeletonCapacity+GameplayWorld::currencyCapacity> combatAlarmPhase_;
-    RunnerStepSnapshot<GameplayWorld::droneBulletCapacity+GameplayWorld::skeletonCapacity> actorEndStepPhase_;
+    RunnerStepSnapshot<GameplayWorld::droneBulletCapacity+GameplayWorld::skeletonCapacity+GameplayPlayerControllers::capacity> actorEndStepPhase_;
     bool actorEndStepExecuting_=false;
     bool combatAlarmCaptureDirty_=true;
     unsigned combatAlarmMask_=0;
@@ -1023,7 +1023,7 @@ private:
     Binding<GameplayBuilderController::Record,View::Kind::builder> builderBinding_{*this};
     GameplayBuilderController builderController_{GameplayBuilderController::Binding::bindMovement(builderBinding_)};
     Binding<GameplayPlayerControllers::Record,View::Kind::playerController> playerControllerBinding_{*this};
-    GameplayPlayerControllers playerControllers_{GameplayPlayerControllers::Binding::bindAnimation(playerControllerBinding_)};
+    GameplayPlayerControllers playerControllers_{GameplayPlayerControllers::Binding::bindDestruction(playerControllerBinding_)};
     Binding<GameplayWorld::DroneBullets::Record,View::Kind::drone> droneBinding_{*this};
     GameplayWorld::DroneBullets drones_{GameplayWorld::DroneBullets::Binding::bindPositionedActor(droneBinding_)};
     Binding<GameplayWorld::Bones::Record,View::Kind::bone> boneBinding_{*this};
@@ -1416,13 +1416,15 @@ public:
         world.configureRegisteredActorEndStep([](void* context,long topQ12){
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
             if(!self.valid())return false;
-            if(!self.drones_.size()&&!self.skeletons_.size())return true;
+            if(!self.drones_.size()&&!self.skeletons_.size()&&!self.playerControllers_.size())return true;
             MotionBinary64 top;
             if(!multiplyBinary64(MotionBinary64::fromInteger(topQ12),{0x3f300000u,0},top))return self.check(false);
             return self.dispatchActorEndStep([&](InstanceHandle shared,int object){
                 View::Kind kind;InstanceHandle local;
                 if(!View::decode(shared,kind,local))return false;
                 if(object==120&&kind==View::Kind::skeleton)return self.skeletons_.endStep(local,top,true);
+                if(object==256&&kind==View::Kind::playerController)
+                    return self.playerControllers_.balloonEndStep(local,self.world_->upgrades().levels[15]!=0);
                 return object==266&&kind==View::Kind::drone&&self.drones_.endStep(local,top,MotionBinary64::fromInteger(284),true);
             });
         },this);
@@ -1787,6 +1789,11 @@ public:
                 if((flags&0x100003u)||object==269)return true;
                 return (object==120||object==266)&&resolves(h)&&
                     actorEndStepPhase_.append(h.slot,h.generation,object);
+            })))return false;
+        if(!check(visitRegistered(View::playerControllerBase,View::capacity,
+            [&](InstanceHandle h,int object,std::uint32_t flags){
+                if((flags&0x100003u)||object!=256)return true;
+                return resolves(h)&&actorEndStepPhase_.append(h.slot,h.generation,object);
             })))return false;
         actorEndStepPhase_.sort();
         for(unsigned i=0;i<actorEndStepPhase_.size();++i){
@@ -2846,6 +2853,7 @@ private:
                 case View::Kind::skeleton:return record.skeleton&&skeletons_.retire(local);
                 case View::Kind::blood:return record.blood&&blood_.retire(local);
                 case View::Kind::currency:return record.currency&&currency_.retire(local);
+                case View::Kind::playerController:return record.playerController&&playerControllers_.retire(local);
                 default:return false;
             }
         });
