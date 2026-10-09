@@ -20,13 +20,15 @@ void require(bool condition, const char* message) {
 void testFirstRoomOrder() {
     downwell::InstanceStore<4> instances;
     const downwell::RoomInstanceDefinition definitions[] = {
-        {100065, 37, true},
-        {100066, 36, false}
+        {100065, 37, true, -16, 704},
+        {100066, 36, false, 240, 192}
     };
     std::vector<TraceEntry> trace;
     int roomCreationCalls = 0;
     const auto instanceHandler = [&trace](downwell::InstanceRecord& instance,
                                           downwell::RoomInstancePhase phase) {
+        require(instance.preciseX==float(instance.x)&&instance.preciseY==float(instance.y),
+                "authored coordinates initialize both stored views before any Create phase");
         trace.push_back({instance.instanceId, phase});
     };
     const auto roomHandler = [&roomCreationCalls](std::int32_t roomId) {

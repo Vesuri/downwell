@@ -1287,6 +1287,20 @@ void StartupRuntime::syncMainBuilderState() {
         areaOneBuilder_.specialObjectsGenerated();
 }
 
+bool StartupRuntime::publishBuilderRow(int y){
+    if(!run_.effectsSucceeded)return false;
+    InstanceHandle key{};
+    for(unsigned i=0;i<instances_.size();++i){
+        const auto& r=instances_.at(i);
+        if(r.objectId!=65||!r.active||r.destroyRequested)continue;
+        if(key.generation)return run_.effectsSucceeded=false;
+        key=instances_.handleAt(i);
+    }
+    auto* r=instances_.resolve(key);
+    if(!r||!lifecycle_.integerPosition(key,*r,r->x,y))return run_.effectsSucceeded=false;
+    r->y=y;r->preciseY=static_cast<float>(y);return true;
+}
+
 void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
     if (!mainBuilderInitialized_ || mainBuilderEndReached_)
         return;
@@ -1311,6 +1325,7 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
         if(!record||!context.runtime.lifecycle_.integerPosition(context.builder,*record,x,y))
             return context.runtime.run_.effectsSucceeded=false;
         record->x=x;record->y=y;
+        record->preciseX=static_cast<float>(x);record->preciseY=static_cast<float>(y);
         return true;
     },&publication);
     const bool generated = areaOneBuilder_.stepVisible(

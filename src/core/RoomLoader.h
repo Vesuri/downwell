@@ -133,6 +133,8 @@ public:
             InstanceRecord& instance = *instances.find(definition.instanceId);
             instance.x = definition.x;
             instance.y = definition.y;
+            instance.preciseX = static_cast<float>(definition.x);
+            instance.preciseY = static_cast<float>(definition.y);
             instance.scaleX = definition.scaleX;
             instance.scaleY = definition.scaleY;
             instance.rotation = definition.rotation;

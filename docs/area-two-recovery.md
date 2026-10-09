@@ -114,6 +114,16 @@ rejected. Integer coordinates, an immutable string of at most 65,535 bytes,
 and integer padding counts up to 65,535 define this executor's admitted domain.
 All pinned catacomb literals lie inside it.
 
+Every newline and extra-row Y increment calls `publishY(nextY)` before
+committing the traversal cursor or creating the following row. The complete
+`build` entry point requires its owner to provide `publishBuilderY`; the
+geometry-only overload has no external publication. The stored builder owner
+publishes through its live lifecycle handle before updating the controller's
+integer/precise coordinates. A failed setter retains earlier children and the
+previous Y, latches failure, and cannot be retried. This preserves the same
+row-boundary contract as cavern generation; it does not enable area selection
+or admit unsupported catacomb actors.
+
 The verification target compares 800 geometry traces against an independent
 line-based oracle using the original strings: all 50 patterns, both mirror and
 wrap states, pillars enabled/disabled, and zero/four extra rows. Separate checks
@@ -156,9 +166,9 @@ changing the record. The wall's dynamic `i` field is distinct from published
 and leaves membership reconciliation at its existing room-phase boundary.
 Failures latch the world's effects status, retaining earlier writes. Pillar
 comparison uses the child's published binary32 X and the runner epsilon against
-half the room width, and rejects a precise/integer position mismatch (some legacy
-authored-room paths do not initialize the precise field). Generated children
-initialize both views. This adapter does not allocate children or bypass their
+half the room width, and rejects a precise/integer position mismatch. Authored
+room records initialize both views before lifetime publication and PreCreate;
+generated children likewise initialize both views. This adapter does not allocate children or bypass their
 registered family Create handlers. Live collision tests check mask publication
 against source resource bounds through the real `StoredWorldCollision` owner;
 unit tests cover write/activation failures and retired-handle reuse.

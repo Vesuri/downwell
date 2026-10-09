@@ -22,12 +22,19 @@ struct CatacombBuilderDispatch {
         return pattern(pack,id,traversal,level,hard,extraRows,random,
             [&](int object,int x,int y){return ops.create(object,x,y,[](auto){return true;});},
             [&](char c,int x,int y){return common.cell(c,x,y,roomWidth,playerHp,style,shared);},
-            [&](int x,int y){return common.pillar(x,y,roomWidth,shared);});
+            [&](int x,int y){return common.pillar(x,y,roomWidth,shared);},
+            [&](int y){return ops.publishBuilderY(y);});
     }
     template<class Random,class Create,class Common,class Pillar>
     bool pattern(const BuilderPatternPack& pack,unsigned id,BuilderStringTraversal& traversal,
                  unsigned level,bool hard,unsigned extraRows,Random& random,
                  Create create,Common common,Pillar pillar){
+        return pattern(pack,id,traversal,level,hard,extraRows,random,create,common,pillar,[](int){return true;});
+    }
+    template<class Random,class Create,class Common,class Pillar,class PublishY>
+    bool pattern(const BuilderPatternPack& pack,unsigned id,BuilderStringTraversal& traversal,
+                 unsigned level,bool hard,unsigned extraRows,Random& random,
+                 Create create,Common common,Pillar pillar,PublishY publishY){
         PackedBuilderPattern pattern;
         const std::uint8_t* text=nullptr;std::uint32_t length=0;
         if(!succeeded || executing_ || traversing_ || level<1 || level>3 ||
@@ -37,7 +44,8 @@ struct CatacombBuilderDispatch {
         const bool ok=traversal.run(text,length,extraRows,
             [&](char symbol,int x,int y){return cell(symbol,x,y,level,hard,random,create);},
             [&](char symbol,int x,int y){return common(symbol,x,y)&&succeeded;},
-            [&](int x,int y){return pillar(x,y)&&succeeded;});
+            [&](int x,int y){return pillar(x,y)&&succeeded;},
+            [&](int y){return publishY(y)&&succeeded;});
         traversing_=false;
         return succeeded=succeeded&&ok;
     }

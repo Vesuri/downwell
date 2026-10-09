@@ -854,6 +854,7 @@ public:
             return world_.run_.effectsSucceeded=post(key)&&world_.run_.effectsSucceeded;
         }
         bool write(InstanceHandle key,BuilderChildField field,int value){return publication_.write(key,field,value);}
+        bool publishBuilderY(int y){return world_.publishBuilderRow(y);}
         bool deactivate(InstanceHandle key){return publication_.deactivate(key);}
         bool rightOfMiddle(InstanceHandle key,int width,bool& right){return publication_.rightOfMiddle(key,width,right);}
     };
@@ -1465,6 +1466,7 @@ public:
 #endif
 
 private:
+    bool publishBuilderRow(int y);
     void applyFrogAlarm(InstanceRecord& instance, const FrogAlarmEffect& effect);
     void controllerCreate(PlatformProfile profile);
     void initRoomCreate();

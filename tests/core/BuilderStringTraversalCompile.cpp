@@ -11,6 +11,7 @@ bool compileBuilderTraversal(downwell::CatacombBuilderDispatch& dispatch,
     return dispatch.pattern(pack,id,cursor,1,false,4,random,create,common,pillar);
 }
 struct CompileBuilderOwner {
+    bool publishBuilderY(int);
     bool birth(int,int,int,int&);
     template<class Post> bool create(int object,int x,int y,Post post){
         int child=0;return birth(object,x,y,child)&&post(child);

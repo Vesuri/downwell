@@ -5,7 +5,9 @@ namespace downwell {
 // scrBuilder VM blocks 72--209, with scrSetBuildx. Execute the original
 // immutable VM string, not a normalized rectangle. Selection and the common
 // symbol switch belong to the caller. Callbacks are synchronous and checked:
-// area(symbol,x,y), common(symbol,x,y), pillar(x,y). A pillar callback includes
+// area(symbol,x,y), common(symbol,x,y), pillar(x,y), publishY(nextY).
+// The three-callback overload is for unregistered geometry/reference callers.
+// A pillar callback includes
 // its Create and subsequent isPillar publication. No area callback is made
 // for the extra pillars after the string.
 struct BuilderStringTraversal {
@@ -16,6 +18,11 @@ struct BuilderStringTraversal {
     template<class Area,class Common,class Pillar>
     bool run(const std::uint8_t* text,unsigned length,unsigned extraRows,
              Area area,Common common,Pillar pillar){
+        return run(text,length,extraRows,area,common,pillar,[](int){return true;});
+    }
+    template<class Area,class Common,class Pillar,class PublishY>
+    bool run(const std::uint8_t* text,unsigned length,unsigned extraRows,
+             Area area,Common common,Pillar pillar,PublishY publishY){
         if(!succeeded)return false;
         if(executing_ || !text || !length || length>65535 || extraRows>65535)
             return succeeded=false;
@@ -30,7 +37,9 @@ struct BuilderStringTraversal {
         };
         auto advance=[&](){
             if(y>2147483647-16)return false;
-            y+=16;return true;
+            const int next=y+16;
+            if(!publishY(next)||!succeeded)return false;
+            y=next;return true;
         };
         t=0;
         for(i=1;i<=length;++i){

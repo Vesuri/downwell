@@ -1,4 +1,5 @@
 #include "core/StartupRuntime.h"
+#include "core/BuilderStringTraversal.h"
 #include "RegisteredSkeletonThrowChecks.h"
 #include "QuietSkeletonEffects.h"
 #include "core/TerrainCreate.h"
@@ -1275,6 +1276,40 @@ int main(){
             "stored Animation End and cleanup retire the registered lifetime");
         require(blood.clear(),"scheduled blood teardown");
     }
+    for(unsigned reject:{0u,1u,2u}){
+        struct RowOwner:StoredWorldCollision {
+            using StoredWorldCollision::StoredWorldCollision;
+            unsigned writes=0,reject=0;
+            bool move(InstanceHandle h,const InstanceRecord& r,RunnerImageValue x,RunnerImageValue y){
+                if(r.objectId==65&&++writes==reject)return false;
+                return StoredWorldCollision::move(h,r,x,y);
+            }
+        };
+        auto owner=std::make_unique<RowOwner>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            InstanceLifecycleBinding::bindPointQueries(*owner));
+        require(owner->attach(*world),"attach literal builder row publication");world->skipToGameForTesting();
+        auto skeletons=world->skeletonRegistration<2>();auto builder=world->builderOwner(skeletons);
+        BuilderStringTraversal cursor;cursor.y=704;cursor.setPillar=false;
+        owner->reject=reject;unsigned births=0;
+        const std::uint8_t text[]="\r\n\tj\r\n\tj\r\n\t";
+        const auto first=world->nextRuntimeInstanceId();
+        const bool ok=cursor.run(text,sizeof(text)-1,0,[](char,int,int){return true;},
+            [&](char c,int x,int y){
+                require(c=='j',"fixture emits only selected skeleton cells");
+                const auto* controller=world->instance(100856);
+                require(controller&&controller->y==y&&controller->preciseY==float(y),
+                    "next synchronous child observes the published builder row");
+                ++births;return builder.create(120,x,y,[](InstanceHandle){return true;});
+            },[](int,int){return true;},[&](int y){return builder.publishBuilderY(y);});
+        require(ok==(reject==0)&&world->effectsSucceeded()==ok&&owner->writes==(reject?reject:2)&&
+            births==(reject==1?1u:2u)&&world->nextRuntimeInstanceId()==first+births,
+            "row setter failure stops later registered child births without consuming their IDs");
+        const auto* controller=world->instance(100856);
+        require(controller&&controller->y==cursor.y&&controller->preciseY==float(cursor.y),
+            "failed row write retains matching published and traversal prefixes");
+        require(skeletons.clear(),"clear literal-builder skeleton lifetimes");
+    }
     for(int offset:{-161,-160,3000,3001}){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
@@ -2174,7 +2209,16 @@ int main(){
         std::memcpy(&expectedX.bits,&beforeFrame->preciseX,4);
         std::memcpy(&expectedY.bits,&beforeFrame->preciseY,4);
         unsigned scheduledPasses=0,scheduledContacts=0,scheduledDitherContacts=0;
-        require(world->stepWithCollisionPass(Input{},false,[&]{
+        // An initial authored wall is not under the above-screen dither.
+        // Supply deliberate geometry for this mixed-event fixture rather
+        // than relying on zeroed authored precise coordinates.
+        bool foundDither=false;
+        require(world->visitDrawChecked([&](InstanceHandle h,const InstanceRecord& r){
+            if(r.objectId!=61)return true;
+            foundDither=true;
+            return world->publishCollisionPosition(h,{0x43700000u},{});
+        })&&foundDither,"publish dither at the fixture's authored wall height");
+        const bool scheduledOkay=world->stepWithCollisionPass(Input{},false,[&]{
             ++scheduledPasses;
             const auto before=world->randomDrawCount();
             return owner->collectCollisionPairs(*pairs,true)&&
@@ -2187,7 +2231,11 @@ int main(){
                         ++scheduledContacts;
                         return world->dispatchTimeShardContact(registration,shards,frame);
                     })&&world->randomDrawCount()==before;
-        })&&scheduledPasses==1&&scheduledContacts>0&&scheduledDitherContacts>0,
+        });
+        if(!scheduledOkay||scheduledPasses!=1||!scheduledContacts||!scheduledDitherContacts)
+            std::fprintf(stderr,"scheduled contacts: okay=%d passes=%u shards=%u dither=%u\n",scheduledOkay,
+                scheduledPasses,scheduledContacts,scheduledDitherContacts);
+        require(scheduledOkay&&scheduledPasses==1&&scheduledContacts>0&&scheduledDitherContacts>0,
             "ordinary scheduler executes collected shard and dither contacts once; cooldown consumes no RNG");
         RunnerCollisionMotion::Previous previous;
         require(world->effectsSucceeded()&&owner->collisionPreviousPosition(tracked,previous)&&

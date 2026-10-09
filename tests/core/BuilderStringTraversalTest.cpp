@@ -19,6 +19,7 @@ struct BuilderOps {
     bool write(Child,BuilderChildField field,int value){trace.insert(trace.end(),{-1,int(field),value});return true;}
     bool deactivate(Child){trace.push_back(-2);return true;}
     bool rightOfMiddle(Child child,int width,bool& right){right=child.x*2>width;return true;}
+    bool publishBuilderY(int y){trace.insert(trace.end(),{-3,y});return true;}
 };
 int main(int argc,char** argv){
     require(argc==2);
@@ -76,12 +77,33 @@ int main(int argc,char** argv){
         auto pillar=[&](int x,int y){return commonExpected.pillar(x,y,480,refOwner);};
         require(actual.build(pack,id,cursor,commonActual,level,hard,4,480,2,0,random,owner));
         const std::uint8_t* text=nullptr;std::uint32_t length=0;require(pack.literalData(id,text,length));
-        require(oracle.run(text,length,4,[&](char c,int x,int y){return expected.cell(c,x,y,level,hard,reference,refCreate);},common,pillar));
+        require(oracle.run(text,length,4,[&](char c,int x,int y){return expected.cell(c,x,y,level,hard,reference,refCreate);},common,pillar,
+            [&](int y){return refOwner.publishBuilderY(y);}));
         require(births==wanted && actual.spawnChance==expected.spawnChance && cursor.y==oracle.y);
         require(commonActual.chunkOrCrate==commonExpected.chunkOrCrate &&
                 commonActual.sideroomRightmost==commonExpected.sideroomRightmost);
         require(random.drawCount()==reference.drawCount());
         for(unsigned word=0;word<16;++word)require(random.stateWord(word)==reference.stateWord(word));
+    }
+    for(unsigned reject=0;reject<=6;++reject){
+        BuilderStringTraversal cursor;cursor.y=704;
+        int published=704;unsigned writes=0,births=0;
+        auto create=[&](int,int y){require(y==published&&cursor.y==published);++births;return true;};
+        const bool ok=cursor.run(sample,sizeof(sample)-1,4,
+            [&](char,int,int y){require(y==published);return true;},
+            [&](char,int x,int y){return create(x,y);},create,
+            [&](int y){
+                require(y==published+16&&cursor.y==published);
+                if(++writes==reject)return false;
+                published=y;return true;
+            });
+        require(ok==(reject==0)&&writes==(reject?reject:6)&&cursor.y==published);
+        if(reject){
+            const auto before=births;
+            require(!cursor.run(sample,sizeof(sample)-1,4,
+                [&](char,int,int){++births;return true;},[&](char,int,int){++births;return true;},create,
+                [&](int){++writes;return true;})&&births==before&&writes==reject);
+        }
     }
     {
         BuilderStringTraversal cursor,nested;
