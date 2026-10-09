@@ -1726,7 +1726,7 @@ public:
             binding.ownerObjectId!=255||event.owner!=binding.ownerObjectId||event.code!=binding.codeId){
             run_.effectsSucceeded=false;return false;
         }
-        run_.effectsSucceeded=wind.contact(random_,self->windSound,uiChannel,volume,audio);
+        run_.effectsSucceeded=wind.contact(random_,self->windSound,self->sound,uiChannel,volume,audio);
         return run_.effectsSucceeded;
     }
     template<unsigned Capacity,unsigned Registered> bool retireTimeShard(

@@ -14,6 +14,7 @@ public:
         unsigned lifetimeId=0;
         unsigned sourceId=0; // Authored/source identity, never a pool handle.
         std::int32_t windSound=0;
+        SoundPlayState sound{};
         bool active=true,destroyRequested=false;
     };
     using Binding=RecordLifecycleBinding<Record>;
@@ -31,7 +32,7 @@ public:
         Random& random,int& channel,MotionBinary64 volume,Audio& audio){
         auto* record=const_cast<Record*>(find(h));
         if(!good_||!record)return good_=false;
-        return good_=wind.contact(random,record->windSound,channel,volume,audio);
+        return good_=wind.contact(random,record->windSound,record->sound,channel,volume,audio);
     }
     bool create(int x,int y,int object=255,InstanceHandle* created=nullptr,unsigned sourceId=0){
         if(!good_||count_==capacity||!next_||(object!=255&&object!=371)||sourceId>0x7fffffffu)return good_=false;

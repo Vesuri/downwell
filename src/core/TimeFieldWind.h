@@ -8,10 +8,14 @@ namespace downwell {
 class TimeFieldWind {
 public:
     int voice=-1;
-    SoundPlayState soundState{};
+    SoundPlayState soundState{}; // Standalone reference caller; live fields supply their own.
     bool succeeded()const{return good_;}
     template<class Random,class Audio>
     bool contact(Random& random,std::int32_t& sound,int& channel,MotionBinary64 gameVolume,Audio& audio){
+        return contact(random,sound,soundState,channel,gameVolume,audio);
+    }
+    template<class Random,class Audio>
+    bool contact(Random& random,std::int32_t& sound,SoundPlayState& caller,int& channel,MotionBinary64 gameVolume,Audio& audio){
         if(!good_)return false;
         bool playing=false;
         if(!check(audio.isPlaying(voice,playing)))return false;
@@ -19,7 +23,7 @@ public:
         sound=349+int(random.chooseIndexSmall(7));
         SoundPlayEnvironment env;env.gameVolume=gameVolume;
         int result=-1;bool returned=false;
-        if(!SoundPlayScript::overlap(soundState,env,audio,[]{return true;},channel,
+        if(!SoundPlayScript::overlap(caller,env,audio,[]{return true;},channel,
             sound,90,false,true,"UI",result,returned,good_))return false;
         if(!check(returned))return false;
         voice=result;

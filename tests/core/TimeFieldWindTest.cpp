@@ -21,20 +21,24 @@ struct Audio {
 int main(){
     for(unsigned seed=0;seed<128;++seed){
         GameMakerRandom random(seed),oracle(seed);const int selected=349+int(oracle.nextU32()%7);
-        TimeFieldWind wind;Audio audio;int sound=-7,channel=22;
-        assert(wind.contact(random,sound,channel,{0x3fd00000u,0},audio));
+        TimeFieldWind wind;SoundPlayState caller;Audio audio;int sound=-7,channel=22;
+        assert(wind.contact(random,sound,caller,channel,{0x3fd00000u,0},audio));
         assert(sound==selected&&channel==selected&&wind.voice==900&&random.drawCount()==1);
+        assert(caller.sfxIndex==selected&&caller.sndsnd==900&&caller.chanNum==8&&wind.soundState.sndsnd==-1);
         assert((audio.calls==std::vector<int>{-1,selected,1000+selected,2000+selected,3000,4000,5000,900,6000}));
-        assert(wind.contact(random,sound,channel,{},audio)&&random.drawCount()==1&&audio.calls.size()==10&&audio.calls.back()==900);
+        SoundPlayState other;int otherSound=-7;
+        assert(wind.contact(random,otherSound,other,channel,{},audio)&&random.drawCount()==1&&audio.calls.size()==10&&audio.calls.back()==900&&
+            otherSound==-7&&other.sndsnd==-1&&other.sfxIndex==0&&caller.sfxIndex==selected);
     }
     for(unsigned failure=1;failure<=9;++failure){
-        TimeFieldWind wind;GameMakerRandom random(2);Audio audio;audio.fail=failure;
+        TimeFieldWind wind;SoundPlayState caller;GameMakerRandom random(2);Audio audio;audio.fail=failure;
         int sound=-7,channel=22;
-        assert(!wind.contact(random,sound,channel,{0x3fd00000u,0},audio)&&!wind.succeeded());
+        assert(!wind.contact(random,sound,caller,channel,{0x3fd00000u,0},audio)&&!wind.succeeded());
         assert(audio.calls.size()==failure&&random.drawCount()==unsigned(failure>1));
         assert((sound==-7)==(failure==1));assert((channel==22)==(failure<=3));
         assert(wind.voice==(failure==9?900:-1));
-        assert(!wind.contact(random,sound,channel,{0x3fd00000u,0},audio)&&audio.calls.size()==failure);
+        assert(caller.sndsnd==(failure>4?900:-1)&&wind.soundState.sndsnd==-1);
+        assert(!wind.contact(random,sound,caller,channel,{0x3fd00000u,0},audio)&&audio.calls.size()==failure);
     }
     {TimeFieldWind wind;wind.voice=777;GameMakerRandom random(2);Audio audio;audio.wind=true;int sound=12,channel=13;
         assert(wind.contact(random,sound,channel,{},audio)&&sound==12&&channel==13&&random.drawCount()==0&&audio.calls.size()==1);}

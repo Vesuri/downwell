@@ -4364,7 +4364,8 @@ int main(){
             "selected field identity and published position refer to the same lifetime");
         const auto beforeWind=production->randomDrawCount();dispatchWind(selected.handle);
         require(production->randomDrawCount()==beforeWind+1&&record->windSound>=349&&record->windSound<=355&&
-            channel==record->windSound&&wind.voice==900&&audio.plays==1&&audio.gains==2,
+            channel==record->windSound&&wind.voice==900&&audio.plays==1&&audio.gains==2&&
+            record->sound.sfxIndex==channel&&record->sound.sndsnd==900&&record->sound.chanNum==8&&wind.soundState.sndsnd==-1,
             "live exit-field collision publishes per-instance sound and shared voice with one choice draw");
         // Explicit setter fixture: query results must use the collision owner's
         // published binary32 position, not the legacy integer record snapshot.
@@ -4420,12 +4421,14 @@ int main(){
         const auto entryDraws=production->randomDrawCount();const auto queries=audio.queries;
         dispatchWind(selected.handle);
         require(production->randomDrawCount()==entryDraws&&audio.queries==queries+1&&audio.plays==1&&
-            productionOwner->resolve(selected.handle)->windSound==-1,
+            productionOwner->resolve(selected.handle)->windSound==-1&&productionOwner->resolve(selected.handle)->sound.sndsnd==-1,
             "inherited entrance wind respects shared playing voice without assigning windsnd or consuming RNG");
         audio.playing=false;
         require(production->dispatchTimeFieldWind(lastWindEvent,wind,channel,MotionBinary64::fromInteger(1),audio)&&
             production->randomDrawCount()==entryDraws+1&&audio.plays==2&&
-            productionOwner->resolve(selected.handle)->windSound==channel,
+            productionOwner->resolve(selected.handle)->windSound==channel&&
+            productionOwner->resolve(selected.handle)->sound.sfxIndex==channel&&
+            productionOwner->resolve(selected.handle)->sound.sndsnd==900&&wind.soundState.sndsnd==-1,
             "expired shared voice permits inherited entrance handler to choose and store its own sound");
         ++lastWindEvent.self.generation;const auto beforeInvalid=audio.queries;
         require(!production->dispatchTimeFieldWind(lastWindEvent,wind,channel,MotionBinary64::fromInteger(1),audio)&&

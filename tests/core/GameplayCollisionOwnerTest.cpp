@@ -1779,6 +1779,7 @@ int main(){
         assert(fields.create(240,192,371));
         TimeFieldWind wind;int channel=-1;InstanceHandle player;
         assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::player,world->playerHandle(),player));
+        SoundPlayState entrySound;
         for(unsigned i=0;i<2;++i){
             if(i==1)assert(world->registerLevelExit(512));
             const auto key=world->goalFieldInstances().handle(i);
@@ -1790,7 +1791,12 @@ int main(){
             auto oracle=world->randomState();const auto draws=world->randomDrawCount();
             audio.playing=false;const int sound=349+int(oracle.chooseIndexSmall(7));
             assert(owner->dispatchTimeFieldWind(event,wind,channel,MotionBinary64::fromInteger(1),audio));
-            assert(record->windSound==sound&&channel==sound&&wind.voice==900&&world->randomDrawCount()==draws+1);
+            assert(record->windSound==sound&&channel==sound&&wind.voice==900&&world->randomDrawCount()==draws+1&&
+                record->sound.sfxIndex==sound&&record->sound.sndsnd==900&&record->sound.chanNum==8&&wind.soundState.sndsnd==-1);
+            if(!i)entrySound=record->sound;
+            else {const auto& retained=world->goalFieldInstances().find(world->goalFieldInstances().handle(0))->sound;
+                assert(retained.sfxIndex==entrySound.sfxIndex&&retained.sndsnd==entrySound.sndsnd&&
+                    retained.sndgain.high==entrySound.sndgain.high&&retained.sndgain.low==entrySound.sndgain.low);}
             const auto queries=audio.queries,plays=audio.plays;
             assert(owner->dispatchTimeFieldWind(event,wind,channel,MotionBinary64::fromInteger(1),audio)&&
                 world->randomDrawCount()==draws+1&&audio.queries==queries+1&&audio.plays==plays);

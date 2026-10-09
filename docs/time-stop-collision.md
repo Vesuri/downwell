@@ -68,6 +68,13 @@ interface. Per-instance sound and shared channel storage are supplied by the
 caller; its voice is shared across fields. Failures retain completed writes,
 RNG and audio effects and stop later work. Tests cover every operation's failure
 prefix, both sound-resource guards, unsuccessful playback and repeated contacts.
+The live contact overload also receives the field's `SoundPlayState`: script
+locals such as `sfxIndex`, `sndsnd`, `sndgain` and `chanNum` are caller-instance
+variables, not global wind state. Stored fields retain these in their instance
+record; native entry/exit fields retain them in their typed record. Contact with
+a playing global voice does not initialize or overwrite a different field's
+caller state. The standalone overload retains a reference caller for isolated
+script tests; neither live dispatcher uses it.
 `StartupRuntime::dispatchTimeFieldWind` validates live self/other generations
 and the selected inherited binding before invoking it. `windsnd` is stored on
 the real instance and included in its digest once assigned; this adds four bytes
