@@ -102,6 +102,11 @@ for name,digest,field in (
     instructions=[line for line in body.splitlines() if line and not line.startswith((".",":"))]
     assert instructions==(["pushi.e 0",f"pop.v.i self.{field}"] if field else [])
 assert "push.d 0.5\npop.v.d self.image_speed" in drone
+balloon_end=assembly("gml_Object_decoyBalloon_Step_2",
+    "53c564f09cf941f9abb926572094437a9ea768125a2d17f17d7b4412c5d0ef0e")
+assert [line for line in balloon_end.splitlines() if line and not line.startswith((".",":"))]==[
+    "pushglb.v global.pugDecoy","conv.v.b","not.b","bf [end]",
+    "call.i instance_destroy(argc=0)","popz.v"]
 assert "push.d 0.08\npop.v.d self.imgSp" in balloon
 assert "push.v self.x\npop.v.v self.xx\npush.v self.y\npop.v.v self.yy" in balloon
 for object_id, sprite_id, frame_count in ((249,131,2),(256,526,4)):

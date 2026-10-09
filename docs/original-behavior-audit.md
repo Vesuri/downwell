@@ -69,6 +69,11 @@ clears `shotDelay`, Drone Alarm 3 is empty, and Balloon Alarms 0/1 clear
 `noHold`/`hitStun` respectively. They consume no RNG and do not reset other
 companion state. The shared runner countdown owns eligibility and the zero
 value on the firing frame; the bodies do not force the alarm to -1.
+Balloon End Step (2187) tests `global.pugDecoy` and requests self-destruction
+when it is zero. The stored runtime publishes the destruction mark before
+changing the record, then retires the registered lifetime during the cleanup
+phase. Its custom companion state is released only after retirement succeeds;
+a rejected publication retains the accepted prefix and stops execution.
 Companion motion, Drone's firing Alarm 0, Draw, native admission and the rest of player
 initialization remain incomplete; correct child IDs alone do not prove those.
 Drone Step adds two to each custom direction every tick without modulo. Its

@@ -902,7 +902,7 @@ bool StartupRuntime::publishMainBullet(MainBulletState& bullet,bool angle){
 
 bool StartupRuntime::cleanupMainOwnedDestroyed(){
     return run_.effectsSucceeded&&instances_.cleanupDestroyedIf(
-        [this](const InstanceRecord& r){return r.objectId==60||r.objectId==61||r.objectId==92||r.objectId==261||r.objectId==370||
+        [this](const InstanceRecord& r){return r.objectId==60||r.objectId==61||r.objectId==92||r.objectId==261||r.objectId==370||r.objectId==256||
             (r.objectId==269&&boneDispatch_)||
             (r.objectId==220&&bloodDispatch_)||
             (r.objectId==120&&skeletonDispatch_)||
@@ -916,6 +916,12 @@ bool StartupRuntime::cleanupMainOwnedDestroyed(){
             if(r.objectId==73)return ownedEntryRegistration_.retire(key);
             if(r.objectId==219)return scriptEffectsBinding_.retire(key,&r);
             if(r.objectId==370)return debrisBinding_.retire(key,&r);
+            if(r.objectId==256){
+                auto* state=const_cast<PlayerCompanionCreateState*>(companionCreateState(r.instanceId));
+                if(!state||!instances_.erase(r.instanceId,
+                    [this](InstanceHandle h,const InstanceRecord& record){return lifecycle_.retire(h,record);}))return false;
+                *state={};return true;
+            }
             return instances_.erase(r.instanceId,
             [this](InstanceHandle h,const InstanceRecord& record){return lifecycle_.retire(h,record);});});
 }
@@ -1968,6 +1974,18 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                 run_.effectsSucceeded=false;return;
             }
             // Companion Step/Draw and alternate camera motion remain separate.
+        }
+        return;
+    case 2187: // gml_Object_decoyBalloon_Step_2: release lost upgrade's lifetime
+        ++implementedCodeCalls_;
+        if(instance&&!run_.upgrades.levels[15]){
+            const auto slot=static_cast<std::size_t>(instance-&instances_.at(0));
+            if(slot>=instances_.size()||instance->objectId!=256||
+               !companionCreateState(instance->instanceId)||
+               (lifecycle_.hasOwner()&&!lifecycle_.markDestroyed(instances_.handleAt(slot),*instance))){
+                run_.effectsSucceeded=false;return;
+            }
+            instance->destroyRequested=true;
         }
         return;
     case 2131: // gml_Object_objDrone_Alarm_3 (empty)

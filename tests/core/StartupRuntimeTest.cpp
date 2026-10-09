@@ -107,6 +107,10 @@ struct LifecycleAudit {
     const downwell::StartupRuntime* observedRuntime=nullptr;
     unsigned initialViewsSeen=0;
     bool markDestroyed(downwell::InstanceHandle h,const downwell::InstanceRecord& r){
+        if(r.objectId==256){
+            require(matches(h,r)&&!r.destroyRequested,"balloon destruction publishes before changing the stored flag");
+            ++balloonMarks;if(rejectBalloonMark)return false;
+        }
         ++calls;
         require(matches(h,r)&&!r.destroyRequested,"destroy marks a still-live lifetime");
         if(r.objectId==61)++ditherMarks;
@@ -132,6 +136,8 @@ struct LifecycleAudit {
     bool rejectBatMask=false;
     bool rejectCompanionImage=false;
     unsigned companionImages=0;
+    unsigned balloonMarks=0,balloonRetires=0;
+    bool rejectBalloonMark=false,rejectBalloonRetire=false;
     unsigned ditherMoves=0,ditherMarks=0,rejectDitherMove=0;
     int rejectBirthObject=-1;
     int rejectBirthRoom=-1;
@@ -222,6 +228,9 @@ struct LifecycleAudit {
     }
     bool retire(downwell::InstanceHandle h,const downwell::InstanceRecord& r){
         ++calls;require(matches(h,r),"retirement still resolves the published lifetime");
+        if(r.objectId==256&&r.destroyRequested){
+            ++balloonRetires;if(rejectBalloonRetire)return false;
+        }
         if(fail==2)return false;
         entries[h.slot].live=false;++retires;return true;
     }
@@ -366,6 +375,39 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
                     "balloon alarms release hit stun and no-hold on their own due frames");
                 }
             }
+        }
+    }
+    for(auto profile:{downwell::PlatformProfile::desktop,downwell::PlatformProfile::nonDesktop})
+    for(unsigned failure=0;failure<3;++failure){
+        LifecycleAudit audit;
+        auto runtime=std::make_unique<Runtime>(profile,&rooms,&objects,2,&patterns,
+            downwell::InstanceLifecycleBinding::bindMaskDestruction(audit));
+        require(runtime->grantUpgrade(15),"grant balloon retirement fixture");
+        runtime->skipToGameForTesting();
+        std::uint32_t id=0;
+        for(unsigned i=0;i<runtime->activeInstanceCount();++i)
+            if(runtime->instanceAt(i).objectId==256)id=runtime->instanceAt(i).instanceId;
+        require(id&&runtime->companionCreateState(id),"balloon retirement starts with a real child");
+        runtime->step(false);
+        require(healthy(*runtime)&&runtime->instance(id)&&audit.balloonMarks==0,
+            "balloon End Step preserves the lifetime while its upgrade is enabled");
+        const_cast<downwell::UpgradeInventory&>(runtime->upgrades()).levels[15]=0;
+        audit.rejectBalloonMark=failure==1;audit.rejectBalloonRetire=failure==2;
+        runtime->step(false);
+        require(audit.balloonMarks==1&&audit.balloonRetires==(failure==1?0u:1u),
+            "balloon removal publishes destruction once and retires only after acceptance");
+        if(!failure){
+            require(healthy(*runtime)&&!runtime->instance(id)&&!runtime->companionCreateState(id),
+                "successful retirement removes both source identity and custom companion state");
+            audit.verify(*runtime);
+        }else{
+            const auto* record=runtime->instance(id);
+            require(!healthy(*runtime)&&record&&record->destroyRequested==(failure==2)&&runtime->companionCreateState(id),
+                "failed destruction or retirement retains its exact accepted prefix");
+            const auto calls=audit.calls;
+            runtime->step(false);
+            require(audit.calls==calls&&audit.balloonMarks==1,
+                "failed balloon removal is terminal and not retried");
         }
     }
     for(unsigned balloon=0;balloon<2;++balloon)for(unsigned drones=0;drones<3;++drones){
