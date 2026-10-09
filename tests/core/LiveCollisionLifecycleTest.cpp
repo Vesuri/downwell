@@ -2560,7 +2560,7 @@ int main(){
         require(!world->createTimeChange(registration,changes,{},{},speed,[](unsigned){return true;})&&
             world->nextRuntimeInstanceId()==failedId+1,"failed world creation cannot consume another ID on retry");
     }
-    {
+    for(bool failAudioQuery:{false,true}){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
         require(owner->attach(*world),"attach transition world");world->skipToGameForTesting();
@@ -2620,12 +2620,13 @@ int main(){
         pose.xx=RunnerImageValue{0x43704000u}.promoted();
         pose.y={0x43300000u};pose.yy=RunnerImageValue{0x43308000u}.promoted();
         const auto failedId=world->nextRuntimeInstanceId();const auto failedDraws=world->randomDrawCount();
-        auto failPause=[](auto effect){return effect!=PlayerTimeStop::Effect::change;};
-        require(!world->beginTimeStop(shards,changes,state,pose,false,[](auto){return true;},failPause)&&
+        auto failPause=[&](auto effect){return failAudioQuery||effect!=PlayerTimeStop::Effect::change;};
+        require(!world->beginTimeStopAudioChecked(shards,changes,state,pose,false,
+            [&](auto,bool& playing){playing=true;return !failAudioQuery;},failPause)&&
             !world->effectsSucceeded()&&state.shards.size()==3&&state.changes.size()==1&&
             world->instance(failedId+3)&&world->randomDrawCount()==failedDraws+24&&
-            world->nextRuntimeInstanceId()==failedId+4,
-            "failed transition pause retains first burst and Create but prevents second burst");
+            world->nextRuntimeInstanceId()==failedId+4&&state.player.bgmOn,
+            "failed transition pause or audio query retains first burst and Create but prevents second burst");
         require(!step()&&world->randomDrawCount()==failedDraws+24&&world->nextRuntimeInstanceId()==failedId+4,
             "failed transition cannot restart through a later Begin Step");
     }

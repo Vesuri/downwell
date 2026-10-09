@@ -7,6 +7,7 @@
 #include "SmokeDirection.h"
 #include "SmokeTrig.h"
 #include "TimeChangeEffects.h"
+#include "TimeStopAudio.h"
 namespace downwell {
 // Shared transition/effect coordination. Backend adapters still supply exact
 // field masks, audio state and synchronous side effects. Emit(change) performs
@@ -24,6 +25,17 @@ template<unsigned Capacity> struct TimeStopEffects {
         MotionBinary64 xsp,ysp;
         MotionBinary64 xx,yy; // private motion coordinates used by time-change Create
     };
+    template<class Side,class Random,class Field,class Lookup,class Audio,class Emit>
+    bool beginStepWithAudio(bool mainRoom,Side side,const PlayerPose& pose,bool lowSpec,
+                   Random& random,Field field,Lookup lookup,TimeStopAudio& audioState,
+                   SoundPlayState& caller,SoundPlayEnvironment& env,int area,int music,int wind,
+                   Audio& audio,Emit emit){
+        return beginStepWithAudioChecked(mainRoom,side,pose,lowSpec,random,field,lookup,
+            [&](PlayerTimeStop::AudioQuery q,bool& value){return TimeStopAudio::query(q,music,wind,audio,value);},
+            [&](PlayerTimeStop::Effect effect){
+                return TimeStopAudio::handles(effect)?audioState.emit(effect,caller,env,area,music,wind,audio):emit(effect);
+            });
+    }
     bool reset(){
         if(!shards.clear()){succeeded=false;return false;}
         if(!changes.clear()){succeeded=false;return false;}
@@ -38,8 +50,14 @@ template<unsigned Capacity> struct TimeStopEffects {
     template<class Side,class Random,class Field,class Lookup,class Audio,class Emit>
     bool beginStepChecked(bool mainRoom,Side side,const PlayerPose& pose,bool lowSpec,
                    Random& random,Field field,Lookup lookup,Audio audio,Emit emit){
+        return beginStepWithAudioChecked(mainRoom,side,pose,lowSpec,random,field,lookup,
+            [&](PlayerTimeStop::AudioQuery query,bool& value){value=audio(query);return true;},emit);
+    }
+    template<class Side,class Random,class Field,class Lookup,class Audio,class Emit>
+    bool beginStepWithAudioChecked(bool mainRoom,Side side,const PlayerPose& pose,bool lowSpec,
+                   Random& random,Field field,Lookup lookup,Audio audio,Emit emit){
         if(!succeeded||!shards.succeeded()||!changes.succeeded()){succeeded=false;return false;}
-        succeeded=player.stepChecked(mainRoom,side,field,audio,[&](PlayerTimeStop::Effect effect){
+        succeeded=player.stepWithAudioChecked(mainRoom,side,field,audio,[&](PlayerTimeStop::Effect effect){
             if(effect==PlayerTimeStop::Effect::change)
                 return changes.createAt(pose.xx,pose.yy,roomSpeed,[&](unsigned){return emit(effect);});
             if(effect!=PlayerTimeStop::Effect::shards)return emit(effect);

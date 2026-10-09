@@ -27,6 +27,12 @@ struct PlayerTimeStop {
     // never evaluated outside rmMain/rmTutorialMain.
     template<class Side,class Field,class Audio,class Emit>
     bool stepChecked(bool mainRoom,Side side,Field field,Audio audio,Emit emit){
+        return stepWithAudioChecked(mainRoom,side,field,[&](AudioQuery query,bool& result){
+            result=audio(query);return true;
+        },emit);
+    }
+    template<class Side,class Field,class Audio,class Emit>
+    bool stepWithAudioChecked(bool mainRoom,Side side,Field field,Audio audio,Emit emit){
         bool inField=false;
         if(!field(inField))return false;
         if(mainRoom){
@@ -46,14 +52,16 @@ struct PlayerTimeStop {
         if(checkStop && !stopped){
             stopped=true;
             if(!emit(Effect::change))return false;
-            if(audio(AudioQuery::musicPlaying) && !emit(Effect::pauseMusic))return false;
+            bool playing=false;
+            if(!audio(AudioQuery::musicPlaying,playing)||(playing&&!emit(Effect::pauseMusic)))return false;
             bgmOn=false;
             if(!emit(Effect::shards) || !emit(Effect::enterSound))return false;
         }else if(!checkStop && stopped){
             stopped=false;
             if(!emit(Effect::change))return false;
-            if(audio(AudioQuery::musicPaused) && !emit(Effect::resumeMusic))return false;
-            if(audio(AudioQuery::windPlaying) && !emit(Effect::stopWind))return false;
+            bool paused=false,wind=false;
+            if(!audio(AudioQuery::musicPaused,paused)||(paused&&!emit(Effect::resumeMusic)))return false;
+            if(!audio(AudioQuery::windPlaying,wind)||(wind&&!emit(Effect::stopWind)))return false;
             bgmOn=true;
             if(!emit(Effect::shards) || !emit(Effect::exitSound) || !emit(Effect::duckMusic))return false;
         }

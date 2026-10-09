@@ -4,7 +4,70 @@
 #include <cstdio>
 #include <vector>
 using namespace downwell;
+struct TransitionAudio {
+    std::vector<int> calls;
+    unsigned fail=0;
+    bool playing=true,paused=true,wind=true,resource=true;
+    MotionBinary64 gain=MotionBinary64::fromInteger(1);
+    bool call(int code){calls.push_back(code);return calls.size()!=fail;}
+    bool isPlaying(int id,bool& value){value=id==700?playing:id==701?wind:resource;return call(id);}
+    bool isPaused(int id,bool& value){assert(id==700);value=paused;return call(1700);}
+    bool pause(int id){assert(id==700);return call(2700);}
+    bool resume(int id){assert(id==700);return call(3700);}
+    bool stop(int id){return call(4000+id);}
+    bool play(int id,int priority,bool loop,int& voice){assert(priority==80&&!loop);voice=900;return call(5000+id);}
+    bool getGain(int id,MotionBinary64& value){value=id==700?gain:MotionBinary64::fromInteger(1);return call(6000+id);}
+    bool setGain(int id,MotionBinary64 value,int duration){
+        if(id==900)assert(value.high==0x3fd00000u&&!value.low&&!duration);
+        else {assert(id==700);assert(duration==0||duration==200);
+            assert(value.high==(duration?0x3ff00000u:0x3fe66666u)&&value.low==(duration?0:0x66666666u));}
+        return call(7000+id+duration);
+    }
+    bool setPitch(int id,MotionBinary64 value){assert(id==900&&value.high==0x3fe19999u&&value.low==0x9999999au);return call(8900);}
+};
+static void checkedAudioTransitions(){
+    using E=PlayerTimeStop::Effect;
+    const std::vector<int> expected={700,2700,184,4184,5184,6900,7900,8900,
+        1700,3700,701,4701,185,4185,5185,6900,7900,8900,700,6700,7700,7900};
+    for(unsigned failure=0;failure<=expected.size();++failure){
+        TimeStopEffects<16> state;GameMakerRandom random(2);TimeStopAudio audioState;
+        SoundPlayState caller;SoundPlayEnvironment env;env.gameVolume={0x3fd00000u,0};env.inWater=true;
+        TransitionAudio audio;audio.fail=failure;bool hit=true;
+        TimeStopEffects<16>::PlayerPose pose{};
+        auto field=[&](bool& result){result=hit;return true;};
+        auto lookup=[&](auto,auto,auto& id,auto& x,auto& y){id=hit?123:-4;x={};y={};return true;};
+        std::vector<E> effects;
+        auto step=[&]{return state.beginStepWithAudio(true,[](bool& side){side=false;return true;},pose,false,
+            random,field,lookup,audioState,caller,env,1,700,701,audio,[&](E e){effects.push_back(e);return true;});};
+        bool ok=step();if(ok){hit=false;ok=step();}
+        assert(ok==(failure==0));
+        const unsigned count=failure?failure:expected.size();
+        assert(audio.calls==std::vector<int>(expected.begin(),expected.begin()+count));
+        if(failure){
+            assert(!state.succeeded);const auto draws=random.drawCount();const auto emitted=effects.size();
+            assert(!step()&&random.drawCount()==draws&&effects.size()==emitted&&audio.calls.size()==count);
+            // Query failure cannot fall through to bgmOn or the second burst.
+            if(failure==1)assert(state.player.bgmOn&&random.drawCount()==24&&state.shards.size()==3);
+            if(failure==9||failure==11)assert(!state.player.bgmOn&&random.drawCount()==72&&state.shards.size()==9);
+        }else {
+            assert(state.player.bgmOn&&!state.player.stopped&&random.drawCount()==96);
+            assert(caller.sfxIndex==185&&caller.soundPriority==80&&!caller.loop&&caller.cutPrv);
+            assert(audioState.duckDuration==200&&audioState.duckAmt.high==0x3fe66666u);
+            assert((effects==std::vector<E>{E::shake,E::change,E::oxygenFloor,E::change}));
+        }
+    }
+    // Original bgmDuck always writes caller fields, even when guards suppress audio.
+    for(unsigned guard=0;guard<3;++guard){
+        TimeStopAudio state;SoundPlayState caller;SoundPlayEnvironment env;TransitionAudio audio;
+        if(guard==1)audio.playing=false;
+        if(guard==2)audio.gain={0x3fe00000u,0};
+        assert(state.emit(E::duckMusic,caller,env,guard==0?5:1,700,701,audio));
+        assert(state.duckDuration==200&&state.duckAmt.low==0x66666666u);
+        assert(audio.calls.size()==guard);
+    }
+}
 int main(){
+    checkedAudioTransitions();
     using Effect=PlayerTimeStop::Effect;
     for(unsigned seed=0;seed<256;++seed){
         TimeStopEffects<16> state;GameMakerRandom rng(seed);unsigned lookups=0;

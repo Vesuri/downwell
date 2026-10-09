@@ -685,10 +685,18 @@ public:
         StoredTimeChangeRegistration<instanceCapacity,Changes>& changes,TimeStopEffects<Capacity>& state,
         const typename TimeStopEffects<Capacity>::PlayerPose& pose,
         bool lowSpec,Audio audio,Emit emit){
+        return beginTimeStopAudioChecked(shards,changes,state,pose,lowSpec,
+            [&](PlayerTimeStop::AudioQuery q,bool& value){value=audio(q);return true;},emit);
+    }
+    template<unsigned Capacity,unsigned Registered,unsigned Changes,class Audio,class Emit>
+    bool beginTimeStopAudioChecked(StoredTimeShardRegistration<instanceCapacity,Registered>& shards,
+        StoredTimeChangeRegistration<instanceCapacity,Changes>& changes,TimeStopEffects<Capacity>& state,
+        const typename TimeStopEffects<Capacity>::PlayerPose& pose,
+        bool lowSpec,Audio audio,Emit emit){
         if(!run_.effectsSucceeded)return false;
         run_.effectsSucceeded=shards.belongsTo(instances_)&&changes.belongsTo(instances_)&&
             state.shards.phasesBoundTo(shards)&&state.changes.boundTo(changes)&&
-            state.beginStepChecked(roomId_==11||roomId_==14,[&](bool& outside){
+            state.beginStepWithAudioChecked(roomId_==11||roomId_==14,[&](bool& outside){
                     return playerOutsideTimeStopSides(pose.xx,outside);
                 },pose,lowSpec,random_,
                 [&](bool& hit){return playerTimeFieldMeeting(pose.xx,pose.yy,hit);},

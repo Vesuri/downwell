@@ -70,6 +70,24 @@ both actual audio backends and persistent global ownership remain open.
 Source: recovered `gml_Object_goalTimeField_Collision_objPlayer_n.asm`,
 `gml_GlobalScript_soundPlayOL.asm` and `gml_GlobalScript_scrGlobalStuff.asm`.
 
+Player transitions use `TimeStopAudio` with the session's music/wind voices,
+the player's `SoundPlayState`, and its caller-local duck fields. Entry/exit
+invoke `soundPlay(184/185,80,0,1)`, including resource cut, volume scaling and
+underwater pitch. Exit's `bgmDuck(200,0.7)` writes its caller fields first,
+skips audio in area 5, and otherwise changes gain only if the music is playing
+and its current gain equals 1. The immediate 0.7 gain precedes the 200 ms ramp
+back to 1; this is not an unconditional volume overwrite.
+
+`TimeStopEffects::beginStepWithAudio` routes those operations through the same
+synchronous shard/Create sequence. Checked audio queries distinguish failure
+from a false playing/paused result. `StartupRuntime::beginTimeStopAudioChecked`
+preserves that distinction for registered lifetimes: failed queries retain
+earlier births/RNG but cannot write `bgmOn` or start the subsequent burst.
+Legacy boolean-query entry points are for infallible query providers only.
+The source contract is `objPlayer_n` Begin Step and the pinned `soundPlay` and
+`bgmDuck` VM scripts; this adapter does not establish actual backend playback
+or automatically install a transition in either normal game loop.
+
 ## Ordinary Destroy versus storage retirement
 
 The Windows `instance_destroy` registration at `0x52cd80` selects wrapper
