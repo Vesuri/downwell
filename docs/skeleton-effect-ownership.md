@@ -143,6 +143,16 @@ change is visible without suppressing the source's impact/destruction tail.
 Broader wall families still require reverse-handler admission. This boundary
 does not admit skeleton/player contacts or supply the missing damage script.
 
+Native `dispatchSkeletonEncounterCollision` routes events from the existing
+sealed `executeCollisionPairs` pass to registered bone, skeleton, skeleton-hit
+bullet, smoke, consumption-particle, dither and field-wind handlers. It neither
+collects another pass nor filters the pair buffer. Skeleton-player and bone
+damage operations are mandatory caller dependencies, as is an explicit handler
+for remaining event families. Each event reads the borrowed stop state anew.
+The mixed bone/smoke regression covers reference, native and retained-scenery
+owners, including a damage callback changing stop state before another bone's
+contact. Live admission still requires complete scene ownership and handlers.
+
 `dispatchSkeletonCollision` similarly validates the source player handler
 (120/1266) or inherited parent-time-field handler (83/1066), including the
 actual opposite object's subtype. Player handling preserves two independent

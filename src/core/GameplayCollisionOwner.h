@@ -2080,6 +2080,25 @@ public:
            binding.ownerObjectId!=238||binding.codeId!=2081)return check(false);
         return check(world_->collideTimeShardRoomEffect(local));
     }
+    // One event router for the sealed mixed pass. Never collects another
+    // family pass: the enclosing dispatcher retains pair order and lifetime.
+    // Other is mandatory, so unsupported live events cannot silently vanish.
+    template<unsigned Capacity,class Frames,class Audio,class Atan,class MakePlayer,class Damage,class Other>
+    bool dispatchSkeletonEncounterCollision(const RunnerCollisionEventContext::Frame& event,
+        const TimeStopEffects<Capacity>& stop,Frames frames,SoundPlayEnvironment& environment,
+        Audio& audio,Atan atan,MakePlayer makePlayer,Damage damage,Other other){
+        View::Kind kind;InstanceHandle local;
+        if(!valid()||!world_||!stop.succeeded||!View::decode(event.self,kind,local)||!resolves(event.self))return check(false);
+        if(kind==View::Kind::bone)return dispatchBoneCollision(event,stop.player.stopped,frames,damage);
+        if(kind==View::Kind::skeleton)return dispatchSkeletonCollision(event,makePlayer);
+        if(kind==View::Kind::bullet&&event.code==2224)
+            return dispatchSkeletonBulletCollision(event,frames,environment,audio,atan);
+        if(kind==View::Kind::smoke)return dispatchSmokeCollision(event);
+        if(kind==View::Kind::consumptionBlood)return dispatchConsumptionBloodCollision(event);
+        if(kind==View::Kind::ditherAbove)return dispatchDitherAboveCollision(event);
+        if(event.owner==255)return dispatchTimeFieldWind(event,environment.gameVolume,audio);
+        return check(other(event));
+    }
     template<class MakePlayer> bool dispatchSkeletonCollision(const RunnerCollisionEventContext::Frame& event,MakePlayer makePlayer){
         View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;
         if(!valid()||!world_||!resolves(event.self)||!resolves(event.other)||

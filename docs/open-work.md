@@ -180,7 +180,8 @@ behavior, both backend integrations and relevant original-game verification.
   time-stop/query adapter for normal encounters, not only explicit test births.
   Connect the stored mixed bone-contact admission to the real player-damage
   script and extend admitted wall families only with their reverse handlers;
-  provide equivalent native mixed-pair admission.
+  install native `dispatchSkeletonEncounterCollision` in the live sealed pass,
+  supplying complete handlers for its remaining event families.
 
 ### D. Verify natural encounters
 

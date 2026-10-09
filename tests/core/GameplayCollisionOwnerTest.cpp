@@ -71,6 +71,14 @@ bool nativeSkeletonTimeState(downwell::GameplayCollisionOwner& owner,downwell::I
     const downwell::TimeStopEffects<64>& state,unsigned& hurts){
     return owner.stepSkeleton(key,state,[&](auto&,auto&){return QuietSkeletonEffects{hurts};});
 }
+bool nativeSkeletonEncounterContact(downwell::GameplayCollisionOwner& owner,
+    const downwell::RunnerCollisionEventContext::Frame& event,const downwell::TimeStopEffects<64>& stop,
+    downwell::SoundPlayEnvironment& env,NativeSkeletonAudio& audio,
+    bool (*frames)(int,unsigned&),bool (*atan)(downwell::MotionBinary64,downwell::MotionBinary64,downwell::MotionBinary64&),
+    bool (*damage)(int,int,int),bool (*other)(const downwell::RunnerCollisionEventContext::Frame&),unsigned& stomps,unsigned& damages){
+    return owner.dispatchSkeletonEncounterCollision(event,stop,frames,env,audio,atan,
+        [&](auto& actor){return CheckedSkeletonContact{actor,0,stomps,damages};},damage,other);
+}
 struct NativeLimboViews {
     bool outside(downwell::RunnerImageValue,downwell::RunnerImageValue,bool&);
     bool viewTop(downwell::MotionBinary64&);
@@ -1938,6 +1946,53 @@ int main(){
     checkEnemySlotDirectory(objects,sprites);
     checkNativeAnimationBatches(objects,sprites);
     const auto mb=read("generated/downwell-sprite-masks.dwsm");SpriteMaskPack masks(mb.data(),mb.size());
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                  GameplayCollisionOwner::Ownership::nativeScenery})for(unsigned contact=0;contact<6;++contact){
+        const bool native=mode!=GameplayCollisionOwner::Ownership::reference;
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),owner->breakableBinding(),
+            owner->playerBinding(),native?nullptr:&owner->terrain());
+        auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
+        assert(owner->attach(*world)&&(!native||world->bindNativeTerrain(*terrain)));
+        int x=240,y=172;GameMakerRandom random(2);InstanceHandle smoke;
+        if(!contact){
+            x=240;y=40008;
+            if(native){assert(terrain->append(60,232,40000)&&terrain->createProperties(terrain->handle(0),51));}
+            else assert(owner->terrain().append(60,232,40000,true)&&
+                owner->terrain().createProperties(owner->terrain().handle(0),51,false,random));
+            assert(owner->registeredSmoke().create(506000,MotionBinary64::fromInteger(x),MotionBinary64::fromInteger(y),random,smoke)&&
+                owner->registeredSmoke().alarmEvent(smoke,0));
+        }
+        InstanceHandle local,second;assert(world->createBoneWithSourceId(506001,x,y,local));
+        if(contact==5)assert(world->createBoneWithSourceId(506002,x,y,second));
+        if(contact==3)assert(owner->bones().dispatch(local,[](auto& state,auto&,bool&){state.active=false;return true;}));
+        auto pairs=std::make_unique<RunnerCollisionPairs<GameplayCollisionView::capacity,64>>();
+        assert(owner->collectCollisionPairs(*pairs)&&pairs->size());
+        struct NonSolid {
+            bool rollback(InstanceHandle){std::abort();}
+            bool prepareMotion(InstanceHandle){std::abort();}
+            bool advanceMotion(InstanceHandle){std::abort();}
+        } motion;
+        RunnerCollisionEventContext context;TimeStopEffects<4> stop;stop.player.stopped=contact==2;
+        SkeletonSoundAudio audio;SoundPlayEnvironment env;unsigned damage=0,stomps=0,unexpected=0,smokeContacts=0;
+        const bool okay=owner->executeCollisionPairs(*pairs,masks,context,motion,
+            []{return RunnerCollisionEventContext::RoomState{true,false};},[&](const auto& event){
+                if(event.owner==225)++smokeContacts;
+                return owner->dispatchSkeletonEncounterCollision(event,stop,
+                    [&](int sprite,unsigned& count){return sprites.frameCount(sprite,count);},env,audio,
+                    [](auto dy,auto dx,auto& angle){return portableAtan(dy,dx,angle);},
+                    [&](auto& actor){++unexpected;return CheckedSkeletonContact{actor,0,stomps,damage};},
+                    [&](int amount,int horizontal,int vertical){assert(amount==1&&horizontal==3&&vertical==2);++damage;
+                        if(contact==5)stop.player.stopped=true;return contact!=4;},
+                    [&](const auto&){++unexpected;return false;});
+            });
+        assert(okay==(contact!=4)&&damage==unsigned(contact==1||contact==4||contact==5)&&!unexpected&&!audio.calls);
+        const auto* r=owner->bones().find(local);
+        assert(r&&r->destroyRequested==(contact<3||contact==5)&&bool(r->myFxLocal)==(contact<3||contact==5));
+        if(contact==5)assert(owner->bones().find(second)->destroyRequested&&owner->bones().find(second)->myFxLocal);
+        if(!contact)assert(smokeContacts==1&&owner->registeredSmoke().find(smoke));
+    }
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
                   GameplayCollisionOwner::Ownership::nativeScenery}){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
