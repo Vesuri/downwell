@@ -77,6 +77,11 @@ public:
         };
         return b;
     }
+    template<class Owner> static RecordLifecycleBinding bindPositionedDestruction(Owner& owner){
+        auto b=bindPositionedLifetime(owner);
+        b.destroyed_=[](void* p,InstanceHandle h,const Record& r){return static_cast<Owner*>(p)->markDestroyed(h,r);};
+        return b;
+    }
     template<class Owner> static RecordLifecycleBinding bindSpriteChanges(Owner& owner) {
         auto b=bindMovement(owner);
         b.sprite_=[](void* p,InstanceHandle h,const Record& r,int sprite){

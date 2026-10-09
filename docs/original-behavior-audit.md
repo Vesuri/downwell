@@ -52,8 +52,13 @@ already-decremented slot from the normal room phase, writes back newly armed
 slots, marks destruction, and retires through normal deferred cleanup. Draw can
 be invoked at the record's shared layer position; absent surfaceFx leaves text
 motion untouched. Clear the borrowed registry before room teardown.
-This does not yet supply localized text, active-font measurement, native
-lifetime ownership, or real surface text operations for natural callers.
+`LevelNumberInstances` provides the native typed lifetime with the same event
+state, externally supplied source IDs, positioned birth, activation, deferred
+destruction and retirement. It deliberately has no pool-wide Step/Draw pass:
+the world must supply mixed alarm/layer visits. Inactive actors retain alarms
+and letter offsets. Native room-owner registration and scheduler binding remain
+unconnected, as do localized text, active-font measurement and real surface
+text operations for natural callers.
 
 ## Result-room population and persistent alarms
 

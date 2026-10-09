@@ -6,6 +6,7 @@
 #include "core/LevelExit.h"
 #include "core/RunSession.h"
 #include "core/LevelNumber.h"
+#include "core/LevelNumberInstances.h"
 #include "core/StoredLevelNumberRegistration.h"
 bool compileStoredLevelNumber(downwell::StoredLevelNumberRegistration<32,2>& owner,
     downwell::InstanceHandle& key,bool (*character)(unsigned,unsigned&)){
@@ -15,6 +16,11 @@ struct LevelNumberCompileDraw {
     bool exists(bool&);bool begin();bool end();bool view(unsigned,downwell::MotionBinary64&);
     bool character(unsigned,downwell::MotionBinary64,downwell::MotionBinary64);
 };
+bool compileNativeLevelNumber(downwell::LevelNumberInstances<2>& owner,unsigned source,
+    downwell::InstanceHandle& key,LevelNumberCompileDraw& draw,bool (*character)(unsigned,unsigned&)){
+    return owner.create(source,{}, {},[&](auto,auto& state){return state.create(3,{},character);},key)&&
+        owner.advanceAlarm(key,0)&&owner.draw(key,draw)&&owner.activate(key,false)&&owner.clear();
+}
 bool compileLevelNumber(downwell::LevelNumber<64>& actor,LevelNumberCompileDraw& draw,
     bool (*character)(unsigned,unsigned&),bool (*destroy)()){
     return actor.create(3,downwell::MotionBinary64::fromInteger(24),character)&&
