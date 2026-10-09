@@ -1740,6 +1740,8 @@ int main(){
             PlayerTimeStop::Effect::resumeMusic,PlayerTimeStop::Effect::stopWind,
             PlayerTimeStop::Effect::exitSound,PlayerTimeStop::Effect::duckMusic}));
         if(mode==GameplayCollisionOwner::Ownership::nativeScenery){
+            InstanceHandle controller;
+            assert(owner->runControllers().create(900001,{}, {},[](InstanceHandle){return true;},controller));
             DamageControllerFailureEvents failure;const int health=world->health();
             assert(!world->typicalPlayerDamage(damageBinding,one,one,one,failure,noBirth)&&!world->effectsSucceeded());
             assert(world->health()==health-1&&world->playerHit()==1&&!world->playerDamaged());
@@ -1749,6 +1751,29 @@ int main(){
         assert(!world->typicalPlayerDamage(damageBinding,one,one,one,failedSound,noBirth)&&!world->effectsSucceeded());
         assert(world->health()==health-1&&world->damageNumbers().size()==numbers+1&&
             failedSound.soundCalls==1&&!world->playerDamaged()&&!world->playerHit());
+        }
+    }
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                   GameplayCollisionOwner::Ownership::nativeScenery})for(bool active:{false,true}){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));int speed=60;assert(world->bindControllerRoomSpeed(speed));
+        InstanceHandle controller;
+        assert(owner->runControllers().create(100065,{}, {},[](InstanceHandle){return true;},controller));
+        assert(owner->runControllers().activate(controller,active)&&owner->reconcileActivation());
+        ContactDamageScripts caller;DamageControllerFailureEvents events;
+        auto bound=bindContactDamagePlayer(caller,*world,[&](InstanceHandle& h){h=world->playerHandle();return true;});
+        // Its external controller callback fails. Registered damage must use
+        // actual ownership instead, including empty/inactive WITH populations.
+        assert(caller.player.executeWithState(MotionBinary64::fromInteger(1),events,bound.state));
+        assert(world->effectsSucceeded()&&world->playerHit()==1&&world->playerDamaged()&&world->health()==3);
+        const auto* record=owner->runControllers().find(controller);
+        assert(speed==(active?40:60)&&record->controllerSlow==(active?23:0)&&record->alarms.get(0)==(active?40:-1));
+        if(active){
+            for(unsigned tick=0;tick<40;++tick)assert(world->advanceControllerRoomAlarm(controller,0));
+            assert(speed==60&&record->controllerSlow==0);
         }
     }
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,

@@ -1836,6 +1836,26 @@ int main(){
         if(ok){require(skeletons.instances().find(local)->state.health==(mode==6?0:60),"time-field inheritance and immunity");
             require(skeletons.clear(),"clear skeleton collision fixture");}
     }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach registered damage slowdown");world->skipToGameForTesting();
+        InstanceHandle player;
+        require(world->visitDrawChecked([&](InstanceHandle h,const InstanceRecord& r){if(r.objectId==35)player=h;return true;}),"select damage player");
+        ContactDamageScripts caller;DamageControllerFailureEvents events;int speed=60;
+        auto bound=bindContactDamagePlayer(caller,*world,[&](InstanceHandle& h){h=player;return true;});
+        require(world->withMomentDelayRoomSpeed(speed,[&]{
+            return caller.player.executeWithState(MotionBinary64::fromInteger(1),events,bound.state);
+        }),"damage bypasses external controller stubs and visits registered controllers");
+        require(speed==40&&world->playerHit()==1&&world->playerDamaged()&&world->mainPlayerHealth()==3,
+            "registered damage publishes health, hit, speed and immunity");
+        unsigned controllers=0;
+        for(std::size_t i=0;i<world->activeInstanceCount();++i){const auto& r=world->instanceAt(i);
+            if(r.objectId!=37||!r.active||r.destroyRequested)continue;
+            ++controllers;require(r.controllerSlow==23&&r.alarms.get(0)==40,"source controller slowdown writes");
+        }
+        require(controllers,"persistent controller participated in damage");
+    }
     for(int alarm:{-1,0,1,2}){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());

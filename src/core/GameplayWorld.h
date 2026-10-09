@@ -460,6 +460,20 @@ public:
         if(!run_.effectsSucceeded)return false;
         return run_.effectsSucceeded=runControllers_&&runControllers_->visitDamageControllers(controllers,apply);
     }
+    void configurePlayerDamageSlowdown(bool (*apply)(void*),void* context){
+        playerDamageSlowdown_=apply;playerDamageSlowdownContext_=context;
+    }
+    bool applyPlayerDamageSlowdown(){
+        return run_.effectsSucceeded=run_.effectsSucceeded&&playerDamageSlowdown_&&
+            playerDamageSlowdown_(playerDamageSlowdownContext_);
+    }
+    template<class Visit> bool applyPlayerDamageSlowdown(Visit controllers){
+        return visitDamageControllers(controllers,[&](auto& controller){
+            if(!controllerRoomSpeed_)return false;
+            *controllerRoomSpeed_=40;
+            controller.setSlow(23);return controller.setAlarm(0,40);
+        });
+    }
     bool advanceControllerRoomAlarm(downwell::InstanceHandle key,unsigned alarm){
         return run_.effectsSucceeded=run_.effectsSucceeded&&runControllers_&&controllerRoomSpeed_&&
             runControllers_->advanceAlarm(key,alarm,*controllerRoomSpeed_);
@@ -2160,6 +2174,8 @@ private:
     downwell::GameplayResultInstance* resultInstance_=nullptr;
     LevelNumbers* levelNumbers_=nullptr;
     int* controllerRoomSpeed_=nullptr; // Same global as timeChangeSpeed_, but persists beyond effect cleanup.
+    bool (*playerDamageSlowdown_)(void*)=nullptr;
+    void* playerDamageSlowdownContext_=nullptr;
     bool playerChildrenStarted_=false;
     bool (*playerChildCreate_)(void*,GameplayWorld&)=nullptr;
     void* playerChildCreateContext_=nullptr;

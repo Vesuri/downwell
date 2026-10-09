@@ -239,6 +239,14 @@ public:
         return run_.effectsSucceeded=okay&&run_.effectsSucceeded;
     }
     bool requestMomentDelay();
+    bool applyPlayerDamageSlowdown(){
+        if(!run_.effectsSucceeded)return false;
+        return visitDamageControllers([&](auto& controller){
+            if(!momentDelayRoomSpeed_)return false;
+            *momentDelayRoomSpeed_=40;
+            controller.setSlow(23);return controller.setAlarm(0,40);
+        });
+    }
     template<class Apply> bool visitDamageControllers(Apply apply){
         if(!run_.effectsSucceeded)return false;
         if(!objectPack_)return run_.effectsSucceeded=false;

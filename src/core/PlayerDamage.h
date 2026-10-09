@@ -37,6 +37,19 @@ bool withPlayerDamageController(Resolve resolve,Apply apply){
     } controller{resolve};
     return apply(controller)&&controller.valid;
 }
+// Explicit callbacks remain the script oracle. A registered state uses the
+// world's actual membership and room-speed global instead of caller stubs.
+template<class Events,class State> bool slowPlayerDamageControllers(Events& events,State&){
+    return events.forEachController([&](auto& controller){
+        events.setRoomSpeed(40);
+        controller.setSlow(23);
+        return controller.setAlarm(0,40);
+    });
+}
+template<class Events,class World,class SelectPlayer>
+bool slowPlayerDamageControllers(Events&,RegisteredPlayerDamageState<World,SelectPlayer>& state){
+    return state.world.applyPlayerDamageSlowdown();
+}
 // scrPDamage caller state. Source-name storage/resolution is supplied by Events
 // because it is a GameMaker string, not a port-owned instance ID. All effect
 // calls are synchronous; callback failure leaves earlier mutations in place.
@@ -64,11 +77,7 @@ struct PlayerDamage {
             state.setHit();
             // room_speed is assigned once per controller in the with loop,
             // before that controller's slown and Alarm 0 writes.
-            if(!events.forEachController([&](auto& controller){
-                events.setRoomSpeed(40);
-                controller.setSlow(23);
-                return controller.setAlarm(0,40);
-            }))return false;
+            if(!slowPlayerDamageControllers(events,state))return false;
         }
         state.setPlayerDamaged();
         // Object-selector property assignment, NOT an invented with loop.

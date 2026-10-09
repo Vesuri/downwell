@@ -1482,6 +1482,17 @@ public:
             boxAllocation_.active=true;
         }
 #endif
+        world.configurePlayerDamageSlowdown([](void* context){
+            auto& self=*static_cast<GameplayCollisionOwner*>(context);
+            if(!self.valid()||!self.world_)return self.check(false);
+            return self.check(self.world_->applyPlayerDamageSlowdown([&](auto apply){
+                return self.visitEligibility([&](InstanceHandle h,int object,std::uint32_t flags){
+                    if(!self.families_.isA(object,37)||(flags&0x140003u))return true;
+                    View::Kind kind;InstanceHandle local;
+                    return View::decode(h,kind,local)&&kind==View::Kind::runController&&apply(local);
+                });
+            }));
+        },this);
         world.configureRegisteredActorEndStep([](void* context,long topQ12){
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
             if(!self.valid())return false;

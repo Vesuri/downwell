@@ -204,6 +204,16 @@ overlap-channel fields. Tests cover all eight backend failure positions, both
 attacker types, volume/underwater pitch, and playback/ducking through SDL audio.
 This adapter does not supply missing native device playback or load the game's
 sound resources into the normal SDL scene automatically.
+Registered damage's controller WITH uses live world ownership, not external
+damage-event callbacks. The stored world visits object 37 and descendants;
+the native collision owner supplies its admitted controller membership stream.
+Each eligible record receives room speed 40, `slown=23`, and Alarm 0 = 40, in
+that order. The speed binding is the same global used by momentDelay and
+time-change effects. Missing speed fails at the first eligible controller,
+after the hit marker; an empty/inactive WITH performs no speed write. The
+explicit-event damage overload retains its original callbacks as an oracle.
+This binding does not supply the missing native startup controller births or
+establish complete original cross-family membership order.
 Alarm 1 VM SHA256:
 `e1dcdae86d6152a96607b2d8429582255d012ef2e742490fcd2ed8fcf9bf7d13`.
 
