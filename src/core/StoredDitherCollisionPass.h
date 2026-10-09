@@ -4,14 +4,40 @@
 namespace downwell {
 // Migration boundary for the authored wall-pruning controller. Collection uses
 // the complete owner queue/tree order; the implemented 61/60 pair and, when
-// explicitly bound, registered 225/60 and 223/60 pairs are executed here. Other families
+// explicitly bound, registered 225/60, 223/60 or 261/120 pairs are executed here. Other families
 // still use the existing gameplay adapters.
 // This is not a second pass to run alongside a complete collision dispatcher.
 class StoredDitherCollisionPass {
 public:
     explicit StoredDitherCollisionPass(StoredWorldCollision& owner):owner_(owner){}
+    // Migration admission for source-owned usual bullets and registered
+    // skeletons. Use this instead of run(), never as a second family pass.
+    // Unbound legacy actors remain with their existing adapters.
+    template<unsigned Capacity,class Frames,class Audio,class Atan>
+    bool runSkeletonContacts(StartupRuntime& world,
+        StoredSkeletonRegistration<StartupRuntime::instanceCapacity,Capacity>& skeletons,
+        Frames frames,SoundPlayEnvironment& environment,Audio& audio,Atan atan){
+        return runSkeletonContacts(world,skeletons,frames,[&]{return world.requestMomentDelay();},environment,audio,atan);
+    }
+    // Explicit delay provider remains for source-prefix/reference tests.
+    template<unsigned Capacity,class Frames,class Delay,class Audio,class Atan>
+    bool runSkeletonContacts(StartupRuntime& world,
+        StoredSkeletonRegistration<StartupRuntime::instanceCapacity,Capacity>& skeletons,
+        Frames frames,Delay delay,SoundPlayEnvironment& environment,Audio& audio,Atan atan){
+        if(!owner_.boundTo(world)||!skeletons.valid())return false;
+        auto selected=[&](InstanceHandle key,const auto& bullet,const auto& enemy){
+            return bullet.objectId==261&&enemy.objectId==120&&
+                world.retainedSourceBullet(key)&&skeletons.handle(enemy).generation;
+        };
+        return runSelected(world,[&](auto ka,auto kb,const auto& a,const auto& b){return selected(ka,a,b)||selected(kb,b,a);},
+            [&](const auto& event){
+                const auto* self=owner_.resolve(event.self);if(!self)return false;
+                return self->objectId==261?world.dispatchSkeletonBulletCollision(skeletons,event,frames,delay,environment,audio,atan):
+                    world.dispatchDitherAboveCollision(event);
+            });
+    }
     bool run(StartupRuntime& world){
-        return runSelected(world,[](const auto&,const auto&){return false;},
+        return runSelected(world,[](auto,auto,const auto&,const auto&){return false;},
             [&](const auto& event){return world.dispatchDitherAboveCollision(event);});
     }
     // Admit registered smoke in the SAME pair stream, not a later smoke-only
@@ -19,7 +45,7 @@ public:
     template<unsigned Capacity> bool run(StartupRuntime& world,
         StoredSmokeRegistration<StartupRuntime::instanceCapacity,Capacity>& smoke){
         if(!smoke.valid())return false;
-        return runSelected(world,[&](const auto& a,const auto& b){
+        return runSelected(world,[&](auto,auto,const auto& a,const auto& b){
             return (a.objectId==225&&b.objectId==60&&smoke.state(a))||
                    (b.objectId==225&&a.objectId==60&&smoke.state(b));
         },[&](const auto& event){
@@ -35,7 +61,7 @@ public:
         const auto effect=[&](const auto& r){
             return (r.objectId==225&&smoke.state(r))||(r.objectId==223&&particles.state(r));
         };
-        return runSelected(world,[&](const auto& a,const auto& b){
+        return runSelected(world,[&](auto,auto,const auto& a,const auto& b){
             return (b.objectId==60&&effect(a))||(a.objectId==60&&effect(b));
         },[&](const auto& event){
             const auto* self=owner_.resolve(event.self);if(!self)return false;
@@ -60,7 +86,7 @@ private:
                 return owner.dispatchCollisionEvent(context,a,b,{world.roomId()==11,false},
                     execute);
             }
-            // Both admitted resource objects are non-solid in runner terms.
+            // Admitted resource objects are non-solid in runner terms.
             // Never invent engine/path motion if this contract changes.
             bool rollback(InstanceHandle){return false;}
             bool prepareMotion(InstanceHandle){return false;}
@@ -71,7 +97,7 @@ private:
             const auto* first=owner_.resolve(a);const auto* second=owner_.resolve(b);
             if(!first||!second)return false;
             const bool selected=(first->objectId==61&&second->objectId==60)||
-                (first->objectId==60&&second->objectId==61)||admit(*first,*second);
+                (first->objectId==60&&second->objectId==61)||admit(a,b,*first,*second);
             return !selected||dispatch.pair(a,b,operations);
         });
     }

@@ -2207,26 +2207,31 @@ int main(){
                 bool setGain(int id,MotionBinary64 gain,int duration){require(++calls==4&&id==123&&gain.high==0x3ff00000u&&!gain.low&&!duration,"damage sound gain write");return true;}
                 bool setPitch(int id,MotionBinary64 pitch){require(++calls==5&&id==123&&pitch.high==0x3ff00000u&&!pitch.low,"damage sound pitch");return true;}
             } audio{failSound};
-            SoundPlayEnvironment environment;unsigned delays=0;RunnerCollisionEventContext context;
+            SoundPlayEnvironment environment;
             const auto before=world->randomDrawCount();const auto effects=world->scriptEffects().size();
-            const bool hitOkay=context.dispatch(shot,skeletons.worldHandle(target),{true,false},
-                [&](auto self,auto other,int& subtype,bool& found,PackedObjectEvent& event){
-                    const auto* a=owner->resolve(self);const auto* b=owner->resolve(other);
-                    if(!a||!b)return false;subtype=b->objectId;return objects.collisionEvent(a->objectId,b->objectId,found,event);
-                },[&](const auto& event){return world->dispatchSkeletonBulletCollision(skeletons,event,frames,
-                    [&]{++delays;return owner->resolve(shot)&&owner->resolve(shot)->destroyRequested;},
-                    environment,audio,[](auto dy,auto dx,auto& angle){return portableAtan(dy,dx,angle);});});
+            auto pass=std::make_unique<StoredDitherCollisionPass>(*owner);
+            int roomSpeed=60;
+            const bool hitOkay=world->withMomentDelayRoomSpeed(roomSpeed,[&]{
+                return pass->runSkeletonContacts(*world,skeletons,frames,environment,audio,
+                    [](auto dy,auto dx,auto& angle){return portableAtan(dy,dx,angle);});
+            });
             require(hitOkay==!failSound,"stored enemy collision dispatch preserves backend failure");
+            unsigned controllers=0;
+            for(std::size_t i=0;i<world->activeInstanceCount();++i){const auto& record=world->instanceAt(i);
+                if(record.objectId!=37||!record.active||record.destroyRequested)continue;
+                ++controllers;require(record.controllerSlow==30&&record.alarms.get(0)==1,"damage delay reaches real controller alarm state");
+            }
+            require(controllers&&roomSpeed==30,"damage delay uses bound source room speed and persistent controller");
             const auto* victim=skeletons.instances().find(target);const auto* caller=owner->resolve(shot);
             if(failSound){
                 require(!world->effectsSucceeded()&&victim&&victim->state.health==51&&victim->state.hitDamage==9&&
-                    victim->state.damageStun&&caller&&caller->destroyRequested&&delays==1&&audio.calls==2&&
+                    victim->state.damageStun&&caller&&caller->destroyRequested&&audio.calls==2&&
                     world->scriptEffects().size()==effects&&world->randomDrawCount()==before,
                     "failed audio retains damage/destruction prefix and prevents effect and second delay");
                 continue; // Terminal failed simulation: never retry or resume this event.
             }
             require(victim&&victim->state.health==51&&victim->state.hitDamage==9&&victim->state.hitPending&&
-                victim->state.damageStun&&delays==2&&audio.calls==5&&caller&&caller->destroyRequested&&!caller->bulletHitIgnore&&
+                victim->state.damageStun&&audio.calls==5&&caller&&caller->destroyRequested&&!caller->bulletHitIgnore&&
                 caller->bulletMyFx&&world->scriptEffects().size()==effects+1&&world->randomDrawCount()==before,
                 "stored skeleton damage preserves health, delays, sound, effect ownership and RNG");
             require(owner->resolve(skeletons.worldHandle(target))->health==51,"publish damaged skeleton health to stored instance");

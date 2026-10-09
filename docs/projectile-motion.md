@@ -1277,6 +1277,16 @@ scheduler and actual controller/audio dependencies are still required before
 natural encounter admission. Controlled contacts after scheduled bullet Step
 verify the bindings, not natural pair selection or Windows-runner equivalence.
 
+`StoredDitherCollisionPass::runSkeletonContacts` admits registered 261/120
+contacts in the existing collected pair stream alongside plain-wall/dither
+contacts. It uses the runner overlap and paired dispatch wrappers, not direct
+invocation from a nearby-target loop. Its default delay dependency calls the
+world's actual object-37 `momentDelay` traversal and requires the source
+room-speed binding. This entry replaces the plain migration pass for such a
+world; it must not run as an additional family pass. Combining all remaining
+actor/effect admissions and installing the complete production scheduler remain
+required. No successful placeholder audio backend is installed by this entry.
+
 Run `make verify-machine-gun-source-motion verify-smoke-direction
 verify-smoke-trig`. The source-motion test covers birth narrowing, raw RNG
 endpoints, ordinary/Laser Sight initialization, repeated coordinate writes,
