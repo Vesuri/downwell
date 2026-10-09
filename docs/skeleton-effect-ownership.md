@@ -1175,7 +1175,12 @@ constructor position and default sprite before synchronous Create queries;
 failed publication/Create remains available for cleanup, not silent reuse.
 The scheduler captures a cutoff before each global phase and dispatches the
 appropriate event per eligible lifetime, retaining outer alarm-index ordering.
-Retirement callbacks run before slots are freed. Capacity exhaustion consumes
+Destruction does not retire at the end of an event or on a subsequent birth.
+Marked lifetimes remain resolvable through `find`, but are excluded from `get`,
+event dispatch and drawing. Only the enclosing room cleanup invokes
+`retireRequested`; retirement callbacks run before slots are freed. This follows
+the ordinary destruction versus room/Draw-entry cleanup distinction pinned by
+`verify-runner-destroy.py`. Capacity exhaustion consumes
 no RNG, room clearing does not rewind handles, and dispatch failures latch the
 owner invalid until explicit cleanup. Callbacks cannot mutate the same store;
 they may synchronously create other effect families. The owner retains no

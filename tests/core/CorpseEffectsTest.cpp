@@ -39,6 +39,13 @@ int main(){
     Events events;
     assert(owner.dispatch(owner.beginPhase(),[&](auto,auto& corpse){return corpse.endStep(true,MotionBinary64::fromInteger(1000),events);},hooks));
     assert(events.destroyed==2&&!owner.get(b)&&!owner.get(c));
+    assert(owner.find(b)&&owner.find(c)&&owner.find(b)->destroyRequested&&owner.find(c)->destroyRequested);
+    const auto retainedDraws=random.drawCount();const auto retireCount=hooks.retired.size();
+    assert(!owner.create({}, {},false,random,hooks)&&owner.valid()&&random.drawCount()==retainedDraws&&
+        hooks.retired.size()==retireCount);
+    assert(owner.dispatch(owner.beginPhase(),[](auto,auto&){assert(false);return true;},hooks));
+    assert(hooks.retired.size()==retireCount&&owner.find(b)&&owner.find(c));
+    assert(owner.retireRequested(hooks)&&!owner.find(b)&&!owner.find(c));
     for(unsigned i=0;i<256;++i){
         auto old=owner.beginPhase();auto h=owner.create({}, {},false,random,hooks);assert(h>old.newest);
         assert(owner.clear(hooks)&&!owner.get(h));
@@ -80,6 +87,18 @@ int main(){
         source.imageXscale=MotionBinary64::fromInteger(1);
         assert(owned.createFromDeath(source,172,{},102,false,rng,adapter));
         assert(!adapter.spriteWrites&&!adapter.facingWrites); // Same resource and scale are not dirty writes.
+        assert(owned.clear(adapter));
+    }
+    {
+        CorpseEffects<1> owned;Hooks adapter;GameMakerRandom rng(17);
+        const auto handle=owned.create({}, {},false,rng,adapter);assert(handle);
+        owned.get(handle)->destroyRequested=true;adapter.failRetire=true;
+        assert(!owned.retireRequested(adapter)&&!owned.valid()&&owned.find(handle)&&adapter.retired.empty());
+        assert(!owned.dispatch(owned.beginPhase(),[](auto,auto&){assert(false);return true;},adapter));
+        const auto draws=rng.drawCount();
+        assert(!owned.create({}, {},false,rng,adapter)&&rng.drawCount()==draws&&owned.find(handle));
+        adapter.failRetire=false;assert(owned.clear(adapter)&&!owned.find(handle)&&adapter.retired.size()==1);
+        const auto replacement=owned.create({}, {},false,rng,adapter);assert(replacement>handle&&!owned.find(handle));
         assert(owned.clear(adapter));
     }
     std::puts("Corpse owner: death-wrapper integration, pre-Create publication, capacity, phase cutoffs, reuse, culling and failure cleanup passed");

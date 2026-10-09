@@ -14,6 +14,14 @@ public:
     struct Phase{Handle newest;};
     bool valid()const{return good_;}
     Phase beginPhase()const{return {next_?next_-1:0xffffffffu};}
+    // Lifetime lookup is separate from event eligibility: marked corpses and
+    // partial failures remain owned until explicit room cleanup succeeds.
+    const CorpseAnimation* find(Handle handle)const{
+        if(handle)for(unsigned i=0;i<count_;++i){const auto& slot=slots_[order_[i]];
+            if(slot.handle==handle)return &slot.effect;
+        }
+        return nullptr;
+    }
     CorpseAnimation* get(Handle handle){
         if(good_&&handle)for(unsigned i=0;i<count_;++i){auto& slot=slots_[order_[i]];
             if(slot.handle==handle&&slot.effect.valid&&!slot.effect.destroyRequested)return &slot.effect;
@@ -22,7 +30,7 @@ public:
     }
     template<class Random,class Hooks>
     Handle create(MotionBinary64 x,MotionBinary64 y,bool rip,Random& random,Hooks& hooks){
-        if(!good_||!retireRequested(hooks)||!next_||count_==Capacity)return 0;
+        if(!good_||!next_||count_==Capacity)return 0;
         unsigned index=0;while(index<Capacity&&slots_[index].handle)++index;
         if(index==Capacity){good_=false;return 0;}
         auto& slot=slots_[index];slot.effect={};
@@ -77,14 +85,16 @@ public:
     }
     // One global phase at a time: animation, ONE alarm index, Step, contact or
     // End Step. The caller supplies the corresponding checked event adapter.
-    template<class Run,class Hooks> bool dispatch(Phase phase,Run run,Hooks& hooks){
+    template<class Run,class Hooks> bool dispatch(Phase phase,Run run,Hooks&){
         if(!good_)return false;
         for(unsigned i=0;i<count_;++i){auto& slot=slots_[order_[i]];
             if(slot.handle>phase.newest||slot.effect.destroyRequested)continue;
             if(!slot.effect.valid||!run(slot.handle,slot.effect)||!slot.effect.valid){good_=false;return false;}
         }
-        return retireRequested(hooks);
+        return true;
     }
+    // Only the enclosing world's cleanup boundary may retire marked records.
+    // Birth and event dispatch must not release their slots or memberships.
     template<class Hooks> bool retireRequested(Hooks& hooks){
         if(!good_)return false;
         for(unsigned i=0;i<count_;++i){auto& slot=slots_[order_[i]];

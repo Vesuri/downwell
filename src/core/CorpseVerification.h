@@ -66,7 +66,9 @@ struct Hooks {
         auto* corpse=owner.get(source.myDeadBody);
         if(corpse)corpse->alarms.set(0,1);
         result.check(owner.dispatch(owner.beginPhase(),[&](auto,auto& state){return state.advanceAlarm(0,hooks);},hooks));
-        result.check(!owner.get(source.myDeadBody)&&hooks.births==1&&hooks.retired==1&&hooks.children==1&&hooks.destroys==1);
+        result.check(owner.find(source.myDeadBody)&&owner.find(source.myDeadBody)->destroyRequested&&hooks.retired==0&&
+            owner.retireRequested(hooks)&&!owner.find(source.myDeadBody)&&!owner.get(source.myDeadBody)&&
+            hooks.births==1&&hooks.retired==1&&hooks.children==1&&hooks.destroys==1);
         result.check(hooks.publications==20&&random.drawCount()==3);
         for(unsigned tick=0;tick<40;++tick){
             result.check(hooks.expiry.advanceImage()&&hooks.expiry.destroyRequested==(tick==39));
