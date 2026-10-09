@@ -146,8 +146,11 @@ public:
     }
     template<class Ops> bool wallEvent(InstanceHandle h,int area,GameMakerRandom& random,Ops& ops){
         Identity id;WallEndStepState state;
-        if(stepping_||!readIdentity(h,id)||id.object!=60||!wallState(h,state))return good_=false;
-        if(flags_[h.slot]&3u)return true;
+        if(stepping_||!readIdentity(h,id))return good_=false;
+        // Wall (99) owns an empty End Step override; it must never inherit
+        // code 986, consume its RNG or require object-60 wall state.
+        if((flags_[h.slot]&3u)||id.object==99)return true;
+        if(id.object!=60||!wallState(h,state))return good_=false;
         const int before=drawSprite(h);const bool checked=state.checked!=0;const int image=state.imageIndex;
         stepping_=&state;steppingHandle_=h;
         const bool ok=wallEndStep(state,area,random,ops);

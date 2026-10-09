@@ -1980,6 +1980,38 @@ int main(){
         assert(!owner->dispatchStepPhase(2,tooSmall,[&](InstanceHandle,const PackedObjectEvent&){++calls;return true;}));
         assert(calls==0&&!owner->valid());
     }
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                  GameplayCollisionOwner::Ownership::nativeScenery}){
+        const bool native=mode!=GameplayCollisionOwner::Ownership::reference;
+        const auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},&rooms,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),owner->breakableBinding(),
+            owner->playerBinding(),native?nullptr:&owner->terrain(),&rooms);
+        auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();GameMakerRandom random(123);
+        assert(owner->attach(*world)&&(!native||world->bindNativeTerrain(*terrain)));
+        InstanceHandle local;
+        if(native){assert(terrain->append(99,240,160));local=terrain->handle(0);assert(terrain->createProperties(local,51));}
+        else {assert(owner->terrain().append(99,240,160,true));local=owner->terrain().handle(0);
+            assert(owner->terrain().createProperties(local,51,false,random));}
+        struct NoEffects {
+            bool tile(MotionBinary64,MotionBinary64){assert(false);return false;}
+            bool create(int,MotionBinary64,MotionBinary64){assert(false);return false;}
+            bool outOfView(InstanceHandle){assert(false);return false;}
+        } effects;
+        const auto draws=random.drawCount();RunnerStepSnapshot<8> phase;unsigned calls=0;
+        assert(owner->dispatchStepPhase(2,phase,[&](InstanceHandle,const PackedObjectEvent& event){
+            if(event.codeId==848)return true;
+            assert(event.codeId==1112);++calls;
+            return owner->wallEndStepEvent(local,4,random,masks,effects);
+        }));
+        assert(calls==1&&owner->wallEndStepEvent(local,5,random,masks,effects)&&random.drawCount()==draws);
+        assert(native?world->activateNativeTerrain(local,false):owner->terrain().activation(local,false));
+        assert(owner->wallEndStepEvent(local,5,random,masks,effects)&&random.drawCount()==draws);
+        assert(native?world->destroyNativeTerrain(local):owner->terrain().requestDestroy(local));
+        assert(owner->wallEndStepEvent(local,5,random,masks,effects)&&owner->prepareDraw());
+        assert((native?terrain->size():owner->terrain().size())==0);
+    }
     // Real shape/point queries through the retained wall script, not mocked
     // neighbour occupancy. Compare callback order and every retained field.
     for(int area:{0,1,4,5})for(bool rejectTile:{false,true}){

@@ -16,6 +16,13 @@ manifest = json.loads((export / "manifest.json").read_text())
 assert manifest["source"]["sha256"] == "c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8"
 assert manifest["extractor"]["version"] == "0.9.2.0"
 assert manifest["resources"]["code"][986]["name"] == "gml_Object_objWall_n_Step_2"
+wall = manifest["resources"]["objects"][99]
+assert wall["name"] == "Wall" and wall["parentId"] == 60
+override = [event for event in wall["events"] if (event["eventType"], event["eventSubtype"]) == (3, 2)]
+assert len(override) == 1 and [action["codeId"] for action in override[0]["actions"]] == [1112]
+assert manifest["resources"]["code"][1112]["name"] == "gml_Object_Wall_Step_2"
+assert not [line for line in (export / "Assembly/gml_Object_Wall_Step_2.asm").read_text().splitlines()
+            if line.strip() and not line.strip().startswith((".", ":["))]
 child = manifest["resources"]["objects"][379]
 assert (child["id"], child["name"], child["spriteId"], child["Depth"]) == (379, "limboShard", 91, 0)
 assert [(event["eventType"], event["eventSubtype"],
