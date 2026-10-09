@@ -22,6 +22,9 @@ create = source("Create_0", "76595cba4a9d7f33e279224ef7963a43e9b56ac6ce5d2f59b64
 parent = (export / "Assembly/gml_Object_parentShootableThing_Create_0.asm").read_bytes()
 assert sha256(parent).hexdigest() == "f5c0c5d89f5db5d6ecc01a01c961592fb0a0e413eda14df7c402ed936f487a40"
 assert b"call.i" not in parent
+assert b"pushi.e 1\npop.v.i self.objHp" in parent
+assert b"pushi.e 0\npop.v.i self.hit\npushi.e 0\npop.v.i self.hitEffect" in parent
+assert "push.v self.objHp\npushi.e 0\ncmp.i.v LTE" in step
 assert create.count("call.i random_range(argc=2)") == 3
 assert create.index("event_inherited") < create.index("random_range")
 skeleton = (export / "Assembly/gml_Object_enmSkeleton_Step_0.asm").read_bytes()

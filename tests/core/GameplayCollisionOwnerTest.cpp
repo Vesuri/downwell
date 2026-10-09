@@ -33,6 +33,12 @@ bool nativeLimboContact(downwell::GameplayCollisionOwner& owner,
     const downwell::RunnerCollisionEventContext::Frame& event,NativeBulletVelocity read){
     return owner.dispatchLimboShardBulletCollision(event,read);
 }
+bool nativeBoneTarget(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle target,
+    downwell::MotionBinary64 health){
+    downwell::MotionBinary64 read;bool effect;
+    return owner.projectileBoneFields(target,read,effect)&&owner.projectileBoneHealthWrite(target,health)&&
+        owner.projectileBoneHit(target);
+}
 struct NativeEnemyDeathAudioProbe { bool isPlaying(int,bool&);bool stop(int); };
 bool nativeRunControllerBirth(downwell::GameplayCollisionOwner& owner,unsigned source,
     bool (*initialize)(downwell::InstanceHandle),downwell::InstanceHandle& key){
@@ -6323,7 +6329,11 @@ int main(){
             assert(stoppedWorld->createBoneWithSourceId(405300,240,100,bone)&&
                 GameplayCollisionView::encode(GameplayCollisionView::Kind::bone,bone,selected));
             auto& stoppedBones=stoppedOwner->bones();
-            assert(stoppedBones.dispatch(bone,[](auto& state,auto&,bool&){state.health=0;return true;}));
+            MotionBinary64 hp;bool hitEffect=true;
+            assert(stoppedOwner->projectileBoneFields(selected,hp,hitEffect)&&hp.high==0x3ff00000u&&!hp.low&&!hitEffect);
+            assert(stoppedBones.activate(bone,false)&&stoppedOwner->projectileBoneHealthWrite(selected,{0xc0040000u,0})&&
+                stoppedOwner->projectileBoneHit(selected)&&stoppedBones.find(bone)->state.hit&&!stoppedBones.find(bone)->active);
+            assert(stoppedOwner->projectileBoneFields(selected,hp,hitEffect)&&hp.high==0xc0040000u&&!hp.low&&stoppedBones.activate(bone,true));
             const auto countFrames=[&](int sprite,unsigned& count){return sprites.frameCount(sprite,count);};
             const auto draws=stoppedWorld->randomDrawCount();
             for(unsigned tick=0;tick<3;++tick){
@@ -6334,8 +6344,11 @@ int main(){
                     stoppedWorld->scriptEffects().size()==0&&stoppedWorld->randomDrawCount()==draws);
             }
             assert(stoppedOwner->stepBone(selected,false,countFrames)&&stoppedBones.find(bone)->destroyRequested&&
-                stoppedWorld->scriptEffects().size()==1&&stoppedWorld->randomDrawCount()==draws&&
-                stoppedOwner->prepareDraw()&&!stoppedBones.find(bone));
+                stoppedWorld->scriptEffects().size()==1&&stoppedWorld->randomDrawCount()==draws);
+            assert(stoppedOwner->projectileBoneHealthWrite(selected,{0x3ff40000u,0})&&
+                stoppedOwner->projectileBoneFields(selected,hp,hitEffect)&&hp.high==0x3ff40000u&&!hp.low&&
+                stoppedBones.find(bone)->destroyRequested&&stoppedOwner->prepareDraw()&&!stoppedBones.find(bone));
+            assert(!stoppedOwner->projectileBoneFields(selected,hp,hitEffect)&&!stoppedOwner->valid());
         }
         auto& bones=owner->bones();InstanceHandle local,shared;
         const auto before=world->randomDrawCount();auto random=world->randomState();BoneProjectile reference;
@@ -6396,7 +6409,7 @@ int main(){
                 effect->x.bits==caller->x.bits&&effect->y.bits==caller->y.bits);
             return true;
         };
-        assert(bones.dispatch(local,[](auto& state,auto&,bool&){state.health=0;return true;}));
+        assert(bones.dispatch(local,[](auto& state,auto&,bool&){state.health={};return true;}));
         auto bonePhase=std::make_unique<RunnerStepSnapshot<GameplayCollisionView::capacity>>();
         const auto beforeStepRng=world->randomDrawCount();
         assert(owner->dispatchStepPhase(0,*bonePhase,[&](InstanceHandle selected,const PackedObjectEvent&){
@@ -6418,7 +6431,7 @@ int main(){
         assert(world->bones()==&bones&&!bones.find(retained)&&bones.size()==0&&owner->valid());
         InstanceHandle replacement;assert(world->createBoneWithSourceId(405192,240,990,replacement)&&
             replacement.generation>retained.generation&&!bones.find(local));
-        assert(bones.dispatch(replacement,[](auto& state,auto&,bool&){state.health=0;return true;}));
+        assert(bones.dispatch(replacement,[](auto& state,auto&,bool&){state.health={};return true;}));
         InstanceHandle replacementShared;
         assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::bone,replacement,replacementShared));
         const auto beforeFailureRng=world->randomDrawCount();unsigned lookups=0;

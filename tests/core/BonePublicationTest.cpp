@@ -25,7 +25,7 @@ struct Ops {
 static BoneProjectile sample(){
     GameMakerRandom random(7);BoneProjectile b;check(b.create(240,990,random));
     check(b.motion.launch(240,990,10,-30));b.sampledAnimationRate=MotionBinary64::fromInteger(1);
-    b.imageSpeed={};b.health=0;return b;
+    b.imageSpeed={};b.health={};return b;
 }
 int main(){
     {
@@ -58,7 +58,7 @@ int main(){
             Ops ops,ref;ops.visible=ref.visible=tick!=63;
             bool crossed;check(b.advanceImagePublished(ops,good)&&reference.advanceImage(crossed));
             check(b.imageIndex.bits==reference.imageIndex.bits&&b.timeline.bits==reference.timeline.bits);
-            if(tick==60)b.health=reference.health=0;
+            if(tick==60)b.health=reference.health={};
             check(b.stepPublished(tick%7==0,ops,good)&&
                 reference.step(tick%7==0,[&](int,int){return ref.visible;},ref));
             check(good&&same(b.motion.xx,reference.motion.xx)&&same(b.motion.yy,reference.motion.yy)&&
@@ -109,7 +109,7 @@ int main(){
         check(!b.advanceImagePublished(ops,good)&&ops.calls.size()==1);
     }
     for(unsigned mode=0;mode<3;++mode){
-        auto b=sample();b.health=1;
+        auto b=sample();b.health=MotionBinary64::fromInteger(1);
         b.sampledAnimationRate=mode==1?MotionBinary64{0x3fb47ae1u,0x47ae147bu}:MotionBinary64{0x3fe00000u,0};
         check(b.imageSpeed.assign(b.sampledAnimationRate));
         if(mode==2)b.imageSpeed={0x3f000200u}; // Different by more than VM epsilon.
@@ -117,6 +117,18 @@ int main(){
         // Promoting the narrowed 0.08 does not equal its custom double, but
         // their difference is within the original VM comparison tolerance.
         check((ops.calls.front()==Ops::speed)==(mode==2));
+    }
+    // objHp is a VM real. Fractional overkill must survive the write; small
+    // positive values within the runner comparison epsilon also satisfy <=0.
+    for(auto hp:{MotionBinary64{0xc0040000u,0},MotionBinary64{0x3fd00000u,0},
+        MotionBinary64{0x3ed4f8b5u,0x88e368f1u},MotionBinary64{0x3ee4f8b5u,0x88e368f1u},
+        MotionBinary64{0x3ee4f8b5u,0x88e368f2u}}){
+        auto b=sample();b.health=hp;bool good=true;Ops ops;
+        check(b.stepPublished(true,ops,good)&&!b.destroyRequested&&same(b.health,hp));
+        ops.calls.clear();check(b.stepPublished(false,ops,good)&&same(b.health,hp));
+        const bool dies=(hp.high>>31)||(hp.high<0x3ee4f8b5u)||
+            (hp.high==0x3ee4f8b5u&&hp.low<=0x88e368f1u);
+        check(b.destroyRequested==dies&&b.active!=dies);
     }
     std::printf("Bone publication: %u scalar comparisons, ordered setters and all callback failure prefixes passed\n",comparisons);
 }

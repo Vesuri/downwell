@@ -54,6 +54,19 @@ public:
     bool advanceAnimation(InstanceHandle key){return good_&&((store_.advanceAnimation(key)&&sync(key))||fail());}
     bool activate(InstanceHandle key,bool active){return good_&&(store_.activate(key,active)||fail());}
     bool mark(InstanceHandle key){return good_&&(store_.markDestroyed(key)||fail());}
+    bool readShootable(InstanceHandle world,MotionBinary64& health,bool& hitEffect){
+        auto* r=records_.resolve(world);const auto* bone=r?store_.find(handle(*r)):nullptr;
+        if(!good_||!store_.valid()||!bone)return fail();
+        health=bone->state.health;hitEffect=bone->state.hitEffect;return true;
+    }
+    bool writeShootableHealth(InstanceHandle world,MotionBinary64 health){
+        auto* r=records_.resolve(world);
+        return (good_&&r&&store_.writeHealth(handle(*r),health))||fail();
+    }
+    bool writeShootableHit(InstanceHandle world){
+        auto* r=records_.resolve(world);
+        return (good_&&r&&store_.writeHit(handle(*r)))||fail();
+    }
     bool assignEffect(InstanceHandle key,unsigned effectLocal,unsigned sourceId){
         return good_&&(store_.assignEffect(key,effectLocal,sourceId)||fail());
     }

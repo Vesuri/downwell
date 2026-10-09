@@ -1845,7 +1845,7 @@ int main(){
         };
         auto view=[&](bool& visible){return world->boneInView(bones,local,visible);};
         auto execute=[&](auto& state,auto& publisher,auto&,bool& good){
-            ++steps;if(kill)state.health=0;
+            ++steps;if(kill)state.health={};
             struct Ops {
                 decltype(publisher) publish;unsigned& effects;decltype(emit)& spawn;decltype(view)& query;
                 bool imageSpeed(RunnerImageValue v){return publish.imageSpeed(v);}
@@ -3200,8 +3200,8 @@ int main(){
         require(entered&&stop.player.stopped&&stop.shards.size()==6&&pauses==1&&begins==1&&collisions==1&&
             world->instance(boneId)&&bones.instances().find(bone)->state.motion.y==200,
             "one tick enters the field and freezes bone motion without an extra world step");
-        require(bones.dispatch(bone,[](auto& state,auto&,bool&){state.health=0;return true;}),"damage the paused bone");
-        expected.health=0;advanceReference(true);
+        require(bones.dispatch(bone,[](auto& state,auto&,bool&){state.health={};return true;}),"damage the paused bone");
+        expected.health={};advanceReference(true);
         require(step()&&begins==2&&collisions==2&&pauses==1&&world->instance(boneId),
             "held time stop defers bone health destruction");
         pose.y={0x447a0000u};pose.yy=RunnerImageValue{0x447a2000u}.promoted();
@@ -3222,6 +3222,36 @@ int main(){
             require(!world->withBoneEvents(bones,execute,[&]{++ticks;return true;}),"reject nested bone scope");
             return true; // Ignoring the inner error cannot revive the world.
         })&&!world->effectsSucceeded()&&!ticks,"bone scope preserves terminal nested failure");
+    }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach shootable bone field world");world->skipToGameForTesting();
+        auto bones=world->boneRegistration<1>();InstanceHandle local;
+        require(world->spawnBone(bones,240,200,local),"create retained shootable bone");
+        const auto selected=bones.worldHandle(local);const auto draws=world->randomDrawCount();
+        MotionBinary64 hp;bool hitEffect=true;
+        require(bones.readShootable(selected,hp,hitEffect)&&hp.high==0x3ff00000u&&!hp.low&&!hitEffect,
+            "inherited Create exposes objHp and hitEffect");
+        require(bones.activate(local,false)&&bones.writeShootableHealth(selected,{0xc0040000u,0})&&
+            bones.writeShootableHit(selected)&&bones.readShootable(selected,hp,hitEffect)&&hp.high==0xc0040000u&&!hp.low&&
+            bones.instances().find(local)->state.hit&&!bones.instances().find(local)->active,
+            "cross-instance fractional health/hit writes do not reactivate a dormant bone");
+        require(bones.activate(local,true),"restore bone engine activation");
+        auto frames=[&](int sprite,unsigned& count){return sprites.frameCount(sprite,count);};
+        auto step=[&](bool stopped){return bones.dispatch(local,[&](auto& actor,auto& publish,bool& good){
+            return actor.stepInWorld(stopped,publish,[&]{return world->spawnBoneImpact(bones,local,frames);},
+                [&](bool& visible){return world->boneInView(bones,local,visible);},good);
+        });};
+        require(step(true)&&!world->resolveInstance(selected)->destroyRequested,
+            "paused bone retains negative fractional health until its unpaused Step");
+        require(step(false)&&world->resolveInstance(selected)->destroyRequested,
+            "resumed bone executes its real impact and destruction sequence");
+        require(bones.writeShootableHealth(selected,{0x3ff40000u,0})&&bones.readShootable(selected,hp,hitEffect)&&
+            hp.high==0x3ff40000u&&!hp.low&&world->resolveInstance(selected)->destroyRequested&&world->randomDrawCount()==draws,
+            "marked lifetime remains writable without undoing destruction or consuming RNG");
+        require(bones.retire(local)&&!world->resolveInstance(selected),"retire selected shootable lifetime");
+        require(!bones.readShootable(selected,hp,hitEffect)&&!world->effectsSucceeded(),"stale shootable target fails loudly");
     }
     for(int inset:{0,1}){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);

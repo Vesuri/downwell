@@ -59,6 +59,17 @@ public:
         if(!r||!effectLocal||sourceId>0x7fffffffu)return fail();
         r->myFxLocal=effectLocal;r->myFxSourceId=sourceId;return true;
     }
+    // Cross-instance VM field writes are not a bone event. They remain valid
+    // while inactive or marked, including during synchronous child callbacks;
+    // only retirement invalidates the selected lifetime. No RNG or membership
+    // change accompanies objHp/hit assignment.
+    bool writeHealth(InstanceHandle key,MotionBinary64 health){
+        auto* r=resolve(key);if(!r||!health.valid())return fail();
+        r->state.health=health;return true;
+    }
+    bool writeHit(InstanceHandle key){
+        auto* r=resolve(key);if(!r)return fail();r->state.hit=true;return true;
+    }
     bool activate(InstanceHandle key,bool active){
         auto* r=resolve(key);
         if(!r||r->destroyRequested||!binding_.activation(key,*r,active))return fail();

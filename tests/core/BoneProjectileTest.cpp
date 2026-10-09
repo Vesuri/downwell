@@ -63,7 +63,7 @@ int main() {
         check(target.create(240,990,random)); source.create(240,990,oracle);
         check(same(target.motion.xsp,source.xsp) && same(target.motion.ysp,source.ysp) &&
               same(target.sampledAnimationRate,source.imgSp) && target.animation == BoneProjectile::Animation::instanceDefault &&
-              target.health == source.health && target.active == source.active && !target.hit && !target.hitEffect);
+              same(target.health,source.health) && target.active == source.active && !target.hit && !target.hitEffect);
         check(random.drawCount() == 3 && random.stateIndex() == oracle.stateIndex());
         for (double field : {source.xsp,source.ysp,source.imgSp}) {
             std::uint64_t raw; std::memcpy(&raw,&field,8);
@@ -111,7 +111,7 @@ int main() {
                 for (int health : {-1,0,1}) {
                     BoneProjectile target;
                     check(target.motion.launch(x,y,vx,vy));
-                    target.health = health; target.active = active;
+                    target.health = downwell::MotionBinary64::fromInteger(health); target.active = active;
                     downwell::BoneProjectileReference source;
                     source.x = x; source.y = y; source.xx = x; source.yy = y;
                     source.xsp = vx/10.0; source.ysp = vy/10.0;

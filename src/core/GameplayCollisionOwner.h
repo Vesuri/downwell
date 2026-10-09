@@ -2519,6 +2519,21 @@ public:
         return valid()&&resolves(h)&&View::decode(h,kind,local)&&kind==View::Kind::breakable&&
             world_->publishBoxHit(local);
     }
+    bool projectileBoneFields(InstanceHandle h,MotionBinary64& health,bool& hitEffect){
+        View::Kind kind;InstanceHandle local;
+        if(!valid()||!resolves(h)||!View::decode(h,kind,local)||kind!=View::Kind::bone)return check(false);
+        const auto* bone=bones_.find(local);if(!bone)return check(false);
+        health=bone->state.health;hitEffect=bone->state.hitEffect;return true;
+    }
+    bool projectileBoneHealthWrite(InstanceHandle h,MotionBinary64 health){
+        View::Kind kind;InstanceHandle local;
+        return check(valid()&&resolves(h)&&View::decode(h,kind,local)&&kind==View::Kind::bone&&
+            bones_.writeHealth(local,health));
+    }
+    bool projectileBoneHit(InstanceHandle h){
+        View::Kind kind;InstanceHandle local;
+        return check(valid()&&resolves(h)&&View::decode(h,kind,local)&&kind==View::Kind::bone&&bones_.writeHit(local));
+    }
     bool population(int object,unsigned& count)const{return valid()&&selectorAvailable(object)&&owner_.instanceNumber(object,families_,count);}
     bool terrainPositionMeeting(int object,MotionBinary64 x,MotionBinary64 y,const SpriteMaskPack& masks,bool& hit){
         if(native_)return nativeTerrainPositionMeeting(object,x,y,masks,hit);

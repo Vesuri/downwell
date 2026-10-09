@@ -124,6 +124,18 @@ Native marked boxes remain accessible until room cleanup; retired/reused
 handles are rejected. These are target adapters for the pending source bullet
 integration, not a change to the current live gun's immediate removal path.
 
+For the bone descendant of parentShootableThing, `BoneProjectile::health`
+retains `objHp` as a custom binary64 real, including fractional overkill. The
+bone Step applies the runner real comparison for `objHp <= 0`, after motion
+and only outside time-stop. `StoredBoneRegistration` exposes selected-world-
+handle reads and health/hit writes; the native collision owner exposes the
+corresponding `projectileBoneFields`, `projectileBoneHealthWrite` and
+`projectileBoneHit` operations. These resolve the lifetime anew on each access.
+They do not invoke a bone event or alter engine activation, membership, RNG or
+destruction. Marked and inactive targets retain writable fields until cleanup;
+retired handles and unsupported numeric values fail. Parent-90 selection and
+natural bullet dispatch remain distinct from this target-field contract.
+
 `MachineGunSourceStep` composes the source motion initialization, synchronous
 `scrEffectSpawn` muzzle sequence, solid script and ordered final X/Y setters.
 It uses the shot's birth profile (ordinary or gem-high), the inherited

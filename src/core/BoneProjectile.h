@@ -15,7 +15,8 @@ struct BoneProjectile {
     BoneMotion motion;
     MotionBinary64 sampledAnimationRate;
     RunnerImageValue timeline{}, imageIndex{}, imageSpeed{0x3f800000u};
-    int health = 1, mask = -1;
+    MotionBinary64 health{0x3ff00000u,0}; // parentShootableThing.objHp, a custom real.
+    int mask = -1;
     bool active = true, destroyRequested = false;
     bool hit = false, hitEffect = false;
     Animation animation = Animation::instanceDefault;
@@ -85,7 +86,8 @@ struct BoneProjectile {
             if (!imageSpeed.assign(sampledAnimationRate)) return false;
             animation = Animation::sampledRate;
             if (!motion.step(false)) return false;
-            if (health <= 0 && active) {
+            int hpOrder;if(!compareRunnerReal(health,{},hpOrder))return false;
+            if (hpOrder <= 0 && active) {
                 animation = Animation::stopped;
                 imageSpeed = {};
                 mask = 582;
@@ -147,7 +149,8 @@ struct BoneProjectile {
             if(!motion.yy.roundPixel(rounded)||!py.assignInteger(rounded)||
                !py.promoted().roundPixel(rounded)||!ops.position(px,py))return good=false;
             motion.y=rounded;
-            if(health<=0&&active){
+            int hpOrder;if(!compareRunnerReal(health,{},hpOrder))return good=false;
+            if(hpOrder<=0&&active){
                 if(!speed({}))return good=false;
                 animation=Animation::stopped;
                 if(!ops.mask(582))return good=false;
