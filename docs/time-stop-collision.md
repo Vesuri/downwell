@@ -207,6 +207,17 @@ sound resources into the normal SDL scene automatically.
 Alarm 1 VM SHA256:
 `e1dcdae86d6152a96607b2d8429582255d012ef2e742490fcd2ed8fcf9bf7d13`.
 
+The registered damage binding also owns `global.pHit`, separately from
+`pDamaged`: sound and music duck complete before damage writes 1, and the
+controller WITH follows that write. Player End Step advances 1 to 2 and then
+to 0, with no time-stop guard. `scrPlayerInit` does not reset this global.
+Both world schedulers dispatch that End Step; the native mixed actor phase
+captures all admitted families before executing player 35 ahead of boxes 92.
+This does not admit the separate oxygen-damage Alarm 9 writer. That event still
+needs its complete source body, not an isolated marker assignment.
+Player End Step VM SHA256:
+`12b8c0939c68c322cb14d15e4f5c28e42fc53e84e14aac274b6003cf8cfe790c`.
+
 The stored registered-skeleton pass also admits skeleton contacts with fields
 82, 255 and 371 in that same collected pair stream. It resolves the inherited
 83/1066 event and sets health to zero unless `timefieldImmune` is set; it does

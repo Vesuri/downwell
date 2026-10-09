@@ -107,6 +107,11 @@ struct RunSession {
     bool noKill = false; // global.achNoKill; initialized by scrPlayerInit, not room loading.
     bool playerDamaged=false; // scrPlayerGlobalStat / scrPlayerInit; Alarm 1 clears it.
     void expirePlayerDamage(){playerDamaged=false;}
+    // global.pHit: initialized by scrPlayerGlobalStat, not scrPlayerInit.
+    // Both damage writers assign 1; player End Step advances 1 -> 2 -> 0.
+    unsigned playerHit=0;
+    void setPlayerHit(){playerHit=1;}
+    void playerDamageEndStep(){if(playerHit)playerHit=playerHit>1?0:playerHit+1;}
     bool firstLand=false;
     int backgroundMusicId=193; // scrInitialize; survives ordinary run/room reset.
     MotionBinary64 oxygen=MotionBinary64::fromInteger(100); // scrPlayerGlobalStat.

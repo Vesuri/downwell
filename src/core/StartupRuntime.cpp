@@ -1881,6 +1881,11 @@ bool StartupRuntime::dispatchObjectEvent(InstanceRecord& instance,
     if (objectPack_ == nullptr ||
         !objectPack_->findEvent(instance.objectId, eventType, eventSubtype, event))
         return false;
+    if(instance.objectId==35&&eventType==3&&eventSubtype==2){
+        ++implementedCodeCalls_;
+        run_.playerDamageEndStep();
+        return true;
+    }
     if(roomId_==mainRoomId&&eventType==3&&eventSubtype==2&&
        (instance.objectId==92||hasSimpleOutOfViewEndStep(instance.objectId))){
         ++implementedCodeCalls_;

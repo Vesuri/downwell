@@ -1856,17 +1856,24 @@ int main(){
         require(world->typicalPlayerDamage(bound,one,one,one,events)&&events.clears==2&&selections==1,
             "repeated contact reads the actual shared damaged guard");
         require(world->setPlayerDamageAlarm(player,alarm),"arm registered player Alarm 1");
+        world->setPlayerHit();require(world->playerHit()==1,"publish source pHit");
         for(int tick=1;tick<=3;++tick){
             world->step({},false);
             require(world->effectsSucceeded()&&world->playerDamaged()==(alarm<=0||tick<alarm),
                 "only a positive-to-zero source alarm clears the shared damage flag");
+            require(world->playerHit()==(tick==1?2u:0u),"player End Step ages hit independently of immunity");
         }
-        if(alarm>0){
+        if(alarm==2){
+            DamageControllerFailureEvents effects;const int health=world->mainPlayerHealth();
+            require(!world->typicalPlayerDamage(bound,one,one,one,effects)&&!world->effectsSucceeded()&&
+                world->mainPlayerHealth()==health-1&&world->playerHit()==1&&!world->playerDamaged()&&
+                world->resolveInstance(player)->alarms.get(1)==-1,"hit publication precedes controller failure and immunity");
+        }else if(alarm>0){
             DamageSoundFailureEvents effects;const int health=world->mainPlayerHealth();
             const auto numbers=world->damageNumbers().size();
             require(!world->typicalPlayerDamage(bound,one,one,one,effects)&&!world->effectsSucceeded()&&
                 world->mainPlayerHealth()==health-1&&world->damageNumbers().size()==numbers+1&&
-                effects.soundCalls==1&&!world->playerDamaged(),"real health/number writes survive later sound failure");
+                effects.soundCalls==1&&!world->playerDamaged()&&!world->playerHit(),"real health/number writes survive later sound failure");
         }
     }
     for(unsigned mode:{4u,5u}){

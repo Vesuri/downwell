@@ -1405,6 +1405,9 @@ public:
     downwell::InstanceHandle playerHandle() const { return {0,playerInstance_.lifetimeId}; }
     bool playerDamaged()const{return run_.playerDamaged;}
     void setPlayerDamaged(){run_.playerDamaged=true;}
+    unsigned playerHit()const{return run_.playerHit;}
+    void setPlayerHit(){run_.setPlayerHit();}
+    void playerDamageEndStep(){run_.playerDamageEndStep();}
     bool setPlayerDamageAlarm(downwell::InstanceHandle key,int ticks){
         if(!run_.effectsSucceeded)return false;
         if(key.slot||!key.generation||key.generation!=playerInstance_.lifetimeId)return run_.effectsSucceeded=false;

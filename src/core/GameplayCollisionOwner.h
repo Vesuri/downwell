@@ -1488,12 +1488,13 @@ public:
             const auto* nativeTerrain=self.world_->nativeTerrainInstances();
             const unsigned terrainCount=nativeTerrain?nativeTerrain->size():self.terrain_.size();
             const auto terrainCutoff=nativeTerrain?nativeTerrain->lastLifetime():self.terrain_.lastLifetime();
-            if(!terrainCount&&!self.world_->breakableSlots()&&!self.world_->enemyCount()&&!self.world_->bulletCount()&&!self.drones_.size()&&!self.skeletons_.size()&&!self.playerControllers_.size()&&!self.corpses_.size())return true;
+            if(!self.world_->playerHandle().generation&&!terrainCount&&!self.world_->breakableSlots()&&!self.world_->enemyCount()&&!self.world_->bulletCount()&&!self.drones_.size()&&!self.skeletons_.size()&&!self.playerControllers_.size()&&!self.corpses_.size())return true;
             MotionBinary64 top;
             if(!multiplyBinary64(MotionBinary64::fromInteger(topQ12),{0x3f300000u,0},top))return self.check(false);
             return self.dispatchActorEndStep([&](InstanceHandle shared,int object){
                 View::Kind kind;InstanceHandle local;
                 if(!View::decode(shared,kind,local))return false;
+                if(object==35&&kind==View::Kind::player){self.world_->playerDamageEndStep();return true;}
                 if(object==92&&kind==View::Kind::breakable){
                     const auto* box=self.world_->findBreakable(local);
                     if(!box||!retireMainRoomObjectsChecked(1,11,1,topQ12,[&](unsigned){
@@ -1918,6 +1919,12 @@ public:
         if(!valid()||!world_||actorEndStepExecuting_||combatAlarmPhaseInUse_)return check(false);
         actorEndStepExecuting_=true;
         struct Reset {bool& value;~Reset(){value=false;}} reset{actorEndStepExecuting_};
+        InstanceHandle player;
+        if(!check(visitRegistered(0,View::enemyBase,[&](InstanceHandle h,int object,std::uint32_t flags){
+            if(flags&0x100003u)return true;
+            if(object!=35||!resolves(h))return false;
+            player=h;return true;
+        })))return false;
         const auto boxes=world_->captureBoxAlarms(); // Stable slots and a phase-wide birth ceiling.
         // Reference box registration can be rebound and callbacks may mutate
         // it. Reuse the inactive alarm workspace for its snapshot; native
@@ -1951,6 +1958,13 @@ public:
                 return resolves(h)&&actorEndStepPhase_.append(h.slot,h.generation,object);
             })))return false;
         actorEndStepPhase_.sort();
+        // Player 35 precedes boxes 92. Capture ALL families before invoking
+        // it: synchronous callbacks must not admit newborns to this phase.
+        if(player.generation){
+            std::uint32_t flags;
+            if(eligibilityFlags(player,flags)&&!(flags&0x100003u)&&
+                (!check(resolves(player)&&execute(player,35))||!valid()))return false;
+        }
         // Object 92 precedes every actor admitted below. Borrow its stable
         // native prefix instead of allocating a per-box snapshot. Reference
         // ownership uses the captured registration order above. Capture actors

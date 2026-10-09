@@ -262,6 +262,8 @@ public:
     bool noKillAchievement()const{return run_.noKill;}
     bool playerDamaged()const{return run_.playerDamaged;}
     void setPlayerDamaged(){run_.playerDamaged=true;}
+    unsigned playerHit()const{return run_.playerHit;}
+    void setPlayerHit(){run_.setPlayerHit();}
     // The source object-selector resolver supplies the selected lifetime.
     bool setPlayerDamageAlarm(InstanceHandle key,int ticks){
         if(!run_.effectsSucceeded)return false;

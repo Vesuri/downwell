@@ -10,6 +10,7 @@ template<class World,class SelectPlayer> struct RegisteredPlayerDamageState {
     World& world;SelectPlayer selectPlayer;
     bool playerDamaged()const{return world.playerDamaged();}
     void setPlayerDamaged(){world.setPlayerDamaged();}
+    void setHit(){world.setPlayerHit();}
     bool subtractHealth(MotionBinary64 amount){return world.subtractPlayerHealth(amount);}
     bool damageNumber(MotionBinary64 amount,MotionBinary64 direction){return world.emitPlayerDamageNumber(amount,direction);}
     bool setPlayerAlarm(unsigned index,int ticks){
@@ -60,7 +61,7 @@ struct PlayerDamage {
                !state.damageNumber(amount,direction) ||
                !audio.sound(5,90,0,0) ||
                !audio.duckMusic(500,MotionBinary64{0x3fe66666u,0x66666666u}))return false;
-            events.setHit();
+            state.setHit();
             // room_speed is assigned once per controller in the with loop,
             // before that controller's slown and Alarm 0 writes.
             if(!events.forEachController([&](auto& controller){

@@ -67,6 +67,14 @@ struct DamageControllerOwner {
     bool membership(InstanceHandle,const RunControllerInstances<2>::Record&,bool){return true;}
 };
 int main(){
+    {
+        RunSession run;
+        assert(!run.playerHit);run.playerDamageEndStep();assert(!run.playerHit);
+        run.setPlayerHit();run.playerCreated();assert(run.playerHit==1);
+        run.playerDamageEndStep();assert(run.playerHit==2);
+        run.setPlayerHit();assert(run.playerHit==1); // A new hit restarts the marker.
+        run.playerDamageEndStep();run.playerDamageEndStep();assert(!run.playerHit);
+    }
     for(unsigned failure=0;failure<=8;++failure){
         const auto check=[&](auto& actor){
             RunSession world;world.stage.area=1;world.backgroundMusicId=193;

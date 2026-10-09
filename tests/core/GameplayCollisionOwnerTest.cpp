@@ -1711,6 +1711,7 @@ int main(){
         assert(damageEvents.alarm==-1&&damageEvents.clears==2);
         assert(world->typicalPlayerDamage(damageBinding,one,one,one,damageEvents,noBirth)&&damageEvents.clears==2&&selections==1);
         assert(world->setPlayerDamageAlarm(world->playerHandle(),2));
+        world->setPlayerHit();assert(world->playerHit()==1);
         assert(world->setOxygen({0x40230000u,0}));
         unsigned next=830000;std::uint8_t input=0;std::vector<PlayerTimeStop::Effect> events;
         const auto tick=[&]{return owner->withPlayerTimeStop(stop,room,masks,false,
@@ -1719,7 +1720,7 @@ int main(){
             [&](PlayerTimeStop::Effect effect){events.push_back(effect);return true;},
             [&]{world->step(input);return world->effectsSucceeded();});};
         assert(tick()&&stop.player.stopped&&stop.player.checkStop&&!stop.player.bgmOn);
-        assert(world->playerDamaged());
+        assert(world->playerDamaged()&&world->playerHit()==2);
         assert(world->oxygen().high==0x40240000u&&!world->oxygen().low);
         assert(next==830007&&owner->timeShards().size()==6&&owner->timeChanges().size()==1);
         assert((events==std::vector<PlayerTimeStop::Effect>{PlayerTimeStop::Effect::shake,
@@ -1729,7 +1730,7 @@ int main(){
         assert(change&&change->sourceId==830003&&change->alarms.get(1)==1&&stop.roomSpeed==30);
         assert(stop.burst.field==820000);
         events.clear();assert(tick()&&next==830007&&stop.roomSpeed==35);
-        assert(!world->playerDamaged());
+        assert(!world->playerDamaged()&&!world->playerHit());
         assert((events==std::vector<PlayerTimeStop::Effect>{PlayerTimeStop::Effect::oxygenFloor}));
         Input right;right.right=true;input=packReplayInput(right);
         for(unsigned i=0;i<60&&stop.player.stopped;++i){events.clear();assert(tick());}
@@ -1738,11 +1739,17 @@ int main(){
         assert((events==std::vector<PlayerTimeStop::Effect>{PlayerTimeStop::Effect::change,
             PlayerTimeStop::Effect::resumeMusic,PlayerTimeStop::Effect::stopWind,
             PlayerTimeStop::Effect::exitSound,PlayerTimeStop::Effect::duckMusic}));
+        if(mode==GameplayCollisionOwner::Ownership::nativeScenery){
+            DamageControllerFailureEvents failure;const int health=world->health();
+            assert(!world->typicalPlayerDamage(damageBinding,one,one,one,failure,noBirth)&&!world->effectsSucceeded());
+            assert(world->health()==health-1&&world->playerHit()==1&&!world->playerDamaged());
+        }else{
         DamageSoundFailureEvents failedSound;const int health=world->health();
         const auto numbers=world->damageNumbers().size();
         assert(!world->typicalPlayerDamage(damageBinding,one,one,one,failedSound,noBirth)&&!world->effectsSucceeded());
         assert(world->health()==health-1&&world->damageNumbers().size()==numbers+1&&
-            failedSound.soundCalls==1&&!world->playerDamaged());
+            failedSound.soundCalls==1&&!world->playerDamaged()&&!world->playerHit());
+        }
     }
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
                    GameplayCollisionOwner::Ownership::nativeScenery})for(unsigned reject:{0u,1u,2u,3u}){
@@ -2704,6 +2711,7 @@ int main(){
         std::vector<int> seen;
         assert(owner->dispatchActorEndStep([&](InstanceHandle shared,int object){
             seen.push_back(object);
+            if(object==35)return true;
             if(object==92){
                 assert(shared.slot==GameplayCollisionView::breakableBase+first.slot&&shared.generation==first.generation);
                 assert(world->markBreakableDestroyed(first));
@@ -2714,7 +2722,7 @@ int main(){
             }else assert(object==120&&world->findBreakable(first)&&world->findBreakable(first)->destroyRequested);
             return true;
         }));
-        assert((seen==std::vector<int>{92,120})); // Neither newborn family enters the captured phase.
+        assert((seen==std::vector<int>{35,92,120})); // Neither newborn family enters the captured phase.
         assert(owner->prepareDraw()&&!world->findBreakable(first)&&world->findBreakable(newborn));
         world->step(0);
         assert(world->effectsSucceeded()&&world->findBreakable(newborn)&&world->findBreakable(newborn)->destroyRequested&&
@@ -2900,7 +2908,7 @@ int main(){
         world->step(0);world->step(0);
         assert(world->effectsSucceeded()&&children.find(balloon)&&b->destroyRequested);
         unsigned endCalls=0;
-        assert(owner->dispatchActorEndStep([&](auto,int){++endCalls;return true;})&&!endCalls);
+        assert(owner->dispatchActorEndStep([&](auto,int object){assert(object==35);++endCalls;return true;})&&endCalls==1);
         assert(owner->prepareDraw()&&!children.find(balloon)&&children.size()==2);
         InstanceHandle replacement;
         assert(children.createCompanion(256,106004,{},{},replacement)&&replacement.generation>balloon.generation);
@@ -6251,10 +6259,11 @@ int main(){
         assert(owner->playerControllers().createCompanion(256,605004,{},{},balloon));
         std::vector<int> objectsSeen;
         assert(owner->dispatchActorEndStep([&](InstanceHandle,int object){objectsSeen.push_back(object);return true;}));
-        assert((objectsSeen==std::vector<int>{120,120,256,266}));
+        assert((objectsSeen==std::vector<int>{35,120,120,256,266}));
         assert(owner->playerControllers().balloonEndStep(balloon,false));
         unsigned calls=0;
         assert(owner->dispatchActorEndStep([&](InstanceHandle shared,int object){
+            if(object==35)return true;
             assert(object==120);GameplayCollisionView::Kind kind;InstanceHandle local;
             assert(GameplayCollisionView::decode(shared,kind,local)&&kind==GameplayCollisionView::Kind::skeleton);
             assert(local.slot==(calls?second:first).slot);
@@ -6272,7 +6281,7 @@ int main(){
                 assert(GameplayCollisionView::decode(shared,kind,local)&&local.slot==newDrone.slot&&local.generation==newDrone.generation);}
             return true;
         }));
-        assert((objectsSeen==std::vector<int>{120,120,266}));
+        assert((objectsSeen==std::vector<int>{35,120,120,266}));
     }
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
                   GameplayCollisionOwner::Ownership::nativeScenery}){
@@ -6289,6 +6298,7 @@ int main(){
         std::vector<int> seen;
         assert(owner->dispatchActorEndStep([&](InstanceHandle shared,int object){
             seen.push_back(object);
+            if(object==35)return true;
             if(object==111){
                 GameplayCollisionView::Kind kind;InstanceHandle local;
                 assert(GameplayCollisionView::decode(shared,kind,local)&&kind==GameplayCollisionView::Kind::enemy&&
@@ -6302,7 +6312,7 @@ int main(){
             }
             return true;
         }));
-        assert((seen==std::vector<int>{111,120})); // New enemy does not inherit a turn in this phase.
+        assert((seen==std::vector<int>{35,111,120})); // New enemy does not inherit a turn in this phase.
         assert(owner->prepareDraw()&&!world->resolveEnemyLifetime(first)&&world->resolveEnemyLifetime(newborn));
         // Production dispatch, rather than the fixture callback above, now
         // owns the offscreen enemy's mark. Removal must still wait for Draw.

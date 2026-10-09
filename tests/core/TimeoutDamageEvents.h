@@ -58,4 +58,12 @@ struct DamageSoundFailureEvents:TimeoutDamageEvents {
         return false;
     }
 };
+// Advance past sound/duck, then fail at controller traversal. The hit marker
+// must already be published, but immunity/alarm writes must not have happened.
+struct DamageControllerFailureEvents:DamageSoundFailureEvents {
+    bool sound(int id,int priority,bool loop,bool cut){
+        DamageSoundFailureEvents::sound(id,priority,loop,cut);return true;
+    }
+    bool duckMusic(int,Number){return true;}
+};
 #endif
