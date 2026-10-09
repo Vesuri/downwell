@@ -4,7 +4,7 @@
 namespace downwell {
 // Migration boundary for the authored wall-pruning controller. Collection uses
 // the complete owner queue/tree order; the implemented 61/60 pair and, when
-// explicitly bound, registered 225/60, 223/60 or 261/120 pairs are executed here. Other families
+// explicitly bound, registered 225/60, 223/60, 261/120 and entry/exit-field/player pairs are executed here. Other families
 // still use the existing gameplay adapters.
 // This is not a second pass to run alongside a complete collision dispatcher.
 class StoredDitherCollisionPass {
@@ -60,14 +60,23 @@ private:
             return bullet.objectId==261&&enemy.objectId==120&&
                 world.retainedSourceBullet(key)&&skeletons.handle(enemy).generation;
         };
-        return runSelected(world,[&](auto ka,auto kb,const auto& a,const auto& b){return selected(ka,a,b)||selected(kb,b,a)||admit(a,b);},
+        return runSelected(world,[&](auto ka,auto kb,const auto& a,const auto& b){
+                return selected(ka,a,b)||selected(kb,b,a)||windPair(a,b)||admit(a,b);},
             [&](const auto& event){
                 const auto* self=owner_.resolve(event.self);if(!self)return false;
+                if(event.owner==255)return world.dispatchTimeFieldWind(event,environment.gameVolume,audio);
                 return self->objectId==261?world.dispatchSkeletonBulletCollision(skeletons,event,frames,delay,environment,audio,atan):
                     execute(event);
             });
     }
 public:
+    // Non-combat admission using the SAME collected stream as authored dither.
+    template<class Audio> bool run(StartupRuntime& world,MotionBinary64 volume,Audio& audio){
+        if(!owner_.boundTo(world))return false;
+        return runSelected(world,[](auto,auto,const auto& a,const auto& b){return windPair(a,b);},
+            [&](const auto& event){return event.owner==255?world.dispatchTimeFieldWind(event,volume,audio):
+                world.dispatchDitherAboveCollision(event);});
+    }
     bool run(StartupRuntime& world){
         return runSelected(world,[](auto,auto,const auto&,const auto&){return false;},
             [&](const auto& event){return world.dispatchDitherAboveCollision(event);});
@@ -103,6 +112,10 @@ public:
         });
     }
 private:
+    static bool windPair(const InstanceRecord& a,const InstanceRecord& b){
+        return ((a.objectId==255||a.objectId==371)&&b.objectId==35)||
+            ((b.objectId==255||b.objectId==371)&&a.objectId==35);
+    }
     template<class Admit,class Execute> bool runSelected(StartupRuntime& world,Admit admit,Execute execute){
         if(!world.effectsSucceeded())return false;
         if(world.roomId()!=11)return true;

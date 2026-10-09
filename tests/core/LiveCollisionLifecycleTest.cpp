@@ -4330,23 +4330,20 @@ int main(){
             bool setPitch(int id,MotionBinary64 pitch){return id==900&&pitch.high==0x3ff00000u&&pitch.low==0;}
         } audio;
         RunnerCollisionEventContext::Frame lastWindEvent;
+        auto windPass=std::make_unique<StoredDitherCollisionPass>(*productionOwner);
         auto dispatchWind=[&](InstanceHandle field){
-            auto candidates=std::make_unique<RunnerCollisionPairs<capacity,16384>>();
-            require(productionOwner->collectCollisionPairs(*candidates,true),"collect field/player wind candidates");
-            for(unsigned i=0;i<candidates->size();++i){
-                const auto pair=*candidates->at(i);
-                for(unsigned reverse=0;reverse<2;++reverse){
-                    const auto a=reverse?pair.other:pair.self,b=reverse?pair.self:pair.other;
-                    if(a.slot!=field.slot||a.generation!=field.generation||productionOwner->resolve(b)->objectId!=35)continue;
-                    RunnerCollisionEventContext context;unsigned called=0;
-                    require(productionOwner->dispatchCollisionEvent(context,a,b,{true,false},[&](const auto& event){
-                        ++called;lastWindEvent=event;
-                        return production->dispatchTimeFieldWind(event,MotionBinary64::fromInteger(1),audio);
-                    })&&called==1,"live field wind resolves inherited event and registered self/other");
-                    return;
-                }
+            // Preserve a resource-resolved frame only for the later explicit
+            // expired-voice/stale-generation checks. The actual contact below
+            // goes through pair collection, overlap and paired dispatch.
+            bool saved=false;
+            for(unsigned i=0;i<production->activeInstanceCount();++i){
+                const auto& r=production->instanceAt(i);if(r.objectId!=35)continue;
+                const auto player=production->instanceHandleAt(i);PackedObjectEvent binding;bool found=false;
+                require(productionOwner->collisionEvent(field,player,found,binding)&&found,"field/player inherited binding");
+                lastWindEvent={field,player,4,35,binding.ownerObjectId,binding.codeId};saved=true;break;
             }
-            require(false,"field/player candidate for live wind dispatch");
+            require(saved&&windPass->run(*production,MotionBinary64::fromInteger(1),audio),
+                "wind contacts join collected dither/wall stream without a family pass");
         };
         const RunnerImageValue x{0x43700000u},y{0x43300000u}; // 240,176
         InstancePlaceResult selected;selected.id=17;

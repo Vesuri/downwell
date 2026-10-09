@@ -83,8 +83,13 @@ sound scripts. Ordinary room changes retain them; new-run reset restores the
 wind voice to -1 and the channel to 0. Explicit state-provider overloads remain
 for reference tests. Live tests cover
 exit fields, the start-field descendant, shared playing/expired voices and stale
-event rejection. Neither normal scheduler installs it automatically yet, and
-actual audio backend integration remains open.
+event rejection. `StoredDitherCollisionPass` admits 255/35 and inherited 371/35
+alongside wall pruning when supplied audio; its skeleton/combat entry points
+include those pairs in the same stream. Collection, overlap, destruction guards
+and paired dispatch are shared, not a second wind-only pass. Player 35 and its
+parent have no reverse collision event for these fields. Other time-field
+families are not implicitly admitted. The normal game loop still needs the
+audio-backed entry point and actual audio backend integration remains open.
 `GameplayCollisionOwner::dispatchTimeFieldWind` applies the same checked
 inherited-binding and generation checks to native goal-field lifetimes (255
 and 371). It uses the world's RNG and the selected record's `windSound`, not a
