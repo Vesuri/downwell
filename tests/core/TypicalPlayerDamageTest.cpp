@@ -1,4 +1,6 @@
 #include "core/RunSession.h"
+#include "core/BoneProjectile.h"
+#include "core/SkeletonActor.h"
 #include <cassert>
 #include <cstdio>
 #include <vector>
@@ -63,7 +65,8 @@ struct Events {
 int main(){
     const std::vector<int> expected{1,2,3,4,5,6,7,8,9,10,11,12,2,3,13,14,15,16,17,18,16,17,18,19,20};
     for(unsigned seed=0;seed<256;++seed){
-        RunSession run;TypicalPlayerDamage caller;GameMakerRandom rng(seed),oracle(seed);Events events;
+        RunSession run;BoneProjectile bone;auto& caller=bone.damageScripts.typical;
+        GameMakerRandom rng(seed),oracle(seed);Events events;
         events.owner=&run;events.random=&rng;
         assert(run.typicalPlayerDamage(caller,n(1),n(3),n(2),rng,events));
         assert(events.log==expected && run.timeFields.size()==2);
@@ -77,7 +80,8 @@ int main(){
         assert(equal(caller.direction,n(315)) && equal(caller.damage,n(1)));
     }
     for(unsigned flags=0;flags<32;++flags){
-        RunSession run;TypicalPlayerDamage caller;GameMakerRandom rng(42);Events events;
+        RunSession run;SkeletonActor skeleton;auto& caller=skeleton.damageScripts.typical;
+        GameMakerRandom rng(42);Events events;
         events.immune=flags&1;events.dead=flags&2;events.positive=!(flags&4);
         events.timeout=flags&8;events.stopped=flags&16;
         caller.direction=n(123);

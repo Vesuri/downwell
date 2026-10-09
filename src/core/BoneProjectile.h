@@ -6,6 +6,7 @@
 #include "EnemyContact.h"
 #include "RunnerRealComparison.h"
 #include "ShootableThing.h"
+#include "ContactDamageScripts.h"
 namespace downwell {
 // Object 269's Create and event state. The owner must call create synchronously
 // before installing the skeleton's velocity overrides.
@@ -14,6 +15,7 @@ namespace downwell {
 struct BoneProjectile : ShootableThing {
     enum class Animation { instanceDefault, sampledRate, stopped };
     BoneMotion motion;
+    ContactDamageScripts damageScripts;
     MotionBinary64 sampledAnimationRate;
     RunnerImageValue timeline{}, imageIndex{}, imageSpeed{0x3f800000u};
     int mask = -1;
@@ -188,11 +190,11 @@ struct BoneProjectile : ShootableThing {
     template<class Publish,class Impact,class Damage>
     bool collideInWorld(bool player,bool stopped,Publish& publish,Impact impact,Damage damage,bool& good){
         struct Ops {
-            Publish& publish;Impact& impact;Damage& applyDamage;
+            BoneProjectile& caller;Publish& publish;Impact& impact;Damage& applyDamage;
             bool destroy(){return publish.destroy();}
             bool effect(int sprite,int tenths){return sprite==85&&tenths==3&&impact();}
-            bool damage(int amount,int horizontal,int vertical){return applyDamage(amount,horizontal,vertical);}
-        } ops{publish,impact,damage};
+            bool damage(int amount,int horizontal,int vertical){return applyDamage(caller,amount,horizontal,vertical);}
+        } ops{*this,publish,impact,damage};
         return player?collidePlayerPublished(stopped,ops,good):collideWallPublished(ops,good);
     }
     template<class Ops> bool collidePlayerPublished(bool stopped,Ops& ops,bool& good){

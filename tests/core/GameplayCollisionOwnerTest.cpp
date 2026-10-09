@@ -75,7 +75,7 @@ bool nativeSkeletonEncounterContact(downwell::GameplayCollisionOwner& owner,
     const downwell::RunnerCollisionEventContext::Frame& event,const downwell::TimeStopEffects<64>& stop,
     downwell::SoundPlayEnvironment& env,NativeSkeletonAudio& audio,
     bool (*frames)(int,unsigned&),bool (*atan)(downwell::MotionBinary64,downwell::MotionBinary64,downwell::MotionBinary64&),
-    bool (*damage)(int,int,int),bool (*other)(const downwell::RunnerCollisionEventContext::Frame&),unsigned& stomps,unsigned& damages){
+    bool (*damage)(downwell::BoneProjectile&,int,int,int),bool (*other)(const downwell::RunnerCollisionEventContext::Frame&),unsigned& stomps,unsigned& damages){
     return owner.dispatchSkeletonEncounterCollision(event,stop,frames,env,audio,atan,
         [&](auto& actor){return CheckedSkeletonContact{actor,0,stomps,damages};},damage,other);
 }
@@ -1983,7 +1983,8 @@ int main(){
                     [&](int sprite,unsigned& count){return sprites.frameCount(sprite,count);},env,audio,
                     [](auto dy,auto dx,auto& angle){return portableAtan(dy,dx,angle);},
                     [&](auto& actor){++unexpected;return CheckedSkeletonContact{actor,0,stomps,damage};},
-                    [&](int amount,int horizontal,int vertical){assert(amount==1&&horizontal==3&&vertical==2);++damage;
+                    [&](auto& caller,int amount,int horizontal,int vertical){assert(amount==1&&horizontal==3&&vertical==2);++damage;
+                        caller.damageScripts.typical.damage=MotionBinary64::fromInteger(amount);
                         if(contact==5)stop.player.stopped=true;return contact!=4;},
                     [&](const auto&){++unexpected;return false;});
             });
@@ -6765,9 +6766,11 @@ int main(){
                 subtype=otherObject;return objects.collisionEvent(269,otherObject,found,event);
             },[&](const auto& event){return contacts->dispatchBoneCollision(event,contact==2,
                 [&](int sprite,unsigned& count){return sprites.frameCount(sprite,count);},
-                [&](int amount,int horizontal,int vertical){
+                [&](auto& caller,int amount,int horizontal,int vertical){
                     const auto* actor=contacts->bones().find(local);
                     assert(amount==1&&horizontal==3&&vertical==2&&actor&&!actor->destroyRequested&&!actor->myFxLocal);
+                    assert(&caller==&actor->state);
+                    caller.damageScripts.typical.damage=MotionBinary64::fromInteger(amount);
                     ++damages;return contact!=4;
                 });});
             if(ok!=(contact!=4)||damages!=unsigned(contact==1||contact==4)||scene->randomDrawCount()!=rng)
@@ -6775,6 +6778,7 @@ int main(){
                     unsigned(ownership),contact,int(ok),damages,unsigned(scene->randomDrawCount()),unsigned(rng),int(contacts->valid()),int(scene->effectsSucceeded()));
             assert(ok==(contact!=4)&&damages==unsigned(contact==1||contact==4)&&scene->randomDrawCount()==rng);
             assert(scene->effectsSucceeded()==ok&&contacts->valid()==ok);
+            assert(contacts->bones().find(local)->state.damageScripts.typical.damage.zero()==(damages==0));
             if(ok){const auto* actor=contacts->bones().find(local);
                 assert(actor&&actor->destroyRequested==(contact<3)&&bool(actor->myFxLocal)==(contact<3));}
         }

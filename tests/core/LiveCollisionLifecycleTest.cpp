@@ -1879,9 +1879,11 @@ int main(){
         const bool ok=owner->dispatchCollisionEvent(context,self,other,{true,false},[&](const auto& event){
             return world->dispatchBoneCollision(bones,event,contact==2,
                 [&](int sprite,unsigned& count){return sprites.frameCount(sprite,count);},
-                [&](int amount,int horizontal,int vertical){
+                [&](auto& caller,int amount,int horizontal,int vertical){
                     require(amount==1&&horizontal==3&&vertical==2&&!bones.instances().find(local)->destroyRequested&&
                         !bones.instances().find(local)->myFxLocal,"damage precedes impact and destruction");
+                    require(&caller==&bones.instances().find(local)->state,"damage borrows the retained bone caller");
+                    caller.damageScripts.typical.damage=MotionBinary64::fromInteger(amount);
                     ++damages;return contact!=4;
                 });
         });
@@ -1889,6 +1891,8 @@ int main(){
             "source contact guards, checked damage and zero impact RNG");
         const auto* retained=world->resolveInstance(self);
         require(retained&&retained->destroyRequested==(contact<3),"collision preserves lifetime and destruction prefix");
+        require(bones.instances().find(local)->state.damageScripts.typical.damage.zero()==(damages==0),
+            "caller damage writes survive failed callbacks and destruction marking");
         if(ok){const auto* actor=bones.instances().find(local);
             require(actor&&bool(actor->myFxLocal)==(contact<3),"registered impact assigned only on admitted contact");
             require(bones.clear(),"clear collision fixture");}
@@ -1922,9 +1926,10 @@ int main(){
         const bool okay=pass->runSkeletonContacts(*world,skeletons,bones,smoke,particles,stop,
             [&](int sprite,unsigned& count){return sprites.frameCount(sprite,count);},environment,audio,
             [](auto dy,auto dx,auto& angle){return portableAtan(dy,dx,angle);},
-            [&](int amount,int horizontal,int vertical){
+            [&](auto& caller,int amount,int horizontal,int vertical){
                 require(amount==1&&horizontal==3&&vertical==2&&!bones.instances().find(local)->destroyRequested,
                     "collected damage precedes bone destruction");++damage;
+                caller.damageScripts.typical.damage=MotionBinary64::fromInteger(amount);
                 if(contact==5)stop.player.stopped=true;
                 return contact!=4;
             });

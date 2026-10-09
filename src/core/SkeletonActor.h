@@ -7,6 +7,7 @@
 #include "SoundPlayScript.h"
 #include "CurrencyRewardFields.h"
 #include "CurrencySpawnScript.h"
+#include "ContactDamageScripts.h"
 namespace downwell {
 // Shared object-120 event body. Owner runs pre-Step animation and global alarm
 // phases separately, supplies synchronous effect/child calls, and defers removal
@@ -30,6 +31,7 @@ struct SkeletonActor : SkeletonDecisions {
         return true;
     }
     SoundPlayState sound;
+    ContactDamageScripts damageScripts;
     bool damageStun=false, stomped=false;
     bool grounded=true, alive=true, destroyRequested=false;
     bool timefieldImmune=false;
