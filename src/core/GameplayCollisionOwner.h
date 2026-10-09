@@ -1926,16 +1926,7 @@ public:
            !objects_.collisionEvent(263,35,found,binding)||!found||
            binding.ownerObjectId!=263||binding.codeId!=event.code)return check(false);
         return check(corpses_.dispatchPublished(local,[&](auto& state,auto& publish,bool& okay){
-            struct Events {
-                Effects& effects;typename GameplayWorld::RegisteredCorpse::Publisher& publish;bool& okay;
-                bool incrementBodiesEaten(){return effects.incrementBodiesEaten();}
-                void eatSound(int sound,int priority,int loop,int gain){effects.eatSound(sound,priority,loop,gain);}
-                MotionBinary64 playerY(){return effects.playerY();}
-                MotionBinary64 playerX(){return effects.playerX();}
-                bool create(int object,MotionBinary64 x,MotionBinary64 y,std::uint32_t& child){return effects.create(object,x,y,child);}
-                void destroy(){okay=publish.destroy()&&okay;}
-            } events{effects,publish,okay};
-            return state.collidePlayer(knifeFork,playerDead,events);
+            return state.collidePlayerPublished(knifeFork,playerDead,publish,effects,okay);
         }));
     }
     template<class Frames,class Damage> bool dispatchBoneCollision(

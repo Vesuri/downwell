@@ -46,6 +46,20 @@ struct CorpseLifecycle : CorpseBirth {
         }
         return true;
     }
+    template<class Publish,class Effects> bool collidePlayerPublished(bool knifeFork,bool playerDead,
+        Publish& publish,Effects& effects,bool& okay){
+        if(!okay)return false;
+        struct Events {
+            Effects& effects;Publish& publish;bool& okay;
+            bool incrementBodiesEaten(){return effects.incrementBodiesEaten();}
+            void eatSound(int sound,int priority,int loop,int gain){effects.eatSound(sound,priority,loop,gain);}
+            MotionBinary64 playerY(){return effects.playerY();}
+            MotionBinary64 playerX(){return effects.playerX();}
+            bool create(int object,MotionBinary64 x,MotionBinary64 y,std::uint32_t& child){return effects.create(object,x,y,child);}
+            void destroy(){okay=publish.destroy()&&okay;}
+        } events{effects,publish,okay};
+        return (collidePlayer(knifeFork,playerDead,events)&&okay)||(okay=false);
+    }
     template<class Events> bool collidePlayer(bool knifeFork,bool playerDead,Events& events){
         if(!valid)return false;
         if(destroyRequested||!knifeFork||playerDead||!active)return true;

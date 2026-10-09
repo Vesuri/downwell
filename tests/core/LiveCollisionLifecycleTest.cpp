@@ -163,6 +163,46 @@ int main(){
     BuilderPatternPack patterns(bb.data(),bb.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     SpriteMaskPack masks(mb.data(),mb.size());
     require(rooms.valid()&&objects.valid()&&patterns.valid()&&sprites.valid()&&masks.valid(),"real collision resources validate");
+    for(unsigned failure=0;failure<=5;++failure){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach stored corpse contact owner");world->skipToGameForTesting();
+        InstanceHandle player;RunnerImageValue x,y;
+        for(unsigned i=0;i<world->activeInstanceCount();++i)if(world->instanceAt(i).objectId==35){player=world->instanceHandleAt(i);break;}
+        require(player.generation&&owner->collisionPosition(player,x,y),"resolve actual corpse-contact player");
+        auto corpses=world->corpseRegistration<1>();DeadBodySource source{x.promoted(),y.promoted(),{},MotionBinary64::fromInteger(-1)};
+        require(world->createRegisteredCorpseFromDeath(corpses,source,206,{},102,
+            [](auto,int,auto,auto,bool& hit){hit=false;return true;}),"create contact corpse");
+        const auto key=corpses.sourceHandle(source.myDeadBody);bool overlaps=false;
+        const auto* state=corpses.state(key);
+        require(state&&owner->placeMeeting(key,*world->resolveInstance(key),35,state->x.promoted(),state->y.promoted(),overlaps)&&overlaps,
+            "corpse mask actually overlaps player");
+        struct Effects {
+            unsigned failure=0,eaten=0,sounds=0,children=0,reads=0;
+            bool incrementBodiesEaten(){++eaten;return true;}
+            void eatSound(int s,int p,int l,int g){require(eaten==1&&s==83&&p==80&&!l&&g==1,"source consumption sound order");++sounds;}
+            MotionBinary64 playerY(){require(reads++==children*2,"read player Y first");return MotionBinary64::fromInteger(192+children);}
+            MotionBinary64 playerX(){require(reads++==children*2+1,"read player X second");return MotionBinary64::fromInteger(240+children);}
+            bool create(int object,MotionBinary64 px,MotionBinary64 py,std::uint32_t& child){
+                require(object==223&&eaten==1&&sounds==1&&px.high==MotionBinary64::fromInteger(240+children).high&&
+                    py.high==MotionBinary64::fromInteger(192+children).high,"each synchronous child sees fresh player fields");
+                child=300000+children++;return children!=failure;
+            }
+        } effects{failure};
+        RunnerCollisionEventContext context;
+        auto contact=[&](bool upgrade,bool dead){return owner->dispatchCollisionEvent(context,key,player,{true,false},[&](const auto& event){
+            return world->dispatchCorpsePlayerCollision(corpses,event,upgrade,dead,effects);
+        });};
+        require(contact(true,false)&&!effects.eaten,"inactive corpse cannot be consumed");
+        require(corpses.dispatchPublished(key,[](auto& state,auto&,bool&){state.active=true;return true;}),"activate contact fixture");
+        require(contact(false,false)&&contact(true,true)&&!effects.eaten,"upgrade and death guards");
+        require(contact(true,false)==!failure&&world->effectsSucceeded()==!failure&&effects.eaten==1&&effects.sounds==1&&
+            effects.children==(failure?failure:5)&&effects.reads==2*effects.children,"stored consumption preserves ordered success/failure prefix");
+        require(world->resolveInstance(key)&&world->resolveInstance(key)->destroyRequested==!failure,
+            "only complete consumption marks corpse; lifetime remains until cleanup");
+        if(failure)require(!contact(true,false)&&effects.children==failure,"failed contact cannot replay children");
+        require(corpses.clear(),"clean contact fixture");
+    }
     for(int x:{159,160,240,320,321})for(bool reject:{false,true})for(bool field:{false,true}){
         struct CorpseQueryOwner:StoredWorldCollision {
             using StoredWorldCollision::StoredWorldCollision;

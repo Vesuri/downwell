@@ -1270,6 +1270,21 @@ public:
             MotionBinary64::fromInteger(mainPlayerMotion_.speedYFifths()),random_);
         return run_.effectsSucceeded;
     }
+    template<unsigned Capacity,class Effects> bool dispatchCorpsePlayerCollision(
+        StoredCorpseRegistration<instanceCapacity,Capacity>& corpses,
+        const RunnerCollisionEventContext::Frame& event,bool knifeFork,bool playerDead,Effects& effects){
+        if(!run_.effectsSucceeded)return false;
+        const auto* self=instances_.resolve(event.self);const auto* other=instances_.resolve(event.other);
+        PackedObjectEvent binding{};bool found=false;
+        if(!corpses.belongsTo(instances_)||!corpses.valid()||!self||!other||!objectPack_||
+           self->objectId!=263||other->objectId!=35||!corpses.state(event.self)||
+           event.type!=4||event.subtype!=35||event.owner!=263||
+           !objectPack_->collisionEvent(263,35,found,binding)||!found||
+           binding.ownerObjectId!=263||binding.codeId!=event.code)return run_.effectsSucceeded=false;
+        return run_.effectsSucceeded=corpses.dispatchPublished(event.self,[&](auto& state,auto& publish,bool& okay){
+            return state.collidePlayerPublished(knifeFork,playerDead,publish,effects,okay);
+        })&&run_.effectsSucceeded;
+    }
     template<unsigned Capacity> bool dispatchSmokeCollision(
         StoredSmokeRegistration<instanceCapacity,Capacity>& smoke,
         const RunnerCollisionEventContext::Frame& event){
