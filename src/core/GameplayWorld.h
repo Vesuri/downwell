@@ -1800,6 +1800,11 @@ public:
         return camera.pixelY() - 142;
     }
     const downwell::GameplayGoalFields& goalFieldInstances()const{return goalFieldInstances_;}
+    int timeFieldWindVoice()const{return run_.fieldWind.voice;}
+    template<class Audio> bool contactGoalFieldWind(downwell::InstanceHandle key,
+        downwell::MotionBinary64 volume,Audio& audio){
+        return contactGoalFieldWind(key,run_.fieldWind,run_.overlapSounds[8],volume,audio);
+    }
     template<class Audio> bool contactGoalFieldWind(downwell::InstanceHandle key,downwell::TimeFieldWind& wind,
         int& channel,downwell::MotionBinary64 volume,Audio& audio){
         return run_.effectsSucceeded=run_.effectsSucceeded&&

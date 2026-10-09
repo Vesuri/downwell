@@ -1,5 +1,6 @@
 #include "core/TimeFieldWind.h"
 #include "core/GameMakerRandom.h"
+#include "core/RunSession.h"
 #include <cassert>
 #include <vector>
 #include <cstdio>
@@ -19,6 +20,8 @@ struct Audio {
     bool setPitch(int voice,MotionBinary64 pitch){assert(voice==900&&pitch.high==0x3ff00000u&&pitch.low==0);return call(5000);}
 };
 int main(){
+    {RunSession run;run.fieldWind.voice=900;run.overlapSounds[8]=350;
+        run.reset();assert(run.fieldWind.voice==-1&&run.fieldWind.succeeded()&&run.overlapSounds[8]==0);}
     for(unsigned seed=0;seed<128;++seed){
         GameMakerRandom random(seed),oracle(seed);const int selected=349+int(oracle.nextU32()%7);
         TimeFieldWind wind;SoundPlayState caller;Audio audio;int sound=-7,channel=22;

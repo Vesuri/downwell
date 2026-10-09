@@ -40,6 +40,7 @@
 #include "ForcedPlayerJump.h"
 #include "Profile.h"
 #include "SoundPlayScript.h"
+#include "TimeFieldWind.h"
 namespace downwell {
 // Persistent subset currently modeled by the port. ResetPlayer calls
 // scrInitialize, which resets defaults then reloads records through scrLoadSave.
@@ -60,6 +61,7 @@ struct RunSession {
     // soundInitialize writes entries 0..10 to zero. Room changes do not
     // reinitialize them; scrInitialize/new-run reset does.
     int overlapSounds[11]{};
+    TimeFieldWind fieldWind; // global.voidWind survives ordinary room changes.
     template<class Audio> bool playSkeletonSound(SoundPlayState& caller,int sound,
         SoundPlayEnvironment& environment,Audio& audio){
         if(!effectsSucceeded)return false;
@@ -699,6 +701,7 @@ struct RunSession {
     }
     void reset(const RunRecords& saved = {}) {
         for(auto& sound:overlapSounds)sound=0;
+        fieldWind={};
         gems = {};
         gems.lifetime = saved.lifetimeGems;
         gems.record = saved.bestRunGems;

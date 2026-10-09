@@ -2012,6 +2012,18 @@ public:
     }
     template<class Audio> bool dispatchTimeFieldWind(const RunnerCollisionEventContext::Frame& event,
         TimeFieldWind& wind,int& channel,MotionBinary64 volume,Audio& audio){
+        return dispatchTimeFieldWindContact(event,[&](InstanceHandle local){
+            return world_->contactGoalFieldWind(local,wind,channel,volume,audio);
+        });
+    }
+    template<class Audio> bool dispatchTimeFieldWind(const RunnerCollisionEventContext::Frame& event,
+        MotionBinary64 volume,Audio& audio){
+        return dispatchTimeFieldWindContact(event,[&](InstanceHandle local){
+            return world_->contactGoalFieldWind(local,volume,audio);
+        });
+    }
+private:
+    template<class Contact> bool dispatchTimeFieldWindContact(const RunnerCollisionEventContext::Frame& event,Contact contact){
         View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;
         if(!valid()||!world_||!resolves(event.self)||!resolves(event.other)||
            !View::decode(event.self,kind,local)||kind!=View::Kind::goalField||
@@ -2019,8 +2031,9 @@ public:
            !objects_.collisionEvent(objectOf(event.self),event.subtype,found,binding)||!found||
            binding.ownerObjectId!=255||event.owner!=binding.ownerObjectId||event.code!=binding.codeId)
             return check(false);
-        return check(world_->contactGoalFieldWind(local,wind,channel,volume,audio));
+        return check(contact(local));
     }
+public:
     // Exact other.xsp/ysp belong to the selected projectile lifetime. The
     // default binding reads retained source motion; legacy/uninitialized shots
     // fail rather than supplying a conversion of the Q20/Q32 trajectory.

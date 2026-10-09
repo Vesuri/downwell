@@ -216,6 +216,10 @@ bool nativeFieldWind(downwell::GameplayCollisionOwner& owner,const downwell::Run
     downwell::TimeFieldWind& wind,int& channel,NativeCurrencyAudioProbe& audio){
     return owner.dispatchTimeFieldWind(event,wind,channel,downwell::MotionBinary64::fromInteger(1),audio);
 }
+bool nativeSessionFieldWind(downwell::GameplayCollisionOwner& owner,const downwell::RunnerCollisionEventContext::Frame& event,
+    NativeCurrencyAudioProbe& audio){
+    return owner.dispatchTimeFieldWind(event,downwell::MotionBinary64::fromInteger(1),audio);
+}
 bool nativePlayerControllerBirth(downwell::GameplayCollisionOwner& owner,unsigned source,
     downwell::RunnerImageValue x,downwell::RunnerImageValue y,downwell::InstanceHandle& key){
     return owner.playerControllers().create(64,source,x,y,key);
@@ -1777,7 +1781,7 @@ int main(){
         // Create destroys this object, so it cannot exercise a later contact.
         auto& fields=const_cast<GameplayGoalFields&>(world->goalFieldInstances());
         assert(fields.create(240,192,371));
-        TimeFieldWind wind;int channel=-1;InstanceHandle player;
+        InstanceHandle player;
         assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::player,world->playerHandle(),player));
         SoundPlayState entrySound;
         for(unsigned i=0;i<2;++i){
@@ -1790,22 +1794,22 @@ int main(){
             RunnerCollisionEventContext::Frame event{field,player,4,35,binding.ownerObjectId,binding.codeId};
             auto oracle=world->randomState();const auto draws=world->randomDrawCount();
             audio.playing=false;const int sound=349+int(oracle.chooseIndexSmall(7));
-            assert(owner->dispatchTimeFieldWind(event,wind,channel,MotionBinary64::fromInteger(1),audio));
-            assert(record->windSound==sound&&channel==sound&&wind.voice==900&&world->randomDrawCount()==draws+1&&
-                record->sound.sfxIndex==sound&&record->sound.sndsnd==900&&record->sound.chanNum==8&&wind.soundState.sndsnd==-1);
+            assert(owner->dispatchTimeFieldWind(event,MotionBinary64::fromInteger(1),audio));
+            assert(record->windSound==sound&&world->overlapSound(8)==sound&&world->timeFieldWindVoice()==900&&world->randomDrawCount()==draws+1&&
+                record->sound.sfxIndex==sound&&record->sound.sndsnd==900&&record->sound.chanNum==8);
             if(!i)entrySound=record->sound;
             else {const auto& retained=world->goalFieldInstances().find(world->goalFieldInstances().handle(0))->sound;
                 assert(retained.sfxIndex==entrySound.sfxIndex&&retained.sndsnd==entrySound.sndsnd&&
                     retained.sndgain.high==entrySound.sndgain.high&&retained.sndgain.low==entrySound.sndgain.low);}
             const auto queries=audio.queries,plays=audio.plays;
-            assert(owner->dispatchTimeFieldWind(event,wind,channel,MotionBinary64::fromInteger(1),audio)&&
+            assert(owner->dispatchTimeFieldWind(event,MotionBinary64::fromInteger(1),audio)&&
                 world->randomDrawCount()==draws+1&&audio.queries==queries+1&&audio.plays==plays);
             if(i==1){
                 audio.fail=true;
-                assert(!owner->dispatchTimeFieldWind(event,wind,channel,MotionBinary64::fromInteger(1),audio)&&
+                assert(!owner->dispatchTimeFieldWind(event,MotionBinary64::fromInteger(1),audio)&&
                     !world->effectsSucceeded()&&!owner->valid()&&world->randomDrawCount()==draws+1);
                 const auto stoppedQueries=audio.queries;
-                assert(!owner->dispatchTimeFieldWind(event,wind,channel,MotionBinary64::fromInteger(1),audio)&&audio.queries==stoppedQueries);
+                assert(!owner->dispatchTimeFieldWind(event,MotionBinary64::fromInteger(1),audio)&&audio.queries==stoppedQueries);
             }
         }
     }

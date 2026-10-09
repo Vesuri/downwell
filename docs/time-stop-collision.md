@@ -77,17 +77,19 @@ caller state. The standalone overload retains a reference caller for isolated
 script tests; neither live dispatcher uses it.
 `StartupRuntime::dispatchTimeFieldWind` validates live self/other generations
 and the selected inherited binding before invoking it. `windsnd` is stored on
-the real instance and included in its digest once assigned; this adds four bytes
-per stored record (8 KiB at 2,048 slots). The voice/channel state is supplied by
-the caller and must survive field retirement/room transitions. Live tests cover
+the real instance and included in its digest once assigned. The default dispatch
+uses `RunSession::fieldWind` and the same `overlapSounds[8]` used by other UI
+sound scripts. Ordinary room changes retain them; new-run reset restores the
+wind voice to -1 and the channel to 0. Explicit state-provider overloads remain
+for reference tests. Live tests cover
 exit fields, the start-field descendant, shared playing/expired voices and stale
 event rejection. Neither normal scheduler installs it automatically yet, and
-both actual audio backends and persistent global ownership remain open.
+actual audio backend integration remains open.
 `GameplayCollisionOwner::dispatchTimeFieldWind` applies the same checked
 inherited-binding and generation checks to native goal-field lifetimes (255
 and 371). It uses the world's RNG and the selected record's `windSound`, not a
-family-wide last-sound value. Shared voice/channel storage still belongs to the
-session service. Audio failure latches both world and collision-owner failure;
+family-wide last-sound value. Its default overload likewise uses the owning
+run's wind voice and UI channel. Audio failure latches both world and collision-owner failure;
 subsequent dispatch cannot repeat the partially executed sequence. This handler
 is an ordered-collision callback, not a separate family contact sweep.
 

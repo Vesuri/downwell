@@ -1716,6 +1716,12 @@ public:
     }
     // Shared voice/channel state outlives room-local fields. Audio is checked
     // and synchronous; event selection must retain the inherited binding.
+    int timeFieldWindVoice()const{return run_.fieldWind.voice;}
+    template<class Audio> bool dispatchTimeFieldWind(const RunnerCollisionEventContext::Frame& event,
+        MotionBinary64 volume,Audio& audio){
+        return dispatchTimeFieldWind(event,run_.fieldWind,run_.overlapSounds[8],volume,audio);
+    }
+    // Explicit state provider retained for script/reference fixtures.
     template<class Audio> bool dispatchTimeFieldWind(const RunnerCollisionEventContext::Frame& event,
         TimeFieldWind& wind,int& uiChannel,MotionBinary64 volume,Audio& audio){
         if(!run_.effectsSucceeded)return false;
