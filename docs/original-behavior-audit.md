@@ -72,9 +72,8 @@ traversal at their compatibility creation depth (-100000), not the OBJT depth
 (0). Both worlds expose an unconditional surface traversal that preserves title
 and entry-cover depth order separately from conditional drawFx particles. The
 compositor dispatches that pass during death/low-spec rendering, but not when
-the effect surface is absent. The live glyph binding is not yet installed: the Amiga direct
-actor list explicitly rejects titles rather than treating their local handle as
-a script effect. Both backend surface paths reject an unbound live title.
+the effect surface is absent. Both backend surface paths reject an unbound live
+title instead of mistaking its family-local handle for another effect.
 `Game::renderMain` now paints bound titles through the shared surface adapter:
 `withLevelNumberText` borrows the glyph bank and current text state for an
 enclosing render, independently of the stored actor-registration binding. It
@@ -83,6 +82,14 @@ surface-local glyph coordinates. The actual Game render test compares published
 surface words to a per-pixel bordered-glyph reference, checks Draw-only letter
 movement/final color, then verifies scope exit rejects further unbound drawing.
 This explicitly supplied state is not automatic admission of natural callers.
+The native draw list likewise borrows a glyph bank/current text state, collects
+no title BOB and does not advance text during collection. The unconditional
+production surface callback invokes its shared title adapter. Currency hardware
+promotion declines while any registered title exists, preserving later title
+occlusion of earlier gems. Tests cover reference/native/native-scenery owners,
+including death-mode composition and a complete per-pixel border/glyph check.
+The native scene must still supply live text state before natural admission;
+this binding does not initialize that state or allocate source IDs.
 Natural source-ID allocation, localized text, active-font measurement and
 surface-text Draw dispatch remain unconnected; explicit test births do not
 admit the natural level-begin/death caller.

@@ -538,6 +538,7 @@ build/level-number-test: tests/core/LevelNumberTest.cpp src/core/FontPack.cpp ge
 	@mkdir -p build
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ $< src/core/FontPack.cpp
 $(GAME_RENDER_TEST_TARGET): generated/downwell-title-glyphs.h
+build/amiga-gameplay-draw-list-test build/amiga-gameplay-draw-list-replay-test: generated/downwell-title-glyphs.h
 .PHONY: verify-enemy-death-worlds
 test: verify-run-controller-instances
 .PHONY: verify-run-controller-instances

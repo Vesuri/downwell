@@ -4,6 +4,7 @@
 #include "core/GameplayWorld.h"
 #include "core/EntryDitherPlacement.h"
 #include "core/EffectMaskAssets.h"
+#include "core/LevelNumberSurfaceDraw.h"
 class AmigaGameplayDrawList {
 public:
     static constexpr unsigned capacity = 4 + 32 + 32 + 32 + 32 + 32 + 8 + GameplayWorld::bulletCapacity +
@@ -17,6 +18,27 @@ public:
     bool rayVisible = false;
     bool entryCoverVisible = false;
     downwell::EntryDitherPlacement entryCover{};
+    // Borrow current text state and offline masks for the enclosing scene.
+    // No implicit font/alignment/alpha defaults; clear before their owner dies.
+    bool bindLevelNumberText(const downwell::FontGlyphMasks* glyphs,downwell::LevelNumberTextDrawState* state){
+        if(bool(glyphs)!=bool(state))return false;
+        titleGlyphs_=glyphs;titleText_=state;return true;
+    }
+    template<class Emit> bool drawLevelNumber(const GameplayWorld& world,downwell::InstanceHandle key,
+        const downwell::EffectSurfacePlacement::View& view,Emit& emit)const{
+        if(!titleGlyphs_||!titleText_)return false;
+        struct Target {
+            const downwell::EffectSurfacePlacement::View& camera;
+            bool exists(bool& present){present=true;return true;}
+            bool begin(){return true;}bool end(){return true;}
+            bool view(unsigned axis,downwell::MotionBinary64& value){
+                if(axis>1)return false;
+                value=axis?camera.y:camera.x;return true;
+            }
+        } target{view};
+        downwell::LevelNumberSurfaceDraw<Target,Emit> draw(*titleGlyphs_,*titleText_,target,emit);
+        return world.drawLevelNumber(key,draw);
+    }
     // Read-only projection of shared simulation into original painter order.
     // No simulation stepping, asset conversion or framebuffer writes.
     bool collect(const GameplayWorld& world, const UBYTE* pack,
@@ -36,6 +58,8 @@ public:
     bool promoteCurrencyComplete(const GameplayWorld& world,int viewX,int viewY,
         const downwell::EffectMaskAssets& assets,const AmigaActorFrames& frames);
 private:
+    const downwell::FontGlyphMasks* titleGlyphs_=nullptr;
+    downwell::LevelNumberTextDrawState* titleText_=nullptr;
     // Admission workspace, never published until the source-ordered pass
     // succeeds. Keep the full family off the small AmigaDOS stack. This also
     // avoids the m68k toolchain's incorrect word-member stack displacement

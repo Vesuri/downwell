@@ -39,6 +39,7 @@ bool AmigaGameplayDrawList::promoteCurrencyComplete(const GameplayWorld& world,i
     if(world.registeredSmoke()&&world.registeredSmoke()->size())other=true;
     if(world.registeredCorpses()&&world.registeredCorpses()->size())other=true;
     if(world.timeShardInstances()&&world.timeShardInstances()->size())other=true;
+    if(world.levelNumbers()&&world.levelNumbers()->size())other=true;
     if(other)return false;
     if(!world.visitDebrisDraw([&](const auto&){other=true;return true;})||other)return false;
     const Placement::PixelView view{viewX,viewY,160,284};
@@ -102,6 +103,7 @@ bool AmigaGameplayDrawList::promoteCurrency(const GameplayWorld& world,int viewX
     if(world.registeredSmoke()&&world.registeredSmoke()->size())other=true;
     if(world.registeredCorpses()&&world.registeredCorpses()->size())other=true;
     if(world.timeShardInstances()&&world.timeShardInstances()->size())other=true;
+    if(world.levelNumbers()&&world.levelNumbers()->size())other=true;
     if(other||!world.visitDebrisDraw([&](const auto&){other=true;return true;})||other)return false;
     const Placement::PixelView view{viewX,viewY,160,284};
 #if defined(DOWNWELL_REFERENCE_CURRENCY_BOBS) || defined(DOWNWELL_REFERENCE_SHADE_PARTITION)
@@ -463,9 +465,9 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
                    !x.roundPixel(px)||!y.roundPixel(py))return false;
                 return append(effect.spriteId,effect.drawFrame(),downwellPlayfieldX+px,py,0);
             }
-            // Title Draw is surface-only and mutable. Until its glyph/surface
-            // binding is supplied, do not mistake its local key for an effect.
-            if(kind==GameplayWorld::DrawActor::levelNumber)return false;
+            // Mutable title Draw belongs to the unconditional surface pass,
+            // never to BOB collection. Missing bindings must still fail.
+            if(kind==GameplayWorld::DrawActor::levelNumber)return titleGlyphs_&&titleText_;
             if(kind==GameplayWorld::DrawActor::corpse){
                 if(compositeCurrency)return true;
                 const auto* r=port.registeredCorpses()?port.registeredCorpses()->find(key):nullptr;

@@ -4,6 +4,7 @@
 #include "core/GameplayCollisionOwner.h"
 #include "core/CurrencySmokeComposition.h"
 #include "core/TimeShardDraw.h"
+#include "../../../generated/downwell-title-glyphs.h"
 #include <fstream>
 #include <iterator>
 #include <memory>
@@ -34,6 +35,47 @@ int main() {
                 owner->playerBinding(),native?nullptr:&owner->terrain(),&rooms);
             auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
             assert(owner->attach(*world)&&(!native||world->bindNativeTerrain(*terrain))&&owner->configureCorpseMasks(masks));
+            {
+                auto list=std::make_unique<AmigaGameplayDrawList>();UBYTE pack[8]{};
+                downwell::InstanceHandle title;
+                assert(owner->levelNumbers().create(105190,{}, {},[](auto,auto& state){
+                    return state.create(1,downwell::MotionBinary64::fromInteger(8),[](unsigned,unsigned& token){token='A';return true;});
+                },title));
+                assert(!list->collect(*world,pack,pack+sizeof(pack),0,0,true));
+                downwell::LevelNumberTextDrawState text{2,0,0,123,downwell::MotionBinary64::fromInteger(1)};
+                assert(list->bindLevelNumberText(&downwell::title_glyphs::bank,&text));
+                assert(list->collect(*world,pack,pack+sizeof(pack),0,0,true));
+                assert(owner->levelNumbers().find(title)->state.characters[1].offset==-2); // Collection is read-only.
+                auto surface=std::make_unique<downwell::CurrencySmokeComposition>();downwell::EffectMaskAssets art;
+                using Real=downwell::MotionBinary64;
+                const downwell::EffectSurfacePlacement::View camera{Real::fromInteger(1234),Real::fromInteger(5678),Real::fromInteger(160),Real::fromInteger(284)};
+                downwell::CurrencySmokeComposition::Settings settings;settings.death=true;
+                assert(surface->prepareWithSurfaceProducers([](auto){},world->smokeEffects(),art,camera,settings,
+                    [](auto){assert(false);return false;},[&](auto emit){
+                        return world->visitUnconditionalSurfaceDraw([&](auto kind,auto key,auto){
+                            return kind==GameplayWorld::DrawActor::levelNumber&&list->drawLevelNumber(*world,key,camera,emit);
+                        });
+                    },[](auto){},[](Real n,std::int32_t& out){return n.roundPixel(out);}));
+                assert(surface->visible()&&text.color==0xffffff&&owner->levelNumbers().find(title)->state.characters[1].offset==-1);
+                unsigned black=0,white=0;
+                std::vector<unsigned char> pixels(160*284),expected(160*284);
+                surface->surface().visit([&](unsigned x,unsigned y,std::uint16_t alpha,std::uint16_t lo,std::uint16_t hi){
+                    assert(x>=64&&x<96&&y>=81&&y<96);black+=(alpha&lo&hi)!=0;white+=(alpha&lo&~hi)!=0;
+                    for(unsigned bit=0;bit<16;++bit)if(alpha&(0x8000>>bit))
+                        pixels[y*160+x+bit]=((lo>>(15-bit))&1)|(((hi>>(15-bit))&1)<<1);
+                });
+                assert(black&&white);
+                const int dx[]={1,-1,0,0,0},dy[]={0,0,1,-1,0};
+                for(unsigned pass=0;pass<5;++pass){
+                    downwell::EffectMaskAssets::Asset glyph;bool ink;
+                    assert(downwell::title_glyphs::bank.resolve(2,'A',pass==4?0xffffff:0,glyph,ink)&&ink);
+                    for(unsigned y=0;y<glyph.mask.height;++y)for(unsigned x=0;x<glyph.mask.width;++x)
+                        if(glyph.mask.data[y*glyph.mask.stride+x/8]&(0x80>>(x%8)))
+                            expected[(82+dy[pass]+y)*160+76+dx[pass]-glyph.originX+x]=pass==4?1:3;
+                }
+                assert(pixels==expected);
+                assert(list->bindLevelNumberText(nullptr,nullptr)&&owner->levelNumbers().clear());
+            }
             auto& corpses=owner->registeredCorpses();downwell::GameMakerRandom random(2);
             const downwell::MotionBinary64 x{0x406f0800u,0},y{0x40601000u,0};
             downwell::DeadBodySource source{x,y,{},downwell::MotionBinary64::fromInteger(-1)};

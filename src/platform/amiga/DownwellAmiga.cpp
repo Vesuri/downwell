@@ -3886,10 +3886,9 @@ __attribute__((noinline)) static int runDownwell(void) {
                     // The collected singleton cover needs no second room walk
                     // unless a title participates in this surface pass.
                     if(!port.levelNumbers()||!port.levelNumbers()->size())return drawCover();
-                    return port.visitUnconditionalSurfaceDraw([&](auto kind,auto,auto){
-                        // Until the glyph binding is supplied, fail explicitly
-                        // instead of skipping title Draw and its animation.
-                        if(kind==GameplayWorld::DrawActor::levelNumber)return false;
+                    return port.visitUnconditionalSurfaceDraw([&](auto kind,auto key,auto){
+                        if(kind==GameplayWorld::DrawActor::levelNumber)
+                            return actorList.drawLevelNumber(port,key,effectView,emit);
                         return drawCover();
                     });
                 },[&](auto emit){
