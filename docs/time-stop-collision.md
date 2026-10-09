@@ -275,6 +275,24 @@ of the complete original game's creation stream or phase ordering.
 
 ## Shard registration contract
 
+`GameplayTimeShardRegistration` is the fixed-address native record adapter for
+`TimeShardEffects::bindPhases`. Its owner must provide resource-backed births
+with real numeric IDs, image/position publication, animation membership,
+population queries, solid-mask queries, destruction marks and retirement. The
+adapter retains marked records until the enclosing room cleanup selects them;
+an event's final position writes still publish after its destruction mark.
+The room scheduler decrements authoritative alarms before dispatch, and all
+sibling counters are imported so effect publication cannot undo their countdown.
+Local generations survive slot reuse independently of source IDs. Failed owner
+callbacks retain the completed prefix and prevent later work/reuse.
+
+`verify-gameplay-time-shard-registration` checks this adapter against the shared
+effect implementation. The Amiga `verify-time-shard-registration-compile` target
+instantiates the same operations under the real 68000 type/ABI definitions;
+its assertions retain their expressions despite the freestanding compatibility
+header. This is a compile check, not a target runtime test or evidence that the
+adapter is already attached to the native collision owner and normal scheduler.
+
 The explicit registered-player-contact boundary uses the world's RNG and
 publishes the changed alarm-2 cooldown immediately. It checks event eligibility
 before consuming random words; inactive or `noTouch`-guarded contacts do no work.

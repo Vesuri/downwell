@@ -941,6 +941,15 @@ build/gameplay-time-change-registration-test: tests/core/GameplayTimeChangeRegis
 	@mkdir -p build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ tests/core/GameplayTimeChangeRegistrationTest.cpp
 
+test: verify-gameplay-time-shard-registration
+.PHONY: verify-gameplay-time-shard-registration
+verify-gameplay-time-shard-registration: build/gameplay-time-shard-registration-test
+	./build/gameplay-time-shard-registration-test
+
+build/gameplay-time-shard-registration-test: tests/core/GameplayTimeShardRegistrationTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/GameplayTimeShardRegistrationTest.cpp src/core/GameMakerRandom.cpp
+
 verify-time-change-effects: build/time-change-effects-test
 	./build/time-change-effects-test
 

@@ -1022,6 +1022,11 @@ verify-blood-compile:
 	@mkdir -p obj
 	$(CC) $(CPPFLAGS) -c -o obj/BloodInstancesCompile.o $(REPO)/tests/core/BloodInstancesCompile.cpp
 
+.PHONY: verify-time-shard-registration-compile
+verify-time-shard-registration-compile:
+	@mkdir -p obj
+	$(CC) $(CPPFLAGS) -DDOWNWELL_NATIVE_QUERY_PROBE -c -o obj/TimeShardRegistrationCompile.o $(REPO)/tests/core/GameplayTimeShardRegistrationTest.cpp
+
 # Keep .run: it owns the live FS-UAE pid used by run.sh to replace the
 # previous project emulator safely.  Removing it leaves a stale window.
 clean:
