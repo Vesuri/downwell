@@ -78,6 +78,10 @@ bool nativeLimboContact(downwell::GameplayCollisionOwner& owner,
     const downwell::RunnerCollisionEventContext::Frame& event,NativeBulletVelocity read){
     return owner.dispatchLimboShardBulletCollision(event,read);
 }
+bool nativeOwnedLimboContact(downwell::GameplayCollisionOwner& owner,
+    const downwell::RunnerCollisionEventContext::Frame& event){
+    return owner.dispatchLimboShardBulletCollision(event);
+}
 bool nativeBoneTarget(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle target,
     downwell::MotionBinary64 health){
     downwell::MotionBinary64 read;bool effect;
@@ -3029,6 +3033,22 @@ int main(){
             assert(calls==tick+1&&initializations==1&&world->resolveBulletLifetime(shot)->sourceOwned&&
                 !world->resolveBulletLifetime(shot)->trajectory.initialized);
         }
+        const auto& motion=world->resolveBulletLifetime(shot)->sourceMotion;
+        InstanceHandle shard,sharedShard,sharedShot;MotionBinary64 vx,vy;
+        assert(world->sourceBulletVelocity(shot,vx,vy)&&vx.high==motion.xsp.high&&vx.low==motion.xsp.low&&
+            vy.high==motion.ysp.high&&vy.low==motion.ysp.low);
+        assert(world->createLimboShardWithSourceId(605501,motion.x.promoted(),motion.y.promoted(),false,shard)&&
+            GameplayCollisionView::encode(GameplayCollisionView::Kind::limboShard,shard,sharedShard)&&
+            GameplayCollisionView::encode(GameplayCollisionView::Kind::bullet,shot,sharedShot));
+        RunnerCollisionEventContext contact;const auto contactDraws=world->randomDrawCount();
+        assert(owner->dispatchCollisionEvent(contact,sharedShard,sharedShot,{true,false},[&](const auto& event){
+            return owner->dispatchLimboShardBulletCollision(event);
+        }));
+        const auto* touched=owner->limboShards().find(shard);
+        assert(touched&&touched->state.noTouch&&touched->state.ysp.high==vy.high&&touched->state.ysp.low==vy.low&&
+            world->randomDrawCount()==contactDraws+1);
+        auto stale=shot;++stale.generation;
+        assert(!world->sourceBulletVelocity(stale,vx,vy)&&vy.high==motion.ysp.high&&vy.low==motion.ysp.low);
         const auto before=world->randomDrawCount();world->step(0);
         assert(!world->effectsSucceeded()&&world->randomDrawCount()==before); // Never silently resume the legacy path.
     }

@@ -871,6 +871,13 @@ public:
         const bool ok=tick();sourceBulletDispatch_=nullptr;sourceBulletContext_=nullptr;
         return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
     }
+    bool sourceBulletVelocity(downwell::InstanceHandle shot,downwell::MotionBinary64& x,downwell::MotionBinary64& y)const{
+        const auto* bullet=resolveBulletLifetime(shot);
+        if(!run_.effectsSucceeded||!bullet||!bullet->sourceOwned||!bullet->sourceMotion.initialized)return false;
+        const auto& motion=bullet->sourceMotion;
+        if(!motion.xsp.valid()||!motion.ysp.valid())return false;
+        x=motion.xsp;y=motion.ysp;return true;
+    }
     template<class Ops,class Frames>
     bool stepSourceBullet(downwell::InstanceHandle shot,downwell::MachineGunSourceMotion& motion,Ops& ops,Frames frames){
         const auto* caller=resolveBulletLifetime(shot);

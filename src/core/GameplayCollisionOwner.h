@@ -2021,9 +2021,16 @@ public:
             return check(false);
         return check(world_->contactGoalFieldWind(local,wind,channel,volume,audio));
     }
-    // Exact other.xsp/ysp belong to the selected projectile lifetime. Until
-    // the live source-motion owner is connected, an unavailable provider is
-    // a failure, never a conversion of the older Q20/Q32 trajectory.
+    // Exact other.xsp/ysp belong to the selected projectile lifetime. The
+    // default binding reads retained source motion; legacy/uninitialized shots
+    // fail rather than supplying a conversion of the Q20/Q32 trajectory.
+    bool dispatchLimboShardBulletCollision(const RunnerCollisionEventContext::Frame& event){
+        return dispatchLimboShardBulletCollision(event,[&](InstanceHandle shared,MotionBinary64& x,MotionBinary64& y){
+            View::Kind kind;InstanceHandle local;
+            return world_&&View::decode(shared,kind,local)&&kind==View::Kind::bullet&&
+                world_->sourceBulletVelocity(local,x,y);
+        });
+    }
     template<class ReadVelocity> bool dispatchLimboShardBulletCollision(
         const RunnerCollisionEventContext::Frame& event,ReadVelocity readVelocity){
         View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;

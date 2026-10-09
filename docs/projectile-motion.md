@@ -1228,6 +1228,16 @@ default. The scheduler fixtures deliberately supply an empty contact domain;
 they check phase admission, retained motion, initial RNG consumption and
 missing-binding failure, separately from explicit impact fixtures.
 
+Both worlds expose `sourceBulletVelocity` for generation-checked reads of the
+retained binary64 `xsp/ysp`. Legacy, uninitialized and stale lifetimes fail
+without altering output values. The default limbo-shard bullet-collision
+binding uses this reader; its existing supplied-provider overload remains for
+reference/failure tests. The collision still verifies the authored event and
+other identity before reading velocity, and inactive/noTouch shards skip it.
+Scheduled-shot fixtures dispatch this bound event and check exact vertical
+velocity and the one-word contact RNG consumption. They do not establish
+natural wall-shard birth admission or a complete mixed collision pass.
+
 Run `make verify-machine-gun-source-motion verify-smoke-direction
 verify-smoke-trig`. The source-motion test covers birth narrowing, raw RNG
 endpoints, ordinary/Laser Sight initialization, repeated coordinate writes,

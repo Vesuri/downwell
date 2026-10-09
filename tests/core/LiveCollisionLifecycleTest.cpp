@@ -2128,6 +2128,23 @@ int main(){
         }
         require(calls==3&&initializations==1&&world->mainBulletCount()==1&&world->mainBulletAt(0).sourceOwned&&
             !world->mainBulletAt(0).trajectory.initialized,"source motion survives frames without legacy advancement");
+        const auto& bullet=world->mainBulletAt(0);const auto& motion=bullet.sourceMotion;
+        MotionBinary64 vx,vy;require(world->sourceBulletVelocity(bullet.instance,vx,vy)&&
+            vx.high==motion.xsp.high&&vx.low==motion.xsp.low&&vy.high==motion.ysp.high&&vy.low==motion.ysp.low,
+            "source velocity reader resolves exact retained shot fields");
+        auto shards=world->limboShardRegistration<1>();InstanceHandle shard;
+        require(world->createRegisteredLimboShard(shards,motion.x.promoted(),motion.y.promoted(),false,shard),
+            "create shard beside scheduled source bullet");
+        RunnerCollisionEventContext contact;const auto contactDraws=world->randomDrawCount();
+        require(owner->dispatchCollisionEvent(contact,shard,bullet.instance,{true,false},[&](const auto& event){
+            return world->dispatchLimboShardBulletCollision(shards,event);
+        }),"bound shard collision reads retained source bullet, without external velocity provider");
+        require(shards.state(shard)->noTouch&&shards.state(shard)->ysp.high==vy.high&&shards.state(shard)->ysp.low==vy.low&&
+            world->randomDrawCount()==contactDraws+1,"source ysp passes unchanged into shard contact");
+        auto stale=bullet.instance;++stale.generation;
+        require(!world->sourceBulletVelocity(stale,vx,vy)&&vy.high==motion.ysp.high&&vy.low==motion.ysp.low,
+            "stale velocity lookup preserves caller outputs");
+        require(shards.clear(),"retire source-contact shard");
         const auto before=world->randomDrawCount();world->step({},false);
         require(!world->effectsSucceeded()&&world->randomDrawCount()==before,"missing source dispatch fails before any tick mutation");
     }

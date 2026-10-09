@@ -1270,6 +1270,16 @@ public:
         const bool ok=tick();sourceBulletDispatch_=nullptr;sourceBulletContext_=nullptr;
         return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
     }
+    bool sourceBulletVelocity(InstanceHandle shot,MotionBinary64& x,MotionBinary64& y)const{
+        if(!run_.effectsSucceeded||!instances_.resolve(shot))return false;
+        for(std::size_t i=0;i<mainBulletCount_;++i){const auto& bullet=mainBullets_[i];
+            if(bullet.instance.slot!=shot.slot||bullet.instance.generation!=shot.generation)continue;
+            const auto& motion=bullet.sourceMotion;
+            if(!bullet.sourceOwned||!motion.initialized||!motion.xsp.valid()||!motion.ysp.valid())return false;
+            x=motion.xsp;y=motion.ysp;return true;
+        }
+        return false;
+    }
     template<class Ops,class Frames>
     bool stepSourceBullet(InstanceHandle shot,MachineGunSourceMotion& motion,Ops& ops,Frames frames){
         if(!run_.effectsSucceeded||!instances_.resolve(shot))return run_.effectsSucceeded=false;
@@ -1490,8 +1500,15 @@ public:
         return run_.effectsSucceeded;
     }
     // The selected bullet's private VM fields are not its engine hspeed/vspeed
-    // or a difference between rounded positions. The caller must supply the
-    // source-motion owner for this exact lifetime; no trajectory fallback.
+    // or a difference between rounded positions. The default binding reads
+    // retained source motion for this exact lifetime; no trajectory fallback.
+    template<unsigned Capacity> bool dispatchLimboShardBulletCollision(
+        StoredLimboShardRegistration<instanceCapacity,Capacity>& shards,
+        const RunnerCollisionEventContext::Frame& event){
+        return dispatchLimboShardBulletCollision(shards,event,[&](InstanceHandle shot,MotionBinary64& x,MotionBinary64& y){
+            return sourceBulletVelocity(shot,x,y);
+        });
+    }
     template<unsigned Capacity,class ReadVelocity> bool dispatchLimboShardBulletCollision(
         StoredLimboShardRegistration<instanceCapacity,Capacity>& shards,
         const RunnerCollisionEventContext::Frame& event,ReadVelocity readVelocity){
