@@ -181,6 +181,19 @@ It is not a cached handle or a WITH loop. The explicit-event-state overloads
 remain the reference path. Both world tests deliberately supply a conflicting
 external immunity value, verify that the real global wins, and verify that a
 second guarded contact neither selects the player nor repeats effects.
+The registered binding also performs health subtraction and damage-number
+creation through the world. Health uses the admitted integral representation:
+binary64 subtraction must have an exact integral result; fractional/out-of-range
+results fail rather than round, and negative health is not clamped. Skeleton
+and bone contacts use damage one. Number creation reads the portable player's
+captured movement globals in absolute room coordinates, not the attacker's
+position or the current rounded player sprite. The existing number owner
+subtracts four from Y before narrowing the birth position. Both world tests
+stop at a deliberately failed subsequent sound call and check that HP and the
+number birth survive while the later damaged-flag write has not happened.
+This still requires the production sound/controller/jump/effect dependencies;
+the existing portable player coordinates are not a substitute for the remaining
+source-precision motion migration.
 Alarm 1 VM SHA256:
 `e1dcdae86d6152a96607b2d8429582255d012ef2e742490fcd2ed8fcf9bf7d13`.
 

@@ -2011,6 +2011,17 @@ public:
     const AmmoGaugeRows& mainAmmoGauge() const { return run_.ammoGauge; }
     int mainAmmoCapacity() const { return mainPlayerMotion_.ammoCapacity(); }
     int mainPlayerHealth() const { return mainPlayerHealth_; }
+    bool subtractPlayerHealth(MotionBinary64 amount){
+        if(!run_.effectsSucceeded)return false;
+        return run_.effectsSucceeded=downwell::subtractPlayerHealth(mainPlayerHealth_,amount);
+    }
+    bool emitPlayerDamageNumber(MotionBinary64 amount,MotionBinary64 direction){
+        if(!run_.effectsSucceeded)return false;
+        MotionBinary64 x,y;
+        if(!mainPlayerInitialized_||!ContactCoordinates::playerGlobals(mainPlayerMotion_.frameStartXFixed(),
+            mainPlayerMotion_.frameStartYFixed(),mainPlayerOriginX_,mainPlayerOriginY_,x,y))return run_.effectsSucceeded=false;
+        return run_.createDamageNumber(x,y,amount,direction)!=0;
+    }
     const PlayerDeathSequence& mainDeathSequence() const { return mainDeath_; }
     const RunGemStatistics& runGemStatistics() const { return run_.gems; }
     std::uint32_t runTimeTicks() const { return run_.clock.ticks; }

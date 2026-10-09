@@ -11,6 +11,8 @@ bool nativeBoundDamage(GameplayWorld& world,downwell::ContactDamageScripts& call
     // Ensure the native state binding resolves the selected lifetime without
     // introducing a second alarm counter or a copied caller state.
     auto bound=downwell::bindContactDamagePlayer(caller,world,select);
+    const auto one=MotionBinary64::fromInteger(1);
+    if(!bound.state.subtractHealth(one)||!bound.state.damageNumber(one,{}))return false;
     bound.state.setPlayerDamaged();return bound.state.setPlayerAlarm(1,90);
 }
 bool nativeDamageDuck(GameplayWorld& world,downwell::ContactDamageScripts& caller,DuckAudio& audio){

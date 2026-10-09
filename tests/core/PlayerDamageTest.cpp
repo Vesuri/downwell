@@ -1,5 +1,6 @@
 #include "core/RunSession.h"
 #include "core/RunControllerInstances.h"
+#include "core/PlayerLifeRules.h"
 #include <cassert>
 #include <cstdio>
 #include <vector>
@@ -64,6 +65,11 @@ struct DamageControllerOwner {
     bool membership(InstanceHandle,const RunControllerInstances<2>::Record&,bool){return true;}
 };
 int main(){
+    int health=4;
+    assert(subtractPlayerHealth(health,n(1))&&health==3);
+    assert(subtractPlayerHealth(health,n(4))&&health==-1); // No clamp at zero.
+    assert(!subtractPlayerHealth(health,{0x3fe00000u,0})&&health==-1); // No fractional rounding.
+    assert(subtractPlayerHealth(health,n(-2))&&health==1);
     for(bool inactive:{false,true}){
         DamageControllerOwner binding;
         RunControllerInstances<2> owner(RunControllerInstances<2>::Binding::bindPositionedLifetime(binding));

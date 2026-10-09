@@ -1864,6 +1864,17 @@ public:
     unsigned gemStreak() const { return currencyAccount_.streak; }
     unsigned gemStreakTimer() const { return currencyAccount_.timer; }
     int health() const { return health_; }
+    bool subtractPlayerHealth(downwell::MotionBinary64 amount){
+        if(!run_.effectsSucceeded)return false;
+        return run_.effectsSucceeded=downwell::subtractPlayerHealth(health_,amount);
+    }
+    bool emitPlayerDamageNumber(downwell::MotionBinary64 amount,downwell::MotionBinary64 direction){
+        if(!run_.effectsSucceeded)return false;
+        downwell::MotionBinary64 x,y;
+        if(!playerInstance_.lifetimeId||!downwell::ContactCoordinates::playerGlobals(player_.frameStartXFixed(),
+            player_.frameStartYFixed(),240,176,x,y))return run_.effectsSucceeded=false;
+        return run_.createDamageNumber(x,y,amount,direction)!=0;
+    }
     unsigned ammoHudOffset() const { return run_.ammoHud.offset; }
     unsigned ammoMeterOffset() const { return run_.ammoHud.meterOffset; }
     const downwell::AmmoGaugeRows& ammoGauge() const { return run_.ammoGauge; }

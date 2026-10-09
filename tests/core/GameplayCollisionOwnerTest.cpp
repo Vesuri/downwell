@@ -1738,6 +1738,11 @@ int main(){
         assert((events==std::vector<PlayerTimeStop::Effect>{PlayerTimeStop::Effect::change,
             PlayerTimeStop::Effect::resumeMusic,PlayerTimeStop::Effect::stopWind,
             PlayerTimeStop::Effect::exitSound,PlayerTimeStop::Effect::duckMusic}));
+        DamageSoundFailureEvents failedSound;const int health=world->health();
+        const auto numbers=world->damageNumbers().size();
+        assert(!world->typicalPlayerDamage(damageBinding,one,one,one,failedSound,noBirth)&&!world->effectsSucceeded());
+        assert(world->health()==health-1&&world->damageNumbers().size()==numbers+1&&
+            failedSound.soundCalls==1&&!world->playerDamaged());
     }
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
                    GameplayCollisionOwner::Ownership::nativeScenery})for(unsigned reject:{0u,1u,2u,3u}){

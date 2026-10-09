@@ -1861,6 +1861,13 @@ int main(){
             require(world->effectsSucceeded()&&world->playerDamaged()==(alarm<=0||tick<alarm),
                 "only a positive-to-zero source alarm clears the shared damage flag");
         }
+        if(alarm>0){
+            DamageSoundFailureEvents effects;const int health=world->mainPlayerHealth();
+            const auto numbers=world->damageNumbers().size();
+            require(!world->typicalPlayerDamage(bound,one,one,one,effects)&&!world->effectsSucceeded()&&
+                world->mainPlayerHealth()==health-1&&world->damageNumbers().size()==numbers+1&&
+                effects.soundCalls==1&&!world->playerDamaged(),"real health/number writes survive later sound failure");
+        }
     }
     for(unsigned mode:{4u,5u}){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);

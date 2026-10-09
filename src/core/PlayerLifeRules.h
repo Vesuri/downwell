@@ -1,7 +1,20 @@
 #ifndef DOWNWELL_CORE_PLAYER_LIFE_RULES_H
 #define DOWNWELL_CORE_PLAYER_LIFE_RULES_H
 #include "Input.h"
+#include "MotionBinary64.h"
 namespace downwell {
+// The admitted player HP representation is integral. Preserve source binary64
+// subtraction, accepting only an exactly representable result (never round
+// fractional damage into a different health value).
+inline bool subtractPlayerHealth(int& health,MotionBinary64 amount){
+    if(!amount.valid())return false;
+    auto result=MotionBinary64::fromInteger(health);amount.high^=0x80000000u;
+    std::int32_t integer;
+    if(!result.add(amount)||!result.roundPixel(integer))return false;
+    const auto exact=MotionBinary64::fromInteger(integer);
+    if(!result.zero()&&(result.high!=exact.high||result.low!=exact.low))return false;
+    health=integer;return true;
+}
 // Contact response retains a depleted-health guard. Movement now receives its
 // death flag from PlayerDeathSequence's Begin Step publication; it uses this
 // input filter with that explicit state, not directly with collision-time HP.

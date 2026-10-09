@@ -10,6 +10,8 @@ template<class World,class SelectPlayer> struct RegisteredPlayerDamageState {
     World& world;SelectPlayer selectPlayer;
     bool playerDamaged()const{return world.playerDamaged();}
     void setPlayerDamaged(){world.setPlayerDamaged();}
+    bool subtractHealth(MotionBinary64 amount){return world.subtractPlayerHealth(amount);}
+    bool damageNumber(MotionBinary64 amount,MotionBinary64 direction){return world.emitPlayerDamageNumber(amount,direction);}
     bool setPlayerAlarm(unsigned index,int ticks){
         InstanceHandle player;
         return index==1&&selectPlayer(player)&&world.setPlayerDamageAlarm(player,ticks);
@@ -46,12 +48,12 @@ struct PlayerDamage {
         if(!events.setDamageSourceName())return false;
         hitInvulnerability=events.candleOwned()?240:90;
         if(!events.playerDead() && !state.playerDamaged()){
-            if(!events.subtractHealth(amount))return false;
+            if(!state.subtractHealth(amount))return false;
             const auto py=events.playerY(),px=events.playerX();
             const auto cy=events.callerY(),cx=events.callerX();
             MotionBinary64 direction;
             if(!events.pointDirection(cx,cy,px,py,direction) ||
-               !events.damageNumber(amount,direction) ||
+               !state.damageNumber(amount,direction) ||
                !events.sound(5,90,0,0) ||
                !events.duckMusic(500,MotionBinary64{0x3fe66666u,0x66666666u}))return false;
             events.setHit();

@@ -48,4 +48,14 @@ struct TimeoutDamageEvents {
     void clearNoDamage(){++clears;}
     void clearAreaNoDamage(){++clears;}
 };
+// Stop immediately after the real health/number prefix, before any fake audio
+// can conceal missing production services.
+struct DamageSoundFailureEvents:TimeoutDamageEvents {
+    unsigned soundCalls=0;
+    bool playerDead(){return false;}
+    bool sound(int id,int priority,bool loop,bool cut){
+        soundCalls+=(id==5&&priority==90&&!loop&&!cut)?1:1000;
+        return false;
+    }
+};
 #endif
