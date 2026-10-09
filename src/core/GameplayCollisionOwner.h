@@ -2461,6 +2461,10 @@ private:
 public:
     bool terrainNonPreciseLine(InstanceHandle self,int object,MotionBinary64 x1,MotionBinary64 y1,
         MotionBinary64 x2,MotionBinary64 y2,bool notMe,Owner::Result& result){
+        if(native_){
+            if(object!=60&&object!=93)return check(false);
+            return nativeTerrainLine(self,object,x1,y1,x2,y2,notMe,result);
+        }
         if(!terrainQuery(object))return check(false);
         return registeredNonPreciseLine(self,object,x1,y1,x2,y2,notMe,result);
     }
@@ -2474,6 +2478,35 @@ public:
         return registeredNonPreciseLine(self,object,x1,y1,x2,y2,notMe,result);
     }
 private:
+    bool nativeTerrainLine(InstanceHandle self,int object,MotionBinary64 x1,MotionBinary64 y1,
+        MotionBinary64 x2,MotionBinary64 y2,bool notMe,Owner::Result& result){
+        RunnerLineArguments args;RunnerSpatialObjectPreparation::Path path;
+        if(!valid()||(notMe&&!resolves(self))||!args.assign(x1,y1,x2,y2)||
+            !prepareNativeObjectQuery(object,path))return check(false);
+        RunnerLineTraversal::Result next;
+        const bool ok=RunnerLineTraversal::run(path,args,[&]{return flushNativeSpatial();},
+            [&](unsigned slot,bool indexed,bool& admitted){
+                const auto h=handleAt(slot);std::uint32_t flags;
+                if(!resolves(h)||!eligibilityFlags(h,flags))return false;
+                admitted=!(flags&0x100003u)&&!(notMe&&h.slot==self.slot&&h.generation==self.generation)&&
+                    (!indexed||families_.isA(objectOf(h),object));return true;
+            },[&](unsigned slot,const auto& line,bool& hit){
+                const auto h=handleAt(slot);Owner::State state;Owner::Sprite sprite;
+                if(!nativeCollisionVisual(h,state,sprite))return false;
+                if(state.flags&8u){
+                    if(!refreshNativeTerrain(h)||!nativeCollisionVisual(h,state,sprite))return false;
+                }
+                bool inside=false;
+                if(!RunnerLineBounds::test(line,state.bounds,true,(state.flags&0x100001u)!=0,inside))return false;
+                if(!inside){hit=false;return true;}
+                PackedSpriteCollision resource;
+                hit=sprites_.collisionSprite(sprite.spriteId,sprite.maskId,resource)&&resource.frameCount;return true;
+            },[&](const auto& line,auto visit){return owner_.externalSpatialPublication(
+                [&](auto& index){return index.queryLine(line,visit);});},
+            [&](auto visit){return nativeTerrainMembers(object,visit);},next);
+        if(!check(ok))return false;
+        result={next.found,next.found?handleAt(next.slot):InstanceHandle{}};return true;
+    }
     bool registeredNonPreciseLine(InstanceHandle self,int object,MotionBinary64 x1,MotionBinary64 y1,
         MotionBinary64 x2,MotionBinary64 y2,bool notMe,Owner::Result& result){
         RunnerLineArguments args;

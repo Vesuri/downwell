@@ -4104,6 +4104,50 @@ int main(){
         }));
         assert((objectsSeen==std::vector<int>{120,120,266}));
     }
+    {
+        std::vector<std::uint32_t> expected;
+        for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                      GameplayCollisionOwner::Ownership::nativeScenery}){
+            const bool native=mode!=GameplayCollisionOwner::Ownership::reference;
+            auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+                GameplayTerrainInstances::WallCollision{},&rooms,mode);
+            auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),owner->breakableBinding(),
+                owner->playerBinding(),native?nullptr:&owner->terrain(),&rooms);
+            auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();GameMakerRandom random;
+            assert(owner->attach(*world)&&(!native||world->bindNativeTerrain(*terrain)));
+            std::vector<std::uint32_t> actual;
+            const auto probe=[&](InstanceHandle self){
+                for(int object:{60,93})for(int dx:{-33,-8,0,8,33})for(int dy:{-17,0,17})
+                    for(bool reverse:{false,true})for(bool notMe:{false,true}){
+                        if(notMe&&!self.generation)continue;
+                        auto x1=MotionBinary64::fromInteger(240+dx),y1=MotionBinary64::fromInteger(160+dy);
+                        auto x2=MotionBinary64::fromInteger(240-dx),y2=MotionBinary64::fromInteger(160-dy);
+                        assert(x1.add({0x3fd00000u,0})&&y1.add({0x3fe00000u,0}));
+                        GameplayCollisionOwner::Owner::Result result;
+                        assert(owner->terrainNonPreciseLine(self,object,reverse?x2:x1,reverse?y2:y1,
+                            reverse?x1:x2,reverse?y1:y2,notMe,result));
+                        actual.insert(actual.end(),{unsigned(result.found),result.handle.slot,result.handle.generation});
+                        assert(owner->terrainNonPreciseLine(self,object,x1,y1,x1,y1,notMe,result));
+                        actual.insert(actual.end(),{unsigned(result.found),result.handle.slot,result.handle.generation});
+                    }
+            };
+            probe({});InstanceHandle first;
+            for(unsigned i=0;i<41;++i){
+                const int object=i==40?93:60,x=240+int(i%8)*16,y=160+int(i/8)*16;
+                InstanceHandle local;
+                if(native){assert(terrain->append(object,x,y));local=terrain->handle(i);assert(terrain->createProperties(local,51));}
+                else {assert(owner->terrain().append(object,x,y,true));local=owner->terrain().handle(i);
+                    assert(owner->terrain().createProperties(local,51,false,random));}
+                if(!i){assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,local,first));probe(first);}
+            }
+            probe(first);const InstanceHandle local{first.slot-GameplayCollisionView::terrainBase,first.generation};
+            assert(native?world->activateNativeTerrain(local,false):owner->terrain().activation(local,false));
+            assert(owner->reconcileActivation());probe(first);
+            assert(native?world->activateNativeTerrain(local,true):owner->terrain().activation(local,true));
+            assert(owner->reconcileActivation());probe(first);
+            if(!native)expected=actual;else assert(actual==expected);
+        }
+    }
     std::vector<bool> bloodContactReference;
     for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
                        GameplayCollisionOwner::Ownership::nativeScenery}){

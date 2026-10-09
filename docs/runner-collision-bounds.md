@@ -526,6 +526,20 @@ and original-mask checks. These checks do not execute wall End Step or establish
 the full Windows runtime FP environment. All/instance-ID selectors and wall
 scheduler integration remain separate work.
 
+## Native non-precise terrain lines
+
+Native `terrainNonPreciseLine` admits wall (60, including 99) and platform
+(93) selectors. It shares `RunnerLineTraversal` with the reference owner:
+family preparation selects list/tree traversal, only the tree path flushes
+pending bounds, and candidates retain source exclusion and not-me gates.
+The candidate refreshes dirty bounds before `RunnerLineBounds` and resource
+frame-count checks. The result is the first hit in source traversal order,
+not the closest geometric hit. Native tests compare selected generation
+handles for fractional/reversed/zero-length lines, sparse and dense terrain,
+deactivation and reactivation. This admission does not extend to projectile
+parents 59/83, precise line masks, all/instance selectors or incomplete solid
+families; it does not establish source-faithful live bullet motion.
+
 ## Cross-target mutation tape
 
 ### Native resource residency and lifetime publication

@@ -21,6 +21,7 @@
 #include "RunnerPointTraversal.h"
 #include "RunnerMaskPoint.h"
 #include "RunnerLineBounds.h"
+#include "RunnerLineTraversal.h"
 #include "RunnerSpriteChange.h"
 #include "RunnerSpriteSetters.h"
 #include "ObjectPack.h"
@@ -952,23 +953,18 @@ public:
                 auto edit=states_.edit(slot);auto& state=edit.get();return emit(slot,state.flags,state.bounds);
             });},[&](unsigned slot,auto&,auto&){return refreshBounds(handle(slot),false);},
             [&](Box box,unsigned slot){return index_.insert(box,slot);});
-        if(path==Prep::Path::failed)return checked(false);
-        if(path==Prep::Path::none){result={};return true;}
-        const bool indexed=path==Prep::Path::spatial;
-        if(indexed&&!checked(flush(refreshBounds)))return false;
-        Result next;bool good=true;
-        auto visit=[&](unsigned slot){
-            if(slot>=Capacity||lifetimes_.object(slot)<0){good=false;return false;}
+        RunnerLineTraversal::Result next;
+        const bool ok=RunnerLineTraversal::run(path,args,[&]{return flush(refreshBounds);},
+            [&](unsigned slot,bool indexed,bool& admitted){
+            if(slot>=Capacity||lifetimes_.object(slot)<0)return false;
             const auto h=handle(slot);
-            if((states_.flags(slot)&0x100003u)||(notMe&&h.slot==self.slot&&h.generation==self.generation)||
-               (indexed&&(states_.kind(slot)!=1||!isA(lifetimes_.object(slot),object))))return true;
-            bool hit=false;if(!candidate(h,args,hit)){good=false;return false;}
-            if(hit){next={true,h};return false;}return true;
-        };
-        if(indexed){if(!index_.queryLine(args,visit))good=false;}
-        else membership_.visit(object,isA,[&](unsigned slot,std::uint32_t){return visit(slot);});
-        if(!checked(good))return false;
-        result=next;return true;
+            admitted=!((states_.flags(slot)&0x100003u)||(notMe&&h.slot==self.slot&&h.generation==self.generation)||
+               (indexed&&(states_.kind(slot)!=1||!isA(lifetimes_.object(slot),object))));return true;
+        },[&](unsigned slot,const auto& line,bool& hit){return candidate(handle(slot),line,hit);},
+        [&](const auto& line,auto visit){return index_.queryLine(line,visit);},
+        [&](auto visit){membership_.visit(object,isA,[&](unsigned slot,std::uint32_t){return visit(slot);});return true;},next);
+        if(!checked(ok))return false;
+        result={next.found,next.found?handle(next.slot):InstanceHandle{}};return true;
     }
     // collision_point object-resource path, 0x4fd79c. This is deliberately NOT
     // point()/position_meeting: no family preparation, no index query and no
