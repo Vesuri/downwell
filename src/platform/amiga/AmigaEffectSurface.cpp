@@ -107,12 +107,13 @@ bool stamp(void* context,const Surface::Mask& m,const std::uint8_t* low,const st
 }
 }
 bool AmigaEffectSurface::bind(downwell::PaletteEffectSurface<>& surface,void* storage,
-    const unsigned char* stamps,unsigned stampBytes,const downwell::EffectMaskAssets& assets){
+    const unsigned char* stamps,unsigned stampBytes,const unsigned char* chipPayload,unsigned payloadBytes,
+    const downwell::EffectMaskAssets& assets){
     if(!storage||(reinterpret_cast<ULONG>(storage)&1)||reinterpret_cast<ULONG>(storage)>=0x200000UL)return false;
-    const ULONG stampAddress=reinterpret_cast<ULONG>(stamps);
-    if(!stamps||(stampAddress&1)||stampAddress>=0x200000UL||stampBytes>0x200000UL-stampAddress)return false;
+    const ULONG stampAddress=reinterpret_cast<ULONG>(chipPayload);
+    if(!chipPayload||(stampAddress&1)||stampAddress>=0x200000UL||payloadBytes>0x200000UL-stampAddress)return false;
     auto* data=static_cast<UBYTE*>(storage);
-    if(!stampBank.bind(stamps,stampBytes,assets))return false;
+    if(!stampBank.bindPayload(stamps,stampBytes,chipPayload,payloadBytes,assets))return false;
 #ifdef DOWNWELL_BOB_VERIFY
     reference=new(referenceStorage) Surface;
 #endif

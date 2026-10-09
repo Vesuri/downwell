@@ -6,6 +6,7 @@
 // Queries and producer coverage remain owned by PaletteEffectSurface.
 class AmigaEffectStampBank {
 public:
+    static constexpr unsigned payloadOffset=388;
     struct Entry {
         downwell::EffectMaskAssets::Asset original{};
         const unsigned char* pixels=nullptr;
@@ -20,8 +21,16 @@ private:
     static unsigned hash(const void* p){return (reinterpret_cast<unsigned long>(p)>>4)&63;}
 public:
     bool bind(const unsigned char* bank,unsigned bytes,const downwell::EffectMaskAssets& assets){
+        return bindPayload(bank,bytes,bank&&bytes>=payloadOffset?bank+payloadOffset:nullptr,
+            bytes>=payloadOffset?bytes-payloadOffset:0,assets);
+    }
+    // Metadata is CPU-only; the independently resident payload is the sole
+    // DMA source. Its offsets retain the on-disk coordinate system.
+    bool bindPayload(const unsigned char* bank,unsigned bytes,const unsigned char* payload,
+                     unsigned payloadBytes,const downwell::EffectMaskAssets& assets){
         ready_=false;for(auto& slot:slots_)slot=0;
-        if(!bank||bytes<388||bank[0]!='D'||bank[1]!='W'||bank[2]!='E'||bank[3]!='F'||
+        if(!bank||!payload||bytes<payloadOffset||payloadBytes!=bytes-payloadOffset||
+           bank[0]!='D'||bank[1]!='W'||bank[2]!='E'||bank[3]!='F'||
            word(bank+4)!=1||word(bank+6)!=17||dword(bank+8)!=20||dword(bank+12)!=388)return false;
         unsigned end=388;
         for(unsigned i=0;i<17;++i){
@@ -35,7 +44,7 @@ public:
                source->mask.width!=width||source->mask.height!=height||source->mask.stride!=stride)return false;
             const unsigned span=stride*height*3;
             if(pixels!=end||mask!=pixels+span||mask>bytes||span>bytes-mask)return false;
-            entries_[i]={*source,bank+pixels,bank+mask};end=mask+span;
+            entries_[i]={*source,payload+(pixels-payloadOffset),payload+(mask-payloadOffset)};end=mask+span;
             unsigned slot=hash(source->mask.data);
             while(slots_[slot])slot=(slot+1)&63;
             slots_[slot]=i+1;

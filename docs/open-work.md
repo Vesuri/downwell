@@ -484,12 +484,10 @@ Reference: [scene architecture](scene-architecture.md).
 - Measure Chip/Fast RAM, task stack, asset residency and peak transition usage.
   Establish the A500 memory requirement; expanded-emulator runs do not prove
   stock-machine fit.
-- Resolve the current 512 KiB Chip startup allocation failure (check 4), then
-  remeasure headroom before native encounter verification. The restored normal
-  build reports 502,584 bytes free, a 502,120-byte largest block and 125,914
-  resident gameplay asset bytes before display/asset allocation. Older free-RAM
-  figures are not evidence of current fit. Keep the 68000 CPU target; do not
-  silently increase the emulator's Chip RAM to make this check pass.
+- Budget further Chip residency against the measured 928-byte startup
+  headroom; remeasure after pack growth and through scene transitions.
+  Keep the 68000 CPU target; do not silently increase emulator Chip RAM
+  to make memory checks pass.
 - The gameplay, HUD, results, shop and clear packs and the cover masks are
   still linked into the executable, so ordinary memory holds them beside any
   Chip copy. Load them as per-scene files like the boot and front banks, one

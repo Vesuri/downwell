@@ -82,18 +82,22 @@ instead of the pair columns.
 | Two channel-seven sprite buffers | 272 |
 | Null sprite | 8 |
 | Shared splash/style cache | 66,704 |
-| Resident gameplay art pack (directory, planar art) | 115,326 |
+| Resident gameplay art pack (directory, planar art) | 125,914 |
 | Effect surface | 20,448 |
-| Offline interleaved smoke/gem stamps | 5,320 |
+| Offline interleaved smoke/gem stamps | 0 additional (4,932 in cache tail) |
 | Shared scene bank (boot or front art; gameplay terrain scratch and field images) | 146,818 |
-| **Total** | **496,386** |
+| **Total** | **501,654** |
 
-`make verify-amiga-memory` reports 6,192 bytes of Chip RAM remaining after
-these allocations.
-The interleaved stamps reuse no live scene storage. Before that bank, the
-same allocation set left 11,512 bytes free. The resident large-field arc
-images cost 56,376 of the scene
-bank's bytes; before they shipped, 67,888 bytes were free.
+A bounded first-gameplay-frame run on the 512 KiB Chip / 8 MiB Fast A500
+configuration reports 928 bytes of Chip RAM remaining after these allocations.
+The 388-byte effect-stamp header/directory stays in ordinary memory. Its 4,932
+DMA bytes occupy the retired selection cache at offset 61,440, immediately
+after the two 30,720-byte gameplay rings and within the 66,704-byte allocation.
+Startup fixtures initialize this payload; every gameplay entry reloads it
+after draining the blitter because intervening scenes can overwrite the cache.
+Neither the per-frame stamp lookup nor the pixel streams change. The resident
+large-field arc images cost 56,376 of the scene bank's bytes. Headroom must be
+remeasured when any pack or other Chip owner grows.
 
 ## Scene banks
 

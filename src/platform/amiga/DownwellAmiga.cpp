@@ -40,6 +40,7 @@ void downwellTerrainBatchMismatch();
 #include "AmigaGameplayDrawList.h"
 #include "AmigaGameplayEffects.h"
 #include "AmigaEffectSurface.h"
+#include "AmigaEffectStampBank.h"
 #include "core/CurrencySmokeComposition.h"
 #include "AmigaTerrainRaster.h"
 #include "AmigaWallDamage.h"
@@ -1879,7 +1880,16 @@ __attribute__((noinline)) static int runDownwell(void) {
     const ULONG gamePackBytes =
         amigaRendererChipPackBytes(amiga_game_pack, amiga_game_pack_end);
     const ULONG effectStampBytes=amiga_effect_stamps_end-amiga_effect_stamps;
-    const ULONG effectStampOffset=(gamePackBytes+AmigaEffectSurface::bytes+3)&~3UL;
+    const ULONG sceneBankOffset=(gamePackBytes+AmigaEffectSurface::bytes+3)&~3UL;
+    // The retired selection cache holds two game rings followed by DMA-only
+    // effect words. Other scenes may overwrite them; reload on gameplay entry.
+    constexpr unsigned effectStampCacheOffset=2*downwellGameRingBytes;
+    static_assert(sceneCacheBytes>=effectStampCacheOffset,"Gameplay rings exceed scene cache");
+    if(effectStampBytes<AmigaEffectStampBank::payloadOffset||
+       effectStampBytes-AmigaEffectStampBank::payloadOffset>sceneCacheBytes-effectStampCacheOffset){
+        platform.restore();FreeMem(startupCopperWords,4*sizeof(UWORD));return 20;
+    }
+    const unsigned effectPayloadBytes=effectStampBytes-AmigaEffectStampBank::payloadOffset;
     gDownwellStartupChipFree = AvailMem(MEMF_CHIP);
     gDownwellStartupChipLargest = AvailMem(MEMF_CHIP | MEMF_LARGEST);
     gDownwellStartupAssetBytes = gamePackBytes;
@@ -1890,7 +1900,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                          bulletSpriteBytes * bulletSpriteBufferCount,
                          enemySpriteBytes,
                          sceneCacheBytes,
-                         ((effectStampOffset+effectStampBytes+3)&~3UL)+sceneBankBytes)) {
+                         sceneBankOffset+sceneBankBytes)) {
         platform.restore();
         FreeMem(startupCopperWords, 4 * sizeof(UWORD));
         gDownwellStartupFailure = 4;
@@ -1898,9 +1908,9 @@ __attribute__((noinline)) static int runDownwell(void) {
         return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
     }
     gDownwellStartupChipRemaining = AvailMem(MEMF_CHIP);
-    sceneBank = memory.assets() + ((effectStampOffset+effectStampBytes+3)&~3UL);
-    UBYTE* effectStamps=memory.assets()+effectStampOffset;
-    memcpy(effectStamps,amiga_effect_stamps,effectStampBytes);
+    sceneBank = memory.assets() + sceneBankOffset;
+    UBYTE* effectStamps=memory.sceneCache()+effectStampCacheOffset;
+    memcpy(effectStamps,amiga_effect_stamps+AmigaEffectStampBank::payloadOffset,effectPayloadBytes);
     const downwell::BuilderPatternPack builders(
         amiga_builder_pack,
         (unsigned long)(amiga_builder_pack_end - amiga_builder_pack));
@@ -2086,7 +2096,7 @@ __attribute__((noinline)) static int runDownwell(void) {
     if (!effectAssets.bind(activeGamePack,gamePackBytes)||
         !effectAssets.bindEntryMask(amiga_entry_mask,amiga_entry_mask_end-amiga_entry_mask)||
         !AmigaEffectSurface::bind(controllerEffects.surface(),memory.assets()+gamePackBytes,
-            effectStamps,effectStampBytes,effectAssets)||
+            amiga_effect_stamps,effectStampBytes,effectStamps,effectPayloadBytes,effectAssets)||
         !AmigaEffectSurface::fixtures(controllerEffects.surface(),effectAssets)) {
         platform.restore();
         FreeMem(startupCopperWords,4*sizeof(UWORD));
@@ -2714,6 +2724,8 @@ __attribute__((noinline)) static int runDownwell(void) {
                         newRunWorldPending = false;
                     }
                     DW_PROFILE_PHASE(profileEntryAssets);
+                    AmigaHardware::blitterDrain();
+                    memcpy(effectStamps,amiga_effect_stamps+AmigaEffectStampBank::payloadOffset,effectPayloadBytes);
                     const unsigned hudBytes = amiga_hud_pack_end - amiga_hud_pack;
                     const auto storage = GameplaySceneStorage::partition(
                         menuPlaneBytes * 2 + amigaMenuEntryPlaneBytes,
