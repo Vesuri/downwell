@@ -319,6 +319,21 @@ available. Neither route synthesizes IDs from local generations. This bridge
 does not establish the complete native global allocation stream, and does not
 by itself admit the player transition or its child phases.
 
+`GameplayCollisionOwner::withPlayerTimeStop` composes that allocator with the
+existing native player Begin Step hook. It reads the owner's published position,
+converts the current portable motion representation to the shared pose, and uses
+the registered parent-field queries for both boolean contact and numeric-ID
+selection. Supplied room metadata controls the strict side exemption. The shared
+transition uses the world's RNG; its shard/change banks and room-speed variable
+are also borrowed by the room animation, alarm and cleanup dispatchers. A live
+bank or controller clock cannot be replaced with a different owner's state.
+Camera shake reaches the world camera before the caller's effect callback.
+Audio queries, synchronous pause, oxygen and other effects remain checked caller
+services, not implicit no-ops. The scope does not schedule shard ordinary Step
+or propagate time-stop to every actor; production admission still requires those
+phases and the complete numbered creation stream. Portable pose conversion does
+not claim original binary64 player-motion equivalence.
+
 `GameplayCollisionOwner::stepTimeShard` accepts one selected shared lifetime and
 borrows the mask pack only for that event. Its solid-parent query merges all
 registered descendants in registration order, including compact box ownership

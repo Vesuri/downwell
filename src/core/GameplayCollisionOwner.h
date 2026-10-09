@@ -2775,6 +2775,34 @@ public:
         }
         result=next;return true;
     }
+    // Compose the shared transition into the native player's existing Begin
+    // Step boundary. Explicit room metadata and source allocation are required;
+    // this does not enable partially numbered production scenes automatically.
+    template<class Allocate,class Audio,class Emit,class Tick>
+    bool withPlayerTimeStop(TimeStopEffects<64>& state,const PackedRoom& room,
+        const SpriteMaskPack& masks,bool lowSpec,Allocate allocate,Audio audio,Emit emit,Tick tick){
+        if(!valid()||!world_||!masks.valid()||room.width<0)return check(false);
+        if(!state.shards.phasesBoundTo(timeShards_)&&!state.shards.bindPhases(timeShards_))return check(false);
+        if(!state.changes.boundTo(timeChanges_)&&!state.changes.bind(timeChanges_))return check(false);
+        return withTimeEffectSourceIds(allocate,[&]{
+            return world_->withPlayerTimeTransition([&](const auto&,const auto& motion,int ox,int oy){
+                InstanceHandle player;RunnerImageValue x,y;
+                if(!View::encode(View::Kind::player,world_->playerHandle(),player))return check(false);
+                if(native_){if(!nativePublishedPosition(player,x,y))return check(false);}
+                else {const auto p=owner_.resolve(player);if(!p)return check(false);x=p->x;y=p->y;}
+                typename TimeStopEffects<64>::PlayerPose pose;
+                if(!pose.fromPortableMotion(x,y,motion,ox,oy))return check(false);
+                return world_->beginTimeStop(state,pose,room.roomId==11||room.roomId==14,lowSpec,
+                    [&](bool& outside){return TimeStopBound::outsideSides(pose.xx,room.width,outside);},
+                    [&](bool& hit){return playerTimeFieldMeeting(pose.xx,pose.yy,masks,hit);},
+                    [&](auto px,auto py,auto& id,auto& fx,auto& fy){
+                        InstancePlaceResult found;
+                        if(!playerTimeFieldInstance(px,py,masks,found))return false;
+                        id=found.id;fx=found.x;fy=found.y;return true;
+                    },audio,emit);
+            },tick);
+        });
+    }
     // Selected global Step entry, not a pool-local sweep. The caller supplies
     // the original per-instance TimeStopBound result through a checked adapter.
     template<unsigned Capacity,class Stopped>

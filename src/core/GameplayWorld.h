@@ -53,6 +53,7 @@
 #include "core/GameplayDebrisInstances.h"
 #include "core/GameplayTimeChangeRegistration.h"
 #include "core/GameplayTimeShardRegistration.h"
+#include "core/TimeStopEffects.h"
 #include "core/ScriptSpawnOperations.h"
 #include "core/EffectSpawnScript.h"
 #include "core/AreaOneBuilder.h"
@@ -675,6 +676,26 @@ public:
     bool bindTimeShardInstances(downwell::NativeTimeShardRegistration& registry);
     bool createTimeShard(downwell::TimeShardEffects<64>& effects,downwell::MotionBinary64 x,
                          downwell::MotionBinary64 y,bool lowSpec);
+    // Borrow the same banks for synchronous transition Create and subsequent
+    // room animation/alarms/cleanup. They must outlive their registered children.
+    template<class Side,class Field,class Lookup,class Audio,class Emit>
+    bool beginTimeStop(downwell::TimeStopEffects<64>& state,
+        const downwell::TimeStopEffects<64>::PlayerPose& pose,bool mainRoom,bool lowSpec,
+        Side side,Field field,Lookup lookup,Audio audio,Emit emit){
+        if(!run_.effectsSucceeded)return false;
+        if(!state.succeeded||!state.shards.succeeded()||!state.changes.succeeded()||
+           !timeShardInstances_||!timeChangeInstances_||
+           !state.shards.phasesBoundTo(*timeShardInstances_)||!state.changes.boundTo(*timeChangeInstances_)||
+           (timeShardInstances_->size()&&timeShardEffects_!=&state.shards)||
+           (timeChangeInstances_->size()&&(timeChangeEffects_!=&state.changes||timeChangeSpeed_!=&state.roomSpeed))||
+           (controllerRoomSpeed_&&controllerRoomSpeed_!=&state.roomSpeed))return run_.effectsSucceeded=false;
+        timeShardEffects_=&state.shards;timeChangeEffects_=&state.changes;timeChangeSpeed_=&state.roomSpeed;
+        return run_.effectsSucceeded=state.beginStepWithAudioChecked(mainRoom,side,pose,lowSpec,enemyRandom_,
+            field,lookup,audio,[&](downwell::PlayerTimeStop::Effect effect){
+                if(effect==downwell::PlayerTimeStop::Effect::shake&&!requestTimeStopCameraShake())return false;
+                return emit(effect);
+            })&&run_.effectsSucceeded;
+    }
     bool advanceTimeShardRoomAlarm(downwell::InstanceHandle key,unsigned index);
     bool advanceTimeShardRoomAnimation(downwell::InstanceHandle key);
     bool retireTimeShardRoomEffect(downwell::InstanceHandle key);

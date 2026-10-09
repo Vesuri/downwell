@@ -1,4 +1,5 @@
 #include "core/GameplayCollisionOwner.h"
+#include "core/Replay.h"
 #include "core/CurrencySmokeComposition.h"
 #ifndef DOWNWELL_NATIVE_QUERY_PROBE
 #include "RegisteredSkeletonThrowChecks.h"
@@ -99,6 +100,15 @@ bool nativeAllocatedTimeChange(GameplayWorld& world,downwell::GameplayCollisionO
     return owner.withTimeEffectSourceIds([&](std::uint32_t& id){id=next++;return true;},[&]{
         return world.createTimeChange(effects,{}, {},speed,[](unsigned ms){return ms==30;});
     });
+}
+struct NativeTimeStopAudioProbe { bool operator()(downwell::PlayerTimeStop::AudioQuery,bool&); };
+struct NativeTimeStopEmitProbe { bool operator()(downwell::PlayerTimeStop::Effect); };
+bool nativePlayerTimeStop(GameplayWorld& world,downwell::GameplayCollisionOwner& owner,
+    downwell::TimeStopEffects<64>& state,const downwell::PackedRoom& room,
+    const downwell::SpriteMaskPack& masks,std::uint32_t& next,
+    NativeTimeStopAudioProbe audio,NativeTimeStopEmitProbe emit){
+    return owner.withPlayerTimeStop(state,room,masks,false,[&](std::uint32_t& id){id=next++;return true;},
+        audio,emit,[&]{world.step(0);return world.effectsSucceeded();});
 }
 bool nativeFieldWind(downwell::GameplayCollisionOwner& owner,const downwell::RunnerCollisionEventContext::Frame& event,
     downwell::TimeFieldWind& wind,int& channel,NativeCurrencyAudioProbe& audio){
@@ -1450,6 +1460,40 @@ int main(){
         assert(metadata.bind(replacement)&&metadata.mask(266,mask)&&mask==0&&!metadata.findEvent(266,0,cached));
         assert(!metadata.bind(invalid)&&!metadata.findEvent(266,0,cached));
         assert(metadata.bind(objects)&&metadata.findEvent(266,0,cached));
+    }
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                   GameplayCollisionOwner::Ownership::nativeScenery}){
+        const auto roomBytes=read("generated/downwell-rooms.dwrm");RoomPack rooms(roomBytes.data(),roomBytes.size());
+        TimeStopEffects<64> stop;PackedRoom room;assert(rooms.findRoom(11,room));
+        const auto maskBytes=read("generated/downwell-sprite-masks.dwsm");SpriteMaskPack masks(maskBytes.data(),maskBytes.size());
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},&rooms,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain(),&rooms);
+        assert(owner->attach(*world)&&world->createTimeFieldWithSourceId(820000,240,176));
+        unsigned next=830000;std::uint8_t input=0;std::vector<PlayerTimeStop::Effect> events;
+        const auto tick=[&]{return owner->withPlayerTimeStop(stop,room,masks,false,
+            [&](std::uint32_t& id){id=next++;return true;},
+            [&](PlayerTimeStop::AudioQuery,bool& answer){answer=true;return true;},
+            [&](PlayerTimeStop::Effect effect){events.push_back(effect);return true;},
+            [&]{world->step(input);return world->effectsSucceeded();});};
+        assert(tick()&&stop.player.stopped&&stop.player.checkStop&&!stop.player.bgmOn);
+        assert(next==830007&&owner->timeShards().size()==6&&owner->timeChanges().size()==1);
+        assert((events==std::vector<PlayerTimeStop::Effect>{PlayerTimeStop::Effect::shake,
+            PlayerTimeStop::Effect::change,PlayerTimeStop::Effect::pauseMusic,
+            PlayerTimeStop::Effect::enterSound,PlayerTimeStop::Effect::oxygenFloor}));
+        const auto* change=owner->timeChanges().find(owner->timeChanges().handle(1));
+        assert(change&&change->sourceId==830003&&change->alarms.get(1)==1&&stop.roomSpeed==30);
+        assert(stop.burst.field==820000);
+        events.clear();assert(tick()&&next==830007&&stop.roomSpeed==35);
+        assert((events==std::vector<PlayerTimeStop::Effect>{PlayerTimeStop::Effect::oxygenFloor}));
+        Input right;right.right=true;input=packReplayInput(right);
+        for(unsigned i=0;i<60&&stop.player.stopped;++i){events.clear();assert(tick());}
+        assert(!stop.player.stopped&&!stop.player.checkStop&&stop.player.bgmOn);
+        assert(next==830014&&owner->timeShards().size()==12);
+        assert((events==std::vector<PlayerTimeStop::Effect>{PlayerTimeStop::Effect::change,
+            PlayerTimeStop::Effect::resumeMusic,PlayerTimeStop::Effect::stopWind,
+            PlayerTimeStop::Effect::exitSound,PlayerTimeStop::Effect::duckMusic}));
     }
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
                    GameplayCollisionOwner::Ownership::nativeScenery})for(unsigned reject:{0u,1u,2u,3u}){
