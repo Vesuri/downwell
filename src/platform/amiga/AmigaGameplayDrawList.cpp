@@ -36,6 +36,7 @@ bool AmigaGameplayDrawList::promoteCurrencyComplete(const GameplayWorld& world,i
     if(!registeredEnemyShadePresent(world,viewX,viewY,shade)||shade)return false;
     bool other=false;
     world.smokeEffects().visitNewest([&](auto,const auto&){other=true;});
+    if(world.registeredSmoke()&&world.registeredSmoke()->size())other=true;
     if(world.timeShardInstances()&&world.timeShardInstances()->size())other=true;
     if(other)return false;
     if(!world.visitDebrisDraw([&](const auto&){other=true;return true;})||other)return false;
@@ -97,6 +98,7 @@ bool AmigaGameplayDrawList::promoteCurrency(const GameplayWorld& world,int viewX
     if(!registeredEnemyShadePresent(world,viewX,viewY,shade)||shade)return false;
     bool other=false;
     world.smokeEffects().visitNewest([&](auto,const auto&){other=true;});
+    if(world.registeredSmoke()&&world.registeredSmoke()->size())other=true;
     if(world.timeShardInstances()&&world.timeShardInstances()->size())other=true;
     if(other||!world.visitDebrisDraw([&](const auto&){other=true;return true;})||other)return false;
     const Placement::PixelView view{viewX,viewY,160,284};
@@ -458,6 +460,18 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
                    !downwell::EffectSurfacePlacement::relative(y,downwell::MotionBinary64::fromInteger(worldViewY),y)||
                    !x.roundPixel(px)||!y.roundPixel(py))return false;
                 return append(effect.spriteId,effect.drawFrame(),downwellPlayfieldX+px,py,0);
+            }
+            if(kind==GameplayWorld::DrawActor::smoke){
+                if(compositeCurrency)return true;
+                const auto* r=port.registeredSmoke()?port.registeredSmoke()->find(key):nullptr;
+                downwell::SmokeDraw::Command command;unsigned frame;std::int32_t x,y;
+                if(!r||!downwell::SmokeDraw::prepare(r->state.imageIndex,r->x,r->y,{},true,false,false,command)||
+                   !downwell::SmokeDraw::frame(command.imageIndex,frame))return false;
+                using Real=downwell::MotionBinary64;
+                if(!downwell::EffectSurfacePlacement::relative(command.placement.x,Real::fromInteger(worldViewX),command.placement.x)||
+                   !downwell::EffectSurfacePlacement::relative(command.placement.y,Real::fromInteger(worldViewY),command.placement.y)||
+                   !command.placement.x.roundPixel(x)||!command.placement.y.roundPixel(y))return false;
+                return append(84,frame,downwellPlayfieldX+x,y,0);
             }
             if(kind==GameplayWorld::DrawActor::debris){
                 if(compositeCurrency)return true; // Published by surfaceFx, not a second world draw.

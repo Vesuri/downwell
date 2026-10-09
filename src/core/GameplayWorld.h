@@ -40,6 +40,9 @@
 #include "core/GameplayScriptSpawnInstances.h"
 #include "core/CorpseExpiryInstances.h"
 #include "core/SmokeInstances.h"
+#include "core/SmokeDraw.h"
+#include "core/DebrisDraw.h"
+#include "core/TimeShardDraw.h"
 #include "core/GameplayDebrisInstances.h"
 #include "core/GameplayTimeChangeRegistration.h"
 #include "core/GameplayTimeShardRegistration.h"
@@ -814,7 +817,7 @@ public:
         return run_.effectsSucceeded=scriptSpawnInstances_&&effects.advanceRegistered(phase,*scriptSpawnInstances_);
     }
     enum class PhaseBoundary { beginStep, alarm, step, collision, endStep, roomEntry };
-    enum class DrawActor { enemy, bullet, scriptEffect, debris, player, entryDither, bone, skeleton, ditherAbove, timeShard, corpseExpiry };
+    enum class DrawActor { enemy, bullet, scriptEffect, debris, player, entryDither, bone, skeleton, ditherAbove, timeShard, corpseExpiry, smoke };
     template<class Visit> bool visitRegisteredEnemyShades(Visit visit)const{
         if((!bones_||!bones_->size())&&(!skeletons_||!skeletons_->size()))return true;
         return visitRoomActorsReadOnly([&](DrawActor kind,downwell::InstanceHandle key,auto){
@@ -855,6 +858,24 @@ public:
             if(kind!=DrawActor::debris)return true;
             const auto* record=debrisInstances_->find(key);
             return record&&record->effect&&visit(*record->effect);
+        });
+    }
+    template<class Emit> bool visitRegisteredEffectSurfaces(const downwell::EffectMaskAssets& assets,
+        const downwell::EffectSurfacePlacement::View& view,Emit emit)const{
+        return visitRoomActors([&](DrawActor kind,downwell::InstanceHandle key,auto){
+            if(kind==DrawActor::smoke){
+                const auto* r=registeredSmoke_?registeredSmoke_->find(key):nullptr;
+                return r&&downwell::SmokeDraw::surface(r->state.imageIndex,r->x,r->y,assets,view,emit);
+            }
+            if(kind==DrawActor::debris){
+                const auto* r=debrisInstances_?debrisInstances_->find(key):nullptr;
+                return r&&r->effect&&downwell::DebrisDraw::surface(*r->effect,assets,view,emit);
+            }
+            if(kind==DrawActor::timeShard){
+                const auto* r=timeShardForDraw(key);
+                return r&&downwell::TimeShardDraw::surface(*r,assets,view,emit);
+            }
+            return true;
         });
     }
     const downwell::NativeTimeShardRegistration::Record* timeShardForDraw(downwell::InstanceHandle key)const{

@@ -67,6 +67,33 @@ int main() {
             assert(world->restartFromResults(downwell::DeathMenuSequence::Action::Retry,42,300)==downwell::ResultsDestination::gameplay&&
                 world->registeredExpiry()==&expiry&&!expiry.find(beforeRetry)&&!expiry.size()&&owner->valid());
             assert(expiry.create(105189,x,y,afterRetry)&&afterRetry.generation>beforeRetry.generation&&expiry.clear());
+            auto& smoke=owner->registeredSmoke();downwell::GameMakerRandom random(2);downwell::InstanceHandle smokeKey;
+            assert(smoke.create(105190,x,y,random,smokeKey));
+            const auto pixels=read("generated/amiga-game.dwap");downwell::EffectMaskAssets art;
+            assert(art.bind(pixels.data(),pixels.size()));
+            const downwell::EffectSurfacePlacement::View effectView{downwell::MotionBinary64::fromInteger(160),
+                downwell::MotionBinary64::fromInteger(34),downwell::MotionBinary64::fromInteger(160),
+                downwell::MotionBinary64::fromInteger(284)};
+            unsigned frames=0,frameMask=0;
+            while(!smoke.find(smokeKey)->destroyRequested){
+                const auto& state=smoke.find(smokeKey)->state;const unsigned frame=state.drawFrame();frameMask|=1u<<frame;
+                AmigaGameplayDrawList direct;assert(direct.collect(*world,pack,pack+8,160,34,false));unsigned seen=0;
+                for(unsigned i=0;i<direct.count;++i)if(direct.actors[i].sprite==84){
+                    assert(direct.actors[i].frame==frame&&direct.actors[i].x==198&&direct.actors[i].y==94);++seen;
+                }
+                assert(seen==1);
+                AmigaGameplayDrawList composited;assert(composited.collect(*world,pack,pack+8,160,34,true));
+                for(unsigned i=0;i<composited.count;++i)assert(composited.actors[i].sprite!=84);
+                unsigned surfaces=0;
+                assert(world->visitRegisteredEffectSurfaces(art,effectView,[&](const auto& asset,auto px,auto py){
+                    assert(asset.mask.data==art.smoke(frame)->mask.data&&px.high==x.high&&px.low==x.low&&
+                        py.high==y.high&&py.low==y.low);++surfaces;return true;
+                })&&surfaces==1);
+                assert(!world->visitRegisteredEffectSurfaces(art,effectView,[](const auto&,auto,auto){return false;}));
+                assert(smoke.advanceAnimation(smokeKey)&&++frames<200);
+            }
+            assert(frameMask==511&&owner->prepareDraw()&&!smoke.find(smokeKey));
+            assert(world->visitRegisteredEffectSurfaces(art,effectView,[](const auto&,auto,auto){return false;}));
         }
         for(auto mode:{downwell::GameplayCollisionOwner::Ownership::reference,
             downwell::GameplayCollisionOwner::Ownership::native,

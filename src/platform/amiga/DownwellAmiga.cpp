@@ -3859,6 +3859,7 @@ __attribute__((noinline)) static int runDownwell(void) {
             }
 #endif
             const bool compositeEffects=(compositeCurrency&&(!hardwareCurrency||actorList.currencyRasterRequired||
+                (port.registeredSmoke()&&port.registeredSmoke()->size())||
                 (port.timeShardInstances()&&port.timeShardInstances()->size())))||
                 (actorList.entryCoverVisible&&!hardwareEntryCover);
             if(compositeEffects){
@@ -3873,11 +3874,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                             emit(gem.large,gem.motion.animation.frame(),std::int32_t(240+gem.x),std::int32_t(176+gem.y));
                     }
                 },port.smokeEffects(),effectAssets,effectView,settings,[&](auto emit){
-                    return port.visitDebrisDraw([&](const downwell::DebrisAnimation& effect){
-                        return downwell::DebrisDraw::surface(effect,effectAssets,effectView,emit);
-                    })&&port.visitTimeShardDraw([&](const downwell::NativeTimeShardRegistration::Record& effect){
-                        return downwell::TimeShardDraw::surface(effect,effectAssets,effectView,emit);
-                    });
+                    return port.visitRegisteredEffectSurfaces(effectAssets,effectView,emit);
                 },[&](auto emit){
                     if(!actorList.entryCoverVisible||hardwareEntryCover)return true;
                     downwell::EffectMaskAssets::Asset mask;
