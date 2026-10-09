@@ -29,6 +29,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
+#include <functional>
 #include <iterator>
 #include <memory>
 #include <unordered_map>
@@ -1672,6 +1673,81 @@ int main(){
         require(!blood.instances().find(key)&&blood.instances().size()==0,
             "stored Animation End and cleanup retire the registered lifetime");
         require(blood.clear(),"scheduled blood teardown");
+    }
+    for(bool reject:{false,true}){
+        struct FieldOwner:StoredWorldCollision {
+            using StoredWorldCollision::StoredWorldCollision;
+            StartupRuntime* runtime=nullptr;bool reject=false;
+            unsigned fieldBirths=0;std::uint64_t before=0;
+            bool birth(InstanceHandle key,const InstanceRecord& record){
+                if(record.objectId==82&&runtime){
+                    ++fieldBirths;
+                    require(runtime->randomDrawCount()==before,
+                        "Timeout field membership precedes radius RNG");
+                    if(reject)return false;
+                }
+                return StoredWorldCollision::birth(key,record);
+            }
+        };
+        auto owner=std::make_unique<FieldOwner>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            InstanceLifecycleBinding::bindPointQueries(*owner));
+        require(owner->attach(*world),"attach runtime Timeout field world");world->skipToGameForTesting();
+        owner->runtime=world.get();owner->reject=reject;owner->before=world->randomDrawCount();
+        const auto id=world->nextRuntimeInstanceId();
+        const auto count=world->timeFields().size();auto oracle=world->randomState();
+        InstanceHandle child;
+        require(world->spawnOrdinaryTimeField(240,40000,child)==!reject,"registered Timeout field birth");
+        require(owner->fieldBirths==1&&world->randomDrawCount()==owner->before+unsigned(!reject),
+            "rejected Timeout membership consumes no Create RNG");
+        if(reject){
+            require(!world->effectsSucceeded()&&!child.generation&&world->timeFields().size()==count,
+                "failed Timeout birth retains terminal state and no radius record");
+            require(!world->spawnOrdinaryTimeField(240,40000,child)&&owner->fieldBirths==1,
+                "failed Timeout birth cannot retry a partial script");
+        }else{
+            const auto* field=world->timeFields().at(count);
+            require(field&&field->sourceId==id&&field->x==240&&field->y==40000&&
+                field->radius.equal(OrdinaryTimeField::nextRadius(oracle)),
+                "Timeout render owner retains room source identity and exact Create sample");
+            InstancePlaceResult selected;
+            RunnerImageValue x,y;x.assignInteger(240);y.assignInteger(40000);
+            require(world->playerTimeFieldInstance(x,y,selected)&&selected.id==static_cast<int>(id),
+                "new Timeout field participates in source identity queries immediately");
+            struct DamageEvents {
+                bool stopped=false;unsigned players=0,clears=0;
+                bool playerDamaged(){return false;}
+                MotionBinary64 playerX(){return MotionBinary64::fromInteger(240);}
+                MotionBinary64 playerY(){return MotionBinary64::fromInteger(40000);}
+                MotionBinary64 callerX(){return playerX();}
+                MotionBinary64 callerY(){return playerY();}
+                bool pointDirection(MotionBinary64,MotionBinary64,MotionBinary64,MotionBinary64,MotionBinary64& out){out={};return true;}
+                bool damagePlayer(MotionBinary64){return true;}
+                bool lengthdirX(MotionBinary64 speed,MotionBinary64,MotionBinary64& out){out=speed;return true;}
+                bool forcedJump(MotionBinary64,MotionBinary64){return true;}
+                bool playerDead(){return true;}
+                bool shake(int,int){return true;}
+                bool playerHealthPositive(){return false;}
+                bool hitEffect(MotionBinary64,MotionBinary64,int,MotionBinary64,int,int){return true;}
+                bool timeoutOwned(){return true;}
+                bool timeStopped(){return stopped;}
+                struct Player {int publishedY(){return 40100;}int publishedX(){return 240;}};
+                bool forEachPlayer(const std::function<bool(Player&)>& visit){
+                    Player player;++players;if(!visit(player))return false;
+                    stopped=true;++players;return visit(player);
+                }
+                void clearNoDamage(){++clears;}
+                void clearAreaNoDamage(){++clears;}
+            } events;
+            TypicalPlayerDamage damage;owner->before=world->randomDrawCount();
+            const auto next=world->nextRuntimeInstanceId();
+            require(world->typicalPlayerDamage(damage,MotionBinary64::fromInteger(1),
+                MotionBinary64::fromInteger(3),MotionBinary64::fromInteger(2),events)&&
+                events.players==2&&events.clears==2&&world->timeFields().size()==count+2&&
+                world->timeFields().at(count+1)->sourceId==next&&
+                world->timeFields().at(count+1)->y==40100&&world->randomDrawCount()==owner->before+1,
+                "Timeout script uses published player coordinates and rereads stop state for each birth");
+        }
     }
     for(unsigned reject:{0u,1u,2u}){
         struct RowOwner:StoredWorldCollision {

@@ -2022,6 +2022,15 @@ public:
     }
     bool registerSideCameraLocker(int x, int y) { return run_.sideCameraLockers.create(x, y); }
     const OrdinaryTimeFields<64>& timeFields() const {return run_.timeFields;}
+    // Runtime object-82 creation (Timeout), unlike adoption of a builder's
+    // already consumed Create sample. Publish the room identity before RNG.
+    bool spawnOrdinaryTimeField(int x,int y,InstanceHandle& child);
+    template<class Events> bool typicalPlayerDamage(TypicalPlayerDamage& caller,
+        MotionBinary64 amount,MotionBinary64 horizontal,MotionBinary64 vertical,Events& events){
+        if(!run_.effectsSucceeded)return false;
+        return run_.effectsSucceeded=caller.execute(amount,horizontal,vertical,events,
+            [&](int x,int y){InstanceHandle child;return spawnOrdinaryTimeField(x,y,child);});
+    }
     bool cameraSideLocked() const { return mainCameraMotion_.sideLocked; }
     std::uint64_t sideCameraDigest() const { return run_.sideCameraLockers.digest(mainCameraMotion_); }
     void registerLevelExit(int y);

@@ -97,7 +97,8 @@ behavior, both backend integrations and relevant original-game verification.
 - Connect player Begin Step `checkStop`/`pTimeStop` and parent-time-field queries
   to both world schedulers before blood dispatch. Goal-stop and shop control-lock
   are not substitutes. Preserve transition effects, RNG and audio order.
-- Add Timeout-damage creation of ordinary object-82 time fields. Connect the
+- Connect registered Timeout-damage object-82 births to natural damage contacts
+  on both backends, supplying the native complete creation stream. Connect the
   parent-field contact adapter and complete Draw scheduling across object
   families, including live time-stop and activation state.
 - Integrate time-shard lifecycle, animation, burst and time-change owners with

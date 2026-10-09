@@ -2822,6 +2822,26 @@ bool StartupRuntime::createLevelExitChild(LevelExit::Effect effect,int x,int y) 
         },lifecycle_)==ApplyInstanceCommandsResult::success;
 }
 
+bool StartupRuntime::spawnOrdinaryTimeField(int x,int y,InstanceHandle& key){
+    if(!run_.effectsSucceeded)return false;
+    if(!objectPack_||!deferredCommandsSucceeded_)return run_.effectsSucceeded=false;
+    // parentTimeField PreCreate only calls event_inherited; it has no parent.
+    // Create assigns radiusMin/Max=24/26 and consumes one random_range word.
+    // The independent queue permits this synchronous birth inside a contact.
+    DeferredInstanceQueue<1> child;
+    if(!child.enqueueCreate(82,x,y))return run_.effectsSucceeded=false;
+    InstanceHandle created;
+    const auto result=child.applyChecked(instances_,*objectPack_,roomId_,nextRuntimeInstanceId_,
+        [&](InstanceRecord& record){
+            created=instances_.handleAt(instances_.size()-1);
+            if(instances_.resolve(created)!=&record)return false;
+            return run_.timeFields.createWithSourceId(record.instanceId,x,y,random_);
+        },lifecycle_);
+    if(result!=ApplyInstanceCommandsResult::success||!instances_.resolve(created))
+        return run_.effectsSucceeded=false;
+    key=created;return true;
+}
+
 bool StartupRuntime::spawnBuilderPrimitive(int object,int x,int y,InstanceHandle& key){
     if(!run_.effectsSucceeded)return false;
     // Admit only primitives whose resource Create is implemented. A raw box
