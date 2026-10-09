@@ -144,10 +144,11 @@ behavior, both backend integrations and relevant original-game verification.
   levelBeginCue creation/audio. Do not use successful placeholder callbacks.
   Admit persistent object 37 from the actual native startup Create sequence,
   including its initialization/HUD dependencies and source numeric ID. Verify
-  the actual rmResult handoff: retire nonpersistent old-room lifetimes, retain
-  and rebind persistent controllers, admit authored Result 102522/object 325,
-  and schedule their alarms in one mixed destination-room phase on the native
-  path. Complete stored Result alarm-storage/activation integration and supply
+  the complete rmResult handoff, including Room End events, native destination
+  layer loading and persistent-controller rebinding. Schedule Result and
+  controller alarms in one mixed destination-room phase on the native path;
+  complete registered native exit-wipe birth and both adapters' Result
+  position/activation publication. Complete stored Result alarm-storage integration and supply
   the actual shared room-speed state at natural controller call sites.
   Do not run the old combat alarm pass behind the menu or batch all
   controller alarms before Result's alarms. Implement remaining fired controller

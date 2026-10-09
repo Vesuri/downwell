@@ -366,6 +366,7 @@ static void checkTypedCollisionView(const GameplayCollisionView& view,GameplayCo
         case K::corpse:assert(view.resolveLocal<K::corpse>(local)==reference.corpse);break;
         case K::consumptionBlood:assert(view.resolveLocal<K::consumptionBlood>(local)==reference.consumptionBlood);break;
         case K::runController:assert(view.resolveLocal<K::runController>(local)==reference.runController);break;
+        case K::result:assert(view.resolveLocal<K::result>(local)==reference.result);break;
         case K::debris:assert(view.resolveLocal<K::debris>(local)==reference.debris);break;
         case K::timeChange:assert(view.resolveLocal<K::timeChange>(local)==reference.timeChange);break;
         case K::timeShard:assert(view.resolveLocal<K::timeShard>(local)==reference.timeShard);break;
@@ -724,12 +725,43 @@ int main(){
     }
     auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
+    const auto resultRoomBytes=read("generated/downwell-rooms.dwrm");
+    RoomPack resultRooms(resultRoomBytes.data(),resultRoomBytes.size());
+    for(unsigned failure:{1u,2u}){
+        struct ResultAudit {
+            GameplayWorld* world=nullptr;InstanceHandle oldPlayer{};
+            unsigned reject=0,births=0,writes=0;
+            bool birth(InstanceHandle,const GameplayResultInstance::Record& r){
+                ++births;assert(!world->findPlayer(oldPlayer)&&r.sourceId==102522&&
+                    r.x.bits==0x42a00000u&&r.y.bits==0x43100000u);
+                return reject!=1;
+            }
+            bool move(InstanceHandle,const GameplayResultInstance::Record& r,RunnerImageValue x,RunnerImageValue y){
+                ++writes;assert(r.y.bits==0x43100000u&&x.bits==r.x.bits&&y.bits==0x430e0000u);
+                return reject!=2;
+            }
+            bool retire(InstanceHandle,const GameplayResultInstance::Record&){return true;}
+            bool activation(InstanceHandle,const GameplayResultInstance::Record&,bool){return true;}
+            bool membership(InstanceHandle,const GameplayResultInstance::Record&,bool){return true;}
+        } audit;
+        GameplayResultInstance result(GameplayResultInstance::Binding::bindMovement(audit));
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,GameplayWorld::EnemyLifecycleBinding{},
+            GameplayWorld::BreakableLifecycleBinding{},GameplayWorld::PlayerLifecycleBinding{},nullptr,&resultRooms);
+        audit.world=world.get();audit.oldPlayer=world->playerHandle();audit.reject=failure;
+        assert(world->bindResultInstance(result)&&world->registerLevelExit(176+world->player().offsetY()));
+        for(unsigned tick=0;tick<100;++tick)world->step(0);
+        const auto draws=world->randomDrawCount();
+        assert(world->levelResultRequested()&&!world->enterLevelClear(0,false)&&!world->effectsSucceeded()&&
+            !world->levelClearActive()&&world->randomDrawCount()==draws&&audit.births==1&&audit.writes==failure-1);
+        assert(result.find(result.handle())->y.bits==0x43100000u);
+        assert(!world->enterLevelClear(0,false)&&audit.births==1&&world->randomDrawCount()==draws);
+    }
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
                    GameplayCollisionOwner::Ownership::nativeScenery}){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
             GameplayTerrainInstances::WallCollision{},nullptr,mode);
         auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
-            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain(),&resultRooms);
         assert(owner->attach(*world));int speed=60;assert(world->bindControllerRoomSpeed(speed));
         auto& controllers=owner->runControllers();InstanceHandle controller,shared;unsigned creates=0;
         assert(controllers.create(100065,{}, {},[&](InstanceHandle){++creates;return true;},controller)&&
@@ -775,6 +807,11 @@ int main(){
             GameplayCollisionView::encode(GameplayCollisionView::Kind::enemy,inactiveEnemy,oldInactive)&&
             GameplayCollisionView::encode(GameplayCollisionView::Kind::debris,debris,oldDebris));
         assert(world->levelResultRequested()&&world->enterLevelClear(0,false));
+        const auto resultLocal=world->resultInstance()->handle();
+        const auto* result=world->resultInstance()->find(resultLocal);InstanceHandle resultKey;
+        assert(result&&result->sourceId==102522&&result->x.bits==0x42a00000u&&result->y.bits==0x430e0000u&&
+            GameplayCollisionView::encode(GameplayCollisionView::Kind::result,resultLocal,resultKey)&&view.contains(resultKey));
+        checkTypedCollisionView(view,GameplayCollisionView::Kind::result,resultLocal);
         GameplayCollisionView::Record departed;
         for(auto old:{oldPlayer,oldActive,oldInactive,oldDebris})
             assert(!GameplayCollisionView(*world).resolve(old,departed));
@@ -791,6 +828,7 @@ int main(){
         assert(controllers.activate(controller,false)&&owner->reconcileActivation());
         assert(world->prepareNextAreaOneLevel({},300)&&world->runStage().level==2&&
             controllers.find(controller)&&controllers.find(controller)->alarms.get(0)==1&&creates==1);
+        assert(!world->resultInstance()->find(resultLocal)&&!view.contains(resultKey));
         world->step(0);assert(world->effectsSucceeded()&&speed==30&&controllers.find(controller)->alarms.get(0)==1);
         assert(controllers.activate(controller,true)&&owner->reconcileActivation());
         world->step(0);assert(world->effectsSucceeded()&&speed==60&&controllers.find(controller)->alarms.get(0)==0&&creates==1);

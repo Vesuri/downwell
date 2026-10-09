@@ -27,6 +27,7 @@
 #include "core/GameplayBuilderController.h"
 #include "core/GameplayPlayerControllers.h"
 #include "core/RunControllerInstances.h"
+#include "core/GameplayResultInstance.h"
 #include "core/PlayerChildCreation.h"
 #include "core/DroneBulletInstances.h"
 #include "core/BoneProjectileInstances.h"
@@ -367,6 +368,11 @@ public:
     const downwell::GameplayBuilderController* builderController()const{return builderController_;}
     const downwell::GameplayPlayerControllers* playerControllers()const{return playerControllers_;}
     using RunControllers=downwell::RunControllerInstances<4>;
+    const downwell::GameplayResultInstance* resultInstance()const{return resultInstance_;}
+    bool bindResultInstance(downwell::GameplayResultInstance& instance){
+        if(resultInstance_||!instance.valid()||instance.handle().generation)return false;
+        resultInstance_=&instance;return true;
+    }
     const RunControllers* runControllers()const{return runControllers_;}
     bool bindRunControllers(RunControllers& records){
         if(runControllers_||!records.valid()||records.size())return false;
@@ -1615,6 +1621,13 @@ public:
         // Reject an unsupported selection before irreversibly retiring actors.
         if(style>4||2+run_.upgrades.levels[6]-(style==2?1:0)>=4)return false;
         if(!retireGameplayRoom())return false;
+        if(resultInstance_){
+            downwell::PackedRoom room;downwell::PackedRoomInstance authored{};
+            if(!entryRooms_||!entryRooms_->findRoom(16,room)||room.instanceCount!=1||
+               !entryRooms_->roomInstance(room,0,authored)||authored.objectId!=325||
+               !resultInstance_->create(authored.instanceId,authored.x,authored.y)||
+               !resultInstance_->position(authored.x,142))return run_.effectsSucceeded=false;
+        }
         return run_.enterLevelClear(style, heartGoal, health_, player_, enemyRandom_);
     }
     template<class Emit>
@@ -1727,6 +1740,7 @@ private:
     downwell::GameplayBuilderController* builderController_=nullptr;
     downwell::GameplayPlayerControllers* playerControllers_=nullptr;
     RunControllers* runControllers_=nullptr;
+    downwell::GameplayResultInstance* resultInstance_=nullptr;
     int* controllerRoomSpeed_=nullptr; // Same global as timeChangeSpeed_, but persists beyond effect cleanup.
     bool playerChildrenStarted_=false;
     bool (*playerChildCreate_)(void*,GameplayWorld&)=nullptr;

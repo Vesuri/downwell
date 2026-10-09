@@ -8,7 +8,7 @@ namespace downwell {
 // and lifetimeId do not. Borrowed views never cache pointers across a mutation.
 class GameplayCollisionView {
 public:
-    enum class Kind {player,enemy,breakable,terrain,timeField,goalField,exitController,bullet,scriptEffect,debris,timeChange,entryDither,drone,bone,skeleton,blood,currency,ditherAbove,builder,timeShard,playerController,corpseExpiry,smoke,corpse,consumptionBlood,runController};
+    enum class Kind {player,enemy,breakable,terrain,timeField,goalField,exitController,bullet,scriptEffect,debris,timeChange,entryDither,drone,bone,skeleton,blood,currency,ditherAbove,builder,timeShard,playerController,corpseExpiry,smoke,corpse,consumptionBlood,runController,result};
     static constexpr unsigned enemyBase=1;
     static constexpr unsigned breakableBase=enemyBase+GameplayWorld::enemyCapacity;
     static constexpr unsigned terrainBase=breakableBase+GameplayWorld::breakableCapacity;
@@ -34,13 +34,15 @@ public:
     static constexpr unsigned corpseBase=smokeBase+32;
     static constexpr unsigned consumptionBloodBase=corpseBase+32;
     static constexpr unsigned runControllerBase=consumptionBloodBase+32;
-    static constexpr unsigned capacity=runControllerBase+4;
+    static constexpr unsigned resultBase=runControllerBase+4;
+    static constexpr unsigned capacity=resultBase+1;
     struct Record {
         const GameplayWorld::RegisteredExpiry::Record* corpseExpiry=nullptr;
         const GameplayWorld::RegisteredSmoke::Record* smoke=nullptr;
         const GameplayWorld::RegisteredCorpse::Record* corpse=nullptr;
         const GameplayWorld::ConsumptionParticles::Record* consumptionBlood=nullptr;
         const GameplayWorld::RunControllers::Record* runController=nullptr;
+        const GameplayResultInstance::Record* result=nullptr;
         const GameplayWorld::PlayerInstance* player=nullptr;
         const GameplayWorld::EnemyState* enemy=nullptr;
         const GameplayWorld::Breakable* breakable=nullptr;
@@ -85,6 +87,7 @@ public:
             case Kind::corpse:base=corpseBase;count=32;break;
             case Kind::consumptionBlood:base=consumptionBloodBase;count=32;break;
             case Kind::runController:base=runControllerBase;count=4;break;
+            case Kind::result:base=resultBase;count=1;break;
             case Kind::debris:base=debrisBase;count=GameplayDebrisInstances::capacity;break;
             case Kind::timeChange:base=timeChangeBase;count=8;break;
             case Kind::timeShard:base=timeShardBase;count=64;break;
@@ -104,6 +107,7 @@ public:
     }
     static bool decode(InstanceHandle key,Kind& kind,InstanceHandle& local){
         if(!key.generation||key.slot>=capacity)return false;
+        if(key.slot>=resultBase){kind=Kind::result;local={key.slot-resultBase,key.generation};return true;}
         if(key.slot>=runControllerBase){kind=Kind::runController;local={key.slot-runControllerBase,key.generation};return true;}
         if(key.slot>=consumptionBloodBase){kind=Kind::consumptionBlood;local={key.slot-consumptionBloodBase,key.generation};return true;}
         if(key.slot>=corpseBase){kind=Kind::corpse;local={key.slot-corpseBase,key.generation};return true;}
@@ -160,6 +164,7 @@ public:
             else if constexpr(Family==Kind::corpse)return world_.registeredCorpses()?world_.registeredCorpses()->find(local):nullptr;
             else if constexpr(Family==Kind::consumptionBlood)return world_.consumptionParticles()?world_.consumptionParticles()->find(local):nullptr;
             else if constexpr(Family==Kind::runController)return world_.runControllers()?world_.runControllers()->find(local):nullptr;
+            else if constexpr(Family==Kind::result)return world_.resultInstance()?world_.resultInstance()->find(local):nullptr;
             else if constexpr(Family==Kind::debris)return world_.debrisInstances()?world_.debrisInstances()->find(local):nullptr;
             else if constexpr(Family==Kind::timeChange)return world_.timeChangeInstances()?world_.timeChangeInstances()->find(local):nullptr;
             else if constexpr(Family==Kind::timeShard)return world_.timeShardInstances()?world_.timeShardInstances()->find(local):nullptr;
@@ -223,6 +228,9 @@ private:
                 break;
             case Kind::runController:
                 if(!world_.runControllers()||!(next.runController=world_.runControllers()->find(local)))return false;
+                break;
+            case Kind::result:
+                if(!world_.resultInstance()||!(next.result=world_.resultInstance()->find(local)))return false;
                 break;
             case Kind::corpse:
                 if(!world_.registeredCorpses()||!(next.corpse=world_.registeredCorpses()->find(local)))return false;

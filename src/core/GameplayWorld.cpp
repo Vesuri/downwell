@@ -34,6 +34,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
         downwell::DeathMenuSequence::Action action, std::uint32_t seed, unsigned initialRingOrigin) {
     const auto destination = downwell::resultsDestination(action);
     if (destination == downwell::ResultsDestination::none) return destination;
+    if(resultInstance_&&!resultInstance_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(!clearRoomTimeChanges()||!clearRoomTimeShards())return downwell::ResultsDestination::none;
     if(entryDithers_&&!entryDithers_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(ditherAbove_&&!ditherAbove_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
@@ -75,6 +76,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto builderController=builderController_;
     const auto playerControllers=playerControllers_;
     const auto runControllers=runControllers_;
+    const auto resultInstance=resultInstance_;
     const auto controllerRoomSpeed=controllerRoomSpeed_;
     const auto droneBullets=droneBullets_;
     const auto bones=bones_;
@@ -140,6 +142,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     builderController_=builderController;
     playerControllers_=playerControllers;
     runControllers_=runControllers;
+    resultInstance_=resultInstance;
     controllerRoomSpeed_=controllerRoomSpeed;
     droneBullets_=droneBullets;
     bones_=bones;
@@ -259,6 +262,7 @@ bool GameplayWorld::retireGameplayRoom() {
     // Create. Persistent controllers and run globals deliberately survive.
     // This also handles explicit test/adaptor births made before the next
     // room load; an already retired lifetime must not receive a second callback.
+    if(resultInstance_&&!resultInstance_->clear())return run_.effectsSucceeded=false;
     if(!clearRoomTimeChanges()||!clearRoomTimeShards())return false;
     if(entryDithers_&&!entryDithers_->clear())return run_.effectsSucceeded=false;
     if(ditherAbove_&&!ditherAbove_->clear())return run_.effectsSucceeded=false;

@@ -48,9 +48,14 @@ completed prefix. The synchronous request supplies style/heart-goal inputs only
 during that load and is cleared on return. It is not a second persistent global.
 
 The native path retires its registered gameplay families before entering the
-shared Result state, preserving persistent controller ownership; destination
-Result registration and mixed destination alarm scheduling are still absent
-there. Neither path yet supplies complete source-ordered Room End/retirement
+shared Result state, preserving persistent controller ownership. With the native
+lifetime owner bound, it reads room 16's sole authored object 325 from the room
+pack, registers its source ID/position, then publishes y=142 before the shared
+initializer consumes RNG. Birth or position failure preserves the completed
+prefix and prevents that initializer. Departure retires the Result handle;
+Retry retains the bound owner but not the room-local lifetime. This admission
+does not yet load rmResult's layer catalog/rebind persistent elements or provide
+mixed destination alarm scheduling. Neither path yet supplies complete source-ordered Room End/retirement
 event dispatch or all Result Create side effects. Result clocks still belong
 to the shared selection state, not the stored record's generic alarm bank.
 The room-population checks are not proof of those missing event integrations
