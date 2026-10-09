@@ -478,6 +478,16 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
                    !command.placement.x.roundPixel(x)||!command.placement.y.roundPixel(y))return false;
                 return append(command.sprite,0,downwellPlayfieldX+x,y,scale>>31);
             }
+            if(kind==GameplayWorld::DrawActor::consumptionBlood){
+                const auto* r=port.consumptionParticles()?port.consumptionParticles()->find(key):nullptr;
+                unsigned frame;std::int32_t x,y;
+                if(!r||!r->state.drawFrame(frame))return false;
+                auto px=r->x.promoted(),py=r->y.promoted();using Real=downwell::MotionBinary64;
+                if(!downwell::EffectSurfacePlacement::relative(px,Real::fromInteger(worldViewX),px)||
+                   !downwell::EffectSurfacePlacement::relative(py,Real::fromInteger(worldViewY),py)||
+                   !px.roundPixel(x)||!py.roundPixel(y))return false;
+                return append(92,frame,downwellPlayfieldX+x,y,0); // Default Draw, never surfaceFx.
+            }
             if(kind==GameplayWorld::DrawActor::smoke){
                 if(compositeCurrency)return true;
                 const auto* r=port.registeredSmoke()?port.registeredSmoke()->find(key):nullptr;

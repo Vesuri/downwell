@@ -107,7 +107,7 @@ private:
         return &nativePositions_[slot<View::terrainBase?slot:slot-(View::timeFieldBase-View::terrainBase)];
     }
     static constexpr unsigned drawCapacity=2+GameplayWorld::enemyCapacity+GameplayWorld::bulletCapacity+
-        GameplayScriptSpawnInstances::capacity+GameplayDebrisInstances::capacity+GameplayEntryDithers::capacity+GameplayWorld::boneCapacity+GameplayWorld::skeletonCapacity+64+32+32+32;
+        GameplayScriptSpawnInstances::capacity+GameplayDebrisInstances::capacity+GameplayEntryDithers::capacity+GameplayWorld::boneCapacity+GameplayWorld::skeletonCapacity+64+32+32+32+32;
     struct DrawEntry {GameplayWorld::DrawActor kind;InstanceHandle local;RunnerImageValue depth;};
     struct DrawIdentity {GameplayWorld::DrawActor kind;InstanceHandle local;};
     DrawIdentity preparedDrawIdentities_[drawCapacity]{};
@@ -118,7 +118,7 @@ private:
 #ifdef DOWNWELL_DRAW_CACHE_AUDIT
     mutable bool drawAuditHasSnapshot_=false;
 #endif
-    RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity+GameplayWorld::droneBulletCapacity+GameplayWorld::boneCapacity+GameplayWorld::skeletonCapacity+GameplayWorld::currencyCapacity+32> combatAlarmPhase_;
+    RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity+GameplayWorld::droneBulletCapacity+GameplayWorld::boneCapacity+GameplayWorld::skeletonCapacity+GameplayWorld::currencyCapacity+32+32> combatAlarmPhase_;
     RunnerStepSnapshot<GameplayWorld::droneBulletCapacity+GameplayWorld::skeletonCapacity+GameplayPlayerControllers::capacity+32> actorEndStepPhase_;
     bool actorEndStepExecuting_=false;
     bool combatAlarmCaptureDirty_=true;
@@ -218,19 +218,21 @@ private:
                 token=1+GameplayWorld::enemyCapacity+GameplayWorld::bulletCapacity+
                     GameplayScriptSpawnInstances::capacity+GameplayDebrisInstances::capacity;break;
             case View::Kind::entryDither:drawKind=GameplayWorld::DrawActor::entryDither;
-                token=drawCapacity-32-64-64-GameplayWorld::skeletonCapacity-GameplayWorld::boneCapacity-GameplayEntryDithers::capacity+local.slot;break;
+                token=drawCapacity-32-32-64-64-GameplayWorld::skeletonCapacity-GameplayWorld::boneCapacity-GameplayEntryDithers::capacity+local.slot;break;
             case View::Kind::bone:drawKind=GameplayWorld::DrawActor::bone;
-                token=drawCapacity-32-64-64-GameplayWorld::skeletonCapacity-GameplayWorld::boneCapacity+local.slot;break;
+                token=drawCapacity-32-32-64-64-GameplayWorld::skeletonCapacity-GameplayWorld::boneCapacity+local.slot;break;
             case View::Kind::skeleton:drawKind=GameplayWorld::DrawActor::skeleton;
-                token=drawCapacity-32-64-64-GameplayWorld::skeletonCapacity+local.slot;break;
+                token=drawCapacity-32-32-64-64-GameplayWorld::skeletonCapacity+local.slot;break;
             case View::Kind::timeShard:drawKind=GameplayWorld::DrawActor::timeShard;
-                token=drawCapacity-32-64-64+local.slot;break;
+                token=drawCapacity-32-32-64-64+local.slot;break;
             case View::Kind::corpseExpiry:drawKind=GameplayWorld::DrawActor::corpseExpiry;
-                token=drawCapacity-32-64+local.slot;break;
-            case View::Kind::corpse:drawKind=GameplayWorld::DrawActor::corpse;
+                token=drawCapacity-32-32-64+local.slot;break;
+            case View::Kind::consumptionBlood:drawKind=GameplayWorld::DrawActor::consumptionBlood;
                 token=drawCapacity-32+local.slot;break;
-            case View::Kind::smoke:drawKind=GameplayWorld::DrawActor::smoke;
+            case View::Kind::corpse:drawKind=GameplayWorld::DrawActor::corpse;
                 token=drawCapacity-32-32+local.slot;break;
+            case View::Kind::smoke:drawKind=GameplayWorld::DrawActor::smoke;
+                token=drawCapacity-32-32-32+local.slot;break;
             default:actor=false;break;
         }
         if(actor){
@@ -636,6 +638,7 @@ private:
             if constexpr(Kind==View::Kind::blood)return 220;
             if constexpr(Kind==View::Kind::smoke)return 225;
             if constexpr(Kind==View::Kind::corpse)return 263;
+            if constexpr(Kind==View::Kind::consumptionBlood)return 223;
             if constexpr(Kind==View::Kind::currency)return 248;
             if constexpr(Kind==View::Kind::goalField||Kind==View::Kind::exitController)return r.objectId;
             return Kind==View::Kind::player?35:92;
@@ -721,11 +724,11 @@ private:
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
             if constexpr(Kind==View::Kind::timeField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
-            if constexpr(Kind==View::Kind::corpse||Kind==View::Kind::corpseExpiry||Kind==View::Kind::smoke)sourceId=r.sourceId;
+            if constexpr(Kind==View::Kind::consumptionBlood||Kind==View::Kind::corpse||Kind==View::Kind::corpseExpiry||Kind==View::Kind::smoke)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeShard)sourceId=parent.pendingTimeShardId_;
             if constexpr(Kind==View::Kind::playerController||Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::builder||Kind==View::Kind::goalField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency)sourceId=r.sourceId;
-            constexpr bool projected=Kind==View::Kind::corpse||Kind==View::Kind::smoke||Kind==View::Kind::corpseExpiry||Kind==View::Kind::player||Kind==View::Kind::enemy||
+            constexpr bool projected=Kind==View::Kind::consumptionBlood||Kind==View::Kind::corpse||Kind==View::Kind::smoke||Kind==View::Kind::corpseExpiry||Kind==View::Kind::player||Kind==View::Kind::enemy||
                 Kind==View::Kind::bullet||Kind==View::Kind::scriptEffect||Kind==View::Kind::debris||Kind==View::Kind::entryDither||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::ditherAbove||Kind==View::Kind::timeShard;
             if(projected&&!parent.actorDepthAvailable(p.depth))return parent.check(false);
             {
@@ -743,7 +746,7 @@ private:
             if constexpr(Kind==View::Kind::scriptEffect||Kind==View::Kind::debris){
                 if(!r.effect)return parent.check(false);
                 position->x=r.effect->x;position->y=r.effect->y;
-            }else if constexpr(Kind==View::Kind::corpse||Kind==View::Kind::smoke||Kind==View::Kind::corpseExpiry||Kind==View::Kind::playerController||Kind==View::Kind::timeShard||Kind==View::Kind::timeChange||Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::builder||Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency){
+            }else if constexpr(Kind==View::Kind::consumptionBlood||Kind==View::Kind::corpse||Kind==View::Kind::smoke||Kind==View::Kind::corpseExpiry||Kind==View::Kind::playerController||Kind==View::Kind::timeShard||Kind==View::Kind::timeChange||Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::builder||Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency){
                 position->x=r.x;position->y=r.y;
             }else{
                 constexpr bool roomCoordinates=Kind==View::Kind::player||Kind==View::Kind::terrain||Kind==View::Kind::timeField||Kind==View::Kind::goalField||Kind==View::Kind::exitController;
@@ -824,11 +827,11 @@ private:
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
             if constexpr(Kind==View::Kind::timeField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
-            if constexpr(Kind==View::Kind::corpse||Kind==View::Kind::corpseExpiry||Kind==View::Kind::smoke)sourceId=r.sourceId;
+            if constexpr(Kind==View::Kind::consumptionBlood||Kind==View::Kind::corpse||Kind==View::Kind::corpseExpiry||Kind==View::Kind::smoke)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeShard)sourceId=parent.pendingTimeShardId_;
             if constexpr(Kind==View::Kind::playerController||Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::builder||Kind==View::Kind::goalField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency)sourceId=r.sourceId;
-            constexpr bool projected=Kind==View::Kind::corpse||Kind==View::Kind::smoke||Kind==View::Kind::corpseExpiry||Kind==View::Kind::player||Kind==View::Kind::enemy||
+            constexpr bool projected=Kind==View::Kind::consumptionBlood||Kind==View::Kind::corpse||Kind==View::Kind::smoke||Kind==View::Kind::corpseExpiry||Kind==View::Kind::player||Kind==View::Kind::enemy||
                 Kind==View::Kind::bullet||Kind==View::Kind::scriptEffect||Kind==View::Kind::debris||Kind==View::Kind::entryDither||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::ditherAbove||Kind==View::Kind::timeShard;
             if(projected&&!parent.actorDepthAvailable(depth))return parent.check(false);
             if(!parent.check(parent.layers_.birth(h,sourceId,depth,inactive,projected)))return false;
@@ -1032,6 +1035,8 @@ private:
     GameplayWorld::RegisteredSmoke smoke_{GameplayWorld::RegisteredSmoke::Binding::bindPositionedActor(smokeBinding_)};
     Binding<GameplayWorld::RegisteredCorpse::Record,View::Kind::corpse> corpseBinding_{*this};
     GameplayWorld::RegisteredCorpse corpses_{GameplayWorld::RegisteredCorpse::Binding::bindPositionedQueryActor(corpseBinding_)};
+    Binding<GameplayWorld::ConsumptionParticles::Record,View::Kind::consumptionBlood> consumptionBinding_{*this};
+    GameplayWorld::ConsumptionParticles consumption_{GameplayWorld::ConsumptionParticles::Binding::bindPositionedActor(consumptionBinding_)};
     const SpriteMaskPack* corpseMasks_=nullptr;
     bool (*corpseChildId_)(void*,std::uint32_t&)=nullptr;
     void* corpseChildIdContext_=nullptr;
@@ -1159,7 +1164,7 @@ public:
     template<class Visit> bool visitRegistrationOrder(Visit visit)const{return valid()&&visitEligibility(visit);}
     // Drone dispatch deliberately exposes bool& status to arbitrary callbacks;
     // retain its live read rather than delaying a callback's failure to return.
-    bool valid()const{return good_&&corpses_.valid()&&smoke_.valid()&&expiry_.valid()&&playerControllers_.valid()&&builderController_.valid()&&blood_.valid()&&skeletons_.valid()&&(failureObserved_?(drones_.valid()&&bones_.valid()):
+    bool valid()const{return good_&&consumption_.valid()&&corpses_.valid()&&smoke_.valid()&&expiry_.valid()&&playerControllers_.valid()&&builderController_.valid()&&blood_.valid()&&skeletons_.valid()&&(failureObserved_?(drones_.valid()&&bones_.valid()):
         (owner_.valid()&&properties_.valid()&&terrain_.valid()&&scriptEffects_.valid()&&debris_.valid()&&
          timeShards_.valid()&&timeChanges_.valid()&&entries_.valid()&&drones_.valid()&&bones_.valid()&&layers_.valid()));}
     unsigned pendingSpatialIndex()const{return owner_.pendingSpatialIndex();}
@@ -1362,6 +1367,7 @@ public:
         if(!world_&&!world.bindRegisteredExpiry(expiry_))return check(false);
         if(!world_&&!world.bindRegisteredSmoke(smoke_))return check(false);
         if(!world_&&!world.bindRegisteredCorpses(corpses_))return check(false);
+        if(!world_&&!world.bindConsumptionParticles(consumption_))return check(false);
         if(!world_&&!world.bindDebrisInstances(debris_))return check(false);
         if(!world_&&!world.bindTimeChangeInstances(timeChanges_))return check(false);
         if(!world_&&!world.bindTimeShardInstances(timeShards_))return check(false);
@@ -1466,7 +1472,7 @@ public:
                 if(!View::decode(shared,kind,local))return false;
                 // Retained terrain/field composition is not part of this
                 // visitor. Do not resolve or copy their records per frame.
-                if(kind!=View::Kind::corpse&&kind!=View::Kind::smoke&&kind!=View::Kind::corpseExpiry&&kind!=View::Kind::enemy&&kind!=View::Kind::bullet&&kind!=View::Kind::scriptEffect&&kind!=View::Kind::debris&&kind!=View::Kind::player&&kind!=View::Kind::entryDither&&kind!=View::Kind::bone&&kind!=View::Kind::skeleton&&kind!=View::Kind::ditherAbove&&kind!=View::Kind::timeShard)return true;
+                if(kind!=View::Kind::consumptionBlood&&kind!=View::Kind::corpse&&kind!=View::Kind::smoke&&kind!=View::Kind::corpseExpiry&&kind!=View::Kind::enemy&&kind!=View::Kind::bullet&&kind!=View::Kind::scriptEffect&&kind!=View::Kind::debris&&kind!=View::Kind::player&&kind!=View::Kind::entryDither&&kind!=View::Kind::bone&&kind!=View::Kind::skeleton&&kind!=View::Kind::ditherAbove&&kind!=View::Kind::timeShard)return true;
                 std::uint32_t flags;
                 if(!self.eligibilityFlags(shared,flags)||!View(*self.world_).contains(shared))return false;
                 if(flags&0x100003u)return true;
@@ -1484,6 +1490,7 @@ public:
                     case View::Kind::corpseExpiry:return visit(visitor,GameplayWorld::DrawActor::corpseExpiry,local,depth);
                     case View::Kind::smoke:return visit(visitor,GameplayWorld::DrawActor::smoke,local,depth);
                     case View::Kind::corpse:return visit(visitor,GameplayWorld::DrawActor::corpse,local,depth);
+                    case View::Kind::consumptionBlood:return visit(visitor,GameplayWorld::DrawActor::consumptionBlood,local,depth);
                     default:return true;
                 }
             };
@@ -1493,7 +1500,7 @@ public:
                 // Retained scenery/field passes own these draws. Preserve the
                 // inactive flag (which terminates a layer), but avoid event
                 // and sprite lookups for every terrain tile each frame.
-                if(kind!=View::Kind::corpse&&kind!=View::Kind::smoke&&kind!=View::Kind::corpseExpiry&&kind!=View::Kind::enemy&&kind!=View::Kind::bullet&&kind!=View::Kind::scriptEffect&&
+                if(kind!=View::Kind::consumptionBlood&&kind!=View::Kind::corpse&&kind!=View::Kind::smoke&&kind!=View::Kind::corpseExpiry&&kind!=View::Kind::enemy&&kind!=View::Kind::bullet&&kind!=View::Kind::scriptEffect&&
                     kind!=View::Kind::debris&&kind!=View::Kind::player&&kind!=View::Kind::entryDither&&kind!=View::Kind::bone&&kind!=View::Kind::skeleton&&kind!=View::Kind::ditherAbove&&kind!=View::Kind::timeShard)return true;
                 const unsigned metadata=self.drawMetadata_.get(self.objectOf(h));
                 out.object=(metadata&ObjectDrawMetadata<386>::exists)!=0;
@@ -1644,6 +1651,7 @@ public:
                     case View::Kind::corpseExpiry:return self.expiry_.advanceAnimation(local);
                     case View::Kind::smoke:return self.smoke_.advanceAnimation(local);
                     case View::Kind::corpse:return self.corpses_.advanceAnimation(local);
+                    case View::Kind::consumptionBlood:return self.consumption_.advanceAnimation(local);
                     case View::Kind::timeShard:return self.world_->advanceTimeShardRoomAnimation(local);
                     case View::Kind::playerController:return self.playerControllers_.advanceAnimation(local);
                     case View::Kind::bone:return self.bones_.advanceAnimation(local);
@@ -1743,6 +1751,7 @@ public:
                     kind==View::Kind::skeleton?self.skeletons_.advanceAlarm(local,alarm):
                     kind==View::Kind::smoke?self.smoke_.advanceAlarm(local,alarm):
                     kind==View::Kind::corpse?self.advanceCorpseAlarm(local,alarm):
+                    kind==View::Kind::consumptionBlood?self.consumption_.advanceAlarm(local,alarm):
                     kind==View::Kind::currency?self.world_->advanceCurrencyRoomAlarm(local,alarm):
                     kind==View::Kind::entryDither&&self.entries_.advanceAlarm(local,alarm);
             },reused,&self.combatAlarmMask_,boxes
@@ -2130,6 +2139,7 @@ public:
     GameplayWorld::RegisteredExpiry& registeredExpiry(){return expiry_;}
     GameplayWorld::RegisteredSmoke& registeredSmoke(){return smoke_;}
     GameplayWorld::RegisteredCorpse& registeredCorpses(){return corpses_;}
+    GameplayWorld::ConsumptionParticles& consumptionParticles(){return consumption_;}
     bool configureCorpseMasks(const SpriteMaskPack& masks){
         if(!valid()||!masks.valid())return check(false);
         corpseMasks_=&masks;return true;
@@ -2527,6 +2537,11 @@ public:
         View::Kind kind;InstanceHandle local;
         if(!valid()||!world_||!View::decode(shared,kind,local)||kind!=View::Kind::smoke||!resolves(shared))return check(false);
         return check(world_->stepSmokeRoomEffect(local));
+    }
+    template<class Globals> bool stepConsumptionBlood(InstanceHandle shared,Globals& globals){
+        View::Kind kind;InstanceHandle local;
+        if(!valid()||!world_||!View::decode(shared,kind,local)||kind!=View::Kind::consumptionBlood||!resolves(shared))return check(false);
+        return check(consumption_.step(local,globals));
     }
     // Entry from the captured mixed Step phase, never a corpse-family sweep.
     // The caller supplies live player time-stop state and synchronous RIP
@@ -2963,6 +2978,7 @@ private:
                 case View::Kind::corpseExpiry:return record.corpseExpiry&&expiry_.retire(local);
                 case View::Kind::smoke:return record.smoke&&smoke_.retire(local);
                 case View::Kind::corpse:return record.corpse&&corpses_.retire(local);
+                case View::Kind::consumptionBlood:return record.consumptionBlood&&consumption_.retire(local);
                 case View::Kind::currency:return record.currency&&currency_.retire(local);
                 case View::Kind::playerController:return record.playerController&&playerControllers_.retire(local);
                 default:return false;

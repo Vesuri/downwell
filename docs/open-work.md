@@ -491,6 +491,10 @@ Reference: [scene architecture](scene-architecture.md).
   stock-machine fit.
 - Budget further Chip residency against the measured 928-byte startup
   headroom; remeasure after pack growth and through scene transitions.
+  Restore the renderer's 120,000-byte resident-art gate: the current pack
+  requires 126,168 bytes (125,914 without consumption-particle sprite 92).
+  Keep the gate unchanged until residency is reduced or a new whole-program
+  allocation measurement justifies a different budget.
   Keep the 68000 CPU target; do not silently increase emulator Chip RAM
   to make memory checks pass.
 - The gameplay, HUD, results, shop and clear packs and the cover masks are

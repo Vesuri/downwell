@@ -40,6 +40,7 @@
 #include "core/GameplayScriptSpawnInstances.h"
 #include "core/CorpseExpiryInstances.h"
 #include "core/CorpseInstances.h"
+#include "core/ConsumptionBloodInstances.h"
 #include "core/CorpseDraw.h"
 #include "core/SmokeInstances.h"
 #include "core/SmokeDraw.h"
@@ -331,6 +332,12 @@ public:
     }
     const downwell::GameplayScriptSpawnInstances* scriptSpawnInstances()const{return scriptSpawnInstances_;}
     using RegisteredExpiry=downwell::CorpseExpiryInstances<32>;
+    using ConsumptionParticles=downwell::ConsumptionBloodInstances<32>;
+    const ConsumptionParticles* consumptionParticles()const{return consumptionParticles_;}
+    bool bindConsumptionParticles(ConsumptionParticles& instances){
+        if(consumptionParticles_||!instances.valid()||instances.size())return false;
+        consumptionParticles_=&instances;return true;
+    }
     using RegisteredCorpse=downwell::CorpseInstances<32>;
     const RegisteredCorpse* registeredCorpses()const{return registeredCorpses_;}
     bool bindRegisteredCorpses(RegisteredCorpse& instances){
@@ -825,7 +832,7 @@ public:
         return run_.effectsSucceeded=scriptSpawnInstances_&&effects.advanceRegistered(phase,*scriptSpawnInstances_);
     }
     enum class PhaseBoundary { beginStep, alarm, step, collision, endStep, roomEntry };
-    enum class DrawActor { enemy, bullet, scriptEffect, debris, player, entryDither, bone, skeleton, ditherAbove, timeShard, corpseExpiry, smoke, corpse };
+    enum class DrawActor { enemy, bullet, scriptEffect, debris, player, entryDither, bone, skeleton, ditherAbove, timeShard, corpseExpiry, smoke, corpse, consumptionBlood };
     template<class Visit> bool visitRegisteredEnemyShades(Visit visit)const{
         if((!bones_||!bones_->size())&&(!skeletons_||!skeletons_->size()))return true;
         return visitRoomActorsReadOnly([&](DrawActor kind,downwell::InstanceHandle key,auto){
@@ -1682,6 +1689,7 @@ private:
     RegisteredExpiry* registeredExpiry_=nullptr;
     RegisteredSmoke* registeredSmoke_=nullptr;
     RegisteredCorpse* registeredCorpses_=nullptr;
+    ConsumptionParticles* consumptionParticles_=nullptr;
     downwell::GameplayDebrisInstances* debrisInstances_=nullptr;
     downwell::NativeTimeChangeRegistration* timeChangeInstances_=nullptr;
     downwell::NativeTimeShardRegistration* timeShardInstances_=nullptr;

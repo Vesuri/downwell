@@ -59,6 +59,26 @@ int main() {
             })&&surfaces==1);
             assert(!world->visitRegisteredEffectSurfaces(art,effectView,[](const auto&,auto,auto){return false;}));
             assert(corpses.clear());
+            struct Globals {
+                downwell::MotionBinary64 grav{};
+                bool gravity(downwell::MotionBinary64 v){grav=v;return true;}
+                downwell::MotionBinary64 gravity(){return grav;}downwell::MotionBinary64 fallSpeed(){return {};}
+            } globals;
+            auto& particles=owner->consumptionParticles();downwell::InstanceHandle particle;
+            assert(particles.create(105188,x,y,random,globals,particle));
+            unsigned frameMask=0;
+            for(unsigned tick=0;tick<30;++tick){
+                unsigned frame;assert(particles.find(particle)->state.drawFrame(frame));frameMask|=1u<<frame;
+                for(bool composite:{false,true}){
+                    AmigaGameplayDrawList list;assert(list.collect(*world,pack,pack+8,160,34,composite));unsigned count=0;
+                    for(unsigned i=0;i<list.count;++i)if(list.actors[i].sprite==92){
+                        const auto& a=list.actors[i];assert(a.frame==frame&&a.x==198&&a.y==94&&!a.flip);++count;
+                    }
+                    assert(count==1);
+                }
+                assert(particles.advanceAnimation(particle));
+            }
+            assert(frameMask==255&&particles.clear());
         }
         for(auto mode:{downwell::GameplayCollisionOwner::Ownership::reference,
             downwell::GameplayCollisionOwner::Ownership::native,

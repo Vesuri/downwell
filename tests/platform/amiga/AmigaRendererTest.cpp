@@ -1629,6 +1629,11 @@ int main(int argc, char** argv) {
         static AmigaActorFrames prepared;
         const auto* pack=gamePack.data();const auto* end=pack+gamePack.size();
         require(prepared.prepare(pack,end),"prepare immutable gameplay actor bindings");
+        for(unsigned frame=0;frame<8;++frame){
+            const auto* particle=prepared.find(92,frame);
+            require(particle&&particle->width==2&&particle->height==2,
+                "all consumption particle frames have offline planar bindings");
+        }
         const auto word=[](const UBYTE* p){return unsigned(p[0])*256+p[1];};
         const unsigned count=word(pack+8)*65536+word(pack+10);
         unsigned checked=0;

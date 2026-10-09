@@ -14,6 +14,12 @@ namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_
 #include "core/CurrencyHomingMath.h"
 #include "core/TerrainWallContacts.h"
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
+struct NativeConsumptionGlobalsProbe {
+    bool gravity(downwell::MotionBinary64);
+    downwell::MotionBinary64 gravity();downwell::MotionBinary64 fallSpeed();
+};
+bool nativeConsumptionStep(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle shared,
+    NativeConsumptionGlobalsProbe& globals){return owner.stepConsumptionBlood(shared,globals);}
 struct NativeCorpseStepProbe {
     int area();int restInPieces();
     bool create(int,downwell::MotionBinary64,downwell::MotionBinary64);
@@ -344,6 +350,7 @@ static void checkTypedCollisionView(const GameplayCollisionView& view,GameplayCo
         case K::corpseExpiry:assert(view.resolveLocal<K::corpseExpiry>(local)==reference.corpseExpiry);break;
         case K::smoke:assert(view.resolveLocal<K::smoke>(local)==reference.smoke);break;
         case K::corpse:assert(view.resolveLocal<K::corpse>(local)==reference.corpse);break;
+        case K::consumptionBlood:assert(view.resolveLocal<K::consumptionBlood>(local)==reference.consumptionBlood);break;
         case K::debris:assert(view.resolveLocal<K::debris>(local)==reference.debris);break;
         case K::timeChange:assert(view.resolveLocal<K::timeChange>(local)==reference.timeChange);break;
         case K::timeShard:assert(view.resolveLocal<K::timeShard>(local)==reference.timeShard);break;
@@ -1425,7 +1432,13 @@ int main(){
         const auto eating=corpses.sourceHandle(205191);InstanceHandle eatingShared,player;
         assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::corpse,eating,eatingShared)&&
             GameplayCollisionView::encode(GameplayCollisionView::Kind::player,world->playerHandle(),player));
+        struct ParticleGlobals {
+            MotionBinary64 grav{};
+            bool gravity(MotionBinary64 v){grav=v;return true;}
+            MotionBinary64 gravity(){return grav;}MotionBinary64 fallSpeed(){return {};}
+        } particleGlobals;
         struct Consumption {
+            GameplayCollisionOwner& owner;GameMakerRandom& random;ParticleGlobals& globals;
             unsigned eaten=0,sounds=0,children=0,reads=0,reject=0;
             bool incrementBodiesEaten(){++eaten;return true;}
             void eatSound(int s,int p,int l,int g){assert(eaten==1&&s==83&&p==80&&!l&&g==1);++sounds;}
@@ -1434,9 +1447,10 @@ int main(){
             bool create(int object,MotionBinary64 x,MotionBinary64 y,std::uint32_t& id){
                 assert(object==223&&eaten==1&&sounds==1&&x.high==MotionBinary64::fromInteger(240+children).high&&
                     y.high==MotionBinary64::fromInteger(192+children).high);
-                id=205192+children++;return children!=reject;
+                id=205192+children++;InstanceHandle child;
+                return children!=reject&&owner.consumptionParticles().create(id,x,y,random,globals,child);
             }
-        } effects;
+        } effects{*owner,random,particleGlobals};
         RunnerCollisionEventContext context;
         auto contact=[&](bool upgrade,bool dead){return owner->dispatchCollisionEvent(context,eatingShared,player,{true,false},
             [&](const auto& event){return owner->dispatchCorpsePlayerCollision(event,upgrade,dead,effects);});};
@@ -1446,12 +1460,26 @@ int main(){
         assert(contact(true,false)&&effects.eaten==1&&effects.sounds==1&&effects.children==5&&effects.reads==10&&
             corpses.find(eating)&&corpses.find(eating)->destroyRequested);
         assert(owner->prepareDraw()&&!corpses.find(eating)&&!view.contains(eatingShared));
+        assert(owner->consumptionParticles().size()==5);
+        for(unsigned child=0;child<5;++child){
+            const auto local=owner->consumptionParticles().sourceHandle(205192+child);
+            checkTypedCollisionView(view,GameplayCollisionView::Kind::consumptionBlood,local);
+        }
+        for(unsigned tick=0;tick<120;++tick){
+            world->step(0);assert(world->effectsSucceeded()&&owner->valid());unsigned selectedParticles=0;
+            assert(owner->dispatchStepPhase(0,*phase,[&](InstanceHandle actor,const PackedObjectEvent& event){
+                GameplayCollisionView::Kind kind;InstanceHandle local;assert(GameplayCollisionView::decode(actor,kind,local));
+                if(kind!=GameplayCollisionView::Kind::consumptionBlood)return true;
+                assert(event.codeId==2006);++selectedParticles;return owner->stepConsumptionBlood(actor,particleGlobals);
+            })&&selectedParticles==(tick==119?0u:5u));
+            assert(owner->prepareDraw()&&owner->consumptionParticles().size()==(tick==119?0u:5u));
+        }
         assert(corpses.createFromDeath(205200,source,206,{},102,false,random,
             [](auto,int,auto,auto,bool& hit){hit=false;return true;}));
         const auto rejected=corpses.sourceHandle(205200);
         assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::corpse,rejected,eatingShared));
         for(unsigned tick=0;tick<8;++tick)assert(owner->advanceCorpseAlarm(rejected,3));
-        effects={};effects.reject=3;
+        effects.eaten=effects.sounds=effects.children=effects.reads=0;effects.reject=3;
         assert(!contact(true,false)&&!owner->valid()&&effects.eaten==1&&effects.sounds==1&&effects.children==3&&
             corpses.find(rejected)&&!corpses.find(rejected)->destroyRequested);
         assert(!contact(true,false)&&effects.children==3); // No replay of the committed prefix.

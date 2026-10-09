@@ -12,6 +12,12 @@ struct ConsumptionBloodEffect {
     MotionBinary64 xsp{},ysp{};
     int alarm0=-1;
     bool valid=true,destroyRequested=false;
+    bool drawFrame(unsigned& frame)const{
+        const unsigned magnitude=imageIndex.bits&0x7fffffffu;
+        if(!valid||magnitude>=0x41000000u||((imageIndex.bits>>31)&&magnitude))return false;
+        const unsigned exponent=(imageIndex.bits>>23)&255u;
+        frame=exponent<127?0:((imageIndex.bits&0x7fffffu)|0x800000u)>>(150u-exponent);return true;
+    }
     template<class Random,class Publish> bool create(MotionBinary64 px,MotionBinary64 py,Random& random,Publish& publish){
         *this={};
         if(!x.assign(px)||!y.assign(py)||

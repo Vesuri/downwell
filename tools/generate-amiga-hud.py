@@ -78,6 +78,7 @@ SELECTIONS = {
         84: None,    # sprSmoke: all nine source animation frames
         85: None,    # sprFxSmokeball: six bone-impact frames
         91: None,    # sprDebris: six frames, default/area-four debris
+        92: None,    # sprWaterSplash: eight default-Draw consumption-blood frames
         96: None,    # sprFlashBall: source shader light/dark classes
         101: None,   # sprFxBulletHitWall: eight source impact frames
         102: None,   # sprFxExplosionS: corpse expiry, twelve planar frames
