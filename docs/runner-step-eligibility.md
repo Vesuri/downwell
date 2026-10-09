@@ -112,8 +112,16 @@ fixture executes collected shard contacts at this boundary and verifies that
 cooldown contacts consume no RNG and the callback cannot survive into another
 tick. Scheduler tests also cover collision births and membership reconciliation.
 
-Normal host gameplay still uses legacy contact loops after End Step, and the
-native scheduler has not adopted this pass. Admitting all handlers requires
+`GameplayWorld::withCollisionPass` exposes the corresponding native-world
+boundary after Step reconciliation and before collision reconciliation/owned
+End Step. Its caller supplies collection and checked event dispatch; the
+callback is scoped to the supplied tick operation and is removed on return.
+Failure prevents End Step, and nested scoped passes or direct recursive ticks
+latch failure before further simulation. It installs no default collision
+handlers and does not disable existing contacts.
+
+Normal gameplay still uses legacy contact loops; neither backend installs a
+complete replacement pass by default. Admitting all handlers requires
 moving their existing work to the source phases and removing the replaced
 routes; do not enable the pass alongside duplicate contacts or skip unknown
 handlers. Engine movement and pending-room semantics remain explicit inputs.

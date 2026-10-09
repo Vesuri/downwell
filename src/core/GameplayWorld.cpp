@@ -986,6 +986,7 @@ bool GameplayWorld::boneInView(downwell::InstanceHandle bone,bool& visible){
 
 GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
 {
+    if(collisionPassExecuting_){run_.effectsSucceeded=false;return {};}
     if (run_.levelClearActive || !run_.effectsSucceeded || !generationSucceeded_) return {}; // Result owner uses stepLevelClear.
     boneViewLeft_=160+cameraPixelX_;
     boneViewTopQ8_=34L*256+viewCameraYQ8();
@@ -1648,6 +1649,12 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     // still reads the previous Draw's view, including after a Collision snap.
     const long viewTop = 34L * 4096 + generationCameraY * 16;
     if(!reconcilePhase(PhaseBoundary::step))return {};
+    if(collisionPass_){
+        collisionPassExecuting_=true;
+        const bool passed=collisionPass_(collisionPassContext_);
+        collisionPassExecuting_=false;
+        if(!passed||!run_.effectsSucceeded){run_.effectsSucceeded=false;return {};}
+    }
     if (followCamera_ && run_.sideCameraLockers.count) {
         run_.sideCameraLockers.collide(cameraMotion_);
         const int collisionScroll = cameraMotion_.pixelY() - 176 - cameraPixelY_;

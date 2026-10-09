@@ -2275,6 +2275,34 @@ int main(){
         assert(audit.calls==(reject<5?reject+1:5));
         if(reject<5){phaseWorld->step(0);assert(audit.calls==reject+1);}
     }
+    for(unsigned mode=0;mode<4;++mode){
+        auto world=std::make_unique<GameplayWorld>(300);
+        std::vector<unsigned> order;
+        world->configurePhaseBoundary([](void* p,GameplayWorld::PhaseBoundary phase){
+            static_cast<std::vector<unsigned>*>(p)->push_back(unsigned(phase));return true;
+        },&order);
+        world->configureRegisteredActorEndStep([](void* p,long){
+            static_cast<std::vector<unsigned>*>(p)->push_back(11);return true;
+        },&order);
+        unsigned passes=0;
+        const bool ok=world->withCollisionPass([&]{
+            ++passes;order.push_back(10);
+            assert((order==std::vector<unsigned>{0,1,2,10}));
+            if(mode==2){
+                assert(!world->withCollisionPass([]{assert(false);return true;},[]{assert(false);return true;}));
+            }else if(mode==3)world->step(0); // Direct recursion must also fail before advancing.
+            return mode!=1; // Deliberately ignore the inner failure in modes 2/3.
+        },[&]{world->step(0);return world->effectsSucceeded();});
+        assert(ok==(mode==0)&&passes==1&&world->effectsSucceeded()==ok);
+        if(ok){
+            assert((order==std::vector<unsigned>{0,1,2,10,3,11,4}));
+            order.clear();world->step(0);
+            assert(world->effectsSucceeded()&&passes==1&&(order==std::vector<unsigned>{0,1,2,3,11,4}));
+        }else{
+            assert((order==std::vector<unsigned>{0,1,2,10}));world->step(0);
+            assert(passes==1&&order.size()==4);
+        }
+    }
     for(bool reject:{false,true}){
         auto ordered=std::make_unique<GameplayCollisionOwner>(objects,sprites);
         auto scene=std::make_unique<GameplayWorld>(300,true,0,false,ordered->enemyBinding(),

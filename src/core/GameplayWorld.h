@@ -752,6 +752,16 @@ public:
     }
     void configureRoomAnimation(bool (*callback)(void*),void* context){roomAnimation_=callback;roomAnimationContext_=context;}
     void configureRegisteredActorEndStep(bool (*callback)(void*,long),void* context){registeredActorEndStep_=callback;registeredActorEndStepContext_=context;}
+    // Scoped ordered collision pass after Step reconciliation, before End
+    // Step. The caller owns collection, dispatch and its persistent workspace.
+    // Legacy contact loops are not replaced merely by installing this hook.
+    template<class Pass,class Tick> bool withCollisionPass(Pass pass,Tick tick){
+        if(!run_.effectsSucceeded||collisionPass_)return run_.effectsSucceeded=false;
+        collisionPassContext_=&pass;
+        collisionPass_=[](void* context){return (*static_cast<Pass*>(context))();};
+        const bool ok=tick();collisionPass_=nullptr;collisionPassContext_=nullptr;
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
+    }
     bool advanceEnemyRoomAnimation(downwell::InstanceHandle key);
     bool advanceEnemyRoomAlarm(downwell::InstanceHandle key,unsigned alarm);
     bool advanceBoxRoomAlarm(downwell::InstanceHandle key,unsigned alarm);
@@ -1443,6 +1453,9 @@ private:
     void* roomAnimationContext_=nullptr;
     bool (*registeredActorEndStep_)(void*,long)=nullptr;
     void* registeredActorEndStepContext_=nullptr;
+    bool (*collisionPass_)(void*)=nullptr;
+    void* collisionPassContext_=nullptr;
+    bool collisionPassExecuting_=false;
     RoomActorDraw roomActorDraw_=nullptr;
     RoomActorDraw roomActorReadOnlyDraw_=nullptr;
     const void* roomActorDrawContext_=nullptr;
