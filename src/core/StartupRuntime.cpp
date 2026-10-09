@@ -394,6 +394,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
         if(instance.objectId==263&&(!corpseDispatch_||!corpseDispatch_(corpseContext_,instance,CorpsePhase::animation,0)))return false;
         if(instance.objectId==242&&(!corpseExpiryDispatch_||!corpseExpiryDispatch_(corpseExpiryContext_,instance,false)))return false;
         if(instance.objectId==225&&(!smokeDispatch_||!smokeDispatch_(smokeContext_,instance,SmokePhase::animation,0)))return false;
+        if(instance.objectId==223&&(!consumptionBloodDispatch_||!consumptionBloodDispatch_(consumptionBloodContext_,instance,ConsumptionBloodPhase::animation,0)))return false;
         if(instance.objectId==249||instance.objectId==256){
             auto* companion=const_cast<PlayerCompanionCreateState*>(companionCreateState(instance.instanceId));
             RunnerImageValue index,speed;
@@ -913,6 +914,7 @@ bool StartupRuntime::cleanupMainOwnedDestroyed(){
             (r.objectId==263&&corpseDispatch_)||
             (r.objectId==242&&corpseExpiryDispatch_)||
             (r.objectId==225&&smokeDispatch_)||
+            (r.objectId==223&&consumptionBloodDispatch_)||
             (r.objectId==248&&currencyDispatch_)||
             (r.objectId==73&&ownedEntryRegistration_.handle(r).generation)||(r.objectId==219&&!scriptAnimationDispatch_);},
         [this](InstanceHandle key,const InstanceRecord& r){
@@ -926,6 +928,7 @@ bool StartupRuntime::cleanupMainOwnedDestroyed(){
             if(r.objectId==263)return corpseDispatch_(corpseContext_,r,CorpsePhase::cleanup,0);
             if(r.objectId==242)return corpseExpiryDispatch_(corpseExpiryContext_,r,true);
             if(r.objectId==225)return smokeDispatch_(smokeContext_,r,SmokePhase::cleanup,0);
+            if(r.objectId==223)return consumptionBloodDispatch_(consumptionBloodContext_,r,ConsumptionBloodPhase::cleanup,0);
             if(r.objectId==248)return currencyDispatch_(currencyContext_,r,CurrencyPhase::cleanup,0);
             if(r.objectId==73)return ownedEntryRegistration_.retire(key);
             if(r.objectId==219)return scriptEffectsBinding_.retire(key,&r);
@@ -1784,6 +1787,12 @@ bool StartupRuntime::dispatchObjectEvent(InstanceRecord& instance,
         ++implementedCodeCalls_;
         run_.effectsSucceeded=smokeDispatch_&&smokeDispatch_(smokeContext_,instance,
             eventType==2?SmokePhase::alarm:SmokePhase::step,unsigned(eventSubtype));
+        return run_.effectsSucceeded;
+    }
+    if(instance.objectId==223&&(eventType==2||(eventType==3&&eventSubtype==0))){
+        ++implementedCodeCalls_;
+        run_.effectsSucceeded=consumptionBloodDispatch_&&consumptionBloodDispatch_(consumptionBloodContext_,instance,
+            eventType==2?ConsumptionBloodPhase::alarm:ConsumptionBloodPhase::step,unsigned(eventSubtype));
         return run_.effectsSucceeded;
     }
     if(instance.objectId==120&&(eventType==2||(eventType==3&&(eventSubtype==0||eventSubtype==2)))){

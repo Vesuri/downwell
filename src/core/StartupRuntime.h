@@ -28,6 +28,7 @@
 #include "StoredCorpseRegistration.h"
 #include "StoredCorpseExpiryRegistration.h"
 #include "StoredSmokeRegistration.h"
+#include "StoredConsumptionBloodRegistration.h"
 #include "StoredTimeChangeRegistration.h"
 #include "StoredEntryDitherRegistration.h"
 #include "GameplayDitherAbove.h"
@@ -430,6 +431,24 @@ public:
         return corpseDrawState_?corpseDrawState_(corpseDrawContext_,record):nullptr;
     }
     enum class SmokePhase {animation,alarm,step,cleanup};
+    enum class ConsumptionBloodPhase {animation,alarm,step,cleanup};
+    template<unsigned Capacity,class Globals,class Tick> bool withConsumptionBloodEvents(
+        StoredConsumptionBloodRegistration<instanceCapacity,Capacity>& registration,Globals& globals,Tick tick){
+        if(!run_.effectsSucceeded)return false;
+        if(consumptionBloodDispatch_||!registration.belongsTo(instances_)||!registration.valid())return run_.effectsSucceeded=false;
+        auto dispatch=[&](const InstanceRecord& record,ConsumptionBloodPhase phase,unsigned index){
+            if(phase==ConsumptionBloodPhase::animation)return registration.advanceAnimation(record);
+            if(phase==ConsumptionBloodPhase::cleanup)return registration.retire(record);
+            if(phase==ConsumptionBloodPhase::alarm)return index==0&&registration.kill(record);
+            return registration.step(record,globals);
+        };
+        consumptionBloodContext_=&dispatch;
+        consumptionBloodDispatch_=[](void* p,const InstanceRecord& r,ConsumptionBloodPhase phase,unsigned index){
+            return (*static_cast<decltype(dispatch)*>(p))(r,phase,index);
+        };
+        const bool ok=tick();consumptionBloodDispatch_=nullptr;consumptionBloodContext_=nullptr;
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok&&registration.valid();
+    }
     template<unsigned Capacity,class Tick>
     bool withSmokeEvents(StoredSmokeRegistration<instanceCapacity,Capacity>& registration,Tick tick){
         if(!run_.effectsSucceeded)return false;
@@ -817,6 +836,15 @@ public:
     }
     template<unsigned Capacity> StoredSmokeRegistration<instanceCapacity,Capacity> smokeRegistration(){
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
+    }
+    template<unsigned Capacity> StoredConsumptionBloodRegistration<instanceCapacity,Capacity> consumptionBloodRegistration(){
+        return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
+    }
+    template<unsigned Capacity,class Globals> bool createRegisteredConsumptionBlood(
+        StoredConsumptionBloodRegistration<instanceCapacity,Capacity>& registry,MotionBinary64 x,MotionBinary64 y,
+        Globals& globals,std::uint32_t& id){
+        if(!registry.belongsTo(instances_))return run_.effectsSucceeded=false;
+        return registry.create(x,y,random_,globals,id);
     }
     template<unsigned Capacity> bool createRegisteredSmoke(StoredSmokeRegistration<instanceCapacity,Capacity>& registry,
         MotionBinary64 x,MotionBinary64 y,std::uint32_t& id){
@@ -1755,6 +1783,8 @@ private:
     void* corpseDrawContext_=nullptr;
     const CorpseAnimation* (*corpseDrawState_)(void*,const InstanceRecord&)=nullptr;
     void* smokeContext_=nullptr;
+    void* consumptionBloodContext_=nullptr;
+    bool (*consumptionBloodDispatch_)(void*,const InstanceRecord&,ConsumptionBloodPhase,unsigned)=nullptr;
     bool (*smokeDispatch_)(void*,const InstanceRecord&,SmokePhase,unsigned)=nullptr;
     bool (*corpseExpiryDispatch_)(void*,const InstanceRecord&,bool)=nullptr;
     void* droneContext_=nullptr;

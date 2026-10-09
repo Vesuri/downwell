@@ -177,7 +177,18 @@ int main(){
         const auto* state=corpses.state(key);
         require(state&&owner->placeMeeting(key,*world->resolveInstance(key),35,state->x.promoted(),state->y.promoted(),overlaps)&&overlaps,
             "corpse mask actually overlaps player");
+        struct Globals {
+            MotionBinary64 grav{};unsigned writes=0;
+            bool gravity(MotionBinary64 value){grav=value;++writes;return true;}
+            MotionBinary64 gravity(){return grav;}MotionBinary64 fallSpeed(){return {};}
+        } globals;
+        auto particles=world->consumptionBloodRegistration<5>();
+        auto createChild=[&](MotionBinary64 px,MotionBinary64 py,std::uint32_t& child){
+            return world->createRegisteredConsumptionBlood(particles,px,py,globals,child);
+        };
+        const auto beforeParticles=world->randomState();
         struct Effects {
+            decltype(createChild)& createChild;
             unsigned failure=0,eaten=0,sounds=0,children=0,reads=0;
             bool incrementBodiesEaten(){++eaten;return true;}
             void eatSound(int s,int p,int l,int g){require(eaten==1&&s==83&&p==80&&!l&&g==1,"source consumption sound order");++sounds;}
@@ -186,9 +197,9 @@ int main(){
             bool create(int object,MotionBinary64 px,MotionBinary64 py,std::uint32_t& child){
                 require(object==223&&eaten==1&&sounds==1&&px.high==MotionBinary64::fromInteger(240+children).high&&
                     py.high==MotionBinary64::fromInteger(192+children).high,"each synchronous child sees fresh player fields");
-                child=300000+children++;return children!=failure;
+                ++children;return children!=failure&&createChild(px,py,child);
             }
-        } effects{failure};
+        } effects{createChild,failure};
         RunnerCollisionEventContext context;
         auto contact=[&](bool upgrade,bool dead){return owner->dispatchCollisionEvent(context,key,player,{true,false},[&](const auto& event){
             return world->dispatchCorpsePlayerCollision(corpses,event,upgrade,dead,effects);
@@ -201,7 +212,35 @@ int main(){
         require(world->resolveInstance(key)&&world->resolveInstance(key)->destroyRequested==!failure,
             "only complete consumption marks corpse; lifetime remains until cleanup");
         if(failure)require(!contact(true,false)&&effects.children==failure,"failed contact cannot replay children");
+        const unsigned born=failure?failure-1:5;require(globals.writes==born,"every real child publishes global gravity");
+        unsigned found=0;auto oracleRandom=beforeParticles;
+        for(unsigned i=0;i<world->activeInstanceCount();++i){
+            const auto& r=world->instanceAt(i);if(r.objectId!=223)continue;
+            const auto* particle=particles.state(r);require(particle&&r.alarms.get(0)==120&&r.spriteId==92,"child completes Create before returning");
+            ConsumptionBloodEffect oracle;Globals expectedGlobals;
+            struct Birth {
+                Globals& globals;
+                bool gravity(MotionBinary64 v){return globals.gravity(v);}
+                bool imageSpeed(RunnerImageValue){return true;}bool imageIndex(RunnerImageValue){return true;}
+            } publish{expectedGlobals};
+            require(oracle.create(MotionBinary64::fromInteger(240+found),MotionBinary64::fromInteger(192+found),oracleRandom,publish)&&
+                particle->imageIndex.bits==oracle.imageIndex.bits&&particle->xsp.high==oracle.xsp.high&&
+                particle->xsp.low==oracle.xsp.low&&particle->ysp.high==oracle.ysp.high&&particle->ysp.low==oracle.ysp.low,
+                "real child state matches sequential source Create and RNG");
+            if(!failure)require(particles.advanceAnimation(r)&&particles.step(r,globals)&&!r.destroyRequested,
+                "registered particle publishes animation and three movement writes");
+            ++found;
+        }
+        require(found==born&&world->randomDrawCount()==oracleRandom.drawCount(),"child count and consumed random words match prefix");
+        for(unsigned i=0;i<16;++i)require(world->randomState().stateWord(i)==oracleRandom.stateWord(i),"full child RNG state");
         require(corpses.clear(),"clean contact fixture");
+        if(!failure)for(unsigned tick=0;tick<120;++tick){
+            require(world->withConsumptionBloodEvents(particles,globals,[&]{world->step(false);return world->effectsSucceeded();}),
+                "real room dispatches consumption particle animation, Step, alarm and cleanup");
+            unsigned live=0;for(unsigned i=0;i<world->activeInstanceCount();++i)live+=world->instanceAt(i).objectId==223;
+            require(live==(tick==119?0u:5u),"alarm 120 retires children in the room cleanup phase");
+        }
+        require(particles.clear(),"clean real consumption children");
     }
     for(int x:{159,160,240,320,321})for(bool reject:{false,true})for(bool field:{false,true}){
         struct CorpseQueryOwner:StoredWorldCollision {
