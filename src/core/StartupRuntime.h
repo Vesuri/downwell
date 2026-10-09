@@ -729,7 +729,8 @@ public:
         StoredTimeChangeRegistration<instanceCapacity,Changes>& changes,TimeStopEffects<Capacity>& state,
         const Input& input,bool advancePressed=false,Transition transition={},Collisions collisions={}){
         if(!run_.effectsSucceeded)return false;
-        if(timeEffectDispatch_||!state.succeeded||!state.shards.succeeded()||!state.changes.succeeded()||
+        if(timeEffectDispatch_||(momentDelayRoomSpeed_&&momentDelayRoomSpeed_!=&state.roomSpeed)||
+            !state.succeeded||!state.shards.succeeded()||!state.changes.succeeded()||
             !shards.belongsTo(instances_)||!changes.belongsTo(instances_)||
             !state.shards.phasesBoundTo(shards)||!state.changes.boundTo(changes)){
             run_.effectsSucceeded=false;return false;
@@ -753,7 +754,13 @@ public:
         timeEffectDispatch_=[](void* context,InstanceRecord& record,TimeEffectPhase phase,unsigned index){
             return (*static_cast<decltype(dispatch)*>(context))(record,phase,index);
         };
+        // Controller Alarm 0 and object-211 alarms mutate the same source
+        // global in the room's mixed alarm order. Never copy it into a second
+        // moment-delay clock; retain an enclosing binding only if it aliases.
+        int* previousRoomSpeed=momentDelayRoomSpeed_;
+        momentDelayRoomSpeed_=&state.roomSpeed;
         const bool ok=stepWithCollisionPass(input,advancePressed,collisions);
+        momentDelayRoomSpeed_=previousRoomSpeed;
         timeEffectDispatch_=nullptr;timeEffectContext_=nullptr;
         return ok;
     }

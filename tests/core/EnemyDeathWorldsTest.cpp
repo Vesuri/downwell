@@ -1,5 +1,6 @@
 #include "core/GameplayWorld.h"
 #include "core/StartupRuntime.h"
+#include "core/StoredWorldCollision.h"
 #include <cassert>
 #include <memory>
 #include <cstdio>
@@ -39,6 +40,49 @@ int main(){
     downwell::RoomPack rooms(roomsData.data(),roomsData.size());
     downwell::ObjectPack objects(objectsData.data(),objectsData.size());
     assert(rooms.valid()&&objects.valid());
+    const auto spriteData=load("generated/downwell-sprites.dwsc"),maskData=load("generated/downwell-sprite-masks.dwsm");
+    downwell::SpriteCollisionPack sprites(spriteData.data(),spriteData.size());
+    downwell::SpriteMaskPack masks(maskData.data(),maskData.size());
+    assert(sprites.valid()&&masks.valid());
+    for(unsigned binding=0;binding<3;++binding){
+        auto owner=std::make_unique<downwell::StoredWorldCollision>(objects,sprites,masks);
+        auto stored=std::make_unique<downwell::StartupRuntime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,
+            2,nullptr,owner->binding());
+        assert(owner->attach(*stored));
+        stored->skipToGameForTesting();
+        downwell::TimeStopEffects<4> state;
+        auto shards=stored->timeShardRegistration<4>();auto changes=stored->timeChangeRegistration<4>();
+        assert(state.shards.bindPhases(shards)&&state.changes.bind(changes));
+        if(binding==1){
+            int otherSpeed=60;unsigned entered=0;
+            assert(!stored->withMomentDelayRoomSpeed(otherSpeed,[&]{
+                return stored->stepWithTimeStopEffects(shards,changes,state,{},false,
+                    downwell::StartupRuntime::NoTimeTransition{},[&]{++entered;return true;});
+            })&&!entered&&otherSpeed==60&&state.roomSpeed==60);
+            continue;
+        }
+        unsigned requests=0;
+        const auto tick=[&]{return stored->stepWithTimeStopEffects(shards,changes,state,{},false,
+            downwell::StartupRuntime::NoTimeTransition{},[&]{
+                ++requests;
+                return stored->requestMomentDelay()&&state.roomSpeed==30&&
+                    state.changes.createAt({}, {},state.roomSpeed,[](unsigned ms){return ms==30;});
+            });};
+        if(binding==2){
+            assert(stored->withMomentDelayRoomSpeed(state.roomSpeed,[&]{
+                return tick()&&stored->requestMomentDelay();
+            }));
+        }else assert(tick());
+        const auto changeId=state.changes.sourceId(1);
+        const auto* controller=stored->instance(downwell::StartupRuntime::controllerInstanceId);
+        assert(requests==1&&controller&&controller->controllerSlow==30&&controller->alarms.get(0)==1&&
+            state.changes.size()==1&&changeId&&stored->instance(changeId));
+        assert(stored->stepWithTimeStopEffects(shards,changes,state,{})&&state.roomSpeed==60&&
+            controller->controllerSlow==0&&state.changes.size()==1);
+        assert(stored->stepWithTimeStopEffects(shards,changes,state,{})&&state.roomSpeed==60&&
+            state.changes.size()==0&&!stored->instance(changeId));
+        assert(state.reset());
+    }
     for(int speed:{30,50,60}){
         auto stored=std::make_unique<downwell::StartupRuntime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects);
         stored->skipToGameForTesting();
