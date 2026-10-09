@@ -731,7 +731,7 @@ int main(){
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::nativeTerrain,
                   GameplayCollisionOwner::Ownership::native}){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
-            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+            GameplayTerrainInstances::WallCollision{},&resultRooms,mode);
         auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
         assert(owner->attach(*world));auto& numbers=owner->levelNumbers();InstanceHandle local,shared;
@@ -741,7 +741,29 @@ int main(){
             GameplayCollisionView::encode(GameplayCollisionView::Kind::levelNumber,local,shared));
         GameplayCollisionView view(*world);assert(view.contains(shared)&&numbers.activate(local,false));
         world->step(0);assert(world->effectsSucceeded()&&numbers.find(local)->state.alarms.get(0)==4);
-        assert(numbers.activate(local,true));
+        assert(numbers.activate(local,true)&&owner->reconcileActivation());
+        for(unsigned pass=0;pass<2;++pass){
+            unsigned seen=0;
+            const bool visited=world->visitRoomActorsReadOnly([&](auto kind,auto key,auto depth){
+                if(kind!=GameplayWorld::DrawActor::levelNumber)return true;
+                RunnerImageValue expectedDepth;assert(expectedDepth.assignInteger(-100000));
+                ++seen;return key.slot==local.slot&&key.generation==local.generation&&depth.bits==expectedDepth.bits;
+            });
+            assert(visited&&seen==1);
+        }
+        struct NoTitleSurface {
+            bool exists(bool& value){value=false;return true;}
+            bool begin(){std::abort();}bool end(){std::abort();}bool color(unsigned){std::abort();}
+            bool view(unsigned,MotionBinary64&){std::abort();}
+            bool character(unsigned,MotionBinary64,MotionBinary64){std::abort();}
+        } noSurface;
+        EffectMaskAssets emptyAssets;EffectSurfacePlacement::View emptyView{};
+        auto emit=[](const EffectMaskAssets::Asset&,MotionBinary64,MotionBinary64){return true;};
+        assert(!world->visitRegisteredEffectSurfaces(emptyAssets,emptyView,emit)); // No silent missing renderer.
+        unsigned titleDraws=0;
+        assert(world->visitRegisteredEffectSurfaces(emptyAssets,emptyView,emit,[&](auto key){
+            ++titleDraws;return world->drawLevelNumber(key,noSurface);
+        })&&titleDraws==1&&numbers.find(local)->state.characters[1].offset==-2);
         for(unsigned tick=1;tick<=142;++tick){
             world->step(0);assert(world->effectsSucceeded()&&owner->valid()&&owner->prepareDraw());
             if(tick<142){

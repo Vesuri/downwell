@@ -463,6 +463,9 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
                    !x.roundPixel(px)||!y.roundPixel(py))return false;
                 return append(effect.spriteId,effect.drawFrame(),downwellPlayfieldX+px,py,0);
             }
+            // Title Draw is surface-only and mutable. Until its glyph/surface
+            // binding is supplied, do not mistake its local key for an effect.
+            if(kind==GameplayWorld::DrawActor::levelNumber)return false;
             if(kind==GameplayWorld::DrawActor::corpse){
                 if(compositeCurrency)return true;
                 const auto* r=port.registeredCorpses()?port.registeredCorpses()->find(key):nullptr;

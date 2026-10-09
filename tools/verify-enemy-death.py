@@ -2,6 +2,7 @@
 """Pin shared enemy-death bookkeeping and gunshot audio order to the VM export."""
 from pathlib import Path
 import json
+import runpy
 
 root = Path(__file__).resolve().parents[1] / "extracted/utmt-0.9.2.0/Assembly"
 
@@ -157,6 +158,10 @@ assert event_instructions("Object_objTransDither_Step_0") == [
     "push.v self.y", "pushi.e 8", "add.i.v", "pop.v.v self.y"]
 number=manifest["objects"][372]
 assert number["name"]=="levelNumber" and number["parentId"]==-1 and not number["Persistent"]
+assert number["Depth"]==0 and number["Visible"] and number["spriteId"]==-1
+# Dynamic instance_create uses the compatibility table, not OBJT's depth.
+depth_tools=runpy.run_path(str(Path(__file__).with_name("generate-object-pack.py")))
+assert depth_tools["dynamic_depths"](root,manifest["objects"])[372]==-100000
 assert {(e["eventType"],e["eventSubtype"]) for e in number["events"]}=={(0,0),(2,0),(2,1),(2,2),(8,0),(14,0)}
 assert event_instructions("Object_levelNumber_PreCreate_0")==["call.i event_inherited(argc=0)","popz.v"]
 number_create=event_instructions("Object_levelNumber_Create_0")

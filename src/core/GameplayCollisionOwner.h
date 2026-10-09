@@ -110,8 +110,9 @@ private:
         GameplayScriptSpawnInstances::capacity+GameplayDebrisInstances::capacity+GameplayEntryDithers::capacity+GameplayWorld::boneCapacity+GameplayWorld::skeletonCapacity+64+32+32+32+32;
     struct DrawEntry {GameplayWorld::DrawActor kind;InstanceHandle local;RunnerImageValue depth;};
     struct DrawIdentity {GameplayWorld::DrawActor kind;InstanceHandle local;};
-    DrawIdentity preparedDrawIdentities_[drawCapacity]{};
-    mutable DrawEntry drawOrder_[drawCapacity]{};
+    static constexpr unsigned drawCapacityWithTitles=drawCapacity+4;
+    DrawIdentity preparedDrawIdentities_[drawCapacityWithTitles]{};
+    mutable DrawEntry drawOrder_[drawCapacityWithTitles]{};
     mutable unsigned drawCount_=0;
     mutable std::uint32_t drawCaptureRevision_=0,drawLayerRevision_=0;
     mutable bool drawOrderValid_=false;
@@ -233,10 +234,12 @@ private:
                 token=drawCapacity-32-32+local.slot;break;
             case View::Kind::smoke:drawKind=GameplayWorld::DrawActor::smoke;
                 token=drawCapacity-32-32-32+local.slot;break;
+            case View::Kind::levelNumber:drawKind=GameplayWorld::DrawActor::levelNumber;
+                token=drawCapacity+local.slot;break;
             default:actor=false;break;
         }
         if(actor){
-            if(token>=drawCapacity)return check(false);
+            if(token>=drawCapacityWithTitles)return check(false);
             preparedDrawIdentities_[token]={drawKind,local};
             const unsigned metadata=drawMetadata_.get(table_.objectId(h));
             element.object=(metadata&ObjectDrawMetadata<386>::exists)!=0;
@@ -731,7 +734,7 @@ private:
             if constexpr(Kind==View::Kind::timeShard)sourceId=parent.pendingTimeShardId_;
             if constexpr(Kind==View::Kind::playerController||Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::builder||Kind==View::Kind::goalField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency)sourceId=r.sourceId;
-            constexpr bool projected=Kind==View::Kind::consumptionBlood||Kind==View::Kind::corpse||Kind==View::Kind::smoke||Kind==View::Kind::corpseExpiry||Kind==View::Kind::player||Kind==View::Kind::enemy||
+            constexpr bool projected=Kind==View::Kind::levelNumber||Kind==View::Kind::consumptionBlood||Kind==View::Kind::corpse||Kind==View::Kind::smoke||Kind==View::Kind::corpseExpiry||Kind==View::Kind::player||Kind==View::Kind::enemy||
                 Kind==View::Kind::bullet||Kind==View::Kind::scriptEffect||Kind==View::Kind::debris||Kind==View::Kind::entryDither||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::ditherAbove||Kind==View::Kind::timeShard;
             if(projected&&!parent.actorDepthAvailable(p.depth))return parent.check(false);
             {
@@ -834,7 +837,7 @@ private:
             if constexpr(Kind==View::Kind::timeShard)sourceId=parent.pendingTimeShardId_;
             if constexpr(Kind==View::Kind::playerController||Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::builder||Kind==View::Kind::goalField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency)sourceId=r.sourceId;
-            constexpr bool projected=Kind==View::Kind::consumptionBlood||Kind==View::Kind::corpse||Kind==View::Kind::smoke||Kind==View::Kind::corpseExpiry||Kind==View::Kind::player||Kind==View::Kind::enemy||
+            constexpr bool projected=Kind==View::Kind::levelNumber||Kind==View::Kind::consumptionBlood||Kind==View::Kind::corpse||Kind==View::Kind::smoke||Kind==View::Kind::corpseExpiry||Kind==View::Kind::player||Kind==View::Kind::enemy||
                 Kind==View::Kind::bullet||Kind==View::Kind::scriptEffect||Kind==View::Kind::debris||Kind==View::Kind::entryDither||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::ditherAbove||Kind==View::Kind::timeShard;
             if(projected&&!parent.actorDepthAvailable(depth))return parent.check(false);
             if(!parent.check(parent.layers_.birth(h,sourceId,depth,inactive,projected)))return false;
@@ -1484,12 +1487,13 @@ public:
                 if(!View::decode(shared,kind,local))return false;
                 // Retained terrain/field composition is not part of this
                 // visitor. Do not resolve or copy their records per frame.
-                if(kind!=View::Kind::consumptionBlood&&kind!=View::Kind::corpse&&kind!=View::Kind::smoke&&kind!=View::Kind::corpseExpiry&&kind!=View::Kind::enemy&&kind!=View::Kind::bullet&&kind!=View::Kind::scriptEffect&&kind!=View::Kind::debris&&kind!=View::Kind::player&&kind!=View::Kind::entryDither&&kind!=View::Kind::bone&&kind!=View::Kind::skeleton&&kind!=View::Kind::ditherAbove&&kind!=View::Kind::timeShard)return true;
+                if(kind!=View::Kind::levelNumber&&kind!=View::Kind::consumptionBlood&&kind!=View::Kind::corpse&&kind!=View::Kind::smoke&&kind!=View::Kind::corpseExpiry&&kind!=View::Kind::enemy&&kind!=View::Kind::bullet&&kind!=View::Kind::scriptEffect&&kind!=View::Kind::debris&&kind!=View::Kind::player&&kind!=View::Kind::entryDither&&kind!=View::Kind::bone&&kind!=View::Kind::skeleton&&kind!=View::Kind::ditherAbove&&kind!=View::Kind::timeShard)return true;
                 std::uint32_t flags;
                 if(!self.eligibilityFlags(shared,flags)||!View(*self.world_).contains(shared))return false;
                 if(flags&0x100003u)return true;
                 switch(kind){
                     case View::Kind::player:return visit(visitor,GameplayWorld::DrawActor::player,local,depth);
+                    case View::Kind::levelNumber:return visit(visitor,GameplayWorld::DrawActor::levelNumber,local,depth);
                     case View::Kind::enemy:return visit(visitor,GameplayWorld::DrawActor::enemy,local,depth);
                     case View::Kind::bullet:return visit(visitor,GameplayWorld::DrawActor::bullet,local,depth);
                     case View::Kind::scriptEffect:return visit(visitor,GameplayWorld::DrawActor::scriptEffect,local,depth);
@@ -1512,7 +1516,7 @@ public:
                 // Retained scenery/field passes own these draws. Preserve the
                 // inactive flag (which terminates a layer), but avoid event
                 // and sprite lookups for every terrain tile each frame.
-                if(kind!=View::Kind::consumptionBlood&&kind!=View::Kind::corpse&&kind!=View::Kind::smoke&&kind!=View::Kind::corpseExpiry&&kind!=View::Kind::enemy&&kind!=View::Kind::bullet&&kind!=View::Kind::scriptEffect&&
+                if(kind!=View::Kind::levelNumber&&kind!=View::Kind::consumptionBlood&&kind!=View::Kind::corpse&&kind!=View::Kind::smoke&&kind!=View::Kind::corpseExpiry&&kind!=View::Kind::enemy&&kind!=View::Kind::bullet&&kind!=View::Kind::scriptEffect&&
                     kind!=View::Kind::debris&&kind!=View::Kind::player&&kind!=View::Kind::entryDither&&kind!=View::Kind::bone&&kind!=View::Kind::skeleton&&kind!=View::Kind::ditherAbove&&kind!=View::Kind::timeShard)return true;
                 const unsigned metadata=self.drawMetadata_.get(self.objectOf(h));
                 out.object=(metadata&ObjectDrawMetadata<386>::exists)!=0;
@@ -1542,7 +1546,7 @@ public:
 #endif
                 self.drawOrderValid_=false;self.drawCount_=0;
                 const bool ok=self.layers_.visitPreparedDraw([&](unsigned token,RunnerImageValue depth){
-                    if(token>=drawCapacity||self.drawCount_==drawCapacity)return false;
+                    if(token>=drawCapacityWithTitles||self.drawCount_==drawCapacityWithTitles)return false;
                     const auto& identity=self.preparedDrawIdentities_[token];
 #ifdef DOWNWELL_DRAW_CACHE_AUDIT
                     if(self.drawCount_>=previousCount)same=false;
@@ -1592,7 +1596,7 @@ public:
             // Fill during the original live traversal, not before dispatch:
             // failed callbacks retain exactly the same successful prefix.
             const bool ok=self.world_->visitRoomActors([&](auto kind,auto key,auto depth){
-                if(self.drawCount_==drawCapacity)return false;
+                if(self.drawCount_==drawCapacityWithTitles)return false;
 #ifdef DOWNWELL_DRAW_CACHE_AUDIT
                 if(self.drawCount_>=previousCount)same=false;
                 else {

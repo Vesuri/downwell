@@ -867,7 +867,7 @@ public:
         return run_.effectsSucceeded=scriptSpawnInstances_&&effects.advanceRegistered(phase,*scriptSpawnInstances_);
     }
     enum class PhaseBoundary { beginStep, alarm, step, collision, endStep, roomEntry };
-    enum class DrawActor { enemy, bullet, scriptEffect, debris, player, entryDither, bone, skeleton, ditherAbove, timeShard, corpseExpiry, smoke, corpse, consumptionBlood };
+    enum class DrawActor { enemy, bullet, scriptEffect, debris, player, entryDither, bone, skeleton, ditherAbove, timeShard, corpseExpiry, smoke, corpse, consumptionBlood, levelNumber };
     template<class Visit> bool visitRegisteredEnemyShades(Visit visit)const{
         if((!bones_||!bones_->size())&&(!skeletons_||!skeletons_->size()))return true;
         return visitRoomActorsReadOnly([&](DrawActor kind,downwell::InstanceHandle key,auto){
@@ -912,7 +912,15 @@ public:
     }
     template<class Emit> bool visitRegisteredEffectSurfaces(const downwell::EffectMaskAssets& assets,
         const downwell::EffectSurfacePlacement::View& view,Emit emit)const{
+        return visitRegisteredEffectSurfaces(assets,view,emit,[](auto){return false;});
+    }
+    template<class Ops> bool drawLevelNumber(downwell::InstanceHandle key,Ops& ops)const{
+        return levelNumbers_&&levelNumbers_->draw(key,ops);
+    }
+    template<class Emit,class TitleDraw> bool visitRegisteredEffectSurfaces(const downwell::EffectMaskAssets& assets,
+        const downwell::EffectSurfacePlacement::View& view,Emit emit,TitleDraw titleDraw)const{
         return visitRoomActors([&](DrawActor kind,downwell::InstanceHandle key,auto){
+            if(kind==DrawActor::levelNumber)return titleDraw(key);
             if(kind==DrawActor::corpse){
                 const auto* r=registeredCorpses_?registeredCorpses_->find(key):nullptr;
                 return r&&downwell::CorpseDraw::surface(r->state,assets,view,emit);
