@@ -4,13 +4,74 @@
 #include "../../generated/downwell-area-titles.h"
 #include "../../generated/downwell-title-glyphs.h"
 #include "core/PaletteEffectSurface.h"
+#include "core/LevelNumberSurfaceDraw.h"
+#include "core/CurrencySmokeComposition.h"
+#include "core/SmokeEffects.h"
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
 #include <fstream>
 #include <iterator>
+#include <memory>
 using namespace downwell;
+static void titleSurface(){
+    struct Target {
+        bool present=true;unsigned begins=0,ends=0,views=0;
+        bool exists(bool& out){out=present;return true;}
+        bool begin(){++begins;return true;}bool end(){++ends;return true;}
+        bool view(unsigned axis,MotionBinary64& out){++views;out=MotionBinary64::fromInteger(axis?30000:1000000);return true;}
+    };
+    SmokeEffects<1> smoke;EffectMaskAssets assets;
+    auto composition=std::make_unique<CurrencySmokeComposition>();
+    const EffectSurfacePlacement::View view{MotionBinary64::fromInteger(1000000),
+        MotionBinary64::fromInteger(30000),MotionBinary64::fromInteger(160),MotionBinary64::fromInteger(284)};
+    const unsigned tokens[]={'A','#','B'};
+    std::vector<unsigned char> expected(160*284);
+    for(unsigned letter:{0u,2u})for(unsigned pass=0;pass<5;++pass){
+        EffectMaskAssets::Asset asset;bool ink;
+        assert(title_glyphs::bank.resolve(2,tokens[letter],pass==4?0xffffff:0,asset,ink)&&ink);
+        const int dx[]={1,-1,0,0,0},dy[]={0,0,1,-1,0};
+        const int x=68+int(letter)*8+dx[pass]-asset.originX,y=82+dy[pass];
+        for(unsigned sy=0;sy<asset.mask.height;++sy)for(unsigned sx=0;sx<asset.mask.width;++sx)
+            if(asset.mask.data[sy*asset.mask.stride+sx/8]&(0x80>>(sx%8)))
+                expected[(y+sy)*160+x+sx]=pass==4?1:3;
+    }
+    for(unsigned mode=0;mode<4;++mode){
+        Target target;target.present=mode!=3;
+        LevelNumber<3> title;assert(title.create(3,MotionBinary64::fromInteger(24),
+            [&](unsigned i,unsigned& out){out=tokens[i-1];return true;}));title.shown=3;
+        LevelNumberTextDrawState state{2,0,0,123,MotionBinary64::fromInteger(1)};
+        CurrencySmokeComposition::Settings settings;settings.death=mode==1;settings.lowSpec=mode==2;
+        assert(composition->prepareWithSurfaceProducers([](auto){},smoke,assets,view,settings,
+            [](auto){return true;},[&](auto emit){
+                LevelNumberSurfaceDraw<Target,decltype(emit)> draw(title_glyphs::bank,state,target,emit);
+                return title.draw(draw);
+            },[](auto){},[](MotionBinary64 value,std::int32_t& out){return value.roundPixel(out);}));
+        std::vector<unsigned char> actual(160*284);
+        composition->surface().visit([&](unsigned x,unsigned y,std::uint16_t alpha,std::uint16_t lo,std::uint16_t hi){
+            for(unsigned b=0;b<16;++b)if(alpha&(0x8000>>b))actual[y*160+x+b]=((lo>>(15-b))&1)|(((hi>>(15-b))&1)<<1);
+        });
+        assert(actual==(mode==3?std::vector<unsigned char>(160*284):expected));
+        assert(title.characters[1].offset==(mode==3?-2:-1));
+        assert(state.color==(mode==3?123u:0xffffffu));
+        assert(target.begins==(mode==3?0u:1u)&&target.ends==target.begins&&target.views==target.begins*4);
+    }
+    // Current renderer state is borrowed, not silently reset to supported
+    // defaults. A rejected draw retains the source's partial mutation prefix.
+    for(unsigned mode=0;mode<4;++mode){
+        Target target;LevelNumber<1> title;
+        assert(title.create(1,MotionBinary64::fromInteger(8),[](unsigned,unsigned& c){c='A';return true;}));
+        LevelNumberTextDrawState state{mode==0?0u:2u,mode==1?1u:0u,mode==2?1u:0u,123,
+            MotionBinary64::fromInteger(mode==3?0:1)};
+        assert(!composition->prepareWithSurfaceProducers([](auto){},smoke,assets,view,{},
+            [](auto){return true;},[&](auto emit){
+                LevelNumberSurfaceDraw<Target,decltype(emit)> draw(title_glyphs::bank,state,target,emit);
+                return title.draw(draw);
+            },[](auto){},[](MotionBinary64 value,std::int32_t& out){return value.roundPixel(out);}));
+        assert(!composition->visible()&&target.begins==1&&!target.ends&&state.color==0&&title.characters[1].offset==-2);
+    }
+}
 static void glyphMasks(){
     std::ifstream file("generated/downwell-fonts.dwfn",std::ios::binary);
     std::vector<std::uint8_t> bytes((std::istreambuf_iterator<char>(file)),{});
@@ -94,6 +155,7 @@ struct Lifetime {
 };
 int main(){
     glyphMasks();
+    titleSurface();
     std::ifstream fontFile("generated/downwell-fonts.dwfn",std::ios::binary);
     const std::vector<unsigned char> fontBytes{std::istreambuf_iterator<char>(fontFile),{}};
     FontPack fonts(fontBytes.data(),fontBytes.size());assert(fonts.valid());

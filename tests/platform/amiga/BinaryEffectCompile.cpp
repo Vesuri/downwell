@@ -11,6 +11,18 @@
 #include "core/LevelNumberText.h"
 #include "core/FontPack.h"
 #include "core/FontGlyphMasks.h"
+#include "core/LevelNumberSurfaceDraw.h"
+struct TitleSurfaceCompileTarget {
+    bool exists(bool&);bool begin();bool end();bool view(unsigned,downwell::MotionBinary64&);
+};
+struct TitleSurfaceCompileEmit {
+    bool atSurface(const downwell::EffectMaskAssets::Asset&,downwell::MotionBinary64,downwell::MotionBinary64);
+};
+bool compileTitleSurface(downwell::LevelNumber<64>& title,const downwell::FontGlyphMasks& bank,
+    downwell::LevelNumberTextDrawState& state,TitleSurfaceCompileTarget& target,TitleSurfaceCompileEmit& emit){
+    downwell::LevelNumberSurfaceDraw<TitleSurfaceCompileTarget,TitleSurfaceCompileEmit> draw(bank,state,target,emit);
+    return title.draw(draw);
+}
 bool compileTitleGlyph(const downwell::FontGlyphMasks& bank,unsigned font,unsigned character,unsigned color,
     downwell::EffectMaskAssets::Asset& asset,bool& ink){return bank.resolve(font,character,color,asset,ink);}
 bool compileLevelTitleMetrics(const downwell::FontPack& fonts,unsigned font,unsigned length,

@@ -72,7 +72,7 @@ traversal at their compatibility creation depth (-100000), not the OBJT depth
 (0). Both worlds expose an unconditional surface traversal that preserves title
 and entry-cover depth order separately from conditional drawFx particles. The
 compositor dispatches that pass during death/low-spec rendering, but not when
-the effect surface is absent. This does not yet provide glyph painting: the Amiga direct
+the effect surface is absent. The live glyph binding is not yet installed: the Amiga direct
 actor list explicitly rejects titles rather than treating their local handle as
 a script effect. Both backend surface paths reject an unbound live title.
 Natural source-ID allocation, localized text, active-font measurement and
@@ -106,9 +106,18 @@ the extraction manifest, atlas, source build, generator version/hash and output.
 `FontGlyphMasks` borrows this immutable ordinary-memory bank; white uses mask/zero
 color planes and opaque black aliases both planes to the mask. Glyph bearings
 are retained; missing glyphs use U+25AF and then no ink. Other font resources and
-colors are rejected, not thresholded or substituted. This is raw glyph art, not
-a complete draw_text adapter: live alignment/alpha, coordinate rasterization and
-the title's surface binding still need integration.
+colors are rejected, not thresholded or substituted.
+
+`LevelNumberSurfaceDraw` joins those glyphs to the shared event for the admitted
+left/top, opaque text state. It borrows current font/alignment/alpha/color rather
+than setting defaults, retains the helper's final white color, and handles each
+single-token hash/newline/NUL as no ink. The compositor's surface-local emitter
+avoids a second camera subtraction and uses its supplied raster policy. Tests
+compare the entire composed title against a per-pixel border/glyph reference at
+large nonzero camera coordinates in normal, death and low-spec modes; absent
+surfaces retain offsets. Unsupported text states fail with the source mutation
+prefix retained. This still requires live renderer-state/target binding and
+verification of the target raster policy before admitting natural callers.
 
 ### Original title-width measurement
 

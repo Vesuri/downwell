@@ -16,6 +16,24 @@ public:
     bool visible()const{return visible_;}
     bool directRequired()const{return direct_;}
 
+    // Some source producers (title text) already subtract the camera in their
+    // Draw event. Keep those surface-local coordinates out of onSurface's
+    // world-to-view subtraction; do not add the camera back just to cancel it.
+    template<class Raster> struct SurfaceEmitter {
+        CurrencySmokeComposition& owner;const EffectSurfacePlacement::View& view;
+        Raster& raster;bool& okay;bool& added;
+        bool atSurface(const EffectMaskAssets::Asset& asset,MotionBinary64 x,MotionBinary64 y){
+            if(!okay)return false;
+            okay=owner.stamp(asset,x,y,false,raster);added|=okay;return okay;
+        }
+        bool operator()(const EffectMaskAssets::Asset& asset,MotionBinary64 x,MotionBinary64 y){
+            if(!okay)return false;
+            EffectSurfacePlacement::Draw draw;
+            okay=EffectSurfacePlacement::onSurface(x,y,view,true,draw);
+            return okay&&atSurface(asset,draw.x,draw.y);
+        }
+    };
+
     // Currency enumerates original Draw order, emitting only non-dflash gems:
     // emit(large, frame, publishedX, publishedY). No simulation/RNG is advanced.
     template<class Currency,class SmokeOwner,class Shades,class Raster>
@@ -93,12 +111,8 @@ public:
             }
         }
         { DW_PROFILE_SCOPE(profileEffectCover);
-        if(okay)okay=surfaceEffects([&](const EffectMaskAssets::Asset& asset,MotionBinary64 x,MotionBinary64 y){
-            if(!okay)return false;
-            EffectSurfacePlacement::Draw draw;
-            okay=EffectSurfacePlacement::onSurface(x,y,view,true,draw)&&stamp(asset,draw.x,draw.y,false,raster);
-            added|=okay;return okay;
-        })&&okay;
+        SurfaceEmitter<Raster> surfaceEmit{*this,view,raster,okay,added};
+        if(okay)okay=surfaceEffects(surfaceEmit)&&okay;
         }
         if(okay && added && !settings.lowSpec && settings.shadeExists && !settings.noControl){
             DW_PROFILE_SCOPE(profileEffectShade);
