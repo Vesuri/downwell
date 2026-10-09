@@ -43,6 +43,11 @@ bool nativeRegisteredStomp(GameplayWorld& world,downwell::SkeletonActor& actor,
     downwell::SoundPlayEnvironment& environment,NativeSkeletonAudio& audio,bool& good){
     return world.stompSkeleton(actor,allocate,player,environment,audio,good);
 }
+bool nativeBoundStomp(downwell::GameplayCollisionOwner& owner,downwell::SkeletonActor& actor,
+    bool (*allocate)(unsigned&),NativeSkeletonStompPlayer& player,
+    downwell::SoundPlayEnvironment& environment,NativeSkeletonAudio& audio,bool& good){
+    return owner.stompSkeleton(actor,allocate,player,environment,audio,good);
+}
 bool nativeOwnedLevelCue(GameplayWorld& world,const downwell::TimeStopEffects<64>& stop,
     bool (*allocate)(unsigned&),const downwell::LevelNumberTextContext& text,
     downwell::SoundPlayState& caller,downwell::SoundPlayEnvironment& environment,NativeSkeletonAudio& audio){
@@ -7082,6 +7087,25 @@ int main(){
                 });good=!knees;return good;
             });
             assert(ok==!knees&&owner->blood().size()==2&&id==605203);
+        }
+        for(bool rejectSound:{false,true})for(int style:{0,2}){
+            auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+                GameplayTerrainInstances::WallCollision{},&rooms,ownership);
+            auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),
+                owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+            assert(owner->attach(*world)&&world->grantUpgrade(0));int speed=60;
+            assert(world->bindControllerRoomSpeed(speed));InstanceHandle controller;
+            assert(owner->runControllers().create(100065,{}, {},[](InstanceHandle){return true;},controller));
+            InstanceHandle skeleton;assert(world->createSkeletonWithSourceId(605200,240,200,skeleton));unsigned id=605201;
+            const bool ok=owner->skeletons().dispatch(skeleton,[&](auto& actor,auto&,bool& good){
+                checkBoundExplodingStomp(*world,actor,style,id,rejectSound,[&](auto& player,auto& env,auto& audio,bool& accepted){
+                    return owner->stompSkeleton(actor,[&](unsigned& source){source=id++;return true;},player,env,audio,accepted);
+                },[&](unsigned source){auto& blasts=owner->registeredBlasts();return blasts.find(blasts.sourceHandle(source));},
+                [&](unsigned source){auto& smoke=owner->registeredSmoke();const auto* r=smoke.find(smoke.sourceHandle(source));return r?&r->state:nullptr;});
+                good=!rejectSound;return good;
+            });
+            assert(ok==!rejectSound&&speed==30&&owner->blood().size()==2&&owner->registeredBlasts().size()==1&&
+                id==605201+(rejectSound?3u:7u));
         }
         auto throwOwner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
             GameplayTerrainInstances::WallCollision{},&rooms,ownership);

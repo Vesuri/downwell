@@ -2491,6 +2491,12 @@ public:
     bool createBlast(unsigned id,MotionBinary64 x,MotionBinary64 y,InstanceHandle& key){
         return check(valid()&&world_&&world_->createBlastWithSourceId(id,x,y,[&]{return requestMomentDelay();},key));
     }
+    template<class Allocate,class Events,class Audio>
+    bool stompSkeleton(SkeletonActor& actor,Allocate allocate,Events& events,
+        SoundPlayEnvironment& environment,Audio& audio,bool& good){
+        if(!valid()||!world_){good=false;return check(false);}
+        return check(world_->stompSkeletonWithBlast(actor,allocate,[&]{return requestMomentDelay();},events,environment,audio,good));
+    }
     GameplayWorld::RegisteredSmoke& registeredSmoke(){return smoke_;}
     GameplayWorld::RegisteredCorpse& registeredCorpses(){return corpses_;}
     GameplayWorld::ConsumptionParticles& consumptionParticles(){return consumption_;}

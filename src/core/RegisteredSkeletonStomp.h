@@ -4,11 +4,11 @@
 namespace downwell {
 // Borrow live state; never copy the attacker's script variables or supply
 // successful stand-ins for precise player writes / synchronous child births.
-template<class World,class Events,class Blood,class Smoke,class Audio>
+template<class World,class Events,class Blood,class Smoke,class Blast,class Audio>
 bool registeredSkeletonStomp(World& world,SkeletonActor& actor,Events& external,
-    Blood blood,Smoke smoke,SoundPlayEnvironment& environment,Audio& audio,bool& good){
+    Blood blood,Smoke smoke,Blast blast,SoundPlayEnvironment& environment,Audio& audio,bool& good){
     struct Services {
-        World& world;SkeletonActor& actor;Events& external;Blood& burst;Smoke& smoke;
+        World& world;SkeletonActor& actor;Events& external;Blood& burst;Smoke& smoke;Blast& blast;
         SoundPlayEnvironment& environment;Audio& audio;
         bool playerDead(){return world.playerDeathActive();}
         bool explodingKnees(){return world.upgrades().levels[0]!=0;}
@@ -28,15 +28,24 @@ bool registeredSkeletonStomp(World& world,SkeletonActor& actor,Events& external,
             bool succeeded=true;int voice=-1;
             return SoundPlayScript::plain(actor.sound,environment,audio,id,priority,loop,cut,voice,succeeded);
         }
-        bool createBlast(int id,int x,int y){return external.createBlast(id,x,y);}
+        bool createBlast(int id,int x,int y){return id==276&&blast(MotionBinary64::fromInteger(x),MotionBinary64::fromInteger(y));}
         unsigned choose(unsigned count){return world.chooseSkeletonExplosion(count);}
         MotionBinary64 playerX(){return external.playerX();}
         MotionBinary64 playerY(){return external.playerY();}
         bool emitSmoke(MotionBinary64 x,MotionBinary64 y,int direction,int speed){
             return smoke(x,y,MotionBinary64::fromInteger(direction),MotionBinary64::fromInteger(speed));
         }
-    } services{world,actor,external,blood,smoke,environment,audio};
+    } services{world,actor,external,blood,smoke,blast,environment,audio};
     return actor.stompPlayerChecked(services,good);
+}
+// Retained explicit-dependency entry for callers not yet bound to a blast owner.
+template<class World,class Events,class Blood,class Smoke,class Audio>
+bool registeredSkeletonStomp(World& world,SkeletonActor& actor,Events& external,
+    Blood blood,Smoke smoke,SoundPlayEnvironment& environment,Audio& audio,bool& good){
+    return registeredSkeletonStomp(world,actor,external,blood,smoke,
+        [&](MotionBinary64 x,MotionBinary64 y){std::int32_t px,py;
+            return x.roundPixel(px)&&y.roundPixel(py)&&external.createBlast(276,px,py);
+        },environment,audio,good);
 }
 }
 #endif

@@ -1546,6 +1546,17 @@ public:
             environment,audio,good);
         return run_.effectsSucceeded=ok;
     }
+    template<class Allocate,class Delay,class Events,class Audio>
+    bool stompSkeletonWithBlast(downwell::SkeletonActor& actor,Allocate allocate,Delay delay,Events& events,
+        downwell::SoundPlayEnvironment& environment,Audio& audio,bool& good){
+        if(!run_.effectsSucceeded)return good=false;
+        const bool ok=downwell::registeredSkeletonStomp(*this,actor,events,[&]{return emitSkeletonBlood(actor,allocate);},
+            [&](auto x,auto y,auto direction,auto speed){return emitRegisteredSmoke(actor.smokeEmitter,x,y,direction,speed,allocate);},
+            [&](auto x,auto y){unsigned id=0;downwell::InstanceHandle child;
+                return allocate(id)&&createBlastWithSourceId(id,x,y,delay,child);
+            },environment,audio,good);
+        return run_.effectsSucceeded=ok;
+    }
     unsigned chooseSkeletonExplosion(unsigned count){
         if(!run_.effectsSucceeded||count!=3){run_.effectsSucceeded=false;return 3;}
         return enemyRandom_.chooseIndexSmall(3);

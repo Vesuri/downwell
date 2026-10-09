@@ -332,8 +332,15 @@ Create's three random draws and initial image speed remain intact even though
 its random direction/speed are overwritten. First Step still computes velocity
 and resamples animation speed from the overridden speed. Failed setters retain
 the completed child and caller writes and stop the world without retry.
-Precise player writes, style and blast creation remain explicit dependencies;
-these adapters do not yet install natural encounters.
+The stored overload accepting a blast registration and the native owner's
+`stompSkeleton` entry also bind synchronous blast Create. Its shake, controller
+delay and random facing complete before explosion-sound choice; smoke children
+follow that sound. Both retain the blast if a later sound operation fails.
+Native blood, blast and smoke births use the same enclosing numeric-ID allocator.
+The explicit-blast callback overload is retained for unbound callers and tests;
+it is not a fallback when registered Create fails.
+Precise player writes, style and native source-ID allocation remain explicit
+dependencies; these adapters do not yet install natural encounters.
 World and caller failure statuses both latch after a rejected service.
 
 `BlastActor` is the shared object-276 event body, with sprite 471's fourteen
@@ -378,7 +385,7 @@ from the enclosing creation stream. The Amiga draw collector emits sprite 471
 in that layer order, using the host-prepared fourteen frames and mirrored
 planar variants. Blast art uses ordinary default Draw, not the effects surface.
 Natural source-ID allocation and mixed collision dispatch remain required
-before replacing the stomp adapter's explicit blast dependency in encounters.
+before admitting the bound stomp adapter in encounters.
 
 Effect-producing callbacks return success. `SkeletonActor` stops the event on
 failed enemy-death setup, blood, smoke, flash, currency, corpse or debris

@@ -233,6 +233,17 @@ public:
             environment,audio,good);
         return run_.effectsSucceeded=ok;
     }
+    template<unsigned Capacity,unsigned SmokeCapacity,unsigned BlastCapacity,class Events,class Audio>
+    bool stompSkeleton(StoredBloodRegistration<instanceCapacity,Capacity>& blood,
+        StoredSmokeRegistration<instanceCapacity,SmokeCapacity>& smoke,
+        StoredBlastRegistration<instanceCapacity,BlastCapacity>& blasts,
+        SkeletonActor& actor,Events& events,SoundPlayEnvironment& environment,Audio& audio,bool& good){
+        if(!run_.effectsSucceeded)return good=false;
+        const bool ok=registeredSkeletonStomp(*this,actor,events,[&]{return emitSkeletonBlood(blood,actor);},
+            [&](auto x,auto y,auto direction,auto speed){return emitRegisteredSmoke(smoke,actor.smokeEmitter,x,y,direction,speed);},
+            [&](auto x,auto y){InstanceHandle child;return spawnBlast(blasts,x,y,child);},environment,audio,good);
+        return run_.effectsSucceeded=ok;
+    }
     template<class Audio> bool playSkeletonSound(SkeletonActor& actor,int sound,
         SoundPlayEnvironment& environment,Audio& audio){
         if(!run_.effectsSucceeded||roomId_!=mainRoomId||cameraViewHeight_!=surfaceHeight)

@@ -1657,6 +1657,25 @@ int main(){
         });
         require(ok==!knees&&blood.instances().size()==2,"registered stomp retains both blood births");
     }
+    for(bool rejectSound:{false,true})for(int style:{0,2}){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach bound stomp world");world->skipToGameForTesting();
+        require(world->grantUpgrade(0),"grant bound Exploding Knees");
+        auto blood=world->bloodRegistration<2>();auto smoke=world->smokeRegistration<4>();
+        auto blasts=world->blastRegistration<1>();auto skeletons=world->skeletonRegistration<1>();InstanceHandle skeleton;
+        require(world->spawnSkeleton(skeletons,240,200,skeleton),"birth bound stomp skeleton");
+        const auto first=world->nextRuntimeInstanceId();int speed=60;
+        const bool ok=world->withMomentDelayRoomSpeed(speed,[&]{return skeletons.dispatch(skeleton,[&](auto& actor,auto&,bool& good){
+            checkBoundExplodingStomp(*world,actor,style,first,rejectSound,[&](auto& player,auto& env,auto& audio,bool& accepted){
+                return world->stompSkeleton(blood,smoke,blasts,actor,player,env,audio,accepted);
+            },[&](unsigned id){return blasts.instances().find(blasts.instances().sourceHandle(id));},
+            [&](unsigned id){const auto* r=world->instance(id);return r?smoke.state(*r):nullptr;});
+            good=!rejectSound;return good;
+        });});
+        require(ok==!rejectSound&&speed==30&&blood.instances().size()==2&&blasts.instances().size()==1&&
+            world->nextRuntimeInstanceId()==first+(rejectSound?3:7),"bound stomp retains ordered child Creates");
+    }
     for(unsigned failAt:{0u,1u,2u}){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,

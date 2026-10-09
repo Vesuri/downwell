@@ -39,6 +39,59 @@ void checkRegisteredSkeletonStomp(World& world,downwell::SkeletonActor& actor,bo
     if(knees){const auto after=world.randomDrawCount();
         SkeletonSoundAudio::check(!invoke(player,env,audio,good)&&world.randomDrawCount()==after&&audio.calls==7);}
 }
+struct BoundStompAudio {
+    unsigned calls=0,failAt=0;int explosion=0;
+    bool call(){return ++calls!=failAt;}
+    bool isPlaying(int,bool& playing){playing=true;return call();}
+    bool stop(int){return call();}
+    bool play(int id,int priority,bool loop,int& voice){
+        SkeletonSoundAudio::check(!loop&&((id==122&&priority==50)||(id==explosion&&priority==60)));
+        voice=1001;return call();
+    }
+    bool getGain(int,downwell::MotionBinary64& gain){gain=downwell::MotionBinary64::fromInteger(1);return call();}
+    bool setGain(int,downwell::MotionBinary64 value,int time){
+        SkeletonSoundAudio::check(value.high==0x3fd00000u&&!value.low&&!time);return call();
+    }
+    bool setPitch(int,downwell::MotionBinary64 value){
+        SkeletonSoundAudio::check(value.high==0x3ff00000u&&!value.low);return call();
+    }
+};
+template<class World,class Invoke,class FindBlast,class FindSmoke>
+void checkBoundExplodingStomp(World& world,downwell::SkeletonActor& actor,int style,unsigned firstId,
+    bool rejectSound,Invoke invoke,FindBlast findBlast,FindSmoke findSmoke){
+    using namespace downwell;
+    struct Player:RegisteredStompPlayer {
+        MotionBinary64 playerX(){return {0x406e0800u,0};} // 240.25
+        MotionBinary64 playerY(){return {0x40691000u,0};} // 200.5
+    } player;player.style=style;
+    auto random=world.randomState();random.nextU32();random.nextU32(); // one blood-angle draw per child
+    const unsigned flip=random.chooseIndexSmall(2);
+    BoundStompAudio audio;audio.explosion=91+random.chooseIndexSmall(3);audio.failAt=rejectSound?8:0;
+    SmokeEffect expected[4];
+    if(!rejectSound)for(auto& effect:expected)
+        SkeletonSoundAudio::check(effect.create(player.playerX(),{0x40699000u,0},random)); // y+4
+    SoundPlayEnvironment env;env.gameVolume={0x3fd00000u,0};bool good=true;
+    SkeletonSoundAudio::check(invoke(player,env,audio,good)==!rejectSound&&good==!rejectSound&&
+        world.effectsSucceeded()==!rejectSound&&actor.health==-40&&actor.stomped&&actor.hitPending&&
+        player.recharges==2&&player.spins==1&&!player.grounded&&!player.blasts&&
+        player.vertical.high==(style==2?0xbff80000u:0xc0040000u)&&!player.vertical.low&&
+        world.cameraShakeAmount()==6&&audio.calls==(rejectSound?8u:13u)&&
+        actor.sound.sfxIndex==audio.explosion&&world.overlapSound(0)==122);
+    const auto* blast=findBlast(firstId+2);
+    SkeletonSoundAudio::check(blast&&blast->state.xscale.bits==(flip?0xbf800000u:0x3f800000u)&&
+        blast->state.imageSpeed.bits==0x3f000000u&&blast->state.shake.shakeAmt==6);
+    const int directions[]={0,180,15,165};
+    for(unsigned i=0;i<4;++i){const auto* smoke=findSmoke(firstId+3+i);
+        if(rejectSound){SkeletonSoundAudio::check(!smoke);continue;}
+        const auto direction=MotionBinary64::fromInteger(directions[i]);
+        const auto speed=MotionBinary64::fromInteger(i<2?4:3);
+        SkeletonSoundAudio::check(smoke&&smoke->x.bits==expected[i].x.bits&&smoke->y.bits==expected[i].y.bits&&
+            smoke->imageSpeed.bits==expected[i].imageSpeed.bits&&smoke->direction.high==direction.high&&
+            smoke->direction.low==direction.low&&smoke->speed.high==speed.high&&smoke->speed.low==speed.low);
+    }
+    SkeletonSoundAudio::check(world.randomDrawCount()==random.drawCount());
+    for(unsigned i=0;i<16;++i)SkeletonSoundAudio::check(world.randomState().stateWord(i)==random.stateWord(i));
+}
 template<class World,class Emit,class Find>
 void checkRegisteredSmokeScript(World& world,Emit emit,Find find){
     using namespace downwell;
