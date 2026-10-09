@@ -39,3 +39,9 @@ for event,digest in {
     assert sha256((export / f"Assembly/gml_Object_objDeadBody_{event}.asm").read_bytes()).hexdigest() == digest
 assert sha256((export / "Assembly/gml_GlobalScript_scrOutofview.asm").read_bytes()).hexdigest() == \
     "e06b55bcc8952fd6eb918461ffce8196a41cff92c7f7dfe97060160468a2fcff"
+step = (export / "Assembly/gml_Object_objDeadBody_Step_0.asm").read_text()
+assert step.index("gml_Script_TimeStopBound") < step.index("call.i place_meeting")
+assert step.count("pushi.e 56\nconv.i.v") == 4
+assert step.count("call.i place_meeting(argc=3)") == 4
+assert "push.v self.yy\ncall.i round(argc=1)\npop.v.v self.y\npush.v self.xx" in step
+print("Pinned corpse Step: TimeStopBound before solid-56 queries, Y then X publication")

@@ -132,6 +132,11 @@ public:
         bool position(RunnerImageValue x,RunnerImageValue y){
             auto* e=owner_.entry(key_);return (e&&owner_.position(*e,x,y))||owner_.fail();
         }
+        bool meeting(int object,MotionBinary64 x,MotionBinary64 y,bool& hit){
+            auto* e=owner_.entry(key_);auto* r=e?owner_.record(*e):nullptr;bool result=false;
+            if(!owner_.good_||!r||!owner_.lifecycle_.placeMeeting(key_,*r,object,x,y,result))return owner_.fail();
+            hit=result;return true;
+        }
         bool destroy(){
             auto* e=owner_.entry(key_);auto* r=e?owner_.record(*e):nullptr;
             if(!owner_.good_||!r)return owner_.fail();

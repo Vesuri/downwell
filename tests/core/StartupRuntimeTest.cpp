@@ -932,12 +932,17 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
 
     if(objects&&patterns){
         struct CorpseAudit:LifecycleAudit {
+            unsigned fieldQueries=0,motionQueries=0;bool fieldHit=false;
             bool birthAt(downwell::InstanceHandle h,const downwell::InstanceRecord& r,
                 downwell::RunnerImageValue,downwell::RunnerImageValue){return birth(h,r);}
             bool placeMeeting(downwell::InstanceHandle h,const downwell::InstanceRecord& r,int object,
                 downwell::MotionBinary64,downwell::MotionBinary64,bool& hit){
                 require(matches(h,r),"controlled collision fixture resolves the querying lifetime");
-                if(r.objectId==263)require(object==57,"corpse Create selects its parent-wall shape");
+                if(r.objectId==263){
+                    require(object==57||object==56||object==82,"corpse uses source Create, movement and time-field families");
+                    if(object==82){++fieldQueries;hit=fieldHit;return true;}
+                    if(object==56)++motionQueries;
+                }
                 hit=false;return true;
             }
             bool instancePlace(downwell::InstanceHandle,const downwell::InstanceRecord&,int,
@@ -984,9 +989,11 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
             }
             ++steps;
             if(steps==10)corpse.yy=downwell::MotionBinary64::fromInteger(-10000);
-            return corpse.step(false,events);
+            return corpse.stepInWorld(steps==2||steps==3,480,publish,events,good);
         };
+        downwell::RunnerImageValue previousX,previousY;
         for(unsigned tick=1;tick<=10;++tick){
+            audit.fieldHit=tick==3;
             require(runtime->withCorpseEvents(corpses,execute,[&]{runtime->step(false);return runtime->effectsSucceeded();}),
                 "corpse joins actual animation/alarm/Step/End Step/cleanup scheduling");
             if(tick<10){
@@ -998,9 +1005,13 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                 std::memcpy(&publicIndex.bits,&record->imageIndex,4);
                 require(publicX.bits==state->x.bits&&publicY.bits==state->y.bits&&publicIndex.bits==state->imageIndex.bits,
                     "corpse motion and animation publish the registered builtin state");
+                if(tick==2)require(publicX.bits==previousX.bits&&publicY.bits==previousY.bits&&record->alarms.get(0)==179,
+                    "frozen corpse retains position and refunds only source cooldown alarms");
+                previousX=publicX;previousY=publicY;
             }
         }
-        require(steps==10&&alarmCalls==1&&!runtime->instance(id)&&!corpses.state(corpseKey),
+        require(steps==10&&alarmCalls==1&&audit.fieldQueries==2&&audit.motionQueries==18&&
+            !runtime->instance(id)&&!corpses.state(corpseKey),
             "out-of-view End Step retires corpse at room cleanup");
         require(corpses.clear()&&!runtime->instance(id),"retire corpse before room teardown");
         audit.verify(*runtime);

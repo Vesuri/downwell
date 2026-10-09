@@ -163,6 +163,59 @@ int main(){
     BuilderPatternPack patterns(bb.data(),bb.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     SpriteMaskPack masks(mb.data(),mb.size());
     require(rooms.valid()&&objects.valid()&&patterns.valid()&&sprites.valid()&&masks.valid(),"real collision resources validate");
+    for(int x:{159,160,240,320,321})for(bool reject:{false,true})for(bool field:{false,true}){
+        struct CorpseQueryOwner:StoredWorldCollision {
+            using StoredWorldCollision::StoredWorldCollision;
+            unsigned fields=0,motion=0;bool reject=false;
+            bool placeMeeting(InstanceHandle key,const InstanceRecord& r,int object,
+                MotionBinary64 x,MotionBinary64 y,bool& hit){
+                if(r.objectId==263){
+                    require(r.maskId==599,"corpse queries retain the source collision mask");
+                    if(object==82){++fields;if(reject)return false;}
+                    else if(object==56)++motion;
+                    else require(object==57,"only corpse Create queries parentWall");
+                }
+                return StoredWorldCollision::placeMeeting(key,r,object,x,y,hit);
+            }
+        };
+        auto owner=std::make_unique<CorpseQueryOwner>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            InstanceLifecycleBinding::bindPositionedBirths(*owner));
+        require(owner->attach(*world),"attach corpse to actual collision world");world->skipToGameForTesting();
+        if(field)world->registerLevelExit(-1032);
+        auto corpses=world->corpseRegistration<1>();DeadBodySource source;
+        source.x=MotionBinary64::fromInteger(x);source.y=MotionBinary64::fromInteger(-1000);
+        source.imageXscale=MotionBinary64::fromInteger(-1);
+        require(world->createRegisteredCorpseFromDeath(corpses,source,206,{},102,
+            [](auto,int layer,auto,auto,bool& hit){require(layer==100,"corpse tile layer");hit=false;return true;}),
+            "create real registered corpse with mirrored transform");
+        const auto key=corpses.sourceHandle(source.myDeadBody);const auto before=*corpses.state(key);
+        struct Environment {
+            int area(){return 1;}int restInPieces(){return 0;}
+            bool create(int,MotionBinary64,MotionBinary64){return false;}
+        } environment;
+        const bool outside=x<160||x>320;
+        bool inField=false;
+        const auto* record=world->resolveInstance(key);
+        require(record&&owner->StoredWorldCollision::placeMeeting(key,*record,82,source.x,source.y,inField),
+            "inspect actual inherited exit-field overlap");
+        if(x==240)require(inField==field,"central corpse overlaps the generated exit field");
+        const bool allowed=outside||inField;
+        owner->reject=reject;
+        const bool ok=corpses.dispatchPublished(key,[&](auto& state,auto& publish,bool& good){
+            return state.stepInWorld(true,480,publish,environment,good);
+        });
+        require(ok==!reject&&world->effectsSucceeded()==!reject&&owner->fields==1&&
+            owner->motion==unsigned(!reject&&allowed)*2,
+            "corpse tests the actual parent field before strict side exemption and solid motion");
+        const auto* state=corpses.state(key);require(state,"corpse lifetime remains owned after Step");
+        if(reject||!allowed)require(state->xx.high==before.xx.high&&state->xx.low==before.xx.low&&
+            state->yy.high==before.yy.high&&state->yy.low==before.yy.low,
+            "blocked or rejected time query does not advance corpse accumulators");
+        if(!reject&&!allowed)require(state->alarms.get(0)==181&&state->alarms.get(3)==8,
+            "frozen corpse refunds expiry but not activation");
+        require(corpses.clear(),"retire registered corpse fixture");
+    }
     {
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());

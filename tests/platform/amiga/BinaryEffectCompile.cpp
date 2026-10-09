@@ -598,7 +598,14 @@ bool compileRegisteredCorpse(downwell::StoredCorpseRegistration<16,4>& owner,
     downwell::DeadBodySource& source,downwell::GameMakerRandom& random,CorpseTileProbe tile){
     if(!owner.createFromDeath(source,206,{},102,false,random,tile))return false;
     const auto key=owner.sourceHandle(source.myDeadBody);
-    return owner.advanceAnimation(key)&&owner.dispatchPublished(key,[](auto& state,auto&,bool&){return state.valid;})&&
+    struct Environment {
+        int area(){return 1;}
+        int restInPieces(){return 0;}
+        bool create(int,downwell::MotionBinary64,downwell::MotionBinary64){return false;}
+    } environment;
+    return owner.advanceAnimation(key)&&owner.dispatchPublished(key,[&](auto& state,auto& publish,bool& good){
+        return state.stepInWorld(true,480,publish,environment,good);
+    })&&
         owner.endStep(key,{},true)&&owner.clear();
 }
 namespace {

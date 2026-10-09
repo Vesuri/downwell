@@ -3,6 +3,7 @@
 #include "CorpseLifecycle.h"
 #include "RunnerRealComparison.h"
 #include "MultiplyBinary64.h"
+#include "TimeStopBound.h"
 namespace downwell {
 struct CorpseMotion : CorpseLifecycle {
     int collisionDistance=0,loopIndex=0,checkRange=0;
@@ -16,6 +17,25 @@ struct CorpseMotion : CorpseLifecycle {
         if(destroyRequested)return true;
         if(!run(stopped,events)){valid=false;return false;}
         return true;
+    }
+    // Live adapter: queries use this registered instance's transformed mask.
+    // Create's wall family is 57; ordinary movement deliberately selects 56.
+    template<class Publish,class Environment> bool stepInWorld(bool playerStopped,int roomWidth,
+        Publish& publish,Environment& environment,bool& good){
+        if(!good||!valid)return false;
+        bool allowed=false;
+        if(!TimeStopBound::evaluate(playerStopped,x.promoted(),y.promoted(),roomWidth,
+            [&](auto px,auto py,bool& hit){return publish.meeting(82,px,py,hit);},allowed))return good=false;
+        struct Events {
+            Publish& output;Environment& environment;bool& good;
+            bool meeting(MotionBinary64 x,MotionBinary64 y,bool& hit){return output.meeting(56,x,y,hit);}
+            bool publish(RunnerImageValue x,RunnerImageValue y){return output.position(x,y);}
+            int area(){return environment.area();}
+            int restInPieces(){return environment.restInPieces();}
+            bool create(int object,MotionBinary64 x,MotionBinary64 y){return environment.create(object,x,y);}
+            void destroy(){if(!output.destroy())good=false;}
+        } events{publish,environment,good};
+        return (step(!allowed,events)&&good)||(good=false);
     }
 private:
     static bool scale(MotionBinary64& value,MotionBinary64 factor){return multiplyBinary64(value,factor,value);}

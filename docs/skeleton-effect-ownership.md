@@ -1216,8 +1216,13 @@ alarm bank and published builtin state; `alarmEvent` executes the body without
 a second countdown. Step adapters must publish position and destruction through
 the supplied publisher; unmatched state is rejected. End Step uses the retained
 view and the shared out-of-view test, with removal deferred to room cleanup.
-Motion queries, time-stop selection and synchronous alarm/death children remain
-caller-supplied checked dependencies. This scope is not default admission of the
+`stepInWorld` uses that lifetime's transformed resource mask for parent-82
+time-field and solid-56 movement queries. TimeStopBound queries the field before
+testing its strict side-boundary exemptions; query failure leaves motion
+unexecuted. Frozen Step refunds alarms 0–2, not activation alarm 3. Position
+setters publish Y before X through the same registered owner. Area, Rest in
+Pieces and synchronous alarm/death children remain caller-supplied checked
+dependencies. This scope is not default admission of the
 complete death chain, nor does it provide native registration or Draw routing.
 
 `CorpseMotion` implements ordinary Step: custom-real gravity and damping,
