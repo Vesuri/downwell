@@ -40,6 +40,15 @@ bool nativeBulletSound(downwell::GameplayCollisionOwner& owner,GameplayWorld& wo
     return world.playBulletWallSound(shot,env,[&](const char*& material){return owner.projectileWallMaterial(wall,material);},audio);
 }
 struct NativeBulletFrames {bool operator()(int,unsigned&);};
+struct NativeBulletSourceOps {
+    bool publishAngle(downwell::RunnerImageValue);bool publishPosition(downwell::RunnerImageValue,downwell::RunnerImageValue);
+    bool line(int,bool&);bool selectWall();bool approachSolid();bool wallParent(int&);
+    bool wallHealth(downwell::MotionBinary64&);bool wallHealthWrite(downwell::MotionBinary64);bool wallHit();
+    bool destroySelf();bool soundWall();bool explosion(int);bool placeShootable(int,bool&);bool selectShootable(int);
+    bool thingHealth(downwell::MotionBinary64&);bool thingHealthWrite(downwell::MotionBinary64);bool thingHit();bool thingHitEffect(bool&);
+};
+bool nativeWorldSourceBullet(GameplayWorld& world,downwell::InstanceHandle shot,downwell::MachineGunSourceMotion& motion,
+    NativeBulletSourceOps& ops,NativeBulletFrames frames){return world.stepSourceBullet(shot,motion,ops,frames);}
 bool nativeBulletEndStep(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle shot){
     return owner.endStepBullet(shot,{});
 }
@@ -3015,7 +3024,8 @@ int main(){
         assert(world->effectsSucceeded()&&child->effect->imageIndex.bits==0x3f000000u);
         assert(effects.clear(owner->scriptEffects()));
     }
-    for(bool high:{false,true})for(bool laser:{false,true})for(unsigned target:{0u,1u,2u}){
+    for(bool high:{false,true})for(bool laser:{false,true})for(unsigned target:{0u,1u,2u})for(bool worldRandom:{false,true}){
+        if(worldRandom&&(high||laser))continue; // Actual birth has the ordinary profile and no Laser Sight.
         const bool wall=target==1,boneTarget=target==2;
         // Exercise the recovered Step against real resource-backed selectors
         // and box writes, using a real fired lifetime for setter/destruction
@@ -3104,14 +3114,25 @@ int main(){
             bool thingHit(){return owner.projectileShootableHit(selected);}
             bool thingHitEffect(bool& effect){MotionBinary64 hp;return owner.projectileShootableFields(selected,hp,effect);}
         } ops{*owner,motion,masks,*world,shotKey,shotShared};
-        assert(world->withBulletEffects(shotKey,frames,[&](auto& muzzle){
+        const auto drawsBefore=world->randomDrawCount();auto expectedRandom=world->randomState();
+        auto expectedMotion=motion;
+        if(worldRandom){
+            assert(!shot.gemHigh&&expectedMotion.initialize(expectedRandom));
+            motion.zeroSpread=true; // Runtime must use the retained birth override, not this supplied value.
+            if(wall){expectedRandom.nextU32();expectedRandom.nextU32();}
+            assert(world->stepSourceBullet(shotKey,motion,ops,frames));
+            assert(!motion.zeroSpread&&world->randomDrawCount()==drawsBefore+1+(wall?2:0)&&
+                motion.direction.high==expectedMotion.direction.high&&motion.direction.low==expectedMotion.direction.low&&
+                world->randomState().stateIndex()==expectedRandom.stateIndex());
+            for(unsigned i=0;i<16;++i)assert(world->randomState().stateWord(i)==expectedRandom.stateWord(i));
+        }else assert(world->withBulletEffects(shotKey,frames,[&](auto& muzzle){
             return MachineGunSourceStep::run(motion,random,high,muzzle,ops,succeeded);
         }));
         assert(succeeded&&ops.destroyed&&ops.lines==(boneTarget?1u:3u)&&ops.writes==2);
         if(!boneTarget)assert(ops.points>1&&ops.approachWrites==2*(ops.points-1));
         const auto myFx=world->resolveBulletLifetime(shotKey)->myFx;
         const auto* child=owner->scriptEffects().find(myFx);
-        assert(random.drawCount()==1&&child&&owner->scriptEffects().size()==(wall?2u:1u));
+        assert(random.drawCount()==(worldRandom?0u:1u)&&child&&owner->scriptEffects().size()==(wall?2u:1u));
         if(boneTarget){
             const auto* victim=owner->bones().find(bone);const auto hp=MotionBinary64::fromInteger(1-machineGunProfile(high).damage);
             assert(victim&&victim->state.hit&&!victim->destroyRequested&&victim->state.health.high==hp.high&&victim->state.health.low==hp.low);
@@ -3147,10 +3168,12 @@ int main(){
                 return owner->projectileWallMaterial(ops.selected,material);
             },audio)&&audio.valid&&audio.calls==7&&world->randomDrawCount()==before+2&&world->overlapSound(2)==29);
         }
-        std::printf("SOURCE_SHOT %u %u %08x %08x %08x %08x %08x %u %u %u %u\n",
+        if(!worldRandom)std::printf("SOURCE_SHOT %u %u %08x %08x %08x %08x %08x %u %u %u %u\n",
             unsigned(high),unsigned(laser),unsigned(motion.x.bits),unsigned(motion.y.bits),unsigned(motion.imageAngle.bits),
             unsigned(box->state.wallHp.high),unsigned(box->state.wallHp.low),ops.lines,ops.points,ops.approachWrites,ops.writes);
         assert(owner->prepareDraw()&&!world->resolveBulletLifetime(shotKey)&&!owner->state(shotShared));
+        if(worldRandom){const auto before=world->randomDrawCount();
+            assert(!world->stepSourceBullet(shotKey,motion,ops,frames)&&!world->effectsSucceeded()&&world->randomDrawCount()==before);}
     }
     {
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);

@@ -2104,7 +2104,8 @@ int main(){
         for(unsigned i=0;i<world->mainBulletCount();++i)
             require(owner->resolve(world->mainBulletAt(i).instance),"bullet draw cache contains no End Step retirees");
     }
-    for(bool high:{false,true})for(bool laser:{false,true})for(bool boneTarget:{false,true}){
+    for(bool high:{false,true})for(bool laser:{false,true})for(bool boneTarget:{false,true})for(bool worldRandom:{false,true}){
+        if(worldRandom&&(high||laser))continue;
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
         require(owner->attach(*world),"attach source bullet Step world");world->skipToGameForTesting();
@@ -2175,7 +2176,16 @@ int main(){
             bool thingHit(){return bones.writeShootableHit(selected);}
             bool thingHitEffect(bool& effect){MotionBinary64 hp;return bones.readShootable(selected,hp,effect);}
         } ops{*world,*owner,motion,shot,bones};
-        require(world->withBulletEffects(shot,frames,[&](auto& muzzle){
+        const auto drawsBefore=world->randomDrawCount();auto expectedRandom=world->randomState();auto expectedMotion=motion;
+        if(worldRandom){
+            motion.zeroSpread=true;
+            require(expectedMotion.initialize(expectedRandom)&&world->stepSourceBullet(shot,motion,ops,frames),
+                "source event uses retained birth profile and world RNG");
+            require(!motion.zeroSpread&&world->randomDrawCount()==drawsBefore+1&&world->randomState().stateIndex()==expectedRandom.stateIndex()&&
+                motion.direction.high==expectedMotion.direction.high&&motion.direction.low==expectedMotion.direction.low,
+                "world source spread matches the exact pre-event RNG state");
+            for(unsigned i=0;i<16;++i)require(world->randomState().stateWord(i)==expectedRandom.stateWord(i),"world source RNG words match");
+        }else require(world->withBulletEffects(shot,frames,[&](auto& muzzle){
             return MachineGunSourceStep::run(motion,random,high,muzzle,ops,succeeded);
         })&&succeeded,
             "source Step runs through stored collision, transform, effect and damage owners");
@@ -2183,7 +2193,7 @@ int main(){
         if(boneTarget){
             const auto* victim=bones.instances().find(bone);
             require(victim&&victim->state.hit&&!victim->destroyRequested&&victim->state.health.high==expected.high&&
-                victim->state.health.low==expected.low&&ops.lines==1&&ops.writes==2&&ops.destroyed&&random.drawCount()==1,
+                victim->state.health.low==expected.low&&ops.lines==1&&ops.writes==2&&ops.destroyed&&random.drawCount()==(worldRandom?0u:1u),
                 "source bullet selects, damages and retains the bone while destroying only itself");
             auto effectFrames=[&](int id,unsigned& count){return sprites.frameCount(id,count);};
             const auto draws=world->randomDrawCount();
@@ -2203,7 +2213,7 @@ int main(){
             target->box.wallHp.high==expected.high&&target->box.wallHp.low==expected.low&&target->active&&!target->destroyRequested,
             "source bullet damage leaves the selected box alive for its own Step");
         require(ops.lines==3&&ops.points>1&&ops.approachWrites==2*(ops.points-1)&&ops.writes==2&&
-            random.drawCount()==1&&world->scriptEffects().size()==1&&
+            random.drawCount()==(worldRandom?0u:1u)&&world->scriptEffects().size()==1&&
             owner->resolve(shot)->bulletMyFx&&owner->resolve(shot)->destroyRequested,
             "source query/movement counts and synchronous muzzle birth survive destruction marking");
         {
@@ -2215,9 +2225,12 @@ int main(){
             },audio)&&audio.valid&&audio.calls==7&&world->randomDrawCount()==before+2&&world->overlapSound(2)==29,
                 "retained bullet sound fields and shared RNG/overlap channel use the real selected material");
         }
-        std::printf("SOURCE_SHOT %u %u %08x %08x %08x %08x %08x %u %u %u %u\n",
+        if(!worldRandom)std::printf("SOURCE_SHOT %u %u %08x %08x %08x %08x %08x %u %u %u %u\n",
             unsigned(high),unsigned(laser),unsigned(motion.x.bits),unsigned(motion.y.bits),unsigned(motion.imageAngle.bits),
             unsigned(target->box.wallHp.high),unsigned(target->box.wallHp.low),ops.lines,ops.points,ops.approachWrites,ops.writes);
+        if(worldRandom){const auto before=world->randomDrawCount();
+            require(!world->stepSourceBullet({},motion,ops,frames)&&!world->effectsSucceeded()&&world->randomDrawCount()==before,
+                "invalid projectile identity fails before source RNG or effects");}
     }
     {
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);

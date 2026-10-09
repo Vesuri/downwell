@@ -172,6 +172,14 @@ retain it while time-stopped, then execute its resumed Step and create sprite
 85 alongside the muzzle without further RNG. These are controlled event-chain
 tests with explicit target births and supplied stop state, not natural skeleton
 encounter admission or a proof of complete global RNG interleaving.
+`stepSourceBullet` supplies the retained bullet's birth profile, first-Step
+Laser Sight spread override, and the world's
+actual random stream, and latches failures in that world. Invalid or retired
+identities fail before draws or effect creation. Its explicit motion/operation
+arguments still need wiring to the ordinary-Step scheduler; invoking this entry
+point is not permission to rerun a shot already advanced by the legacy path.
+The controlled owner tests compare the full pre/post RNG state, including the
+spread-plus-material sequence for wall hits, rather than merely counting draws.
 The enclosing runtime supplies the same motion object to its query/approach
 callbacks and retains the executing bullet through destruction requests.
 `verify-machine-gun-source-step` checks both profiles through empty, box, wall,

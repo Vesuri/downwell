@@ -16,6 +16,7 @@
 #include "ProjectileSegment.h"
 #include "LaserSightRay.h"
 #include "MachineGunEmitter.h"
+#include "MachineGunSourceStep.h"
 #include "CurrencyAccount.h"
 #include "CurrencySpawnScript.h"
 #include "CurrencyGainAccountOperations.h"
@@ -1256,6 +1257,21 @@ public:
         return run_.effectsSucceeded=registration.frozen(key,effect,pTimeStop,width,frozen);
     }
     const ScriptSpawnEffects<scriptSpawnEffectCapacity>& scriptEffects()const{return ownedScriptEffects_;}
+    template<class Ops,class Frames>
+    bool stepSourceBullet(InstanceHandle shot,MachineGunSourceMotion& motion,Ops& ops,Frames frames){
+        if(!run_.effectsSucceeded||!instances_.resolve(shot))return run_.effectsSucceeded=false;
+        const MainBulletState* caller=nullptr;
+        for(std::size_t i=0;i<mainBulletCount_;++i)
+            if(mainBullets_[i].instance.slot==shot.slot&&mainBullets_[i].instance.generation==shot.generation){
+                caller=&mainBullets_[i];break;
+            }
+        if(!caller)return run_.effectsSucceeded=false;
+        const bool high=caller->gemHigh;
+        if(!motion.initialized)motion.zeroSpread=caller->trajectory.zeroSpread;
+        return withBulletEffects(shot,frames,[&](auto& effects){
+            return MachineGunSourceStep::run(motion,random_,high,effects,ops,run_.effectsSucceeded);
+        });
+    }
     template<class Frames,class Execute>
     bool withBulletEffects(InstanceHandle shot,Frames frames,Execute execute){
         if(!run_.effectsSucceeded)return false;

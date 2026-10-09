@@ -12,6 +12,7 @@
 #include "core/GemMotion.h"
 #include "core/ProjectileAnimation.h"
 #include "core/MachineGunTrajectory.h"
+#include "core/MachineGunSourceStep.h"
 #include "core/ProjectileSegment.h"
 #include "core/LaserSightRay.h"
 #include "core/MachineGunEmitter.h"
@@ -855,6 +856,16 @@ public:
         return downwell::EffectSpawnScript::run(ops,x,y,sprite,speed,angle,depth);
     }
     const downwell::ScriptSpawnEffects<downwell::scriptSpawnEffectCapacity>& scriptEffects()const{return ownedScriptEffects_;}
+    template<class Ops,class Frames>
+    bool stepSourceBullet(downwell::InstanceHandle shot,downwell::MachineGunSourceMotion& motion,Ops& ops,Frames frames){
+        const auto* caller=resolveBulletLifetime(shot);
+        if(!run_.effectsSucceeded||!caller)return run_.effectsSucceeded=false;
+        const bool high=caller->gemHigh;
+        if(!motion.initialized)motion.zeroSpread=caller->trajectory.zeroSpread;
+        return withBulletEffects(shot,frames,[&](auto& effects){
+            return downwell::MachineGunSourceStep::run(motion,enemyRandom_,high,effects,ops,run_.effectsSucceeded);
+        });
+    }
     template<class Frames,class Execute>
     bool withBulletEffects(downwell::InstanceHandle shot,Frames frames,Execute execute){
         if(!run_.effectsSucceeded||!scriptSpawnInstances_)return run_.effectsSucceeded=false;
