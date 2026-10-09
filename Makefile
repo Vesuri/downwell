@@ -530,6 +530,7 @@ test: verify-level-number
 .PHONY: verify-level-number
 verify-level-number: build/level-number-test
 	./build/level-number-test
+	python3 tools/verify-runner-text-draw.py
 generated/downwell-title-glyphs.h: tools/generate-title-glyphs.py extracted/utmt-0.9.2.0/manifest.json $(wildcard extracted/utmt-0.9.2.0/TexturePages/*.png)
 	python3 tools/generate-title-glyphs.py
 generated/downwell-area-titles.h: tools/generate-area-titles.py data/language.ini

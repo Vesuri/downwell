@@ -124,7 +124,7 @@ are retained; missing glyphs use U+25AF and then no ink. Other font resources an
 colors are rejected, not thresholded or substituted.
 
 `LevelNumberSurfaceDraw` joins those glyphs to the shared event for the admitted
-left/top, opaque text state. It borrows current font/alignment/alpha/color rather
+left/center/right horizontal, top vertical, opaque text state. It borrows current font/alignment/alpha/color rather
 than setting defaults, retains the helper's final white color, and handles each
 single-token hash/newline/NUL as no ink. The compositor's surface-local emitter
 avoids a second camera subtraction and uses its supplied raster policy. Tests
@@ -133,6 +133,19 @@ large nonzero camera coordinates in normal, death and low-spec modes; absent
 surfaces retain offsets. Unsupported text states fail with the source mutation
 prefix retained. This still requires live renderer-state/target binding and
 verification of the target raster policy before admitting natural callers.
+
+`verify-runner-text-draw.py` pins draw_text registration/wrapper 0x5323A0 and
+alignment setters 0x45A9C0/0x45AA00. Horizontal/vertical alignment are globals
+0x9359BC/0x9359C0, not title-local defaults. The VM playerDraw sets horizontal
+center in block 5 with no explicit restoration; the title event sets neither
+alignment, font nor alpha. This does not establish the final live state: intervening
+Draw calls still need tracking. The draw_text wrapper narrows X/Y with FSTP m32;
+0x459D9C subtracts signed-truncated half line width for center or full width for
+right, with a binary32 addition. The shared adapter now preserves those two
+rounding boundaries, using offline unit-font advances for single tokens. Tests
+include values beyond 2^24 that distinguish input narrowing from integer-only
+placement. Vertical alignment and final glyph-quad raster sampling are not yet
+admitted beyond the existing top/integer path.
 
 The stored runner's `withLevelNumberDraw` borrows the title registration only
 for its enclosing render, while `drawLevelNumber` resolves the original room

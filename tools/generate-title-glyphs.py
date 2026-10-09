@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from PIL import Image
 
-VERSION = 1
+VERSION = 2
 SOURCE = "c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8"
 
 def mask_bytes(alpha, width, height):
@@ -57,7 +57,7 @@ def generate(manifest_path, output, check):
                     raise ValueError('planar mask round trip failed')
         total += len(mask); maximum = max(maximum,len(mask))
         lines.append(f'static const std::uint8_t mask{i}[] = {{'+','.join(str(b) for b in mask or b'\0')+'};')
-        records.append(f'{{{c},{{mask{i},{len(mask)},{w},{h},{stride}}},{glyph["offset"]}}},')
+        records.append(f'{{{c},{{mask{i},{len(mask)},{w},{h},{stride}}},{glyph["offset"]},{glyph["shift"]}}},')
     lines += [f'static const std::uint8_t zero[{max(1,maximum)}] = {{}};',
               'static const FontGlyphMask glyphs[] = {',*records,'};',
               'static const FontGlyphMasks bank(2,glyphs,sizeof(glyphs)/sizeof(glyphs[0]),zero,sizeof(zero));','}']

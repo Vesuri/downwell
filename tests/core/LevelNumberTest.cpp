@@ -22,6 +22,20 @@ static void titleSurface(){
         bool begin(){++begins;return true;}bool end(){++ends;return true;}
         bool view(unsigned axis,MotionBinary64& out){++views;out=MotionBinary64::fromInteger(axis?30000:1000000);return true;}
     };
+    struct PositionEmit {
+        int expectedX;unsigned calls=0;
+        bool atSurface(const EffectMaskAssets::Asset&,MotionBinary64 x,MotionBinary64 y){
+            std::int32_t px,py;assert(x.roundPixel(px)&&y.roundPixel(py));
+            assert(px==expectedX&&py==16777220);++calls;return true;
+        }
+    };
+    for(unsigned token:{unsigned('A'),unsigned('.'),unsigned('1')})for(unsigned align=0;align<3;++align){
+        int width;assert(title_glyphs::bank.width(2,token,width));
+        PositionEmit emit{16777216-(align==1?width/2:align==2?width:0)};
+        Target target;LevelNumberTextDrawState state{2,align,0,0xffffff,MotionBinary64::fromInteger(1)};
+        LevelNumberSurfaceDraw<Target,PositionEmit> draw(title_glyphs::bank,state,target,emit);
+        assert(draw.character(token,MotionBinary64::fromInteger(16777217),MotionBinary64::fromInteger(16777219))&&emit.calls==1);
+    }
     SmokeEffects<1> smoke;EffectMaskAssets assets;
     auto composition=std::make_unique<CurrencySmokeComposition>();
     const EffectSurfacePlacement::View view{MotionBinary64::fromInteger(1000000),
@@ -62,7 +76,7 @@ static void titleSurface(){
     for(unsigned mode=0;mode<4;++mode){
         Target target;LevelNumber<1> title;
         assert(title.create(1,MotionBinary64::fromInteger(8),[](unsigned,unsigned& c){c='A';return true;}));
-        LevelNumberTextDrawState state{mode==0?0u:2u,mode==1?1u:0u,mode==2?1u:0u,123,
+        LevelNumberTextDrawState state{mode==0?0u:2u,mode==1?3u:0u,mode==2?1u:0u,123,
             MotionBinary64::fromInteger(mode==3?0:1)};
         assert(!composition->prepareWithSurfaceProducers([](auto){},smoke,assets,view,{},
             [](auto){return true;},[&](auto emit){
@@ -86,6 +100,7 @@ static void glyphMasks(){
         assert(title_glyphs::bank.resolve(2,glyph.character,0xffffff,white,ink)&&ink);
         assert(black.mask.width==unsigned(glyph.sourceWidth)&&black.mask.height==unsigned(glyph.sourceHeight));
         assert(black.originX==-glyph.offset&&black.originY==0);
+        int advance;assert(title_glyphs::bank.width(2,glyph.character,advance)&&advance==glyph.shift);
         assert(black.mask.data==white.mask.data&&black.low==black.mask.data&&black.high==black.mask.data);
         assert(white.low==white.mask.data&&white.high==title_glyphs::zero);
         for(unsigned b=0;b<white.mask.bytes;++b)assert(!white.high[b]);

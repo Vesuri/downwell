@@ -7,7 +7,7 @@ namespace downwell {
 struct FontGlyphMask {
     unsigned character;
     BinaryEffectSurface<>::Mask mask;
-    int offset;
+    int offset,advance;
 };
 class FontGlyphMasks {
 public:
@@ -15,6 +15,11 @@ public:
                    const std::uint8_t* zero,unsigned zeroBytes):
         font_(font),glyphs_(glyphs),count_(count),zero_(zero),zeroBytes_(zeroBytes){}
     // Missing characters use the runner's U+25AF fallback, then no ink.
+    bool width(unsigned font,unsigned character,int& value)const{
+        if(font!=font_||!glyphs_)return false;
+        const auto* glyph=find(character);if(!glyph)glyph=find(0x25af);
+        value=glyph?glyph->advance:0;return true;
+    }
     // Color black remains opaque; it must not subtract surface coverage.
     bool resolve(unsigned font,unsigned character,unsigned color,EffectMaskAssets::Asset& asset,bool& ink)const{
         ink=false;
