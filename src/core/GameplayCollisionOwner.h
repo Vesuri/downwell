@@ -1718,6 +1718,23 @@ public:
             const auto& self=*static_cast<GameplayCollisionOwner*>(context);
             return self.valid()?self.captureRevision():0xffffffffu;
         });
+        world.configureResultRoomAlarms([](void* context,GameplayWorld::ResultAlarmEmit emit,void* emitContext){
+            auto& self=*static_cast<GameplayCollisionOwner*>(context);
+            if(!self.valid()||!self.world_||!self.world_->levelClearActive())return false;
+            const auto* result=self.result_.find(self.result_.handle());
+            if(!result||!result->active||result->destroyRequested)return self.check(false);
+            RunnerStepSnapshot<5> phase;
+            if(!self.check(self.visitRegistered(View::runControllerBase,View::capacity,
+                [&](InstanceHandle h,int object,std::uint32_t flags){
+                    return self.resolves(h)&&((flags&0x100003u)||phase.append(h.slot,h.generation,object));
+                })))return false;
+            return self.dispatchCapturedAlarms(phase,[&](InstanceHandle h,unsigned alarm,const PackedObjectEvent&){
+                View::Kind kind;InstanceHandle local;
+                if(!View::decode(h,kind,local))return false;
+                return kind==View::Kind::runController?self.world_->advanceControllerRoomAlarm(local,alarm):
+                    kind==View::Kind::result&&self.world_->advanceResultRoomAlarm(local,alarm,emit,emitContext);
+            });
+        },this);
         world.configureRoomAlarms([](void* context){
             DW_PROFILE_SCOPE(profileAlarmCapture);
             auto& self=*static_cast<GameplayCollisionOwner*>(context);

@@ -953,6 +953,21 @@ public:
     bool advanceEnemyRoomAlarm(downwell::InstanceHandle key,unsigned alarm);
     bool advanceBoxRoomAlarm(downwell::InstanceHandle key,unsigned alarm);
     void configureRoomAlarms(bool (*callback)(void*),void* context){roomAlarms_=callback;roomAlarmsContext_=context;}
+    using ResultAlarmEmit=bool (*)(void*,downwell::LevelClearSelection::Effect,unsigned);
+    void configureResultRoomAlarms(bool (*callback)(void*,ResultAlarmEmit,void*),void* context){
+        resultRoomAlarms_=callback;resultRoomAlarmsContext_=context;
+    }
+    bool advanceResultRoomAlarm(downwell::InstanceHandle key,unsigned alarm,ResultAlarmEmit emit,void* context){
+        const auto* r=resultInstance_?resultInstance_->find(key):nullptr;
+        if(!run_.effectsSucceeded||!run_.levelClearActive||!r||!r->active||r->destroyRequested||!emit)
+            return run_.effectsSucceeded=false;
+        // The admitted Result singleton follows object 37 and the existing
+        // scalar object-68 wipe. A new wipe born by this Alarm 0 is not stepped
+        // by this alarm phase. Full registered wipe ownership remains separate.
+        if(alarm==0)run_.exitDither.advanceAlarm();
+        return run_.effectsSucceeded=run_.levelClear.selection.advanceAlarmChecked(alarm,
+            [&](auto event,unsigned value){return emit(context,event,value)&&run_.effectsSucceeded;});
+    }
     bool advanceBulletRoomAnimation(downwell::InstanceHandle key);
     // Only the native room owner uses these: its image publication callbacks
     // are no-ops and its typed records are the authoritative image state.
@@ -1634,8 +1649,17 @@ public:
     bool stepLevelClear(bool& confirm, bool leftPressed, bool rightPressed, bool& heartGoal, Emit emit) {
         if (!run_.effectsSucceeded || !run_.levelClearActive || run_.nextLevelRequested) return false;
         ++tick_;
-        return run_.stepLevelClear(confirm, leftPressed, rightPressed, heartGoal,
-            currencyAccount_, player_, health_, enemyRandom_, emit);
+        return run_.stepLevelClearScheduled(confirm, leftPressed, rightPressed, heartGoal,
+            currencyAccount_, player_, health_, enemyRandom_, emit,[](int,int){return true;},
+            [this](auto event){
+                if(!resultRoomAlarms_){
+                    run_.exitDither.advanceAlarm();return run_.levelClear.advanceAlarmsChecked(event);
+                }
+                return resultRoomAlarms_(resultRoomAlarmsContext_,
+                    [](void* context,downwell::LevelClearSelection::Effect effect,unsigned value){
+                        return (*static_cast<decltype(event)*>(context))(effect,value);
+                    },&event);
+            });
     }
     bool levelClearActive() const { return run_.levelClearActive; }
     bool nextLevelRequested() const { return run_.nextLevelRequested; }
@@ -1681,6 +1705,8 @@ private:
     downwell::ScriptEffectRuntimeBinding debrisBinding_;
     bool (*debrisAlarm_)(void*,downwell::GameplayDebrisInstances&,downwell::InstanceHandle,unsigned)=nullptr;
     bool (*roomAlarms_)(void*)=nullptr;
+    bool (*resultRoomAlarms_)(void*,ResultAlarmEmit,void*)=nullptr;
+    void* resultRoomAlarmsContext_=nullptr;
     void* roomAlarmsContext_=nullptr;
     downwell::DebrisEffects<downwell::debrisEffectCapacity> ownedDebrisEffects_;
     DebrisStepOrder debrisStepOrder_;

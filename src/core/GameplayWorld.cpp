@@ -89,6 +89,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto roomAnimation=roomAnimation_;
     const auto actorEndStep=registeredActorEndStep_;void* const actorEndStepContext=registeredActorEndStepContext_;
     const auto roomAlarms=roomAlarms_;void* const roomAlarmsContext=roomAlarmsContext_;
+    const auto resultRoomAlarms=resultRoomAlarms_;void* const resultRoomAlarmsContext=resultRoomAlarmsContext_;
     void* const roomAnimationContext=roomAnimationContext_;
     const auto roomActorDraw=roomActorDraw_;
     const auto roomActorReadOnlyDraw=roomActorReadOnlyDraw_;
@@ -154,6 +155,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     configureRoomAnimation(roomAnimation,roomAnimationContext);
     configureRegisteredActorEndStep(actorEndStep,actorEndStepContext);
     configureRoomAlarms(roomAlarms,roomAlarmsContext);
+    configureResultRoomAlarms(resultRoomAlarms,resultRoomAlarmsContext);
     configureRoomActorDraw(roomActorDraw,roomActorDrawContext,roomActorReadOnlyDraw);
     configureEnemyStepOrder(enemyOrderCapture,enemyOrderContext,enemyOrderRevision);
     configureDebrisStepOrder(debrisOrderCapture,debrisOrderContext);

@@ -820,9 +820,17 @@ int main(){
         if(mode==GameplayCollisionOwner::Ownership::reference)
             assert(owner->population(112,population)&&population==0);
         assert(controllers.find(controller)&&creates==1);
+        assert(owner->requestMomentDelay()&&speed==30&&
+            controllers.activate(controller,false)&&owner->reconcileActivation());
         bool heart=false;
         for(unsigned tick=0;tick<400&&!world->nextLevelRequested();++tick){
-            bool confirm=true;assert(world->stepLevelClear(confirm,false,false,heart,[](auto,unsigned){}));
+            if(tick==1)assert(controllers.activate(controller,true)&&owner->reconcileActivation());
+            bool confirm=true;assert(world->stepLevelClear(confirm,false,false,heart,[&](auto effect,unsigned){
+                if(effect==LevelClearSelection::Effect::dither)
+                    assert(speed==60&&owner->requestMomentDelay()&&speed==30);
+            }));
+            if(tick==0||tick==120)assert(speed==30&&controllers.find(controller)->alarms.get(0)==1);
+            if(tick==1||tick==121)assert(speed==60&&controllers.find(controller)->alarms.get(0)==0);
         }
         assert(world->nextLevelRequested()&&owner->requestMomentDelay()&&speed==30);
         assert(controllers.activate(controller,false)&&owner->reconcileActivation());
@@ -833,6 +841,29 @@ int main(){
         assert(controllers.activate(controller,true)&&owner->reconcileActivation());
         world->step(0);assert(world->effectsSucceeded()&&speed==60&&controllers.find(controller)->alarms.get(0)==0&&creates==1);
         assert(controllers.clear()&&!view.contains(shared));
+    }
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                   GameplayCollisionOwner::Ownership::nativeScenery}){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain(),&resultRooms);
+        assert(owner->attach(*world));int speed=60;assert(world->bindControllerRoomSpeed(speed));
+        InstanceHandle controller;auto& controllers=owner->runControllers();
+        assert(controllers.create(100065,{},{},[](InstanceHandle){return true;},controller));
+        assert(world->registerLevelExit(176+world->player().offsetY()));
+        for(unsigned tick=0;tick<100;++tick)world->step(0);
+        assert(world->enterLevelClear(0,false));bool heart=false;
+        for(unsigned tick=0;tick<120;++tick){bool confirm=true;
+            assert(world->stepLevelClear(confirm,false,false,heart,[](auto,unsigned){}));}
+        const auto camera=world->levelClear().motion.cameraY;
+        assert(controllers.setAlarm(controller,1,1));unsigned events=0;bool confirm=true;
+        assert(!world->stepLevelClear(confirm,false,false,heart,[&](auto,unsigned){++events;})&&
+            !world->effectsSucceeded()&&events==2&&world->exitDither().active&&
+            world->exitDither().alarm0==15&&world->levelClear().selection.alarm1==90&&
+            controllers.find(controller)->alarms.get(1)==0&&world->levelClear().motion.cameraY.equal(camera));
+        const auto tick=world->tick();
+        assert(!world->stepLevelClear(confirm,false,false,heart,[](auto,unsigned){std::abort();})&&world->tick()==tick);
     }
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
                    GameplayCollisionOwner::Ownership::nativeScenery}){

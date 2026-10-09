@@ -145,9 +145,9 @@ behavior, both backend integrations and relevant original-game verification.
   Admit persistent object 37 from the actual native startup Create sequence,
   including its initialization/HUD dependencies and source numeric ID. Verify
   the complete rmResult handoff, including Room End events, native destination
-  layer loading and persistent-controller rebinding. Schedule Result and
-  controller alarms in one mixed destination-room phase on the native path;
-  complete registered native exit-wipe birth and both adapters' Result
+  layer loading and persistent-controller rebinding. Complete registered native
+  exit-wipe birth and its admission to the mixed destination alarm phase,
+  including arbitrary activation/populations; complete both adapters' Result
   position/activation publication. Complete stored Result alarm-storage integration and supply
   the actual shared room-speed state at natural controller call sites.
   Do not run the old combat alarm pass behind the menu or batch all

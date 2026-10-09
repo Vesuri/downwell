@@ -54,8 +54,17 @@ pack, registers its source ID/position, then publishes y=142 before the shared
 initializer consumes RNG. Birth or position failure preserves the completed
 prefix and prevents that initializer. Departure retires the Result handle;
 Retry retains the bound owner but not the room-local lifetime. This admission
-does not yet load rmResult's layer catalog/rebind persistent elements or provide
-mixed destination alarm scheduling. Neither path yet supplies complete source-ordered Room End/retirement
+does not yet load rmResult's layer catalog/rebind persistent elements.
+Its destination alarm adapter captures registered controllers and Result once,
+then uses the resource-backed alarm dispatcher; no old gameplay alarms run
+behind the menu. The admitted Result must remain active. The scalar exit wipe's
+Alarm 0 is advanced immediately before Result Alarm 0, after controller Alarm 0,
+so a wipe born by Result waits until the following phase. This preserves order
+for that admitted population but does not establish registered wipe ownership
+or arbitrary Result activation/populations. Unsupported fired controller events
+stop the phase before later Result counters or Step. Controller callbacks still
+require the shared room-speed state, not a PAL scheduling constant.
+Neither path yet supplies complete source-ordered Room End/retirement
 event dispatch or all Result Create side effects. Result clocks still belong
 to the shared selection state, not the stored record's generic alarm bank.
 The room-population checks are not proof of those missing event integrations
