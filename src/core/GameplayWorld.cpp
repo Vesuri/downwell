@@ -1291,6 +1291,118 @@ bool GameplayWorld::stepEnemyRoomEffect(downwell::InstanceHandle key,int publish
     return true;
 }
 
+bool GameplayWorld::stepBulletRoomEffect(downwell::InstanceHandle key,long generationCameraY,bool& bulletChanged)
+{
+    auto* bullet=const_cast<BulletState*>(resolveBulletLifetime(key));
+    return !bullet||stepBulletEffect(*bullet,generationCameraY,bulletChanged);
+}
+
+bool GameplayWorld::stepBulletEffect(BulletState& bullet,long generationCameraY,bool& bulletChanged)
+{
+    if(!bullet.active)return true;
+    bulletChanged = true;
+    const long cameraCentreQ12 = 176L * 4096 + generationCameraY * 16;
+    bool alive=false;
+    if(!downwell::stepMachineGunProjectileChecked(bullet, enemyRandom_,
+        [this, &bullet](const downwell::ProjectileSegment& path) {
+            DW_PROFILE_SCOPE(profileBulletEnemyQuery);
+            for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {
+                EnemyState& enemy = enemies_[enemyIndex];
+                const downwell::ContactActor contact{
+                    enemy.x * 256L, enemy.y * 256L,
+                    enemy.objectId == 117 ? enemy.motionState : enemy.facing,
+                    enemy.imageScaleY(),
+                    downwell::enemyContactMask(enemy.objectId, enemy.spriteId,enemy.maskId)};
+                if (!enemy.active || enemy.health <= 0 ||
+                    !path.intersects(contact))
+                    continue;
+                const auto impact = downwell::applyStandardBulletImpact(
+                    enemy, run_.kills, enemyRandom_,
+                    [this, &enemy] { run_.combo.state.enemyDefeated(); spawnReward(enemy, false); return run_.effectsSucceeded; },
+                    bullet.gemHigh, bullet.trajectory.direction,
+                    [this](const EnemyState& record){return publishEnemyActivation(record,false);});
+                return impact.kind != downwell::BulletImpactKind::ignored;
+            }
+            return false;
+        }, [this, &bullet]
+           (const downwell::ProjectileSegment& path) {
+            DW_PROFILE_SCOPE(profileBulletSolidQuery);
+            unsigned firstBlock = 0, endBlock = breakableCount_;
+            if (breakableIndexReady_) {
+                int candidate = -1;
+                // An eight-pixel segment can touch at most four
+                // 16-pixel tiles, including a corner-adjacent tile
+                // containing neither endpoint. Test all candidates.
+                const int xs[] = {path.x.pixel, path.endX.pixel};
+                const int ys[] = {path.y.pixel, path.endY.pixel};
+                const unsigned columns = ((xs[0]+8) >> 4) == ((xs[1]+8) >> 4) ? 1 : 2;
+                const unsigned rows = ((ys[0]+8) >> 4) == ((ys[1]+8) >> 4) ? 1 : 2;
+                for (unsigned column = 0; column < columns; ++column)
+                  for (unsigned row = 0; row < rows; ++row) {
+                    const int next = indexedBreakable(xs[column], ys[row]);
+                    if (next < 0) continue;
+                    const auto& block = breakables_[next];
+                    if (block.active && !block.destroyRequested && path.intersects(block.x-8, block.x+8, block.y-8, block.y+8) &&
+                            (candidate < 0 || next < candidate)) candidate = next;
+                }
+                firstBlock = candidate < 0 ? 0 : (unsigned)candidate;
+                endBlock = candidate < 0 ? 0 : firstBlock + 1;
+            }
+            for (unsigned blockIndex = firstBlock; blockIndex < endBlock; ++blockIndex) {
+                Breakable& block = breakables_[blockIndex];
+                // Indexed selection already proved this exact hit.
+                if (block.active && !block.destroyRequested && (breakableIndexReady_ || path.intersects(block.x - 8, block.x + 8,
+                                                   block.y - 8, block.y + 8))) {
+                    bool applied=false;
+                    if(!block.state.bulletHit(downwell::MotionBinary64::fromInteger(
+                        downwell::machineGunProfile(bullet.gemHigh).damage),applied)){
+                        run_.effectsSucceeded=false;return true;
+                    }
+                    return applied;
+                }
+            }
+            // An ordinary, non-wave bullet also stops at unbreakable walls.
+            if (solidResolver_ != 0) {
+                if (segmentResolver_) return segmentResolver_(solidResolverContext_, path);
+                const int left = path.x.pixel < path.endX.pixel ? path.x.pixel : path.endX.pixel;
+                const int right = path.x.pixel > path.endX.pixel ? path.x.pixel : path.endX.pixel;
+                const int top = path.y.pixel < path.endY.pixel ? path.y.pixel : path.endY.pixel;
+                const int bottom = path.y.pixel > path.endY.pixel ? path.y.pixel : path.endY.pixel;
+                for (int y = top; y <= bottom; ++y)
+                    for (int x = left; x <= right; ++x)
+                        if (solidResolver_(solidResolverContext_, x, y) && path.intersects(x,x+1,y,y+1))
+                            return true;
+            }
+            return false;
+        },alive,[this]{return run_.effectsSucceeded;},176,cameraCentreQ12-142L*4096,284,
+        [this,&bullet]{
+            DW_PROFILE_SCOPE(profileBulletPublication);
+            if(!bulletLifecycle_.hasOwner())return true;
+            downwell::RunnerImageValue angle;
+            if(!downwell::ProjectilePublication::angle(bullet.trajectory.direction,angle)||
+                !publishBulletAngle({bullet.identitySlot,bullet.lifetimeId},angle))
+                return run_.effectsSucceeded=false;
+            return true;
+        }))return false;
+    if(bulletLifecycle_.hasOwner()){
+        DW_PROFILE_SCOPE(profileBulletPublication);
+        const downwell::InstanceHandle h{bullet.identitySlot,bullet.lifetimeId};
+        downwell::RunnerImageValue x,y;
+        if(!downwell::ProjectilePublication::coordinate(bullet.trajectory.x,240,x)||
+            !downwell::ProjectilePublication::coordinate(bullet.trajectory.y,176,y)||
+            !publishBulletCollisionPosition(h,x,y)){
+            run_.effectsSucceeded=false;return false;
+        }
+    }
+    if(!alive){
+        const downwell::InstanceHandle h{bullet.identitySlot,bullet.lifetimeId};
+        if(bulletLifecycle_.hasOwner()){
+            if(!markBulletDestroyed(h))return false;
+        }else if(!retireBulletOwnership(bullet))return false;
+    }
+    return true;
+}
+
 GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
 {
     if(playerBirthPending_){run_.effectsSucceeded=false;return {};}
@@ -1581,113 +1693,9 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
      * advance together after player movement and firing.
      */
     {
-        unsigned bulletIndex;
         DW_PROFILE_PHASE(profileBullets);
-        for (bulletIndex = 0; bulletIndex < bulletSlotEnd_; ++bulletIndex) {
-            BulletState& bullet = bullets_[bulletIndex];
-            if (!bullet.active)
-                continue;
-            bulletChanged = true;
-            const long cameraCentreQ12 = 176L * 4096 + generationCameraY * 16;
-            bool alive=false;
-            if(!downwell::stepMachineGunProjectileChecked(bullet, enemyRandom_,
-                [this, &bullet](const downwell::ProjectileSegment& path) {
-                    DW_PROFILE_SCOPE(profileBulletEnemyQuery);
-                    for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {
-                        EnemyState& enemy = enemies_[enemyIndex];
-                        const downwell::ContactActor contact{
-                            enemy.x * 256L, enemy.y * 256L,
-                            enemy.objectId == 117 ? enemy.motionState : enemy.facing,
-                            enemy.imageScaleY(),
-                            downwell::enemyContactMask(enemy.objectId, enemy.spriteId,enemy.maskId)};
-                        if (!enemy.active || enemy.health <= 0 ||
-                            !path.intersects(contact))
-                            continue;
-                        const auto impact = downwell::applyStandardBulletImpact(
-                            enemy, run_.kills, enemyRandom_,
-                            [this, &enemy] { run_.combo.state.enemyDefeated(); spawnReward(enemy, false); return run_.effectsSucceeded; },
-                            bullet.gemHigh, bullet.trajectory.direction,
-                            [this](const EnemyState& record){return publishEnemyActivation(record,false);});
-                        return impact.kind != downwell::BulletImpactKind::ignored;
-                    }
-                    return false;
-                }, [this, &bullet]
-                   (const downwell::ProjectileSegment& path) {
-                    DW_PROFILE_SCOPE(profileBulletSolidQuery);
-                    unsigned firstBlock = 0, endBlock = breakableCount_;
-                    if (breakableIndexReady_) {
-                        int candidate = -1;
-                        // An eight-pixel segment can touch at most four
-                        // 16-pixel tiles, including a corner-adjacent tile
-                        // containing neither endpoint. Test all candidates.
-                        const int xs[] = {path.x.pixel, path.endX.pixel};
-                        const int ys[] = {path.y.pixel, path.endY.pixel};
-                        const unsigned columns = ((xs[0]+8) >> 4) == ((xs[1]+8) >> 4) ? 1 : 2;
-                        const unsigned rows = ((ys[0]+8) >> 4) == ((ys[1]+8) >> 4) ? 1 : 2;
-                        for (unsigned column = 0; column < columns; ++column)
-                          for (unsigned row = 0; row < rows; ++row) {
-                            const int next = indexedBreakable(xs[column], ys[row]);
-                            if (next < 0) continue;
-                            const auto& block = breakables_[next];
-                            if (block.active && !block.destroyRequested && path.intersects(block.x-8, block.x+8, block.y-8, block.y+8) &&
-                                    (candidate < 0 || next < candidate)) candidate = next;
-                        }
-                        firstBlock = candidate < 0 ? 0 : (unsigned)candidate;
-                        endBlock = candidate < 0 ? 0 : firstBlock + 1;
-                    }
-                    for (unsigned blockIndex = firstBlock; blockIndex < endBlock; ++blockIndex) {
-                        Breakable& block = breakables_[blockIndex];
-                        // Indexed selection already proved this exact hit.
-                        if (block.active && !block.destroyRequested && (breakableIndexReady_ || path.intersects(block.x - 8, block.x + 8,
-                                                           block.y - 8, block.y + 8))) {
-                            bool applied=false;
-                            if(!block.state.bulletHit(downwell::MotionBinary64::fromInteger(
-                                downwell::machineGunProfile(bullet.gemHigh).damage),applied)){
-                                run_.effectsSucceeded=false;return true;
-                            }
-                            return applied;
-                        }
-                    }
-                    // An ordinary, non-wave bullet also stops at unbreakable walls.
-                    if (solidResolver_ != 0) {
-                        if (segmentResolver_) return segmentResolver_(solidResolverContext_, path);
-                        const int left = path.x.pixel < path.endX.pixel ? path.x.pixel : path.endX.pixel;
-                        const int right = path.x.pixel > path.endX.pixel ? path.x.pixel : path.endX.pixel;
-                        const int top = path.y.pixel < path.endY.pixel ? path.y.pixel : path.endY.pixel;
-                        const int bottom = path.y.pixel > path.endY.pixel ? path.y.pixel : path.endY.pixel;
-                        for (int y = top; y <= bottom; ++y)
-                            for (int x = left; x <= right; ++x)
-                                if (solidResolver_(solidResolverContext_, x, y) && path.intersects(x,x+1,y,y+1))
-                                    return true;
-                    }
-                    return false;
-                },alive,[this]{return run_.effectsSucceeded;},176,cameraCentreQ12-142L*4096,284,
-                [this,&bullet]{
-                    DW_PROFILE_SCOPE(profileBulletPublication);
-                    if(!bulletLifecycle_.hasOwner())return true;
-                    downwell::RunnerImageValue angle;
-                    if(!downwell::ProjectilePublication::angle(bullet.trajectory.direction,angle)||
-                        !publishBulletAngle({bullet.identitySlot,bullet.lifetimeId},angle))
-                        return run_.effectsSucceeded=false;
-                    return true;
-                }))return {};
-            if(bulletLifecycle_.hasOwner()){
-                DW_PROFILE_SCOPE(profileBulletPublication);
-                const downwell::InstanceHandle h{bullet.identitySlot,bullet.lifetimeId};
-                downwell::RunnerImageValue x,y;
-                if(!downwell::ProjectilePublication::coordinate(bullet.trajectory.x,240,x)||
-                    !downwell::ProjectilePublication::coordinate(bullet.trajectory.y,176,y)||
-                    !publishBulletCollisionPosition(h,x,y)){
-                    run_.effectsSucceeded=false;return {};
-                }
-            }
-            if(!alive){
-                const downwell::InstanceHandle h{bullet.identitySlot,bullet.lifetimeId};
-                if(bulletLifecycle_.hasOwner()){
-                    if(!markBulletDestroyed(h))return {};
-                }else if(!retireBulletOwnership(bullet))return {};
-            }
-        }
+        for(unsigned bulletIndex=0;bulletIndex<bulletSlotEnd_;++bulletIndex)
+            if(!stepBulletEffect(bullets_[bulletIndex],generationCameraY,bulletChanged))return {};
     }
 
 

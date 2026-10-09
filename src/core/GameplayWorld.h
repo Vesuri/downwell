@@ -1310,6 +1310,10 @@ public:
     // This preserves the existing behavior pending the complete mixed Step
     // dispatcher; it does not claim original motion/collision equivalence.
     bool stepEnemyRoomEffect(downwell::InstanceHandle key,int publishedCameraX,long generationCameraY);
+    // Same selected-lifetime boundary for the retained projectile Step. Its
+    // approximate trajectory and legacy contacts are not source collision
+    // dispatch; keep those fidelity gates when wiring the mixed scheduler.
+    bool stepBulletRoomEffect(downwell::InstanceHandle key,long generationCameraY,bool& bulletChanged);
     // Borrow only for this tick scope, as with the stored event composition.
     // The transition runs after published x/y and interaction observation,
     // before later player work, room alarms and ordinary Step. It must not
@@ -1867,6 +1871,7 @@ private:
     bool retireEnemyOwnership(EnemyState& enemy);
     bool clearEnemyOwnership();
     bool retireBulletOwnership(BulletState& bullet);
+    bool stepBulletEffect(BulletState& bullet,long generationCameraY,bool& bulletChanged);
     bool clearBulletOwnership();
     // Normal gameplay reads camMain's published pixel position. Preserve the
     // synthetic replay fixture's explicit camera track when following is off.

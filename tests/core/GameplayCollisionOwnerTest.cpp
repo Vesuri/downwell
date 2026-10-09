@@ -6132,6 +6132,15 @@ int main(){
             owner->state(secondKey)&&!owner->state(firstKey));
         const auto newest=local(world->bulletAt(1));
         assert(newest.generation>second.generation&&newest.slot==first.slot);
+        // A mixed phase retains generation keys across compaction and reuse.
+        // Selecting an old key must not step the new occupant or dirty Draw.
+        bool changed=false;const auto beforeStepRng=world->randomDrawCount();
+        const auto beforeY=world->resolveBulletLifetime(newest)->trajectory.y;
+        assert(world->stepBulletRoomEffect(first,0,changed)&&!changed&&
+            world->randomDrawCount()==beforeStepRng);
+        const auto afterY=world->resolveBulletLifetime(newest)->trajectory.y;
+        assert(afterY.pixel==beforeY.pixel&&afterY.fraction==beforeY.fraction);
+        assert(world->stepBulletRoomEffect(newest,0,changed)&&changed&&world->effectsSucceeded());
         assert(world->restartFromResults(DeathMenuSequence::Action::Retry,2,300)==ResultsDestination::gameplay&&
             !owner->state(secondKey)&&!world->resolveBulletLifetime(newest)&&owner->population(261,population)&&population==0);
         world->step(4);
