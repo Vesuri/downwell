@@ -1133,8 +1133,14 @@ the remaining whole-pipeline raster uncertainty is described in
   numeric-ID allocator. `StartupRuntime::withFlashBallEvents` admits animation
   and cleanup to the mixed world phases; registered flashes use the normal
   depth-ordered direct sprite path. `emitSkeletonFlash` retains the skeleton's
-  shared script fields. These explicit registrations do not install natural
-  skeleton deaths or replace the native world's legacy flash pool.
+  shared script fields. The native `GameplayCollisionOwner` registers the same
+  store in its reference/native/native-scenery modes, retaining supplied source
+  IDs, resource depth and mixed animation/cleanup order. Amiga collection emits
+  sprite 96 directly at that depth even when surfaceFx composition is enabled.
+  Room retirement clears these lifetimes without rewinding their generations.
+  Native `emitSkeletonFlash` requires an enclosing source-ID allocator; these
+  explicit registrations do not install natural skeleton deaths or replace
+  the existing callers of the legacy flash pool.
 - Corpse Create inherits object 90's health/hit defaults, then samples X/Y
   velocity and chooses signed animation speed. Keep those samples even though
   `scrDeadBody` subsequently overwrites velocity. The wrapper caps impact at

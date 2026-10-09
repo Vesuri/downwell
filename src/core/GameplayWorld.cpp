@@ -36,6 +36,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     if (destination == downwell::ResultsDestination::none) return destination;
     if(levelNumbers_&&!levelNumbers_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(limboShards_&&!limboShards_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
+    if(registeredFlash_&&!registeredFlash_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(resultInstance_&&!resultInstance_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(!clearRoomTimeChanges()||!clearRoomTimeShards())return downwell::ResultsDestination::none;
     if(entryDithers_&&!entryDithers_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
@@ -81,6 +82,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto resultInstance=resultInstance_;
     const auto levelNumbers=levelNumbers_;
     const auto limboShards=limboShards_;
+    const auto registeredFlash=registeredFlash_;
     const auto controllerRoomSpeed=controllerRoomSpeed_;
     const auto droneBullets=droneBullets_;
     const auto bones=bones_;
@@ -153,6 +155,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     resultInstance_=resultInstance;
     levelNumbers_=levelNumbers;
     limboShards_=limboShards;
+    registeredFlash_=registeredFlash;
     controllerRoomSpeed_=controllerRoomSpeed;
     droneBullets_=droneBullets;
     bones_=bones;
@@ -275,6 +278,7 @@ bool GameplayWorld::retireGameplayRoom() {
     // room load; an already retired lifetime must not receive a second callback.
     if(levelNumbers_&&!levelNumbers_->clear())return run_.effectsSucceeded=false;
     if(limboShards_&&!limboShards_->clear())return run_.effectsSucceeded=false;
+    if(registeredFlash_&&!registeredFlash_->clear())return run_.effectsSucceeded=false;
     if(resultInstance_&&!resultInstance_->clear())return run_.effectsSucceeded=false;
     if(!clearRoomTimeChanges()||!clearRoomTimeShards())return false;
     if(entryDithers_&&!entryDithers_->clear())return run_.effectsSucceeded=false;

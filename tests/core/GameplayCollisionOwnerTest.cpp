@@ -40,7 +40,7 @@ bool nativeSkeletonDeathBookkeeping(downwell::GameplayCollisionOwner& owner,down
     return owner.recordSkeletonDeath(actor,true,stop,allocate,text,environment,audio);
 }
 bool nativeSkeletonBloodSmoke(GameplayWorld& world,downwell::SkeletonActor& actor,bool (*allocate)(unsigned&)){
-    return world.emitSkeletonBlood(actor,allocate)&&world.emitSkeletonSmoke(actor,allocate);
+    return world.emitSkeletonBlood(actor,allocate)&&world.emitSkeletonSmoke(actor,allocate)&&world.emitSkeletonFlash(actor,allocate);
 }
 bool nativeSkeletonThrow(GameplayWorld& world,downwell::SkeletonActor& actor,downwell::RegisteredSkeletonThrow& caller,
     downwell::SoundPlayEnvironment& environment,NativeSkeletonAudio& audio){
@@ -509,6 +509,7 @@ static void checkTypedCollisionView(const GameplayCollisionView& view,GameplayCo
         case K::result:assert(view.resolveLocal<K::result>(local)==reference.result);break;
         case K::levelNumber:assert(view.resolveLocal<K::levelNumber>(local)==reference.levelNumber);break;
         case K::limboShard:assert(view.resolveLocal<K::limboShard>(local)==reference.limboShard);break;
+        case K::flashBall:assert(view.resolveLocal<K::flashBall>(local)==reference.flashBall);break;
         case K::debris:assert(view.resolveLocal<K::debris>(local)==reference.debris);break;
         case K::timeChange:assert(view.resolveLocal<K::timeChange>(local)==reference.timeChange);break;
         case K::timeShard:assert(view.resolveLocal<K::timeShard>(local)==reference.timeShard);break;
@@ -525,7 +526,7 @@ static void checkTypedCollisionView(const GameplayCollisionView& view,GameplayCo
 }
 static void checkCollisionViewMembership(const GameplayWorld& world){
     const GameplayCollisionView view(world);
-    for(unsigned family=0;family<=unsigned(GameplayCollisionView::Kind::smoke);++family)
+    for(unsigned family=0;family<=unsigned(GameplayCollisionView::Kind::flashBall);++family)
         for(auto local:{InstanceHandle{0,0},InstanceHandle{0xffffffffu,1},InstanceHandle{GameplayCollisionView::capacity,1}})
             checkTypedCollisionView(view,GameplayCollisionView::Kind(family),local);
     for(unsigned slot=0;slot<=GameplayCollisionView::capacity;++slot){

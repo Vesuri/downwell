@@ -128,6 +128,48 @@ int main(){
     assert(sprites.valid()&&masks.valid());
     const auto fontData=load("generated/downwell-fonts.dwfn");downwell::FontPack fonts(fontData.data(),fontData.size());
     assert(fonts.valid());
+    for(auto mode:{downwell::GameplayCollisionOwner::Ownership::reference,
+                  downwell::GameplayCollisionOwner::Ownership::native,
+                  downwell::GameplayCollisionOwner::Ownership::nativeScenery}){
+        using namespace downwell;
+        const bool native=mode!=GameplayCollisionOwner::Ownership::reference;
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},&rooms,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),owner->breakableBinding(),
+            owner->playerBinding(),native?nullptr:&owner->terrain(),&rooms);
+        auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
+        assert(owner->attach(*world)&&(!native||world->bindNativeTerrain(*terrain)));
+        SkeletonActor actor;actor.xx=MotionBinary64::fromInteger(240);actor.yy=MotionBinary64::fromInteger(704);
+        auto random=world->randomState();SmokeBurstCaller expected;std::vector<FlashBallEffect> children;
+        assert((flashBurstPublished<6,2,10>(expected,actor.xx,actor.yy,random,[&](int,auto x,auto y){
+            FlashBallEffect child;if(!child.create(x,y,random))return false;children.push_back(child);return true;
+        })));
+        unsigned next=510000;
+        assert(world->emitSkeletonFlash(actor,[&](unsigned& id){id=next++;return true;}));
+        assert(owner->registeredFlash().size()==children.size()&&actor.smokeScript.smokenum==int(children.size()));
+        for(unsigned i=0;i<16;++i)assert(random.stateWord(i)==world->randomState().stateWord(i));
+        unsigned drawn=0;
+        assert(world->visitRoomActorsReadOnly([&](auto kind,auto key,auto depth){
+            if(kind==GameplayWorld::DrawActor::flashBall){
+                const auto* r=owner->registeredFlash().find(key);RunnerImageValue expectedDepth;
+                assert(expectedDepth.assignInteger(-200000)&&r&&depth.bits==expectedDepth.bits);
+                const auto& expectedChild=children[r->sourceId-510000];
+                assert(r->x.bits==expectedChild.x.bits&&r->y.bits==expectedChild.y.bits);
+                GameplayCollisionView::Record resolved;InstanceHandle shared;
+                assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::flashBall,key,shared)&&
+                    GameplayCollisionView(*world).resolve(shared,resolved)&&resolved.flashBall==r);
+                ++drawn;
+            }
+            return true;
+        })&&drawn==children.size());
+        for(unsigned frame=0;frame<7;++frame){
+            world->step(0);assert(world->effectsSucceeded()&&owner->valid()&&owner->prepareDraw());
+            assert(owner->registeredFlash().size()==(frame==6?0u:children.size()));
+        }
+        assert(world->emitSkeletonFlash(actor,[&](unsigned& id){id=next++;return true;}));
+        assert(world->restartFromResults(DeathMenuSequence::Action::Retry,2,0)==ResultsDestination::gameplay&&
+            owner->registeredFlash().size()==0&&owner->valid());
+    }
     for(unsigned failAllocation=0;failAllocation<=2;++failAllocation){
         using namespace downwell;
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);

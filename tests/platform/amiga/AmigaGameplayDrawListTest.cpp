@@ -91,6 +91,23 @@ int main() {
                 }
                 assert(owner->limboShards().clear());
             }
+            {
+                downwell::InstanceHandle flash;downwell::GameMakerRandom random(23);
+                assert(owner->registeredFlash().create(105194,downwell::MotionBinary64::fromInteger(240),
+                    downwell::MotionBinary64::fromInteger(128),random,flash));
+                const auto* r=owner->registeredFlash().find(flash);assert(r);
+                UBYTE pack[8]{};
+                for(bool composite:{false,true}){
+                    AmigaGameplayDrawList list;assert(list.collect(*world,pack,pack+8,160,34,composite));
+                    unsigned seen=0;
+                    for(unsigned i=0;i<list.count;++i)if(list.actors[i].sprite==96){
+                        assert(list.actors[i].x==r->state.pixelX()-50&&list.actors[i].y==r->state.pixelY()-34&&
+                            list.actors[i].frame==1&&!list.actors[i].flip);++seen;
+                    }
+                    assert(seen==1); // Registered flash stays direct, including surfaceFx mode.
+                }
+                assert(owner->registeredFlash().clear());
+            }
             auto& corpses=owner->registeredCorpses();downwell::GameMakerRandom random(2);
             const downwell::MotionBinary64 x{0x406f0800u,0},y{0x40601000u,0};
             downwell::DeadBodySource source{x,y,{},downwell::MotionBinary64::fromInteger(-1)};

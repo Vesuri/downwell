@@ -140,10 +140,10 @@ behavior, both backend integrations and relevant original-game verification.
   registered corpse/expiry chain in natural skeleton deaths, not only explicit
   test births.
 - Connect natural death/stomp/hit events to effect owners, including registered
-  flash-ball births: connect the shared flash lifetime store to the native
-  resource-backed owner, numeric-ID stream and mixed animation/Draw scheduling.
-  Install the stored world's registered flash scope around natural death
-  callers; explicit burst births and seven-frame lifecycle tests are not live
+  flash-ball births: supply the native burst's IDs from the complete creation
+  stream and install the stored world's registered flash scope around natural
+  death callers. Replace those callers' legacy flash-pool paths; explicit
+  registered burst births and seven-frame lifecycle tests are not live
   encounter admission.
   Route enemy-death bookkeeping through the shared run-state entry, supplying
   actual toggleGuncut, the owned achNoKill entry, momentDelay controller events and
