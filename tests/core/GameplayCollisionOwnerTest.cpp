@@ -1,4 +1,5 @@
 #include "core/GameplayCollisionOwner.h"
+#include "TimeoutDamageEvents.h"
 #include "core/Replay.h"
 #include "core/CurrencySmokeComposition.h"
 #include "QuietSkeletonEffects.h"
@@ -2610,6 +2611,38 @@ int main(){
         assert(state.initialized==!failure);
         if(!failure)assert(state.xx.high==0x80000000u&&state.xx.low==0&&state.yy.high==0x40680000u);
         else assert(state.xx.zero()&&state.yy.zero());
+    }
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                  GameplayCollisionOwner::Ownership::nativeScenery})for(unsigned scenario=0;scenario<8;++scenario){
+        auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+        auto scene=std::make_unique<GameplayWorld>(300,true,0,false,collision->enemyBinding(),
+            collision->breakableBinding(),collision->playerBinding(),nullptr);
+        assert(collision->attach(*scene));
+        TimeoutDamageEvents events;events.immune=scenario==1;events.timeout=scenario!=2;
+        events.stopped=scenario==3;events.stopSecond=scenario!=5&&scenario!=7;
+        BoneProjectile caller;unsigned allocations=0;const auto draws=scene->randomDrawCount();
+        const auto allocate=[&](std::uint32_t& id){
+            assert(scene->randomDrawCount()==draws+allocations);
+            id=210001+allocations++;
+            if(scenario==6)id=0;
+            return scenario!=4&&!(scenario==5&&allocations==2);
+        };
+        const bool okay=scene->typicalPlayerDamage(caller.damageScripts.typical,MotionBinary64::fromInteger(1),
+            MotionBinary64::fromInteger(3),MotionBinary64::fromInteger(2),events,allocate);
+        const bool failure=scenario>=4&&scenario<=6;
+        const unsigned count=scenario==0||scenario==5?1:scenario==7?2:0;
+        assert(okay==!failure&&scene->effectsSucceeded()==!failure&&scene->timeFields().size()==count&&
+            scene->randomDrawCount()==draws+count&&events.clears==unsigned(!failure&&scenario!=1)*2);
+        assert(allocations==(scenario==4||scenario==6?1:scenario==5||scenario==7?2:count));
+        if(count){
+            const auto* field=scene->timeFields().at(0);
+            assert(field->sourceId==210001&&field->x==240&&field->y==40100);
+            if(okay){RunnerImageValue x,y;x.assignInteger(240);y.assignInteger(40100);InstancePlaceResult result;
+                assert(collision->playerTimeFieldInstance(x,y,masks,result)&&result.id>=210001);}
+        }
+        if(failure){const auto saved=allocations;
+            assert(!scene->typicalPlayerDamage(caller.damageScripts.typical,{}, {}, {},events,allocate)&&allocations==saved);}
     }
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
                   GameplayCollisionOwner::Ownership::nativeScenery}){

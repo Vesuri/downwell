@@ -1,6 +1,7 @@
 #include "core/RunSession.h"
 #include "core/PlayerDamageNumber.h"
 #include "core/RunControllerInstances.h"
+#include "core/GameplayWorld.h"
 using downwell::MotionBinary64;
 bool nativeDamageControllerWrites(downwell::RunControllerInstances<4>& controllers,
     const downwell::InstanceHandle* order,unsigned count,int& roomSpeed){
@@ -54,6 +55,11 @@ struct NumberDraw {
     void align(int),color(int);
     bool text(MotionBinary64,MotionBinary64,MotionBinary64);
 };
+bool nativeTypicalDamage(GameplayWorld& world,downwell::TypicalPlayerDamage& caller,
+    DamageEvents& events,bool (*allocate)(std::uint32_t&)){
+    return world.typicalPlayerDamage(caller,MotionBinary64::fromInteger(1),
+        MotionBinary64::fromInteger(3),MotionBinary64::fromInteger(2),events,allocate);
+}
 bool compileDamageNumber(downwell::PlayerDamageNumber& effect,DamageEvents& events,NumberDraw& draw){
     effect.advanceAlarm(0);
     return effect.step([&](auto speed,auto angle,auto& out){return events.lengthdirX(speed,angle,out);},

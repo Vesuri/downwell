@@ -1873,6 +1873,18 @@ public:
         if(!run_.effectsSucceeded)return false;
         return run_.effectsSucceeded=run_.timeFields.createWithSourceId(source,x,y,enemyRandom_);
     }
+    // Allocation belongs to the complete room creation stream. Request it
+    // inside each admitted instance_create, not before immunity/Timeout/stop
+    // checks or once for the whole player WITH traversal.
+    template<class Events,class Allocate> bool typicalPlayerDamage(downwell::TypicalPlayerDamage& caller,
+        downwell::MotionBinary64 amount,downwell::MotionBinary64 horizontal,
+        downwell::MotionBinary64 vertical,Events& events,Allocate allocate){
+        if(!run_.effectsSucceeded)return false;
+        return run_.effectsSucceeded=caller.execute(amount,horizontal,vertical,events,[&](int x,int y){
+            std::uint32_t source=0;
+            return allocate(source)&&createTimeFieldWithSourceId(source,x,y);
+        });
+    }
     bool bindTimeFieldLifecycle(downwell::OrdinaryTimeFields<64>::Binding binding){
         if(!run_.effectsSucceeded)return false;
         run_.effectsSucceeded=run_.timeFields.bindLifecycle(binding);return run_.effectsSucceeded;

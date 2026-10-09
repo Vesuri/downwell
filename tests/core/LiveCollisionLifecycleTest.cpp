@@ -1,4 +1,5 @@
 #include "core/StartupRuntime.h"
+#include "TimeoutDamageEvents.h"
 #include "BulletWallSoundChecks.h"
 #include "SourceBulletSchedulingChecks.h"
 #include "core/BuilderStringTraversal.h"
@@ -1714,31 +1715,7 @@ int main(){
             RunnerImageValue x,y;x.assignInteger(240);y.assignInteger(40000);
             require(world->playerTimeFieldInstance(x,y,selected)&&selected.id==static_cast<int>(id),
                 "new Timeout field participates in source identity queries immediately");
-            struct DamageEvents {
-                bool stopped=false;unsigned players=0,clears=0;
-                bool playerDamaged(){return false;}
-                MotionBinary64 playerX(){return MotionBinary64::fromInteger(240);}
-                MotionBinary64 playerY(){return MotionBinary64::fromInteger(40000);}
-                MotionBinary64 callerX(){return playerX();}
-                MotionBinary64 callerY(){return playerY();}
-                bool pointDirection(MotionBinary64,MotionBinary64,MotionBinary64,MotionBinary64,MotionBinary64& out){out={};return true;}
-                bool damagePlayer(MotionBinary64){return true;}
-                bool lengthdirX(MotionBinary64 speed,MotionBinary64,MotionBinary64& out){out=speed;return true;}
-                bool forcedJump(MotionBinary64,MotionBinary64){return true;}
-                bool playerDead(){return true;}
-                bool shake(int,int){return true;}
-                bool playerHealthPositive(){return false;}
-                bool hitEffect(MotionBinary64,MotionBinary64,int,MotionBinary64,int,int){return true;}
-                bool timeoutOwned(){return true;}
-                bool timeStopped(){return stopped;}
-                struct Player {int publishedY(){return 40100;}int publishedX(){return 240;}};
-                bool forEachPlayer(const std::function<bool(Player&)>& visit){
-                    Player player;++players;if(!visit(player))return false;
-                    stopped=true;++players;return visit(player);
-                }
-                void clearNoDamage(){++clears;}
-                void clearAreaNoDamage(){++clears;}
-            } events;
+            TimeoutDamageEvents events;
             TypicalPlayerDamage damage;owner->before=world->randomDrawCount();
             const auto next=world->nextRuntimeInstanceId();
             require(world->typicalPlayerDamage(damage,MotionBinary64::fromInteger(1),
