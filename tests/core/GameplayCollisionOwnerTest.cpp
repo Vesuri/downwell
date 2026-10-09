@@ -299,6 +299,7 @@ static void checkTypedCollisionView(const GameplayCollisionView& view,GameplayCo
         case K::scriptEffect:assert(view.resolveLocal<K::scriptEffect>(local)==reference.scriptEffect);break;
         case K::debris:assert(view.resolveLocal<K::debris>(local)==reference.debris);break;
         case K::timeChange:assert(view.resolveLocal<K::timeChange>(local)==reference.timeChange);break;
+        case K::timeShard:assert(view.resolveLocal<K::timeShard>(local)==reference.timeShard);break;
         case K::entryDither:assert(view.resolveLocal<K::entryDither>(local)==reference.entryDither);break;
         case K::drone:assert(view.resolveLocal<K::drone>(local)==reference.drone);break;
         case K::bone:assert(view.resolveLocal<K::bone>(local)==reference.bone);break;
@@ -1029,6 +1030,42 @@ int main(){
         assert(metadata.bind(replacement)&&metadata.mask(266,mask)&&mask==0&&!metadata.findEvent(266,0,cached));
         assert(!metadata.bind(invalid)&&!metadata.findEvent(266,0,cached));
         assert(metadata.bind(objects)&&metadata.findEvent(266,0,cached));
+    }
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                   GameplayCollisionOwner::Ownership::nativeScenery}){
+        TimeShardEffects<64> effects;
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));
+        for(unsigned i=0;i<3;++i){world->step(0);assert(world->effectsSucceeded());}
+        const auto draws=world->randomDrawCount();
+        auto create=[&](std::uint32_t id){return owner->createTimeShardWithSourceId(effects,id,
+            RunnerImageValue{0x43704000u}.promoted(),RunnerImageValue{0x43308000u}.promoted(),false);};
+        assert(create(105187)&&world->randomDrawCount()==draws+6);
+        const auto key=owner->timeShards().handle(1);InstanceHandle shared;
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::timeShard,key,shared));
+        auto* record=owner->timeShards().schedulerRecord(key);
+        assert(record&&record->sourceId==105187&&record->x.bits==0x43704000u&&record->y.bits==0x43308000u);
+        assert(GameplayCollisionView(*world).resolveLocal<GameplayCollisionView::Kind::timeShard>(key)==record);
+        unsigned population=0;assert(owner->population(population)&&population==1);
+        assert(owner->timeShards().activation(key,false)&&owner->population(population)&&population==0);
+        const int alarm=record->alarms.get(0);
+        world->step(0);assert(world->effectsSucceeded()&&record->alarms.get(0)==alarm);
+        assert(owner->timeShards().activation(key,true));
+        // Exercise the real room animation/alarm traversal and selected cleanup.
+        record->alarms.set(0,2);
+        world->step(0);assert(world->effectsSucceeded()&&record->alarms.get(0)==1);
+        world->step(0);assert(world->effectsSucceeded()&&record->destroyRequested&&effects.size()==0);
+        assert(owner->timeShards().size()==1&&owner->population(population)&&population==0);
+        assert(owner->prepareDraw()&&owner->timeShards().size()==0&&!owner->timeShards().find(key));
+        assert(create(105188));
+        const auto replacement=owner->timeShards().handle(2);
+        assert(replacement.slot==key.slot&&replacement.generation!=key.generation);
+        assert(world->restartFromResults(DeathMenuSequence::Action::Retry,43,300)==ResultsDestination::gameplay);
+        assert(world->effectsSucceeded()&&owner->valid()&&effects.size()==0&&owner->timeShards().size()==0);
+        assert(create(105189)&&effects.clear()&&owner->valid());
     }
     {
         TimeChangeEffects<8> effects;int speed=60;unsigned pauses=0;

@@ -616,6 +616,7 @@ private:
             if constexpr(Kind==View::Kind::scriptEffect)return 219;
             if constexpr(Kind==View::Kind::debris)return 370;
             if constexpr(Kind==View::Kind::timeChange)return 211;
+            if constexpr(Kind==View::Kind::timeShard)return 238;
             if constexpr(Kind==View::Kind::entryDither)return 73;
             if constexpr(Kind==View::Kind::ditherAbove)return 61;
             if constexpr(Kind==View::Kind::builder)return 65;
@@ -708,6 +709,7 @@ private:
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
             if constexpr(Kind==View::Kind::timeField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
+            if constexpr(Kind==View::Kind::timeShard)sourceId=parent.pendingTimeShardId_;
             if constexpr(Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::builder||Kind==View::Kind::goalField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency)sourceId=r.sourceId;
             constexpr bool projected=Kind==View::Kind::player||Kind==View::Kind::enemy||
@@ -728,7 +730,7 @@ private:
             if constexpr(Kind==View::Kind::scriptEffect||Kind==View::Kind::debris){
                 if(!r.effect)return parent.check(false);
                 position->x=r.effect->x;position->y=r.effect->y;
-            }else if constexpr(Kind==View::Kind::timeChange||Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::builder||Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency){
+            }else if constexpr(Kind==View::Kind::timeShard||Kind==View::Kind::timeChange||Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::builder||Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency){
                 position->x=r.x;position->y=r.y;
             }else{
                 constexpr bool roomCoordinates=Kind==View::Kind::player||Kind==View::Kind::terrain||Kind==View::Kind::timeField||Kind==View::Kind::goalField||Kind==View::Kind::exitController;
@@ -809,6 +811,7 @@ private:
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
             if constexpr(Kind==View::Kind::timeField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
+            if constexpr(Kind==View::Kind::timeShard)sourceId=parent.pendingTimeShardId_;
             if constexpr(Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::builder||Kind==View::Kind::goalField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency)sourceId=r.sourceId;
             constexpr bool projected=Kind==View::Kind::player||Kind==View::Kind::enemy||
@@ -1008,6 +1011,8 @@ private:
     GameplayDebrisInstances debris_{GameplayDebrisInstances::Binding::bindDestruction(debrisBinding_)};
     Binding<NativeTimeChangeRegistration::Record,View::Kind::timeChange> timeChangeBinding_{*this};
     NativeTimeChangeRegistration timeChanges_{*this};
+    Binding<NativeTimeShardRegistration::Record,View::Kind::timeShard> timeShardBinding_{*this};
+    NativeTimeShardRegistration timeShards_{*this};
     Binding<GameplayEntryDithers::Record,View::Kind::entryDither> entryBinding_{*this};
     GameplayEntryDithers entries_{GameplayEntryDithers::Binding::bindDestruction(entryBinding_)};
     Binding<GameplayDitherAbove::Record,View::Kind::ditherAbove> aboveBinding_{*this};
@@ -1025,6 +1030,7 @@ private:
     Binding<GameplayWorld::Currency::Record,View::Kind::currency> currencyBinding_{*this};
     GameplayWorld::Currency currency_{GameplayWorld::Currency::Binding::bindPositionedActor(currencyBinding_)};
     std::uint32_t pendingTimeChangeId_=0;
+    std::uint32_t pendingTimeShardId_=0;
     const bool native_;
     const bool sceneryLayers_;
     const bool nativeBoxes_;
@@ -1109,6 +1115,7 @@ public:
             // public family accessors, not merely the enclosing callbacks.
             terrain_.observeFailure(good_);scriptEffects_.observeFailure(good_);
             debris_.observeFailure(good_);timeChanges_.observeFailure(good_);
+            timeShards_.observeFailure(good_);
             entries_.observeFailure(good_);
             layers_.observeFailure(good_);failureObserved_=true;
         }
@@ -1122,7 +1129,7 @@ public:
     // retain its live read rather than delaying a callback's failure to return.
     bool valid()const{return good_&&builderController_.valid()&&blood_.valid()&&skeletons_.valid()&&(failureObserved_?(drones_.valid()&&bones_.valid()):
         (owner_.valid()&&properties_.valid()&&terrain_.valid()&&scriptEffects_.valid()&&debris_.valid()&&
-         timeChanges_.valid()&&entries_.valid()&&drones_.valid()&&bones_.valid()&&layers_.valid()));}
+         timeShards_.valid()&&timeChanges_.valid()&&entries_.valid()&&drones_.valid()&&bones_.valid()&&layers_.valid()));}
     unsigned pendingSpatialIndex()const{return owner_.pendingSpatialIndex();}
     // Explicit source dirty pass. It is not yet scheduled as a gameplay
     // collision pass: complete animation/scene publication remains required.
@@ -1322,6 +1329,7 @@ public:
         if(!world_&&!world.bindScriptSpawnInstances(scriptEffects_))return check(false);
         if(!world_&&!world.bindDebrisInstances(debris_))return check(false);
         if(!world_&&!world.bindTimeChangeInstances(timeChanges_))return check(false);
+        if(!world_&&!world.bindTimeShardInstances(timeShards_))return check(false);
         if(!world_&&!world.bindEntryDithers(entries_))return check(false);
         if(!world_&&!world.bindDitherAbove(above_))return check(false);
         if(!world_&&!world.bindBuilderController(builderController_))return check(false);
@@ -1590,6 +1598,7 @@ public:
                         return self.world_->advanceDebrisRoomAnimation(local);
                     }
                     case View::Kind::drone:return self.drones_.advanceAnimation(local);
+                    case View::Kind::timeShard:return self.world_->advanceTimeShardRoomAnimation(local);
                     case View::Kind::bone:return self.bones_.advanceAnimation(local);
                     case View::Kind::skeleton:return self.skeletons_.advanceAnimation(local);
                     case View::Kind::blood:return self.blood_.advanceAnimation(local);
@@ -1681,6 +1690,7 @@ public:
                     kind==View::Kind::breakable?self.world_->advanceBoxRoomAlarm(local,alarm):
                     kind==View::Kind::debris?self.world_->advanceBoundDebrisRoomAlarm(local,alarm):
                     kind==View::Kind::timeChange?self.world_->advanceTimeChangeRoomAlarm(local,alarm):
+                    kind==View::Kind::timeShard?self.world_->advanceTimeShardRoomAlarm(local,alarm):
                     kind==View::Kind::drone?(alarm==0&&self.drones_.advanceAlarm(local)):
                     kind==View::Kind::skeleton?self.skeletons_.advanceAlarm(local,alarm):
                     kind==View::Kind::currency?self.world_->advanceCurrencyRoomAlarm(local,alarm):
@@ -2011,6 +2021,50 @@ public:
     GameplayScriptSpawnInstances& scriptEffects(){return scriptEffects_;}
     GameplayDebrisInstances& debris(){return debris_;}
     NativeTimeChangeRegistration& timeChanges(){return timeChanges_;}
+    NativeTimeShardRegistration& timeShards(){return timeShards_;}
+    bool createTimeShardWithSourceId(TimeShardEffects<64>& effects,std::uint32_t id,
+        MotionBinary64 x,MotionBinary64 y,bool lowSpec){
+        if(!valid()||!world_||pendingTimeShardId_||!id||id>0x7fffffffu)return check(false);
+        if(!effects.phasesBoundTo(timeShards_)&&!effects.bindPhases(timeShards_))return check(false);
+        pendingTimeShardId_=id;
+        const bool ok=world_->createTimeShard(effects,x,y,lowSpec);
+        pendingTimeShardId_=0;return check(ok);
+    }
+    bool birth(InstanceHandle key,const NativeTimeShardRegistration::Record& record,std::uint32_t& id){
+        if(!pendingTimeShardId_)return check(false);
+        id=pendingTimeShardId_;
+        const bool ok=timeShardBinding_.birth(key,record);
+        pendingTimeShardId_=0;return ok;
+    }
+    bool markDestroyed(InstanceHandle key,const NativeTimeShardRegistration::Record& record){
+        return timeShardBinding_.markDestroyed(key,record);
+    }
+    bool activation(InstanceHandle key,const NativeTimeShardRegistration::Record& record,bool active){
+        return timeShardBinding_.activation(key,record,active);
+    }
+    bool retire(InstanceHandle key,const NativeTimeShardRegistration::Record& record){
+        return timeShardBinding_.retire(key,record);
+    }
+    bool imageIndex(InstanceHandle key,const NativeTimeShardRegistration::Record& record,RunnerImageValue value){
+        return timeShardBinding_.imageIndex(key,record,value);
+    }
+    bool position(InstanceHandle key,const NativeTimeShardRegistration::Record& record,RunnerImageValue x,RunnerImageValue y){
+        return timeShardBinding_.move(key,record,x,y);
+    }
+    bool animationMember(InstanceHandle key,const NativeTimeShardRegistration::Record& record,bool& eligible){
+        InstanceHandle shared;
+        if(!timeShardBinding_.key(key,record,shared))return check(false);
+        eligible=room_.active(shared.slot);return true;
+    }
+    bool population(unsigned& count){
+        if(!valid()||!world_)return check(false);
+        count=0;
+        return check(visitRegistered(View::timeShardBase,View::capacity,
+            [&](InstanceHandle,int object,std::uint32_t flags){
+                if(object==238&&!(flags&0x140003u))++count;
+                return true;
+            }));
+    }
     GameplayEntryDithers& entryDithers(){return entries_;}
     // Until every native dynamic family participates in the source ID stream,
     // this entry point accepts only an explicitly supplied original ID. Never
@@ -2711,6 +2765,7 @@ private:
                 case View::Kind::scriptEffect:return retireEffect(local,record);
                 case View::Kind::debris:return record.debris&&world_->retireDebrisRoomEffect(local);
                 case View::Kind::timeChange:return record.timeChange&&world_->retireTimeChangeRoomEffect(local);
+                case View::Kind::timeShard:return record.timeShard&&world_->retireTimeShardRoomEffect(local);
                 case View::Kind::entryDither:return record.entryDither&&entries_.retire(local);
                 case View::Kind::ditherAbove:return record.ditherAbove&&above_.retireMarked(local);
                 case View::Kind::drone:return record.drone&&drones_.retire(local);

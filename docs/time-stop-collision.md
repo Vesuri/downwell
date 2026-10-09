@@ -290,8 +290,17 @@ callbacks retain the completed prefix and prevent later work/reuse.
 effect implementation. The Amiga `verify-time-shard-registration-compile` target
 instantiates the same operations under the real 68000 type/ABI definitions;
 its assertions retain their expressions despite the freestanding compatibility
-header. This is a compile check, not a target runtime test or evidence that the
-adapter is already attached to the native collision owner and normal scheduler.
+header. This is a compile check, not a target runtime test.
+
+`GameplayCollisionOwner::createTimeShardWithSourceId` connects that adapter to
+the resource-backed owner and `GameplayWorld` room animation, alarm and selected
+cleanup callbacks. The effect bank is borrowed until room teardown; Retry clears
+registered effects before reconstructing the world. Animation eligibility reads
+active room-list membership, while population uses the instance-number flag mask
+`0x140003`, excluding destruction marks before physical retirement. Birth accepts
+an explicit source ID; it does not allocate a family-local substitute. This
+boundary does not enable automatic player bursts or supply ordinary Step,
+collision and Draw dispatch; those remain required by the live integration.
 
 The explicit registered-player-contact boundary uses the world's RNG and
 publishes the changed alarm-2 cooldown immediately. It checks event eligibility

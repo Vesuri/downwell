@@ -38,6 +38,7 @@
 #include "core/GameplayScriptSpawnInstances.h"
 #include "core/GameplayDebrisInstances.h"
 #include "core/GameplayTimeChangeRegistration.h"
+#include "core/GameplayTimeShardRegistration.h"
 #include "core/ScriptSpawnOperations.h"
 #include "core/EffectSpawnScript.h"
 #include "core/AreaOneBuilder.h"
@@ -93,6 +94,7 @@ struct GameplayFrame {
 namespace downwell {
 class GameplayCollisionOwner;
 using NativeTimeChangeRegistration=GameplayTimeChangeRegistration<8,GameplayCollisionOwner>;
+using NativeTimeShardRegistration=GameplayTimeShardRegistration<64,GameplayCollisionOwner>;
 }
 class GameplayWorld {
 public:
@@ -320,6 +322,7 @@ public:
     const downwell::GameplayScriptSpawnInstances* scriptSpawnInstances()const{return scriptSpawnInstances_;}
     const downwell::GameplayDebrisInstances* debrisInstances()const{return debrisInstances_;}
     const downwell::NativeTimeChangeRegistration* timeChangeInstances()const{return timeChangeInstances_;}
+    const downwell::NativeTimeShardRegistration* timeShardInstances()const{return timeShardInstances_;}
     const downwell::GameplayEntryDithers* entryDithers()const{return entryDithers_;}
     const downwell::GameplayDitherAbove* ditherAbove()const{return ditherAbove_;}
     const downwell::GameplayBuilderController* builderController()const{return builderController_;}
@@ -542,6 +545,12 @@ public:
         entryDithers_=&entries;return true;
     }
     bool bindTimeChangeInstances(downwell::NativeTimeChangeRegistration& registry);
+    bool bindTimeShardInstances(downwell::NativeTimeShardRegistration& registry);
+    bool createTimeShard(downwell::TimeShardEffects<64>& effects,downwell::MotionBinary64 x,
+                         downwell::MotionBinary64 y,bool lowSpec);
+    bool advanceTimeShardRoomAlarm(downwell::InstanceHandle key,unsigned index);
+    bool advanceTimeShardRoomAnimation(downwell::InstanceHandle key);
+    bool retireTimeShardRoomEffect(downwell::InstanceHandle key);
     template<class Pause> bool createTimeChange(downwell::TimeChangeEffects<8>& effects,
         downwell::MotionBinary64 x,downwell::MotionBinary64 y,int& speed,Pause pause){
         if(!run_.effectsSucceeded)return false;
@@ -1538,6 +1547,9 @@ private:
     downwell::GameplayScriptSpawnInstances* scriptSpawnInstances_=nullptr;
     downwell::GameplayDebrisInstances* debrisInstances_=nullptr;
     downwell::NativeTimeChangeRegistration* timeChangeInstances_=nullptr;
+    downwell::NativeTimeShardRegistration* timeShardInstances_=nullptr;
+    downwell::TimeShardEffects<64>* timeShardEffects_=nullptr;
+    bool clearRoomTimeShards();
     downwell::GameplayEntryDithers* entryDithers_=nullptr;
     downwell::GameplayDitherAbove* ditherAbove_=nullptr;
     downwell::GameplayBuilderController* builderController_=nullptr;

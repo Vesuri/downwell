@@ -8,7 +8,7 @@ namespace downwell {
 // and lifetimeId do not. Borrowed views never cache pointers across a mutation.
 class GameplayCollisionView {
 public:
-    enum class Kind {player,enemy,breakable,terrain,timeField,goalField,exitController,bullet,scriptEffect,debris,timeChange,entryDither,drone,bone,skeleton,blood,currency,ditherAbove,builder};
+    enum class Kind {player,enemy,breakable,terrain,timeField,goalField,exitController,bullet,scriptEffect,debris,timeChange,entryDither,drone,bone,skeleton,blood,currency,ditherAbove,builder,timeShard};
     static constexpr unsigned enemyBase=1;
     static constexpr unsigned breakableBase=enemyBase+GameplayWorld::enemyCapacity;
     static constexpr unsigned terrainBase=breakableBase+GameplayWorld::breakableCapacity;
@@ -27,7 +27,8 @@ public:
     static constexpr unsigned currencyBase=bloodBase+GameplayWorld::bloodCapacity;
     static constexpr unsigned ditherAboveBase=currencyBase+GameplayWorld::currencyCapacity;
     static constexpr unsigned builderBase=ditherAboveBase+1;
-    static constexpr unsigned capacity=builderBase+1;
+    static constexpr unsigned timeShardBase=builderBase+1;
+    static constexpr unsigned capacity=timeShardBase+64;
     struct Record {
         const GameplayWorld::PlayerInstance* player=nullptr;
         const GameplayWorld::EnemyState* enemy=nullptr;
@@ -43,6 +44,7 @@ public:
         const GameplayScriptSpawnInstances::Record* scriptEffect=nullptr;
         const GameplayDebrisInstances::Record* debris=nullptr;
         const NativeTimeChangeRegistration::Record* timeChange=nullptr;
+        const NativeTimeShardRegistration::Record* timeShard=nullptr;
         const GameplayEntryDithers::Record* entryDither=nullptr;
         const GameplayWorld::DroneBullets::Record* drone=nullptr;
         const GameplayWorld::Bones::Record* bone=nullptr;
@@ -68,6 +70,7 @@ public:
             case Kind::scriptEffect:base=scriptEffectBase;count=GameplayScriptSpawnInstances::capacity;break;
             case Kind::debris:base=debrisBase;count=GameplayDebrisInstances::capacity;break;
             case Kind::timeChange:base=timeChangeBase;count=8;break;
+            case Kind::timeShard:base=timeShardBase;count=64;break;
             case Kind::entryDither:base=entryDitherBase;count=GameplayEntryDithers::capacity;break;
             case Kind::drone:base=droneBase;count=GameplayWorld::droneBulletCapacity;break;
             case Kind::bone:base=boneBase;count=GameplayWorld::boneCapacity;break;
@@ -83,6 +86,7 @@ public:
     }
     static bool decode(InstanceHandle key,Kind& kind,InstanceHandle& local){
         if(!key.generation||key.slot>=capacity)return false;
+        if(key.slot>=timeShardBase){kind=Kind::timeShard;local={key.slot-timeShardBase,key.generation};return true;}
         if(key.slot>=builderBase){kind=Kind::builder;local={key.slot-builderBase,key.generation};return true;}
         if(key.slot>=ditherAboveBase){kind=Kind::ditherAbove;local={key.slot-ditherAboveBase,key.generation};return true;}
         if(key.slot>=currencyBase){kind=Kind::currency;local={key.slot-currencyBase,key.generation};return true;}
@@ -129,6 +133,7 @@ public:
             else if constexpr(Family==Kind::scriptEffect)return world_.scriptSpawnInstances()?world_.scriptSpawnInstances()->find(local):nullptr;
             else if constexpr(Family==Kind::debris)return world_.debrisInstances()?world_.debrisInstances()->find(local):nullptr;
             else if constexpr(Family==Kind::timeChange)return world_.timeChangeInstances()?world_.timeChangeInstances()->find(local):nullptr;
+            else if constexpr(Family==Kind::timeShard)return world_.timeShardInstances()?world_.timeShardInstances()->find(local):nullptr;
             else if constexpr(Family==Kind::entryDither)return world_.entryDithers()?world_.entryDithers()->find(local):nullptr;
             else if constexpr(Family==Kind::drone)return world_.droneBullets()?world_.droneBullets()->find(local):nullptr;
             else if constexpr(Family==Kind::bone)return world_.bones()?world_.bones()->find(local):nullptr;
@@ -149,6 +154,9 @@ private:
         if(!decode(key,kind,local))return false;
         Record next;
         switch(kind){
+            case Kind::timeShard:
+                if(!world_.timeShardInstances()||!(next.timeShard=world_.timeShardInstances()->find(local)))return false;
+                break;
             case Kind::player:next.player=world_.findPlayer(local);if(!next.player)return false;break;
             case Kind::enemy:next.enemy=world_.resolveEnemyLifetime(local);if(!next.enemy)return false;break;
             case Kind::breakable:next.breakable=world_.findBreakable(local);if(!next.breakable)return false;break;

@@ -34,7 +34,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
         downwell::DeathMenuSequence::Action action, std::uint32_t seed, unsigned initialRingOrigin) {
     const auto destination = downwell::resultsDestination(action);
     if (destination == downwell::ResultsDestination::none) return destination;
-    if(!clearRoomTimeChanges())return downwell::ResultsDestination::none;
+    if(!clearRoomTimeChanges()||!clearRoomTimeShards())return downwell::ResultsDestination::none;
     if(entryDithers_&&!entryDithers_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(ditherAbove_&&!ditherAbove_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(builderController_&&!builderController_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
@@ -60,6 +60,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto scriptSpawnInstances=scriptSpawnInstances_;
     const auto debrisInstances=debrisInstances_;
     const auto timeChangeInstances=timeChangeInstances_;
+    const auto timeShardInstances=timeShardInstances_;
     const auto entryDithers=entryDithers_;
     const auto ditherAbove=ditherAbove_;
     const auto builderController=builderController_;
@@ -117,6 +118,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     scriptSpawnInstances_=scriptSpawnInstances;
     debrisInstances_=debrisInstances;
     timeChangeInstances_=timeChangeInstances;
+    timeShardInstances_=timeShardInstances;
     entryDithers_=entryDithers;
     ditherAbove_=ditherAbove;
     builderController_=builderController;
@@ -172,6 +174,40 @@ bool GameplayWorld::bindTimeChangeInstances(downwell::NativeTimeChangeRegistrati
     if(timeChangeInstances_||!registry.valid()||registry.size())return false;
     timeChangeInstances_=&registry;return true;
 }
+bool GameplayWorld::bindTimeShardInstances(downwell::NativeTimeShardRegistration& registry){
+    if(timeShardInstances_||!registry.valid()||registry.size())return false;
+    timeShardInstances_=&registry;return true;
+}
+bool GameplayWorld::createTimeShard(downwell::TimeShardEffects<64>& effects,downwell::MotionBinary64 x,
+                                   downwell::MotionBinary64 y,bool lowSpec){
+    if(!run_.effectsSucceeded)return false;
+    if(!timeShardInstances_||!effects.phasesBoundTo(*timeShardInstances_)||
+       (timeShardInstances_->size()&&timeShardEffects_!=&effects))return run_.effectsSucceeded=false;
+    timeShardEffects_=&effects;
+    return run_.effectsSucceeded=effects.create(x,y,lowSpec,enemyRandom_)!=0;
+}
+bool GameplayWorld::advanceTimeShardRoomAlarm(downwell::InstanceHandle key,unsigned index){
+    if(!run_.effectsSucceeded)return false;
+    auto* record=timeShardInstances_?timeShardInstances_->schedulerRecord(key):nullptr;
+    if(!record||!timeShardEffects_||index>2)return run_.effectsSucceeded=false;
+    if(!record->active||record->destroyRequested)return true;
+    if(!record->alarms.advanceOne(index))return true;
+    return run_.effectsSucceeded=timeShardInstances_->dispatchAlarm(key,*timeShardEffects_,index);
+}
+bool GameplayWorld::advanceTimeShardRoomAnimation(downwell::InstanceHandle key){
+    return run_.effectsSucceeded=run_.effectsSucceeded&&timeShardInstances_&&timeShardEffects_&&
+        timeShardInstances_->dispatchAnimation(key,*timeShardEffects_);
+}
+bool GameplayWorld::retireTimeShardRoomEffect(downwell::InstanceHandle key){
+    return run_.effectsSucceeded=run_.effectsSucceeded&&timeShardInstances_&&timeShardEffects_&&
+        timeShardInstances_->retireMarked(key,*timeShardEffects_);
+}
+bool GameplayWorld::clearRoomTimeShards(){
+    if(!run_.effectsSucceeded)return false;
+    if(timeShardInstances_&&timeShardInstances_->size()&&(!timeShardEffects_||!timeShardEffects_->clear()))
+        return run_.effectsSucceeded=false;
+    timeShardEffects_=nullptr;return true;
+}
 bool GameplayWorld::advanceTimeChangeRoomAlarm(downwell::InstanceHandle key,unsigned index){
     if(!run_.effectsSucceeded)return false;
     auto* record=timeChangeInstances_?timeChangeInstances_->schedulerRecord(key):nullptr;
@@ -194,7 +230,7 @@ bool GameplayWorld::clearRoomTimeChanges(){
 bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsigned initialRingOrigin) {
     if (!run_.levelClearActive || !run_.nextLevelRequested ||
         run_.stage.area != 1 || run_.stage.level >= 3) return false;
-    if(!clearRoomTimeChanges())return false;
+    if(!clearRoomTimeChanges()||!clearRoomTimeShards())return false;
     if(entryDithers_&&!entryDithers_->clear())return run_.effectsSucceeded=false;
     if(ditherAbove_&&!ditherAbove_->clear())return run_.effectsSucceeded=false;
     if(builderController_&&!builderController_->clear())return run_.effectsSucceeded=false;
