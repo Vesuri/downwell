@@ -855,6 +855,13 @@ public:
         return downwell::EffectSpawnScript::run(ops,x,y,sprite,speed,angle,depth);
     }
     const downwell::ScriptSpawnEffects<downwell::scriptSpawnEffectCapacity>& scriptEffects()const{return ownedScriptEffects_;}
+    template<class Frames,class Execute>
+    bool withBulletEffects(downwell::InstanceHandle shot,Frames frames,Execute execute){
+        if(!run_.effectsSucceeded||!scriptSpawnInstances_)return run_.effectsSucceeded=false;
+        auto ops=bulletEffectOperations(shot,ownedScriptEffects_,*scriptSpawnInstances_,frames);
+        if(!run_.effectsSucceeded)return false;
+        const bool ok=execute(ops);return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
+    }
     template<unsigned Capacity,class Frames>
     auto bulletEffectOperations(downwell::InstanceHandle shot,downwell::ScriptSpawnEffects<Capacity>& effects,
         downwell::GameplayScriptSpawnInstances& registration,Frames frames){

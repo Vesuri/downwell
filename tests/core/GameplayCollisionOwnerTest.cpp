@@ -48,6 +48,11 @@ bool nativeBulletEffects(GameplayWorld& world,downwell::GameplayScriptSpawnInsta
     auto ops=world.bulletEffectOperations(shot,effects,registry,frames);
     return downwell::EffectSpawnScript::run(ops,{}, {},101,{0x3fe00000u,0},{},{});
 }
+bool nativeOwnedBulletEffects(GameplayWorld& world,downwell::InstanceHandle shot,NativeBulletFrames frames){
+    return world.withBulletEffects(shot,frames,[&](auto& ops){
+        return downwell::EffectSpawnScript::run(ops,{}, {},101,{0x3fe00000u,0},{},{});
+    });
+}
 bool nativeLimboContact(downwell::GameplayCollisionOwner& owner,
     const downwell::RunnerCollisionEventContext::Frame& event,NativeBulletVelocity read){
     return owner.dispatchLimboShardBulletCollision(event,read);
@@ -3010,7 +3015,8 @@ int main(){
         assert(world->effectsSucceeded()&&child->effect->imageIndex.bits==0x3f000000u);
         assert(effects.clear(owner->scriptEffects()));
     }
-    for(bool high:{false,true})for(bool laser:{false,true})for(bool wall:{false,true}){
+    for(bool high:{false,true})for(bool laser:{false,true})for(unsigned target:{0u,1u,2u}){
+        const bool wall=target==1,boneTarget=target==2;
         // Exercise the recovered Step against real resource-backed selectors
         // and box writes, using a real fired lifetime for setter/destruction
         // callbacks. The supplied profile and isolated position are fixture
@@ -3022,17 +3028,20 @@ int main(){
         assert(world->effectsSucceeded()&&world->bulletCount()==1);
         const auto& shot=world->bulletAt(0);const InstanceHandle shotKey{shot.identitySlot,shot.lifetimeId};
         InstanceHandle shotShared;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::bullet,shotKey,shotShared));
-        assert(world->createGeneratedInstance({wall?60:92,240,512},objects,[](const auto&){return true;}));
+        InstanceHandle bone,boneShared;
+        if(boneTarget){
+            assert(world->createBoneWithSourceId(605500,240,200,bone)&&
+                GameplayCollisionView::encode(GameplayCollisionView::Kind::bone,bone,boneShared));
+        }else assert(world->createGeneratedInstance({wall?60:92,240,512},objects,[](const auto&){return true;}));
         MachineGunSourceMotion motion;GameMakerRandom random(2);
-        assert(motion.reset(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(500),laser));
+        assert(motion.reset(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(boneTarget?200:500),laser));
         assert(world->publishBulletCollisionPosition(shotKey,motion.x,motion.y));
-        ScriptSpawnEffects<4> effects;bool succeeded=true;
+        bool succeeded=true;
         auto frames=[&](int id,unsigned& count){PackedSpriteCollision art;
             const auto* caller=world->resolveBulletLifetime(shotKey);
             const auto* child=caller?owner->scriptEffects().find(caller->myFx):nullptr;
             assert(child&&child->effect->spriteId==-1); // myFx precedes the first child setter.
             if(!sprites.sprite(id,art))return false;count=art.frameCount;return true;};
-        auto muzzle=world->bulletEffectOperations(shotKey,effects,owner->scriptEffects(),frames);
         struct Ops {
             GameplayCollisionOwner& owner;MachineGunSourceMotion& motion;const SpriteMaskPack& masks;
             GameplayWorld& world;InstanceHandle shotKey,shotShared;
@@ -3085,21 +3094,40 @@ int main(){
                 },audio)&&audio.valid&&audio.calls==7&&world.randomDrawCount()==before+2;
             }
             bool explosion(int){return false;}
-            bool placeShootable(int,bool&){return false;}bool selectShootable(int){return false;}
-            bool thingHealth(MotionBinary64&){return false;}bool thingHealthWrite(MotionBinary64){return false;}
-            bool thingHit(){return false;}bool thingHitEffect(bool&){return false;}
+            bool placeShootable(int object,bool& hit){return object==90&&
+                owner.projectileShootableMeeting(shotShared,motion.x.promoted(),motion.y.promoted(),masks,hit);}
+            bool selectShootable(int object){GameplayCollisionOwner::Owner::Result result;
+                if(object!=90||!owner.projectileShootableSelection(shotShared,motion.x.promoted(),motion.y.promoted(),masks,result)||!result.found)return false;
+                selected=result.handle;return true;}
+            bool thingHealth(MotionBinary64& hp){bool effect;return owner.projectileShootableFields(selected,hp,effect);}
+            bool thingHealthWrite(MotionBinary64 hp){return owner.projectileShootableHealthWrite(selected,hp);}
+            bool thingHit(){return owner.projectileShootableHit(selected);}
+            bool thingHitEffect(bool& effect){MotionBinary64 hp;return owner.projectileShootableFields(selected,hp,effect);}
         } ops{*owner,motion,masks,*world,shotKey,shotShared};
-        assert(MachineGunSourceStep::run(motion,random,high,muzzle,ops,succeeded));
-        assert(succeeded&&ops.destroyed&&ops.lines==3&&ops.points>1&&ops.approachWrites==2*(ops.points-1)&&ops.writes==2);
+        assert(world->withBulletEffects(shotKey,frames,[&](auto& muzzle){
+            return MachineGunSourceStep::run(motion,random,high,muzzle,ops,succeeded);
+        }));
+        assert(succeeded&&ops.destroyed&&ops.lines==(boneTarget?1u:3u)&&ops.writes==2);
+        if(!boneTarget)assert(ops.points>1&&ops.approachWrites==2*(ops.points-1));
         const auto myFx=world->resolveBulletLifetime(shotKey)->myFx;
         const auto* child=owner->scriptEffects().find(myFx);
         assert(random.drawCount()==1&&child&&owner->scriptEffects().size()==(wall?2u:1u));
+        if(boneTarget){
+            const auto* victim=owner->bones().find(bone);const auto hp=MotionBinary64::fromInteger(1-machineGunProfile(high).damage);
+            assert(victim&&victim->state.hit&&!victim->destroyRequested&&victim->state.health.high==hp.high&&victim->state.health.low==hp.low);
+            const auto before=world->randomDrawCount();
+            auto effectFrames=[&](int id,unsigned& count){return sprites.frameCount(id,count);};
+            assert(owner->stepBone(boneShared,true,effectFrames)&&!owner->bones().find(bone)->destroyRequested&&world->scriptEffects().size()==1);
+            assert(owner->stepBone(boneShared,false,effectFrames)&&owner->bones().find(bone)->destroyRequested&&world->scriptEffects().size()==2&&world->randomDrawCount()==before);
+            assert(world->scriptEffects().atNewest(0)->spriteId==85&&owner->prepareDraw()&&!owner->bones().find(bone)&&!world->resolveBulletLifetime(shotKey));
+            continue;
+        }
         if(wall){
             const auto* impact=child->effect;
             assert(impact&&impact->spriteId==101&&impact->imageSpeed.bits==0x3f000000u&&
                 impact->angle.bits==0&&impact->depth.bits==0);
             assert(world->resolveBulletLifetime(shotKey)->destroyRequested&&world->overlapSound(2)==29);
-            assert(owner->prepareDraw(effects)&&!world->resolveBulletLifetime(shotKey));
+            assert(owner->prepareDraw()&&!world->resolveBulletLifetime(shotKey));
             continue;
         }
         const auto* box=world->findBreakable({0,1});assert(box);
@@ -3122,7 +3150,7 @@ int main(){
         std::printf("SOURCE_SHOT %u %u %08x %08x %08x %08x %08x %u %u %u %u\n",
             unsigned(high),unsigned(laser),unsigned(motion.x.bits),unsigned(motion.y.bits),unsigned(motion.imageAngle.bits),
             unsigned(box->state.wallHp.high),unsigned(box->state.wallHp.low),ops.lines,ops.points,ops.approachWrites,ops.writes);
-        assert(owner->prepareDraw(effects)&&!world->resolveBulletLifetime(shotKey)&&!owner->state(shotShared));
+        assert(owner->prepareDraw()&&!world->resolveBulletLifetime(shotKey)&&!owner->state(shotShared));
     }
     {
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);

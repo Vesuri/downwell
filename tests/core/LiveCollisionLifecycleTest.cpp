@@ -2104,7 +2104,7 @@ int main(){
         for(unsigned i=0;i<world->mainBulletCount();++i)
             require(owner->resolve(world->mainBulletAt(i).instance),"bullet draw cache contains no End Step retirees");
     }
-    for(bool high:{false,true})for(bool laser:{false,true}){
+    for(bool high:{false,true})for(bool laser:{false,true})for(bool boneTarget:{false,true}){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
         require(owner->attach(*world),"attach source bullet Step world");world->skipToGameForTesting();
@@ -2125,20 +2125,22 @@ int main(){
             const auto key=world->instanceHandleAt(i);
             require(world->publishCollisionPosition(key,real(10000+int(i)*32),real(10000)),"isolate collision geometry");
         }
-        require(world->publishCollisionPosition(box,real(240),real(512)),"position isolated box");
+        if(!boneTarget)require(world->publishCollisionPosition(box,real(240),real(512)),"position isolated box");
+        auto bones=world->boneRegistration<4>();InstanceHandle bone;
+        const int shotY=boneTarget?int(world->mainPlayerY()):500;
+        if(boneTarget)require(world->spawnBone(bones,240,shotY,bone),"create registered shootable bone");
         MachineGunSourceMotion motion;GameMakerRandom random(2);
-        require(motion.reset(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(500),laser)&&
+        require(motion.reset(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(shotY),laser)&&
             world->publishBulletCollisionPosition(shot,motion.x,motion.y),"publish source bullet starting position");
-        auto registration=world->scriptSpawnRegistration<4>();ScriptSpawnEffects<4> effects;
         bool succeeded=true;
         auto frames=[&](int id,unsigned& count){PackedSpriteCollision art;
             const auto* caller=owner->resolve(shot);
-            require(caller&&caller->bulletMyFx==registration.sourceId(1)&&caller->bulletMyFx,
+            require(caller&&caller->bulletMyFx&&world->scriptEffects().size()==1,
                 "actual caller stores the source child ID before the sprite setter");
             if(!sprites.sprite(id,art))return false;count=art.frameCount;return true;};
-        auto muzzle=world->bulletEffectOperations(shot,effects,registration,frames);
         struct Ops {
             StartupRuntime& world;StoredWorldCollision& owner;MachineGunSourceMotion& motion;InstanceHandle shot;
+            StoredBoneRegistration<StartupRuntime::instanceCapacity,4>& bones;
             InstanceHandle selected{};unsigned lines=0,points=0,approachWrites=0,writes=0;
             bool approaching=false,destroyed=false;
             bool publishAngle(RunnerImageValue angle){return world.publishBulletAngle(shot,angle);}
@@ -2163,19 +2165,45 @@ int main(){
             bool destroySelf(){destroyed=world.markBulletDestroyed(shot);return destroyed;}
             bool effect(int,MotionBinary64,MotionBinary64){return false;}
             bool soundWall(){return false;}bool explosion(int){return false;}
-            bool placeShootable(int,bool&){return false;}bool selectShootable(int){return false;}
-            bool thingHealth(MotionBinary64&){return false;}bool thingHealthWrite(MotionBinary64){return false;}
-            bool thingHit(){return false;}bool thingHitEffect(bool&){return false;}
-        } ops{*world,*owner,motion,shot};
-        require(MachineGunSourceStep::run(motion,random,high,muzzle,ops,succeeded)&&succeeded,
+            bool placeShootable(int object,bool& hit){const auto* r=owner.resolve(shot);return r&&
+                owner.placeMeeting(shot,*r,object,motion.x.promoted(),motion.y.promoted(),hit);}
+            bool selectShootable(int object){const auto* r=owner.resolve(shot);InstancePlaceResult result;
+                if(!r||!owner.instancePlace(shot,*r,object,motion.x.promoted(),motion.y.promoted(),result)||result.id==-4)return false;
+                selected=result.handle;return true;}
+            bool thingHealth(MotionBinary64& hp){bool effect;return bones.readShootable(selected,hp,effect);}
+            bool thingHealthWrite(MotionBinary64 hp){return bones.writeShootableHealth(selected,hp);}
+            bool thingHit(){return bones.writeShootableHit(selected);}
+            bool thingHitEffect(bool& effect){MotionBinary64 hp;return bones.readShootable(selected,hp,effect);}
+        } ops{*world,*owner,motion,shot,bones};
+        require(world->withBulletEffects(shot,frames,[&](auto& muzzle){
+            return MachineGunSourceStep::run(motion,random,high,muzzle,ops,succeeded);
+        })&&succeeded,
             "source Step runs through stored collision, transform, effect and damage owners");
         const auto expected=MotionBinary64::fromInteger(1-machineGunProfile(high).damage);
+        if(boneTarget){
+            const auto* victim=bones.instances().find(bone);
+            require(victim&&victim->state.hit&&!victim->destroyRequested&&victim->state.health.high==expected.high&&
+                victim->state.health.low==expected.low&&ops.lines==1&&ops.writes==2&&ops.destroyed&&random.drawCount()==1,
+                "source bullet selects, damages and retains the bone while destroying only itself");
+            auto effectFrames=[&](int id,unsigned& count){return sprites.frameCount(id,count);};
+            const auto draws=world->randomDrawCount();
+            auto step=[&](bool stopped){return bones.dispatch(bone,[&](auto& state,auto& publisher,bool& good){
+                return state.stepInWorld(stopped,publisher,[&]{return world->spawnBoneImpact(bones,bone,effectFrames);},
+                    [&](bool& visible){return world->boneInView(bones,bone,visible);},good);
+            });};
+            require(step(true)&&!bones.instances().find(bone)->destroyRequested&&world->scriptEffects().size()==1,
+                "time-stop postpones shot bone's death without replacing the muzzle pool");
+            require(step(false)&&bones.instances().find(bone)->destroyRequested&&world->scriptEffects().size()==2&&
+                world->scriptEffects().atNewest(0)->spriteId==85&&world->randomDrawCount()==draws,
+                "resumed bone Step shares the world effect pool and consumes no RNG");
+            require(bones.clear(),"retire retained shot bone");continue;
+        }
         const auto* target=owner->resolve(box);
         require(ops.selected.slot==box.slot&&ops.selected.generation==box.generation&&target&&target->box.hit&&
             target->box.wallHp.high==expected.high&&target->box.wallHp.low==expected.low&&target->active&&!target->destroyRequested,
             "source bullet damage leaves the selected box alive for its own Step");
         require(ops.lines==3&&ops.points>1&&ops.approachWrites==2*(ops.points-1)&&ops.writes==2&&
-            random.drawCount()==1&&owner->resolve(shot)->bulletMyFx==registration.sourceId(1)&&
+            random.drawCount()==1&&world->scriptEffects().size()==1&&
             owner->resolve(shot)->bulletMyFx&&owner->resolve(shot)->destroyRequested,
             "source query/movement counts and synchronous muzzle birth survive destruction marking");
         {
@@ -2190,7 +2218,6 @@ int main(){
         std::printf("SOURCE_SHOT %u %u %08x %08x %08x %08x %08x %u %u %u %u\n",
             unsigned(high),unsigned(laser),unsigned(motion.x.bits),unsigned(motion.y.bits),unsigned(motion.imageAngle.bits),
             unsigned(target->box.wallHp.high),unsigned(target->box.wallHp.low),ops.lines,ops.points,ops.approachWrites,ops.writes);
-        require(effects.clear(registration),"retire borrowed muzzle registry before fixture teardown");
     }
     {
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);

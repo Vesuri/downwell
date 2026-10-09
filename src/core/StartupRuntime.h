@@ -1256,6 +1256,13 @@ public:
         return run_.effectsSucceeded=registration.frozen(key,effect,pTimeStop,width,frozen);
     }
     const ScriptSpawnEffects<scriptSpawnEffectCapacity>& scriptEffects()const{return ownedScriptEffects_;}
+    template<class Frames,class Execute>
+    bool withBulletEffects(InstanceHandle shot,Frames frames,Execute execute){
+        if(!run_.effectsSucceeded)return false;
+        auto ops=bulletEffectOperations(shot,ownedScriptEffects_,ownedScriptRegistration_,frames);
+        if(!run_.effectsSucceeded)return false;
+        const bool ok=execute(ops);return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
+    }
     template<unsigned Capacity,class Frames> bool spawnCurrencyPickupEffect(
         StoredCurrencyRegistration<instanceCapacity,Capacity>& currency,InstanceHandle gem,Frames frames){
         if(!run_.effectsSucceeded||!currency.belongsTo(instances_)||!currency.valid())

@@ -164,6 +164,14 @@ source ID. Each assignment resolves the bullet again after synchronous creation.
 Later child-setter failure leaves the completed birth and caller assignment
 intact and latches world failure. The effect owner and registry must remain at
 stable addresses while their registered records exist.
+`withBulletEffects` supplies the world's own shared effect pool and registry
+to a synchronous Step execution; it never creates a bullet-only pool. This
+allows a retained muzzle to coexist with a later bone impact. Both world-owner
+fixtures select and damage a registered bone through the source solid script,
+retain it while time-stopped, then execute its resumed Step and create sprite
+85 alongside the muzzle without further RNG. These are controlled event-chain
+tests with explicit target births and supplied stop state, not natural skeleton
+encounter admission or a proof of complete global RNG interleaving.
 The enclosing runtime supplies the same motion object to its query/approach
 callbacks and retains the executing bullet through destruction requests.
 `verify-machine-gun-source-step` checks both profiles through empty, box, wall,
