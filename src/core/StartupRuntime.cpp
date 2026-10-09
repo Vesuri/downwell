@@ -526,54 +526,67 @@ void StartupRuntime::stepInternal(bool advancePressed,
             if(phase==StepEventPhase::step)smokeStepPhase=run_.smokeEffects.beginPhase();
         },[this](InstanceHandle h,const InstanceRecord& record,bool member){return lifecycle_.membership(h,record,member);},
         [this]{return run_.effectsSucceeded&&roomLoadSucceeded_&&deferredCommandsSucceeded_;},
-        [this]{return !collisionDispatch_||collisionDispatch_(collisionContext_);},
-        [this]{return !roomPack_||roomLayers_.serviceDepths();})){
+        [this]{
+            if(roomId_==mainRoomId){
+                run_.collideSmokeWalls([&](const ContactBounds& query,auto emit){
+                    for(std::size_t i=0;i<instances_.size();++i){
+                        const auto& wall=instances_.at(i);
+                        if(!wall.active || wall.destroyRequested || (wall.objectId!=60 && wall.objectId!=92 && wall.objectId!=293))continue;
+                        if((wall.scaleX!=1 && wall.scaleX!=-1) || (wall.scaleY!=1 && wall.scaleY!=-1) || wall.rotation!=0)return false;
+                        const auto bounds=contactWorldBounds({long(wall.x)*256,long(wall.y)*256,
+                            int(wall.scaleX),int(wall.scaleY),wall.objectId==293?569:585});
+                        if(contactBoundsOverlap(query,bounds) && !emit())return false;
+                    }
+                    return true;
+                });
+                if(!run_.effectsSucceeded)return false;
+                updateMainEnemyInteractions();
+                if(!run_.effectsSucceeded)return false;
+                run_.collideLevelExit(roundGameMakerCoordinate(mainPlayerX_),
+                    roundGameMakerCoordinate(mainPlayerY_), mainDeath_.active);
+            }
+            if(!run_.effectsSucceeded||!roomLoadSucceeded_||!deferredCommandsSucceeded_||
+                (collisionDispatch_&&!collisionDispatch_(collisionContext_)))return false;
+            if(roomId_==mainRoomId){
+                // The post-Step runner update is dirty-only. Moving camMain does not
+                // dirty the camera cache; normal following happens before Draw.
+                run_.sideCameraLockers.collide(mainCameraMotion_);
+                mainCameraX_ = mainCameraMotion_.x / 4096.0F;
+                mainCameraY_ = mainCameraMotion_.y / 4096.0F;
+                mainCameraTargetY_ = mainCameraMotion_.targetY / 4096.0F;
+                for (std::size_t i = 0; i < instances_.size(); ++i) {
+                    auto& camera = instances_.at(i);
+                    if (camera.active && camera.objectId == 64) {
+                        if(!publishMainCameraPosition(camera))return false;
+                    }
+                }
+            }
+            return run_.effectsSucceeded;
+        },
+        [this]{return !roomPack_||roomLayers_.serviceDepths();},
+        [&]{
+            if(deferredInstances_.size()!=0)flushDeferredInstances(instances_,roomId_);
+            if(!roomLoadSucceeded_||!deferredCommandsSucceeded_||!run_.effectsSucceeded)return false;
+            if(roomId_!=mainRoomId)return true;
+            run_.exitDither.step(ordinaryStepViewTopQ12_ / 4096, surfaceHeight);
+            // Enemy motion runs in the selected ordinary-Step event above.
+            // These remaining manual effect/projectile adapters still need
+            // admission into selected object/instance dispatch.
+            run_.stepSmoke(smokeStepPhase,random_);
+            if(!run_.effectsSucceeded)return false;
+            updateMainCurrency();
+            if(!run_.effectsSucceeded)return false;
+            updateMainBullets();
+            if(!run_.effectsSucceeded)return false;
+            updateMainLifecycle(false,ordinaryStepViewTopQ12_);
+            return run_.effectsSucceeded;
+        })){
         run_.effectsSucceeded=false;return;
     }
     if (deferredInstances_.size() != 0)
         flushDeferredInstances(instances_, roomId_);
     if (!roomLoadSucceeded_ || !deferredCommandsSucceeded_ || !run_.effectsSucceeded) return;
     if (roomId_ == mainRoomId) {
-        run_.exitDither.step(ordinaryStepViewTopQ12_ / 4096, surfaceHeight);
-        // Enemy motion runs in the selected ordinary-Step event above.
-        // These remaining manual effect/projectile adapters still need
-        // admission into the same generic phases.
-        run_.stepSmoke(smokeStepPhase,random_);
-        if(!run_.effectsSucceeded)return;
-        updateMainCurrency();
-        if(!run_.effectsSucceeded)return;
-        updateMainBullets();
-        if(!run_.effectsSucceeded)return;
-        run_.collideSmokeWalls([&](const ContactBounds& query,auto emit){
-            for(std::size_t i=0;i<instances_.size();++i){
-                const auto& wall=instances_.at(i);
-                if(!wall.active || wall.destroyRequested || (wall.objectId!=60 && wall.objectId!=92 && wall.objectId!=293))continue;
-                if((wall.scaleX!=1 && wall.scaleX!=-1) || (wall.scaleY!=1 && wall.scaleY!=-1) || wall.rotation!=0)return false;
-                const auto bounds=contactWorldBounds({long(wall.x)*256,long(wall.y)*256,
-                    int(wall.scaleX),int(wall.scaleY),wall.objectId==293?569:585});
-                if(contactBoundsOverlap(query,bounds) && !emit())return false;
-            }
-            return true;
-        });
-        if(!run_.effectsSucceeded)return;
-        updateMainEnemyInteractions();
-        if(!run_.effectsSucceeded)return;
-        run_.collideLevelExit(roundGameMakerCoordinate(mainPlayerX_),
-            roundGameMakerCoordinate(mainPlayerY_), mainDeath_.active);
-        updateMainLifecycle(false, ordinaryStepViewTopQ12_);
-        if(!run_.effectsSucceeded)return;
-        // The post-Step runner update is dirty-only. Moving camMain does not
-        // dirty the camera cache; normal following happens before Draw.
-        run_.sideCameraLockers.collide(mainCameraMotion_);
-        mainCameraX_ = mainCameraMotion_.x / 4096.0F;
-        mainCameraY_ = mainCameraMotion_.y / 4096.0F;
-        mainCameraTargetY_ = mainCameraMotion_.targetY / 4096.0F;
-        for (std::size_t i = 0; i < instances_.size(); ++i) {
-            auto& camera = instances_.at(i);
-            if (camera.active && camera.objectId == 64) {
-                if(!publishMainCameraPosition(camera))return;
-            }
-        }
         updateMainLifecycle(true, ordinaryStepViewTopQ12_);
         if(!run_.effectsSucceeded)return;
         run_.shops.endStep(ordinaryStepViewTopQ12_ / 4096);

@@ -76,6 +76,17 @@ public:
     static bool runStepChecked(InstanceStore<Capacity>& instances,
         AlarmEvents alarmEvents,Handler handler,BeforePhase beforePhase,
         Publish publish,Healthy healthy,Collisions collisions,Maintain maintain) {
+        return runStepChecked(instances,alarmEvents,handler,beforePhase,publish,healthy,collisions,maintain,
+            []{return true;});
+    }
+    // Transitional owners may still have retained Step bodies outside the
+    // registered population. Complete those before Step reconciliation and
+    // Collision, never after End Step. This does not establish their mutual
+    // object/instance order; they must ultimately join selected dispatch.
+    template<class AlarmEvents,class Handler,class BeforePhase,class Publish,class Healthy,class Collisions,class Maintain,class CompleteStep>
+    static bool runStepChecked(InstanceStore<Capacity>& instances,
+        AlarmEvents alarmEvents,Handler handler,BeforePhase beforePhase,
+        Publish publish,Healthy healthy,Collisions collisions,Maintain maintain,CompleteStep completeStep) {
         if(!healthy())return false;
         const auto checkedPublish=[&](InstanceHandle h,const InstanceRecord& record,bool member){
             return healthy()&&publish(h,record,member)&&healthy();
@@ -91,6 +102,7 @@ public:
         if(!maintenance())return false;
         beforePhase(StepEventPhase::step);
         if(!healthy() || !dispatchPhase(instances, StepEventPhase::step, handler,healthy))return false;
+        if(!completeStep()||!healthy())return false;
         if(!maintenance())return false;
         if(!collisions()||!healthy())return false;
         if(!maintenance())return false;

@@ -490,6 +490,41 @@ void testCollisionBoundary(){
     }
 }
 
+void testRetainedStepCompletion(){
+    using namespace downwell;
+    for(unsigned failure=0;failure<4;++failure){
+        InstanceStore<4> instances;instances.create(1,10,11,false);instances.create(2,20,11,false);
+        const auto first=instances.handleAt(0);
+        bool healthy=true;unsigned completions=0,collisions=0,maintenance=0;
+        std::vector<unsigned> steps,ends;
+        const bool ok=EventScheduler<4>::runStepChecked(instances,[](const auto&){return AlarmBank::allEvents;},
+            [&](auto& r,StepEvent event){
+                if(event.phase==StepEventPhase::step){steps.push_back(r.instanceId);if(failure==3)healthy=false;}
+                if(event.phase==StepEventPhase::endStep)ends.push_back(r.instanceId);
+            },[](auto){},[](auto,const auto&,bool){return true;},[&]{return healthy;},[&]{
+                ++collisions;bool member=true;
+                require(completions==1&&maintenance==3&&instances.animationMember(first,member)&&!member,
+                    "retained Step completes before membership reconciliation and Collision");
+                require(instances.find(3)&&instances.find(3)->alarms.get(0)==2,
+                    "retained Step birth is visible at Collision without retroactive alarms");
+                return true;
+            },[&]{++maintenance;return true;},[&]{
+                ++completions;
+                require(steps==std::vector<unsigned>({1,2})&&maintenance==2,
+                    "retained Step follows selected handlers, before their phase maintenance");
+                require(instances.requestActivation(first,false),"request deactivation in retained Step");
+                instances.create(3,30,11,false);instances.find(3)->alarms.set(0,2);
+                if(failure==2)healthy=false;
+                return failure!=1;
+            });
+        require(ok==(failure==0)&&completions==unsigned(failure!=3)&&collisions==unsigned(failure==0),
+            "checked completion failure suppresses Collision and End Step");
+        if(!failure)require(ends==std::vector<unsigned>({2,3})&&maintenance==5,
+            "Step completion birth participates in the next End Step capture");
+        else require(ends.empty()&&maintenance==2,"failed Step never reconciles a partial phase");
+    }
+}
+
 void testLayerMaintenance(){
     using namespace downwell;
     for(unsigned failure=0;failure<=5;++failure){
@@ -579,6 +614,7 @@ int main() {
     testCheckedDispatch();
     testDeferredDestroyEligibility();
     testCollisionBoundary();
+    testRetainedStepCompletion();
     testLayerMaintenance();
     std::cout << "event scheduler tests passed\n";
     return 0;

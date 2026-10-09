@@ -394,9 +394,14 @@ executes builder (65) before entry wipe (73), and runs retained contact work
 after ordinary-Step membership reconciliation. Box stable-slot prefixes and
 monotonic lifetime ceilings exclude appended and replacement births without
 allocating a full box snapshot. These boundaries do not admit missing event
-families or make the remaining manual adapters a complete source dispatcher:
-the stored world's retained passes still execute outside its generic phase
-walker, and projectile contact scripts still need source event integration.
+families or make the remaining manual adapters a complete source dispatcher.
+The stored world's remaining smoke/currency/bullet bodies execute at Step
+completion before membership reconciliation, and retained contact work executes
+at Collision before End Step. The checked completion hook stops on failure
+without reconciling a partial phase; successful births can join Collision and
+the next End Step capture. These bodies are not yet interleaved with all
+registered instances by object and registration order, and projectile contact
+scripts still need source event integration.
 
 The integration audit found that both existing enemy adapters manually ran
 new builder children immediately after the builder, outside the dispatcher.

@@ -543,9 +543,27 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
     audit.observedRuntime=indexed.get();
     indexed->skipToGameForTesting();plain->skipToGameForTesting();audit.verify(*indexed);
     require(audit.initialViewsSeen==1,"live room entry observed source initial camera view");
+    unsigned collisionShots=0;
     for(unsigned tick=0;tick<1800;++tick){
         const auto input=downwell::gameplayContactProfileInput(tick,indexed->mainPlayerX(),indexed->mainPlayerY());
-        indexed->step(input,false);plain->step(input,false);
+        std::vector<downwell::StartupRuntime::MainBulletState> shots;
+        require(indexed->stepWithCollisionPass(input,false,[&]{
+            for(std::size_t i=0;i<indexed->mainBulletCount();++i){
+                const auto& shot=indexed->mainBulletAt(i);
+                require(shot.trajectory.initialized,"live collision pass sees completed bullet Step initialization");
+                shots.push_back(shot);++collisionShots;
+            }
+            return true;
+        }),"live retained Step completes before collision observation");
+        plain->step(input,false);
+        require(shots.size()==indexed->mainBulletCount(),"post-Collision path does not dispatch bullets again");
+        for(std::size_t i=0;i<shots.size();++i){
+            const auto& before=shots[i];const auto& after=indexed->mainBulletAt(i);
+            require(before.instance.slot==after.instance.slot&&before.instance.generation==after.instance.generation&&
+                before.trajectory.x.pixel==after.trajectory.x.pixel&&before.trajectory.x.fraction==after.trajectory.x.fraction&&
+                before.trajectory.y.pixel==after.trajectory.y.pixel&&before.trajectory.y.fraction==after.trajectory.y.fraction,
+                "bullet position observed at Collision is retained through End Step");
+        }
         require(healthy(*indexed)&&indexed->stateDigest()==plain->stateDigest(),
                 "lifecycle publication preserves complete live gameplay state and RNG");
         const auto* builder=indexed->instance(100856);
@@ -554,6 +572,7 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
             "natural generation keeps stored and published builder rows synchronized");
         audit.verify(*indexed);
     }
+    require(collisionShots>0,"natural contact tape exercises bullet Step at the collision boundary");
     std::cout << "Live lifecycle births=" << audit.births << " retires=" << audit.retires
               << " activations=" << audit.activations << " inactivations=" << audit.inactivations
               << " memberships=" << audit.memberships << " moves=" << audit.moves
