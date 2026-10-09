@@ -1,6 +1,7 @@
 #include "platform/sdl/AudioSDL.h"
 #include "core/TimeFieldWind.h"
 #include "core/MusicDuck.h"
+#include "core/TimeStopAudio.h"
 #include <sndfile.h>
 #include <cassert>
 #include <cstdio>
@@ -9,6 +10,10 @@
 using namespace downwell;
 namespace downwell {
 struct AudioSDLTestAccess {
+    static void manual(AudioSDL& audio){SDL_PauseAudioDevice(audio.device_,1);}
+    static double cursor(AudioSDL& audio,int id){
+        AudioSDL::Lock lock(audio.device_);auto* voice=audio.find(id);assert(voice);return voice->cursor;
+    }
     static float sample(AudioSDL& audio){
         AudioSDL::Lock lock(audio.device_);float frame[2]{};audio.mix(frame,1);
         assert(frame[0]==frame[1]);return frame[0];
@@ -85,6 +90,38 @@ int main(){
         assert(!audio.play(349,90,true,voice));assert(audio.stop(voices[0]));
         assert(audio.isPlaying(349,playing)&&playing);assert(audio.stop(349));
         assert(audio.isPlaying(349,playing)&&!playing);
+    }
+    {
+        AudioSDL audio;assert(audio.ready());AudioSDLTestAccess::manual(audio);
+        const auto one=MotionBinary64::fromInteger(1);
+        assert(audio.load(193,path,one));int first,second;
+        assert(audio.play(193,80,true,first)&&audio.play(193,80,true,second));
+        assert(AudioSDLTestAccess::sample(audio)==0.5f);
+        const auto cursor=AudioSDLTestAccess::cursor(audio,first);
+        TimeStopAudio transition;SoundPlayState caller;SoundPlayEnvironment environment;
+        using E=PlayerTimeStop::Effect;using Q=PlayerTimeStop::AudioQuery;
+        assert(transition.emit(E::pauseMusic,caller,environment,1,193,-1,audio));
+        bool state=false;
+        assert(transition.query(Q::musicPaused,193,-1,audio,state)&&state);
+        assert(transition.query(Q::musicPlaying,193,-1,audio,state)&&state);
+        assert(AudioSDLTestAccess::sample(audio)==0&&AudioSDLTestAccess::cursor(audio,first)==cursor);
+        // Repeated pause is harmless; future resource voices are not paused.
+        assert(audio.pause(193));int third;assert(audio.play(193,80,true,third));
+        assert(audio.isPaused(third,state)&&!state);
+        assert(AudioSDLTestAccess::sample(audio)==0.25f);
+        assert(audio.stop(third));
+        assert(audio.setGain(first,{},0)&&audio.setGain(first,one,1));
+        SDL_Delay(5);audio.update();MotionBinary64 gain;
+        assert(audio.getGain(first,gain)&&gain.high==one.high);
+        assert(AudioSDLTestAccess::cursor(audio,first)==cursor);
+        assert(audio.resume(first)&&audio.isPaused(193,state)&&state); // Second remains paused.
+        assert(AudioSDLTestAccess::sample(audio)==0.25f);
+        assert(AudioSDLTestAccess::cursor(audio,first)==cursor+1);
+        assert(transition.emit(E::resumeMusic,caller,environment,1,193,-1,audio));
+        assert(audio.isPaused(193,state)&&!state&&AudioSDLTestAccess::sample(audio)==0.5f);
+        assert(audio.pause(193)&&audio.stop(193)&&audio.resume(193));
+        assert(audio.isPlaying(193,state)&&!state&&audio.isPaused(193,state)&&!state);
+        assert(audio.pause(-1)&&audio.resume(-1)&&audio.isPaused(-1,state)&&!state);
     }
     {
         AudioSDL audio;assert(audio.ready());

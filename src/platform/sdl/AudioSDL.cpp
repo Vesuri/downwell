@@ -56,7 +56,22 @@ bool AudioSDL::isPlaying(int id,bool& playing){
     for(const auto& voice:voices_)if(voice.active&&(voice.id==id||voice.resource==id))playing=true;
     return device_!=0;
 }
-bool AudioSDL::stop(int id){Lock lock(device_);for(auto& v:voices_)if(v.id==id||v.resource==id)v.active=false;return device_!=0;}
+bool AudioSDL::isPaused(int id,bool& paused){
+    Lock lock(device_);paused=false;
+    for(const auto& v:voices_)if(v.active&&v.paused&&(v.id==id||v.resource==id))paused=true;
+    return device_!=0;
+}
+bool AudioSDL::pause(int id){
+    Lock lock(device_);
+    for(auto& v:voices_)if(v.active&&(v.id==id||v.resource==id))v.paused=true;
+    return device_!=0;
+}
+bool AudioSDL::resume(int id){
+    Lock lock(device_);
+    for(auto& v:voices_)if(v.active&&(v.id==id||v.resource==id))v.paused=false;
+    return device_!=0;
+}
+bool AudioSDL::stop(int id){Lock lock(device_);for(auto& v:voices_)if(v.id==id||v.resource==id){v.active=false;v.paused=false;}return device_!=0;}
 bool AudioSDL::getGain(int id,MotionBinary64& gain){
     Lock lock(device_);
     if(id>=0&&id<int(samples_.size())&&!samples_[id].pcm.empty()){gain=samples_[id].gain.current.promoted();return true;}
@@ -86,7 +101,7 @@ void AudioSDL::callback(void* self,Uint8* bytes,int count){
     static_cast<AudioSDL*>(self)->mix(reinterpret_cast<float*>(bytes),unsigned(count)/(2*sizeof(float)));
 }
 void AudioSDL::mix(float* output,unsigned frames){
-    for(auto& v:voices_)if(v.active){
+    for(auto& v:voices_)if(v.active&&!v.paused){
         const auto& sample=samples_[v.resource];const auto length=sample.pcm.size()/2;
         const double increment=v.pitch*sample.rate/rate_;
         // Resource and voice gains are independent binary32 controls.

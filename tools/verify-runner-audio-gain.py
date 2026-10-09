@@ -18,6 +18,10 @@ for start, end, digest in (
     (0x4a23f9, 0x4a249a, "563d70b0f581d125595a53a30b4f71dabe74cccd05c441eb7c982bf8cd5c2caa"),
     (0x4d0230, 0x4d02ab, "33e7fe765ba9e8f8f1db487cccf177ab60820e7d6df62cdf5b73a513d23101f9"),
     (0x50f4ea, 0x50f559, "c01551f626b44554ac9b6d749a003f2efea00a4004f6a5f9033a41c77634e309"),
+    (0x49edb0, 0x49ef5e, "484ba223a4c78bda7dfc412e13e87f06feecf7049942642f7bce88d121f93f46"),
+    (0x4a0370, 0x4a0533, "37c7ce6ce8d7ffbedc58641ab5453dd7637c7c89631cd4979f2696455b10d610"),
+    (0x4a1110, 0x4a12d0, "33e70cfc5103712dc583f9b3ea4f58158090295868642eeb2c2d1c74a4e835a4"),
+    (0x49ec50, 0x49ed30, "8fee5c3ba0498ad35333ee46e9222ce96fbc7717bb45192caf8496c39aa1c779"),
 ):
     assert sha256(region(start, end-start)).hexdigest() == digest
 assert region(0x795ab8, 4) == bytes.fromhex("0000803f")

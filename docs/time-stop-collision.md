@@ -133,6 +133,19 @@ and the runner's overflowing signed-32-bit `ms*1000` cases fail explicitly.
 This establishes control semantics, not original device sample equivalence or
 runtime floating-point-mode verification. Native device audio remains open.
 
+SDL pause/resume preserves voice ownership, playback cursor and gain controls.
+The resource forms affect currently matching voices; a later play starts
+unpaused. The runner's pause dispatcher/helper (`0x49edb0`/`0x49ee70`) admits
+active, playing sources; resume (`0x4a0370`/`0x4a0430`) admits paused sources.
+`audio_is_paused` (`0x4a1110`) tests the device paused state. In contrast,
+`audio_is_playing` (`0x4a11e0`, voice helper `0x49ec50`) accepts both playing
+and paused sources. A resource query succeeds if any matching voice qualifies.
+These routines are pinned by the gain verifier as well. Gain update tests only
+active ownership, not the device paused state, so ramps advance while playback
+is paused. SDL tests exercise the shared `TimeStopAudio` pause/resume/query
+entry points, retained cursors, mixed paused/playing resource voices and ramps
+on paused voices. This does not yet admit natural player time-stop transitions.
+
 The stored registered-skeleton pass also admits skeleton contacts with fields
 82, 255 and 371 in that same collected pair stream. It resolves the inherited
 83/1066 event and sets health to zero unless `timefieldImmune` is set; it does
