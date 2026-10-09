@@ -699,6 +699,12 @@ public:
     template<unsigned Capacity,unsigned StopCapacity,class MakeEffects,class Tick>
     bool withSkeletonTimeStopEvents(StoredSkeletonRegistration<instanceCapacity,Capacity>& registration,
         const TimeStopEffects<StopCapacity>& stop,MakeEffects makeEffects,Tick tick){
+        return withSkeletonTimeStopPublishedEvents(registration,stop,
+            [&](auto key,auto& actor,auto& throwing,auto&){return makeEffects(key,actor,throwing);},tick);
+    }
+    template<unsigned Capacity,unsigned StopCapacity,class MakeEffects,class Tick>
+    bool withSkeletonTimeStopPublishedEvents(StoredSkeletonRegistration<instanceCapacity,Capacity>& registration,
+        const TimeStopEffects<StopCapacity>& stop,MakeEffects makeEffects,Tick tick){
         if(!stop.succeeded)return run_.effectsSucceeded=false;
         return withSkeletonPublishedEvents(registration,[&](InstanceHandle key,SkeletonPhase phase,
             auto& actor,auto& throwing,auto& publish,bool& good){
@@ -706,8 +712,50 @@ public:
             if(phase!=SkeletonPhase::step||!stop.succeeded||!mainPlayerInitialized_||roomId_!=mainRoomId||
                !ContactCoordinates::playerGlobals(mainPlayerMotion_.frameStartXFixed(),mainPlayerMotion_.frameStartYFixed(),
                    mainPlayerOriginX_,mainPlayerOriginY_,x,y))return good=false;
-            auto effects=makeEffects(key,actor,throwing);
+            auto effects=makeEffects(key,actor,throwing,publish);
             return actor.stepPublished(stop.player.stopped,x,y,publish,effects,good);
+        },tick);
+    }
+    // Registries and publisher remain borrowed for this selected event. Child
+    // registration uses the stored room's real allocator and synchronous Create.
+    template<class Publish,class Bones,class Blood,class Smoke,class Flash,class Currency,class Corpses,class Titles,
+             unsigned StopCapacity,class Tile,class Audio>
+    auto registeredSkeletonEffects(SkeletonActor& actor,RegisteredSkeletonThrow& throwing,Publish& publish,
+        Bones& bones,Blood& blood,Smoke& smoke,Flash& flash,Currency& currency,Corpses& corpses,Titles& titles,
+        const TimeStopEffects<StopCapacity>& stop,bool cutGunshot,const LevelNumberTextContext& text,
+        Tile& tile,SoundPlayEnvironment& environment,Audio& audio){
+        struct Effects {
+            StartupRuntime& world;SkeletonActor& actor;RegisteredSkeletonThrow& throwing;Publish& publish;
+            Bones& bones;Blood& bloods;Smoke& smokes;Flash& flashes;Currency& gems;Corpses& corpses;Titles& titles;
+            const TimeStopEffects<StopCapacity>& stop;bool cut;const LevelNumberTextContext& text;
+            Tile& tile;SoundPlayEnvironment& environment;Audio& audio;
+            bool hurtSound(int sound){return world.playSkeletonSound(actor,sound,environment,audio);}
+            bool throwBone(int){return world.throwSkeletonBone(bones,actor,throwing,environment,audio);}
+            bool enemyDeath(){return world.recordSkeletonDeath(actor,cut,stop,titles,text,environment,audio);}
+            bool blood(int count,int spread){return count==10&&spread==3&&world.emitSkeletonBlood(bloods,actor);}
+            bool smoke(MotionBinary64,MotionBinary64,int count,int spread){return count==5&&spread==1&&
+                world.emitSkeletonSmoke(smokes,actor);}
+            bool flash(MotionBinary64,MotionBinary64,int count,int spread,int radius){return count==6&&spread==2&&radius==10&&
+                world.emitSkeletonFlash(flashes,actor);}
+            bool currency(int amount){return amount==actor.money&&world.emitSkeletonCurrency(gems,actor,tile);}
+            bool deathSound(int sound){return world.playSkeletonSound(actor,sound,environment,audio);}
+            bool deadBody(int sprite,MotionBinary64 impact,int explosion){return sprite==206&&explosion==102&&
+                world.emitSkeletonCorpse(corpses,publish,impact,tile);}
+            bool debris(int x,int y){std::uint32_t id=0;return world.spawnDebris(MotionBinary64::fromInteger(x),
+                MotionBinary64::fromInteger(y),world.runStage().area,id);}
+        };
+        return Effects{*this,actor,throwing,publish,bones,blood,smoke,flash,currency,corpses,titles,
+            stop,cutGunshot,text,tile,environment,audio};
+    }
+    template<unsigned Capacity,class Bones,class Blood,class Smoke,class Flash,class Currency,class Corpses,class Titles,
+             unsigned StopCapacity,class Tile,class Audio,class Tick>
+    bool withRegisteredSkeletonEvents(StoredSkeletonRegistration<instanceCapacity,Capacity>& skeletons,
+        Bones& bones,Blood& blood,Smoke& smoke,Flash& flash,Currency& currency,Corpses& corpses,Titles& titles,
+        const TimeStopEffects<StopCapacity>& stop,bool cutGunshot,const LevelNumberTextContext& text,
+        Tile tile,SoundPlayEnvironment& environment,Audio& audio,Tick tick){
+        return withSkeletonTimeStopPublishedEvents(skeletons,stop,[&](auto,auto& actor,auto& throwing,auto& publish){
+            return registeredSkeletonEffects(actor,throwing,publish,bones,blood,smoke,flash,currency,corpses,titles,
+                stop,cutGunshot,text,tile,environment,audio);
         },tick);
     }
     template<unsigned Capacity,class Execute,class Tick>

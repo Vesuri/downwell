@@ -175,8 +175,9 @@ behavior, both backend integrations and relevant original-game verification.
   source-ordered births and animation/alarm/Step/collision/End Step scheduling,
   player/bullet damage, rewards, capacity failure and out-of-view retirement.
   Admit native `stepRegisteredSkeleton` in the complete mixed scheduler with
-  the room creation stream and real tile/audio/settings dependencies; provide
-  the stored world's equivalent complete registered-effects composition.
+  the room creation stream and real tile/audio/settings dependencies. Install
+  stored `withRegisteredSkeletonEvents` alongside every child owner and live
+  time-stop/query adapter for normal encounters, not only explicit test births.
 
 ### D. Verify natural encounters
 

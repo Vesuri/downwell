@@ -128,6 +128,110 @@ int main(){
     assert(sprites.valid()&&masks.valid());
     const auto fontData=load("generated/downwell-fonts.dwfn");downwell::FontPack fonts(fontData.data(),fontData.size());
     assert(fonts.valid());
+    for(unsigned seed=0;seed<17;++seed){
+        using namespace downwell;
+        auto storedOwner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto stored=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,seed,nullptr,storedOwner->binding());
+        assert(storedOwner->attach(*stored));stored->skipToGameForTesting();
+        auto skeletons=stored->skeletonRegistration<1>();auto bones=stored->boneRegistration<2>();
+        auto blood=stored->bloodRegistration<2>();auto smoke=stored->smokeRegistration<8>();
+        auto flash=stored->flashBallRegistration<8>();auto currency=stored->currencyRegistration<3>();
+        auto corpses=stored->corpseRegistration<1>();auto titles=stored->levelNumberRegistration<1>();
+        InstanceHandle skeleton;assert(stored->spawnSkeleton(skeletons,240,40000,skeleton));
+        const auto initialRandom=stored->randomState();const auto first=stored->nextRuntimeInstanceId();
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto native=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),owner->breakableBinding(),
+            owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*native)&&owner->configureCorpseMasks(masks));
+        int storedSpeed=60,nativeSpeed=60;InstanceHandle controller,other,shared;
+        assert(native->bindControllerRoomSpeed(nativeSpeed)&&owner->runControllers().create(105500,{}, {},
+            [](InstanceHandle){return true;},controller));
+        assert(native->createSkeletonWithSourceId(first-1,240,40000,other));
+        native->configureEnemyRandom(initialRandom);
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::skeleton,other,shared));
+        auto prepare=[](auto& actor,auto&,bool&){actor.health=0;actor.money=14;
+            actor.takenImpact=MotionBinary64::fromInteger(2);return true;};
+        assert(skeletons.dispatch(skeleton,prepare)&&owner->skeletons().dispatch(other,prepare));
+        struct Audio {
+            std::vector<int> plays;
+            bool isPlaying(int,bool& playing){playing=false;return true;}
+            bool stop(int){return true;}
+            bool play(int id,int,bool,int& voice){plays.push_back(id);voice=1000+id;return true;}
+            bool getGain(int,MotionBinary64& gain){gain=MotionBinary64::fromInteger(1);return true;}
+            bool setGain(int,MotionBinary64,int){return true;}
+            bool setPitch(int,MotionBinary64){return true;}
+        } storedAudio,nativeAudio;
+        struct Queries {
+            bool wall(InstanceHandle,MotionBinary64,MotionBinary64,bool& hit){hit=false;return true;}
+            bool tile(InstanceHandle,int layer,MotionBinary64,MotionBinary64,bool& hit){assert(layer==100);hit=false;return true;}
+        } queries;
+        auto tile=[&](auto key,int layer,auto x,auto y,bool& hit){return queries.tile(key,layer,x,y,hit);};
+        const char* language="english";unsigned font=2;bool hard=false;
+        LevelNumberTextContext text{fonts,area_titles::entries,area_titles::count,language,font,hard};
+        TimeStopEffects<4> stop;SoundPlayEnvironment storedEnv,nativeEnv;
+        if(seed==16){
+            // Children born during this ordinary Step must not receive an
+            // ordinary Step from the snapshot already being dispatched.
+            auto noChildStep=[](auto&&...)->bool{std::abort();};
+            assert(stored->withMomentDelayRoomSpeed(storedSpeed,[&]{
+                return stored->withBloodEvents(blood,noChildStep,[&]{
+                    return stored->withSmokeEvents(smoke,[&]{
+                        return stored->withFlashBallEvents(flash,[&]{
+                            return stored->withCurrencyEvents(currency,noChildStep,[&]{
+                                return stored->withCorpseEvents(corpses,noChildStep,[&]{
+                                    return stored->withLevelNumberEvents(titles,[&]{
+                                        return stored->withRegisteredSkeletonEvents(skeletons,bones,blood,smoke,flash,
+                                            currency,corpses,titles,stop,true,text,tile,storedEnv,storedAudio,[&]{
+                                                return stored->stepWithOwnedDebris(Input{},noChildStep);
+                                            });
+                                    });
+                                });
+                            });
+                        });
+                    });
+                });
+            }));
+            assert(stored->mainEnemiesDefeated()==1&&skeletons.instances().size()==0&&
+                stored->debrisEffects().size()==2&&blood.instances().size()==2&&flash.instances().size()>=4);
+            continue;
+        }
+        assert(stored->withMomentDelayRoomSpeed(storedSpeed,[&]{
+            return skeletons.dispatchPublished(skeleton,[&](auto& actor,auto& throwing,auto& publish,bool& good){
+                auto effects=stored->registeredSkeletonEffects(actor,throwing,publish,bones,blood,smoke,flash,currency,
+                    corpses,titles,stop,true,text,tile,storedEnv,storedAudio);
+                return actor.stepPublished(false,{}, {},publish,effects,good);
+            });
+        }));
+        auto next=first;
+        assert(owner->stepRegisteredSkeleton(shared,stop,true,[&](std::uint32_t& id){id=next++;return true;},
+            tile,queries,text,nativeEnv,nativeAudio));
+        assert(next==stored->nextRuntimeInstanceId()&&storedSpeed==nativeSpeed&&storedAudio.plays==nativeAudio.plays);
+        assert(stored->randomDrawCount()==native->randomDrawCount());
+        for(unsigned i=0;i<16;++i)assert(stored->randomState().stateWord(i)==native->randomState().stateWord(i));
+        const auto& a=skeletons.instances().find(skeleton)->state;const auto& b=owner->skeletons().find(other)->state;
+        assert(a.destroyRequested&&b.destroyRequested&&a.myFx==b.myFx&&a.myDeadBody==b.myDeadBody&&
+            a.reward.myGem==b.reward.myGem&&a.smokeScript.smokenum==b.smokeScript.smokenum);
+        unsigned compared=0;
+        auto child=[&](std::uint32_t id,int object,RunnerImageValue x,RunnerImageValue y){
+            const auto* r=stored->instance(id);std::uint32_t sx,sy;
+            assert(r&&id>=first&&id<next&&r->objectId==object);
+            std::memcpy(&sx,&r->preciseX,4);std::memcpy(&sy,&r->preciseY,4);
+            assert(sx==x.bits&&sy==y.bits);++compared;
+        };
+        GameplayCollisionView view(*native);
+        assert(owner->visitRegistrationOrder([&](auto key,int,auto){
+            GameplayCollisionView::Record r;assert(view.resolve(key,r));
+            if(r.blood)child(r.blood->sourceId,220,r.blood->x,r.blood->y);
+            if(r.smoke)child(r.smoke->sourceId,225,r.smoke->x,r.smoke->y);
+            if(r.flashBall)child(r.flashBall->sourceId,224,r.flashBall->x,r.flashBall->y);
+            if(r.currency)child(r.currency->sourceId,248,r.currency->x,r.currency->y);
+            if(r.corpse)child(r.corpse->sourceId,263,r.corpse->x,r.corpse->y);
+            if(r.levelNumber)child(r.levelNumber->sourceId,372,r.levelNumber->x,r.levelNumber->y);
+            if(r.debris)child(r.debris->sourceId,370,r.debris->effect->x,r.debris->effect->y);
+            return true;
+        }));
+        assert(compared==next-first);
+    }
     for(auto mode:{downwell::GameplayCollisionOwner::Ownership::reference,
                   downwell::GameplayCollisionOwner::Ownership::native,
                   downwell::GameplayCollisionOwner::Ownership::nativeScenery})for(unsigned failure=0;failure<=19;++failure){

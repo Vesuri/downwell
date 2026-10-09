@@ -1209,6 +1209,18 @@ queries, language/font state, stop state, settings and audio are explicit
 dependencies. This is a selected-event adapter, not an independent family walk
 or a substitute for complete room startup and mixed scheduler admission.
 
+The stored counterpart is `StartupRuntime::registeredSkeletonEffects`, scoped
+by `withRegisteredSkeletonEvents` through the existing published skeleton
+animation/alarm/Step/End Step/cleanup adapter. It borrows registered bone, blood,
+smoke, flash, currency, corpse and title owners; debris uses the world's owned
+registered bank. All births use the real stored room ID allocator. The room
+must scope each child owner's dispatch and the controller room-speed binding
+around the same tick. The death fixture exercises that tick and rejects any
+ordinary child Step from the already-captured source Step snapshot. Separate
+paired-event fixtures compare child IDs, fractional positions, caller fields,
+audio calls and complete RNG state across the two worlds. Those comparisons
+do not establish original-runner collision order or natural encounter fidelity.
+
 `CorpseBirth` supplies inherited object-90 defaults and object-263 Create,
 including the three initial random draws and terrain-dependent relocation.
 Its wall adapter queries parent 57; its tile adapter queries layer 100. The
