@@ -367,6 +367,7 @@ static void checkTypedCollisionView(const GameplayCollisionView& view,GameplayCo
         case K::consumptionBlood:assert(view.resolveLocal<K::consumptionBlood>(local)==reference.consumptionBlood);break;
         case K::runController:assert(view.resolveLocal<K::runController>(local)==reference.runController);break;
         case K::result:assert(view.resolveLocal<K::result>(local)==reference.result);break;
+        case K::levelNumber:assert(view.resolveLocal<K::levelNumber>(local)==reference.levelNumber);break;
         case K::debris:assert(view.resolveLocal<K::debris>(local)==reference.debris);break;
         case K::timeChange:assert(view.resolveLocal<K::timeChange>(local)==reference.timeChange);break;
         case K::timeShard:assert(view.resolveLocal<K::timeShard>(local)==reference.timeShard);break;
@@ -727,6 +728,35 @@ int main(){
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     const auto resultRoomBytes=read("generated/downwell-rooms.dwrm");
     RoomPack resultRooms(resultRoomBytes.data(),resultRoomBytes.size());
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::nativeTerrain,
+                  GameplayCollisionOwner::Ownership::native}){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));auto& numbers=owner->levelNumbers();InstanceHandle local,shared;
+        auto init=[](auto,auto& state){return state.create(3,MotionBinary64::fromInteger(24),
+            [](unsigned i,unsigned& token){token=i;return true;});};
+        assert(numbers.create(105187,MotionBinary64::fromInteger(241),MotionBinary64::fromInteger(603),init,local)&&
+            GameplayCollisionView::encode(GameplayCollisionView::Kind::levelNumber,local,shared));
+        GameplayCollisionView view(*world);assert(view.contains(shared)&&numbers.activate(local,false));
+        world->step(0);assert(world->effectsSucceeded()&&numbers.find(local)->state.alarms.get(0)==4);
+        assert(numbers.activate(local,true));
+        for(unsigned tick=1;tick<=142;++tick){
+            world->step(0);assert(world->effectsSucceeded()&&owner->valid()&&owner->prepareDraw());
+            if(tick<142){
+                assert(view.contains(shared));const auto& state=numbers.find(local)->state;
+                if(tick==4)assert(state.shown==2&&state.alarms.get(0)==4);
+                if(tick==12)assert(state.alarms.get(1)==119);
+                if(tick==131)assert(state.exit==1&&state.alarms.get(2)==3);
+                assert(state.characters[1].offset==-2);
+            }
+        }
+        assert(!view.contains(shared)&&!numbers.find(local)&&!numbers.size());
+        assert(numbers.create(105188,{}, {},init,local));
+        assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)==ResultsDestination::gameplay&&
+            world->levelNumbers()==&numbers&&!numbers.size()&&!numbers.find(local)&&owner->valid());
+    }
     for(unsigned failure:{1u,2u}){
         struct ResultAudit {
             GameplayWorld* world=nullptr;InstanceHandle oldPlayer{};

@@ -28,6 +28,7 @@
 #include "core/GameplayPlayerControllers.h"
 #include "core/RunControllerInstances.h"
 #include "core/GameplayResultInstance.h"
+#include "core/LevelNumberInstances.h"
 #include "core/PlayerChildCreation.h"
 #include "core/DroneBulletInstances.h"
 #include "core/BoneProjectileInstances.h"
@@ -334,6 +335,12 @@ public:
     }
     const downwell::GameplayScriptSpawnInstances* scriptSpawnInstances()const{return scriptSpawnInstances_;}
     using RegisteredExpiry=downwell::CorpseExpiryInstances<32>;
+    using LevelNumbers=downwell::LevelNumberInstances<4>;
+    const LevelNumbers* levelNumbers()const{return levelNumbers_;}
+    bool bindLevelNumbers(LevelNumbers& instances){
+        if(levelNumbers_||!instances.valid()||instances.size())return false;
+        levelNumbers_=&instances;return true;
+    }
     using ConsumptionParticles=downwell::ConsumptionBloodInstances<32>;
     const ConsumptionParticles* consumptionParticles()const{return consumptionParticles_;}
     bool bindConsumptionParticles(ConsumptionParticles& instances){
@@ -1773,6 +1780,7 @@ private:
     downwell::GameplayPlayerControllers* playerControllers_=nullptr;
     RunControllers* runControllers_=nullptr;
     downwell::GameplayResultInstance* resultInstance_=nullptr;
+    LevelNumbers* levelNumbers_=nullptr;
     int* controllerRoomSpeed_=nullptr; // Same global as timeChangeSpeed_, but persists beyond effect cleanup.
     bool playerChildrenStarted_=false;
     bool (*playerChildCreate_)(void*,GameplayWorld&)=nullptr;

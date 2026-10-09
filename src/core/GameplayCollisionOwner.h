@@ -118,7 +118,7 @@ private:
 #ifdef DOWNWELL_DRAW_CACHE_AUDIT
     mutable bool drawAuditHasSnapshot_=false;
 #endif
-    RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity+GameplayWorld::droneBulletCapacity+GameplayWorld::boneCapacity+GameplayWorld::skeletonCapacity+GameplayWorld::currencyCapacity+32+32+4> combatAlarmPhase_;
+    RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity+GameplayWorld::droneBulletCapacity+GameplayWorld::boneCapacity+GameplayWorld::skeletonCapacity+GameplayWorld::currencyCapacity+32+32+4+4> combatAlarmPhase_;
     RunnerStepSnapshot<GameplayWorld::droneBulletCapacity+GameplayWorld::skeletonCapacity+GameplayPlayerControllers::capacity+32> actorEndStepPhase_;
     bool actorEndStepExecuting_=false;
     bool combatAlarmCaptureDirty_=true;
@@ -621,6 +621,7 @@ private:
         GameplayCollisionOwner& parent;
         static int object(const Record& r){
             if constexpr(Kind==View::Kind::result)return 325;
+            if constexpr(Kind==View::Kind::levelNumber)return 372;
             if constexpr(Kind==View::Kind::runController)return 37;
             if constexpr(Kind==View::Kind::playerController)return r.objectId;
             if constexpr(Kind==View::Kind::enemy||Kind==View::Kind::terrain)return r.objectId;
@@ -726,7 +727,7 @@ private:
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
             if constexpr(Kind==View::Kind::timeField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
-            if constexpr(Kind==View::Kind::result||Kind==View::Kind::runController||Kind==View::Kind::consumptionBlood||Kind==View::Kind::corpse||Kind==View::Kind::corpseExpiry||Kind==View::Kind::smoke)sourceId=r.sourceId;
+            if constexpr(Kind==View::Kind::levelNumber||Kind==View::Kind::result||Kind==View::Kind::runController||Kind==View::Kind::consumptionBlood||Kind==View::Kind::corpse||Kind==View::Kind::corpseExpiry||Kind==View::Kind::smoke)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeShard)sourceId=parent.pendingTimeShardId_;
             if constexpr(Kind==View::Kind::playerController||Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::builder||Kind==View::Kind::goalField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency)sourceId=r.sourceId;
@@ -748,7 +749,7 @@ private:
             if constexpr(Kind==View::Kind::scriptEffect||Kind==View::Kind::debris){
                 if(!r.effect)return parent.check(false);
                 position->x=r.effect->x;position->y=r.effect->y;
-            }else if constexpr(Kind==View::Kind::result||Kind==View::Kind::runController||Kind==View::Kind::consumptionBlood||Kind==View::Kind::corpse||Kind==View::Kind::smoke||Kind==View::Kind::corpseExpiry||Kind==View::Kind::playerController||Kind==View::Kind::timeShard||Kind==View::Kind::timeChange||Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::builder||Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency){
+            }else if constexpr(Kind==View::Kind::levelNumber||Kind==View::Kind::result||Kind==View::Kind::runController||Kind==View::Kind::consumptionBlood||Kind==View::Kind::corpse||Kind==View::Kind::smoke||Kind==View::Kind::corpseExpiry||Kind==View::Kind::playerController||Kind==View::Kind::timeShard||Kind==View::Kind::timeChange||Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::builder||Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency){
                 position->x=r.x;position->y=r.y;
             }else{
                 constexpr bool roomCoordinates=Kind==View::Kind::player||Kind==View::Kind::terrain||Kind==View::Kind::timeField||Kind==View::Kind::goalField||Kind==View::Kind::exitController;
@@ -829,7 +830,7 @@ private:
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
             if constexpr(Kind==View::Kind::timeField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
-            if constexpr(Kind==View::Kind::result||Kind==View::Kind::runController||Kind==View::Kind::consumptionBlood||Kind==View::Kind::corpse||Kind==View::Kind::corpseExpiry||Kind==View::Kind::smoke)sourceId=r.sourceId;
+            if constexpr(Kind==View::Kind::levelNumber||Kind==View::Kind::result||Kind==View::Kind::runController||Kind==View::Kind::consumptionBlood||Kind==View::Kind::corpse||Kind==View::Kind::corpseExpiry||Kind==View::Kind::smoke)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeShard)sourceId=parent.pendingTimeShardId_;
             if constexpr(Kind==View::Kind::playerController||Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::builder||Kind==View::Kind::goalField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency)sourceId=r.sourceId;
@@ -1043,6 +1044,8 @@ private:
     GameplayWorld::RunControllers controllers_{GameplayWorld::RunControllers::Binding::bindPositionedLifetime(controllerBinding_)};
     Binding<GameplayResultInstance::Record,View::Kind::result> resultBinding_{*this};
     GameplayResultInstance result_{GameplayResultInstance::Binding::bindMovement(resultBinding_)};
+    Binding<GameplayWorld::LevelNumbers::Record,View::Kind::levelNumber> levelNumberBinding_{*this};
+    GameplayWorld::LevelNumbers levelNumbers_{GameplayWorld::LevelNumbers::Binding::bindPositionedDestruction(levelNumberBinding_)};
     const SpriteMaskPack* corpseMasks_=nullptr;
     bool (*corpseChildId_)(void*,std::uint32_t&)=nullptr;
     void* corpseChildIdContext_=nullptr;
@@ -1170,7 +1173,7 @@ public:
     template<class Visit> bool visitRegistrationOrder(Visit visit)const{return valid()&&visitEligibility(visit);}
     // Drone dispatch deliberately exposes bool& status to arbitrary callbacks;
     // retain its live read rather than delaying a callback's failure to return.
-    bool valid()const{return good_&&result_.valid()&&controllers_.valid()&&consumption_.valid()&&corpses_.valid()&&smoke_.valid()&&expiry_.valid()&&playerControllers_.valid()&&builderController_.valid()&&blood_.valid()&&skeletons_.valid()&&(failureObserved_?(drones_.valid()&&bones_.valid()):
+    bool valid()const{return good_&&levelNumbers_.valid()&&result_.valid()&&controllers_.valid()&&consumption_.valid()&&corpses_.valid()&&smoke_.valid()&&expiry_.valid()&&playerControllers_.valid()&&builderController_.valid()&&blood_.valid()&&skeletons_.valid()&&(failureObserved_?(drones_.valid()&&bones_.valid()):
         (owner_.valid()&&properties_.valid()&&terrain_.valid()&&scriptEffects_.valid()&&debris_.valid()&&
          timeShards_.valid()&&timeChanges_.valid()&&entries_.valid()&&drones_.valid()&&bones_.valid()&&layers_.valid()));}
     unsigned pendingSpatialIndex()const{return owner_.pendingSpatialIndex();}
@@ -1376,6 +1379,7 @@ public:
         if(!world_&&!world.bindConsumptionParticles(consumption_))return check(false);
         if(!world_&&!world.bindRunControllers(controllers_))return check(false);
         if(!world_&&!world.bindResultInstance(result_))return check(false);
+        if(!world_&&!world.bindLevelNumbers(levelNumbers_))return check(false);
         if(!world_&&!world.bindDebrisInstances(debris_))return check(false);
         if(!world_&&!world.bindTimeChangeInstances(timeChanges_))return check(false);
         if(!world_&&!world.bindTimeShardInstances(timeShards_))return check(false);
@@ -1724,7 +1728,7 @@ public:
             const auto* result=self.result_.find(self.result_.handle());
             if(!result||!result->active||result->destroyRequested)return self.check(false);
             RunnerStepSnapshot<5> phase;
-            if(!self.check(self.visitRegistered(View::runControllerBase,View::capacity,
+            if(!self.check(self.visitRegistered(View::runControllerBase,View::levelNumberBase,
                 [&](InstanceHandle h,int object,std::uint32_t flags){
                     return self.resolves(h)&&((flags&0x100003u)||phase.append(h.slot,h.generation,object));
                 })))return false;
@@ -1779,6 +1783,7 @@ public:
                     kind==View::Kind::consumptionBlood?self.consumption_.advanceAlarm(local,alarm):
                     kind==View::Kind::runController?self.world_->advanceControllerRoomAlarm(local,alarm):
                     kind==View::Kind::currency?self.world_->advanceCurrencyRoomAlarm(local,alarm):
+                    kind==View::Kind::levelNumber?self.levelNumbers_.advanceAlarm(local,alarm):
                     kind==View::Kind::entryDither&&self.entries_.advanceAlarm(local,alarm);
             },reused,&self.combatAlarmMask_,boxes
 #ifndef DOWNWELL_REFERENCE_ENEMY_ALARM_ROSTER
@@ -2181,6 +2186,7 @@ public:
     GameplayWorld::RegisteredCorpse& registeredCorpses(){return corpses_;}
     GameplayWorld::ConsumptionParticles& consumptionParticles(){return consumption_;}
     GameplayWorld::RunControllers& runControllers(){return controllers_;}
+    GameplayWorld::LevelNumbers& levelNumbers(){return levelNumbers_;}
     bool requestMomentDelay(){
         if(!valid()||!world_)return check(false);
         return check(world_->requestMomentDelay([&](auto apply){
@@ -3027,6 +3033,7 @@ private:
                 case View::Kind::skeleton:return record.skeleton&&skeletons_.retire(local);
                 case View::Kind::blood:return record.blood&&blood_.retire(local);
                 case View::Kind::corpseExpiry:return record.corpseExpiry&&expiry_.retire(local);
+                case View::Kind::levelNumber:return record.levelNumber&&levelNumbers_.retire(local);
                 case View::Kind::smoke:return record.smoke&&smoke_.retire(local);
                 case View::Kind::corpse:return record.corpse&&corpses_.retire(local);
                 case View::Kind::consumptionBlood:return record.consumptionBlood&&consumption_.retire(local);

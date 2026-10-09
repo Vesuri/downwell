@@ -56,9 +56,14 @@ motion untouched. Clear the borrowed registry before room teardown.
 state, externally supplied source IDs, positioned birth, activation, deferred
 destruction and retirement. It deliberately has no pool-wide Step/Draw pass:
 the world must supply mixed alarm/layer visits. Inactive actors retain alarms
-and letter offsets. Native room-owner registration and scheduler binding remain
-unconnected, as do localized text, active-font measurement and real surface
-text operations for natural callers.
+and letter offsets. The native room owner registers its resource-backed identity
+and source ID, includes it in the mixed alarm capture, and retires marked actors
+at Draw cleanup. Gameplay room retirement and Retry clear its nonpersistent
+lifetimes while retaining the owner binding. The three ownership modes exercise
+the same 142-tick three-character lifetime and later-slot alarm countdowns.
+Natural source-ID allocation, localized text, active-font measurement and
+surface-text Draw dispatch remain unconnected; explicit test births do not
+admit the natural level-begin/death caller.
 
 ## Result-room population and persistent alarms
 
