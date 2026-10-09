@@ -14,6 +14,14 @@ namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_
 #include "core/CurrencyHomingMath.h"
 #include "core/TerrainWallContacts.h"
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
+struct NativeCorpseStepProbe {
+    int area();int restInPieces();
+    bool create(int,downwell::MotionBinary64,downwell::MotionBinary64);
+};
+bool nativeCorpseStep(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle shared,
+    bool stopped,int roomWidth,NativeCorpseStepProbe& events){
+    return owner.stepCorpse(shared,stopped,roomWidth,events);
+}
 struct NativeCurrencyAudioProbe {
     bool isPlaying(int,bool&);bool stop(int);bool play(int,int,bool,int&);
     bool getGain(int,downwell::MotionBinary64&);bool setGain(int,downwell::MotionBinary64,int);
@@ -1366,6 +1374,37 @@ int main(){
         },&nextId);
         for(unsigned tick=0;tick<8;++tick){world->step(0);assert(world->effectsSucceeded()&&owner->valid());}
         assert(corpses.find(key)&&corpses.find(key)->state.active&&corpses.find(key)->state.alarms.get(0)==172);
+        struct CorpseEnvironment {
+            int area(){return 1;}int restInPieces(){return 0;}
+            bool create(int,MotionBinary64,MotionBinary64){assert(false);return false;}
+        } environment;
+        auto phase=std::make_unique<RunnerStepSnapshot<GameplayCollisionView::capacity>>();
+        const auto before=corpses.find(key)->state;
+        unsigned selected=0;
+        assert(owner->dispatchStepPhase(0,*phase,[&](InstanceHandle actor,const PackedObjectEvent& event){
+            GameplayCollisionView::Kind kind;InstanceHandle local;assert(GameplayCollisionView::decode(actor,kind,local));
+            if(kind!=GameplayCollisionView::Kind::corpse)return true;
+            PackedObjectEvent original;assert(objects.findEvent(263,3,0,original)&&event.codeId==original.codeId);
+            ++selected;return owner->stepCorpse(actor,true,480,environment);
+        })&&selected==1);
+        const auto& frozen=corpses.find(key)->state;
+        assert(frozen.x.bits==before.x.bits&&frozen.y.bits==before.y.bits&&
+            frozen.xx.high==before.xx.high&&frozen.xx.low==before.xx.low&&
+            frozen.alarms.get(0)==173&&frozen.alarms.get(1)==before.alarms.get(1)+1);
+        // Resume uses the same registered solid queries and publishes Y then X.
+        assert(owner->stepCorpse(shared,false,480,environment));
+        const auto* moving=corpses.find(key);
+        assert(moving&&moving->x.bits==moving->state.x.bits&&moving->y.bits==moving->state.y.bits&&
+            (moving->state.xx.high!=before.xx.high||moving->state.xx.low!=before.xx.low));
+        std::int32_t fieldX,fieldY;
+        assert(moving->x.promoted().roundPixel(fieldX)&&moving->y.promoted().roundPixel(fieldY)&&
+            world->createTimeFieldWithSourceId(205190,fieldX,fieldY));
+        const auto inside=moving->state;
+        assert(owner->stepCorpse(shared,true,480,environment));
+        const auto& allowed=corpses.find(key)->state;
+        assert(allowed.alarms.get(0)==inside.alarms.get(0)&&
+            (allowed.xx.high!=inside.xx.high||allowed.xx.low!=inside.xx.low));
+        assert(owner->advanceCorpseAlarm(key,0)); // Account for the frozen Step's compensation.
         for(unsigned tick=8;tick<180;++tick)for(unsigned alarm=0;alarm<4;++alarm)assert(owner->advanceCorpseAlarm(key,alarm));
         const auto* corpse=corpses.find(key);
         assert(corpse&&corpse->destroyRequested&&corpse->state.myExplosion==205188&&nextId==205189);

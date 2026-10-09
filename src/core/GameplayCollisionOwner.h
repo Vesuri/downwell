@@ -2514,6 +2514,18 @@ public:
         if(!valid()||!world_||!View::decode(shared,kind,local)||kind!=View::Kind::smoke||!resolves(shared))return check(false);
         return check(world_->stepSmokeRoomEffect(local));
     }
+    // Entry from the captured mixed Step phase, never a corpse-family sweep.
+    // The caller supplies live player time-stop state and synchronous RIP
+    // child creation; missing child behavior must fail, not discard births.
+    template<class Environment> bool stepCorpse(InstanceHandle shared,bool playerStopped,int roomWidth,
+        Environment& environment){
+        View::Kind kind;InstanceHandle local;
+        if(!valid()||!world_||!corpseMasks_||!View::decode(shared,kind,local)||
+           kind!=View::Kind::corpse||!resolves(shared))return check(false);
+        return check(corpses_.dispatchPublished(local,[&](auto& state,auto& publish,bool& okay){
+            return state.stepInWorld(playerStopped,roomWidth,publish,environment,okay);
+        }));
+    }
     bool currencyTimeAllowed(InstanceHandle local,bool stopped,int width,const SpriteMaskPack& masks,bool& allowed){
         const auto* child=currency_.find(local);
         if(!valid()||!world_||!child)return check(false);
