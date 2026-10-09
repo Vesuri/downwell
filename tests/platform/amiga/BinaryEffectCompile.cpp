@@ -1,6 +1,14 @@
 #include "core/BinaryEffectSurface.h"
 #include "core/InstanceStore.h"
 #include "core/MomentDelay.h"
+#include "core/RunControllerInstances.h"
+bool compileControllerLifetime(downwell::RunControllerInstances<4>& owner,unsigned id,
+    bool (*initialize)(downwell::InstanceHandle),downwell::InstanceHandle& key){
+    return owner.create(id,{}, {},initialize,key);
+}
+bool compileControllerAlarm(downwell::RunControllerInstances<4>& owner,downwell::InstanceHandle key,int& speed){
+    return owner.advanceAlarm(key,0,speed);
+}
 bool compileMomentDelay(int& speed,downwell::InstanceRecord& controller){
     return downwell::MomentDelay::request(speed,[&](auto apply){return apply(controller);});
 }

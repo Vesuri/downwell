@@ -70,6 +70,13 @@ public:
         };
         return b;
     }
+    template<class Owner> static RecordLifecycleBinding bindPositionedLifetime(Owner& owner){
+        auto b=bind(owner);
+        b.birthAt_=[](void* p,InstanceHandle h,const Record& r,RunnerImageValue x,RunnerImageValue y){
+            return static_cast<Owner*>(p)->birthAt(h,r,x,y);
+        };
+        return b;
+    }
     template<class Owner> static RecordLifecycleBinding bindSpriteChanges(Owner& owner) {
         auto b=bindMovement(owner);
         b.sprite_=[](void* p,InstanceHandle h,const Record& r,int sprite){

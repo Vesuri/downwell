@@ -527,6 +527,13 @@ test: verify-damage-number-worlds
 .PHONY: verify-damage-number-worlds
 test: verify-enemy-death-worlds
 .PHONY: verify-enemy-death-worlds
+test: verify-run-controller-instances
+.PHONY: verify-run-controller-instances
+verify-run-controller-instances: build/run-controller-instances-test
+	./build/run-controller-instances-test
+build/run-controller-instances-test: tests/core/RunControllerInstancesTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ $<
 verify-enemy-death-worlds: build/enemy-death-worlds-test generate-room-pack generate-object-pack generate-sprite-pack generate-precise-masks
 	python3 tools/verify-enemy-death.py
 	./build/enemy-death-worlds-test
