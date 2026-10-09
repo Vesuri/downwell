@@ -1198,6 +1198,17 @@ hooks, including sprite assignment's animation/collision consequences.
 `verify-dead-body-creation` pins the VM script and checks scalar branch
 boundaries, synchronous caller mutations and terminal callback failures.
 
+`GameplayCollisionOwner::stepRegisteredSkeleton` binds the shared published
+Step to registered bone throws, enemy-death bookkeeping/title, blood, smoke,
+flash, currency, sound, corpse and debris. It passes the live publisher into
+corpse creation so caller fields are not copied. The shared Step alone owns
+effect order, final destruction and post-destruction setters. Every child uses
+the enclosing supplied numeric-ID stream; bone allocation happens inside its
+Create callback, after coordinate validation. Required tile queries, currency
+queries, language/font state, stop state, settings and audio are explicit
+dependencies. This is a selected-event adapter, not an independent family walk
+or a substitute for complete room startup and mixed scheduler admission.
+
 `CorpseBirth` supplies inherited object-90 defaults and object-263 Create,
 including the three initial random draws and terrain-dependent relocation.
 Its wall adapter queries parent 57; its tile adapter queries layer 100. The

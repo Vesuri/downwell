@@ -2187,6 +2187,54 @@ public:
            !resolves(shared))return check(false);
         return check(world_->stepSkeletonRoomEffect(local,stopped,playerX,playerY,makeEffects));
     }
+    // Complete registered skeleton Step composition. The enclosing room owns
+    // the numeric-ID stream, tile queries, settings and audio device; missing
+    // dependencies are failures, never successful placeholder effects.
+    template<unsigned Capacity,class Allocate,class Tile,class CurrencyQueries,class Audio>
+    bool stepRegisteredSkeleton(InstanceHandle shared,const TimeStopEffects<Capacity>& stop,
+        bool cutGunshot,Allocate allocate,Tile tile,CurrencyQueries& currencyQueries,
+        const LevelNumberTextContext& text,SoundPlayEnvironment& environment,Audio& audio){
+        View::Kind kind;InstanceHandle local;MotionBinary64 px,py;
+        if(!valid()||!world_||!stop.succeeded||!View::decode(shared,kind,local)||
+           kind!=View::Kind::skeleton||!resolves(shared)||
+           !ContactCoordinates::playerGlobals(world_->player().frameStartXFixed(),
+               world_->player().frameStartYFixed(),240,176,px,py))return check(false);
+        return check(world_->stepSkeletonRoomEffectPublished(local,stop.player.stopped,px,py,
+            [&](auto& actor,auto& throwing,auto& publish){
+                struct Effects {
+                    GameplayCollisionOwner& owner;GameplayWorld& world;SkeletonActor& actor;
+                    RegisteredSkeletonThrow& throwing;decltype(publish)& publication;
+                    const TimeStopEffects<Capacity>& stop;bool cut;
+                    Allocate& allocate;Tile& tile;CurrencyQueries& queries;
+                    const LevelNumberTextContext& text;SoundPlayEnvironment& environment;Audio& audio;
+                    bool next(unsigned& id){std::uint32_t source=0;
+                        if(!allocate(source)||!source||source>0x7fffffffu)return false;
+                        id=source;return true;
+                    }
+                    bool hurtSound(int sound){return world.playSkeletonSound(actor,sound,environment,audio);}
+                    bool throwBone(int){return world.throwSkeletonBoneAllocated(actor,throwing,allocate,environment,audio);}
+                    bool enemyDeath(){return owner.recordSkeletonDeath(actor,cut,stop,
+                        [&](unsigned& id){return next(id);},text,environment,audio);}
+                    bool blood(int count,int spread){return count==10&&spread==3&&
+                        world.emitSkeletonBlood(actor,[&](unsigned& id){return next(id);});}
+                    bool smoke(MotionBinary64,MotionBinary64,int count,int spread){return count==5&&spread==1&&
+                        world.emitSkeletonSmoke(actor,[&](unsigned& id){return next(id);});}
+                    bool flash(MotionBinary64,MotionBinary64,int count,int spread,int radius){return count==6&&spread==2&&radius==10&&
+                        world.emitSkeletonFlash(actor,[&](unsigned& id){return next(id);});}
+                    bool currency(int amount){return amount==actor.money&&
+                        world.emitSkeletonCurrency(owner.objects_,actor,allocate,queries);}
+                    bool deathSound(int sound){return world.playSkeletonSound(actor,sound,environment,audio);}
+                    bool deadBody(int sprite,MotionBinary64 impact,int explosion){return sprite==206&&explosion==102&&
+                        world.emitSkeletonCorpse(publication,impact,allocate,tile);}
+                    bool debris(int x,int y){std::uint32_t id=0;InstanceHandle child;
+                        return allocate(id)&&world.spawnDebrisWithSourceId(id,MotionBinary64::fromInteger(x),
+                            MotionBinary64::fromInteger(y),world.runStage().area,child);
+                    }
+                };
+                return Effects{*this,*world_,actor,throwing,publish,stop,cutGunshot,allocate,tile,currencyQueries,
+                    text,environment,audio};
+            }));
+    }
     // Called for a selected ordinary Step event, never as a separate family
     // walk. Preserve the shared handle until the resource owner resolves it.
     template<class Frames> bool stepBone(InstanceHandle shared,bool stopped,Frames frames){

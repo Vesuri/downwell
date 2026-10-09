@@ -53,6 +53,12 @@ bool nativeSkeletonReward(GameplayWorld& world,const downwell::ObjectPack& objec
 struct NativeSkeletonCorpseTiles {
     bool operator()(downwell::InstanceHandle,int,downwell::MotionBinary64,downwell::MotionBinary64,bool&);
 };
+bool nativeCompleteSkeletonStep(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle key,
+    const downwell::TimeStopEffects<64>& stop,bool (*allocate)(std::uint32_t&),NativeSkeletonCorpseTiles tile,
+    NativeSkeletonRewardQueries& queries,const downwell::LevelNumberTextContext& text,
+    downwell::SoundPlayEnvironment& environment,NativeSkeletonAudio& audio){
+    return owner.stepRegisteredSkeleton(key,stop,true,allocate,tile,queries,text,environment,audio);
+}
 bool nativeSkeletonCorpse(GameplayWorld& world,GameplayWorld::Skeletons::Publisher& publish,
     downwell::MotionBinary64 impact,bool (*allocate)(std::uint32_t&),NativeSkeletonCorpseTiles tile){
     return world.emitSkeletonCorpse(publish,impact,allocate,tile);

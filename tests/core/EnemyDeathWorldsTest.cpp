@@ -128,6 +128,67 @@ int main(){
     assert(sprites.valid()&&masks.valid());
     const auto fontData=load("generated/downwell-fonts.dwfn");downwell::FontPack fonts(fontData.data(),fontData.size());
     assert(fonts.valid());
+    for(auto mode:{downwell::GameplayCollisionOwner::Ownership::reference,
+                  downwell::GameplayCollisionOwner::Ownership::native,
+                  downwell::GameplayCollisionOwner::Ownership::nativeScenery})for(unsigned failure=0;failure<=19;++failure){
+        using namespace downwell;
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),owner->breakableBinding(),
+            owner->playerBinding(),mode==GameplayCollisionOwner::Ownership::reference?&owner->terrain():nullptr);
+        assert(owner->attach(*world)&&owner->configureCorpseMasks(masks));
+        auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
+        if(mode!=GameplayCollisionOwner::Ownership::reference)assert(world->bindNativeTerrain(*terrain));
+        int speed=60;InstanceHandle controller,skeleton,shared;
+        assert(world->bindControllerRoomSpeed(speed)&&owner->runControllers().create(105500,{}, {},
+            [](InstanceHandle){return true;},controller));
+        assert(world->createSkeletonWithSourceId(105501,240,200,skeleton));
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::skeleton,skeleton,shared));
+        assert(owner->skeletons().dispatch(skeleton,[](auto& actor,auto&,bool&){
+            actor.health=0;actor.money=14;actor.takenImpact=MotionBinary64::fromInteger(2);return true;
+        }));
+        struct Audio {
+            std::vector<int> played;
+            bool isPlaying(int,bool& playing){playing=false;return true;}
+            bool stop(int){return true;}
+            bool play(int id,int,bool,int& voice){played.push_back(id);voice=1000+id;return true;}
+            bool getGain(int,MotionBinary64& gain){gain=MotionBinary64::fromInteger(1);return true;}
+            bool setGain(int,MotionBinary64,int){return true;}
+            bool setPitch(int,MotionBinary64){return true;}
+        } audio;
+        struct Queries {
+            bool wall(InstanceHandle,MotionBinary64,MotionBinary64,bool& hit){hit=false;return true;}
+            bool tile(InstanceHandle,int layer,MotionBinary64,MotionBinary64,bool& hit){assert(layer==100);hit=false;return true;}
+        } queries;
+        const char* language="english";unsigned font=2;bool hard=false;
+        LevelNumberTextContext text{fonts,area_titles::entries,area_titles::count,language,font,hard};
+        TimeStopEffects<4> stop;SoundPlayEnvironment environment;std::uint32_t next=106000;unsigned allocations=0;
+        const bool complete=owner->stepRegisteredSkeleton(shared,stop,true,[&](std::uint32_t& id){
+            ++allocations;if(allocations==failure)return false;id=next++;return true;},
+            [&](auto key,int layer,auto x,auto y,bool& hit){return queries.tile(key,layer,x,y,hit);},
+            queries,text,environment,audio);
+        assert(complete==!failure);
+        if(failure){
+            assert(allocations==failure&&!world->effectsSucceeded()&&!owner->valid());
+            const auto* retained=owner->skeletons().find(skeleton);
+            assert(retained&&!retained->destroyRequested&&retained->state.takenImpact.high==0x40000000u);
+            assert(!owner->stepRegisteredSkeleton(shared,stop,true,
+                [&](std::uint32_t&){std::abort();return false;},
+                [&](auto key,int layer,auto x,auto y,bool& hit){return queries.tile(key,layer,x,y,hit);},
+                queries,text,environment,audio));
+            continue;
+        }
+        assert(allocations==19);
+        const auto* record=owner->skeletons().find(skeleton);assert(record&&record->destroyRequested);
+        assert(record->state.myFx>=106001&&record->state.reward.myGem>record->state.myFx&&
+            record->state.myDeadBody>record->state.reward.myGem&&!record->state.takenImpact.high);
+        assert(world->enemiesDefeated()==1&&!world->noKillAchievement()&&speed==30);
+        assert(owner->levelNumbers().size()==1&&owner->currency().size()==3&&
+            owner->registeredCorpses().size()==1&&owner->debris().size()==2);
+        assert(owner->registeredSmoke().size()>=4&&owner->registeredFlash().size()>=4);
+        assert((audio.played==std::vector<int>{194,132}));
+        assert(next==record->state.myDeadBody+3&&owner->prepareDraw()&&!owner->skeletons().find(skeleton));
+    }
     for(unsigned failure:{0u,1u,2u})for(bool native:{false,true}){
         if(!native&&failure==1)continue; // Explicit allocator failure is native-only.
         using namespace downwell;

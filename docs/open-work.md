@@ -174,6 +174,9 @@ behavior, both backend integrations and relevant original-game verification.
 - Complete natural skeleton and owned-bone integration in shared gameplay:
   source-ordered births and animation/alarm/Step/collision/End Step scheduling,
   player/bullet damage, rewards, capacity failure and out-of-view retirement.
+  Admit native `stepRegisteredSkeleton` in the complete mixed scheduler with
+  the room creation stream and real tile/audio/settings dependencies; provide
+  the stored world's equivalent complete registered-effects composition.
 
 ### D. Verify natural encounters
 

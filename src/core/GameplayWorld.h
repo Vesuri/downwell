@@ -717,9 +717,14 @@ public:
     }
     template<class MakeEffects> bool stepSkeletonRoomEffect(downwell::InstanceHandle key,bool stopped,
         downwell::MotionBinary64 playerX,downwell::MotionBinary64 playerY,MakeEffects makeEffects){
+        return stepSkeletonRoomEffectPublished(key,stopped,playerX,playerY,
+            [&](auto& actor,auto& throwing,auto&){return makeEffects(actor,throwing);});
+    }
+    template<class MakeEffects> bool stepSkeletonRoomEffectPublished(downwell::InstanceHandle key,bool stopped,
+        downwell::MotionBinary64 playerX,downwell::MotionBinary64 playerY,MakeEffects makeEffects){
         if(!run_.effectsSucceeded||!skeletons_||!skeletons_->valid())return run_.effectsSucceeded=false;
         const bool ok=skeletons_->dispatchPublished(key,[&](auto& actor,auto& throwing,auto& publish,bool& good){
-            auto effects=makeEffects(actor,throwing);
+            auto effects=makeEffects(actor,throwing,publish);
             return actor.stepPublished(stopped,playerX,playerY,publish,effects,good);
         });
         return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
@@ -756,10 +761,15 @@ public:
     }
     template<class Audio> bool throwSkeletonBoneWithSourceId(unsigned id,downwell::SkeletonActor& actor,
         downwell::RegisteredSkeletonThrow& caller,downwell::SoundPlayEnvironment& environment,Audio& audio){
+        return throwSkeletonBoneAllocated(actor,caller,[id](std::uint32_t& source){source=id;return true;},environment,audio);
+    }
+    template<class Allocate,class Audio> bool throwSkeletonBoneAllocated(downwell::SkeletonActor& actor,
+        downwell::RegisteredSkeletonThrow& caller,Allocate allocate,downwell::SoundPlayEnvironment& environment,Audio& audio){
         if(!bones_||!bones_->valid())return run_.effectsSucceeded=false;
         return caller.runAimed(actor.x,actor.y,actor.shot,run_.effectsSucceeded,
             [&](int x,int y,downwell::InstanceHandle& key){
-                if(!createBoneWithSourceId(id,x,y,key))return false;
+                std::uint32_t id=0;
+                if(!allocate(id)||!id||id>0x7fffffffu||!createBoneWithSourceId(id,x,y,key))return false;
                 caller.myBoneSourceId=id;return true;
             },[&](downwell::InstanceHandle key,auto event){return bones_->dispatch(key,event);},enemyRandom_,
             [&](int sound){return playSkeletonSound(actor,sound,environment,audio);},
