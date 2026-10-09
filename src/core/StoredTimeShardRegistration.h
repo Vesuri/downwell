@@ -81,6 +81,7 @@ public:
         r->imageSpeed=stored(effect.imageSpeed);
         if(!lifecycle_.imageIndex(e->key,*r,effect.imageIndex))return fail();
         r->imageIndex=stored(effect.imageIndex);
+        r->timeShardFlash=effect.dflash;r->timeShardInitialized=true;
         r->alarms.set(0,effect.alarm0);r->alarms.set(1,effect.alarm1);r->alarms.set(2,effect.alarm2);
         return true;
     }
@@ -176,6 +177,7 @@ public:
         // event's final x/y setters. Storage survives until event cleanup.
         if(!lifecycle_.integerPosition(e->key,*r,x,y))return fail();
         r->x=x;r->y=y;r->preciseX=stored(effect.x);r->preciseY=stored(effect.y);
+        r->timeShardFlash=effect.dflash;
         r->imageSpeed=stored(effect.imageSpeed);
         r->alarms.set(0,effect.alarm0);r->alarms.set(1,effect.alarm1);r->alarms.set(2,effect.alarm2);
         return true;

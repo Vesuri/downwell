@@ -187,6 +187,12 @@ Normal gameplay contributes white pixels to the shaded controller surface;
 death/low-spec mode emits a direct actor at that layer position instead.
 Currency hardware promotion is disabled while registered shards remain, so
 their combined surface cannot be split into incompatible compositing paths.
+The stored SDL world retains the shard's published `dflash` with its instance
+record alongside the existing position/index fields. Create and Step publish
+it; Draw does not borrow the scoped Step callback or inspect unpublished private
+effect state. Uninitialized shard presentation fails explicitly. The state
+digest includes this field only for initialized shards, retaining existing
+checkpoints for scenes without them.
 
 `prepareWithLateEffects` additionally accepts source-ordered surface producers
 between smoke and controller publication, before shade subtraction. The caller

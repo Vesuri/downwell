@@ -1,4 +1,5 @@
 #include "Game.h"
+#include "TimeShardDraw.h"
 #include "EntryDitherPlacement.h"
 #include "WallDrawLookup.h"
 #include "WallPresentation.h"
@@ -270,6 +271,13 @@ void Game::render(Renderer& renderer) const {
 }
 
 void Game::renderMain(Renderer& renderer) const {
+    const auto shardPresentation=[](const InstanceRecord& record){
+        TimeShardDraw::State state;
+        std::memcpy(&state.x.bits,&record.preciseX,4);std::memcpy(&state.y.bits,&record.preciseY,4);
+        std::memcpy(&state.imageIndex.bits,&record.imageIndex,4);
+        state.dflash=record.timeShardFlash;state.destroyRequested=record.destroyRequested;
+        return state;
+    };
     const InstanceRecord* player = startup_.instance(100855);
     if (player == nullptr)
         return;
@@ -294,6 +302,8 @@ void Game::renderMain(Renderer& renderer) const {
         }, startup_.smokeEffects(), *effectAssets_, view, settings, [&](auto emit) {
             return startup_.visitDebrisDraw([&](const DebrisAnimation& effect){
                 return DebrisDraw::surface(effect,*effectAssets_,view,emit);
+            })&&startup_.visitTimeShardDraw([&](const InstanceRecord& record){
+                return TimeShardDraw::surface(shardPresentation(record),*effectAssets_,view,emit);
             });
         }, [&](auto emit) {
             return startup_.visitEntryDitherDraw([&](InstanceHandle,const InstanceRecord& record,int depth){
@@ -476,6 +486,16 @@ void Game::renderMain(Renderer& renderer) const {
         if(!instance.active||instance.destroyRequested)return true;
         if(depth < -1000){drawUnregisteredBullets();if(!drawForeground())return false;}
         if(instance.objectId==35){drawPlayer();return true;}
+        if(instance.objectId==238){
+            if(!instance.timeShardInitialized)return false;
+            if(composite)return true;
+            const auto state=shardPresentation(instance);TimeShardDraw::Command command;unsigned frame;
+            if(!TimeShardDraw::prepare(state,{},true,false,false,command))return false;
+            if(command.placement.target==EffectSurfacePlacement::hidden)return true;
+            if(!DebrisDraw::frame(91,command.imageIndex,frame))return false;
+            renderer.drawSpriteTransformed(91,frame,instance.preciseX-viewX,instance.preciseY-viewY,1,1,0);
+            return true;
+        }
         if(instance.objectId==370){
             if(composite)return true;
             const auto* effect=startup_.debrisForDraw(key,instance);

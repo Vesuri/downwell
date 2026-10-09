@@ -452,6 +452,24 @@ int main() {
         debris.get(2)->flash=1;RecordingRenderer hidden;scene->render(hidden);
         require(std::find(hidden.spriteOrder.begin(),hidden.spriteOrder.end(),91)==hidden.spriteOrder.end(),"flashing debris omitted");
         require(debris.clear(registration),"retire registered rendering fixtures before updating");
+        {
+            auto registration=world.timeShardRegistration<1>();downwell::TimeShardEffects<1> shards;
+            downwell::GameMakerRandom random(2);
+            require(shards.bindPhases(registration)&&shards.create(n(248),n(128),false,random),"register SDL shard presentation");
+            auto* shard=shards.get(1);const auto id=shards.sourceId(1);
+            for(int flash:{-1,0,1})for(unsigned frame=0;frame<6;++frame){
+                shard->dflash=flash;require(shard->imageIndex.assignInteger(frame),"shard frame");
+                require(registration.publishAnimation(1,id,*shard)&&registration.publishStep(1,id,*shard),"publish shard Draw fields");
+                const auto digest=world.stateDigest();RecordingRenderer drawn;drawn.recordTransforms=true;scene->render(drawn);
+                unsigned seen=0;for(const auto& item:drawn.transforms)if(item.sprite==91){
+                    require(item.frame==frame&&item.x==110+248-world.mainCameraRenderViewX()&&
+                        item.y==128-world.mainCameraRenderViewY(),"SDL shard frame and position");++seen;
+                }
+                require(scene->renderingSucceeded()&&seen==unsigned(flash<=0)&&world.stateDigest()==digest,
+                    "SDL shard GameMaker flash truth and read-only rendering");
+            }
+            require(shards.clear(),"retire SDL shard before ordinary updates");
+        }
         scene->update({});scene->update({});RecordingRenderer retired;scene->render(retired);
         require(scene->simulationSucceeded()&&scene->renderingSucceeded()&&
             std::find(retired.spriteOrder.begin(),retired.spriteOrder.end(),602)==retired.spriteOrder.end()&&
@@ -846,6 +864,23 @@ int main() {
         debris.get(1)->flash=0;RecordingRenderer returned;effectGame.render(returned);
         require(effectGame.renderingSucceeded()&&returned.effectWords==particle.effectWords,"debris reappears after flash gate");
         require(debris.clear(registration),"retire composited debris fixture");
+        {
+            auto registration=runtime.timeShardRegistration<1>();downwell::TimeShardEffects<1> shards;
+            downwell::GameMakerRandom random(2);
+            require(shards.bindPhases(registration)&&shards.create(x,y,false,random),"register composited shard");
+            auto* shard=shards.get(1);const auto id=shards.sourceId(1);
+            shard->imageIndex={};require(registration.publishAnimation(1,id,*shard),"publish shard frame");
+            RecordingRenderer drawn;effectGame.render(drawn);
+            require(effectGame.renderingSucceeded()&&drawn.effectWords&&
+                std::find(drawn.spriteOrder.begin(),drawn.spriteOrder.end(),91)==drawn.spriteOrder.end(),
+                "SDL shard contributes to effect surface only");
+            shard->dflash=1;RecordingRenderer unpublished;effectGame.render(unpublished);
+            require(unpublished.effectWords==drawn.effectWords,"Draw reads published fields, not borrowed effect state");
+            require(registration.publishStep(1,id,*shard),"publish shard flash");
+            RecordingRenderer hidden;effectGame.render(hidden);
+            require(effectGame.renderingSucceeded()&&!hidden.effectWords,"published flash hides surface shard");
+            require(shards.clear(),"retire composited shard");
+        }
         RecordingRenderer retired;effectGame.render(retired);
         require(effectGame.renderingSucceeded()&&!retired.effectWords,"retirement clears retained effect coverage");
         require(runtime.emitSmokeBurst(x,y) && runtime.emitFlashBurst(x,y),"live world emits overlapping effect owners");

@@ -7,12 +7,16 @@ namespace downwell {
 // Sprite 91 is also used by debris, including the same bitmap frame decoder.
 struct TimeShardDraw {
     using Command=EffectSpriteDraw::Command;
-    static bool prepare(const TimeShardAnimation& effect,const EffectSurfacePlacement::View& view,
+    struct State {
+        RunnerImageValue x{},y{},imageIndex{};
+        int dflash=-1;bool destroyRequested=false;
+    };
+    template<class Effect> static bool prepare(const Effect& effect,const EffectSurfacePlacement::View& view,
         bool death,bool lowSpec,bool surfaceExists,Command& out){
         return EffectSpriteDraw::prepare(!effect.destroyRequested&&effect.dflash<=0,91,effect.imageIndex,
             effect.x.promoted(),effect.y.promoted(),{0x3f800000u},view,death,lowSpec,surfaceExists,out);
     }
-    template<class Emit> static bool surface(const TimeShardAnimation& effect,const EffectMaskAssets& assets,
+    template<class Effect,class Emit> static bool surface(const Effect& effect,const EffectMaskAssets& assets,
         const EffectSurfacePlacement::View& view,Emit emit){
         Command command;unsigned frame;EffectMaskAssets::Asset asset;
         if(!prepare(effect,view,false,false,true,command))return false;

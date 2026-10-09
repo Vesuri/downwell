@@ -41,6 +41,8 @@ struct InstanceRecord {
     unsigned char enemyImageRemainder = 0;
     bool enemyImageInitialized = false;
     bool enemyStepEligible = false; // Set only by this tick's ordinary-Step dispatch.
+    bool timeShardInitialized = false;
+    int timeShardFlash = -1; // Object-238 dflash, retained for Draw after scoped Step.
     std::int32_t spriteId = -1;
     std::int32_t maskId = -1;
     std::int32_t creationCodeId = -1;

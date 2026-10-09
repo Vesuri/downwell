@@ -944,6 +944,12 @@ public:
             const auto* effect=debrisForDraw(key,record);return effect&&visit(*effect);
         });
     }
+    template<class Visit> bool visitTimeShardDraw(Visit visit)const{
+        return visitDrawChecked([&](InstanceHandle,const InstanceRecord& record){
+            if(record.objectId!=238||!record.active||record.destroyRequested)return true;
+            return record.timeShardInitialized&&visit(record);
+        });
+    }
     // drawOnSurface does not use scrInView: the sprite can overlap the view
     // even with its origin outside it. Preserve the source layer traversal,
     // including depth-setter overrides; the renderer resolves transforms.

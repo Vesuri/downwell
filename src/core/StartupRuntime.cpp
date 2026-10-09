@@ -3025,6 +3025,7 @@ std::uint64_t StartupRuntime::stateDigest() const {
         digest.addI32(instance.auxiliaryState);
         // The dynamic variable is absent until a wind event assigns it.
         if(instance.windSound>=0){digest.addU32(0x57494e44u);digest.addI32(instance.windSound);}
+        if(instance.timeShardInitialized){digest.addU32(0x53485244u);digest.addI32(instance.timeShardFlash);}
         if (instance.objectId == 116) {
             digest.addBool(instance.batActivity.initialized);
             digest.addBool(instance.batActivity.flying);
