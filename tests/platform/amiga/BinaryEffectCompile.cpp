@@ -10,6 +10,9 @@
 #include "core/LevelNumberInstances.h"
 #include "core/LevelNumberText.h"
 #include "core/FontPack.h"
+#include "core/FontGlyphMasks.h"
+bool compileTitleGlyph(const downwell::FontGlyphMasks& bank,unsigned font,unsigned character,unsigned color,
+    downwell::EffectMaskAssets::Asset& asset,bool& ink){return bank.resolve(font,character,color,asset,ink);}
 bool compileLevelTitleMetrics(const downwell::FontPack& fonts,unsigned font,unsigned length,
     bool (*read)(unsigned,unsigned&),std::int32_t& width){return fonts.stringWidth(font,length,read,width);}
 bool compileLocalizedLevelNumber(downwell::LevelNumberText<64>& text,downwell::LevelNumber<64>& state,

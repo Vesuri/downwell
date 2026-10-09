@@ -530,9 +530,11 @@ test: verify-level-number
 .PHONY: verify-level-number
 verify-level-number: build/level-number-test
 	./build/level-number-test
+generated/downwell-title-glyphs.h: tools/generate-title-glyphs.py extracted/utmt-0.9.2.0/manifest.json $(wildcard extracted/utmt-0.9.2.0/TexturePages/*.png)
+	python3 tools/generate-title-glyphs.py
 generated/downwell-area-titles.h: tools/generate-area-titles.py data/language.ini
 	python3 tools/generate-area-titles.py
-build/level-number-test: tests/core/LevelNumberTest.cpp src/core/FontPack.cpp generated/downwell-area-titles.h generated/downwell-fonts.dwfn $(wildcard src/core/*.h)
+build/level-number-test: tests/core/LevelNumberTest.cpp src/core/FontPack.cpp generated/downwell-area-titles.h generated/downwell-title-glyphs.h generated/downwell-fonts.dwfn $(wildcard src/core/*.h)
 	@mkdir -p build
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ $< src/core/FontPack.cpp
 .PHONY: verify-enemy-death-worlds

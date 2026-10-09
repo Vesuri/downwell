@@ -2,6 +2,8 @@
 #include "core/LevelNumberInstances.h"
 #include "core/FontPack.h"
 #include "../../generated/downwell-area-titles.h"
+#include "../../generated/downwell-title-glyphs.h"
+#include "core/PaletteEffectSurface.h"
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
@@ -9,6 +11,55 @@
 #include <fstream>
 #include <iterator>
 using namespace downwell;
+static void glyphMasks(){
+    std::ifstream file("generated/downwell-fonts.dwfn",std::ios::binary);
+    std::vector<std::uint8_t> bytes((std::istreambuf_iterator<char>(file)),{});
+    FontPack fonts(bytes.data(),bytes.size());PackedFont font;assert(fonts.font(2,font));
+    assert(font.glyphCount==sizeof(title_glyphs::glyphs)/sizeof(title_glyphs::glyphs[0]));
+    for(unsigned i=0;i<font.glyphCount;++i){
+        PackedGlyph glyph;assert(fonts.glyph(font.firstGlyph+i,glyph));
+        EffectMaskAssets::Asset black,white;bool ink=false;
+        assert(title_glyphs::bank.resolve(2,glyph.character,0,black,ink));
+        assert(ink==(glyph.sourceWidth>0&&glyph.sourceHeight>0));
+        if(!ink)continue;
+        assert(title_glyphs::bank.resolve(2,glyph.character,0xffffff,white,ink)&&ink);
+        assert(black.mask.width==unsigned(glyph.sourceWidth)&&black.mask.height==unsigned(glyph.sourceHeight));
+        assert(black.originX==-glyph.offset&&black.originY==0);
+        assert(black.mask.data==white.mask.data&&black.low==black.mask.data&&black.high==black.mask.data);
+        assert(white.low==white.mask.data&&white.high==title_glyphs::zero);
+        for(unsigned b=0;b<white.mask.bytes;++b)assert(!white.high[b]);
+    }
+    EffectMaskAssets::Asset asset;bool ink;
+    assert(!title_glyphs::bank.resolve(0,'A',0xffffff,asset,ink));
+    assert(!title_glyphs::bank.resolve(2,'A',0xff0000,asset,ink));
+    PackedGlyph fallback;const bool hasFallback=fonts.findGlyph(font,0x25af,fallback);
+    assert(title_glyphs::bank.resolve(2,0x10ffff,0xffffff,asset,ink));
+    assert(ink==(hasFallback&&fallback.sourceWidth>0&&fallback.sourceHeight>0));
+    // Paint a black border then white glyph at a non-word-aligned origin.
+    // Compare coverage/colors against a separate per-pixel reference, including
+    // opaque black ink (which must never erase alpha).
+    PaletteEffectSurface<64,32> surface;
+    unsigned char pixels[64*32]={};
+    const int dx[]={1,-1,0,0,0},dy[]={0,0,1,-1,0};
+    for(unsigned pass=0;pass<5;++pass){
+        assert(title_glyphs::bank.resolve(2,'A',pass==4?0xffffff:0,asset,ink)&&ink);
+        const int x=15+dx[pass]-asset.originX,y=7+dy[pass];
+        PaletteEffectSurface<64,32>::Asset stamp{
+            {asset.mask.data,asset.mask.bytes,asset.mask.width,asset.mask.height,asset.mask.stride},asset.low,asset.high};
+        assert(surface.add(stamp,x,y));
+        for(unsigned sy=0;sy<asset.mask.height;++sy)for(unsigned sx=0;sx<asset.mask.width;++sx)
+            if(asset.mask.data[sy*asset.mask.stride+sx/8]&(0x80>>(sx%8))){
+                const int px=x+int(sx),py=y+int(sy);
+                if(px>=0&&px<64&&py>=0&&py<32)pixels[py*64+px]=pass==4?1:3;
+            }
+    }
+    unsigned char actual[64*32]={};
+    surface.visit([&](unsigned x,unsigned y,std::uint16_t alpha,std::uint16_t low,std::uint16_t high){
+        for(unsigned b=0;b<16;++b)if(alpha&(0x8000>>b))
+            actual[y*64+x+b]=((low>>(15-b))&1)|(((high>>(15-b))&1)<<1);
+    });
+    for(unsigned i=0;i<64*32;++i)assert(actual[i]==pixels[i]);
+}
 struct Draw {
     bool surface=true;unsigned views=0,ends=0,failCharacter=0;
     std::vector<int> tokens,xs,ys;
@@ -42,6 +93,7 @@ struct Lifetime {
     bool retire(InstanceHandle,const Numbers::Record&){++retired;return true;}
 };
 int main(){
+    glyphMasks();
     std::ifstream fontFile("generated/downwell-fonts.dwfn",std::ios::binary);
     const std::vector<unsigned char> fontBytes{std::istreambuf_iterator<char>(fontFile),{}};
     FontPack fonts(fontBytes.data(),fontBytes.size());assert(fonts.valid());

@@ -98,6 +98,18 @@ Invalid font measurement retains the published child but fails the cue before
 firstLand/audio. This adapter is tested with both world owners, not yet installed
 at the natural enemy-death/first-landing call sites.
 
+`generate-title-glyphs.py` prepares all 412 glyphs from font resource 2 as
+word-padded, MSB-first alpha masks (8,180 mask bytes, plus descriptors and a
+shared zero plane). It verifies every covered atlas texel is white and alpha is
+binary, then checks all packed pixels and padding. The generated manifest pins
+the extraction manifest, atlas, source build, generator version/hash and output.
+`FontGlyphMasks` borrows this immutable ordinary-memory bank; white uses mask/zero
+color planes and opaque black aliases both planes to the mask. Glyph bearings
+are retained; missing glyphs use U+25AF and then no ink. Other font resources and
+colors are rejected, not thresholded or substituted. This is raw glyph art, not
+a complete draw_text adapter: live alignment/alpha, coordinate rasterization and
+the title's surface binding still need integration.
+
 ### Original title-width measurement
 
 Read-only inspection of the pinned Windows executable identifies string_width
