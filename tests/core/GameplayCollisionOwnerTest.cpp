@@ -1486,6 +1486,30 @@ int main(){
         SpriteMaskPack absent(nullptr,0);bool sentinel=true;
         assert(!collision->playerTimeFieldMeeting({},{},absent,sentinel)&&sentinel&&!collision->valid());
     }
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                  GameplayCollisionOwner::Ownership::nativeScenery}){
+        const auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
+        auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},&rooms,mode);
+        auto scene=std::make_unique<GameplayWorld>(300,true,0,true,collision->enemyBinding(),
+            collision->breakableBinding(),collision->playerBinding(),&collision->terrain(),&rooms);
+        assert(collision->attach(*scene));const auto draws=scene->randomDrawCount();
+        assert(scene->createTimeFieldWithSourceId(210001,240,176)&&scene->randomDrawCount()==draws+1);
+        InstancePlaceResult result;
+        assert(collision->playerTimeFieldInstance({0x43700000u},{0x43300000u},masks,result)&&result.id==210001&&
+            result.x.high==MotionBinary64::fromInteger(240).high&&result.y.high==MotionBinary64::fromInteger(176).high);
+        unsigned transitions=0;
+        assert(scene->withPlayerTimeTransition([&](const auto& player,const auto&,int x,int y){
+            ++transitions;RunnerImageValue px,py;bool hit=false;
+            return px.assignInteger(player.x)&&py.assignInteger(player.y)&&
+                collision->playerTimeFieldMeeting(MotionBinary64::fromInteger(x),MotionBinary64::fromInteger(y),masks,hit)&&hit&&
+                collision->playerTimeFieldInstance(px,py,masks,result)&&result.id==210001;
+        },[&]{scene->step(0);return scene->effectsSucceeded();})&&transitions==1);
+        assert(collision->playerTimeFieldInstance({0x43700000u},{0x461c4000u},masks,result)&&result.id==-4);
+        assert(scene->createGeneratedInstance({82,240,1000},objects,[](const auto&){return true;}));
+        result.id=123;
+        assert(!collision->playerTimeFieldInstance({0x43700000u},{0x447a0000u},masks,result)&&result.id==123&&!collision->valid());
+    }
     {
         std::vector<std::uint32_t> expected;
         const auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());

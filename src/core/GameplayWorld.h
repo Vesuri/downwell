@@ -1347,6 +1347,10 @@ public:
     const downwell::ShopWorld& shops() const { return run_.shops; }
     bool registerSideCameraLocker(int x, int y) { return run_.sideCameraLockers.create(x, y); }
     const downwell::OrdinaryTimeFields<64>& timeFields() const {return run_.timeFields;}
+    bool createTimeFieldWithSourceId(std::uint32_t source,int x,int y){
+        if(!run_.effectsSucceeded)return false;
+        return run_.effectsSucceeded=run_.timeFields.createWithSourceId(source,x,y,enemyRandom_);
+    }
     bool bindTimeFieldLifecycle(downwell::OrdinaryTimeFields<64>::Binding binding){
         if(!run_.effectsSucceeded)return false;
         run_.effectsSucceeded=run_.timeFields.bindLifecycle(binding);return run_.effectsSucceeded;

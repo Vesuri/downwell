@@ -15,9 +15,10 @@ int main(){
         OrdinaryTimeFields<2>* fields=nullptr;GameMakerRandom* random=nullptr;
         unsigned births=0,retires=0,failBirth=0,failRetire=0;
         std::uint32_t drawsAtBirth=0;
+        std::uint32_t sourceAtBirth=0;
         bool birth(InstanceHandle h,const OrdinaryTimeField& r){
             assert(fields->find(h.generation)==&r&&fields->identityAt(h.slot)==h.generation&&r.radius.mantissa==0);
-            drawsAtBirth=random->drawCount();return ++births!=failBirth;
+            sourceAtBirth=r.sourceId;drawsAtBirth=random->drawCount();return ++births!=failBirth;
         }
         bool retire(InstanceHandle h,const OrdinaryTimeField& r){
             assert(fields->find(h.generation)==&r);return ++retires!=failRetire;
@@ -25,6 +26,21 @@ int main(){
         bool activation(InstanceHandle,const OrdinaryTimeField&,bool){return true;}
         bool membership(InstanceHandle,const OrdinaryTimeField&,bool){return true;}
     };
+    for(bool reject:{false,true}){
+        OrdinaryTimeFields<2> fields;GameMakerRandom random(42);Audit audit{&fields,&random};
+        audit.failBirth=reject?1:0;
+        assert(fields.bindLifecycle(OrdinaryTimeFields<2>::Binding::bind(audit)));
+        assert(fields.createWithSourceId(210001,240,512,random)==!reject);
+        assert(audit.sourceAtBirth==210001&&audit.drawsAtBirth==0&&fields.at(0)->sourceId==210001&&
+            random.drawCount()==unsigned(!reject));
+        const auto draws=random.drawCount();
+        assert(!fields.createWithSourceId(210001,241,512,random)&&fields.size()==1&&audit.births==1&&
+            random.drawCount()==draws&&!fields.valid());
+    }
+    for(auto invalid:{0u,0x80000000u}){
+        OrdinaryTimeFields<2> fields;GameMakerRandom random(42);
+        assert(!fields.createWithSourceId(invalid,240,512,random)&&!fields.size()&&!random.drawCount()&&!fields.valid());
+    }
     {
         OrdinaryTimeFields<2> fields;GameMakerRandom random(42);Audit audit{&fields,&random};
         assert(fields.bindLifecycle(OrdinaryTimeFields<2>::Binding::bind(audit)));

@@ -17,11 +17,21 @@ their effects, or audio to the native Begin Step scheduler.
 `RegisteredFieldContact`: a generation-safe internal handle and copied
 published coordinates, or an empty result on a miss. Overlapping-field tests
 cover first eligible selection, activation exclusion and clearing a prior hit.
-This is deliberately not `InstancePlaceResult`: native field records still
-lack the source-style global numeric instance IDs. Passing a slot/generation
-as the VM-visible `field` value would be incorrect. The numeric-ID allocation
-and synchronous cross-family creation-order work remains necessary before
-feeding this selection into live `scrTimeShard` caller state.
+This internal result is deliberately separate from `InstancePlaceResult`.
+`playerTimeFieldInstance` resolves the selected typed lifetime to its supplied
+source ID and returns that ID with copied published coordinates. A miss returns
+the VM sentinel -4. A selected legacy field with no source ID fails without
+overwriting the output; passing a slot/generation as `field` is never allowed.
+Ordinary fields admit `createTimeFieldWithSourceId`: the source ID is stored
+and registered before the synchronous radius RNG draw. Zero, out-of-domain
+and duplicate same-family IDs are rejected without consuming that draw.
+Registration failures retain the already-published birth prefix. Existing
+unnumbered callers remain suitable only for boolean/internal-handle queries.
+The supplied-ID path does not supply the missing global numeric allocator or
+complete synchronous cross-family creation order. Those remain necessary for
+automatic natural `scrTimeShard` calls. Reference/native/native-scenery tests
+exercise the numeric query inside the actual player Begin Step transition,
+as well as miss and missing-ID behavior.
 
 Both native ownership modes use the shared `RunnerPlaceQuery` for this
 selection, rather than returning the first overlap from a family-local scan.

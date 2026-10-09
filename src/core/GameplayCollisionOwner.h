@@ -706,6 +706,7 @@ private:
             unsigned sourceId=0;
             if constexpr(Kind==View::Kind::terrain)sourceId=r.sourceInstanceId;
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
+            if constexpr(Kind==View::Kind::timeField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
             if constexpr(Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::builder||Kind==View::Kind::goalField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency)sourceId=r.sourceId;
@@ -806,6 +807,7 @@ private:
                 }
             unsigned sourceId=0;
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
+            if constexpr(Kind==View::Kind::timeField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
             if constexpr(Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::builder||Kind==View::Kind::goalField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency)sourceId=r.sourceId;
@@ -2402,6 +2404,31 @@ public:
                 if(!state||!resolves(selected.handle))return check(false);
                 next={true,selected.handle,state->x,state->y};
             }
+        }
+        result=next;return true;
+    }
+    // scrTimeShard needs a Windows numeric identity and the selected field's
+    // published coordinates. Do not replace an unnumbered legacy birth with
+    // its internal key; the global source creation stream must supply the ID.
+    bool playerTimeFieldInstance(RunnerImageValue x,RunnerImageValue y,const SpriteMaskPack& masks,
+                                InstancePlaceResult& result){
+        RegisteredFieldContact selected;
+        if(!playerTimeFieldSelection(x.promoted(),y.promoted(),masks,selected))return false;
+        InstancePlaceResult next;
+        if(selected.found){
+            View::Kind kind;InstanceHandle local;unsigned source=0;
+            if(!View::decode(selected.handle,kind,local))return check(false);
+            if(kind==View::Kind::timeField){
+                const auto* field=world_->timeFields().find(local.generation);
+                if(!field||world_->timeFields().identityAt(local.slot)!=local.generation)return check(false);
+                source=field->sourceId;
+            }else if(kind==View::Kind::goalField){
+                const auto* field=world_->goalFieldInstances().find(local);
+                if(!field)return check(false);source=field->sourceId;
+            }else return check(false);
+            if(!source||source>0x7fffffffu)return check(false);
+            next.id=static_cast<std::int32_t>(source);next.handle=selected.handle;
+            next.x=selected.x.promoted();next.y=selected.y.promoted();
         }
         result=next;return true;
     }

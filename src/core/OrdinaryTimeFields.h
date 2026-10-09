@@ -54,6 +54,11 @@ public:
         if(!birth(x,y))return false;
         fields_[count_-1].adoptCreate(x,y,random.nextU32());return true;
     }
+    bool createWithSourceId(std::uint32_t source,int x,int y,GameMakerRandom& random){
+        if(!source||source>0x7fffffffu){good_=false;return false;}
+        if(!birth(x,y,source))return false;
+        fields_[count_-1].adoptCreate(x,y,random.nextU32());return true;
+    }
     // Equal-depth dynamic instances are inserted before existing equals by
     // runner 0x487610. The goal's boundary is the ordinary count at its birth;
     // later ordinary births therefore precede it. No coordinate sorting.
@@ -69,10 +74,13 @@ public:
         return true;
     }
 private:
-    bool birth(int x,int y){
+    bool birth(int x,int y,std::uint32_t source=0){
         if(!good_||count_==Capacity||!nextIdentity_)return false;
+        for(unsigned i=retired_;source&&i<count_;++i)
+            if(fields_[i].sourceId==source){good_=false;return false;}
         const unsigned index=count_++;const auto identity=nextIdentity_++;
         fields_[index]={};fields_[index].x=x;fields_[index].y=y;
+        fields_[index].sourceId=source;
         if(!binding_.birth({index,identity},fields_[index])){good_=false;return false;}
         return true;
     }

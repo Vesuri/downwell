@@ -12,6 +12,7 @@ struct OrdinaryTimeField {
     int x=0,y=0;
     HudReal radius;
     mutable std::uint32_t nativeRegistration=0; // Ordering stamp, not a VM ID.
+    std::uint32_t sourceId=0; // Zero for legacy unnumbered births, never a slot ID.
     static HudReal radiusFromWord(std::uint32_t word){
         // 24 + random(2), exact binary64: exponent 4 and a 2^-48 mantissa unit.
         return {(std::uint64_t{3}<<51)|(static_cast<std::uint64_t>(word)<<17),4};
