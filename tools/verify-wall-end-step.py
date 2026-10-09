@@ -16,6 +16,14 @@ manifest = json.loads((export / "manifest.json").read_text())
 assert manifest["source"]["sha256"] == "c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8"
 assert manifest["extractor"]["version"] == "0.9.2.0"
 assert manifest["resources"]["code"][986]["name"] == "gml_Object_objWall_n_Step_2"
+child = manifest["resources"]["objects"][379]
+assert (child["id"], child["name"], child["spriteId"], child["Depth"]) == (379, "limboShard", 91, 0)
+assert [(event["eventType"], event["eventSubtype"],
+         [action["codeId"] for action in event["actions"]]) for event in child["events"]] == [
+    (0, 0, [2769]), (3, 0, [2770]), (4, 89, [2771]), (8, 0, [2772]), (14, 0, [2773])]
+# Birth is synchronous in production. This trace fixture records the call;
+# it does not execute the child's RNG-consuming Create or claim to verify it.
+assert manifest["resources"]["code"][2769]["name"] == "gml_Object_limboShard_Create_0"
 code, labels = [], {}
 for line in (export / "Assembly/gml_Object_objWall_n_Step_2.asm").read_text().splitlines():
     line = line.strip()

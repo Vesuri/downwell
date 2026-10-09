@@ -1256,7 +1256,7 @@ surrounded wall is marked during that event; only the following event adds
 background 739 (source 48,48; size 16,16; position x-8,y-8; depth 100), requests
 destruction and then, when requested, deactivation. Destruction must remain an
 engine request during the callback: the VM continues executing the event.
-Area-five out-of-view runs before either branch. Area-four flower choice and
+Area-five out-of-view runs before either branch. Area-four limboShard choice and
 area-zero repeated frame writes preserve the VM's order and RNG calls.
 
 The handler is not installed in either production scheduler yet. It requires
@@ -1273,7 +1273,7 @@ scheduler-selected terrain handle. It runs the same portable handler against
 resource-backed shape/point queries, publishes image-index writes through
 collision ownership, and retains the record through destruction/deactivation.
 Checked binary64 additions form room-coordinate query/tile/child positions.
-Tile publication, flower Create and area-five out-of-view policy are explicit
+Tile publication, limboShard Create and area-five out-of-view policy are explicit
 external callbacks; no generic successful stubs are installed. Inactive or
 destroy-requested records are skipped and subtype 99's empty override is honored.
 An event failure latches terrain/owner validity without undoing its prefix.
@@ -1281,7 +1281,14 @@ Real-resource 3-by-3 wall fixtures check the first-event surrounded state, the
 second-event retained tile at `(x-8,y-8)`, deferred destruction, unchanged cavern
 RNG, failure before destruction, and tile survival after ordered cleanup.
 This is per-event integration, not a claim that production frame dispatch,
-area-four flowers, area-five retirement or global creation order is complete.
+area-four limboShards, area-five retirement or global creation order is complete.
+
+The area-four child is object 379 `limboShard` (sprite 91, depth 0), not a
+decorative flower. Its synchronous Create 2769 consumes `irandom_range`,
+seven-way `choose`, `random_range`, two more `choose` calls and `random(7)` in
+that order. Step 2770 uses time-stop state and solid queries; Collision 2771
+targets parentPBullet (89); Draw 2772 has a flash guard. A callback which only
+records its birth does not reproduce these effects or the following RNG state.
 
 `StoredWorldCollision` has the corresponding one-handle adapter for
 `StartupRuntime`, sharing the portable event handler and resource queries.

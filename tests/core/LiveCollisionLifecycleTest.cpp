@@ -1935,7 +1935,7 @@ int main(){
         require(count==9,"room provides nine ordinary walls");
         struct Effects {
             bool outOfView(InstanceHandle){require(false,"unexpected cavern out-of-view callback");return false;}
-            bool create(int,MotionBinary64,MotionBinary64){require(false,"unexpected cavern flower creation");return false;}
+            bool create(int,MotionBinary64,MotionBinary64){require(false,"unexpected cavern limboShard creation");return false;}
         } effects;
         const auto draws=world->randomDrawCount();
         for(auto h:handles)require(owner->wallEndStepEvent(*world,h,1,effects),"stored wall first event");

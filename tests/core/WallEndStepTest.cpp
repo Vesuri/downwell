@@ -16,7 +16,7 @@ static InstanceHandle prepare(Native& owner,int pillar){
     const auto h=owner.handle(0);assert(owner.createProperties(h,51)&&owner.roomCreation(h));return h;
 }
 struct Ops {
-    unsigned neighbors=0,diagonals=0,places=0,points=0,flowers=0,tiles=0,destroys=0,deactivations=0;
+    unsigned neighbors=0,diagonals=0,places=0,points=0,shards=0,tiles=0,destroys=0,deactivations=0;
     unsigned fail=0,calls=0;
     std::vector<int> trace;
     Native* native=nullptr;InstanceHandle handle{};
@@ -45,7 +45,7 @@ struct Ops {
     }
     bool destroy(){++destroys;return call(5);}
     bool deactivate(){++deactivations;return call(6);}
-    bool create(int object,int dx,int dy){assert(object==379&&dx==0&&dy==-16);++flowers;return call(7);}
+    bool create(int object,int dx,int dy){assert(object==379&&dx==0&&dy==-16);++shards;return call(7);}
 };
 int main(int argc,char** argv){
     {
@@ -100,14 +100,14 @@ int main(int argc,char** argv){
         const bool enclosed=raw==15&&diagonals==15;
         const bool choice=area==4&&(raw==0||raw==2||raw==6||raw==8||raw==10||raw==12||raw==14);
         const int choiceIndex=choice?int(oracle.chooseIndexSmall(3)):-1;
-        const bool flower=choiceIndex==2;
+        const bool shard=choiceIndex==2;
         const int final=area==0?((raw==0||raw==2||raw==8||raw==10||raw==14)?14:
             (raw==6||raw==12?raw:15)):raw;
         assert(wallEndStep(state,area,random,ops));
         assert(state.checked==1&&state.neighbors==raw&&state.imageIndex==final&&state.checkThing==60&&
             state.surrounded==enclosed&&state.lights==(raw==15?(15u^diagonals):0)&&
             state.checkDistance==(raw==15?16:0)&&ops.places==4&&ops.points==(raw==15?4u:0u)&&
-            ops.flowers==unsigned(flower)&&!ops.tiles&&!ops.destroys);
+            ops.shards==unsigned(shard)&&!ops.tiles&&!ops.destroys);
         assert(random.drawCount()==oracle.drawCount()&&random.stateIndex()==oracle.stateIndex());
         for(unsigned i=0;i<16;++i)assert(random.stateWord(i)==oracle.stateWord(i));
         Native native;const auto h=prepare(native,pillar);

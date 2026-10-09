@@ -1965,15 +1965,15 @@ int main(){
             assert(owner->attach(*world)&&(!native||world->bindNativeTerrain(*terrain)));
             std::vector<int> actual;
             struct Effects {
-                std::vector<int>& values;bool reject;
+                GameplayWorld& world;std::vector<int>& values;bool reject;
                 bool position(int kind,MotionBinary64 x,MotionBinary64 y){
                     std::int32_t px,py;assert(x.roundPixel(px)&&y.roundPixel(py));
                     values.insert(values.end(),{kind,px,py});return true;
                 }
-                bool tile(MotionBinary64 x,MotionBinary64 y){return position(739,x,y)&&!reject;}
+                bool tile(MotionBinary64 x,MotionBinary64 y){return position(739,x,y)&&!reject&&world.addWallBackground(x,y);}
                 bool create(int object,MotionBinary64 x,MotionBinary64 y){assert(object==379);return position(object,x,y);}
                 bool outOfView(InstanceHandle h){values.insert(values.end(),{5,int(h.slot)});return true;}
-            } effects{actual,rejectTile};
+            } effects{*world,actual,rejectTile};
             GameMakerRandom random(123);
             for(int y=0;y<3;++y)for(int x=0;x<3;++x){
                 const unsigned i=unsigned(y*3+x);
@@ -1989,6 +1989,16 @@ int main(){
                 actual.insert(actual.end(),{int(ok),s.checked,s.pillar,s.neighbors,s.imageIndex,s.checkThing,
                     s.checkDistance,int(s.surrounded),int(s.deactivate),int(s.lights),int(random.drawCount())});
                 if(!ok){assert(rejectTile&&pass==1&&i==4);break;}
+            }
+            assert(world->wallBackgroundTiles().size()==(rejectTile?0u:1u));
+            if(!rejectTile){
+                std::int32_t x,y;const auto* tile=world->wallBackgroundTiles().at(0);
+                assert(tile->x.roundPixel(x)&&tile->y.roundPixel(y)&&x==248&&y==520);
+                // The tile outlives its source wall. Draw-entry cleanup must
+                // consume the native destruction mark, not erase the patch.
+                assert(owner->prepareDraw());
+                assert((native?terrain->size():owner->terrain().size())==8);
+                assert(world->wallBackgroundTiles().size()==1);
             }
             if(!native)expected=actual;else assert(actual==expected);
         }

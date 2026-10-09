@@ -2522,7 +2522,7 @@ public:
         active=room_.active(h.slot);return true;
     }
     // Dispatch a scheduler-selected wall, not a terrain-only phase. Effects
-    // owns tile publication, synchronous flower Create and area-five lifetime
+    // owns tile publication, synchronous limboShard Create and area-five lifetime
     // policy; none may physically retire this record during the callback.
     template<class Effects> bool wallEndStepEvent(InstanceHandle local,int area,GameMakerRandom& random,
         const SpriteMaskPack& masks,Effects& effects){
