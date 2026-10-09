@@ -273,6 +273,8 @@ public:
     void clearNoDamageAchievement(){run_.noDamage=false;}
     void clearAreaNoDamageAchievement(){run_.areaNoDamage=false;}
     bool playerDamaged()const{return run_.playerDamaged;}
+    bool playerDeathActive()const{return mainDeath_.active;}
+    bool playerHealthPositive()const{return mainPlayerHealth_>0;}
     void setPlayerDamaged(){run_.playerDamaged=true;}
     unsigned playerHit()const{return run_.playerHit;}
     void setPlayerHit(){run_.setPlayerHit();}

@@ -160,8 +160,18 @@ Source assembly SHA256: player Begin Step
 `scrPlayerGlobalStat`
 `34dfd0f192ca34217da36cdfd001b792a3e7d496d3fc8c3e9967f8ce7ff2266a`.
 
-Registered player damage uses shared `RunSession::playerDamaged`. Player
-creation and run reset clear it. Object 35 Alarm 1 clears it at its mixed alarm
+Registered player damage uses shared `RunSession::playerDamaged`.
+
+Death gates read the world's separately published death state, not `HP<=0` or
+external damage callbacks. The later hit-effect gate re-reads current HP after
+forced jump and screen shake. Thus a lethal hit before the next death
+publication still plays damage audio and shakes, but omits the surviving-HP
+effect; an already-dead player skips health subtraction, audio and shake while
+the script's unguarded tail still runs. Both adapters use their shared player
+death sequence's published flag. Tests deliberately supply conflicting
+external death/health answers for live, lethal and already-dead contacts.
+This does not establish complete original player Begin Step fidelity.
+Player creation and run reset clear the damaged flag. Object 35 Alarm 1 clears it at its mixed alarm
 position; zero and negative starting counters do not fire. The stored adapter
 uses the real record alarm bank. Native player ownership retains a compact
 Alarm 1 counter, captures the player alongside the other implemented alarm

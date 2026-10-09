@@ -1704,7 +1704,7 @@ int main(){
         auto damageBinding=bindContactDamagePlayer(damageCaller,*world,[&](InstanceHandle& selected){
             assert(world->playerDamaged());++selections;selected=world->playerHandle();return true;
         });
-        TimeoutDamageEvents damageEvents;damageEvents.timeout=false;damageEvents.immune=true;
+        DamageLiveStateEvents damageEvents;damageEvents.timeout=false;damageEvents.immune=true;
         const auto one=MotionBinary64::fromInteger(1);
         auto noBirth=[](std::uint32_t&){return false;};
         assert(world->typicalPlayerDamage(damageBinding,one,one,one,damageEvents,noBirth)&&world->playerDamaged());
@@ -1787,7 +1787,7 @@ int main(){
         inventory.levels[7]=inventory.levels[17]=upgraded?1:0;
         ContactDamageScripts caller;
         auto bound=bindContactDamagePlayer(caller,*world,[&](InstanceHandle& h){h=world->playerHandle();return true;});
-        struct Events:TimeoutDamageEvents {
+        struct Events:DamageLiveStateEvents {
             bool candle=false,failJump=false;bool candleOwned(){return candle;}
             bool setVertical(Number value){vy=value;return !failJump;}
             bool lengthdirX(Number,Number,Number&){return false;}
@@ -1809,6 +1809,25 @@ int main(){
         assert(world->timeFields().size()==fields+unsigned(upgraded)&&world->randomDrawCount()==draws+unsigned(upgraded));
         if(upgraded){const auto* field=world->timeFields().at(fields);
             assert(field&&field->sourceId==910000&&field->x==240&&field->y==40100);}
+    }
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                   GameplayCollisionOwner::Ownership::nativeScenery})for(unsigned scenario=0;scenario<3;++scenario){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));
+        if(scenario==2){assert(world->subtractPlayerHealth(MotionBinary64::fromInteger(4)));world->step(0);}
+        assert(world->playerDeathActive()==(scenario==2));
+        ContactDamageScripts caller;DamageLiveStateEvents events;events.timeout=false;events.deadAnswer=scenario!=2;
+        auto bound=bindContactDamagePlayer(caller,*world,[&](InstanceHandle& h){h=world->playerHandle();return true;});
+        const auto one=MotionBinary64::fromInteger(1);
+        assert(world->typicalPlayerDamage(bound,MotionBinary64::fromInteger(scenario==1?4:1),one,one,events,
+            [](std::uint32_t&){return false;}));
+        assert(world->health()==(scenario==0?3:0)&&world->playerDeathActive()==(scenario==2)&&
+            events.sounds==unsigned(scenario!=2)&&events.ducks==unsigned(scenario!=2)&&
+            events.shakes==unsigned(scenario!=2)&&events.hits==unsigned(scenario==0));
+        assert(world->playerDamaged()&&!world->noDamageAchievement()&&!world->areaNoDamageAchievement());
     }
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
                    GameplayCollisionOwner::Ownership::nativeScenery})for(unsigned reject:{0u,1u,2u,3u}){

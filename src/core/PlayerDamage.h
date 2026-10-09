@@ -10,6 +10,8 @@ namespace downwell {
 template<class World,class SelectPlayer> struct RegisteredPlayerDamageState {
     World& world;SelectPlayer selectPlayer;
     bool playerDamaged()const{return world.playerDamaged();}
+    bool playerDead()const{return world.playerDeathActive();}
+    bool playerHealthPositive()const{return world.playerHealthPositive();}
     void setPlayerDamaged(){world.setPlayerDamaged();}
     void setHit(){world.setPlayerHit();}
     bool candleOwned()const{return world.upgrades().levels[7]!=0;}
@@ -75,7 +77,7 @@ struct PlayerDamage {
         MotionBinary64 amount,Events& events,State& state,Audio& audio){
         if(!events.setDamageSourceName())return false;
         hitInvulnerability=state.candleOwned()?240:90;
-        if(!events.playerDead() && !state.playerDamaged()){
+        if(!state.playerDead() && !state.playerDamaged()){
             if(!state.subtractHealth(amount))return false;
             const auto py=events.playerY(),px=events.playerX();
             const auto cy=events.callerY(),cx=events.callerX();

@@ -1866,7 +1866,7 @@ int main(){
         require(world->visitDrawChecked([&](InstanceHandle h,const InstanceRecord& r){if(r.objectId==35)player=h;return true;}),"select upgrade fixture player");
         ContactDamageScripts caller;
         auto bound=bindContactDamagePlayer(caller,*world,[&](InstanceHandle& h){h=player;return true;});
-        struct Events:TimeoutDamageEvents {
+        struct Events:DamageLiveStateEvents {
             bool candle=false,failJump=false;bool candleOwned(){return candle;}
             bool setVertical(Number value){vy=value;return !failJump;}
             bool lengthdirX(Number,Number,Number&){return false;}
@@ -1876,7 +1876,9 @@ int main(){
         const auto one=MotionBinary64::fromInteger(1);
         const auto fields=world->timeFields().size();const auto draws=world->randomDrawCount();
         require(world->noDamageAchievement()&&world->areaNoDamageAchievement(),"player creation sets damage achievements");
-        require(world->typicalPlayerDamage(bound,one,one,one,events)==!failJump,"registered upgrade-aware damage");
+        int roomSpeed=60;
+        require(world->withMomentDelayRoomSpeed(roomSpeed,[&]{return world->typicalPlayerDamage(bound,one,one,one,events);})==!failJump,
+            "registered upgrade-aware damage");
         require(events.vx.high==one.high&&events.vx.low==one.low,"registered lengthdir bypasses external approximation");
         require(world->noDamageAchievement()==failJump&&world->areaNoDamageAchievement()==failJump&&!events.clears,
             "achievement writes belong to the run and occur only after synchronous damage effects");
@@ -1887,6 +1889,25 @@ int main(){
             "Candle and Timeout use inventory, not conflicting external callbacks");
         require(world->timeFields().size()==fields+unsigned(upgraded)&&world->randomDrawCount()==draws+unsigned(upgraded),
             "only the unstopped Timeout iteration creates a registered field and consumes its Create RNG");
+    }
+    for(unsigned scenario=0;scenario<3;++scenario){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach real death/health damage gates");world->skipToGameForTesting();
+        if(scenario==2){require(world->subtractPlayerHealth(MotionBinary64::fromInteger(4)),"deplete preexisting health");world->step({},false);}
+        require(world->playerDeathActive()==(scenario==2),"death publication is a player phase, not an HP alias");
+        InstanceHandle player;
+        require(world->visitDrawChecked([&](InstanceHandle h,const InstanceRecord& r){if(r.objectId==35)player=h;return true;}),"resolve death gate player");
+        ContactDamageScripts caller;DamageLiveStateEvents events;events.timeout=false;events.deadAnswer=scenario!=2;
+        auto bound=bindContactDamagePlayer(caller,*world,[&](InstanceHandle& h){h=player;return true;});
+        const auto one=MotionBinary64::fromInteger(1);int speed=60;
+        require(world->withMomentDelayRoomSpeed(speed,[&]{return world->typicalPlayerDamage(bound,
+            MotionBinary64::fromInteger(scenario==1?4:1),one,one,events);}),"source live/depleted/dead damage branches");
+        require(world->mainPlayerHealth()==(scenario==0?3:0)&&world->playerDeathActive()==(scenario==2)&&
+            events.sounds==unsigned(scenario!=2)&&events.ducks==unsigned(scenario!=2)&&
+            events.shakes==unsigned(scenario!=2)&&events.hits==unsigned(scenario==0),"separate death and surviving HP gates");
+        require(world->playerDamaged()&&!world->noDamageAchievement()&&!world->areaNoDamageAchievement(),
+            "already-dead damage still completes unguarded tail writes");
     }
     for(int alarm:{-1,0,1,2}){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
@@ -1900,9 +1921,10 @@ int main(){
             require(world->playerDamaged(),"selector runs after damaged flag write");
             ++selections;selected=player;return true;
         });
-        TimeoutDamageEvents events;events.timeout=false;events.immune=true;
+        DamageLiveStateEvents events;events.timeout=false;events.immune=true;
         const auto one=MotionBinary64::fromInteger(1);
-        require(world->typicalPlayerDamage(bound,one,one,one,events)&&world->playerDamaged()&&
+        int roomSpeed=60;
+        require(world->withMomentDelayRoomSpeed(roomSpeed,[&]{return world->typicalPlayerDamage(bound,one,one,one,events);})&&world->playerDamaged()&&
             world->resolveInstance(player)->alarms.get(1)==90&&events.alarm==-1&&events.clears==0&&
             !world->noDamageAchievement()&&!world->areaNoDamageAchievement(),
             "source damage writes actual player state, not stale external immunity");

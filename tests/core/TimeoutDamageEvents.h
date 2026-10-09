@@ -66,4 +66,22 @@ struct DamageControllerFailureEvents:DamageSoundFailureEvents {
     }
     bool duckMusic(int,Number){return true;}
 };
+// Explicit test effects for exercising real world state. These are not a
+// backend implementation. Deliberately stale death/health answers must be
+// ignored by the registered binding; effects still validate source arguments.
+struct DamageLiveStateEvents:TimeoutDamageEvents {
+    unsigned sounds=0,ducks=0,shakes=0,hits=0;
+    bool deadAnswer=true;
+    bool playerDead(){return deadAnswer;}
+    bool sound(int id,int priority,bool loop,bool cut){
+        ++sounds;return id==5&&priority==90&&!loop&&!cut;
+    }
+    bool duckMusic(int ms,Number amount){
+        ++ducks;return ms==500&&amount.high==0x3fe66666u&&amount.low==0x66666666u;
+    }
+    bool shake(int force,int duration){++shakes;return force==5&&duration==8;}
+    bool hitEffect(Number,Number,int sprite,Number speed,int angle,int depth){
+        ++hits;return sprite==114&&speed.high==0x3fd99999u&&speed.low==0x9999999au&&angle==0&&depth==-100000;
+    }
+};
 #endif

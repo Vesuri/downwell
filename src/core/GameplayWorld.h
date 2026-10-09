@@ -1418,6 +1418,8 @@ public:
     }
     downwell::InstanceHandle playerHandle() const { return {0,playerInstance_.lifetimeId}; }
     bool playerDamaged()const{return run_.playerDamaged;}
+    bool playerDeathActive()const{return death_.active;}
+    bool playerHealthPositive()const{return health_>0;}
     bool noDamageAchievement()const{return run_.noDamage;}
     bool areaNoDamageAchievement()const{return run_.areaNoDamage;}
     void clearNoDamageAchievement(){run_.noDamage=false;}
