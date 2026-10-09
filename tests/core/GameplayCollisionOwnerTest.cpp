@@ -1,4 +1,5 @@
 #include "core/GameplayCollisionOwner.h"
+#include "core/CurrencySmokeComposition.h"
 #ifndef DOWNWELL_NATIVE_QUERY_PROBE
 #include "RegisteredSkeletonThrowChecks.h"
 #include "QuietSkeletonEffects.h"
@@ -759,11 +760,35 @@ int main(){
         } noSurface;
         EffectMaskAssets emptyAssets;EffectSurfacePlacement::View emptyView{};
         auto emit=[](const EffectMaskAssets::Asset&,MotionBinary64,MotionBinary64){return true;};
-        assert(!world->visitRegisteredEffectSurfaces(emptyAssets,emptyView,emit)); // No silent missing renderer.
+        assert(world->visitRegisteredEffectSurfaces(emptyAssets,emptyView,emit)); // Titles are not conditional drawFx.
         unsigned titleDraws=0;
-        assert(world->visitRegisteredEffectSurfaces(emptyAssets,emptyView,emit,[&](auto key){
+        assert(world->visitUnconditionalSurfaceDraw([&](auto kind,auto key,auto){
+            assert(kind==GameplayWorld::DrawActor::levelNumber);
             ++titleDraws;return world->drawLevelNumber(key,noSurface);
         })&&titleDraws==1&&numbers.find(local)->state.characters[1].offset==-2);
+        struct TitleSurface {
+            unsigned glyphs=0;
+            bool exists(bool& value){value=true;return true;}
+            bool begin(){return true;}bool end(){return true;}bool color(unsigned){return true;}
+            bool view(unsigned,MotionBinary64& value){value={};return true;}
+            bool character(unsigned,MotionBinary64,MotionBinary64){++glyphs;return true;}
+        } titleSurface;
+        auto composition=std::make_unique<CurrencySmokeComposition>();
+        for(unsigned setting=0;setting<4;++setting){
+            CurrencySmokeComposition::Settings settings;
+            settings.death=setting==1;settings.lowSpec=setting==2;settings.effectsExist=setting!=3;
+            unsigned conditionalCalls=0,unconditionalCalls=0;
+            assert(composition->prepareWithSurfaceProducers([](auto){},world->smokeEffects(),emptyAssets,
+                emptyView,settings,[&](auto){++conditionalCalls;return true;},[&](auto){
+                    ++unconditionalCalls;
+                    return world->visitUnconditionalSurfaceDraw([&](auto kind,auto key,auto){
+                        return kind==GameplayWorld::DrawActor::levelNumber&&world->drawLevelNumber(key,titleSurface);
+                    });
+                },[](auto){},[](MotionBinary64 value,std::int32_t& out){return value.roundPixel(out);}));
+            assert(conditionalCalls==(setting==0?1u:0u)&&unconditionalCalls==(setting!=3?1u:0u));
+            assert(titleSurface.glyphs==5*(setting<3?setting+1:3));
+            assert(numbers.find(local)->state.characters[1].offset==(setting<3?int(setting)-1:1));
+        }
         for(unsigned tick=1;tick<=142;++tick){
             world->step(0);assert(world->effectsSucceeded()&&owner->valid()&&owner->prepareDraw());
             if(tick<142){
@@ -771,7 +796,7 @@ int main(){
                 if(tick==4)assert(state.shown==2&&state.alarms.get(0)==4);
                 if(tick==12)assert(state.alarms.get(1)==119);
                 if(tick==131)assert(state.exit==1&&state.alarms.get(2)==3);
-                assert(state.characters[1].offset==-2);
+                assert(state.characters[1].offset==1); // Alarms/Step do not change the three Draw updates above.
             }
         }
         assert(!view.contains(shared)&&!numbers.find(local)&&!numbers.size());

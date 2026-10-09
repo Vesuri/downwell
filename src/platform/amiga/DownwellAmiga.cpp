@@ -3862,7 +3862,8 @@ __attribute__((noinline)) static int runDownwell(void) {
                 (port.registeredSmoke()&&port.registeredSmoke()->size())||
                 (port.registeredCorpses()&&port.registeredCorpses()->size())||
                 (port.timeShardInstances()&&port.timeShardInstances()->size())))||
-                (actorList.entryCoverVisible&&!hardwareEntryCover);
+                (actorList.entryCoverVisible&&!hardwareEntryCover)||
+                (port.levelNumbers()&&port.levelNumbers()->size());
             if(compositeEffects){
                 DW_PROFILE_SCOPE(profileControllerComposition);
                 downwell::CurrencySmokeComposition::Settings settings;
@@ -3877,9 +3878,20 @@ __attribute__((noinline)) static int runDownwell(void) {
                 },port.smokeEffects(),effectAssets,effectView,settings,[&](auto emit){
                     return port.visitRegisteredEffectSurfaces(effectAssets,effectView,emit);
                 },[&](auto emit){
-                    if(!actorList.entryCoverVisible||hardwareEntryCover)return true;
-                    downwell::EffectMaskAssets::Asset mask;
-                    return effectAssets.entryDither(80,actorList.entryCover.y,mask)&&emit(mask,effectView.x,effectView.y);
+                    auto drawCover=[&](){
+                        if(!actorList.entryCoverVisible||hardwareEntryCover)return true;
+                        downwell::EffectMaskAssets::Asset mask;
+                        return effectAssets.entryDither(80,actorList.entryCover.y,mask)&&emit(mask,effectView.x,effectView.y);
+                    };
+                    // The collected singleton cover needs no second room walk
+                    // unless a title participates in this surface pass.
+                    if(!port.levelNumbers()||!port.levelNumbers()->size())return drawCover();
+                    return port.visitUnconditionalSurfaceDraw([&](auto kind,auto,auto){
+                        // Until the glyph binding is supplied, fail explicitly
+                        // instead of skipping title Draw and its animation.
+                        if(kind==GameplayWorld::DrawActor::levelNumber)return false;
+                        return drawCover();
+                    });
                 },[&](auto emit){
                     for(unsigned i=0;i<port.enemyCount();++i){
                         const auto& enemy=port.enemyAt(i);

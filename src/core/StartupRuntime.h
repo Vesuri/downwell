@@ -1161,6 +1161,12 @@ public:
             return visit(key,record,depth);
         });
     }
+    template<class Visit> bool visitUnconditionalSurfaceDraw(Visit visit)const{
+        return visitDrawAtDepthChecked([&](InstanceHandle key,const InstanceRecord& record,int depth){
+            if((record.objectId!=73&&record.objectId!=372)||!record.active||record.destroyRequested)return true;
+            return visit(key,record,depth);
+        });
+    }
     // Read the source player's pTimeStop at the particle's Step boundary;
     // neither goalStopped nor a shop control lock is a substitute.
     template<unsigned Registered>

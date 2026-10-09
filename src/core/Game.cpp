@@ -322,7 +322,10 @@ void Game::renderMain(Renderer& renderer) const {
                 return true;
             });
         }, [&](auto emit) {
-            return startup_.visitEntryDitherDraw([&](InstanceHandle,const InstanceRecord& record,int depth){
+            return startup_.visitUnconditionalSurfaceDraw([&](InstanceHandle,const InstanceRecord& record,int depth){
+                // A title requires its live font and mutable registered Draw
+                // binding. Never silently drop it from low-spec/death draws.
+                if(record.objectId==372)return false;
                 // Compact original-art mask only supports its verified default
                 // transform/depth and centered integer viewport placement.
                 if(depth!=-200000||record.spriteId!=129||record.scaleX!=1||record.scaleY!=1||record.rotation!=0)

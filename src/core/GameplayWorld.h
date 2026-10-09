@@ -910,17 +910,20 @@ public:
             return record&&record->effect&&visit(*record->effect);
         });
     }
-    template<class Emit> bool visitRegisteredEffectSurfaces(const downwell::EffectMaskAssets& assets,
-        const downwell::EffectSurfacePlacement::View& view,Emit emit)const{
-        return visitRegisteredEffectSurfaces(assets,view,emit,[](auto){return false;});
-    }
     template<class Ops> bool drawLevelNumber(downwell::InstanceHandle key,Ops& ops)const{
         return levelNumbers_&&levelNumbers_->draw(key,ops);
     }
-    template<class Emit,class TitleDraw> bool visitRegisteredEffectSurfaces(const downwell::EffectMaskAssets& assets,
-        const downwell::EffectSurfacePlacement::View& view,Emit emit,TitleDraw titleDraw)const{
+    // Unlike drawFx particles, these objects draw to surfaceFx even during
+    // death/low-spec rendering. Keep them in one source-ordered traversal so
+    // the entry cover follows the title. Draw may mutate title animation.
+    template<class Visit> bool visitUnconditionalSurfaceDraw(Visit visit)const{
+        return visitRoomActors([&](DrawActor kind,downwell::InstanceHandle key,auto depth){
+            return (kind!=DrawActor::levelNumber&&kind!=DrawActor::entryDither)||visit(kind,key,depth);
+        });
+    }
+    template<class Emit> bool visitRegisteredEffectSurfaces(const downwell::EffectMaskAssets& assets,
+        const downwell::EffectSurfacePlacement::View& view,Emit emit)const{
         return visitRoomActors([&](DrawActor kind,downwell::InstanceHandle key,auto){
-            if(kind==DrawActor::levelNumber)return titleDraw(key);
             if(kind==DrawActor::corpse){
                 const auto* r=registeredCorpses_?registeredCorpses_->find(key):nullptr;
                 return r&&downwell::CorpseDraw::surface(r->state,assets,view,emit);

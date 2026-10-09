@@ -69,12 +69,12 @@ lifetimes while retaining the owner binding. The three ownership modes exercise
 the same 142-tick three-character lifetime and later-slot alarm countdowns.
 Native title identities also participate in ordinary and cached actor Draw
 traversal at their compatibility creation depth (-100000), not the OBJT depth
-(0). The registered surface-producer visitor
-accepts a title Draw callback at that position and rejects a live title if no
-callback is supplied. This does not yet provide glyph painting: the Amiga direct
+(0). Both worlds expose an unconditional surface traversal that preserves title
+and entry-cover depth order separately from conditional drawFx particles. The
+compositor dispatches that pass during death/low-spec rendering, but not when
+the effect surface is absent. This does not yet provide glyph painting: the Amiga direct
 actor list explicitly rejects titles rather than treating their local handle as
-a script effect. The composition path still needs to dispatch unconditional title
-Draw when ordinary drawFx producers are disabled by death/low-spec settings.
+a script effect. Both backend surface paths reject an unbound live title.
 Natural source-ID allocation, localized text, active-font measurement and
 surface-text Draw dispatch remain unconnected; explicit test births do not
 admit the natural level-begin/death caller.
