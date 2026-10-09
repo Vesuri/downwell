@@ -11,6 +11,43 @@ source-backed frontier/phase correction and remaining region-boundary gaps.
 VM-backed registration, latch/release and collision-phase camera snaps on both
 adapters, plus the remaining original-runner and achievement caveats.
 
+## Result-room population and persistent alarms
+
+The exported `objLineToResult` Alarm 1 calls `room_goto(16)` unconditionally.
+Room 16 is `rmResult`, a nonpersistent room with one authored instance:
+`Result` (object 325), numeric ID 102522, at (80,144). Object 37
+`objControlerN` is persistent; object 325 and the exit wipe (68) are not.
+These are serialized flags, not an assumption based on visible presentation.
+`tools/verify-enemy-death.py` guards this metadata and the relevant VM events.
+
+The room Create only sets view-camera 0's size to (160, g_cameraHeight).
+Neither it nor Result Create writes `room_speed`. Result Create sets
+`pTimeStop=1`; that gameplay global is not an instruction to suspend runner
+alarms. A retained controller's pending moment-delay restoration must not be
+reinitialized or postponed merely because the upgrade screen is visible.
+Controller Create must not run again for that survivor.
+
+This is a destination-room scheduler, not the previous gameplay scheduler
+running behind a menu. Nonpersistent old-room lifetimes must leave before
+the destination's authored birth, with the persistent records retained and
+rebound through the room lifecycle. Result's alarms participate in the same
+alarm-index / resource-ID / exact-object-registration traversal described in
+[runner alarms](runner-alarms.md). In particular, Result Alarm 0 creates a
+new object 68 synchronously and then arms its own Alarm 1 to 90. A blanket
+controller-alarm pass before all Result alarms is not generally equivalent:
+for each alarm index, object 37 precedes 325, but Result Alarm 0 precedes
+controller Alarm 1. Same-phase birth eligibility remains governed by the
+runner's creation filter, not unconditional recapture after each event.
+
+The current `enterLevelClear` shortcuts do not enter rmResult through this
+room lifecycle. The stored path clears bullets and enters the shared Result
+state; the native path additionally clears goal-field and exit-controller
+owners. Other old-room records remain until the subsequent level load.
+Calling the existing combat alarm callback from `stepLevelClear` would advance
+those stale records, not repair the destination scheduler. This audit defines
+the population/order contract; it is not evidence that either shortcut already
+implements it or an original-runner execution comparison.
+
 ## Main-room controller births and numeric IDs
 
 `verify-runner-instance-ids.py` pins both the executable's GEN8-based counter

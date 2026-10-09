@@ -144,8 +144,12 @@ behavior, both backend integrations and relevant original-game verification.
   levelBeginCue creation/audio. Do not use successful placeholder callbacks.
   Admit persistent object 37 from the actual native startup Create sequence,
   including its initialization/HUD dependencies and source numeric ID. Verify
-  controller alarm scheduling during level-clear/menu updates (currently bypassed)
-  and implement its remaining fired alarm events;
+  the actual rmResult handoff: retire nonpersistent old-room lifetimes, retain
+  and rebind persistent controllers, admit authored Result 102522/object 325,
+  and schedule their alarms in one mixed destination-room phase (currently
+  bypassed). Do not run the old combat alarm pass behind the menu or batch all
+  controller alarms before Result's alarms. Implement remaining fired controller
+  events; see the [Result-room contract](original-behavior-audit.md#result-room-population-and-persistent-alarms).
   explicit registered births and alarm-0 tests are not full controller admission.
   A PAL frame scheduler must
   not replace the source room-speed global with 50.
