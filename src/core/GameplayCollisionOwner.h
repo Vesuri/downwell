@@ -334,7 +334,8 @@ private:
                     const auto* definition=objectDefaults_.get(id.object);if(!definition)return false;
                     std::uint32_t spatial;
                     if(!world_->nativeTerrainInstances()->spatialFlags(id.handle,spatial))return false;
-                    out=(definition->initialFlags&~8u)|spatial;return true;
+                    out=(definition->initialFlags&~8u)|spatial|
+                        (table_.externalRegistered(h)?0u:0x80000u);return true;
                 }
             }
             return false;
@@ -359,8 +360,9 @@ private:
     template<class Visit> bool visitNativeRegistered(unsigned first,unsigned last,Visit visit)const{
         const bool boxes=nativeBoxes_&&last>View::breakableBase&&first<View::terrainBase;
         const bool fields=nativeFields_&&last>View::timeFieldBase&&first<View::goalFieldBase;
+        auto flagsOf=[&](InstanceHandle h,std::uint32_t& flags){return eligibilityFlags(h,flags);};
         if(!boxes&&!fields)
-            return table_.visitRegistrationRange(first,last,visit);
+            return table_.visitRegistrationRange(first,last,flagsOf,visit);
         if(!world_||first>last||last>View::capacity)return false;
         unsigned box=first>View::breakableBase?first-View::breakableBase:0;
         const unsigned end=boxes?(last<View::terrainBase?last-View::breakableBase:world_->breakableSlots()):0;
@@ -393,8 +395,11 @@ private:
                 }
             }
         };
-        return table_.visitRegistrationRange(first,last,[&](InstanceHandle h,int object,std::uint32_t flags){
-            return emitBefore(table_.registrationOrder(h))&&visit(h,object,flags);
+        return table_.visitRegistrationRange(first,last,flagsOf,[&](InstanceHandle h,int object,std::uint32_t flags){
+            const auto order=h.slot>=View::terrainBase&&h.slot<View::timeFieldBase?
+                world_->nativeTerrainInstances()->registrationOrder({h.slot-View::terrainBase,h.generation}):
+                table_.registrationOrder(h);
+            return emitBefore(order)&&visit(h,object,flags);
         })&&emitBefore(0);
     }
     static bool inverseTrig(RunnerImageValue angle,RunnerImageValue& cosine,RunnerImageValue& sine){
@@ -515,6 +520,7 @@ private:
         std::uint32_t& order,std::uint32_t& flags){
         const unsigned slot=View::terrainBase+id.handle.slot;
         if(!valid()||!table_.externalBirth(slot,order)||!nativeBirthQueues(slot,id.object))return check(false);
+        if(!check(table_.registerExternalObject({slot,id.handle.generation},id.object,true)))return false;
         const auto* definition=objectDefaults_.get(id.object);const auto* objectFlags=families_.flags(unsigned(id.object));
         if(!definition||!objectFlags)return check(false);
         if(!check(room_.bind(slot,definition->creationDepth)))return false;
@@ -547,6 +553,7 @@ private:
             })))return false;
         }
         if(!check(room_.remove(slot)))return false;
+        if(!check(table_.registerExternalObject({slot,h.generation},id.object,false)))return false;
         table_.externalRetire(slot);return nativeRetireQueues(slot);
     }
     template<class Record,View::Kind Kind> struct Binding {
@@ -2286,15 +2293,14 @@ public:
         },[&](unsigned slot,bool registered){
             if(native_&&slot>=View::terrainBase&&slot<View::timeFieldBase){
                 // The identity lives in the terrain run owner, not table_.
-                // This callback publishes room membership only; no generic
-                // object-list or layer entry may be fabricated for it.
+                // Borrow registration links, never a generic instance Entry.
                 const auto h=handleAt(slot);if(!resolves(h))return false;
                 if(registered){
                     std::uint32_t order=0;
                     if(!table_.externalBirth(slot,order)||
                         !world_->rebindNativeTerrainOrder({slot-View::terrainBase,h.generation},order))return false;
                 }
-                return true;
+                return table_.registerExternalObject(h,objectOf(h),registered);
             }
             // Writes while inactive may have been consumed by an intervening
             // active-room pass. Promotion must refresh that retained snapshot.

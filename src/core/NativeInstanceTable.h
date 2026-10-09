@@ -70,6 +70,21 @@ public:
     }
     void externalRetire(unsigned slot){changedBinding(slot,false);}
     void externalFlagsChanged(unsigned slot){changedCapture(slot,false);}
+    // Run-owned lifetimes borrow only the existing registration links. The
+    // caller validates their lifetime and owns flags and chronology; no Entry
+    // is synthesized, and reactivation must publish its fresh stamp first.
+    bool externalRegistered(InstanceHandle h)const{
+        std::uint32_t generation;int object;
+        return h.generation&&registration_.read(h.slot,generation,object)&&generation==h.generation;
+    }
+    bool registerExternalObject(InstanceHandle h,int object,bool registered){
+        if(!externalOrder_||h.slot>=Capacity||!h.generation||object<0||entries_[h.slot].generation)return false;
+        if(registration_.contains(h.slot)&&!externalRegistered(h))return false;
+        if(externalRegistered(h)==registered)return true;
+        const bool okay=registered?registration_.bind(h.slot,object,h.generation):registration_.unbind(h.slot);
+        if(okay)changedCapture(h.slot,false);
+        return okay;
+    }
     std::uint32_t registrationOrder(InstanceHandle h)const{return live(h)?entries_[h.slot].order:0;}
     std::uint32_t roomOrder(InstanceHandle h)const{return live(h)?entries_[h.slot].roomOrder:0;}
     bool roomReactivated(InstanceHandle h){
@@ -105,7 +120,7 @@ public:
     }
     // Birth appends the registration, as attachObjectPrepared does.
     bool birth(InstanceHandle h,int object,std::uint32_t flags,int sprite){
-        if(h.slot>=Capacity||!h.generation||object<0||entries_[h.slot].generation||
+        if(h.slot>=Capacity||!h.generation||object<0||entries_[h.slot].generation||registration_.contains(h.slot)||
             (externalOrder_&&!nextOrder_))return false;
         entries_[h.slot]={h.generation,flags,object,sprite,externalOrder_?nextOrder_++:0};
         entries_[h.slot].roomOrder=entries_[h.slot].order;
@@ -154,11 +169,19 @@ public:
     // Registration order restricted to a slot domain. Callbacks must not
     // mutate registration; they receive the live flag word.
     template<class Visit> bool visitRegistrationRange(unsigned first,unsigned last,Visit visit)const{
+        return visitRegistrationRange(first,last,[](InstanceHandle,std::uint32_t&){return false;},visit);
+    }
+    template<class ExternalFlags,class Visit> bool visitRegistrationRange(unsigned first,unsigned last,
+        ExternalFlags externalFlags,Visit visit)const{
         return registration_.visitRegistrationRange(first,last,[&](unsigned slot,std::uint32_t generation,int object){
-            return visit(InstanceHandle{slot,generation},object,entries_[slot].flags);
+            const InstanceHandle h{slot,generation};std::uint32_t value;
+            if(live(h))value=entries_[slot].flags;
+            else if(!externalFlags(h,value))return false;
+            return visit(h,object,value);
         });
     }
     void clear(){
+        registration_.clear();
         for(unsigned slot=0;slot<Capacity;++slot)if(entries_[slot].generation){
             registration_.unbind(slot);entries_[slot]=Entry{};
         }

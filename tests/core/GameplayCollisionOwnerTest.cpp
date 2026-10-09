@@ -2192,6 +2192,7 @@ int main(){
     }
     auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
     std::vector<unsigned> roomCleanupOracle;
+    std::vector<std::vector<std::uint64_t>> registrationOracle;
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
         GameplayCollisionOwner::Ownership::nativeScenery}){
         const bool native=mode!=GameplayCollisionOwner::Ownership::reference;
@@ -2210,12 +2211,28 @@ int main(){
         auto activate=[&](unsigned i,bool active){return native?world->activateNativeTerrain(local[i],active):owner->terrain().activation(local[i],active);};
         const int bx=0,by=160;assert(world->appendBreakables(&bx,&by,1));
         const InstanceHandle box{0,world->breakableSlot(0).lifetimeId};
+        unsigned checkpoint=0;
+        auto registrations=[&]{
+            std::vector<std::uint64_t> actual;
+            assert(owner->visitRegistrationOrder([&](InstanceHandle h,int object,std::uint32_t flags){
+                actual.push_back((std::uint64_t(h.slot)<<32)|(std::uint64_t(object)<<20)|(flags&0x80003u));
+                return true;
+            }));
+            if(!native)registrationOracle.push_back(actual);
+            else assert(actual==registrationOracle.at(checkpoint));
+            ++checkpoint;
+        };
         auto member=[&](unsigned i){bool active=false;assert(owner->roomMembershipActive(shared[i],active));return active;};
+        registrations();
         assert(activate(0,false)&&activate(2,false)&&member(0)&&member(2));
+        registrations(); // Immediate inactive flags; membership unchanged.
         assert(owner->reconcileActivation()&&!member(0)&&member(1)&&!member(2));
+        registrations(); // Deferred unlink, preserving the mixed-family order.
         assert(activate(0,true)&&!member(0)&&owner->reconcileActivation()&&member(0));
+        registrations(); // Promotion appends after the box, not its old slot.
         for(unsigned i=0;i<3;++i)assert(native?world->destroyNativeTerrain(local[i]):owner->terrain().requestDestroy(local[i]));
         assert(world->markBreakableDestroyed(box));
+        registrations(); // Destruction marks do not eagerly unlink.
         std::vector<unsigned> retired;
         assert(owner->cleanupDestroyed([&](InstanceHandle h,const GameplayCollisionView::Record& record){
             if(record.breakable){retired.push_back(99);return world->retireMarkedBreakable(box);}
@@ -2227,6 +2244,7 @@ int main(){
         std::vector<unsigned> walls;for(auto slot:retired)if(slot!=99)walls.push_back(slot);
         assert(walls==std::vector<unsigned>({1,0,2})&&retired.size()==4);
         for(auto h:shared){bool active;assert(!owner->roomMembershipActive(h,active));}
+        registrations();
         assert(owner->prepareDraw());
     }
     for(auto mode:{GameplayCollisionOwner::Ownership::native,GameplayCollisionOwner::Ownership::nativeScenery}){

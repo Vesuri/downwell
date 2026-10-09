@@ -49,7 +49,7 @@ behavior, both backend integrations and relevant original-game verification.
   before enabling destruction dispatch there: finish animation/cached-frame and
   dynamic-rebinding publication, plus spatial mutation/traversal publication;
   connect retained native wall End Step state to source spatial queries,
-  deferred object-family/layer activation and tile/flower effects;
+  deferred layer activation and tile/flower effects;
   schedule the mixed spatial flush with candidate collection and post-pass
   retention after the remaining publication paths are connected.
   Registration stamps alone are not pair

@@ -56,6 +56,26 @@ static void preparedFamily(){
 }
 int main(){
     preparedFamily();
+    {
+        downwell::NativeInstanceTable<8> registry(true);
+        const downwell::InstanceHandle external{4,7};
+        assert(registry.registerExternalObject(external,60,true));
+        assert(registry.externalRegistered(external)&&!registry.contains(external));
+        assert(!registry.registerExternalObject({4,8},60,false));
+        assert(!registry.birth({4,8},60,0,51));
+        assert(!registry.visitRegistrationRange(0,8,[](auto,int,auto){return true;}));
+        unsigned count=0;
+        assert(registry.visitRegistrationRange(0,8,[&](auto h,std::uint32_t& flags){
+            assert(h.slot==external.slot&&h.generation==external.generation);flags=2;return true;
+        },[&](auto h,int object,auto flags){
+            assert(h.slot==external.slot&&h.generation==external.generation&&object==60&&flags==2);++count;return true;
+        })&&count==1);
+        assert(registry.registerExternalObject(external,60,false));
+        assert(!registry.externalRegistered(external));
+        assert(registry.registerExternalObject({4,8},60,true));
+        registry.clear();
+        assert(!registry.externalRegistered({4,8})&&registry.birth({4,9},60,0,51));
+    }
     downwell::NativeInstanceTable<8> table(true);
     bool dirty=false;
     assert(table.watchCaptureRanges(0,4,4,8,dirty));
