@@ -2438,6 +2438,21 @@ public:
     // queried until all of their lifetimes and setters are owned here.
     bool terrainCollisionPoint(InstanceHandle self,int object,MotionBinary64 x,MotionBinary64 y,
         bool precise,bool notMe,const SpriteMaskPack& masks,Owner::Result& result){
+        if(native_){
+            RunnerImageValue px,py;
+            if(!valid()||!world_||!world_->nativeTerrainInstances()||(object!=60&&object!=93)||
+                !terrainFamilies_[object==93]||!masks.valid()||(notMe&&!resolves(self))||
+                !px.assign(x)||!py.assign(y))return check(false);
+            RunnerCollisionPoint::Result next;
+            const bool ok=RunnerCollisionPoint::run(self,notMe,px,py,
+                [&](auto visit){return nativeTerrainMembers(object,[&](unsigned slot){return visit(handleAt(slot));});},
+                [&](InstanceHandle h,std::uint32_t& flags){return resolves(h)&&eligibilityFlags(h,flags);},
+                [&](InstanceHandle h,RunnerImageValue qx,RunnerImageValue qy,bool& hit){
+                    return collisionPointCandidate(h,qx,qy,true,precise,masks,hit);
+                },next);
+            if(!check(ok))return false;
+            result={next.found,next.handle};return true;
+        }
         if(!terrainQuery(object))return check(false);
         return registeredCollisionPoint(self,object,x,y,precise,notMe,masks,result);
     }

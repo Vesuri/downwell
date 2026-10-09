@@ -22,6 +22,7 @@
 #include "RunnerMaskPoint.h"
 #include "RunnerLineBounds.h"
 #include "RunnerLineTraversal.h"
+#include "RunnerCollisionPoint.h"
 #include "RunnerSpriteChange.h"
 #include "RunnerSpriteSetters.h"
 #include "ObjectPack.h"
@@ -988,20 +989,14 @@ private:
         if(!valid()||object<0||object>=100000||!graph.valid()||!graph.flags(unsigned(object)))return false;
         Real nx,ny;
         if(!checked(nx.assign(x)&&ny.assign(y))||(notMe&&!live(self)))return false;
-        Result next;bool good=true;
-        membership_.visit(object,[&](int child,int parent){return graph.isA(child,parent);},
-            [&](unsigned slot,std::uint32_t generation){
-                const InstanceHandle h{slot,generation};
-                std::uint32_t flags;
-                if(!readEligibility<FullState>(h,flags)){good=false;return false;}
-                if((flags&0x100003u)||(notMe&&h.slot==self.slot&&h.generation==self.generation))return true;
-                bool hit=false;
-                if(!candidate(h,nx,ny,hit)){good=false;return false;}
-                if(hit){next={true,h};return false;}
-                return true;
-            });
-        if(!checked(good))return false;
-        result=next;return true;
+        RunnerCollisionPoint::Result next;
+        const bool ok=RunnerCollisionPoint::run(self,notMe,nx,ny,[&](auto visit){
+            membership_.visit(object,[&](int child,int parent){return graph.isA(child,parent);},
+                [&](unsigned slot,std::uint32_t generation){return visit(InstanceHandle{slot,generation});});
+            return true;
+        },[&](InstanceHandle h,std::uint32_t& flags){return readEligibility<FullState>(h,flags);},candidate,next);
+        if(!checked(ok))return false;
+        result={next.found,next.handle};return true;
     }
     template<bool FullState> bool readEligibility(InstanceHandle h,std::uint32_t& flags)const{
         if constexpr(FullState){

@@ -4129,6 +4129,10 @@ int main(){
                         actual.insert(actual.end(),{unsigned(result.found),result.handle.slot,result.handle.generation});
                         assert(owner->terrainNonPreciseLine(self,object,x1,y1,x1,y1,notMe,result));
                         actual.insert(actual.end(),{unsigned(result.found),result.handle.slot,result.handle.generation});
+                        for(bool precise:{false,true}){
+                            assert(owner->terrainCollisionPoint(self,object,x1,y1,precise,notMe,masks,result));
+                            actual.insert(actual.end(),{unsigned(result.found),result.handle.slot,result.handle.generation});
+                        }
                     }
             };
             probe({});InstanceHandle first;
@@ -4139,6 +4143,21 @@ int main(){
                 else {assert(owner->terrain().append(object,x,y,true));local=owner->terrain().handle(i);
                     assert(owner->terrain().createProperties(local,51,false,random));}
                 if(!i){assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,local,first));probe(first);}
+                if(i==1){
+                    bool movedHit=false;
+                    assert(owner->terrainPlaceMeeting(local,60,MotionBinary64::fromInteger(272),
+                        MotionBinary64::fromInteger(160),masks,movedHit));
+                    GameplayCollisionOwner::Owner::Result point;
+                    assert(owner->terrainCollisionPoint({},60,MotionBinary64::fromInteger(240),
+                        MotionBinary64::fromInteger(160),true,false,masks,point)&&point.found&&point.handle.slot==first.slot);
+                    // First-hit point selection must not flush this later,
+                    // unvisited wall's restored-position dirty bounds.
+                    std::uint32_t flags;
+                    if(native)assert(terrain->spatialFlags(local,flags));
+                    else {InstanceHandle shared;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,local,shared));
+                        const auto state=owner->state(shared);assert(state);flags=state->flags;}
+                    assert(flags&8u);
+                }
             }
             probe(first);const InstanceHandle local{first.slot-GameplayCollisionView::terrainBase,first.generation};
             assert(native?world->activateNativeTerrain(local,false):owner->terrain().activation(local,false));

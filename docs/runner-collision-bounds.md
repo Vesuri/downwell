@@ -540,6 +540,14 @@ deactivation and reactivation. This admission does not extend to projectile
 parents 59/83, precise line masks, all/instance selectors or incomplete solid
 families; it does not establish source-faithful live bullet motion.
 
+`terrainCollisionPoint` admits those same native terrain families, with
+precise and non-precise candidate sampling. Its shared `RunnerCollisionPoint`
+traversal follows registrations directly: unlike `position_meeting` and
+`collision_line`, it neither prepares a family nor flushes the spatial index.
+Each visited candidate performs its own lazy refresh after outer exclusions
+and not-me filtering. First-hit tests retain the dirty bounds of an unvisited
+later wall, guarding against accidentally substituting a tree-based query.
+
 ## Cross-target mutation tape
 
 ### Native resource residency and lifetime publication
