@@ -9,6 +9,15 @@ struct LifetimeInstance {
 };
 
 enum class MainRoomLifetimePhase { step, endStep };
+// These pinned End Step bodies contain only scrOutofview. Box End Step also
+// performs autotiling, so admitting this event must not admit the box body.
+inline bool hasSimpleOutOfViewEndStep(int objectId) {
+    switch (objectId) {
+    case 93: case 111: case 112: case 113: case 116: case 117: case 119:
+        return true;
+    default: return false;
+    }
+}
 // Implemented families calling scrOutofview. Scattered16 does so in Step;
 // the others in End Step. objWall_n additionally guards on area five.
 inline bool usesMainRoomOutOfView(int objectId, int area) {

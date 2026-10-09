@@ -947,7 +947,7 @@ bool StartupRuntime::publishMainBullet(MainBulletState& bullet,bool angle){
 
 bool StartupRuntime::cleanupMainOwnedDestroyed(){
     return run_.effectsSucceeded&&instances_.cleanupDestroyedIf(
-        [this](const InstanceRecord& r){return r.objectId==60||r.objectId==61||r.objectId==92||r.objectId==261||r.objectId==370||r.objectId==256||
+        [this](const InstanceRecord& r){return hasSimpleOutOfViewEndStep(r.objectId)||r.objectId==60||r.objectId==61||r.objectId==92||r.objectId==261||r.objectId==370||r.objectId==256||
             ((r.objectId==238||r.objectId==211)&&timeEffectDispatch_)||
             (r.objectId==269&&boneDispatch_)||
             (r.objectId==220&&bloodDispatch_)||
@@ -960,6 +960,12 @@ bool StartupRuntime::cleanupMainOwnedDestroyed(){
             (r.objectId==248&&currencyDispatch_)||
             (r.objectId==73&&ownedEntryRegistration_.handle(r).generation)||(r.objectId==219&&!scriptAnimationDispatch_);},
         [this](InstanceHandle key,const InstanceRecord& r){
+            if(hasSimpleOutOfViewEndStep(r.objectId)){
+                if(!instances_.erase(r.instanceId,
+                    [this](InstanceHandle h,const InstanceRecord& record){return lifecycle_.retire(h,record);}))return false;
+                ++mainInstancesRetired_;
+                return true;
+            }
             if(r.objectId==238||r.objectId==211){
                 auto* record=instances_.resolve(key);
                 return record&&timeEffectDispatch_&&timeEffectDispatch_(timeEffectContext_,*record,TimeEffectPhase::cleanup,0);
@@ -1307,7 +1313,9 @@ void StartupRuntime::updateMainLifecycle(bool endStep, long publishedViewTopQ12)
         publishedViewTopQ12,
         [this, &removed](unsigned i) {
             const auto& instance = instances_.at(i - removed);
-            return LifetimeInstance{instance.objectId, instance.y, instance.active&&!instance.destroyRequested};
+            return LifetimeInstance{instance.objectId, instance.y,
+                instance.active&&!instance.destroyRequested&&
+                !(objectPack_&&hasSimpleOutOfViewEndStep(instance.objectId))};
         },
         [this, &removed](unsigned i) {
             const auto id = instances_.at(i - removed).instanceId;
@@ -1818,6 +1826,23 @@ bool StartupRuntime::dispatchObjectEvent(InstanceRecord& instance,
     if (objectPack_ == nullptr ||
         !objectPack_->findEvent(instance.objectId, eventType, eventSubtype, event))
         return false;
+    if(roomId_==mainRoomId&&eventType==3&&eventSubtype==2&&
+       hasSimpleOutOfViewEndStep(instance.objectId)){
+        ++implementedCodeCalls_;
+        // Keep the currently published-coordinate adapter, but run the source
+        // event at its selected End Step position. Mark now; retain the record
+        // until room cleanup, rather than compacting storage under dispatch.
+        return run_.effectsSucceeded=retireMainRoomObjectsChecked(1,roomId_,1,
+            ordinaryStepViewTopQ12_,[&](unsigned){
+                return LifetimeInstance{instance.objectId,instance.y,
+                    instance.active&&!instance.destroyRequested};
+            },[&](unsigned){
+                const auto index=static_cast<std::size_t>(&instance-&instances_.at(0));
+                if(lifecycle_.hasOwner()&&!lifecycle_.markDestroyed(instances_.handleAt(index),instance))return false;
+                instance.destroyRequested=true;
+                return true;
+            });
+    }
     if(roomId_==mainRoomId&&eventType==3&&eventSubtype==0&&
         (instance.objectId==111||instance.objectId==112||instance.objectId==113||
          instance.objectId==116||instance.objectId==117||instance.objectId==119)){

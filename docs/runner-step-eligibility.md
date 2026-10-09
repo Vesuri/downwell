@@ -384,6 +384,18 @@ the gameplay world has not yet adopted the store.
 
 ## Correction to existing live enemy adapters
 
+The stored adapter dispatches the simple out-of-view End Step bodies for
+objects 93, 111, 112, 113, 116, 117 and 119 through selected event dispatch.
+`tools/verify-main-room-lifetime.py` pins those bodies and `scrOutofview`.
+An accepted destruction request sets the lifetime flag during the event;
+physical removal waits for pre-Draw room cleanup. Rejected marking leaves the
+flag unchanged; rejected cleanup retains the marked identity and stops the
+tick. The remaining family sweep excludes these objects when resource-backed
+events are available. Box End Step is not included: its autotiling body still
+needs integration. The retained integer-coordinate out-of-view adapter is not
+proof of original fractional-coordinate behavior, nor of native mixed-phase
+retirement ordering.
+
 The retained gameplay adapters order supported enemy motion before smoke
 (225), currency (248) and ordinary bullets (261). Combat rewards born after
 currency's turn retain age zero and their Create image until the next tick;

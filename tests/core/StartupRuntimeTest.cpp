@@ -108,6 +108,11 @@ struct LifecycleAudit {
     const downwell::StartupRuntime* observedRuntime=nullptr;
     unsigned initialViewsSeen=0;
     bool markDestroyed(downwell::InstanceHandle h,const downwell::InstanceRecord& r){
+        if(r.instanceId==outOfViewId){
+            require(matches(h,r)&&!r.destroyRequested,"out-of-view event marks the live identity before changing its flag");
+            ++outOfViewMarks;
+            if(rejectOutOfViewMark)return false;
+        }
         if(r.objectId==256){
             require(matches(h,r)&&!r.destroyRequested,"balloon destruction publishes before changing the stored flag");
             ++balloonMarks;if(rejectBalloonMark)return false;
@@ -138,6 +143,9 @@ struct LifecycleAudit {
     bool rejectCompanionImage=false;
     unsigned companionImages=0;
     unsigned balloonMarks=0,balloonRetires=0;
+    std::uint32_t outOfViewId=0;
+    unsigned outOfViewMarks=0,outOfViewRetires=0;
+    bool rejectOutOfViewMark=false,rejectOutOfViewRetire=false;
     bool rejectBalloonMark=false,rejectBalloonRetire=false;
     unsigned ditherMoves=0,ditherMarks=0,rejectDitherMove=0;
     int rejectBirthObject=-1;
@@ -229,6 +237,11 @@ struct LifecycleAudit {
     }
     bool retire(downwell::InstanceHandle h,const downwell::InstanceRecord& r){
         ++calls;require(matches(h,r),"retirement still resolves the published lifetime");
+        if(r.instanceId==outOfViewId){
+            require(r.destroyRequested&&outOfViewMarks==1,"out-of-view cleanup follows one accepted event destruction request");
+            ++outOfViewRetires;
+            if(rejectOutOfViewRetire)return false;
+        }
         if(r.objectId==256&&r.destroyRequested){
             ++balloonRetires;if(rejectBalloonRetire)return false;
         }
@@ -262,6 +275,43 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
                        const downwell::BuilderPatternPack& patterns){
     using Runtime=downwell::StartupRuntime;
     const auto healthy=[](const Runtime& r){return r.effectsSucceeded()&&r.roomLoadSucceeded()&&r.deferredCommandsSucceeded();};
+    for(unsigned reject:{0u,1u,2u}){
+        LifecycleAudit audit;
+        auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            downwell::InstanceLifecycleBinding::bindMaskDestruction(audit));
+        runtime->skipToGameForTesting();
+        for(unsigned tick=0;tick<600&&!audit.outOfViewId;++tick){
+            runtime->step(downwell::gameplayContactProfileInput(tick,runtime->mainPlayerX(),runtime->mainPlayerY()),false);
+            for(unsigned i=0;i<runtime->activeInstanceCount();++i){
+                const auto& r=runtime->instanceAt(i);
+                if(r.objectId==93&&r.active&&!r.destroyRequested){audit.outOfViewId=r.instanceId;break;}
+            }
+        }
+        require(audit.outOfViewId&&healthy(*runtime),"out-of-view fixture has a live thin platform");
+        audit.rejectOutOfViewMark=reject==1;audit.rejectOutOfViewRetire=reject==2;
+        unsigned collisions=0;
+        const bool ok=runtime->stepWithCollisionPass({},false,[&]{
+            ++collisions;
+            auto* r=const_cast<downwell::InstanceRecord*>(runtime->instance(audit.outOfViewId));
+            require(r&&!r->destroyRequested&&!audit.outOfViewMarks,
+                "End Step destruction has not run during Collision");
+            // Controlled collision-time movement: End Step must read this
+            // position, not a pre-Collision list of retirement candidates.
+            r->y=-10000;
+            return true;
+        });
+        require(collisions==1&&ok==(reject==0)&&healthy(*runtime)==(reject==0)&&audit.outOfViewMarks==1,
+            "selected End Step publishes destruction and propagates failures");
+        const auto* retained=runtime->instance(audit.outOfViewId);
+        require(audit.outOfViewRetires==(reject==1?0u:1u)&&
+            (reject?(retained&&retained->destroyRequested==(reject==2)):!retained),
+            "cleanup retains the exact accepted destruction prefix on failure");
+        if(reject){
+            runtime->step({},false);
+            require(audit.outOfViewMarks==1&&audit.outOfViewRetires==(reject==1?0u:1u),
+                "failed retirement is terminal rather than retrying callbacks");
+        }
+    }
     for(unsigned reject:{1u,30u}){
         LifecycleAudit audit;audit.rejectBuilderMove=reject;
         auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
