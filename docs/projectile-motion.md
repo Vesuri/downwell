@@ -158,6 +158,21 @@ second-Step initialization. This shared event composition is not yet wired
 into the live schedulers: remaining target/effect/retirement adapters above
 still gate replacement of the approximate gun path.
 
+`BulletWallSound` implements `soundBullet` using the authored `initSfxBhit`
+table. The selected target's material is read before the random choice:
+breakable/thin/foliage select sound 29, rock selects 34/35, and metal selects
+32/33. Unknown strings retain table slot zero. Even a singleton choice consumes
+the source `irandom_range` call's two RNG words. The script then uses the shared
+`gunwall` overlap channel with priority 60 and previous-voice cutting enabled;
+sound-script fields belong to the retained executing bullet, not the wall.
+Both world adapters use their actual RNG and run-session overlap state.
+Material lookup resolves the selected lifetime again and rejects unsupported
+objects rather than inventing inherited fields (object 99 has an empty Create
+override). `verify-bullet-wall-sound` pins the script/table and material Create
+assembly and checks material choices, underwater pitch, overlap ordering and
+failure prefixes. World-owner fixtures exercise the retained caller and target;
+they do not establish natural wall-impact event or audio-backend dispatch.
+
 `GameplayCollisionOwnerTest` also composes this Step with resource-backed wall
 line/point selection, actual box health/hit writes and the registered script
 effect owner for its muzzle. Ordinary and gem-high profiles, with and without

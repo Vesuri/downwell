@@ -163,6 +163,7 @@ public:
         bool gemHigh = false;
         downwell::ProjectileAnimation animation;
         downwell::MachineGunTrajectory trajectory;
+        downwell::SoundPlayState sound{};
     };
     using BulletLifecycleBinding=downwell::RecordLifecycleBinding<BulletState>;
     struct EnemyState {
@@ -1256,6 +1257,12 @@ public:
         return Operations(*this,objects,box,controls,position,allocate,queries);
     }
     int overlapSound(unsigned channel)const{return channel<11?run_.overlapSounds[channel]:-1;}
+    template<class Material,class Audio> bool playBulletWallSound(downwell::InstanceHandle shot,
+        downwell::SoundPlayEnvironment& environment,Material material,Audio& audio){
+        auto* caller=const_cast<BulletState*>(resolveBulletLifetime(shot));
+        if(!run_.effectsSucceeded||!caller)return run_.effectsSucceeded=false;
+        return run_.playBulletWallSound(caller->sound,environment,enemyRandom_,material,audio);
+    }
     template<class Audio,class NoKill,class Delay,class Cue>
     bool recordEnemyDeath(bool cutGunshot,Audio& audio,NoKill clearNoKill,Delay delay,Cue cue){
         return run_.recordEnemyDeath(cutGunshot,audio,clearNoKill,delay,cue);

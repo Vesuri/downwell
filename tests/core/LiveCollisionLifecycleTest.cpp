@@ -1,4 +1,5 @@
 #include "core/StartupRuntime.h"
+#include "BulletWallSoundChecks.h"
 #include "core/BuilderStringTraversal.h"
 #include "RegisteredSkeletonThrowChecks.h"
 #include "QuietSkeletonEffects.h"
@@ -2153,6 +2154,15 @@ int main(){
         require(ops.lines==3&&ops.points>1&&ops.approachWrites==2*(ops.points-1)&&ops.writes==2&&
             random.drawCount()==1&&child&&registration.sourceId(child)&&owner->resolve(shot)->destroyRequested,
             "source query/movement counts and synchronous muzzle birth survive destruction marking");
+        {
+            const auto before=world->randomDrawCount();const int previous=world->overlapSound(2);
+            SoundPlayEnvironment env;env.gameVolume={0x3fd00000u,0};env.inWater=true;
+            BulletWallAudio audio{world->resolveInstance(shot)->sound,previous,29,true};
+            require(world->playBulletWallSound(shot,env,[&](const char*& material){
+                return owner->projectileWallMaterial(box,material);
+            },audio)&&audio.valid&&audio.calls==7&&world->randomDrawCount()==before+2&&world->overlapSound(2)==29,
+                "retained bullet sound fields and shared RNG/overlap channel use the real selected material");
+        }
         std::printf("SOURCE_SHOT %u %u %08x %08x %08x %08x %08x %u %u %u %u\n",
             unsigned(high),unsigned(laser),unsigned(motion.x.bits),unsigned(motion.y.bits),unsigned(motion.imageAngle.bits),
             unsigned(target->box.wallHp.high),unsigned(target->box.wallHp.low),ops.lines,ops.points,ops.approachWrites,ops.writes);

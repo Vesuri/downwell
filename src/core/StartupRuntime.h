@@ -208,6 +208,12 @@ public:
         r->box.wallHp=health;return true;
     }
     int overlapSound(unsigned channel)const{return channel<11?run_.overlapSounds[channel]:-1;}
+    template<class Material,class Audio> bool playBulletWallSound(InstanceHandle shot,
+        SoundPlayEnvironment& environment,Material material,Audio& audio){
+        auto* caller=instances_.resolve(shot);
+        if(!run_.effectsSucceeded||!caller||caller->objectId!=261)return run_.effectsSucceeded=false;
+        return run_.playBulletWallSound(caller->sound,environment,random_,material,audio);
+    }
     template<class Tick> bool withMomentDelayRoomSpeed(int& roomSpeed,Tick tick){
         if(!run_.effectsSucceeded)return false;
         if(momentDelayRoomSpeed_)return run_.effectsSucceeded=false;

@@ -2489,6 +2489,17 @@ public:
         if(!valid()||!resolves(h)||!objects_.findObject(objectOf(h),object))return false;
         parent=object.parentId;return true;
     }
+    bool projectileWallMaterial(InstanceHandle h,const char*& material)const{
+        if(!valid()||!resolves(h))return false;
+        const int object=objectOf(h);
+        if(object==60)material="foliage";
+        else if(object==93)material="thin";
+        else if(object==92){View::Record record;
+            if(!View(*world_).resolve(h,record)||!record.breakable)return false;
+            material=record.breakable->state.materialBreakable?"breakable":"wood";
+        }else return false;
+        return true;
+    }
     bool projectileBoxHealth(InstanceHandle h,MotionBinary64& health)const{
         View::Record record;
         if(!valid()||!resolves(h)||!View(*world_).resolve(h,record)||!record.breakable)return false;

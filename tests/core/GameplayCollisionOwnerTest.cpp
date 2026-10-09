@@ -2,6 +2,7 @@
 #include "core/Replay.h"
 #include "core/CurrencySmokeComposition.h"
 #ifndef DOWNWELL_NATIVE_QUERY_PROBE
+#include "BulletWallSoundChecks.h"
 #include "RegisteredSkeletonThrowChecks.h"
 #include "QuietSkeletonEffects.h"
 #include "ScheduledBoxEffectsCheck.h"
@@ -29,6 +30,15 @@ bool nativeLimboProbe(downwell::GameplayCollisionOwner& owner,GameplayWorld& wor
 struct NativeBulletVelocity {
     bool operator()(downwell::InstanceHandle,downwell::MotionBinary64&,downwell::MotionBinary64&);
 };
+struct NativeBulletSoundAudio {
+    bool isPlaying(int,bool&);bool stop(int);bool play(int,int,bool,int&);
+    bool getGain(int,downwell::MotionBinary64&);bool setGain(int,downwell::MotionBinary64,int);
+    bool setPitch(int,downwell::MotionBinary64);
+};
+bool nativeBulletSound(downwell::GameplayCollisionOwner& owner,GameplayWorld& world,
+    downwell::InstanceHandle shot,downwell::InstanceHandle wall,downwell::SoundPlayEnvironment& env,NativeBulletSoundAudio& audio){
+    return world.playBulletWallSound(shot,env,[&](const char*& material){return owner.projectileWallMaterial(wall,material);},audio);
+}
 bool nativeLimboContact(downwell::GameplayCollisionOwner& owner,
     const downwell::RunnerCollisionEventContext::Frame& event,NativeBulletVelocity read){
     return owner.dispatchLimboShardBulletCollision(event,read);
@@ -3035,6 +3045,14 @@ int main(){
         assert(owner->projectileSolidPoint({},x,y,false,masks,selected)&&selected.found&&
             selected.handle.slot==ops.selected.slot&&selected.handle.generation==ops.selected.generation);
         assert(world->resolveBulletLifetime(shotKey)&&world->resolveBulletLifetime(shotKey)->destroyRequested);
+        {
+            const auto before=world->randomDrawCount();const int previous=world->overlapSound(2);
+            SoundPlayEnvironment env;env.gameVolume={0x3fd00000u,0};env.inWater=true;
+            BulletWallAudio audio{world->resolveBulletLifetime(shotKey)->sound,previous,29,true};
+            assert(world->playBulletWallSound(shotKey,env,[&](const char*& material){
+                return owner->projectileWallMaterial(ops.selected,material);
+            },audio)&&audio.valid&&audio.calls==7&&world->randomDrawCount()==before+2&&world->overlapSound(2)==29);
+        }
         std::printf("SOURCE_SHOT %u %u %08x %08x %08x %08x %08x %u %u %u %u\n",
             unsigned(high),unsigned(laser),unsigned(motion.x.bits),unsigned(motion.y.bits),unsigned(motion.imageAngle.bits),
             unsigned(box->state.wallHp.high),unsigned(box->state.wallHp.low),ops.lines,ops.points,ops.approachWrites,ops.writes);

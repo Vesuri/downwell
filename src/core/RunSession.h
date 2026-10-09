@@ -1,5 +1,6 @@
 #ifndef DOWNWELL_CORE_RUN_SESSION_H
 #define DOWNWELL_CORE_RUN_SESSION_H
+#include "BulletWallSound.h"
 #include "RunGemStatistics.h"
 #include "WallBackgroundTiles.h"
 #include "RunClock.h"
@@ -59,6 +60,10 @@ struct RunSession {
     // soundInitialize writes entries 0..10 to zero. Room changes do not
     // reinitialize them; scrInitialize/new-run reset does.
     int overlapSounds[11]{};
+    template<class Random,class Material,class Audio> bool playBulletWallSound(SoundPlayState& caller,
+        SoundPlayEnvironment& environment,Random& random,Material material,Audio& audio){
+        return BulletWallSound::play(caller,environment,overlapSounds[2],random,material,audio,effectsSucceeded);
+    }
     template<class Audio> bool playCurrencyPickupSound(SoundPlayState& caller,
         MotionBinary64 volume,Audio& audio){
         if(!effectsSucceeded)return false;

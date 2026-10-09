@@ -740,6 +740,19 @@ build/machine-gun-source-step-test: tests/core/MachineGunSourceStepTest.cpp $(wi
 verify-bullet-solid-script: build/bullet-solid-script-test
 	python3 tools/verify-machine-gun.py
 	./build/bullet-solid-script-test
+
+.PHONY: verify-bullet-wall-sound
+test: verify-bullet-wall-sound
+verify-bullet-wall-sound: build/bullet-wall-sound-test
+	python3 tools/verify-bullet-wall-sound.py
+	./build/bullet-wall-sound-test
+
+build/bullet-wall-sound-test: tests/core/BulletWallSoundTest.cpp tests/core/BulletWallSoundChecks.h $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -ffp-contract=off -Isrc -o $@ tests/core/BulletWallSoundTest.cpp src/core/GameMakerRandom.cpp
+
+build/live-collision-lifecycle-test build/gameplay-collision-owner-test build/gameplay-collision-owner-scalar-test build/gameplay-collision-owner-snapshot-test: tests/core/BulletWallSoundChecks.h
+
 build/bullet-solid-script-test: tests/core/BulletSolidScriptTest.cpp $(wildcard src/core/*.h)
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<

@@ -87,6 +87,14 @@ public:
         if(!valid()||!r||!adapter_.objects.findObject(r->objectId,object))return false;
         parent=object.parentId;return true;
     }
+    bool projectileWallMaterial(InstanceHandle h,const char*& material)const{
+        const auto* r=resolve(h);if(!valid()||!r)return false;
+        if(r->objectId==60)material="foliage";
+        else if(r->objectId==93)material="thin";
+        else if(r->objectId==92)material=r->box.materialBreakable?"breakable":"wood";
+        else return false; // An empty Create override does not inherit material.
+        return true;
+    }
     bool projectileBoxHealth(InstanceHandle h,MotionBinary64& health)const{
         const auto* r=resolve(h);
         if(!valid()||!r||r->objectId!=92)return false;
