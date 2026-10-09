@@ -70,6 +70,9 @@ bool nativeCameraCreate(downwell::GameplayCollisionOwner& owner,downwell::Instan
     downwell::RunnerImageValue x,downwell::RunnerImageValue y){
     return owner.playerControllers().initializeCamera(key,480,false,x,y);
 }
+bool nativeCompanionCreate(downwell::GameplayCollisionOwner& owner,unsigned source,downwell::InstanceHandle& key){
+    return owner.playerControllers().createCompanion(249,source,{0x43700000u},{0x43300000u},key);
+}
 bool nativeRegisteredTimeShardStep(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle shared,
     const downwell::SpriteMaskPack& masks,bool stopped){
     return owner.stepTimeShard(shared,stopped,masks);
@@ -1776,6 +1779,41 @@ int main(){
         assert(controllers.createCamera(105200,x,y,160,true,playerX,playerY,next)&&
             next.generation!=camera.generation&&controllers.find(next)->camera.initialized&&
             controllers.find(next)->camera.daop==-32&&controllers.clear());
+    }
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                  GameplayCollisionOwner::Ownership::nativeScenery}){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));auto& children=owner->playerControllers();
+        InstanceHandle balloon,first,second;const auto draws=world->randomDrawCount();
+        assert(children.createCompanion(256,106001,{0x43704000u},{0x43308000u},balloon)&&
+            children.createCompanion(249,106002,{0x43700000u},{0x43300000u},first)&&
+            children.createCompanion(249,106003,{0x43700000u},{0x43300000u},second)&&children.reverseDrone(second));
+        const auto* b=children.find(balloon);const auto* d=children.find(first);const auto* d2=children.find(second);
+        assert(b&&d&&d2&&b->imageSpeed.bits==0x3da3d70au&&d->imageSpeed.bits==0x3f000000u&&
+            b->companion.balloon.xx.high==b->x.promoted().high&&b->companion.balloon.xx.low==b->x.promoted().low&&
+            d2->companion.drone.xdir.high==MotionBinary64::fromInteger(180).high&&world->randomDrawCount()==draws);
+        // Test initial sequence advancement through the actual mixed room walk.
+        PlayerCompanionCreateState oracleBalloon=b->companion,oracleDrone=d->companion;
+        RunnerImageValue bi=b->imageIndex,di=d->imageIndex;
+        auto& balloonState=const_cast<PlayerCompanionCreateState&>(b->companion);
+        auto& droneState=const_cast<PlayerCompanionCreateState&>(d->companion);
+        auto& secondState=const_cast<PlayerCompanionCreateState&>(d2->companion);
+        balloonState.balloon.noHold=droneState.drone.shotDelay=secondState.drone.droneShooting=MotionBinary64::fromInteger(3);
+        assert(children.setAlarm(balloon,0,1)&&children.setAlarm(first,2,1)&&children.setAlarm(second,3,1));
+        for(unsigned tick=0;tick<16;++tick){
+            assert(oracleBalloon.advanceImage(256,526,bi,b->imageSpeed,[&](auto v){bi=v;return true;})&&
+                oracleDrone.advanceImage(249,131,di,d->imageSpeed,[&](auto v){di=v;return true;}));
+            world->step(0);assert(world->effectsSucceeded()&&owner->valid());
+            assert(b->imageIndex.bits==bi.bits&&d->imageIndex.bits==di.bits&&d2->imageIndex.bits==di.bits);
+            assert(b->alarms.get(0)==(tick?-1:0)&&d->alarms.get(2)==(tick?-1:0)&&d2->alarms.get(3)==(tick?-1:0));
+            assert(b->companion.balloon.noHold.zero()&&d->companion.drone.shotDelay.zero()&&
+                d2->companion.drone.droneShooting.high==MotionBinary64::fromInteger(3).high);
+        }
+        assert(world->restartFromResults(DeathMenuSequence::Action::Retry,43,300)==ResultsDestination::gameplay&&
+            children.size()==0&&!children.find(balloon)&&!children.find(first)&&!children.find(second));
     }
     for(int area=1;area<=5;++area){
         auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites);

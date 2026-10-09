@@ -81,7 +81,15 @@ when it is zero. The stored runtime publishes the destruction mark before
 changing the record, then retires the registered lifetime during the cleanup
 phase. Its custom companion state is released only after retirement succeeds;
 a rejected publication retains the accepted prefix and stops execution.
-Companion motion, Drone's firing Alarm 0, Draw, native admission and the rest of player
+Native `GameplayPlayerControllers` also admits one Balloon and two Drone
+lifetimes with supplied source IDs. Their Create state, initial binary32
+animation speed/index and second-Drone direction override use the same shared
+representation. Initial sprite animation runs in the existing room traversal;
+simple alarms run in the mixed resource-ordered alarm phase, not an extra family
+tick. Rejected publication or an unsupported fired body fails the owner. Retry
+retires these records with the other player children. This explicit admission
+does not allocate the automatic global birth stream.
+Companion motion, Drone's firing Alarm 0, Draw, automatic native births and the rest of player
 initialization remain incomplete; correct child IDs alone do not prove those.
 Drone Step adds two to each custom direction every tick without modulo. Its
 lengthdir inputs therefore exceed the current `SmokeDirection` domain

@@ -1023,7 +1023,7 @@ private:
     Binding<GameplayBuilderController::Record,View::Kind::builder> builderBinding_{*this};
     GameplayBuilderController builderController_{GameplayBuilderController::Binding::bindMovement(builderBinding_)};
     Binding<GameplayPlayerControllers::Record,View::Kind::playerController> playerControllerBinding_{*this};
-    GameplayPlayerControllers playerControllers_{GameplayPlayerControllers::Binding::bindMovement(playerControllerBinding_)};
+    GameplayPlayerControllers playerControllers_{GameplayPlayerControllers::Binding::bindAnimation(playerControllerBinding_)};
     Binding<GameplayWorld::DroneBullets::Record,View::Kind::drone> droneBinding_{*this};
     GameplayWorld::DroneBullets drones_{GameplayWorld::DroneBullets::Binding::bindPositionedActor(droneBinding_)};
     Binding<GameplayWorld::Bones::Record,View::Kind::bone> boneBinding_{*this};
@@ -1607,6 +1607,7 @@ public:
                     }
                     case View::Kind::drone:return self.drones_.advanceAnimation(local);
                     case View::Kind::timeShard:return self.world_->advanceTimeShardRoomAnimation(local);
+                    case View::Kind::playerController:return self.playerControllers_.advanceAnimation(local);
                     case View::Kind::bone:return self.bones_.advanceAnimation(local);
                     case View::Kind::skeleton:return self.skeletons_.advanceAnimation(local);
                     case View::Kind::blood:return self.blood_.advanceAnimation(local);
@@ -1699,6 +1700,7 @@ public:
                     kind==View::Kind::debris?self.world_->advanceBoundDebrisRoomAlarm(local,alarm):
                     kind==View::Kind::timeChange?self.world_->advanceTimeChangeRoomAlarm(local,alarm):
                     kind==View::Kind::timeShard?self.world_->advanceTimeShardRoomAlarm(local,alarm):
+                    kind==View::Kind::playerController?self.playerControllers_.advanceAlarm(local,alarm):
                     kind==View::Kind::drone?(alarm==0&&self.drones_.advanceAlarm(local)):
                     kind==View::Kind::skeleton?self.skeletons_.advanceAlarm(local,alarm):
                     kind==View::Kind::currency?self.world_->advanceCurrencyRoomAlarm(local,alarm):
