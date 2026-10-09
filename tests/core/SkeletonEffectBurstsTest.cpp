@@ -32,7 +32,10 @@ int main(){
         };
         const double x=seed%2?96.125:-32.375,y=seed%3?192.75:-256.25;
         downwell::SmokeBurstCaller caller;
-        bool result=published&&!flash?(box?
+        bool result=published&&flash?(box?
+                         downwell::flashBurstPublished<1,0,2>(caller,number(x),number(y),random,create):
+                         downwell::flashBurstPublished<6,2,10>(caller,number(x),number(y),random,create)):
+                         published?(box?
                          downwell::smokeBurstPublished<1,0>(caller,number(x),number(y),random,create):
                          downwell::smokeBurstPublished<5,1>(caller,number(x),number(y),random,create)):
                          box?(flash?downwell::boxFlashBurst(number(x),number(y),random,create):
@@ -41,8 +44,9 @@ int main(){
                                 downwell::skeletonSmokeBurst(number(x),number(y),random,create));
         // Independent 64-bit modulus and ordinary host-double arithmetic.
         const unsigned count=(box?1:4)+unsigned(oracle.irandom(box?0:flash?4:2));
-        if(published&&!flash)check(real(caller.smx)==x&&real(caller.smy)==y&&
-            caller.smokenum==int(count)&&caller.vary==(box?0:1));
+        if(published)check(real(caller.smx)==x&&real(caller.smy)==y&&
+            caller.smokenum==int(count)&&caller.vary==(box?0:flash?2:1)&&
+            caller.pvary==(flash?(box?2:10):0));
         bool success=true;
         for(unsigned i=0;i<count;++i){
             double py,px;
@@ -72,5 +76,24 @@ int main(){
         check(real(x)==expectedX&&real(y)==expectedY);
         caller.smx=number(100);caller.smy=number(200);caller.smokenum=0;++emitted;return true;
     })&&emitted==count&&caller.smokenum==0);
+    // Flash reuses the very same caller fields after smoke. Child mutations
+    // affect subsequent positions/radii, not the number of iterations.
+    random=downwell::GameMakerRandom(71);oracle=downwell::GameMakerRandom(71);
+    const unsigned flashCount=4+oracle.irandom(4);emitted=0;
+    check(downwell::flashBurstPublished<6,2,10>(caller,number(10),number(20),random,[&](int object,auto x,auto y){
+        const double baseX=emitted?100:10,baseY=emitted?200:20;
+        const int radius=emitted?2:10;
+        const double expectedY=baseY+oracle.random(radius*2)-radius;
+        const double expectedX=baseX+oracle.random(radius*2)-radius;
+        check(object==224&&real(x)==expectedX&&real(y)==expectedY);
+        caller.smx=number(100);caller.smy=number(200);caller.pvary=2;caller.smokenum=0;
+        random.irandomSmall(4);random.irandomSmall(4);oracle.irandom(4);oracle.irandom(4);
+        ++emitted;return true;
+    })&&emitted==flashCount&&caller.smokenum==0);
+    check(random.drawCount()==oracle.drawCount()&&random.stateIndex()==oracle.stateIndex());
+    for(unsigned i=0;i<16;++i)check(random.stateWord(i)==oracle.stateWord(i));
+    // Smoke overwrites the shared count/coordinates, but not flash's pvary.
+    check(downwell::smokeBurstPublished<1,0>(caller,number(3),number(4),random,[](int,auto,auto){return true;}));
+    check(caller.pvary==2&&caller.smokenum==1&&caller.vary==0);
     std::printf("Skeleton/box effect bursts: 24576 sequences, %u ordered child births passed\n",births);
 }

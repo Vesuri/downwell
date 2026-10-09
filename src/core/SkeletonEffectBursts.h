@@ -2,10 +2,10 @@
 #define DOWNWELL_CORE_SKELETON_EFFECT_BURSTS_H
 #include "RandomBinary64.h"
 namespace downwell {
-// scrSmokefx writes these fields on its caller, not on each smoke child.
+// scrSmokefx and scrFlashballfx share fields on their caller, not their children.
 struct SmokeBurstCaller {
     MotionBinary64 smx{},smy{};
-    int smokenum=0,vary=0;
+    int smokenum=0,vary=0,pvary=0;
 };
 template<unsigned Count,unsigned Variation,class Random,class Create>
 bool smokeBurstPublished(SmokeBurstCaller& caller,MotionBinary64 x,MotionBinary64 y,
@@ -44,19 +44,30 @@ bool smokeBurstScript(MotionBinary64 x,MotionBinary64 y,Random& random,Create cr
     return true;
 }
 template<unsigned Count,unsigned Variation,unsigned Radius,class Random,class Create>
-bool flashBurstScript(MotionBinary64 x,MotionBinary64 y,Random& random,Create create) {
+bool flashBurstPublished(SmokeBurstCaller& caller,MotionBinary64 x,MotionBinary64 y,
+                         Random& random,Create create) {
     static_assert(Count>=Variation&&Variation<=32767&&Count<=32767&&Radius<=32767,"admitted integer burst arguments");
-    const unsigned count=Count-Variation+random.irandomSmall(Variation*2);
-    for(unsigned i=0;i<count;++i) {
-        auto py=y,px=x;
+    caller.smx=x;caller.smy=y;caller.smokenum=Count;caller.vary=Variation;caller.pvary=Radius;
+    caller.smokenum+=int(random.irandomSmall(Variation*2))-int(Variation);
+    const int count=caller.smokenum;
+    for(int i=0;i<count;++i) {
+        // VM argument evaluation is Y then X. Synchronous child Create may
+        // change these shared fields, but cannot change the captured repeat count.
+        auto py=caller.smy,px=caller.smx;
         MotionBinary64 dy,dx;
-        if(!randomBinary64(random.nextU32(),MotionBinary64::fromInteger(int(Radius)*2),dy) ||
-           !dy.add(MotionBinary64::fromInteger(-int(Radius))) || !py.add(dy)) return false;
-        if(!randomBinary64(random.nextU32(),MotionBinary64::fromInteger(int(Radius)*2),dx) ||
-           !dx.add(MotionBinary64::fromInteger(-int(Radius))) || !px.add(dx)) return false;
+        if(caller.pvary<0 || caller.pvary>32767)return false;
+        if(!randomBinary64(random.nextU32(),MotionBinary64::fromInteger(caller.pvary*2),dy) ||
+           !dy.add(MotionBinary64::fromInteger(-caller.pvary)) || !py.add(dy)) return false;
+        if(!randomBinary64(random.nextU32(),MotionBinary64::fromInteger(caller.pvary*2),dx) ||
+           !dx.add(MotionBinary64::fromInteger(-caller.pvary)) || !px.add(dx)) return false;
         if(!create(224,px,py)) return false;
     }
     return true;
+}
+template<unsigned Count,unsigned Variation,unsigned Radius,class Random,class Create>
+bool flashBurstScript(MotionBinary64 x,MotionBinary64 y,Random& random,Create create) {
+    SmokeBurstCaller caller;
+    return flashBurstPublished<Count,Variation,Radius>(caller,x,y,random,create);
 }
 template<class Random,class Create>
 bool skeletonSmokeBurst(MotionBinary64 x,MotionBinary64 y,Random& random,Create create) {

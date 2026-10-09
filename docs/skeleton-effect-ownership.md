@@ -1118,6 +1118,14 @@ the remaining whole-pipeline raster uncertainty is described in
 - Flash-ball count also uses `irandom_range`. Its per-child Y range draw
   precedes X. Object 224's Create then adds independent integer jitter to X
   and Y and sets image speed to 0.3. Those extra draws must not be omitted.
+  `scrFlashballfx` writes the same caller `smx`, `smy`, `smokenum` and `vary`
+  fields as smoke, plus `pvary`. The repeat count is captured once, while
+  coordinates and radius are re-read after each synchronous child Create.
+  `flashBurstPublished` preserves these writes even on a failed birth; a later
+  smoke call leaves `pvary` unchanged. Its admitted radius domain is a
+  nonnegative integer up to 32767 (source callers use 2 or 10), not arbitrary
+  VM real radius values. This script adapter alone does not register flash
+  lifetimes or install their mixed animation/Draw scheduling.
 - Corpse Create inherits object 90's health/hit defaults, then samples X/Y
   velocity and chooses signed animation speed. Keep those samples even though
   `scrDeadBody` subsequently overwrites velocity. The wrapper caps impact at
