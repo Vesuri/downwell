@@ -166,7 +166,11 @@ the field at its serialized boundary and performs cleanup after the traversal.
 There are distinct existing entry inputs, which must not be conflated:
 
 - Ordinary native initial entry restores the builder's seed-2, draw-330
-  checkpoint, then executes entry-field Create (draw 331).
+  checkpoint, then executes entry-field Create (draw 331). The builder's
+  authored position is (-16,704), distinct from the player's (240,176).
+  `gml_GlobalScript_scrBuilder` block 13 creates object 78 at `self.x-100`,
+  `self.y`; its initial X is therefore -116. All native entry checkpoints
+  retain this position, including the seed-4 and seed-8 verification entries.
 - Native Retry/next-level entry resets the builder on the world's current RNG
   and subsequently executes entry-field Create. It must not restore the initial
   seed/checkpoint.
@@ -177,9 +181,11 @@ There are distinct existing entry inputs, which must not be conflated:
 
 The live native call sites perform builder setup before the fresh traversal.
 The stored adapter runs builder Create (code 1002) at authored index 0 and
-field Create (2731) at index 147. Native builder setup still does not register
-the builder's controller lifetime, and the player is still born earlier during
-world construction. These omissions prevent claiming full room-order parity.
+field Create (2731) at index 147. Native player ownership is published at
+authored index 1, but native builder setup still does not register the builder's
+controller lifetime, and native player-created controllers/companions are not
+yet a complete synchronous birth stream. These omissions prevent claiming full
+room-order parity.
 Non-glitch wall Create consumes no RNG, but that does not make relocating
 field lifetime publication or cleanup equivalent. Terrain failure before the
 field consumes no field RNG; failure afterwards retains its marked lifetime

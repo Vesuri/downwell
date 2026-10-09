@@ -3,6 +3,7 @@
 #include "platform/amiga/AmigaTerrain.h"
 #include "platform/amiga/AmigaGameplayGeneration.h"
 #include "platform/amiga/AmigaNaturalRouteVerification.h"
+#include "platform/amiga/AmigaOverflowProfileEntry.h"
 #include "core/BuilderPatternPack.h"
 #include "core/ObjectPack.h"
 #include "core/EnemyAlarmEvents.h"
@@ -2181,6 +2182,71 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
 }
 }
 
+void testBuilderCheckpoints(const char* roomPath, const char* objectPath, const char* patternPath) {
+    auto rb = readFile(roomPath), ob = readFile(objectPath), pb = readFile(patternPath);
+    downwell::RoomPack rooms(rb.data(), rb.size());
+    downwell::ObjectPack objects(ob.data(), ob.size());
+    downwell::BuilderPatternPack patterns(pb.data(), pb.size());
+    downwell::PackedRoom room;
+    require(rooms.findRoom(11, room), "natural route has decoded main room");
+    downwell::PackedRoomInstance authoredBuilder;
+    require(rooms.roomInstance(room, 0, authoredBuilder) &&
+        authoredBuilder.objectId == 65 && authoredBuilder.instanceId == 100856 &&
+        authoredBuilder.x == -16 && authoredBuilder.y == 704,
+        "builder checkpoint is anchored to the serialized builder, not the player");
+    for (unsigned seed : {2u, 4u, 8u}) {
+        downwell::StartupRuntime entry(downwell::PlatformProfile::nonDesktop,
+            &rooms, &objects, seed, &patterns);
+        entry.skipToGameForTesting();
+        auto reference = entry.mainBuilderState();
+        auto referenceRandom = entry.randomState();
+        downwell::GameMakerRandom nativeRandom;
+        AmigaTerrainFragment fragments[19];
+        AmigaAreaOneTerrainBuilder checkpoint(fragments, 19);
+        if (seed == 2) checkpoint.resetInitialCheckpoint(nativeRandom);
+        else if (seed == 4) AmigaNaturalRouteVerification::entry(checkpoint, nativeRandom);
+        else {
+            require(amigaOverflowProfileEntry(checkpoint, nativeRandom), "overflow checkpoint imports");
+            nativeRandom.nextU32(); // This checkpoint precedes entrance-field Create.
+        }
+        using Commands = std::vector<downwell::DeferredCreateInstance>;
+        Commands expected, actual;
+        const auto collect = [](void* context, const downwell::DeferredCreateInstance& command) {
+            static_cast<Commands*>(context)->push_back(command);
+            return true;
+        };
+        checkpoint.setCreateObserver(collect, &actual);
+        bool sawSpawner = false;
+        for (unsigned tick = 0; tick < 128 && !reference.endReached(); ++tick) {
+            expected.clear(); actual.clear();
+            downwell::AreaOneBuilderStep a, b;
+            require(reference.stepVisible(patterns, referenceRandom, 100000, collect, &expected, a) &&
+                checkpoint.stepVisible(patterns, nativeRandom, 100000, b),
+                "decoded and checkpoint builders generate the complete initial level");
+            require(expected.size() == actual.size(), "checkpoint preserves ordered birth count");
+            for (unsigned i = 0; i < expected.size(); ++i) {
+                const auto& e = expected[i]; const auto& n = actual[i];
+                require(e.objectId == n.objectId && e.x == n.x && e.y == n.y,
+                    "checkpoint preserves every ordered birth identity and position");
+                if (e.objectId == 78) {
+                    require(!sawSpawner && n.x == authoredBuilder.x - 100,
+                        "scrBuilder creates its single spawner at self.x minus 100");
+                    sawSpawner = true;
+                }
+            }
+            require(reference.y() == checkpoint.frontierY() &&
+                referenceRandom.drawCount() == nativeRandom.drawCount() &&
+                referenceRandom.stateIndex() == nativeRandom.stateIndex(),
+                "checkpoint preserves generation frontier and RNG cursor");
+            for (unsigned word = 0; word < 16; ++word)
+                require(referenceRandom.stateWord(word) == nativeRandom.stateWord(word),
+                    "checkpoint preserves complete generation RNG state");
+        }
+        require(sawSpawner && reference.endReached() && checkpoint.endReached(),
+            "all initial checkpoints reach the end with the source-positioned spawner");
+    }
+}
+
 // Input-only route: inspect terrain to choose buttons, never modify the world.
 // This checks the actual room builder and collision adapters, not exit fixtures.
 void testNaturalExit(const char* roomPath, const char* objectPath, const char* patternPath) {
@@ -2648,6 +2714,7 @@ int main(int argc, char** argv) {
         std::cout << "Generated world handoff passed\n";
         return 0;
     }
+    if (argc >= 4) testBuilderCheckpoints(argv[1], argv[2], argv[3]);
     if (argc >= 4 && (std::getenv("DOWNWELL_VERIFY_NATURAL_EXIT") || std::getenv("DOWNWELL_VERIFY_ROUTE_SWEEP"))) {
         testNaturalExit(argv[1], argv[2], argv[3]);
         return 0;

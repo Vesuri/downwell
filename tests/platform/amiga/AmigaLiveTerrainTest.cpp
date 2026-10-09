@@ -391,7 +391,7 @@ void checkSchedule(const downwell::BuilderPatternPack& patterns, bool interleave
     native.resetInitialCheckpoint(nativeRandom);
     for (unsigned i = 0; i < 331; ++i) referenceRandom.nextU32();
     downwell::AreaOneBuilder reference;
-    reference.restoreInitialCheckpoint(240, 704, -30, 8, 3);
+    reference.restoreInitialCheckpoint(-16, 704, -30, 8, 3);
     Commands commands;
     unsigned ticks = 0, enemyCount = 0, decorationCount = 0;
     while (!native.endReached() && ticks++ < 128) {

@@ -174,7 +174,9 @@ void AmigaAreaOneTerrainBuilder::resetInitialCheckpointBeforeEntrance(
     // Captured at the initial main-room entry, before any builder Step event.
     random.setSeed(2);
     for (unsigned draw = 0; draw < 330; ++draw) random.nextU32();
-    builder_.restoreInitialCheckpoint(240, 704, -30, 8, 3);
+    // rmMain's objBuilder (100856) is at -16,704, not the player's x=240.
+    // scrBuilder uses this x for the synchronous objSpawner birth (x-100).
+    builder_.restoreInitialCheckpoint(-16, 704, -30, 8, 3);
     fragmentCount_ = enemyCount_ = decorationCount_ = 0;
     failed_ = false;
 }

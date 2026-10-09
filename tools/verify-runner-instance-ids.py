@@ -51,6 +51,12 @@ def assembly(name, digest):
     assert sha256(payload).hexdigest() == digest, name
     return payload.decode()
 
+builder = assembly("gml_GlobalScript_scrBuilder",
+    "0c95048af06ff612499acd64a717766441b820d19ffc6017c0ff3a95425581f5")
+assert (authored[100856]["x"], authored[100856]["y"]) == (-16, 704)
+assert ("pushi.e 78\nconv.i.v\npush.v self.y\npush.v self.x\n"
+        "pushi.e 100\nsub.i.v\ncall.i gml_Script_instance_create(argc=3)") in builder
+
 player = assembly("gml_Object_objPlayer_n_Create_0",
     "8298b2249fec2b4226f43d257335176ea0f6282bf89dfc5aab5be2c700e88e3b")
 init = assembly("gml_GlobalScript_scrPlayerInit",

@@ -16,7 +16,7 @@ struct AmigaNaturalRouteVerification {
         random.setSeed(4);
         for (unsigned i = 0; i < 325; ++i) random.nextU32();
         downwell::AreaOneBuilder initial;
-        initial.restoreInitialCheckpoint(240, 704, -30, 8, 4);
+        initial.restoreInitialCheckpoint(-16, 704, -30, 8, 4);
         builder.resetFromRoomEntry(initial);
     }
     downwell::Input input(const AmigaPortRuntime& game, AmigaTerrainCollisionContext& collision,

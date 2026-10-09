@@ -9,7 +9,7 @@ inline bool amigaOverflowProfileEntry(AmigaAreaOneTerrainBuilder& builder,
     random.setSeed(8);
     for(unsigned i=0;i<334;++i)random.nextU32();
     downwell::AreaOneBuilder initial;
-    initial.restoreInitialCheckpoint(240,704,-30,13,4);
+    initial.restoreInitialCheckpoint(-16,704,-30,13,4);
     return builder.resetFromRoomEntry(initial);
 }
 #endif
