@@ -686,6 +686,59 @@ int main(){
         }
         require(child.generation&&shards.clear(),"source wall path produced and retired a registered limbo child");
     }
+    for(unsigned reject=0;reject<5;++reject){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach limbo bullet contact world");world->skipToGameForTesting();
+        InstanceHandle shot;
+        for(unsigned tick=0;tick<1000&&!shot.generation;++tick){
+            world->step(gameplayContactProfileInput(tick,world->mainPlayerX(),world->mainPlayerY()),false);
+            if(world->mainBulletCount())shot=world->mainBulletAt(0).instance;
+        }
+        require(world->effectsSucceeded()&&shot.generation,"obtain a live fired bullet identity");
+        // Explicit source-state admission. This does not resume the legacy
+        // trajectory or claim that natural source bullet scheduling is wired.
+        MachineGunSourceMotion motion;GameMakerRandom spread(2);
+        require(motion.reset(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(512))&&motion.initialize(spread),
+            "initialize exact VM velocity for the selected bullet");
+        auto shards=world->limboShardRegistration<1>();InstanceHandle shard;
+        require(world->createRegisteredLimboShard(shards,motion.x.promoted(),motion.y.promoted(),false,shard),"create contact shard");
+        unsigned reads=0;
+        auto velocity=[&](InstanceHandle selected,MotionBinary64& x,MotionBinary64& y){
+            ++reads;require(selected.slot==shot.slot&&selected.generation==shot.generation,"resolve selected other lifetime");
+            if(reject==1||!motion.initialized)return false;
+            x=motion.xsp;y=reject==2?MotionBinary64{0x7ff00000u,0}:motion.ysp;return true;
+        };
+        const auto draws=world->randomDrawCount();auto expectedRandom=world->randomState();
+        MotionBinary64 expectedX;
+        require(randomBinary64(expectedRandom.nextU32(),MotionBinary64::fromInteger(2),expectedX),"expected contact RNG");
+        if(motion.xsp.zero())expectedX={};else expectedX.high|=motion.xsp.high&0x80000000u;
+        RunnerCollisionEventContext context;
+        auto dispatch=[&]{return owner->dispatchCollisionEvent(context,shard,shot,{true,false},[&](const auto& event){
+            require(event.owner==379&&event.code==2771&&event.subtype==world->resolveInstance(shot)->objectId,
+                "parentPBullet event inherits with actual other subtype");
+            auto selected=event;
+            if(reject==3)selected.owner=89;
+            if(reject==4)++selected.other.generation;
+            return world->dispatchLimboShardBulletCollision(shards,selected,velocity);
+        });};
+        if(reject){
+            require(!dispatch()&&!world->effectsSucceeded()&&!context.current()&&world->randomDrawCount()==draws&&
+                !shards.state(shard)->noTouch&&reads==(reject<3?1u:0u),"reject unavailable velocity, malformed binding and stale other before mutation");
+            continue;
+        }
+        require(shards.activate(shard,false)&&dispatch()&&reads==0&&world->randomDrawCount()==draws,
+            "inactive shard does not evaluate bullet fields");
+        require(shards.activate(shard,true)&&dispatch()&&reads==1&&world->randomDrawCount()==draws+1,"one contact consumes one shared RNG word");
+        const auto* state=shards.state(shard);
+        require(state&&state->xsp.high==expectedX.high&&state->xsp.low==expectedX.low&&
+            state->ysp.high==motion.ysp.high&&state->ysp.low==motion.ysp.low&&state->noTouch&&state->alarm2==5&&
+            world->resolveInstance(shard)->alarms.get(2)==5,"contact preserves fractional velocity and publishes alarm 2");
+        motion.initialized=false;
+        require(dispatch()&&reads==1&&world->randomDrawCount()==draws+1&&!context.current(),
+            "noTouch skips even an unavailable bullet velocity owner");
+        require(shards.clear(),"retire contact shard");
+    }
     for(unsigned reject=0;reject<3;++reject){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());

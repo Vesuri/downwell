@@ -1430,6 +1430,25 @@ public:
             MotionBinary64::fromInteger(mainPlayerMotion_.speedYFifths()),random_);
         return run_.effectsSucceeded;
     }
+    // The selected bullet's private VM fields are not its engine hspeed/vspeed
+    // or a difference between rounded positions. The caller must supply the
+    // source-motion owner for this exact lifetime; no trajectory fallback.
+    template<unsigned Capacity,class ReadVelocity> bool dispatchLimboShardBulletCollision(
+        StoredLimboShardRegistration<instanceCapacity,Capacity>& shards,
+        const RunnerCollisionEventContext::Frame& event,ReadVelocity readVelocity){
+        if(!run_.effectsSucceeded)return false;
+        const auto* self=instances_.resolve(event.self);const auto* other=instances_.resolve(event.other);
+        PackedObjectEvent binding{};bool found=false;
+        if(!shards.belongsTo(instances_)||!shards.valid()||!self||!other||!objectPack_||
+           self->objectId!=379||!shards.state(event.self)||event.type!=4||event.subtype!=other->objectId||
+           event.owner!=379||event.code!=2771||
+           !objectPack_->collisionEvent(379,other->objectId,found,binding)||!found||
+           binding.ownerObjectId!=379||binding.codeId!=2771)return run_.effectsSucceeded=false;
+        if(!self->active||self->destroyRequested||shards.state(event.self)->noTouch)return true;
+        MotionBinary64 xsp,ysp;
+        if(!readVelocity(event.other,xsp,ysp)||!xsp.valid()||!ysp.valid())return run_.effectsSucceeded=false;
+        return run_.effectsSucceeded=shards.bulletContact(event.self,xsp,ysp,random_)&&run_.effectsSucceeded;
+    }
     template<unsigned Capacity,class Effects> bool dispatchCorpsePlayerCollision(
         StoredCorpseRegistration<instanceCapacity,Capacity>& corpses,
         const RunnerCollisionEventContext::Frame& event,bool knifeFork,bool playerDead,Effects& effects){

@@ -1893,6 +1893,17 @@ the time shard's cooldown handler. Population overflow alone does not destroy
 the actor: it also must be outside the view. The final above-view test still
 runs after an earlier destruction request.
 
+Collision code 2771 inherits through parentPBullet (89), but the collision
+context retains the selected bullet's actual object subtype and generation.
+The stored and native `dispatchLimboShardBulletCollision` adapters validate that
+binding and resolve the selected lifetime before asking its source-motion owner
+for custom `xsp`/`ysp`. They never derive these fields from engine velocity or
+rounded position differences. The horizontal sign scales one shared RNG draw;
+vertical velocity is copied without builtin-field narrowing. Inactive, marked
+or noTouch shards do not read velocity or consume RNG. An unavailable source
+owner is an explicit failure. The adapter contract does not admit the older
+Q20/Q32 bullet trajectory as source motion.
+
 Draw calls draw_self when `!dflash`; the authored -1/+1 states use VM numeric
 truth, so the negative phase is visible. This is direct default sprite drawing,
 not the time shard's effect-surface routing. `LimboShard` implements the event

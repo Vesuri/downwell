@@ -26,6 +26,13 @@ bool nativeLimboProbe(downwell::GameplayCollisionOwner& owner,GameplayWorld& wor
     return world.createLimboShardWithSourceId(105193,{}, {},false,child)&&
         owner.stepLimboShard(child,true,480,{},masks,views);
 }
+struct NativeBulletVelocity {
+    bool operator()(downwell::InstanceHandle,downwell::MotionBinary64&,downwell::MotionBinary64&);
+};
+bool nativeLimboContact(downwell::GameplayCollisionOwner& owner,
+    const downwell::RunnerCollisionEventContext::Frame& event,NativeBulletVelocity read){
+    return owner.dispatchLimboShardBulletCollision(event,read);
+}
 struct NativeEnemyDeathAudioProbe { bool isPlaying(int,bool&);bool stop(int); };
 bool nativeRunControllerBirth(downwell::GameplayCollisionOwner& owner,unsigned source,
     bool (*initialize)(downwell::InstanceHandle),downwell::InstanceHandle& key){
@@ -3241,6 +3248,53 @@ int main(){
         assert(world->createLimboShardWithSourceId(105191,{}, {},false,local)&&local.generation!=shared.generation);
         assert(world->restartFromResults(DeathMenuSequence::Action::Retry,2,0)==ResultsDestination::gameplay&&
             owner->limboShards().size()==0&&owner->valid());
+    }
+    for(unsigned reject=0;reject<5;++reject){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));world->step(4);
+        assert(world->effectsSucceeded()&&world->bulletCount()==1);
+        const auto& bullet=world->bulletAt(0);InstanceHandle shot,shard,local;
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::bullet,{bullet.identitySlot,bullet.lifetimeId},shot));
+        MachineGunSourceMotion motion;GameMakerRandom spread(2);
+        // Explicit checked source state for this real bullet lifetime, not a
+        // reconstruction from its old trajectory or a natural Step fixture.
+        const auto* position=owner->state(shot);assert(position);
+        assert(motion.reset(position->x.promoted(),position->y.promoted())&&motion.initialize(spread));
+        assert(world->createLimboShardWithSourceId(105194,motion.x.promoted(),motion.y.promoted(),false,local)&&
+            GameplayCollisionView::encode(GameplayCollisionView::Kind::limboShard,local,shard));
+        unsigned reads=0;
+        auto velocity=[&](InstanceHandle selected,MotionBinary64& x,MotionBinary64& y){
+            ++reads;assert(selected.slot==shot.slot&&selected.generation==shot.generation);
+            if(reject==1||!motion.initialized)return false;
+            x=motion.xsp;y=reject==2?MotionBinary64{0x7ff00000u,0}:motion.ysp;return true;
+        };
+        const auto draws=world->randomDrawCount();auto expectedRandom=world->randomState();MotionBinary64 expectedX;
+        assert(randomBinary64(expectedRandom.nextU32(),MotionBinary64::fromInteger(2),expectedX));
+        if(motion.xsp.zero())expectedX={};else expectedX.high|=motion.xsp.high&0x80000000u;
+        RunnerCollisionEventContext context;
+        auto dispatch=[&]{return owner->dispatchCollisionEvent(context,shard,shot,{true,false},[&](const auto& event){
+            assert(event.owner==379&&event.code==2771&&event.subtype==261);
+            auto selected=event;
+            if(reject==3)selected.owner=89;
+            if(reject==4)++selected.other.generation;
+            return owner->dispatchLimboShardBulletCollision(selected,velocity);
+        });};
+        if(reject){
+            assert(!dispatch()&&!owner->valid()&&!context.current()&&world->randomDrawCount()==draws&&
+                !owner->limboShards().find(local)->state.noTouch&&reads==(reject<3?1u:0u));
+            continue;
+        }
+        assert(owner->limboShards().activate(local,false)&&dispatch()&&reads==0&&world->randomDrawCount()==draws);
+        assert(owner->limboShards().activate(local,true)&&dispatch()&&reads==1&&world->randomDrawCount()==draws+1);
+        const auto* record=owner->limboShards().find(local);assert(record);
+        const auto& state=record->state;
+        assert(state.xsp.high==expectedX.high&&state.xsp.low==expectedX.low&&
+            state.ysp.high==motion.ysp.high&&state.ysp.low==motion.ysp.low&&state.noTouch&&state.alarm2==5&&record->alarms.get(2)==5);
+        motion.initialized=false;
+        assert(dispatch()&&reads==1&&world->randomDrawCount()==draws+1&&!context.current());
+        assert(owner->limboShards().clear());
     }
     // Real shape/point queries through the retained wall script, not mocked
     // neighbour occupancy. Compare callback order and every retained field.

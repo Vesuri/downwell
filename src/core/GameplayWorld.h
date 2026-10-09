@@ -361,6 +361,10 @@ public:
         return run_.effectsSucceeded=run_.effectsSucceeded&&limboShards_&&
             limboShards_->step(key,allowed,player,enemyRandom_,queries);
     }
+    bool collideLimboShard(downwell::InstanceHandle key,downwell::MotionBinary64 xsp,downwell::MotionBinary64 ysp){
+        return run_.effectsSucceeded=run_.effectsSucceeded&&limboShards_&&
+            limboShards_->bulletContact(key,xsp,ysp,enemyRandom_);
+    }
     const ConsumptionParticles* consumptionParticles()const{return consumptionParticles_;}
     bool bindConsumptionParticles(ConsumptionParticles& instances){
         if(consumptionParticles_||!instances.valid()||instances.size())return false;

@@ -2016,6 +2016,23 @@ public:
             return check(false);
         return check(world_->contactGoalFieldWind(local,wind,channel,volume,audio));
     }
+    // Exact other.xsp/ysp belong to the selected projectile lifetime. Until
+    // the live source-motion owner is connected, an unavailable provider is
+    // a failure, never a conversion of the older Q20/Q32 trajectory.
+    template<class ReadVelocity> bool dispatchLimboShardBulletCollision(
+        const RunnerCollisionEventContext::Frame& event,ReadVelocity readVelocity){
+        View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;
+        if(!valid()||!world_||!resolves(event.self)||!resolves(event.other)||
+           !View::decode(event.self,kind,local)||kind!=View::Kind::limboShard||
+           event.type!=4||event.subtype!=objectOf(event.other)||event.owner!=379||event.code!=2771||
+           !objects_.collisionEvent(379,event.subtype,found,binding)||!found||
+           binding.ownerObjectId!=379||binding.codeId!=2771)return check(false);
+        const auto* shard=limbo_.find(local);if(!shard)return check(false);
+        if(!shard->active||shard->destroyRequested||shard->state.noTouch)return true;
+        MotionBinary64 xsp,ysp;
+        if(!readVelocity(event.other,xsp,ysp)||!xsp.valid()||!ysp.valid())return check(false);
+        return check(world_->collideLimboShard(local,xsp,ysp));
+    }
     bool dispatchTimeShardCollision(const RunnerCollisionEventContext::Frame& event){
         View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;
         InstanceHandle player;
