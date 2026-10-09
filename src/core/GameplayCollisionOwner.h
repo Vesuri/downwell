@@ -1916,6 +1916,20 @@ public:
            (event.code!=2016&&event.code!=2017))return check(false);
         return event.code==2016||check(smoke_.wallContact(local));
     }
+    bool dispatchConsumptionBloodCollision(const RunnerCollisionEventContext::Frame& event){
+        View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;
+        if(!valid()||!world_||!resolves(event.self)||
+           !View::decode(event.self,kind,local)||kind!=View::Kind::consumptionBlood||event.type!=4)return check(false);
+        View::Record opposite;
+        if(!View(*world_).resolve(event.other,opposite))return check(false);
+        const int otherObject=!terrainRegistered_&&opposite.terrain?opposite.terrain->objectId:
+            (resolves(event.other)?objectOf(event.other):-1);
+        if(otherObject<0||event.subtype!=otherObject||
+           !objects_.collisionEvent(223,otherObject,found,binding)||!found||
+           event.owner!=223||binding.ownerObjectId!=223||event.code!=binding.codeId||
+           (event.code!=2007&&event.code!=2008))return check(false);
+        return check(consumption_.kill(local));
+    }
     template<class Ops> bool dispatchCurrencyCollision(const RunnerCollisionEventContext::Frame& event,Ops& ops){
         View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;
         if(!valid()||!world_||!resolves(event.self)||!resolves(event.other)||

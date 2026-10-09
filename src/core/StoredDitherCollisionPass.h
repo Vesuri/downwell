@@ -4,7 +4,7 @@
 namespace downwell {
 // Migration boundary for the authored wall-pruning controller. Collection uses
 // the complete owner queue/tree order; the implemented 61/60 pair and, when
-// explicitly bound, registered 225/60 pairs are executed here. Other families
+// explicitly bound, registered 225/60 and 223/60 pairs are executed here. Other families
 // still use the existing gameplay adapters.
 // This is not a second pass to run alongside a complete collision dispatcher.
 class StoredDitherCollisionPass {
@@ -26,6 +26,22 @@ public:
             const auto* self=owner_.resolve(event.self);
             return self&&(self->objectId==225?world.dispatchSmokeCollision(smoke,event):
                          world.dispatchDitherAboveCollision(event));
+        });
+    }
+    template<unsigned SmokeCapacity,unsigned ParticleCapacity> bool run(StartupRuntime& world,
+        StoredSmokeRegistration<StartupRuntime::instanceCapacity,SmokeCapacity>& smoke,
+        StoredConsumptionBloodRegistration<StartupRuntime::instanceCapacity,ParticleCapacity>& particles){
+        if(!smoke.valid()||!particles.valid())return false;
+        const auto effect=[&](const auto& r){
+            return (r.objectId==225&&smoke.state(r))||(r.objectId==223&&particles.state(r));
+        };
+        return runSelected(world,[&](const auto& a,const auto& b){
+            return (b.objectId==60&&effect(a))||(a.objectId==60&&effect(b));
+        },[&](const auto& event){
+            const auto* self=owner_.resolve(event.self);if(!self)return false;
+            if(self->objectId==223)return world.dispatchConsumptionBloodCollision(particles,event);
+            if(self->objectId==225)return world.dispatchSmokeCollision(smoke,event);
+            return world.dispatchDitherAboveCollision(event);
         });
     }
 private:

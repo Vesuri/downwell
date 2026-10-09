@@ -1313,6 +1313,19 @@ public:
             return state.collidePlayerPublished(knifeFork,playerDead,publish,effects,okay);
         })&&run_.effectsSucceeded;
     }
+    template<unsigned Capacity> bool dispatchConsumptionBloodCollision(
+        StoredConsumptionBloodRegistration<instanceCapacity,Capacity>& particles,
+        const RunnerCollisionEventContext::Frame& event){
+        if(!run_.effectsSucceeded)return false;
+        const auto* self=instances_.resolve(event.self);const auto* other=instances_.resolve(event.other);
+        PackedObjectEvent binding{};bool found=false;
+        if(!particles.belongsTo(instances_)||!particles.valid()||!self||!other||!objectPack_||self->objectId!=223||
+           !particles.state(*self)||event.type!=4||event.subtype!=other->objectId||
+           !objectPack_->collisionEvent(223,other->objectId,found,binding)||!found||
+           binding.ownerObjectId!=223||event.owner!=223||event.code!=binding.codeId||
+           (event.code!=2007&&event.code!=2008))return run_.effectsSucceeded=false;
+        return run_.effectsSucceeded=particles.kill(*self)&&run_.effectsSucceeded;
+    }
     template<unsigned Capacity> bool dispatchSmokeCollision(
         StoredSmokeRegistration<instanceCapacity,Capacity>& smoke,
         const RunnerCollisionEventContext::Frame& event){

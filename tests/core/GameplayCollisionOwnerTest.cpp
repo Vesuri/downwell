@@ -20,6 +20,9 @@ struct NativeConsumptionGlobalsProbe {
 };
 bool nativeConsumptionStep(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle shared,
     NativeConsumptionGlobalsProbe& globals){return owner.stepConsumptionBlood(shared,globals);}
+bool nativeConsumptionContact(downwell::GameplayCollisionOwner& owner,const downwell::RunnerCollisionEventContext::Frame& event){
+    return owner.dispatchConsumptionBloodCollision(event);
+}
 struct NativeCorpseStepProbe {
     int area();int restInPieces();
     bool create(int,downwell::MotionBinary64,downwell::MotionBinary64);
@@ -799,6 +802,38 @@ int main(){
         }
         assert(world->randomDrawCount()==draws&&owner->valid()==(reject==0));
         if(reject){world->step(0);assert(!world->effectsSucceeded());}
+    }
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+        GameplayCollisionOwner::Ownership::nativeScenery})
+    for(unsigned reject=0;reject<3;++reject){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));auto& particles=owner->consumptionParticles();GameMakerRandom random(2);
+        struct Globals {
+            MotionBinary64 grav{};
+            bool gravity(MotionBinary64 v){grav=v;return true;}
+            MotionBinary64 gravity(){return grav;}MotionBinary64 fallSpeed(){return {};}
+        } globals;
+        InstanceHandle local,self,wall;
+        assert(particles.create(105187,{}, {},random,globals,local)&&
+            GameplayCollisionView::encode(GameplayCollisionView::Kind::consumptionBlood,local,self));
+        assert(owner->terrain().append(60,0,200,true)&&GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,
+            owner->terrain().handle(owner->terrain().size()-1),wall));
+        const auto draws=world->randomDrawCount();RunnerCollisionEventContext context;
+        const bool ok=context.dispatch(self,wall,{true,false},[&](auto,auto,int& subtype,bool& found,PackedObjectEvent& event){
+            subtype=60;return objects.collisionEvent(223,60,found,event);
+        },[&](auto event){
+            if(reject==1)event.code=2007; // A water event cannot be substituted for a wall event.
+            if(reject==2)++event.other.generation;
+            return owner->dispatchConsumptionBloodCollision(event);
+        });
+        assert(ok==(reject==0)&&owner->valid()==ok&&world->randomDrawCount()==draws);
+        const auto* record=particles.find(local);
+        assert(record&&record->destroyRequested==ok&&record->state.destroyRequested==ok);
+        if(ok){assert(owner->prepareDraw()&&!particles.find(local));}
+        else {world->step(0);assert(!world->effectsSucceeded());}
     }
     for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native})
     for(unsigned failure=0;failure<4;++failure){

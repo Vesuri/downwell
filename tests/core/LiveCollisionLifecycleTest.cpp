@@ -540,16 +540,62 @@ int main(){
         for(unsigned i=0;i<world->activeInstanceCount();++i)
             if(world->instanceAt(i).instanceId==id)self=world->instanceHandleAt(i);
         auto expected=*smoke.state(*r);unsigned contacts=0;
+        auto particles=world->consumptionBloodRegistration<1>();std::uint32_t particleId=0;
+        struct Globals {
+            MotionBinary64 grav{};
+            bool gravity(MotionBinary64 v){grav=v;return true;}
+            MotionBinary64 gravity(){return grav;}MotionBinary64 fallSpeed(){return {};}
+        } globals;
+        require(world->createRegisteredConsumptionBlood(particles,MotionBinary64::fromInteger(wall->x+4),
+            MotionBinary64::fromInteger(wall->y+4),globals,particleId),"place particle inside actual retained wall");
         for(unsigned i=0;i<world->activeInstanceCount();++i){
             const auto& other=world->instanceAt(i);if(other.objectId!=60||other.destroyRequested)continue;
             bool hit=false;require(owner->collisionOverlap(self,world->instanceHandleAt(i),hit),"resource smoke/wall overlap");
             if(hit){++contacts;require(expected.collideWall(),"one source event per overlapping wall");}
         }
-        require(contacts&&pass->run(*world,smoke),"shared ordered pair stream admits smoke beside dither");
+        require(contacts&&pass->run(*world,smoke,particles),"shared ordered pair stream admits smoke and particles beside dither");
+        const auto* particle=world->instance(particleId);
+        require(particle&&particle->destroyRequested&&particles.state(*particle)->destroyRequested,
+            "actual ordered geometric contact marks particle without immediate retirement");
         const auto* state=smoke.state(*r);
         require(state&&state->speed.high==expected.speed.high&&state->speed.low==expected.speed.low,
             "ordered collection executes all smoke contacts once");
         require(smoke.clear(),"retire mixed smoke fixture");
+        require(particles.clear(),"retire mixed particle fixture");
+    }
+    for(unsigned reject=0;reject<3;++reject){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach consumption collision world");world->skipToGameForTesting();
+        auto particles=world->consumptionBloodRegistration<1>();std::uint32_t id=0;
+        struct Globals {
+            MotionBinary64 grav{};
+            bool gravity(MotionBinary64 v){grav=v;return true;}
+            MotionBinary64 gravity(){return grav;}MotionBinary64 fallSpeed(){return {};}
+        } globals;
+        require(world->createRegisteredConsumptionBlood(particles,{}, {},globals,id),"register collision particle");
+        InstanceHandle self{},wall{};
+        require(world->visitDrawChecked([&](InstanceHandle key,const InstanceRecord& record){
+            if(record.instanceId==id)self=key;
+            if(record.objectId==60&&!wall.generation)wall=key;
+            return true;
+        })&&self.generation&&wall.generation,"select registered particle and wall lifetimes");
+        const auto draws=world->randomDrawCount();RunnerCollisionEventContext context;
+        const bool ok=owner->dispatchCollisionEvent(context,self,wall,{true,false},[&](auto event){
+            if(reject==1)event.code=2007;
+            if(reject==2)++event.other.generation;
+            return world->dispatchConsumptionBloodCollision(particles,event);
+        });
+        require(ok==(reject==0)&&world->effectsSucceeded()==ok&&world->randomDrawCount()==draws,
+            "consumption contact validates event/lifetime and consumes no RNG");
+        const auto* record=world->instance(id);
+        require(record&&record->destroyRequested==ok&&particles.state(*record)->destroyRequested==ok,
+            "kill marks both owners but preserves lifetime until cleanup");
+        if(ok){
+            require(world->withConsumptionBloodEvents(particles,globals,[&]{world->step({});return world->effectsSucceeded();})&&
+                !world->instance(id),"room cleanup retires contact-killed particle");
+        }
+        require(particles.clear(),"teardown collision particle");
     }
     for(unsigned mode=0;mode<4;++mode){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
