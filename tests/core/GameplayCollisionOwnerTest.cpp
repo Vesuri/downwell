@@ -6680,7 +6680,7 @@ int main(){
             assert(skeletons.dispatch(key,[](auto& state,auto&,bool&){state.hitPending=true;return true;}));
             unsigned hurts=0;SkeletonSoundAudio audio;audio.wet=true;
             SoundPlayEnvironment soundEnvironment;soundEnvironment.gameVolume={0x3fd00000u,0};
-            soundEnvironment.viewHeight=MotionBinary64::fromInteger(1000);soundEnvironment.inWater=true;
+            soundEnvironment.viewY=MotionBinary64::fromInteger(10000);soundEnvironment.inWater=true;
             auto stepPhase=std::make_unique<RunnerStepSnapshot<GameplayCollisionView::capacity>>();
             TimeStopEffects<4> skeletonStop;skeletonStop.player.stopped=true;
             auto stepSkeletons=[&]{return skeletonOwner->dispatchStepPhase(0,*stepPhase,[&](InstanceHandle selected,const PackedObjectEvent&){
@@ -6695,7 +6695,9 @@ int main(){
             skeletonStop.player.stopped=false;
             assert(stepSkeletons()&&hurts==1&&actor->state.sprite==205&&actor->state.hitStun&&!actor->state.hitPending&&
                 actor->state.alarms[1]==4&&actor->state.alarms[3]==30);
-            assert(audio.calls==7&&skeletonWorld->overlapSound(4)==133&&actor->state.sound.sndsnd==1001);
+            assert(audio.calls==7&&skeletonWorld->overlapSound(4)==133&&actor->state.sound.sndsnd==1001&&
+                soundEnvironment.viewHeight.high==MotionBinary64::fromInteger(284).high&&
+                soundEnvironment.viewY.high!=MotionBinary64::fromInteger(10000).high);
             assert(skeletons.dispatchPublished(key,[&](auto& state,auto&,auto& publish,bool&){
                 assert(publish.sprite(207)&&publish.imageIndex({0x40800000u})&&publish.sprite(205)&&state.sprite==205&&!state.timeline.bits&&
                     !state.imageIndex.high&&!state.imageIndex.low&&publish.sprite(207)&&publish.facing(-1));

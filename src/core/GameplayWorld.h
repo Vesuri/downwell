@@ -1372,6 +1372,11 @@ public:
     int overlapSound(unsigned channel)const{return channel<11?run_.overlapSounds[channel]:-1;}
     template<class Audio> bool playSkeletonSound(downwell::SkeletonActor& actor,int sound,
         downwell::SoundPlayEnvironment& environment,Audio& audio){
+        if(!run_.effectsSucceeded)return false;
+        auto top=downwell::MotionBinary64::fromInteger(boneViewTopQ8_);
+        if(!top.zero())top.high-=8u<<20;
+        environment.viewY=top;
+        environment.viewHeight=downwell::MotionBinary64::fromInteger(284);
         environment.y=downwell::MotionBinary64::fromInteger(actor.y);
         return run_.playSkeletonSound(actor.sound,sound,environment,audio);
     }

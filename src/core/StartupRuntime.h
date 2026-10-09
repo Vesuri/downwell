@@ -214,6 +214,13 @@ public:
     int overlapSound(unsigned channel)const{return channel<11?run_.overlapSounds[channel]:-1;}
     template<class Audio> bool playSkeletonSound(SkeletonActor& actor,int sound,
         SoundPlayEnvironment& environment,Audio& audio){
+        if(!run_.effectsSucceeded||roomId_!=mainRoomId||cameraViewHeight_!=surfaceHeight)
+            return run_.effectsSucceeded=false;
+        // Ordinary Step reads the previous Draw's published view, not the
+        // followed camera instance after its own Step has moved it.
+        if(!multiplyBinary64(MotionBinary64::fromInteger(ordinaryStepViewTopQ12_),{0x3f300000u,0},
+            environment.viewY))return run_.effectsSucceeded=false;
+        environment.viewHeight=MotionBinary64::fromInteger(cameraViewHeight_);
         environment.y=MotionBinary64::fromInteger(actor.y);
         return run_.playSkeletonSound(actor.sound,sound,environment,audio);
     }
