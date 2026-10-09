@@ -49,14 +49,20 @@ int main() {
             if (effect == Exit::Effect::ditherTransition) {
                 require(tick == 5, "dither starts on fifth alarm phase"); ++ditherEvents;
             } else {
-                require(effect == Exit::Effect::resultRoom && tick == 95,
-                    "result-room request follows ninety further alarm phases"); ++result;
+                require(effect == Exit::Effect::resultRoom && tick == 94,
+                    "result-room request counts Alarm 1 in the arming phase"); ++result;
             }
         });
         require(!exit.collide(tick > 10, stop, locked), "later living/dead collisions cannot rearm exit");
-        if (tick == 5) require(exit.alarm1 == 90, "new alarm retains full duration in dispatch frame");
+        if (tick == 5) require(exit.alarm1 == 89, "later alarm decrements after being armed");
     }
     require(ditherEvents == 1 && result == 1 && exit.alarm0 == -1 && exit.alarm1 == -1,
         "alarms are one-shot and later death does not invent cancellation");
+    exit.alarm0=exit.alarm1=1;
+    exit.advanceAlarms([&](Exit::Effect effect,int,int){
+        require(effect==Exit::Effect::ditherTransition,"overwritten due alarm must not request a room");
+        exit.alarm1=1; // Synchronous child Create, before the source assigns 90.
+    });
+    require(exit.alarm0==0&&exit.alarm1==89,"source post-Create assignment wins before later countdown");
     std::puts("Shared level-exit Create, collision and alarm sequence passed");
 }

@@ -19,7 +19,7 @@ int main() {
                 "grant occurs before decrement with the selected cursor"); ++grants;
         }
         if (effect == Effect::dither) { require(tick == 121, "exit dither follows thirty alarm phases"); ++dither; }
-        if (effect == Effect::nextLevel) { require(tick == 211, "next level follows ninety further phases"); ++next; }
+        if (effect == Effect::nextLevel) { require(tick == 210, "alarm 1 includes its arming phase in the ninety countdowns"); ++next; }
     };
     for (tick = 1; tick <= 220; ++tick) {
         menu.advanceAlarms(emit);
@@ -53,5 +53,30 @@ int main() {
         if (effect == Effect::rollOffers) require(menu.cursor == 1 && remaining == 1, "reroll resets cursor after decrement");
     });
     require(order == 4 && menu.visible && !menu.inputWait && !held, "additional award does not invent another input wait");
+    menu.create(2); menu.alarm0 = menu.alarm1 = 1;
+    unsigned departures = 0;
+    menu.advanceAlarms([&](Effect effect, unsigned) {
+        if (effect == Effect::nextLevel) ++departures;
+    });
+    require(menu.alarm0 == 0 && menu.alarm1 == 89 && departures == 0,
+        "Alarm 0 overwrites the formerly due Alarm 1 before its countdown");
+
+    menu.create(2); menu.alarm0 = 1;
+    menu.advanceAlarms([&](Effect effect, unsigned) {
+        if (effect == Effect::dither) menu.alarm1 = 1;
+        if (effect == Effect::fadeWhoosh) {
+            require(menu.alarm1 == 90, "post-Create source assignment overwrites child mutation");
+            menu.alarm1 = 1; menu.alarm3 = 1; menu.alarm4 = 1;
+            menu.alarm0 = 2;
+        }
+        if (effect == Effect::nextLevel) ++departures;
+    });
+    require(departures == 1 && menu.alarm1 == 0 && !menu.inputWait && menu.next == 4,
+        "synchronous event writes reach every later alarm in the same phase");
+    require(menu.alarm0 == 2, "earlier alarm is not revisited after a callback writes it");
+    menu.alarm0 = -1;
+    menu.advanceAlarms([&](Effect, unsigned) { std::abort(); });
+    require(menu.alarm1 == -1 && menu.alarm3 == -1 && menu.alarm4 == -1,
+        "zero alarms retire without dispatch on the following phase");
     std::puts("Level-clear selection timing, input and effect-order tests passed");
 }

@@ -182,12 +182,25 @@ int main() {
     {
         RunSession failed;GameMakerRandom rng(123);
         require(failed.emitBloodBurst(MotionBinary64::fromInteger(240),{},rng),"failure fixture births");
+        auto before=failed.bloodEffects;
         unsigned calls=0;
         failed.stepBloodBound(failed.bloodEffects.beginPhase(),true,480,
-            [&](const auto&,bool&){++calls;return false;});
+            [&](const auto& effect,bool&){
+                ++calls;
+                require(effect.savedSpeed.bits==effect.imageSpeed.bits,
+                    "source captures image speed before the failing field query");
+                return false;
+            });
         require(!failed.effectsSucceeded && calls==1,"unsupported field query latches session failure");
-        failed.bloodEffects.visitNewest([&](auto,const auto& effect){
-            require(effect.savedSpeed.bits==0xbf800000u,"failed query must not freeze or move an instance");
+        unsigned visited=0;
+        failed.bloodEffects.visitNewest([&](auto handle,const auto& effect){
+            const auto* old=before.get(handle);
+            require(old && effect.savedSpeed.bits==(visited++==0?old->imageSpeed.bits:old->savedSpeed.bits),
+                "query failure retains the first capture and does not visit later blood");
+            require(effect.imageSpeed.bits==old->imageSpeed.bits && effect.x.bits==old->x.bits &&
+                effect.y.bits==old->y.bits && effect.xx.high==old->xx.high && effect.xx.low==old->xx.low &&
+                effect.yy.high==old->yy.high && effect.yy.low==old->yy.low,
+                "failed query must not freeze or move an instance");
         });
         const auto draws=rng.drawCount();
         require(!failed.emitBloodBurst({}, {},rng) && rng.drawCount()==draws,"latched failure consumes no further RNG");
@@ -262,10 +275,10 @@ int main() {
             require(tick == 121, "source departure dither alarm timing"); ++dithers;
         }
         if (event == LevelClearSelection::Effect::nextLevel) {
-            require(tick == 211, "source next-room alarm timing"); ++advances;
+            require(tick == 210, "source next-room alarm timing includes the arming phase"); ++advances;
         }
     };
-    for (tick = 1; tick <= 211; ++tick) {
+    for (tick = 1; tick <= 210; ++tick) {
         require(!run.advanceAfterLevelClear(), "loader cannot advance before departure completes");
         bool confirm = true;
         require(run.stepLevelClear(confirm, false, false, heart, currency, player, health, random, emit),

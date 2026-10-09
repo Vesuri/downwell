@@ -19,19 +19,32 @@ struct LevelClearSelection {
         cursor = lastIndex / 2;
         return true;
     }
-    template<class Emit> void advanceAlarms(Emit emit) {
-        const bool a0 = AlarmBank::advanceValue(alarm0);
-        const bool a1 = AlarmBank::advanceValue(alarm1);
-        const bool a3 = AlarmBank::advanceValue(alarm3);
-        const bool a4 = AlarmBank::advanceValue(alarm4);
-        if (a0) {
-            emit(Effect::dither, 0);
-            alarm1 = 90;
-            emit(Effect::fadeWhoosh, 0);
+    // Dispatch immediately after each countdown. Later alarms observe writes
+    // made by this event (including synchronous effects), not a frozen mask.
+    // The room scheduler can interleave other objects at each alarm index.
+    template<class Emit> void advanceAlarm(unsigned index, Emit emit) {
+        switch (index) {
+        case 0:
+            if (AlarmBank::advanceValue(alarm0)) {
+                emit(Effect::dither, 0);
+                alarm1 = 90;
+                emit(Effect::fadeWhoosh, 0);
+            }
+            break;
+        case 1:
+            if (AlarmBank::advanceValue(alarm1)) emit(Effect::nextLevel, 0);
+            break;
+        case 3:
+            if (AlarmBank::advanceValue(alarm3)) inputWait = false;
+            break;
+        case 4:
+            if (AlarmBank::advanceValue(alarm4) && next <= 4) next = 4;
+            break;
         }
-        if (a1) emit(Effect::nextLevel, 0);
-        if (a3) inputWait = false;
-        if (a4 && next <= 4) next = 4;
+    }
+    template<class Emit> void advanceAlarms(Emit emit) {
+        for (unsigned index = 0; index < AlarmBank::count; ++index)
+            advanceAlarm(index, emit);
     }
     template<class Emit>
     void step(bool& confirm, bool leftPressed, bool rightPressed,

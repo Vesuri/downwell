@@ -32,17 +32,16 @@ struct LevelExit {
         goalStop = noControl = active = true;
         return true;
     }
-    // Call in the alarm phase, before that frame's collisions. Newly armed
-    // alarms are not decremented again during the same dispatch.
+    // Call in the alarm phase, before that frame's collisions. Dispatch before
+    // visiting the next slot so Alarm 1 observes Alarm 0's synchronous writes.
     template<class Emit>
     void advanceAlarms(Emit emit) {
         const bool first = AlarmBank::advanceValue(alarm0);
-        const bool second = AlarmBank::advanceValue(alarm1);
         if (first) {
             emit(Effect::ditherTransition, 0, 0);
             alarm1 = 90;
         }
-        if (second) emit(Effect::resultRoom, 0, 0);
+        if (AlarmBank::advanceValue(alarm1)) emit(Effect::resultRoom, 0, 0);
     }
 };
 }

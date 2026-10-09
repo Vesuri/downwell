@@ -2,6 +2,16 @@
 #include "core/InstanceStore.h"
 #include "core/MomentDelay.h"
 #include "core/RunControllerInstances.h"
+#include "core/LevelClearSelection.h"
+#include "core/LevelExit.h"
+void compileLevelExitAlarms(downwell::LevelExit& exit,
+    void (*emit)(downwell::LevelExit::Effect,int,int)){
+    exit.advanceAlarms(emit);
+}
+void compileResultAlarm(downwell::LevelClearSelection& result,unsigned index,
+    void (*emit)(downwell::LevelClearSelection::Effect,unsigned)){
+    result.advanceAlarm(index,emit);
+}
 bool compileControllerLifetime(downwell::RunControllerInstances<4>& owner,unsigned id,
     bool (*initialize)(downwell::InstanceHandle),downwell::InstanceHandle& key){
     return owner.create(id,{}, {},initialize,key);

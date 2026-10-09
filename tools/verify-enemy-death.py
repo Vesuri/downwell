@@ -86,6 +86,10 @@ def event_instructions(name):
 
 assert event_instructions("Object_objLineToResult_Alarm_1") == [
     "pushi.e 16", "conv.i.v", "call.i room_goto(argc=1)", "popz.v"]
+assert event_instructions("Object_objLineToResult_Alarm_0") == [
+    "pushi.e 68", "conv.i.v", "pushi.e 0", "conv.i.v", "pushi.e 0", "conv.i.v",
+    "call.i gml_Script_instance_create(argc=3)", "popz.v", "push.i 68049", "setowner.e",
+    "pushi.e 90", "conv.i.v", "pushi.e -1", "pushi.e 1", "pop.v.v [array]self.alarm"]
 assert event_instructions("Room_rmResult_Create") == [
     "pushglb.v global.g_cameraHeight", "pushi.e 160", "conv.i.v",
     "pushi.e -6", "pushi.e 0", "push.v [array]self.view_camera",
