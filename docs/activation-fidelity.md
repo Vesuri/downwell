@@ -145,8 +145,14 @@ entries. Deferred deactivation unlinks these registrations; reactivation appends
 them, using the same fresh stamp to merge fast boxes and fields. Flags are read
 from the live run owner, with unregistered status derived from membership.
 Destruction marks retain membership until retirement. Layer-element membership
-and complete source selector admission remain separate from this registration
-sequence; it is not Draw order.
+is published independently through `GameplayRoomLayers`: serialized source IDs
+bind their placed elements, while generated terrain attaches unnumbered scenery
+elements. Activation immediately publishes the inactive Draw cutoff, including
+the prepared actor projection; phase reconciliation moves the element under the
+shared lifetime rules. Retirement releases it. These are existing layer records,
+not generic spatial-instance records or a second terrain geometry store.
+Complete source selector admission and mixed terrain/effect raster composition
+remain separate from this registration sequence; it is not Draw order.
 
 The native `GameplayWorld` calls its borrowed phase-boundary hook after Begin
 Step, alarms, ordinary Step, collisions, and the implemented End Step work.

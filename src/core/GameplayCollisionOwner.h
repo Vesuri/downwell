@@ -191,7 +191,7 @@ private:
             (h.slot>=View::timeFieldBase&&h.slot<View::goalFieldBase)))return true;
         View::Kind kind;InstanceHandle local;
         RunnerLayerDraw::Element element;
-        if(!View::decode(h,kind,local)||!table_.flags(h,element.flags))return check(false);
+        if(!View::decode(h,kind,local)||!eligibilityFlags(h,element.flags))return check(false);
         element.type=2;element.instance=true;
         unsigned token=0;bool actor=true;
         GameplayWorld::DrawActor drawKind=GameplayWorld::DrawActor::player;
@@ -528,10 +528,15 @@ private:
         flags=definition->initialFlags|(active?0u:2u);
         RunnerImageValue x,y;Owner::Box bounds,cached{};bool found,precise;
         if(!nativeTerrainBirthBounds(id,x,y,bounds,found,precise))return false;
-        return check(owner_.externalSpatialPublication([&](auto& index){
+        if(!check(owner_.externalSpatialPublication([&](auto& index){
             return RunnerSpatialBoundsUpdate::finishRefresh(index,slot,*objectFlags,flags,false,cached,
                 found?&bounds:nullptr,x,y,precise,true);
-        }));
+        })))return false;
+        if(!check(layers_.birth({slot,id.handle.generation},id.source,definition->creationDepth,!active,false)))return false;
+        // The birth callback precedes run publication. Publish the scenery
+        // cutoff directly; resolving this handle through the run is premature.
+        return !preparedDrawEnabled()||check(layers_.publishPreparedDraw({slot,id.handle.generation},0,
+            active?RunnerLayerDraw::Action::skip:RunnerLayerDraw::Action::endLayer));
     }
     bool nativeTerrainRetire(unsigned local){
         if(!valid()||!world_||!world_->nativeTerrainInstances())return check(false);
@@ -553,6 +558,7 @@ private:
             })))return false;
         }
         if(!check(room_.remove(slot)))return false;
+        if(!check(layers_.retire({slot,h.generation})))return false;
         if(!check(table_.registerExternalObject({slot,h.generation},id.object,false)))return false;
         table_.externalRetire(slot);return nativeRetireQueues(slot);
     }
@@ -1290,6 +1296,9 @@ public:
                 const unsigned slot=View::terrainBase+id.handle.slot;
                 if(active&&(flags&2u)&&!self.nativeDirty(slot,id.object,flags))return false;
                 if(bool(flags&2u)==active)self.table_.externalFlagsChanged(slot);
+                if(!self.check(self.layers_.activation({slot,id.handle.generation},active)))return false;
+                if(self.preparedDrawEnabled()&&!self.check(self.layers_.publishPreparedDraw(
+                    {slot,id.handle.generation},0,active?RunnerLayerDraw::Action::skip:RunnerLayerDraw::Action::endLayer)))return false;
                 self.activationPending_=true;
                 // Reconcile room membership at the phase boundary, not here.
                 // Object-family and layer-element publication stay separate.
@@ -2300,7 +2309,8 @@ public:
                     if(!table_.externalBirth(slot,order)||
                         !world_->rebindNativeTerrainOrder({slot-View::terrainBase,h.generation},order))return false;
                 }
-                return table_.registerExternalObject(h,objectOf(h),registered);
+                return table_.registerExternalObject(h,objectOf(h),registered)&&
+                    layers_.reconcile(h)&&publishPreparedDraw(h);
             }
             // Writes while inactive may have been consumed by an intervening
             // active-room pass. Promotion must refresh that retained snapshot.

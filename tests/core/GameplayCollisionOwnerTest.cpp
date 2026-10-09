@@ -2191,6 +2191,52 @@ int main(){
         }
     }
     auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
+    std::vector<std::vector<unsigned>> layerCutoffOracle;
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+        GameplayCollisionOwner::Ownership::nativeScenery}){
+        const bool native=mode!=GameplayCollisionOwner::Ownership::reference;
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
+            GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&rooms,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),owner->breakableBinding(),
+            owner->playerBinding(),native?nullptr:&owner->terrain(),&rooms);
+        auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
+        assert(owner->attach(*world)&&(!native||world->bindNativeTerrain(*terrain)));
+        // Live actors at terrain depth remain intentionally unadmitted until
+        // mixed raster composition is connected. Exercise independent layers
+        // here; GameplayRoomLayers fixtures below cover same-layer cutoffs.
+        const auto depth=MotionBinary64::fromInteger(0);
+        auto frames=[&](int id,unsigned& count){PackedSpriteCollision art;
+            if(!sprites.sprite(id,art))return false;count=art.frameCount;return true;};
+        auto effect=[&]{InstanceHandle h;
+            assert(world->spawnScriptEffect(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(160),
+                603,{},{},depth,frames,h));
+            world->step(0);assert(world->effectsSucceeded()); // Service the deferred source depth write.
+            assert(owner->prepareDraw());return h;
+        };
+        const auto first=effect();
+        InstanceHandle wall;
+        if(native){assert(terrain->append(60,240,160));wall=terrain->handle(0);}
+        else {assert(owner->terrain().append(60,240,160,true));wall=owner->terrain().handle(0);}
+        const auto second=effect();assert(first.slot!=second.slot);
+        unsigned checkpoint=0;
+        auto draw=[&]{
+            checkReadOnlyDraw(*world);std::vector<unsigned> result;
+            assert(world->visitRoomActorsReadOnly([&](auto kind,InstanceHandle h,auto){
+                if(kind==GameplayWorld::DrawActor::scriptEffect)result.push_back(h.slot);return true;
+            }));
+            if(!native)layerCutoffOracle.push_back(result);
+            else assert(result==layerCutoffOracle.at(checkpoint));
+            ++checkpoint;return result;
+        };
+        assert(draw().size()==2);
+        auto activate=[&](bool active){return native?world->activateNativeTerrain(wall,active):owner->terrain().activation(wall,active);};
+        assert(activate(false));assert(draw().size()==2);
+        assert(owner->reconcileActivation());draw();
+        assert(activate(true));draw();
+        assert(owner->reconcileActivation());assert(draw().size()==2);
+        assert(native?world->destroyNativeTerrain(wall):owner->terrain().requestDestroy(wall));
+        assert(owner->prepareDraw());assert(draw().size()==2);
+    }
     std::vector<unsigned> roomCleanupOracle;
     std::vector<std::vector<std::uint64_t>> registrationOracle;
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
