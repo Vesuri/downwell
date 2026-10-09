@@ -3,6 +3,7 @@
 #include "core/DebrisEffects.h"
 #include "core/GameMakerRandom.h"
 #include "core/StoredCorpseRegistration.h"
+#include "core/StoredCorpseExpiryRegistration.h"
 #include <cassert>
 #include <cstring>
 #include <cstdio>
@@ -58,6 +59,46 @@ static void registeredCorpses(){
     std::ifstream file("generated/downwell-objects.dwob",std::ios::binary);
     std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(file),std::istreambuf_iterator<char>()};
     ObjectPack objects(bytes.data(),bytes.size());assert(objects.valid());
+    for(unsigned failure=0;failure<=5;++failure){
+        struct ExpiryAudit:RegistryAudit {
+            unsigned reject=0;
+            bool birth(InstanceHandle,const InstanceRecord& r){
+                assert(r.objectId==242&&r.spriteId==102&&r.imageSpeed==1);return reject!=1;
+            }
+            bool birthAt(InstanceHandle h,const InstanceRecord& r,RunnerImageValue,RunnerImageValue){return birth(h,r);}
+            bool sprite(InstanceHandle,const InstanceRecord& r,int next){assert(r.spriteId==102&&next==206);return reject!=2;}
+            bool imageIndex(InstanceHandle,const InstanceRecord&,RunnerImageValue){return reject!=3;}
+            bool markDestroyed(InstanceHandle,const InstanceRecord& r){assert(!r.destroyRequested);++destroyMarks;return reject!=4;}
+            bool retire(InstanceHandle,const InstanceRecord&){++retired;return reject!=5;}
+        } audit;
+        InstanceStore<4> records;std::uint32_t next=105187,id=0;int room=11;bool good=true;audit.reject=failure;
+        StoredCorpseExpiryRegistration<4,1> expiry(records,&objects,InstanceLifecycleBinding::bindPositionedBirths(audit),next,room,good);
+        bool ok=expiry.create(real(96.25),real(192.5),id);
+        assert(next==105188&&records.size()==1&&ok==(failure!=1));
+        const auto key=records.handleAt(0);
+        if(ok){assert(id==105187&&records.resolve(key)->imageSpeed==0.3f);
+            ok=expiry.sprite(id,206,1);assert(ok==(failure!=2&&failure!=3));
+        }
+        if(ok){
+            for(unsigned i=0;i<4&&ok;++i)ok=expiry.advanceAnimation(*records.resolve(key));
+            assert(ok==(failure!=4));
+        }
+        if(ok){assert(records.resolve(key)->destroyRequested&&expiry.state(id));
+            ok=expiry.retire(*records.resolve(key));assert(ok==(failure!=5));
+        }
+        assert(ok==!failure&&good==!failure);
+        if(failure){
+            assert(records.size()==1&&expiry.state(105187));std::uint32_t other=7;
+            assert(!expiry.create(real(1),real(2),other)&&!other&&next==105188);
+        }else assert(records.size()==0&&!expiry.state(id));
+        if(!failure){
+            std::uint32_t replacement=0,overflow=9;
+            assert(expiry.create(real(1),real(2),replacement)&&replacement==105188);
+            assert(!expiry.create(real(3),real(4),overflow)&&!overflow&&next==105189&&records.size()==1);
+            assert(!expiry.state(id)&&expiry.state(replacement));
+        }
+        audit.reject=0;assert(expiry.clear()&&records.size()==0);
+    }
     for(unsigned failure=0;failure<=10;++failure){
         InstanceStore<4> records;RegistryAudit audit;audit.failure=failure;
         std::uint32_t next=105187;int room=11;bool good=true;GameMakerRandom rng(42);

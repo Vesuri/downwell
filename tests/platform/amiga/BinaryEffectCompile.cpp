@@ -591,6 +591,13 @@ bool compileCorpseDraw(const downwell::CorpseAnimation& corpse,
 }
 #include "core/CorpseEffects.h"
 #include "core/StoredCorpseRegistration.h"
+#include "core/StoredCorpseExpiryRegistration.h"
+bool compileRegisteredExpiry(downwell::StoredCorpseExpiryRegistration<16,4>& owner,
+    downwell::CorpseAnimation& corpse,downwell::StoredCorpseRegistration<16,4>::Publisher& publish,
+    const downwell::InstanceRecord& record){
+    return owner.alarmEvent(corpse,0,publish,[](int){return 12u;})&&
+        owner.advanceAnimation(record)&&owner.retire(record)&&owner.clear();
+}
 struct CorpseTileProbe {
     bool operator()(downwell::InstanceHandle,int,downwell::MotionBinary64,downwell::MotionBinary64,bool&);
 };

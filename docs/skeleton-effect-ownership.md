@@ -1128,6 +1128,19 @@ Host rendering retains fractional coordinates; native raster projection uses
 the existing nearest-pixel convention. Integer-position command tests cover
 both renderers; fractional GPU raster equivalence remains unverified. Explicit
 world emission in tests is not evidence of a natural skeleton death chain.
+
+`StoredCorpseExpiryRegistration` is the resource-backed room path for object
+242. It allocates from the enclosing numeric-ID stream, publishes constructor
+geometry before the synchronous Create rate assignment, and retains failed
+births for explicit teardown. Its alarm adapter executes the already-fired
+corpse alarm body: child Create, source sprite override, then parent destruction.
+The child joins ordinary room layer traversal at its serialized creation depth;
+it does not inherit the compatibility painter's synthetic -1000 depth.
+`withCorpseExpiryEvents` dispatches animation from the mixed room walk and
+retirement from cleanup. A child born during alarms first animates next frame.
+Animation End publishes its index before marking destruction, without unlinking
+the current animation iterator. This registered path does not yet replace the
+legacy RunSession pool in both backend renderers or enable natural deaths.
 `RunSession::advanceCorpseAlarm` is the shared production adapter for alarms:
 it invokes the source lifecycle with synchronous creation into the room-owned
 expiry pool, then resolves the requested sprite's unit-track frame count and

@@ -1014,6 +1014,58 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
             !runtime->instance(id)&&!corpses.state(corpseKey),
             "out-of-view End Step retires corpse at room cleanup");
         require(corpses.clear()&&!runtime->instance(id),"retire corpse before room teardown");
+        auto expiry=runtime->corpseExpiryRegistration<1>();
+        const auto parentId=runtime->nextRuntimeInstanceId();
+        require(runtime->createRegisteredCorpseFromDeath(corpses,source,206,{},102,
+            [](auto,int,auto,auto,bool& hit){hit=false;return true;}),"create expiring corpse");
+        const auto parentKey=corpses.sourceHandle(parentId);
+        require(corpses.dispatchPublished(parentKey,[](auto& corpse,auto&,bool&){
+            corpse.alarms.set(0,1);return true;
+        }),"set expiry alarm before room countdown");
+        const auto childId=runtime->nextRuntimeInstanceId();unsigned expired=0;
+        auto expiryAlarm=[&](auto,auto phase,unsigned index,auto& corpse,auto& publish,bool&){
+            require(phase==downwell::StartupRuntime::CorpsePhase::alarm&&index==0,
+                "expiry alarm destroys parent before ordinary Step");
+            const auto rng=runtime->randomDrawCount();
+            require(expiry.alarmEvent(corpse,index,publish,[](int sprite){
+                require(sprite==102,"source-selected expiry sprite");return 12u;
+            }),"registered child Create, override and parent mark complete synchronously");
+            require(corpse.myExplosion==childId&&runtime->instance(parentId)->destroyRequested&&
+                runtime->instance(childId)&&runtime->randomDrawCount()==rng,
+                "expiry uses real numeric identity and consumes no RNG");
+            ++expired;return true;
+        };
+        auto tickExpiry=[&]{return runtime->withCorpseExpiryEvents(expiry,[&]{
+            return runtime->withCorpseEvents(corpses,expiryAlarm,[&]{runtime->step(false);return runtime->effectsSucceeded();});
+        });};
+        require(tickExpiry()&&expired==1&&!runtime->instance(parentId)&&runtime->instance(childId),
+            "room cleanup retires only parent on child birth frame");
+        require(expiry.state(childId)&&expiry.state(childId)->timeline.bits==0&&
+            runtime->instance(childId)->imageSpeed==0.3f&&runtime->nextRuntimeInstanceId()==childId+1,
+            "child waits for next animation walk and publishes Create speed");
+        unsigned childDraws=0;downwell::PackedObject expiryDefinition;
+        require(objects->findObject(242,expiryDefinition)&&runtime->visitSourceDrawChecked(
+            [&](auto,const auto& record,int depth,auto action){
+                if(record.instanceId==childId){++childDraws;
+                    require(action==downwell::RunnerLayerDraw::Action::sprite&&
+                        depth==expiryDefinition.creationDepth&&record.spriteId==102,
+                        "registered expiry joins ordinary source layer drawing at serialized depth");
+                }
+                return true;
+            },[](const auto&,int){return true;})&&childDraws==1,
+            "expiry is included once in mixed room Draw traversal");
+        downwell::CorpseExpiryEffect oracle;
+        require(oracle.create(source.x,source.y),"create scalar expiry oracle");
+        unsigned frames=0;
+        while(!oracle.destroyRequested&&frames<50){
+            require(oracle.advanceImage()&&tickExpiry(),"room expiry animation matches source unit track");++frames;
+            const auto* child=expiry.state(childId);
+            if(!oracle.destroyRequested)require(child&&child->timeline.bits==oracle.timeline.bits&&
+                child->imageIndex.bits==oracle.imageIndex.bits,"registered expiry preserves animation state");
+            else require(!child&&!runtime->instance(childId),"Animation End mark reaches deferred room cleanup");
+        }
+        require(oracle.destroyRequested&&expired==1&&expiry.clear()&&corpses.clear(),
+            "expiry chain completes once without leaked room records");
         audit.verify(*runtime);
     }
 

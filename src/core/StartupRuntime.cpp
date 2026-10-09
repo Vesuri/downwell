@@ -392,6 +392,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
         if(instance.objectId==269&&(!boneDispatch_||!boneDispatch_(boneContext_,instance,BonePhase::animation)))return false;
         if(instance.objectId==120&&(!skeletonDispatch_||!skeletonDispatch_(skeletonContext_,instance,SkeletonPhase::animation,0)))return false;
         if(instance.objectId==263&&(!corpseDispatch_||!corpseDispatch_(corpseContext_,instance,CorpsePhase::animation,0)))return false;
+        if(instance.objectId==242&&(!corpseExpiryDispatch_||!corpseExpiryDispatch_(corpseExpiryContext_,instance,false)))return false;
         if(instance.objectId==249||instance.objectId==256){
             auto* companion=const_cast<PlayerCompanionCreateState*>(companionCreateState(instance.instanceId));
             RunnerImageValue index,speed;
@@ -909,6 +910,7 @@ bool StartupRuntime::cleanupMainOwnedDestroyed(){
             (r.objectId==220&&bloodDispatch_)||
             (r.objectId==120&&skeletonDispatch_)||
             (r.objectId==263&&corpseDispatch_)||
+            (r.objectId==242&&corpseExpiryDispatch_)||
             (r.objectId==248&&currencyDispatch_)||
             (r.objectId==73&&ownedEntryRegistration_.handle(r).generation)||(r.objectId==219&&!scriptAnimationDispatch_);},
         [this](InstanceHandle key,const InstanceRecord& r){
@@ -920,6 +922,7 @@ bool StartupRuntime::cleanupMainOwnedDestroyed(){
             if(r.objectId==220)return bloodDispatch_(bloodContext_,r,BloodPhase::cleanup);
             if(r.objectId==120)return skeletonDispatch_(skeletonContext_,r,SkeletonPhase::cleanup,0);
             if(r.objectId==263)return corpseDispatch_(corpseContext_,r,CorpsePhase::cleanup,0);
+            if(r.objectId==242)return corpseExpiryDispatch_(corpseExpiryContext_,r,true);
             if(r.objectId==248)return currencyDispatch_(currencyContext_,r,CurrencyPhase::cleanup,0);
             if(r.objectId==73)return ownedEntryRegistration_.retire(key);
             if(r.objectId==219)return scriptEffectsBinding_.retire(key,&r);

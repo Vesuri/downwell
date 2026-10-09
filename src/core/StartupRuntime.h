@@ -26,6 +26,7 @@
 #include "PlayerMotion.h"
 #include "StoredTimeShardRegistration.h"
 #include "StoredCorpseRegistration.h"
+#include "StoredCorpseExpiryRegistration.h"
 #include "StoredTimeChangeRegistration.h"
 #include "StoredEntryDitherRegistration.h"
 #include "GameplayDitherAbove.h"
@@ -411,6 +412,20 @@ public:
     }
     enum class SkeletonPhase {animation,alarm,step,endStep,cleanup};
     enum class CorpsePhase {animation,alarm,step,endStep,cleanup};
+    template<unsigned Capacity,class Tick>
+    bool withCorpseExpiryEvents(StoredCorpseExpiryRegistration<instanceCapacity,Capacity>& registration,Tick tick){
+        if(!run_.effectsSucceeded)return false;
+        if(corpseExpiryDispatch_||!registration.belongsTo(instances_)||!registration.valid())return run_.effectsSucceeded=false;
+        auto dispatch=[&](const InstanceRecord& record,bool cleanup){
+            return cleanup?registration.retire(record):registration.advanceAnimation(record);
+        };
+        corpseExpiryContext_=&dispatch;
+        corpseExpiryDispatch_=[](void* p,const InstanceRecord& r,bool cleanup){
+            return (*static_cast<decltype(dispatch)*>(p))(r,cleanup);
+        };
+        const bool ok=tick();corpseExpiryDispatch_=nullptr;corpseExpiryContext_=nullptr;
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok&&registration.valid();
+    }
     template<unsigned Capacity,class Execute,class Tick>
     bool withCorpseEvents(StoredCorpseRegistration<instanceCapacity,Capacity>& registration,Execute execute,Tick tick){
         if(!run_.effectsSucceeded)return false;
@@ -760,6 +775,9 @@ public:
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
     }
     template<unsigned Capacity> StoredCorpseRegistration<instanceCapacity,Capacity> corpseRegistration(){
+        return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
+    }
+    template<unsigned Capacity> StoredCorpseExpiryRegistration<instanceCapacity,Capacity> corpseExpiryRegistration(){
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
     }
     template<unsigned Capacity,class Tile> bool createRegisteredCorpseFromDeath(
@@ -1655,6 +1673,8 @@ private:
     void* skeletonContext_=nullptr;
     bool (*corpseDispatch_)(void*,const InstanceRecord&,CorpsePhase,unsigned)=nullptr;
     void* corpseContext_=nullptr;
+    void* corpseExpiryContext_=nullptr;
+    bool (*corpseExpiryDispatch_)(void*,const InstanceRecord&,bool)=nullptr;
     void* droneContext_=nullptr;
     void* timeEffectContext_=nullptr;
     void* entryDitherContext_=nullptr;
