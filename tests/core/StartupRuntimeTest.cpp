@@ -1,4 +1,5 @@
 #include "core/StartupRuntime.h"
+#include "core/PlayerChildCreation.h"
 #include <memory>
 #include "core/BuilderPatternPack.h"
 #include "core/ObjectPack.h"
@@ -1708,6 +1709,35 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
 } // namespace
 
 int main(int argc, char** argv) {
+    for(int room:{11,14,17,20,24})for(unsigned balloon:{0u,1u})for(unsigned drones:{0u,1u,2u}){
+        std::vector<int> expected;
+        if(balloon)expected.push_back(256);
+        expected.push_back(1000);
+        if(drones){expected.push_back(249);expected.push_back(1001);}
+        if(drones==2){expected.push_back(249);expected.push_back(1002);}
+        expected.push_back(66);expected.push_back(64);expected.push_back(1003);
+        if(room==11)expected.push_back(73);
+        for(unsigned failure=0;failure<=expected.size();++failure){
+            std::vector<int> actual;std::uint32_t captured=0;
+            auto accept=[&](int op){actual.push_back(op);return actual.size()!=failure;};
+            const bool ok=downwell::PlayerChildCreation::run(room,240,176,balloon,drones,
+                [&](int object,int x,int y)->std::uint32_t{
+                    require(x==(object==66?-100:240)&&y==176,"source child coordinates");
+                    if(!accept(object))return 0;
+                    // Deliberately nonconsecutive: nested child Creates may consume IDs.
+                    return captured=100000+unsigned(actual.size())*3;
+                },[&](unsigned count){return accept(1000+int(count));},
+                [&](std::uint32_t id){require(id==captured,"second drone uses captured child ID");return accept(1002);},
+                [&](std::uint32_t id,bool freeCam,bool clearScroll){
+                    require(id==captured&&freeCam==((room>=20&&room<=24)||room==17)&&clearScroll==(room==11),
+                        "camera reference and post-Create room modes");
+                    return accept(1003);
+                },[&](int destination){require(destination==room,"entry wipe destination");return accept(73);});
+            const unsigned count=failure?failure:unsigned(expected.size());
+            require(ok==!failure&&actual.size()==count,"child sequence stops at rejected operation");
+            for(unsigned i=0;i<count;++i)require(actual[i]==expected[i],"child source-order prefix");
+        }
+    }
     testDesktopBootState();
     testFailedRoomLoadStopsUpdates();
     testInitialDeferredFailureStopsRoomStart();

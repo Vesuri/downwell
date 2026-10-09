@@ -1,4 +1,5 @@
 #include "StartupRuntime.h"
+#include "PlayerChildCreation.h"
 #include "TerrainCreate.h"
 #include "BoxCreateScript.h"
 #include "RunnerSpatialSplit.h"
@@ -1979,41 +1980,31 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             };
             // scrPlayerInit runs these synchronous births before returning to
             // objPlayer_n Create (and before its depth meter/camera children).
-            if(run_.upgrades.levels[15]&&!createChild(256,instance->x,instance->y)){
-                deferredCommandsSucceeded_=false;return;
-            }
-            droneNumber_=0; // scrPlayerInit, after balloon Create and before Drone births.
-            if(run_.upgrades.levels[9]){
-                if(!createChild(249,instance->x,instance->y)){
-                    deferredCommandsSucceeded_=false;return;
-                }
-                droneNumber_=1;
-                if(run_.upgrades.levels[9]==2){
-                    const auto id=createChild(249,instance->x,instance->y);
+            if(!PlayerChildCreation::run(instance->roomId,instance->x,instance->y,
+                run_.upgrades.levels[15],run_.upgrades.levels[9],
+                [&](int object,int x,int y){
+                    const auto id=createChild(object,x,y);
+                    if(!id)deferredCommandsSucceeded_=false;
+                    return id;
+                },[&](unsigned value){droneNumber_=value;return true;},
+                [&](std::uint32_t id){
                     auto* state=const_cast<PlayerCompanionCreateState*>(companionCreateState(id));
-                    if(!id||!state){deferredCommandsSucceeded_=false;return;}
+                    if(!state)return deferredCommandsSucceeded_=false;
                     state->drone.xdir=MotionBinary64::fromInteger(180);
                     state->drone.ydir=MotionBinary64::fromInteger(180);
-                }
-            }
-            if (!createChild(66, -100, instance->y)){
-                deferredCommandsSucceeded_=false;return;
-            }
-            const auto cameraId=createChild(64,instance->x,instance->y);
-            if(!cameraId){deferredCommandsSucceeded_=false;return;}
-            // scrSpawnCamera assigns myCam only after child Create completes.
-            instance->playerCameraId=cameraId;
-            auto* camera=instances_.find(instance->playerCameraId);
-            if(!camera){deferredCommandsSucceeded_=false;return;}
-            // scrSpawnCamera's assignments happen after camMain Create has
-            // initialized both fields. groundRoom covers all five garden rooms.
-            const int room=instance->roomId;
-            if((room>=20&&room<=24)||room==10||room==17)camera->cameraFreeCam=true;
-            if(room==11)camera->cameraAutoScroll=false;
-            if(room==11&&((entryDitherCreate_&&!entryDitherCreate_(entryDitherCreateContext_,room))||
-                (!entryDitherCreate_&&!createOwnedEntryDither(room)))){
-                run_.effectsSucceeded=false;return;
-            }
+                    return true;
+                },[&](std::uint32_t id,bool freeCam,bool clearAutoScroll){
+                    instance->playerCameraId=id;
+                    auto* camera=instances_.find(id);
+                    if(!camera)return deferredCommandsSucceeded_=false;
+                    if(freeCam)camera->cameraFreeCam=true;
+                    if(clearAutoScroll)camera->cameraAutoScroll=false;
+                    return true;
+                },[&](int room){
+                    const bool ok=entryDitherCreate_?entryDitherCreate_(entryDitherCreateContext_,room):createOwnedEntryDither(room);
+                    if(!ok)run_.effectsSucceeded=false;
+                    return ok;
+                }))return;
             // Companion Step/Draw and alternate camera motion remain separate.
         }
         return;

@@ -27,6 +27,13 @@ initializer can already create decoy 256 and one or two drones 249; this is
 not a fixed three-ID reservation independent of upgrades. Called scripts and
 child Creates still require their own complete synchronous birth accounting.
 
+`PlayerChildCreation` expresses this ordered birth/post-Create sequence without
+owning an allocator or instance storage. Its create operation returns the captured
+child ID only after synchronous Create succeeds; the reverse-drone and camera
+callbacks receive that ID even when nested births make IDs nonconsecutive.
+The stored player Create calls this shared sequence. Native integration must
+supply real registered children and the complete allocator, not no-op callbacks.
+
 Entry-dither Create copies parent-camera 63's x, reads view 0's published y,
 and sets Alarm 0 to 120. Step adds 16 to y and recopies camera x; Alarm 0
 destroys it. Draw targets `global.surfaceFx`. Camera Create itself does not
