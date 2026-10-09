@@ -75,6 +75,31 @@ public:
         }
         good_=false;return 0;
     }
+    // Source admission: constructor membership precedes Create and every
+    // builtin setter is visible before the next RNG draw. The legacy atomic
+    // registration entry above remains a reference until adapters opt in.
+    template<class Random,class Lifecycle>
+    Handle createPublishedRegistered(MotionBinary64 x,MotionBinary64 y,int area,Random& random,Lifecycle& lifecycle){
+        if(!good_||!next_||count_==Capacity)return 0;
+        for(unsigned index=0;index<Capacity;++index)if(!slots_[index].handle){
+            auto& s=slots_[index];s.effect={};s.markPublished=false;
+            if(!s.effect.x.assign(x)||!s.effect.y.assign(y)){good_=false;return 0;}
+            s.effect.imageSpeed={0x3f800000u};
+            for(unsigned i=count_;i>0;--i)order_[i]=order_[i-1];
+            order_[0]=index;++count_;s.handle=next_++;
+            if(!lifecycle.constructed(s.handle,s.effect)){good_=false;return 0;}
+            struct Publish {
+                Lifecycle& life;Slot& slot;
+                bool sprite(int value){return life.sprite(slot.handle,slot.effect,value);}
+                bool imageSpeed(RunnerImageValue value){return life.imageSpeed(slot.handle,slot.effect,value);}
+                bool imageIndex(RunnerImageValue){return life.image(slot.handle,slot.effect);}
+                bool alarm(unsigned index,int ticks){return life.alarm(slot.handle,slot.effect,index,ticks);}
+            } publish{lifecycle,s};
+            if(!s.effect.createPublished(area,random,publish)){good_=false;return 0;}
+            return s.handle;
+        }
+        good_=false;return 0;
+    }
     template<class Lifecycle>
     bool advanceRegisteredAnimationOne(Handle h,Phase phase,Lifecycle& lifecycle){
         auto* slot=find(h);if(!slot)return good_=false;

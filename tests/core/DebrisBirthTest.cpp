@@ -41,6 +41,41 @@ int main(){
         assert(actual.drawCount()==4&&actual.drawCount()==oracle.drawCount()&&actual.stateIndex()==oracle.stateIndex());
         for(unsigned i=0;i<16;++i)assert(actual.stateWord(i)==oracle.stateWord(i));
         assert(actual.nextU32()==oracle.nextU32());
+        downwell::GameMakerRandom publishedRandom(seed),referenceRandom(seed);
+        downwell::DebrisBirth published,reference;
+        struct Publish {
+            unsigned calls=0;
+            bool sprite(int){++calls;return true;}
+            bool imageSpeed(downwell::RunnerImageValue){++calls;return true;}
+            bool imageIndex(downwell::RunnerImageValue){++calls;return true;}
+            bool alarm(unsigned,int){++calls;return true;}
+        } writes;
+        assert(published.createPublished(area,publishedRandom,writes)&&reference.create(area,referenceRandom));
+        assert(writes.calls==unsigned(area>=1&&area<=5?6:5));
+        assert(published.xsp.high==reference.xsp.high&&published.xsp.low==reference.xsp.low&&
+            published.ysp.high==reference.ysp.high&&published.ysp.low==reference.ysp.low&&
+            published.imageRate.high==reference.imageRate.high&&published.imageRate.low==reference.imageRate.low&&
+            published.imageSpeed.bits==reference.imageSpeed.bits&&published.imageIndex.bits==reference.imageIndex.bits&&
+            published.spriteId==reference.spriteId);
+        for(unsigned i=0;i<16;++i)assert(publishedRandom.stateWord(i)==referenceRandom.stateWord(i));
+    }
+    for(unsigned failure=1;failure<=6;++failure){
+        downwell::GameMakerRandom random(19);downwell::DebrisBirth birth;
+        birth.disappearing=true;birth.flash=42;birth.noTouch=false;
+        struct Publish {
+            downwell::GameMakerRandom& random;unsigned fail,calls=0;
+            bool next(unsigned draws){assert(random.drawCount()==draws);return ++calls!=fail;}
+            bool sprite(int value){assert(value==115&&calls==0);return next(2);}
+            bool imageSpeed(downwell::RunnerImageValue){assert(calls==1);return next(3);}
+            bool imageIndex(downwell::RunnerImageValue){assert(calls==2);return next(4);}
+            bool alarm(unsigned index,int ticks){
+                assert(calls==3+index&&ticks==(index==0?30:index==1?15:7));return next(4);
+            }
+        } publish{random,failure};
+        assert(!birth.createPublished(1,random,publish)&&publish.calls==failure);
+        assert(random.drawCount()==(failure==1?2:failure==2?3:4));
+        assert(birth.disappearing&&birth.flash==42&&!birth.noTouch); // Final writes not reached.
+        for(unsigned i=0;i<3;++i)assert(birth.alarms.get(i)==(failure>=4+i?(i==0?30:i==1?15:7):-1));
     }
     std::puts("Debris Create: 7168 area/seed cases preserve four draws, float fields and defaults");
 }

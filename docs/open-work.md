@@ -120,6 +120,9 @@ behavior, both backend integrations and relevant original-game verification.
   real formatting; verify fractional text placement against the original.
 - Connect debris to source-ordered natural breakable destruction and complete
   its production scheduling, including the player's live time-stop state.
+  Bind native debris to constructor-before-Create publication and source
+  numeric IDs; its legacy registration still happens after Create. Use the
+  published debris path for the skeleton death sequence as well.
   Replace the removal-only box Step with the full ordered audio, smoke, flash,
   impact, chain-reaction, debris and reward sequence before lifetime retirement.
   Complete registered currency reward-caller publication, collection, Draw and

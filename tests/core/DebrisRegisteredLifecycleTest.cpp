@@ -8,7 +8,14 @@ struct Lifecycle {
     bool image(unsigned,const downwell::DebrisAnimation&);
     bool destroyed(unsigned,const downwell::DebrisAnimation&);
     bool retire(unsigned,const downwell::DebrisAnimation&);
+    bool constructed(unsigned,const downwell::DebrisAnimation&);
+    bool sprite(unsigned,const downwell::DebrisAnimation&,int);
+    bool imageSpeed(unsigned,const downwell::DebrisAnimation&,downwell::RunnerImageValue);
+    bool alarm(unsigned,const downwell::DebrisAnimation&,unsigned,int);
 };
+bool nativePublishedDebris(downwell::DebrisEffects<2>& owner,downwell::GameMakerRandom& random,Lifecycle& life){
+    return owner.createPublishedRegistered({}, {},1,random,life)!=0;
+}
 bool nativeDebrisAlarmEvent(downwell::DebrisEffects<2>& owner,unsigned h,
     const downwell::AlarmBank& bank,unsigned index,Lifecycle& life){
     return owner.dispatchRegisteredAlarmEventOne(h,bank,index,life);
@@ -37,6 +44,34 @@ struct Lifecycle {
     bool retire(unsigned h,const DebrisAnimation&){deaths.push_back(h);return !rejectRetire;}
 };
 int main(){
+    for(unsigned failure=0;failure<=7;++failure){
+        DebrisEffects<1> owner;GameMakerRandom random(42);
+        struct Ordered {
+            GameMakerRandom& random;unsigned failure,calls=0,retired=0;
+            const DebrisAnimation* retained=nullptr;unsigned handle=0;
+            bool next(unsigned draws){assert(random.drawCount()==draws);return ++calls!=failure;}
+            bool constructed(unsigned h,const DebrisAnimation& e){
+                assert(!calls&&h&&e.spriteId==91&&e.imageIndex.bits==0&&e.imageSpeed.bits==0x3f800000u&&e.alarms.get(0)==-1);
+                retained=&e;handle=h;return next(0);
+            }
+            bool sprite(unsigned h,const DebrisAnimation& e,int sprite){
+                assert(h==handle&&&e==retained&&calls==1&&sprite==115&&e.spriteId==91);return next(2);
+            }
+            bool imageSpeed(unsigned h,const DebrisAnimation& e,RunnerImageValue v){
+                assert(h==handle&&&e==retained&&calls==2&&e.imageSpeed.bits==v.bits&&e.spriteId==115);return next(3);
+            }
+            bool image(unsigned h,const DebrisAnimation& e){assert(h==handle&&&e==retained&&calls==3);return next(4);}
+            bool alarm(unsigned h,const DebrisAnimation& e,unsigned index,int ticks){
+                assert(h==handle&&&e==retained&&calls==4+index&&e.alarms.get(index)==ticks);return next(4);
+            }
+            bool retire(unsigned h,const DebrisAnimation& e){assert(h==handle&&&e==retained);++retired;return true;}
+        } life{random,failure};
+        const auto h=owner.createPublishedRegistered(MotionBinary64::fromInteger(13),{},1,random,life);
+        assert(bool(h)==!failure&&owner.valid()==!failure&&life.calls==(failure?failure:7));
+        assert(random.drawCount()==(failure==1?0:failure==2?2:failure==3?3:4));
+        assert(life.retained&&life.retained->x.bits==0x41500000u);
+        assert(owner.clear(life)&&life.retired==1&&owner.size()==0);
+    }
     for(bool byAlarm:{false,true}){
         DebrisEffects<1> owner;GameMakerRandom random(42);Lifecycle life;
         const auto before=owner.beginPhase();const auto h=owner.createRegistered({}, {},1,random,life);

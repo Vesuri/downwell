@@ -69,6 +69,21 @@ public:
         r->imageIndex=stored(effect.imageIndex);r->imageSpeed=stored(effect.imageSpeed);r->alarms=effect.alarms;
         return lifecycle_.birthAt(free->key,*r,effect.x,effect.y)||fail();
     }
+    bool constructed(unsigned local,const DebrisAnimation& effect){return birth(local,effect);}
+    bool sprite(unsigned local,const DebrisAnimation& effect,int value){
+        auto* e=checked(local,effect);auto* r=e?record(*e):nullptr;
+        if(!r||!lifecycle_.sprite(e->key,*r,value))return fail();
+        // Create assigns sprite before image_index; constructor index is zero.
+        r->spriteId=value;r->imageIndex=0;return true;
+    }
+    bool imageSpeed(unsigned local,const DebrisAnimation& effect,RunnerImageValue value){
+        auto* e=checked(local,effect);auto* r=e?record(*e):nullptr;
+        if(!r)return fail();r->imageSpeed=stored(value);return true;
+    }
+    bool alarm(unsigned local,const DebrisAnimation& effect,unsigned index,int ticks){
+        auto* e=checked(local,effect);auto* r=e?record(*e):nullptr;
+        if(!r||index>2)return fail();r->alarms.set(index,ticks);return true;
+    }
     bool image(unsigned local,const DebrisAnimation& effect){
         auto* e=checked(local,effect);auto* r=e?record(*e):nullptr;
         if(!r||!lifecycle_.imageIndex(e->key,*r,effect.imageIndex))return fail();

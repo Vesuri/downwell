@@ -1310,7 +1310,7 @@ public:
             if(hasDebrisRecords())return run_.effectsSucceeded=false;
             bindDebrisDraw(effects,registration);
         }
-        const auto local=effects.createRegistered(x,y,area,random_,registration);
+        const auto local=effects.createPublishedRegistered(x,y,area,random_,registration);
         if(!local)return run_.effectsSucceeded=false;
         id=registration.sourceId(local);return run_.effectsSucceeded=id!=0;
     }

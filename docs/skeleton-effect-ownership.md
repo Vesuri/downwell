@@ -1175,6 +1175,14 @@ the remaining whole-pipeline raster uncertainty is described in
   (-0.5,-0.3,0,0.3,0.5), copies it to builtin image_speed, then samples
   image_index=random(7). Area selects the sprite. Both instance-count branches
   assign alarms 0/1/2 to 30/15/7, so the count does not change the result.
+  `DebrisEffects::createPublishedRegistered` reserves stable storage and calls
+  constructor registration with sprite 91, image index zero, speed one and
+  unset alarms before any Create RNG. `DebrisBirth::createPublished` publishes
+  the area sprite after two draws, speed after three, index after four, then
+  alarms separately. Failed registration or setters retain the completed
+  prefix for terminal teardown. Stored `spawnDebris` uses this path; the native
+  atomic registration remains a legacy path until its source-ID adapter is
+  connected. The atomic `create` behavior remains the arithmetic reference.
 
 `createDeadBody` implements the `scrDeadBody` wrapper, not object 263's Create
 or physics. Its adapter must complete inherited Create, random samples and
