@@ -46,6 +46,7 @@
 #include "StoredBoneRegistration.h"
 #include "StoredBloodRegistration.h"
 #include "StoredSkeletonRegistration.h"
+#include "StoredBlastRegistration.h"
 #include "RegisteredSkeletonThrow.h"
 #include "RegisteredSkeletonStomp.h"
 #include "BoneViewRetirement.h"
@@ -631,6 +632,37 @@ public:
         return limboShardDrawState_?limboShardDrawState_(limboShardDrawContext_,record):nullptr;
     }
     enum class SmokePhase {animation,alarm,step,cleanup};
+    enum class BlastPhase {animation,alarm,step,cleanup};
+    template<unsigned Capacity> StoredBlastRegistration<instanceCapacity,Capacity> blastRegistration(){
+        return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
+    }
+    template<unsigned Capacity> bool spawnBlast(StoredBlastRegistration<instanceCapacity,Capacity>& registry,
+        MotionBinary64 x,MotionBinary64 y,InstanceHandle& key){
+        if(!run_.effectsSucceeded||!registry.belongsTo(instances_))return run_.effectsSucceeded=false;
+        struct Services {
+            StartupRuntime& world;
+            bool shake(int a,int d){return world.requestCameraShake(a,d);}
+            bool momentDelay(){return world.requestMomentDelay();}
+            bool choose(unsigned count,unsigned& choice){if(count!=2)return false;choice=world.random_.chooseIndexSmall(2);return true;}
+        } services{*this};
+        return run_.effectsSucceeded=registry.create(x,y,services,key);
+    }
+    template<unsigned Capacity,class Tick>
+    bool withBlastEvents(StoredBlastRegistration<instanceCapacity,Capacity>& registry,Tick tick){
+        if(!run_.effectsSucceeded)return false;
+        if(blastDispatch_||!registry.belongsTo(instances_)||!registry.valid())return run_.effectsSucceeded=false;
+        auto dispatch=[&](const InstanceRecord& record,BlastPhase phase,unsigned index){
+            const auto key=registry.handle(record);
+            if(phase==BlastPhase::animation)return registry.advanceAnimation(key);
+            if(phase==BlastPhase::cleanup)return registry.retire(key);
+            if(phase==BlastPhase::alarm)return registry.alarm(key,index);
+            return registry.step(key);
+        };
+        blastContext_=&dispatch;
+        blastDispatch_=[](void* p,const InstanceRecord& r,BlastPhase phase,unsigned index){return (*static_cast<decltype(dispatch)*>(p))(r,phase,index);};
+        const bool ok=tick();blastDispatch_=nullptr;blastContext_=nullptr;
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok&&registry.valid();
+    }
     enum class LimboShardPhase {animation,step,cleanup};
     template<unsigned Capacity,class Environment,class Tick> bool withLimboShardEvents(
         StoredLimboShardRegistration<instanceCapacity,Capacity>& registration,Environment& environment,Tick tick){
@@ -2403,6 +2435,8 @@ private:
     int* momentDelayRoomSpeed_=nullptr;
     bool (*consumptionBloodDispatch_)(void*,const InstanceRecord&,ConsumptionBloodPhase,unsigned)=nullptr;
     bool (*smokeDispatch_)(void*,const InstanceRecord&,SmokePhase,unsigned)=nullptr;
+    bool (*blastDispatch_)(void*,const InstanceRecord&,BlastPhase,unsigned)=nullptr;
+    void* blastContext_=nullptr;
     bool (*corpseExpiryDispatch_)(void*,const InstanceRecord&,bool)=nullptr;
     void* droneContext_=nullptr;
     void* timeEffectContext_=nullptr;

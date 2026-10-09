@@ -353,9 +353,24 @@ enemy contacts. It keeps `checkTarget`, `hitIgnore`, count and the scan's final
 targets before their health test, while the enemy handler tests health first.
 Its capacity is an explicit owner limit: exhaustion fails rather than evicting
 old IDs. `verify-blast-actor` pins the event inputs and checks phase boundaries
-and service-failure prefixes. This event body still needs registered lifetime,
-publication, Draw and mixed collision dispatch on both worlds; it is not a
-successful replacement for the stomp adapter's explicit blast dependency.
+and service-failure prefixes.
+
+`BlastInstances` owns generation-safe lifetimes separately from numeric source
+IDs. Constructor geometry is published before inherited Create; image index,
+image speed and horizontal scale are published at their individual writes.
+Failed Create retains its completed prefix and latches failure. Animation-end
+marks destruction; room cleanup, not the event itself, retires the lifetime.
+Inactive records do not animate or step.
+
+`StoredBlastRegistration` binds these lifetimes to stored room records.
+`StartupRuntime::spawnBlast` supplies the actual camera, room-speed controller
+and shared RNG. Its borrowed `withBlastEvents` scope joins the existing room
+animation, alarm, Step and cleanup phases. At speed 0.5, Step disables damage
+on tick 7 and animation-end retires the fourteen-frame image on tick 28.
+Registration requires a matching live room handle, not just a reused source ID.
+This scope is not installed by the normal frontend yet. Native owner admission,
+Draw and mixed collision dispatch remain required before replacing the stomp
+adapter's explicit blast dependency in natural encounters.
 
 Effect-producing callbacks return success. `SkeletonActor` stops the event on
 failed enemy-death setup, blood, smoke, flash, currency, corpse or debris

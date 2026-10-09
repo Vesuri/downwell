@@ -1617,6 +1617,31 @@ int main(){
             return world->emitRegisteredSmoke(smoke,caller,x,y,direction,speed);
         },[&](unsigned id){const auto* r=world->instance(id);return r?smoke.state(*r):nullptr;});
     }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach blast world");world->skipToGameForTesting();
+        auto blasts=world->blastRegistration<2>();InstanceHandle blast;int speed=60;
+        require(world->withMomentDelayRoomSpeed(speed,[&]{
+            const auto id=world->nextRuntimeInstanceId();const auto draws=world->randomDrawCount();
+            if(!world->spawnBlast(blasts,MotionBinary64{0x406e0800u,0},MotionBinary64::fromInteger(800),blast))return false;
+            const auto* birth=world->instance(id);
+            require(birth&&birth->objectId==276&&birth->spriteId==471&&birth->imageSpeed==0.5f&&birth->preciseX==240.25f&&
+                (birth->scaleX==1.0f||birth->scaleX==-1.0f)&&world->randomDrawCount()==draws+1&&
+                world->cameraShakeAmount()==6&&speed==30,"blast Create uses real shake, delay and RNG");
+            return world->withBlastEvents(blasts,[&]{
+                for(unsigned frame=1;frame<=28;++frame){
+                    world->step({});if(!world->effectsSucceeded())return false;
+                    const auto* r=blasts.instances().find(blast);
+                    if(frame<28)require(r&&r->state.damageEnd==(frame>=7)&&world->instance(id)&&
+                        world->instance(id)->imageIndex==frame*0.5f,"blast animation and Step share room scheduling");
+                    else require(!r&&!world->instance(id),"blast animation-end cleans registered lifetime");
+                }
+                InstanceHandle reused;
+                return world->spawnBlast(blasts,{}, {},reused)&&reused.slot==blast.slot&&reused.generation!=blast.generation&&blasts.clear();
+            });
+        }),"registered blast room lifecycle");
+    }
     for(bool knees:{false,true})for(int style:{0,2}){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());

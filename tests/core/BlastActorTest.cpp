@@ -1,4 +1,4 @@
-#include "core/BlastActor.h"
+#include "core/BlastInstances.h"
 #ifdef DOWNWELL_NATIVE_BLAST_PROBE
 struct BlastEvents {
     bool shake(int,int);bool momentDelay();bool imageIndex(downwell::RunnerImageValue);
@@ -18,9 +18,15 @@ bool nativeBlastProbe(downwell::BlastActor<32>& actor,BlastEvents& events,bool& 
     return actor.create(events,good)&&actor.advanceAnimation(events,good)&&actor.step(good)&&
         actor.wallContact(events,good)&&actor.shootableContact(events,good)&&actor.enemyContact(events,good);
 }
+bool nativeBlastLifetimeProbe(downwell::BlastInstances<8>& store,BlastEvents& events){
+    downwell::InstanceHandle key;
+    return store.create(700000,{}, {},events,key)&&store.advanceAnimation(key)&&store.step(key)&&
+        store.alarm(key,0)&&store.markDestroyed(key)&&store.retire(key);
+}
 #else
 #include <cassert>
 #include <cstdio>
+#include <cstdlib>
 #include <vector>
 using namespace downwell;
 static bool equal(MotionBinary64 a,MotionBinary64 b){return a.high==b.high&&a.low==b.low;}
@@ -66,7 +72,52 @@ struct BlastEvents {
     }
 };
 static BlastActor<4> fresh(){BlastActor<4> a;BlastEvents e;bool good=true;assert(a.create(e,good));return a;}
+struct BlastOwner {
+    using Store=BlastInstances<1>;using Record=Store::Record;
+    std::vector<int> calls;unsigned fail=0;
+    bool call(int event){calls.push_back(event);return calls.size()!=fail;}
+    bool birth(InstanceHandle,const Record&){std::abort();}
+    bool birthAt(InstanceHandle,const Record& r,RunnerImageValue x,RunnerImageValue y){
+        assert(r.sourceId==700000&&r.spriteId==471&&!r.state.allSet&&r.state.imageSpeed.bits==0x3f800000u&&
+            x.bits==0x41240000u&&y.bits==0x41c40000u);return call(1);
+    }
+    bool shake(int a,int d){assert(a==6&&d==8);return call(2);}
+    bool momentDelay(){return call(3);}
+    bool choose(unsigned count,unsigned& choice){assert(count==2);choice=1;return call(6);}
+    bool imageIndex(InstanceHandle,const Record&,RunnerImageValue){return call(4);}
+    bool imageSpeed(InstanceHandle,const Record& r,RunnerImageValue v){assert(r.state.imageSpeed.bits==v.bits);return call(5);}
+    bool transform(InstanceHandle,const Record&,RunnerTransformField field,RunnerImageValue v,RunnerImageValue,std::uint32_t){
+        assert(field==RunnerTransformField::scaleX&&v.bits==0xbf800000u);return call(7);
+    }
+    bool markDestroyed(InstanceHandle,const Record&){return call(8);}
+    bool retire(InstanceHandle,const Record&){return call(9);}
+    bool activation(InstanceHandle,const Record&,bool){return call(10);}
+    bool membership(InstanceHandle,const Record&,bool){return call(11);}
+    bool move(InstanceHandle,const Record&,RunnerImageValue,RunnerImageValue){std::abort();}
+    bool mask(InstanceHandle,const Record&,int){std::abort();}
+    bool sprite(InstanceHandle,const Record&,int){std::abort();}
+};
 int main(){
+    for(unsigned failure=0;failure<=7;++failure){
+        BlastOwner owner;owner.fail=failure;
+        BlastOwner::Store store(BlastOwner::Store::Binding::bindPositionedActor(owner),{&owner,
+            [](void* p,InstanceHandle key,const BlastOwner::Record& r,RunnerImageValue v){return static_cast<BlastOwner*>(p)->imageSpeed(key,r,v);}});
+        InstanceHandle key;
+        assert(store.create(700000,{0x40248000u,0},{0x40388000u,0},owner,key)==!failure&&store.valid()==!failure&&
+            store.size()==1&&store.find(key)&&owner.calls.size()==(failure?failure:7));
+        if(failure){const auto before=owner.calls.size();InstanceHandle unused;
+            assert(!store.create(700001,{}, {},owner,unused)&&owner.calls.size()==before&&store.clear()&&store.size()==0);}
+        else {
+            assert(owner.calls==std::vector<int>({1,2,3,4,5,6,7})&&store.find(key)->publishedScale.bits==0xbf800000u);
+            assert(store.activate(key,false));const auto before=owner.calls.size();
+            assert(store.advanceAnimation(key)&&store.step(key)&&owner.calls.size()==before);
+            assert(store.activate(key,true));
+            for(unsigned frame=1;frame<=28;++frame)assert(store.advanceAnimation(key)&&store.step(key));
+            assert(store.find(key)->destroyRequested&&store.size()==1&&store.retire(key)&&!store.find(key));
+            InstanceHandle reused;assert(store.create(700000,{0x40248000u,0},{0x40388000u,0},owner,reused)&&
+                reused.slot==key.slot&&reused.generation!=key.generation&&!store.find(key)&&store.clear());
+        }
+    }
     for(unsigned choice=0;choice<2;++choice)for(unsigned fail=0;fail<=6;++fail){
         BlastActor<4> a;BlastEvents e;e.choice=choice;e.fail=fail;bool good=true;
         assert(a.create(e,good)==!fail&&good==!fail&&e.calls.size()==(fail?fail:6));
