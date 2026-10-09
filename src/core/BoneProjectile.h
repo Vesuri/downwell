@@ -5,20 +5,19 @@
 #include "UnitSequenceFrames.h"
 #include "EnemyContact.h"
 #include "RunnerRealComparison.h"
+#include "ShootableThing.h"
 namespace downwell {
 // Object 269's Create and event state. The owner must call create synchronously
 // before installing the skeleton's velocity overrides.
 // It supplies collision dispatch, precise view bounds and effect/damage sinks.
 // Requests never free the instance during an executing event.
-struct BoneProjectile {
+struct BoneProjectile : ShootableThing {
     enum class Animation { instanceDefault, sampledRate, stopped };
     BoneMotion motion;
     MotionBinary64 sampledAnimationRate;
     RunnerImageValue timeline{}, imageIndex{}, imageSpeed{0x3f800000u};
-    MotionBinary64 health{0x3ff00000u,0}; // parentShootableThing.objHp, a custom real.
     int mask = -1;
     bool active = true, destroyRequested = false;
-    bool hit = false, hitEffect = false;
     Animation animation = Animation::instanceDefault;
     ContactBounds collisionBounds() const {
         // The original uses published x/y and an unrotated, unit-scale

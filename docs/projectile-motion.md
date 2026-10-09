@@ -124,17 +124,27 @@ Native marked boxes remain accessible until room cleanup; retired/reused
 handles are rejected. These are target adapters for the pending source bullet
 integration, not a change to the current live gun's immediate removal path.
 
-For the bone descendant of parentShootableThing, `BoneProjectile::health`
-retains `objHp` as a custom binary64 real, including fractional overkill. The
+`ShootableThing` supplies parent-90 Create fields to both bones and corpses:
+`objHp` as a custom binary64 real, including fractional overkill, and the
+`hit`/`hitEffect` flags. The
 bone Step applies the runner real comparison for `objHp <= 0`, after motion
-and only outside time-stop. `StoredBoneRegistration` exposes selected-world-
-handle reads and health/hit writes; the native collision owner exposes the
-corresponding `projectileBoneFields`, `projectileBoneHealthWrite` and
-`projectileBoneHit` operations. These resolve the lifetime anew on each access.
-They do not invoke a bone event or alter engine activation, membership, RNG or
+and only outside time-stop. Corpse Create overrides health to zero without
+Rest in Pieces; with it, health remains one and hit effects are enabled. The
+corpse's unpaused Step with that upgrade restores health to one while its
+private `active` flag is false, before testing health for explosion. Neither
+private activity nor damage writes substitute for engine activation.
+`StoredBoneRegistration` and `StoredCorpseRegistration` expose selected-world-
+handle reads and health/hit writes; the native collision owner dispatches the
+corresponding `projectileShootableFields`, `projectileShootableHealthWrite` and
+`projectileShootableHit` operations to the selected bone or corpse owner, failing
+on unsupported descendants. These resolve the lifetime anew on each access.
+They do not invoke a target event or alter engine activation, membership, RNG or
 destruction. Marked and inactive targets retain writable fields until cleanup;
 retired handles and unsupported numeric values fail. Parent-90 selection and
 natural bullet dispatch remain distinct from this target-field contract.
+The bullet solid script's positive-health guards also use the runner real
+comparison; a value within the zero epsilon band must not take damage merely
+because its sign bit is positive.
 
 `MachineGunSourceStep` composes the source motion initialization, synchronous
 `scrEffectSpawn` muzzle sequence, solid script and ordered final X/Y setters.

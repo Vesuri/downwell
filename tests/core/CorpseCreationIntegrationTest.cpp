@@ -281,7 +281,12 @@ static void registeredCorpses(){
             equal(state->xsp,-3);equal(state->ysp,2);equal(source.xsp,-1.5);
             GameMakerRandom oracle(42);oracle.nextU32();oracle.nextU32();oracle.chooseIndexSmall(5);
             oracle.irandomSmall(8);oracle.irandomSmall(8);sameRandom(rng,oracle);
-            assert(state->explosionFx==102&&state->health==1&&state->hitEffect==1);
+            assert(state->explosionFx==102&&state->health.high==0x3ff00000u&&!state->health.low&&state->hitEffect);
+            const auto draws=rng.drawCount();MotionBinary64 hp;bool effect=false;
+            assert(corpses.readShootable(key,hp,effect)&&effect);equal(hp,1);
+            assert(corpses.writeShootableHealth(key,real(-2.5))&&corpses.writeShootableHit(key)&&
+                corpses.readShootable(key,hp,effect)&&corpses.state(key)->hit&&!records.resolve(key)->destroyRequested);
+            equal(hp,-2.5);assert(rng.drawCount()==draws);
             assert(corpses.advanceAnimation(key));
             assert(!corpses.endStep(key,real(10000),true)&&!good&&audit.destroyMarks==1&&
                 corpses.state(key)&&!records.resolve(key)->destroyRequested);
@@ -325,7 +330,7 @@ int main(){
         assert(corpse.spriteId==206&&source.myDeadBody==1&&adapter.setters==2);
         assert(corpse.imageIndex.bits==0&&corpse.timeline.bits==0);
         equal(corpse.imageXscale.promoted(),-1);
-        assert(corpse.health==1&&corpse.hitEffect==1);
+        assert(corpse.health.high==0x3ff00000u&&!corpse.health.low&&corpse.hitEffect);
         // Skeleton then creates two debris at its own position, not the relocated corpse.
         DebrisEffects<2> debris;
         for(unsigned n=0;n<2;++n){

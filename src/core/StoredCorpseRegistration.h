@@ -48,6 +48,17 @@ public:
         return {};
     }
     const CorpseAnimation* state(InstanceHandle h){auto* e=entry(h);return e&&record(*e)?&e->state:nullptr;}
+    bool readShootable(InstanceHandle key,MotionBinary64& health,bool& hitEffect){
+        const auto* value=state(key);if(!good_||!value)return fail();
+        health=value->health;hitEffect=value->hitEffect;return true;
+    }
+    bool writeShootableHealth(InstanceHandle key,MotionBinary64 health){
+        auto* e=entry(key);if(!good_||!e||!record(*e)||!health.valid())return fail();
+        e->state.health=health;return true;
+    }
+    bool writeShootableHit(InstanceHandle key){
+        auto* e=entry(key);if(!good_||!e||!record(*e))return fail();e->state.hit=true;return true;
+    }
     InstanceHandle sourceHandle(unsigned id){
         for(auto& e:entries_)if(id&&e.id==id&&record(e))return e.key;
         return {};

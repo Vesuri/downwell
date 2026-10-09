@@ -73,7 +73,7 @@ int main(){
         if(!failure){
             const auto* corpse=owned.get(source.myDeadBody);assert(corpse);
             assert(corpse->ysp.high==0x40100000u&&corpse->xsp.high==0xc0180000u);
-            assert(source.xsp.high==0xbff80000u&&corpse->health==1&&corpse->hitEffect==1);
+            assert(source.xsp.high==0xbff80000u&&corpse->health.high==0x3ff00000u&&!corpse->health.low&&corpse->hitEffect);
             assert(adapter.spriteWrites==1&&adapter.facingWrites==1);
         }else{
             assert(!owned.valid()&&!owned.get(source.myDeadBody));

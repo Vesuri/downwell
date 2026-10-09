@@ -2519,20 +2519,26 @@ public:
         return valid()&&resolves(h)&&View::decode(h,kind,local)&&kind==View::Kind::breakable&&
             world_->publishBoxHit(local);
     }
-    bool projectileBoneFields(InstanceHandle h,MotionBinary64& health,bool& hitEffect){
+    bool projectileShootableFields(InstanceHandle h,MotionBinary64& health,bool& hitEffect){
         View::Kind kind;InstanceHandle local;
-        if(!valid()||!resolves(h)||!View::decode(h,kind,local)||kind!=View::Kind::bone)return check(false);
-        const auto* bone=bones_.find(local);if(!bone)return check(false);
-        health=bone->state.health;hitEffect=bone->state.hitEffect;return true;
+        if(!valid()||!resolves(h)||!View::decode(h,kind,local))return check(false);
+        const ShootableThing* value=nullptr;
+        if(kind==View::Kind::bone){const auto* r=bones_.find(local);if(r)value=&r->state;}
+        else if(kind==View::Kind::corpse){const auto* r=corpses_.find(local);if(r)value=&r->state;}
+        if(!value)return check(false); // Never fabricate fields for an omitted descendant.
+        health=value->health;hitEffect=value->hitEffect;return true;
     }
-    bool projectileBoneHealthWrite(InstanceHandle h,MotionBinary64 health){
+    bool projectileShootableHealthWrite(InstanceHandle h,MotionBinary64 health){
         View::Kind kind;InstanceHandle local;
-        return check(valid()&&resolves(h)&&View::decode(h,kind,local)&&kind==View::Kind::bone&&
-            bones_.writeHealth(local,health));
+        if(!valid()||!resolves(h)||!View::decode(h,kind,local))return check(false);
+        if(kind==View::Kind::bone)return check(bones_.writeHealth(local,health));
+        return check(kind==View::Kind::corpse&&corpses_.writeShootableHealth(local,health));
     }
-    bool projectileBoneHit(InstanceHandle h){
+    bool projectileShootableHit(InstanceHandle h){
         View::Kind kind;InstanceHandle local;
-        return check(valid()&&resolves(h)&&View::decode(h,kind,local)&&kind==View::Kind::bone&&bones_.writeHit(local));
+        if(!valid()||!resolves(h)||!View::decode(h,kind,local))return check(false);
+        if(kind==View::Kind::bone)return check(bones_.writeHit(local));
+        return check(kind==View::Kind::corpse&&corpses_.writeShootableHit(local));
     }
     bool population(int object,unsigned& count)const{return valid()&&selectorAvailable(object)&&owner_.instanceNumber(object,families_,count);}
     bool terrainPositionMeeting(int object,MotionBinary64 x,MotionBinary64 y,const SpriteMaskPack& masks,bool& hit){

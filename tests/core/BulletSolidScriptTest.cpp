@@ -89,6 +89,24 @@ int main(){
                 ops.writtenHp==written&&ops.destroyed==destroyed);++failures;
         }
     }
+    for(bool wall:{false,true})for(auto value:{MotionBinary64{0x3ee4f8b5u,0x88e368f1u},
+        MotionBinary64{0x3ee4f8b5u,0x88e368f2u},MotionBinary64{0x3fe00000u,0}}){
+        struct RealOps:Ops {
+            MotionBinary64 value,written{};unsigned writes=0;
+            bool wallHealth(MotionBinary64& out){out=value;return event(WallHp);}
+            bool thingHealth(MotionBinary64& out){out=value;return event(ThingHp);}
+            bool wallHealthWrite(MotionBinary64 out){written=out;++writes;return event(WallWrite);}
+            bool thingHealthWrite(MotionBinary64 out){written=out;++writes;return event(ThingWrite);}
+            bool wallHit(){return event(WallHit);}bool thingHit(){return event(ThingHit);}
+        } ops;
+        static_cast<Ops&>(ops)={wall,false,true,false,84,0,0,{},12345,false};ops.value=value;
+        bool good=true;BulletSolidScript::Settings settings{MotionBinary64::fromInteger(9),{},604};
+        assert(BulletSolidScript::run(settings,ops,good)&&good);
+        const bool positive=value.high>0x3ee4f8b5u||value.low>0x88e368f1u;
+        assert(ops.writes==unsigned(positive)&&ops.destroyed==positive);
+        if(positive){auto expected=value;assert(expected.add(MotionBinary64::fromInteger(-9))&&
+            ops.written.high==expected.high&&ops.written.low==expected.low);}
+    }
     std::printf("Solid script: %u branch combinations and %u terminal failure boundaries passed\n",cases,failures);
 }
 #endif

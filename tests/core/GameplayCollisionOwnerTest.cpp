@@ -36,8 +36,8 @@ bool nativeLimboContact(downwell::GameplayCollisionOwner& owner,
 bool nativeBoneTarget(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle target,
     downwell::MotionBinary64 health){
     downwell::MotionBinary64 read;bool effect;
-    return owner.projectileBoneFields(target,read,effect)&&owner.projectileBoneHealthWrite(target,health)&&
-        owner.projectileBoneHit(target);
+    return owner.projectileShootableFields(target,read,effect)&&owner.projectileShootableHealthWrite(target,health)&&
+        owner.projectileShootableHit(target);
 }
 bool nativeShootableQuery(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle shot,
     const downwell::SpriteMaskPack& masks,downwell::GameplayCollisionOwner::Owner::Result& selected){
@@ -2908,6 +2908,11 @@ int main(){
         for(auto bone:bones)assert(owner->bones().activate(bone,false));
         auto selected=query();GameplayCollisionView::Record record;
         assert(selected.found&&GameplayCollisionView(*world).resolve(selected.handle,record)&&record.corpse&&record.corpse->sourceId==605300);
+        MotionBinary64 health;bool effect=true;const auto beforeWrite=world->randomDrawCount();
+        assert(owner->projectileShootableFields(selected.handle,health,effect)&&health.zero()&&!effect);
+        assert(owner->projectileShootableHealthWrite(selected.handle,{0xc0040000u,0})&&owner->projectileShootableHit(selected.handle)&&
+            owner->projectileShootableFields(selected.handle,health,effect)&&health.high==0xc0040000u&&!health.low&&
+            record.corpse->state.hit&&!record.corpse->destroyRequested&&world->randomDrawCount()==beforeWrite);
         const auto corpse=owner->registeredCorpses().sourceHandle(605300);
         assert(owner->registeredCorpses().activate(corpse,false)&&!query().found);
         assert(owner->bones().activate(bones.front(),true)&&query().found);
@@ -6390,10 +6395,10 @@ int main(){
                 GameplayCollisionView::encode(GameplayCollisionView::Kind::bone,bone,selected));
             auto& stoppedBones=stoppedOwner->bones();
             MotionBinary64 hp;bool hitEffect=true;
-            assert(stoppedOwner->projectileBoneFields(selected,hp,hitEffect)&&hp.high==0x3ff00000u&&!hp.low&&!hitEffect);
-            assert(stoppedBones.activate(bone,false)&&stoppedOwner->projectileBoneHealthWrite(selected,{0xc0040000u,0})&&
-                stoppedOwner->projectileBoneHit(selected)&&stoppedBones.find(bone)->state.hit&&!stoppedBones.find(bone)->active);
-            assert(stoppedOwner->projectileBoneFields(selected,hp,hitEffect)&&hp.high==0xc0040000u&&!hp.low&&stoppedBones.activate(bone,true));
+            assert(stoppedOwner->projectileShootableFields(selected,hp,hitEffect)&&hp.high==0x3ff00000u&&!hp.low&&!hitEffect);
+            assert(stoppedBones.activate(bone,false)&&stoppedOwner->projectileShootableHealthWrite(selected,{0xc0040000u,0})&&
+                stoppedOwner->projectileShootableHit(selected)&&stoppedBones.find(bone)->state.hit&&!stoppedBones.find(bone)->active);
+            assert(stoppedOwner->projectileShootableFields(selected,hp,hitEffect)&&hp.high==0xc0040000u&&!hp.low&&stoppedBones.activate(bone,true));
             const auto countFrames=[&](int sprite,unsigned& count){return sprites.frameCount(sprite,count);};
             const auto draws=stoppedWorld->randomDrawCount();
             for(unsigned tick=0;tick<3;++tick){
@@ -6405,10 +6410,10 @@ int main(){
             }
             assert(stoppedOwner->stepBone(selected,false,countFrames)&&stoppedBones.find(bone)->destroyRequested&&
                 stoppedWorld->scriptEffects().size()==1&&stoppedWorld->randomDrawCount()==draws);
-            assert(stoppedOwner->projectileBoneHealthWrite(selected,{0x3ff40000u,0})&&
-                stoppedOwner->projectileBoneFields(selected,hp,hitEffect)&&hp.high==0x3ff40000u&&!hp.low&&
+            assert(stoppedOwner->projectileShootableHealthWrite(selected,{0x3ff40000u,0})&&
+                stoppedOwner->projectileShootableFields(selected,hp,hitEffect)&&hp.high==0x3ff40000u&&!hp.low&&
                 stoppedBones.find(bone)->destroyRequested&&stoppedOwner->prepareDraw()&&!stoppedBones.find(bone));
-            assert(!stoppedOwner->projectileBoneFields(selected,hp,hitEffect)&&!stoppedOwner->valid());
+            assert(!stoppedOwner->projectileShootableFields(selected,hp,hitEffect)&&!stoppedOwner->valid());
         }
         auto& bones=owner->bones();InstanceHandle local,shared;
         const auto before=world->randomDrawCount();auto random=world->randomState();BoneProjectile reference;

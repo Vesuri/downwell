@@ -50,7 +50,7 @@ int main(){
         Queries queries{oracle,failures,0,0,0,tiles};CorpseBirth birth;
         assert(birth.create(real(12.25),real(-3.5),upgrade,random,queries));
         equal(birth.xsp,vx);equal(birth.ysp,vy);equal(birth.imageSpeed.promoted(),double(rate));
-        assert(birth.health==int(upgrade)&&birth.hitEffect==int(upgrade));
+        assert(birth.health.high==MotionBinary64::fromInteger(int(upgrade)).high&&!birth.health.low&&birth.hitEffect==upgrade);
         assert(!birth.grounded&&!birth.active&&!birth.hit&&!birth.disappearing&&birth.noTouch&&birth.bouncing);
         assert(birth.explosionFx==102&&birth.flash==-1&&birth.bounceSound==-1);
         equal(birth.gravity,.1);equal(birth.hardGravity,.2);

@@ -139,6 +139,12 @@ public:
             return state.endStep(mainRoom,top,events);
         });
     }
+    bool writeShootableHealth(InstanceHandle key,MotionBinary64 health){
+        auto* r=resolve(key);if(!r||!health.valid())return fail();r->state.health=health;return true;
+    }
+    bool writeShootableHit(InstanceHandle key){
+        auto* r=resolve(key);if(!r)return fail();r->state.hit=true;return true;
+    }
     bool activate(InstanceHandle key,bool active){
         auto* r=resolve(key);if(!r||r->destroyRequested||!binding_.activation(key,*r,active))return fail();
         r->active=active;return true;

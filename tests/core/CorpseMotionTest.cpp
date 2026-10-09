@@ -24,6 +24,14 @@ struct Events {
 };
 int main(){
     unsigned cases=0;
+    for(bool active:{false,true})for(bool stopped:{false,true}){
+        CorpseMotion corpse;corpse.active=active;corpse.health=real(-2.5);
+        Events events;events.upgrade=1;
+        if(!stopped)events.queries={{0,0,false},{0,.1,false}};
+        assert(corpse.step(stopped,events));
+        equal(corpse.health,!stopped&&!active?1:-2.5);
+        assert(events.born==unsigned(!stopped&&active?4:0)&&events.destroyed==unsigned(!stopped&&active));
+    }
     for(double vx:{-2.,-.3,-.04998,0.,.04998,.3,2.})
     for(double vy:{-1.00002,-1.,-.1,.10002,.3,1.,4.})
     for(bool bounce:{false,true})for(unsigned tape=0;tape<32;++tape)for(int area:{1,3}){
@@ -66,14 +74,14 @@ int main(){
         assert(corpse.flash==(fading?1:-1)&&events.next==0&&events.published==0&&corpse.loopIndex==3);
     }
     for(int upgrade:{0,1,2})for(bool active:{false,true})for(int health:{0,1}){
-        CorpseMotion corpse;corpse.active=active;corpse.health=health;corpse.disappearing=true;
+        CorpseMotion corpse;corpse.active=active;corpse.health=MotionBinary64::fromInteger(health);corpse.disappearing=true;
         Events events;events.upgrade=upgrade;events.queries={{0,0,false},{0,.1,false}};
         assert(corpse.step(false,events));const bool explode=upgrade&&active&&!health;
         assert(events.born==(explode?(upgrade==2?8u:4u):0u)&&events.destroyed==explode&&corpse.destroyRequested==explode);
-        assert(corpse.flash==1&&corpse.health==(upgrade&&!active?1:health));
+        assert(corpse.flash==1&&corpse.health.high==MotionBinary64::fromInteger(upgrade&&!active?1:health).high&&!corpse.health.low);
     }
     for(unsigned failure=1;failure<=8;++failure){
-        CorpseMotion corpse;corpse.active=true;corpse.health=0;
+        CorpseMotion corpse;corpse.active=true;corpse.health={};
         Events events;events.upgrade=2;events.failBirth=failure;events.queries={{0,0,false},{0,.1,false}};
         assert(!corpse.step(false,events)&&!corpse.valid&&!corpse.destroyRequested);
         assert(events.born==failure&&!events.destroyed&&corpse.flash==-1);

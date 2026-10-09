@@ -101,8 +101,9 @@ private:
                !xx.roundPixel(coordinate)||!x.assign(MotionBinary64::fromInteger(coordinate))||!events.publish(x,y))return false;
             checkRange=4;
             if(events.restInPieces()){
-                if(!active)health=1;
-                if(health<=0&&active){
+                if(!active)health=MotionBinary64::fromInteger(1);
+                if(!compareRunnerReal(health,{},order))return false;
+                if(order<=0&&active){
                     if(!events.create(272,x.promoted(),yy))return false;
                     if(events.restInPieces()==2)for(unsigned n=0;n<4;++n)
                         if(!events.create(272,x.promoted(),yy))return false;

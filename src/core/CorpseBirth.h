@@ -4,19 +4,20 @@
 #include "RunnerImageValue.h"
 #include "AlarmBank.h"
 #include "RunnerMoveSnap.h"
+#include "ShootableThing.h"
 namespace downwell {
 // Object 263 and inherited object 90 Create. Wall queries select parent 57;
 // tile queries use layer 100. Queries report success separately from a hit.
 // publish runs after each builtin coordinate write, including move_snap.
 // Failure is terminal: RNG, earlier writes and membership are not rolled back.
-struct CorpseBirth {
+struct CorpseBirth : ShootableThing {
     RunnerImageValue x{},y{},imageSpeed{};
     MotionBinary64 xx{},yy{},xsp{},ysp{};
     MotionBinary64 gravity{0x3fb99999u,0x9999999au},hardGravity{0x3fc99999u,0x9999999au};
     AlarmBank alarms;
-    int health=1,hitEffect=0,explosionFx=102,flash=-1,bounceSound=-1;
+    int explosionFx=102,flash=-1,bounceSound=-1;
     int attempts=0,radius=0,maxRadius=0,rx=0,ry=0;
-    bool grounded=false,active=false,hit=false,disappearing=false,noTouch=true,bouncing=true;
+    bool grounded=false,active=false,disappearing=false,noTouch=true,bouncing=true;
     static bool snap(RunnerImageValue coordinate,RunnerImageValue& out){
         return RunnerMoveSnap::coordinate16(coordinate,out);
     }
@@ -29,7 +30,7 @@ struct CorpseBirth {
            !xsp.add(MotionBinary64::fromInteger(-3))||
            !randomBinary64(random.nextU32(),MotionBinary64::fromInteger(4),ysp)||
            !ysp.add(MotionBinary64::fromInteger(-2)))return false;
-        if(restInPieces)hitEffect=1;else health=0;
+        if(restInPieces)hitEffect=true;else health={};
         alarms.set(3,8);
         const MotionBinary64 rates[]={{0xbfe00000u,0},{0xbfd33333u,0x33333333u},{},
                                       {0x3fd33333u,0x33333333u},{0x3fe00000u,0}};

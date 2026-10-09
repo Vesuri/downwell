@@ -1,6 +1,6 @@
 #ifndef DOWNWELL_CORE_BULLET_SOLID_SCRIPT_H
 #define DOWNWELL_CORE_BULLET_SOLID_SCRIPT_H
-#include "MotionBinary64.h"
+#include "RunnerRealComparison.h"
 namespace downwell {
 // scrBulCheckSolid, excluding the outer bulletStandard Step's final X/Y writes.
 // Ops retains thatWall/thatThing identities, performs original query rounding,
@@ -16,7 +16,6 @@ struct BulletSolidScript {
     template<class Ops> static bool run(const Settings& settings,Ops& ops,bool& succeeded){
         if(!succeeded)return false;
         auto check=[&](bool ok){if(!ok)succeeded=false;return ok;};
-        auto positive=[](MotionBinary64 n){return !n.zero()&&!(n.high&0x80000000u);};
         auto damage=[&](MotionBinary64& hp){
             auto delta=settings.damage;delta.high^=0x80000000u;
             return check(hp.add(delta));
@@ -33,7 +32,8 @@ struct BulletSolidScript {
             if(parent==84){ // Direct parent, not ancestor membership.
                 MotionBinary64 hp;
                 if(!check(ops.wallHealth(hp)&&hp.valid()))return false;
-                if(positive(hp)){
+                int order;if(!check(compareRunnerReal(hp,{},order)))return false;
+                if(order>0){
                     if(!damage(hp)||!check(ops.wallHealthWrite(hp))||!check(ops.wallHit()))return false;
                     if(!settings.consistent&&!check(ops.destroySelf()))return false;
                 }
@@ -49,7 +49,8 @@ struct BulletSolidScript {
                 if(!check(ops.selectShootable(90)))return false;
                 MotionBinary64 hp;
                 if(!check(ops.thingHealth(hp)&&hp.valid()))return false;
-                if(positive(hp)){
+                int order;if(!check(compareRunnerReal(hp,{},order)))return false;
+                if(order>0){
                     if(!damage(hp)||!check(ops.thingHealthWrite(hp))||!check(ops.thingHit()))return false;
                     bool effect=false;
                     if(!check(ops.thingHitEffect(effect)))return false;

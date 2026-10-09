@@ -2067,6 +2067,13 @@ int main(){
         for(auto child:children)require(bones.activate(child,false),"deactivate all bones between separate queries");
         auto selected=query();require(selected.handle.slot==corpse.slot&&selected.handle.generation==corpse.generation,
             "fresh identity query sees surviving corpse, not a cached bone");
+        MotionBinary64 hp;bool effect=true;const auto beforeWrite=world->randomDrawCount();
+        require(corpses.readShootable(selected.handle,hp,effect)&&hp.zero()&&!effect,
+            "selected ordinary corpse exposes zero health and disabled hit effects");
+        require(corpses.writeShootableHealth(selected.handle,{0xc0040000u,0})&&corpses.writeShootableHit(selected.handle)&&
+            corpses.readShootable(selected.handle,hp,effect)&&hp.high==0xc0040000u&&!hp.low&&corpses.state(corpse)->hit&&
+            !world->resolveInstance(corpse)->destroyRequested&&world->randomDrawCount()==beforeWrite,
+            "selected corpse real-field writes preserve membership, lifetime and RNG");
         require(bones.activate(children.front(),true)&&bones.mark(children.front()),"retain marked bone beside corpse");
         selected=query();require(selected.handle.slot==corpse.slot&&selected.handle.generation==corpse.generation,
             "marked bone is not selected");
