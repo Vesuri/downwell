@@ -146,8 +146,10 @@ behavior, both backend integrations and relevant original-game verification.
   including its initialization/HUD dependencies and source numeric ID. Verify
   the actual rmResult handoff: retire nonpersistent old-room lifetimes, retain
   and rebind persistent controllers, admit authored Result 102522/object 325,
-  and schedule their alarms in one mixed destination-room phase (currently
-  bypassed). Do not run the old combat alarm pass behind the menu or batch all
+  and schedule their alarms in one mixed destination-room phase on the native
+  path. Complete stored Result alarm-storage/activation integration and supply
+  the actual shared room-speed state at natural controller call sites.
+  Do not run the old combat alarm pass behind the menu or batch all
   controller alarms before Result's alarms. Implement remaining fired controller
   events; see the [Result-room contract](original-behavior-audit.md#result-room-population-and-persistent-alarms).
   explicit registered births and alarm-0 tests are not full controller admission.

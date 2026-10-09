@@ -99,6 +99,23 @@ public:
         return maintenance();
     }
 
+    // One captured room population, with alarm index outside source object /
+    // registration order. Typed event adapters may own their alarm storage;
+    // visit performs countdown and immediate dispatch, not a later fire mask.
+    template<class Visit,class Healthy>
+    static bool visitAlarmPhaseChecked(InstanceStore<Capacity>& instances,Visit visit,Healthy healthy) {
+        if(!healthy())return false;
+        RunnerStepSnapshot<Capacity> handles;
+        if(!instances.captureStepOrder(handles))return false;
+        for(unsigned alarm=0;alarm<AlarmBank::count;++alarm)
+            for(std::size_t index=0;index<handles.size();++index){
+                auto* instance=instances.resolve(handles.handle(index));
+                if(!instance||!instance->active||instance->destroyRequested)continue;
+                if(!visit(*instance,alarm)||!healthy())return false;
+            }
+        return true;
+    }
+
 private:
     template <typename Handler,typename Healthy>
     static bool dispatchPhase(InstanceStore<Capacity>& instances,
@@ -121,26 +138,13 @@ private:
     static bool dispatchAlarms(InstanceStore<Capacity>& instances,
                                AlarmEvents& alarmEvents,
                                Handler& handler,Healthy& healthy) {
-        RunnerStepSnapshot<Capacity> handles;
-        if(!instances.captureStepOrder(handles))return false;
-        const std::size_t count = handles.size();
-        // Original runner 0x509d97: alarm index is the outer loop and each
-        // zero is dispatched immediately. Later alarms observe handler writes.
-        for (std::size_t alarm = 0; alarm < AlarmBank::count; ++alarm) {
-            for (std::size_t index = 0; index < count; ++index) {
-                InstanceRecord* instance = instances.resolve(handles.handle(index));
-                if (instance == nullptr || !instance->active || instance->destroyRequested)
-                    continue;
-                const bool hasEvent = (alarmEvents(*instance) & (1u << alarm)) != 0;
-                if(!healthy())return false;
-                if (!instance->alarms.advanceOne(alarm, hasEvent)) continue;
-                handler(*instance,
-                        StepEvent{StepEventPhase::alarm,
-                                  static_cast<std::uint8_t>(alarm)});
-                if(!healthy())return false;
-            }
-        }
-        return true;
+        return visitAlarmPhaseChecked(instances,[&](InstanceRecord& instance,unsigned alarm){
+            const bool hasEvent=(alarmEvents(instance)&(1u<<alarm))!=0;
+            if(!healthy())return false;
+            if(instance.alarms.advanceOne(alarm,hasEvent))
+                handler(instance,StepEvent{StepEventPhase::alarm,static_cast<std::uint8_t>(alarm)});
+            return healthy();
+        },healthy);
     }
 };
 

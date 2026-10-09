@@ -1317,18 +1317,35 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                 "old gameplay dispatcher cannot advance while the clear room owns the runtime");
             bool nativeHeart = false, hostHeart = false;
             std::uint32_t resultWipeId=0;
+            int roomSpeed=30;
+            auto* persistent=const_cast<downwell::InstanceRecord*>(reference.instance(100065));
+            persistent->alarms.set(0,1);persistent->controllerSlow=30;
             for (unsigned tick = 1; tick <= 210; ++tick) {
                 bool nativeConfirm = true, hostConfirm = true;
                 std::vector<unsigned> nativeEvents, hostEvents;
                 const bool right = tick == 61 || tick == 62;
                 const bool left = tick == 75;
-                require(gameplay.stepLevelClear(nativeConfirm, left, right, nativeHeart,
+                const bool nativeOkay=gameplay.stepLevelClear(nativeConfirm, left, right, nativeHeart,
                     [&](downwell::LevelClearSelection::Effect event, unsigned value) {
                         nativeEvents.push_back(unsigned(event)); nativeEvents.push_back(value);
-                    }) && reference.stepLevelClear(hostConfirm, left, right, hostHeart,
+                    });
+                const auto missing=reference.unimplementedCodeCalls();
+                const bool hostOkay=reference.withMomentDelayRoomSpeed(roomSpeed,[&]{return reference.stepLevelClear(hostConfirm, left, right, hostHeart,
                     [&](downwell::LevelClearSelection::Effect event, unsigned value) {
                         hostEvents.push_back(unsigned(event)); hostEvents.push_back(value);
-                    }), "both result adapters update successfully");
+                        if(event==downwell::LevelClearSelection::Effect::dither){
+                            require(roomSpeed==60&&reference.requestMomentDelay()&&roomSpeed==30,
+                                "Result Alarm 0 can arm an already-visited controller alarm");
+                        }
+                    });});
+                if(!nativeOkay||!hostOkay)std::cerr<<"Result alarm failure tick="<<tick<<" native="<<nativeOkay
+                    <<" host="<<hostOkay<<" missing="<<reference.unimplementedCodeCalls()-missing
+                    <<" speed="<<roomSpeed<<" controller0="<<persistent->alarms.get(0)<<std::endl;
+                require(nativeOkay&&hostOkay,"both result adapters update successfully");
+                if(tick==121)require(roomSpeed==30&&persistent->alarms.get(0)==1,
+                    "already-visited controller keeps its pending restoration");
+                if(tick==1||tick==122)require(roomSpeed==60&&persistent->alarms.get(0)==0,
+                    "active controller restores speed in the next Result alarm phase");
                 const auto& a = gameplay.levelClear();
                 const auto& b = reference.levelClear();
                 require(nativeEvents == hostEvents && nativeConfirm == hostConfirm && nativeHeart == hostHeart &&

@@ -554,8 +554,16 @@ struct RunSession {
     bool stepLevelClearPublished(bool& confirm, bool leftPressed, bool rightPressed, bool& heartGoal,
                         CurrencyAccount& currency, PlayerMotion& player, int& health,
                         GameMakerRandom& random, Emit emit,DitherBirth birth) {
+        return stepLevelClearScheduled(confirm,leftPressed,rightPressed,heartGoal,currency,player,health,
+            random,emit,birth,[&](auto event){
+                exitDither.advanceAlarm();return levelClear.advanceAlarmsChecked(event);
+            });
+    }
+    template<class Emit,class DitherBirth,class Alarms>
+    bool stepLevelClearScheduled(bool& confirm, bool leftPressed, bool rightPressed, bool& heartGoal,
+                        CurrencyAccount& currency, PlayerMotion& player, int& health,
+                        GameMakerRandom& random, Emit emit,DitherBirth birth,Alarms alarms) {
         if (!effectsSucceeded || !levelClearActive || nextLevelRequested) return false;
-        exitDither.advanceAlarm();
         const auto effect = [&](LevelClearSelection::Effect event, unsigned value) {
             if (event == LevelClearSelection::Effect::dither) {
                 if(!birth(0,levelClear.motion.viewY())||!effectsSucceeded){effectsSucceeded=false;return;}
@@ -565,7 +573,7 @@ struct RunSession {
             if (event == LevelClearSelection::Effect::nextLevel) nextLevelRequested = true;
             emit(event, value);
         };
-        if(!levelClear.advanceAlarmsChecked([&](auto event,unsigned value){
+        if(!alarms([&](auto event,unsigned value){
             effect(event,value);return effectsSucceeded;
         }))return effectsSucceeded=false;
         const bool ok = levelClear.step(confirm, leftPressed, rightPressed, heartGoal,

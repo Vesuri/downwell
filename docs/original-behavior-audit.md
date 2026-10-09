@@ -49,9 +49,9 @@ during that load and is cleared on return. It is not a second persistent global.
 
 The native path retires its registered gameplay families before entering the
 shared Result state, preserving persistent controller ownership; destination
-Result registration is still absent there. Neither path yet supplies complete
-source-ordered Room End/retirement event dispatch, all Result Create side
-effects, or the mixed destination alarm scheduler. Result clocks still belong
+Result registration and mixed destination alarm scheduling are still absent
+there. Neither path yet supplies complete source-ordered Room End/retirement
+event dispatch or all Result Create side effects. Result clocks still belong
 to the shared selection state, not the stored record's generic alarm bank.
 The room-population checks are not proof of those missing event integrations
 or an original-runner execution comparison.
@@ -61,12 +61,16 @@ object-68 birth at (0,0), followed by X then Y publication and Alarm 0=15.
 The checked birth hook completes before the shared wipe snapshot is enabled or
 Result Alarm 1 is armed. Rejected birth/setters retain the allocated ID and
 accepted record writes, latch failure, and suppress later alarm effects.
-The stable handle leaves with rmResult. While the mixed scheduler is pending,
-the shared Result adapter remains the alarm/Step owner and publishes its wipe
-state to the registered record after each update; this is not two independent
-timers. Create currently consumes that adapter's integer view snapshot, not a
+The stable handle leaves with rmResult. The stored destination alarm phase uses
+one captured population, interleaving the controller's registered alarms,
+the wipe's Alarm 0 and the shared Result clocks by alarm index/resource order.
+Unsupported fired controller events fail the phase after its completed prefix;
+they are not silently skipped. Moment-delay restoration requires the actual
+room-speed state to be borrowed by the caller. The wipe's registered Alarm 0
+feeds the shared effect state, and the shared Step publishes movement afterward;
+these are not two independent timers. Create currently consumes that adapter's integer view snapshot, not a
 complete generic camera-cache read. Fractional view publication, arbitrary
-wipe populations and activation-aware mixed event dispatch are not established
+wipe populations and complete activation-aware mixed event dispatch are not established
 by this single natural-departure integration.
 
 ## Main-room controller births and numeric IDs

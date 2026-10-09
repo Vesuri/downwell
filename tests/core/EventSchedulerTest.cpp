@@ -552,6 +552,19 @@ void testLayerMaintenance(){
 } // namespace
 
 int main() {
+    {
+        using namespace downwell;
+        InstanceStore<8> room;
+        room.create(102522,325,16,false);room.create(100065,37,16,true);room.create(105187,68,16,false);
+        std::vector<unsigned> trace;
+        require(EventScheduler<8>::visitAlarmPhaseChecked(room,[&](InstanceRecord& r,unsigned alarm){
+            if(alarm<2)trace.push_back(alarm*1000+unsigned(r.objectId));
+            if(alarm==0&&r.objectId==325)room.create(105188,68,16,false);
+            return true;
+        },[]{return true;}),"typed room alarm visitor succeeds");
+        require(trace==std::vector<unsigned>({37,68,325,1037,1068,1325}),
+            "typed adapters interleave globally and exclude births from the captured alarm phase");
+    }
     testObjectRegistrationOrder();
     testOrderedSnapshotSort();
     testPhaseAndAlarmOrder();

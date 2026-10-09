@@ -1602,9 +1602,10 @@ public:
     bool stepLevelClear(bool& confirm, bool leftPressed, bool rightPressed, bool& heartGoal, Emit emit) {
         if (!run_.effectsSucceeded || !run_.levelClearActive || run_.nextLevelRequested) return false;
         ++tick_;
-        const bool ok = run_.stepLevelClearPublished(confirm, leftPressed, rightPressed, heartGoal,
+        const bool ok = run_.stepLevelClearScheduled(confirm, leftPressed, rightPressed, heartGoal,
             currencyAccount_, mainPlayerMotion_, mainPlayerHealth_, random_, emit,
-            [this](int x,int y){return createResultDither(x,y);});
+            [this](int x,int y){return createResultDither(x,y);},
+            [this](auto event){return this->advanceResultRoomAlarms(event);});
         if(!ok||!publishResultDither())return run_.effectsSucceeded=false;
         mainAmmo_ = mainPlayerMotion_.ammo();
         return ok;
@@ -1758,6 +1759,31 @@ private:
     bool createResultDither(int viewX,int viewY);
     bool publishResultDither();
     InstanceHandle resultDither_{};
+    template<class Emit> bool advanceResultRoomAlarms(Emit emit){
+        const auto healthy=[&]{return run_.effectsSucceeded&&deferredCommandsSucceeded_&&roomLoadSucceeded_;};
+        if(!objectPack_||roomId_!=resultRoomId||!healthy())return false;
+        if(!EventScheduler<instanceCapacity>::visitAlarmPhaseChecked(instances_,
+            [&](InstanceRecord& record,unsigned alarm){
+                PackedObjectEvent binding;
+                if(!objectPack_->findEvent(record.objectId,2,alarm,binding))return true;
+                if(record.objectId==325){
+                    if(record.instanceId!=102522)return false;
+                    return run_.levelClear.selection.advanceAlarmChecked(alarm,emit);
+                }
+                if(record.objectId==68){
+                    if(instances_.resolve(resultDither_)!=&record||alarm!=0)return false;
+                    run_.exitDither.alarm0=record.alarms.get(0);
+                    run_.exitDither.advanceAlarm();record.alarms.set(0,run_.exitDither.alarm0);
+                    return true;
+                }
+                if(!record.alarms.advanceOne(alarm))return true;
+                const auto missing=unimplementedCodeCalls_;
+                return dispatchObjectEvent(record,2,alarm)&&missing==unimplementedCodeCalls_&&healthy();
+            },healthy))return false;
+        return instances_.reconcileObjectMembership([&](InstanceHandle key,const InstanceRecord& record,bool member){
+            return lifecycle_.membership(key,record,member)&&healthy();
+        })&&roomLayers_.serviceDepths()&&healthy();
+    }
     void resetSceneState();
     InstanceRecord* initRoomInstance();
     const InstanceRecord* initRoomInstance() const;

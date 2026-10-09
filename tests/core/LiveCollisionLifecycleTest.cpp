@@ -4043,7 +4043,7 @@ int main(){
                 "maintained goal-family query finds the later-level entrance descendant");
         }
     }
-    for(unsigned failure=1;failure<=3;++failure){
+    for(unsigned failure=1;failure<=4;++failure){
         auto wipeStorage=std::make_unique<Storage>();
         require(wipeStorage->families.bindInstanceFlags(objects),"wipe failure family fixture");
         RecordingLifecycle wipeLife({wipeStorage->owner,wipeStorage->properties,objects,sprites,wipeStorage->families,{}, {}});
@@ -4057,15 +4057,23 @@ int main(){
         for(unsigned tick=0;tick<120;++tick){bool fire=true;
             require(wipe->stepLevelClear(fire,false,false,heart,[](auto,unsigned){}),"wipe fixture approaches Alarm 0");}
         const auto id=wipe->nextRuntimeInstanceId();const auto draws=wipe->randomDrawCount();
-        wipeLife.rejectWipeStage=failure;bool fire=true;
-        require(!wipe->stepLevelClear(fire,false,false,heart,[](auto,unsigned){std::abort();})&&
-            !wipe->effectsSucceeded()&&wipeLife.wipeBirths==1&&wipeLife.wipeWrites==failure-1&&
+        wipeLife.rejectWipeStage=failure<4?failure:0;bool fire=true;unsigned events=0;
+        if(failure==4)const_cast<InstanceRecord*>(wipe->instance(100065))->alarms.set(1,1);
+        require(!wipe->stepLevelClear(fire,false,false,heart,[&](auto,unsigned){++events;})&&
+            !wipe->effectsSucceeded()&&wipeLife.wipeBirths==1&&wipeLife.wipeWrites==(failure<4?failure-1:2)&&
             wipe->nextRuntimeInstanceId()==id+1&&wipe->randomDrawCount()==draws,
             "wipe failure retains numeric allocation and stops before feedback or RNG");
         const auto* partial=wipe->instance(id);
-        require(partial&&partial->objectId==68&&partial->x==(failure==3?80:0)&&partial->y==0&&
-            partial->alarms.get(0)==-1&&!wipe->exitDither().active&&wipe->levelClear().selection.alarm1==-1,
-            "wipe failure retains only the accepted Create prefix and does not arm either timer");
+        if(failure<4){
+            require(events==0&&partial&&partial->objectId==68&&partial->x==(failure==3?80:0)&&partial->y==0&&
+                partial->alarms.get(0)==-1&&!wipe->exitDither().active&&wipe->levelClear().selection.alarm1==-1,
+                "wipe failure retains only the accepted Create prefix and does not arm either timer");
+        }else{
+            require(events==2&&partial&&partial->x==80&&partial->y==wipe->exitDither().y&&
+                partial->alarms.get(0)==15&&wipe->exitDither().active&&
+                wipe->levelClear().selection.alarm1==90&&wipe->instance(100065)->alarms.get(1)==0,
+                "Result Alarm 0 precedes controller Alarm 1; unsupported event stops before Result Alarm 1 and Step");
+        }
         const auto tick=wipe->tick();
         require(!wipe->stepLevelClear(fire,false,false,heart,[](auto,unsigned){std::abort();})&&
             wipe->tick()==tick&&wipeLife.wipeBirths==1,"failed wipe update cannot be retried");
