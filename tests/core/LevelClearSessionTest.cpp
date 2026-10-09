@@ -7,6 +7,22 @@ static void require(bool ok, const char* why) {
 }
 int main() {
     using namespace downwell;
+    {
+        RunSession stopped;GameMakerRandom random(42);PlayerMotion player;CurrencyAccount currency;
+        int health=4;bool heart=false,confirm=true;
+        stopped.levelResultRequested=true;
+        require(stopped.enterLevelClear(0,false,health,player,random),"wipe birth failure fixture");
+        stopped.levelClear.selection.alarm0=1;
+        unsigned births=0,events=0;
+        require(!stopped.stepLevelClearPublished(confirm,false,false,heart,currency,player,health,random,
+            [&](auto,unsigned){++events;},[&](int x,int y){
+                ++births;require(x==0&&y==0&&!stopped.exitDither.active&&
+                    stopped.levelClear.selection.alarm1==-1,"registered birth precedes scalar wipe and Alarm 1");
+                return false;
+            })&&!stopped.effectsSucceeded&&births==1&&events==0&&
+            !stopped.exitDither.active&&!stopped.exitDitherRequested&&stopped.levelClear.selection.alarm1==-1,
+            "failed wipe publication stops the source alarm before later effects");
+    }
     for(auto failed:{LevelClearSelection::Effect::dither,LevelClearSelection::Effect::fadeWhoosh,
                     LevelClearSelection::Effect::nextLevel}){
         RunSession stopped;GameMakerRandom random(42);PlayerMotion player;CurrencyAccount currency;

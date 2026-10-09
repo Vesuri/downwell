@@ -547,10 +547,18 @@ struct RunSession {
     bool stepLevelClear(bool& confirm, bool leftPressed, bool rightPressed, bool& heartGoal,
                         CurrencyAccount& currency, PlayerMotion& player, int& health,
                         GameMakerRandom& random, Emit emit) {
+        return stepLevelClearPublished(confirm,leftPressed,rightPressed,heartGoal,currency,player,health,
+            random,emit,[](int,int){return true;});
+    }
+    template<class Emit,class DitherBirth>
+    bool stepLevelClearPublished(bool& confirm, bool leftPressed, bool rightPressed, bool& heartGoal,
+                        CurrencyAccount& currency, PlayerMotion& player, int& health,
+                        GameMakerRandom& random, Emit emit,DitherBirth birth) {
         if (!effectsSucceeded || !levelClearActive || nextLevelRequested) return false;
         exitDither.advanceAlarm();
         const auto effect = [&](LevelClearSelection::Effect event, unsigned value) {
             if (event == LevelClearSelection::Effect::dither) {
+                if(!birth(0,levelClear.motion.viewY())||!effectsSucceeded){effectsSucceeded=false;return;}
                 exitDitherRequested = true;
                 exitDither.create(0, levelClear.motion.viewY());
             }

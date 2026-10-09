@@ -2764,6 +2764,50 @@ void StartupRuntime::initRoomEndStep(bool advancePressed) {
     }
 }
 
+bool StartupRuntime::createResultDither(int viewX,int viewY) {
+    if(!run_.effectsSucceeded||!objectPack_||roomId_!=resultRoomId||resultDither_.generation)
+        return run_.effectsSucceeded=false;
+    DeferredInstanceQueue<1> child;
+    if(!child.enqueueCreate(68,0,0))return run_.effectsSucceeded=false;
+    InstanceHandle created;
+    const auto result=child.applyChecked(instances_,*objectPack_,roomId_,nextRuntimeInstanceId_,
+        [&](InstanceRecord& record){
+            for(std::size_t i=0;i<instances_.size();++i)if(&instances_.at(i)==&record)created=instances_.handleAt(i);
+            if(!created.generation)return false;
+            // Parentless PreCreate has no effects. Create publishes X then Y,
+            // then arms Alarm 0. Use the shared Result adapter's view snapshot;
+            // the complete generic camera/event scheduler remains separate.
+            auto* r=instances_.resolve(created);
+            if(!r||!lifecycle_.integerPosition(created,*r,viewX+80,r->y)||!run_.effectsSucceeded)return false;
+            r=instances_.resolve(created);if(!r)return false;
+            r->x=viewX+80;r->preciseX=static_cast<float>(r->x);
+            if(!lifecycle_.integerPosition(created,*r,r->x,viewY-100)||!run_.effectsSucceeded)return false;
+            r=instances_.resolve(created);if(!r)return false;
+            r->y=viewY-100;r->preciseY=static_cast<float>(r->y);r->alarms.set(0,15);
+            return true;
+        },lifecycle_);
+    if(result!=ApplyInstanceCommandsResult::success||!run_.effectsSucceeded)return run_.effectsSucceeded=false;
+    resultDither_=created;return true;
+}
+
+bool StartupRuntime::publishResultDither() {
+    if(!run_.effectsSucceeded)return false;
+    if(!resultDither_.generation)return !run_.exitDither.active;
+    auto* r=instances_.resolve(resultDither_);
+    if(!r||r->objectId!=68)return false;
+    // Until the mixed room scheduler owns the alarm and Step bodies, publish
+    // their shared adapter state to this registered lifetime after each update.
+    r->alarms.set(0,run_.exitDither.alarm0);
+    const auto& state=run_.exitDither;
+    if(r->x!=state.x||r->y!=state.y){
+        if(!lifecycle_.integerPosition(resultDither_,*r,state.x,state.y)||!run_.effectsSucceeded)return false;
+        r=instances_.resolve(resultDither_);if(!r)return false;
+        r->x=state.x;r->y=state.y;
+        r->preciseX=static_cast<float>(state.x);r->preciseY=static_cast<float>(state.y);
+    }
+    return true;
+}
+
 bool StartupRuntime::enterLevelClear(unsigned style,bool heartGoal) {
     if(!run_.levelResultRequested||run_.levelClearActive||resultEntryRequest_||
        !roomPack_||!objectPack_||style>4||2+run_.upgrades.levels[6]-(style==2?1:0)>=4)return false;
@@ -2809,6 +2853,7 @@ void StartupRuntime::gotoRoom(int roomId) {
 
 void StartupRuntime::loadRoom(int roomId, bool firstGameRoom) {
     if(!deferredCommandsSucceeded_ || !run_.effectsSucceeded){roomLoadSucceeded_=false;return;}
+    resultDither_={};
     if (roomId == mainRoomId) random_.prepareLookahead(randomLookahead_);
     if(!ownedEntryRegistration_.clear()){roomLoadSucceeded_=false;return;}
     if(!clearRoomDebris()){roomLoadSucceeded_=false;return;}

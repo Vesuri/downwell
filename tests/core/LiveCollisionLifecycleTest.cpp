@@ -54,6 +54,7 @@ struct RecordingLifecycle:Lifecycle {
     unsigned resultBirths=0;
     unsigned resultWrites=0;
     bool rejectResultBirth=false,rejectResultPosition=false;
+    unsigned wipeBirths=0,wipeWrites=0,rejectWipeStage=0;
     unsigned goalWrites=0,rejectGoalStage=0;
     unsigned startWrites=0,rejectStartStage=0,startRetires=0,startMarks=0;
     InstanceHandle markedStart{};
@@ -81,6 +82,11 @@ struct RecordingLifecycle:Lifecycle {
         return meetingVm(view,h,object,x,y,*masks,RunnerMaskDispatch{},inverse,hit);
     }
     bool birth(InstanceHandle h,const InstanceRecord& r){
+        if(r.objectId==68){
+            ++wipeBirths;
+            require(r.roomId==16&&r.x==0&&r.y==0&&handles.count(102522),"wipe birth uses Result room and source origin");
+            if(rejectWipeStage==1)return false;
+        }
         if(r.objectId==325){
             ++resultBirths;
             require(r.instanceId==102522&&r.roomId==16&&r.x==80&&r.y==144&&
@@ -114,6 +120,12 @@ struct RecordingLifecycle:Lifecycle {
         return Lifecycle::transform(h,r,field,value,alpha,blend);
     }
     bool move(InstanceHandle h,const InstanceRecord& r,RunnerImageValue x,RunnerImageValue y){
+        if(r.objectId==68){
+            ++wipeWrites;
+            if(wipeWrites<=2)require(x.bits==0x42a00000u&&r.y==0&&
+                (wipeWrites==1?(r.x==0&&y.bits==0):r.x==80),"wipe Create publishes X then Y");
+            if(rejectWipeStage==wipeWrites+1)return false;
+        }
         if(r.objectId==325){
             ++resultWrites;
             require(r.y==144&&y.bits==0x430e0000u,"Result Create publishes y=142 before its record write");
@@ -4030,6 +4042,33 @@ int main(){
             require(clock->effectsSucceeded()&&clockLife.meetingCalls==entryCalls+1&&clock->runTimeTicks()==entryTicks,
                 "maintained goal-family query finds the later-level entrance descendant");
         }
+    }
+    for(unsigned failure=1;failure<=3;++failure){
+        auto wipeStorage=std::make_unique<Storage>();
+        require(wipeStorage->families.bindInstanceFlags(objects),"wipe failure family fixture");
+        RecordingLifecycle wipeLife({wipeStorage->owner,wipeStorage->properties,objects,sprites,wipeStorage->families,{}, {}});
+        auto wipe=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            InstanceLifecycleBinding::bindQueryDestruction(wipeLife));
+        wipeLife.runtime=wipe.get();wipeLife.masks=&masks;
+        wipe->skipToGameForTesting();wipe->registerLevelExit(static_cast<int>(wipe->mainPlayerY()));
+        for(unsigned tick=0;tick<110&&!wipe->levelResultRequested();++tick)wipe->step({},false);
+        require(wipe->enterLevelClear(0,false),"wipe failure fixture enters Result");
+        bool heart=false;
+        for(unsigned tick=0;tick<120;++tick){bool fire=true;
+            require(wipe->stepLevelClear(fire,false,false,heart,[](auto,unsigned){}),"wipe fixture approaches Alarm 0");}
+        const auto id=wipe->nextRuntimeInstanceId();const auto draws=wipe->randomDrawCount();
+        wipeLife.rejectWipeStage=failure;bool fire=true;
+        require(!wipe->stepLevelClear(fire,false,false,heart,[](auto,unsigned){std::abort();})&&
+            !wipe->effectsSucceeded()&&wipeLife.wipeBirths==1&&wipeLife.wipeWrites==failure-1&&
+            wipe->nextRuntimeInstanceId()==id+1&&wipe->randomDrawCount()==draws,
+            "wipe failure retains numeric allocation and stops before feedback or RNG");
+        const auto* partial=wipe->instance(id);
+        require(partial&&partial->objectId==68&&partial->x==(failure==3?80:0)&&partial->y==0&&
+            partial->alarms.get(0)==-1&&!wipe->exitDither().active&&wipe->levelClear().selection.alarm1==-1,
+            "wipe failure retains only the accepted Create prefix and does not arm either timer");
+        const auto tick=wipe->tick();
+        require(!wipe->stepLevelClear(fire,false,false,heart,[](auto,unsigned){std::abort();})&&
+            wipe->tick()==tick&&wipeLife.wipeBirths==1,"failed wipe update cannot be retried");
     }
     for(bool rejectPosition:{false,true}){
         auto resultStorage=std::make_unique<Storage>();

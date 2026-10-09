@@ -1602,8 +1602,10 @@ public:
     bool stepLevelClear(bool& confirm, bool leftPressed, bool rightPressed, bool& heartGoal, Emit emit) {
         if (!run_.effectsSucceeded || !run_.levelClearActive || run_.nextLevelRequested) return false;
         ++tick_;
-        const bool ok = run_.stepLevelClear(confirm, leftPressed, rightPressed, heartGoal,
-            currencyAccount_, mainPlayerMotion_, mainPlayerHealth_, random_, emit);
+        const bool ok = run_.stepLevelClearPublished(confirm, leftPressed, rightPressed, heartGoal,
+            currencyAccount_, mainPlayerMotion_, mainPlayerHealth_, random_, emit,
+            [this](int x,int y){return createResultDither(x,y);});
+        if(!ok||!publishResultDither())return run_.effectsSucceeded=false;
         mainAmmo_ = mainPlayerMotion_.ammo();
         return ok;
     }
@@ -1753,6 +1755,9 @@ private:
     void loadRoom(int roomId, bool firstGameRoom);
     struct ResultEntryRequest { unsigned style; bool heartGoal; };
     const ResultEntryRequest* resultEntryRequest_=nullptr;
+    bool createResultDither(int viewX,int viewY);
+    bool publishResultDither();
+    InstanceHandle resultDither_{};
     void resetSceneState();
     InstanceRecord* initRoomInstance();
     const InstanceRecord* initRoomInstance() const;

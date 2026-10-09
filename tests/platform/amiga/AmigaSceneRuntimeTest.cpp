@@ -1316,6 +1316,7 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             require(gameplay.tick() == nativeTick && reference.tick() == hostTick,
                 "old gameplay dispatcher cannot advance while the clear room owns the runtime");
             bool nativeHeart = false, hostHeart = false;
+            std::uint32_t resultWipeId=0;
             for (unsigned tick = 1; tick <= 210; ++tick) {
                 bool nativeConfirm = true, hostConfirm = true;
                 std::vector<unsigned> nativeEvents, hostEvents;
@@ -1353,6 +1354,17 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                     gameplay.nextLevelRequested() == (tick == 210) &&
                     reference.nextLevelRequested() == (tick == 210),
                     "result grants, presentation and departure requests match across adapters");
+                unsigned wipes=0;
+                for(std::size_t i=0;i<reference.activeInstanceCount();++i){
+                    const auto& r=reference.instanceAt(i);if(r.objectId!=68)continue;
+                    ++wipes;
+                    if(!resultWipeId)resultWipeId=r.instanceId;
+                    require(r.instanceId==resultWipeId&&r.roomId==downwell::StartupRuntime::resultRoomId&&
+                        r.x==reference.exitDither().x&&r.y==reference.exitDither().y&&
+                        r.alarms.get(0)==reference.exitDither().alarm0,
+                        "registered Result wipe retains identity and publishes shared movement/alarm state");
+                }
+                require(wipes==unsigned(tick>=121),"Result wipe is born once at the source Alarm 0 boundary");
             }
             const auto carriedRandom = gameplay.randomState();
             const auto carriedClock = gameplay.runTimeTicks();
@@ -1364,6 +1376,7 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             downwell::Input heldEntry; heldEntry.fire = true;
             require(gameplay.prepareNextAreaOneLevel(heldEntry, 319) && reference.loadNextAreaOneLevel(heldEntry),
                 "both runtime adapters accept completed departure into the next area-one level");
+            require(resultWipeId&&!reference.instance(resultWipeId),"Result wipe retires when leaving its room");
             require(!gameplay.findPlayer(oldPlayerHandle)&&gameplay.findPlayer(gameplay.playerHandle())&&
                     gameplay.playerHandle().generation>oldPlayerHandle.generation,
                     "next level retires the old player and publishes a fresh lifetime");

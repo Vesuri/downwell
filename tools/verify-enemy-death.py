@@ -112,3 +112,12 @@ assert event_instructions("Object_Result_Alarm_0")[:14] == [
     "call.i gml_Script_instance_create(argc=3)", "popz.v", "push.i 68049", "setowner.e",
     "pushi.e 90", "conv.i.v", "pushi.e -1", "pushi.e 1"]
 print("Pinned Result-room handoff, authored birth and persistent-controller survival contract")
+assert manifest["objects"][68]["name"] == "objTransDither" and manifest["objects"][68]["parentId"] == -1
+assert event_instructions("Object_objTransDither_PreCreate_0") == ["call.i event_inherited(argc=0)", "popz.v"]
+assert event_instructions("Object_objTransDither_Create_0") == [
+    "pushi.e 0", "conv.i.v", "push.l 0", "conv.l.v", "call.i gml_Script___view_get(argc=2)",
+    "pushi.e 80", "add.i.v", "pop.v.v self.x",
+    "pushi.e 0", "conv.i.v", "push.l 1", "conv.l.v", "call.i gml_Script___view_get(argc=2)",
+    "pushi.e 100", "sub.i.v", "pop.v.v self.y",
+    "push.i 68049", "setowner.e", "pushi.e 15", "conv.i.v", "pushi.e -1", "pushi.e 0", "pop.v.v [array]self.alarm"]
+print("Pinned exit-wipe parentless PreCreate, ordered view-relative setters and alarm initialization")

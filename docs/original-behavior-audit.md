@@ -56,6 +56,19 @@ to the shared selection state, not the stored record's generic alarm bank.
 The room-population checks are not proof of those missing event integrations
 or an original-runner execution comparison.
 
+Result Alarm 0's stored exit wipe uses the shared numeric allocator and normal
+object-68 birth at (0,0), followed by X then Y publication and Alarm 0=15.
+The checked birth hook completes before the shared wipe snapshot is enabled or
+Result Alarm 1 is armed. Rejected birth/setters retain the allocated ID and
+accepted record writes, latch failure, and suppress later alarm effects.
+The stable handle leaves with rmResult. While the mixed scheduler is pending,
+the shared Result adapter remains the alarm/Step owner and publishes its wipe
+state to the registered record after each update; this is not two independent
+timers. Create currently consumes that adapter's integer view snapshot, not a
+complete generic camera-cache read. Fractional view publication, arbitrary
+wipe populations and activation-aware mixed event dispatch are not established
+by this single natural-departure integration.
+
 ## Main-room controller births and numeric IDs
 
 `verify-runner-instance-ids.py` pins both the executable's GEN8-based counter
