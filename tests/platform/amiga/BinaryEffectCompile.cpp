@@ -592,6 +592,12 @@ bool compileCorpseDraw(const downwell::CorpseAnimation& corpse,
 #include "core/CorpseEffects.h"
 #include "core/StoredCorpseRegistration.h"
 #include "core/StoredCorpseExpiryRegistration.h"
+#include "core/CorpseExpiryInstances.h"
+bool compileNativeExpiry(downwell::CorpseExpiryInstances<4>& owner,std::uint32_t sourceId){
+    downwell::InstanceHandle key;
+    return owner.create(sourceId,{}, {},key)&&owner.sprite(key,102,12)&&
+        owner.advanceAnimation(key)&&owner.activate(key,false)&&owner.clear();
+}
 bool compileRegisteredExpiry(downwell::StoredCorpseExpiryRegistration<16,4>& owner,
     downwell::CorpseAnimation& corpse,downwell::StoredCorpseRegistration<16,4>::Publisher& publish,
     const downwell::InstanceRecord& record){

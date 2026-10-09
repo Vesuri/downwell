@@ -4,6 +4,7 @@
 #include "core/GameMakerRandom.h"
 #include "core/StoredCorpseRegistration.h"
 #include "core/StoredCorpseExpiryRegistration.h"
+#include "core/CorpseExpiryInstances.h"
 #include <cassert>
 #include <cstring>
 #include <cstdio>
@@ -30,6 +31,65 @@ struct Adapter {
 static void sameRandom(const GameMakerRandom& a,const GameMakerRandom& b){
     assert(a.drawCount()==b.drawCount()&&a.stateIndex()==b.stateIndex());
     for(unsigned i=0;i<16;++i)assert(a.stateWord(i)==b.stateWord(i));
+}
+struct NativeExpiryAudit {
+    using Record=CorpseExpiryInstances<1>::Record;
+    unsigned rejected=0,marks=0,retirements=0;
+    bool birth(InstanceHandle,const Record&){return false;}
+    bool birthAt(InstanceHandle,const Record& r,RunnerImageValue x,RunnerImageValue y){
+        assert(r.sourceId==105187&&r.state.spriteId==102&&r.state.imageSpeed.bits==0x3f800000u&&
+            r.x.bits==x.bits&&r.y.bits==y.bits);return rejected!=1;
+    }
+    bool sprite(InstanceHandle,const Record& r,int sprite){assert(r.state.spriteId==sprite);return rejected!=2;}
+    bool imageIndex(InstanceHandle,const Record& r,RunnerImageValue value){assert(r.state.imageIndex.bits==value.bits);return rejected!=3;}
+    bool markDestroyed(InstanceHandle,const Record& r){assert(r.state.destroyRequested&&!r.destroyRequested);++marks;return rejected!=4;}
+    bool retire(InstanceHandle,const Record&){++retirements;return rejected!=5;}
+    bool activation(InstanceHandle,const Record&,bool){return true;}
+    bool membership(InstanceHandle,const Record&,bool){return true;}
+    bool move(InstanceHandle,const Record&,RunnerImageValue,RunnerImageValue){return false;}
+    bool mask(InstanceHandle,const Record&,int){return false;}
+    bool transform(InstanceHandle,const Record&,RunnerTransformField,RunnerImageValue,RunnerImageValue,std::uint32_t){return false;}
+};
+static void nativeExpiry(){
+    {
+        using Instances=CorpseExpiryInstances<1>;NativeExpiryAudit audit;
+        Instances effects(Instances::Binding::bindPositionedActor(audit));InstanceHandle key;
+        assert(effects.create(105187,real(96.25),real(192.5),key));
+        CorpseExpiryEffect oracle;assert(oracle.create(real(96.25),real(192.5)));
+        for(unsigned i=0;i<40;++i){
+            assert(oracle.advanceImage()&&effects.advanceAnimation(key));
+            const auto* r=effects.find(key);
+            assert(r&&r->state.timeline.bits==oracle.timeline.bits&&r->state.imageIndex.bits==oracle.imageIndex.bits&&
+                r->destroyRequested==oracle.destroyRequested&&effects.size()==1);
+        }
+        assert(oracle.destroyRequested&&audit.marks==1&&!audit.retirements&&effects.retire(key)&&!effects.find(key));
+    }
+    for(unsigned failure=0;failure<=5;++failure){
+        NativeExpiryAudit audit;audit.rejected=failure;
+        using Instances=CorpseExpiryInstances<1>;
+        Instances effects(Instances::Binding::bindPositionedActor(audit));bool good=true;effects.observeFailure(good);
+        InstanceHandle key;bool ok=effects.create(105187,real(96.25),real(192.5),key);
+        const auto retained=effects.sourceHandle(105187);assert(retained.generation&&effects.size()==1);
+        assert(ok==(failure!=1));
+        if(ok){
+            assert(key.generation!=105187&&effects.find(key)->state.imageSpeed.bits==0x3e99999au);
+            ok=effects.sprite(key,206,1);assert(ok==(failure!=2&&failure!=3));
+        }
+        if(ok){
+            assert(effects.activate(key,false)&&effects.advanceAnimation(key)&&effects.find(key)->state.timeline.bits==0);
+            assert(effects.activate(key,true));
+            for(unsigned i=0;i<4&&ok;++i)ok=effects.advanceAnimation(key);
+            assert(ok==(failure!=4)&&effects.size()==1&&effects.find(key));
+        }
+        if(ok){
+            assert(effects.find(key)->destroyRequested&&effects.advanceAnimation(key)&&audit.marks==1);
+            ok=effects.retire(key);assert(ok==(failure!=5));
+        }
+        assert(ok==!failure&&good==!failure);
+        if(failure){InstanceHandle retry;assert(!effects.create(105188,{}, {},retry)&&!retry.generation&&effects.find(retained));}
+        else assert(!effects.find(retained)&&!effects.size());
+        audit.rejected=0;assert(effects.clear()&&!effects.size()&&!effects.find(retained));
+    }
 }
 struct RegistryAudit {
     unsigned calls=0,failure=0,walls=0,retired=0,destroyMarks=0;
@@ -132,6 +192,7 @@ static void registeredCorpses(){
     }
 }
 int main(){
+    nativeExpiry();
     registeredCorpses();
     unsigned cases=0;
     for(unsigned seed=0;seed<256;++seed)for(int path:{-1,0,7,32,33})for(double impact:{0.,2.,9.}){

@@ -1141,6 +1141,15 @@ retirement from cleanup. A child born during alarms first animates next frame.
 Animation End publishes its index before marking destruction, without unlinking
 the current animation iterator. This registered path does not yet replace the
 legacy RunSession pool in both backend renderers or enable natural deaths.
+
+`CorpseExpiryInstances` supplies the corresponding native typed storage. It
+uses the same `CorpseExpiryEffect` state and unit-track advancement, takes an
+explicit source numeric ID from the enclosing creation stream, and keeps that
+ID separate from its generation handle. Positioned constructor publication
+precedes Create, inactive records do not animate, and Animation End publishes
+the index and destruction mark without freeing the slot. Failed publication
+retains the partial lifetime for teardown. Native resource-owner registration,
+mixed scheduling and Draw routing are not provided by this storage class.
 `RunSession::advanceCorpseAlarm` is the shared production adapter for alarms:
 it invokes the source lifecycle with synchronous creation into the room-owned
 expiry pool, then resolves the requested sprite's unit-track frame count and
