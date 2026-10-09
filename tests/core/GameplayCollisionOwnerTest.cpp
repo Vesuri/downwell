@@ -4124,6 +4124,15 @@ int main(){
                 // Suppress right-side escape; the source's left-side rule still applies.
                 bool allowed=false;
                 assert(owner->bloodTimeAllowed(key,true,10000,masks,allowed));contacts.push_back(allowed);
+                const auto* blood=owner->blood().find(key);assert(blood);
+                if(ownership!=GameplayCollisionOwner::Ownership::reference){
+                    RunnerImageValue restoredX,restoredY;
+                    assert(owner->nativePublishedPosition(shared,restoredX,restoredY)&&
+                        restoredX.bits==blood->x.bits&&restoredY.bits==blood->y.bits);
+                }else{
+                    const auto restored=owner->state(shared);
+                    assert(restored&&restored->x.bits==blood->x.bits&&restored->y.bits==blood->y.bits);
+                }
                 assert(owner->stepBlood(shared,true,10000,masks)&&
                     owner->blood().find(key)->state.imageSpeed.bits==(allowed?0x3f000000u:0u));
                 assert(owner->blood().clear());

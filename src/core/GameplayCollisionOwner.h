@@ -10,7 +10,6 @@
 #include "SmokeTrig.h"
 #include "DebrisDraw.h"
 #include "TimeStopBound.h"
-#include "BloodGoalContact.h"
 #include "GameplayRoomLayers.h"
 #include "ObjectDrawMetadata.h"
 #include "ObjectAlarmMetadata.h"
@@ -2274,35 +2273,15 @@ public:
             },allowed))return check(false);
         frozen=!allowed;return true;
     }
-    // Boolean contact only: no source instance identity or ordering is exposed.
-    // Native field stores admit integral centres, unit ordinary fields and 2x
-    // entry/exit fields. Reject unsupported geometry rather than approximating.
+    // Boolean result, but preserve the source query's traversal and lazy
+    // bounds publication on both backends, including rotated blood masks.
     bool bloodTimeAllowed(InstanceHandle local,bool pTimeStop,int roomWidth,const SpriteMaskPack& masks,bool& allowed){
         InstanceHandle self;const auto* child=blood_.find(local);
         if(!valid()||!world_||!child||child->spriteId!=84||
            !View::encode(View::Kind::blood,local,self)||!resolves(self))return check(false);
         return check(TimeStopBound::evaluate(pTimeStop,child->x.promoted(),child->y.promoted(),roomWidth,
             [&](auto x,auto y,bool& hit){
-                if(!native_)return masks.valid()&&registeredPlaceMeeting(self,82,x,y,masks,hit);
-                bool found=false;
-                const bool ok=visitRegistered(View::timeFieldBase,View::exitControllerBase,
-                    [&](InstanceHandle h,int object,std::uint32_t flags){
-                        if(found||(flags&0x100003u))return true;
-                        View::Kind kind;InstanceHandle key;
-                        if(!View::decode(h,kind,key))return false;
-                        if(object==82&&kind==View::Kind::timeField){
-                            const auto* field=View(*world_).template resolveLocal<View::Kind::timeField>(key);
-                            return field&&BloodGoalContact::query(child->state,*field,found);
-                        }
-                        if((object==255||object==371)&&kind==View::Kind::goalField){
-                            const auto* field=world_->goalFieldInstances().find(key);
-                            if(!field||field->scaleX!=2||field->scaleY!=2)return false;
-                            GoalTimeField shape;shape.x=field->x;shape.y=field->y;
-                            return BloodGoalContact::query(child->state,shape,found);
-                        }
-                        return false;
-                    });
-                if(ok)hit=found;return ok;
+                return masks.valid()&&registeredPlaceMeeting(self,82,x,y,masks,hit);
             },allowed));
     }
     bool stepBlood(InstanceHandle shared,bool pTimeStop,int roomWidth,const SpriteMaskPack& masks){
@@ -2324,38 +2303,7 @@ public:
         const int mask=child?(child->maskId<0?child->spriteId:child->maskId):-1;
         if(!valid()||!world_||!child||(mask!=133&&mask!=134)||
             !View::encode(View::Kind::currency,local,self)||!resolves(self)||!px.assign(x)||!py.assign(y))return check(false);
-        if(!native_)return masks.valid()&&registeredPlaceMeeting(self,82,x,y,masks,hit);
-        const auto shape=mask==133?TimeStopGoalContact::Mask::SmallCurrency:TimeStopGoalContact::Mask::MediumCurrency;
-        return nativeSolidFieldMeeting(self,shape,px,py,hit);
-    }
-    // Boolean-only query over registered field lifetimes. It must not be used
-    // as an identity-bearing instance_place selector.
-    bool nativeSolidFieldMeeting(InstanceHandle self,TimeStopGoalContact::Mask shape,RunnerImageValue px,RunnerImageValue py,bool& hit){
-        std::uint32_t flags=0;
-        if(!valid()||!world_||!native_||!resolves(self)||!eligibilityFlags(self,flags))return check(false);
-        // Pair testing rejects a destroyed caller even when its current Step
-        // continues after instance_destroy (boxes and stuck currency).
-        if(flags&0x100001u){hit=false;return true;}
-        bool found=false;
-        const RunnerImageValue unit{0x3f800000u};
-        const bool ok=visitRegistered(View::timeFieldBase,View::exitControllerBase,
-            [&](InstanceHandle h,int object,std::uint32_t flags){
-                if(found||(flags&0x100003u))return true;
-                View::Kind kind;InstanceHandle key;if(!View::decode(h,kind,key))return false;
-                if(object==82&&kind==View::Kind::timeField){
-                    const auto* field=View(*world_).template resolveLocal<View::Kind::timeField>(key);
-                    return field&&TimeStopGoalContact::query(shape,px,py,unit,unit,*field,found);
-                }
-                if((object==255||object==371)&&kind==View::Kind::goalField){
-                    const auto* field=world_->goalFieldInstances().find(key);
-                    if(!field||field->scaleX!=2||field->scaleY!=2)return false;
-                    GoalTimeField value;value.x=field->x;value.y=field->y;
-                    return TimeStopGoalContact::query(shape,px,py,unit,unit,value,found);
-                }
-                return false;
-            });
-        if(ok)hit=found;
-        return check(ok);
+        return masks.valid()&&registeredPlaceMeeting(self,82,x,y,masks,hit);
     }
     bool currencyWallMeeting(InstanceHandle local,MotionBinary64 x,MotionBinary64 y,const SpriteMaskPack& masks,bool& hit){
         InstanceHandle self;
@@ -2409,9 +2357,7 @@ public:
         BoxDestructionScript::Caller caller;if(!readBoxDestruction(self,caller))return check(false);
         return check(TimeStopBound::evaluate(pTimeStop,caller.x,caller.y,roomWidth,
                 [&](auto x,auto y,bool& hit){
-                    if(!native_)return masks.valid()&&registeredPlaceMeeting(self,82,x,y,masks,hit);
-                    RunnerImageValue px,py;
-                    return px.assign(x)&&py.assign(y)&&nativeSolidFieldMeeting(self,TimeStopGoalContact::Mask::Box,px,py,hit);
+                    return masks.valid()&&registeredPlaceMeeting(self,82,x,y,masks,hit);
                 },allowed));
     }
     bool stopBoxAlarm0(InstanceHandle local,bool pTimeStop,int roomWidth,const SpriteMaskPack& masks){

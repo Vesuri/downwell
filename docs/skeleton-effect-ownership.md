@@ -981,17 +981,16 @@ rotated mask before checking the strict side bounds. An unstopped query bypasses
 collision work. The callback must read the source player's current `pTimeStop`;
 this interface does not infer it from goal/shop locks.
 
-Native `bloodTimeAllowed` uses a bounded boolean-only contact path over live
-registered field records. Ordinary fields have integral centres and unit scale;
-entry/exit fields have integral centres and scale 2. It applies
-`BloodGoalContact` to the registered blood sprite/angle, retaining the precise
-mask samples rather than substituting a bounding-box or centre test. Unsupported
-field geometry is rejected. Reference ownership retains the generic resource
-query for differential verification. This path exposes no selected instance
-identity and does not establish spatial traversal order; it cannot be reused
-for identity-bearing shard-direction queries. `stepBlood` invokes it after
-saved-speed capture. Automatic player `pTimeStop` and mixed-family ordinary
-Step admission remain separate integration requirements.
+Native `bloodTimeAllowed` uses the shared source field-family place query over
+registered lifetimes, including list/tree preparation, precise rotated masks
+and temporary position/cache publication. It no longer substitutes a
+family-local boolean overlap scan, even though its result is boolean.
+`BloodGoalContact` remains a standalone geometry specialization, not this
+owner's production query adapter. Reference/native fixtures compare fractional
+contacts against ordinary, entry and exit fields and check restored positions.
+`stepBlood` invokes the query after saved-speed capture. Automatic player
+`pTimeStop` and mixed-family ordinary Step admission remain separate
+integration requirements.
 
 `stepWithTimeStopBonesAndBlood` composes the stored blood dispatch with the
 existing bone/shard/time-change tick, without advancing the world twice. Blood

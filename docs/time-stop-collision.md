@@ -33,8 +33,9 @@ Selected slots are resolved back to generation handles before returning field
 coordinates. No numeric VM identity is invented. The same query tests compare
 empty, singleton and overlapping mixed-field populations, fractional player
 positions and both facings across reference/native/native-scenery ownership.
-This does not admit arbitrary native selectors or replace the separately
-specialized boolean blood/currency overlap paths.
+Blood, currency and box boolean contacts also use this shared traversal and
+position/cache publication. Their boolean return does not make traversal side
+effects optional. This does not admit arbitrary native selectors.
 
 ## Field wind audio ordering
 
