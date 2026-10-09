@@ -468,6 +468,21 @@ the list path preserves registration order. Compatibility truncation applies
 only to the tree query, not to candidate coordinates. This does not admit
 general native selectors or temporary `place_meeting` movement, and does not
 schedule wall End Step by itself.
+
+`actorTerrainPlaceMeeting` explicitly tests a published actor against the audited
+60/93 terrain families using shared family preparation and `RunnerPlaceQuery`.
+Temporary movement and restoration use `RunnerSpatialPosition`, preserving
+dirty-queue effects. Indexed queries restore the saved cached bounds; list
+queries retain the source's temporary cache until lazy refresh. Regression
+checks compare both the boolean result and subsequent nonpublishing/publishing
+overlap tests against reference storage. No family-specific collision phase or
+new trajectory is enabled by this adapter.
+
+Run-owned terrain callers are not admitted by that actor API: reconstructing
+their cache from the immutable position cannot represent the list branch's
+retained temporary bounds. Wall-to-wall `place_meeting` needs that state handled
+before wall End Step can use the complete query pair. Merely restoring position
+or translating a box for one test would discard observable publication state.
 `RunnerSpatialInstances::point` supplies object-family traversal through the
 same preparation/index ownership used by `instance_place`. It filters flags
 `0x100003`, and indexed candidates additionally require kind 1 and matching

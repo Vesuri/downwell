@@ -2417,6 +2417,13 @@ int main(){
                     if(!native){expected.push_back(hit);hit?++hits:++misses;}
                     else assert(ordinal<expected.size()&&hit==expected[ordinal]);
                     ++ordinal;
+                    auto shifted=x.promoted();assert(shifted.add(MotionBinary64::fromInteger(16)));
+                    assert(owner->actorTerrainPlaceMeeting(player,object,shifted,y.promoted(),masks,hit));
+                    if(!native){expected.push_back(hit);hit?++hits:++misses;}
+                    else assert(ordinal<expected.size()&&hit==expected[ordinal]);
+                    ++ordinal;
+                    compare(false); // Includes the list path's retained temporary bounds.
+                    compare(true); // Restored position must refresh to its original shape.
                 }
             };
             RunnerImageValue queryX,queryY;assert(queryX.assignInteger(240)&&queryY.assignInteger(160));
