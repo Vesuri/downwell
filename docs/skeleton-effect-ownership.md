@@ -394,8 +394,13 @@ and direction writes, health subtraction, stun, delay, sound, impact and the
 second delay. Skeleton health remains integral; nonintegral or out-of-range
 writes fail instead of being rounded. The specialization uses object 120's
 inherited non-immune/non-through state, not a rule for all enemies.
-The impact callback remains an explicit synchronous source-219 creation and
-caller-`myFx` publication dependency. Event-adapter tests cover live target
+The `dispatchBlastSkeletonCollisionWithEffects` entry binds synchronous object
+219 creation and numeric caller-`myFx` publication before the sprite, speed,
+angle and depth setters. The native entry takes the child's ID from the enclosing
+allocator and publishes it through the existing effect lifetime and layer owner.
+The explicit impact-callback entry remains available for checked dependencies.
+Amiga sprite 605 has three offline planar frames at zero and 270 degrees; a
+pixel comparison preserves its non-square source anchor. Event-adapter tests cover live target
 writes, duplicate suppression and failed-impact retention; they do not prove
 mixed spatial collection or natural encounter admission. Native blast wall
 contacts also require original numeric IDs for breakable hit memory; native

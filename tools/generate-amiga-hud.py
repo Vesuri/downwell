@@ -135,6 +135,7 @@ SELECTIONS = {
         569: None,   # sprGemChunk
         602: None,   # sprFxBoingRed (gem-high muzzle)
         603: None,   # sprFxBoingball (usual gunboot muzzle)
+        605: None,   # sprFxImpactSplosion: blast impact, three frames
         631: None,   # sprTree
         635: None,   # sprGrass
         636: None,   # sprGrass2
@@ -647,7 +648,7 @@ def build_records(manifest, extracted, profile, language_path=None):
                 canvas = flash_palette_canvas(canvas)
             if profile == "game" and sprite_id in (84, 85, 96, 101, 153, 154, 157, 162, 163, 164,
                     166, 168, 170, 173, 177, 178, 186, 187, 188, 205, 207, 208, 278,
-                    458, 459, 460, 471, 485, 486, 487, 496, 497, 602, 603):
+                    458, 459, 460, 471, 485, 486, 487, 496, 497, 602, 603, 605):
                 # Prepare snail Y flips and crawler quarter turns on the host.
                 # Crop transparent padding to keep variants Chip-RAM cheap.
                 snail = sprite_id in (177, 178)
@@ -655,7 +656,7 @@ def build_records(manifest, extracted, profile, language_path=None):
                 if gun_spread:
                     require(not sprite["smooth"], "spread proof requires nearest-sampled source artwork")
                     verify_projectile_spread_pixels(canvas, sprite["originX"], sprite["originY"])
-                turns = (0, 3) if gun_spread else range(2 if snail else 4 if sprite_id == 278 else 1)
+                turns = (0, 3) if gun_spread or sprite_id == 605 else range(2 if snail else 4 if sprite_id == 278 else 1)
                 for turn in turns:
                     if turn == 0:
                         variant = canvas
@@ -667,6 +668,10 @@ def build_records(manifest, extracted, profile, language_path=None):
                     ox, oy = sprite["originX"], sprite["originY"]
                     if snail:
                         if turn: oy = canvas.height - oy
+                    elif sprite_id == 605 and turn == 3:
+                        # This non-square source rotates clockwise around its
+                        # authored anchor; do not reuse width for both axes.
+                        ox, oy = canvas.height - oy, ox
                     else:
                         for _ in range(turn):
                             ox, oy = oy, canvas.width - ox
@@ -697,7 +702,7 @@ def build_records(manifest, extracted, profile, language_path=None):
                     # used planar facing; DMA variants remain independently
                     # generated below and checked against the pixel oracle.
                     # fxSmoke also leaves image_xscale at its default +1.
-                    facings = (False,) if gun_spread or sprite_id in (84, 85, 101, 485, 486, 487, 496, 497) else (False, True)
+                    facings = (False,) if gun_spread or sprite_id in (84, 85, 101, 485, 486, 487, 496, 497, 605) else (False, True)
                     for flip_x in facings:
                         image = variant.transpose(Image.Transpose.FLIP_LEFT_RIGHT) if flip_x else variant
                         pixels = [pixel_to_pen(pixel) for pixel in image.get_flattened_data()]

@@ -741,7 +741,7 @@ private:
             if constexpr(Kind==View::Kind::terrain)sourceId=r.sourceInstanceId;
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
             if constexpr(Kind==View::Kind::timeField)sourceId=r.sourceId;
-            if constexpr(Kind==View::Kind::debris)sourceId=r.sourceId;
+            if constexpr(Kind==View::Kind::debris||Kind==View::Kind::scriptEffect)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
             if constexpr(Kind==View::Kind::flashBall||Kind==View::Kind::limboShard||Kind==View::Kind::levelNumber||Kind==View::Kind::result||Kind==View::Kind::runController||Kind==View::Kind::consumptionBlood||Kind==View::Kind::corpse||Kind==View::Kind::corpseExpiry||Kind==View::Kind::blast||Kind==View::Kind::smoke)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeShard)sourceId=parent.pendingTimeShardId_;
@@ -845,7 +845,7 @@ private:
             unsigned sourceId=0;
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
             if constexpr(Kind==View::Kind::timeField)sourceId=r.sourceId;
-            if constexpr(Kind==View::Kind::debris)sourceId=r.sourceId;
+            if constexpr(Kind==View::Kind::debris||Kind==View::Kind::scriptEffect)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
             if constexpr(Kind==View::Kind::flashBall||Kind==View::Kind::limboShard||Kind==View::Kind::levelNumber||Kind==View::Kind::result||Kind==View::Kind::runController||Kind==View::Kind::consumptionBlood||Kind==View::Kind::corpse||Kind==View::Kind::corpseExpiry||Kind==View::Kind::blast||Kind==View::Kind::smoke)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeShard)sourceId=parent.pendingTimeShardId_;
@@ -2161,6 +2161,15 @@ public:
            !objects_.collisionEvent(261,120,found,binding)||!found||
            binding.ownerObjectId!=261||binding.codeId!=2224)return check(false);
         return check(world_->hitSkeletonWithSourceBullet(shot,target,frames,delay,environment,audio,atan));
+    }
+    template<class Allocate,class Frames,class Audio>
+    bool dispatchBlastSkeletonCollisionWithEffects(const RunnerCollisionEventContext::Frame& event,
+        Allocate allocate,Frames frames,SoundPlayEnvironment& environment,Audio& audio){
+        return dispatchBlastSkeletonCollision(event,[&](auto& caller,auto x,auto y,int sprite,auto speed,auto angle,int depth){
+            unsigned id=0;
+            return allocate(id)&&world_->spawnScriptEffectWithSourceId(id,x,y,sprite,speed,angle,
+                MotionBinary64::fromInteger(depth),frames,caller.myFx);
+        },environment,audio);
     }
     template<class Impact,class Audio>
     bool dispatchBlastSkeletonCollision(const RunnerCollisionEventContext::Frame& event,Impact impact,

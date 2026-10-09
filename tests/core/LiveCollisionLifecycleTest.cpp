@@ -1658,6 +1658,30 @@ int main(){
         });
         require(ok==!knees&&blood.instances().size()==2,"registered stomp retains both blood births");
     }
+    for(bool missingFrames:{false,true}){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach bound blast effect world");world->skipToGameForTesting();
+        auto blasts=world->blastRegistration<1>();auto skeletons=world->skeletonRegistration<1>();InstanceHandle blast,skeleton;
+        require(world->spawnSkeleton(skeletons,240,200,skeleton),"birth bound impact victim");int speed=60;
+        const bool ok=world->withMomentDelayRoomSpeed(speed,[&]{
+            if(!world->spawnBlast(blasts,{0x406e0800u,0},MotionBinary64::fromInteger(200),blast))return false;
+            const auto id=world->nextRuntimeInstanceId();const auto draws=world->randomDrawCount();
+            BlastHitAudio audio;SoundPlayEnvironment env;RunnerCollisionEventContext context;
+            const bool hit=owner->dispatchCollisionEvent(context,blasts.worldHandle(blast),skeletons.worldHandle(skeleton),{true,false},
+                [&](const auto& event){return world->dispatchBlastSkeletonCollisionWithEffects(blasts,skeletons,event,
+                    [&](int sprite,std::uint32_t& count){return !missingFrames&&sprites.frameCount(sprite,count);},env,audio);});
+            const auto* effect=world->instance(id);
+            require(hit==!missingFrames&&effect&&effect->objectId==219&&effect->preciseX==240.25f&&effect->preciseY==200&&
+                blasts.instances().find(blast)->state.myFx==id&&world->nextRuntimeInstanceId()==id+1&&
+                world->randomDrawCount()==draws&&skeletons.instances().find(skeleton)->state.health==10,
+                "blast creates actual impact with retained numeric caller ID");
+            if(hit)require(effect->spriteId==605&&effect->imageSpeed==0.4f&&effect->rotation==270&&effect->depth==0,
+                "blast impact ordered setters");
+            return hit;
+        });
+        require(ok==!missingFrames,"bound impact outcome");
+    }
     for(bool rejectImpact:{false,true}){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());

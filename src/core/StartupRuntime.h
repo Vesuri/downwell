@@ -1846,6 +1846,15 @@ public:
            (event.code!=2007&&event.code!=2008))return run_.effectsSucceeded=false;
         return run_.effectsSucceeded=particles.kill(*self)&&run_.effectsSucceeded;
     }
+    template<unsigned BlastCapacity,unsigned SkeletonCapacity,class Frames,class Audio>
+    bool dispatchBlastSkeletonCollisionWithEffects(StoredBlastRegistration<instanceCapacity,BlastCapacity>& blasts,
+        StoredSkeletonRegistration<instanceCapacity,SkeletonCapacity>& skeletons,
+        const RunnerCollisionEventContext::Frame& event,Frames frames,SoundPlayEnvironment& environment,Audio& audio){
+        return dispatchBlastSkeletonCollision(blasts,skeletons,event,
+            [&](auto& caller,auto x,auto y,int sprite,auto speed,auto angle,int depth){
+                return spawnScriptEffect(x,y,sprite,speed,angle,MotionBinary64::fromInteger(depth),frames,caller.myFx);
+            },environment,audio);
+    }
     template<unsigned BlastCapacity,unsigned SkeletonCapacity,class Impact,class Audio>
     bool dispatchBlastSkeletonCollision(StoredBlastRegistration<instanceCapacity,BlastCapacity>& blasts,
         StoredSkeletonRegistration<instanceCapacity,SkeletonCapacity>& skeletons,

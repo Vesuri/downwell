@@ -10,7 +10,7 @@ namespace downwell {
 class GameplayScriptSpawnInstances {
 public:
     static constexpr unsigned capacity=scriptSpawnEffectCapacity;
-    struct Record {const ScriptSpawnEffect* effect=nullptr;unsigned lifetimeId=0;bool active=true,destroyRequested=false;};
+    struct Record {const ScriptSpawnEffect* effect=nullptr;unsigned lifetimeId=0;bool active=true,destroyRequested=false;std::uint32_t sourceId=0;};
     using Binding=RecordLifecycleBinding<Record>;
     explicit GameplayScriptSpawnInstances(Binding binding={}):binding_(binding){}
     bool valid()const{return good_;}
@@ -23,11 +23,19 @@ public:
         for(unsigned i=0;local&&i<capacity;++i)if(records_[i].lifetimeId==local)return {i,local};
         return {};
     }
+    template<class Execute> bool withSourceId(std::uint32_t id,Execute execute){
+        if(!good_||sourceScope_||!id||id>0x7fffffffu)return good_=false;
+        for(const auto& r:records_)if(r.lifetimeId&&r.sourceId==id)return good_=false;
+        sourceScope_=true;pendingSourceId_=id;
+        const bool ok=execute();const bool consumed=pendingSourceId_==0;
+        pendingSourceId_=0;sourceScope_=false;
+        return good_=good_&&ok&&consumed;
+    }
     bool birth(unsigned local,const ScriptSpawnEffect& effect){
-        if(!good_||!local||local<=newest_||handle(local).generation)return good_=false;
+        if(!good_||!local||local<=newest_||handle(local).generation||(sourceScope_&&!pendingSourceId_))return good_=false;
         unsigned i=0;while(i<capacity&&records_[i].lifetimeId)++i;
         if(i==capacity)return good_=false;
-        records_[i]={&effect,local,true};newest_=local;++count_;
+        records_[i]={&effect,local,true,false,pendingSourceId_};pendingSourceId_=0;newest_=local;++count_;
         return good_=binding_.birth({i,local},records_[i]);
     }
     bool sprite(unsigned local,const ScriptSpawnEffect& effect){
@@ -77,6 +85,7 @@ private:
         const auto* r=find(handle(local));return good_=good_&&r&&r->effect==&effect;
     }
     Record records_[capacity]{};unsigned count_=0,newest_=0;FailureSignal<> good_=true;Binding binding_{};
+    std::uint32_t pendingSourceId_=0;bool sourceScope_=false;
 };
 }
 #endif

@@ -193,6 +193,10 @@ struct NativeBlastImpact {
     bool operator()(downwell::BlastActor<64>&,downwell::MotionBinary64,downwell::MotionBinary64,
         int,downwell::MotionBinary64,downwell::MotionBinary64,int);
 };
+bool nativeBlastContactWithEffects(downwell::GameplayCollisionOwner& owner,const downwell::RunnerCollisionEventContext::Frame& event,
+    bool (*allocate)(unsigned&),bool (*frames)(int,unsigned&),downwell::SoundPlayEnvironment& environment,NativeSkeletonAudio& audio){
+    return owner.dispatchBlastSkeletonCollisionWithEffects(event,allocate,frames,environment,audio);
+}
 bool nativeBlastContact(downwell::GameplayCollisionOwner& owner,const downwell::RunnerCollisionEventContext::Frame& event,
     NativeBlastImpact impact,downwell::SoundPlayEnvironment& environment,NativeSkeletonAudio& audio){
     return owner.dispatchBlastSkeletonCollision(event,impact,environment,audio);
@@ -7096,6 +7100,31 @@ int main(){
                 });good=!knees;return good;
             });
             assert(ok==!knees&&owner->blood().size()==2&&id==605203);
+        }
+        for(bool missingFrames:{false,true}){
+            auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+                GameplayTerrainInstances::WallCollision{},&rooms,ownership);
+            auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+            assert(owner->attach(*world));int speed=60;assert(world->bindControllerRoomSpeed(speed));
+            InstanceHandle controller,skeleton,blast,self,other;
+            assert(owner->runControllers().create(100065,{}, {},[](InstanceHandle){return true;},controller)&&
+                world->createSkeletonWithSourceId(605200,240,200,skeleton)&&
+                owner->createBlast(605201,{0x406e0800u,0},MotionBinary64::fromInteger(200),blast)&&
+                GameplayCollisionView::encode(GameplayCollisionView::Kind::blast,blast,self)&&
+                GameplayCollisionView::encode(GameplayCollisionView::Kind::skeleton,skeleton,other));
+            unsigned allocations=0;const auto draws=world->randomDrawCount();BlastHitAudio audio;SoundPlayEnvironment env;
+            RunnerCollisionEventContext context;
+            const bool hit=owner->dispatchCollisionEvent(context,self,other,{true,false},[&](const auto& event){
+                return owner->dispatchBlastSkeletonCollisionWithEffects(event,[&](unsigned& id){++allocations;id=605202;return true;},
+                    [&](int sprite,std::uint32_t& count){return !missingFrames&&sprites.frameCount(sprite,count);},env,audio);
+            });
+            const auto* registered=owner->scriptEffects().find(owner->scriptEffects().handle(1));
+            const auto* effect=registered?registered->effect:nullptr;
+            assert(hit==!missingFrames&&allocations==1&&effect&&registered&&registered->sourceId==605202&&
+                owner->registeredBlasts().find(blast)->state.myFx==605202&&effect->x.bits==0x43704000u&&
+                owner->skeletons().find(skeleton)->state.health==10&&world->randomDrawCount()==draws);
+            if(hit)assert(effect->spriteId==605&&effect->imageSpeed.bits==0x3ecccccdu&&effect->angle.bits==0x43870000u&&
+                effect->depth.bits==0);
         }
         for(bool rejectImpact:{false,true}){
             auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},

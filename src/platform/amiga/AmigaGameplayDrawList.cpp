@@ -564,15 +564,19 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
             // no runtime conversion or silently rounded fractional artwork.
             const bool wallImpact=effect.spriteId==101;
             const bool boneImpact=effect.spriteId==85;
-            if(!effect.valid||(!wallImpact&&!boneImpact&&effect.spriteId!=602&&effect.spriteId!=603)||
-               effect.drawFrame()>=(wallImpact?8u:boneImpact?6u:1u)||
+            const bool blastImpact=effect.spriteId==605;
+            if(!effect.valid||(!wallImpact&&!boneImpact&&!blastImpact&&effect.spriteId!=602&&effect.spriteId!=603)||
+               effect.drawFrame()>=(wallImpact?8u:boneImpact?6u:blastImpact?3u:1u)||
                !effect.x.promoted().roundPixel(x)||!effect.y.promoted().roundPixel(y)||
                !ix.assign(downwell::MotionBinary64::fromInteger(x))||
                !iy.assign(downwell::MotionBinary64::fromInteger(y))||
                ((ix.bits!=effect.x.bits)&&((ix.bits|effect.x.bits)&0x7fffffffu))||
                ((iy.bits!=effect.y.bits)&&((iy.bits|effect.y.bits)&0x7fffffffu)))return false;
             unsigned frame=effect.drawFrame();
-            if(effect.angle.bits&0x7fffffffu){
+            if(blastImpact){
+                if(effect.angle.bits!=0x43870000u)return false; // Source blast direction: 270 degrees.
+                frame+=768;
+            }else if(effect.angle.bits&0x7fffffffu){
                 if(wallImpact||boneImpact)return false;
                 downwell::RunnerImageValue lo,hi;
                 lo.assign(downwell::MotionBinary64::fromInteger(267));

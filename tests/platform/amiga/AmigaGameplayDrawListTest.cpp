@@ -442,6 +442,18 @@ int main() {
             assert(owner->attach(*scene)); // Restore production traversal.
             inventory.levels[12]=0;
         }
+        std::uint32_t impactId=0;
+        assert(scene->spawnScriptEffectWithSourceId(705100,n(248),n(128),605,{0x3fd99999u,0x9999999au},n(270),{},frames,impactId)&&impactId==705100);
+        const unsigned impactFrames[]={0,0,0,1,1,2,2,2};
+        for(unsigned frame:impactFrames){
+            assert(list.collect(*scene,pack,pack+8,160,34));unsigned seen=0;
+            for(unsigned i=0;i<list.count;++i)if(list.actors[i].sprite==605){
+                assert(list.actors[i].frame==768+frame&&list.actors[i].x==198&&list.actors[i].y==94);++seen;
+            }
+            assert(seen==1);scene->step(0);assert(scene->effectsSucceeded());
+        }
+        assert(owner->prepareDraw()&&list.collect(*scene,pack,pack+8,160,34));
+        for(unsigned i=0;i<list.count;++i)assert(list.actors[i].sprite!=605);
         downwell::InstanceHandle impact;
         assert(scene->spawnScriptEffect(n(248),n(128),101,{0x3fe00000u,0},{},{},frames,impact));
         for(unsigned tick=0;tick<16;++tick){

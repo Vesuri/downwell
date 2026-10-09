@@ -1002,6 +1002,17 @@ public:
         },run_.effectsSucceeded);
         return downwell::EffectSpawnScript::run(ops,x,y,sprite,speed,angle,depth);
     }
+    template<class Frames> bool spawnScriptEffectWithSourceId(std::uint32_t id,
+        downwell::MotionBinary64 x,downwell::MotionBinary64 y,int sprite,downwell::MotionBinary64 speed,
+        downwell::MotionBinary64 angle,downwell::MotionBinary64 depth,Frames frames,std::uint32_t& myFx){
+        if(!run_.effectsSucceeded||!scriptSpawnInstances_)return run_.effectsSucceeded=false;
+        return run_.effectsSucceeded=scriptSpawnInstances_->withSourceId(id,[&]{
+            return spawnScriptEffectWithCaller(ownedScriptEffects_,x,y,sprite,speed,angle,depth,frames,
+                [&](downwell::InstanceHandle child){const auto* r=scriptSpawnInstances_->find(child);
+                    if(!r||r->sourceId!=id)return false;myFx=r->sourceId;return true;
+                });
+        });
+    }
     const downwell::ScriptSpawnEffects<downwell::scriptSpawnEffectCapacity>& scriptEffects()const{return ownedScriptEffects_;}
     template<class Execute,class Tick> bool withSourceBulletSteps(Execute execute,Tick tick){
         if(!run_.effectsSucceeded||!bulletLifecycle_.hasOwner()||sourceBulletDispatch_)return run_.effectsSucceeded=false;
