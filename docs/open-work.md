@@ -48,8 +48,8 @@ behavior, both backend integrations and relevant original-game verification.
   Connect native terrain's identity runs to ordered collision candidates
   before enabling destruction dispatch there: finish animation/image publication and
   dynamic-rebinding publication, plus spatial mutation/traversal publication;
-  connect retained native wall End Step state to source spatial queries,
-  tile publication and synchronous area-four limboShard (379) creation;
+  schedule retained native wall End Step in the complete mixed phase and
+  connect synchronous area-four limboShard (379) creation;
   schedule the mixed spatial flush with candidate collection and post-pass
   retention after the remaining publication paths are connected.
   Registration stamps alone are not pair

@@ -2496,7 +2496,7 @@ int main(){
         assert(terrain->spatialFlags(h,flags)&&(flags&1u)&&!(flags&2u));
         assert(terrain->retire(h)&&!world->activateNativeTerrain(h,true));
     }
-    for(unsigned transition:{0u,1u,2u,3u}){
+    for(bool scheduled:{false,true})for(unsigned transition:{0u,1u,2u,3u}){
         std::vector<unsigned> expected;
         for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
             GameplayCollisionOwner::Ownership::nativeScenery}){
@@ -2514,7 +2514,6 @@ int main(){
                     assert(owner->terrain().createProperties(owner->terrain().handle(i),51,false,random));}
             }
             auto pairs=std::make_unique<RunnerCollisionPairs<GameplayCollisionView::capacity,64>>();
-            assert(owner->collectCollisionPairs(*pairs)&&pairs->size()>0);
             struct NonSolidMotion {
                 bool rollback(InstanceHandle){assert(false);return false;}
                 bool prepareMotion(InstanceHandle){assert(false);return false;}
@@ -2522,7 +2521,11 @@ int main(){
             } motion;
             RunnerCollisionEventContext context;bool pending=transition==2;std::vector<unsigned> actual;
             const auto draws=world->randomDrawCount();
-            const bool executed=owner->executeCollisionPairs(*pairs,masks,context,motion,
+            unsigned passes=0;
+            const auto pass=[&]{
+                ++passes;
+                assert(owner->collectCollisionPairs(*pairs)&&pairs->size()>0);
+                return owner->executeCollisionPairs(*pairs,masks,context,motion,
                 [&]{return RunnerCollisionEventContext::RoomState{true,pending};},
                 [&](const auto& event){
                     assert(context.depth()==1&&context.current()->code==991&&event.code==991);
@@ -2531,6 +2534,11 @@ int main(){
                     if(transition==1)pending=true;
                     return transition!=3;
                 });
+            };
+            const bool executed=scheduled?world->withCollisionPass(pass,[&]{
+                world->step(0);return world->effectsSucceeded();
+            }):pass();
+            assert(passes==1&&(!scheduled||world->effectsSucceeded()==executed));
             assert(executed==(transition!=3)&&owner->valid()==(transition!=3));
             assert(!context.depth()&&!context.current()&&world->randomDrawCount()==draws);
             assert(transition==2?actual.empty():(!actual.empty()&&(!transition||actual.size()==1)));
