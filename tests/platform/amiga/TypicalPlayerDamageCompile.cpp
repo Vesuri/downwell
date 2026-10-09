@@ -1,6 +1,16 @@
 #include "core/RunSession.h"
 #include "core/PlayerDamageNumber.h"
+#include "core/RunControllerInstances.h"
 using downwell::MotionBinary64;
+bool nativeDamageControllerWrites(downwell::RunControllerInstances<4>& controllers,
+    const downwell::InstanceHandle* order,unsigned count,int& roomSpeed){
+    return controllers.visitDamageControllers([&](auto apply){
+        for(unsigned i=0;i<count;++i)if(!apply(order[i]))return false;
+        return true;
+    },[&](auto& controller){
+        roomSpeed=40;controller.setSlow(23);return controller.setAlarm(0,40);
+    });
+}
 // Compile-only backend contract: declarations deliberately prevent the
 // compiler from folding away any event branches or synchronous field Create.
 struct DamageEvents {

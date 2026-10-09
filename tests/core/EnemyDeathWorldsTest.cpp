@@ -716,6 +716,21 @@ int main(){
         assert((replacement.slot!=key.slot||replacement.generation!=key.generation)&&
             !numbers.state(key)&&numbers.clear()&&numbers.valid());
     }
+    {
+        auto owner=std::make_unique<downwell::StoredWorldCollision>(objects,sprites,masks);
+        auto stored=std::make_unique<downwell::StartupRuntime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,
+            2,nullptr,owner->binding());
+        assert(owner->attach(*stored));stored->skipToGameForTesting();
+        unsigned visited=0;int speed=60;
+        assert(stored->visitDamageControllers([&](auto& controller){
+            ++visited;speed=40;controller.setSlow(23);return controller.setAlarm(0,40);
+        }));
+        const auto* controller=stored->instance(downwell::StartupRuntime::controllerInstanceId);
+        assert(visited==1&&speed==40&&controller&&controller->controllerSlow==23&&controller->alarms.get(0)==40);
+        assert(!stored->visitDamageControllers([&](auto& controller){
+            controller.setSlow(17);return controller.setAlarm(downwell::AlarmBank::count,40);
+        })&&!stored->effectsSucceeded()&&controller->controllerSlow==17&&controller->alarms.get(0)==40);
+    }
     for(unsigned binding=0;binding<3;++binding){
         auto owner=std::make_unique<downwell::StoredWorldCollision>(objects,sprites,masks);
         auto stored=std::make_unique<downwell::StartupRuntime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,

@@ -455,6 +455,10 @@ public:
         if(!run_.effectsSucceeded)return false;
         return run_.effectsSucceeded=runControllers_&&controllerRoomSpeed_&&runControllers_->momentDelay(*controllerRoomSpeed_,controllers);
     }
+    template<class Visit,class Apply> bool visitDamageControllers(Visit controllers,Apply apply){
+        if(!run_.effectsSucceeded)return false;
+        return run_.effectsSucceeded=runControllers_&&runControllers_->visitDamageControllers(controllers,apply);
+    }
     bool advanceControllerRoomAlarm(downwell::InstanceHandle key,unsigned alarm){
         return run_.effectsSucceeded=run_.effectsSucceeded&&runControllers_&&controllerRoomSpeed_&&
             runControllers_->advanceAlarm(key,alarm,*controllerRoomSpeed_);

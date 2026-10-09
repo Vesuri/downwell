@@ -239,6 +239,26 @@ public:
         return run_.effectsSucceeded=okay&&run_.effectsSucceeded;
     }
     bool requestMomentDelay();
+    template<class Apply> bool visitDamageControllers(Apply apply){
+        if(!run_.effectsSucceeded)return false;
+        if(!objectPack_)return run_.effectsSucceeded=false;
+        bool okay=true;
+        instances_.visitObject(37,[&](int object,int parent){
+            for(unsigned depth=0;depth<objectPack_->objectCount();++depth){
+                if(object==parent)return true;
+                PackedObject definition;
+                if(!objectPack_->findObject(object,definition)){okay=false;return false;}
+                if(definition.parentId<0)return false;
+                object=definition.parentId;
+            }
+            okay=false;return false;
+        },[&](InstanceHandle key,const InstanceRecord& record){
+            if(!okay)return false;
+            if(!record.active||record.destroyRequested)return true;
+            return okay=withPlayerDamageController([&]{return instances_.resolve(key);},apply);
+        });
+        return run_.effectsSucceeded=okay;
+    }
     bool noKillAchievement()const{return run_.noKill;}
     template<class Audio,class Delay,class Cue>
     bool recordEnemyDeath(bool cutGunshot,Audio& audio,Delay delay,Cue cue){

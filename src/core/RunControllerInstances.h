@@ -3,6 +3,7 @@
 #include "InstanceLifecycle.h"
 #include "MomentDelay.h"
 #include "AlarmBank.h"
+#include "PlayerDamage.h"
 namespace downwell {
 // Persistent object-37 lifetimes. The enclosing world supplies source IDs and
 // synchronous global initialization. Room changes must retain these records;
@@ -51,6 +52,14 @@ public:
                 auto* r=resolve(key);if(!r)return fail();
                 return !r->active||r->destroyRequested||apply(*r);
             });
+        })||fail();
+    }
+    template<class Visit,class Apply> bool visitDamageControllers(Visit visit,Apply apply){
+        if(!good_)return false;
+        return visit([&](InstanceHandle key){
+            auto* record=resolve(key);if(!record)return fail();
+            if(!record->active||record->destroyRequested)return true;
+            return withPlayerDamageController([&]{return resolve(key);},apply)||fail();
         })||fail();
     }
     bool advanceAlarm(InstanceHandle key,unsigned alarm,int& speed){

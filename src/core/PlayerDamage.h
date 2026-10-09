@@ -1,7 +1,27 @@
 #ifndef DOWNWELL_CORE_PLAYER_DAMAGE_H
 #define DOWNWELL_CORE_PLAYER_DAMAGE_H
 #include "MotionBinary64.h"
+#include "AlarmBank.h"
 namespace downwell {
+// Borrow one registered controller for the scrPDamage WITH body. Resolve
+// every write independently: a callback may retire/compact the owner.
+template<class Resolve,class Apply>
+bool withPlayerDamageController(Resolve resolve,Apply apply){
+    struct Controller {
+        Resolve& resolve;bool valid=true;
+        void setSlow(int value){
+            auto* record=valid?resolve():nullptr;
+            if(!record){valid=false;return;}
+            record->controllerSlow=value;
+        }
+        bool setAlarm(unsigned index,int value){
+            auto* record=valid?resolve():nullptr;
+            if(!record||index>=AlarmBank::count)return valid=false;
+            record->alarms.set(index,value);return true;
+        }
+    } controller{resolve};
+    return apply(controller)&&controller.valid;
+}
 // scrPDamage caller state. Source-name storage/resolution is supplied by Events
 // because it is a GameMaker string, not a port-owned instance ID. All effect
 // calls are synchronous; callback failure leaves earlier mutations in place.

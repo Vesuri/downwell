@@ -1,4 +1,5 @@
 #include "core/RunSession.h"
+#include "core/RunControllerInstances.h"
 #include <cassert>
 #include <cstdio>
 #include <vector>
@@ -49,7 +50,45 @@ struct Events {
     void setPlayerDamaged(){damaged=true;record(19);}
     bool setPlayerAlarm(int index,int value){assert(index==1 && damaged);alarm=value;return record(20);}
 };
+struct OwnedControllerEvents:Events {
+    RunControllerInstances<2>* owner=nullptr;InstanceHandle first{},second{};
+    template<class Visit> bool forEachController(Visit visit){
+        return owner->visitDamageControllers([&](auto apply){return apply(second)&&apply(first);},visit);
+    }
+};
+struct DamageControllerOwner {
+    bool birth(InstanceHandle,const RunControllerInstances<2>::Record&){return true;}
+    bool birthAt(InstanceHandle,const RunControllerInstances<2>::Record&,RunnerImageValue,RunnerImageValue){return true;}
+    bool retire(InstanceHandle,const RunControllerInstances<2>::Record&){return true;}
+    bool activation(InstanceHandle,const RunControllerInstances<2>::Record&,bool){return true;}
+    bool membership(InstanceHandle,const RunControllerInstances<2>::Record&,bool){return true;}
+};
 int main(){
+    for(bool inactive:{false,true}){
+        DamageControllerOwner binding;
+        RunControllerInstances<2> owner(RunControllerInstances<2>::Binding::bindPositionedLifetime(binding));
+        OwnedControllerEvents events;events.owner=&owner;
+        assert(owner.create(100001,{}, {},[](auto){return true;},events.first));
+        assert(owner.create(100002,{}, {},[](auto){return true;},events.second));
+        assert(owner.activate(events.second,!inactive));
+        PlayerDamage damage;
+        assert(damage.execute(n(1),events)&&events.health==3&&events.roomSpeed==40&&events.alarm==90);
+        assert(owner.find(events.first)->controllerSlow==23&&owner.find(events.first)->alarms.get(0)==40);
+        assert(owner.find(events.second)->controllerSlow==(inactive?0:23)&&
+            owner.find(events.second)->alarms.get(0)==(inactive?-1:40));
+        for(unsigned i=0;i<40;++i)assert(owner.advanceAlarm(events.first,0,events.roomSpeed));
+        assert(events.roomSpeed==60&&owner.find(events.first)->controllerSlow==0);
+    }
+    {
+        DamageControllerOwner binding;
+        RunControllerInstances<2> owner(RunControllerInstances<2>::Binding::bindPositionedLifetime(binding));InstanceHandle key;
+        assert(owner.create(100001,{}, {},[](auto){return true;},key));
+        assert(!owner.visitDamageControllers([&](auto visit){return visit(key);},[&](auto& controller){
+            controller.setSlow(23);assert(owner.find(key)->controllerSlow==23);
+            assert(owner.clear()); // Lifetime changes between the two source writes.
+            return controller.setAlarm(0,40);
+        })&&!owner.valid());
+    }
     const std::vector<int> full{1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,16,17,18,19,20};
     for(unsigned flags=0;flags<8;++flags){
         RunSession run;PlayerDamage caller;Events events;
