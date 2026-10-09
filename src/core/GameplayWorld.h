@@ -1402,6 +1402,11 @@ public:
         return camera.pixelY() - 142;
     }
     const downwell::GameplayGoalFields& goalFieldInstances()const{return goalFieldInstances_;}
+    template<class Audio> bool contactGoalFieldWind(downwell::InstanceHandle key,downwell::TimeFieldWind& wind,
+        int& channel,downwell::MotionBinary64 volume,Audio& audio){
+        return run_.effectsSucceeded=run_.effectsSucceeded&&
+            goalFieldInstances_.contactWind(key,wind,enemyRandom_,channel,volume,audio);
+    }
     bool retireMarkedGoalField(downwell::InstanceHandle h){
         return run_.effectsSucceeded=run_.effectsSucceeded&&goalFieldInstances_.retireMarked(h);
     }

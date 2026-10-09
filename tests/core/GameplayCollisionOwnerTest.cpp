@@ -58,6 +58,10 @@ bool nativeRegisteredTimeChange(downwell::GameplayCollisionOwner& owner,
         downwell::RunnerImageValue{0x43704000u}.promoted(),
         downwell::RunnerImageValue{0x43308000u}.promoted(),speed,[](unsigned ms){return ms==30;});
 }
+bool nativeFieldWind(downwell::GameplayCollisionOwner& owner,const downwell::RunnerCollisionEventContext::Frame& event,
+    downwell::TimeFieldWind& wind,int& channel,NativeCurrencyAudioProbe& audio){
+    return owner.dispatchTimeFieldWind(event,wind,channel,downwell::MotionBinary64::fromInteger(1),audio);
+}
 bool nativeRegisteredTimeShardStep(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle shared,
     const downwell::SpriteMaskPack& masks,bool stopped){
     return owner.stepTimeShard(shared,stopped,masks);
@@ -1086,6 +1090,52 @@ int main(){
         assert(world->restartFromResults(DeathMenuSequence::Action::Retry,43,300)==ResultsDestination::gameplay);
         assert(world->effectsSucceeded()&&owner->valid()&&effects.size()==0&&owner->timeShards().size()==0);
         assert(create(105189)&&effects.clear()&&owner->valid());
+    }
+    {
+        struct Audio {
+            unsigned queries=0,plays=0;bool playing=false,fail=false;
+            bool isPlaying(int id,bool& value){++queries;value=id==900?playing:false;return !fail;}
+            bool stop(int){return true;}
+            bool play(int sound,int priority,bool loop,int& voice){
+                assert(sound>=349&&sound<=355&&priority==90&&!loop);++plays;voice=900;playing=true;return true;
+            }
+            bool getGain(int,MotionBinary64& gain){gain=MotionBinary64::fromInteger(1);return true;}
+            bool setGain(int,MotionBinary64,int){return true;}
+            bool setPitch(int,MotionBinary64){return true;}
+        } audio;
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));
+        // Admit a retained entry-field lifetime directly: ordinary first-level
+        // Create destroys this object, so it cannot exercise a later contact.
+        auto& fields=const_cast<GameplayGoalFields&>(world->goalFieldInstances());
+        assert(fields.create(240,192,371));
+        TimeFieldWind wind;int channel=-1;InstanceHandle player;
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::player,world->playerHandle(),player));
+        for(unsigned i=0;i<2;++i){
+            if(i==1)assert(world->registerLevelExit(512));
+            const auto key=world->goalFieldInstances().handle(i);
+            const auto* record=world->goalFieldInstances().find(key);assert(record);
+            InstanceHandle field;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::goalField,key,field));
+            PackedObjectEvent binding;bool found=false;
+            assert(objects.collisionEvent(record->objectId,35,found,binding)&&found&&binding.ownerObjectId==255);
+            RunnerCollisionEventContext::Frame event{field,player,4,35,binding.ownerObjectId,binding.codeId};
+            auto oracle=world->randomState();const auto draws=world->randomDrawCount();
+            audio.playing=false;const int sound=349+int(oracle.chooseIndexSmall(7));
+            assert(owner->dispatchTimeFieldWind(event,wind,channel,MotionBinary64::fromInteger(1),audio));
+            assert(record->windSound==sound&&channel==sound&&wind.voice==900&&world->randomDrawCount()==draws+1);
+            const auto queries=audio.queries,plays=audio.plays;
+            assert(owner->dispatchTimeFieldWind(event,wind,channel,MotionBinary64::fromInteger(1),audio)&&
+                world->randomDrawCount()==draws+1&&audio.queries==queries+1&&audio.plays==plays);
+            if(i==1){
+                audio.fail=true;
+                assert(!owner->dispatchTimeFieldWind(event,wind,channel,MotionBinary64::fromInteger(1),audio)&&
+                    !world->effectsSucceeded()&&!owner->valid()&&world->randomDrawCount()==draws+1);
+                const auto stoppedQueries=audio.queries;
+                assert(!owner->dispatchTimeFieldWind(event,wind,channel,MotionBinary64::fromInteger(1),audio)&&audio.queries==stoppedQueries);
+            }
+        }
     }
     {
         TimeChangeEffects<8> effects;int speed=60;unsigned pauses=0;

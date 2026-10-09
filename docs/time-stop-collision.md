@@ -76,6 +76,13 @@ the caller and must survive field retirement/room transitions. Live tests cover
 exit fields, the start-field descendant, shared playing/expired voices and stale
 event rejection. Neither normal scheduler installs it automatically yet, and
 both actual audio backends and persistent global ownership remain open.
+`GameplayCollisionOwner::dispatchTimeFieldWind` applies the same checked
+inherited-binding and generation checks to native goal-field lifetimes (255
+and 371). It uses the world's RNG and the selected record's `windSound`, not a
+family-wide last-sound value. Shared voice/channel storage still belongs to the
+session service. Audio failure latches both world and collision-owner failure;
+subsequent dispatch cannot repeat the partially executed sequence. This handler
+is an ordered-collision callback, not a separate family contact sweep.
 
 Source: recovered `gml_Object_goalTimeField_Collision_objPlayer_n.asm`,
 `gml_GlobalScript_soundPlayOL.asm` and `gml_GlobalScript_scrGlobalStuff.asm`.

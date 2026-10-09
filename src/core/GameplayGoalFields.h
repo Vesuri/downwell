@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_GAMEPLAY_GOAL_FIELDS_H
 #define DOWNWELL_CORE_GAMEPLAY_GOAL_FIELDS_H
 #include "InstanceLifecycle.h"
+#include "TimeFieldWind.h"
 namespace downwell {
 // Native collision records for goalTimeField (255) and startTimeField (371). Presentation/radius RNG
 // remains in RunSession. Keep every birth, including overlapping exit fixtures.
@@ -12,6 +13,7 @@ public:
         int x=0,y=0,scaleX=1,scaleY=1,objectId=255;
         unsigned lifetimeId=0;
         unsigned sourceId=0; // Authored/source identity, never a pool handle.
+        std::int32_t windSound=0;
         bool active=true,destroyRequested=false;
     };
     using Binding=RecordLifecycleBinding<Record>;
@@ -24,6 +26,12 @@ public:
     }
     InstanceHandle handle(unsigned index)const{
         return index>=retired_&&index<count_?InstanceHandle{index,records_[index].lifetimeId}:InstanceHandle{};
+    }
+    template<class Random,class Audio> bool contactWind(InstanceHandle h,TimeFieldWind& wind,
+        Random& random,int& channel,MotionBinary64 volume,Audio& audio){
+        auto* record=const_cast<Record*>(find(h));
+        if(!good_||!record)return good_=false;
+        return good_=wind.contact(random,record->windSound,channel,volume,audio);
     }
     bool create(int x,int y,int object=255,InstanceHandle* created=nullptr,unsigned sourceId=0){
         if(!good_||count_==capacity||!next_||(object!=255&&object!=371)||sourceId>0x7fffffffu)return good_=false;

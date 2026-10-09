@@ -1810,6 +1810,17 @@ public:
             binding.ownerObjectId!=61||binding.codeId!=991||objects_.findEvent(60,1,0,destroy))return check(false);
         return check(native_?world_->destroyNativeTerrain(other):terrain_.requestDestroy(other));
     }
+    template<class Audio> bool dispatchTimeFieldWind(const RunnerCollisionEventContext::Frame& event,
+        TimeFieldWind& wind,int& channel,MotionBinary64 volume,Audio& audio){
+        View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;
+        if(!valid()||!world_||!resolves(event.self)||!resolves(event.other)||
+           !View::decode(event.self,kind,local)||kind!=View::Kind::goalField||
+           event.type!=4||event.subtype!=objectOf(event.other)||
+           !objects_.collisionEvent(objectOf(event.self),event.subtype,found,binding)||!found||
+           binding.ownerObjectId!=255||event.owner!=binding.ownerObjectId||event.code!=binding.codeId)
+            return check(false);
+        return check(world_->contactGoalFieldWind(local,wind,channel,volume,audio));
+    }
     bool dispatchTimeShardCollision(const RunnerCollisionEventContext::Frame& event){
         View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;
         InstanceHandle player;
