@@ -142,8 +142,11 @@ behavior, both backend integrations and relevant original-game verification.
   Route enemy-death bookkeeping through the shared run-state entry, supplying
   actual toggleGuncut, achNoKill publication, momentDelay controller events and
   levelBeginCue creation/audio. Do not use successful placeholder callbacks.
-  Add the omitted native object-37 ownership and mixed
-  alarm dispatch before admitting moment delay there. A PAL frame scheduler must
+  Admit persistent object 37 from the actual native startup Create sequence,
+  including its initialization/HUD dependencies and source numeric ID. Verify
+  normal next-room transfer and implement its remaining fired alarm events;
+  explicit registered births and alarm-0 tests are not full controller admission.
+  A PAL frame scheduler must
   not replace the source room-speed global with 50.
   Complete death/low-spec direct drawing at original world-depth boundaries,
   rather than flattening those paths into an overlay.

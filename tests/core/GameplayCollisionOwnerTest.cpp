@@ -15,6 +15,11 @@ namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_
 #include "core/TerrainWallContacts.h"
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
 struct NativeEnemyDeathAudioProbe { bool isPlaying(int,bool&);bool stop(int); };
+bool nativeRunControllerBirth(downwell::GameplayCollisionOwner& owner,unsigned source,
+    bool (*initialize)(downwell::InstanceHandle),downwell::InstanceHandle& key){
+    return owner.runControllers().create(source,{}, {},initialize,key);
+}
+bool nativeMomentDelay(downwell::GameplayCollisionOwner& owner){return owner.requestMomentDelay();}
 struct NativeEnemyDeathScriptProbe { bool operator()(); };
 bool nativeEnemyDeath(GameplayWorld& world,NativeEnemyDeathAudioProbe& audio,
     NativeEnemyDeathScriptProbe flag,NativeEnemyDeathScriptProbe delay,NativeEnemyDeathScriptProbe cue){
@@ -360,6 +365,7 @@ static void checkTypedCollisionView(const GameplayCollisionView& view,GameplayCo
         case K::smoke:assert(view.resolveLocal<K::smoke>(local)==reference.smoke);break;
         case K::corpse:assert(view.resolveLocal<K::corpse>(local)==reference.corpse);break;
         case K::consumptionBlood:assert(view.resolveLocal<K::consumptionBlood>(local)==reference.consumptionBlood);break;
+        case K::runController:assert(view.resolveLocal<K::runController>(local)==reference.runController);break;
         case K::debris:assert(view.resolveLocal<K::debris>(local)==reference.debris);break;
         case K::timeChange:assert(view.resolveLocal<K::timeChange>(local)==reference.timeChange);break;
         case K::timeShard:assert(view.resolveLocal<K::timeShard>(local)==reference.timeShard);break;
@@ -718,6 +724,36 @@ int main(){
     }
     auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                   GameplayCollisionOwner::Ownership::nativeScenery}){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));int speed=60;assert(world->bindControllerRoomSpeed(speed));
+        auto& controllers=owner->runControllers();InstanceHandle controller,shared;unsigned creates=0;
+        assert(controllers.create(100065,{}, {},[&](InstanceHandle){++creates;return true;},controller)&&
+            GameplayCollisionView::encode(GameplayCollisionView::Kind::runController,controller,shared));
+        GameplayCollisionView view(*world);checkTypedCollisionView(view,GameplayCollisionView::Kind::runController,controller);
+        assert(owner->requestMomentDelay()&&speed==30&&controllers.find(controller)->alarms.get(0)==1);
+        TimeChangeEffects<8> changes;
+        assert(owner->createTimeChangeWithSourceId(changes,105187,{}, {},speed,[](unsigned ms){return ms==30;}));
+        world->step(0);
+        assert(world->effectsSucceeded()&&speed==60&&controllers.find(controller)->controllerSlow==0&&
+            controllers.find(controller)->alarms.get(0)==0&&changes.size()==1);
+        world->step(0);
+        assert(world->effectsSucceeded()&&speed==60&&changes.size()==0&&creates==1);
+        assert(controllers.activate(controller,false)&&owner->reconcileActivation());
+        assert(owner->requestMomentDelay()&&speed==60);
+        assert(controllers.activate(controller,true)&&owner->reconcileActivation());
+        assert(owner->requestMomentDelay()&&speed==30);
+        world->step(0);assert(world->effectsSucceeded()&&speed==60&&creates==1);
+        assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)==ResultsDestination::gameplay&&
+            world->runControllers()==&controllers&&controllers.find(controller)&&creates==1);
+        assert(owner->requestMomentDelay()&&speed==30);
+        world->step(0);assert(world->effectsSucceeded()&&speed==60&&creates==1);
+        assert(controllers.clear()&&!view.contains(shared));
+    }
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
                    GameplayCollisionOwner::Ownership::nativeScenery}){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},

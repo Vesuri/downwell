@@ -74,6 +74,8 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto ditherAbove=ditherAbove_;
     const auto builderController=builderController_;
     const auto playerControllers=playerControllers_;
+    const auto runControllers=runControllers_;
+    const auto controllerRoomSpeed=controllerRoomSpeed_;
     const auto droneBullets=droneBullets_;
     const auto bones=bones_;
     const auto skeletons=skeletons_;
@@ -137,6 +139,8 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     ditherAbove_=ditherAbove;
     builderController_=builderController;
     playerControllers_=playerControllers;
+    runControllers_=runControllers;
+    controllerRoomSpeed_=controllerRoomSpeed;
     droneBullets_=droneBullets;
     bones_=bones;
     skeletons_=skeletons;

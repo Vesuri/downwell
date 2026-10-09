@@ -118,7 +118,7 @@ private:
 #ifdef DOWNWELL_DRAW_CACHE_AUDIT
     mutable bool drawAuditHasSnapshot_=false;
 #endif
-    RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity+GameplayWorld::droneBulletCapacity+GameplayWorld::boneCapacity+GameplayWorld::skeletonCapacity+GameplayWorld::currencyCapacity+32+32> combatAlarmPhase_;
+    RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity+GameplayWorld::droneBulletCapacity+GameplayWorld::boneCapacity+GameplayWorld::skeletonCapacity+GameplayWorld::currencyCapacity+32+32+4> combatAlarmPhase_;
     RunnerStepSnapshot<GameplayWorld::droneBulletCapacity+GameplayWorld::skeletonCapacity+GameplayPlayerControllers::capacity+32> actorEndStepPhase_;
     bool actorEndStepExecuting_=false;
     bool combatAlarmCaptureDirty_=true;
@@ -620,6 +620,7 @@ private:
     template<class Record,View::Kind Kind> struct Binding {
         GameplayCollisionOwner& parent;
         static int object(const Record& r){
+            if constexpr(Kind==View::Kind::runController)return 37;
             if constexpr(Kind==View::Kind::playerController)return r.objectId;
             if constexpr(Kind==View::Kind::enemy||Kind==View::Kind::terrain)return r.objectId;
             if constexpr(Kind==View::Kind::timeField)return 82;
@@ -724,7 +725,7 @@ private:
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
             if constexpr(Kind==View::Kind::timeField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
-            if constexpr(Kind==View::Kind::consumptionBlood||Kind==View::Kind::corpse||Kind==View::Kind::corpseExpiry||Kind==View::Kind::smoke)sourceId=r.sourceId;
+            if constexpr(Kind==View::Kind::runController||Kind==View::Kind::consumptionBlood||Kind==View::Kind::corpse||Kind==View::Kind::corpseExpiry||Kind==View::Kind::smoke)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeShard)sourceId=parent.pendingTimeShardId_;
             if constexpr(Kind==View::Kind::playerController||Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::builder||Kind==View::Kind::goalField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency)sourceId=r.sourceId;
@@ -746,7 +747,7 @@ private:
             if constexpr(Kind==View::Kind::scriptEffect||Kind==View::Kind::debris){
                 if(!r.effect)return parent.check(false);
                 position->x=r.effect->x;position->y=r.effect->y;
-            }else if constexpr(Kind==View::Kind::consumptionBlood||Kind==View::Kind::corpse||Kind==View::Kind::smoke||Kind==View::Kind::corpseExpiry||Kind==View::Kind::playerController||Kind==View::Kind::timeShard||Kind==View::Kind::timeChange||Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::builder||Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency){
+            }else if constexpr(Kind==View::Kind::runController||Kind==View::Kind::consumptionBlood||Kind==View::Kind::corpse||Kind==View::Kind::smoke||Kind==View::Kind::corpseExpiry||Kind==View::Kind::playerController||Kind==View::Kind::timeShard||Kind==View::Kind::timeChange||Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::builder||Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency){
                 position->x=r.x;position->y=r.y;
             }else{
                 constexpr bool roomCoordinates=Kind==View::Kind::player||Kind==View::Kind::terrain||Kind==View::Kind::timeField||Kind==View::Kind::goalField||Kind==View::Kind::exitController;
@@ -827,7 +828,7 @@ private:
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
             if constexpr(Kind==View::Kind::timeField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
-            if constexpr(Kind==View::Kind::consumptionBlood||Kind==View::Kind::corpse||Kind==View::Kind::corpseExpiry||Kind==View::Kind::smoke)sourceId=r.sourceId;
+            if constexpr(Kind==View::Kind::runController||Kind==View::Kind::consumptionBlood||Kind==View::Kind::corpse||Kind==View::Kind::corpseExpiry||Kind==View::Kind::smoke)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeShard)sourceId=parent.pendingTimeShardId_;
             if constexpr(Kind==View::Kind::playerController||Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::builder||Kind==View::Kind::goalField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency)sourceId=r.sourceId;
@@ -1037,6 +1038,8 @@ private:
     GameplayWorld::RegisteredCorpse corpses_{GameplayWorld::RegisteredCorpse::Binding::bindPositionedQueryActor(corpseBinding_)};
     Binding<GameplayWorld::ConsumptionParticles::Record,View::Kind::consumptionBlood> consumptionBinding_{*this};
     GameplayWorld::ConsumptionParticles consumption_{GameplayWorld::ConsumptionParticles::Binding::bindPositionedActor(consumptionBinding_)};
+    Binding<GameplayWorld::RunControllers::Record,View::Kind::runController> controllerBinding_{*this};
+    GameplayWorld::RunControllers controllers_{GameplayWorld::RunControllers::Binding::bindPositionedLifetime(controllerBinding_)};
     const SpriteMaskPack* corpseMasks_=nullptr;
     bool (*corpseChildId_)(void*,std::uint32_t&)=nullptr;
     void* corpseChildIdContext_=nullptr;
@@ -1164,7 +1167,7 @@ public:
     template<class Visit> bool visitRegistrationOrder(Visit visit)const{return valid()&&visitEligibility(visit);}
     // Drone dispatch deliberately exposes bool& status to arbitrary callbacks;
     // retain its live read rather than delaying a callback's failure to return.
-    bool valid()const{return good_&&consumption_.valid()&&corpses_.valid()&&smoke_.valid()&&expiry_.valid()&&playerControllers_.valid()&&builderController_.valid()&&blood_.valid()&&skeletons_.valid()&&(failureObserved_?(drones_.valid()&&bones_.valid()):
+    bool valid()const{return good_&&controllers_.valid()&&consumption_.valid()&&corpses_.valid()&&smoke_.valid()&&expiry_.valid()&&playerControllers_.valid()&&builderController_.valid()&&blood_.valid()&&skeletons_.valid()&&(failureObserved_?(drones_.valid()&&bones_.valid()):
         (owner_.valid()&&properties_.valid()&&terrain_.valid()&&scriptEffects_.valid()&&debris_.valid()&&
          timeShards_.valid()&&timeChanges_.valid()&&entries_.valid()&&drones_.valid()&&bones_.valid()&&layers_.valid()));}
     unsigned pendingSpatialIndex()const{return owner_.pendingSpatialIndex();}
@@ -1368,6 +1371,7 @@ public:
         if(!world_&&!world.bindRegisteredSmoke(smoke_))return check(false);
         if(!world_&&!world.bindRegisteredCorpses(corpses_))return check(false);
         if(!world_&&!world.bindConsumptionParticles(consumption_))return check(false);
+        if(!world_&&!world.bindRunControllers(controllers_))return check(false);
         if(!world_&&!world.bindDebrisInstances(debris_))return check(false);
         if(!world_&&!world.bindTimeChangeInstances(timeChanges_))return check(false);
         if(!world_&&!world.bindTimeShardInstances(timeShards_))return check(false);
@@ -1752,6 +1756,7 @@ public:
                     kind==View::Kind::smoke?self.smoke_.advanceAlarm(local,alarm):
                     kind==View::Kind::corpse?self.advanceCorpseAlarm(local,alarm):
                     kind==View::Kind::consumptionBlood?self.consumption_.advanceAlarm(local,alarm):
+                    kind==View::Kind::runController?self.world_->advanceControllerRoomAlarm(local,alarm):
                     kind==View::Kind::currency?self.world_->advanceCurrencyRoomAlarm(local,alarm):
                     kind==View::Kind::entryDither&&self.entries_.advanceAlarm(local,alarm);
             },reused,&self.combatAlarmMask_,boxes
@@ -2154,6 +2159,17 @@ public:
     GameplayWorld::RegisteredSmoke& registeredSmoke(){return smoke_;}
     GameplayWorld::RegisteredCorpse& registeredCorpses(){return corpses_;}
     GameplayWorld::ConsumptionParticles& consumptionParticles(){return consumption_;}
+    GameplayWorld::RunControllers& runControllers(){return controllers_;}
+    bool requestMomentDelay(){
+        if(!valid()||!world_)return check(false);
+        return check(world_->requestMomentDelay([&](auto apply){
+            return visitEligibility([&](InstanceHandle h,int object,std::uint32_t flags){
+                if(!families_.isA(object,37)||(flags&0x140003u))return true;
+                View::Kind kind;InstanceHandle local;
+                return View::decode(h,kind,local)&&kind==View::Kind::runController&&apply(local);
+            });
+        }));
+    }
     bool configureCorpseMasks(const SpriteMaskPack& masks){
         if(!valid()||!masks.valid())return check(false);
         corpseMasks_=&masks;return true;

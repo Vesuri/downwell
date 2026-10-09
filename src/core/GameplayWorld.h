@@ -26,6 +26,7 @@
 #include "core/GameplayDitherAbove.h"
 #include "core/GameplayBuilderController.h"
 #include "core/GameplayPlayerControllers.h"
+#include "core/RunControllerInstances.h"
 #include "core/PlayerChildCreation.h"
 #include "core/DroneBulletInstances.h"
 #include "core/BoneProjectileInstances.h"
@@ -365,6 +366,25 @@ public:
     const downwell::GameplayDitherAbove* ditherAbove()const{return ditherAbove_;}
     const downwell::GameplayBuilderController* builderController()const{return builderController_;}
     const downwell::GameplayPlayerControllers* playerControllers()const{return playerControllers_;}
+    using RunControllers=downwell::RunControllerInstances<4>;
+    const RunControllers* runControllers()const{return runControllers_;}
+    bool bindRunControllers(RunControllers& records){
+        if(runControllers_||!records.valid()||records.size())return false;
+        runControllers_=&records;return true;
+    }
+    bool bindControllerRoomSpeed(int& speed){
+        if(!run_.effectsSucceeded||(timeChangeSpeed_&&timeChangeSpeed_!=&speed)||
+            (controllerRoomSpeed_&&controllerRoomSpeed_!=&speed))return run_.effectsSucceeded=false;
+        controllerRoomSpeed_=&speed;return true;
+    }
+    template<class Visit> bool requestMomentDelay(Visit controllers){
+        if(!run_.effectsSucceeded)return false;
+        return run_.effectsSucceeded=runControllers_&&controllerRoomSpeed_&&runControllers_->momentDelay(*controllerRoomSpeed_,controllers);
+    }
+    bool advanceControllerRoomAlarm(downwell::InstanceHandle key,unsigned alarm){
+        return run_.effectsSucceeded=run_.effectsSucceeded&&runControllers_&&controllerRoomSpeed_&&
+            runControllers_->advanceAlarm(key,alarm,*controllerRoomSpeed_);
+    }
     bool bindPlayerControllers(downwell::GameplayPlayerControllers& records){
         if(playerControllers_||!records.valid()||records.size())return false;
         playerControllers_=&records;return true;
@@ -654,6 +674,7 @@ public:
         downwell::MotionBinary64 x,downwell::MotionBinary64 y,int& speed,Pause pause){
         if(!run_.effectsSucceeded)return false;
         if(!timeChangeInstances_||!effects.boundTo(*timeChangeInstances_)||
+           (controllerRoomSpeed_&&controllerRoomSpeed_!=&speed)||
            (timeChangeInstances_->size()&&(timeChangeEffects_!=&effects||timeChangeSpeed_!=&speed)))
             return run_.effectsSucceeded=false;
         timeChangeEffects_=&effects;timeChangeSpeed_=&speed;
@@ -1703,6 +1724,8 @@ private:
     downwell::GameplayDitherAbove* ditherAbove_=nullptr;
     downwell::GameplayBuilderController* builderController_=nullptr;
     downwell::GameplayPlayerControllers* playerControllers_=nullptr;
+    RunControllers* runControllers_=nullptr;
+    int* controllerRoomSpeed_=nullptr; // Same global as timeChangeSpeed_, but persists beyond effect cleanup.
     bool playerChildrenStarted_=false;
     bool (*playerChildCreate_)(void*,GameplayWorld&)=nullptr;
     void* playerChildCreateContext_=nullptr;
