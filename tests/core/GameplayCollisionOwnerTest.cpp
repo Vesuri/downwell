@@ -2191,6 +2191,57 @@ int main(){
         }
     }
     auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
+    {
+        std::vector<bool> expected;unsigned hits=0,misses=0;
+        for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+            GameplayCollisionOwner::Ownership::nativeScenery}){
+            const bool native=mode!=GameplayCollisionOwner::Ownership::reference;
+            auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
+                GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&rooms,mode);
+            auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),owner->breakableBinding(),
+                owner->playerBinding(),native?nullptr:&owner->terrain(),&rooms);
+            auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
+            assert(owner->attach(*world)&&(!native||world->bindNativeTerrain(*terrain)));
+            InstanceHandle wall,player;GameMakerRandom random;
+            if(native){assert(terrain->append(60,240,160));wall=terrain->handle(0);assert(terrain->createProperties(wall,51));}
+            else {assert(owner->terrain().append(60,240,160,true));wall=owner->terrain().handle(0);
+                assert(owner->terrain().createProperties(wall,51,false,random));}
+            const auto local=world->playerHandle();const auto* record=world->findPlayer(local);
+            assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::player,local,player));
+            InstanceHandle target;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,wall,target));
+            unsigned ordinal=0;
+            auto compare=[&](bool publish){
+                for(bool reverse:{false,true}){
+                    bool hit=false;assert(owner->collisionOverlap(reverse?target:player,reverse?player:target,masks,publish,hit));
+                    if(!native){expected.push_back(hit);hit?++hits:++misses;}
+                    else assert(ordinal<expected.size()&&hit==expected[ordinal]);
+                    ++ordinal;
+                }
+            };
+            compare(false); // Cached constructor bounds; no implicit flush.
+            for(int mask:{-1,51,99999})for(unsigned variant=0;variant<3;++variant){
+                const auto binding=owner->playerBinding();
+                assert(binding.mask(local,*record,mask));
+                assert(binding.transform(local,*record,RunnerTransformField::scaleX,
+                    {variant==1?0xbf800000u:0x3f800000u},{0x3f800000u},0xffffffu));
+                assert(binding.transform(local,*record,RunnerTransformField::angle,
+                    {variant==2?0x41f00000u:0u},{0x3f800000u},0xffffffu));
+                for(int y=144;y<=176;y+=8)for(int x=220;x<=260;x+=5)for(bool fractional:{false,true}){
+                    RunnerImageValue px,py;assert(px.assignInteger(x)&&py.assignInteger(y));
+                    if(fractional){
+                        auto xx=MotionBinary64::fromInteger(x),yy=MotionBinary64::fromInteger(y);
+                        assert(xx.add(MotionBinary64{0x3fd00000u,0})&&yy.add(MotionBinary64{0x3fe00000u,0})&&px.assign(xx)&&py.assign(yy));
+                    }
+                    assert(binding.publishedPosition(local,*record,px,py));compare(false);compare(true);
+                }
+            }
+            if(native)assert(terrain->markDestroyed(wall));else assert(owner->terrain().requestDestroy(wall));
+            compare(true);
+            bool selfHit=true;assert(owner->collisionOverlap(player,player,masks,true,selfHit)&&!selfHit);
+            if(native)assert(ordinal==expected.size());
+        }
+        assert(hits&&misses);
+    }
     for(auto mode:{GameplayCollisionOwner::Ownership::native,GameplayCollisionOwner::Ownership::nativeScenery})
     for(unsigned failure=0;failure<5;++failure){
         struct Notice {

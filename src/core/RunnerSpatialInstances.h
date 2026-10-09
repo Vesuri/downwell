@@ -16,6 +16,7 @@
 #include "RunnerSpriteBounds.h"
 #include "SpriteCollisionPack.h"
 #include "RunnerMaskPair.h"
+#include "RunnerSpriteOverlap.h"
 #include "RunnerMaskPoint.h"
 #include "RunnerLineBounds.h"
 #include "RunnerSpriteChange.h"
@@ -803,36 +804,7 @@ public:
             if((second.flags&8u)&&!checked(refreshBounds(other,true)))return false;
             if((first.flags&8u)&&!checked(refreshBounds(self,true)))return false;
         }
-        // Compatibility mode adds binary32 1 to each inclusive far edge and
-        // uses a strict comparison. Do not replace this with integer overlap.
-        const Real near[]={second.bounds.left,first.bounds.left,second.bounds.top,first.bounds.top};
-        const Real far[]={first.bounds.right,second.bounds.right,first.bounds.bottom,second.bounds.bottom};
-        for(unsigned i=0;i<4;++i){
-            Real upper;
-            if(!Math::valid(near[i])||!Math::valid(far[i])||
-                !Math::sub(far[i],Real{0xbf800000},upper))return checked(false);
-            if(!Math::less(near[i],upper)){hit=false;return true;}
-        }
-        if(!sprites.valid())return checked(false);
-        PackedSpriteCollision resources[2];
-        if(!sprites.collisionSprite(a.spriteId,a.maskId,resources[0])||!resources[0].frameCount||
-           !sprites.collisionSprite(b.spriteId,b.maskId,resources[1])||!resources[1].frameCount){hit=false;return true;}
-        if(!resources[0].collisionMode&&!resources[1].collisionMode){hit=true;return true;}
-        if(!masks.valid())return checked(false);
-        const Sprite* visuals[]={&a,&b};const State* states[]={&first,&second};
-        RunnerMaskPair::Shape shapes[2];
-        for(unsigned i=0;i<2;++i){
-            const auto& v=*visuals[i];const auto& s=*states[i];const auto& r=resources[i];
-            unsigned frame;
-            if(!RunnerMaskPair::storedFrame(v.imageIndex,r.collisionMaskCount,frame)||
-                !masks.mask(unsigned(v.maskId<0?v.spriteId:v.maskId),frame,shapes[i].mask))return checked(false);
-            shapes[i].x=s.x;shapes[i].y=s.y;shapes[i].bounds=s.bounds;
-            shapes[i].transform={v.scaleX,v.scaleY,v.angle};
-            shapes[i].originX=r.originX;shapes[i].originY=r.originY;shapes[i].frameCount=r.frameCount;
-        }
-        RunnerMaskPair::Result result;
-        if(!checked(RunnerMaskPair::test(shapes[0],shapes[1],dispatch,inverseTrig,round,result)))return false;
-        hit=result.hit;return true;
+        return checked(RunnerSpriteOverlap::test(first,second,a,b,sprites,masks,dispatch,inverseTrig,round,hit));
     }
     // collision_line precise=false, ordinary sprite candidate (0x4650b0).
     // Bounds refresh precedes exclusions and missing-resource checks. Pack

@@ -133,6 +133,15 @@ Broad phase uses strict binary32 comparisons against inclusive far edges plus
 one. It does not normalize/reorder cached rectangles or substitute integer
 overlap tests.
 
+`GameplayCollisionOwner::collisionOverlap` exposes that pair test for native
+identities without registering duplicate terrain records. Native snapshots
+combine actor publication state or run-owned terrain coordinates/cached
+geometry with current appearance. Both ownership modes use
+`RunnerSpriteOverlap` for the geometric tail, after exclusions and ordered
+lazy refresh. The native adapter covers admitted ordinary resources; this API
+does not select candidates or enable event scheduling. Native/reference matrix
+agreement is not independent evidence of the Windows runtime FP environment.
+
 Only after overlap does the routine resolve masks/artwork and require nonzero
 resource frame counts. Two rectangular-mode resources hit without mask pixels
 or image-index conversion. If either is precise, both stored mask frames are

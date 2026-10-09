@@ -493,6 +493,23 @@ private:
         const bool recorded=world_->publishNativeTerrainBounds(local,flags);
         return check(okay&&recorded);
     }
+    bool nativeCollisionVisual(InstanceHandle h,Owner::State& state,Owner::Sprite& sprite){
+        if(!native_||!resolves(h)||!eligibilityFlags(h,state.flags))return false;
+        if(const auto* actor=nativePosition(h.slot)){
+            state.x=actor->x;state.y=actor->y;state.bounds=actor->bounds;sprite=actor->sprite;return true;
+        }
+        if(!world_||!world_->nativeTerrainInstances())return false;
+        const auto* terrain=world_->nativeTerrainInstances();
+        const InstanceHandle local{h.slot-View::terrainBase,h.generation};
+        GameplayWorld::NativeTerrain::Identity id;bool active,destroyed,created,found,precise;
+        int cached,current;unsigned index;
+        if(!terrain->read(local,id,active,destroyed)||!terrain->cachedSprite(local,cached)||
+            !terrain->appearance(local,current,index,created)||
+            !nativeTerrainBirthBounds(id,state.x,state.y,state.bounds,found,precise,cached))return false;
+        const auto* definition=objectDefaults_.get(id.object);if(!definition)return false;
+        sprite.spriteId=current==-2?definition->spriteId:current;sprite.maskId=definition->maskId;
+        return sprite.imageIndex.assignInteger(index);
+    }
     bool nativeTerrainBirth(const GameplayWorld::NativeTerrain::Identity& id,bool active,
         std::uint32_t& order,std::uint32_t& flags){
         const unsigned slot=View::terrainBase+id.handle.slot;
@@ -1094,6 +1111,29 @@ public:
                 PackedSpriteCollision resource;
                 frames=sprites_.collisionSprite(sprite,mask,resource)?resource.frameCount:0;return true;
             }));
+    }
+    // Pair test only, after ordered broad-phase collection. This does not
+    // select candidates, dispatch events or approximate unsupported selectors.
+    bool collisionOverlap(InstanceHandle self,InstanceHandle other,const SpriteMaskPack& masks,
+        bool publish,bool& hit){
+        if(!valid()||!resolves(self)||!resolves(other))return check(false);
+        if(!native_)return check(owner_.collideCompatibility(self,other,
+            properties_.read(self.slot)->sprite,properties_.read(other.slot)->sprite,sprites_,masks,
+            RunnerMaskDispatch{},publish,[&](InstanceHandle h,bool update){return refresh(h,update);},
+            inverseTrig,roundPixel,hit));
+        Owner::State first,second;Owner::Sprite a,b;
+        if(!nativeCollisionVisual(self,first,a)||!nativeCollisionVisual(other,second,b))return check(false);
+        if(self.slot==other.slot||((first.flags|second.flags)&0x100001u)){hit=false;return true;}
+        if(publish){
+            const auto update=[&](InstanceHandle h){return h.slot>=View::terrainBase&&h.slot<View::timeFieldBase?
+                refreshNativeTerrain(h):refreshNativeActor(h,true);};
+            // OTHER's dirty bounds are published first, even if SELF later
+            // rejects the pair. Preserve the spatial journal's mutation order.
+            if((second.flags&8u)&&!update(other))return check(false);
+            if((first.flags&8u)&&!update(self))return check(false);
+            if(!nativeCollisionVisual(self,first,a)||!nativeCollisionVisual(other,second,b))return check(false);
+        }
+        return check(RunnerSpriteOverlap::test(first,second,a,b,sprites_,masks,RunnerMaskDispatch{},inverseTrig,roundPixel,hit));
     }
     // Diagnostic traversal only: this is not spatial candidate selection.
     // Spatial refresh is explicit; collision consumption still requires
