@@ -109,6 +109,17 @@ alarm participate in native checkpoints. This is still the native fixed camera
 slot, not a source-ID-registered controller in the complete mixed scheduler;
 automatic player time-stop activation must call this boundary when connected.
 
+`GameplayWorld::withPlayerTimeTransition` installs a borrowed transition only
+for its enclosing tick scope. The shared player phase calls it with the actual
+published player record, motion state and rounded world coordinates after
+interaction observation, before later player work and room alarms. A rejected
+transition retains earlier movement/publication/clock work but prevents later
+alarms and camera RNG. Nested scopes fail the world; returning success from the
+outer callback cannot hide that failure. The scope removes its callback before
+returning. It neither supplies exact private binary64 player motion nor installs
+field/effect/audio owners automatically; those are required to enable source
+time-stop behavior in the default native loop.
+
 ## Ordinary Destroy versus storage retirement
 
 The Windows `instance_destroy` registration at `0x52cd80` selects wrapper

@@ -1058,6 +1058,23 @@ public:
         breakables_[h.slot].state.hit=true;return true;
     }
     GameplayFrame step(std::uint8_t packedInput);
+    // Borrow only for this tick scope, as with the stored event composition.
+    // The transition runs after published x/y and interaction observation,
+    // before later player work, room alarms and ordinary Step. It must not
+    // reset or replace the world; source Create effects are permitted.
+    template<class Transition,class Tick>
+    bool withPlayerTimeTransition(Transition transition,Tick tick){
+        if(!run_.effectsSucceeded)return false;
+        if(playerTimeTransition_)return run_.effectsSucceeded=false;
+        playerTimeContext_=&transition;
+        playerTimeTransition_=[](void* context,const PlayerInstance& player,
+                                const PlayerMotion& motion,int x,int y){
+            return (*static_cast<Transition*>(context))(player,motion,x,y);
+        };
+        const bool ok=tick();
+        playerTimeTransition_=nullptr;playerTimeContext_=nullptr;
+        return run_.effectsSucceeded=ok&&run_.effectsSucceeded;
+    }
     // Engine destruction mark, after any game Destroy/CleanUp callbacks.
     // Keep the typed record until the owner's Draw-entry cleanup.
     bool markEnemyDestroyed(downwell::InstanceHandle handle);
@@ -1534,6 +1551,8 @@ private:
     // view cache must be available before any player birth callbacks.
     const downwell::RoomPack* entryRooms_=nullptr;
     PlayerInstance playerInstance_;
+    bool (*playerTimeTransition_)(void*,const PlayerInstance&,const PlayerMotion&,int,int)=nullptr;
+    void* playerTimeContext_=nullptr;
     PlayerBirthTiming playerBirthTiming_=PlayerBirthTiming::construction;
     bool playerBirthPending_=false;
     std::uint32_t nextPlayerLifetimeId_=1;

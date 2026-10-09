@@ -1125,6 +1125,9 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             return playerInstance_.lifetimeId&&playerLifecycle_.placeMeeting(playerHandle(),playerInstance_,255,
                 downwell::MotionBinary64::fromInteger(playerInstance_.x),
                 downwell::MotionBinary64::fromInteger(playerInstance_.y),hit);
+        },[this](const PlayerMotion& motion,int x,int y){
+            return run_.effectsSucceeded&&(!playerTimeTransition_||
+                playerTimeTransition_(playerTimeContext_,playerInstance_,motion,x,y))&&run_.effectsSucceeded;
         });
     player_.configureBreakBoxResolver(nullptr, nullptr);
     if(!run_.effectsSucceeded)return {};

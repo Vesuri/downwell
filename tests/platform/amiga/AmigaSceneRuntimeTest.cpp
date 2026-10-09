@@ -2554,8 +2554,16 @@ int main(int argc, char** argv) {
         static GameplayWorld shaken(0,true,0,true),plain(0,true,0,true);
         auto oracle=shaken.randomState();const auto before=shaken.randomDrawCount();
         const int dx=int(oracle.irandom(2))-1,dy=int(oracle.irandom(4))-2;
-        require(shaken.requestTimeStopCameraShake(),"native camera accepts time-stop shake");
-        shaken.step(0);plain.step(0);
+        unsigned transitions=0;
+        require(shaken.withPlayerTimeTransition([&](const auto& player,const auto& motion,int x,int y){
+            ++transitions;
+            require(player.x==x&&player.y==y&&
+                x==240+downwell::roundGameMakerQ8(motion.offsetXFixed())&&
+                y==176+downwell::roundGameMakerQ8(motion.offsetYFixed())&&shaken.randomDrawCount()==before,
+                "native transition sees new published player coordinates before camera RNG");
+            return shaken.requestTimeStopCameraShake();
+        },[&]{shaken.step(0);return shaken.effectsSucceeded();}),"native transition requests shake inside player Begin Step");
+        plain.step(0);
         require(shaken.effectsSucceeded()&&plain.effectsSucceeded()&&
             shaken.randomDrawCount()==before+4&&plain.randomDrawCount()==before&&
             shaken.cameraOffsetX()==plain.cameraOffsetX()+dx&&
@@ -2564,11 +2572,30 @@ int main(int argc, char** argv) {
         for(unsigned word=0;word<16;++word)
             require(shaken.randomState().stateWord(word)==oracle.stateWord(word),"native shake preserves exact WELL state");
         shaken.step(0);plain.step(0);
-        require(shaken.randomDrawCount()==before+4&&
+        require(transitions==1&&shaken.randomDrawCount()==before+4&&
             shaken.cameraOffsetX()==plain.cameraOffsetX()&&shaken.cameraOffsetY()==plain.cameraOffsetY(),
             "native second-tick alarm removes shake without additional RNG");
         shaken.step(0);plain.step(0);
         require(shaken.checkpoint()==plain.checkpoint(),"expired shake leaves no permanent scrolling offset");
+    }
+    for(bool nested:{false,true}){
+        auto world=std::make_unique<GameplayWorld>(0,true,0,true);
+        unsigned transitions=0,alarms=0;
+        world->configureRoomAlarms([](void* p){++*static_cast<unsigned*>(p);return true;},&alarms);
+        const auto draws=world->randomDrawCount();const auto clock=world->runTimeTicks();
+        auto unused=[](const auto&,const auto&,int,int){return true;};
+        require(!world->withPlayerTimeTransition([&](const auto&,const auto&,int,int){
+            ++transitions;
+            if(nested){
+                require(!world->withPlayerTimeTransition(unused,[]{return true;}),"nested native transition scopes are rejected");
+                return true; // A caller cannot hide the world's failed state.
+            }
+            return false;
+        },[&]{world->step(0);return world->effectsSucceeded();}),"failed native transition stops the tick");
+        require(transitions==1&&!alarms&&world->randomDrawCount()==draws&&world->runTimeTicks()==clock+1,
+            "transition failure retains earlier clock work and prevents later alarms and camera RNG");
+        world->step(0);
+        require(transitions==1&&!alarms&&world->randomDrawCount()==draws,"failed native world does not retry transition");
     }
     {
         struct Capture {unsigned calls=0;std::uint32_t revision=1;bool okay=true;} capture;
