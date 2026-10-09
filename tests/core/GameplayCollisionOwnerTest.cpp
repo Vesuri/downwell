@@ -2412,9 +2412,24 @@ int main(){
                     else assert(ordinal<expected.size()&&hit==expected[ordinal]);
                     ++ordinal;
                 }
+                for(int object:{60,93}){
+                    bool hit=false;assert(owner->terrainPositionMeeting(object,x.promoted(),y.promoted(),masks,hit));
+                    if(!native){expected.push_back(hit);hit?++hits:++misses;}
+                    else assert(ordinal<expected.size()&&hit==expected[ordinal]);
+                    ++ordinal;
+                }
             };
             RunnerImageValue queryX,queryY;assert(queryX.assignInteger(240)&&queryY.assignInteger(160));
             point(queryX,queryY); // Dirty post-Create bounds refresh on the candidate path.
+            // A split tree with many walls and one platform exercises spatial
+            // traversal for 60 and the population<height list path for 93.
+            for(unsigned n=0;n<41;++n){
+                const int object=n==40?93:60,x=n==40?240:2000+int(n)*32;
+                if(native){assert(terrain->append(object,x,160));assert(terrain->createProperties(terrain->handle(n+1),51));}
+                else {assert(owner->terrain().append(object,x,160,true));
+                    assert(owner->terrain().createProperties(owner->terrain().handle(n+1),51,false,random));}
+            }
+            point(queryX,queryY);
             assert(native?world->activateNativeTerrain(wall,false):owner->terrain().activation(wall,false));
             point(queryX,queryY); // Candidate geometry itself must not filter inactive state.
             assert(native?world->activateNativeTerrain(wall,true):owner->terrain().activation(wall,true));

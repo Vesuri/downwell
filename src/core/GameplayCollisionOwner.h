@@ -480,7 +480,7 @@ private:
             RunnerImageValue{0x3f800000u},RunnerImageValue{0x3f800000u},false,RunnerImageValue{},RunnerImageValue{},true,
             [](auto value,std::int32_t& pixel){return value.roundPixel(pixel);},bounds));
     }
-    bool refreshNativeTerrain(InstanceHandle h){
+    bool refreshNativeTerrain(InstanceHandle h,bool publish=true){
         if(!valid()||!world_||!world_->nativeTerrainInstances()||h.slot<View::terrainBase||h.slot>=View::timeFieldBase)return check(false);
         const auto* terrain=world_->nativeTerrainInstances();
         const InstanceHandle local{h.slot-View::terrainBase,h.generation};
@@ -494,7 +494,7 @@ private:
             !nativeTerrainBirthBounds(id,x,y,newBounds,found,precise,current))return false;
         const bool okay=owner_.externalSpatialPublication([&](auto& index){
             return RunnerSpatialBoundsUpdate::finishRefresh(index,h.slot,*objectFlags,flags,false,oldBounds,
-                found?&newBounds:nullptr,x,y,precise,true);
+                found?&newBounds:nullptr,x,y,precise,publish);
         });
         // finishRefresh publishes cache/flags before index mutation. Preserve
         // that prefix even if the journal operation failed terminally.
@@ -2006,9 +2006,55 @@ public:
     }
     bool population(int object,unsigned& count)const{return valid()&&selectorAvailable(object)&&owner_.instanceNumber(object,families_,count);}
     bool terrainPositionMeeting(int object,MotionBinary64 x,MotionBinary64 y,const SpriteMaskPack& masks,bool& hit){
+        if(native_)return nativeTerrainPositionMeeting(object,x,y,masks,hit);
         return terrainQuery(object)?registeredPositionMeeting(object,x,y,masks,hit):check(false);
     }
 private:
+    bool nativeTerrainPositionMeeting(int object,MotionBinary64 x,MotionBinary64 y,const SpriteMaskPack& masks,bool& hit){
+        RunnerImageValue px,py;
+        if(!valid()||!world_||!world_->nativeTerrainInstances()||(object!=60&&object!=93)||
+            !terrainFamilies_[object==93]||!masks.valid()||!px.assign(x)||!py.assign(y))return check(false);
+        auto members=[&](auto visit){
+            bool stopped=false;
+            return visitNativeRegistered(View::terrainBase,View::timeFieldBase,
+                [&](InstanceHandle h,int child,std::uint32_t){
+                    if(!stopped&&families_.isA(child,object))stopped=!visit(h.slot);
+                    return true;
+                });
+        };
+        unsigned count=0,height=0;
+        if(!members([&](unsigned){++count;return true;})||!owner_.externalSpatialPublication(
+            [&](auto& index){height=index.height();return true;}))return check(false);
+        using Prep=RunnerSpatialObjectPreparation;
+        bool prepared=true;
+        const auto path=Prep::prepare(count,height,*families_.flags(unsigned(object)),false,
+            [&]{return families_.markSpatialFamily(unsigned(object));},
+            [&](auto emit){
+                prepared=members([&](unsigned slot){
+                    Owner::State state;Owner::Sprite sprite;
+                    if(!nativeCollisionVisual(handleAt(slot),state,sprite)){prepared=false;return false;}
+                    return emit(slot,state.flags,state.bounds);
+                })&&prepared;
+            },[&](unsigned slot,std::uint32_t& flags,Owner::Box& bounds){
+                Owner::State state;Owner::Sprite sprite;
+                if(!refreshNativeTerrain(handleAt(slot),false)||!nativeCollisionVisual(handleAt(slot),state,sprite))return false;
+                flags=state.flags;bounds=state.bounds;return true;
+            },[&](Owner::Box box,unsigned slot){
+                const auto h=handleAt(slot);
+                return owner_.externalSpatialPublication([&](auto& index){return index.insert(box,slot);})&&
+                    world_->publishNativeTerrainIndexed({slot-View::terrainBase,h.generation});
+            });
+        if(!prepared)return check(false);
+        return check(RunnerPointTraversal::run(path,px,py,true,[&]{return flushNativeSpatial();},
+            [&](unsigned slot,bool indexed,bool& admitted){
+                const auto h=handleAt(slot);std::uint32_t flags;
+                if(!resolves(h)||!eligibilityFlags(h,flags))return false;
+                admitted=!(flags&0x100003u)&&(!indexed||families_.isA(objectOf(h),object));return true;
+            },[&](unsigned slot,RunnerImageValue qx,RunnerImageValue qy,bool& result){
+                return collisionPointCandidate(handleAt(slot),qx,qy,true,true,masks,result);
+            },[&](Owner::Box box,auto visit){return owner_.externalSpatialPublication([&](auto& index){return index.query(box,visit);});},
+            members,hit));
+    }
     bool registeredPositionMeeting(int object,MotionBinary64 x,MotionBinary64 y,const SpriteMaskPack& masks,bool& hit){
         RunnerImageValue px,py;bool result=false;
         if(!selectorAvailable(object)||!masks.valid()||!px.assign(x)||!py.assign(y))return check(false);

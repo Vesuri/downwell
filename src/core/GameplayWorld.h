@@ -275,6 +275,10 @@ public:
         return run_.effectsSucceeded=run_.effectsSucceeded&&nativeTerrainInstances_&&
             nativeTerrainInstances_->createProperties(h,downwell::terrainTileForArea(run_.stage.area));
     }
+    bool publishNativeTerrainIndexed(downwell::InstanceHandle h){
+        return run_.effectsSucceeded=run_.effectsSucceeded&&nativeTerrainInstances_&&
+            nativeTerrainInstances_->publishIndexed(h);
+    }
     bool publishNativeTerrainBounds(downwell::InstanceHandle h,std::uint32_t flags){
         return run_.effectsSucceeded=run_.effectsSucceeded&&nativeTerrainInstances_&&
             nativeTerrainInstances_->publishRefreshedBounds(h,flags);

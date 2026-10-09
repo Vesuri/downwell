@@ -457,9 +457,17 @@ The geometric tail is shared in `RunnerSpritePoint`; native actor/terrain
 candidate testing reads the published bounds and appearance, performs the same
 lazy refresh, then uses this tail. Mixed owner tests compare fractional,
 mirrored, rotated, missing-mask, inactive and destroyed candidates in both
-compatibility modes. This explicit candidate API does not enable native outer
-selectors: family preparation, traversal and temporary place-query movement
-remain independently required before wall End Step can call them.
+compatibility modes. The explicit candidate API alone does not enable selectors.
+Native `terrainPositionMeeting` now supplies the outer object-resource path for
+the audited 60/93 families: source population/tree-height preparation, ancestor
+registration order, lazy unindexed refresh and insertion, then shared
+`RunnerPointTraversal`. Preparation publishes indexed membership without
+changing the run's cached-resource stage. The indexed path flushes the shared
+dirty queue and filters exclusions/family before precise candidate testing;
+the list path preserves registration order. Compatibility truncation applies
+only to the tree query, not to candidate coordinates. This does not admit
+general native selectors or temporary `place_meeting` movement, and does not
+schedule wall End Step by itself.
 `RunnerSpatialInstances::point` supplies object-family traversal through the
 same preparation/index ownership used by `instance_place`. It filters flags
 `0x100003`, and indexed candidates additionally require kind 1 and matching

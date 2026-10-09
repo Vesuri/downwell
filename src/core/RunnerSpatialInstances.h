@@ -18,6 +18,7 @@
 #include "RunnerMaskPair.h"
 #include "RunnerSpriteOverlap.h"
 #include "RunnerSpritePoint.h"
+#include "RunnerPointTraversal.h"
 #include "RunnerMaskPoint.h"
 #include "RunnerLineBounds.h"
 #include "RunnerSpriteChange.h"
@@ -925,34 +926,14 @@ public:
             });},
             [&](unsigned slot,auto&,auto&){return refreshBounds(handle(slot),false);},
             [&](Box box,unsigned slot){return index_.insert(box,slot);});
-        if(path==Prep::Path::failed)return checked(false);
-        if(path==Prep::Path::none){hit=false;return true;}
-        const bool indexed=path==Prep::Path::spatial;
-        if(indexed&&!checked(flush(refreshBounds)))return false;
-        bool good=true,result=false;
-        auto visit=[&](unsigned slot){
-            if(slot>=Capacity||lifetimes_.object(slot)<0){good=false;return false;}
-            // 0x501e40 is an unconditional false stub in the pinned runner.
-            if((states_.flags(slot)&0x100003u)||
-               (indexed&&(states_.kind(slot)!=1||!isA(lifetimes_.object(slot),object))))return true;
-            if(!candidate(handle(slot),x,y,result)){good=false;return false;}
-            return !result;
-        };
-        if(indexed){
-            // cvttss2si + cvtdq2ps affects only broad-phase coordinates;
-            // candidate tests still receive the original narrowed fractions.
-            const auto truncate=[](Real value){
-                const int exponent=int((value.bits>>23)&255)-127;
-                if(exponent<0)return Real{};
-                if(exponent>=31)return Real{0xcf000000u}; // SSE integer indefinite.
-                if(exponent<23)value.bits&=~((1u<<unsigned(23-exponent))-1u);
-                return value;
-            };
-            const Real bx=compatibility?truncate(x):x,by=compatibility?truncate(y):y;
-            if(!index_.query({bx,by,bx,by},visit))good=false;
-        }else membership_.visit(object,isA,[&](unsigned slot,std::uint32_t){return visit(slot);});
-        if(!checked(good))return false;
-        hit=result;return true;
+        return checked(RunnerPointTraversal::run(path,x,y,compatibility,[&]{return flush(refreshBounds);},
+            [&](unsigned slot,bool indexed,bool& admitted){
+                if(slot>=Capacity||lifetimes_.object(slot)<0)return false;
+                admitted=!(states_.flags(slot)&0x100003u)&&
+                    (!indexed||(states_.kind(slot)==1&&isA(lifetimes_.object(slot),object)));return true;
+            },[&](unsigned slot,Real px,Real py,bool& result){return candidate(handle(slot),px,py,result);},
+            [&](Box box,auto visit){return index_.query(box,visit);},
+            [&](auto visit){membership_.visit(object,isA,[&](unsigned slot,std::uint32_t){return visit(slot);});return true;},hit));
     }
     // collision_line object-resource selector, 0x4fd370. Args have passed the
     // VM float wrapper. Family preparation selects list/tree; tree queries

@@ -72,6 +72,10 @@ public:
         if(!contains(h))return false;
         sprite=(flags_[h.slot]&64u)?createSprite_[h.slot]:-2;return true;
     }
+    bool publishIndexed(InstanceHandle h){
+        if(!contains(h))return good_=false;
+        flags_[h.slot]|=16u;return true;
+    }
     // Geometry is immutable within either constructor or post-Create state.
     // One existing flags bit selects which resource produced cached bounds.
     bool publishRefreshedBounds(InstanceHandle h,std::uint32_t spatial){
