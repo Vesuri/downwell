@@ -26,6 +26,7 @@
 #include "core/GameplayDitherAbove.h"
 #include "core/GameplayBuilderController.h"
 #include "core/GameplayPlayerControllers.h"
+#include "core/PlayerChildCreation.h"
 #include "core/DroneBulletInstances.h"
 #include "core/BoneProjectileInstances.h"
 #include "core/SkeletonInstances.h"
@@ -245,6 +246,7 @@ public:
         // Serialized room identity, independent of the reusable native slot.
         // Zero until the resource-backed room handoff reaches the player.
         std::uint32_t sourceInstanceId=0;
+        std::uint32_t cameraSourceId=0;
     };
     using PlayerLifecycleBinding = downwell::RecordLifecycleBinding<PlayerInstance>;
     // When supplied, entryRooms is borrowed for this world and its run resets;
@@ -332,6 +334,43 @@ public:
         if(playerControllers_||!records.valid()||records.size())return false;
         playerControllers_=&records;return true;
     }
+    // Explicit rmMain player Create composition. The enclosing source-ordered
+    // allocator must provide each ID; this cannot infer IDs from typed handles.
+    template<class Allocate> bool createPlayerChildren(Allocate allocate){
+        if(!run_.effectsSucceeded)return false;
+        downwell::PackedRoom room;
+        const auto* view=roomEntryViews_.get(0);
+        if(playerChildrenStarted_||!playerInstance_.lifetimeId||!playerInstance_.sourceInstanceId||
+            !playerControllers_||playerControllers_->size()||!entryDithers_||entryDithers_->size()||
+            !entryRooms_||!entryRooms_->findRoom(11,room)||!view)return run_.effectsSucceeded=false;
+        playerChildrenStarted_=true;
+        downwell::RunnerImageValue px,py;
+        if(!px.assignInteger(playerInstance_.x)||!py.assignInteger(playerInstance_.y))return run_.effectsSucceeded=false;
+        return run_.effectsSucceeded=downwell::PlayerChildCreation::run(11,playerInstance_.x,playerInstance_.y,
+            run_.upgrades.levels[15],run_.upgrades.levels[9],
+            [&](int object,int x,int y)->std::uint32_t{
+                unsigned id=0;downwell::InstanceHandle child;downwell::RunnerImageValue cx,cy;
+                if(!allocate(object,id)||!id||!cx.assignInteger(x)||!cy.assignInteger(y))return 0;
+                const bool ok=object==64?playerControllers_->createCamera(id,cx,cy,room.width,false,px,py,child):
+                    object==66?playerControllers_->create(object,id,cx,cy,child):
+                    playerControllers_->createCompanion(object,id,cx,cy,child);
+                return ok?id:0;
+            },[&](unsigned value){droneNumber_=value;return true;},
+            [&](unsigned id){return playerControllers_->reverseDrone(playerControllers_->sourceHandle(id));},
+            [&](unsigned id,bool freeCam,bool clearAutoScroll){
+                playerInstance_.cameraSourceId=id;
+                return playerControllers_->cameraModes(playerControllers_->sourceHandle(id),freeCam,clearAutoScroll);
+            },[&](int){
+                unsigned id=0;downwell::InstanceHandle child;
+                if(!allocate(73,id)||!id)return false;
+                return entryDithers_->create(id,[&](downwell::MotionBinary64& x){
+                    const auto* camera=playerControllers_->find(playerControllers_->sourceHandle(playerInstance_.cameraSourceId));
+                    if(!camera)return false;
+                    x=camera->x.promoted();return true;
+                },[&](downwell::MotionBinary64& y){y=view->y.promoted();return true;},child);
+            });
+    }
+    unsigned droneNumber()const{return droneNumber_;}
     bool bindBuilderController(downwell::GameplayBuilderController& actor){
         if(builderController_||!actor.valid()||actor.handle().generation)return false;
         builderController_=&actor;return true;
@@ -1584,6 +1623,8 @@ private:
     downwell::GameplayDitherAbove* ditherAbove_=nullptr;
     downwell::GameplayBuilderController* builderController_=nullptr;
     downwell::GameplayPlayerControllers* playerControllers_=nullptr;
+    bool playerChildrenStarted_=false;
+    unsigned droneNumber_=0;
     bool ditherLowSpec_=false,ditherEnding_=false;
     DroneBullets* droneBullets_=nullptr;
     Bones* bones_=nullptr;

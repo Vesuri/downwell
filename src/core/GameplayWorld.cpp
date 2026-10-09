@@ -422,6 +422,7 @@ bool GameplayWorld::birthPlayerOwnership() {
     // Authored room identity precedes the birth callback. This does not
     // allocate a dynamic ID or stand in for the remaining room Create order.
     playerInstance_.sourceInstanceId=sourceId;
+    playerChildrenStarted_=false;
     if(!playerLifecycle_.birth(playerHandle(),playerInstance_)) {
         run_.effectsSucceeded=false;return false;
     }

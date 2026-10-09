@@ -30,6 +30,17 @@ public:
         return key.generation&&key.slot<capacity&&records_[key.slot].lifetimeId==key.generation?&records_[key.slot]:nullptr;
     }
     InstanceHandle handle(unsigned slot)const{return slot<capacity?InstanceHandle{slot,records_[slot].lifetimeId}:InstanceHandle{};}
+    InstanceHandle sourceHandle(unsigned id)const{
+        for(unsigned i=0;id&&i<capacity;++i)if(records_[i].lifetimeId&&records_[i].sourceId==id)return handle(i);
+        return {};
+    }
+    bool cameraModes(InstanceHandle key,bool freeCam,bool clearAutoScroll){
+        auto* r=const_cast<Record*>(find(key));
+        if(!good_||!r||r->objectId!=64||!r->camera.initialized)return fail();
+        if(freeCam)r->camera.freeCam=1;
+        if(clearAutoScroll)r->camera.autoScroll=0;
+        return true;
+    }
     bool create(int object,unsigned source,RunnerImageValue x,RunnerImageValue y,InstanceHandle& result){
         result={};
         if(!good_||!next_||count_==capacity||(object!=64&&object!=66&&object!=249&&object!=256)||!source||source>0x7fffffffu)return fail();

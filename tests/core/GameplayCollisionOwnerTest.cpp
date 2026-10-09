@@ -73,6 +73,10 @@ bool nativeCameraCreate(downwell::GameplayCollisionOwner& owner,downwell::Instan
 bool nativeCompanionCreate(downwell::GameplayCollisionOwner& owner,unsigned source,downwell::InstanceHandle& key){
     return owner.playerControllers().createCompanion(249,source,{0x43700000u},{0x43300000u},key);
 }
+struct NativeChildAllocatorProbe {bool operator()(int,unsigned&);};
+bool nativePlayerChildSequence(GameplayWorld& world,NativeChildAllocatorProbe allocate){
+    return world.createPlayerChildren(allocate);
+}
 bool nativeRegisteredTimeShardStep(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle shared,
     const downwell::SpriteMaskPack& masks,bool stopped){
     return owner.stepTimeShard(shared,stopped,masks);
@@ -1814,6 +1818,50 @@ int main(){
         }
         assert(world->restartFromResults(DeathMenuSequence::Action::Retry,43,300)==ResultsDestination::gameplay&&
             children.size()==0&&!children.find(balloon)&&!children.find(first)&&!children.find(second));
+    }
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                  GameplayCollisionOwner::Ownership::nativeScenery})for(unsigned failure=0;failure<=6;++failure){
+        const auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},&rooms,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain(),&rooms);
+        assert(owner->attach(*world));
+        // Source can branch on value two even though normal offers cap Drone.
+        auto& upgrades=const_cast<UpgradeInventory&>(world->upgrades());upgrades.levels[9]=2;upgrades.levels[15]=1;
+        unsigned calls=0;const int expected[]={256,249,249,66,64,73};
+        const auto draws=world->randomDrawCount();
+        auto allocate=[&](int object,unsigned& id){
+            assert(calls<6&&object==expected[calls]);++calls;id=150000+calls*3;return calls!=failure;
+        };
+        const bool ok=world->createPlayerChildren(allocate);
+        assert(ok==!failure&&calls==(failure?failure:6)&&world->effectsSucceeded()==!failure&&world->randomDrawCount()==draws);
+        const auto& children=owner->playerControllers();
+        const unsigned born=failure?failure-1:6;
+        assert(children.size()==(born<5?born:5)&&owner->entryDithers().size()==unsigned(born==6));
+        for(unsigned i=0;i<children.size();++i){const auto* child=children.find(children.handle(i));
+            assert(child&&child->objectId==expected[i]&&child->sourceId==150003+i*3);
+        }
+        const auto* player=world->findPlayer(world->playerHandle());assert(player);
+        assert(player->cameraSourceId==(born>=5?150015u:0u));
+        assert(world->droneNumber()==unsigned(born>=2));
+        if(born>=3){const auto* second=children.find(children.handle(2));
+            assert(second->companion.drone.xdir.high==MotionBinary64::fromInteger(180).high);}
+        if(ok){
+            const auto* wipe=owner->entryDithers().find(owner->entryDithers().handle(0));
+            const auto* camera=children.find(children.sourceHandle(player->cameraSourceId));
+            assert(wipe&&camera&&camera->camera.initialized&&wipe->sourceId==150018&&
+                wipe->x.bits==camera->x.bits&&wipe->y.bits==world->roomEntryView()->y.bits&&wipe->effect.alarm0==120);
+            assert(world->restartFromResults(DeathMenuSequence::Action::Retry,43,300)==ResultsDestination::gameplay&&
+                children.size()==0&&owner->entryDithers().size()==0);
+            unsigned retryCalls=0;const int retryOrder[]={66,64,73};
+            assert(world->createPlayerChildren([&](int object,unsigned& id){
+                assert(retryCalls<3&&object==retryOrder[retryCalls]);id=170000+ ++retryCalls;return true;
+            })&&retryCalls==3&&children.size()==2&&owner->entryDithers().size()==1&&world->droneNumber()==0);
+            assert(world->findPlayer(world->playerHandle())->cameraSourceId==170002);
+        }else{
+            assert(!world->createPlayerChildren(allocate)&&calls==failure);
+        }
     }
     for(int area=1;area<=5;++area){
         auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites);
