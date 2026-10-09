@@ -1699,8 +1699,10 @@ pose work, so this does not establish full source phase equivalence.
 The source then applies wrap mode and publishes `x=round(xx)`, `y=round(yy)`.
 The shared phase exposes a checked position-publication boundary before shop
 processing. The stored host player routes it through its generation-checked
-movement binding before changing the record's coordinates. Rejection retains
-earlier motion/clock changes and stops subsequent phases. Deferred host bullet
+movement binding before changing the record's coordinates. Accepted publication
+updates both integer and floating builtin fields to the rounded coordinates
+(not the private motion accumulators). Rejection retains the old builtin fields
+and earlier motion/clock changes, and stops subsequent phases. Deferred host bullet
 emission keeps an explicit copy of the pre-movement muzzle coordinates, not
 the newly published record. The native world has a separate published player
 record in world coordinates, with a generation-checked single-slot lifetime and

@@ -2963,6 +2963,8 @@ int main(){
         unsigned pauses=0,hooks=0;std::uint32_t first=0;
         auto transition=[&](const InstanceRecord& player,const PlayerMotion& motion,int ox,int oy){
             ++hooks;if(!first)first=world->nextRuntimeInstanceId();
+            require(player.preciseX==static_cast<float>(player.x)&&player.preciseY==static_cast<float>(player.y),
+                "player Begin Step publishes rounded builtins before time-field identity queries");
             TimeStopEffects<16>::PlayerPose pose;
             // Exact projection of the current portable motion representation;
             // this does not assert that its Q8 motion matches all original FP paths.
@@ -2990,6 +2992,24 @@ int main(){
         require(world->stepWithTimeStopEffects(shards,changes,state,Input{},false,transition)&&hooks==2&&pauses==1,
             "held field does not recreate the transition on the next world tick");
         require(state.reset(),"retire live transition fixture before teardown");
+    }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach moving player publication world");world->skipToGameForTesting();
+        Input walking;walking.right=true;bool moved=false;int firstX=0;
+        for(unsigned tick=0;tick<12;++tick){
+            require(world->stepWithCollisionPass(walking,false,[&]{
+                for(std::size_t i=0;i<world->activeInstanceCount();++i){
+                    const auto& player=world->instanceAt(i);if(player.objectId!=35)continue;
+                    if(!tick)firstX=player.x;else moved|=player.x!=firstX;
+                    require(player.preciseX==static_cast<float>(player.x)&&player.preciseY==static_cast<float>(player.y),
+                        "moving player record retains rounded builtin coordinates for identity queries");
+                }
+                return true;
+            }),"step moving player publication world");
+        }
+        require(moved,"publication regression exercises player movement");
     }
     auto productionOwner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
     {

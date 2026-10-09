@@ -1506,7 +1506,12 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
         [this,&instance](int x,int y){
             for(std::size_t i=0;i<instances_.size();++i)if(&instances_.at(i)==&instance){
                 if(!lifecycle_.integerPosition(instances_.handleAt(i),instance,x,y))return false;
-                instance.x=x;instance.y=y;return true;
+                // Begin Step [25] assigns rounded builtin x/y, not private
+                // xx/yy. Keep identity-query reads of the record in agreement
+                // with the accepted collision-owner publication.
+                instance.x=x;instance.y=y;
+                instance.preciseX=static_cast<float>(x);instance.preciseY=static_cast<float>(y);
+                return true;
             }
             return false;
         },[this,&instance](int value){
