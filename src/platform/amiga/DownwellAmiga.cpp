@@ -1988,14 +1988,17 @@ __attribute__((noinline)) static int runDownwell(void) {
         terrainCollision.fragments = fragments;
         terrainCollision.fragmentCount = 0;
         terrainCollision.runtime = &port;
-        liveBuilder.resetInitialCheckpointBeforeEntrance(enemyRandom);
+        if (!liveGeneration.loadRoomWithStartField(port,rooms,mainRoom,&roomTerrainPlan,&roomTerrainBackend,
+            [](AmigaPortRuntime& world,AmigaAreaOneTerrainBuilder& builder,
+               const downwell::PackedRoomInstance& instance,void* context){
+                if(instance.x!=-16||instance.y!=704)return false;
+                auto& random=*static_cast<downwell::GameMakerRandom*>(context);
+                builder.resetInitialCheckpointBeforeEntrance(random);
 #ifdef DOWNWELL_PROFILE_OVERFLOW
-        if(!amigaOverflowProfileEntry(liveBuilder,enemyRandom)){
-            platform.restore();FreeMem(startupCopperWords,4*sizeof(UWORD));memory.release();return 20;
-        }
+                if(!amigaOverflowProfileEntry(builder,random))return false;
 #endif
-        port.configureEnemyRandom(enemyRandom);
-        if (!liveGeneration.loadRoomWithStartField(port,rooms,mainRoom,&roomTerrainPlan,&roomTerrainBackend)) {
+                world.configureEnemyRandom(random);return true;
+            },&enemyRandom)) {
             platform.restore();
             FreeMem(startupCopperWords, 4 * sizeof(UWORD));
             memory.release();
@@ -2701,8 +2704,13 @@ __attribute__((noinline)) static int runDownwell(void) {
                         terrainTiles.clear();
                         terrainCollision.fragmentCount = 0;
                         port.confirmFirstStage();
-                        if (!port.resetAreaOneBuilder(liveBuilder, -16, 704, scenes.styleCursor())) break;
-                        if (!liveGeneration.loadRoomWithStartField(port,rooms,mainRoom,&roomTerrainPlan,&roomTerrainBackend)) break;
+                        unsigned style=scenes.styleCursor();
+                        if (!liveGeneration.loadRoomWithStartField(port,rooms,mainRoom,&roomTerrainPlan,&roomTerrainBackend,
+                            [](AmigaPortRuntime& world,AmigaAreaOneTerrainBuilder& builder,
+                               const downwell::PackedRoomInstance& instance,void* context){
+                                return world.resetAreaOneBuilder(builder,instance.x,instance.y,
+                                    *static_cast<unsigned*>(context));
+                            },&style)) break;
                         liveGeneration.bind(port);
                         port.configureGenerationStep(generateLiveTerrain, &liveGeneration);
                         port.configureLandingResolver(amigaResolveTerrainLanding, &terrainCollision);

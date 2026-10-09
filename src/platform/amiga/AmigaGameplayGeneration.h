@@ -25,7 +25,9 @@ public:
         const downwell::GameplayDitherAbove::Snapshot& dither,
         const downwell::PreparedRoomTerrain* prepared=nullptr,AmigaRoomTerrainPlan* backend=nullptr);
     bool loadRoomWithStartField(AmigaPortRuntime& runtime,const downwell::RoomPack& rooms,const downwell::PackedRoom& room,
-        const downwell::PreparedRoomTerrain* prepared=nullptr,AmigaRoomTerrainPlan* backend=nullptr);
+        const downwell::PreparedRoomTerrain* prepared=nullptr,AmigaRoomTerrainPlan* backend=nullptr,
+        bool (*builderCreate)(AmigaPortRuntime&,AmigaAreaOneTerrainBuilder&,const downwell::PackedRoomInstance&,void*)=nullptr,
+        void* builderContext=nullptr);
     bool step(downwell::GameMakerRandom& random, int viewBottom);
     unsigned fragmentCount() const { return builder_.fragmentCount(); }
     int dirtyFirst = worldRows, dirtyEnd = 0;

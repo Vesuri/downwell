@@ -34,14 +34,18 @@ bool AmigaGameplayGeneration::adoptRoom(AmigaPortRuntime& runtime,
 
 bool AmigaGameplayGeneration::loadRoomWithStartField(AmigaPortRuntime& runtime,
     const downwell::RoomPack& rooms,const downwell::PackedRoom& room,
-    const downwell::PreparedRoomTerrain* prepared,AmigaRoomTerrainPlan* backend){
+    const downwell::PreparedRoomTerrain* prepared,AmigaRoomTerrainPlan* backend,
+    bool (*builderCreate)(AmigaPortRuntime&,AmigaAreaOneTerrainBuilder&,const downwell::PackedRoomInstance&,void*),
+    void* builderContext){
     if(lifetimes_&&(!lifetimes_->clear()||
         (runtime.terrainCreatesBackendOnly()&&!runtime.bindNativeTerrain(*lifetimes_))))return false;
     const bool compiled=backend&&prepared&&prepared->matches(rooms,room)&&backend->begin(prepared);
     return runtime.loadRoomTerrainWithStartField(rooms,room,[this,backend,compiled](const downwell::PackedRoomInstance& instance){
         return (compiled?backend->emit(index_,instance):
             amigaAddTerrainObject(index_,instance.objectId,instance.x,instance.y,true))&&roomBirth(instance);
-    },prepared);
+    },prepared,[&](const downwell::PackedRoomInstance& instance){
+        return !builderCreate||builderCreate(runtime,builder_,instance,builderContext);
+    });
 }
 
 void AmigaGameplayGeneration::bind(AmigaPortRuntime& runtime,bool terrainRuns) {

@@ -139,13 +139,20 @@ struct LiveSceneWorld {
                 imported->x.bits==dither.x.bits&&imported->y.bits==dither.y.bits):!imported,
                 "room handoff retains controller presence and published coordinates");
         } else if (continuing) {
-            require(port.resetAreaOneBuilder(builder, -16, 704), "native continuation initializes the current level on its owned RNG");
-            require(generation.loadRoomWithStartField(port,rooms,room,&prepared),"continuation field follows authored room order");
+            require(generation.loadRoomWithStartField(port,rooms,room,&prepared,nullptr,
+                [](AmigaPortRuntime& world,AmigaAreaOneTerrainBuilder& builder,
+                   const downwell::PackedRoomInstance& instance,void*){
+                    return world.resetAreaOneBuilder(builder,instance.x,instance.y);
+                }),"continuation builder Create and field follow authored room order");
         } else {
-            downwell::GameMakerRandom random;
-            builder.resetInitialCheckpointBeforeEntrance(random);
-            port.configureEnemyRandom(random);
-            require(generation.loadRoomWithStartField(port,rooms,room,&prepared),"native initial field Create follows authored room order");
+            require(generation.loadRoomWithStartField(port,rooms,room,&prepared,nullptr,
+                [](AmigaPortRuntime& world,AmigaAreaOneTerrainBuilder& builder,
+                   const downwell::PackedRoomInstance& instance,void*){
+                    require(instance.x==-16&&instance.y==704,"native checkpoint uses authored builder position");
+                    downwell::GameMakerRandom random;
+                    builder.resetInitialCheckpointBeforeEntrance(random);
+                    world.configureEnemyRandom(random);return true;
+                }),"native initial checkpoint and field follow authored room order");
         }
         generation.dirtyFirst = 0; generation.dirtyEnd = AmigaGameplayGeneration::worldRows;
         checkTerrainIdentities();

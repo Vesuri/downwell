@@ -4057,23 +4057,27 @@ int main(){
             fieldsOwner->population(371,population)&&population==0&&
             !fieldWorld->goalFieldInstances().find({0,firstIdentity})&&fieldsOwner->valid());
     }
-    {
+    for(bool rejectCreate:{false,true}){
         struct RejectedBuilder {
             unsigned births=0;
+            bool rejectBirth=true;
             bool birth(InstanceHandle,const GameplayBuilderController::Record& r){
-                ++births;assert(r.sourceId==100856);return false;
+                ++births;assert(r.sourceId==100856);return !rejectBirth;
             }
             bool retire(InstanceHandle,const GameplayBuilderController::Record&){return true;}
             bool activation(InstanceHandle,const GameplayBuilderController::Record&,bool){return true;}
             bool membership(InstanceHandle,const GameplayBuilderController::Record&,bool){return true;}
         } rejected;
+        rejected.rejectBirth=!rejectCreate;
         GameplayBuilderController builder(GameplayBuilderController::Binding::bind(rejected));
         auto world=std::make_unique<GameplayWorld>(300,false,1025,true,
             GameplayWorld::EnemyLifecycleBinding{},GameplayWorld::BreakableLifecycleBinding{},
             GameplayWorld::PlayerLifecycleBinding{},nullptr,&rooms,GameplayWorld::PlayerBirthTiming::authoredRoom);
         assert(world->bindBuilderController(builder));
-        unsigned walls=0;const auto draws=world->randomDrawCount();
-        assert(!world->loadRoomTerrainWithStartField(rooms,room,[&](const auto&){++walls;return true;}));
+        unsigned walls=0,creates=0;const auto draws=world->randomDrawCount();
+        assert(!world->loadRoomTerrainWithStartField(rooms,room,[&](const auto&){++walls;return true;},nullptr,
+            [&](const auto&){++creates;assert(builder.handle().generation);return false;}));
+        assert(creates==unsigned(rejectCreate));
         assert(rejected.births==1&&!walls&&!world->effectsSucceeded()&&world->awaitingPlayerBirth()&&
             !world->playerHandle().generation&&world->randomDrawCount()==draws);
         assert(!world->loadRoomTerrainWithStartField(rooms,room,[&](const auto&){++walls;return true;}));
@@ -4101,8 +4105,15 @@ int main(){
             assert(generation>priorGeneration);
             PackedRoom room;assert(rooms.findRoom(11,room));
             PreparedRoomTerrain plan;assert(plan.prepare(rooms,room));
-            unsigned walls=0;
+            struct Builder : AreaOneBuilder {
+                void resetRoom(int x,int y,GameMakerRandom& random,const Setup& setup){reset(x,y,random,setup);}
+            } liveBuilder;
+            AreaOneBuilder expectedBuilder;
+            auto expectedRandom=world->randomState();
+            expectedBuilder.reset(-16,704,expectedRandom);
+            unsigned walls=0,creates=0;
             assert(world->loadRoomTerrainWithStartField(rooms,room,[&](const auto& instance){
+                assert(creates==1);
                 assert(!world->awaitingPlayerBirth());
                 const auto player=world->playerHandle();
                 assert(player.generation>priorPlayerGeneration&&world->findPlayer(player)->sourceInstanceId==100855);
@@ -4128,8 +4139,17 @@ int main(){
                 }
                 ++walls;return !native||nativeTerrain->append(instance.objectId,instance.x,instance.y,true,
                     instance.instanceId,instance.creationCodeId);
-            },retry?&plan:nullptr)&&walls==240);
-            assert(world->randomDrawCount()==draws+1);
+            },retry?&plan:nullptr,[&](const auto& instance){
+                ++creates;
+                assert(instance.objectId==65&&instance.instanceId==100856&&!walls&&
+                    world->builderController()->handle().generation&&world->awaitingPlayerBirth()==deferred&&
+                    world->randomDrawCount()==draws);
+                return world->resetAreaOneBuilder(liveBuilder,instance.x,instance.y);
+            })&&walls==240&&creates==1);
+            expectedRandom.nextU32(); // Entry field Create, after builder and player.
+            assert(world->randomDrawCount()==expectedRandom.drawCount()&&
+                world->randomState().stateIndex()==expectedRandom.stateIndex());
+            for(unsigned i=0;i<16;++i)assert(world->randomState().stateWord(i)==expectedRandom.stateWord(i));
             const auto builderLocal=world->builderController()->handle();
             assert(builderLocal.generation>priorBuilderGeneration);
             const auto* builder=world->builderController()->find(builderLocal);

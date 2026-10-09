@@ -179,7 +179,6 @@ There are distinct existing entry inputs, which must not be conflated:
   room creation. Replaying builder or field Create after importing that cursor
   would consume those effects twice. Adopting state is not a new source birth.
 
-The live native call sites perform builder setup before the fresh traversal.
 The stored adapter runs builder Create (code 1002) at authored index 0 and
 field Create (2731) at index 147. Native builder ownership is published at
 authored index 0 with source ID 100856, before the production player's birth
@@ -187,9 +186,16 @@ at index 1. Its typed record retains position and identity, while generation
 and RNG state remain in the existing shared builder. A failed builder birth
 stops entry before player, terrain or field births. Retry/next-level teardown
 retires that identity before publishing a replacement generation.
-Builder setup still precedes the native room traversal, and native
-player-created controllers/companions are not yet a complete synchronous birth
-stream. These omissions prevent claiming full room-order parity. The builder
+Native fresh-entry callers perform builder setup immediately after that
+lifetime's birth, before the traversal reaches the player. Initial entry
+restores the audited startup checkpoint at that boundary; Retry/next-level
+entry runs the shared builder Create on the current RNG with the authored
+coordinates. Failure stops the room traversal without retrying Create or
+consuming the entrance field's RNG. Adoption of an already-entered stored room
+does neither operation. The initial checkpoint is still not a complete replay
+of every startup controller birth, and native player-created
+controllers/companions are not yet a complete synchronous birth stream.
+These omissions prevent claiming full room-order parity. The builder
 joins resource-backed lifetime, spatial and layer ownership; full mixed event
 and Draw scheduling remains a separate integration requirement.
 

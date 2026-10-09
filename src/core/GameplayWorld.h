@@ -854,14 +854,20 @@ public:
         return loadRoomTerrainCreates(rooms,room,terrain,prepared,[](const auto&){return true;});
     }
     // Fresh room creation, not adoption of an already-executed stored room.
-    // Builder/RNG setup must precede this call. Admit the authored dither and
-    // field at their serialized boundaries, not after the terrain batch.
-    // Full player-child creation and builder setup timing still need integration.
+    // Admit the authored builder Create, dither and field at their serialized
+    // boundaries, not before or after the terrain batch. The no-callback
+    // overload is for callers that already own an initialized builder.
     template<class Terrain>
     bool loadRoomTerrainWithStartField(const downwell::RoomPack& rooms,const downwell::PackedRoom& room,
         Terrain terrain,const downwell::PreparedRoomTerrain* prepared=nullptr){
+        return loadRoomTerrainWithStartField(rooms,room,terrain,prepared,[](const auto&){return true;});
+    }
+    template<class Terrain,class BuilderCreate>
+    bool loadRoomTerrainWithStartField(const downwell::RoomPack& rooms,const downwell::PackedRoom& room,
+        Terrain terrain,const downwell::PreparedRoomTerrain* prepared,BuilderCreate builderCreate){
         bool seen=false,aboveSeen=false;
         if(!loadRoomTerrainCreates(rooms,room,terrain,prepared,[&](const auto& instance){
+            if(instance.objectId==65)return builderCreate(instance);
             if(instance.objectId==61){
                 if(aboveSeen||!instance.instanceId)return false;
                 aboveSeen=true;
