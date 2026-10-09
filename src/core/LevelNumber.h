@@ -13,6 +13,8 @@ template<unsigned Capacity> struct LevelNumber {
     unsigned length=0,shown=1,exit=0,i=1;
     int appearInterval=4,exitInterval=4,remainTime=120;
     MotionBinary64 width{},textX{},textY{};
+    // scrDrawBorderTextBlack writes these variables on its calling instance.
+    MotionBinary64 sx{},sy{};unsigned txt=0;
     AlarmBank alarms;
     bool good=true,destroyRequested=false,created=false;
     template<class Read> bool create(unsigned count,MotionBinary64 measuredWidth,Read read){
@@ -67,13 +69,27 @@ template<unsigned Capacity> struct LevelNumber {
             if((!exit&&i<=shown)||(exit&&c.offset<=3)){
                 auto x=textX,y=textY;
                 if(!x.add(MotionBinary64::fromInteger(int((i-1)*8)))||
-                   !y.add(MotionBinary64::fromInteger(c.offset))||!ops.character(c.token,x,y))return good=false;
+                   !y.add(MotionBinary64::fromInteger(c.offset))||!borderedCharacter(ops,c.token,x,y))return good=false;
                 if(!exit&&c.offset<=0)++c.offset;
             }
         }
         return good=ops.end()&&good;
     }
 private:
+    template<class Ops> bool borderedCharacter(Ops& ops,unsigned token,MotionBinary64 x,MotionBinary64 y){
+        sx=x;sy=y;txt=token;
+        if(!ops.color(0))return false;
+        // Preserve the VM's four cardinal draws and final white draw. The
+        // backend applies string_hash_to_newline to each character token.
+        const int dx[]={1,-1,0,0},dy[]={0,0,1,-1};
+        for(unsigned n=0;n<4;++n){
+            auto px=sx,py=sy;
+            if((dx[n]&&!px.add(MotionBinary64::fromInteger(dx[n])))||
+               (dy[n]&&!py.add(MotionBinary64::fromInteger(dy[n])))||
+               !ops.character(txt,px,py))return false;
+        }
+        return ops.color(0xffffffu)&&ops.character(txt,sx,sy);
+    }
     static bool subtract(MotionBinary64& value,MotionBinary64 other){
         if(!other.zero())other.high^=0x80000000u;
         return value.add(other);

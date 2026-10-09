@@ -124,6 +124,7 @@ int main(){
         if(incomplete){assert(!stored->effectsSucceeded()&&!key.generation&&stored->instance(id)->alarms.get(0)==-1);continue;}
         assert(stored->instance(id)->alarms.get(0)==4);
         struct AbsentSurface {
+            bool color(unsigned){std::abort();}
             bool exists(bool& present){present=false;return true;}
             bool begin(){std::abort();}bool end(){std::abort();}
             bool view(unsigned,downwell::MotionBinary64&){std::abort();}

@@ -45,7 +45,13 @@ later slots in the same phase. Alarm 2 writes `txtAt[txtShown][1]`, not
 source-measured width. Draw changes offsets only when surfaceFx exists. Entrance
 increments after drawing; exit increments before its visibility test. Four
 separate view reads are preserved in the surface-coordinate calculation rather
-than algebraically cancelling them. The stored registry pairs that private state
+than algebraically cancelling them. Each character invokes the shared black-border
+sequence: write caller sx/sy/txt, set black, draw at (+1,0), (-1,0), (0,+1),
+(0,-1), set white and draw at (0,0). It leaves white selected; a failed draw
+retains the completed prefix without advancing that character's entrance offset
+or resetting the surface target. Backend character operations must apply the
+source hash-to-newline conversion and active font/alignment/alpha state.
+The stored registry pairs that private state
 with a resource-backed room record and consumes the enclosing numeric-ID stream
 before synchronous text initialization. Its scoped alarm adapter receives the
 already-decremented slot from the normal room phase, writes back newly armed

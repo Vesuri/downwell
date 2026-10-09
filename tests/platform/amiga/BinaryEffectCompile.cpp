@@ -13,6 +13,7 @@ bool compileStoredLevelNumber(downwell::StoredLevelNumberRegistration<32,2>& own
     return owner.create({}, {},[&](auto,auto& state){return state.create(3,{},character);},key);
 }
 struct LevelNumberCompileDraw {
+    bool color(unsigned);
     bool exists(bool&);bool begin();bool end();bool view(unsigned,downwell::MotionBinary64&);
     bool character(unsigned,downwell::MotionBinary64,downwell::MotionBinary64);
 };

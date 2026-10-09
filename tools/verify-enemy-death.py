@@ -183,3 +183,18 @@ assert number_draw.count("call.i gml_Script_scrDrawBorderTextBlack(argc=3)")==2
 assert number_draw[:4]==["pushglb.v global.surfaceFx","call.i surface_exists(argc=1)","conv.v.b","bf [end]"]
 assert number_draw[-2:]==["call.i surface_reset_target(argc=0)","popz.v"]
 print("Pinned level-number parentless lifetime, alarms and Draw-owned text animation")
+border = ["push.v arg.argument0", "pop.v.v self.sx", "push.v arg.argument1", "pop.v.v self.sy",
+          "push.v arg.argument2", "call.i string(argc=1)", "pop.v.v self.txt",
+          "pushi.e 0", "conv.i.v", "call.i draw_set_color(argc=1)", "popz.v"]
+for axis, operation in [("x","add"),("x","sub"),("y","add"),("y","sub")]:
+    border += ["push.v self.txt", "call.i string_hash_to_newline(argc=1)", "push.v self.sy"]
+    if axis == "x":
+        border += ["push.v self.sx", "pushi.e 1", f"{operation}.i.v"]
+    else:
+        border += ["pushi.e 1", f"{operation}.i.v", "push.v self.sx"]
+    border += ["call.i draw_text(argc=3)", "popz.v"]
+border += ["push.i 16777215", "conv.i.v", "call.i draw_set_color(argc=1)", "popz.v",
+           "push.v self.txt", "call.i string_hash_to_newline(argc=1)", "push.v self.sy", "push.v self.sx",
+           "call.i draw_text(argc=3)", "popz.v", "exit.i"]
+assert body("scrDrawBorderTextBlack",2) == border
+print("Pinned black-border text caller fields, cardinal draw order and final white color")

@@ -8,6 +8,8 @@ using namespace downwell;
 struct Draw {
     bool surface=true;unsigned views=0,ends=0,failCharacter=0;
     std::vector<int> tokens,xs,ys;
+    std::vector<unsigned> colors;unsigned failColor=0;
+    bool color(unsigned value){colors.push_back(value);return colors.size()!=failColor;}
     bool exists(bool& result){result=surface;return true;}
     bool begin(){return true;}
     bool view(unsigned axis,MotionBinary64& value){
@@ -87,7 +89,9 @@ int main(){
     Draw absent;absent.surface=false;
     assert(title.draw(absent)&&!absent.views&&!absent.ends&&title.characters[1].offset==-2);
     Draw first;
-    assert(title.draw(first)&&first.tokens==std::vector<int>{101}&&first.xs[0]==77&&first.ys[0]==80&&
+    assert(title.draw(first)&&first.tokens==std::vector<int>({101,101,101,101,101})&&
+        first.xs==std::vector<int>({78,76,77,77,77})&&first.ys==std::vector<int>({80,80,81,79,80})&&
+        first.colors==std::vector<unsigned>({0,0xffffffu})&&
         first.views==4&&first.ends==1&&title.characters[1].offset==-1);
     for(unsigned n=0;n<3;++n){Draw next;assert(title.draw(next));}
     assert(title.characters[1].offset==1&&title.characters[2].offset==-2);
@@ -105,11 +109,21 @@ int main(){
     LevelNumber<8> exiting;assert(exiting.create(3,MotionBinary64::fromInteger(5),read));
     exiting.exit=1;exiting.characters[1].offset=3;
     Draw exitDraw;assert(exiting.draw(exitDraw)&&exiting.characters[1].offset==4&&
-        exitDraw.tokens==std::vector<int>({102,103}));
+        exitDraw.tokens==std::vector<int>({102,102,102,102,102,103,103,103,103,103}));
     LevelNumber<8> failed;assert(failed.create(3,{},read));failed.shown=3;
-    Draw rejected;rejected.failCharacter=2;
+    Draw rejected;rejected.failCharacter=7;
     assert(!failed.draw(rejected)&&!failed.good&&failed.characters[1].offset==-1&&
         failed.characters[2].offset==-2&&!rejected.ends&&failed.i==2);
+    for(unsigned failure=1;failure<=7;++failure){
+        LevelNumber<8> interrupted;assert(interrupted.create(1,MotionBinary64::fromInteger(5),read));
+        Draw ops;
+        if(failure<=5)ops.failCharacter=failure;
+        else ops.failColor=failure-5;
+        assert(!interrupted.draw(ops)&&!interrupted.good&&!ops.ends&&interrupted.txt==101&&
+            interrupted.characters[1].offset==-2);
+        std::int32_t x,y;assert(interrupted.sx.roundPixel(x)&&interrupted.sy.roundPixel(y)&&x==77&&y==80);
+        assert(ops.tokens.size()==(failure<=5?failure:failure==6?0u:4u));
+    }
     LevelNumber<2> overflow;assert(!overflow.create(3,{},read));
     LevelNumber<8> retirement;assert(retirement.create(1,{},read));
     retirement.exit=1;retirement.alarms.set(2,1);unsigned retireCalls=0;
