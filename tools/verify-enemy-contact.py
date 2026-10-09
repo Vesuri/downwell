@@ -8,6 +8,21 @@ root = Path(__file__).resolve().parents[1]
 manifest = json.loads((root / "extracted/utmt-0.9.2.0/manifest.json").read_text())
 assert manifest["source"]["sha256"] == "c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8"
 assert manifest["extractor"]["version"] == "0.9.2.0"
+objects = manifest["resources"]["objects"]
+assert objects[120]["parentId"] == 83 and objects[83]["parentId"] == 34
+assert objects[82]["parentId"] == -1 and objects[255]["parentId"] == 82 and objects[371]["parentId"] == 255
+assert any(e["eventType"] == 4 and e["eventSubtype"] == 82 and
+           [a["codeId"] for a in e["actions"]] == [1066] for e in objects[83]["events"])
+# These admitted field families have no reverse skeleton/enemy collision:
+# their only collision handler is goalTimeField's player-wind event.
+for object_id in (82,255,371):
+    for event in objects[object_id]["events"]:
+        if event["eventType"] == 4:
+            assert object_id == 255 and event["eventSubtype"] == 35
+field_body = (root / "extracted/utmt-0.9.2.0/Assembly/gml_Object_subparentEnemy_Collision_parentTimeField.asm").read_text()
+assert [line for line in field_body.splitlines() if line and not line.startswith((".", ":"))] == [
+    "push.v self.timefieldImmune", "conv.v.b", "not.b", "bf [end]",
+    "pushi.e 0", "pop.v.i self.ehp"]
 header = (root / "src/core/EnemyContact.h").read_text()
 records = re.findall(r"case (\d+): return \{(-?\d+), (-?\d+), (-?\d+), (-?\d+)\};", header)
 assert {int(row[0]) for row in records} == {31, 84, 133, 134, 153, 154, 157, 162, 163, 164, 166, 177, 186, 208, 278, 460, 569, 585}

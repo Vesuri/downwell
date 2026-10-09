@@ -97,6 +97,15 @@ sample equivalence. Capacity exhaustion and unsupported gain ramps fail instead
 of pretending to play. This admission uses the default volume of one (the wind
 script subsequently sets the voice gain to 0.5); settings integration remains
 open. Native device playback and complete native mixed-pass admission remain open.
+
+The stored registered-skeleton pass also admits skeleton contacts with fields
+82, 255 and 371 in that same collected pair stream. It resolves the inherited
+83/1066 event and sets health to zero unless `timefieldImmune` is set; it does
+not run the death-effects sequence or retire the actor from inside Collision.
+Those actions belong to the later source Step. The selected field families have
+no reverse skeleton handler. Further descendants require an explicit reverse-event
+audit before admission. Field-only dispatch does not require a fake player-damage
+provider. This does not install the complete skeleton pipeline in the SDL main loop.
 `GameplayCollisionOwner::dispatchTimeFieldWind` applies the same checked
 inherited-binding and generation checks to native goal-field lifetimes (255
 and 371). It uses the world's RNG and the selected record's `windSound`, not a

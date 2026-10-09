@@ -4331,6 +4331,7 @@ int main(){
         } audio;
         RunnerCollisionEventContext::Frame lastWindEvent;
         auto windPass=std::make_unique<StoredDitherCollisionPass>(*productionOwner);
+        auto fieldSkeletons=production->skeletonRegistration<3>();
         auto dispatchWind=[&](InstanceHandle field){
             // Preserve a resource-resolved frame only for the later explicit
             // expired-voice/stale-generation checks. The actual contact below
@@ -4342,8 +4343,25 @@ int main(){
                 require(productionOwner->collisionEvent(field,player,found,binding)&&found,"field/player inherited binding");
                 lastWindEvent={field,player,4,35,binding.ownerObjectId,binding.codeId};saved=true;break;
             }
-            require(saved&&windPass->run(*production,MotionBinary64::fromInteger(1),audio),
+            const auto* fieldRecord=productionOwner->resolve(field);require(fieldRecord,"field remains live");
+            InstanceHandle vulnerable,immune,outside;
+            require(production->spawnSkeleton(fieldSkeletons,int(fieldRecord->x),int(fieldRecord->y),vulnerable)&&
+                production->spawnSkeleton(fieldSkeletons,int(fieldRecord->x),int(fieldRecord->y),immune),"birth mixed field-contact skeletons");
+            require(production->spawnSkeleton(fieldSkeletons,-10000,int(fieldRecord->y),outside),"birth nonoverlapping field control");
+            require(fieldSkeletons.dispatch(immune,[](auto& actor,auto&,bool&){actor.timefieldImmune=true;return true;}),"set source field immunity");
+            SoundPlayEnvironment environment;
+            require(saved&&windPass->runSkeletonContacts(*production,fieldSkeletons,
+                [&](int sprite,unsigned& count){return sprites.frameCount(sprite,count);},environment,audio,
+                [](auto dy,auto dx,auto& angle){return portableAtan(dy,dx,angle);}),
                 "wind contacts join collected dither/wall stream without a family pass");
+            require(fieldSkeletons.instances().find(vulnerable)->state.health==0&&
+                fieldSkeletons.instances().find(immune)->state.health==60&&
+                fieldSkeletons.instances().find(outside)->state.health==60,
+                "same mixed pass applies inherited field death and preserves immune skeleton");
+            require(!fieldSkeletons.instances().find(vulnerable)->destroyRequested&&
+                !productionOwner->resolve(fieldSkeletons.worldHandle(vulnerable))->destroyRequested,
+                "field Collision changes health without prematurely running death or retirement");
+            require(fieldSkeletons.clear(),"retire field-contact fixtures before next room");
         };
         const RunnerImageValue x{0x43700000u},y{0x43300000u}; // 240,176
         InstancePlaceResult selected;selected.id=17;

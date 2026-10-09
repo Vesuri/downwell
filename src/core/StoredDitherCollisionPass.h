@@ -60,11 +60,18 @@ private:
             return bullet.objectId==261&&enemy.objectId==120&&
                 world.retainedSourceBullet(key)&&skeletons.handle(enemy).generation;
         };
+        auto fieldContact=[&](const auto& enemy,const auto& field){
+            // These admitted field families have no reverse enemy handler.
+            // Broader descendants require their reverse event audit first.
+            return enemy.objectId==120&&skeletons.handle(enemy).generation&&
+                (field.objectId==82||field.objectId==255||field.objectId==371);
+        };
         return runSelected(world,[&](auto ka,auto kb,const auto& a,const auto& b){
-                return selected(ka,a,b)||selected(kb,b,a)||windPair(a,b)||admit(a,b);},
+                return selected(ka,a,b)||selected(kb,b,a)||fieldContact(a,b)||fieldContact(b,a)||windPair(a,b)||admit(a,b);},
             [&](const auto& event){
                 const auto* self=owner_.resolve(event.self);if(!self)return false;
                 if(event.owner==255)return world.dispatchTimeFieldWind(event,environment.gameVolume,audio);
+                if(self->objectId==120)return world.dispatchSkeletonFieldCollision(skeletons,event);
                 return self->objectId==261?world.dispatchSkeletonBulletCollision(skeletons,event,frames,delay,environment,audio,atan):
                     execute(event);
             });
