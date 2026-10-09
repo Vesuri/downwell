@@ -27,6 +27,7 @@
 #include "StoredTimeShardRegistration.h"
 #include "StoredCorpseRegistration.h"
 #include "StoredLevelNumberRegistration.h"
+#include "LevelNumberText.h"
 #include "StoredCorpseExpiryRegistration.h"
 #include "StoredSmokeRegistration.h"
 #include "StoredConsumptionBloodRegistration.h"
@@ -437,6 +438,16 @@ public:
     template<unsigned Capacity,unsigned TextCapacity=64>
     StoredLevelNumberRegistration<instanceCapacity,Capacity,TextCapacity> levelNumberRegistration(){
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
+    }
+    template<unsigned Capacity,unsigned TextCapacity,class AreaMusic,class Audio>
+    bool beginLevelCueWithTitle(bool& firstLand,bool stopped,int& bgm,MotionBinary64 x,MotionBinary64 y,
+        StoredLevelNumberRegistration<instanceCapacity,Capacity,TextCapacity>& registration,
+        const LevelNumberTextContext& text,AreaMusic music,SoundPlayState& caller,SoundPlayEnvironment& env,Audio& audio){
+        return run_.beginLevelCue(firstLand,stopped,bgm,x,y,[&](int object,auto px,auto py){
+            InstanceHandle child;
+            return object==372&&registration.belongsTo(instances_)&&registration.create(px,py,
+                [&](auto,auto& state){return text.initialize(state,run_.stage);},child);
+        },music,caller,env,audio);
     }
     template<unsigned Capacity,unsigned TextCapacity,class Tick>
     bool withLevelNumberEvents(StoredLevelNumberRegistration<instanceCapacity,Capacity,TextCapacity>& registration,Tick tick){

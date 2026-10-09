@@ -80,6 +80,16 @@ current font owner's measurement callback. Missing keys yield the source's
 single-space default. This text construction is tested across the extracted
 labels but is not yet bound to the live language/font state or natural births.
 
+Both worlds expose `beginLevelCueWithTitle`: the shared cue synchronously creates
+the registered object 372 and initializes its localized text using the supplied
+font pack before firstLand or audio publication. `LevelNumberTextContext` borrows
+language, font ID and hard-mode settings; these and the real run stage are read
+inside child Create after positioned registration. The stored world consumes its
+normal source-ID stream; native callers must supply the enclosing allocator.
+Invalid font measurement retains the published child but fails the cue before
+firstLand/audio. This adapter is tested with both world owners, not yet installed
+at the natural enemy-death/first-landing call sites.
+
 ### Original title-width measurement
 
 Read-only inspection of the pinned Windows executable identifies string_width

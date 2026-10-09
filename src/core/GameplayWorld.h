@@ -29,6 +29,7 @@
 #include "core/RunControllerInstances.h"
 #include "core/GameplayResultInstance.h"
 #include "core/LevelNumberInstances.h"
+#include "core/LevelNumberText.h"
 #include "core/PlayerChildCreation.h"
 #include "core/DroneBulletInstances.h"
 #include "core/BoneProjectileInstances.h"
@@ -1208,6 +1209,16 @@ public:
         downwell::MotionBinary64 y,Create create,AreaMusic music,downwell::SoundPlayState& caller,
         downwell::SoundPlayEnvironment& env,Audio& audio){
         return run_.beginLevelCue(firstLand,playerTimeStop,bgm,x,y,create,music,caller,env,audio);
+    }
+    template<class Allocate,class AreaMusic,class Audio>
+    bool beginLevelCueWithTitle(bool& firstLand,bool stopped,int& bgm,downwell::MotionBinary64 x,
+        downwell::MotionBinary64 y,Allocate allocate,const downwell::LevelNumberTextContext& text,
+        AreaMusic music,downwell::SoundPlayState& caller,downwell::SoundPlayEnvironment& env,Audio& audio){
+        return run_.beginLevelCue(firstLand,stopped,bgm,x,y,[&](int object,auto px,auto py){
+            unsigned id=0;downwell::InstanceHandle child;
+            return object==372&&levelNumbers_&&allocate(id)&&levelNumbers_->create(id,px,py,
+                [&](auto,auto& state){return text.initialize(state,run_.stage);},child);
+        },music,caller,env,audio);
     }
     template<class Audio> bool playBoxChainSound(downwell::InstanceHandle h,downwell::MotionBinary64 volume,bool inWater,Audio& audio){
         if(!run_.effectsSucceeded||!findBreakable(h))return run_.effectsSucceeded=false;

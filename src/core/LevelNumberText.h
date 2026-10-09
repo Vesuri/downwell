@@ -1,6 +1,8 @@
 #ifndef DOWNWELL_CORE_LEVEL_NUMBER_TEXT_H
 #define DOWNWELL_CORE_LEVEL_NUMBER_TEXT_H
 #include "LevelNumber.h"
+#include "FontPack.h"
+#include "RunStage.h"
 namespace downwell {
 struct AreaTitle {
     const char* language;
@@ -49,6 +51,24 @@ private:
         while(*a&&*a==*b){++a;++b;}return *a==*b;
     }
     bool append(unsigned c){if(length==Capacity)return good=false;characters[length++]=c;return true;}
+};
+// Borrow the live language/font/settings state. Read it only after the child
+// record has been published, inside synchronous Create, not before birth.
+struct LevelNumberTextContext {
+    const FontPack& fonts;
+    const AreaTitle* titles;
+    unsigned titleCount;
+    const char* const& language;
+    const unsigned& fontId;
+    const bool& hardMode;
+    template<unsigned Capacity> bool initialize(LevelNumber<Capacity>& state,const RunStage& stage)const{
+        LevelNumberText<Capacity> text;
+        return text.create(state,titles,titleCount,language,stage.area,stage.level,hardMode,
+            [&](unsigned length,auto read,MotionBinary64& width){
+                std::int32_t pixels;if(!fonts.stringWidth(fontId,length,read,pixels))return false;
+                width=MotionBinary64::fromInteger(pixels);return true;
+            });
+    }
 };
 }
 #endif

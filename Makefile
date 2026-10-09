@@ -546,7 +546,7 @@ build/run-controller-instances-test: tests/core/RunControllerInstancesTest.cpp $
 verify-enemy-death-worlds: build/enemy-death-worlds-test generate-room-pack generate-object-pack generate-sprite-pack generate-precise-masks
 	python3 tools/verify-enemy-death.py
 	./build/enemy-death-worlds-test
-build/enemy-death-worlds-test: tests/core/EnemyDeathWorldsTest.cpp $(filter-out tests/core/StartupRuntimeTest.cpp,$(STARTUP_TEST_SOURCES)) src/core/GameplayWorld.cpp src/core/Replay.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc
+build/enemy-death-worlds-test: tests/core/EnemyDeathWorldsTest.cpp $(filter-out tests/core/StartupRuntimeTest.cpp,$(STARTUP_TEST_SOURCES)) src/core/GameplayWorld.cpp src/core/Replay.cpp src/core/FontPack.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc generated/downwell-area-titles.h generated/downwell-fonts.dwfn
 	@mkdir -p build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ $(filter %.cpp,$^)
 verify-damage-number-worlds: build/damage-number-worlds-test generate-room-pack generate-object-pack generate-builder-pattern-pack

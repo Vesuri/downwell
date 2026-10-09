@@ -142,8 +142,10 @@ behavior, both backend integrations and relevant original-game verification.
   Route enemy-death bookkeeping through the shared run-state entry, supplying
   actual toggleGuncut, achNoKill publication, momentDelay controller events and
   levelBeginCue creation/audio. Bind its actual firstLand/BGM state and area-music
-  lookup, and register/schedule its synchronous levelNumber (372) child before
-  admitting natural callers. Do not use successful placeholder callbacks.
+  lookup, and connect the registered levelNumber (372) child's live language/font
+  inputs and surface Draw before admitting natural callers. Complete its native
+  source-ID allocation in the enclosing creation stream. Do not use successful
+  placeholder callbacks.
   Admit persistent object 37 from the actual native startup Create sequence,
   including its initialization/HUD dependencies and source numeric ID. Verify
   the complete rmResult handoff, including Room End events, native destination

@@ -1,6 +1,8 @@
 #include "core/GameplayWorld.h"
 #include "core/StartupRuntime.h"
 #include "core/StoredWorldCollision.h"
+#include "core/GameplayCollisionOwner.h"
+#include "../../generated/downwell-area-titles.h"
 #include <cassert>
 #include <memory>
 #include <cstdio>
@@ -106,6 +108,50 @@ int main(){
     downwell::SpriteCollisionPack sprites(spriteData.data(),spriteData.size());
     downwell::SpriteMaskPack masks(maskData.data(),maskData.size());
     assert(sprites.valid()&&masks.valid());
+    const auto fontData=load("generated/downwell-fonts.dwfn");downwell::FontPack fonts(fontData.data(),fontData.size());
+    assert(fonts.valid());
+    for(bool native:{false,true})for(bool badFont:{false,true}){
+        using namespace downwell;
+        auto storedOwner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto stored=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,nullptr,storedOwner->binding());
+        assert(storedOwner->attach(*stored));stored->skipToGameForTesting();auto registration=stored->levelNumberRegistration<1>();
+        auto nativeOwner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,nativeOwner->enemyBinding(),
+            nativeOwner->breakableBinding(),nativeOwner->playerBinding(),&nativeOwner->terrain());
+        assert(nativeOwner->attach(*world));
+        const char* language="japanese";unsigned font=badFont?999:2;bool hard=true,firstLand=false;
+        LevelNumberTextContext text{fonts,area_titles::entries,area_titles::count,language,font,hard};
+        unsigned source=native?105187:stored->nextRuntimeInstanceId(),allocations=0,queries=0;int bgm=20;
+        auto title=[&]()->const LevelNumber<64>*{
+            if(native){auto* r=nativeOwner->levelNumbers().find(nativeOwner->levelNumbers().sourceHandle(source));return r?&r->state:nullptr;}
+            const auto* r=stored->instance(source);return r?registration.state(registration.handle(*r)):nullptr;
+        };
+        struct Audio {
+            decltype(title)& child;bool& first;unsigned& queries;
+            bool isPlaying(int id,bool& playing){assert(first&&child()&&child()->created);++queries;playing=id==20;return true;}
+            bool stop(int){std::abort();}
+            bool setGain(int,MotionBinary64,unsigned){std::abort();}
+            bool play(int,int,bool,int&){std::abort();}
+            bool getGain(int,MotionBinary64&){std::abort();}
+            bool setPitch(int,MotionBinary64){std::abort();}
+        } audio{title,firstLand,queries};
+        SoundPlayState caller;SoundPlayEnvironment env;
+        auto music=[&](int area,int& id){assert(firstLand&&area==(native?world->runStage().area:stored->runStage().area));id=20;return true;};
+        auto invoke=[&](bool stopped){
+            if(native)return world->beginLevelCueWithTitle(firstLand,stopped,bgm,{}, {},
+                [&](unsigned& id){++allocations;id=source;return true;},text,music,caller,env,audio);
+            return stored->beginLevelCueWithTitle(firstLand,stopped,bgm,{}, {},registration,text,music,caller,env,audio);
+        };
+        assert(invoke(true)&&!title()&&!firstLand&&!queries&&!allocations);
+        assert(invoke(false)==!badFont&&title()&&firstLand==!badFont&&queries==(badFont?0u:2u));
+        assert(native?allocations==1:stored->nextRuntimeInstanceId()==source+1);
+        if(badFont){assert(!title()->created);continue;}
+        LevelNumber<64> expected;
+        assert(text.initialize(expected,native?world->runStage():stored->runStage())&&title()->length==expected.length&&
+            title()->width.high==expected.width.high&&title()->width.low==expected.width.low);
+        for(unsigned i=1;i<=expected.length;++i)assert(title()->characters[i].token==expected.characters[i].token);
+        assert(invoke(false)&&queries==2); // No second child/audio after firstLand.
+    }
     for(bool incomplete:{false,true}){
         auto owner=std::make_unique<downwell::StoredWorldCollision>(objects,sprites,masks);
         auto stored=std::make_unique<downwell::StartupRuntime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,

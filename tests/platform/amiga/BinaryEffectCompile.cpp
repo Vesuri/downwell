@@ -5,6 +5,7 @@
 #include "core/LevelClearSelection.h"
 #include "core/LevelExit.h"
 #include "core/RunSession.h"
+#include "core/GameplayWorld.h"
 #include "core/LevelNumber.h"
 #include "core/LevelNumberInstances.h"
 #include "core/LevelNumberText.h"
@@ -45,6 +46,11 @@ struct CueCompileAudio {
     bool play(int,int,bool,int&);bool getGain(int,downwell::MotionBinary64&);
     bool setPitch(int,downwell::MotionBinary64);
 };
+bool compileNativeLocalizedCue(GameplayWorld& world,bool& first,int& bgm,
+    bool (*allocate)(unsigned&),const downwell::LevelNumberTextContext& text,bool (*music)(int,int&),
+    downwell::SoundPlayState& caller,downwell::SoundPlayEnvironment& env,CueCompileAudio& audio){
+    return world.beginLevelCueWithTitle(first,false,bgm,{}, {},allocate,text,music,caller,env,audio);
+}
 bool compileLevelBeginCue(downwell::RunSession& run,bool& firstLand,bool stopped,int& bgm,
     bool (*create)(int,downwell::MotionBinary64,downwell::MotionBinary64),bool (*music)(int,int&),
     downwell::SoundPlayState& caller,downwell::SoundPlayEnvironment& env,CueCompileAudio& audio){
