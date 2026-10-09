@@ -1437,6 +1437,15 @@ public:
         return beginLevelCueWithTitle(run_.firstLand,stop.player.stopped,run_.backgroundMusicId,x,y,
             allocate,text,downwell::RunSession::areaMusic,caller,env,audio);
     }
+    template<unsigned TimeCapacity,class Allocate,class Delay,class Audio>
+    bool recordSkeletonDeath(downwell::SkeletonActor& actor,bool cutGunshot,const downwell::TimeStopEffects<TimeCapacity>& stop,
+        Allocate allocate,Delay delay,const downwell::LevelNumberTextContext& text,
+        downwell::SoundPlayEnvironment& environment,Audio& audio){
+        return recordEnemyDeath(cutGunshot,audio,delay,[&]{
+            return beginLevelCueWithTitle(stop,downwell::MotionBinary64::fromInteger(actor.x),
+                downwell::MotionBinary64::fromInteger(actor.y),allocate,text,actor.sound,environment,audio);
+        });
+    }
     template<class Audio> bool playBoxChainSound(downwell::InstanceHandle h,downwell::MotionBinary64 volume,bool inWater,Audio& audio){
         if(!run_.effectsSucceeded||!findBreakable(h))return run_.effectsSucceeded=false;
         return run_.playBoxChainSound(breakables_[h.slot].sound,volume,inWater,audio);

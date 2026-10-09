@@ -323,6 +323,16 @@ audio queries. Explicit state/lookup providers remain the reference path. Native
 title allocation still requires the enclosing source-ID stream, and normal
 death callers still need the complete effects/cue composition.
 
+`StartupRuntime::recordSkeletonDeath` composes the ordered shared bookkeeping,
+its bound controller `momentDelay`, and the owned title/music cue using the
+skeleton's published x/y and retained sound-script caller fields. The native
+`GameplayCollisionOwner::recordSkeletonDeath` binds its source-ordered controller
+walk to the same world composition. Neither accepts a successful replacement for
+delay or cue. The caller still supplies the source gunshot-cut condition, live
+time-stop owner, language/font context and audio; native allocation still comes
+from the enclosing ID stream. These entries implement the `enemyDeath` part of
+skeleton Step, not the later blood, smoke, flash, reward, corpse or debris work.
+
 Both runtime adapters route flash bursts and pre-Step flash animation through
 `RunSession`'s shared `effectsSucceeded` latch. Failed bursts retain earlier
 children and consumed random words; subsequent effect calls and animation must

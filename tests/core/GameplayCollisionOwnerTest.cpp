@@ -34,6 +34,11 @@ bool nativeOwnedLevelCue(GameplayWorld& world,const downwell::TimeStopEffects<64
     downwell::SoundPlayState& caller,downwell::SoundPlayEnvironment& environment,NativeSkeletonAudio& audio){
     return world.beginLevelCueWithTitle(stop,{}, {},allocate,text,caller,environment,audio);
 }
+bool nativeSkeletonDeathBookkeeping(downwell::GameplayCollisionOwner& owner,downwell::SkeletonActor& actor,
+    const downwell::TimeStopEffects<64>& stop,bool (*allocate)(unsigned&),
+    const downwell::LevelNumberTextContext& text,downwell::SoundPlayEnvironment& environment,NativeSkeletonAudio& audio){
+    return owner.recordSkeletonDeath(actor,true,stop,allocate,text,environment,audio);
+}
 bool nativeSkeletonThrow(GameplayWorld& world,downwell::SkeletonActor& actor,downwell::RegisteredSkeletonThrow& caller,
     downwell::SoundPlayEnvironment& environment,NativeSkeletonAudio& audio){
     return world.throwSkeletonBoneWithSourceId(505201,actor,caller,environment,audio);

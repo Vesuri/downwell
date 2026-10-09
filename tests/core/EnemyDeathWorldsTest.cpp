@@ -128,6 +128,67 @@ int main(){
     assert(sprites.valid()&&masks.valid());
     const auto fontData=load("generated/downwell-fonts.dwfn");downwell::FontPack fonts(fontData.data(),fontData.size());
     assert(fonts.valid());
+    for(bool native:{false,true})for(bool stopped:{false,true})for(bool badFont:{false,true})for(bool musicPlaying:{false,true}){
+        using namespace downwell;
+        auto storedOwner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto stored=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,nullptr,storedOwner->binding());
+        assert(storedOwner->attach(*stored));stored->skipToGameForTesting();
+        auto titles=stored->levelNumberRegistration<1>();auto skeletons=stored->skeletonRegistration<1>();
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));int speed=60;InstanceHandle controller,skeleton;
+        // Explicit native source-ID fixture; production startup admission is separate.
+        if(native){
+            assert(world->bindControllerRoomSpeed(speed)&&owner->runControllers().create(StartupRuntime::controllerInstanceId,{}, {},
+                [&](InstanceHandle key){const auto* record=owner->runControllers().find(key);
+                    return record&&record->controllerSlow==0&&record->alarms.get(0)==-1;},controller));
+            assert(world->createSkeletonWithSourceId(505001,240,704,skeleton));
+        }else assert(stored->spawnSkeleton(skeletons,240,704,skeleton));
+        const unsigned titleId=native?505002:stored->nextRuntimeInstanceId();unsigned allocated=0,queries=0;
+        const char* language="english";unsigned font=badFont?999:2;bool hard=false;
+        LevelNumberTextContext text{fonts,area_titles::entries,area_titles::count,language,font,hard};
+        TimeStopEffects<4> stop;stop.player.stopped=stopped;SoundPlayEnvironment environment;
+        struct Audio {
+            unsigned& queries;bool musicPlaying;unsigned plays=0;
+            bool isPlaying(int id,bool& playing){
+                ++queries;assert(id==(queries==1?0:queries==2?186:queries==3?194:queries==4?0:900));
+                playing=id==900||(id==194&&musicPlaying);return true;
+            }
+            bool stop(int){std::abort();}
+            bool play(int id,int priority,bool loop,int& voice){assert(id==194&&priority==100&&loop);++plays;voice=900;return true;}
+            bool getGain(int id,MotionBinary64& gain){assert(id==900);gain=MotionBinary64::fromInteger(1);return true;}
+            bool setGain(int id,MotionBinary64 gain,int time){assert((id==194||id==900)&&gain.high==0x3ff00000u&&!gain.low&&!time);return true;}
+            bool setPitch(int id,MotionBinary64 pitch){assert(id==900&&pitch.high==0x3ff00000u&&!pitch.low);return true;}
+        } audio{queries,musicPlaying};
+        auto death=[&](SkeletonActor& actor){
+            if(native)return owner->recordSkeletonDeath(actor,true,stop,
+                [&](unsigned& id){++allocated;id=titleId;return true;},text,environment,audio);
+            return stored->recordSkeletonDeath(actor,true,stop,titles,text,environment,audio);
+        };
+        const bool okay=native?owner->skeletons().dispatch(skeleton,[&](auto& actor,auto&,bool&){return death(actor);}):
+            stored->withMomentDelayRoomSpeed(speed,[&]{return skeletons.dispatch(skeleton,[&](auto& actor,auto&,bool&){return death(actor);});});
+        assert(okay==(stopped||!badFont)&&speed==30&&queries==(stopped||badFont?1u:musicPlaying?3u:5u));
+        assert(audio.plays==unsigned(!stopped&&!badFont&&!musicPlaying));
+        const auto* actor=native?&owner->skeletons().find(skeleton)->state:&skeletons.instances().find(skeleton)->state;
+        if(audio.plays)assert(actor->sound.sfxIndex==194&&actor->sound.sndsnd==900&&actor->sound.chanNum==5);
+        assert(native?!world->noKillAchievement():!stored->noKillAchievement());
+        assert((native?world->enemiesDefeated():stored->mainEnemiesDefeated())==1);
+        assert((native?world->firstLand():stored->firstLand())==(!stopped&&!badFont));
+        assert((native?world->backgroundMusicId():stored->backgroundMusicId())==(!stopped&&!badFont?194:193));
+        if(native){
+            const auto* control=owner->runControllers().find(controller);
+            assert(control&&control->controllerSlow==30&&control->alarms.get(0)==1&&allocated==unsigned(!stopped));
+            const auto* child=owner->levelNumbers().find(owner->levelNumbers().sourceHandle(titleId));
+            assert(bool(child)==!stopped);
+            if(child)assert(child->x.bits==0x43700000u&&child->y.bits==0x44300000u);
+        }else{
+            const auto* control=stored->instance(StartupRuntime::controllerInstanceId);
+            assert(control&&control->controllerSlow==30&&control->alarms.get(0)==1);
+            const auto* child=stored->instance(titleId);assert(bool(child)==!stopped);
+            if(child)assert(child->x==240&&child->y==704);
+        }
+    }
     for(bool native:{false,true})for(bool badFont:{false,true}){
         using namespace downwell;
         auto storedOwner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);

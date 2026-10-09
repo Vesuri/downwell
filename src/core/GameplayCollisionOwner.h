@@ -2401,6 +2401,13 @@ public:
             [&](auto x,auto y,bool& hit){return queries.meeting(local,x,y,82,hit);},allowed))return check(false);
         return check(world_->stepLimboShard(local,allowed,player,queries));
     }
+    template<unsigned TimeCapacity,class Allocate,class Audio>
+    bool recordSkeletonDeath(SkeletonActor& actor,bool cutGunshot,const TimeStopEffects<TimeCapacity>& stop,
+        Allocate allocate,const LevelNumberTextContext& text,SoundPlayEnvironment& environment,Audio& audio){
+        if(!valid()||!world_)return check(false);
+        return check(world_->recordSkeletonDeath(actor,cutGunshot,stop,allocate,
+            [&]{return requestMomentDelay();},text,environment,audio));
+    }
     bool requestMomentDelay(){
         if(!valid()||!world_)return check(false);
         return check(world_->requestMomentDelay([&](auto apply){

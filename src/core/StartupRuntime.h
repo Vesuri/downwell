@@ -488,6 +488,15 @@ public:
         return beginLevelCueWithTitle(run_.firstLand,stop.player.stopped,run_.backgroundMusicId,x,y,
             registration,text,RunSession::areaMusic,caller,env,audio);
     }
+    template<unsigned Capacity,unsigned TextCapacity,unsigned TimeCapacity,class Audio>
+    bool recordSkeletonDeath(SkeletonActor& actor,bool cutGunshot,const TimeStopEffects<TimeCapacity>& stop,
+        StoredLevelNumberRegistration<instanceCapacity,Capacity,TextCapacity>& titles,
+        const LevelNumberTextContext& text,SoundPlayEnvironment& environment,Audio& audio){
+        return recordEnemyDeath(cutGunshot,audio,[&]{return requestMomentDelay();},[&]{
+            return beginLevelCueWithTitle(stop,MotionBinary64::fromInteger(actor.x),MotionBinary64::fromInteger(actor.y),
+                titles,text,actor.sound,environment,audio);
+        });
+    }
     template<unsigned Capacity,unsigned TextCapacity,class Tick>
     bool withLevelNumberEvents(StoredLevelNumberRegistration<instanceCapacity,Capacity,TextCapacity>& registration,Tick tick){
         if(!run_.effectsSucceeded)return false;
