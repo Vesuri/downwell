@@ -38,6 +38,7 @@
 #include "core/RegisteredSkeletonThrow.h"
 #include "core/BoneViewRetirement.h"
 #include "core/GameplayScriptSpawnInstances.h"
+#include "core/CorpseExpiryInstances.h"
 #include "core/GameplayDebrisInstances.h"
 #include "core/GameplayTimeChangeRegistration.h"
 #include "core/GameplayTimeShardRegistration.h"
@@ -323,6 +324,12 @@ public:
         return run_.effectsSucceeded=run_.effectsSucceeded&&nativeTerrainInstances_&&nativeTerrainInstances_->rebindOrder(h,order);
     }
     const downwell::GameplayScriptSpawnInstances* scriptSpawnInstances()const{return scriptSpawnInstances_;}
+    using RegisteredExpiry=downwell::CorpseExpiryInstances<32>;
+    const RegisteredExpiry* registeredExpiry()const{return registeredExpiry_;}
+    bool bindRegisteredExpiry(RegisteredExpiry& instances){
+        if(registeredExpiry_||!instances.valid()||instances.size())return false;
+        registeredExpiry_=&instances;return true;
+    }
     const downwell::GameplayDebrisInstances* debrisInstances()const{return debrisInstances_;}
     const downwell::NativeTimeChangeRegistration* timeChangeInstances()const{return timeChangeInstances_;}
     const downwell::NativeTimeShardRegistration* timeShardInstances()const{return timeShardInstances_;}
@@ -797,7 +804,7 @@ public:
         return run_.effectsSucceeded=scriptSpawnInstances_&&effects.advanceRegistered(phase,*scriptSpawnInstances_);
     }
     enum class PhaseBoundary { beginStep, alarm, step, collision, endStep, roomEntry };
-    enum class DrawActor { enemy, bullet, scriptEffect, debris, player, entryDither, bone, skeleton, ditherAbove, timeShard };
+    enum class DrawActor { enemy, bullet, scriptEffect, debris, player, entryDither, bone, skeleton, ditherAbove, timeShard, corpseExpiry };
     template<class Visit> bool visitRegisteredEnemyShades(Visit visit)const{
         if((!bones_||!bones_->size())&&(!skeletons_||!skeletons_->size()))return true;
         return visitRoomActorsReadOnly([&](DrawActor kind,downwell::InstanceHandle key,auto){
@@ -1629,6 +1636,7 @@ private:
     NativeTerrain* nativeTerrainInstances_=nullptr;
     NativeTerrain::Binding nativeTerrainBinding_{};
     downwell::GameplayScriptSpawnInstances* scriptSpawnInstances_=nullptr;
+    RegisteredExpiry* registeredExpiry_=nullptr;
     downwell::GameplayDebrisInstances* debrisInstances_=nullptr;
     downwell::NativeTimeChangeRegistration* timeChangeInstances_=nullptr;
     downwell::NativeTimeShardRegistration* timeShardInstances_=nullptr;

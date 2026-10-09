@@ -31,6 +31,50 @@ int main() {
                 downwell::GameplayTerrainInstances::Presentation{},downwell::GameplayTerrainInstances::WallCollision{},&rooms,mode);
             auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
                 owner->breakableBinding(),owner->playerBinding(),&owner->terrain(),&rooms);
+            assert(owner->attach(*world));
+            auto& expiry=owner->registeredExpiry();downwell::InstanceHandle local,shared;
+            const downwell::MotionBinary64 x{0x406f0800u,0},y{0x40601000u,0}; // 248.25, 128.5
+            assert(expiry.create(105187,x,y,local)&&
+                downwell::GameplayCollisionView::encode(downwell::GameplayCollisionView::Kind::corpseExpiry,local,shared));
+            downwell::GameplayCollisionView view(*world);downwell::GameplayCollisionView::Record resolved;
+            assert(view.resolve(shared,resolved)&&resolved.corpseExpiry==expiry.find(local)&&resolved.corpseExpiry->sourceId==105187);
+            unsigned projected=0;downwell::PackedObject definition;assert(objects.findObject(242,definition));
+            assert(world->visitRoomActors([&](auto kind,auto key,auto depth){
+                if(kind==GameplayWorld::DrawActor::corpseExpiry){
+                    std::int32_t value;assert(key.slot==local.slot&&key.generation==local.generation&&
+                        depth.promoted().roundPixel(value)&&value==definition.creationDepth);++projected;
+                }
+                return true;
+            })&&projected==1);
+            assert(world->corpseExpiryEffects().size()==0);
+            downwell::CorpseExpiryEffect oracle;assert(oracle.create(x,y));UBYTE pack[8]{};
+            for(unsigned tick=0;tick<40;++tick){
+                AmigaGameplayDrawList list;assert(list.collect(*world,pack,pack+8,160,34));unsigned seen=0;
+                for(unsigned i=0;i<list.count;++i)if(list.actors[i].sprite==102){
+                    const auto& a=list.actors[i];assert(a.frame==oracle.drawFrame()&&a.x==198&&a.y==94&&a.flip==0);++seen;
+                }
+                assert(seen==1&&oracle.advanceImage());world->step(0);assert(world->effectsSucceeded()&&owner->valid());
+                const auto* r=expiry.find(local);
+                if(!oracle.destroyRequested)assert(r&&r->state.timeline.bits==oracle.timeline.bits&&r->state.imageIndex.bits==oracle.imageIndex.bits);
+                else assert(r&&r->destroyRequested&&view.contains(shared));
+                assert(owner->prepareDraw());
+                if(oracle.destroyRequested)assert(!expiry.find(local)&&!view.contains(shared));
+            }
+            AmigaGameplayDrawList ended;assert(oracle.destroyRequested&&ended.collect(*world,pack,pack+8,160,34));
+            for(unsigned i=0;i<ended.count;++i)assert(ended.actors[i].sprite!=102);
+            downwell::InstanceHandle beforeRetry,afterRetry;
+            assert(expiry.create(105188,x,y,beforeRetry));
+            assert(world->restartFromResults(downwell::DeathMenuSequence::Action::Retry,42,300)==downwell::ResultsDestination::gameplay&&
+                world->registeredExpiry()==&expiry&&!expiry.find(beforeRetry)&&!expiry.size()&&owner->valid());
+            assert(expiry.create(105189,x,y,afterRetry)&&afterRetry.generation>beforeRetry.generation&&expiry.clear());
+        }
+        for(auto mode:{downwell::GameplayCollisionOwner::Ownership::reference,
+            downwell::GameplayCollisionOwner::Ownership::native,
+            downwell::GameplayCollisionOwner::Ownership::nativeScenery}){
+            auto owner=std::make_unique<downwell::GameplayCollisionOwner>(objects,sprites,
+                downwell::GameplayTerrainInstances::Presentation{},downwell::GameplayTerrainInstances::WallCollision{},&rooms,mode);
+            auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+                owner->breakableBinding(),owner->playerBinding(),&owner->terrain(),&rooms);
             assert(owner->attach(*world)&&world->createAuthoredDitherAbove());
             const auto* r=world->ditherAbove()->find(world->ditherAbove()->handle());
             int sourceX,sourceY;assert(r&&r->x.roundPixel(sourceX)&&r->y.roundPixel(sourceY));

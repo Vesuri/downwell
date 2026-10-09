@@ -326,6 +326,7 @@ static void checkTypedCollisionView(const GameplayCollisionView& view,GameplayCo
         case K::exitController:assert(view.resolveLocal<K::exitController>(local)==reference.exitController);break;
         case K::bullet:assert(view.resolveLocal<K::bullet>(local)==reference.bullet);break;
         case K::scriptEffect:assert(view.resolveLocal<K::scriptEffect>(local)==reference.scriptEffect);break;
+        case K::corpseExpiry:assert(view.resolveLocal<K::corpseExpiry>(local)==reference.corpseExpiry);break;
         case K::debris:assert(view.resolveLocal<K::debris>(local)==reference.debris);break;
         case K::timeChange:assert(view.resolveLocal<K::timeChange>(local)==reference.timeChange);break;
         case K::timeShard:assert(view.resolveLocal<K::timeShard>(local)==reference.timeShard);break;
@@ -342,7 +343,7 @@ static void checkTypedCollisionView(const GameplayCollisionView& view,GameplayCo
 }
 static void checkCollisionViewMembership(const GameplayWorld& world){
     const GameplayCollisionView view(world);
-    for(unsigned family=0;family<=unsigned(GameplayCollisionView::Kind::builder);++family)
+    for(unsigned family=0;family<=unsigned(GameplayCollisionView::Kind::corpseExpiry);++family)
         for(auto local:{InstanceHandle{0,0},InstanceHandle{0xffffffffu,1},InstanceHandle{GameplayCollisionView::capacity,1}})
             checkTypedCollisionView(view,GameplayCollisionView::Kind(family),local);
     for(unsigned slot=0;slot<=GameplayCollisionView::capacity;++slot){

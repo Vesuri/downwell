@@ -1148,8 +1148,14 @@ explicit source numeric ID from the enclosing creation stream, and keeps that
 ID separate from its generation handle. Positioned constructor publication
 precedes Create, inactive records do not animate, and Animation End publishes
 the index and destruction mark without freeing the slot. Failed publication
-retains the partial lifetime for teardown. Native resource-owner registration,
-mixed scheduling and Draw routing are not provided by this storage class.
+retains the partial lifetime for teardown. The native resource owner registers
+these lifetimes as object 242 with their supplied source IDs and serialized
+depth, dispatches animation in the mixed room walk, and retires marks at the
+pre-Draw cleanup boundary. Live and cached actor traversal route them to the
+Amiga planar draw list, outside the compatibility foreground-effect pool.
+Room/Retry teardown clears them without resetting the generation counter.
+Natural corpse alarms still need native admission and a complete source-ID
+allocation stream; the explicit-ID entry point does not invent that stream.
 `RunSession::advanceCorpseAlarm` is the shared production adapter for alarms:
 it invokes the source lifecycle with synchronous creation into the room-owned
 expiry pool, then resolves the requested sprite's unit-track frame count and

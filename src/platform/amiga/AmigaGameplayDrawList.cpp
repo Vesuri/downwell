@@ -449,6 +449,16 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
                    !command.placement.x.roundPixel(x)||!command.placement.y.roundPixel(y))return false;
                 failedSprite=0;return append(91,frame,downwellPlayfieldX+x,y,0);
             }
+            if(kind==GameplayWorld::DrawActor::corpseExpiry){
+                const auto* record=port.registeredExpiry()?port.registeredExpiry()->find(key):nullptr;
+                if(!record||!record->state.valid)return false;
+                const auto& effect=record->state;
+                auto x=record->x.promoted(),y=record->y.promoted();std::int32_t px,py;
+                if(!downwell::EffectSurfacePlacement::relative(x,downwell::MotionBinary64::fromInteger(worldViewX),x)||
+                   !downwell::EffectSurfacePlacement::relative(y,downwell::MotionBinary64::fromInteger(worldViewY),y)||
+                   !x.roundPixel(px)||!y.roundPixel(py))return false;
+                return append(effect.spriteId,effect.drawFrame(),downwellPlayfieldX+px,py,0);
+            }
             if(kind==GameplayWorld::DrawActor::debris){
                 if(compositeCurrency)return true; // Published by surfaceFx, not a second world draw.
                 const auto* record=port.debrisInstances()?port.debrisInstances()->find(key):nullptr;
