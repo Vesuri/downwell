@@ -1117,7 +1117,7 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         require(source.myDeadBody==id&&runtime->nextRuntimeInstanceId()==id+1&&audit.births==births+1&&
             runtime->randomDrawCount()==draws+3,"corpse uses enclosing ID stream and three Create draws");
         const auto* state=corpses.state(corpses.sourceHandle(id));
-        require(state&&state->health==1&&state->hitEffect==1&&runtime->instance(id)->spriteId==206,
+        require(state&&state->health.high==0x3ff00000u&&state->health.low==0&&state->hitEffect==1&&runtime->instance(id)->spriteId==206,
             "runtime upgrade and wrapper overrides reach registered corpse");
         unsigned steps=0,alarmCalls=0;
         const auto corpseKey=corpses.sourceHandle(id);

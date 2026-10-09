@@ -310,6 +310,19 @@ Counter overflow beyond the current
 unsigned storage is a terminal unsupported state rather than wrapping. The
 entry is not an alternative family-wide death sweep.
 
+Both adapters also expose an owned `beginLevelCueWithTitle` entry. It reads the
+supplied live time-stop owner's player flag, uses shared `RunSession::firstLand`
+and music resource state, and creates the registered title synchronously with
+the supplied language/font context. `scrInitialize` sets music to 193 and the
+area table to 194–198; the checked lookup rejects areas outside 1–5. Player Create
+clears first-land without resetting music. Ordinary retry preserves music, including
+the native runtime's in-place reconstruction; a full controller initialization
+sets it to 193. The stored startup getter and cue share that same resource state.
+Failed title Create leaves first-land clear; successful Create sets it before
+audio queries. Explicit state/lookup providers remain the reference path. Native
+title allocation still requires the enclosing source-ID stream, and normal
+death callers still need the complete effects/cue composition.
+
 Both runtime adapters route flash bursts and pre-Step flash animation through
 `RunSession`'s shared `effectsSucceeded` latch. Failed bursts retain earlier
 children and consumed random words; subsequent effect calls and animation must

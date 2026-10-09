@@ -29,6 +29,11 @@ bool nativeSkeletonSound(GameplayWorld& world,downwell::SkeletonActor& actor,
     downwell::SoundPlayEnvironment& environment,NativeSkeletonAudio& audio){
     return world.playSkeletonSound(actor,133,environment,audio);
 }
+bool nativeOwnedLevelCue(GameplayWorld& world,const downwell::TimeStopEffects<64>& stop,
+    bool (*allocate)(unsigned&),const downwell::LevelNumberTextContext& text,
+    downwell::SoundPlayState& caller,downwell::SoundPlayEnvironment& environment,NativeSkeletonAudio& audio){
+    return world.beginLevelCueWithTitle(stop,{}, {},allocate,text,caller,environment,audio);
+}
 bool nativeSkeletonThrow(GameplayWorld& world,downwell::SkeletonActor& actor,downwell::RegisteredSkeletonThrow& caller,
     downwell::SoundPlayEnvironment& environment,NativeSkeletonAudio& audio){
     return world.throwSkeletonBoneWithSourceId(505201,actor,caller,environment,audio);

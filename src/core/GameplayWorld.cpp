@@ -110,6 +110,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto breakableLifecycle=breakableLifecycle_;
     const auto nextBreakableIdentity=nextBreakableLifetimeId_;
     const auto records = run_.records();
+    const int backgroundMusic=run_.backgroundMusicId;
     const auto controllerRise=run_.gemStreakRise;
     const auto nextBulletIdentity=nextBulletLifetimeId_;
     const auto bulletLifecycle=bulletLifecycle_;
@@ -131,6 +132,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto foregroundBirth=run_.nextForegroundBirth;
     this->~GameplayWorld();
     new (this) GameplayWorld(initialRingOrigin, false, 1201 - 176, true, enemyLifecycle,breakableLifecycle,{},terrainInstances,entryRooms,playerBirthTiming);
+    run_.backgroundMusicId=backgroundMusic;
     nativeTerrainInstances_=nativeTerrainInstances;
     nativeTerrainBinding_=nativeTerrainBinding;
     run_.gemStreakRise=controllerRise; // Persistent controller survives Retry.

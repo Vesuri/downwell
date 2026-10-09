@@ -1403,6 +1403,8 @@ public:
         return run_.playBulletWallSound(caller->sound,environment,enemyRandom_,material,audio);
     }
     bool noKillAchievement()const{return run_.noKill;}
+    bool firstLand()const{return run_.firstLand;}
+    int backgroundMusicId()const{return run_.backgroundMusicId;}
     template<class Audio,class Delay,class Cue>
     bool recordEnemyDeath(bool cutGunshot,Audio& audio,Delay delay,Cue cue){
         return run_.recordEnemyDeath(cutGunshot,audio,delay,cue);
@@ -1427,6 +1429,13 @@ public:
             return object==372&&levelNumbers_&&allocate(id)&&levelNumbers_->create(id,px,py,
                 [&](auto,auto& state){return text.initialize(state,run_.stage);},child);
         },music,caller,env,audio);
+    }
+    template<unsigned TimeCapacity,class Allocate,class Audio>
+    bool beginLevelCueWithTitle(const downwell::TimeStopEffects<TimeCapacity>& stop,downwell::MotionBinary64 x,
+        downwell::MotionBinary64 y,Allocate allocate,const downwell::LevelNumberTextContext& text,
+        downwell::SoundPlayState& caller,downwell::SoundPlayEnvironment& env,Audio& audio){
+        return beginLevelCueWithTitle(run_.firstLand,stop.player.stopped,run_.backgroundMusicId,x,y,
+            allocate,text,downwell::RunSession::areaMusic,caller,env,audio);
     }
     template<class Audio> bool playBoxChainSound(downwell::InstanceHandle h,downwell::MotionBinary64 volume,bool inWater,Audio& audio){
         if(!run_.effectsSucceeded||!findBreakable(h))return run_.effectsSucceeded=false;

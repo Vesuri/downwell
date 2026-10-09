@@ -373,7 +373,8 @@ public:
     std::uint32_t unimplementedCodeCalls() const { return unimplementedCodeCalls_; }
     int cameraViewWidth() const { return cameraViewWidth_; }
     int cameraViewHeight() const { return cameraViewHeight_; }
-    int backgroundMusicId() const { return backgroundMusicId_; }
+    int backgroundMusicId() const { return run_.backgroundMusicId; }
+    bool firstLand()const{return run_.firstLand;}
     bool controlsLocked() const { return controlsLocked_; }
     std::uint32_t soundGainRequests() const { return soundGainRequests_; }
     std::uint32_t soundPlayRequests() const { return soundPlayRequests_; }
@@ -479,6 +480,13 @@ public:
             return object==372&&registration.belongsTo(instances_)&&registration.create(px,py,
                 [&](auto,auto& state){return text.initialize(state,run_.stage);},child);
         },music,caller,env,audio);
+    }
+    template<unsigned Capacity,unsigned TextCapacity,unsigned TimeCapacity,class Audio>
+    bool beginLevelCueWithTitle(const TimeStopEffects<TimeCapacity>& stop,MotionBinary64 x,MotionBinary64 y,
+        StoredLevelNumberRegistration<instanceCapacity,Capacity,TextCapacity>& registration,
+        const LevelNumberTextContext& text,SoundPlayState& caller,SoundPlayEnvironment& env,Audio& audio){
+        return beginLevelCueWithTitle(run_.firstLand,stop.player.stopped,run_.backgroundMusicId,x,y,
+            registration,text,RunSession::areaMusic,caller,env,audio);
     }
     template<unsigned Capacity,unsigned TextCapacity,class Tick>
     bool withLevelNumberEvents(StoredLevelNumberRegistration<instanceCapacity,Capacity,TextCapacity>& registration,Tick tick){
@@ -2217,7 +2225,6 @@ private:
     int cameraViewWidth_ = 0;
     RoomEntryViews roomEntryViews_;
     int cameraViewHeight_ = 0;
-    int backgroundMusicId_ = -1;
     bool controlsLocked_ = false;
     std::uint32_t soundGainRequests_ = 0;
     std::uint32_t soundPlayRequests_ = 0;

@@ -96,7 +96,6 @@ void StartupRuntime::reset(PlatformProfile profile) {
     cameraViewWidth_ = 0;
     roomEntryViews_.clear();
     cameraViewHeight_ = 0;
-    backgroundMusicId_ = -1;
     controlsLocked_ = false;
     soundGainRequests_ = 0;
     soundPlayRequests_ = 0;
@@ -274,6 +273,7 @@ void StartupRuntime::skipToGameForTesting() {
 }
 
 void StartupRuntime::controllerCreate(PlatformProfile profile) {
+    run_.backgroundMusicId=193; // scrInitialize, not scrGlobalStuff/run reset.
     run_.gemStreakRise.reset(); // scrDrawHudInitStuff, not a room/run reset.
     // objControlerN_Create_0 sets initTimes to zero, then scrInitialize()
     // increments it and establishes the platform profile.
@@ -2120,7 +2120,7 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
         ++implementedCodeCalls_;
         cameraViewWidth_ = surfaceWidth;
         cameraViewHeight_ = surfaceHeight;
-        backgroundMusicId_ = 193; // bgmOverworld
+        run_.backgroundMusicId = 193; // bgmOverworld
         ++soundGainRequests_;
         ++soundPlayRequests_;
         ++ditherFadeSpawnRequests_; // object 382; applied by deferred creation later.
@@ -3091,7 +3091,7 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addBool(roomLoadSucceeded_);
     digest.addI32(cameraViewWidth_);
     digest.addI32(cameraViewHeight_);
-    digest.addI32(backgroundMusicId_);
+    digest.addI32(run_.backgroundMusicId);
     digest.addBool(controlsLocked_);
     digest.addU32(soundGainRequests_);
     digest.addU32(soundPlayRequests_);

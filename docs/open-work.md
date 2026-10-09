@@ -142,8 +142,8 @@ behavior, both backend integrations and relevant original-game verification.
 - Connect natural death/stomp/hit events to effect owners, including flash balls.
   Route enemy-death bookkeeping through the shared run-state entry, supplying
   actual toggleGuncut, the owned achNoKill entry, momentDelay controller events and
-  levelBeginCue creation/audio. Bind its actual firstLand/BGM state and area-music
-  lookup, and connect the registered levelNumber (372) child's live language/font
+  levelBeginCue creation/audio. Route natural callers through its owned firstLand/BGM
+  entry, and connect the registered levelNumber (372) child's live language/font
   inputs and surface Draw before admitting natural callers. Complete its native
   source-ID allocation in the enclosing creation stream. Do not use successful
   placeholder callbacks.

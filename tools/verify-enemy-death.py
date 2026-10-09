@@ -8,6 +8,13 @@ root = Path(__file__).resolve().parents[1] / "extracted/utmt-0.9.2.0/Assembly"
 player_init = (root / "gml_GlobalScript_scrPlayerInit.asm").read_text()
 assert "pushi.e 1\npop.v.i global.achNoKill" in player_init
 assert player_init.index("pop.v.i global.achNoKill") < player_init.index("pushglb.v global.pugDecoy")
+assert "pushi.e 0\npop.v.i global.firstLand" in player_init
+initialize = (root / "gml_GlobalScript_scrInitialize.asm").read_text()
+assert "pushi.e 193\npop.v.i global.bgm" in initialize
+for area in range(1,6):
+    assert f"pushi.e {193+area}\nconv.i.v\npushi.e -5\npushi.e {area}\npop.v.v [array]self.areaBgm" in initialize
+global_stuff = (root / "gml_GlobalScript_scrGlobalStuff.asm").read_text()
+assert "global.bgm" not in global_stuff and "global.firstLand" not in global_stuff
 
 def body(name, end):
     text = (root / f"gml_GlobalScript_{name}.asm").read_text()
