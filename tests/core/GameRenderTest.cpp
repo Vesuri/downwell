@@ -1267,11 +1267,20 @@ int main() {
     unsigned combatTicks = 1;
     bool retried = false;
     unsigned observedFlashFrames = 0;
+    unsigned naturalClearFrames = 0;
     for (unsigned frame = 0; frame < 14000 && !retried; ++frame) {
         const auto& runtime = naturalDeath.startup();
         input = {};
         if (runtime.inMenu()) input.right = true;
         else if (runtime.inPlayMenu() && runtime.playMenuYOffset() == 0) input.fire = true;
+        else if (runtime.levelClearActive()) {
+            // rmResult is a real room, no longer an overlay reported as
+            // inMainRoom(). Surviving a level must not strand the death tape
+            // at CHOOSE 1 UPGRADE: use the normal gated confirmation input.
+            input.fire = true;
+            ++naturalClearFrames;
+            require(!runtime.inMainRoom(), "natural level completion uses its own room, not a gameplay overlay");
+        }
         else if (runtime.inMainRoom()) {
             if (runtime.deathResults().active) {
                 const auto& menu = runtime.deathResults().menu;
@@ -1377,9 +1386,10 @@ int main() {
         }
     }
     require(retried, "bounded natural-death tape reaches and executes Retry");
+    require(naturalClearFrames>0, "natural death route exercises upgrade confirmation before fatal damage");
     require(observedFlashFrames == 2, "natural death renders both white flash frames before Retry");
-    std::printf("Natural death route: %u combat updates, %u flash frames, Retry passed\n",
-        combatTicks-1, observedFlashFrames);
+    std::printf("Natural death route: %u combat updates, %u level-clear updates, %u flash frames, Retry passed\n",
+        combatTicks-1, naturalClearFrames, observedFlashFrames);
     auto shopStorage = std::make_unique<downwell::Game>(&rooms, &objects, &builders);
     auto& shopGame = *shopStorage;
     auto& shopRuntime = const_cast<downwell::StartupRuntime&>(shopGame.startup());
