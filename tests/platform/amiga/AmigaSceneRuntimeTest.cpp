@@ -1301,6 +1301,15 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             require(gameplay.enterLevelClear(0, false) && reference.enterLevelClear(0, false),
                 "both adapters consume the exit request at an explicit scene boundary");
             require(!gameplay.findPlayer(oldPlayerHandle),"old player lifetime leaves before Result Create");
+            require(reference.roomId()==downwell::StartupRuntime::resultRoomId&&
+                !reference.instance(100855)&&reference.instance(100065)&&
+                reference.instance(100065)->roomId==downwell::StartupRuntime::resultRoomId&&
+                reference.instance(102522)&&reference.instance(102522)->objectId==325&&
+                reference.instance(102522)->x==80&&reference.instance(102522)->y==142,
+                "stored Result room retains controller and admits authored Result after player retirement");
+            for(std::size_t i=0;i<reference.activeInstanceCount();++i)
+                require(reference.instanceAt(i).persistent||reference.instanceAt(i).instanceId==102522,
+                    "no nonpersistent gameplay record survives Result entry");
             const auto nativeTick = gameplay.tick();
             const auto hostTick = reference.tick();
             gameplay.step(0); reference.step({}, false);

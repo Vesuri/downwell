@@ -51,6 +51,9 @@ struct RecordingLifecycle:Lifecycle {
     std::unordered_map<std::uint32_t,InstanceHandle> handles;
     std::uint32_t ids[capacity]{};
     unsigned births=0,retires=0;
+    unsigned resultBirths=0;
+    unsigned resultWrites=0;
+    bool rejectResultBirth=false,rejectResultPosition=false;
     unsigned goalWrites=0,rejectGoalStage=0;
     unsigned startWrites=0,rejectStartStage=0,startRetires=0,startMarks=0;
     InstanceHandle markedStart{};
@@ -78,6 +81,13 @@ struct RecordingLifecycle:Lifecycle {
         return meetingVm(view,h,object,x,y,*masks,RunnerMaskDispatch{},inverse,hit);
     }
     bool birth(InstanceHandle h,const InstanceRecord& r){
+        if(r.objectId==325){
+            ++resultBirths;
+            require(r.instanceId==102522&&r.roomId==16&&r.x==80&&r.y==144&&
+                !handles.count(100855)&&handles.count(100065),
+                "authored Result birth follows player retirement without retiring the persistent controller");
+            if(rejectResultBirth)return false;
+        }
         if((rejectGoalStage==1&&r.objectId==74)||(rejectGoalStage==2&&r.objectId==255))return false;
         if(r.objectId==255||r.objectId==371)require(r.scaleX==1.0F&&r.scaleY==1.0F,"field birth precedes Create scales");
         if(!Lifecycle::birth(h,r)){std::fprintf(stderr,"birth failed: object=%d id=%u\n",r.objectId,r.instanceId);return false;}
@@ -102,6 +112,14 @@ struct RecordingLifecycle:Lifecycle {
                (rejectStartStage==2&&field==RunnerTransformField::scaleY))return false;
         }
         return Lifecycle::transform(h,r,field,value,alpha,blend);
+    }
+    bool move(InstanceHandle h,const InstanceRecord& r,RunnerImageValue x,RunnerImageValue y){
+        if(r.objectId==325){
+            ++resultWrites;
+            require(r.y==144&&y.bits==0x430e0000u,"Result Create publishes y=142 before its record write");
+            if(rejectResultPosition)return false;
+        }
+        return Lifecycle::move(h,r,x,y);
     }
     bool retire(InstanceHandle h,const InstanceRecord& r){
         if(r.objectId==371){
@@ -3989,7 +4007,15 @@ int main(){
                     if(clock->nextLevelRequested())require(clock->loadNextAreaOneLevel(confirm),"load next collision-owned room");
                 }else{
                     clock->step(confirm,false);
-                    if(clock->levelResultRequested())require(clock->enterLevelClear(0,heartGoal),"enter collision-owned level clear");
+                    if(clock->levelResultRequested()){
+                        const auto controller=clockLife.handles.at(100065);
+                        require(clock->enterLevelClear(0,heartGoal),"enter collision-owned level clear");
+                        require(clockLife.resultBirths==1&&clockLife.handles.count(102522)&&
+                            !clockLife.handles.count(100855)&&
+                            clockLife.handles.at(100065).slot==controller.slot&&
+                            clockLife.handles.at(100065).generation==controller.generation,
+                            "Result registers in the live owner while the original controller handle survives");
+                    }
                 }
             }
             if(clock->runStage().level!=2||!clock->effectsSucceeded())std::fprintf(stderr,
@@ -4004,6 +4030,31 @@ int main(){
             require(clock->effectsSucceeded()&&clockLife.meetingCalls==entryCalls+1&&clock->runTimeTicks()==entryTicks,
                 "maintained goal-family query finds the later-level entrance descendant");
         }
+    }
+    for(bool rejectPosition:{false,true}){
+        auto resultStorage=std::make_unique<Storage>();
+        require(resultStorage->families.bindInstanceFlags(objects),"Result failure family fixture");
+        RecordingLifecycle resultLife({resultStorage->owner,resultStorage->properties,objects,sprites,resultStorage->families,{}, {}});
+        auto result=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            InstanceLifecycleBinding::bindQueryDestruction(resultLife));
+        resultLife.runtime=result.get();resultLife.masks=&masks;
+        result->skipToGameForTesting();
+        result->registerLevelExit(static_cast<int>(result->mainPlayerY()));
+        for(unsigned tick=0;tick<110&&!result->levelResultRequested();++tick)result->step({},false);
+        require(result->effectsSucceeded()&&result->levelResultRequested(),"Result failure fixture reaches handoff");
+        const auto draws=result->randomDrawCount();
+        resultLife.rejectResultBirth=!rejectPosition;
+        resultLife.rejectResultPosition=rejectPosition;
+        require(!result->enterLevelClear(0,false)&&!result->effectsSucceeded()&&!result->roomLoadSucceeded()&&
+            !result->levelClearActive()&&resultLife.resultBirths==1&&result->randomDrawCount()==draws,
+            "failed Result birth/position prevents Create RNG and latches the partial room transition");
+        require(!result->instance(100855)&&result->instance(100065)&&result->instance(102522),
+            "failed Result birth retains the committed retirement prefix and partial new record");
+        require(result->instance(102522)->y==144&&resultLife.resultWrites==unsigned(rejectPosition)&&
+            resultLife.handles.count(102522)==unsigned(rejectPosition),
+            "Create publication failure retains birth but not the rejected position write");
+        require(!result->enterLevelClear(0,false)&&resultLife.resultBirths==1&&result->randomDrawCount()==draws,
+            "terminal Result entry cannot replay retirement or Create");
     }
     for(unsigned failure=1;failure<=4;++failure){
         auto failedStorage=std::make_unique<Storage>();

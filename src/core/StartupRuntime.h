@@ -102,6 +102,7 @@ public:
     static constexpr int entryRoomId = 7;
     static constexpr int playMenuRoomId = 8;
     static constexpr int mainRoomId = 11;
+    static constexpr int resultRoomId = 16;
     static constexpr int menuRoomId = 20;
     static constexpr std::uint32_t controllerInstanceId = 100065;
     static constexpr std::uint32_t initRoomInstanceId = 100066;
@@ -1596,12 +1597,7 @@ public:
     bool levelResultRequested() const { return run_.levelResultRequested; }
     // Scene owner retires old presentation before entering. While active,
     // update via stepLevelClear, not the main-room event scheduler.
-    bool enterLevelClear(unsigned style, bool heartGoal) {
-        if(!run_.levelResultRequested||run_.levelClearActive||!clearMainBullets())return false;
-        if (!run_.enterLevelClear(style, heartGoal, mainPlayerHealth_, mainPlayerMotion_, random_)) return false;
-        mainAmmo_ = mainPlayerMotion_.ammo();
-        return true;
-    }
+    bool enterLevelClear(unsigned style, bool heartGoal);
     template<class Emit>
     bool stepLevelClear(bool& confirm, bool leftPressed, bool rightPressed, bool& heartGoal, Emit emit) {
         if (!run_.levelClearActive || run_.nextLevelRequested) return false;
@@ -1755,6 +1751,8 @@ private:
                      bool advancePressed = false);
     void gotoRoom(int roomId);
     void loadRoom(int roomId, bool firstGameRoom);
+    struct ResultEntryRequest { unsigned style; bool heartGoal; };
+    const ResultEntryRequest* resultEntryRequest_=nullptr;
     void resetSceneState();
     InstanceRecord* initRoomInstance();
     const InstanceRecord* initRoomInstance() const;

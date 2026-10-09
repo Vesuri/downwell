@@ -39,16 +39,22 @@ for each alarm index, object 37 precedes 325, but Result Alarm 0 precedes
 controller Alarm 1. Same-phase birth eligibility remains governed by the
 runner's creation filter, not unconditional recapture after each event.
 
-The `enterLevelClear` shortcuts do not yet enter rmResult through this complete
-room lifecycle. The native path retires its registered gameplay families before
-entering the shared Result state, preserving persistent controller ownership.
-This is not yet source-ordered Room End/retirement event dispatch or destination
-Result registration. The stored path still clears bullets without retiring the
-other old-room records until the subsequent level load. Calling its gameplay
-alarm pass from `stepLevelClear` would advance those stale records, not repair
-the destination scheduler. This audit defines
-the population/order contract; it is not evidence that either shortcut already
-implements it or an original-runner execution comparison.
+Stored Result entry uses the resource-backed room loader: old nonpersistent
+records leave, survivors retain their handles, and authored instance 102522 is
+registered before its PreCreate/Create. Its Create publishes y=142 before the
+shared selection initializer consumes gemSp's RNG word. A failed birth prevents
+that initializer and latches the partial handoff; a failed Create preserves its
+completed prefix. The synchronous request supplies style/heart-goal inputs only
+during that load and is cleared on return. It is not a second persistent global.
+
+The native path retires its registered gameplay families before entering the
+shared Result state, preserving persistent controller ownership; destination
+Result registration is still absent there. Neither path yet supplies complete
+source-ordered Room End/retirement event dispatch, all Result Create side
+effects, or the mixed destination alarm scheduler. Result clocks still belong
+to the shared selection state, not the stored record's generic alarm bank.
+The room-population checks are not proof of those missing event integrations
+or an original-runner execution comparison.
 
 ## Main-room controller births and numeric IDs
 

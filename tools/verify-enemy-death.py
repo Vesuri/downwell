@@ -78,6 +78,11 @@ assert result_room["name"] == "rmResult" and not result_room["persistent"]
 assert [(i["instanceId"], i["objectId"]) for i in result_room["instanceCreationOrder"]] == [(102522, 325)]
 assert manifest["objects"][325]["name"] == "Result"
 assert not manifest["objects"][325]["Persistent"]
+assert manifest["objects"][325]["parentId"] == -1
+result_events = {(e["eventType"], e["eventSubtype"]): e["actions"][0]["codeId"]
+                 for e in manifest["objects"][325]["events"]}
+assert result_events[(0, 0)] == 2513 and result_events[(14, 0)] == 2521
+assert result_room["creationCodeId"] == 695
 assert not manifest["objects"][68]["Persistent"]
 
 def event_instructions(name):
@@ -95,6 +100,11 @@ assert event_instructions("Room_rmResult_Create") == [
     "pushi.e -6", "pushi.e 0", "push.v [array]self.view_camera",
     "call.i camera_set_view_size(argc=3)", "popz.v"]
 result_create = event_instructions("Object_Result_Create_0")
+assert event_instructions("Object_Result_PreCreate_0") == ["call.i event_inherited(argc=0)", "popz.v"]
+position = result_create.index("push.v self.yPlace")
+assert result_create[position:position+5] == ["push.v self.yPlace", "pop.v.v self.yy",
+    "push.v self.yy", "call.i round(argc=1)", "pop.v.v self.y"]
+assert position < result_create.index("call.i random_range(argc=2)")
 assert not any("room_speed" in s for s in result_create)
 assert "pop.v.i global.pTimeStop" in result_create
 assert event_instructions("Object_Result_Alarm_0")[:14] == [

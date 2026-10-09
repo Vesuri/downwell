@@ -1948,6 +1948,35 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
         cameraViewHeight_ = surfaceHeight;
         controlsLocked_ = false;
         return;
+    case 695: // gml_Room_rmResult_Create
+        ++implementedCodeCalls_;
+        cameraViewWidth_ = surfaceWidth;
+        cameraViewHeight_ = surfaceHeight;
+        return;
+    case 2521: // Result PreCreate: event_inherited, no parent
+        ++implementedCodeCalls_;
+        return;
+    case 2513: // Result Create: shared selection state at the authored birth
+        ++implementedCodeCalls_;
+        if(!instance||instance->objectId!=325||instance->roomId!=resultRoomId||!resultEntryRequest_){
+            run_.effectsSucceeded=false;return;
+        }
+        for(std::size_t i=0;i<instances_.size();++i)if(&instances_.at(i)==instance){
+            // yy=yPlace; y=round(yy) precedes gemSp's random_range call.
+            const auto key=instances_.handleAt(i);
+            if(!lifecycle_.integerPosition(key,*instance,instance->x,142)||
+               !run_.effectsSucceeded||!deferredCommandsSucceeded_){
+                run_.effectsSucceeded=false;return;
+            }
+            instance=instances_.resolve(key);
+            if(!instance||instance->objectId!=325){run_.effectsSucceeded=false;return;}
+            instance->y=142;instance->preciseY=142.0F;
+            if(!run_.enterLevelClear(resultEntryRequest_->style,resultEntryRequest_->heartGoal,
+                mainPlayerHealth_,mainPlayerMotion_,random_))run_.effectsSucceeded=false;
+            return;
+        }
+        run_.effectsSucceeded=false;
+        return;
     case 648: // gml_Room_rmInit_Create
         ++implementedCodeCalls_;
         cameraViewWidth_ = surfaceWidth;
@@ -2733,6 +2762,21 @@ void StartupRuntime::initRoomEndStep(bool advancePressed) {
             gotoRoom(roomDestination_);
         }
     }
+}
+
+bool StartupRuntime::enterLevelClear(unsigned style,bool heartGoal) {
+    if(!run_.levelResultRequested||run_.levelClearActive||resultEntryRequest_||
+       !roomPack_||!objectPack_||style>4||2+run_.upgrades.levels[6]-(style==2?1:0)>=4)return false;
+    if(!run_.effectsSucceeded||!deferredCommandsSucceeded_||!roomLoadSucceeded_||!clearMainBullets())
+        return run_.effectsSucceeded=false;
+    const ResultEntryRequest request{style,heartGoal};
+    resultEntryRequest_=&request;
+    loadRoom(resultRoomId,false);
+    resultEntryRequest_=nullptr;
+    if(!roomLoadSucceeded_||!deferredCommandsSucceeded_||!run_.effectsSucceeded||!run_.levelClearActive)
+        return run_.effectsSucceeded=false;
+    mainAmmo_=mainPlayerMotion_.ammo();
+    return true;
 }
 
 bool StartupRuntime::loadNextAreaOneLevel(const Input& input) {
