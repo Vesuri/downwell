@@ -25,6 +25,7 @@
 #include "Input.h"
 #include "PlayerMotion.h"
 #include "StoredTimeShardRegistration.h"
+#include "StoredLimboShardRegistration.h"
 #include "StoredCorpseRegistration.h"
 #include "StoredLevelNumberRegistration.h"
 #include "LevelNumberDrawOps.h"
@@ -500,6 +501,27 @@ public:
         return corpseDrawState_?corpseDrawState_(corpseDrawContext_,record):nullptr;
     }
     enum class SmokePhase {animation,alarm,step,cleanup};
+    enum class LimboShardPhase {animation,step,cleanup};
+    template<unsigned Capacity,class Environment,class Tick> bool withLimboShardEvents(
+        StoredLimboShardRegistration<instanceCapacity,Capacity>& registration,Environment& environment,Tick tick){
+        if(!run_.effectsSucceeded)return false;
+        if(limboShardDispatch_||!registration.belongsTo(instances_)||!registration.valid())return run_.effectsSucceeded=false;
+        auto dispatch=[&](const InstanceRecord& record,LimboShardPhase phase){
+            const auto key=registration.handle(record);
+            if(!key.generation)return false;
+            if(phase==LimboShardPhase::animation)return registration.advanceAnimation(key);
+            if(phase==LimboShardPhase::cleanup)return registration.retire(key);
+            bool stopped=false;int width=0;LimboShard::Player player;
+            return environment.prepare(record,stopped,width,player)&&
+                registration.step(key,stopped,width,player,random_,environment);
+        };
+        limboShardContext_=&dispatch;
+        limboShardDispatch_=[](void* p,const InstanceRecord& r,LimboShardPhase phase){
+            return (*static_cast<decltype(dispatch)*>(p))(r,phase);
+        };
+        const bool ok=tick();limboShardDispatch_=nullptr;limboShardContext_=nullptr;
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok&&registration.valid();
+    }
     enum class ConsumptionBloodPhase {animation,alarm,step,cleanup};
     template<unsigned Capacity,class Globals,class Tick> bool withConsumptionBloodEvents(
         StoredConsumptionBloodRegistration<instanceCapacity,Capacity>& registration,Globals& globals,Tick tick){
@@ -915,6 +937,20 @@ public:
     }
     template<unsigned Capacity> StoredConsumptionBloodRegistration<instanceCapacity,Capacity> consumptionBloodRegistration(){
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
+    }
+    template<unsigned Capacity> StoredLimboShardRegistration<instanceCapacity,Capacity> limboShardRegistration(){
+        return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
+    }
+    template<unsigned Capacity> bool createRegisteredLimboShard(StoredLimboShardRegistration<instanceCapacity,Capacity>& registry,
+        MotionBinary64 x,MotionBinary64 y,bool lowSpec,InstanceHandle& child){
+        if(!registry.belongsTo(instances_))return run_.effectsSucceeded=false;
+        return registry.create(x,y,lowSpec,random_,child);
+    }
+    template<unsigned Capacity,class Views> bool stepRegisteredLimboShard(
+        StoredLimboShardRegistration<instanceCapacity,Capacity>& registry,InstanceHandle key,bool stopped,int roomWidth,
+        const LimboShard::Player& player,Views& views){
+        if(!registry.belongsTo(instances_))return run_.effectsSucceeded=false;
+        return registry.step(key,stopped,roomWidth,player,random_,views);
     }
     template<unsigned Capacity,class Globals> bool createRegisteredConsumptionBlood(
         StoredConsumptionBloodRegistration<instanceCapacity,Capacity>& registry,MotionBinary64 x,MotionBinary64 y,
@@ -1913,6 +1949,8 @@ private:
     void* corpseDrawContext_=nullptr;
     const CorpseAnimation* (*corpseDrawState_)(void*,const InstanceRecord&)=nullptr;
     void* smokeContext_=nullptr;
+    void* limboShardContext_=nullptr;
+    bool (*limboShardDispatch_)(void*,const InstanceRecord&,LimboShardPhase)=nullptr;
     void* consumptionBloodContext_=nullptr;
     int* momentDelayRoomSpeed_=nullptr;
     bool (*consumptionBloodDispatch_)(void*,const InstanceRecord&,ConsumptionBloodPhase,unsigned)=nullptr;

@@ -419,6 +419,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
         if(instance.objectId==263&&(!corpseDispatch_||!corpseDispatch_(corpseContext_,instance,CorpsePhase::animation,0)))return false;
         if(instance.objectId==242&&(!corpseExpiryDispatch_||!corpseExpiryDispatch_(corpseExpiryContext_,instance,false)))return false;
         if(instance.objectId==225&&(!smokeDispatch_||!smokeDispatch_(smokeContext_,instance,SmokePhase::animation,0)))return false;
+        if(instance.objectId==379&&(!limboShardDispatch_||!limboShardDispatch_(limboShardContext_,instance,LimboShardPhase::animation)))return false;
         if(instance.objectId==223&&(!consumptionBloodDispatch_||!consumptionBloodDispatch_(consumptionBloodContext_,instance,ConsumptionBloodPhase::animation,0)))return false;
         if(instance.objectId==249||instance.objectId==256){
             auto* companion=const_cast<PlayerCompanionCreateState*>(companionCreateState(instance.instanceId));
@@ -956,6 +957,7 @@ bool StartupRuntime::cleanupMainOwnedDestroyed(){
             (r.objectId==372&&levelNumberDispatch_)||
             (r.objectId==242&&corpseExpiryDispatch_)||
             (r.objectId==225&&smokeDispatch_)||
+            (r.objectId==379&&limboShardDispatch_)||
             (r.objectId==223&&consumptionBloodDispatch_)||
             (r.objectId==248&&currencyDispatch_)||
             (r.objectId==73&&ownedEntryRegistration_.handle(r).generation)||(r.objectId==219&&!scriptAnimationDispatch_);},
@@ -977,6 +979,7 @@ bool StartupRuntime::cleanupMainOwnedDestroyed(){
             if(r.objectId==372)return levelNumberDispatch_(levelNumberContext_,r,true,0);
             if(r.objectId==242)return corpseExpiryDispatch_(corpseExpiryContext_,r,true);
             if(r.objectId==225)return smokeDispatch_(smokeContext_,r,SmokePhase::cleanup,0);
+            if(r.objectId==379)return limboShardDispatch_(limboShardContext_,r,LimboShardPhase::cleanup);
             if(r.objectId==223)return consumptionBloodDispatch_(consumptionBloodContext_,r,ConsumptionBloodPhase::cleanup,0);
             if(r.objectId==248)return currencyDispatch_(currencyContext_,r,CurrencyPhase::cleanup,0);
             if(r.objectId==73)return ownedEntryRegistration_.retire(key);
@@ -1890,6 +1893,11 @@ bool StartupRuntime::dispatchObjectEvent(InstanceRecord& instance,
         run_.effectsSucceeded=smokeDispatch_&&smokeDispatch_(smokeContext_,instance,
             eventType==2?SmokePhase::alarm:SmokePhase::step,unsigned(eventSubtype));
         return run_.effectsSucceeded;
+    }
+    if(instance.objectId==379&&eventType==3&&eventSubtype==0){
+        ++implementedCodeCalls_;
+        return run_.effectsSucceeded=limboShardDispatch_&&
+            limboShardDispatch_(limboShardContext_,instance,LimboShardPhase::step);
     }
     if(instance.objectId==223&&(eventType==2||(eventType==3&&eventSubtype==0))){
         ++implementedCodeCalls_;

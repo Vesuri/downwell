@@ -599,6 +599,93 @@ int main(){
         require(smoke.clear(),"retire mixed smoke fixture");
         require(particles.clear(),"retire mixed particle fixture");
     }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach limbo shard collision world");world->skipToGameForTesting();
+        auto shards=world->limboShardRegistration<2>();InstanceHandle first,second;
+        const auto before=world->randomDrawCount();
+        require(world->createRegisteredLimboShard(shards,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(10000),false,first),
+            "register source-ID limbo shard before synchronous Create");
+        const auto id=world->resolveInstance(first)->instanceId;
+        require(world->randomDrawCount()==before+7&&shards.state(first)&&
+            world->resolveInstance(first)->spriteId==91&&world->resolveInstance(first)->imageSpeed!=1.f,
+            "limbo Create publishes image fields and consumes seven words");
+        require(world->createRegisteredLimboShard(shards,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(10000),true,second)&&
+            world->resolveInstance(second)->instanceId==id+1&&shards.state(second)->shardLimit==5,
+            "limbo births share the room numeric-ID stream");
+        RunnerImageValue x,y;
+        require(owner->collisionPosition(first,x,y)&&x.bits==shards.state(first)->x.bits&&y.bits==shards.state(first)->y.bits,
+            "fractional-capable engine position is registered");
+        require(shards.advanceAnimation(first),"registered sprite-91 sequence advances through lifecycle owner");
+        struct Views {
+            int top=9000;unsigned reads=0;
+            std::vector<unsigned> selected;
+            bool prepare(const InstanceRecord& r,bool& stopped,int& width,LimboShard::Player& player){
+                selected.push_back(r.instanceId);stopped=true;width=480;player={};return true;
+            }
+            bool viewTop(MotionBinary64& value){++reads;value=MotionBinary64::fromInteger(top);return true;}
+            bool outside(RunnerImageValue,RunnerImageValue,bool&){require(false,"population cap not reached");return false;}
+        } views;
+        const auto draws=world->randomDrawCount();
+        require(world->stepRegisteredLimboShard(shards,first,true,480,{},views)&&
+            world->resolveInstance(first)->imageSpeed==0.f&&views.reads==1&&world->randomDrawCount()==draws,
+            "real parent-field query freezes rate but preserves inertial Step and final view read");
+        require(owner->collisionPosition(first,x,y)&&x.bits==shards.state(first)->x.bits&&y.bits==shards.state(first)->y.bits,
+            "both rounded position setters reach collision owner");
+        require(world->withLimboShardEvents(shards,views,[&]{world->step(false);return world->effectsSucceeded();})&&
+            views.selected.size()==2&&views.reads==3,
+            "room scheduler selects both registered limbo Steps and their animation");
+        require(shards.activate(first,false),"deactivate limbo shard");
+        require(world->stepRegisteredLimboShard(shards,first,false,480,{},views)&&views.reads==3,
+            "inactive limbo shard does not run Step");
+        require(shards.activate(first,true),"reactivate limbo shard");views.top=11000;
+        require(world->stepRegisteredLimboShard(shards,first,false,480,{},views)&&
+            world->resolveInstance(first)->destroyRequested&&shards.state(first)->destroyRequested,
+            "view retirement marks both states before cleanup");
+        require(shards.retire(first)&&!world->resolveInstance(first)&&!shards.state(first)&&shards.state(second),
+            "ordered cleanup retires memberships and preserves sibling identity after compaction");
+        InstanceHandle reused;
+        require(world->createRegisteredLimboShard(shards,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(10000),false,reused)&&
+            reused.generation!=first.generation&&!shards.state(first)&&world->resolveInstance(reused)->instanceId==id+2,
+            "slot reuse cannot revive a stale handle or reuse source IDs");
+        require(world->withLimboShardEvents(shards,views,[&]{world->step(false);return world->effectsSucceeded();})&&
+            !world->resolveInstance(reused)&&!world->resolveInstance(second)&&!shards.state(reused)&&!shards.state(second),
+            "selected Steps mark limbo lifetimes and actual room cleanup retires both");
+        require(shards.clear(),"limbo owner clears before room teardown");
+    }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach wall-to-limbo birth composition");world->skipToGameForTesting();
+        auto shards=world->limboShardRegistration<1>();InstanceHandle child;
+        auto create=[&](int object,MotionBinary64 x,MotionBinary64 y){
+            return object==379&&world->createRegisteredLimboShard(shards,x,y,false,child);
+        };
+        struct Effects {
+            decltype(create)& spawn;
+            bool create(int object,MotionBinary64 x,MotionBinary64 y){return spawn(object,x,y);}
+            bool outOfView(InstanceHandle){return false;}
+        } effects{create};
+        unsigned attempts=0;
+        for(unsigned i=0;i<world->activeInstanceCount()&&!child.generation;++i){
+            const auto& wall=world->instanceAt(i);if(wall.objectId!=60||wall.wall.pillar)continue;
+            const auto h=world->instanceHandleAt(i);RunnerImageValue x,y;
+            require(x.assignInteger(1000)&&y.assignInteger(10000+int(attempts)*64)&&
+                world->publishCollisionPosition(h,x,y),"isolate wall through collision setters");
+            const auto before=world->randomDrawCount();
+            require(owner->wallEndStepEvent(*world,h,4,effects),"wall's area-four branch executes registered child Create");
+            require(world->randomDrawCount()==before+1+(child.generation?7:0),
+                "wall choice and child Create consume the same shared stream synchronously");
+            ++attempts;
+            if(child.generation){
+                const auto* r=world->resolveInstance(child);
+                require(r&&r->x==1000&&r->y==10000+int(attempts-1)*64-16&&shards.state(child),
+                    "wall child is registered at exact source offset before End Step returns");
+            }
+        }
+        require(child.generation&&shards.clear(),"source wall path produced and retired a registered limbo child");
+    }
     for(unsigned reject=0;reject<3;++reject){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
