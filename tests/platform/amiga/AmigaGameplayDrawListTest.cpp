@@ -3,6 +3,7 @@
 #include "core/GameMakerRounding.h"
 #include "core/GameplayCollisionOwner.h"
 #include "core/CurrencySmokeComposition.h"
+#include "core/TimeShardDraw.h"
 #include <fstream>
 #include <iterator>
 #include <memory>
@@ -277,6 +278,35 @@ int main() {
         }
         assert(frameMask==63&&list.collect(*scene,pack,pack+8,160,34));
         for(unsigned i=0;i<list.count;++i)assert(list.actors[i].sprite!=85);
+        {
+            downwell::TimeShardEffects<64> shards;
+            assert(owner->createTimeShardWithSourceId(shards,405288,n(248),n(128),false));
+            auto* shard=shards.get(1);assert(shard);
+            const auto key=owner->timeShards().handle(1);
+            const auto before=scene->randomDrawCount();
+            const auto pixels=read("generated/amiga-game.dwap");downwell::EffectMaskAssets art;
+            assert(art.bind(pixels.data(),pixels.size()));
+            const downwell::EffectSurfacePlacement::View view{n(160),n(34),n(160),n(284)};
+            for(int flash:{-1,0,1})for(unsigned frame=0;frame<8;++frame){
+                shard->dflash=flash;assert(shard->imageIndex.assignInteger(frame));
+                // Create admits [0,7); use 6.75 for its upper fractional case.
+                if(frame==7)shard->imageIndex.bits=0x40d80000u;
+                assert(owner->timeShards().publishAnimation(1,405288,*shard));
+                assert(list.collect(*scene,pack,pack+8,160,34,false));unsigned seen=0;
+                for(unsigned i=0;i<list.count;++i)if(list.actors[i].sprite==91){
+                    assert(list.actors[i].frame==(frame==7?0:frame%6)&&list.actors[i].x==198&&list.actors[i].y==94);++seen;
+                }
+                assert(seen==unsigned(flash<=0));
+                assert(list.collect(*scene,pack,pack+8,160,34,true));
+                for(unsigned i=0;i<list.count;++i)assert(list.actors[i].sprite!=91);
+                unsigned emitted=0;
+                assert(scene->visitTimeShardDraw([&](const auto& effect){
+                    return downwell::TimeShardDraw::surface(effect,art,view,[&](const auto&,auto,auto){++emitted;return true;});
+                })&&emitted==unsigned(flash<=0));
+            }
+            assert(scene->randomDrawCount()==before&&scene->timeShardForDraw(key)==shard&&shards.clear());
+            assert(owner->prepareDraw()&&!scene->timeShardForDraw(key));
+        }
         downwell::DebrisEffects<2> debris;downwell::InstanceHandle first,last;
         assert(scene->spawnDebris(debris,n(240),n(120),1,first)&&
             scene->spawnDebris(debris,n(244),n(124),4,last));

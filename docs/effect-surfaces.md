@@ -179,6 +179,15 @@ backend must draw each producer at its own world-depth boundary, not flatten
 them into a controller overlay. A missing normal effect surface remains empty.
 Preparation failure clears partial output so it cannot publish stale pixels.
 
+`TimeShardDraw` implements object 238's `!dflash` gate (`dflash<=0` under
+GameMaker truth) and the same `drawFx` routing. Sprite 91 reuses the six
+offline debris masks and planar frames; fractional subimages are floored then
+wrapped by six. Native shard identities participate in the actor layer walk.
+Normal gameplay contributes white pixels to the shaded controller surface;
+death/low-spec mode emits a direct actor at that layer position instead.
+Currency hardware promotion is disabled while registered shards remain, so
+their combined surface cannot be split into incompatible compositing paths.
+
 `prepareWithLateEffects` additionally accepts source-ordered surface producers
 between smoke and controller publication, before shade subtraction. The caller
 supplies resolved offline artwork and exact published world coordinates; this

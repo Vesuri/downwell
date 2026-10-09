@@ -5,6 +5,7 @@
 #include "core/DamageNumberText.h"
 #include "core/RunnerSpatialSplit.h"
 #include "core/DebrisDraw.h"
+#include "core/TimeShardDraw.h"
 #include "core/PackedMaskIntersection.h"
 #if defined(DOWNWELL_BOB_VERIFY) || defined(DOWNWELL_DRAW_ORDER_AUDIT)
 #include "core/ActorDrawOrderVerification.h"
@@ -35,6 +36,7 @@ bool AmigaGameplayDrawList::promoteCurrencyComplete(const GameplayWorld& world,i
     if(!registeredEnemyShadePresent(world,viewX,viewY,shade)||shade)return false;
     bool other=false;
     world.smokeEffects().visitNewest([&](auto,const auto&){other=true;});
+    if(world.timeShardInstances()&&world.timeShardInstances()->size())other=true;
     if(other)return false;
     if(!world.visitDebrisDraw([&](const auto&){other=true;return true;})||other)return false;
     const Placement::PixelView view{viewX,viewY,160,284};
@@ -95,6 +97,7 @@ bool AmigaGameplayDrawList::promoteCurrency(const GameplayWorld& world,int viewX
     if(!registeredEnemyShadePresent(world,viewX,viewY,shade)||shade)return false;
     bool other=false;
     world.smokeEffects().visitNewest([&](auto,const auto&){other=true;});
+    if(world.timeShardInstances()&&world.timeShardInstances()->size())other=true;
     if(other||!world.visitDebrisDraw([&](const auto&){other=true;return true;})||other)return false;
     const Placement::PixelView view{viewX,viewY,160,284};
 #if defined(DOWNWELL_REFERENCE_CURRENCY_BOBS) || defined(DOWNWELL_REFERENCE_SHADE_PARTITION)
@@ -431,6 +434,20 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
                    ((iy.bits!=py.bits)&&((iy.bits|py.bits)&0x7fffffffu)))return false;
                 failedSprite=0;
                 return append(sprite,frame,downwellPlayfieldX+x-worldViewX,y-worldViewY,actor&&actor->publishedFacing<0);
+            }
+            if(kind==GameplayWorld::DrawActor::timeShard){
+                if(compositeCurrency)return true;
+                const auto* effect=port.timeShardForDraw(key);
+                downwell::TimeShardDraw::Command command;unsigned frame;std::int32_t x,y;
+                if(!effect||!downwell::TimeShardDraw::prepare(*effect,{},true,false,false,command))return false;
+                if(command.placement.target==downwell::EffectSurfacePlacement::hidden)return true;
+                failedSprite=91;
+                using Real=downwell::MotionBinary64;
+                if(!downwell::DebrisDraw::frame(91,command.imageIndex,frame)||
+                   !downwell::EffectSurfacePlacement::relative(command.placement.x,Real::fromInteger(worldViewX),command.placement.x)||
+                   !downwell::EffectSurfacePlacement::relative(command.placement.y,Real::fromInteger(worldViewY),command.placement.y)||
+                   !command.placement.x.roundPixel(x)||!command.placement.y.roundPixel(y))return false;
+                failedSprite=0;return append(91,frame,downwellPlayfieldX+x,y,0);
             }
             if(kind==GameplayWorld::DrawActor::debris){
                 if(compositeCurrency)return true; // Published by surfaceFx, not a second world draw.

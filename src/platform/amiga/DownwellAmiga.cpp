@@ -38,6 +38,7 @@ void downwellTerrainBatchMismatch();
 #include "AmigaWallCollision.h"
 #include "AmigaGameplayActors.h"
 #include "AmigaGameplayDrawList.h"
+#include "core/TimeShardDraw.h"
 #include "AmigaGameplayEffects.h"
 #include "AmigaEffectSurface.h"
 #include "AmigaEffectStampBank.h"
@@ -3857,7 +3858,8 @@ __attribute__((noinline)) static int runDownwell(void) {
                 hardwareCurrency=actorList.promoteCurrency(port,worldViewX,worldViewY,effectAssets,actorFrames);
             }
 #endif
-            const bool compositeEffects=(compositeCurrency&&(!hardwareCurrency||actorList.currencyRasterRequired))||
+            const bool compositeEffects=(compositeCurrency&&(!hardwareCurrency||actorList.currencyRasterRequired||
+                (port.timeShardInstances()&&port.timeShardInstances()->size())))||
                 (actorList.entryCoverVisible&&!hardwareEntryCover);
             if(compositeEffects){
                 DW_PROFILE_SCOPE(profileControllerComposition);
@@ -3873,6 +3875,8 @@ __attribute__((noinline)) static int runDownwell(void) {
                 },port.smokeEffects(),effectAssets,effectView,settings,[&](auto emit){
                     return port.visitDebrisDraw([&](const downwell::DebrisAnimation& effect){
                         return downwell::DebrisDraw::surface(effect,effectAssets,effectView,emit);
+                    })&&port.visitTimeShardDraw([&](const downwell::TimeShardAnimation& effect){
+                        return downwell::TimeShardDraw::surface(effect,effectAssets,effectView,emit);
                     });
                 },[&](auto emit){
                     if(!actorList.entryCoverVisible||hardwareEntryCover)return true;

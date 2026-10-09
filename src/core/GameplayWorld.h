@@ -739,7 +739,7 @@ public:
         return run_.effectsSucceeded=scriptSpawnInstances_&&effects.advanceRegistered(phase,*scriptSpawnInstances_);
     }
     enum class PhaseBoundary { beginStep, alarm, step, collision, endStep, roomEntry };
-    enum class DrawActor { enemy, bullet, scriptEffect, debris, player, entryDither, bone, skeleton, ditherAbove };
+    enum class DrawActor { enemy, bullet, scriptEffect, debris, player, entryDither, bone, skeleton, ditherAbove, timeShard };
     template<class Visit> bool visitRegisteredEnemyShades(Visit visit)const{
         if((!bones_||!bones_->size())&&(!skeletons_||!skeletons_->size()))return true;
         return visitRoomActorsReadOnly([&](DrawActor kind,downwell::InstanceHandle key,auto){
@@ -780,6 +780,19 @@ public:
             if(kind!=DrawActor::debris)return true;
             const auto* record=debrisInstances_->find(key);
             return record&&record->effect&&visit(*record->effect);
+        });
+    }
+    const downwell::TimeShardAnimation* timeShardForDraw(downwell::InstanceHandle key)const{
+        const auto* record=timeShardInstances_?timeShardInstances_->find(key):nullptr;
+        if(!record||!timeShardEffects_||record->destroyRequested||
+            timeShardEffects_->sourceId(key.generation)!=record->sourceId)return nullptr;
+        return timeShardEffects_->get(key.generation);
+    }
+    template<class Visit> bool visitTimeShardDraw(Visit visit)const{
+        if(!timeShardInstances_||!timeShardInstances_->size())return true;
+        return visitRoomActors([&](DrawActor kind,downwell::InstanceHandle key,auto){
+            if(kind!=DrawActor::timeShard)return true;
+            const auto* effect=timeShardForDraw(key);return effect&&visit(*effect);
         });
     }
     void configureRoomAnimation(bool (*callback)(void*),void* context){roomAnimation_=callback;roomAnimationContext_=context;}
