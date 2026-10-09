@@ -185,6 +185,14 @@ upgrades at contact entry. `scrIncrementPug`'s switch maps these IDs to
 `pugCandle` and `pugTime`. The explicit-event reference path retains external
 upgrade callbacks. Registered tests supply conflicting callbacks and check
 90/240-tick alarms, conditional field allocation and its Create RNG draw.
+`achNoDamage` and `achAreaNoDamage` also live in shared run state. Player
+Create's `scrPlayerInit` sets both; `scrGlobalStuff` sets only `achNoDamage`.
+Registered typical damage clears them in that order after the Timeout WITH,
+not inside `scrPDamage`. An immunity early return or earlier synchronous
+failure does not clear them. Both world tests preserve the flags across a
+failed forced jump while checking that the preceding immunity write remains.
+The external-event overload retains the explicit writes as its reference;
+this state binding does not implement Result's Steam achievement submission.
 The explicit-event-state overloads
 remain the reference path. Both world tests deliberately supply a conflicting
 external immunity value, verify that the real global wins, and verify that a

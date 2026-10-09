@@ -13,6 +13,8 @@ template<class World,class SelectPlayer> struct RegisteredPlayerDamageState {
     void setHit(){world.setPlayerHit();}
     bool candleOwned()const{return world.upgrades().levels[7]!=0;}
     bool timeoutOwned()const{return world.upgrades().levels[17]!=0;}
+    void clearNoDamage(){world.clearNoDamageAchievement();}
+    void clearAreaNoDamage(){world.clearAreaNoDamageAchievement();}
     bool subtractHealth(MotionBinary64 amount){return world.subtractPlayerHealth(amount);}
     bool damageNumber(MotionBinary64 amount,MotionBinary64 direction){return world.emitPlayerDamageNumber(amount,direction);}
     bool setPlayerAlarm(unsigned index,int ticks){

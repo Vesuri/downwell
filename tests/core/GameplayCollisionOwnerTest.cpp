@@ -1708,8 +1708,8 @@ int main(){
         const auto one=MotionBinary64::fromInteger(1);
         auto noBirth=[](std::uint32_t&){return false;};
         assert(world->typicalPlayerDamage(damageBinding,one,one,one,damageEvents,noBirth)&&world->playerDamaged());
-        assert(damageEvents.alarm==-1&&damageEvents.clears==2);
-        assert(world->typicalPlayerDamage(damageBinding,one,one,one,damageEvents,noBirth)&&damageEvents.clears==2&&selections==1);
+        assert(damageEvents.alarm==-1&&!damageEvents.clears&&!world->noDamageAchievement()&&!world->areaNoDamageAchievement());
+        assert(world->typicalPlayerDamage(damageBinding,one,one,one,damageEvents,noBirth)&&!damageEvents.clears&&selections==1);
         assert(world->setPlayerDamageAlarm(world->playerHandle(),2));
         world->setPlayerHit();assert(world->playerHit()==1);
         assert(world->setOxygen({0x40230000u,0}));
@@ -1777,7 +1777,7 @@ int main(){
         }
     }
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
-                   GameplayCollisionOwner::Ownership::nativeScenery})for(bool upgraded:{false,true}){
+                   GameplayCollisionOwner::Ownership::nativeScenery})for(bool upgraded:{false,true})for(bool failJump:{false,true}){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
             GameplayTerrainInstances::WallCollision{},nullptr,mode);
         auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
@@ -1787,12 +1787,20 @@ int main(){
         inventory.levels[7]=inventory.levels[17]=upgraded?1:0;
         ContactDamageScripts caller;
         auto bound=bindContactDamagePlayer(caller,*world,[&](InstanceHandle& h){h=world->playerHandle();return true;});
-        struct Events:TimeoutDamageEvents {bool candle=false;bool candleOwned(){return candle;}} events;
+        struct Events:TimeoutDamageEvents {
+            bool candle=false,failJump=false;bool candleOwned(){return candle;}
+            bool setVertical(Number value){vy=value;return !failJump;}
+        } events;
         events.candle=events.timeout=!upgraded;
+        events.failJump=failJump;
         unsigned births=0;
         const auto one=MotionBinary64::fromInteger(1);
         const auto fields=world->timeFields().size();const auto draws=world->randomDrawCount();
-        assert(world->typicalPlayerDamage(bound,one,one,one,events,[&](std::uint32_t& id){id=910000+births++;return true;}));
+        assert(world->noDamageAchievement()&&world->areaNoDamageAchievement());
+        assert(world->typicalPlayerDamage(bound,one,one,one,events,[&](std::uint32_t& id){id=910000+births++;return true;})==!failJump);
+        assert(world->noDamageAchievement()==failJump&&world->areaNoDamageAchievement()==failJump&&!events.clears);
+        if(failJump){assert(world->timeFields().size()==fields&&world->randomDrawCount()==draws&&
+            !births&&world->playerDamaged());continue;}
         assert(caller.player.hitInvulnerability==(upgraded?240:90)&&events.players==(upgraded?2u:0u)&&births==unsigned(upgraded));
         bool pending=false;assert(world->playerDamageAlarmPending(world->playerHandle(),1,pending)&&pending);
         assert(world->findPlayer(world->playerHandle())->damageAlarm==(upgraded?240:90));

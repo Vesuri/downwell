@@ -105,6 +105,8 @@ struct RunSession {
     // entry. DeathMenu/EndMenu display the cumulative total across levels.
     std::uint32_t kills = 0;
     bool noKill = false; // global.achNoKill; initialized by scrPlayerInit, not room loading.
+    bool noDamage=true; // scrGlobalStuff; scrPlayerInit also sets both flags.
+    bool areaNoDamage=false;
     bool playerDamaged=false; // scrPlayerGlobalStat / scrPlayerInit; Alarm 1 clears it.
     void expirePlayerDamage(){playerDamaged=false;}
     // global.pHit: initialized by scrPlayerGlobalStat, not scrPlayerInit.
@@ -138,7 +140,7 @@ struct RunSession {
         if(area<1||area>5)return false;
         sound=193+area;return true;
     }
-    void playerCreated(){noKill=true;firstLand=false;oxygen=MotionBinary64::fromInteger(100);playerDamaged=false;}
+    void playerCreated(){noKill=true;noDamage=true;areaNoDamage=true;firstLand=false;oxygen=MotionBinary64::fromInteger(100);playerDamaged=false;}
     template<class Audio,class Delay,class Cue>
     bool recordEnemyDeath(bool cutGunshot,Audio& audio,Delay delay,Cue cue){
         return recordEnemyDeath(cutGunshot,audio,[&]{noKill=false;return true;},delay,cue);
@@ -750,6 +752,7 @@ struct RunSession {
         combo = {};
         kills = 0;
         noKill = false;
+        noDamage=true; // scrGlobalStuff does not write achAreaNoDamage.
         playerDamaged=false;
         combo.state.record = saved.bestCombo;
         stage = {};

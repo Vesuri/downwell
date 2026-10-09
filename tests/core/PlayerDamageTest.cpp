@@ -74,6 +74,10 @@ int main(){
         run.playerDamageEndStep();assert(run.playerHit==2);
         run.setPlayerHit();assert(run.playerHit==1); // A new hit restarts the marker.
         run.playerDamageEndStep();run.playerDamageEndStep();assert(!run.playerHit);
+        assert(run.noDamage&&run.areaNoDamage);
+        run.noDamage=run.areaNoDamage=false;
+        run.reset();assert(run.noDamage&&!run.areaNoDamage);
+        run.playerCreated();assert(run.noDamage&&run.areaNoDamage);
     }
     for(unsigned failure=0;failure<=8;++failure){
         const auto check=[&](auto& actor){

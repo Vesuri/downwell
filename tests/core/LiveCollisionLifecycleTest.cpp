@@ -1856,7 +1856,7 @@ int main(){
         }
         require(controllers,"persistent controller participated in damage");
     }
-    for(bool upgraded:{false,true}){
+    for(bool upgraded:{false,true})for(bool failJump:{false,true}){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
         require(owner->attach(*world),"attach damage upgrade ownership");world->skipToGameForTesting();
@@ -1866,11 +1866,20 @@ int main(){
         require(world->visitDrawChecked([&](InstanceHandle h,const InstanceRecord& r){if(r.objectId==35)player=h;return true;}),"select upgrade fixture player");
         ContactDamageScripts caller;
         auto bound=bindContactDamagePlayer(caller,*world,[&](InstanceHandle& h){h=player;return true;});
-        struct Events:TimeoutDamageEvents {bool candle=false;bool candleOwned(){return candle;}} events;
+        struct Events:TimeoutDamageEvents {
+            bool candle=false,failJump=false;bool candleOwned(){return candle;}
+            bool setVertical(Number value){vy=value;return !failJump;}
+        } events;
         events.candle=events.timeout=!upgraded;
+        events.failJump=failJump;
         const auto one=MotionBinary64::fromInteger(1);
         const auto fields=world->timeFields().size();const auto draws=world->randomDrawCount();
-        require(world->typicalPlayerDamage(bound,one,one,one,events),"registered upgrade-aware damage");
+        require(world->noDamageAchievement()&&world->areaNoDamageAchievement(),"player creation sets damage achievements");
+        require(world->typicalPlayerDamage(bound,one,one,one,events)==!failJump,"registered upgrade-aware damage");
+        require(world->noDamageAchievement()==failJump&&world->areaNoDamageAchievement()==failJump&&!events.clears,
+            "achievement writes belong to the run and occur only after synchronous damage effects");
+        if(failJump){require(world->timeFields().size()==fields&&world->randomDrawCount()==draws&&
+            world->playerDamaged(),"failed jump retains immunity but skips later Timeout and achievement writes");continue;}
         require(world->resolveInstance(player)->alarms.get(1)==(upgraded?240:90)&&
             caller.player.hitInvulnerability==(upgraded?240:90)&&events.players==(upgraded?2u:0u),
             "Candle and Timeout use inventory, not conflicting external callbacks");
@@ -1892,9 +1901,10 @@ int main(){
         TimeoutDamageEvents events;events.timeout=false;events.immune=true;
         const auto one=MotionBinary64::fromInteger(1);
         require(world->typicalPlayerDamage(bound,one,one,one,events)&&world->playerDamaged()&&
-            world->resolveInstance(player)->alarms.get(1)==90&&events.alarm==-1&&events.clears==2,
+            world->resolveInstance(player)->alarms.get(1)==90&&events.alarm==-1&&events.clears==0&&
+            !world->noDamageAchievement()&&!world->areaNoDamageAchievement(),
             "source damage writes actual player state, not stale external immunity");
-        require(world->typicalPlayerDamage(bound,one,one,one,events)&&events.clears==2&&selections==1,
+        require(world->typicalPlayerDamage(bound,one,one,one,events)&&events.clears==0&&selections==1,
             "repeated contact reads the actual shared damaged guard");
         require(world->setPlayerDamageAlarm(player,alarm),"arm registered player Alarm 1");
         world->setPlayerHit();require(world->playerHit()==1,"publish source pHit");

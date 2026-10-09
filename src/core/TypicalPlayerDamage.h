@@ -47,8 +47,8 @@ struct TypicalPlayerDamage {
             const auto y=player.publishedY(),x=player.publishedX();
             return createField(x,y);
         }))return false;
-        events.clearNoDamage();
-        events.clearAreaNoDamage();
+        state.clearNoDamage();
+        state.clearAreaNoDamage();
         return true;
     }
 };

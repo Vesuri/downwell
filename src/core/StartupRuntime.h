@@ -268,6 +268,10 @@ public:
         return run_.effectsSucceeded=okay;
     }
     bool noKillAchievement()const{return run_.noKill;}
+    bool noDamageAchievement()const{return run_.noDamage;}
+    bool areaNoDamageAchievement()const{return run_.areaNoDamage;}
+    void clearNoDamageAchievement(){run_.noDamage=false;}
+    void clearAreaNoDamageAchievement(){run_.areaNoDamage=false;}
     bool playerDamaged()const{return run_.playerDamaged;}
     void setPlayerDamaged(){run_.playerDamaged=true;}
     unsigned playerHit()const{return run_.playerHit;}
