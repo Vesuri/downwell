@@ -58,6 +58,7 @@ public:
     bool valid()const{return good_;}
     void observeFailure(bool& owner){good_.observe(owner);}
     unsigned size()const{return count_;}
+    std::uint32_t lastLifetime()const{return next_-1;}
     // Conservative presentation candidates, in unchanged birth order. The
     // caller still tests the current sprite footprint/visibility. Coordinates
     // are immutable for these terrain lifetimes; callbacks must not mutate us.

@@ -2449,6 +2449,41 @@ int main(){
             !world->findBreakable(box)->state.checked&&owner->skeletons().find(skeleton)&&
             !owner->skeletons().find(skeleton)->destroyRequested);
     }
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                  GameplayCollisionOwner::Ownership::nativeScenery}){
+        const bool native=mode!=GameplayCollisionOwner::Ownership::reference;
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+        auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),native?nullptr:&owner->terrain());
+        auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
+        assert(owner->attach(*world)&&(!native||world->bindNativeTerrain(*terrain)));
+        const int top=world->cameraOffsetY()+34;
+        const int ys[]={top-161,top-160,top+3000,top+3001,top-200};
+        InstanceHandle keys[5];
+        for(unsigned i=0;i<5;++i){
+            DeferredCreateInstance birth(93,240,ys[i]);birth.active=i!=4;
+            assert(world->createGeneratedInstance(birth,objects,[&](const auto& c){
+                return !native||(terrain->append(c.objectId,c.x,c.y,c.active)&&
+                    world->finishNativeTerrainCreate(terrain->handle(terrain->size()-1)));
+            }));
+            const auto local=native?terrain->handle(terrain->size()-1):owner->terrain().handle(owner->terrain().size()-1);
+            assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,local,keys[i]));
+        }
+        unsigned collisions=0;
+        assert(world->withCollisionPass([&]{
+            ++collisions;
+            for(const auto key:keys){GameplayWorld::NativeTerrain::Identity id;bool active,destroyed;
+                assert(GameplayCollisionView(*world).readTerrain(key,id,active,destroyed)&&!destroyed);}
+            return true;
+        },[&]{world->step(0);return world->effectsSucceeded();})&&collisions==1);
+        for(unsigned i=0;i<5;++i){GameplayWorld::NativeTerrain::Identity id;bool active,destroyed;
+            assert(GameplayCollisionView(*world).readTerrain(keys[i],id,active,destroyed)&&
+                destroyed==(i==0||i==3)&&active==(i!=4));}
+        assert(owner->prepareDraw());
+        for(unsigned i=0;i<5;++i)
+            assert(GameplayCollisionView(*world).contains(keys[i])==(i!=0&&i!=3));
+    }
     {
         std::vector<std::uint32_t> expected;
         const auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());

@@ -60,6 +60,7 @@ public:
         return good_=(good_&&order&&runs_.changePublication(h,Order{order}));
     }
     bool valid()const{return good_;}
+    std::uint32_t lastLifetime()const{return next_-1;}
     // -2 means constructor defaults, not the runner's missing-sprite value.
     bool appearance(InstanceHandle h,int& sprite,unsigned& index,bool& created)const{
         if(!contains(h))return false;

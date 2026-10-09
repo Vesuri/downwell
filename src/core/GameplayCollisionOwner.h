@@ -1471,7 +1471,10 @@ public:
         world.configureRegisteredActorEndStep([](void* context,long topQ12){
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
             if(!self.valid())return false;
-            if(!self.world_->breakableSlots()&&!self.world_->enemyCount()&&!self.drones_.size()&&!self.skeletons_.size()&&!self.playerControllers_.size()&&!self.corpses_.size())return true;
+            const auto* nativeTerrain=self.world_->nativeTerrainInstances();
+            const unsigned terrainCount=nativeTerrain?nativeTerrain->size():self.terrain_.size();
+            const auto terrainCutoff=nativeTerrain?nativeTerrain->lastLifetime():self.terrain_.lastLifetime();
+            if(!terrainCount&&!self.world_->breakableSlots()&&!self.world_->enemyCount()&&!self.drones_.size()&&!self.skeletons_.size()&&!self.playerControllers_.size()&&!self.corpses_.size())return true;
             MotionBinary64 top;
             if(!multiplyBinary64(MotionBinary64::fromInteger(topQ12),{0x3f300000u,0},top))return self.check(false);
             return self.dispatchActorEndStep([&](InstanceHandle shared,int object){
@@ -1499,7 +1502,7 @@ public:
                 if(object==256&&kind==View::Kind::playerController)
                     return self.playerControllers_.balloonEndStep(local,self.world_->upgrades().levels[15]!=0);
                 return object==266&&kind==View::Kind::drone&&self.drones_.endStep(local,top,MotionBinary64::fromInteger(284),true);
-            });
+            },[&]{return !terrainCount||self.retireThinPlatforms(topQ12,terrainCutoff);});
         },this,true);
         world.configureRoomActorDraw([](const void* context,GameplayWorld::DrawActorVisitor visit,void* visitor){
             const auto& self=*static_cast<const GameplayCollisionOwner*>(context);
@@ -1887,6 +1890,10 @@ public:
     // alarm workspace; native boxes borrow their lifetime prefix instead.
     // This does not stand in for the complete mixed world phase.
     template<class Execute> bool dispatchActorEndStep(Execute execute){
+        return dispatchActorEndStep(execute,[]{return true;});
+    }
+    template<class Execute,class BetweenBoxesAndActors>
+    bool dispatchActorEndStep(Execute execute,BetweenBoxesAndActors betweenBoxesAndActors){
         if(!valid()||!world_||actorEndStepExecuting_||combatAlarmPhaseInUse_)return check(false);
         actorEndStepExecuting_=true;
         struct Reset {bool& value;~Reset(){value=false;}} reset{actorEndStepExecuting_};
@@ -1939,6 +1946,7 @@ public:
                 if(!check(resolves(h)&&execute(h,92))||!valid())return false;
             }
         }
+        if(!check(betweenBoxesAndActors())||!valid())return false;
         for(unsigned i=0;i<actorEndStepPhase_.size();++i){
             const auto h=actorEndStepPhase_.handle(i);std::uint32_t flags;
             if(!eligibilityFlags(h,flags)||(flags&0x100003u))continue;
@@ -1946,6 +1954,29 @@ public:
         }
         return true;
     }
+private:
+    bool retireThinPlatforms(long topQ12,std::uint32_t cutoff){
+        // Pinned object 93 End Step has only scrOutofview, with no inherited
+        // Destroy/Clean Up. Marking leaves registration intact, so this known
+        // event body may borrow registration order without a terrain snapshot.
+        PackedObjectEvent event;
+        if(objects_.findEvent(93,1,0,event)||objects_.findEvent(93,12,0,event))return check(false);
+        const auto visit=[&](InstanceHandle h,int object,std::uint32_t flags){
+                if(object!=93||h.generation>cutoff||(flags&0x100003u))return true;
+                GameplayWorld::NativeTerrain::Identity id;bool active,destroyed;
+                if(!View(*world_).readTerrain(h,id,active,destroyed))return false;
+                return retireMainRoomObjectsChecked(1,11,1,topQ12,[&](unsigned){
+                    return LifetimeInstance{93,id.y,active&&!destroyed};
+                },[&](unsigned){
+                    return world_->nativeTerrainInstances()?world_->destroyNativeTerrain(id.handle):terrain_.requestDestroy(id.handle);
+                });
+            };
+        // The retained actor projection deliberately excludes terrain.
+        return check(native_?visitNativeRegistered(View::terrainBase,View::timeFieldBase,visit):
+            owner_.visitRegistrationRange(View::terrainBase,View::timeFieldBase,
+                [&](InstanceHandle h,int object,const Owner::State& state){return visit(h,object,state.flags);}));
+    }
+public:
     GameplayWorld::DroneBullets& droneBullets(){return drones_;}
     GameplayWorld::Bones& bones(){return bones_;}
     GameplayWorld::Skeletons& skeletons(){return skeletons_;}

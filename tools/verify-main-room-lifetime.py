@@ -14,6 +14,10 @@ assert manifest["source"]["sha256"] == source
 assert manifest["extractor"]["version"] == "0.9.2.0"
 assert manifest["extractor"]["commit"] == "03c7048438347799e0717b6e57a9358d000472e0"
 simple = "71aaac10eef02f61e15327032a995fe459f49451cd38b8434e071ec96268b315"
+for object_id, parent in [(93,87),(87,56),(56,-1)]:
+    obj = manifest["resources"]["objects"][object_id]
+    assert obj["parentId"] == parent
+    assert not any(e["eventType"] in (1,12) for e in obj["events"])
 for object_id, name, subtype, code_id, digest in [
     (93,"objThinPlatform",2,1091,simple),
     (111,"enmSnake",2,1194,simple),

@@ -256,6 +256,13 @@ capture through recursive dispatch. The 165-entry workspace is owner-resident
 (2,640 bytes of entries), not on the 8 KiB Amiga task stack, and is separate
 from the cached alarm snapshot. This corrects ordering within that handoff;
 walls, remaining controllers and the other family passes are not thereby interleaved.
+Thin platforms (93) run between boxes and actors. This known body only checks
+`scrOutofview`; neither it nor its parents define Destroy/Clean Up events, as
+pinned by the lifetime verifier. It borrows the full terrain registration order
+(not the actor-only retained projection), marks without unregistering, and uses
+the phase-entry generation ceiling to exclude later births. Removal remains at
+Draw cleanup. Native runs retain their existing identities without a per-tile
+phase snapshot. This admits platform retirement, not the wall End Step body.
 Boxes (92) precede this actor capture's dispatch, using a stable-slot prefix and
 generation ceiling rather than an additional per-box snapshot. Both the prefix
 and actor snapshot are captured before box callbacks: new boxes and actors wait
