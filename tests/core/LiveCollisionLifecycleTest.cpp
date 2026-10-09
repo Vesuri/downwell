@@ -3417,6 +3417,7 @@ int main(){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
         require(owner->attach(*world),"attach transition world");world->skipToGameForTesting();
+        require(world->setOxygen({0x40230000u,0}),"set fractional oxygen below floor");
         world->registerLevelExit(176);
         TimeStopEffects<16> state;
         auto shards=world->timeShardRegistration<16>();auto changes=world->timeChangeRegistration<8>();
@@ -3426,6 +3427,8 @@ int main(){
         const auto first=world->nextRuntimeInstanceId();const auto draws=world->randomDrawCount();
         unsigned pauses=0;
         auto emit=[&](PlayerTimeStop::Effect effect){
+            if(effect==PlayerTimeStop::Effect::oxygenFloor)
+                require(world->oxygen().high==0x40240000u&&!world->oxygen().low,"shared oxygen floor precedes notification");
             if(effect==PlayerTimeStop::Effect::change){
                 const auto id=pauses?first+10:first+3;const auto* r=world->instance(id);
                 require(r&&r->objectId==211&&r->preciseX==240.25f&&

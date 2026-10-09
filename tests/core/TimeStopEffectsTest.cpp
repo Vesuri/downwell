@@ -68,6 +68,16 @@ static void checkedAudioTransitions(){
     }
 }
 int main(){
+    for(auto value:{MotionBinary64::fromInteger(-2),MotionBinary64{},
+                   MotionBinary64{0x4023ffffu,0xffffffffu},MotionBinary64::fromInteger(10),
+                   MotionBinary64{0x40240000u,1},MotionBinary64::fromInteger(100)}){
+        RunSession run;assert(run.setOxygen(value)&&run.floorTimeStopOxygen());
+        const auto expected=((value.high&0x80000000u)||value.high<0x40240000u)?MotionBinary64::fromInteger(10):value;
+        assert(run.oxygen.high==expected.high&&run.oxygen.low==expected.low);
+        run.playerCreated();assert(run.oxygen.high==MotionBinary64::fromInteger(100).high);
+        assert(run.setOxygen(value));
+        run.reset();assert(run.oxygen.high==MotionBinary64::fromInteger(100).high);
+    }
     checkedAudioTransitions();
     for(unsigned failure=0;failure<=4;++failure){
         RunSession run;MusicDuck caller;unsigned calls=0;run.backgroundMusicId=193;

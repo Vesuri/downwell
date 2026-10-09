@@ -146,6 +146,20 @@ is paused. SDL tests exercise the shared `TimeStopAudio` pause/resume/query
 entry points, retained cursors, mixed paused/playing resource voices and ramps
 on paused voices. This does not yet admit natural player time-stop transitions.
 
+The stored and native Begin Step adapters apply the stopped-player oxygen floor
+to shared `RunSession` state before notifying the external effect callback.
+This is the final `global.oxygen < 10` / write-10 branch in player Begin Step
+blocks 78–79, not an unconditional refill or an integer rounding operation.
+`scrPlayerGlobalStat` initializes the sole source-written oxygen maximum to 100;
+`scrPlayerInit` copies that maximum on player creation. Shared run reset and
+player creation restore 100. Tests cover fractional values immediately below
+and above ten, negative values, repeated stopped ticks and both world adapters.
+The water depletion/collection events are not implemented by this floor.
+Source assembly SHA256: player Begin Step
+`46a8178a1b7cf78ff8f14f204047096d00717ea59da6e2cd74d908cf1932fed5`;
+`scrPlayerGlobalStat`
+`34dfd0f192ca34217da36cdfd001b792a3e7d496d3fc8c3e9967f8ce7ff2266a`.
+
 The stored registered-skeleton pass also admits skeleton contacts with fields
 82, 255 and 371 in that same collected pair stream. It resolves the inherited
 83/1066 event and sets health to zero unless `timefieldImmune` is set; it does

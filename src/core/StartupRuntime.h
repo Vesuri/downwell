@@ -260,6 +260,8 @@ public:
         return run_.effectsSucceeded=okay;
     }
     bool noKillAchievement()const{return run_.noKill;}
+    MotionBinary64 oxygen()const{return run_.oxygen;}
+    bool setOxygen(MotionBinary64 value){return run_.setOxygen(value);}
     template<class Audio> bool duckMusic(MusicDuck& caller,int duration,MotionBinary64 amount,Audio& audio){
         return run_.duckMusic(caller,duration,amount,audio);
     }
@@ -1075,6 +1077,7 @@ public:
                     id=result.id;fx=result.x;fy=result.y;return true;
                 },audio,[&](PlayerTimeStop::Effect effect){
                     if(effect==PlayerTimeStop::Effect::shake&&!requestTimeStopCameraShake())return false;
+                    if(effect==PlayerTimeStop::Effect::oxygenFloor&&!run_.floorTimeStopOxygen())return false;
                     return emit(effect);
                 });
         return run_.effectsSucceeded;

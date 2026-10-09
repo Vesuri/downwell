@@ -107,6 +107,21 @@ struct RunSession {
     bool noKill = false; // global.achNoKill; initialized by scrPlayerInit, not room loading.
     bool firstLand=false;
     int backgroundMusicId=193; // scrInitialize; survives ordinary run/room reset.
+    MotionBinary64 oxygen=MotionBinary64::fromInteger(100); // scrPlayerGlobalStat.
+    bool setOxygen(MotionBinary64 value){
+        if(!effectsSucceeded)return false;
+        if(!value.valid())return effectsSucceeded=false;
+        oxygen=value;return true;
+    }
+    bool floorTimeStopOxygen(){
+        if(!effectsSucceeded)return false;
+        if(!oxygen.valid())return effectsSucceeded=false;
+        // Positive finite binary64 bit order is numeric order; all negatives
+        // and signed zero are below ten. Preserve values above the floor.
+        if((oxygen.high&0x80000000u)||oxygen.high<0x40240000u)
+            oxygen=MotionBinary64::fromInteger(10);
+        return true;
+    }
     template<class Audio> bool duckMusic(MusicDuck& caller,int duration,MotionBinary64 amount,Audio& audio){
         if(!effectsSucceeded)return false;
         return effectsSucceeded=caller.execute(duration,amount,[&]{return stage.area;},
@@ -116,7 +131,7 @@ struct RunSession {
         if(area<1||area>5)return false;
         sound=193+area;return true;
     }
-    void playerCreated(){noKill=true;firstLand=false;}
+    void playerCreated(){noKill=true;firstLand=false;oxygen=MotionBinary64::fromInteger(100);}
     template<class Audio,class Delay,class Cue>
     bool recordEnemyDeath(bool cutGunshot,Audio& audio,Delay delay,Cue cue){
         return recordEnemyDeath(cutGunshot,audio,[&]{noKill=false;return true;},delay,cue);
@@ -718,6 +733,7 @@ struct RunSession {
         return {gems.lifetime, gems.record, combo.state.record};
     }
     void reset(const RunRecords& saved = {}) {
+        oxygen=MotionBinary64::fromInteger(100);
         for(auto& sound:overlapSounds)sound=0;
         fieldWind={};
         gems = {};

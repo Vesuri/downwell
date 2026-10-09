@@ -809,6 +809,7 @@ public:
         return run_.effectsSucceeded=state.beginStepWithAudioChecked(mainRoom,side,pose,lowSpec,enemyRandom_,
             field,lookup,audio,[&](downwell::PlayerTimeStop::Effect effect){
                 if(effect==downwell::PlayerTimeStop::Effect::shake&&!requestTimeStopCameraShake())return false;
+                if(effect==downwell::PlayerTimeStop::Effect::oxygenFloor&&!run_.floorTimeStopOxygen())return false;
                 return emit(effect);
             })&&run_.effectsSucceeded;
     }
@@ -1475,6 +1476,8 @@ public:
         return run_.playBulletWallSound(caller->sound,environment,enemyRandom_,material,audio);
     }
     bool noKillAchievement()const{return run_.noKill;}
+    downwell::MotionBinary64 oxygen()const{return run_.oxygen;}
+    bool setOxygen(downwell::MotionBinary64 value){return run_.setOxygen(value);}
     bool firstLand()const{return run_.firstLand;}
     int backgroundMusicId()const{return run_.backgroundMusicId;}
     template<class Audio,class Delay,class Cue>

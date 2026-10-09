@@ -1700,6 +1700,7 @@ int main(){
         auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain(),&rooms);
         assert(owner->attach(*world)&&world->createTimeFieldWithSourceId(820000,240,176));
+        assert(world->setOxygen({0x40230000u,0}));
         unsigned next=830000;std::uint8_t input=0;std::vector<PlayerTimeStop::Effect> events;
         const auto tick=[&]{return owner->withPlayerTimeStop(stop,room,masks,false,
             [&](std::uint32_t& id){id=next++;return true;},
@@ -1707,6 +1708,7 @@ int main(){
             [&](PlayerTimeStop::Effect effect){events.push_back(effect);return true;},
             [&]{world->step(input);return world->effectsSucceeded();});};
         assert(tick()&&stop.player.stopped&&stop.player.checkStop&&!stop.player.bgmOn);
+        assert(world->oxygen().high==0x40240000u&&!world->oxygen().low);
         assert(next==830007&&owner->timeShards().size()==6&&owner->timeChanges().size()==1);
         assert((events==std::vector<PlayerTimeStop::Effect>{PlayerTimeStop::Effect::shake,
             PlayerTimeStop::Effect::change,PlayerTimeStop::Effect::pauseMusic,
