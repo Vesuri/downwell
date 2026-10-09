@@ -911,6 +911,33 @@ int main() {
         }
         RecordingRenderer retired;effectGame.render(retired);
         require(effectGame.renderingSucceeded()&&!retired.effectWords,"retirement clears retained effect coverage");
+        {
+            auto corpses=runtime.corpseRegistration<1>();auto smoke=runtime.smokeRegistration<1>();
+            downwell::GameMakerRandom random(2);downwell::InstanceHandle corpse;std::uint32_t smokeId=0;
+            require(corpses.create(x,y,false,random,[](auto,int,auto,auto,bool& hit){hit=false;return true;},corpse)&&
+                corpses.sprite(corpse,206)&&corpses.facing(corpse,downwell::MotionBinary64::fromInteger(-1))&&
+                runtime.createRegisteredSmoke(smoke,x,y,smokeId),"register overlapping corpse and smoke draw lifetimes");
+            auto render=[&](RecordingRenderer& target){return runtime.withCorpseDraw(corpses,[&]{
+                effectGame.render(target);return effectGame.renderingSucceeded();
+            });};
+            RecordingRenderer together;together.effectPixels.assign(160*284,-1);
+            require(render(together)&&together.effectWords&&
+                std::find(together.spriteOrder.begin(),together.spriteOrder.end(),206)==together.spriteOrder.end()&&
+                std::find(together.spriteOrder.begin(),together.spriteOrder.end(),84)==together.spriteOrder.end(),
+                "registered corpse and smoke reach the shared surface without direct duplicates");
+            require(corpses.dispatchPublished(corpse,[](auto& state,auto&,bool&){state.flash=1;return true;}),
+                "set corpse private Draw flash gate");
+            RecordingRenderer onlySmoke;onlySmoke.effectPixels.assign(160*284,-1);
+            require(render(onlySmoke)&&onlySmoke.effectPixels!=together.effectPixels,
+                "live corpse flash gate removes its surface contribution");
+            require(corpses.dispatchPublished(corpse,[](auto& state,auto&,bool&){state.flash=-1;return true;}),
+                "restore corpse Draw flash gate");
+            RecordingRenderer restored;restored.effectPixels.assign(160*284,-1);
+            require(render(restored)&&restored.effectPixels==together.effectPixels,"mixed surface rebuild is deterministic");
+            RecordingRenderer unbound;effectGame.render(unbound);
+            require(!effectGame.renderingSucceeded(),"missing corpse Draw owner fails rather than showing stale private state");
+            require(smoke.clear()&&corpses.clear(),"retire registered mixed surface fixture");
+        }
         require(runtime.emitSmokeBurst(x,y) && runtime.emitFlashBurst(x,y),"live world emits overlapping effect owners");
         const auto draws=runtime.randomDrawCount();
         RecordingRenderer first,second;

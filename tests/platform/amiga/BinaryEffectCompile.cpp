@@ -600,6 +600,13 @@ bool compileBinaryEffect(downwell::BinaryEffectSurface<>& surface,
 #include "core/CorpseMotion.h"
 #include "core/CorpseAnimation.h"
 #include "core/CorpseDraw.h"
+#include "core/SmokeDraw.h"
+bool compileSmokeSurface(downwell::RunnerImageValue index,downwell::RunnerImageValue x,downwell::RunnerImageValue y,
+    const downwell::EffectMaskAssets& assets,const downwell::EffectSurfacePlacement::View& view){
+    return downwell::SmokeDraw::surface(index,x,y,assets,view,[](const auto& asset,auto px,auto py){
+        return asset.mask.data&&px.valid()&&py.valid();
+    });
+}
 bool compileCorpseDraw(const downwell::CorpseAnimation& corpse,
                        const downwell::EffectSurfacePlacement::View& view,
                        downwell::CorpseDraw::Command& out){

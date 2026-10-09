@@ -413,6 +413,22 @@ public:
     }
     enum class SkeletonPhase {animation,alarm,step,endStep,cleanup};
     enum class CorpsePhase {animation,alarm,step,endStep,cleanup};
+    // Borrow private corpse Draw state only for the enclosing render. The
+    // renderer still walks the shared layers; this is not a separate pass.
+    template<unsigned Capacity,class Render> bool withCorpseDraw(
+        StoredCorpseRegistration<instanceCapacity,Capacity>& registration,Render render){
+        if(corpseDrawState_||!registration.belongsTo(instances_)||!registration.valid())return false;
+        corpseDrawContext_=&registration;
+        corpseDrawState_=[](void* context,const InstanceRecord& record)->const CorpseAnimation*{
+            auto& owner=*static_cast<StoredCorpseRegistration<instanceCapacity,Capacity>*>(context);
+            return owner.state(owner.handle(record));
+        };
+        const bool ok=render();corpseDrawContext_=nullptr;corpseDrawState_=nullptr;
+        return ok&&registration.valid();
+    }
+    const CorpseAnimation* corpseForDraw(const InstanceRecord& record)const{
+        return corpseDrawState_?corpseDrawState_(corpseDrawContext_,record):nullptr;
+    }
     enum class SmokePhase {animation,alarm,step,cleanup};
     template<unsigned Capacity,class Tick>
     bool withSmokeEvents(StoredSmokeRegistration<instanceCapacity,Capacity>& registration,Tick tick){
@@ -1721,6 +1737,8 @@ private:
     bool (*corpseDispatch_)(void*,const InstanceRecord&,CorpsePhase,unsigned)=nullptr;
     void* corpseContext_=nullptr;
     void* corpseExpiryContext_=nullptr;
+    void* corpseDrawContext_=nullptr;
+    const CorpseAnimation* (*corpseDrawState_)(void*,const InstanceRecord&)=nullptr;
     void* smokeContext_=nullptr;
     bool (*smokeDispatch_)(void*,const InstanceRecord&,SmokePhase,unsigned)=nullptr;
     bool (*corpseExpiryDispatch_)(void*,const InstanceRecord&,bool)=nullptr;

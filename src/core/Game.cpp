@@ -1,5 +1,7 @@
 #include "Game.h"
 #include "TimeShardDraw.h"
+#include "CorpseDraw.h"
+#include "SmokeDraw.h"
 #include "EntryDitherPlacement.h"
 #include "WallDrawLookup.h"
 #include "WallPresentation.h"
@@ -300,10 +302,24 @@ void Game::renderMain(Renderer& renderer) const {
                     emit(gem.large,gem.motion.animation.frame(),Real::fromInteger(int(gem.x)),Real::fromInteger(int(gem.y)));
             }
         }, startup_.smokeEffects(), *effectAssets_, view, settings, [&](auto emit) {
-            return startup_.visitDebrisDraw([&](const DebrisAnimation& effect){
-                return DebrisDraw::surface(effect,*effectAssets_,view,emit);
-            })&&startup_.visitTimeShardDraw([&](const InstanceRecord& record){
-                return TimeShardDraw::surface(shardPresentation(record),*effectAssets_,view,emit);
+            return startup_.visitDrawChecked([&](InstanceHandle key,const InstanceRecord& record){
+                if(record.objectId==370){
+                    const auto* effect=startup_.debrisForDraw(key,record);
+                    return effect&&DebrisDraw::surface(*effect,*effectAssets_,view,emit);
+                }
+                if(record.objectId==238)return TimeShardDraw::surface(shardPresentation(record),*effectAssets_,view,emit);
+                if(record.objectId==263){
+                    const auto* effect=startup_.corpseForDraw(record);
+                    return effect&&CorpseDraw::surface(*effect,*effectAssets_,view,emit);
+                }
+                if(record.objectId==225){
+                    if(record.spriteId!=84||record.scaleX!=1||record.scaleY!=1||record.rotation!=0)return false;
+                    RunnerImageValue x,y,index;
+                    std::memcpy(&x.bits,&record.preciseX,4);std::memcpy(&y.bits,&record.preciseY,4);
+                    std::memcpy(&index.bits,&record.imageIndex,4);
+                    return SmokeDraw::surface(index,x,y,*effectAssets_,view,emit);
+                }
+                return true;
             });
         }, [&](auto emit) {
             return startup_.visitEntryDitherDraw([&](InstanceHandle,const InstanceRecord& record,int depth){
@@ -486,6 +502,26 @@ void Game::renderMain(Renderer& renderer) const {
         if(!instance.active||instance.destroyRequested)return true;
         if(depth < -1000){drawUnregisteredBullets();if(!drawForeground())return false;}
         if(instance.objectId==35){drawPlayer();return true;}
+        if(instance.objectId==225||instance.objectId==263){
+            if(composite)return true;
+            const bool death=startup_.mainDeathSequence().active;
+            EffectSpriteDraw::Command command;unsigned frame=0;
+            RunnerImageValue x,y,index;
+            std::memcpy(&x.bits,&instance.preciseX,4);std::memcpy(&y.bits,&instance.preciseY,4);
+            std::memcpy(&index.bits,&instance.imageIndex,4);
+            if(instance.objectId==225){
+                if(instance.spriteId!=84||instance.scaleX!=1||instance.scaleY!=1||instance.rotation!=0||
+                   !SmokeDraw::prepare(index,x,y,{},death,false,false,command)||!SmokeDraw::frame(index,frame))return false;
+            }else{
+                const auto* effect=startup_.corpseForDraw(instance);
+                if(!effect||!CorpseDraw::prepare(*effect,{},death,false,false,command))return false;
+                if(command.imageIndex.bits&0x7fffffffu)return false;
+            }
+            if(command.placement.target==EffectSurfacePlacement::hidden)return true;
+            float scale;std::memcpy(&scale,&command.scaleX.bits,4);
+            renderer.drawSpriteTransformed(command.sprite,frame,instance.preciseX-viewX,instance.preciseY-viewY,scale,1,0);
+            return true;
+        }
         if(instance.objectId==238){
             if(!instance.timeShardInitialized)return false;
             if(composite)return true;
