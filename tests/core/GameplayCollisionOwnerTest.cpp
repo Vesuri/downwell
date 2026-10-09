@@ -1777,6 +1777,30 @@ int main(){
         }
     }
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                   GameplayCollisionOwner::Ownership::nativeScenery})for(bool upgraded:{false,true}){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));
+        auto& inventory=const_cast<UpgradeInventory&>(world->upgrades());
+        inventory.levels[7]=inventory.levels[17]=upgraded?1:0;
+        ContactDamageScripts caller;
+        auto bound=bindContactDamagePlayer(caller,*world,[&](InstanceHandle& h){h=world->playerHandle();return true;});
+        struct Events:TimeoutDamageEvents {bool candle=false;bool candleOwned(){return candle;}} events;
+        events.candle=events.timeout=!upgraded;
+        unsigned births=0;
+        const auto one=MotionBinary64::fromInteger(1);
+        const auto fields=world->timeFields().size();const auto draws=world->randomDrawCount();
+        assert(world->typicalPlayerDamage(bound,one,one,one,events,[&](std::uint32_t& id){id=910000+births++;return true;}));
+        assert(caller.player.hitInvulnerability==(upgraded?240:90)&&events.players==(upgraded?2u:0u)&&births==unsigned(upgraded));
+        bool pending=false;assert(world->playerDamageAlarmPending(world->playerHandle(),1,pending)&&pending);
+        assert(world->findPlayer(world->playerHandle())->damageAlarm==(upgraded?240:90));
+        assert(world->timeFields().size()==fields+unsigned(upgraded)&&world->randomDrawCount()==draws+unsigned(upgraded));
+        if(upgraded){const auto* field=world->timeFields().at(fields);
+            assert(field&&field->sourceId==910000&&field->x==240&&field->y==40100);}
+    }
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
                    GameplayCollisionOwner::Ownership::nativeScenery})for(unsigned reject:{0u,1u,2u,3u}){
         TimeShardEffects<64> shards;TimeChangeEffects<8> changes;int speed=60;
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},

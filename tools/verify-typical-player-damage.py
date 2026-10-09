@@ -22,6 +22,7 @@ assert (number["name"],number["parentId"],number["spriteId"],number["textureMask
     "objDmgCalcFxPlayer",-1,-1,-1,True,False)
 assert {(event["eventType"],event["eventSubtype"]) for event in number["events"]} == {(0,0),(2,0),(3,0),(8,0),(14,0)}
 for name,digest in (
+    ("gml_GlobalScript_scrIncrementPug","ffeef3c577d4153ffca3705053f13d8edb490ec7ab7c155ae5533dae87175d7d"),
     ("gml_Object_objPlayer_n_Step_2","12b8c0939c68c322cb14d15e4f5c28e42fc53e84e14aac274b6003cf8cfe790c"),
     ("gml_GlobalScript_scrFjump","ba5311eb9bcd8cb5feadc0328c2c498451e39eebb83101a69992dfad0b47fab9"),
     ("gml_Object_objDmgCalcFxPlayer_Create_0","27def18e2dba947dd29714073b1eb23996cd1ff0177a3e2a65fe84bdeb58a7b7"),

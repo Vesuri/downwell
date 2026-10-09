@@ -177,7 +177,15 @@ attacker's caller fields. Pass the borrowed binding through the world's
 `typicalPlayerDamage` entry so Timeout births still use its registered path.
 The selector callback runs only at the final Alarm 1 assignment, after the
 damaged flag write, and must perform the source object-selector lookup then.
-It is not a cached handle or a WITH loop. The explicit-event-state overloads
+It is not a cached handle or a WITH loop.
+The same registered state reads Candle (upgrade 7) at `scrPDamage`'s entry
+and Timeout (upgrade 17) at the later `scrTypicalDamage` branch. These are
+live inventory reads at separate script positions, not a snapshot of both
+upgrades at contact entry. `scrIncrementPug`'s switch maps these IDs to
+`pugCandle` and `pugTime`. The explicit-event reference path retains external
+upgrade callbacks. Registered tests supply conflicting callbacks and check
+90/240-tick alarms, conditional field allocation and its Create RNG draw.
+The explicit-event-state overloads
 remain the reference path. Both world tests deliberately supply a conflicting
 external immunity value, verify that the real global wins, and verify that a
 second guarded contact neither selects the player nor repeats effects.

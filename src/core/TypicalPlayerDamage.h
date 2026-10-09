@@ -42,7 +42,7 @@ struct TypicalPlayerDamage {
         }
         // This is outside both death and surviving-health conditions. Do not
         // snapshot pTimeStop: every with iteration reads the current global.
-        if(events.timeoutOwned() && !events.forEachPlayer([&](auto& player){
+        if(state.timeoutOwned() && !events.forEachPlayer([&](auto& player){
             if(events.timeStopped())return true;
             const auto y=player.publishedY(),x=player.publishedX();
             return createField(x,y);

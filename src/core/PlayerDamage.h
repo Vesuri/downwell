@@ -11,6 +11,8 @@ template<class World,class SelectPlayer> struct RegisteredPlayerDamageState {
     bool playerDamaged()const{return world.playerDamaged();}
     void setPlayerDamaged(){world.setPlayerDamaged();}
     void setHit(){world.setPlayerHit();}
+    bool candleOwned()const{return world.upgrades().levels[7]!=0;}
+    bool timeoutOwned()const{return world.upgrades().levels[17]!=0;}
     bool subtractHealth(MotionBinary64 amount){return world.subtractPlayerHealth(amount);}
     bool damageNumber(MotionBinary64 amount,MotionBinary64 direction){return world.emitPlayerDamageNumber(amount,direction);}
     bool setPlayerAlarm(unsigned index,int ticks){
@@ -64,7 +66,7 @@ struct PlayerDamage {
     template<class Events,class State,class Audio> bool executeWithServices(
         MotionBinary64 amount,Events& events,State& state,Audio& audio){
         if(!events.setDamageSourceName())return false;
-        hitInvulnerability=events.candleOwned()?240:90;
+        hitInvulnerability=state.candleOwned()?240:90;
         if(!events.playerDead() && !state.playerDamaged()){
             if(!state.subtractHealth(amount))return false;
             const auto py=events.playerY(),px=events.playerX();

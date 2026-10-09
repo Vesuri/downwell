@@ -1856,6 +1856,27 @@ int main(){
         }
         require(controllers,"persistent controller participated in damage");
     }
+    for(bool upgraded:{false,true}){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach damage upgrade ownership");world->skipToGameForTesting();
+        auto& inventory=const_cast<UpgradeInventory&>(world->upgrades());
+        inventory.levels[7]=inventory.levels[17]=upgraded?1:0;
+        InstanceHandle player;
+        require(world->visitDrawChecked([&](InstanceHandle h,const InstanceRecord& r){if(r.objectId==35)player=h;return true;}),"select upgrade fixture player");
+        ContactDamageScripts caller;
+        auto bound=bindContactDamagePlayer(caller,*world,[&](InstanceHandle& h){h=player;return true;});
+        struct Events:TimeoutDamageEvents {bool candle=false;bool candleOwned(){return candle;}} events;
+        events.candle=events.timeout=!upgraded;
+        const auto one=MotionBinary64::fromInteger(1);
+        const auto fields=world->timeFields().size();const auto draws=world->randomDrawCount();
+        require(world->typicalPlayerDamage(bound,one,one,one,events),"registered upgrade-aware damage");
+        require(world->resolveInstance(player)->alarms.get(1)==(upgraded?240:90)&&
+            caller.player.hitInvulnerability==(upgraded?240:90)&&events.players==(upgraded?2u:0u),
+            "Candle and Timeout use inventory, not conflicting external callbacks");
+        require(world->timeFields().size()==fields+unsigned(upgraded)&&world->randomDrawCount()==draws+unsigned(upgraded),
+            "only the unstopped Timeout iteration creates a registered field and consumes its Create RNG");
+    }
     for(int alarm:{-1,0,1,2}){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
