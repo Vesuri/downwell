@@ -135,6 +135,17 @@ surfaces retain offsets. Unsupported text states fail with the source mutation
 prefix retained. This still requires live renderer-state/target binding and
 verification of the target raster policy before admitting natural callers.
 
+The complete exported VM font-setter inventory has nine entries. Initialization
+(`scrInitialize`, block 54) selects resource 2. The other eight are Draw events
+of `Obj_YoYo_textbox`, `Obj_YoYo_text`, `Obj_Steam_UGC`,
+`Obj_Steam_Leaderboard_Entry`, `Obj_Steam_StatsInfo`, `Obj_Steam_StorageInfo`,
+`Obj_Steam_OverlayInfo` and `Obj_Steam_GeneralInfo`. Neither these objects nor
+their descendants occur in the authored instances of any non-`Room_Steam_`
+room. The verifier checks the full writer set and transitive parent closure.
+This narrows live font-state admission to dynamic births/event calls and the
+initialization handoff; it does not prove those events unreachable or justify
+resetting the font at each title Draw. Alignment and alpha are separate state.
+
 `verify-runner-text-draw.py` pins draw_text registration/wrapper 0x5323A0 and
 alignment setters 0x45A9C0/0x45AA00. Horizontal/vertical alignment are globals
 0x9359BC/0x9359C0, not title-local defaults. The VM playerDraw sets horizontal

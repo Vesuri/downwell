@@ -4,6 +4,7 @@ from hashlib import sha256
 from pathlib import Path
 import runpy
 import struct
+import json
 
 root = Path(__file__).resolve().parents[1]
 runner = runpy.run_path(str(Path(__file__).with_name('verify-runner-choose.py')))
@@ -60,6 +61,34 @@ while offset<len(data):
 else:
     raise AssertionError('missing FONT chunk')
 assembly=root/'extracted/utmt-0.9.2.0/Assembly'
+# Inventory every exported font setter, not just the title's local event.
+# This establishes the initialization value and authored-room exclusion; it
+# deliberately does not infer that dynamic births/event calls are unreachable.
+font_events={
+    'Obj_YoYo_textbox', 'Obj_YoYo_text', 'Obj_Steam_UGC',
+    'Obj_Steam_Leaderboard_Entry', 'Obj_Steam_StatsInfo',
+    'Obj_Steam_StorageInfo', 'Obj_Steam_OverlayInfo', 'Obj_Steam_GeneralInfo',
+}
+font_writers={path.stem for path in assembly.glob('*.asm')
+              if 'call.i draw_set_font(' in path.read_text()}
+assert font_writers=={'gml_GlobalScript_scrInitialize'}|{
+    f'gml_Object_{name}_Draw_0' for name in font_events}
+initialize=(assembly/'gml_GlobalScript_scrInitialize.asm').read_text()
+assert initialize.count('call.i draw_set_font(')==1
+assert ':[54]\npushi.e 2\nconv.i.v\ncall.i draw_set_font(argc=1)' in initialize
+resources=json.loads((assembly.parent/'manifest.json').read_text())['resources']
+font_objects={o['id'] for o in resources['objects'] if o['name'] in font_events}
+assert len(font_objects)==8
+# Include inherited Draw writers (e.g. Obj_YoYo_button), not only exact IDs.
+while True:
+    inherited=font_objects|{o['id'] for o in resources['objects']
+                            if o['parentId'] in font_objects}
+    if inherited==font_objects: break
+    font_objects=inherited
+for room in resources['rooms']:
+    if not room['name'].startswith('Room_Steam_'):
+        assert not any(i['objectId'] in font_objects for i in room['instances']),room['name']
+print('Pinned initial font 2; all other font writers and descendants absent from authored game rooms')
 player=(assembly/'gml_GlobalScript_playerDraw.asm').read_text()
 assert player.count('call.i draw_set_halign(argc=1)')==1
 assert ':[5]\npushi.e 1\nconv.i.v\ncall.i draw_set_halign(argc=1)' in player
