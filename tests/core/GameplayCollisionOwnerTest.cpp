@@ -2991,6 +2991,31 @@ int main(){
                 actual.insert(actual.end(),{int(ok),s.checked,s.pillar,s.neighbors,s.imageIndex,s.checkThing,
                     s.checkDistance,int(s.surrounded),int(s.deactivate),int(s.lights),int(random.drawCount())});
                 if(!ok){assert(rejectTile&&pass==1&&i==4);break;}
+                // Consume the event's newly published appearance immediately,
+                // before any animation pass or Draw preparation. Native wall
+                // state is borrowed during the event and packed afterwards;
+                // queries must not revert to constructor/previous images.
+                InstanceHandle shared;
+                assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,h,shared));
+                if(native){
+                    int sprite=-1;unsigned image=999;bool created=false;
+                    assert(terrain->appearance(h,sprite,image,created)&&created&&
+                        sprite==51&&image==unsigned(s.imageIndex));
+                }else{
+                    const auto appearance=owner->properties(shared);RunnerImageValue image;
+                    assert(image.assignInteger(s.imageIndex)&&appearance&&
+                        appearance->sprite.spriteId==51&&appearance->sprite.imageIndex.bits==image.bits);
+                }
+                for(int dy=-9;dy<=9;dy+=3)for(int dx=-9;dx<=9;dx+=3){
+                    RunnerImageValue px,py;
+                    assert(px.assignInteger(240+int(i%3)*16+dx)&&
+                        py.assignInteger(512+int(i/3)*16+dy));
+                    for(bool precise:{false,true}){
+                        bool hit=false;
+                        assert(owner->collisionPointCandidate(shared,px,py,true,precise,masks,hit));
+                        actual.push_back(int(hit));
+                    }
+                }
             }
             assert(world->wallBackgroundTiles().size()==(rejectTile?0u:1u));
             if(!rejectTile){

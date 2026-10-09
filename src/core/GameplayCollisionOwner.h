@@ -1323,7 +1323,8 @@ public:
     }
     // Diagnostic traversal only: this is not spatial candidate selection.
     // Spatial refresh is explicit; collision consumption still requires
-    // complete scene publication and animation's cached-frame invalidation.
+    // complete scene publication and ordered animation/image writes. The
+    // ordinary sprite getter has no collision-frame cache to invalidate.
     template<class Visit> bool visitNativeDirty(bool collision,Visit visit)const{
         if(!native_||!valid())return false;
         const auto& queue=collision?nativeCollisionDirty_:nativeSpatialDirty_;
