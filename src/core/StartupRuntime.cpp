@@ -548,9 +548,8 @@ void StartupRuntime::stepInternal(bool advancePressed,
         run_.ammoGauge.step(mainAmmo_, mainPlayerMotion_.ammoCapacity());
         run_.gameplayPresentationStep(random_);
         // This frame adapter finishes at the pre-Draw boundary. Only the
-        // walls/controllers, box/projectile families and bound script/debris effects are owned here;
-        // external effect owners retain their
-        // separate cleanup dispatch until the full room scheduler is joined.
+        // admitted families retire in room order while their scoped owners
+        // are still installed. Unbound families retain explicit cleanup.
         if(!cleanupMainOwnedDestroyed())run_.effectsSucceeded=false;
     }
 }
@@ -903,12 +902,17 @@ bool StartupRuntime::publishMainBullet(MainBulletState& bullet,bool angle){
 bool StartupRuntime::cleanupMainOwnedDestroyed(){
     return run_.effectsSucceeded&&instances_.cleanupDestroyedIf(
         [this](const InstanceRecord& r){return r.objectId==60||r.objectId==61||r.objectId==92||r.objectId==261||r.objectId==370||r.objectId==256||
+            ((r.objectId==238||r.objectId==211)&&timeEffectDispatch_)||
             (r.objectId==269&&boneDispatch_)||
             (r.objectId==220&&bloodDispatch_)||
             (r.objectId==120&&skeletonDispatch_)||
             (r.objectId==248&&currencyDispatch_)||
             (r.objectId==73&&ownedEntryRegistration_.handle(r).generation)||(r.objectId==219&&!scriptAnimationDispatch_);},
         [this](InstanceHandle key,const InstanceRecord& r){
+            if(r.objectId==238||r.objectId==211){
+                auto* record=instances_.resolve(key);
+                return record&&timeEffectDispatch_&&timeEffectDispatch_(timeEffectContext_,*record,TimeEffectPhase::cleanup,0);
+            }
             if(r.objectId==269)return boneDispatch_(boneContext_,r,BonePhase::cleanup);
             if(r.objectId==220)return bloodDispatch_(bloodContext_,r,BloodPhase::cleanup);
             if(r.objectId==120)return skeletonDispatch_(skeletonContext_,r,SkeletonPhase::cleanup,0);

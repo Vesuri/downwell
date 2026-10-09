@@ -2813,6 +2813,58 @@ int main(){
             "stopped bone retires at equality but survives a quarter pixel inside old view");
         require(bones.clear(),"clear surviving boundary fixture bone");
     }
+    for(unsigned reject:{0u,2u}){
+        struct CleanupOwner:StoredWorldCollision {
+            using StoredWorldCollision::StoredWorldCollision;
+            std::vector<unsigned> order,attempted;unsigned reject=0;
+            static bool selected(int object){return object==211||object==238;}
+            bool capturePrevious(InstanceHandle key,const InstanceRecord& r){
+                if(selected(r.objectId))order.push_back(r.instanceId);
+                return StoredWorldCollision::capturePrevious(key,r);
+            }
+            bool retire(InstanceHandle key,const InstanceRecord& r){
+                if(selected(r.objectId)){
+                    require(r.destroyRequested,"normal time-effect retirement requires a prior destruction mark");
+                    attempted.push_back(r.instanceId);
+                    if(attempted.size()==reject)return false;
+                }
+                return StoredWorldCollision::retire(key,r);
+            }
+        };
+        auto owner=std::make_unique<CleanupOwner>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            InstanceLifecycleBinding::bindPointQueries(*owner));
+        require(owner->attach(*world),"attach mixed time-effect cleanup owner");world->skipToGameForTesting();
+        TimeStopEffects<16> state;auto shards=world->timeShardRegistration<16>();auto changes=world->timeChangeRegistration<8>();
+        require(state.shards.bindPhases(shards)&&state.changes.bind(changes),"bind automatic cleanup families");
+        auto change=[&]{return world->createTimeChange(changes,state.changes,MotionBinary64::fromInteger(240),
+            MotionBinary64::fromInteger(176),state.roomSpeed,[](unsigned){return true;});};
+        require(change()&&world->emitTimeShards(state.burst,state.shards,{0x43700000u},{0x43300000u},{},{},false)&&change(),
+            "interleave time-change and shard lifetimes in the same room");
+        for(unsigned i=0;i<world->activeInstanceCount();++i){
+            auto& r=const_cast<InstanceRecord&>(world->instanceAt(i));
+            if(CleanupOwner::selected(r.objectId))r.alarms.set(r.objectId==211?1:0,1);
+        }
+        state.roomSpeed=60;owner->reject=reject;unsigned collisions=0;
+        const bool ok=world->stepWithTimeStopEffects(shards,changes,state,Input{},false,StartupRuntime::NoTimeTransition{},[&]{
+            ++collisions;
+            require(owner->order.size()==5&&owner->attempted.empty(),"marked effects retain storage through collision");
+            for(auto id:owner->order)require(world->instance(id)&&world->instance(id)->destroyRequested,
+                "alarm destruction is visible before pre-Draw cleanup");
+            return true;
+        });
+        require(ok==(reject==0)&&world->effectsSucceeded()==ok&&collisions==1&&
+            owner->attempted.size()==(reject?reject:5),"ordered cleanup stops at the rejected lifetime");
+        for(unsigned i=0;i<owner->attempted.size();++i)
+            require(owner->attempted[i]==owner->order[i],"mixed families retire in room order, not separate family sweeps");
+        const unsigned retired=reject?reject-1:5;
+        for(unsigned i=0;i<owner->order.size();++i)
+            require(bool(world->instance(owner->order[i]))==(i>=retired),"cleanup preserves exactly its accepted retirement prefix");
+        if(reject){
+            require(!world->stepWithTimeStopEffects(shards,changes,state,Input{})&&owner->attempted.size()==reject,
+                "failed time-effect retirement is terminal and not retried");
+        }else require(state.reset(),"automatic cleanup leaves owners empty and reusable");
+    }
     for(int beyond:{0,1}){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
@@ -2829,9 +2881,14 @@ int main(){
             world->emitTimeShards(state.burst,state.shards,{0x43700000u},y,{},{},false),
             "create real registered shards at the strict outOfView upper edge");
         const auto id=state.shards.sourceId(1);
-        require(world->stepWithTimeStopEffects(shards,changes,state,Input{})&&
+        bool sawMarked=false;
+        require(world->stepWithTimeStopEffects(shards,changes,state,Input{},false,StartupRuntime::NoTimeTransition{},[&]{
+            const auto* r=world->instance(id);
+            sawMarked=r&&r->destroyRequested;
+            return r&&r->destroyRequested==(beyond!=0);
+        })&&
             world->mainCameraRenderViewY()>oldView,"camera moves before the shard Step boundary check");
-        require(world->instance(id)&&world->instance(id)->destroyRequested==(beyond!=0)&&
+        require(sawMarked==(beyond!=0)&&bool(world->instance(id))==(beyond==0)&&
             state.shards.size()==(beyond?0u:3u),
             "shard Step preserves cached-view equality and destroys only strictly beyond it");
         require(world->cleanupDestroyed(shards,changes,state,[](auto,const auto&){return false;}),
@@ -2857,18 +2914,19 @@ int main(){
             require(world->stepWithTimeStopEffects(shards,changes,state,Input{},false,StartupRuntime::NoTimeTransition{},[&]{
                 ++collisions;
                 return state.shards.get(1)->imageIndex.bits==expectedAnimation.imageIndex.bits&&
-                    world->instance(shardId)->alarms.get(0)==lifetime-int(tick);
+                    world->instance(shardId)->alarms.get(0)==lifetime-int(tick)&&
+                    world->instance(changeId)&&world->instance(changeId)->destroyRequested==(tick==14);
             })&&collisions==1,"time effects and collision pass share one tick after animation and alarms");
             require(state.shards.get(1)->imageIndex.bits==expectedAnimation.imageIndex.bits&&
                 state.shards.get(1)->timeline.bits==expectedAnimation.timeline.bits,
                 "world animation traversal advances each registered shard exactly once");
             require(state.roomSpeed==int(tick<12?30+5*(tick/2):60)&&
                 world->instance(shardId)->alarms.get(0)==lifetime-int(tick)&&
-                world->instance(changeId)->destroyRequested==(tick==14),
+                bool(world->instance(changeId))==(tick<14),
                 "live world alarm counters advance once and execute recovered time-change ramp");
         }
         require(world->cleanupDestroyed(shards,changes,state,[](auto,const auto&){return false;})&&!world->instance(changeId),
-            "live routed expiry awaits normal explicit cleanup");
+            "normal pre-Draw cleanup already retired the time-change; explicit cleanup is idempotent");
         state.player.stopped=true;
         const auto frozenLife=world->instance(shardId)->alarms.get(0),frozenFade=world->instance(shardId)->alarms.get(1);
         const auto cooldown=world->instance(shardId)->alarms.get(2);

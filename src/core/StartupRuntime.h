@@ -563,7 +563,7 @@ public:
     // The optional
     // transition callback runs at the shared player's source Begin Step boundary.
     struct NoTimeTransition {bool operator()(const InstanceRecord&,const PlayerMotion&,int,int)const{return true;}};
-    enum class TimeEffectPhase {animation,alarm,step,playerBegin};
+    enum class TimeEffectPhase {animation,alarm,step,playerBegin,cleanup};
     // Scoped admission while entering a room: the player's recovered Create
     // invokes this owner after scrSpawnCamera, not after the room has loaded.
     // The caller keeps the registry alive and retires it before room teardown.
@@ -627,6 +627,13 @@ public:
             run_.effectsSucceeded=false;return false;
         }
         auto dispatch=[&](InstanceRecord& record,TimeEffectPhase phase,unsigned index){
+            if(phase==TimeEffectPhase::cleanup){
+                const auto slot=static_cast<unsigned>(&record-&instances_.at(0));
+                if(slot>=instances_.size())return false;
+                const auto key=instances_.handleAt(slot);
+                return record.objectId==238?shards.retireMarked(key,record,state.shards):
+                    record.objectId==211&&changes.retireMarked(key,record,state.changes);
+            }
             if(phase==TimeEffectPhase::playerBegin)return transition(record,mainPlayerMotion_,mainPlayerOriginX_,mainPlayerOriginY_);
             if(phase==TimeEffectPhase::animation)return shards.dispatchAnimation(record,state.shards);
             if(phase==TimeEffectPhase::step)return shards.dispatchStep(record,state.shards,state.player.stopped,random_,

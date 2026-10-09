@@ -133,8 +133,8 @@ For an ordered sweep, `TimeShardEffects::retireMarked` removes only the selected
 private-handle/source-ID pair. `StartupRuntime::retireTimeShard` routes a selected
 world ID through its registered generation and effect owner before removing it.
 Live, stale, foreign or failed selections stop the operation without recycling
-the selected storage or retiring siblings. These are explicit sweep operations;
-the automatic mixed-family traversal still needs to be connected.
+the selected storage or retiring siblings. These are also the operations used
+by the composed stored tick's pre-Draw cleanup.
 
 `InstanceStore::cleanupDestroyed` traverses current room membership, active
 before inactive, and dispatches marked records to their family owners. Removal
@@ -143,8 +143,19 @@ during this traversal are not. A successful callback must actually retire its
 selected generation. Failure preserves the already-completed prefix and stops
 before later families. `StartupRuntime::cleanupDestroyed` routes shards through
 their registration and requires an explicit dispatcher for other families. This
-boundary is exercised with the live collision owner; normal frame scheduling
-and the remaining family dispatchers are not yet wired to it.
+boundary is exercised with the live collision owner.
+
+`stepWithTimeStopEffects` keeps its borrowed registrations installed through
+the normal pre-Draw cleanup. Destroy-marked shards (238) and time changes (211)
+join the same room-order sweep as the other admitted families; there is no
+separate shard-first or change-first sweep. Alarm/Step destruction retains both
+records and local storage through Collision and End Step. Successful cleanup
+then removes the numeric ID and local lifetime together. Rejection retains the
+failed lifetime and every later candidate and stops the world without retry.
+Tests interleave both families and compare retirement order to their unchanged
+active-room traversal, including failure after an accepted retirement. This
+composition does not install the real player transition/audio adapter into
+the default SDL loop or supply the native global-ID stream.
 
 ## Time-change registration boundary
 
