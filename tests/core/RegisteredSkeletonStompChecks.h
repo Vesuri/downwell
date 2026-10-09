@@ -1,6 +1,8 @@
 #ifndef DOWNWELL_TEST_REGISTERED_SKELETON_STOMP_CHECKS_H
 #define DOWNWELL_TEST_REGISTERED_SKELETON_STOMP_CHECKS_H
 #include "SkeletonSoundChecks.h"
+#include "core/SmokeEffect.h"
+#include "core/EmitSmokeScript.h"
 // Exact player setters are explicit test dependencies, not a production
 // replacement for player motion. Reject unimplemented child services loudly.
 struct RegisteredStompPlayer {
@@ -36,5 +38,28 @@ void checkRegisteredSkeletonStomp(World& world,downwell::SkeletonActor& actor,bo
         actor.sound.sfxIndex==122&&actor.sound.chanNum==0&&actor.sound.cutPrv);
     if(knees){const auto after=world.randomDrawCount();
         SkeletonSoundAudio::check(!invoke(player,env,audio,good)&&world.randomDrawCount()==after&&audio.calls==7);}
+}
+template<class World,class Emit,class Find>
+void checkRegisteredSmokeScript(World& world,Emit emit,Find find){
+    using namespace downwell;
+    auto random=world.randomState();EmitSmokeScript caller;caller.mySmoke=777;
+    SkeletonSoundAudio::check(world.chooseSkeletonExplosion(3)==random.chooseIndexSmall(3));
+    const int directions[]={0,180,15,165,42};
+    const MotionBinary64 x{0x40248000u,0},y{0x40388000u,0}; // 10.25,24.5
+    for(unsigned i=0;i<5;++i){
+        SmokeEffect reference;SkeletonSoundAudio::check(reference.create(x,y,random));
+        const auto direction=MotionBinary64::fromInteger(directions[i]);
+        const auto speed=i==4?MotionBinary64{0x7ff80000u,0}:MotionBinary64::fromInteger(i<2?4:3);
+        const auto before=caller.mySmoke;
+        SkeletonSoundAudio::check(emit(caller,x,y,direction,speed)==(i<4)&&caller.mySmoke!=before);
+        const auto* actual=find(caller.mySmoke);
+        SkeletonSoundAudio::check(actual&&actual->direction.high==direction.high&&actual->direction.low==direction.low&&
+            actual->speed.high==(i<4?speed:reference.speed).high&&actual->speed.low==(i<4?speed:reference.speed).low&&
+            actual->imageSpeed.bits==reference.imageSpeed.bits&&!actual->allSet&&actual->x.bits==reference.x.bits&&
+            actual->y.bits==reference.y.bits&&world.randomDrawCount()==random.drawCount());
+        for(unsigned n=0;n<16;++n)SkeletonSoundAudio::check(world.randomState().stateWord(n)==random.stateWord(n));
+    }
+    const auto id=caller.mySmoke;const auto draws=world.randomDrawCount();
+    SkeletonSoundAudio::check(!emit(caller,x,y,MotionBinary64{},MotionBinary64{})&&caller.mySmoke==id&&world.randomDrawCount()==draws);
 }
 #endif

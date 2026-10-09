@@ -422,6 +422,17 @@ public:
                 return object==225&&allocate(id)&&id&&registeredSmoke_->create(id,x,y,enemyRandom_,child);
             });
     }
+    template<class Allocate> bool emitRegisteredSmoke(downwell::EmitSmokeScript& caller,
+        downwell::MotionBinary64 x,downwell::MotionBinary64 y,downwell::MotionBinary64 direction,
+        downwell::MotionBinary64 speed,Allocate allocate){
+        if(!run_.effectsSucceeded||!registeredSmoke_)return run_.effectsSucceeded=false;
+        return run_.effectsSucceeded=caller.execute(x,y,direction,speed,
+            [&](auto px,auto py,std::uint32_t& id){downwell::InstanceHandle child;unsigned allocated=0;
+                if(!allocate(allocated)||!allocated||!registeredSmoke_->create(allocated,px,py,enemyRandom_,child))return false;
+                id=allocated;return true;},
+            [&](unsigned id,auto value){return registeredSmoke_->setDirection(registeredSmoke_->sourceHandle(id),value);},
+            [&](unsigned id,auto value){return registeredSmoke_->setSpeed(registeredSmoke_->sourceHandle(id),value);});
+    }
     bool stepSmokeRoomEffect(downwell::InstanceHandle key){
         return run_.effectsSucceeded=run_.effectsSucceeded&&registeredSmoke_&&registeredSmoke_->step(key,enemyRandom_);
     }
@@ -1511,8 +1522,13 @@ public:
         downwell::SoundPlayEnvironment& environment,Audio& audio,bool& good){
         if(!run_.effectsSucceeded)return good=false;
         const bool ok=downwell::registeredSkeletonStomp(*this,actor,events,[&]{return emitSkeletonBlood(actor,allocate);},
+            [&](auto x,auto y,auto direction,auto speed){return emitRegisteredSmoke(actor.smokeEmitter,x,y,direction,speed,allocate);},
             environment,audio,good);
         return run_.effectsSucceeded=ok;
+    }
+    unsigned chooseSkeletonExplosion(unsigned count){
+        if(!run_.effectsSucceeded||count!=3){run_.effectsSucceeded=false;return 3;}
+        return enemyRandom_.chooseIndexSmall(3);
     }
     template<class Audio> bool playSkeletonSound(downwell::SkeletonActor& actor,int sound,
         downwell::SoundPlayEnvironment& environment,Audio& audio){

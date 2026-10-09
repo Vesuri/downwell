@@ -34,6 +34,14 @@ public:
     StoredSmokeRegistration& operator=(const StoredSmokeRegistration&)=delete;
     bool belongsTo(const InstanceStore<WorldCapacity>& records)const{return &records_==&records;}
     bool valid()const{return good_;}
+    bool setDirection(std::uint32_t id,MotionBinary64 value){
+        auto* r=records_.find(id);auto* e=r?entry(*r):nullptr;
+        if(!good_||!e||!value.valid())return fail();e->state.direction=value;return true;
+    }
+    bool setSpeed(std::uint32_t id,MotionBinary64 value){
+        auto* r=records_.find(id);auto* e=r?entry(*r):nullptr;
+        if(!good_||!e||!value.valid())return fail();e->state.speed=value;return true;
+    }
     const SmokeEffect* state(const InstanceRecord& r){auto* e=entry(r);return e?&e->state:nullptr;}
     template<class Random> bool skeletonBurst(SmokeBurstCaller& caller,MotionBinary64 x,MotionBinary64 y,Random& random){
         if(!good_)return false;

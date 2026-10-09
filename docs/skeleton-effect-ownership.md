@@ -324,9 +324,16 @@ and the retained attacker's sound state. Footsteps use global overlap channel 0
 and stop its previous resource, without enemymove's view culling. The blast's
 plain sound shares that same caller state. Blood retains synchronous child
 creation, two interleaved RNG draws and the caller's final numeric `myFx` ID.
-The native adapter requires the enclosing source-ID allocator. Precise player
-writes, style, blast creation, sound choice RNG and smoke emission remain
-explicit dependencies; these adapters do not yet install natural encounters.
+The native adapter requires the enclosing source-ID allocator. Explosion-sound
+choice consumes the world's shared RNG only after successful blast Create.
+`EmitSmokeScript` then runs registered smoke Create, publishes the numeric child
+ID into the skeleton's retained `mySmoke`, and writes direction before speed.
+Create's three random draws and initial image speed remain intact even though
+its random direction/speed are overwritten. First Step still computes velocity
+and resamples animation speed from the overridden speed. Failed setters retain
+the completed child and caller writes and stop the world without retry.
+Precise player writes, style and blast creation remain explicit dependencies;
+these adapters do not yet install natural encounters.
 World and caller failure statuses both latch after a rejected service.
 
 Effect-producing callbacks return success. `SkeletonActor` stops the event on

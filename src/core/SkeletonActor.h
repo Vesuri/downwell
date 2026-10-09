@@ -8,6 +8,7 @@
 #include "CurrencyRewardFields.h"
 #include "CurrencySpawnScript.h"
 #include "ContactDamageScripts.h"
+#include "EmitSmokeScript.h"
 namespace downwell {
 // Shared object-120 event body. Owner runs pre-Step animation and global alarm
 // phases separately, supplies synchronous effect/child calls, and defers removal
@@ -23,6 +24,7 @@ struct SkeletonActor : SkeletonDecisions {
     std::uint32_t myDeadBody=0;
     std::uint32_t myFx=0; // emitMovingFx writes the source numeric child ID before its setters.
     SmokeBurstCaller smokeScript;
+    EmitSmokeScript smokeEmitter;
     CurrencyRewardFields reward;
     bool readCurrencyReward(CurrencySpawnSource<std::uint32_t>& out)const{
         out.x=MotionBinary64::fromInteger(x);out.y=MotionBinary64::fromInteger(y);

@@ -218,11 +218,17 @@ public:
         SoundPlayEnvironment& environment,Audio& audio){
         return run_.playSkeletonStompSound(actor.sound,environment,audio);
     }
-    template<unsigned Capacity,class Events,class Audio>
+    unsigned chooseSkeletonExplosion(unsigned count){
+        if(!run_.effectsSucceeded||count!=3){run_.effectsSucceeded=false;return 3;}
+        return random_.chooseIndexSmall(3);
+    }
+    template<unsigned Capacity,unsigned SmokeCapacity,class Events,class Audio>
     bool stompSkeleton(StoredBloodRegistration<instanceCapacity,Capacity>& blood,
+        StoredSmokeRegistration<instanceCapacity,SmokeCapacity>& smoke,
         SkeletonActor& actor,Events& events,SoundPlayEnvironment& environment,Audio& audio,bool& good){
         if(!run_.effectsSucceeded)return good=false;
         const bool ok=registeredSkeletonStomp(*this,actor,events,[&]{return emitSkeletonBlood(blood,actor);},
+            [&](auto x,auto y,auto direction,auto speed){return emitRegisteredSmoke(smoke,actor.smokeEmitter,x,y,direction,speed);},
             environment,audio,good);
         return run_.effectsSucceeded=ok;
     }
@@ -1174,6 +1180,14 @@ public:
         MotionBinary64 x,MotionBinary64 y,std::uint32_t& id){
         if(!registry.belongsTo(instances_))return run_.effectsSucceeded=false;
         return registry.create(x,y,random_,id);
+    }
+    template<unsigned Capacity> bool emitRegisteredSmoke(StoredSmokeRegistration<instanceCapacity,Capacity>& registry,
+        EmitSmokeScript& caller,MotionBinary64 x,MotionBinary64 y,MotionBinary64 direction,MotionBinary64 speed){
+        if(!run_.effectsSucceeded||!registry.belongsTo(instances_))return run_.effectsSucceeded=false;
+        return run_.effectsSucceeded=caller.execute(x,y,direction,speed,
+            [&](auto px,auto py,std::uint32_t& id){return registry.create(px,py,random_,id);},
+            [&](unsigned id,auto value){return registry.setDirection(id,value);},
+            [&](unsigned id,auto value){return registry.setSpeed(id,value);});
     }
     template<unsigned Capacity> bool emitRegisteredSkeletonSmoke(StoredSmokeRegistration<instanceCapacity,Capacity>& registry,
         SmokeBurstCaller& caller,MotionBinary64 x,MotionBinary64 y){

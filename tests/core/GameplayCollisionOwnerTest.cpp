@@ -7018,6 +7018,18 @@ int main(){
             assert(skeletonWorld->restartFromResults(DeathMenuSequence::Action::Retry,42,300)!=ResultsDestination::none&&
                 skeletonWorld->skeletons()==&skeletons&&skeletons.size()==0&&skeletonOwner->valid());
         }
+        {
+            auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+                GameplayTerrainInstances::WallCollision{},&rooms,ownership);
+            auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),
+                owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+            assert(owner->attach(*world));unsigned id=605100;
+            checkRegisteredSmokeScript(*world,[&](auto& caller,auto x,auto y,auto direction,auto speed){
+                return world->emitRegisteredSmoke(caller,x,y,direction,speed,[&](unsigned& source){source=id++;return true;});
+            },[&](unsigned source){const auto* smoke=world->registeredSmoke();
+                const auto* r=smoke->find(smoke->sourceHandle(source));return r?&r->state:nullptr;});
+            assert(id==605105);
+        }
         for(bool knees:{false,true})for(int style:{0,2}){
             auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
                 GameplayTerrainInstances::WallCollision{},&rooms,ownership);

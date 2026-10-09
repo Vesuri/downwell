@@ -60,6 +60,14 @@ public:
             return SmokeDirection::vector(speed,direction,x,y,smokeTrig);
         },publish,smokeEscapedDistance,okay)||fail();
     }
+    bool setDirection(InstanceHandle key,MotionBinary64 value){
+        auto* r=resolve(key);if(!r||!value.valid())return fail();
+        r->state.direction=value;return true;
+    }
+    bool setSpeed(InstanceHandle key,MotionBinary64 value){
+        auto* r=resolve(key);if(!r||!value.valid())return fail();
+        r->state.speed=value;return true;
+    }
     bool advanceAnimation(InstanceHandle key){
         auto* r=resolve(key);if(!r)return fail();if(!r->active||r->destroyRequested)return true;
         if(!r->state.advanceImage()||!binding_.imageIndex(key,*r,r->state.imageIndex))return fail();

@@ -4,11 +4,11 @@
 namespace downwell {
 // Borrow live state; never copy the attacker's script variables or supply
 // successful stand-ins for precise player writes / synchronous child births.
-template<class World,class Events,class Blood,class Audio>
+template<class World,class Events,class Blood,class Smoke,class Audio>
 bool registeredSkeletonStomp(World& world,SkeletonActor& actor,Events& external,
-    Blood blood,SoundPlayEnvironment& environment,Audio& audio,bool& good){
+    Blood blood,Smoke smoke,SoundPlayEnvironment& environment,Audio& audio,bool& good){
     struct Services {
-        World& world;SkeletonActor& actor;Events& external;Blood& burst;
+        World& world;SkeletonActor& actor;Events& external;Blood& burst;Smoke& smoke;
         SoundPlayEnvironment& environment;Audio& audio;
         bool playerDead(){return world.playerDeathActive();}
         bool explodingKnees(){return world.upgrades().levels[0]!=0;}
@@ -29,13 +29,13 @@ bool registeredSkeletonStomp(World& world,SkeletonActor& actor,Events& external,
             return SoundPlayScript::plain(actor.sound,environment,audio,id,priority,loop,cut,voice,succeeded);
         }
         bool createBlast(int id,int x,int y){return external.createBlast(id,x,y);}
-        unsigned choose(unsigned count){return external.choose(count);}
+        unsigned choose(unsigned count){return world.chooseSkeletonExplosion(count);}
         MotionBinary64 playerX(){return external.playerX();}
         MotionBinary64 playerY(){return external.playerY();}
         bool emitSmoke(MotionBinary64 x,MotionBinary64 y,int direction,int speed){
-            return external.emitSmoke(x,y,direction,speed);
+            return smoke(x,y,MotionBinary64::fromInteger(direction),MotionBinary64::fromInteger(speed));
         }
-    } services{world,actor,external,blood,environment,audio};
+    } services{world,actor,external,blood,smoke,environment,audio};
     return actor.stompPlayerChecked(services,good);
 }
 }
