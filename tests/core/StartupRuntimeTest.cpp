@@ -124,6 +124,7 @@ struct LifecycleAudit {
     unsigned frogTransforms=0;
     unsigned batTransforms=0;
     unsigned playerMoves=0;
+    unsigned builderMoves=0,rejectBuilderMove=0;
     unsigned boxRemovals=0;
     bool rejectBoxRemoval=false;
     std::uint32_t rejectedBoxId=0;
@@ -187,6 +188,11 @@ struct LifecycleAudit {
         ++calls;require(matches(h,r)&&r.active,"movement resolves an active published lifetime");
         std::int32_t px,py;
         require(x.promoted().roundPixel(px)&&y.promoted().roundPixel(py),"published enemy coordinates are representable");
+        if(r.objectId==65){
+            require(px==r.x&&py==r.y+16,
+                "stored builder publishes each row through its live owner before updating the record");
+            return ++builderMoves!=rejectBuilderMove;
+        }
         if(r.objectId==61&&++ditherMoves==rejectDitherMove)return false;
         if(r.objectId==111||r.objectId==112||r.objectId==113||r.objectId==116||r.objectId==117||r.objectId==119){
             if(fail==6)return false;
@@ -246,6 +252,22 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
                        const downwell::BuilderPatternPack& patterns){
     using Runtime=downwell::StartupRuntime;
     const auto healthy=[](const Runtime& r){return r.effectsSucceeded()&&r.roomLoadSucceeded()&&r.deferredCommandsSucceeded();};
+    for(unsigned reject:{1u,30u}){
+        LifecycleAudit audit;audit.rejectBuilderMove=reject;
+        auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            downwell::InstanceLifecycleBinding::bindMaskDestruction(audit));
+        runtime->skipToGameForTesting();
+        for(unsigned tick=0;tick<1800&&healthy(*runtime);++tick)
+            runtime->step(downwell::gameplayContactProfileInput(tick,runtime->mainPlayerX(),runtime->mainPlayerY()),false);
+        const auto* builder=runtime->instance(100856);
+        require(!healthy(*runtime)&&audit.builderMoves==reject&&builder&&
+            builder->y==704+int(reject-1)*16,
+            "rejected builder setter retains exactly its accepted row prefix");
+        const auto calls=audit.calls;const auto births=audit.births;const auto draws=runtime->randomDrawCount();
+        runtime->step(false);
+        require(audit.calls==calls&&audit.births==births&&runtime->randomDrawCount()==draws,
+            "failed builder publication is terminal, without later births or replaying RNG");
+    }
     for(bool low:{false,true}){
         LifecycleAudit audit;
         auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
@@ -269,6 +291,10 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
             const auto moves=audit.ditherMoves;
             runtime->step(false);
             dither=runtime->instance(100854);
+            const auto* builder=runtime->instance(100856);
+            require(builder&&audit.builderMoves==runtime->mainBuilderRowsGenerated()&&
+                builder->y==704+int(audit.builderMoves)*16,
+                "stored builder row state and owner publications agree after each Step");
             require(healthy(*runtime)&&dither&&dither->preciseX==expectedX&&dither->preciseY==expectedY&&
                 audit.ditherMoves==moves+(advance?3:2),"Begin Step reads previous camera and publishes each source setter");
         }
@@ -428,6 +454,10 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
         indexed->step(input,false);plain->step(input,false);
         require(healthy(*indexed)&&indexed->stateDigest()==plain->stateDigest(),
                 "lifecycle publication preserves complete live gameplay state and RNG");
+        const auto* builder=indexed->instance(100856);
+        require(builder&&audit.builderMoves==indexed->mainBuilderRowsGenerated()&&
+            builder->y==704+int(audit.builderMoves)*16,
+            "natural generation keeps stored and published builder rows synchronized");
         audit.verify(*indexed);
     }
     std::cout << "Live lifecycle births=" << audit.births << " retires=" << audit.retires
@@ -443,6 +473,7 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
             audit.terrainSprites>0&&audit.sprites>audit.terrainSprites&&audit.spriteChanges>0&&audit.indices>audit.sprites,
             "natural gameplay covers dynamic births, contact inactivation, retirement and reconciliation");
     require(audit.playerMoves>=1800,"live player publishes each Begin Step position to its owner");
+    require(audit.builderMoves>30,"natural contact tape exercises multi-row builder publication");
     indexed->reset(downwell::PlatformProfile::nonDesktop);audit.verify(*indexed);
     require(healthy(*indexed),"reset retires old lifetimes before creating a fresh room");
     for(bool reject:{false,true}){

@@ -186,6 +186,15 @@ authored index 1, but native builder setup still does not register the builder's
 controller lifetime, and native player-created controllers/companions are not
 yet a complete synchronous birth stream. These omissions prevent claiming full
 room-order parity.
+
+`scrBuilder` blocks 187 and 207 write `self.y += 16` after each newline's
+pillars and each extra-pillar row respectively. Shared scalar, run and prepared
+generation retain these setter boundaries, including the completed prefix on
+failure. The stored adapter publishes each setter through its lifecycle owner
+before the next synchronous child Create; copying only the final frontier into
+the instance record is not equivalent. Native controller ownership must bind
+the same publication points when it is integrated.
+
 Non-glitch wall Create consumes no RNG, but that does not make relocating
 field lifetime publication or cleanup equivalent. Terrain failure before the
 field consumes no field RNG; failure afterwards retains its marked lifetime

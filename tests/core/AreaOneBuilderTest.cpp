@@ -177,6 +177,67 @@ int main(int argc, char** argv) {
         (std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
     BuilderPatternPack pack(bytes.data(), bytes.size());
     require(pack.valid(), "builder pack validates");
+    // Each source newline writes self.y after its two pillars, before any
+    // child of the next row. Prepared terrain must keep those same boundaries.
+    struct RowPublication {
+        AreaOneBuilder* builder;
+        int published=704;
+        unsigned writes=0,failAt=0;
+        std::vector<int> tape;
+        static bool position(void* opaque,int x,int y){
+            auto& self=*static_cast<RowPublication*>(opaque);
+            require(x==-16&&self.builder->y()==self.published&&y==self.published+16,
+                "source row setter observes the previous builder position");
+            self.tape.insert(self.tape.end(),{-1,x,y});
+            if(++self.writes==self.failAt)return false;
+            self.published=y;return true;
+        }
+        static bool create(void* opaque,const DeferredCreateInstance& child){
+            auto& self=*static_cast<RowPublication*>(opaque);
+            require(self.builder->y()==self.published,
+                "synchronous child sees the last published builder row");
+            if(child.objectId==60||child.objectId==93)
+                require(child.y==self.published,"terrain birth sees its source builder row");
+            self.tape.insert(self.tape.end(),{child.objectId,child.x,child.y});
+            return true;
+        }
+    };
+    for(unsigned seed:{2u,4u,8u}){
+        std::vector<int> expected;
+        GameMakerRandom expectedRandom;
+        for(unsigned mode=0;mode<3;++mode){
+            AreaOneBuilder builder;
+            GameMakerRandom random(seed);
+            builder.reset(-16,704,random);
+            RowPublication publication{&builder};
+            builder.setPositionPublisher(RowPublication::position,&publication);
+            builder.enableTerrainRuns(mode==1);
+            if(mode==2)builder.setPreparedTerrainEmitter([](void* p,const AreaOneBuilder::PreparedTerrain& row,
+                AreaOneBuilder::EmitFunction emit){return row.executeReference(emit,p);});
+            for(unsigned tick=0;tick<128&&!builder.endReached();++tick){
+                AreaOneBuilderStep result;
+                require(builder.step(pack,random,RowPublication::create,&publication,result),
+                    "row-published generation reaches every synchronous child");
+            }
+            require(builder.endReached()&&publication.writes==builder.rowsGenerated(),
+                "one source setter per advanced row including end padding");
+            if(!mode){expected=publication.tape;expectedRandom=random;}
+            else require(expected==publication.tape&&sameRandom(expectedRandom,random),
+                "scalar/run/prepared paths preserve interleaved setters, births and RNG");
+        }
+    }
+    {
+        AreaOneBuilder builder;
+        GameMakerRandom random(2);
+        builder.reset(-16,704,random);
+        RowPublication publication{&builder};publication.failAt=1;
+        builder.setPositionPublisher(RowPublication::position,&publication);
+        AreaOneBuilderStep result;
+        require(!builder.step(pack,random,RowPublication::create,&publication,result)&&
+            builder.y()==704&&builder.rowsGenerated()==0&&publication.tape.size()==9&&
+            publication.tape[6]==-1,
+            "failed row publication stops after pillars without advancing or later births");
+    }
     unsigned runs=0,runCells=0;
     for(unsigned seed=1;seed<=8;++seed)for(unsigned level=1;level<=3;++level)
     for(unsigned executor:{0u,1u,2u,3u,4u})for(unsigned failAt:{0u,1u,17u,101u,701u}){
@@ -342,7 +403,10 @@ int main(int argc, char** argv) {
         <<", levels "<<finishedLevels<<", digest "<<std::hex<<emissionDigest<<std::dec<<'\n';
     require(interleavedCallbacks==148068 && failedCreates==288 && finishedLevels==72,
         "interleaved corpus covers all successful levels and failure boundaries");
-    require(emissionDigest==0xb89d2e31bdbd7d69ULL,
+    // Row setters now remain visible on a later failed Create, instead of
+    // leaving y at the beginning of the pattern. Successful emission/RNG
+    // fingerprints below remain unchanged.
+    require(emissionDigest==0xc2f4db85016aa9d2ULL,
         "live RNG/health interleaving preserves ordered commands and partial builder state");
     emissionDigest=legacyDigest=preBoxDigest=14695981039346656037ULL;
     unsigned fieldCount=0;

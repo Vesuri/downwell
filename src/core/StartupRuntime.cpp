@@ -1295,6 +1295,18 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
 
     AreaOneBuilderStep result;
     areaOneBuilder_.setPlayerHealth(mainPlayerHealth_);
+    struct Publication {
+        StartupRuntime& runtime;
+        InstanceHandle builder;
+    } publication{*this,instances_.handleAt(unsigned(&instance-&instances_.at(0)))};
+    areaOneBuilder_.setPositionPublisher([](void* opaque,int x,int y){
+        auto& context=*static_cast<Publication*>(opaque);
+        auto* record=context.runtime.instances_.resolve(context.builder);
+        if(!record||!context.runtime.lifecycle_.integerPosition(context.builder,*record,x,y))
+            return context.runtime.run_.effectsSucceeded=false;
+        record->x=x;record->y=y;
+        return true;
+    },&publication);
     const bool generated = areaOneBuilder_.stepVisible(
         *builderPatternPack_, random_, static_cast<int>(std::ceil(viewBottom)),
         [](void* opaque, const DeferredCreateInstance& command) {
@@ -1317,11 +1329,11 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
             return runtime->deferredCommandsSucceeded_&&runtime->run_.effectsSucceeded;
         },
         this, result);
+    areaOneBuilder_.setPositionPublisher(nullptr,nullptr);
     if (!generated) {
         deferredCommandsSucceeded_ = false;
         return;
     }
-    instance.y = areaOneBuilder_.y();
     syncMainBuilderState();
 }
 

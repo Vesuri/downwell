@@ -56,6 +56,10 @@ builder = assembly("gml_GlobalScript_scrBuilder",
 assert (authored[100856]["x"], authored[100856]["y"]) == (-16, 704)
 assert ("pushi.e 78\nconv.i.v\npush.v self.y\npush.v self.x\n"
         "pushi.e 100\nsub.i.v\ncall.i gml_Script_instance_create(argc=3)") in builder
+# The newline and extra-pillar loops each publish a row before continuing;
+# updating just once at pattern end changes synchronous child observations.
+for label in (187,207):
+    assert f":[{label}]\npush.v self.y\npushi.e 16\nadd.i.v\npop.v.v self.y" in builder
 
 player = assembly("gml_Object_objPlayer_n_Create_0",
     "8298b2249fec2b4226f43d257335176ea0f6282bf89dfc5aab5be2c700e88e3b")

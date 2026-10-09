@@ -182,6 +182,12 @@ public:
                      AreaOneBuilderStep& result);
 
     int y() const { return y_; }
+    // scrBuilder's newline/padding setters execute between synchronous births.
+    // Reset/import clears this borrowed callback; bind it for the live Step.
+    using PositionPublisher = bool (*)(void*, int, int);
+    void setPositionPublisher(PositionPublisher publish, void* context) {
+        positionPublisher_=publish; positionContext_=context;
+    }
     void setPlayerHealth(int health) { playerHealth_ = health; }
     int generationCount() const { return generationCount_; }
     std::uint32_t rowsGenerated() const { return rowsGenerated_; }
@@ -212,6 +218,14 @@ public:
     }
 
 private:
+    PositionPublisher positionPublisher_=nullptr;
+    void* positionContext_=nullptr;
+    bool advanceRow() {
+        const int next=y_+16;
+        if(positionPublisher_&&!positionPublisher_(positionContext_,x_,next))return false;
+        y_=next;
+        return true;
+    }
     BreakableEmitter breakableEmitter_=nullptr;
     void* breakableContext_=nullptr;
     TerrainRunFunction terrainRunEmitter_=nullptr;
