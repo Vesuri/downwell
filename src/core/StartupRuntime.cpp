@@ -2790,13 +2790,22 @@ bool StartupRuntime::createResultDither(int viewX,int viewY) {
     resultDither_=created;return true;
 }
 
+bool StartupRuntime::publishResultPosition(std::int32_t y) {
+    auto* r=instances_.find(102522);
+    if(!run_.effectsSucceeded||roomId_!=resultRoomId||!r||r->objectId!=325||!r->active||r->destroyRequested)return false;
+    const auto key=instances_.handleAt(static_cast<unsigned>(r-&instances_.at(0)));
+    if(!lifecycle_.integerPosition(key,*r,r->x,y)||!run_.effectsSucceeded)return false;
+    r=instances_.resolve(key);if(!r)return false;
+    r->y=y;r->preciseY=static_cast<float>(y);return true;
+}
+
 bool StartupRuntime::publishResultDither() {
     if(!run_.effectsSucceeded)return false;
     if(!resultDither_.generation)return !run_.exitDither.active;
     auto* r=instances_.resolve(resultDither_);
     if(!r||r->objectId!=68)return false;
-    // Until the mixed room scheduler owns the alarm and Step bodies, publish
-    // their shared adapter state to this registered lifetime after each update.
+    // Publish the shared wipe Step before Result's later ordinary Step. Its
+    // registered alarm already participated in the destination alarm phase.
     r->alarms.set(0,run_.exitDither.alarm0);
     const auto& state=run_.exitDither;
     if(r->x!=state.x||r->y!=state.y){

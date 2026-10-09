@@ -8,6 +8,36 @@ static void require(bool ok, const char* why) {
 int main() {
     using namespace downwell;
     {
+        RunSession session;GameMakerRandom random(42);PlayerMotion player;CurrencyAccount currency;
+        int health=4;bool heart=false,confirm=false;session.levelResultRequested=true;
+        require(session.enterLevelClear(0,false,health,player,random),"wipe view-read fixture");
+        session.levelClear.motion.cameraTarget=HudReal::integer(340);
+        session.exitDither.create(0,384); // y=284, exactly the old view bottom.
+        require(session.stepLevelClear(confirm,false,false,heart,currency,player,health,random,[](auto,unsigned){}),
+            "Result update with a boundary wipe succeeds");
+        require(session.exitDither.y==284&&session.levelClear.motion.viewY()==20,
+            "wipe Step reads the previous view before Result yy advances");
+    }
+    {
+        RunSession stopped;GameMakerRandom random(42);PlayerMotion player;CurrencyAccount currency;
+        int health=4;bool heart=false,confirm=false;
+        stopped.levelResultRequested=true;
+        require(stopped.enterLevelClear(0,false,health,player,random),"Result Step publication fixture");
+        stopped.levelClear.motion.cameraTarget=HudReal::integer(340);
+        stopped.exitDither.create(0,0);
+        const auto time=stopped.levelClearFrame.time;
+        unsigned writes=0;
+        require(!stopped.stepLevelClearPositioned(confirm,false,false,heart,currency,player,health,random,
+            [](auto,unsigned){},[](int,int){return true;},[&](auto event){
+                stopped.exitDither.advanceAlarm();return stopped.levelClear.advanceAlarmsChecked(event);
+            },[&](std::int32_t y){++writes;require(y==162,"publish rounded new yy after motion");return false;},[]{return true;}),
+            "failed Result y setter stops the update");
+        require(!stopped.effectsSucceeded&&writes==1&&stopped.exitDither.alarm0==14&&
+            stopped.exitDither.y==-92&&stopped.levelClearFrame.time==time&&
+            stopped.levelClear.motion.cameraY.floor()==161,
+            "failed setter retains earlier alarms, wipe Step and motion but suppresses later presentation");
+    }
+    {
         RunSession stopped;GameMakerRandom random(42);PlayerMotion player;CurrencyAccount currency;
         int health=4;bool heart=false,confirm=true;
         stopped.levelResultRequested=true;

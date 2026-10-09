@@ -128,7 +128,13 @@ struct RecordingLifecycle:Lifecycle {
         }
         if(r.objectId==325){
             ++resultWrites;
-            require(r.y==144&&y.bits==0x430e0000u,"Result Create publishes y=142 before its record write");
+            if(!runtime->levelClearActive())
+                require(r.y==144&&y.bits==0x430e0000u,"Result Create publishes y=142 before its record write");
+            else {
+                std::int32_t expected;RunnerImageValue value;
+                require(runtime->levelClear().motion.instanceY(expected)&&value.assignInteger(expected)&&value.bits==y.bits,
+                    "Result Step publishes rounded new yy to the resource owner");
+            }
             if(rejectResultPosition)return false;
         }
         return Lifecycle::move(h,r,x,y);

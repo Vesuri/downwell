@@ -831,6 +831,9 @@ int main(){
             }));
             if(tick==0||tick==120)assert(speed==30&&controllers.find(controller)->alarms.get(0)==1);
             if(tick==1||tick==121)assert(speed==60&&controllers.find(controller)->alarms.get(0)==0);
+            std::int32_t resultY;RunnerImageValue expectedY;
+            assert(world->levelClear().motion.instanceY(resultY)&&expectedY.assignInteger(resultY)&&
+                world->resultInstance()->find(resultLocal)->y.bits==expectedY.bits);
         }
         assert(world->nextLevelRequested()&&owner->requestMomentDelay()&&speed==30);
         assert(controllers.activate(controller,false)&&owner->reconcileActivation());

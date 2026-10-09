@@ -148,7 +148,7 @@ behavior, both backend integrations and relevant original-game verification.
   layer loading and persistent-controller rebinding. Complete registered native
   exit-wipe birth and its admission to the mixed destination alarm phase,
   including arbitrary activation/populations; complete both adapters' Result
-  position/activation publication. Complete stored Result alarm-storage integration and supply
+  activation publication. Complete stored Result alarm-storage integration and supply
   the actual shared room-speed state at natural controller call sites.
   Do not run the old combat alarm pass behind the menu or batch all
   controller alarms before Result's alarms. Implement remaining fired controller

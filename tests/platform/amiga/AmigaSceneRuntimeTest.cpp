@@ -1348,6 +1348,10 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                     "active controller restores speed in the next Result alarm phase");
                 const auto& a = gameplay.levelClear();
                 const auto& b = reference.levelClear();
+                std::int32_t resultY;
+                require(b.motion.instanceY(resultY)&&reference.instance(102522)->y==resultY&&
+                    reference.instance(102522)->preciseY==resultY,
+                    "stored Result publishes the rounded yy builtin every Step");
                 require(nativeEvents == hostEvents && nativeConfirm == hostConfirm && nativeHeart == hostHeart &&
                     a.selection.cursor == b.selection.cursor && a.selection.next == b.selection.next &&
                     a.selection.visible == b.selection.visible && a.motion.playerY.equal(b.motion.playerY) &&

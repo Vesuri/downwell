@@ -87,6 +87,16 @@ complete generic camera-cache read. Fractional view publication, arbitrary
 wipe populations and complete activation-aware mixed event dispatch are not established
 by this single natural-departure integration.
 
+The admitted ordinary Step order is wipe (68), then Result (325). The wipe
+compares its y against the pre-Result view bottom and publishes its movement
+before `scrResult` eases `global.ply` and `yy`. Result's builtin y is
+`round(yy)`, not `global.ply`; both adapters publish that rounded value from
+the shared motion state using ties-to-even rounding. Rejected publication
+retains the earlier alarm/wipe/motion prefix and stops later presentation.
+The VM guard pins the final `yy`/`round`/y sequence and the enclosing Step's
+subsequent wind-audio branch. That audio/RNG branch and complete mixed room
+Step dispatch remain outside this admitted two-object adapter.
+
 ## Main-room controller births and numeric IDs
 
 `verify-runner-instance-ids.py` pins both the executable's GEN8-based counter

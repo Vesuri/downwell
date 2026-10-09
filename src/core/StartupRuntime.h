@@ -1602,11 +1602,13 @@ public:
     bool stepLevelClear(bool& confirm, bool leftPressed, bool rightPressed, bool& heartGoal, Emit emit) {
         if (!run_.effectsSucceeded || !run_.levelClearActive || run_.nextLevelRequested) return false;
         ++tick_;
-        const bool ok = run_.stepLevelClearScheduled(confirm, leftPressed, rightPressed, heartGoal,
+        const bool ok = run_.stepLevelClearPositioned(confirm, leftPressed, rightPressed, heartGoal,
             currencyAccount_, mainPlayerMotion_, mainPlayerHealth_, random_, emit,
             [this](int x,int y){return createResultDither(x,y);},
-            [this](auto event){return this->advanceResultRoomAlarms(event);});
-        if(!ok||!publishResultDither())return run_.effectsSucceeded=false;
+            [this](auto event){return this->advanceResultRoomAlarms(event);},
+            [this](std::int32_t y){return publishResultPosition(y);},
+            [this]{return publishResultDither();});
+        if(!ok)return run_.effectsSucceeded=false;
         mainAmmo_ = mainPlayerMotion_.ammo();
         return ok;
     }
@@ -1758,6 +1760,7 @@ private:
     const ResultEntryRequest* resultEntryRequest_=nullptr;
     bool createResultDither(int viewX,int viewY);
     bool publishResultDither();
+    bool publishResultPosition(std::int32_t y);
     InstanceHandle resultDither_{};
     template<class Emit> bool advanceResultRoomAlarms(Emit emit){
         const auto healthy=[&]{return run_.effectsSucceeded&&deferredCommandsSucceeded_&&roomLoadSucceeded_;};

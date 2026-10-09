@@ -6,6 +6,15 @@ static void require(bool ok, const char* why) {
 }
 int main() {
     using namespace downwell;
+    {
+        LevelClearMotion motion;std::int32_t y=-1;
+        motion.cameraY=HudReal::ratio(285,2);
+        require(motion.instanceY(y)&&y==142,"Result y rounds an even exact half down");
+        motion.cameraY=HudReal::ratio(287,2);
+        require(motion.instanceY(y)&&y==144,"Result y rounds an odd exact half up");
+        motion.playerY=HudReal::integer(2000);
+        require(motion.instanceY(y)&&y==144,"Result instance y follows yy, not global.ply");
+    }
     LevelClearController room;
     UpgradeInventory inventory;
     Consumables consumables;

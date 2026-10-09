@@ -1649,7 +1649,7 @@ public:
     bool stepLevelClear(bool& confirm, bool leftPressed, bool rightPressed, bool& heartGoal, Emit emit) {
         if (!run_.effectsSucceeded || !run_.levelClearActive || run_.nextLevelRequested) return false;
         ++tick_;
-        return run_.stepLevelClearScheduled(confirm, leftPressed, rightPressed, heartGoal,
+        return run_.stepLevelClearPositioned(confirm, leftPressed, rightPressed, heartGoal,
             currencyAccount_, player_, health_, enemyRandom_, emit,[](int,int){return true;},
             [this](auto event){
                 if(!resultRoomAlarms_){
@@ -1659,7 +1659,7 @@ public:
                     [](void* context,downwell::LevelClearSelection::Effect effect,unsigned value){
                         return (*static_cast<decltype(event)*>(context))(effect,value);
                     },&event);
-            });
+            },[this](std::int32_t y){return !resultInstance_||resultInstance_->publishY(y);},[]{return true;});
     }
     bool levelClearActive() const { return run_.levelClearActive; }
     bool nextLevelRequested() const { return run_.nextLevelRequested; }

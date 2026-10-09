@@ -35,6 +35,12 @@ public:
         if(!good_||(record_.lifetimeId&&!binding_.retire(handle(),record_)))return fail();
         record_={};return true;
     }
+    bool publishY(int y){
+        RunnerImageValue py;
+        if(!good_||!record_.lifetimeId||!py.assignInteger(y)||
+           (binding_.hasOwner()&&!binding_.publishedPosition(handle(),record_,record_.x,py)))return fail();
+        record_.y=py;return true;
+    }
 private:
     bool fail(){good_=false;return false;}
     Record record_{};Binding binding_{};unsigned next_=1;bool good_=true;

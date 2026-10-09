@@ -563,6 +563,13 @@ struct RunSession {
     bool stepLevelClearScheduled(bool& confirm, bool leftPressed, bool rightPressed, bool& heartGoal,
                         CurrencyAccount& currency, PlayerMotion& player, int& health,
                         GameMakerRandom& random, Emit emit,DitherBirth birth,Alarms alarms) {
+        return stepLevelClearPositioned(confirm,leftPressed,rightPressed,heartGoal,currency,player,health,
+            random,emit,birth,alarms,[](std::int32_t){return true;},[]{return true;});
+    }
+    template<class Emit,class DitherBirth,class Alarms,class Position,class Wipe>
+    bool stepLevelClearPositioned(bool& confirm, bool leftPressed, bool rightPressed, bool& heartGoal,
+                        CurrencyAccount& currency, PlayerMotion& player, int& health,
+                        GameMakerRandom& random, Emit emit,DitherBirth birth,Alarms alarms,Position position,Wipe wipe) {
         if (!effectsSucceeded || !levelClearActive || nextLevelRequested) return false;
         const auto effect = [&](LevelClearSelection::Effect event, unsigned value) {
             if (event == LevelClearSelection::Effect::dither) {
@@ -576,10 +583,15 @@ struct RunSession {
         if(!alarms([&](auto event,unsigned value){
             effect(event,value);return effectsSucceeded;
         }))return effectsSucceeded=false;
+        // Ordinary Step uses ascending resource IDs: objTransDither (68)
+        // before Result (325). Its view read precedes scrResult's new yy.
+        exitDither.step(levelClear.motion.viewY(),284);
+        if(!wipe()||!effectsSucceeded)return effectsSucceeded=false;
         const bool ok = levelClear.step(confirm, leftPressed, rightPressed, heartGoal,
             upgrades, consumables, currency, player, health, combo.healthReserve, random, effect);
         if(!ok||!effectsSucceeded)return effectsSucceeded=false;
-        exitDither.step(levelClear.motion.viewY(), 284);
+        std::int32_t y;
+        if(!levelClear.motion.instanceY(y)||!position(y)||!effectsSucceeded)return effectsSucceeded=false;
         levelClearFrame = levelClear.presentation.advance(stage.area, stage.level,
             levelClear.selection.next, levelClear.selection.visible);
         return ok;
