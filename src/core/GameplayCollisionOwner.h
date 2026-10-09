@@ -1871,6 +1871,20 @@ public:
            !((event.owner==120&&event.code==1266)||(event.owner==83&&event.code==1066)))return check(false);
         return check(world_->collideSkeletonRoomEffect(local,event.code==1066,makePlayer));
     }
+    bool dispatchSmokeCollision(const RunnerCollisionEventContext::Frame& event){
+        View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;
+        if(!valid()||!world_||!resolves(event.self)||
+           !View::decode(event.self,kind,local)||kind!=View::Kind::smoke||event.type!=4)return check(false);
+        View::Record opposite;
+        if(!View(*world_).resolve(event.other,opposite))return check(false);
+        const int otherObject=!terrainRegistered_&&opposite.terrain?opposite.terrain->objectId:
+            (resolves(event.other)?objectOf(event.other):-1);
+        if(otherObject<0||event.subtype!=otherObject||
+           !objects_.collisionEvent(225,otherObject,found,binding)||!found||
+           event.owner!=225||binding.ownerObjectId!=225||event.code!=binding.codeId||
+           (event.code!=2016&&event.code!=2017))return check(false);
+        return event.code==2016||check(smoke_.wallContact(local));
+    }
     template<class Ops> bool dispatchCurrencyCollision(const RunnerCollisionEventContext::Frame& event,Ops& ops){
         View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;
         if(!valid()||!world_||!resolves(event.self)||!resolves(event.other)||

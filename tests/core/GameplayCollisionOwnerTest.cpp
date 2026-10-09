@@ -701,13 +701,21 @@ int main(){
         SmokeEffect oracle;GameMakerRandom oracleRandom(2);assert(oracle.create(x,y,oracleRandom));
         assert(smoke.setAlarm0(local,2));
         unsigned ticks=0;
+        auto smokePhase=std::make_unique<RunnerStepSnapshot<GameplayCollisionView::capacity>>();
         while(!oracle.destroyRequested){
             assert(oracle.advanceImage());world->step(0);
             assert(world->effectsSucceeded()&&owner->valid());
             if(ticks==1)oracle.alarm0();
             if(!oracle.destroyRequested){
                 auto expectedRandom=world->randomState();
-                assert(owner->stepSmoke(shared)&&oracle.step(expectedRandom,[](auto speed,auto direction,auto& vx,auto& vy){
+                unsigned selectedSmoke=0;
+                assert(owner->dispatchStepPhase(0,*smokePhase,[&](InstanceHandle selected,const PackedObjectEvent& event){
+                    GameplayCollisionView::Kind kind;InstanceHandle local;
+                    assert(GameplayCollisionView::decode(selected,kind,local));
+                    if(kind!=GameplayCollisionView::Kind::smoke)return true;
+                    assert(event.codeId==2015&&selected.slot==shared.slot&&selected.generation==shared.generation);
+                    ++selectedSmoke;return owner->stepSmoke(selected);
+                })&&selectedSmoke==1&&oracle.step(expectedRandom,[](auto speed,auto direction,auto& vx,auto& vy){
                     return SmokeDirection::vector(speed,direction,vx,vy,smokeTrig);
                 }));
                 assert(world->randomState().drawCount()==expectedRandom.drawCount());
@@ -724,6 +732,50 @@ int main(){
         assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)==ResultsDestination::gameplay&&
             world->registeredSmoke()==&smoke&&!smoke.find(before)&&owner->valid());
         assert(smoke.create(105189,x,y,random,after)&&after.generation>before.generation&&smoke.clear());
+        InstanceHandle first,child;assert(smoke.create(105190,x,y,random,first));
+        unsigned calls=0;
+        assert(owner->dispatchStepPhase(0,*smokePhase,[&](InstanceHandle selected,const PackedObjectEvent&){
+            GameplayCollisionView::Kind kind;InstanceHandle local;assert(GameplayCollisionView::decode(selected,kind,local));
+            if(kind!=GameplayCollisionView::Kind::smoke)return true;
+            ++calls;assert(smoke.create(105191,x,y,random,child));return owner->stepSmoke(selected);
+        })&&calls==1&&smoke.find(first)->state.allSet&&!smoke.find(child)->state.allSet);
+        calls=0;
+        assert(owner->dispatchStepPhase(0,*smokePhase,[&](InstanceHandle selected,const PackedObjectEvent&){
+            GameplayCollisionView::Kind kind;InstanceHandle local;assert(GameplayCollisionView::decode(selected,kind,local));
+            if(kind!=GameplayCollisionView::Kind::smoke)return true;
+            ++calls;return owner->stepSmoke(selected);
+        })&&calls==2&&smoke.find(child)->state.allSet&&smoke.clear());
+    }
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native})
+    for(unsigned reject=0;reject<3;++reject){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));auto& smoke=owner->registeredSmoke();GameMakerRandom random(2);
+        InstanceHandle local,self,walls[2];assert(smoke.create(105187,{}, {},random,local)&&
+            GameplayCollisionView::encode(GameplayCollisionView::Kind::smoke,local,self));
+        for(unsigned i=0;i<2;++i){assert(owner->terrain().append(60,int(i)*16,200,true)&&
+            GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,
+                owner->terrain().handle(owner->terrain().size()-1),walls[i]));}
+        auto oracle=smoke.find(local)->state;const auto draws=world->randomDrawCount();
+        for(unsigned i=0;i<3;++i){
+            if(i==1){assert(smoke.alarmEvent(local,0));oracle.alarm0();}
+            RunnerCollisionEventContext context;
+            const bool okay=context.dispatch(self,walls[i%2],{true,false},[&](auto,auto,int& subtype,bool& found,PackedObjectEvent& event){
+                subtype=60;return objects.collisionEvent(225,60,found,event);
+            },[&](auto event){
+                if(reject==1)event.code=2016;
+                if(reject==2)++event.other.generation;
+                return owner->dispatchSmokeCollision(event);
+            });
+            assert(okay==(reject==0));if(!okay)break;
+            assert(oracle.collideWall());const auto* r=smoke.find(local);
+            assert(r&&r->state.speed.high==oracle.speed.high&&r->state.speed.low==oracle.speed.low&&
+                r->state.imageSpeed.bits==oracle.imageSpeed.bits);
+        }
+        assert(world->randomDrawCount()==draws&&owner->valid()==(reject==0));
+        if(reject){world->step(0);assert(!world->effectsSucceeded());}
     }
     for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native})
     for(unsigned failure=0;failure<4;++failure){
