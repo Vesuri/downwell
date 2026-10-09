@@ -6326,6 +6326,48 @@ int main(){
             owner->scriptEffects().find(second)&&world->scriptEffects().size()==2&&lookups==2);
         assert(!world->spawnBoxScriptEffect(box,x,y,603,{},{},{},frames)&&lookups==2&&world->randomDrawCount()==draws);
     }
+    for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                       GameplayCollisionOwner::Ownership::nativeScenery})
+    for(bool replacement:{false,true})for(bool sourceStep:{false,true}){
+        // Birth during builder Step must not inherit a later box Step turn,
+        // including a replacement that occupies an already-captured slot.
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},&rooms,ownership);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));
+        const int x=64,y=512;assert(world->appendBreakables(&x,&y,1));
+        const InstanceHandle old{0,world->breakableSlot(0).lifetimeId};
+        if(!sourceStep)assert(world->publishBoxHealth(old,{}));
+        struct Birth {bool replacement,sourceStep,done=false;InstanceHandle key{};} birth{replacement,sourceStep};
+        world->configureGenerationStep([](void* context,GameplayWorld& w,GameMakerRandom&,int){
+            auto& b=*static_cast<Birth*>(context);if(b.done)return true;b.done=true;
+            const int x=96,y=512;
+            if(b.replacement)w.configureBreakables(&x,&y,1);
+            else if(!w.appendBreakables(&x,&y,1))return false;
+            const unsigned slot=w.breakableSlots()-1;b.key={slot,w.breakableSlot(slot).lifetimeId};
+            return w.effectsSucceeded()&&(b.sourceStep||w.publishBoxHealth(b.key,{}));
+        },&birth);
+        ScheduledBoxCounts counts;
+        auto tick=[&]{
+            if(!sourceStep){world->step(0);return world->effectsSucceeded();}
+            return world->withBoxDestruction([&](InstanceHandle h,BoxDestructionScript::Caller& caller){
+                InstanceHandle shared;
+                return GameplayCollisionView::encode(GameplayCollisionView::Kind::breakable,h,shared)&&
+                    owner->readBoxDestruction(shared,caller);
+            },[&](InstanceHandle h){return scheduledBoxEffects(*world,h,counts,
+                [&](InstanceHandle key){return world->markBreakableDestroyed(key);});},
+                [&]{world->step(0);return world->effectsSucceeded();});
+        };
+        assert(tick()&&birth.done&&world->findBreakable(birth.key)&&!world->findBreakable(birth.key)->destroyRequested);
+        assert(birth.key.generation>old.generation);
+        if(replacement)assert(!world->findBreakable(old));
+        else assert(world->findBreakable(old)->destroyRequested==!sourceStep);
+        assert(counts.stop==(sourceStep&&!replacement?1u:0u)&&!counts.sound);
+        counts={};assert(tick());
+        assert(world->findBreakable(birth.key)->destroyRequested==!sourceStep);
+        assert(counts.stop==(sourceStep?(replacement?1u:2u):0u)&&!counts.sound);
+    }
     for(unsigned water=0;water<2;++water)for(unsigned failure=0;failure<=6;++failure){
         auto world=std::make_unique<GameplayWorld>(300,true);
         const int bx=0,by=336;assert(world->appendBreakables(&bx,&by,1));const InstanceHandle box{0,1};

@@ -1590,6 +1590,11 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         !currencyOrderCapture_(currencyOrderContext_,currencyStepOrder_))){run_.effectsSucceeded=false;return {};}
     const auto smokeStepPhase=run_.smokeEffects.beginPhase();
     const auto damageNumberStepPhase=run_.damageNumbers.beginPhase();
+    // Original Step takes one creation cutoff before any object handler.
+    // Boxes are stable slots with monotonic lifetimes, so a prefix and ceiling
+    // exclude both generation births and replacements without a handle array.
+    const unsigned boxStepEnd=breakableCount_;
+    const std::uint32_t boxStepLastLifetime=nextBreakableLifetimeId_-1;
     // Capture before ordinary Step: later births must not inherit a turn.
     // This family's monotonic generation is its registration order, not its
     // numeric VM ID. Reused storage slots must not reorder two live covers.
@@ -1663,9 +1668,9 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     // Step (261). A bound source adapter also runs healthy boxes' alarmStop.
     // The unbound path retains the old destruction boundary until all effect,
     // audio and time-stop owners can be supplied by the gameplay scene.
-    for(unsigned i=0;i<breakableCount_;++i){
+    for(unsigned i=0;i<boxStepEnd&&i<breakableCount_;++i){
         auto& box=breakables_[i];
-        if(!box.lifetimeId||!box.active||box.destroyRequested)continue;
+        if(!box.lifetimeId||box.lifetimeId>boxStepLastLifetime||!box.active||box.destroyRequested)continue;
         if(boxStepDispatch_.bound()){
             const downwell::InstanceHandle key{i,box.lifetimeId};
             const bool ok=boxStepDispatch_.step(key);
