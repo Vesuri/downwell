@@ -478,10 +478,12 @@ void Game::renderMain(Renderer& renderer) const {
         });
     };
     const auto drawBullet=[&](const StartupRuntime::MainBulletState& bullet){
+        float angle=static_cast<float>(bullet.trajectory.direction * (360.0 / 4294967296.0));
+        if(bullet.sourceOwned)std::memcpy(&angle,&bullet.sourceMotion.imageAngle.bits,4);
         renderer.drawSpriteTransformed(machineGunProfile(bullet.gemHigh).sprite, bullet.animation.frame(),
                             static_cast<int>(bullet.x - viewX),
                             static_cast<int>(bullet.y - viewY), 1.0F, 1.0F,
-                            static_cast<float>(bullet.trajectory.direction * (360.0 / 4294967296.0)));
+                            angle);
     };
     bool unregisteredBulletsDrawn=false;
     const auto drawUnregisteredBullets=[&]{

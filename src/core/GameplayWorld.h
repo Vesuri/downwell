@@ -166,6 +166,8 @@ public:
         downwell::MachineGunTrajectory trajectory;
         downwell::SoundPlayState sound{};
         downwell::InstanceHandle myFx{};
+        downwell::MachineGunSourceMotion sourceMotion{};
+        bool sourceOwned=false;
     };
     using BulletLifecycleBinding=downwell::RecordLifecycleBinding<BulletState>;
     struct EnemyState {
@@ -856,6 +858,19 @@ public:
         return downwell::EffectSpawnScript::run(ops,x,y,sprite,speed,angle,depth);
     }
     const downwell::ScriptSpawnEffects<downwell::scriptSpawnEffectCapacity>& scriptEffects()const{return ownedScriptEffects_;}
+    template<class Execute,class Tick> bool withSourceBulletSteps(Execute execute,Tick tick){
+        if(!run_.effectsSucceeded||!bulletLifecycle_.hasOwner()||sourceBulletDispatch_)return run_.effectsSucceeded=false;
+        for(unsigned i=0;i<bulletSlotEnd_;++i){const auto& bullet=bullets_[i];
+            if(bullet.identitySlot<bulletCapacity&&!bullet.sourceOwned&&bullet.trajectory.initialized)
+                return run_.effectsSucceeded=false;
+        }
+        sourceBulletContext_=&execute;
+        sourceBulletDispatch_=[](void* context,downwell::InstanceHandle shot,downwell::MachineGunSourceMotion& motion){
+            return (*static_cast<Execute*>(context))(shot,motion);
+        };
+        const bool ok=tick();sourceBulletDispatch_=nullptr;sourceBulletContext_=nullptr;
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
+    }
     template<class Ops,class Frames>
     bool stepSourceBullet(downwell::InstanceHandle shot,downwell::MachineGunSourceMotion& motion,Ops& ops,Frames frames){
         const auto* caller=resolveBulletLifetime(shot);
@@ -1859,6 +1874,8 @@ private:
     bool (*roomAnimation_)(void*)=nullptr;
     void* roomAnimationContext_=nullptr;
     bool (*registeredActorEndStep_)(void*,long)=nullptr;
+    bool (*sourceBulletDispatch_)(void*,downwell::InstanceHandle,downwell::MachineGunSourceMotion&)=nullptr;
+    void* sourceBulletContext_=nullptr;
     bool registeredOrdinaryEndStep_=false;
     void* registeredActorEndStepContext_=nullptr;
     bool (*collisionPass_)(void*)=nullptr;

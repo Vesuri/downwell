@@ -596,6 +596,12 @@ bool GameplayWorld::publishBulletCollisionPosition(downwell::InstanceHandle h,
     if(!run_.effectsSucceeded||!bullet||!downwell::RunnerSpatialSplit::valid(x)||
        !downwell::RunnerSpatialSplit::valid(y)||!bulletLifecycle_.publishedPosition(h,*bullet,x,y))
         return run_.effectsSucceeded=false;
+    if(bullet->sourceOwned){
+        std::int32_t px,py;
+        if(!x.promoted().roundPixel(px)||!y.promoted().roundPixel(py))return run_.effectsSucceeded=false;
+        auto* current=const_cast<BulletState*>(resolveBulletLifetime(h));if(!current)return run_.effectsSucceeded=false;
+        current->sourceMotion.x=x;current->sourceMotion.y=y;current->x=px-240;current->y=py-176;
+    }
     return true;
 }
 bool GameplayWorld::publishBulletAngle(downwell::InstanceHandle h,downwell::RunnerImageValue angle){
@@ -1306,6 +1312,15 @@ bool GameplayWorld::stepBulletEffect(BulletState& bullet,long generationCameraY,
 {
     if(!bullet.active||bullet.destroyRequested)return true;
     bulletChanged = true;
+    if(sourceBulletDispatch_){
+        if(!bullet.sourceOwned){
+            if(bullet.trajectory.initialized||!bullet.sourceMotion.reset(downwell::MotionBinary64::fromInteger(bullet.x+240),
+                downwell::MotionBinary64::fromInteger(bullet.y+176),bullet.trajectory.zeroSpread))return run_.effectsSucceeded=false;
+            bullet.sourceOwned=true;
+        }
+        const bool ok=sourceBulletDispatch_(sourceBulletContext_,{bullet.identitySlot,bullet.lifetimeId},bullet.sourceMotion);
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
+    }
     const long cameraCentreQ12 = 176L * 4096 + generationCameraY * 16;
     bool alive=false;
     if(!downwell::stepMachineGunProjectileChecked(bullet, enemyRandom_,
@@ -1410,6 +1425,9 @@ bool GameplayWorld::stepBulletEffect(BulletState& bullet,long generationCameraY,
 
 GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
 {
+    if(!sourceBulletDispatch_)for(unsigned i=0;i<bulletSlotEnd_;++i){const auto& b=bullets_[i];
+        if(b.identitySlot<bulletCapacity&&b.active&&!b.destroyRequested&&b.sourceOwned){run_.effectsSucceeded=false;return {};}
+    }
     if(playerBirthPending_){run_.effectsSucceeded=false;return {};}
     if(collisionPassExecuting_){run_.effectsSucceeded=false;return {};}
     if (run_.levelClearActive || !run_.effectsSucceeded || !generationSucceeded_) return {}; // Result owner uses stepLevelClear.

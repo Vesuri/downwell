@@ -3,6 +3,7 @@
 #include "core/CurrencySmokeComposition.h"
 #ifndef DOWNWELL_NATIVE_QUERY_PROBE
 #include "BulletWallSoundChecks.h"
+#include "SourceBulletSchedulingChecks.h"
 #include "RegisteredSkeletonThrowChecks.h"
 #include "QuietSkeletonEffects.h"
 #include "ScheduledBoxEffectsCheck.h"
@@ -49,6 +50,11 @@ struct NativeBulletSourceOps {
 };
 bool nativeWorldSourceBullet(GameplayWorld& world,downwell::InstanceHandle shot,downwell::MachineGunSourceMotion& motion,
     NativeBulletSourceOps& ops,NativeBulletFrames frames){return world.stepSourceBullet(shot,motion,ops,frames);}
+bool nativeScheduledSourceBullet(GameplayWorld& world,NativeBulletSourceOps& ops,NativeBulletFrames frames){
+    return world.withSourceBulletSteps([&](downwell::InstanceHandle shot,downwell::MachineGunSourceMotion& motion){
+        return world.stepSourceBullet(shot,motion,ops,frames);
+    },[&]{world.step(0);return world.effectsSucceeded();});
+}
 bool nativeBulletEndStep(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle shot){
     return owner.endStepBullet(shot,{});
 }
@@ -3001,6 +3007,24 @@ int main(){
         },[&]{world->step(4);return world->effectsSucceeded();}));
         assert(world->resolveBulletLifetime(shot)&&world->resolveBulletLifetime(shot)->destroyRequested);
         assert(owner->prepareDraw()&&!world->resolveBulletLifetime(shot));
+    }
+    {
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));unsigned calls=0,initializations=0;InstanceHandle shot;
+        auto frames=[&](int id,unsigned& count){return sprites.frameCount(id,count);};
+        for(unsigned tick=0;tick<3;++tick){
+            assert(world->withSourceBulletSteps([&](InstanceHandle key,MachineGunSourceMotion& motion){
+                shot=key;++calls;const bool first=!motion.initialized;initializations+=first;
+                const auto before=world->randomDrawCount();ScheduledEmptyBulletOps<GameplayWorld> ops{*world,key};
+                return world->stepSourceBullet(key,motion,ops,frames)&&ops.writes==2&&world->randomDrawCount()==before+unsigned(first);
+            },[&]{world->step(tick?0:4);return world->effectsSucceeded();}));
+            assert(calls==tick+1&&initializations==1&&world->resolveBulletLifetime(shot)->sourceOwned&&
+                !world->resolveBulletLifetime(shot)->trajectory.initialized);
+        }
+        const auto before=world->randomDrawCount();world->step(0);
+        assert(!world->effectsSucceeded()&&world->randomDrawCount()==before); // Never silently resume the legacy path.
     }
     for(bool failSprite:{false,true}){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);

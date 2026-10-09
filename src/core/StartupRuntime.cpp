@@ -332,6 +332,12 @@ bool StartupRuntime::publishCollisionPosition(InstanceHandle h,RunnerImageValue 
         // Unlike player/box motion accumulators, these precise fields mirror
         // published builtins. Bullet private motion lives in mainBullets_.
         std::memcpy(&record->preciseX,&x.bits,4);std::memcpy(&record->preciseY,&y.bits,4);
+        if(record->objectId==261)for(std::size_t i=0;i<mainBulletCount_;++i){auto& bullet=mainBullets_[i];
+            if(bullet.instance.slot==h.slot&&bullet.instance.generation==h.generation&&bullet.sourceOwned){
+                bullet.sourceMotion.x=x;bullet.sourceMotion.y=y;
+                std::memcpy(&bullet.x,&x.bits,4);std::memcpy(&bullet.y,&y.bits,4);break;
+            }
+        }
     }
     return true;
 }
@@ -348,6 +354,8 @@ void StartupRuntime::stepInternal(bool advancePressed,
                                   bool anyInput) {
     if (run_.levelClearActive || !run_.effectsSucceeded ||
         !roomLoadSucceeded_ || !deferredCommandsSucceeded_) return; // Result owner uses stepLevelClear.
+    if(!sourceBulletDispatch_)for(std::size_t i=0;i<mainBulletCount_;++i)
+        if(mainBullets_[i].sourceOwned){run_.effectsSucceeded=false;return;}
     GameMakerRandom::FrameRefill refill{random_};
     // Previous Draw's follow publication remains visible throughout ordinary
     // Step, even after camMain's own Step changes the followed instance.
@@ -487,9 +495,10 @@ void StartupRuntime::stepInternal(bool advancePressed,
     };
     const auto handler = [this, advancePressed](InstanceRecord& instance,
                                                  StepEvent event) {
-        // Projectiles still use the shared supported Step adapter below.
-        // Registration does not authorize a second dispatch of their events.
+        // Source-owned projectiles run here; the legacy post-Step adapter is
+        // disabled for that scope so registration cannot advance them twice.
         if(instance.objectId==261){
+            if(event.phase==StepEventPhase::step&&sourceBulletDispatch_&&!stepSourceMainBullet(instance))run_.effectsSucceeded=false;
             if(event.phase==StepEventPhase::endStep&&!endStepMainBullet(instance))run_.effectsSucceeded=false;
             return;
         }
@@ -871,6 +880,7 @@ bool StartupRuntime::publishMainInactivation(const InstanceRecord& record) {
 }
 
 void StartupRuntime::updateMainBullets() {
+    if(sourceBulletDispatch_)return; // Already executed at each selected object-261 Step slot.
     std::size_t write = 0;
     for (std::size_t index = 0; index < mainBulletCount_; ++index) {
         MainBulletState bullet = mainBullets_[index];
@@ -927,6 +937,21 @@ void StartupRuntime::updateMainBullets() {
             mainBullets_[write++] = bullet;
     }
     mainBulletCount_ = write;
+}
+
+bool StartupRuntime::stepSourceMainBullet(InstanceRecord& instance){
+    const auto key=instances_.handleAt(static_cast<std::size_t>(&instance-&instances_.at(0)));
+    for(std::size_t i=0;i<mainBulletCount_;++i){
+        auto& bullet=mainBullets_[i];
+        if(bullet.instance.slot!=key.slot||bullet.instance.generation!=key.generation)continue;
+        if(!bullet.sourceOwned){
+            RunnerImageValue x,y;std::memcpy(&x.bits,&instance.preciseX,4);std::memcpy(&y.bits,&instance.preciseY,4);
+            if(bullet.trajectory.initialized||!bullet.sourceMotion.reset(x.promoted(),y.promoted(),bullet.trajectory.zeroSpread))return false;
+            bullet.sourceOwned=true;
+        }
+        return sourceBulletDispatch_&&sourceBulletDispatch_(sourceBulletContext_,key,bullet.sourceMotion)&&run_.effectsSucceeded;
+    }
+    return false;
 }
 
 bool StartupRuntime::endStepMainBullet(InstanceRecord& instance){

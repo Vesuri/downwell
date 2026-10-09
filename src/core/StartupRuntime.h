@@ -92,6 +92,8 @@ public:
         ProjectileAnimation animation;
         MachineGunTrajectory trajectory;
         InstanceHandle instance{};
+        MachineGunSourceMotion sourceMotion{};
+        bool sourceOwned=false;
     };
     struct MainCurrencyState {
         GemMotion motion;
@@ -1257,6 +1259,17 @@ public:
         return run_.effectsSucceeded=registration.frozen(key,effect,pTimeStop,width,frozen);
     }
     const ScriptSpawnEffects<scriptSpawnEffectCapacity>& scriptEffects()const{return ownedScriptEffects_;}
+    template<class Execute,class Tick> bool withSourceBulletSteps(Execute execute,Tick tick){
+        if(!run_.effectsSucceeded||!objectPack_||sourceBulletDispatch_)return run_.effectsSucceeded=false;
+        for(std::size_t i=0;i<mainBulletCount_;++i)
+            if(!mainBullets_[i].sourceOwned&&mainBullets_[i].trajectory.initialized)return run_.effectsSucceeded=false;
+        sourceBulletContext_=&execute;
+        sourceBulletDispatch_=[](void* context,InstanceHandle shot,MachineGunSourceMotion& motion){
+            return (*static_cast<Execute*>(context))(shot,motion);
+        };
+        const bool ok=tick();sourceBulletDispatch_=nullptr;sourceBulletContext_=nullptr;
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
+    }
     template<class Ops,class Frames>
     bool stepSourceBullet(InstanceHandle shot,MachineGunSourceMotion& motion,Ops& ops,Frames frames){
         if(!run_.effectsSucceeded||!instances_.resolve(shot))return run_.effectsSucceeded=false;
@@ -1904,6 +1917,7 @@ private:
     void updateMainBullets();
     bool publishMainBullet(MainBulletState& bullet,bool angle);
     bool endStepMainBullet(InstanceRecord& instance);
+    bool stepSourceMainBullet(InstanceRecord& instance);
     bool cleanupMainOwnedDestroyed();
     bool clearMainBullets();
     bool publishMainInactivation(const InstanceRecord& record);
@@ -2156,6 +2170,8 @@ private:
     std::uint32_t mainInstancesRetired_ = 0;
     std::uint32_t mainJumps_ = 0;
     std::array<MainBulletState, mainBulletCapacity> mainBullets_{};
+    bool (*sourceBulletDispatch_)(void*,InstanceHandle,MachineGunSourceMotion&)=nullptr;
+    void* sourceBulletContext_=nullptr;
     std::size_t mainBulletCount_ = 0;
     std::array<MainCurrencyState, mainCurrencyCapacity> mainCurrencyItems_{};
     std::size_t mainCurrencyCount_ = 0;

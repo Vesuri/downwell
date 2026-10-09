@@ -1188,6 +1188,23 @@ sprites or angles fail the draw rather than silently rounding or converting
 assets at runtime. This presentation support does not enable automatic muzzle
 emission from the still-approximate live gun trajectory.
 
+The scoped `withSourceBulletSteps` adapter admits the source body at the
+world's ordinary object-261 Step slot. Exact absolute motion is retained with
+each bullet, not rebuilt from rounded drawing coordinates on each tick.
+Published coordinate setters update that state and the backend's drawing
+cache; the SDL renderer uses the published source image angle. End Step
+retirement remains after collision dispatch. The scope disables the legacy
+post-Step advancement and rejects admission of an already initialized legacy
+trajectory. A later tick without the required source binding fails before
+advancing a live source-owned bullet; it cannot silently resume Q20 motion.
+
+The caller must provide complete collision and audio operations. Production
+callers without this scope still use the legacy trajectory: scoped scheduling
+does not establish complete natural collision selection or enable it by
+default. The scheduler fixtures deliberately supply an empty contact domain;
+they check phase admission, retained motion, initial RNG consumption and
+missing-binding failure, separately from explicit impact fixtures.
+
 Run `make verify-machine-gun-source-motion verify-smoke-direction
 verify-smoke-trig`. The source-motion test covers birth narrowing, raw RNG
 endpoints, ordinary/Laser Sight initialization, repeated coordinate writes,

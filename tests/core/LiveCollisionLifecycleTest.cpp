@@ -1,5 +1,6 @@
 #include "core/StartupRuntime.h"
 #include "BulletWallSoundChecks.h"
+#include "SourceBulletSchedulingChecks.h"
 #include "core/BuilderStringTraversal.h"
 #include "RegisteredSkeletonThrowChecks.h"
 #include "QuietSkeletonEffects.h"
@@ -2103,6 +2104,27 @@ int main(){
         require(shot.generation&&!owner->resolve(shot),"bullet End Step observes collision-published Y and cleanup retires it");
         for(unsigned i=0;i<world->mainBulletCount();++i)
             require(owner->resolve(world->mainBulletAt(i).instance),"bullet draw cache contains no End Step retirees");
+    }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach scheduled source-bullet world");world->skipToGameForTesting();
+        unsigned calls=0,initializations=0;
+        auto frames=[&](int id,unsigned& count){return sprites.frameCount(id,count);};
+        for(unsigned tick=0;tick<1000&&calls<3;++tick){
+            const auto input=calls?Input{}:gameplayContactProfileInput(tick,world->mainPlayerX(),world->mainPlayerY());
+            const auto previous=calls;
+            require(world->withSourceBulletSteps([&](InstanceHandle key,MachineGunSourceMotion& motion){
+                ++calls;const bool first=!motion.initialized;initializations+=first;
+                const auto before=world->randomDrawCount();ScheduledEmptyBulletOps<StartupRuntime> ops{*world,key};
+                return world->stepSourceBullet(key,motion,ops,frames)&&ops.writes==2&&world->randomDrawCount()==before+unsigned(first);
+            },[&]{world->step(input,false);return world->effectsSucceeded();}),"source bullet dispatch occupies ordinary Step");
+            require(calls<=previous+1,"one selected source bullet Step per tick");
+        }
+        require(calls==3&&initializations==1&&world->mainBulletCount()==1&&world->mainBulletAt(0).sourceOwned&&
+            !world->mainBulletAt(0).trajectory.initialized,"source motion survives frames without legacy advancement");
+        const auto before=world->randomDrawCount();world->step({},false);
+        require(!world->effectsSucceeded()&&world->randomDrawCount()==before,"missing source dispatch fails before any tick mutation");
     }
     for(bool high:{false,true})for(bool laser:{false,true})for(bool boneTarget:{false,true})for(bool worldRandom:{false,true}){
         if(worldRandom&&(high||laser))continue;
