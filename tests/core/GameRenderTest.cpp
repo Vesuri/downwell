@@ -471,6 +471,27 @@ int main() {
             }
             require(shards.clear(),"retire SDL shard before ordinary updates");
         }
+        {
+            auto shards=world.limboShardRegistration<1>();downwell::InstanceHandle child;
+            require(world.createRegisteredLimboShard(shards,{0x406e0400u,0},{0x40600800u,0},false,child),
+                "register fractional SDL limbo Draw fixture");
+            RecordingRenderer unbound;scene->render(unbound);
+            require(!scene->renderingSucceeded(),"missing limbo Draw state is an error, not an invisible actor");
+            const auto digest=world.stateDigest();const auto draws=world.randomDrawCount();
+            RecordingRenderer drawn;drawn.recordTransforms=true;
+            require(world.withLimboShardDraw(shards,[&]{scene->render(drawn);return scene->renderingSucceeded();}),
+                "borrow limbo state during ordered SDL Draw");
+            unsigned seen=0;
+            for(const auto& item:drawn.transforms)if(item.sprite==91){
+                require(item.x==110+240.125f-world.mainCameraRenderViewX()&&
+                    item.y==128.25f-world.mainCameraRenderViewY(),"SDL limbo preserves fractional published coordinates");++seen;
+            }
+            require(seen==1&&world.stateDigest()==digest&&world.randomDrawCount()==draws,
+                "SDL limbo draws once without changing game state or RNG");
+            RecordingRenderer released;scene->render(released);
+            require(!scene->renderingSucceeded(),"limbo Draw binding cannot outlive its scope");
+            require(shards.clear(),"retire SDL limbo fixture before normal updates");
+        }
         scene->update({});scene->update({});RecordingRenderer retired;scene->render(retired);
         require(scene->simulationSucceeded()&&scene->renderingSucceeded()&&
             std::find(retired.spriteOrder.begin(),retired.spriteOrder.end(),602)==retired.spriteOrder.end()&&
@@ -911,6 +932,18 @@ int main() {
         }
         const auto x=downwell::MotionBinary64::fromInteger(runtime.mainCameraRenderViewX()+80);
         const auto y=downwell::MotionBinary64::fromInteger(runtime.mainCameraRenderViewY()+60);
+        {
+            auto shards=runtime.limboShardRegistration<1>();downwell::InstanceHandle child;
+            require(runtime.createRegisteredLimboShard(shards,x,y,false,child),"register direct limbo beside effect surface");
+            RecordingRenderer drawn;drawn.recordTransforms=true;
+            require(runtime.withLimboShardDraw(shards,[&]{effectGame.render(drawn);return effectGame.renderingSucceeded();}),
+                "composited rendering retains ordered limbo Draw");
+            unsigned seen=0;for(const auto& item:drawn.transforms)if(item.sprite==91){
+                require(item.x==190&&item.y==60,"direct limbo Draw uses current view placement");++seen;
+            }
+            require(seen==1&&!drawn.effectWords,"limbo does not duplicate itself into surfaceFx");
+            require(shards.clear(),"retire composited limbo fixture");
+        }
         auto registration=runtime.debrisRegistration<1>();downwell::DebrisEffects<1> debris;unsigned id=0;
         require(runtime.spawnDebris(registration,debris,x,y,1,id),"register composited debris");
         debris.get(1)->imageIndex.bits=0;

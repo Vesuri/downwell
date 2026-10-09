@@ -547,6 +547,18 @@ void Game::renderMain(Renderer& renderer) const {
             renderer.drawSpriteTransformed(91,frame,instance.preciseX-viewX,instance.preciseY-viewY,1,1,0);
             return true;
         }
+        if(instance.objectId==379){
+            const auto* state=startup_.limboShardForDraw(instance);
+            if(!state||instance.spriteId!=91)return false;
+            if(!state->drawsSelf())return true;
+            RunnerImageValue index;std::memcpy(&index.bits,&instance.imageIndex,4);unsigned frame;
+            if(!DebrisDraw::frame(91,index,frame))return false;
+            // limboShard uses draw_self at room depth zero, not drawFx. It
+            // stays a direct draw even while the effect surface is enabled.
+            renderer.drawSpriteTransformed(91,frame,instance.preciseX-viewX,instance.preciseY-viewY,
+                instance.scaleX,instance.scaleY,instance.rotation);
+            return true;
+        }
         if(instance.objectId==370){
             if(composite)return true;
             const auto* effect=startup_.debrisForDraw(key,instance);

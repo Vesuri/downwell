@@ -500,6 +500,20 @@ public:
     const CorpseAnimation* corpseForDraw(const InstanceRecord& record)const{
         return corpseDrawState_?corpseDrawState_(corpseDrawContext_,record):nullptr;
     }
+    template<unsigned Capacity,class Render> bool withLimboShardDraw(
+        StoredLimboShardRegistration<instanceCapacity,Capacity>& registration,Render render){
+        if(limboShardDrawState_||!registration.belongsTo(instances_)||!registration.valid())return false;
+        limboShardDrawContext_=&registration;
+        limboShardDrawState_=[](void* context,const InstanceRecord& record)->const LimboShard*{
+            auto& owner=*static_cast<StoredLimboShardRegistration<instanceCapacity,Capacity>*>(context);
+            return owner.state(owner.handle(record));
+        };
+        const bool ok=render();limboShardDrawContext_=nullptr;limboShardDrawState_=nullptr;
+        return ok&&registration.valid();
+    }
+    const LimboShard* limboShardForDraw(const InstanceRecord& record)const{
+        return limboShardDrawState_?limboShardDrawState_(limboShardDrawContext_,record):nullptr;
+    }
     enum class SmokePhase {animation,alarm,step,cleanup};
     enum class LimboShardPhase {animation,step,cleanup};
     template<unsigned Capacity,class Environment,class Tick> bool withLimboShardEvents(
@@ -1950,6 +1964,8 @@ private:
     const CorpseAnimation* (*corpseDrawState_)(void*,const InstanceRecord&)=nullptr;
     void* smokeContext_=nullptr;
     void* limboShardContext_=nullptr;
+    void* limboShardDrawContext_=nullptr;
+    const LimboShard* (*limboShardDrawState_)(void*,const InstanceRecord&)=nullptr;
     bool (*limboShardDispatch_)(void*,const InstanceRecord&,LimboShardPhase)=nullptr;
     void* consumptionBloodContext_=nullptr;
     int* momentDelayRoomSpeed_=nullptr;
