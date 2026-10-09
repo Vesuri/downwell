@@ -42,8 +42,14 @@ public:
             x=px.promoted();
         }
         EffectMaskAssets::Asset asset;bool ink;
-        return glyphs_.resolve(state_.font,token,state_.color,asset,ink)&&
-            (!ink||emit_.atSurface(asset,x,y));
+        if(!glyphs_.resolve(state_.font,token,state_.color,asset,ink))return false;
+        if(!ink)return true;
+        // The original atlas renderer adds the signed glyph bearing before
+        // sampling, with binary32 rounding. Sprite-style integer origins in
+        // the compositor would apply it after sampling and change half ties.
+        if(!x.add(MotionBinary64::fromInteger(-asset.originX))||!px.assign(x))return false;
+        asset.originX=0;
+        return emit_.atSurface(asset,px.promoted(),y);
     }
 private:
     const FontGlyphMasks& glyphs_;LevelNumberTextDrawState& state_;Target& target_;Emit& emit_;

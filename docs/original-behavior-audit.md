@@ -156,6 +156,19 @@ narrowing and with binary32 subtraction. All nine alignment combinations are
 tested. Final glyph-quad raster sampling remains unverified beyond the existing
 integer placement cases.
 
+The atlas glyph path at 0x44751F loads the signed bearing from glyph +0x0C,
+scales it and adds it in binary32 before building the textured quad. Applying
+the bearing as a compositor integer origin after rounding is not equivalent:
+for glyph `1`, X=0.5 plus bearing 1 reaches 1.5 before sampling. The shared
+adapter now performs this addition and emits a zero-origin asset. The regression
+checks both the emitted real coordinate and the existing nearest-even sampler's
+result. This proves the ordering correction, not the original GPU's sampling rule.
+Direct FONT verification also pins font 2 scaleX/scaleY=1, the baseline-related
+fields at +0x28/+0x2C=0, 412 glyphs and maximum height 10. The baseline read at
+0x447289 therefore contributes zero for this font. Expanded quad borders,
+texture filtering and device raster rules still require evidence before claiming
+fractional-placement parity with Windows.
+
 The stored runner's `withLevelNumberDraw` borrows the title registration only
 for its enclosing render, while `drawLevelNumber` resolves the original room
 record back to that registration at the layer callback. The synchronous ops

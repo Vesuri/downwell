@@ -32,10 +32,24 @@ static void titleSurface(){
     for(unsigned token:{unsigned('A'),unsigned('.'),unsigned('1')})for(unsigned align=0;align<3;++align)for(unsigned vertical=0;vertical<3;++vertical){
         int width;assert(title_glyphs::bank.width(2,token,width));
         int height;assert(title_glyphs::bank.lineHeight(2,height)&&height==10);
-        PositionEmit emit{16777216-(align==1?width/2:align==2?width:0),16777220-(vertical==1?5:vertical==2?10:0)};
+        EffectMaskAssets::Asset glyph;bool ink;assert(title_glyphs::bank.resolve(2,token,0xffffff,glyph,ink)&&ink);
+        const float aligned=float(16777216-(align==1?width/2:align==2?width:0));
+        PositionEmit emit{int(aligned-float(glyph.originX)),16777220-(vertical==1?5:vertical==2?10:0)};
         Target target;LevelNumberTextDrawState state{2,align,vertical,0xffffff,MotionBinary64::fromInteger(1)};
         LevelNumberSurfaceDraw<Target,PositionEmit> draw(title_glyphs::bank,state,target,emit);
         assert(draw.character(token,MotionBinary64::fromInteger(16777217),MotionBinary64::fromInteger(16777219))&&emit.calls==1);
+    }
+    {
+        struct BearingEmit {
+            bool atSurface(const EffectMaskAssets::Asset& asset,MotionBinary64 x,MotionBinary64){
+                assert(asset.originX==0&&x.high==0x3ff80000u&&x.low==0); // 0.5 + bearing 1 = 1.5
+                std::int32_t pixel;assert(x.roundPixel(pixel)&&pixel==2); // Old round(0.5)+1 gave 1.
+                return true;
+            }
+        } emit;
+        Target target;LevelNumberTextDrawState state{2,0,0,0xffffff,MotionBinary64::fromInteger(1)};
+        LevelNumberSurfaceDraw<Target,BearingEmit> draw(title_glyphs::bank,state,target,emit);
+        assert(draw.character('1',{0x3fe00000u,0},{}));
     }
     SmokeEffects<1> smoke;EffectMaskAssets assets;
     auto composition=std::make_unique<CurrencySmokeComposition>();

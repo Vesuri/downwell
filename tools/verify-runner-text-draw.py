@@ -26,6 +26,9 @@ for start,end,digest in (
     (0x44A077,0x44A12A,'4a434e964ea76863018199b7f7d23f7ed581314dcd0e077bcac3392ebfbc3bc9'),
     (0x44A280,0x44A29A,'e3fa35683877ad7cdeb36b2e5583ed4e9084c34c969975f53dfb462147df09c0'),
     (0x459CEC,0x459D4B,'32212e9122890aecec49194caa90e4423f0993ac6319d391d9b1d0c222e3214d'),
+    (0x44751F,0x447572,'ce0c98bd191222a0336382d6d80987ef956cded151e1b76e3aef9948eb9eaf9c'),
+    (0x449FD3,0x44A010,'6f7c4e79f070f060e3071e4f4870ecbec3af2ea337274f8aee3f8070c4f3f6eb'),
+    (0x447289,0x4472B4,'851e9183c9e1f1f2602ba6ef56eaa4f7d9c4af0bfc0f4039c8c7b59a64b88f35'),
 ):
     assert sha256(region(start,end-start)).hexdigest()==digest,hex(start)
 # draw_text narrows both numeric arguments using FSTP m32 before 0x459C50.
@@ -38,6 +41,24 @@ assert region(0x459E29,5)==bytes.fromhex('f3 0f 58 45 08')
 assert region(0x44A10B,4)==bytes.fromhex('0f bf 40 08')
 assert region(0x44A280,8)==bytes.fromhex('66 0f 6e 81 80 00 00 00')
 assert region(0x44A28B,8)==bytes.fromhex('f3 0f 59 81 90 00 00 00')
+# Atlas glyph's signed bearing is scaled and added before quad generation.
+assert region(0x44751F,4)==bytes.fromhex('0f bf 4f 0c')
+assert region(0x44755B,4)==bytes.fromhex('f3 0f 58 cb')
+# Confirm fields omitted by the JSON font manifest directly from untouched FONT.
+data=(root/'data/data.win').read_bytes()
+assert sha256(data).hexdigest()=='c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8'
+offset=8
+while offset<len(data):
+    tag,size=struct.unpack_from('<4sI',data,offset)
+    if tag==b'FONT':
+        font=struct.unpack_from('<I',data,offset+12+2*4)[0]
+        assert struct.unpack_from('<ffiiI',data,font+0x20)==(1.0,1.0,0,0,412)
+        glyphs=struct.unpack_from('<412I',data,font+0x34)
+        assert max(struct.unpack_from('<h',data,g+8)[0] for g in glyphs)==10
+        break
+    offset+=8+size
+else:
+    raise AssertionError('missing FONT chunk')
 assembly=root/'extracted/utmt-0.9.2.0/Assembly'
 player=(assembly/'gml_GlobalScript_playerDraw.asm').read_text()
 assert player.count('call.i draw_set_halign(argc=1)')==1
