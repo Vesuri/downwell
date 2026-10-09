@@ -442,6 +442,36 @@ int main(){
             counts.mark==1&&counts.stop==1&&audio.valid&&audio.calls==7,"reward preserves completed destruction effects and tail alarmStop");
         require(gems.clear(),"retire box reward registry before teardown");
     }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach mixed smoke/wall collision pass");world->skipToGameForTesting();
+        auto pass=std::make_unique<StoredDitherCollisionPass>(*owner);
+        require(pass->run(*world),"settle authored dither contacts before smoke fixture");
+        const InstanceRecord* wall=nullptr;
+        for(unsigned i=0;i<world->activeInstanceCount();++i){
+            const auto& r=world->instanceAt(i);if(r.objectId==60&&!r.destroyRequested){wall=&r;break;}
+        }
+        require(wall,"retained wall for smoke geometry");
+        auto smoke=world->smokeRegistration<1>();std::uint32_t id=0;
+        require(world->createRegisteredSmoke(smoke,MotionBinary64::fromInteger(wall->x),MotionBinary64::fromInteger(wall->y),id),
+            "place smoke on actual retained wall");
+        const auto* r=world->instance(id);require(r&&smoke.alarmEvent(*r,0),"enable smoke wall response");
+        InstanceHandle self{};
+        for(unsigned i=0;i<world->activeInstanceCount();++i)
+            if(world->instanceAt(i).instanceId==id)self=world->instanceHandleAt(i);
+        auto expected=*smoke.state(*r);unsigned contacts=0;
+        for(unsigned i=0;i<world->activeInstanceCount();++i){
+            const auto& other=world->instanceAt(i);if(other.objectId!=60||other.destroyRequested)continue;
+            bool hit=false;require(owner->collisionOverlap(self,world->instanceHandleAt(i),hit),"resource smoke/wall overlap");
+            if(hit){++contacts;require(expected.collideWall(),"one source event per overlapping wall");}
+        }
+        require(contacts&&pass->run(*world,smoke),"shared ordered pair stream admits smoke beside dither");
+        const auto* state=smoke.state(*r);
+        require(state&&state->speed.high==expected.speed.high&&state->speed.low==expected.speed.low,
+            "ordered collection executes all smoke contacts once");
+        require(smoke.clear(),"retire mixed smoke fixture");
+    }
     for(unsigned mode=0;mode<4;++mode){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
@@ -1381,6 +1411,40 @@ int main(){
         require(!endCallbacks&&bool(world->instance(sourceId))==!retire&&skeletons.instances().size()==unsigned(!retire),
             "strict source view boundaries retire through both owners, not external no-op callbacks");
         require(skeletons.clear(),"clear view boundary fixture");
+    }
+    for(unsigned mode=0;mode<4;++mode){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            InstanceLifecycleBinding::bindPointQueries(*owner));
+        require(owner->attach(*world),"attach smoke collision world");world->skipToGameForTesting();
+        auto smoke=world->smokeRegistration<1>();std::uint32_t id=0;
+        require(world->createRegisteredSmoke(smoke,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(192),id),
+            "register collision smoke");
+        InstanceHandle self{},walls[2]{};unsigned count=0;
+        require(world->visitDrawChecked([&](InstanceHandle key,const InstanceRecord& record){
+            if(record.instanceId==id)self=key;
+            if(record.objectId==60&&count<2)walls[count++]=key;
+            return true;
+        })&&self.generation&&count==2,"select two distinct live wall lifetimes");
+        const auto* record=world->instance(id);auto expected=*smoke.state(*record);
+        if(mode){require(smoke.alarmEvent(*record,0),"source alarm clears smoke contact guard");expected.alarm0();}
+        const auto draws=world->randomDrawCount();RunnerCollisionEventContext context;
+        for(unsigned i=0;i<2;++i){
+            const bool ok=owner->dispatchCollisionEvent(context,self,walls[i],{true,false},[&](auto event){
+                if(mode==2)event.code=2016; // Cannot forge water's empty override for a wall.
+                if(mode==3)++event.other.generation;
+                return world->dispatchSmokeCollision(smoke,event);
+            });
+            require(ok==(mode<2),"smoke validates selected binding and opposite lifetime");
+            if(!ok)break;
+            require(expected.collideWall(),"scalar wall event");
+            const auto* state=smoke.state(*record);
+            require(state&&state->speed.high==expected.speed.high&&state->speed.low==expected.speed.low&&
+                state->xsp.high==expected.xsp.high&&state->ysp.high==expected.ysp.high&&
+                state->imageSpeed.bits==expected.imageSpeed.bits,
+                "each wall independently scales speed without recomputing velocity or animation rate");
+        }
+        require(world->randomDrawCount()==draws&&smoke.clear(),"contacts consume no RNG and permit explicit teardown");
     }
     for(unsigned mode=0;mode<8;++mode){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);

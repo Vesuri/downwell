@@ -1254,6 +1254,21 @@ public:
             MotionBinary64::fromInteger(mainPlayerMotion_.speedYFifths()),random_);
         return run_.effectsSucceeded;
     }
+    template<unsigned Capacity> bool dispatchSmokeCollision(
+        StoredSmokeRegistration<instanceCapacity,Capacity>& smoke,
+        const RunnerCollisionEventContext::Frame& event){
+        if(!run_.effectsSucceeded)return false;
+        const auto* self=instances_.resolve(event.self);const auto* other=instances_.resolve(event.other);
+        PackedObjectEvent binding{};bool found=false;
+        if(!smoke.belongsTo(instances_)||!smoke.valid()||!self||!other||!objectPack_||self->objectId!=225||
+           !smoke.state(*self)||event.type!=4||event.subtype!=other->objectId||
+           !objectPack_->collisionEvent(225,other->objectId,found,binding)||!found||
+           binding.ownerObjectId!=225||event.owner!=225||event.code!=binding.codeId||
+           (event.code!=2016&&event.code!=2017))return run_.effectsSucceeded=false;
+        // parentWater's empty event overrides inherited parentWall behavior.
+        // The collision wrapper owns pair selection/order; never aggregate hits.
+        return run_.effectsSucceeded=event.code==2016||smoke.wallContact(*self);
+    }
     template<unsigned Capacity,class MakePlayer> bool dispatchSkeletonCollision(
         StoredSkeletonRegistration<instanceCapacity,Capacity>& skeletons,
         const RunnerCollisionEventContext::Frame& event,MakePlayer makePlayer){
