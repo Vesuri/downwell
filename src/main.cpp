@@ -110,6 +110,7 @@ int main() {
     while (!game.finished()) {
         const auto input = platform.pollInput();
         const auto begin = SDL_GetPerformanceCounter();
+        audio.update();
         game.update(input, static_cast<std::uint32_t>(begin));
         if (!game.simulationSucceeded()) return 20;
         const auto updated = profile ? SDL_GetPerformanceCounter() : 0;

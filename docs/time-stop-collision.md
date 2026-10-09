@@ -93,7 +93,7 @@ entry with `AudioSDL`: resources 349–355 are decoded by libsndfile before game
 and device-time voice expiry drives the shared guard. Resource IDs and voice IDs
 occupy separate ranges; stopping a resource stops all its voices. Playback uses
 stereo float mixing with linear rate conversion, not a claim of original-runner
-sample equivalence. Capacity exhaustion and unsupported gain ramps fail instead
+sample equivalence. Capacity exhaustion and unsupported gain inputs fail instead
 of pretending to play. This admission uses the default volume of one (the wind
 script subsequently sets the voice gain to 0.5); settings integration remains
 open. Native device playback and complete native mixed-pass admission remain open.
@@ -112,8 +112,26 @@ gain at `+0x24` or resource gain at `+4`; `0x4a0ef0` selects independent gain
 records and clamps negatives; `0x4a3670` multiplies the resource and voice
 gains before device publication. Resource loading at `0x4a2fc9` copies the
 serialized gain, while voice initialization at `0x49f26b` sets one. The timed
-branch records start/end timestamps and separate ramp endpoints; this evidence
-does not establish the ramp update cadence or original device sample output.
+branch records start/end timestamps and separate ramp endpoints.
+
+Timed gain controls share `RunnerAudioGain`. The audio update at `0x4a21f0`
+samples the microsecond clock once, updates resources (`0x4a22d2`) and then
+active voices (`0x4a23f9`). Its direct call at `0x50f4ea` precedes the main-loop
+work at `0x50f53c`; it is not a sample-mixer callback. The clock at `0x4d0230`
+converts elapsed performance-counter ticks to integer microseconds. SDL calls
+the control update before game update and leaves the device callback to mix the
+last published gains. Reads and retargeting do not implicitly advance a ramp.
+
+Interpolation divides elapsed/duration in binary64, narrows the fraction to
+binary32, then separately rounds the target-minus-start subtraction, product
+and sum in binary32. At `now == end` it still interpolates and retains the ramp;
+only `now > end` copies the target exactly and clears it. An immediate write
+cancels the ramp. Tests include a target rounded away by interpolation at the
+exact endpoint, then restored on the next update. The admitted duration domain
+is 0–2,147,483 ms (including the source 200/500 ms ducks); negative durations
+and the runner's overflowing signed-32-bit `ms*1000` cases fail explicitly.
+This establishes control semantics, not original device sample equivalence or
+runtime floating-point-mode verification. Native device audio remains open.
 
 The stored registered-skeleton pass also admits skeleton contacts with fields
 82, 255 and 371 in that same collected pair stream. It resolves the inherited

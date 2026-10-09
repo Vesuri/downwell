@@ -1,5 +1,6 @@
 #include "platform/sdl/AudioSDL.h"
 #include "core/TimeFieldWind.h"
+#include "core/MusicDuck.h"
 #include <sndfile.h>
 #include <cassert>
 #include <cstdio>
@@ -15,6 +16,23 @@ struct AudioSDLTestAccess {
 };
 }
 int main(){
+    {
+        RunnerAudioGain ramp;
+        const auto one=MotionBinary64::fromInteger(1);
+        assert(ramp.set({},0,100)&&ramp.set(one,500,100));
+        ramp.update(250100);assert(ramp.current.bits==0x3f000000u);
+        // Retarget from the last published value, not an implicit clock update.
+        assert(ramp.set({},200,300100));
+        ramp.update(400100);assert(ramp.current.bits==0x3e800000u);
+        assert(ramp.set(one,0,400100)&&ramp.endMicros==0);
+        ramp.update(600100);assert(ramp.current.bits==0x3f800000u);
+        // At exactly the endpoint, SSE interpolation can round away the target.
+        const MotionBinary64 tiny{0x3e600000u,0}; // 2^-25
+        assert(ramp.set(tiny,1,100));ramp.update(1100);
+        assert(ramp.current.bits==0&&ramp.endMicros==1100);
+        ramp.update(1101);assert(ramp.current.bits==0x33000000u&&ramp.endMicros==0);
+        assert(!ramp.set(one,-1,0)&&!ramp.set(one,2147484,0));
+    }
     assert(SDL_Init(SDL_INIT_AUDIO)==0);
     char path[]="/tmp/downwell-audio-test-XXXXXX";
     const int fd=mkstemp(path);assert(fd>=0);close(fd);
@@ -46,8 +64,18 @@ int main(){
         assert(audio.load(348,path,half));int quiet=-1;
         assert(audio.play(348,90,true,quiet)&&audio.getGain(quiet,gain)&&gain.high==one.high);
         assert(audio.getGain(348,gain)&&gain.high==half.high&&audio.stop(348));
-        assert(!audio.setGain(voice,one,200));assert(!audio.setPitch(voice,{}));
+        assert(audio.setGain(voice,one,200));assert(!audio.setPitch(voice,{}));
         assert(audio.setPitch(voice,half));SDL_Delay(250);
+        assert(audio.getGain(voice,gain)&&gain.high==half.high); // No callback-time ramp.
+        audio.update();assert(audio.getGain(voice,gain)&&gain.high==one.high&&gain.low==0);
+        MusicDuck duck;
+        assert(duck.execute(500,sevenTenths,[]{return 1;},[]{return 349;},audio));
+        assert(audio.getGain(349,gain)&&gain.high==0x3fe66666u&&gain.low==0x60000000u);
+        // A second hit while ducked is guarded, not a restart of the ramp.
+        assert(duck.execute(500,half,[]{return 1;},[]{return 349;},audio));
+        assert(audio.getGain(349,gain)&&gain.high==0x3fe66666u&&gain.low==0x60000000u);
+        SDL_Delay(510);audio.update();
+        assert(audio.getGain(349,gain)&&gain.high==one.high&&gain.low==0);
         assert(audio.isPlaying(voice,playing)&&playing);
         assert(audio.stop(349));assert(audio.isPlaying(voice,playing)&&!playing);
         const int old=voice;assert(audio.play(349,90,false,voice)&&voice!=old);
