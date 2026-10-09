@@ -3875,7 +3875,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                 },port.smokeEffects(),effectAssets,effectView,settings,[&](auto emit){
                     return port.visitDebrisDraw([&](const downwell::DebrisAnimation& effect){
                         return downwell::DebrisDraw::surface(effect,effectAssets,effectView,emit);
-                    })&&port.visitTimeShardDraw([&](const downwell::TimeShardAnimation& effect){
+                    })&&port.visitTimeShardDraw([&](const downwell::NativeTimeShardRegistration::Record& effect){
                         return downwell::TimeShardDraw::surface(effect,effectAssets,effectView,emit);
                     });
                 },[&](auto emit){

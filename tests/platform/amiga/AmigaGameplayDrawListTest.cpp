@@ -292,6 +292,7 @@ int main() {
                 // Create admits [0,7); use 6.75 for its upper fractional case.
                 if(frame==7)shard->imageIndex.bits=0x40d80000u;
                 assert(owner->timeShards().publishAnimation(1,405288,*shard));
+                assert(owner->timeShards().publishStep(1,405288,*shard));
                 assert(list.collect(*scene,pack,pack+8,160,34,false));unsigned seen=0;
                 for(unsigned i=0;i<list.count;++i)if(list.actors[i].sprite==91){
                     assert(list.actors[i].frame==(frame==7?0:frame%6)&&list.actors[i].x==198&&list.actors[i].y==94);++seen;
@@ -304,7 +305,25 @@ int main() {
                     return downwell::TimeShardDraw::surface(effect,art,view,[&](const auto&,auto,auto){++emitted;return true;});
                 })&&emitted==unsigned(flash<=0));
             }
-            assert(scene->randomDrawCount()==before&&scene->timeShardForDraw(key)==shard&&shards.clear());
+            const auto* published=scene->timeShardForDraw(key);assert(published&&published->dflash==1);
+            const auto oldX=published->x.bits,oldFrame=published->imageIndex.bits;
+            shard->dflash=0;assert(shard->x.assignInteger(260)&&shard->imageIndex.assignInteger(3));
+            assert(scene->timeShardForDraw(key)->x.bits==oldX&&scene->timeShardForDraw(key)->imageIndex.bits==oldFrame);
+            assert(list.collect(*scene,pack,pack+8,160,34,false));
+            for(unsigned i=0;i<list.count;++i)assert(list.actors[i].sprite!=91);
+            unsigned emitted=0;
+            assert(scene->visitTimeShardDraw([&](const auto& effect){
+                return downwell::TimeShardDraw::surface(effect,art,view,[&](const auto&,auto,auto){++emitted;return true;});
+            })&&emitted==0);
+            assert(owner->timeShards().publishStep(1,405288,*shard));
+            assert(list.collect(*scene,pack,pack+8,160,34,false));unsigned seen=0;
+            for(unsigned i=0;i<list.count;++i)if(list.actors[i].sprite==91){
+                assert(list.actors[i].x==210&&list.actors[i].frame==0);++seen;
+            }
+            assert(seen==1&&scene->timeShardForDraw(key)->imageIndex.bits==oldFrame);
+            assert(owner->timeShards().publishAnimation(1,405288,*shard));
+            assert(scene->timeShardForDraw(key)->imageIndex.bits==shard->imageIndex.bits);
+            assert(scene->randomDrawCount()==before&&shards.clear());
             assert(owner->prepareDraw()&&!scene->timeShardForDraw(key));
         }
         downwell::DebrisEffects<2> debris;downwell::InstanceHandle first,last;

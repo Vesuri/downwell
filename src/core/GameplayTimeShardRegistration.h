@@ -14,6 +14,8 @@ public:
         std::uint32_t lifetimeId=0,sourceId=0;
         RunnerImageValue x{},y{},imageIndex{},imageSpeed{};
         AlarmBank alarms;
+        int dflash=-1;
+        bool initialized=false;
         bool active=true,destroyRequested=false;
         static constexpr int objectId=238;
     };
@@ -45,7 +47,9 @@ public:
     bool created(std::uint32_t local,std::uint32_t id,const TimeShardAnimation& effect){
         auto* r=resolve(local,id);if(!r)return fail();
         r->imageSpeed=effect.imageSpeed;
-        return publishAnimation(local,id,effect)&&publishAlarm(local,id,effect);
+        if(!publishAnimation(local,id,effect))return false;
+        r->dflash=effect.dflash;r->initialized=true;
+        return publishAlarm(local,id,effect);
     }
     bool population(unsigned& count){return good_&&(owner_.population(count)||fail());}
     bool eventEligible(std::uint32_t local,std::uint32_t id,bool& eligible){
@@ -75,6 +79,7 @@ public:
         // Even a destroyed event completes its final position setters.
         if(!r||!owner_.position(handle(local),*r,effect.x,effect.y))return fail();
         r->x=effect.x;r->y=effect.y;r->imageSpeed=effect.imageSpeed;
+        r->dflash=effect.dflash;
         return publishAlarm(local,id,effect);
     }
     bool destroyed(std::uint32_t local,std::uint32_t id,const TimeShardAnimation&){

@@ -782,11 +782,11 @@ public:
             return record&&record->effect&&visit(*record->effect);
         });
     }
-    const downwell::TimeShardAnimation* timeShardForDraw(downwell::InstanceHandle key)const{
+    const downwell::NativeTimeShardRegistration::Record* timeShardForDraw(downwell::InstanceHandle key)const{
         const auto* record=timeShardInstances_?timeShardInstances_->find(key):nullptr;
-        if(!record||!timeShardEffects_||record->destroyRequested||
+        if(!record||!record->initialized||!timeShardEffects_||record->destroyRequested||
             timeShardEffects_->sourceId(key.generation)!=record->sourceId)return nullptr;
-        return timeShardEffects_->get(key.generation);
+        return record;
     }
     template<class Visit> bool visitTimeShardDraw(Visit visit)const{
         if(!timeShardInstances_||!timeShardInstances_->size())return true;
