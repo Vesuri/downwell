@@ -8,6 +8,23 @@ template<class World,class Throw,class Find,class Clear>
 void checkRegisteredSkeletonThrows(World& world,Throw fire,Find find,Clear clear){
     const auto check=[](bool ok){if(!ok)std::abort();};
     const auto same=[](downwell::MotionBinary64 a,downwell::MotionBinary64 b){return a.high==b.high&&a.low==b.low;};
+    for(bool rejectAim:{false,true}){
+        auto random=world.randomState();const auto before=random.drawCount();
+        downwell::RegisteredSkeletonThrow caller;downwell::BoneProjectile child;
+        bool good=true,shot=false,apart=false;int facing=1;unsigned aims=0,edits=0;
+        const bool ok=caller.runAimed(240,200,shot,good,
+            [&](int x,int y,downwell::InstanceHandle& key){key={0,1};return child.create(x,y,random);},
+            [&](auto key,auto edit){++edits;check(key.generation==1);return edit(child,caller,good);},random,
+            [&](int id){check(id==134&&random.drawCount()==before+3);apart=true;facing=-1;return true;},
+            [&](bool& separated,int& scale){
+                ++aims;check(random.drawCount()==before+4&&!caller.yarc.zero());
+                separated=apart;scale=facing;return !rejectAim;
+            });
+        check(ok==!rejectAim&&good==ok&&shot==ok&&aims==1&&edits==unsigned(ok)&&
+            random.drawCount()==before+(rejectAim?4:5));
+        if(ok)check((caller.xarc.high&0x80000000u)&&!caller.xarc.zero()&&same(child.motion.xsp,caller.xarc));
+        else check(caller.myBone.generation==1&&!caller.yarc.zero()&&caller.xarc.zero());
+    }
     for(bool separated:{false,true})for(int facing:{-1,0,1}){
         auto random=world.randomState();downwell::BoneProjectile expected;
         check(expected.create(240,190,random));

@@ -29,6 +29,10 @@ bool nativeSkeletonSound(GameplayWorld& world,downwell::SkeletonActor& actor,
     downwell::SoundPlayEnvironment& environment,NativeSkeletonAudio& audio){
     return world.playSkeletonSound(actor,133,environment,audio);
 }
+bool nativeSkeletonThrow(GameplayWorld& world,downwell::SkeletonActor& actor,downwell::RegisteredSkeletonThrow& caller,
+    downwell::SoundPlayEnvironment& environment,NativeSkeletonAudio& audio){
+    return world.throwSkeletonBoneWithSourceId(505201,actor,caller,environment,audio);
+}
 bool nativeSkeletonTimeState(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle key,
     const downwell::TimeStopEffects<64>& state,unsigned& hurts){
     return owner.stepSkeleton(key,state,[&](auto&,auto&){return QuietSkeletonEffects{hurts};});
@@ -6729,6 +6733,7 @@ int main(){
             assert(encounterOwner->attach(*encounter));InstanceHandle skeleton;
             assert(encounter->createSkeletonWithSourceId(505200,240,200,skeleton));
             auto phase=std::make_unique<RunnerStepSnapshot<GameplayCollisionView::capacity>>();unsigned throws=0,hurts=0;
+            TimeStopEffects<4> stop;
             for(unsigned frame=0;frame<24;++frame){
                 encounter->step(0);assert(encounter->effectsSucceeded());
                 assert(encounterOwner->dispatchStepPhase(0,*phase,[&](InstanceHandle selected,const PackedObjectEvent&){
@@ -6736,13 +6741,14 @@ int main(){
                     if(kind==GameplayCollisionView::Kind::bone)return encounterOwner->stepBone(selected,false,
                         [&](int sprite,unsigned& count){return sprites.frameCount(sprite,count);});
                     if(kind!=GameplayCollisionView::Kind::skeleton)return true;
-                    return encounterOwner->stepSkeleton(selected,false,MotionBinary64::fromInteger(180),MotionBinary64::fromInteger(300),
+                    return encounterOwner->stepSkeleton(selected,stop,
                         [&](auto& actor,auto& throwing){
-                            auto launch=[&](int facing){
+                            auto launch=[&](int){
                                 const auto before=encounter->randomDrawCount();
-                                const bool ok=encounter->throwRegisteredBoneWithSourceId(505201+throws,throwing,actor.x,actor.y,true,
-                                    facing,actor.shot,[&](int id){return id==134&&actor.sprite==207&&actor.facing==-1;});
-                                assert(ok&&encounter->randomDrawCount()==before+5);++throws;return ok;
+                                SkeletonSoundAudio audio;SoundPlayEnvironment environment;environment.gameVolume={0x3fd00000u,0};
+                                const bool ok=encounter->throwSkeletonBoneWithSourceId(505201+throws,actor,throwing,environment,audio);
+                                assert(ok&&encounter->randomDrawCount()==before+4&&audio.calls==7&&encounter->overlapSound(4)==134&&
+                                    throwing.xarc.high==0x3ff00000u&&!throwing.xarc.low);++throws;return ok;
                             };
                             return ThrowingSkeletonEffects<decltype(launch)>{hurts,launch};
                         });

@@ -1534,20 +1534,17 @@ int main(){
         require(stop.shards.bindPhases(shards)&&stop.changes.bind(changes),"bind encounter time state");
         unsigned throws=0,hurts=0;
         for(unsigned frame=0;frame<24;++frame){
-            require(world->withSkeletonPublishedEvents(skeletons,[&](InstanceHandle,auto phase,auto& actor,auto& throwing,auto& publish,bool& good){
-                if(phase!=StartupRuntime::SkeletonPhase::step)return true;
-                auto launch=[&](int facing){
+            require(world->withSkeletonTimeStopEvents(skeletons,stop,[&](InstanceHandle,auto& actor,auto& throwing){
+                auto launch=[&](int){
                     const auto before=world->randomDrawCount();
-                    const bool ok=world->throwRegisteredBone(bones,throwing,actor.x,actor.y,true,facing,actor.shot,[&](int id){
-                        const auto* r=world->instance(skeletons.instances().find(skeleton)->sourceId);
-                        require(id==134&&r&&r->spriteId==207&&r->scaleX==-1&&throwing.myBoneSourceId,
-                            "source throw observes published parent art and child identity");return true;
-                    });
-                    require(ok&&world->randomDrawCount()==before+5,"source bone Create and arc choices share world RNG");
+                    SkeletonSoundAudio audio;SoundPlayEnvironment environment;environment.gameVolume={0x3fd00000u,0};
+                    const bool ok=world->throwSkeletonBone(bones,actor,throwing,environment,audio);
+                    require(ok&&world->randomDrawCount()==before+4&&audio.calls==7&&world->overlapSound(4)==134&&
+                        throwing.myBoneSourceId&&throwing.xarc.high==0x3ff00000u&&!throwing.xarc.low,
+                        "coincident live player skips horizontal RNG after registered Create and real sound script");
                     ++throws;return ok;
                 };
-                ThrowingSkeletonEffects<decltype(launch)> effects{hurts,launch};
-                return actor.stepPublished(false,MotionBinary64::fromInteger(180),MotionBinary64::fromInteger(300),publish,effects,good);
+                return ThrowingSkeletonEffects<decltype(launch)>{hurts,launch};
             },[&]{return world->stepWithTimeStopAndBones(bones,shards,changes,stop,Input{},
                 [&](int sprite,unsigned& count){return sprites.frameCount(sprite,count);},StartupRuntime::NoTimeTransition{});}),
                 "shared skeleton/bone room tick");

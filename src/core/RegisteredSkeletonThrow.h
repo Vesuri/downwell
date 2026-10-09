@@ -13,11 +13,24 @@ struct RegisteredSkeletonThrow {
     bool run(int x,int y,bool separated,int facing,bool& shot,bool& good,
              Create create,Edit edit,Random& random,Sound sound){
         if(!good)return false;
-        if(y<(-2147483647-1)+10||facing< -1||facing>1)return good=false;
+        if(facing< -1||facing>1)return good=false;
+        return runAimed(x,y,shot,good,create,edit,random,sound,[&](bool& apart,int& scale){
+            apart=separated;scale=facing;return true;
+        });
+    }
+    template<class Create,class Edit,class Random,class Sound,class Aim>
+    bool runAimed(int x,int y,bool& shot,bool& good,
+                  Create create,Edit edit,Random& random,Sound sound,Aim aim){
+        if(!good)return false;
+        if(y<(-2147483647-1)+10)return good=false;
         if(!create(x,y-10,myBone)||!good)return good=false;
         if(!sound(134)||!good)return good=false;
         const MotionBinary64 vertical[]={{0xc0080000u,0},{0xc008ccccu,0xcccccccdu},{0xc0099999u,0x9999999au}};
         yarc=vertical[random.chooseIndexSmall(3)];
+        // VM reads global.plx and image_xscale only after child Create,
+        // soundPlayOL and the vertical choose have completed.
+        bool separated=false;int facing=0;
+        if(!aim(separated,facing)||!good||facing< -1||facing>1)return good=false;
         const int horizontal[]={10,8,12};
         const int vx=separated?facing*horizontal[random.chooseIndexSmall(3)]:10;
         if(!BoneMotion::horizontal(vx,xarc))return good=false;

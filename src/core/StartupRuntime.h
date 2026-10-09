@@ -1204,6 +1204,25 @@ public:
             },
             [&](InstanceHandle key,auto event){return registration.dispatch(key,event);},random_,sound);
     }
+    template<unsigned Capacity,class Audio> bool throwSkeletonBone(
+        StoredBoneRegistration<instanceCapacity,Capacity>& registration,SkeletonActor& actor,
+        RegisteredSkeletonThrow& caller,SoundPlayEnvironment& environment,Audio& audio){
+        if(!registration.belongsTo(instances_)||!registration.valid())return run_.effectsSucceeded=false;
+        return caller.runAimed(actor.x,actor.y,actor.shot,run_.effectsSucceeded,
+            [&](int x,int y,InstanceHandle& key){
+                if(!spawnBone(registration,x,y,key))return false;
+                caller.myBoneSourceId=registration.instances().find(key)->sourceId;return true;
+            },[&](InstanceHandle key,auto event){return registration.dispatch(key,event);},random_,
+            [&](int sound){return playSkeletonSound(actor,sound,environment,audio);},
+            [&](bool& separated,int& facing){
+                MotionBinary64 px,py;
+                if(!mainPlayerInitialized_||roomId_!=mainRoomId||!ContactCoordinates::playerGlobals(
+                    mainPlayerMotion_.frameStartXFixed(),mainPlayerMotion_.frameStartYFixed(),
+                    mainPlayerOriginX_,mainPlayerOriginY_,px,py))return false;
+                const auto x=MotionBinary64::fromInteger(actor.x);
+                separated=x.high!=px.high||x.low!=px.low;facing=actor.facing;return true;
+            });
+    }
     template<unsigned Capacity> StoredScriptSpawnRegistration<instanceCapacity,Capacity> scriptSpawnRegistration(){
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
     }

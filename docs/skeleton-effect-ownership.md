@@ -169,6 +169,14 @@ ID or Create RNG word is consumed, not a claim about Windows allocation failure.
 
 `RegisteredSkeletonThrow` connects the throw block to either registered bone
 owner through `throwRegisteredBone` / `throwRegisteredBoneWithSourceId`.
+Those explicit-argument entry points remain references. The live
+`throwSkeletonBone` / `throwSkeletonBoneWithSourceId` bindings use the shared
+sound script and read captured player X and the actor's current facing after
+Create, sound and the vertical choice. Aligned X skips the horizontal choice
+and uses positive 1, regardless of facing. The admitted Q8 player coordinates
+and integer actor coordinates make this zero-separation test exact; this does
+not establish full binary64 player-motion equivalence. Failed aiming retains
+the created child and vertical choice without publishing arc setters or shot.
 It retains the caller's child handle, distinct numeric ID and arc variables, finishes child Create
 before sound 134, consumes the vertical choice before the conditional horizontal
 choice, and writes ysp, xsp and sampled spin without resetting child coordinates

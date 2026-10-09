@@ -703,6 +703,22 @@ public:
             },
             [&](downwell::InstanceHandle key,auto event){return bones_->dispatch(key,event);},enemyRandom_,sound);
     }
+    template<class Audio> bool throwSkeletonBoneWithSourceId(unsigned id,downwell::SkeletonActor& actor,
+        downwell::RegisteredSkeletonThrow& caller,downwell::SoundPlayEnvironment& environment,Audio& audio){
+        if(!bones_||!bones_->valid())return run_.effectsSucceeded=false;
+        return caller.runAimed(actor.x,actor.y,actor.shot,run_.effectsSucceeded,
+            [&](int x,int y,downwell::InstanceHandle& key){
+                if(!createBoneWithSourceId(id,x,y,key))return false;
+                caller.myBoneSourceId=id;return true;
+            },[&](downwell::InstanceHandle key,auto event){return bones_->dispatch(key,event);},enemyRandom_,
+            [&](int sound){return playSkeletonSound(actor,sound,environment,audio);},
+            [&](bool& separated,int& facing){
+                downwell::MotionBinary64 px,py;
+                if(!downwell::ContactCoordinates::playerGlobals(player_.frameStartXFixed(),player_.frameStartYFixed(),240,176,px,py))return false;
+                const auto x=downwell::MotionBinary64::fromInteger(actor.x);
+                separated=x.high!=px.high||x.low!=px.low;facing=actor.facing;return true;
+            });
+    }
     bool bindEntryDithers(downwell::GameplayEntryDithers& entries){
         if(entryDithers_||!entries.valid()||entries.size())return false;
         entryDithers_=&entries;return true;

@@ -31,7 +31,7 @@ skeleton = (export / "Assembly/gml_Object_enmSkeleton_Step_0.asm").read_bytes()
 assert sha256(skeleton).hexdigest() == "159d57d00e13a2dd00e8aefd5edc246735f47c8988f1ca69839add909865d76a"
 throw = skeleton.decode().split(":[21]", 1)[1].split(":[27]", 1)[0]
 ordered = ["call.i gml_Script_instance_create", "pop.v.v self.myBone",
-           "call.i gml_Script_soundPlayOL", "pop.v.v self.yarc", "pop.v.v self.xarc",
+           "call.i gml_Script_soundPlayOL", "pop.v.v self.yarc", "pushglb.v global.plx", "pop.v.v self.xarc",
            "pop.v.v [stacktop]self.ysp", "pop.v.v [stacktop]self.xsp",
            "pop.i.v [stacktop]self.imgSp", "pop.v.i self.eShotDelay"]
 assert [throw.index(op) for op in ordered] == sorted(throw.index(op) for op in ordered)
