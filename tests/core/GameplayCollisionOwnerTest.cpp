@@ -66,6 +66,10 @@ bool nativePlayerControllerBirth(downwell::GameplayCollisionOwner& owner,unsigne
     downwell::RunnerImageValue x,downwell::RunnerImageValue y,downwell::InstanceHandle& key){
     return owner.playerControllers().create(64,source,x,y,key);
 }
+bool nativeCameraCreate(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle key,
+    downwell::RunnerImageValue x,downwell::RunnerImageValue y){
+    return owner.playerControllers().initializeCamera(key,480,false,x,y);
+}
 bool nativeRegisteredTimeShardStep(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle shared,
     const downwell::SpriteMaskPack& masks,bool stopped){
     return owner.stepTimeShard(shared,stopped,masks);
@@ -1648,6 +1652,24 @@ int main(){
         SpriteMaskPack absent(nullptr,0);bool sentinel=true;
         assert(!collision->playerTimeFieldMeeting({},{},absent,sentinel)&&sentinel&&!collision->valid());
     }
+    for(unsigned failure=0;failure<=2;++failure){
+        CameraCreateState state;RunnerImageValue x{0x80000000u},y{0x43300000u};
+        unsigned calls=0;
+        const bool ok=state.create(160,true,x,y,{0},{0x43400000u},
+            [&](bool vertical,RunnerImageValue value,RunnerImageValue& accepted){
+                ++calls;assert(vertical==(calls==2));
+                if(calls==failure)return false;
+                // Model the setter's retained negative-zero representation.
+                if(vertical)y=value;else if(value.bits&0x7fffffffu)x=value;
+                accepted=vertical?y:x;return true;
+            });
+        assert(ok==!failure&&calls==(failure?failure:2)&&state.daop==-32&&
+            state.camSlowdown==5&&state.chasePlayer==1&&state.roomEnd==-1);
+        assert(y.bits==(failure?0x43300000u:0x43400000u)&&x.bits==0x80000000u);
+        assert(state.initialized==!failure);
+        if(!failure)assert(state.xx.high==0x80000000u&&state.xx.low==0&&state.yy.high==0x40680000u);
+        else assert(state.xx.zero()&&state.yy.zero());
+    }
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
                   GameplayCollisionOwner::Ownership::nativeScenery}){
         const auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
@@ -1730,13 +1752,30 @@ int main(){
         x.bits=0x43704000u; // 240.25: no integer position substitute.
         assert(controllers.position(camera,x,y)&&controllers.find(camera)->x.bits==x.bits);
         if(mode==GameplayCollisionOwner::Ownership::reference)assert(owner->state(shared)->x.bits==x.bits);
+        RunnerImageValue playerX{0x43718000u},playerY{0x43344000u}; // 241.5, 180.25
+        assert(controllers.initializeCamera(camera,480,false,playerX,playerY));
+        const auto& initialized=controllers.find(camera)->camera;
+        assert(initialized.initialized&&initialized.roomw==480&&initialized.daop==24&&
+            initialized.camSlowdown==5&&initialized.camSlowdownX==1&&initialized.chasePlayer==1&&
+            initialized.centered==1&&initialized.xAhead==16&&initialized.roomEnd==-1&&
+            initialized.freeCam==0&&initialized.autoScroll==0);
+        auto sameDouble=[](MotionBinary64 value,double expected){
+            std::uint64_t bits;std::memcpy(&bits,&expected,8);
+            return value.high==std::uint32_t(bits>>32)&&value.low==std::uint32_t(bits);
+        };
+        assert(sameDouble(initialized.camAcclx,(80.0-240.25)/10.0)&&
+            sameDouble(initialized.camAccly,(180.25+24.0-176.0)/5.0)&&
+            sameDouble(initialized.xx,241.5)&&sameDouble(initialized.yy,180.25)&&
+            controllers.find(camera)->x.bits==playerX.bits&&controllers.find(camera)->y.bits==playerY.bits);
         unsigned found=0;assert(owner->visitRegistrationOrder([&](auto key,int object,auto){
             if(key.slot==shared.slot&&key.generation==shared.generation){assert(object==64);++found;}return true;
         })&&found==1&&world->randomDrawCount()==draws);
         assert(world->restartFromResults(DeathMenuSequence::Action::Retry,43,300)==ResultsDestination::gameplay);
         assert(owner->valid()&&world->effectsSucceeded()&&controllers.size()==0&&!controllers.find(camera)&&!owner->state(shared));
         InstanceHandle next;
-        assert(controllers.create(64,105200,x,y,next)&&next.generation!=camera.generation&&controllers.clear());
+        assert(controllers.createCamera(105200,x,y,160,true,playerX,playerY,next)&&
+            next.generation!=camera.generation&&controllers.find(next)->camera.initialized&&
+            controllers.find(next)->camera.daop==-32&&controllers.clear());
     }
     for(int area=1;area<=5;++area){
         auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites);

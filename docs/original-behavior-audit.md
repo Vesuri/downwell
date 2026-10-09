@@ -118,9 +118,15 @@ objects 66 and 64. Its resource-backed owner uses supplied source IDs and local
 generation handles separately, retains binary32 position publications, and
 registers activation/layer membership. Retry and next-room teardown retire these
 records before reconstruction; local generations are not rewound. This is an
-explicit-birth boundary, not automatic player Create: controller Create/Step/Draw
-bodies and allocation through the full synchronous child stream must still be
-connected. No invisible placeholder births or fixed ID reservations are used.
+explicit-birth boundary, not automatic player Create. `createCamera` completes
+the shared `CameraCreateState` body before returning the child handle. Create
+computes initial accelerations from the pre-Create coordinates, publishes X
+then Y, and only then copies accepted public values into private xx/yy. A failed
+setter retains earlier writes without returning a completed child. These use
+the existing binary64 arithmetic contract; original process FP-state verification
+remains separate. Controller Step/Draw and allocation through the full synchronous
+child stream must still be connected. No invisible placeholder births or fixed
+ID reservations are used.
 The room-entry field likewise resolves authored object 371's ID 101097 before
 its lifecycle birth, scale publications and random-radius Create. Its registered
 layer lifetime retains that ID; first-level destruction and Retry retire the
