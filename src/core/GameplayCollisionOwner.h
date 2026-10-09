@@ -2066,6 +2066,11 @@ public:
            !((event.owner==120&&event.code==1266)||(event.owner==83&&event.code==1066)))return check(false);
         return check(world_->collideSkeletonRoomEffect(local,event.code==1066,makePlayer));
     }
+    template<class Frames,class Audio,class Atan>
+    bool dispatchSkeletonBulletCollision(const RunnerCollisionEventContext::Frame& event,
+        Frames frames,SoundPlayEnvironment& environment,Audio& audio,Atan atan){
+        return dispatchSkeletonBulletCollision(event,frames,[&]{return requestMomentDelay();},environment,audio,atan);
+    }
     template<class Frames,class Delay,class Audio,class Atan>
     bool dispatchSkeletonBulletCollision(const RunnerCollisionEventContext::Frame& event,
         Frames frames,Delay delay,SoundPlayEnvironment& environment,Audio& audio,Atan atan){

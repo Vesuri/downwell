@@ -1269,13 +1269,20 @@ undefined behavior. The old helper remains the arithmetic reference.
 bullet/skeleton lifetimes and resource event. Both world bindings use
 retained source motion, the runner point-direction wrapper, caller SoundPlay
 state and the owned effect pool (including caller myFx publication). Destruction
-does not retire the executing bullet. Controller delay, audio backend and atan
-remain supplied dependencies. The stored path publishes the registered actor's
+does not retire the executing bullet. The native dispatch's default delay
+uses its resource owner's actual object-37 traversal; the explicit delay
+provider remains for reference/failure tests. Audio backend and atan remain
+supplied dependencies. The stored path publishes the registered actor's
 health back to its instance record and retains the effect's source numeric ID;
 the native path retains its generation handle. The complete mixed collision
 scheduler and actual controller/audio dependencies are still required before
 natural encounter admission. Controlled contacts after scheduled bullet Step
 verify the bindings, not natural pair selection or Windows-runner equivalence.
+Native-owner fixtures also collect and dispatch the complete fixture pair
+stream at the scheduled post-Step/pre-End-Step boundary. They distinguish a
+line-query enemy that the bullet has already passed from an actual endpoint
+mask overlap: only the latter damages the skeleton and changes controller
+speed/alarms. Explicit fixture births do not prove natural actor admission.
 
 `StoredDitherCollisionPass::runSkeletonContacts` admits registered 261/120
 contacts in the existing collected pair stream alongside plain-wall/dither

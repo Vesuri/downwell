@@ -42,12 +42,11 @@ bool nativeBulletSound(downwell::GameplayCollisionOwner& owner,GameplayWorld& wo
     return world.playBulletWallSound(shot,env,[&](const char*& material){return owner.projectileWallMaterial(wall,material);},audio);
 }
 struct NativeBulletFrames {bool operator()(int,unsigned&);};
-struct NativeBulletDelay {bool operator()();};
 struct NativeBulletAtan {bool operator()(downwell::MotionBinary64,downwell::MotionBinary64,downwell::MotionBinary64&);};
 bool nativeSkeletonBullet(downwell::GameplayCollisionOwner& owner,
     const downwell::RunnerCollisionEventContext::Frame& event,NativeBulletFrames frames,
-    NativeBulletDelay delay,downwell::SoundPlayEnvironment& environment,NativeBulletSoundAudio& audio,NativeBulletAtan atan){
-    return owner.dispatchSkeletonBulletCollision(event,frames,delay,environment,audio,atan);
+    downwell::SoundPlayEnvironment& environment,NativeBulletSoundAudio& audio,NativeBulletAtan atan){
+    return owner.dispatchSkeletonBulletCollision(event,frames,environment,audio,atan);
 }
 bool nativeBoundSourceBullet(GameplayWorld& world,downwell::GameplayCollisionOwner& owner,
     downwell::InstanceHandle shot,downwell::MachineGunSourceMotion& motion,const downwell::SpriteMaskPack& masks,
@@ -3059,11 +3058,11 @@ int main(){
         const auto before=world->randomDrawCount();world->step(0);
         assert(!world->effectsSucceeded()&&world->randomDrawCount()==before); // Never silently resume the legacy path.
     }
-    std::vector<std::uint32_t> scheduledContacts[2][5];
+    std::vector<std::uint32_t> scheduledContacts[2][6];
     const auto sourceRoomBytes=read("generated/downwell-rooms.dwrm");
     RoomPack sourceRooms(sourceRoomBytes.data(),sourceRoomBytes.size());assert(sourceRooms.valid());
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
-                  GameplayCollisionOwner::Ownership::nativeScenery})for(unsigned crowd:{0u,12u})for(unsigned target:{0u,1u,2u,3u,4u}){
+                  GameplayCollisionOwner::Ownership::nativeScenery})for(unsigned crowd:{0u,12u})for(unsigned target:{0u,1u,2u,3u,4u,5u}){
         const bool native=mode!=GameplayCollisionOwner::Ownership::reference;
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
             GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&sourceRooms,mode);
@@ -3083,11 +3082,16 @@ int main(){
             return !native||command.objectId!=60||(terrain->append(command.objectId,command.x,command.y)&&
                 world->finishNativeTerrainCreate(terrain->handle(terrain->size()-1)));
         }));
-        if(target==3)assert(world->createSkeletonWithSourceId(605503,240,500,skeleton));
+        // Source Create snaps to a 16px grid. At 496 the bullet's endpoint
+        // has already passed this mask; 512 exercises actual post-Step overlap.
+        if(target==3||target==5)assert(world->createSkeletonWithSourceId(605503,240,target==3?512:500,skeleton));
         for(unsigned i=0;i<crowd;++i)
             assert(world->createGeneratedInstance({92,1000,600+int(i)*16},objects,[](const auto&){return true;}));
         auto frames=[&](int id,unsigned& count){return sprites.frameCount(id,count);};
-        assert(world->withSourceBulletSteps([&](InstanceHandle key,MachineGunSourceMotion& motion){
+        int controllerSpeed=60;InstanceHandle controller;
+        if(target==3||target==5)assert(world->bindControllerRoomSpeed(controllerSpeed)&&
+            owner->runControllers().create(605504,{}, {},[](InstanceHandle){return true;},controller));
+        const auto sourceStep=[&](InstanceHandle key,MachineGunSourceMotion& motion){
             shot=key;++calls;RunnerImageValue x,y;
             assert(x.assignInteger(240)&&y.assignInteger(target==2?200:500)&&
                 world->publishBulletCollisionPosition(key,x,y));
@@ -3109,7 +3113,13 @@ int main(){
             for(unsigned i=0;i<16;++i)snapshot.push_back(world->randomState().stateWord(i));
             if(!native)scheduledContacts[crowd!=0][target]=snapshot;
             else assert(scheduledContacts[crowd!=0][target]==snapshot);
-            if(target==3){
+            return ok;
+        };
+        unsigned collisionPasses=0;
+        const auto collisionPass=[&]{
+            ++collisionPasses;
+            if(target==3||target==5){
+                const auto key=shot;
                 // A real fired lifetime and inherited event lookup, not a
                 // freestanding damage helper with synthetic destruction.
                 struct Audio {
@@ -3121,30 +3131,48 @@ int main(){
                     bool setGain(int id,MotionBinary64 gain,int duration){assert(++calls==4&&id==123&&gain.high==0x3ff00000u&&!gain.low&&!duration);return true;}
                     bool setPitch(int id,MotionBinary64 pitch){assert(++calls==5&&id==123&&pitch.high==0x3ff00000u&&!pitch.low);return true;}
                 } hitAudio;
-                SoundPlayEnvironment hitEnvironment;unsigned delays=0;
+                SoundPlayEnvironment hitEnvironment;
                 InstanceHandle self,other;
                 assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::bullet,key,self)&&
                     GameplayCollisionView::encode(GameplayCollisionView::Kind::skeleton,skeleton,other));
                 RunnerCollisionEventContext context;
                 const auto rng=world->randomDrawCount();
-                const bool hitOkay=context.dispatch(self,other,{true,false},[&](auto,auto,int& subtype,bool& found,PackedObjectEvent& event){
-                    subtype=120;return objects.collisionEvent(261,120,found,event);
-                },[&](const auto& event){return owner->dispatchSkeletonBulletCollision(event,frames,
-                    [&]{++delays;assert(world->resolveBulletLifetime(key)->destroyRequested);return true;},
-                    hitEnvironment,hitAudio,[](auto y,auto x,auto& result){return portableAtan(y,x,result);});});
-                if(!hitOkay)std::fprintf(stderr,"skeleton bullet mode=%u owner=%u world=%u skeleton=%u delays=%u audio=%u\n",
-                    unsigned(mode),unsigned(owner->valid()),unsigned(world->effectsSucceeded()),unsigned(owner->skeletons().valid()),delays,hitAudio.calls);
+                auto pairs=std::make_unique<RunnerCollisionPairs<GameplayCollisionView::capacity,16384>>();
+                struct NonSolidMotion {
+                    bool rollback(InstanceHandle){assert(false);return false;}
+                    bool prepareMotion(InstanceHandle){assert(false);return false;}
+                    bool advanceMotion(InstanceHandle){assert(false);return false;}
+                } nonSolid;
+                assert(owner->collectCollisionPairs(*pairs));
+                const bool hitOkay=owner->executeCollisionPairs(*pairs,masks,context,nonSolid,
+                    []{return RunnerCollisionEventContext::RoomState{true,false};},[&](const auto& event){
+                        assert(event.self.slot==self.slot&&event.other.slot==other.slot&&event.code==2224);
+                        return owner->dispatchSkeletonBulletCollision(event,frames,hitEnvironment,hitAudio,
+                            [](auto y,auto x,auto& result){return portableAtan(y,x,result);});
+                    });
+                if(!hitOkay)std::fprintf(stderr,"skeleton bullet mode=%u owner=%u world=%u skeleton=%u audio=%u\n",
+                    unsigned(mode),unsigned(owner->valid()),unsigned(world->effectsSucceeded()),unsigned(owner->skeletons().valid()),hitAudio.calls);
                 assert(hitOkay);
                 const auto* victim=owner->skeletons().find(skeleton);
                 const auto* caller=world->resolveBulletLifetime(key);
+                if(target==5){
+                    assert(victim&&victim->state.health==60&&!victim->state.hitPending&&caller&&!caller->destroyRequested&&
+                        !hitAudio.calls&&controllerSpeed==60&&world->scriptEffects().size()==1&&world->randomDrawCount()==rng);
+                    return true; // Line suppression is not itself an enemy Collision event.
+                }
                 assert(victim&&victim->state.health==51&&victim->state.hitDamage==9&&victim->state.damageStun&&
-                    victim->state.hitPending&&delays==2&&hitAudio.calls==5&&caller&&caller->destroyRequested&&!caller->hitIgnore);
+                    victim->state.hitPending&&hitAudio.calls==5&&caller&&caller->destroyRequested&&!caller->hitIgnore);
+                assert(controllerSpeed==30&&owner->runControllers().find(controller)->alarms.get(0)==1&&
+                    owner->runControllers().find(controller)->controllerSlow==30);
                 const auto* child=owner->scriptEffects().find(caller->myFx);
                 assert(child&&child->effect->spriteId==605&&world->scriptEffects().size()==2&&world->randomDrawCount()==rng);
             }
-            return ok;
-        },[&]{world->step(4);return world->effectsSucceeded();}));
-        assert(calls==1);
+            return true;
+        };
+        assert(world->withSourceBulletSteps(sourceStep,[&]{return world->withCollisionPass(collisionPass,[&]{
+            world->step(4);return world->effectsSucceeded();
+        });}));
+        assert(calls==1&&collisionPasses==1);
         if(target==0){const auto* box=world->findBreakable({0,1});assert(box&&box->state.hit&&box->state.wallHp.high==0xc0200000u);}
         if(target==2){const auto* victim=owner->bones().find(bone);assert(victim&&victim->state.hit&&victim->state.health.high==0xc0200000u);}
         assert(owner->prepareDraw()&&!world->resolveBulletLifetime(shot));
