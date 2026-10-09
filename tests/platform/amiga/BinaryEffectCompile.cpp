@@ -4,6 +4,18 @@
 #include "core/RunControllerInstances.h"
 #include "core/LevelClearSelection.h"
 #include "core/LevelExit.h"
+#include "core/RunSession.h"
+struct CueCompileAudio {
+    bool isPlaying(int,bool&);bool stop(int);
+    bool setGain(int,downwell::MotionBinary64,unsigned);
+    bool play(int,int,bool,int&);bool getGain(int,downwell::MotionBinary64&);
+    bool setPitch(int,downwell::MotionBinary64);
+};
+bool compileLevelBeginCue(downwell::RunSession& run,bool& firstLand,bool stopped,int& bgm,
+    bool (*create)(int,downwell::MotionBinary64,downwell::MotionBinary64),bool (*music)(int,int&),
+    downwell::SoundPlayState& caller,downwell::SoundPlayEnvironment& env,CueCompileAudio& audio){
+    return run.beginLevelCue(firstLand,stopped,bgm,{}, {},create,music,caller,env,audio);
+}
 void compileLevelExitAlarms(downwell::LevelExit& exit,
     void (*emit)(downwell::LevelExit::Effect,int,int)){
     exit.advanceAlarms(emit);

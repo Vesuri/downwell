@@ -26,7 +26,69 @@ template<class World,class Kills> void check(World& world,Kills kills,unsigned f
         world.runCombo().state.count==before+1&&kills()==killed+(failure&&failure<3?0:1)&&
         calls==(failure?failure:5));
 }
+template<class World> void checkCue(World& world,unsigned failure,bool ending=false,bool changeArea=false,bool musicPlaying=false){
+    using namespace downwell;
+    const_cast<RunStage&>(world.runStage()).area=ending?5:1;
+    bool firstLand=false;int bgm=10;unsigned calls=0;
+    std::vector<int> trace;
+    auto operation=[&](int tag){trace.push_back(tag);return ++calls!=failure;};
+    struct Audio {
+        decltype(operation)& op;bool& firstLand;bool ending,musicPlaying;
+        bool isPlaying(int id,bool& playing){
+            assert(firstLand);playing=id==186||id==900||(ending&&id==10)||(musicPlaying&&id==20);
+            return op(id==186?2:id==0?7:id==900?12:5);
+        }
+        bool stop(int id){assert(id==186||id==10);return op(id==186?3:13);}
+        bool setGain(int id,MotionBinary64 gain,unsigned time){
+            assert((id==20||id==900)&&gain.high==0x3ff00000u&&!gain.low&&!time);
+            return op(id==20?6:10);
+        }
+        bool play(int id,int priority,bool loop,int& voice){
+            assert(id==20&&priority==100&&loop);voice=900;return op(8);
+        }
+        bool getGain(int id,MotionBinary64& gain){assert(id==900);gain=MotionBinary64::fromInteger(1);return op(9);}
+        bool setPitch(int id,MotionBinary64 pitch){assert(id==900&&pitch.high==0x3ff00000u&&!pitch.low);return op(11);}
+    } audio{operation,firstLand,ending,musicPlaying};
+    SoundPlayState caller;SoundPlayEnvironment env;
+    const auto x=MotionBinary64::fromInteger(241),y=MotionBinary64::fromInteger(603);
+    assert(world.beginLevelCue(firstLand,true,bgm,x,y,[](auto...){std::abort();return false;},
+        [](int,int&){std::abort();return false;},caller,env,audio)&&!firstLand&&bgm==10&&!calls);
+    const bool ok=world.beginLevelCue(firstLand,false,bgm,x,y,[&](int object,auto px,auto py){
+        assert(!firstLand&&!ending&&object==372&&px.high==x.high&&px.low==x.low&&py.high==y.high&&py.low==y.low);
+        if(changeArea)const_cast<RunStage&>(world.runStage()).area=2;
+        return operation(1);
+    },[&](int area,int& id){assert(firstLand&&area==(changeArea?2:ending?5:1));id=20;return operation(4);},caller,env,audio);
+    const std::vector<int> expected=ending?std::vector<int>{2,3,5,13,4,4}:musicPlaying?std::vector<int>{1,2,3,4,4,5}:
+        std::vector<int>{1,2,3,4,4,5,6,7,8,9,10,11,12};
+    assert(ok==(failure==0)&&world.effectsSucceeded()==ok&&trace.size()==(failure?failure:expected.size()));
+    for(unsigned i=0;i<trace.size();++i)assert(trace[i]==expected[i]);
+    assert(firstLand==(ending||failure!=1));
+    assert(bgm==((!failure||failure>(ending?6u:5u))?20:10));
+    if(ok){
+        const auto before=calls;
+        assert(world.beginLevelCue(firstLand,false,bgm,x,y,[](auto...){std::abort();return false;},
+            [](int,int&){std::abort();return false;},caller,env,audio)&&calls==before);
+    }
+}
 int main(){
+    {
+        auto native=std::make_unique<GameplayWorld>(300,true,0,false);
+        checkCue(*native,0,false,false,true);
+        auto stored=std::make_unique<downwell::StartupRuntime>();
+        checkCue(*stored,0,false,false,true);
+    }
+    {
+        auto native=std::make_unique<GameplayWorld>(300,true,0,false);
+        checkCue(*native,0,false,true);
+        auto stored=std::make_unique<downwell::StartupRuntime>();
+        checkCue(*stored,0,false,true);
+    }
+    for(bool ending:{false,true})for(unsigned failure=0;failure<=(ending?6u:13u);++failure){
+        auto native=std::make_unique<GameplayWorld>(300,true,0,false);
+        checkCue(*native,failure,ending);
+        auto stored=std::make_unique<downwell::StartupRuntime>();
+        checkCue(*stored,failure,ending);
+    }
     {
         downwell::InstanceRecord controllers[2];int speed=60;
         assert(downwell::MomentDelay::request(speed,[&](auto apply){
@@ -117,5 +179,5 @@ int main(){
         auto stored=std::make_unique<downwell::StartupRuntime>();
         check(*stored,[&]{return stored->mainEnemiesDefeated();},failure);
     }
-    std::puts("Enemy death: both worlds publish real counters in source order and retain five failure prefixes");
+    std::puts("Enemy death: both-world counters and level-begin cue; five bookkeeping, thirteen normal cue and six ending cue failure prefixes passed");
 }

@@ -11,6 +11,26 @@ source-backed frontier/phase correction and remaining region-boundary gaps.
 VM-backed registration, latch/release and collision-phase camera snaps on both
 adapters, plus the remaining original-runner and achievement caveats.
 
+## Enemy-death level-begin cue
+
+`levelBeginCue` returns without side effects when `firstLand` or `pTimeStop`
+is true. Outside area 5 it synchronously creates object 372 at the caller's
+position **before** writing `firstLand=1`. It then conditionally stops falling
+sound 186, selects `areaBgm[area]`, and, if that music is not playing, sets gain
+to one and invokes `soundPlayOL(bgm,100,1,1,"music")`. Area 5 omits the child
+and playback: after firstLand/falling audio it stops the old BGM before selecting
+the replacement. Area and BGM reads following synchronous operations must use
+their current values, not entry snapshots.
+
+The shared run-session operation is exposed through both runtime APIs and
+uses the existing overlap-sound implementation/channel state. First-land,
+player-stop, BGM, caller sound fields and environment are supplied by their
+owners, as are actual child creation and the area-music lookup. This does not
+admit a natural enemy-death caller or a level-number actor; those require real
+source-global bindings and registered synchronous creation. Failures preserve
+completed writes and suppress subsequent operations. VM guards and scripted
+audio tests establish this ordering, not original-runner playback fidelity.
+
 ## Result-room population and persistent alarms
 
 The exported `objLineToResult` Alarm 1 calls `room_goto(16)` unconditionally.

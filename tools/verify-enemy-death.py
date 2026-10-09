@@ -27,6 +27,28 @@ popz.v
 call.i gml_Script_levelBeginCue(argc=0)
 popz.v
 exit.i""".splitlines()
+cue = body("levelBeginCue",20)
+assert cue[:19] == [
+    "pushglb.v global.firstLand", "conv.v.b", "not.b", "bf [3]",
+    "pushglb.v global.pTimeStop", "conv.v.b", "not.b", "b [4]", "push.e 0", "bf [19]",
+    "pushglb.v global.area", "pushi.e 5", "cmp.i.v NEQ", "bf [13]",
+    "pushi.e 372", "conv.i.v", "push.v self.y", "push.v self.x", "call.i gml_Script_instance_create(argc=3)"]
+assert cue[19:32] == ["popz.v", "pushi.e 1", "pop.v.i global.firstLand", "pushi.e 186", "conv.i.v",
+    "call.i audio_is_playing(argc=1)", "conv.v.b", "bf [8]", "pushi.e 186", "conv.i.v",
+    "call.i audio_stop_sound(argc=1)", "popz.v", "pushglb.v global.bgm"]
+gain = cue.index("call.i audio_sound_gain(argc=3)")
+assert cue[gain-5:gain+14] == ["pushi.e 0", "conv.i.v", "pushi.e 1", "conv.i.v", "pushglb.v global.bgm",
+    "call.i audio_sound_gain(argc=3)", "popz.v", 'push.s "music"@192', "conv.s.v", "pushi.e 1", "conv.i.v",
+    "pushi.e 1", "conv.i.v", "pushi.e 100", "conv.i.v", "pushglb.v global.bgm",
+    "call.i gml_Script_soundPlayOL(argc=5)", "popz.v", "b [19]"]
+ending = cue[gain+14:]
+assert ending[:19] == ["pushi.e 1", "pop.v.i global.firstLand", "pushi.e 186", "conv.i.v",
+    "call.i audio_is_playing(argc=1)", "conv.v.b", "bf [15]", "pushi.e 186", "conv.i.v",
+    "call.i audio_stop_sound(argc=1)", "popz.v", "pushglb.v global.bgm", "call.i audio_is_playing(argc=1)",
+    "conv.v.b", "bf [17]", "pushglb.v global.bgm", "call.i audio_stop_sound(argc=1)", "popz.v", "pushglb.v global.bgm"]
+assert "call.i gml_Script_instance_create(argc=3)" not in ending
+assert "call.i gml_Script_soundPlayOL(argc=5)" not in ending
+print("Pinned levelBeginCue guards, synchronous child, firstLand and normal/ending audio order")
 assert body("gunshotStop", 5) == """pushglb.v global.toggleGuncut
 conv.v.b
 bf [4]

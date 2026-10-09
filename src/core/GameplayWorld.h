@@ -1196,6 +1196,12 @@ public:
     bool recordEnemyDeath(bool cutGunshot,Audio& audio,NoKill clearNoKill,Delay delay,Cue cue){
         return run_.recordEnemyDeath(cutGunshot,audio,clearNoKill,delay,cue);
     }
+    template<class Create,class AreaMusic,class Audio>
+    bool beginLevelCue(bool& firstLand,bool playerTimeStop,int& bgm,downwell::MotionBinary64 x,
+        downwell::MotionBinary64 y,Create create,AreaMusic music,downwell::SoundPlayState& caller,
+        downwell::SoundPlayEnvironment& env,Audio& audio){
+        return run_.beginLevelCue(firstLand,playerTimeStop,bgm,x,y,create,music,caller,env,audio);
+    }
     template<class Audio> bool playBoxChainSound(downwell::InstanceHandle h,downwell::MotionBinary64 volume,bool inWater,Audio& audio){
         if(!run_.effectsSucceeded||!findBreakable(h))return run_.effectsSucceeded=false;
         return run_.playBoxChainSound(breakables_[h.slot].sound,volume,inWater,audio);

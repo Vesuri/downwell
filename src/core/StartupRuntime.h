@@ -216,6 +216,11 @@ public:
     bool recordEnemyDeath(bool cutGunshot,Audio& audio,NoKill clearNoKill,Delay delay,Cue cue){
         return run_.recordEnemyDeath(cutGunshot,audio,clearNoKill,delay,cue);
     }
+    template<class Create,class AreaMusic,class Audio>
+    bool beginLevelCue(bool& firstLand,bool playerTimeStop,int& bgm,MotionBinary64 x,MotionBinary64 y,
+        Create create,AreaMusic music,SoundPlayState& caller,SoundPlayEnvironment& env,Audio& audio){
+        return run_.beginLevelCue(firstLand,playerTimeStop,bgm,x,y,create,music,caller,env,audio);
+    }
     template<unsigned Capacity,class Audio> bool playCurrencyPickupSound(
         StoredCurrencyRegistration<instanceCapacity,Capacity>& currency,InstanceHandle gem,
         MotionBinary64 volume,Audio& audio){

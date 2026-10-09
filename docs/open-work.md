@@ -141,7 +141,9 @@ behavior, both backend integrations and relevant original-game verification.
 - Connect natural death/stomp/hit events to effect owners, including flash balls.
   Route enemy-death bookkeeping through the shared run-state entry, supplying
   actual toggleGuncut, achNoKill publication, momentDelay controller events and
-  levelBeginCue creation/audio. Do not use successful placeholder callbacks.
+  levelBeginCue creation/audio. Bind its actual firstLand/BGM state and area-music
+  lookup, and register/schedule its synchronous levelNumber (372) child before
+  admitting natural callers. Do not use successful placeholder callbacks.
   Admit persistent object 37 from the actual native startup Create sequence,
   including its initialization/HUD dependencies and source numeric ID. Verify
   the complete rmResult handoff, including Room End events, native destination

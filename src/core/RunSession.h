@@ -109,6 +109,39 @@ struct RunSession {
         return true;
     }
     RunStage stage;
+    // levelBeginCue borrows the caller's actual globals and sound-script
+    // fields. Object 372 must finish Create before firstLand changes. Music
+    // selection reads the live area after synchronous creation/audio calls.
+    template<class Create,class AreaMusic,class Audio>
+    bool beginLevelCue(bool& firstLand,bool playerTimeStop,int& bgm,
+        MotionBinary64 x,MotionBinary64 y,Create create,AreaMusic areaMusic,
+        SoundPlayState& caller,SoundPlayEnvironment& env,Audio& audio){
+        if(!effectsSucceeded)return false;
+        if(firstLand||playerTimeStop)return true;
+        const bool ending=stage.area==5;
+        if(!ending&&(!create(372,x,y)||!effectsSucceeded))return effectsSucceeded=false;
+        firstLand=true;
+        bool playing=false;
+        if(!audio.isPlaying(186,playing)||!effectsSucceeded)return effectsSucceeded=false;
+        if(playing&&(!audio.stop(186)||!effectsSucceeded))return effectsSucceeded=false;
+        if(ending){
+            if(!audio.isPlaying(bgm,playing)||!effectsSucceeded)return effectsSucceeded=false;
+            if(playing&&(!audio.stop(bgm)||!effectsSucceeded))return effectsSucceeded=false;
+        }
+        int selected;
+        if(!areaMusic(stage.area,selected)||!effectsSucceeded)return effectsSucceeded=false;
+        if(bgm!=selected){
+            if(!areaMusic(stage.area,selected)||!effectsSucceeded)return effectsSucceeded=false;
+            bgm=selected;
+        }
+        if(ending)return true;
+        if(!audio.isPlaying(bgm,playing)||!effectsSucceeded)return effectsSucceeded=false;
+        if(playing)return true;
+        if(!audio.setGain(bgm,MotionBinary64::fromInteger(1),0)||!effectsSucceeded)return effectsSucceeded=false;
+        int result=-1;bool returned=false;
+        return SoundPlayScript::overlap(caller,env,audio,[]{return false;},overlapSounds[5],
+            bgm,100,true,true,"music",result,returned,effectsSucceeded);
+    }
     DeathResults results;
     AmmoHudMotion ammoHud;
     AmmoGaugeRows ammoGauge;
