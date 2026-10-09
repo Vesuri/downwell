@@ -72,10 +72,20 @@ value on the firing frame; the bodies do not force the alarm to -1.
 Companion motion, Drone's firing Alarm 0, Draw, native admission and the rest of player
 initialization remain incomplete; correct child IDs alone do not prove those.
 Drone Step adds two to each custom direction every tick without modulo. Its
-lengthdir inputs therefore exceed the current `SmokeDirection` / `SmokeTrig`
-domain (and its X radius is 24, beyond that helper's length limit of 8).
+lengthdir inputs therefore exceed the current `SmokeDirection` domain
+(and its X radius is 24, beyond that helper's length limit of 8).
 Wrapping angles or substituting host trigonometry would not preserve the
 original wrapper's float conversion and argument reduction.
+The recovered `SmokeTrig` program admits the original straight-line dispatch:
+the sign-cleared top sixteen bits of the binary64 radian input must be in
+`0x3030..0x40f5`, with zero handled separately. In particular, 90112 radians
+is excluded, while its binary64 predecessor is included. The source dispatch
+at `0x74b621` / `0x74b7e1` is verified by `export-smoke-trig.py`.
+Larger arguments call `0x770b1f` / `0x770c0f`, which execute x87 `FCOS` /
+`FSIN` and use `FPREM1` if hardware argument reduction reports out of range.
+Those fallback operations are not part of the portable polynomial. Expanding
+its admitted range does not establish arbitrary-angle companion support or
+the original process's live FP environment.
 Native terrain loading retains the authored player/wall IDs but is not complete
 cross-family room creation. Ordinary Amiga entry uses `authoredRoom` player-birth
 timing: construction prepares the room views without registering a player, the

@@ -17,13 +17,19 @@ audit = runpy.run_path(str(root / "tools/verify-runner-choose.py"))
 region = audit["region"]
 decoder = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
 decoder.detail = True
-# These exponent dispatches admit the currency wrapper's +/-720-degree
-# float radians as well as the smaller smoke domain. Keep the signed input
+# These exponent dispatches admit absolute top words 0x3030 through 0x40f5,
+# not just the currency wrapper's +/-720-degree float radians. Keep the signed input
 # unchanged for the recovered reduction; do not substitute modulo degrees.
 for start, fallback in ((0x74b621, "0x74b76e"), (0x74b7e1, "0x74b92e")):
     dispatch = [(i.mnemonic, i.op_str) for i in decoder.disasm(region(start, 23), start)]
     assert dispatch == [("pextrw", "eax, xmm0, 3"), ("and", "ax, 0x7fff"),
                         ("sub", "ax, 0x3030"), ("cmp", "ax, 0x10c5"), ("ja", fallback)]
+# Large arguments leave this exported program for actual x87 transcendental
+# instructions. Do not extend the polynomial or wrap degrees to hide that path.
+for call, target, operation, opcode in ((0x74b797, "0x770b1f", 0x770b3d, "fcos"),
+                                      (0x74b964, "0x770c0f", 0x770c2d, "fsin")):
+    assert [(i.mnemonic, i.op_str) for i in decoder.disasm(region(call, 5), call)] == [("call", target)]
+    assert [(i.mnemonic, i.op_str) for i in decoder.disasm(region(operation, 2), operation)] == [(opcode, "")]
 lines = ["// Generated from the pinned original runner; do not commit this payload.",
          "template<class Real> bool smokeTrigProgram(Real input, bool cosine, Real& output) {",
          "Real r[8][2]{}; r[0][0]=input; int index=0; bool ok=true;"]

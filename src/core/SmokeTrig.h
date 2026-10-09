@@ -14,7 +14,7 @@ struct IntegerReal {
 #include "../../generated/smoke-trig.inc"
 }
 // The pinned SSE straight-line paths under nearest-even rounding, bounded to
-// admitted float radians in [-13,13], including unnormalized currency turns.
+// the original exponent dispatch's complete straight-line argument range.
 // Tiny/general arguments and alternate FP
 // environment fallbacks are not admitted. Source zero has explicit results.
 inline bool smokeTrigComponent(MotionBinary64 radians,bool cosine,MotionBinary64& output){
@@ -23,8 +23,11 @@ inline bool smokeTrigComponent(MotionBinary64 radians,bool cosine,MotionBinary64
     const auto magnitude=radians.high&0x7fffffffu;
     // Original dispatch strips the sign before checking the exponent range.
     // Feed signed input to the polynomial; do not substitute trig symmetry.
-    if(magnitude<0x30300000u || magnitude>0x402a0000u ||
-       (magnitude==0x402a0000u && radians.low))return false;
+    // pextrw/sign-clear/sub 0x3030/cmp 0x10c5/ja tests the high
+    // sixteen bits, not a rounded numeric cutoff. The upper endpoint
+    // 0x40f6000000000000 (90112 radians) belongs to the x87 fallback.
+    const auto top=magnitude>>16;
+    if(top<0x3030u || top>0x40f5u)return false;
     smoke_trig_detail::IntegerReal result,input{radians};
     if(!smoke_trig_detail::smokeTrigProgram(input,cosine,result))return false;
     output=result.value;return true;

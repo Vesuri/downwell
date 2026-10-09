@@ -5,7 +5,8 @@
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
-static void check(bool ok){if(!ok)std::abort();}
+static void checked(bool ok,int line){if(!ok){std::fprintf(stderr,"Smoke trig check failed at line %d\n",line);std::abort();}}
+#define check(ok) checked((ok),__LINE__)
 using downwell::MotionBinary64;
 static MotionBinary64 number(double d){std::uint64_t b;std::memcpy(&b,&d,8);return {std::uint32_t(b>>32),std::uint32_t(b)};}
 static double real(MotionBinary64 x){const std::uint64_t b=(std::uint64_t(x.high)<<32)|x.low;double d;std::memcpy(&d,&b,8);return d;}
@@ -22,7 +23,7 @@ int main(){
     unsigned count=0;
     // Source endpoints, the smallest nonzero WELL-derived smoke angle and
     // neighboring float radians at table-reduction boundaries.
-    auto compare=[&](float radian){
+    auto compare=[&](double radian){
         MotionBinary64 c,s,only;
         check(downwell::smokeTrig(number(radian),c,s));
         check(downwell::smokeCosine(number(radian),only)&&only.high==c.high&&only.low==c.low);
@@ -43,7 +44,27 @@ int main(){
         compare(boundary);compare(std::nextafter(boundary,0.f));compare(std::nextafter(boundary,14.f));
         compare(-boundary);compare(std::nextafter(-boundary,0.f));compare(std::nextafter(-boundary,-14.f));
     }
-    for(auto invalid:{number(-14),number(14),MotionBinary64{0x7ff00000u,0},MotionBinary64{0,1}}){
+    // Exact source-dispatch boundaries, including lower words that the
+    // original pextrw does not inspect. The oracle executes the recovered
+    // instruction sequence in host binary64, not a substituted libm path.
+    for(auto bits:{MotionBinary64{0x30300000u,0},MotionBinary64{0x30300000u,1},
+                   MotionBinary64{0x40f5ffffu,0xffffffffu}}){
+        compare(real(bits));bits.high|=0x80000000u;compare(real(bits));
+    }
+    for(unsigned i=0;i<20000;++i){
+        const double radian=random.random(180224)-90112;
+        compare(radian);++count;
+    }
+    // Reduction boundaries near the top of the admitted interval exercise
+    // the much larger integer index before the source's table-index mask.
+    for(unsigned i=917800;i<917873;++i){
+        const double boundary=(i+0.5)*3.14159265358979323846/32;
+        for(double value:{boundary,std::nextafter(boundary,0.),std::nextafter(boundary,90112.)}){
+            compare(value);compare(-value);
+        }
+    }
+    for(auto invalid:{number(-90112),number(90112),MotionBinary64{0x302fffffu,0xffffffffu},
+                     MotionBinary64{0x7ff00000u,0},MotionBinary64{0,1}}){
         auto c=number(2),s=number(3);
         check(!downwell::smokeTrig(invalid,c,s) && real(c)==2 && real(s)==3);
         check(!downwell::smokeCosine(invalid,c)&&real(c)==2);
