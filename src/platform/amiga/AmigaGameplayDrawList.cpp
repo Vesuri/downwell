@@ -505,6 +505,16 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
                    !px.roundPixel(x)||!py.roundPixel(y))return false;
                 return append(91,frame,downwellPlayfieldX+x,y,0);
             }
+            if(kind==GameplayWorld::DrawActor::blast){
+                const auto* r=port.registeredBlasts()?port.registeredBlasts()->find(key):nullptr;
+                unsigned frame;std::int32_t x,y;
+                if(!r||!r->state.drawFrame(frame))return false;
+                auto px=r->x.promoted(),py=r->y.promoted();using Real=downwell::MotionBinary64;
+                if(!downwell::EffectSurfacePlacement::relative(px,Real::fromInteger(worldViewX),px)||
+                   !downwell::EffectSurfacePlacement::relative(py,Real::fromInteger(worldViewY),py)||
+                   !px.roundPixel(x)||!py.roundPixel(y))return false;
+                return append(471,frame,downwellPlayfieldX+x,y,r->publishedScale.bits>>31);
+            }
             if(kind==GameplayWorld::DrawActor::flashBall){
                 const auto* r=port.registeredFlash()?port.registeredFlash()->find(key):nullptr;
                 if(!r)return false;

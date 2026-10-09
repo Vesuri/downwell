@@ -120,6 +120,7 @@ SELECTIONS = {
         458: None,   # sprBulScatter2 (six-frame gem-high projectile)
         459: None,   # sprBulScatter1 (six-frame usual gunboot projectile)
         460: None,   # sprSkeletonBone
+        471: None,   # sprBlast: fourteen frames, offline mirrored planar art
         480: [0],    # sprShopCounter
         481: [0],    # sprShopTable
         482: [0],    # sprShopCase, intact fixture (sold cases stay intact)
@@ -646,7 +647,7 @@ def build_records(manifest, extracted, profile, language_path=None):
                 canvas = flash_palette_canvas(canvas)
             if profile == "game" and sprite_id in (84, 85, 96, 101, 153, 154, 157, 162, 163, 164,
                     166, 168, 170, 173, 177, 178, 186, 187, 188, 205, 207, 208, 278,
-                    458, 459, 460, 485, 486, 487, 496, 497, 602, 603):
+                    458, 459, 460, 471, 485, 486, 487, 496, 497, 602, 603):
                 # Prepare snail Y flips and crawler quarter turns on the host.
                 # Crop transparent padding to keep variants Chip-RAM cheap.
                 snail = sprite_id in (177, 178)

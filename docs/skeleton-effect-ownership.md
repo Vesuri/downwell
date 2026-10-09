@@ -368,9 +368,17 @@ and shared RNG. Its borrowed `withBlastEvents` scope joins the existing room
 animation, alarm, Step and cleanup phases. At speed 0.5, Step disables damage
 on tick 7 and animation-end retires the fourteen-frame image on tick 28.
 Registration requires a matching live room handle, not just a reused source ID.
-This scope is not installed by the normal frontend yet. Native owner admission,
-Draw and mixed collision dispatch remain required before replacing the stomp
-adapter's explicit blast dependency in natural encounters.
+This scope is not installed by the normal frontend yet.
+
+The native `GameplayCollisionOwner` binds the same `BlastInstances` to numeric
+source IDs, spatial publication, room animation, captured Step dispatch, layer
+Draw order and deferred cleanup. `createBlast` uses the world's camera and RNG
+and the registered controller traversal for delay; its source ID must come
+from the enclosing creation stream. The Amiga draw collector emits sprite 471
+in that layer order, using the host-prepared fourteen frames and mirrored
+planar variants. Blast art uses ordinary default Draw, not the effects surface.
+Natural source-ID allocation and mixed collision dispatch remain required
+before replacing the stomp adapter's explicit blast dependency in encounters.
 
 Effect-producing callbacks return success. `SkeletonActor` stops the event on
 failed enemy-death setup, blood, smoke, flash, currency, corpse or debris

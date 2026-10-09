@@ -47,6 +47,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     if(bones_&&!bones_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(registeredExpiry_&&!registeredExpiry_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(registeredSmoke_&&!registeredSmoke_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
+    if(registeredBlasts_&&!registeredBlasts_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(registeredCorpses_&&!registeredCorpses_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(consumptionParticles_&&!consumptionParticles_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(skeletons_&&!skeletons_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
@@ -69,6 +70,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto scriptSpawnInstances=scriptSpawnInstances_;
     const auto registeredExpiry=registeredExpiry_;
     const auto registeredSmoke=registeredSmoke_;
+    const auto registeredBlasts=registeredBlasts_;
     const auto registeredCorpses=registeredCorpses_;
     const auto consumptionParticles=consumptionParticles_;
     const auto debrisInstances=debrisInstances_;
@@ -142,6 +144,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     scriptSpawnInstances_=scriptSpawnInstances;
     registeredExpiry_=registeredExpiry;
     registeredSmoke_=registeredSmoke;
+    registeredBlasts_=registeredBlasts;
     registeredCorpses_=registeredCorpses;
     consumptionParticles_=consumptionParticles;
     debrisInstances_=debrisInstances;
@@ -289,6 +292,7 @@ bool GameplayWorld::retireGameplayRoom() {
     if(bones_&&!bones_->clear())return run_.effectsSucceeded=false;
     if(registeredExpiry_&&!registeredExpiry_->clear())return run_.effectsSucceeded=false;
     if(registeredSmoke_&&!registeredSmoke_->clear())return run_.effectsSucceeded=false;
+    if(registeredBlasts_&&!registeredBlasts_->clear())return run_.effectsSucceeded=false;
     if(registeredCorpses_&&!registeredCorpses_->clear())return run_.effectsSucceeded=false;
     if(consumptionParticles_&&!consumptionParticles_->clear())return run_.effectsSucceeded=false;
     if(skeletons_&&!skeletons_->clear())return run_.effectsSucceeded=false;

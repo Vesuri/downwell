@@ -98,6 +98,12 @@ struct BlastOwner {
     bool sprite(InstanceHandle,const Record&,int){std::abort();}
 };
 int main(){
+    for(unsigned half=0;half<28;++half){
+        auto a=fresh();RunnerImageValue whole;assert(whole.assignInteger(half));
+        a.imageIndex=whole;if(half)a.imageIndex.bits-=1u<<23;
+        unsigned frame=99;assert(a.drawFrame(frame)&&frame==half/2);
+        a.destroyRequested=true;assert(!a.drawFrame(frame));
+    }
     for(unsigned failure=0;failure<=7;++failure){
         BlastOwner owner;owner.fail=failure;
         BlastOwner::Store store(BlastOwner::Store::Binding::bindPositionedActor(owner),{&owner,

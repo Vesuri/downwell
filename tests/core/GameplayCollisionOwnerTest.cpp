@@ -180,6 +180,9 @@ bool nativeRunControllerBirth(downwell::GameplayCollisionOwner& owner,unsigned s
     return owner.runControllers().create(source,{}, {},initialize,key);
 }
 bool nativeMomentDelay(downwell::GameplayCollisionOwner& owner){return owner.requestMomentDelay();}
+bool nativeBlastBirth(downwell::GameplayCollisionOwner& owner,unsigned source,downwell::InstanceHandle& key){
+    return owner.createBlast(source,{}, {},key);
+}
 struct NativeEnemyDeathScriptProbe { bool operator()(); };
 bool nativeEnemyDeath(GameplayWorld& world,NativeEnemyDeathAudioProbe& audio,
     NativeEnemyDeathScriptProbe flag,NativeEnemyDeathScriptProbe delay,NativeEnemyDeathScriptProbe cue){
@@ -557,6 +560,7 @@ static void checkTypedCollisionView(const GameplayCollisionView& view,GameplayCo
         case K::levelNumber:assert(view.resolveLocal<K::levelNumber>(local)==reference.levelNumber);break;
         case K::limboShard:assert(view.resolveLocal<K::limboShard>(local)==reference.limboShard);break;
         case K::flashBall:assert(view.resolveLocal<K::flashBall>(local)==reference.flashBall);break;
+        case K::blast:assert(view.resolveLocal<K::blast>(local)==reference.blast);break;
         case K::debris:assert(view.resolveLocal<K::debris>(local)==reference.debris);break;
         case K::timeChange:assert(view.resolveLocal<K::timeChange>(local)==reference.timeChange);break;
         case K::timeShard:assert(view.resolveLocal<K::timeShard>(local)==reference.timeShard);break;
@@ -573,7 +577,7 @@ static void checkTypedCollisionView(const GameplayCollisionView& view,GameplayCo
 }
 static void checkCollisionViewMembership(const GameplayWorld& world){
     const GameplayCollisionView view(world);
-    for(unsigned family=0;family<=unsigned(GameplayCollisionView::Kind::flashBall);++family)
+    for(unsigned family=0;family<=unsigned(GameplayCollisionView::Kind::blast);++family)
         for(auto local:{InstanceHandle{0,0},InstanceHandle{0xffffffffu,1},InstanceHandle{GameplayCollisionView::capacity,1}})
             checkTypedCollisionView(view,GameplayCollisionView::Kind(family),local);
     for(unsigned slot=0;slot<=GameplayCollisionView::capacity;++slot){
@@ -1202,6 +1206,41 @@ int main(){
             controllers.find(controller)->alarms.get(1)==0&&world->levelClear().motion.cameraY.equal(camera));
         const auto tick=world->tick();
         assert(!world->stepLevelClear(confirm,false,false,heart,[](auto,unsigned){std::abort();})&&world->tick()==tick);
+    }
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                   GameplayCollisionOwner::Ownership::nativeScenery}){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));int speed=60;assert(world->bindControllerRoomSpeed(speed));
+        InstanceHandle controller;
+        assert(owner->runControllers().create(100065,{}, {},[](InstanceHandle){return true;},controller));
+        InstanceHandle local,shared;const auto before=world->randomDrawCount();
+        assert(owner->createBlast(700000,MotionBinary64{0x406e0800u,0},MotionBinary64::fromInteger(800),local));
+        assert(speed==30&&world->randomDrawCount()==before+1&&world->cameraShakeAmount()==6);
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::blast,local,shared));
+        GameplayCollisionView view(*world);GameplayCollisionView::Record record;
+        assert(view.resolve(shared,record)&&record.blast==owner->registeredBlasts().find(local)&&record.blast->sourceId==700000);
+        checkTypedCollisionView(view,GameplayCollisionView::Kind::blast,local);
+        auto phase=std::make_unique<RunnerStepSnapshot<GameplayCollisionView::capacity>>();
+        for(unsigned tick=1;tick<=28;++tick){
+            world->step(0);assert(world->effectsSucceeded()&&owner->valid());
+            unsigned count=0;
+            assert(owner->dispatchStepPhase(0,*phase,[&](InstanceHandle selected,const PackedObjectEvent&){
+                GameplayCollisionView::Kind kind;InstanceHandle key;
+                assert(GameplayCollisionView::decode(selected,kind,key));
+                if(kind!=GameplayCollisionView::Kind::blast)return true;
+                ++count;return owner->stepBlast(selected);
+            }));
+            const auto* r=owner->registeredBlasts().find(local);
+            assert(r&&r->state.damageEnd==(tick>=7)&&r->destroyRequested==(tick==28)&&count==(tick<28?1u:0u));
+            assert(owner->prepareDraw());
+            assert(view.contains(shared)==(tick<28));
+        }
+        InstanceHandle reused;assert(owner->createBlast(700001,{}, {},reused));
+        assert(reused.slot==local.slot&&reused.generation!=local.generation&&!view.contains(shared));
+        assert(owner->registeredBlasts().clear()&&owner->valid());
     }
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
                    GameplayCollisionOwner::Ownership::nativeScenery}){

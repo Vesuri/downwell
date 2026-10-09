@@ -108,6 +108,27 @@ int main() {
                 }
                 assert(owner->registeredFlash().clear());
             }
+            int blastRoomSpeed=60;assert(world->bindControllerRoomSpeed(blastRoomSpeed));
+            {
+                downwell::InstanceHandle blast;
+                assert(owner->createBlast(700000,downwell::MotionBinary64::fromInteger(240),
+                    downwell::MotionBinary64::fromInteger(128),blast));
+                UBYTE pack[8]{};
+                for(unsigned tick=0;tick<28;++tick){
+                    const auto* r=owner->registeredBlasts().find(blast);assert(r);
+                    for(bool composite:{false,true}){
+                        AmigaGameplayDrawList list;assert(list.collect(*world,pack,pack+8,160,34,composite));
+                        unsigned seen=0;
+                        for(unsigned i=0;i<list.count;++i)if(list.actors[i].sprite==471){
+                            assert(list.actors[i].x==190&&list.actors[i].y==94&&list.actors[i].frame==tick/2&&
+                                list.actors[i].flip==int(r->publishedScale.bits>>31));++seen;
+                        }
+                        assert(seen==1);
+                    }
+                    assert(owner->registeredBlasts().advanceAnimation(blast));
+                }
+                assert(owner->prepareDraw()&&!owner->registeredBlasts().find(blast));
+            }
             auto& corpses=owner->registeredCorpses();downwell::GameMakerRandom random(2);
             const downwell::MotionBinary64 x{0x406f0800u,0},y{0x40601000u,0};
             downwell::DeadBodySource source{x,y,{},downwell::MotionBinary64::fromInteger(-1)};

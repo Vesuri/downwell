@@ -22,6 +22,13 @@ template<unsigned HitCapacity> struct BlastActor {
     RunnerImageValue timeline{},imageIndex{},imageSpeed{0x3f800000u},xscale{0x3f800000u};
     bool damageEnd=false,destroyRequested=false,disregardWall=false,disregardWallWritten=false;
     MotionBinary64 damageEndFrame{};
+    bool drawFrame(unsigned& frame)const{
+        const auto magnitude=imageIndex.bits&0x7fffffffu;
+        if(destroyRequested||magnitude>0x41580000u||((imageIndex.bits>>31)&&magnitude))return false;
+        const unsigned exponent=magnitude>>23;
+        frame=exponent<127?0:((magnitude&0x7fffffu)|0x800000u)>>(150-exponent);
+        return frame<14;
+    }
     template<class Events> bool create(Events& events,bool& good){
         if(!good)return false;
         // event_inherited: parentPBullet Create, followed by child assignments.

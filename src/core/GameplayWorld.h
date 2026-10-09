@@ -52,6 +52,7 @@
 #include "core/ConsumptionBloodInstances.h"
 #include "core/CorpseDraw.h"
 #include "core/SmokeInstances.h"
+#include "core/BlastInstances.h"
 #include "core/SmokeDraw.h"
 #include "core/DebrisDraw.h"
 #include "core/TimeShardDraw.h"
@@ -407,6 +408,25 @@ public:
     bool bindRegisteredCorpses(RegisteredCorpse& instances){
         if(registeredCorpses_||!instances.valid()||instances.size())return false;
         registeredCorpses_=&instances;return true;
+    }
+    using RegisteredBlasts=downwell::BlastInstances<8>;
+    const RegisteredBlasts* registeredBlasts()const{return registeredBlasts_;}
+    bool bindRegisteredBlasts(RegisteredBlasts& instances){
+        if(registeredBlasts_||!instances.valid()||instances.size())return false;
+        registeredBlasts_=&instances;return true;
+    }
+    template<class Delay> bool createBlastWithSourceId(unsigned id,downwell::MotionBinary64 x,
+        downwell::MotionBinary64 y,Delay delay,downwell::InstanceHandle& key){
+        if(!run_.effectsSucceeded||!registeredBlasts_)return run_.effectsSucceeded=false;
+        struct Services {
+            GameplayWorld& world;Delay& delay;
+            bool shake(int a,int d){return world.requestCameraShake(a,d);}
+            bool momentDelay(){return delay();}
+            bool choose(unsigned count,unsigned& choice){
+                if(count!=2)return false;choice=world.enemyRandom_.chooseIndexSmall(2);return true;
+            }
+        } services{*this,delay};
+        return run_.effectsSucceeded=registeredBlasts_->create(id,x,y,services,key);
     }
     using RegisteredSmoke=downwell::SmokeInstances<32>;
     const RegisteredSmoke* registeredSmoke()const{return registeredSmoke_;}
@@ -1139,7 +1159,7 @@ public:
         return run_.effectsSucceeded=scriptSpawnInstances_&&effects.advanceRegistered(phase,*scriptSpawnInstances_);
     }
     enum class PhaseBoundary { beginStep, alarm, step, collision, endStep, roomEntry };
-    enum class DrawActor { enemy, bullet, scriptEffect, debris, player, entryDither, bone, skeleton, ditherAbove, timeShard, corpseExpiry, smoke, corpse, consumptionBlood, levelNumber, limboShard, flashBall };
+    enum class DrawActor { enemy, bullet, scriptEffect, debris, player, entryDither, bone, skeleton, ditherAbove, timeShard, corpseExpiry, smoke, corpse, consumptionBlood, levelNumber, limboShard, flashBall, blast };
     template<class Visit> bool visitRegisteredEnemyShades(Visit visit)const{
         if((!bones_||!bones_->size())&&(!skeletons_||!skeletons_->size()))return true;
         return visitRoomActorsReadOnly([&](DrawActor kind,downwell::InstanceHandle key,auto){
@@ -2197,6 +2217,7 @@ private:
     downwell::GameplayScriptSpawnInstances* scriptSpawnInstances_=nullptr;
     RegisteredExpiry* registeredExpiry_=nullptr;
     RegisteredSmoke* registeredSmoke_=nullptr;
+    RegisteredBlasts* registeredBlasts_=nullptr;
     RegisteredCorpse* registeredCorpses_=nullptr;
     ConsumptionParticles* consumptionParticles_=nullptr;
     LimboShards* limboShards_=nullptr;
