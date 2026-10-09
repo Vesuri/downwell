@@ -11,7 +11,24 @@ struct FlashBallEffect {
     // Seed that equivalent timeline directly; arbitrary frame writes are not
     // supported by this effect's source events.
     RunnerImageValue x{},y{},timeline{0x3f800000u},imageIndex{0x3f800000u};
+    RunnerImageValue imageSpeed{0x3e99999au};
+    int vrange=2;
     bool destroyRequested=false;
+    // Called after positioned birth. Unlike the legacy atomic create below,
+    // every source setter is published before the next RNG site is reached.
+    template<class Random,class Publish> bool createPublished(Random& random,Publish& publish) {
+        imageIndex={0x3f800000u};timeline=imageIndex;
+        if(!publish.imageIndex(imageIndex))return false;
+        vrange=2;
+        auto px=x.promoted();
+        if(!px.add(MotionBinary64::fromInteger(int(random.irandomSmall(4))-2))||
+           !x.assign(px)||!publish.position(x,y))return false;
+        auto py=y.promoted();
+        if(!py.add(MotionBinary64::fromInteger(int(random.irandomSmall(4))-2))||
+           !y.assign(py)||!publish.position(x,y))return false;
+        imageSpeed={0x3e99999au};
+        return publish.imageSpeed(imageSpeed);
+    }
     template<class Random> bool create(MotionBinary64 px,MotionBinary64 py,Random& random) {
         FlashBallEffect next;
         if(!next.x.assign(px) || !next.y.assign(py)) return false;
@@ -30,6 +47,14 @@ struct FlashBallEffect {
         if(!UnitSequenceFrames::advance(timeline,{0x3e99999au},3,imageIndex,crossed)) return false;
         // action_kill_object in Other 7. No additional RNG or death effects.
         if(crossed) destroyRequested=true;
+        return true;
+    }
+    template<class Publish> bool advanceImage(Publish& publish) {
+        if(destroyRequested)return true;
+        bool crossed;
+        if(!UnitSequenceFrames::advance(timeline,imageSpeed,3,imageIndex,crossed)||
+           !publish.imageIndex(imageIndex))return false;
+        if(crossed){destroyRequested=true;return publish.destroy();}
         return true;
     }
     unsigned drawFrame() const {

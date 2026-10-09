@@ -189,7 +189,27 @@ int main(){
                     skeletons.instances().find(skeleton)->state.smokeScript.smokenum==int(count));
                 for(unsigned i=0;i<16;++i)assert(random.stateWord(i)==world->randomState().stateWord(i));
                 for(unsigned i=0;i<count;++i){const auto* child=world->instance(first+2+i);assert(child&&child->objectId==225);}
-                assert(smoke.clear()&&blood.clear()&&skeletons.clear());
+                assert(smoke.clear()&&blood.clear());
+                auto flash=world->flashBallRegistration<8>();random=world->randomState();
+                const auto flashFirst=world->nextRuntimeInstanceId();count=0;
+                std::vector<FlashBallEffect> expectedFlashes;
+                assert((flashBurstPublished<6,2,10>(expected,MotionBinary64::fromInteger(999),MotionBinary64::fromInteger(999),random,
+                    [&](int object,auto x,auto y){FlashBallEffect child;++count;
+                        if(object!=224||!child.create(x,y,random))return false;
+                        expectedFlashes.push_back(child);return true;})));
+                assert(skeletons.dispatch(skeleton,[&](auto& actor,auto&,bool&){return world->emitSkeletonFlash(flash,actor);}));
+                assert(skeletons.instances().find(skeleton)->state.smokeScript.pvary==10);
+                for(unsigned i=0;i<count;++i){
+                    const auto* child=world->instance(flashFirst+i);
+                    assert(child&&child->objectId==224&&child->spriteId==96&&child->imageIndex==1&&child->imageSpeed==0.3F);
+                    const auto* record=flash.instances().find(flash.handle(*child));assert(record);
+                    assert(record->x.bits==expectedFlashes[i].x.bits&&record->y.bits==expectedFlashes[i].y.bits);
+                }
+                for(unsigned i=0;i<16;++i)assert(random.stateWord(i)==world->randomState().stateWord(i));
+                assert(skeletons.clear());
+                for(unsigned frame=0;frame<7;++frame)assert(world->withFlashBallEvents(flash,[&]{world->step(false);return world->effectsSucceeded();}));
+                assert(flash.instances().size()==0&&flash.valid());
+                for(unsigned i=0;i<count;++i)assert(!world->instance(flashFirst+i));
             }
         };
         if(small){auto blood=world->bloodRegistration<1>();run(blood);}

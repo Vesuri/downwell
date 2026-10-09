@@ -1,9 +1,16 @@
 #include "core/FlashBallEffects.h"
+#include "core/FlashBallInstances.h"
 #include "core/GameMakerRandom.h"
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
 bool nativeBoxFlash(downwell::FlashBallEffects<32>& effects,downwell::MotionBinary64 x,
                     downwell::MotionBinary64 y,downwell::GameMakerRandom& random){
     return effects.boxBurst(x,y,random);
+}
+bool nativeRegisteredFlash(downwell::FlashBallInstances<32>& effects,std::uint32_t id,
+                          downwell::MotionBinary64 x,downwell::MotionBinary64 y,
+                          downwell::GameMakerRandom& random){
+    downwell::InstanceHandle key;
+    return effects.create(id,x,y,random,key)&&effects.advanceAnimation(key)&&effects.activate(key,false);
 }
 #else
 #include <cmath>
@@ -17,7 +24,87 @@ static downwell::MotionBinary64 number(double x){
 }
 static float scalar(downwell::RunnerImageValue x){float value;std::memcpy(&value,&x.bits,4);return value;}
 struct Reference {float x,y,index=1;};
+using Registered=downwell::FlashBallInstances<2>;
+struct Owner {
+    using Record=Registered::Record;
+    unsigned calls=0,failAt=0,births=0,images=0,moves=0,deaths=0,retirements=0;
+    bool event(){return ++calls!=failAt;}
+    bool birth(downwell::InstanceHandle,const Record&){check(false);return false;}
+    bool birthAt(downwell::InstanceHandle key,const Record& r,downwell::RunnerImageValue x,downwell::RunnerImageValue y){
+        check(key.generation==r.lifetimeId&&r.sourceId>=1000&&r.state.imageIndex.bits==0&&
+              r.state.imageSpeed.bits==0x3f800000u&&r.state.vrange==0&&x.bits==r.x.bits&&y.bits==r.y.bits);
+        ++births;return event();
+    }
+    bool move(downwell::InstanceHandle,const Record&,downwell::RunnerImageValue,downwell::RunnerImageValue){++moves;return event();}
+    bool imageIndex(downwell::InstanceHandle,const Record&,downwell::RunnerImageValue){++images;return event();}
+    bool markDestroyed(downwell::InstanceHandle,const Record& r){check(r.state.destroyRequested);++deaths;return event();}
+    bool retire(downwell::InstanceHandle,const Record&){++retirements;return event();}
+    bool activation(downwell::InstanceHandle,const Record&,bool){return event();}
+    bool membership(downwell::InstanceHandle,const Record&,bool){check(false);return false;}
+    bool sprite(downwell::InstanceHandle,const Record&,int){check(false);return false;}
+    bool mask(downwell::InstanceHandle,const Record&,int){check(false);return false;}
+    bool transform(downwell::InstanceHandle,const Record&,downwell::RunnerTransformField,
+                   downwell::RunnerImageValue,downwell::RunnerImageValue,std::uint32_t){check(false);return false;}
+};
+static void registeredTests(){
+    for(unsigned seed=0;seed<1024;++seed){
+        Owner owner;Registered effects(Registered::Binding::bindPositionedActor(owner));
+        downwell::GameMakerRandom random(seed),oracle(seed);downwell::FlashBallEffect reference;
+        const auto x=number(seed%2?16777217.25:-64.125),y=number(-192.375);
+        downwell::InstanceHandle key;
+        check(effects.create(1000,x,y,random,key)&&reference.create(x,y,oracle));
+        const auto* r=effects.find(key);check(r&&r->x.bits==reference.x.bits&&r->y.bits==reference.y.bits);
+        check(owner.births==1&&owner.images==1&&owner.moves==2&&effects.size()==1);
+        check(random.drawCount()==oracle.drawCount()&&random.stateIndex()==oracle.stateIndex());
+        for(unsigned i=0;i<16;++i)check(random.stateWord(i)==oracle.stateWord(i));
+        check(effects.activate(key,false));
+        const auto calls=owner.calls;check(effects.advanceAnimation(key)&&owner.calls==calls);
+        check(effects.activate(key,true));
+        for(unsigned frame=0;frame<7;++frame){
+            check(effects.advanceAnimation(key)&&reference.advanceImage());
+            check(r->state.imageIndex.bits==reference.imageIndex.bits&&r->destroyRequested==reference.destroyRequested);
+        }
+        check(owner.deaths==1&&effects.size()==1); // Destruction is not retirement.
+        check(effects.advanceAnimation(key)&&owner.deaths==1);
+        check(effects.retire(key)&&!effects.find(key)&&effects.size()==0);
+        downwell::InstanceHandle newer;check(effects.create(1001,x,y,random,newer));
+        check(newer.slot==key.slot&&newer.generation!=key.generation&&!effects.find(key));
+        check(effects.clear()&&effects.size()==0&&owner.retirements==2);
+    }
+    // Birth, image-index, X setter and Y setter failures retain exactly the
+    // already-published prefix and consume no later RNG draws.
+    for(unsigned fail=1;fail<=4;++fail){
+        Owner owner;owner.failAt=fail;Registered effects(Registered::Binding::bindPositionedActor(owner));
+        bool worldGood=true;effects.observeFailure(worldGood);
+        downwell::GameMakerRandom random(19);downwell::InstanceHandle key;
+        check(!effects.create(1000,number(10),number(20),random,key)&&!key.generation);
+        check(!effects.valid()&&!worldGood&&effects.size()==1&&owner.calls==fail);
+        check(random.drawCount()==(fail<=2?0:fail==3?2:4));
+        const auto retained=effects.sourceHandle(1000);check(retained.generation&&effects.find(retained));
+        const auto draws=random.drawCount();
+        check(!effects.create(1001,number(0),number(0),random,key)&&random.drawCount()==draws);
+    }
+    for(bool destructionFailure:{false,true}){
+        Owner owner;Registered effects(Registered::Binding::bindPositionedActor(owner));
+        downwell::GameMakerRandom random(42);downwell::InstanceHandle key;
+        check(effects.create(1000,number(0),number(0),random,key));
+        for(unsigned i=0;i<6;++i)check(effects.advanceAnimation(key));
+        owner.failAt=owner.calls+(destructionFailure?2:1);
+        check(!effects.advanceAnimation(key)&&!effects.valid()&&effects.size()==1);
+        const auto* r=effects.find(key);
+        check(r&&!r->destroyRequested&&r->state.destroyRequested==destructionFailure);
+        check(owner.deaths==unsigned(destructionFailure));
+    }
+    Owner owner;Registered effects(Registered::Binding::bindPositionedActor(owner));
+    downwell::GameMakerRandom random(21);downwell::InstanceHandle first,second,failed;
+    check(effects.create(1000,number(0),number(0),random,first));
+    check(effects.create(1001,number(0),number(0),random,second));
+    const auto draws=random.drawCount();const auto calls=owner.calls;
+    check(!effects.create(1002,number(0),number(0),random,failed)&&!failed.generation);
+    check(random.drawCount()==draws&&owner.calls==calls&&effects.size()==2);
+}
 int main(){
+    registeredTests();
     unsigned births=0;
     for(unsigned seed=0;seed<1024;++seed)for(bool box:{false,true}){
         downwell::GameMakerRandom random(seed),oracle(seed);

@@ -35,6 +35,7 @@
 #include "StoredCorpseExpiryRegistration.h"
 #include "StoredSmokeRegistration.h"
 #include "StoredConsumptionBloodRegistration.h"
+#include "StoredFlashBallRegistration.h"
 #include "MomentDelay.h"
 #include "StoredTimeChangeRegistration.h"
 #include "StoredEntryDitherRegistration.h"
@@ -582,6 +583,19 @@ public:
         const bool ok=tick();limboShardDispatch_=nullptr;limboShardContext_=nullptr;
         return run_.effectsSucceeded=run_.effectsSucceeded&&ok&&registration.valid();
     }
+    template<unsigned Capacity,class Tick> bool withFlashBallEvents(
+        StoredFlashBallRegistration<instanceCapacity,Capacity>& registration,Tick tick){
+        if(!run_.effectsSucceeded)return false;
+        if(flashBallDispatch_||!registration.belongsTo(instances_)||!registration.valid())return run_.effectsSucceeded=false;
+        auto dispatch=[&](const InstanceRecord& record,bool cleanup){
+            const auto key=registration.handle(record);
+            return key.generation&&(cleanup?registration.retire(key):registration.advanceAnimation(key));
+        };
+        flashBallContext_=&dispatch;
+        flashBallDispatch_=[](void* p,const InstanceRecord& r,bool cleanup){return (*static_cast<decltype(dispatch)*>(p))(r,cleanup);};
+        const bool ok=tick();flashBallDispatch_=nullptr;flashBallContext_=nullptr;
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok&&registration.valid();
+    }
     enum class ConsumptionBloodPhase {animation,alarm,step,cleanup};
     template<unsigned Capacity,class Globals,class Tick> bool withConsumptionBloodEvents(
         StoredConsumptionBloodRegistration<instanceCapacity,Capacity>& registration,Globals& globals,Tick tick){
@@ -1011,6 +1025,16 @@ public:
     }
     template<unsigned Capacity> StoredConsumptionBloodRegistration<instanceCapacity,Capacity> consumptionBloodRegistration(){
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
+    }
+    template<unsigned Capacity> StoredFlashBallRegistration<instanceCapacity,Capacity> flashBallRegistration(){
+        return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
+    }
+    template<unsigned Capacity> bool emitSkeletonFlash(StoredFlashBallRegistration<instanceCapacity,Capacity>& registry,
+        SkeletonActor& actor){
+        if(!run_.effectsSucceeded)return false;
+        if(!registry.belongsTo(instances_))return run_.effectsSucceeded=false;
+        return run_.effectsSucceeded=flashBurstPublished<6,2,10>(actor.smokeScript,actor.xx,actor.yy,random_,
+            [&](int object,auto x,auto y){InstanceHandle child;return object==224&&registry.create(x,y,random_,child);});
     }
     template<unsigned Capacity> StoredLimboShardRegistration<instanceCapacity,Capacity> limboShardRegistration(){
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
@@ -2210,6 +2234,8 @@ private:
     const LimboShard* (*limboShardDrawState_)(void*,const InstanceRecord&)=nullptr;
     bool (*limboShardDispatch_)(void*,const InstanceRecord&,LimboShardPhase)=nullptr;
     void* consumptionBloodContext_=nullptr;
+    void* flashBallContext_=nullptr;
+    bool (*flashBallDispatch_)(void*,const InstanceRecord&,bool)=nullptr;
     int* momentDelayRoomSpeed_=nullptr;
     bool (*consumptionBloodDispatch_)(void*,const InstanceRecord&,ConsumptionBloodPhase,unsigned)=nullptr;
     bool (*smokeDispatch_)(void*,const InstanceRecord&,SmokePhase,unsigned)=nullptr;

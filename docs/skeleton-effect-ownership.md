@@ -1126,6 +1126,15 @@ the remaining whole-pipeline raster uncertainty is described in
   nonnegative integer up to 32767 (source callers use 2 or 10), not arbitrary
   VM real radius values. This script adapter alone does not register flash
   lifetimes or install their mixed animation/Draw scheduling.
+  `FlashBallInstances` supplies positioned, source-ID-bearing lifetimes and
+  publishes the Create image index, X jitter, Y jitter and final speed in VM
+  order. Animation End marks destruction; storage is retained until cleanup.
+  `StoredFlashBallRegistration` uses resource 224/sprite 96 and the enclosing
+  numeric-ID allocator. `StartupRuntime::withFlashBallEvents` admits animation
+  and cleanup to the mixed world phases; registered flashes use the normal
+  depth-ordered direct sprite path. `emitSkeletonFlash` retains the skeleton's
+  shared script fields. These explicit registrations do not install natural
+  skeleton deaths or replace the native world's legacy flash pool.
 - Corpse Create inherits object 90's health/hit defaults, then samples X/Y
   velocity and chooses signed animation speed. Keep those samples even though
   `scrDeadBody` subsequently overwrites velocity. The wrapper caps impact at

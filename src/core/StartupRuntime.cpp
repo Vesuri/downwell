@@ -429,6 +429,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
         if(instance.objectId==225&&(!smokeDispatch_||!smokeDispatch_(smokeContext_,instance,SmokePhase::animation,0)))return false;
         if(instance.objectId==379&&(!limboShardDispatch_||!limboShardDispatch_(limboShardContext_,instance,LimboShardPhase::animation)))return false;
         if(instance.objectId==223&&(!consumptionBloodDispatch_||!consumptionBloodDispatch_(consumptionBloodContext_,instance,ConsumptionBloodPhase::animation,0)))return false;
+        if(instance.objectId==224&&(!flashBallDispatch_||!flashBallDispatch_(flashBallContext_,instance,false)))return false;
         if(instance.objectId==249||instance.objectId==256){
             auto* companion=const_cast<PlayerCompanionCreateState*>(companionCreateState(instance.instanceId));
             RunnerImageValue index,speed;
@@ -1008,6 +1009,7 @@ bool StartupRuntime::cleanupMainOwnedDestroyed(){
             (r.objectId==225&&smokeDispatch_)||
             (r.objectId==379&&limboShardDispatch_)||
             (r.objectId==223&&consumptionBloodDispatch_)||
+            (r.objectId==224&&flashBallDispatch_)||
             (r.objectId==248&&currencyDispatch_)||
             (r.objectId==73&&ownedEntryRegistration_.handle(r).generation)||(r.objectId==219&&!scriptAnimationDispatch_);},
         [this](InstanceHandle key,const InstanceRecord& r){
@@ -1030,6 +1032,7 @@ bool StartupRuntime::cleanupMainOwnedDestroyed(){
             if(r.objectId==225)return smokeDispatch_(smokeContext_,r,SmokePhase::cleanup,0);
             if(r.objectId==379)return limboShardDispatch_(limboShardContext_,r,LimboShardPhase::cleanup);
             if(r.objectId==223)return consumptionBloodDispatch_(consumptionBloodContext_,r,ConsumptionBloodPhase::cleanup,0);
+            if(r.objectId==224)return flashBallDispatch_(flashBallContext_,r,true);
             if(r.objectId==248)return currencyDispatch_(currencyContext_,r,CurrencyPhase::cleanup,0);
             if(r.objectId==73)return ownedEntryRegistration_.retire(key);
             if(r.objectId==219)return scriptEffectsBinding_.retire(key,&r);
