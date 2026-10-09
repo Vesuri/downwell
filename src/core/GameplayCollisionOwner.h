@@ -1079,6 +1079,8 @@ private:
     GameplayWorld::Currency currency_{GameplayWorld::Currency::Binding::bindPositionedActor(currencyBinding_)};
     std::uint32_t pendingTimeChangeId_=0;
     std::uint32_t pendingTimeShardId_=0;
+    void* timeEffectIdContext_=nullptr;
+    bool (*timeEffectIdAllocate_)(void*,std::uint32_t&)=nullptr;
     const SpriteMaskPack* timeShardStepMasks_=nullptr; // Borrowed only during selected Step.
     const bool native_;
     const bool sceneryLayers_;
@@ -2225,6 +2227,20 @@ public:
             }));
     }
     NativeTimeShardRegistration& timeShards(){return timeShards_;}
+    // Borrow the enclosing source stream for synchronous transition-script
+    // births. One allocator serves both families, so nested Create and other
+    // callers may consume the same stream between children. No local fallback.
+    template<class Allocate,class Execute>
+    bool withTimeEffectSourceIds(Allocate allocate,Execute execute){
+        if(!valid()||!world_||timeEffectIdAllocate_||pendingTimeChangeId_||pendingTimeShardId_)return check(false);
+        timeEffectIdContext_=&allocate;
+        timeEffectIdAllocate_=[](void* context,std::uint32_t& id){
+            return (*static_cast<Allocate*>(context))(id);
+        };
+        const bool ok=execute();
+        timeEffectIdAllocate_=nullptr;timeEffectIdContext_=nullptr;
+        return check(ok&&valid());
+    }
     GameplayPlayerControllers& playerControllers(){return playerControllers_;}
     bool createTimeShardWithSourceId(TimeShardEffects<64>& effects,std::uint32_t id,
         MotionBinary64 x,MotionBinary64 y,bool lowSpec){
@@ -2235,7 +2251,11 @@ public:
         pendingTimeShardId_=0;return check(ok);
     }
     bool birth(InstanceHandle key,const NativeTimeShardRegistration::Record& record,std::uint32_t& id){
-        if(!pendingTimeShardId_)return check(false);
+        if(!pendingTimeShardId_){
+            if(!timeEffectIdAllocate_||!timeEffectIdAllocate_(timeEffectIdContext_,id)||!id||id>0x7fffffffu)
+                return check(false);
+            pendingTimeShardId_=id;
+        }
         id=pendingTimeShardId_;
         const bool ok=timeShardBinding_.birth(key,record);
         pendingTimeShardId_=0;return ok;
@@ -2304,7 +2324,11 @@ public:
         pendingTimeChangeId_=0;return check(ok);
     }
     bool birth(InstanceHandle key,const NativeTimeChangeRegistration::Record& record,std::uint32_t& id){
-        if(!pendingTimeChangeId_)return check(false);
+        if(!pendingTimeChangeId_){
+            if(!timeEffectIdAllocate_||!timeEffectIdAllocate_(timeEffectIdContext_,id)||!id||id>0x7fffffffu)
+                return check(false);
+            pendingTimeChangeId_=id;
+        }
         id=pendingTimeChangeId_;
         const bool ok=timeChangeBinding_.birth(key,record);
         pendingTimeChangeId_=0;return ok;

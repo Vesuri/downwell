@@ -309,6 +309,16 @@ an explicit source ID; it does not allocate a family-local substitute. This
 boundary does not enable automatic player bursts or schedule the complete
 Step/collision/Draw sequence; those remain required by the live integration.
 
+For synchronous transition-script births, `withTimeEffectSourceIds` borrows an
+enclosing source-ID allocator for both object 238 and object 211. Allocation
+occurs at registered birth, before resource-backed publication and child Create;
+it is not a batch reservation. Other synchronous callers can consume the same
+stream between these births. The scope rejects nesting, preserves consumed IDs
+on failure, and drops its callback on return. Explicit-ID entry points remain
+available. Neither route synthesizes IDs from local generations. This bridge
+does not establish the complete native global allocation stream, and does not
+by itself admit the player transition or its child phases.
+
 `GameplayCollisionOwner::stepTimeShard` accepts one selected shared lifetime and
 borrows the mask pack only for that event. Its solid-parent query merges all
 registered descendants in registration order, including compact box ownership
