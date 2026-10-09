@@ -60,6 +60,35 @@ public:
         StoredSmokeRegistration<StartupRuntime::instanceCapacity,SmokeCapacity>& smoke,
         StoredConsumptionBloodRegistration<StartupRuntime::instanceCapacity,ParticleCapacity>& particles,
         const TimeStopEffects<StopCapacity>& stop,Frames frames,SoundPlayEnvironment& environment,Audio& audio,Atan atan,Damage damage){
+        return runSkeletonContactsUsing(world,skeletons,bones,smoke,particles,stop,frames,environment,audio,atan,damage,
+            [](const auto&,const auto&){return false;},[](const auto&){return false;});
+    }
+    // Full registered encounter admission. The player factory must supply the
+    // real damage/stomp environment; the narrower overload is retained for
+    // callers that have not yet installed that environment.
+    template<unsigned Capacity,unsigned BoneCapacity,unsigned SmokeCapacity,unsigned ParticleCapacity,unsigned StopCapacity,
+             class Frames,class Audio,class Atan,class Damage,class MakePlayer>
+    bool runSkeletonContacts(StartupRuntime& world,
+        StoredSkeletonRegistration<StartupRuntime::instanceCapacity,Capacity>& skeletons,
+        StoredBoneRegistration<StartupRuntime::instanceCapacity,BoneCapacity>& bones,
+        StoredSmokeRegistration<StartupRuntime::instanceCapacity,SmokeCapacity>& smoke,
+        StoredConsumptionBloodRegistration<StartupRuntime::instanceCapacity,ParticleCapacity>& particles,
+        const TimeStopEffects<StopCapacity>& stop,Frames frames,SoundPlayEnvironment& environment,Audio& audio,
+        Atan atan,Damage damage,MakePlayer makePlayer){
+        return runSkeletonContactsUsing(world,skeletons,bones,smoke,particles,stop,frames,environment,audio,atan,damage,
+            [&](const auto& a,const auto& b){return a.objectId==120&&b.objectId==35&&skeletons.handle(a).generation;},
+            [&](const auto& event){return world.dispatchSkeletonCollision(skeletons,event,makePlayer);});
+    }
+private:
+    template<unsigned Capacity,unsigned BoneCapacity,unsigned SmokeCapacity,unsigned ParticleCapacity,unsigned StopCapacity,
+             class Frames,class Audio,class Atan,class Damage,class AdmitPlayer,class PlayerContact>
+    bool runSkeletonContactsUsing(StartupRuntime& world,
+        StoredSkeletonRegistration<StartupRuntime::instanceCapacity,Capacity>& skeletons,
+        StoredBoneRegistration<StartupRuntime::instanceCapacity,BoneCapacity>& bones,
+        StoredSmokeRegistration<StartupRuntime::instanceCapacity,SmokeCapacity>& smoke,
+        StoredConsumptionBloodRegistration<StartupRuntime::instanceCapacity,ParticleCapacity>& particles,
+        const TimeStopEffects<StopCapacity>& stop,Frames frames,SoundPlayEnvironment& environment,Audio& audio,
+        Atan atan,Damage damage,AdmitPlayer admitPlayer,PlayerContact playerContact){
         if(!stop.succeeded||!bones.valid()||!smoke.valid()||!particles.valid())return false;
         auto effect=[&](const auto& r){return (r.objectId==225&&smoke.state(r))||
             (r.objectId==223&&particles.state(r));};
@@ -70,9 +99,11 @@ public:
         };
         return runSkeletonContactsSelected(world,skeletons,frames,[&]{return world.requestMomentDelay();},
             environment,audio,atan,[&](const auto& a,const auto& b){
-                return bonePair(a,b)||bonePair(b,a)||(b.objectId==60&&effect(a))||(a.objectId==60&&effect(b));
+                return bonePair(a,b)||bonePair(b,a)||admitPlayer(a,b)||admitPlayer(b,a)||
+                    (b.objectId==60&&effect(a))||(a.objectId==60&&effect(b));
             },[&](const auto& event){
                 const auto* self=owner_.resolve(event.self);if(!self)return false;
+                if(self->objectId==120)return playerContact(event);
                 if(self->objectId==269)return stop.succeeded&&
                     world.dispatchBoneCollision(bones,event,stop.player.stopped,frames,damage);
                 if(self->objectId==225)return world.dispatchSmokeCollision(smoke,event);
@@ -102,7 +133,7 @@ private:
             [&](const auto& event){
                 const auto* self=owner_.resolve(event.self);if(!self)return false;
                 if(event.owner==255)return world.dispatchTimeFieldWind(event,environment.gameVolume,audio);
-                if(self->objectId==120)return world.dispatchSkeletonFieldCollision(skeletons,event);
+                if(self->objectId==120&&event.code==1066)return world.dispatchSkeletonFieldCollision(skeletons,event);
                 return self->objectId==261?world.dispatchSkeletonBulletCollision(skeletons,event,frames,delay,environment,audio,atan):
                     execute(event);
             });

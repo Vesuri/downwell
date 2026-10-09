@@ -1836,6 +1836,40 @@ int main(){
         if(ok){require(skeletons.instances().find(local)->state.health==(mode==6?0:60),"time-field inheritance and immunity");
             require(skeletons.clear(),"clear skeleton collision fixture");}
     }
+    for(unsigned mode:{4u,5u}){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach collected skeleton-player encounter");world->skipToGameForTesting();
+        auto pass=std::make_unique<StoredDitherCollisionPass>(*owner);
+        auto skeletons=world->skeletonRegistration<1>();auto bones=world->boneRegistration<1>();
+        auto smoke=world->smokeRegistration<1>();auto particles=world->consumptionBloodRegistration<1>();
+        int x=0,y=0;bool found=false;
+        for(unsigned i=0;i<world->activeInstanceCount();++i){const auto& r=world->instanceAt(i);
+            if(r.objectId==35){x=r.x;y=r.y;found=true;break;}}
+        require(found,"find actual player collision position");
+        PackedObjectEvent reverse{};bool hasReverse=true;
+        require(objects.collisionEvent(35,120,hasReverse,reverse)&&!hasReverse,"player has no reverse skeleton handler");
+        InstanceHandle skeleton;require(world->spawnSkeleton(skeletons,x,y,skeleton),"register overlapping skeleton");
+        struct Audio {
+            bool isPlaying(int,bool& playing){playing=false;return true;}
+            bool stop(int){return true;}
+            bool play(int,int,bool,int&){return false;}
+            bool getGain(int,MotionBinary64&){return false;}
+            bool setGain(int,MotionBinary64,int){return false;}
+            bool setPitch(int,MotionBinary64){return false;}
+        } audio;
+        SoundPlayEnvironment environment;TimeStopEffects<4> stop;unsigned stomps=0,damages=0;
+        const bool okay=pass->runSkeletonContacts(*world,skeletons,bones,smoke,particles,stop,
+            [&](int sprite,unsigned& count){return sprites.frameCount(sprite,count);},environment,audio,
+            [](auto dy,auto dx,auto& angle){return portableAtan(dy,dx,angle);},
+            [](auto&,int,int,int){return false;},
+            [&](auto& actor){
+                require(&actor==&skeletons.instances().find(skeleton)->state,"factory receives retained skeleton caller");
+                return CheckedSkeletonContact{actor,mode,stomps,damages};
+            });
+        require(okay==(mode==4)&&stomps==0&&damages==1,"collected skeleton-player handler and terminal failure");
+        if(okay)require(skeletons.clear(),"retire collected skeleton fixture");
+    }
     for(unsigned contact=0;contact<5;++contact){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,

@@ -140,8 +140,15 @@ selected event through `dispatchBoneCollision`; it does not run a later bone
 pass. Player damage remains a required checked dependency. The stop state is
 borrowed and read at each selected bone event, so a preceding callback's state
 change is visible without suppressing the source's impact/destruction tail.
-Broader wall families still require reverse-handler admission. This boundary
-does not admit skeleton/player contacts or supply the missing damage script.
+Broader wall families still require reverse-handler admission. The overload
+with an additional player-environment factory also admits registered 120/35
+contacts in that same collected stream. It routes the source player handler
+through `dispatchSkeletonCollision`, borrowing the retained skeleton caller;
+only code 1066 takes the inherited field shortcut. The serialized player has
+no reverse handler for skeletons. The narrower overload remains available for
+owners without a player environment. Tests use real overlap collection and
+check success and terminal damage failure. This admission does not supply the
+missing natural damage environment or install the encounter scope in SDL main.
 
 Native `dispatchSkeletonEncounterCollision` routes events from the existing
 sealed `executeCollisionPairs` pass to registered bone, skeleton, skeleton-hit
