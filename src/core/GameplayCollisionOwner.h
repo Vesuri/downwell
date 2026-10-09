@@ -1915,6 +1915,29 @@ public:
             event.owner!=248||binding.ownerObjectId!=248||event.code!=2127||binding.codeId!=2127)return check(false);
         return check(world_->collectRegisteredCurrency(local,ops));
     }
+    template<class Effects> bool dispatchCorpsePlayerCollision(const RunnerCollisionEventContext::Frame& event,
+        bool knifeFork,bool playerDead,Effects& effects){
+        View::Kind kind;InstanceHandle local,player;PackedObjectEvent binding{};bool found=false;
+        if(!valid()||!world_||!resolves(event.self)||!resolves(event.other)||
+           !View::decode(event.self,kind,local)||kind!=View::Kind::corpse||
+           !View::encode(View::Kind::player,world_->playerHandle(),player)||
+           event.other.slot!=player.slot||event.other.generation!=player.generation||
+           event.type!=4||event.subtype!=35||event.owner!=263||
+           !objects_.collisionEvent(263,35,found,binding)||!found||
+           binding.ownerObjectId!=263||binding.codeId!=event.code)return check(false);
+        return check(corpses_.dispatchPublished(local,[&](auto& state,auto& publish,bool& okay){
+            struct Events {
+                Effects& effects;typename GameplayWorld::RegisteredCorpse::Publisher& publish;bool& okay;
+                bool incrementBodiesEaten(){return effects.incrementBodiesEaten();}
+                void eatSound(int sound,int priority,int loop,int gain){effects.eatSound(sound,priority,loop,gain);}
+                MotionBinary64 playerY(){return effects.playerY();}
+                MotionBinary64 playerX(){return effects.playerX();}
+                bool create(int object,MotionBinary64 x,MotionBinary64 y,std::uint32_t& child){return effects.create(object,x,y,child);}
+                void destroy(){okay=publish.destroy()&&okay;}
+            } events{effects,publish,okay};
+            return state.collidePlayer(knifeFork,playerDead,events);
+        }));
+    }
     template<class Frames,class Damage> bool dispatchBoneCollision(
         const RunnerCollisionEventContext::Frame& event,bool stopped,Frames frames,Damage damage){
         View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;

@@ -18,6 +18,13 @@ struct NativeCorpseStepProbe {
     int area();int restInPieces();
     bool create(int,downwell::MotionBinary64,downwell::MotionBinary64);
 };
+struct NativeCorpseContactProbe {
+    bool incrementBodiesEaten();void eatSound(int,int,int,int);
+    downwell::MotionBinary64 playerY();downwell::MotionBinary64 playerX();
+    bool create(int,downwell::MotionBinary64,downwell::MotionBinary64,std::uint32_t&);
+};
+bool nativeCorpseContact(downwell::GameplayCollisionOwner& owner,const downwell::RunnerCollisionEventContext::Frame& event,
+    NativeCorpseContactProbe& effects){return owner.dispatchCorpsePlayerCollision(event,true,false,effects);}
 bool nativeCorpseStep(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle shared,
     bool stopped,int roomWidth,NativeCorpseStepProbe& events){
     return owner.stepCorpse(shared,stopped,roomWidth,events);
@@ -1413,6 +1420,41 @@ int main(){
         assert(owner->prepareDraw()&&!corpses.find(key)&&!view.contains(shared));
         assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)==ResultsDestination::gameplay&&
             world->registeredCorpses()==&corpses&&!corpses.size()&&owner->valid());
+        assert(corpses.createFromDeath(205191,source,206,{},102,false,random,
+            [](auto,int,auto,auto,bool& hit){hit=false;return true;}));
+        const auto eating=corpses.sourceHandle(205191);InstanceHandle eatingShared,player;
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::corpse,eating,eatingShared)&&
+            GameplayCollisionView::encode(GameplayCollisionView::Kind::player,world->playerHandle(),player));
+        struct Consumption {
+            unsigned eaten=0,sounds=0,children=0,reads=0,reject=0;
+            bool incrementBodiesEaten(){++eaten;return true;}
+            void eatSound(int s,int p,int l,int g){assert(eaten==1&&s==83&&p==80&&!l&&g==1);++sounds;}
+            MotionBinary64 playerY(){assert(reads++==children*2);return MotionBinary64::fromInteger(192+children);}
+            MotionBinary64 playerX(){assert(reads++==children*2+1);return MotionBinary64::fromInteger(240+children);}
+            bool create(int object,MotionBinary64 x,MotionBinary64 y,std::uint32_t& id){
+                assert(object==223&&eaten==1&&sounds==1&&x.high==MotionBinary64::fromInteger(240+children).high&&
+                    y.high==MotionBinary64::fromInteger(192+children).high);
+                id=205192+children++;return children!=reject;
+            }
+        } effects;
+        RunnerCollisionEventContext context;
+        auto contact=[&](bool upgrade,bool dead){return owner->dispatchCollisionEvent(context,eatingShared,player,{true,false},
+            [&](const auto& event){return owner->dispatchCorpsePlayerCollision(event,upgrade,dead,effects);});};
+        assert(contact(true,false)&&!effects.eaten); // Source active flag is still false.
+        for(unsigned tick=0;tick<8;++tick)assert(owner->advanceCorpseAlarm(eating,3));
+        assert(contact(false,false)&&contact(true,true)&&!effects.eaten);
+        assert(contact(true,false)&&effects.eaten==1&&effects.sounds==1&&effects.children==5&&effects.reads==10&&
+            corpses.find(eating)&&corpses.find(eating)->destroyRequested);
+        assert(owner->prepareDraw()&&!corpses.find(eating)&&!view.contains(eatingShared));
+        assert(corpses.createFromDeath(205200,source,206,{},102,false,random,
+            [](auto,int,auto,auto,bool& hit){hit=false;return true;}));
+        const auto rejected=corpses.sourceHandle(205200);
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::corpse,rejected,eatingShared));
+        for(unsigned tick=0;tick<8;++tick)assert(owner->advanceCorpseAlarm(rejected,3));
+        effects={};effects.reject=3;
+        assert(!contact(true,false)&&!owner->valid()&&effects.eaten==1&&effects.sounds==1&&effects.children==3&&
+            corpses.find(rejected)&&!corpses.find(rejected)->destroyRequested);
+        assert(!contact(true,false)&&effects.children==3); // No replay of the committed prefix.
     }
     for(unsigned layout=0;layout<3;++layout){
         std::vector<std::uint32_t> expected;
