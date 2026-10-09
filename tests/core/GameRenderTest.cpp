@@ -493,6 +493,34 @@ int main() {
         RecordingRenderer ended;scene->render(ended);
         require(std::find(ended.spriteOrder.begin(),ended.spriteOrder.end(),101)==ended.spriteOrder.end(),
             "wall impact retires after sixteen source animation updates");
+        {
+            auto expiry=world.corpseExpiryRegistration<1>();std::uint32_t child=0;
+            auto ex=n(248),ey=n(128);
+            require(ex.add({0x3fd00000u,0})&&ey.add({0x3fe00000u,0})&&expiry.create(ex,ey,child),
+                "create registered expiry at a fractional room anchor");
+            require(world.corpseExpiryEffects().size()==0,"registered expiry does not duplicate compatibility pool");
+            downwell::CorpseExpiryEffect oracle;require(oracle.create(ex,ey),"expiry rendering oracle");
+            unsigned frames=0;
+            while(!oracle.destroyRequested&&frames<50){
+                RecordingRenderer frame;frame.recordTransforms=true;scene->render(frame);unsigned seen=0;
+                for(const auto& item:frame.transforms)if(item.sprite==102){
+                    require(item.frame==oracle.drawFrame()&&item.sx==1&&item.sy==1&&item.angle==0&&
+                        item.x==110+248.25f-world.mainCameraRenderViewX()&&
+                        item.y==128.5f-world.mainCameraRenderViewY(),
+                        "registered expiry default Draw preserves fractional position and source animation");
+                    ++seen;
+                }
+                require(seen==1&&scene->renderingSucceeded(),"registered expiry reaches host renderer once");
+                require(oracle.advanceImage()&&world.withCorpseExpiryEvents(expiry,[&]{
+                    scene->update({});return scene->simulationSucceeded();
+                }),"update registered expiry through actual game frame");
+                ++frames;
+            }
+            RecordingRenderer ended;scene->render(ended);
+            require(oracle.destroyRequested&&!world.instance(child)&&
+                std::find(ended.spriteOrder.begin(),ended.spriteOrder.end(),102)==ended.spriteOrder.end()&&expiry.clear(),
+                "Animation End removes registered expiry from host drawing");
+        }
         auto blood=world.bloodRegistration<2>();downwell::InstanceHandle firstBlood,lastBlood;
         downwell::MotionBinary64 bx=n(248),by=n(128);
         require(bx.add({0x3fd00000u,0})&&by.add({0x3fe00000u,0}),"fractional blood Draw anchor");
