@@ -384,6 +384,20 @@ the gameplay world has not yet adopted the store.
 
 ## Correction to existing live enemy adapters
 
+The retained gameplay adapters order supported enemy motion before smoke
+(225), currency (248) and ordinary bullets (261). Combat rewards born after
+currency's turn retain age zero and their Create image until the next tick;
+animation and the first currency Step then both advance once. Source object
+order, not the old same-frame reward movement, determines this boundary.
+The native world captures its family cutoffs before camera/builder Step,
+executes builder (65) before entry wipe (73), and runs retained contact work
+after ordinary-Step membership reconciliation. Box stable-slot prefixes and
+monotonic lifetime ceilings exclude appended and replacement births without
+allocating a full box snapshot. These boundaries do not admit missing event
+families or make the remaining manual adapters a complete source dispatcher:
+the stored world's retained passes still execute outside its generic phase
+walker, and projectile contact scripts still need source event integration.
+
 The integration audit found that both existing enemy adapters manually ran
 new builder children immediately after the builder, outside the dispatcher.
 `GameplayWorld` now captures ordinary-Step enemy lifetimes before generation;

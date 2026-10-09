@@ -1103,7 +1103,7 @@ bool GameplayWorld::stepEnemyRoomEffect(downwell::InstanceHandle key,int publish
     auto* live=const_cast<EnemyState*>(resolveEnemyLifetime(key));
     if(!live)return true;
     EnemyState& enemy = *live;
-    if (!enemy.active)
+    if (!enemy.active||enemy.destroyRequested)
         return true;
     if (enemy.objectId == 113)
         enemy.imageSpeed = enemy.frogPresentation.beginStepRate();
@@ -1299,7 +1299,7 @@ bool GameplayWorld::stepBulletRoomEffect(downwell::InstanceHandle key,long gener
 
 bool GameplayWorld::stepBulletEffect(BulletState& bullet,long generationCameraY,bool& bulletChanged)
 {
-    if(!bullet.active)return true;
+    if(!bullet.active||bullet.destroyRequested)return true;
     bulletChanged = true;
     const long cameraCentreQ12 = 176L * 4096 + generationCameraY * 16;
     bool alive=false;
@@ -1595,6 +1595,14 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     // exclude both generation births and replacements without a handle array.
     const unsigned boxStepEnd=breakableCount_;
     const std::uint32_t boxStepLastLifetime=nextBreakableLifetimeId_-1;
+    const std::uint32_t bulletStepLastLifetime=nextBulletLifetimeId_-1;
+    const std::uint32_t gemStepLastLifetime=nextGemLifetimeId_-1;
+    if(!captureEnemyStepOrder())return {};
+    if(debrisStepDispatch_){
+        debrisStepOrder_.clear();debrisStepPhase_=ownedDebrisEffects_.beginPhase();
+        if(!debrisOrderCapture_(debrisOrderContext_,debrisStepOrder_)){run_.effectsSucceeded=false;return {};}
+        debrisStepOrder_.sort();
+    }
     // Capture before ordinary Step: later births must not inherit a turn.
     // This family's monotonic generation is its registration order, not its
     // numeric VM ID. Reused storage slots must not reorder two live covers.
@@ -1637,7 +1645,18 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         ringOrigin_ = (unsigned)origin;
     }
 
-    // camMain (64) precedes objEnterDither (73), which precedes the builder.
+    // Step's object table is ascending: camMain (64), objBuilder (65),
+    // objEnterDither (73). All family cutoffs above precede the builder's births.
+    if (generationStep_ && generationSucceeded_) {
+        DW_PROFILE_SCOPE(profileGeneration);
+        const long bottom = generationCameraY + 318L * 256L;
+        const int bottomCeiling = bottom >= 0 ? (int)((bottom + 255) / 256)
+                                              : -(int)((-bottom) / 256);
+        generationSucceeded_ = generationStep_(generationContext_, *this,
+                                               enemyRandom_, bottomCeiling);
+        if (!generationSucceeded_) return {};
+    }
+
     // camMain publishes round(xxFinal) to x before this VM read, not its
     // fractional Q12 easing accumulator (nor the view's left edge). Full source camera
     // arithmetic and source-ordered native controller births remain separate.
@@ -1647,21 +1666,6 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         if(!entryDithers_->step(key,[&](downwell::MotionBinary64& x){
             x=downwell::MotionBinary64::fromInteger(cameraMotion_.pixelX());return true;
         })){run_.effectsSucceeded=false;return {};}
-    }
-    if(!captureEnemyStepOrder())return {};
-    if(debrisStepDispatch_){
-        debrisStepOrder_.clear();debrisStepPhase_=ownedDebrisEffects_.beginPhase();
-        if(!debrisOrderCapture_(debrisOrderContext_,debrisStepOrder_)){run_.effectsSucceeded=false;return {};}
-        debrisStepOrder_.sort();
-    }
-    if (generationStep_ && generationSucceeded_) {
-        DW_PROFILE_SCOPE(profileGeneration);
-        const long bottom = generationCameraY + 318L * 256L;
-        const int bottomCeiling = bottom >= 0 ? (int)((bottom + 255) / 256)
-                                              : -(int)((-bottom) / 256);
-        generationSucceeded_ = generationStep_(generationContext_, *this,
-                                               enemyRandom_, bottomCeiling);
-        if (!generationSucceeded_) return {};
     }
 
     // objBox_n (92) observes health after player Begin Step and before bullet
@@ -1692,25 +1696,17 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         ++blocksDestroyed_;
     }
 
-    /*
-     * The adapted default bullet receives its Step later in the phase in
-     * which objPlayer_n creates it. Existing and newly-created shots therefore
-     * advance together after player movement and firing.
-     */
-    {
-        DW_PROFILE_PHASE(profileBullets);
-        for(unsigned bulletIndex=0;bulletIndex<bulletSlotEnd_;++bulletIndex)
-            if(!stepBulletEffect(bullets_[bulletIndex],generationCameraY,bulletChanged))return {};
-    }
-
-
+    // Existing native families follow their source object table order. This
+    // does not admit the omitted actor/effect handlers or replace legacy
+    // bullet contacts with the original Collision event pass.
     DW_PROFILE_PHASE(profileEnemyMotion);
     for (unsigned i=0;i<enemyStepOrder_.size();++i)
         if(!stepEnemyRoomEffect(enemyStepOrder_.handle(i),publishedCameraX,generationCameraY))return {};
 
     DW_PROFILE_PHASE(profileEnemyContact);
-    run_.stepSmoke(smokeStepPhase,enemyRandom_);
     run_.stepDamageNumbers(damageNumberStepPhase);
+    run_.stepSmoke(smokeStepPhase,enemyRandom_);
+    if(!run_.effectsSucceeded)return {};
     for(unsigned i=0;i<currencyStepOrder_.size();++i){
         const auto key=currencyStepOrder_.handle(i);const auto* r=currencyInstances_->find(key);
         if(!r||!r->active||r->destroyRequested)continue;
@@ -1723,6 +1719,55 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             run_.effectsSucceeded=false;return {};
         }
     }
+    DW_PROFILE_PHASE(profileGems);
+    for (unsigned gemIndex = 0; gemIndex < gemSlotEnd_; ++gemIndex) {
+        GemState& gem = gems_[gemIndex];
+        if (!gem.active||gem.lifetimeId>gemStepLastLifetime)
+            continue;
+        const auto result = run_.collectCurrency(gem.motion, gem.large, static_cast<unsigned>(gem.amount),
+            player_, currencyAccount_,
+            [this](int x, int y) { return solidResolver_ && solidResolver_(solidResolverContext_, x, y); }, enemyRandom_);
+        if (result != downwell::CurrencyStepResult::alive) {
+            gem.active = false;
+            continue;
+        }
+        gem.age = gem.motion.lifetime.age;
+        gem.preciseX = downwell::GemMotion::q8(gem.motion.x);
+        gem.preciseY = downwell::GemMotion::q8(gem.motion.y);
+        gem.speedX = downwell::GemMotion::q8(gem.motion.vx);
+        gem.speedY = downwell::GemMotion::q8(gem.motion.vy);
+        gem.attracted = gem.motion.attracted;
+        gem.x = downwell::GemMotion::rounded(gem.motion.x);
+        gem.y = downwell::GemMotion::rounded(gem.motion.y);
+    }
+
+    // A shot born in player Begin Step is eligible here; one born during this
+    // ordinary Step is not. Currency (248) precedes the usual bullet (261).
+    {
+        DW_PROFILE_PHASE(profileBullets);
+        for(unsigned bulletIndex=0;bulletIndex<bulletSlotEnd_;++bulletIndex)
+            if(bullets_[bulletIndex].lifetimeId<=bulletStepLastLifetime&&
+                !stepBulletEffect(bullets_[bulletIndex],generationCameraY,bulletChanged))return {};
+    }
+
+    DW_PROFILE_PHASE(profileLifecycle);
+    if(debrisStepDispatch_)for(unsigned i=0;i<debrisStepOrder_.size();++i){
+        const auto key=debrisStepOrder_.handle(i);
+        const auto* record=debrisInstances_?debrisInstances_->find(key):nullptr;
+        if(!record||!record->active||record->destroyRequested)continue;
+        if(!debrisStepDispatch_(debrisStepContext_,key)){run_.effectsSucceeded=false;return {};}
+    }
+    // Only discard inactive tails; holes stay in creation order until the
+    // existing stable compaction at the next birth. Never reorder live slots.
+    while (bulletSlotEnd_ && bullets_[bulletSlotEnd_-1].identitySlot>=bulletCapacity) --bulletSlotEnd_;
+    while (gemSlotEnd_ && !gems_[gemSlotEnd_-1].active) --gemSlotEnd_;
+    run_.exitDither.step(34 + downwell::floorQ8Coordinate(generationCameraY), 284);
+    // Moving the followed instance does not dirty the camera cache. End Step
+    // still reads the previous Draw's view, including after a Collision snap.
+    const long viewTop = 34L * 4096 + generationCameraY * 16;
+    if(!reconcilePhase(PhaseBoundary::step))return {};
+    // Collision work follows the complete ordinary Step and membership flush.
+    // These retained adapters still need replacement by the mixed source pass.
     run_.collideSmokeWalls([&](const downwell::ContactBounds& bounds,auto emit){
         unsigned count=0;
         if(wallContactResolver_ && !wallContactResolver_(solidResolverContext_,bounds,count))return false;
@@ -1746,47 +1791,8 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             return run_.contactDamageNumber(player_.frameStartXFixed(),player_.frameStartYFixed(),
                 x,y,240,176);
         },[this](const EnemyState& enemy){return publishEnemyActivation(enemy,false);})) return {};
-
-    DW_PROFILE_PHASE(profileGems);
-    for (unsigned gemIndex = 0; gemIndex < gemSlotEnd_; ++gemIndex) {
-        GemState& gem = gems_[gemIndex];
-        if (!gem.active)
-            continue;
-        const auto result = run_.collectCurrency(gem.motion, gem.large, static_cast<unsigned>(gem.amount),
-            player_, currencyAccount_,
-            [this](int x, int y) { return solidResolver_ && solidResolver_(solidResolverContext_, x, y); }, enemyRandom_);
-        if (result != downwell::CurrencyStepResult::alive) {
-            gem.active = false;
-            continue;
-        }
-        gem.age = gem.motion.lifetime.age;
-        gem.preciseX = downwell::GemMotion::q8(gem.motion.x);
-        gem.preciseY = downwell::GemMotion::q8(gem.motion.y);
-        gem.speedX = downwell::GemMotion::q8(gem.motion.vx);
-        gem.speedY = downwell::GemMotion::q8(gem.motion.vy);
-        gem.attracted = gem.motion.attracted;
-        gem.x = downwell::GemMotion::rounded(gem.motion.x);
-        gem.y = downwell::GemMotion::rounded(gem.motion.y);
-    }
-
-    DW_PROFILE_PHASE(profileLifecycle);
-    if(debrisStepDispatch_)for(unsigned i=0;i<debrisStepOrder_.size();++i){
-        const auto key=debrisStepOrder_.handle(i);
-        const auto* record=debrisInstances_?debrisInstances_->find(key):nullptr;
-        if(!record||!record->active||record->destroyRequested)continue;
-        if(!debrisStepDispatch_(debrisStepContext_,key)){run_.effectsSucceeded=false;return {};}
-    }
-    // Only discard inactive tails; holes stay in creation order until the
-    // existing stable compaction at the next birth. Never reorder live slots.
-    while (bulletSlotEnd_ && bullets_[bulletSlotEnd_-1].identitySlot>=bulletCapacity) --bulletSlotEnd_;
-    while (gemSlotEnd_ && !gems_[gemSlotEnd_-1].active) --gemSlotEnd_;
-    run_.exitDither.step(34 + downwell::floorQ8Coordinate(generationCameraY), 284);
     run_.collideLevelExit(240 + downwell::roundGameMakerQ8(player_.offsetXFixed()),
         176 + downwell::roundGameMakerQ8(player_.offsetYFixed()), death_.active);
-    // Moving the followed instance does not dirty the camera cache. End Step
-    // still reads the previous Draw's view, including after a Collision snap.
-    const long viewTop = 34L * 4096 + generationCameraY * 16;
-    if(!reconcilePhase(PhaseBoundary::step))return {};
     if(collisionPass_){
         collisionPassExecuting_=true;
         const bool passed=collisionPass_(collisionPassContext_);

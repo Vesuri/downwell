@@ -262,6 +262,14 @@ streak change) and 844 (86.6 ms: generation). Menu scenes
 (`profile.sh transition`) peak at two fields; measure the cold gameplay
 handoff separately with `profile.sh entry`.
 
+Before the next performance change, re-capture and re-rank the contact workload
+after the live Step-order correction. Enemy/currency/bullet ordering changes
+the subsequent combat and generation trajectory: the paired host replay now
+places its largest terrain burst at 1689, not 701. The numbers and window
+labels above describe the historical audit, not a current native baseline.
+Retain the same input tape and establish new budget frames, coverage and
+per-owner costs before applying the measured gates below.
+
 ### How to work this section
 
 An earlier round spent most of its commits on one parked item (the ammo

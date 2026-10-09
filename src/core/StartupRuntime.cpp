@@ -535,10 +535,16 @@ void StartupRuntime::stepInternal(bool advancePressed,
     if (!roomLoadSucceeded_ || !deferredCommandsSucceeded_ || !run_.effectsSucceeded) return;
     if (roomId_ == mainRoomId) {
         run_.exitDither.step(ordinaryStepViewTopQ12_ / 4096, surfaceHeight);
-        updateMainBullets();
-        if(!run_.effectsSucceeded)return;
+        // Retained manual adapters must preserve the same source object order
+        // as the native path: enemies, smoke 225, currency 248, bullets 261.
+        // Their admission into the generic mixed phases remains separate.
         updateMainEnemies();
         run_.stepSmoke(smokeStepPhase,random_);
+        if(!run_.effectsSucceeded)return;
+        updateMainCurrency();
+        if(!run_.effectsSucceeded)return;
+        updateMainBullets();
+        if(!run_.effectsSucceeded)return;
         run_.collideSmokeWalls([&](const ContactBounds& query,auto emit){
             for(std::size_t i=0;i<instances_.size();++i){
                 const auto& wall=instances_.at(i);
@@ -555,8 +561,6 @@ void StartupRuntime::stepInternal(bool advancePressed,
         if(!run_.effectsSucceeded)return;
         run_.collideLevelExit(roundGameMakerCoordinate(mainPlayerX_),
             roundGameMakerCoordinate(mainPlayerY_), mainDeath_.active);
-        updateMainCurrency();
-        if(!run_.effectsSucceeded)return;
         updateMainLifecycle(false, ordinaryStepViewTopQ12_);
         if(!run_.effectsSucceeded)return;
         // The post-Step runner update is dirty-only. Moving camMain does not

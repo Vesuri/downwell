@@ -544,6 +544,44 @@ int main(){
         assert(world->retireMarkedBullet(key)&&audit.last==7&&!world->resolveBulletLifetime(key));
         assert(!world->markBulletDestroyed(key)&&!world->effectsSucceeded()&&audit.last==7);
     }
+    {
+        // Observe real publications, not a synthetic list of event names:
+        // bat 116 must move before the usual bullet 261 publishes its Step.
+        auto world=std::make_unique<GameplayWorld>(300,false,1000,false);
+        struct OrderedBullet:BulletAudit {
+            long enemyX=0,enemyY=0;bool observed=false;
+            bool move(InstanceHandle h,const Record& r,RunnerImageValue x,RunnerImageValue y){
+                enemyX=world->enemyAt(0).preciseX;enemyY=world->enemyAt(0).preciseY;observed=true;
+                return BulletAudit::move(h,r,x,y);
+            }
+        } audit;
+        audit.world=world.get();
+        assert(world->bindBulletLifecycle(GameplayWorld::BulletLifecycleBinding::bindMaskDestruction(audit)));
+        world->configureSolidResolver([](void*,int,int){return false;},nullptr);
+        assert(world->configureEnemy(0,116,153,64,12,0,0,15,12,0,0,-1,-1,270,256,true,false,true));
+        const auto beforeX=world->enemyAt(0).preciseX,beforeY=world->enemyAt(0).preciseY;
+        world->step(4);
+        const auto& bat=world->enemyAt(0);
+        assert(world->effectsSucceeded()&&audit.observed&&world->bulletCount()==1&&
+            audit.enemyX==bat.preciseX&&audit.enemyY==bat.preciseY&&
+            (bat.preciseX!=beforeX||bat.preciseY!=beforeY));
+    }
+    for(bool rejectStep:{false,true}){
+        auto world=std::make_unique<GameplayWorld>(300,false,1000,false);
+        assert(world->configureEnemy(0,116,153,0,0,0,0,15,12,0,0,-1,-1,270,256,true,false,true));
+        struct Boundary {GameplayWorld* world;bool reject;int before,atStep=-1,atCollision=-1;}
+            boundary{world.get(),rejectStep,world->health()};
+        world->configurePhaseBoundary([](void* p,GameplayWorld::PhaseBoundary phase){
+            auto& b=*static_cast<Boundary*>(p);
+            if(phase==GameplayWorld::PhaseBoundary::step){b.atStep=b.world->health();return !b.reject;}
+            if(phase==GameplayWorld::PhaseBoundary::collision)b.atCollision=b.world->health();
+            return true;
+        },&boundary);
+        world->step(0);
+        assert(world->effectsSucceeded()==!rejectStep&&boundary.atStep==boundary.before);
+        if(rejectStep)assert(world->health()==boundary.before&&boundary.atCollision==-1&&world->damageNumbers().size()==0);
+        else assert(boundary.atCollision==boundary.before-1&&world->damageNumbers().size()==1);
+    }
     for(unsigned failure=1;failure<=7;++failure){
         auto world=std::make_unique<GameplayWorld>(300,false,1000,false);
         BulletAudit audit{world.get(),failure};
@@ -690,6 +728,38 @@ int main(){
         assert(store->append(60,32,48,true));const auto h=store->handle(0);
         assert(!store->requestDestroy(h)&&store->find(h)->destroyRequested&&!store->valid()&&damage.calls==1&&lifecycle.destroys==1);
         assert(!store->activation(h,false)&&!store->retireMarked(h)&&lifecycle.activations==0&&lifecycle.retires==0);
+    }
+    for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                       GameplayCollisionOwner::Ownership::nativeScenery}){
+        const auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc"),
+            rb=read("generated/downwell-rooms.dwrm");
+        ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
+        RoomPack rooms(rb.data(),rb.size());
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
+            GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&rooms,ownership);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));auto& entries=owner->entryDithers();InstanceHandle first;
+        auto zero=[](auto& value){value={};return true;};
+        assert(entries.create(411001,zero,zero,first));
+        struct Builder {
+            GameplayEntryDithers* entries;InstanceHandle first,child{};unsigned calls=0;
+        } builder{&entries,first};
+        world->configureGenerationStep([](void* context,GameplayWorld&,GameMakerRandom&,int){
+            auto& b=*static_cast<Builder*>(context);int y=-1;
+            // Builder 65 sees the old position: entry wipe 73 has not stepped.
+            assert(b.entries->find(b.first)->y.promoted().roundPixel(y)&&y==int(16*b.calls));
+            if(b.calls++==0){
+                auto zero=[](auto& value){value={};return true;};
+                return b.entries->create(411002,zero,zero,b.child);
+            }
+            return true;
+        },&builder);
+        for(int tick=1;tick<=2;++tick){
+            world->step(0);int existing=-1,newborn=-1;
+            assert(world->effectsSucceeded()&&entries.find(first)->y.promoted().roundPixel(existing)&&
+                entries.find(builder.child)->y.promoted().roundPixel(newborn)&&existing==16*tick&&newborn==16*(tick-1));
+        }
     }
     for(unsigned failure=0;failure<3;++failure){
         TerrainDestructionAudit audit;audit.rejectDestroy=failure==1;audit.rejectActivation=failure==2;
@@ -6258,6 +6328,25 @@ int main(){
         auto copied=batWorld->enemyAt(0);
         assert(!masks->enemyBinding().mask(bat,copied,999)&&!masks->valid()&&batWorld->enemyAt(0).maskId==153);
         batWorld->step(0);assert(!batWorld->effectsSucceeded());
+    }
+    for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                       GameplayCollisionOwner::Ownership::nativeScenery}){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},&rooms,ownership);
+        auto world=std::make_unique<GameplayWorld>(300,false,1000,false,
+            owner->enemyBinding(),owner->breakableBinding(),owner->playerBinding());
+        assert(owner->attach(*world));
+        world->configureSolidResolver([](void*,int,int){return false;},nullptr);
+        assert(world->configureEnemy(0,116,153,0,12,0,0,1,12,0,0,-1,-1,270,256,true,false,true));
+        world->step(4);
+        assert(world->effectsSucceeded()&&!world->enemyAt(0).active&&world->gemCount()>0);
+        // Rewards born in bullet 261's Step cannot have run currency 248's
+        // earlier Step. Their Create state must reach Draw unchanged.
+        for(unsigned i=0;i<world->gemCount();++i){
+            const auto& gem=world->gemAt(i);
+            assert(gem.active&&gem.age==0&&gem.motion.lifetime.age==0&&
+                gem.x==world->enemyAt(0).x&&gem.y==world->enemyAt(0).y);
+        }
     }
     {
         TerrainAudit audit;

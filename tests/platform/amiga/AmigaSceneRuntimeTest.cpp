@@ -2746,11 +2746,14 @@ int main(int argc, char** argv) {
                             gem.motion.animation.phaseBits()==other.motion.animation.phaseBits() &&
                             gem.motion.animation.speedBits()==other.motion.animation.speedBits(),
                             "paired currency animation phase and speed agree");
-                        if(gem.age==1){
+                        // The runner's phase creation cutoff excludes rewards
+                        // born in bullet Step / Collision. Create is age zero;
+                        // first animation and first Step both occur next tick.
+                        if(gem.age==0){
                             ++currencyBirths;
                             require(gem.motion.animation.phaseBits()==0,
                                 "combat-born currency retains Create frame in its birth tick");
-                        }else if(gem.age==2){
+                        }else if(gem.age==1){
                             ++currencyAdvances;
                             downwell::RunnerImageValue expected{};bool crossed=false;
                             require(downwell::SequenceTimeline::advance(expected,
@@ -2794,9 +2797,12 @@ int main(int argc, char** argv) {
             coverage.report();
             std::cout<<"Contact terrain burst frame="<<worstBirthTick<<" walls="<<worstBirths.walls
                 <<" platforms="<<worstBirths.platforms<<" other="<<worstBirths.other<<std::endl;
-            if(!search)require(worstBirthTick==701&&worstBirths.walls==134&&
-                worstBirths.platforms==4&&worstBirths.other==0,
-                "contact benchmark retains the measured 138-terrain-birth generation burst");
+            // Source-ordered enemy/currency/bullet updates change the combat
+            // trajectory and subsequent pattern draws. This pins the corrected
+            // workload; the historical frame-701 timings are not its baseline.
+            if(!search)require(worstBirthTick==1689&&worstBirths.walls==127&&
+                worstBirths.platforms==5&&worstBirths.other==0,
+                "source-ordered contact benchmark retains its 132-terrain-birth burst");
             if(!search)require(firstDamage&&damageFrames,"profile input must reach real damage");
         }
 #ifdef DOWNWELL_AUDIT_RANDOM
