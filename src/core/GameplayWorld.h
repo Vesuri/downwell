@@ -1305,6 +1305,11 @@ public:
         breakables_[h.slot].state.hit=true;return true;
     }
     GameplayFrame step(std::uint8_t packedInput);
+    // Execute one selected legacy enemy lifetime without walking its family.
+    // The caller owns source phase ordering and the phase's published view.
+    // This preserves the existing behavior pending the complete mixed Step
+    // dispatcher; it does not claim original motion/collision equivalence.
+    bool stepEnemyRoomEffect(downwell::InstanceHandle key,int publishedCameraX,long generationCameraY);
     // Borrow only for this tick scope, as with the stored event composition.
     // The transition runs after published x/y and interaction observation,
     // before later player work, room alarms and ordinary Step. It must not

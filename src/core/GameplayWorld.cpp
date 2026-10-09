@@ -1098,6 +1098,199 @@ bool GameplayWorld::timeShardOutsideView(downwell::RunnerImageValue publishedY,b
     retire=order>0;return true;
 }
 
+bool GameplayWorld::stepEnemyRoomEffect(downwell::InstanceHandle key,int publishedCameraX,long generationCameraY)
+{
+    auto* live=const_cast<EnemyState*>(resolveEnemyLifetime(key));
+    if(!live)return true;
+    EnemyState& enemy = *live;
+    if (!enemy.active)
+        return true;
+    if (enemy.objectId == 113)
+        enemy.imageSpeed = enemy.frogPresentation.beginStepRate();
+    if (!enemy.awake && enemy.y - cameraPixelY_ <= 254)
+        enemy.awake = true;
+    if ((!enemy.awake && enemy.objectId != 113 && enemy.objectId != 111 && enemy.objectId != 112 && enemy.objectId != 116) || solidResolver_ == 0)
+        return true;
+    if (enemy.objectId == 111 || enemy.objectId == 112) {
+        const bool turtle = enemy.objectId == 112;
+        DW_PROFILE_SCOPE(profileEnemyWalker);
+        const long cx = publishedCameraX * 4096L;
+        const long cy = generationCameraY * 16;
+        const bool visible = downwell::CrawlerMotion::inView(enemy.x, enemy.y,
+            cx - 80L * 4096, cy - 142L * 4096, cx + 80L * 4096, cy + 142L * 4096,
+            turtle ? 64 : 32);
+        if(!enemy.walker.step(turtle, downwell::groundTurtleWalking(enemy.auxiliaryState), visible,
+            [this, &enemy, turtle](long x, long y) {
+                return enemy.walker.meetsTiles(x, y, turtle, [this](int px, int py) {
+                    return solidResolver_(solidResolverContext_, px, py);
+                });
+            },[this,&enemy](int sprite,int scale){
+                enemy.grounded=enemy.walker.grounded;
+                if(!enemyLifecycle_.sprite({enemy.identitySlot,enemy.lifetimeId},enemy,sprite)){
+                    run_.effectsSucceeded=false;return false;
+                }
+                enemy.spriteId=sprite;
+                if(scale){
+                    if(!publishEnemyTransform(enemy,downwell::RunnerTransformField::scaleX,scale))return false;
+                    enemy.facing=scale;
+                }
+                return true;
+            }))return false;
+        enemy.preciseX = downwell::FrogVerticalMotion::floorDivide(enemy.walker.x, 5);
+        enemy.preciseY = downwell::FrogVerticalMotion::floorDivide(enemy.walker.y, 5);
+        enemy.speedX = downwell::FrogVerticalMotion::floorDivide(enemy.walker.vx, 5);
+        enemy.speedY = downwell::FrogVerticalMotion::floorDivide(enemy.walker.vy, 5);
+        enemy.gravityPositionRemainder = enemy.walker.y - enemy.preciseY * 5;
+        enemy.gravityRemainder = enemy.walker.vy - enemy.speedY * 5;
+        enemy.grounded = enemy.walker.grounded;
+    } else if (enemy.objectId == 116) {
+        downwell::BatMotion bat{enemy.preciseX, enemy.preciseY, enemy.speedX, enemy.speedY,
+            enemy.direction, (enemy.moveSpeed * 40 + 128) / 256, enemy.facing,
+            enemy.batDirectionFraction};
+        DW_PROFILE_SCOPE(profileEnemyBat);
+        bat.collisionMask=downwell::enemyContactMask(enemy.objectId,enemy.spriteId,enemy.maskId);
+        const auto effects = downwell::stepBatBehavior(bat, enemy.batHit, enemy.batActivity,
+            enemy.x, enemy.y, bat.collisionMask, player_.frameStartXFixed(),
+            player_.frameStartYFixed(), enemyRandom_,
+            [this](int x, int y) {
+                return solidResolver_(solidResolverContext_, x, y);
+            },[this,&enemy](int scale){
+                if(!publishEnemyTransform(enemy,downwell::RunnerTransformField::scaleX,scale))return false;
+                enemy.facing=scale;return true;
+            });
+        enemy.preciseX = bat.x;
+        enemy.preciseY = bat.y;
+        enemy.speedX = bat.speedX;
+        enemy.speedY = bat.speedY;
+        enemy.direction = bat.direction;
+        enemy.batDirectionFraction = bat.directionFraction;
+        enemy.facing = bat.facing;
+        enemy.moveSpeed = (bat.speedFortieths * 256 + 20) / 40;
+        if(!effects.succeeded)return false;
+        if (effects.hit) {
+            enemy.alarm0 = 3;
+            if(!publishEnemyImage(enemy,0))return false;
+            enemy.imagePhase = 0;
+            enemy.imageRemainder = 0;
+        }
+    } else if (enemy.objectId == 113) {
+        const bool integrate = downwell::frogMotionVisible(enemy.x * 256L, enemy.y * 256L,
+            (publishedCameraX - 80) * 256L, generationCameraY - 142 * 256L,
+            (publishedCameraX + 80) * 256L, generationCameraY + 142 * 256L);
+        DW_PROFILE_SCOPE(profileEnemyFrog);
+        downwell::FrogVerticalMotion vertical{
+            enemy.preciseY * 5 + enemy.gravityPositionRemainder,
+            enemy.speedY * 5 + enemy.gravityRemainder, enemy.grounded};
+        const auto effects = downwell::stepFrogMotion(enemy.frogHorizontal, vertical,
+            enemy.frogHit, integrate, [this](int x, int y) {
+                return solidResolver_(solidResolverContext_, x, y);
+            },[this,&enemy]{
+            enemy.auxiliaryState = 0;
+            enemy.alarm0 = 0;
+            enemy.alarm1 = 60;
+            enemy.speedX = downwell::FrogHorizontalMotion::toQ8(enemy.frogHorizontal.velocity);
+            if(!publishEnemyImage(enemy,0))return false;
+            enemy.imagePhase = 0;
+            enemy.imageRemainder = 0;
+            return true;
+        },[this,&enemy](int scale){
+            if(!publishEnemyTransform(enemy,downwell::RunnerTransformField::scaleX,scale))return false;
+            enemy.facing=scale;return true;
+        },[&enemy](bool grounded){
+            if(downwell::frogLandingEdge(grounded,enemy.frogLanded))enemy.alarm1=60;
+        });
+        enemy.preciseY = downwell::FrogVerticalMotion::floorDivide(vertical.position, 5);
+        enemy.gravityPositionRemainder = static_cast<unsigned char>(vertical.position - enemy.preciseY * 5);
+        enemy.speedY = downwell::FrogVerticalMotion::floorDivide(vertical.velocity, 5);
+        enemy.gravityRemainder = static_cast<unsigned char>(vertical.velocity - enemy.speedY * 5);
+        enemy.grounded = vertical.grounded;
+        enemy.preciseX = downwell::FrogHorizontalMotion::toQ8(enemy.frogHorizontal.position);
+        enemy.speedX = downwell::FrogHorizontalMotion::toQ8(enemy.frogHorizontal.velocity);
+        if(!effects.succeeded)return false;
+    } else if (enemy.objectId == 117) {
+        DW_PROFILE_SCOPE(profileEnemySnail);
+        const int hitAlarm = enemy.snailHit.consume(enemyRandom_);
+        if (hitAlarm >= 0) {
+            if(!publishEnemyImage(enemy,0))return false;
+            enemy.imagePhase = 0; enemy.imageRemainder = 0;
+            enemy.alarm0 = 0; enemy.alarm1 = hitAlarm;
+        }
+        const bool alive = enemy.snail.step([this](int x, int y) {
+            return solidResolver_(solidResolverContext_, x, y);
+        },false,[this,&enemy](downwell::RunnerTransformField field,int value){return publishEnemyTransform(enemy,field,value);});
+        if(!run_.effectsSucceeded)return false;
+        if (!alive && !publishEnemyActivation(enemy,false)) return false;
+        enemy.active = alive;
+        if (!enemy.active)
+            return true;
+        enemy.preciseX = enemy.snail.x / 5;
+        enemy.preciseY = enemy.snail.y / 5;
+        enemy.speedY = enemy.snail.vy / 5;
+        enemy.motionState = enemy.facing = enemy.snail.facing;
+    } else if (enemy.objectId == 119) {
+        DW_PROFILE_SCOPE(profileEnemyCrawler);
+        updateCrawler(enemy, false, publishedCameraX, generationCameraY);
+    }
+    DW_PROFILE_SCOPE(profileEnemyFinalize);
+    // World origins (240,176) are even integers, so ties-to-even is
+    // unchanged by storing these positions relative to the origin.
+    int publishedX = (int)downwell::roundGameMakerQ8(enemy.preciseX);
+    int publishedY = (int)downwell::roundGameMakerQ8(enemy.preciseY);
+    if (enemy.objectId == 113) {
+        publishedX = (int)downwell::frogPublishedPixel(enemy.frogHorizontal.position,65536);
+        publishedY = (int)downwell::frogPublishedPixel(
+            enemy.preciseY*5+enemy.gravityPositionRemainder,1280);
+    }
+    if (enemy.objectId == 111 || enemy.objectId == 112) {
+        publishedX = enemy.walker.publishedX;
+        publishedY = enemy.walker.publishedY;
+    }
+    if (enemy.objectId == 119) {
+        publishedX = enemy.crawler.pixelX();
+        publishedY = enemy.crawler.pixelY();
+    }
+    if (enemy.objectId == 117) {
+        publishedX = static_cast<int>(downwell::FixedCollisionMath::round(enemy.snail.x) / 1280);
+        publishedY = static_cast<int>(downwell::FixedCollisionMath::round(enemy.snail.y) / 1280);
+    }
+    { DW_PROFILE_SCOPE(profileEnemyPositionPublish);
+    if(!enemyLifecycle_.integerPosition({enemy.identitySlot,enemy.lifetimeId},enemy,
+                                       publishedX+240,publishedY+176)) {
+        run_.effectsSucceeded=false;return false;
+    }
+    }
+    enemy.x=publishedX;enemy.y=publishedY;
+    if(enemy.objectId==119 &&
+       !publishEnemyTransform(enemy,downwell::RunnerTransformField::angle,enemy.crawler.imageDirection*90))return false;
+    if (enemy.objectId!=116 && enemy.objectId!=113 && enemy.speedX != 0)
+        enemy.facing = enemy.speedX < 0 ? -1 : 1;
+    const auto nextSprite = downwell::finishEnemyPresentation(
+        {enemy.objectId, enemy.auxiliaryState, enemy.grounded, enemy.speedY < 0,
+         enemy.frogHit.remaining != 0, enemy.snailHit.stunned},
+        enemy.frogPresentation, enemy.batActivity, enemy.batHit,
+        enemy.imagePhase, enemy.imageRemainder);
+    { DW_PROFILE_SCOPE(profileEnemyPresentationPublish);
+    if(enemy.objectId!=111 && enemy.objectId!=112 &&
+       !enemyLifecycle_.sprite({enemy.identitySlot,enemy.lifetimeId},enemy,nextSprite)) {
+        run_.effectsSucceeded=false;return false;
+    }
+    enemy.spriteId=nextSprite;
+    if(enemy.objectId==116 && !downwell::finishBatFields(enemy.batActivity,nextSprite,
+        [this,&enemy](int mask){
+            if(!enemyLifecycle_.mask({enemy.identitySlot,enemy.lifetimeId},enemy,mask)){
+                run_.effectsSucceeded=false;return false;
+            }
+            enemy.maskId=mask;return true;
+        },[this,&enemy](int scale){
+            if(!publishEnemyTransform(enemy,downwell::RunnerTransformField::scaleX,scale))return false;
+            enemy.facing=scale;return true;
+        },[&enemy]{enemy.direction=270;enemy.batDirectionFraction=0;enemy.moveSpeed=512;}))return false;
+    if(!publishEnemyImage(enemy,enemy.imagePhase))return false;
+    }
+    enemy.imageFrame = enemy.imagePhase >> 8;
+    return true;
+}
+
 GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
 {
     if(playerBirthPending_){run_.effectsSucceeded=false;return {};}
@@ -1499,196 +1692,8 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
 
 
     DW_PROFILE_PHASE(profileEnemyMotion);
-    for (unsigned i=0;i<enemyStepOrder_.size();++i) {
-        auto* live=const_cast<EnemyState*>(resolveEnemyLifetime(enemyStepOrder_.handle(i)));
-        if(!live)continue;
-        EnemyState& enemy = *live;
-        if (!enemy.active)
-            continue;
-        if (enemy.objectId == 113)
-            enemy.imageSpeed = enemy.frogPresentation.beginStepRate();
-        if (!enemy.awake && enemy.y - cameraPixelY_ <= 254)
-            enemy.awake = true;
-        if ((!enemy.awake && enemy.objectId != 113 && enemy.objectId != 111 && enemy.objectId != 112 && enemy.objectId != 116) || solidResolver_ == 0)
-            continue;
-        if (enemy.objectId == 111 || enemy.objectId == 112) {
-            const bool turtle = enemy.objectId == 112;
-            DW_PROFILE_SCOPE(profileEnemyWalker);
-            const long cx = publishedCameraX * 4096L;
-            const long cy = generationCameraY * 16;
-            const bool visible = downwell::CrawlerMotion::inView(enemy.x, enemy.y,
-                cx - 80L * 4096, cy - 142L * 4096, cx + 80L * 4096, cy + 142L * 4096,
-                turtle ? 64 : 32);
-            if(!enemy.walker.step(turtle, downwell::groundTurtleWalking(enemy.auxiliaryState), visible,
-                [this, &enemy, turtle](long x, long y) {
-                    return enemy.walker.meetsTiles(x, y, turtle, [this](int px, int py) {
-                        return solidResolver_(solidResolverContext_, px, py);
-                    });
-                },[this,&enemy](int sprite,int scale){
-                    enemy.grounded=enemy.walker.grounded;
-                    if(!enemyLifecycle_.sprite({enemy.identitySlot,enemy.lifetimeId},enemy,sprite)){
-                        run_.effectsSucceeded=false;return false;
-                    }
-                    enemy.spriteId=sprite;
-                    if(scale){
-                        if(!publishEnemyTransform(enemy,downwell::RunnerTransformField::scaleX,scale))return false;
-                        enemy.facing=scale;
-                    }
-                    return true;
-                }))return {};
-            enemy.preciseX = downwell::FrogVerticalMotion::floorDivide(enemy.walker.x, 5);
-            enemy.preciseY = downwell::FrogVerticalMotion::floorDivide(enemy.walker.y, 5);
-            enemy.speedX = downwell::FrogVerticalMotion::floorDivide(enemy.walker.vx, 5);
-            enemy.speedY = downwell::FrogVerticalMotion::floorDivide(enemy.walker.vy, 5);
-            enemy.gravityPositionRemainder = enemy.walker.y - enemy.preciseY * 5;
-            enemy.gravityRemainder = enemy.walker.vy - enemy.speedY * 5;
-            enemy.grounded = enemy.walker.grounded;
-        } else if (enemy.objectId == 116) {
-            downwell::BatMotion bat{enemy.preciseX, enemy.preciseY, enemy.speedX, enemy.speedY,
-                enemy.direction, (enemy.moveSpeed * 40 + 128) / 256, enemy.facing,
-                enemy.batDirectionFraction};
-            DW_PROFILE_SCOPE(profileEnemyBat);
-            bat.collisionMask=downwell::enemyContactMask(enemy.objectId,enemy.spriteId,enemy.maskId);
-            const auto effects = downwell::stepBatBehavior(bat, enemy.batHit, enemy.batActivity,
-                enemy.x, enemy.y, bat.collisionMask, player_.frameStartXFixed(),
-                player_.frameStartYFixed(), enemyRandom_,
-                [this](int x, int y) {
-                    return solidResolver_(solidResolverContext_, x, y);
-                },[this,&enemy](int scale){
-                    if(!publishEnemyTransform(enemy,downwell::RunnerTransformField::scaleX,scale))return false;
-                    enemy.facing=scale;return true;
-                });
-            enemy.preciseX = bat.x;
-            enemy.preciseY = bat.y;
-            enemy.speedX = bat.speedX;
-            enemy.speedY = bat.speedY;
-            enemy.direction = bat.direction;
-            enemy.batDirectionFraction = bat.directionFraction;
-            enemy.facing = bat.facing;
-            enemy.moveSpeed = (bat.speedFortieths * 256 + 20) / 40;
-            if(!effects.succeeded)return {};
-            if (effects.hit) {
-                enemy.alarm0 = 3;
-                if(!publishEnemyImage(enemy,0))return {};
-                enemy.imagePhase = 0;
-                enemy.imageRemainder = 0;
-            }
-        } else if (enemy.objectId == 113) {
-            const bool integrate = downwell::frogMotionVisible(enemy.x * 256L, enemy.y * 256L,
-                (publishedCameraX - 80) * 256L, generationCameraY - 142 * 256L,
-                (publishedCameraX + 80) * 256L, generationCameraY + 142 * 256L);
-            DW_PROFILE_SCOPE(profileEnemyFrog);
-            downwell::FrogVerticalMotion vertical{
-                enemy.preciseY * 5 + enemy.gravityPositionRemainder,
-                enemy.speedY * 5 + enemy.gravityRemainder, enemy.grounded};
-            const auto effects = downwell::stepFrogMotion(enemy.frogHorizontal, vertical,
-                enemy.frogHit, integrate, [this](int x, int y) {
-                    return solidResolver_(solidResolverContext_, x, y);
-                },[this,&enemy]{
-                enemy.auxiliaryState = 0;
-                enemy.alarm0 = 0;
-                enemy.alarm1 = 60;
-                enemy.speedX = downwell::FrogHorizontalMotion::toQ8(enemy.frogHorizontal.velocity);
-                if(!publishEnemyImage(enemy,0))return false;
-                enemy.imagePhase = 0;
-                enemy.imageRemainder = 0;
-                return true;
-            },[this,&enemy](int scale){
-                if(!publishEnemyTransform(enemy,downwell::RunnerTransformField::scaleX,scale))return false;
-                enemy.facing=scale;return true;
-            },[&enemy](bool grounded){
-                if(downwell::frogLandingEdge(grounded,enemy.frogLanded))enemy.alarm1=60;
-            });
-            enemy.preciseY = downwell::FrogVerticalMotion::floorDivide(vertical.position, 5);
-            enemy.gravityPositionRemainder = static_cast<unsigned char>(vertical.position - enemy.preciseY * 5);
-            enemy.speedY = downwell::FrogVerticalMotion::floorDivide(vertical.velocity, 5);
-            enemy.gravityRemainder = static_cast<unsigned char>(vertical.velocity - enemy.speedY * 5);
-            enemy.grounded = vertical.grounded;
-            enemy.preciseX = downwell::FrogHorizontalMotion::toQ8(enemy.frogHorizontal.position);
-            enemy.speedX = downwell::FrogHorizontalMotion::toQ8(enemy.frogHorizontal.velocity);
-            if(!effects.succeeded)return {};
-        } else if (enemy.objectId == 117) {
-            DW_PROFILE_SCOPE(profileEnemySnail);
-            const int hitAlarm = enemy.snailHit.consume(enemyRandom_);
-            if (hitAlarm >= 0) {
-                if(!publishEnemyImage(enemy,0))return {};
-                enemy.imagePhase = 0; enemy.imageRemainder = 0;
-                enemy.alarm0 = 0; enemy.alarm1 = hitAlarm;
-            }
-            const bool alive = enemy.snail.step([this](int x, int y) {
-                return solidResolver_(solidResolverContext_, x, y);
-            },false,[this,&enemy](downwell::RunnerTransformField field,int value){return publishEnemyTransform(enemy,field,value);});
-            if(!run_.effectsSucceeded)return {};
-            if (!alive && !publishEnemyActivation(enemy,false)) return {};
-            enemy.active = alive;
-            if (!enemy.active)
-                continue;
-            enemy.preciseX = enemy.snail.x / 5;
-            enemy.preciseY = enemy.snail.y / 5;
-            enemy.speedY = enemy.snail.vy / 5;
-            enemy.motionState = enemy.facing = enemy.snail.facing;
-        } else if (enemy.objectId == 119) {
-            DW_PROFILE_SCOPE(profileEnemyCrawler);
-            updateCrawler(enemy, false, publishedCameraX, generationCameraY);
-        }
-        DW_PROFILE_SCOPE(profileEnemyFinalize);
-        // World origins (240,176) are even integers, so ties-to-even is
-        // unchanged by storing these positions relative to the origin.
-        int publishedX = (int)downwell::roundGameMakerQ8(enemy.preciseX);
-        int publishedY = (int)downwell::roundGameMakerQ8(enemy.preciseY);
-        if (enemy.objectId == 113) {
-            publishedX = (int)downwell::frogPublishedPixel(enemy.frogHorizontal.position,65536);
-            publishedY = (int)downwell::frogPublishedPixel(
-                enemy.preciseY*5+enemy.gravityPositionRemainder,1280);
-        }
-        if (enemy.objectId == 111 || enemy.objectId == 112) {
-            publishedX = enemy.walker.publishedX;
-            publishedY = enemy.walker.publishedY;
-        }
-        if (enemy.objectId == 119) {
-            publishedX = enemy.crawler.pixelX();
-            publishedY = enemy.crawler.pixelY();
-        }
-        if (enemy.objectId == 117) {
-            publishedX = static_cast<int>(downwell::FixedCollisionMath::round(enemy.snail.x) / 1280);
-            publishedY = static_cast<int>(downwell::FixedCollisionMath::round(enemy.snail.y) / 1280);
-        }
-        { DW_PROFILE_SCOPE(profileEnemyPositionPublish);
-        if(!enemyLifecycle_.integerPosition({enemy.identitySlot,enemy.lifetimeId},enemy,
-                                           publishedX+240,publishedY+176)) {
-            run_.effectsSucceeded=false;return {};
-        }
-        }
-        enemy.x=publishedX;enemy.y=publishedY;
-        if(enemy.objectId==119 &&
-           !publishEnemyTransform(enemy,downwell::RunnerTransformField::angle,enemy.crawler.imageDirection*90))return {};
-        if (enemy.objectId!=116 && enemy.objectId!=113 && enemy.speedX != 0)
-            enemy.facing = enemy.speedX < 0 ? -1 : 1;
-        const auto nextSprite = downwell::finishEnemyPresentation(
-            {enemy.objectId, enemy.auxiliaryState, enemy.grounded, enemy.speedY < 0,
-             enemy.frogHit.remaining != 0, enemy.snailHit.stunned},
-            enemy.frogPresentation, enemy.batActivity, enemy.batHit,
-            enemy.imagePhase, enemy.imageRemainder);
-        { DW_PROFILE_SCOPE(profileEnemyPresentationPublish);
-        if(enemy.objectId!=111 && enemy.objectId!=112 &&
-           !enemyLifecycle_.sprite({enemy.identitySlot,enemy.lifetimeId},enemy,nextSprite)) {
-            run_.effectsSucceeded=false;return {};
-        }
-        enemy.spriteId=nextSprite;
-        if(enemy.objectId==116 && !downwell::finishBatFields(enemy.batActivity,nextSprite,
-            [this,&enemy](int mask){
-                if(!enemyLifecycle_.mask({enemy.identitySlot,enemy.lifetimeId},enemy,mask)){
-                    run_.effectsSucceeded=false;return false;
-                }
-                enemy.maskId=mask;return true;
-            },[this,&enemy](int scale){
-                if(!publishEnemyTransform(enemy,downwell::RunnerTransformField::scaleX,scale))return false;
-                enemy.facing=scale;return true;
-            },[&enemy]{enemy.direction=270;enemy.batDirectionFraction=0;enemy.moveSpeed=512;}))return {};
-        if(!publishEnemyImage(enemy,enemy.imagePhase))return {};
-        }
-        enemy.imageFrame = enemy.imagePhase >> 8;
-    }
+    for (unsigned i=0;i<enemyStepOrder_.size();++i)
+        if(!stepEnemyRoomEffect(enemyStepOrder_.handle(i),publishedCameraX,generationCameraY))return {};
 
     DW_PROFILE_PHASE(profileEnemyContact);
     run_.stepSmoke(smokeStepPhase,enemyRandom_);
