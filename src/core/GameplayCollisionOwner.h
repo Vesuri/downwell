@@ -517,6 +517,8 @@ private:
         if(!valid()||!table_.externalBirth(slot,order)||!nativeBirthQueues(slot,id.object))return check(false);
         const auto* definition=objectDefaults_.get(id.object);const auto* objectFlags=families_.flags(unsigned(id.object));
         if(!definition||!objectFlags)return check(false);
+        if(!check(room_.bind(slot,definition->creationDepth)))return false;
+        if(!active)activationPending_=true;
         flags=definition->initialFlags|(active?0u:2u);
         RunnerImageValue x,y;Owner::Box bounds,cached{};bool found,precise;
         if(!nativeTerrainBirthBounds(id,x,y,bounds,found,precise))return false;
@@ -544,6 +546,7 @@ private:
                 bool removed;return index.remove(bounds,slot,true,removed);
             })))return false;
         }
+        if(!check(room_.remove(slot)))return false;
         table_.externalRetire(slot);return nativeRetireQueues(slot);
     }
     template<class Record,View::Kind Kind> struct Binding {
@@ -1250,6 +1253,8 @@ public:
                 return self.nativeTerrainRetire(slot);},
             [](void* p,unsigned slot){auto& self=*static_cast<GameplayCollisionOwner*>(p);
                 if(!self.valid())return false;
+                if(!self.check(self.room_.mark(View::terrainBase+slot)))return false;
+                self.destructionPending_=true;
                 self.table_.externalFlagsChanged(View::terrainBase+slot);return true;},
             [](void* p,const GameplayWorld::NativeTerrain::Identity& id,int tile,std::uint32_t& flags){
                 auto& self=*static_cast<GameplayCollisionOwner*>(p);
@@ -1278,9 +1283,9 @@ public:
                 const unsigned slot=View::terrainBase+id.handle.slot;
                 if(active&&(flags&2u)&&!self.nativeDirty(slot,id.object,flags))return false;
                 if(bool(flags&2u)==active)self.table_.externalFlagsChanged(slot);
-                // Only immediate flags and collision queues are published
-                // here. Native terrain's deferred room/layer membership must
-                // be connected before complete mixed scheduler admission.
+                self.activationPending_=true;
+                // Reconcile room membership at the phase boundary, not here.
+                // Object-family and layer-element publication stay separate.
                 return true;
             }
         }))return check(false);
@@ -2279,6 +2284,18 @@ public:
             if(!eligibilityFlags(handleAt(slot),flags)){good_=false;return true;}
             return (flags&2u)!=0;
         },[&](unsigned slot,bool registered){
+            if(native_&&slot>=View::terrainBase&&slot<View::timeFieldBase){
+                // The identity lives in the terrain run owner, not table_.
+                // This callback publishes room membership only; no generic
+                // object-list or layer entry may be fabricated for it.
+                const auto h=handleAt(slot);if(!resolves(h))return false;
+                if(registered){
+                    std::uint32_t order=0;
+                    if(!table_.externalBirth(slot,order)||
+                        !world_->rebindNativeTerrainOrder({slot-View::terrainBase,h.generation},order))return false;
+                }
+                return true;
+            }
             // Writes while inactive may have been consumed by an intervening
             // active-room pass. Promotion must refresh that retained snapshot.
             if(registered&&slot>=View::terrainBase&&slot<View::timeFieldBase)terrainSnapshotDirty_=true;
@@ -2289,6 +2306,12 @@ public:
         });
         if(!check(result&&good_))return false;
         activationPending_=false;return true;
+    }
+    // Distinguish immediate flag 2 from deferred room membership. Read-only;
+    // this does not reconcile or derive order from object registrations.
+    bool roomMembershipActive(InstanceHandle h,bool& active)const{
+        if(!valid()||!resolves(h)||!room_.contains(h.slot))return false;
+        active=room_.active(h.slot);return true;
     }
     // Dispatch a scheduler-selected wall, not a terrain-only phase. Effects
     // owns tile publication, synchronous flower Create and area-five lifetime
@@ -2351,7 +2374,10 @@ public:
                 return true;
             };
             cleaned=room_.visitMarkedCleanupOrdered([&](unsigned slot,RunnerImageValue key,bool active){
-                return before(key,table_.roomOrder(handleAt(slot)),active)&&cleanup(slot);
+                const auto h=handleAt(slot);
+                const auto order=slot>=View::terrainBase&&slot<View::timeFieldBase&&world_->nativeTerrainInstances()?
+                    world_->nativeTerrainInstances()->registrationOrder({slot-View::terrainBase,h.generation}):table_.roomOrder(h);
+                return before(key,order,active)&&cleanup(slot);
             })&&before(RunnerImageValue{},0,false);
             if(cleaned)markedBoxCount_=0;
         }else
@@ -2376,7 +2402,8 @@ private:
             View::Kind kind;InstanceHandle local;
             if(!View::decode(shared,kind,local))return false;
             switch(kind){
-                case View::Kind::terrain:return record.terrain==terrain_.find(local)&&terrain_.retireMarked(local);
+                case View::Kind::terrain:return record.nativeTerrain?world_->retireNativeTerrain(local):
+                    record.terrain==terrain_.find(local)&&terrain_.retireMarked(local);
                 case View::Kind::enemy:return record.enemy==world_->resolveEnemyLifetime(local)&&world_->retireMarkedEnemy(local);
                 case View::Kind::breakable:return record.breakable==world_->findBreakable(local)&&world_->retireMarkedBreakable(local);
                 case View::Kind::goalField:return record.goalField==world_->goalFieldInstances().find(local)&&world_->retireMarkedGoalField(local);

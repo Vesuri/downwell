@@ -133,8 +133,15 @@ removing its spatial entry. Reactivation queues spatial/collision work under
 the original object-flag gates, without setting bounds-dirty bit `8`; repeated
 activation is idle for those queues. End Step coalesces presentation notices
 but not collision exclusion, including destruction followed by deactivation.
-This immediate terrain path does not yet publish deferred room/layer requests;
-it must not be mistaken for complete mixed-room reconciliation.
+Native terrain births also enter the existing room-membership container.
+Activation requests set its pending flag; the phase-boundary reconciliation
+moves terrain between active/inactive room lists. Marked terrain participates
+in the same active-before-inactive cleanup traversal and retires through its
+run owner. Reactivation obtains a fresh shared registration stamp in the run
+publication, preserving its position relative to fast-box cleanup; the birth
+stamp cannot stand in for reactivated room order. This does not publish
+object-family or layer-element membership;
+room order alone is not complete mixed-family query or Draw ordering.
 
 The native `GameplayWorld` calls its borrowed phase-boundary hook after Begin
 Step, alarms, ordinary Step, collisions, and the implemented End Step work.

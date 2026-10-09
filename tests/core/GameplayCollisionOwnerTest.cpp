@@ -2191,6 +2191,44 @@ int main(){
         }
     }
     auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
+    std::vector<unsigned> roomCleanupOracle;
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+        GameplayCollisionOwner::Ownership::nativeScenery}){
+        const bool native=mode!=GameplayCollisionOwner::Ownership::reference;
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
+            GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&rooms,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),owner->breakableBinding(),
+            owner->playerBinding(),native?nullptr:&owner->terrain(),&rooms);
+        auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
+        assert(owner->attach(*world)&&(!native||world->bindNativeTerrain(*terrain)));
+        InstanceHandle local[3],shared[3];
+        for(unsigned i=0;i<3;++i){
+            if(native){assert(terrain->append(60,240+int(i)*16,160));local[i]=terrain->handle(i);}
+            else {assert(owner->terrain().append(60,240+int(i)*16,160,true));local[i]=owner->terrain().handle(i);}
+            assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,local[i],shared[i]));
+        }
+        auto activate=[&](unsigned i,bool active){return native?world->activateNativeTerrain(local[i],active):owner->terrain().activation(local[i],active);};
+        const int bx=0,by=160;assert(world->appendBreakables(&bx,&by,1));
+        const InstanceHandle box{0,world->breakableSlot(0).lifetimeId};
+        auto member=[&](unsigned i){bool active=false;assert(owner->roomMembershipActive(shared[i],active));return active;};
+        assert(activate(0,false)&&activate(2,false)&&member(0)&&member(2));
+        assert(owner->reconcileActivation()&&!member(0)&&member(1)&&!member(2));
+        assert(activate(0,true)&&!member(0)&&owner->reconcileActivation()&&member(0));
+        for(unsigned i=0;i<3;++i)assert(native?world->destroyNativeTerrain(local[i]):owner->terrain().requestDestroy(local[i]));
+        assert(world->markBreakableDestroyed(box));
+        std::vector<unsigned> retired;
+        assert(owner->cleanupDestroyed([&](InstanceHandle h,const GameplayCollisionView::Record& record){
+            if(record.breakable){retired.push_back(99);return world->retireMarkedBreakable(box);}
+            retired.push_back(h.slot-GameplayCollisionView::terrainBase);
+            const InstanceHandle key{h.slot-GameplayCollisionView::terrainBase,h.generation};
+            return record.nativeTerrain?world->retireNativeTerrain(key):owner->terrain().retireMarked(key);
+        }));
+        if(!native)roomCleanupOracle=retired;else assert(retired==roomCleanupOracle);
+        std::vector<unsigned> walls;for(auto slot:retired)if(slot!=99)walls.push_back(slot);
+        assert(walls==std::vector<unsigned>({1,0,2})&&retired.size()==4);
+        for(auto h:shared){bool active;assert(!owner->roomMembershipActive(h,active));}
+        assert(owner->prepareDraw());
+    }
     for(auto mode:{GameplayCollisionOwner::Ownership::native,GameplayCollisionOwner::Ownership::nativeScenery}){
         struct Notice {
             std::vector<bool> collision;std::vector<int> sprites;
@@ -2268,6 +2306,10 @@ int main(){
                 if(native){GameplayWorld::NativeTerrain::Identity id;bool active,destroyed;
                     assert(terrain->read(terrain->handle(index),id,active,destroyed)&&destroyed);}
                 else assert(owner->terrain().find(owner->terrain().handle(index))->destroyRequested);
+            }
+            if(executed){
+                assert(owner->prepareDraw());
+                assert((native?terrain->size():owner->terrain().size())==8-actual.size());
             }
         }
     }

@@ -292,6 +292,12 @@ public:
     bool activateNativeTerrain(downwell::InstanceHandle h,bool active){
         return run_.effectsSucceeded=run_.effectsSucceeded&&nativeTerrainInstances_&&nativeTerrainInstances_->activation(h,active);
     }
+    bool retireNativeTerrain(downwell::InstanceHandle h){
+        return run_.effectsSucceeded=run_.effectsSucceeded&&nativeTerrainInstances_&&nativeTerrainInstances_->retire(h);
+    }
+    bool rebindNativeTerrainOrder(downwell::InstanceHandle h,std::uint32_t order){
+        return run_.effectsSucceeded=run_.effectsSucceeded&&nativeTerrainInstances_&&nativeTerrainInstances_->rebindOrder(h,order);
+    }
     const downwell::GameplayScriptSpawnInstances* scriptSpawnInstances()const{return scriptSpawnInstances_;}
     const downwell::GameplayDebrisInstances* debrisInstances()const{return debrisInstances_;}
     const downwell::NativeTimeChangeRegistration* timeChangeInstances()const{return timeChangeInstances_;}
