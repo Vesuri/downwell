@@ -14,7 +14,68 @@ static bool outside(double sx,double sy,double x,double y){
     const float dx=float(x-sx),dy=float(y-sy),xx=dx*dx,yy=dy*dy,total=xx+yy;
     return double(float(std::sqrt(double(total))))-16>1e-5;
 }
+static void publishedSteps(){
+    for(unsigned seed=0;seed<1024;++seed){
+        downwell::GameMakerRandom random(seed),referenceRandom(seed);
+        downwell::SmokeMotion live,reference;
+        check(live.create(number(192.125),number(-96.125),random));
+        check(reference.create(number(192.125),number(-96.125),referenceRandom));
+        auto direction=[](auto speed,auto angle,auto& x,auto& y){
+            return downwell::SmokeDirection::vector(speed,angle,x,y,downwell::smokeTrig);
+        };
+        for(unsigned frame=0;frame<40;++frame){
+            const auto before=live;
+            unsigned calls=0;
+            struct Publish {
+                downwell::SmokeMotion& live;
+                const downwell::SmokeMotion& before;
+                unsigned& calls;
+                bool imageSpeed(downwell::RunnerImageValue value){
+                    check(!live.allSet&&calls++==0&&value.bits==live.imageSpeed.bits);return true;
+                }
+                bool position(downwell::RunnerImageValue x,downwell::RunnerImageValue y){
+                    const unsigned axis=calls++-unsigned(!before.allSet);
+                    check(axis<2&&live.allSet&&x.bits==live.x.bits&&y.bits==live.y.bits);
+                    if(axis==0)check(y.bits==before.y.bits);
+                    return true;
+                }
+            } publish{live,before,calls};
+            bool good=true;
+            check(live.stepPublished(random,direction,publish,downwell::smokeEscapedDistance,good));
+            check(reference.step(referenceRandom,direction));
+            check(calls==2+unsigned(!before.allSet));
+            check(live.xx.high==reference.xx.high&&live.xx.low==reference.xx.low&&
+                  live.yy.high==reference.yy.high&&live.yy.low==reference.yy.low&&
+                  live.xsp.high==reference.xsp.high&&live.xsp.low==reference.xsp.low&&
+                  live.ysp.high==reference.ysp.high&&live.ysp.low==reference.ysp.low&&
+                  live.x.bits==reference.x.bits&&live.y.bits==reference.y.bits&&
+                  live.imageSpeed.bits==reference.imageSpeed.bits&&live.noCollision==reference.noCollision);
+            check(random.drawCount()==referenceRandom.drawCount());
+            for(unsigned i=0;i<16;++i)check(random.stateWord(i)==referenceRandom.stateWord(i));
+        }
+        for(unsigned fail=0;fail<4;++fail){
+            auto state=reference;
+            state.allSet=false;state.noCollision=true;
+            const auto before=state;
+            unsigned calls=0;
+            struct FailingPublish {
+                unsigned& calls;unsigned fail;
+                bool imageSpeed(downwell::RunnerImageValue){return calls++!=fail;}
+                bool position(downwell::RunnerImageValue,downwell::RunnerImageValue){return calls++!=fail;}
+            } publish{calls,fail};
+            bool good=true;
+            auto escaped=[&](auto,auto,auto,auto,bool&){return calls++!=fail;};
+            check(!state.stepPublished(random,direction,publish,escaped,good)&&!good&&calls==fail+1);
+            if(fail==0)check(!state.allSet&&state.x.bits==before.x.bits&&state.y.bits==before.y.bits);
+            if(fail==1)check(state.allSet&&state.y.bits==before.y.bits);
+            const auto draws=random.drawCount();
+            check(!state.stepPublished(random,direction,publish,escaped,good)&&calls==fail+1&&random.drawCount()==draws);
+        }
+    }
+    std::puts("Smoke publication: 40960 scalar/RNG matches and 4096 terminal callback failures passed");
+}
 int main(){
+    publishedSteps();
     unsigned steps=0,escapes=0;
     for(unsigned seed=0;seed<1024;++seed){
         downwell::GameMakerRandom rng(seed),oracle(seed);

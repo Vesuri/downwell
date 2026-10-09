@@ -472,6 +472,15 @@ bool compilePaletteEffect(downwell::PaletteEffectSurface<>& surface,
 #include "core/SmokeComposition.h"
 #include "core/CurrencySmokeComposition.h"
 #include "core/SmokeEffects.h"
+bool compileSmokePublication(downwell::SmokeMotion& smoke,downwell::GameMakerRandom& random,bool& good){
+    struct Publish {
+        bool imageSpeed(downwell::RunnerImageValue){return true;}
+        bool position(downwell::RunnerImageValue,downwell::RunnerImageValue){return true;}
+    } publish;
+    return smoke.stepPublished(random,[](auto speed,auto direction,auto& x,auto& y){
+        return downwell::SmokeDirection::vector(speed,direction,x,y,downwell::smokeTrig);
+    },publish,downwell::smokeEscapedDistance,good);
+}
 bool compileSmokeContacts(downwell::SmokeEffects<32>& smoke){
     return smoke.collideWalls(smoke.beginPhase(),[](downwell::ContactBounds,auto emit){return emit();});
 }

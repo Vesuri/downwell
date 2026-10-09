@@ -47,6 +47,33 @@ struct SmokeMotion : SmokeBirth {
         }
         return true;
     }
+    // Registered room path. Retain step() above as the scalar oracle. The VM
+    // publishes image_speed before allSet, and X before Y before damping;
+    // observers must not see an atomically committed end-of-Step position.
+    // A failed observer leaves its executed prefix intact and stops the owner.
+    template<class Random,class Direction,class Publish,class Escaped>
+    bool stepPublished(Random& random,Direction directionVector,Publish& publish,
+                       Escaped escaped,bool& good) {
+        if(!good)return false;
+        if(!allSet){
+            if(!directionVector(speed,direction,xsp,ysp)||!sampleImageSpeed(random)||
+               !publish.imageSpeed(imageSpeed))return good=false;
+            allSet=true;
+        }
+        std::int32_t rounded;
+        if(!xx.add(xsp)||!yy.add(ysp)||!xx.roundPixel(rounded)||
+           !x.assignInteger(rounded)||!publish.position(x,y)||
+           !yy.roundPixel(rounded)||!y.assignInteger(rounded)||
+           !publish.position(x,y))return good=false;
+        if(!multiplyBinary64(xsp,{0x3fecccccu,0xcccccccdu},xsp)||
+           !multiplyBinary64(ysp,{0x3fecccccu,0xcccccccdu},ysp))return good=false;
+        if(noCollision){
+            bool outside=false;
+            if(!escaped(xstart,ystart,x.promoted(),y.promoted(),outside))return good=false;
+            if(outside)noCollision=false;
+        }
+        return true;
+    }
     void alarm0(){noCollision=false;}
     bool collideWall(){
         // The source changes smokesp, NOT xsp/ysp or image_speed. Once allSet,
