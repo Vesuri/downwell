@@ -16,6 +16,7 @@ struct BoneProjectile : ShootableThing {
     enum class Animation { instanceDefault, sampledRate, stopped };
     BoneMotion motion;
     ContactDamageScripts damageScripts;
+    SoundPlayState sound; // soundPlay called by scrPDamage retains fields on this bone.
     MotionBinary64 sampledAnimationRate;
     RunnerImageValue timeline{}, imageIndex{}, imageSpeed{0x3f800000u};
     int mask = -1;

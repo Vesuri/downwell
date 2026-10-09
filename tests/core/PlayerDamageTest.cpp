@@ -1,6 +1,8 @@
 #include "core/RunSession.h"
 #include "core/RunControllerInstances.h"
 #include "core/PlayerLifeRules.h"
+#include "core/BoneProjectile.h"
+#include "core/SkeletonActor.h"
 #include <cassert>
 #include <cstdio>
 #include <vector>
@@ -65,6 +67,36 @@ struct DamageControllerOwner {
     bool membership(InstanceHandle,const RunControllerInstances<2>::Record&,bool){return true;}
 };
 int main(){
+    for(unsigned failure=0;failure<=8;++failure){
+        const auto check=[&](auto& actor){
+            RunSession world;world.stage.area=1;world.backgroundMusicId=193;
+            Events events;SoundPlayEnvironment environment;environment.gameVolume={0x3fe00000u,0};environment.inWater=true;
+            struct Audio {
+                unsigned calls=0,failure;
+                bool next(){return ++calls!=failure;}
+                bool play(int id,int priority,bool loop,int& voice){assert(id==5&&priority==90&&!loop);voice=700;return next();}
+                bool getGain(int id,MotionBinary64& gain){assert(id==(calls==1?700:193));gain=n(1);return next();}
+                bool setGain(int id,MotionBinary64 gain,int duration){
+                    if(calls==2)assert(id==700&&eq(gain,{0x3fe00000u,0})&&duration==0);
+                    else if(calls==6)assert(id==193&&eq(gain,{0x3fe66666u,0x66666666u})&&duration==0);
+                    else assert(calls==7&&id==193&&eq(gain,n(1))&&duration==500);
+                    return next();
+                }
+                bool setPitch(int id,MotionBinary64 pitch){assert(id==700&&eq(pitch,{0x3fe19999u,0x9999999au}));return next();}
+                bool isPlaying(int id,bool& result){assert(id==193);result=true;return next();}
+                bool stop(int){assert(false);return false;} // Damage does not cut prior sounds.
+            } audio{0,failure};
+            actor.sound.OLnum="enemymove";
+            ContactDamageAudio<RunSession,Audio> service{world,actor.damageScripts.music,actor.sound,environment,audio};
+            const bool okay=actor.damageScripts.player.executeWithServices(n(1),events,events,service);
+            assert(okay==(failure==0)&&audio.calls==(failure?failure:8));
+            assert(actor.sound.sfxIndex==5&&actor.sound.soundPriority==90&&!actor.sound.cutPrv&&!actor.sound.loop);
+            assert(actor.sound.OLnum&&actor.sound.OLnum[0]=='e'); // Plain playback does not reset overlap fields.
+            assert(events.health==3&&events.hit==(failure==0)&&events.damaged==(failure==0));
+            assert(actor.damageScripts.music.duckDuration==(failure&&failure<=4?0:500));
+        };
+        BoneProjectile bone;check(bone);SkeletonActor skeleton;check(skeleton);
+    }
     int health=4;
     assert(subtractPlayerHealth(health,n(1))&&health==3);
     assert(subtractPlayerHealth(health,n(4))&&health==-1); // No clamp at zero.

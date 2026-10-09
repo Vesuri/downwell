@@ -194,6 +194,16 @@ number birth survive while the later damaged-flag write has not happened.
 This still requires the production sound/controller/jump/effect dependencies;
 the existing portable player coordinates are not a substitute for the remaining
 source-precision motion migration.
+The audio-enabled `bindContactDamagePlayer` overload accepts the attacker's
+existing `SoundPlayState`, current sound environment and backend. It executes
+the shared `soundPlay(5,90,0,0)` followed by the owned 500 ms music duck at the
+source script positions. Skeleton damage reuses the same sound fields as its
+throw/hurt/death calls; bones own corresponding sound fields, reset on birth.
+Plain damage playback neither cuts previous voices nor overwrites unrelated
+overlap-channel fields. Tests cover all eight backend failure positions, both
+attacker types, volume/underwater pitch, and playback/ducking through SDL audio.
+This adapter does not supply missing native device playback or load the game's
+sound resources into the normal SDL scene automatically.
 Alarm 1 VM SHA256:
 `e1dcdae86d6152a96607b2d8429582255d012ef2e742490fcd2ed8fcf9bf7d13`.
 

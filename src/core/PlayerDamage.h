@@ -45,6 +45,10 @@ struct PlayerDamage {
         return executeWithState(amount,events,events);
     }
     template<class Events,class State> bool executeWithState(MotionBinary64 amount,Events& events,State& state){
+        return executeWithServices(amount,events,state,events);
+    }
+    template<class Events,class State,class Audio> bool executeWithServices(
+        MotionBinary64 amount,Events& events,State& state,Audio& audio){
         if(!events.setDamageSourceName())return false;
         hitInvulnerability=events.candleOwned()?240:90;
         if(!events.playerDead() && !state.playerDamaged()){
@@ -54,8 +58,8 @@ struct PlayerDamage {
             MotionBinary64 direction;
             if(!events.pointDirection(cx,cy,px,py,direction) ||
                !state.damageNumber(amount,direction) ||
-               !events.sound(5,90,0,0) ||
-               !events.duckMusic(500,MotionBinary64{0x3fe66666u,0x66666666u}))return false;
+               !audio.sound(5,90,0,0) ||
+               !audio.duckMusic(500,MotionBinary64{0x3fe66666u,0x66666666u}))return false;
             events.setHit();
             // room_speed is assigned once per controller in the with loop,
             // before that controller's slown and Alarm 0 writes.

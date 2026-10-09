@@ -1821,6 +1821,8 @@ verify-sdl-audio: build/sdl-audio-test
 	python3 tools/verify-runner-audio-gain.py
 	SDL_AUDIODRIVER=dummy ./build/sdl-audio-test
 
+build/sdl-audio-test: src/core/ContactDamageScripts.h src/core/PlayerDamage.h src/core/TypicalPlayerDamage.h src/core/SoundPlayScript.h src/core/MusicDuck.h
+
 build/sdl-screenshot-test: tests/platform/SDLScreenshotTest.cpp src/platform/sdl/PlatformSDL.cpp src/core/SpritePack.cpp src/core/FontPack.cpp
 	@mkdir -p build
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)

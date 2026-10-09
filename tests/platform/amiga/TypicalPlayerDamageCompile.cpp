@@ -5,6 +5,7 @@
 using downwell::MotionBinary64;
 struct DuckAudio {
     bool isPlaying(int,bool&),getGain(int,MotionBinary64&),setGain(int,MotionBinary64,int);
+    bool play(int,int,bool,int&),stop(int),setPitch(int,MotionBinary64);
 };
 bool nativeBoundDamage(GameplayWorld& world,downwell::ContactDamageScripts& caller,
                       bool (*select)(downwell::InstanceHandle&)){
@@ -75,6 +76,13 @@ struct NumberDraw {
 bool nativeTypicalDamage(GameplayWorld& world,downwell::ContactDamageScripts& caller,
     DamageEvents& events,bool (*allocate)(std::uint32_t&)){
     return world.typicalPlayerDamage(caller,MotionBinary64::fromInteger(1),
+        MotionBinary64::fromInteger(3),MotionBinary64::fromInteger(2),events,allocate);
+}
+bool nativeAudibleDamage(GameplayWorld& world,downwell::ContactDamageScripts& caller,
+    downwell::SoundPlayState& sound,downwell::SoundPlayEnvironment& environment,DuckAudio& audio,
+    DamageEvents& events,bool (*select)(downwell::InstanceHandle&),bool (*allocate)(std::uint32_t&)){
+    auto bound=downwell::bindContactDamagePlayer(caller,world,select,sound,environment,audio);
+    return world.typicalPlayerDamage(bound,MotionBinary64::fromInteger(1),
         MotionBinary64::fromInteger(3),MotionBinary64::fromInteger(2),events,allocate);
 }
 bool compileDamageNumber(downwell::PlayerDamageNumber& effect,DamageEvents& events,NumberDraw& draw){

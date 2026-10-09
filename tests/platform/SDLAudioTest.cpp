@@ -2,6 +2,7 @@
 #include "core/TimeFieldWind.h"
 #include "core/MusicDuck.h"
 #include "core/TimeStopAudio.h"
+#include "core/ContactDamageScripts.h"
 #include <sndfile.h>
 #include <cassert>
 #include <cstdio>
@@ -9,6 +10,11 @@
 #include <unistd.h>
 using namespace downwell;
 namespace downwell {
+struct DamageMusicWorld {
+    bool duckMusic(MusicDuck& caller,int duration,MotionBinary64 amount,AudioSDL& audio){
+        return caller.execute(duration,amount,[]{return 1;},[]{return 193;},audio);
+    }
+};
 struct AudioSDLTestAccess {
     static void manual(AudioSDL& audio){SDL_PauseAudioDevice(audio.device_,1);}
     static double cursor(AudioSDL& audio,int id){
@@ -122,6 +128,12 @@ int main(){
         assert(audio.pause(193)&&audio.stop(193)&&audio.resume(193));
         assert(audio.isPlaying(193,state)&&!state&&audio.isPaused(193,state)&&!state);
         assert(audio.pause(-1)&&audio.resume(-1)&&audio.isPaused(-1,state)&&!state);
+        assert(audio.load(5,path,one)&&audio.play(193,80,true,first));
+        DamageMusicWorld musicWorld;ContactDamageScripts scripts;SoundPlayState sound;
+        ContactDamageAudio<DamageMusicWorld,AudioSDL> damage{musicWorld,scripts.music,sound,environment,audio};
+        assert(damage.sound(5,90,false,false)&&audio.isPlaying(sound.sndsnd,state)&&state);
+        assert(damage.duckMusic(500,{0x3fe66666u,0x66666666u})&&scripts.music.duckDuration==500);
+        assert(audio.getGain(193,gain)&&gain.high==0x3fe66666u&&gain.low==0x60000000u);
     }
     {
         AudioSDL audio;assert(audio.ready());
