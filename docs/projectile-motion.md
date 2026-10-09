@@ -1216,7 +1216,8 @@ point query enumerates the parent-59 registration order and evaluates each
 candidate with the native published shape. Neither query substitutes occupancy
 or nearest-distance ordering. Scheduled contact tests compare motion and the
 complete RNG state against reference ownership for box, wall and bone targets,
-with and without extra boxes, using real room layers and native wall births.
+enemy-over-wall suppression and zero-health corpses, with and without extra
+boxes, using real room layers and native wall births.
 
 `StoredSourceBulletStep` is the corresponding stored-world binding. It uses
 the stored owner's line/point/place queries and box writes, and dispatches
@@ -1227,9 +1228,11 @@ world handle to that registration. It never tries a second registry after a
 failed lookup, and unsupported descendants fail instead of receiving invented
 health or hit flags. The enclosing runtime must retain both registrations for
 their actors' lifetimes; this dispatcher does not create or schedule actors.
-The scoped stored scheduler fixture checks a registered bone impact through
-this adapter and the subsequent normal bullet cleanup. As with the native
-fixture, target placement is explicit and audio is a command recorder.
+The scoped stored scheduler fixtures check a registered bone impact and a
+zero-health corpse through this adapter, including normal bullet cleanup and
+the corpse's phase binding. The latter supplies explicit unstopped time and
+no Rest in Pieces upgrade for its one-tick contact case. As with the native
+fixtures, target placement is explicit and audio is a command recorder.
 
 The caller must provide complete collision and audio operations. Production
 callers without this scope still use the legacy trajectory: scoped scheduling

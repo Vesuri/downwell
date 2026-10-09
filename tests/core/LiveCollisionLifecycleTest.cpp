@@ -2148,35 +2148,51 @@ int main(){
         const auto before=world->randomDrawCount();world->step({},false);
         require(!world->effectsSucceeded()&&world->randomDrawCount()==before,"missing source dispatch fails before any tick mutation");
     }
-    {
+    for(bool corpseTarget:{false,true}){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
         require(owner->attach(*world),"attach concrete source bullet adapter");world->skipToGameForTesting();
         auto bones=world->boneRegistration<4>();auto corpses=world->corpseRegistration<1>();
         auto targets=storedShootableTargets(*owner,bones,corpses);InstanceHandle bone,shot;unsigned calls=0;
         auto frames=[&](int id,unsigned& count){return sprites.frameCount(id,count);};
+        auto corpseEvent=[&](auto,auto phase,unsigned,auto& state,auto& publish,bool& good){
+            require(phase==StartupRuntime::CorpsePhase::step,"new corpse cannot fire an alarm in its birth tick");
+            struct Environment {
+                int areaValue;
+                int area(){return areaValue;}int restInPieces(){return 0;}
+                bool create(int,MotionBinary64,MotionBinary64){return false;}
+            } environment{world->runStage().area};
+            return state.stepInWorld(false,480,publish,environment,good);
+        };
         for(unsigned tick=0;tick<1000&&!calls;++tick){
             require(world->withSourceBulletSteps([&](InstanceHandle key,MachineGunSourceMotion& motion){
                 shot=key;++calls;const int y=int(world->mainPlayerY());RunnerImageValue px,py;
-                require(px.assignInteger(240)&&py.assignInteger(y)&&world->spawnBone(bones,240,y,bone)&&
+                require(px.assignInteger(240)&&py.assignInteger(y)&&world->spawnBone(bones,corpseTarget?1000:240,y,bone)&&
                     world->publishBulletCollisionPosition(key,px,py),
                     "prepare explicit registered bone at source bullet position");
+                if(corpseTarget){
+                    DeadBodySource source{px.promoted(),py.promoted(),{},MotionBinary64::fromInteger(-1)};
+                    require(world->createRegisteredCorpseFromDeath(corpses,source,206,{},102,
+                        [](auto,int,auto,auto,bool& hit){hit=false;return true;}),"create zero-health corpse in bullet shape");
+                }
                 SoundPlayEnvironment environment;
                 BulletWallAudio audio{world->resolveInstance(key)->sound,world->overlapSound(2),29,false};
                 const auto before=world->randomDrawCount();
                 require(StoredSourceBulletStep::run(*world,*owner,key,motion,targets,frames,environment,audio),
                     "scheduled source event uses concrete stored collision adapter");
                 const auto* victim=bones.instances().find(bone);
-                require(victim&&victim->state.hit&&victim->state.health.high==0xc0200000u&&
+                require(victim&&victim->state.hit==!corpseTarget&&victim->state.health.high==(corpseTarget?0x3ff00000u:0xc0200000u)&&
                     world->randomDrawCount()==before+1&&audio.calls==0&&world->scriptEffects().size()==1&&
-                    owner->resolve(key)->destroyRequested&&motion.initialized,
+                    owner->resolve(key)->destroyRequested==!corpseTarget&&motion.initialized,
                     "scheduled bone impact retains source damage, muzzle and destruction timing");
                 return true;
-            },[&]{world->step(gameplayContactProfileInput(tick,world->mainPlayerX(),world->mainPlayerY()),false);
-                return world->effectsSucceeded();}),"source adapter completes ordinary world tick");
+            },[&]{return world->withCorpseEvents(corpses,corpseEvent,[&]{
+                world->step(gameplayContactProfileInput(tick,world->mainPlayerX(),world->mainPlayerY()),false);
+                return world->effectsSucceeded();});}),"source adapter completes ordinary world tick");
         }
-        require(calls==1&&!owner->resolve(shot),"stored cleanup retires source shot after scheduled impact");
-        require(bones.clear(),"clear explicitly registered adapter target");
+        require(calls==1&&(corpseTarget?(owner->resolve(shot)&&!owner->resolve(shot)->destroyRequested):!owner->resolve(shot)),
+            "bone impact retires the shot, but zero-health corpse leaves it moving");
+        require(bones.clear()&&corpses.clear(),"clear explicitly registered adapter targets");
     }
     for(bool high:{false,true})for(bool laser:{false,true})for(bool boneTarget:{false,true})for(bool worldRandom:{false,true}){
         if(worldRandom&&(high||laser))continue;
