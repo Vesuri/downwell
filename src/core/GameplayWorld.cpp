@@ -90,7 +90,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto phaseBoundary=phaseBoundary_;
     const auto roomAnimation=roomAnimation_;
     const auto actorEndStep=registeredActorEndStep_;void* const actorEndStepContext=registeredActorEndStepContext_;
-    const bool actorEndStepOwnsEnemies=registeredEnemyEndStep_;
+    const bool actorEndStepOwnsOrdinary=registeredOrdinaryEndStep_;
     const auto roomAlarms=roomAlarms_;void* const roomAlarmsContext=roomAlarmsContext_;
     const auto resultRoomAlarms=resultRoomAlarms_;void* const resultRoomAlarmsContext=resultRoomAlarmsContext_;
     void* const roomAnimationContext=roomAnimationContext_;
@@ -157,7 +157,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     configureCurrencyStepOrder(currencyOrderCapture,currencyOrderContext,currencyStepEligible);
     configurePhaseBoundary(phaseBoundary,phaseBoundaryContext);
     configureRoomAnimation(roomAnimation,roomAnimationContext);
-    configureRegisteredActorEndStep(actorEndStep,actorEndStepContext,actorEndStepOwnsEnemies);
+    configureRegisteredActorEndStep(actorEndStep,actorEndStepContext,actorEndStepOwnsOrdinary);
     configureRoomAlarms(roomAlarms,roomAlarmsContext);
     configureResultRoomAlarms(resultRoomAlarms,resultRoomAlarmsContext);
     configureRoomActorDraw(roomActorDraw,roomActorDrawContext,roomActorReadOnlyDraw);
@@ -1814,7 +1814,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         }
     }
     if(!reconcilePhase(PhaseBoundary::collision))return {};
-    if(!registeredEnemyEndStep_){
+    if(!registeredOrdinaryEndStep_){
         unsigned retiredEnemies = 0;
         const bool enemiesRetired=downwell::retireMainRoomObjectsChecked(enemyCount_, 11, 1, viewTop,
             [this, &retiredEnemies](unsigned i) {
@@ -1835,14 +1835,14 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                 return true;
             });
         if(!enemiesRetired){run_.effectsSucceeded=false;return {};}
+        const bool boxesRetired=downwell::retireMainRoomObjectsChecked(breakableCount_, 11, 1, viewTop,
+            [this](unsigned i) {
+                const auto& box = breakables_[i];
+                return downwell::LifetimeInstance{92, box.y + 176, box.active&&!box.destroyRequested};
+            },
+            [this](unsigned i) { return retireBreakable(i); });
+        if(!boxesRetired){run_.effectsSucceeded=false;return {};}
     }
-    const bool boxesRetired=downwell::retireMainRoomObjectsChecked(breakableCount_, 11, 1, viewTop,
-        [this](unsigned i) {
-            const auto& box = breakables_[i];
-            return downwell::LifetimeInstance{92, box.y + 176, box.active&&!box.destroyRequested};
-        },
-        [this](unsigned i) { return retireBreakable(i); });
-    if(!boxesRetired){run_.effectsSucceeded=false;return {};}
     if(registeredActorEndStep_&&!registeredActorEndStep_(registeredActorEndStepContext_,viewTop)){run_.effectsSucceeded=false;return {};}
 
 #if !defined(DOWNWELL_PLATFORM_AMIGA) || defined(DOWNWELL_REPLAY_VERIFY) || defined(DOWNWELL_SCENE_VERIFY)

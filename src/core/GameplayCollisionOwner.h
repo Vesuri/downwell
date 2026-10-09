@@ -123,6 +123,7 @@ private:
     RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity+GameplayWorld::droneBulletCapacity+GameplayWorld::boneCapacity+GameplayWorld::skeletonCapacity+GameplayWorld::currencyCapacity+32+32+4+4> combatAlarmPhase_;
     RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::droneBulletCapacity+GameplayWorld::skeletonCapacity+GameplayPlayerControllers::capacity+32> actorEndStepPhase_;
     bool actorEndStepExecuting_=false;
+    bool combatAlarmPhaseInUse_=false;
     bool combatAlarmCaptureDirty_=true;
     unsigned combatAlarmMask_=0;
     bool combatAlarmCaptureValid_=false;
@@ -1470,12 +1471,22 @@ public:
         world.configureRegisteredActorEndStep([](void* context,long topQ12){
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
             if(!self.valid())return false;
-            if(!self.world_->enemyCount()&&!self.drones_.size()&&!self.skeletons_.size()&&!self.playerControllers_.size()&&!self.corpses_.size())return true;
+            if(!self.world_->breakableSlots()&&!self.world_->enemyCount()&&!self.drones_.size()&&!self.skeletons_.size()&&!self.playerControllers_.size()&&!self.corpses_.size())return true;
             MotionBinary64 top;
             if(!multiplyBinary64(MotionBinary64::fromInteger(topQ12),{0x3f300000u,0},top))return self.check(false);
             return self.dispatchActorEndStep([&](InstanceHandle shared,int object){
                 View::Kind kind;InstanceHandle local;
                 if(!View::decode(shared,kind,local))return false;
+                if(object==92&&kind==View::Kind::breakable){
+                    const auto* box=self.world_->findBreakable(local);
+                    if(!box||!retireMainRoomObjectsChecked(1,11,1,topQ12,[&](unsigned){
+                        return LifetimeInstance{92,box->y+176,box->active&&!box->destroyRequested};
+                    },[&](unsigned){return self.world_->markBreakableDestroyed(local);}))return false;
+                    // Pinned original bytecode initializes autoTile to false
+                    // and never writes it again. Reject an unsupported external
+                    // state instead of silently omitting its image publication.
+                    return !box->state.autoTile||box->state.checked;
+                }
                 if(kind==View::Kind::enemy){
                     const auto* enemy=self.world_->resolveEnemyLifetime(local);
                     return enemy&&hasSimpleOutOfViewEndStep(object)&&
@@ -1757,7 +1768,9 @@ public:
         world.configureRoomAlarms([](void* context){
             DW_PROFILE_SCOPE(profileAlarmCapture);
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
-            if(!self.valid())return false;
+            if(!self.valid()||self.combatAlarmPhaseInUse_||self.actorEndStepExecuting_)return self.check(false);
+            self.combatAlarmPhaseInUse_=true;
+            struct ReleasePhase {bool& flag;~ReleasePhase(){flag=false;}} releasePhase{self.combatAlarmPhaseInUse_};
             auto& phase=self.combatAlarmPhase_;
             const auto boxes=self.nativeBoxAlarmPrefix_?self.world_->captureBoxAlarms():GameplayWorld::BoxAlarmPrefix{};
             EnemyAlarmRoster::Phase enemies;
@@ -1870,12 +1883,24 @@ public:
     }
     GameplayTerrainInstances& terrain(){return terrain_;}
     // Production handoff for the currently owned End Step actors. Keep its
-    // capture off the Amiga task stack and separate from cached alarm state.
+    // actor capture off the Amiga task stack. Reference boxes borrow the idle
+    // alarm workspace; native boxes borrow their lifetime prefix instead.
     // This does not stand in for the complete mixed world phase.
     template<class Execute> bool dispatchActorEndStep(Execute execute){
-        if(!valid()||!world_||actorEndStepExecuting_)return check(false);
+        if(!valid()||!world_||actorEndStepExecuting_||combatAlarmPhaseInUse_)return check(false);
         actorEndStepExecuting_=true;
         struct Reset {bool& value;~Reset(){value=false;}} reset{actorEndStepExecuting_};
+        const auto boxes=world_->captureBoxAlarms(); // Stable slots and a phase-wide birth ceiling.
+        // Reference box registration can be rebound and callbacks may mutate
+        // it. Reuse the inactive alarm workspace for its snapshot; native
+        // append-only box ownership needs only the prefix above.
+        if(!nativeBoxes_){
+            combatAlarmCaptureValid_=false;combatAlarmPhase_.clear();
+            if(!check(visitRegistered(View::breakableBase,View::terrainBase,
+                [&](InstanceHandle h,int object,std::uint32_t flags){
+                    return (flags&0x100003u)||(object==92&&resolves(h)&&combatAlarmPhase_.append(h.slot,h.generation,object));
+                })))return false;
+        }
         actorEndStepPhase_.clear();
         if(!check(visitRegistered(View::enemyBase,View::breakableBase,
             [&](InstanceHandle h,int object,std::uint32_t flags){
@@ -1894,6 +1919,26 @@ public:
                 return resolves(h)&&actorEndStepPhase_.append(h.slot,h.generation,object);
             })))return false;
         actorEndStepPhase_.sort();
+        // Object 92 precedes every actor admitted below. Borrow its stable
+        // native prefix instead of allocating a per-box snapshot. Reference
+        // ownership uses the captured registration order above. Capture actors
+        // BEFORE callbacks so box-born actors wait.
+        if(nativeBoxes_){
+            const unsigned end=boxes.end;
+            for(unsigned i=0;i<end&&i<world_->breakableSlots();++i){
+                const auto& box=world_->breakableSlot(i);
+                if(!box.nativeRegistration||box.lifetimeId>boxes.lastLifetime||!box.active||box.destroyRequested||
+                    (nativeBoxFlags_&0x100003u))continue;
+                const InstanceHandle h{View::breakableBase+i,box.lifetimeId};
+                if(!check(execute(h,92))||!valid())return false;
+            }
+        }else{
+            for(unsigned i=0;i<combatAlarmPhase_.size();++i){
+                const auto h=combatAlarmPhase_.handle(i);std::uint32_t flags;
+                if(!eligibilityFlags(h,flags)||(flags&0x100003u))continue;
+                if(!check(resolves(h)&&execute(h,92))||!valid())return false;
+            }
+        }
         for(unsigned i=0;i<actorEndStepPhase_.size();++i){
             const auto h=actorEndStepPhase_.handle(i);std::uint32_t flags;
             if(!eligibilityFlags(h,flags)||(flags&0x100003u))continue;

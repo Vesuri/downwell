@@ -255,10 +255,26 @@ rechecks lifetime and exclusion flags; callbacks cannot overwrite the active
 capture through recursive dispatch. The 165-entry workspace is owner-resident
 (2,640 bytes of entries), not on the 8 KiB Amiga task stack, and is separate
 from the cached alarm snapshot. This corrects ordering within that handoff;
-walls, boxes, remaining controllers and the other family passes are not thereby interleaved.
+walls, remaining controllers and the other family passes are not thereby interleaved.
+Boxes (92) precede this actor capture's dispatch, using a stable-slot prefix and
+generation ceiling rather than an additional per-box snapshot. Both the prefix
+and actor snapshot are captured before box callbacks: new boxes and actors wait
+until the next End Step. Reference ownership captures box registration order in
+the idle alarm workspace (invalidating its cached capture); nested use of these
+phases is rejected. Native ownership borrows its append-ordered registrations,
+without allocating or copying a box snapshot. Eligible boxes mark
+out-of-view destruction and remain allocated until Draw-entry cleanup.
+The native body specializes `autoTile == false`: the pinned complete 2,501-root
+bytecode export writes this field only in box Create, assigning zero, and has no
+dynamic instance/struct setter or code-evaluation calls. An externally supplied
+unchecked `autoTile == true` state fails rather than omitting its image write.
+Such synthetic states require native autotile query/render integration; the
+stored adapter retains the complete body for them. This is not an assumption
+that arbitrary modified game data or external extensions preserve the invariant.
 Ordinary enemies request destruction in this pass and survive until Draw-entry
 cleanup, just like the registered skeletons. They no longer run the preceding
-family retirement sweep when this owner is attached. Standalone worlds retain
+family retirement sweep when this owner is attached. Boxes likewise no longer
+retire before registered actor dispatch. Standalone worlds retain
 that sweep; Retry preserves which scheduler owns retirement. The ordinary
 enemy adapter still uses its existing published integer coordinates.
 Keep the phase cutoff and immediate flag rechecks below when integrating it;

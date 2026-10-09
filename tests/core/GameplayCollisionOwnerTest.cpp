@@ -2399,6 +2399,56 @@ int main(){
         result.id=123;
         assert(!collision->playerTimeFieldInstance({0x43700000u},{0x447a0000u},masks,result)&&result.id==123&&!collision->valid());
     }
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                  GameplayCollisionOwner::Ownership::nativeScenery}){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+        auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));
+        InstanceHandle skeleton;
+        assert(world->createSkeletonWithSourceId(607000,240,192,skeleton));
+        assert(world->createGeneratedInstance({92,240,-10000},objects,[](const auto&){return true;}));
+        const InstanceHandle first{0,world->breakableSlot(0).lifetimeId};
+        InstanceHandle newborn,enemy;
+        std::vector<int> seen;
+        assert(owner->dispatchActorEndStep([&](InstanceHandle shared,int object){
+            seen.push_back(object);
+            if(object==92){
+                assert(shared.slot==GameplayCollisionView::breakableBase+first.slot&&shared.generation==first.generation);
+                assert(world->markBreakableDestroyed(first));
+                assert(world->createGeneratedInstance({92,256,-10000},objects,[](const auto&){return true;}));
+                newborn={world->breakableSlots()-1,world->breakableSlot(world->breakableSlots()-1).lifetimeId};
+                assert(world->createGeneratedInstance({111,240,-10000},objects,[](const auto&){return true;}));
+                enemy=world->enemyHandle(world->enemyAt(0).lifetimeId);
+            }else assert(object==120&&world->findBreakable(first)&&world->findBreakable(first)->destroyRequested);
+            return true;
+        }));
+        assert((seen==std::vector<int>{92,120})); // Neither newborn family enters the captured phase.
+        assert(owner->prepareDraw()&&!world->findBreakable(first)&&world->findBreakable(newborn));
+        world->step(0);
+        assert(world->effectsSucceeded()&&world->findBreakable(newborn)&&world->findBreakable(newborn)->destroyRequested&&
+            world->resolveEnemyLifetime(enemy)&&world->resolveEnemyLifetime(enemy)->destroyRequested);
+        assert(owner->prepareDraw()&&!world->findBreakable(newborn)&&!world->resolveEnemyLifetime(enemy));
+        assert(owner->skeletons().find(skeleton));
+    }
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                  GameplayCollisionOwner::Ownership::nativeScenery}){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+        auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));
+        InstanceHandle skeleton;
+        assert(world->createSkeletonWithSourceId(607001,240,-10000,skeleton));
+        assert(world->createGeneratedInstance({92,240,-10000},objects,[](const auto&){return true;}));
+        const InstanceHandle box{0,world->breakableSlot(0).lifetimeId};
+        const_cast<GameplayWorld::Breakable*>(world->findBreakable(box))->state.autoTile=true;
+        world->step(0);
+        assert(!world->effectsSucceeded()&&world->findBreakable(box)&&world->findBreakable(box)->destroyRequested&&
+            !world->findBreakable(box)->state.checked&&owner->skeletons().find(skeleton)&&
+            !owner->skeletons().find(skeleton)->destroyRequested);
+    }
     {
         std::vector<std::uint32_t> expected;
         const auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
