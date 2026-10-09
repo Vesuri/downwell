@@ -5,6 +5,8 @@
 #include "OutOfViewLifetime.h"
 #include "SkeletonEffectBursts.h"
 #include "SoundPlayScript.h"
+#include "CurrencyRewardFields.h"
+#include "CurrencySpawnScript.h"
 namespace downwell {
 // Shared object-120 event body. Owner runs pre-Step animation and global alarm
 // phases separately, supplies synchronous effect/child calls, and defers removal
@@ -20,6 +22,13 @@ struct SkeletonActor : SkeletonDecisions {
     std::uint32_t myDeadBody=0;
     std::uint32_t myFx=0; // emitMovingFx writes the source numeric child ID before its setters.
     SmokeBurstCaller smokeScript;
+    CurrencyRewardFields reward;
+    bool readCurrencyReward(CurrencySpawnSource<std::uint32_t>& out)const{
+        out.x=MotionBinary64::fromInteger(x);out.y=MotionBinary64::fromInteger(y);
+        out.objectIndex=120;out.stomped=MotionBinary64::fromInteger(stomped?1:0);
+        out.moniAmount=reward.moniAmount;out.atrState=reward.atrState;out.myGem=reward.myGem;
+        return true;
+    }
     SoundPlayState sound;
     bool damageStun=false, stomped=false;
     bool grounded=true, alive=true, destroyRequested=false;

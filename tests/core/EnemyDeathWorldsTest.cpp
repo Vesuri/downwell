@@ -128,6 +128,62 @@ int main(){
     assert(sprites.valid()&&masks.valid());
     const auto fontData=load("generated/downwell-fonts.dwfn");downwell::FontPack fonts(fontData.data(),fontData.size());
     assert(fonts.valid());
+    for(bool stomped:{false,true})for(bool failSecond:{false,true})for(bool native:{false,true}){
+        using namespace downwell;
+        auto verify=[&](const SkeletonActor& actor,unsigned first,unsigned calls,const auto& world,auto child){
+            assert(calls==(failSecond?2u:3u)&&world.effectsSucceeded()==!failSecond);
+            assert(actor.reward.atrState==stomped&&actor.reward.myGem==first+(failSecond?0:2));
+            assert(actor.reward.moniAmount.high==(failSecond?0x40100000u:0u)&&!actor.reward.moniAmount.low);
+            for(unsigned i=0;i<calls;++i){
+                const auto* state=child(first+i);assert(state);
+                const bool complete=!failSecond||i==0;
+                assert(state->getAmount==(i==0?10:2)&&state->size==(i==0?1:0));
+                assert(state->attracted==(complete&&stomped));
+                assert(state->x.bits==0x43700000u&&state->y.bits==0x471c4000u); // published 240,40000
+            }
+        };
+        if(native){
+            auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+            auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),owner->breakableBinding(),
+                owner->playerBinding(),&owner->terrain());assert(owner->attach(*world));
+            InstanceHandle skeleton;assert(world->createSkeletonWithSourceId(505001,240,40000,skeleton));
+            struct Queries {
+                bool fail;unsigned calls=0;
+                bool wall(InstanceHandle,MotionBinary64,MotionBinary64,bool& hit){hit=false;return true;}
+                bool tile(InstanceHandle,int layer,MotionBinary64,MotionBinary64,bool& hit){
+                    assert(layer==100);hit=false;return !(++calls==2&&fail);
+                }
+            } queries{failSecond};
+            auto random=world->randomState();std::uint32_t next=506000;
+            assert(owner->skeletons().dispatch(skeleton,[&](auto& actor,auto&,bool&){
+                actor.money=14;actor.stomped=stomped;actor.xx=actor.yy=MotionBinary64::fromInteger(999);
+                return world->emitSkeletonCurrency(objects,actor,[&](std::uint32_t& id){id=next++;return true;},queries);
+            })==!failSecond);
+            verify(owner->skeletons().find(skeleton)->state,506000,queries.calls,*world,[&](unsigned id){
+                const auto* r=owner->currency().find(owner->currency().handleForSourceId(id));return r?&r->state:nullptr;
+            });
+            for(unsigned i=0;i<queries.calls*8;++i)random.nextU32();
+            for(unsigned i=0;i<16;++i)assert(random.stateWord(i)==world->randomState().stateWord(i));
+        }else{
+            auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+            auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,nullptr,owner->binding());
+            assert(owner->attach(*world));world->skipToGameForTesting();
+            auto skeletons=world->skeletonRegistration<1>();auto gems=world->currencyRegistration<3>();InstanceHandle skeleton;
+            assert(world->spawnSkeleton(skeletons,240,40000,skeleton));
+            const auto first=world->nextRuntimeInstanceId();auto random=world->randomState();unsigned calls=0;
+            assert(skeletons.dispatch(skeleton,[&](auto& actor,auto&,bool&){
+                actor.money=14;actor.stomped=stomped;actor.xx=actor.yy=MotionBinary64::fromInteger(999);
+                return world->emitSkeletonCurrency(gems,actor,[&](InstanceHandle,int layer,auto,auto,bool& hit){
+                    assert(layer==100);hit=false;return !(++calls==2&&failSecond);
+                });
+            })==!failSecond);
+            verify(skeletons.instances().find(skeleton)->state,first,calls,*world,[&](unsigned id){
+                const auto* r=world->instance(id);return r?gems.find(gems.handle(*r)):nullptr;
+            });
+            for(unsigned i=0;i<calls*8;++i)random.nextU32();
+            for(unsigned i=0;i<16;++i)assert(random.stateWord(i)==world->randomState().stateWord(i));
+        }
+    }
     for(auto mode:{downwell::GameplayCollisionOwner::Ownership::reference,
                   downwell::GameplayCollisionOwner::Ownership::native,
                   downwell::GameplayCollisionOwner::Ownership::nativeScenery}){

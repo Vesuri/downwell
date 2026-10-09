@@ -42,6 +42,14 @@ bool nativeSkeletonDeathBookkeeping(downwell::GameplayCollisionOwner& owner,down
 bool nativeSkeletonBloodSmoke(GameplayWorld& world,downwell::SkeletonActor& actor,bool (*allocate)(unsigned&)){
     return world.emitSkeletonBlood(actor,allocate)&&world.emitSkeletonSmoke(actor,allocate)&&world.emitSkeletonFlash(actor,allocate);
 }
+struct NativeSkeletonRewardQueries {
+    bool wall(downwell::InstanceHandle,downwell::MotionBinary64,downwell::MotionBinary64,bool&);
+    bool tile(downwell::InstanceHandle,int,downwell::MotionBinary64,downwell::MotionBinary64,bool&);
+};
+bool nativeSkeletonReward(GameplayWorld& world,const downwell::ObjectPack& objects,
+    downwell::SkeletonActor& actor,bool (*allocate)(std::uint32_t&),NativeSkeletonRewardQueries& queries){
+    return world.emitSkeletonCurrency(objects,actor,allocate,queries);
+}
 bool nativeSkeletonThrow(GameplayWorld& world,downwell::SkeletonActor& actor,downwell::RegisteredSkeletonThrow& caller,
     downwell::SoundPlayEnvironment& environment,NativeSkeletonAudio& audio){
     return world.throwSkeletonBoneWithSourceId(505201,actor,caller,environment,audio);

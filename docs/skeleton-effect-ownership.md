@@ -690,6 +690,15 @@ the registry's generation handles. Caller fields remain the responsibility of
 the required read/write accessors, not a temporary snapshot copied back at
 script exit. This entry point does not admit natural rewards or supply the
 native world's incomplete cross-family numeric-ID stream.
+`SkeletonActor::reward` retains those caller fields for registered skeleton
+events. Both worlds' `emitSkeletonCurrency` entry points run the retained script
+against that actor, reading its published x/y and stomp state rather than xx/yy.
+They must run within the selected skeleton's dispatch lifetime, whose owner
+defers retirement until the event returns. Child Create failure leaves the
+last completed numeric `myGem`, remaining amount and attraction flag intact;
+it does not publish the failed child's ID. The native entry still requires an
+enclosing numeric-ID allocator and source wall/tile queries. These bindings
+alone do not admit natural reward motion or complete the death event.
 The native `GameplayWorld::spawnRegisteredCurrency` uses that same retained
 script and real currency owner. Its mandatory allocator supplies each source
 ID before synchronous Create; allocation is never derived from a pool handle.

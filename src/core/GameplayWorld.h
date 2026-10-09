@@ -589,6 +589,14 @@ public:
         return downwell::CurrencySpawnScript::runRetained(read,writeAmount,writeAttracted,writeChild,amount,ops,run_.effectsSucceeded);
     }
     static constexpr unsigned bloodCapacity=32;
+    template<class Allocate,class Queries> bool emitSkeletonCurrency(const downwell::ObjectPack& objects,
+        downwell::SkeletonActor& actor,Allocate allocate,Queries& queries){
+        return spawnRegisteredCurrency(objects,[&](auto& out){return actor.readCurrencyReward(out);},
+            [&](downwell::MotionBinary64 value){actor.reward.moniAmount=value;return true;},
+            [&](bool value){actor.reward.atrState=value;return true;},
+            [&](std::uint32_t value){actor.reward.myGem=value;return true;},
+            downwell::MotionBinary64::fromInteger(actor.money),allocate,queries);
+    }
     bool currencyWallMeeting(downwell::InstanceHandle key,downwell::MotionBinary64 x,
         downwell::MotionBinary64 y,bool& hit){
         const auto* r=currencyInstances_?currencyInstances_->find(key):nullptr;

@@ -1094,6 +1094,14 @@ public:
         if(!registry.belongsTo(instances_))return run_.effectsSucceeded=false;
         return registry.create(x,y,run_.stage.area,run_.upgrades.levels[10]!=0,random_,tile,output);
     }
+    template<unsigned Capacity,class Tile> bool emitSkeletonCurrency(
+        StoredCurrencyRegistration<instanceCapacity,Capacity>& registry,SkeletonActor& actor,Tile tile){
+        return spawnRegisteredCurrency(registry,[&](auto& out){return actor.readCurrencyReward(out);},
+            [&](MotionBinary64 value){actor.reward.moniAmount=value;return true;},
+            [&](bool value){actor.reward.atrState=value;return true;},
+            [&](std::uint32_t value){actor.reward.myGem=value;return true;},
+            MotionBinary64::fromInteger(actor.money),tile);
+    }
     template<unsigned Capacity,class Ops> bool collectRegisteredCurrency(
         StoredCurrencyRegistration<instanceCapacity,Capacity>& registry,InstanceHandle gem,Ops& ops){
         if(!registry.belongsTo(instances_))return run_.effectsSucceeded=false;
