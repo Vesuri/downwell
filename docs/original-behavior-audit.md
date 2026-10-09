@@ -80,6 +80,33 @@ current font owner's measurement callback. Missing keys yield the source's
 single-space default. This text construction is tested across the extracted
 labels but is not yet bound to the live language/font state or natural births.
 
+### Original title-width measurement
+
+Read-only inspection of the pinned Windows executable identifies string_width
+registration at 0x537D32 (name 0x811D04, wrapper 0x535D50). The wrapper converts
+the string to character tokens and calls 0x45AA40 with both optional arguments
+set to -1. That routine resolves the selected font from global 0x8A5DF0 (or
+the default font), builds lines through 0x45ADC0, and returns their maximum
+integer width. Its line-width method is 0x44A2A0:
+
+- Look up each character through 0x449830. Missing characters retry U+25AF;
+  if that is absent too, the advance is zero.
+- Read the signed 16-bit glyph advance at record offset 0x0A, convert to
+  binary32, multiply by the font's binary32 scale at offset 0x8C, add the
+  previous integer width converted to binary32, then truncate back to integer
+  with CVTTSS2SI. The string_width caller supplies zero inter-character spacing.
+- There is no call to the separate kerning lookup at 0x449920 in this path.
+  The current SDL drawText lineWidth lambda adds kerning and therefore is not
+  an oracle for original string_width.
+
+`tools/verify-runner-text-width.py` pins the reviewed wrapper, font setter,
+maximum-line-width routine, glyph lookup and per-line arithmetic. Normal
+scrInitialize block 54 selects resource 2; levelNumber Create does not select
+a font itself. This is static executable/VM evidence, not an execution
+comparison. Font scale loading, line splitting and live active-font publication
+still require binding/audit before the measurement callback can be admitted. Do not replace
+this callback with character-count times eight or kerning-aware SDL layout.
+
 ## Result-room population and persistent alarms
 
 The exported `objLineToResult` Alarm 1 calls `room_goto(16)` unconditionally.
