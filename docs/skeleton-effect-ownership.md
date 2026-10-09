@@ -1261,6 +1261,13 @@ Pieces and synchronous alarm/death children remain caller-supplied checked
 dependencies. This scope is not default admission of the
 complete death chain, nor does it provide native registration or Draw routing.
 
+`CorpseDraw::surface` resolves the existing immutable planar corpse frames,
+including pre-mirrored variants. It retains fractional world anchors for the
+compositor, skips flash-hidden/destroyed/out-of-view and zero-scale draws,
+and rejects transforms outside the admitted unit-scale artwork. It does not
+choose cross-family order: smoke and corpse share a depth, so the caller must
+merge their source room order rather than append a separate corpse pass.
+
 `CorpseMotion` implements ordinary Step: custom-real gravity and damping,
 parent-56 motion probes, bounce/settling and the bounded 1–16 floor search.
 Area 3 divides displacement by four without changing stored velocities. It

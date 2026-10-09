@@ -1,5 +1,6 @@
 #include "core/BinaryEffectSurface.h"
 #include "core/EffectMaskAssets.h"
+#include "core/CorpseDraw.h"
 #include <array>
 #include <vector>
 #include <fstream>
@@ -33,6 +34,37 @@ int main(int argc,char**argv){
     Surface surface;std::array<bool,160*284> expected{};
     downwell::EffectMaskAssets shared;
     check(shared.bind(pack.data(),pack.size()));
+    {
+        using Real=downwell::MotionBinary64;
+        const downwell::EffectSurfacePlacement::View view{Real::fromInteger(160),Real::fromInteger(34),
+            Real::fromInteger(160),Real::fromInteger(284)};
+        for(unsigned sprite:{172u,206u})for(bool mirrored:{false,true}){
+            downwell::CorpseAnimation corpse;corpse.spriteId=int(sprite);
+            corpse.x={0x43784000u};corpse.y={0x43008000u}; // 248.25, 128.5
+            corpse.imageXscale={mirrored?0xbf800000u:0x3f800000u};corpse.imageIndex={0x3f400000u};
+            unsigned emitted=0;
+            auto emit=[&](const auto& actual,Real x,Real y){
+                const auto expectedAsset=asset(sprite+(mirrored?62000:0),0);
+                check(actual.mask.data==expectedAsset.mask.data&&actual.originX==expectedAsset.ox&&actual.originY==expectedAsset.oy);
+                check(x.high==corpse.x.promoted().high&&x.low==corpse.x.promoted().low&&
+                    y.high==corpse.y.promoted().high&&y.low==corpse.y.promoted().low);
+                ++emitted;return true;
+            };
+            check(downwell::CorpseDraw::surface(corpse,shared,view,emit)&&emitted==1);
+            check(!downwell::CorpseDraw::surface(corpse,shared,view,[](const auto&,auto,auto){return false;}));
+            corpse.flash=1;check(downwell::CorpseDraw::surface(corpse,shared,view,emit)&&emitted==1);
+            corpse.flash=0;corpse.destroyRequested=true;
+            check(downwell::CorpseDraw::surface(corpse,shared,view,emit)&&emitted==1);
+            corpse.destroyRequested=false;corpse.x={0x43200000u}; // Strict left edge: hidden.
+            check(downwell::CorpseDraw::surface(corpse,shared,view,emit)&&emitted==1);
+            corpse.x={0x43784000u};corpse.imageXscale={};
+            check(downwell::CorpseDraw::surface(corpse,shared,view,emit)&&emitted==1);
+            corpse.imageXscale={0x40000000u};check(!downwell::CorpseDraw::surface(corpse,shared,view,emit));
+            corpse.imageXscale={0x3f800000u};corpse.imageIndex={0x7fc00000u};
+            check(!downwell::CorpseDraw::surface(corpse,shared,view,emit)&&emitted==1);
+        }
+        std::puts("Corpse surface adapter: four offline variants, fractional anchors, visibility and failure gates passed");
+    }
     // Keep the independent directory walker above as an oracle for the shared
     // descriptor's borrowed bytes and signed cropped-frame origins.
     for(unsigned frame=0;frame<9;++frame){

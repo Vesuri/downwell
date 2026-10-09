@@ -589,6 +589,12 @@ bool compileCorpseDraw(const downwell::CorpseAnimation& corpse,
                        downwell::CorpseDraw::Command& out){
     return downwell::CorpseDraw::prepare(corpse,view,false,false,true,out);
 }
+bool compileCorpseSurface(const downwell::CorpseAnimation& corpse,const downwell::EffectMaskAssets& assets,
+    const downwell::EffectSurfacePlacement::View& view){
+    return downwell::CorpseDraw::surface(corpse,assets,view,[](const auto& asset,auto x,auto y){
+        return asset.mask.data&&x.valid()&&y.valid();
+    });
+}
 #include "core/CorpseEffects.h"
 #include "core/StoredCorpseRegistration.h"
 #include "core/SkeletonInstances.h"

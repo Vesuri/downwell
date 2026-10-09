@@ -554,7 +554,7 @@ test: verify-smoke-composition
 verify-binary-effects: build/binary-effects-test generate-amiga-game
 	./build/binary-effects-test generated/amiga-game.dwap
 
-build/binary-effects-test: tests/core/BinaryEffectSurfaceTest.cpp src/core/BinaryEffectSurface.h src/core/EffectMaskAssets.h
+build/binary-effects-test: tests/core/BinaryEffectSurfaceTest.cpp $(wildcard src/core/*.h)
 	@mkdir -p build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ $<
 
