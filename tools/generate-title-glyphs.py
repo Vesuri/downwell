@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from PIL import Image
 
-VERSION = 2
+VERSION = 3
 SOURCE = "c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8"
 
 def mask_bytes(alpha, width, height):
@@ -58,15 +58,16 @@ def generate(manifest_path, output, check):
         total += len(mask); maximum = max(maximum,len(mask))
         lines.append(f'static const std::uint8_t mask{i}[] = {{'+','.join(str(b) for b in mask or b'\0')+'};')
         records.append(f'{{{c},{{mask{i},{len(mask)},{w},{h},{stride}}},{glyph["offset"]},{glyph["shift"]}}},')
+    line_height = max(0,*(g['sourceHeight'] for g in font['glyphs']))
     lines += [f'static const std::uint8_t zero[{max(1,maximum)}] = {{}};',
               'static const FontGlyphMask glyphs[] = {',*records,'};',
-              'static const FontGlyphMasks bank(2,glyphs,sizeof(glyphs)/sizeof(glyphs[0]),zero,sizeof(zero));','}']
+              f'static const FontGlyphMasks bank(2,glyphs,sizeof(glyphs)/sizeof(glyphs[0]),zero,sizeof(zero),{line_height});','}']
     payload = ('\n'.join(lines)+'\n').encode()
     evidence = {'schemaVersion':1,'tool':{'name':Path(__file__).name,'version':VERSION,
         'sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest()},
         'sourceSha256':SOURCE,'manifestSha256':hashlib.sha256(raw).hexdigest(),
         'texture':{'name':page_path.name,'sha256':hashlib.sha256(page_path.read_bytes()).hexdigest()},
-        'fontId':2,'glyphCount':len(records),'maskBytes':total,'zeroBytes':maximum,
+        'fontId':2,'glyphCount':len(records),'maskBytes':total,'zeroBytes':maximum,'lineHeight':line_height,
         'outputSha256':hashlib.sha256(payload).hexdigest()}
     metadata = (json.dumps(evidence,indent=2)+'\n').encode()
     if check:

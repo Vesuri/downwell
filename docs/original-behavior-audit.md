@@ -124,7 +124,8 @@ are retained; missing glyphs use U+25AF and then no ink. Other font resources an
 colors are rejected, not thresholded or substituted.
 
 `LevelNumberSurfaceDraw` joins those glyphs to the shared event for the admitted
-left/center/right horizontal, top vertical, opaque text state. It borrows current font/alignment/alpha/color rather
+left/center/right horizontal and top/middle/bottom vertical, opaque text state.
+It borrows current font/alignment/alpha/color rather
 than setting defaults, retains the helper's final white color, and handles each
 single-token hash/newline/NUL as no ink. The compositor's surface-local emitter
 avoids a second camera subtraction and uses its supplied raster policy. Tests
@@ -144,8 +145,16 @@ Draw calls still need tracking. The draw_text wrapper narrows X/Y with FSTP m32;
 right, with a binary32 addition. The shared adapter now preserves those two
 rounding boundaries, using offline unit-font advances for single tokens. Tests
 include values beyond 2^24 that distinguish input narrowing from integer-only
-placement. Vertical alignment and final glyph-quad raster sampling are not yet
-admitted beyond the existing top/integer path.
+placement. The font loader at 0x44A077 initializes the height to zero and keeps
+the maximum signed glyph field at +8 (serialized sourceHeight). The height
+accessor at 0x44A280 multiplies this integer by binary32 scaleY and truncates;
+its apparent "M" string argument is unused. The single-token title domain thus
+uses the whole font's 10-pixel line height, not each glyph's visible bounds or
+the 12-pixel spacing used by some offline multi-line text. The vertical path at
+0x459CEC subtracts half/full total line height for middle/bottom, after input
+narrowing and with binary32 subtraction. All nine alignment combinations are
+tested. Final glyph-quad raster sampling remains unverified beyond the existing
+integer placement cases.
 
 The stored runner's `withLevelNumberDraw` borrows the title registration only
 for its enclosing render, while `drawLevelNumber` resolves the original room

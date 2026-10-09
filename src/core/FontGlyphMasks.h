@@ -12,8 +12,12 @@ struct FontGlyphMask {
 class FontGlyphMasks {
 public:
     FontGlyphMasks(unsigned font,const FontGlyphMask* glyphs,unsigned count,
-                   const std::uint8_t* zero,unsigned zeroBytes):
-        font_(font),glyphs_(glyphs),count_(count),zero_(zero),zeroBytes_(zeroBytes){}
+                   const std::uint8_t* zero,unsigned zeroBytes,int lineHeight):
+        font_(font),glyphs_(glyphs),count_(count),zero_(zero),zeroBytes_(zeroBytes),lineHeight_(lineHeight){}
+    bool lineHeight(unsigned font,int& value)const{
+        if(font!=font_||lineHeight_<0)return false;
+        value=lineHeight_;return true;
+    }
     // Missing characters use the runner's U+25AF fallback, then no ink.
     bool width(unsigned font,unsigned character,int& value)const{
         if(font!=font_||!glyphs_)return false;
@@ -41,6 +45,7 @@ private:
     }
     unsigned font_;const FontGlyphMask* glyphs_;unsigned count_;
     const std::uint8_t* zero_;unsigned zeroBytes_;
+    int lineHeight_;
 };
 }
 #endif

@@ -23,16 +23,17 @@ static void titleSurface(){
         bool view(unsigned axis,MotionBinary64& out){++views;out=MotionBinary64::fromInteger(axis?30000:1000000);return true;}
     };
     struct PositionEmit {
-        int expectedX;unsigned calls=0;
+        int expectedX,expectedY;unsigned calls=0;
         bool atSurface(const EffectMaskAssets::Asset&,MotionBinary64 x,MotionBinary64 y){
             std::int32_t px,py;assert(x.roundPixel(px)&&y.roundPixel(py));
-            assert(px==expectedX&&py==16777220);++calls;return true;
+            assert(px==expectedX&&py==expectedY);++calls;return true;
         }
     };
-    for(unsigned token:{unsigned('A'),unsigned('.'),unsigned('1')})for(unsigned align=0;align<3;++align){
+    for(unsigned token:{unsigned('A'),unsigned('.'),unsigned('1')})for(unsigned align=0;align<3;++align)for(unsigned vertical=0;vertical<3;++vertical){
         int width;assert(title_glyphs::bank.width(2,token,width));
-        PositionEmit emit{16777216-(align==1?width/2:align==2?width:0)};
-        Target target;LevelNumberTextDrawState state{2,align,0,0xffffff,MotionBinary64::fromInteger(1)};
+        int height;assert(title_glyphs::bank.lineHeight(2,height)&&height==10);
+        PositionEmit emit{16777216-(align==1?width/2:align==2?width:0),16777220-(vertical==1?5:vertical==2?10:0)};
+        Target target;LevelNumberTextDrawState state{2,align,vertical,0xffffff,MotionBinary64::fromInteger(1)};
         LevelNumberSurfaceDraw<Target,PositionEmit> draw(title_glyphs::bank,state,target,emit);
         assert(draw.character(token,MotionBinary64::fromInteger(16777217),MotionBinary64::fromInteger(16777219))&&emit.calls==1);
     }
@@ -76,7 +77,7 @@ static void titleSurface(){
     for(unsigned mode=0;mode<4;++mode){
         Target target;LevelNumber<1> title;
         assert(title.create(1,MotionBinary64::fromInteger(8),[](unsigned,unsigned& c){c='A';return true;}));
-        LevelNumberTextDrawState state{mode==0?0u:2u,mode==1?3u:0u,mode==2?1u:0u,123,
+        LevelNumberTextDrawState state{mode==0?0u:2u,mode==1?3u:0u,mode==2?3u:0u,123,
             MotionBinary64::fromInteger(mode==3?0:1)};
         assert(!composition->prepareWithSurfaceProducers([](auto){},smoke,assets,view,{},
             [](auto){return true;},[&](auto emit){

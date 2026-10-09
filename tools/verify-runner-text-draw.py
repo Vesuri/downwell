@@ -23,6 +23,9 @@ for start,end,digest in (
     (0x45AA00,0x45AA34,'2b2630c125db33b6193cc82ba173c74eb40a9d1cfb9512ccc81fcf2a8a2fdb12'),
     (0x459D9C,0x459E38,'e6e4fe5bc2244e224b55206b0c835b92467122e86d3ced8a5b43a090b3955763'),
     (0x45A940,0x45A973,'ff711292f49058bdea687049bdb8bc26276a1bc2c7bc990955f34bc1e729c31d'),
+    (0x44A077,0x44A12A,'4a434e964ea76863018199b7f7d23f7ed581314dcd0e077bcac3392ebfbc3bc9'),
+    (0x44A280,0x44A29A,'e3fa35683877ad7cdeb36b2e5583ed4e9084c34c969975f53dfb462147df09c0'),
+    (0x459CEC,0x459D4B,'32212e9122890aecec49194caa90e4423f0993ac6319d391d9b1d0c222e3214d'),
 ):
     assert sha256(region(start,end-start)).hexdigest()==digest,hex(start)
 # draw_text narrows both numeric arguments using FSTP m32 before 0x459C50.
@@ -31,6 +34,10 @@ assert region(0x5323E5,3)==bytes.fromhex('d9 1c 24')
 # Centered alignment: signed truncation of width/2, negate, convert to f32.
 assert region(0x459DBA,11)==bytes.fromhex('99 2b c2 d1 f8 f7 d8 66 0f 6e c0')
 assert region(0x459E29,5)==bytes.fromhex('f3 0f 58 45 08')
+# Height is max signed glyph +8; nominal "M" argument is unused by height accessor.
+assert region(0x44A10B,4)==bytes.fromhex('0f bf 40 08')
+assert region(0x44A280,8)==bytes.fromhex('66 0f 6e 81 80 00 00 00')
+assert region(0x44A28B,8)==bytes.fromhex('f3 0f 59 81 90 00 00 00')
 assembly=root/'extracted/utmt-0.9.2.0/Assembly'
 player=(assembly/'gml_GlobalScript_playerDraw.asm').read_text()
 assert player.count('call.i draw_set_halign(argc=1)')==1
