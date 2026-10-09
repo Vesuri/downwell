@@ -547,7 +547,7 @@ struct RunSession {
     bool stepLevelClear(bool& confirm, bool leftPressed, bool rightPressed, bool& heartGoal,
                         CurrencyAccount& currency, PlayerMotion& player, int& health,
                         GameMakerRandom& random, Emit emit) {
-        if (!levelClearActive || nextLevelRequested) return false;
+        if (!effectsSucceeded || !levelClearActive || nextLevelRequested) return false;
         exitDither.advanceAlarm();
         const auto effect = [&](LevelClearSelection::Effect event, unsigned value) {
             if (event == LevelClearSelection::Effect::dither) {
@@ -557,9 +557,12 @@ struct RunSession {
             if (event == LevelClearSelection::Effect::nextLevel) nextLevelRequested = true;
             emit(event, value);
         };
-        levelClear.advanceAlarms(effect);
+        if(!levelClear.advanceAlarmsChecked([&](auto event,unsigned value){
+            effect(event,value);return effectsSucceeded;
+        }))return effectsSucceeded=false;
         const bool ok = levelClear.step(confirm, leftPressed, rightPressed, heartGoal,
             upgrades, consumables, currency, player, health, combo.healthReserve, random, effect);
+        if(!ok||!effectsSucceeded)return effectsSucceeded=false;
         exitDither.step(levelClear.motion.viewY(), 284);
         levelClearFrame = levelClear.presentation.advance(stage.area, stage.level,
             levelClear.selection.next, levelClear.selection.visible);

@@ -12,6 +12,10 @@ void compileResultAlarm(downwell::LevelClearSelection& result,unsigned index,
     void (*emit)(downwell::LevelClearSelection::Effect,unsigned)){
     result.advanceAlarm(index,emit);
 }
+bool compileCheckedResultAlarm(downwell::LevelClearSelection& result,unsigned index,
+    bool (*emit)(downwell::LevelClearSelection::Effect,unsigned)){
+    return result.advanceAlarmChecked(index,emit);
+}
 bool compileControllerLifetime(downwell::RunControllerInstances<4>& owner,unsigned id,
     bool (*initialize)(downwell::InstanceHandle),downwell::InstanceHandle& key){
     return owner.create(id,{}, {},initialize,key);

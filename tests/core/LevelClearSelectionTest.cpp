@@ -78,5 +78,15 @@ int main() {
     menu.advanceAlarms([&](Effect, unsigned) { std::abort(); });
     require(menu.alarm1 == -1 && menu.alarm3 == -1 && menu.alarm4 == -1,
         "zero alarms retire without dispatch on the following phase");
+    for(auto failed:{Effect::dither,Effect::fadeWhoosh,Effect::nextLevel}){
+        menu.create(2);menu.alarm0=failed==Effect::nextLevel?-1:1;menu.alarm1=1;
+        unsigned calls=0;
+        require(!menu.advanceAlarmsChecked([&](Effect effect,unsigned){++calls;return effect!=failed;}),
+            "checked alarm failure stops the phase");
+        require(calls==(failed==Effect::fadeWhoosh?2u:1u)&&
+            menu.alarm1==(failed==Effect::dither?1:failed==Effect::fadeWhoosh?90:0)&&
+            menu.alarm4==60&&menu.next==0,
+            "failure preserves exactly the completed alarm prefix without later countdowns");
+    }
     std::puts("Level-clear selection timing, input and effect-order tests passed");
 }

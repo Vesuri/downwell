@@ -35,6 +35,7 @@ struct LevelClearController {
         return true;
     }
     template<class Emit> void advanceAlarms(Emit emit) { selection.advanceAlarms(emit); }
+    template<class Emit> bool advanceAlarmsChecked(Emit emit) { return selection.advanceAlarmsChecked(emit); }
     template<class Emit>
     bool step(bool& confirm, bool leftPressed, bool rightPressed, bool& heartGoal,
               UpgradeInventory& inventory, Consumables& consumables,

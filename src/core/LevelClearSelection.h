@@ -22,17 +22,17 @@ struct LevelClearSelection {
     // Dispatch immediately after each countdown. Later alarms observe writes
     // made by this event (including synchronous effects), not a frozen mask.
     // The room scheduler can interleave other objects at each alarm index.
-    template<class Emit> void advanceAlarm(unsigned index, Emit emit) {
+    template<class Emit> bool advanceAlarmChecked(unsigned index, Emit emit) {
         switch (index) {
         case 0:
             if (AlarmBank::advanceValue(alarm0)) {
-                emit(Effect::dither, 0);
+                if(!emit(Effect::dither, 0))return false;
                 alarm1 = 90;
-                emit(Effect::fadeWhoosh, 0);
+                if(!emit(Effect::fadeWhoosh, 0))return false;
             }
             break;
         case 1:
-            if (AlarmBank::advanceValue(alarm1)) emit(Effect::nextLevel, 0);
+            if (AlarmBank::advanceValue(alarm1) && !emit(Effect::nextLevel, 0))return false;
             break;
         case 3:
             if (AlarmBank::advanceValue(alarm3)) inputWait = false;
@@ -41,10 +41,18 @@ struct LevelClearSelection {
             if (AlarmBank::advanceValue(alarm4) && next <= 4) next = 4;
             break;
         }
+        return true;
+    }
+    template<class Emit> void advanceAlarm(unsigned index, Emit emit) {
+        advanceAlarmChecked(index,[&](Effect effect,unsigned value){emit(effect,value);return true;});
+    }
+    template<class Emit> bool advanceAlarmsChecked(Emit emit) {
+        for (unsigned index = 0; index < AlarmBank::count; ++index)
+            if(!advanceAlarmChecked(index, emit))return false;
+        return true;
     }
     template<class Emit> void advanceAlarms(Emit emit) {
-        for (unsigned index = 0; index < AlarmBank::count; ++index)
-            advanceAlarm(index, emit);
+        advanceAlarmsChecked([&](Effect effect,unsigned value){emit(effect,value);return true;});
     }
     template<class Emit>
     void step(bool& confirm, bool leftPressed, bool rightPressed,

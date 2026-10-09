@@ -1619,7 +1619,7 @@ public:
     }
     template<class Emit>
     bool stepLevelClear(bool& confirm, bool leftPressed, bool rightPressed, bool& heartGoal, Emit emit) {
-        if (!run_.levelClearActive || run_.nextLevelRequested) return false;
+        if (!run_.effectsSucceeded || !run_.levelClearActive || run_.nextLevelRequested) return false;
         ++tick_;
         return run_.stepLevelClear(confirm, leftPressed, rightPressed, heartGoal,
             currencyAccount_, player_, health_, enemyRandom_, emit);

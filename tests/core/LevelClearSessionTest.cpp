@@ -7,6 +7,29 @@ static void require(bool ok, const char* why) {
 }
 int main() {
     using namespace downwell;
+    for(auto failed:{LevelClearSelection::Effect::dither,LevelClearSelection::Effect::fadeWhoosh,
+                    LevelClearSelection::Effect::nextLevel}){
+        RunSession stopped;GameMakerRandom random(42);PlayerMotion player;CurrencyAccount currency;
+        int health=4;bool heart=false,confirm=true;
+        stopped.levelResultRequested=true;
+        require(stopped.enterLevelClear(0,false,health,player,random),"checked Result fixture entry");
+        stopped.levelClear.selection.alarm0=failed==LevelClearSelection::Effect::nextLevel?-1:1;
+        stopped.levelClear.selection.alarm1=1;
+        const auto draws=random.drawCount();
+        const auto time=stopped.levelClearFrame.time;
+        unsigned calls=0;
+        auto emit=[&](LevelClearSelection::Effect event,unsigned){
+            ++calls;if(event==failed)stopped.effectsSucceeded=false;
+        };
+        require(!stopped.stepLevelClear(confirm,false,false,heart,currency,player,health,random,emit)&&
+            !stopped.effectsSucceeded,"Result callback failure is terminal");
+        require(stopped.levelClearFrame.time==time&&random.drawCount()==draws&&
+            stopped.levelClear.selection.alarm4==60&&confirm,
+            "failed alarm does not run Result Step, presentation or later timers");
+        const auto count=calls;
+        require(!stopped.stepLevelClear(confirm,false,false,heart,currency,player,health,random,emit)&&calls==count,
+            "failed Result phase is not retried");
+    }
     for(int area:{1,2})for(int level:{1,2,3}){
         RunSession run;run.stage.area=area;run.stage.level=level;
         GameMakerRandom random(42),expected(42);
