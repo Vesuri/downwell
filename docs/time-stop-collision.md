@@ -302,6 +302,17 @@ easing accumulators. Alarm expiry leaves the prior published offset intact
 until Step. A side-lock collision's explicit Y assignment replaces its vertical
 offset without replacing X. This covers the admitted time-stop amplitude, not
 arbitrary VM-valued shake arguments or the unimplemented camera modes.
+Registered contact damage now uses this same admitted camera path for
+`scrSShake(5,8)`, after forced jump and the live death check. Its attacker owns
+`ScreenShakeCaller` through `ContactDamageScripts`; other shake calls on that
+attacker must borrow the same caller fields. The fields are written before
+camera resolution, so a failed camera request does not erase them. Amplitude
+and Alarm 0 are raised independently, never shortened by a weaker request.
+Amplitude 5 samples inclusive X [-2,2] and Y [-5,5]. Both world tests follow
+damage with the weaker time-stop request and verify expiry after eight ticks.
+The native adapter still requires its followed main camera; the stored path
+rejects missing or multiple active cameras. This is not general object-64
+selector support or complete native camera/controller lifetime admission.
 
 `GameplayWorld::requestTimeStopCameraShake` supplies the same effect to the
 native followed-camera path. Its compact Alarm 0 uses the shared countdown

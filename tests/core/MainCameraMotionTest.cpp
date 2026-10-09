@@ -12,6 +12,19 @@ int main() {
         struct Random {
             unsigned calls=0;
             unsigned irandomSmall(unsigned max){
+                require(max==(calls%2?10u:4u),"odd damage amplitude truncates X half endpoints");
+                ++calls;return max;
+            }
+        } random;
+        downwell::MainCameraMotion camera;
+        camera.requestShake(5);camera.requestTimeStopShake();camera.sampleShake(random);
+        require(random.calls==2&&camera.shakeAmount==5&&camera.pixelX()==242&&camera.pixelY()==181,
+            "damage shake retains larger amplitude and samples X before Y");
+    }
+    {
+        struct Random {
+            unsigned calls=0;
+            unsigned irandomSmall(unsigned max){
                 require(max==(calls%2?4u:2u),"shake requests inclusive X then Y ranges");
                 ++calls;return max;
             }

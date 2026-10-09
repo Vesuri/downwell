@@ -1949,10 +1949,15 @@ public:
     }
     bool cameraSideLocked() const { return cameraMotion_.sideLocked; }
     bool requestTimeStopCameraShake(){
+        return requestCameraShake(2,2);
+    }
+    int cameraShakeAmount()const{return cameraMotion_.shakeAmount;}
+    bool requestCameraShake(int amount,int duration){
         if(!run_.effectsSucceeded)return false;
+        if(amount<0||amount>32767||duration<0)return run_.effectsSucceeded=false;
         if(!followCamera_)return run_.effectsSucceeded=false;
-        cameraMotion_.requestTimeStopShake();
-        if(cameraShakeAlarm_<2)cameraShakeAlarm_=2;
+        cameraMotion_.requestShake(amount);
+        if(cameraShakeAlarm_<duration)cameraShakeAlarm_=duration;
         return true;
     }
     std::uint64_t sideCameraDigest() const { return run_.sideCameraLockers.digest(cameraMotion_); }

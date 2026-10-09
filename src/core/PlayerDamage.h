@@ -4,14 +4,18 @@
 #include "AlarmBank.h"
 #include "InstanceHandle.h"
 #include "CurrencyHomingMath.h"
+#include "ScreenShakeCaller.h"
 namespace downwell {
 // Borrow the shared flag; evaluate the object selector at the alarm write,
 // after synchronous effects that may have changed the player population.
 template<class World,class SelectPlayer> struct RegisteredPlayerDamageState {
-    World& world;SelectPlayer selectPlayer;
+    World& world;SelectPlayer selectPlayer;ScreenShakeCaller& shakeCaller;
     bool playerDamaged()const{return world.playerDamaged();}
     bool playerDead()const{return world.playerDeathActive();}
     bool playerHealthPositive()const{return world.playerHealthPositive();}
+    bool shake(int amount,int duration){
+        return shakeCaller.execute(amount,duration,[&](int a,int d){return world.requestCameraShake(a,d);});
+    }
     void setPlayerDamaged(){world.setPlayerDamaged();}
     void setHit(){world.setPlayerHit();}
     bool candleOwned()const{return world.upgrades().levels[7]!=0;}

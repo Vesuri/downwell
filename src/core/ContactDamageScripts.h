@@ -15,6 +15,7 @@ struct ContactDamageScripts {
     PlayerDamage player;
     ForcedPlayerJump jump;
     MusicDuck music;
+    ScreenShakeCaller shake;
     template<class Events,class CreateField>
     bool execute(MotionBinary64 amount,MotionBinary64 horizontal,MotionBinary64 vertical,
         Events& events,CreateField createField){
@@ -57,7 +58,7 @@ template<class World,class SelectPlayer> struct RegisteredContactDamage {
     }
 };
 template<class World,class SelectPlayer> RegisteredContactDamage<World,SelectPlayer> bindContactDamagePlayer(
-    ContactDamageScripts& caller,World& world,SelectPlayer selectPlayer){return {caller,{world,selectPlayer}};}
+    ContactDamageScripts& caller,World& world,SelectPlayer selectPlayer){return {caller,{world,selectPlayer,caller.shake}};}
 template<class World,class SelectPlayer,class Audio> struct AudibleRegisteredContactDamage {
     RegisteredContactDamage<World,SelectPlayer> binding;ContactDamageAudio<World,Audio> services;
     template<class Events,class CreateField>
@@ -70,7 +71,7 @@ template<class World,class SelectPlayer,class Audio>
 AudibleRegisteredContactDamage<World,SelectPlayer,Audio> bindContactDamagePlayer(
     ContactDamageScripts& caller,World& world,SelectPlayer selectPlayer,
     SoundPlayState& sound,SoundPlayEnvironment& environment,Audio& audio){
-    return {{caller,{world,selectPlayer}},{world,caller.music,sound,environment,audio}};
+    return {{caller,{world,selectPlayer,caller.shake}},{world,caller.music,sound,environment,audio}};
 }
 }
 #endif

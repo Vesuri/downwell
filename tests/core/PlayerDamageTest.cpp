@@ -69,7 +69,9 @@ struct DamageControllerOwner {
 int main(){
     {
         struct World {} world;
-        RegisteredPlayerDamageState<World,int> state{world,0};
+        ScreenShakeCaller shake;
+        assert(!shake.execute(5,8,[](int,int){return false;})&&shake.shakeAmt==5&&shake.shakeDur==8);
+        RegisteredPlayerDamageState<World,int> state{world,0,shake};
         MotionBinary64 value;
         assert(state.lengthdirX(n(3),n(0),value)&&eq(value,n(3)));
         assert(state.lengthdirX(n(3),n(90),value)&&value.zero());

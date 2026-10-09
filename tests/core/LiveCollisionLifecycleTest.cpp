@@ -1905,9 +1905,17 @@ int main(){
             MotionBinary64::fromInteger(scenario==1?4:1),one,one,events);}),"source live/depleted/dead damage branches");
         require(world->mainPlayerHealth()==(scenario==0?3:0)&&world->playerDeathActive()==(scenario==2)&&
             events.sounds==unsigned(scenario!=2)&&events.ducks==unsigned(scenario!=2)&&
-            events.shakes==unsigned(scenario!=2)&&events.hits==unsigned(scenario==0),"separate death and surviving HP gates");
+            !events.shakes&&events.hits==unsigned(scenario==0),"separate death and surviving HP gates");
+        require(world->cameraShakeAmount()==(scenario==2?0:5)&&caller.shake.shakeAmt==(scenario==2?0:5)&&
+            caller.shake.shakeDur==(scenario==2?0:8),"damage reaches actual camera and retains caller shake fields");
         require(world->playerDamaged()&&!world->noDamageAchievement()&&!world->areaNoDamageAchievement(),
             "already-dead damage still completes unguarded tail writes");
+        if(scenario!=2){
+            require(world->requestTimeStopCameraShake()&&world->cameraShakeAmount()==5,"weaker shake does not replace damage amplitude");
+            for(unsigned tick=1;tick<=8;++tick){world->step({},false);
+                require(world->effectsSucceeded()&&world->cameraShakeAmount()==(tick<8?5:0),
+                    "shorter time-stop request cannot shorten damage's camera alarm");}
+        }
     }
     for(int alarm:{-1,0,1,2}){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);

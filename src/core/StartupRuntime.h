@@ -1108,6 +1108,8 @@ public:
         return run_.effectsSucceeded;
     }
     bool requestTimeStopCameraShake();
+    bool requestCameraShake(int amount,int duration);
+    int cameraShakeAmount()const{return mainCameraMotion_.shakeAmount;}
     // The caller must keep the returned bridge alive and retire its shards
     // before changing rooms. Phase dispatch is intentionally not supplied here.
     template<unsigned Capacity> StoredTimeShardRegistration<instanceCapacity,Capacity> timeShardRegistration(){

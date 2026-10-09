@@ -15,7 +15,8 @@ struct MainCameraMotion {
     bool shaking = false;
     int shakeAmount = 0, shakeX = 0, shakeY = 0;
     void stopShake(){shaking=false;shakeAmount=0;}
-    void requestTimeStopShake(){shaking=true;if(shakeAmount<2)shakeAmount=2;}
+    void requestShake(int amount){shaking=true;if(shakeAmount<amount)shakeAmount=amount;}
+    void requestTimeStopShake(){requestShake(2);}
     template<class Random> void sampleShake(Random& random){
         shakeX=shakeY=0;
         if(!shaking)return;

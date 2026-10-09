@@ -1780,7 +1780,7 @@ int main(){
                    GameplayCollisionOwner::Ownership::nativeScenery})for(bool upgraded:{false,true})for(bool failJump:{false,true}){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
             GameplayTerrainInstances::WallCollision{},nullptr,mode);
-        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+        auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
         assert(owner->attach(*world));
         auto& inventory=const_cast<UpgradeInventory&>(world->upgrades());
@@ -1814,7 +1814,7 @@ int main(){
                    GameplayCollisionOwner::Ownership::nativeScenery})for(unsigned scenario=0;scenario<3;++scenario){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
             GameplayTerrainInstances::WallCollision{},nullptr,mode);
-        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+        auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
         assert(owner->attach(*world));
         if(scenario==2){assert(world->subtractPlayerHealth(MotionBinary64::fromInteger(4)));world->step(0);}
@@ -1826,8 +1826,15 @@ int main(){
             [](std::uint32_t&){return false;}));
         assert(world->health()==(scenario==0?3:0)&&world->playerDeathActive()==(scenario==2)&&
             events.sounds==unsigned(scenario!=2)&&events.ducks==unsigned(scenario!=2)&&
-            events.shakes==unsigned(scenario!=2)&&events.hits==unsigned(scenario==0));
+            !events.shakes&&events.hits==unsigned(scenario==0));
+        assert(world->cameraShakeAmount()==(scenario==2?0:5)&&caller.shake.shakeAmt==(scenario==2?0:5)&&
+            caller.shake.shakeDur==(scenario==2?0:8));
         assert(world->playerDamaged()&&!world->noDamageAchievement()&&!world->areaNoDamageAchievement());
+        if(scenario!=2){
+            assert(world->requestTimeStopCameraShake()&&world->cameraShakeAmount()==5);
+            for(unsigned tick=1;tick<=8;++tick){world->step(0);
+                assert(world->effectsSucceeded()&&world->cameraShakeAmount()==(tick<8?5:0));}
+        }
     }
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
                    GameplayCollisionOwner::Ownership::nativeScenery})for(unsigned reject:{0u,1u,2u,3u}){

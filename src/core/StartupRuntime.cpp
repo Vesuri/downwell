@@ -1792,7 +1792,11 @@ bool StartupRuntime::publishMainCameraPosition(InstanceRecord& instance){
 }
 
 bool StartupRuntime::requestTimeStopCameraShake(){
+    return requestCameraShake(2,2);
+}
+bool StartupRuntime::requestCameraShake(int amount,int duration){
     if(!run_.effectsSucceeded)return false;
+    if(amount<0||amount>32767||duration<0)return run_.effectsSucceeded=false;
     if(!mainCameraInitialized_||roomId_!=mainRoomId)return run_.effectsSucceeded=false;
     InstanceRecord* camera=nullptr;
     for(std::size_t i=0;i<instances_.size();++i){
@@ -1802,8 +1806,8 @@ bool StartupRuntime::requestTimeStopCameraShake(){
         camera=&r;
     }
     if(!camera)return run_.effectsSucceeded=false;
-    mainCameraMotion_.requestTimeStopShake();
-    if(camera->alarms.get(0)<2)camera->alarms.set(0,2);
+    mainCameraMotion_.requestShake(amount);
+    if(camera->alarms.get(0)<duration)camera->alarms.set(0,duration);
     return true;
 }
 
