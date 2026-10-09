@@ -618,6 +618,7 @@ private:
             if constexpr(Kind==View::Kind::timeChange)return 211;
             if constexpr(Kind==View::Kind::entryDither)return 73;
             if constexpr(Kind==View::Kind::ditherAbove)return 61;
+            if constexpr(Kind==View::Kind::builder)return 65;
             if constexpr(Kind==View::Kind::drone)return 266;
             if constexpr(Kind==View::Kind::bone)return 269;
             if constexpr(Kind==View::Kind::skeleton)return 120;
@@ -648,7 +649,7 @@ private:
             DW_PROFILE_SCOPE(profileInstanceBirth);
             InstanceHandle h;
             if(!key(local,r,h,true))return false;
-            if constexpr(Kind==View::Kind::player)if(!parent.check(parent.layers_.prepare()))return false;
+            if constexpr(Kind==View::Kind::player||Kind==View::Kind::builder)if(!parent.check(parent.layers_.prepareFirstBirth()))return false;
             if constexpr(Kind!=View::Kind::terrain)if(parent.native_)return nativeBirth(local,h,r);
             Owner::State state;
             Owner::Box terrainBounds;bool preparedTerrain=false,terrainPrecise=false;
@@ -706,7 +707,7 @@ private:
             if constexpr(Kind==View::Kind::terrain)sourceId=r.sourceInstanceId;
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
             if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
-            if constexpr(Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::goalField)sourceId=r.sourceId;
+            if constexpr(Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::builder||Kind==View::Kind::goalField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency)sourceId=r.sourceId;
             constexpr bool projected=Kind==View::Kind::player||Kind==View::Kind::enemy||
                 Kind==View::Kind::bullet||Kind==View::Kind::scriptEffect||Kind==View::Kind::debris||Kind==View::Kind::entryDither||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::ditherAbove;
@@ -726,7 +727,7 @@ private:
             if constexpr(Kind==View::Kind::scriptEffect||Kind==View::Kind::debris){
                 if(!r.effect)return parent.check(false);
                 position->x=r.effect->x;position->y=r.effect->y;
-            }else if constexpr(Kind==View::Kind::timeChange||Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency){
+            }else if constexpr(Kind==View::Kind::timeChange||Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::builder||Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency){
                 position->x=r.x;position->y=r.y;
             }else{
                 constexpr bool roomCoordinates=Kind==View::Kind::player||Kind==View::Kind::terrain||Kind==View::Kind::timeField||Kind==View::Kind::goalField||Kind==View::Kind::exitController;
@@ -806,7 +807,7 @@ private:
             unsigned sourceId=0;
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
             if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
-            if constexpr(Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::goalField)sourceId=r.sourceId;
+            if constexpr(Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::builder||Kind==View::Kind::goalField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency)sourceId=r.sourceId;
             constexpr bool projected=Kind==View::Kind::player||Kind==View::Kind::enemy||
                 Kind==View::Kind::bullet||Kind==View::Kind::scriptEffect||Kind==View::Kind::debris||Kind==View::Kind::entryDither||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::ditherAbove;
@@ -1009,6 +1010,8 @@ private:
     GameplayEntryDithers entries_{GameplayEntryDithers::Binding::bindDestruction(entryBinding_)};
     Binding<GameplayDitherAbove::Record,View::Kind::ditherAbove> aboveBinding_{*this};
     GameplayDitherAbove above_{GameplayDitherAbove::Binding::bindDestruction(aboveBinding_)};
+    Binding<GameplayBuilderController::Record,View::Kind::builder> builderBinding_{*this};
+    GameplayBuilderController builderController_{GameplayBuilderController::Binding::bindMovement(builderBinding_)};
     Binding<GameplayWorld::DroneBullets::Record,View::Kind::drone> droneBinding_{*this};
     GameplayWorld::DroneBullets drones_{GameplayWorld::DroneBullets::Binding::bindPositionedActor(droneBinding_)};
     Binding<GameplayWorld::Bones::Record,View::Kind::bone> boneBinding_{*this};
@@ -1115,7 +1118,7 @@ public:
     template<class Visit> bool visitRegistrationOrder(Visit visit)const{return valid()&&visitEligibility(visit);}
     // Drone dispatch deliberately exposes bool& status to arbitrary callbacks;
     // retain its live read rather than delaying a callback's failure to return.
-    bool valid()const{return good_&&blood_.valid()&&skeletons_.valid()&&(failureObserved_?(drones_.valid()&&bones_.valid()):
+    bool valid()const{return good_&&builderController_.valid()&&blood_.valid()&&skeletons_.valid()&&(failureObserved_?(drones_.valid()&&bones_.valid()):
         (owner_.valid()&&properties_.valid()&&terrain_.valid()&&scriptEffects_.valid()&&debris_.valid()&&
          timeChanges_.valid()&&entries_.valid()&&drones_.valid()&&bones_.valid()&&layers_.valid()));}
     unsigned pendingSpatialIndex()const{return owner_.pendingSpatialIndex();}
@@ -1319,6 +1322,7 @@ public:
         if(!world_&&!world.bindTimeChangeInstances(timeChanges_))return check(false);
         if(!world_&&!world.bindEntryDithers(entries_))return check(false);
         if(!world_&&!world.bindDitherAbove(above_))return check(false);
+        if(!world_&&!world.bindBuilderController(builderController_))return check(false);
         if(!world_&&!world.bindDroneBullets(drones_))return check(false);
         if(!world_&&!world.bindBones(bones_))return check(false);
         if(!world_&&!world.bindSkeletons(skeletons_))return check(false);

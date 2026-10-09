@@ -189,8 +189,12 @@ bool AmigaGameplayGeneration::step(downwell::GameMakerRandom& random, int viewBo
     dirtyFirst = worldRows; dirtyEnd = 0;
     if (!runtime_) return false;
     builder_.setPlayerHealth(runtime_->health());
+    builder_.setPositionPublisher([](void* opaque,int x,int y){
+        return static_cast<AmigaPortRuntime*>(opaque)->publishBuilderPosition(x,y);
+    },runtime_);
     downwell::AreaOneBuilderStep result;
     const bool ok = builder_.stepVisible(patterns_, random, viewBottom, result);
+    builder_.setPositionPublisher(nullptr,nullptr);
     if (dirtyFirst < 0) dirtyFirst = 0;
     if (dirtyEnd > worldRows) dirtyEnd = worldRows;
     return ok;

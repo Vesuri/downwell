@@ -181,19 +181,25 @@ There are distinct existing entry inputs, which must not be conflated:
 
 The live native call sites perform builder setup before the fresh traversal.
 The stored adapter runs builder Create (code 1002) at authored index 0 and
-field Create (2731) at index 147. Native player ownership is published at
-authored index 1, but native builder setup still does not register the builder's
-controller lifetime, and native player-created controllers/companions are not
-yet a complete synchronous birth stream. These omissions prevent claiming full
-room-order parity.
+field Create (2731) at index 147. Native builder ownership is published at
+authored index 0 with source ID 100856, before the production player's birth
+at index 1. Its typed record retains position and identity, while generation
+and RNG state remain in the existing shared builder. A failed builder birth
+stops entry before player, terrain or field births. Retry/next-level teardown
+retires that identity before publishing a replacement generation.
+Builder setup still precedes the native room traversal, and native
+player-created controllers/companions are not yet a complete synchronous birth
+stream. These omissions prevent claiming full room-order parity. The builder
+joins resource-backed lifetime, spatial and layer ownership; full mixed event
+and Draw scheduling remains a separate integration requirement.
 
 `scrBuilder` blocks 187 and 207 write `self.y += 16` after each newline's
 pillars and each extra-pillar row respectively. Shared scalar, run and prepared
 generation retain these setter boundaries, including the completed prefix on
 failure. The stored adapter publishes each setter through its lifecycle owner
 before the next synchronous child Create; copying only the final frontier into
-the instance record is not equivalent. Native controller ownership must bind
-the same publication points when it is integrated.
+the instance record is not equivalent. Native generation binds the same row
+publication points to the builder's registered position for each Step.
 
 Non-glitch wall Create consumes no RNG, but that does not make relocating
 field lifetime publication or cleanup equivalent. Terrain failure before the

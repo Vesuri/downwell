@@ -24,6 +24,7 @@
 #include "core/GameplayExitControllers.h"
 #include "core/GameplayEntryDithers.h"
 #include "core/GameplayDitherAbove.h"
+#include "core/GameplayBuilderController.h"
 #include "core/DroneBulletInstances.h"
 #include "core/BoneProjectileInstances.h"
 #include "core/SkeletonInstances.h"
@@ -321,6 +322,16 @@ public:
     const downwell::NativeTimeChangeRegistration* timeChangeInstances()const{return timeChangeInstances_;}
     const downwell::GameplayEntryDithers* entryDithers()const{return entryDithers_;}
     const downwell::GameplayDitherAbove* ditherAbove()const{return ditherAbove_;}
+    const downwell::GameplayBuilderController* builderController()const{return builderController_;}
+    bool bindBuilderController(downwell::GameplayBuilderController& actor){
+        if(builderController_||!actor.valid()||actor.handle().generation)return false;
+        builderController_=&actor;return true;
+    }
+    bool publishBuilderPosition(int x,int y){
+        if(!run_.effectsSucceeded)return false;
+        // Unindexed generator fixtures have no room/controller ownership.
+        return run_.effectsSucceeded=!builderController_||builderController_->position(x,y);
+    }
     void configureDitherAboveEnvironment(bool lowSpec,bool ending){ditherLowSpec_=lowSpec;ditherEnding_=ending;}
     bool adoptDitherAbove(const downwell::GameplayDitherAbove::Snapshot& snapshot){
         if(!run_.effectsSucceeded||!ditherAbove_||!ditherAbove_->adopt(snapshot))return run_.effectsSucceeded=false;
@@ -845,7 +856,7 @@ public:
     // Fresh room creation, not adoption of an already-executed stored room.
     // Builder/RNG setup must precede this call. Admit the authored dither and
     // field at their serialized boundaries, not after the terrain batch.
-    // Full player-child and builder lifetime ordering still needs integration.
+    // Full player-child creation and builder setup timing still need integration.
     template<class Terrain>
     bool loadRoomTerrainWithStartField(const downwell::RoomPack& rooms,const downwell::PackedRoom& room,
         Terrain terrain,const downwell::PreparedRoomTerrain* prepared=nullptr){
@@ -889,6 +900,9 @@ private:
             downwell::PackedRoomInstance decoded;
             if(!retained&&!rooms.roomInstance(room,i,decoded)){run_.effectsSucceeded=false;return false;}
             const auto& instance=retained?prepared->at(i):decoded;
+            if(instance.objectId==65&&builderController_&&
+                !builderController_->create(instance.instanceId,instance.x,instance.y))
+                return run_.effectsSucceeded=false;
             if(instance.objectId==35&&playerBirthPending_){
                 if(!birthPlayerOwnership())return false;
                 playerBirthPending_=false;
@@ -1492,6 +1506,7 @@ private:
     downwell::NativeTimeChangeRegistration* timeChangeInstances_=nullptr;
     downwell::GameplayEntryDithers* entryDithers_=nullptr;
     downwell::GameplayDitherAbove* ditherAbove_=nullptr;
+    downwell::GameplayBuilderController* builderController_=nullptr;
     bool ditherLowSpec_=false,ditherEnding_=false;
     DroneBullets* droneBullets_=nullptr;
     Bones* bones_=nullptr;

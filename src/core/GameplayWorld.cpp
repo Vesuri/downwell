@@ -37,6 +37,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     if(!clearRoomTimeChanges())return downwell::ResultsDestination::none;
     if(entryDithers_&&!entryDithers_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(ditherAbove_&&!ditherAbove_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
+    if(builderController_&&!builderController_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(droneBullets_&&!droneBullets_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(bones_&&!bones_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(skeletons_&&!skeletons_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
@@ -61,6 +62,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto timeChangeInstances=timeChangeInstances_;
     const auto entryDithers=entryDithers_;
     const auto ditherAbove=ditherAbove_;
+    const auto builderController=builderController_;
     const auto droneBullets=droneBullets_;
     const auto bones=bones_;
     const auto skeletons=skeletons_;
@@ -117,6 +119,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     timeChangeInstances_=timeChangeInstances;
     entryDithers_=entryDithers;
     ditherAbove_=ditherAbove;
+    builderController_=builderController;
     droneBullets_=droneBullets;
     bones_=bones;
     skeletons_=skeletons;
@@ -193,6 +196,7 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
     if(!clearRoomTimeChanges())return false;
     if(entryDithers_&&!entryDithers_->clear())return run_.effectsSucceeded=false;
     if(ditherAbove_&&!ditherAbove_->clear())return run_.effectsSucceeded=false;
+    if(builderController_&&!builderController_->clear())return run_.effectsSucceeded=false;
     if(droneBullets_&&!droneBullets_->clear())return run_.effectsSucceeded=false;
     if(bones_&&!bones_->clear())return run_.effectsSucceeded=false;
     if(skeletons_&&!skeletons_->clear())return run_.effectsSucceeded=false;

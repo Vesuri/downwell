@@ -306,11 +306,12 @@ static void checkTypedCollisionView(const GameplayCollisionView& view,GameplayCo
         case K::blood:assert(view.resolveLocal<K::blood>(local)==reference.blood);break;
         case K::currency:assert(view.resolveLocal<K::currency>(local)==reference.currency);break;
         case K::ditherAbove:assert(view.resolveLocal<K::ditherAbove>(local)==reference.ditherAbove);break;
+        case K::builder:assert(view.resolveLocal<K::builder>(local)==reference.builder);break;
     }
 }
 static void checkCollisionViewMembership(const GameplayWorld& world){
     const GameplayCollisionView view(world);
-    for(unsigned family=0;family<=unsigned(GameplayCollisionView::Kind::ditherAbove);++family)
+    for(unsigned family=0;family<=unsigned(GameplayCollisionView::Kind::builder);++family)
         for(auto local:{InstanceHandle{0,0},InstanceHandle{0xffffffffu,1},InstanceHandle{GameplayCollisionView::capacity,1}})
             checkTypedCollisionView(view,GameplayCollisionView::Kind(family),local);
     for(unsigned slot=0;slot<=GameplayCollisionView::capacity;++slot){
@@ -4056,6 +4057,28 @@ int main(){
             fieldsOwner->population(371,population)&&population==0&&
             !fieldWorld->goalFieldInstances().find({0,firstIdentity})&&fieldsOwner->valid());
     }
+    {
+        struct RejectedBuilder {
+            unsigned births=0;
+            bool birth(InstanceHandle,const GameplayBuilderController::Record& r){
+                ++births;assert(r.sourceId==100856);return false;
+            }
+            bool retire(InstanceHandle,const GameplayBuilderController::Record&){return true;}
+            bool activation(InstanceHandle,const GameplayBuilderController::Record&,bool){return true;}
+            bool membership(InstanceHandle,const GameplayBuilderController::Record&,bool){return true;}
+        } rejected;
+        GameplayBuilderController builder(GameplayBuilderController::Binding::bind(rejected));
+        auto world=std::make_unique<GameplayWorld>(300,false,1025,true,
+            GameplayWorld::EnemyLifecycleBinding{},GameplayWorld::BreakableLifecycleBinding{},
+            GameplayWorld::PlayerLifecycleBinding{},nullptr,&rooms,GameplayWorld::PlayerBirthTiming::authoredRoom);
+        assert(world->bindBuilderController(builder));
+        unsigned walls=0;const auto draws=world->randomDrawCount();
+        assert(!world->loadRoomTerrainWithStartField(rooms,room,[&](const auto&){++walls;return true;}));
+        assert(rejected.births==1&&!walls&&!world->effectsSucceeded()&&world->awaitingPlayerBirth()&&
+            !world->playerHandle().generation&&world->randomDrawCount()==draws);
+        assert(!world->loadRoomTerrainWithStartField(rooms,room,[&](const auto&){++walls;return true;}));
+        assert(rejected.births==1&&!walls);
+    }
     for(auto timing:{GameplayWorld::PlayerBirthTiming::construction,GameplayWorld::PlayerBirthTiming::authoredRoom})
     for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
                        GameplayCollisionOwner::Ownership::nativeScenery}){
@@ -4066,9 +4089,10 @@ int main(){
         auto world=std::make_unique<GameplayWorld>(300,false,1201-176,true,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),native?nullptr:&owner->terrain(),&rooms,timing);
         assert(owner->attach(*world)&&(!native||world->bindNativeTerrain(*nativeTerrain)));
-        unsigned priorGeneration=0,priorDitherGeneration=0,priorPlayerGeneration=0;
+        unsigned priorGeneration=0,priorDitherGeneration=0,priorPlayerGeneration=0,priorBuilderGeneration=0;
         for(unsigned retry=0;retry<2;++retry){
             const bool deferred=timing==GameplayWorld::PlayerBirthTiming::authoredRoom;
+            assert(world->builderController()&&!world->builderController()->handle().generation);
             assert(world->awaitingPlayerBirth()==deferred);
             if(deferred)assert(!world->playerHandle().generation&&world->cameraOffsetY()==0);
             world->confirmFirstStage();
@@ -4106,6 +4130,25 @@ int main(){
                     instance.instanceId,instance.creationCodeId);
             },retry?&plan:nullptr)&&walls==240);
             assert(world->randomDrawCount()==draws+1);
+            const auto builderLocal=world->builderController()->handle();
+            assert(builderLocal.generation>priorBuilderGeneration);
+            const auto* builder=world->builderController()->find(builderLocal);
+            assert(builder&&builder->sourceId==100856&&builder->x.bits==0xc1800000u&&builder->y.bits==0x44300000u);
+            InstanceHandle builderKey;
+            assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::builder,builderLocal,builderKey));
+            checkTypedCollisionView(GameplayCollisionView(*world),GameplayCollisionView::Kind::builder,builderLocal);
+            unsigned firstTwo=0;
+            assert(owner->visitRegistrationOrder([&](auto,int object,auto){
+                if(object==65||object==35){
+                    assert(firstTwo<2&&object==((firstTwo==0)==deferred?65:35));++firstTwo;
+                }
+                return true;
+            })&&firstTwo==2);
+            RunnerImageValue bx,by;
+            assert(world->publishBuilderPosition(-16,720)&&
+                (native?owner->nativePublishedPosition(builderKey,bx,by)&&by.bits==0x44340000u:
+                    owner->state(builderKey)&&owner->state(builderKey)->y.bits==0x44340000u)&&
+                world->builderController()->find(builderLocal)->y.bits==0x44340000u);
             assert(!world->goalFieldInstances().find({0,generation}));
             InstanceHandle shared;
             assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::goalField,{0,generation},shared));
@@ -4113,7 +4156,10 @@ int main(){
             priorGeneration=generation;
             priorPlayerGeneration=world->playerHandle().generation;
             priorDitherGeneration=world->ditherAbove()->handle().generation;
+            priorBuilderGeneration=builderLocal.generation;
             assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)!=ResultsDestination::none);
+            assert(!world->builderController()->find(builderLocal)&&!owner->state(builderKey));
+            if(native)assert(!owner->nativePublishedPosition(builderKey,bx,by));
         }
     }
     {

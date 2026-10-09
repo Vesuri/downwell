@@ -118,6 +118,9 @@ public:
                      downwell::AreaOneBuilderStep& result);
     unsigned fragmentCount() const { return fragmentCount_; }
     void setPlayerHealth(int health) { builder_.setPlayerHealth(health); }
+    void setPositionPublisher(downwell::AreaOneBuilder::PositionPublisher publish,void* context){
+        builder_.setPositionPublisher(publish,context);
+    }
     unsigned enemyCount() const { return enemyCount_; }
     unsigned decorationCount() const { return decorationCount_; }
     int frontierY() const { return builder_.y(); }

@@ -183,6 +183,9 @@ public:
             [&](unsigned e){return backgrounds_.initialize(e);}))return fail();
         prepared_=true;return true;
     }
+    // Either the authored builder or a compatibility-fixture player may be
+    // first. Never rebuild a room that already contains the other lifetime.
+    bool prepareFirstBirth(){return live_?valid()&&prepared_:prepare();}
     unsigned playerSourceId()const{return playerId_;}
     // A native always-active family has no per-instance layer elements.
     // Its first live birth resolves the layer at the source creation point;

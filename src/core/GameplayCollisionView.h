@@ -8,7 +8,7 @@ namespace downwell {
 // and lifetimeId do not. Borrowed views never cache pointers across a mutation.
 class GameplayCollisionView {
 public:
-    enum class Kind {player,enemy,breakable,terrain,timeField,goalField,exitController,bullet,scriptEffect,debris,timeChange,entryDither,drone,bone,skeleton,blood,currency,ditherAbove};
+    enum class Kind {player,enemy,breakable,terrain,timeField,goalField,exitController,bullet,scriptEffect,debris,timeChange,entryDither,drone,bone,skeleton,blood,currency,ditherAbove,builder};
     static constexpr unsigned enemyBase=1;
     static constexpr unsigned breakableBase=enemyBase+GameplayWorld::enemyCapacity;
     static constexpr unsigned terrainBase=breakableBase+GameplayWorld::breakableCapacity;
@@ -26,7 +26,8 @@ public:
     static constexpr unsigned bloodBase=skeletonBase+GameplayWorld::skeletonCapacity;
     static constexpr unsigned currencyBase=bloodBase+GameplayWorld::bloodCapacity;
     static constexpr unsigned ditherAboveBase=currencyBase+GameplayWorld::currencyCapacity;
-    static constexpr unsigned capacity=ditherAboveBase+1;
+    static constexpr unsigned builderBase=ditherAboveBase+1;
+    static constexpr unsigned capacity=builderBase+1;
     struct Record {
         const GameplayWorld::PlayerInstance* player=nullptr;
         const GameplayWorld::EnemyState* enemy=nullptr;
@@ -49,6 +50,7 @@ public:
         const GameplayWorld::Blood::Record* blood=nullptr;
         const GameplayWorld::Currency::Record* currency=nullptr;
         const GameplayDitherAbove::Record* ditherAbove=nullptr;
+        const GameplayBuilderController::Record* builder=nullptr;
     };
     explicit GameplayCollisionView(const GameplayWorld& world):world_(world){}
     static bool encode(Kind kind,InstanceHandle local,InstanceHandle& key){
@@ -73,6 +75,7 @@ public:
             case Kind::blood:base=bloodBase;count=GameplayWorld::bloodCapacity;break;
             case Kind::currency:base=currencyBase;count=GameplayWorld::currencyCapacity;break;
             case Kind::ditherAbove:base=ditherAboveBase;count=1;break;
+            case Kind::builder:base=builderBase;count=1;break;
             default:return false;
         }
         if(local.slot>=count)return false;
@@ -80,6 +83,7 @@ public:
     }
     static bool decode(InstanceHandle key,Kind& kind,InstanceHandle& local){
         if(!key.generation||key.slot>=capacity)return false;
+        if(key.slot>=builderBase){kind=Kind::builder;local={key.slot-builderBase,key.generation};return true;}
         if(key.slot>=ditherAboveBase){kind=Kind::ditherAbove;local={key.slot-ditherAboveBase,key.generation};return true;}
         if(key.slot>=currencyBase){kind=Kind::currency;local={key.slot-currencyBase,key.generation};return true;}
         if(key.slot>=bloodBase){kind=Kind::blood;local={key.slot-bloodBase,key.generation};return true;}
@@ -131,6 +135,7 @@ public:
             else if constexpr(Family==Kind::blood)return world_.bloodInstances()?world_.bloodInstances()->find(local):nullptr;
             else if constexpr(Family==Kind::currency)return world_.currencyInstances()?world_.currencyInstances()->find(local):nullptr;
             else if constexpr(Family==Kind::ditherAbove)return world_.ditherAbove()?world_.ditherAbove()->find(local):nullptr;
+            else if constexpr(Family==Kind::builder)return world_.builderController()?world_.builderController()->find(local):nullptr;
             else {static_assert(Family==Kind::skeleton,"Unknown collision family");
                 return world_.skeletons()?world_.skeletons()->find(local):nullptr;}
         };
@@ -192,6 +197,9 @@ private:
                 break;
             case Kind::ditherAbove:
                 if(!world_.ditherAbove()||!(next.ditherAbove=world_.ditherAbove()->find(local)))return false;
+                break;
+            case Kind::builder:
+                if(!world_.builderController()||!(next.builder=world_.builderController()->find(local)))return false;
                 break;
             case Kind::skeleton:
                 if(!world_.skeletons()||!(next.skeleton=world_.skeletons()->find(local)))return false;
