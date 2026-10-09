@@ -385,6 +385,16 @@ build/corpse-motion-test: tests/core/CorpseMotionTest.cpp $(wildcard src/core/*.
 	$(CXX) -Isrc $(CXXFLAGS) -ffp-contract=off -o $@ tests/core/CorpseMotionTest.cpp
 
 .PHONY: verify-corpse-lifecycle
+test: verify-consumption-blood
+.PHONY: verify-consumption-blood
+verify-consumption-blood: build/consumption-blood-test
+	python3 tools/verify-consumption-blood.py
+	./build/consumption-blood-test
+
+build/consumption-blood-test: tests/core/ConsumptionBloodEffectTest.cpp src/core/GameMakerRandom.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -ffp-contract=off -o $@ tests/core/ConsumptionBloodEffectTest.cpp src/core/GameMakerRandom.cpp
+
 verify-corpse-lifecycle: build/corpse-lifecycle-test
 	python3 tools/verify-dead-body-creation.py
 	./build/corpse-lifecycle-test

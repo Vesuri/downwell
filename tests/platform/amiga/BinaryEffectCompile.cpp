@@ -607,6 +607,16 @@ bool compileBinaryEffect(downwell::BinaryEffectSurface<>& surface,
 #include "core/CorpseAnimation.h"
 #include "core/CorpseDraw.h"
 #include "core/CorpseInstances.h"
+#include "core/ConsumptionBloodEffect.h"
+struct ConsumptionBloodCompilePublisher {
+    bool gravity(downwell::MotionBinary64);downwell::MotionBinary64 gravity();downwell::MotionBinary64 fallSpeed();
+    bool imageSpeed(downwell::RunnerImageValue);bool imageIndex(downwell::RunnerImageValue);
+    bool position(downwell::RunnerImageValue,downwell::RunnerImageValue);bool destroy();
+};
+bool compileConsumptionBlood(downwell::ConsumptionBloodEffect& effect,downwell::GameMakerRandom& random,
+    ConsumptionBloodCompilePublisher& publish){
+    return effect.create({}, {},random,publish)&&effect.advanceImage(publish)&&effect.step(publish)&&effect.kill(publish);
+}
 bool compileNativeCorpse(downwell::CorpseInstances<32>& owner,downwell::GameMakerRandom& random,std::uint32_t id){
     downwell::InstanceHandle key;
     return owner.create(id,{}, {},false,random,[](auto,int,auto,auto,bool& hit){hit=false;return true;},key)&&

@@ -1842,3 +1842,23 @@ transitions, external writes outside the admitted position publisher and full
 cross-family End Step ordering remain outside this path's evidence. This does
 not make the approximate camera-motion adapters authoritative or enable
 natural projectile births by itself.
+
+## Corpse-consumption particle (object 223)
+
+Knife and Fork creates five `fxBlood` instances (223), not the separate blood
+actor 220. The resource uses sprite 92 (`sprWaterSplash`, eight frames), depth
+zero, no parent and default Draw. VM events 2004–2008 define Create, Alarm 0,
+Step and water/wall contacts; all three termination events call
+`action_kill_object`. There is no Animation End handler.
+
+Create samples `random_range(-2,1)` into `ysp`, then `random(1)` followed by
+`choose(1,-1)` for `xsp`. It sets alarm 0 to 120, writes **global** `grav=0.2`,
+sets builtin `image_speed=0.3`, then samples `irandom(7)` for `image_index`.
+The global write must occur before the remaining animation/RNG operations.
+
+Step publishes `x+xsp`, then rereads and publishes `y+ysp`; it divides `xsp`
+by 1.01, adds current global gravity to `ysp`, then rereads Y and subtracts
+current global fall speed with a third position publication. Builtin position
+writes narrow to binary32; custom speeds retain binary64. No time-stop guard
+appears in this event. `verify-consumption-blood` pins the VM instructions and
+resource identity; the portable event implementation is `ConsumptionBloodEffect`.
