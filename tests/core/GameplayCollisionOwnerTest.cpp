@@ -2191,6 +2191,31 @@ int main(){
         }
     }
     auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
+    for(auto mode:{GameplayCollisionOwner::Ownership::native,GameplayCollisionOwner::Ownership::nativeScenery}){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
+            GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&rooms,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),owner->breakableBinding(),
+            owner->playerBinding(),nullptr,&rooms);
+        auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
+        assert(owner->attach(*world)&&world->bindNativeTerrain(*terrain)&&terrain->append(60,240,160));
+        const auto local=terrain->handle(0);InstanceHandle shared;
+        assert(terrain->createProperties(local,51)&&owner->flushNativeSpatial()&&
+            GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,local,shared));
+        PackedObject object;PackedSpriteCollision art;
+        assert(objects.findObject(60,object)&&sprites.collisionSprite(51,object.textureMaskId,art));
+        for(const auto delta:std::vector<std::pair<int,int>>{{0,0},{0,-16},{16,0},{0,16},{-16,0}}){
+            assert(terrain->publishCachedOffset(local,delta.first,delta.second));
+            RunnerImageValue x,y;assert(x.assignInteger(240+delta.first)&&y.assignInteger(160+delta.second));
+            RunnerSpatialSplit::Box bounds;
+            assert(RunnerSpriteBounds::fromSprite(art,x,y,{0x3f800000u},{0x3f800000u},false,{}, {},true,
+                [](auto value,std::int32_t& pixel){return value.roundPixel(pixel);},bounds));
+            bool hit=false;assert(owner->collisionPointCandidate(shared,bounds.left,bounds.top,true,false,masks,hit)&&hit);
+            RunnerImageValue outside;assert(RunnerSpatialSplit::sub(bounds.right,{0xc0000000u},outside));
+            assert(owner->collisionPointCandidate(shared,outside,bounds.top,true,false,masks,hit)&&!hit);
+            GameplayWorld::NativeTerrain::Identity id;bool active,destroyed;
+            assert(terrain->read(local,id,active,destroyed)&&id.x==240&&id.y==160);
+        }
+    }
     std::vector<std::vector<unsigned>> layerCutoffOracle;
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
         GameplayCollisionOwner::Ownership::nativeScenery}){

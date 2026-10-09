@@ -479,6 +479,29 @@ static void constructorPublication(){
     require(failed.appearance(0).same(a));
 }
 int main(){
+    static_assert(sizeof(downwell::PackedWallState)==4,"No extra per-wall cache allocation");
+    for(const auto delta:std::vector<std::pair<int,int>>{{0,0},{0,-16},{16,0},{0,16},{-16,0}}){
+        downwell::PackedWallState packed;
+        require(packed.storeCachedOffset(delta.first,delta.second));
+        for(int frame=0;frame<16;++frame){
+            downwell::WallEndStepState state;state.imageIndex=frame;state.neighbors=15-frame;
+            state.checked=frame%3;state.pillar=frame%3-1;state.lights=frame;
+            require(packed.store(state));int x,y;require(packed.cachedOffset(x,y));
+            require(x==delta.first&&y==delta.second&&packed.load().imageIndex==frame&&
+                packed.load().neighbors==15-frame&&packed.load().pillar==state.pillar);
+        }
+        const auto before=packed.bits;
+        require(!packed.storeCachedOffset(16,16)&&packed.bits==before);
+        downwell::NativeTerrainLifetimes<2> live;
+        require(live.append(60,240,160,true,100900,676));const auto h=live.handle(0);
+        require(live.publishCachedOffset(h,delta.first,delta.second)&&live.createProperties(h,51)&&live.roomCreation(h));
+        int x,y;require(live.cachedOffset(h,x,y)&&x==delta.first&&y==delta.second);
+        require(live.setWallDeactivation(h,true)&&live.cachedOffset(h,x,y)&&x==delta.first&&y==delta.second);
+        require(live.publishRefreshedBounds(h,0x8000)&&live.cachedOffset(h,x,y)&&!x&&!y);
+        require(live.publishCachedOffset(h,delta.first,delta.second)&&live.markDestroyed(h)&&live.retire(h));
+        require(live.append(60,240,160)&&!live.cachedOffset(h,x,y));
+        require(live.cachedOffset(live.handle(0),x,y)&&!x&&!y);
+    }
     for(int code:{-1,676,677,678}){
         downwell::NativeTerrainLifetimes<8> live;
         require(live.append(60,240,160,true,100900,code));

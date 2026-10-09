@@ -480,9 +480,18 @@ new trajectory is enabled by this adapter.
 
 Run-owned terrain callers are not admitted by that actor API: reconstructing
 their cache from the immutable position cannot represent the list branch's
-retained temporary bounds. Wall-to-wall `place_meeting` needs that state handled
-before wall End Step can use the complete query pair. Merely restoring position
-or translating a box for one test would discard observable publication state.
+retained temporary bounds. Code 986's four cardinal shape-query offsets are
+exactly `(0,-16)`, `(16,0)`, `(0,16)`, `(-16,0)`. Together with the origin, these
+fit in three spare bits of the existing four-byte packed wall word. The native
+store retains this cached origin independently of event state; normal bounds
+refresh clears it, and lifetime reuse resets it. Bounds readers, old-index
+removal and candidate collection reconstruct the cached geometry at that origin
+while retaining the actual instance position. No per-cell rectangle is added.
+Offsets outside this audited domain reject rather than silently approximate.
+
+The temporary wall-query transaction still needs to publish these bits before
+wall End Step can use the complete query pair. Merely restoring position or
+translating a box for one test would discard observable publication state.
 `RunnerSpatialInstances::point` supplies object-family traversal through the
 same preparation/index ownership used by `instance_place`. It filters flags
 `0x100003`, and indexed candidates additionally require kind 1 and matching

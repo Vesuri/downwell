@@ -72,14 +72,23 @@ public:
         if(!contains(h))return false;
         sprite=(flags_[h.slot]&64u)?createSprite_[h.slot]:-2;return true;
     }
+    bool cachedOffset(InstanceHandle h,int& x,int& y)const{
+        return contains(h)&&walls_[h.slot].cachedOffset(x,y);
+    }
+    // Store the cache's origin, not the instance position. The source list
+    // branch restores position but leaves these temporary bounds dirty.
+    bool publishCachedOffset(InstanceHandle h,int x,int y){
+        return good_=(good_&&contains(h)&&walls_[h.slot].storeCachedOffset(x,y));
+    }
     bool publishIndexed(InstanceHandle h){
         if(!contains(h))return good_=false;
         flags_[h.slot]|=16u;return true;
     }
-    // Geometry is immutable within either constructor or post-Create state.
-    // One existing flags bit selects which resource produced cached bounds.
+    // One flags bit selects constructor versus post-Create cached resource.
+    // A normal refresh also returns the cached origin to the actual position.
     bool publishRefreshedBounds(InstanceHandle h,std::uint32_t spatial){
         if(!contains(h))return good_=false;
+        if(!walls_[h.slot].storeCachedOffset(0,0))return good_=false;
         const unsigned previous=flags_[h.slot];
         flags_[h.slot]=(previous&163u)|((previous&32u)?64u:0u)|((spatial&8u)?4u:0u)|
             ((spatial&0x200u)?8u:0u)|((spatial&0x8000u)?16u:0u);
@@ -188,6 +197,7 @@ public:
         ++next_;freeHint_=slot+1;
         flags_[slot]=(active?0:2)|((spatial&8u)?4u:0u)|((spatial&0x200u)?8u:0u)|((spatial&0x8000u)?16u:0u);
         createSprite_[slot]=-2;
+        walls_[slot]=PackedWallState{}; // Slot reuse must not inherit a query cache.
         walls_[slot].store(WallEndStepState{});
         if(object==60&&!active)wallPresentationState_=true;
         return true;

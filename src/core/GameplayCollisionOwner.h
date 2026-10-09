@@ -480,6 +480,23 @@ private:
             RunnerImageValue{0x3f800000u},RunnerImageValue{0x3f800000u},false,RunnerImageValue{},RunnerImageValue{},true,
             [](auto value,std::int32_t& pixel){return value.roundPixel(pixel);},bounds));
     }
+    bool nativeTerrainCachedBounds(const GameplayWorld::NativeTerrain::Identity& id,
+        RunnerImageValue& x,RunnerImageValue& y,Owner::Box& bounds,bool& found,bool& precise,int sprite){
+        int dx,dy;
+        if(!world_||!world_->nativeTerrainInstances()||!world_->nativeTerrainInstances()->cachedOffset(id.handle,dx,dy))return false;
+        if(!dx&&!dy)return nativeTerrainBirthBounds(id,x,y,bounds,found,precise,sprite);
+        const auto* definition=objectDefaults_.get(id.object);
+        RunnerImageValue ox,oy,cx,cy;
+        if(!definition||!x.assignInteger(id.x)||!y.assignInteger(id.y)||!ox.assignInteger(-dx)||!oy.assignInteger(-dy)||
+            !RunnerSpatialSplit::sub(x,ox,cx)||!RunnerSpatialSplit::sub(y,oy,cy))return false;
+        PackedSpriteCollision resource;
+        found=sprites_.collisionSprite(sprite==-2?definition->spriteId:sprite,definition->maskId,resource);
+        precise=found&&resource.collisionMode==1;
+        if(!found){bounds={cx,cy,cx,cy};return true;}
+        return RunnerSpriteBounds::fromSprite(resource,cx,cy,RunnerImageValue{0x3f800000u},
+            RunnerImageValue{0x3f800000u},false,RunnerImageValue{},RunnerImageValue{},true,
+            [](auto value,std::int32_t& pixel){return value.roundPixel(pixel);},bounds);
+    }
     bool refreshNativeTerrain(InstanceHandle h,bool publish=true){
         if(!valid()||!world_||!world_->nativeTerrainInstances()||h.slot<View::terrainBase||h.slot>=View::timeFieldBase)return check(false);
         const auto* terrain=world_->nativeTerrainInstances();
@@ -490,7 +507,7 @@ private:
             !terrain->appearance(local,current,imageIndex,created)||!terrain->cachedSprite(local,cached))return check(false);
         const auto* objectFlags=families_.flags(unsigned(id.object));if(!objectFlags)return check(false);
         RunnerImageValue x,y;Owner::Box oldBounds,newBounds;bool found,precise;
-        if(!nativeTerrainBirthBounds(id,x,y,oldBounds,found,precise,cached)||
+        if(!nativeTerrainCachedBounds(id,x,y,oldBounds,found,precise,cached)||
             !nativeTerrainBirthBounds(id,x,y,newBounds,found,precise,current))return false;
         const bool okay=owner_.externalSpatialPublication([&](auto& index){
             return RunnerSpatialBoundsUpdate::finishRefresh(index,h.slot,*objectFlags,flags,false,oldBounds,
@@ -513,7 +530,7 @@ private:
         int cached,current;unsigned index;
         if(!terrain->read(local,id,active,destroyed)||!terrain->cachedSprite(local,cached)||
             !terrain->appearance(local,current,index,created)||
-            !nativeTerrainBirthBounds(id,state.x,state.y,state.bounds,found,precise,cached))return false;
+            !nativeTerrainCachedBounds(id,state.x,state.y,state.bounds,found,precise,cached))return false;
         const auto* definition=objectDefaults_.get(id.object);if(!definition)return false;
         sprite.spriteId=current==-2?definition->spriteId:current;sprite.maskId=definition->maskId;
         return sprite.imageIndex.assignInteger(index);
@@ -552,7 +569,7 @@ private:
             // Never remove using the current appearance before it is flushed.
             RunnerImageValue x,y;Owner::Box bounds;bool found,precise;
             int cached;if(!terrain->cachedSprite(h,cached)||
-                !nativeTerrainBirthBounds(id,x,y,bounds,found,precise,cached))return check(false);
+                !nativeTerrainCachedBounds(id,x,y,bounds,found,precise,cached))return check(false);
             if(RunnerSpatialSplit::less(bounds.right,bounds.left)){const auto v=bounds.left;bounds.left=bounds.right;bounds.right=v;}
             if(RunnerSpatialSplit::less(bounds.bottom,bounds.top)){const auto v=bounds.top;bounds.top=bounds.bottom;bounds.bottom=v;}
             if(!check(owner_.externalSpatialPublication([&](auto& index){
@@ -1110,7 +1127,7 @@ public:
                 GameplayWorld::NativeTerrain::Identity id;bool active,destroyed,found,precise;int cached;
                 RunnerImageValue x,y;
                 return terrain->read(local,id,active,destroyed)&&terrain->cachedSprite(local,cached)&&
-                    nativeTerrainBirthBounds(id,x,y,bounds,found,precise,cached);
+                    nativeTerrainCachedBounds(id,x,y,bounds,found,precise,cached);
             },
             [&](Owner::Box box,auto visit){return owner_.externalSpatialPublication([&](auto& index){return index.query(box,visit);});},
             [&](InstanceHandle self,InstanceHandle other,bool& found){
