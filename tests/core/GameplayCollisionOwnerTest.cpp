@@ -2405,6 +2405,19 @@ int main(){
                 }
             };
             compare(false); // Cached constructor bounds; no implicit flush.
+            auto point=[&](RunnerImageValue x,RunnerImageValue y){
+                for(auto h:{player,target})for(bool compatibility:{false,true})for(bool precise:{false,true}){
+                    bool hit=false;assert(owner->collisionPointCandidate(h,x,y,compatibility,precise,masks,hit));
+                    if(!native){expected.push_back(hit);hit?++hits:++misses;}
+                    else assert(ordinal<expected.size()&&hit==expected[ordinal]);
+                    ++ordinal;
+                }
+            };
+            RunnerImageValue queryX,queryY;assert(queryX.assignInteger(240)&&queryY.assignInteger(160));
+            point(queryX,queryY); // Dirty post-Create bounds refresh on the candidate path.
+            assert(native?world->activateNativeTerrain(wall,false):owner->terrain().activation(wall,false));
+            point(queryX,queryY); // Candidate geometry itself must not filter inactive state.
+            assert(native?world->activateNativeTerrain(wall,true):owner->terrain().activation(wall,true));
             for(int mask:{-1,51,99999})for(unsigned variant=0;variant<3;++variant){
                 const auto binding=owner->playerBinding();
                 assert(binding.mask(local,*record,mask));
@@ -2418,11 +2431,12 @@ int main(){
                         auto xx=MotionBinary64::fromInteger(x),yy=MotionBinary64::fromInteger(y);
                         assert(xx.add(MotionBinary64{0x3fd00000u,0})&&yy.add(MotionBinary64{0x3fe00000u,0})&&px.assign(xx)&&py.assign(yy));
                     }
-                    assert(binding.publishedPosition(local,*record,px,py));compare(false);compare(true);
+                    assert(binding.publishedPosition(local,*record,px,py));compare(false);compare(true);point(px,py);
                 }
             }
             if(native)assert(terrain->markDestroyed(wall));else assert(owner->terrain().requestDestroy(wall));
             compare(true);
+            RunnerImageValue px,py;assert(px.assignInteger(240)&&py.assignInteger(160));point(px,py);
             bool selfHit=true;assert(owner->collisionOverlap(player,player,masks,true,selfHit)&&!selfHit);
             if(native)assert(ordinal==expected.size());
         }

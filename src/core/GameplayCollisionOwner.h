@@ -1131,6 +1131,23 @@ public:
                 frames=sprites_.collisionSprite(sprite,mask,resource)?resource.frameCount:0;return true;
             }));
     }
+    // Candidate geometry only; callers must retain source family traversal
+    // and inactive gates. Refresh precedes destruction rejection in 0x465520.
+    bool collisionPointCandidate(InstanceHandle h,RunnerImageValue x,RunnerImageValue y,
+        bool compatibility,bool precise,const SpriteMaskPack& masks,bool& hit){
+        if(!valid()||!resolves(h))return check(false);
+        if(!native_)return check(owner_.pointCandidate(h,properties_.read(h.slot)->sprite,x,y,
+            compatibility,precise,sprites_,masks,[&](InstanceHandle key,bool publish){return refresh(key,publish);},
+            inverseTrig,roundPixel,hit));
+        Owner::State state;Owner::Sprite sprite;
+        if(!RunnerSpatialSplit::valid(x)||!RunnerSpatialSplit::valid(y)||!nativeCollisionVisual(h,state,sprite))return check(false);
+        if(state.flags&8u){
+            if(!(h.slot>=View::terrainBase&&h.slot<View::timeFieldBase?refreshNativeTerrain(h):refreshNativeActor(h,true))||
+                !nativeCollisionVisual(h,state,sprite))return check(false);
+        }
+        return check(RunnerSpritePoint::test(state,sprite,x,y,compatibility,precise,sprites_,masks,
+            inverseTrig,roundPixel,hit));
+    }
     // Pair test only, after ordered broad-phase collection. This does not
     // select candidates, dispatch events or approximate unsupported selectors.
     bool collisionOverlap(InstanceHandle self,InstanceHandle other,const SpriteMaskPack& masks,

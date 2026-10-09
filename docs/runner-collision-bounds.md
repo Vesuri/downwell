@@ -453,6 +453,13 @@ positive mask-count modulo. Zero serialized mask count preserves the source's
 unexpanded-mask true fallback; missing required offline mask bytes are a port
 failure, not permission to invent that fallback. Candidate tests cover 1,680
 combinations plus lifetime rejection, frame selection and terminal failure.
+The geometric tail is shared in `RunnerSpritePoint`; native actor/terrain
+candidate testing reads the published bounds and appearance, performs the same
+lazy refresh, then uses this tail. Mixed owner tests compare fractional,
+mirrored, rotated, missing-mask, inactive and destroyed candidates in both
+compatibility modes. This explicit candidate API does not enable native outer
+selectors: family preparation, traversal and temporary place-query movement
+remain independently required before wall End Step can call them.
 `RunnerSpatialInstances::point` supplies object-family traversal through the
 same preparation/index ownership used by `instance_place`. It filters flags
 `0x100003`, and indexed candidates additionally require kind 1 and matching
