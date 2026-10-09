@@ -498,6 +498,15 @@ state only on the list path. The indexed path restores the cache origin saved
 after flushing, not an earlier stale snapshot. General wall motion and arbitrary
 offsets remain unadmitted. This connects explicit wall queries; automatic mixed
 End Step scheduling and tile/flower effects remain separate work.
+
+`wallEndStepEvent` connects a scheduler-selected native wall to these real
+shape/point queries and the shared code-986 handler. Native state remains
+borrowed for the event, so nested queries see its current image. Destruction
+and activation publish through the typed world; tile, flower and out-of-view
+callbacks remain the caller's responsibility. The explicit area and RNG are
+passed through unchanged, including failure prefixes. This adapter is not an
+automatic terrain phase or a production flower implementation.
+
 `RunnerSpatialInstances::point` supplies object-family traversal through the
 same preparation/index ownership used by `instance_place`. It filters flags
 `0x100003`, and indexed candidates additionally require kind 1 and matching

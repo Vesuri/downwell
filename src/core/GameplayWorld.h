@@ -292,8 +292,11 @@ public:
     // use the source spatial queries and publish renderer/collision changes;
     // this is not a separate terrain-only End Step pass.
     template<class Ops> bool stepNativeTerrainWall(downwell::InstanceHandle h,Ops& ops){
+        return stepNativeTerrainWall(h,run_.stage.area,enemyRandom_,ops);
+    }
+    template<class Ops> bool stepNativeTerrainWall(downwell::InstanceHandle h,int area,downwell::GameMakerRandom& random,Ops& ops){
         return run_.effectsSucceeded=run_.effectsSucceeded&&nativeTerrainInstances_&&
-            nativeTerrainInstances_->wallEvent(h,run_.stage.area,enemyRandom_,ops);
+            nativeTerrainInstances_->wallEvent(h,area,random,ops);
     }
     bool destroyNativeTerrain(downwell::InstanceHandle h){
         return run_.effectsSucceeded=run_.effectsSucceeded&&nativeTerrainInstances_&&nativeTerrainInstances_->markDestroyed(h);

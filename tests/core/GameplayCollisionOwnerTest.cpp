@@ -1949,6 +1949,50 @@ int main(){
         assert(!owner->dispatchStepPhase(2,tooSmall,[&](InstanceHandle,const PackedObjectEvent&){++calls;return true;}));
         assert(calls==0&&!owner->valid());
     }
+    // Real shape/point queries through the retained wall script, not mocked
+    // neighbour occupancy. Compare callback order and every retained field.
+    for(int area:{0,1,4,5})for(bool rejectTile:{false,true}){
+        const auto roomBytes=read("generated/downwell-rooms.dwrm");RoomPack rooms(roomBytes.data(),roomBytes.size());
+        std::vector<int> expected;
+        for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+            GameplayCollisionOwner::Ownership::nativeScenery}){
+            const bool native=mode!=GameplayCollisionOwner::Ownership::reference;
+            auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
+                GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&rooms,mode);
+            auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),owner->breakableBinding(),
+                owner->playerBinding(),native?nullptr:&owner->terrain(),&rooms);
+            auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
+            assert(owner->attach(*world)&&(!native||world->bindNativeTerrain(*terrain)));
+            std::vector<int> actual;
+            struct Effects {
+                std::vector<int>& values;bool reject;
+                bool position(int kind,MotionBinary64 x,MotionBinary64 y){
+                    std::int32_t px,py;assert(x.roundPixel(px)&&y.roundPixel(py));
+                    values.insert(values.end(),{kind,px,py});return true;
+                }
+                bool tile(MotionBinary64 x,MotionBinary64 y){return position(739,x,y)&&!reject;}
+                bool create(int object,MotionBinary64 x,MotionBinary64 y){assert(object==379);return position(object,x,y);}
+                bool outOfView(InstanceHandle h){values.insert(values.end(),{5,int(h.slot)});return true;}
+            } effects{actual,rejectTile};
+            GameMakerRandom random(123);
+            for(int y=0;y<3;++y)for(int x=0;x<3;++x){
+                const unsigned i=unsigned(y*3+x);
+                if(native){assert(terrain->append(60,240+x*16,512+y*16));assert(terrain->createProperties(terrain->handle(i),51));}
+                else {assert(owner->terrain().append(60,240+x*16,512+y*16,true));
+                    assert(owner->terrain().createProperties(owner->terrain().handle(i),51,false,random));}
+            }
+            for(unsigned pass=0;pass<2;++pass)for(unsigned i=0;i<9;++i){
+                const auto h=native?terrain->handle(i):owner->terrain().handle(i);
+                const bool ok=owner->wallEndStepEvent(h,area,random,masks,effects);
+                WallEndStepState s;
+                if(native)assert(terrain->wallState(h,s));else s=owner->terrain().find(h)->wall;
+                actual.insert(actual.end(),{int(ok),s.checked,s.pillar,s.neighbors,s.imageIndex,s.checkThing,
+                    s.checkDistance,int(s.surrounded),int(s.deactivate),int(s.lights),int(random.drawCount())});
+                if(!ok){assert(rejectTile&&pass==1&&i==4);break;}
+            }
+            if(!native)expected=actual;else assert(actual==expected);
+        }
+    }
     for(bool rejectTile:{false,true}){
         struct Damage:AmigaWallDamage<64> {std::vector<std::pair<int,int>> cells;
             bool changed(int x,int y,int before,int after){assert(before==51&&(after==51||after==-1));cells.push_back({x,y});return AmigaWallDamage<64>::changed(x,y,before,after);}
