@@ -3210,14 +3210,48 @@ int main(){
             std::vector<int> actual;
             struct Effects {
                 GameplayWorld& world;std::vector<int>& values;bool reject;
+                GameplayCollisionOwner& owner;GameplayWorld::NativeTerrain& terrain;
+                const SpriteMaskPack& masks;bool native;InstanceHandle current{};
+                unsigned creates=0;
                 bool position(int kind,MotionBinary64 x,MotionBinary64 y){
                     std::int32_t px,py;assert(x.roundPixel(px)&&y.roundPixel(py));
                     values.insert(values.end(),{kind,px,py});return true;
                 }
                 bool tile(MotionBinary64 x,MotionBinary64 y){return position(739,x,y)&&!reject&&world.addWallBackground(x,y);}
-                bool create(int object,MotionBinary64 x,MotionBinary64 y){assert(object==379);return position(object,x,y);}
+                bool create(int object,MotionBinary64 x,MotionBinary64 y){
+                    assert(object==379);
+                    ++creates;
+                    // instance_create runs synchronously after image_index is
+                    // assigned, while native wall state is still borrowed.
+                    // Exercise actual collision consumers here, not just the
+                    // packed state visible after End Step returns.
+                    WallEndStepState state;
+                    if(native)assert(terrain.wallState(current,state));
+                    else state=owner.terrain().find(current)->wall;
+                    assert(state.imageIndex==state.neighbors);
+                    InstanceHandle shared;
+                    assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,current,shared));
+                    RunnerImageValue image;assert(image.assignInteger(state.imageIndex));
+                    if(native){
+                        int sprite=-1;unsigned index=999;bool created=false;
+                        assert(terrain.appearance(current,sprite,index,created)&&created&&
+                            sprite==51&&index==unsigned(state.imageIndex));
+                    }else{
+                        const auto appearance=owner.properties(shared);
+                        assert(appearance&&appearance->sprite.imageIndex.bits==image.bits);
+                    }
+                    std::int32_t cx,cy;assert(x.roundPixel(cx)&&y.roundPixel(cy));
+                    for(int dy=-9;dy<=9;dy+=3)for(int dx=-9;dx<=9;dx+=3){
+                        RunnerImageValue px,py;
+                        assert(px.assignInteger(cx+dx)&&py.assignInteger(cy+16+dy));
+                        bool hit=false;
+                        assert(owner.collisionPointCandidate(shared,px,py,true,true,masks,hit));
+                        values.push_back(int(hit));
+                    }
+                    return position(object,x,y);
+                }
                 bool outOfView(InstanceHandle h){values.insert(values.end(),{5,int(h.slot)});return true;}
-            } effects{*world,actual,rejectTile};
+            } effects{*world,actual,rejectTile,*owner,*terrain,masks,native};
             GameMakerRandom random(123);
             for(int y=0;y<3;++y)for(int x=0;x<3;++x){
                 const unsigned i=unsigned(y*3+x);
@@ -3227,6 +3261,7 @@ int main(){
             }
             for(unsigned pass=0;pass<2;++pass)for(unsigned i=0;i<9;++i){
                 const auto h=native?terrain->handle(i):owner->terrain().handle(i);
+                effects.current=h;
                 const bool ok=owner->wallEndStepEvent(h,area,random,masks,effects);
                 WallEndStepState s;
                 if(native)assert(terrain->wallState(h,s));else s=owner->terrain().find(h)->wall;
@@ -3259,6 +3294,7 @@ int main(){
                     }
                 }
             }
+            assert((area==4)==(effects.creates!=0));
             assert(world->wallBackgroundTiles().size()==(rejectTile?0u:1u));
             if(!rejectTile){
                 std::int32_t x,y;const auto* tile=world->wallBackgroundTiles().at(0);
