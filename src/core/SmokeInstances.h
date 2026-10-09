@@ -5,6 +5,7 @@
 #include "SmokeTrig.h"
 #include "InstanceLifecycle.h"
 #include "FailureSignal.h"
+#include "AlarmBank.h"
 namespace downwell {
 // Native smoke lifetimes: source IDs are supplied by the room, never inferred
 // from the family's generation handles. The room owns phase ordering.
@@ -15,6 +16,7 @@ public:
         std::uint32_t lifetimeId=0,sourceId=0;
         RunnerImageValue x{},y{};
         SmokeEffect state;
+        int alarm0=-1;
         bool active=true,destroyRequested=false;
         static constexpr int objectId=225;
     };
@@ -68,6 +70,12 @@ public:
     }
     bool alarmEvent(InstanceHandle key,unsigned index){
         auto* r=resolve(key);if(!r||index!=0)return fail();r->state.alarm0();return true;
+    }
+    bool setAlarm0(InstanceHandle key,int value){auto* r=resolve(key);if(!r)return fail();r->alarm0=value;return true;}
+    bool advanceAlarm(InstanceHandle key,unsigned index){
+        auto* r=resolve(key);if(!r||index!=0)return fail();
+        if(r->active&&!r->destroyRequested&&AlarmBank::advanceValue(r->alarm0))r->state.alarm0();
+        return true;
     }
     bool wallContact(InstanceHandle key){auto* r=resolve(key);return (r&&r->state.collideWall())||fail();}
     bool activate(InstanceHandle key,bool active){

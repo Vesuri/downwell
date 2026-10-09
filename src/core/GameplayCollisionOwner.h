@@ -630,6 +630,7 @@ private:
             if constexpr(Kind==View::Kind::bone)return 269;
             if constexpr(Kind==View::Kind::skeleton)return 120;
             if constexpr(Kind==View::Kind::blood)return 220;
+            if constexpr(Kind==View::Kind::smoke)return 225;
             if constexpr(Kind==View::Kind::currency)return 248;
             if constexpr(Kind==View::Kind::goalField||Kind==View::Kind::exitController)return r.objectId;
             return Kind==View::Kind::player?35:92;
@@ -715,7 +716,7 @@ private:
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
             if constexpr(Kind==View::Kind::timeField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
-            if constexpr(Kind==View::Kind::corpseExpiry)sourceId=r.sourceId;
+            if constexpr(Kind==View::Kind::corpseExpiry||Kind==View::Kind::smoke)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeShard)sourceId=parent.pendingTimeShardId_;
             if constexpr(Kind==View::Kind::playerController||Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::builder||Kind==View::Kind::goalField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency)sourceId=r.sourceId;
@@ -737,7 +738,7 @@ private:
             if constexpr(Kind==View::Kind::scriptEffect||Kind==View::Kind::debris){
                 if(!r.effect)return parent.check(false);
                 position->x=r.effect->x;position->y=r.effect->y;
-            }else if constexpr(Kind==View::Kind::corpseExpiry||Kind==View::Kind::playerController||Kind==View::Kind::timeShard||Kind==View::Kind::timeChange||Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::builder||Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency){
+            }else if constexpr(Kind==View::Kind::smoke||Kind==View::Kind::corpseExpiry||Kind==View::Kind::playerController||Kind==View::Kind::timeShard||Kind==View::Kind::timeChange||Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::builder||Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency){
                 position->x=r.x;position->y=r.y;
             }else{
                 constexpr bool roomCoordinates=Kind==View::Kind::player||Kind==View::Kind::terrain||Kind==View::Kind::timeField||Kind==View::Kind::goalField||Kind==View::Kind::exitController;
@@ -818,7 +819,7 @@ private:
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
             if constexpr(Kind==View::Kind::timeField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
-            if constexpr(Kind==View::Kind::corpseExpiry)sourceId=r.sourceId;
+            if constexpr(Kind==View::Kind::corpseExpiry||Kind==View::Kind::smoke)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeShard)sourceId=parent.pendingTimeShardId_;
             if constexpr(Kind==View::Kind::playerController||Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::builder||Kind==View::Kind::goalField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency)sourceId=r.sourceId;
@@ -1016,6 +1017,8 @@ private:
     Binding<GameplayScriptSpawnInstances::Record,View::Kind::scriptEffect> scriptEffectsBinding_{*this};
     Binding<GameplayWorld::RegisteredExpiry::Record,View::Kind::corpseExpiry> expiryBinding_{*this};
     GameplayWorld::RegisteredExpiry expiry_{GameplayWorld::RegisteredExpiry::Binding::bindPositionedActor(expiryBinding_)};
+    Binding<GameplayWorld::RegisteredSmoke::Record,View::Kind::smoke> smokeBinding_{*this};
+    GameplayWorld::RegisteredSmoke smoke_{GameplayWorld::RegisteredSmoke::Binding::bindPositionedActor(smokeBinding_)};
     GameplayScriptSpawnInstances scriptEffects_{GameplayScriptSpawnInstances::Binding::bindMaskDestructionDepth(scriptEffectsBinding_)};
     Binding<GameplayDebrisInstances::Record,View::Kind::debris> debrisBinding_{*this};
     GameplayDebrisInstances debris_{GameplayDebrisInstances::Binding::bindDestruction(debrisBinding_)};
@@ -1140,7 +1143,7 @@ public:
     template<class Visit> bool visitRegistrationOrder(Visit visit)const{return valid()&&visitEligibility(visit);}
     // Drone dispatch deliberately exposes bool& status to arbitrary callbacks;
     // retain its live read rather than delaying a callback's failure to return.
-    bool valid()const{return good_&&expiry_.valid()&&playerControllers_.valid()&&builderController_.valid()&&blood_.valid()&&skeletons_.valid()&&(failureObserved_?(drones_.valid()&&bones_.valid()):
+    bool valid()const{return good_&&smoke_.valid()&&expiry_.valid()&&playerControllers_.valid()&&builderController_.valid()&&blood_.valid()&&skeletons_.valid()&&(failureObserved_?(drones_.valid()&&bones_.valid()):
         (owner_.valid()&&properties_.valid()&&terrain_.valid()&&scriptEffects_.valid()&&debris_.valid()&&
          timeShards_.valid()&&timeChanges_.valid()&&entries_.valid()&&drones_.valid()&&bones_.valid()&&layers_.valid()));}
     unsigned pendingSpatialIndex()const{return owner_.pendingSpatialIndex();}
@@ -1341,6 +1344,7 @@ public:
         if(!world_&&!world.bindBulletLifecycle(GameplayWorld::BulletLifecycleBinding::bindMaskDestruction(bullets_)))return check(false);
         if(!world_&&!world.bindScriptSpawnInstances(scriptEffects_))return check(false);
         if(!world_&&!world.bindRegisteredExpiry(expiry_))return check(false);
+        if(!world_&&!world.bindRegisteredSmoke(smoke_))return check(false);
         if(!world_&&!world.bindDebrisInstances(debris_))return check(false);
         if(!world_&&!world.bindTimeChangeInstances(timeChanges_))return check(false);
         if(!world_&&!world.bindTimeShardInstances(timeShards_))return check(false);
@@ -1618,6 +1622,7 @@ public:
                     }
                     case View::Kind::drone:return self.drones_.advanceAnimation(local);
                     case View::Kind::corpseExpiry:return self.expiry_.advanceAnimation(local);
+                    case View::Kind::smoke:return self.smoke_.advanceAnimation(local);
                     case View::Kind::timeShard:return self.world_->advanceTimeShardRoomAnimation(local);
                     case View::Kind::playerController:return self.playerControllers_.advanceAnimation(local);
                     case View::Kind::bone:return self.bones_.advanceAnimation(local);
@@ -1715,6 +1720,7 @@ public:
                     kind==View::Kind::playerController?self.playerControllers_.advanceAlarm(local,alarm):
                     kind==View::Kind::drone?(alarm==0&&self.drones_.advanceAlarm(local)):
                     kind==View::Kind::skeleton?self.skeletons_.advanceAlarm(local,alarm):
+                    kind==View::Kind::smoke?self.smoke_.advanceAlarm(local,alarm):
                     kind==View::Kind::currency?self.world_->advanceCurrencyRoomAlarm(local,alarm):
                     kind==View::Kind::entryDither&&self.entries_.advanceAlarm(local,alarm);
             },reused,&self.combatAlarmMask_,boxes
@@ -2072,6 +2078,7 @@ public:
     GameplayDebrisInstances& debris(){return debris_;}
     NativeTimeChangeRegistration& timeChanges(){return timeChanges_;}
     GameplayWorld::RegisteredExpiry& registeredExpiry(){return expiry_;}
+    GameplayWorld::RegisteredSmoke& registeredSmoke(){return smoke_;}
     NativeTimeShardRegistration& timeShards(){return timeShards_;}
     GameplayPlayerControllers& playerControllers(){return playerControllers_;}
     bool createTimeShardWithSourceId(TimeShardEffects<64>& effects,std::uint32_t id,
@@ -2442,6 +2449,11 @@ public:
         return check(world_->stepBloodRoomEffect(local,[&](const auto&,bool& allowed){
             return bloodTimeAllowed(local,pTimeStop,roomWidth,masks,allowed);
         }));
+    }
+    bool stepSmoke(InstanceHandle shared){
+        View::Kind kind;InstanceHandle local;
+        if(!valid()||!world_||!View::decode(shared,kind,local)||kind!=View::Kind::smoke||!resolves(shared))return check(false);
+        return check(world_->stepSmokeRoomEffect(local));
     }
     bool currencyTimeAllowed(InstanceHandle local,bool stopped,int width,const SpriteMaskPack& masks,bool& allowed){
         const auto* child=currency_.find(local);
@@ -2864,6 +2876,7 @@ private:
                 case View::Kind::skeleton:return record.skeleton&&skeletons_.retire(local);
                 case View::Kind::blood:return record.blood&&blood_.retire(local);
                 case View::Kind::corpseExpiry:return record.corpseExpiry&&expiry_.retire(local);
+                case View::Kind::smoke:return record.smoke&&smoke_.retire(local);
                 case View::Kind::currency:return record.currency&&currency_.retire(local);
                 case View::Kind::playerController:return record.playerController&&playerControllers_.retire(local);
                 default:return false;

@@ -39,6 +39,7 @@
 #include "core/BoneViewRetirement.h"
 #include "core/GameplayScriptSpawnInstances.h"
 #include "core/CorpseExpiryInstances.h"
+#include "core/SmokeInstances.h"
 #include "core/GameplayDebrisInstances.h"
 #include "core/GameplayTimeChangeRegistration.h"
 #include "core/GameplayTimeShardRegistration.h"
@@ -325,6 +326,15 @@ public:
     }
     const downwell::GameplayScriptSpawnInstances* scriptSpawnInstances()const{return scriptSpawnInstances_;}
     using RegisteredExpiry=downwell::CorpseExpiryInstances<32>;
+    using RegisteredSmoke=downwell::SmokeInstances<32>;
+    const RegisteredSmoke* registeredSmoke()const{return registeredSmoke_;}
+    bool bindRegisteredSmoke(RegisteredSmoke& instances){
+        if(registeredSmoke_||!instances.valid()||instances.size())return false;
+        registeredSmoke_=&instances;return true;
+    }
+    bool stepSmokeRoomEffect(downwell::InstanceHandle key){
+        return run_.effectsSucceeded=run_.effectsSucceeded&&registeredSmoke_&&registeredSmoke_->step(key,enemyRandom_);
+    }
     const RegisteredExpiry* registeredExpiry()const{return registeredExpiry_;}
     bool bindRegisteredExpiry(RegisteredExpiry& instances){
         if(registeredExpiry_||!instances.valid()||instances.size())return false;
@@ -1637,6 +1647,7 @@ private:
     NativeTerrain::Binding nativeTerrainBinding_{};
     downwell::GameplayScriptSpawnInstances* scriptSpawnInstances_=nullptr;
     RegisteredExpiry* registeredExpiry_=nullptr;
+    RegisteredSmoke* registeredSmoke_=nullptr;
     downwell::GameplayDebrisInstances* debrisInstances_=nullptr;
     downwell::NativeTimeChangeRegistration* timeChangeInstances_=nullptr;
     downwell::NativeTimeShardRegistration* timeShardInstances_=nullptr;

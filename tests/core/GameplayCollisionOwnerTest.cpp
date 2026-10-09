@@ -327,6 +327,7 @@ static void checkTypedCollisionView(const GameplayCollisionView& view,GameplayCo
         case K::bullet:assert(view.resolveLocal<K::bullet>(local)==reference.bullet);break;
         case K::scriptEffect:assert(view.resolveLocal<K::scriptEffect>(local)==reference.scriptEffect);break;
         case K::corpseExpiry:assert(view.resolveLocal<K::corpseExpiry>(local)==reference.corpseExpiry);break;
+        case K::smoke:assert(view.resolveLocal<K::smoke>(local)==reference.smoke);break;
         case K::debris:assert(view.resolveLocal<K::debris>(local)==reference.debris);break;
         case K::timeChange:assert(view.resolveLocal<K::timeChange>(local)==reference.timeChange);break;
         case K::timeShard:assert(view.resolveLocal<K::timeShard>(local)==reference.timeShard);break;
@@ -343,7 +344,7 @@ static void checkTypedCollisionView(const GameplayCollisionView& view,GameplayCo
 }
 static void checkCollisionViewMembership(const GameplayWorld& world){
     const GameplayCollisionView view(world);
-    for(unsigned family=0;family<=unsigned(GameplayCollisionView::Kind::corpseExpiry);++family)
+    for(unsigned family=0;family<=unsigned(GameplayCollisionView::Kind::smoke);++family)
         for(auto local:{InstanceHandle{0,0},InstanceHandle{0xffffffffu,1},InstanceHandle{GameplayCollisionView::capacity,1}})
             checkTypedCollisionView(view,GameplayCollisionView::Kind(family),local);
     for(unsigned slot=0;slot<=GameplayCollisionView::capacity;++slot){
@@ -685,6 +686,45 @@ int main(){
     }
     auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                   GameplayCollisionOwner::Ownership::nativeScenery}){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));auto& smoke=owner->registeredSmoke();GameMakerRandom random(2);
+        InstanceHandle local,shared;const auto x=MotionBinary64::fromInteger(240),y=MotionBinary64::fromInteger(192);
+        assert(smoke.create(105187,x,y,random,local)&&GameplayCollisionView::encode(GameplayCollisionView::Kind::smoke,local,shared));
+        GameplayCollisionView view(*world);GameplayCollisionView::Record record;
+        assert(view.resolve(shared,record)&&record.smoke==smoke.find(local)&&record.smoke->sourceId==105187);
+        checkTypedCollisionView(view,GameplayCollisionView::Kind::smoke,local);
+        SmokeEffect oracle;GameMakerRandom oracleRandom(2);assert(oracle.create(x,y,oracleRandom));
+        assert(smoke.setAlarm0(local,2));
+        unsigned ticks=0;
+        while(!oracle.destroyRequested){
+            assert(oracle.advanceImage());world->step(0);
+            assert(world->effectsSucceeded()&&owner->valid());
+            if(ticks==1)oracle.alarm0();
+            if(!oracle.destroyRequested){
+                auto expectedRandom=world->randomState();
+                assert(owner->stepSmoke(shared)&&oracle.step(expectedRandom,[](auto speed,auto direction,auto& vx,auto& vy){
+                    return SmokeDirection::vector(speed,direction,vx,vy,smokeTrig);
+                }));
+                assert(world->randomState().drawCount()==expectedRandom.drawCount());
+                for(unsigned word=0;word<16;++word)assert(world->randomState().stateWord(word)==expectedRandom.stateWord(word));
+            }
+            const auto* current=smoke.find(local);
+            assert(current&&current->state.imageIndex.bits==oracle.imageIndex.bits&&current->destroyRequested==oracle.destroyRequested&&
+                current->x.bits==oracle.x.bits&&current->y.bits==oracle.y.bits&&current->state.noCollision==oracle.noCollision);
+            assert(owner->prepareDraw());
+            if(oracle.destroyRequested)assert(!smoke.find(local)&&!view.contains(shared));
+            assert(++ticks<200);
+        }
+        InstanceHandle before,after;assert(smoke.create(105188,x,y,random,before));
+        assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)==ResultsDestination::gameplay&&
+            world->registeredSmoke()==&smoke&&!smoke.find(before)&&owner->valid());
+        assert(smoke.create(105189,x,y,random,after)&&after.generation>before.generation&&smoke.clear());
+    }
     for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native})
     for(unsigned failure=0;failure<4;++failure){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
