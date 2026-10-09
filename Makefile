@@ -526,6 +526,13 @@ test: verify-smoke-world
 test: verify-damage-number-worlds
 .PHONY: verify-damage-number-worlds
 test: verify-enemy-death-worlds
+test: verify-level-number
+.PHONY: verify-level-number
+verify-level-number: build/level-number-test
+	./build/level-number-test
+build/level-number-test: tests/core/LevelNumberTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ $<
 .PHONY: verify-enemy-death-worlds
 test: verify-run-controller-instances
 .PHONY: verify-run-controller-instances

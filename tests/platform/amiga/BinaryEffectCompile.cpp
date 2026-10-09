@@ -5,6 +5,16 @@
 #include "core/LevelClearSelection.h"
 #include "core/LevelExit.h"
 #include "core/RunSession.h"
+#include "core/LevelNumber.h"
+struct LevelNumberCompileDraw {
+    bool exists(bool&);bool begin();bool end();bool view(unsigned,downwell::MotionBinary64&);
+    bool character(unsigned,downwell::MotionBinary64,downwell::MotionBinary64);
+};
+bool compileLevelNumber(downwell::LevelNumber<64>& actor,LevelNumberCompileDraw& draw,
+    bool (*character)(unsigned,unsigned&),bool (*destroy)()){
+    return actor.create(3,downwell::MotionBinary64::fromInteger(24),character)&&
+        actor.advanceAlarm(0,destroy)&&actor.draw(draw);
+}
 struct CueCompileAudio {
     bool isPlaying(int,bool&);bool stop(int);
     bool setGain(int,downwell::MotionBinary64,unsigned);

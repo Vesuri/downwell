@@ -31,6 +31,24 @@ source-global bindings and registered synchronous creation. Failures preserve
 completed writes and suppress subsequent operations. VM guards and scripted
 audio tests establish this ordering, not original-runner playback fidelity.
 
+Object 372 (`levelNumber`) is parentless/nonpersistent and has Create, three
+alarms, and Draw, but no Step event. Its localized text and measured width use
+different source inputs: width measures `string_hash_to_newline(levelTxt)`,
+whereas the character array uses the original string. Its one-based characters
+start with offset -2; the first is visible immediately. Alarm 0 reveals later
+characters every four phases, then arms Alarm 1 for 120. Alarm 1 starts exit
+and arms Alarm 2 for four; index-ordered dispatch counts down those newly armed
+later slots in the same phase. Alarm 2 writes `txtAt[txtShown][1]`, not
+`txtAt[txtExit][1]`, and eventually requests destruction.
+
+`LevelNumber` represents those events using caller-owned character tokens and
+source-measured width. Draw changes offsets only when surfaceFx exists. Entrance
+increments after drawing; exit increments before its visibility test. Four
+separate view reads are preserved in the surface-coordinate calculation rather
+than algebraically cancelling them. This event state does not yet supply the
+localized text, active-font measurement, registered lifetime, or real surface
+text operations needed to admit the actor into either live world.
+
 ## Result-room population and persistent alarms
 
 The exported `objLineToResult` Alarm 1 calls `room_goto(16)` unconditionally.

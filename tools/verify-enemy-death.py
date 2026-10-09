@@ -155,3 +155,31 @@ assert event_instructions("Object_objTransDither_Step_0") == [
     "call.i gml_Script___view_get(argc=2)", "pushi.e 0", "conv.i.v", "push.l 3", "conv.l.v",
     "call.i gml_Script___view_get(argc=2)", "add.v.v", "cmp.v.v LT", "bf [end]",
     "push.v self.y", "pushi.e 8", "add.i.v", "pop.v.v self.y"]
+number=manifest["objects"][372]
+assert number["name"]=="levelNumber" and number["parentId"]==-1 and not number["Persistent"]
+assert {(e["eventType"],e["eventSubtype"]) for e in number["events"]}=={(0,0),(2,0),(2,1),(2,2),(8,0),(14,0)}
+assert event_instructions("Object_levelNumber_PreCreate_0")==["call.i event_inherited(argc=0)","popz.v"]
+number_create=event_instructions("Object_levelNumber_Create_0")
+assert number_create.count("call.i string_char_at(argc=2)")==1
+assert number_create.index("call.i string_hash_to_newline(argc=1)")<number_create.index("call.i string_width(argc=1)")
+assert number_create[-14:]==["pushi.e 4","pop.v.i self.txtApInterval","push.i 68049","setowner.e",
+    "push.v self.txtApInterval","pushi.e -1","pushi.e 0","pop.v.v [array]self.alarm",
+    "pushi.e 4","pop.v.i self.txtExInterval","pushi.e 120","pop.v.i self.txtRemainTime",
+    "pushi.e 0","pop.v.i self.txtExit"]
+assert event_instructions("Object_levelNumber_Alarm_1")==[
+    "pushi.e 1","pop.v.i self.txtExit","push.i 68049","setowner.e","push.v self.txtExInterval",
+    "pushi.e -1","pushi.e 2","pop.v.v [array]self.alarm"]
+for index,counter,interval,next_alarm in [(0,"txtShown","txtApInterval",0),(2,"txtExit","txtExInterval",2)]:
+    instructions=event_instructions(f"Object_levelNumber_Alarm_{index}")
+    assert instructions[:4]==[f"push.v self.{counter}","push.v self.txtLength","cmp.v.v LT","bf [2]"]
+    assert instructions[4:15]==["push.i 167295","setowner.e","pushi.e 1","conv.i.v","pushi.e -1",
+        "push.v self.txtShown","conv.v.i","push.v [arraypopaf]self.txtAt","pushi.e 1","popaf.e",f"push.v self.{counter}"]
+    assert instructions[15:24]==["pushi.e 1","add.i.v",f"pop.v.v self.{counter}","push.i 68049","setowner.e",
+        f"push.v self.{interval}","pushi.e -1",f"pushi.e {next_alarm}","pop.v.v [array]self.alarm"]
+assert event_instructions("Object_levelNumber_Alarm_2")[-2:]==["call.i instance_destroy(argc=0)","popz.v"]
+number_draw=event_instructions("Object_levelNumber_Draw_0")
+assert number_draw.count("call.i gml_Script___view_get(argc=2)")==4
+assert number_draw.count("call.i gml_Script_scrDrawBorderTextBlack(argc=3)")==2
+assert number_draw[:4]==["pushglb.v global.surfaceFx","call.i surface_exists(argc=1)","conv.v.b","bf [end]"]
+assert number_draw[-2:]==["call.i surface_reset_target(argc=0)","popz.v"]
+print("Pinned level-number parentless lifetime, alarms and Draw-owned text animation")
