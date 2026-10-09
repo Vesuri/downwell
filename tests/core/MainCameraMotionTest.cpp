@@ -9,6 +9,30 @@ void require(bool value, const char* text) {
 }
 int main() {
     {
+        struct Random {
+            unsigned calls=0;
+            unsigned irandomSmall(unsigned max){
+                require(max==(calls%2?4u:2u),"shake requests inclusive X then Y ranges");
+                ++calls;return max;
+            }
+        } random;
+        downwell::MainCameraMotion camera;
+        camera.sampleShake(random);
+        require(!random.calls,"idle camera consumes no shake RNG");
+        camera.requestTimeStopShake();camera.sampleShake(random);
+        require(random.calls==2&&camera.pixelX()==241&&camera.pixelY()==178&&
+            camera.x==240*4096L&&camera.y==176*4096L,"shake offsets published position only");
+        camera.stopShake();
+        require(camera.pixelX()==241,"alarm does not retroactively publish a camera Step");
+        camera.sampleShake(random);
+        require(random.calls==2&&camera.pixelX()==240&&camera.pixelY()==176,"next Step clears expired shake without RNG");
+        camera.requestTimeStopShake();camera.sampleShake(random);
+        camera.collideSideLocker(1000);
+        require(camera.pixelX()==241&&camera.pixelY()==1000,"locker collision overrides shaken Y but preserves published X");
+        camera.reset(240,176);
+        require(!camera.shaking&&!camera.shakeAmount&&!camera.shakeX&&!camera.shakeY,"reset clears shake state");
+    }
+    {
         using downwell::SideCameraLocker;
         require(SideCameraLocker::createdX(159) == 80 &&
             SideCameraLocker::createdX(160) == 160 &&

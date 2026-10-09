@@ -1674,12 +1674,29 @@ bool StartupRuntime::publishMainCameraPosition(InstanceRecord& instance){
     return true;
 }
 
+bool StartupRuntime::requestTimeStopCameraShake(){
+    if(!run_.effectsSucceeded)return false;
+    if(!mainCameraInitialized_||roomId_!=mainRoomId)return run_.effectsSucceeded=false;
+    InstanceRecord* camera=nullptr;
+    for(std::size_t i=0;i<instances_.size();++i){
+        auto& r=instances_.at(i);
+        if(r.objectId!=64||!r.active||r.destroyRequested)continue;
+        if(camera)return run_.effectsSucceeded=false;
+        camera=&r;
+    }
+    if(!camera)return run_.effectsSucceeded=false;
+    mainCameraMotion_.requestTimeStopShake();
+    if(camera->alarms.get(0)<2)camera->alarms.set(0,2);
+    return true;
+}
+
 void StartupRuntime::updateMainCamera(InstanceRecord& instance) {
     if (!mainCameraInitialized_ || !mainPlayerInitialized_)
         return;
     mainCameraMotion_.step(static_cast<long>(std::round(mainPlayerX_ * 256.0F)),
                            static_cast<long>(std::round(mainPlayerY_ * 256.0F)), mainDeath_.active,
                            run_.sideCameraLockers.overlaps(mainCameraMotion_));
+    mainCameraMotion_.sampleShake(random_);
     mainCameraX_ = mainCameraMotion_.x / 4096.0F;
     mainCameraY_ = mainCameraMotion_.y / 4096.0F;
     mainCameraTargetY_ = mainCameraMotion_.targetY / 4096.0F;
@@ -2428,6 +2445,10 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             publishMainCameraPosition(*instance);
         }
         return;
+    case 998: // gml_Object_camMain_Alarm_0
+        ++implementedCodeCalls_;
+        if(instance&&instance->roomId==mainRoomId)mainCameraMotion_.stopShake();
+        return;
     case 999: // gml_Object_camMain_Step_0 (menu/rmMain camera subsets)
         ++implementedCodeCalls_;
         if (instance != nullptr && instance->roomId == mainRoomId)
@@ -2952,6 +2973,11 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addI32(mainCameraMotion_.targetY);
     digest.addI32(mainCameraMotion_.slowdownX);
     digest.addI32(mainCameraMotion_.slowdownY);
+    if(mainCameraMotion_.shaking||mainCameraMotion_.shakeX||mainCameraMotion_.shakeY){
+        digest.addU32(0x5348414b); // SHAK: preserve empty-state replay hashes.
+        digest.addBool(mainCameraMotion_.shaking);digest.addI32(mainCameraMotion_.shakeAmount);
+        digest.addI32(mainCameraMotion_.shakeX);digest.addI32(mainCameraMotion_.shakeY);
+    }
     if (run_.sideCameraLockers.count || mainCameraMotion_.sideLocked) {
         digest.addU32(0x534c4f43); // Optional SLOC extension; unchanged empty-room hashes.
         digest.addU64(sideCameraDigest());

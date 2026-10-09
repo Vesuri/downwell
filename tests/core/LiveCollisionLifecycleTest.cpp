@@ -2987,11 +2987,20 @@ int main(){
         require(world->stepWithTimeStopEffects(shards,changes,state,Input{},false,transition)&&hooks==1&&pauses==1&&
             state.player.stopped&&state.shards.size()==6&&state.changes.sourceId(1)==first+3&&
             state.shards.sourceId(4)==first+4,"normal player Begin Step creates source-ordered transition families");
+        auto camera=[&]() -> const InstanceRecord& {
+            for(std::size_t i=0;i<world->activeInstanceCount();++i)
+                if(world->instanceAt(i).objectId==64)return world->instanceAt(i);
+            require(false,"registered transition camera exists");std::abort();
+        };
+        require(state.shakeAmt==2&&state.shakeDur==2&&camera().alarms.get(0)==1&&
+            camera().x==world->mainCameraRenderViewX()+80&&camera().y==world->mainCameraRenderViewY()+142,
+            "Begin Step shake arms the real camera before alarms and publishes its shaken Step position");
         require(state.shards.get(1)->timeline.bits==0&&world->instance(first)->alarms.get(2)==29&&
             world->instance(first+3)->alarms.get(1)==1,
             "Begin Step births miss preceding animation but join same-tick alarms and Step");
         require(world->stepWithTimeStopEffects(shards,changes,state,Input{},false,transition)&&hooks==2&&pauses==1,
             "held field does not recreate the transition on the next world tick");
+        require(camera().alarms.get(0)==0,"camera Alarm 0 expires on second tick without repeated shake request");
         require(state.reset(),"retire live transition fixture before teardown");
     }
     {
@@ -3013,6 +3022,13 @@ int main(){
         require(moved,"publication regression exercises player movement");
     }
     auto productionOwner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+    for(unsigned seed=0;seed<128;++seed){
+        GameMakerRandom random(seed),oracle(seed);MainCameraMotion camera;
+        const int dx=int(oracle.irandom(2))-1,dy=int(oracle.irandom(4))-2;
+        camera.requestTimeStopShake();camera.sampleShake(random);
+        require(camera.pixelX()==240+dx&&camera.pixelY()==176+dy&&random.drawCount()==4&&
+            random.nextU32()==oracle.nextU32(),"camera shake preserves X/Y inclusive ranges and four-word RNG order");
+    }
     {
         auto shardOwner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,shardOwner->binding());

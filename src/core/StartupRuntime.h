@@ -678,7 +678,8 @@ public:
         },[&]{return stepWithTimeStopAndBones(bones,shards,changes,stop,input,frames,transition,collisions);});
     }
     // Explicit Begin Step boundary; the scheduler supplies synchronous audio,
-    // shake, pause and oxygen effects. Registrations must
+    // pause and oxygen effects. Shake updates the registered main camera before
+    // notifying the supplied effect callback. Registrations must
     // outlive the effect owner and be retired before room teardown.
     template<unsigned Capacity,unsigned Registered,unsigned Changes,class Audio,class Emit>
     bool beginTimeStop(StoredTimeShardRegistration<instanceCapacity,Registered>& shards,
@@ -704,9 +705,13 @@ public:
                     InstancePlaceResult result;
                     if(!playerTimeFieldInstance(x,y,result))return false;
                     id=result.id;fx=result.x;fy=result.y;return true;
-                },audio,emit);
+                },audio,[&](PlayerTimeStop::Effect effect){
+                    if(effect==PlayerTimeStop::Effect::shake&&!requestTimeStopCameraShake())return false;
+                    return emit(effect);
+                });
         return run_.effectsSucceeded;
     }
+    bool requestTimeStopCameraShake();
     // The caller must keep the returned bridge alive and retire its shards
     // before changing rooms. Phase dispatch is intentionally not supplied here.
     template<unsigned Capacity> StoredTimeShardRegistration<instanceCapacity,Capacity> timeShardRegistration(){

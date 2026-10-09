@@ -19,6 +19,7 @@ template<unsigned Capacity> struct TimeStopEffects {
     TimeShardEffects<Capacity> shards;
     TimeChangeEffects<8> changes;
     int roomSpeed=60; // Source target rate; PAL backend must not add catch-up.
+    int shakeAmt=0,shakeDur=0; // scrSShake's caller-local writes.
     bool succeeded=true;
     struct PlayerPose {
         RunnerImageValue x,y; // published builtins, not private xx/yy
@@ -39,7 +40,7 @@ template<unsigned Capacity> struct TimeStopEffects {
     bool reset(){
         if(!shards.clear()){succeeded=false;return false;}
         if(!changes.clear()){succeeded=false;return false;}
-        player={};burst={};roomSpeed=60;succeeded=true;return true;
+        player={};burst={};roomSpeed=60;shakeAmt=shakeDur=0;succeeded=true;return true;
     }
     template<class Random,class Field,class Lookup,class Audio,class Emit>
     bool beginStep(bool mainRoom,bool outsideSides,const PlayerPose& pose,bool lowSpec,
@@ -58,6 +59,7 @@ template<unsigned Capacity> struct TimeStopEffects {
                    Random& random,Field field,Lookup lookup,Audio audio,Emit emit){
         if(!succeeded||!shards.succeeded()||!changes.succeeded()){succeeded=false;return false;}
         succeeded=player.stepWithAudioChecked(mainRoom,side,field,audio,[&](PlayerTimeStop::Effect effect){
+            if(effect==PlayerTimeStop::Effect::shake){shakeAmt=2;shakeDur=2;}
             if(effect==PlayerTimeStop::Effect::change)
                 return changes.createAt(pose.xx,pose.yy,roomSpeed,[&](unsigned){return emit(effect);});
             if(effect!=PlayerTimeStop::Effect::shards)return emit(effect);

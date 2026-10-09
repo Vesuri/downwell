@@ -88,6 +88,19 @@ The source contract is `objPlayer_n` Begin Step and the pinned `soundPlay` and
 `bgmDuck` VM scripts; this adapter does not establish actual backend playback
 or automatically install a transition in either normal game loop.
 
+The registered transition's shake callback applies `scrSShake(2,2)` to the
+admitted main-room camera before notifying the external effect callback.
+Caller-local `shakeAmt/shakeDur` are assigned first. The request enables shake,
+raises its amplitude to at least 2 and raises the actual camera Alarm 0 to at
+least 2. Normal room alarm dispatch clears shake/amplitude on expiry. Camera
+Step samples X then Y with inclusive integer ranges [-1,1] and [-2,2], consuming
+four WELL words, and publishes the offset position without changing the Q12
+easing accumulators. Alarm expiry leaves the prior published offset intact
+until Step. A side-lock collision's explicit Y assignment replaces its vertical
+offset without replacing X. This covers the admitted time-stop amplitude, not
+arbitrary VM-valued shake arguments or the unimplemented camera modes. Native
+scheduler wiring remains part of the unfinished integration.
+
 ## Ordinary Destroy versus storage retirement
 
 The Windows `instance_destroy` registration at `0x52cd80` selects wrapper
