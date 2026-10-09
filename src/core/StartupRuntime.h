@@ -29,6 +29,7 @@
 #include "StoredCorpseExpiryRegistration.h"
 #include "StoredSmokeRegistration.h"
 #include "StoredConsumptionBloodRegistration.h"
+#include "MomentDelay.h"
 #include "StoredTimeChangeRegistration.h"
 #include "StoredEntryDitherRegistration.h"
 #include "GameplayDitherAbove.h"
@@ -202,6 +203,14 @@ public:
         r->box.wallHp=health;return true;
     }
     int overlapSound(unsigned channel)const{return channel<11?run_.overlapSounds[channel]:-1;}
+    template<class Tick> bool withMomentDelayRoomSpeed(int& roomSpeed,Tick tick){
+        if(!run_.effectsSucceeded)return false;
+        if(momentDelayRoomSpeed_)return run_.effectsSucceeded=false;
+        momentDelayRoomSpeed_=&roomSpeed;
+        const bool okay=tick();momentDelayRoomSpeed_=nullptr;
+        return run_.effectsSucceeded=okay&&run_.effectsSucceeded;
+    }
+    bool requestMomentDelay();
     template<class Audio,class NoKill,class Delay,class Cue>
     bool recordEnemyDeath(bool cutGunshot,Audio& audio,NoKill clearNoKill,Delay delay,Cue cue){
         return run_.recordEnemyDeath(cutGunshot,audio,clearNoKill,delay,cue);
@@ -1801,6 +1810,7 @@ private:
     const CorpseAnimation* (*corpseDrawState_)(void*,const InstanceRecord&)=nullptr;
     void* smokeContext_=nullptr;
     void* consumptionBloodContext_=nullptr;
+    int* momentDelayRoomSpeed_=nullptr;
     bool (*consumptionBloodDispatch_)(void*,const InstanceRecord&,ConsumptionBloodPhase,unsigned)=nullptr;
     bool (*smokeDispatch_)(void*,const InstanceRecord&,SmokePhase,unsigned)=nullptr;
     bool (*corpseExpiryDispatch_)(void*,const InstanceRecord&,bool)=nullptr;

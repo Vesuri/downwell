@@ -284,6 +284,31 @@ void StartupRuntime::controllerCreate(PlatformProfile profile) {
         showSplash_ = 1;
 }
 
+bool StartupRuntime::requestMomentDelay(){
+    if(!run_.effectsSucceeded)return false;
+    if(!momentDelayRoomSpeed_||!objectPack_)return run_.effectsSucceeded=false;
+    return run_.effectsSucceeded=MomentDelay::request(*momentDelayRoomSpeed_,[&](auto apply){
+        bool okay=true;
+        instances_.visitObject(37,[&](int object,int parent){
+            for(unsigned depth=0;depth<objectPack_->objectCount();++depth){
+                if(object==parent)return true;
+                PackedObject definition;
+                if(!objectPack_->findObject(object,definition)){okay=false;return false;}
+                if(definition.parentId<0)return false;
+                object=definition.parentId;
+            }
+            okay=false;return false;
+        },
+            [&](InstanceHandle key,const InstanceRecord& record){
+                if(!okay)return false;
+                if(!record.active||record.destroyRequested)return true;
+                auto* current=instances_.resolve(key);
+                return okay=current&&apply(*current);
+            });
+        return okay;
+    });
+}
+
 void StartupRuntime::initRoomCreate() {
     roomDestinationSet_ = false;
     splashSpeed_ = 180;
@@ -2342,6 +2367,12 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
     case 869: // gml_Object_objControlerN_Create_0
         ++implementedCodeCalls_;
         controllerCreate(profile_);
+        if(instance)instance->controllerSlow=0;
+        return;
+    case 878: // gml_Object_objControlerN_Alarm_0
+        ++implementedCodeCalls_;
+        if(!instance||!momentDelayRoomSpeed_){run_.effectsSucceeded=false;return;}
+        MomentDelay::alarm0(*momentDelayRoomSpeed_,*instance);
         return;
     case 2435: // gml_Object_objTeleportMain_Create_0
         ++implementedCodeCalls_;

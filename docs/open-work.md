@@ -142,6 +142,10 @@ behavior, both backend integrations and relevant original-game verification.
   Route enemy-death bookkeeping through the shared run-state entry, supplying
   actual toggleGuncut, achNoKill publication, momentDelay controller events and
   levelBeginCue creation/audio. Do not use successful placeholder callbacks.
+  Bind stored moment-delay requests and their later alarms to the same room-speed
+  global as time changes; add the omitted native object-37 ownership and mixed
+  alarm dispatch before admitting that path there. A PAL frame scheduler must
+  not replace the source room-speed global with 50.
   Complete death/low-spec direct drawing at original world-depth boundaries,
   rather than flattening those paths into an overlay.
 - Complete natural skeleton and owned-bone integration in shared gameplay:

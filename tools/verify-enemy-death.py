@@ -42,3 +42,26 @@ call.i audio_stop_sound(argc=1)
 popz.v
 exit.i""".splitlines()
 print("Pinned enemy-death global mutation order and gunshot channel reread")
+assert body("momentDelay", 6) == """pushbltn.v builtin.room_speed
+pushi.e 60
+cmp.i.v EQ
+bf [5]
+pushi.e 37
+pushenv [4]
+pushi.e 30
+pop.v.i builtin.room_speed
+pushi.e 30
+pop.v.i self.slown
+push.i 12323281
+setowner.e
+pushi.e 1
+conv.i.v
+pushi.e -1
+pushi.e 0
+pop.v.v [array]self.alarm
+popenv [3]
+exit.i""".splitlines()
+alarm = (root / "gml_Object_objControlerN_Alarm_0.asm").read_text()
+assert [line.strip() for line in alarm.splitlines() if line.strip() and not line.startswith((".", ":"))] == [
+    "pushi.e 60", "pop.v.i builtin.room_speed", "pushi.e 0", "pop.v.i self.slown"]
+print("Pinned moment-delay outer speed guard, controller writes and alarm restoration")

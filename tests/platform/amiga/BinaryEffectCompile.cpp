@@ -1,5 +1,12 @@
 #include "core/BinaryEffectSurface.h"
 #include "core/InstanceStore.h"
+#include "core/MomentDelay.h"
+bool compileMomentDelay(int& speed,downwell::InstanceRecord& controller){
+    return downwell::MomentDelay::request(speed,[&](auto apply){return apply(controller);});
+}
+void compileMomentDelayAlarm(int& speed,downwell::InstanceRecord& controller){
+    downwell::MomentDelay::alarm0(speed,controller);
+}
 #include "core/RunnerLayerElements.h"
 #include "core/RunnerLayers.h"
 #include "core/RunnerDepthChanges.h"
