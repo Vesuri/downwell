@@ -176,7 +176,7 @@ encounter admission or a proof of complete global RNG interleaving.
 Laser Sight spread override, and the world's
 actual random stream, and latches failures in that world. Invalid or retired
 identities fail before draws or effect creation. Its explicit motion/operation
-arguments still need wiring to the ordinary-Step scheduler; invoking this entry
+arguments are bound by the scoped ordinary-Step adapters below; invoking this entry
 point is not permission to rerun a shot already advanced by the legacy path.
 The controlled owner tests compare the full pre/post RNG state, including the
 spread-plus-material sequence for wall hits, rather than merely counting draws.
@@ -184,9 +184,9 @@ The enclosing runtime supplies the same motion object to its query/approach
 callbacks and retains the executing bullet through destruction requests.
 `verify-machine-gun-source-step` checks both profiles through empty, box, wall,
 enemy-suppression and shootable routes, every callback failure prefix, and
-second-Step initialization. This shared event composition is not yet wired
-into the live schedulers: remaining target/effect/retirement adapters above
-still gate replacement of the approximate gun path.
+second-Step initialization. Automatic production admission is still gated by
+complete target populations and bindings; the scoped source scheduler does not
+by itself replace the approximate gun path in normal gameplay.
 
 `BulletWallSound` implements `soundBullet` using the authored `initSfxBhit`
 table. The selected target's material is read before the random choice:
@@ -1207,6 +1207,15 @@ state. Scheduled fixtures exercise box, plain-wall and bone impacts with this
 adapter; the selected target positions are controlled test inputs, not a
 natural encounter replay. It covers registered populations only and does not
 authorize omitted actors or incomplete source-ID streams.
+
+`StoredSourceBulletStep` is the corresponding stored-world binding. It uses
+the stored owner's line/point/place queries and box writes, and dispatches
+parent-90 field access to the supplied owning registration. Each access first
+checks the selected world lifetime. A mixed bone/corpse population therefore
+requires its actual mixed registration dispatcher, not a bone-only substitute.
+The scoped stored scheduler fixture checks a registered bone impact through
+this adapter and the subsequent normal bullet cleanup. As with the native
+fixture, target placement is explicit and audio is a command recorder.
 
 The caller must provide complete collision and audio operations. Production
 callers without this scope still use the legacy trajectory: scoped scheduling

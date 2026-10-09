@@ -42,6 +42,7 @@ public:
     StoredWorldCollision(const StoredWorldCollision&)=delete;
     StoredWorldCollision& operator=(const StoredWorldCollision&)=delete;
     bool valid()const{return valid_&&owner_.valid();}
+    bool boundTo(const StartupRuntime& world)const{return valid()&&runtime_==&world;}
     bool attach(const StartupRuntime& runtime){
         if(!valid()||(runtime_&&runtime_!=&runtime))return false;
         runtime_=&runtime;return true;

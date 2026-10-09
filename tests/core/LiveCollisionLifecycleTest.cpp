@@ -9,6 +9,7 @@
 #include "core/StoredCollisionLifecycle.h"
 #include "core/StoredLayerLifecycle.h"
 #include "core/StoredWorldCollision.h"
+#include "core/StoredSourceBulletStep.h"
 #include "core/StoredDitherCollisionPass.h"
 #include "core/TimeChangeEffects.h"
 #include "core/EventScheduler.h"
@@ -2125,6 +2126,35 @@ int main(){
             !world->mainBulletAt(0).trajectory.initialized,"source motion survives frames without legacy advancement");
         const auto before=world->randomDrawCount();world->step({},false);
         require(!world->effectsSucceeded()&&world->randomDrawCount()==before,"missing source dispatch fails before any tick mutation");
+    }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach concrete source bullet adapter");world->skipToGameForTesting();
+        auto bones=world->boneRegistration<4>();InstanceHandle bone,shot;unsigned calls=0;
+        auto frames=[&](int id,unsigned& count){return sprites.frameCount(id,count);};
+        for(unsigned tick=0;tick<1000&&!calls;++tick){
+            require(world->withSourceBulletSteps([&](InstanceHandle key,MachineGunSourceMotion& motion){
+                shot=key;++calls;const int y=int(world->mainPlayerY());RunnerImageValue px,py;
+                require(px.assignInteger(240)&&py.assignInteger(y)&&world->spawnBone(bones,240,y,bone)&&
+                    world->publishBulletCollisionPosition(key,px,py),
+                    "prepare explicit registered bone at source bullet position");
+                SoundPlayEnvironment environment;
+                BulletWallAudio audio{world->resolveInstance(key)->sound,world->overlapSound(2),29,false};
+                const auto before=world->randomDrawCount();
+                require(StoredSourceBulletStep::run(*world,*owner,key,motion,bones,frames,environment,audio),
+                    "scheduled source event uses concrete stored collision adapter");
+                const auto* victim=bones.instances().find(bone);
+                require(victim&&victim->state.hit&&victim->state.health.high==0xc0200000u&&
+                    world->randomDrawCount()==before+1&&audio.calls==0&&world->scriptEffects().size()==1&&
+                    owner->resolve(key)->destroyRequested&&motion.initialized,
+                    "scheduled bone impact retains source damage, muzzle and destruction timing");
+                return true;
+            },[&]{world->step(gameplayContactProfileInput(tick,world->mainPlayerX(),world->mainPlayerY()),false);
+                return world->effectsSucceeded();}),"source adapter completes ordinary world tick");
+        }
+        require(calls==1&&!owner->resolve(shot),"stored cleanup retires source shot after scheduled impact");
+        require(bones.clear(),"clear explicitly registered adapter target");
     }
     for(bool high:{false,true})for(bool laser:{false,true})for(bool boneTarget:{false,true})for(bool worldRandom:{false,true}){
         if(worldRandom&&(high||laser))continue;
