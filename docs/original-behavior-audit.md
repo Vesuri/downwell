@@ -119,6 +119,15 @@ surfaces retain offsets. Unsupported text states fail with the source mutation
 prefix retained. This still requires live renderer-state/target binding and
 verification of the target raster policy before admitting natural callers.
 
+The stored runner's `withLevelNumberDraw` borrows the title registration only
+for its enclosing render, while `drawLevelNumber` resolves the original room
+record back to that registration at the layer callback. The synchronous ops
+bridge forwards target, view, color and glyph calls without copying event state.
+Nested binding and unbound dispatch reject; the binding is released on both
+successful and failed rendering. The stored-world lifetime test exercises this
+through the unconditional layer traversal, including absent/present surfaces,
+Draw-only letter movement and the retained 142-tick alarm/destruction sequence.
+
 ### Original title-width measurement
 
 Read-only inspection of the pinned Windows executable identifies string_width

@@ -27,6 +27,7 @@
 #include "StoredTimeShardRegistration.h"
 #include "StoredCorpseRegistration.h"
 #include "StoredLevelNumberRegistration.h"
+#include "LevelNumberDrawOps.h"
 #include "LevelNumberText.h"
 #include "StoredCorpseExpiryRegistration.h"
 #include "StoredSmokeRegistration.h"
@@ -464,8 +465,26 @@ public:
         const bool okay=tick();levelNumberDispatch_=nullptr;levelNumberContext_=nullptr;
         return run_.effectsSucceeded=okay&&run_.effectsSucceeded&&registration.valid();
     }
-    // Borrow private corpse Draw state only for the enclosing render. The
+    // Borrow private title Draw state only for the enclosing render. The
     // renderer still walks the shared layers; this is not a separate pass.
+    template<unsigned Capacity,unsigned TextCapacity,class Render> bool withLevelNumberDraw(
+        StoredLevelNumberRegistration<instanceCapacity,Capacity,TextCapacity>& registration,Render render){
+        if(levelNumberDraw_||!registration.belongsTo(instances_)||!registration.valid())return false;
+        levelNumberDrawContext_=&registration;
+        levelNumberDraw_=[](void* context,const InstanceRecord& record,LevelNumberDrawOps& ops){
+            auto& owner=*static_cast<StoredLevelNumberRegistration<instanceCapacity,Capacity,TextCapacity>*>(context);
+            const auto key=owner.handle(record);
+            return key.generation&&owner.draw(key,ops);
+        };
+        const bool okay=render();levelNumberDraw_=nullptr;levelNumberDrawContext_=nullptr;
+        return okay&&registration.valid();
+    }
+    template<class Ops> bool drawLevelNumber(const InstanceRecord& record,Ops& ops)const{
+        if(!levelNumberDraw_||record.objectId!=372)return false;
+        LevelNumberDrawOps bridge(ops);
+        return levelNumberDraw_(levelNumberDrawContext_,record,bridge);
+    }
+    // Corpse state is borrowed under the same enclosing-render lifetime.
     template<unsigned Capacity,class Render> bool withCorpseDraw(
         StoredCorpseRegistration<instanceCapacity,Capacity>& registration,Render render){
         if(corpseDrawState_||!registration.belongsTo(instances_)||!registration.valid())return false;
@@ -1886,6 +1905,8 @@ private:
     void* skeletonContext_=nullptr;
     bool (*levelNumberDispatch_)(void*,const InstanceRecord&,bool,unsigned)=nullptr;
     void* levelNumberContext_=nullptr;
+    void* levelNumberDrawContext_=nullptr;
+    bool (*levelNumberDraw_)(void*,const InstanceRecord&,LevelNumberDrawOps&)=nullptr;
     bool (*corpseDispatch_)(void*,const InstanceRecord&,CorpsePhase,unsigned)=nullptr;
     void* corpseContext_=nullptr;
     void* corpseExpiryContext_=nullptr;

@@ -183,12 +183,39 @@ int main(){
             if(tick==131)assert(numbers.state(key)->exit==1&&stored->instance(id)->alarms.get(2)==3);
             if(tick==1){
                 unsigned draws=0;
-                assert(stored->visitDrawChecked([&](auto live,const auto& record){
-                    if(record.objectId!=372)return true;
-                    ++draws;return live.slot==key.slot&&live.generation==key.generation&&numbers.draw(live,surface);
+                assert(!stored->drawLevelNumber(*stored->instance(id),surface));
+                assert(stored->withLevelNumberDraw(numbers,[&]{
+                    unsigned nested=0;
+                    assert(!stored->withLevelNumberDraw(numbers,[&]{++nested;return true;})&&!nested);
+                    return stored->visitUnconditionalSurfaceDraw([&](auto live,const auto& record,int depth){
+                        if(record.objectId!=372)return true;
+                        ++draws;return live.slot==key.slot&&live.generation==key.generation&&depth==-100000&&
+                            stored->drawLevelNumber(record,surface);
+                    });
                 })&&draws==1);
+                assert(!stored->drawLevelNumber(*stored->instance(id),surface));
+                assert(!stored->withLevelNumberDraw(numbers,[]{return false;}));
+                assert(!stored->drawLevelNumber(*stored->instance(id),surface));
             }
-            if(tick<142)assert(numbers.state(key)->characters[1].offset==-2); // No Draw: no letter movement.
+            if(tick==2){
+                struct PresentSurface {
+                    unsigned glyphs=0,views=0,colors=0,ends=0,colorValue=123;
+                    bool exists(bool& value){value=true;return true;}bool begin(){return true;}
+                    bool end(){++ends;return true;}
+                    bool color(unsigned value){++colors;colorValue=value;return true;}
+                    bool view(unsigned,downwell::MotionBinary64& value){++views;value={};return true;}
+                    bool character(unsigned token,downwell::MotionBinary64,downwell::MotionBinary64){
+                        assert(token==1&&colorValue==(glyphs==4?0xffffffu:0u));++glyphs;return true;
+                    }
+                } present;
+                assert(stored->withLevelNumberDraw(numbers,[&]{
+                    return stored->visitUnconditionalSurfaceDraw([&](auto,const auto& record,int){
+                        return record.objectId!=372||stored->drawLevelNumber(record,present);
+                    });
+                }));
+                assert(present.glyphs==5&&present.views==4&&present.colors==2&&present.ends==1&&present.colorValue==0xffffff);
+            }
+            if(tick<142)assert(numbers.state(key)->characters[1].offset==(tick<2?-2:-1)); // Only Draw moves letters.
         }
         assert(!stored->instance(id)&&!numbers.state(key)&&numbers.valid());
         downwell::InstanceHandle replacement;
