@@ -35,6 +35,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto destination = downwell::resultsDestination(action);
     if (destination == downwell::ResultsDestination::none) return destination;
     if(levelNumbers_&&!levelNumbers_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
+    if(limboShards_&&!limboShards_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(resultInstance_&&!resultInstance_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(!clearRoomTimeChanges()||!clearRoomTimeShards())return downwell::ResultsDestination::none;
     if(entryDithers_&&!entryDithers_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
@@ -79,6 +80,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto runControllers=runControllers_;
     const auto resultInstance=resultInstance_;
     const auto levelNumbers=levelNumbers_;
+    const auto limboShards=limboShards_;
     const auto controllerRoomSpeed=controllerRoomSpeed_;
     const auto droneBullets=droneBullets_;
     const auto bones=bones_;
@@ -148,6 +150,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     runControllers_=runControllers;
     resultInstance_=resultInstance;
     levelNumbers_=levelNumbers;
+    limboShards_=limboShards;
     controllerRoomSpeed_=controllerRoomSpeed;
     droneBullets_=droneBullets;
     bones_=bones;
@@ -269,6 +272,7 @@ bool GameplayWorld::retireGameplayRoom() {
     // This also handles explicit test/adaptor births made before the next
     // room load; an already retired lifetime must not receive a second callback.
     if(levelNumbers_&&!levelNumbers_->clear())return run_.effectsSucceeded=false;
+    if(limboShards_&&!limboShards_->clear())return run_.effectsSucceeded=false;
     if(resultInstance_&&!resultInstance_->clear())return run_.effectsSucceeded=false;
     if(!clearRoomTimeChanges()||!clearRoomTimeShards())return false;
     if(entryDithers_&&!entryDithers_->clear())return run_.effectsSucceeded=false;

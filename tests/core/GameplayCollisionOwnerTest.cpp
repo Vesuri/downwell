@@ -16,6 +16,16 @@ namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_
 #include "core/CurrencyHomingMath.h"
 #include "core/TerrainWallContacts.h"
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
+struct NativeLimboViews {
+    bool outside(downwell::RunnerImageValue,downwell::RunnerImageValue,bool&);
+    bool viewTop(downwell::MotionBinary64&);
+};
+bool nativeLimboProbe(downwell::GameplayCollisionOwner& owner,GameplayWorld& world,
+    const downwell::SpriteMaskPack& masks,NativeLimboViews& views){
+    downwell::InstanceHandle child;
+    return world.createLimboShardWithSourceId(105193,{}, {},false,child)&&
+        owner.stepLimboShard(child,true,480,{},masks,views);
+}
 struct NativeEnemyDeathAudioProbe { bool isPlaying(int,bool&);bool stop(int); };
 bool nativeRunControllerBirth(downwell::GameplayCollisionOwner& owner,unsigned source,
     bool (*initialize)(downwell::InstanceHandle),downwell::InstanceHandle& key){
@@ -385,6 +395,7 @@ static void checkTypedCollisionView(const GameplayCollisionView& view,GameplayCo
         case K::runController:assert(view.resolveLocal<K::runController>(local)==reference.runController);break;
         case K::result:assert(view.resolveLocal<K::result>(local)==reference.result);break;
         case K::levelNumber:assert(view.resolveLocal<K::levelNumber>(local)==reference.levelNumber);break;
+        case K::limboShard:assert(view.resolveLocal<K::limboShard>(local)==reference.limboShard);break;
         case K::debris:assert(view.resolveLocal<K::debris>(local)==reference.debris);break;
         case K::timeChange:assert(view.resolveLocal<K::timeChange>(local)==reference.timeChange);break;
         case K::timeShard:assert(view.resolveLocal<K::timeShard>(local)==reference.timeShard);break;
@@ -3192,6 +3203,44 @@ int main(){
         assert(native?world->destroyNativeTerrain(local):owner->terrain().requestDestroy(local));
         assert(owner->wallEndStepEvent(local,5,random,masks,effects)&&owner->prepareDraw());
         assert((native?terrain->size():owner->terrain().size())==0);
+    }
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+        GameplayCollisionOwner::Ownership::nativeScenery}){
+        const bool native=mode!=GameplayCollisionOwner::Ownership::reference;
+        const auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},&rooms,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),owner->breakableBinding(),
+            owner->playerBinding(),native?nullptr:&owner->terrain(),&rooms);
+        auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
+        assert(owner->attach(*world)&&(!native||world->bindNativeTerrain(*terrain)));
+        InstanceHandle local,shared;
+        assert(world->createLimboShardWithSourceId(105190,MotionBinary64::fromInteger(240),
+            MotionBinary64::fromInteger(10000),false,local));
+        GameplayCollisionView::Record resolved;
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::limboShard,local,shared)&&GameplayCollisionView(*world).resolve(shared,resolved));
+        checkTypedCollisionView(GameplayCollisionView(*world),GameplayCollisionView::Kind::limboShard,local);
+        unsigned seen=0;
+        assert(world->visitRoomActorsReadOnly([&](auto kind,auto key,auto){
+            if(kind==GameplayWorld::DrawActor::limboShard){assert(key.slot==local.slot&&key.generation==local.generation);++seen;}
+            return true;
+        })&&seen==1);
+        struct Views {
+            int top=9000;
+            bool outside(RunnerImageValue,RunnerImageValue,bool&){assert(false);return false;}
+            bool viewTop(MotionBinary64& y){y=MotionBinary64::fromInteger(top);return true;}
+        } views;
+        assert(owner->limboShards().advanceAnimation(local));
+        assert(owner->stepLimboShard(local,true,480,{},masks,views));
+        const auto* r=owner->limboShards().find(local);
+        assert(r&&r->state.imageSpeed.bits==0&&!r->destroyRequested);
+        assert(owner->limboShards().activate(local,false)&&owner->stepLimboShard(local,false,480,{},masks,views));
+        assert(owner->limboShards().activate(local,true));views.top=11000;
+        assert(owner->stepLimboShard(local,false,480,{},masks,views)&&owner->limboShards().find(local)->destroyRequested);
+        assert(owner->prepareDraw()&&!owner->limboShards().find(local)&&!GameplayCollisionView(*world).resolve(shared,resolved));
+        assert(world->createLimboShardWithSourceId(105191,{}, {},false,local)&&local.generation!=shared.generation);
+        assert(world->restartFromResults(DeathMenuSequence::Action::Retry,2,0)==ResultsDestination::gameplay&&
+            owner->limboShards().size()==0&&owner->valid());
     }
     // Real shape/point queries through the retained wall script, not mocked
     // neighbour occupancy. Compare callback order and every retained field.

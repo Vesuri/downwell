@@ -8,7 +8,7 @@ namespace downwell {
 // and lifetimeId do not. Borrowed views never cache pointers across a mutation.
 class GameplayCollisionView {
 public:
-    enum class Kind {player,enemy,breakable,terrain,timeField,goalField,exitController,bullet,scriptEffect,debris,timeChange,entryDither,drone,bone,skeleton,blood,currency,ditherAbove,builder,timeShard,playerController,corpseExpiry,smoke,corpse,consumptionBlood,runController,result,levelNumber};
+    enum class Kind {player,enemy,breakable,terrain,timeField,goalField,exitController,bullet,scriptEffect,debris,timeChange,entryDither,drone,bone,skeleton,blood,currency,ditherAbove,builder,timeShard,playerController,corpseExpiry,smoke,corpse,consumptionBlood,runController,result,levelNumber,limboShard};
     static constexpr unsigned enemyBase=1;
     static constexpr unsigned breakableBase=enemyBase+GameplayWorld::enemyCapacity;
     static constexpr unsigned terrainBase=breakableBase+GameplayWorld::breakableCapacity;
@@ -36,7 +36,8 @@ public:
     static constexpr unsigned runControllerBase=consumptionBloodBase+32;
     static constexpr unsigned resultBase=runControllerBase+4;
     static constexpr unsigned levelNumberBase=resultBase+1;
-    static constexpr unsigned capacity=levelNumberBase+4;
+    static constexpr unsigned limboShardBase=levelNumberBase+4;
+    static constexpr unsigned capacity=limboShardBase+32;
     struct Record {
         const GameplayWorld::RegisteredExpiry::Record* corpseExpiry=nullptr;
         const GameplayWorld::RegisteredSmoke::Record* smoke=nullptr;
@@ -45,6 +46,7 @@ public:
         const GameplayWorld::RunControllers::Record* runController=nullptr;
         const GameplayResultInstance::Record* result=nullptr;
         const GameplayWorld::LevelNumbers::Record* levelNumber=nullptr;
+        const GameplayWorld::LimboShards::Record* limboShard=nullptr;
         const GameplayWorld::PlayerInstance* player=nullptr;
         const GameplayWorld::EnemyState* enemy=nullptr;
         const GameplayWorld::Breakable* breakable=nullptr;
@@ -91,6 +93,7 @@ public:
             case Kind::runController:base=runControllerBase;count=4;break;
             case Kind::result:base=resultBase;count=1;break;
             case Kind::levelNumber:base=levelNumberBase;count=4;break;
+            case Kind::limboShard:base=limboShardBase;count=32;break;
             case Kind::debris:base=debrisBase;count=GameplayDebrisInstances::capacity;break;
             case Kind::timeChange:base=timeChangeBase;count=8;break;
             case Kind::timeShard:base=timeShardBase;count=64;break;
@@ -110,6 +113,7 @@ public:
     }
     static bool decode(InstanceHandle key,Kind& kind,InstanceHandle& local){
         if(!key.generation||key.slot>=capacity)return false;
+        if(key.slot>=limboShardBase){kind=Kind::limboShard;local={key.slot-limboShardBase,key.generation};return true;}
         if(key.slot>=levelNumberBase){kind=Kind::levelNumber;local={key.slot-levelNumberBase,key.generation};return true;}
         if(key.slot>=resultBase){kind=Kind::result;local={key.slot-resultBase,key.generation};return true;}
         if(key.slot>=runControllerBase){kind=Kind::runController;local={key.slot-runControllerBase,key.generation};return true;}
@@ -167,6 +171,7 @@ public:
             else if constexpr(Family==Kind::smoke)return world_.registeredSmoke()?world_.registeredSmoke()->find(local):nullptr;
             else if constexpr(Family==Kind::corpse)return world_.registeredCorpses()?world_.registeredCorpses()->find(local):nullptr;
             else if constexpr(Family==Kind::consumptionBlood)return world_.consumptionParticles()?world_.consumptionParticles()->find(local):nullptr;
+            else if constexpr(Family==Kind::limboShard)return world_.limboShards()?world_.limboShards()->find(local):nullptr;
             else if constexpr(Family==Kind::runController)return world_.runControllers()?world_.runControllers()->find(local):nullptr;
             else if constexpr(Family==Kind::result)return world_.resultInstance()?world_.resultInstance()->find(local):nullptr;
             else if constexpr(Family==Kind::levelNumber)return world_.levelNumbers()?world_.levelNumbers()->find(local):nullptr;
@@ -239,6 +244,9 @@ private:
                 break;
             case Kind::levelNumber:
                 if(!world_.levelNumbers()||!(next.levelNumber=world_.levelNumbers()->find(local)))return false;
+                break;
+            case Kind::limboShard:
+                if(!world_.limboShards()||!(next.limboShard=world_.limboShards()->find(local)))return false;
                 break;
             case Kind::corpse:
                 if(!world_.registeredCorpses()||!(next.corpse=world_.registeredCorpses()->find(local)))return false;

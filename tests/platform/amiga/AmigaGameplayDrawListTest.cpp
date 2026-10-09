@@ -76,6 +76,21 @@ int main() {
                 assert(pixels==expected);
                 assert(list->bindLevelNumberText(nullptr,nullptr)&&owner->levelNumbers().clear());
             }
+            {
+                downwell::InstanceHandle shard;
+                assert(world->createLimboShardWithSourceId(105193,downwell::MotionBinary64::fromInteger(240),
+                    downwell::MotionBinary64::fromInteger(128),false,shard));
+                UBYTE pack[8]{};
+                for(bool composite:{false,true}){
+                    AmigaGameplayDrawList list;assert(list.collect(*world,pack,pack+8,160,34,composite));
+                    unsigned seen=0;
+                    for(unsigned i=0;i<list.count;++i)if(list.actors[i].sprite==91){
+                        assert(list.actors[i].x==190&&list.actors[i].y==94&&!list.actors[i].flip);++seen;
+                    }
+                    assert(seen==1); // Limbo Draw is direct even with surfaceFx composition.
+                }
+                assert(owner->limboShards().clear());
+            }
             auto& corpses=owner->registeredCorpses();downwell::GameMakerRandom random(2);
             const downwell::MotionBinary64 x{0x406f0800u,0},y{0x40601000u,0};
             downwell::DeadBodySource source{x,y,{},downwell::MotionBinary64::fromInteger(-1)};

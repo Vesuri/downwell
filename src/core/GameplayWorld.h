@@ -29,6 +29,7 @@
 #include "core/RunControllerInstances.h"
 #include "core/GameplayResultInstance.h"
 #include "core/LevelNumberInstances.h"
+#include "core/LimboShardInstances.h"
 #include "core/LevelNumberText.h"
 #include "core/PlayerChildCreation.h"
 #include "core/DroneBulletInstances.h"
@@ -344,6 +345,22 @@ public:
         levelNumbers_=&instances;return true;
     }
     using ConsumptionParticles=downwell::ConsumptionBloodInstances<32>;
+    using LimboShards=downwell::LimboShardInstances<32>;
+    const LimboShards* limboShards()const{return limboShards_;}
+    bool bindLimboShards(LimboShards& instances){
+        if(limboShards_||!instances.valid()||instances.size())return false;
+        limboShards_=&instances;return true;
+    }
+    bool createLimboShardWithSourceId(std::uint32_t id,downwell::MotionBinary64 x,downwell::MotionBinary64 y,
+        bool lowSpec,downwell::InstanceHandle& child){
+        return run_.effectsSucceeded=run_.effectsSucceeded&&limboShards_&&
+            limboShards_->create(id,x,y,lowSpec,enemyRandom_,child);
+    }
+    template<class Queries> bool stepLimboShard(downwell::InstanceHandle key,bool allowed,
+        const downwell::LimboShard::Player& player,Queries& queries){
+        return run_.effectsSucceeded=run_.effectsSucceeded&&limboShards_&&
+            limboShards_->step(key,allowed,player,enemyRandom_,queries);
+    }
     const ConsumptionParticles* consumptionParticles()const{return consumptionParticles_;}
     bool bindConsumptionParticles(ConsumptionParticles& instances){
         if(consumptionParticles_||!instances.valid()||instances.size())return false;
@@ -888,7 +905,7 @@ public:
         return run_.effectsSucceeded=scriptSpawnInstances_&&effects.advanceRegistered(phase,*scriptSpawnInstances_);
     }
     enum class PhaseBoundary { beginStep, alarm, step, collision, endStep, roomEntry };
-    enum class DrawActor { enemy, bullet, scriptEffect, debris, player, entryDither, bone, skeleton, ditherAbove, timeShard, corpseExpiry, smoke, corpse, consumptionBlood, levelNumber };
+    enum class DrawActor { enemy, bullet, scriptEffect, debris, player, entryDither, bone, skeleton, ditherAbove, timeShard, corpseExpiry, smoke, corpse, consumptionBlood, levelNumber, limboShard };
     template<class Visit> bool visitRegisteredEnemyShades(Visit visit)const{
         if((!bones_||!bones_->size())&&(!skeletons_||!skeletons_->size()))return true;
         return visitRoomActorsReadOnly([&](DrawActor kind,downwell::InstanceHandle key,auto){
@@ -1825,6 +1842,7 @@ private:
     RegisteredSmoke* registeredSmoke_=nullptr;
     RegisteredCorpse* registeredCorpses_=nullptr;
     ConsumptionParticles* consumptionParticles_=nullptr;
+    LimboShards* limboShards_=nullptr;
     downwell::GameplayDebrisInstances* debrisInstances_=nullptr;
     downwell::NativeTimeChangeRegistration* timeChangeInstances_=nullptr;
     downwell::NativeTimeShardRegistration* timeShardInstances_=nullptr;
