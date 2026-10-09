@@ -88,8 +88,15 @@ alongside wall pruning when supplied audio; its skeleton/combat entry points
 include those pairs in the same stream. Collection, overlap, destruction guards
 and paired dispatch are shared, not a second wind-only pass. Player 35 and its
 parent have no reverse collision event for these fields. Other time-field
-families are not implicitly admitted. The normal game loop still needs the
-audio-backed entry point and actual audio backend integration remains open.
+families are not implicitly admitted. The SDL main loop uses the audio-backed
+entry with `AudioSDL`: resources 349–355 are decoded by libsndfile before gameplay,
+and device-time voice expiry drives the shared guard. Resource IDs and voice IDs
+occupy separate ranges; stopping a resource stops all its voices. Playback uses
+stereo float mixing with linear rate conversion, not a claim of original-runner
+sample equivalence. Capacity exhaustion and unsupported gain ramps fail instead
+of pretending to play. This admission uses the default volume of one (the wind
+script subsequently sets the voice gain to 0.5); settings integration remains
+open. Native device playback and complete native mixed-pass admission remain open.
 `GameplayCollisionOwner::dispatchTimeFieldWind` applies the same checked
 inherited-binding and generation checks to native goal-field lifetimes (255
 and 371). It uses the world's RNG and the selected record's `windSound`, not a

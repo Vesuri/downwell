@@ -7,6 +7,7 @@
 #include "core/StoredWorldCollision.h"
 #include "core/StoredDitherCollisionPass.h"
 #include "platform/sdl/PlatformSDL.h"
+#include "platform/sdl/AudioSDL.h"
 #include <cstdio>
 #include <fstream>
 #include <iterator>
@@ -86,9 +87,20 @@ int main() {
     std::unique_ptr<downwell::StoredDitherCollisionPass> collisionsPass(
         new(std::nothrow) downwell::StoredDitherCollisionPass(*collisionOwner));
     if(!collisionsPass)return 20;
+    downwell::AudioSDL audio;
+    if(!audio.ready())return 20;
+    // These seven original resources have gain 1. Decode before gameplay.
+    for(int id=349;id<=355;++id){
+        char path[128];std::snprintf(path,sizeof(path),
+            "extracted/audio/sound-effects/%03d_sfxMagicWind%d.ogg",id,id-348);
+        if(!audio.load(id,path,downwell::MotionBinary64::fromInteger(1)))return 20;
+    }
+    struct Contacts {downwell::StoredDitherCollisionPass& pass;downwell::AudioSDL& audio;};
+    Contacts contacts{*collisionsPass,audio};
     game.configureCollisionPass([](void* context,downwell::StartupRuntime& world){
-        return static_cast<downwell::StoredDitherCollisionPass*>(context)->run(world);
-    },collisionsPass.get());
+        auto& contacts=*static_cast<Contacts*>(context);
+        return contacts.pass.run(world,downwell::MotionBinary64::fromInteger(1),contacts.audio);
+    },&contacts);
     game.applyStartupShortcut();
     const char* profileOption = std::getenv("DOWNWELL_PROFILE");
     const bool profile = profileOption && std::string(profileOption) == "1";

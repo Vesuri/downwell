@@ -14,8 +14,8 @@ REFERENCE_BREAKABLES ?= 0
 REFERENCE_GEM_POSITION ?= 0
 export SKIP_INTRO SKIP_TO_GAME SKIP_LEVEL
 
-SDL_CFLAGS  := $(shell pkg-config --cflags sdl2 SDL2_image)
-SDL_LDFLAGS := $(shell pkg-config --libs sdl2 SDL2_image)
+SDL_CFLAGS  := $(shell pkg-config --cflags sdl2 SDL2_image sndfile)
+SDL_LDFLAGS := $(shell pkg-config --libs sdl2 SDL2_image sndfile)
 
 CPPFLAGS := -Isrc $(SDL_CFLAGS)
 ifeq ($(SKIP_INTRO),1)
@@ -69,6 +69,7 @@ SOURCES := \
 	src/core/StartupRuntime.cpp \
 	src/core/PlayerMotion.cpp \
 	src/platform/sdl/PlatformSDL.cpp \
+	src/platform/sdl/AudioSDL.cpp \
 	src/main.cpp
 
 OBJECTS := $(patsubst %.cpp,build/%.o,$(SOURCES))
@@ -1809,6 +1810,14 @@ build/enemy-contact-test: tests/core/EnemyContactTest.cpp src/core/EnemyContact.
 build/bat-motion-test: tests/core/BatMotionTest.cpp src/core/BatMotion.h src/core/GameMakerRounding.h
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/BatMotionTest.cpp
+
+build/sdl-audio-test: tests/platform/SDLAudioTest.cpp src/platform/sdl/AudioSDL.cpp src/platform/sdl/AudioSDL.h
+	@mkdir -p build
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ $(filter %.cpp,$^) $(LDFLAGS)
+.PHONY: verify-sdl-audio
+test: verify-sdl-audio
+verify-sdl-audio: build/sdl-audio-test
+	SDL_AUDIODRIVER=dummy ./build/sdl-audio-test
 
 build/sdl-screenshot-test: tests/platform/SDLScreenshotTest.cpp src/platform/sdl/PlatformSDL.cpp src/core/SpritePack.cpp src/core/FontPack.cpp
 	@mkdir -p build

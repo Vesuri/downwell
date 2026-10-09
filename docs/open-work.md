@@ -89,9 +89,10 @@ behavior, both backend integrations and relevant original-game verification.
 
 ### B. Connect time-stop state and effects
 
-- Connect inherited wind-audio collision behavior for room-entry
-  `startTimeField` (371) and exit fields, preserving sound guards and choice RNG
-  on both platforms. Verify their cross-family Draw order against the runner
+- Finish native mixed-pass/device-audio integration for inherited room-entry
+  `startTimeField` (371) and exit-field wind contacts. Connect settings to the SDL
+  admission and verify natural contacts, sound guards and choice RNG on both
+  platforms. Verify their cross-family Draw order against the runner
   when entry, ordinary and exit fields coexist.
 - Connect player Begin Step `checkStop`/`pTimeStop` and parent-time-field queries
   to both world schedulers before blood dispatch. Goal-stop and shop control-lock

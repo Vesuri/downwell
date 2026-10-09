@@ -85,7 +85,11 @@ build/                host output; ignored
 
 ## Host reference build
 
-Requirements: a C++17 compiler, `pkg-config`, and SDL2.
+Requirements: a C++17 compiler, `pkg-config`, SDL2, SDL2_image and libsndfile.
+Run `python3 tools/extract-audio.py` after the UTMT export to supply the original
+wind sounds. The SDL backend decodes them before gameplay; missing audio assets
+or an unavailable audio device return exit code 20. Only time-field wind contacts
+are connected to device playback so far; this is not full game audio support.
 
 ```sh
 make

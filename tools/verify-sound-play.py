@@ -18,3 +18,7 @@ for name, digest in (
 ):
     assert sha256((export / f"Assembly/gml_GlobalScript_{name}.asm").read_bytes()).hexdigest() == digest
 print("Pinned sound scripts: caller writes, ten channels, cut/visibility/water/music gates and voice returns")
+for sound in manifest["resources"]["sounds"][349:356]:
+    assert sound["name"] == f"sfxMagicWind{sound['id']-348}"
+    assert sound["volume"] == 1.0
+print("Pinned SDL wind resource mapping and initial gains (349..355)")
