@@ -144,7 +144,8 @@ behavior, both backend integrations and relevant original-game verification.
   levelBeginCue creation/audio. Do not use successful placeholder callbacks.
   Admit persistent object 37 from the actual native startup Create sequence,
   including its initialization/HUD dependencies and source numeric ID. Verify
-  normal next-room transfer and implement its remaining fired alarm events;
+  controller alarm scheduling during level-clear/menu updates (currently bypassed)
+  and implement its remaining fired alarm events;
   explicit registered births and alarm-0 tests are not full controller admission.
   A PAL frame scheduler must
   not replace the source room-speed global with 50.

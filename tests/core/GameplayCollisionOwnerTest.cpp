@@ -752,6 +752,20 @@ int main(){
             world->runControllers()==&controllers&&controllers.find(controller)&&creates==1);
         assert(owner->requestMomentDelay()&&speed==30);
         world->step(0);assert(world->effectsSucceeded()&&speed==60&&creates==1);
+        assert(world->registerLevelExit(176+world->player().offsetY()));
+        for(unsigned tick=0;tick<100;++tick)world->step(0);
+        assert(world->levelResultRequested()&&world->enterLevelClear(0,false));
+        bool heart=false;
+        for(unsigned tick=0;tick<400&&!world->nextLevelRequested();++tick){
+            bool confirm=true;assert(world->stepLevelClear(confirm,false,false,heart,[](auto,unsigned){}));
+        }
+        assert(world->nextLevelRequested()&&owner->requestMomentDelay()&&speed==30);
+        assert(controllers.activate(controller,false)&&owner->reconcileActivation());
+        assert(world->prepareNextAreaOneLevel({},300)&&world->runStage().level==2&&
+            controllers.find(controller)&&controllers.find(controller)->alarms.get(0)==1&&creates==1);
+        world->step(0);assert(world->effectsSucceeded()&&speed==30&&controllers.find(controller)->alarms.get(0)==1);
+        assert(controllers.activate(controller,true)&&owner->reconcileActivation());
+        world->step(0);assert(world->effectsSucceeded()&&speed==60&&controllers.find(controller)->alarms.get(0)==0&&creates==1);
         assert(controllers.clear()&&!view.contains(shared));
     }
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
@@ -4793,13 +4807,30 @@ int main(){
         assert(fieldsOwner->state(roomDebrisKey)&&fieldsOwner->state(markedDebrisKey));
         const auto debrisSequence=fieldWorld->debrisEffects().birthSequence();
         const auto transitionDraws=fieldWorld->randomDrawCount();
+        int controllerSpeed=60;assert(fieldWorld->bindControllerRoomSpeed(controllerSpeed));
+        auto& controllers=fieldsOwner->runControllers();InstanceHandle activeController,inactiveController;
+        unsigned controllerCreates=0;
+        assert(controllers.create(100065,{}, {},[&](InstanceHandle){++controllerCreates;return true;},activeController)&&
+            controllers.create(105999,{}, {},[&](InstanceHandle){++controllerCreates;return true;},inactiveController));
+        assert(fieldsOwner->requestMomentDelay()&&controllerSpeed==30);
+        assert(controllers.activate(inactiveController,false)&&fieldsOwner->reconcileActivation());
         assert(fieldWorld->prepareNextAreaOneLevel({},300)&&fieldWorld->runStage().level==2);
+        assert(fieldWorld->runControllers()==&controllers&&controllerCreates==2&&controllerSpeed==30&&
+            controllers.find(activeController)->alarms.get(0)==1&&controllers.find(inactiveController)->alarms.get(0)==1&&
+            !controllers.find(inactiveController)->active);
         assert(!fieldWorld->debrisInstances()->size()&&!fieldWorld->debrisEffects().retained(roomDebris.generation)&&
             !fieldWorld->debrisEffects().retained(markedDebris.generation));
         assert(!fieldsOwner->state(roomDebrisKey)&&!fieldsOwner->state(markedDebrisKey)&&
             fieldsOwner->population(370,population)&&population==0);
         assert(fieldWorld->debrisEffects().birthSequence().next==debrisSequence.next&&
             fieldWorld->randomDrawCount()==transitionDraws);
+        fieldWorld->step(0);
+        assert(fieldWorld->effectsSucceeded()&&controllerSpeed==60&&controllerCreates==2&&
+            controllers.find(activeController)->alarms.get(0)==0&&controllers.find(inactiveController)->alarms.get(0)==1);
+        assert(controllers.activate(inactiveController,true)&&fieldsOwner->reconcileActivation());
+        controllerSpeed=35;fieldWorld->step(0);
+        assert(fieldWorld->effectsSucceeded()&&controllerSpeed==60&&controllers.find(inactiveController)->alarms.get(0)==0);
+        assert(controllers.clear());
         InstanceHandle nextDebris,nextDebrisKey;
         assert(fieldWorld->spawnDebris({},{},1,nextDebris)&&nextDebris.generation>markedDebris.generation);
         assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::debris,nextDebris,nextDebrisKey));
