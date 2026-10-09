@@ -1871,3 +1871,30 @@ current global fall speed with a third position publication. Builtin position
 writes narrow to binary32; custom speeds retain binary64. No time-stop guard
 appears in this event. `verify-consumption-blood` pins the VM instructions and
 resource identity; the portable event implementation is `ConsumptionBloodEffect`.
+
+## Wall-created limbo shard (object 379)
+
+The area-four wall End Step creates `limboShard` synchronously after publishing
+its image index. Object 379 uses sprite 91, has no parent and has no alarm
+handlers. It is not an `fxTimeShard` subtype. `verify-limbo-shard.py` pins its
+five event bodies, resource bindings, input hash and extractor version.
+
+Create consumes seven RNG words: two for integer horizontal velocity, one for
+vertical choice, one for ascent speed, one for animation-rate magnitude, one
+for its sign and one for image index. Its cap is 16, or 5 with lowSpec. Custom
+motion fields retain binary64; builtin position and image fields use binary32.
+
+Step's TimeStopBound guard covers the firing response, animation rate, wall
+bounce, ascent and flashing. Inertial movement, damping, rounded position
+publication and retirement checks remain outside that guard. The firing strip
+uses strict bounds. A bullet contact or firing response sets noTouch and
+alarm 2; there is no source alarm handler that clears noTouch. Do not borrow
+the time shard's cooldown handler. Population overflow alone does not destroy
+the actor: it also must be outside the view. The final above-view test still
+runs after an earlier destruction request.
+
+Draw calls draw_self when `!dflash`; the authored -1/+1 states use VM numeric
+truth, so the negative phase is visible. This is direct default sprite drawing,
+not the time shard's effect-surface routing. `LimboShard` implements the event
+state and checked synchronous publication boundary; it does not own world
+registration, TimeStopBound queries, animation advancement or Draw submission.

@@ -1130,6 +1130,16 @@ build/time-shard-burst-test: tests/core/TimeShardBurstTest.cpp $(wildcard src/co
 	@mkdir -p build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/TimeShardBurstTest.cpp src/core/GameMakerRandom.cpp
 
+test: verify-limbo-shard
+.PHONY: verify-limbo-shard
+verify-limbo-shard: build/limbo-shard-test
+	python3 tools/verify-limbo-shard.py
+	./build/limbo-shard-test
+
+build/limbo-shard-test: tests/core/LimboShardTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/LimboShardTest.cpp src/core/GameMakerRandom.cpp
+
 .PHONY: verify-time-shard-effects
 verify-time-shard-effects: build/time-shard-effects-test
 	./build/time-shard-effects-test
