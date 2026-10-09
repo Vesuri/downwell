@@ -5,6 +5,7 @@
 #include "core/StoredCorpseRegistration.h"
 #include "core/StoredCorpseExpiryRegistration.h"
 #include "core/CorpseExpiryInstances.h"
+#include "core/CorpseInstances.h"
 #include <cassert>
 #include <cstring>
 #include <cstdio>
@@ -50,6 +51,79 @@ struct NativeExpiryAudit {
     bool mask(InstanceHandle,const Record&,int){return false;}
     bool transform(InstanceHandle,const Record&,RunnerTransformField,RunnerImageValue,RunnerImageValue,std::uint32_t){return false;}
 };
+struct NativeCorpseAudit {
+    using Record=CorpseInstances<1>::Record;
+    unsigned calls=0,reject=0,walls=0,moves=0,marks=0;bool blocked=false;
+    bool accept(){return ++calls!=reject;}
+    bool birth(InstanceHandle,const Record&){return false;}
+    bool birthAt(InstanceHandle,const Record& r,RunnerImageValue x,RunnerImageValue y){
+        assert(r.sourceId==105187&&r.state.spriteId==172&&r.x.bits==x.bits&&r.y.bits==y.bits);return accept();
+    }
+    bool placeMeeting(InstanceHandle,const Record& r,int object,MotionBinary64,MotionBinary64,bool& hit){
+        assert(object==57||object==56||object==82);
+        if(object==57){assert(r.state.alarms.get(0)==180&&r.state.alarms.get(3)==8);hit=++walls==1&&blocked;}
+        else hit=false;
+        return accept();
+    }
+    bool instancePlace(InstanceHandle,const Record&,int,MotionBinary64,MotionBinary64,InstancePlaceResult&){return false;}
+    bool instanceNumber(int,unsigned&){return false;}
+    bool sprite(InstanceHandle,const Record& r,int sprite){assert(r.state.spriteId==sprite);return accept();}
+    bool imageIndex(InstanceHandle,const Record&,RunnerImageValue){return accept();}
+    bool markDestroyed(InstanceHandle,const Record& r){assert(r.state.destroyRequested&&!r.destroyRequested);++marks;return accept();}
+    bool retire(InstanceHandle,const Record&){return accept();}
+    bool activation(InstanceHandle,const Record&,bool){return true;}
+    bool membership(InstanceHandle,const Record&,bool){return true;}
+    bool move(InstanceHandle,const Record& r,RunnerImageValue x,RunnerImageValue y){
+        assert(x.bits==r.state.x.bits&&y.bits==r.state.y.bits);++moves;return accept();
+    }
+    bool mask(InstanceHandle,const Record&,int){return true;}
+    bool transform(InstanceHandle,const Record&,RunnerTransformField,RunnerImageValue,RunnerImageValue,std::uint32_t){return accept();}
+};
+static void nativeCorpses(){
+    using Owner=CorpseInstances<1>;
+    for(unsigned seed=0;seed<128;++seed){
+        NativeCorpseAudit audit;audit.blocked=seed%2;
+        Owner owner(Owner::Binding::bindPositionedBirths(audit));InstanceHandle key;
+        GameMakerRandom random(seed),referenceRandom(seed);CorpseAnimation reference;Adapter queries;queries.blocked=audit.blocked;
+        auto tile=[](auto,int layer,auto,auto,bool& hit){assert(layer==100);hit=false;return true;};
+        assert(owner.create(105187,real(240.25),real(192.5),false,random,tile,key)&&
+            reference.create(real(240.25),real(192.5),false,referenceRandom,queries));
+        for(unsigned word=0;word<16;++word)assert(random.stateWord(word)==referenceRandom.stateWord(word));
+        assert(random.drawCount()==referenceRandom.drawCount()&&audit.walls==queries.walls&&audit.moves==queries.publications);
+        assert(owner.sprite(key,206)&&reference.setSprite(206,[](const auto&){return true;})&&owner.facing(key,real(-1)));
+        for(unsigned frame=0;frame<32;++frame){
+            struct Events {
+                bool meeting(MotionBinary64,MotionBinary64,bool& hit){hit=false;return true;}
+                bool publish(RunnerImageValue,RunnerImageValue){return true;}
+                int area(){return 1;}int restInPieces(){return 0;}
+                bool create(int,MotionBinary64,MotionBinary64){return false;}void destroy(){assert(false);}
+            } events;
+            assert(owner.advanceAnimation(key)&&reference.advanceImage());
+            assert(owner.dispatchPublished(key,[&](auto& state,auto& publish,bool& good){
+                return state.stepInWorld(false,480,publish,events,good);
+            })&&reference.step(false,events));
+            const auto* r=owner.find(key);
+            assert(r&&r->x.bits==reference.x.bits&&r->y.bits==reference.y.bits&&
+                r->state.imageIndex.bits==reference.imageIndex.bits&&r->state.timeline.bits==reference.timeline.bits&&
+                r->state.xsp.high==reference.xsp.high&&r->state.xsp.low==reference.xsp.low&&
+                r->state.ysp.high==reference.ysp.high&&r->state.ysp.low==reference.ysp.low);
+        }
+        assert(owner.dispatchPublished(key,[](auto& state,auto& publish,bool&){
+            state.destroyRequested=true;return publish.destroy();
+        })&&owner.find(key)&&audit.marks==1&&owner.retire(key)&&!owner.find(key));
+    }
+    for(unsigned failure=1;failure<=7;++failure){
+        NativeCorpseAudit audit;audit.blocked=true;audit.reject=failure;
+        Owner owner(Owner::Binding::bindPositionedBirths(audit));bool worldGood=true;owner.observeFailure(worldGood);
+        GameMakerRandom random(2);InstanceHandle key;
+        assert(!owner.create(105187,real(240.25),real(192.5),false,random,
+            [](auto,int,auto,auto,bool& hit){hit=false;return true;},key)&&!key.generation&&!owner.valid()&&!worldGood);
+        assert(owner.size()==1&&owner.find(owner.sourceHandle(105187)));
+        const auto draws=random.drawCount();assert(!owner.advanceAnimation(owner.sourceHandle(105187))&&random.drawCount()==draws);
+        audit.reject=0;assert(owner.clear()&&!owner.size());
+    }
+    std::puts("Native corpses: 4096 shared motion/animation frames and seven retained Create failures passed");
+}
 static void nativeExpiry(){
     {
         using Instances=CorpseExpiryInstances<1>;NativeExpiryAudit audit;
@@ -192,6 +266,7 @@ static void registeredCorpses(){
     }
 }
 int main(){
+    nativeCorpses();
     nativeExpiry();
     registeredCorpses();
     unsigned cases=0;

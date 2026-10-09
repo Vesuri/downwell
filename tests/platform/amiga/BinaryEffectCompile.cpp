@@ -606,6 +606,15 @@ bool compileBinaryEffect(downwell::BinaryEffectSurface<>& surface,
 #include "core/CorpseMotion.h"
 #include "core/CorpseAnimation.h"
 #include "core/CorpseDraw.h"
+#include "core/CorpseInstances.h"
+bool compileNativeCorpse(downwell::CorpseInstances<32>& owner,downwell::GameMakerRandom& random,std::uint32_t id){
+    downwell::InstanceHandle key;
+    return owner.create(id,{}, {},false,random,[](auto,int,auto,auto,bool& hit){hit=false;return true;},key)&&
+        owner.sprite(key,206)&&owner.facing(key,downwell::MotionBinary64::fromInteger(-1))&&
+        owner.advanceAnimation(key)&&owner.dispatchPublished(key,[](auto& state,auto& publish,bool&){
+            state.destroyRequested=true;return publish.destroy();
+        })&&owner.retire(key);
+}
 #include "core/SmokeDraw.h"
 bool compileSmokeSurface(downwell::RunnerImageValue index,downwell::RunnerImageValue x,downwell::RunnerImageValue y,
     const downwell::EffectMaskAssets& assets,const downwell::EffectSurfacePlacement::View& view){
