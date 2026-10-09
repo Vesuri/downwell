@@ -81,6 +81,36 @@ struct NativeCorpseAudit {
 };
 static void nativeCorpses(){
     using Owner=CorpseInstances<1>;
+    for(unsigned failure=0;failure<=5;++failure){
+        NativeCorpseAudit audit;audit.reject=failure;
+        Owner owner(Owner::Binding::bindPositionedBirths(audit));
+        GameMakerRandom random(23),oracleRandom(23);
+        DeadBodySource source{real(240.25),real(192.5),real(.25),real(-1)};
+        const bool okay=owner.createFromDeath(105187,source,206,real(8),102,false,random,
+            [](auto,int layer,auto,auto,bool& hit){assert(layer==100);hit=false;return true;});
+        assert(okay==!failure&&owner.valid()==!failure);
+        const auto key=owner.sourceHandle(105187);const auto* record=owner.find(key);
+        assert(record&&key.generation!=105187&&source.bodySprite==206);
+        equal(source.impactSp,4);
+        // Birth, wall query, sprite, image-index publication, then facing.
+        // Failed Create does not return a child ID; later failures retain it.
+        assert(source.myDeadBody==(failure==1||failure==2?0u:105187u));
+        if(!failure){
+            CorpseAnimation oracle;Adapter queries;
+            assert(oracle.create(source.x,source.y,false,oracleRandom,queries));
+            sameRandom(random,oracleRandom);
+            equal(source.xsp,-1.5);equal(record->state.xsp,-6);equal(record->state.ysp,4);
+            equal(record->state.imageXscale.promoted(),-1);
+            assert(record->state.spriteId==206&&record->state.explosionFx==102&&
+                record->state.alarms.get(3)==8&&record->state.alarms.get(0)==180);
+        }else{
+            equal(source.xsp,.25);
+            const auto draws=random.drawCount();
+            assert(!owner.createFromDeath(105188,source,206,real(1),102,false,random,
+                [](auto,int,auto,auto,bool&){return false;})&&random.drawCount()==draws);
+        }
+        audit.reject=0;assert(owner.clear());
+    }
     for(unsigned seed=0;seed<128;++seed){
         NativeCorpseAudit audit;audit.blocked=seed%2;
         Owner owner(Owner::Binding::bindPositionedBirths(audit));InstanceHandle key;

@@ -615,6 +615,11 @@ bool compileNativeCorpse(downwell::CorpseInstances<32>& owner,downwell::GameMake
             state.destroyRequested=true;return publish.destroy();
         })&&owner.retire(key);
 }
+bool compileNativeCorpseDeath(downwell::CorpseInstances<32>& owner,downwell::GameMakerRandom& random,
+    std::uint32_t id,downwell::DeadBodySource& source){
+    return owner.createFromDeath(id,source,206,downwell::MotionBinary64::fromInteger(4),102,false,random,
+        [](auto,int,auto,auto,bool& hit){hit=false;return true;});
+}
 #include "core/SmokeDraw.h"
 bool compileSmokeSurface(downwell::RunnerImageValue index,downwell::RunnerImageValue x,downwell::RunnerImageValue y,
     const downwell::EffectMaskAssets& assets,const downwell::EffectSurfacePlacement::View& view){

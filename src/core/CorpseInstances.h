@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_CORPSE_INSTANCES_H
 #define DOWNWELL_CORE_CORPSE_INSTANCES_H
 #include "CorpseAnimation.h"
+#include "DeadBodyCreation.h"
 #include "InstanceLifecycle.h"
 #include "FailureSignal.h"
 namespace downwell {
@@ -71,6 +72,27 @@ public:
         } queries{publish,tile,key};
         if(!r.state.create(x,y,rip,random,queries)||!good_)return fail();
         output=key;return true;
+    }
+    // The enclosing creation stream supplies the source ID; the slot generation
+    // is only a lifetime key. Child Create finishes before script overrides.
+    template<class Source,class Random,class Tile> bool createFromDeath(std::uint32_t id,Source& source,
+        int spriteId,MotionBinary64 impact,int explosion,bool rip,Random& random,Tile tile){
+        if(!good_||executing_)return fail();
+        struct Events {
+            CorpseInstances& owner;std::uint32_t sourceId;Random& random;Tile& tile;bool rip;
+            bool create(int object,MotionBinary64 x,MotionBinary64 y,std::uint32_t& child){
+                InstanceHandle key;
+                if(object!=263||!owner.create(sourceId,x,y,rip,random,tile,key))return false;
+                child=sourceId;return true;
+            }
+            Record* selected(unsigned id){return owner.resolve(owner.sourceHandle(id));}
+            bool sprite(unsigned id,int value){return owner.sprite(owner.sourceHandle(id),value);}
+            bool facing(unsigned id,MotionBinary64 value){return owner.facing(owner.sourceHandle(id),value);}
+            bool verticalSpeed(unsigned id,MotionBinary64 value){auto* r=selected(id);if(!r)return false;r->state.ysp=value;return true;}
+            bool horizontalSpeed(unsigned id,MotionBinary64 value){auto* r=selected(id);if(!r)return false;r->state.xsp=value;return true;}
+            bool explosion(unsigned id,int value){auto* r=selected(id);if(!r)return false;r->state.explosionFx=value;return true;}
+        } events{*this,id,random,tile,rip};
+        return createDeadBody(source,spriteId,impact,explosion,events)||fail();
     }
     bool sprite(InstanceHandle key,int sprite){
         auto* r=resolve(key);if(!r)return fail();
