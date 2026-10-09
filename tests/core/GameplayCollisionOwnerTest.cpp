@@ -77,6 +77,12 @@ struct NativeChildAllocatorProbe {bool operator()(int,unsigned&);};
 bool nativePlayerChildSequence(GameplayWorld& world,NativeChildAllocatorProbe allocate){
     return world.createPlayerChildren(allocate);
 }
+bool nativeAuthoredPlayerChildren(GameplayWorld& world,NativeChildAllocatorProbe allocate,
+    const downwell::RoomPack& rooms,const downwell::PackedRoom& room){
+    return world.withPlayerChildCreation(allocate,[&]{
+        return world.loadRoomTerrainWithStartField(rooms,room,[](const auto&){return true;});
+    });
+}
 bool nativeRegisteredTimeShardStep(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle shared,
     const downwell::SpriteMaskPack& masks,bool stopped){
     return owner.stepTimeShard(shared,stopped,masks);
@@ -1862,6 +1868,42 @@ int main(){
         }else{
             assert(!world->createPlayerChildren(allocate)&&calls==failure);
         }
+    }
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                  GameplayCollisionOwner::Ownership::nativeScenery})for(unsigned failure=0;failure<=3;++failure){
+        const auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
+        PackedRoom room;assert(rooms.findRoom(11,room));
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},&rooms,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain(),&rooms,
+            GameplayWorld::PlayerBirthTiming::authoredRoom);
+        assert(owner->attach(*world));
+        unsigned allocations=0,walls=0;const int expected[]={66,64,73};
+        auto allocate=[&](int object,unsigned& id){
+            assert(allocations<3&&object==expected[allocations]&&!walls);
+            assert(world->playerHandle().generation&&!world->awaitingPlayerBirth());
+            assert(world->builderController()->handle().generation&&!world->ditherAbove()->handle().generation);
+            id=180000+ ++allocations;return allocations!=failure;
+        };
+        const bool ok=world->withPlayerChildCreation(allocate,[&]{
+            return world->loadRoomTerrainWithStartField(rooms,room,[&](const auto&){
+                assert(allocations==3&&owner->entryDithers().size()==1);
+                ++walls;return true;
+            });
+        });
+        assert(ok==!failure&&allocations==(failure?failure:3)&&walls==(failure?0u:240u));
+        unsigned position=0;const int prefix[]={65,35,66,64,73,61};
+        assert(owner->visitRegistrationOrder([&](auto,int object,auto){
+            if(position<6){assert(object==prefix[position]);++position;}return true;
+        }));
+        assert(position==(failure?failure+1:6));
+        if(ok){
+            const auto* wipe=owner->entryDithers().find(owner->entryDithers().handle(0));
+            assert(wipe&&wipe->y.bits==world->roomEntryView()->y.bits);
+        }
+        bool invoked=false;
+        assert(!world->withPlayerChildCreation(allocate,[&]{invoked=true;return true;})&&!invoked);
     }
     for(int area=1;area<=5;++area){
         auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites);

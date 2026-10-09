@@ -371,6 +371,19 @@ public:
             });
     }
     unsigned droneNumber()const{return droneNumber_;}
+    // Borrow the enclosing source-ID stream only for this room load. Children
+    // execute synchronously at the authored player birth, not after the room.
+    template<class Allocate,class Load> bool withPlayerChildCreation(Allocate allocate,Load load){
+        if(!run_.effectsSucceeded||!playerBirthPending_||roomTerrainLoaded_||playerChildCreate_)
+            return run_.effectsSucceeded=false;
+        playerChildCreateContext_=&allocate;
+        playerChildCreate_=[](void* context,GameplayWorld& world){
+            return world.createPlayerChildren(*static_cast<Allocate*>(context));
+        };
+        const bool ok=load();
+        playerChildCreate_=nullptr;playerChildCreateContext_=nullptr;
+        return run_.effectsSucceeded=ok&&run_.effectsSucceeded&&playerChildrenStarted_&&!playerBirthPending_;
+    }
     bool bindBuilderController(downwell::GameplayBuilderController& actor){
         if(builderController_||!actor.valid()||actor.handle().generation)return false;
         builderController_=&actor;return true;
@@ -985,6 +998,8 @@ private:
             if(instance.objectId==35&&playerBirthPending_){
                 if(!birthPlayerOwnership())return false;
                 playerBirthPending_=false;
+                if(playerChildCreate_&&!playerChildCreate_(playerChildCreateContext_,*this))
+                    return run_.effectsSucceeded=false;
                 // Preserve the initial/Retry presentation snapshot. Later
                 // rooms retain their unadvanced camera until ordinary Step.
                 if(!tick_)initializeMainCameraFrame();
@@ -1624,6 +1639,8 @@ private:
     downwell::GameplayBuilderController* builderController_=nullptr;
     downwell::GameplayPlayerControllers* playerControllers_=nullptr;
     bool playerChildrenStarted_=false;
+    bool (*playerChildCreate_)(void*,GameplayWorld&)=nullptr;
+    void* playerChildCreateContext_=nullptr;
     unsigned droneNumber_=0;
     bool ditherLowSpec_=false,ditherEnding_=false;
     DroneBullets* droneBullets_=nullptr;

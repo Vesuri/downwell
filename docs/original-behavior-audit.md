@@ -38,9 +38,13 @@ for rmMain, retaining `droneNum`, the returned camera source ID, post-Create
 camera flags and the entry wipe's published-view read. Its allocator callback
 is required at each actual birth, including the wipe; allocation failure keeps
 the already created prefix and permanently fails that world. Retry clears the
-children before a new player lifetime can execute the sequence. This explicit
-entry point is not yet installed in the default room loader: its caller must
-provide the complete enclosing numeric-ID stream rather than a local counter.
+children before a new player lifetime can execute the sequence.
+`withPlayerChildCreation` borrows that allocator for an authored-room load and
+executes the sequence immediately after player registration, before the
+compatibility camera snapshot and later authored instances. Late installation
+after player birth or room loading is rejected. The borrowed callback is cleared
+on return, including failure. The default caller still must provide the complete
+enclosing numeric-ID stream rather than a local counter.
 
 Entry-dither Create copies parent-camera 63's x, reads view 0's published y,
 and sets Alarm 0 to 120. Step adds 16 to y and recopies camera x; Alarm 0
