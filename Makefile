@@ -361,9 +361,9 @@ verify-corpse-creation-integration: build/corpse-creation-integration-test
 	python3 tools/verify-debris-create.py
 	./build/corpse-creation-integration-test
 
-build/corpse-creation-integration-test: tests/core/CorpseCreationIntegrationTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+build/corpse-creation-integration-test: tests/core/CorpseCreationIntegrationTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp src/core/ObjectPack.cpp
 	@mkdir -p build
-	$(CXX) -Isrc $(CXXFLAGS) -ffp-contract=off -o $@ tests/core/CorpseCreationIntegrationTest.cpp src/core/GameMakerRandom.cpp
+	$(CXX) -Isrc $(CXXFLAGS) -ffp-contract=off -o $@ tests/core/CorpseCreationIntegrationTest.cpp src/core/GameMakerRandom.cpp src/core/ObjectPack.cpp
 
 .PHONY: verify-out-of-view-lifetime
 verify-out-of-view-lifetime: build/out-of-view-lifetime-test

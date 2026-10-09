@@ -1199,6 +1199,18 @@ operation's owner so a partial death sequence cannot be retried. The 3,840-chain
 integration gate now uses this entry point, not an independently assembled
 test-only implementation of corpse creation and setters.
 
+`StoredCorpseRegistration` performs the same Create and death-wrapper sequence
+against the stored room registry. Constructor geometry and resource metadata
+are registered before Create RNG and queries. Parent-wall queries use object
+57, tile queries use layer 100, and each relocation setter publishes immediately.
+The wrapper stores the room's numeric child ID, not a corpse-local handle, then
+publishes sprite and facing changes on that same lifetime. Failed creation or
+publication retains the accepted prefix for explicit teardown and latches the
+world failure. `StartupRuntime::createRegisteredCorpseFromDeath` supplies the
+room allocator, RNG and Rest in Pieces state; the caller still owns publication
+of the returned dying-enemy fields. This registration does not yet supply live
+corpse event scheduling, Draw routing, or the complete skeleton death chain.
+
 `CorpseMotion` implements ordinary Step: custom-real gravity and damping,
 parent-56 motion probes, bounce/settling and the bounded 1–16 floor search.
 Area 3 divides displacement by four without changing stored velocities. It

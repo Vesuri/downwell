@@ -590,6 +590,14 @@ bool compileCorpseDraw(const downwell::CorpseAnimation& corpse,
     return downwell::CorpseDraw::prepare(corpse,view,false,false,true,out);
 }
 #include "core/CorpseEffects.h"
+#include "core/StoredCorpseRegistration.h"
+struct CorpseTileProbe {
+    bool operator()(downwell::InstanceHandle,int,downwell::MotionBinary64,downwell::MotionBinary64,bool&);
+};
+bool compileRegisteredCorpse(downwell::StoredCorpseRegistration<16,4>& owner,
+    downwell::DeadBodySource& source,downwell::GameMakerRandom& random,CorpseTileProbe tile){
+    return owner.createFromDeath(source,206,{},102,false,random,tile)&&owner.clear();
+}
 namespace {
 struct CorpseOwnerHooks {
     bool sprite(unsigned,const downwell::CorpseAnimation&){return true;}

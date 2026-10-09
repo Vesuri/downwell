@@ -930,6 +930,43 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
 
     if(objects&&patterns)testLiveLifecycle(pack,*objects,*patterns);
 
+    if(objects&&patterns){
+        struct CorpseAudit:LifecycleAudit {
+            bool birthAt(downwell::InstanceHandle h,const downwell::InstanceRecord& r,
+                downwell::RunnerImageValue,downwell::RunnerImageValue){return birth(h,r);}
+            bool placeMeeting(downwell::InstanceHandle h,const downwell::InstanceRecord& r,int object,
+                downwell::MotionBinary64,downwell::MotionBinary64,bool& hit){
+                require(matches(h,r)&&r.objectId==263&&object==57,"corpse queries its registered parent-wall shape");
+                hit=false;return true;
+            }
+            bool instancePlace(downwell::InstanceHandle,const downwell::InstanceRecord&,int,
+                downwell::MotionBinary64,downwell::MotionBinary64,downwell::InstancePlaceResult&){return false;}
+            bool instanceNumber(int,unsigned&){return false;}
+        } audit;
+        auto runtime=std::make_unique<downwell::StartupRuntime>(downwell::PlatformProfile::nonDesktop,
+            &pack,objects,2,patterns,downwell::InstanceLifecycleBinding::bindPositionedBirths(audit));
+        runtime->skipToGameForTesting();
+        require(runtime->effectsSucceeded(),"enter room before registered corpse death fixture");
+        require(runtime->grantUpgrade(3),"grant Rest in Pieces for corpse Create");
+        auto corpses=runtime->corpseRegistration<2>();
+        const auto id=runtime->nextRuntimeInstanceId(),births=audit.births;
+        const auto draws=runtime->randomDrawCount();
+        downwell::DeadBodySource source;source.x=downwell::MotionBinary64::fromInteger(240);
+        source.y=downwell::MotionBinary64::fromInteger(1200);source.imageXscale=downwell::MotionBinary64::fromInteger(-1);
+        require(runtime->createRegisteredCorpseFromDeath(corpses,source,206,downwell::MotionBinary64::fromInteger(2),102,
+            [&](auto h,int layer,auto,auto,bool& hit){
+                require(runtime->instance(id)&&h.generation&&layer==100,"tile query sees synchronous corpse birth");
+                hit=false;return true;
+            }),"create registered corpse through the real runtime allocator and RNG");
+        require(source.myDeadBody==id&&runtime->nextRuntimeInstanceId()==id+1&&audit.births==births+1&&
+            runtime->randomDrawCount()==draws+3,"corpse uses enclosing ID stream and three Create draws");
+        const auto* state=corpses.state(corpses.sourceHandle(id));
+        require(state&&state->health==1&&state->hitEffect==1&&runtime->instance(id)->spriteId==206,
+            "runtime upgrade and wrapper overrides reach registered corpse");
+        require(corpses.clear()&&!runtime->instance(id),"retire corpse before room teardown");
+        audit.verify(*runtime);
+    }
+
     if (objects != nullptr) {
         auto cached = std::make_unique<downwell::StartupRuntime>(
             downwell::PlatformProfile::nonDesktop, &pack, objects,

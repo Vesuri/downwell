@@ -25,6 +25,7 @@
 #include "Input.h"
 #include "PlayerMotion.h"
 #include "StoredTimeShardRegistration.h"
+#include "StoredCorpseRegistration.h"
 #include "StoredTimeChangeRegistration.h"
 #include "StoredEntryDitherRegistration.h"
 #include "GameplayDitherAbove.h"
@@ -732,6 +733,15 @@ public:
     // before changing rooms. Phase dispatch is intentionally not supplied here.
     template<unsigned Capacity> StoredTimeShardRegistration<instanceCapacity,Capacity> timeShardRegistration(){
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
+    }
+    template<unsigned Capacity> StoredCorpseRegistration<instanceCapacity,Capacity> corpseRegistration(){
+        return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
+    }
+    template<unsigned Capacity,class Tile> bool createRegisteredCorpseFromDeath(
+        StoredCorpseRegistration<instanceCapacity,Capacity>& registry,DeadBodySource& source,
+        int sprite,MotionBinary64 impact,int explosion,Tile tile){
+        if(!registry.belongsTo(instances_))return run_.effectsSucceeded=false;
+        return registry.createFromDeath(source,sprite,impact,explosion,run_.upgrades.levels[3]!=0,random_,tile);
     }
     template<unsigned Capacity> StoredTimeChangeRegistration<instanceCapacity,Capacity> timeChangeRegistration(){
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};

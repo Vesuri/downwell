@@ -1,0 +1,121 @@
+#ifndef DOWNWELL_CORE_STORED_CORPSE_REGISTRATION_H
+#define DOWNWELL_CORE_STORED_CORPSE_REGISTRATION_H
+#include "CorpseAnimation.h"
+#include "DeadBodyCreation.h"
+#include "InstanceStore.h"
+#include "InstanceLifecycle.h"
+#include "ObjectPack.h"
+#include <cstring>
+namespace downwell {
+// Object 263's shared state, registered in the enclosing room's ID stream.
+// Keep this owner at a fixed address and clear it before room teardown.
+template<unsigned WorldCapacity,unsigned Capacity> class StoredCorpseRegistration {
+    static_assert(Capacity>0,"nonempty corpse registration required");
+    struct Entry {InstanceHandle key{};unsigned id=0;CorpseAnimation state;};
+    Entry entries_[Capacity]{};
+    InstanceStore<WorldCapacity>& records_;const ObjectPack* objects_;
+    InstanceLifecycleBinding lifecycle_;std::uint32_t& nextId_;const int& room_;bool& good_;
+    bool fail(){good_=false;return false;}
+    static float stored(RunnerImageValue v){float f;std::memcpy(&f,&v.bits,4);return f;}
+    Entry* entry(InstanceHandle h){
+        for(auto& e:entries_)if(e.id&&e.key.slot==h.slot&&e.key.generation==h.generation)return &e;
+        return nullptr;
+    }
+    InstanceRecord* record(const Entry& e){
+        auto* r=records_.resolve(e.key);return r&&r->instanceId==e.id&&r->objectId==263?r:nullptr;
+    }
+    bool builtins(Entry& e){
+        auto* r=record(e);if(!r)return fail();
+        r->imageSpeed=stored(e.state.imageSpeed);r->alarms=e.state.alarms;return true;
+    }
+    bool position(Entry& e,RunnerImageValue x,RunnerImageValue y){
+        auto* r=record(e);std::int32_t ix,iy;
+        if(!good_||!r||!x.promoted().roundPixel(ix)||!y.promoted().roundPixel(iy)||
+            !lifecycle_.publishedPosition(e.key,*r,x,y))return fail();
+        r->x=ix;r->y=iy;r->preciseX=stored(x);r->preciseY=stored(y);return true;
+    }
+public:
+    StoredCorpseRegistration(InstanceStore<WorldCapacity>& records,const ObjectPack* objects,
+        InstanceLifecycleBinding lifecycle,std::uint32_t& nextId,const int& room,bool& good)
+        :records_(records),objects_(objects),lifecycle_(lifecycle),nextId_(nextId),room_(room),good_(good){}
+    StoredCorpseRegistration(const StoredCorpseRegistration&)=delete;
+    StoredCorpseRegistration& operator=(const StoredCorpseRegistration&)=delete;
+    bool belongsTo(const InstanceStore<WorldCapacity>& records)const{return &records_==&records;}
+    const CorpseAnimation* state(InstanceHandle h){auto* e=entry(h);return e&&record(*e)?&e->state:nullptr;}
+    InstanceHandle sourceHandle(unsigned id){
+        for(auto& e:entries_)if(id&&e.id==id&&record(e))return e.key;
+        return {};
+    }
+    template<class Random,class Tile> bool create(MotionBinary64 x,MotionBinary64 y,bool rip,
+        Random& random,Tile tile,InstanceHandle& output){
+        output={};if(!good_)return false;
+        Entry* free=nullptr;for(auto& e:entries_)if(!e.id&&!free)free=&e;
+        PackedObject definition;RunnerImageValue px,py;std::int32_t ix,iy;
+        if(!free||!objects_||!objects_->findObject(263,definition)||!nextId_||nextId_>0x7fffffffu||
+            !px.assign(x)||!py.assign(y)||!px.promoted().roundPixel(ix)||!py.promoted().roundPixel(iy))return fail();
+        if(records_.create(nextId_,263,room_,definition.persistent(),definition.creationDepth)!=CreateInstanceResult::success)return fail();
+        free->id=nextId_++;free->key=records_.handleAt(records_.size()-1);free->state={};
+        free->state.x=px;free->state.y=py;
+        auto* r=record(*free);if(!r)return fail();
+        r->x=ix;r->y=iy;r->preciseX=stored(px);r->preciseY=stored(py);
+        r->spriteId=definition.spriteId;r->maskId=definition.textureMaskId;
+        if(!lifecycle_.birthAt(free->key,*r,px,py))return fail();
+        struct Queries {
+            StoredCorpseRegistration& owner;Entry& e;Tile& tiles;
+            bool wall(MotionBinary64 x,MotionBinary64 y,bool& hit){
+                auto* r=owner.record(e);bool result=false;
+                if(!r||!owner.builtins(e)||!owner.lifecycle_.placeMeeting(e.key,*r,57,x,y,result))return owner.fail();
+                hit=result;return true;
+            }
+            bool tile(MotionBinary64 x,MotionBinary64 y,bool& hit){
+                bool result=false;if(!tiles(e.key,100,x,y,result))return owner.fail();
+                hit=result;return true;
+            }
+            bool publish(RunnerImageValue x,RunnerImageValue y){return owner.position(e,x,y);}
+        } queries{*this,*free,tile};
+        if(!free->state.create(x,y,rip,random,queries)||!builtins(*free)||!good_)return fail();
+        output=free->key;return true;
+    }
+    bool sprite(InstanceHandle h,int sprite){
+        auto* e=entry(h);if(!good_||!e||!record(*e))return fail();
+        return e->state.setSprite(sprite,[&](const auto& state){
+            auto* r=record(*e);if(!r||!lifecycle_.sprite(h,*r,sprite))return fail();
+            r->spriteId=sprite;r->imageIndex=stored(state.imageIndex);return true;
+        })||fail();
+    }
+    bool facing(InstanceHandle h,MotionBinary64 value){
+        auto* e=entry(h);auto* r=e?record(*e):nullptr;RunnerImageValue next;
+        if(!good_||!r||!next.assign(value))return fail();
+        const auto old=e->state.imageXscale.bits;
+        if(next.bits==old||!((next.bits|old)&0x7fffffffu))return true;
+        if(!lifecycle_.transform(h,*r,RunnerTransformField::scaleX,next,{0x3f800000u},0xffffffu))return fail();
+        e->state.imageXscale=next;r->scaleX=stored(next);return true;
+    }
+    template<class Random,class Tile> bool createFromDeath(DeadBodySource& source,int spriteId,MotionBinary64 impact,
+        int explosion,bool rip,Random& random,Tile tile){
+        if(!good_)return false;
+        struct Events {
+            StoredCorpseRegistration& owner;Random& random;Tile& tile;bool rip;
+            bool create(int object,MotionBinary64 x,MotionBinary64 y,std::uint32_t& id){
+                InstanceHandle h;if(object!=263||!owner.create(x,y,rip,random,tile,h))return false;
+                auto* e=owner.entry(h);if(!e)return false;id=e->id;return true;
+            }
+            Entry* selected(unsigned id){auto* e=owner.entry(owner.sourceHandle(id));return owner.good_?e:nullptr;}
+            bool sprite(unsigned id,int v){return owner.sprite(owner.sourceHandle(id),v);}
+            bool facing(unsigned id,MotionBinary64 v){return owner.facing(owner.sourceHandle(id),v);}
+            bool verticalSpeed(unsigned id,MotionBinary64 v){auto* e=selected(id);if(!e)return false;e->state.ysp=v;return true;}
+            bool horizontalSpeed(unsigned id,MotionBinary64 v){auto* e=selected(id);if(!e)return false;e->state.xsp=v;return true;}
+            bool explosion(unsigned id,int v){auto* e=selected(id);if(!e)return false;e->state.explosionFx=v;return true;}
+        } events{*this,random,tile,rip};
+        return createDeadBody(source,spriteId,impact,explosion,events)||fail();
+    }
+    bool clear(){
+        for(auto& e:entries_)if(e.id){
+            if(!record(e)||!records_.erase(e.id,[&](auto h,const auto& r){return lifecycle_.retire(h,r);}))return fail();
+            e={};
+        }
+        return true;
+    }
+};
+}
+#endif
