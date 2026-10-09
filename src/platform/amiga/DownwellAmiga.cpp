@@ -3860,6 +3860,7 @@ __attribute__((noinline)) static int runDownwell(void) {
 #endif
             const bool compositeEffects=(compositeCurrency&&(!hardwareCurrency||actorList.currencyRasterRequired||
                 (port.registeredSmoke()&&port.registeredSmoke()->size())||
+                (port.registeredCorpses()&&port.registeredCorpses()->size())||
                 (port.timeShardInstances()&&port.timeShardInstances()->size())))||
                 (actorList.entryCoverVisible&&!hardwareEntryCover);
             if(compositeEffects){

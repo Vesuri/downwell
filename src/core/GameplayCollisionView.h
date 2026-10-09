@@ -8,7 +8,7 @@ namespace downwell {
 // and lifetimeId do not. Borrowed views never cache pointers across a mutation.
 class GameplayCollisionView {
 public:
-    enum class Kind {player,enemy,breakable,terrain,timeField,goalField,exitController,bullet,scriptEffect,debris,timeChange,entryDither,drone,bone,skeleton,blood,currency,ditherAbove,builder,timeShard,playerController,corpseExpiry,smoke};
+    enum class Kind {player,enemy,breakable,terrain,timeField,goalField,exitController,bullet,scriptEffect,debris,timeChange,entryDither,drone,bone,skeleton,blood,currency,ditherAbove,builder,timeShard,playerController,corpseExpiry,smoke,corpse};
     static constexpr unsigned enemyBase=1;
     static constexpr unsigned breakableBase=enemyBase+GameplayWorld::enemyCapacity;
     static constexpr unsigned terrainBase=breakableBase+GameplayWorld::breakableCapacity;
@@ -31,10 +31,12 @@ public:
     static constexpr unsigned playerControllerBase=timeShardBase+64;
     static constexpr unsigned corpseExpiryBase=playerControllerBase+GameplayPlayerControllers::capacity;
     static constexpr unsigned smokeBase=corpseExpiryBase+32;
-    static constexpr unsigned capacity=smokeBase+32;
+    static constexpr unsigned corpseBase=smokeBase+32;
+    static constexpr unsigned capacity=corpseBase+32;
     struct Record {
         const GameplayWorld::RegisteredExpiry::Record* corpseExpiry=nullptr;
         const GameplayWorld::RegisteredSmoke::Record* smoke=nullptr;
+        const GameplayWorld::RegisteredCorpse::Record* corpse=nullptr;
         const GameplayWorld::PlayerInstance* player=nullptr;
         const GameplayWorld::EnemyState* enemy=nullptr;
         const GameplayWorld::Breakable* breakable=nullptr;
@@ -76,6 +78,7 @@ public:
             case Kind::scriptEffect:base=scriptEffectBase;count=GameplayScriptSpawnInstances::capacity;break;
             case Kind::corpseExpiry:base=corpseExpiryBase;count=32;break;
             case Kind::smoke:base=smokeBase;count=32;break;
+            case Kind::corpse:base=corpseBase;count=32;break;
             case Kind::debris:base=debrisBase;count=GameplayDebrisInstances::capacity;break;
             case Kind::timeChange:base=timeChangeBase;count=8;break;
             case Kind::timeShard:base=timeShardBase;count=64;break;
@@ -95,6 +98,7 @@ public:
     }
     static bool decode(InstanceHandle key,Kind& kind,InstanceHandle& local){
         if(!key.generation||key.slot>=capacity)return false;
+        if(key.slot>=corpseBase){kind=Kind::corpse;local={key.slot-corpseBase,key.generation};return true;}
         if(key.slot>=smokeBase){kind=Kind::smoke;local={key.slot-smokeBase,key.generation};return true;}
         if(key.slot>=corpseExpiryBase){kind=Kind::corpseExpiry;local={key.slot-corpseExpiryBase,key.generation};return true;}
         if(key.slot>=playerControllerBase){kind=Kind::playerController;local={key.slot-playerControllerBase,key.generation};return true;}
@@ -145,6 +149,7 @@ public:
             else if constexpr(Family==Kind::scriptEffect)return world_.scriptSpawnInstances()?world_.scriptSpawnInstances()->find(local):nullptr;
             else if constexpr(Family==Kind::corpseExpiry)return world_.registeredExpiry()?world_.registeredExpiry()->find(local):nullptr;
             else if constexpr(Family==Kind::smoke)return world_.registeredSmoke()?world_.registeredSmoke()->find(local):nullptr;
+            else if constexpr(Family==Kind::corpse)return world_.registeredCorpses()?world_.registeredCorpses()->find(local):nullptr;
             else if constexpr(Family==Kind::debris)return world_.debrisInstances()?world_.debrisInstances()->find(local):nullptr;
             else if constexpr(Family==Kind::timeChange)return world_.timeChangeInstances()?world_.timeChangeInstances()->find(local):nullptr;
             else if constexpr(Family==Kind::timeShard)return world_.timeShardInstances()?world_.timeShardInstances()->find(local):nullptr;
@@ -202,6 +207,9 @@ private:
                 break;
             case Kind::corpseExpiry:
                 if(!world_.registeredExpiry()||!(next.corpseExpiry=world_.registeredExpiry()->find(local)))return false;
+                break;
+            case Kind::corpse:
+                if(!world_.registeredCorpses()||!(next.corpse=world_.registeredCorpses()->find(local)))return false;
                 break;
             case Kind::smoke:
                 if(!world_.registeredSmoke()||!(next.smoke=world_.registeredSmoke()->find(local)))return false;

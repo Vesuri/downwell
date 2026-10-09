@@ -39,6 +39,8 @@
 #include "core/BoneViewRetirement.h"
 #include "core/GameplayScriptSpawnInstances.h"
 #include "core/CorpseExpiryInstances.h"
+#include "core/CorpseInstances.h"
+#include "core/CorpseDraw.h"
 #include "core/SmokeInstances.h"
 #include "core/SmokeDraw.h"
 #include "core/DebrisDraw.h"
@@ -329,6 +331,12 @@ public:
     }
     const downwell::GameplayScriptSpawnInstances* scriptSpawnInstances()const{return scriptSpawnInstances_;}
     using RegisteredExpiry=downwell::CorpseExpiryInstances<32>;
+    using RegisteredCorpse=downwell::CorpseInstances<32>;
+    const RegisteredCorpse* registeredCorpses()const{return registeredCorpses_;}
+    bool bindRegisteredCorpses(RegisteredCorpse& instances){
+        if(registeredCorpses_||!instances.valid()||instances.size())return false;
+        registeredCorpses_=&instances;return true;
+    }
     using RegisteredSmoke=downwell::SmokeInstances<32>;
     const RegisteredSmoke* registeredSmoke()const{return registeredSmoke_;}
     bool bindRegisteredSmoke(RegisteredSmoke& instances){
@@ -817,7 +825,7 @@ public:
         return run_.effectsSucceeded=scriptSpawnInstances_&&effects.advanceRegistered(phase,*scriptSpawnInstances_);
     }
     enum class PhaseBoundary { beginStep, alarm, step, collision, endStep, roomEntry };
-    enum class DrawActor { enemy, bullet, scriptEffect, debris, player, entryDither, bone, skeleton, ditherAbove, timeShard, corpseExpiry, smoke };
+    enum class DrawActor { enemy, bullet, scriptEffect, debris, player, entryDither, bone, skeleton, ditherAbove, timeShard, corpseExpiry, smoke, corpse };
     template<class Visit> bool visitRegisteredEnemyShades(Visit visit)const{
         if((!bones_||!bones_->size())&&(!skeletons_||!skeletons_->size()))return true;
         return visitRoomActorsReadOnly([&](DrawActor kind,downwell::InstanceHandle key,auto){
@@ -863,6 +871,10 @@ public:
     template<class Emit> bool visitRegisteredEffectSurfaces(const downwell::EffectMaskAssets& assets,
         const downwell::EffectSurfacePlacement::View& view,Emit emit)const{
         return visitRoomActors([&](DrawActor kind,downwell::InstanceHandle key,auto){
+            if(kind==DrawActor::corpse){
+                const auto* r=registeredCorpses_?registeredCorpses_->find(key):nullptr;
+                return r&&downwell::CorpseDraw::surface(r->state,assets,view,emit);
+            }
             if(kind==DrawActor::smoke){
                 const auto* r=registeredSmoke_?registeredSmoke_->find(key):nullptr;
                 return r&&downwell::SmokeDraw::surface(r->state.imageIndex,r->x,r->y,assets,view,emit);
@@ -1669,6 +1681,7 @@ private:
     downwell::GameplayScriptSpawnInstances* scriptSpawnInstances_=nullptr;
     RegisteredExpiry* registeredExpiry_=nullptr;
     RegisteredSmoke* registeredSmoke_=nullptr;
+    RegisteredCorpse* registeredCorpses_=nullptr;
     downwell::GameplayDebrisInstances* debrisInstances_=nullptr;
     downwell::NativeTimeChangeRegistration* timeChangeInstances_=nullptr;
     downwell::NativeTimeShardRegistration* timeShardInstances_=nullptr;

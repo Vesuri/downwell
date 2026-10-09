@@ -122,6 +122,23 @@ public:
         if(!next.advanceImage()||!binding_.imageIndex(key,*r,next.imageIndex))return fail();
         r->state.timeline=next.timeline;r->state.imageIndex=next.imageIndex;return true;
     }
+    template<class Create,class Sprite> bool advanceAlarm(InstanceHandle key,unsigned index,Create create,Sprite sprite){
+        return dispatchPublished(key,[&](auto& state,auto& publish,bool& okay){
+            struct Events {
+                Create& createChild;Sprite& setSprite;Publisher& publish;bool& okay;
+                bool create(int object,MotionBinary64 x,MotionBinary64 y,std::uint32_t& child){return createChild(object,x,y,child);}
+                bool sprite(std::uint32_t child,int value){return setSprite(child,value);}
+                void destroy(){okay=publish.destroy()&&okay;}
+            } events{create,sprite,publish,okay};
+            return state.advanceAlarm(index,events);
+        });
+    }
+    bool endStep(InstanceHandle key,MotionBinary64 top,bool mainRoom){
+        return dispatchPublished(key,[&](auto& state,auto& publish,bool& okay){
+            struct Events {Publisher& publish;bool& okay;void destroy(){okay=publish.destroy()&&okay;}} events{publish,okay};
+            return state.endStep(mainRoom,top,events);
+        });
+    }
     bool activate(InstanceHandle key,bool active){
         auto* r=resolve(key);if(!r||r->destroyRequested||!binding_.activation(key,*r,active))return fail();
         r->active=active;return true;

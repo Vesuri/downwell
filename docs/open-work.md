@@ -133,6 +133,11 @@ behavior, both backend integrations and relevant original-game verification.
 - Implement remaining blood, corpse and blast dependencies. Preserve
   synchronous child Create, RNG consumption and mutation order before rewards
   and retirement.
+  Connect native corpse creation/expiry to the complete source-ID stream and
+  live mask/tile queries; dispatch its Step and player contact in the mixed
+  world phases, with the real time-stop and Knife and Fork state. Verify the
+  registered corpse/expiry chain in natural skeleton deaths, not only explicit
+  test births.
 - Connect natural death/stomp/hit events to effect owners, including flash balls.
   Complete death/low-spec direct drawing at original world-depth boundaries,
   rather than flattening those paths into an overlay.

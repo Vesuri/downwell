@@ -24,6 +24,42 @@ int main() {
         downwell::RoomPack rooms(rb.data(),rb.size());
         downwell::ObjectPack objects(ob.data(),ob.size());
         downwell::SpriteCollisionPack sprites(sb.data(),sb.size());
+        const auto mb=read("generated/downwell-sprite-masks.dwsm");downwell::SpriteMaskPack masks(mb.data(),mb.size());
+        for(auto mode:{downwell::GameplayCollisionOwner::Ownership::reference,
+            downwell::GameplayCollisionOwner::Ownership::native,downwell::GameplayCollisionOwner::Ownership::nativeScenery}){
+            const bool native=mode!=downwell::GameplayCollisionOwner::Ownership::reference;
+            auto owner=std::make_unique<downwell::GameplayCollisionOwner>(objects,sprites,
+                downwell::GameplayTerrainInstances::Presentation{},downwell::GameplayTerrainInstances::WallCollision{},&rooms,mode);
+            auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),owner->breakableBinding(),
+                owner->playerBinding(),native?nullptr:&owner->terrain(),&rooms);
+            auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
+            assert(owner->attach(*world)&&(!native||world->bindNativeTerrain(*terrain))&&owner->configureCorpseMasks(masks));
+            auto& corpses=owner->registeredCorpses();downwell::GameMakerRandom random(2);
+            const downwell::MotionBinary64 x{0x406f0800u,0},y{0x40601000u,0};
+            downwell::DeadBodySource source{x,y,{},downwell::MotionBinary64::fromInteger(-1)};
+            assert(corpses.createFromDeath(105187,source,206,{},102,false,random,
+                [](auto,int,auto,auto,bool& hit){hit=false;return true;}));
+            UBYTE pack[8]{};AmigaGameplayDrawList direct;
+            assert(direct.collect(*world,pack,pack+8,160,34,false));unsigned seen=0;
+            for(unsigned i=0;i<direct.count;++i)if(direct.actors[i].sprite==206){
+                const auto& a=direct.actors[i];assert(a.frame==0&&a.x==198&&a.y==94&&a.flip==1);++seen;
+            }
+            assert(seen==1);AmigaGameplayDrawList composite;
+            assert(composite.collect(*world,pack,pack+8,160,34,true));
+            for(unsigned i=0;i<composite.count;++i)assert(composite.actors[i].sprite!=206);
+            const auto pixels=read("generated/amiga-game.dwap");downwell::EffectMaskAssets art;
+            assert(art.bind(pixels.data(),pixels.size()));downwell::EffectMaskAssets::Asset expected;
+            assert(art.corpse(206,true,expected));unsigned surfaces=0;
+            const downwell::EffectSurfacePlacement::View effectView{downwell::MotionBinary64::fromInteger(160),
+                downwell::MotionBinary64::fromInteger(34),downwell::MotionBinary64::fromInteger(160),
+                downwell::MotionBinary64::fromInteger(284)};
+            assert(world->visitRegisteredEffectSurfaces(art,effectView,[&](const auto& asset,auto px,auto py){
+                assert(asset.mask.data==expected.mask.data&&px.high==x.high&&px.low==x.low&&py.high==y.high&&py.low==y.low);
+                ++surfaces;return true;
+            })&&surfaces==1);
+            assert(!world->visitRegisteredEffectSurfaces(art,effectView,[](const auto&,auto,auto){return false;}));
+            assert(corpses.clear());
+        }
         for(auto mode:{downwell::GameplayCollisionOwner::Ownership::reference,
             downwell::GameplayCollisionOwner::Ownership::native,
             downwell::GameplayCollisionOwner::Ownership::nativeScenery}){

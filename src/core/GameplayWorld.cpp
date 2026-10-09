@@ -43,6 +43,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     if(bones_&&!bones_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(registeredExpiry_&&!registeredExpiry_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(registeredSmoke_&&!registeredSmoke_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
+    if(registeredCorpses_&&!registeredCorpses_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(skeletons_&&!skeletons_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(blood_&&!blood_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(currencyInstances_&&!currencyInstances_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
@@ -63,6 +64,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto scriptSpawnInstances=scriptSpawnInstances_;
     const auto registeredExpiry=registeredExpiry_;
     const auto registeredSmoke=registeredSmoke_;
+    const auto registeredCorpses=registeredCorpses_;
     const auto debrisInstances=debrisInstances_;
     const auto timeChangeInstances=timeChangeInstances_;
     const auto timeShardInstances=timeShardInstances_;
@@ -124,6 +126,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     scriptSpawnInstances_=scriptSpawnInstances;
     registeredExpiry_=registeredExpiry;
     registeredSmoke_=registeredSmoke;
+    registeredCorpses_=registeredCorpses;
     debrisInstances_=debrisInstances;
     timeChangeInstances_=timeChangeInstances;
     timeShardInstances_=timeShardInstances;
@@ -256,6 +259,7 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
     if(bones_&&!bones_->clear())return run_.effectsSucceeded=false;
     if(registeredExpiry_&&!registeredExpiry_->clear())return run_.effectsSucceeded=false;
     if(registeredSmoke_&&!registeredSmoke_->clear())return run_.effectsSucceeded=false;
+    if(registeredCorpses_&&!registeredCorpses_->clear())return run_.effectsSucceeded=false;
     if(skeletons_&&!skeletons_->clear())return run_.effectsSucceeded=false;
     if(blood_&&!blood_->clear())return run_.effectsSucceeded=false;
     if(currencyInstances_&&!currencyInstances_->clear())return run_.effectsSucceeded=false;

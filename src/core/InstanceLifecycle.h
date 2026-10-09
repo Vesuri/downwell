@@ -172,6 +172,14 @@ public:
         b.number_=[](void* p,int object,unsigned& count){return static_cast<Owner*>(p)->instanceNumber(object,count);};
         return b;
     }
+    template<class Owner> static RecordLifecycleBinding bindPositionedQueryActor(Owner& owner){
+        auto b=bindPositionedActor(owner);
+        b.placeMeeting_=[](void* p,InstanceHandle h,const Record& r,int object,
+                          MotionBinary64 x,MotionBinary64 y,bool& hit){
+            return static_cast<Owner*>(p)->placeMeeting(h,r,object,x,y,hit);
+        };
+        return b;
+    }
     bool instanceNumber(int object,unsigned& result)const{
         unsigned count=0;
         if(!number_||!number_(context_,object,count))return false;

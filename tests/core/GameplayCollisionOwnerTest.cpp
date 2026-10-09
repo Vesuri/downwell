@@ -328,6 +328,7 @@ static void checkTypedCollisionView(const GameplayCollisionView& view,GameplayCo
         case K::scriptEffect:assert(view.resolveLocal<K::scriptEffect>(local)==reference.scriptEffect);break;
         case K::corpseExpiry:assert(view.resolveLocal<K::corpseExpiry>(local)==reference.corpseExpiry);break;
         case K::smoke:assert(view.resolveLocal<K::smoke>(local)==reference.smoke);break;
+        case K::corpse:assert(view.resolveLocal<K::corpse>(local)==reference.corpse);break;
         case K::debris:assert(view.resolveLocal<K::debris>(local)==reference.debris);break;
         case K::timeChange:assert(view.resolveLocal<K::timeChange>(local)==reference.timeChange);break;
         case K::timeShard:assert(view.resolveLocal<K::timeShard>(local)==reference.timeShard);break;
@@ -1334,6 +1335,46 @@ int main(){
     checkEnemySlotDirectory(objects,sprites);
     checkNativeAnimationBatches(objects,sprites);
     const auto mb=read("generated/downwell-sprite-masks.dwsm");SpriteMaskPack masks(mb.data(),mb.size());
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                  GameplayCollisionOwner::Ownership::nativeScenery}){
+        const bool native=mode!=GameplayCollisionOwner::Ownership::reference;
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),owner->breakableBinding(),
+            owner->playerBinding(),native?nullptr:&owner->terrain());
+        auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
+        assert(owner->attach(*world)&&(!native||world->bindNativeTerrain(*terrain))&&owner->configureCorpseMasks(masks));
+        GameMakerRandom wallRandom(1);
+        if(native){
+            assert(terrain->append(60,240,192)&&terrain->createProperties(terrain->handle(0),51));
+        }else{
+            assert(owner->terrain().append(60,240,192,true)&&
+                owner->terrain().createProperties(owner->terrain().handle(0),51,false,wallRandom));
+        }
+        auto& corpses=owner->registeredCorpses();GameMakerRandom random(2);
+        DeadBodySource source{MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(192),{},MotionBinary64::fromInteger(-1)};
+        assert(corpses.createFromDeath(205187,source,206,MotionBinary64::fromInteger(2),102,false,random,
+            [](auto,int layer,auto,auto,bool& hit){assert(layer==100);hit=false;return true;}));
+        const auto key=corpses.sourceHandle(205187);InstanceHandle shared;
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::corpse,key,shared));
+        GameplayCollisionView view(*world);checkTypedCollisionView(view,GameplayCollisionView::Kind::corpse,key);
+        assert(view.contains(shared)&&corpses.find(key)->state.alarms.get(0)==180);
+        assert(random.drawCount()>3); // The real wall-57 shape query caused relocation.
+        std::uint32_t nextId=205188;
+        owner->configureCorpseChildIds([](void* context,std::uint32_t& out){
+            out=(*static_cast<std::uint32_t*>(context))++;return true;
+        },&nextId);
+        for(unsigned tick=0;tick<8;++tick){world->step(0);assert(world->effectsSucceeded()&&owner->valid());}
+        assert(corpses.find(key)&&corpses.find(key)->state.active&&corpses.find(key)->state.alarms.get(0)==172);
+        for(unsigned tick=8;tick<180;++tick)for(unsigned alarm=0;alarm<4;++alarm)assert(owner->advanceCorpseAlarm(key,alarm));
+        const auto* corpse=corpses.find(key);
+        assert(corpse&&corpse->destroyRequested&&corpse->state.myExplosion==205188&&nextId==205189);
+        const auto expiryKey=owner->registeredExpiry().sourceHandle(205188);
+        assert(owner->registeredExpiry().find(expiryKey)&&owner->registeredExpiry().find(expiryKey)->state.spriteId==102);
+        assert(owner->prepareDraw()&&!corpses.find(key)&&!view.contains(shared));
+        assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)==ResultsDestination::gameplay&&
+            world->registeredCorpses()==&corpses&&!corpses.size()&&owner->valid());
+    }
     for(unsigned layout=0;layout<3;++layout){
         std::vector<std::uint32_t> expected;
         for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,

@@ -37,6 +37,7 @@ bool AmigaGameplayDrawList::promoteCurrencyComplete(const GameplayWorld& world,i
     bool other=false;
     world.smokeEffects().visitNewest([&](auto,const auto&){other=true;});
     if(world.registeredSmoke()&&world.registeredSmoke()->size())other=true;
+    if(world.registeredCorpses()&&world.registeredCorpses()->size())other=true;
     if(world.timeShardInstances()&&world.timeShardInstances()->size())other=true;
     if(other)return false;
     if(!world.visitDebrisDraw([&](const auto&){other=true;return true;})||other)return false;
@@ -99,6 +100,7 @@ bool AmigaGameplayDrawList::promoteCurrency(const GameplayWorld& world,int viewX
     bool other=false;
     world.smokeEffects().visitNewest([&](auto,const auto&){other=true;});
     if(world.registeredSmoke()&&world.registeredSmoke()->size())other=true;
+    if(world.registeredCorpses()&&world.registeredCorpses()->size())other=true;
     if(world.timeShardInstances()&&world.timeShardInstances()->size())other=true;
     if(other||!world.visitDebrisDraw([&](const auto&){other=true;return true;})||other)return false;
     const Placement::PixelView view{viewX,viewY,160,284};
@@ -460,6 +462,21 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
                    !downwell::EffectSurfacePlacement::relative(y,downwell::MotionBinary64::fromInteger(worldViewY),y)||
                    !x.roundPixel(px)||!y.roundPixel(py))return false;
                 return append(effect.spriteId,effect.drawFrame(),downwellPlayfieldX+px,py,0);
+            }
+            if(kind==GameplayWorld::DrawActor::corpse){
+                if(compositeCurrency)return true;
+                const auto* r=port.registeredCorpses()?port.registeredCorpses()->find(key):nullptr;
+                downwell::CorpseDraw::Command command;std::int32_t x,y;
+                if(!r||!downwell::CorpseDraw::prepare(r->state,{},true,false,false,command))return false;
+                if(command.placement.target==downwell::EffectSurfacePlacement::hidden)return true;
+                using Real=downwell::MotionBinary64;
+                const auto scale=command.scaleX.bits;
+                if(!(scale&0x7fffffffu))return true;
+                if((scale&0x7fffffffu)!=0x3f800000u||command.imageIndex.bits&0x7fffffffu)return false;
+                if(!downwell::EffectSurfacePlacement::relative(command.placement.x,Real::fromInteger(worldViewX),command.placement.x)||
+                   !downwell::EffectSurfacePlacement::relative(command.placement.y,Real::fromInteger(worldViewY),command.placement.y)||
+                   !command.placement.x.roundPixel(x)||!command.placement.y.roundPixel(y))return false;
+                return append(command.sprite,0,downwellPlayfieldX+x,y,scale>>31);
             }
             if(kind==GameplayWorld::DrawActor::smoke){
                 if(compositeCurrency)return true;
