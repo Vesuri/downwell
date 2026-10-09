@@ -260,6 +260,9 @@ public:
         return run_.effectsSucceeded=okay;
     }
     bool noKillAchievement()const{return run_.noKill;}
+    template<class Audio> bool duckMusic(MusicDuck& caller,int duration,MotionBinary64 amount,Audio& audio){
+        return run_.duckMusic(caller,duration,amount,audio);
+    }
     template<class Audio,class Delay,class Cue>
     bool recordEnemyDeath(bool cutGunshot,Audio& audio,Delay delay,Cue cue){
         return run_.recordEnemyDeath(cutGunshot,audio,delay,cue);

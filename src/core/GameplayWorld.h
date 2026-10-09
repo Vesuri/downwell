@@ -1869,6 +1869,8 @@ public:
     const downwell::ShopWorld& shops() const { return run_.shops; }
     bool registerSideCameraLocker(int x, int y) { return run_.sideCameraLockers.create(x, y); }
     const downwell::OrdinaryTimeFields<64>& timeFields() const {return run_.timeFields;}
+    template<class Audio> bool duckMusic(downwell::MusicDuck& caller,int duration,
+        downwell::MotionBinary64 amount,Audio& audio){return run_.duckMusic(caller,duration,amount,audio);}
     bool createTimeFieldWithSourceId(std::uint32_t source,int x,int y){
         if(!run_.effectsSucceeded)return false;
         return run_.effectsSucceeded=run_.timeFields.createWithSourceId(source,x,y,enemyRandom_);

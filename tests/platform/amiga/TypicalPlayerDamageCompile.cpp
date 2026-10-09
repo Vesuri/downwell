@@ -3,6 +3,12 @@
 #include "core/RunControllerInstances.h"
 #include "core/GameplayWorld.h"
 using downwell::MotionBinary64;
+struct DuckAudio {
+    bool isPlaying(int,bool&),getGain(int,MotionBinary64&),setGain(int,MotionBinary64,int);
+};
+bool nativeDamageDuck(GameplayWorld& world,downwell::ContactDamageScripts& caller,DuckAudio& audio){
+    return world.duckMusic(caller.music,500,{0x3fe66666u,0x66666666u},audio);
+}
 bool nativeDamageControllerWrites(downwell::RunControllerInstances<4>& controllers,
     const downwell::InstanceHandle* order,unsigned count,int& roomSpeed){
     return controllers.visitDamageControllers([&](auto apply){

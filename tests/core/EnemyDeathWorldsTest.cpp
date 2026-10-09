@@ -86,7 +86,28 @@ template<class World> void checkCue(World& world,unsigned failure,bool ending=fa
             [](int,int&){std::abort();return false;},caller,env,audio)&&calls==before);
     }
 }
+template<class World> void checkDamageDuck(World& world,unsigned failure){
+    downwell::ContactDamageScripts caller;
+    struct Audio {
+        int music;unsigned failure,calls=0;
+        bool call(int id){assert(id==music);return ++calls!=failure;}
+        bool isPlaying(int id,bool& playing){playing=true;return call(id);}
+        bool getGain(int id,downwell::MotionBinary64& value){value=downwell::MotionBinary64::fromInteger(1);return call(id);}
+        bool setGain(int id,downwell::MotionBinary64 value,int duration){
+            assert(duration==(calls==2?0:500)&&value.high==(calls==2?0x3fe66666u:0x3ff00000u));
+            return call(id);
+        }
+    } audio{world.backgroundMusicId(),failure};
+    assert(world.duckMusic(caller.music,500,{0x3fe66666u,0x66666666u},audio)==!failure&&
+        world.effectsSucceeded()==!failure&&audio.calls==(failure?failure:4)&&caller.music.duckDuration==500);
+    if(failure){const auto count=audio.calls;
+        assert(!world.duckMusic(caller.music,123,{},audio)&&audio.calls==count&&caller.music.duckDuration==500);}
+}
 int main(){
+    for(unsigned failure=0;failure<=4;++failure){
+        auto native=std::make_unique<GameplayWorld>(300,true,0,false);checkDamageDuck(*native,failure);
+        auto stored=std::make_unique<downwell::StartupRuntime>();checkDamageDuck(*stored,failure);
+    }
     for(int area=0;area<=6;++area){
         int music=-1;const bool valid=downwell::RunSession::areaMusic(area,music);
         assert(valid==(area>=1&&area<=5)&&music==(valid?193+area:-1));

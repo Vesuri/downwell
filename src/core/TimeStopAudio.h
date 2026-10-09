@@ -2,12 +2,11 @@
 #define DOWNWELL_CORE_TIME_STOP_AUDIO_H
 #include "PlayerTimeStop.h"
 #include "SoundPlayScript.h"
+#include "MusicDuck.h"
 namespace downwell {
 // bgmDuck writes these fields on its caller. Voices remain owned by the
 // session/backend, not by the room-local transition or an individual field.
-struct TimeStopAudio {
-    int duckDuration=0;
-    MotionBinary64 duckAmt{};
+struct TimeStopAudio : MusicDuck {
     template<class Audio>
     static bool query(PlayerTimeStop::AudioQuery query,int music,int wind,Audio& audio,bool& result){
         switch(query){
@@ -36,14 +35,7 @@ struct TimeStopAudio {
                 80,false,true,result,good);
         }
         case E::duckMusic:{
-            duckDuration=200;duckAmt={0x3fe66666u,0x66666666u};
-            if(area==5)return true;
-            bool playing=false;if(!audio.isPlaying(music,playing))return false;
-            if(!playing)return true;
-            MotionBinary64 gain;if(!audio.getGain(music,gain))return false;
-            if(gain.high!=0x3ff00000u||gain.low)return true;
-            return audio.setGain(music,duckAmt,0)&&
-                audio.setGain(music,MotionBinary64::fromInteger(1),duckDuration);
+            return execute(200,{0x3fe66666u,0x66666666u},[&]{return area;},[&]{return music;},audio);
         }
         default:return false;
         }

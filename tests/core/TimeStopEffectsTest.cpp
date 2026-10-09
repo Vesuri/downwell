@@ -1,5 +1,6 @@
 #include "core/TimeStopEffects.h"
 #include "core/GameMakerRandom.h"
+#include "core/RunSession.h"
 #include <cassert>
 #include <cstdio>
 #include <vector>
@@ -68,6 +69,24 @@ static void checkedAudioTransitions(){
 }
 int main(){
     checkedAudioTransitions();
+    for(unsigned failure=0;failure<=4;++failure){
+        RunSession run;MusicDuck caller;unsigned calls=0;run.backgroundMusicId=193;
+        struct Audio {
+            RunSession& run;MusicDuck& caller;unsigned& calls;unsigned failure;
+            bool call(int id){assert(id==193+int(calls));++calls;++run.backgroundMusicId;return calls!=failure;}
+            bool isPlaying(int id,bool& out){out=true;return call(id);}
+            bool getGain(int id,MotionBinary64& out){out=MotionBinary64::fromInteger(1);return call(id);}
+            bool setGain(int id,MotionBinary64 value,int milliseconds){
+                if(calls==2){assert(milliseconds==0&&value.high==0x3fe66666u);caller.duckDuration=777;}
+                else assert(calls==3&&milliseconds==777&&value.high==0x3ff00000u);
+                return call(id);
+            }
+        } audio{run,caller,calls,failure};
+        const auto amount=MotionBinary64{0x3fe66666u,0x66666666u};
+        assert(run.duckMusic(caller,500,amount,audio)==!failure&&run.effectsSucceeded==!failure);
+        assert(calls==(failure?failure:4)&&caller.duckDuration==(calls>=3?777:500)&&caller.duckAmt.low==amount.low);
+        if(failure){const auto previous=calls;assert(!run.duckMusic(caller,123,{},audio)&&calls==previous);}
+    }
     using Effect=PlayerTimeStop::Effect;
     for(unsigned seed=0;seed<256;++seed){
         TimeStopEffects<16> state;GameMakerRandom rng(seed);unsigned lookups=0;

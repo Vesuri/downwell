@@ -32,6 +32,7 @@
 #include "OrdinaryTimeFields.h"
 #include "TypicalPlayerDamage.h"
 #include "PlayerDamage.h"
+#include "MusicDuck.h"
 #include "PlayerDamageNumbers.h"
 #include "RunnerPointDirection.h"
 #include "ContactCoordinates.h"
@@ -106,6 +107,11 @@ struct RunSession {
     bool noKill = false; // global.achNoKill; initialized by scrPlayerInit, not room loading.
     bool firstLand=false;
     int backgroundMusicId=193; // scrInitialize; survives ordinary run/room reset.
+    template<class Audio> bool duckMusic(MusicDuck& caller,int duration,MotionBinary64 amount,Audio& audio){
+        if(!effectsSucceeded)return false;
+        return effectsSucceeded=caller.execute(duration,amount,[&]{return stage.area;},
+            [&]{return backgroundMusicId;},audio);
+    }
     static bool areaMusic(int area,int& sound){
         if(area<1||area>5)return false;
         sound=193+area;return true;
