@@ -978,7 +978,10 @@ public:
         });
     }
     void configureRoomAnimation(bool (*callback)(void*),void* context){roomAnimation_=callback;roomAnimationContext_=context;}
-    void configureRegisteredActorEndStep(bool (*callback)(void*,long),void* context){registeredActorEndStep_=callback;registeredActorEndStepContext_=context;}
+    void configureRegisteredActorEndStep(bool (*callback)(void*,long),void* context,bool ownsEnemyRetirement=false){
+        registeredActorEndStep_=callback;registeredActorEndStepContext_=context;
+        registeredEnemyEndStep_=callback&&ownsEnemyRetirement;
+    }
     // Scoped ordered collision pass after Step reconciliation, before End
     // Step. The caller owns collection, dispatch and its persistent workspace.
     // Legacy contact loops are not replaced merely by installing this hook.
@@ -1793,6 +1796,7 @@ private:
     bool (*roomAnimation_)(void*)=nullptr;
     void* roomAnimationContext_=nullptr;
     bool (*registeredActorEndStep_)(void*,long)=nullptr;
+    bool registeredEnemyEndStep_=false;
     void* registeredActorEndStepContext_=nullptr;
     bool (*collisionPass_)(void*)=nullptr;
     void* collisionPassContext_=nullptr;

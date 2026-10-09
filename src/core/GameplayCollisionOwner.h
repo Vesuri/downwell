@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_GAMEPLAY_COLLISION_OWNER_H
 #include "GameplayCollisionView.h"
 #include "BoxDestructionScript.h"
+#include "MainRoomLifetime.h"
 #include "RunnerSpatialInstances.h"
 #include "RunnerObjectFamilies.h"
 #include "RunnerRoomMembership.h"
@@ -120,7 +121,7 @@ private:
     mutable bool drawAuditHasSnapshot_=false;
 #endif
     RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity+GameplayWorld::droneBulletCapacity+GameplayWorld::boneCapacity+GameplayWorld::skeletonCapacity+GameplayWorld::currencyCapacity+32+32+4+4> combatAlarmPhase_;
-    RunnerStepSnapshot<GameplayWorld::droneBulletCapacity+GameplayWorld::skeletonCapacity+GameplayPlayerControllers::capacity+32> actorEndStepPhase_;
+    RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::droneBulletCapacity+GameplayWorld::skeletonCapacity+GameplayPlayerControllers::capacity+32> actorEndStepPhase_;
     bool actorEndStepExecuting_=false;
     bool combatAlarmCaptureDirty_=true;
     unsigned combatAlarmMask_=0;
@@ -1469,19 +1470,26 @@ public:
         world.configureRegisteredActorEndStep([](void* context,long topQ12){
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
             if(!self.valid())return false;
-            if(!self.drones_.size()&&!self.skeletons_.size()&&!self.playerControllers_.size()&&!self.corpses_.size())return true;
+            if(!self.world_->enemyCount()&&!self.drones_.size()&&!self.skeletons_.size()&&!self.playerControllers_.size()&&!self.corpses_.size())return true;
             MotionBinary64 top;
             if(!multiplyBinary64(MotionBinary64::fromInteger(topQ12),{0x3f300000u,0},top))return self.check(false);
             return self.dispatchActorEndStep([&](InstanceHandle shared,int object){
                 View::Kind kind;InstanceHandle local;
                 if(!View::decode(shared,kind,local))return false;
+                if(kind==View::Kind::enemy){
+                    const auto* enemy=self.world_->resolveEnemyLifetime(local);
+                    return enemy&&hasSimpleOutOfViewEndStep(object)&&
+                        retireMainRoomObjectsChecked(1,11,1,topQ12,[&](unsigned){
+                            return LifetimeInstance{object,enemy->y+176,enemy->active&&!enemy->destroyRequested};
+                        },[&](unsigned){return self.world_->markEnemyDestroyed(local);});
+                }
                 if(object==120&&kind==View::Kind::skeleton)return self.skeletons_.endStep(local,top,true);
                 if(object==263&&kind==View::Kind::corpse)return self.corpses_.endStep(local,top,true);
                 if(object==256&&kind==View::Kind::playerController)
                     return self.playerControllers_.balloonEndStep(local,self.world_->upgrades().levels[15]!=0);
                 return object==266&&kind==View::Kind::drone&&self.drones_.endStep(local,top,MotionBinary64::fromInteger(284),true);
             });
-        },this);
+        },this,true);
         world.configureRoomActorDraw([](const void* context,GameplayWorld::DrawActorVisitor visit,void* visitor){
             const auto& self=*static_cast<const GameplayCollisionOwner*>(context);
             if(!self.valid())return false;
@@ -1869,6 +1877,11 @@ public:
         actorEndStepExecuting_=true;
         struct Reset {bool& value;~Reset(){value=false;}} reset{actorEndStepExecuting_};
         actorEndStepPhase_.clear();
+        if(!check(visitRegistered(View::enemyBase,View::breakableBase,
+            [&](InstanceHandle h,int object,std::uint32_t flags){
+                if((flags&0x100003u)||!hasSimpleOutOfViewEndStep(object))return true;
+                return resolves(h)&&actorEndStepPhase_.append(h.slot,h.generation,object);
+            })))return false;
         if(!check(visitRegistered(View::droneBase,View::bloodBase,
             [&](InstanceHandle h,int object,std::uint32_t flags){
                 if((flags&0x100003u)||object==269)return true;

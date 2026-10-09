@@ -247,14 +247,20 @@ captured from the resource-backed owner's registrations. This orders enemies
 within their current scheduling block; it does not yet interleave all native
 families according to the complete event table.
 
-The production owned-actor End Step handoff also captures and sorts its
-currently admitted skeleton (120) and drone-bullet (266) lifetimes, regardless
-of which family registered first. Bones (269) have no End Step. Each callback
+The production owned-actor End Step handoff captures and sorts its ordinary
+enemy (111–119), skeleton (120), balloon (256), corpse (263) and drone-bullet
+(266) lifetimes, regardless of which family registered first. Bones (269) have
+no End Step. Only the supported enemy event bodies enter this handoff. Each callback
 rechecks lifetime and exclusion flags; callbacks cannot overwrite the active
-capture through recursive dispatch. The 64-entry workspace is owner-resident
-(1,024 bytes of entries), not on the 8 KiB Amiga task stack, and is separate
+capture through recursive dispatch. The 165-entry workspace is owner-resident
+(2,640 bytes of entries), not on the 8 KiB Amiga task stack, and is separate
 from the cached alarm snapshot. This corrects ordering within that handoff;
-walls, controllers and the other family passes are not thereby interleaved.
+walls, boxes, remaining controllers and the other family passes are not thereby interleaved.
+Ordinary enemies request destruction in this pass and survive until Draw-entry
+cleanup, just like the registered skeletons. They no longer run the preceding
+family retirement sweep when this owner is attached. Standalone worlds retain
+that sweep; Retry preserves which scheduler owns retirement. The ordinary
+enemy adapter still uses its existing published integer coordinates.
 Keep the phase cutoff and immediate flag rechecks below when integrating it;
 sorting by resource ID alone does not handle reactivation or new lifetimes.
 

@@ -5430,6 +5430,50 @@ int main(){
         }));
         assert((objectsSeen==std::vector<int>{120,120,266}));
     }
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                  GameplayCollisionOwner::Ownership::nativeScenery}){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},&rooms,mode);
+        auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));
+        InstanceHandle skeleton;
+        assert(world->createSkeletonWithSourceId(606000,240,192,skeleton));
+        assert(world->createGeneratedInstance({111,240,-10000},objects,[](const auto&){return true;}));
+        const auto first=world->enemyHandle(world->enemyAt(0).lifetimeId);
+        InstanceHandle newborn;
+        std::vector<int> seen;
+        assert(owner->dispatchActorEndStep([&](InstanceHandle shared,int object){
+            seen.push_back(object);
+            if(object==111){
+                GameplayCollisionView::Kind kind;InstanceHandle local;
+                assert(GameplayCollisionView::decode(shared,kind,local)&&kind==GameplayCollisionView::Kind::enemy&&
+                    local.slot==first.slot&&local.generation==first.generation);
+                assert(world->markEnemyDestroyed(local));
+                assert(world->createGeneratedInstance({111,256,-10000},objects,[](const auto&){return true;}));
+                newborn=world->enemyHandle(world->enemyAt(world->enemyCount()-1).lifetimeId);
+            }else{
+                assert(object==120&&world->resolveEnemyLifetime(first)&&world->resolveEnemyLifetime(first)->destroyRequested&&
+                    world->resolveEnemyLifetime(newborn));
+            }
+            return true;
+        }));
+        assert((seen==std::vector<int>{111,120})); // New enemy does not inherit a turn in this phase.
+        assert(owner->prepareDraw()&&!world->resolveEnemyLifetime(first)&&world->resolveEnemyLifetime(newborn));
+        // Production dispatch, rather than the fixture callback above, now
+        // owns the offscreen enemy's mark. Removal must still wait for Draw.
+        world->step(0);
+        assert(world->effectsSucceeded()&&owner->valid()&&world->resolveEnemyLifetime(newborn)&&
+            world->resolveEnemyLifetime(newborn)->destroyRequested&&owner->skeletons().find(skeleton));
+        assert(owner->prepareDraw()&&!world->resolveEnemyLifetime(newborn)&&owner->skeletons().find(skeleton));
+        assert(world->restartFromResults(DeathMenuSequence::Action::Retry,43,300)==ResultsDestination::gameplay);
+        assert(world->createGeneratedInstance({111,240,-10000},objects,[](const auto&){return true;}));
+        const auto afterRetry=world->enemyHandle(world->enemyAt(0).lifetimeId);
+        world->step(0);
+        assert(world->effectsSucceeded()&&world->resolveEnemyLifetime(afterRetry)&&
+            world->resolveEnemyLifetime(afterRetry)->destroyRequested);
+        assert(owner->prepareDraw()&&!world->resolveEnemyLifetime(afterRetry));
+    }
     {
         std::vector<std::uint32_t> expected;
         for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
@@ -6287,6 +6331,8 @@ int main(){
     // A backend rejection must not invent an identity for a cell it rejected.
     assert(!world->createGeneratedInstance({60,1,2},objects,[](const auto&){return false;})&&owner->terrain().size()==3);
     world->step(0);
+    assert(world->effectsSucceeded()&&owner->valid()&&world->enemyCount()==2&&world->enemyAt(0).destroyRequested);
+    assert(owner->prepareDraw()); // End Step marks; Draw-entry cleanup removes the offscreen snake.
     assert(world->effectsSucceeded()&&owner->valid()&&world->enemyCount()==1&&owner->state(key));
     const auto* enemy=world->findEnemy(local);assert(enemy);
     state=owner->state(key);
