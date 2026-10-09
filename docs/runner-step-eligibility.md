@@ -186,6 +186,17 @@ The fixture rejects any unexpected solid-motion callback rather than supplying
 invented zero velocities. This is explicit pass execution, not automatic normal
 scheduler admission or complete collision-handler coverage on either backend.
 
+`GameplayCollisionOwner::executeCollisionPairs` provides the corresponding
+explicit pass for native and registered gameplay ownership. It consumes the
+same sealed pair type and uses `RunnerCollisionDispatch`, rereading room guards
+and inherited event bindings for each direction. Native collision requeueing
+updates only the collision queue, not spatial dirtiness. The caller must supply
+source-faithful rollback and motion operations for solid pairs; unsupported
+motion is not silently replaced with zero velocity. Dither/wall fixtures run
+real collection, mask overlap and code-991 destruction, retaining marked wall
+identities through the pass. This entry point does not admit incomplete native
+families into the normal scheduler.
+
 The pair buffer's completed-instance set models
 one pass; source counter overflow and concurrent mutation during collection
 are outside its contract. The runner evidence verifier pins these regions.

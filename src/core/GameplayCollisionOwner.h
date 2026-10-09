@@ -20,6 +20,7 @@
 #include "RunnerFullProperties.h"
 #include "NativeInstanceTable.h"
 #include "RunnerCollisionEventContext.h"
+#include "RunnerCollisionDispatch.h"
 #include "NativeEnemyAlarmRoster.h"
 namespace downwell {
 #ifdef DOWNWELL_DRAW_CACHE_AUDIT
@@ -1134,6 +1135,47 @@ public:
             if(!nativeCollisionVisual(self,first,a)||!nativeCollisionVisual(other,second,b))return check(false);
         }
         return check(RunnerSpriteOverlap::test(first,second,a,b,sprites_,masks,RunnerMaskDispatch{},inverseTrig,roundPixel,hit));
+    }
+    bool queueCollision(InstanceHandle h){
+        if(!valid()||!resolves(h))return check(false);
+        const auto* flags=families_.flags(unsigned(objectOf(h)));if(!flags)return check(false);
+        return check(native_?(!(*flags&8u)||nativeCollisionDirty_.mark(h.slot)):owner_.queueCollision(h,*flags));
+    }
+    template<class Execute> bool dispatchCollisionEvent(RunnerCollisionEventContext& context,
+        InstanceHandle self,InstanceHandle other,RunnerCollisionEventContext::RoomState room,Execute execute){
+        if(!valid())return false;
+        return check(context.dispatch(self,other,room,
+            [&](InstanceHandle a,InstanceHandle b,int& subtype,bool& found,PackedObjectEvent& event){
+                if(!resolves(a)||!resolves(b))return false;
+                const int object=objectOf(a);subtype=objectOf(b);
+                return object>=0&&subtype>=0&&objects_.collisionEvent(object,subtype,found,event);
+            },execute));
+    }
+    // Execute an already sealed, mixed-family pass; never filter it into
+    // separate per-family passes. Motion owns source position/path rollback
+    // and engine motion, not an integer-position approximation. Room guards
+    // and current object IDs are reread separately for each event direction.
+    // Physical retirement is forbidden until this pass has finished.
+    template<unsigned Pairs,class Motion,class RoomState,class Execute>
+    bool executeCollisionPairs(RunnerCollisionPairs<View::capacity,Pairs>& pairs,
+        const SpriteMaskPack& masks,RunnerCollisionEventContext& context,
+        Motion& motion,RoomState roomState,Execute execute){
+        if(!valid()||!world_||!world_->effectsSucceeded()||!context.succeeded())return check(false);
+        struct Ops {
+            GameplayCollisionOwner& owner;const SpriteMaskPack& masks;RunnerCollisionEventContext& context;
+            Motion& motion;RoomState& roomState;Execute& execute;
+            bool overlap(InstanceHandle a,InstanceHandle b,bool& hit){return owner.collisionOverlap(a,b,masks,false,hit);}
+            bool flags(InstanceHandle h,std::uint32_t& flags){return owner.eligibilityFlags(h,flags);}
+            bool queueCollision(InstanceHandle h){return owner.queueCollision(h);}
+            bool rollback(InstanceHandle h){return motion.rollback(h);}
+            bool prepareMotion(InstanceHandle h){return motion.prepareMotion(h);}
+            bool advanceMotion(InstanceHandle h){return motion.advanceMotion(h);}
+            bool dispatch(InstanceHandle a,InstanceHandle b){
+                return owner.dispatchCollisionEvent(context,a,b,roomState(),execute)&&owner.world_->effectsSucceeded();
+            }
+        } ops{*this,masks,context,motion,roomState,execute};
+        RunnerCollisionDispatch dispatch;
+        return check(pairs.dispatch([&](InstanceHandle a,InstanceHandle b){return dispatch.pair(a,b,ops);}));
     }
     // Diagnostic traversal only: this is not spatial candidate selection.
     // Spatial refresh is explicit; collision consumption still requires

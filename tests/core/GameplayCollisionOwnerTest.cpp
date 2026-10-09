@@ -2191,6 +2191,53 @@ int main(){
         }
     }
     auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
+    for(unsigned transition:{0u,1u,2u,3u}){
+        std::vector<unsigned> expected;
+        for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+            GameplayCollisionOwner::Ownership::nativeScenery}){
+            const bool native=mode!=GameplayCollisionOwner::Ownership::reference;
+            auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
+                GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&rooms,mode);
+            auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),owner->breakableBinding(),
+                owner->playerBinding(),native?nullptr:&owner->terrain(),&rooms);
+            auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
+            assert(owner->attach(*world)&&(!native||world->bindNativeTerrain(*terrain))&&world->createAuthoredDitherAbove());
+            GameMakerRandom random;
+            for(unsigned i=0;i<8;++i){
+                if(native){assert(terrain->append(60,496+int(i)*16,-128));assert(terrain->createProperties(terrain->handle(i),51));}
+                else {assert(owner->terrain().append(60,496+int(i)*16,-128,true));
+                    assert(owner->terrain().createProperties(owner->terrain().handle(i),51,false,random));}
+            }
+            auto pairs=std::make_unique<RunnerCollisionPairs<GameplayCollisionView::capacity,64>>();
+            assert(owner->collectCollisionPairs(*pairs)&&pairs->size()>0);
+            struct NonSolidMotion {
+                bool rollback(InstanceHandle){assert(false);return false;}
+                bool prepareMotion(InstanceHandle){assert(false);return false;}
+                bool advanceMotion(InstanceHandle){assert(false);return false;}
+            } motion;
+            RunnerCollisionEventContext context;bool pending=transition==2;std::vector<unsigned> actual;
+            const auto draws=world->randomDrawCount();
+            const bool executed=owner->executeCollisionPairs(*pairs,masks,context,motion,
+                [&]{return RunnerCollisionEventContext::RoomState{true,pending};},
+                [&](const auto& event){
+                    assert(context.depth()==1&&context.current()->code==991&&event.code==991);
+                    actual.push_back(event.other.slot);
+                    if(!owner->dispatchDitherAboveCollision(event))return false;
+                    if(transition==1)pending=true;
+                    return transition!=3;
+                });
+            assert(executed==(transition!=3)&&owner->valid()==(transition!=3));
+            assert(!context.depth()&&!context.current()&&world->randomDrawCount()==draws);
+            assert(transition==2?actual.empty():(!actual.empty()&&(!transition||actual.size()==1)));
+            if(!native)expected=actual;else assert(actual==expected);
+            for(unsigned slot:actual){
+                const unsigned index=slot-GameplayCollisionView::terrainBase;
+                if(native){GameplayWorld::NativeTerrain::Identity id;bool active,destroyed;
+                    assert(terrain->read(terrain->handle(index),id,active,destroyed)&&destroyed);}
+                else assert(owner->terrain().find(owner->terrain().handle(index))->destroyRequested);
+            }
+        }
+    }
     {
         std::vector<bool> expected;unsigned hits=0,misses=0;
         for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
