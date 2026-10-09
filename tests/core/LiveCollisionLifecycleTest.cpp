@@ -1658,6 +1658,39 @@ int main(){
         });
         require(ok==!knees&&blood.instances().size()==2,"registered stomp retains both blood births");
     }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach collected blast world");world->skipToGameForTesting();
+        auto pass=std::make_unique<StoredDitherCollisionPass>(*owner);
+        auto blasts=world->blastRegistration<1>();auto skeletons=world->skeletonRegistration<2>();
+        auto bones=world->boneRegistration<1>();auto smoke=world->smokeRegistration<1>();
+        auto particles=world->consumptionBloodRegistration<1>();
+        InstanceHandle first,second,blast;
+        require(world->spawnSkeleton(skeletons,240,200,first)&&world->spawnSkeleton(skeletons,240,200,second),
+            "birth two collected blast victims");
+        int speed=60;unsigned stomps=0,damages=0;
+        require(world->withMomentDelayRoomSpeed(speed,[&]{
+            if(!world->spawnBlast(blasts,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(200),blast))return false;
+            const auto next=world->nextRuntimeInstanceId();
+            BlastHitAudio audio;SoundPlayEnvironment environment;TimeStopEffects<4> stop;
+            for(unsigned repeat=0;repeat<2;++repeat){
+                if(!pass->runSkeletonContacts(*world,skeletons,bones,smoke,particles,blasts,stop,
+                    [&](int sprite,unsigned& count){return sprites.frameCount(sprite,count);},environment,audio,
+                    [](auto dy,auto dx,auto& angle){return portableAtan(dy,dx,angle);},
+                    [](auto&,int,int,int){return false;},
+                    [&](auto& actor){return CheckedSkeletonContact{actor,4,stomps,damages};}))return false;
+                require(skeletons.instances().find(first)->state.health==10&&
+                    skeletons.instances().find(second)->state.health==10&&audio.calls==12&&
+                    world->nextRuntimeInstanceId()==next+2&&!stomps&&!damages,
+                    "collected blast hits both targets once across repeated passes");
+                for(unsigned id=next;id<next+2;++id)
+                    require(world->instance(id)&&world->instance(id)->objectId==219&&world->instance(id)->spriteId==605,
+                        "collected blast publishes real impacts");
+            }
+            return true;
+        }),"collected blast encounter succeeds");
+    }
     for(bool missingFrames:{false,true}){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());

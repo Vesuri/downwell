@@ -79,6 +79,29 @@ public:
             [&](const auto& a,const auto& b){return a.objectId==120&&b.objectId==35&&skeletons.handle(a).generation;},
             [&](const auto& event){return world.dispatchSkeletonCollision(skeletons,event,makePlayer);});
     }
+    // Extend the same collected encounter stream with registered blast targets.
+    // Do not run this after another encounter pass in the same collision phase.
+    template<unsigned Capacity,unsigned BoneCapacity,unsigned SmokeCapacity,unsigned ParticleCapacity,unsigned BlastCapacity,unsigned StopCapacity,
+             class Frames,class Audio,class Atan,class Damage,class MakePlayer>
+    bool runSkeletonContacts(StartupRuntime& world,
+        StoredSkeletonRegistration<StartupRuntime::instanceCapacity,Capacity>& skeletons,
+        StoredBoneRegistration<StartupRuntime::instanceCapacity,BoneCapacity>& bones,
+        StoredSmokeRegistration<StartupRuntime::instanceCapacity,SmokeCapacity>& smoke,
+        StoredConsumptionBloodRegistration<StartupRuntime::instanceCapacity,ParticleCapacity>& particles,
+        StoredBlastRegistration<StartupRuntime::instanceCapacity,BlastCapacity>& blasts,
+        const TimeStopEffects<StopCapacity>& stop,Frames frames,SoundPlayEnvironment& environment,Audio& audio,
+        Atan atan,Damage damage,MakePlayer makePlayer){
+        if(!owner_.boundTo(world)||!blasts.valid())return false;
+        return runSkeletonContactsUsing(world,skeletons,bones,smoke,particles,stop,frames,environment,audio,atan,damage,
+            [&](const auto& a,const auto& b){
+                return (a.objectId==120&&b.objectId==35&&skeletons.handle(a).generation)||
+                    (a.objectId==276&&b.objectId==120&&blasts.handle(a).generation&&skeletons.handle(b).generation);
+            },[&](const auto& event){
+                const auto* self=owner_.resolve(event.self);if(!self)return false;
+                return self->objectId==276?world.dispatchBlastSkeletonCollisionWithEffects(blasts,skeletons,event,frames,environment,audio):
+                    world.dispatchSkeletonCollision(skeletons,event,makePlayer);
+            });
+    }
 private:
     template<unsigned Capacity,unsigned BoneCapacity,unsigned SmokeCapacity,unsigned ParticleCapacity,unsigned StopCapacity,
              class Frames,class Audio,class Atan,class Damage,class AdmitPlayer,class PlayerContact>
@@ -103,7 +126,7 @@ private:
                     (b.objectId==60&&effect(a))||(a.objectId==60&&effect(b));
             },[&](const auto& event){
                 const auto* self=owner_.resolve(event.self);if(!self)return false;
-                if(self->objectId==120)return playerContact(event);
+                if(self->objectId==120||self->objectId==276)return playerContact(event);
                 if(self->objectId==269)return stop.succeeded&&
                     world.dispatchBoneCollision(bones,event,stop.player.stopped,frames,damage);
                 if(self->objectId==225)return world.dispatchSmokeCollision(smoke,event);

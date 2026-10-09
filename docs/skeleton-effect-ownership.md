@@ -401,8 +401,13 @@ allocator and publishes it through the existing effect lifetime and layer owner.
 The explicit impact-callback entry remains available for checked dependencies.
 Amiga sprite 605 has three offline planar frames at zero and 270 degrees; a
 pixel comparison preserves its non-square source anchor. Event-adapter tests cover live target
-writes, duplicate suppression and failed-impact retention; they do not prove
-mixed spatial collection or natural encounter admission. Native blast wall
+writes, duplicate suppression and failed-impact retention. The stored encounter
+pass can admit registered blast/skeleton pairs alongside its existing admitted
+families; the native encounter router accepts the same events from its enclosing
+sealed collision pass. Neither performs a separate blast collision walk.
+Collected-contact fixtures cover two overlapping targets and a repeated pass,
+including real impact births and duplicate sound/damage suppression. This is
+not natural encounter admission. Native blast wall
 contacts also require original numeric IDs for breakable hit memory; native
 storage slots are not valid substitutes.
 

@@ -99,6 +99,14 @@ bool nativeSkeletonEncounterContact(downwell::GameplayCollisionOwner& owner,
     return owner.dispatchSkeletonEncounterCollision(event,stop,frames,env,audio,atan,
         [&](auto& actor){return CheckedSkeletonContact{actor,0,stomps,damages};},damage,other);
 }
+bool nativeSkeletonEncounterBlastContact(downwell::GameplayCollisionOwner& owner,
+    const downwell::RunnerCollisionEventContext::Frame& event,const downwell::TimeStopEffects<64>& stop,
+    downwell::SoundPlayEnvironment& env,NativeSkeletonAudio& audio,bool (*allocate)(unsigned&),
+    bool (*frames)(int,unsigned&),bool (*atan)(downwell::MotionBinary64,downwell::MotionBinary64,downwell::MotionBinary64&),
+    bool (*damage)(downwell::BoneProjectile&,int,int,int),bool (*other)(const downwell::RunnerCollisionEventContext::Frame&),unsigned& stomps,unsigned& damages){
+    return owner.dispatchSkeletonEncounterCollisionWithBlasts(event,stop,allocate,frames,env,audio,atan,
+        [&](auto& actor){return CheckedSkeletonContact{actor,0,stomps,damages};},damage,other);
+}
 struct NativeLimboViews {
     bool outside(downwell::RunnerImageValue,downwell::RunnerImageValue,bool&);
     bool viewTop(downwell::MotionBinary64&);
@@ -7100,6 +7108,40 @@ int main(){
                 });good=!knees;return good;
             });
             assert(ok==!knees&&owner->blood().size()==2&&id==605203);
+        }
+        {
+            auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+                GameplayTerrainInstances::WallCollision{},&rooms,ownership);
+            auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+            assert(owner->attach(*world));int speed=60;assert(world->bindControllerRoomSpeed(speed));
+            InstanceHandle controller,first,second,blast;
+            assert(owner->runControllers().create(100065,{}, {},[](InstanceHandle){return true;},controller)&&
+                world->createSkeletonWithSourceId(605200,240,200,first)&&
+                world->createSkeletonWithSourceId(605201,240,200,second)&&
+                owner->createBlast(605202,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(200),blast));
+            auto pairs=std::make_unique<RunnerCollisionPairs<GameplayCollisionView::capacity,16384>>();
+            struct NonSolidMotion {
+                bool rollback(InstanceHandle){assert(false);return false;}
+                bool prepareMotion(InstanceHandle){assert(false);return false;}
+                bool advanceMotion(InstanceHandle){assert(false);return false;}
+            } motion;
+            unsigned next=605203,stomps=0,damages=0;BlastHitAudio audio;SoundPlayEnvironment env;
+            TimeStopEffects<4> stop;RunnerCollisionEventContext context;
+            for(unsigned repeat=0;repeat<2;++repeat){
+                assert(owner->collectCollisionPairs(*pairs));
+                assert(owner->executeCollisionPairs(*pairs,masks,context,motion,
+                    []{return RunnerCollisionEventContext::RoomState{true,false};},[&](const auto& event){
+                        return owner->dispatchSkeletonEncounterCollisionWithBlasts(event,stop,
+                            [&](unsigned& id){id=next++;return true;},
+                            [&](int sprite,unsigned& count){return sprites.frameCount(sprite,count);},env,audio,
+                            [](auto dy,auto dx,auto& angle){return portableAtan(dy,dx,angle);},
+                            [&](auto& actor){return CheckedSkeletonContact{actor,4,stomps,damages};},
+                            [](auto&,int,int,int){return false;},[](const auto&){assert(false);return false;});
+                    }));
+                assert(next==605205&&audio.calls==12&&!stomps&&!damages&&
+                    owner->skeletons().find(first)->state.health==10&&owner->skeletons().find(second)->state.health==10&&
+                    owner->scriptEffects().size()==2);
+            }
         }
         for(bool missingFrames:{false,true}){
             auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},

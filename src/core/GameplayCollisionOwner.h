@@ -2136,6 +2136,18 @@ public:
         if(event.owner==255)return dispatchTimeFieldWind(event,environment.gameVolume,audio);
         return check(other(event));
     }
+    template<unsigned Capacity,class Allocate,class Frames,class Audio,class Atan,class MakePlayer,class Damage,class Other>
+    bool dispatchSkeletonEncounterCollisionWithBlasts(const RunnerCollisionEventContext::Frame& event,
+        const TimeStopEffects<Capacity>& stop,Allocate allocate,Frames frames,SoundPlayEnvironment& environment,
+        Audio& audio,Atan atan,MakePlayer makePlayer,Damage damage,Other other){
+        return dispatchSkeletonEncounterCollision(event,stop,frames,environment,audio,atan,makePlayer,damage,
+            [&](const auto& unhandled){
+                View::Kind kind;InstanceHandle local;
+                if(!View::decode(unhandled.self,kind,local))return false;
+                return kind==View::Kind::blast&&unhandled.subtype==120?
+                    dispatchBlastSkeletonCollisionWithEffects(unhandled,allocate,frames,environment,audio):other(unhandled);
+            });
+    }
     template<class MakePlayer> bool dispatchSkeletonCollision(const RunnerCollisionEventContext::Frame& event,MakePlayer makePlayer){
         View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;
         if(!valid()||!world_||!resolves(event.self)||!resolves(event.other)||
