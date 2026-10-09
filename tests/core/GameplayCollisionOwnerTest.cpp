@@ -1700,6 +1700,7 @@ int main(){
         auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain(),&rooms);
         assert(owner->attach(*world)&&world->createTimeFieldWithSourceId(820000,240,176));
+        world->setPlayerDamaged();assert(world->setPlayerDamageAlarm(world->playerHandle(),2));
         assert(world->setOxygen({0x40230000u,0}));
         unsigned next=830000;std::uint8_t input=0;std::vector<PlayerTimeStop::Effect> events;
         const auto tick=[&]{return owner->withPlayerTimeStop(stop,room,masks,false,
@@ -1708,6 +1709,7 @@ int main(){
             [&](PlayerTimeStop::Effect effect){events.push_back(effect);return true;},
             [&]{world->step(input);return world->effectsSucceeded();});};
         assert(tick()&&stop.player.stopped&&stop.player.checkStop&&!stop.player.bgmOn);
+        assert(world->playerDamaged());
         assert(world->oxygen().high==0x40240000u&&!world->oxygen().low);
         assert(next==830007&&owner->timeShards().size()==6&&owner->timeChanges().size()==1);
         assert((events==std::vector<PlayerTimeStop::Effect>{PlayerTimeStop::Effect::shake,
@@ -1717,6 +1719,7 @@ int main(){
         assert(change&&change->sourceId==830003&&change->alarms.get(1)==1&&stop.roomSpeed==30);
         assert(stop.burst.field==820000);
         events.clear();assert(tick()&&next==830007&&stop.roomSpeed==35);
+        assert(!world->playerDamaged());
         assert((events==std::vector<PlayerTimeStop::Effect>{PlayerTimeStop::Effect::oxygenFloor}));
         Input right;right.right=true;input=packReplayInput(right);
         for(unsigned i=0;i<60&&stop.player.stopped;++i){events.clear();assert(tick());}

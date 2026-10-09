@@ -1836,6 +1836,20 @@ int main(){
         if(ok){require(skeletons.instances().find(local)->state.health==(mode==6?0:60),"time-field inheritance and immunity");
             require(skeletons.clear(),"clear skeleton collision fixture");}
     }
+    for(int alarm:{-1,0,1,2}){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach source player damage alarm");world->skipToGameForTesting();
+        InstanceHandle player;
+        require(world->visitDrawChecked([&](InstanceHandle h,const InstanceRecord& r){if(r.objectId==35)player=h;return true;})&&
+            player.generation,"resolve current player lifetime");
+        world->setPlayerDamaged();require(world->setPlayerDamageAlarm(player,alarm),"arm registered player Alarm 1");
+        for(int tick=1;tick<=3;++tick){
+            world->step({},false);
+            require(world->effectsSucceeded()&&world->playerDamaged()==(alarm<=0||tick<alarm),
+                "only a positive-to-zero source alarm clears the shared damage flag");
+        }
+    }
     for(unsigned mode:{4u,5u}){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());

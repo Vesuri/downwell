@@ -1929,6 +1929,9 @@ bool StartupRuntime::dispatchObjectEvent(InstanceRecord& instance,
         updateMainEnemy(instance);
         return run_.effectsSucceeded;
     }
+    if(instance.objectId==35&&eventType==2&&eventSubtype==1){
+        ++implementedCodeCalls_;run_.expirePlayerDamage();return true;
+    }
     if(instance.objectId==372&&eventType==2){
         ++implementedCodeCalls_;
         return run_.effectsSucceeded=levelNumberDispatch_&&

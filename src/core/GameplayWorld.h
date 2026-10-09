@@ -269,6 +269,7 @@ public:
         // Zero until the resource-backed room handoff reaches the player.
         std::uint32_t sourceInstanceId=0;
         std::uint32_t cameraSourceId=0;
+        std::int32_t damageAlarm=-1; // Object 35 Alarm 1; other alarms are not admitted here.
     };
     using PlayerLifecycleBinding = downwell::RecordLifecycleBinding<PlayerInstance>;
     // When supplied, entryRooms is borrowed for this world and its run resets;
@@ -1402,6 +1403,24 @@ public:
         return roomEntryViews_.get(slot);
     }
     downwell::InstanceHandle playerHandle() const { return {0,playerInstance_.lifetimeId}; }
+    bool playerDamaged()const{return run_.playerDamaged;}
+    void setPlayerDamaged(){run_.playerDamaged=true;}
+    bool setPlayerDamageAlarm(downwell::InstanceHandle key,int ticks){
+        if(!run_.effectsSucceeded)return false;
+        if(key.slot||!key.generation||key.generation!=playerInstance_.lifetimeId)return run_.effectsSucceeded=false;
+        playerInstance_.damageAlarm=ticks;return true;
+    }
+    bool playerDamageAlarmPending(downwell::InstanceHandle key,unsigned alarm,bool& pending)const{
+        if(key.slot||!key.generation||key.generation!=playerInstance_.lifetimeId)return false;
+        pending=alarm==1&&playerInstance_.damageAlarm>=0;return true;
+    }
+    bool advancePlayerDamageAlarm(downwell::InstanceHandle key,unsigned alarm){
+        bool pending=false;
+        if(!run_.effectsSucceeded)return false;
+        if(alarm!=1||!playerDamageAlarmPending(key,alarm,pending))return run_.effectsSucceeded=false;
+        if(downwell::AlarmBank::advanceValue(playerInstance_.damageAlarm))run_.expirePlayerDamage();
+        return true;
+    }
     bool playerTimeFieldInstance(downwell::RunnerImageValue x,downwell::RunnerImageValue y,
                                  downwell::InstancePlaceResult& result){
         if(!run_.effectsSucceeded)return false;

@@ -260,6 +260,15 @@ public:
         return run_.effectsSucceeded=okay;
     }
     bool noKillAchievement()const{return run_.noKill;}
+    bool playerDamaged()const{return run_.playerDamaged;}
+    void setPlayerDamaged(){run_.playerDamaged=true;}
+    // The source object-selector resolver supplies the selected lifetime.
+    bool setPlayerDamageAlarm(InstanceHandle key,int ticks){
+        if(!run_.effectsSucceeded)return false;
+        auto* player=instances_.resolve(key);
+        if(!player||player->objectId!=35)return run_.effectsSucceeded=false;
+        player->alarms.set(1,ticks);return true;
+    }
     MotionBinary64 oxygen()const{return run_.oxygen;}
     bool setOxygen(MotionBinary64 value){return run_.setOxygen(value);}
     template<class Audio> bool duckMusic(MusicDuck& caller,int duration,MotionBinary64 amount,Audio& audio){

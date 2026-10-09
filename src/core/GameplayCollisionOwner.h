@@ -120,7 +120,7 @@ private:
 #ifdef DOWNWELL_DRAW_CACHE_AUDIT
     mutable bool drawAuditHasSnapshot_=false;
 #endif
-    RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity+GameplayWorld::droneBulletCapacity+GameplayWorld::boneCapacity+GameplayWorld::skeletonCapacity+GameplayWorld::currencyCapacity+32+32+4+4> combatAlarmPhase_;
+    RunnerStepSnapshot<1+GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity+GameplayWorld::droneBulletCapacity+GameplayWorld::boneCapacity+GameplayWorld::skeletonCapacity+GameplayWorld::currencyCapacity+32+32+4+4> combatAlarmPhase_;
     RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::bulletCapacity+GameplayWorld::droneBulletCapacity+GameplayWorld::skeletonCapacity+GameplayPlayerControllers::capacity+32> actorEndStepPhase_;
     bool actorEndStepExecuting_=false;
     bool combatAlarmPhaseInUse_=false;
@@ -1382,8 +1382,8 @@ public:
     bool serviceSpatialIndex(unsigned budget){return check(owner_.serviceSpatialIndex(budget));}
     bool attach(GameplayWorld& world){
         combatAlarmCaptureValid_=false;
-        if(!(native_?table_.watchCaptureRanges(View::enemyBase,nativeBoxAlarmPrefix_?View::breakableBase:View::terrainBase,View::debrisBase,View::capacity,combatAlarmCaptureDirty_):
-            owner_.watchCaptureRanges(View::enemyBase,View::terrainBase,View::debrisBase,View::capacity,combatAlarmCaptureDirty_)))
+        if(!(native_?table_.watchCaptureRanges(0,nativeBoxAlarmPrefix_?View::breakableBase:View::terrainBase,View::debrisBase,View::capacity,combatAlarmCaptureDirty_):
+            owner_.watchCaptureRanges(0,View::terrainBase,View::debrisBase,View::capacity,combatAlarmCaptureDirty_)))
             return check(false);
         if(!valid()||(world_&&world_!=&world)||(!world_&&
             (world.awaitingPlayerBirth()?initialPlayer_!=nullptr:
@@ -1811,7 +1811,8 @@ public:
                 // terrain record for this partial combat alarm traversal.
                 const unsigned first=enemies.entries?View::breakableBase:View::enemyBase;
                 const unsigned last=self.nativeBoxAlarmPrefix_?View::breakableBase:View::terrainBase;
-                if(!self.check((first==last||self.visitRegistered(first,last,capture))&&
+                if(!self.check(self.visitRegistered(0,View::enemyBase,capture)&&
+                    (first==last||self.visitRegistered(first,last,capture))&&
                     self.visitRegistered(View::debrisBase,View::capacity,capture)))return false;
                 // Save before callbacks: mutation during dispatch invalidates
                 // reuse next tick without changing this phase's captured set.
@@ -1820,7 +1821,8 @@ public:
             }
             return self.dispatchCapturedAlarms<true>(phase,[&](InstanceHandle h,unsigned alarm,const PackedObjectEvent&){
                 View::Kind kind;InstanceHandle local;if(!View::decode(h,kind,local))return false;
-                return kind==View::Kind::enemy?self.world_->advanceEnemyRoomAlarm(local,alarm):
+                return kind==View::Kind::player?self.world_->advancePlayerDamageAlarm(local,alarm):
+                    kind==View::Kind::enemy?self.world_->advanceEnemyRoomAlarm(local,alarm):
                     kind==View::Kind::breakable?self.world_->advanceBoxRoomAlarm(local,alarm):
                     kind==View::Kind::debris?self.world_->advanceBoundDebrisRoomAlarm(local,alarm):
                     kind==View::Kind::timeChange?self.world_->advanceTimeChangeRoomAlarm(local,alarm):
@@ -2308,6 +2310,7 @@ private:
     bool combatAlarmPending(InstanceHandle h,unsigned alarm,bool& pending)const{
         pending=true;
         if(!world_)return false;
+        if(h.slot<View::enemyBase)return world_->playerDamageAlarmPending(h,alarm,pending);
         if(h.slot>=View::enemyBase&&h.slot<View::breakableBase){
             const auto* enemy=world_->resolveEnemyLifetime({h.slot-View::enemyBase,h.generation});
             if(!enemy)return false;

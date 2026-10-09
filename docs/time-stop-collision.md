@@ -160,6 +160,20 @@ Source assembly SHA256: player Begin Step
 `scrPlayerGlobalStat`
 `34dfd0f192ca34217da36cdfd001b792a3e7d496d3fc8c3e9967f8ce7ff2266a`.
 
+Registered player damage uses shared `RunSession::playerDamaged`. Player
+creation and run reset clear it. Object 35 Alarm 1 clears it at its mixed alarm
+position; zero and negative starting counters do not fire. The stored adapter
+uses the real record alarm bank. Native player ownership retains a compact
+Alarm 1 counter, captures the player alongside the other implemented alarm
+families, and invalidates that capture on player lifetime/activation changes.
+Explicit alarm writes require the selected live player handle; these setters
+do not claim to implement general object-selector lookup. Other player alarm
+events are not admitted by the compact native counter. The old area-one
+contact countdown remains separate pending replacement of that entire damage
+path; it is not a second owner of this source alarm.
+Alarm 1 VM SHA256:
+`e1dcdae86d6152a96607b2d8429582255d012ef2e742490fcd2ed8fcf9bf7d13`.
+
 The stored registered-skeleton pass also admits skeleton contacts with fields
 82, 255 and 371 in that same collected pair stream. It resolves the inherited
 83/1066 event and sets health to zero unless `timefieldImmune` is set; it does
