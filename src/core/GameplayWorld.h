@@ -1612,7 +1612,9 @@ public:
     // instead of gameplay step until the next-room request is consumed.
     bool enterLevelClear(unsigned style, bool heartGoal) {
         if(!run_.levelResultRequested||run_.levelClearActive)return false;
-        if(!run_.effectsSucceeded||!clearBulletOwnership()||!goalFieldInstances_.clear()||!exitControllers_.clear())return run_.effectsSucceeded=false;
+        // Reject an unsupported selection before irreversibly retiring actors.
+        if(style>4||2+run_.upgrades.levels[6]-(style==2?1:0)>=4)return false;
+        if(!retireGameplayRoom())return false;
         return run_.enterLevelClear(style, heartGoal, health_, player_, enemyRandom_);
     }
     template<class Emit>
@@ -1751,6 +1753,7 @@ private:
     std::uint32_t nextPlayerLifetimeId_=1;
     bool birthPlayerOwnership();
     bool retirePlayerOwnership();
+    bool retireGameplayRoom();
     bool publishPlayerPosition(int x,int y);
     bool retireBreakable(unsigned index);
     bool clearBreakableOwnership();

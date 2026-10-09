@@ -39,12 +39,14 @@ for each alarm index, object 37 precedes 325, but Result Alarm 0 precedes
 controller Alarm 1. Same-phase birth eligibility remains governed by the
 runner's creation filter, not unconditional recapture after each event.
 
-The current `enterLevelClear` shortcuts do not enter rmResult through this
-room lifecycle. The stored path clears bullets and enters the shared Result
-state; the native path additionally clears goal-field and exit-controller
-owners. Other old-room records remain until the subsequent level load.
-Calling the existing combat alarm callback from `stepLevelClear` would advance
-those stale records, not repair the destination scheduler. This audit defines
+The `enterLevelClear` shortcuts do not yet enter rmResult through this complete
+room lifecycle. The native path retires its registered gameplay families before
+entering the shared Result state, preserving persistent controller ownership.
+This is not yet source-ordered Room End/retirement event dispatch or destination
+Result registration. The stored path still clears bullets without retiring the
+other old-room records until the subsequent level load. Calling its gameplay
+alarm pass from `stepLevelClear` would advance those stale records, not repair
+the destination scheduler. This audit defines
 the population/order contract; it is not evidence that either shortcut already
 implements it or an original-runner execution comparison.
 

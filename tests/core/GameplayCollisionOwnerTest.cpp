@@ -754,7 +754,35 @@ int main(){
         world->step(0);assert(world->effectsSucceeded()&&speed==60&&creates==1);
         assert(world->registerLevelExit(176+world->player().offsetY()));
         for(unsigned tick=0;tick<100;++tick)world->step(0);
+        assert(world->levelResultRequested());
+        const auto beforeInvalid=world->playerHandle();
+        const auto beforeInvalidRandom=world->randomDrawCount();
+        assert(!world->enterLevelClear(9,false)&&world->effectsSucceeded()&&
+            world->findPlayer(beforeInvalid)&&world->randomDrawCount()==beforeInvalidRandom);
+        // Result entry, not the later rmMain load, retires old-room ownership.
+        assert(world->configureEnemy(0,112,163,240,300,0,0,5,14,0,1,-1,1));
+        assert(world->configureEnemy(1,112,163,240,320,0,0,5,14,0,1,-1,1));
+        const auto activeEnemy=world->enemyHandle(world->enemyAt(0).lifetimeId);
+        const auto inactiveEnemy=world->enemyHandle(world->enemyAt(1).lifetimeId);
+        auto& sleeping=const_cast<GameplayWorld::EnemyState&>(*world->findEnemy(inactiveEnemy));
+        assert(owner->enemyBinding().activation(inactiveEnemy,sleeping,false));sleeping.active=false;
+        assert(owner->reconcileActivation());
+        InstanceHandle debris;
+        assert(world->spawnDebris({}, {},1,debris));
+        InstanceHandle oldPlayer,oldActive,oldInactive,oldDebris;
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::player,world->playerHandle(),oldPlayer)&&
+            GameplayCollisionView::encode(GameplayCollisionView::Kind::enemy,activeEnemy,oldActive)&&
+            GameplayCollisionView::encode(GameplayCollisionView::Kind::enemy,inactiveEnemy,oldInactive)&&
+            GameplayCollisionView::encode(GameplayCollisionView::Kind::debris,debris,oldDebris));
         assert(world->levelResultRequested()&&world->enterLevelClear(0,false));
+        GameplayCollisionView::Record departed;
+        for(auto old:{oldPlayer,oldActive,oldInactive,oldDebris})
+            assert(!GameplayCollisionView(*world).resolve(old,departed));
+        unsigned population=99;
+        assert(owner->valid());
+        if(mode==GameplayCollisionOwner::Ownership::reference)
+            assert(owner->population(112,population)&&population==0);
+        assert(controllers.find(controller)&&creates==1);
         bool heart=false;
         for(unsigned tick=0;tick<400&&!world->nextLevelRequested();++tick){
             bool confirm=true;assert(world->stepLevelClear(confirm,false,false,heart,[](auto,unsigned){}));

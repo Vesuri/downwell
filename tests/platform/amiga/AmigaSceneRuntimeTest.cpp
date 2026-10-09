@@ -1275,8 +1275,8 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                 "exit latch suppresses jump/fall and stops the run clock on both adapters");
             require(gameplay.exitDitherRequested() == (tick >= 5) &&
                 reference.exitDitherRequested() == (tick >= 5) &&
-                gameplay.levelResultRequested() == (tick >= 95) &&
-                reference.levelResultRequested() == (tick >= 95),
+                gameplay.levelResultRequested() == (tick >= 94) &&
+                reference.levelResultRequested() == (tick >= 94),
                 "both live adapters request dither at five and results at ninety-five ticks");
             const auto& a = gameplay.exitDither();
             const auto& b = reference.exitDither();
@@ -1297,15 +1297,17 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                 "both runtime adapters apply identical grants, refunds and deferred consumables");
         }
         for (int completedLevel = 1; completedLevel <= 2; ++completedLevel) {
+            const auto oldPlayerHandle=gameplay.playerHandle();
             require(gameplay.enterLevelClear(0, false) && reference.enterLevelClear(0, false),
                 "both adapters consume the exit request at an explicit scene boundary");
+            require(!gameplay.findPlayer(oldPlayerHandle),"old player lifetime leaves before Result Create");
             const auto nativeTick = gameplay.tick();
             const auto hostTick = reference.tick();
             gameplay.step(0); reference.step({}, false);
             require(gameplay.tick() == nativeTick && reference.tick() == hostTick,
                 "old gameplay dispatcher cannot advance while the clear room owns the runtime");
             bool nativeHeart = false, hostHeart = false;
-            for (unsigned tick = 1; tick <= 211; ++tick) {
+            for (unsigned tick = 1; tick <= 210; ++tick) {
                 bool nativeConfirm = true, hostConfirm = true;
                 std::vector<unsigned> nativeEvents, hostEvents;
                 const bool right = tick == 61 || tick == 62;
@@ -1339,8 +1341,8 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                     gameplay.levelClearFrame().tileY == reference.levelClearFrame().tileY &&
                     gameplay.levelClearFrame().time == reference.levelClearFrame().time &&
                     gameplay.exitDither().y == reference.exitDither().y &&
-                    gameplay.nextLevelRequested() == (tick == 211) &&
-                    reference.nextLevelRequested() == (tick == 211),
+                    gameplay.nextLevelRequested() == (tick == 210) &&
+                    reference.nextLevelRequested() == (tick == 210),
                     "result grants, presentation and departure requests match across adapters");
             }
             const auto carriedRandom = gameplay.randomState();
@@ -1351,7 +1353,6 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             const auto carriedInventory = gameplay.upgrades();
             const int carriedCapacity = gameplay.player().ammoCapacity();
             downwell::Input heldEntry; heldEntry.fire = true;
-            const auto oldPlayerHandle=gameplay.playerHandle();
             require(gameplay.prepareNextAreaOneLevel(heldEntry, 319) && reference.loadNextAreaOneLevel(heldEntry),
                 "both runtime adapters accept completed departure into the next area-one level");
             require(!gameplay.findPlayer(oldPlayerHandle)&&gameplay.findPlayer(gameplay.playerHandle())&&
@@ -2382,8 +2383,13 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
                 << " dead=" << game.dead() << std::endl;
         require(!game.dead() && game.levelResultRequested() && reference.levelResultRequested(),
             "input-only route reaches a naturally generated exit alive on both adapters");
+        require(terrainInstances.valid()&&terrainInstances.size()>0,
+            "natural generation publishes individual terrain lifetimes");
+        const auto oldTerrain=terrainInstances.handle(0);
         require(game.enterLevelClear(0, false) && reference.enterLevelClear(0, false),
             "natural exit transfers to upgrade scene");
+        require(terrainInstances.size()==0&&!terrainInstances.find(oldTerrain),
+            "natural Result entry retires generated terrain before the upgrade screen");
         bool heartA = false, heartB = false;
         unsigned clearUpdates = 0;
         for (; clearUpdates < 400 && !game.nextLevelRequested(); ++clearUpdates) {
@@ -2410,9 +2416,6 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
         require(carriedKills == reference.mainEnemiesDefeated(), "natural run kill totals agree before reentry");
         std::cout << "Natural carried kills=" << carriedKills << std::endl;
         downwell::Input held; held.fire = true;
-        require(terrainInstances.valid()&&terrainInstances.size()>0,
-            "natural generation publishes individual terrain lifetimes");
-        const auto oldTerrain=terrainInstances.handle(0);
         require(game.prepareNextAreaOneLevel(held, 319) && reference.loadNextAreaOneLevel(held),
             "natural route enters second cavern");
         require(terrainInstances.size()==0&&!terrainInstances.find(oldTerrain),

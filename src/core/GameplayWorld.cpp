@@ -254,9 +254,11 @@ bool GameplayWorld::clearRoomTimeChanges(){
     timeChangeEffects_=nullptr;timeChangeSpeed_=nullptr;return true;
 }
 
-bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsigned initialRingOrigin) {
-    if (!run_.levelClearActive || !run_.nextLevelRequested ||
-        run_.stage.area != 1 || run_.stage.level >= 3) return false;
+bool GameplayWorld::retireGameplayRoom() {
+    // Retire registered room-local lifetimes at departure, before Result
+    // Create. Persistent controllers and run globals deliberately survive.
+    // This also handles explicit test/adaptor births made before the next
+    // room load; an already retired lifetime must not receive a second callback.
     if(!clearRoomTimeChanges()||!clearRoomTimeShards())return false;
     if(entryDithers_&&!entryDithers_->clear())return run_.effectsSucceeded=false;
     if(ditherAbove_&&!ditherAbove_->clear())return run_.effectsSucceeded=false;
@@ -280,6 +282,15 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
     if(terrainInstances_&&!terrainInstances_->clear()){run_.effectsSucceeded=false;return false;}
     roomTerrainLoaded_=false;
     if(nativeTerrainInstances_&&!nativeTerrainInstances_->clear())return run_.effectsSucceeded=false;
+    if(!run_.timeFields.clear())return run_.effectsSucceeded=false;
+    run_.sideCameraLockers.clear();
+    return true;
+}
+
+bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsigned initialRingOrigin) {
+    if (!run_.levelClearActive || !run_.nextLevelRequested ||
+        run_.stage.area != 1 || run_.stage.level >= 3) return false;
+    if(!retireGameplayRoom())return false;
     if (!run_.advanceAfterLevelClear()) return false;
     // Do not reconstruct this large runtime or copy RunSession onto the task
     // stack: its run globals remain in place while old world ownership retires.
@@ -289,8 +300,6 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
     run_.bloodEffects.clear();
     run_.clearCorpseExpiry();
     run_.clearDamageNumbers();
-    if(!run_.timeFields.clear()){run_.effectsSucceeded=false;return false;}
-    run_.sideCameraLockers.clear();
     player_.enterRoom(input.fire, 1201 - 176);
     emitter_.reset(run_.upgrades.levels[12] != 0);
     run_.ammoHud.previousShots = run_.ammoHud.previousRecharges = 0;
