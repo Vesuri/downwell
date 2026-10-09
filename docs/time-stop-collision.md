@@ -98,8 +98,16 @@ four WELL words, and publishes the offset position without changing the Q12
 easing accumulators. Alarm expiry leaves the prior published offset intact
 until Step. A side-lock collision's explicit Y assignment replaces its vertical
 offset without replacing X. This covers the admitted time-stop amplitude, not
-arbitrary VM-valued shake arguments or the unimplemented camera modes. Native
-scheduler wiring remains part of the unfinished integration.
+arbitrary VM-valued shake arguments or the unimplemented camera modes.
+
+`GameplayWorld::requestTimeStopCameraShake` supplies the same effect to the
+native followed-camera path. Its compact Alarm 0 uses the shared countdown
+semantics in the existing alarm phase; camera Step samples the same shared
+shake implementation before computing display-scroll deltas and circular-buffer
+origin changes. Retry/next-level reset clears the alarm. Active shake and its
+alarm participate in native checkpoints. This is still the native fixed camera
+slot, not a source-ID-registered controller in the complete mixed scheduler;
+automatic player time-stop activation must call this boundary when connected.
 
 ## Ordinary Destroy versus storage retirement
 

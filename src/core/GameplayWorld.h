@@ -1335,6 +1335,13 @@ public:
         run_.effectsSucceeded=run_.timeFields.bindLifecycle(binding);return run_.effectsSucceeded;
     }
     bool cameraSideLocked() const { return cameraMotion_.sideLocked; }
+    bool requestTimeStopCameraShake(){
+        if(!run_.effectsSucceeded)return false;
+        if(!followCamera_)return run_.effectsSucceeded=false;
+        cameraMotion_.requestTimeStopShake();
+        if(cameraShakeAlarm_<2)cameraShakeAlarm_=2;
+        return true;
+    }
     std::uint64_t sideCameraDigest() const { return run_.sideCameraLockers.digest(cameraMotion_); }
     // Read-only rendering hint: entering a camera column may collide with a
     // locker at a different height. No RNG or live camera state is changed.
@@ -1561,6 +1568,7 @@ private:
     bool followCamera_;
     long cameraY_;
     downwell::MainCameraMotion cameraMotion_;
+    int cameraShakeAlarm_=-1; // camMain's only alarm; global identity remains separate.
     int cameraPixelY_;
     int cameraPixelX_;
     // Event-phase snapshot in absolute room coordinates, not the camera

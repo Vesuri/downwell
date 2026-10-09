@@ -159,6 +159,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     // The temporary owner-free construction prepared a presentation frame.
     // Restore pre-Step camera state before publishing the real room birth.
     cameraMotion_.reset(240,176);
+    cameraShakeAlarm_=-1;
     cameraY_=cameraPixelY_=cameraPixelX_=0;
     ringOrigin_=initialRingOrigin%ringHeight;
     if(playerBirthPending_)return destination;
@@ -247,6 +248,7 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
     breakableIndexReady_ = false;
     followCamera_ = true;
     cameraMotion_.reset(240, 176);
+    cameraShakeAlarm_=-1;
     cameraY_ = cameraPixelY_ = cameraPixelX_ = activationY_ = 0;
     ringOrigin_ = initialRingOrigin % ringHeight;
     playerBirthPending_=playerBirthTiming_==PlayerBirthTiming::authoredRoom;
@@ -1170,6 +1172,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     const auto damageNumberAlarmPhase=run_.damageNumbers.beginPhase();
     // Object 221 Alarm 0 only destroys itself: no RNG or cross-family effects.
     run_.advanceDamageNumberAlarm(damageNumberAlarmPhase,0);
+    if(downwell::AlarmBank::advanceValue(cameraShakeAlarm_))cameraMotion_.stopShake();
     advanceEnemyAlarms();
     if(!reconcilePhase(PhaseBoundary::alarm))return {};
     currencyStepOrder_.clear();
@@ -1202,6 +1205,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         cameraMotion_.step(240L * 256 + player_.offsetXFixed(),
                            176L * 256 + player_.offsetYFixed(), dead(),
                            run_.sideCameraLockers.overlaps(cameraMotion_));
+        cameraMotion_.sampleShake(enemyRandom_);
         cameraPixelX_ = cameraMotion_.pixelX() - 240;
         cameraXDelta = cameraPixelX_ - oldCameraPixelX;
         cameraY_ = (cameraMotion_.y - 176L * 4096) / 16;
@@ -1720,6 +1724,13 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         extended.addU32(0x534c4f43);
         extended.addU64(sideCameraDigest());
         checkpoint_ = extended.value();
+    }
+    if(cameraMotion_.shaking||cameraMotion_.shakeX||cameraMotion_.shakeY||cameraShakeAlarm_>=0){
+        downwell::StateDigest extended;
+        extended.addU64(checkpoint_);extended.addU32(0x5348414b);
+        extended.addBool(cameraMotion_.shaking);extended.addI32(cameraMotion_.shakeAmount);
+        extended.addI32(cameraMotion_.shakeX);extended.addI32(cameraMotion_.shakeY);
+        extended.addI32(cameraShakeAlarm_);checkpoint_=extended.value();
     }
     trajectory_.addU64(checkpoint_);
 #endif

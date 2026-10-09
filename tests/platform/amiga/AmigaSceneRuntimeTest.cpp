@@ -2551,6 +2551,26 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
 
 int main(int argc, char** argv) {
     {
+        static GameplayWorld shaken(0,true,0,true),plain(0,true,0,true);
+        auto oracle=shaken.randomState();const auto before=shaken.randomDrawCount();
+        const int dx=int(oracle.irandom(2))-1,dy=int(oracle.irandom(4))-2;
+        require(shaken.requestTimeStopCameraShake(),"native camera accepts time-stop shake");
+        shaken.step(0);plain.step(0);
+        require(shaken.effectsSucceeded()&&plain.effectsSucceeded()&&
+            shaken.randomDrawCount()==before+4&&plain.randomDrawCount()==before&&
+            shaken.cameraOffsetX()==plain.cameraOffsetX()+dx&&
+            shaken.cameraOffsetY()==plain.cameraOffsetY()+dy,
+            "native camera samples source-ordered shake after alarm countdown without altering easing");
+        for(unsigned word=0;word<16;++word)
+            require(shaken.randomState().stateWord(word)==oracle.stateWord(word),"native shake preserves exact WELL state");
+        shaken.step(0);plain.step(0);
+        require(shaken.randomDrawCount()==before+4&&
+            shaken.cameraOffsetX()==plain.cameraOffsetX()&&shaken.cameraOffsetY()==plain.cameraOffsetY(),
+            "native second-tick alarm removes shake without additional RNG");
+        shaken.step(0);plain.step(0);
+        require(shaken.checkpoint()==plain.checkpoint(),"expired shake leaves no permanent scrolling offset");
+    }
+    {
         struct Capture {unsigned calls=0;std::uint32_t revision=1;bool okay=true;} capture;
         static GameplayWorld world(0);
         const auto read=[](void* p){return static_cast<Capture*>(p)->revision;};
