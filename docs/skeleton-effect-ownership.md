@@ -1160,6 +1160,15 @@ the remaining whole-pipeline raster uncertainty is described in
   and runs a bounded random relocation search, then republishes xx/yy. The
   velocity and animation-speed samples precede that relocation loop, so
   terrain-dependent draws follow them.
+  Both worlds' `emitSkeletonCorpse` use the selected skeleton publisher's
+  aliased caller fields and published position/facing. Native
+  `CorpseInstances::createFromDeathAllocated` requests its numeric ID inside
+  `instance_create`, after `bodySpr` and capped `impactSp` publication, not at
+  script entry. Allocation failure consumes no child RNG and leaves those
+  caller writes intact; failed child Create does not assign `myDeadBody`.
+  The explicit-ID entry remains available through the same implementation.
+  Native callers must configure corpse masks and supply source tile queries;
+  the wrapper does not turn unavailable collision evidence into empty space.
   This work belongs to object 263, not debris object 370.
 - Debris has no parent and its Create does not query terrain. It samples
   xsp=random_range(-2,2), ysp=random_range(-0.5,1), chooses imgSp from

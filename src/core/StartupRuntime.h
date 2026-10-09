@@ -1072,6 +1072,14 @@ public:
         if(!registry.belongsTo(instances_))return run_.effectsSucceeded=false;
         return registry.createFromDeath(source,sprite,impact,explosion,run_.upgrades.levels[3]!=0,random_,tile);
     }
+    template<unsigned Capacity,class Publish,class Tile> bool emitSkeletonCorpse(
+        StoredCorpseRegistration<instanceCapacity,Capacity>& registry,Publish& publish,MotionBinary64 impact,Tile tile){
+        if(!run_.effectsSucceeded)return false;
+        if(!registry.belongsTo(instances_))return run_.effectsSucceeded=false;
+        return run_.effectsSucceeded=publish.deadBody([&](auto& source){
+            return createRegisteredCorpseFromDeath(registry,source,206,impact,102,tile);
+        });
+    }
     template<unsigned Capacity> bool emitSkeletonSmoke(StoredSmokeRegistration<instanceCapacity,Capacity>& registry,
         SkeletonActor& actor){
         return emitRegisteredSkeletonSmoke(registry,actor.smokeScript,actor.xx,actor.yy);

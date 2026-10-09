@@ -77,12 +77,19 @@ public:
     // is only a lifetime key. Child Create finishes before script overrides.
     template<class Source,class Random,class Tile> bool createFromDeath(std::uint32_t id,Source& source,
         int spriteId,MotionBinary64 impact,int explosion,bool rip,Random& random,Tile tile){
+        return createFromDeathAllocated(source,spriteId,impact,explosion,rip,random,tile,
+            [id](std::uint32_t& child){child=id;return true;});
+    }
+    // Allocate at instance_create, after the caller's bodySprite/impactSp
+    // writes. An allocation failure must not discard that script prefix.
+    template<class Source,class Random,class Tile,class Allocate> bool createFromDeathAllocated(Source& source,
+        int spriteId,MotionBinary64 impact,int explosion,bool rip,Random& random,Tile tile,Allocate allocate){
         if(!good_||executing_)return fail();
         struct Events {
-            CorpseInstances& owner;std::uint32_t sourceId;Random& random;Tile& tile;bool rip;
+            CorpseInstances& owner;Allocate& allocate;Random& random;Tile& tile;bool rip;
             bool create(int object,MotionBinary64 x,MotionBinary64 y,std::uint32_t& child){
-                InstanceHandle key;
-                if(object!=263||!owner.create(sourceId,x,y,rip,random,tile,key))return false;
+                InstanceHandle key;std::uint32_t sourceId=0;
+                if(object!=263||!allocate(sourceId)||!owner.create(sourceId,x,y,rip,random,tile,key))return false;
                 child=sourceId;return true;
             }
             Record* selected(unsigned id){return owner.resolve(owner.sourceHandle(id));}
@@ -91,7 +98,7 @@ public:
             bool verticalSpeed(unsigned id,MotionBinary64 value){auto* r=selected(id);if(!r)return false;r->state.ysp=value;return true;}
             bool horizontalSpeed(unsigned id,MotionBinary64 value){auto* r=selected(id);if(!r)return false;r->state.xsp=value;return true;}
             bool explosion(unsigned id,int value){auto* r=selected(id);if(!r)return false;r->state.explosionFx=value;return true;}
-        } events{*this,id,random,tile,rip};
+        } events{*this,allocate,random,tile,rip};
         return createDeadBody(source,spriteId,impact,explosion,events)||fail();
     }
     bool sprite(InstanceHandle key,int sprite){

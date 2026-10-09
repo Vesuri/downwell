@@ -128,6 +128,58 @@ int main(){
     assert(sprites.valid()&&masks.valid());
     const auto fontData=load("generated/downwell-fonts.dwfn");downwell::FontPack fonts(fontData.data(),fontData.size());
     assert(fonts.valid());
+    for(unsigned failure:{0u,1u,2u})for(bool native:{false,true}){
+        if(!native&&failure==1)continue; // Explicit allocator failure is native-only.
+        using namespace downwell;
+        auto prepare=[](auto& actor,auto& publish){
+            actor.xx=actor.yy=MotionBinary64::fromInteger(-999);
+            actor.xsp={0x3fb99999u,0x9999999au};return publish.facing(-1);
+        };
+        auto verify=[&](const SkeletonActor& actor,unsigned id,const CorpseAnimation* child){
+            assert(actor.bodySprite==206&&actor.impactSp.high==0x40100000u&&!actor.impactSp.low);
+            assert(actor.myDeadBody==(failure?0:id));
+            assert(actor.xsp.high==(failure?0x3fb99999u:0xbff80000u));
+            if(failure==1){assert(!child);return;}
+            assert(child&&child->x.bits==0x43700000u&&child->y.bits==0x471c4000u);
+            if(!failure)assert(child->spriteId==206&&child->imageXscale.bits==0xbf800000u&&
+                child->ysp.high==0x40100000u&&child->xsp.high==0xc0180000u&&child->explosionFx==102);
+        };
+        if(native){
+            auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+            auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),owner->breakableBinding(),
+                owner->playerBinding(),&owner->terrain());assert(owner->attach(*world)&&owner->configureCorpseMasks(masks));
+            InstanceHandle skeleton;assert(world->createSkeletonWithSourceId(505001,240,40000,skeleton));
+            auto random=world->randomState();unsigned allocations=0;
+            assert(owner->skeletons().dispatchPublished(skeleton,[&](auto& actor,auto&,auto& publish,bool&){
+                assert(prepare(actor,publish));
+                return world->emitSkeletonCorpse(publish,MotionBinary64::fromInteger(9),[&](std::uint32_t& id){
+                    assert(actor.bodySprite==206&&actor.impactSp.high==0x40100000u&&!actor.myDeadBody);
+                    ++allocations;id=506000;return failure!=1;
+                },[&](auto,int layer,auto,auto,bool& hit){assert(layer==100);hit=false;return failure!=2;});
+            })==!failure);
+            const auto* corpse=owner->registeredCorpses().find(owner->registeredCorpses().sourceHandle(506000));
+            verify(owner->skeletons().find(skeleton)->state,506000,corpse?&corpse->state:nullptr);
+            assert(allocations==1&&world->effectsSucceeded()==!failure);
+            if(failure!=1)for(unsigned i=0;i<3;++i)random.nextU32();
+            for(unsigned i=0;i<16;++i)assert(random.stateWord(i)==world->randomState().stateWord(i));
+        }else{
+            auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+            auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,nullptr,owner->binding());
+            assert(owner->attach(*world));world->skipToGameForTesting();
+            auto skeletons=world->skeletonRegistration<1>();auto corpses=world->corpseRegistration<1>();InstanceHandle skeleton;
+            assert(world->spawnSkeleton(skeletons,240,40000,skeleton));
+            const auto id=world->nextRuntimeInstanceId();auto random=world->randomState();
+            assert(skeletons.dispatchPublished(skeleton,[&](auto& actor,auto&,auto& publish,bool&){
+                assert(prepare(actor,publish));
+                return world->emitSkeletonCorpse(corpses,publish,MotionBinary64::fromInteger(9),
+                    [&](auto,int layer,auto,auto,bool& hit){assert(layer==100);hit=false;return failure!=2;});
+            })==!failure);
+            verify(skeletons.instances().find(skeleton)->state,id,corpses.state(corpses.sourceHandle(id)));
+            assert(world->effectsSucceeded()==!failure);
+            for(unsigned i=0;i<3;++i)random.nextU32();
+            for(unsigned i=0;i<16;++i)assert(random.stateWord(i)==world->randomState().stateWord(i));
+        }
+    }
     for(bool stomped:{false,true})for(bool failSecond:{false,true})for(bool native:{false,true}){
         using namespace downwell;
         auto verify=[&](const SkeletonActor& actor,unsigned first,unsigned calls,const auto& world,auto child){

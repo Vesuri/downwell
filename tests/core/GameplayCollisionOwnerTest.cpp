@@ -50,6 +50,13 @@ bool nativeSkeletonReward(GameplayWorld& world,const downwell::ObjectPack& objec
     downwell::SkeletonActor& actor,bool (*allocate)(std::uint32_t&),NativeSkeletonRewardQueries& queries){
     return world.emitSkeletonCurrency(objects,actor,allocate,queries);
 }
+struct NativeSkeletonCorpseTiles {
+    bool operator()(downwell::InstanceHandle,int,downwell::MotionBinary64,downwell::MotionBinary64,bool&);
+};
+bool nativeSkeletonCorpse(GameplayWorld& world,GameplayWorld::Skeletons::Publisher& publish,
+    downwell::MotionBinary64 impact,bool (*allocate)(std::uint32_t&),NativeSkeletonCorpseTiles tile){
+    return world.emitSkeletonCorpse(publish,impact,allocate,tile);
+}
 bool nativeSkeletonThrow(GameplayWorld& world,downwell::SkeletonActor& actor,downwell::RegisteredSkeletonThrow& caller,
     downwell::SoundPlayEnvironment& environment,NativeSkeletonAudio& audio){
     return world.throwSkeletonBoneWithSourceId(505201,actor,caller,environment,audio);

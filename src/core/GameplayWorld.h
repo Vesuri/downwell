@@ -394,6 +394,14 @@ public:
     }
     using RegisteredCorpse=downwell::CorpseInstances<32>;
     const RegisteredCorpse* registeredCorpses()const{return registeredCorpses_;}
+    template<class Publish,class Allocate,class Tile> bool emitSkeletonCorpse(Publish& publish,
+        downwell::MotionBinary64 impact,Allocate allocate,Tile tile){
+        if(!run_.effectsSucceeded||!registeredCorpses_)return run_.effectsSucceeded=false;
+        return run_.effectsSucceeded=publish.deadBody([&](auto& source){
+            return registeredCorpses_->createFromDeathAllocated(source,206,impact,102,
+                run_.upgrades.levels[3]!=0,enemyRandom_,tile,allocate);
+        });
+    }
     bool bindRegisteredCorpses(RegisteredCorpse& instances){
         if(registeredCorpses_||!instances.valid()||instances.size())return false;
         registeredCorpses_=&instances;return true;
