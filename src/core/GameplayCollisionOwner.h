@@ -184,6 +184,7 @@ private:
     bool activationPending_=false;
     bool destructionPending_=false;
     bool terrainFamilies_[2]={false,false};
+    bool timeFieldFamily_=false;
     bool check(bool ok){if(!ok)good_=false;return ok;}
     bool preparedDrawEnabled()const{
 #if defined(DOWNWELL_REFERENCE_DRAW_LIST) || defined(DOWNWELL_SCALAR_TERRAIN_OWNERSHIP)
@@ -1089,6 +1090,11 @@ public:
             for(unsigned i=0;i<families_.size();++i)
                 if(families_.isA(int(i),selector==0?60:93)&&i!=60&&i!=93&&i!=99)
                     terrainFamilies_[selector]=false;
+        }
+        if(good_){
+            timeFieldFamily_=true;
+            for(unsigned i=0;i<families_.size();++i)
+                if(families_.isA(int(i),82)&&i!=82&&i!=255&&i!=371)timeFieldFamily_=false;
         }
 #ifndef DOWNWELL_REFERENCE_VALIDATION
         if(native_&&valid()){
@@ -2081,10 +2087,21 @@ private:
                     return true;
                 });
     }
-    bool prepareNativeTerrainQuery(int object,RunnerSpatialObjectPreparation::Path& path){
-        if(!valid()||!world_||!world_->nativeTerrainInstances()||(object!=60&&object!=93)||
+    template<class Visit> bool nativeQueryMembers(int object,Visit visit){
+        if(object!=82)return nativeTerrainMembers(object,visit);
+        bool stopped=false;
+        return visitNativeRegistered(View::timeFieldBase,View::exitControllerBase,
+            [&](InstanceHandle h,int child,std::uint32_t){
+                if(!stopped&&families_.isA(child,object))stopped=!visit(h.slot);
+                return true;
+            });
+    }
+    bool prepareNativeObjectQuery(int object,RunnerSpatialObjectPreparation::Path& path){
+        if(!valid()||!world_||!native_)return check(false);
+        if(object==82){if(!timeFieldFamily_)return check(false);}
+        else if(!world_->nativeTerrainInstances()||(object!=60&&object!=93)||
             !terrainFamilies_[object==93])return check(false);
-        auto members=[&](auto visit){return nativeTerrainMembers(object,visit);};
+        auto members=[&](auto visit){return nativeQueryMembers(object,visit);};
         unsigned count=0,height=0;
         if(!members([&](unsigned){++count;return true;})||!owner_.externalSpatialPublication(
             [&](auto& index){height=index.height();return true;}))return check(false);
@@ -2100,18 +2117,21 @@ private:
                 })&&prepared;
             },[&](unsigned slot,std::uint32_t& flags,Owner::Box& bounds){
                 Owner::State state;Owner::Sprite sprite;
-                if(!refreshNativeTerrain(handleAt(slot),false)||!nativeCollisionVisual(handleAt(slot),state,sprite))return false;
+                if(!(object==82?refreshNativeActor(handleAt(slot),false):refreshNativeTerrain(handleAt(slot),false))||
+                    !nativeCollisionVisual(handleAt(slot),state,sprite))return false;
                 flags=state.flags;bounds=state.bounds;return true;
             },[&](Owner::Box box,unsigned slot){
                 const auto h=handleAt(slot);
-                return owner_.externalSpatialPublication([&](auto& index){return index.insert(box,slot);})&&
-                    world_->publishNativeTerrainIndexed({slot-View::terrainBase,h.generation});
+                if(!owner_.externalSpatialPublication([&](auto& index){return index.insert(box,slot);}))return false;
+                if(object==82){auto* state=nativePosition(slot);if(!state)return false;
+                    state->appearanceFlags|=0x8000u;return true;}
+                return world_->publishNativeTerrainIndexed({slot-View::terrainBase,h.generation});
             });
         return check(prepared&&path!=Prep::Path::failed);
     }
     bool nativeTerrainPositionMeeting(int object,MotionBinary64 x,MotionBinary64 y,const SpriteMaskPack& masks,bool& hit){
         RunnerImageValue px,py;RunnerSpatialObjectPreparation::Path path;
-        if(!masks.valid()||!px.assign(x)||!py.assign(y)||!prepareNativeTerrainQuery(object,path))return check(false);
+        if((object!=60&&object!=93)||!masks.valid()||!px.assign(x)||!py.assign(y)||!prepareNativeObjectQuery(object,path))return check(false);
         return check(RunnerPointTraversal::run(path,px,py,true,[&]{return flushNativeSpatial();},
             [&](unsigned slot,bool indexed,bool& admitted){
                 const auto h=handleAt(slot);std::uint32_t flags;
@@ -2141,6 +2161,14 @@ public:
         const SpriteMaskPack& masks,bool& hit){
         if(!valid()||!resolves(self)||!masks.valid()||(object!=60&&object!=93))return check(false);
         if(!native_)return registeredPlaceMeeting(self,object,x,y,masks,hit);
+        Owner::Result result;
+        if(!nativeActorPlaceSelection(self,object,x,y,masks,result))return false;
+        hit=result.found;return true;
+    }
+private:
+    bool nativeActorPlaceSelection(InstanceHandle self,int object,MotionBinary64 x,MotionBinary64 y,
+        const SpriteMaskPack& masks,Owner::Result& selected){
+        if(!valid()||!resolves(self)||!masks.valid())return check(false);
         auto* state=nativePosition(self.slot);RunnerImageValue px,py;std::uint32_t flags;
         if(!state||!px.assign(x)||!py.assign(y)||!eligibilityFlags(self,flags))return check(false);
         const auto* objectFlags=families_.flags(unsigned(objectOf(self)));if(!objectFlags)return check(false);
@@ -2153,20 +2181,21 @@ public:
         RunnerPlaceQuery::Result result;
         const bool okay=RunnerPlaceQuery::run(state->x,state->y,flags,state->bounds,px,py,
             [&]{RunnerSpatialObjectPreparation::Path path;
-                return prepareNativeTerrainQuery(object,path)?path:RunnerSpatialObjectPreparation::Path::failed;},
+                return prepareNativeObjectQuery(object,path)?path:RunnerSpatialObjectPreparation::Path::failed;},
             [&]{return flushNativeSpatial()&&sync();},
             [&](bool publish){return refreshNativeActor(self,publish)&&sync();},
             [&](RunnerImageValue nx,RunnerImageValue ny){
                 if(!sync()||!RunnerSpatialPosition::assign(self.slot,state->x,state->y,flags,nx,ny,
                     false,true,*objectFlags,nativeSpatialDirty_,nativeCollisionDirty_))return false;
                 state->appearanceFlags=(state->appearanceFlags&~0xc208u)|(flags&0xc208u);return true;
-            },[&](auto visit){return nativeTerrainMembers(object,[&](unsigned slot){return !eligible(slot,false)||visit(slot);});},
+            },[&](auto visit){return nativeQueryMembers(object,[&](unsigned slot){return !eligible(slot,false)||visit(slot);});},
             [&](Owner::Box box,auto visit){return owner_.externalSpatialPublication([&](auto& index){
                 return index.query(box,[&](unsigned slot){return !eligible(slot,true)||visit(slot);});});},
             [&](unsigned slot,bool publish,bool& found){return collisionOverlap(self,handleAt(slot),masks,publish,found)&&sync();},result);
         if(!check(okay))return false;
-        hit=result.found;return true;
+        selected={result.found,result.found?handleAt(result.identity):InstanceHandle{}};return true;
     }
+public:
     bool terrainPlaceMeeting(InstanceHandle local,int object,MotionBinary64 x,MotionBinary64 y,
         const SpriteMaskPack& masks,bool& hit){
         if(native_)return nativeWallPlaceMeeting(local,object,x,y,masks,hit);
@@ -2179,7 +2208,7 @@ private:
     bool nativeWallPlaceMeeting(InstanceHandle local,int object,MotionBinary64 x,MotionBinary64 y,
         const SpriteMaskPack& masks,bool& hit){
         NativeWallQuery q;RunnerImageValue px,py;
-        if(wallQuery_||!valid()||!world_||!masks.valid()||!View::encode(View::Kind::terrain,local,q.handle)||
+        if((object!=60&&object!=93)||wallQuery_||!valid()||!world_||!masks.valid()||!View::encode(View::Kind::terrain,local,q.handle)||
             !resolves(q.handle)||objectOf(q.handle)!=60||!px.assign(x)||!py.assign(y)||
             !nativeCollisionVisual(q.handle,q.state,q.sprite)||
             !world_->nativeTerrainInstances()->cachedOffset(local,q.cacheX,q.cacheY))return check(false);
@@ -2206,7 +2235,7 @@ private:
         };
         RunnerPlaceQuery::Result result;
         const bool okay=RunnerPlaceQuery::run(q.state.x,q.state.y,q.state.flags,q.state.bounds,px,py,
-            [&]{return prepareNativeTerrainQuery(object,path)&&sync()?path:RunnerSpatialObjectPreparation::Path::failed;},
+            [&]{return prepareNativeObjectQuery(object,path)&&sync()?path:RunnerSpatialObjectPreparation::Path::failed;},
             [&]{return flushNativeSpatial()&&sync();},
             [&](bool publish){return refreshNativeTerrain(q.handle,publish)&&sync();},
             [&](RunnerImageValue nx,RunnerImageValue ny){
@@ -2414,9 +2443,14 @@ public:
         if(!registeredPlaceSelection(self,82,x,y,masks,selected))return false;
         RegisteredFieldContact next;
         if(selected.found){
-            const auto state=owner_.resolve(selected.handle);
-            if(!state||!resolves(selected.handle))return check(false);
-            next={true,selected.handle,state->x,state->y};
+            if(native_){Owner::State state;Owner::Sprite sprite;
+                if(!nativeCollisionVisual(selected.handle,state,sprite))return check(false);
+                next={true,selected.handle,state.x,state.y};
+            }else{
+                const auto state=owner_.resolve(selected.handle);
+                if(!state||!resolves(selected.handle))return check(false);
+                next={true,selected.handle,state->x,state->y};
+            }
         }
         result=next;return true;
     }
@@ -2441,6 +2475,7 @@ private:
     }
     bool registeredPlaceSelection(InstanceHandle self,int object,MotionBinary64 x,MotionBinary64 y,
         const SpriteMaskPack& masks,Owner::Result& result){
+        if(native_&&object==82)return nativeActorPlaceSelection(self,object,x,y,masks,result);
         if(!selectorAvailable(object))return check(false);
         auto update=[&](InstanceHandle h,bool publish){return resolves(h)&&refresh(h,publish);};
         if(!owner_.placeVm(self,object,x,y,false,families_,update,

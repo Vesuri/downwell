@@ -23,6 +23,19 @@ as the VM-visible `field` value would be incorrect. The numeric-ID allocation
 and synchronous cross-family creation-order work remains necessary before
 feeding this selection into live `scrTimeShard` caller state.
 
+Both native ownership modes use the shared `RunnerPlaceQuery` for this
+selection, rather than returning the first overlap from a family-local scan.
+Parent 82 is admitted only when resource ancestry contains the owned ordinary,
+goal and entry types (82, 255, 371). Family preparation chooses list versus
+spatial traversal from population and tree height; the indexed path flushes
+pending bounds and restores the player's cache after temporary movement.
+Selected slots are resolved back to generation handles before returning field
+coordinates. No numeric VM identity is invented. The same query tests compare
+empty, singleton and overlapping mixed-field populations, fractional player
+positions and both facings across reference/native/native-scenery ownership.
+This does not admit arbitrary native selectors or replace the separately
+specialized boolean blood/currency overlap paths.
+
 ## Field wind audio ordering
 
 `goalTimeField`'s player collision checks `global.voidWind` first. If it is not

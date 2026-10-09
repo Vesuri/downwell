@@ -1485,6 +1485,37 @@ int main(){
         SpriteMaskPack absent(nullptr,0);bool sentinel=true;
         assert(!collision->playerTimeFieldMeeting({},{},absent,sentinel)&&sentinel&&!collision->valid());
     }
+    {
+        std::vector<std::uint32_t> expected;
+        const auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
+        for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                      GameplayCollisionOwner::Ownership::nativeScenery}){
+            auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+                GameplayTerrainInstances::WallCollision{},&rooms,mode);
+            auto scene=std::make_unique<GameplayWorld>(300,true,0,false,collision->enemyBinding(),
+                collision->breakableBinding(),collision->playerBinding(),&collision->terrain(),&rooms);
+            assert(collision->attach(*scene));std::vector<std::uint32_t> actual;
+            const auto query=[&](int qx,int qy){
+                auto x=MotionBinary64::fromInteger(qx);x.high-=2u<<20;
+                GameplayCollisionOwner::RegisteredFieldContact result;
+                assert(collision->playerTimeFieldSelection(x,MotionBinary64::fromInteger(qy),masks,result));
+                actual.insert(actual.end(),{unsigned(result.found),result.handle.slot,result.handle.generation,result.x.bits,result.y.bits});
+                bool hit=false;assert(collision->playerTimeFieldMeeting(x,MotionBinary64::fromInteger(qy),masks,hit)&&hit==result.found);
+            };
+            query(960,512); // Empty family must not move the caller.
+            assert(scene->createGeneratedInstance({82,240,512},objects,[](const auto&){return true;}));
+            for(int x=600;x<=1320;x+=7)query(x,512);
+            assert(scene->createRoomStartField()&&scene->registerLevelExit(512));
+            for(unsigned i=0;i<40;++i)
+                assert(scene->createGeneratedInstance({82,224+int(i%4)*16,480+int(i/4)*16},objects,[](const auto&){return true;}));
+            for(int facing:{-1,1}){
+                auto binding=collision->playerBinding();const auto* record=scene->findPlayer(scene->playerHandle());assert(record);
+                assert(binding.integerTransform(scene->playerHandle(),*record,RunnerTransformField::scaleX,facing,{0x3f800000u},0xffffffu));
+                for(int y:{160,480,512,600,10000})for(int x=600;x<=1320;x+=17)query(x,y);
+            }
+            if(mode==GameplayCollisionOwner::Ownership::reference)expected=actual;else assert(actual==expected);
+        }
+    }
     for(int area=1;area<=5;++area){
         auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites);
         auto scene=std::make_unique<GameplayWorld>(300,true,0,false,collision->enemyBinding(),
