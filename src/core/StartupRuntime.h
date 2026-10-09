@@ -26,6 +26,7 @@
 #include "PlayerMotion.h"
 #include "StoredTimeShardRegistration.h"
 #include "StoredCorpseRegistration.h"
+#include "StoredLevelNumberRegistration.h"
 #include "StoredCorpseExpiryRegistration.h"
 #include "StoredSmokeRegistration.h"
 #include "StoredConsumptionBloodRegistration.h"
@@ -433,6 +434,25 @@ public:
     }
     enum class SkeletonPhase {animation,alarm,step,endStep,cleanup};
     enum class CorpsePhase {animation,alarm,step,endStep,cleanup};
+    template<unsigned Capacity,unsigned TextCapacity=64>
+    StoredLevelNumberRegistration<instanceCapacity,Capacity,TextCapacity> levelNumberRegistration(){
+        return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
+    }
+    template<unsigned Capacity,unsigned TextCapacity,class Tick>
+    bool withLevelNumberEvents(StoredLevelNumberRegistration<instanceCapacity,Capacity,TextCapacity>& registration,Tick tick){
+        if(!run_.effectsSucceeded)return false;
+        if(levelNumberDispatch_||!registration.belongsTo(instances_)||!registration.valid())return run_.effectsSucceeded=false;
+        auto dispatch=[&](const InstanceRecord& record,bool cleanup,unsigned alarm){
+            const auto key=registration.handle(record);if(!key.generation)return false;
+            return cleanup?registration.retire(key):registration.alarm(key,alarm);
+        };
+        levelNumberContext_=&dispatch;
+        levelNumberDispatch_=[](void* context,const InstanceRecord& record,bool cleanup,unsigned alarm){
+            return (*static_cast<decltype(dispatch)*>(context))(record,cleanup,alarm);
+        };
+        const bool okay=tick();levelNumberDispatch_=nullptr;levelNumberContext_=nullptr;
+        return run_.effectsSucceeded=okay&&run_.effectsSucceeded&&registration.valid();
+    }
     // Borrow private corpse Draw state only for the enclosing render. The
     // renderer still walks the shared layers; this is not a separate pass.
     template<unsigned Capacity,class Render> bool withCorpseDraw(
@@ -1847,6 +1867,8 @@ private:
     void* bloodContext_=nullptr;
     bool (*skeletonDispatch_)(void*,const InstanceRecord&,SkeletonPhase,unsigned)=nullptr;
     void* skeletonContext_=nullptr;
+    bool (*levelNumberDispatch_)(void*,const InstanceRecord&,bool,unsigned)=nullptr;
+    void* levelNumberContext_=nullptr;
     bool (*corpseDispatch_)(void*,const InstanceRecord&,CorpsePhase,unsigned)=nullptr;
     void* corpseContext_=nullptr;
     void* corpseExpiryContext_=nullptr;

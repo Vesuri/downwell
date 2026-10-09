@@ -106,6 +106,49 @@ int main(){
     downwell::SpriteCollisionPack sprites(spriteData.data(),spriteData.size());
     downwell::SpriteMaskPack masks(maskData.data(),maskData.size());
     assert(sprites.valid()&&masks.valid());
+    for(bool incomplete:{false,true}){
+        auto owner=std::make_unique<downwell::StoredWorldCollision>(objects,sprites,masks);
+        auto stored=std::make_unique<downwell::StartupRuntime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,
+            2,nullptr,owner->binding());
+        assert(owner->attach(*stored));stored->skipToGameForTesting();
+        auto numbers=stored->levelNumberRegistration<1>();
+        const auto id=stored->nextRuntimeInstanceId();downwell::InstanceHandle key;
+        const bool created=numbers.create(downwell::MotionBinary64::fromInteger(241),downwell::MotionBinary64::fromInteger(603),
+            [&](auto live,auto& state){
+                assert(live.generation&&stored->instance(id)&&stored->instance(id)->objectId==372&&
+                    stored->instance(id)->x==241&&stored->instance(id)->alarms.get(0)==-1);
+                if(incomplete)return true; // A successful placeholder is not a completed Create.
+                return state.create(3,downwell::MotionBinary64::fromInteger(24),[](unsigned i,unsigned& token){token=i;return true;});
+            },key);
+        assert(stored->nextRuntimeInstanceId()==id+1&&created==!incomplete);
+        if(incomplete){assert(!stored->effectsSucceeded()&&!key.generation&&stored->instance(id)->alarms.get(0)==-1);continue;}
+        assert(stored->instance(id)->alarms.get(0)==4);
+        struct AbsentSurface {
+            bool exists(bool& present){present=false;return true;}
+            bool begin(){std::abort();}bool end(){std::abort();}
+            bool view(unsigned,downwell::MotionBinary64&){std::abort();}
+            bool character(unsigned,downwell::MotionBinary64,downwell::MotionBinary64){std::abort();}
+        } surface;
+        for(unsigned tick=1;tick<=142;++tick){
+            assert(stored->withLevelNumberEvents(numbers,[&]{stored->step({});return stored->effectsSucceeded();}));
+            if(tick==4)assert(numbers.state(key)->shown==2&&stored->instance(id)->alarms.get(0)==4);
+            if(tick==12)assert(stored->instance(id)->alarms.get(1)==119);
+            if(tick==131)assert(numbers.state(key)->exit==1&&stored->instance(id)->alarms.get(2)==3);
+            if(tick==1){
+                unsigned draws=0;
+                assert(stored->visitDrawChecked([&](auto live,const auto& record){
+                    if(record.objectId!=372)return true;
+                    ++draws;return live.slot==key.slot&&live.generation==key.generation&&numbers.draw(live,surface);
+                })&&draws==1);
+            }
+            if(tick<142)assert(numbers.state(key)->characters[1].offset==-2); // No Draw: no letter movement.
+        }
+        assert(!stored->instance(id)&&!numbers.state(key)&&numbers.valid());
+        downwell::InstanceHandle replacement;
+        assert(numbers.create({}, {},[](auto,auto& state){return state.create(1,{},[](unsigned,unsigned& token){token=1;return true;});},replacement));
+        assert((replacement.slot!=key.slot||replacement.generation!=key.generation)&&
+            !numbers.state(key)&&numbers.clear()&&numbers.valid());
+    }
     for(unsigned binding=0;binding<3;++binding){
         auto owner=std::make_unique<downwell::StoredWorldCollision>(objects,sprites,masks);
         auto stored=std::make_unique<downwell::StartupRuntime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,

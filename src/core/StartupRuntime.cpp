@@ -937,6 +937,7 @@ bool StartupRuntime::cleanupMainOwnedDestroyed(){
             (r.objectId==220&&bloodDispatch_)||
             (r.objectId==120&&skeletonDispatch_)||
             (r.objectId==263&&corpseDispatch_)||
+            (r.objectId==372&&levelNumberDispatch_)||
             (r.objectId==242&&corpseExpiryDispatch_)||
             (r.objectId==225&&smokeDispatch_)||
             (r.objectId==223&&consumptionBloodDispatch_)||
@@ -951,6 +952,7 @@ bool StartupRuntime::cleanupMainOwnedDestroyed(){
             if(r.objectId==220)return bloodDispatch_(bloodContext_,r,BloodPhase::cleanup);
             if(r.objectId==120)return skeletonDispatch_(skeletonContext_,r,SkeletonPhase::cleanup,0);
             if(r.objectId==263)return corpseDispatch_(corpseContext_,r,CorpsePhase::cleanup,0);
+            if(r.objectId==372)return levelNumberDispatch_(levelNumberContext_,r,true,0);
             if(r.objectId==242)return corpseExpiryDispatch_(corpseExpiryContext_,r,true);
             if(r.objectId==225)return smokeDispatch_(smokeContext_,r,SmokePhase::cleanup,0);
             if(r.objectId==223)return consumptionBloodDispatch_(consumptionBloodContext_,r,ConsumptionBloodPhase::cleanup,0);
@@ -1802,6 +1804,11 @@ bool StartupRuntime::dispatchObjectEvent(InstanceRecord& instance,
     if (objectPack_ == nullptr ||
         !objectPack_->findEvent(instance.objectId, eventType, eventSubtype, event))
         return false;
+    if(instance.objectId==372&&eventType==2){
+        ++implementedCodeCalls_;
+        return run_.effectsSucceeded=levelNumberDispatch_&&
+            levelNumberDispatch_(levelNumberContext_,instance,false,unsigned(eventSubtype));
+    }
     if(instance.objectId==263&&(eventType==2||(eventType==3&&(eventSubtype==0||eventSubtype==2)))){
         ++implementedCodeCalls_;
         run_.effectsSucceeded=corpseDispatch_&&corpseDispatch_(corpseContext_,instance,

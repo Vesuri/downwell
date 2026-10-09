@@ -14,7 +14,7 @@ template<unsigned Capacity> struct LevelNumber {
     int appearInterval=4,exitInterval=4,remainTime=120;
     MotionBinary64 width{},textX{},textY{};
     AlarmBank alarms;
-    bool good=true,destroyRequested=false;
+    bool good=true,destroyRequested=false,created=false;
     template<class Read> bool create(unsigned count,MotionBinary64 measuredWidth,Read read){
         if(!good||count>Capacity||!measuredWidth.valid())return good=false;
         length=count;width=measuredWidth;shown=1;exit=0;i=1;destroyRequested=false;
@@ -24,11 +24,16 @@ template<unsigned Capacity> struct LevelNumber {
             characters[i]={token,0,-2};
         }
         appearInterval=exitInterval=4;remainTime=120;
-        alarms.reset();alarms.set(0,appearInterval);return true;
+        alarms.reset();alarms.set(0,appearInterval);created=true;return true;
     }
     template<class Destroy> bool advanceAlarm(unsigned index,Destroy destroy){
         if(!good||index>=AlarmBank::count)return good=false;
         if(destroyRequested||index>2||!alarms.advanceOne(index))return true;
+        return fireAlarm(index,destroy);
+    }
+    // Stored runners have already decremented the registered alarm slot.
+    template<class Destroy> bool fireAlarm(unsigned index,Destroy destroy){
+        if(!good||index>2||destroyRequested)return good=false;
         if(index==0){
             if(shown<length){characters[shown].enabled=1;++shown;alarms.set(0,appearInterval);}
             else alarms.set(1,remainTime);

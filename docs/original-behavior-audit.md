@@ -45,9 +45,15 @@ later slots in the same phase. Alarm 2 writes `txtAt[txtShown][1]`, not
 source-measured width. Draw changes offsets only when surfaceFx exists. Entrance
 increments after drawing; exit increments before its visibility test. Four
 separate view reads are preserved in the surface-coordinate calculation rather
-than algebraically cancelling them. This event state does not yet supply the
-localized text, active-font measurement, registered lifetime, or real surface
-text operations needed to admit the actor into either live world.
+than algebraically cancelling them. The stored registry pairs that private state
+with a resource-backed room record and consumes the enclosing numeric-ID stream
+before synchronous text initialization. Its scoped alarm adapter receives the
+already-decremented slot from the normal room phase, writes back newly armed
+slots, marks destruction, and retires through normal deferred cleanup. Draw can
+be invoked at the record's shared layer position; absent surfaceFx leaves text
+motion untouched. Clear the borrowed registry before room teardown.
+This does not yet supply localized text, active-font measurement, native
+lifetime ownership, or real surface text operations for natural callers.
 
 ## Result-room population and persistent alarms
 

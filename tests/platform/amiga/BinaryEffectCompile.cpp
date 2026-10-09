@@ -6,6 +6,11 @@
 #include "core/LevelExit.h"
 #include "core/RunSession.h"
 #include "core/LevelNumber.h"
+#include "core/StoredLevelNumberRegistration.h"
+bool compileStoredLevelNumber(downwell::StoredLevelNumberRegistration<32,2>& owner,
+    downwell::InstanceHandle& key,bool (*character)(unsigned,unsigned&)){
+    return owner.create({}, {},[&](auto,auto& state){return state.create(3,{},character);},key);
+}
 struct LevelNumberCompileDraw {
     bool exists(bool&);bool begin();bool end();bool view(unsigned,downwell::MotionBinary64&);
     bool character(unsigned,downwell::MotionBinary64,downwell::MotionBinary64);
