@@ -4,6 +4,7 @@
 #include "EnemyContact.h"
 #include "OutOfViewLifetime.h"
 #include "SkeletonEffectBursts.h"
+#include "SoundPlayScript.h"
 namespace downwell {
 // Shared object-120 event body. Owner runs pre-Step animation and global alarm
 // phases separately, supplies synchronous effect/child calls, and defers removal
@@ -18,6 +19,7 @@ struct SkeletonActor : SkeletonDecisions {
     int bodySprite=0;
     std::uint32_t myDeadBody=0;
     SmokeBurstCaller smokeScript;
+    SoundPlayState sound;
     bool damageStun=false, stomped=false;
     bool grounded=true, alive=true, destroyRequested=false;
     bool timefieldImmune=false;

@@ -60,6 +60,17 @@ The effects adapter must complete synchronous child Creates or fail, retaining
 the completed prefix and latching failure rather than retrying it. The scalar
 `stepAtPlayer` remains a successful-event reference, not a backend authority.
 
+Skeleton Step's sounds 133 (hurt), 134 (throw) and 132 (death) all invoke
+`soundPlayOL(sound,50,false,true,"enemymove")`. Both worlds expose this through
+the shared run's channel 4 and retain the script's caller variables in the
+skeleton actor. The world binding supplies the published actor Y, not private
+`yy`; the caller must supply the current published view and audio environment.
+The shared sound script stops an already-playing copy of that sound even when
+offscreen, suppresses the subsequent start outside the inclusive vertical view,
+and applies volume and underwater pitch to an admitted voice. Failed backend
+operations latch simulation failure and retain completed writes. This binding
+requires an actual audio backend; it does not provide a successful silent one.
+
 The stored scoped Step handler and native captured-Step adapter use this same
 body. Controlled owner fixtures advance the source animation until it throws a
 registered bone, checking parent publication and the five shared RNG draws of

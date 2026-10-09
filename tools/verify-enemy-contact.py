@@ -74,4 +74,11 @@ assert instructions == [
     "pushi.e 2", "conv.i.v", "pushi.e 3", "conv.i.v", "pushi.e 1", "conv.i.v",
     "call.i gml_Script_scrTypicalDamage(argc=3)", "popz.v",
 ]
-print("18 actor/terrain contact rectangles and smoke wall response match pinned source")
+step = (root / "extracted/utmt-0.9.2.0/Assembly/gml_Object_enmSkeleton_Step_0.asm").read_text()
+sound_calls = re.findall(
+    r'push\.s "enemymove"@\d+\nconv\.s\.v\npushi\.e 1\nconv\.i\.v\n'
+    r'pushi\.e 0\nconv\.i\.v\npushi\.e 50\nconv\.i\.v\npushi\.e (\d+)\n'
+    r'conv\.i\.v\ncall\.i gml_Script_soundPlayOL\(argc=5\)', step)
+assert sound_calls == ["133", "134", "132"]
+assert step.count("call.i gml_Script_soundPlayOL") == 3
+print("18 actor/terrain contact rectangles, smoke wall response and skeleton Step sound calls match pinned source")

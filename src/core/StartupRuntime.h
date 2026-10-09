@@ -212,6 +212,11 @@ public:
         r->box.wallHp=health;return true;
     }
     int overlapSound(unsigned channel)const{return channel<11?run_.overlapSounds[channel]:-1;}
+    template<class Audio> bool playSkeletonSound(SkeletonActor& actor,int sound,
+        SoundPlayEnvironment& environment,Audio& audio){
+        environment.y=MotionBinary64::fromInteger(actor.y);
+        return run_.playSkeletonSound(actor.sound,sound,environment,audio);
+    }
     template<class Material,class Audio> bool playBulletWallSound(InstanceHandle shot,
         SoundPlayEnvironment& environment,Material material,Audio& audio){
         auto* caller=instances_.resolve(shot);

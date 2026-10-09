@@ -1370,6 +1370,11 @@ public:
         return Operations(*this,objects,box,controls,position,allocate,queries);
     }
     int overlapSound(unsigned channel)const{return channel<11?run_.overlapSounds[channel]:-1;}
+    template<class Audio> bool playSkeletonSound(downwell::SkeletonActor& actor,int sound,
+        downwell::SoundPlayEnvironment& environment,Audio& audio){
+        environment.y=downwell::MotionBinary64::fromInteger(actor.y);
+        return run_.playSkeletonSound(actor.sound,sound,environment,audio);
+    }
     template<class Material,class Audio> bool playBulletWallSound(downwell::InstanceHandle shot,
         downwell::SoundPlayEnvironment& environment,Material material,Audio& audio){
         auto* caller=const_cast<BulletState*>(resolveBulletLifetime(shot));

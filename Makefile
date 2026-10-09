@@ -1513,9 +1513,9 @@ build/skeleton-publication-test: tests/core/SkeletonPublicationTest.cpp $(wildca
 	@mkdir -p build
 	$(CXX) $(CXXFLAGS) -ffp-contract=off -Isrc -o $@ $<
 
-build/live-collision-lifecycle-test build/gameplay-collision-owner-test build/gameplay-collision-owner-scalar-test build/gameplay-collision-owner-snapshot-test: tests/core/QuietSkeletonEffects.h tests/core/ScheduledBoxEffectsCheck.h
+build/live-collision-lifecycle-test build/gameplay-collision-owner-test build/gameplay-collision-owner-scalar-test build/gameplay-collision-owner-snapshot-test: tests/core/QuietSkeletonEffects.h tests/core/ScheduledBoxEffectsCheck.h tests/core/SkeletonSoundChecks.h
 
-build/skeleton-actor-test: tests/core/SkeletonActorTest.cpp src/core/SkeletonActor.h src/core/SkeletonDecisions.h src/core/SkeletonAnimation.h src/core/SkeletonTiming.h src/core/MotionBinary64.h src/core/PlayerMotion.cpp src/core/PlayerMotion.h
+build/skeleton-actor-test: tests/core/SkeletonActorTest.cpp tests/core/SkeletonSoundChecks.h src/core/SkeletonActor.h src/core/SkeletonDecisions.h src/core/SkeletonAnimation.h src/core/SkeletonTiming.h src/core/MotionBinary64.h src/core/PlayerMotion.cpp src/core/PlayerMotion.h
 	@mkdir -p build
 	$(CXX) $(CXXFLAGS) -ffp-contract=off -Isrc -o $@ $< src/core/PlayerMotion.cpp
 

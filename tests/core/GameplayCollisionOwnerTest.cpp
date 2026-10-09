@@ -3,6 +3,7 @@
 #include "core/CurrencySmokeComposition.h"
 #include "QuietSkeletonEffects.h"
 #ifndef DOWNWELL_NATIVE_QUERY_PROBE
+#include "SkeletonSoundChecks.h"
 #include "BulletWallSoundChecks.h"
 #include "SourceBulletSchedulingChecks.h"
 #include "RegisteredSkeletonThrowChecks.h"
@@ -19,6 +20,15 @@ namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_
 #include "core/CurrencyHomingMath.h"
 #include "core/TerrainWallContacts.h"
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
+struct NativeSkeletonAudio {
+    bool isPlaying(int,bool&);bool stop(int);bool play(int,int,bool,int&);
+    bool getGain(int,downwell::MotionBinary64&);bool setGain(int,downwell::MotionBinary64,int);
+    bool setPitch(int,downwell::MotionBinary64);
+};
+bool nativeSkeletonSound(GameplayWorld& world,downwell::SkeletonActor& actor,
+    downwell::SoundPlayEnvironment& environment,NativeSkeletonAudio& audio){
+    return world.playSkeletonSound(actor,133,environment,audio);
+}
 bool nativeSkeletonTimeState(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle key,
     const downwell::TimeStopEffects<64>& state,unsigned& hurts){
     return owner.stepSkeleton(key,state,[&](auto&,auto&){return QuietSkeletonEffects{hurts};});
@@ -6668,19 +6678,24 @@ int main(){
             assert(skeletonWorld->effectsSucceeded()&&actor->state.alarms[2]==0&&!actor->state.shot&&
                 actor->state.alarms[3]==14&&!actor->state.imageIndex.high&&!actor->state.imageIndex.low);
             assert(skeletons.dispatch(key,[](auto& state,auto&,bool&){state.hitPending=true;return true;}));
-            unsigned hurts=0;
+            unsigned hurts=0;SkeletonSoundAudio audio;audio.wet=true;
+            SoundPlayEnvironment soundEnvironment;soundEnvironment.gameVolume={0x3fd00000u,0};
+            soundEnvironment.viewHeight=MotionBinary64::fromInteger(1000);soundEnvironment.inWater=true;
             auto stepPhase=std::make_unique<RunnerStepSnapshot<GameplayCollisionView::capacity>>();
             TimeStopEffects<4> skeletonStop;skeletonStop.player.stopped=true;
             auto stepSkeletons=[&]{return skeletonOwner->dispatchStepPhase(0,*stepPhase,[&](InstanceHandle selected,const PackedObjectEvent&){
                 GameplayCollisionView::Kind kind;InstanceHandle local;
                 assert(GameplayCollisionView::decode(selected,kind,local));
                 return kind!=GameplayCollisionView::Kind::skeleton||skeletonOwner->stepSkeleton(selected,skeletonStop,
-                    [&](auto&,auto&){return QuietSkeletonEffects{hurts};});
+                    [&](auto& actor,auto&){return soundingSkeletonEffects(hurts,[&actor,&skeletonWorld,&soundEnvironment,&audio](int id){
+                        return skeletonWorld->playSkeletonSound(actor,id,soundEnvironment,audio);
+                    });});
             });};
             assert(stepSkeletons()&&!hurts&&actor->state.hitPending&&actor->state.imageSpeed.zero());
             skeletonStop.player.stopped=false;
             assert(stepSkeletons()&&hurts==1&&actor->state.sprite==205&&actor->state.hitStun&&!actor->state.hitPending&&
                 actor->state.alarms[1]==4&&actor->state.alarms[3]==30);
+            assert(audio.calls==7&&skeletonWorld->overlapSound(4)==133&&actor->state.sound.sndsnd==1001);
             assert(skeletons.dispatchPublished(key,[&](auto& state,auto&,auto& publish,bool&){
                 assert(publish.sprite(207)&&publish.imageIndex({0x40800000u})&&publish.sprite(205)&&state.sprite==205&&!state.timeline.bits&&
                     !state.imageIndex.high&&!state.imageIndex.low&&publish.sprite(207)&&publish.facing(-1));

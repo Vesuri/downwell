@@ -60,6 +60,14 @@ struct RunSession {
     // soundInitialize writes entries 0..10 to zero. Room changes do not
     // reinitialize them; scrInitialize/new-run reset does.
     int overlapSounds[11]{};
+    template<class Audio> bool playSkeletonSound(SoundPlayState& caller,int sound,
+        SoundPlayEnvironment& environment,Audio& audio){
+        if(!effectsSucceeded)return false;
+        if(sound<132||sound>134)return effectsSucceeded=false;
+        int result=-1;bool returned=false;
+        return SoundPlayScript::overlap(caller,environment,audio,[]{return false;},overlapSounds[4],
+            sound,50,false,true,"enemymove",result,returned,effectsSucceeded);
+    }
     template<class Random,class Material,class Audio> bool playBulletWallSound(SoundPlayState& caller,
         SoundPlayEnvironment& environment,Random& random,Material material,Audio& audio){
         return BulletWallSound::play(caller,environment,overlapSounds[2],random,material,audio,effectsSucceeded);

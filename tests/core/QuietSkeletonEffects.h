@@ -31,4 +31,10 @@ template<class Throw> struct ThrowingSkeletonEffects:QuietSkeletonEffects {
     ThrowingSkeletonEffects(unsigned& hurts,Throw launch):QuietSkeletonEffects{hurts},launch(launch){}
     bool throwBone(int facing){return launch(facing);}
 };
+template<class Play> struct SoundingSkeletonEffects:QuietSkeletonEffects {
+    Play play;
+    SoundingSkeletonEffects(unsigned& hurts,Play play):QuietSkeletonEffects{hurts},play(play){}
+    bool hurtSound(int id){++hurts;return id==133&&play(id);}
+};
+template<class Play> auto soundingSkeletonEffects(unsigned& hurts,Play play){return SoundingSkeletonEffects<Play>(hurts,play);}
 #endif

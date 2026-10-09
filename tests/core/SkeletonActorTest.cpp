@@ -1,5 +1,6 @@
 #include "core/SkeletonActor.h"
 #include "core/PlayerMotion.h"
+#include "SkeletonSoundChecks.h"
 #include <cstdlib>
 #include <cstdio>
 #include <initializer_list>
@@ -124,6 +125,7 @@ struct StompEvents {
     }
 };
 int main() {
+    checkSkeletonSoundContract();
     for(bool stopped:{false,true}) for(unsigned failure:{1u,2u,3u,4u,5u,7u,8u,9u}){
         downwell::SkeletonActor actor;check(actor.create(96,192));
         actor.health=0;actor.takenImpact=number(9);

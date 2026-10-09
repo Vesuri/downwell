@@ -12,6 +12,7 @@
 #include "core/StoredSourceBulletStep.h"
 #include "core/StoredShootableTargets.h"
 #include "core/StoredDitherCollisionPass.h"
+#include "SkeletonSoundChecks.h"
 #include "core/TimeChangeEffects.h"
 #include "core/EventScheduler.h"
 #include "core/RunnerObjectFamilies.h"
@@ -1439,16 +1440,22 @@ int main(){
         require(tick()&&steps==2&&ends==0&&!actor->state.shot&&record->alarms.get(2)==0&&record->alarms.get(3)==14&&
             record->imageIndex==0,"skeleton alarm decrements once and later slot sees same-phase write");
         require(skeletons.dispatch(key,[](auto& state,auto&,bool&){state.hitPending=true;return true;}),"hit source skeleton");
-        unsigned hurts=0;QuietSkeletonEffects effects{hurts};
+        unsigned hurts=0;SkeletonSoundAudio audio;audio.wet=true;
+        SoundPlayEnvironment soundEnvironment;soundEnvironment.gameVolume={0x3fd00000u,0};
+        soundEnvironment.viewHeight=MotionBinary64::fromInteger(1000);soundEnvironment.inWater=true;
         TimeStopEffects<4> skeletonStop;skeletonStop.player.stopped=true;
         auto skeletonTick=[&]{return world->withSkeletonTimeStopEvents(skeletons,skeletonStop,
-            [&](auto,auto&,auto&){return effects;},[&]{world->step({},false);return world->effectsSucceeded();});};
+            [&](auto,auto& actor,auto&){return soundingSkeletonEffects(hurts,[&actor,&world,&soundEnvironment,&audio](int id){
+                return world->playSkeletonSound(actor,id,soundEnvironment,audio);
+            });},[&]{world->step({},false);return world->effectsSucceeded();});};
         require(skeletonTick()&&!hurts&&actor->state.hitPending&&record->imageSpeed==0,
             "source stopped state defers skeleton hit processing");
         skeletonStop.player.stopped=false;
         require(skeletonTick()&&hurts==1&&
             record->spriteId==205&&record->imageSpeed==0&&record->alarms.get(1)==4&&record->alarms.get(3)==30&&
             actor->state.hitStun&&!actor->state.hitPending,"checked hit Step executes in the stored room scheduler");
+        require(audio.calls==7&&world->overlapSound(4)==133&&actor->state.sound.sndsnd==1001,
+            "stored hit Step runs source enemymove sound with retained caller and global channel");
         require(world->withSkeletonPublishedEvents(skeletons,[&](InstanceHandle,auto phase,auto& state,auto&,auto& publish,bool&){
             if(phase!=StartupRuntime::SkeletonPhase::step)return true;
             require(publish.sprite(207)&&publish.imageIndex({0x40800000u})&&record->imageIndex==4,"publish source image index immediately");
