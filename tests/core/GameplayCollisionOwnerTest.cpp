@@ -3052,13 +3052,26 @@ int main(){
         const auto before=world->randomDrawCount();world->step(0);
         assert(!world->effectsSucceeded()&&world->randomDrawCount()==before); // Never silently resume the legacy path.
     }
-    for(unsigned target:{0u,1u,2u}){
-        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+    std::vector<std::uint32_t> scheduledContacts[2][3];
+    const auto sourceRoomBytes=read("generated/downwell-rooms.dwrm");
+    RoomPack sourceRooms(sourceRoomBytes.data(),sourceRoomBytes.size());assert(sourceRooms.valid());
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                  GameplayCollisionOwner::Ownership::nativeScenery})for(unsigned crowd:{0u,12u})for(unsigned target:{0u,1u,2u}){
+        const bool native=mode!=GameplayCollisionOwner::Ownership::reference;
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
+            GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&sourceRooms,mode);
         auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
-            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
-        assert(owner->attach(*world));InstanceHandle bone,shot;unsigned calls=0;
+            owner->breakableBinding(),owner->playerBinding(),native?nullptr:&owner->terrain(),&sourceRooms);
+        auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
+        assert(owner->attach(*world)&&(!native||world->bindNativeTerrain(*terrain)));
+        InstanceHandle bone,shot;unsigned calls=0;
         if(target==2)assert(world->createBoneWithSourceId(605500,240,200,bone));
-        else assert(world->createGeneratedInstance({target==1?60:92,240,512},objects,[](const auto&){return true;}));
+        else assert(world->createGeneratedInstance({target==1?60:92,240,512},objects,[&](const auto& command){
+            return !native||command.objectId!=60||(terrain->append(command.objectId,command.x,command.y)&&
+                world->finishNativeTerrainCreate(terrain->handle(terrain->size()-1)));
+        }));
+        for(unsigned i=0;i<crowd;++i)
+            assert(world->createGeneratedInstance({92,1000,600+int(i)*16},objects,[](const auto&){return true;}));
         auto frames=[&](int id,unsigned& count){return sprites.frameCount(id,count);};
         assert(world->withSourceBulletSteps([&](InstanceHandle key,MachineGunSourceMotion& motion){
             shot=key;++calls;RunnerImageValue x,y;
@@ -3068,10 +3081,20 @@ int main(){
             BulletWallAudio audio{world->resolveBulletLifetime(key)->sound,world->overlapSound(2),29,true};
             const auto before=world->randomDrawCount();
             const bool ok=NativeSourceBulletStep::run(*world,*owner,key,motion,masks,frames,environment,audio);
+            if(!ok||world->randomDrawCount()!=before+(target==1?3u:1u)||!audio.valid||audio.calls!=(target==1?7u:0u))
+                std::fprintf(stderr,"scheduled source contact mode=%u target=%u ok=%u rng=%u audio=%u/%u owner=%u world=%u initialized=%u effects=%u\n",
+                    unsigned(mode),target,unsigned(ok),unsigned(world->randomDrawCount()-before),audio.calls,unsigned(audio.valid),
+                    unsigned(owner->valid()),unsigned(world->effectsSucceeded()),unsigned(motion.initialized),unsigned(world->scriptEffects().size()));
             assert(ok&&world->randomDrawCount()==before+(target==1?3u:1u)&&audio.valid&&audio.calls==(target==1?7u:0u));
             const auto* retained=world->resolveBulletLifetime(key);
             assert(retained&&retained->sourceOwned&&retained->destroyRequested&&motion.initialized&&!retained->trajectory.initialized);
             assert(world->scriptEffects().size()==(target==1?2u:1u));
+            std::vector<std::uint32_t> snapshot{motion.x.bits,motion.y.bits,motion.imageAngle.bits,
+                motion.direction.high,motion.direction.low,motion.xsp.high,motion.xsp.low,motion.ysp.high,motion.ysp.low,
+                std::uint32_t(world->randomState().stateIndex())};
+            for(unsigned i=0;i<16;++i)snapshot.push_back(world->randomState().stateWord(i));
+            if(!native)scheduledContacts[crowd!=0][target]=snapshot;
+            else assert(scheduledContacts[crowd!=0][target]==snapshot);
             return ok;
         },[&]{world->step(4);return world->effectsSucceeded();}));
         assert(calls==1);

@@ -1208,6 +1208,16 @@ adapter; the selected target positions are controlled test inputs, not a
 natural encounter replay. It covers registered populations only and does not
 authorize omitted actors or incomplete source-ID streams.
 
+Native projectile lines use the same object-list/tree preparation and line
+traversal as the retained terrain queries, with parent-59 and parent-83 members
+merged across registered actor and terrain lifetimes. Dirty actor bounds are
+refreshed through the actor path, not the terrain-run path. The approach-loop
+point query enumerates the parent-59 registration order and evaluates each
+candidate with the native published shape. Neither query substitutes occupancy
+or nearest-distance ordering. Scheduled contact tests compare motion and the
+complete RNG state against reference ownership for box, wall and bone targets,
+with and without extra boxes, using real room layers and native wall births.
+
 `StoredSourceBulletStep` is the corresponding stored-world binding. It uses
 the stored owner's line/point/place queries and box writes, and dispatches
 parent-90 field access to the supplied owning registration. Each access first

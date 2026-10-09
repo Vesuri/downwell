@@ -2600,7 +2600,7 @@ private:
                 });
     }
     template<class Visit> bool nativeQueryMembers(int object,Visit visit){
-        if(object==56||object==57||object==90){
+        if(object==56||object==57||object==59||object==83||object==90){
             // The solid parent spans native boxes, retained walls/platforms
             // and any other registered descendants. Merge by registration
             // order before filtering; separate family sweeps change the tree.
@@ -2624,8 +2624,8 @@ private:
     bool prepareNativeObjectQuery(int object,RunnerSpatialObjectPreparation::Path& path){
         if(!valid()||!world_||!native_)return check(false);
         if(object==82){if(!timeFieldFamily_)return check(false);}
-        else if(object==90){/* No terrain descendants; use every registered subtype. */}
-        else if(object==56||object==57){if(!world_->nativeTerrainInstances())return check(false);}
+        else if(object==90||object==83){/* No terrain descendants; use every registered subtype. */}
+        else if(object==56||object==57||object==59){if(!world_->nativeTerrainInstances())return check(false);}
         else if(!world_->nativeTerrainInstances()||(object!=60&&object!=93)||
             !terrainFamilies_[object==93])return check(false);
         auto members=[&](auto visit){return nativeQueryMembers(object,visit);};
@@ -3084,6 +3084,20 @@ public:
     bool projectileSolidPoint(InstanceHandle self,MotionBinary64 x,MotionBinary64 y,
         bool notMe,const SpriteMaskPack& masks,Owner::Result& result){
         if(!valid()||!world_)return check(false);
+        if(native_){
+            RunnerImageValue px,py;
+            if(!world_->nativeTerrainInstances()||!masks.valid()||(notMe&&!resolves(self))||
+                !px.assign(x)||!py.assign(y))return check(false);
+            RunnerCollisionPoint::Result next;
+            const bool ok=RunnerCollisionPoint::run(self,notMe,px,py,
+                [&](auto visit){return nativeQueryMembers(59,[&](unsigned slot){return visit(handleAt(slot));});},
+                [&](InstanceHandle h,std::uint32_t& flags){return resolves(h)&&eligibilityFlags(h,flags);},
+                [&](InstanceHandle h,RunnerImageValue qx,RunnerImageValue qy,bool& hit){
+                    return collisionPointCandidate(h,qx,qy,true,false,masks,hit);
+                },next);
+            if(!check(ok))return false;
+            result={next.found,next.handle};return true;
+        }
         return registeredCollisionPoint(self,59,x,y,false,notMe,masks,result);
     }
 private:
@@ -3103,7 +3117,7 @@ public:
         MotionBinary64 x2,MotionBinary64 y2,bool notMe,Owner::Result& result){
         if(native_){
             if(object!=60&&object!=93)return check(false);
-            return nativeTerrainLine(self,object,x1,y1,x2,y2,notMe,result);
+            return nativeRegisteredLine(self,object,x1,y1,x2,y2,notMe,result);
         }
         if(!terrainQuery(object))return check(false);
         return registeredNonPreciseLine(self,object,x1,y1,x2,y2,notMe,result);
@@ -3115,10 +3129,11 @@ public:
     bool projectileNonPreciseLine(InstanceHandle self,int object,MotionBinary64 x1,MotionBinary64 y1,
         MotionBinary64 x2,MotionBinary64 y2,bool notMe,Owner::Result& result){
         if(!valid()||!world_||(object!=59&&object!=83))return check(false);
+        if(native_)return nativeRegisteredLine(self,object,x1,y1,x2,y2,notMe,result);
         return registeredNonPreciseLine(self,object,x1,y1,x2,y2,notMe,result);
     }
 private:
-    bool nativeTerrainLine(InstanceHandle self,int object,MotionBinary64 x1,MotionBinary64 y1,
+    bool nativeRegisteredLine(InstanceHandle self,int object,MotionBinary64 x1,MotionBinary64 y1,
         MotionBinary64 x2,MotionBinary64 y2,bool notMe,Owner::Result& result){
         RunnerLineArguments args;RunnerSpatialObjectPreparation::Path path;
         if(!valid()||(notMe&&!resolves(self))||!args.assign(x1,y1,x2,y2)||
@@ -3134,7 +3149,8 @@ private:
                 const auto h=handleAt(slot);Owner::State state;Owner::Sprite sprite;
                 if(!nativeCollisionVisual(h,state,sprite))return false;
                 if(state.flags&8u){
-                    if(!refreshNativeTerrain(h)||!nativeCollisionVisual(h,state,sprite))return false;
+                    if(!(nativePosition(h.slot)?refreshNativeActor(h,true):refreshNativeTerrain(h))||
+                        !nativeCollisionVisual(h,state,sprite))return false;
                 }
                 bool inside=false;
                 if(!RunnerLineBounds::test(line,state.bounds,true,(state.flags&0x100001u)!=0,inside))return false;
@@ -3143,7 +3159,7 @@ private:
                 hit=sprites_.collisionSprite(sprite.spriteId,sprite.maskId,resource)&&resource.frameCount;return true;
             },[&](const auto& line,auto visit){return owner_.externalSpatialPublication(
                 [&](auto& index){return index.queryLine(line,visit);});},
-            [&](auto visit){return nativeTerrainMembers(object,visit);},next);
+            [&](auto visit){return nativeQueryMembers(object,visit);},next);
         if(!check(ok))return false;
         result={next.found,next.found?handleAt(next.slot):InstanceHandle{}};return true;
     }
