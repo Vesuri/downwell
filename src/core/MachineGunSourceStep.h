@@ -18,7 +18,11 @@ struct MachineGunSourceStep {
         const auto profile=machineGunProfile(gemHigh);
         const BulletSolidScript::Settings settings{MotionBinary64::fromInteger(profile.damage),
             motion.direction,hitWallFx,profile.consistent,profile.wave,profile.explode};
-        if(!BulletSolidScript::run(settings,ops,succeeded))return false;
+        if(!BulletSolidScript::run(settings,ops,succeeded,
+            [&](int sprite,MotionBinary64 speed,MotionBinary64 angle){
+                return EffectSpawnScript::run(effects,motion.x.promoted(),motion.y.promoted(),
+                    sprite,speed,angle,{});
+            }))return false;
         // instance_destroy does not return from the VM event. Both builtin
         // setters still execute, individually, after solid-contact effects.
         return check(motion.commitPosition([&](RunnerImageValue x,RunnerImageValue y){

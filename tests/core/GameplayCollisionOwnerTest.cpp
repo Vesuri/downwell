@@ -2964,7 +2964,7 @@ int main(){
         assert(!world->publishBulletCollisionPosition(key,{0x7f800000u},{})&&!world->effectsSucceeded());
         assert(owner->state(shared)->x.bits==last.x.bits&&owner->state(shared)->y.bits==last.y.bits);
     }
-    for(bool high:{false,true})for(bool laser:{false,true}){
+    for(bool high:{false,true})for(bool laser:{false,true})for(bool wall:{false,true}){
         // Exercise the recovered Step against real resource-backed selectors
         // and box writes, using a real fired lifetime for setter/destruction
         // callbacks. The supplied profile and isolated position are fixture
@@ -2976,7 +2976,7 @@ int main(){
         assert(world->effectsSucceeded()&&world->bulletCount()==1);
         const auto& shot=world->bulletAt(0);const InstanceHandle shotKey{shot.identitySlot,shot.lifetimeId};
         InstanceHandle shotShared;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::bullet,shotKey,shotShared));
-        assert(world->createGeneratedInstance({92,240,512},objects,[](const auto&){return true;}));
+        assert(world->createGeneratedInstance({wall?60:92,240,512},objects,[](const auto&){return true;}));
         MachineGunSourceMotion motion;GameMakerRandom random(2);
         assert(motion.reset(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(500),laser));
         assert(world->publishBulletCollisionPosition(shotKey,motion.x,motion.y));
@@ -3028,14 +3028,30 @@ int main(){
             bool wallHit(){return owner.projectileBoxHit(selected);}
             bool destroySelf(){destroyed=world.markBulletDestroyed(shotKey);return destroyed;}
             bool effect(int,MotionBinary64,MotionBinary64){return false;}
-            bool soundWall(){return false;}bool explosion(int){return false;}
+            bool soundWall(){
+                const auto before=world.randomDrawCount();
+                SoundPlayEnvironment env;env.gameVolume={0x3fd00000u,0};env.inWater=true;
+                BulletWallAudio audio{world.resolveBulletLifetime(shotKey)->sound,world.overlapSound(2),29,true};
+                return world.playBulletWallSound(shotKey,env,[&](const char*& material){
+                    return owner.projectileWallMaterial(selected,material);
+                },audio)&&audio.valid&&audio.calls==7&&world.randomDrawCount()==before+2;
+            }
+            bool explosion(int){return false;}
             bool placeShootable(int,bool&){return false;}bool selectShootable(int){return false;}
             bool thingHealth(MotionBinary64&){return false;}bool thingHealthWrite(MotionBinary64){return false;}
             bool thingHit(){return false;}bool thingHitEffect(bool&){return false;}
         } ops{*owner,motion,masks,*world,shotKey,shotShared};
         assert(MachineGunSourceStep::run(motion,random,high,muzzle,ops,succeeded));
         assert(succeeded&&ops.destroyed&&ops.lines==3&&ops.points>1&&ops.approachWrites==2*(ops.points-1)&&ops.writes==2);
-        assert(random.drawCount()==1&&child!=~0u&&owner->scriptEffects().size()==1);
+        assert(random.drawCount()==1&&child!=~0u&&owner->scriptEffects().size()==(wall?2u:1u));
+        if(wall){
+            const auto* impact=effects.get(child);
+            assert(impact&&impact->spriteId==101&&impact->imageSpeed.bits==0x3f000000u&&
+                impact->angle.bits==0&&impact->depth.bits==0);
+            assert(world->resolveBulletLifetime(shotKey)->destroyRequested&&world->overlapSound(2)==29);
+            assert(owner->prepareDraw(effects)&&!world->resolveBulletLifetime(shotKey));
+            continue;
+        }
         const auto* box=world->findBreakable({0,1});assert(box);
         const auto expected=MotionBinary64::fromInteger(1-machineGunProfile(high).damage);
         assert(box->state.wallHp.high==expected.high&&box->state.wallHp.low==expected.low&&box->state.hit);

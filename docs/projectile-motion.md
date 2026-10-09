@@ -150,6 +150,13 @@ because its sign bit is positive.
 `scrEffectSpawn` muzzle sequence, solid script and ordered final X/Y setters.
 It uses the shot's birth profile (ordinary or gem-high), the inherited
 `hitWallFx=101` default, and the raw spread direction for impact effects. The
+same registered effect operations handle muzzle and impact births, including
+the caller's `myFx` assignment and the four ordered setters. Impact coordinates
+are read after the approach loop and before final movement; depth is explicitly
+zero. Backends do not supply an alternative impact-effect implementation to
+this Step. The standalone solid-script interface retains its callback for
+isolated branch tests.
+The
 enclosing runtime supplies the same motion object to its query/approach
 callbacks and retains the executing bullet through destruction requests.
 `verify-machine-gun-source-step` checks both profiles through empty, box, wall,
@@ -195,6 +202,11 @@ The comparison checks bit-exact final position, angle and box health, plus line,
 point and position-write counts. Both executables independently require the
 synchronous muzzle birth and retained marked projectile. These are host-built
 world-owner tests, not an Amiga CPU replay or Windows gameplay capture.
+
+The native-owner fixture additionally covers ordinary-wall impacts with the
+registered muzzle/impact effect lifetimes and material sound dispatch before
+destruction and final movement. This isolates one non-breakable branch; it does
+not enable natural projectile scheduling.
 
 Both live worlds route ordinary shot-consumption through `markBulletDestroyed`.
 This handle-based operation publishes the collision exclusion once, retains the

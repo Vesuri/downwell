@@ -14,6 +14,11 @@ struct BulletSolidScript {
         bool consistent=false,wave=false,explode=false;
     };
     template<class Ops> static bool run(const Settings& settings,Ops& ops,bool& succeeded){
+        return run(settings,ops,succeeded,[&](int sprite,MotionBinary64 speed,MotionBinary64 angle){
+            return ops.effect(sprite,speed,angle);
+        });
+    }
+    template<class Ops,class Effect> static bool run(const Settings& settings,Ops& ops,bool& succeeded,Effect spawnHitEffect){
         if(!succeeded)return false;
         auto check=[&](bool ok){if(!ok)succeeded=false;return ok;};
         auto damage=[&](MotionBinary64& hp){
@@ -38,7 +43,7 @@ struct BulletSolidScript {
                     if(!settings.consistent&&!check(ops.destroySelf()))return false;
                 }
             }else if(!settings.wave){
-                if(!check(ops.effect(settings.hitWallFx,{0x3fe00000u,0},{}))||
+                if(!check(spawnHitEffect(settings.hitWallFx,{0x3fe00000u,0},{}))||
                    !check(ops.soundWall())||!check(ops.destroySelf()))return false;
             }
             if(settings.explode&&!settings.wave&&!check(ops.explosion(272)))return false;
@@ -54,7 +59,7 @@ struct BulletSolidScript {
                     if(!damage(hp)||!check(ops.thingHealthWrite(hp))||!check(ops.thingHit()))return false;
                     bool effect=false;
                     if(!check(ops.thingHitEffect(effect)))return false;
-                    if(effect&&!check(ops.effect(605,{0x3fd99999u,0x9999999au},settings.direction)))return false;
+                    if(effect&&!check(spawnHitEffect(605,{0x3fd99999u,0x9999999au},settings.direction)))return false;
                     if(!settings.consistent&&!check(ops.destroySelf()))return false;
                 }
             }

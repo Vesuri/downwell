@@ -41,16 +41,21 @@ struct Fixture {
     bool publishAngle(RunnerImageValue a){assert(!motion.initialized&&a.bits==motion.imageAngle.bits);return event(Angle);}
     using Handle=unsigned;
     bool create(int id,MotionBinary64 x,MotionBinary64 y,Handle& child){
-        assert(!motion.initialized&&id==219&&x.high==motion.x.promoted().high&&y.high==motion.y.promoted().high);
+        assert(id==219&&x.high==motion.x.promoted().high&&x.low==motion.x.promoted().low&&
+            y.high==motion.y.promoted().high&&y.low==motion.y.promoted().low);
         child=1;return event(Create);
     }
     bool myFx(Handle h){assert(h==1);return event(Caller);}
-    bool sprite(Handle h,int id){assert(h==1&&id==(high?602:603));return event(Sprite);}
-    bool imageSpeed(Handle,MotionBinary64 speed){assert(speed.high==0x3fe00000u&&!speed.low);return event(Speed);}
-    bool imageAngle(Handle,MotionBinary64 angle){
-        assert(angle.high==motion.direction.high&&angle.low==motion.direction.low);return event(EffectAngle);
+    bool sprite(Handle h,int id){assert(h==1&&id==(motion.initialized?(route==Stone?101:605):(high?602:603)));return event(Sprite);}
+    bool imageSpeed(Handle,MotionBinary64 speed){
+        if(motion.initialized&&route==Thing)assert(speed.high==0x3fd99999u&&speed.low==0x9999999au);
+        else assert(speed.high==0x3fe00000u&&!speed.low);return event(Speed);
     }
-    bool depth(Handle,MotionBinary64 d){assert(d.zero()&&!motion.initialized);return event(Depth);}
+    bool imageAngle(Handle,MotionBinary64 angle){
+        if(motion.initialized&&route==Stone)assert(angle.zero());
+        else assert(angle.high==motion.direction.high&&angle.low==motion.direction.low);return event(EffectAngle);
+    }
+    bool depth(Handle,MotionBinary64 d){assert(d.zero());return event(Depth);}
     bool line(int object,bool& found){
         assert(motion.initialized);RunnerLineArguments args;assert(motion.lineArguments(args));
         assert(args.x1.bits==motion.x.bits&&args.y1.bits==motion.y.bits);
@@ -100,10 +105,11 @@ int main(){
         if(route==Box||route==Stone){
             for(auto e:{SelectWall,Point,ApproachY,ApproachX,Point,ApproachY,ApproachX,Point,Parent})expected.push_back(e);
             if(route==Box)for(auto e:{Health,HealthWrite,Hit,Destroy})expected.push_back(e);
-            else for(auto e:{WallEffect,WallSound,Destroy})expected.push_back(e);
+            else for(auto e:{Create,Caller,Sprite,Speed,EffectAngle,Depth,WallSound,Destroy})expected.push_back(e);
         }else{
             expected.push_back(Place);
-            if(route==Thing)for(auto e:{SelectThing,ThingHealth,ThingWrite,ThingHit,HitEffect,ThingEffect,Destroy})expected.push_back(e);
+            if(route==Thing)for(auto e:{SelectThing,ThingHealth,ThingWrite,ThingHit,HitEffect,
+                Create,Caller,Sprite,Speed,EffectAngle,Depth,Destroy})expected.push_back(e);
         }
         expected.push_back(MoveX);expected.push_back(MoveY);
         Fixture f(route,high,0);bool ok=true;
