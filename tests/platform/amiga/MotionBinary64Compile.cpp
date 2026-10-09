@@ -185,6 +185,15 @@ extern "C" unsigned skeletonBulletCompile(downwell::SkeletonActor* state,int dam
     if(!state->hitByMachineGun(damage,direction,events)) return 0xffffffffu;
     return events.trace;
 }
+struct CheckedSkeletonBulletEvents {
+    bool clearHitIgnore();bool destroyBullet();bool impactAngle(downwell::MotionBinary64&);
+    bool momentDelay();bool bulletHitSound(int,int,bool,bool);
+    bool impactEffect(int,downwell::MotionBinary64,downwell::MotionBinary64,int);
+};
+extern "C" bool skeletonCheckedBulletCompile(downwell::SkeletonActor* state,int damage,
+    downwell::MotionBinary64 direction,CheckedSkeletonBulletEvents& events,bool& good){
+    return state->hitByMachineGunChecked(damage,direction,events,good);
+}
 extern "C" unsigned skeletonStompCompile(downwell::SkeletonActor* state) {
     SkeletonDecisionEvents events;
     if(!state->stompPlayer(events)) return 0xffffffffu;

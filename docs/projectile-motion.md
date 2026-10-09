@@ -1251,6 +1251,20 @@ Scheduled-shot fixtures dispatch this bound event and check exact vertical
 velocity and the one-word contact RNG consumption. They do not establish
 natural wall-shard birth admission or a complete mixed collision pass.
 
+The object-261 collision with parent enemy 83 invokes
+`scrTypicalBulletDamage` (event 2196), independently of its ordinary Step.
+For the non-immune, non-through skeleton and the two usual-gun profiles,
+`SkeletonActor::hitByMachineGunChecked` preserves the script order: clear the
+bullet's hitIgnore, mark it destroyed, write hit/direction/angle/damage, apply
+health damage and damageStun, invoke the first momentDelay, play sound 29 at
+priority 90, assign takenImpact, create effect 605 at speed 0.4, then re-read
+hitStun before the second momentDelay. It retains completed writes and latches
+callback failures; a failed event cannot be retried. Its integer damage fields
+cover this admitted profile and reject overflow rather than invoking C++
+undefined behavior. The old helper remains the arithmetic reference. Actual
+collision-context, point-direction, controller/audio and effect bindings are
+still required before using the checked body in natural encounters.
+
 Run `make verify-machine-gun-source-motion verify-smoke-direction
 verify-smoke-trig`. The source-motion test covers birth narrowing, raw RNG
 endpoints, ordinary/Laser Sight initialization, repeated coordinate writes,

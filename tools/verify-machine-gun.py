@@ -73,6 +73,13 @@ for name, digest in {
 }.items():
     assert hashlib.sha256((export / "Assembly" / ("gml_GlobalScript_" + name + ".asm")).read_bytes()).hexdigest() == digest
 print("Usual-gun view retirement is source-ordered End Step, not movement-time removal")
+for name, digest in {
+    "scrTypicalBulletDamage": "1058a3a5cf596e3e7d607b9a6955ee2530e1957b8fa0ed8df9134b8d3df35fcb",
+    "scrDamageEnemy": "912a0fada8c28104c9d4f975346dd908527546556be1fb0d908763a66e66c95d",
+    "scrBulletImpact": "6bcd3beb826d00ca8c9fd34d360bcad709ce938cef45e9cca7757c9858f1e960",
+}.items():
+    assert hashlib.sha256((export / "Assembly" / ("gml_GlobalScript_" + name + ".asm")).read_bytes()).hexdigest() == digest
+print("Pinned bullet enemy-contact write/effect order, damage delay and takenImpact division")
 create = (export / "Assembly/gml_Object_bulletStandard_Create_0.asm").read_text()
 parent_create = (export / "Assembly/gml_Object_parentPBullet_Create_0.asm").read_text()
 assert "pushi.e 101\npop.v.i self.hitWallFx" in parent_create

@@ -58,6 +58,24 @@ struct BulletEvents {
         calls.push_back(5);
     }
 };
+struct CheckedBulletEvents {
+    downwell::SkeletonActor& actor;unsigned fail=0,calls=0;bool hitIgnore=true;
+    bool accept(){return ++calls!=fail;}
+    bool clearHitIgnore(){hitIgnore=false;return accept();}
+    bool destroyBullet(){check(!hitIgnore&&!actor.hitPending);return accept();}
+    bool impactAngle(downwell::MotionBinary64& result){
+        check(actor.hitPending&&actor.hitDirection.high==number(270).high);
+        if(!accept())return false;result=number(42);return true;
+    }
+    bool momentDelay(){check(actor.damageStun);return accept();}
+    bool bulletHitSound(int id,int priority,bool loop,bool cut){
+        check(id==29&&priority==90&&!loop&&cut&&actor.damageStun);return accept();
+    }
+    bool impactEffect(int sprite,downwell::MotionBinary64 speed,downwell::MotionBinary64 direction,int depth){
+        check(sprite==605&&speed.high==number(0.4).high&&speed.low==number(0.4).low&&
+            direction.high==number(270).high&&depth==0&&!actor.takenImpact.zero());return accept();
+    }
+};
 struct PreciseContact {
     double y,speed;
     bool onGround;
@@ -186,6 +204,27 @@ int main() {
         Events death{s}; death.expectedImpact=number(1.8);
         check(s.step(false,false,false,0,death));
         check(death.order==10 && s.destroyRequested && s.takenImpact.zero());
+    }
+    for(int damage:{9,15})for(bool stunned:{false,true})for(unsigned fail=0;fail<=(stunned?6u:7u);++fail){
+        downwell::SkeletonActor actor;check(actor.create(96,192));actor.hitStun=stunned;
+        CheckedBulletEvents events{actor,fail};bool good=true;
+        check(actor.hitByMachineGunChecked(damage,number(270),events,good)==!fail&&good==!fail);
+        check(events.calls==(fail?fail:(stunned?6u:7u))&&!events.hitIgnore);
+        const bool hit=!fail||fail>=3,damaged=!fail||fail>=4,impact=!fail||fail>=6;
+        check(actor.hitPending==hit&&actor.damageStun==damaged&&actor.health==60-(damaged?damage:0)&&
+            actor.hitDamage==(damaged?damage:0)&&actor.takenImpact.zero()==!impact&&actor.alive&&!actor.destroyRequested);
+        if(fail){const auto calls=events.calls;check(!actor.hitByMachineGunChecked(damage,number(270),events,good)&&events.calls==calls);}
+        else {
+            downwell::SkeletonActor oracle;check(oracle.create(96,192));oracle.hitStun=stunned;BulletEvents reference{oracle,{}};
+            check(oracle.hitByMachineGun(damage,number(270),reference)&&actor.health==oracle.health&&
+                actor.hitDamage==oracle.hitDamage&&actor.hitAngle.high==oracle.hitAngle.high&&
+                actor.takenImpact.high==oracle.takenImpact.high&&actor.takenImpact.low==oracle.takenImpact.low);
+        }
+    }
+    for(int hp:{-1,0}){
+        downwell::SkeletonActor actor;check(actor.create(96,192));actor.health=hp;
+        CheckedBulletEvents events{actor};bool good=true;
+        check(actor.hitByMachineGunChecked(9,number(270),events,good)&&good&&!events.calls&&events.hitIgnore);
     }
     for(int coordinate=-4096;coordinate<=4096;++coordinate) {
         downwell::SkeletonActor s;

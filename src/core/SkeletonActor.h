@@ -115,6 +115,29 @@ struct SkeletonActor : SkeletonDecisions {
         if(!hitStun) events.momentDelay();
         return true;
     }
+    // Checked live form of bulletStandard Collision subparentEnemy (2196),
+    // restricted to its two non-consistent/non-exploding usual-gun profiles
+    // against object 120 (neither immune nor bullet-through). The older entry
+    // above remains the supported arithmetic/reference path. Publish caller
+    // hitIgnore and preserve every completed write before a callback failure.
+    template<class Events>
+    bool hitByMachineGunChecked(int damage,MotionBinary64 direction,Events& events,bool& good){
+        if(!good)return false;
+        auto check=[&](bool okay){if(!okay)good=false;return good;};
+        if(!check(damage==9||damage==15))return false;
+        if(health<=0)return true;
+        if(!check(events.clearHitIgnore())||!check(events.destroyBullet()))return false;
+        hitPending=true;hitDirection=direction;
+        MotionBinary64 angle;
+        if(!check(events.impactAngle(angle)&&angle.valid()))return false;
+        hitAngle=angle;
+        if(!check(hitDamage<=2147483647-damage))return false;
+        hitDamage+=damage;health-=damage;damageStun=true;
+        if(!check(events.momentDelay())||!check(events.bulletHitSound(29,90,false,true)))return false;
+        takenImpact=damage==9?MotionBinary64{0x3ffcccccu,0xcccccccdu}:MotionBinary64{0x40080000u,0};
+        if(!check(events.impactEffect(605,MotionBinary64{0x3fd99999u,0x9999999au},direction,0)))return false;
+        return hitStun||check(events.momentDelay());
+    }
     static bool snapCreateCoordinate(std::int32_t value,std::int32_t& snapped) {
         RunnerImageValue coordinate;
         if(!coordinate.assign(MotionBinary64::fromInteger(value))) return false;
