@@ -63,6 +63,16 @@ assert "pushi.e 270\npush.v self.aimAngle\nadd.v.i\npop.v.v self.shotAngle" in s
 assert "push.v self.bDir\npop.v.v self.image_angle" in step
 assert step.index("call.i random_range(argc=2)") < step.index("pop.v.v self.image_angle")
 print("VM projectile image angle follows firing direction plus first-Step spread")
+end_step = (export / "Assembly/gml_Object_bulletStandard_Step_2.asm").read_bytes()
+assert hashlib.sha256(end_step).hexdigest() == "5daab67fc60337936392d83c43dc43d2068d3b73e937650cc1c5e8fc1264913f"
+assert re.findall(r"call.i ([^\n]+)", end_step.decode()) == [
+    "gml_Script_scrOutofview(argc=0)", "gml_Script_scrBulletOov(argc=0)"]
+for name, digest in {
+    "scrOutofview": "e06b55bcc8952fd6eb918461ffce8196a41cff92c7f7dfe97060160468a2fcff",
+    "scrBulletOov": "1b393802ddd4cc84545f3571f4a244d0baf692d7ddc1ae49a3b8c9aefeb1f022",
+}.items():
+    assert hashlib.sha256((export / "Assembly" / ("gml_GlobalScript_" + name + ".asm")).read_bytes()).hexdigest() == digest
+print("Usual-gun view retirement is source-ordered End Step, not movement-time removal")
 create = (export / "Assembly/gml_Object_bulletStandard_Create_0.asm").read_text()
 parent_create = (export / "Assembly/gml_Object_parentPBullet_Create_0.asm").read_text()
 assert "pushi.e 101\npop.v.i self.hitWallFx" in parent_create

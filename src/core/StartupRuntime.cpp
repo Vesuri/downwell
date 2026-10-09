@@ -328,9 +328,9 @@ bool StartupRuntime::publishCollisionPosition(InstanceHandle h,RunnerImageValue 
         run_.effectsSucceeded=false;return false;
     }
     record->x=drawX;record->y=drawY;
-    if(record->objectId==61){
-        // Unlike player/box motion accumulators, this controller's precise
-        // fields mirror its published builtins, including external setters.
+    if(record->objectId==61||record->objectId==261){
+        // Unlike player/box motion accumulators, these precise fields mirror
+        // published builtins. Bullet private motion lives in mainBullets_.
         std::memcpy(&record->preciseX,&x.bits,4);std::memcpy(&record->preciseY,&y.bits,4);
     }
     return true;
@@ -489,7 +489,10 @@ void StartupRuntime::stepInternal(bool advancePressed,
                                                  StepEvent event) {
         // Projectiles still use the shared supported Step adapter below.
         // Registration does not authorize a second dispatch of their events.
-        if(instance.objectId==261)return;
+        if(instance.objectId==261){
+            if(event.phase==StepEventPhase::endStep&&!endStepMainBullet(instance))run_.effectsSucceeded=false;
+            return;
+        }
         if(instance.objectId==370){
             if(!debrisEventDispatch_||!debrisEventDispatch_(debrisEventContext_,instance,event))run_.effectsSucceeded=false;
             return;
@@ -598,6 +601,12 @@ void StartupRuntime::stepInternal(bool advancePressed,
         // admitted families retire in room order while their scoped owners
         // are still installed. Unbound families retain explicit cleanup.
         if(!cleanupMainOwnedDestroyed())run_.effectsSucceeded=false;
+        if(objectPack_&&run_.effectsSucceeded){
+            std::size_t write=0;
+            for(std::size_t i=0;i<mainBulletCount_;++i)
+                if(instances_.resolve(mainBullets_[i].instance))mainBullets_[write++]=mainBullets_[i];
+            mainBulletCount_=write;
+        }
     }
 }
 
@@ -902,7 +911,7 @@ void StartupRuntime::updateMainBullets() {
           [this,&bullet]{
               if(!publishMainBullet(bullet,true))return run_.effectsSucceeded=false;
               return true;
-          });
+          },objectPack_==nullptr);
         if(succeeded&&!publishMainBullet(bullet,false))succeeded=run_.effectsSucceeded=false;
         if(succeeded&&!alive&&bullet.instance.generation){
             succeeded=markBulletDestroyed(bullet.instance);
@@ -918,6 +927,21 @@ void StartupRuntime::updateMainBullets() {
             mainBullets_[write++] = bullet;
     }
     mainBulletCount_ = write;
+}
+
+bool StartupRuntime::endStepMainBullet(InstanceRecord& instance){
+    const auto key=instances_.handleAt(static_cast<std::size_t>(&instance-&instances_.at(0)));
+    struct Ops {
+        StartupRuntime& world;InstanceHandle key;long top;
+        bool readY(MotionBinary64& value){const auto* r=world.resolveInstance(key);
+            if(!r||r->objectId!=261)return false;
+            RunnerImageValue y;std::memcpy(&y.bits,&r->preciseY,4);value=y.promoted();return value.valid();}
+        bool viewY(MotionBinary64& value){return multiplyBinary64(MotionBinary64::fromInteger(top),{0x3f300000u,0},value);}
+        bool viewHeight(MotionBinary64& value){value=MotionBinary64::fromInteger(surfaceHeight);return true;}
+        bool mainRoom(bool& value){value=world.roomId()==mainRoomId;return true;}
+        bool destroySelf(){return world.markBulletDestroyed(key);}
+    } ops{*this,key,ordinaryStepViewTopQ12_};
+    return ProjectileViewRetirement::run(ops,run_.effectsSucceeded);
 }
 
 bool StartupRuntime::publishBulletAngle(InstanceHandle h,RunnerImageValue angle){

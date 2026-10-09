@@ -40,6 +40,9 @@ bool nativeBulletSound(downwell::GameplayCollisionOwner& owner,GameplayWorld& wo
     return world.playBulletWallSound(shot,env,[&](const char*& material){return owner.projectileWallMaterial(wall,material);},audio);
 }
 struct NativeBulletFrames {bool operator()(int,unsigned&);};
+bool nativeBulletEndStep(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle shot){
+    return owner.endStepBullet(shot,{});
+}
 bool nativeBulletEffects(GameplayWorld& world,downwell::GameplayScriptSpawnInstances& registry,
     downwell::ScriptSpawnEffects<4>& effects,downwell::InstanceHandle shot,NativeBulletFrames frames){
     auto ops=world.bulletEffectOperations(shot,effects,registry,frames);
@@ -2969,6 +2972,21 @@ int main(){
         const auto last=*owner->state(shared);
         assert(!world->publishBulletCollisionPosition(key,{0x7f800000u},{})&&!world->effectsSucceeded());
         assert(owner->state(shared)->x.bits==last.x.bits&&owner->state(shared)->y.bits==last.y.bits);
+    }
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+        GameplayCollisionOwner::Ownership::nativeScenery}){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+        auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));InstanceHandle shot;
+        assert(world->withCollisionPass([&]{
+            assert(world->bulletCount()==1);const auto& r=world->bulletAt(0);shot={r.identitySlot,r.lifetimeId};
+            RunnerImageValue x,y;assert(x.assignInteger(240)&&y.assignInteger(10000));
+            return world->publishBulletCollisionPosition(shot,x,y)&&!world->resolveBulletLifetime(shot)->destroyRequested;
+        },[&]{world->step(4);return world->effectsSucceeded();}));
+        assert(world->resolveBulletLifetime(shot)&&world->resolveBulletLifetime(shot)->destroyRequested);
+        assert(owner->prepareDraw()&&!world->resolveBulletLifetime(shot));
     }
     for(bool failSprite:{false,true}){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);

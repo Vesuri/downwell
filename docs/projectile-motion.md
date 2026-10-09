@@ -220,8 +220,22 @@ This handle-based operation publishes the collision exclusion once, retains the
 record until cleanup, accepts repeated requests and rejects stale generations.
 The stored-world integration test also publishes coordinates through the real
 collision owner after marking destruction. This supplies the destruction-request
-boundary needed by the recovered Step; it does not change when the approximate
-gun path currently requests destruction or complete its source scheduling.
+boundary needed by the recovered Step; it does not complete ordinary-Step
+collision scheduling or replace the approximate trajectory.
+
+Resource-owned usual-gun view retirement runs in the selected End Step phase,
+after collision processing: `scrOutofview`, then both independent
+`scrBulletOov` comparisons. It reads published binary32 Y promoted to the VM
+real, not the private trajectory or rounded drawing coordinate. Destruction
+marks retain the executing bullet until cleanup; the stored draw list drops
+those retired handles before presentation. The native owner includes object
+261 in its captured, sorted actor End Step population. These adapters use the
+phase-published main-room view, as the existing camera contract requires.
+Resource-less motion fixtures retain their combined movement/view-retirement
+adapter; they have no room event dispatcher. Collision-driven position tests
+cover subsequent End Step retirement in both worlds and all native ownership
+variants. Exact ordinary-Step motion and full mixed collision scheduling remain
+separate from this connected End Step behavior.
 
 `publishBulletCollisionPosition` exposes checked builtin position publication
 on both live worlds. It resolves the projectile lifetime on each call, accepts

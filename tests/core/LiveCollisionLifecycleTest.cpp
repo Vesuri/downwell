@@ -2084,6 +2084,26 @@ int main(){
         require(owner->collisionPosition(shot,actualX,actualY)&&actualX.bits==0x43700000u&&actualY.bits==0x44000000u,
             "place query restores exact published bullet position");
     }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach bullet End Step world");world->skipToGameForTesting();
+        InstanceHandle shot;
+        for(unsigned tick=0;tick<1000&&!shot.generation;++tick){
+            require(world->stepWithCollisionPass(gameplayContactProfileInput(tick,world->mainPlayerX(),world->mainPlayerY()),false,[&]{
+                for(unsigned i=0;i<world->mainBulletCount();++i){
+                    const auto key=world->mainBulletAt(i).instance;const auto* r=owner->resolve(key);
+                    if(!r||r->destroyRequested)continue;
+                    RunnerImageValue x,y;require(x.assignInteger(240)&&y.assignInteger(10000),"bullet test position");
+                    shot=key;return world->publishBulletCollisionPosition(key,x,y)&&!owner->resolve(key)->destroyRequested;
+                }
+                return true;
+            }),"live bullet survives collision publication until End Step");
+        }
+        require(shot.generation&&!owner->resolve(shot),"bullet End Step observes collision-published Y and cleanup retires it");
+        for(unsigned i=0;i<world->mainBulletCount();++i)
+            require(owner->resolve(world->mainBulletAt(i).instance),"bullet draw cache contains no End Step retirees");
+    }
     for(bool high:{false,true})for(bool laser:{false,true}){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());

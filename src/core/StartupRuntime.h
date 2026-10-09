@@ -12,6 +12,7 @@
 #include "GameplayLimits.h"
 #include "GemMotion.h"
 #include "ProjectileAnimation.h"
+#include "ProjectileViewRetirement.h"
 #include "ProjectileSegment.h"
 #include "LaserSightRay.h"
 #include "MachineGunEmitter.h"
@@ -364,6 +365,7 @@ public:
     bool deferredCommandsSucceeded() const { return deferredCommandsSucceeded_; }
     // Engine x/y setter for collision response. Keeps private actor motion and
     // preciseX/Y motion caches untouched; the collision owner stores exact x/y.
+    // Objects 61 and 261 instead mirror published builtins in preciseX/Y.
     bool publishCollisionPosition(InstanceHandle h,RunnerImageValue x,RunnerImageValue y);
     bool publishBulletCollisionPosition(InstanceHandle h,RunnerImageValue x,RunnerImageValue y){
         const auto* record=instances_.resolve(h);
@@ -1878,6 +1880,7 @@ private:
     void emitMainBullet(int x,int y);
     void updateMainBullets();
     bool publishMainBullet(MainBulletState& bullet,bool angle);
+    bool endStepMainBullet(InstanceRecord& instance);
     bool cleanupMainOwnedDestroyed();
     bool clearMainBullets();
     bool publishMainInactivation(const InstanceRecord& record);

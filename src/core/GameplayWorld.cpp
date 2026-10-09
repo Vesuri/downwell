@@ -1388,7 +1388,7 @@ bool GameplayWorld::stepBulletEffect(BulletState& bullet,long generationCameraY,
                 !publishBulletAngle({bullet.identitySlot,bullet.lifetimeId},angle))
                 return run_.effectsSucceeded=false;
             return true;
-        }))return false;
+        },!registeredOrdinaryEndStep_))return false;
     if(bulletLifecycle_.hasOwner()){
         DW_PROFILE_SCOPE(profileBulletPublication);
         const downwell::InstanceHandle h{bullet.identitySlot,bullet.lifetimeId};

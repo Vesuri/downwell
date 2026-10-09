@@ -121,7 +121,7 @@ private:
     mutable bool drawAuditHasSnapshot_=false;
 #endif
     RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity+GameplayWorld::droneBulletCapacity+GameplayWorld::boneCapacity+GameplayWorld::skeletonCapacity+GameplayWorld::currencyCapacity+32+32+4+4> combatAlarmPhase_;
-    RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::droneBulletCapacity+GameplayWorld::skeletonCapacity+GameplayPlayerControllers::capacity+32> actorEndStepPhase_;
+    RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::bulletCapacity+GameplayWorld::droneBulletCapacity+GameplayWorld::skeletonCapacity+GameplayPlayerControllers::capacity+32> actorEndStepPhase_;
     bool actorEndStepExecuting_=false;
     bool combatAlarmPhaseInUse_=false;
     bool combatAlarmCaptureDirty_=true;
@@ -1480,7 +1480,7 @@ public:
             const auto* nativeTerrain=self.world_->nativeTerrainInstances();
             const unsigned terrainCount=nativeTerrain?nativeTerrain->size():self.terrain_.size();
             const auto terrainCutoff=nativeTerrain?nativeTerrain->lastLifetime():self.terrain_.lastLifetime();
-            if(!terrainCount&&!self.world_->breakableSlots()&&!self.world_->enemyCount()&&!self.drones_.size()&&!self.skeletons_.size()&&!self.playerControllers_.size()&&!self.corpses_.size())return true;
+            if(!terrainCount&&!self.world_->breakableSlots()&&!self.world_->enemyCount()&&!self.world_->bulletCount()&&!self.drones_.size()&&!self.skeletons_.size()&&!self.playerControllers_.size()&&!self.corpses_.size())return true;
             MotionBinary64 top;
             if(!multiplyBinary64(MotionBinary64::fromInteger(topQ12),{0x3f300000u,0},top))return self.check(false);
             return self.dispatchActorEndStep([&](InstanceHandle shared,int object){
@@ -1503,6 +1503,7 @@ public:
                             return LifetimeInstance{object,enemy->y+176,enemy->active&&!enemy->destroyRequested};
                         },[&](unsigned){return self.world_->markEnemyDestroyed(local);});
                 }
+                if(object==261&&kind==View::Kind::bullet)return self.endStepBullet(shared,top);
                 if(object==120&&kind==View::Kind::skeleton)return self.skeletons_.endStep(local,top,true);
                 if(object==263&&kind==View::Kind::corpse)return self.corpses_.endStep(local,top,true);
                 if(object==256&&kind==View::Kind::playerController)
@@ -1922,6 +1923,10 @@ public:
                 if((flags&0x100003u)||!hasSimpleOutOfViewEndStep(object))return true;
                 return resolves(h)&&actorEndStepPhase_.append(h.slot,h.generation,object);
             })))return false;
+        if(!check(visitRegistered(View::bulletBase,View::scriptEffectBase,
+            [&](InstanceHandle h,int object,std::uint32_t flags){
+                return (flags&0x100003u)||(object==261&&resolves(h)&&actorEndStepPhase_.append(h.slot,h.generation,object));
+            })))return false;
         if(!check(visitRegistered(View::droneBase,View::bloodBase,
             [&](InstanceHandle h,int object,std::uint32_t flags){
                 if((flags&0x100003u)||object==269)return true;
@@ -2135,6 +2140,27 @@ public:
         if(!valid()||!world_||!View::decode(shared,kind,local)||kind!=View::Kind::bone||
            !resolves(shared))return check(false);
         return check(world_->stepBoneRoomEffect(local,stopped,frames));
+    }
+    // GameplayWorld owns rmMain; invoke only at the selected End Step slot.
+    // Read the published builtin again after each destruction request.
+    bool endStepBullet(InstanceHandle shared,MotionBinary64 top){
+        View::Kind kind;InstanceHandle local;
+        if(!valid()||!world_||!resolves(shared)||!View::decode(shared,kind,local)||kind!=View::Kind::bullet)
+            return check(false);
+        struct Ops {
+            GameplayCollisionOwner& owner;InstanceHandle shared,local;MotionBinary64 top;
+            bool readY(MotionBinary64& y){
+                if(!owner.resolves(shared))return false;
+                if(owner.native_){const auto* p=owner.nativePosition(shared.slot);if(!p)return false;y=p->y.promoted();}
+                else {const auto* p=owner.state(shared);if(!p)return false;y=p->y.promoted();}
+                return y.valid();
+            }
+            bool viewY(MotionBinary64& y){y=top;return true;}
+            bool viewHeight(MotionBinary64& h){h=MotionBinary64::fromInteger(284);return true;}
+            bool mainRoom(bool& main){main=true;return true;}
+            bool destroySelf(){return owner.world_->markBulletDestroyed(local);}
+        } ops{*this,shared,local,top};
+        bool good=true;return check(ProjectileViewRetirement::run(ops,good));
     }
     // Caller-resident phase snapshot, shared by all twelve alarm indices.
     // advanceAndDispatch owns the actor's alarm storage: decrement once and

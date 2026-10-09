@@ -66,15 +66,18 @@ bool stepMachineGunBullet(MachineGunTrajectory& motion,Random& random,Enemy enem
 // queries and their world origin. Animation runs separately before Begin Step,
 // so a shot created during that phase retains its Create image on this Step.
 // Consumed shots still finish this update; owners retire/compact them afterward.
+// Resource-backed worlds defer view retirement to their selected End Step;
+// resource-less arithmetic fixtures keep the combined adapter by default.
 template<class Bullet,class Random,class Enemy,class Wall,class Healthy,class PublishInitialization>
 bool stepMachineGunProjectileChecked(Bullet& bullet,Random& random,Enemy enemy,Wall wall,
-    bool& alive,Healthy healthy,int originY,long viewTopQ12,int viewHeight,PublishInitialization publishInitialization){
+    bool& alive,Healthy healthy,int originY,long viewTopQ12,int viewHeight,PublishInitialization publishInitialization,
+    bool retireInStep=true){
     if(!healthy())return false;
     bool moving=false;
     if(!stepMachineGunBulletChecked(bullet.trajectory,random,enemy,wall,moving,healthy,publishInitialization))return false;
     bullet.x = bullet.trajectory.x.pixel;
     bullet.y = bullet.trajectory.y.pixel;
-    alive=!fractionalBulletOutsideView(bullet.trajectory.y,originY,viewTopQ12,viewHeight)&&moving;
+    alive=moving&&(!retireInStep||!fractionalBulletOutsideView(bullet.trajectory.y,originY,viewTopQ12,viewHeight));
     return true;
 }
 template<class Bullet,class Random,class Enemy,class Wall,class Healthy>
