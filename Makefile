@@ -1522,6 +1522,16 @@ build/skeleton-actor-test: tests/core/SkeletonActorTest.cpp tests/core/SkeletonS
 	@mkdir -p build
 	$(CXX) $(CXXFLAGS) -ffp-contract=off -Isrc -o $@ $< src/core/PlayerMotion.cpp
 
+.PHONY: verify-blast-actor
+test: verify-blast-actor
+verify-blast-actor: build/blast-actor-test
+	python3 tools/verify-blast-actor.py
+	./build/blast-actor-test
+
+build/blast-actor-test: tests/core/BlastActorTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -ffp-contract=off -Isrc -o $@ $<
+
 .PHONY: verify-skeleton-decisions
 verify-skeleton-decisions: build/skeleton-decisions-test
 	./build/skeleton-decisions-test

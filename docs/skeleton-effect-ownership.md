@@ -336,6 +336,27 @@ Precise player writes, style and blast creation remain explicit dependencies;
 these adapters do not yet install natural encounters.
 World and caller failure statuses both latch after a rejected service.
 
+`BlastActor` is the shared object-276 event body, with sprite 471's fourteen
+frames and inherited object-89 bullet defaults. Its Create publishes damage 50,
+direction 270, consistent/wave/allSet, and a damage cutoff of frame 3 before
+camera shake (6,8) and `momentDelay`. Only then are image index 0, image speed
+0.5 and the randomly chosen horizontal sign written. Ordinary Step disables
+damage strictly after image index 3; animation-end marks destruction. There is
+no time-stop early return. Player collision has no body. Wall collision admits
+only direct parent 84. Shootable-object collision emits its flash after health
+subtraction. Enemy collision preserves immunity/health guards, damage stun,
+both delay calls, sound, impact and effect order without retiring the target.
+
+`ProjectileHitMemory` retains source numeric target IDs across wall, object and
+enemy contacts. It keeps `checkTarget`, `hitIgnore`, count and the scan's final
+`i`; finding a match does not terminate the scan. Wall/object handlers remember
+targets before their health test, while the enemy handler tests health first.
+Its capacity is an explicit owner limit: exhaustion fails rather than evicting
+old IDs. `verify-blast-actor` pins the event inputs and checks phase boundaries
+and service-failure prefixes. This event body still needs registered lifetime,
+publication, Draw and mixed collision dispatch on both worlds; it is not a
+successful replacement for the stomp adapter's explicit blast dependency.
+
 Effect-producing callbacks return success. `SkeletonActor` stops the event on
 failed enemy-death setup, blood, smoke, flash, currency, corpse or debris
 creation; stomp blood and each Exploding Knees smoke emission have the same
