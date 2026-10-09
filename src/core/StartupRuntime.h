@@ -1276,6 +1276,21 @@ public:
         return spawnScriptEffect(ownedScriptRegistration_,ownedScriptEffects_,x,y,sprite,speed,angle,depth,frames,myFx);
     }
     template<unsigned Capacity,unsigned Registered,class Frames>
+    auto bulletEffectOperations(InstanceHandle shot,ScriptSpawnEffects<Capacity>& effects,
+        StoredScriptSpawnRegistration<instanceCapacity,Registered>& registration,Frames frames){
+        const auto* record=instances_.resolve(shot);
+        if(!record||record->objectId!=261||!registration.belongsTo(instances_))run_.effectsSucceeded=false;
+        if(run_.effectsSucceeded&&(scriptEffectsBinding_.effects!=&effects||scriptEffectsBinding_.registry!=&registration)){
+            if(hasScriptEffectRecords())run_.effectsSucceeded=false;
+            else scriptEffectsBinding_=ScriptEffectRuntimeBinding::bind<InstanceRecord>(effects,registration);
+        }
+        return scriptSpawnOperations(effects,registration,frames,[this,shot,&registration](unsigned local){
+            auto* caller=instances_.resolve(shot);const auto id=registration.sourceId(local);
+            if(!caller||caller->objectId!=261||!id)return false;
+            caller->bulletMyFx=id;return true;
+        },run_.effectsSucceeded);
+    }
+    template<unsigned Capacity,unsigned Registered,class Frames>
     bool spawnScriptEffect(StoredScriptSpawnRegistration<instanceCapacity,Registered>& registration,
         ScriptSpawnEffects<Capacity>& effects,MotionBinary64 x,MotionBinary64 y,int sprite,
         MotionBinary64 speed,MotionBinary64 angle,MotionBinary64 depth,Frames frames,std::uint32_t& myFx){

@@ -164,6 +164,7 @@ public:
         downwell::ProjectileAnimation animation;
         downwell::MachineGunTrajectory trajectory;
         downwell::SoundPlayState sound{};
+        downwell::InstanceHandle myFx{};
     };
     using BulletLifecycleBinding=downwell::RecordLifecycleBinding<BulletState>;
     struct EnemyState {
@@ -854,6 +855,22 @@ public:
         return downwell::EffectSpawnScript::run(ops,x,y,sprite,speed,angle,depth);
     }
     const downwell::ScriptSpawnEffects<downwell::scriptSpawnEffectCapacity>& scriptEffects()const{return ownedScriptEffects_;}
+    template<unsigned Capacity,class Frames>
+    auto bulletEffectOperations(downwell::InstanceHandle shot,downwell::ScriptSpawnEffects<Capacity>& effects,
+        downwell::GameplayScriptSpawnInstances& registration,Frames frames){
+        if(!resolveBulletLifetime(shot)||scriptSpawnInstances_!=&registration||!registration.valid())
+            run_.effectsSucceeded=false;
+        if(run_.effectsSucceeded&&scriptEffectsBinding_.effects!=&effects){
+            if(registration.size())run_.effectsSucceeded=false;
+            else scriptEffectsBinding_=downwell::ScriptEffectRuntimeBinding::bind<downwell::GameplayScriptSpawnInstances::Record>(effects,registration);
+        }
+        return downwell::scriptSpawnOperations(effects,registration,frames,[this,shot,&registration](unsigned local){
+            auto* caller=const_cast<BulletState*>(resolveBulletLifetime(shot));
+            const auto child=registration.handle(local);
+            if(!caller||!child.generation)return false;
+            caller->myFx=child;return true;
+        },run_.effectsSucceeded);
+    }
     template<class Frames> bool spawnBoxScriptEffect(downwell::InstanceHandle box,
         downwell::MotionBinary64 x,downwell::MotionBinary64 y,int sprite,downwell::MotionBinary64 speed,
         downwell::MotionBinary64 angle,downwell::MotionBinary64 depth,Frames frames){

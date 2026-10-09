@@ -156,8 +156,15 @@ are read after the approach loop and before final movement; depth is explicitly
 zero. Backends do not supply an alternative impact-effect implementation to
 this Step. The standalone solid-script interface retains its callback for
 isolated branch tests.
-The
-enclosing runtime supplies the same motion object to its query/approach
+Both worlds' `bulletEffectOperations` bind those births to the room's effect
+animation/retirement owner and write `myFx` on the actual retained bullet before
+the child's sprite setter. The stored world keeps the source numeric ID; the
+native world keeps a generation-checked internal effect handle, not a fabricated
+source ID. Each assignment resolves the bullet again after synchronous creation.
+Later child-setter failure leaves the completed birth and caller assignment
+intact and latches world failure. The effect owner and registry must remain at
+stable addresses while their registered records exist.
+The enclosing runtime supplies the same motion object to its query/approach
 callbacks and retains the executing bullet through destruction requests.
 `verify-machine-gun-source-step` checks both profiles through empty, box, wall,
 enemy-suppression and shootable routes, every callback failure prefix, and

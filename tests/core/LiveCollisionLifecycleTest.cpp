@@ -2110,10 +2110,13 @@ int main(){
         require(motion.reset(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(500),laser)&&
             world->publishBulletCollisionPosition(shot,motion.x,motion.y),"publish source bullet starting position");
         auto registration=world->scriptSpawnRegistration<4>();ScriptSpawnEffects<4> effects;
-        bool succeeded=true;unsigned child=0;
+        bool succeeded=true;
         auto frames=[&](int id,unsigned& count){PackedSpriteCollision art;
+            const auto* caller=owner->resolve(shot);
+            require(caller&&caller->bulletMyFx==registration.sourceId(1)&&caller->bulletMyFx,
+                "actual caller stores the source child ID before the sprite setter");
             if(!sprites.sprite(id,art))return false;count=art.frameCount;return true;};
-        auto muzzle=scriptSpawnOperations(effects,registration,frames,[&](unsigned id){child=id;return true;},succeeded);
+        auto muzzle=world->bulletEffectOperations(shot,effects,registration,frames);
         struct Ops {
             StartupRuntime& world;StoredWorldCollision& owner;MachineGunSourceMotion& motion;InstanceHandle shot;
             InstanceHandle selected{};unsigned lines=0,points=0,approachWrites=0,writes=0;
@@ -2152,7 +2155,8 @@ int main(){
             target->box.wallHp.high==expected.high&&target->box.wallHp.low==expected.low&&target->active&&!target->destroyRequested,
             "source bullet damage leaves the selected box alive for its own Step");
         require(ops.lines==3&&ops.points>1&&ops.approachWrites==2*(ops.points-1)&&ops.writes==2&&
-            random.drawCount()==1&&child&&registration.sourceId(child)&&owner->resolve(shot)->destroyRequested,
+            random.drawCount()==1&&owner->resolve(shot)->bulletMyFx==registration.sourceId(1)&&
+            owner->resolve(shot)->bulletMyFx&&owner->resolve(shot)->destroyRequested,
             "source query/movement counts and synchronous muzzle birth survive destruction marking");
         {
             const auto before=world->randomDrawCount();const int previous=world->overlapSound(2);
