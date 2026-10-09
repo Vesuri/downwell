@@ -15,7 +15,7 @@ static double real(downwell::MotionBinary64 x){
 struct Birth {int object;double x,y;};
 int main(){
     unsigned births=0;
-    for(unsigned seed=0;seed<1024;++seed) for(bool flash:{false,true}) for(bool box:{false,true})
+    for(unsigned seed=0;seed<1024;++seed) for(bool flash:{false,true}) for(bool box:{false,true}) for(bool published:{false,true})
     for(int capacity:{0,2,32}) {
         downwell::GameMakerRandom random(seed),oracle(seed);
         std::vector<Birth> actual,expected;
@@ -31,12 +31,18 @@ int main(){
             childDraws(random,flash);return true;
         };
         const double x=seed%2?96.125:-32.375,y=seed%3?192.75:-256.25;
-        bool result=box?(flash?downwell::boxFlashBurst(number(x),number(y),random,create):
+        downwell::SmokeBurstCaller caller;
+        bool result=published&&!flash?(box?
+                         downwell::smokeBurstPublished<1,0>(caller,number(x),number(y),random,create):
+                         downwell::smokeBurstPublished<5,1>(caller,number(x),number(y),random,create)):
+                         box?(flash?downwell::boxFlashBurst(number(x),number(y),random,create):
                               downwell::boxSmokeBurst(number(x),number(y),random,create)):
                          (flash?downwell::skeletonFlashBurst(number(x),number(y),random,create):
                                 downwell::skeletonSmokeBurst(number(x),number(y),random,create));
         // Independent 64-bit modulus and ordinary host-double arithmetic.
         const unsigned count=(box?1:4)+unsigned(oracle.irandom(box?0:flash?4:2));
+        if(published&&!flash)check(real(caller.smx)==x&&real(caller.smy)==y&&
+            caller.smokenum==int(count)&&caller.vary==(box?0:1));
         bool success=true;
         for(unsigned i=0;i<count;++i){
             double py,px;
@@ -55,5 +61,16 @@ int main(){
         check(random.drawCount()==oracle.drawCount() && random.stateIndex()==oracle.stateIndex());
         for(unsigned i=0;i<16;++i)check(random.stateWord(i)==oracle.stateWord(i));
     }
-    std::printf("Skeleton/box effect bursts: 12288 sequences, %u ordered child births passed\n",births);
+    // Synchronous children may mutate the caller. The repeat count remains
+    // captured, but each subsequent child reads the current coordinates.
+    downwell::SmokeBurstCaller caller;downwell::GameMakerRandom random(42),oracle(42);
+    const unsigned count=4+oracle.irandom(2);unsigned emitted=0;
+    check(downwell::smokeBurstPublished<5,1>(caller,number(10),number(20),random,[&](int,auto x,auto y){
+        const double baseX=emitted?100:10,baseY=emitted?200:20;
+        const double expectedY=baseY+int(oracle.nextU32()%5)-2;
+        const double expectedX=baseX+int(oracle.nextU32()%5)-2;
+        check(real(x)==expectedX&&real(y)==expectedY);
+        caller.smx=number(100);caller.smy=number(200);caller.smokenum=0;++emitted;return true;
+    })&&emitted==count&&caller.smokenum==0);
+    std::printf("Skeleton/box effect bursts: 24576 sequences, %u ordered child births passed\n",births);
 }

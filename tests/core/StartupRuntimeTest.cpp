@@ -1017,6 +1017,39 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         auto expiry=runtime->corpseExpiryRegistration<1>();
         auto skeletons=runtime->skeletonRegistration<1>();downwell::InstanceHandle dyingSkeleton;
         require(runtime->spawnSkeleton(skeletons,240,1200,dyingSkeleton),"registered dying caller");
+        auto smokeBurst=runtime->smokeRegistration<6>();
+        auto smokeRandom=runtime->randomState();
+        const auto firstSmokeId=runtime->nextRuntimeInstanceId();
+        downwell::SmokeEffect expectedSmoke[6];unsigned expectedCount=0;
+        const auto smokeX=downwell::MotionBinary64::fromInteger(240);
+        const auto smokeY=downwell::MotionBinary64::fromInteger(1200);
+        require(downwell::skeletonSmokeBurst(smokeX,smokeY,smokeRandom,[&](int object,auto x,auto y){
+            require(object==225&&expectedCount<6,"scalar skeleton burst child");
+            return expectedSmoke[expectedCount++].create(x,y,smokeRandom);
+        }),"scalar complete synchronous smoke burst");
+        require(skeletons.dispatchPublished(dyingSkeleton,[&](auto& actor,auto&,auto& publish,bool&){
+            return publish.smoke([&](auto& caller){
+                require(runtime->emitRegisteredSkeletonSmoke(smokeBurst,caller,actor.xx,actor.yy),
+                    "skeleton caller emits room-owned smoke burst");
+                return caller.smokenum==int(expectedCount)&&caller.vary==1&&
+                    actor.smokeScript.smokenum==int(expectedCount);
+            });
+        }),"script caller fields published on actual skeleton");
+        require(runtime->nextRuntimeInstanceId()==firstSmokeId+expectedCount&&
+            runtime->randomDrawCount()==smokeRandom.drawCount()&&runtime->smokeEffects().size()==0,
+            "source IDs and synchronous RNG belong to room, not compatibility smoke pool");
+        for(unsigned i=0;i<16;++i)require(runtime->randomState().stateWord(i)==smokeRandom.stateWord(i),
+            "complete registered burst RNG agrees with scalar source path");
+        for(unsigned i=0;i<expectedCount;++i){
+            const auto* r=runtime->instance(firstSmokeId+i);const auto* s=r?smokeBurst.state(*r):nullptr;
+            const auto& expected=expectedSmoke[i];
+            require(s&&s->x.bits==expected.x.bits&&s->y.bits==expected.y.bits&&
+                s->speed.high==expected.speed.high&&s->speed.low==expected.speed.low&&
+                s->direction.high==expected.direction.high&&s->direction.low==expected.direction.low&&
+                s->imageSpeed.bits==expected.imageSpeed.bits&&!s->allSet,
+                "registered children complete Create without consuming first-Step random draw");
+        }
+        require(smokeBurst.clear(),"explicit burst fixture teardown");
         const auto parentId=runtime->nextRuntimeInstanceId();
         require(skeletons.dispatchPublished(dyingSkeleton,[&](auto& actor,auto&,auto& publish,bool&){
             actor.xsp={0x3fb99999u,0x9999999au}; // 0.1 triggers source fallback.

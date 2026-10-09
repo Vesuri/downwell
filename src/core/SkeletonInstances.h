@@ -81,6 +81,10 @@ public:
         SkeletonInstances& store_;InstanceHandle key_;
     public:
         Publisher(SkeletonInstances& store,InstanceHandle key):store_(store),key_(key){}
+        template<class Create> bool smoke(Create create){
+            auto* r=store_.resolve(key_);if(!r)return store_.fail();
+            return create(r->state.smokeScript)||store_.fail();
+        }
         bool imageSpeed(RunnerImageValue value){
             auto* r=store_.resolve(key_);if(!r)return store_.fail();
             r->state.imageSpeed=value.promoted();return store_.publishBuiltins(key_,*r);

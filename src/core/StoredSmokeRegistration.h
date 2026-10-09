@@ -3,6 +3,7 @@
 #include "SmokeEffect.h"
 #include "SmokeDirection.h"
 #include "SmokeTrig.h"
+#include "SkeletonEffectBursts.h"
 #include "InstanceStore.h"
 #include "InstanceLifecycle.h"
 #include "ObjectPack.h"
@@ -34,6 +35,12 @@ public:
     bool belongsTo(const InstanceStore<WorldCapacity>& records)const{return &records_==&records;}
     bool valid()const{return good_;}
     const SmokeEffect* state(const InstanceRecord& r){auto* e=entry(r);return e?&e->state:nullptr;}
+    template<class Random> bool skeletonBurst(SmokeBurstCaller& caller,MotionBinary64 x,MotionBinary64 y,Random& random){
+        if(!good_)return false;
+        return smokeBurstPublished<5,1>(caller,x,y,random,[&](int object,auto px,auto py){
+            std::uint32_t id=0;return object==225&&create(px,py,random,id);
+        })||fail();
+    }
     template<class Random> bool create(MotionBinary64 x,MotionBinary64 y,Random& random,std::uint32_t& output){
         output=0;if(!good_)return false;
         Entry* free=nullptr;for(auto& e:entries_)if(!e.id&&!free)free=&e;

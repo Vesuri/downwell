@@ -807,6 +807,11 @@ public:
         if(!registry.belongsTo(instances_))return run_.effectsSucceeded=false;
         return registry.create(x,y,random_,id);
     }
+    template<unsigned Capacity> bool emitRegisteredSkeletonSmoke(StoredSmokeRegistration<instanceCapacity,Capacity>& registry,
+        SmokeBurstCaller& caller,MotionBinary64 x,MotionBinary64 y){
+        if(!registry.belongsTo(instances_))return run_.effectsSucceeded=false;
+        return registry.skeletonBurst(caller,x,y,random_);
+    }
     template<unsigned Capacity,class Source,class Tile> bool createRegisteredCorpseFromDeath(
         StoredCorpseRegistration<instanceCapacity,Capacity>& registry,Source& source,
         int sprite,MotionBinary64 impact,int explosion,Tile tile){

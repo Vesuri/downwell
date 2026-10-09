@@ -2,6 +2,27 @@
 #define DOWNWELL_CORE_SKELETON_EFFECT_BURSTS_H
 #include "RandomBinary64.h"
 namespace downwell {
+// scrSmokefx writes these fields on its caller, not on each smoke child.
+struct SmokeBurstCaller {
+    MotionBinary64 smx{},smy{};
+    int smokenum=0,vary=0;
+};
+template<unsigned Count,unsigned Variation,class Random,class Create>
+bool smokeBurstPublished(SmokeBurstCaller& caller,MotionBinary64 x,MotionBinary64 y,
+                         Random& random,Create create){
+    static_assert(Count>=Variation&&Variation<=32767&&Count<=32767,"admitted integer burst count");
+    caller.smx=x;caller.smy=y;caller.smokenum=Count;caller.vary=Variation;
+    caller.smokenum+=int(random.irandomSmall(Variation*2))-int(Variation);
+    // The VM repeat count is captured once; smx/smy are re-read for each child.
+    const int count=caller.smokenum;
+    for(int i=0;i<count;++i){
+        auto py=caller.smy,px=caller.smx;
+        if(!py.add(MotionBinary64::fromInteger(int(random.chooseIndexSmall(5))-2))||
+           !px.add(MotionBinary64::fromInteger(int(random.chooseIndexSmall(5))-2))||
+           !create(225,px,py))return false;
+    }
+    return true;
+}
 // Shared constant-argument scrSmokefx and scrFlashballfx calls. The skeleton
 // uses (5,1)/(6,2,10); box destruction uses (1,0)/(1,0,2).
 // create(object,x,y) must complete the child's Create, including its RNG,
