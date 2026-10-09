@@ -49,6 +49,37 @@ public:
                 return world.dispatchDitherAboveCollision(event);
             });
     }
+    // Registered bones share the same collected stream as skeleton damage,
+    // fields, smoke and authored wall pruning. This replaces the narrower
+    // overload above; it must never be run as a second family collision pass.
+    template<unsigned Capacity,unsigned BoneCapacity,unsigned SmokeCapacity,unsigned ParticleCapacity,unsigned StopCapacity,
+             class Frames,class Audio,class Atan,class Damage>
+    bool runSkeletonContacts(StartupRuntime& world,
+        StoredSkeletonRegistration<StartupRuntime::instanceCapacity,Capacity>& skeletons,
+        StoredBoneRegistration<StartupRuntime::instanceCapacity,BoneCapacity>& bones,
+        StoredSmokeRegistration<StartupRuntime::instanceCapacity,SmokeCapacity>& smoke,
+        StoredConsumptionBloodRegistration<StartupRuntime::instanceCapacity,ParticleCapacity>& particles,
+        const TimeStopEffects<StopCapacity>& stop,Frames frames,SoundPlayEnvironment& environment,Audio& audio,Atan atan,Damage damage){
+        if(!stop.succeeded||!bones.valid()||!smoke.valid()||!particles.valid())return false;
+        auto effect=[&](const auto& r){return (r.objectId==225&&smoke.state(r))||
+            (r.objectId==223&&particles.state(r));};
+        auto bonePair=[&](const auto& a,const auto& b){
+            // Plain walls have no reverse bone handler. Other wall families
+            // need their reverse-event audit before admission here.
+            return a.objectId==269&&bones.handle(a).generation&&(b.objectId==60||b.objectId==35);
+        };
+        return runSkeletonContactsSelected(world,skeletons,frames,[&]{return world.requestMomentDelay();},
+            environment,audio,atan,[&](const auto& a,const auto& b){
+                return bonePair(a,b)||bonePair(b,a)||(b.objectId==60&&effect(a))||(a.objectId==60&&effect(b));
+            },[&](const auto& event){
+                const auto* self=owner_.resolve(event.self);if(!self)return false;
+                if(self->objectId==269)return stop.succeeded&&
+                    world.dispatchBoneCollision(bones,event,stop.player.stopped,frames,damage);
+                if(self->objectId==225)return world.dispatchSmokeCollision(smoke,event);
+                if(self->objectId==223)return world.dispatchConsumptionBloodCollision(particles,event);
+                return world.dispatchDitherAboveCollision(event);
+            });
+    }
 private:
     template<unsigned Capacity,class Frames,class Delay,class Audio,class Atan,class Admit,class Execute>
     bool runSkeletonContactsSelected(StartupRuntime& world,

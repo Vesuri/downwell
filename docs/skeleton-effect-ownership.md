@@ -133,6 +133,16 @@ impact RNG or retire the caller prematurely. These adapters do not choose
 collision candidates or silently implement the missing player-damage script;
 the production paired dispatcher and damage owner must supply those operations.
 
+The stored `runSkeletonContacts` overload taking registered bones admits
+269/60 and 269/35 in the same collected pair stream as skeleton bullet/field
+contacts, smoke/consumption particles and dither/wall pruning. It resolves each
+selected event through `dispatchBoneCollision`; it does not run a later bone
+pass. Player damage remains a required checked dependency. The stop state is
+borrowed and read at each selected bone event, so a preceding callback's state
+change is visible without suppressing the source's impact/destruction tail.
+Broader wall families still require reverse-handler admission. This boundary
+does not admit skeleton/player contacts or supply the missing damage script.
+
 `dispatchSkeletonCollision` similarly validates the source player handler
 (120/1266) or inherited parent-time-field handler (83/1066), including the
 actual opposite object's subtype. Player handling preserves two independent

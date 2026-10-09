@@ -178,6 +178,9 @@ behavior, both backend integrations and relevant original-game verification.
   the room creation stream and real tile/audio/settings dependencies. Install
   stored `withRegisteredSkeletonEvents` alongside every child owner and live
   time-stop/query adapter for normal encounters, not only explicit test births.
+  Connect the stored mixed bone-contact admission to the real player-damage
+  script and extend admitted wall families only with their reverse handlers;
+  provide equivalent native mixed-pair admission.
 
 ### D. Verify natural encounters
 

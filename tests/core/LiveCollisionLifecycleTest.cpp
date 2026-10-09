@@ -1817,6 +1817,49 @@ int main(){
             require(actor&&bool(actor->myFxLocal)==(contact<3),"registered impact assigned only on admitted contact");
             require(bones.clear(),"clear collision fixture");}
     }
+    for(unsigned contact=0;contact<6;++contact){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach collected bone contacts");world->skipToGameForTesting();
+        auto pass=std::make_unique<StoredDitherCollisionPass>(*owner);
+        auto skeletons=world->skeletonRegistration<1>();auto bones=world->boneRegistration<2>();
+        auto smoke=world->smokeRegistration<1>();auto particles=world->consumptionBloodRegistration<1>();
+        int x=240,y=40008;
+        if(contact){
+            bool found=false;
+            for(unsigned i=0;i<world->activeInstanceCount();++i){const auto& r=world->instanceAt(i);
+                if(r.objectId==35){x=r.x;y=r.y-4;found=true;break;}}
+            require(found,"player position for collected bone overlap");
+        }else{InstanceHandle wall;require(world->spawnBuilderPrimitive(60,232,40000,wall),"plain wall for bone contact");}
+        InstanceHandle local;require(world->spawnBone(bones,x,y,local),"bone positioned for collected collision");
+        InstanceHandle second;if(contact==5)require(world->spawnBone(bones,x,y,second),"second bone observes mutable stop state");
+        if(contact==3)require(bones.dispatch(local,[](auto& state,auto&,bool&){state.active=false;return true;}),"inactive collected bone");
+        struct Audio {
+            bool isPlaying(int,bool& playing){playing=false;return true;}
+            bool stop(int){return true;}
+            bool play(int,int,bool,int& voice){voice=1000;return true;}
+            bool getGain(int,MotionBinary64& gain){gain=MotionBinary64::fromInteger(1);return true;}
+            bool setGain(int,MotionBinary64,int){return true;}
+            bool setPitch(int,MotionBinary64){return true;}
+        } audio;
+        SoundPlayEnvironment environment;unsigned damage=0;TimeStopEffects<4> stop;stop.player.stopped=contact==2;
+        const bool okay=pass->runSkeletonContacts(*world,skeletons,bones,smoke,particles,stop,
+            [&](int sprite,unsigned& count){return sprites.frameCount(sprite,count);},environment,audio,
+            [](auto dy,auto dx,auto& angle){return portableAtan(dy,dx,angle);},
+            [&](int amount,int horizontal,int vertical){
+                require(amount==1&&horizontal==3&&vertical==2&&!bones.instances().find(local)->destroyRequested,
+                    "collected damage precedes bone destruction");++damage;
+                if(contact==5)stop.player.stopped=true;
+                return contact!=4;
+            });
+        require(okay==(contact!=4)&&damage==unsigned(contact==1||contact==4||contact==5),"collected bone guards and damage failure");
+        const auto* record=bones.instances().find(local);
+        require(record&&record->destroyRequested==(contact<3||contact==5)&&bool(record->myFxLocal)==(contact<3||contact==5),
+            "collected bone preserves source impact and destruction order");
+        if(contact==5)require(bones.instances().find(second)->destroyRequested&&bones.instances().find(second)->myFxLocal,
+            "time-stop change suppresses later damage without suppressing impact or destruction");
+        if(okay)require(bones.clear(),"collected bone teardown");
+    }
     for(unsigned rejectedMove=0;rejectedMove<=2;++rejectedMove){
         struct BoneOwner:StoredWorldCollision {
             using StoredWorldCollision::StoredWorldCollision;
