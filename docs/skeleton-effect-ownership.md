@@ -333,6 +333,16 @@ time-stop owner, language/font context and audio; native allocation still comes
 from the enclosing ID stream. These entries implement the `enemyDeath` part of
 skeleton Step, not the later blood, smoke, flash, reward, corpse or debris work.
 
+The registered `emitSkeletonBlood`/`emitSkeletonSmoke` entries bind the next two
+scripts to the same skeleton caller on both adapters. Blood reads published x/y,
+emits exactly two object-220 children, and stores each source ID in `myFx` after
+Create and before child setters. Smoke reads the Step arguments xx/yy and retains
+the shared script locals in `smokeScript`; it does not overwrite `myFx`. Each
+child Create finishes before the next angle/jitter draw. Capacity/allocation
+failure keeps prior children, caller writes and RNG consumption. Native entries
+still require the enclosing source-ID allocator. Registered birth/RNG tests do
+not establish complete death-Step scheduling or mixed effect rendering.
+
 Both runtime adapters route flash bursts and pre-Step flash animation through
 `RunSession`'s shared `effectsSucceeded` latch. Failed bursts retain earlier
 children and consumed random words; subsequent effect calls and animation must

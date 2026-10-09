@@ -18,6 +18,7 @@ struct SkeletonActor : SkeletonDecisions {
     MotionBinary64 impactSp{};
     int bodySprite=0;
     std::uint32_t myDeadBody=0;
+    std::uint32_t myFx=0; // emitMovingFx writes the source numeric child ID before its setters.
     SmokeBurstCaller smokeScript;
     SoundPlayState sound;
     bool damageStun=false, stomped=false;

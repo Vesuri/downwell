@@ -39,6 +39,9 @@ bool nativeSkeletonDeathBookkeeping(downwell::GameplayCollisionOwner& owner,down
     const downwell::LevelNumberTextContext& text,downwell::SoundPlayEnvironment& environment,NativeSkeletonAudio& audio){
     return owner.recordSkeletonDeath(actor,true,stop,allocate,text,environment,audio);
 }
+bool nativeSkeletonBloodSmoke(GameplayWorld& world,downwell::SkeletonActor& actor,bool (*allocate)(unsigned&)){
+    return world.emitSkeletonBlood(actor,allocate)&&world.emitSkeletonSmoke(actor,allocate);
+}
 bool nativeSkeletonThrow(GameplayWorld& world,downwell::SkeletonActor& actor,downwell::RegisteredSkeletonThrow& caller,
     downwell::SoundPlayEnvironment& environment,NativeSkeletonAudio& audio){
     return world.throwSkeletonBoneWithSourceId(505201,actor,caller,environment,audio);

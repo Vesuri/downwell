@@ -1048,6 +1048,10 @@ public:
         if(!registry.belongsTo(instances_))return run_.effectsSucceeded=false;
         return registry.createFromDeath(source,sprite,impact,explosion,run_.upgrades.levels[3]!=0,random_,tile);
     }
+    template<unsigned Capacity> bool emitSkeletonSmoke(StoredSmokeRegistration<instanceCapacity,Capacity>& registry,
+        SkeletonActor& actor){
+        return emitRegisteredSkeletonSmoke(registry,actor.smokeScript,actor.xx,actor.yy);
+    }
     template<unsigned Capacity> StoredTimeChangeRegistration<instanceCapacity,Capacity> timeChangeRegistration(){
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
     }
@@ -1168,6 +1172,11 @@ public:
                 return record&&caller(child,record->sourceId);
             },key);
         });
+    }
+    template<unsigned Capacity> bool emitSkeletonBlood(StoredBloodRegistration<instanceCapacity,Capacity>& registration,
+        SkeletonActor& actor){
+        return spawnBloodBurst(registration,MotionBinary64::fromInteger(actor.x),MotionBinary64::fromInteger(actor.y),
+            [&](InstanceHandle,unsigned source){actor.myFx=source;return true;});
     }
     template<unsigned Capacity> StoredBoneRegistration<instanceCapacity,Capacity> boneRegistration(){
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};

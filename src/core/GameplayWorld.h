@@ -389,6 +389,14 @@ public:
         if(registeredSmoke_||!instances.valid()||instances.size())return false;
         registeredSmoke_=&instances;return true;
     }
+    template<class Allocate> bool emitSkeletonSmoke(downwell::SkeletonActor& actor,Allocate allocate){
+        if(!run_.effectsSucceeded||!registeredSmoke_)return run_.effectsSucceeded=false;
+        return run_.effectsSucceeded=downwell::smokeBurstPublished<5,1>(actor.smokeScript,actor.xx,actor.yy,
+            enemyRandom_,[&](int object,auto x,auto y){
+                unsigned id=0;downwell::InstanceHandle child;
+                return object==225&&allocate(id)&&id&&registeredSmoke_->create(id,x,y,enemyRandom_,child);
+            });
+    }
     bool stepSmokeRoomEffect(downwell::InstanceHandle key){
         return run_.effectsSucceeded=run_.effectsSucceeded&&registeredSmoke_&&registeredSmoke_->step(key,enemyRandom_);
     }
@@ -640,6 +648,18 @@ public:
         downwell::MotionBinary64 y,downwell::MotionBinary64 angle,Caller caller,downwell::InstanceHandle& key){
         if(!run_.effectsSucceeded||!blood_||!blood_->create(id,x,y,angle,caller,key))return run_.effectsSucceeded=false;
         return true;
+    }
+    template<class Allocate> bool emitSkeletonBlood(downwell::SkeletonActor& actor,Allocate allocate){
+        if(!run_.effectsSucceeded||!blood_)return run_.effectsSucceeded=false;
+        return run_.effectsSucceeded=downwell::bloodBurst(downwell::MotionBinary64::fromInteger(actor.x),
+            downwell::MotionBinary64::fromInteger(actor.y),enemyRandom_,[&](auto x,auto y,auto angle){
+                unsigned id=0;downwell::InstanceHandle child;
+                if(!allocate(id)||!id)return false;
+                return createBloodWithSourceId(id,x,y,angle,[&](downwell::InstanceHandle key){
+                    const auto* record=blood_->find(key);if(!record)return false;
+                    actor.myFx=record->sourceId;return true;
+                },child);
+            });
     }
     template<class Query> bool stepBloodRoomEffect(downwell::InstanceHandle key,Query query){
         if(!run_.effectsSucceeded||!blood_||!blood_->step(key,query))return run_.effectsSucceeded=false;

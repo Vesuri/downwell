@@ -139,7 +139,9 @@ behavior, both backend integrations and relevant original-game verification.
   world phases, with the real time-stop and Knife and Fork state. Verify the
   registered corpse/expiry chain in natural skeleton deaths, not only explicit
   test births.
-- Connect natural death/stomp/hit events to effect owners, including flash balls.
+- Connect natural death/stomp/hit events to effect owners, including registered
+  flash-ball births and mixed animation/Draw scheduling. Preserve flash's shared
+  smoke-script caller fields (`smx`, `smy`, `smokenum`, `vary`, `pvary`).
   Route enemy-death bookkeeping through the shared run-state entry, supplying
   actual toggleGuncut, the owned achNoKill entry, momentDelay controller events and
   levelBeginCue creation/audio. Route natural callers through its owned firstLand/BGM

@@ -128,6 +128,73 @@ int main(){
     assert(sprites.valid()&&masks.valid());
     const auto fontData=load("generated/downwell-fonts.dwfn");downwell::FontPack fonts(fontData.data(),fontData.size());
     assert(fonts.valid());
+    for(unsigned failAllocation=0;failAllocation<=2;++failAllocation){
+        using namespace downwell;
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));InstanceHandle skeleton;
+        assert(world->createSkeletonWithSourceId(505001,240,704,skeleton));
+        auto random=world->randomState();const auto draws=world->randomDrawCount();unsigned calls=0;
+        const bool okay=owner->skeletons().dispatch(skeleton,[&](auto& actor,auto&,bool&){
+            actor.xx=actor.yy=MotionBinary64::fromInteger(999); // Script reads published x/y, not private accumulators.
+            return world->emitSkeletonBlood(actor,[&](unsigned& id){++calls;id=506000+calls;return calls!=failAllocation;});
+        });
+        const unsigned births=calls-unsigned(failAllocation!=0);
+        const auto* actor=owner->skeletons().find(skeleton);
+        assert(okay==!failAllocation&&actor&&actor->state.myFx==(births?506000+births:0)&&
+            world->bloodInstances()->size()==births&&world->randomDrawCount()==draws+calls);
+        for(unsigned i=0;i<calls;++i)random.nextU32();
+        for(unsigned i=0;i<16;++i)assert(random.stateWord(i)==world->randomState().stateWord(i));
+        for(unsigned i=0;i<births;++i){const auto* child=world->bloodInstances()->find({i,i+1});
+            assert(child&&child->sourceId==506001+i&&child->x.bits==0x43700000u&&child->y.bits==0x44300000u&&child->spriteId==84);}
+        if(okay){
+            SmokeBurstCaller expected;SmokeEffect children[6];unsigned count=0,allocated=0;
+            assert((smokeBurstPublished<5,1>(expected,MotionBinary64::fromInteger(999),MotionBinary64::fromInteger(999),random,
+                [&](int object,auto x,auto y){return object==225&&count<6&&children[count++].create(x,y,random);})));
+            assert(owner->skeletons().dispatch(skeleton,[&](auto& state,auto&,bool&){
+                return world->emitSkeletonSmoke(state,[&](unsigned& id){id=506003+allocated++;return true;});
+            }));
+            assert(allocated==count&&actor->state.myFx==506002&&actor->state.smokeScript.smokenum==int(count)&&
+                actor->state.smokeScript.smx.high==expected.smx.high&&actor->state.smokeScript.smx.low==expected.smx.low);
+            for(unsigned i=0;i<count;++i){const auto* child=world->registeredSmoke()->find(world->registeredSmoke()->sourceHandle(506003+i));
+                assert(child&&child->x.bits==children[i].x.bits&&child->y.bits==children[i].y.bits);}
+            for(unsigned i=0;i<16;++i)assert(random.stateWord(i)==world->randomState().stateWord(i));
+        }
+    }
+    for(bool small:{false,true}){
+        using namespace downwell;
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,nullptr,owner->binding());
+        assert(owner->attach(*world));world->skipToGameForTesting();
+        auto skeletons=world->skeletonRegistration<1>();InstanceHandle skeleton;
+        assert(world->spawnSkeleton(skeletons,240,704,skeleton));
+        auto run=[&](auto& blood){
+            const auto first=world->nextRuntimeInstanceId();const auto draws=world->randomDrawCount();
+            const bool okay=skeletons.dispatch(skeleton,[&](auto& actor,auto&,bool&){
+                actor.xx=actor.yy=MotionBinary64::fromInteger(999);
+                return world->emitSkeletonBlood(blood,actor);
+            });
+            assert(okay==!small&&skeletons.instances().find(skeleton)->state.myFx==first+unsigned(!small)&&
+                blood.instances().size()==(small?1u:2u)&&world->randomDrawCount()==draws+2);
+            for(unsigned i=0;i<(small?1u:2u);++i){const auto* child=world->instance(first+i);
+                assert(child&&child->x==240&&child->y==704&&child->spriteId==84);}
+            if(okay){
+                auto smoke=world->smokeRegistration<6>();auto random=world->randomState();
+                SmokeBurstCaller expected;unsigned count=0;
+                assert((smokeBurstPublished<5,1>(expected,MotionBinary64::fromInteger(999),MotionBinary64::fromInteger(999),random,
+                    [&](int object,auto x,auto y){SmokeEffect child;++count;return object==225&&child.create(x,y,random);})));
+                assert(skeletons.dispatch(skeleton,[&](auto& actor,auto&,bool&){return world->emitSkeletonSmoke(smoke,actor);}));
+                assert(skeletons.instances().find(skeleton)->state.myFx==first+1&&
+                    skeletons.instances().find(skeleton)->state.smokeScript.smokenum==int(count));
+                for(unsigned i=0;i<16;++i)assert(random.stateWord(i)==world->randomState().stateWord(i));
+                for(unsigned i=0;i<count;++i){const auto* child=world->instance(first+2+i);assert(child&&child->objectId==225);}
+                assert(smoke.clear()&&blood.clear()&&skeletons.clear());
+            }
+        };
+        if(small){auto blood=world->bloodRegistration<1>();run(blood);}
+        else{auto blood=world->bloodRegistration<2>();run(blood);}
+    }
     for(bool native:{false,true})for(bool stopped:{false,true})for(bool badFont:{false,true})for(bool musicPlaying:{false,true}){
         using namespace downwell;
         auto storedOwner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
