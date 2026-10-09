@@ -530,7 +530,9 @@ test: verify-level-number
 .PHONY: verify-level-number
 verify-level-number: build/level-number-test
 	./build/level-number-test
-build/level-number-test: tests/core/LevelNumberTest.cpp $(wildcard src/core/*.h)
+generated/downwell-area-titles.h: tools/generate-area-titles.py data/language.ini
+	python3 tools/generate-area-titles.py
+build/level-number-test: tests/core/LevelNumberTest.cpp generated/downwell-area-titles.h $(wildcard src/core/*.h)
 	@mkdir -p build
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ $<
 .PHONY: verify-enemy-death-worlds

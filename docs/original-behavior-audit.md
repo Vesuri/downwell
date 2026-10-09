@@ -71,6 +71,15 @@ Natural source-ID allocation, localized text, active-font measurement and
 surface-text Draw dispatch remain unconnected; explicit test births do not
 admit the natural level-begin/death caller.
 
+`generate-area-titles.py` reads the shipped UTF-8 `language.ini` and writes all
+nine languages' area0–area5 labels as Unicode tokens to ignored generated data,
+with an input/tool/output-hash manifest. `LevelNumberText` constructs normal and
+hard-mode suffixes for the integer RunStage domain, retains the original
+characters for `string_char_at`, and supplies hash-converted characters to the
+current font owner's measurement callback. Missing keys yield the source's
+single-space default. This text construction is tested across the extracted
+labels but is not yet bound to the live language/font state or natural births.
+
 ## Result-room population and persistent alarms
 
 The exported `objLineToResult` Alarm 1 calls `room_goto(16)` unconditionally.

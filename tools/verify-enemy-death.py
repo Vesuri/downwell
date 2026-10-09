@@ -160,6 +160,19 @@ assert number["name"]=="levelNumber" and number["parentId"]==-1 and not number["
 assert {(e["eventType"],e["eventSubtype"]) for e in number["events"]}=={(0,0),(2,0),(2,1),(2,2),(8,0),(14,0)}
 assert event_instructions("Object_levelNumber_PreCreate_0")==["call.i event_inherited(argc=0)","popz.v"]
 number_create=event_instructions("Object_levelNumber_Create_0")
+assert number_create[:4]==["pushglb.v global.hardMode","conv.v.b","not.b","bf [2]"]
+for suffix in ['push.s "-"@913', 'push.s "-H"@3215']:
+    i=number_create.index(suffix)
+    assert number_create[i-5:i]==['push.s "area"@269',"pushglb.v global.area","call.i string(argc=1)",
+        "add.v.s","call.i gml_Script_langString(argc=1)"]
+    assert number_create[i+1:i+6]==["add.s.v","pushglb.v global.level","call.i string(argc=1)","add.v.v","pop.v.v self.levelTxt"]
+assert body("langString",3)==[
+    "push.v arg.argument0","pop.v.v self.getString",'push.s "language.ini"@2354',"conv.s.v",
+    "call.i ini_open(argc=1)","popz.v",'push.s " "@304',"conv.s.v","push.v self.getString",
+    "pushglb.v global.globalLanguage","call.i ini_read_string(argc=3)","pop.v.v self.returnString",
+    "call.i ini_close(argc=0)","popz.v",'push.s "#"@2356',"conv.s.v",'push.s "*"@2357',"conv.s.v",
+    "push.v self.returnString","call.i string_replace_all(argc=3)","pop.v.v self.returnString",
+    "push.v self.returnString","ret.v","exit.i"]
 assert number_create.count("call.i string_char_at(argc=2)")==1
 assert number_create.index("call.i string_hash_to_newline(argc=1)")<number_create.index("call.i string_width(argc=1)")
 assert number_create[-14:]==["pushi.e 4","pop.v.i self.txtApInterval","push.i 68049","setowner.e",

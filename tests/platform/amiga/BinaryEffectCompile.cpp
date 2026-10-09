@@ -7,6 +7,15 @@
 #include "core/RunSession.h"
 #include "core/LevelNumber.h"
 #include "core/LevelNumberInstances.h"
+#include "core/LevelNumberText.h"
+bool compileLocalizedLevelNumber(downwell::LevelNumberText<64>& text,downwell::LevelNumber<64>& state,
+    const downwell::AreaTitle* titles,unsigned count,const char* language,int area,int level,bool hard,
+    bool (*measure)(unsigned,const unsigned*,downwell::MotionBinary64&)){
+    return text.create(state,titles,count,language,area,level,hard,[&](unsigned n,auto at,auto& width){
+        unsigned chars[64];for(unsigned i=0;i<n;++i)if(!at(i,chars[i]))return false;
+        return measure(n,chars,width);
+    });
+}
 #include "core/StoredLevelNumberRegistration.h"
 bool compileStoredLevelNumber(downwell::StoredLevelNumberRegistration<32,2>& owner,
     downwell::InstanceHandle& key,bool (*character)(unsigned,unsigned&)){

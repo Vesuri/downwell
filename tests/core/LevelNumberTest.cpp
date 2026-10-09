@@ -1,5 +1,6 @@
 #include "core/LevelNumber.h"
 #include "core/LevelNumberInstances.h"
+#include "../../generated/downwell-area-titles.h"
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
@@ -38,6 +39,36 @@ struct Lifetime {
     bool retire(InstanceHandle,const Numbers::Record&){++retired;return true;}
 };
 int main(){
+    for(const auto& area:area_titles::entries)for(bool hard:{false,true}){
+        LevelNumberText<64> text;LevelNumber<64> state;unsigned measures=0;
+        assert(text.create(state,area_titles::entries,area_titles::count,area.language,area.area,3,hard,
+            [&](unsigned count,auto at,MotionBinary64& width){
+                ++measures;assert(count==area.length+(hard?3u:2u));
+                for(unsigned i=0;i<area.length;++i){unsigned c;assert(at(i,c)&&c==area.characters[i]);}
+                width=MotionBinary64::fromInteger(37);return true;
+            }));
+        assert(measures==1&&state.length==area.length+(hard?3u:2u)&&state.width.high==MotionBinary64::fromInteger(37).high);
+        for(unsigned i=0;i<area.length;++i)assert(state.characters[i+1].token==area.characters[i]);
+        assert(state.characters[area.length+1].token=='-'&&state.characters[state.length].token=='3');
+        if(hard)assert(state.characters[area.length+2].token=='H');
+    }
+    {
+        const unsigned tokens[]={0x0410,'*',0x30a2};const AreaTitle area{"test",1,tokens,3};
+        LevelNumberText<32> text;LevelNumber<32> state;
+        assert(text.create(state,&area,1,"test",1,-2147483647-1,true,
+            [](unsigned count,auto at,MotionBinary64& width){
+                unsigned c;assert(count==16&&at(1,c)&&c=='\n');width={};return true;
+            }));
+        assert(state.characters[1].token==0x0410&&state.characters[2].token=='#'&&state.characters[3].token==0x30a2&&
+            state.characters[6].token=='-'&&state.characters[16].token=='8');
+        LevelNumberText<8> missing;LevelNumber<8> fallback;
+        assert(missing.create(fallback,nullptr,0,"missing",9,0,false,
+            [](unsigned count,auto,MotionBinary64& width){assert(count==3);width={};return true;})&&fallback.characters[1].token==' ');
+        LevelNumberText<2> shortText;LevelNumber<2> shortState;
+        assert(!shortText.create(shortState,&area,1,"test",1,1,false,[](auto...){std::abort();return false;})&&!shortState.created);
+        LevelNumberText<32> bad;LevelNumber<32> badState;
+        assert(!bad.create(badState,&area,1,"test",1,1,false,[](auto...){return false;})&&!badState.created);
+    }
     auto read=[](unsigned i,unsigned& token){token=100+i;return true;};
     for(bool rejectDestroy:{false,true}){
         Lifetime life;life.rejectDestroy=rejectDestroy;
