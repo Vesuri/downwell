@@ -1797,7 +1797,7 @@ private:
                            bool attracted = false);
     void updateMainCurrency();
     void updateMainLifecycle(bool endStep, long publishedViewTopQ12);
-    void updateMainEnemies();
+    void updateMainEnemy(InstanceRecord& enemy);
     void updateCrawler(InstanceRecord& enemy, bool alarm);
     void updateMainEnemyInteractions();
     InstanceRecord* mainBulletEnemyCollision(const ProjectileSegment& path);

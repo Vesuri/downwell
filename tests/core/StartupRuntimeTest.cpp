@@ -619,8 +619,19 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
         require(id!=0,"host pursuit fixture has an owned enemy");
         checked.rejectBatScale=reject==1;checked.rejectBatMask=reject==2;
         const auto before=checked.batTransforms;
-        runtime->step(false);
+        unsigned collisionCalls=0;float collisionX=0,collisionY=0;
+        const bool tickSucceeded=runtime->stepWithCollisionPass({},false,[&]{
+            ++collisionCalls;const auto* moved=runtime->instance(id);
+            require(moved&&checked.batTransforms==before+1&&
+                (moved->preciseX!=startX||moved->preciseY!=startY),
+                "selected enemy Step publishes movement before the collision phase");
+            collisionX=moved->preciseX;collisionY=moved->preciseY;return true;
+        });
+        require(tickSucceeded==!reject&&collisionCalls==(reject?0u:1u),
+                "enemy Step failure stops the scheduler before Collision and End Step");
         const auto* bat=runtime->instance(id);
+        if(!reject)require(bat&&bat->preciseX==collisionX&&bat->preciseY==collisionY,
+                "enemy motion is not dispatched again by a post-phase family loop");
         if(!(bat&&healthy(*runtime)==!reject&&checked.batTransforms==before+1))
             std::cerr << "Bat fixture reject=" << reject << " healthy=" << healthy(*runtime)
                       << " transforms=" << checked.batTransforms-before << " active=" << (bat?bat->active:false)

@@ -535,10 +535,9 @@ void StartupRuntime::stepInternal(bool advancePressed,
     if (!roomLoadSucceeded_ || !deferredCommandsSucceeded_ || !run_.effectsSucceeded) return;
     if (roomId_ == mainRoomId) {
         run_.exitDither.step(ordinaryStepViewTopQ12_ / 4096, surfaceHeight);
-        // Retained manual adapters must preserve the same source object order
-        // as the native path: enemies, smoke 225, currency 248, bullets 261.
-        // Their admission into the generic mixed phases remains separate.
-        updateMainEnemies();
+        // Enemy motion runs in the selected ordinary-Step event above.
+        // These remaining manual effect/projectile adapters still need
+        // admission into the same generic phases.
         run_.stepSmoke(smokeStepPhase,random_);
         if(!run_.effectsSucceeded)return;
         updateMainCurrency();
@@ -1053,210 +1052,208 @@ void StartupRuntime::updateCrawler(InstanceRecord& enemy, bool alarm) {
     enemy.grounded = enemy.crawler.latched;
 }
 
-void StartupRuntime::updateMainEnemies() {
-    for (std::size_t index = 0; index < instances_.size(); ++index) {
-        InstanceRecord& enemy = instances_.at(index);
-        const bool enemyObject = enemy.objectId == 111 ||
-                                 enemy.objectId == 112 ||
-                                 enemy.objectId == 113 ||
-                                 enemy.objectId == 116 ||
-                                 enemy.objectId == 117 ||
-                                 enemy.objectId == 119;
-        if (!enemy.active || !enemyObject || enemy.health <= 0 || !enemy.enemyStepEligible)
-            continue;
-        if (!enemy.motionInitialized) {
-            enemy.preciseX = static_cast<float>(enemy.x);
-            enemy.preciseY = static_cast<float>(enemy.y);
-            enemy.motionInitialized = true;
-        }
+void StartupRuntime::updateMainEnemy(InstanceRecord& enemy) {
+    const auto index=static_cast<std::size_t>(&enemy-&instances_.at(0));
+    const bool enemyObject = enemy.objectId == 111 ||
+                             enemy.objectId == 112 ||
+                             enemy.objectId == 113 ||
+                             enemy.objectId == 116 ||
+                             enemy.objectId == 117 ||
+                             enemy.objectId == 119;
+    if (!enemy.active || enemy.destroyRequested || !enemyObject || enemy.health <= 0)
+        return;
+    if (!enemy.motionInitialized) {
+        enemy.preciseX = static_cast<float>(enemy.x);
+        enemy.preciseY = static_cast<float>(enemy.y);
+        enemy.motionInitialized = true;
+    }
 
-        if (enemy.objectId == 113)
-            enemy.imageSpeed = enemy.frogPresentation.beginStepRate() / 20.0F;
-        if (enemy.objectId == 111 || enemy.objectId == 112) {
-            if (!enemy.walker.initialized) {
-                enemy.walker.initialize(enemy.x, enemy.y,
-                    static_cast<long>(std::round(enemy.velocityX * 1280)),
-                    static_cast<long>(std::round(enemy.velocityY * 1280)), enemy.grounded);
-                enemy.walker.facing=enemy.scaleX<0?-1:1;
-            }
-            const bool turtle = enemy.objectId == 112;
-            const bool visible = CrawlerMotion::inView(enemy.x, enemy.y,
-                ordinaryStepViewLeftQ12_, ordinaryStepViewTopQ12_,
-                ordinaryStepViewLeftQ12_ + surfaceWidth * 4096L, ordinaryStepViewTopQ12_ + surfaceHeight * 4096L,
-                turtle ? 64 : 32);
-            if(!enemy.walker.step(turtle, groundTurtleWalking(enemy.auxiliaryState), visible,
-                [this, &enemy, turtle](long x, long y) {
-                    return enemy.walker.meetsTiles(x, y, turtle,
-                        [this](int px, int py) { return mainSolidAt(px, py); });
-                },[this,index,&enemy](int sprite,int scale){
-                    enemy.grounded=enemy.walker.grounded;
-                    if(!lifecycle_.sprite(instances_.handleAt(index),enemy,sprite)){
-                        run_.effectsSucceeded=false;return false;
-                    }
-                    enemy.spriteId=sprite;
-                    if(scale){
-                        if(!publishMainEnemyTransform(index,RunnerTransformField::scaleX,scale))return false;
-                        enemy.scaleX=static_cast<float>(scale);
-                    }
-                    return true;
-                }))return;
-            enemy.preciseX = enemy.walker.x / 1280.0F;
-            enemy.preciseY = enemy.walker.y / 1280.0F;
-            enemy.velocityX = enemy.walker.vx / 1280.0F;
-            enemy.velocityY = enemy.walker.vy / 1280.0F;
-            enemy.grounded = enemy.walker.grounded;
-        } else if (enemy.objectId == 113) {
-            const bool integrate = frogMotionVisible(enemy.x * 256L, enemy.y * 256L,
-                ordinaryStepViewLeftQ12_ / 16, ordinaryStepViewTopQ12_ / 16,
-                ordinaryStepViewLeftQ12_ / 16 + surfaceWidth * 256L,
-                ordinaryStepViewTopQ12_ / 16 + surfaceHeight * 256L);
-            if (!enemy.frogMotionInitialized) {
-                enemy.frogHorizontal.position = static_cast<long>(std::round((enemy.preciseX - mainPlayerOriginX_) * 65536.0F));
-                enemy.frogHorizontal.velocity = static_cast<long>(std::round(enemy.velocityX * 65536.0F));
-                enemy.frogVertical.position = static_cast<long>(std::round((enemy.preciseY - mainPlayerOriginY_) * 1280.0F));
-                enemy.frogVertical.velocity = static_cast<long>(std::round(enemy.velocityY * 1280.0F));
-                enemy.frogMotionInitialized = true;
-            }
-            enemy.frogVertical.grounded = enemy.grounded;
-            const auto effects = stepFrogMotion(enemy.frogHorizontal, enemy.frogVertical,
-                enemy.frogHit, integrate, [this](int x, int y) {
-                    return mainSolidAt(mainPlayerOriginX_ + x, mainPlayerOriginY_ + y);
-                },[this,index,&enemy]{
-                enemy.auxiliaryState = 0;
-                enemy.alarms.set(0, 0);
-                enemy.alarms.set(1, 60);
-                enemy.velocityX = enemy.frogHorizontal.velocity / 65536.0F;
-                if(!publishMainEnemyImage(index,0))return false;
-                enemy.imageIndex = 0;
-                enemy.enemyImagePhase = 0; enemy.enemyImageRemainder = 0;
-                ++soundPlayRequests_;
-                return true;
-            },[this,index,&enemy](int scale){
-                if(!publishMainEnemyTransform(index,RunnerTransformField::scaleX,scale))return false;
-                enemy.scaleX=static_cast<float>(scale);return true;
-            },[&enemy](bool grounded){
-                if(frogLandingEdge(grounded,enemy.frogLanded))enemy.alarms.set(1,60);
-            });
-            enemy.preciseY = mainPlayerOriginY_ + enemy.frogVertical.position / 1280.0F;
-            enemy.velocityY = enemy.frogVertical.velocity / 1280.0F;
-            enemy.grounded = enemy.frogVertical.grounded;
-            enemy.preciseX = mainPlayerOriginX_ + enemy.frogHorizontal.position / 65536.0F;
-            enemy.velocityX = enemy.frogHorizontal.velocity / 65536.0F;
-            if(!effects.succeeded)return;
-        } else if (enemy.objectId == 116) {
-            BatMotion bat{
-                static_cast<long>(std::round(enemy.preciseX * 256.0F)),
-                static_cast<long>(std::round(enemy.preciseY * 256.0F)),
-                static_cast<long>(std::round(enemy.velocityX * 256.0F)),
-                static_cast<long>(std::round(enemy.velocityY * 256.0F)),
-                static_cast<int>(enemy.direction),
-                static_cast<int>(std::round(enemy.moveSpeed * 40.0F)),
-                enemy.scaleX < 0 ? -1 : 1, enemy.batDirectionFraction
-            };
-            bat.collisionMask=enemyContactMask(enemy.objectId,enemy.spriteId,enemy.maskId);
-            const auto effects = stepBatBehavior(bat, enemy.batHit, enemy.batActivity,
-                enemy.x, enemy.y, bat.collisionMask,
-                mainPlayerOriginX_ * 256L + mainPlayerMotion_.frameStartXFixed(),
-                mainPlayerOriginY_ * 256L + mainPlayerMotion_.frameStartYFixed(),
-                random_,
-                [this](int x, int y) { return mainSolidAt(x, y); },
-                [this,index,&enemy](int scale){
-                    if(!publishMainEnemyTransform(index,RunnerTransformField::scaleX,scale))return false;
-                    enemy.scaleX=static_cast<float>(scale);return true;
-                });
-            // Preserve completed turn/collision work even if the scale setter
-            // rejects publication. The checked helper skips subsequent motion.
-            enemy.preciseX = bat.x / 256.0F;
-            enemy.preciseY = bat.y / 256.0F;
-            enemy.velocityX = bat.speedX / 256.0F;
-            enemy.velocityY = bat.speedY / 256.0F;
-            enemy.direction = static_cast<float>(bat.direction);
-            enemy.batDirectionFraction = bat.directionFraction;
-            enemy.moveSpeed = bat.speedFortieths / 40.0F;
-            enemy.scaleX = static_cast<float>(bat.facing);
-            if(!effects.succeeded)return;
-            if (effects.hit) {
-                enemy.alarms.set(0, 3);
-                if(!publishMainEnemyImage(index,0))return;
-                enemy.imageIndex = 0;
-                enemy.enemyImagePhase = 0; enemy.enemyImageRemainder = 0;
-                ++soundPlayRequests_;
-            }
-            soundPlayRequests_ += effects.wakeSounds;
-        } else if (enemy.objectId == 117) {
-            const int hitAlarm = enemy.snailHit.consume(random_);
-            if (hitAlarm >= 0) {
-                if(!publishMainEnemyImage(index,0))return;
-                enemy.imageIndex = 0;
-                enemy.enemyImagePhase = 0; enemy.enemyImageRemainder = 0;
-                enemy.alarms.set(0, 0); enemy.alarms.set(1, hitAlarm);
-                ++soundPlayRequests_;
-            }
-            if (!enemy.snail.initialized)
-                enemy.snail.initialize(enemy.x, enemy.y, enemy.velocityY >= 0);
-            const bool alive = enemy.snail.step([this](int x, int y) { return mainSolidAt(x, y); },false,
-                [this,index](RunnerTransformField field,int value){return publishMainEnemyTransform(index,field,value);});
-            if(!run_.effectsSucceeded)return;
-            if (!alive && !publishMainInactivation(enemy)) return;
-            enemy.active = alive;
-            if (!alive) continue;
-            if (enemy.active) {
-                enemy.preciseX = enemy.snail.x / 1280.0F;
-                enemy.preciseY = enemy.snail.y / 1280.0F;
-                enemy.velocityY = enemy.snail.vy / 1280.0F;
-                enemy.motionState = enemy.snail.facing;
-                enemy.scaleX = static_cast<float>(enemy.snail.facing);
-                enemy.scaleY = static_cast<float>(enemy.snail.verticalFlip);
-            }
-        } else if (enemy.objectId == 119) {
-            updateCrawler(enemy, false);
+    if (enemy.objectId == 113)
+        enemy.imageSpeed = enemy.frogPresentation.beginStepRate() / 20.0F;
+    if (enemy.objectId == 111 || enemy.objectId == 112) {
+        if (!enemy.walker.initialized) {
+            enemy.walker.initialize(enemy.x, enemy.y,
+                static_cast<long>(std::round(enemy.velocityX * 1280)),
+                static_cast<long>(std::round(enemy.velocityY * 1280)), enemy.grounded);
+            enemy.walker.facing=enemy.scaleX<0?-1:1;
         }
-        auto publishedX = static_cast<std::int32_t>(roundGameMakerCoordinate(enemy.preciseX));
-        auto publishedY = static_cast<std::int32_t>(roundGameMakerCoordinate(enemy.preciseY));
-        if (enemy.objectId == 113 && enemy.frogMotionInitialized) {
-            publishedX = mainPlayerOriginX_ + frogPublishedPixel(enemy.frogHorizontal.position,65536);
-            publishedY = mainPlayerOriginY_ + frogPublishedPixel(enemy.frogVertical.position,1280);
-        }
-        if ((enemy.objectId == 111 || enemy.objectId == 112) && enemy.walker.initialized) {
-            publishedX = enemy.walker.publishedX;
-            publishedY = enemy.walker.publishedY;
-        }
-        if (enemy.objectId == 117 && enemy.snail.initialized) {
-            publishedX = static_cast<std::int32_t>(FixedCollisionMath::round(enemy.snail.x) / 1280);
-            publishedY = static_cast<std::int32_t>(FixedCollisionMath::round(enemy.snail.y) / 1280);
-        }
-        if(!lifecycle_.integerPosition(instances_.handleAt(index),enemy,publishedX,publishedY)) {
-            run_.effectsSucceeded=false;return;
-        }
-        enemy.x=publishedX;enemy.y=publishedY;
-        if(enemy.objectId==119){
-            // Step publishes image_angle after x/y; Alarm 0 never assigns it.
-            if(!publishMainEnemyTransform(index,RunnerTransformField::angle,enemy.crawler.imageDirection*90))return;
-            enemy.rotation=enemy.crawler.imageDirection*90;
-        }
-        const auto nextSprite = finishEnemyPresentation(
-            {enemy.objectId, enemy.auxiliaryState, enemy.grounded, enemy.velocityY < 0.0F,
-             enemy.frogHit.remaining != 0, enemy.snailHit.stunned},
-            enemy.frogPresentation, enemy.batActivity, enemy.batHit,
-            enemy.enemyImagePhase, enemy.enemyImageRemainder);
-        if(enemy.objectId!=111 && enemy.objectId!=112 &&
-           !lifecycle_.sprite(instances_.handleAt(index),enemy,nextSprite)) {
-            run_.effectsSucceeded=false;return;
-        }
-        enemy.spriteId=nextSprite;
-        if(enemy.objectId==116 && !finishBatFields(enemy.batActivity,nextSprite,
-            [this,index,&enemy](int mask){
-                if(!lifecycle_.mask(instances_.handleAt(index),enemy,mask)){
+        const bool turtle = enemy.objectId == 112;
+        const bool visible = CrawlerMotion::inView(enemy.x, enemy.y,
+            ordinaryStepViewLeftQ12_, ordinaryStepViewTopQ12_,
+            ordinaryStepViewLeftQ12_ + surfaceWidth * 4096L, ordinaryStepViewTopQ12_ + surfaceHeight * 4096L,
+            turtle ? 64 : 32);
+        if(!enemy.walker.step(turtle, groundTurtleWalking(enemy.auxiliaryState), visible,
+            [this, &enemy, turtle](long x, long y) {
+                return enemy.walker.meetsTiles(x, y, turtle,
+                    [this](int px, int py) { return mainSolidAt(px, py); });
+            },[this,index,&enemy](int sprite,int scale){
+                enemy.grounded=enemy.walker.grounded;
+                if(!lifecycle_.sprite(instances_.handleAt(index),enemy,sprite)){
                     run_.effectsSucceeded=false;return false;
                 }
-                enemy.maskId=mask;return true;
-            },[this,index,&enemy](int scale){
+                enemy.spriteId=sprite;
+                if(scale){
+                    if(!publishMainEnemyTransform(index,RunnerTransformField::scaleX,scale))return false;
+                    enemy.scaleX=static_cast<float>(scale);
+                }
+                return true;
+            }))return;
+        enemy.preciseX = enemy.walker.x / 1280.0F;
+        enemy.preciseY = enemy.walker.y / 1280.0F;
+        enemy.velocityX = enemy.walker.vx / 1280.0F;
+        enemy.velocityY = enemy.walker.vy / 1280.0F;
+        enemy.grounded = enemy.walker.grounded;
+    } else if (enemy.objectId == 113) {
+        const bool integrate = frogMotionVisible(enemy.x * 256L, enemy.y * 256L,
+            ordinaryStepViewLeftQ12_ / 16, ordinaryStepViewTopQ12_ / 16,
+            ordinaryStepViewLeftQ12_ / 16 + surfaceWidth * 256L,
+            ordinaryStepViewTopQ12_ / 16 + surfaceHeight * 256L);
+        if (!enemy.frogMotionInitialized) {
+            enemy.frogHorizontal.position = static_cast<long>(std::round((enemy.preciseX - mainPlayerOriginX_) * 65536.0F));
+            enemy.frogHorizontal.velocity = static_cast<long>(std::round(enemy.velocityX * 65536.0F));
+            enemy.frogVertical.position = static_cast<long>(std::round((enemy.preciseY - mainPlayerOriginY_) * 1280.0F));
+            enemy.frogVertical.velocity = static_cast<long>(std::round(enemy.velocityY * 1280.0F));
+            enemy.frogMotionInitialized = true;
+        }
+        enemy.frogVertical.grounded = enemy.grounded;
+        const auto effects = stepFrogMotion(enemy.frogHorizontal, enemy.frogVertical,
+            enemy.frogHit, integrate, [this](int x, int y) {
+                return mainSolidAt(mainPlayerOriginX_ + x, mainPlayerOriginY_ + y);
+            },[this,index,&enemy]{
+            enemy.auxiliaryState = 0;
+            enemy.alarms.set(0, 0);
+            enemy.alarms.set(1, 60);
+            enemy.velocityX = enemy.frogHorizontal.velocity / 65536.0F;
+            if(!publishMainEnemyImage(index,0))return false;
+            enemy.imageIndex = 0;
+            enemy.enemyImagePhase = 0; enemy.enemyImageRemainder = 0;
+            ++soundPlayRequests_;
+            return true;
+        },[this,index,&enemy](int scale){
+            if(!publishMainEnemyTransform(index,RunnerTransformField::scaleX,scale))return false;
+            enemy.scaleX=static_cast<float>(scale);return true;
+        },[&enemy](bool grounded){
+            if(frogLandingEdge(grounded,enemy.frogLanded))enemy.alarms.set(1,60);
+        });
+        enemy.preciseY = mainPlayerOriginY_ + enemy.frogVertical.position / 1280.0F;
+        enemy.velocityY = enemy.frogVertical.velocity / 1280.0F;
+        enemy.grounded = enemy.frogVertical.grounded;
+        enemy.preciseX = mainPlayerOriginX_ + enemy.frogHorizontal.position / 65536.0F;
+        enemy.velocityX = enemy.frogHorizontal.velocity / 65536.0F;
+        if(!effects.succeeded)return;
+    } else if (enemy.objectId == 116) {
+        BatMotion bat{
+            static_cast<long>(std::round(enemy.preciseX * 256.0F)),
+            static_cast<long>(std::round(enemy.preciseY * 256.0F)),
+            static_cast<long>(std::round(enemy.velocityX * 256.0F)),
+            static_cast<long>(std::round(enemy.velocityY * 256.0F)),
+            static_cast<int>(enemy.direction),
+            static_cast<int>(std::round(enemy.moveSpeed * 40.0F)),
+            enemy.scaleX < 0 ? -1 : 1, enemy.batDirectionFraction
+        };
+        bat.collisionMask=enemyContactMask(enemy.objectId,enemy.spriteId,enemy.maskId);
+        const auto effects = stepBatBehavior(bat, enemy.batHit, enemy.batActivity,
+            enemy.x, enemy.y, bat.collisionMask,
+            mainPlayerOriginX_ * 256L + mainPlayerMotion_.frameStartXFixed(),
+            mainPlayerOriginY_ * 256L + mainPlayerMotion_.frameStartYFixed(),
+            random_,
+            [this](int x, int y) { return mainSolidAt(x, y); },
+            [this,index,&enemy](int scale){
                 if(!publishMainEnemyTransform(index,RunnerTransformField::scaleX,scale))return false;
                 enemy.scaleX=static_cast<float>(scale);return true;
-            },[&enemy]{enemy.direction=270;enemy.batDirectionFraction=0;enemy.moveSpeed=2;}))return;
-        if(!publishMainEnemyImage(index,enemy.enemyImagePhase))return;
-        enemy.imageIndex = enemy.enemyImagePhase / 256.0F;
+            });
+        // Preserve completed turn/collision work even if the scale setter
+        // rejects publication. The checked helper skips subsequent motion.
+        enemy.preciseX = bat.x / 256.0F;
+        enemy.preciseY = bat.y / 256.0F;
+        enemy.velocityX = bat.speedX / 256.0F;
+        enemy.velocityY = bat.speedY / 256.0F;
+        enemy.direction = static_cast<float>(bat.direction);
+        enemy.batDirectionFraction = bat.directionFraction;
+        enemy.moveSpeed = bat.speedFortieths / 40.0F;
+        enemy.scaleX = static_cast<float>(bat.facing);
+        if(!effects.succeeded)return;
+        if (effects.hit) {
+            enemy.alarms.set(0, 3);
+            if(!publishMainEnemyImage(index,0))return;
+            enemy.imageIndex = 0;
+            enemy.enemyImagePhase = 0; enemy.enemyImageRemainder = 0;
+            ++soundPlayRequests_;
+        }
+        soundPlayRequests_ += effects.wakeSounds;
+    } else if (enemy.objectId == 117) {
+        const int hitAlarm = enemy.snailHit.consume(random_);
+        if (hitAlarm >= 0) {
+            if(!publishMainEnemyImage(index,0))return;
+            enemy.imageIndex = 0;
+            enemy.enemyImagePhase = 0; enemy.enemyImageRemainder = 0;
+            enemy.alarms.set(0, 0); enemy.alarms.set(1, hitAlarm);
+            ++soundPlayRequests_;
+        }
+        if (!enemy.snail.initialized)
+            enemy.snail.initialize(enemy.x, enemy.y, enemy.velocityY >= 0);
+        const bool alive = enemy.snail.step([this](int x, int y) { return mainSolidAt(x, y); },false,
+            [this,index](RunnerTransformField field,int value){return publishMainEnemyTransform(index,field,value);});
+        if(!run_.effectsSucceeded)return;
+        if (!alive && !publishMainInactivation(enemy)) return;
+        enemy.active = alive;
+        if (!alive) return;
+        if (enemy.active) {
+            enemy.preciseX = enemy.snail.x / 1280.0F;
+            enemy.preciseY = enemy.snail.y / 1280.0F;
+            enemy.velocityY = enemy.snail.vy / 1280.0F;
+            enemy.motionState = enemy.snail.facing;
+            enemy.scaleX = static_cast<float>(enemy.snail.facing);
+            enemy.scaleY = static_cast<float>(enemy.snail.verticalFlip);
+        }
+    } else if (enemy.objectId == 119) {
+        updateCrawler(enemy, false);
     }
+    auto publishedX = static_cast<std::int32_t>(roundGameMakerCoordinate(enemy.preciseX));
+    auto publishedY = static_cast<std::int32_t>(roundGameMakerCoordinate(enemy.preciseY));
+    if (enemy.objectId == 113 && enemy.frogMotionInitialized) {
+        publishedX = mainPlayerOriginX_ + frogPublishedPixel(enemy.frogHorizontal.position,65536);
+        publishedY = mainPlayerOriginY_ + frogPublishedPixel(enemy.frogVertical.position,1280);
+    }
+    if ((enemy.objectId == 111 || enemy.objectId == 112) && enemy.walker.initialized) {
+        publishedX = enemy.walker.publishedX;
+        publishedY = enemy.walker.publishedY;
+    }
+    if (enemy.objectId == 117 && enemy.snail.initialized) {
+        publishedX = static_cast<std::int32_t>(FixedCollisionMath::round(enemy.snail.x) / 1280);
+        publishedY = static_cast<std::int32_t>(FixedCollisionMath::round(enemy.snail.y) / 1280);
+    }
+    if(!lifecycle_.integerPosition(instances_.handleAt(index),enemy,publishedX,publishedY)) {
+        run_.effectsSucceeded=false;return;
+    }
+    enemy.x=publishedX;enemy.y=publishedY;
+    if(enemy.objectId==119){
+        // Step publishes image_angle after x/y; Alarm 0 never assigns it.
+        if(!publishMainEnemyTransform(index,RunnerTransformField::angle,enemy.crawler.imageDirection*90))return;
+        enemy.rotation=enemy.crawler.imageDirection*90;
+    }
+    const auto nextSprite = finishEnemyPresentation(
+        {enemy.objectId, enemy.auxiliaryState, enemy.grounded, enemy.velocityY < 0.0F,
+         enemy.frogHit.remaining != 0, enemy.snailHit.stunned},
+        enemy.frogPresentation, enemy.batActivity, enemy.batHit,
+        enemy.enemyImagePhase, enemy.enemyImageRemainder);
+    if(enemy.objectId!=111 && enemy.objectId!=112 &&
+       !lifecycle_.sprite(instances_.handleAt(index),enemy,nextSprite)) {
+        run_.effectsSucceeded=false;return;
+    }
+    enemy.spriteId=nextSprite;
+    if(enemy.objectId==116 && !finishBatFields(enemy.batActivity,nextSprite,
+        [this,index,&enemy](int mask){
+            if(!lifecycle_.mask(instances_.handleAt(index),enemy,mask)){
+                run_.effectsSucceeded=false;return false;
+            }
+            enemy.maskId=mask;return true;
+        },[this,index,&enemy](int scale){
+            if(!publishMainEnemyTransform(index,RunnerTransformField::scaleX,scale))return false;
+            enemy.scaleX=static_cast<float>(scale);return true;
+        },[&enemy]{enemy.direction=270;enemy.batDirectionFraction=0;enemy.moveSpeed=2;}))return;
+    if(!publishMainEnemyImage(index,enemy.enemyImagePhase))return;
+    enemy.imageIndex = enemy.enemyImagePhase / 256.0F;
 }
 
 void StartupRuntime::updateMainEnemyInteractions() {
@@ -1808,6 +1805,13 @@ bool StartupRuntime::dispatchObjectEvent(InstanceRecord& instance,
     if (objectPack_ == nullptr ||
         !objectPack_->findEvent(instance.objectId, eventType, eventSubtype, event))
         return false;
+    if(roomId_==mainRoomId&&eventType==3&&eventSubtype==0&&
+        (instance.objectId==111||instance.objectId==112||instance.objectId==113||
+         instance.objectId==116||instance.objectId==117||instance.objectId==119)){
+        ++implementedCodeCalls_;
+        updateMainEnemy(instance);
+        return run_.effectsSucceeded;
+    }
     if(instance.objectId==372&&eventType==2){
         ++implementedCodeCalls_;
         return run_.effectsSucceeded=levelNumberDispatch_&&

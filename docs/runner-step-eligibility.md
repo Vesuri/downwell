@@ -400,10 +400,15 @@ walker, and projectile contact scripts still need source event integration.
 
 The integration audit found that both existing enemy adapters manually ran
 new builder children immediately after the builder, outside the dispatcher.
-`GameplayWorld` now captures ordinary-Step enemy lifetimes before generation;
-`StartupRuntime` marks records only when visited by ordinary-Step dispatch.
-Their manual enemy Step passes exclude newly created records. Later collision
-processing is not excluded by this flag.
+`GameplayWorld` captures ordinary-Step enemy lifetimes before generation.
+`StartupRuntime` executes supported enemy motion directly when the scheduler
+selects that instance's resolved ordinary-Step event. Its lifetime snapshot
+therefore supplies birth exclusion, object/registration order and immediate
+destruction/activation checks; there is no post-End-Step enemy movement pass.
+The `enemyStepEligible` marker remains a diagnostic of that tick's visit, not
+a second dispatch mechanism. Failed movement publication stops the scheduler
+before Collision/End Step. Later collision processing is not excluded merely
+because a newly created instance did not receive Step.
 
 Both adapters also advance existing enemy animation before Begin Step/alarms,
 not inside the later manual Step pass. Newly generated enemies therefore keep
