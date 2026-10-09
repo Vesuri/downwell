@@ -55,6 +55,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto nativeTerrainInstances=nativeTerrainInstances_;
     const auto nativeTerrainBinding=nativeTerrainBinding_;
     const auto entryRooms=entryRooms_;
+    const auto playerBirthTiming=playerBirthTiming_;
     const auto scriptSpawnInstances=scriptSpawnInstances_;
     const auto debrisInstances=debrisInstances_;
     const auto timeChangeInstances=timeChangeInstances_;
@@ -106,7 +107,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto flashBirths=run_.flashEffects.birthSequence();
     const auto foregroundBirth=run_.nextForegroundBirth;
     this->~GameplayWorld();
-    new (this) GameplayWorld(initialRingOrigin, false, 1201 - 176, true, enemyLifecycle,breakableLifecycle,{},terrainInstances,entryRooms);
+    new (this) GameplayWorld(initialRingOrigin, false, 1201 - 176, true, enemyLifecycle,breakableLifecycle,{},terrainInstances,entryRooms,playerBirthTiming);
     nativeTerrainInstances_=nativeTerrainInstances;
     nativeTerrainBinding_=nativeTerrainBinding;
     run_.gemStreakRise=controllerRise; // Persistent controller survives Retry.
@@ -157,6 +158,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     cameraMotion_.reset(240,176);
     cameraY_=cameraPixelY_=cameraPixelX_=0;
     ringOrigin_=initialRingOrigin%ringHeight;
+    if(playerBirthPending_)return destination;
     if(!birthPlayerOwnership())return downwell::ResultsDestination::none;
     initializeMainCameraFrame();
     return destination;
@@ -243,7 +245,8 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
     cameraMotion_.reset(240, 176);
     cameraY_ = cameraPixelY_ = cameraPixelX_ = activationY_ = 0;
     ringOrigin_ = initialRingOrigin % ringHeight;
-    return birthPlayerOwnership();
+    playerBirthPending_=playerBirthTiming_==PlayerBirthTiming::authoredRoom;
+    return playerBirthPending_||birthPlayerOwnership();
 }
 
 GameplayWorld::GameplayWorld(unsigned initialRingOrigin,
@@ -253,7 +256,7 @@ GameplayWorld::GameplayWorld(unsigned initialRingOrigin,
                                    const BreakableLifecycleBinding& breakableLifecycle,
                                    const PlayerLifecycleBinding& playerLifecycle,
                                    downwell::GameplayTerrainInstances* terrainInstances,
-                                   const downwell::RoomPack* entryRooms)
+                                   const downwell::RoomPack* entryRooms,PlayerBirthTiming playerBirthTiming)
     : enemyLifecycle_(enemyLifecycle), breakableLifecycle_(breakableLifecycle), playerLifecycle_(playerLifecycle), terrainInstances_(terrainInstances), player_(startsGrounded, landingOffset), tick_(0),
       ringOrigin_(initialRingOrigin % ringHeight),
       followCamera_(followCamera), cameraY_(0), cameraPixelY_(0),
@@ -268,6 +271,9 @@ GameplayWorld::GameplayWorld(unsigned initialRingOrigin,
     run_.reset();
     enemyRandom_.prepareLookahead(randomLookahead_);
     entryRooms_=entryRooms;
+    playerBirthTiming_=playerBirthTiming;
+    playerBirthPending_=playerBirthTiming==PlayerBirthTiming::authoredRoom;
+    if(playerBirthPending_&&!entryRooms_){run_.effectsSucceeded=false;return;}
     // The selected runner copies serialized views before instance events.
     // This adapter enters rmMain; following the camera is a separate phase.
     if(entryRooms_&&!roomEntryViews_.load(*entryRooms_,11)){
@@ -323,7 +329,7 @@ GameplayWorld::GameplayWorld(unsigned initialRingOrigin,
         gems_[index].attracted = false;
         gems_[index].active = false;
     }
-    if(birthPlayerOwnership())initializeMainCameraFrame();
+    if(!playerBirthPending_&&birthPlayerOwnership())initializeMainCameraFrame();
 }
 
 void GameplayWorld::initializeMainCameraFrame(){
@@ -986,6 +992,7 @@ bool GameplayWorld::boneInView(downwell::InstanceHandle bone,bool& visible){
 
 GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
 {
+    if(playerBirthPending_){run_.effectsSucceeded=false;return {};}
     if(collisionPassExecuting_){run_.effectsSucceeded=false;return {};}
     if (run_.levelClearActive || !run_.effectsSucceeded || !generationSucceeded_) return {}; // Result owner uses stepLevelClear.
     boneViewLeft_=160+cameraPixelX_;

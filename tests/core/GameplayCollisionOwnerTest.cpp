@@ -3687,6 +3687,31 @@ int main(){
         probe.reject=true;
         assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)==ResultsDestination::none);
         assert(!world->effectsSucceeded()&&probe.births==4&&world->cameraOffsetY()==0&&world->ringOrigin()==300);
+        for(bool prematureTick:{false,true}){
+            world.reset();probe.births=0;probe.reject=false;
+            probe.world=static_cast<GameplayWorld*>(::operator new(sizeof(GameplayWorld)));
+            world.reset(new(probe.world) GameplayWorld(300,false,1025,true,
+                {},{},GameplayWorld::PlayerLifecycleBinding::bind(probe),nullptr,&rooms,
+                GameplayWorld::PlayerBirthTiming::authoredRoom));
+            assert(world->effectsSucceeded()&&world->awaitingPlayerBirth()&&!probe.births&&
+                !world->playerHandle().generation&&world->cameraOffsetY()==0);
+            terrainCalls=0;
+            if(prematureTick){
+                world->step(0);
+                assert(!world->effectsSucceeded()&&!world->tick()&&!probe.births);
+            }else{
+                assert(world->loadRoomTerrain(rooms,room,[&](const auto&){
+                    assert(probe.births==1&&!world->awaitingPlayerBirth());++terrainCalls;return true;
+                })&&terrainCalls==240&&world->cameraOffsetY()==5&&world->ringOrigin()==305);
+                assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)==ResultsDestination::gameplay);
+                assert(world->awaitingPlayerBirth()&&probe.births==1&&!world->playerHandle().generation);
+                probe.reject=true;terrainCalls=0;
+            }
+            assert(!world->loadRoomTerrain(rooms,room,[&](const auto&){++terrainCalls;return true;}));
+            assert(!terrainCalls&&probe.births==(prematureTick?0u:2u));
+            assert(!world->loadRoomTerrain(rooms,room,[&](const auto&){++terrainCalls;return true;}));
+            assert(!terrainCalls&&probe.births==(prematureTick?0u:2u));
+        }
     }
     {
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
@@ -4031,15 +4056,21 @@ int main(){
             fieldsOwner->population(371,population)&&population==0&&
             !fieldWorld->goalFieldInstances().find({0,firstIdentity})&&fieldsOwner->valid());
     }
+    for(auto timing:{GameplayWorld::PlayerBirthTiming::construction,GameplayWorld::PlayerBirthTiming::authoredRoom})
     for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
                        GameplayCollisionOwner::Ownership::nativeScenery}){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
             GameplayTerrainInstances::WallCollision{},&rooms,ownership);
+        const bool native=ownership!=GameplayCollisionOwner::Ownership::reference;
+        auto nativeTerrain=std::make_unique<GameplayWorld::NativeTerrain>();
         auto world=std::make_unique<GameplayWorld>(300,false,1201-176,true,owner->enemyBinding(),
-            owner->breakableBinding(),owner->playerBinding(),&owner->terrain(),&rooms);
-        assert(owner->attach(*world));
-        unsigned priorGeneration=0,priorDitherGeneration=0;
+            owner->breakableBinding(),owner->playerBinding(),native?nullptr:&owner->terrain(),&rooms,timing);
+        assert(owner->attach(*world)&&(!native||world->bindNativeTerrain(*nativeTerrain)));
+        unsigned priorGeneration=0,priorDitherGeneration=0,priorPlayerGeneration=0;
         for(unsigned retry=0;retry<2;++retry){
+            const bool deferred=timing==GameplayWorld::PlayerBirthTiming::authoredRoom;
+            assert(world->awaitingPlayerBirth()==deferred);
+            if(deferred)assert(!world->playerHandle().generation&&world->cameraOffsetY()==0);
             world->confirmFirstStage();
             const auto generation=world->goalFieldInstances().birthSequence();
             const auto draws=world->randomDrawCount();
@@ -4047,7 +4078,10 @@ int main(){
             PackedRoom room;assert(rooms.findRoom(11,room));
             PreparedRoomTerrain plan;assert(plan.prepare(rooms,room));
             unsigned walls=0;
-            assert(world->loadRoomTerrainWithStartField(rooms,room,[&](const auto&){
+            assert(world->loadRoomTerrainWithStartField(rooms,room,[&](const auto& instance){
+                assert(!world->awaitingPlayerBirth());
+                const auto player=world->playerHandle();
+                assert(player.generation>priorPlayerGeneration&&world->findPlayer(player)->sourceInstanceId==100855);
                 const auto above=world->ditherAbove()->handle();
                 const auto* dither=world->ditherAbove()->find(above);
                 assert(dither&&dither->sourceId==100854&&above.generation>priorDitherGeneration);
@@ -4055,7 +4089,7 @@ int main(){
                 assert(bool(field)==(walls>=144));
                 if(field)assert(field->sourceId==101097&&field->destroyRequested);
                 if(walls==144){
-                    assert(world->terrainInstances()->size()==144);
+                    assert((native?nativeTerrain->size():world->terrainInstances()->size())==144);
                 }
                 // The native registration projection intentionally excludes
                 // retained terrain; use the complete reference walk here.
@@ -4068,7 +4102,8 @@ int main(){
                         return true;
                     })&&found&&aboveFound);
                 }
-                ++walls;return true;
+                ++walls;return !native||nativeTerrain->append(instance.objectId,instance.x,instance.y,true,
+                    instance.instanceId,instance.creationCodeId);
             },retry?&plan:nullptr)&&walls==240);
             assert(world->randomDrawCount()==draws+1);
             assert(!world->goalFieldInstances().find({0,generation}));
@@ -4076,6 +4111,7 @@ int main(){
             assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::goalField,{0,generation},shared));
             assert(!GameplayCollisionView(*world).contains(shared)&&owner->valid());
             priorGeneration=generation;
+            priorPlayerGeneration=world->playerHandle().generation;
             priorDitherGeneration=world->ditherAbove()->handle().generation;
             assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)!=ResultsDestination::none);
         }

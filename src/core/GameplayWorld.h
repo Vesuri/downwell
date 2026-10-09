@@ -246,6 +246,10 @@ public:
     // When supplied, entryRooms is borrowed for this world and its run resets;
     // it must remain immutable and prepares rmMain's initial view cache before
     // player lifecycle callbacks. The terrain handoff reuses that same snapshot.
+    // Fresh native rooms use authoredRoom so ownership can be attached before
+    // Create and registration occurs in the serialized walk. Construction is
+    // retained for already-entered standalone simulations and replay fixtures.
+    enum class PlayerBirthTiming { construction, authoredRoom };
     explicit GameplayWorld(unsigned initialRingOrigin,
                               bool startsGrounded = true,
                               int landingOffset = 0,
@@ -254,7 +258,9 @@ public:
                               const BreakableLifecycleBinding& breakableLifecycle = {},
                               const PlayerLifecycleBinding& playerLifecycle = {},
                               downwell::GameplayTerrainInstances* terrainInstances = nullptr,
-                              const downwell::RoomPack* entryRooms = nullptr);
+                              const downwell::RoomPack* entryRooms = nullptr,
+                              PlayerBirthTiming playerBirthTiming = PlayerBirthTiming::construction);
+    bool awaitingPlayerBirth()const{return playerBirthPending_;}
     const downwell::GameplayTerrainInstances* terrainInstances()const{return terrainInstances_;}
     using NativeTerrain=downwell::NativeTerrainLifetimes<downwell::GameplayTerrainInstances::capacity>;
     const NativeTerrain* nativeTerrainInstances()const{return nativeTerrainInstances_;}
@@ -883,12 +889,18 @@ private:
             downwell::PackedRoomInstance decoded;
             if(!retained&&!rooms.roomInstance(room,i,decoded)){run_.effectsSucceeded=false;return false;}
             const auto& instance=retained?prepared->at(i):decoded;
+            if(instance.objectId==35&&playerBirthPending_){
+                if(!birthPlayerOwnership())return false;
+                playerBirthPending_=false;
+                // Preserve the initial/Retry presentation snapshot. Later
+                // rooms retain their unadvanced camera until ordinary Step.
+                if(!tick_)initializeMainCameraFrame();
+            }
             if(!create(instance))return run_.effectsSucceeded=false;
             if(instance.objectId==35){
-                // The native scheduler currently births its player before this
-                // handoff. Validate/retain the authored identity without replaying
-                // Create or inventing a numeric ID from its lifetime handle.
-                // Full serialized cross-family birth ordering is still required.
+                // Either just born at this boundary or already supplied by an
+                // entered-world fixture. Retain the authored ID without a
+                // second birth or inventing it from the lifetime handle.
                 if(playerSeen||!instance.instanceId||!playerInstance_.lifetimeId||
                     (playerInstance_.sourceInstanceId&&playerInstance_.sourceInstanceId!=instance.instanceId)){
                     run_.effectsSucceeded=false;return false;
@@ -1494,6 +1506,8 @@ private:
     // view cache must be available before any player birth callbacks.
     const downwell::RoomPack* entryRooms_=nullptr;
     PlayerInstance playerInstance_;
+    PlayerBirthTiming playerBirthTiming_=PlayerBirthTiming::construction;
+    bool playerBirthPending_=false;
     std::uint32_t nextPlayerLifetimeId_=1;
     bool birthPlayerOwnership();
     bool retirePlayerOwnership();

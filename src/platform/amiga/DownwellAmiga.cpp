@@ -1747,7 +1747,12 @@ __attribute__((noinline)) static int runDownwell(void) {
         AmigaPortRuntime(initialRingOrigin, false, 1201 - 176, true,collisionOwner.enemyBinding(),
             collisionOwner.breakableBinding(),collisionOwner.playerBinding(),
             (ownership==downwell::GameplayCollisionOwner::Ownership::native||
-             ownership==downwell::GameplayCollisionOwner::Ownership::nativeScenery)?nullptr:&collisionOwner.terrain(),&rooms);
+             ownership==downwell::GameplayCollisionOwner::Ownership::nativeScenery)?nullptr:&collisionOwner.terrain(),&rooms,
+#if defined(DOWNWELL_ENTRY_WIPE_VERIFY) || defined(DOWNWELL_FIELD_VERIFY)
+            GameplayWorld::PlayerBirthTiming::construction);
+#else
+            GameplayWorld::PlayerBirthTiming::authoredRoom);
+#endif
 #endif
     if(!port.effectsSucceeded()||!collisionOwner.attach(port))return 20;
 #ifdef DOWNWELL_ENTRY_WIPE_VERIFY
@@ -1988,6 +1993,8 @@ __attribute__((noinline)) static int runDownwell(void) {
             downwellStartupFailed();
             return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
         }
+        worldViewX = mainViewX + port.cameraOffsetX();
+        worldViewY = mainInitialViewY + port.cameraOffsetY();
         terrainCollision.index = &terrainIndex;
 #ifdef DOWNWELL_SCENE_VERIFY
         // Exercise the target's actual precise-mask route, not an occupancy

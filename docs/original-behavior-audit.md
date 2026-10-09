@@ -71,15 +71,20 @@ lengthdir inputs therefore exceed the current `SmokeDirection` / `SmokeTrig`
 domain (and its X radius is 24, beyond that helper's length limit of 8).
 Wrapping angles or substituting host trigonometry would not preserve the
 original wrapper's float conversion and argument reduction.
-Native terrain loading retains the
-authored player/wall IDs but is not complete cross-family room creation.
-When supplied the room resource at construction, native player birth resolves
-the unique authored object-35 ID before invoking its lifecycle callback, on
-initial entry and Retry. It consumes no dynamic ID. Later terrain loading
-validates that identity rather than treating it as a fresh assignment. Worlds
-constructed without entry resources retain the explicit late handoff; they do
-not establish source-equivalent player creation. Resolving the ID early does
-not change the still-incomplete builder/player/controller birth order.
+Native terrain loading retains the authored player/wall IDs but is not complete
+cross-family room creation. Ordinary Amiga entry uses `authoredRoom` player-birth
+timing: construction prepares the room views without registering a player, the
+collision owner attaches, and the serialized room walk registers object 35 at
+index 1 before dither/wall creation. Builder setup precedes this walk. Retry and
+subsequent level entry preserve this timing; an attempted gameplay tick before
+the player is born fails rather than simulating an unregistered player. A failed
+birth stops the room walk and cannot be retried. The initial/Retry compatibility
+camera snapshot is advanced only after the birth callback, and the backend then
+rebases its display origin. The source ID is 100855, not a dynamic allocation.
+Already-entered standalone/replay fixtures retain construction-time birth;
+resource-less fixtures retain the explicit late ID handoff. Neither route yet
+owns the builder/controller lifetimes or the complete synchronous player-child
+sequence, so this does not establish the global dynamic-ID stream.
 The room-entry field likewise resolves authored object 371's ID 101097 before
 its lifecycle birth, scale publications and random-radius Create. Its registered
 layer lifetime retains that ID; first-level destruction and Retry retire the

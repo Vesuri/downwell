@@ -1308,7 +1308,8 @@ public:
             owner_.watchCaptureRanges(View::enemyBase,View::terrainBase,View::debrisBase,View::capacity,combatAlarmCaptureDirty_)))
             return check(false);
         if(!valid()||(world_&&world_!=&world)||(!world_&&
-            (!initialPlayer_||world.findPlayer(initialPlayerKey_)!=initialPlayer_)))return false;
+            (world.awaitingPlayerBirth()?initialPlayer_!=nullptr:
+             (!initialPlayer_||world.findPlayer(initialPlayerKey_)!=initialPlayer_))))return false;
         if(!world_&&!world.bindTimeFieldLifecycle(OrdinaryTimeFields<64>::Binding::bind(fields_)))return check(false);
         if(!world_&&!world.bindGoalFieldLifecycle(GameplayGoalFields::Binding::bindMaskDestruction(goals_)))return check(false);
         if(!world_&&!world.bindExitControllerLifecycle(GameplayExitControllers::Binding::bind(exits_)))return check(false);
