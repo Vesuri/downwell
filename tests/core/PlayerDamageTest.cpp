@@ -68,6 +68,21 @@ struct DamageControllerOwner {
 };
 int main(){
     {
+        struct World {} world;
+        RegisteredPlayerDamageState<World,int> state{world,0};
+        MotionBinary64 value;
+        assert(state.lengthdirX(n(3),n(0),value)&&eq(value,n(3)));
+        assert(state.lengthdirX(n(3),n(90),value)&&value.zero());
+        assert(state.lengthdirX(n(3),n(180),value)&&eq(value,n(-3)));
+        assert(state.lengthdirX(n(3),n(270),value)&&value.zero());
+        assert(state.lengthdirX(n(3),n(45),value));
+        RunnerImageValue narrowed;assert(narrowed.assign(value)&&narrowed.bits==0x4007c3b6u);
+        // Keep the full promoted wrapper result; it is not an integer Q8 speed.
+        auto q8=value;assert(multiplyBinary64(q8,n(256),q8));std::int32_t rounded;
+        assert(q8.roundPixel(rounded)&&!eq(q8,n(rounded)));
+        assert(!state.lengthdirX(n(10),n(45),value)); // Outside the reviewed wrapper domain.
+    }
+    {
         RunSession run;
         assert(!run.playerHit);run.playerDamageEndStep();assert(!run.playerHit);
         run.setPlayerHit();run.playerCreated();assert(run.playerHit==1);

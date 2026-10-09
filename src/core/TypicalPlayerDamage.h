@@ -34,7 +34,7 @@ struct TypicalPlayerDamage {
         if(!events.pointDirection(cx,cy,px,py,direction) || !applyDamage(damage))return false;
         const auto jumpY=yImpact;
         MotionBinary64 jumpX;
-        if(!events.lengthdirX(xImpact,direction,jumpX) || !forceJump(jumpX,jumpY))return false;
+        if(!state.lengthdirX(xImpact,direction,jumpX) || !forceJump(jumpX,jumpY))return false;
         if(!events.playerDead() && !events.shake(5,8))return false;
         if(events.playerHealthPositive()){
             const auto effectY=events.playerY(),effectX=events.playerX();

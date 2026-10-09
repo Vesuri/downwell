@@ -3,6 +3,7 @@
 #include "MotionBinary64.h"
 #include "AlarmBank.h"
 #include "InstanceHandle.h"
+#include "CurrencyHomingMath.h"
 namespace downwell {
 // Borrow the shared flag; evaluate the object selector at the alarm write,
 // after synchronous effects that may have changed the player population.
@@ -15,6 +16,11 @@ template<class World,class SelectPlayer> struct RegisteredPlayerDamageState {
     bool timeoutOwned()const{return world.upgrades().levels[17]!=0;}
     void clearNoDamage(){world.clearNoDamageAchievement();}
     void clearAreaNoDamage(){world.clearAreaNoDamageAchievement();}
+    // Same recovered lengthdir wrapper used by currency; this does not
+    // supply atan2 or convert the result to the legacy player's Q8 storage.
+    bool lengthdirX(MotionBinary64 length,MotionBinary64 direction,MotionBinary64& result){
+        return CurrencyHomingMath::component(length,direction,false,result);
+    }
     bool subtractHealth(MotionBinary64 amount){return world.subtractPlayerHealth(amount);}
     bool damageNumber(MotionBinary64 amount,MotionBinary64 direction){return world.emitPlayerDamageNumber(amount,direction);}
     bool setPlayerAlarm(unsigned index,int ticks){

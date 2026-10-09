@@ -1790,6 +1790,7 @@ int main(){
         struct Events:TimeoutDamageEvents {
             bool candle=false,failJump=false;bool candleOwned(){return candle;}
             bool setVertical(Number value){vy=value;return !failJump;}
+            bool lengthdirX(Number,Number,Number&){return false;}
         } events;
         events.candle=events.timeout=!upgraded;
         events.failJump=failJump;
@@ -1798,6 +1799,7 @@ int main(){
         const auto fields=world->timeFields().size();const auto draws=world->randomDrawCount();
         assert(world->noDamageAchievement()&&world->areaNoDamageAchievement());
         assert(world->typicalPlayerDamage(bound,one,one,one,events,[&](std::uint32_t& id){id=910000+births++;return true;})==!failJump);
+        assert(events.vx.high==one.high&&events.vx.low==one.low);
         assert(world->noDamageAchievement()==failJump&&world->areaNoDamageAchievement()==failJump&&!events.clears);
         if(failJump){assert(world->timeFields().size()==fields&&world->randomDrawCount()==draws&&
             !births&&world->playerDamaged());continue;}

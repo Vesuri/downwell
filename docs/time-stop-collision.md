@@ -936,6 +936,16 @@ Exactly coincident caller/player coordinates produce direction zero and hence
 positive horizontal impulse 3, rather than no impulse. Other directions still
 use the legacy fixed-point normalized vector in `PlayerMotion`; this is not the
 original `point_direction`/`lengthdir_x` pipeline and remains migration work.
+The registered contact-script binding supplies the recovered `lengthdir_x`
+wrapper directly: binary32 input narrowing, float radians conversion, the
+pinned cosine program, float product and near-integer snap. The result remains
+a promoted binary32 value in `MotionBinary64` when passed to `scrFjump`; it is
+not converted into Q8. Both world tests reject an external lengthdir callback
+to verify this binding, and the diagonal test retains a non-Q8 result. This
+does not supply the original atan2 dependency or replace the legacy live
+player's velocity storage/integration; those are still required before natural
+contact admission. Its accepted length/angle domain is the same reviewed
+wrapper domain used by currency, with unsupported inputs failing explicitly.
 Component tests cover default height, signed zero, caller mutation during
 recharge and partial failure; the damage replay includes forced-jump writes on
 both CPUs. These do not prove original-runner contact dispatch or general motion

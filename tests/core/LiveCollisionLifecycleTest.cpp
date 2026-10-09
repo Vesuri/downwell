@@ -1869,6 +1869,7 @@ int main(){
         struct Events:TimeoutDamageEvents {
             bool candle=false,failJump=false;bool candleOwned(){return candle;}
             bool setVertical(Number value){vy=value;return !failJump;}
+            bool lengthdirX(Number,Number,Number&){return false;}
         } events;
         events.candle=events.timeout=!upgraded;
         events.failJump=failJump;
@@ -1876,6 +1877,7 @@ int main(){
         const auto fields=world->timeFields().size();const auto draws=world->randomDrawCount();
         require(world->noDamageAchievement()&&world->areaNoDamageAchievement(),"player creation sets damage achievements");
         require(world->typicalPlayerDamage(bound,one,one,one,events)==!failJump,"registered upgrade-aware damage");
+        require(events.vx.high==one.high&&events.vx.low==one.low,"registered lengthdir bypasses external approximation");
         require(world->noDamageAchievement()==failJump&&world->areaNoDamageAchievement()==failJump&&!events.clears,
             "achievement writes belong to the run and occur only after synchronous damage effects");
         if(failJump){require(world->timeFields().size()==fields&&world->randomDrawCount()==draws&&
