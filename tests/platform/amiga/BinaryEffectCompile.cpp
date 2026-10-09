@@ -591,6 +591,7 @@ bool compileCorpseDraw(const downwell::CorpseAnimation& corpse,
 }
 #include "core/CorpseEffects.h"
 #include "core/StoredCorpseRegistration.h"
+#include "core/SkeletonInstances.h"
 #include "core/StoredCorpseExpiryRegistration.h"
 #include "core/CorpseExpiryInstances.h"
 bool compileNativeExpiry(downwell::CorpseExpiryInstances<4>& owner,std::uint32_t sourceId){
@@ -607,6 +608,10 @@ bool compileRegisteredExpiry(downwell::StoredCorpseExpiryRegistration<16,4>& own
 struct CorpseTileProbe {
     bool operator()(downwell::InstanceHandle,int,downwell::MotionBinary64,downwell::MotionBinary64,bool&);
 };
+bool compileSkeletonCorpse(downwell::StoredCorpseRegistration<16,4>& corpses,
+    downwell::SkeletonInstances<4>::Publisher& publish,downwell::GameMakerRandom& random,CorpseTileProbe tile){
+    return publish.deadBody([&](auto& source){return corpses.createFromDeath(source,206,{},102,false,random,tile);});
+}
 bool compileRegisteredCorpse(downwell::StoredCorpseRegistration<16,4>& owner,
     downwell::DeadBodySource& source,downwell::GameMakerRandom& random,CorpseTileProbe tile){
     if(!owner.createFromDeath(source,206,{},102,false,random,tile))return false;

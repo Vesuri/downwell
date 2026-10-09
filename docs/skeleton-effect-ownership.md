@@ -1237,6 +1237,14 @@ publication retains the accepted prefix for explicit teardown and latches the
 world failure. `StartupRuntime::createRegisteredCorpseFromDeath` supplies the
 room allocator, RNG and Rest in Pieces state; the caller still owns publication
 of the returned dying-enemy fields.
+`SkeletonInstances::Publisher::deadBody` supplies a source view whose private
+script fields alias the live skeleton: body sprite, capped impact, child ID
+and horizontal velocity are retained as each statement executes, including
+failed event prefixes. Spawn coordinates come from published builtins rather
+than the motion accumulators; facing is read from the published scale whenever
+the script requests it. The stored runtime's registered creation entry accepts
+this view without copying those mutations back at the end. This connects the
+corpse portion of the death caller, not its preceding blood/reward services.
 `withCorpseEvents` admits registered corpses to the stored room's animation,
 alarm, ordinary/End Step and cleanup phases. Animation publishes the evaluated
 index before committing its timeline. Event dispatch imports the room's current

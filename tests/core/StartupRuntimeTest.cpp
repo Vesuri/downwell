@@ -1015,9 +1015,29 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
             "out-of-view End Step retires corpse at room cleanup");
         require(corpses.clear()&&!runtime->instance(id),"retire corpse before room teardown");
         auto expiry=runtime->corpseExpiryRegistration<1>();
+        auto skeletons=runtime->skeletonRegistration<1>();downwell::InstanceHandle dyingSkeleton;
+        require(runtime->spawnSkeleton(skeletons,240,1200,dyingSkeleton),"registered dying caller");
         const auto parentId=runtime->nextRuntimeInstanceId();
-        require(runtime->createRegisteredCorpseFromDeath(corpses,source,206,{},102,
-            [](auto,int,auto,auto,bool& hit){hit=false;return true;}),"create expiring corpse");
+        require(skeletons.dispatchPublished(dyingSkeleton,[&](auto& actor,auto&,auto& publish,bool&){
+            actor.xsp={0x3fb99999u,0x9999999au}; // 0.1 triggers source fallback.
+            actor.xx=downwell::MotionBinary64::fromInteger(-1000); // Not the published spawn position.
+            require(publish.facing(-1),"dying skeleton facing publication");
+            return publish.deadBody([&](auto& caller){
+                require(runtime->createRegisteredCorpseFromDeath(corpses,caller,206,
+                    downwell::MotionBinary64::fromInteger(9),102,
+                    [](auto,int,auto,auto,bool& hit){hit=false;return true;}),"create corpse from live skeleton fields");
+                require(actor.myDeadBody==parentId&&actor.bodySprite==206&&
+                    actor.impactSp.high==0x40100000u&&actor.impactSp.low==0&&
+                    actor.xsp.high==0xbff80000u&&actor.xsp.low==0,
+                    "script mutations reach the live caller before returning");
+                return true;
+            });
+        }),"registered skeleton invokes source dead-body wrapper");
+        const auto* born=corpses.state(corpses.sourceHandle(parentId));
+        require(born&&born->x.bits==0x43700000u&&born->y.bits==0x44960000u&&
+            born->imageXscale.bits==0xbf800000u&&born->xsp.high==0xc0180000u&&born->xsp.low==0,
+            "corpse uses published anchor, facing and capped impact instead of private accumulators");
+        require(skeletons.mark(dyingSkeleton)&&skeletons.retire(dyingSkeleton),"retire fixture caller after its death callback");
         const auto parentKey=corpses.sourceHandle(parentId);
         require(corpses.dispatchPublished(parentKey,[](auto& corpse,auto&,bool&){
             corpse.alarms.set(0,1);return true;
@@ -1067,6 +1087,26 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         require(oracle.destroyRequested&&expired==1&&expiry.clear()&&corpses.clear(),
             "expiry chain completes once without leaked room records");
         audit.verify(*runtime);
+        downwell::InstanceHandle failedCaller;
+        require(runtime->spawnSkeleton(skeletons,240,1200,failedCaller),"failure-retention caller");
+        const auto failedBody=runtime->nextRuntimeInstanceId();unsigned callbacks=0;
+        require(!skeletons.dispatchPublished(failedCaller,[&](auto&,auto&,auto& publish,bool&){
+            return publish.deadBody([&](auto& caller){
+                ++callbacks;
+                require(runtime->createRegisteredCorpseFromDeath(corpses,caller,206,
+                    downwell::MotionBinary64::fromInteger(9),102,
+                    [](auto,int,auto,auto,bool& hit){hit=false;return true;}),"retain completed child before caller failure");
+                return false;
+            });
+        }),"caller failure is terminal after synchronous child creation");
+        const auto* failed=skeletons.instances().find(failedCaller);
+        require(failed&&failed->state.myDeadBody==failedBody&&failed->state.bodySprite==206&&
+            failed->state.impactSp.high==0x40100000u&&failed->state.xsp.high==0x3ff80000u&&
+            corpses.state(corpses.sourceHandle(failedBody))&&!runtime->effectsSucceeded(),
+            "failed event retains actual caller mutations and child lifetime");
+        require(!skeletons.dispatchPublished(failedCaller,[&](auto&,auto&,auto&,bool&){++callbacks;return true;})&&callbacks==1,
+            "failed caller cannot replay Create or RNG");
+        require(corpses.clear()&&skeletons.clear(),"explicit teardown of retained failure prefix");
     }
 
     if (objects != nullptr) {

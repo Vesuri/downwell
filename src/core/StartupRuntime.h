@@ -780,8 +780,8 @@ public:
     template<unsigned Capacity> StoredCorpseExpiryRegistration<instanceCapacity,Capacity> corpseExpiryRegistration(){
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
     }
-    template<unsigned Capacity,class Tile> bool createRegisteredCorpseFromDeath(
-        StoredCorpseRegistration<instanceCapacity,Capacity>& registry,DeadBodySource& source,
+    template<unsigned Capacity,class Source,class Tile> bool createRegisteredCorpseFromDeath(
+        StoredCorpseRegistration<instanceCapacity,Capacity>& registry,Source& source,
         int sprite,MotionBinary64 impact,int explosion,Tile tile){
         if(!registry.belongsTo(instances_))return run_.effectsSucceeded=false;
         return registry.createFromDeath(source,sprite,impact,explosion,run_.upgrades.levels[3]!=0,random_,tile);

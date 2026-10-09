@@ -15,8 +15,8 @@ struct DeadBodySource {
 // hooks (sprite assignment can reset animation/collision state). Callbacks may
 // modify source fields: the script re-reads them after each call. Failure is
 // terminal; retain earlier changes and do not retry or replay RNG draws.
-template<class Events>
-bool createDeadBody(DeadBodySource& source,int sprite,MotionBinary64 impact,
+template<class Events,class Source>
+bool createDeadBody(Source& source,int sprite,MotionBinary64 impact,
                     int explosion,Events& events){
     source.bodySprite=sprite;source.impactSp=impact;
     int order;

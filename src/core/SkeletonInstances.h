@@ -118,6 +118,22 @@ public:
             r->state.x=px;r->state.y=py;return true;
         }
         bool destroy(){return store_.markDestroyed(key_);}
+        template<class Create> bool deadBody(Create create){
+            auto* r=store_.resolve(key_);if(!r)return store_.fail();
+            // Private script fields alias the actual caller: partial failure
+            // must not lose myDeadBody, impactSp or the xsp fallback write.
+            struct Facing {
+                const int& value;
+                operator MotionBinary64()const{return MotionBinary64::fromInteger(value);}
+            };
+            struct Source {
+                MotionBinary64 x,y;Facing imageXscale;
+                MotionBinary64& xsp;MotionBinary64& impactSp;
+                int& bodySprite;std::uint32_t& myDeadBody;
+            } source{r->x.promoted(),r->y.promoted(),{r->publishedFacing},
+                r->state.xsp,r->state.impactSp,r->state.bodySprite,r->state.myDeadBody};
+            return create(source)||store_.fail();
+        }
     };
     bool endStep(InstanceHandle key,MotionBinary64 viewY,bool mainRoom){
         return dispatchPublished(key,[&](auto&,auto&,auto& publish,bool& good){

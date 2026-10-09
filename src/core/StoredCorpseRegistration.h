@@ -97,7 +97,7 @@ public:
         if(!lifecycle_.transform(h,*r,RunnerTransformField::scaleX,next,{0x3f800000u},0xffffffu))return fail();
         e->state.imageXscale=next;r->scaleX=stored(next);return true;
     }
-    template<class Random,class Tile> bool createFromDeath(DeadBodySource& source,int spriteId,MotionBinary64 impact,
+    template<class Source,class Random,class Tile> bool createFromDeath(Source& source,int spriteId,MotionBinary64 impact,
         int explosion,bool rip,Random& random,Tile tile){
         if(!good_)return false;
         struct Events {

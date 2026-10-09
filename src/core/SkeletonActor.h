@@ -12,6 +12,10 @@ struct SkeletonActor : SkeletonDecisions {
     std::int32_t x=0, y=0;
     int health=60, previousHealth=60, money=10, hitDamage=0;
     MotionBinary64 takenImpact{},hitDirection{},hitAngle{};
+    // scrDeadBody writes these caller fields before the enemy is retired.
+    MotionBinary64 impactSp{};
+    int bodySprite=0;
+    std::uint32_t myDeadBody=0;
     bool damageStun=false, stomped=false;
     bool grounded=true, alive=true, destroyRequested=false;
     bool timefieldImmune=false;
