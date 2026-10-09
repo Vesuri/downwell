@@ -171,6 +171,16 @@ do not claim to implement general object-selector lookup. Other player alarm
 events are not admitted by the compact native counter. The old area-one
 contact countdown remains separate pending replacement of that entire damage
 path; it is not a second owner of this source alarm.
+`bindContactDamagePlayer` supplies the shared damaged guard and alarm write to
+both `scrTypicalDamage` and its nested `scrPDamage`, while retaining the
+attacker's caller fields. Pass the borrowed binding through the world's
+`typicalPlayerDamage` entry so Timeout births still use its registered path.
+The selector callback runs only at the final Alarm 1 assignment, after the
+damaged flag write, and must perform the source object-selector lookup then.
+It is not a cached handle or a WITH loop. The explicit-event-state overloads
+remain the reference path. Both world tests deliberately supply a conflicting
+external immunity value, verify that the real global wins, and verify that a
+second guarded contact neither selects the player nor repeats effects.
 Alarm 1 VM SHA256:
 `e1dcdae86d6152a96607b2d8429582255d012ef2e742490fcd2ed8fcf9bf7d13`.
 

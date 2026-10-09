@@ -1843,7 +1843,19 @@ int main(){
         InstanceHandle player;
         require(world->visitDrawChecked([&](InstanceHandle h,const InstanceRecord& r){if(r.objectId==35)player=h;return true;})&&
             player.generation,"resolve current player lifetime");
-        world->setPlayerDamaged();require(world->setPlayerDamageAlarm(player,alarm),"arm registered player Alarm 1");
+        ContactDamageScripts caller;unsigned selections=0;
+        auto bound=bindContactDamagePlayer(caller,*world,[&](InstanceHandle& selected){
+            require(world->playerDamaged(),"selector runs after damaged flag write");
+            ++selections;selected=player;return true;
+        });
+        TimeoutDamageEvents events;events.timeout=false;events.immune=true;
+        const auto one=MotionBinary64::fromInteger(1);
+        require(world->typicalPlayerDamage(bound,one,one,one,events)&&world->playerDamaged()&&
+            world->resolveInstance(player)->alarms.get(1)==90&&events.alarm==-1&&events.clears==2,
+            "source damage writes actual player state, not stale external immunity");
+        require(world->typicalPlayerDamage(bound,one,one,one,events)&&events.clears==2&&selections==1,
+            "repeated contact reads the actual shared damaged guard");
+        require(world->setPlayerDamageAlarm(player,alarm),"arm registered player Alarm 1");
         for(int tick=1;tick<=3;++tick){
             world->step({},false);
             require(world->effectsSucceeded()&&world->playerDamaged()==(alarm<=0||tick<alarm),

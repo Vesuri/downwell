@@ -20,8 +20,13 @@ struct TypicalPlayerDamage {
     template<class Events,class CreateField,class Damage,class Jump>
     bool executeCalls(MotionBinary64 amount,MotionBinary64 horizontal,MotionBinary64 vertical,
         Events& events,CreateField createField,Damage applyDamage,Jump forceJump){
+        return executeCallsWithState(amount,horizontal,vertical,events,createField,applyDamage,forceJump,events);
+    }
+    template<class Events,class CreateField,class Damage,class Jump,class State>
+    bool executeCallsWithState(MotionBinary64 amount,MotionBinary64 horizontal,MotionBinary64 vertical,
+        Events& events,CreateField createField,Damage applyDamage,Jump forceJump,State& state){
         damage=amount;xImpact=horizontal;yImpact=vertical;
-        if(events.playerDamaged())return true;
+        if(state.playerDamaged())return true;
         // Read in VM evaluation order. scrPDamage may move the player or
         // mutate the caller; do not recompute pdir after that synchronous call.
         const auto py=events.playerY(),px=events.playerX();

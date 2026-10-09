@@ -1700,7 +1700,17 @@ int main(){
         auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain(),&rooms);
         assert(owner->attach(*world)&&world->createTimeFieldWithSourceId(820000,240,176));
-        world->setPlayerDamaged();assert(world->setPlayerDamageAlarm(world->playerHandle(),2));
+        ContactDamageScripts damageCaller;unsigned selections=0;
+        auto damageBinding=bindContactDamagePlayer(damageCaller,*world,[&](InstanceHandle& selected){
+            assert(world->playerDamaged());++selections;selected=world->playerHandle();return true;
+        });
+        TimeoutDamageEvents damageEvents;damageEvents.timeout=false;damageEvents.immune=true;
+        const auto one=MotionBinary64::fromInteger(1);
+        auto noBirth=[](std::uint32_t&){return false;};
+        assert(world->typicalPlayerDamage(damageBinding,one,one,one,damageEvents,noBirth)&&world->playerDamaged());
+        assert(damageEvents.alarm==-1&&damageEvents.clears==2);
+        assert(world->typicalPlayerDamage(damageBinding,one,one,one,damageEvents,noBirth)&&damageEvents.clears==2&&selections==1);
+        assert(world->setPlayerDamageAlarm(world->playerHandle(),2));
         assert(world->setOxygen({0x40230000u,0}));
         unsigned next=830000;std::uint8_t input=0;std::vector<PlayerTimeStop::Effect> events;
         const auto tick=[&]{return owner->withPlayerTimeStop(stop,room,masks,false,

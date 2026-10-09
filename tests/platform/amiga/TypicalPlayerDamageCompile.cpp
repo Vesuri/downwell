@@ -6,6 +6,13 @@ using downwell::MotionBinary64;
 struct DuckAudio {
     bool isPlaying(int,bool&),getGain(int,MotionBinary64&),setGain(int,MotionBinary64,int);
 };
+bool nativeBoundDamage(GameplayWorld& world,downwell::ContactDamageScripts& caller,
+                      bool (*select)(downwell::InstanceHandle&)){
+    // Ensure the native state binding resolves the selected lifetime without
+    // introducing a second alarm counter or a copied caller state.
+    auto bound=downwell::bindContactDamagePlayer(caller,world,select);
+    bound.state.setPlayerDamaged();return bound.state.setPlayerAlarm(1,90);
+}
 bool nativeDamageDuck(GameplayWorld& world,downwell::ContactDamageScripts& caller,DuckAudio& audio){
     return world.duckMusic(caller.music,500,{0x3fe66666u,0x66666666u},audio);
 }

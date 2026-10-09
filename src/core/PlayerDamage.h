@@ -2,7 +2,19 @@
 #define DOWNWELL_CORE_PLAYER_DAMAGE_H
 #include "MotionBinary64.h"
 #include "AlarmBank.h"
+#include "InstanceHandle.h"
 namespace downwell {
+// Borrow the shared flag; evaluate the object selector at the alarm write,
+// after synchronous effects that may have changed the player population.
+template<class World,class SelectPlayer> struct RegisteredPlayerDamageState {
+    World& world;SelectPlayer selectPlayer;
+    bool playerDamaged()const{return world.playerDamaged();}
+    void setPlayerDamaged(){world.setPlayerDamaged();}
+    bool setPlayerAlarm(unsigned index,int ticks){
+        InstanceHandle player;
+        return index==1&&selectPlayer(player)&&world.setPlayerDamageAlarm(player,ticks);
+    }
+};
 // Borrow one registered controller for the scrPDamage WITH body. Resolve
 // every write independently: a callback may retire/compact the owner.
 template<class Resolve,class Apply>
@@ -28,9 +40,12 @@ bool withPlayerDamageController(Resolve resolve,Apply apply){
 struct PlayerDamage {
     int hitInvulnerability=0;
     template<class Events> bool execute(MotionBinary64 amount,Events& events){
+        return executeWithState(amount,events,events);
+    }
+    template<class Events,class State> bool executeWithState(MotionBinary64 amount,Events& events,State& state){
         if(!events.setDamageSourceName())return false;
         hitInvulnerability=events.candleOwned()?240:90;
-        if(!events.playerDead() && !events.playerDamaged()){
+        if(!events.playerDead() && !state.playerDamaged()){
             if(!events.subtractHealth(amount))return false;
             const auto py=events.playerY(),px=events.playerX();
             const auto cy=events.callerY(),cx=events.callerX();
@@ -48,9 +63,9 @@ struct PlayerDamage {
                 return controller.setAlarm(0,40);
             }))return false;
         }
-        events.setPlayerDamaged();
+        state.setPlayerDamaged();
         // Object-selector property assignment, NOT an invented with loop.
-        return events.setPlayerAlarm(1,hitInvulnerability);
+        return state.setPlayerAlarm(1,hitInvulnerability);
     }
 };
 }
