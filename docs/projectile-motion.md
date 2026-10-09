@@ -1211,8 +1211,12 @@ authorize omitted actors or incomplete source-ID streams.
 `StoredSourceBulletStep` is the corresponding stored-world binding. It uses
 the stored owner's line/point/place queries and box writes, and dispatches
 parent-90 field access to the supplied owning registration. Each access first
-checks the selected world lifetime. A mixed bone/corpse population therefore
-requires its actual mixed registration dispatcher, not a bone-only substitute.
+checks the selected world lifetime. `StoredShootableTargets` dispatches mixed
+bone/corpse targets by the selected record's object type and passes the full
+world handle to that registration. It never tries a second registry after a
+failed lookup, and unsupported descendants fail instead of receiving invented
+health or hit flags. The enclosing runtime must retain both registrations for
+their actors' lifetimes; this dispatcher does not create or schedule actors.
 The scoped stored scheduler fixture checks a registered bone impact through
 this adapter and the subsequent normal bullet cleanup. As with the native
 fixture, target placement is explicit and audio is a command recorder.

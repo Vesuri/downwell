@@ -10,6 +10,7 @@
 #include "core/StoredLayerLifecycle.h"
 #include "core/StoredWorldCollision.h"
 #include "core/StoredSourceBulletStep.h"
+#include "core/StoredShootableTargets.h"
 #include "core/StoredDitherCollisionPass.h"
 #include "core/TimeChangeEffects.h"
 #include "core/EventScheduler.h"
@@ -2070,17 +2071,20 @@ int main(){
         for(auto child:children)require(bones.activate(child,false),"deactivate all bones between separate queries");
         auto selected=query();require(selected.handle.slot==corpse.slot&&selected.handle.generation==corpse.generation,
             "fresh identity query sees surviving corpse, not a cached bone");
+        auto targets=storedShootableTargets(*owner,bones,corpses);
         MotionBinary64 hp;bool effect=true;const auto beforeWrite=world->randomDrawCount();
-        require(corpses.readShootable(selected.handle,hp,effect)&&hp.zero()&&!effect,
+        require(targets.readShootable(selected.handle,hp,effect)&&hp.zero()&&!effect,
             "selected ordinary corpse exposes zero health and disabled hit effects");
-        require(corpses.writeShootableHealth(selected.handle,{0xc0040000u,0})&&corpses.writeShootableHit(selected.handle)&&
-            corpses.readShootable(selected.handle,hp,effect)&&hp.high==0xc0040000u&&!hp.low&&corpses.state(corpse)->hit&&
+        require(targets.writeShootableHealth(selected.handle,{0xc0040000u,0})&&targets.writeShootableHit(selected.handle)&&
+            targets.readShootable(selected.handle,hp,effect)&&hp.high==0xc0040000u&&!hp.low&&corpses.state(corpse)->hit&&
             !world->resolveInstance(corpse)->destroyRequested&&world->randomDrawCount()==beforeWrite,
             "selected corpse real-field writes preserve membership, lifetime and RNG");
         require(bones.activate(children.front(),true)&&bones.mark(children.front()),"retain marked bone beside corpse");
         selected=query();require(selected.handle.slot==corpse.slot&&selected.handle.generation==corpse.generation,
             "marked bone is not selected");
         require(bones.clear()&&corpses.clear()&&query().id==-4,"retired shootables leave no selectable stale identity");
+        require(!targets.readShootable(corpse,hp,effect)&&!targets.writeShootableHit(shot)&&world->effectsSucceeded(),
+            "stale and unrelated identities never dispatch into either actor registration");
         require(x.assignInteger(1000)&&query().id==-4,"offscreen temporary query misses");
         RunnerImageValue actualX,actualY;
         require(owner->collisionPosition(shot,actualX,actualY)&&actualX.bits==0x43700000u&&actualY.bits==0x44000000u,
@@ -2131,7 +2135,8 @@ int main(){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
         require(owner->attach(*world),"attach concrete source bullet adapter");world->skipToGameForTesting();
-        auto bones=world->boneRegistration<4>();InstanceHandle bone,shot;unsigned calls=0;
+        auto bones=world->boneRegistration<4>();auto corpses=world->corpseRegistration<1>();
+        auto targets=storedShootableTargets(*owner,bones,corpses);InstanceHandle bone,shot;unsigned calls=0;
         auto frames=[&](int id,unsigned& count){return sprites.frameCount(id,count);};
         for(unsigned tick=0;tick<1000&&!calls;++tick){
             require(world->withSourceBulletSteps([&](InstanceHandle key,MachineGunSourceMotion& motion){
@@ -2142,7 +2147,7 @@ int main(){
                 SoundPlayEnvironment environment;
                 BulletWallAudio audio{world->resolveInstance(key)->sound,world->overlapSound(2),29,false};
                 const auto before=world->randomDrawCount();
-                require(StoredSourceBulletStep::run(*world,*owner,key,motion,bones,frames,environment,audio),
+                require(StoredSourceBulletStep::run(*world,*owner,key,motion,targets,frames,environment,audio),
                     "scheduled source event uses concrete stored collision adapter");
                 const auto* victim=bones.instances().find(bone);
                 require(victim&&victim->state.hit&&victim->state.health.high==0xc0200000u&&
