@@ -299,9 +299,14 @@ claim that the live worlds yet implement the script or level-title creation.
 `RunSession::recordEnemyDeath` publishes combo and kill counters in this order
 and uses overlap channel 1 for checked gunshot audio. It rereads the channel
 after the playing query, as the VM does. Both world entry points delegate to
-this shared implementation. Achievement publication, moment delay and the level
-cue are mandatory checked callbacks; they must observe the completed counter
-prefix and failure stops later callbacks. Counter overflow beyond the current
+this shared implementation. The owned entry clears `RunSession::noKill` at the
+achievement write, after the kill counter and before moment delay. Both adapters
+initialize it at player Create, before child creation; new player lifetimes reset
+it even when run counters survive a room transition. The explicit publication
+callback remains a failure-prefix reference, not the default state owner.
+Moment delay and the level cue remain mandatory checked callbacks; they must
+observe the completed counter/achievement prefix and failure stops later calls.
+Counter overflow beyond the current
 unsigned storage is a terminal unsupported state rather than wrapping. The
 entry is not an alternative family-wide death sweep.
 

@@ -28,6 +28,20 @@ template<class World,class Kills> void check(World& world,Kills kills,unsigned f
         world.runCombo().state.count==before+1&&kills()==killed+(failure&&failure<3?0:1)&&
         calls==(failure?failure:5));
 }
+template<class World,class Kills> void checkOwnedAchievement(World& world,Kills kills,unsigned failure){
+    assert(world.noKillAchievement());const auto before=kills();unsigned calls=0;
+    struct Audio {
+        unsigned& calls;unsigned failure;
+        bool isPlaying(int id,bool& result){assert(id==0);++calls;result=true;return failure!=1;}
+        bool stop(int id){assert(id==0&&calls==1);++calls;return failure!=2;}
+    } audio{calls,failure};
+    const bool okay=world.recordEnemyDeath(true,audio,[&]{
+        assert(kills()==before+1&&!world.noKillAchievement()&&calls==2);++calls;return failure!=3;
+    },[&]{assert(!world.noKillAchievement()&&calls==3);++calls;return failure!=4;});
+    assert(okay==(failure==0)&&world.effectsSucceeded()==okay&&
+        world.noKillAchievement()==(failure==1||failure==2)&&
+        kills()==before+(failure==1||failure==2?0:1)&&calls==(failure?failure:4));
+}
 template<class World> void checkCue(World& world,unsigned failure,bool ending=false,bool changeArea=false,bool musicPlaying=false){
     using namespace downwell;
     const_cast<RunStage&>(world.runStage()).area=ending?5:1;
@@ -273,10 +287,10 @@ int main(){
                 bool isPlaying(int,bool&){assert(false);return false;}
                 bool stop(int){assert(false);return false;}
             } audio;
-            bool noKill=true;unsigned cues=0;
-            assert(stored->recordEnemyDeath(false,audio,[&]{noKill=false;return true;},
+            assert(stored->noKillAchievement());unsigned cues=0;
+            assert(stored->recordEnemyDeath(false,audio,
                 [&]{return stored->requestMomentDelay();},[&]{
-                    assert(!noKill&&controller->controllerSlow==(original==60?30:0));++cues;return true;
+                    assert(!stored->noKillAchievement()&&controller->controllerSlow==(original==60?30:0));++cues;return true;
                 })&&cues==1&&stored->mainEnemiesDefeated()==1);
             assert(speed==(original==60?30:original)&&controller->controllerSlow==(original==60?30:0));
             if(original==60){
@@ -289,6 +303,19 @@ int main(){
             }
             return stored->effectsSucceeded();
         }));
+    }
+    for(unsigned failure=0;failure<=4;++failure){
+        auto native=std::make_unique<GameplayWorld>(300,true,0,false);
+        checkOwnedAchievement(*native,[&]{return native->enemiesDefeated();},failure);
+        auto stored=std::make_unique<downwell::StartupRuntime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects);
+        stored->skipToGameForTesting();
+        checkOwnedAchievement(*stored,[&]{return stored->mainEnemiesDefeated();},failure);
+        if(!failure){
+            assert(native->restartFromResults(downwell::DeathMenuSequence::Action::Retry,2,300)==downwell::ResultsDestination::gameplay&&
+                native->noKillAchievement());
+            stored->reset(downwell::PlatformProfile::nonDesktop);assert(!stored->noKillAchievement());
+            stored->skipToGameForTesting();assert(stored->noKillAchievement());
+        }
     }
     for(unsigned failure=0;failure<=5;++failure){
         auto native=std::make_unique<GameplayWorld>(300,true,0,false);

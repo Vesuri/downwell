@@ -5,6 +5,9 @@ import json
 import runpy
 
 root = Path(__file__).resolve().parents[1] / "extracted/utmt-0.9.2.0/Assembly"
+player_init = (root / "gml_GlobalScript_scrPlayerInit.asm").read_text()
+assert "pushi.e 1\npop.v.i global.achNoKill" in player_init
+assert player_init.index("pop.v.i global.achNoKill") < player_init.index("pushglb.v global.pugDecoy")
 
 def body(name, end):
     text = (root / f"gml_GlobalScript_{name}.asm").read_text()

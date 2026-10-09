@@ -2174,6 +2174,7 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                 currencyAccount_.playerCreated();
                 // The shared player now owns the default gun's countdown.
             }
+            run_.playerCreated();
             // Publish each child and finish its Create before continuing this
             // event, not at room-load completion. In particular camMain must
             // exist before later player/room-controller Create reads it.

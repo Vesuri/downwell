@@ -129,6 +129,10 @@ bool nativeEnemyDeath(GameplayWorld& world,NativeEnemyDeathAudioProbe& audio,
     NativeEnemyDeathScriptProbe flag,NativeEnemyDeathScriptProbe delay,NativeEnemyDeathScriptProbe cue){
     return world.recordEnemyDeath(true,audio,flag,delay,cue);
 }
+bool nativeOwnedEnemyDeath(GameplayWorld& world,NativeEnemyDeathAudioProbe& audio,
+    NativeEnemyDeathScriptProbe delay,NativeEnemyDeathScriptProbe cue){
+    return world.recordEnemyDeath(true,audio,delay,cue);
+}
 struct NativeConsumptionGlobalsProbe {
     bool gravity(downwell::MotionBinary64);
     downwell::MotionBinary64 gravity();downwell::MotionBinary64 fallSpeed();

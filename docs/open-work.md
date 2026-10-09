@@ -141,7 +141,7 @@ behavior, both backend integrations and relevant original-game verification.
   test births.
 - Connect natural death/stomp/hit events to effect owners, including flash balls.
   Route enemy-death bookkeeping through the shared run-state entry, supplying
-  actual toggleGuncut, achNoKill publication, momentDelay controller events and
+  actual toggleGuncut, the owned achNoKill entry, momentDelay controller events and
   levelBeginCue creation/audio. Bind its actual firstLand/BGM state and area-music
   lookup, and connect the registered levelNumber (372) child's live language/font
   inputs and surface Draw before admitting natural callers. Complete its native

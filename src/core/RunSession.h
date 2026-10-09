@@ -103,9 +103,15 @@ struct RunSession {
     // global.killCount: scrGlobalStuff resets it for a new run, not rmMain
     // entry. DeathMenu/EndMenu display the cumulative total across levels.
     std::uint32_t kills = 0;
-    // scrEnemyDeath's ordered global mutations. The caller must publish the
-    // achievement flag and implement both controller scripts; none are
-    // optional successful defaults. Keep completed prefixes on failure.
+    bool noKill = false; // global.achNoKill; initialized by scrPlayerInit, not room loading.
+    void playerCreated(){noKill=true;}
+    template<class Audio,class Delay,class Cue>
+    bool recordEnemyDeath(bool cutGunshot,Audio& audio,Delay delay,Cue cue){
+        return recordEnemyDeath(cutGunshot,audio,[&]{noKill=false;return true;},delay,cue);
+    }
+    // Explicit publication provider retained as the source/failure reference.
+    // The owned overload above writes the shared flag at this same boundary.
+    // Both controller scripts remain required. Keep completed prefixes on failure.
     template<class Audio,class NoKill,class Delay,class Cue>
     bool recordEnemyDeath(bool cutGunshot,Audio& audio,NoKill clearNoKill,Delay delay,Cue cue){
         if(!effectsSucceeded)return false;
@@ -708,6 +714,7 @@ struct RunSession {
         clock = {};
         combo = {};
         kills = 0;
+        noKill = false;
         combo.state.record = saved.bestCombo;
         stage = {};
         results = {};

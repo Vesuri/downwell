@@ -238,6 +238,12 @@ public:
         return run_.effectsSucceeded=okay&&run_.effectsSucceeded;
     }
     bool requestMomentDelay();
+    bool noKillAchievement()const{return run_.noKill;}
+    template<class Audio,class Delay,class Cue>
+    bool recordEnemyDeath(bool cutGunshot,Audio& audio,Delay delay,Cue cue){
+        return run_.recordEnemyDeath(cutGunshot,audio,delay,cue);
+    }
+    // Explicit publication provider retained for failure-prefix reference tests.
     template<class Audio,class NoKill,class Delay,class Cue>
     bool recordEnemyDeath(bool cutGunshot,Audio& audio,NoKill clearNoKill,Delay delay,Cue cue){
         return run_.recordEnemyDeath(cutGunshot,audio,clearNoKill,delay,cue);

@@ -470,6 +470,7 @@ bool GameplayWorld::birthPlayerOwnership() {
     if(!playerLifecycle_.birth(playerHandle(),playerInstance_)) {
         run_.effectsSucceeded=false;return false;
     }
+    run_.playerCreated();
     return true;
 }
 
