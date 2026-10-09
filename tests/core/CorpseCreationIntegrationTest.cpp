@@ -31,11 +31,11 @@ static void sameRandom(const GameMakerRandom& a,const GameMakerRandom& b){
     for(unsigned i=0;i<16;++i)assert(a.stateWord(i)==b.stateWord(i));
 }
 struct RegistryAudit {
-    unsigned calls=0,failure=0,walls=0,retired=0;
+    unsigned calls=0,failure=0,walls=0,retired=0,destroyMarks=0;
     bool accept(){return ++calls!=failure;}
     bool birth(InstanceHandle,const InstanceRecord& r){assert(r.objectId==263&&r.spriteId==172);return accept();}
     bool birthAt(InstanceHandle h,const InstanceRecord& r,RunnerImageValue,RunnerImageValue){return birth(h,r);}
-    bool markDestroyed(InstanceHandle,const InstanceRecord&){return false;}
+    bool markDestroyed(InstanceHandle,const InstanceRecord& r){assert(!r.destroyRequested);++destroyMarks;return false;}
     bool instanceNumber(int,unsigned&){return false;}
     bool instancePlace(InstanceHandle,const InstanceRecord&,int,MotionBinary64,MotionBinary64,InstancePlaceResult&){return false;}
     bool retire(InstanceHandle,const InstanceRecord&){++retired;return true;}
@@ -77,6 +77,10 @@ static void registeredCorpses(){
             GameMakerRandom oracle(42);oracle.nextU32();oracle.nextU32();oracle.chooseIndexSmall(5);
             oracle.irandomSmall(8);oracle.irandomSmall(8);sameRandom(rng,oracle);
             assert(state->explosionFx==102&&state->health==1&&state->hitEffect==1);
+            assert(corpses.advanceAnimation(key));
+            assert(!corpses.endStep(key,real(10000),true)&&!good&&audit.destroyMarks==1&&
+                corpses.state(key)&&!records.resolve(key)->destroyRequested);
+            assert(!corpses.endStep(key,real(10000),true)&&audit.destroyMarks==1);
         }else{
             const auto draws=rng.drawCount();const auto calls=audit.calls;
             assert(!corpses.createFromDeath(source,206,real(2),102,true,rng,tile)&&

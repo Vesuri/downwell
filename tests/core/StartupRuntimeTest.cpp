@@ -936,7 +936,8 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                 downwell::RunnerImageValue,downwell::RunnerImageValue){return birth(h,r);}
             bool placeMeeting(downwell::InstanceHandle h,const downwell::InstanceRecord& r,int object,
                 downwell::MotionBinary64,downwell::MotionBinary64,bool& hit){
-                require(matches(h,r)&&r.objectId==263&&object==57,"corpse queries its registered parent-wall shape");
+                require(matches(h,r),"controlled collision fixture resolves the querying lifetime");
+                if(r.objectId==263)require(object==57,"corpse Create selects its parent-wall shape");
                 hit=false;return true;
             }
             bool instancePlace(downwell::InstanceHandle,const downwell::InstanceRecord&,int,
@@ -963,6 +964,44 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         const auto* state=corpses.state(corpses.sourceHandle(id));
         require(state&&state->health==1&&state->hitEffect==1&&runtime->instance(id)->spriteId==206,
             "runtime upgrade and wrapper overrides reach registered corpse");
+        unsigned steps=0,alarmCalls=0;
+        const auto corpseKey=corpses.sourceHandle(id);
+        auto execute=[&](auto,auto phase,unsigned index,auto& corpse,auto& publish,bool& good){
+            struct Events {
+                decltype(publish)& output;bool& good;int currentArea;
+                bool meeting(downwell::MotionBinary64,downwell::MotionBinary64,bool& hit){hit=false;return true;}
+                bool publish(downwell::RunnerImageValue x,downwell::RunnerImageValue y){return output.position(x,y);}
+                int area(){return currentArea;}
+                int restInPieces(){return 1;}
+                bool create(int,downwell::MotionBinary64,downwell::MotionBinary64){return false;}
+                bool create(int,downwell::MotionBinary64,downwell::MotionBinary64,std::uint32_t&){return false;}
+                bool sprite(unsigned,int){return false;}
+                void destroy(){if(!output.destroy())good=false;}
+            } events{publish,good,runtime->runStage().area};
+            if(phase==downwell::StartupRuntime::CorpsePhase::alarm){
+                ++alarmCalls;require(index==3,"only activation alarm fires in short corpse tape");
+                return corpse.alarmEvent(index,events);
+            }
+            ++steps;
+            if(steps==10)corpse.yy=downwell::MotionBinary64::fromInteger(-10000);
+            return corpse.step(false,events);
+        };
+        for(unsigned tick=1;tick<=10;++tick){
+            require(runtime->withCorpseEvents(corpses,execute,[&]{runtime->step(false);return runtime->effectsSucceeded();}),
+                "corpse joins actual animation/alarm/Step/End Step/cleanup scheduling");
+            if(tick<10){
+                state=corpses.state(corpseKey);const auto* record=runtime->instance(id);
+                require(state&&record&&state->active==(tick>=8)&&record->alarms.get(3)==(tick<8?8-int(tick):tick==8?0:-1),
+                    "room alarm countdown is not applied twice by corpse owner");
+                downwell::RunnerImageValue publicX,publicY,publicIndex;
+                std::memcpy(&publicX.bits,&record->preciseX,4);std::memcpy(&publicY.bits,&record->preciseY,4);
+                std::memcpy(&publicIndex.bits,&record->imageIndex,4);
+                require(publicX.bits==state->x.bits&&publicY.bits==state->y.bits&&publicIndex.bits==state->imageIndex.bits,
+                    "corpse motion and animation publish the registered builtin state");
+            }
+        }
+        require(steps==10&&alarmCalls==1&&!runtime->instance(id)&&!corpses.state(corpseKey),
+            "out-of-view End Step retires corpse at room cleanup");
         require(corpses.clear()&&!runtime->instance(id),"retire corpse before room teardown");
         audit.verify(*runtime);
     }

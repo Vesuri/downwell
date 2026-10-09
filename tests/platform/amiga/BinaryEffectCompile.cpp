@@ -596,7 +596,10 @@ struct CorpseTileProbe {
 };
 bool compileRegisteredCorpse(downwell::StoredCorpseRegistration<16,4>& owner,
     downwell::DeadBodySource& source,downwell::GameMakerRandom& random,CorpseTileProbe tile){
-    return owner.createFromDeath(source,206,{},102,false,random,tile)&&owner.clear();
+    if(!owner.createFromDeath(source,206,{},102,false,random,tile))return false;
+    const auto key=owner.sourceHandle(source.myDeadBody);
+    return owner.advanceAnimation(key)&&owner.dispatchPublished(key,[](auto& state,auto&,bool&){return state.valid;})&&
+        owner.endStep(key,{},true)&&owner.clear();
 }
 namespace {
 struct CorpseOwnerHooks {

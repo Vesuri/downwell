@@ -1208,8 +1208,17 @@ publishes sprite and facing changes on that same lifetime. Failed creation or
 publication retains the accepted prefix for explicit teardown and latches the
 world failure. `StartupRuntime::createRegisteredCorpseFromDeath` supplies the
 room allocator, RNG and Rest in Pieces state; the caller still owns publication
-of the returned dying-enemy fields. This registration does not yet supply live
-corpse event scheduling, Draw routing, or the complete skeleton death chain.
+of the returned dying-enemy fields.
+`withCorpseEvents` admits registered corpses to the stored room's animation,
+alarm, ordinary/End Step and cleanup phases. Animation publishes the evaluated
+index before committing its timeline. Event dispatch imports the room's current
+alarm bank and published builtin state; `alarmEvent` executes the body without
+a second countdown. Step adapters must publish position and destruction through
+the supplied publisher; unmatched state is rejected. End Step uses the retained
+view and the shared out-of-view test, with removal deferred to room cleanup.
+Motion queries, time-stop selection and synchronous alarm/death children remain
+caller-supplied checked dependencies. This scope is not default admission of the
+complete death chain, nor does it provide native registration or Draw routing.
 
 `CorpseMotion` implements ordinary Step: custom-real gravity and damping,
 parent-56 motion probes, bounce/settling and the bounded 1–16 floor search.

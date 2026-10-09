@@ -410,6 +410,31 @@ public:
         return run_.effectsSucceeded=run_.effectsSucceeded&&ok&&registration.valid();
     }
     enum class SkeletonPhase {animation,alarm,step,endStep,cleanup};
+    enum class CorpsePhase {animation,alarm,step,endStep,cleanup};
+    template<unsigned Capacity,class Execute,class Tick>
+    bool withCorpseEvents(StoredCorpseRegistration<instanceCapacity,Capacity>& registration,Execute execute,Tick tick){
+        if(!run_.effectsSucceeded)return false;
+        if(corpseDispatch_||!registration.belongsTo(instances_)||!registration.valid())return run_.effectsSucceeded=false;
+        auto dispatch=[&](const InstanceRecord& record,CorpsePhase phase,unsigned index){
+            const auto key=registration.handle(record);if(!key.generation)return false;
+            if(phase==CorpsePhase::animation)return registration.advanceAnimation(key);
+            if(phase==CorpsePhase::cleanup)return registration.retire(key);
+            if(phase==CorpsePhase::endStep){
+                MotionBinary64 top;
+                if(!multiplyBinary64(MotionBinary64::fromInteger(ordinaryStepViewTopQ12_),{0x3f300000u,0},top))return false;
+                return registration.endStep(key,top,roomId_==mainRoomId);
+            }
+            return registration.dispatchPublished(key,[&](auto& state,auto& publish,bool& good){
+                return execute(key,phase,index,state,publish,good);
+            });
+        };
+        corpseContext_=&dispatch;
+        corpseDispatch_=[](void* p,const InstanceRecord& r,CorpsePhase phase,unsigned index){
+            return (*static_cast<decltype(dispatch)*>(p))(r,phase,index);
+        };
+        const bool ok=tick();corpseDispatch_=nullptr;corpseContext_=nullptr;
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok&&registration.valid();
+    }
     template<unsigned Capacity,class Execute,class Tick>
     bool withSkeletonPublishedEvents(StoredSkeletonRegistration<instanceCapacity,Capacity>& registration,
         Execute execute,Tick tick){
@@ -1628,6 +1653,8 @@ private:
     void* bloodContext_=nullptr;
     bool (*skeletonDispatch_)(void*,const InstanceRecord&,SkeletonPhase,unsigned)=nullptr;
     void* skeletonContext_=nullptr;
+    bool (*corpseDispatch_)(void*,const InstanceRecord&,CorpsePhase,unsigned)=nullptr;
+    void* corpseContext_=nullptr;
     void* droneContext_=nullptr;
     void* timeEffectContext_=nullptr;
     void* entryDitherContext_=nullptr;

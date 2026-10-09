@@ -391,6 +391,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
         if(instance.objectId==220&&(!bloodDispatch_||!bloodDispatch_(bloodContext_,instance,BloodPhase::animation)))return false;
         if(instance.objectId==269&&(!boneDispatch_||!boneDispatch_(boneContext_,instance,BonePhase::animation)))return false;
         if(instance.objectId==120&&(!skeletonDispatch_||!skeletonDispatch_(skeletonContext_,instance,SkeletonPhase::animation,0)))return false;
+        if(instance.objectId==263&&(!corpseDispatch_||!corpseDispatch_(corpseContext_,instance,CorpsePhase::animation,0)))return false;
         if(instance.objectId==249||instance.objectId==256){
             auto* companion=const_cast<PlayerCompanionCreateState*>(companionCreateState(instance.instanceId));
             RunnerImageValue index,speed;
@@ -907,6 +908,7 @@ bool StartupRuntime::cleanupMainOwnedDestroyed(){
             (r.objectId==269&&boneDispatch_)||
             (r.objectId==220&&bloodDispatch_)||
             (r.objectId==120&&skeletonDispatch_)||
+            (r.objectId==263&&corpseDispatch_)||
             (r.objectId==248&&currencyDispatch_)||
             (r.objectId==73&&ownedEntryRegistration_.handle(r).generation)||(r.objectId==219&&!scriptAnimationDispatch_);},
         [this](InstanceHandle key,const InstanceRecord& r){
@@ -917,6 +919,7 @@ bool StartupRuntime::cleanupMainOwnedDestroyed(){
             if(r.objectId==269)return boneDispatch_(boneContext_,r,BonePhase::cleanup);
             if(r.objectId==220)return bloodDispatch_(bloodContext_,r,BloodPhase::cleanup);
             if(r.objectId==120)return skeletonDispatch_(skeletonContext_,r,SkeletonPhase::cleanup,0);
+            if(r.objectId==263)return corpseDispatch_(corpseContext_,r,CorpsePhase::cleanup,0);
             if(r.objectId==248)return currencyDispatch_(currencyContext_,r,CurrencyPhase::cleanup,0);
             if(r.objectId==73)return ownedEntryRegistration_.retire(key);
             if(r.objectId==219)return scriptEffectsBinding_.retire(key,&r);
@@ -1765,6 +1768,12 @@ bool StartupRuntime::dispatchObjectEvent(InstanceRecord& instance,
     if (objectPack_ == nullptr ||
         !objectPack_->findEvent(instance.objectId, eventType, eventSubtype, event))
         return false;
+    if(instance.objectId==263&&(eventType==2||(eventType==3&&(eventSubtype==0||eventSubtype==2)))){
+        ++implementedCodeCalls_;
+        run_.effectsSucceeded=corpseDispatch_&&corpseDispatch_(corpseContext_,instance,
+            eventType==2?CorpsePhase::alarm:eventSubtype==0?CorpsePhase::step:CorpsePhase::endStep,unsigned(eventSubtype));
+        return run_.effectsSucceeded;
+    }
     if(instance.objectId==120&&(eventType==2||(eventType==3&&(eventSubtype==0||eventSubtype==2)))){
         ++implementedCodeCalls_;
         run_.effectsSucceeded=skeletonDispatch_&&skeletonDispatch_(skeletonContext_,instance,

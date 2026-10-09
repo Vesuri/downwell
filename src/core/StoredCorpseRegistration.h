@@ -15,6 +15,7 @@ template<unsigned WorldCapacity,unsigned Capacity> class StoredCorpseRegistratio
     Entry entries_[Capacity]{};
     InstanceStore<WorldCapacity>& records_;const ObjectPack* objects_;
     InstanceLifecycleBinding lifecycle_;std::uint32_t& nextId_;const int& room_;bool& good_;
+    bool dispatching_=false;
     bool fail(){good_=false;return false;}
     static float stored(RunnerImageValue v){float f;std::memcpy(&f,&v.bits,4);return f;}
     Entry* entry(InstanceHandle h){
@@ -41,6 +42,11 @@ public:
     StoredCorpseRegistration(const StoredCorpseRegistration&)=delete;
     StoredCorpseRegistration& operator=(const StoredCorpseRegistration&)=delete;
     bool belongsTo(const InstanceStore<WorldCapacity>& records)const{return &records_==&records;}
+    bool valid()const{return good_;}
+    InstanceHandle handle(const InstanceRecord& r){
+        for(auto& e:entries_)if(e.id==r.instanceId&&record(e)==&r)return e.key;
+        return {};
+    }
     const CorpseAnimation* state(InstanceHandle h){auto* e=entry(h);return e&&record(*e)?&e->state:nullptr;}
     InstanceHandle sourceHandle(unsigned id){
         for(auto& e:entries_)if(id&&e.id==id&&record(e))return e.key;
@@ -48,7 +54,7 @@ public:
     }
     template<class Random,class Tile> bool create(MotionBinary64 x,MotionBinary64 y,bool rip,
         Random& random,Tile tile,InstanceHandle& output){
-        output={};if(!good_)return false;
+        output={};if(!good_||dispatching_)return fail();
         Entry* free=nullptr;for(auto& e:entries_)if(!e.id&&!free)free=&e;
         PackedObject definition;RunnerImageValue px,py;std::int32_t ix,iy;
         if(!free||!objects_||!objects_->findObject(263,definition)||!nextId_||nextId_>0x7fffffffu||
@@ -109,7 +115,64 @@ public:
         } events{*this,random,tile,rip};
         return createDeadBody(source,spriteId,impact,explosion,events)||fail();
     }
+    bool advanceAnimation(InstanceHandle h){
+        auto* e=entry(h);auto* r=e?record(*e):nullptr;
+        if(!good_||!r||r->spriteId!=e->state.spriteId)return fail();
+        auto next=e->state;
+        std::memcpy(&next.imageIndex.bits,&r->imageIndex,4);
+        std::memcpy(&next.imageSpeed.bits,&r->imageSpeed,4);
+        if(!next.advanceImage()||!lifecycle_.imageIndex(h,*r,next.imageIndex))return fail();
+        e->state.timeline=next.timeline;e->state.imageIndex=next.imageIndex;e->state.imageSpeed=next.imageSpeed;
+        r->imageIndex=stored(next.imageIndex);return true;
+    }
+    class Publisher {
+        StoredCorpseRegistration& owner_;InstanceHandle key_;
+    public:
+        Publisher(StoredCorpseRegistration& owner,InstanceHandle key):owner_(owner),key_(key){}
+        bool position(RunnerImageValue x,RunnerImageValue y){
+            auto* e=owner_.entry(key_);return (e&&owner_.position(*e,x,y))||owner_.fail();
+        }
+        bool destroy(){
+            auto* e=owner_.entry(key_);auto* r=e?owner_.record(*e):nullptr;
+            if(!owner_.good_||!r)return owner_.fail();
+            if(!r->destroyRequested&&!owner_.lifecycle_.markDestroyed(key_,*r))return owner_.fail();
+            r->destroyRequested=e->state.destroyRequested=true;return true;
+        }
+    };
+    template<class Execute> bool dispatchPublished(InstanceHandle h,Execute execute){
+        auto* e=entry(h);auto* r=e?record(*e):nullptr;
+        if(!good_||!r||dispatching_)return fail();
+        if(!r->active||r->destroyRequested)return true;
+        dispatching_=true;
+        struct Reset {bool& flag;~Reset(){flag=false;}} reset{dispatching_};
+        if(r->spriteId!=e->state.spriteId)return fail();
+        e->state.alarms=r->alarms;
+        std::memcpy(&e->state.imageSpeed.bits,&r->imageSpeed,4);
+        std::memcpy(&e->state.imageIndex.bits,&r->imageIndex,4);
+        std::memcpy(&e->state.imageXscale.bits,&r->scaleX,4);
+        std::memcpy(&e->state.x.bits,&r->preciseX,4);std::memcpy(&e->state.y.bits,&r->preciseY,4);
+        Publisher publish(*this,h);
+        const bool ok=execute(e->state,publish,good_);
+        r=record(*e);if(!r)return fail();
+        const bool published=stored(e->state.x)==r->preciseX&&stored(e->state.y)==r->preciseY&&
+            e->state.spriteId==r->spriteId&&stored(e->state.imageIndex)==r->imageIndex&&
+            stored(e->state.imageXscale)==r->scaleX&&e->state.destroyRequested==r->destroyRequested;
+        return (builtins(*e)&&ok&&good_&&published&&e->state.valid)||fail();
+    }
+    bool endStep(InstanceHandle h,MotionBinary64 viewY,bool mainRoom){
+        return dispatchPublished(h,[&](auto& state,auto& publish,bool& good){
+            struct Events {Publisher& publish;bool& good;void destroy(){if(!publish.destroy())good=false;}} events{publish,good};
+            return state.endStep(mainRoom,viewY,events)&&good;
+        });
+    }
+    bool retire(InstanceHandle h){
+        auto* e=entry(h);auto* r=e?record(*e):nullptr;
+        if(!good_||dispatching_||!r||!r->destroyRequested||!e->state.destroyRequested||
+            !records_.erase(e->id,[&](auto key,const auto& record){return lifecycle_.retire(key,record);}))return fail();
+        *e={};return true;
+    }
     bool clear(){
+        if(dispatching_)return fail();
         for(auto& e:entries_)if(e.id){
             if(!record(e)||!records_.erase(e.id,[&](auto h,const auto& r){return lifecycle_.retire(h,r);}))return fail();
             e={};

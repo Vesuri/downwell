@@ -24,6 +24,13 @@ struct CorpseLifecycle : CorpseBirth {
     template<class Events> bool advanceAlarm(unsigned index,Events& events){
         if(!valid)return false;
         if(destroyRequested||index>3||!alarms.advanceOne(index))return true;
+        return alarmEvent(index,events);
+    }
+    // The room scheduler has already decremented the shared alarm bank.
+    template<class Events> bool alarmEvent(unsigned index,Events& events){
+        if(!valid)return false;
+        if(destroyRequested)return true;
+        if(index>3)return valid=false;
         switch(index){
             case 0: {
                 std::uint32_t child=0;
