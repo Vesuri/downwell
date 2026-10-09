@@ -80,6 +80,13 @@ for name, digest in {
 }.items():
     assert hashlib.sha256((export / "Assembly" / ("gml_GlobalScript_" + name + ".asm")).read_bytes()).hexdigest() == digest
 print("Pinned bullet enemy-contact write/effect order, damage delay and takenImpact division")
+bullet = manifest["resources"]["objects"][261]
+assert bullet["name"] == "bulletRanged"
+contact = [event for event in bullet["events"] if event["eventType"] == 4 and event["eventSubtype"] == 83]
+assert len(contact) == 1 and contact[0]["actions"][0]["codeId"] == 2224
+ranged_contact = (export / "Assembly/gml_Object_bulletRanged_Collision_subparentEnemy.asm").read_text()
+assert re.findall(r"call.i ([^\n]+)", ranged_contact) == ["gml_Script_scrTypicalBulletDamage(argc=0)"]
+print("Usual gun object 261 binds enemy contact to bulletRanged event 2224")
 create = (export / "Assembly/gml_Object_bulletStandard_Create_0.asm").read_text()
 parent_create = (export / "Assembly/gml_Object_parentPBullet_Create_0.asm").read_text()
 assert "pushi.e 101\npop.v.i self.hitWallFx" in parent_create

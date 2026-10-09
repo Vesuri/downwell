@@ -1251,8 +1251,10 @@ Scheduled-shot fixtures dispatch this bound event and check exact vertical
 velocity and the one-word contact RNG consumption. They do not establish
 natural wall-shard birth admission or a complete mixed collision pass.
 
-The object-261 collision with parent enemy 83 invokes
-`scrTypicalBulletDamage` (event 2196), independently of its ordinary Step.
+The object-261 (`bulletRanged`) collision with parent enemy 83 invokes
+`scrTypicalBulletDamage` (event 2224), independently of its ordinary Step.
+Object 257 (`bulletStandard`) also invokes this script through event 2196;
+the usual-gun live binding must use object 261's own event, not that ancestor's.
 For the non-immune, non-through skeleton and the two usual-gun profiles,
 `SkeletonActor::hitByMachineGunChecked` preserves the script order: clear the
 bullet's hitIgnore, mark it destroyed, write hit/direction/angle/damage, apply
@@ -1261,9 +1263,14 @@ priority 90, assign takenImpact, create effect 605 at speed 0.4, then re-read
 hitStun before the second momentDelay. It retains completed writes and latches
 callback failures; a failed event cannot be retried. Its integer damage fields
 cover this admitted profile and reject overflow rather than invoking C++
-undefined behavior. The old helper remains the arithmetic reference. Actual
-collision-context, point-direction, controller/audio and effect bindings are
-still required before using the checked body in natural encounters.
+undefined behavior. The old helper remains the arithmetic reference.
+`GameplayCollisionOwner::dispatchSkeletonBulletCollision` validates the
+selected bullet/skeleton lifetimes and resource event. Its world binding uses
+retained source motion, the runner point-direction wrapper, caller SoundPlay
+state and the owned effect pool (including caller myFx publication). Destruction
+does not retire the executing bullet. Controller delay, audio backend and atan
+remain supplied dependencies. The complete mixed collision scheduler and stored
+backend binding are still required before natural encounter admission.
 
 Run `make verify-machine-gun-source-motion verify-smoke-direction
 verify-smoke-trig`. The source-motion test covers birth narrowing, raw RNG

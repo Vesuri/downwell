@@ -2066,6 +2066,18 @@ public:
            !((event.owner==120&&event.code==1266)||(event.owner==83&&event.code==1066)))return check(false);
         return check(world_->collideSkeletonRoomEffect(local,event.code==1066,makePlayer));
     }
+    template<class Frames,class Delay,class Audio,class Atan>
+    bool dispatchSkeletonBulletCollision(const RunnerCollisionEventContext::Frame& event,
+        Frames frames,Delay delay,SoundPlayEnvironment& environment,Audio& audio,Atan atan){
+        View::Kind selfKind,otherKind;InstanceHandle shot,target;PackedObjectEvent binding{};bool found=false;
+        if(!valid()||!world_||!resolves(event.self)||!resolves(event.other)||
+           !View::decode(event.self,selfKind,shot)||selfKind!=View::Kind::bullet||
+           !View::decode(event.other,otherKind,target)||otherKind!=View::Kind::skeleton||
+           event.type!=4||event.subtype!=120||event.owner!=261||event.code!=2224||
+           !objects_.collisionEvent(261,120,found,binding)||!found||
+           binding.ownerObjectId!=261||binding.codeId!=2224)return check(false);
+        return check(world_->hitSkeletonWithSourceBullet(shot,target,frames,delay,environment,audio,atan));
+    }
     bool dispatchSmokeCollision(const RunnerCollisionEventContext::Frame& event){
         View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;
         if(!valid()||!world_||!resolves(event.self)||

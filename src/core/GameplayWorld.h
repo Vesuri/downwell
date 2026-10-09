@@ -13,6 +13,7 @@
 #include "core/ProjectileAnimation.h"
 #include "core/MachineGunTrajectory.h"
 #include "core/MachineGunSourceStep.h"
+#include "core/RunnerPointDirection.h"
 #include "core/ProjectileSegment.h"
 #include "core/LaserSightRay.h"
 #include "core/MachineGunEmitter.h"
@@ -168,6 +169,7 @@ public:
         downwell::InstanceHandle myFx{};
         downwell::MachineGunSourceMotion sourceMotion{};
         bool sourceOwned=false;
+        bool hitIgnore=false;
     };
     using BulletLifecycleBinding=downwell::RecordLifecycleBinding<BulletState>;
     struct EnemyState {
@@ -894,6 +896,53 @@ public:
         auto ops=bulletEffectOperations(shot,ownedScriptEffects_,*scriptSpawnInstances_,frames);
         if(!run_.effectsSucceeded)return false;
         const bool ok=execute(ops);return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
+    }
+    // bulletRanged Collision subparentEnemy: self remains the retained
+    // bullet after instance_destroy; other is the registered skeleton.
+    template<class Frames,class Delay,class Audio,class Atan>
+    bool hitSkeletonWithSourceBullet(downwell::InstanceHandle shot,downwell::InstanceHandle target,
+        Frames frames,Delay delay,downwell::SoundPlayEnvironment& environment,Audio& audio,Atan atan){
+        const auto* bullet=resolveBulletLifetime(shot);
+        if(!run_.effectsSucceeded||!bullet||!bullet->sourceOwned||!bullet->sourceMotion.initialized||
+           !skeletons_||!skeletons_->valid()||!skeletons_->find(target))return run_.effectsSucceeded=false;
+        const int damage=downwell::machineGunProfile(bullet->gemHigh).damage;
+        const auto direction=bullet->sourceMotion.direction;
+        const bool ok=skeletons_->dispatch(target,[&](auto& actor,auto&,bool& good){
+            struct Events {
+                GameplayWorld& world;downwell::InstanceHandle shot,target;
+                Frames& frames;Delay& delay;downwell::SoundPlayEnvironment& environment;
+                Audio& audio;Atan& atan;bool& good;
+                bool clearHitIgnore(){
+                    auto* caller=const_cast<BulletState*>(world.resolveBulletLifetime(shot));
+                    if(!caller)return false;caller->hitIgnore=false;return true;
+                }
+                bool destroyBullet(){return world.markBulletDestroyed(shot);}
+                bool impactAngle(downwell::MotionBinary64& angle){
+                    const auto* caller=world.resolveBulletLifetime(shot);
+                    const auto* other=world.skeletons_->find(target);
+                    return caller&&other&&downwell::RunnerPointDirection::evaluate(
+                        caller->sourceMotion.x.promoted(),caller->sourceMotion.y.promoted(),
+                        other->x.promoted(),other->y.promoted(),angle,atan);
+                }
+                bool momentDelay(){return delay();}
+                bool bulletHitSound(int sound,int priority,bool loop,bool cut){
+                    auto* caller=const_cast<BulletState*>(world.resolveBulletLifetime(shot));int voice=0;
+                    return caller&&downwell::SoundPlayScript::plain(caller->sound,environment,audio,
+                        sound,priority,loop,cut,voice,good);
+                }
+                bool impactEffect(int sprite,downwell::MotionBinary64 speed,
+                    downwell::MotionBinary64 angle,int depth){
+                    const auto* caller=world.resolveBulletLifetime(shot);if(!caller)return false;
+                    const auto x=caller->sourceMotion.x.promoted(),y=caller->sourceMotion.y.promoted();
+                    return world.withBulletEffects(shot,frames,[&](auto& effects){
+                        return downwell::EffectSpawnScript::run(effects,x,y,sprite,speed,angle,
+                            downwell::MotionBinary64::fromInteger(depth));
+                    });
+                }
+            } events{*this,shot,target,frames,delay,environment,audio,atan,good};
+            return actor.hitByMachineGunChecked(damage,direction,events,good);
+        });
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
     }
     template<unsigned Capacity,class Frames>
     auto bulletEffectOperations(downwell::InstanceHandle shot,downwell::ScriptSpawnEffects<Capacity>& effects,
