@@ -4038,6 +4038,41 @@ int main(){
         InstanceHandle replacement;
         assert(drones.create(105192,{},{},replacement)&&replacement.generation>retained.generation&&drones.clear());
     }
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                  GameplayCollisionOwner::Ownership::nativeScenery}){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},&rooms,mode);
+        auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));
+        InstanceHandle drone,first,second,newDrone;
+        assert(owner->droneBullets().create(605000,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(192),drone));
+        assert(world->createSkeletonWithSourceId(605001,240,192,first));
+        assert(world->createSkeletonWithSourceId(605002,256,192,second));
+        std::vector<int> objectsSeen;
+        assert(owner->dispatchActorEndStep([&](InstanceHandle,int object){objectsSeen.push_back(object);return true;}));
+        assert((objectsSeen==std::vector<int>{120,120,266}));
+        unsigned calls=0;
+        assert(owner->dispatchActorEndStep([&](InstanceHandle shared,int object){
+            assert(object==120);GameplayCollisionView::Kind kind;InstanceHandle local;
+            assert(GameplayCollisionView::decode(shared,kind,local)&&kind==GameplayCollisionView::Kind::skeleton);
+            assert(local.slot==(calls?second:first).slot);
+            if(!calls++){
+                assert(owner->droneBullets().markDestroyed(drone));
+                assert(owner->droneBullets().create(605003,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(192),newDrone));
+            }
+            return true;
+        }));
+        assert(calls==2); // Marked lifetime suppressed; new birth waits for next capture.
+        objectsSeen.clear();
+        assert(owner->dispatchActorEndStep([&](InstanceHandle shared,int object){
+            objectsSeen.push_back(object);
+            if(object==266){GameplayCollisionView::Kind kind;InstanceHandle local;
+                assert(GameplayCollisionView::decode(shared,kind,local)&&local.slot==newDrone.slot&&local.generation==newDrone.generation);}
+            return true;
+        }));
+        assert((objectsSeen==std::vector<int>{120,120,266}));
+    }
     std::vector<bool> bloodContactReference;
     for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
                        GameplayCollisionOwner::Ownership::nativeScenery}){

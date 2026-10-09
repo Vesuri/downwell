@@ -120,6 +120,8 @@ private:
     mutable bool drawAuditHasSnapshot_=false;
 #endif
     RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity+GameplayWorld::droneBulletCapacity+GameplayWorld::boneCapacity+GameplayWorld::skeletonCapacity+GameplayWorld::currencyCapacity> combatAlarmPhase_;
+    RunnerStepSnapshot<GameplayWorld::droneBulletCapacity+GameplayWorld::skeletonCapacity> actorEndStepPhase_;
+    bool actorEndStepExecuting_=false;
     bool combatAlarmCaptureDirty_=true;
     unsigned combatAlarmMask_=0;
     bool combatAlarmCaptureValid_=false;
@@ -1390,14 +1392,12 @@ public:
             if(!self.drones_.size()&&!self.skeletons_.size())return true;
             MotionBinary64 top;
             if(!multiplyBinary64(MotionBinary64::fromInteger(topQ12),{0x3f300000u,0},top))return self.check(false);
-            return self.check(self.visitRegistered(View::droneBase,View::bloodBase,
-                [&](InstanceHandle shared,int object,std::uint32_t flags){
-                    if((flags&0x100003u)||object==269)return true; // Bones have no End Step.
-                    View::Kind kind;InstanceHandle local;
-                    if(!View::decode(shared,kind,local))return false;
-                    if(object==120&&kind==View::Kind::skeleton)return self.skeletons_.endStep(local,top,true);
-                    return object==266&&kind==View::Kind::drone&&self.drones_.endStep(local,top,MotionBinary64::fromInteger(284),true);
-                }));
+            return self.dispatchActorEndStep([&](InstanceHandle shared,int object){
+                View::Kind kind;InstanceHandle local;
+                if(!View::decode(shared,kind,local))return false;
+                if(object==120&&kind==View::Kind::skeleton)return self.skeletons_.endStep(local,top,true);
+                return object==266&&kind==View::Kind::drone&&self.drones_.endStep(local,top,MotionBinary64::fromInteger(284),true);
+            });
         },this);
         world.configureRoomActorDraw([](const void* context,GameplayWorld::DrawActorVisitor visit,void* visitor){
             const auto& self=*static_cast<const GameplayCollisionOwner*>(context);
@@ -1742,6 +1742,28 @@ public:
         return true;
     }
     GameplayTerrainInstances& terrain(){return terrain_;}
+    // Production handoff for the currently owned End Step actors. Keep its
+    // capture off the Amiga task stack and separate from cached alarm state.
+    // This does not stand in for the complete mixed world phase.
+    template<class Execute> bool dispatchActorEndStep(Execute execute){
+        if(!valid()||!world_||actorEndStepExecuting_)return check(false);
+        actorEndStepExecuting_=true;
+        struct Reset {bool& value;~Reset(){value=false;}} reset{actorEndStepExecuting_};
+        actorEndStepPhase_.clear();
+        if(!check(visitRegistered(View::droneBase,View::bloodBase,
+            [&](InstanceHandle h,int object,std::uint32_t flags){
+                if((flags&0x100003u)||object==269)return true;
+                return (object==120||object==266)&&resolves(h)&&
+                    actorEndStepPhase_.append(h.slot,h.generation,object);
+            })))return false;
+        actorEndStepPhase_.sort();
+        for(unsigned i=0;i<actorEndStepPhase_.size();++i){
+            const auto h=actorEndStepPhase_.handle(i);std::uint32_t flags;
+            if(!eligibilityFlags(h,flags)||(flags&0x100003u))continue;
+            if(!check(resolves(h)&&execute(h,actorEndStepPhase_.object(i)))||!valid())return false;
+        }
+        return true;
+    }
     GameplayWorld::DroneBullets& droneBullets(){return drones_;}
     GameplayWorld::Bones& bones(){return bones_;}
     GameplayWorld::Skeletons& skeletons(){return skeletons_;}

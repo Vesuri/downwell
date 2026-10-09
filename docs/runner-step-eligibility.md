@@ -238,6 +238,15 @@ tie-breaker. Native enemy alarms and ordinary Step use the same snapshot,
 captured from the resource-backed owner's registrations. This orders enemies
 within their current scheduling block; it does not yet interleave all native
 families according to the complete event table.
+
+The production owned-actor End Step handoff also captures and sorts its
+currently admitted skeleton (120) and drone-bullet (266) lifetimes, regardless
+of which family registered first. Bones (269) have no End Step. Each callback
+rechecks lifetime and exclusion flags; callbacks cannot overwrite the active
+capture through recursive dispatch. The 64-entry workspace is owner-resident
+(1,024 bytes of entries), not on the 8 KiB Amiga task stack, and is separate
+from the cached alarm snapshot. This corrects ordering within that handoff;
+walls, controllers and the other family passes are not thereby interleaved.
 Keep the phase cutoff and immediate flag rechecks below when integrating it;
 sorting by resource ID alone does not handle reactivation or new lifetimes.
 
