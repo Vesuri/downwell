@@ -6,6 +6,16 @@ namespace downwell {
 // In that domain subtracting narrowed arguments is exactly integer subtraction
 // followed by ONE binary32 rounding. No origin cancellation is used outside it.
 struct ContactCoordinates {
+    // scrPlMovement publishes global.plx/ply before integrating movement.
+    // Preserve the portable player's captured Q8 values as binary64 globals,
+    // not the rounded builtin position or the post-movement drawing cache.
+    static bool playerGlobals(std::int32_t x,std::int32_t y,int ox,int oy,
+        MotionBinary64& px,MotionBinary64& py){
+        auto ax=MotionBinary64::fromInteger(x),ay=MotionBinary64::fromInteger(y);
+        if(x)ax.high-=8u<<20;if(y)ay.high-=8u<<20;
+        if(!ax.add(MotionBinary64::fromInteger(ox))||!ay.add(MotionBinary64::fromInteger(oy)))return false;
+        px=ax;py=ay;return true;
+    }
     MotionBinary64 playerX{},playerY{};
     RunnerImageValue dx{},dy{};
     static RunnerImageValue q8(std::int32_t value){

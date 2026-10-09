@@ -1823,6 +1823,20 @@ do not substitute Draw order, storage order or nearest-centre selection.
 
 ### Published and private player positions
 
+`scrPlMovement` publishes `global.plx/ply` from private `xx/yy` before
+integration. Skeleton Step reads these globals, not the rounded player builtin
+position. The stored `withSkeletonTimeStopEvents` and native `stepSkeleton`
+time-state overloads convert the portable player's captured frame-start Q8
+position to absolute binary64 coordinates without rounding to pixels. This
+conversion is exact for the represented Q8 values; it does not establish that
+the portable motion matches the original binary64 integration.
+Both bindings read `TimeStopEffects::player.stopped` at ordinary Step dispatch
+and reject a failed time-state owner. The effects factory remains responsible
+for actual throw, damage and death dependencies. These bindings neither create
+player time transitions nor supply placeholder audio/effects. Frozen Step
+retains pending hits; unfreezing resumes their processing. Death processing
+remains outside the stop guard, as in the source actor.
+
 `RunSession::parentTimeFieldContact` supplies the boolean union of the supported
 ordinary and goal masks for player/shard queries. It narrows caller coordinates
 once, does not consume RNG, and latches unsupported numeric failures without

@@ -1440,10 +1440,13 @@ int main(){
             record->imageIndex==0,"skeleton alarm decrements once and later slot sees same-phase write");
         require(skeletons.dispatch(key,[](auto& state,auto&,bool&){state.hitPending=true;return true;}),"hit source skeleton");
         unsigned hurts=0;QuietSkeletonEffects effects{hurts};
-        require(world->withSkeletonPublishedEvents(skeletons,[&](InstanceHandle,auto phase,auto& state,auto&,auto& publish,bool& good){
-            return phase!=StartupRuntime::SkeletonPhase::step||state.stepPublished(false,MotionBinary64::fromInteger(180),
-                MotionBinary64::fromInteger(300),publish,effects,good);
-        },[&]{return world->stepWithCollisionPass(Input{},false,[]{return true;});})&&hurts==1&&
+        TimeStopEffects<4> skeletonStop;skeletonStop.player.stopped=true;
+        auto skeletonTick=[&]{return world->withSkeletonTimeStopEvents(skeletons,skeletonStop,
+            [&](auto,auto&,auto&){return effects;},[&]{world->step({},false);return world->effectsSucceeded();});};
+        require(skeletonTick()&&!hurts&&actor->state.hitPending&&record->imageSpeed==0,
+            "source stopped state defers skeleton hit processing");
+        skeletonStop.player.stopped=false;
+        require(skeletonTick()&&hurts==1&&
             record->spriteId==205&&record->imageSpeed==0&&record->alarms.get(1)==4&&record->alarms.get(3)==30&&
             actor->state.hitStun&&!actor->state.hitPending,"checked hit Step executes in the stored room scheduler");
         require(world->withSkeletonPublishedEvents(skeletons,[&](InstanceHandle,auto phase,auto& state,auto&,auto& publish,bool&){

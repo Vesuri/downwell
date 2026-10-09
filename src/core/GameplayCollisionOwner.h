@@ -2150,6 +2150,13 @@ public:
            (event.code!=2291&&event.code!=2292))return check(false);
         return check(world_->collideBoneRoomEffect(local,event.code==2292,stopped,frames,damage));
     }
+    template<unsigned Capacity,class MakeEffects> bool stepSkeleton(InstanceHandle shared,
+        const TimeStopEffects<Capacity>& stop,MakeEffects makeEffects){
+        View::Kind kind;InstanceHandle local;
+        if(!valid()||!world_||!View::decode(shared,kind,local)||kind!=View::Kind::skeleton||
+           !resolves(shared))return check(false);
+        return check(world_->stepSkeletonRoomEffect(local,stop,makeEffects));
+    }
     template<class MakeEffects> bool stepSkeleton(InstanceHandle shared,bool stopped,
         MotionBinary64 playerX,MotionBinary64 playerY,MakeEffects makeEffects){
         View::Kind kind;InstanceHandle local;

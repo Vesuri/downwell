@@ -657,6 +657,13 @@ public:
         if(!run_.effectsSucceeded||!skeletons_||!skeletons_->create(id,x,y,key))return run_.effectsSucceeded=false;
         return true;
     }
+    template<unsigned Capacity,class MakeEffects> bool stepSkeletonRoomEffect(downwell::InstanceHandle key,
+        const downwell::TimeStopEffects<Capacity>& stop,MakeEffects makeEffects){
+        downwell::MotionBinary64 x,y;
+        if(!stop.succeeded||!downwell::ContactCoordinates::playerGlobals(player_.frameStartXFixed(),
+            player_.frameStartYFixed(),240,176,x,y))return run_.effectsSucceeded=false;
+        return stepSkeletonRoomEffect(key,stop.player.stopped,x,y,makeEffects);
+    }
     template<class MakeEffects> bool stepSkeletonRoomEffect(downwell::InstanceHandle key,bool stopped,
         downwell::MotionBinary64 playerX,downwell::MotionBinary64 playerY,MakeEffects makeEffects){
         if(!run_.effectsSucceeded||!skeletons_||!skeletons_->valid())return run_.effectsSucceeded=false;

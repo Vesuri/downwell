@@ -647,6 +647,20 @@ public:
         const bool ok=tick();skeletonDispatch_=nullptr;skeletonContext_=nullptr;
         return run_.effectsSucceeded=run_.effectsSucceeded&&ok&&registration.valid();
     }
+    template<unsigned Capacity,unsigned StopCapacity,class MakeEffects,class Tick>
+    bool withSkeletonTimeStopEvents(StoredSkeletonRegistration<instanceCapacity,Capacity>& registration,
+        const TimeStopEffects<StopCapacity>& stop,MakeEffects makeEffects,Tick tick){
+        if(!stop.succeeded)return run_.effectsSucceeded=false;
+        return withSkeletonPublishedEvents(registration,[&](InstanceHandle key,SkeletonPhase phase,
+            auto& actor,auto& throwing,auto& publish,bool& good){
+            MotionBinary64 x,y;
+            if(phase!=SkeletonPhase::step||!stop.succeeded||!mainPlayerInitialized_||roomId_!=mainRoomId||
+               !ContactCoordinates::playerGlobals(mainPlayerMotion_.frameStartXFixed(),mainPlayerMotion_.frameStartYFixed(),
+                   mainPlayerOriginX_,mainPlayerOriginY_,x,y))return good=false;
+            auto effects=makeEffects(key,actor,throwing);
+            return actor.stepPublished(stop.player.stopped,x,y,publish,effects,good);
+        },tick);
+    }
     template<unsigned Capacity,class Execute,class Tick>
     bool withSkeletonEvents(StoredSkeletonRegistration<instanceCapacity,Capacity>& registration,
         Execute execute,Tick tick){

@@ -1,11 +1,11 @@
 #include "core/GameplayCollisionOwner.h"
 #include "core/Replay.h"
 #include "core/CurrencySmokeComposition.h"
+#include "QuietSkeletonEffects.h"
 #ifndef DOWNWELL_NATIVE_QUERY_PROBE
 #include "BulletWallSoundChecks.h"
 #include "SourceBulletSchedulingChecks.h"
 #include "RegisteredSkeletonThrowChecks.h"
-#include "QuietSkeletonEffects.h"
 #include "ScheduledBoxEffectsCheck.h"
 #endif
 #include "core/BoxWorldEffects.h"
@@ -19,6 +19,10 @@ namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_
 #include "core/CurrencyHomingMath.h"
 #include "core/TerrainWallContacts.h"
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
+bool nativeSkeletonTimeState(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle key,
+    const downwell::TimeStopEffects<64>& state,unsigned& hurts){
+    return owner.stepSkeleton(key,state,[&](auto&,auto&){return QuietSkeletonEffects{hurts};});
+}
 struct NativeLimboViews {
     bool outside(downwell::RunnerImageValue,downwell::RunnerImageValue,bool&);
     bool viewTop(downwell::MotionBinary64&);
@@ -6666,13 +6670,16 @@ int main(){
             assert(skeletons.dispatch(key,[](auto& state,auto&,bool&){state.hitPending=true;return true;}));
             unsigned hurts=0;
             auto stepPhase=std::make_unique<RunnerStepSnapshot<GameplayCollisionView::capacity>>();
-            assert(skeletonOwner->dispatchStepPhase(0,*stepPhase,[&](InstanceHandle selected,const PackedObjectEvent&){
+            TimeStopEffects<4> skeletonStop;skeletonStop.player.stopped=true;
+            auto stepSkeletons=[&]{return skeletonOwner->dispatchStepPhase(0,*stepPhase,[&](InstanceHandle selected,const PackedObjectEvent&){
                 GameplayCollisionView::Kind kind;InstanceHandle local;
                 assert(GameplayCollisionView::decode(selected,kind,local));
-                return kind!=GameplayCollisionView::Kind::skeleton||skeletonOwner->stepSkeleton(selected,false,
-                    MotionBinary64::fromInteger(180),MotionBinary64::fromInteger(300),
+                return kind!=GameplayCollisionView::Kind::skeleton||skeletonOwner->stepSkeleton(selected,skeletonStop,
                     [&](auto&,auto&){return QuietSkeletonEffects{hurts};});
-            })&&hurts==1&&actor->state.sprite==205&&actor->state.hitStun&&!actor->state.hitPending&&
+            });};
+            assert(stepSkeletons()&&!hurts&&actor->state.hitPending&&actor->state.imageSpeed.zero());
+            skeletonStop.player.stopped=false;
+            assert(stepSkeletons()&&hurts==1&&actor->state.sprite==205&&actor->state.hitStun&&!actor->state.hitPending&&
                 actor->state.alarms[1]==4&&actor->state.alarms[3]==30);
             assert(skeletons.dispatchPublished(key,[&](auto& state,auto&,auto& publish,bool&){
                 assert(publish.sprite(207)&&publish.imageIndex({0x40800000u})&&publish.sprite(205)&&state.sprite==205&&!state.timeline.bits&&

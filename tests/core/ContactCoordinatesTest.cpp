@@ -1,5 +1,6 @@
 #include "core/ContactCoordinates.h"
 #include "core/RunnerPointDirection.h"
+#include "core/DivideBinary64.h"
 #include <cassert>
 #include <cstdio>
 #include <climits>
@@ -41,6 +42,14 @@ int main(){
     const int edges[]={INT_MIN,-16777217,-16777216,-16777215,-257,-256,-1,0,1,255,256,
         16777215,16777216,16777217,INT_MAX};
     const int origins[]={INT_MIN,-65537,-65536,-176,-1,0,1,176,240,65536,65537,INT_MAX};
+    for(int x:edges)for(int y:edges)for(int origin:origins){
+        MotionBinary64 px,py,rx,ry;
+        assert(ContactCoordinates::playerGlobals(x,y,origin,origin,px,py));
+        assert(divideBinary64(MotionBinary64::fromInteger(x),MotionBinary64::fromInteger(256),rx)&&
+            divideBinary64(MotionBinary64::fromInteger(y),MotionBinary64::fromInteger(256),ry)&&
+            rx.add(MotionBinary64::fromInteger(origin))&&ry.add(MotionBinary64::fromInteger(origin)));
+        assert(same(px,rx)&&same(py,ry));
+    }
     for(int p:edges)for(int q:edges)for(int origin:origins)
         check(p,q,origin,0,origin,origin==INT_MIN?INT_MAX:-origin);
     for(int origin:origins)for(int caller:origins)
