@@ -39,6 +39,10 @@ public:
         auto& r=records_[key.slot];if(!r.active||r.destroyRequested)return true;
         return r.state.step(r.y.promoted(),random,ops)||fail();
     }
+    bool meeting(InstanceHandle key,MotionBinary64 x,MotionBinary64 y,int object,bool& hit){
+        if(!good_||!find(key))return fail();
+        return binding_.placeMeeting(key,records_[key.slot],object,x,y,hit)||fail();
+    }
     bool markDestroyed(InstanceHandle key){
         if(!good_||!find(key))return fail();
         auto& r=records_[key.slot];

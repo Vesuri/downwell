@@ -371,6 +371,16 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             GameplayCollisionView(*world).resolve(jellyShared,jellyRecord)&&jellyRecord.whiteJelly==jellies.find(jelly));
         assert(jellyRecord.whiteJelly->sourceId==899000&&jellyRecord.whiteJelly->x.bits==0x43800000u&&
             jellyRecord.whiteJelly->y.bits==0x44300000u&&owner->prepareDraw());
+        assert(spawners.mask(replacement,174));bool candidateHit=false;
+        assert(spawners.meeting(replacement,MotionBinary64::fromInteger(256),MotionBinary64::fromInteger(704),83,candidateHit)&&candidateHit);
+        assert(jellies.activate(jelly,false));
+        assert(spawners.meeting(replacement,MotionBinary64::fromInteger(256),MotionBinary64::fromInteger(704),83,candidateHit)&&!candidateHit);
+        assert(jellies.activate(jelly,true));
+        assert(spawners.meeting(replacement,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(512),57,candidateHit)&&candidateHit);
+        assert(spawners.meeting(replacement,MotionBinary64::fromInteger(-1000),MotionBinary64::fromInteger(-1000),57,candidateHit)&&!candidateHit);
+        int retainedX,retainedY;
+        assert(spawners.find(replacement)->x.roundPixel(retainedX)&&spawners.find(replacement)->y.roundPixel(retainedY)&&
+            retainedX==-116&&retainedY==800);
         bool wallHit=false;
         assert(jellies.meeting(jelly,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(512),57,wallHit)&&wallHit);
         assert(jellies.meeting(jelly,MotionBinary64::fromInteger(-1000),MotionBinary64::fromInteger(-1000),57,wallHit)&&!wallHit);

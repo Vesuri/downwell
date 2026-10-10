@@ -883,7 +883,7 @@ private:
             return parent.check(r.x.bits==x.bits&&r.y.bits==y.bits)&&birth(local,r);
         }
         bool placeMeeting(InstanceHandle local,const Record& r,int object,MotionBinary64 x,MotionBinary64 y,bool& hit){
-            static_assert(Kind==View::Kind::corpse||Kind==View::Kind::whiteJelly,"registered actor query binding");
+            static_assert(Kind==View::Kind::corpse||Kind==View::Kind::whiteJelly||Kind==View::Kind::spawner,"registered actor query binding");
             InstanceHandle shared;
             if(!parent.corpseMasks_||!key(local,r,shared))return parent.check(false);
             return parent.registeredPlaceMeeting(shared,object,x,y,*parent.corpseMasks_,hit);
@@ -1067,7 +1067,7 @@ private:
     Binding<GameplayScattered::Record,View::Kind::scattered> scatteredBinding_{*this};
     GameplayScattered scattered_{GameplayScattered::Binding::bindMaskDestruction(scatteredBinding_)};
     Binding<GameplaySpawners::Record,View::Kind::spawner> spawnerBinding_{*this};
-    GameplaySpawners spawners_{GameplaySpawners::Binding::bindMaskDestruction(spawnerBinding_)};
+    GameplaySpawners spawners_{GameplaySpawners::Binding::bindPositionedQueryActor(spawnerBinding_)};
     Binding<GameplayWhiteJellies::Record,View::Kind::whiteJelly> whiteJellyBinding_{*this};
     GameplayWhiteJellies whiteJellies_{GameplayWhiteJellies::Binding::bindPositionedQueryActor(whiteJellyBinding_)};
     Binding<GameplayWorld::BulletState,View::Kind::bullet> bullets_{*this};
@@ -3472,7 +3472,7 @@ private:
     }
     bool registeredPlaceSelection(InstanceHandle self,int object,MotionBinary64 x,MotionBinary64 y,
         const SpriteMaskPack& masks,Owner::Result& result){
-        if(native_&&(object==82||object==56||object==57||object==90))return nativeActorPlaceSelection(self,object,x,y,masks,result);
+        if(native_&&(object==82||object==83||object==56||object==57||object==90))return nativeActorPlaceSelection(self,object,x,y,masks,result);
         if(!selectorAvailable(object))return check(false);
         auto update=[&](InstanceHandle h,bool publish){return resolves(h)&&refresh(h,publish);};
         if(!owner_.placeVm(self,object,x,y,false,families_,update,
