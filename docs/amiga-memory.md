@@ -138,6 +138,23 @@ two-byte decomposition rather than storing a 279,438-byte three-digit bank.
 `REFERENCE_HUD_COMPOSITION=1` links the retained individual-layer tables
 instead of the pair columns.
 
+## Scalar reference storage admission
+
+`GameplayCollisionOwner::ReferenceStorage` owns the scalar spatial and appearance
+arrays. It is not a member of `GameplayCollisionOwner`. Reference and
+terrain-only reference construction require that backing explicitly; native
+construction rejects it. The normal Amiga build reserves no such arrays.
+Reference scene/field/entry verification builds construct them before the owner,
+outside the task stack. Host fixtures hold them until after the owner dies.
+
+`RunnerBorrowedRecords` does not allocate on first use. An absent or out-of-range
+read/write latches terminal failure and immediately notifies the owner; no
+additional per-frame validation scan is needed. The small failed-write sentinel
+is not backing storage and can never make a failed owner valid again. Record
+capacity changes do not change the borrower's size. These rules remove the
+two scalar record arrays only: the shared journal/index and other reference
+ownership machinery still have their existing owners.
+
 ## Current Chip RAM ownership
 
 | Owner | Bytes |

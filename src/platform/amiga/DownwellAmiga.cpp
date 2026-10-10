@@ -1803,10 +1803,16 @@ __attribute__((noinline)) static int runDownwell(void) {
 #else
     constexpr auto ownership=downwell::GameplayCollisionOwner::Ownership::native;
 #endif
+    downwell::GameplayCollisionOwner::ReferenceStorage* referenceStorage=nullptr;
+#if defined(DOWNWELL_SCENE_VERIFY) || defined(DOWNWELL_FIELD_VERIFY) || defined(DOWNWELL_ENTRY_WIPE_VERIFY)
+    using ReferenceStorage=downwell::GameplayCollisionOwner::ReferenceStorage;
+    alignas(ReferenceStorage) static UBYTE referenceMemory[sizeof(ReferenceStorage)];
+    referenceStorage=new(referenceMemory) ReferenceStorage;
+#endif
     auto& collisionOwner=*new(collisionStorage) downwell::GameplayCollisionOwner(objects,collisionSprites,
         downwell::GameplayTerrainInstances::Presentation::bind(wallDamage),
         downwell::GameplayTerrainInstances::WallCollision::bind(wallCollision),&rooms,ownership,
-        DOWNWELL_NATIVE_BOXES!=0,DOWNWELL_NATIVE_FIELDS!=0);
+        DOWNWELL_NATIVE_BOXES!=0,DOWNWELL_NATIVE_FIELDS!=0,referenceStorage);
     if(!collisionOwner.valid())return 20;
     checkSceneStack(2);
 #ifdef DOWNWELL_REPLAY_VERIFY

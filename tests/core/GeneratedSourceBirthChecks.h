@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_TEST_GENERATED_SOURCE_BIRTH_CHECKS_H
 #define DOWNWELL_TEST_GENERATED_SOURCE_BIRTH_CHECKS_H
 #include "core/GameplayCollisionOwner.h"
+#include "CollisionOwnerFixture.h"
 #include "core/StoredShopCreationOwner.h"
 #include "core/GameplayShopInstances.h"
 #include "core/ShopFixtures.h"
@@ -24,7 +25,7 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
                   GameplayCollisionOwner::Ownership::nativeScenery}){
         const bool native=mode!=GameplayCollisionOwner::Ownership::reference;
-        auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+        auto collision=makeCollisionOwner(objects,sprites,GameplayTerrainInstances::Presentation{},
             GameplayTerrainInstances::WallCollision{},&rooms,mode);
         auto world=std::make_unique<GameplayWorld>(300,false,1000,false,collision->enemyBinding(),
             collision->breakableBinding(),collision->playerBinding(),native?nullptr:&collision->terrain(),&rooms);
@@ -528,7 +529,7 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
     // Exercise the production room animation/alarm callbacks through a whole
     // tick, rather than directly advancing the actor from the test.
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native}){
-        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+        auto owner=makeCollisionOwner(objects,sprites,GameplayTerrainInstances::Presentation{},
             GameplayTerrainInstances::WallCollision{},nullptr,mode);
         const bool native=mode==GameplayCollisionOwner::Ownership::native;
         auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
@@ -690,7 +691,7 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
         for(unsigned word=0;word<16;++word)assert(world->randomState().stateWord(word)==oracle.stateWord(word));
     }
     for(int style:{0,2})for(bool knees:{false,true})for(bool rejectSound:{false,true}){
-        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+        auto owner=makeCollisionOwner(objects,sprites,GameplayTerrainInstances::Presentation{},
             GameplayTerrainInstances::WallCollision{},nullptr,GameplayCollisionOwner::Ownership::native);
         auto world=std::make_unique<GameplayWorld>(300,false,1000,true,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding());
@@ -838,7 +839,7 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
         else assert(store.clear()&&!store.find(key)&&!store.size());
     }
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native}){
-        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+        auto owner=makeCollisionOwner(objects,sprites,GameplayTerrainInstances::Presentation{},
             GameplayTerrainInstances::WallCollision{},nullptr,mode);
         const bool native=mode==GameplayCollisionOwner::Ownership::native;
         auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),

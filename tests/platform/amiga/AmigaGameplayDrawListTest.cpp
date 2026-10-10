@@ -2,6 +2,7 @@
 #include "core/ShopFixtures.h"
 #include "core/GameMakerRounding.h"
 #include "core/GameplayCollisionOwner.h"
+#include "../../core/CollisionOwnerFixture.h"
 #include "core/CurrencySmokeComposition.h"
 #include "core/TimeShardDraw.h"
 #include "../../../generated/downwell-title-glyphs.h"
@@ -52,7 +53,7 @@ int main() {
         for(auto mode:{downwell::GameplayCollisionOwner::Ownership::reference,
             downwell::GameplayCollisionOwner::Ownership::native,downwell::GameplayCollisionOwner::Ownership::nativeScenery}){
             const bool native=mode!=downwell::GameplayCollisionOwner::Ownership::reference;
-            auto owner=std::make_unique<downwell::GameplayCollisionOwner>(objects,sprites,
+            auto owner=downwell::makeCollisionOwner(objects,sprites,
                 downwell::GameplayTerrainInstances::Presentation{},downwell::GameplayTerrainInstances::WallCollision{},&rooms,mode);
             auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),owner->breakableBinding(),
                 owner->playerBinding(),native?nullptr:&owner->terrain(),&rooms);
@@ -322,7 +323,7 @@ int main() {
         for(auto mode:{downwell::GameplayCollisionOwner::Ownership::reference,
             downwell::GameplayCollisionOwner::Ownership::native,
             downwell::GameplayCollisionOwner::Ownership::nativeScenery}){
-            auto owner=std::make_unique<downwell::GameplayCollisionOwner>(objects,sprites,
+            auto owner=downwell::makeCollisionOwner(objects,sprites,
                 downwell::GameplayTerrainInstances::Presentation{},downwell::GameplayTerrainInstances::WallCollision{},&rooms,mode);
             auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
                 owner->breakableBinding(),owner->playerBinding(),&owner->terrain(),&rooms);
@@ -395,7 +396,7 @@ int main() {
         for(auto mode:{downwell::GameplayCollisionOwner::Ownership::reference,
             downwell::GameplayCollisionOwner::Ownership::native,
             downwell::GameplayCollisionOwner::Ownership::nativeScenery}){
-            auto owner=std::make_unique<downwell::GameplayCollisionOwner>(objects,sprites,
+            auto owner=downwell::makeCollisionOwner(objects,sprites,
                 downwell::GameplayTerrainInstances::Presentation{},downwell::GameplayTerrainInstances::WallCollision{},&rooms,mode);
             auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
                 owner->breakableBinding(),owner->playerBinding(),&owner->terrain(),&rooms);
@@ -420,7 +421,7 @@ int main() {
             }
         }
         {
-            auto owner=std::make_unique<downwell::GameplayCollisionOwner>(objects,sprites,
+            auto owner=downwell::makeCollisionOwner(objects,sprites,
                 downwell::GameplayTerrainInstances::Presentation{},downwell::GameplayTerrainInstances::WallCollision{},&rooms);
             auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
                 owner->breakableBinding(),owner->playerBinding(),&owner->terrain(),&rooms);
@@ -512,7 +513,7 @@ int main() {
             assert(layers->retire({0,1})&&layers->retire({1,1})&&layers->prepare());
             assert(layers->birth({0,2},100855,depth,false)&&!layers->retire({0,1}));
 
-            auto hiddenOwner=std::make_unique<downwell::GameplayCollisionOwner>(objects,sprites,
+            auto hiddenOwner=downwell::makeCollisionOwner(objects,sprites,
                 downwell::GameplayTerrainInstances::Presentation{},downwell::GameplayTerrainInstances::WallCollision{},&hidden);
             auto hiddenWorld=std::make_unique<GameplayWorld>(300,true,0,false,hiddenOwner->enemyBinding(),
                 hiddenOwner->breakableBinding(),hiddenOwner->playerBinding(),&hiddenOwner->terrain());
@@ -521,7 +522,7 @@ int main() {
             UBYTE dummy[8]{};AmigaGameplayDrawList hiddenList;
             assert(hiddenList.collect(*hiddenWorld,dummy,dummy+8,160,34)&&hiddenList.count==0&&!hiddenList.rayVisible);
         }
-        auto owner=std::make_unique<downwell::GameplayCollisionOwner>(objects,sprites,
+        auto owner=downwell::makeCollisionOwner(objects,sprites,
             downwell::GameplayTerrainInstances::Presentation{},downwell::GameplayTerrainInstances::WallCollision{},&rooms);
         auto scene=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain());

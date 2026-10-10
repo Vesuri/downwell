@@ -53,7 +53,8 @@ template<unsigned Capacity,unsigned Nodes,bool PreparedGeometry> struct RunnerSp
 // No platform types or asset residency decisions belong here.
 template<unsigned Capacity,unsigned Nodes,bool ScheduledIndex=false,unsigned RetainedFirst=0,unsigned RetainedLast=0,bool RunRegistration=ScheduledIndex,class Lifetimes=RunnerSpatialLifetimes<Capacity>,
     class Registration=typename RunnerRegistrationStorage<Capacity,RetainedFirst,RetainedLast,
-        RunRegistration&&(RetainedFirst<RetainedLast)>::Type,bool PreparedGeometry=false,class TerrainStates=void> class RunnerSpatialInstances {
+        RunRegistration&&(RetainedFirst<RetainedLast)>::Type,bool PreparedGeometry=false,class TerrainStates=void,
+    class StateStorage=RunnerSpatialStates<RunnerSpatialState,Capacity,RetainedFirst,RetainedLast,TerrainStates>> class RunnerSpatialInstances {
     static_assert(Capacity>0,"Spatial instances need stable slots");
     using Queue=typename RunnerDirtyQueueStorage<Capacity,RetainedFirst,RetainedLast,TerrainStates,0>::Type;
     using CollisionQueue=typename RunnerDirtyQueueStorage<Capacity,RetainedFirst,RetainedLast,TerrainStates,1>::Type;
@@ -65,7 +66,9 @@ public:
         typename Membership::template RegistrationProjection<First,Last>;
     using Box=Math::Box;
     using State=RunnerSpatialState;
-    using States=RunnerSpatialStates<State,Capacity,RetainedFirst,RetainedLast,TerrainStates>;
+    using States=StateStorage;
+    bool bindStateStorage(State* records){return states_.bindStorage(records);}
+    void observeStateFailure(bool& owner){states_.observeFailure(owner);}
     using StateRead=typename States::Read;
     struct Result {bool found=false;InstanceHandle handle{};};
     struct Sprite {

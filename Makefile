@@ -1331,6 +1331,14 @@ build/time-shard-motion-test: tests/core/TimeShardMotionTest.cpp $(wildcard src/
 test: verify-time-field-wind
 .PHONY: verify-time-field-wind
 test: verify-gameplay-collision-owner
+.PHONY: verify-borrowed-state
+test: verify-borrowed-state
+verify-borrowed-state: build/runner-borrowed-state-test
+	./build/runner-borrowed-state-test
+build/runner-borrowed-state-test: tests/core/RunnerBorrowedStateTest.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -Isrc -o $@ $<
+build/gameplay-collision-owner-test build/gameplay-collision-owner-scalar-test build/gameplay-collision-owner-snapshot-test build/enemy-death-worlds-test build/amiga-terrain-ownership-test build/amiga-gameplay-draw-list-test build/amiga-gameplay-draw-list-replay-test: tests/core/CollisionOwnerFixture.h
 .PHONY: verify-gameplay-collision-owner
 .PHONY: verify-slot-family-map
 .PHONY: verify-stationary-retirement

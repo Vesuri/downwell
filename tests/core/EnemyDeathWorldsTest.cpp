@@ -2,6 +2,7 @@
 #include "core/StartupRuntime.h"
 #include "core/StoredWorldCollision.h"
 #include "core/GameplayCollisionOwner.h"
+#include "CollisionOwnerFixture.h"
 #include "core/CurrencyHomingMath.h"
 #include "core/PortableAtan.h"
 #include "../../generated/downwell-area-titles.h"
@@ -165,7 +166,7 @@ int main(){
         const int skeletonY=seed==16?200:40000;
         InstanceHandle skeleton;assert(stored->spawnSkeleton(skeletons,240,skeletonY,skeleton));
         const auto initialRandom=stored->randomState();auto first=stored->nextRuntimeInstanceId();
-        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto owner=makeCollisionOwner(objects,sprites);
         auto native=std::make_unique<GameplayWorld>(300,true,0,seed==15,owner->enemyBinding(),owner->breakableBinding(),
             owner->playerBinding(),&owner->terrain());
         assert(owner->attach(*native)&&owner->configureCorpseMasks(masks));
@@ -362,7 +363,7 @@ int main(){
                   downwell::GameplayCollisionOwner::Ownership::native,
                   downwell::GameplayCollisionOwner::Ownership::nativeScenery})for(unsigned failure=0;failure<=19;++failure){
         using namespace downwell;
-        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+        auto owner=makeCollisionOwner(objects,sprites,GameplayTerrainInstances::Presentation{},
             GameplayTerrainInstances::WallCollision{},nullptr,mode);
         auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),owner->breakableBinding(),
             owner->playerBinding(),mode==GameplayCollisionOwner::Ownership::reference?&owner->terrain():nullptr);
@@ -436,7 +437,7 @@ int main(){
                 child->ysp.high==0x40100000u&&child->xsp.high==0xc0180000u&&child->explosionFx==102);
         };
         if(native){
-            auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+            auto owner=makeCollisionOwner(objects,sprites);
             auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),owner->breakableBinding(),
                 owner->playerBinding(),&owner->terrain());assert(owner->attach(*world)&&owner->configureCorpseMasks(masks));
             InstanceHandle skeleton;assert(world->createSkeletonWithSourceId(505001,240,40000,skeleton));
@@ -486,7 +487,7 @@ int main(){
             }
         };
         if(native){
-            auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+            auto owner=makeCollisionOwner(objects,sprites);
             auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),owner->breakableBinding(),
                 owner->playerBinding(),&owner->terrain());assert(owner->attach(*world));
             InstanceHandle skeleton;assert(world->createSkeletonWithSourceId(505001,240,40000,skeleton));
@@ -532,7 +533,7 @@ int main(){
                   downwell::GameplayCollisionOwner::Ownership::nativeScenery}){
         using namespace downwell;
         const bool native=mode!=GameplayCollisionOwner::Ownership::reference;
-        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+        auto owner=makeCollisionOwner(objects,sprites,GameplayTerrainInstances::Presentation{},
             GameplayTerrainInstances::WallCollision{},&rooms,mode);
         auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),owner->breakableBinding(),
             owner->playerBinding(),native?nullptr:&owner->terrain(),&rooms);
@@ -571,7 +572,7 @@ int main(){
     }
     for(unsigned failAllocation=0;failAllocation<=2;++failAllocation){
         using namespace downwell;
-        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto owner=makeCollisionOwner(objects,sprites);
         auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
         assert(owner->attach(*world));InstanceHandle skeleton;
@@ -662,7 +663,7 @@ int main(){
         auto stored=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,nullptr,storedOwner->binding());
         assert(storedOwner->attach(*stored));stored->skipToGameForTesting();
         auto titles=stored->levelNumberRegistration<1>();auto skeletons=stored->skeletonRegistration<1>();
-        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto owner=makeCollisionOwner(objects,sprites);
         auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
         assert(owner->attach(*world));int speed=60;InstanceHandle controller,skeleton;
@@ -722,7 +723,7 @@ int main(){
         auto storedOwner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto stored=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,nullptr,storedOwner->binding());
         assert(storedOwner->attach(*stored));stored->skipToGameForTesting();auto registration=stored->levelNumberRegistration<1>();
-        auto nativeOwner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto nativeOwner=makeCollisionOwner(objects,sprites);
         auto world=std::make_unique<GameplayWorld>(300,true,0,false,nativeOwner->enemyBinding(),
             nativeOwner->breakableBinding(),nativeOwner->playerBinding(),&nativeOwner->terrain());
         assert(nativeOwner->attach(*world));

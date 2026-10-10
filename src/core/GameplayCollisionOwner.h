@@ -23,7 +23,7 @@
 #include "Profile.h"
 #include "PreparedUnitSpriteBounds.h"
 #include "PreparedTerrainBirthBounds.h"
-#include "RunnerFullProperties.h"
+#include "RunnerBorrowedState.h"
 #include "NativeInstanceTable.h"
 #include "RunnerCollisionEventContext.h"
 #include "RunnerCollisionDispatch.h"
@@ -45,16 +45,23 @@ extern volatile unsigned localDrawCaptureMode;
 class GameplayCollisionOwner {
 public:
     using View=GameplayCollisionView;
+    using ScalarStates=RunnerBorrowedSpatialStates<RunnerSpatialState,View::capacity>;
     // Verification builds keep the complete scalar membership pipeline alive,
     // not just isolated container tests. Spatial journal scheduling is the
     // same on both sides so query timing is not changed by this comparison.
 #ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
-    using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2,true,View::terrainBase,View::timeFieldBase,false>;
+    using Registration=typename RunnerRegistrationStorage<View::capacity,View::terrainBase,View::timeFieldBase,false>::Type;
+    using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2,true,View::terrainBase,View::timeFieldBase,false,
+        RunnerSpatialLifetimes<View::capacity>,Registration,false,void,ScalarStates>;
 #else
     using Registration=typename RunnerRegistrationStorage<View::capacity,View::terrainBase,View::timeFieldBase,true>::Type;
     using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2,true,View::terrainBase,View::timeFieldBase,
-        true,RunnerSpatialLifetimes<View::capacity>,Registration,true>;
+        true,RunnerSpatialLifetimes<View::capacity>,Registration,true,void,ScalarStates>;
 #endif
+    struct ReferenceStorage {
+        Owner::State states[View::capacity]{};
+        Owner::Properties properties[View::capacity]{};
+    };
 private:
     Owner owner_;
     StationaryRetirementWindow thinRetirementWindow_;
@@ -172,7 +179,7 @@ private:
     RunnerRunRoomMembership<View::capacity,View::terrainBase,View::timeFieldBase> room_;
 #endif
     bool terrainSnapshotDirty_=true;
-    using PropertyStore=RunnerFullProperties<Owner::Properties,View::capacity>;
+    using PropertyStore=RunnerBorrowedRecords<Owner::Properties,View::capacity>;
     PropertyStore properties_;
     RunnerObjectFamilies<386> families_;
     const ObjectPack& objects_;
@@ -1253,7 +1260,8 @@ public:
     enum class Ownership {reference,nativeTerrain,native,nativeScenery};
     GameplayCollisionOwner(const ObjectPack& objects,const SpriteCollisionPack& sprites,
         GameplayTerrainInstances::Presentation presentation={},GameplayTerrainInstances::WallCollision collision={},
-        const RoomPack* rooms=nullptr,Ownership ownership=Ownership::reference,bool nativeBoxes=true,bool nativeFields=true):
+        const RoomPack* rooms=nullptr,Ownership ownership=Ownership::reference,bool nativeBoxes=true,bool nativeFields=true,
+        ReferenceStorage* reference=nullptr):
         objects_(objects),sprites_(sprites),layers_(rooms),
         native_(ownership==Ownership::native||ownership==Ownership::nativeScenery),
         sceneryLayers_(ownership==Ownership::nativeScenery),
@@ -1264,6 +1272,11 @@ public:
         terrain_(terrainRegistered_?GameplayTerrainInstances::Binding::bindDestruction(terrainBinding_):
             GameplayTerrainInstances::Binding{},presentation,collision),
         nativeTerrainPresentation_(presentation),nativeTerrainCollision_(collision){
+        owner_.observeStateFailure(good_);properties_.observeFailure(good_);
+        // Only the scalar/reference backend may own these arrays. Native
+        // publication borrows the journal, never its scalar actor records.
+        if(native_?reference!=nullptr:(!reference||!owner_.bindStateStorage(reference->states)||
+                                     !properties_.bindStorage(reference->properties))){good_=false;return;}
         if(preparedDrawEnabled())layers_.enablePreparedDraw();
         good_=sprites_.prepare(preparedSprites_,741)&&objectDefaults_.prepare(objects,sprites_)&&
             spriteGeometry_.prepare(sprites_)&&

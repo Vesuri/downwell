@@ -7,6 +7,7 @@
 #include "platform/amiga/AmigaGameplayGeneration.h"
 #include "core/BuilderPatternPack.h"
 #include "core/GameplayCollisionOwner.h"
+#include "../../core/CollisionOwnerFixture.h"
 #include "core/GameplayContactProfileInput.h"
 #include "core/ObjectPack.h"
 #include "core/Replay.h"
@@ -41,7 +42,7 @@ using View=downwell::GameplayCollisionView;
 std::vector<unsigned> cleanupOrder(const downwell::ObjectPack& objects,
     const downwell::SpriteCollisionPack& sprites,Ownership ownership,unsigned scenario,
     const downwell::RoomPack* rooms=nullptr){
-    auto owner=std::make_unique<downwell::GameplayCollisionOwner>(objects,sprites,
+    auto owner=downwell::makeCollisionOwner(objects,sprites,
         downwell::GameplayTerrainInstances::Presentation{},downwell::GameplayTerrainInstances::WallCollision{},
         rooms,ownership);
     auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
@@ -116,7 +117,7 @@ struct Scene {
     AmigaTerrainTiles tiles;
     std::unique_ptr<AmigaGameplayGeneration::TerrainLifetimes> lifetimes;
     AmigaGameplayGeneration generation;
-    std::unique_ptr<downwell::GameplayCollisionOwner> owner;
+    downwell::CollisionOwnerFixture owner;
     std::unique_ptr<AmigaPortRuntime> world;
     Scene(const downwell::BuilderPatternPack& patterns,const downwell::ObjectPack& objects,
           const downwell::SpriteCollisionPack& sprites,const downwell::RoomPack& rooms,
@@ -125,7 +126,7 @@ struct Scene {
         :collision{nullptr,nullptr,&patterns,nullptr,0,nullptr},
          lifetimes(nativeLifetimes?std::make_unique<AmigaGameplayGeneration::TerrainLifetimes>():nullptr),
          generation(builder,patterns,objects,index,tiles,lifetimes.get()){
-        owner=std::make_unique<downwell::GameplayCollisionOwner>(objects,sprites,
+        owner=downwell::makeCollisionOwner(objects,sprites,
             downwell::GameplayTerrainInstances::Presentation{},downwell::GameplayTerrainInstances::WallCollision{},
             &rooms,ownership,nativeBoxes,nativeFields);
         require(owner->valid(),"owner prepares");
