@@ -389,8 +389,12 @@ int main(int argc,char** argv){
                 require(other->owner->prepareDraw(),"native Draw cleanup succeeds");
                 require(other->digest()==expected,"simulation state and actor order agree");
                 requireSameBackendTerrain(*reference,*other);
-                if(other->world->terrainInstances())
+                if(other->world->terrainInstances()){
+                    if(other->owner->terrain().size()!=reference->owner->terrain().size())
+                        std::cerr<<"phase="<<phase<<" owner="<<(&other-&others[0])<<" terrain="
+                            <<other->owner->terrain().size()<<" reference="<<reference->owner->terrain().size()<<"\n";
                     require(other->owner->terrain().size()==reference->owner->terrain().size(),"terrain identities agree");
+                }
                 else if(frame%30==0)requireWallsMatchGrid(*reference,*other);
             }
             if(reference->owner->terrain().size()>maxTerrain)maxTerrain=reference->owner->terrain().size();
