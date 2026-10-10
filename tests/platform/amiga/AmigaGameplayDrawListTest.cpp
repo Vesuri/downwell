@@ -12,6 +12,29 @@
 #include <cstdio>
 #include <vector>
 static bool boundsOK=true;
+static unsigned compareEffectSurfaces(const GameplayWorld& world,const downwell::EffectMaskAssets& assets,
+    const downwell::EffectSurfacePlacement::View& view){
+    struct Draw {downwell::EffectMaskAssets::Asset art;downwell::MotionBinary64 x,y;};
+    std::vector<Draw> reference;
+    assert(world.visitRegisteredEffectSurfaces<false>(assets,view,[&](const auto& art,auto x,auto y){
+        reference.push_back({art,x,y});return true;
+    }));
+    // Repeat after capture, and compare each failing emission prefix too.
+    for(unsigned stop=0;stop<=reference.size()+1;++stop){
+        unsigned count=0;
+        const bool okay=world.visitRegisteredEffectSurfaces(assets,view,[&](const auto& a,auto x,auto y){
+            assert(count<reference.size());const auto& r=reference[count++];const auto& b=r.art;
+            assert(a.mask.data==b.mask.data&&a.mask.bytes==b.mask.bytes&&a.mask.width==b.mask.width&&
+                a.mask.height==b.mask.height&&a.mask.stride==b.mask.stride&&a.low==b.low&&a.high==b.high&&
+                a.originX==b.originX&&a.originY==b.originY&&x.high==r.x.high&&x.low==r.x.low&&
+                y.high==r.y.high&&y.low==r.y.low);
+            return !stop||count<stop;
+        });
+        assert(okay==(!stop||stop>reference.size()));
+        assert(count==(!stop||stop>reference.size()?reference.size():stop));
+    }
+    return unsigned(reference.size());
+}
 int amigaRendererAssetBounds(const UBYTE*,const UBYTE*,UWORD sprite,UWORD,int x,int y,int,
     int* left,int* top,int* width,int* height) {
     if(sprite==gameplayDitherEdge){*left=x-160;*top=y;*width=320;*height=80;return boundsOK;}
@@ -262,7 +285,19 @@ int main() {
                 ++surfaces;return true;
             })&&surfaces==1);
             assert(!world->visitRegisteredEffectSurfaces(art,effectView,[](const auto&,auto,auto){return false;}));
+            assert(compareEffectSurfaces(*world,art,effectView)==1);
+            // Birth invalidates retained order; animation changes artwork
+            // without changing that order. Retirement removes only its entry.
+            downwell::InstanceHandle mixedSmoke;
+            assert(owner->registeredSmoke().create(1900100,x,y,random,mixedSmoke));
+            for(unsigned frame=0;frame<12;++frame){
+                assert(compareEffectSurfaces(*world,art,effectView)==2);
+                assert(owner->registeredSmoke().advanceAnimation(mixedSmoke));
+            }
+            assert(owner->registeredSmoke().clear());
+            assert(compareEffectSurfaces(*world,art,effectView)==1);
             assert(corpses.clear());
+            assert(compareEffectSurfaces(*world,art,effectView)==0);
             struct Globals {
                 downwell::MotionBinary64 grav{};
                 bool gravity(downwell::MotionBinary64 v){grav=v;return true;}
@@ -350,10 +385,12 @@ int main() {
                         py.high==y.high&&py.low==y.low);++surfaces;return true;
                 })&&surfaces==1);
                 assert(!world->visitRegisteredEffectSurfaces(art,effectView,[](const auto&,auto,auto){return false;}));
+                assert(compareEffectSurfaces(*world,art,effectView)==1);
                 assert(smoke.advanceAnimation(smokeKey)&&++frames<200);
             }
             assert(frameMask==511&&owner->prepareDraw()&&!smoke.find(smokeKey));
             assert(world->visitRegisteredEffectSurfaces(art,effectView,[](const auto&,auto,auto){return false;}));
+            assert(compareEffectSurfaces(*world,art,effectView)==0);
         }
         for(auto mode:{downwell::GameplayCollisionOwner::Ownership::reference,
             downwell::GameplayCollisionOwner::Ownership::native,

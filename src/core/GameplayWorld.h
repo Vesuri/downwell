@@ -1470,9 +1470,12 @@ public:
             return (kind!=DrawActor::levelNumber&&kind!=DrawActor::entryDither)||visit(kind,key,depth);
         });
     }
-    template<class Emit> bool visitRegisteredEffectSurfaces(const downwell::EffectMaskAssets& assets,
+    template<bool RetainOrder=true,class Emit> bool visitRegisteredEffectSurfaces(const downwell::EffectMaskAssets& assets,
         const downwell::EffectSurfacePlacement::View& view,Emit emit)const{
-        return visitRoomActors([&](DrawActor kind,downwell::InstanceHandle key,auto){
+        // These surface emitters do not run mutable Draw events. Share the
+        // actor renderer's mutation-invalidated order, but read all artwork,
+        // positions and frames live. The full traversal remains the oracle.
+        const auto visitor=[&](DrawActor kind,downwell::InstanceHandle key,auto){
             if(kind==DrawActor::corpse){
                 const auto* r=registeredCorpses_?registeredCorpses_->find(key):nullptr;
                 return r&&downwell::CorpseDraw::surface(r->state,assets,view,emit);
@@ -1490,7 +1493,9 @@ public:
                 return r&&downwell::TimeShardDraw::surface(*r,assets,view,emit);
             }
             return true;
-        });
+        };
+        if constexpr(RetainOrder)return visitRoomActorsReadOnly(visitor);
+        else return visitRoomActors(visitor);
     }
     const downwell::NativeTimeShardRegistration::Record* timeShardForDraw(downwell::InstanceHandle key)const{
         const auto* record=timeShardInstances_?timeShardInstances_->find(key):nullptr;

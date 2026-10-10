@@ -35,9 +35,8 @@ behavior, both backend integrations and relevant original-game verification.
   across handoffs, not just the allocation boundary and first gameplay frames.
   Preserve the user's local 1 MiB launcher workaround until that wider check
   passes; do not silently raise verification memory or discard source behavior.
-- Preserve the current failing executable/symbols and establish a reproducible
-  bounded SKIP_TO_GAME gameplay profile. Locate a comparable pre-regression
-  build; distinguish behavior/input-path changes from increased per-frame work.
+- Extend the bounded SKIP_TO_GAME contact audit with a comparable pre-regression
+  workload; distinguish behavior/input-path changes from increased per-frame work.
   Report quiet, firing/combat, generation and field windows with worst-frame
   costs and coverage. Old section 5 numbers are not a current baseline.
 - Remove the measured regression at its architectural cause. Compare the same
@@ -445,22 +444,15 @@ Reference: [upgrade IDs and source entry points](upgrade-coverage.md).
 Target <=20 ms frames during active gameplay and smooth style/upgrade navigation.
 Scene handoffs are not gameplay frames: judge them by total transition latency
 and visible stalls, not a 20 ms per-frame limit. Average gameplay FPS alone is
-not the criterion. The [frame-cost audit](amiga-frame-cost.md)
-measures `13e08ca2` on the contact tape: 2,800 PAL fields. Quiet frames take
-26.7 ms, combat 53.0 ms and time-field frames 36.1 ms. Budget frames are
-701 (91.1 ms: generation on top of combat), 646 (76.5 ms: the contact damage
-number's first step), 645 (86.6 ms: contact), 660 (51.9 ms: gem counter and
-streak change) and 844 (86.6 ms: generation). Menu scenes
-(`profile.sh transition`) peak at two fields; measure the cold gameplay
-handoff separately with `profile.sh entry`.
-
-Before the next performance change, re-capture and re-rank the contact workload
-after the live Step-order correction. Enemy/currency/bullet ordering changes
-the subsequent combat and generation trajectory: the paired host replay now
-places its largest terrain burst at 1689, not 701. The numbers and window
-labels above describe the historical audit, not a current native baseline.
-Retain the same input tape and establish new budget frames, coverage and
-per-owner costs before applying the measured gates below.
+not the criterion. Use the current regression baseline and exact comparison
+windows in the [frame-cost audit](amiga-frame-cost.md), not its historical
+`13e08ca2` section. Source Step-order changes altered the contact tape's
+trajectory; frame 701 is no longer its largest terrain burst. Finish section 0
+before resuming the historical ranked items below, re-estimating their costs
+against the live workload. Extend coverage to the new worst-gap frame 676,
+quiet gameplay and scene handoffs rather than treating the seven captured
+windows as a complete game audit. Measure the cold gameplay handoff separately
+with `profile.sh entry`.
 
 ### How to work this section
 
@@ -478,8 +470,9 @@ gauge) and left ten opt-in flags behind. Do not repeat that.
   expected saving from the numbers here. Afterwards trace only the affected
   windows (start a capture one frame early: 644, 659, 699, 843) and run the
   FPS tape. Repeat the full audit only after each lettered group lands.
-- Gate on the frames the budget is about, not on every frame. Accept when
-  the targeted cost falls, no budget frame (645, 646, 660, 701, 844) or window
+- Gate on the frames the budget is about, not on every frame. Use the current
+  audit's frame numbers and coverage. Accept when
+  the targeted cost falls, no measured budget frame or window
   worst frame gets slower by more than 0.5 ms, and no window mean the change
   runs in gets worse. Another single frame may rise by up to about 1 ms when
   the change saves several times that elsewhere; report it in the commit.
