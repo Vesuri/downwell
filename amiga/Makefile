@@ -531,6 +531,12 @@ CPPFLAGS := $(CFLAGS) -x c++ -std=gnu++17 -fno-rtti -fno-exceptions \
 	-fno-use-cxa-atexit -DDOWNWELL_FREESTANDING \
 	-I$(AMIGA_SRC)/compat -I$(REPO)/src
 ASFLAGS := -mcpu=68000 -g --register-prefix-optional -I"$(SDKDIR)" -I"$(CURDIR)"
+# Pixel verifiers retain linked source bytes as an independent load oracle.
+# Shipping/profiling executables must never link these transient scene banks.
+ifneq ($(findstring VERIFY,$(CFLAGS)),)
+CPPFLAGS += -DDOWNWELL_REFERENCE_SCENE_BANKS
+ASFLAGS += --defsym DOWNWELL_REFERENCE_SCENE_BANKS=1
+endif
 LDFLAGS := -Wl,--emit-relocs,--gc-sections,-Ttext=0,-Map=$(OUT).map
 
 AMIGA_HUD := $(REPO)/generated/amiga-hud.dwap
@@ -573,7 +579,24 @@ endif
 
 .PHONY: all check clean audit
 
-all: check $(OUT).exe $(OUT).boot $(OUT).front $(OUT).planes
+all: check $(OUT).exe $(OUT).boot $(OUT).front $(OUT).planes $(OUT).results $(OUT).shop $(OUT).clear
+
+$(REPO)/generated/amiga-transient-banks.h: $(AMIGA_RESULTS) $(AMIGA_SHOP) $(AMIGA_CLEAR) $(REPO)/tools/generate-amiga-transient-banks.py
+	python3 $(REPO)/tools/generate-amiga-transient-banks.py
+
+obj/DownwellAmiga.o: $(REPO)/generated/amiga-transient-banks.h
+
+$(OUT).results: $(AMIGA_RESULTS)
+	@mkdir -p $(@D)
+	cp -f $< $@
+
+$(OUT).shop: $(AMIGA_SHOP)
+	@mkdir -p $(@D)
+	cp -f $< $@
+
+$(OUT).clear: $(AMIGA_CLEAR)
+	@mkdir -p $(@D)
+	cp -f $< $@
 
 $(REPO)/generated/amiga-game.planes: $(AMIGA_GAME) $(REPO)/tools/generate-amiga-plane-bank.py
 	python3 $(REPO)/tools/generate-amiga-plane-bank.py
@@ -644,6 +667,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
 	@printf '%s\n' '$(PROFILE_SHOP)' >> $@.tmp
 	@printf '%s\n' '$(PROFILE_OVERFLOW)' >> $@.tmp
 	@printf '%s\n' '$(OVERFLOW_VERIFY)' >> $@.tmp
+	@printf '%s\n' '$(findstring VERIFY,$(CFLAGS))' >> $@.tmp
 	@cmp -s $@.tmp $@ || cp $@.tmp $@
 
 $(OBJECTS): obj/startup-options
@@ -987,10 +1011,10 @@ $(AMIGA_BOOT_BANK) $(AMIGA_FRONT_BANK) $(AMIGA_SCENE_BANKS): $(AMIGA_GAME)
 $(AMIGA_EFFECT_STAMPS): $(AMIGA_GAME) $(REPO)/tools/generate-effect-stamps.py
 	cd $(REPO) && python3 tools/generate-effect-stamps.py
 
-obj/AmigaAssets.o: $(AMIGA_SRC)/AmigaAssets.s $(AMIGA_HUD) $(REPO)/generated/amiga-health-source.inc $(REPO)/generated/amiga-health-art.h $(AMIGA_GAME) $(AMIGA_EFFECT_STAMPS) $(AMIGA_EXIT_MASK) $(AMIGA_ENTRY_MASK) $(AMIGA_SELECTION_MASK) \
+obj/AmigaAssets.o: obj/startup-options $(AMIGA_SRC)/AmigaAssets.s $(AMIGA_HUD) $(REPO)/generated/amiga-health-source.inc $(REPO)/generated/amiga-health-art.h $(AMIGA_GAME) $(AMIGA_EFFECT_STAMPS) $(AMIGA_EXIT_MASK) $(AMIGA_ENTRY_MASK) $(AMIGA_SELECTION_MASK) \
 		$(AMIGA_RESULTS) $(AMIGA_SHOP) $(AMIGA_CLEAR) $(ROOM_PACK) $(OBJECT_PACK) $(COLLISION_PACK) $(COLLISION_MASK_PACK) $(BUILDER_PACK)
 	@mkdir -p $(@D)
-	$(AS) $(ASFLAGS) -o $@ $<
+	$(AS) $(ASFLAGS) -o $@ $(AMIGA_SRC)/AmigaAssets.s
 
 $(REPO)/generated/amiga-terrain-phase6.bin: $(AMIGA_GAME) $(REPO)/tools/generate-terrain-phase.py
 	python3 $(REPO)/tools/generate-terrain-phase.py
@@ -1026,6 +1050,9 @@ obj/gcc8_a_support.o: $(SUPPORT)/gcc8_a_support.s
 	$(AS) $(ASFLAGS) -o $@ $<
 
 audit:
+	@if [ -z '$(findstring VERIFY,$(CFLAGS))' ] && $(OBJDUMP) -t $(OUT).elf | grep -qE 'amiga_(results|shop|clear)_pack'; then \
+		echo "*** transient scene art linked into shipping executable"; exit 1; \
+	else echo "Transient scene-bank linkage audit: clean"; fi
 	@if $(OBJDUMP) -t $(OUT).elf | grep -qE \
 		'__(ashl|ashr|lshr|mul|u?div|u?mod)di3'; then \
 		echo "*** unexpected 64-bit software arithmetic in native executable"; exit 1; \

@@ -37,7 +37,10 @@ while $s < 4
 end
 dump binary memory .run/entry-hud.bin gDownwellEntryHud gDownwellEntryHud+gDownwellEntryHudBytes
 dump binary memory .run/entry-fields.bin gDownwellEntryFields gDownwellEntryFields+gDownwellEntryFieldBytes
-dump binary memory .run/entry-results.bin gDownwellResultsPack gDownwellResultsPack+gDownwellResultsAssetBytes
+if gDownwellResultsPack != 0 || gDownwellResultsAssetBytes != 0 || gDownwellEntryResultsUploads != 0 || gDownwellUpgradeSourceBytes != 0
+    printf "Entry loaded an unrelated results/upgrade bank\n"
+    quit 1
+end
 printf "DOWNWELL_PROFILE_READY\n"
 shell touch .run/gdb-ready.marker
 detach

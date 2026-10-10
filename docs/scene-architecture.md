@@ -21,6 +21,33 @@ construct verification-only state; playable selection uses `AmigaSelectionLayer`
 
 ## Display lifecycle
 
+### Transient artwork leases
+
+Shop, death-results and upgrade artwork are files, not shipping executable
+payloads. `AmigaTransientBank` grants a view only to the declared owner. New
+contracts need explicit byte budgets in `generate-amiga-transient-banks.py`;
+the generator rejects growth beyond them and records input hashes/tool version.
+The shipping link audit rejects accidentally re-embedded transient banks.
+Verification builds retain linked shop/results bytes only to compare the
+file-loaded copies. The upgrade pixel oracle reads the loaded original pack;
+it still independently composes the expected display, without a second 169 KiB
+executable copy. The generated manifest pins the source file's SHA-256.
+
+Style selection and ordinary gameplay must not prepare death-results art.
+Shop and results load directly into their mutually exclusive Chip bank, without
+an ordinary-memory source copy. Repeated frames with the same lease perform no
+loading or validation. Failed replacement publishes neither the old nor a
+partially read new bank. Shop closure repairs its old footprint before releasing
+the lease. Cover DMA invalidates the overlay lease before borrowing its memory.
+
+Upgrade selection allocates its ordinary-memory source only on entry. Selected
+records are copied to the scene's Chip bank; the source remains available for
+offer/inventory changes and is freed after scene retirement. Exiting the program
+also frees it. Acquire failures return code 20, never an empty successful scene.
+The link audit, lease tests, entry profiler and clear/restart verifiers enforce
+these boundaries. These contracts do not yet partition the gameplay resource,
+room, collision-mask or SDL texture catalogues; that scope remains in the queue.
+
 Use the platform framework for Copper publication and DMA retirement.
 Prepare an inactive list or patch only safe, relevant words; do not rebuild
 complete lists for pointer-only scrolling. Failed preparation must prevent

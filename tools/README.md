@@ -66,10 +66,19 @@ the derived cell payload under ignored `generated/`.
 its immutable colour and mask planes independently, including aligned matching
 substreams. It writes `amiga-game.planes`, its size/source-hash header, and an
 input/output hash manifest under `generated/`. The Amiga build installs the bank
-as `Downwell.planes`; keep it beside the executable, `.boot` and `.front` files.
+as `Downwell.planes`; keep it beside the executable, `.boot`, `.front`,
+`.results`, `.shop` and `.clear` files. The build and run scripts package them.
 CPU effects continue reading the original ordinary-memory DWAP. The blitter
 binds separate low/high/mask views through the common `Bitmap` class; it does
 not regenerate or upload planes during gameplay.
+
+`generate-amiga-transient-banks.py` generates the explicit size/budget contracts
+and input-hash manifest for shop, death-results and upgrade sources. These banks
+are loaded only by their scene owners; normal/profiling builds reject linked
+copies. `make test-amiga-transient-bank` checks owner admission, retained loads,
+replacement failure and release. Pixel-verification builds additionally retain
+linked shop/results reference bytes and compare their loaded banks against them.
+Upgrade pixel checks use independent composition from the loaded source pack.
 
 `make test-amiga-plane-bank` checks every view against the original pixels and
 rejects malformed bank layouts. For the native pixel oracle, build with

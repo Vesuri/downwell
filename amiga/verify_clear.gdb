@@ -28,6 +28,10 @@ if gDownwellClearReentries != 2 || gDownwellClearGameplayUpdates != 60
     printf "Clear departure did not resume gameplay\n"
     quit 1
 end
+if gDownwellUpgradeSourceBytes != 0
+    printf "Upgrade source still resident after returning to gameplay\n"
+    quit 1
+end
 if gDownwellClearCursorMasks[0] != 7 || gDownwellClearCursorMasks[1] != 7
     printf "Upgrade navigation missed choices: first=%lu second=%lu\n", gDownwellClearCursorMasks[0], gDownwellClearCursorMasks[1]
     quit 1

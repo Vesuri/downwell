@@ -48,6 +48,15 @@ if gDownwellProfileRequireDamage && gDownwellProfileDamageBirths == 0
     printf "Damage profiling tape did not reach a damaging contact\n"
     quit 1
 end
+printf "Transient scene residency: loads=%lu upgrade_source_bytes=%lu results_bytes=%lu shop_bytes=%lu\n", gDownwellTransientLoads, gDownwellUpgradeSourceBytes, gDownwellResultsAssetBytes, gDownwellShopAssetBytes
+# The living world-1 contact tape never enters a shop, results or upgrade room.
+# New scene content must not introduce bank loading/preparation to this route.
+if gDownwellProfileRequireDamage && gDownwellProfileDeadSamples == 0
+    if gDownwellTransientLoads != 0 || gDownwellUpgradeSourceBytes != 0 || gDownwellResultsAssetBytes != 0 || gDownwellShopAssetBytes != 0
+        printf "Unrelated transient scene work on the contact tape\n"
+        quit 1
+    end
+end
 set $i = 0
 printf "Staged camera transfers=%ld last_shortfall=%ld rows\n", gDownwellProfileStagedHits, gDownwellProfileStageShortfall
 while $i < gDownwellProfileMissCount && $i < 32

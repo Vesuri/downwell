@@ -43,6 +43,9 @@ cp -f out/Downwell.exe "$DH1/Downwell"
 cp -f out/Downwell.boot "$DH1/Downwell.boot"
 cp -f out/Downwell.front "$DH1/Downwell.front"
 cp -f out/Downwell.planes "$DH1/Downwell.planes"
+for bank in results shop clear; do
+  cp -f "out/Downwell.$bank" "$DH1/Downwell.$bank"
+done
 find "$RUN/state" -name '*.uss' -delete
 rm -f "$RUN/gdb-startup.log" "$RUN/fsuae-startup.log" \
   "$RUN/gdb-ready.marker"

@@ -2919,6 +2919,14 @@ build/amiga-effect-stamp-bank-test: tests/platform/amiga/AmigaEffectStampBankTes
 	$(CXX) $(CXXFLAGS) -Isrc -o $@ $<
 
 .PHONY: test-amiga-immutable-upload
+.PHONY: test-amiga-transient-bank
+test: test-amiga-transient-bank
+test-amiga-transient-bank: build/amiga-transient-bank-test
+	./build/amiga-transient-bank-test
+build/amiga-transient-bank-test: tests/platform/amiga/AmigaTransientBankTest.cpp src/platform/amiga/AmigaTransientBank.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+
 test-amiga-immutable-upload: build/amiga-immutable-upload-test
 	./build/amiga-immutable-upload-test
 build/amiga-immutable-upload-test: tests/platform/amiga/AmigaImmutableUploadTest.cpp src/platform/amiga/AmigaImmutableUpload.h

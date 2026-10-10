@@ -248,18 +248,18 @@ extern const UBYTE amiga_field_images[],amiga_field_images_end[];
 extern const UBYTE amiga_terrain_phase6[],amiga_terrain_phase6_end[];
 extern const UBYTE amiga_initial_terrain[],amiga_initial_terrain_end[];
 #endif
+#ifdef DOWNWELL_REFERENCE_SCENE_BANKS
 extern const UBYTE amiga_results_pack[];
+extern const UBYTE amiga_results_pack_end[];
+extern const UBYTE amiga_shop_pack[];
+extern const UBYTE amiga_shop_pack_end[];
+#endif
 extern const UBYTE amiga_exit_mask[];
 extern const UBYTE amiga_exit_mask_end[];
 extern const UBYTE amiga_entry_mask[];
 extern const UBYTE amiga_entry_mask_end[];
 extern const UBYTE amiga_selection_mask[];
 extern const UBYTE amiga_selection_mask_end[];
-extern const UBYTE amiga_results_pack_end[];
-extern const UBYTE amiga_shop_pack[];
-extern const UBYTE amiga_shop_pack_end[];
-extern const UBYTE amiga_clear_pack[];
-extern const UBYTE amiga_clear_pack_end[];
 extern const UBYTE amiga_room_pack[];
 extern const UBYTE amiga_room_pack_end[];
 extern const UBYTE amiga_object_pack[];
@@ -327,14 +327,65 @@ static const UBYTE* activeHudPack = amiga_hud_pack;
 static const UBYTE* activeHudPackEnd = amiga_hud_pack_end;
 static AmigaImmutableByteUpload entryHudUpload;
 static bool entryHudReady=false;
-static AmigaImmutableUpload entryResultsUpload;
-static bool entryResultsReady=false;
 
-// Chip RAM holds only the current scene's art. Boot (splash) and front
+#include "AmigaTransientBank.h"
+#include "../../../generated/amiga-transient-banks.h"
+using TransientOwner = AmigaTransientBank::Owner;
+static constexpr AmigaTransientBank::Contract shopBankContract{
+    TransientOwner::shop, "PROGDIR:Downwell.shop", DOWNWELL_SHOP_BANK_BYTES, DOWNWELL_SHOP_BANK_BUDGET};
+static constexpr AmigaTransientBank::Contract resultsBankContract{
+    TransientOwner::results, "PROGDIR:Downwell.results", DOWNWELL_RESULTS_BANK_BYTES, DOWNWELL_RESULTS_BANK_BUDGET};
+static constexpr AmigaTransientBank::Contract clearBankContract{
+    TransientOwner::upgrade, "PROGDIR:Downwell.clear", DOWNWELL_CLEAR_BANK_BYTES, DOWNWELL_CLEAR_BANK_BUDGET};
+static AmigaTransientBank overlayBank;
+static AmigaPlatform* sceneAssetPlatform;
+extern "C" { volatile ULONG gDownwellTransientLoads, gDownwellUpgradeSourceBytes; }
+
+static bool readTransientBank(const char* file, UBYTE* target, unsigned bytes) {
+    if (!sceneAssetPlatform || sceneAssetPlatform->loadFile(file, target, bytes) != LONG(bytes)) return false;
+    ++gDownwellTransientLoads;
+    return true;
+}
+static bool validateTransientBank(const UBYTE* data, unsigned bytes) {
+    return amigaRendererChipPackBytes(data, data + bytes) == bytes;
+}
+#ifdef DOWNWELL_REFERENCE_SCENE_BANKS
+static bool sameSceneBank(const UBYTE* loaded, const UBYTE* reference, unsigned bytes) {
+    for (unsigned i=0; i<bytes; ++i) if (loaded[i] != reference[i]) return false;
+    return true;
+}
+#endif
+// Ordinary source memory exists only during upgrade selection. Selected Chip
+// records are owned by AmigaUpgradeScene, and have a separate DMA lifetime.
+class UpgradeSource {
+    UBYTE* storage_ = nullptr;
+    AmigaTransientBank bank_;
+public:
+    ~UpgradeSource() { release(); }
+    bool acquire() {
+        if (bank_.view(TransientOwner::upgrade).data) return true;
+        if (!storage_) storage_ = static_cast<UBYTE*>(AllocMem(clearBankContract.bytes, MEMF_FAST));
+        if (!storage_ || !bank_.load(TransientOwner::upgrade, clearBankContract, storage_,
+                clearBankContract.bytes, readTransientBank, validateTransientBank)) {
+            release(); return false;
+        }
+        gDownwellUpgradeSourceBytes = clearBankContract.bytes;
+        return true;
+    }
+    AmigaTransientBank::View view() const { return bank_.view(TransientOwner::upgrade); }
+    void release() {
+        bank_.release();
+        if (storage_) FreeMem(storage_, clearBankContract.bytes);
+        storage_ = nullptr; gDownwellUpgradeSourceBytes = 0;
+    }
+};
+
+// Boot (splash) and front
 // (garden and style select) banks are files, each read whole in one load
 // into one shared Chip region. Boot art is composed into the splash cache
 // and dropped; front art is reloaded whenever gameplay returns to it.
-// Gameplay leaves the region unused by any bank.
+// Gameplay reuses the region for terrain/field staging. The separate gameplay
+// DMA atlas is still resident during startup; this is only partial banking.
 static const char bootBankName[] = "PROGDIR:Downwell.boot";
 static const char frontBankName[] = "PROGDIR:Downwell.front";
 static const ULONG baseSceneBankBytes = DOWNWELL_FRONT_BANK_BYTES > DOWNWELL_BOOT_BANK_BYTES
@@ -467,18 +518,22 @@ __attribute__((noinline, used)) void downwellClearReady() { __asm__ volatile("" 
 // sprites and display bitplanes never point into this immutable artwork region.
 static bool selectOverlayAssetBank(bool shop) {
     if (residentCover!=ResidentCover::none) return false; // DMA owns this bank until scene retirement.
-    if ((shop && gDownwellShopPack) || (!shop && gDownwellResultsPack)) return true;
-    const UBYTE* source = shop ? amiga_shop_pack : amiga_results_pack;
-    const UBYTE* end = shop ? amiga_shop_pack_end : amiga_results_pack_end;
-    const unsigned bytes = end - source;
-    if (!overlayAssetStorage || bytes > overlayAssetCapacity ||
-        amigaRendererChipPackBytes(source, end) != bytes) return false;
+    const auto& contract = shop ? shopBankContract : resultsBankContract;
+    const auto held = overlayBank.view(contract.owner);
+    if (held.data == overlayAssetStorage && held.bytes == contract.bytes) return true;
     AmigaHardware::blitterDrain();
-    for (unsigned i = 0; i < bytes; ++i) overlayAssetStorage[i] = source[i];
+    gDownwellShopPack = gDownwellResultsPack = nullptr;
+    gDownwellShopAssetBytes = gDownwellResultsAssetBytes = 0;
+    if (!overlayBank.load(contract.owner, contract, overlayAssetStorage, overlayAssetCapacity,
+            readTransientBank, validateTransientBank)) return false;
+#ifdef DOWNWELL_REFERENCE_SCENE_BANKS
+    const UBYTE* source = shop ? amiga_shop_pack : amiga_results_pack;
+    if (!sameSceneBank(overlayAssetStorage, source, contract.bytes)) { overlayBank.release(); return false; }
+#endif
     gDownwellShopPack = shop ? overlayAssetStorage : nullptr;
-    gDownwellShopAssetBytes = shop ? bytes : 0;
+    gDownwellShopAssetBytes = shop ? contract.bytes : 0;
     gDownwellResultsPack = shop ? nullptr : overlayAssetStorage;
-    gDownwellResultsAssetBytes = shop ? 0 : bytes;
+    gDownwellResultsAssetBytes = shop ? 0 : contract.bytes;
     return true;
 }
 static bool selectExitMaskBank() {
@@ -487,6 +542,7 @@ static bool selectExitMaskBank() {
     if (!overlayAssetStorage || AmigaExitMask::bytes > overlayAssetCapacity ||
         amiga_exit_mask_end - amiga_exit_mask != AmigaExitMask::bytes) return false;
     AmigaHardware::blitterDrain();
+    overlayBank.release();
     for (unsigned i = 0; i < AmigaExitMask::bytes; ++i)
         overlayAssetStorage[i] = amiga_exit_mask[i];
     gDownwellResultsPack = gDownwellShopPack = nullptr;
@@ -510,6 +566,7 @@ static bool selectEntryMaskBank(){
     if(residentCover!=ResidentCover::none||!overlayAssetStorage||AmigaEntryMask::bytes>overlayAssetCapacity||
        amiga_entry_mask_end-amiga_entry_mask!=AmigaEntryMask::bytes)return false;
     AmigaHardware::blitterDrain();
+    overlayBank.release();
 #ifdef DOWNWELL_PROFILE_ENTRY
     if(gDownwellResultsPack)++gDownwellEntryResultsDiscarded;
 #endif
@@ -1710,6 +1767,8 @@ __attribute__((noinline)) static int runDownwell(void) {
     if(gCoverageWordVerifiedCases!=80)return 20;
 #endif
     AmigaPlatform platform;
+    sceneAssetPlatform = &platform;
+    UpgradeSource upgradeSource;
 #ifdef DOWNWELL_SCENE_VERIFY
     AmigaVerificationScratch::Storage verificationStorage;
     if (!verificationStorage.valid()) return 20;
@@ -2593,6 +2652,9 @@ __attribute__((noinline)) static int runDownwell(void) {
                     platform.publish(splashBlankList);
                     platform.waitVblank();
                     AmigaHardware::blitterDrain();
+                    overlayBank.release();
+                    gDownwellResultsPack = gDownwellShopPack = nullptr;
+                    gDownwellResultsAssetBytes = gDownwellShopAssetBytes = 0;
                     if (!loadFrontBank(platform)) break;
                     if (presentedScene == AmigaScene::menu &&
                         !gardenScene.prepare(menuDrawList, frontPack, frontPackEnd))
@@ -2602,8 +2664,6 @@ __attribute__((noinline)) static int runDownwell(void) {
                 if (presentationChanged && presentedScene == AmigaScene::styleSelect) {
                     entryHudUpload.invalidate();
                     entryHudReady=false;
-                    entryResultsUpload.invalidate();
-                    entryResultsReady=false;
                     // These framebuffers and copper slots may contain gameplay,
                     // even when the new selection matches the last visit exactly.
                     // Garden prepared the immutable border/masks on entry and
@@ -2757,9 +2817,8 @@ __attribute__((noinline)) static int runDownwell(void) {
                     const auto storage = GameplaySceneStorage::partition(
                         menuPlaneBytes * 2 + amigaMenuEntryPlaneBytes,
                         downwellGameRingBytes, hudBytes);
-                    const unsigned resultsBytes = amiga_results_pack_end - amiga_results_pack;
-                    if (!storage.valid || resultsBytes > storage.resultsCapacity ||
-                        amigaRendererChipPackBytes(amiga_results_pack, amiga_results_pack_end) != resultsBytes) {
+                    if (!storage.valid || DOWNWELL_RESULTS_BANK_BYTES > storage.resultsCapacity ||
+                        DOWNWELL_SHOP_BANK_BYTES > storage.resultsCapacity) {
                         ++gDownwellResultsAssetFailures;
                         exitCode = 20;
                         break;
@@ -2804,32 +2863,15 @@ __attribute__((noinline)) static int runDownwell(void) {
                     overlayAssetStorage = memory.menuForeground() + storage.resultsOffset;
                     overlayAssetCapacity = storage.resultsCapacity;
                     residentCover = ResidentCover::none;
-                    // Retired intro DMA is blank. Copy immutable, already planar
-                    // assets once; never convert or copy them per results frame.
+                    // No overlay is required by a living player. The first
+                    // actual shop/results consumer acquires its own bank.
+                    overlayBank.release();
                     gDownwellResultsPack = gDownwellShopPack = nullptr;
+                    gDownwellResultsAssetBytes = gDownwellShopAssetBytes = 0;
                     shopMenuOverlay.reset();
-                    DW_PROFILE_PHASE(profileEntryResultsCopy);
-#ifndef DOWNWELL_REFERENCE_ENTRY_ASSETS
-                    if(entryResultsReady){
-                        gDownwellResultsPack=overlayAssetStorage;
-                        gDownwellResultsAssetBytes=resultsBytes;
-                        gDownwellShopAssetBytes=0;
-                    }
-#endif
-                    if (!selectOverlayAssetBank(false)) {
-                        ++gDownwellResultsAssetFailures;
-                        exitCode = 20;
-                        break;
-                    }
-                    entryResultsUpload.invalidate();
-                    entryResultsReady=false;
-#ifdef DOWNWELL_PROFILE_ENTRY
-                    ++gDownwellEntryResultsUploads;
-#endif
 #ifdef DOWNWELL_RESULTS_RESTART_VERIFY
-                    for(unsigned byte=0;byte<resultsBytes;++byte)
-                        if(gDownwellResultsPack[byte]!=amiga_results_pack[byte])
-                            ++gDownwellResultsBankFailures;
+                    if(gDownwellResultsPack || gDownwellShopPack || gDownwellResultsAssetBytes || gDownwellShopAssetBytes)
+                        ++gDownwellResultsBankFailures;
                     ++gDownwellResultsBankChecks;
 #endif
                     DW_PROFILE_PHASE(profileEntryRaster);
@@ -3081,13 +3123,6 @@ __attribute__((noinline)) static int runDownwell(void) {
                         if (!layout.valid) { exitCode=20; break; }
                         entryHudReady=entryHudUpload.step(memory.menuForeground()+layout.hudOffset,
                             amiga_hud_pack,bytes,256);
-                        const unsigned resultBytes=amiga_results_pack_end-amiga_results_pack;
-                        if(resultBytes>layout.resultsCapacity||(resultBytes&1u)){
-                            exitCode=20;break;
-                        }
-                        entryResultsReady=entryResultsUpload.step(
-                            reinterpret_cast<UWORD*>(memory.menuForeground()+layout.resultsOffset),
-                            reinterpret_cast<const UWORD*>(amiga_results_pack),resultBytes/2,256);
                     }
 #endif
 #if defined(DOWNWELL_PREPARED_FIELDS) && !defined(DOWNWELL_REFERENCE_FIELD_BANK)
@@ -3197,9 +3232,13 @@ __attribute__((noinline)) static int runDownwell(void) {
                     platform.publish(splashBlankList);
                     platform.waitVblank();
                     AmigaHardware::blitterDrain();
+                    overlayBank.release();
+                    gDownwellResultsPack = gDownwellShopPack = nullptr;
+                    gDownwellResultsAssetBytes = gDownwellShopAssetBytes = 0;
+                    if (!upgradeSource.acquire()) { exitCode = 20; break; }
                     if (!clear.enter(port, scenes.styleCursor(), liveInput,
                             memory.menuForeground(), menuPlaneBytes * 2 + amigaMenuEntryPlaneBytes,
-                            amiga_hud_pack_end - amiga_hud_pack, amiga_clear_pack, amiga_clear_pack_end - amiga_clear_pack,
+                            amiga_hud_pack_end - amiga_hud_pack, upgradeSource.view().data, upgradeSource.view().bytes,
                             amiga_selection_mask, amiga_selection_mask_end - amiga_selection_mask)) { exitCode = 20; break; }
 #ifdef DOWNWELL_CLEAR_VERIFY
                     gDownwellClearPhase = 2;
@@ -3217,6 +3256,8 @@ __attribute__((noinline)) static int runDownwell(void) {
                     for (unsigned channel = 0; channel < 8; ++channel) splashBlankList.showSprite(channel, nullSprite);
                     splashBlankList.finish(); platform.publish(splashBlankList); platform.waitVblank();
                     AmigaHardware::blitterDrain();
+                    clear.invalidateDisplay();
+                    upgradeSource.release();
                     {
                         DW_PROFILE_SCOPE(profileEntryWorld);
                         if (!port.prepareNextAreaOneLevel(liveInput, initialRingOrigin)) { exitCode = 20; break; }
@@ -3235,7 +3276,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                 if (bankChanged) {
                     DW_PROFILE_SCOPE(profileClearBank);
                     AmigaHardware::blitterDrain();
-                    if (!clear.refreshArtwork(port, memory.menuForeground(), amiga_clear_pack, amiga_clear_pack_end - amiga_clear_pack)) {
+                    if (!clear.refreshArtwork(port, memory.menuForeground(), upgradeSource.view().data, upgradeSource.view().bytes)) {
                         exitCode = 20; break;
                     }
                 }
@@ -3289,7 +3330,8 @@ __attribute__((noinline)) static int runDownwell(void) {
                 // Production banks omit label frame0 when only its offline
                 // outline is drawn. The scalar oracle reads original frames
                 // from the immutable full source pack in ordinary memory.
-                if (!oracle.render(back, reference, amiga_clear_pack, amiga_clear_pack_end, room, snapshot, port.upgrades(), expected))
+                if (!oracle.render(back, reference, upgradeSource.view().data,
+                        upgradeSource.view().data + upgradeSource.view().bytes, room, snapshot, port.upgrades(), expected))
                     ++gDownwellClearFailures;
                 // Compare visible pixels, not storage: the new canvases are
                 // world-space narrow planes, the oracle uses a wide ring.
@@ -3549,6 +3591,12 @@ __attribute__((noinline)) static int runDownwell(void) {
                 ++gDownwellShopLiveFrames;
             }
 #endif
+            if (!activeShop && gDownwellShopPack) {
+                // draw(nullptr) above repairs the old menu footprint first.
+                AmigaHardware::blitterDrain();
+                overlayBank.release();
+                gDownwellShopPack = nullptr; gDownwellShopAssetBytes = 0;
+            }
             if (port.deathResults().active && !port.exitDither().active) {
 #ifdef DOWNWELL_PROFILE_ENTRY
                 ++gDownwellEntryResultsFrames;

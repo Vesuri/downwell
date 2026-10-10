@@ -177,9 +177,10 @@ remeasured when any pack or other Chip owner grows.
 
 ## Scene banks
 
-Chip RAM holds only the current scene's art. `generate-amiga-hud.py --profile
-game` encodes the former single game pack and splits its records, unchanged,
-into three banks:
+Boot/front art shares a scene bank, but the gameplay DMA atlas still remains
+resident across those scenes. This is partial scene banking, not a proof that
+only current-scene assets are loaded. `generate-amiga-hud.py --profile game`
+splits its records, unchanged, into three banks:
 
 - `amiga-game.dwap`, the ordinary-memory gameplay reference. Its offline
   `amiga-game.planes` derivative (`Downwell.planes`) is the resident DMA bank.
@@ -191,6 +192,16 @@ into three banks:
   while the garden is shown, so the two share one bank. Garden scenery keeps
   only the frames the seed-2 menu creation selects; `amiga-menu-test` checks
   every draw-list frame against this bank.
+
+Shop and death-results art is loaded directly from `Downwell.shop` and
+`Downwell.results` into their mutually exclusive Chip region, only on demand.
+Neither is prepared during style selection or ordinary gameplay entry.
+`Downwell.clear` has an ordinary-memory source allocation only during upgrade
+selection, released on departure. These three payloads are not linked into
+shipping executables. The generated transient-bank contracts have explicit
+growth budgets; their source hashes are in `amiga-transient-banks.json`.
+Retained pixel buffers have independent lifetimes: releasing source art must
+not erase a still-visible scene, and repurposing DMA storage requires retirement.
 
 The front bank puts its complete directory and all live garden/style payloads
 in a 64,936-byte prefix. Within it, all style-readable resources and the

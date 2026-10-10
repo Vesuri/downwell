@@ -31,10 +31,10 @@ if gDownwellResultsHudChecks != 4 || gDownwellResultsHudFailures != 0
 end
 printf "HUD residency: four presentation entries match the offline bank byte-for-byte\n"
 if gDownwellResultsBankChecks != 4 || gDownwellResultsBankFailures != 0
-    printf "Results bank failed across destinations: checks=%lu failures=%lu\n", gDownwellResultsBankChecks, gDownwellResultsBankFailures
+    printf "Unrelated overlay bank resident on gameplay entry: checks=%lu failures=%lu\n", gDownwellResultsBankChecks, gDownwellResultsBankFailures
     quit 1
 end
-printf "Results artwork: four presentation entries match the offline bank byte-for-byte\n"
+printf "Results artwork: four gameplay entries have no unrelated overlay bank\n"
 if gDownwellStackGuardReady != 1
     quit 1
 end

@@ -29,6 +29,23 @@ behavior, both backend integrations and relevant original-game verification.
 
 ## 0. Restore a runnable, measured A500 baseline
 
+- Enforce scene/level-local residency and execution before adding content:
+  1. Replace permanently resident gameplay/room/collision-mask catalogues with
+     explicit scene/level dependencies. Include reachable spawns, persistent
+     objects, nested Create/Draw dependencies and transition overlap; fail on
+     undeclared resources rather than falling back to all assets. Apply the
+     same dependency declarations to SDL texture/audio residency. Prove peak
+     ordinary/Chip memory and unload/re-entry with growing unrelated content.
+  2. Make phase dispatch depend on live, eligible family membership and scene
+     ownership, not the catalogue of implemented families. Preserve event/RNG
+     order, synchronous births, activation and captured-phase cutoffs. Assert
+     inactive systems do no work; a later family must not add empty per-frame
+     scans to world 1. Identify each replaced measured runner walk before
+     changing it; do not simply add another full validation pass.
+  3. Add regression fixtures that add unrelated resources/families and verify
+     unchanged current-scene residency and work counts, alongside replay and
+     bounded native timing gates. Transition-only preparation must not run in
+     gameplay frames. Check failure, Retry and all scene handoffs.
 - Extend the bounded SKIP_TO_GAME contact audit with a comparable pre-regression
   workload; distinguish behavior/input-path changes from increased per-frame work.
   Report quiet, firing/combat, generation and field windows with worst-frame
@@ -709,19 +726,18 @@ Reference: [scene architecture](scene-architecture.md).
   Establish the A500 memory requirement; expanded-emulator runs do not prove
   stock-machine fit. Size the shop speech overlap reserve against repeated
   messages within the nested parent Step, not just one replacement per parent.
-- Budget further Chip residency against the measured 928-byte startup
-  headroom; remeasure after pack growth and through scene transitions.
-  Restore the renderer's 120,000-byte resident-art gate: the current pack
-  requires 169,294 bytes. Reconcile gameplay-family residency before admitting
-  the additional encounter artwork on a stock-memory machine.
+- Budget further Chip residency against the measured 13,872-byte startup
+  minimum free space; remeasure after pack growth and through scene transitions.
+  The compact DMA plane bank is 112,970 bytes. Reconcile gameplay-family
+  residency before admitting additional encounter artwork on a stock-memory machine.
   Keep the gate unchanged until residency is reduced or a new whole-program
   allocation measurement justifies a different budget.
   Keep the 68000 CPU target; do not silently increase emulator Chip RAM
   to make memory checks pass.
-- The gameplay, HUD, results, shop and clear packs and the cover masks are
-  still linked into the executable, so ordinary memory holds them beside any
-  Chip copy. Load them as per-scene files like the boot and front banks, one
-  whole-file read per scene, and keep the startup failure codes meaningful.
+- The gameplay and HUD packs and cover masks are still linked into the
+  executable, so ordinary memory holds them beside any Chip copy. Give them
+  scene/level dependency contracts and bounded file residency; merely moving
+  every bank to a permanently loaded sidecar does not reduce memory.
 - Exercise allocation/capacity failures and scene teardown/re-entry. Preserve
   meaningful nonzero exit codes for startup failures.
 - Propagate terminal failures through the remaining direct actor, reward and

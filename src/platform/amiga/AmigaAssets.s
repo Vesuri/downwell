@@ -41,6 +41,7 @@ amiga_selection_mask:
 	.globl amiga_selection_mask_end
 amiga_selection_mask_end:
 
+	.ifdef DOWNWELL_REFERENCE_SCENE_BANKS
 	.balign 4
 	.globl amiga_results_pack
 amiga_results_pack:
@@ -55,12 +56,7 @@ amiga_shop_pack:
 	.globl amiga_shop_pack_end
 amiga_shop_pack_end:
 
-	.balign 4
-	.globl amiga_clear_pack
-amiga_clear_pack:
-	.incbin "../generated/amiga-clear.dwap"
-	.globl amiga_clear_pack_end
-amiga_clear_pack_end:
+	.endif
 
 	.balign 4
 	.globl amiga_room_pack
