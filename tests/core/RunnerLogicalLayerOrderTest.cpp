@@ -1,5 +1,6 @@
 #include "core/RunnerLogicalLayerOrder.h"
 #include "core/RunnerLayerDraw.h"
+#include "core/RunnerPreparedDrawList.h"
 #include <vector>
 #include <cstdio>
 #include <cstdlib>
@@ -122,13 +123,16 @@ static void mutations(){
         });REQUIRE(a==b);
     }
 }
-static std::vector<unsigned> drawMutation(bool useLogical,bool birth){
+static std::vector<unsigned> drawMutation(bool useLogical,bool birth,bool prepared=false){
     Terrain terrain;Logical logical;Reference reference;REQUIRE(logical.bindTerrain(terrain));
+    RunnerPreparedDrawList<3,8> projection;
     unsigned layer,r;REQUIRE(logical.insertAfterEquals(1,0,false,layer)&&reference.insertAfterEquals(1,0,false,r));
     // [actor 3, retained 4, actor 0], with room for a new retained head.
     for(unsigned e:{0u,4u,3u}){
         REQUIRE(reference.attach(layer,e,true,false,[](unsigned){return false;}));
         REQUIRE(e<4?logical.attach(layer,e,true,false,[](unsigned){return false;}):logical.retainInstance({e-4,1},layer,false));
+        if(e<4){REQUIRE(projection.attach(layer,e,projection.End));
+            REQUIRE(projection.publish(e,e,decltype(projection)::draw));}
     }
     bool inactive[8]{};std::vector<unsigned> out;
     auto draw=[&](unsigned e){out.push_back(e);if(e!=3)return;
@@ -138,12 +142,42 @@ static std::vector<unsigned> drawMutation(bool useLogical,bool birth){
     };
     if(useLogical){
         RunnerLayerOrderKey after;bool haveAfter=false;
-        logical.visitDrawElements(layer,[&](unsigned e){const auto key=logical.physicalOrder(e);
+        auto before=[&](unsigned e){const auto key=logical.physicalOrder(e);
             if(logical.cutsOff(layer,haveAfter?&after:nullptr,key))return false;
-            draw(e);after=key;haveAfter=true;return true;
-        });
+            after=key;haveAfter=true;return true;
+        };
+        if(prepared)REQUIRE(projection.visitOrdered(layer,before,[&](unsigned e){draw(e);return true;}));
+        else logical.visitDrawElements(layer,[&](unsigned e){if(!before(e))return false;draw(e);return true;});
     }else reference.visitDrawElements(layer,[&](unsigned e){if(inactive[e])return false;if(e<4)draw(e);return true;});
     return out;
+}
+static void preparedCutoffs(){
+    for(unsigned mask=0;mask<256;++mask){
+        Terrain terrain;Logical logical;Reference reference;REQUIRE(logical.bindTerrain(terrain));
+        RunnerPreparedDrawList<3,8> projection;
+        unsigned layer,r;REQUIRE(logical.insertAfterEquals(1,0,false,layer)&&reference.insertAfterEquals(1,0,false,r));
+        for(unsigned e:{0u,4u,1u,5u,2u,6u,3u,7u}){
+            REQUIRE(reference.attach(layer,e,true,false,[](unsigned){return false;}));
+            if(e<4){
+                REQUIRE(logical.attach(layer,e,true,false,[](unsigned){return false;}));
+                REQUIRE(projection.attach(layer,e,projection.End));
+                REQUIRE(projection.publish(e,e,(mask&(1u<<e))?decltype(projection)::endLayer:decltype(projection)::draw));
+            }else REQUIRE(logical.retainInstance({e-4,1},layer,(mask&(1u<<e))!=0));
+        }
+        std::vector<unsigned> expected,actual;
+        reference.visitElements(layer,[&](unsigned e){if(mask&(1u<<e))return false;if(e<4)expected.push_back(e);return true;});
+        RunnerLayerOrderKey after;bool haveAfter=false;
+        const auto before=[&](unsigned e){const auto key=logical.physicalOrder(e);
+            if(logical.cutsOff(layer,haveAfter?&after:nullptr,key))return false;
+            after=key;haveAfter=true;return true;};
+        REQUIRE(projection.visitOrdered(layer,before,[&](unsigned e){actual.push_back(e);return true;}));
+        REQUIRE(actual==expected);
+        if(!expected.empty()){
+            after={};haveAfter=false;unsigned calls=0;
+            REQUIRE(!projection.visitOrdered(layer,before,[&](unsigned){++calls;return false;}));
+            REQUIRE(calls==1);
+        }
+    }
 }
 static void failedPublication(){
     for(unsigned failure=0;failure<4;++failure){
@@ -172,10 +206,12 @@ static void failedPublication(){
         }
     }
 }
-int main(){inheritedCapacity();merges();mutations();failedPublication();
+int main(){inheritedCapacity();merges();mutations();failedPublication();preparedCutoffs();
     REQUIRE(drawMutation(true,true)==drawMutation(false,true));
     REQUIRE(drawMutation(true,false)==drawMutation(false,false));
     REQUIRE(drawMutation(true,true)==std::vector<unsigned>({3,0}));
     REQUIRE(drawMutation(true,false)==std::vector<unsigned>({3}));
-    std::puts("Logical retained layer order: 2304 merges, 10000 mutations, failed publication prefixes and live Draw cutoffs passed");
+    REQUIRE(drawMutation(true,true,true)==drawMutation(false,true));
+    REQUIRE(drawMutation(true,false,true)==drawMutation(false,false));
+    std::puts("Logical retained layer order: 2304 merges, 10000 mutations, 256 prepared cutoffs, failed publication prefixes and live Draw cutoffs passed");
 }

@@ -140,7 +140,17 @@ public:
     template<class Draw> bool visitPreparedDraw(Draw draw)const{
         if(!preparedDrawEnabled_||!enabled()||!valid()||!prepared_)return false;
         return layers_.visitLayersReverse([&](unsigned slot,const auto& layer){
-            return !visible_[slot]||preparedDraw_.visit(slot,[&](unsigned token){
+            if(!visible_[slot])return true;
+            RunnerLayerOrderKey after;bool haveAfter=false;
+            return preparedDraw_.visitOrdered(slot,[&](unsigned element){
+                if constexpr(Storage::retained){
+                    const auto key=layers_.physicalOrder(element);
+                    if(layers_.cutsOff(slot,haveAfter?&after:nullptr,key))return false;
+                    // Save before Draw: a callback can insert a newer head.
+                    after=key;haveAfter=true;
+                }
+                return true;
+            },[&](unsigned token){
                 return draw(token,layer.encodedDepth);
             });
         });

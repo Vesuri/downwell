@@ -58,14 +58,23 @@ public:
         if(node.next!=End)nodes_[node.next].previous=e;
         heads_[layer]=e;return true;
     }
-    template<class Visit> bool visit(unsigned layer,Visit visitor)const{
+    // A logical owner may retain invisible terrain outside this physical
+    // list. Its inactive cutoff can end the layer before the next Draw node.
+    // Reaching that cutoff is success; a failing Draw remains failure.
+    template<class Before,class Visit> bool visitOrdered(unsigned layer,Before before,Visit visitor)const{
         if(layer>=Layers)return false;
         for(unsigned e=heads_[layer];e!=End;e=nodes_[e].next){
             const auto& node=nodes_[e];
             if(node.action==endLayer)break;
-            if(node.action==draw&&!visitor(node.token))return false;
+            if(node.action==draw){
+                if(!before(e))break;
+                if(!visitor(node.token))return false;
+            }
         }
         return true;
+    }
+    template<class Visit> bool visit(unsigned layer,Visit visitor)const{
+        return visitOrdered(layer,[](unsigned){return true;},visitor);
     }
 };
 }
