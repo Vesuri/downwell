@@ -1333,6 +1333,13 @@ test: verify-time-field-wind
 test: verify-gameplay-collision-owner
 .PHONY: verify-gameplay-collision-owner
 .PHONY: verify-slot-family-map
+.PHONY: verify-stationary-retirement
+test: verify-stationary-retirement
+verify-stationary-retirement: build/stationary-retirement-test
+	./build/stationary-retirement-test
+build/stationary-retirement-test: tests/core/StationaryRetirementWindowTest.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -Isrc -o $@ $<
 test: verify-slot-family-map
 verify-slot-family-map: build/slot-family-map-test
 	./build/slot-family-map-test

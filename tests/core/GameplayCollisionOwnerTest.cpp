@@ -7495,6 +7495,41 @@ int main(){
             if(!native)expected=actual;else assert(actual==expected);
         }
     }
+    // Populate an empty/interior retirement proof, then change the eligible
+    // set. Production End Step must still visit newborn/reactivated platforms.
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                  GameplayCollisionOwner::Ownership::nativeScenery}){
+        const bool native=mode!=GameplayCollisionOwner::Ownership::reference;
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},&rooms,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),owner->breakableBinding(),
+            owner->playerBinding(),native?nullptr:&owner->terrain(),&rooms);
+        auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
+        assert(owner->attach(*world)&&(!native||world->bindNativeTerrain(*terrain)));
+        const auto birth=[&](int y){
+            assert(world->createGeneratedInstance({93,240,y},objects,[&](const auto& command){
+                return !native||(terrain->append(command.objectId,command.x,command.y)&&
+                    world->finishNativeTerrainCreate(terrain->handle(terrain->size()-1)));
+            }));
+            return native?terrain->handle(terrain->size()-1):owner->terrain().handle(owner->terrain().size()-1);
+        };
+        const auto destroyed=[&](InstanceHandle h){
+            if(native){GameplayWorld::NativeTerrain::Identity id;bool active,marked;
+                assert(terrain->read(h,id,active,marked));return marked;}
+            const auto* r=owner->terrain().find(h);assert(r);return r->destroyRequested;
+        };
+        world->step(0);assert(world->effectsSucceeded());
+        const auto inside=birth(400);
+        world->step(0);world->step(0);assert(world->effectsSucceeded()&&!destroyed(inside));
+        const auto outside=birth(-10000);
+        assert(native?world->activateNativeTerrain(outside,false):owner->terrain().activation(outside,false));
+        world->step(0);assert(world->effectsSucceeded()&&!destroyed(outside));
+        assert(native?world->activateNativeTerrain(outside,true):owner->terrain().activation(outside,true));
+        world->step(0);assert(world->effectsSucceeded()&&destroyed(outside)&&!destroyed(inside));
+        assert(owner->prepareDraw());
+        const auto newborn=birth(-10000);
+        world->step(0);assert(world->effectsSucceeded()&&destroyed(newborn));
+    }
     std::vector<bool> bloodContactReference;
     for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
                        GameplayCollisionOwner::Ownership::nativeScenery}){

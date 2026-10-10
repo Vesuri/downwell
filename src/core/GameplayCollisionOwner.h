@@ -6,6 +6,7 @@
 #include "BlastShootableContact.h"
 #include "BoxDestructionScript.h"
 #include "MainRoomLifetime.h"
+#include "StationaryRetirementWindow.h"
 #include "ProjectileViewInterior.h"
 #include "RunnerSpatialInstances.h"
 #include "RunnerObjectFamilies.h"
@@ -56,6 +57,7 @@ public:
 #endif
 private:
     Owner owner_;
+    StationaryRetirementWindow thinRetirementWindow_;
     // Published binary32 setters are not the actors' integer drawing positions.
     // Terrain owns immutable coordinates in runs, not duplicate slot records.
     struct NativePosition {
@@ -623,6 +625,7 @@ private:
     }
     bool nativeTerrainBirth(const GameplayWorld::NativeTerrain::Identity& id,bool active,
         std::uint32_t& order,std::uint32_t& flags){
+        thinRetirementWindow_.append(id.y,id.object==93,id.handle.generation);
 #ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
         // Some callers install the native store after attaching this owner.
         // Bind at the first birth, before any terrain layer publication.
@@ -691,6 +694,7 @@ private:
         GameplayWorld::NativeTerrain::Identity id;bool active,destroyed;std::uint32_t flags;
         const auto h=terrain->currentHandle(local);
         if(!terrain->read(h,id,active,destroyed)||!terrain->spatialFlags(h,flags))return check(false);
+        if(id.object==93)thinRetirementWindow_.invalidate();
         const unsigned slot=View::terrainBase+local;
         if(flags&0x8000u){
             // Cached geometry may still be constructor state after Create.
@@ -1571,6 +1575,7 @@ public:
                 return self.nativeTerrainRetire(slot);},
             [](void* p,unsigned slot){auto& self=*static_cast<GameplayCollisionOwner*>(p);
                 if(!self.valid())return false;
+                self.thinRetirementWindow_.invalidate();
                 if(!self.check(self.room_.mark(View::terrainBase+slot)))return false;
                 self.destructionPending_=true;
                 self.table_.externalFlagsChanged(View::terrainBase+slot);return true;},
@@ -1604,6 +1609,7 @@ public:
             [](void* p,const GameplayWorld::NativeTerrain::Identity& id,bool active,std::uint32_t flags){
                 auto& self=*static_cast<GameplayCollisionOwner*>(p);
                 if(!self.valid())return false;
+                if(id.object==93)self.thinRetirementWindow_.invalidate();
                 const unsigned slot=View::terrainBase+id.handle.slot;
                 if(active&&(flags&2u)&&!self.nativeDirty(slot,id.object,flags))return false;
                 if(bool(flags&2u)==active)self.table_.externalFlagsChanged(slot);
@@ -2281,6 +2287,9 @@ public:
     }
 private:
     bool retireThinPlatforms(long topQ12,std::uint32_t cutoff){
+        const bool retain=native_&&world_->nativeTerrainInstances();
+        if(retain&&thinRetirementWindow_.contains(topQ12,cutoff))return true;
+        auto proof=thinRetirementWindow_.begin(cutoff);
         // Pinned object 93 End Step has only scrOutofview, with no inherited
         // Destroy/Clean Up. Marking leaves registration intact, so this known
         // event body may borrow registration order without a terrain snapshot.
@@ -2303,6 +2312,7 @@ private:
                 if(object!=93||h.generation>cutoff||(flags&0x100003u))return true;
                 GameplayWorld::NativeTerrain::Identity id;bool active,destroyed;
                 if(!View(*world_).readTerrain(h,id,active,destroyed))return false;
+                if(retain&&active&&!destroyed)proof.include(id.y);
                 return retireMainRoomObjectsChecked(1,11,1,topQ12,[&](unsigned){
                     return LifetimeInstance{93,id.y,active&&!destroyed};
                 },[&](unsigned){
@@ -2310,10 +2320,12 @@ private:
                 });
             };
         // The retained actor projection deliberately excludes terrain.
-        return check(native_?table_.visitObjectRegistrationRange(View::terrainBase,View::timeFieldBase,93,
+        const bool okay=check(native_?table_.visitObjectRegistrationRange(View::terrainBase,View::timeFieldBase,93,
                 [&](InstanceHandle h,std::uint32_t& flags){return eligibilityFlags(h,flags);},visit):
             owner_.visitRegistrationRange(View::terrainBase,View::timeFieldBase,
                 [&](InstanceHandle h,int object,const Owner::State& state){return visit(h,object,state.flags);}));
+        if(retain&&okay)thinRetirementWindow_.complete(proof);
+        return okay;
     }
 public:
     GameplayWorld::DroneBullets& droneBullets(){return drones_;}
@@ -4214,6 +4226,7 @@ public:
             return (flags&2u)!=0;
         },[&](unsigned slot,bool registered){
             if(native_&&slot>=View::terrainBase&&slot<View::timeFieldBase){
+                thinRetirementWindow_.invalidate();
                 // The identity lives in the terrain run owner, not table_.
                 // Borrow registration links, never a generic instance Entry.
                 const auto h=handleAt(slot);if(!resolves(h))return false;

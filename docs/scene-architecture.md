@@ -212,6 +212,24 @@ when unrelated families are added. Routing does not prove lifetime validity:
 callers still resolve generations and live eligibility at the original event
 boundaries. It does not replace the remaining membership-driven scheduling work.
 
+## Stationary thin-platform retirement
+
+Object 93's pinned End Step only calls `scrOutofview`: strict Y comparisons
+against view top minus 160 and plus 3000, followed by the main-room check.
+Native terrain owns immutable Y coordinates. `StationaryRetirementWindow`
+retains the inclusive camera interval in which the captured eligible set cannot
+be destroyed. Inside that interval the retirement walk does no work. Outside
+it the original registration-ordered walk remains authoritative; destruction
+is never reordered or delayed. The scalar owner remains the replay oracle.
+
+Terrain births extend the existing proof and lifetime ceiling directly.
+Ordinary walls add no Y constraint; including a newborn platform before its
+eligible phase is conservative. Activation, registration reconciliation,
+destruction marks and retirement invalidate the proof. Mutations during a walk
+prevent publishing its stale proof. Unsupported coordinate ranges and revision
+exhaustion retain the original walk. This is specific to the pinned stationary
+event, not a general license to skip actor End Step or source callbacks.
+
 ## Read-only actor ordering
 
 `GameplayWorld::visitRoomActors` remains the live layer traversal. Command
