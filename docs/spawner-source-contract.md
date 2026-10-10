@@ -54,6 +54,15 @@ The native publication requires the source player-child stream to have created
 the meter; it must not invent a meter for legacy worlds. Publication occurs at
 player ordinary Step, before the spawner reads the retained global.
 
+The activation comparison uses a different value: `scrPlMovement` publishes
+`global.ply` from private `yy` at the start of movement. The world-backed
+spawner adapter therefore reads the player's captured frame-start Q8 value,
+not its post-movement accumulator or rounded sprite Y. Its world/resource
+bindings own area, death, fall depth, eligible enemy count, selected mask and
+instance queries. The enclosing environment must still supply the actual
+builder end flag, selected view, depth-100 tile query and synchronous child
+creation/deactivation; none may default to a successful empty query.
+
 1. If script active is false, activate when global.ply > self.y and area != 5.
    Continue into the active body in the same event.
 2. Assign depthMeasure = global.falldepth - falldepthMem, then update

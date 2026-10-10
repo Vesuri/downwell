@@ -2263,6 +2263,41 @@ public:
            !objects_.findEvent(78,3,0,event)||event.ownerObjectId!=78||event.codeId!=1048)return check(false);
         return check(world_->stepSpawnerRoomEffect(local,ops));
     }
+    // Bind retained world state and resource-backed queries here, not in each
+    // frontend. The environment still owns the actual builder, selected view,
+    // tile layer and synchronous source-ID/Create/deactivation stream.
+    template<class Environment> bool stepRegisteredSpawnerWithWorld(InstanceHandle shared,Environment& environment){
+        View::Kind kind;InstanceHandle local;
+        if(!valid()||!world_||!resolves(shared)||!View::decode(shared,kind,local)||kind!=View::Kind::spawner)
+            return check(false);
+        struct Ops {
+            GameplayCollisionOwner& owner;GameplayWorld& world;InstanceHandle key;Environment& env;
+            bool playerY(MotionBinary64& value){
+                MotionBinary64 x;
+                return ContactCoordinates::playerGlobals(world.player().frameStartXFixed(),
+                    world.player().frameStartYFixed(),240,176,x,value);
+            }
+            bool area(int& value){value=world.runStage().area;return true;}
+            bool fallDepth(MotionBinary64& value){return world.sourceFallDepth(value);}
+            bool death(bool& value){value=world.dead();return true;}
+            bool enemyCount(int& value){unsigned count;if(!owner.population(83,count))return false;value=int(count);return true;}
+            bool objectMask(int object,int& value){
+                PackedObject resource;if(!owner.objects_.findObject(object,resource))return false;
+                value=resource.textureMaskId;return true;
+            }
+            bool mask(int value){return owner.spawners().mask(key,value);}
+            bool meeting(MotionBinary64 x,MotionBinary64 y,int object,bool& hit){
+                return owner.spawners().meeting(key,x,y,object,hit);
+            }
+            bool endReached(bool& value){return env.endReached(value);}
+            bool viewY(MotionBinary64& value){return env.viewY(value);}
+            bool viewHeight(MotionBinary64& value){return env.viewHeight(value);}
+            bool tile(int depth,MotionBinary64 x,MotionBinary64 y,bool& hit){return env.tile(depth,x,y,hit);}
+            bool create(int object,MotionBinary64 x,MotionBinary64 y,unsigned& id){return env.create(object,x,y,id);}
+            bool deactivate(unsigned id){return env.deactivate(id);}
+        } ops{*this,*world_,local,environment};
+        return stepRegisteredSpawner(shared,ops);
+    }
     template<class Ops> bool stepRegisteredWhiteJelly(InstanceHandle shared,bool stopped,Ops& ops){
         View::Kind kind;InstanceHandle local;PackedObjectEvent event{};
         if(!valid()||!world_||!resolves(shared)||!View::decode(shared,kind,local)||kind!=View::Kind::whiteJelly||

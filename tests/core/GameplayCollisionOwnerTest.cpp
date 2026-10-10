@@ -138,6 +138,8 @@ bool nativeSpawnerStep(downwell::SpawnerStep& state,downwell::MotionBinary64 y,
     downwell::GameMakerRandom& random,NativeSpawnerOps& ops){return state.step(y,random,ops);}
 bool nativeRegisteredSpawnerStep(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle key,
     NativeSpawnerOps& ops){return owner.stepRegisteredSpawner(key,ops);}
+bool nativeWorldSpawnerStep(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle key,
+    NativeSpawnerOps& ops){return owner.stepRegisteredSpawnerWithWorld(key,ops);}
 bool nativeSpawnerCreate(downwell::SpawnerStep& state,int level,bool hard){return state.createCaverns(level,hard);}
 bool nativeStoredSpawnerCreate(downwell::StoredSpawnerStates<2,1>& states,downwell::InstanceHandle key,
     int level,bool hard){return states.createCaverns(key,level,hard);}
@@ -3514,6 +3516,35 @@ int main(){
             RunnerImageValue fractionalMeter;assert(fractionalMeter.assign(movedY));
             assert(owner->playerControllers().position(meter,children.find(meter)->x,fractionalMeter)&&
                 world->publishPlayerFallDepth()&&world->sourceFallDepth(depth)&&depth.high==0xc0040000u&&!depth.low);
+            // The live composition must read the world, not caller-provided
+            // player/depth/count fixtures. A builder guard suppresses births
+            // but still updates the retained depth on every ordinary Step.
+            InstanceHandle spawner,sharedSpawner;
+            assert(owner->spawners().createCaverns(170004,-116,-1000,1,false,spawner)&&
+                GameplayCollisionView::encode(GameplayCollisionView::Kind::spawner,spawner,sharedSpawner));
+            struct Environment {
+                unsigned guards=0;
+                bool endReached(bool& value){++guards;value=true;return true;}
+                bool viewY(MotionBinary64&){assert(false);return false;}
+                bool viewHeight(MotionBinary64&){assert(false);return false;}
+                bool tile(int,MotionBinary64,MotionBinary64,bool&){assert(false);return false;}
+                bool create(int,MotionBinary64,MotionBinary64,unsigned&){assert(false);return false;}
+                bool deactivate(unsigned){assert(false);return false;}
+            } environment;
+            GameplayCollisionOwner::EncounterStepOrder phase;
+            const auto randomBefore=world->randomDrawCount();
+            for(unsigned tick=0;tick<2;++tick){
+                assert(owner->withEncounterSteps(phase,[&](InstanceHandle h,int object){
+                    assert(object==78&&h.slot==sharedSpawner.slot&&h.generation==sharedSpawner.generation);
+                    return owner->stepRegisteredSpawnerWithWorld(h,environment);
+                },[&]{world->step(0);return world->effectsSucceeded();}));
+                assert(world->sourceFallDepth(depth));
+                const auto& state=owner->spawners().find(spawner)->state;
+                assert(state.scriptActive&&state.fallDepthMemory.high==depth.high&&state.fallDepthMemory.low==depth.low&&
+                    state.channels[0].countdown.high==MotionBinary64::fromInteger(160).high&&
+                    !state.channels[0].countdown.low&&environment.guards==tick+1);
+            }
+            assert(world->randomDrawCount()==randomBefore);
         }else{
             assert(!world->createPlayerChildren(allocate)&&calls==failure);
         }
