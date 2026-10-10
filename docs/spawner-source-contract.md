@@ -39,6 +39,12 @@ the builder's existing enemy profiles.
 
 ## Ordinary Step order
 
+The player's ordinary Step publishes `global.falldepth = yy - objDepthMeter.y`
+(object 66). The depth meter is created at `(-100, player.y)` by player Create;
+it has no authored movement events. Do not accumulate positive deltas or use
+the camera's high-water mark: jumping can decrease falldepth. The selected
+meter's published Y and the player's private yy are separate representations.
+
 1. If script active is false, activate when global.ply > self.y and area != 5.
    Continue into the active body in the same event.
 2. Assign depthMeasure = global.falldepth - falldepthMem, then update

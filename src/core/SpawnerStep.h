@@ -19,8 +19,49 @@ struct SpawnerStep {
     unsigned channelCount=0;
     Real depthMeasure{},fallDepthMemory{},randxGrid{},randyGrid{},snappyViewh{},snappyViewy{};
     int enemyMaxCount=10,totalDepthCount=500,fromAbove=0;
-    int i=0,spawnAmt=0,spawningEnemy=0,maskIndex=-1,wl=0;
+    int chan=0,i=0,spawnAmt=0,spawningEnemy=0,maskIndex=-1,wl=0;
     bool scriptActive=false;
+
+    // Synchronous initialization of a NEW area-one spawner. Other areas use
+    // different scripts and must not silently receive this configuration.
+    bool createCaverns(int level,bool hard){
+        if(level<1||level>3)return false;
+        *this={};enemyMaxCount=20;
+        auto channel=[&](int start,int interval,int amplitude,int minimum,int maximum,bool above,
+            unsigned count,int a,int b=0,int c=0,int d=0,int e=0,int f=0){
+            chan=int(channelCount++);auto& out=channels[chan];
+            out.countdown=Real::fromInteger(start);out.interval=interval;out.amplitude=amplitude;
+            out.minimum=minimum;out.maximum=maximum;out.above=above;out.enemyCount=count;
+            const int enemies[]={a,b,c,d,e,f};
+            for(unsigned j=0;j<count;++j)out.enemies[j]=enemies[j];
+        };
+        if(!hard){
+            if(level==1)channel(160,160,32,1,1,false,1,115);
+            if(level==2){
+                channel(160,240,120,1,1,false,1,115);
+                channel(2000,360,32,1,1,false,6,118,116,116,116,116,116);
+            }
+            if(level==3){
+                channel(160,320,64,1,1,false,2,115,115);
+                channel(800,560,100,1,1,false,2,116,116);
+                channel(1300,800,100,1,1,false,3,118,118,118);
+            }
+        }else{
+            if(level==1){
+                channel(160,240,64,1,2,false,4,115,116,114,118);
+                channel(160,360,32,1,1,true,1,173);
+            }
+            if(level==2){
+                channel(160,300,100,1,1,true,1,173);
+                channel(160,220,32,1,2,false,4,118,116,114,115);
+            }
+            if(level==3){
+                channel(160,240,64,1,1,true,2,173,173);
+                channel(800,200,32,1,1,false,3,118,116,114);
+            }
+        }
+        return true;
+    }
 
     // Exact signed ceil/round of the small world-coordinate grid. Keep the
     // view addition before division. Comparisons for ceil are NOT VM's epsilon

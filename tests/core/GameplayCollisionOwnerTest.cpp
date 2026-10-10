@@ -35,6 +35,7 @@ struct NativeSpawnerOps {
 };
 bool nativeSpawnerStep(downwell::SpawnerStep& state,downwell::MotionBinary64 y,
     downwell::GameMakerRandom& random,NativeSpawnerOps& ops){return state.step(y,random,ops);}
+bool nativeSpawnerCreate(downwell::SpawnerStep& state,int level,bool hard){return state.createCaverns(level,hard);}
 struct NativeScatteredEffects {
     bool outOfView();bool currency(int);bool attractGem();bool createDebris();
     bool debrisYSpeed(downwell::MotionBinary64);bool sound(int,int,int,int);bool sprite(int);

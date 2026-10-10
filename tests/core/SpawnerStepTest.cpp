@@ -35,15 +35,27 @@ struct Ops {
     bool deactivate(unsigned child){calls.push_back(12);return child==unsigned(105199+births);}
 };
 static SpawnerStep initial(){
-    SpawnerStep s;s.channelCount=1;s.enemyMaxCount=20;
-    auto& c=s.channels[0];c.countdown=Real::fromInteger(160);c.interval=160;
-    c.amplitude=32;c.minimum=c.maximum=1;c.enemyCount=1;c.enemies[0]=115;return s;
+    SpawnerStep s;assert(s.createCaverns(1,false));return s;
 }
 static void same(const downwell::GameMakerRandom& a,const downwell::GameMakerRandom& b){
     assert(a.drawCount()==b.drawCount()&&a.stateIndex()==b.stateIndex());
     for(unsigned i=0;i<16;++i)assert(a.stateWord(i)==b.stateWord(i));
 }
-int main(){
+int main(int argc,char**){
+    if(argc>1){
+        for(bool hard:{false,true})for(int level=1;level<=3;++level){
+            SpawnerStep s;assert(s.createCaverns(level,hard));
+            assert(s.enemyMaxCount==20&&s.totalDepthCount==500&&!s.fromAbove&&!s.scriptActive&&
+                s.depthMeasure.zero()&&s.fallDepthMemory.zero()&&s.chan==int(s.channelCount)-1);
+            for(unsigned j=0;j<s.channelCount;++j){const auto& c=s.channels[j];
+                std::printf("%d %d %u %d %d %d %d %d %d",int(hard),level,j,integer(c.countdown),
+                    c.interval,c.amplitude,c.minimum,c.maximum,int(c.above));
+                for(unsigned e=0;e<c.enemyCount;++e)std::printf(" %d",c.enemies[e]);
+                std::puts("");
+            }
+        }
+        return 0;
+    }
     for(bool above:{false,true})for(int obstruction:{0,1,31,32,33}){
         auto state=initial();state.channels[0].above=above;
         downwell::GameMakerRandom random(23),oracle(23);Ops ops{random};ops.obstruct=obstruction;
