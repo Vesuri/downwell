@@ -906,6 +906,13 @@ public:
         const bool ok=whiteJellies_->step(key,stopped,enemyRandom_,ops);
         return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
     }
+    template<class MakeOps> bool createWhiteJellyWithSourceId(unsigned source,
+        downwell::RunnerImageValue x,downwell::RunnerImageValue y,MakeOps makeOps,downwell::InstanceHandle& key){
+        key={};
+        if(!run_.effectsSucceeded||!whiteJellies_||!whiteJellies_->valid())return run_.effectsSucceeded=false;
+        const bool ok=whiteJellies_->create(source,x,y,enemyRandom_,makeOps,key);
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
+    }
     static constexpr unsigned boneCapacity=32;
     const Bones* bones()const{return bones_;}
     bool bindBones(Bones& bones){

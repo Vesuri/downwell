@@ -43,8 +43,16 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             bool flash(MotionBinary64,MotionBinary64,int,int,int){assert(false);return false;}
             bool currency(int){assert(false);return false;}
         };
-        GameMakerRandom random(19);InstanceHandle key;
-        assert(store.create(899000,{0x43800000u},{0x44300000u},random,[&](auto h){return Ops{store,h};},key));
+        auto expectedRandom=world->randomState();InstanceHandle key;
+        MotionBinary64 expectedVelocity;
+        assert(randomBinary64(expectedRandom.nextU32(),{0x3fe00000u,0},expectedVelocity)&&
+            expectedVelocity.add(MotionBinary64::fromInteger(1)));
+        assert(world->createWhiteJellyWithSourceId(899000,{0x43800000u},{0x44300000u},
+            [&](auto h){return Ops{store,h};},key));
+        assert(store.find(key)->initialized&&store.find(key)->active&&
+            store.find(key)->velocity.high==expectedVelocity.high&&store.find(key)->velocity.low==expectedVelocity.low&&
+            world->randomState().stateIndex()==expectedRandom.stateIndex());
+        for(unsigned word=0;word<16;++word)assert(world->randomState().stateWord(word)==expectedRandom.stateWord(word));
         assert(store.dispatch(key,[](auto& r){r.hitStun=true;return true;}));
         assert(store.setAlarm(key,1,2));
         world->step(0);

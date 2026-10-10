@@ -93,6 +93,10 @@ bool nativeRegisteredWhiteJellyStep(downwell::GameplayCollisionOwner& owner,down
     bool stop,NativeWhiteJellyStepOps& ops){
     return owner.stepRegisteredWhiteJelly(shared,stop,ops);
 }
+bool nativeWorldWhiteJellyCreate(GameplayWorld& world,unsigned source,downwell::RunnerImageValue x,
+    downwell::RunnerImageValue y,NativeWhiteJellyBirthOps& ops,downwell::InstanceHandle& key){
+    return world.createWhiteJellyWithSourceId(source,x,y,[&](downwell::InstanceHandle){return ops;},key);
+}
 bool nativeWhiteJellyAnimation(downwell::GameplayWhiteJellies& owner,downwell::InstanceHandle key){
     return owner.advanceAnimation(key)&&owner.sprite(key,175)&&owner.imageIndex(key,{});
 }
