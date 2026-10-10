@@ -1651,6 +1651,9 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     const std::uint32_t bulletStepLastLifetime=nextBulletLifetimeId_-1;
     const std::uint32_t gemStepLastLifetime=nextGemLifetimeId_-1;
     if(!captureEnemyStepOrder())return {};
+    if(skeletonBoneSteps_&&!skeletonBoneSteps_(skeletonBoneContext_,-1)){
+        run_.effectsSucceeded=false;return {};
+    }
     if(debrisStepDispatch_){
         debrisStepOrder_.clear();debrisStepPhase_=ownedDebrisEffects_.beginPhase();
         if(!debrisOrderCapture_(debrisOrderContext_,debrisStepOrder_)){run_.effectsSucceeded=false;return {};}
@@ -1756,6 +1759,12 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     for (unsigned i=0;i<enemyStepOrder_.size();++i)
         if(!stepEnemyRoomEffect(enemyStepOrder_.handle(i),publishedCameraX,generationCameraY))return {};
 
+    // The admitted legacy enemies are 111..119. Skeleton 120 follows them,
+    // before damage numbers (221), smoke (225), currency (248) and bullets.
+    if(skeletonBoneSteps_&&!skeletonBoneSteps_(skeletonBoneContext_,120)){
+        run_.effectsSucceeded=false;return {};
+    }
+
     DW_PROFILE_PHASE(profileEnemyContact);
     run_.stepDamageNumbers(damageNumberStepPhase);
     run_.stepSmoke(smokeStepPhase,enemyRandom_);
@@ -1804,6 +1813,10 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     }
 
     DW_PROFILE_PHASE(profileLifecycle);
+    // Bones (269) follow the usual bullet (261), before debris (370).
+    if(skeletonBoneSteps_&&!skeletonBoneSteps_(skeletonBoneContext_,269)){
+        run_.effectsSucceeded=false;return {};
+    }
     if(debrisStepDispatch_)for(unsigned i=0;i<debrisStepOrder_.size();++i){
         const auto key=debrisStepOrder_.handle(i);
         const auto* record=debrisInstances_?debrisInstances_->find(key):nullptr;

@@ -1355,6 +1355,22 @@ public:
         return run_.effectsSucceeded&&generationSucceeded_;
     }
     using EnemyStepOrder=downwell::RunnerStepSnapshot<enemyCapacity>;
+    // Borrow an encounter dispatcher for a complete tick. Capture once before
+    // builder Step births, then enter the two source object-table positions.
+    // The owning collision adapter retains handles and rechecks eligibility;
+    // no family-local scan may discover children born during this Step.
+    template<class Capture,class Execute,class Tick>
+    bool withSkeletonBoneSteps(Capture capture,Execute execute,Tick tick){
+        if(!run_.effectsSucceeded||skeletonBoneSteps_)return run_.effectsSucceeded=false;
+        auto dispatch=[&](int object){return object<0?capture():execute(object);};
+        skeletonBoneContext_=&dispatch;
+        skeletonBoneSteps_=[](void* context,int object){
+            return (*static_cast<decltype(dispatch)*>(context))(object);
+        };
+        const bool okay=tick();
+        skeletonBoneSteps_=nullptr;skeletonBoneContext_=nullptr;
+        return run_.effectsSucceeded=okay&&run_.effectsSucceeded;
+    }
     // Optional revision covers capture membership, registration order, object
     // identity and exclusions. UINT32_MAX disables reuse (including saturation).
     // Dispatch still resolves current lifetimes/flags; this retains only order.
@@ -2222,6 +2238,8 @@ private:
     void* roomAnimationContext_=nullptr;
     bool (*registeredActorEndStep_)(void*,long)=nullptr;
     bool (*sourceBulletDispatch_)(void*,downwell::InstanceHandle,downwell::MachineGunSourceMotion&)=nullptr;
+    bool (*skeletonBoneSteps_)(void*,int)=nullptr;
+    void* skeletonBoneContext_=nullptr;
     void* sourceBulletContext_=nullptr;
     bool registeredOrdinaryEndStep_=false;
     void* registeredActorEndStepContext_=nullptr;

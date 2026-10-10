@@ -242,6 +242,17 @@ int main(){
             }));
             assert(stored->mainEnemiesDefeated()==1&&skeletons.instances().size()==0&&
                 stored->debrisEffects().size()==2&&blood.instances().size()==2&&flash.instances().size()>=4);
+            // Native death also enters through the ordinary gameplay tick,
+            // rather than a manually invoked Step after that tick finishes.
+            auto phase=std::make_unique<GameplayCollisionOwner::SkeletonBoneStepOrder>();
+            auto next=first;unsigned selected=0;
+            assert(owner->withSkeletonBoneSteps(*phase,[&](InstanceHandle h){
+                ++selected;
+                return owner->stepRegisteredSkeleton(h,stop,true,[&](std::uint32_t& id){id=next++;return true;},
+                    tile,queries,text,nativeEnv,nativeAudio);
+            },noChildStep,[&]{native->step(0);return native->effectsSucceeded();}));
+            assert(selected==1&&native->debrisEffects().size()==2&&owner->blood().size()==2&&
+                owner->registeredFlash().size()>=4);
             continue;
         }
         assert(stored->withMomentDelayRoomSpeed(storedSpeed,[&]{

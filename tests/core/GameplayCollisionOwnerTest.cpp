@@ -79,6 +79,16 @@ bool nativeCompleteSkeletonStep(downwell::GameplayCollisionOwner& owner,downwell
     downwell::SoundPlayEnvironment& environment,NativeSkeletonAudio& audio){
     return owner.stepRegisteredSkeleton(key,stop,true,allocate,tile,queries,text,environment,audio);
 }
+bool nativeScheduledSkeletonStep(GameplayWorld& world,downwell::GameplayCollisionOwner& owner,
+    downwell::GameplayCollisionOwner::SkeletonBoneStepOrder& phase,
+    const downwell::TimeStopEffects<64>& stop,bool (*allocate)(std::uint32_t&),NativeSkeletonCorpseTiles tile,
+    NativeSkeletonRewardQueries& queries,const downwell::LevelNumberTextContext& text,
+    downwell::SoundPlayEnvironment& environment,NativeSkeletonAudio& audio,bool (*frames)(int,unsigned&)){
+    return owner.withSkeletonBoneSteps(phase,[&](downwell::InstanceHandle key){
+        return owner.stepRegisteredSkeleton(key,stop,true,allocate,tile,queries,text,environment,audio);
+    },[&](downwell::InstanceHandle key){return owner.stepBone(key,stop.player.stopped,frames);},
+    [&]{world.step(0);return world.effectsSucceeded();});
+}
 bool nativeSkeletonCorpse(GameplayWorld& world,GameplayWorld::Skeletons::Publisher& publish,
     downwell::MotionBinary64 impact,bool (*allocate)(std::uint32_t&),NativeSkeletonCorpseTiles tile){
     return world.emitSkeletonCorpse(publish,impact,allocate,tile);
@@ -1120,6 +1130,48 @@ int main(){
             !world->levelClearActive()&&world->randomDrawCount()==draws&&audit.births==1&&audit.writes==failure-1);
         assert(result.find(result.handle())->y.bits==0x43100000u);
         assert(!world->enterLevelClear(0,false)&&audit.births==1&&world->randomDrawCount()==draws);
+    }
+    // Exercise the real world tick, not dispatchStepPhase after the frame.
+    // Synthetic births test the shared ordinary-Step creation cutoff.
+    for(bool fail:{false,true})for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                   GameplayCollisionOwner::Ownership::nativeScenery}){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));
+        InstanceHandle skeleton,bone;
+        assert(world->createSkeletonWithSourceId(705000,240,200,skeleton)&&
+            world->createBoneWithSourceId(705001,240,200,bone));
+        struct Generation {
+            bool born=false;unsigned calls=0;
+            static bool run(void* context,GameplayWorld& world,GameMakerRandom&,int){
+                auto& self=*static_cast<Generation*>(context);++self.calls;
+                if(self.born)return true;
+                self.born=true;InstanceHandle child;
+                return world.createSkeletonWithSourceId(705002,240,200,child);
+            }
+        } generation;
+        world->configureGenerationStep(Generation::run,&generation);
+        auto phase=std::make_unique<GameplayCollisionOwner::SkeletonBoneStepOrder>();
+        unsigned skeletonSteps=0,boneSteps=0,hurts=0;bool childBorn=false;
+        auto tick=[&]{
+            return owner->withSkeletonBoneSteps(*phase,[&](InstanceHandle h){
+                assert(generation.calls>0);++skeletonSteps;
+                if(fail)return false;
+                if(!childBorn){
+                    childBorn=true;InstanceHandle child;
+                    assert(world->createBoneWithSourceId(705003,240,200,child));
+                }
+                return owner->stepSkeleton(h,true,{}, {},[&](auto&,auto&){return QuietSkeletonEffects{hurts};});
+            },[&](InstanceHandle h){
+                assert(skeletonSteps>boneSteps);++boneSteps;
+                return owner->stepBone(h,true,[&](int sprite,unsigned& frames){return sprites.frameCount(sprite,frames);});
+            },[&]{world->step(0);return world->effectsSucceeded();});
+        };
+        assert(tick()==!fail&&skeletonSteps==1&&boneSteps==(fail?0u:1u));
+        if(fail){assert(!world->effectsSucceeded()&&!owner->valid());continue;}
+        assert(tick()&&skeletonSteps==3&&boneSteps==3&&hurts==0);
     }
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
                    GameplayCollisionOwner::Ownership::nativeScenery}){

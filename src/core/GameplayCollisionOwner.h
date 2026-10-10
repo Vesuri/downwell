@@ -1931,6 +1931,34 @@ public:
         }
         return true;
     }
+    // Join the real GameplayWorld tick at object 120 and 269, not a second
+    // family tick before/after gameplay. The caller owns this small workspace
+    // off the Amiga task stack and supplies the actual registered handlers.
+    // This covers these two ordinary Steps only; other actor families and the
+    // complete Begin/End/Collision phases still need their own integrations.
+    using SkeletonBoneStepOrder=RunnerStepSnapshot<GameplayWorld::skeletonCapacity+GameplayWorld::boneCapacity>;
+    template<class SkeletonStep,class BoneStep,class Tick>
+    bool withSkeletonBoneSteps(SkeletonBoneStepOrder& phase,SkeletonStep skeletonStep,BoneStep boneStep,Tick tick){
+        if(!valid()||!world_)return check(false);
+        return check(world_->withSkeletonBoneSteps([&]{
+            phase.clear();
+            if(!check(visitRegistered(View::boneBase,View::bloodBase,
+                [&](InstanceHandle h,int object,std::uint32_t flags){
+                    if(flags&0x100003u)return true;
+                    return (object==120||object==269)&&resolves(h)&&phase.append(h.slot,h.generation,object);
+                })))return false;
+            phase.sort();return true;
+        },[&](int object){
+            for(unsigned i=0;i<phase.size();++i){
+                if(phase.object(i)!=object)continue;
+                const auto h=phase.handle(i);std::uint32_t flags;
+                if(!eligibilityFlags(h,flags)||(flags&0x100003u))continue;
+                if(!check(resolves(h)&&objectOf(h)==object))return false;
+                if(!check(object==120?skeletonStep(h):boneStep(h)))return false;
+            }
+            return true;
+        },tick));
+    }
     GameplayTerrainInstances& terrain(){return terrain_;}
     // Production handoff for the currently owned End Step actors. Keep its
     // actor capture off the Amiga task stack. Reference boxes borrow the idle

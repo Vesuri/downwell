@@ -248,6 +248,19 @@ numeric ID: it does not fill the missing native global allocator. Automatic
 throwing, ordinary Step/collision dispatch, time-stop/damage adapters
 and replay serialization remain required for natural encounters.
 
+`GameplayCollisionOwner::withSkeletonBoneSteps` joins the native gameplay tick
+at the ordinary-Step positions for objects 120 and 269. Its caller-owned
+`SkeletonBoneStepOrder` workspace captures eligible registered lifetimes before
+builder Step and sorts by object and registration order. Skeleton dispatch is
+after the admitted legacy enemies (111–119) and before damage numbers (221);
+bone dispatch is after usual bullets (261) and before debris (370). Each call
+rechecks lifetime and exclusions. Generation births and bones thrown during
+that phase are therefore deferred to the next ordinary Step. Handler failures
+stop the frame before later families. The scope requires actual skeleton/bone
+handlers; it does not synthesize audio, time-stop state or source IDs. This is
+not a complete mixed scheduler for every effect family, nor is the scope yet
+installed by the Amiga scene frontend.
+
 Bone view queries resolve the retained lifetime's published binary32 x/y and
 apply `scrInView(0,0,0)` with the VM real-comparison tolerance. All four edges
 are excluded, including equality; these are origin checks, not mask bounds.
