@@ -58,6 +58,45 @@ identity in the owner for animated-mask retention. This scratch lives in
 ordinary memory rather than the Amiga task stack; it holds ordering keys,
 not copied terrain or actor records.
 
+## Executable size versus runtime memory
+
+The preserved pre-repair `STRIP=1` baseline in
+`tmp/a500-baseline-before/Downwell.exe` is **3,277,112 bytes**, SHA-256
+`11e7a541b9ebc34be9c2a5cdc55dcd624fb3ab05398b2d1234cb5418cd896fbd`.
+The matching ELF section sizes distinguish payload from runtime allocation:
+
+| Section | Bytes | Stored in the executable? |
+| --- | ---: | --- |
+| Machine code (`.text`) | 1,309,748 | Yes |
+| Read-only data (`.rodata`) | 1,887,160 | Yes |
+| Initialized writable data (`.data`) | 34,202 | Yes |
+| Initializer pointer | 4 | Yes |
+| Zero-filled storage (`.bss`) | 4,761,676 | No; allocated at load |
+
+Initialized payload totals 3,231,114 bytes. Hunk relocation and container
+records account for the remaining 45,998 bytes. Stripping cannot remove
+the initialized payload. ELF debug sections are not that payload either.
+
+Grouping linked text symbols by owner attributes roughly 551 KB to
+`GameplayCollisionOwner` and its template instantiations, 260 KB to
+`GameplayWorld`, and 64 KB to spatial-tree machinery. This is linked code
+size, not inclusive call cost. Embedded sprite collision masks alone occupy
+511,580 bytes; the room pack is 288,248 bytes and the gameplay pack 234,718
+bytes. Other scene/resource banks and precomputed tables make up the rest.
+
+The largest BSS owners are collision storage (2,851,990 bytes) and the
+full-height CPU terrain raster (1,105,958 bytes). Initialized payload plus
+BSS already approaches 8 MB before dynamic graphics allocations. A small
+Hunk file therefore would not, on its own, prove an A500 memory fit.
+Moving data to sidecar files changes file size, not residency, unless its
+lifetime or representation also changes. The shared DMA plane atlas below
+addresses Chip residency; it does not remove the original CPU-side pack.
+
+Reproduce section sizes with `m68k-amiga-elf-objdump -h Downwell.elf`, and
+linked symbol sizes with `m68k-amiga-elf-objdump -t Downwell.elf`. Use the
+matching stripped Hunk for file-size comparisons; the debugger ELF intentionally
+retains symbols. Build with `make -C amiga STRIP=1` for the stripped Hunk.
+
 ## CPU-only HUD artwork
 
 The immutable counter/streak pair-column tables occupy 49,368 bytes in
