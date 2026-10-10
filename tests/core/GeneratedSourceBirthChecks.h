@@ -2,12 +2,87 @@
 #define DOWNWELL_TEST_GENERATED_SOURCE_BIRTH_CHECKS_H
 #include "core/GameplayCollisionOwner.h"
 #include "core/StoredShopCreationOwner.h"
+#include "core/GameplayShopInstances.h"
 #include <cassert>
 #include <memory>
 #include <vector>
 inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
     const downwell::SpriteCollisionPack& sprites,const downwell::SpriteMaskPack& masks){
     using namespace downwell;
+    for(unsigned failure=0;failure<=12;++failure){
+        auto world=std::make_unique<GameplayWorld>(300,false,1000,false);
+        auto reference=std::make_unique<GameplayWorld>(300,false,1000,false);
+        assert(world->grantUpgrade(14)&&reference->grantUpgrade(14));
+        struct Publication {
+            const GameplayShopInstances* store=nullptr;
+            unsigned failure,births=0,images=0,retired=0;
+            bool birth(InstanceHandle,const GameplayShopInstances::Record&){assert(false);return false;}
+            bool birthAt(InstanceHandle h,const GameplayShopInstances::Record& r,RunnerImageValue x,RunnerImageValue y){
+                assert(store&&store->find(h)==&r&&!r.initialized&&!r.state.initialized&&
+                    r.imageIndex.bits==0&&r.imageSpeed.bits==0x3f800000u&&
+                    r.x.bits==x.bits&&r.y.bits==y.bits&&r.alarms.get(0)==-1);
+                ++births;return births!=failure;
+            }
+            bool imageIndex(InstanceHandle h,const GameplayShopInstances::Record& r,RunnerImageValue v){
+                assert(store->find(h)==&r&&r.objectId==283&&!r.initialized&&
+                    !r.imageIndex.bits&&r.imageSpeed.bits==0x3f800000u&&v.bits==0x3f800000u);
+                ++images;return failure!=12;
+            }
+            bool retire(InstanceHandle h,const GameplayShopInstances::Record& r){assert(store->find(h)==&r);++retired;return true;}
+            bool activation(InstanceHandle,const GameplayShopInstances::Record&,bool){return true;}
+            bool membership(InstanceHandle,const GameplayShopInstances::Record&,bool){return true;}
+            bool move(InstanceHandle,const GameplayShopInstances::Record&,RunnerImageValue,RunnerImageValue){return true;}
+            bool sprite(InstanceHandle,const GameplayShopInstances::Record&,int){return true;}
+            bool mask(InstanceHandle,const GameplayShopInstances::Record&,int){return true;}
+            bool transform(InstanceHandle,const GameplayShopInstances::Record&,RunnerTransformField,RunnerImageValue,RunnerImageValue,std::uint32_t){return true;}
+            bool markDestroyed(InstanceHandle,const GameplayShopInstances::Record&){return true;}
+        } publication{nullptr,failure};
+        auto store=std::make_unique<GameplayShopInstances>(objects,GameplayShopInstances::Binding::bindPositionedActor(publication));
+        publication.store=store.get();unsigned next=950000;std::vector<int> order;
+        auto allocate=[&](int object,unsigned& id){order.push_back(object);id=next++;return true;};
+        struct Audio {
+            unsigned calls=0;
+            bool play(int sound,int priority,bool loop,int& voice){assert(sound==192&&priority==100&&loop);++calls;voice=88;return true;}
+            bool setGain(int voice,MotionBinary64 gain,int duration){assert(voice==88&&gain.zero()&&!duration);++calls;return true;}
+        } audio;
+        auto creation=store->creation(allocate,audio);
+        auto* shop=world->registerShopWithOwner(480,2000,creation);
+        assert(bool(shop)==!failure&&store->valid()==!failure&&world->effectsSucceeded()==!failure);
+        const unsigned count=failure?(failure==12?9:failure):11;
+        const int expected[]={277,278,279,279,279,98,280,212,283,283,283};
+        assert(store->size()==count&&next==950000+count&&order.size()==count&&publication.births==count);
+        for(unsigned i=0;i<count;++i){
+            const auto* r=store->find(store->sourceHandle(950000+i));
+            assert(order[i]==expected[i]&&r&&r->objectId==expected[i]&&
+                r->initialized==(!failure||i+1<count));
+        }
+        const auto old=store->sourceHandle(950000);
+        if(shop){
+            const auto* control=reference->registerShop(480,2000);
+            assert(control&&publication.images==3&&audio.calls==2&&shop->sourceId==950000&&
+                shop->children.items[2]==950010&&shop->farewellVariant==control->farewellVariant);
+            assert(world->randomState().stateIndex()==reference->randomState().stateIndex());
+            for(unsigned i=0;i<16;++i)assert(world->randomState().stateWord(i)==reference->randomState().stateWord(i));
+            for(unsigned i=0;i<3;++i){
+                const auto* item=store->find(store->sourceHandle(shop->children.items[i]));
+                const auto* box=store->find(store->sourceHandle(shop->children.cases[i]));
+                assert(item&&box&&item->state.whichUg==control->stock.items[i].upgrade&&
+                    shop->stock.items[i].price==control->stock.items[i].price&&box->state.storedItem==1&&
+                    box->state.wallHp==1000000&&item->imageIndex.bits==0x3f800000u&&!item->imageSpeed.bits);
+            }
+            const auto* text=store->find(store->sourceHandle(shop->children.risingText));
+            const auto* keeper=store->find(store->sourceHandle(shop->children.keeper));
+            assert(text&&keeper&&text->alarms.get(0)==90&&text->alarms.get(1)==60&&
+                text->state.ysp.high==0xc0080000u&&text->state.drawing==1&&keeper->imageSpeed.bits==0x3db851ecu);
+        }else{
+            assert(!world->registerShopWithOwner(0,0,creation)&&next==950000+count);
+        }
+        assert(store->clear()&&!store->size()&&!store->find(old)&&publication.retired==count);
+        if(!failure){
+            const unsigned id=creation.create(278,0,0);const auto h=store->sourceHandle(id);
+            assert(id==950011&&h.generation!=old.generation&&!store->find(old)&&store->clear());
+        }
+    }
     // The generated Shop callback now enters the actual GameplayWorld run
     // state. Use a concrete retained owner here, not successful ID-only child
     // callbacks. Native family ownership/front-end installation is separate.
@@ -409,8 +484,8 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
                 world->finishNativeTerrainCreate(terrain->handle(terrain->size()-1)));
         };
         // Shop ownership is intentionally not faked by this fixture. There is
-        // no native shop owner yet: the composed handoff must propagate its
-        // eventual owner's failure, rather than fall back to compact stock.
+        // no shop collision/layer binding in this fixture: the composed
+        // handoff must not fall back to compact stock.
         auto noShop=[](const auto&,auto&){assert(false);return false;};
         for(int object:{60,93,99,92,112,82,62}){
             DeferredCreateInstance command(object,240,512);

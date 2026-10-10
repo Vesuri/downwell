@@ -749,6 +749,16 @@ that the invisible wall's ancestors have no Create body to execute. This owner
 does not itself admit the children's later Step, Alarm or Draw events, and is
 not yet installed by either normal generation adapter.
 
+`GameplayShopInstances` retains the same parent and child lifetimes in a native
+generation pool, with binary32 builtin values represented as words rather than
+host floats. Its borrowed creation adapter takes the enclosing allocator and
+audio owner; it never reserves IDs ahead of child Create. `ShopChildState`
+supplies the same six child Create bodies to both owners. The native pool
+publishes positioned births before setters, retains rejected prefixes, and
+does not reuse generation handles after teardown. Its lifecycle binding must
+be connected to native collision/layer ownership before normal generation
+admission; the pool alone does not schedule later child events.
+
 The rising-text event entries publish the Y setter before multiplying binary64
 `ysp` by `decreaseBy`. Alarm 1 sets `flashing`; Step then negates the integer
 `drawing` field (it is not a boolean toggle). Alarm 0 publishes a destruction

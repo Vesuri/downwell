@@ -31,10 +31,17 @@ namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_
 #include "core/TerrainWallContacts.h"
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
 #include "core/StoredShopCreationOwner.h"
+#include "core/GameplayShopInstances.h"
 struct NativeShopAudio {
     bool play(int,int,bool,int&);
     bool setGain(int,downwell::MotionBinary64,int);
 };
+struct NativeShopAllocation {bool operator()(int,unsigned&);};
+downwell::ShopWorld::Instance* nativeTypedWorldShopCreate(GameplayWorld& world,
+    downwell::GameplayShopInstances& instances,NativeShopAllocation& allocate,NativeShopAudio& audio){
+    auto owner=instances.creation(allocate,audio);
+    return world.registerShopWithOwner(480,2000,owner);
+}
 downwell::ShopWorld::Instance* nativeWorldShopCreate(GameplayWorld& world,
     downwell::StoredShopCreationOwner<16,1,NativeShopAudio>& owner,int x,int y){
     return world.registerShopWithOwner(x,y,owner);

@@ -5,6 +5,7 @@
 #include "ObjectPack.h"
 #include "MultiplyBinary64.h"
 #include "RunnerRealComparison.h"
+#include "ShopChildCreate.h"
 #include <cstring>
 namespace downwell {
 // Synchronous Create ownership for Shop's ten children. This is deliberately
@@ -14,18 +15,8 @@ namespace downwell {
 template<unsigned WorldCapacity,unsigned Capacity> class StoredShopChildRegistration {
     static_assert(Capacity>0,"shop child registration needs storage");
 public:
-    enum class Material { unset,metal,rock };
-    struct State {
-        Material material=Material::unset;
-        int wallHp=0,previousWallHp=0,keeper=0,storedItem=0,xsp=0;
-        int opened=0,destroyed=0,flashing=0,thankful=0,goodbye=0,confused=0;
-        unsigned whichUg=0;
-        MotionBinary64 ysp{},decreaseBy{};
-        MotionBinary64 textWidth{},drawX{},overXview{},underXview{};
-        const char* text=nullptr;
-        int drawing=0;
-        bool initialized=false;
-    };
+    using State=ShopChildState;
+    using Material=State::Material;
 private:
     struct Entry {InstanceHandle key{};unsigned id=0;int object=-1;State state;};
     Entry entries_[Capacity]{};
@@ -80,29 +71,17 @@ public:
         // Publish default builtins before executing Create setters. PreCreate
         // for these resources/ancestors only delegates to event_inherited.
         if(!lifecycle_.birthAt(free->key,*r,px,py)||!good_){fail();return 0;}
-        auto& s=free->state;
-        switch(object){
-        case 278:s.material=Material::metal;break;
-        case 98:s.material=Material::rock;break;
-        case 279:
-            s.material=Material::metal;r->imageSpeed=0;
-            s.wallHp=s.previousWallHp=1000000;break;
-        case 280:{
-            RunnerImageValue speed;
-            if(!speed.assign({0x3fb70a3du,0x70a3d70au})){fail();return 0;}
-            r->imageSpeed=stored(speed);break;
-        }
-        case 212:
-            s.ysp=MotionBinary64::fromInteger(-3);s.text="+100 GEMS#+50 AMMO";
-            r->alarms.set(0,90);r->alarms.set(1,60);s.drawing=true;
-            s.decreaseBy={0x3feb3333u,0x33333333u};break;
-        case 283:{
-            const RunnerImageValue index{0x3f800000u};
-            if(!lifecycle_.imageIndex(free->key,*r,index)||!good_){fail();return 0;}
-            r->imageIndex=stored(index);r->imageSpeed=0;break;
-        }
-        }
-        s.initialized=true;return free->id;
+        struct Builtins {
+            StoredShopChildRegistration& owner;Entry& e;InstanceRecord& r;
+            bool speed(RunnerImageValue v){r.imageSpeed=stored(v);return true;}
+            bool alarm(unsigned n,int v){r.alarms.set(n,v);return true;}
+            bool index(RunnerImageValue v){
+                if(!owner.lifecycle_.imageIndex(e.key,r,v)||!owner.good_)return false;
+                r.imageIndex=stored(v);return true;
+            }
+        } builtins{*this,*free,*r};
+        if(!free->state.create(object,builtins)){fail();return 0;}
+        return free->id;
     }
     bool readX(unsigned id,int& x){int y;return position(id,x,y);}
     bool position(unsigned id,int& x,int& y){
