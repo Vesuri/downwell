@@ -145,6 +145,15 @@ TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET) $(ALARM_TEST_TARGET
 
 all: $(TARGET)
 
+.PHONY: test-white-jelly-birth
+test: test-white-jelly-birth
+test-white-jelly-birth: build/white-jelly-birth-test
+	./build/white-jelly-birth-test
+	python3 tools/verify-enemy-create.py
+build/white-jelly-birth-test: tests/core/WhiteJellyBirthTest.cpp src/core/WhiteJellyBirth.h src/core/GameMakerRandom.cpp src/core/RandomBinary64.h src/core/MultiplyBinary64.h src/core/RunnerImageValue.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/WhiteJellyBirthTest.cpp src/core/GameMakerRandom.cpp
+
 .PHONY: test-spawner-step
 test: test-spawner-step
 test-spawner-step: build/spawner-step-test

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Verify shared area-one enemy birth constants against pinned VM assembly."""
 from decimal import Decimal
+from hashlib import sha256
 import json
 from pathlib import Path
 import re
@@ -27,3 +28,26 @@ for object_id, health, reward, rate in profiles:
     assert assigned("imgSp") * 20 == Decimal(rate), obj["name"]
     assert "push.v self.imgSp\npop.v.v self.image_speed" in assembly, obj["name"]
 print("6 shared enemy birth profiles match pinned Create-event VM assembly")
+
+# White jelly is a separately owned source actor, not another compact profile.
+# Its inherited setters and RNG precede the concrete direction publication.
+for name, digest in (
+    ("parentLife", "19838825dc0e49ada1d670de755ba9942ab622914a87d8d4d2acb51eae4c3c04"),
+    ("subparentEnemy", "575a31b3123128e4ce352c4ee169193583167b76cd0001d4e360f0f4362cd3c0"),
+    ("enmWhiteJelly", "d23276a6a24d6e69159f8f8a2bde523119b594f5336d1e17a739d4e2116e312e"),
+):
+    payload = (export / "Assembly" / f"gml_Object_{name}_Create_0.asm").read_bytes()
+    assert sha256(payload).hexdigest() == digest
+jelly = manifest["resources"]["objects"][115]
+assert (jelly["name"], jelly["parentId"], jelly["textureMaskId"]) == ("enmWhiteJelly", 83, 174)
+assert manifest["resources"]["objects"][83]["parentId"] == 34
+assert manifest["resources"]["objects"][34]["name"] == "parentLife"
+assembly = payload.decode()
+markers = ["call.i event_inherited(argc=0)", "call.i random_range(argc=2)",
+           "pop.v.v self.xx", "pushglb.v global.ply", "pushglb.v global.plx",
+           "call.i point_direction(argc=4)", "pop.v.v self.direction",
+           "push.v self.direction\npop.v.v self.playerDir", "pop.v.i self.active",
+           "pop.v.v self.image_speed"]
+positions = [assembly.index(marker) for marker in markers]
+assert positions == sorted(positions)
+print("Pinned white-jelly inheritance, RNG and direction/image setter sequence")

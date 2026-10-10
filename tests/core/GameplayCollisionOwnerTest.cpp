@@ -16,6 +16,7 @@
 #include "core/BoxWorldEffects.h"
 #include "core/SpawnerStep.h"
 #include "core/StoredSpawnerStates.h"
+#include "core/WhiteJellyBirth.h"
 #ifdef DOWNWELL_LOCAL_DRAW_CAPTURE
 namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_CAPTURE; }
 #endif
@@ -26,6 +27,18 @@ namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_
 #include "core/CurrencyHomingMath.h"
 #include "core/TerrainWallContacts.h"
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
+struct NativeWhiteJellyBirthOps {
+    bool position(bool,downwell::RunnerImageValue,downwell::RunnerImageValue&);
+    bool playerY(downwell::MotionBinary64&);bool playerX(downwell::MotionBinary64&);
+    bool pointDirection(downwell::MotionBinary64,downwell::MotionBinary64,downwell::MotionBinary64,
+        downwell::MotionBinary64,downwell::MotionBinary64&);
+    bool direction(downwell::MotionBinary64,downwell::MotionBinary64&);
+    bool imageSpeed(downwell::RunnerImageValue,downwell::RunnerImageValue&);
+};
+bool nativeWhiteJellyBirth(downwell::WhiteJellyBirth& state,downwell::RunnerImageValue x,
+    downwell::RunnerImageValue y,downwell::GameMakerRandom& random,NativeWhiteJellyBirthOps& ops){
+    return state.create(x,y,random,ops);
+}
 struct NativeSpawnerOps {
     bool playerY(downwell::MotionBinary64&);bool area(int&);bool fallDepth(downwell::MotionBinary64&);
     bool death(bool&);bool endReached(bool&);bool enemyCount(int&);bool objectMask(int,int&);bool mask(int);
