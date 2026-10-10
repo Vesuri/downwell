@@ -146,6 +146,14 @@ TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET) $(ALARM_TEST_TARGET
 all: $(TARGET)
 
 .PHONY: test-white-jelly-birth
+test: test-white-jelly-step
+.PHONY: test-white-jelly-step
+test-white-jelly-step: build/white-jelly-step-test
+	./build/white-jelly-step-test
+build/white-jelly-step-test: tests/core/WhiteJellyStepTest.cpp src/core/WhiteJellyStep.h src/core/WhiteJellyBirth.h src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/WhiteJellyStepTest.cpp src/core/GameMakerRandom.cpp
+
 test: test-white-jelly-birth
 test-white-jelly-birth: build/white-jelly-birth-test
 	./build/white-jelly-birth-test
