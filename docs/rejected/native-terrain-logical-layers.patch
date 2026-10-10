@@ -1,0 +1,238 @@
+diff --git a/src/core/GameplayCollisionOwner.h b/src/core/GameplayCollisionOwner.h
+index e9e185b0..cda7e7d9 100644
+--- a/src/core/GameplayCollisionOwner.h
++++ b/src/core/GameplayCollisionOwner.h
+@@ -184,7 +184,8 @@ private:
+ #ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+     GameplayRoomLayers<View::capacity> layers_;
+ #else
+-    GameplayRoomLayers<View::capacity,true> layers_;
++    GameplayRoomLayers<View::capacity,true,GameplayWorld::NativeTerrain> layers_;
++    bool nativeTerrainLayersBound_=false;
+ #endif
+     ObjectDrawMetadata<386> drawMetadata_;
+     ObjectAlarmMetadata<386> alarmMetadata_;
+@@ -604,6 +605,15 @@ private:
+     }
+     bool nativeTerrainBirth(const GameplayWorld::NativeTerrain::Identity& id,bool active,
+         std::uint32_t& order,std::uint32_t& flags){
++#ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
++        // Some callers install the native store after attaching this owner.
++        // Bind at the first birth, before any terrain layer publication.
++        if(!nativeTerrainLayersBound_){
++            if(!world_||!world_->nativeTerrainInstances()||
++               !layers_.bindTerrain(*world_->nativeTerrainInstances(),View::terrainBase))return check(false);
++            nativeTerrainLayersBound_=true;
++        }
++#endif
+         const unsigned slot=View::terrainBase+id.handle.slot;
+         if(!valid()||!table_.externalBirth(slot,order)||!nativeBirthQueues(slot,id.object))return check(false);
+         if(!check(table_.registerExternalObject({slot,id.handle.generation},id.object,true)))return false;
+diff --git a/src/core/GameplayRoomLayers.h b/src/core/GameplayRoomLayers.h
+index 979d8779..c85f67e8 100644
+--- a/src/core/GameplayRoomLayers.h
++++ b/src/core/GameplayRoomLayers.h
+@@ -77,7 +77,8 @@ template<unsigned I,bool CompactUnnumbered=false,class Terrain=void,
+     unsigned live_=0,playerId_=0;
+     FailureSignal<> good_=true;bool prepared_=false;
+     std::uint32_t drawRevision_=0;
+-    void changedDraw(){if(drawRevision_!=0xffffffffu)++drawRevision_;}
++    void changedDraw(){if(drawRevision_!=0xffffffffu)++drawRevision_;
++        if constexpr(Storage::retained)if(preparedDrawEnabled_)preparedDraw_.invalidateOrder();}
+     bool fail(){good_=false;return false;}
+     template<class Visit> bool visitProjectedElements(unsigned layer,Visit visit)const{
+         if(!layers_.get(layer))return false;
+@@ -131,6 +132,8 @@ public:
+     std::uint32_t preparedDrawRevision()const{return preparedDraw_.revision();}
+     bool publishPreparedDraw(InstanceHandle h,unsigned token,RunnerLayerDraw::Action action){
+         if(!preparedDrawEnabled_)return true;
++        if constexpr(Storage::retained)if(auto state=retainedState(h))if(state->bound())
++            return action==(state->inactive?RunnerLayerDraw::Action::endLayer:RunnerLayerDraw::Action::skip);
+         const unsigned element=registry_.find(h);
+         const auto prepared=action==RunnerLayerDraw::Action::endLayer?PreparedDraw::endLayer:
+             action==RunnerLayerDraw::Action::drawEvent||action==RunnerLayerDraw::Action::sprite||
+diff --git a/src/core/GameplayWorld.h b/src/core/GameplayWorld.h
+index 490ddaac..64e28248 100644
+--- a/src/core/GameplayWorld.h
++++ b/src/core/GameplayWorld.h
+@@ -304,6 +304,7 @@ public:
+     const downwell::GameplayTerrainInstances* terrainInstances()const{return terrainInstances_;}
+     using NativeTerrain=downwell::NativeTerrainLifetimes<downwell::GameplayTerrainInstances::capacity>;
+     const NativeTerrain* nativeTerrainInstances()const{return nativeTerrainInstances_;}
++    NativeTerrain* nativeTerrainInstances(){return nativeTerrainInstances_;}
+     bool bindNativeTerrain(NativeTerrain& terrain){
+         if(!run_.effectsSucceeded||terrainInstances_||!terrain.valid()||
+             (nativeTerrainInstances_&&nativeTerrainInstances_!=&terrain))return run_.effectsSucceeded=false;
+diff --git a/src/core/NativeTerrainLifetimes.h b/src/core/NativeTerrainLifetimes.h
+index bc123e5a..5474eec4 100644
+--- a/src/core/NativeTerrainLifetimes.h
++++ b/src/core/NativeTerrainLifetimes.h
+@@ -5,6 +5,7 @@
+ #include "WallEndStep.h"
+ #include "PackedWallState.h"
+ #include "WallFootprint.h"
++#include "RunnerLogicalLayerOrder.h"
+ namespace downwell {
+ // Identity and birth chronology: no duplicate spatial tree, room list, animation state or
+ // raster cache. Generated source IDs remain unknown until the shared global
+@@ -12,8 +13,9 @@ namespace downwell {
+ template<unsigned Capacity> class NativeTerrainLifetimes {
+     struct Order {
+         std::uint32_t stamp=0;
+-        Order shifted(unsigned n)const{return {stamp?stamp+n:0};}
+-        bool same(const Order& other)const{return stamp==other.stamp;}
++        RunnerRetainedLayerState layer;
++        Order shifted(unsigned n)const{return {stamp?stamp+n:0,layer.shifted(n)};}
++        bool same(const Order& other)const{return stamp==other.stamp&&layer.same(other.layer);}
+     };
+     using Runs=TerrainOwnershipRuns<Capacity,Order>;
+     Runs runs_;
+@@ -25,7 +27,10 @@ template<unsigned Capacity> class NativeTerrainLifetimes {
+     InstanceHandle steppingHandle_{};
+     bool good_=true;
+     bool wallPresentationState_=false,unboundedWallArt_=false;
++    Order* pendingPublication_=nullptr;
++    InstanceHandle pendingHandle_{};
+ public:
++    static constexpr unsigned capacity=Capacity;
+     using Identity=typename Runs::Identity;
+     struct Binding {
+         void* context=nullptr;
+@@ -57,7 +62,39 @@ public:
+         Order value;return good_&&runs_.publication(h,value)?value.stamp:0;
+     }
+     bool rebindOrder(InstanceHandle h,std::uint32_t order){
+-        return good_=(good_&&order&&runs_.changePublication(h,Order{order}));
++        Order value;
++        if(!good_||!order||!runs_.publication(h,value))return good_=false;
++        value.stamp=order;return good_=runs_.changePublication(h,value);
++    }
++    RunnerRetainedLayerRead layerState(InstanceHandle h)const{
++        if(pendingPublication_&&h.slot==pendingHandle_.slot&&h.generation==pendingHandle_.generation)
++            return pendingPublication_->layer;
++        Order value;return runs_.publication(h,value)?RunnerRetainedLayerRead(value.layer):nullptr;
++    }
++    RunnerRetainedLayerRead layerState(unsigned slot)const{
++        return layerState(pendingPublication_&&slot==pendingHandle_.slot?pendingHandle_:runs_.currentHandle(slot));
++    }
++    void setLayerState(unsigned slot,const RunnerRetainedLayerState& layer){
++        if(pendingPublication_&&slot==pendingHandle_.slot){pendingPublication_->layer=layer;return;}
++        const auto h=runs_.currentHandle(slot);Order value;
++        if(!runs_.publication(h,value)){good_=false;return;}
++        value.layer=layer;if(!runs_.changePublication(h,value))good_=false;
++    }
++    template<class Visit> bool visitLayerStates(Visit visit)const{
++        return runs_.visit([&](const Identity& id){return visit(id.handle,*layerState(id.handle));});
++    }
++    template<class Visit> bool visitLayerCutoffs(unsigned layer,const RunnerLayerOrderKey* after,Visit visit)const{
++        return runs_.visitPublicationRuns([&](const auto& run){
++            const auto& basis=run.publication().layer;
++            if(!basis.bound()||basis.layer!=layer||!basis.inactive)return true;
++            bool found=false;unsigned first=0;
++            run.visitSlots([&](unsigned,unsigned offset){
++                if(after&&!after->before(basis.shifted(offset).order))return true;
++                if(!found||(basis.order.tail?offset<first:offset>first)){found=true;first=offset;}
++                return true;
++            });
++            return !found||visit(basis.shifted(first).order);
++        });
+     }
+     bool valid()const{return good_;}
+     std::uint32_t lastLifetime()const{return next_-1;}
+@@ -200,8 +237,11 @@ public:
+         Order order;
+         const Identity identity{{slot,next_},object,x,y,creation,source};
+         std::uint32_t spatial=8u;
+-        if(slot==Capacity||(binding_.birth&&!binding_.birth(binding_.context,identity,active,order.stamp,spatial))||
+-            !runs_.append({slot,next_},object,x,y,source,creation,order))return good_=false;
++        if(slot==Capacity||pendingPublication_)return good_=false;
++        pendingPublication_=&order;pendingHandle_=identity.handle;
++        const bool published=!binding_.birth||binding_.birth(binding_.context,identity,active,order.stamp,spatial);
++        pendingPublication_=nullptr;pendingHandle_={};
++        if(!published||!runs_.append({slot,next_},object,x,y,source,creation,order))return good_=false;
+         ++next_;freeHint_=slot+1;
+         flags_[slot]=(active?0:2)|((spatial&8u)?4u:0u)|((spatial&0x200u)?8u:0u)|((spatial&0x8000u)?16u:0u);
+         createSprite_[slot]=-2;
+@@ -248,7 +288,10 @@ public:
+     bool clear(){
+         if(stepping_)return good_=false;
+         if(!good_)return false;
+-        if(binding_.retire&&!runs_.visit([&](const Identity& id){return binding_.retire(binding_.context,id.handle.slot);}))return good_=false;
++        // Releasing retained layers can split publication runs. Reacquire by
++        // ordinal rather than mutating a borrowed descriptor traversal.
++        if(binding_.retire)for(unsigned i=0;i<runs_.size();++i)
++            if(!binding_.retire(binding_.context,runs_.handle(i).slot))return good_=false;
+         runs_.~Runs();new(&runs_) Runs;freeHint_=0;wallPresentationState_=unboundedWallArt_=false;return true;
+     }
+ private:
+diff --git a/src/core/RunnerPreparedDrawList.h b/src/core/RunnerPreparedDrawList.h
+index f30069a2..10145900 100644
+--- a/src/core/RunnerPreparedDrawList.h
++++ b/src/core/RunnerPreparedDrawList.h
+@@ -21,6 +21,7 @@ public:
+     RunnerPreparedDrawList(){clear();}
+     void clear(){for(auto& node:nodes_)node=Node{};for(auto& head:heads_)head=End;changed();}
+     std::uint32_t revision()const{return revision_;}
++    void invalidateOrder(){changed();}
+     bool contains(unsigned e)const{return e<Elements&&nodes_[e].action!=absent;}
+     bool attach(unsigned layer,unsigned e,unsigned previous){
+         if(layer>=Layers||e>=Elements||contains(e)||
+diff --git a/tests/core/RunnerLogicalLayerOrderTest.cpp b/tests/core/RunnerLogicalLayerOrderTest.cpp
+index 206d8251..53fd227c 100644
+--- a/tests/core/RunnerLogicalLayerOrderTest.cpp
++++ b/tests/core/RunnerLogicalLayerOrderTest.cpp
+@@ -1,6 +1,7 @@
+ #include "core/RunnerLogicalLayerOrder.h"
+ #include "core/RunnerLayerDraw.h"
+ #include "core/RunnerPreparedDrawList.h"
++#include "core/NativeTerrainLifetimes.h"
+ #include <vector>
+ #include <cstdio>
+ #include <cstdlib>
+@@ -206,7 +207,45 @@ static void failedPublication(){
+         }
+     }
+ }
+-int main(){inheritedCapacity();merges();mutations();failedPublication();preparedCutoffs();
++static void nativePublication(){
++    struct Fixture {
++        NativeTerrainLifetimes<8> terrain;
++        RunnerLogicalLayerOrder<3,16,NativeTerrainLifetimes<8>> layers;
++        unsigned layer=0,stamp=0;
++    } fixture;
++    REQUIRE(fixture.layers.bindTerrain(fixture.terrain));
++    REQUIRE(fixture.layers.insertAfterEquals(1,100,false,fixture.layer));
++    REQUIRE(fixture.terrain.bind({&fixture,
++        [](void*,unsigned){return true;},
++        [](void* p,const NativeTerrainLifetimes<8>::Identity& id,bool active,std::uint32_t& stamp,std::uint32_t&){
++            auto& f=*static_cast<Fixture*>(p);stamp=++f.stamp;
++            REQUIRE(f.terrain.layerState(id.handle)&&!f.terrain.layerState(id.handle)->bound());
++            return f.layers.retainInstance(id.handle,f.layer,!active);
++        },
++        [](void* p,unsigned slot){auto& f=*static_cast<Fixture*>(p);
++            return f.layers.releaseInstance(f.terrain.currentHandle(slot));},
++        [](void*,unsigned){return true;}
++    }));
++    for(unsigned i=0;i<8;++i)REQUIRE(fixture.terrain.append(60,int(i)*16,0));
++    for(unsigned i=0;i<8;++i){
++        const auto h=fixture.terrain.handle(i);const auto before=*fixture.terrain.layerState(h);
++        REQUIRE(before.bound()&&before.order.serial.low==i+1);
++        if(i==2)REQUIRE(fixture.terrain.rebindOrder(h,100+i));
++        REQUIRE(fixture.terrain.layerState(h)->same(before));
++    }
++    REQUIRE(fixture.layers.publishInactive(fixture.terrain.handle(3),true));
++    REQUIRE(fixture.layers.reconcileRetained(fixture.terrain.handle(3)));
++    unsigned count=0;
++    REQUIRE(fixture.terrain.visitLayerStates([&](InstanceHandle,const RunnerRetainedLayerState& s){
++        REQUIRE(s.bound());++count;return true;
++    }));REQUIRE(count==8);
++    // Releasing layer publications splits runs during whole-room teardown.
++    REQUIRE(fixture.terrain.clear()&&fixture.layers.elementCount(fixture.layer)==0);
++    REQUIRE(fixture.terrain.append(60,0,0));
++    REQUIRE(fixture.terrain.layerState(fixture.terrain.handle(0))->bound());
++    REQUIRE(fixture.terrain.clear());
++}
++int main(){inheritedCapacity();merges();mutations();failedPublication();preparedCutoffs();nativePublication();
+     REQUIRE(drawMutation(true,true)==drawMutation(false,true));
+     REQUIRE(drawMutation(true,false)==drawMutation(false,false));
+     REQUIRE(drawMutation(true,true)==std::vector<unsigned>({3,0}));

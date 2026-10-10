@@ -51,7 +51,9 @@ behavior, both backend integrations and relevant original-game verification.
   end-of-layer cutoffs, activation, depth order and retirement; an always-active
   scenery lease alone cannot represent these semantics. Gate on current frames
   676 and 1689 as well as ordinary gameplay. This is not a revival of rejected
-  immutable-row/copy-on-write spatial encodings.
+  immutable-row/copy-on-write spatial encodings. Publish bounded run membership
+  once rather than replacing physical attachment with another per-cell logical
+  lookup/publication path (see the rejected-approaches table).
 - Reduce executable and static-memory growth at its owning structures: audit
   linked collision/query machinery, embedded resource/mask banks and full-height
   terrain caches. Account separately for Hunk code/data/relocations, zero-filled
