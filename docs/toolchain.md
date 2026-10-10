@@ -15,7 +15,9 @@ The build emits dependency files and mirrors the source tree under `build/`.
 
 The sibling ports use the BartmanAbyss Amiga GCC toolchain installed under
 `~/.local`, together with `elf2hunk`, vasm, FS-UAE, and the matching GDB.
-Activate it with:
+AmigaXDev installs it with the Kickstarts (`make setup`); `amiga/env.sh` sources
+its shared `~/.local/share/amiga/env.sh`, and AmigaXDev's `docs/environment.md`
+describes the variables. Activate it with:
 
 ```sh
 . amiga/env.sh
@@ -39,8 +41,11 @@ budget. `CHIP_MEMORY` and `FAST_MEMORY` can override those values. Reducing the
 ordinary-memory footprint to a practical A500 configuration remains a separate
 measured task.
 
-`KICKSTART` defaults to `~/Documents/RetroPie/BIOS/kick31.rom` and may be
-overridden before sourcing `env.sh`.
+`KICKSTART` defaults to the shared Kickstart 3.1 (`kick40063.A600`) and may be
+overridden before sourcing `env.sh`. The verification scripts are debug runs:
+they are silent and open their window behind the others (`WINDOW=none` runs
+without one). `amiga/run.sh` plays with sound in front; `DEBUG=1` adds the gdb
+stub, and `SOUND`, `WINDOW` and the other shared FS-UAE options apply.
 
 ## GameMaker extraction
 

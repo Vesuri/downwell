@@ -2,11 +2,10 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 . ./env.sh
-. "${FSUAE_COMMON:-$HOME/.local/share/amiga/fsuae_common.sh}"
+. "$FSUAE_COMMON"
 
-FSUAE="${FSUAE:-fs-uae}"
 GDB="${GDB:-m68k-amiga-elf-gdb}"
-ROM="${KICKSTART:-$HOME/Documents/RetroPie/BIOS/kick31.rom}"
+ROM="$KICKSTART"
 RUN=.run
 DH0="$RUN/dh0"
 DH1="$RUN/dh1"
@@ -54,18 +53,14 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 VERIFY_DEADLINE=$((SECONDS + VERIFY_TIMEOUT_SECONDS))
 
-"$FSUAE" \
-  --amiga_model=A500 --chip_memory=512 --fast_memory=8192 \
-  --kickstart_file="$ROM" \
+# Quiet debug run (no sound, window behind the others): fsuae_options in $FSUAE_COMMON.
+KICKSTART="$ROM" AMIGA_MODEL=A500 CHIP_KB=512 FAST_KB=8192 WARP=1 DEBUG=1
+fsuae_options
+FSUAE_LOG="$RUN/fsuae-startup.log" fsuae_launch \
   --hard_drive_0="$DH0" --hard_drive_1="$DH1" \
   --joystick_port_0=none --joystick_port_1=none \
-  --automatic_input_grab=0 --fullscreen=0 \
-  --audio_driver=dummy --warp_mode=1 \
-  --remote_debugger=20 --remote_debugger_port="$DEBUG_PORT" \
-  --remote_debugger_trigger=Downwell --ntsc_mode=0 \
-  --state_dir="$RUN/state" > "$RUN/fsuae-startup.log" 2>&1 &
-FSUAE_PID=$!
-fsuae_track "$FSUAE_PID"
+  --remote_debugger_trigger=Downwell \
+  --state_dir="$RUN/state"
 
 for _ in $(seq 1 120); do
   if (( SECONDS >= VERIFY_DEADLINE )); then

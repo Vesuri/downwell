@@ -35,7 +35,7 @@ import sys
 
 FIELD_CYCLES = 142102
 IRQ_PC = 0x7fffffff
-BIN = os.path.expanduser('~/.local/opt/bin')
+BIN = os.path.join(os.environ.get('AMIGA_TOOLCHAIN') or os.path.expanduser('~/.local/opt'), 'bin')
 
 
 def tool(name):

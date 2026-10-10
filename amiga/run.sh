@@ -2,10 +2,9 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 . ./env.sh
-. "${FSUAE_COMMON:-$HOME/.local/share/amiga/fsuae_common.sh}"
+. "$FSUAE_COMMON"
 
-FSUAE="${FSUAE:-fs-uae}"
-ROM="${1:-${KICKSTART:-$HOME/Documents/RetroPie/BIOS/kick31.rom}}"
+ROM="${1:-$KICKSTART}"
 EXE="${DOWNWELL_EXE:-out/Downwell.exe}"
 [ -f "$ROM" ] || { echo "Kickstart ROM not found: $ROM"; exit 1; }
 [ -f "$EXE" ] || { echo "not found: $EXE (build first)"; exit 1; }
@@ -18,7 +17,8 @@ DH1="$RUN/dh1"
 # before replacing either the startup sequence or the executable, otherwise
 # it can observe the new file while cp is still writing it (or leave the user
 # looking at the old AmigaDOS prompt).
-fsuae_stop_previous
+# DEBUG=1 also opens the gdb stub, on a port no other project holds.
+if [ "${DEBUG:-0}" = 1 ]; then fsuae_claim_port; else fsuae_stop_previous; fi
 
 mkdir -p "$DH0/s" "$DH1" "$RUN/state"
 printf 'Stack 8192\ncd dh1:\nDownwell\n' > "$DH0/s/startup-sequence"
@@ -35,14 +35,13 @@ SHOTS="${FSEMU_SCREENSHOTS_DIR:-$HOME/Pictures/Screenshots}"
 mkdir -p "$SHOTS"
 export FSEMU_SCREENSHOTS_DIR="$SHOTS"
 
-fsuae_track_self
-exec "$FSUAE" \
-  --amiga_model="${AMIGA_MODEL:-A500}" \
-  --chip_memory="${CHIP_MEMORY:-512}" --fast_memory="${FAST_MEMORY:-8192}" \
-  --kickstart_file="$ROM" \
+# Model, memory, sound and window: fsuae_options in $FSUAE_COMMON.
+KICKSTART="$ROM" AMIGA_MODEL="${AMIGA_MODEL:-A500}"
+CHIP_KB="${CHIP_KB:-${CHIP_MEMORY:-512}}" FAST_KB="${FAST_KB:-${FAST_MEMORY:-8192}}"
+fsuae_options
+fsuae_exec \
   --hard_drive_0="$DH0" --hard_drive_1="$DH1" \
   --joystick_port_0=none --joystick_port_1=none \
-  --automatic_input_grab=0 --fullscreen=0 \
-  --window_width=760 --window_height=568 --ntsc_mode=0 \
+  --window_width=760 --window_height=568 \
   --state_dir="$RUN/state" \
   --screenshots_output_dir="$SHOTS"

@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# Source this to put the shared ~/.local Amiga toolchain on PATH.
+# Source this for the shared Amiga environment that AmigaXDev installs (~/.local/share/amiga):
+# the toolchain and FS-UAE on PATH, the Kickstart and the FS-UAE helpers.  Every variable can be
+# overridden from the environment.
 #   . amiga/env.sh
 # or from the amiga/ directory:
 #   . env.sh
-TC="$HOME/.local"
-export PATH="$TC/opt/bin:$TC:$TC/fs-uae:$PATH"
-export KICKSTART="${KICKSTART:-$HOME/Documents/RetroPie/BIOS/kick31.rom}"
-
+. "${AMIGA_ENV:-$HOME/.local/share/amiga/env.sh}"
