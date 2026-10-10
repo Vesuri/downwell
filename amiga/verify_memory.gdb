@@ -11,6 +11,12 @@ end
 break downwellStartupReady
 continue
 printf "Startup passed: resident assets=%lu, Chip remaining=%lu bytes\n", gDownwellStartupAssetBytes, gDownwellStartupChipRemaining
+# This is the normal-startup audit; explicit plane/replay oracle builds have
+# their own verifiers and must not weaken the front-end residency guard.
+if gDownwellGamePlaneResidentBytes != 0 || gDownwellGamePlaneLoads != 0
+    printf "Gameplay DMA unexpectedly resident during normal startup\n"
+    quit 1
+end
 downwell-chip-snapshot
 if $chip_changes == 0 || $chip_minimum > gDownwellStartupChipRemaining
     printf "CHIP_AUDIT_ERROR: watcher missed startup allocations\n"

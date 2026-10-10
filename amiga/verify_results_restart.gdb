@@ -61,6 +61,11 @@ if gDownwellSceneBankLoads != 4
     quit 1
 end
 printf "Scene bank loads: %lu\n", gDownwellSceneBankLoads
+if gDownwellGamePlaneLoads != 3 || gDownwellGamePlaneReleases != 2 || gDownwellGamePlaneResidentBytes != gDownwellGamePlaneExpectedBytes || gDownwellGamePlaneExpectedBytes == 0
+    printf "Gameplay DMA lease failed: loads=%u releases=%u resident=%u\n", gDownwellGamePlaneLoads, gDownwellGamePlaneReleases, gDownwellGamePlaneResidentBytes
+    quit 1
+end
+printf "Gameplay DMA lease: Retry retained; style/surface released and reloaded\n"
 printf "Three results destinations executed; final gameplay reached 200 updates\n"
 printf "DOWNWELL_RESULTS_RESTART_READY\n"
 downwell-chip-snapshot

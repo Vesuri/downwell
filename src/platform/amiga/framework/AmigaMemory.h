@@ -15,6 +15,11 @@ public:
                   ULONG sceneCacheBytes,
                   ULONG assetBytes = 0);
     void release();
+    // Gameplay-only DMA storage. The caller must retire DMA and renderer
+    // bindings before release; resizing a live lease is forbidden.
+    bool acquireGameAssets(ULONG bytes);
+    void releaseGameAssets();
+    UBYTE* gameAssets() const { return gameAssets_; }
 
     UBYTE* game() const { return game_; }
     UBYTE* hud() const { return hud_; }
@@ -47,6 +52,8 @@ private:
     UWORD* enemySprite_[2];
     UBYTE* sceneCache_;
     UBYTE* assets_;
+    UBYTE* gameAssets_;
+    ULONG gameAssetBytes_;
     ULONG gameBytes_;
     ULONG hudBytes_;
     ULONG menuPlaneBytes_;

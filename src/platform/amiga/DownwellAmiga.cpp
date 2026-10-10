@@ -20,6 +20,12 @@ __attribute__((noinline,used)) void downwellFieldReentryReady(){__asm__ volatile
 #include "AmigaVerificationScratch.h"
 #include "../../../generated/amiga-game-planes.h"
 extern "C" int amigaBlitterBindGamePlanes(const UBYTE*,unsigned,const UBYTE*,unsigned,const UBYTE*);
+extern "C" void amigaBlitterReleaseGamePlanes();
+extern "C" {
+volatile unsigned gDownwellGamePlaneResidentBytes, gDownwellGamePlaneLoads, gDownwellGamePlaneReleases,
+    gDownwellGamePlaneExpectedBytes;
+__attribute__((noinline, used)) void downwellGamePlanesReady(){ __asm__ volatile("" ::: "memory"); }
+}
 #ifdef DOWNWELL_PLANE_BANK_VERIFY
 extern "C" int amigaBlitterVerifyGamePlanes(const UBYTE*,UBYTE*);
 #endif
@@ -385,7 +391,7 @@ public:
 // into one shared Chip region. Boot art is composed into the splash cache
 // and dropped; front art is reloaded whenever gameplay returns to it.
 // Gameplay reuses the region for terrain/field staging. The separate gameplay
-// DMA atlas is still resident during startup; this is only partial banking.
+// DMA atlas is a separate gameplay lease, absent during front-end scenes.
 static const char bootBankName[] = "PROGDIR:Downwell.boot";
 static const char frontBankName[] = "PROGDIR:Downwell.front";
 static const ULONG baseSceneBankBytes = DOWNWELL_FRONT_BANK_BYTES > DOWNWELL_BOOT_BANK_BYTES
@@ -1957,8 +1963,9 @@ __attribute__((noinline)) static int runDownwell(void) {
         return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
     }
     const ULONG gamePackBytes = DOWNWELL_GAME_PLANE_BYTES;
+    gDownwellGamePlaneExpectedBytes=gamePackBytes;
     const ULONG effectStampBytes=amiga_effect_stamps_end-amiga_effect_stamps;
-    const ULONG sceneBankOffset=(gamePackBytes+AmigaEffectSurface::bytes+3)&~3UL;
+    const ULONG sceneBankOffset=(AmigaEffectSurface::bytes+3)&~3UL;
     // The retired selection cache holds two game rings followed by DMA-only
     // effect words. Other scenes may overwrite them; reload on gameplay entry.
     constexpr unsigned effectStampCacheOffset=2*downwellGameRingBytes;
@@ -1970,7 +1977,7 @@ __attribute__((noinline)) static int runDownwell(void) {
     const unsigned effectPayloadBytes=effectStampBytes-AmigaEffectStampBank::payloadOffset;
     gDownwellStartupChipFree = AvailMem(MEMF_CHIP);
     gDownwellStartupChipLargest = AvailMem(MEMF_CHIP | MEMF_LARGEST);
-    gDownwellStartupAssetBytes = gamePackBytes;
+    gDownwellStartupAssetBytes = 0;
     if (!memory.allocate(downwellGameRingBytes, downwellLayerBytes,
                          menuPlaneBytes, amigaMenuEntryPlaneBytes,
                          downwellCopperWords * copperListCount * sizeof(UWORD),
@@ -2133,12 +2140,27 @@ __attribute__((noinline)) static int runDownwell(void) {
         port.configureGenerationStep(generateLiveTerrain, &liveGeneration);
     }
 #endif
-    if(platform.loadFile("PROGDIR:Downwell.planes",memory.assets(),gamePackBytes)!=(LONG)gamePackBytes||
-       !amigaBlitterBindGamePlanes(amiga_game_pack,amiga_game_pack_end-amiga_game_pack,
-           memory.assets(),gamePackBytes,downwellGamePlaneSourceHash)){
+    const auto acquireGameplayPlanes=[&](){
+        if(memory.gameAssets())return true;
+        if(!memory.acquireGameAssets(gamePackBytes))return false;
+        if(platform.loadFile("PROGDIR:Downwell.planes",memory.gameAssets(),gamePackBytes)!=(LONG)gamePackBytes||
+           !amigaBlitterBindGamePlanes(amiga_game_pack,amiga_game_pack_end-amiga_game_pack,
+               memory.gameAssets(),gamePackBytes,downwellGamePlaneSourceHash)){
+            amigaBlitterReleaseGamePlanes();memory.releaseGameAssets();return false;
+        }
+        gDownwellGamePlaneResidentBytes=gamePackBytes;
+        ++gDownwellGamePlaneLoads;
+        downwellGamePlanesReady();
+        return true;
+    };
+#if defined(DOWNWELL_REPLAY_VERIFY) || defined(DOWNWELL_PLANE_BANK_VERIFY)
+    // Explicit gameplay-only oracles, not the ordinary startup path.
+    if(!acquireGameplayPlanes()){
         gDownwellStartupFailure=7;downwellStartupFailed();
         platform.restore();FreeMem(startupCopperWords,4*sizeof(UWORD));memory.release();return 20;
     }
+    gDownwellStartupAssetBytes=gamePackBytes;
+#endif
     activeGamePack = amiga_game_pack;
     activeGamePackEnd = amiga_game_pack_end;
 #ifdef DOWNWELL_PLANE_BANK_VERIFY
@@ -2182,7 +2204,7 @@ __attribute__((noinline)) static int runDownwell(void) {
     auto& controllerEffects = *new (effectStorage) downwell::CurrencySmokeComposition;
     if (!effectAssets.bind(activeGamePack,activeGamePackEnd-activeGamePack)||
         !effectAssets.bindEntryMask(amiga_entry_mask,amiga_entry_mask_end-amiga_entry_mask)||
-        !AmigaEffectSurface::bind(controllerEffects.surface(),memory.assets()+gamePackBytes,
+        !AmigaEffectSurface::bind(controllerEffects.surface(),memory.assets(),
             amiga_effect_stamps,effectStampBytes,effectStamps,effectPayloadBytes,effectAssets)||
         !AmigaEffectSurface::fixtures(controllerEffects.surface(),effectAssets)) {
         platform.restore();
@@ -2661,6 +2683,10 @@ __attribute__((noinline)) static int runDownwell(void) {
                     overlayBank.release();
                     gDownwellResultsPack = gDownwellShopPack = nullptr;
                     gDownwellResultsAssetBytes = gDownwellShopAssetBytes = 0;
+                    amigaBlitterReleaseGamePlanes();
+                    memory.releaseGameAssets();
+                    gDownwellGamePlaneResidentBytes=0;
+                    ++gDownwellGamePlaneReleases;
                     if (!loadFrontBank(platform)) break;
                     if (presentedScene == AmigaScene::menu &&
                         !gardenScene.prepare(menuDrawList, frontPack, frontPackEnd))
@@ -2745,6 +2771,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     platform.publish(splashBlankList);
                     platform.waitVblank();
                     DW_PROFILE_PHASE(profileEntryFields);
+                    if (!acquireGameplayPlanes()) { exitCode=20; break; }
 #ifdef DOWNWELL_PREPARED_FIELDS
                     // Terrain batching owns the prefix. Rebind after every
                     // front-bank reload, only after retiring its DMA.

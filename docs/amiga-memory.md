@@ -168,17 +168,23 @@ ownership machinery still have their existing owners.
 | Two channel-seven sprite buffers | 272 |
 | Null sprite | 8 |
 | Shared splash/style cache | 66,704 |
-| Resident gameplay DMA plane atlas (directory and shared planes) | 112,970 |
+| Gameplay-leased DMA plane atlas (directory and shared planes) | 112,970 |
 | Effect surface | 20,448 |
 | Offline interleaved smoke/gem stamps | 0 additional (4,932 in cache tail) |
 | Shared scene bank (boot or front art; gameplay terrain scratch and field images) | 146,818 |
-| **Total, before allocation alignment** | **488,710** |
+| **Gameplay total, before allocation alignment** | **488,710** |
+| **Front-end total, without gameplay DMA atlas** | **375,740** |
 
 The directory sizes depend on the generated asset set; remeasure actual free
 and largest Chip blocks when it changes. The original contiguous gameplay
 DWAP stays in ordinary memory for CPU rendering, effects, metadata and sprite
-stream selection. `Downwell.planes` is loaded once into the resident Chip
-allocation. Its immutable colour and mask planes are interned independently
+stream selection. `Downwell.planes` has a separate Chip allocation acquired at
+gameplay entry, not during ordinary startup. Retry retains the allocation;
+returning to style select or the surface retires its blits and cached Bitmap
+views before freeing it. Re-entry allocates, loads and validates it again;
+failure returns 20 rather than publishing a partial binding. Gameplay-only
+replay and plane pixel-oracle builds explicitly acquire it before their tests.
+Its immutable colour and mask planes are interned independently
 offline, including aligned substreams. Blitter source views bind those three
 addresses; no mask generation, conversion or per-frame upload takes place.
 `make test-amiga-plane-bank` compares every source view byte-for-byte and
@@ -194,13 +200,15 @@ remeasured when any pack or other Chip owner grows.
 
 ## Scene banks
 
-Boot/front art shares a scene bank, but the gameplay DMA atlas still remains
-resident across those scenes. This is partial scene banking, not a proof that
-only current-scene assets are loaded. `generate-amiga-hud.py --profile game`
+Boot/front art shares a scene bank. The gameplay DMA atlas is absent during
+ordinary front-end scenes, including later returns. The CPU-side gameplay
+catalogue and gameplay preparation still exist during startup, so this is
+partial scene banking, not proof that only current-scene assets are loaded.
+`generate-amiga-hud.py --profile game`
 splits its records, unchanged, into three banks:
 
 - `amiga-game.dwap`, the ordinary-memory gameplay reference. Its offline
-  `amiga-game.planes` derivative (`Downwell.planes`) is the resident DMA bank.
+  `amiga-game.planes` derivative (`Downwell.planes`) is the gameplay DMA lease.
 - `amiga-boot.dwap` (`Downwell.boot`), the publisher logo, controls, credits
   text and dither fade. Startup composes it into the splash cache, then
   discards it.

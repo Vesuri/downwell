@@ -71,7 +71,7 @@ Packing manifests record the admission contract version and hash.
 `make test-scene-asset-admission` checks unknown-resource rejection, exporter
 growth, unchanged gameplay membership when boot art grows, shared dependencies
 and budget failures. This guard does **not** split the existing gameplay bank
-by level, unload it during startup, or control SDL residency; those remaining
+by level, unload its CPU catalogue during startup, or control SDL residency; those remaining
 boundaries are tracked in `docs/open-work.md`.
 
 `generate-amiga-plane-bank.py` reads `generated/amiga-game.dwap` and interns
@@ -83,6 +83,11 @@ as `Downwell.planes`; keep it beside the executable, `.boot`, `.front`,
 CPU effects continue reading the original ordinary-memory DWAP. The blitter
 binds separate low/high/mask views through the common `Bitmap` class; it does
 not regenerate or upload planes during gameplay.
+The DMA bank is leased at gameplay entry, retained for Retry and upgrades,
+and released after retiring DMA when returning to style selection or the
+surface. `verify_memory.gdb` rejects gameplay DMA residency in normal startup;
+`make verify-amiga-results-restart` checks retention/reload across all results
+destinations, alongside the existing native pixels and memory watcher.
 
 `generate-amiga-transient-banks.py` generates the explicit size/budget contracts
 and input-hash manifest for shop, death-results and upgrade sources. These banks

@@ -128,6 +128,11 @@ extern "C" int amigaBlitterBindGamePlanes(const UBYTE* source,unsigned sourceByt
     return gamePlanes.bind(source,sourceBytes,bank,bytes,hash);
 }
 
+extern "C" void amigaBlitterReleaseGamePlanes(){
+    // Invalid binding drains outstanding blits and retires every cached view.
+    (void)amigaBlitterBindGamePlanes(nullptr,0,nullptr,0,nullptr);
+}
+
 #ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
 extern "C" {
 volatile unsigned gDownwellPreparedFieldChecks,gDownwellPreparedFieldFailures;
