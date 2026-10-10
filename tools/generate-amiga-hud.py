@@ -8,10 +8,14 @@ import json
 import math
 import os
 import struct
+import sys
 import tempfile
 from pathlib import Path
 
 from PIL import Image
+# This exporter is also loaded by path by the host pixel-oracle tests.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from amiga_scene_contract import GAME_IDS, BANK_BUDGETS, VERSION as SCENE_CONTRACT_VERSION, require_budget
 
 
 MAGIC = b"DWAP"
@@ -249,7 +253,8 @@ MENU_TITLE_LEFT_PADDING = 8
 # - front: garden scenery, title, garden hardware sprites and style select.
 #   The menu prepares style select while the garden is shown, so both are
 #   resident together. It is loaded again whenever gameplay returns here.
-# - game: everything else, resident throughout.
+# - game: explicitly admitted gameplay records, currently resident throughout.
+# Unknown records fail admission; adding an exporter is not a residency policy.
 # Garden scenery keeps only the frames AmigaMenu's seed-2 creates select;
 # amiga-menu-test checks every draw-list frame against the front bank.
 BOOT_BANK_IDS = {695, 696, 733, *range(65200, 65206)}
@@ -285,10 +290,12 @@ def scene_banks(encoded):
                 banks["front"].append(item)
         elif ident in FRONT_BANK_IDS:
             banks["front"].append(item)
-        else:
+        elif ident in GAME_IDS:
             banks["game"].append(item)
             if FRONT_SHARED(ident, frame):
                 banks["front"].append(item)
+        else:
+            raise ValueError(f'asset {ident} frame {frame} has no scene owner')
     return banks
 
 
@@ -1275,6 +1282,8 @@ def main():
     if args.output is None:
         args.output = root / f"generated/amiga-{args.profile}.dwap"
     def emit(profile, path, data):
+        if profile in BANK_BUDGETS:
+            require_budget(profile, len(data))
         digest = hashlib.sha256(data).hexdigest()
         if args.check:
             require(path.is_file(), f"missing Amiga asset pack: {path}")
@@ -1295,6 +1304,11 @@ def main():
             "languageSha256": hashlib.sha256(args.language.read_bytes()).hexdigest(),
             "layout": "word-aligned-tail-or-disjoint-paths-with-joined-containment",
             **({"sceneBanks": "game-boot-front-v3-style-prefix"} if profile in ("game", "boot", "front") else {}),
+            **({"sceneAdmission": SCENE_CONTRACT_VERSION,
+                "sceneAdmissionSha256": hashlib.sha256(
+                    Path(__file__).with_name("amiga_scene_contract.py").read_bytes()).hexdigest(),
+                "bankBudgetBytes": BANK_BUDGETS[profile]}
+               if profile in ("game", "boot", "front") else {}),
         }, indent=2).encode() + b"\n"
         if args.check:
             require(packing_path.read_bytes() == packing_provenance, "packing provenance differs")

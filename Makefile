@@ -2415,7 +2415,7 @@ test-amiga-terrain-batch: generate-amiga-game build/amiga-terrain-batch-test bui
 build/amiga-terrain-batch-test: tests/platform/amiga/AmigaTerrainBatchTest.cpp src/platform/amiga/AmigaRenderer.c $(HOST_CHECK_HEADERS)
 	@mkdir -p build
 	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $(filter %.cpp %.c,$^)
-generated/amiga-game.planes: generated/amiga-game.dwap tools/generate-amiga-plane-bank.py
+generated/amiga-game.planes: generated/amiga-game.dwap tools/generate-amiga-plane-bank.py tools/amiga_scene_contract.py
 	python3 tools/generate-amiga-plane-bank.py
 
 generated/amiga-game-planes.h: generated/amiga-game.planes
@@ -2633,8 +2633,14 @@ verify-amiga-hud: generate-amiga-hud
 	tools/generate-amiga-hud.py --check
 
 generate-amiga-game:
+	python3 tests/scene-asset-admission-test.py
 	python3 tests/projectile-art-test.py
 	tools/generate-amiga-hud.py --profile game
+
+.PHONY: test-scene-asset-admission
+test-scene-asset-admission:
+	python3 tests/scene-asset-admission-test.py
+test: test-scene-asset-admission
 
 .PHONY: generate-amiga-clear verify-amiga-clear
 generate-amiga-clear:

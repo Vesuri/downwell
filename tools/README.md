@@ -62,6 +62,18 @@ the derived cell payload under ignored `generated/`.
 
 ## Shared Amiga DMA planes
 
+`amiga_scene_contract.py` is the explicit native art admission boundary used by
+the production exporters. Adding art to `SELECTIONS` does not assign it to the
+gameplay bank: every encoded resource and prepared variant needs a declared
+owner. Unknown IDs fail generation. Boot, front, game and gameplay DMA banks
+have fixed reviewed byte ceilings; output size must not set its own budget.
+Packing manifests record the admission contract version and hash.
+`make test-scene-asset-admission` checks unknown-resource rejection, exporter
+growth, unchanged gameplay membership when boot art grows, shared dependencies
+and budget failures. This guard does **not** split the existing gameplay bank
+by level, unload it during startup, or control SDL residency; those remaining
+boundaries are tracked in `docs/open-work.md`.
+
 `generate-amiga-plane-bank.py` reads `generated/amiga-game.dwap` and interns
 its immutable colour and mask planes independently, including aligned matching
 substreams. It writes `amiga-game.planes`, its size/source-hash header, and an

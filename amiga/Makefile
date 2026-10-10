@@ -598,7 +598,7 @@ $(OUT).clear: $(AMIGA_CLEAR)
 	@mkdir -p $(@D)
 	cp -f $< $@
 
-$(REPO)/generated/amiga-game.planes: $(AMIGA_GAME) $(REPO)/tools/generate-amiga-plane-bank.py
+$(REPO)/generated/amiga-game.planes: $(AMIGA_GAME) $(REPO)/tools/generate-amiga-plane-bank.py $(REPO)/tools/amiga_scene_contract.py
 	python3 $(REPO)/tools/generate-amiga-plane-bank.py
 
 $(REPO)/generated/amiga-game-planes.h: $(REPO)/generated/amiga-game.planes
@@ -966,7 +966,7 @@ obj/AmigaBlitter.o: $(AMIGA_SRC)/AmigaBlitter.cpp \
 $(AMIGA_HUD):
 	$(MAKE) -C $(REPO) generate-amiga-hud
 
-$(AMIGA_GAME): $(REPO)/tools/generate-amiga-hud.py
+$(AMIGA_GAME): $(REPO)/tools/generate-amiga-hud.py $(REPO)/tools/amiga_scene_contract.py
 	$(MAKE) -C $(REPO) generate-amiga-game
 
 $(AMIGA_RESULTS): $(REPO)/tools/generate-amiga-hud.py

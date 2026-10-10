@@ -3,7 +3,10 @@
 import hashlib
 import json
 import struct
+import sys
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from amiga_scene_contract import require_budget, VERSION as SCENE_CONTRACT_VERSION, BANK_BUDGETS
 
 ROOT = Path(__file__).resolve().parents[1]
 RECORD = struct.Struct('>HHhhHHHHII')
@@ -55,6 +58,7 @@ def build(pack):
 def main():
     source = ROOT / 'generated/amiga-game.dwap'
     bank, records, payload = build(source.read_bytes())
+    require_budget('game-planes', len(bank))
     (ROOT / 'generated/amiga-game.planes').write_bytes(bank)
     digest = hashlib.sha256(source.read_bytes()).digest()
     (ROOT / 'generated/amiga-game-planes.h').write_text(
@@ -62,9 +66,12 @@ def main():
         f'#define DOWNWELL_GAME_PLANE_BYTES {len(bank)}u\n'
         'static const unsigned char downwellGamePlaneSourceHash[32]={' +
         ','.join(map(str, digest)) + '};\n')
-    inputs = ['data/data.win', 'generated/amiga-game.dwap', 'tools/generate-amiga-plane-bank.py']
+    inputs = ['data/data.win', 'generated/amiga-game.dwap', 'tools/generate-amiga-plane-bank.py',
+              'tools/amiga_scene_contract.py']
     manifest = {'tool': 'generate-amiga-plane-bank/v1', 'records': records,
                 'payload_bytes': payload, 'bank_bytes': len(bank),
+                'scene_admission': SCENE_CONTRACT_VERSION,
+                'bank_budget_bytes': BANK_BUDGETS['game-planes'],
                 'inputs': {p: hashlib.sha256((ROOT / p).read_bytes()).hexdigest() for p in inputs},
                 'sha256': hashlib.sha256(bank).hexdigest()}
     (ROOT / 'generated/amiga-game-planes.json').write_text(json.dumps(manifest, indent=2)+'\n')
