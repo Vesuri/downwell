@@ -1156,7 +1156,7 @@ private:
     const bool nativeBoxes_;
     const bool nativeFields_;
     const bool terrainRegistered_;
-    NativeInstanceTable<View::capacity> table_;
+    NativeInstanceTable<View::capacity,View::terrainBase,View::timeFieldBase,93> table_;
     std::uint32_t nativeBoxFlags_=0;
     std::uint32_t nativeFieldFlags_=0;
     InstanceHandle markedBoxes_[GameplayWorld::breakableCapacity]{};
@@ -2178,7 +2178,8 @@ private:
                 });
             };
         // The retained actor projection deliberately excludes terrain.
-        return check(native_?visitNativeRegistered(View::terrainBase,View::timeFieldBase,visit):
+        return check(native_?table_.visitObjectRegistrationRange(View::terrainBase,View::timeFieldBase,93,
+                [&](InstanceHandle h,std::uint32_t& flags){return eligibilityFlags(h,flags);},visit):
             owner_.visitRegistrationRange(View::terrainBase,View::timeFieldBase,
                 [&](InstanceHandle h,int object,const Owner::State& state){return visit(h,object,state.flags);}));
     }

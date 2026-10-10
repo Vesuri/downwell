@@ -2,6 +2,52 @@
 #include "core/RunnerLayers.h"
 #include <cassert>
 #include <cstdio>
+#include <initializer_list>
+static void terrainPhaseSelection(){
+    using namespace downwell;
+    NativeInstanceTable<12,3,9,93> selected(true);
+    NativeInstanceTable<12> reference(true);
+    for(unsigned slot:{1u,4u,9u,5u,2u,7u,10u}){
+        const InstanceHandle h{slot,slot+1};
+        const int object=slot==5||slot==7?93:60;
+        assert(selected.registerExternalObject(h,object,true));
+        assert(reference.registerExternalObject(h,object,true));
+    }
+    // Rebinding changes order; replacing a lifetime must not leave a stale
+    // handle in the maintained non-terrain projection.
+    assert(selected.registerExternalObject({1,2},60,false));
+    assert(reference.registerExternalObject({1,2},60,false));
+    assert(selected.registerExternalObject({1,20},60,true));
+    assert(reference.registerExternalObject({1,20},60,true));
+    for(unsigned first=0;first<=12;++first)for(unsigned end=first;end<=12;++end){
+        unsigned expected[12]{},actual[12]{},n=0,m=0;
+        auto flags=[](InstanceHandle h,std::uint32_t& value){value=h.generation;return true;};
+        assert(reference.visitRegistrationRange(first,end,flags,[&](auto h,int,auto f){expected[n++]=h.slot*100+f;return true;}));
+        assert(selected.visitRegistrationRange(first,end,flags,[&](auto h,int,auto f){actual[m++]=h.slot*100+f;return true;}));
+        assert(n==m);for(unsigned i=0;i<n;++i)assert(expected[i]==actual[i]);
+    }
+    unsigned resolved=0,visited=0;
+    assert(selected.visitObjectRegistrationRange(3,9,93,[&](InstanceHandle h,std::uint32_t& flags){
+        assert(h.slot==5||h.slot==7);++resolved;flags=h.slot==5?2:1;return true;
+    },[&](InstanceHandle h,int object,auto flags){
+        assert(object==93&&h.slot==(visited?7u:5u)&&flags==(visited?1u:2u));++visited;return true;
+    }));
+    assert(resolved==2&&visited==2);
+    assert(!selected.visitObjectRegistrationRange(3,9,93,[](auto,auto&){return false;},[](auto,int,auto){return true;}));
+    assert(selected.registerExternalObject({5,6},93,false));
+    assert(selected.registerExternalObject({5,30},93,true));
+    unsigned order=0;
+    assert(selected.visitObjectRegistrationRange(3,9,93,[](auto,auto& f){f=0;return true;},
+        [&](auto h,int,auto){assert(h.slot==(order++?5u:7u));return true;}));
+    assert(order==2);
+    assert(selected.registerExternalObject({5,30},93,false));
+    assert(selected.registerExternalObject({5,31},60,true)); // No stale thin slot after reuse.
+    assert(selected.registerExternalObject({7,8},93,false));
+    assert(selected.visitObjectRegistrationRange(3,9,93,[](auto,auto&){assert(false);return false;},
+        [](auto,int,auto){assert(false);return false;}));
+    selected.clear();
+    assert(selected.visitRegistrationRange(0,3,[](auto,int,auto){assert(false);return false;}));
+}
 static void preparedFamily(){
     using namespace downwell;
     NativeInstanceTable<8> direct(true),reference(true);
@@ -55,6 +101,7 @@ static void preparedFamily(){
     assert(!population.good&&direct.bindingRevision()==reference.bindingRevision());
 }
 int main(){
+    terrainPhaseSelection();
     preparedFamily();
     {
         downwell::NativeInstanceTable<8> registry(true);

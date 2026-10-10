@@ -18,11 +18,11 @@ namespace downwell {
 // draw routines for the same image, which native Draw does not distinguish.
 // Revision rules are conservative supersets of that owner's: every change
 // that can alter a capture advances the capture revision.
-template<unsigned Capacity> class NativeInstanceTable {
+template<unsigned Capacity,unsigned TerrainFirst=0,unsigned TerrainLast=0,int TerrainEventObject=-1> class NativeInstanceTable {
     static_assert(Capacity>0&&Capacity<65535,"Compact native slots");
     struct Entry {std::uint32_t generation=0,flags=0;int object=-1,sprite=-1;std::uint32_t order=0,roomOrder=0;};
     Entry entries_[Capacity];
-    RunnerObjectMembership<Capacity> registration_;
+    RunnerObjectMembership<Capacity,TerrainFirst,TerrainLast,TerrainEventObject> registration_;
     std::uint32_t bindingRevision_=0,captureRevision_=0;
 #ifdef DOWNWELL_LOCAL_DRAW_CAPTURE
     std::uint32_t localCaptureRevision_=0;
@@ -173,12 +173,34 @@ public:
     }
     template<class ExternalFlags,class Visit> bool visitRegistrationRange(unsigned first,unsigned last,
         ExternalFlags externalFlags,Visit visit)const{
-        return registration_.visitRegistrationRange(first,last,[&](unsigned slot,std::uint32_t generation,int object){
+        const auto emit=[&](unsigned slot,std::uint32_t generation,int object){
             const InstanceHandle h{slot,generation};std::uint32_t value;
             if(live(h))value=entries_[slot].flags;
             else if(!externalFlags(h,value))return false;
             return visit(h,object,value);
-        });
+        };
+        // Native terrain shares registration chronology, not actor phases.
+        // Maintain the existing compact projection at birth/retirement instead
+        // of repeatedly walking every wall for each disjoint actor family.
+        if constexpr(TerrainFirst<TerrainLast)
+            if(last<=TerrainFirst||first>=TerrainLast)
+                return registration_.visitRetainedRegistrationRange(first,last,emit);
+        return registration_.visitRegistrationRange(first,last,emit);
+    }
+    // Select the exact resource before consulting external lifetime/geometry
+    // state. Thin-platform End Step must not resolve every ordinary wall.
+    template<class ExternalFlags,class Visit> bool visitObjectRegistrationRange(unsigned first,unsigned last,
+        int selected,ExternalFlags externalFlags,Visit visit)const{
+        const auto emit=[&](unsigned slot,std::uint32_t generation,int object){
+            if(object!=selected)return true;
+            const InstanceHandle h{slot,generation};std::uint32_t value;
+            if(live(h))value=entries_[slot].flags;
+            else if(!externalFlags(h,value))return false;
+            return visit(h,object,value);
+        };
+        if constexpr(TerrainFirst<TerrainLast&&TerrainEventObject>=0)
+            if(selected==TerrainEventObject)return registration_.visitRetainedObjectRange(first,last,emit);
+        return registration_.visitRegistrationRange(first,last,emit);
     }
     void clear(){
         registration_.clear();
