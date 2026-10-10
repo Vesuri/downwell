@@ -15,6 +15,11 @@ READY_MARKER="${READY_MARKER:-DOWNWELL_MENU_SPRITE_READY}"
 READY_DESCRIPTION="${READY_DESCRIPTION:-splash and hardware-sprite menu loop}"
 VERIFY_TIMEOUT_SECONDS="${VERIFY_TIMEOUT_SECONDS:-120}"
 VERIFY_STACK_BYTES="${VERIFY_STACK_BYTES:-8192}"
+VERIFY_CHIP_KB="${VERIFY_CHIP_KB:-512}"
+case "$VERIFY_CHIP_KB" in
+  512|1024) ;;
+  *) echo "VERIFY_CHIP_KB must be 512 or 1024"; exit 1 ;;
+esac
 if ! [[ "$VERIFY_STACK_BYTES" =~ ^[1-9][0-9]*$ ]]; then
   echo "VERIFY_STACK_BYTES must be a positive integer" >&2
   exit 1
@@ -54,7 +59,8 @@ trap 'exit 143' TERM
 VERIFY_DEADLINE=$((SECONDS + VERIFY_TIMEOUT_SECONDS))
 
 # Quiet debug run (no sound, window behind the others): fsuae_options in $FSUAE_COMMON.
-KICKSTART="$ROM" AMIGA_MODEL=A500 CHIP_KB=512 FAST_KB=8192 WARP=1 DEBUG=1
+KICKSTART="$ROM" AMIGA_MODEL=A500 CHIP_KB="$VERIFY_CHIP_KB" FAST_KB=8192 WARP=1 DEBUG=1
+echo "A500 verification: Chip=${CHIP_KB} KiB Fast=${FAST_KB} KiB"
 fsuae_options
 FSUAE_LOG="$RUN/fsuae-startup.log" fsuae_launch \
   --hard_drive_0="$DH0" --hard_drive_1="$DH1" \

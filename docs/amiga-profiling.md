@@ -28,6 +28,12 @@ have not changed the replay. Presentation time includes display synchronization.
 
 ### Amiga checks
 
+The startup/profile launcher defaults to 512 KiB Chip and 8 MiB Fast RAM.
+`VERIFY_CHIP_KB=1024` is available solely for explicitly reported diagnostic
+comparisons when the normal allocation fails. The launcher prints the selected
+memory configuration. A successful expanded-memory run does not establish the
+512 KiB baseline or justify changing the normal launcher default.
+
 Every measured optimization is part of the normal build. The Amiga Makefile
 options that select an older path (for example `TABLE_CONTACT_ATAN=0`,
 `TERRAIN_DIRECT=0`, `PREPARED_FIELDS=0`, `AMMO_FACTORED=0`) exist only as
