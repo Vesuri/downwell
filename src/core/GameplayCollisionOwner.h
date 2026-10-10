@@ -1939,26 +1939,50 @@ public:
     using SkeletonBoneStepOrder=RunnerStepSnapshot<GameplayWorld::skeletonCapacity+GameplayWorld::boneCapacity>;
     template<class SkeletonStep,class BoneStep,class Tick>
     bool withSkeletonBoneSteps(SkeletonBoneStepOrder& phase,SkeletonStep skeletonStep,BoneStep boneStep,Tick tick){
+        return withEncounterStepsSelected(phase,[](int object){return object==120||object==269;},
+            [&](InstanceHandle h,int object){return object==120?skeletonStep(h):boneStep(h);},tick);
+    }
+    // Registered ordinary-Step dependencies of the skeleton encounter. Flash
+    // balls and corpse-expiry pictures have no Step: their existing room
+    // animation/cleanup dispatch remains authoritative.
+    using EncounterStepOrder=RunnerStepSnapshot<7*32+8>;
+    template<class Execute,class Tick>
+    bool withEncounterSteps(EncounterStepOrder& phase,Execute execute,Tick tick){
+        return withEncounterStepsSelected(phase,[](int object){
+            return object==120||object==220||object==223||object==225||object==263||
+                object==269||object==276||object==379;
+        },execute,tick);
+    }
+private:
+    template<unsigned Capacity,class Admit,class Execute,class Tick>
+    bool withEncounterStepsSelected(RunnerStepSnapshot<Capacity>& phase,Admit admit,Execute execute,Tick tick){
         if(!valid()||!world_)return check(false);
-        return check(world_->withSkeletonBoneSteps([&]{
+        unsigned next=0;
+        return check(world_->withRegisteredEncounterSteps([&]{
+            next=0;
             phase.clear();
-            if(!check(visitRegistered(View::boneBase,View::bloodBase,
+            if(!check(visitRegistered(View::boneBase,View::capacity,
                 [&](InstanceHandle h,int object,std::uint32_t flags){
-                    if(flags&0x100003u)return true;
-                    return (object==120||object==269)&&resolves(h)&&phase.append(h.slot,h.generation,object);
+                    if((flags&0x100003u)||!admit(object))return true;
+                    return resolves(h)&&phase.append(h.slot,h.generation,object);
                 })))return false;
             phase.sort();return true;
-        },[&](int object){
-            for(unsigned i=0;i<phase.size();++i){
-                if(phase.object(i)!=object)continue;
+        },[&](int before){
+            while(next<phase.size()&&phase.object(next)<before){
+                const unsigned i=next++;const int object=phase.object(i);
                 const auto h=phase.handle(i);std::uint32_t flags;
                 if(!eligibilityFlags(h,flags)||(flags&0x100003u))continue;
                 if(!check(resolves(h)&&objectOf(h)==object))return false;
-                if(!check(object==120?skeletonStep(h):boneStep(h)))return false;
+                // There is no shared registration order for the transitional
+                // unregistered smoke pool. Never pretend two family passes
+                // define the source order when both populations coexist.
+                if(object==225&&world_->smokeEffects().size())return check(false);
+                if(!check(execute(h,object)))return false;
             }
             return true;
         },tick));
     }
+public:
     GameplayTerrainInstances& terrain(){return terrain_;}
     // Production handoff for the currently owned End Step actors. Keep its
     // actor capture off the Amiga task stack. Reference boxes borrow the idle

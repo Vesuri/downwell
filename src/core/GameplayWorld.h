@@ -1356,11 +1356,11 @@ public:
     }
     using EnemyStepOrder=downwell::RunnerStepSnapshot<enemyCapacity>;
     // Borrow an encounter dispatcher for a complete tick. Capture once before
-    // builder Step births, then enter the two source object-table positions.
+    // builder Step births, then dispatch up to exclusive object boundaries.
     // The owning collision adapter retains handles and rechecks eligibility;
     // no family-local scan may discover children born during this Step.
     template<class Capture,class Execute,class Tick>
-    bool withSkeletonBoneSteps(Capture capture,Execute execute,Tick tick){
+    bool withRegisteredEncounterSteps(Capture capture,Execute execute,Tick tick){
         if(!run_.effectsSucceeded||skeletonBoneSteps_)return run_.effectsSucceeded=false;
         auto dispatch=[&](int object){return object<0?capture():execute(object);};
         skeletonBoneContext_=&dispatch;

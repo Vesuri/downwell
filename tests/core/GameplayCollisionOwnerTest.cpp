@@ -89,6 +89,11 @@ bool nativeScheduledSkeletonStep(GameplayWorld& world,downwell::GameplayCollisio
     },[&](downwell::InstanceHandle key){return owner.stepBone(key,stop.player.stopped,frames);},
     [&]{world.step(0);return world.effectsSucceeded();});
 }
+bool nativeScheduledEncounterStep(GameplayWorld& world,downwell::GameplayCollisionOwner& owner,
+    downwell::GameplayCollisionOwner::EncounterStepOrder& phase,
+    bool (*execute)(downwell::InstanceHandle,int)){
+    return owner.withEncounterSteps(phase,execute,[&]{world.step(0);return world.effectsSucceeded();});
+}
 bool nativeSkeletonCorpse(GameplayWorld& world,GameplayWorld::Skeletons::Publisher& publish,
     downwell::MotionBinary64 impact,bool (*allocate)(std::uint32_t&),NativeSkeletonCorpseTiles tile){
     return world.emitSkeletonCorpse(publish,impact,allocate,tile);
@@ -1130,6 +1135,41 @@ int main(){
             !world->levelClearActive()&&world->randomDrawCount()==draws&&audit.births==1&&audit.writes==failure-1);
         assert(result.find(result.handle())->y.bits==0x43100000u);
         assert(!world->enterLevelClear(0,false)&&audit.births==1&&world->randomDrawCount()==draws);
+    }
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                   GameplayCollisionOwner::Ownership::nativeScenery}){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));
+        const auto maskBytes=read("generated/downwell-sprite-masks.dwsm");
+        SpriteMaskPack masks(maskBytes.data(),maskBytes.size());assert(masks.valid());
+        const auto x=MotionBinary64::fromInteger(240),y=MotionBinary64::fromInteger(200);
+        InstanceHandle skeleton,bone,smoke,blood;GameMakerRandom random(2);
+        // Deliberately create in a different order from the Step object table.
+        assert(world->createBoneWithSourceId(706000,240,200,bone)&&
+            owner->registeredSmoke().create(706001,x,y,random,smoke)&&
+            world->createBloodWithSourceId(706002,x,y,{},[](InstanceHandle){return true;},blood)&&
+            world->createSkeletonWithSourceId(706003,240,200,skeleton));
+        auto phase=std::make_unique<GameplayCollisionOwner::EncounterStepOrder>();
+        std::vector<int> order;unsigned hurts=0;bool born=false;
+        auto tick=[&]{return owner->withEncounterSteps(*phase,[&](InstanceHandle h,int object){
+            order.push_back(object);
+            if(object==120){
+                if(!born){born=true;InstanceHandle child;
+                    assert(owner->registeredSmoke().create(706004,x,y,random,child));}
+                return owner->stepSkeleton(h,true,{}, {},[&](auto&,auto&){return QuietSkeletonEffects{hurts};});
+            }
+            if(object==220)return owner->stepBlood(h,false,480,masks);
+            if(object==225)return owner->stepSmoke(h);
+            if(object==269)return owner->stepBone(h,true,[&](int sprite,unsigned& n){return sprites.frameCount(sprite,n);});
+            return false;
+        },[&]{world->step(0);return world->effectsSucceeded();});};
+        assert(tick()&&(order==std::vector<int>{120,220,225,269}));
+        order.clear();
+        assert(tick()&&(order==std::vector<int>{120,220,225,225,269}));
+        assert(hurts==0&&owner->valid());
     }
     // Exercise the real world tick, not dispatchStepPhase after the frame.
     // Synthetic births test the shared ordinary-Step creation cutoff.

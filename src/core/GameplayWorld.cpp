@@ -1759,14 +1759,17 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     for (unsigned i=0;i<enemyStepOrder_.size();++i)
         if(!stepEnemyRoomEffect(enemyStepOrder_.handle(i),publishedCameraX,generationCameraY))return {};
 
-    // The admitted legacy enemies are 111..119. Skeleton 120 follows them,
-    // before damage numbers (221), smoke (225), currency (248) and bullets.
-    if(skeletonBoneSteps_&&!skeletonBoneSteps_(skeletonBoneContext_,120)){
+    // The admitted legacy enemies are 111..119. Skeleton 120 and blood 220
+    // follow them, before damage numbers (221).
+    if(skeletonBoneSteps_&&!skeletonBoneSteps_(skeletonBoneContext_,221)){
         run_.effectsSucceeded=false;return {};
     }
 
     DW_PROFILE_PHASE(profileEnemyContact);
     run_.stepDamageNumbers(damageNumberStepPhase);
+    if(skeletonBoneSteps_&&!skeletonBoneSteps_(skeletonBoneContext_,248)){
+        run_.effectsSucceeded=false;return {};
+    }
     run_.stepSmoke(smokeStepPhase,enemyRandom_);
     if(!run_.effectsSucceeded)return {};
     for(unsigned i=0;i<currencyStepOrder_.size();++i){
@@ -1813,8 +1816,8 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     }
 
     DW_PROFILE_PHASE(profileLifecycle);
-    // Bones (269) follow the usual bullet (261), before debris (370).
-    if(skeletonBoneSteps_&&!skeletonBoneSteps_(skeletonBoneContext_,269)){
+    // Corpse/bone/blast (263/269/276) follow usual bullets, before debris 370.
+    if(skeletonBoneSteps_&&!skeletonBoneSteps_(skeletonBoneContext_,370)){
         run_.effectsSucceeded=false;return {};
     }
     if(debrisStepDispatch_)for(unsigned i=0;i<debrisStepOrder_.size();++i){
@@ -1822,6 +1825,9 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         const auto* record=debrisInstances_?debrisInstances_->find(key):nullptr;
         if(!record||!record->active||record->destroyRequested)continue;
         if(!debrisStepDispatch_(debrisStepContext_,key)){run_.effectsSucceeded=false;return {};}
+    }
+    if(skeletonBoneSteps_&&!skeletonBoneSteps_(skeletonBoneContext_,0x7fffffff)){
+        run_.effectsSucceeded=false;return {};
     }
     // Only discard inactive tails; holes stay in creation order until the
     // existing stable compaction at the next birth. Never reorder live slots.
