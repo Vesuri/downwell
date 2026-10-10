@@ -124,7 +124,7 @@ private:
     mutable bool drawAuditHasSnapshot_=false;
 #endif
     RunnerStepSnapshot<1+GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity+GameplayWorld::droneBulletCapacity+GameplayWorld::boneCapacity+GameplayWorld::skeletonCapacity+GameplayWorld::currencyCapacity+32+32+4+4+8> combatAlarmPhase_;
-    RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::bulletCapacity+GameplayWorld::droneBulletCapacity+GameplayWorld::skeletonCapacity+GameplayPlayerControllers::capacity+32> actorEndStepPhase_;
+    RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::bulletCapacity+GameplayWorld::droneBulletCapacity+GameplayWorld::skeletonCapacity+GameplayPlayerControllers::capacity+32+GameplayWhiteJellies::capacity> actorEndStepPhase_;
     bool actorEndStepExecuting_=false;
     bool combatAlarmPhaseInUse_=false;
     bool combatAlarmCaptureDirty_=true;
@@ -1533,7 +1533,7 @@ public:
             const auto* nativeTerrain=self.world_->nativeTerrainInstances();
             const unsigned terrainCount=nativeTerrain?nativeTerrain->size():self.terrain_.size();
             const auto terrainCutoff=nativeTerrain?nativeTerrain->lastLifetime():self.terrain_.lastLifetime();
-            if(!self.world_->playerHandle().generation&&!terrainCount&&!self.world_->breakableSlots()&&!self.world_->enemyCount()&&!self.world_->bulletCount()&&!self.drones_.size()&&!self.skeletons_.size()&&!self.playerControllers_.size()&&!self.corpses_.size())return true;
+            if(!self.world_->playerHandle().generation&&!terrainCount&&!self.world_->breakableSlots()&&!self.world_->enemyCount()&&!self.world_->bulletCount()&&!self.drones_.size()&&!self.skeletons_.size()&&!self.whiteJellies_.size()&&!self.playerControllers_.size()&&!self.corpses_.size())return true;
             MotionBinary64 top;
             if(!multiplyBinary64(MotionBinary64::fromInteger(topQ12),{0x3f300000u,0},top))return self.check(false);
             return self.dispatchActorEndStep([&](InstanceHandle shared,int object){
@@ -1559,6 +1559,15 @@ public:
                 }
                 if(object==261&&kind==View::Kind::bullet)return self.endStepBullet(shared,top);
                 if(object==120&&kind==View::Kind::skeleton)return self.skeletons_.endStep(local,top,true);
+                if(object==115&&kind==View::Kind::whiteJelly){
+                    struct Ops {
+                        GameplayWhiteJellies& store;InstanceHandle key;MotionBinary64 top;
+                        bool viewY(MotionBinary64& value){value=top;return true;}
+                        bool room(int& value){value=11;return true;}
+                        bool destroy(){return store.markDestroyed(key);}
+                    } ops{self.whiteJellies_,local,top};
+                    return self.whiteJellies_.dispatch(local,[&](auto& actor){return actor.endStep(ops);});
+                }
                 if(object==263&&kind==View::Kind::corpse)return self.corpses_.endStep(local,top,true);
                 if(object==256&&kind==View::Kind::playerController)
                     return self.playerControllers_.balloonEndStep(local,self.world_->upgrades().levels[15]!=0);
@@ -2058,7 +2067,7 @@ public:
             })))return false;
         if(!check(visitRegistered(View::playerControllerBase,View::capacity,
             [&](InstanceHandle h,int object,std::uint32_t flags){
-                if((flags&0x100003u)||(object!=256&&object!=263))return true;
+                if((flags&0x100003u)||(object!=256&&object!=263&&object!=115))return true;
                 return resolves(h)&&actorEndStepPhase_.append(h.slot,h.generation,object);
             })))return false;
         actorEndStepPhase_.sort();

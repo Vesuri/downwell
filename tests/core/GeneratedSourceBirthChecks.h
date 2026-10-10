@@ -34,6 +34,11 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
         world->step(0);
         assert(world->effectsSucceeded()&&owner->valid()&&!store.find(key)->hitStun&&
             store.find(key)->imageIndex.bits==0x3ecccccdu);
+        RunnerImageValue outside,accepted;
+        assert(outside.assignInteger(-1000)&&store.position(key,true,outside,accepted));
+        world->step(0);
+        assert(world->effectsSucceeded()&&owner->valid()&&store.find(key)&&store.find(key)->destroyRequested);
+        assert(owner->prepareDraw()&&!store.find(key));
     }
     for(int style:{0,2})for(bool knees:{false,true})for(bool rejectSound:{false,true}){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
