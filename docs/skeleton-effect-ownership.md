@@ -411,6 +411,13 @@ not natural encounter admission. Native blast wall
 contacts also require original numeric IDs for breakable hit memory; native
 storage slots are not valid substitutes.
 
+Blast/player event 2332 has an empty body after its damage-window guard in the
+VM. Both resource-backed adapters validate the two retained lifetimes and route
+it to the shared no-op, including after the damage window closes. It neither
+adds the player to hit memory nor produces damage, sound or an impact. The
+encounter routers admit this event; an unrecognized blast target still requires
+its own handler and must not be silently treated as another empty event.
+
 Effect-producing callbacks return success. `SkeletonActor` stops the event on
 failed enemy-death setup, blood, smoke, flash, currency, corpse or debris
 creation; stomp blood and each Exploding Knees smoke emission have the same

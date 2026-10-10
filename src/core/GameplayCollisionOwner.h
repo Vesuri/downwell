@@ -2144,6 +2144,7 @@ public:
             [&](const auto& unhandled){
                 View::Kind kind;InstanceHandle local;
                 if(!View::decode(unhandled.self,kind,local))return false;
+                if(kind==View::Kind::blast&&unhandled.subtype==35)return dispatchBlastPlayerCollision(unhandled);
                 return kind==View::Kind::blast&&unhandled.subtype==120?
                     dispatchBlastSkeletonCollisionWithEffects(unhandled,allocate,frames,environment,audio):other(unhandled);
             });
@@ -2173,6 +2174,14 @@ public:
            !objects_.collisionEvent(261,120,found,binding)||!found||
            binding.ownerObjectId!=261||binding.codeId!=2224)return check(false);
         return check(world_->hitSkeletonWithSourceBullet(shot,target,frames,delay,environment,audio,atan));
+    }
+    bool dispatchBlastPlayerCollision(const RunnerCollisionEventContext::Frame& event){
+        View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;
+        if(!valid()||!world_||!resolves(event.self)||!resolves(event.other)||
+           !View::decode(event.self,kind,local)||kind!=View::Kind::blast||objectOf(event.other)!=35||
+           event.type!=4||event.subtype!=35||event.owner!=276||event.code!=2332||
+           !objects_.collisionEvent(276,35,found,binding)||!found||binding.ownerObjectId!=276||binding.codeId!=2332)return check(false);
+        return check(blasts_.dispatch(local,[](auto& actor,auto&,bool& good){return actor.playerContact(good);}));
     }
     template<class Allocate,class Frames,class Audio>
     bool dispatchBlastSkeletonCollisionWithEffects(const RunnerCollisionEventContext::Frame& event,

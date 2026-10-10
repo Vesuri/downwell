@@ -7142,6 +7142,22 @@ int main(){
                     owner->skeletons().find(first)->state.health==10&&owner->skeletons().find(second)->state.health==10&&
                     owner->scriptEffects().size()==2);
             }
+            InstanceHandle player,self;unsigned contacts=0;
+            assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::player,world->playerHandle(),player)&&
+                GameplayCollisionView::encode(GameplayCollisionView::Kind::blast,blast,self));
+            for(bool ended:{false,true}){
+                assert(owner->registeredBlasts().dispatch(blast,[&](auto& actor,auto&,bool&){actor.damageEnd=ended;return true;}));
+                assert(owner->dispatchCollisionEvent(context,self,player,{true,false},[&](const auto& event){
+                    ++contacts;return owner->dispatchSkeletonEncounterCollisionWithBlasts(event,stop,
+                        [&](unsigned& id){id=next++;return true;},
+                        [&](int sprite,unsigned& count){return sprites.frameCount(sprite,count);},env,audio,
+                        [](auto dy,auto dx,auto& angle){return portableAtan(dy,dx,angle);},
+                        [&](auto& actor){return CheckedSkeletonContact{actor,4,stomps,damages};},
+                        [](auto&,int,int,int){return false;},[](const auto&){assert(false);return false;});
+                }));
+            }
+            assert(contacts==2&&owner->registeredBlasts().find(blast)->state.hits.count==2&&
+                next==605205&&audio.calls==12&&!stomps&&!damages);
         }
         for(bool missingFrames:{false,true}){
             auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},

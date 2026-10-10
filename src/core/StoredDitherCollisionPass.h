@@ -95,9 +95,11 @@ public:
         return runSkeletonContactsUsing(world,skeletons,bones,smoke,particles,stop,frames,environment,audio,atan,damage,
             [&](const auto& a,const auto& b){
                 return (a.objectId==120&&b.objectId==35&&skeletons.handle(a).generation)||
+                    (a.objectId==276&&b.objectId==35&&blasts.handle(a).generation)||
                     (a.objectId==276&&b.objectId==120&&blasts.handle(a).generation&&skeletons.handle(b).generation);
             },[&](const auto& event){
                 const auto* self=owner_.resolve(event.self);if(!self)return false;
+                if(self->objectId==276&&event.subtype==35)return world.dispatchBlastPlayerCollision(blasts,event);
                 return self->objectId==276?world.dispatchBlastSkeletonCollisionWithEffects(blasts,skeletons,event,frames,environment,audio):
                     world.dispatchSkeletonCollision(skeletons,event,makePlayer);
             });

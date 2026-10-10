@@ -1688,6 +1688,19 @@ int main(){
                     require(world->instance(id)&&world->instance(id)->objectId==219&&world->instance(id)->spriteId==605,
                         "collected blast publishes real impacts");
             }
+            InstanceHandle player;
+            require(world->visitDrawChecked([&](InstanceHandle key,const InstanceRecord& r){
+                if(r.objectId==35)player=key;return true;
+            })&&player.generation,"resolve retained player for blast contact");
+            RunnerCollisionEventContext context;unsigned contacts=0;
+            for(bool ended:{false,true}){
+                require(blasts.dispatch(blast,[&](auto& actor,auto&,bool&){actor.damageEnd=ended;return true;}),"set blast damage window");
+                require(owner->dispatchCollisionEvent(context,blasts.worldHandle(blast),player,{true,false},[&](const auto& event){
+                    ++contacts;return world->dispatchBlastPlayerCollision(blasts,event);
+                }),"resource-bound blast player event");
+            }
+            require(contacts==2&&blasts.instances().find(blast)->state.hits.count==2&&audio.calls==12&&
+                world->nextRuntimeInstanceId()==next+2,"empty player event preserves hit memory and effects");
             return true;
         }),"collected blast encounter succeeds");
     }

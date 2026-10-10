@@ -1846,6 +1846,18 @@ public:
            (event.code!=2007&&event.code!=2008))return run_.effectsSucceeded=false;
         return run_.effectsSucceeded=particles.kill(*self)&&run_.effectsSucceeded;
     }
+    template<unsigned Capacity> bool dispatchBlastPlayerCollision(
+        StoredBlastRegistration<instanceCapacity,Capacity>& blasts,const RunnerCollisionEventContext::Frame& event){
+        const auto* self=instances_.resolve(event.self);const auto* other=instances_.resolve(event.other);
+        PackedObjectEvent binding{};bool found=false;
+        if(!run_.effectsSucceeded||!blasts.belongsTo(instances_)||!blasts.valid()||!self||!other||!objectPack_||
+           self->objectId!=276||other->objectId!=35||event.type!=4||event.subtype!=35||event.owner!=276||event.code!=2332||
+           !objectPack_->collisionEvent(276,35,found,binding)||!found||binding.ownerObjectId!=276||binding.codeId!=2332)
+            return run_.effectsSucceeded=false;
+        return run_.effectsSucceeded=blasts.dispatch(blasts.handle(*self),[](auto& actor,auto&,bool& good){
+            return actor.playerContact(good);
+        });
+    }
     template<unsigned BlastCapacity,unsigned SkeletonCapacity,class Frames,class Audio>
     bool dispatchBlastSkeletonCollisionWithEffects(StoredBlastRegistration<instanceCapacity,BlastCapacity>& blasts,
         StoredSkeletonRegistration<instanceCapacity,SkeletonCapacity>& skeletons,
