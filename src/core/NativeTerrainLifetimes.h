@@ -164,8 +164,14 @@ public:
         return true;
     }
     bool createProperties(InstanceHandle h,int tile){
-        Identity id;std::uint32_t spatial;
-        if(!readIdentity(h,id)||!spatialFlags(h,spatial)||(flags_[h.slot]&32u))return good_=false;
+        Identity id;
+        if(!readIdentity(h,id))return good_=false;
+        return createKnownIdentity(id,tile);
+    }
+private:
+    bool createKnownIdentity(const Identity& id,int tile){
+        const auto h=id.handle;std::uint32_t spatial;
+        if(!spatialFlags(h,spatial)||(flags_[h.slot]&32u))return good_=false;
         if(id.object!=99){
             if(tile<0||tile>32767||(binding_.context&&
                 (!binding_.create||!binding_.create(binding_.context,id,tile,spatial))))return good_=false;
@@ -177,6 +183,7 @@ public:
         walls_[h.slot].store(WallEndStepState{});
         return true;
     }
+public:
     // Serialized creation code runs after object Create, before the next
     // room birth. Keep its application stage in the spare flags bit and its
     // immutable operand in the existing run identity, not a per-cell record.
@@ -259,6 +266,23 @@ public:
             (flags_[id.handle.slot]&1)!=0);});
     }
     bool append(int object,int x,int y,bool active=true,unsigned source=0,int creation=-1){
+        return appendConstructed(object,x,y,active,source,creation,nullptr,0);
+    }
+    // Only a callback-free generated segment may borrow this constructor.
+    // Each cell still completes birth and then Create before the next cell.
+    // The born identity is live on the stack: do not recover it by ordinal
+    // and reconstruct it from the run just to execute that same Create.
+    template<class Producer> bool constructRun(int tile,bool& effectsSucceeded,Producer producer){
+        return publishRun([&]{
+            return producer([&](int object,int x,int y){
+                if(object!=60&&object!=93)return good_=false;
+                return appendConstructed(object,x,y,true,0,-1,&effectsSucceeded,tile);
+            });
+        });
+    }
+private:
+    bool appendConstructed(int object,int x,int y,bool active,unsigned source,int creation,
+        bool* effectsSucceeded,int tile){
         if(!canAppend(1)||(object!=60&&object!=93&&object!=99))return good_=false;
         unsigned slot=freeHint_;while(slot<Capacity&&runs_.occupied(slot))++slot;
         Order order;
@@ -275,8 +299,11 @@ public:
         walls_[slot]=PackedWallState{}; // Slot reuse must not inherit a query cache.
         walls_[slot].store(WallEndStepState{});
         if(object==60&&!active)wallPresentationState_=true;
+        if(effectsSucceeded)
+            return *effectsSucceeded=*effectsSucceeded&&createKnownIdentity(identity,tile);
         return true;
     }
+public:
     bool canAppend(unsigned count)const{
         return good_&&count<=available()&&next_&&(!count||count-1<=0xffffffffu-next_)&&
             (!binding_.admit||binding_.admit(binding_.context,count));

@@ -99,11 +99,16 @@ bool AmigaGameplayGeneration::createPrepared(void* opaque,const downwell::AreaOn
     }
     if(!self.tiles_.appendPrepared(batch))return false;
     if(self.lifetimes_){
-        if(!self.lifetimes_->publishRun([&]{
+        const auto produce=[&](auto birth){
             const auto* source=batch.creates();
             for(unsigned i=0;i<batch.count();++i,source+=2)
-                if(!self.birth((source[0]&128)?93:60,(int(source[0]&127)-32)*16,batch.y))return false;
+                if(!birth((source[0]&128)?93:60,(int(source[0]&127)-32)*16,batch.y))return false;
             return true;
+        };
+        if(self.runtime_->nativeTerrainInstances()==self.lifetimes_){
+            if(!self.runtime_->constructNativeTerrainRun(produce))return false;
+        }else if(!self.lifetimes_->publishRun([&]{
+            return produce([&](int object,int x,int y){return self.birth(object,x,y);});
         }))return false;
     }
     batch.completePublication();

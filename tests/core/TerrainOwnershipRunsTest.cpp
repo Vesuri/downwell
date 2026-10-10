@@ -478,7 +478,60 @@ static void constructorPublication(){
     }));
     require(failed.appearance(0).same(a));
 }
+static void constructedSegments(){
+    using Native=downwell::NativeTerrainLifetimes<16>;
+    struct Observer {
+        Native* live;std::vector<unsigned> log;int fail=-1;unsigned calls=0;
+        bool event(unsigned kind,unsigned slot,unsigned value){
+            log.insert(log.end(),{kind,slot,value,live->size(),live->lastLifetime(),unsigned(live->valid())});
+            return int(calls++)!=fail;
+        }
+    };
+    for(int failure=-1;failure<26;++failure){
+        Native scalar,segment;Observer a{&scalar,{},failure},b{&segment,{},failure};
+        auto binding=[](Observer& observer){
+            Native::Binding result;
+            result.context=&observer;
+            result.admit=[](void* p,unsigned n){return static_cast<Observer*>(p)->event(0,0,n);};
+            result.birth=[](void* p,const Native::Identity& id,bool active,std::uint32_t& order,std::uint32_t& flags){
+                order=100+id.handle.generation;flags=8u;
+                return static_cast<Observer*>(p)->event(1,id.handle.slot,unsigned(id.object)+unsigned(active)*1000);
+            };
+            result.retire=[](void*,unsigned){return true;};
+            result.mark=[](void*,unsigned){return true;};
+            result.create=[](void* p,const Native::Identity& id,int tile,std::uint32_t& flags){
+                auto& o=*static_cast<Observer*>(p);
+                require(o.live->publishCachedOffset(id.handle,16,0));flags|=0x200u;
+                return o.event(2,id.handle.slot,unsigned(tile));
+            };
+            result.beginRun=[](void* p){return static_cast<Observer*>(p)->event(3,0,0);};
+            result.endRun=[](void* p){return static_cast<Observer*>(p)->event(4,0,0);};
+            return result;
+        };
+        require(scalar.bind(binding(a))&&segment.bind(binding(b)));
+        const auto produce=[](auto birth){
+            for(unsigned i=0;i<8;++i)if(!birth(i%3?60:93,240+int(i)*16,160))return false;
+            return true;
+        };
+        bool scalarEffects=true,segmentEffects=true;
+        const bool expected=scalar.publishRun([&]{return produce([&](int object,int x,int y){
+            if(!scalar.append(object,x,y))return false;
+            return scalarEffects=scalarEffects&&scalar.createProperties(scalar.handle(scalar.size()-1),51);
+        });});
+        const bool actual=segment.constructRun(51,segmentEffects,produce);
+        require(actual==expected&&scalarEffects==segmentEffects&&a.log==b.log&&
+            scalar.size()==segment.size()&&scalar.lastLifetime()==segment.lastLifetime()&&
+            scalar.valid()==segment.valid()&&scalar.runCount()==segment.runCount());
+        if(actual)for(unsigned i=0;i<scalar.size();++i){
+            int as,bs,ax,ay,bx,by;unsigned ai,bi;bool ac,bc;
+            require(scalar.appearance(scalar.handle(i),as,ai,ac)&&segment.appearance(segment.handle(i),bs,bi,bc));
+            require(as==bs&&ai==bi&&ac==bc&&scalar.cachedOffset(scalar.handle(i),ax,ay)&&
+                segment.cachedOffset(segment.handle(i),bx,by)&&ax==bx&&ay==by);
+        }
+    }
+}
 int main(){
+    constructedSegments();
     static_assert(sizeof(downwell::PackedWallState)==4,"No extra per-wall cache allocation");
     for(const auto delta:std::vector<std::pair<int,int>>{{0,0},{0,-16},{16,0},{0,16},{-16,0}}){
         downwell::PackedWallState packed;

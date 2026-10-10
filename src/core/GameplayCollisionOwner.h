@@ -190,6 +190,8 @@ private:
     using TerrainLayerRun=decltype(layers_)::TerrainRunBirth;
     TerrainLayerRun nativeTerrainLayerRun_;
     bool nativeTerrainLayerRunActive_=false;
+    int terrainCreateTile_=-1;
+    const PreparedTerrainCreate::Plan* terrainCreatePlans_[2]{};
     unsigned terrainRoomFirst_=0,terrainRoomCount_=0;
     RunnerImageValue terrainRoomDepth_{};
     bool flushTerrainRoomSpan(){
@@ -1574,7 +1576,13 @@ public:
                 self.table_.externalFlagsChanged(View::terrainBase+slot);return true;},
             [](void* p,const GameplayWorld::NativeTerrain::Identity& id,int tile,std::uint32_t& flags){
                 auto& self=*static_cast<GameplayCollisionOwner*>(p);
-                const auto* plan=self.nativeTerrainCreate_.get(id.object,tile);
+                const PreparedTerrainCreate::Plan* plan;
+#ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+                if(self.nativeTerrainLayerRunActive_&&tile==self.terrainCreateTile_&&(id.object==60||id.object==93))
+                    plan=self.terrainCreatePlans_[id.object==93];
+                else
+#endif
+                    plan=self.nativeTerrainCreate_.get(id.object,tile);
                 if(!self.valid()||!plan||plan->sprite!=tile)return self.check(false);
                 if(plan->changedSprite){
                     flags|=8u;
@@ -1614,6 +1622,9 @@ public:
                 if(!self.check(self.valid()&&!self.nativeTerrainLayerRunActive_&&wall&&thin&&
                     RunnerSpatialSplit::equal(wall->creationDepth,thin->creationDepth)))return false;
                 self.nativeTerrainLayerRun_=TerrainLayerRun{};
+                self.terrainCreateTile_=terrainTileForArea(self.world_->runStage().area);
+                self.terrainCreatePlans_[0]=self.nativeTerrainCreate_.get(60,self.terrainCreateTile_);
+                self.terrainCreatePlans_[1]=self.nativeTerrainCreate_.get(93,self.terrainCreateTile_);
                 self.terrainRoomCount_=0;
                 self.nativeTerrainLayerRunActive_=true;
 #endif

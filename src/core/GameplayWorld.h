@@ -322,6 +322,10 @@ public:
         return run_.effectsSucceeded=run_.effectsSucceeded&&nativeTerrainInstances_&&
             nativeTerrainInstances_->createProperties(h,downwell::terrainTileForArea(run_.stage.area));
     }
+    template<class Producer> bool constructNativeTerrainRun(Producer producer){
+        return nativeTerrainInstances_&&nativeTerrainInstances_->constructRun(
+            downwell::terrainTileForArea(run_.stage.area),run_.effectsSucceeded,producer);
+    }
     bool publishNativeTerrainIndexed(downwell::InstanceHandle h){
         return run_.effectsSucceeded=run_.effectsSucceeded&&nativeTerrainInstances_&&
             nativeTerrainInstances_->publishIndexed(h);
