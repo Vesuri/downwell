@@ -1357,6 +1357,40 @@ int main(){
         assert(depths.request(0,a,MotionBinary64::fromInteger(1))&&owner);
         assert(!depths.request(1,b,MotionBinary64::fromInteger(2))&&!owner&&!depths.succeeded());
     }
+    {
+        const auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
+        ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
+        // Public child access may fail without returning through an owner
+        // callback. Both polling and subscribed ownership must see it now.
+        for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::nativeScenery})
+        for(unsigned family=0;family<15;++family){
+            auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
+                GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},nullptr,mode);
+            assert(owner->valid());bool result=true;
+            switch(family){
+            case 0:result=owner->shopInstances().setAlarm({},0,1);break;
+            case 1:result=owner->redBalls().setAlarm({},0,1);break;
+            case 2:result=owner->whiteJellies().setAlarm({},0,1);break;
+            case 3:result=owner->movingEffects().retire({});break;
+            case 4:result=owner->spawners().mask({},-1);break;
+            case 5:result=owner->scattered().alarm0({});break;
+            case 6:result=owner->registeredFlash().retire({});break;
+            case 7:result=owner->limboShards().retire({});break;
+            case 8:result=owner->levelNumbers().retire({});break;
+            case 9:result=owner->runControllers().setAlarm({},0,1);break;
+            case 10:result=owner->consumptionParticles().retire({});break;
+            case 11:result=owner->registeredCorpses().retire({});break;
+            case 12:result=owner->registeredSmoke().retire({});break;
+            case 13:result=owner->registeredExpiry().retire({});break;
+            case 14:result=owner->playerControllers().setAlarm({},0,1);break;
+            }
+            assert(!result&&!owner->valid());
+        }
+        bool healthy=true;GameplayResultInstance result;result.observeFailure(healthy);
+        assert(!result.position(0,0)&&!healthy&&!result.valid());
+        healthy=true;GameplayBuilderController builder;builder.observeFailure(healthy);
+        assert(!builder.position(0,0)&&!healthy&&!builder.valid());
+    }
     for(bool failSmoke:{false,true}){
         auto world=std::make_unique<GameplayWorld>(300,false,1000,false);
         checkBoxBurstWorld(*world,failSmoke);

@@ -3,6 +3,7 @@
 #include "InstanceLifecycle.h"
 #include "CameraCreateState.h"
 #include "PlayerCompanionCreate.h"
+#include "FailureSignal.h"
 namespace downwell {
 // Registered player-created meter, camera, balloon and up to two Drones. Source IDs are supplied
 // by the enclosing synchronous creation stream, never by this local pool.
@@ -25,6 +26,7 @@ public:
     using Binding=RecordLifecycleBinding<Record>;
     explicit GameplayPlayerControllers(Binding binding={}):binding_(binding){}
     bool valid()const{return good_;}
+    void observeFailure(bool& owner){good_.observe(owner);}
     unsigned size()const{return count_;}
     const Record* find(InstanceHandle key)const{
         return key.generation&&key.slot<capacity&&records_[key.slot].lifetimeId==key.generation?&records_[key.slot]:nullptr;
@@ -146,7 +148,7 @@ public:
     }
 private:
     bool fail(){good_=false;return false;}
-    Record records_[capacity]{};Binding binding_{};unsigned count_=0,next_=1;bool good_=true;
+    Record records_[capacity]{};Binding binding_{};unsigned count_=0,next_=1;FailureSignal<> good_=true;
 };
 }
 #endif

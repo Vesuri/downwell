@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_MOVING_FX_INSTANCES_H
 #include "MovingFx.h"
 #include "InstanceLifecycle.h"
+#include "FailureSignal.h"
 namespace downwell {
 // Native object-220 ownership. No parallel generic room record; the caller
 // supplies a source ID from the complete room allocation stream.
@@ -17,6 +18,7 @@ public:
     MovingFxInstances(const MovingFxInstances&)=delete;
     MovingFxInstances& operator=(const MovingFxInstances&)=delete;
     bool valid()const{return good_;}
+    void observeFailure(bool& owner){good_.observe(owner);}
     unsigned size()const{return count_;}
     const Record* find(InstanceHandle key)const{
         return key.generation&&key.slot<Capacity&&records_[key.slot].lifetimeId==key.generation?&records_[key.slot]:nullptr;
@@ -99,7 +101,7 @@ public:
         return true;
     }
 private:
-    Record records_[Capacity]{};Binding binding_;unsigned next_=1,count_=0;bool good_=true;
+    Record records_[Capacity]{};Binding binding_;unsigned next_=1,count_=0;FailureSignal<> good_=true;
     bool fail(){good_=false;return false;}
     Record* resolve(InstanceHandle key){
         return good_&&find(key)&&!records_[key.slot].busy?&records_[key.slot]:nullptr;

@@ -5,6 +5,7 @@
 #include "ScatteredEvents.h"
 #include "CurrencyRewardFields.h"
 #include "SoundPlayScript.h"
+#include "FailureSignal.h"
 namespace downwell {
 // Scattered16 (289), a shootable/stompable scenery actor, not objSpike_n.
 // Builder adoption must not repeat its already-consumed Create RNG.
@@ -22,6 +23,7 @@ public:
     using Binding=RecordLifecycleBinding<Record>;
     explicit GameplayScattered(Binding binding={}):binding_(binding){}
     bool valid()const{return good_;}
+    void observeFailure(bool& owner){good_.observe(owner);}
     unsigned size()const{return count_;}
     InstanceHandle handle(unsigned slot)const{return slot<capacity?InstanceHandle{slot,records_[slot].lifetimeId}:InstanceHandle{};}
     const Record* find(InstanceHandle h)const{
@@ -88,7 +90,7 @@ public:
     }
 private:
     bool fail(){good_=false;return false;}
-    Record records_[capacity]{};Binding binding_;unsigned next_=1,count_=0;bool good_=true;
+    Record records_[capacity]{};Binding binding_;unsigned next_=1,count_=0;FailureSignal<> good_=true;
 };
 }
 #endif

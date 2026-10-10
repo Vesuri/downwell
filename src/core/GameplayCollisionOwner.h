@@ -1284,6 +1284,15 @@ public:
             debris_.observeFailure(good_);timeChanges_.observeFailure(good_);
             timeShards_.observeFailure(good_);
             entries_.observeFailure(good_);
+            shopInstances_.observeFailure(good_);redBalls_.observeFailure(good_);
+            movingEffects_.observeFailure(good_);whiteJellies_.observeFailure(good_);
+            spawners_.observeFailure(good_);scattered_.observeFailure(good_);
+            flash_.observeFailure(good_);limbo_.observeFailure(good_);
+            levelNumbers_.observeFailure(good_);result_.observeFailure(good_);
+            controllers_.observeFailure(good_);consumption_.observeFailure(good_);
+            corpses_.observeFailure(good_);smoke_.observeFailure(good_);
+            expiry_.observeFailure(good_);playerControllers_.observeFailure(good_);
+            builderController_.observeFailure(good_);
             layers_.observeFailure(good_);failureObserved_=true;
         }
 #endif
@@ -1292,11 +1301,19 @@ public:
     GameplayCollisionOwner& operator=(const GameplayCollisionOwner&)=delete;
     // Registration order with live flags, for differential verification.
     template<class Visit> bool visitRegistrationOrder(Visit visit)const{return valid()&&visitEligibility(visit);}
-    // Drone dispatch deliberately exposes bool& status to arbitrary callbacks;
-    // retain its live read rather than delaying a callback's failure to return.
-    bool valid()const{return shopInstances_.valid()&&redBalls_.valid()&&movingEffects_.valid()&&whiteJellies_.valid()&&spawners_.valid()&&scattered_.valid()&&good_&&blasts_.valid()&&flash_.valid()&&limbo_.valid()&&levelNumbers_.valid()&&result_.valid()&&controllers_.valid()&&consumption_.valid()&&corpses_.valid()&&smoke_.valid()&&expiry_.valid()&&playerControllers_.valid()&&builderController_.valid()&&blood_.valid()&&skeletons_.valid()&&(failureObserved_?(drones_.valid()&&bones_.valid()):
-        (owner_.valid()&&properties_.valid()&&terrain_.valid()&&scriptEffects_.valid()&&debris_.valid()&&
-         timeShards_.valid()&&timeChanges_.valid()&&entries_.valid()&&drones_.valid()&&bones_.valid()&&layers_.valid()));}
+    // These dispatchers expose bool& status to arbitrary callbacks. Keep
+    // their live reads: a nested query can see failure before callback return.
+    bool valid()const{
+        if(failureObserved_)return good_&&drones_.valid()&&bones_.valid()&&
+            blasts_.valid()&&blood_.valid()&&skeletons_.valid();
+        return shopInstances_.valid()&&redBalls_.valid()&&movingEffects_.valid()&&whiteJellies_.valid()&&
+            spawners_.valid()&&scattered_.valid()&&good_&&blasts_.valid()&&flash_.valid()&&limbo_.valid()&&
+            levelNumbers_.valid()&&result_.valid()&&controllers_.valid()&&consumption_.valid()&&corpses_.valid()&&
+            smoke_.valid()&&expiry_.valid()&&playerControllers_.valid()&&builderController_.valid()&&blood_.valid()&&
+            skeletons_.valid()&&owner_.valid()&&properties_.valid()&&terrain_.valid()&&scriptEffects_.valid()&&
+            debris_.valid()&&timeShards_.valid()&&timeChanges_.valid()&&entries_.valid()&&drones_.valid()&&
+            bones_.valid()&&layers_.valid();
+    }
     unsigned pendingSpatialIndex()const{return owner_.pendingSpatialIndex();}
     // Explicit source dirty pass. It is not yet scheduled as a gameplay
     // collision pass: complete animation/scene publication remains required.

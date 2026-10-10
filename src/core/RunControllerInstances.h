@@ -4,6 +4,7 @@
 #include "MomentDelay.h"
 #include "AlarmBank.h"
 #include "PlayerDamage.h"
+#include "FailureSignal.h"
 namespace downwell {
 // Persistent object-37 lifetimes. The enclosing world supplies source IDs and
 // synchronous global initialization. Room changes must retain these records;
@@ -24,6 +25,7 @@ public:
     RunControllerInstances(const RunControllerInstances&)=delete;
     RunControllerInstances& operator=(const RunControllerInstances&)=delete;
     bool valid()const{return good_;}
+    void observeFailure(bool& owner){good_.observe(owner);}
     unsigned size()const{return count_;}
     const Record* find(InstanceHandle h)const{
         return h.generation&&h.slot<Capacity&&records_[h.slot].lifetimeId==h.generation?&records_[h.slot]:nullptr;
@@ -88,7 +90,7 @@ public:
 private:
     Record* resolve(InstanceHandle h){return good_?const_cast<Record*>(find(h)):nullptr;}
     bool fail(){good_=false;return false;}
-    Binding binding_;Record records_[Capacity]{};unsigned next_=1,count_=0;bool good_=true;
+    Binding binding_;Record records_[Capacity]{};unsigned next_=1,count_=0;FailureSignal<> good_=true;
 };
 }
 #endif

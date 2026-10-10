@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_GAMEPLAY_RESULT_INSTANCE_H
 #define DOWNWELL_CORE_GAMEPLAY_RESULT_INSTANCE_H
 #include "InstanceLifecycle.h"
+#include "FailureSignal.h"
 namespace downwell {
 // rmResult's authored object 325. Selection state remains in RunSession;
 // this owns only the source identity and published instance builtins.
@@ -14,6 +15,7 @@ public:
     using Binding=RecordLifecycleBinding<Record>;
     explicit GameplayResultInstance(Binding binding={}):binding_(binding){}
     bool valid()const{return good_;}
+    void observeFailure(bool& owner){good_.observe(owner);}
     InstanceHandle handle()const{return {0,record_.lifetimeId};}
     const Record* find(InstanceHandle h)const{
         return !h.slot&&h.generation&&h.generation==record_.lifetimeId?&record_:nullptr;
@@ -43,7 +45,7 @@ public:
     }
 private:
     bool fail(){good_=false;return false;}
-    Record record_{};Binding binding_{};unsigned next_=1;bool good_=true;
+    Record record_{};Binding binding_{};unsigned next_=1;FailureSignal<> good_=true;
 };
 }
 #endif

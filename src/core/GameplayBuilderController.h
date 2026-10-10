@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_GAMEPLAY_BUILDER_CONTROLLER_H
 #define DOWNWELL_CORE_GAMEPLAY_BUILDER_CONTROLLER_H
 #include "InstanceLifecycle.h"
+#include "FailureSignal.h"
 namespace downwell {
 // Authored objBuilder identity and published builtins. Generation/RNG state
 // remains in AreaOneBuilder; this is not a second generator or numeric allocator.
@@ -14,6 +15,7 @@ public:
     using Binding=RecordLifecycleBinding<Record>;
     explicit GameplayBuilderController(Binding binding={}):binding_(binding){}
     bool valid()const{return good_;}
+    void observeFailure(bool& owner){good_.observe(owner);}
     InstanceHandle handle()const{return {0,record_.lifetimeId};}
     const Record* find(InstanceHandle h)const{
         return !h.slot&&h.generation&&h.generation==record_.lifetimeId?&record_:nullptr;
@@ -40,7 +42,7 @@ private:
     Record record_{};
     Binding binding_{};
     unsigned next_=1;
-    bool good_=true;
+    FailureSignal<> good_=true;
 };
 }
 #endif

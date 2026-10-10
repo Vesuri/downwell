@@ -17,6 +17,7 @@
 #include "ShopParentEvents.h"
 #include "ShopTextDraw.h"
 #include "ShopParentDraw.h"
+#include "FailureSignal.h"
 namespace downwell {
 // Native ownership of Shop and its ten synchronous children. Numeric IDs
 // belong to the enclosing room allocator, never to this generation pool.
@@ -41,6 +42,7 @@ public:
     GameplayShopInstances(const ObjectPack& objects,const SpriteCollisionPack& sprites,Binding binding={})
         :objects_(objects),sprites_(sprites),binding_(binding){}
     bool valid()const{return good_;}
+    void observeFailure(bool& owner){good_.observe(owner);}
     template<class Environment> bool parentDraw(InstanceHandle h,Environment& env){
         if(!ready(h,277)||!records_[h.slot].shop)return fail();
         auto& r=records_[h.slot];if(!r.active||r.destroyRequested)return true;
@@ -446,7 +448,7 @@ private:
         r.initialized=true;return source;
     }
     const ObjectPack& objects_;const SpriteCollisionPack& sprites_;Binding binding_;Record records_[capacity]{};
-    unsigned count_=0,next_=1;bool good_=true,creating_=false;
+    unsigned count_=0,next_=1;FailureSignal<> good_=true;bool creating_=false;
 };
 }
 #endif

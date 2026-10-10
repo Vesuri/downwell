@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_GAMEPLAY_SPAWNERS_H
 #include "InstanceLifecycle.h"
 #include "SpawnerStep.h"
+#include "FailureSignal.h"
 namespace downwell {
 class GameplaySpawners {
 public:
@@ -15,6 +16,7 @@ public:
     using Binding=RecordLifecycleBinding<Record>;
     explicit GameplaySpawners(Binding binding={}):binding_(binding){}
     bool valid()const{return good_;}
+    void observeFailure(bool& owner){good_.observe(owner);}
     unsigned size()const{return count_;}
     InstanceHandle handle(unsigned slot)const{return slot<capacity?InstanceHandle{slot,records_[slot].lifetimeId}:InstanceHandle{};}
     const Record* find(InstanceHandle key)const{
@@ -64,7 +66,7 @@ public:
     }
 private:
     bool fail(){good_=false;return false;}
-    Record records_[capacity]{};Binding binding_;unsigned count_=0,next_=1;bool good_=true;
+    Record records_[capacity]{};Binding binding_;unsigned count_=0,next_=1;FailureSignal<> good_=true;
 };
 }
 #endif

@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_LEVEL_NUMBER_INSTANCES_H
 #include "LevelNumber.h"
 #include "InstanceLifecycle.h"
+#include "FailureSignal.h"
 namespace downwell {
 // Native object-372 storage. The enclosing world supplies source IDs and
 // resource/layer registration; local generations are never source IDs.
@@ -21,6 +22,7 @@ public:
     LevelNumberInstances(const LevelNumberInstances&)=delete;
     LevelNumberInstances& operator=(const LevelNumberInstances&)=delete;
     bool valid()const{return good_;}
+    void observeFailure(bool& owner){good_.observe(owner);}
     unsigned size()const{return count_;}
     const Record* find(InstanceHandle h)const{
         return h.generation&&h.slot<Capacity&&records_[h.slot].lifetimeId==h.generation?&records_[h.slot]:nullptr;
@@ -81,7 +83,7 @@ private:
     Record* resolve(InstanceHandle h){return good_&&!busy_?const_cast<Record*>(find(h)):nullptr;}
     bool fail(){good_=false;return false;}
     Binding binding_;Record records_[Capacity]{};unsigned next_=1,count_=0;
-    bool good_=true,busy_=false;
+    FailureSignal<> good_=true;bool busy_=false;
 };
 }
 #endif

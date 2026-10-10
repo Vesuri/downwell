@@ -5,6 +5,7 @@
 #include "RunnerDirectionValue.h"
 #include "RunnerSpriteChange.h"
 #include "UnitSequenceFrames.h"
+#include "FailureSignal.h"
 namespace downwell {
 // Shared native lifetime/publication owner for the steering-enemy families.
 // Builtin operations publish through this owner at the actual script writes;
@@ -26,6 +27,7 @@ public:
     GameplaySteeringEnemies(const GameplaySteeringEnemies&)=delete;
     GameplaySteeringEnemies& operator=(const GameplaySteeringEnemies&)=delete;
     bool valid()const{return good_;}
+    void observeFailure(bool& owner){good_.observe(owner);}
     unsigned size()const{return count_;}
     InstanceHandle handle(unsigned slot)const{return slot<capacity?InstanceHandle{slot,records_[slot].lifetimeId}:InstanceHandle{};}
     const Record* find(InstanceHandle key)const{
@@ -167,7 +169,7 @@ public:
     }
 private:
     bool fail(){good_=false;return false;}
-    Record records_[capacity]{};Binding binding_;unsigned next_=1,count_=0;bool good_=true;
+    Record records_[capacity]{};Binding binding_;unsigned next_=1,count_=0;FailureSignal<> good_=true;
 };
 }
 #endif
