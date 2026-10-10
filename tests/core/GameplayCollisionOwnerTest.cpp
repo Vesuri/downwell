@@ -1868,8 +1868,12 @@ int main(){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
             GameplayTerrainInstances::WallCollision{},&rooms,mode);
         auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),
-            owner->breakableBinding(),owner->playerBinding(),&owner->terrain(),&rooms);
-        assert(owner->attach(*world)&&world->createTimeFieldWithSourceId(820000,240,176));
+            owner->breakableBinding(),owner->playerBinding(),
+            mode==GameplayCollisionOwner::Ownership::reference?&owner->terrain():nullptr,&rooms);
+        auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
+        assert(owner->attach(*world)&&
+            (mode==GameplayCollisionOwner::Ownership::reference||world->bindNativeTerrain(*terrain))&&
+            world->createTimeFieldWithSourceId(820000,240,176));
         ContactDamageScripts damageCaller;unsigned selections=0;
         auto damageBinding=bindContactDamagePlayer(damageCaller,*world,[&](InstanceHandle& selected){
             assert(world->playerDamaged());++selections;selected=world->playerHandle();return true;
@@ -1884,12 +1888,21 @@ int main(){
         world->setPlayerHit();assert(world->playerHit()==1);
         assert(world->setOxygen({0x40230000u,0}));
         unsigned next=830000;std::uint8_t input=0;std::vector<PlayerTimeStop::Effect> events;
+        auto encounterPhase=std::make_unique<GameplayCollisionOwner::EncounterStepOrder>();
+        unsigned shardSteps=0;
         const auto tick=[&]{return owner->withPlayerTimeStop(stop,room,masks,false,
             [&](std::uint32_t& id){id=next++;return true;},
             [&](PlayerTimeStop::AudioQuery,bool& answer){answer=true;return true;},
             [&](PlayerTimeStop::Effect effect){events.push_back(effect);return true;},
-            [&]{world->step(input);return world->effectsSucceeded();});};
+            [&]{return owner->withEncounterSteps(*encounterPhase,[&](InstanceHandle h,int object){
+                if(object!=238)return false;
+                ++shardSteps;return owner->stepTimeShard(h,stop.player.stopped,masks);
+            },[&]{world->step(input);return world->effectsSucceeded();});});};
         assert(tick()&&stop.player.stopped&&stop.player.checkStop&&!stop.player.bgmOn);
+        // Begin Step births join this ordinary Step and read its freshly
+        // published stop state; they do not wait for the following frame.
+        assert(shardSteps==6);
+        assert(owner->timeShards().find(owner->timeShards().handle(1))->imageSpeed.bits==0);
         assert(world->playerDamaged()&&world->playerHit()==2);
         assert(world->oxygen().high==0x40240000u&&!world->oxygen().low);
         assert(next==830007&&owner->timeShards().size()==6&&owner->timeChanges().size()==1);

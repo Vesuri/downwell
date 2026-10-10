@@ -1945,11 +1945,11 @@ public:
     // Registered ordinary-Step dependencies of the skeleton encounter. Flash
     // balls and corpse-expiry pictures have no Step: their existing room
     // animation/cleanup dispatch remains authoritative.
-    using EncounterStepOrder=RunnerStepSnapshot<7*32+8>;
+    using EncounterStepOrder=RunnerStepSnapshot<7*32+8+64>;
     template<class Execute,class Tick>
     bool withEncounterSteps(EncounterStepOrder& phase,Execute execute,Tick tick){
         return withEncounterStepsSelected(phase,[](int object){
-            return object==120||object==220||object==223||object==225||object==263||
+            return object==120||object==220||object==223||object==225||object==238||object==263||
                 object==269||object==276||object==379;
         },execute,tick);
     }

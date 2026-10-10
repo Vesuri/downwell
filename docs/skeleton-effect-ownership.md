@@ -262,9 +262,9 @@ not a complete mixed scheduler for every effect family, nor is the scope yet
 installed by the Amiga scene frontend.
 
 `withEncounterSteps` extends that captured phase to registered blood (220),
-consumption blood (223), smoke (225), corpses (263), blasts (276) and limbo
-shards (379). The dispatcher advances one sorted cursor at boundaries before
-221, 248, 370 and the end of ordinary Step, interleaving with the existing
+consumption blood (223), smoke (225), time shards (238), corpses (263), blasts
+(276) and limbo shards (379). The dispatcher advances one sorted cursor at boundaries before
+221, 226, 248, 370 and the end of ordinary Step, interleaving with the existing
 damage-number, currency, bullet and debris handlers. It never recaptures
 between boundaries. Flash balls and corpse-expiry pictures have no ordinary
 Step and retain their room animation/cleanup paths. The caller must handle
@@ -272,6 +272,14 @@ every admitted object; unknown events cannot be silently accepted. Coexisting
 registered and legacy smoke populations fail rather than inventing their
 missing joint registration order. Natural callers must replace legacy smoke
 births before enabling this scope.
+
+An enclosing `withPlayerTimeStop` writes the live stop state in player Begin
+Step. Its newly registered time shards are included by the ordinary-Step
+capture later in the same tick. Object 238 dispatch reads that state, after
+both registered and legacy smoke and before currency. This differs from
+children born during ordinary Step, which remain excluded until the next
+capture. Native solid queries require the native terrain identity owner;
+retaining the reference terrain store alongside it is not a valid binding.
 
 Bone view queries resolve the retained lifetime's published binary32 x/y and
 apply `scrInView(0,0,0)` with the VM real-comparison tolerance. All four edges

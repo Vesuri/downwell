@@ -1767,11 +1767,15 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
 
     DW_PROFILE_PHASE(profileEnemyContact);
     run_.stepDamageNumbers(damageNumberStepPhase);
-    if(skeletonBoneSteps_&&!skeletonBoneSteps_(skeletonBoneContext_,248)){
+    if(skeletonBoneSteps_&&!skeletonBoneSteps_(skeletonBoneContext_,226)){
         run_.effectsSucceeded=false;return {};
     }
     run_.stepSmoke(smokeStepPhase,enemyRandom_);
     if(!run_.effectsSucceeded)return {};
+    // Time shards (238) follow all smoke (225), before currency (248).
+    if(skeletonBoneSteps_&&!skeletonBoneSteps_(skeletonBoneContext_,248)){
+        run_.effectsSucceeded=false;return {};
+    }
     for(unsigned i=0;i<currencyStepOrder_.size();++i){
         const auto key=currencyStepOrder_.handle(i);const auto* r=currencyInstances_->find(key);
         if(!r||!r->active||r->destroyRequested)continue;
