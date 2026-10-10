@@ -146,7 +146,13 @@ TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET) $(ALARM_TEST_TARGET
 all: $(TARGET)
 
 .PHONY: test-white-jelly-birth
-test: test-moving-fx test-red-ball-birth
+test: test-moving-fx-instances test-moving-fx test-red-ball-birth
+.PHONY: test-moving-fx-instances
+test-moving-fx-instances: build/moving-fx-instances-test
+	./build/moving-fx-instances-test
+build/moving-fx-instances-test: tests/core/MovingFxInstancesTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
 .PHONY: test-moving-fx
 test-moving-fx: build/moving-fx-test
 	./build/moving-fx-test

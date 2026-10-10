@@ -2,6 +2,10 @@
 using N=downwell::MotionBinary64;using F=downwell::RunnerImageValue;
 #ifdef DOWNWELL_FREESTANDING
 #include "core/StoredMovingFxRegistration.h"
+#include "core/MovingFxInstances.h"
+bool nativeMovingFxOwner(downwell::MovingFxInstances<2>& owner,downwell::InstanceHandle key,bool allowed){
+    return owner.advanceAnimation(key)&&owner.step(key,[&](const auto&,bool& value){value=allowed;return true;});
+}
 bool nativeMovingFxBirth(downwell::StoredMovingFxRegistration<8,2>& owner,N x,N y,downwell::InstanceHandle& child){
     return owner.create(x,y,child)&&owner.sprite(child,704,4)&&owner.imageSpeed(child,{0x3fb99999u,0x9999999au})&&
         owner.imageAngle(child,N::fromInteger(90))&&owner.velocity(child,true,{0xbfe00000u,0});
