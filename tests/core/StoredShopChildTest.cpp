@@ -8,6 +8,7 @@
 #include "ShopViewChecks.h"
 #include "ShopMenuChecks.h"
 #include "ShopParentChecks.h"
+#include "ShopSpeechChecks.h"
 #ifndef DOWNWELL_NATIVE_QUERY_PROBE
 #include <cstdio>
 #include <cstdlib>
@@ -348,6 +349,35 @@ bool registeredKeeperAlarmCheck(const ObjectPack& objects,bool reject){
     if(!owner.keeperAlarmEvent(h,0,random)||!owner.keeperAlarmEvent(h,1,random)||rolls!=1||observer.images!=2)return false;
     return owner.clear();
 }
+bool registeredShopSpeechCheck(const ObjectPack& objects){
+    if(!checkShopSpeechScript())return false;
+    InstanceStore<16> records;std::uint32_t next=930000;int room=11;bool good=true;
+    struct Audio {bool play(int,int,bool,int&){return false;} bool setGain(int,MotionBinary64,int){return false;}} audio;
+    ShopChildObserver observer;
+    StoredShopCreationOwner<16,1,Audio> owner(records,objects,InstanceLifecycleBinding::bindPositionedActor(observer),next,room,good,audio);
+    ShopWorld::Instance shop;
+    if(!owner.begin(shop))return false;
+    const auto old=owner.children().create(212,-100,-100);shop.children.risingText=old;
+    const auto oldKey=owner.children().sourceHandle(old);
+    const MotionBinary64 x{0x40536000u,0},y{0x405ed000u,0}; // 77.5,123.25
+    if(!old||!owner.replaceRisingText(shop.sourceId,x,y,"hello")||!records.resolve(oldKey)->destroyRequested||
+       shop.children.risingText!=old+1||records.size()!=3||next!=old+2)return false;
+    const auto key=owner.children().sourceHandle(shop.children.risingText);const auto* r=records.resolve(key);
+    const auto* state=owner.children().state(key);
+    if(!r||!state||r->preciseX!=77.5F||r->preciseY!=123.25F||r->alarms.get(0)!=90||r->alarms.get(1)!=60||
+       !state->text||state->text[0]!='h'||!state->initialized)return false;
+    if(!owner.children().retire(oldKey)||records.resolve(oldKey))return false;
+    // An expired myRisingText is a missing selector, not a failed script.
+    if(!owner.children().risingTextAlarmEvent(key,0)||!owner.children().retire(key)||
+       !owner.replaceRisingText(shop.sourceId,x,y,"again")||shop.children.risingText!=old+2||records.size()!=2)return false;
+    // Fill the bounded child owner. Exhaustion retains the destroy prefix,
+    // not a silently recycled text slot or overwritten myRisingText value.
+    for(unsigned i=0;i<10;++i)if(!owner.children().create(212,-100,-100))return false;
+    const auto retained=shop.children.risingText;const auto before=next;
+    if(owner.replaceRisingText(shop.sourceId,x,y,"full")||good||next!=before||
+       shop.children.risingText!=retained||!records.find(retained)->destroyRequested)return false;
+    return owner.clear()&&records.empty()&&observer.valid&&observer.births==14&&observer.retirements==14;
+}
 #ifndef DOWNWELL_NATIVE_QUERY_PROBE
 int main(){
     if(!checkShopRadioLogic())return 1;
@@ -357,6 +387,7 @@ int main(){
     std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(file),{}};
     ObjectPack objects(bytes.data(),bytes.size());
     if(!objects.valid())return 1;
+    if(!registeredShopSpeechCheck(objects))return 1;
     if(!registeredKeeperAlarmCheck(objects,false)||!registeredKeeperAlarmCheck(objects,true))return 1;
     for(unsigned reject=0;reject<=10;++reject)if(!shopChildRegistrationCheck(objects,reject,false)){
         std::fprintf(stderr,"shop child registration failed at birth %u\n",reject);return 1;

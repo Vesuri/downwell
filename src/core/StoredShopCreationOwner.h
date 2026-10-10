@@ -24,7 +24,9 @@ private:
     Parent parents_[ShopCapacity]{};
     InstanceStore<WorldCapacity>& records_;const ObjectPack& objects_;
     InstanceLifecycleBinding lifecycle_;std::uint32_t& nextId_;const int& room_;bool& good_;Audio& audio_;
-    StoredShopChildRegistration<WorldCapacity,ShopCapacity*10> children_;
+    // Retain the previous text until cleanup while creating its replacement.
+    // Bounded capacity is checked, never satisfied by early ID/slot recycling.
+    StoredShopChildRegistration<WorldCapacity,ShopCapacity*11> children_;
     bool fail(){good_=false;return false;}
     bool live(const Parent& p)const{
         const auto* r=records_.resolve(p.key);
@@ -47,6 +49,18 @@ public:
         return nullptr;
     }
     auto& children(){return children_;}
+    bool replaceRisingText(unsigned id,MotionBinary64 x,MotionBinary64 y,const char* text){
+        const auto* p=parent(id);if(!good_||!p||!p->shop)return fail();
+        struct Ops {
+            StoredShopCreationOwner& owner;
+            bool destroyPrevious(unsigned id){return owner.children_.destroyPreviousText(id);}
+            bool create(MotionBinary64 x,MotionBinary64 y,unsigned& id){
+                id=owner.children_.createReal(212,x,y);return id&&owner.good_;
+            }
+            bool text(unsigned id,const char* text){return owner.children_.assignText(id,text);}
+        } ops{*this};
+        return p->shop->speech.replace(p->shop->children.risingText,x,y,text,ops)||fail();
+    }
     template<class Environment> bool parentRadioStep(unsigned id,Environment& environment){
         const auto* p=parent(id);auto* r=p?records_.resolve(p->key):nullptr;
         if(!good_||!r||!p->shop)return fail();

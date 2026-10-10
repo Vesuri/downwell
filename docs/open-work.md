@@ -557,7 +557,8 @@ Reference: [scene architecture](scene-architecture.md).
 
 - Measure Chip/Fast RAM, task stack, asset residency and peak transition usage.
   Establish the A500 memory requirement; expanded-emulator runs do not prove
-  stock-machine fit.
+  stock-machine fit. Size the shop speech overlap reserve against repeated
+  messages within the nested parent Step, not just one replacement per parent.
 - Budget further Chip residency against the measured 928-byte startup
   headroom; remeasure after pack growth and through scene transitions.
   Restore the renderer's 120,000-byte resident-art gate: the current pack

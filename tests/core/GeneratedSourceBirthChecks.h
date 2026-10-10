@@ -9,6 +9,7 @@
 #include "ShopViewChecks.h"
 #include "ShopMenuChecks.h"
 #include "ShopParentChecks.h"
+#include "ShopSpeechChecks.h"
 #include <cassert>
 #include <memory>
 #include <vector>
@@ -267,6 +268,25 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
                 assert(object==277);++outer;return collision->stepRegisteredShopParent(h,input,currency,bind);
             },[&]{return collision->withShopRadioEvents(radio,[&]{world->step(0);return world->effectsSucceeded();});}));
             assert(outer==count&&visits==count*count&&collision->prepareDraw()&&store.size()==0);
+        }
+        {
+            assert(checkShopSpeechScript());ShopWorld::Instance speech;assert(creation.begin(speech));
+            speech.children.risingText=creation.create(212,-100,-100);
+            const auto old=store.sourceHandle(speech.children.risingText),parent=store.sourceHandle(speech.sourceId);
+            const unsigned nextId=next;const MotionBinary64 x{0x40536000u,0},y{0x405ed000u,0};
+            assert(store.replaceRisingText(parent,x,y,"hello",allocate)&&speech.children.risingText==nextId&&
+                next==nextId+1&&store.size()==3&&store.find(old)->destroyRequested);
+            const auto key=store.sourceHandle(speech.children.risingText);const auto* text=store.find(key);
+            assert(text&&text->x.bits==0x429b0000u&&text->y.bits==0x42f68000u&&text->state.initialized&&
+                text->state.text[0]=='h'&&text->alarms.get(0)==90&&text->alarms.get(1)==60);
+            InstanceHandle sharedText;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::shop,key,sharedText));
+            if(native){RunnerImageValue px,py;assert(collision->nativePublishedPosition(sharedText,px,py)&&
+                px.bits==text->x.bits&&py.bits==text->y.bits);}
+            else{const auto* state=collision->state(sharedText);assert(state&&state->x.bits==text->x.bits&&state->y.bits==text->y.bits);}
+            assert(store.retireMarked(old)&&store.setAlarm(key,0,1)&&
+                store.advanceAlarm(key,0,[](unsigned,unsigned){assert(false);return 0u;})&&store.retireMarked(key));
+            assert(store.replaceRisingText(parent,x,y,"again",allocate)&&speech.children.risingText==nextId+1&&store.size()==2);
+            assert(store.clear());
         }
         auto* distant=world->registerShopWithOwner(480,10000,creation);
         assert(distant&&store.size()==11);

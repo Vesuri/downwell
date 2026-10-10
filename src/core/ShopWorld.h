@@ -9,6 +9,7 @@
 #include "EnemyContact.h"
 #include "ShopChildCreation.h"
 #include "MotionBinary64.h"
+#include "ShopRisingText.h"
 namespace downwell {
 // Bounded world ownership and static child masks, separate from shop rendering.
 // Coordinates passed here are integer mask-query positions. Full fractional
@@ -31,6 +32,7 @@ struct ShopWorld {
         ShopFeedback feedback;
         ShopKeeper keeper;
         InteractionPrompt prompt;
+        ShopRisingText speech;
     };
     Instance instances[capacity];
     unsigned allocatedCount = 0;

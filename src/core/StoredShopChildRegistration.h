@@ -55,13 +55,16 @@ public:
     }
     const State* state(InstanceHandle h){auto* e=entry(h);return e&&record(*e)?&e->state:nullptr;}
     unsigned create(int object,int x,int y){
+        return createReal(object,MotionBinary64::fromInteger(x),MotionBinary64::fromInteger(y));
+    }
+    unsigned createReal(int object,MotionBinary64 x,MotionBinary64 y){
         if(!good_||creating_||(object!=278&&object!=279&&object!=98&&object!=280&&object!=212&&object!=283)){
             fail();return 0;
         }
         Entry* free=nullptr;for(auto& e:entries_)if(!e.id&&!free)free=&e;
         PackedObject definition;RunnerImageValue px,py;std::int32_t ix,iy;
         if(!free||!objects_.findObject(object,definition)||!nextId_||nextId_>0x7fffffffu||
-           !px.assignInteger(x)||!py.assignInteger(y)||!px.roundPixel(ix)||!py.roundPixel(iy)){
+           !px.assign(x)||!py.assign(y)||!px.roundPixel(ix)||!py.roundPixel(iy)){
             fail();return 0;
         }
         creating_=true;struct Reset {bool& flag;~Reset(){flag=false;}} reset{creating_};
@@ -86,6 +89,22 @@ public:
         } builtins{*this,*free,*r};
         if(!free->state.create(object,builtins)){fail();return 0;}
         return free->id;
+    }
+    bool destroyPreviousText(unsigned id){
+        if(!good_||creating_)return fail();
+        const auto key=sourceHandle(id);auto* e=entry(key);auto* r=e?record(*e):nullptr;
+        // Explicit-instance pushenv skips missing, inactive or marked targets.
+        if(!r)return records_.find(id)?fail():true;
+        if(!r->active||r->destroyRequested)return true;
+        PackedObjectEvent event;
+        if(e->object!=212||!e->state.initialized||objects_.findEvent(212,1,0,event)||
+           !lifecycle_.markDestroyed(key,*r)||!good_)return fail();
+        r->destroyRequested=true;return true;
+    }
+    bool assignText(unsigned id,const char* text){
+        auto* e=entry(sourceHandle(id));
+        if(!good_||creating_||!e||!record(*e)||e->object!=212||!e->state.initialized||!text)return fail();
+        e->state.text=text;return true;
     }
     bool readX(unsigned id,int& x){int y;return position(id,x,y);}
     bool position(unsigned id,int& x,int& y){

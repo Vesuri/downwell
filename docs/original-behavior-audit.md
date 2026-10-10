@@ -840,6 +840,25 @@ update when the stored parent handler is absent. Registration and event
 admission alone do not supply text, audio, player queries or normal frontend
 creation scopes.
 
+`scrRisingTextShop` writes caller `basex`, `basey` and `drawText` before selecting
+the old `myRisingText`. Missing/inactive/marked explicit targets are skipped.
+Object 212 has no Destroy event or parent, so an admitted old child is marked
+without an inherited script. The caller then creates a new object 212, assigns
+its returned source ID to `myRisingText`, and finally overwrites the new child's
+Create-default text. The old child remains allocated until cleanup. Original
+creation passes fractional coordinates through `instance_create_depth`; it
+does not round them to pixels first.
+
+`ShopRisingText` retains these caller fields and failure prefixes. Both owner
+adapters use the room's ID allocator and publish narrowed builtin coordinates
+before synchronous Create; stored integer query caches are separate from those
+coordinates. Text pointers borrow language storage, which must remain valid
+until every referencing text child retires. There is one replacement-lifetime
+reserve per parent, not a proof of the worst-case outstanding-message bound;
+further exhaustion is explicit and never triggers early retirement. Neither
+this script adapter nor its reserve supplies the language lookup or frontend
+speech binding.
+
 `ShopInteraction` and `ShopWorld::step` are still compact adapters, not a full
 implementation of that parent event. Besides missing the inner traversal and
 radio/view branches, their aggregate feedback callbacks cannot stand in for

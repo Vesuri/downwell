@@ -42,6 +42,10 @@ struct NativeShopAudio {
     bool setGain(int,downwell::MotionBinary64,int);
 };
 struct NativeShopAllocation {bool operator()(int,unsigned&);};
+bool nativeShopSpeech(downwell::GameplayShopInstances& owner,downwell::InstanceHandle key,
+    downwell::MotionBinary64 x,downwell::MotionBinary64 y,const char* text,NativeShopAllocation& allocate){
+    return owner.replaceRisingText(key,x,y,text,allocate);
+}
 bool nativeShopBody(downwell::GameplayShopInstances& owner,downwell::InstanceHandle key,
     downwell::ShopInteraction::Input& input,downwell::CurrencyAccount& currency,ShopParentProbe& env){
     return owner.parentStepBody(key,input,currency,env);

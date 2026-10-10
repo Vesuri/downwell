@@ -21,7 +21,9 @@ namespace downwell {
 // The pool must outlive its ShopWorld and every borrowed creation adapter.
 class GameplayShopInstances {
 public:
-    static constexpr unsigned capacity=ShopWorld::capacity*11;
+    // One replacement-text reserve per parent; multiple outstanding messages
+    // still fail explicitly on exhaustion rather than retire captured lifetimes.
+    static constexpr unsigned capacity=ShopWorld::capacity*12;
     struct Record {
         unsigned lifetimeId=0,sourceId=0;
         int objectId=-1,spriteId=-1,maskId=-1;
@@ -47,6 +49,31 @@ public:
     InstanceHandle sourceHandle(unsigned source)const{
         for(unsigned i=0;i<capacity;++i)if(source&&records_[i].lifetimeId&&records_[i].sourceId==source)return handle(i);
         return {};
+    }
+    template<class Allocate> bool replaceRisingText(InstanceHandle h,MotionBinary64 x,MotionBinary64 y,
+        const char* text,Allocate& allocate){
+        if(!ready(h,277)||!records_[h.slot].shop)return fail();
+        auto& shop=*records_[h.slot].shop;
+        struct Ops {
+            GameplayShopInstances& owner;Allocate& allocate;
+            bool destroyPrevious(unsigned source){
+                const auto key=owner.sourceHandle(source);const auto* old=owner.find(key);
+                if(!old)return owner.good_;
+                if(!old->active||old->destroyRequested)return true;
+                PackedObjectEvent event;
+                if(!owner.ready(key,212)||owner.objects_.findEvent(212,1,0,event)||
+                   !owner.binding_.markDestroyed(key,*old)||!owner.good_)return false;
+                owner.records_[key.slot].destroyRequested=true;return true;
+            }
+            bool create(MotionBinary64 x,MotionBinary64 y,unsigned& id){
+                id=owner.createReal(212,x,y,allocate,nullptr);return id&&owner.good_;
+            }
+            bool text(unsigned source,const char* text){
+                const auto key=owner.sourceHandle(source);if(!text||!owner.ready(key,212))return false;
+                owner.records_[key.slot].state.text=text;return true;
+            }
+        } ops{*this,allocate};
+        return shop.speech.replace(shop.children.risingText,x,y,text,ops)||fail();
     }
     template<class Allocate,class Audio> class Creation {
         GameplayShopInstances& owner_;Allocate& allocate_;Audio& audio_;
@@ -353,11 +380,14 @@ private:
         return true;
     }
     template<class Allocate> unsigned create(int object,int x,int y,Allocate& allocate,ShopWorld::Instance* shop){
+        return createReal(object,MotionBinary64::fromInteger(x),MotionBinary64::fromInteger(y),allocate,shop);
+    }
+    template<class Allocate> unsigned createReal(int object,MotionBinary64 x,MotionBinary64 y,Allocate& allocate,ShopWorld::Instance* shop){
         if(!good_||creating_||!next_||count_==capacity||
            (object!=277&&object!=278&&object!=279&&object!=98&&object!=280&&object!=212&&object!=283)||
            (object==277)!=bool(shop)){fail();return 0;}
         PackedObject definition;RunnerImageValue px,py;
-        if(!objects_.findObject(object,definition)||!px.assignInteger(x)||!py.assignInteger(y)){fail();return 0;}
+        if(!objects_.findObject(object,definition)||!px.assign(x)||!py.assign(y)){fail();return 0;}
         creating_=true;struct Reset{bool& value;~Reset(){value=false;}} reset{creating_};
         unsigned source=0;
         if(!allocate(object,source)||!good_||!source||source>0x7fffffffu||sourceHandle(source).generation){fail();return 0;}

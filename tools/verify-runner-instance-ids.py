@@ -319,6 +319,18 @@ invisible = assembly("gml_Object_objInvisWall_Create_0",
 assert invisible.count("call.i") == 1 and "call.i event_inherited(argc=0)" in invisible
 assert 'push.s "rock"@777\npop.v.s self.material' in invisible
 print("Pinned shop child PreCreate ancestry and invisible-wall inherited Create")
+speech = assembly("gml_GlobalScript_scrRisingTextShop",
+    "a623aca85d6834a1fb1377125bca379173891dbe85f6ab9f2324a5a7ca7db20a")
+sequence = ["pop.v.v self.basex", "pop.v.v self.basey", "pop.v.v self.drawText",
+            "push.v self.myRisingText", "call.i instance_destroy(argc=0)",
+            "call.i gml_Script_instance_create(argc=3)", "pop.v.v self.myRisingText",
+            "pop.v.v [stacktop]self.text"]
+positions = [speech.index(token) for token in sequence]
+assert positions == sorted(positions)
+assert objects[212]["parentId"] == -1 and not any(e["eventType"] == 1 for e in objects[212]["events"])
+assembly("gml_GlobalScript_instance_create",
+    "a653a868d31b5cbdfdfc40aca69f7046df1b2d0939518f4561400e5c241912f8")
+print("Pinned shop speech: caller fields, previous-text destroy, fresh fractional birth, then text assignment")
 rising_step = assembly("gml_Object_fxRisingText_Step_0",
     "c1f478f143645d40945f8424c5051635b9f711099afb2dac73b2d75bbc18a96d")
 assert rising_step.index("pop.v.v self.y\n") < rising_step.index("pop.v.v self.ysp\n") < rising_step.index("pop.v.v self.drawing")
