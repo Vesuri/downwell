@@ -40,6 +40,10 @@ int main(){
     assert(pool.size()==1&&random.drawCount()==1&&pool.find(first)->initialized);
     assert(audit.calls==std::vector<int>({1,2,2}));
     assert(pool.find(first)->x.bits==0x42000000u&&pool.find(first)->y.bits==0x42800000u);
+    assert(pool.dispatch(first,[&](auto& r){
+        assert(r.busy&&pool.publishMovingFx(first,100001)&&r.myFx==100001);
+        return true;
+    }));
     assert(pool.dispatch(first,[](auto& r){r.hitStun=true;return true;}));
     assert(pool.setAlarm(first,1,2)&&pool.advanceAlarm(first,1)&&pool.find(first)->hitStun);
     assert(pool.advanceAlarm(first,1)&&!pool.find(first)->hitStun);
@@ -64,6 +68,7 @@ int main(){
     H second;assert(pool.create(101,{0x41c00000u},{0x42600000u},random,make,second));
     assert(second.slot==first.slot&&second.generation!=first.generation&&pool.valid());
     assert(pool.clear()&&!pool.size());
+    assert(!pool.publishMovingFx(first,100002)&&!pool.valid());
     // Publication failure occurs before the random velocity draw; partial
     // state stays owned and the owner is poisoned, not rolled back/retried.
     Audit failing;failing.rejectMove=true;Pool broken(Pool::Binding::bindPositionedActor(failing));

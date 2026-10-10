@@ -80,6 +80,7 @@ struct NativeWhiteJellyStepOps : NativeWhiteJellyBirthOps {
     bool destroy();bool sprite(int);
     bool otherX(N&);bool otherY(N&);bool viewY(N&);bool room(int&);
     bool emitTimer(N&);bool effectAlarmReset(N);
+    bool allocateMovingFx(unsigned&);
 };
 bool nativeWhiteJellyStep(downwell::WhiteJellyStep& state,bool stop,
     downwell::GameMakerRandom& random,NativeWhiteJellyStepOps& ops){
@@ -974,6 +975,28 @@ int main(){
         assert(effects.advanceAnimation(local)&&effects.find(local)->destroyRequested&&effects.retire(local));
         checkDraw({});
         assert(!GameplayCollisionView(*world).contains(shared)&&owner->population(220,count)&&!count&&owner->valid());
+        const auto draws=world->randomDrawCount();unsigned writes=0;InstanceHandle emitted;
+        assert(owner->spawnMovingFx(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(512),704,
+            {0x3fd00000u,0},MotionBinary64::fromInteger(90),{0x3fe00000u,0},
+            [&](unsigned& source){assert(writes++==0);source=990020;return true;},
+            [&](unsigned source){
+                assert(writes++==1&&source==990020);
+                return owner->visitRegistrationOrder([&](InstanceHandle h,int object,std::uint32_t){
+                    if(object!=220)return true;
+                    GameplayCollisionView::Record child;
+                    assert(GameplayCollisionView(*world).resolve(h,child)&&child.movingFx&&
+                        child.movingFx->initialized&&child.movingFx->sourceId==source&&child.movingFx->spriteId==-1);
+                    emitted=h;return true;
+                })&&emitted.generation;
+            })&&writes==2&&world->randomDrawCount()==draws);
+        GameplayCollisionView::Record child;
+        assert(GameplayCollisionView(*world).resolve(emitted,child)&&child.movingFx->spriteId==704&&
+            child.movingFx->imageSpeed.bits==0x3e800000u&&child.movingFx->angle.bits==0x42b40000u);
+        MotionBinary64 dx,dy;
+        assert(WhiteJellyStep::movementComponent(false,{0x3fe00000u,0},MotionBinary64::fromInteger(90),dx)&&
+            WhiteJellyStep::movementComponent(true,{0x3fe00000u,0},MotionBinary64::fromInteger(90),dy)&&
+            child.movingFx->xsp.high==dx.high&&child.movingFx->xsp.low==dx.low&&
+            child.movingFx->ysp.high==dy.high&&child.movingFx->ysp.low==dy.low);
     }
     {
         bool owner=true,otherOwner=true;

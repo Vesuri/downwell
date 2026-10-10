@@ -44,6 +44,7 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             bool enemyDeath(){assert(false);return false;}
             bool smoke(MotionBinary64,MotionBinary64,int,int){assert(false);return false;}
             bool movingFx(MotionBinary64,MotionBinary64,int,MotionBinary64,MotionBinary64,MotionBinary64){assert(false);return false;}
+            bool allocateMovingFx(unsigned&){assert(false);return false;}
             bool flash(MotionBinary64,MotionBinary64,int,int,int){assert(false);return false;}
             bool currency(int){assert(false);return false;}
         };

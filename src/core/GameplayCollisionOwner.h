@@ -2313,6 +2313,31 @@ public:
            !objects_.findEvent(115,3,0,event)||event.ownerObjectId!=115||event.codeId!=1225)return check(false);
         return check(world_->stepWhiteJellyRoomEffect(local,stopped,ops));
     }
+    template<class Allocate,class Caller>
+    bool spawnMovingFx(MotionBinary64 x,MotionBinary64 y,int sprite,MotionBinary64 rate,
+        MotionBinary64 angle,MotionBinary64 speed,Allocate allocate,Caller caller){
+        if(!valid()||!world_)return check(false);
+        struct Ops {
+            using Handle=InstanceHandle;
+            GameplayCollisionOwner& owner;Allocate& allocate;Caller& caller;
+            bool create(int object,MotionBinary64 x,MotionBinary64 y,Handle& child){
+                unsigned source=0;
+                return object==220&&allocate(source)&&owner.movingEffects_.create(source,x,y,child);
+            }
+            bool myFx(Handle child){const auto* r=owner.movingEffects_.find(child);return r&&caller(r->sourceId);}
+            bool sprite(Handle child,int sprite){
+                std::uint32_t count;return sprite>=0&&owner.sprites_.frameCount(unsigned(sprite),count)&&
+                    owner.movingEffects_.sprite(child,sprite,count);
+            }
+            bool imageSpeed(Handle child,MotionBinary64 value){return owner.movingEffects_.imageSpeed(child,value);}
+            bool imageAngle(Handle child,MotionBinary64 value){return owner.movingEffects_.imageAngle(child,value);}
+            bool lengthdir(bool vertical,MotionBinary64 speed,MotionBinary64 angle,MotionBinary64& value){
+                return WhiteJellyStep::movementComponent(vertical,speed,angle,value);
+            }
+            bool velocity(Handle child,bool vertical,MotionBinary64 value){return owner.movingEffects_.velocity(child,vertical,value);}
+        } ops{*this,allocate,caller};
+        return check(MovingFxSpawnScript::run(ops,x,y,sprite,rate,angle,speed));
+    }
     // World-backed Step operations. Decoy target globals, source atan, audio
     // and synchronous effect births remain explicit environment dependencies.
     template<class Environment> bool stepRegisteredWhiteJellyWithWorld(InstanceHandle shared,bool stopped,Environment& environment){
@@ -2358,6 +2383,12 @@ public:
             bool sprite(int value){return owner.whiteJellies_.sprite(key,value);}
             bool meeting(MotionBinary64 x,MotionBinary64 y,int object,bool& hit){return owner.whiteJellies_.meeting(key,x,y,object,hit);}
             bool destroy(){return owner.whiteJellies_.markDestroyed(key);}
+            bool movingFx(MotionBinary64 x,MotionBinary64 y,int sprite,MotionBinary64 rate,
+                MotionBinary64 angle,MotionBinary64 speed){
+                return owner.spawnMovingFx(x,y,sprite,rate,angle,speed,
+                    [&](unsigned& source){return Environment::allocateMovingFx(source);},
+                    [&](unsigned source){return owner.whiteJellies_.publishMovingFx(key,source);});
+            }
         } ops{environment,*this,*world_,local};
         return stepRegisteredWhiteJelly(shared,stopped,ops);
     }

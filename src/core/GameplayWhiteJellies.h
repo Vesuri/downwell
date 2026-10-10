@@ -63,6 +63,12 @@ public:
         if(!good_||!find(key))return fail();
         return binding_.placeMeeting(key,records_[key.slot],object,x,y,hit)||fail();
     }
+    // emitMovingFx assigns the caller while its event is still executing.
+    // Do not redispatch the busy actor or replace the child ID by a local slot.
+    bool publishMovingFx(InstanceHandle key,unsigned source){
+        if(!good_||!find(key)||!records_[key.slot].busy||!source||source>0x7fffffffu)return fail();
+        records_[key.slot].myFx=source;return true;
+    }
     // This family never writes builtin speed: engine components stay zero,
     // independently of custom xsp/ysp. Keep the mandatory dirty publication.
     template<class Publish> bool direction(InstanceHandle key,MotionBinary64 wanted,
