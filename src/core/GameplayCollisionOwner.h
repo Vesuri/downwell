@@ -26,6 +26,7 @@
 #include "RunnerCollisionEventContext.h"
 #include "RunnerCollisionDispatch.h"
 #include "NativeEnemyAlarmRoster.h"
+#include "RunnerWithSnapshot.h"
 namespace downwell {
 #ifdef DOWNWELL_DRAW_CACHE_AUDIT
 // Optional diagnostic observer; absent from normal code and simulation state.
@@ -2031,7 +2032,7 @@ public:
     bool withEncounterSteps(EncounterStepOrder& phase,Execute execute,Tick tick){
         return withEncounterStepsSelected(phase,[](int object){
             return object==78||object==115||object==118||object==120||object==220||object==223||object==225||object==238||object==263||
-                object==269||object==276||object==379||object==212||object==279||object==280||object==283;
+                object==269||object==276||object==379||object==212||object==277||object==279||object==280||object==283;
         },execute,tick);
     }
 private:
@@ -2190,6 +2191,24 @@ public:
         };
         struct Reset {GameplayCollisionOwner& owner;~Reset(){owner.shopRadioDispatch_=nullptr;owner.shopRadioContext_=nullptr;}} reset{*this};
         return check(tick())&&valid();
+    }
+    template<class EnvironmentFor>
+    bool stepRegisteredShopParent(InstanceHandle caller,ShopInteraction::Input& input,
+        CurrencyAccount& currency,EnvironmentFor environmentFor){
+        if(!valid()||!world_||!resolves(caller)||objectOf(caller)!=277)return check(false);
+        RunnerWithSnapshot<ShopWorld::capacity> selected;
+        // Shop activation is reconciled before ordinary Step in this source;
+        // no ordinary event requests a Shop activation or object change.
+        if(!check(visitRegistered(View::shopBase,View::capacity,[&](InstanceHandle h,int object,std::uint32_t flags){
+            if(!families_.isA(object,277)||(flags&0x100003u))return true;
+            return resolves(h)&&selected.append(h);
+        })&&selected.seal()))return false;
+        return check(selected.visit([&](InstanceHandle h){
+            View::Kind kind;InstanceHandle local;
+            if(!resolves(h)||!View::decode(h,kind,local)||kind!=View::Kind::shop)return false;
+            const auto* record=shopInstances_.find(local);if(!record)return false;
+            return environmentFor(*record,[&](auto& env){return shopInstances_.parentStepBody(local,input,currency,env);});
+        }));
     }
     template<class Environment> bool stepRegisteredShopKeeper(InstanceHandle shared,Environment& environment){
         View::Kind kind;InstanceHandle local;

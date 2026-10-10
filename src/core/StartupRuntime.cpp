@@ -1997,6 +1997,10 @@ bool StartupRuntime::dispatchObjectEvent(InstanceRecord& instance,
         return run_.effectsSucceeded=limboShardDispatch_&&
             limboShardDispatch_(limboShardContext_,instance,LimboShardPhase::step);
     }
+    if(instance.objectId==277&&eventType==3&&eventSubtype==0){
+        ++implementedCodeCalls_;
+        return run_.effectsSucceeded=shopParentStep_&&shopParentStep_(shopParentStepContext_,instance);
+    }
     if(instance.objectId==277&&((eventType==3&&eventSubtype==2)||(eventType==7&&eventSubtype==5))){
         return run_.effectsSucceeded=shopParentDispatch_&&shopParentDispatch_(shopParentContext_,instance,
             eventType==3?ShopParentPhase::endStep:ShopParentPhase::roomEnd);

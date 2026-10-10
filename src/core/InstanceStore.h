@@ -14,6 +14,7 @@
 #include "BatBehavior.h"
 #include "RunnerObjectMembership.h"
 #include "RunnerStepSnapshot.h"
+#include "RunnerWithSnapshot.h"
 #include "RunnerRoomMembership.h"
 #include "InstanceHandle.h"
 #include "WallEndStep.h"
@@ -253,6 +254,17 @@ public:
         });
         if(result)snapshot.template sortDenseObjects<512>();
         return result;
+    }
+    // Registered portion of object-with capture only. Caller must prove that
+    // no matching pending object-change/activation entries remain, or append
+    // those separately before sealing. Never execute events during this walk.
+    template<unsigned N,class IsA>
+    bool captureRegisteredWith(int object,IsA isA,RunnerWithSnapshot<N>& snapshot)const{
+        return objectMembership_.visitRegistrations([&](unsigned slot,std::uint32_t generation,int own){
+            if(!isA(own,object))return true;
+            const InstanceHandle h{slot,generation};const auto* r=resolve(h);
+            return r&&(!r->active||r->destroyRequested||snapshot.append(h));
+        });
     }
     // Original global-ID table: 512 buckets, ID & 511, append within each
     // bucket; room initialization walks buckets ascending (0x413549).

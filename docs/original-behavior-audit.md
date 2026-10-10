@@ -820,6 +820,26 @@ checks. A captured lifetime must remain resolvable through the body, even if
 marked for deferred destruction. This contract does not permit slot reuse or
 replace the original selector with a compact shop-slot loop.
 
+For this game's **ordinary Shop Step**, the pending lists contribute no
+additional Shop candidates. The 2,501-root assembly corpus contains no
+`instance_change` call or `object_index` write. Whole-room and region activation
+calls occur only in controller/player Begin Step, whose maintenance boundary
+precedes ordinary Step. Other activation callers are builder-created object-92
+boxes, spawner-created enemies, bat Create and wall End Step; they cannot enqueue
+a Shop. The resource graph has no Shop descendants. The source verifier pins
+that complete caller set and its full assembly hashes. This restriction does
+not apply to arbitrary `with` expressions: notably the controller's unpause
+`with (Shop)` occurs before Begin Step reconciliation and needs pending entries.
+
+The stored `withShopParentSteps` scope and native `stepRegisteredShopParent`
+entry capture registered Shop lifetimes afresh for each mixed ordinary Step.
+They bind queries/scripts to each selected parent while retaining shared input
+and currency across visits. Scope callbacks remain required dependencies;
+the event dispatcher fails instead of silently substituting the compact shop
+update when the stored parent handler is absent. Registration and event
+admission alone do not supply text, audio, player queries or normal frontend
+creation scopes.
+
 `ShopInteraction` and `ShopWorld::step` are still compact adapters, not a full
 implementation of that parent event. Besides missing the inner traversal and
 radio/view branches, their aggregate feedback callbacks cannot stand in for

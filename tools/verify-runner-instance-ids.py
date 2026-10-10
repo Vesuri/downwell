@@ -5,6 +5,7 @@ from pathlib import Path
 import runpy
 import struct
 import json
+import re
 
 root = Path(__file__).resolve().parents[1]
 # Reuse the hash-checked PE reader; this also validates the selected executable.
@@ -50,6 +51,33 @@ def assembly(name, digest):
     payload = (export / "Assembly" / (name + ".asm")).read_bytes()
     assert sha256(payload).hexdigest() == digest, name
     return payload.decode()
+
+# Shop ordinary Step may capture registered membership without pending Shop
+# candidates: there are no object changes anywhere in this exact corpus, and
+# the only whole-room/region activation calls are reconciled Begin Steps.
+# Other callers deactivate their newly-created box/enemy or the wall itself.
+activation_roots = {
+    "gml_GlobalScript_scrBuilder": "0c95048af06ff612499acd64a717766441b820d19ffc6017c0ff3a95425581f5",
+    "gml_GlobalScript_spawnerStep": "793947ac8f003f7a32b0f2b66d449af53a20600b196f9a8b563852ce43f048fb",
+    "gml_Object_enmBat_Create_0": "e80ce038ee2ea894a97991c294541c4cd1f1b6d74e426e6222313721ab04632a",
+    "gml_Object_objControlerN_Step_1": "b5897552335417df74ce906851b290990cb47082df34b344dc20b84d30e43a4f",
+    "gml_Object_objPlayer_n_Step_1": "46a8178a1b7cf78ff8f14f204047096d00717ea59da6e2cd74d908cf1932fed5",
+    "gml_Object_objWall_n_Step_2": "782c095938c35cbc94a2163b39379ce1957126deec5731201faba9b9faf0e49d",
+}
+roots = list((export / "Assembly").glob("*.asm"))
+assert len(roots) == 2501
+actual_activation_roots = set()
+for path in roots:
+    text = path.read_text()
+    assert not re.search(r"call\..*\b(?:gml_Script_)?instance_change\(", text), path.name
+    assert not re.search(r"^pop\..*\bobject_index\b", text, re.M), path.name
+    if re.search(r"call\..*\b(?:gml_Script_)?instance_(?:activate|deactivate)_", text):
+        actual_activation_roots.add(path.stem)
+assert actual_activation_roots == set(activation_roots)
+for name, digest in activation_roots.items():
+    assembly(name, digest)
+assert not any(o["parentId"] == 277 for o in manifest["resources"]["objects"])
+print("Pinned Shop ordinary-Step capture domain: no descendants, type changes or pending Shop activation callers")
 
 # Player and enemy-target globals are distinct when a decoy is selected.
 assembly("gml_Object_enmWhiteJelly_Create_0",

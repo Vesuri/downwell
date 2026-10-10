@@ -2802,6 +2802,36 @@ public:
         struct Reset {StartupRuntime& world;~Reset(){world.shopParentDispatch_=nullptr;world.shopParentContext_=nullptr;}} reset{*this};
         const bool ok=tick();return run_.effectsSucceeded=run_.effectsSucceeded&&ok&&owner.valid();
     }
+    // One fresh inner with(Shop) capture per ordinary parent event, retaining
+    // shared input/currency across every inner visit and subsequent parent.
+    // The selected game's ordinary Shop phase has no pending Shop activation
+    // or object-change candidates; see the source audit. EnvironmentFor binds
+    // real queries/scripts to the selected parent, not the outer event caller.
+    template<unsigned Capacity,class CreationAudio,class EnvironmentFor,class Tick>
+    bool withShopParentSteps(StoredShopCreationOwner<instanceCapacity,Capacity,CreationAudio>& owner,
+        ShopInteraction::Input& input,CurrencyAccount& currency,EnvironmentFor environmentFor,Tick tick){
+        if(!run_.effectsSucceeded)return false;
+        if(shopParentStep_||!owner.belongsTo(instances_,objectPack_)||!owner.valid())return run_.effectsSucceeded=false;
+        auto step=[&](const InstanceRecord& caller){
+            const auto* parent=owner.parent(caller.instanceId);
+            if(!parent||instances_.resolve(parent->key)!=&caller)return false;
+            RunnerWithSnapshot<Capacity> selected;
+            // The source resource graph has no Shop descendants.
+            if(!instances_.captureRegisteredWith(277,[](int own,int object){return own==object;},selected)||
+               !selected.seal())return false;
+            return selected.visit([&](InstanceHandle key){
+                const auto* record=instances_.resolve(key);if(!record)return false;
+                const auto* retained=owner.parent(record->instanceId);
+                if(!retained||retained->key.slot!=key.slot||retained->key.generation!=key.generation)return false;
+                const auto id=record->instanceId;
+                return environmentFor(*record,[&](auto& env){return owner.parentStepBody(id,input,currency,env);});
+            });
+        };
+        shopParentStepContext_=&step;
+        shopParentStep_=[](void* p,const InstanceRecord& r){return (*static_cast<decltype(step)*>(p))(r);};
+        struct Reset {StartupRuntime& world;~Reset(){world.shopParentStep_=nullptr;world.shopParentStepContext_=nullptr;}} reset{*this};
+        const bool ok=tick();return run_.effectsSucceeded=run_.effectsSucceeded&&ok&&owner.valid();
+    }
     template<unsigned Capacity,class Environment,class Tick>
     bool withShopCaseEvents(StoredShopChildRegistration<instanceCapacity,Capacity>& owner,Environment& environment,Tick tick){
         if(!run_.effectsSucceeded)return false;
@@ -3261,6 +3291,8 @@ private:
     void* shopCaseContext_=nullptr;
     void* shopParentContext_=nullptr;
     bool (*shopParentDispatch_)(void*,const InstanceRecord&,ShopParentPhase)=nullptr;
+    void* shopParentStepContext_=nullptr;
+    bool (*shopParentStep_)(void*,const InstanceRecord&)=nullptr;
     bool (*shopCaseDispatch_)(void*,const InstanceRecord&,bool,unsigned)=nullptr;
     void* scatteredStepContext_=nullptr;
     bool (*scatteredStep_)(void*,InstanceHandle)=nullptr;

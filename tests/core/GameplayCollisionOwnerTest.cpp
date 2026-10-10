@@ -46,6 +46,13 @@ bool nativeShopBody(downwell::GameplayShopInstances& owner,downwell::InstanceHan
     downwell::ShopInteraction::Input& input,downwell::CurrencyAccount& currency,ShopParentProbe& env){
     return owner.parentStepBody(key,input,currency,env);
 }
+bool nativeShopParentEvent(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle key,
+    downwell::ShopInteraction::Input& input,downwell::CurrencyAccount& currency){
+    return owner.stepRegisteredShopParent(key,input,currency,[&](const auto& record,auto body){
+        if(!record.shop)return false;
+        ShopParentProbe env{*record.shop,currency,record.shop->y};return body(env);
+    });
+}
 bool nativeShopMenu(downwell::GameplayShopInstances& owner,downwell::InstanceHandle key,
     downwell::ShopInteraction::Input& input,downwell::CurrencyAccount& currency,ShopMenuProbe& env){
     return owner.parentMenuStep(key,input,currency,env);

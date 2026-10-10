@@ -41,8 +41,9 @@ behavior, both backend integrations and relevant original-game verification.
   generation handles for serialized bindings and global lookup order.
   Supply the native generator's source-creation scope from the complete startup
   stream, including spawner 78 and concrete shop ownership. Shop admission
-  must preserve each parent Step's inner `with (Shop)` traversal, shared input consumption,
-  synchronous purchase/child setters and radio/view branches. The compact
+  must install the retained per-parent `with (Shop)` capture/body in normal
+  frontend encounters, supplying live shared input, synchronous purchase/child
+  setters and radio/view dependencies. The compact
   once-per-shop update is not a source-equivalent parent Step. Complete
   ordered Room End dispatch and device-audio bindings as well. Spawner admission
   requires its depth-driven Step, selected enemy mask queries and synchronous

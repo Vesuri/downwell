@@ -1,6 +1,7 @@
 #include "core/StartupRuntime.h"
 #include "core/StoredWorldCollision.h"
 #include "core/ShopFixtures.h"
+#include "ShopParentChecks.h"
 #include <fstream>
 #include <vector>
 #include <memory>
@@ -173,12 +174,44 @@ int main(){
             require(voice==987&&!world.instance(id)->destroyRequested,"radio stop precedes parent destruction");++stops;return true;
         }
     } parentRadio{live,parentId};
-    require(live.withShopParentLifetimeEvents(owner,parentRadio,[&]{live.step(false);return live.effectsSucceeded();}),
+    ShopInteraction::Input parentInput;CurrencyAccount parentCurrency;unsigned parentBodies=0;
+    auto parentEnvironment=[&](const InstanceRecord& r,auto body){
+        require(r.instanceId==parentId,"selected parent context");++parentBodies;
+        ShopParentProbe env{parentOnly,parentCurrency,parentOnly.y};env.crime=true;env.meet=false;
+        return body(env);
+    };
+    require(live.withShopParentSteps(owner,parentInput,parentCurrency,parentEnvironment,[&]{
+        return live.withShopParentLifetimeEvents(owner,parentRadio,[&]{live.step(false);return live.effectsSucceeded();});
+    })&&parentBodies==1,
         "parent lifetime handler joins stored End Step and deferred cleanup");
     require(parentRadio.queries==1&&parentRadio.stops==1&&!live.instance(parentId)&&!owner.parent(parentId)&&
         !collision->resolve(retiringParentKey)&&live.instance(tableId)&&!live.instance(tableId)->destroyRequested,
         "parent retirement keeps separately owned children alive");
     require(owner.clear(),"retire retained table");layers(live);
+    for(unsigned count:{2u,3u}){
+        auto parents=live.shopCreationOwner<3>(objects,audio);
+        ShopWorld::Instance selected[3];unsigned ids[3]{};
+        for(unsigned i=0;i<count;++i){
+            selected[i].x=480;selected[i].y=10000;
+            require(parents.begin(selected[i]),"register multi-parent Step fixture");ids[i]=selected[i].sourceId;
+        }
+        unsigned visits=0;ShopInteraction::Input input;CurrencyAccount currency;
+        auto bind=[&](const InstanceRecord& r,auto body){
+            const unsigned index=count==2?visits%count:count-1-visits%count;
+            require(visits<count*count&&r.instanceId==ids[index],"fresh ordered inner capture for every outer Step");
+            ++visits;ShopParentProbe env{selected[index],currency,10000};env.crime=true;env.meet=false;
+            return body(env);
+        };
+        struct Radio {
+            bool isPlaying(int voice,bool& playing){playing=false;return voice==-1;}
+            bool stop(int){return false;}
+        } radio;
+        require(live.withShopParentSteps(parents,input,currency,bind,[&]{
+            return live.withShopParentLifetimeEvents(parents,radio,[&]{live.step(false);return live.effectsSucceeded();});
+        })&&visits==count*count,"mixed Step retains nested Shop population visits");
+        for(unsigned i=0;i<count;++i)require(!live.instance(ids[i]),"deferred parent retirement after all Steps");
+        require(parents.clear(),"clear multi-parent fixture");layers(live);
+    }
     InstanceHandle scenery;const auto sceneryId=live.nextRuntimeInstanceId();
     DeferredCreateInstance sceneryCommand(289,240,int(live.mainCameraViewY())+100);
     sceneryCommand.integerImageIndex=12;sceneryCommand.imageIndex=12;sceneryCommand.imageSpeed=0;

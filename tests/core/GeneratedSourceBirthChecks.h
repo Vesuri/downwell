@@ -246,6 +246,28 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
                 store.find(caseKey)->state.opened&&!store.find(caseKey)->state.flashing&&caseEnvironment.calls==3);
         }
         assert(store.clear());
+        for(unsigned count:{2u,3u}){
+            ShopWorld::Instance selected[3];unsigned ids[3]{};
+            for(unsigned i=0;i<count;++i){
+                selected[i].x=480;selected[i].y=10000;
+                assert(creation.begin(selected[i]));ids[i]=selected[i].sourceId;
+            }
+            unsigned visits=0,outer=0;ShopInteraction::Input input;CurrencyAccount currency;
+            auto bind=[&](const GameplayShopInstances::Record& r,auto body){
+                const unsigned index=count==2?visits%count:count-1-visits%count;
+                assert(visits<count*count&&r.sourceId==ids[index]);++visits;
+                ShopParentProbe env{selected[index],currency,10000};env.crime=true;env.meet=false;
+                return body(env);
+            };
+            struct Radio {
+                bool isPlaying(int id,bool& playing){playing=false;return id==-1;}
+                bool stop(int){return false;}
+            } radio;
+            assert(collision->withEncounterSteps(*phase,[&](InstanceHandle h,int object){
+                assert(object==277);++outer;return collision->stepRegisteredShopParent(h,input,currency,bind);
+            },[&]{return collision->withShopRadioEvents(radio,[&]{world->step(0);return world->effectsSucceeded();});}));
+            assert(outer==count&&visits==count*count&&collision->prepareDraw()&&store.size()==0);
+        }
         auto* distant=world->registerShopWithOwner(480,10000,creation);
         assert(distant&&store.size()==11);
         const auto distantKey=store.sourceHandle(distant->sourceId);
