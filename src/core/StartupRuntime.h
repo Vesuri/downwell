@@ -526,6 +526,10 @@ public:
                     const auto* r=world.instances_.resolve(key);
                     return r&&r->objectId==78&&queries.placeMeeting(key,*r,object,x,y,hit);
                 }
+                bool create(int object,MotionBinary64 x,MotionBinary64 y,unsigned& id){
+                    return world.createSpawnerEnemy(object,x,y,id);
+                }
+                bool deactivate(unsigned id){return world.deactivateSpawnerEnemy(id);}
             };
             return Ops{external,*this,queries,key};
         },tick);
@@ -559,6 +563,11 @@ public:
         return run_.effectsSucceeded=run_.effectsSucceeded&&ok&&owner.valid();
     }
     bool spawnWhiteJelly(int x,int y,InstanceHandle& key);
+    // Spawner grids are integral world coordinates. Preserve synchronous
+    // Create and the room-wide numeric allocator before returning the child
+    // ID; unsupported channel families must not become generic room records.
+    bool createSpawnerEnemy(int object,MotionBinary64 x,MotionBinary64 y,unsigned& id);
+    bool deactivateSpawnerEnemy(unsigned id);
     bool roomDestinationSet() const { return roomDestinationSet_; }
     bool roomLoadSucceeded() const { return roomLoadSucceeded_; }
     bool recoveredEventBindingsActive() const { return objectPack_ != nullptr; }

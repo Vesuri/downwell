@@ -2940,6 +2940,7 @@ bool StartupRuntime::adoptBuilderScattered(const DeferredCreateInstance& command
 }
 
 bool StartupRuntime::spawnWhiteJelly(int x,int y,InstanceHandle& key){
+    key={};
     if(!run_.effectsSucceeded||!whiteJellyDispatch_||!objectPack_||!deferredCommandsSucceeded_)
         return run_.effectsSucceeded=false;
     DeferredInstanceQueue<1> child;
@@ -2957,6 +2958,30 @@ bool StartupRuntime::spawnWhiteJelly(int x,int y,InstanceHandle& key){
         },lifecycle_);
     if(result!=ApplyInstanceCommandsResult::success||!instances_.resolve(created))return run_.effectsSucceeded=false;
     key=created;return true;
+}
+
+bool StartupRuntime::createSpawnerEnemy(int object,MotionBinary64 x,MotionBinary64 y,unsigned& id){
+    id=0;
+    std::int32_t ix,iy;
+    if(!run_.effectsSucceeded||object!=115||!x.roundPixel(ix)||!y.roundPixel(iy))
+        return run_.effectsSucceeded=false;
+    const auto exactX=MotionBinary64::fromInteger(ix),exactY=MotionBinary64::fromInteger(iy);
+    if(x.high!=exactX.high||x.low!=exactX.low||y.high!=exactY.high||y.low!=exactY.low)
+        return run_.effectsSucceeded=false;
+    InstanceHandle child;
+    if(!spawnWhiteJelly(ix,iy,child))return false;
+    const auto* r=instances_.resolve(child);
+    if(!r||r->objectId!=115||!r->active||r->destroyRequested)return run_.effectsSucceeded=false;
+    id=r->instanceId;return true;
+}
+
+bool StartupRuntime::deactivateSpawnerEnemy(unsigned id){
+    const auto* r=instances_.find(id);
+    if(!run_.effectsSucceeded||!r||r->objectId!=115||r->destroyRequested)
+        return run_.effectsSucceeded=false;
+    const auto key=instances_.handleAt(unsigned(r-&instances_.at(0)));
+    return run_.effectsSucceeded=instances_.requestActivation(key,false,
+        [&](auto h,const auto& record,bool active){return lifecycle_.activation(h,record,active);});
 }
 
 bool StartupRuntime::spawnBuilderPrimitive(int object,int x,int y,InstanceHandle& key){

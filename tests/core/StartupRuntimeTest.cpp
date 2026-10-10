@@ -1232,6 +1232,41 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
             bool viewY(N& out){out={};return true;}bool room(int&){return false;}
             bool emitTimer(N&){return false;}bool effectAlarmReset(N){return false;}
         };
+        using Runtime=downwell::StartupRuntime;
+        for(bool reject:{false,true}){
+            struct BirthAudit:LifecycleAudit {
+                downwell::StoredWhiteJellyStates<Runtime::instanceCapacity,2>* states=nullptr;
+                bool reject=false;unsigned dormant=0;
+                bool activation(downwell::InstanceHandle h,const downwell::InstanceRecord& r,bool active){
+                    if(r.objectId!=115)return LifecycleAudit::activation(h,r,active);
+                    const auto* actor=states?states->state(r.instanceId):nullptr;
+                    require(!active&&r.active&&actor&&actor->initialized&&actor->scriptActive&&actor->health==25,
+                        "spawner deactivation observes complete synchronous jelly Create");
+                    ++dormant;return !reject;
+                }
+            } audit;
+            audit.reject=reject;
+            auto spawned=std::make_unique<Runtime>(downwell::PlatformProfile::desktop,&pack,objects,2,patterns,
+                downwell::InstanceLifecycleBinding::bind(audit));
+            auto states=spawned->whiteJellyStates<2>();audit.states=&states;
+            unsigned speeds=0,sprites=0,id=0;auto oracle=spawned->randomState();oracle.nextU32();
+            const bool ok=spawned->withWhiteJellyEvents(states,[&](auto){return Ops{speeds,sprites};},
+                [](bool&){return false;},[&]{
+                    require(spawned->createSpawnerEnemy(115,N::fromInteger(32),N::fromInteger(64),id)&&id,
+                        "spawner returns the synchronous child's real room ID");
+                    const auto* child=spawned->instance(id);
+                    require(child&&child->active&&child->objectId==115&&states.state(id)&&speeds==1,
+                        "successful Create does not prematurely deactivate the child");
+                    return spawned->deactivateSpawnerEnemy(id);
+                });
+            const auto* child=spawned->instance(id);
+            require(ok==!reject&&spawned->effectsSucceeded()==!reject&&audit.dormant==1&&child&&
+                child->active==reject&&child->activationPending==!reject&&states.state(id)->scriptActive,
+                "deactivation publishes before changing room eligibility; script active is separate");
+            require(spawned->randomState().stateIndex()==oracle.stateIndex(),"spawner child consumes one shared RNG word");
+            for(unsigned i=0;i<16;++i)require(spawned->randomState().stateWord(i)==oracle.stateWord(i),
+                "spawner child preserves full shared RNG state through deactivation");
+        }
         auto runtime=std::make_unique<downwell::StartupRuntime>(downwell::PlatformProfile::desktop,&pack,objects);
         auto owner=runtime->whiteJellyStates<2>();unsigned speeds=0,sprites=0,stopReads=0;
         downwell::InstanceHandle key;unsigned id=0;

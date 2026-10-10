@@ -240,24 +240,19 @@ int main(){
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
             InstanceLifecycleBinding::bindPointQueries(*owner));
         require(owner->attach(*world),"attach resource-backed natural spawner queries");world->skipToGameForTesting();
-        unsigned births=0,tiles=0;
+        unsigned tiles=0;
         struct Environment {
-            StartupRuntime& world;unsigned& births;unsigned& tiles;
+            StartupRuntime& world;unsigned& tiles;
             bool viewY(MotionBinary64& value){value=MotionBinary64::fromInteger(world.mainCameraRenderViewY());return true;}
             bool viewHeight(MotionBinary64& value){value=MotionBinary64::fromInteger(world.cameraViewHeight());return true;}
             bool tile(int depth,MotionBinary64 x,MotionBinary64 y,bool& hit){
                 require(depth==100,"spawner queries depth-100 tile layer");++tiles;
                 return world.wallBackgroundTiles().contains(x,y,hit);
             }
-            bool create(int object,MotionBinary64,MotionBinary64,unsigned&){
-                require(object==115,"natural level-one channel selects a white jelly");++births;
-                return false; // Deliberately absent child provider must remain a failure.
-            }
-            bool deactivate(unsigned){require(false,"failed child cannot be deactivated");return false;}
         };
         bool admitted=true;
         for(unsigned frame=0;frame<1200&&admitted;++frame)
-            admitted=world->withRegisteredSpawnerEvents(*owner,[&](InstanceHandle){return Environment{*world,births,tiles};},[&]{
+            admitted=world->withRegisteredSpawnerEvents(*owner,[&](InstanceHandle){return Environment{*world,tiles};},[&]{
                 world->step(gameplayContactProfileInput(frame,world->mainPlayerX(),world->mainPlayerY()),false);
                 return world->effectsSucceeded();
             });
@@ -266,8 +261,10 @@ int main(){
         const auto* state=caller?world->spawnerState(caller->instanceId):nullptr;
         require(caller&&state&&caller->maskId==(rejectMask?-1:174)&&state->maskIndex==(rejectMask?-1:174),
             "mask failure preserves both caller and script publication prefix");
-        require(rejectMask?(!owner->walls&&!owner->enemies&&!births&&!tiles):
-            (owner->walls>=2&&owner->enemies&&births==1&&tiles),"real candidate queries precede synchronous birth");
+        require(rejectMask?(!owner->walls&&!owner->enemies&&!tiles):
+            (owner->walls>=2&&owner->enemies&&state->spawningEnemy==115&&tiles),"real candidate queries precede synchronous birth");
+        for(unsigned i=0;i<world->activeInstanceCount();++i)
+            require(world->instanceAt(i).objectId!=115,"missing jelly Create scope cannot publish an uninitialized child");
     }
     for(unsigned failure=0;failure<=5;++failure){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
