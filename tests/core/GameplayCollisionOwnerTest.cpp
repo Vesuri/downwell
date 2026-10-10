@@ -47,6 +47,15 @@ struct NativeShopCaseEnvironment {
     bool flash(downwell::MotionBinary64,downwell::MotionBinary64,int,int,int);
     bool criminal();
 };
+struct NativeShopLifetimeEnvironment {
+    bool viewY(downwell::MotionBinary64&);
+    bool room(int&);
+    bool isPlaying(int,bool&);
+    bool stop(int);
+};
+bool nativeShopLifetime(downwell::GameplayShopInstances& owner,downwell::InstanceHandle key,bool roomEnd,NativeShopLifetimeEnvironment& env){
+    return owner.parentLifetimeEvent(key,roomEnd,env);
+}
 bool nativeRegisteredCaseStep(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle key,NativeShopCaseEnvironment& env){
     return owner.stepRegisteredShopCase(key,env);
 }

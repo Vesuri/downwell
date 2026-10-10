@@ -286,6 +286,10 @@ assert "pop.v.v self.sprite_index" in item_step and "image_index" not in item_st
 assert objects[283]["parentId"] == -1
 case_step=assembly("gml_Object_shopCase_Step_0",
     "6c3d60b9040966633bd75afcf70b8c84da6a087e02a177e8b8bf3f017c3fc707")
+assembly("gml_Object_Shop_Step_2",
+    "e124d7e7d595c81e9e222a01e8570eb9f95ad58bdc37b111cc7e5909a861ea6b")
+assembly("gml_Object_Shop_Other_5",
+    "dfdb7033f2234097ab181e2a4359da5e5ca76af51efc6036bdbc67e1bf68637d")
 ordered=["pop.v.i self.opened","call.i gml_Script_soundPlay", "pop.v.i self.image_index",
          "pop.v.i self.mask_index","call.i gml_Script_scrFlashballfx","pop.v.i global.criminal"]
 assert [case_step.index(s) for s in ordered] == sorted(case_step.index(s) for s in ordered)

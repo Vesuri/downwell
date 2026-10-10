@@ -10,6 +10,30 @@
 #include <vector>
 #endif
 using namespace downwell;
+static bool shopLifetimeCheck(){
+    struct Ops {
+        int top=0,roomId=11;unsigned reads=0,queries=0,stops=0,destroys=0;
+        bool playing=true,reject=false;
+        bool viewY(MotionBinary64& y){++reads;y=MotionBinary64::fromInteger(top);return true;}
+        bool room(int& id){id=roomId;return true;}
+        bool isPlaying(bool& value){++queries;value=playing;return true;}
+        bool stop(){++stops;return !reject;}
+        bool destroy(){++destroys;return true;}
+    } ops;
+    for(int y=-321;y<=3001;++y){
+        ops={};if(!ShopLifetimeEvents::endStep(MotionBinary64::fromInteger(y),ops))return false;
+        const bool outside=y<-320||y>3000;
+        if(ops.reads!=(y<-320?1u:2u)||ops.queries!=unsigned(outside)||ops.stops!=unsigned(outside)||ops.destroys!=unsigned(outside))return false;
+    }
+    ops={};ops.roomId=12;
+    if(!ShopLifetimeEvents::endStep(MotionBinary64::fromInteger(-321),ops)||ops.queries||ops.destroys)return false;
+    ops={};ops.reject=true;
+    if(ShopLifetimeEvents::endStep(MotionBinary64::fromInteger(-321),ops)||ops.stops!=1||ops.destroys)return false;
+    ops={};ops.playing=false;
+    if(!ShopLifetimeEvents::endStep(MotionBinary64::fromInteger(3001),ops)||ops.stops||ops.destroys!=1)return false;
+    ops={};if(!ShopLifetimeEvents::roomEnd(ops)||ops.queries!=1||ops.stops!=1||ops.reads||ops.destroys)return false;
+    return true;
+}
 static bool shopCaseEventCheck(){
     for(unsigned failure=0;failure<=5;++failure){
         ShopChildState state;state.destroyed=state.storedItem=1;
@@ -154,6 +178,19 @@ bool shopParentRegistrationCheck(const ObjectPack& objects,unsigned area,unsigne
     if(!parent||parent->inheritedInitialized!=(reject!=1)||parent->shop!=&world.instances[0]||
        parent->speaking||parent->checkThis||parent->interactOk!=1||parent->textOver||parent->choice0!=-1)return false;
     if(expected){
+        struct Radio {
+            int expected;int view=1020;unsigned views=0,queries=0,stops=0;bool playing=true;
+            bool viewY(MotionBinary64& y){++views;y=MotionBinary64::fromInteger(view);return true;}
+            bool isPlaying(int id,bool& out){++queries;out=playing;return id==expected;}
+            bool stop(int id){++stops;playing=false;return id==expected;}
+        } radio{shop->radio};
+        if(!owner.parentLifetimeEvent(shop->sourceId,true,radio)||radio.stops!=1||records.resolve(parent->key)->destroyRequested)return false;
+        radio.playing=true;
+        if(!owner.parentLifetimeEvent(shop->sourceId,false,radio)||radio.views!=2||radio.queries!=1)return false;
+        ++radio.view;
+        if(!owner.parentLifetimeEvent(shop->sourceId,false,radio)||radio.views!=3||radio.stops!=2||
+           !records.resolve(parent->key)->destroyRequested||records.size()!=11)return false;
+        for(unsigned i=1;i<records.size();++i)if(records.at(i).destroyRequested)return false;
         if(shop->sourceId!=920000||shop->children.table!=920001||shop->children.risingText!=920007||
            shop->children.items[2]!=920010||shop->radio!=(area==5?-1:123)||shop->farewellVariant!=2)return false;
         const auto* item=owner.children().state(owner.children().sourceHandle(shop->children.items[2]));
@@ -254,7 +291,7 @@ bool shopItemStepCheck(const ObjectPack& objects,unsigned failure){
     return owner.clear();
 }
 bool registeredKeeperAlarmCheck(const ObjectPack& objects,bool reject){
-    InstanceStore<2> records;unsigned next=970000;const int room=11;bool good=true;
+    InstanceStore<2> records;std::uint32_t next=970000;const int room=11;bool good=true;
     struct Observer:ShopChildObserver {
         bool imageIndex(InstanceHandle,const InstanceRecord& r,RunnerImageValue v){
             valid=valid&&r.objectId==280&&r.spriteId==487&&(v.bits==0||v.bits==0x3f800000u);
@@ -277,6 +314,7 @@ bool registeredKeeperAlarmCheck(const ObjectPack& objects,bool reject){
 }
 #ifndef DOWNWELL_NATIVE_QUERY_PROBE
 int main(){
+    if(!shopLifetimeCheck())return 1;
     if(!shopCaseEventCheck())return 1;
     std::ifstream file("generated/downwell-objects.dwob",std::ios::binary);
     std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(file),{}};

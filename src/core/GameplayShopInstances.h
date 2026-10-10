@@ -9,6 +9,7 @@
 #include "SpriteCollisionPack.h"
 #include "RunnerSpriteChange.h"
 #include "ShopKeeperAnimation.h"
+#include "ShopLifetimeEvents.h"
 namespace downwell {
 // Native ownership of Shop and its ten synchronous children. Numeric IDs
 // belong to the enclosing room allocator, never to this generation pool.
@@ -89,6 +90,23 @@ public:
         const auto* r=find(h);
         if(!good_||creating_||!r||!r->initialized||number>=AlarmBank::count)return fail();
         records_[h.slot].alarms.set(number,ticks);return true;
+    }
+    template<class Environment> bool parentLifetimeEvent(InstanceHandle h,bool roomEnd,Environment& environment){
+        if(!ready(h,277))return fail();auto& r=records_[h.slot];
+        if(!r.active||r.destroyRequested)return true;
+        if(!r.shop)return fail();
+        struct Ops {
+            GameplayShopInstances& owner;Record& r;InstanceHandle h;Environment& env;
+            bool viewY(MotionBinary64& out){return env.viewY(out)&&owner.good_;}
+            bool room(int& out){return env.room(out)&&owner.good_;}
+            bool isPlaying(bool& out){return env.isPlaying(r.shop->radio,out)&&owner.good_;}
+            bool stop(){return env.stop(r.shop->radio)&&owner.good_;}
+            bool destroy(){
+                if(!owner.binding_.markDestroyed(h,r)||!owner.good_)return false;
+                r.destroyRequested=true;return true;
+            }
+        } ops{*this,r,h,environment};
+        return (roomEnd?ShopLifetimeEvents::roomEnd(ops):ShopLifetimeEvents::endStep(r.y.promoted(),ops))||fail();
     }
     bool advanceKeeperAnimation(InstanceHandle h){
         if(!ready(h,280))return fail();auto& r=records_[h.slot];

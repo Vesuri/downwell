@@ -736,6 +736,15 @@ its gain to zero with zero transition time. Area 5 retains radio=-1 and makes
 neither call. Rejected playback/gain publication stops before the first child
 or stock RNG. The inherited parentInteractable Create has no calls, hence no
 additional births or RNG; both that body and the radio branch are hash-pinned.
+The parent lifetime event entries in both owners use `ShopLifetimeEvents`.
+End Step reads view Y once for the strict lower bound (Y−320), and again for
+the upper bound (Y+3000) only if needed. Outside those bounds it reads room,
+and only in room 11 queries/stops the current radio and marks the parent for
+destruction. Other 5 (Room End) only queries/stops radio, without destroying
+the parent or children. Radio is reread for stop after the playing query.
+Publication failure prevents later effects. These explicit owner entries still
+need mixed End Step/Room End scheduling and concrete device-audio bindings;
+calling them in a fixture does not establish natural room retirement.
 
 `StoredShopChildRegistration` implements these six child resources' synchronous
 Create bodies in real `InstanceStore` records, borrowing the room counter and

@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_STORED_SHOP_CREATION_OWNER_H
 #include "StoredShopChildRegistration.h"
 #include "ShopWorld.h"
+#include "ShopLifetimeEvents.h"
 namespace downwell {
 // Concrete owner for ShopWorld::createRegistered. The compact shop owns stock
 // and menu state; its retained room record owns identity and builtins. Children
@@ -42,6 +43,24 @@ public:
         return nullptr;
     }
     auto& children(){return children_;}
+    template<class Environment> bool parentLifetimeEvent(unsigned id,bool roomEnd,Environment& environment){
+        const auto* p=parent(id);auto* r=p?records_.resolve(p->key):nullptr;
+        if(!good_||!r||!p->shop)return fail();
+        if(!r->active||r->destroyRequested)return true;
+        struct Ops {
+            StoredShopCreationOwner& owner;const Parent& p;InstanceRecord& r;Environment& env;
+            bool viewY(MotionBinary64& out){return env.viewY(out)&&owner.good_;}
+            bool room(int& out){out=owner.room_;return true;}
+            bool isPlaying(bool& out){return env.isPlaying(p.shop->radio,out)&&owner.good_;}
+            bool stop(){return env.stop(p.shop->radio)&&owner.good_;}
+            bool destroy(){
+                if(!owner.lifecycle_.markDestroyed(p.key,r)||!owner.good_)return false;
+                r.destroyRequested=true;return true;
+            }
+        } ops{*this,*p,*r,environment};
+        RunnerImageValue y;std::memcpy(&y.bits,&r->preciseY,4);
+        return (roomEnd?ShopLifetimeEvents::roomEnd(ops):ShopLifetimeEvents::endStep(y.promoted(),ops))||fail();
+    }
     bool begin(ShopWorld::Instance& shop){
         if(!good_||shop.sourceId||!nextId_||nextId_>0x7fffffffu)return fail();
         Parent* free=nullptr;

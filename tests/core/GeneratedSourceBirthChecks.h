@@ -64,6 +64,21 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
         auto* replacement=world->registerShopWithOwner(480,2000,creation);
         assert(replacement&&replacement->sourceId==960011&&store.size()==11&&next==960022);
         for(auto h:shared)assert(!GameplayCollisionView(*world).contains(h));
+        struct RadioEnvironment {
+            int view=2320,roomId=11;unsigned queries=0,stops=0,views=0;bool playing=true;
+            bool viewY(MotionBinary64& y){++views;y=MotionBinary64::fromInteger(view);return true;}
+            bool room(int& out){out=roomId;return true;}
+            bool isPlaying(int id,bool& out){assert(id==99);++queries;out=playing;return true;}
+            bool stop(int id){assert(id==99);++stops;playing=false;return true;}
+        } radio;
+        const auto parentKey=store.sourceHandle(replacement->sourceId);
+        assert(store.parentLifetimeEvent(parentKey,true,radio)&&radio.stops==1&&!store.find(parentKey)->destroyRequested);
+        radio.playing=true;
+        assert(store.parentLifetimeEvent(parentKey,false,radio)&&radio.views==2&&radio.queries==1);
+        ++radio.view;
+        assert(store.parentLifetimeEvent(parentKey,false,radio)&&radio.views==3&&radio.stops==2&&
+            store.find(parentKey)->destroyRequested&&store.size()==11);
+        assert(store.find(store.sourceHandle(replacement->children.items[0]))&&!store.find(store.sourceHandle(replacement->children.items[0]))->destroyRequested);
         // Admit only the implemented child events, not a placeholder update
         // for the keeper, cases or parent shop. The real world alarm/Step/
         // cleanup phases must own their ordering and retirement.
