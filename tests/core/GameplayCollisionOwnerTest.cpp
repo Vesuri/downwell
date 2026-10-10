@@ -23,6 +23,16 @@ namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_
 #include "core/CurrencyHomingMath.h"
 #include "core/TerrainWallContacts.h"
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
+struct NativeShopBirthOwner {
+    bool begin(downwell::ShopWorld::Instance&);
+    unsigned create(int,int,int);
+    bool readX(unsigned,int&);bool position(unsigned,int&,int&);
+    bool upgrade(unsigned,unsigned);bool stored(unsigned,unsigned);
+};
+downwell::ShopWorld::Instance* nativeRegisteredShop(downwell::ShopWorld& shops,NativeShopBirthOwner& owner,
+    unsigned (*range)(unsigned,unsigned),unsigned (*choice)(),bool& good){
+    return shops.createRegistered(100,700,range,choice,4,1,false,0,false,owner,good);
+}
 bool nativeExitSourceBirth(GameplayWorld& world,int y,bool (*allocate)(int,unsigned&)){
     return world.registerLevelExitWithSourceIds(y,allocate);
 }

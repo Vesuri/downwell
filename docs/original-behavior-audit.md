@@ -652,6 +652,15 @@ lifetimes. Thus a complete dynamic numeric stream cannot be recovered by
 numbering the existing terrain and enemy records alone. Registering the
 children after all stock/text RNG would also lose synchronous Create ordering.
 
+`ShopChildCreation` retains the returned IDs and the two child phases.
+`ShopWorld::createRegistered` composes them around stock generation and before
+farewell selection. Its required owner registers the parent and performs
+inherited/radio setup, completes each child Create, reads actual retained
+positions and performs the item/case field writes. Missing or rejected work
+fails the enclosing status, retains the accepted prefix and prevents later
+births/RNG; the phases cannot be retried. The default compact creation path
+remains separate until the frontend supplies every required child owner.
+
 `scrBuilder` blocks 187 and 207 write `self.y += 16` after each newline's
 pillars and each extra-pillar row respectively. Shared scalar, run and prepared
 generation retain these setter boundaries, including the completed prefix on

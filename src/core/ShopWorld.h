@@ -7,6 +7,7 @@
 #include "Input.h"
 #include "ProjectileSegment.h"
 #include "EnemyContact.h"
+#include "ShopChildCreation.h"
 namespace downwell {
 // Bounded world ownership and static child masks, separate from shop rendering.
 // Coordinates passed here are integer mask-query positions. Full fractional
@@ -14,6 +15,8 @@ namespace downwell {
 struct ShopWorld {
     static constexpr unsigned capacity = 8;
     struct Instance {
+        std::uint32_t sourceId=0;
+        ShopChildCreation children;
         int x = 0, y = 0;
         bool allocated = false, wallPresent = false;
         unsigned artRevision = 0;
@@ -57,6 +60,34 @@ struct ShopWorld {
             return &shop;
         }
         return nullptr; // Caller must handle exhaustion; do not consume RNG.
+    }
+    // Explicit registered creation. The owner must register the parent and
+    // execute inherited/radio setup in begin, then supply synchronous child
+    // creation and actual retained-instance reads/writes. No fallback owner.
+    // The legacy compact create above remains until each backend provides it.
+    template<class Range,class Choice,class Owner>
+    Instance* createRegistered(int x,int y,Range random,Choice chooseFarewell,int health,unsigned area,
+        bool hard,unsigned style,bool member,Owner& owner,bool& good){
+        if(!good)return nullptr;
+        for(auto& shop:instances)if(!shop.allocated){
+            shop={};shop.x=x;shop.y=y;shop.present=true;
+            shop.allocated=shop.wallPresent=true;shop.artRevision=1;
+            ++allocatedCount;++fixtureRevision;
+            if(!owner.begin(shop)||!good||!shop.sourceId||shop.sourceId>0x7fffffffu){good=false;return nullptr;}
+            auto create=[&](int object,int cx,int cy)->std::uint32_t{
+                if(!good)return 0;const auto id=owner.create(object,cx,cy);return good?id:0;
+            };
+            if(!shop.children.beforeStock(x,y,create,[&](unsigned id,int& cx){return owner.readX(id,cx)&&good;})){good=false;return nullptr;}
+            shop.stock.create(random,health,area,hard,style,member);
+            if(!shop.children.afterStock(shop.stock,create,
+                [&](unsigned id,int& cx,int& cy){return owner.position(id,cx,cy)&&good;},
+                [&](unsigned id,unsigned value){return owner.upgrade(id,value)&&good;},
+                [&](unsigned id,unsigned value){return owner.stored(id,value)&&good;})){
+                good=false;return nullptr;
+            }
+            shop.farewellVariant=chooseFarewell();return good?&shop:nullptr;
+        }
+        good=false;return nullptr;
     }
     static bool meets(const Instance& shop, int x, int y) {
         // sprShopCounter (480), origin 12,12, margins 2..11 / 11..20;

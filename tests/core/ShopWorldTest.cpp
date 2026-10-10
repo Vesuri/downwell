@@ -2,6 +2,7 @@
 #include "core/PlayerMotion.h"
 #include "core/ShopFixtures.h"
 #include "core/LaserSightRay.h"
+#include "core/ShopChildCreation.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -9,6 +10,79 @@ static void require(bool ok, const char* message) {
     if (!ok) { std::fprintf(stderr, "%s\n", message); std::abort(); }
 }
 int main() {
+    for(unsigned reject:{0u,1u,8u,10u}){
+        downwell::ShopWorld world;bool good=true;unsigned rng=0,choices=0;
+        struct Owner {
+            unsigned reject,births=0,writes=0;downwell::ShopWorld::Instance* parent=nullptr;
+            bool begin(downwell::ShopWorld::Instance& shop){
+                require(!parent,"parent registered once");parent=&shop;shop.sourceId=860000;return true;
+            }
+            unsigned create(int,int,int){
+                require(parent&&parent->sourceId==860000,"parent identity precedes children");
+                ++births;return births==reject?0:860000+births*3;
+            }
+            bool readX(unsigned,int& x){x=118;return true;}
+            bool position(unsigned id,int& x,int& y){
+                require(id==parent->children.cases[writes/2],"registered creation reads retained case");
+                x=145+int(writes/2)*19;y=691;return true;
+            }
+            bool upgrade(unsigned id,unsigned value){
+                require(id==parent->children.items[writes/2]&&value==parent->stock.items[writes/2].upgrade,
+                    "registered shop retains item identity before field write");++writes;return true;
+            }
+            bool stored(unsigned,unsigned value){require(value==1,"stored item flag");++writes;return true;}
+        } owner{reject};
+        auto range=[&](unsigned,unsigned){
+            require(owner.births==7,"registered fixtures before stock selection");
+            const unsigned values[]={100,101,104,105};return values[rng++];
+        };
+        auto choice=[&]{require(owner.births==10&&owner.writes==6,"farewell follows all item assignments");++choices;return 2u;};
+        auto* shop=world.createRegistered(100,700,range,choice,4,1,false,0,false,owner,good);
+        require(bool(shop)==(reject==0)&&good==(reject==0)&&world.allocatedCount==1,"registered shop failure prefix retained");
+        require(rng==(reject==1?0u:4u)&&choices==(reject?0u:1u),"registered shop RNG prefix");
+        if(!reject)require(shop->farewellVariant==2,"registered farewell retained");
+        else require(!world.createRegistered(100,700,range,choice,4,1,false,0,false,owner,good)&&world.allocatedCount==1,
+            "failed registered shop cannot continue creation");
+    }
+    for(unsigned failure=0;failure<=10;++failure){
+        downwell::ShopChildCreation children;downwell::ShopInventory stock;
+        const unsigned expected[]={278,279,279,279,98,280,212,283,283,283};
+        unsigned births=0,reads=0,writes=0,rng=0;
+        auto create=[&](int object,int x,int y)->unsigned{
+            require(births<10&&unsigned(object)==expected[births],"shop child source order");
+            const auto i=births++;
+            require((i<7?rng==0:rng==4),"shop children straddle stock RNG");
+            if(i==0)require(x==164&&y==700,"shop table position");
+            if(i>=1&&i<=3)require(x==145+int(i-1)*19&&y==691,"shop case positions");
+            if(i==4)require(x==100&&y==708,"shop invisible wall position");
+            if(i==5)require(x==118&&y==700,"shop keeper position");
+            if(i==6)require(x==-100&&y==-100,"rising text is absolute, not shop-relative");
+            if(i>=7)require(x==900+int(i-7)&&y==801,"items use retained case positions");
+            return failure==births?0:850000+i*7;
+        };
+        bool okay=children.beforeStock(100,700,create,[&](unsigned id,int& x){
+            require(id==850035&&births==6,"read keeper after its Create");x=321;return true;
+        });
+        if(okay){
+            const unsigned choices[]={100,101,104,105};
+            stock.create([&](unsigned,unsigned){return choices[rng++];},4);
+            okay=children.afterStock(stock,create,[&](unsigned id,int& x,int& y){
+                require(id==850007+reads*7,"case source ID retained across intervening births");
+                x=900+int(reads++);y=800;return true;
+            },[&](unsigned id,unsigned value){
+                require(id==850049+(writes/2)*7&&value==stock.items[writes/2].upgrade,
+                    "item upgrade write uses returned child ID");++writes;return true;
+            },[&](unsigned id,unsigned value){
+                require(id==850007+(writes/2)*7&&value==1,"case storedItem follows item whichUg");++writes;return true;
+            });
+        }
+        require(okay==(failure==0)&&births==(failure?failure:10),"failed child stops later births");
+        if(okay)require(children.keeperX==321&&writes==6&&rng==4,"complete shop child phases");
+        else require(!children.succeeded()&&rng==(failure<=7?0u:4u),"failure preserves RNG prefix");
+        const auto before=births;
+        require(!children.beforeStock(100,700,create,[](unsigned,int&){return true;})&&births==before,
+            "partial or complete child phase cannot be replayed");
+    }
     {
         downwell::ShopWorld world;
         unsigned calls = 0;
