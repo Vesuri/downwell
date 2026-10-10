@@ -161,6 +161,32 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             }
             assert(store.setSprite(key,target)&&store.find(key)->imageIndex.bits==expected);
         }
+        assert(store.clear());
+        const auto caseId=creation.create(279,480,2000);const auto caseKey=store.sourceHandle(caseId);
+        assert(store.collideCaseBullet(caseKey,106)&&store.find(caseKey)->state.wallHp==1000000);
+        assert(store.collideCaseBullet(caseKey,107)&&store.find(caseKey)->state.wallHp==0);
+        // Fixture setup represents the still-unconnected damage caller's
+        // user-variable write, not instance_destroy or implicit HP polling.
+        auto& caseState=const_cast<ShopChildState&>(store.find(caseKey)->state);
+        caseState.destroyed=caseState.storedItem=caseState.flashing=1;
+        assert(store.setAlarm(caseKey,0,1));
+        struct CaseEnvironment {
+            const GameplayShopInstances& store;InstanceHandle key;unsigned calls=0;
+            bool sound(int a,int b,int c,int d){assert(calls++==0&&a==10&&b==50&&c==0&&d==1);return true;}
+            bool flash(MotionBinary64 x,MotionBinary64 y,int a,int b,int c){
+                assert(calls++==1&&x.high==MotionBinary64::fromInteger(480).high&&
+                    y.high==MotionBinary64::fromInteger(2000).high&&a==3&&b==0&&c==5&&
+                    store.find(key)->imageIndex.bits==0x40000000u&&store.find(key)->maskId==582);return true;
+            }
+            bool criminal(){assert(calls++==2);return true;}
+        } caseEnvironment{store,caseKey};
+        for(unsigned tick=0;tick<2;++tick){
+            assert(collision->withEncounterSteps(*phase,[&](InstanceHandle h,int object){
+                assert(object==279);return collision->stepRegisteredShopCase(h,caseEnvironment);
+            },[&]{world->step(0);return world->effectsSucceeded();}));
+            assert(collision->prepareDraw()&&store.find(caseKey)&&!store.find(caseKey)->destroyRequested&&
+                store.find(caseKey)->state.opened&&!store.find(caseKey)->state.flashing&&caseEnvironment.calls==3);
+        }
     }
     for(unsigned failure=0;failure<=12;++failure){
         auto world=std::make_unique<GameplayWorld>(300,false,1000,false);

@@ -760,7 +760,7 @@ binds its positioned births and image setters to the shared collision tables
 and source-ID-bearing room/layer lifetimes in reference and native modes.
 World room teardown clears the pool before resetting compact Shop state, and
 Retry preserves the binding without preserving old generation handles. This
-registration does not project their Draw or admit the parent/case
+registration does not project their Draw or admit the parent
 events; those are required before normal frontend generation admission.
 Rising text and item selection can join `withEncounterSteps` through
 `stepRegisteredShopChild`, with the caller supplying the real upgrade-array
@@ -782,7 +782,19 @@ two-frame angry sprite. The runner inverse mapping at `0x50ed71`–`0x50ee09`
 reduces exactly for these values (zero or the exactly representable half-cycle);
 other inverse writes are rejected rather than approximated. Changed-sprite
 resets also reset the retained timeline. This admission does not implement
-the other shop objects' animation, collision events or Draw paths.
+the other shop objects' animation or Draw paths.
+Registered case Step and Alarm 0 share `ShopChildState` event bodies on both
+owners and join their existing mixed phases. The source user variable
+`destroyed` is not `instance_destroy`: an opened case remains registered. Its
+opening writes `opened=1`, calls `soundPlay(10,50,0,1)`, writes frame 2 and
+mask 582, invokes `scrFlashballfx(x,y,3,0,5)`, then writes `global.criminal=1`
+only if `storedItem` is set. Required effect/global callbacks cannot be omitted;
+failure retains the accepted prefix and latches the enclosing status. Alarm 0
+resets image/flashing only before opening. The bullet event only sets health
+to zero when the other sprite is 107; it does not itself set `destroyed`.
+The ordered live contact/damage caller and real sound/flash/criminal adapters
+remain required before frontend admission. Tests that initialize the destroyed
+user variable directly do not establish natural breakage.
 Registered keeper alarms use the same shared handler body in the native and
 stored owners. The native mixed dispatcher advances each slot immediately
 before its handler and takes `irandom_range(20,60)` from the world RNG; rejected

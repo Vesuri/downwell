@@ -99,6 +99,28 @@ public:
                 r.imageIndex=value;return true;
             })||fail();
     }
+    template<class Environment> bool stepCase(InstanceHandle h,Environment& environment){
+        if(!ready(h,279))return fail();auto& r=records_[h.slot];
+        if(!r.active||r.destroyRequested)return true;
+        struct Ops {
+            GameplayShopInstances& owner;Record& r;InstanceHandle h;Environment& env;
+            bool sound(int a,int b,int c,int d){return env.sound(a,b,c,d)&&owner.good_;}
+            bool image(RunnerImageValue value){
+                if(!owner.binding_.imageIndex(h,r,value)||!owner.good_)return false;
+                r.imageIndex=value;return true;
+            }
+            bool mask(int value){
+                if(!owner.binding_.mask(h,r,value)||!owner.good_)return false;
+                r.maskId=value;return true;
+            }
+            bool flash(int a,int b,int c){return env.flash(r.x.promoted(),r.y.promoted(),a,b,c)&&owner.good_;}
+            bool criminal(){return env.criminal()&&owner.good_;}
+        } ops{*this,r,h,environment};
+        return r.state.caseStep(ops)||fail();
+    }
+    bool collideCaseBullet(InstanceHandle h,int sprite){
+        if(!ready(h,279))return fail();records_[h.slot].state.caseBullet(sprite);return true;
+    }
     template<class Environment,class Range> bool stepKeeper(InstanceHandle h,Environment& environment,Range range){
         if(!ready(h,280))return fail();auto& r=records_[h.slot];
         if(!r.active||r.destroyRequested)return true;
@@ -151,6 +173,10 @@ public:
         if(!good_||creating_||!record||!record->initialized||number>=AlarmBank::count)return fail();
         auto& r=records_[h.slot];
         if(!r.active||r.destroyRequested||!r.alarms.advanceOne(number))return true;
+        if(r.objectId==279)return r.state.caseAlarm(number,[&](RunnerImageValue value){
+            if(!binding_.imageIndex(h,r,value)||!good_)return false;
+            r.imageIndex=value;return true;
+        })||fail();
         if(r.objectId==280){
             struct Ops {
                 GameplayShopInstances& owner;Record& r;InstanceHandle h;Range& random;

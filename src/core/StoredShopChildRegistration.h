@@ -140,6 +140,43 @@ public:
             r->imageIndex=stored(value);return true;
         })||fail();
     }
+    template<class Environment> bool stepCase(InstanceHandle key,Environment& environment){
+        auto* e=entry(key);auto* r=e?record(*e):nullptr;
+        if(!good_||creating_||!r||e->object!=279||!e->state.initialized)return fail();
+        if(!r->active||r->destroyRequested)return true;
+        struct Ops {
+            StoredShopChildRegistration& owner;InstanceRecord& r;InstanceHandle key;Environment& env;
+            bool sound(int a,int b,int c,int d){return env.sound(a,b,c,d)&&owner.good_;}
+            bool image(RunnerImageValue value){
+                if(!owner.lifecycle_.imageIndex(key,r,value)||!owner.good_)return false;
+                r.imageIndex=stored(value);return true;
+            }
+            bool mask(int value){
+                if(!owner.lifecycle_.mask(key,r,value)||!owner.good_)return false;
+                r.maskId=value;return true;
+            }
+            bool flash(int a,int b,int c){
+                RunnerImageValue x,y;std::memcpy(&x.bits,&r.preciseX,4);std::memcpy(&y.bits,&r.preciseY,4);
+                return env.flash(x.promoted(),y.promoted(),a,b,c)&&owner.good_;
+            }
+            bool criminal(){return env.criminal()&&owner.good_;}
+        } ops{*this,*r,key,environment};
+        return e->state.caseStep(ops)||fail();
+    }
+    bool caseAlarmEvent(InstanceHandle key,unsigned number){
+        auto* e=entry(key);auto* r=e?record(*e):nullptr;
+        if(!good_||creating_||!r||e->object!=279||!e->state.initialized)return fail();
+        if(!r->active||r->destroyRequested)return true;
+        return e->state.caseAlarm(number,[&](RunnerImageValue value){
+            if(!lifecycle_.imageIndex(key,*r,value)||!good_)return false;
+            r->imageIndex=stored(value);return true;
+        })||fail();
+    }
+    bool collideCaseBullet(InstanceHandle key,int sprite){
+        auto* e=entry(key);auto* r=e?record(*e):nullptr;
+        if(!good_||creating_||!r||e->object!=279||!e->state.initialized)return fail();
+        e->state.caseBullet(sprite);return true;
+    }
     bool keeperSprite(InstanceHandle key,int value){
         auto* e=entry(key);auto* r=e?record(*e):nullptr;
         if(!good_||creating_||!r||e->object!=280)return fail();

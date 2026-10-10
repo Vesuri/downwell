@@ -42,6 +42,14 @@ struct NativeKeeperEnvironment {
     bool criminal(bool&);
     bool createEnemy(int,downwell::MotionBinary64,downwell::MotionBinary64);
 };
+struct NativeShopCaseEnvironment {
+    bool sound(int,int,int,int);
+    bool flash(downwell::MotionBinary64,downwell::MotionBinary64,int,int,int);
+    bool criminal();
+};
+bool nativeRegisteredCaseStep(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle key,NativeShopCaseEnvironment& env){
+    return owner.stepRegisteredShopCase(key,env);
+}
 bool nativeRegisteredKeeperStep(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle key,NativeKeeperEnvironment& env){
     return owner.stepRegisteredShopKeeper(key,env);
 }

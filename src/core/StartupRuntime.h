@@ -2774,6 +2774,21 @@ public:
         return record.objectId==212&&risingTextDraw_&&risingTextDraw_(risingTextDrawContext_,record);
     }
     template<unsigned Capacity,class Environment,class Tick>
+    bool withShopCaseEvents(StoredShopChildRegistration<instanceCapacity,Capacity>& owner,Environment& environment,Tick tick){
+        if(!run_.effectsSucceeded)return false;
+        if(shopCaseDispatch_||!owner.belongsTo(instances_)||!owner.valid())return run_.effectsSucceeded=false;
+        auto dispatch=[&](const InstanceRecord& r,bool alarm,unsigned number){
+            const auto key=owner.handle(r);if(!key.generation)return false;
+            return alarm?owner.caseAlarmEvent(key,number):owner.stepCase(key,environment);
+        };
+        shopCaseContext_=&dispatch;
+        shopCaseDispatch_=[](void* p,const InstanceRecord& r,bool alarm,unsigned n){
+            return (*static_cast<decltype(dispatch)*>(p))(r,alarm,n);
+        };
+        struct Reset {StartupRuntime& world;~Reset(){world.shopCaseDispatch_=nullptr;world.shopCaseContext_=nullptr;}} reset{*this};
+        const bool ok=tick();return run_.effectsSucceeded=run_.effectsSucceeded&&ok&&owner.valid();
+    }
+    template<unsigned Capacity,class Environment,class Tick>
     bool withShopKeeperEvents(StoredShopChildRegistration<instanceCapacity,Capacity>& owner,Environment& environment,Tick tick){
         if(!run_.effectsSucceeded)return false;
         if(shopKeeperDispatch_||!owner.belongsTo(instances_)||!owner.valid())return run_.effectsSucceeded=false;
@@ -3214,6 +3229,8 @@ private:
     void* shopItemStepContext_=nullptr;
     void* shopKeeperContext_=nullptr;
     bool (*shopKeeperDispatch_)(void*,const InstanceRecord&,ShopKeeperPhase,unsigned)=nullptr;
+    void* shopCaseContext_=nullptr;
+    bool (*shopCaseDispatch_)(void*,const InstanceRecord&,bool,unsigned)=nullptr;
     void* scatteredStepContext_=nullptr;
     bool (*scatteredStep_)(void*,InstanceHandle)=nullptr;
     bool (*shopItemStep_)(void*,const InstanceRecord&)=nullptr;

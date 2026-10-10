@@ -284,6 +284,15 @@ item_step = assembly("gml_Object_objObtainableUg_Step_0",
 assert item_step.count("push.v self.whichUg") == 2
 assert "pop.v.v self.sprite_index" in item_step and "image_index" not in item_step
 assert objects[283]["parentId"] == -1
+case_step=assembly("gml_Object_shopCase_Step_0",
+    "6c3d60b9040966633bd75afcf70b8c84da6a087e02a177e8b8bf3f017c3fc707")
+ordered=["pop.v.i self.opened","call.i gml_Script_soundPlay", "pop.v.i self.image_index",
+         "pop.v.i self.mask_index","call.i gml_Script_scrFlashballfx","pop.v.i global.criminal"]
+assert [case_step.index(s) for s in ordered] == sorted(case_step.index(s) for s in ordered)
+assembly("gml_Object_shopCase_Alarm_0",
+    "bdbc9eee0ec4a87d04baadaf3cb277335425411aadf62a0210deccde5d8d637b")
+assembly("gml_Object_shopCase_Collision_enemyBulletAni",
+    "37dd91e99b0977b57db529c1ba01a3dc0f0baa4292b06f41ffe586223b9b0fa1")
 assert not any(e["eventType"] == 8 for e in objects[283]["events"])
 assert objects[289]["name"] == "Scattered16" and objects[289]["parentId"] == 90
 assert objects[289]["spriteId"] == 550 and objects[289]["textureMaskId"] == -1

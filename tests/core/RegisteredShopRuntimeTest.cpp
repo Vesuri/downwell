@@ -125,6 +125,30 @@ int main(){
         }
     }
     require(owner.clear(),"retire idle keeper fixture");layers(live);
+    const auto caseId=owner.children().create(279,480,2000);
+    const auto caseKey=owner.children().sourceHandle(caseId);
+    require(owner.children().collideCaseBullet(caseKey,107)&&owner.children().state(caseKey)->wallHp==0,
+        "case bullet event changes health, not destruction state");
+    auto& caseState=const_cast<ShopChildState&>(*owner.children().state(caseKey));
+    caseState.destroyed=caseState.storedItem=caseState.flashing=1; // Pending damage caller fixture.
+    const_cast<InstanceRecord*>(live.instance(caseId))->alarms.set(0,1);
+    struct CaseEnvironment {
+        StartupRuntime& world;unsigned id,calls=0;
+        bool sound(int a,int b,int c,int d){require(calls++==0&&a==10&&b==50&&c==0&&d==1,"case sound order");return true;}
+        bool flash(MotionBinary64 x,MotionBinary64 y,int a,int b,int c){
+            require(calls++==1&&a==3&&b==0&&c==5&&x.high==MotionBinary64::fromInteger(480).high&&
+                y.high==MotionBinary64::fromInteger(2000).high&&world.instance(id)->imageIndex==2&&
+                world.instance(id)->maskId==582,"case flash after image and mask publication");return true;
+        }
+        bool criminal(){require(calls++==2,"criminal follows flash");return true;}
+    } caseEnvironment{live,caseId};
+    for(unsigned tick=0;tick<2;++tick){
+        require(live.withShopCaseEvents(owner.children(),caseEnvironment,[&]{live.step(false);return live.effectsSucceeded();}),
+            "registered case joins mixed alarm and Step phases");
+        require(caseEnvironment.calls==3&&live.instance(caseId)&&!live.instance(caseId)->destroyRequested&&
+            caseState.opened&&!caseState.flashing,"opened case remains alive and does not repeat effects");
+    }
+    require(owner.clear(),"retire case fixture");layers(live);
     InstanceHandle scenery;const auto sceneryId=live.nextRuntimeInstanceId();
     DeferredCreateInstance sceneryCommand(289,240,int(live.mainCameraViewY())+100);
     sceneryCommand.integerImageIndex=12;sceneryCommand.imageIndex=12;sceneryCommand.imageSpeed=0;

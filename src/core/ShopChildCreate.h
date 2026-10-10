@@ -16,6 +16,22 @@ struct ShopChildState {
     const char* text=nullptr;
     int drawing=0;
     bool initialized=false;
+    template<class Ops> bool caseStep(Ops& ops){
+        // The undestroyed branch only tests local fields; its body is empty.
+        // destroyed is a user variable, not deferred lifetime destruction.
+        if(!destroyed||opened)return true;
+        opened=1;
+        if(!ops.sound(10,50,0,1)||!ops.image({0x40000000u})||!ops.mask(582)||
+           !ops.flash(3,0,5))return false;
+        return !storedItem||ops.criminal();
+    }
+    template<class Image> bool caseAlarm(unsigned number,Image image){
+        if(number!=0)return false;
+        if(opened)return true;
+        if(!image(RunnerImageValue{}))return false;
+        flashing=0;return true;
+    }
+    void caseBullet(int sprite){if(sprite==107)wallHp=0;}
     template<class Ops> bool keeperAlarm(unsigned number,int sprite,Ops& ops){
         if(number==2){thankful=goodbye=confused=0;return true;}
         if(number>2)return false;

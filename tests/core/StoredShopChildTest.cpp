@@ -10,6 +10,33 @@
 #include <vector>
 #endif
 using namespace downwell;
+static bool shopCaseEventCheck(){
+    for(unsigned failure=0;failure<=5;++failure){
+        ShopChildState state;state.destroyed=state.storedItem=1;
+        struct Ops {
+            ShopChildState& state;unsigned failure,calls=0;
+            bool next(){return state.opened==1&&++calls!=failure;}
+            bool sound(int a,int b,int c,int d){return a==10&&b==50&&c==0&&d==1&&next();}
+            bool image(RunnerImageValue value){return value.bits==0x40000000u&&next();}
+            bool mask(int value){return value==582&&next();}
+            bool flash(int a,int b,int c){return a==3&&b==0&&c==5&&next();}
+            bool criminal(){return next();}
+        } ops{state,failure};
+        if(state.caseStep(ops)!=!failure||!state.opened||ops.calls!=(failure?failure:5))return false;
+        // Even a rejected effect leaves the opened prefix; the caller latches
+        // failure rather than retrying the event and replaying its effects.
+        const auto before=ops.calls;
+        if(!state.caseStep(ops)||ops.calls!=before)return false;
+        state.flashing=1;
+        if(!state.caseAlarm(0,[](RunnerImageValue){return false;})||!state.flashing)return false;
+        state.opened=0;
+        if(state.caseAlarm(0,[](RunnerImageValue){return false;})||!state.flashing)return false;
+        if(!state.caseAlarm(0,[](RunnerImageValue v){return !v.bits;})||state.flashing)return false;
+        state.wallHp=123;state.caseBullet(106);if(state.wallHp!=123)return false;
+        state.caseBullet(107);if(state.wallHp)return false;
+    }
+    return true;
+}
 bool risingTextRendererProbe(const FontGlyphMasks& glyphs,LevelNumberTextDrawState& state,Renderer& renderer){
     RisingTextRenderer draw(glyphs,state,renderer,160,1024,160,110);
     MotionBinary64 width;
@@ -250,6 +277,7 @@ bool registeredKeeperAlarmCheck(const ObjectPack& objects,bool reject){
 }
 #ifndef DOWNWELL_NATIVE_QUERY_PROBE
 int main(){
+    if(!shopCaseEventCheck())return 1;
     std::ifstream file("generated/downwell-objects.dwob",std::ios::binary);
     std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(file),{}};
     ObjectPack objects(bytes.data(),bytes.size());
