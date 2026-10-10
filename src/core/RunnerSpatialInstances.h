@@ -870,6 +870,13 @@ public:
     }
     unsigned pendingSpatial()const{return spatial_.size();}
     unsigned pendingCollision()const{return collision_.size();}
+    // Tail of engine-component refresh 0x466a44: unconditional bounds dirtiness
+    // and 0x501e50 requeue, even for an unchanged direction or zero speed.
+    bool engineMotionChanged(InstanceHandle h,std::uint32_t objectFlags){
+        if(!valid()||!live(h))return false;
+        {auto edit=states_.edit(h.slot);edit.get().flags|=8u;}
+        markSpatialChange(h.slot,objectFlags);return true;
+    }
     // 0x501ef0, called for OTHER after a precise collision and inactivity
     // checks. Queue only collision processing, without dirtying spatial bounds.
     bool queueCollision(InstanceHandle h,std::uint32_t objectFlags){

@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_STARTUP_RUNTIME_H
 
 #include "AreaOneBuilder.h"
+#include "RunnerDirectionValue.h"
 #include "BlastWallContact.h"
 #include "BlastShootableContact.h"
 #include "InstanceStore.h"
@@ -593,6 +594,19 @@ public:
                 }
                 bool playerX(MotionBinary64& value){return player(false,value);}
                 bool playerY(MotionBinary64& value){return player(true,value);}
+                bool direction(MotionBinary64 wanted,MotionBinary64& accepted){
+                    auto* r=record();RunnerImageValue value;
+                    // Jelly scripts use custom xsp/ysp; builtin speed remains
+                    // at constructor zero. Do not apply this specialization
+                    // if another caller has supplied nonzero engine speed.
+                    if(!r||r->moveSpeed!=0||!RunnerDirectionValue::normalize(wanted,value))return false;
+                    std::memcpy(&r->direction,&value.bits,4);
+                    // cos/sin * zero followed by the runner's near-integer
+                    // snap yields positive zero for BOTH engine components.
+                    r->velocityX=0;r->velocityY=0;
+                    if(!queries.engineMotionChanged(key,*r))return false;
+                    accepted=value.promoted();return true;
+                }
                 bool imageSpeed(RunnerImageValue value,RunnerImageValue& accepted){
                     auto* r=record();if(!r||!value.promoted().valid())return false;
                     std::memcpy(&r->imageSpeed,&value.bits,4);accepted=value;return true;

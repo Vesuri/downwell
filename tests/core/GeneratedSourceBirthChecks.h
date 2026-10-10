@@ -19,12 +19,12 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
         assert(owner->attach(*world)&&(!native||world->bindNativeTerrain(*terrain)));
         auto& store=owner->whiteJellies();
         struct Ops {
-            GameplayWhiteJellies& store;InstanceHandle key;
+            GameplayWhiteJellies& store;InstanceHandle key;GameplayCollisionOwner& owner;
             bool position(bool y,RunnerImageValue v,RunnerImageValue& out){return store.position(key,y,v,out);}
             bool playerY(MotionBinary64& v){v={};return true;}
             bool playerX(MotionBinary64& v){v={};return true;}
             bool pointDirection(MotionBinary64,MotionBinary64,MotionBinary64,MotionBinary64,MotionBinary64& v){v={};return true;}
-            bool direction(MotionBinary64 v,MotionBinary64& out){out=v;return true;}
+            bool direction(MotionBinary64 v,MotionBinary64& out){return owner.whiteJellyDirection(key,v,out);}
             bool imageSpeed(RunnerImageValue v,RunnerImageValue& out){out=v;return true;}
             bool enemyPlayerY(MotionBinary64& v){v={};return true;}
             bool enemyPlayerX(MotionBinary64& v){v={};return true;}
@@ -48,7 +48,10 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
         assert(randomBinary64(expectedRandom.nextU32(),{0x3fe00000u,0},expectedVelocity)&&
             expectedVelocity.add(MotionBinary64::fromInteger(1)));
         assert(world->createWhiteJellyWithSourceId(899000,{0x43800000u},{0x44300000u},
-            [&](auto h){return Ops{store,h};},key));
+            [&](auto h){return Ops{store,h,*owner};},key));
+        MotionBinary64 heading;
+        assert(owner->whiteJellyDirection(key,MotionBinary64::fromInteger(360),heading)&&heading.zero());
+        assert(owner->whiteJellyDirection(key,heading,heading)&&heading.zero());
         assert(store.find(key)->initialized&&store.find(key)->active&&
             store.find(key)->velocity.high==expectedVelocity.high&&store.find(key)->velocity.low==expectedVelocity.low&&
             world->randomState().stateIndex()==expectedRandom.stateIndex());
@@ -63,7 +66,7 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             store.find(key)->imageIndex.bits==0x3ecccccdu);
         assert(owner->configureCorpseMasks(masks));
         assert(store.dispatch(key,[](auto& r){r.xx=MotionBinary64::fromInteger(-1000);return true;}));
-        GameplayCollisionOwner::EncounterStepOrder phase;Ops ops{store,key};unsigned steps=0;
+        GameplayCollisionOwner::EncounterStepOrder phase;Ops ops{store,key,*owner};unsigned steps=0;
         auto expectedX=MotionBinary64::fromInteger(-1000);
         assert(expectedX.add(store.find(key)->moveSpeed));
         assert(owner->withEncounterSteps(phase,[&](InstanceHandle h,int object){
@@ -99,7 +102,7 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
                 assert(object==115&&!births&&!deactivations);RunnerImageValue px,py;
                 if(!px.assign(x)||!py.assign(y))return false;id=next++;
                 const bool ok=world.createWhiteJellyWithSourceId(id,px,py,
-                    [&](auto h){return Ops{owner.whiteJellies(),h};},child);
+                    [&](auto h){return Ops{owner.whiteJellies(),h,owner};},child);
                 assert(ok&&owner.whiteJellies().find(child)->initialized&&owner.whiteJellies().find(child)->active);
                 unsigned count;assert(owner.population(83,count)&&count==1);
                 ++births;return ok;

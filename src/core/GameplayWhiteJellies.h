@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_GAMEPLAY_WHITE_JELLIES_H
 #include "InstanceLifecycle.h"
 #include "WhiteJellyStep.h"
+#include "RunnerDirectionValue.h"
 #include "RunnerSpriteChange.h"
 #include "UnitSequenceFrames.h"
 namespace downwell {
@@ -61,6 +62,16 @@ public:
     bool meeting(InstanceHandle key,MotionBinary64 x,MotionBinary64 y,int object,bool& hit){
         if(!good_||!find(key))return fail();
         return binding_.placeMeeting(key,records_[key.slot],object,x,y,hit)||fail();
+    }
+    // This family never writes builtin speed: engine components stay zero,
+    // independently of custom xsp/ysp. Keep the mandatory dirty publication.
+    template<class Publish> bool direction(InstanceHandle key,MotionBinary64 wanted,
+        MotionBinary64& accepted,Publish publish){
+        if(!good_||!find(key))return fail();RunnerImageValue value;
+        if(!RunnerDirectionValue::normalize(wanted,value))return fail();
+        auto& r=records_[key.slot];r.direction=value.promoted();
+        if(!publish(key,r))return fail();
+        accepted=r.direction;return true;
     }
     bool imageIndex(InstanceHandle key,RunnerImageValue value){
         // The authored hit event only assigns zero. Do not claim arbitrary

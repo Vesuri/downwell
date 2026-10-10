@@ -2304,6 +2304,20 @@ public:
            !objects_.findEvent(115,3,0,event)||event.ownerObjectId!=115||event.codeId!=1225)return check(false);
         return check(world_->stepWhiteJellyRoomEffect(local,stopped,ops));
     }
+    bool whiteJellyDirection(InstanceHandle local,MotionBinary64 wanted,MotionBinary64& accepted){
+        InstanceHandle shared;
+        if(!valid()||!whiteJellies_.find(local)||!View::encode(View::Kind::whiteJelly,local,shared)||!resolves(shared))
+            return check(false);
+        return check(whiteJellies_.direction(local,wanted,accepted,[&](auto,const auto&){
+            if(native_){
+                auto* position=nativePosition(shared.slot);if(!position)return false;
+                position->appearanceFlags|=8u;std::uint32_t flags;
+                return eligibilityFlags(shared,flags)&&nativeDirty(shared.slot,115,flags);
+            }
+            const auto* flags=families_.flags(115);
+            return flags&&owner_.engineMotionChanged(shared,*flags);
+        }));
+    }
     template<class PointDirection,class DirectionSetter>
     bool dispatchWhiteJellyEnemyCollision(const RunnerCollisionEventContext::Frame& event,
         PointDirection pointDirection,DirectionSetter directionSetter){

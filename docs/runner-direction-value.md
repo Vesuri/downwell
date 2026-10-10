@@ -31,3 +31,22 @@ cases against host float conversion, `fmod` and float addition. This is not
 Windows runtime FP-mode verification, nor a complete direction setter: live
 owners must additionally publish the engine-component and dirty-state effects.
 In particular, white jelly custom `xsp`/`ysp` are not those engine components.
+
+## Registered white-jelly specialization
+
+The instance initialization sequences at `0x461850` and `0x461985` zero
+direction, builtin speed, hspeed and vspeed (`0xc8`, `0xcc`, `0xdc`, `0xe0`).
+The admitted white-jelly scripts move through custom `xsp`/`ysp` and position
+setters, not builtin speed. For this zero-speed domain, the engine refresh's
+cosine/sine products are zero; its near-integer snap produces positive zero
+for both engine components. This specialization does not implement nonzero
+builtin-speed trigonometry.
+
+The registered stored-world setter checks builtin speed is zero, publishes
+the normalized direction and zero components, then dirties bounds and requeues
+spatial/collision work. The native jelly owner retains the same zero-speed
+invariant and publishes the same dirty operation. Repeated equal directions
+must still requeue: `0x466a44` sets bit 8 and calls `0x501e50` unconditionally.
+Tests exercise that ordering as well as Create-time publication in both native
+and reference ownership. Controlled steering inputs in these tests do not
+establish original point-direction/trig behavior or natural encounter admission.

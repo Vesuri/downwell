@@ -210,6 +210,10 @@ public:
     bool move(InstanceHandle h,const InstanceRecord& r,RunnerImageValue x,RunnerImageValue y){return adapter_.move(h,r,x,y);}
     bool sprite(InstanceHandle h,const InstanceRecord& r,int sprite){return adapter_.sprite(h,r,sprite);}
     bool mask(InstanceHandle h,const InstanceRecord& r,int mask){return adapter_.mask(h,r,mask);}
+    bool engineMotionChanged(InstanceHandle h,const InstanceRecord& r){
+        const auto* flags=families_.flags(unsigned(r.objectId));
+        return valid()&&resolve(h)==&r&&flags&&owner_.engineMotionChanged(h,*flags);
+    }
     bool imageIndex(InstanceHandle h,const InstanceRecord& r,RunnerImageValue index){return adapter_.imageIndex(h,r,index);}
     bool transform(InstanceHandle h,const InstanceRecord& r,RunnerTransformField field,
                    RunnerImageValue value,RunnerImageValue alpha,std::uint32_t blend){

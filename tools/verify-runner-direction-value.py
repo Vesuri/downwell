@@ -8,6 +8,8 @@ import struct
 audit = runpy.run_path(str(Path(__file__).with_name("verify-runner-choose.py")))
 region = audit["region"]
 for start, end, digest in (
+    (0x461850, 0x461878, "0bb0dd577ba88f74f6fa1a720c9b1965a183efa69e0ec8e87743dc04863a1fa3"),
+    (0x461985, 0x4619ad, "0bb0dd577ba88f74f6fa1a720c9b1965a183efa69e0ec8e87743dc04863a1fa3"),
     (0x430b76, 0x430b8c, "fdde38fb1a7e0333169143e134723d78c81798ad261cb8b174f3632ca8a52600"),
     (0x431db0, 0x431df2, "afff95ba28daeed5eeb27cfa28ae1b7aa57dbc81abb3147e130e932008e87d0c"),
     (0x42d850, 0x42d871, "4076814ff204064e940dd8e2c654f1a2cecd5905e0bb9848cbea12516245ce84"),

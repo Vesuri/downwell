@@ -276,8 +276,7 @@ int main(){
         struct JellyEnvironment {
             using N=MotionBinary64;
             unsigned& directions;
-            bool pointDirection(N,N,N,N,N& value){++directions;value=N::fromInteger(90);return true;}
-            bool direction(N value,N& accepted){accepted=value;return true;}
+            bool pointDirection(N,N,N,N,N& value){++directions;value=N::fromInteger(450);return true;}
             bool enemyPlayerX(N&){return false;}bool enemyPlayerY(N&){return false;}
             bool lengthdir(bool,N,N,N&){return false;}
             bool sound(int,int,int,int,const char*){return false;}
@@ -308,6 +307,9 @@ int main(){
                 require(state&&state->initialized&&state->scriptActive&&!r.active&&r.activationPending&&
                     speed.bits==0x3e4ccccdu&&r.imageIndex==0&&directions==1&&stopReads==0,
                     "child Create precedes dormant publication; no same-frame child Step or animation");
+                require(r.direction==90&&r.moveSpeed==0&&r.velocityX==0&&r.velocityY==0&&
+                    state->direction.high==MotionBinary64::fromInteger(90).high&&state->direction.low==0&&
+                    !state->moveSpeed.zero(),"registered direction normalizes without conflating custom and engine speed");
                 require(owner->collisionPosition(world->instanceHandleAt(i),x,y)&&
                     x.bits==state->x.bits&&y.bits==state->y.bits&&r.preciseX==float(r.x)&&r.preciseY==float(r.y),
                     "jelly builtin coordinates agree with its registered collision state");

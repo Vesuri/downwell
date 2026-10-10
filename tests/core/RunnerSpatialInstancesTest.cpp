@@ -62,6 +62,22 @@ template<bool Scheduled,unsigned Nodes> static void preparedTerrainPublication()
 }
 int main(){
     {
+        // Engine refresh queues even unchanged/zero-speed writes. Requeue
+        // order is remove-and-prepend, not first insertion order.
+        using Owner=RunnerSpatialInstances<8,32,true>;
+        Owner owner;Owner::State state;state.flags=0;
+        assert(owner.attach({0,1},1,state)&&owner.attach({1,1},1,state));
+        assert(owner.engineMotionChanged({0,1},8)&&owner.engineMotionChanged({1,1},8)&&
+            owner.engineMotionChanged({0,1},8));
+        assert(owner.resolve({0,1})->flags&8u);
+        assert(owner.pendingSpatial()==2&&owner.pendingCollision()==2);
+        std::vector<unsigned> order;
+        assert(owner.flush([&](InstanceHandle h,bool){order.push_back(h.slot);return true;}));
+        assert(order.size()>=2&&order[0]==0&&order[1]==1);
+        assert(!owner.engineMotionChanged({0,2},8));
+        assert(owner.engineMotionChanged({0,1},8)&&owner.pendingSpatial()==1);
+    }
+    {
         // Eligibility is an identity/flag observation, not a request for
         // geometry. Compare it with full resolution through lifecycle changes,
         // including readable partial state after a terminal owner failure.

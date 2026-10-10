@@ -30,6 +30,10 @@ namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_
 #include "core/CurrencyHomingMath.h"
 #include "core/TerrainWallContacts.h"
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
+bool nativeWhiteJellyDirection(downwell::GameplayCollisionOwner& owner,
+    downwell::InstanceHandle key,downwell::MotionBinary64 value,downwell::MotionBinary64& accepted){
+    return owner.whiteJellyDirection(key,value,accepted);
+}
 struct NativeWhiteJellyBirthOps {
     bool position(bool,downwell::RunnerImageValue,downwell::RunnerImageValue&);
     bool playerY(downwell::MotionBinary64&);bool playerX(downwell::MotionBinary64&);
