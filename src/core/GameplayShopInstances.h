@@ -12,6 +12,7 @@
 #include "ShopLifetimeEvents.h"
 #include "ShopRadioEvents.h"
 #include "ShopPurchaseEvents.h"
+#include "ShopViewEvents.h"
 namespace downwell {
 // Native ownership of Shop and its ten synchronous children. Numeric IDs
 // belong to the enclosing room allocator, never to this generation pool.
@@ -126,6 +127,21 @@ public:
             bool resume(){return env.resume(r.shop->radio)&&owner.good_;}
         } ops{*this,r,environment};
         return ShopRadioEvents::step(r.shop->shopBgm,ops)||fail();
+    }
+    // Caller retains the !criminal branch decision taken before interaction.
+    template<class Environment> bool parentViewStep(InstanceHandle h,Environment& environment){
+        if(!ready(h,277)||!records_[h.slot].shop)return fail();auto& r=records_[h.slot];
+        if(!r.active||r.destroyRequested)return true;
+        struct Ops {
+            GameplayShopInstances& owner;Record& r;Environment& env;
+            MotionBinary64 x(){return r.x.promoted();}
+            MotionBinary64 y(){return r.y.promoted();}
+            MotionBinary64 keeperX(){return MotionBinary64::fromInteger(r.shop->children.keeperX);}
+            bool view(unsigned field,MotionBinary64& out){return env.view(field,out)&&owner.good_;}
+            bool playerX(MotionBinary64& out){return env.playerX(out)&&owner.good_;}
+            bool sound(int id){return env.sound(id,90,0,1,"merchant")&&owner.good_;}
+        } ops{*this,r,environment};
+        return ShopViewEvents::step(r.shop->shopInView,r.shop->keeperAngry,ops)||fail();
     }
     // Environment borrows this parent's grant/text/sound scripts. maido(y)
     // executes scrRisingTextShop with its live msgx/logMaido and supplied y.

@@ -5,6 +5,7 @@
 #include "core/ShopInventory.h"
 #include "ShopRadioChecks.h"
 #include "ShopPurchaseChecks.h"
+#include "ShopViewChecks.h"
 #ifndef DOWNWELL_NATIVE_QUERY_PROBE
 #include <cstdio>
 #include <cstdlib>
@@ -182,6 +183,9 @@ bool shopParentRegistrationCheck(const ObjectPack& objects,unsigned area,unsigne
     if(expected){
         ShopRadioProbe radioStep;radioStep.expectedRadio=shop->radio;
         if(!owner.parentRadioStep(shop->sourceId,radioStep)||!shop->shopBgm||!radioStep.matches("tdlvgmpr"))return false;
+        ShopViewProbe view;
+        if(!checkShopViewEvents()||!owner.parentViewStep(shop->sourceId,view)||!shop->shopInView||!shop->keeperAngry||
+           view.greetings!=1||view.angrySounds!=1)return false;
         CurrencyAccount purchaseMoney;purchaseMoney.currency=10000;
         ShopPurchaseProbe purchase{*shop,purchaseMoney,700};ShopInventory::Purchase result;
         if(!owner.purchase(shop->sourceId,purchaseMoney,purchase,result)||result!=ShopInventory::Purchase::bought||purchase.calls!=4)return false;

@@ -6,6 +6,7 @@
 #include "core/ShopFixtures.h"
 #include "ShopRadioChecks.h"
 #include "ShopPurchaseChecks.h"
+#include "ShopViewChecks.h"
 #include <cassert>
 #include <memory>
 #include <vector>
@@ -76,6 +77,9 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
         const auto parentKey=store.sourceHandle(replacement->sourceId);
         ShopRadioProbe radioStep;radioStep.expectedRadio=replacement->radio;
         assert(store.parentRadioStep(parentKey,radioStep)&&replacement->shopBgm&&radioStep.matches("tdlvgmpr"));
+        ShopViewProbe view;
+        assert(checkShopViewEvents()&&store.parentViewStep(parentKey,view)&&replacement->shopInView&&replacement->keeperAngry&&
+            view.greetings==1&&view.angrySounds==1);
         CurrencyAccount purchaseMoney;purchaseMoney.currency=10000;
         ShopPurchaseProbe purchase{*replacement,purchaseMoney,2000};ShopInventory::Purchase result;
         assert(store.purchase(parentKey,purchaseMoney,purchase,result)&&result==ShopInventory::Purchase::bought&&purchase.calls==4);

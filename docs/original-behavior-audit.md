@@ -805,6 +805,20 @@ point-distance, published-view, settings and device-audio adapters still
 belong to full parent Step admission; this component is not scheduled as an
 independent once-per-frame audio pass.
 
+The later `ShopViewEvents` branch is distinct from that radio visibility test.
+Blocks 96–113 are reached only through the earlier non-criminal branch, after
+interaction. They read XView twice and YView twice, short-circuiting strict
+`x > left`, `x < right`, `y > top`, `y < bottom` comparisons. Each coordinate
+is captured before the corresponding view calls. Entry sets `shopInView`
+before sound 103; leaving clears that latch but retains `keeperAngry`. While
+visible, the player is compared with `keeperx` captured by Shop Create, not
+the keeper child's current X. Crossing right sets `keeperAngry` before sound
+94; returning to or left of that X clears it. Both owners retain these flags
+and use live published coordinates. The branch still requires the enclosing
+source-ordered parent event and published-view/device-audio dependencies; its
+owner entry must not be scheduled independently or guarded by a fresh criminal
+read after interaction.
+
 `StoredShopChildRegistration` implements these six child resources' synchronous
 Create bodies in real `InstanceStore` records, borrowing the room counter and
 lifecycle publisher. Birth publication precedes Create setters; item image-index

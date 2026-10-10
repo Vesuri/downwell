@@ -5,6 +5,7 @@
 #include "ShopLifetimeEvents.h"
 #include "ShopRadioEvents.h"
 #include "ShopPurchaseEvents.h"
+#include "ShopViewEvents.h"
 namespace downwell {
 // Concrete owner for ShopWorld::createRegistered. The compact shop owns stock
 // and menu state; its retained room record owns identity and builtins. Children
@@ -80,6 +81,23 @@ public:
         } ops{*this,*p,*r,environment};
         RunnerImageValue y;std::memcpy(&y.bits,&r->preciseY,4);
         return (roomEnd?ShopLifetimeEvents::roomEnd(ops):ShopLifetimeEvents::endStep(y.promoted(),ops))||fail();
+    }
+    // Caller retains the !criminal branch decision taken before interaction.
+    template<class Environment> bool parentViewStep(unsigned id,Environment& environment){
+        const auto* p=parent(id);auto* r=p?records_.resolve(p->key):nullptr;
+        if(!good_||!r||!p->shop)return fail();
+        if(!r->active||r->destroyRequested)return true;
+        struct Ops {
+            StoredShopCreationOwner& owner;const Parent& p;InstanceRecord& r;Environment& env;
+            static MotionBinary64 real(float f){RunnerImageValue v;std::memcpy(&v.bits,&f,4);return v.promoted();}
+            MotionBinary64 x(){return real(r.preciseX);}
+            MotionBinary64 y(){return real(r.preciseY);}
+            MotionBinary64 keeperX(){return MotionBinary64::fromInteger(p.shop->children.keeperX);}
+            bool view(unsigned field,MotionBinary64& out){return env.view(field,out)&&owner.good_;}
+            bool playerX(MotionBinary64& out){return env.playerX(out)&&owner.good_;}
+            bool sound(int id){return env.sound(id,90,0,1,"merchant")&&owner.good_;}
+        } ops{*this,*p,*r,environment};
+        return ShopViewEvents::step(p->shop->shopInView,p->shop->keeperAngry,ops)||fail();
     }
     // Environment borrows this parent's grant/text/sound scripts. maido(y)
     // executes scrRisingTextShop with its live msgx/logMaido and supplied y.

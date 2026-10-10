@@ -218,6 +218,19 @@ ordered = ["pop.v.i self.thank", "popaf.e", "call.i gml_Script_scrGainUg", "pop.
            "pop.v.i [stacktop]self.image_index", "call.i gml_Script_scrRisingTextShop", "call.i gml_Script_soundPlayOL"]
 assert [purchase.index(s) for s in ordered] == sorted(purchase.index(s) for s in ordered)
 print("Pinned Shop Step: per-event with(277) traversal, shared input writes and synchronous purchase ordering")
+view = shop_step.split(":[96]\n",1)[1].split(":[114]\n",1)[0]
+assert view.count("call.i gml_Script___view_get(argc=2)") == 6
+assert "scrInView" not in view
+for block,coordinate,comparison in ((96,"x","GT"),(97,"x","LT"),(98,"y","GT"),(99,"y","LT")):
+    body = shop_step.split(f":[{block}]\n",1)[1].split(":[",1)[0]
+    assert body.startswith(f"push.v self.{coordinate}\n") and f"cmp.v.v {comparison}" in body
+for block,latch,sound in ((103,"shopInView",103),(110,"keeperAngry",94)):
+    body = shop_step.split(f":[{block}]\n",1)[1].split(":[",1)[0]
+    assert body.index(f"pop.v.i self.{latch}") < body.index("call.i gml_Script_soundPlayOL")
+    assert f"pushi.e {sound}\nconv.i.v\ncall.i gml_Script_soundPlayOL" in body
+assert "push.v self.keeperx\ncmp.v.v GT" in view
+assert "pushi.e 0\npop.v.i self.keeperAngry\npushi.e 0\npop.v.i self.shopInView" in shop
+print("Pinned shop greeting/anger latches, strict view edges and six ordered view reads")
 inherited = assembly("gml_Object_parentInteractable_Create_0",
     "c7501948045f88afa9ab289ee4b1b5a380bb4de07aee3857eeba1e937a427647")
 assert "call.i" not in inherited and objects[91]["parentId"] == -1

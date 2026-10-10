@@ -20,6 +20,7 @@ struct ShopWorld {
         ShopChildCreation children;
         int radio=-1;
         bool shopBgm=false;
+        bool shopInView=false,keeperAngry=false;
         int x = 0, y = 0;
         bool allocated = false, wallPresent = false;
         unsigned artRevision = 0;
