@@ -2246,6 +2246,18 @@ public:
            !((event.owner==120&&event.code==1266)||(event.owner==83&&event.code==1066)))return check(false);
         return check(world_->collideSkeletonRoomEffect(local,event.code==1066,makePlayer));
     }
+    template<class MakePlayer> bool dispatchWhiteJellyPlayerCollision(
+        const RunnerCollisionEventContext::Frame& event,MakePlayer makePlayer){
+        View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;
+        if(!valid()||!world_||!resolves(event.self)||!resolves(event.other)||
+           !View::decode(event.self,kind,local)||kind!=View::Kind::whiteJelly||objectOf(event.other)!=35||
+           event.type!=4||event.subtype!=35||event.owner!=115||event.code!=1227||
+           !objects_.collisionEvent(115,35,found,binding)||!found||binding.ownerObjectId!=115||binding.codeId!=1227)
+            return check(false);
+        return check(whiteJellies_.dispatch(local,[&](auto& actor){
+            auto player=makePlayer(actor);return actor.playerContact(player);
+        }));
+    }
     template<class Frames,class Audio,class Atan>
     bool dispatchSkeletonBulletCollision(const RunnerCollisionEventContext::Frame& event,
         Frames frames,SoundPlayEnvironment& environment,Audio& audio,Atan atan){

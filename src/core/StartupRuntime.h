@@ -2070,6 +2070,20 @@ public:
             auto player=makePlayer(actor);return actor.collidePlayerPublished(player,good);
         })&&run_.effectsSucceeded;
     }
+    template<unsigned Capacity,class MakePlayer> bool dispatchWhiteJellyPlayerCollision(
+        StoredWhiteJellyStates<instanceCapacity,Capacity>& owner,const RunnerCollisionEventContext::Frame& event,
+        MakePlayer makePlayer){
+        if(!run_.effectsSucceeded)return false;
+        const auto* self=instances_.resolve(event.self);const auto* other=instances_.resolve(event.other);
+        PackedObjectEvent binding{};bool found=false;
+        if(!owner.belongsTo(instances_)||!owner.valid()||!self||!other||!objectPack_||self->objectId!=115||other->objectId!=35||
+           event.type!=4||event.subtype!=35||event.owner!=115||event.code!=1227||
+           !objectPack_->collisionEvent(115,35,found,binding)||!found||binding.ownerObjectId!=115||binding.codeId!=1227)
+            return run_.effectsSucceeded=false;
+        return run_.effectsSucceeded=owner.dispatch(event.self,[&](auto& actor){
+            auto player=makePlayer(actor);return actor.playerContact(player);
+        })&&run_.effectsSucceeded;
+    }
     template<unsigned Capacity,class Frames,class Delay,class Audio,class Atan>
     bool dispatchSkeletonBulletCollision(StoredSkeletonRegistration<instanceCapacity,Capacity>& skeletons,
         const RunnerCollisionEventContext::Frame& event,Frames frames,Delay delay,

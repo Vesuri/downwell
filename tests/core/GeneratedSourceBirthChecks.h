@@ -300,6 +300,19 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             GameplayCollisionView(*world).resolve(jellyShared,jellyRecord)&&jellyRecord.whiteJelly==jellies.find(jelly));
         assert(jellyRecord.whiteJelly->sourceId==899000&&jellyRecord.whiteJelly->x.bits==0x43800000u&&
             jellyRecord.whiteJelly->y.bits==0x44300000u&&owner->prepareDraw());
+        InstanceHandle playerShared;
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::player,world->playerHandle(),playerShared));
+        struct JellyPlayer {
+            MotionBinary64 y;unsigned& stomps;unsigned& damages;
+            bool globalY(MotionBinary64& out){out=y;return true;}
+            bool stomp(){++stomps;return true;}
+            bool damage(int a,int b,int c){assert(a==1&&b==3&&c==2);++damages;return true;}
+        };
+        unsigned stomps=0,damages=0;
+        const RunnerCollisionEventContext::Frame playerContact{jellyShared,playerShared,4,35,115,1227};
+        for(int playerY:{700,702})assert(owner->dispatchWhiteJellyPlayerCollision(playerContact,
+            [&](auto& actor){assert(actor.sourceId==899000);return JellyPlayer{MotionBinary64::fromInteger(playerY),stomps,damages};}));
+        assert(stomps==1&&damages==1);
         for(unsigned frame=0;frame<8;++frame)assert(jellies.advanceAnimation(jelly));
         assert(jellies.sprite(jelly,175)&&jellies.find(jelly)->imageIndex.bits==0&&owner->prepareDraw());
         assert(jellies.find(jelly)->maskId==174&&jellies.sprite(jelly,176)&&

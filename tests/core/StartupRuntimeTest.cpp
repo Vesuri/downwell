@@ -1199,6 +1199,30 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         const auto count=runtime->activeInstanceCount();
         require(!runtime->spawnWhiteJelly(24,56,key)&&runtime->activeInstanceCount()==count,
                 "jelly resource birth cannot reuse expired stack-bound operations");
+        if(patterns){
+            auto live=std::make_unique<downwell::StartupRuntime>(downwell::PlatformProfile::nonDesktop,&pack,objects,2,patterns);
+            live->skipToGameForTesting();auto liveOwner=live->whiteJellyStates<2>();
+            downwell::InstanceHandle playerKey;
+            for(unsigned i=0;i<live->activeInstanceCount();++i)
+                if(live->instanceAt(i).objectId==35)playerKey=live->instanceHandleAt(i);
+            require(playerKey.generation!=0,"main room supplies actual player contact lifetime");
+            unsigned stomps=0,damages=0;
+            struct Contact {
+                N y;unsigned& stomps;unsigned& damages;
+                bool globalY(N& value){value=y;return true;}
+                bool stomp(){++stomps;return true;}
+                bool damage(int a,int b,int c){require(a==1&&b==3&&c==2,"jelly damage arguments");++damages;return true;}
+            };
+            require(live->withWhiteJellyEvents(liveOwner,[&](auto){return Ops{speeds,sprites};},
+                [](bool& stop){stop=false;return true;},[&]{
+                    downwell::InstanceHandle jelly;if(!live->spawnWhiteJelly(24,56,jelly))return false;
+                    const downwell::RunnerCollisionEventContext::Frame event{jelly,playerKey,4,35,115,1227};
+                    for(int y:{60,62})if(!live->dispatchWhiteJellyPlayerCollision(liveOwner,event,
+                        [&](auto&){return Contact{N::fromInteger(y),stomps,damages};}))return false;
+                    return true;
+                }),"stored jelly player contact validates resource and actor lifetimes");
+            require(stomps==1&&damages==1,"stored typStompable shares the native branch threshold");
+        }
     }
 
     if(objects&&patterns){

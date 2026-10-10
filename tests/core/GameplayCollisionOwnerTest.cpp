@@ -46,6 +46,13 @@ struct NativeWhiteJellyStompOps {
     unsigned choose(unsigned);bool explosionSound(int,int,bool,bool);N playerX();N playerY();
     bool emitSmoke(N,N,int,int);
 };
+struct NativeWhiteJellyPlayer {
+    bool globalY(downwell::MotionBinary64&);bool stomp();bool damage(int,int,int);
+};
+bool nativeWhiteJellyPlayerContact(downwell::GameplayCollisionOwner& owner,
+    const downwell::RunnerCollisionEventContext::Frame& event,NativeWhiteJellyPlayer& player){
+    return owner.dispatchWhiteJellyPlayerCollision(event,[&](auto&){return player;});
+}
 bool nativeWhiteJellyStomp(downwell::WhiteJellyStep& actor,NativeWhiteJellyStompOps& ops,bool& good){
     return actor.stompPlayerChecked(ops,good);
 }
