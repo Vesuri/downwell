@@ -9,6 +9,7 @@
 #include "core/RunSession.h"
 #include "core/StateDigest.h"
 #include "core/StoredWorldCollision.h"
+#include "core/RisingTextRenderer.h"
 #include "../../generated/downwell-title-glyphs.h"
 #include <algorithm>
 #include <cstring>
@@ -74,6 +75,7 @@ public:
     std::vector<int> spriteOrder;
     struct DamageText {float x,y;downwell::Color color;};
     std::vector<DamageText> damageTexts;
+    std::vector<DamageText> risingTexts;
     void drawSpriteTransformed(std::int32_t sprite, std::uint32_t frame, float x, float y,
                                float sx, float sy, float angle) override {
         spriteOrder.push_back(sprite);
@@ -97,6 +99,10 @@ public:
     void drawText(std::int32_t, const char* text, float x, float y,
                   downwell::Color color,
                   downwell::TextAlign align) override {
+        if(std::strcmp(text,"+100 GEMS\n+50 AMMO")==0){
+            require(align==downwell::TextAlign::center,"rising text is centered");
+            risingTexts.push_back({x,y,color});spriteOrder.push_back(-1002);
+        }
         if(std::strcmp(text,"-12")==0){
             require(align==downwell::TextAlign::center,"damage text is centered");
             damageTexts.push_back({x,y,color});spriteOrder.push_back(-1001);
@@ -943,6 +949,33 @@ int main() {
             }
             require(seen==1&&!drawn.effectWords,"limbo does not duplicate itself into surfaceFx");
             require(shards.clear(),"retire composited limbo fixture");
+        }
+        {
+            struct NoAudio {
+                bool play(int,int,bool,int&){return false;}
+                bool setGain(int,downwell::MotionBinary64,int){return false;}
+            } audio;
+            auto shop=runtime.shopCreationOwner<1>(objects,audio);
+            auto& children=shop.children();
+            const auto id=children.create(212,runtime.mainCameraRenderViewX()+80,runtime.mainCameraRenderViewY()+60);
+            const auto key=children.sourceHandle(id);require(id,"registered rising text Draw fixture");
+            downwell::LevelNumberTextDrawState state{2,0,0,123,downwell::MotionBinary64::fromInteger(1)};
+            RecordingRenderer text;
+            downwell::RisingTextRenderer ops(downwell::title_glyphs::bank,state,text,
+                runtime.mainCameraRenderViewX(),runtime.mainCameraRenderViewY(),160,downwell::Game::playfieldX);
+            require(runtime.withRisingTextDraw(children,ops,[&]{effectGame.render(text);return effectGame.renderingSucceeded();}),
+                "rising text executes at its registered Game Draw boundary");
+            require(text.risingTexts.size()==5&&state.halign==0&&state.color==0xffffff,"five border passes and retained text state");
+            const int dx[]={1,-1,0,0,0},dy[]={0,0,1,-1,0};
+            for(unsigned i=0;i<5;++i)require(text.risingTexts[i].x==190+dx[i]&&text.risingTexts[i].y==60+dy[i]&&
+                text.risingTexts[i].color.r==(i==4?255:0),"source border text order and viewport projection");
+            require(children.risingTextAlarmEvent(key,1)&&children.stepRisingText(key),"negative drawing frame");
+            text.risingTexts.clear();
+            require(runtime.withRisingTextDraw(children,ops,[&]{effectGame.render(text);return effectGame.renderingSucceeded();})&&
+                text.risingTexts.empty(),"negative drawing flag suppresses every border pass");
+            RecordingRenderer unbound;effectGame.render(unbound);
+            require(!effectGame.renderingSucceeded(),"unbound rising text cannot silently disappear");
+            require(shop.clear(),"retire rising text render fixture");
         }
         auto registration=runtime.debrisRegistration<1>();downwell::DebrisEffects<1> debris;unsigned id=0;
         require(runtime.spawnDebris(registration,debris,x,y,1,id),"register composited debris");

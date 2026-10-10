@@ -699,8 +699,19 @@ Rising-text Draw measures hash-to-newline text with the current font, retains
 priority over the left-edge adjustment when text exceeds both bounds. It sets
 horizontal alignment to centre even on a hidden flashing frame, then restores
 left alignment. The shared Draw entry delegates the original four-black-pass
-border text operation; renderer binding is still required. Odd widths retain
+border text operation. Odd widths retain
 half-pixel placement rather than rounding before alignment.
+
+The shared `Game` layer walk dispatches object 212 through
+`withRisingTextDraw`; an unbound live text fails rendering rather than silently
+vanishing. `RisingTextRenderer` borrows current font/alignment/color state and
+the matching original glyph metrics, converts hashes to newlines, and emits
+four complete black text passes followed by the white pass through `Renderer`.
+It projects world coordinates into the gameplay viewport. Its currently
+admitted text domain is bounded ASCII, full opacity and top vertical alignment;
+other states reject rather than use invented defaults. The normal frontend
+still needs to install the owner and renderer scope alongside the other shop
+families. The Amiga scene frontend does not yet bind this route.
 
 The selected Windows numeric truth helper at `0x56a390` dispatches real/bool
 payloads to a strict comparison with 0.5, signed int32 to `SETG` against zero,

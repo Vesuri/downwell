@@ -1,5 +1,6 @@
 #include "core/StoredShopChildRegistration.h"
 #include "core/StoredShopCreationOwner.h"
+#include "core/RisingTextRenderer.h"
 #include "core/ShopChildCreation.h"
 #include "core/ShopInventory.h"
 #ifndef DOWNWELL_NATIVE_QUERY_PROBE
@@ -9,6 +10,12 @@
 #include <vector>
 #endif
 using namespace downwell;
+bool risingTextRendererProbe(const FontGlyphMasks& glyphs,LevelNumberTextDrawState& state,Renderer& renderer){
+    RisingTextRenderer draw(glyphs,state,renderer,160,1024,160,110);
+    MotionBinary64 width;
+    return draw.widthHashText("+100 GEMS#+50 AMMO",width)&&draw.align(1)&&
+        draw.borderTextBlack("+100 GEMS#+50 AMMO",MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(1084))&&draw.align(0);
+}
 static bool sameText(const char* a,const char* b){
     if(!a||!b)return false;
     while(*a&&*a==*b){++a;++b;}

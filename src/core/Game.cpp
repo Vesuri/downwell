@@ -519,6 +519,7 @@ void Game::renderMain(Renderer& renderer) const {
         if(!instance.active||instance.destroyRequested)return true;
         if(depth < -1000){drawUnregisteredBullets();if(!drawForeground())return false;}
         if(instance.objectId==35){drawPlayer();return true;}
+        if(instance.objectId==212)return startup_.drawRisingText(instance);
         if(instance.objectId==225||instance.objectId==263){
             if(composite)return true;
             const bool death=startup_.mainDeathSequence().active;

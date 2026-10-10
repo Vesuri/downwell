@@ -2236,6 +2236,18 @@ public:
     int mainNextMuzzleOffset() const { return mainEmitter_.leg; }
     const Consumables& consumables() const { return run_.consumables; }
     enum class RisingTextPhase {alarm,step,cleanup};
+    template<unsigned Capacity,class Ops,class Render>
+    bool withRisingTextDraw(StoredShopChildRegistration<instanceCapacity,Capacity>& owner,Ops& ops,Render render){
+        if(risingTextDraw_||!owner.belongsTo(instances_)||!owner.valid())return false;
+        auto draw=[&](const InstanceRecord& record){const auto key=owner.handle(record);return key.generation&&owner.drawRisingText(key,ops);};
+        risingTextDrawContext_=&draw;
+        risingTextDraw_=[](void* p,const InstanceRecord& r){return (*static_cast<decltype(draw)*>(p))(r);};
+        struct Reset {StartupRuntime& world;~Reset(){world.risingTextDraw_=nullptr;world.risingTextDrawContext_=nullptr;}} reset{*this};
+        return render()&&owner.valid();
+    }
+    bool drawRisingText(const InstanceRecord& record)const{
+        return record.objectId==212&&risingTextDraw_&&risingTextDraw_(risingTextDrawContext_,record);
+    }
     template<unsigned Capacity,class Tick>
     bool withRisingTextEvents(StoredShopChildRegistration<instanceCapacity,Capacity>& owner,Tick tick){
         if(!run_.effectsSucceeded)return false;
@@ -2635,6 +2647,8 @@ private:
     std::uint32_t nextRuntimeInstanceId_ = 105187;
     void* shopCreateContext_=nullptr;
     void* risingTextContext_=nullptr;
+    void* risingTextDrawContext_=nullptr;
+    bool (*risingTextDraw_)(void*,const InstanceRecord&)=nullptr;
     bool (*risingTextDispatch_)(void*,const InstanceRecord&,RisingTextPhase,unsigned)=nullptr;
     ShopWorld::Instance* (*shopCreate_)(void*,int,int)=nullptr;
     bool deferredCommandsSucceeded_ = true;
