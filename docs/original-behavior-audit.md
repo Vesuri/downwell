@@ -760,7 +760,7 @@ binds its positioned births and image setters to the shared collision tables
 and source-ID-bearing room/layer lifetimes in reference and native modes.
 World room teardown clears the pool before resetting compact Shop state, and
 Retry preserves the binding without preserving old generation handles. This
-registration does not project their Draw or admit the parent/keeper/case
+registration does not project their Draw or admit the parent/case
 events; those are required before normal frontend generation admission.
 Rising text and item selection can join `withEncounterSteps` through
 `stepRegisteredShopChild`, with the caller supplying the real upgrade-array
@@ -769,6 +769,12 @@ the record for the existing pre-Draw cleanup pass rather than erasing it in-plac
 Both owners execute the same `ShopChildState` Step bodies, including two
 upgrade-array reads when the item's sprite changes and the text's Y setter
 before velocity damping. There is no independent shop-family tick.
+Native shop sprite changes resolve frame counts from the complete collision
+metadata and apply `RunnerSpriteChange` to the owning record as well as its
+collision publication. A shorter or absent sprite can implicitly reset the
+image index; same-ID writes retain it and an explicit collision mask is not
+replaced. This reset belongs to the sprite setter, not a second image-index
+publication. Shop sequence advancement/reconciliation remains separate.
 Registered keeper alarms use the same shared handler body in the native and
 stored owners. The native mixed dispatcher advances each slot immediately
 before its handler and takes `irandom_range(20,60)` from the world RNG; rejected

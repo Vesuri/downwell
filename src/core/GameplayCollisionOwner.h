@@ -1085,7 +1085,7 @@ private:
     GameplayWhiteJellies whiteJellies_{GameplayWhiteJellies::Binding::bindPositionedQueryActor(whiteJellyBinding_)};
     GameplayRedBalls redBalls_{GameplayRedBalls::Binding::bindPositionedQueryActor(redBallBinding_)};
     Binding<GameplayShopInstances::Record,View::Kind::shop> shopBinding_{*this};
-    GameplayShopInstances shopInstances_{objects_,GameplayShopInstances::Binding::bindPositionedActor(shopBinding_)};
+    GameplayShopInstances shopInstances_{objects_,sprites_,GameplayShopInstances::Binding::bindPositionedActor(shopBinding_)};
     Binding<GameplayWorld::MovingEffects::Record,View::Kind::movingFx> movingFxBinding_{*this};
     GameplayWorld::MovingEffects movingEffects_{GameplayWorld::MovingEffects::Binding::bindPositionedActor(movingFxBinding_)};
     Binding<GameplayWorld::BulletState,View::Kind::bullet> bullets_{*this};

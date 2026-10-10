@@ -124,6 +124,35 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
         },[&]{world->step(0);return world->effectsSucceeded();}));
         keeper=store.find(keeperKey);
         assert(keeper&&keeperSteps==1&&environment.reads==1&&keeper->spriteId==485&&keeper->imageSpeed.bits==0x3db851ecu);
+        // The sprite setter may reset image_index even though the event
+        // contains no explicit image write. Check the actor AND published
+        // collision state, including same-ID and absent-resource semantics.
+        for(int target=-1;target<=int(sprites.spriteCount());++target){
+            assert(store.clear());
+            const auto id=creation.create(283,-100,-100);
+            const auto key=store.sourceHandle(id);const auto* item=store.find(key);
+            assert(item&&item->imageIndex.bits==0x3f800000u);
+            const int original=item->spriteId,mask=item->maskId;
+            std::uint32_t frames=0;if(target>=0)sprites.frameCount(unsigned(target),frames);
+            const unsigned expected=target!=original&&frames<=1?0:0x3f800000u;
+            unsigned lookups=0;
+            assert(store.stepItem(key,[&](unsigned,int& value){++lookups;value=target;return true;}));
+            item=store.find(key);
+            assert(item&&item->spriteId==target&&item->imageIndex.bits==expected&&item->maskId==mask&&
+                lookups==(target==original?1u:2u));
+            InstanceHandle h;
+            assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::shop,key,h));
+            if(native){
+                GameplayCollisionOwner::Owner::Sprite published;std::uint32_t flags;
+                assert(collision->nativePublishedSprite(h,published,flags)&&published.spriteId==target&&
+                    published.imageIndex.bits==expected&&published.maskId==mask);
+            }else{
+                const auto* published=collision->properties(h);
+                assert(published&&published->sprite.spriteId==target&&published->sprite.imageIndex.bits==expected&&
+                    published->sprite.maskId==mask);
+            }
+            assert(store.setSprite(key,target)&&store.find(key)->imageIndex.bits==expected);
+        }
     }
     for(unsigned failure=0;failure<=12;++failure){
         auto world=std::make_unique<GameplayWorld>(300,false,1000,false);
@@ -132,6 +161,7 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
         struct Publication {
             const GameplayShopInstances* store=nullptr;
             unsigned failure,births=0,images=0,retired=0;
+            bool rejectSprite=false;
             bool birth(InstanceHandle,const GameplayShopInstances::Record&){assert(false);return false;}
             bool birthAt(InstanceHandle h,const GameplayShopInstances::Record& r,RunnerImageValue x,RunnerImageValue y){
                 assert(store&&store->find(h)==&r&&!r.initialized&&!r.state.initialized&&
@@ -148,12 +178,12 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             bool activation(InstanceHandle,const GameplayShopInstances::Record&,bool){return true;}
             bool membership(InstanceHandle,const GameplayShopInstances::Record&,bool){return true;}
             bool move(InstanceHandle,const GameplayShopInstances::Record&,RunnerImageValue,RunnerImageValue){return true;}
-            bool sprite(InstanceHandle,const GameplayShopInstances::Record&,int){return true;}
+            bool sprite(InstanceHandle,const GameplayShopInstances::Record&,int){return !rejectSprite;}
             bool mask(InstanceHandle,const GameplayShopInstances::Record&,int){return true;}
             bool transform(InstanceHandle,const GameplayShopInstances::Record&,RunnerTransformField,RunnerImageValue,RunnerImageValue,std::uint32_t){return true;}
             bool markDestroyed(InstanceHandle,const GameplayShopInstances::Record&){return true;}
         } publication{nullptr,failure};
-        auto store=std::make_unique<GameplayShopInstances>(objects,GameplayShopInstances::Binding::bindPositionedActor(publication));
+        auto store=std::make_unique<GameplayShopInstances>(objects,sprites,GameplayShopInstances::Binding::bindPositionedActor(publication));
         publication.store=store.get();unsigned next=950000;std::vector<int> order;
         auto allocate=[&](int object,unsigned& id){order.push_back(object);id=next++;return true;};
         struct Audio {
@@ -197,6 +227,11 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
         if(!failure){
             const unsigned id=creation.create(278,0,0);const auto h=store->sourceHandle(id);
             assert(id==950011&&h.generation!=old.generation&&!store->find(old)&&store->clear());
+            const auto itemId=creation.create(283,0,0);const auto item=store->sourceHandle(itemId);
+            const int before=store->find(item)->spriteId;
+            publication.rejectSprite=true;
+            assert(!store->setSprite(item,-1)&&!store->valid()&&store->find(item)->spriteId==before&&
+                store->find(item)->imageIndex.bits==0x3f800000u&&store->clear());
         }
     }
     // The generated Shop callback now enters the actual GameplayWorld run

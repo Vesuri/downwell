@@ -6,6 +6,8 @@
 #include "InstanceLifecycle.h"
 #include "AlarmBank.h"
 #include "ShopKeeperEvents.h"
+#include "SpriteCollisionPack.h"
+#include "RunnerSpriteChange.h"
 namespace downwell {
 // Native ownership of Shop and its ten synchronous children. Numeric IDs
 // belong to the enclosing room allocator, never to this generation pool.
@@ -24,7 +26,8 @@ public:
         bool active=true,destroyRequested=false,initialized=false;
     };
     using Binding=RecordLifecycleBinding<Record>;
-    explicit GameplayShopInstances(const ObjectPack& objects,Binding binding={}):objects_(objects),binding_(binding){}
+    GameplayShopInstances(const ObjectPack& objects,const SpriteCollisionPack& sprites,Binding binding={})
+        :objects_(objects),sprites_(sprites),binding_(binding){}
     bool valid()const{return good_;}
     unsigned size()const{return count_;}
     InstanceHandle handle(unsigned slot)const{
@@ -78,10 +81,7 @@ public:
         if(!ready(h,283))return fail();auto& r=records_[h.slot];
         if(!r.active||r.destroyRequested)return true;
         return r.state.stepItem(r.spriteId,[&](unsigned index,int& sprite){return lookup(index,sprite)&&good_;},
-            [&](int sprite){
-                if(!binding_.sprite(h,r,sprite)||!good_)return false;
-                r.spriteId=sprite;return true;
-            })||fail();
+            [&](int sprite){return setSprite(h,sprite);})||fail();
     }
     bool setAlarm(InstanceHandle h,unsigned number,int ticks){
         const auto* r=find(h);
@@ -119,8 +119,20 @@ public:
     }
     bool setSprite(InstanceHandle h,int sprite){
         const auto* r=find(h);
-        if(!good_||creating_||!r||!r->initialized||!binding_.sprite(h,*r,sprite)||!good_)return fail();
-        records_[h.slot].spriteId=sprite;return true;
+        if(!good_||creating_||!r||!r->initialized)return fail();
+        if(r->spriteId==sprite)return true;
+        if(!sprites_.valid())return fail();
+        std::uint32_t frames=0;
+        if(sprite>=0)sprites_.frameCount(unsigned(sprite),frames);
+        RunnerSpriteChange::Result change;
+        if(!RunnerSpriteChange::plan(r->spriteId,sprite,r->imageIndex,frames,change)||
+           !binding_.sprite(h,*r,sprite)||!good_)return fail();
+        // The publication performs the same setter on collision state. Its
+        // implicit index reset is part of this one setter, not a second GML
+        // image_index write. Keep the owning record in agreement with it.
+        auto& record=records_[h.slot];record.spriteId=sprite;
+        if(change.resetIndex)record.imageIndex={};
+        return true;
     }
     template<class Range> bool advanceAlarm(InstanceHandle h,unsigned number,Range range){
         const auto* record=find(h);
@@ -201,7 +213,7 @@ private:
         // Parent's inherited variables have their source defaults in Record.
         r.initialized=true;return source;
     }
-    const ObjectPack& objects_;Binding binding_;Record records_[capacity]{};
+    const ObjectPack& objects_;const SpriteCollisionPack& sprites_;Binding binding_;Record records_[capacity]{};
     unsigned count_=0,next_=1;bool good_=true,creating_=false;
 };
 }
