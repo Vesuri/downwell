@@ -8,7 +8,7 @@ namespace downwell {
 // and lifetimeId do not. Borrowed views never cache pointers across a mutation.
 class GameplayCollisionView {
 public:
-    enum class Kind {player,enemy,breakable,terrain,timeField,goalField,exitController,bullet,scriptEffect,debris,timeChange,entryDither,drone,bone,skeleton,blood,currency,ditherAbove,builder,timeShard,playerController,corpseExpiry,smoke,corpse,consumptionBlood,runController,result,levelNumber,limboShard,flashBall,blast,sideCameraLocker,scattered,spawner,whiteJelly};
+    enum class Kind {player,enemy,breakable,terrain,timeField,goalField,exitController,bullet,scriptEffect,debris,timeChange,entryDither,drone,bone,skeleton,blood,currency,ditherAbove,builder,timeShard,playerController,corpseExpiry,smoke,corpse,consumptionBlood,runController,result,levelNumber,limboShard,flashBall,blast,sideCameraLocker,scattered,spawner,whiteJelly,movingFx};
     static constexpr unsigned enemyBase=1;
     static constexpr unsigned breakableBase=enemyBase+GameplayWorld::enemyCapacity;
     static constexpr unsigned terrainBase=breakableBase+GameplayWorld::breakableCapacity;
@@ -43,8 +43,10 @@ public:
     static constexpr unsigned scatteredBase=sideCameraLockerBase+SideCameraLockers::capacity;
     static constexpr unsigned spawnerBase=scatteredBase+GameplayScattered::capacity;
     static constexpr unsigned whiteJellyBase=spawnerBase+GameplaySpawners::capacity;
-    static constexpr unsigned capacity=whiteJellyBase+GameplayWhiteJellies::capacity;
+    static constexpr unsigned movingFxBase=whiteJellyBase+GameplayWhiteJellies::capacity;
+    static constexpr unsigned capacity=movingFxBase+32;
     struct Record {
+        const GameplayWorld::MovingEffects::Record* movingFx=nullptr;
         const GameplaySpawners::Record* spawner=nullptr;
         const GameplayWhiteJellies::Record* whiteJelly=nullptr;
         const GameplayScattered::Record* scattered=nullptr;
@@ -89,6 +91,7 @@ public:
         if(!local.generation)return false;
         unsigned base=0,count=0;
         switch(kind){
+            case Kind::movingFx:base=movingFxBase;count=32;break;
             case Kind::scattered:base=scatteredBase;count=GameplayScattered::capacity;break;
             case Kind::spawner:base=spawnerBase;count=GameplaySpawners::capacity;break;
             case Kind::whiteJelly:base=whiteJellyBase;count=GameplayWhiteJellies::capacity;break;
@@ -131,6 +134,7 @@ public:
     }
     static bool decode(InstanceHandle key,Kind& kind,InstanceHandle& local){
         if(!key.generation||key.slot>=capacity)return false;
+        if(key.slot>=movingFxBase){kind=Kind::movingFx;local={key.slot-movingFxBase,key.generation};return true;}
         if(key.slot>=whiteJellyBase){kind=Kind::whiteJelly;local={key.slot-whiteJellyBase,key.generation};return true;}
         if(key.slot>=spawnerBase){kind=Kind::spawner;local={key.slot-spawnerBase,key.generation};return true;}
         if(key.slot>=scatteredBase){kind=Kind::scattered;local={key.slot-scatteredBase,key.generation};return true;}
@@ -185,6 +189,7 @@ public:
             else if constexpr(Family==Kind::scattered)return world_.scattered()?world_.scattered()->find(local):nullptr;
             else if constexpr(Family==Kind::spawner)return world_.spawners()?world_.spawners()->find(local):nullptr;
             else if constexpr(Family==Kind::whiteJelly)return world_.whiteJellies()?world_.whiteJellies()->find(local):nullptr;
+            else if constexpr(Family==Kind::movingFx)return world_.movingEffects()?world_.movingEffects()->find(local):nullptr;
             else if constexpr(Family==Kind::sideCameraLocker)return world_.sideCameraLockers().find(local);
             else if constexpr(Family==Kind::enemy)return world_.resolveEnemyLifetime(local);
             else if constexpr(Family==Kind::breakable)return world_.findBreakable(local);
@@ -229,6 +234,9 @@ private:
         if(!decode(key,kind,local))return false;
         Record next;
         switch(kind){
+            case Kind::movingFx:
+                if(!world_.movingEffects()||!(next.movingFx=world_.movingEffects()->find(local)))return false;
+                break;
             case Kind::whiteJelly:
                 if(!world_.whiteJellies()||!(next.whiteJelly=world_.whiteJellies()->find(local)))return false;
                 break;

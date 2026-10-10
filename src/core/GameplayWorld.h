@@ -31,6 +31,7 @@
 #include "core/GameplayScattered.h"
 #include "core/GameplaySpawners.h"
 #include "core/GameplayWhiteJellies.h"
+#include "core/MovingFxInstances.h"
 #include "core/RegisteredScatteredContact.h"
 #include "core/RunControllerInstances.h"
 #include "core/GameplayResultInstance.h"
@@ -486,6 +487,12 @@ public:
     const downwell::GameplayScattered* scattered()const{return scattered_;}
     const downwell::GameplaySpawners* spawners()const{return spawners_;}
     const downwell::GameplayWhiteJellies* whiteJellies()const{return whiteJellies_;}
+    using MovingEffects=downwell::MovingFxInstances<32>;
+    const MovingEffects* movingEffects()const{return movingEffects_;}
+    bool bindMovingEffects(MovingEffects& records){
+        if(movingEffects_||!records.valid()||records.size())return false;
+        movingEffects_=&records;return true;
+    }
     bool bindWhiteJellies(downwell::GameplayWhiteJellies& records){
         if(whiteJellies_||!records.valid()||records.size())return false;
         whiteJellies_=&records;return true;
@@ -2518,6 +2525,7 @@ private:
     downwell::GameplayScattered* scattered_=nullptr;
     downwell::GameplaySpawners* spawners_=nullptr;
     downwell::GameplayWhiteJellies* whiteJellies_=nullptr;
+    MovingEffects* movingEffects_=nullptr;
     RunControllers* runControllers_=nullptr;
     downwell::GameplayResultInstance* resultInstance_=nullptr;
     LevelNumbers* levelNumbers_=nullptr;

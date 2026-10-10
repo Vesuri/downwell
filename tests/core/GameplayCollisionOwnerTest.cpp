@@ -758,6 +758,7 @@ static void checkTypedCollisionView(const GameplayCollisionView& view,GameplayCo
     InstanceHandle shared;GameplayCollisionView::Record reference;
     if(GameplayCollisionView::encode(kind,local,shared))view.resolve(shared,reference);
     switch(kind){
+        case K::movingFx:assert(view.resolveLocal<K::movingFx>(local)==reference.movingFx);break;
         case K::scattered:assert(view.resolveLocal<K::scattered>(local)==reference.scattered);break;
         case K::spawner:assert(view.resolveLocal<K::spawner>(local)==reference.spawner);break;
         case K::whiteJelly:assert(view.resolveLocal<K::whiteJelly>(local)==reference.whiteJelly);break;
@@ -905,6 +906,23 @@ static void checkNativeAnimationBatches(const ObjectPack& objects,const SpriteCo
 }
 int main(){
     assert(downwell::RunnerBindingRevisionVerification::run());
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native}){
+        const auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
+        ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),owner->breakableBinding(),owner->playerBinding(),nullptr);
+        assert(owner->attach(*world));auto& effects=owner->movingEffects();InstanceHandle local,shared;
+        assert(effects.create(990001,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(512),local));
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::movingFx,local,shared)&&GameplayCollisionView(*world).contains(shared));
+        GameplayCollisionView::Record record;
+        assert(GameplayCollisionView(*world).resolve(shared,record)&&record.movingFx==effects.find(local));
+        unsigned count;assert(owner->population(220,count)&&count==1);
+        unsigned frames;assert(sprites.frameCount(704,frames)&&effects.sprite(local,704,frames)&&
+            effects.imageSpeed(local,MotionBinary64::fromInteger(int(frames))));
+        assert(effects.advanceAnimation(local)&&effects.find(local)->destroyRequested&&effects.retire(local));
+        assert(!GameplayCollisionView(*world).contains(shared)&&owner->population(220,count)&&!count&&owner->valid());
+    }
     {
         bool owner=true,otherOwner=true;
         FailureSignal<> signal;signal.observe(owner);

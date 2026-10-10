@@ -638,6 +638,7 @@ private:
     template<class Record,View::Kind Kind> struct Binding {
         GameplayCollisionOwner& parent;
         static int object(const Record& r){
+            if constexpr(Kind==View::Kind::movingFx)return 220;
             if constexpr(Kind==View::Kind::scattered)return 289;
             if constexpr(Kind==View::Kind::spawner)return 78;
             if constexpr(Kind==View::Kind::whiteJelly)return 115;
@@ -748,7 +749,7 @@ private:
                     return parent.refresh(live,publish);
                 })))return false;
             unsigned sourceId=0;
-            if constexpr(Kind==View::Kind::scattered||Kind==View::Kind::spawner||Kind==View::Kind::whiteJelly)sourceId=r.sourceId;
+            if constexpr(Kind==View::Kind::scattered||Kind==View::Kind::spawner||Kind==View::Kind::whiteJelly||Kind==View::Kind::movingFx)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::terrain)sourceId=r.sourceInstanceId;
             if constexpr(Kind==View::Kind::breakable||Kind==View::Kind::enemy)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
@@ -777,7 +778,7 @@ private:
             if constexpr(Kind==View::Kind::scriptEffect||Kind==View::Kind::debris){
                 if(!r.effect)return parent.check(false);
                 position->x=r.effect->x;position->y=r.effect->y;
-            }else if constexpr(Kind==View::Kind::scattered||Kind==View::Kind::spawner||Kind==View::Kind::whiteJelly){
+            }else if constexpr(Kind==View::Kind::scattered||Kind==View::Kind::spawner||Kind==View::Kind::whiteJelly||Kind==View::Kind::movingFx){
                 position->x=r.x;position->y=r.y;
             }else if constexpr(Kind==View::Kind::flashBall||Kind==View::Kind::limboShard||Kind==View::Kind::levelNumber||Kind==View::Kind::result||Kind==View::Kind::runController||Kind==View::Kind::consumptionBlood||Kind==View::Kind::corpse||Kind==View::Kind::blast||Kind==View::Kind::smoke||Kind==View::Kind::corpseExpiry||Kind==View::Kind::playerController||Kind==View::Kind::timeShard||Kind==View::Kind::timeChange||Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::builder||Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency){
                 position->x=r.x;position->y=r.y;
@@ -857,7 +858,7 @@ private:
                     return parent.check(!inactive&&parent.layers_.birthScenery(depth));
                 }
             unsigned sourceId=0;
-            if constexpr(Kind==View::Kind::scattered||Kind==View::Kind::spawner||Kind==View::Kind::whiteJelly)sourceId=r.sourceId;
+            if constexpr(Kind==View::Kind::scattered||Kind==View::Kind::spawner||Kind==View::Kind::whiteJelly||Kind==View::Kind::movingFx)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
             if constexpr(Kind==View::Kind::breakable||Kind==View::Kind::enemy)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeField||Kind==View::Kind::exitController||Kind==View::Kind::sideCameraLocker)sourceId=r.sourceId;
@@ -1070,6 +1071,8 @@ private:
     GameplaySpawners spawners_{GameplaySpawners::Binding::bindPositionedQueryActor(spawnerBinding_)};
     Binding<GameplayWhiteJellies::Record,View::Kind::whiteJelly> whiteJellyBinding_{*this};
     GameplayWhiteJellies whiteJellies_{GameplayWhiteJellies::Binding::bindPositionedQueryActor(whiteJellyBinding_)};
+    Binding<GameplayWorld::MovingEffects::Record,View::Kind::movingFx> movingFxBinding_{*this};
+    GameplayWorld::MovingEffects movingEffects_{GameplayWorld::MovingEffects::Binding::bindPositionedActor(movingFxBinding_)};
     Binding<GameplayWorld::BulletState,View::Kind::bullet> bullets_{*this};
     Binding<GameplayScriptSpawnInstances::Record,View::Kind::scriptEffect> scriptEffectsBinding_{*this};
     Binding<GameplayWorld::RegisteredExpiry::Record,View::Kind::corpseExpiry> expiryBinding_{*this};
@@ -1221,7 +1224,7 @@ public:
     template<class Visit> bool visitRegistrationOrder(Visit visit)const{return valid()&&visitEligibility(visit);}
     // Drone dispatch deliberately exposes bool& status to arbitrary callbacks;
     // retain its live read rather than delaying a callback's failure to return.
-    bool valid()const{return whiteJellies_.valid()&&spawners_.valid()&&scattered_.valid()&&good_&&blasts_.valid()&&flash_.valid()&&limbo_.valid()&&levelNumbers_.valid()&&result_.valid()&&controllers_.valid()&&consumption_.valid()&&corpses_.valid()&&smoke_.valid()&&expiry_.valid()&&playerControllers_.valid()&&builderController_.valid()&&blood_.valid()&&skeletons_.valid()&&(failureObserved_?(drones_.valid()&&bones_.valid()):
+    bool valid()const{return movingEffects_.valid()&&whiteJellies_.valid()&&spawners_.valid()&&scattered_.valid()&&good_&&blasts_.valid()&&flash_.valid()&&limbo_.valid()&&levelNumbers_.valid()&&result_.valid()&&controllers_.valid()&&consumption_.valid()&&corpses_.valid()&&smoke_.valid()&&expiry_.valid()&&playerControllers_.valid()&&builderController_.valid()&&blood_.valid()&&skeletons_.valid()&&(failureObserved_?(drones_.valid()&&bones_.valid()):
         (owner_.valid()&&properties_.valid()&&terrain_.valid()&&scriptEffects_.valid()&&debris_.valid()&&
          timeShards_.valid()&&timeChanges_.valid()&&entries_.valid()&&drones_.valid()&&bones_.valid()&&layers_.valid()));}
     unsigned pendingSpatialIndex()const{return owner_.pendingSpatialIndex();}
@@ -1442,6 +1445,7 @@ public:
         if(!world_&&!world.bindPlayerControllers(playerControllers_))return check(false);
         if(!world_&&!world.bindScattered(scattered_))return check(false);
         if(!world_&&!world.bindSpawners(spawners_))return check(false);
+        if(!world_&&!world.bindMovingEffects(movingEffects_))return check(false);
         if(!world_&&!world.bindWhiteJellies(whiteJellies_))return check(false);
         if(!world_&&!world.bindDroneBullets(drones_))return check(false);
         if(!world_&&!world.bindBones(bones_))return check(false);
@@ -1776,6 +1780,7 @@ public:
                     case View::Kind::bone:return self.bones_.advanceAnimation(local);
                     case View::Kind::skeleton:return self.skeletons_.advanceAnimation(local);
                     case View::Kind::whiteJelly:return self.whiteJellies_.advanceAnimation(local);
+                    case View::Kind::movingFx:return self.movingEffects_.advanceAnimation(local);
                     case View::Kind::blood:return self.blood_.advanceAnimation(local);
                     case View::Kind::currency:return self.currency_.advanceAnimation(local);
                     default:return true;
@@ -2135,6 +2140,7 @@ public:
     GameplayScattered& scattered(){return scattered_;}
     GameplaySpawners& spawners(){return spawners_;}
     GameplayWhiteJellies& whiteJellies(){return whiteJellies_;}
+    GameplayWorld::MovingEffects& movingEffects(){return movingEffects_;}
     GameplayWorld::Blood& blood(){return blood_;}
     GameplayWorld::Currency& currency(){return currency_;}
     // Selected code 991 destroys OTHER, not the dither. Pair collection and
@@ -3894,6 +3900,7 @@ private:
                 case View::Kind::scattered:return record.scattered&&scattered_.retireMarked(local);
                 case View::Kind::spawner:return record.spawner&&spawners_.retireMarked(local);
                 case View::Kind::whiteJelly:return record.whiteJelly&&whiteJellies_.retireMarked(local);
+                case View::Kind::movingFx:return record.movingFx&&movingEffects_.retire(local);
                 default:return false;
             }
         });
