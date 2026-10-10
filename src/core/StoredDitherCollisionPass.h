@@ -110,6 +110,26 @@ public:
             [&](const auto& a,const auto& b){return a.objectId==276&&b.objectId==269&&blasts.handle(a).generation&&bones.handle(b).generation;},
             [&](const auto& event){return world.dispatchBlastBoneCollision(blasts,bones,flashes,event);});
     }
+    template<unsigned Capacity,unsigned BoneCapacity,unsigned SmokeCapacity,unsigned ParticleCapacity,unsigned BlastCapacity,unsigned FlashCapacity,unsigned CorpseCapacity,unsigned StopCapacity,
+             class Frames,class Audio,class Atan,class Damage,class MakePlayer>
+    bool runSkeletonContacts(StartupRuntime& world,
+        StoredSkeletonRegistration<StartupRuntime::instanceCapacity,Capacity>& skeletons,
+        StoredBoneRegistration<StartupRuntime::instanceCapacity,BoneCapacity>& bones,
+        StoredSmokeRegistration<StartupRuntime::instanceCapacity,SmokeCapacity>& smoke,
+        StoredConsumptionBloodRegistration<StartupRuntime::instanceCapacity,ParticleCapacity>& particles,
+        StoredBlastRegistration<StartupRuntime::instanceCapacity,BlastCapacity>& blasts,
+        StoredFlashBallRegistration<StartupRuntime::instanceCapacity,FlashCapacity>& flashes,
+        StoredCorpseRegistration<StartupRuntime::instanceCapacity,CorpseCapacity>& corpses,
+        const TimeStopEffects<StopCapacity>& stop,Frames frames,SoundPlayEnvironment& environment,Audio& audio,
+        Atan atan,Damage damage,MakePlayer makePlayer){
+        if(!flashes.valid()||!corpses.valid())return false;
+        return runBlastContactsUsing(world,skeletons,bones,smoke,particles,blasts,stop,frames,environment,audio,atan,damage,makePlayer,
+            [&](const auto& a,const auto& b){return a.objectId==276&&blasts.handle(a).generation&&
+                ((b.objectId==269&&bones.handle(b).generation)||(b.objectId==263&&corpses.handle(b).generation));},
+            [&](const auto& event){return event.owner==263?world.dispatchCorpseBlastCollision(corpses,blasts,event):
+                event.subtype==263?world.dispatchBlastCorpseCollision(blasts,corpses,flashes,event):
+                world.dispatchBlastBoneCollision(blasts,bones,flashes,event);});
+    }
 private:
     template<unsigned Capacity,unsigned BoneCapacity,unsigned SmokeCapacity,unsigned ParticleCapacity,unsigned BlastCapacity,unsigned StopCapacity,
              class Frames,class Audio,class Atan,class Damage,class MakePlayer,class ExtraPair,class ExtraEvent>
@@ -133,6 +153,7 @@ private:
                 if(self->objectId==276&&event.subtype==35)return world.dispatchBlastPlayerCollision(blasts,event);
                 if(self->objectId==276&&event.code==2330)return world.dispatchBlastWallCollision(blasts,event);
                 if(self->objectId==276&&event.code==2329)return extraEvent(event);
+                if(self->objectId==263)return extraEvent(event);
                 return self->objectId==276?world.dispatchBlastSkeletonCollisionWithEffects(blasts,skeletons,event,frames,environment,audio):
                     world.dispatchSkeletonCollision(skeletons,event,makePlayer);
             });
@@ -161,7 +182,7 @@ private:
                     (b.objectId==60&&effect(a))||(a.objectId==60&&effect(b));
             },[&](const auto& event){
                 const auto* self=owner_.resolve(event.self);if(!self)return false;
-                if(self->objectId==120||self->objectId==276)return playerContact(event);
+                if(self->objectId==120||self->objectId==276||self->objectId==263)return playerContact(event);
                 if(self->objectId==269)return stop.succeeded&&
                     world.dispatchBoneCollision(bones,event,stop.player.stopped,frames,damage);
                 if(self->objectId==225)return world.dispatchSmokeCollision(smoke,event);

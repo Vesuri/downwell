@@ -7159,6 +7159,43 @@ int main(){
             assert(contacts==2&&owner->registeredBlasts().find(blast)->state.hits.count==2&&
                 next==605205&&audio.calls==12&&!stomps&&!damages);
         }
+        for(bool rip:{false,true}){
+            auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+                GameplayTerrainInstances::WallCollision{},&rooms,ownership);
+            auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),owner->breakableBinding(),owner->playerBinding(),
+                ownership==GameplayCollisionOwner::Ownership::reference?&owner->terrain():nullptr);
+            auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
+            assert(owner->attach(*world)&&owner->configureCorpseMasks(masks)&&
+                (ownership==GameplayCollisionOwner::Ownership::reference||world->bindNativeTerrain(*terrain)));
+            int speed=60;assert(world->bindControllerRoomSpeed(speed));InstanceHandle controller,blast,self,other;
+            GameMakerRandom corpseRandom(2);DeadBodySource source{MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(200),{},MotionBinary64::fromInteger(1)};
+            assert(owner->registeredCorpses().createFromDeath(605230,source,206,{},102,rip,corpseRandom,
+                [](auto,int,auto,auto,bool& hit){hit=false;return true;}));
+            const auto corpse=owner->registeredCorpses().sourceHandle(605230);
+            assert(owner->runControllers().create(100065,{}, {},[](InstanceHandle){return true;},controller)&&
+                owner->createBlast(605231,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(200),blast)&&
+                GameplayCollisionView::encode(GameplayCollisionView::Kind::blast,blast,self)&&
+                GameplayCollisionView::encode(GameplayCollisionView::Kind::corpse,corpse,other));
+            const auto draws=world->randomDrawCount();unsigned allocations=0;RunnerCollisionEventContext context;
+            auto pairs=std::make_unique<RunnerCollisionPairs<GameplayCollisionView::capacity,16384>>();unsigned forward=0,reverse=0;
+            struct CorpseMotionGuard {
+                bool rollback(InstanceHandle){assert(false);return false;}
+                bool prepareMotion(InstanceHandle){assert(false);return false;}
+                bool advanceMotion(InstanceHandle){assert(false);return false;}
+            } motion;
+            for(unsigned repeat=0;repeat<2;++repeat)
+                {assert(owner->collectCollisionPairs(*pairs));
+                assert(owner->executeCollisionPairs(*pairs,masks,context,motion,
+                    []{return RunnerCollisionEventContext::RoomState{true,false};},[&](const auto& event){
+                        if(event.owner==263){++reverse;return owner->dispatchCorpseBlastCollision(event);}
+                        ++forward;return owner->dispatchBlastShootableCollision(event,[&](unsigned& id){++allocations;id=605232;return true;});
+                    }));}
+            assert(forward==2&&reverse==2);
+            const auto* victim=owner->registeredCorpses().find(corpse);const auto* caller=owner->registeredBlasts().find(blast);
+            assert(victim&&victim->state.health.high==MotionBinary64::fromInteger(rip?-49:0).high&&!victim->state.health.low&&
+                !victim->state.hit&&!victim->destroyRequested&&caller&&caller->state.hits.count==1&&
+                allocations==unsigned(rip)&&owner->registeredFlash().size()==unsigned(rip)&&world->randomDrawCount()==draws+(rip?8:0));
+        }
         for(bool rejectFlash:{false,true}){
             auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
                 GameplayTerrainInstances::WallCollision{},&rooms,ownership);
@@ -7182,7 +7219,7 @@ int main(){
                 const bool ok=owner->executeCollisionPairs(*pairs,masks,context,motion,
                     []{return RunnerCollisionEventContext::RoomState{true,false};},[&](const auto& event){
                         assert(event.self.slot==self.slot&&event.other.slot==other.slot&&event.code==2329);
-                        return owner->dispatchBlastBoneCollision(event,[&](unsigned& id){++allocations;id=605222;return !rejectFlash;});
+                        return owner->dispatchBlastShootableCollision(event,[&](unsigned& id){++allocations;id=605222;return !rejectFlash;});
                     });
                 assert(ok==!rejectFlash);
             }

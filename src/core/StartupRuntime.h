@@ -1852,19 +1852,43 @@ public:
     bool dispatchBlastBoneCollision(StoredBlastRegistration<instanceCapacity,BlastCapacity>& blasts,
         StoredBoneRegistration<instanceCapacity,BoneCapacity>& bones,
         StoredFlashBallRegistration<instanceCapacity,FlashCapacity>& flashes,const RunnerCollisionEventContext::Frame& event){
+        return dispatchBlastShootableCollision<269>(blasts,bones,flashes,event);
+    }
+    template<unsigned CorpseCapacity,unsigned BlastCapacity>
+    bool dispatchCorpseBlastCollision(StoredCorpseRegistration<instanceCapacity,CorpseCapacity>& corpses,
+        StoredBlastRegistration<instanceCapacity,BlastCapacity>& blasts,const RunnerCollisionEventContext::Frame& event){
         const auto* self=instances_.resolve(event.self);const auto* other=instances_.resolve(event.other);
         PackedObjectEvent binding{};bool found=false;
-        if(!run_.effectsSucceeded||!blasts.belongsTo(instances_)||!blasts.valid()||!bones.belongsTo(instances_)||!bones.valid()||
-           !flashes.belongsTo(instances_)||!flashes.valid()||!self||!other||!objectPack_||self->objectId!=276||other->objectId!=269||
-           event.type!=4||event.subtype!=269||event.owner!=276||event.code!=2329||
-           !objectPack_->collisionEvent(276,269,found,binding)||!found||binding.ownerObjectId!=276||binding.codeId!=2329)
+        if(!run_.effectsSucceeded||!corpses.belongsTo(instances_)||!corpses.valid()||!blasts.belongsTo(instances_)||!blasts.valid()||
+           !self||!other||!objectPack_||self->objectId!=263||other->objectId!=276||
+           !corpses.handle(*self).generation||!blasts.handle(*other).generation||event.type!=4||event.subtype!=276||
+           event.owner!=263||event.code!=2244||!objectPack_->collisionEvent(263,276,found,binding)||!found||
+           binding.ownerObjectId!=263||binding.codeId!=2244)return run_.effectsSucceeded=false;
+        return true; // Source objDeadBody/parentPBullet event has no instructions.
+    }
+    template<unsigned BlastCapacity,unsigned CorpseCapacity,unsigned FlashCapacity>
+    bool dispatchBlastCorpseCollision(StoredBlastRegistration<instanceCapacity,BlastCapacity>& blasts,
+        StoredCorpseRegistration<instanceCapacity,CorpseCapacity>& corpses,
+        StoredFlashBallRegistration<instanceCapacity,FlashCapacity>& flashes,const RunnerCollisionEventContext::Frame& event){
+        return dispatchBlastShootableCollision<263>(blasts,corpses,flashes,event);
+    }
+    template<int ObjectId,unsigned BlastCapacity,unsigned FlashCapacity,class Shootables>
+    bool dispatchBlastShootableCollision(StoredBlastRegistration<instanceCapacity,BlastCapacity>& blasts,Shootables& shootables,
+        StoredFlashBallRegistration<instanceCapacity,FlashCapacity>& flashes,const RunnerCollisionEventContext::Frame& event){
+        static_assert(ObjectId==269||ObjectId==263,"registered shootable descendants only");
+        const auto* self=instances_.resolve(event.self);const auto* other=instances_.resolve(event.other);
+        PackedObjectEvent binding{};bool found=false;
+        if(!run_.effectsSucceeded||!blasts.belongsTo(instances_)||!blasts.valid()||!shootables.belongsTo(instances_)||!shootables.valid()||
+           !flashes.belongsTo(instances_)||!flashes.valid()||!self||!other||!objectPack_||self->objectId!=276||other->objectId!=ObjectId||
+           event.type!=4||event.subtype!=ObjectId||event.owner!=276||event.code!=2329||
+           !objectPack_->collisionEvent(276,ObjectId,found,binding)||!found||binding.ownerObjectId!=276||binding.codeId!=2329)
             return run_.effectsSucceeded=false;
         const auto local=blasts.handle(*self);const auto* caller=blasts.instances().find(local);
-        if(!caller||!bones.handle(*other).generation)return run_.effectsSucceeded=false;
+        if(!caller||!shootables.handle(*other).generation)return run_.effectsSucceeded=false;
         const auto x=caller->x.promoted(),y=caller->y.promoted();const auto id=other->instanceId;
         return run_.effectsSucceeded=blasts.dispatch(local,[&](auto& actor,auto&,bool& good){
-            return blastShootableContact(actor,id,x,y,[&](MotionBinary64& hp){bool unused;return bones.readShootable(event.other,hp,unused);},
-                [&](MotionBinary64 hp){return bones.writeShootableHealth(event.other,hp);},
+            return blastShootableContact(actor,id,x,y,[&](MotionBinary64& hp){bool unused;return shootables.readShootable(event.other,hp,unused);},
+                [&](MotionBinary64 hp){return shootables.writeShootableHealth(event.other,hp);},
                 [&](auto& state,auto px,auto py){return flashBurstPublished<1,0,0>(state,px,py,random_,
                     [&](int object,auto fx,auto fy){InstanceHandle child;return object==224&&flashes.create(fx,fy,random_,child);});},good);
         });

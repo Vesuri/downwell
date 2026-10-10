@@ -2148,9 +2148,10 @@ public:
             [&](const auto& unhandled){
                 View::Kind kind;InstanceHandle local;
                 if(!View::decode(unhandled.self,kind,local))return false;
+                if(kind==View::Kind::corpse&&unhandled.subtype==276)return dispatchCorpseBlastCollision(unhandled);
                 if(kind==View::Kind::blast&&unhandled.subtype==35)return dispatchBlastPlayerCollision(unhandled);
                 if(kind==View::Kind::blast&&unhandled.code==2330)return dispatchBlastWallCollision(unhandled);
-                if(kind==View::Kind::blast&&unhandled.subtype==269)return dispatchBlastBoneCollision(unhandled,allocate);
+                if(kind==View::Kind::blast&&(unhandled.subtype==269||unhandled.subtype==263))return dispatchBlastShootableCollision(unhandled,allocate);
                 return kind==View::Kind::blast&&unhandled.subtype==120?
                     dispatchBlastSkeletonCollisionWithEffects(unhandled,allocate,frames,environment,audio):other(unhandled);
             });
@@ -2181,16 +2182,26 @@ public:
            binding.ownerObjectId!=261||binding.codeId!=2224)return check(false);
         return check(world_->hitSkeletonWithSourceBullet(shot,target,frames,delay,environment,audio,atan));
     }
-    template<class Allocate> bool dispatchBlastBoneCollision(const RunnerCollisionEventContext::Frame& event,Allocate allocate){
+    bool dispatchCorpseBlastCollision(const RunnerCollisionEventContext::Frame& event){
+        View::Kind kind,targetKind;InstanceHandle local,target;PackedObjectEvent binding{};bool found=false;
+        return check(valid()&&world_&&resolves(event.self)&&resolves(event.other)&&
+            View::decode(event.self,kind,local)&&kind==View::Kind::corpse&&corpses_.find(local)&&
+            View::decode(event.other,targetKind,target)&&targetKind==View::Kind::blast&&blasts_.find(target)&&
+            event.type==4&&event.subtype==276&&event.owner==263&&event.code==2244&&
+            objects_.collisionEvent(263,276,found,binding)&&found&&binding.ownerObjectId==263&&binding.codeId==2244);
+    }
+    template<class Allocate> bool dispatchBlastShootableCollision(const RunnerCollisionEventContext::Frame& event,Allocate allocate){
         View::Kind kind,targetKind;InstanceHandle local,target;PackedObjectEvent binding{};bool found=false;
         if(!valid()||!world_||!resolves(event.self)||!resolves(event.other)||
            !View::decode(event.self,kind,local)||kind!=View::Kind::blast||
-           !View::decode(event.other,targetKind,target)||targetKind!=View::Kind::bone||
-           event.type!=4||event.subtype!=269||event.owner!=276||event.code!=2329||
-           !objects_.collisionEvent(276,269,found,binding)||!found||binding.ownerObjectId!=276||binding.codeId!=2329)return check(false);
-        const auto* caller=blasts_.find(local);const auto* victim=bones_.find(target);
-        if(!caller||!victim)return check(false);
-        const auto x=caller->x.promoted(),y=caller->y.promoted();const auto id=victim->sourceId;
+           !View::decode(event.other,targetKind,target)||(targetKind!=View::Kind::bone&&targetKind!=View::Kind::corpse)||
+           event.type!=4||event.subtype!=objectOf(event.other)||event.owner!=276||event.code!=2329||
+           !objects_.collisionEvent(276,event.subtype,found,binding)||!found||binding.ownerObjectId!=276||binding.codeId!=2329)return check(false);
+        const auto* caller=blasts_.find(local);std::uint32_t id=0;
+        if(targetKind==View::Kind::bone){const auto* victim=bones_.find(target);if(victim)id=victim->sourceId;}
+        else{const auto* victim=corpses_.find(target);if(victim)id=victim->sourceId;}
+        if(!caller||!id)return check(false);
+        const auto x=caller->x.promoted(),y=caller->y.promoted();
         return check(blasts_.dispatch(local,[&](auto& actor,auto&,bool& good){
             return blastShootableContact(actor,id,x,y,[&](MotionBinary64& hp){bool unused;return projectileShootableFields(event.other,hp,unused);},
                 [&](MotionBinary64 hp){return projectileShootableHealthWrite(event.other,hp);},

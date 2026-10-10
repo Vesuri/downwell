@@ -1756,6 +1756,37 @@ int main(){
             return true;
         }),"blast bone event succeeds");
     }
+    for(bool rip:{false,true}){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach blast corpse world");world->skipToGameForTesting();
+        if(rip)require(world->grantUpgrade(3),"enable Rest in Pieces");
+        auto corpses=world->corpseRegistration<1>();auto blasts=world->blastRegistration<1>();auto flashes=world->flashBallRegistration<1>();
+        auto skeletons=world->skeletonRegistration<1>();auto bones=world->boneRegistration<1>();
+        auto smoke=world->smokeRegistration<1>();auto particles=world->consumptionBloodRegistration<1>();
+        auto pass=std::make_unique<StoredDitherCollisionPass>(*owner);
+        DeadBodySource source{MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(200),{},MotionBinary64::fromInteger(1)};
+        require(world->createRegisteredCorpseFromDeath(corpses,source,206,{},102,
+            [](auto,int,auto,auto,bool& hit){hit=false;return true;}),"create actual skeleton corpse");
+        const auto corpse=corpses.sourceHandle(source.myDeadBody);InstanceHandle blast;int speed=60;
+        require(world->withMomentDelayRoomSpeed(speed,[&]{
+            if(!world->spawnBlast(blasts,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(200),blast))return false;
+            const auto next=world->nextRuntimeInstanceId();const auto draws=world->randomDrawCount();
+            SoundPlayEnvironment env;BlastHitAudio audio;TimeStopEffects<4> stop;unsigned stomps=0,damages=0;
+            for(unsigned repeat=0;repeat<2;++repeat)
+                if(!pass->runSkeletonContacts(*world,skeletons,bones,smoke,particles,blasts,flashes,corpses,stop,
+                    [&](int sprite,unsigned& count){return sprites.frameCount(sprite,count);},env,audio,
+                    [](auto dy,auto dx,auto& angle){return portableAtan(dy,dx,angle);},
+                    [](auto&,int,int,int){return false;},
+                    [&](auto& actor){return CheckedSkeletonContact{actor,4,stomps,damages};}))return false;
+            const auto* victim=corpses.state(corpse);
+            require(victim&&victim->health.high==MotionBinary64::fromInteger(rip?-49:0).high&&!victim->health.low&&
+                !victim->hit&&blasts.instances().find(blast)->state.hits.count==1&&
+                world->nextRuntimeInstanceId()==next+unsigned(rip)&&world->randomDrawCount()==draws+(rip?8:0),
+                "corpse blast behavior respects source Rest in Pieces health and hit memory");
+            return true;
+        }),"blast corpse event succeeds");
+    }
     for(bool missingFrames:{false,true}){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());

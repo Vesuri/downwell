@@ -11,6 +11,7 @@ assert sha256((root / "data/data.win").read_bytes()).hexdigest() == digest
 manifest = json.loads((export / "manifest.json").read_text())
 assert manifest["source"]["sha256"] == digest
 pins = {
+    "gml_Object_objDeadBody_Collision_parentPBullet": "e14dac0a7386d3f986e505aa6a23ba025b66de1ae6796ef8eb1e098f17370010",
     "gml_Object_bulletBlast_Alarm_0": "e6a4f5b338660e6e9d1c4455b84c1a1caebf9935d0eef61fd9964f5e154bbd84",
     "gml_Object_bulletBlast_Collision_objPlayer_n": "b2e4dba2b576defffbdd70c0820452c5a9647d13d98af0019fb6bcd7beda626a",
     "gml_Object_bulletBlast_Collision_parentShootableThing": "d307f4cc5411e070a9dc39f500e0693bcc5d9f76ea45a4e8d4cd7a02290bf66e",

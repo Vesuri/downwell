@@ -440,6 +440,19 @@ own position jitter. Allocation failure retains the health/hit-memory/caller
 writes and the first four draws, but stops the event. Both collected encounter
 paths admit the contact when the registered flash dependency is supplied.
 
+Registered skeleton corpses (263) use the same inherited shootable event and
+adapter as bones. Corpse Create leaves health zero without Rest in Pieces,
+or retains inherited health one with it. Blast hit memory is updated before
+the positive-health guard: ordinary corpses consume no flash/RNG here, whereas
+Rest in Pieces corpses reach health -49 and emit the registered flash. Neither
+branch sets `hit` or retires the corpse during the collision. Corpse Step owns
+the subsequent response. The stored encounter pass requires an explicit corpse
+registration before admitting these targets; it does not infer ownership from
+an object ID alone.
+The reverse corpse-to-blast event (2244, inherited target parentPBullet 89)
+has an empty VM body. Both routers validate and dispatch it in the same pair
+transaction; it is not discarded as an unsupported event.
+
 Effect-producing callbacks return success. `SkeletonActor` stops the event on
 failed enemy-death setup, blood, smoke, flash, currency, corpse or debris
 creation; stomp blood and each Exploding Knees smoke emission have the same
