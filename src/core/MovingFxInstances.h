@@ -84,6 +84,20 @@ public:
         auto* r=resolve(key);if(!r||!r->destroyRequested||!binding_.retire(key,*r))return fail();
         *r={};--count_;return true;
     }
+    bool clear(){
+        if(!good_)return false;
+        for(const auto& r:records_)if(r.busy)return fail();
+        for(unsigned slot=0;slot<Capacity;++slot){
+            auto& r=records_[slot];if(!r.lifetimeId)continue;
+            const InstanceHandle key{slot,r.lifetimeId};
+            if(!r.destroyRequested){
+                if(!binding_.markDestroyed(key,r))return fail();
+                r.destroyRequested=true;
+            }
+            if(!retire(key))return false;
+        }
+        return true;
+    }
 private:
     Record records_[Capacity]{};Binding binding_;unsigned next_=1,count_=0;bool good_=true;
     bool fail(){good_=false;return false;}

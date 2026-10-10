@@ -997,6 +997,13 @@ int main(){
             WhiteJellyStep::movementComponent(true,{0x3fe00000u,0},MotionBinary64::fromInteger(90),dy)&&
             child.movingFx->xsp.high==dx.high&&child.movingFx->xsp.low==dx.low&&
             child.movingFx->ysp.high==dy.high&&child.movingFx->ysp.low==dy.low);
+        assert(world->restartFromResults(DeathMenuSequence::Action::Retry,2,300)==ResultsDestination::gameplay);
+        assert(world->movingEffects()==&effects&&!effects.size()&&!GameplayCollisionView(*world).contains(emitted)&&
+            owner->population(220,count)&&!count&&owner->prepareDraw());
+        InstanceHandle afterRetry;
+        assert(effects.create(990021,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(512),afterRetry)&&
+            afterRetry.generation!=emitted.generation&&effects.sprite(afterRetry,704,frames));
+        checkDraw({afterRetry});
     }
     {
         bool owner=true,otherOwner=true;
@@ -6688,8 +6695,14 @@ int main(){
         assert(!fieldWorld->enterLevelClear(0,false)&&fieldsOwner->population(255,population)&&population==1);
         assert(fieldWorld->registerLevelExit(176+fieldWorld->player().offsetY()));
         for(unsigned i=0;i<100;++i)fieldWorld->step(0);
+        InstanceHandle departingParticle,departingShared;
+        assert(fieldsOwner->movingEffects().create(990030,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(512),departingParticle)&&
+            GameplayCollisionView::encode(GameplayCollisionView::Kind::movingFx,departingParticle,departingShared)&&
+            GameplayCollisionView(*fieldWorld).contains(departingShared));
         assert(fieldWorld->levelResultRequested()&&fieldWorld->enterLevelClear(0,false)&&
             fieldsOwner->population(255,population)&&population==0);
+        assert(!fieldsOwner->movingEffects().size()&&!GameplayCollisionView(*fieldWorld).contains(departingShared)&&
+            fieldsOwner->population(220,population)&&population==0);
         bool heart=false;
         for(unsigned i=0;i<400&&!fieldWorld->nextLevelRequested();++i){
             bool confirm=true;

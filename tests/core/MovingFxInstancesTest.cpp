@@ -5,11 +5,11 @@
 using Pool=downwell::MovingFxInstances<2>;using R=Pool::Record;
 using H=downwell::InstanceHandle;using F=downwell::RunnerImageValue;using N=downwell::MotionBinary64;
 struct Audit {
-    std::vector<int> calls;bool reject=false;
+    std::vector<int> calls;bool reject=false,rejectRetire=false;
     bool birth(H,const R&){return false;}
     bool birthAt(H,const R& r,F,F){assert(r.busy&&!r.initialized&&r.spriteId==-1);calls.push_back(1);return true;}
     bool move(H,const R&,F,F){calls.push_back(2);return !reject;}
-    bool retire(H,const R& r){assert(r.destroyRequested);calls.push_back(3);return true;}
+    bool retire(H,const R& r){assert(r.destroyRequested);calls.push_back(3);return !rejectRetire;}
     bool activation(H,const R& r,bool active){assert(r.active!=active);calls.push_back(4);return true;}
     bool membership(H,const R&,bool){return false;}
     bool markDestroyed(H,const R& r){assert(!r.destroyRequested);calls.push_back(5);return true;}
@@ -32,10 +32,17 @@ int main(){
     assert(pool.find(first)->destroyRequested&&pool.retire(first)&&!pool.find(first)&&!pool.size());
     H second;assert(pool.create(101,N::fromInteger(10),N::fromInteger(20),second));
     assert(second.slot==first.slot&&second.generation!=first.generation);
+    H third;assert(pool.create(102,{}, {},third)&&pool.activate(third,false));
+    audit.calls.clear();assert(pool.clear()&&!pool.size()&&!pool.find(second)&&!pool.find(third));
+    assert(audit.calls==std::vector<int>({5,3,5,3})&&pool.clear());
+    H reused;assert(pool.create(103,{}, {},reused)&&reused.generation!=second.generation&&reused.generation!=third.generation);
     assert(!pool.imageSpeed(first,{})&&!pool.valid());
     Audit reject;Pool broken(Pool::Binding::bindPositionedActor(reject));H key;
     assert(broken.create(200,N::fromInteger(10),N::fromInteger(20),key));reject.reject=true;
     assert(!broken.step(key,[](const auto&,bool& allowed){allowed=false;return true;})&&!broken.valid());
     assert(broken.find(key)->imageSpeed.bits==0); // completed write survives failed position publication
+    Audit retirement;Pool retained(Pool::Binding::bindPositionedActor(retirement));H pending;
+    assert(retained.create(300,{}, {},pending));retirement.rejectRetire=true;
+    assert(!retained.clear()&&!retained.valid()&&retained.size()==1&&retained.find(pending)->destroyRequested);
     std::puts("Native moving effects: publication, activation, animation end, stale handles and failure prefixes passed");
 }
