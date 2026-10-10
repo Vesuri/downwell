@@ -1,4 +1,5 @@
 #include "core/StoredShopChildRegistration.h"
+#include "core/StoredShopCreationOwner.h"
 #include "core/ShopChildCreation.h"
 #include "core/ShopInventory.h"
 #ifndef DOWNWELL_NATIVE_QUERY_PROBE
@@ -91,6 +92,43 @@ bool shopChildRegistrationCheck(const ObjectPack& objects,unsigned reject,bool r
     }
     return true;
 }
+bool shopParentRegistrationCheck(const ObjectPack& objects,unsigned area,unsigned reject,unsigned rejectAudio){
+    InstanceStore<16> records;ShopWorld world;std::uint32_t next=920000;const int room=11;bool good=true;
+    ShopChildObserver observer;observer.rejectBirth=reject;
+    struct Audio {
+        const InstanceStore<16>& records;unsigned area,reject,calls=0;bool valid=true;
+        bool play(int sound,int priority,bool loop,int& handle){
+            valid=valid&&records.size()==1&&records.at(0).objectId==277&&sound==(area==3?201:192)&&priority==100&&loop;
+            handle=123;++calls;return reject!=1;
+        }
+        bool setGain(int handle,MotionBinary64 gain,int duration){
+            valid=valid&&records.size()==1&&calls==1&&handle==123&&gain.zero()&&duration==0;
+            ++calls;return reject!=2;
+        }
+    } audio{records,area,rejectAudio};
+    StoredShopCreationOwner<16,1,Audio> owner(records,objects,InstanceLifecycleBinding::bindPositionedActor(observer),next,room,good,audio);
+    unsigned rng=0,choices=0;bool order=true;
+    const unsigned values[]={100,101,104,105};
+    auto* shop=world.createRegistered(100,700,[&](unsigned,unsigned){
+        order=order&&records.size()==8;return values[rng++];
+    },[&]{order=order&&records.size()==11;++choices;return 2u;},4,area,false,0,false,owner,good);
+    const bool expected=!reject&&!rejectAudio;
+    const unsigned count=reject?reject:rejectAudio?1:11;
+    if(bool(shop)!=expected||good!=expected||!order||!observer.valid||!audio.valid||records.size()!=count||next!=920000+count||
+       rng!=(count>=9||expected?4u:0u)||choices!=(expected?1u:0u))return false;
+    const auto* parent=owner.parent(920000);
+    if(!parent||parent->inheritedInitialized!=(reject!=1)||parent->shop!=&world.instances[0]||
+       parent->speaking||parent->checkThis||parent->interactOk!=1||parent->textOver||parent->choice0!=-1)return false;
+    if(expected){
+        if(shop->sourceId!=920000||shop->children.table!=920001||shop->children.risingText!=920007||
+           shop->children.items[2]!=920010||shop->radio!=(area==5?-1:123)||shop->farewellVariant!=2)return false;
+        const auto* item=owner.children().state(owner.children().sourceHandle(shop->children.items[2]));
+        if(!item||item->whichUg!=shop->stock.items[2].upgrade)return false;
+    }
+    const auto key=parent->key;
+    if(!owner.clear()||records.size()||owner.parent(920000)||records.resolve(key)||observer.retirements!=count)return false;
+    world.reset();return true;
+}
 #ifndef DOWNWELL_NATIVE_QUERY_PROBE
 int main(){
     std::ifstream file("generated/downwell-objects.dwob",std::ios::binary);
@@ -101,6 +139,12 @@ int main(){
         std::fprintf(stderr,"shop child registration failed at birth %u\n",reject);return 1;
     }
     if(!shopChildRegistrationCheck(objects,0,true))return 1;
+    for(unsigned area:{1u,3u,5u}){
+        for(unsigned reject=0;reject<=11;++reject)if(!shopParentRegistrationCheck(objects,area,reject,0)){
+            std::fprintf(stderr,"shop parent registration failed in area %u at birth %u\n",area,reject);return 1;
+        }
+        if(area!=5)for(unsigned reject=1;reject<=2;++reject)if(!shopParentRegistrationCheck(objects,area,0,reject))return 1;
+    }
     std::puts("Stored shop children: Create state, numeric IDs, publication failures and teardown passed");
 }
 #endif

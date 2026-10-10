@@ -679,6 +679,15 @@ that the invisible wall's ancestors have no Create body to execute. This owner
 does not itself admit the children's later Step, Alarm or Draw events, and is
 not yet installed by either normal generation adapter.
 
+`StoredShopCreationOwner` is the concrete owner accepted by
+`ShopWorld::createRegistered`: it registers resource 277 in that same room
+store/counter, retains the inherited interactable state and delegates child
+operations to `StoredShopChildRegistration`. Its required audio adapter is
+borrowed; playback/gain rejection propagates to the same failure state used by
+the room owner. The parent record and compact Shop state remain linked until
+explicit teardown, which must precede `ShopWorld::reset`. This supplies the
+creation boundary, not automatic admission of later shop events.
+
 `scrBuilder` blocks 187 and 207 write `self.y += 16` after each newline's
 pillars and each extra-pillar row respectively. Shared scalar, run and prepared
 generation retain these setter boundaries, including the completed prefix on

@@ -199,7 +199,7 @@ assert text.count("call.i choose(argc=3)") == 1
 assert "gml_Script_instance_create" not in text
 print("Pinned seven pre-stock shop children and three post-stock item births before farewell RNG")
 # Child Create admission must include the inherited chain, not only the leaf.
-for object_id, parent_id in ((278,59),(279,57),(98,59),(280,-1),(212,-1),(283,-1),(59,57),(57,56),(56,-1)):
+for object_id, parent_id in ((277,91),(91,-1),(278,59),(279,57),(98,59),(280,-1),(212,-1),(283,-1),(59,57),(57,56),(56,-1)):
     definition = objects[object_id]
     assert definition["parentId"] == parent_id
     assembly("gml_Object_" + definition["name"] + "_PreCreate_0",
