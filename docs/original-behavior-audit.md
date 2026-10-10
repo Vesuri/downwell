@@ -624,6 +624,34 @@ position-publication and retirement failures are terminal. This registration
 does not replace the existing camera-contact adapter with the full ordered
 collision dispatcher, nor supply the missing global source-ID allocator.
 
+### Shop creation and the shared numeric stream
+
+Shop 277's VM Create calls inherited Create, starts/mutes the area-specific
+radio when applicable, then creates these children synchronously:
+
+| Order | Resource | Birth position relative to Shop |
+| --- | --- | --- |
+| 1 | Table 278 | (x+64, y) |
+| 2–4 | Case 279 | (x+45/64/83, y−9) |
+| 5 | Invisible wall 98 | (x, y+8) |
+| 6 | Keeper 280 | (x+18, y) |
+| 7 | Rising text 212 | (−100, −100), absolute |
+
+Stock selection and rejection-sampling RNG follow those births. The next
+three children are item 283, created in case order at each retained case's
+current x and y+1, not reconstructed from the Shop origin. Each item completes
+Create before Shop writes its `whichUg` and the corresponding case's
+`storedItem`. Only after all three does `scrShopAssignText` choose the farewell
+text. The hash-pinned evidence is in `verify-runner-instance-ids.py`; it does
+not prove inherited events or either backend's live implementation complete.
+
+Both existing generation adapters bypass generic instance creation for Shop
+and call the compact `ShopWorld` representation directly. That representation
+retains stock/visual state but not the parent plus these ten registered
+lifetimes. Thus a complete dynamic numeric stream cannot be recovered by
+numbering the existing terrain and enemy records alone. Registering the
+children after all stock/text RNG would also lose synchronous Create ordering.
+
 `scrBuilder` blocks 187 and 207 write `self.y += 16` after each newline's
 pillars and each extra-pillar row respectively. Shared scalar, run and prepared
 generation retain these setter boundaries, including the completed prefix on

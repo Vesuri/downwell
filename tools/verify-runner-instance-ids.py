@@ -156,3 +156,36 @@ assert "call.i instance_destroy(argc=0)" in above["Collision_objWall_n"]
 assert "call.i draw_self(argc=0)" in above["Draw_0"]
 print("Pinned authored dither Begin Step and wall-destruction events; an inert controller is not equivalent")
 print("Pinned rmMain's 240 walls/four controllers and player child-birth order; live allocation parity remains unverified")
+
+# Shop creation is not just stock RNG and static drawing. Its ten children
+# consume the same numeric stream as the enclosing builder and its next cell.
+shop = assembly("gml_Object_Shop_Create_0",
+    "670e7f398a89a720f63eae31b674023ea06e2ae1b6f45be5560349b5f0a7fb3a")
+assert objects[277]["parentId"] == 91
+prefix, stock = shop.split(":[8]\n", 1)
+assert prefix.count("call.i gml_Script_instance_create(argc=3)") == 7
+assert prefix.count("pushi.e 279\nconv.i.v") == 3
+cursor = 0
+for object_id in (278, 279, 279, 279, 98, 280, 212):
+    cursor = prefix.index(f"pushi.e {object_id}\nconv.i.v", cursor) + 1
+assert "call.i irandom_range" not in prefix
+assert stock.index("call.i irandom_range") < stock.index("pushi.e 283\nconv.i.v")
+item_loop = stock[stock.index(":[20]\n"):stock.index(":[28]\n")]
+assert "push.v self.i\npushi.e 3\ncmp.i.v LTE" in item_loop
+assert item_loop.count("call.i gml_Script_instance_create(argc=3)") == 1
+assert item_loop.index("call.i gml_Script_instance_create") < item_loop.index("self.whichUg") < item_loop.index("self.storedItem")
+assert "self.glassCase" in item_loop and "[stacktop]self.y\npushi.e 1\nadd.i.v" in item_loop
+assert stock.index(":[28]\n") < stock.index("call.i gml_Script_scrShopAssignText")
+for name, digest in (
+    ("shopTable", "fcbb4a5f57c8976eebfc816c58e1fc80f622ab0681089f7d7d532f6d57e09c8c"),
+    ("shopCase", "216b2c6928f6dd9ad53a373d12af0b320a912ee033f067aad19c6976f116d083"),
+    ("shopKeeper", "7abd29cc17b2cbdcae4fc7cbef96de917c4afc912bc34ef3aded0d174c0e3210"),
+    ("objObtainableUg", "b488cae24ca6095c5e158ec67c6424b19d83b8642d60289d4ae05b6b2c6ec29f"),
+    ("fxRisingText", "5da331894603ae60423df75c122cb4d96eeec816d392626870409eb999a2fb66")):
+    child = assembly("gml_Object_" + name + "_Create_0", digest)
+    assert "call.i" not in child  # These Create bodies add no nested births/RNG.
+text = assembly("gml_GlobalScript_scrShopAssignText",
+    "732a1cab1f2ef3db8feaa5929cc36979ec04c62f3da5806f2365418e3d957a3f")
+assert text.count("call.i choose(argc=3)") == 1
+assert "gml_Script_instance_create" not in text
+print("Pinned seven pre-stock shop children and three post-stock item births before farewell RNG")
