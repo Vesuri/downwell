@@ -12,7 +12,9 @@ on PAL; do not add 60 Hz catch-up.
 
 ## Priority and scope
 
-Next: finish live skeleton encounters (section 1), following its numbered
+Immediate priority: restore the runnable, measured A500 baseline in section 0.
+Do not add further section 1 functionality while this regression is unresolved.
+After that, finish live skeleton encounters (section 1), following its numbered
 integration tasks: production ownership, generation/query/dispatch, time-stop
 and damage chains, then natural encounter verification. The A500 frame-budget work in
 section 5 remains open; use its measured architectural approach rather than
@@ -24,6 +26,29 @@ not deferred cleanup phases.
 
 Supporting helpers alone do not close an item. Completion requires the shared
 behavior, both backend integrations and relevant original-game verification.
+
+## 0. Restore a runnable, measured A500 baseline
+
+- Restore normal startup and gameplay at explicit 512 KiB Chip / 8 MiB Fast,
+  68000 settings. Diagnose actual allocation owners and scene lifetimes; remove
+  unnecessary simultaneous residency without discarding source behavior or
+  silently raising emulator memory. Preserve the user's local 1 MiB launcher
+  workaround until the fix is verified. Measure free/largest Chip blocks and
+  peak allocations through startup, gameplay, transitions and Retry.
+- Preserve the current failing executable/symbols and establish a reproducible
+  bounded SKIP_TO_GAME gameplay profile. Locate a comparable pre-regression
+  build; distinguish behavior/input-path changes from increased per-frame work.
+  Report quiet, firing/combat, generation and field windows with worst-frame
+  costs and coverage. Old section 5 numbers are not a current baseline.
+- Remove the measured regression at its architectural cause. Compare the same
+  workload and behavior checks before/after, preserving hardware scrolling,
+  offline assets and native terrain ownership. Do not resume micro-optimization
+  sweeps, duplicate simulation passes or reference-only performance modes.
+- Close this goal only with a normally runnable build, repeatable measured
+  baseline, explained/resolved recent regressions and meaningful startup failure
+  codes. Retain any remaining absolute 20 ms shortfall explicitly in section 5;
+  do not claim 50 FPS or stock total-memory fit without evidence. Restore a normal
+  non-profile build and stop every owned emulator run before handoff.
 
 ## 1. Finish live skeleton and bone integration
 
