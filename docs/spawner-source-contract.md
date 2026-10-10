@@ -116,6 +116,11 @@ and clears `ballooning`.
 The registered adapters bind the no-decoy branch to captured player globals.
 The upgrade branch requires the environment's actual retained enemy-target
 globals, including its balloon selection; it does not assume a balloon exists.
+The registered Create/Step adapters own `RunnerPointDirection` argument
+narrowing, subtraction and degree conversion. Their environment supplies only
+the atan dependency. Integration fixtures explicitly use `portableAtan`, the
+candidate described in [point-direction evidence](runner-point-direction.md);
+passing those fixtures does not certify that candidate for natural encounters.
 Source hashes for the two scripts respectively:
 `3ff0e28b9dcef221ed9dd6a1ceb801bef746d7538016547fbe49a60af0177644`
 and `34dfd0f192ca34217da36cdfd001b792a3e7d496d3fc8c3e9967f8ce7ff2266a`.

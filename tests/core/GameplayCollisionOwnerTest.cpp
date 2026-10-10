@@ -72,6 +72,7 @@ bool nativeWhiteJellyBirth(downwell::WhiteJellyBirth& state,downwell::RunnerImag
 }
 struct NativeWhiteJellyStepOps : NativeWhiteJellyBirthOps {
     using N=downwell::MotionBinary64;
+    bool atan(N,N,N&);
     bool imageIndex(int);bool sound(int,int,int,int,const char*);bool alarm(int,int);
     bool enemyPlayerY(N&);bool enemyPlayerX(N&);bool lengthdir(bool,N,N,N&);
     bool meeting(N,N,int,bool&);bool enemyDeath();bool smoke(N,N,int,int);

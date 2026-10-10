@@ -271,19 +271,13 @@ int main(){
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
         require(owner->attach(*world),"attach natural jelly birth world");world->skipToGameForTesting();
         auto jellies=world->whiteJellyStates<2>();unsigned childId=0,stopReads=0,directions=0;
-        // Steering math remains a controlled provider in this creation-order
-        // test. All room globals, builtin publication and lifetimes are real.
+        // The atan candidate is explicit: this exercises real coordinates and
+        // the recovered wrapper, but is not original-runner atan verification.
         struct JellyEnvironment {
             using N=MotionBinary64;
             unsigned& directions;
             StartupRuntime& world;
-            bool pointDirection(N,N,N x,N y,N& value){
-                N expectedX,expectedY;
-                require(ContactCoordinates::playerGlobals(world.mainEnemyTargetX(),world.mainEnemyTargetY(),
-                    240,176,expectedX,expectedY)&&x.high==expectedX.high&&x.low==expectedX.low&&
-                    y.high==expectedY.high&&y.low==expectedY.low,"jelly steering reads captured room globals");
-                value=N::fromInteger(directions++==0?450:90);return true;
-            }
+            bool atan(N y,N x,N& value){++directions;return portableAtan(y,x,value);}
             bool enemyPlayerX(N&){return false;}bool enemyPlayerY(N&){return false;}
             bool sound(int,int,int,int,const char*){return false;}
             bool enemyDeath(){return false;}bool smoke(N,N,int,int){return false;}
@@ -311,11 +305,17 @@ int main(){
                 const auto* state=jellies.state(childId);RunnerImageValue x,y,speed;
                 std::memcpy(&speed.bits,&r.imageSpeed,4);
                 require(state&&state->initialized&&state->scriptActive&&!r.active&&r.activationPending&&
-                    speed.bits==0x3e4ccccdu&&r.imageIndex==0&&directions==1&&stopReads==0,
+                    speed.bits==0x3e4ccccdu&&r.imageIndex==0&&directions<=1&&stopReads==0,
                     "child Create precedes dormant publication; no same-frame child Step or animation");
-                require(r.direction==90&&r.moveSpeed==0&&r.velocityX==0&&r.velocityY==0&&
-                    state->direction.high==MotionBinary64::fromInteger(90).high&&state->direction.low==0&&
-                    !state->moveSpeed.zero(),"registered direction normalizes without conflating custom and engine speed");
+                RunnerImageValue direction;std::memcpy(&direction.bits,&r.direction,4);
+                MotionBinary64 targetX,targetY,expectedDirection;RunnerImageValue expectedStored;
+                require(ContactCoordinates::playerGlobals(world->mainEnemyTargetX(),world->mainEnemyTargetY(),
+                    240,176,targetX,targetY)&&RunnerPointDirection::evaluate(state->x.promoted(),state->y.promoted(),
+                    targetX,targetY,expectedDirection,portableAtan)&&RunnerDirectionValue::normalize(expectedDirection,expectedStored)&&
+                    direction.bits==expectedStored.bits,"Create direction uses actual coordinates, including zero-dx atan bypass");
+                require(r.moveSpeed==0&&r.velocityX==0&&r.velocityY==0&&
+                    state->direction.high==direction.promoted().high&&state->direction.low==direction.promoted().low&&
+                    !state->moveSpeed.zero(),"registered direction preserves custom and engine speed separation");
                 require(owner->collisionPosition(world->instanceHandleAt(i),x,y)&&
                     x.bits==state->x.bits&&y.bits==state->y.bits&&r.preciseX==float(r.x)&&r.preciseY==float(r.y),
                     "jelly builtin coordinates agree with its registered collision state");

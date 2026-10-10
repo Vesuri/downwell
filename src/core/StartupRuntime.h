@@ -603,6 +603,12 @@ public:
                 bool lengthdir(bool vertical,MotionBinary64 speed,MotionBinary64 angle,MotionBinary64& value){
                     return WhiteJellyStep::movementComponent(vertical,speed,angle,value);
                 }
+                bool pointDirection(MotionBinary64 x,MotionBinary64 y,MotionBinary64 targetX,
+                    MotionBinary64 targetY,MotionBinary64& value){
+                    return RunnerPointDirection::evaluate(x,y,targetX,targetY,value,[&](auto dy,auto dx,auto& radians){
+                        return decltype(external)::atan(dy,dx,radians);
+                    });
+                }
                 bool viewY(MotionBinary64& value){
                     value=MotionBinary64::fromInteger(world.mainCameraRenderViewY());return true;
                 }

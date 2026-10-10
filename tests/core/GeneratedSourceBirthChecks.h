@@ -20,19 +20,13 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
         auto& store=owner->whiteJellies();
         struct Ops {
             GameplayWhiteJellies& store;InstanceHandle key;GameplayCollisionOwner& owner;
-            GameplayWorld* targetWorld=nullptr;unsigned* decoyReads=nullptr;
+            unsigned* decoyReads=nullptr;
             bool position(bool y,RunnerImageValue v,RunnerImageValue& out){return store.position(key,y,v,out);}
             bool playerY(MotionBinary64& v){v={};return true;}
             bool playerX(MotionBinary64& v){v={};return true;}
-            bool pointDirection(MotionBinary64,MotionBinary64,MotionBinary64 x,MotionBinary64 y,MotionBinary64& v){
-                if(targetWorld){
-                    MotionBinary64 expectedX,expectedY;
-                    if(decoyReads){expectedX=MotionBinary64::fromInteger(1234);expectedY=MotionBinary64::fromInteger(2345);}
-                    else assert(ContactCoordinates::playerGlobals(targetWorld->player().frameStartXFixed(),
-                        targetWorld->player().frameStartYFixed(),240,176,expectedX,expectedY));
-                    assert(x.high==expectedX.high&&x.low==expectedX.low&&y.high==expectedY.high&&y.low==expectedY.low);
-                }
-                v={};return true;
+            bool atan(MotionBinary64 y,MotionBinary64 x,MotionBinary64& v){return portableAtan(y,x,v);}
+            bool pointDirection(MotionBinary64 x,MotionBinary64 y,MotionBinary64 tx,MotionBinary64 ty,MotionBinary64& v){
+                return RunnerPointDirection::evaluate(x,y,tx,ty,v,portableAtan);
             }
             bool direction(MotionBinary64 v,MotionBinary64& out){return owner.whiteJellyDirection(key,v,out);}
             bool imageSpeed(RunnerImageValue v,RunnerImageValue& out){out=v;return true;}
@@ -76,20 +70,28 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             store.find(key)->imageIndex.bits==0x3ecccccdu);
         assert(owner->configureCorpseMasks(masks));
         assert(store.dispatch(key,[](auto& r){r.xx=MotionBinary64::fromInteger(-1000);return true;}));
-        GameplayCollisionOwner::EncounterStepOrder phase;Ops ops{store,key,*owner,world.get()};unsigned steps=0;
-        auto expectedX=MotionBinary64::fromInteger(-1000);
-        RunnerImageValue narrowedSpeed;
-        assert(narrowedSpeed.assign(store.find(key)->moveSpeed)&&expectedX.add(narrowedSpeed.promoted()));
+        GameplayCollisionOwner::EncounterStepOrder phase;Ops ops{store,key,*owner};unsigned steps=0;
+        auto beforeX=store.find(key)->xx,beforeY=store.find(key)->yy;
         assert(owner->withEncounterSteps(phase,[&](InstanceHandle h,int object){
             assert(object==115);++steps;const bool ok=owner->stepRegisteredWhiteJellyWithWorld(h,false,ops);assert(ok);return ok;
         },[&]{world->step(0);return world->effectsSucceeded();}));
-        assert(steps==1&&store.find(key)->xx.high==expectedX.high&&store.find(key)->xx.low==expectedX.low&&
+        auto expectedX=MotionBinary64::fromInteger(-1000);
+        assert(expectedX.add(store.find(key)->xsp));
+        assert(steps==1&&!store.find(key)->xsp.zero()&&store.find(key)->xx.high==expectedX.high&&store.find(key)->xx.low==expectedX.low&&
             store.find(key)->x.bits==0xc47a0000u);
+        MotionBinary64 targetX,targetY,expectedDirection;
+        assert(ContactCoordinates::playerGlobals(world->player().frameStartXFixed(),world->player().frameStartYFixed(),
+            240,176,targetX,targetY)&&RunnerPointDirection::evaluate(beforeX,beforeY,targetX,targetY,expectedDirection,portableAtan));
+        assert(store.find(key)->playerDirection.high==expectedDirection.high&&store.find(key)->playerDirection.low==expectedDirection.low);
         assert(world->grantUpgrade(15));unsigned decoyReads=0;ops.decoyReads=&decoyReads;
+        beforeX=store.find(key)->xx;beforeY=store.find(key)->yy;
         assert(owner->withEncounterSteps(phase,[&](InstanceHandle h,int object){
             assert(object==115);return owner->stepRegisteredWhiteJellyWithWorld(h,false,ops);
         },[&]{world->step(0);return world->effectsSucceeded();}));
         assert(decoyReads==2); // Target selection is not silently replaced with the player.
+        assert(RunnerPointDirection::evaluate(beforeX,beforeY,MotionBinary64::fromInteger(1234),
+            MotionBinary64::fromInteger(2345),expectedDirection,portableAtan));
+        assert(store.find(key)->playerDirection.high==expectedDirection.high&&store.find(key)->playerDirection.low==expectedDirection.low);
         RunnerImageValue outside,accepted;
         assert(outside.assignInteger(-1000)&&store.position(key,true,outside,accepted));
         world->step(0);

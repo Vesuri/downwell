@@ -2304,7 +2304,7 @@ public:
            !objects_.findEvent(115,3,0,event)||event.ownerObjectId!=115||event.codeId!=1225)return check(false);
         return check(world_->stepWhiteJellyRoomEffect(local,stopped,ops));
     }
-    // World-backed Step operations. Decoy target globals, source trig, audio
+    // World-backed Step operations. Decoy target globals, source atan, audio
     // and synchronous effect births remain explicit environment dependencies.
     template<class Environment> bool stepRegisteredWhiteJellyWithWorld(InstanceHandle shared,bool stopped,Environment& environment){
         View::Kind kind;InstanceHandle local;
@@ -2328,6 +2328,12 @@ public:
             }
             bool lengthdir(bool vertical,MotionBinary64 speed,MotionBinary64 angle,MotionBinary64& value){
                 return WhiteJellyStep::movementComponent(vertical,speed,angle,value);
+            }
+            bool pointDirection(MotionBinary64 x,MotionBinary64 y,MotionBinary64 targetX,
+                MotionBinary64 targetY,MotionBinary64& value){
+                return RunnerPointDirection::evaluate(x,y,targetX,targetY,value,[&](auto dy,auto dx,auto& radians){
+                    return Environment::atan(dy,dx,radians);
+                });
             }
             bool position(bool vertical,RunnerImageValue value,RunnerImageValue& accepted){
                 return owner.whiteJellies_.position(key,vertical,value,accepted);
