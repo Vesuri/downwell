@@ -281,6 +281,16 @@ children born during ordinary Step, which remain excluded until the next
 capture. Native solid queries require the native terrain identity owner;
 retaining the reference terrain store alongside it is not a valid binding.
 
+Time-shard/player collision 2081 is routed by the native
+`dispatchSkeletonEncounterCollision` through the resource-bound shard handler.
+The stored adapter's `withTimeShardContacts` borrows the registration and effect
+owner around one admitted collision pass, merging 238/35 pairs into that pass's
+existing collection and dispatch order. It does not collect a second stream.
+The scope rejects nesting and a different collision world; the handler checks
+the actual event owner and retained lifetimes before applying cooldown and RNG.
+These scopes still require installation alongside natural transition births;
+they do not enable player transitions on their own.
+
 Bone view queries resolve the retained lifetime's published binary32 x/y and
 apply `scrInView(0,0,0)` with the VM real-comparison tolerance. All four edges
 are excluded, including equality; these are origin checks, not mask bounds.

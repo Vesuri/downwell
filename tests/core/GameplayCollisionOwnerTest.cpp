@@ -2081,11 +2081,17 @@ int main(){
         assert(owner->timeShards().activation(key,true));
         InstanceHandle player;
         assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::player,world->playerHandle(),player));
-        RunnerCollisionEventContext context;
+        RunnerCollisionEventContext context;TimeStopEffects<4> stop;
+        SkeletonSoundAudio audio;SoundPlayEnvironment env;unsigned unexpected=0,stomps=0,damage=0;
         auto contact=[&]{return context.dispatch(shared,player,{true,false},
             [&](auto,auto,int& subtype,bool& found,PackedObjectEvent& event){
                 subtype=35;return objects.collisionEvent(238,35,found,event);
-            },[&](const auto& event){return owner->dispatchTimeShardCollision(event);});};
+            },[&](const auto& event){return owner->dispatchSkeletonEncounterCollision(event,stop,
+                [&](int sprite,unsigned& count){return sprites.frameCount(sprite,count);},env,audio,
+                [](auto dy,auto dx,auto& angle){return portableAtan(dy,dx,angle);},
+                [&](auto& actor){++unexpected;return CheckedSkeletonContact{actor,0,stomps,damage};},
+                [&](auto&,int,int,int){++unexpected;return false;},
+                [&](const auto&){++unexpected;return false;});});};
         auto beforeContact=world->randomDrawCount();
         assert(contact()&&world->randomDrawCount()==beforeContact); // Create cooldown.
         record->alarms.set(2,1);
@@ -2095,6 +2101,7 @@ int main(){
         assert(contact()&&world->randomDrawCount()==beforeContact+2&&record->alarms.get(2)==5);
         assert(record->alarms.get(0)==life&&record->alarms.get(1)==fade);
         assert(contact()&&world->randomDrawCount()==beforeContact+2);
+        assert(!unexpected&&!audio.calls);
         // Exercise the real room animation/alarm traversal and selected cleanup.
         record->alarms.set(0,2);
         world->step(0);assert(world->effectsSucceeded()&&record->alarms.get(0)==1);

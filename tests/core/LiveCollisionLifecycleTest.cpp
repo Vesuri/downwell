@@ -3455,6 +3455,12 @@ int main(){
                     world->instance(self->instanceId)->alarms.get(2)==5;
             })&&contacts==preciseHits&&contacts>0&&world->randomDrawCount()==beforeContactDraws+2*contacts,
             "source-ordered live pair execution dispatches real shard contacts and exact RNG/cooldown effects");
+        auto selectedPass=std::make_unique<StoredDitherCollisionPass>(*owner);
+        for(unsigned tick=0;tick<5;++tick)shards.advanceAlarm(shards.beginPhase(),2);
+        const auto beforeSelected=world->randomDrawCount();
+        require(selectedPass->withTimeShardContacts(*world,registration,shards,
+            [&]{return selectedPass->run(*world);})&&world->randomDrawCount()==beforeSelected+2*preciseHits,
+            "admitted production pass merges shard/player contacts with dither in one collected stream");
         const auto tracked=pairs->at(0)->self;
         const auto* beforeFrame=owner->resolve(tracked);
         require(beforeFrame,"snapshot fixture lifetime resolves");

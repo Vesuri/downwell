@@ -10,6 +10,23 @@ namespace downwell {
 class StoredDitherCollisionPass {
 public:
     explicit StoredDitherCollisionPass(StoredWorldCollision& owner):owner_(owner){}
+    // Extend whichever admitted pass the caller runs, without collecting a
+    // second shard-only stream. Effects and registration must stay borrowed
+    // together for the complete collision phase.
+    template<unsigned Registered,unsigned Capacity,class Run>
+    bool withTimeShardContacts(StartupRuntime& world,
+        StoredTimeShardRegistration<StartupRuntime::instanceCapacity,Registered>& registration,
+        TimeShardEffects<Capacity>& shards,Run run){
+        if(!owner_.boundTo(world)||shardDispatch_||!shards.phasesBoundTo(registration))return false;
+        auto dispatch=[&](const auto& event){return world.dispatchTimeShardContact(registration,shards,event);};
+        shardWorld_=&world;shardContext_=&dispatch;
+        shardDispatch_=[](void* p,const RunnerCollisionEventContext::Frame& event){
+            return (*static_cast<decltype(dispatch)*>(p))(event);
+        };
+        const bool okay=run();
+        shardDispatch_=nullptr;shardContext_=nullptr;shardWorld_=nullptr;
+        return okay&&world.effectsSucceeded();
+    }
     // Migration admission for source-owned usual bullets and registered
     // skeletons. Use this instead of run(), never as a second family pass.
     // Unbound legacy actors remain with their existing adapters.
@@ -265,13 +282,18 @@ private:
             ((b.objectId==255||b.objectId==371)&&a.objectId==35);
     }
     template<class Admit,class Execute> bool runSelected(StartupRuntime& world,Admit admit,Execute execute){
-        if(!world.effectsSucceeded())return false;
+        if(!world.effectsSucceeded()||(shardDispatch_&&shardWorld_!=&world))return false;
         if(world.roomId()!=11)return true;
         if(!owner_.collectCollisionPairs(pairs_,true))return false;
         RunnerCollisionEventContext context;
+        auto routed=[&](const RunnerCollisionEventContext::Frame& event){
+            const auto* self=owner_.resolve(event.self);
+            if(!self)return false;
+            return shardDispatch_&&self->objectId==238?shardDispatch_(shardContext_,event):execute(event);
+        };
         struct Operations {
             StoredWorldCollision& owner;StartupRuntime& world;RunnerCollisionEventContext& context;
-            Execute& execute;
+            decltype(routed)& execute;
             bool overlap(InstanceHandle a,InstanceHandle b,bool& hit){return owner.collisionOverlap(a,b,hit);}
             bool flags(InstanceHandle h,std::uint32_t& value){return owner.collisionFlags(h,value);}
             bool queueCollision(InstanceHandle h){return owner.queueCollision(h);}
@@ -284,18 +306,23 @@ private:
             bool rollback(InstanceHandle){return false;}
             bool prepareMotion(InstanceHandle){return false;}
             bool advanceMotion(InstanceHandle){return false;}
-        } operations{owner_,world,context,execute};
+        } operations{owner_,world,context,routed};
         RunnerCollisionDispatch dispatch;
         return pairs_.dispatch([&](InstanceHandle a,InstanceHandle b){
             const auto* first=owner_.resolve(a);const auto* second=owner_.resolve(b);
             if(!first||!second)return false;
             const bool selected=(first->objectId==61&&second->objectId==60)||
-                (first->objectId==60&&second->objectId==61)||admit(a,b,*first,*second);
+                (first->objectId==60&&second->objectId==61)||admit(a,b,*first,*second)||
+                (shardDispatch_&&((first->objectId==238&&second->objectId==35)||
+                                  (first->objectId==35&&second->objectId==238)));
             return !selected||dispatch.pair(a,b,operations);
         });
     }
 private:
     StoredWorldCollision& owner_;
+    StartupRuntime* shardWorld_=nullptr;
+    void* shardContext_=nullptr;
+    bool (*shardDispatch_)(void*,const RunnerCollisionEventContext::Frame&)=nullptr;
     RunnerCollisionPairs<StartupRuntime::instanceCapacity,16384> pairs_;
 };
 }

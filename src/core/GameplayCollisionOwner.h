@@ -2183,6 +2183,7 @@ public:
         View::Kind kind;InstanceHandle local;
         if(!valid()||!world_||!stop.succeeded||!View::decode(event.self,kind,local)||!resolves(event.self))return check(false);
         if(kind==View::Kind::bone)return dispatchBoneCollision(event,stop.player.stopped,frames,damage);
+        if(kind==View::Kind::timeShard)return dispatchTimeShardCollision(event);
         if(kind==View::Kind::skeleton)return dispatchSkeletonCollision(event,makePlayer);
         if(kind==View::Kind::bullet&&event.code==2224)
             return dispatchSkeletonBulletCollision(event,frames,environment,audio,atan);
