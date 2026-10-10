@@ -395,8 +395,8 @@ struct RunSession {
     void clearCorpseExpiry(){ExpiryHooks hooks;corpseExpiryEffects.clear(hooks);}
     OrdinaryTimeFields<64> timeFields;
     bool effectsSucceeded=true;
-    bool adoptTimeField(int x,int y,std::uint32_t radiusWord){
-        if(effectsSucceeded)effectsSucceeded=timeFields.adoptCreate(x,y,radiusWord);
+    bool adoptTimeField(int x,int y,std::uint32_t radiusWord,std::uint32_t sourceId=0){
+        if(effectsSucceeded)effectsSucceeded=timeFields.adoptCreate(x,y,radiusWord,sourceId);
         return effectsSucceeded;
     }
     bool createTimeField(int x,int y,GameMakerRandom& random){

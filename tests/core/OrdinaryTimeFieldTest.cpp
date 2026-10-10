@@ -37,6 +37,17 @@ int main(){
         assert(!fields.createWithSourceId(210001,241,512,random)&&fields.size()==1&&audit.births==1&&
             random.drawCount()==draws&&!fields.valid());
     }
+    for(bool reject:{false,true}){
+        OrdinaryTimeFields<2> fields;GameMakerRandom random(42);Audit audit{&fields,&random};
+        audit.failBirth=reject?1:0;
+        assert(fields.bindLifecycle(OrdinaryTimeFields<2>::Binding::bind(audit)));
+        const auto word=random.nextU32();
+        assert(fields.adoptCreate(240,512,word,210007)==!reject);
+        assert(audit.sourceAtBirth==210007&&audit.drawsAtBirth==1&&random.drawCount()==1);
+        assert(fields.at(0)->sourceId==210007);
+        if(!reject)assert(fields.at(0)->radius.equal(OrdinaryTimeField::radiusFromWord(word)));
+        assert(!fields.adoptCreate(256,600,word,210007)&&fields.size()==1&&!fields.valid());
+    }
     for(auto invalid:{0u,0x80000000u}){
         OrdinaryTimeFields<2> fields;GameMakerRandom random(42);
         assert(!fields.createWithSourceId(invalid,240,512,random)&&!fields.size()&&!random.drawCount()&&!fields.valid());

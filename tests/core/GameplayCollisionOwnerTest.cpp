@@ -26,6 +26,9 @@ namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_
 bool nativeExitSourceBirth(GameplayWorld& world,int y,bool (*allocate)(int,unsigned&)){
     return world.registerLevelExitWithSourceIds(y,allocate);
 }
+bool nativeGeneratedFieldBirth(GameplayWorld& world,unsigned source,const downwell::DeferredCreateInstance& command){
+    return world.adoptGeneratedTimeFieldWithSourceId(source,command);
+}
 struct NativeSkeletonAudio {
     bool isPlaying(int,bool&);bool stop(int);bool play(int,int,bool,int&);
     bool getGain(int,downwell::MotionBinary64&);bool setGain(int,downwell::MotionBinary64,int);
@@ -872,6 +875,28 @@ int main(){
             assert(world->exitControllers().find(world->exitControllers().handle(1))->sourceId==810007);
             assert(world->goalFieldInstances().find(world->goalFieldInstances().handle(0))->sourceId==810014);
         }
+    }
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+        GameplayCollisionOwner::Ownership::nativeScenery}){
+        const auto ob=read("generated/downwell-objects.dwob");
+        const auto sb=read("generated/downwell-sprites.dwsc");
+        ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),nullptr);
+        assert(owner->attach(*world));
+        DeferredCreateInstance command{82,240,512};command.setTimeFieldRadiusWord(0xabc12345u);
+        const auto draws=world->randomDrawCount();
+        assert(world->adoptGeneratedTimeFieldWithSourceId(820007,command));
+        const auto* field=world->timeFields().at(0);
+        assert(field&&field->sourceId==820007&&field->radius.equal(OrdinaryTimeField::radiusFromWord(0xabc12345u)));
+        unsigned population=0;
+        assert(owner->visitRegistrationOrder([&](InstanceHandle,int object,std::uint32_t){
+            if(object==82)++population;return true;
+        })&&population==1&&world->randomDrawCount()==draws);
+        assert(!world->adoptGeneratedTimeFieldWithSourceId(820007,command)&&!world->effectsSucceeded());
+        assert(world->timeFields().size()==1&&world->randomDrawCount()==draws);
     }
     for(unsigned failure=0;failure<4;++failure){
         auto world=std::make_unique<GameplayWorld>(300,true,0,false);

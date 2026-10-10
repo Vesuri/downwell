@@ -43,8 +43,9 @@ public:
         return at(identity-firstIdentity_);
     }
     const OrdinaryTimeField* at(unsigned index)const{return index>=retired_&&index<count_?&fields_[index]:nullptr;}
-    bool adoptCreate(int x,int y,std::uint32_t word){
-        if(!birth(x,y))return false;
+    bool adoptCreate(int x,int y,std::uint32_t word,std::uint32_t source=0){
+        if(source>0x7fffffffu){good_=false;return false;}
+        if(!birth(x,y,source))return false;
         fields_[count_-1].adoptCreate(x,y,word);return true;
     }
     // Runtime instance_create executes object 82 Create synchronously, unlike

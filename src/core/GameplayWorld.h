@@ -2029,6 +2029,14 @@ public:
         if(!run_.effectsSucceeded)return false;
         return run_.effectsSucceeded=run_.timeFields.createWithSourceId(source,x,y,enemyRandom_);
     }
+    // Builder commands already carry the radius sample. Re-running Create
+    // here would consume an extra RNG draw. The source ID must come from the
+    // enclosing birth stream, not from the field's opaque lifetime key.
+    bool adoptGeneratedTimeFieldWithSourceId(std::uint32_t source,const downwell::DeferredCreateInstance& command){
+        if(!run_.effectsSucceeded)return false;
+        if(!source||source>0x7fffffffu||command.objectId!=82)return run_.effectsSucceeded=false;
+        return run_.adoptTimeField(command.x,command.y,command.timeFieldRadiusWord(),source);
+    }
     // Allocation belongs to the complete room creation stream. Request it
     // inside each admitted instance_create, not before immunity/Timeout/stop
     // checks or once for the whole player WITH traversal.
