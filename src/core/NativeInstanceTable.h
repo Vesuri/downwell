@@ -68,6 +68,12 @@ public:
     bool canExternalBirth(unsigned count)const{
         return externalOrder_&&nextOrder_&&(!count||count-1<=0xffffffffu-nextOrder_);
     }
+    bool canFreshExternalSpan(unsigned first,unsigned count)const{
+        if(first>=Capacity||count>Capacity-first||!canExternalBirth(count))return false;
+        for(unsigned i=first;i<first+count;++i)
+            if(entries_[i].generation||registration_.contains(i))return false;
+        return true;
+    }
     void externalRetire(unsigned slot){changedBinding(slot,false);}
     void externalFlagsChanged(unsigned slot){changedCapture(slot,false);}
     // Run-owned lifetimes borrow only the existing registration links. The

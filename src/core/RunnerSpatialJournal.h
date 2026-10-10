@@ -26,6 +26,15 @@ class RunnerSpatialJournal:private RunnerSpatialGeometrySource<PreparedGeometry>
     static constexpr unsigned safePopulation=Nodes>reserve?(Nodes-reserve)/2:0;
 public:
     using Box=typename Math::Box;
+    // Read-only admission for a constructor with no intervening observation.
+    // Do not cross pressure/service or eager-fallback boundaries in this path.
+    bool admitsFreshGeometrySpan(unsigned first,unsigned count,const Math::PixelBox& envelope)const{
+        if constexpr(!PreparedGeometry)return false;
+        if(!valid()||!deferred_||first>=Slots||count>Slots-first||
+           count>Pending-count_||population_>safePopulation||count>safePopulation-population_)return false;
+        for(unsigned i=first;i<first+count;++i)if(contains(i))return false;
+        Math::PixelBox combined;return admitPixels(envelope,combined);
+    }
     bool bindGeometry(const PreparedTerrainBirthBounds& geometry){
         if constexpr(PreparedGeometry){
             if(this->geometry_||count_||population_||!valid())return false;

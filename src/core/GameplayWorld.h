@@ -326,6 +326,10 @@ public:
         return nativeTerrainInstances_&&nativeTerrainInstances_->constructRun(
             downwell::terrainTileForArea(run_.stage.area),run_.effectsSucceeded,producer);
     }
+    bool constructNativeTerrainPrepared(NativeTerrain::PreparedCells cells){
+        return nativeTerrainInstances_&&nativeTerrainInstances_->constructPrepared(
+            downwell::terrainTileForArea(run_.stage.area),run_.effectsSucceeded,cells);
+    }
     bool publishNativeTerrainIndexed(downwell::InstanceHandle h){
         return run_.effectsSucceeded=run_.effectsSucceeded&&nativeTerrainInstances_&&
             nativeTerrainInstances_->publishIndexed(h);

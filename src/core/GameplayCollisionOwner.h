@@ -637,6 +637,95 @@ private:
         sprite.spriteId=current==-2?definition->spriteId:current;sprite.maskId=definition->maskId;
         return sprite.imageIndex.assignInteger(index);
     }
+#ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+    GameplayWorld::NativeTerrain::SpanResult constructTerrainSpan(
+        const GameplayWorld::NativeTerrain::Identity& first,GameplayWorld::NativeTerrain::PreparedCells cells,int tile,
+        unsigned& completed,std::uint32_t& stamp,std::uint32_t* flags,RunnerRetainedLayerState& layer){
+        using Result=GameplayWorld::NativeTerrain::SpanResult;
+        completed=0;const unsigned count=cells.count;
+        const unsigned slot=View::terrainBase+first.handle.slot;
+        const auto* wall=objectDefaults_.get(60);unsigned layerSlot=0;
+        if(!valid()||!count||count>GameplayWorld::NativeTerrain::capacity||
+           !nativeTerrainLayerRunActive_||tile!=terrainCreateTile_||
+           !nativeTerrainLayersBound_||!wall||terrainRoomCount_||
+           !layers_.admitPreparedTerrainSpan(count,wall->creationDepth,layerSlot)||
+           !table_.canFreshExternalSpan(slot,count))return Result::unsupported;
+        struct Recipe {
+            int low=0x7fffffff,high=(-2147483647-1);
+            PreparedTerrainBirthBounds::Key key;
+            RunnerSpatialSplit::PixelBox pixels;
+            bool queue=false,collision=false;
+        } recipes[2];
+        unsigned present=0;
+        for(unsigned i=0;i<count;++i){
+            auto& recipe=recipes[cells.kind(i)];const int x=cells.x(i);
+            if(x<recipe.low)recipe.low=x;if(x>recipe.high)recipe.high=x;
+            present|=1u<<cells.kind(i);
+            if(room_.contains(slot+i))return Result::unsupported;
+        }
+        RunnerSpatialSplit::PixelBox envelope{};bool haveEnvelope=false;
+        for(unsigned kind=0;kind<2;++kind)if(present&(1u<<kind)){
+            const int object=kind?93:60;
+            const auto* definition=objectDefaults_.get(object);
+            const auto* objectFlags=families_.flags(unsigned(object));
+            const auto* plan=terrainCreatePlans_[kind];
+            // An unprepared family keeps the scalar constructor's ordering of
+            // queue setters and ancestor preparation.
+            if(!definition||!objectFlags||!(*objectFlags&0x28u)||!plan||plan->sprite!=tile||
+               (definition->initialFlags&0x8000u))return Result::unsupported;
+            auto& recipe=recipes[kind];PreparedTerrainBirthBounds::Key lastKey;
+            RunnerSpatialSplit::PixelBox last;bool precise,lastPrecise;
+            if(!terrainBirthBounds_.publication(object,recipe.low,cells.y,recipe.key,recipe.pixels,precise)||
+               !terrainBirthBounds_.publication(object,recipe.high,cells.y,lastKey,last,lastPrecise))return Result::unsupported;
+            flags[kind]=(definition->initialFlags&~0x208u)|(precise?0x200u:0u);
+            if(!NativeDirtyQueue::shouldPublishBounds(*objectFlags,flags[kind],false))return Result::unsupported;
+            recipe.queue=NativeDirtyQueue::shouldQueue(true,*objectFlags,definition->initialFlags);
+            recipe.collision=(*objectFlags&8u)!=0;
+            flags[kind]|=0x8000u;if(plan->changedSprite)flags[kind]|=8u;
+            if(!haveEnvelope){envelope=recipe.pixels;haveEnvelope=true;}
+            if(recipe.pixels.left<envelope.left)envelope.left=recipe.pixels.left;
+            if(last.right>envelope.right)envelope.right=last.right;
+            if(recipe.pixels.top<envelope.top)envelope.top=recipe.pixels.top;
+            if(recipe.pixels.bottom>envelope.bottom)envelope.bottom=recipe.pixels.bottom;
+        }
+        bool admitted=false;
+        if(!owner_.externalSpatialPublication([&](auto& index){
+            admitted=index.admitsFreshGeometrySpan(slot,count,envelope);return true;
+        }))return Result::failure;
+        if(!admitted)return Result::unsupported;
+        terrainRoomFirst_=slot;terrainRoomDepth_=wall->creationDepth;
+        // The same immutable Create plan applies to every cell. Its repeated
+        // queue setters only prepend the already-current head; one mark per
+        // cell preserves the complete reverse-birth queue order.
+        unsigned roomCount=0;
+        bool okay=owner_.externalSpatialPublication([&](auto& index){
+          for(unsigned i=0;i<count;++i){
+            const unsigned current=slot+i;
+            const unsigned kind=cells.kind(i);const int object=kind?93:60;
+            const auto& recipe=recipes[kind];
+            std::uint32_t order=0;
+            thinRetirementWindow_.append(cells.y,kind!=0,first.handle.generation+i);
+            if(!table_.externalBirth(current,order))return false;
+            if(!i)stamp=order;
+            if(recipe.queue)nativeSpatialDirty_.mark(current);
+            if(recipe.collision)nativeCollisionDirty_.mark(current);
+            if(!table_.registerExternalObject({current,first.handle.generation+i},object,true))return false;
+            ++roomCount;
+            DW_PROFILE_COUNT(counterSpatialFirstPublication);
+            const unsigned delta=unsigned(cells.x(i)-recipe.low);
+            auto pixels=recipe.pixels;pixels.left+=int(delta);pixels.right+=int(delta);
+            auto key=recipe.key;key.value+=delta/4;
+            if(!index.insertGeometry(key,current,pixels))return false;
+            ++completed;
+          }
+          return true;
+        });
+        terrainRoomCount_+=roomCount;
+        if(completed&&!layers_.publishPreparedTerrainSpan(layerSlot,completed,layer))okay=false;
+        if(!okay){check(false);return Result::failure;}
+        return Result::success;
+    }
+#endif
     bool nativeTerrainBirth(const GameplayWorld::NativeTerrain::Identity& id,bool active,
         std::uint32_t& order,std::uint32_t& flags){
         thinRetirementWindow_.append(id.y,id.object==93,id.handle.generation);
@@ -1670,6 +1759,13 @@ public:
                 return self.valid();
 #endif
             }
+#ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+            ,[](void* p,const GameplayWorld::NativeTerrain::Identity& first,GameplayWorld::NativeTerrain::PreparedCells cells,int tile,
+                unsigned& completed,std::uint32_t& stamp,std::uint32_t* flags,RunnerRetainedLayerState& layer){
+                return static_cast<GameplayCollisionOwner*>(p)->constructTerrainSpan(first,cells,tile,
+                                                                                   completed,stamp,flags,layer);
+            }
+#endif
         }))return check(false);
 #ifndef DOWNWELL_REFERENCE_BREAKABLES
         if(nativeBoxes_){

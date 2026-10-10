@@ -64,6 +64,26 @@ template<unsigned Nodes,unsigned Pending,bool Prepared=false,bool Background=tru
 }
 int main(){
     {
+        // Batch admission must never drain history, cross the pressure gate,
+        // accept occupied identities, or change the historical bounds.
+        downwell::PreparedTerrainBirthBounds geometry;
+        downwell::RunnerSpatialJournal<1024,128,8,true> journal;
+        assert(journal.bindGeometry(geometry));
+        assert(journal.admitsFreshGeometrySpan(0,8,{0,0,128,16}));
+        assert(!journal.admitsFreshGeometrySpan(0,9,{0,0,144,16}));
+        assert(!journal.admitsFreshGeometrySpan(127,2,{0,0,32,16}));
+        assert(!journal.admitsFreshGeometrySpan(0,1,{0,0,65535,65535}));
+        assert(journal.pending()==0&&journal.deferred());
+        for(unsigned i=0;i<7;++i)assert(journal.insert(box(int(i)*16,0),i));
+        assert(!journal.admitsFreshGeometrySpan(7,2,{112,0,144,16}));
+        assert(!journal.admitsFreshGeometrySpan(0,1,{0,0,16,16}));
+        assert(journal.admitsFreshGeometrySpan(7,1,{112,0,128,16}));
+        assert(journal.pending()==7&&journal.deferred());
+        assert(journal.insert(box(112,0),7));
+        assert(!journal.admitsFreshGeometrySpan(8,1,{128,0,144,16}));
+        assert(journal.pending()==8&&journal.deferred());
+    }
+    {
         // A selector-free level must retain more than the old 512 records.
         // The first real query replays history, including retirement/reuse,
         // and must return exactly the eager tree's ordered identities.

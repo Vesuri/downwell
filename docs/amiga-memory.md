@@ -91,20 +91,20 @@ interpret restoring this diagnostic's loader fit as a shipping memory reduction.
 ## Executable size versus runtime memory
 
 The normal `STRIP=1` build with admitted room payloads and without reference-only
-collision-mask payloads is **2,352,988 bytes**, SHA-256
-`cebbe708b60ce6fd56fac1f9720a779344d23ad673188fdfb304f2a90a2a6ab7`.
+collision-mask payloads is **2,359,388 bytes**, SHA-256
+`3d115dc1253bcc939c84e9ef5e80abcf655bcfaad9cf16aec1e0102c978e4026`.
 The matching ELF section sizes distinguish payload from runtime allocation:
 
 | Section | Bytes | Stored in the executable? |
 | --- | ---: | --- |
-| Machine code (`.text`) | 1,361,350 | Yes |
+| Machine code (`.text`) | 1,367,686 | Yes |
 | Read-only data (`.rodata`) | 909,652 | Yes |
 | Initialized writable data (`.data`) | 34,202 | Yes |
 | Initializer pointer | 4 | Yes |
-| Zero-filled storage (`.bss`) | 4,563,828 | No; allocated at load |
+| Zero-filled storage (`.bss`) | 4,563,836 | No; allocated at load |
 
-Initialized payload totals 2,305,208 bytes. Hunk relocation and container
-records account for the remaining 47,780 bytes. Stripping cannot remove
+Initialized payload totals 2,311,544 bytes. Hunk relocation and container
+records account for the remaining 47,844 bytes. Stripping cannot remove
 the initialized payload. ELF debug sections are not that payload either.
 
 The pre-repair owner audit attributes roughly 551 KB to

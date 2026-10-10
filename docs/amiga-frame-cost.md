@@ -100,7 +100,7 @@ cell. Pixel row painting is not this cost. Per-cell registration redesign is
 closed by the two rejected attempts below; a faster copy/flag helper would
 also leave the construction pipeline intact.
 
-`createPrepared` admits a callback-free terrain segment: source Create
+At this baseline, `createPrepared` admits a callback-free terrain segment: source Create
 observers and unsupported geometry use the scalar oracle. `constructRun`
 still calls `appendConstructed` per cell. Its birth callback publishes default
 bounds before the prepared Create plan dirties appearance. No game callback
@@ -130,6 +130,39 @@ Reports: `tmp/scene-local-baseline-report.txt` and
 `tmp/scene-local-{676,1689}-report.txt`; retained ELF/capture metadata:
 `tmp/trace/scene-local-baseline/`. Use `--frames=676 --causes --tree-min 1`
 or `--frames=1689 --causes --tree-min 1` for the focused reports.
+
+### Whole prepared terrain construction
+
+The shipping prepared constructor now admits a complete source segment before
+borrowing its existing dynamic layer and spatial journal. Default geometry and
+Create results are prepared once per used terrain kind; chronological IDs,
+registration links and journal entries retain their original per-cell order.
+Run identity/publication insertion and retained-layer population are published
+in spans. There is no generic first-cell constructor just to obtain a layer.
+Unprepared families, missing layers, source observers, journal pressure and
+unsupported geometry retain the scalar constructor. A terminal failure still
+publishes only the completed prefix, not an atomic all-or-nothing batch.
+
+Same four windows and configuration as `2fcd7feb`:
+
+| Frames | Mean ms | Worst ms (frame) |
+| --- | ---: | ---: |
+| 51–74 | 41.33 | 63.4 (54) |
+| 676–683 | 141.38 | 521.9 (676) |
+| 1301–1314 | 74.91 | 104.1 (1314) |
+| 1689–1696 | 129.19 | 480.3 (1689) |
+
+The two generation stalls save 83.2/98.4 ms; no matched frame is more than
+0.5 ms slower. Frame 51 remains 32.5 ms and frame 1304 is 96.2 ms. The complete
+contact tape takes 6,211 PAL fields (14.49 FPS), with maximum gap 34 at frame
+1512. These are still unacceptable gameplay stalls, not 50 FPS.
+
+Trace ELF SHA-256:
+`0d7c830e273ab30848f6b8ff95b22fca72c1d31e95f7eea64b94d96656d0c1d9`.
+Reports: `tmp/terrain-complete-report.txt`,
+`tmp/terrain-complete-{676,1689}-report.txt`, and
+`tmp/terrain-complete-fps.log`. Reproduce using the preceding contact command
+with `TRACE_FRAMES=50,675,1300,1688 TRACE_FIELDS=100`.
 
 ## Historical pre-integration audit
 

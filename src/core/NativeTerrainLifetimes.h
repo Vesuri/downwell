@@ -35,6 +35,15 @@ template<unsigned Capacity> class NativeTerrainLifetimes {
 public:
     static constexpr unsigned capacity=Capacity;
     using Identity=typename Runs::Identity;
+    enum class SpanResult { unsupported, success, failure };
+    // Borrowed AreaOneBuilder prepared-cell stream: two bytes per cell, with
+    // object kind in bit 7 and a signed-grid column biased by 32 in bits 0–6.
+    struct PreparedCells {
+        const unsigned char* bytes=nullptr;unsigned count=0;int y=0;
+        unsigned kind(unsigned i)const{return bytes[i*2]>>7;}
+        int object(unsigned i)const{return kind(i)?93:60;}
+        int x(unsigned i)const{return (int(bytes[i*2]&127)-32)*16;}
+    };
     struct Binding {
         void* context=nullptr;
         bool (*admit)(void*,unsigned)=nullptr;
@@ -47,6 +56,8 @@ public:
         bool (*activation)(void*,const Identity&,bool,std::uint32_t)=nullptr;
         bool (*beginRun)(void*)=nullptr;
         bool (*endRun)(void*)=nullptr;
+        SpanResult (*constructSpan)(void*,const Identity&,PreparedCells,int,unsigned&,
+                                   std::uint32_t&,std::uint32_t*,RunnerRetainedLayerState&)=nullptr;
     };
     bool spatialFlags(InstanceHandle h,std::uint32_t& out)const{
         if(!contains(h))return false;
@@ -56,11 +67,11 @@ public:
     }
     bool bind(Binding binding){
         if(!good_)return false;
-        if(!binding.context&&(binding.admit||binding.birth||binding.retire||binding.mark||binding.create||binding.collision||binding.presentation||binding.activation||binding.beginRun||binding.endRun))return good_=false;
+        if(!binding.context&&(binding.admit||binding.birth||binding.retire||binding.mark||binding.create||binding.collision||binding.presentation||binding.activation||binding.beginRun||binding.endRun||binding.constructSpan))return good_=false;
         if(binding_.context)return binding_.context==binding.context&&binding_.admit==binding.admit&&
             binding_.birth==binding.birth&&binding_.retire==binding.retire&&binding_.mark==binding.mark&&binding_.create==binding.create&&
             binding_.collision==binding.collision&&binding_.presentation==binding.presentation&&binding_.activation==binding.activation&&
-            binding_.beginRun==binding.beginRun&&binding_.endRun==binding.endRun;
+            binding_.beginRun==binding.beginRun&&binding_.endRun==binding.endRun&&binding_.constructSpan==binding.constructSpan;
         if(binding.context&&(!binding.admit||!binding.birth||!binding.retire||!binding.mark||size()))return good_=false;
         binding_=binding;return true;
     }
@@ -280,7 +291,56 @@ public:
             });
         });
     }
+    // Admit the complete immutable segment once. If it needs a new dynamic
+    // layer or a journal service boundary, keep the scalar birth sequence.
+    bool constructPrepared(int tile,bool& effectsSucceeded,PreparedCells cells){
+        if(cells.count&&!cells.bytes)return good_=false;
+        return publishRun([&]{
+            if(!cells.count)return true;
+            return appendPreparedCells(cells,tile,effectsSucceeded);
+        });
+    }
 private:
+    bool appendPreparedCells(PreparedCells cells,int tile,bool& effectsSucceeded){
+        const unsigned count=cells.count;
+        unsigned slot=freeHint_;while(slot<Capacity&&runs_.occupied(slot))++slot;
+        bool contiguous=count<=Capacity-slot;
+        if(contiguous)for(unsigned i=0;i<count;++i)if(runs_.occupied(slot+i)){contiguous=false;break;}
+        if(binding_.constructSpan&&contiguous&&canAppend(count)){
+            Order order;unsigned completed=0;std::uint32_t spatial[2]{};
+            const Identity first{{slot,next_},cells.object(0),cells.x(0),cells.y,-1,0};
+            const auto result=binding_.constructSpan(binding_.context,first,cells,tile,
+                                                    completed,order.stamp,spatial,order.layer);
+            if(result!=SpanResult::unsupported){
+                if(completed>count)return good_=false;
+                unsigned i=0;
+                while(i<completed){
+                    const unsigned kind=cells.kind(i);const int x=cells.x(i),object=cells.object(i);
+                    int step=16;if(i+1<completed&&cells.x(i+1)==x-16)step=-16;
+                    unsigned n=1;
+                    while(i+n<completed&&cells.kind(i+n)==kind&&cells.x(i+n)==x+int(n)*step)++n;
+                    if(!runs_.appendSpan({slot+i,next_+i},object,x,cells.y,step,n,order.shifted(i)))return good_=false;
+                    const auto value=spatial[kind];
+                    const unsigned char flags=32u|((value&8u)?4u:0u)|((value&0x200u)?8u:0u)|((value&0x8000u)?16u:0u);
+                    for(unsigned j=0;j<n;++j){
+                        flags_[slot+i+j]=flags;createSprite_[slot+i+j]=static_cast<std::int16_t>(tile);
+                        walls_[slot+i+j]=PackedWallState{};
+                    }
+                    if(!kind&&(wallRadius(tile)<0||wallRadius(tile)>16))unboundedWallArt_=true;
+                    i+=n;
+                }
+                next_+=completed;freeHint_=slot+completed;
+                // This callback can fail only in birth publication. Like the
+                // scalar birth path, do not report it as a Create failure by
+                // overwriting the caller's separate effects flag.
+                return good_=result==SpanResult::success&&completed==count;
+            }
+        }
+        for(unsigned i=0;i<count;++i){
+            if(!appendConstructed(cells.object(i),cells.x(i),cells.y,true,0,-1,&effectsSucceeded,tile))return false;
+        }
+        return true;
+    }
     bool appendConstructed(int object,int x,int y,bool active,unsigned source,int creation,
         bool* effectsSucceeded,int tile){
         if(!canAppend(1)||(object!=60&&object!=93&&object!=99))return good_=false;

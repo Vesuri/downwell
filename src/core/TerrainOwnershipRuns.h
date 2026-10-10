@@ -161,6 +161,32 @@ public:
     bool appendInherited(InstanceHandle h,int object,int x,int y,std::uint32_t source,int creationCode,bool* inherited){
         return append(h,object,x,y,source,creationCode,initialPublication_,true,inherited);
     }
+    // An admitted callback-free constructor publishes one complete horizontal
+    // span. Keep the scalar append as its oracle; don't rebuild a Publication
+    // and revalidate the run geometry for every cell.
+    bool appendSpan(InstanceHandle first,int object,int x,int y,int step,unsigned count,
+                    const Publication& publication){
+        if(!count||count>Capacity||first.slot>=Capacity||count>Capacity-first.slot||
+           count>Capacity-population_||!first.generation||count-1>0xffffffffu-first.generation||
+           (object!=60&&object!=93)||(step!=16&&step!=-16))return false;
+        const int distance=int(count-1)*16;
+        if((step>0&&x>0x7fffffff-distance)||(step<0&&x<(-2147483647-1)+distance))return false;
+        for(unsigned i=0;i<count;++i)if(occupied(first.slot+i))return false;
+        // Use the scalar first append to preserve descriptor merging exactly,
+        // including singleton tails and exceptional publication boundaries.
+        if(!append(first,object,x,y,0,-1,publication))return false;
+        auto& r=runs_[tail_];
+        if(count>1&&r.count>1&&r.step!=step){
+            // The first cell joined an opposite-direction tail. The second
+            // begins a new run, exactly as scalar append would.
+            return appendSpan({first.slot+1,first.generation+1},object,x+step,y,step,count-1,
+                              publication.shifted(1));
+        }
+        if(count>1)r.step=step;
+        r.count=Slot(unsigned(r.count)+count-1);r.live=Slot(unsigned(r.live)+count-1);
+        for(unsigned i=1;i<count;++i)locator_[first.slot+i]=Slot(tail_+1);
+        population_+=count-1;return true;
+    }
     bool retire(InstanceHandle h){
         if(!contains(h))return false;
         const unsigned n=locator_[h.slot]-1;auto& r=runs_[n];

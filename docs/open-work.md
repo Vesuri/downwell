@@ -56,19 +56,19 @@ behavior, both backend integrations and relevant original-game verification.
   workload and behavior checks before/after, preserving hardware scrolling,
   offline assets and native terrain ownership. Do not resume micro-optimization
   sweeps, duplicate simulation passes or reference-only performance modes.
-  For generation, remove the remaining per-cell ownership/publication work
-  around the run-owned chronology and bounded layer membership. Standalone
+  For generation, profile the remaining work inside and around admitted
+  whole-segment construction; it must not reintroduce generic cell constructors
+  or per-cell retained-layer publication. Standalone
   registration-owner replacements are closed after two measured rejections;
   do not retry registry encodings or tune their lookup helpers. Preserve inactive
   end-of-layer cutoffs, activation, depth order and retirement; an always-active
   scenery lease alone cannot represent these semantics. Gate on current frames
   676 and 1689 as well as ordinary gameplay. This is not a revival of rejected
-  immutable-row/copy-on-write spatial encodings. Publish bounded run membership
-  once rather than replacing physical attachment with another per-cell logical
-  lookup/publication path (see the rejected-approaches table). The larger run
-  records must not make ordinary identity/Create reads copy publication state;
-  judge a structural separation against the remaining generation cost and
-  memory footprint, not an isolated copy-helper improvement.
+  immutable-row/copy-on-write spatial encodings. Preserve bounded run membership
+  rather than replacing it with another per-cell logical lookup/publication
+  path (see the rejected-approaches table). Judge the next structural change
+  against the remaining generation cost and memory footprint, not an isolated
+  copy-helper improvement.
 - Reduce executable and static-memory growth at its owning structures: audit
   linked collision/query machinery, embedded resource/mask banks and full-height
   terrain caches. Account separately for Hunk code/data/relocations, zero-filled

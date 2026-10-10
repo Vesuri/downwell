@@ -530,7 +530,95 @@ static void constructedSegments(){
         }
     }
 }
+static void bulkPublicationRuns(){
+    using Runs=downwell::TerrainOwnershipRuns<64,Publication>;
+    for(int previous:{-16,16})for(int step:{-16,16})for(unsigned count:{1u,2u,7u,31u}){
+        Runs scalar,bulk;
+        const Publication base{{0xfffffff0u,3},0x8208};
+        auto compare=[&]{
+            require(scalar.size()==bulk.size()&&scalar.runCount()==bulk.runCount());
+            for(unsigned i=0;i<scalar.size();++i){
+                const auto h=scalar.handle(i);typename Runs::Identity a,b;Publication ap,bp;
+                require(scalar.read(h,a)&&bulk.read(h,b));
+                require(a.object==b.object&&a.x==b.x&&a.y==b.y&&a.handle.generation==b.handle.generation);
+                require(scalar.publication(h,ap)&&bulk.publication(h,bp)&&ap.same(bp));
+            }
+        };
+        for(unsigned i=0;i<2;++i){
+            require(scalar.append({i,i+1},60,int(i)*previous,32,0,-1,base.shifted(i)));
+            require(bulk.append({i,i+1},60,int(i)*previous,32,0,-1,base.shifted(i)));
+        }
+        require(bulk.appendSpan({2,3},60,2*previous,32,step,count,base.shifted(2)));
+        for(unsigned i=0;i<count;++i)
+            require(scalar.append({i+2,i+3},60,2*previous+int(i)*step,32,0,-1,base.shifted(i+2)));
+        compare();
+        require(!bulk.appendSpan({2,3},60,0,32,step,1,base));compare();
+        const auto middle=scalar.handle(scalar.size()/2);
+        require(scalar.changePublication(middle,{{17,9},2})&&bulk.changePublication(middle,{{17,9},2}));compare();
+        require(scalar.retire(middle)&&bulk.retire(middle));compare();
+        require(scalar.append(middle,93,96,48,0,-1,base)&&bulk.append(middle,93,96,48,0,-1,base));compare();
+    }
+    Runs invalid;
+    require(!invalid.appendSpan({0,1},60,2147483647,0,16,2,{}));
+    require(!invalid.appendSpan({0,1},60,(-2147483647-1),0,-16,2,{}));
+    require(!invalid.appendSpan({63,1},60,0,0,16,2,{}));
+    require(!invalid.appendSpan({0,0xffffffffu},60,0,0,16,2,{}));
+    require(!invalid.size());
+    std::puts("Whole-run publication: scalar geometry/order/merge/carry/mutation/reuse comparisons passed");
+}
+static void preparedSpanConstruction(){
+    using Native=downwell::NativeTerrainLifetimes<16>;
+    struct Observer {
+        Native* live;unsigned next=100,spanCalls=0,spanCells=0;
+        downwell::RunnerRegistrationOrder clock{0xfffffffcu,7};int fail=-1;
+    };
+    auto binding=[](Observer& observer,bool spans){
+        Native::Binding b;
+        b.context=&observer;b.admit=[](void*,unsigned){return true;};
+        b.birth=[](void* p,const Native::Identity& id,bool,std::uint32_t& stamp,std::uint32_t& flags){
+            auto& o=*static_cast<Observer*>(p);if(int(id.handle.slot)==o.fail)return false;
+            stamp=o.next++;flags=0x8008u;o.clock.advance();
+            o.live->setLayerState(id.handle.slot,{{o.clock,false},21,2,false});return true;
+        };
+        b.retire=[](void*,unsigned){return true;};b.mark=b.retire;
+        b.create=[](void*,const Native::Identity&,int,std::uint32_t& flags){flags|=0x200u;return true;};
+        if(spans)b.constructSpan=[](void* p,const Native::Identity& id,Native::PreparedCells cells,int,unsigned& completed,
+            std::uint32_t& stamp,std::uint32_t* flags,downwell::RunnerRetainedLayerState& layer){
+            auto& o=*static_cast<Observer*>(p);++o.spanCalls;
+            const unsigned count=cells.count;completed=count;
+            if(o.fail>=0&&unsigned(o.fail)>=id.handle.slot&&unsigned(o.fail)<id.handle.slot+count)
+                completed=unsigned(o.fail)-id.handle.slot;
+            stamp=o.next;o.next+=completed;flags[0]=flags[1]=0x8208u;o.spanCells+=completed;
+            if(completed)layer={{o.clock.shifted(1),false},21,2,false};
+            o.clock=o.clock.shifted(completed);
+            return completed==count?Native::SpanResult::success:Native::SpanResult::failure;
+        };
+        return b;
+    };
+    for(int failure:{-1,0,1,5,11}){
+        Native scalar,bulk;Observer a{&scalar},b{&bulk};a.fail=b.fail=failure;
+        require(scalar.bind(binding(a,false))&&bulk.bind(binding(b,true)));
+        bool af=true,bf=true;
+        unsigned char source[24]{};
+        for(unsigned i=0;i<12;++i)source[i*2]=32+(i<6?i:11-i)+(i%3==1?128:0);
+        const bool expected=scalar.constructPrepared(51,af,{source,12,32});
+        const bool actual=bulk.constructPrepared(51,bf,{source,12,32});
+        require(expected==actual&&scalar.size()==bulk.size()&&scalar.lastLifetime()==bulk.lastLifetime());
+        require(af==bf&&a.next==b.next&&a.clock.low==b.clock.low&&a.clock.high==b.clock.high);
+        require(b.spanCalls==1&&b.spanCells==(failure<0?12u:unsigned(failure)));
+        if(actual)for(unsigned i=0;i<scalar.size();++i){
+            const auto h=scalar.handle(i);std::uint32_t ap=0,bp=0;int as=0,bs=0;unsigned ai=0,bi=0;bool ac=false,bc=false;
+            require(scalar.registrationOrder(h)==bulk.registrationOrder(h));
+            require(scalar.layerState(h)->same(*bulk.layerState(h)));
+            require(scalar.spatialFlags(h,ap)&&bulk.spatialFlags(h,bp)&&ap==bp);
+            require(scalar.appearance(h,as,ai,ac)&&bulk.appearance(h,bs,bi,bc)&&as==bs&&ai==bi&&ac==bc);
+        }
+    }
+    std::puts("Prepared span construction: publication clocks, final fields and failed prefixes agree");
+}
 int main(){
+    bulkPublicationRuns();
+    preparedSpanConstruction();
     constructedSegments();
     static_assert(sizeof(downwell::PackedWallState)==4,"No extra per-wall cache allocation");
     for(const auto delta:std::vector<std::pair<int,int>>{{0,0},{0,-16},{16,0},{0,16},{-16,0}}){

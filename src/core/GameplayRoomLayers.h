@@ -274,6 +274,19 @@ public:
         unsigned layer=Layers::End,available=0,pending=0,drawPending=0;
         bool admitted=false;
     };
+    bool admitPreparedTerrainSpan(unsigned count,RunnerImageValue depth,unsigned& layer)const{
+        if(!enabled()||!valid()||!prepared_)return false;
+        std::int32_t integer;if(!RunnerDepthService::integerDepth(depth,integer))return false;
+        layer=layers_.findDynamic(integer);
+        return layer!=Layers::End&&count<=layers_.retainedAvailable(layer);
+    }
+    bool publishPreparedTerrainSpan(unsigned layer,unsigned count,RunnerRetainedLayerState& first){
+        if(!layers_.retainConstructedSpan(layer,count,first))return fail();
+        live_+=count;
+        drawRevision_=drawRevision_>0xffffffffu-count?0xffffffffu:drawRevision_+count;
+        if(preparedDrawEnabled_)preparedDraw_.invalidateOrder();
+        return true;
+    }
     bool birthInheritedTerrain(InstanceHandle h,TerrainRunBirth& run){
         ++run.drawPending;
         if(!enabled())return true;

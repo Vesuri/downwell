@@ -106,7 +106,7 @@ bool AmigaGameplayGeneration::createPrepared(void* opaque,const downwell::AreaOn
             return true;
         };
         if(self.runtime_->nativeTerrainInstances()==self.lifetimes_){
-            if(!self.runtime_->constructNativeTerrainRun(produce))return false;
+            if(!self.runtime_->constructNativeTerrainPrepared({batch.creates(),batch.count(),batch.y}))return false;
         }else if(!self.lifetimes_->publishRun([&]{
             return produce([&](int object,int x,int y){return self.birth(object,x,y);});
         }))return false;

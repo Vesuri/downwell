@@ -145,6 +145,11 @@ public:
         if(!Base::retain(layer,count))return false;
         clock_=clock_.shifted(count);cutoffs_[layer].dirty=true;return true;
     }
+    bool retainConstructedSpan(unsigned layer,unsigned count,RunnerRetainedLayerState& first){
+        if(!count||!succeeded()||!Base::get(layer)||!Base::retain(layer,count))return false;
+        first={stamp(false),Base::get(layer)->id,layer,false};
+        clock_=clock_.shifted(count-1);cutoffs_[layer].dirty=true;return true;
+    }
     bool releaseInstance(InstanceHandle h){
         auto s=terrain_?terrain_->layerState(h):RunnerRetainedLayerRead{};
         if(!succeeded()||!s||!s->bound()||!Base::releaseRetained(s->layer,1))return false;
