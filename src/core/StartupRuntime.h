@@ -13,6 +13,7 @@
 #include "StoredSpawnerStates.h"
 #include "StoredWhiteJellyStates.h"
 #include "StoredRedBallStates.h"
+#include "StoredMovingFxRegistration.h"
 #include "RunnerLayerIds.h"
 #include "ScriptEffectRuntimeBinding.h"
 #include "BoxStepDispatch.h"
@@ -1889,6 +1890,29 @@ public:
             return id&&currency.dispatch(gem,[&](auto& state,bool&){state.myFx=id;return true;});
         },run_.effectsSucceeded);
         return EffectSpawnScript::runNol(ops,x,y,105,{0x3fe99999u,0x9999999au});
+    }
+    template<unsigned Capacity> StoredMovingFxRegistration<instanceCapacity,Capacity> movingFxRegistration(){
+        return StoredMovingFxRegistration<instanceCapacity,Capacity>(instances_,objectPack_,lifecycle_,
+            nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded);
+    }
+    template<unsigned Capacity,class Frames,class Lengthdir,class Caller>
+    bool spawnMovingFx(StoredMovingFxRegistration<instanceCapacity,Capacity>& owner,
+        MotionBinary64 x,MotionBinary64 y,int sprite,MotionBinary64 rate,MotionBinary64 angle,
+        MotionBinary64 speed,Frames frames,Lengthdir lengthdir,Caller caller){
+        if(!run_.effectsSucceeded||!owner.valid()||!owner.belongsTo(instances_))return run_.effectsSucceeded=false;
+        struct Ops {
+            using Handle=InstanceHandle;
+            StoredMovingFxRegistration<instanceCapacity,Capacity>& owner;
+            Frames& frames;Lengthdir& trig;Caller& caller;
+            bool create(int object,MotionBinary64 x,MotionBinary64 y,Handle& child){return object==220&&owner.create(x,y,child);}
+            bool myFx(Handle child){const auto id=owner.sourceId(child);return id&&caller(id);}
+            bool sprite(Handle child,int sprite){unsigned count;return frames(sprite,count)&&owner.sprite(child,sprite,count);}
+            bool imageSpeed(Handle child,MotionBinary64 value){return owner.imageSpeed(child,value);}
+            bool imageAngle(Handle child,MotionBinary64 value){return owner.imageAngle(child,value);}
+            bool lengthdir(bool vertical,MotionBinary64 speed,MotionBinary64 angle,MotionBinary64& value){return trig(vertical,speed,angle,value);}
+            bool velocity(Handle child,bool vertical,MotionBinary64 value){return owner.velocity(child,vertical,value);}
+        } ops{owner,frames,lengthdir,caller};
+        return run_.effectsSucceeded=MovingFxSpawnScript::run(ops,x,y,sprite,rate,angle,speed)&&owner.valid()&&run_.effectsSucceeded;
     }
     template<class Frames> bool spawnScriptEffect(MotionBinary64 x,MotionBinary64 y,int sprite,
         MotionBinary64 speed,MotionBinary64 angle,MotionBinary64 depth,Frames frames,std::uint32_t& myFx){

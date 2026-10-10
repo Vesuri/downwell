@@ -442,6 +442,36 @@ int main(){
         require(!world->dispatchRedBallCollision(balls,*owner,{active,player,4,35,118,1248},makePlayer)&&damageCalls==1,
             "mismatched resource event is rejected without executing another contact");
     }
+    for(bool rejectArtwork:{false,true}){
+        auto collision=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,collision->binding());
+        require(collision->attach(*world),"attach moving-effect world");world->skipToGameForTesting();
+        auto effects=world->movingFxRegistration<2>();unsigned myFx=0;InstanceHandle child;
+        const auto draws=world->randomDrawCount();
+        const bool okay=world->spawnMovingFx(effects,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(400),
+            704,MotionBinary64{0x3fb99999u,0x9999999au},MotionBinary64::fromInteger(90),MotionBinary64{0x3fe00000u,0},
+            [&](int sprite,unsigned& count){return !rejectArtwork&&sprites.frameCount(sprite,count);},
+            [](bool vertical,auto speed,auto angle,auto& value){return WhiteJellyStep::movementComponent(vertical,speed,angle,value);},
+            [&](unsigned id){
+                myFx=id;
+                for(unsigned i=0;i<world->activeInstanceCount();++i)
+                    if(world->instanceAt(i).instanceId==id)child=world->instanceHandleAt(i);
+                const auto* state=effects.state(child);const auto* record=world->resolveInstance(child);
+                require(state&&state->initialized&&record&&record->objectId==220&&record->spriteId==-1&&
+                    state->imageRate.high==MotionBinary64::fromInteger(-1).high&&state->xsp.zero()&&state->ysp.zero(),
+                    "moving-effect Create finishes before caller myFx assignment and sprite setter");
+                return true;
+            });
+        require(okay==!rejectArtwork&&myFx&&world->randomDrawCount()==draws,"moving effect preserves birth RNG and failure result");
+        const auto* state=effects.state(child);const auto* record=world->resolveInstance(child);
+        require(state&&record&&effects.sourceId(child)==myFx,"effect retains source ID after later setter failure");
+        if(rejectArtwork){require(record->spriteId==-1&&state->spriteId==-1,"failed sprite lookup retains default child");continue;}
+        require(record->spriteId==704&&state->spriteId==704&&record->rotation==90&&record->imageSpeed>0&&
+            state->ysp.high==0xbfe00000u&&state->ysp.low==0,"moving effect publishes artwork and downward-coordinate velocity");
+        RunnerImageValue x,y;
+        require(collision->collisionPosition(child,x,y)&&x.bits==state->x.bits&&y.bits==state->y.bits,
+            "moving effect has a registered published collision position");
+    }
     for(unsigned failure=0;failure<=5;++failure){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
