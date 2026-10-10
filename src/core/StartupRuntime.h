@@ -2682,6 +2682,7 @@ public:
     const Consumables& consumables() const { return run_.consumables; }
     enum class RisingTextPhase {alarm,step,cleanup};
     enum class ShopKeeperPhase {alarm,step,cleanup,animation};
+    enum class ShopParentPhase {endStep,roomEnd,cleanup};
     template<class Effects> bool collideScatteredPlayer(InstanceHandle key,Effects& effects){
         auto* r=instances_.resolve(key);
         if(!run_.effectsSucceeded||!r||r->objectId!=289)return run_.effectsSucceeded=false;
@@ -2772,6 +2773,31 @@ public:
     }
     bool drawRisingText(const InstanceRecord& record)const{
         return record.objectId==212&&risingTextDraw_&&risingTextDraw_(risingTextDrawContext_,record);
+    }
+    template<unsigned Capacity,class CreationAudio,class Audio,class Tick>
+    bool withShopParentLifetimeEvents(StoredShopCreationOwner<instanceCapacity,Capacity,CreationAudio>& owner,Audio& audio,Tick tick){
+        if(!run_.effectsSucceeded)return false;
+        if(shopParentDispatch_||!owner.belongsTo(instances_,objectPack_)||!owner.valid())return run_.effectsSucceeded=false;
+        struct Environment {
+            StartupRuntime& world;Audio& audio;
+            bool viewY(MotionBinary64& value){
+                return multiplyBinary64(MotionBinary64::fromInteger(world.ordinaryStepViewTopQ12_),{0x3f300000u,0},value);
+            }
+            bool isPlaying(int id,bool& out){return audio.isPlaying(id,out);}
+            bool stop(int id){return audio.stop(id);}
+        } environment{*this,audio};
+        auto dispatch=[&](const InstanceRecord& r,ShopParentPhase phase){
+            const auto* p=owner.parent(r.instanceId);
+            if(!p||instances_.resolve(p->key)!=&r)return false;
+            return phase==ShopParentPhase::cleanup?owner.retireParent(r.instanceId):
+                owner.parentLifetimeEvent(r.instanceId,phase==ShopParentPhase::roomEnd,environment);
+        };
+        shopParentContext_=&dispatch;
+        shopParentDispatch_=[](void* p,const InstanceRecord& r,ShopParentPhase phase){
+            return (*static_cast<decltype(dispatch)*>(p))(r,phase);
+        };
+        struct Reset {StartupRuntime& world;~Reset(){world.shopParentDispatch_=nullptr;world.shopParentContext_=nullptr;}} reset{*this};
+        const bool ok=tick();return run_.effectsSucceeded=run_.effectsSucceeded&&ok&&owner.valid();
     }
     template<unsigned Capacity,class Environment,class Tick>
     bool withShopCaseEvents(StoredShopChildRegistration<instanceCapacity,Capacity>& owner,Environment& environment,Tick tick){
@@ -3230,6 +3256,8 @@ private:
     void* shopKeeperContext_=nullptr;
     bool (*shopKeeperDispatch_)(void*,const InstanceRecord&,ShopKeeperPhase,unsigned)=nullptr;
     void* shopCaseContext_=nullptr;
+    void* shopParentContext_=nullptr;
+    bool (*shopParentDispatch_)(void*,const InstanceRecord&,ShopParentPhase)=nullptr;
     bool (*shopCaseDispatch_)(void*,const InstanceRecord&,bool,unsigned)=nullptr;
     void* scatteredStepContext_=nullptr;
     bool (*scatteredStep_)(void*,InstanceHandle)=nullptr;

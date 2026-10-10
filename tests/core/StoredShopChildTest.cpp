@@ -197,6 +197,7 @@ bool shopParentRegistrationCheck(const ObjectPack& objects,unsigned area,unsigne
         if(!item||item->whichUg!=shop->stock.items[2].upgrade)return false;
     }
     const auto key=parent->key;
+    if(expected&&(!owner.retireParent(920000)||owner.parent(920000)||records.resolve(key)||records.size()!=10))return false;
     if(!owner.clear()||records.size()||owner.parent(920000)||records.resolve(key)||observer.retirements!=count)return false;
     world.reset();return true;
 }

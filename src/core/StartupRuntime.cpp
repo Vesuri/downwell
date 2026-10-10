@@ -1006,6 +1006,7 @@ bool StartupRuntime::cleanupMainOwnedDestroyed(){
             ((r.objectId==238||r.objectId==211)&&timeEffectDispatch_)||
             (r.objectId==212&&risingTextDispatch_)||
             (r.objectId==280&&shopKeeperDispatch_)||
+            (r.objectId==277&&shopParentDispatch_)||
             (r.objectId==269&&boneDispatch_)||
             (r.objectId==220&&(bloodDispatch_||movingFxDispatch_))||
             (r.objectId==120&&skeletonDispatch_)||
@@ -1032,6 +1033,7 @@ bool StartupRuntime::cleanupMainOwnedDestroyed(){
             }
             if(r.objectId==212)return risingTextDispatch_(risingTextContext_,r,RisingTextPhase::cleanup,0);
             if(r.objectId==280)return shopKeeperDispatch_(shopKeeperContext_,r,ShopKeeperPhase::cleanup,0);
+            if(r.objectId==277)return shopParentDispatch_(shopParentContext_,r,ShopParentPhase::cleanup);
             if(r.objectId==269)return boneDispatch_(boneContext_,r,BonePhase::cleanup);
             if(r.objectId==220)return dispatchParentMovingFx(r,BloodPhase::cleanup);
             if(r.objectId==120)return skeletonDispatch_(skeletonContext_,r,SkeletonPhase::cleanup,0);
@@ -1992,6 +1994,10 @@ bool StartupRuntime::dispatchObjectEvent(InstanceRecord& instance,
         ++implementedCodeCalls_;
         return run_.effectsSucceeded=limboShardDispatch_&&
             limboShardDispatch_(limboShardContext_,instance,LimboShardPhase::step);
+    }
+    if(instance.objectId==277&&((eventType==3&&eventSubtype==2)||(eventType==7&&eventSubtype==5))){
+        return run_.effectsSucceeded=shopParentDispatch_&&shopParentDispatch_(shopParentContext_,instance,
+            eventType==3?ShopParentPhase::endStep:ShopParentPhase::roomEnd);
     }
     if(instance.objectId==279&&(eventType==2||(eventType==3&&eventSubtype==0))){
         return run_.effectsSucceeded=shopCaseDispatch_&&shopCaseDispatch_(shopCaseContext_,instance,eventType==2,unsigned(eventSubtype));

@@ -152,6 +152,26 @@ int main(){
             caseState.opened&&!caseState.flashing,"opened case remains alive and does not repeat effects");
     }
     require(owner.clear(),"retire case fixture");layers(live);
+    ShopWorld::Instance parentOnly;parentOnly.x=480;parentOnly.y=10000;parentOnly.radio=987;
+    require(owner.begin(parentOnly),"register parent for actual End Step scheduling");
+    const auto parentId=parentOnly.sourceId;const auto retiringParentKey=owner.parent(parentId)->key;
+    const auto tableId=owner.children().create(278,480,10000);
+    struct ParentRadio {
+        StartupRuntime& world;unsigned id,queries=0,stops=0;
+        bool isPlaying(int voice,bool& out){
+            require(voice==987&&world.instance(id)&&!world.instance(id)->destroyRequested,"radio query precedes parent destruction");
+            ++queries;out=true;return true;
+        }
+        bool stop(int voice){
+            require(voice==987&&!world.instance(id)->destroyRequested,"radio stop precedes parent destruction");++stops;return true;
+        }
+    } parentRadio{live,parentId};
+    require(live.withShopParentLifetimeEvents(owner,parentRadio,[&]{live.step(false);return live.effectsSucceeded();}),
+        "parent lifetime handler joins stored End Step and deferred cleanup");
+    require(parentRadio.queries==1&&parentRadio.stops==1&&!live.instance(parentId)&&!owner.parent(parentId)&&
+        !collision->resolve(retiringParentKey)&&live.instance(tableId)&&!live.instance(tableId)->destroyRequested,
+        "parent retirement keeps separately owned children alive");
+    require(owner.clear(),"retire retained table");layers(live);
     InstanceHandle scenery;const auto sceneryId=live.nextRuntimeInstanceId();
     DeferredCreateInstance sceneryCommand(289,240,int(live.mainCameraViewY())+100);
     sceneryCommand.integerImageIndex=12;sceneryCommand.imageIndex=12;sceneryCommand.imageSpeed=0;

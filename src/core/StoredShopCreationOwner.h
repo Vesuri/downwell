@@ -90,6 +90,16 @@ public:
     bool position(unsigned id,int& x,int& y){return children_.position(id,x,y);}
     bool upgrade(unsigned id,unsigned value){return children_.upgrade(id,value);}
     bool stored(unsigned id,unsigned value){return children_.stored(id,value);}
+    bool retireParent(unsigned id){
+        if(!good_)return false;
+        for(auto& p:parents_)if(p.id==id){
+            const auto* r=records_.resolve(p.key);
+            if(!live(p)||!r->destroyRequested||
+               !records_.erase(id,[&](auto h,const auto& record){return lifecycle_.retire(h,record);})||!good_)return fail();
+            p={};return true;
+        }
+        return fail();
+    }
     // Explicit teardown, before ShopWorld::reset. No Destroy events are
     // synthesized here; the room scheduler must dispatch them where required.
     bool clear(){

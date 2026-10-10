@@ -747,9 +747,14 @@ existing mixed End Step snapshot and pre-Draw retirement; children remain in
 their own lifetimes. `withShopRadioEvents` supplies required playing/stop
 callbacks, and an out-of-view parent without that scope fails instead of
 silently skipping radio shutdown. View Y comes from the same live world End
-Step value as the other registered actors. Stored mixed End Step, both Room
-End schedules and concrete device-audio bindings remain to be connected;
-registered-world tests do not establish normal frontend shop retirement.
+Step value as the other registered actors. Stored parents join End Step and
+deferred cleanup through `withShopParentLifetimeEvents`, using the published
+view captured for source events, not the camera's later render position.
+Their retired parent entry is released separately from the retained children.
+The stored event adapter also recognizes Other 5, but both room-transition
+dispatches and concrete device-audio bindings remain to be connected;
+registered-world tests do not establish normal frontend shop retirement or
+the parent's still-unimplemented ordinary Step.
 
 `StoredShopChildRegistration` implements these six child resources' synchronous
 Create bodies in real `InstanceStore` records, borrowing the room counter and
