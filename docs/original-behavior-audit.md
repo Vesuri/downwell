@@ -713,6 +713,16 @@ other states reject rather than use invented defaults. The normal frontend
 still needs to install the owner and renderer scope alongside the other shop
 families. The Amiga scene frontend does not yet bind this route.
 
+Item 283's ordinary Step reads `global.ug[whichUg][2]`, compares it with
+`sprite_index`, and reads the table again only when the setter executes.
+`withShopItemEvents` installs that source-table reader in the existing mixed
+Step phase. Its registered setter publishes the new collision sprite without
+resetting Create's image index or speed. Item 283 has no custom Draw event:
+`Game` draws its retained sprite/frame/transform at its layer position, and
+`drawShopFixtures` omits an item's compact copy when its source child ID exists.
+Player collection (`scrGainUg`, sound and destruction), the remaining shop
+families and automatic frontend admission are not covered by this Step scope.
+
 The selected Windows numeric truth helper at `0x56a390` dispatches real/bool
 payloads to a strict comparison with 0.5, signed int32 to `SETG` against zero,
 and signed int64 to an equivalent high/low-word comparison. Thus both numeric

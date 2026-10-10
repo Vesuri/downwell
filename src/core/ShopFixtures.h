@@ -15,7 +15,7 @@ void drawShopFixtures(const ShopWorld& world, Emit emit) {
         if (shop.present) emit(480, 0, shop.x, shop.y);
         emit(481, 0, shop.x + 64, shop.y);
         for (int i = 0; i < 3; ++i) emit(482, 0, shop.x + 45 + i * 19, shop.y - 9);
-        for (int i = 0; i < 3; ++i) if (shop.feedback.itemPresent[i]) {
+        for (int i = 0; i < 3; ++i) if (shop.feedback.itemPresent[i]&&!shop.children.items[i]) {
             const int sprite = shopItemSprite(shop.stock.items[i].upgrade);
             // objObtainableUg Create selects frame 1 and image_speed=0;
             // Step changes only sprite_index. Shop places items at case.y+1.

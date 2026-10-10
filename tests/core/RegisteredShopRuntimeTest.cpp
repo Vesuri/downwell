@@ -1,5 +1,6 @@
 #include "core/StartupRuntime.h"
 #include "core/StoredWorldCollision.h"
+#include "core/ShopFixtures.h"
 #include <fstream>
 #include <vector>
 #include <memory>
@@ -55,9 +56,18 @@ int main(){
     const auto textId=owner.children().create(212,-100,-100);
     const auto textKey=owner.children().sourceHandle(textId);
     require(textId&&textKey.generation,"registered text for mixed-phase fixture");
+    const auto itemId=owner.children().create(283,-100,-100);
+    require(itemId&&owner.children().upgrade(itemId,100),"registered item for mixed-phase fixture");
+    unsigned itemReads=0;
+    auto lookup=[&](unsigned upgrade,int& sprite){++itemReads;sprite=shopItemSprite(upgrade);return sprite>=0;};
     for(unsigned tick=1;tick<=90;++tick){
-        require(live.withRisingTextEvents(owner.children(),[&]{live.step(false);return live.effectsSucceeded();}),
+        require(live.withShopItemEvents(owner.children(),lookup,[&]{
+            return live.withRisingTextEvents(owner.children(),[&]{live.step(false);return live.effectsSucceeded();});
+        }),
             "room schedules rising text alarm, Step and cleanup");
+        const auto* item=live.instance(itemId);
+        require(item&&item->spriteId==152&&item->imageIndex==1&&item->imageSpeed==0&&itemReads==tick+1,
+            "mixed room Step selects item art once and preserves Create image fields");
         const auto* r=live.instance(textId);
         if(tick==90){
             require(!r&&!owner.children().state(textKey)&&!collision->resolve(textKey),"alarm 90 retires through all live owners");

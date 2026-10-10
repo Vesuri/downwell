@@ -2236,6 +2236,16 @@ public:
     int mainNextMuzzleOffset() const { return mainEmitter_.leg; }
     const Consumables& consumables() const { return run_.consumables; }
     enum class RisingTextPhase {alarm,step,cleanup};
+    template<unsigned Capacity,class Lookup,class Tick>
+    bool withShopItemEvents(StoredShopChildRegistration<instanceCapacity,Capacity>& owner,Lookup lookup,Tick tick){
+        if(!run_.effectsSucceeded)return false;
+        if(shopItemStep_||!owner.belongsTo(instances_)||!owner.valid())return run_.effectsSucceeded=false;
+        auto step=[&](const InstanceRecord& record){const auto key=owner.handle(record);return key.generation&&owner.stepItem(key,lookup);};
+        shopItemStepContext_=&step;
+        shopItemStep_=[](void* p,const InstanceRecord& r){return (*static_cast<decltype(step)*>(p))(r);};
+        struct Reset {StartupRuntime& world;~Reset(){world.shopItemStep_=nullptr;world.shopItemStepContext_=nullptr;}} reset{*this};
+        const bool ok=tick();return run_.effectsSucceeded=run_.effectsSucceeded&&ok&&owner.valid();
+    }
     template<unsigned Capacity,class Ops,class Render>
     bool withRisingTextDraw(StoredShopChildRegistration<instanceCapacity,Capacity>& owner,Ops& ops,Render render){
         if(risingTextDraw_||!owner.belongsTo(instances_)||!owner.valid())return false;
@@ -2646,6 +2656,8 @@ private:
     DeferredInstanceQueue<512> deferredInstances_;
     std::uint32_t nextRuntimeInstanceId_ = 105187;
     void* shopCreateContext_=nullptr;
+    void* shopItemStepContext_=nullptr;
+    bool (*shopItemStep_)(void*,const InstanceRecord&)=nullptr;
     void* risingTextContext_=nullptr;
     void* risingTextDrawContext_=nullptr;
     bool (*risingTextDraw_)(void*,const InstanceRecord&)=nullptr;

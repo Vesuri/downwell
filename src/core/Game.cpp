@@ -582,12 +582,12 @@ void Game::renderMain(Renderer& renderer) const {
             return false;
         }
         const bool effect=instance.objectId==219||instance.objectId==220||instance.objectId==224||instance.objectId==242;
-        const bool registeredEnemy=instance.objectId==269||instance.objectId==120;
-        if(effect||registeredEnemy||enemyPresentationSprite(instance.objectId,instance.grounded,instance.auxiliaryState)>=0){
+        const bool registeredActor=instance.objectId==269||instance.objectId==120||instance.objectId==283;
+        if(effect||registeredActor||enemyPresentationSprite(instance.objectId,instance.grounded,instance.auxiliaryState)>=0){
             if(instance.spriteId<0)return true;
             renderer.drawSpriteTransformed(instance.spriteId,static_cast<unsigned>(instance.imageIndex),
-                (effect||registeredEnemy?instance.preciseX:float(instance.x))-viewX,
-                (effect||registeredEnemy?instance.preciseY:float(instance.y))-viewY,
+                (effect||registeredActor?instance.preciseX:float(instance.x))-viewX,
+                (effect||registeredActor?instance.preciseY:float(instance.y))-viewY,
                 instance.scaleX,instance.scaleY,instance.rotation);
         }
         return true;

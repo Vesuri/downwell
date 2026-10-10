@@ -135,6 +135,18 @@ public:
         if(e->state.flashing)e->state.drawing=-e->state.drawing;
         return true;
     }
+    template<class Lookup> bool stepItem(InstanceHandle key,Lookup lookup){
+        auto* e=entry(key);auto* r=e?record(*e):nullptr;
+        if(!good_||creating_||!r||e->object!=283||!e->state.initialized)return fail();
+        if(!r->active||r->destroyRequested)return true;
+        int sprite;
+        if(!lookup(e->state.whichUg,sprite)||!good_)return fail();
+        if(r->spriteId==sprite)return true;
+        // The VM reads global.ug[whichUg][2] again for the assignment.
+        // Publish only the sprite setter; image_index remains Create's 1.
+        if(!lookup(e->state.whichUg,sprite)||!good_||!lifecycle_.sprite(key,*r,sprite)||!good_)return fail();
+        r->spriteId=sprite;return true;
+    }
     bool advanceRisingTextAlarm(InstanceHandle key,unsigned number){
         auto* e=entry(key);auto* r=e?record(*e):nullptr;
         if(!good_||creating_||!r||e->object!=212||!e->state.initialized||number>=AlarmBank::count)return fail();

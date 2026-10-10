@@ -22,8 +22,8 @@ static bool sameText(const char* a,const char* b){
     return *a==*b;
 }
 struct ShopChildObserver {
-    unsigned births=0,retirements=0,images=0,rejectBirth=0,moves=0,destroys=0;
-    bool valid=true,rejectImage=false,rejectMove=false,rejectDestroy=false;
+    unsigned births=0,retirements=0,images=0,rejectBirth=0,moves=0,destroys=0,sprites=0;
+    bool valid=true,rejectImage=false,rejectMove=false,rejectDestroy=false,rejectSprite=false;
     bool birth(InstanceHandle,const InstanceRecord& r){
         valid=valid&&r.imageIndex==0&&r.imageSpeed==1&&r.alarms.get(0)==-1;
         return ++births!=rejectBirth;
@@ -36,7 +36,7 @@ struct ShopChildObserver {
     bool activation(InstanceHandle,const InstanceRecord&,bool){return true;}
     bool membership(InstanceHandle,const InstanceRecord&,bool){return true;}
     bool move(InstanceHandle,const InstanceRecord&,RunnerImageValue,RunnerImageValue){++moves;return !rejectMove;}
-    bool sprite(InstanceHandle,const InstanceRecord&,int){return true;}
+    bool sprite(InstanceHandle,const InstanceRecord&,int){++sprites;return !rejectSprite;}
     bool imageIndex(InstanceHandle,const InstanceRecord& r,RunnerImageValue v){
         valid=valid&&r.objectId==283&&r.imageIndex==0&&r.imageSpeed==1&&v.bits==0x3f800000;
         ++images;return !rejectImage;
@@ -204,6 +204,28 @@ bool risingTextDrawCheck(const ObjectPack& objects,int x,int width,bool flashing
     } draw{width,x,flashing?697:700,flashing};
     return owner.drawRisingText(key,draw)&&draw.valid&&draw.calls==(flashing?6u:7u)&&draw.draws==(flashing?0u:1u)&&owner.clear();
 }
+bool shopItemStepCheck(const ObjectPack& objects,unsigned failure){
+    InstanceStore<2> records;std::uint32_t next=950000;const int room=11;bool good=true;
+    ShopChildObserver observer;observer.rejectSprite=failure==3;
+    StoredShopChildRegistration<2,1> owner(records,objects,InstanceLifecycleBinding::bindPositionedActor(observer),next,room,good);
+    const auto id=owner.create(283,100,700);const auto key=owner.sourceHandle(id);
+    if(!id||!owner.upgrade(id,100))return false;
+    unsigned reads=0;
+    auto lookup=[&](unsigned upgrade,int& sprite){
+        if(upgrade!=100)return false;
+        ++reads;if(reads==failure&&failure<3)return false;
+        sprite=reads==1?152:143;return true;
+    };
+    const bool ok=owner.stepItem(key,lookup);const auto* r=records.resolve(key);
+    if(ok!=(failure==0)||good!=ok||!r||r->imageIndex!=1||r->imageSpeed!=0||
+       r->spriteId!=(ok?143:501)||reads!=(failure==1?1u:2u)||observer.sprites!=(failure==1||failure==2?0u:1u))return false;
+    if(ok){
+        if(!owner.stepItem(key,lookup)||reads!=3||observer.sprites!=1)return false;
+        // Unsupported/missing table data is not replaced with a guessed icon.
+        if(owner.stepItem(key,[](unsigned,int&){return false;})||good||r->spriteId!=143)return false;
+    }
+    return owner.clear();
+}
 #ifndef DOWNWELL_NATIVE_QUERY_PROBE
 int main(){
     std::ifstream file("generated/downwell-objects.dwob",std::ios::binary);
@@ -225,6 +247,7 @@ int main(){
     }
     for(int x:{160,170,240,310,320})for(int width:{40,41,200})for(bool flashing:{false,true})
         if(!risingTextDrawCheck(objects,x,width,flashing)){std::fprintf(stderr,"rising text Draw failed\n");return 1;}
+    for(unsigned failure=0;failure<=3;++failure)if(!shopItemStepCheck(objects,failure))return 1;
     std::puts("Stored shop children: Create state, numeric IDs, publication failures and teardown passed");
 }
 #endif

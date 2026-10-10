@@ -10,6 +10,7 @@
 #include "core/StateDigest.h"
 #include "core/StoredWorldCollision.h"
 #include "core/RisingTextRenderer.h"
+#include "core/ShopFixtures.h"
 #include "../../generated/downwell-title-glyphs.h"
 #include <algorithm>
 #include <cstring>
@@ -975,6 +976,23 @@ int main() {
                 text.risingTexts.empty(),"negative drawing flag suppresses every border pass");
             RecordingRenderer unbound;effectGame.render(unbound);
             require(!effectGame.renderingSucceeded(),"unbound rising text cannot silently disappear");
+            const auto itemId=children.create(283,runtime.mainCameraRenderViewX()+80,runtime.mainCameraRenderViewY()+100);
+            require(itemId&&children.upgrade(itemId,100)&&children.stepItem(children.sourceHandle(itemId),
+                [](unsigned upgrade,int& sprite){sprite=downwell::shopItemSprite(upgrade);return sprite>=0;}),"select registered shop item artwork");
+            RecordingRenderer itemDraw;itemDraw.recordTransforms=true;
+            downwell::RisingTextRenderer hidden(downwell::title_glyphs::bank,state,itemDraw,
+                runtime.mainCameraRenderViewX(),runtime.mainCameraRenderViewY(),160,downwell::Game::playfieldX);
+            require(runtime.withRisingTextDraw(children,hidden,[&]{effectGame.render(itemDraw);return effectGame.renderingSucceeded();}),
+                "registered item reaches Game layer walk");
+            unsigned itemDraws=0;
+            for(const auto& t:itemDraw.transforms)if(t.sprite==152){
+                require(t.frame==1&&t.x==190&&t.y==100&&t.sx==1&&t.sy==1&&t.angle==0,"item retains source frame and transform");++itemDraws;
+            }
+            require(itemDraws==1,"registered shop item draws once");
+            downwell::ShopWorld compact;compact.instances[0].allocated=true;compact.instances[0].children.items[0]=itemId;
+            unsigned legacyItems=0;
+            downwell::drawShopFixtures(compact,[&](int sprite,int,int,int){if(sprite==152)++legacyItems;});
+            require(legacyItems==2,"compact fixture skips only the registered item");
             require(shop.clear(),"retire rising text render fixture");
         }
         auto registration=runtime.debrisRegistration<1>();downwell::DebrisEffects<1> debris;unsigned id=0;

@@ -227,3 +227,9 @@ assembly("gml_Object_fxRisingText_Draw_0",
     "b3f4de1e393b0608999219ff82fba8a18679e5f526e3295f4b440e283cf6c7cc")
 assembly("gml_GlobalScript_scrDrawBorderTextBlack",
     "fa8d7e4e10625d3474e6ca2e2d1ed674d5c25c3ccc2b23a264215ca22bf93d6b")
+item_step = assembly("gml_Object_objObtainableUg_Step_0",
+    "2251be9cb63fac1d63d62b287e5431acda66055646f21ddb3a7dc749b4bc85b8")
+assert item_step.count("push.v self.whichUg") == 2
+assert "pop.v.v self.sprite_index" in item_step and "image_index" not in item_step
+assert objects[283]["parentId"] == -1
+assert not any(e["eventType"] == 8 for e in objects[283]["events"])
