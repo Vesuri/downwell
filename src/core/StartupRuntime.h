@@ -1716,10 +1716,10 @@ public:
     template<class Visit> bool visitRegisteredEnemyShades(Visit visit)const{
         bool present=false;
         for(unsigned i=0;i<instances_.size();++i){const int object=instances_.at(i).objectId;
-            if(object==269||object==120){present=true;break;}}
+            if(object==115||object==269||object==120){present=true;break;}}
         if(!present)return true;
         return visitDrawAtDepthChecked([&](InstanceHandle,const InstanceRecord& record,int){
-            if((record.objectId!=269&&record.objectId!=120)||!record.active||record.destroyRequested)return true;
+            if((record.objectId!=115&&record.objectId!=269&&record.objectId!=120)||!record.active||record.destroyRequested)return true;
             RunnerImageValue x,y;
             std::memcpy(&x.bits,&record.preciseX,4);std::memcpy(&y.bits,&record.preciseY,4);
             return visit(x.promoted(),y.promoted());

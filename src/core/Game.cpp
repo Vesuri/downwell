@@ -581,7 +581,7 @@ void Game::renderMain(Renderer& renderer) const {
             return false;
         }
         const bool effect=instance.objectId==219||instance.objectId==220||instance.objectId==224||instance.objectId==242;
-        const bool registeredActor=instance.objectId==269||instance.objectId==120||instance.objectId==283||instance.objectId==289;
+        const bool registeredActor=instance.objectId==115||instance.objectId==269||instance.objectId==120||instance.objectId==283||instance.objectId==289;
         if(effect||registeredActor||enemyPresentationSprite(instance.objectId,instance.grounded,instance.auxiliaryState)>=0){
             if(instance.spriteId<0)return true;
             renderer.drawSpriteTransformed(instance.spriteId,static_cast<unsigned>(instance.imageIndex),

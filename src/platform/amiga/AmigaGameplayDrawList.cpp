@@ -361,6 +361,14 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
             DW_PROFILE_SCOPE(profileActorPreparation);
             if(downwell::RunnerSpatialSplit::less(depth,foregroundDepth)&&!drawForeground())return false;
             if(kind==GameplayWorld::DrawActor::player)return port.findPlayer(key)&&drawPlayer();
+            if(kind==GameplayWorld::DrawActor::whiteJelly){
+                const auto* record=port.whiteJellies()?port.whiteJellies()->find(key):nullptr;
+                std::int32_t x,y;unsigned frame;
+                if(!record||!record->x.roundPixel(x)||!record->y.roundPixel(y))return false;
+                // draw_self selects floor(image_index), not round(image_index).
+                if(!downwell::GameplayWhiteJellies::drawFrame(record->spriteId,record->imageIndex,frame))return false;
+                return append(record->spriteId,frame,downwellPlayfieldX+x-worldViewX,y-worldViewY,false);
+            }
             if(kind==GameplayWorld::DrawActor::scattered){
                 const auto* record=port.scattered()?port.scattered()->find(key):nullptr;
                 std::int32_t x,y,frame,scale;

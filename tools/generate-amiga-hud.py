@@ -106,6 +106,8 @@ SELECTIONS = {
         170: None,   # sprFrogPrepare
         172: None,   # sprFrogDead: initial corpse artwork, planar only
         173: None,   # sprFrogDamage
+        175: None,   # sprEnmJellyHit
+        176: None,   # sprEnmWhiteJelly
         177: None,   # sprEnmSnail
         178: None,   # sprEnmSnailHit
         186: None,   # sprGroundedTurtle

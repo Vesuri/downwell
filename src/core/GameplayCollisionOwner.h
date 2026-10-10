@@ -114,7 +114,7 @@ private:
         GameplayScriptSpawnInstances::capacity+GameplayDebrisInstances::capacity+GameplayEntryDithers::capacity+GameplayWorld::boneCapacity+GameplayWorld::skeletonCapacity+64+32+32+32+32;
     struct DrawEntry {GameplayWorld::DrawActor kind;InstanceHandle local;RunnerImageValue depth;};
     struct DrawIdentity {GameplayWorld::DrawActor kind;InstanceHandle local;};
-    static constexpr unsigned drawCapacityWithTitles=drawCapacity+4+32+32+8+GameplayScattered::capacity;
+    static constexpr unsigned drawCapacityWithTitles=drawCapacity+4+32+32+8+GameplayScattered::capacity+GameplayWhiteJellies::capacity;
     DrawIdentity preparedDrawIdentities_[drawCapacityWithTitles]{};
     mutable DrawEntry drawOrder_[drawCapacityWithTitles]{};
     mutable unsigned drawCount_=0;
@@ -211,6 +211,8 @@ private:
         unsigned token=0;bool actor=true;
         GameplayWorld::DrawActor drawKind=GameplayWorld::DrawActor::player;
         switch(kind){
+            case View::Kind::whiteJelly:drawKind=GameplayWorld::DrawActor::whiteJelly;
+                token=drawCapacity+4+32+32+8+GameplayScattered::capacity+local.slot;break;
             case View::Kind::scattered:drawKind=GameplayWorld::DrawActor::scattered;
                 token=drawCapacity+4+32+32+8+local.slot;break;
             case View::Kind::player:break;
@@ -757,7 +759,7 @@ private:
             if constexpr(Kind==View::Kind::timeShard)sourceId=parent.pendingTimeShardId_;
             if constexpr(Kind==View::Kind::playerController||Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::builder||Kind==View::Kind::goalField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency)sourceId=r.sourceId;
-            constexpr bool projected=Kind==View::Kind::scattered||Kind==View::Kind::flashBall||Kind==View::Kind::limboShard||Kind==View::Kind::levelNumber||Kind==View::Kind::consumptionBlood||Kind==View::Kind::corpse||Kind==View::Kind::blast||Kind==View::Kind::smoke||Kind==View::Kind::corpseExpiry||Kind==View::Kind::player||Kind==View::Kind::enemy||
+            constexpr bool projected=Kind==View::Kind::whiteJelly||Kind==View::Kind::scattered||Kind==View::Kind::flashBall||Kind==View::Kind::limboShard||Kind==View::Kind::levelNumber||Kind==View::Kind::consumptionBlood||Kind==View::Kind::corpse||Kind==View::Kind::blast||Kind==View::Kind::smoke||Kind==View::Kind::corpseExpiry||Kind==View::Kind::player||Kind==View::Kind::enemy||
                 Kind==View::Kind::bullet||Kind==View::Kind::scriptEffect||Kind==View::Kind::debris||Kind==View::Kind::entryDither||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::ditherAbove||Kind==View::Kind::timeShard;
             if(projected&&!parent.actorDepthAvailable(p.depth))return parent.check(false);
             {
@@ -865,7 +867,7 @@ private:
             if constexpr(Kind==View::Kind::timeShard)sourceId=parent.pendingTimeShardId_;
             if constexpr(Kind==View::Kind::playerController||Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::builder||Kind==View::Kind::goalField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency)sourceId=r.sourceId;
-            constexpr bool projected=Kind==View::Kind::scattered||Kind==View::Kind::flashBall||Kind==View::Kind::limboShard||Kind==View::Kind::levelNumber||Kind==View::Kind::consumptionBlood||Kind==View::Kind::corpse||Kind==View::Kind::blast||Kind==View::Kind::smoke||Kind==View::Kind::corpseExpiry||Kind==View::Kind::player||Kind==View::Kind::enemy||
+            constexpr bool projected=Kind==View::Kind::whiteJelly||Kind==View::Kind::scattered||Kind==View::Kind::flashBall||Kind==View::Kind::limboShard||Kind==View::Kind::levelNumber||Kind==View::Kind::consumptionBlood||Kind==View::Kind::corpse||Kind==View::Kind::blast||Kind==View::Kind::smoke||Kind==View::Kind::corpseExpiry||Kind==View::Kind::player||Kind==View::Kind::enemy||
                 Kind==View::Kind::bullet||Kind==View::Kind::scriptEffect||Kind==View::Kind::debris||Kind==View::Kind::entryDither||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::ditherAbove||Kind==View::Kind::timeShard;
             if(projected&&!parent.actorDepthAvailable(depth))return parent.check(false);
             if(!parent.check(parent.layers_.birth(h,sourceId,depth,inactive,projected)))return false;
@@ -1571,11 +1573,12 @@ public:
                 if(!View::decode(shared,kind,local))return false;
                 // Retained terrain/field composition is not part of this
                 // visitor. Do not resolve or copy their records per frame.
-                if(kind!=View::Kind::scattered&&kind!=View::Kind::flashBall&&kind!=View::Kind::limboShard&&kind!=View::Kind::levelNumber&&kind!=View::Kind::consumptionBlood&&kind!=View::Kind::corpse&&kind!=View::Kind::blast&&kind!=View::Kind::smoke&&kind!=View::Kind::corpseExpiry&&kind!=View::Kind::enemy&&kind!=View::Kind::bullet&&kind!=View::Kind::scriptEffect&&kind!=View::Kind::debris&&kind!=View::Kind::player&&kind!=View::Kind::entryDither&&kind!=View::Kind::bone&&kind!=View::Kind::skeleton&&kind!=View::Kind::ditherAbove&&kind!=View::Kind::timeShard)return true;
+                if(kind!=View::Kind::whiteJelly&&kind!=View::Kind::scattered&&kind!=View::Kind::flashBall&&kind!=View::Kind::limboShard&&kind!=View::Kind::levelNumber&&kind!=View::Kind::consumptionBlood&&kind!=View::Kind::corpse&&kind!=View::Kind::blast&&kind!=View::Kind::smoke&&kind!=View::Kind::corpseExpiry&&kind!=View::Kind::enemy&&kind!=View::Kind::bullet&&kind!=View::Kind::scriptEffect&&kind!=View::Kind::debris&&kind!=View::Kind::player&&kind!=View::Kind::entryDither&&kind!=View::Kind::bone&&kind!=View::Kind::skeleton&&kind!=View::Kind::ditherAbove&&kind!=View::Kind::timeShard)return true;
                 std::uint32_t flags;
                 if(!self.eligibilityFlags(shared,flags)||!View(*self.world_).contains(shared))return false;
                 if(flags&0x100003u)return true;
                 switch(kind){
+                    case View::Kind::whiteJelly:return visit(visitor,GameplayWorld::DrawActor::whiteJelly,local,depth);
                     case View::Kind::scattered:return visit(visitor,GameplayWorld::DrawActor::scattered,local,depth);
                     case View::Kind::player:return visit(visitor,GameplayWorld::DrawActor::player,local,depth);
                     case View::Kind::levelNumber:return visit(visitor,GameplayWorld::DrawActor::levelNumber,local,depth);
@@ -1604,7 +1607,7 @@ public:
                 // Retained scenery/field passes own these draws. Preserve the
                 // inactive flag (which terminates a layer), but avoid event
                 // and sprite lookups for every terrain tile each frame.
-                if(kind!=View::Kind::scattered&&kind!=View::Kind::flashBall&&kind!=View::Kind::limboShard&&kind!=View::Kind::levelNumber&&kind!=View::Kind::consumptionBlood&&kind!=View::Kind::corpse&&kind!=View::Kind::blast&&kind!=View::Kind::smoke&&kind!=View::Kind::corpseExpiry&&kind!=View::Kind::enemy&&kind!=View::Kind::bullet&&kind!=View::Kind::scriptEffect&&
+                if(kind!=View::Kind::whiteJelly&&kind!=View::Kind::scattered&&kind!=View::Kind::flashBall&&kind!=View::Kind::limboShard&&kind!=View::Kind::levelNumber&&kind!=View::Kind::consumptionBlood&&kind!=View::Kind::corpse&&kind!=View::Kind::blast&&kind!=View::Kind::smoke&&kind!=View::Kind::corpseExpiry&&kind!=View::Kind::enemy&&kind!=View::Kind::bullet&&kind!=View::Kind::scriptEffect&&
                     kind!=View::Kind::debris&&kind!=View::Kind::player&&kind!=View::Kind::entryDither&&kind!=View::Kind::bone&&kind!=View::Kind::skeleton&&kind!=View::Kind::ditherAbove&&kind!=View::Kind::timeShard)return true;
                 const unsigned metadata=self.drawMetadata_.get(self.objectOf(h));
                 out.object=(metadata&ObjectDrawMetadata<386>::exists)!=0;

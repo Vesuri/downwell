@@ -64,6 +64,12 @@ public:
         records_[key.slot].imageIndex=value;return true;
     }
     static unsigned frames(int sprite){return sprite==176?4:sprite==175?1:0;}
+    static bool drawFrame(int sprite,RunnerImageValue index,unsigned& frame){
+        const unsigned count=frames(sprite),magnitude=index.bits&0x7fffffffu,exponent=magnitude>>23;
+        if(!count||!SequenceTimeline::valid(index)||((index.bits>>31)&&magnitude)||
+            magnitude>=SequenceTimeline::integerBits(count))return false;
+        frame=exponent<127?0:((magnitude&0x7fffffu)|0x800000u)>>(150-exponent);return true;
+    }
     bool sprite(InstanceHandle key,int value){
         if(!good_||!find(key)||!frames(value))return fail();auto& r=records_[key.slot];
         RunnerSpriteChange::Result change;

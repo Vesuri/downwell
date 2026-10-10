@@ -60,6 +60,34 @@ int main() {
             }
             {
                 auto list=std::make_unique<AmigaGameplayDrawList>();UBYTE pack[8]{};
+                auto& store=owner->whiteJellies();downwell::InstanceHandle jelly;downwell::GameMakerRandom random(19);
+                struct Ops {
+                    downwell::GameplayWhiteJellies& store;downwell::InstanceHandle key;
+                    using N=downwell::MotionBinary64;using F=downwell::RunnerImageValue;
+                    bool position(bool y,F v,F& out){return store.position(key,y,v,out);}
+                    bool playerX(N& v){v={};return true;}bool playerY(N& v){v={};return true;}
+                    bool pointDirection(N,N,N,N,N& v){v={};return true;}
+                    bool direction(N v,N& out){out=v;return true;}
+                    bool imageSpeed(F v,F& out){out=v;return true;}
+                };
+                assert(store.create(105188,{0x43700000u},{0x43000000u},random,
+                    [&](auto key){return Ops{store,key};},jelly));
+                for(unsigned tick=0;tick<8;++tick)assert(store.advanceAnimation(jelly));
+                for(int sprite:{176,175}){
+                    assert(store.sprite(jelly,sprite));
+                    for(bool composite:{false,true}){
+                        assert(list->collect(*world,pack,pack+8,160,34,composite));unsigned seen=0;
+                        for(unsigned i=0;i<list->count;++i)if(list->actors[i].sprite==sprite){
+                            const auto& actor=list->actors[i];
+                            assert(actor.frame==unsigned(sprite==176?1:0)&&actor.x==190&&actor.y==94&&!actor.flip);++seen;
+                        }
+                        assert(seen==1);
+                    }
+                }
+                assert(store.markDestroyed(jelly)&&owner->prepareDraw()&&store.clear());
+            }
+            {
+                auto list=std::make_unique<AmigaGameplayDrawList>();UBYTE pack[8]{};
                 downwell::InstanceHandle title;
                 assert(owner->levelNumbers().create(105190,{}, {},[](auto,auto& state){
                     return state.create(1,downwell::MotionBinary64::fromInteger(8),[](unsigned,unsigned& token){token='A';return true;});

@@ -1278,12 +1278,13 @@ public:
         return run_.effectsSucceeded=scriptSpawnInstances_&&effects.advanceRegistered(phase,*scriptSpawnInstances_);
     }
     enum class PhaseBoundary { beginStep, alarm, step, collision, endStep, roomEntry };
-    enum class DrawActor { enemy, bullet, scriptEffect, debris, player, entryDither, bone, skeleton, ditherAbove, timeShard, corpseExpiry, smoke, corpse, consumptionBlood, levelNumber, limboShard, flashBall, blast, scattered };
+    enum class DrawActor { enemy, bullet, scriptEffect, debris, player, entryDither, bone, skeleton, ditherAbove, timeShard, corpseExpiry, smoke, corpse, consumptionBlood, levelNumber, limboShard, flashBall, blast, scattered, whiteJelly };
     template<class Visit> bool visitRegisteredEnemyShades(Visit visit)const{
-        if((!bones_||!bones_->size())&&(!skeletons_||!skeletons_->size()))return true;
+        if((!bones_||!bones_->size())&&(!skeletons_||!skeletons_->size())&&(!whiteJellies_||!whiteJellies_->size()))return true;
         return visitRoomActorsReadOnly([&](DrawActor kind,downwell::InstanceHandle key,auto){
             if(kind==DrawActor::bone){const auto* r=bones_->find(key);return r&&visit(r->x.promoted(),r->y.promoted());}
             if(kind==DrawActor::skeleton){const auto* r=skeletons_->find(key);return r&&visit(r->x.promoted(),r->y.promoted());}
+            if(kind==DrawActor::whiteJelly){const auto* r=whiteJellies_->find(key);return r&&visit(r->x.promoted(),r->y.promoted());}
             return true;
         });
     }
