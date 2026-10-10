@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_GAMEPLAY_COLLISION_VIEW_H
 #define DOWNWELL_CORE_GAMEPLAY_COLLISION_VIEW_H
 #include "GameplayWorld.h"
+#include "SlotFamilyMap.h"
 namespace downwell {
 // Disjoint keys for the native world's existing typed stores. These are
 // internal owner slots, NOT Windows numeric instance IDs or traversal order.
@@ -139,6 +140,57 @@ public:
         key={base+local.slot,local.generation};return true;
     }
     static bool decode(InstanceHandle key,Kind& kind,InstanceHandle& local){
+        using Map=SlotFamilyMap<capacity,static_cast<unsigned>(Kind::shop)+1>;
+        static_assert(sizeof(Map)<=4096,"Shared family routing must stay within its 4 KiB budget");
+        static constexpr Map map({
+            {0,enemyBase,unsigned(Kind::player)},
+            {enemyBase,breakableBase,unsigned(Kind::enemy)},
+            {breakableBase,terrainBase,unsigned(Kind::breakable)},
+            {terrainBase,timeFieldBase,unsigned(Kind::terrain)},
+            {timeFieldBase,goalFieldBase,unsigned(Kind::timeField)},
+            {goalFieldBase,exitControllerBase,unsigned(Kind::goalField)},
+            {exitControllerBase,bulletBase,unsigned(Kind::exitController)},
+            {bulletBase,scriptEffectBase,unsigned(Kind::bullet)},
+            {scriptEffectBase,debrisBase,unsigned(Kind::scriptEffect)},
+            {debrisBase,timeChangeBase,unsigned(Kind::debris)},
+            {timeChangeBase,entryDitherBase,unsigned(Kind::timeChange)},
+            {entryDitherBase,droneBase,unsigned(Kind::entryDither)},
+            {droneBase,boneBase,unsigned(Kind::drone)},
+            {boneBase,skeletonBase,unsigned(Kind::bone)},
+            {skeletonBase,bloodBase,unsigned(Kind::skeleton)},
+            {bloodBase,currencyBase,unsigned(Kind::blood)},
+            {currencyBase,ditherAboveBase,unsigned(Kind::currency)},
+            {ditherAboveBase,builderBase,unsigned(Kind::ditherAbove)},
+            {builderBase,timeShardBase,unsigned(Kind::builder)},
+            {timeShardBase,playerControllerBase,unsigned(Kind::timeShard)},
+            {playerControllerBase,corpseExpiryBase,unsigned(Kind::playerController)},
+            {corpseExpiryBase,smokeBase,unsigned(Kind::corpseExpiry)},
+            {smokeBase,corpseBase,unsigned(Kind::smoke)},
+            {corpseBase,consumptionBloodBase,unsigned(Kind::corpse)},
+            {consumptionBloodBase,runControllerBase,unsigned(Kind::consumptionBlood)},
+            {runControllerBase,resultBase,unsigned(Kind::runController)},
+            {resultBase,levelNumberBase,unsigned(Kind::result)},
+            {levelNumberBase,limboShardBase,unsigned(Kind::levelNumber)},
+            {limboShardBase,flashBallBase,unsigned(Kind::limboShard)},
+            {flashBallBase,blastBase,unsigned(Kind::flashBall)},
+            {blastBase,sideCameraLockerBase,unsigned(Kind::blast)},
+            {sideCameraLockerBase,scatteredBase,unsigned(Kind::sideCameraLocker)},
+            {scatteredBase,spawnerBase,unsigned(Kind::scattered)},
+            {spawnerBase,whiteJellyBase,unsigned(Kind::spawner)},
+            {whiteJellyBase,movingFxBase,unsigned(Kind::whiteJelly)},
+            {movingFxBase,redBallBase,unsigned(Kind::movingFx)},
+            {redBallBase,shopBase,unsigned(Kind::redBall)},
+            {shopBase,capacity,unsigned(Kind::shop)}
+        });
+        static_assert(map.valid,"Every owner slot must have exactly one declared family");
+        if(!key.generation||key.slot>=capacity)return false;
+        const unsigned family=map.families[key.slot];
+        kind=static_cast<Kind>(family);
+        local={key.slot-map.bases[family],key.generation};
+        return true;
+    }
+    // Retained portable routing oracle. No mutable state or family dispatch.
+    static bool decodeReference(InstanceHandle key,Kind& kind,InstanceHandle& local){
         if(!key.generation||key.slot>=capacity)return false;
         if(key.slot>=shopBase){kind=Kind::shop;local={key.slot-shopBase,key.generation};return true;}
         if(key.slot>=redBallBase){kind=Kind::redBall;local={key.slot-redBallBase,key.generation};return true;}

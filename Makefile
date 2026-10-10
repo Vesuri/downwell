@@ -1332,6 +1332,13 @@ test: verify-time-field-wind
 .PHONY: verify-time-field-wind
 test: verify-gameplay-collision-owner
 .PHONY: verify-gameplay-collision-owner
+.PHONY: verify-slot-family-map
+test: verify-slot-family-map
+verify-slot-family-map: build/slot-family-map-test
+	./build/slot-family-map-test
+build/slot-family-map-test: tests/core/SlotFamilyMapTest.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -Isrc -o $@ $<
 .PHONY: verify-native-enemy-alarm-roster
 build/native-enemy-alarm-roster-test: tests/core/NativeEnemyAlarmRosterTest.cpp $(HOST_CHECK_HEADERS)
 	@mkdir -p build

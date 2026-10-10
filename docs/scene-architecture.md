@@ -195,6 +195,23 @@ edges. Scene reconstruction invalidates the retained image. Validate optimized
 composition against the complete ordered draw sequence, including clipping,
 capacity changes and every meter offset.
 
+## Family routing is not a family scan
+
+Internal collision handles use the existing disjoint slot ranges, not Windows
+numeric instance IDs. `GameplayCollisionView::decode` reads a compile-time
+slot-to-family tag and that family's base. It never walks other families to
+identify the requested one. Adding an unrelated family cannot add comparisons
+to an existing actor's lookup. Metadata has a 4 KiB compile-time budget, with
+no room-entry construction, per-frame preparation or BSS allocation.
+
+Each slot must belong to exactly one declared range; gaps, overlaps and missing
+families fail compilation. The previous decoder remains the portable oracle.
+`verify-slot-family-map` compares every slot and representative generations,
+including failures and encode/decode round trips, and checks unchanged routing
+when unrelated families are added. Routing does not prove lifetime validity:
+callers still resolve generations and live eligibility at the original event
+boundaries. It does not replace the remaining membership-driven scheduling work.
+
 ## Read-only actor ordering
 
 `GameplayWorld::visitRoomActors` remains the live layer traversal. Command
