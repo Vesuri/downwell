@@ -2914,6 +2914,19 @@ public:
         const bool ok=execute();
         return run_.effectsSucceeded=run_.effectsSucceeded&&ok&&owner.valid();
     }
+    template<unsigned Capacity,class Audio,class Lookup,class Execute>
+    bool withRegisteredShopCreation(StoredShopCreationOwner<instanceCapacity,Capacity,Audio>& owner,Lookup& lookup,Execute execute){
+        if(!run_.effectsSucceeded)return false;
+        if(shopCreate_||!owner.belongsTo(instances_,objectPack_)||!owner.valid())return run_.effectsSucceeded=false;
+        auto create=[&](int x,int y){
+            return run_.createRegisteredShop(x,y,[this](unsigned lo,unsigned hi){return lo+random_.irandomSmall(hi-lo);},
+                [this]{return random_.chooseIndexSmall(3);},mainPlayerHealth_,owner,lookup);
+        };
+        shopCreateContext_=&create;
+        shopCreate_=[](void* context,int x,int y){return (*static_cast<decltype(create)*>(context))(x,y);};
+        struct Reset {StartupRuntime& world;~Reset(){world.shopCreate_=nullptr;world.shopCreateContext_=nullptr;}} reset{*this};
+        const bool ok=execute();return run_.effectsSucceeded=run_.effectsSucceeded&&ok&&owner.valid();
+    }
     ShopWorld::Instance* registerShop(int x, int y) {
         if(!run_.effectsSucceeded)return nullptr;
         if(shopCreate_)return shopCreate_(shopCreateContext_,x,y);

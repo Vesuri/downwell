@@ -107,6 +107,11 @@ public:
         e->state.text=text;return true;
     }
     bool readX(unsigned id,int& x){int y;return position(id,x,y);}
+    bool readXReal(unsigned id,MotionBinary64& x){
+        auto* e=entry(sourceHandle(id));auto* r=e?record(*e):nullptr;
+        if(!good_||!r||!e->state.initialized)return fail();
+        RunnerImageValue value;std::memcpy(&value.bits,&r->preciseX,4);x=value.promoted();return true;
+    }
     bool position(unsigned id,int& x,int& y){
         auto* e=entry(sourceHandle(id));auto* r=e?record(*e):nullptr;
         if(!good_||!r||!e->state.initialized)return fail();

@@ -915,6 +915,28 @@ still needs the enclosing `with (Shop)` event, view/tail composition and normal
 frontend bindings; a successful isolated menu call is not complete Step
 admission.
 
+`ShopText` retains the labels assigned by `scrShopAssignText`: three item
+name/description pairs, menu labels and the speech phrases. Its lookup order
+includes the farewell choice between `shopGreet2` and `shopByeN`; language
+assignment must not move that RNG draw. `createRegisteredWithText` and the
+lookup-taking runtime creation scopes use the same registered births and RNG
+as the metadata-only entry. Generated UTF-8 strings apply `langString`'s
+asterisk-to-hash replacement and missing-key space fallback. They remain
+resident while any Shop or retired-but-not-yet-removed speech child borrows
+them. Language changes require explicit reassignment, not a lookup on each
+speech. The script's `getString`/`returnString` temporaries are only read by
+`langString` in the extracted assembly corpus; they are not generic published
+instance variables in this adapter.
+
+After the seven initial child births and before stock RNG, Shop Create reads
+the keeper's current builtin X and adds two into `msgx`. This is a fresh read,
+not the earlier `keeperx` capture, and retains the fractional coordinate.
+Both retained owners' `sayMessage` entries resolve the cached phrase (or the
+literal question mark) and invoke the ordered speech replacement path.
+Unassigned cached phrases fail admission. These contracts do not establish
+normal frontend installation, language-change unpause ordering or multilingual
+glyph rendering.
+
 `ShopParentEvents` composes one selected inner body: radio, a fresh criminal
 test, menu and view under that test, then the unconditional tail. The tail
 rereads criminal and short-circuits death; either disables interaction and

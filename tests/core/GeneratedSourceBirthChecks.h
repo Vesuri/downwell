@@ -10,6 +10,7 @@
 #include "ShopMenuChecks.h"
 #include "ShopParentChecks.h"
 #include "ShopSpeechChecks.h"
+#include "../../generated/downwell-shop-text.h"
 #include <cassert>
 #include <memory>
 #include <vector>
@@ -33,12 +34,18 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             bool setGain(int voice,MotionBinary64 gain,int ticks){return voice==99&&gain.zero()&&!ticks;}
         } audio;
         auto creation=store.creation(allocate,audio);
+        const char* language=shop_language::entries[0].language;
+        ShopLanguageLookup languageLookup{shop_language::entries,shop_language::count,language};
         auto shop=[&](const auto& command,auto& cursor){
-            assert(&cursor==&allocate);return world->registerShopWithOwner(command.x,command.y,creation)!=nullptr;
+            assert(&cursor==&allocate);return world->registerShopWithOwner(command.x,command.y,creation,languageLookup)!=nullptr;
         };
         auto backend=[](const auto&,unsigned){assert(false);return false;};
         assert(world->createGeneratedInstanceWithSourceIds({277,480,2000},objects,allocate,backend,shop));
         assert(collision->valid()&&store.size()==11&&next==960011&&world->shopInstances()==&store);
+        const auto* sourceParent=store.find(store.sourceHandle(960000));const char* greeting=nullptr;
+        assert(sourceParent&&sourceParent->shop&&languageLookup.lookup("shopGreet0",greeting)&&
+            ShopLanguageLookup::same(sourceParent->shop->text.greeting[0],greeting)&&sourceParent->shop->text.index==4&&
+            sourceParent->shop->messageX.high==MotionBinary64::fromInteger(500).high);
         unsigned count=0;
         for(int object:{277,278,98,280,212})assert(collision->population(object,count)&&count==1);
         for(int object:{279,283})assert(collision->population(object,count)&&count==3);
@@ -63,12 +70,25 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             }
             shared.push_back(h);
         }
+        {
+            const auto key=store.sourceHandle(960000);auto& shop=*sourceParent->shop;
+            const auto previous=shop.children.risingText,created=next;
+            ShopInteraction::Input input;input.confirm=true;CurrencyAccount currency;
+            auto say=[&](ShopMenuEvents::Message message,MotionBinary64 y){return store.sayMessage(key,message,y,allocate);};
+            ShopCachedSpeechProbe speech{shop,currency,say};
+            assert(store.parentStepBody(key,input,currency,speech)&&!input.confirm&&speech.says==1&&
+                shop.children.risingText==created&&store.find(store.sourceHandle(previous))->destroyRequested);
+            const auto* text=store.find(store.sourceHandle(created));
+            assert(text&&ShopLanguageLookup::same(text->state.text,greeting)&&text->x.promoted().high==MotionBinary64::fromInteger(500).high&&
+                text->y.promoted().high==MotionBinary64::fromInteger(1982).high);
+        }
+        const unsigned replacementId=next;
         assert(world->restartFromResults(DeathMenuSequence::Action::Retry,2,300)==ResultsDestination::gameplay);
         assert(collision->valid()&&store.size()==0&&world->shopInstances()==&store);
         for(auto h:shared)assert(!GameplayCollisionView(*world).contains(h));
         assert(collision->population(277,count)&&count==0&&collision->population(279,count)&&count==0);
         auto* replacement=world->registerShopWithOwner(480,2000,creation);
-        assert(replacement&&replacement->sourceId==960011&&store.size()==11&&next==960022);
+        assert(replacement&&replacement->sourceId==replacementId&&store.size()==11&&next==replacementId+11);
         for(auto h:shared)assert(!GameplayCollisionView(*world).contains(h));
         struct RadioEnvironment {
             int view=2320,roomId=11;unsigned queries=0,stops=0,views=0;bool playing=true;

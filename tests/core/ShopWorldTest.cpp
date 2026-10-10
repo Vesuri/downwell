@@ -32,6 +32,9 @@ int main() {
                 ++births;return births==reject?0:860000+births*3;
             }
             bool readX(unsigned,int& x){x=118;return true;}
+            bool readXReal(unsigned,downwell::MotionBinary64& x){
+                require(births==7,"message anchor follows initial text Create");x={0x405da000u,0};return true; // 118.5
+            }
             bool position(unsigned id,int& x,int& y){
                 require(id==parent->children.cases[writes/2],"registered creation reads retained case");
                 x=145+int(writes/2)*19;y=691;return true;
@@ -44,10 +47,12 @@ int main() {
         } owner{reject,area};
         auto range=[&](unsigned,unsigned){
             require(owner.births==7,"registered fixtures before stock selection");
+            require(owner.parent->messageX.high==0x405e2000u&&!owner.parent->messageX.low,"fractional message anchor precedes stock RNG");
             const unsigned values[]={100,101,104,105};return values[rng++];
         };
-        auto choice=[&]{require(owner.births==10&&owner.writes==6,"farewell follows all item assignments");++choices;return 2u;};
-        auto* shop=world.createRegistered(100,700,range,choice,4,area,false,0,false,owner,good);
+        struct Lookup {unsigned calls=0;bool lookup(const char*,const char*& out){++calls;out="translated";return true;}} lookup;
+        auto choice=[&]{require(owner.births==10&&owner.writes==6&&lookup.calls==13,"farewell follows all items and preceding language reads");++choices;return 2u;};
+        auto* shop=world.createRegisteredWithText(100,700,range,choice,4,area,false,0,false,owner,good,lookup);
         require(bool(shop)==(reject==0)&&good==(reject==0)&&world.allocatedCount==1,"registered shop failure prefix retained");
         require(rng==((reject==1||reject>=11)?0u:4u)&&choices==(reject?0u:1u),"registered shop RNG prefix");
         if(reject>=11)require(!owner.births&&owner.audio==reject-10,"radio failure stops before child births");

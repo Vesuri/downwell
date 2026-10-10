@@ -2,6 +2,7 @@
 #include "core/StoredWorldCollision.h"
 #include "core/ShopFixtures.h"
 #include "ShopParentChecks.h"
+#include "../../generated/downwell-shop-text.h"
 #include <fstream>
 #include <vector>
 #include <memory>
@@ -41,9 +42,14 @@ int main(){
         bool setGain(int handle,MotionBinary64 gain,int duration){require(handle==777&&gain.zero()&&duration==0,"gain");++calls;return true;}
     } audio;
     auto owner=live.shopCreationOwner<1>(objects,audio);
+    const char* language=shop_language::entries[0].language;
+    ShopLanguageLookup languageLookup{shop_language::entries,shop_language::count,language};
     const auto before=live.activeInstanceCount();const auto id=live.nextRuntimeInstanceId();
     ShopWorld::Instance* shop=nullptr;
-    require(live.withRegisteredShopCreation(owner,[&]{shop=live.registerShop(480,2000);return shop!=nullptr;}),"registered generation entry");
+    require(live.withRegisteredShopCreation(owner,languageLookup,[&]{shop=live.registerShop(480,2000);return shop!=nullptr;}),"registered generation entry");
+    const char* greeting=nullptr;require(languageLookup.lookup("shopGreet0",greeting)&&
+        ShopLanguageLookup::same(shop->text.greeting[0],greeting)&&shop->text.index==4&&
+        shop->messageX.high==MotionBinary64::fromInteger(500).high,"registered source message fields");
     auto* legacy=control.registerShop(480,2000);
     require(legacy&&audio.calls==2&&live.activeInstanceCount()==before+11&&live.nextRuntimeInstanceId()==id+11&&
         shop->sourceId==id&&live.instance(id)->objectId==277,"one live numeric stream");
@@ -55,6 +61,16 @@ int main(){
     const auto parentKey=owner.parent(id)->key;
     for(unsigned i=before;i<live.activeInstanceCount();++i)
         require(collision->resolve(live.instanceHandleAt(i))==&live.instanceAt(i),"collision owner resolves every shop lifetime");
+    const auto previousText=shop->children.risingText;
+    const auto speechId=live.nextRuntimeInstanceId();ShopInteraction::Input speechInput;speechInput.confirm=true;
+    CurrencyAccount speechCurrency;
+    auto say=[&](ShopMenuEvents::Message message,MotionBinary64 y){return owner.sayMessage(id,message,y);};
+    ShopCachedSpeechProbe speech{*shop,speechCurrency,say};
+    require(owner.parentStepBody(id,speechInput,speechCurrency,speech)&&!speechInput.confirm&&speech.says==1&&
+        shop->children.risingText==speechId&&live.instance(previousText)->destroyRequested,"opening uses real source-ordered speech replacement");
+    const auto* text=owner.children().state(owner.children().sourceHandle(speechId));
+    require(text&&ShopLanguageLookup::same(text->text,greeting)&&live.instance(speechId)->preciseX==500&&
+        live.instance(speechId)->preciseY==1982,"cached language text and retained message anchor");
     require(owner.clear()&&live.activeInstanceCount()==before&&!collision->resolve(parentKey),"retire registered shop");layers(live);
     // Isolate the child whose later events are admitted. Other shop families
     // must not be silently treated as complete by this scheduler fixture.

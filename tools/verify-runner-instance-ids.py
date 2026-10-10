@@ -286,6 +286,8 @@ cursor = 0
 for object_id in (278, 279, 279, 279, 98, 280, 212):
     cursor = prefix.index(f"pushi.e {object_id}\nconv.i.v", cursor) + 1
 assert "call.i irandom_range" not in prefix
+assert "push.v self.keeper\npushi.e -9\npush.v [stacktop]self.x\npushi.e 2\nadd.i.v\npop.v.v self.msgx" in prefix
+assert prefix.rindex("call.i gml_Script_instance_create(argc=3)") < prefix.index("pop.v.v self.msgx")
 assert stock.index("call.i irandom_range") < stock.index("pushi.e 283\nconv.i.v")
 item_loop = stock[stock.index(":[20]\n"):stock.index(":[28]\n")]
 assert "push.v self.i\npushi.e 3\ncmp.i.v LTE" in item_loop

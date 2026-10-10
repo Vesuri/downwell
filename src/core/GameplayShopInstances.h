@@ -50,6 +50,11 @@ public:
         for(unsigned i=0;i<capacity;++i)if(source&&records_[i].lifetimeId&&records_[i].sourceId==source)return handle(i);
         return {};
     }
+    template<class Allocate> bool sayMessage(InstanceHandle h,ShopMenuEvents::Message message,MotionBinary64 y,Allocate& allocate){
+        if(!ready(h,277)||!records_[h.slot].shop)return fail();
+        const auto& shop=*records_[h.slot].shop;const auto* text=ShopMenuEvents::message(shop.text,message);
+        return text?replaceRisingText(h,shop.messageX,y,text,allocate):fail();
+    }
     template<class Allocate> bool replaceRisingText(InstanceHandle h,MotionBinary64 x,MotionBinary64 y,
         const char* text,Allocate& allocate){
         if(!ready(h,277)||!records_[h.slot].shop)return fail();
@@ -98,6 +103,10 @@ public:
             x=px;y=py;return true;
         }
         bool readX(unsigned source,int& x){int y;return position(source,x,y);}
+        bool readXReal(unsigned source,MotionBinary64& x){
+            const auto* r=owner_.find(owner_.sourceHandle(source));
+            if(!valid()||!r||!r->initialized)return owner_.fail();x=r->x.promoted();return true;
+        }
         bool upgrade(unsigned source,unsigned value){return owner_.write(source,283,value);}
         bool stored(unsigned source,unsigned value){return owner_.write(source,279,value);}
     };

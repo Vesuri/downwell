@@ -7,6 +7,20 @@ namespace downwell {
 // the view branch and crime/exit/sign tail afterwards in the same inner body.
 struct ShopMenuEvents {
     enum class Message {welcome,hello,hoho,thank,maido,poor,question,what,huh};
+    static const char* message(const ShopText& text,Message id){
+        switch(id){
+            case Message::welcome:return text.greeting[0];
+            case Message::hello:return text.greeting[1];
+            case Message::hoho:return text.greeting[2];
+            case Message::thank:return text.thank;
+            case Message::maido:return text.sold;
+            case Message::poor:return text.poor;
+            case Message::question:return "?";
+            case Message::what:return text.what;
+            case Message::huh:return text.huh;
+        }
+        return nullptr;
+    }
     enum class KeeperField {thankful,goodbye,confused};
     template<class Ops> static bool exit(ShopInteraction& menu,Ops& ops){
         menu.exitRequested=true;

@@ -58,6 +58,12 @@ struct ShopParentProbe:ShopMenuProbe {
     }
     bool playerX(downwell::MotionBinary64& out){out=downwell::MotionBinary64::fromInteger(2000);return true;}
 };
+template<class Speak> struct ShopCachedSpeechProbe:ShopParentProbe {
+    Speak& speak;
+    ShopCachedSpeechProbe(downwell::ShopWorld::Instance& shop,downwell::CurrencyAccount& currency,Speak& callback)
+        :ShopParentProbe{shop,currency,shop.y},speak(callback){}
+    bool say(Message message,downwell::MotionBinary64 y){++says;return speak(message,y);}
+};
 inline bool checkShopParentEvents(){
     using namespace downwell;
     if(!checkShopWithCapture())return false;

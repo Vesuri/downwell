@@ -211,6 +211,16 @@ Run `PROBES=1 AMMO_FACTORED_VERIFY=1 bash amiga/profile.sh entry` to compare the
 natural entry gauge against the scalar renderer before accepting a handoff
 change. This is a pixel-oracle run, not a performance measurement.
 
+## Shop language strings
+
+`python3 tools/generate-shop-text.py` prepares the Shop's 25 language keys per
+language from the untouched `data/language.ini`. The generated header uses
+UTF-8 byte escapes and applies the source `langString` newline substitution
+(`*` to `#`), with a space for missing keys. Its sibling JSON manifest records
+tool version/hash, input/output hashes, object ID and keys. Both outputs stay
+under ignored `generated/`; no translated payload is committed. This prepares
+text storage, not font coverage or a device text renderer.
+
 ## Original audio
 
 After the UTMT extraction, run `python3 tools/extract-audio.py` to extract all

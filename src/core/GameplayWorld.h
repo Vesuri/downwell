@@ -2332,6 +2332,13 @@ public:
             return lo+enemyRandom_.irandomSmall(hi-lo);
         },[this]{return enemyRandom_.chooseIndexSmall(3);},health_,owner);
     }
+    template<class Owner,class Lookup>
+    downwell::ShopWorld::Instance* registerShopWithOwner(int x,int y,Owner& owner,Lookup& lookup){
+        if(!run_.effectsSucceeded)return nullptr;
+        return run_.createRegisteredShop(x,y,[this](unsigned lo,unsigned hi){
+            return lo+enemyRandom_.irandomSmall(hi-lo);
+        },[this]{return enemyRandom_.chooseIndexSmall(3);},health_,owner,lookup);
+    }
     const downwell::ShopWorld& shops() const { return run_.shops; }
     bool registerSideCameraLocker(int x, int y,unsigned sourceId=0) {
         return run_.effectsSucceeded=run_.effectsSucceeded&&run_.sideCameraLockers.create(x,y,sourceId);

@@ -654,6 +654,17 @@ generated/downwell-title-glyphs.h: tools/generate-title-glyphs.py extracted/utmt
 	python3 tools/generate-title-glyphs.py
 generated/downwell-area-titles.h: tools/generate-area-titles.py data/language.ini
 	python3 tools/generate-area-titles.py
+generated/downwell-shop-text.h: tools/generate-shop-text.py data/language.ini
+	python3 tools/generate-shop-text.py
+build/gameplay-collision-owner-test build/registered-shop-runtime-test: generated/downwell-shop-text.h
+build/shop-text-test: tests/core/ShopTextTest.cpp src/core/ShopText.h src/core/ShopInventory.h generated/downwell-shop-text.h
+	@mkdir -p build
+	$(CXX) -Isrc -Igenerated $(CXXFLAGS) -o $@ $<
+.PHONY: test-shop-text
+test-shop-text: build/shop-text-test
+	python3 tests/test_generate_shop_text.py
+	./build/shop-text-test
+test: test-shop-text
 build/level-number-test: tests/core/LevelNumberTest.cpp src/core/FontPack.cpp generated/downwell-area-titles.h generated/downwell-title-glyphs.h generated/downwell-fonts.dwfn $(wildcard src/core/*.h)
 	@mkdir -p build
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ $< src/core/FontPack.cpp

@@ -49,6 +49,11 @@ public:
         return nullptr;
     }
     auto& children(){return children_;}
+    bool sayMessage(unsigned id,ShopMenuEvents::Message message,MotionBinary64 y){
+        const auto* p=parent(id);if(!good_||!p||!p->shop)return fail();
+        const auto* text=ShopMenuEvents::message(p->shop->text,message);
+        return text?replaceRisingText(id,p->shop->messageX,y,text):fail();
+    }
     bool replaceRisingText(unsigned id,MotionBinary64 x,MotionBinary64 y,const char* text){
         const auto* p=parent(id);if(!good_||!p||!p->shop)return fail();
         struct Ops {
@@ -195,6 +200,7 @@ public:
     }
     unsigned create(int object,int x,int y){return children_.create(object,x,y);}
     bool readX(unsigned id,int& x){return children_.readX(id,x);}
+    bool readXReal(unsigned id,MotionBinary64& x){return children_.readXReal(id,x);}
     bool position(unsigned id,int& x,int& y){return children_.position(id,x,y);}
     bool upgrade(unsigned id,unsigned value){return children_.upgrade(id,value);}
     bool stored(unsigned id,unsigned value){return children_.stored(id,value);}

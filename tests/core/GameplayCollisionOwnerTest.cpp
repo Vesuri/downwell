@@ -275,12 +275,16 @@ struct NativeShopBirthOwner {
     bool begin(downwell::ShopWorld::Instance&);
     bool play(int,int,bool,int&);bool setGain(int,downwell::MotionBinary64,int);
     unsigned create(int,int,int);
-    bool readX(unsigned,int&);bool position(unsigned,int&,int&);
+    bool readX(unsigned,int&);bool readXReal(unsigned,downwell::MotionBinary64&);bool position(unsigned,int&,int&);
     bool upgrade(unsigned,unsigned);bool stored(unsigned,unsigned);
 };
 downwell::ShopWorld::Instance* nativeRegisteredShop(downwell::ShopWorld& shops,NativeShopBirthOwner& owner,
     unsigned (*range)(unsigned,unsigned),unsigned (*choice)(),bool& good){
     return shops.createRegistered(100,700,range,choice,4,1,false,0,false,owner,good);
+}
+downwell::ShopWorld::Instance* nativeRegisteredShopText(downwell::ShopWorld& shops,NativeShopBirthOwner& owner,
+    unsigned (*range)(unsigned,unsigned),unsigned (*choice)(),bool& good,downwell::ShopLanguageLookup& lookup){
+    return shops.createRegisteredWithText(100,700,range,choice,4,1,false,0,false,owner,good,lookup);
 }
 bool nativeExitSourceBirth(GameplayWorld& world,int y,bool (*allocate)(int,unsigned&)){
     return world.registerLevelExitWithSourceIds(y,allocate);

@@ -10,6 +10,7 @@
 #include "ShopChildCreation.h"
 #include "MotionBinary64.h"
 #include "ShopRisingText.h"
+#include "ShopText.h"
 namespace downwell {
 // Bounded world ownership and static child masks, separate from shop rendering.
 // Coordinates passed here are integer mask-query positions. Full fractional
@@ -33,6 +34,8 @@ struct ShopWorld {
         ShopKeeper keeper;
         InteractionPrompt prompt;
         ShopRisingText speech;
+        MotionBinary64 messageX{};
+        ShopText text;
     };
     Instance instances[capacity];
     unsigned allocatedCount = 0;
@@ -74,6 +77,26 @@ struct ShopWorld {
     template<class Range,class Choice,class Owner>
     Instance* createRegistered(int x,int y,Range random,Choice chooseFarewell,int health,unsigned area,
         bool hard,unsigned style,bool member,Owner& owner,bool& good){
+        return createRegisteredBody(x,y,random,health,area,hard,style,member,owner,good,[&](Instance& shop){
+            shop.farewellVariant=chooseFarewell();return good;
+        });
+    }
+    template<class Range,class Choice,class Owner,class Lookup>
+    Instance* createRegisteredWithText(int x,int y,Range random,Choice chooseFarewell,int health,unsigned area,
+        bool hard,unsigned style,bool member,Owner& owner,bool& good,Lookup& lookup){
+        return createRegisteredBody(x,y,random,health,area,hard,style,member,owner,good,[&](Instance& shop){
+            struct Ops {
+                Lookup& language;Choice& choose;bool& good;
+                bool lookup(const char* key,const char*& text){return language.lookup(key,text)&&good;}
+                bool chooseFarewell(unsigned& out){out=choose();return good;}
+            } ops{lookup,chooseFarewell,good};
+            return shop.text.assign(shop.stock,shop.farewellVariant,ops);
+        });
+    }
+private:
+    template<class Range,class Owner,class AssignText>
+    Instance* createRegisteredBody(int x,int y,Range random,int health,unsigned area,
+        bool hard,unsigned style,bool member,Owner& owner,bool& good,AssignText assignText){
         if(!good)return nullptr;
         for(auto& shop:instances)if(!shop.allocated){
             shop={};shop.x=x;shop.y=y;shop.present=true;
@@ -88,6 +111,8 @@ struct ShopWorld {
                 if(!good)return 0;const auto id=owner.create(object,cx,cy);return good?id:0;
             };
             if(!shop.children.beforeStock(x,y,create,[&](unsigned id,int& cx){return owner.readX(id,cx)&&good;})){good=false;return nullptr;}
+            if(!owner.readXReal(shop.children.keeper,shop.messageX)||!good||
+               !shop.messageX.add(MotionBinary64::fromInteger(2))){good=false;return nullptr;}
             shop.stock.create(random,health,area,hard,style,member);
             if(!shop.children.afterStock(shop.stock,create,
                 [&](unsigned id,int& cx,int& cy){return owner.position(id,cx,cy)&&good;},
@@ -95,10 +120,11 @@ struct ShopWorld {
                 [&](unsigned id,unsigned value){return owner.stored(id,value)&&good;})){
                 good=false;return nullptr;
             }
-            shop.farewellVariant=chooseFarewell();return good?&shop:nullptr;
+            if(!assignText(shop)||!good){good=false;return nullptr;}return &shop;
         }
         good=false;return nullptr;
     }
+public:
     static bool meets(const Instance& shop, int x, int y) {
         // sprShopCounter (480), origin 12,12, margins 2..11 / 11..20;
         // sprPlayerIdle mask -4..3 / -4..7.
