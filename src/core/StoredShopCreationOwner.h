@@ -33,6 +33,10 @@ public:
          children_(records,objects,lifecycle,nextId,room,good){}
     StoredShopCreationOwner(const StoredShopCreationOwner&)=delete;
     StoredShopCreationOwner& operator=(const StoredShopCreationOwner&)=delete;
+    bool belongsTo(const InstanceStore<WorldCapacity>& records,const ObjectPack* objects)const{
+        return &records_==&records && &objects_==objects;
+    }
+    bool valid()const{return good_;}
     const Parent* parent(unsigned id)const{
         for(const auto& p:parents_)if(id&&p.id==id&&live(p))return &p;
         return nullptr;

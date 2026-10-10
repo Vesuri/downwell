@@ -1988,6 +1988,12 @@ build/stored-shop-child-test: tests/core/StoredShopChildTest.cpp src/core/Object
 test-stored-shop-child: build/stored-shop-child-test
 	./build/stored-shop-child-test
 .PHONY: test-stored-shop-child
+build/registered-shop-runtime-test: tests/core/RegisteredShopRuntimeTest.cpp $(filter-out tests/core/StartupRuntimeTest.cpp,$(STARTUP_TEST_SOURCES)) $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+test-registered-shop-runtime: build/registered-shop-runtime-test
+	./build/registered-shop-runtime-test
+.PHONY: test-registered-shop-runtime
 .PHONY: test-shop-interaction
 build/shop-interaction-test: tests/core/ShopInteractionTest.cpp $(HOST_CHECK_HEADERS)
 	@mkdir -p build

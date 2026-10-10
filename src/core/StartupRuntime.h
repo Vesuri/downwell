@@ -6,6 +6,7 @@
 #include "BlastShootableContact.h"
 #include "InstanceStore.h"
 #include "StoredBuilderPublication.h"
+#include "StoredShopCreationOwner.h"
 #include "RunnerLayerIds.h"
 #include "ScriptEffectRuntimeBinding.h"
 #include "BoxStepDispatch.h"
@@ -2234,7 +2235,29 @@ public:
     unsigned droneNumber()const{return droneNumber_;}
     int mainNextMuzzleOffset() const { return mainEmitter_.leg; }
     const Consumables& consumables() const { return run_.consumables; }
+    template<unsigned Capacity,class Audio>
+    StoredShopCreationOwner<instanceCapacity,Capacity,Audio> shopCreationOwner(const ObjectPack& objects,Audio& audio){
+        return {instances_,objects,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded,audio};
+    }
+    // Borrow a concrete room owner for synchronous builder Shop births. This
+    // scope does not admit later shop events; they require their own handlers.
+    template<unsigned Capacity,class Audio,class Execute>
+    bool withRegisteredShopCreation(StoredShopCreationOwner<instanceCapacity,Capacity,Audio>& owner,Execute execute){
+        if(!run_.effectsSucceeded)return false;
+        if(shopCreate_||!owner.belongsTo(instances_,objectPack_)||!owner.valid())return run_.effectsSucceeded=false;
+        auto create=[&](int x,int y){
+            return run_.createRegisteredShop(x,y,[this](unsigned lo,unsigned hi){return lo+random_.irandomSmall(hi-lo);},
+                [this]{return random_.chooseIndexSmall(3);},mainPlayerHealth_,owner);
+        };
+        shopCreateContext_=&create;
+        shopCreate_=[](void* context,int x,int y){return (*static_cast<decltype(create)*>(context))(x,y);};
+        struct Reset {StartupRuntime& world;~Reset(){world.shopCreate_=nullptr;world.shopCreateContext_=nullptr;}} reset{*this};
+        const bool ok=execute();
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok&&owner.valid();
+    }
     ShopWorld::Instance* registerShop(int x, int y) {
+        if(!run_.effectsSucceeded)return nullptr;
+        if(shopCreate_)return shopCreate_(shopCreateContext_,x,y);
         return run_.createShop(x, y, [this](unsigned lo, unsigned hi) {
             return lo + random_.irandomSmall(hi - lo);
         }, [this] { return random_.chooseIndexSmall(3); }, mainPlayerHealth_);
@@ -2592,6 +2615,8 @@ private:
     // objects before GameMaker returns to the step loop.
     DeferredInstanceQueue<512> deferredInstances_;
     std::uint32_t nextRuntimeInstanceId_ = 105187;
+    void* shopCreateContext_=nullptr;
+    ShopWorld::Instance* (*shopCreate_)(void*,int,int)=nullptr;
     bool deferredCommandsSucceeded_ = true;
     bool inputLeft_ = false;
     bool inputRight_ = false;

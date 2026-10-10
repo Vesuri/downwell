@@ -517,6 +517,11 @@ struct RunSession {
         return shops.create(x, y, random, chooseFarewell, health, stage.area > 0 ? stage.area : 1,
                             false, 0, upgrades.levels[14] != 0);
     }
+    template<class Range,class Choice,class Owner>
+    ShopWorld::Instance* createRegisteredShop(int x,int y,Range random,Choice chooseFarewell,int health,Owner& owner){
+        return shops.createRegistered(x,y,random,chooseFarewell,health,stage.area>0?stage.area:1,
+            false,0,upgrades.levels[14]!=0,owner,effectsSucceeded);
+    }
     LevelExit levelExit;
     GoalTimeField goalField;
     GoalTimeField startField;

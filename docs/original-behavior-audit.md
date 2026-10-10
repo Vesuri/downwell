@@ -696,6 +696,15 @@ the room owner. The parent record and compact Shop state remain linked until
 explicit teardown, which must precede `ShopWorld::reset`. This supplies the
 creation boundary, not automatic admission of later shop events.
 
+`StartupRuntime::withRegisteredShopCreation` borrows that owner around the
+existing `registerShop` entry used by the builder. It rejects nested or foreign
+room owners and restores the dispatch binding on scope exit. `RunSession`
+supplies the same health, area and membership-card pricing context as compact
+creation; the room supplies the actual RNG and numeric counter. Positioned
+births require a real lifecycle owner, not a birth-then-move fallback. The
+normal frontends do not install this scope until the later event paths are
+admitted.
+
 `scrBuilder` blocks 187 and 207 write `self.y += 16` after each newline's
 pillars and each extra-pillar row respectively. Shared scalar, run and prepared
 generation retain these setter boundaries, including the completed prefix on
