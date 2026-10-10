@@ -1730,6 +1730,32 @@ int main(){
             return true;
         }),"bound blast wall event succeeds");
     }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach blast bone world");world->skipToGameForTesting();
+        auto blasts=world->blastRegistration<1>();auto bones=world->boneRegistration<1>();auto flashes=world->flashBallRegistration<1>();
+        auto skeletons=world->skeletonRegistration<1>();auto smoke=world->smokeRegistration<1>();
+        auto particles=world->consumptionBloodRegistration<1>();auto pass=std::make_unique<StoredDitherCollisionPass>(*owner);
+        InstanceHandle bone,blast;require(world->spawnBone(bones,240,200,bone),"create blast bone target");int speed=60;
+        require(world->withMomentDelayRoomSpeed(speed,[&]{
+            if(!world->spawnBlast(blasts,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(200),blast))return false;
+            const auto next=world->nextRuntimeInstanceId();const auto draws=world->randomDrawCount();
+            SoundPlayEnvironment env;BlastHitAudio audio;TimeStopEffects<4> stop;unsigned stomps=0,damages=0;
+            for(unsigned repeat=0;repeat<2;++repeat)
+                if(!pass->runSkeletonContacts(*world,skeletons,bones,smoke,particles,blasts,flashes,stop,
+                    [&](int sprite,unsigned& count){return sprites.frameCount(sprite,count);},env,audio,
+                    [](auto dy,auto dx,auto& angle){return portableAtan(dy,dx,angle);},
+                    [](auto&,int,int,int){return false;},
+                    [&](auto& actor){return CheckedSkeletonContact{actor,4,stomps,damages};}))return false;
+            const auto* target=bones.instances().find(bone);const auto* flash=world->instance(next);
+            require(target&&target->state.health.high==MotionBinary64::fromInteger(-49).high&&!target->state.health.low&&
+                !target->state.hit&&!target->destroyRequested&&flashes.instances().size()==1&&flash&&flash->objectId==224&&
+                flash->imageIndex==1&&flash->imageSpeed==0.3f&&world->nextRuntimeInstanceId()==next+1&&world->randomDrawCount()==draws+8,
+                "blast bone contact creates one real flash and preserves deferred destruction");
+            return true;
+        }),"blast bone event succeeds");
+    }
     for(bool missingFrames:{false,true}){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());

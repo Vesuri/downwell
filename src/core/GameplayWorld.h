@@ -364,6 +364,15 @@ public:
         if(registeredFlash_||!instances.valid()||instances.size())return false;
         registeredFlash_=&instances;return true;
     }
+    template<class Allocate> bool emitBlastContactFlash(downwell::SmokeBurstCaller& caller,
+        downwell::MotionBinary64 x,downwell::MotionBinary64 y,Allocate allocate){
+        if(!run_.effectsSucceeded)return false;
+        return run_.effectsSucceeded=registeredFlash_&&downwell::flashBurstPublished<1,0,0>(
+            caller,x,y,enemyRandom_,[&](int object,auto px,auto py){
+                unsigned id=0;downwell::InstanceHandle child;
+                return object==224&&allocate(id)&&registeredFlash_->create(id,px,py,enemyRandom_,child);
+            });
+    }
     template<class Allocate> bool emitSkeletonFlash(downwell::SkeletonActor& actor,Allocate allocate){
         if(!run_.effectsSucceeded)return false;
         return run_.effectsSucceeded=registeredFlash_&&downwell::flashBurstPublished<6,2,10>(

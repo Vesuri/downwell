@@ -91,17 +91,48 @@ public:
         StoredBlastRegistration<StartupRuntime::instanceCapacity,BlastCapacity>& blasts,
         const TimeStopEffects<StopCapacity>& stop,Frames frames,SoundPlayEnvironment& environment,Audio& audio,
         Atan atan,Damage damage,MakePlayer makePlayer){
+        return runBlastContactsUsing(world,skeletons,bones,smoke,particles,blasts,stop,frames,environment,audio,atan,damage,makePlayer,
+            [](const auto&,const auto&){return false;},[](const auto&){return false;});
+    }
+    template<unsigned Capacity,unsigned BoneCapacity,unsigned SmokeCapacity,unsigned ParticleCapacity,unsigned BlastCapacity,unsigned FlashCapacity,unsigned StopCapacity,
+             class Frames,class Audio,class Atan,class Damage,class MakePlayer>
+    bool runSkeletonContacts(StartupRuntime& world,
+        StoredSkeletonRegistration<StartupRuntime::instanceCapacity,Capacity>& skeletons,
+        StoredBoneRegistration<StartupRuntime::instanceCapacity,BoneCapacity>& bones,
+        StoredSmokeRegistration<StartupRuntime::instanceCapacity,SmokeCapacity>& smoke,
+        StoredConsumptionBloodRegistration<StartupRuntime::instanceCapacity,ParticleCapacity>& particles,
+        StoredBlastRegistration<StartupRuntime::instanceCapacity,BlastCapacity>& blasts,
+        StoredFlashBallRegistration<StartupRuntime::instanceCapacity,FlashCapacity>& flashes,
+        const TimeStopEffects<StopCapacity>& stop,Frames frames,SoundPlayEnvironment& environment,Audio& audio,
+        Atan atan,Damage damage,MakePlayer makePlayer){
+        if(!flashes.valid())return false;
+        return runBlastContactsUsing(world,skeletons,bones,smoke,particles,blasts,stop,frames,environment,audio,atan,damage,makePlayer,
+            [&](const auto& a,const auto& b){return a.objectId==276&&b.objectId==269&&blasts.handle(a).generation&&bones.handle(b).generation;},
+            [&](const auto& event){return world.dispatchBlastBoneCollision(blasts,bones,flashes,event);});
+    }
+private:
+    template<unsigned Capacity,unsigned BoneCapacity,unsigned SmokeCapacity,unsigned ParticleCapacity,unsigned BlastCapacity,unsigned StopCapacity,
+             class Frames,class Audio,class Atan,class Damage,class MakePlayer,class ExtraPair,class ExtraEvent>
+    bool runBlastContactsUsing(StartupRuntime& world,
+        StoredSkeletonRegistration<StartupRuntime::instanceCapacity,Capacity>& skeletons,
+        StoredBoneRegistration<StartupRuntime::instanceCapacity,BoneCapacity>& bones,
+        StoredSmokeRegistration<StartupRuntime::instanceCapacity,SmokeCapacity>& smoke,
+        StoredConsumptionBloodRegistration<StartupRuntime::instanceCapacity,ParticleCapacity>& particles,
+        StoredBlastRegistration<StartupRuntime::instanceCapacity,BlastCapacity>& blasts,
+        const TimeStopEffects<StopCapacity>& stop,Frames frames,SoundPlayEnvironment& environment,Audio& audio,
+        Atan atan,Damage damage,MakePlayer makePlayer,ExtraPair extraPair,ExtraEvent extraEvent){
         if(!owner_.boundTo(world)||!blasts.valid())return false;
         return runSkeletonContactsUsing(world,skeletons,bones,smoke,particles,stop,frames,environment,audio,atan,damage,
             [&](const auto& a,const auto& b){
                 return (a.objectId==120&&b.objectId==35&&skeletons.handle(a).generation)||
                     (a.objectId==276&&b.objectId==35&&blasts.handle(a).generation)||
                     (a.objectId==276&&(b.objectId==60||b.objectId==92)&&blasts.handle(a).generation)||
-                    (a.objectId==276&&b.objectId==120&&blasts.handle(a).generation&&skeletons.handle(b).generation);
+                    (a.objectId==276&&b.objectId==120&&blasts.handle(a).generation&&skeletons.handle(b).generation)||extraPair(a,b);
             },[&](const auto& event){
                 const auto* self=owner_.resolve(event.self);if(!self)return false;
                 if(self->objectId==276&&event.subtype==35)return world.dispatchBlastPlayerCollision(blasts,event);
                 if(self->objectId==276&&event.code==2330)return world.dispatchBlastWallCollision(blasts,event);
+                if(self->objectId==276&&event.code==2329)return extraEvent(event);
                 return self->objectId==276?world.dispatchBlastSkeletonCollisionWithEffects(blasts,skeletons,event,frames,environment,audio):
                     world.dispatchSkeletonCollision(skeletons,event,makePlayer);
             });

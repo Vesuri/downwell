@@ -431,6 +431,15 @@ adds the player to hit memory nor produces damage, sound or an impact. The
 encounter routers admit this event; an unrecognized blast target still requires
 its own handler and must not be silently treated as another empty event.
 
+Blast/bone contact resolves inherited shootable event 2329. It records the
+bone's source ID, subtracts health, and synchronously emits one registered
+object-224 flash through `scrFlashballfx(1,0,0)`. It does not set the ordinary
+bullet-hit flag or retire the bone. The zero-variation arguments still consume
+four RNG words before child Create; flash Create consumes four more for its
+own position jitter. Allocation failure retains the health/hit-memory/caller
+writes and the first four draws, but stops the event. Both collected encounter
+paths admit the contact when the registered flash dependency is supplied.
+
 Effect-producing callbacks return success. `SkeletonActor` stops the event on
 failed enemy-death setup, blood, smoke, flash, currency, corpse or debris
 creation; stomp blood and each Exploding Knees smoke emission have the same

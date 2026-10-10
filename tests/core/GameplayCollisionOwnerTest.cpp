@@ -7159,6 +7159,42 @@ int main(){
             assert(contacts==2&&owner->registeredBlasts().find(blast)->state.hits.count==2&&
                 next==605205&&audio.calls==12&&!stomps&&!damages);
         }
+        for(bool rejectFlash:{false,true}){
+            auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+                GameplayTerrainInstances::WallCollision{},&rooms,ownership);
+            auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+            assert(owner->attach(*world));int speed=60;assert(world->bindControllerRoomSpeed(speed));
+            InstanceHandle controller,bone,blast,self,other;
+            assert(owner->runControllers().create(100065,{}, {},[](InstanceHandle){return true;},controller)&&
+                world->createBoneWithSourceId(605220,240,200,bone)&&
+                owner->createBlast(605221,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(200),blast)&&
+                GameplayCollisionView::encode(GameplayCollisionView::Kind::blast,blast,self)&&
+                GameplayCollisionView::encode(GameplayCollisionView::Kind::bone,bone,other));
+            const auto draws=world->randomDrawCount();unsigned allocations=0;RunnerCollisionEventContext context;
+            auto pairs=std::make_unique<RunnerCollisionPairs<GameplayCollisionView::capacity,16384>>();
+            struct BoneMotionGuard {
+                bool rollback(InstanceHandle){assert(false);return false;}
+                bool prepareMotion(InstanceHandle){assert(false);return false;}
+                bool advanceMotion(InstanceHandle){assert(false);return false;}
+            } motion;
+            for(unsigned repeat=0;repeat<(rejectFlash?1u:2u);++repeat){
+                assert(owner->collectCollisionPairs(*pairs));
+                const bool ok=owner->executeCollisionPairs(*pairs,masks,context,motion,
+                    []{return RunnerCollisionEventContext::RoomState{true,false};},[&](const auto& event){
+                        assert(event.self.slot==self.slot&&event.other.slot==other.slot&&event.code==2329);
+                        return owner->dispatchBlastBoneCollision(event,[&](unsigned& id){++allocations;id=605222;return !rejectFlash;});
+                    });
+                assert(ok==!rejectFlash);
+            }
+            const auto* target=owner->bones().find(bone);const auto* caller=owner->registeredBlasts().find(blast);
+            assert(target&&target->state.health.high==MotionBinary64::fromInteger(-49).high&&!target->state.health.low&&
+                !target->state.hit&&!target->destroyRequested&&caller&&caller->state.hits.count==1&&allocations==1&&
+                caller->state.flashCaller.smokenum==1&&!caller->state.flashCaller.pvary&&
+                world->randomDrawCount()==draws+(rejectFlash?4:8));
+            const auto* flash=owner->registeredFlash().find(owner->registeredFlash().sourceHandle(605222));
+            assert(bool(flash)==!rejectFlash);
+            if(flash)assert(flash->state.imageIndex.bits==0x3f800000u&&flash->state.imageSpeed.bits==0x3e99999au);
+        }
         for(bool generated:{false,true})for(bool knownId:{false,true}){
             auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
                 GameplayTerrainInstances::WallCollision{},&rooms,ownership);

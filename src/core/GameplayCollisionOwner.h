@@ -3,6 +3,7 @@
 #include "GameplayCollisionView.h"
 #include "BlastSkeletonContact.h"
 #include "BlastWallContact.h"
+#include "BlastShootableContact.h"
 #include "BoxDestructionScript.h"
 #include "MainRoomLifetime.h"
 #include "RunnerSpatialInstances.h"
@@ -2149,6 +2150,7 @@ public:
                 if(!View::decode(unhandled.self,kind,local))return false;
                 if(kind==View::Kind::blast&&unhandled.subtype==35)return dispatchBlastPlayerCollision(unhandled);
                 if(kind==View::Kind::blast&&unhandled.code==2330)return dispatchBlastWallCollision(unhandled);
+                if(kind==View::Kind::blast&&unhandled.subtype==269)return dispatchBlastBoneCollision(unhandled,allocate);
                 return kind==View::Kind::blast&&unhandled.subtype==120?
                     dispatchBlastSkeletonCollisionWithEffects(unhandled,allocate,frames,environment,audio):other(unhandled);
             });
@@ -2178,6 +2180,22 @@ public:
            !objects_.collisionEvent(261,120,found,binding)||!found||
            binding.ownerObjectId!=261||binding.codeId!=2224)return check(false);
         return check(world_->hitSkeletonWithSourceBullet(shot,target,frames,delay,environment,audio,atan));
+    }
+    template<class Allocate> bool dispatchBlastBoneCollision(const RunnerCollisionEventContext::Frame& event,Allocate allocate){
+        View::Kind kind,targetKind;InstanceHandle local,target;PackedObjectEvent binding{};bool found=false;
+        if(!valid()||!world_||!resolves(event.self)||!resolves(event.other)||
+           !View::decode(event.self,kind,local)||kind!=View::Kind::blast||
+           !View::decode(event.other,targetKind,target)||targetKind!=View::Kind::bone||
+           event.type!=4||event.subtype!=269||event.owner!=276||event.code!=2329||
+           !objects_.collisionEvent(276,269,found,binding)||!found||binding.ownerObjectId!=276||binding.codeId!=2329)return check(false);
+        const auto* caller=blasts_.find(local);const auto* victim=bones_.find(target);
+        if(!caller||!victim)return check(false);
+        const auto x=caller->x.promoted(),y=caller->y.promoted();const auto id=victim->sourceId;
+        return check(blasts_.dispatch(local,[&](auto& actor,auto&,bool& good){
+            return blastShootableContact(actor,id,x,y,[&](MotionBinary64& hp){bool unused;return projectileShootableFields(event.other,hp,unused);},
+                [&](MotionBinary64 hp){return projectileShootableHealthWrite(event.other,hp);},
+                [&](auto& state,auto px,auto py){return world_->emitBlastContactFlash(state,px,py,allocate);},good);
+        }));
     }
     bool dispatchBlastWallCollision(const RunnerCollisionEventContext::Frame& event){
         View::Kind kind;InstanceHandle local;View::Record target;

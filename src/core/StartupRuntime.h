@@ -3,6 +3,7 @@
 
 #include "AreaOneBuilder.h"
 #include "BlastWallContact.h"
+#include "BlastShootableContact.h"
 #include "InstanceStore.h"
 #include "StoredBuilderPublication.h"
 #include "RunnerLayerIds.h"
@@ -1846,6 +1847,27 @@ public:
            binding.ownerObjectId!=223||event.owner!=223||event.code!=binding.codeId||
            (event.code!=2007&&event.code!=2008))return run_.effectsSucceeded=false;
         return run_.effectsSucceeded=particles.kill(*self)&&run_.effectsSucceeded;
+    }
+    template<unsigned BlastCapacity,unsigned BoneCapacity,unsigned FlashCapacity>
+    bool dispatchBlastBoneCollision(StoredBlastRegistration<instanceCapacity,BlastCapacity>& blasts,
+        StoredBoneRegistration<instanceCapacity,BoneCapacity>& bones,
+        StoredFlashBallRegistration<instanceCapacity,FlashCapacity>& flashes,const RunnerCollisionEventContext::Frame& event){
+        const auto* self=instances_.resolve(event.self);const auto* other=instances_.resolve(event.other);
+        PackedObjectEvent binding{};bool found=false;
+        if(!run_.effectsSucceeded||!blasts.belongsTo(instances_)||!blasts.valid()||!bones.belongsTo(instances_)||!bones.valid()||
+           !flashes.belongsTo(instances_)||!flashes.valid()||!self||!other||!objectPack_||self->objectId!=276||other->objectId!=269||
+           event.type!=4||event.subtype!=269||event.owner!=276||event.code!=2329||
+           !objectPack_->collisionEvent(276,269,found,binding)||!found||binding.ownerObjectId!=276||binding.codeId!=2329)
+            return run_.effectsSucceeded=false;
+        const auto local=blasts.handle(*self);const auto* caller=blasts.instances().find(local);
+        if(!caller||!bones.handle(*other).generation)return run_.effectsSucceeded=false;
+        const auto x=caller->x.promoted(),y=caller->y.promoted();const auto id=other->instanceId;
+        return run_.effectsSucceeded=blasts.dispatch(local,[&](auto& actor,auto&,bool& good){
+            return blastShootableContact(actor,id,x,y,[&](MotionBinary64& hp){bool unused;return bones.readShootable(event.other,hp,unused);},
+                [&](MotionBinary64 hp){return bones.writeShootableHealth(event.other,hp);},
+                [&](auto& state,auto px,auto py){return flashBurstPublished<1,0,0>(state,px,py,random_,
+                    [&](int object,auto fx,auto fy){InstanceHandle child;return object==224&&flashes.create(fx,fy,random_,child);});},good);
+        });
     }
     template<unsigned Capacity> bool dispatchBlastWallCollision(
         StoredBlastRegistration<instanceCapacity,Capacity>& blasts,const RunnerCollisionEventContext::Frame& event){
