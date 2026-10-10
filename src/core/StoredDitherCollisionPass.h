@@ -96,10 +96,12 @@ public:
             [&](const auto& a,const auto& b){
                 return (a.objectId==120&&b.objectId==35&&skeletons.handle(a).generation)||
                     (a.objectId==276&&b.objectId==35&&blasts.handle(a).generation)||
+                    (a.objectId==276&&(b.objectId==60||b.objectId==92)&&blasts.handle(a).generation)||
                     (a.objectId==276&&b.objectId==120&&blasts.handle(a).generation&&skeletons.handle(b).generation);
             },[&](const auto& event){
                 const auto* self=owner_.resolve(event.self);if(!self)return false;
                 if(self->objectId==276&&event.subtype==35)return world.dispatchBlastPlayerCollision(blasts,event);
+                if(self->objectId==276&&event.code==2330)return world.dispatchBlastWallCollision(blasts,event);
                 return self->objectId==276?world.dispatchBlastSkeletonCollisionWithEffects(blasts,skeletons,event,frames,environment,audio):
                     world.dispatchSkeletonCollision(skeletons,event,makePlayer);
             });

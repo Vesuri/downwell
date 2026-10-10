@@ -407,9 +407,21 @@ families; the native encounter router accepts the same events from its enclosing
 sealed collision pass. Neither performs a separate blast collision walk.
 Collected-contact fixtures cover two overlapping targets and a repeated pass,
 including real impact births and duplicate sound/damage suppression. This is
-not natural encounter admission. Native blast wall
-contacts also require original numeric IDs for breakable hit memory; native
-storage slots are not valid substitutes.
+not natural encounter admission.
+
+Blast wall event 2330 uses the target object's direct parent, not a descendant
+test. Only parent 84 reaches hit memory and wall health. Both owners bind this
+event to retained box health; negative health remains until the box's own Step
+handles destruction, and the event does not set the ordinary bullet-hit flag.
+Native breakable batches can accept source IDs before lifecycle publication;
+omitting them leaves identity unknown. IDs are retained separately from slots
+and registration order (four bytes per record, 2 KiB for the 512-slot pool).
+Known IDs feed blast hit memory; unknown IDs fail at the source ID read rather
+than aliasing a native handle. The stored pass admits plain walls and boxes;
+neither has a reverse blast event in the resource inheritance chain.
+The complete native creation stream must still supply these IDs in natural
+generation, and native scenery's global identity/layer lookup remains separate
+integration work. Explicit numbered batches do not establish that stream.
 
 Blast/player event 2332 has an empty body after its damage-window guard in the
 VM. Both resource-backed adapters validate the two retained lifetimes and route

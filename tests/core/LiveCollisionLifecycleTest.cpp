@@ -1704,6 +1704,32 @@ int main(){
             return true;
         }),"collected blast encounter succeeds");
     }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach blast box world");world->skipToGameForTesting();
+        auto blasts=world->blastRegistration<1>();InstanceHandle box,blast;
+        auto skeletons=world->skeletonRegistration<1>();auto bones=world->boneRegistration<1>();
+        auto smoke=world->smokeRegistration<1>();auto particles=world->consumptionBloodRegistration<1>();
+        auto pass=std::make_unique<StoredDitherCollisionPass>(*owner);
+        require(world->spawnBuilderPrimitive(92,240,200,box),"create blast box target");
+        const auto id=world->resolveInstance(box)->instanceId;int speed=60;
+        require(world->withMomentDelayRoomSpeed(speed,[&]{
+            if(!world->spawnBlast(blasts,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(200),blast))return false;
+            SoundPlayEnvironment env;BlastHitAudio audio;TimeStopEffects<4> stop;unsigned stomps=0,damages=0;
+            for(unsigned repeat=0;repeat<2;++repeat)
+                if(!pass->runSkeletonContacts(*world,skeletons,bones,smoke,particles,blasts,stop,
+                    [&](int sprite,unsigned& count){return sprites.frameCount(sprite,count);},env,audio,
+                    [](auto dy,auto dx,auto& angle){return portableAtan(dy,dx,angle);},
+                    [](auto&,int,int,int){return false;},
+                    [&](auto& actor){return CheckedSkeletonContact{actor,4,stomps,damages};}))return false;
+            const auto* target=world->resolveInstance(box);const auto& actor=blasts.instances().find(blast)->state;
+            require(target&&target->box.wallHp.high==MotionBinary64::fromInteger(-49).high&&!target->box.wallHp.low&&
+                !target->box.hit&&actor.hits.count==1&&unsigned(actor.hits.ids[0])==id,
+                "blast writes health once without bullet-hit effects or immediate retirement");
+            return true;
+        }),"bound blast wall event succeeds");
+    }
     for(bool missingFrames:{false,true}){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());

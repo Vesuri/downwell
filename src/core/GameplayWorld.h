@@ -260,6 +260,7 @@ public:
         // Native ownership chronology only; simulation identity remains
         // lifetimeId. Mutable because lifecycle observers receive const data.
         mutable std::uint32_t nativeRegistration=0;
+        std::uint32_t sourceId=0; // VM numeric identity; never the native slot/order.
     };
     using BreakableLifecycleBinding = downwell::RecordLifecycleBinding<Breakable>;
     struct PlayerInstance {
@@ -1741,7 +1742,7 @@ public:
     // Append a newly generated batch without reviving destroyed earlier blocks.
     // Reject capacity failure before changing any state.
     bool appendBreakables(const int* x, const int* y, unsigned count,
-        const downwell::BreakableState* creation=nullptr);
+        const downwell::BreakableState* creation=nullptr,const std::uint32_t* sourceIds=nullptr);
     bool appendGeneratedBreakable(int x,int y,const downwell::GeneratedBreakableCreate& creation);
     void configureSolidResolver(SolidResolver resolver, void* context, SegmentResolver segment = nullptr,
                                 SolidResolver mask = nullptr,WallContactResolver walls = nullptr,

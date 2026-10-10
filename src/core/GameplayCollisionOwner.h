@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_GAMEPLAY_COLLISION_OWNER_H
 #include "GameplayCollisionView.h"
 #include "BlastSkeletonContact.h"
+#include "BlastWallContact.h"
 #include "BoxDestructionScript.h"
 #include "MainRoomLifetime.h"
 #include "RunnerSpatialInstances.h"
@@ -739,6 +740,7 @@ private:
                 })))return false;
             unsigned sourceId=0;
             if constexpr(Kind==View::Kind::terrain)sourceId=r.sourceInstanceId;
+            if constexpr(Kind==View::Kind::breakable)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
             if constexpr(Kind==View::Kind::timeField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::debris||Kind==View::Kind::scriptEffect)sourceId=r.sourceId;
@@ -844,6 +846,7 @@ private:
                 }
             unsigned sourceId=0;
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
+            if constexpr(Kind==View::Kind::breakable)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeField)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::debris||Kind==View::Kind::scriptEffect)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
@@ -2145,6 +2148,7 @@ public:
                 View::Kind kind;InstanceHandle local;
                 if(!View::decode(unhandled.self,kind,local))return false;
                 if(kind==View::Kind::blast&&unhandled.subtype==35)return dispatchBlastPlayerCollision(unhandled);
+                if(kind==View::Kind::blast&&unhandled.code==2330)return dispatchBlastWallCollision(unhandled);
                 return kind==View::Kind::blast&&unhandled.subtype==120?
                     dispatchBlastSkeletonCollisionWithEffects(unhandled,allocate,frames,environment,audio):other(unhandled);
             });
@@ -2174,6 +2178,21 @@ public:
            !objects_.collisionEvent(261,120,found,binding)||!found||
            binding.ownerObjectId!=261||binding.codeId!=2224)return check(false);
         return check(world_->hitSkeletonWithSourceBullet(shot,target,frames,delay,environment,audio,atan));
+    }
+    bool dispatchBlastWallCollision(const RunnerCollisionEventContext::Frame& event){
+        View::Kind kind;InstanceHandle local;View::Record target;
+        PackedObjectEvent binding{};PackedObject definition{};bool found=false;
+        if(!valid()||!world_||!resolves(event.self)||!resolves(event.other)||
+           !View::decode(event.self,kind,local)||kind!=View::Kind::blast||!View(*world_).resolve(event.other,target)||
+           event.type!=4||event.subtype!=objectOf(event.other)||event.owner!=276||event.code!=2330||
+           !objects_.collisionEvent(276,event.subtype,found,binding)||!found||binding.ownerObjectId!=276||binding.codeId!=2330||
+           !objects_.findObject(event.subtype,definition))return check(false);
+        const unsigned id=target.breakable?target.breakable->sourceId:0;
+        return check(blasts_.dispatch(local,[&](auto& actor,auto&,bool& good){
+            return blastWallContact(actor,definition.parentId,id,
+                [&](MotionBinary64& hp){return projectileBoxHealth(event.other,hp);},
+                [&](MotionBinary64 hp){return projectileBoxHealthWrite(event.other,hp);},good);
+        }));
     }
     bool dispatchBlastPlayerCollision(const RunnerCollisionEventContext::Frame& event){
         View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;

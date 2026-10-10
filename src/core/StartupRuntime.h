@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_STARTUP_RUNTIME_H
 
 #include "AreaOneBuilder.h"
+#include "BlastWallContact.h"
 #include "InstanceStore.h"
 #include "StoredBuilderPublication.h"
 #include "RunnerLayerIds.h"
@@ -1845,6 +1846,21 @@ public:
            binding.ownerObjectId!=223||event.owner!=223||event.code!=binding.codeId||
            (event.code!=2007&&event.code!=2008))return run_.effectsSucceeded=false;
         return run_.effectsSucceeded=particles.kill(*self)&&run_.effectsSucceeded;
+    }
+    template<unsigned Capacity> bool dispatchBlastWallCollision(
+        StoredBlastRegistration<instanceCapacity,Capacity>& blasts,const RunnerCollisionEventContext::Frame& event){
+        const auto* self=instances_.resolve(event.self);const auto* other=instances_.resolve(event.other);
+        PackedObjectEvent binding{};PackedObject target{};bool found=false;
+        if(!run_.effectsSucceeded||!blasts.belongsTo(instances_)||!blasts.valid()||!self||!other||!objectPack_||
+           self->objectId!=276||event.type!=4||event.subtype!=other->objectId||event.owner!=276||event.code!=2330||
+           !objectPack_->collisionEvent(276,other->objectId,found,binding)||!found||binding.ownerObjectId!=276||binding.codeId!=2330||
+           !objectPack_->findObject(other->objectId,target))return run_.effectsSucceeded=false;
+        const unsigned id=other->instanceId;
+        return run_.effectsSucceeded=blasts.dispatch(blasts.handle(*self),[&](auto& actor,auto&,bool& good){
+            return blastWallContact(actor,target.parentId,id,[&](MotionBinary64& hp){
+                const auto* r=instances_.resolve(event.other);if(!r||r->objectId!=92)return false;hp=r->box.wallHp;return true;
+            },[&](MotionBinary64 hp){return publishBoxHealth(event.other,hp);},good);
+        });
     }
     template<unsigned Capacity> bool dispatchBlastPlayerCollision(
         StoredBlastRegistration<instanceCapacity,Capacity>& blasts,const RunnerCollisionEventContext::Frame& event){

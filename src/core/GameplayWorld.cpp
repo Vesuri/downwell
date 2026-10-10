@@ -869,14 +869,21 @@ void GameplayWorld::prepareBreakableSlotsForReuse(){
 }
 
 bool GameplayWorld::appendBreakables(const int* x, const int* y, unsigned count,
-    const downwell::BreakableState* creation)
+    const downwell::BreakableState* creation,const std::uint32_t* sourceIds)
 {
     if(!run_.effectsSucceeded)return false;
     if (count > breakableCapacity - breakableCount_ || (count && (!x || !y)))
         return false;
     if(count&&(!nextBreakableLifetimeId_||count-1>0xffffffffu-nextBreakableLifetimeId_))return false;
+    if(sourceIds)for(unsigned i=0;i<count;++i){
+        if(!sourceIds[i]||sourceIds[i]>0x7fffffffu)return run_.effectsSucceeded=false;
+        for(unsigned j=0;j<i;++j)if(sourceIds[j]==sourceIds[i])return run_.effectsSucceeded=false;
+        for(unsigned j=0;j<breakableCount_;++j)
+            if(breakables_[j].lifetimeId&&breakables_[j].sourceId==sourceIds[i])return run_.effectsSucceeded=false;
+    }
     for (unsigned source = 0; source < count; ++source) {
         const unsigned index = breakableCount_++;
+        breakables_[index].sourceId=sourceIds?sourceIds[source]:0;
 #ifndef DOWNWELL_REFERENCE_BREAKABLES
         // The unused pool slot already holds default script state. Only
         // actual Create inputs and its new identity are live work.
