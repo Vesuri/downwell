@@ -40,7 +40,12 @@ behavior, both backend integrations and relevant original-game verification.
   retaining source numeric instance IDs separately from native family-local
   generation handles for serialized bindings and global lookup order.
   Supply the native generator's source-creation scope from the complete startup
-  stream, including spawner 78 and concrete shop ownership. Complete registered
+  stream, including spawner 78 and concrete shop ownership. Spawner admission
+  requires its depth-driven Step, selected enemy mask queries and synchronous
+  child Create-before-deactivate, not an ID-only placeholder. Supply source
+  fall-depth state and actual enemy counts; include its area-one white-jelly
+  (115) and red-ball (118) child dependencies. See the
+  [spawner source contract](spawner-source-contract.md). Complete registered
   Scattered16 (289) normal mixed Step/contact/Draw admission on both backends,
   including bullet contacts and the live player selector writes/full recharge
   effects used by the registered forced-jump/Exploding Knees composition.

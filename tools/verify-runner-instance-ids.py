@@ -61,6 +61,35 @@ assert ("pushi.e 78\nconv.i.v\npush.v self.y\npush.v self.x\n"
 for label in (187,207):
     assert f":[{label}]\npush.v self.y\npushi.e 16\nadd.i.v\npop.v.v self.y" in builder
 
+spawner = manifest["resources"]["objects"][78]
+assert (spawner["name"], spawner["parentId"], spawner["spriteId"]) == ("Spawner", -1, 702)
+spawner_create = assembly("gml_Object_Spawner_Create_0",
+    "18c953fa8b664ee259c633e56ea906128bfad370792bf20234250213c9d07627")
+spawner_event = assembly("gml_Object_Spawner_Step_0",
+    "c4b6b170447274b021385cd01836f998a4744d4acf523112193453d644d8811a")
+assert "call.i gml_Script_spawnerInit(argc=0)" in spawner_create
+assert "call.i gml_Script_spawnerStep(argc=0)" in spawner_event
+spawner_init = assembly("gml_GlobalScript_spawnerInit",
+    "c1c81d5b355ecde8291ee261518dc5c1deec03647e47b9ffe1a24721a2257ce5")
+spawner_set = assembly("gml_GlobalScript_spawnerSet1",
+    "f2f87b87c3567f5840210c9f417372d1fcf55f1ac76afd0ca599b0ce1ad0d74b")
+spawner_step = assembly("gml_GlobalScript_spawnerStep",
+    "793947ac8f003f7a32b0f2b66d449af53a20600b196f9a8b563852ce43f048fb")
+# Script active is not runner activation. The spawner remains scheduled while
+# waiting for the player, and newborn enemies deactivate only AFTER Create.
+assert "pushi.e 0\npop.v.i self.active" in spawner_init
+assert "instance_deactivate_object" not in spawner_init
+assert "pushi.e 20\npop.v.i self.enemyMaxCount" in spawner_set
+assert "pushi.e 115\nconv.i.v" in spawner_set
+assert spawner_step.count("call.i gml_Script_instance_create(argc=3)") == 2
+assert spawner_step.count("call.i instance_deactivate_object(argc=1)") == 2
+for create_label, with_label in ((33,34),(55,56)):
+    birth = spawner_step.index(f":[{create_label}]")
+    enter = spawner_step.index(f":[{with_label}]", birth)
+    assert "gml_Script_instance_create" in spawner_step[birth:enter]
+    assert "call.i @@This@@(argc=0)\ncall.i instance_deactivate_object(argc=1)" in spawner_step[enter:]
+print("Pinned Spawner 78: depth-driven channels and synchronous Create-before-deactivate")
+
 player = assembly("gml_Object_objPlayer_n_Create_0",
     "8298b2249fec2b4226f43d257335176ea0f6282bf89dfc5aab5be2c700e88e3b")
 init = assembly("gml_GlobalScript_scrPlayerInit",
