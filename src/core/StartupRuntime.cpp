@@ -2381,6 +2381,13 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             run_.effectsSucceeded=run_.effectsSucceeded&&spawners_.createCaverns(key,run_.stage.level,false);
         }else ++unimplementedCodeCalls_;
         return;
+    case 1048: // Spawner ordinary Step
+        if(instance&&instance->objectId==78&&spawnerDispatch_){
+            ++implementedCodeCalls_;
+            const auto key=instances_.handleAt(unsigned(instance-&instances_.at(0)));
+            run_.effectsSucceeded=run_.effectsSucceeded&&spawnerDispatch_(spawnerContext_,key);
+        }else ++unimplementedCodeCalls_;
+        return;
     case 1221: // enmWhiteJelly Create
     case 1222: // enmWhiteJelly Alarm 1
     case 1223: // enmWhiteJelly Alarm 0

@@ -328,6 +328,32 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
             if(!spawner)runtime->step(downwell::gameplayContactProfileInput(tick,runtime->mainPlayerX(),runtime->mainPlayerY()),false);
         }
         require(spawner&&healthy(*runtime),"natural spawner initialization preserves room health");
+        struct Ops {
+            using N=downwell::MotionBinary64;int fall;bool dead;unsigned& reads;
+            bool playerY(N& v){v=N::fromInteger(1000000);return true;}
+            bool area(int& v){v=1;return true;}
+            bool fallDepth(N& v){++reads;v=N::fromInteger(fall);return true;}
+            bool death(bool& v){v=dead;return true;}
+            bool endReached(bool& v){v=false;return true;}
+            bool enemyCount(int& v){v=0;return true;}
+            bool objectMask(int,int&){return false;}bool mask(int){return false;}
+            bool viewY(N&){return false;}bool viewHeight(N&){return false;}
+            bool meeting(N,N,int,bool&){return false;}bool tile(int,N,N,bool&){return false;}
+            bool create(int,N,N,unsigned&){return false;}bool deactivate(unsigned){return false;}
+        };
+        unsigned reads=0;
+        for(int fall:{10,12,15}){
+            require(runtime->withSpawnerEvents([&](downwell::InstanceHandle){return Ops{fall,fall==15,reads};},[&]{
+                runtime->step(downwell::Input{},false);return healthy(*runtime);
+            }),"stored source spawner Step executes through resource dispatch");
+            const auto* state=runtime->spawnerState(spawner);int memory,countdown;
+            require(state&&state->scriptActive&&state->fallDepthMemory.roundPixel(memory)&&memory==fall&&
+                state->channels[0].countdown.roundPixel(countdown)&&countdown==(fall==10?150:148),
+                "spawner publishes fall-depth before guards and only then reduces countdown");
+        }
+        require(reads==6,"source Step reads fall depth twice per dispatch");
+        runtime->step(downwell::Input{},false);
+        require(reads==6,"borrowed spawner operations expire at the end of their scope");
         runtime->reset(downwell::PlatformProfile::nonDesktop);
         require(!runtime->spawnerState(spawner),"reset invalidates retained spawner state");
     }

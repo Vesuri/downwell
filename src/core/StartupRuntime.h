@@ -456,6 +456,19 @@ public:
         return instances_.at(index);
     }
     const SpawnerStep* spawnerState(unsigned id)const{return spawners_.state(id);}
+    template<class MakeOps,class Tick> bool withSpawnerEvents(MakeOps makeOps,Tick tick){
+        if(!run_.effectsSucceeded)return false;
+        if(spawnerDispatch_)return run_.effectsSucceeded=false;
+        auto dispatch=[&](InstanceHandle key){
+            auto ops=makeOps(key);return spawners_.step(key,random_,ops);
+        };
+        spawnerContext_=&dispatch;
+        spawnerDispatch_=[](void* context,InstanceHandle key){
+            return (*static_cast<decltype(dispatch)*>(context))(key);
+        };
+        const bool ok=tick();spawnerDispatch_=nullptr;spawnerContext_=nullptr;
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
+    }
     template<unsigned Capacity> StoredWhiteJellyStates<instanceCapacity,Capacity> whiteJellyStates(){
         return StoredWhiteJellyStates<instanceCapacity,Capacity>(instances_);
     }
@@ -2706,6 +2719,8 @@ private:
     int showSplash_ = 0;
     InstanceStore<instanceCapacity> instances_;
     StoredSpawnerStates<instanceCapacity,8> spawners_{instances_};
+    void* spawnerContext_=nullptr;
+    bool (*spawnerDispatch_)(void*,InstanceHandle)=nullptr;
     void* whiteJellyContext_=nullptr;
     bool (*whiteJellyDispatch_)(void*,InstanceHandle,int)=nullptr;
     RunnerLayerIds layerIds_;
