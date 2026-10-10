@@ -568,6 +568,41 @@ These omissions prevent claiming full room-order parity. The builder
 joins resource-backed lifetime, spatial and layer ownership; full mixed event
 and Draw scheduling remains a separate integration requirement.
 
+### Native generated-birth boundary
+
+The dynamic creation stream cannot be attached only to the terrain sink.
+`AmigaGameplayGeneration::create` takes several different routes into
+`GameplayWorld::createGeneratedInstance`:
+
+| Birth | Current native publication boundary |
+| --- | --- |
+| Wall 60 / platform 93 | Direct backend publication in native mode; scalar, run and prepared paths converge on `birth` |
+| Terrain 99 | Generic terrain callback followed by terrain Create |
+| Breakable 92 | Prepared breakable publisher or generic `appendBreakables` path |
+| Shop 277 | `registerShop` returns before the terrain callback |
+| Time field 82 | `adoptTimeField` returns before the terrain callback |
+| Side camera locker 62 | Its family Create returns before the terrain callback |
+| Level exit 306 | `registerLevelExit` runs before the terrain callback |
+| Ordinary enemy | Terrain callback precedes `configureEnemy` |
+
+`birth` currently appends dynamic terrain without a source numeric ID, and
+the prepared breakable publisher calls `appendGeneratedBreakable` with its
+default zero ID. The families' lifetime handles do not repair this omission.
+Merely supplying IDs to those two calls would skip the other creation routes
+and any synchronous children. An allocator at the terrain callback would
+therefore produce a different numeric stream even if every terrain ID were
+unique. Likewise, assigning an ID after `registerShop` or `registerLevelExit`
+is too late to establish the parent's identity before its Create effects.
+
+The source contract is one allocation before construction, followed by
+synchronous Create with that same allocator available to children. Authored
+room IDs do not advance it. The stored `DeferredInstanceQueue::applyChecked`
+retains the allocated ID locally and advances the shared cursor before its
+Create handler, so a caller must not recover the parent's ID as cursor minus
+one after that handler returns. Native generated-birth integration must
+preserve that boundary across the table above, not infer a stream from the
+terrain representation or a batch's final population.
+
 `scrBuilder` blocks 187 and 207 write `self.y += 16` after each newline's
 pillars and each extra-pillar row respectively. Shared scalar, run and prepared
 generation retain these setter boundaries, including the completed prefix on
