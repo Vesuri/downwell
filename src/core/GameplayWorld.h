@@ -896,6 +896,11 @@ public:
         });
         return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
     }
+    template<class Ops> bool collideWhiteJellyEnemy(downwell::InstanceHandle key,Ops& ops){
+        if(!run_.effectsSucceeded||!whiteJellies_||!whiteJellies_->valid())return run_.effectsSucceeded=false;
+        const bool ok=whiteJellies_->dispatch(key,[&](auto& actor){return actor.enemyContact(enemyRandom_,ops);});
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
+    }
     static constexpr unsigned boneCapacity=32;
     const Bones* bones()const{return bones_;}
     bool bindBones(Bones& bones){

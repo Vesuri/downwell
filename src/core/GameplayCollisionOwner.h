@@ -2246,6 +2246,36 @@ public:
            !((event.owner==120&&event.code==1266)||(event.owner==83&&event.code==1066)))return check(false);
         return check(world_->collideSkeletonRoomEffect(local,event.code==1066,makePlayer));
     }
+    template<class PointDirection,class DirectionSetter>
+    bool dispatchWhiteJellyEnemyCollision(const RunnerCollisionEventContext::Frame& event,
+        PointDirection pointDirection,DirectionSetter directionSetter){
+        View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;
+        if(!valid()||!world_||!resolves(event.self)||!resolves(event.other)||
+           !View::decode(event.self,kind,local)||kind!=View::Kind::whiteJelly||
+           event.type!=4||event.subtype!=objectOf(event.other)||event.owner!=115||event.code!=1226||
+           !objects_.collisionEvent(115,event.subtype,found,binding)||!found||
+           binding.ownerObjectId!=115||binding.codeId!=1226)return check(false);
+        struct Ops {
+            GameplayCollisionOwner& owner;InstanceHandle self,other;PointDirection& point;DirectionSetter& setter;
+            bool read(bool vertical,MotionBinary64& out){
+                if(!owner.resolves(other))return false;
+                if(owner.native_){
+                    Owner::State state;Owner::Sprite sprite;
+                    if(!owner.nativeCollisionVisual(other,state,sprite))return false;
+                    out=(vertical?state.y:state.x).promoted();return true;
+                }
+                const auto r=owner.state(other);if(!r)return false;
+                out=(vertical?r->y:r->x).promoted();return true;
+            }
+            bool otherX(MotionBinary64& out){return read(false,out);}
+            bool otherY(MotionBinary64& out){return read(true,out);}
+            bool pointDirection(MotionBinary64 x,MotionBinary64 y,MotionBinary64 tx,MotionBinary64 ty,MotionBinary64& out){
+                return point(x,y,tx,ty,out);
+            }
+            bool direction(MotionBinary64 wanted,MotionBinary64& accepted){return setter(self,wanted,accepted);}
+        } ops{*this,event.self,event.other,pointDirection,directionSetter};
+        return check(world_->collideWhiteJellyEnemy(local,ops));
+    }
     bool dispatchWhiteJellyFieldCollision(const RunnerCollisionEventContext::Frame& event){
         View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;
         if(!valid()||!world_||!resolves(event.self)||!resolves(event.other)||

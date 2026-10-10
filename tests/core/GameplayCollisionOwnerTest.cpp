@@ -56,6 +56,12 @@ bool nativeWhiteJellyPlayerContact(downwell::GameplayCollisionOwner& owner,
 bool nativeWhiteJellyStomp(downwell::WhiteJellyStep& actor,NativeWhiteJellyStompOps& ops,bool& good){
     return actor.stompPlayerChecked(ops,good);
 }
+bool nativeWhiteJellyEnemyContact(downwell::GameplayCollisionOwner& owner,
+    const downwell::RunnerCollisionEventContext::Frame& event,NativeWhiteJellyBirthOps& ops){
+    return owner.dispatchWhiteJellyEnemyCollision(event,
+        [&](auto x,auto y,auto tx,auto ty,auto& out){return ops.pointDirection(x,y,tx,ty,out);},
+        [&](downwell::InstanceHandle,auto wanted,auto& accepted){return ops.direction(wanted,accepted);});
+}
 bool nativeWhiteJellyBirth(downwell::WhiteJellyBirth& state,downwell::RunnerImageValue x,
     downwell::RunnerImageValue y,downwell::GameMakerRandom& random,NativeWhiteJellyBirthOps& ops){
     return state.create(x,y,random,ops);

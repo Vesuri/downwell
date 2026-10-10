@@ -324,6 +324,36 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
         for(int playerY:{700,702})assert(owner->dispatchWhiteJellyPlayerCollision(playerContact,
             [&](auto& actor){assert(actor.sourceId==899000);return JellyPlayer{MotionBinary64::fromInteger(playerY),stomps,damages};}));
         assert(stomps==1&&damages==1);
+        InstanceHandle peer,peerShared;
+        assert(jellies.create(899002,{0x43800000u},{0x44300000u},jellyRandom,
+            [&](auto h){return JellyOps{jellies,h};},peer));
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::whiteJelly,peer,peerShared));
+        const RunnerCollisionEventContext::Frame enemyContact{jellyShared,peerShared,4,115,115,1226};
+        auto expectedRandom=world->randomState();
+        const auto expectedDirection=MotionBinary64::fromInteger(int(expectedRandom.irandomSmall(359)));
+        unsigned pointCalls=0,setterCalls=0;
+        auto point=[&](MotionBinary64 x,MotionBinary64 y,MotionBinary64 tx,MotionBinary64 ty,MotionBinary64& out){
+            ++pointCalls;
+            assert(x.high==MotionBinary64::fromInteger(272).high&&y.high==MotionBinary64::fromInteger(704).high&&
+                tx.high==MotionBinary64::fromInteger(256).high&&ty.high==y.high);
+            out=MotionBinary64::fromInteger(180);return true;
+        };
+        auto setter=[&](InstanceHandle self,MotionBinary64 wanted,MotionBinary64& accepted){
+            assert(self.slot==jellyShared.slot&&self.generation==jellyShared.generation);
+            ++setterCalls;accepted=wanted;return true;
+        };
+        assert(owner->dispatchWhiteJellyEnemyCollision(enemyContact,point,setter)&&!pointCalls&&setterCalls==1);
+        assert(jellies.find(jelly)->direction.high==expectedDirection.high&&
+            jellies.find(jelly)->direction.low==expectedDirection.low);
+        assert(world->randomState().stateIndex()==expectedRandom.stateIndex());
+        for(unsigned word=0;word<16;++word)assert(world->randomState().stateWord(word)==expectedRandom.stateWord(word));
+        RunnerImageValue acceptedPosition;
+        assert(jellies.position(peer,false,{0x43880000u},acceptedPosition));
+        assert(owner->dispatchWhiteJellyEnemyCollision(enemyContact,point,setter)&&pointCalls==1&&setterCalls==2&&
+            jellies.find(jelly)->direction.high==MotionBinary64::fromInteger(180).high);
+        assert(world->randomState().stateIndex()==expectedRandom.stateIndex());
+        for(unsigned word=0;word<16;++word)assert(world->randomState().stateWord(word)==expectedRandom.stateWord(word));
+        assert(jellies.markDestroyed(peer)&&owner->prepareDraw()&&!jellies.find(peer));
         InstanceHandle fieldShared;
         assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::timeField,
             {0,world->timeFields().identityAt(0)},fieldShared));
