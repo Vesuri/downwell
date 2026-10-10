@@ -92,6 +92,26 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
                 if(tick==1)assert(text->y.bits==0xc2ce0000u); // -103, before damping.
             }
         }
+        const auto keeperId=creation.create(280,498,2000);const auto keeperKey=store.sourceHandle(keeperId);
+        assert(keeperId&&store.setSprite(keeperKey,487)&&store.setAlarm(keeperKey,0,1)&&
+            store.setAlarm(keeperKey,1,1)&&store.setAlarm(keeperKey,2,1));
+        auto expectedRandom=world->randomState();
+        auto tickAlarms=[&]{
+            return collision->withEncounterSteps(*phase,[&](InstanceHandle h,int object){
+                assert(object==283);return collision->stepRegisteredShopChild(h,lookup);
+            },[&]{world->step(0);return world->effectsSucceeded();});
+        };
+        assert(tickAlarms());
+        const auto* keeper=store.find(keeperKey);
+        assert(keeper&&keeper->imageIndex.bits==0x3f800000u&&keeper->alarms.get(0)==0&&
+            keeper->alarms.get(1)==4&&keeper->alarms.get(2)==0&&
+            world->randomState().drawCount()==expectedRandom.drawCount());
+        const unsigned delay=20+expectedRandom.irandomSmall(40);
+        for(unsigned tick=0;tick<4;++tick)assert(tickAlarms());
+        keeper=store.find(keeperKey);
+        assert(keeper&&!keeper->imageIndex.bits&&keeper->alarms.get(0)==int(delay)&&keeper->alarms.get(1)==0&&
+            world->randomState().stateIndex()==expectedRandom.stateIndex());
+        for(unsigned i=0;i<16;++i)assert(world->randomState().stateWord(i)==expectedRandom.stateWord(i));
     }
     for(unsigned failure=0;failure<=12;++failure){
         auto world=std::make_unique<GameplayWorld>(300,false,1000,false);

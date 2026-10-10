@@ -16,6 +16,14 @@ struct ShopChildState {
     const char* text=nullptr;
     int drawing=0;
     bool initialized=false;
+    template<class Ops> bool keeperAlarm(unsigned number,int sprite,Ops& ops){
+        if(number==2){thankful=goodbye=confused=0;return true;}
+        if(number>2)return false;
+        if(sprite!=487)return true;
+        if(number==0)return ops.image({0x3f800000u})&&ops.alarm(1,5);
+        unsigned ticks;
+        return ops.image(RunnerImageValue{})&&ops.range(20,60,ticks)&&ops.alarm(0,int(ticks));
+    }
     template<class Publish> bool stepRisingText(RunnerImageValue y,Publish publish){
         auto next=y.promoted();
         if(!next.add(ysp)||!y.assign(next)||!publish(y))return false;

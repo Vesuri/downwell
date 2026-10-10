@@ -226,12 +226,35 @@ bool shopItemStepCheck(const ObjectPack& objects,unsigned failure){
     }
     return owner.clear();
 }
+bool registeredKeeperAlarmCheck(const ObjectPack& objects,bool reject){
+    InstanceStore<2> records;unsigned next=970000;const int room=11;bool good=true;
+    struct Observer:ShopChildObserver {
+        bool imageIndex(InstanceHandle,const InstanceRecord& r,RunnerImageValue v){
+            valid=valid&&r.objectId==280&&r.spriteId==487&&(v.bits==0||v.bits==0x3f800000u);
+            ++images;return !rejectImage;
+        }
+    } observer;
+    StoredShopChildRegistration<2,1> owner(records,objects,InstanceLifecycleBinding::bindPositionedActor(observer),next,room,good);
+    const auto id=owner.create(280,498,2000);const auto h=owner.sourceHandle(id);
+    auto* r=records.resolve(h);if(!id||!r)return false;
+    r->spriteId=487;observer.rejectImage=reject;unsigned rolls=0;
+    auto random=[&](unsigned lo,unsigned hi){if(lo!=20||hi!=60)good=false;++rolls;return 37u;};
+    if(owner.keeperAlarmEvent(h,0,random)==reject||good==reject||!observer.valid||rolls)return false;
+    if(reject)return r->imageIndex==0&&r->alarms.get(1)==-1&&owner.clear();
+    if(r->imageIndex!=1||r->alarms.get(1)!=5||!owner.keeperAlarmEvent(h,1,random)||
+       r->imageIndex!=0||r->alarms.get(0)!=37||rolls!=1||observer.images!=2)return false;
+    if(!owner.keeperAlarmEvent(h,2,random)||rolls!=1||observer.images!=2)return false;
+    r->spriteId=485;
+    if(!owner.keeperAlarmEvent(h,0,random)||!owner.keeperAlarmEvent(h,1,random)||rolls!=1||observer.images!=2)return false;
+    return owner.clear();
+}
 #ifndef DOWNWELL_NATIVE_QUERY_PROBE
 int main(){
     std::ifstream file("generated/downwell-objects.dwob",std::ios::binary);
     std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(file),{}};
     ObjectPack objects(bytes.data(),bytes.size());
     if(!objects.valid())return 1;
+    if(!registeredKeeperAlarmCheck(objects,false)||!registeredKeeperAlarmCheck(objects,true))return 1;
     for(unsigned reject=0;reject<=10;++reject)if(!shopChildRegistrationCheck(objects,reject,false)){
         std::fprintf(stderr,"shop child registration failed at birth %u\n",reject);return 1;
     }

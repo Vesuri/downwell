@@ -82,11 +82,33 @@ public:
                 r.spriteId=sprite;return true;
             })||fail();
     }
-    bool advanceAlarm(InstanceHandle h,unsigned number){
+    bool setAlarm(InstanceHandle h,unsigned number,int ticks){
+        const auto* r=find(h);
+        if(!good_||creating_||!r||!r->initialized||number>=AlarmBank::count)return fail();
+        records_[h.slot].alarms.set(number,ticks);return true;
+    }
+    bool setSprite(InstanceHandle h,int sprite){
+        const auto* r=find(h);
+        if(!good_||creating_||!r||!r->initialized||!binding_.sprite(h,*r,sprite)||!good_)return fail();
+        records_[h.slot].spriteId=sprite;return true;
+    }
+    template<class Range> bool advanceAlarm(InstanceHandle h,unsigned number,Range range){
         const auto* record=find(h);
         if(!good_||creating_||!record||!record->initialized||number>=AlarmBank::count)return fail();
         auto& r=records_[h.slot];
         if(!r.active||r.destroyRequested||!r.alarms.advanceOne(number))return true;
+        if(r.objectId==280){
+            struct Ops {
+                GameplayShopInstances& owner;Record& r;InstanceHandle h;Range& random;
+                bool image(RunnerImageValue value){
+                    if(!owner.binding_.imageIndex(h,r,value)||!owner.good_)return false;
+                    r.imageIndex=value;return true;
+                }
+                bool alarm(unsigned n,int v){r.alarms.set(n,v);return true;}
+                bool range(unsigned lo,unsigned hi,unsigned& value){value=random(lo,hi);return owner.good_;}
+            } ops{*this,r,h,range};
+            return r.state.keeperAlarm(number,r.spriteId,ops)||fail();
+        }
         if(r.objectId!=212||number>1)return fail();
         if(number==1){r.state.flashing=1;return true;}
         if(!binding_.markDestroyed(h,r)||!good_)return fail();

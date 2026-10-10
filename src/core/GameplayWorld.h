@@ -495,6 +495,12 @@ public:
         if(shopInstances_||!records.valid()||records.size())return false;
         shopInstances_=&records;return true;
     }
+    bool advanceShopRoomAlarm(downwell::InstanceHandle key,unsigned number){
+        if(!run_.effectsSucceeded||!shopInstances_||!shopInstances_->valid())return run_.effectsSucceeded=false;
+        return run_.effectsSucceeded=shopInstances_->advanceAlarm(key,number,[&](unsigned lo,unsigned hi){
+            return lo+enemyRandom_.irandomSmall(hi-lo);
+        })&&run_.effectsSucceeded;
+    }
     template<class Ops> bool drawRegisteredRedBall(downwell::InstanceHandle key,Ops& ops)const{
         return redBalls_&&redBalls_->dispatch(key,[&](auto& actor){return actor.draw(ops);});
     }

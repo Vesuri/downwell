@@ -769,6 +769,13 @@ the record for the existing pre-Draw cleanup pass rather than erasing it in-plac
 Both owners execute the same `ShopChildState` Step bodies, including two
 upgrade-array reads when the item's sprite changes and the text's Y setter
 before velocity damping. There is no independent shop-family tick.
+Registered keeper alarms use the same shared handler body in the native and
+stored owners. The native mixed dispatcher advances each slot immediately
+before its handler and takes `irandom_range(20,60)` from the world RNG; rejected
+image publication stops before rearming or drawing randomness. The stored
+entry executes the handler only, after its room dispatcher has decremented
+the counter. Keeper Step/animation and stored runtime alarm admission are
+separate requirements; these handlers do not make the keeper a complete actor.
 
 The rising-text event entries publish the Y setter before multiplying binary64
 `ysp` by `decreaseBy`. Alarm 1 sets `flashing`; Step then negates the integer

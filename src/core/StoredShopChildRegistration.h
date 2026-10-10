@@ -126,6 +126,22 @@ public:
         if(!r->active||r->destroyRequested||number>1||!r->alarms.advanceOne(number))return true;
         return risingTextAlarmEvent(key,number);
     }
+    // Called after the stored room dispatcher decrements the selected alarm.
+    template<class Range> bool keeperAlarmEvent(InstanceHandle key,unsigned number,Range range){
+        auto* e=entry(key);auto* r=e?record(*e):nullptr;
+        if(!good_||creating_||!r||e->object!=280||!e->state.initialized||number>2)return fail();
+        if(!r->active||r->destroyRequested)return true;
+        struct Ops {
+            StoredShopChildRegistration& owner;InstanceRecord& r;InstanceHandle key;Range& random;
+            bool image(RunnerImageValue value){
+                if(!owner.lifecycle_.imageIndex(key,r,value)||!owner.good_)return false;
+                r.imageIndex=stored(value);return true;
+            }
+            bool alarm(unsigned n,int v){r.alarms.set(n,v);return true;}
+            bool range(unsigned lo,unsigned hi,unsigned& value){value=random(lo,hi);return owner.good_;}
+        } ops{*this,*r,key,range};
+        return e->state.keeperAlarm(number,r->spriteId,ops)||fail();
+    }
     // The room's mixed alarm phase has already decremented this alarm.
     // Keep event execution separate from the standalone countdown adapter.
     bool risingTextAlarmEvent(InstanceHandle key,unsigned number){

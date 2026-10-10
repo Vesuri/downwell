@@ -1919,7 +1919,7 @@ public:
                     kind==View::Kind::skeleton?self.skeletons_.advanceAlarm(local,alarm):
                     kind==View::Kind::whiteJelly?self.world_->advanceWhiteJellyRoomAlarm(local,alarm):
                     kind==View::Kind::redBall?self.world_->advanceRedBallRoomAlarm(local,alarm):
-                    kind==View::Kind::shop?self.shopInstances_.advanceAlarm(local,alarm):
+                    kind==View::Kind::shop?self.world_->advanceShopRoomAlarm(local,alarm):
                     kind==View::Kind::smoke?self.smoke_.advanceAlarm(local,alarm):
                     kind==View::Kind::blast?self.blasts_.alarm(local,alarm):
                     kind==View::Kind::corpse?self.advanceCorpseAlarm(local,alarm):
