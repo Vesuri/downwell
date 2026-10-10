@@ -16,7 +16,7 @@ template<unsigned WorldCapacity,unsigned ShopCapacity,class Audio> class StoredS
 public:
     struct Parent {
         InstanceHandle key{};unsigned id=0;ShopWorld::Instance* shop=nullptr;
-        int speaking=0,checkThis=0,interactOk=1,textOver=0,choice0=-1;
+        int checkThis=0,interactOk=1,textOver=0,choice0=-1;
         bool inheritedInitialized=false;
     };
 private:
@@ -81,6 +81,17 @@ public:
         } ops{*this,*p,*r,environment};
         RunnerImageValue y;std::memcpy(&y.bits,&r->preciseY,4);
         return (roomEnd?ShopLifetimeEvents::roomEnd(ops):ShopLifetimeEvents::endStep(y.promoted(),ops))||fail();
+    }
+    bool menuKeeper(unsigned id,ShopMenuEvents::KeeperField field,int value){return children_.menuKeeper(id,field,value);}
+    bool menuKeeperImageZero(unsigned id){return children_.purchaseResetKeeper(id);}
+    bool menuKeeperY(unsigned id,MotionBinary64& out){return children_.purchaseKeeperY(id,out);}
+    template<class Environment> bool parentMenuStep(unsigned id,ShopInteraction::Input& input,
+        CurrencyAccount& currency,Environment& environment){
+        const auto* p=parent(id);auto* r=p?records_.resolve(p->key):nullptr;
+        if(!good_||!r||!p->shop)return fail();
+        if(!r->active||r->destroyRequested)return true;
+        ShopMenuOwnerOps<StoredShopCreationOwner,unsigned,Environment> ops{*this,id,*p->shop,currency,environment};
+        return ShopMenuEvents::step(p->shop->menu,input,ops)||fail();
     }
     // Caller retains the !criminal branch decision taken before interaction.
     template<class Environment> bool parentViewStep(unsigned id,Environment& environment){

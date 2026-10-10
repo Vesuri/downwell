@@ -13,6 +13,7 @@
 #include "ShopRadioEvents.h"
 #include "ShopPurchaseEvents.h"
 #include "ShopViewEvents.h"
+#include "ShopMenuEvents.h"
 namespace downwell {
 // Native ownership of Shop and its ten synchronous children. Numeric IDs
 // belong to the enclosing room allocator, never to this generation pool.
@@ -28,7 +29,7 @@ public:
         AlarmBank alarms;
         ShopChildState state;
         ShopWorld::Instance* shop=nullptr;
-        int speaking=0,checkThis=0,interactOk=1,textOver=0,choice0=-1;
+        int checkThis=0,interactOk=1,textOver=0,choice0=-1;
         bool active=true,destroyRequested=false,initialized=false;
     };
     using Binding=RecordLifecycleBinding<Record>;
@@ -128,6 +129,30 @@ public:
         } ops{*this,r,environment};
         return ShopRadioEvents::step(r.shop->shopBgm,ops)||fail();
     }
+    bool menuKeeper(unsigned id,ShopMenuEvents::KeeperField field,int value){
+        const auto key=sourceHandle(id);if(!ready(key,280))return fail();
+        auto& state=records_[key.slot].state;
+        switch(field){
+            case ShopMenuEvents::KeeperField::thankful:state.thankful=value;break;
+            case ShopMenuEvents::KeeperField::goodbye:state.goodbye=value;break;
+            case ShopMenuEvents::KeeperField::confused:state.confused=value;break;
+        }
+        return true;
+    }
+    bool menuKeeperImageZero(unsigned id){
+        const auto key=sourceHandle(id);if(!ready(key,280))return fail();auto& r=records_[key.slot];
+        if(!binding_.imageIndex(key,r,{})||!good_)return fail();r.imageIndex={};return true;
+    }
+    bool menuKeeperY(unsigned id,MotionBinary64& out){
+        const auto key=sourceHandle(id);if(!ready(key,280))return fail();out=records_[key.slot].y.promoted();return true;
+    }
+    template<class Environment> bool parentMenuStep(InstanceHandle h,ShopInteraction::Input& input,
+        CurrencyAccount& currency,Environment& environment){
+        if(!ready(h,277)||!records_[h.slot].shop)return fail();auto& r=records_[h.slot];
+        if(!r.active||r.destroyRequested)return true;
+        ShopMenuOwnerOps<GameplayShopInstances,InstanceHandle,Environment> ops{*this,h,*r.shop,currency,environment};
+        return ShopMenuEvents::step(r.shop->menu,input,ops)||fail();
+    }
     // Caller retains the !criminal branch decision taken before interaction.
     template<class Environment> bool parentViewStep(InstanceHandle h,Environment& environment){
         if(!ready(h,277)||!records_[h.slot].shop)return fail();auto& r=records_[h.slot];
@@ -162,22 +187,14 @@ public:
                 r.destroyRequested=true;return true;
             }
             bool thankKeeper(unsigned id){
-                const auto key=owner.sourceHandle(id);
-                if(!owner.ready(key,280))return false;
-                owner.records_[key.slot].state.thankful=1;return true;
+                return owner.menuKeeper(id,ShopMenuEvents::KeeperField::thankful,1);
             }
             bool resetKeeper(unsigned id){
-                const auto key=owner.sourceHandle(id);
-                if(!owner.ready(key,280))return false;
-                auto& r=owner.records_[key.slot];
-                if(!owner.binding_.imageIndex(key,r,{})||!owner.good_)return false;
-                r.imageIndex={};return true;
+                return owner.menuKeeperImageZero(id);
             }
             bool maido(unsigned id){
-                const auto key=owner.sourceHandle(id);
-                if(!owner.ready(key,280))return false;
-                auto y=owner.records_[key.slot].y.promoted();
-                return y.add(MotionBinary64::fromInteger(-18))&&env.maido(y)&&owner.good_;
+                MotionBinary64 y;
+                return owner.menuKeeperY(id,y)&&y.add(MotionBinary64::fromInteger(-18))&&env.maido(y)&&owner.good_;
             }
             bool sound(int id,int priority,const char* group){return env.sound(id,priority,0,1,group)&&owner.good_;}
         } ops{*this,environment};
@@ -341,7 +358,8 @@ private:
             } builtins{*this,r,h};
             if(!r.state.create(object,builtins)){fail();return 0;}
         }
-        // Parent's inherited variables have their source defaults in Record.
+        // Parent's inherited variables have their source defaults in Record
+        // and the retained ShopWorld menu (the sole owner of speaking).
         r.initialized=true;return source;
     }
     const ObjectPack& objects_;const SpriteCollisionPack& sprites_;Binding binding_;Record records_[capacity]{};

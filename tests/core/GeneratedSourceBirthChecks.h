@@ -7,6 +7,7 @@
 #include "ShopRadioChecks.h"
 #include "ShopPurchaseChecks.h"
 #include "ShopViewChecks.h"
+#include "ShopMenuChecks.h"
 #include <cassert>
 #include <memory>
 #include <vector>
@@ -75,14 +76,20 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             bool stop(int id){assert(id==99);++stops;playing=false;return true;}
         } radio;
         const auto parentKey=store.sourceHandle(replacement->sourceId);
+        assert(checkShopMenuEvents());
+        CurrencyAccount menuCurrency;menuCurrency.currency=10000;
+        ShopMenuProbe menuProbe{*replacement,menuCurrency,2000};ShopInteraction::Input menuInput;menuInput.confirm=true;
+        assert(store.parentMenuStep(parentKey,menuInput,menuCurrency,menuProbe)&&!menuInput.confirm&&
+            replacement->menu.speaking&&menuProbe.locked&&menuProbe.soundIds[0]==101);
         ShopRadioProbe radioStep;radioStep.expectedRadio=replacement->radio;
         assert(store.parentRadioStep(parentKey,radioStep)&&replacement->shopBgm&&radioStep.matches("tdlvgmpr"));
         ShopViewProbe view;
         assert(checkShopViewEvents()&&store.parentViewStep(parentKey,view)&&replacement->shopInView&&replacement->keeperAngry&&
             view.greetings==1&&view.angrySounds==1);
         CurrencyAccount purchaseMoney;purchaseMoney.currency=10000;
-        ShopPurchaseProbe purchase{*replacement,purchaseMoney,2000};ShopInventory::Purchase result;
-        assert(store.purchase(parentKey,purchaseMoney,purchase,result)&&result==ShopInventory::Purchase::bought&&purchase.calls==4);
+        ShopMenuProbe purchase{*replacement,purchaseMoney,2000};ShopInteraction::Input buyInput;buyInput.confirm=buyInput.cancel=true;
+        assert(store.parentMenuStep(parentKey,buyInput,purchaseMoney,purchase)&&buyInput.confirm&&!buyInput.cancel&&
+            purchase.grants==1&&purchase.calls==4&&purchase.soundIds[0]==104&&purchase.soundIds[1]==105);
         const auto purchased=store.sourceHandle(replacement->children.items[0]);
         const auto purchaseKeeper=store.sourceHandle(replacement->children.keeper);
         assert(store.find(purchased)->destroyRequested&&store.find(purchaseKeeper)->state.thankful==1&&

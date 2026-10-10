@@ -9,6 +9,7 @@
 #include "ShopKeeperEvents.h"
 #include "ShopKeeperAnimation.h"
 #include "RunnerSpriteChange.h"
+#include "ShopMenuEvents.h"
 #include <cstring>
 namespace downwell {
 // Synchronous Create ownership for Shop's ten children. This is deliberately
@@ -108,10 +109,18 @@ public:
            !lifecycle_.markDestroyed(key,*r)||!good_)return fail();
         r->destroyRequested=true;return true;
     }
-    bool purchaseThankKeeper(unsigned id){
+    bool menuKeeper(unsigned id,ShopMenuEvents::KeeperField field,int value){
         auto* e=entry(sourceHandle(id));
         if(!good_||creating_||!e||!record(*e)||!e->state.initialized||e->object!=280)return fail();
-        e->state.thankful=1;return true;
+        switch(field){
+            case ShopMenuEvents::KeeperField::thankful:e->state.thankful=value;break;
+            case ShopMenuEvents::KeeperField::goodbye:e->state.goodbye=value;break;
+            case ShopMenuEvents::KeeperField::confused:e->state.confused=value;break;
+        }
+        return true;
+    }
+    bool purchaseThankKeeper(unsigned id){
+        return menuKeeper(id,ShopMenuEvents::KeeperField::thankful,1);
     }
     bool purchaseResetKeeper(unsigned id){
         const auto key=sourceHandle(id);auto* e=entry(key);auto* r=e?record(*e):nullptr;

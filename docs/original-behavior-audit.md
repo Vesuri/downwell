@@ -819,6 +819,23 @@ source-ordered parent event and published-view/device-audio dependencies; its
 owner entry must not be scheduled independently or guarded by a fresh criminal
 read after interaction.
 
+`ShopMenuEvents` implements blocks 18–95 under that same earlier non-criminal
+decision. Its input reference must be shared between inner visits: opening
+and the outer menu consume confirmation, while item confirmation only clears
+cancel. The two menu-state branches are independent, so a direction can be
+processed again immediately after entering the item menu. Selection changes
+precede navigation sound 109; `wfxx` changes follow it. Exit sets `exitShop`
+before text/audio and, when thanking, clears `thank` before writing keeper
+goodbye and image index. It does not run the later exit/control-unlock tail
+early. The retained owners use the actual child fields and the checked
+purchase branch rather than compact feedback flags. `speaking` has one owner
+in the retained menu, not a second stale copy in the registration record.
+The environment must provide live player/global queries, the shared choice
+stream and synchronous grant, rising-text and sound scripts. This menu entry
+still needs the enclosing `with (Shop)` event, view/tail composition and normal
+frontend bindings; a successful isolated menu call is not complete Step
+admission.
+
 `StoredShopChildRegistration` implements these six child resources' synchronous
 Create bodies in real `InstanceStore` records, borrowing the room counter and
 lifecycle publisher. Birth publication precedes Create setters; item image-index

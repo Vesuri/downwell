@@ -6,6 +6,7 @@
 #include "ShopRadioChecks.h"
 #include "ShopPurchaseChecks.h"
 #include "ShopViewChecks.h"
+#include "ShopMenuChecks.h"
 #ifndef DOWNWELL_NATIVE_QUERY_PROBE
 #include <cstdio>
 #include <cstdlib>
@@ -179,16 +180,22 @@ bool shopParentRegistrationCheck(const ObjectPack& objects,unsigned area,unsigne
        rng!=(count>=9||expected?4u:0u)||choices!=(expected?1u:0u))return false;
     const auto* parent=owner.parent(920000);
     if(!parent||parent->inheritedInitialized!=(reject!=1)||parent->shop!=&world.instances[0]||
-       parent->speaking||parent->checkThis||parent->interactOk!=1||parent->textOver||parent->choice0!=-1)return false;
+       parent->shop->menu.speaking||parent->checkThis||parent->interactOk!=1||parent->textOver||parent->choice0!=-1)return false;
     if(expected){
+        if(!checkShopMenuEvents())return false;
+        CurrencyAccount menuCurrency;menuCurrency.currency=10000;
+        ShopMenuProbe menuProbe{*shop,menuCurrency,700};ShopInteraction::Input menuInput;menuInput.confirm=true;
+        if(!owner.parentMenuStep(shop->sourceId,menuInput,menuCurrency,menuProbe)||menuInput.confirm||
+           !shop->menu.speaking||!menuProbe.locked||menuProbe.soundIds[0]!=101)return false;
         ShopRadioProbe radioStep;radioStep.expectedRadio=shop->radio;
         if(!owner.parentRadioStep(shop->sourceId,radioStep)||!shop->shopBgm||!radioStep.matches("tdlvgmpr"))return false;
         ShopViewProbe view;
         if(!checkShopViewEvents()||!owner.parentViewStep(shop->sourceId,view)||!shop->shopInView||!shop->keeperAngry||
            view.greetings!=1||view.angrySounds!=1)return false;
         CurrencyAccount purchaseMoney;purchaseMoney.currency=10000;
-        ShopPurchaseProbe purchase{*shop,purchaseMoney,700};ShopInventory::Purchase result;
-        if(!owner.purchase(shop->sourceId,purchaseMoney,purchase,result)||result!=ShopInventory::Purchase::bought||purchase.calls!=4)return false;
+        ShopMenuProbe purchase{*shop,purchaseMoney,700};ShopInteraction::Input buyInput;buyInput.confirm=buyInput.cancel=true;
+        if(!owner.parentMenuStep(shop->sourceId,buyInput,purchaseMoney,purchase)||!buyInput.confirm||buyInput.cancel||
+           purchase.grants!=1||purchase.calls!=4||purchase.soundIds[0]!=104||purchase.soundIds[1]!=105)return false;
         const auto itemKey=owner.children().sourceHandle(shop->children.items[0]);
         const auto keeperKey=owner.children().sourceHandle(shop->children.keeper);
         if(!records.resolve(itemKey)->destroyRequested||!owner.children().state(keeperKey)->thankful||
