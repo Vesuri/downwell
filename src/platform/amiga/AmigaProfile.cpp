@@ -25,7 +25,9 @@ volatile ULONG gDownwellPhaseSamples[profilePhaseCount];
 volatile ULONG gDownwellFocusSamples[profilePhaseCount];
 volatile ULONG gDownwellTerrainPreparationCalls, gDownwellTerrainPreparationFields;
 volatile ULONG gDownwellTerrainPreparationExpectedCalls =
-    1;
+    // GameplayCollisionOwner prepares immutable birth bounds and terrain
+    // Create plans separately. Each owns one preparation scope.
+    2;
 #ifdef DOWNWELL_PROFILE_SHOP
 volatile ULONG gDownwellProfileTargetScene = 3;
 // Completion sets the exact boundary; this hard ceiling rejects a stalled tape.

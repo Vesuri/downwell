@@ -1,5 +1,60 @@
 # Amiga gameplay frame-cost audit
 
+## Runnable 512 KiB regression baseline — 2026-10-10
+
+`c64e8385`, cycle-exact A500/68000, PAL, 512 KiB Chip / 8 MiB Fast.
+The complete contact tape takes 9,874 PAL fields for 1,800 updates (9.11 FPS),
+with a maximum 43-field gap at frame 1689. Native coverage: ticks 0–1799,
+view Y 39–2749 (maximum 2759), seven allocated enemy slots, two damage-number
+births, final health 2 and no dead samples. Two immutable terrain preparation
+operations take eight fields before takeover; the FPS verifier previously
+expected one operation and has been corrected. This is not 50 FPS or a claim
+of stock total-memory fit.
+
+The old audit below is **not a matched gameplay workload**: source behavior
+changes now let this same input controller descend farther. Do not subtract
+old frame costs and call the difference overhead without checking coverage.
+
+Seven 100-field captures start at 50, 450, 644, 700, 843, 1300 and 1688.
+First/final partial frames are excluded. Means below use these exact complete
+windows, not the number of frames that happens to fit after a later change.
+
+| Frames | Mean ms | Worst ms (frame) |
+| --- | ---: | ---: |
+| 51–74 | 77.0 | 102.9 (54) |
+| 451–464 | 134.9 | 372.8 (455) |
+| 645–657 | 141.2 | 412.3 (649) |
+| 701–713 | 134.9 | 173.7 (704) |
+| 844–855 | 154.5 | 203.9 (854) |
+| 1301–1314 | 131.5 | 178.3 (1314) |
+| 1689–1696 | 227.9 | 873.0 (1689) |
+
+Frame 1689 costs 873.0 ms by instruction trace, including 726.0 ms of terrain
+generation: 132 birth calls, 462.6 ms in native terrain owner birth, 152.9 ms
+in its spatial publication and 117.9 ms in room-layer birth (inclusive, not
+additive). Actual terrain row painting is only a few milliseconds. Across
+the 98 captured complete frames, actor End Step averages 32.0 ms, alarm dispatch
+12.9 ms, and an effect-surface room traversal 6.7 ms. The latter runs even
+without relevant effect producers. These are architectural work costs, not
+evidence for tuning the blitter or compiler settings.
+
+```sh
+SKIP_TO_GAME=1 PROFILE_CONTACT=1 VERIFY_CHIP_KB=512 VERIFY_TIMEOUT_SECONDS=300 bash amiga/profile.sh fps
+SKIP_TO_GAME=1 PROFILE_CONTACT=1 VERIFY_CHIP_KB=512 VERIFY_TIMEOUT_SECONDS=360 \
+  TRACE_FRAMES=50,450,644,700,843,1300,1688 TRACE_FIELDS=100 \
+  TRACE_OUTPUT=$PWD/tmp/trace/baseline-c64e8385 bash amiga/profile.sh trace
+python3 tools/amiga-trace-report.py tmp/trace/baseline-c64e8385 --causes
+```
+
+Trace ELF SHA-256:
+`5de31a57fc74699c4a8b971244016241383a23ce0d100669ba3bf8559d5f7769`.
+Compact reports and the FPS driver log are in `tmp/a500-baseline-before/`
+(`full-trace-report.txt`, `worst1689-report.txt`, `full-contact-verified.log`).
+The ELF and capture log are retained in `tmp/trace/baseline-c64e8385/`;
+raw instruction captures are disposable after comparison.
+
+## Historical pre-integration audit
+
 Default A500 build at `13e08ca2` (2026-10-08), compared with the supplied
 `36d8a0f2` audit. Remaining work is ranked in
 [open-work §5](open-work.md#5-meet-the-amiga-frame-budget). This is a snapshot
