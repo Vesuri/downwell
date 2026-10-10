@@ -1,0 +1,186 @@
+diff --git a/src/core/GameplayCollisionOwner.h b/src/core/GameplayCollisionOwner.h
+index 3739cdca..6dee28de 100644
+--- a/src/core/GameplayCollisionOwner.h
++++ b/src/core/GameplayCollisionOwner.h
+@@ -19,6 +19,7 @@
+ #include "GameplayRoomLayers.h"
+ #include "ObjectDrawMetadata.h"
+ #include "ObjectAlarmMetadata.h"
++#include "CapturedAlarmGroups.h"
+ #include "Profile.h"
+ #include "PreparedUnitSpriteBounds.h"
+ #include "PreparedTerrainBirthBounds.h"
+@@ -137,6 +138,7 @@ private:
+     bool combatAlarmPhaseInUse_=false;
+     bool combatAlarmCaptureDirty_=true;
+     unsigned combatAlarmMask_=0;
++    CapturedAlarmGroups<386> combatAlarmGroups_;
+     bool combatAlarmCaptureValid_=false;
+     bool nativeBoxAlarmPrefix_=false;
+     using EnemyAlarmRoster=NativeEnemyAlarmRoster<GameplayWorld::enemyCapacity>;
+@@ -3166,6 +3168,9 @@ private:
+         if(!alreadySorted){DW_PROFILE_SCOPE(profileAlarmSort);snapshot.sort();}
+         const unsigned count=snapshot.size();
+         const auto bindingRevision=this->bindingRevision();
++        // Only the guarded combat snapshot owns this retained plan. Generic
++        // and reference dispatch keep rediscovering groups as the oracle.
++        const bool preparedGroups=native_&&retainedMask==&combatAlarmMask_;
+         unsigned capturedAlarms=alreadySorted&&retainedMask?*retainedMask:0;
+         // Capture admitted resource-backed objects and sort grouped them.
+         // No callbacks occur here, so one lookup per group safely identifies
+@@ -3174,6 +3179,9 @@ private:
+         // masks. Retain this union with it instead of rescanning every tick.
+         // Binding changes during dispatch still disable absent-column skips.
+         if(!alreadySorted||!retainedMask){
++          if(preparedGroups){
++            if(!check(combatAlarmGroups_.prepare(snapshot,alarmMetadata_,capturedAlarms)))return false;
++          }else{
+             int previousObject=-1;
+             for(unsigned i=0;i<count;++i){
+                 const int object=snapshot.object(i);
+@@ -3182,6 +3190,7 @@ private:
+                 if(!check(alarmMetadata_.mask(object,mask)))return false;
+                 capturedAlarms|=mask;previousObject=object;
+             }
++          }
+             if(retainedMask)*retainedMask=capturedAlarms;
+         }
+         for(unsigned alarm=0;alarm<AlarmBank::count;++alarm){
+@@ -3206,6 +3215,7 @@ private:
+           int cachedObject=-1;unsigned alarmMask=0;
+           PackedObjectEvent event;bool eventCached=false,eventFound=false;
+           unsigned groupEnd=0;
++          unsigned preparedGroup=0;
+           for(unsigned i=0;i<count;++i){
+             // Resource order, not layer or compact-array order. The native
+             // box family is the sole object-92 owner in this combat phase.
+@@ -3219,11 +3229,22 @@ private:
+                 enemiesPending=false;
+             }
+ #endif
++            // Re-evaluate after the interleaved box/enemy callbacks. Once
++            // bindings change, neither a prepared mask nor an absent-group
++            // skip may replace live resource/eligibility reads.
++            const bool unchanged=bindingsUnchanged(bindingRevision);
++            const typename CapturedAlarmGroups<386>::Group* group=nullptr;
++            if(preparedGroups&&unchanged){
++                while(preparedGroup<combatAlarmGroups_.size()&&i>=combatAlarmGroups_.group(preparedGroup).end)
++                    ++preparedGroup;
++                if(!check(preparedGroup<combatAlarmGroups_.size()))return false;
++                group=&combatAlarmGroups_.group(preparedGroup);
++            }
+             if constexpr(SkipInactive)if(i>=groupEnd){
+                 // Captured boxes are live boxes. When none has this alarm set
+                 // at group entry, no member is pending and no callback runs.
+                 // The reference owner keeps the per-member walk as the oracle.
+-                groupEnd=snapshot.objectGroupEnd(i);
++                groupEnd=group?group->end:snapshot.objectGroupEnd(i);
+                 const unsigned slot=snapshot.handle(i).slot;
+                 if(native_&&slot>=View::breakableBase&&slot<View::terrainBase&&!world_->boxAlarmMayDispatch(alarm)){
+                     i=groupEnd-1;continue;
+@@ -3235,20 +3256,21 @@ private:
+             // A captured object's absent event needs no instance lookup while
+             // bindings are unchanged. Any birth, retire, rebind or clear makes
+             // the rest of this pass use live lookup, including later alarms.
+-            if(!bindingsUnchanged(bindingRevision)){
++            if(!unchanged){
+                 haveFlags=eligibilityFlags(h,flags);
+                 if(!haveFlags||(flags&0x100003u))continue;
+                 object=objectOf(h);
+             }
+             if(object!=cachedObject){
+-                if(!check(alarmMetadata_.mask(object,alarmMask)))return false;
++                if(group)alarmMask=group->mask;
++                else if(!check(alarmMetadata_.mask(object,alarmMask)))return false;
+                 cachedObject=object;eventCached=false;
+             }
+             if(!(alarmMask&(1u<<alarm))){
+                 // No callbacks occur in an absent event group. While bindings
+                 // match capture, every remaining member has the same resource
+                 // and can be skipped together. After mutation retain live reads.
+-                if(bindingsUnchanged(bindingRevision))i=snapshot.objectGroupEnd(i)-1;
++                if(unchanged)i=(group?group->end:snapshot.objectGroupEnd(i))-1;
+                 continue;
+             }
+             if(!haveFlags)haveFlags=eligibilityFlags(h,flags);
+diff --git a/tests/core/GameplayCollisionOwnerTest.cpp b/tests/core/GameplayCollisionOwnerTest.cpp
+index 4371b6ec..11bef6bc 100644
+--- a/tests/core/GameplayCollisionOwnerTest.cpp
++++ b/tests/core/GameplayCollisionOwnerTest.cpp
+@@ -1028,6 +1028,39 @@ static void checkNativeAnimationBatches(const ObjectPack& objects,const SpriteCo
+     }
+ }
+ int main(){
++    {
++        struct Metadata {
++            bool mask(int object,unsigned& out)const{
++                if(object==35){out=5;return true;}
++                if(object==92){out=1;return true;}
++                if(object==250){out=0;return true;}
++                return false;
++            }
++        } metadata;
++        RunnerStepSnapshot<12> phase;
++        assert(phase.append(0,1,250)&&phase.append(1,2,35)&&phase.append(2,3,92)&&
++            phase.append(3,4,250)&&phase.append(4,5,35));
++        phase.sort();CapturedAlarmGroups<3> plan;unsigned alarms=0;
++        assert(plan.prepare(phase,metadata,alarms)&&alarms==5&&plan.size()==3);
++        assert(plan.group(0).end==2&&plan.group(0).mask==5);
++        assert(plan.group(1).end==3&&plan.group(1).mask==1);
++        assert(plan.group(2).end==5&&plan.group(2).mask==0);
++        for(unsigned alarm=0;alarm<12;++alarm){
++            unsigned first=0;
++            for(unsigned group=0;group<plan.size();++group){
++                const auto& row=plan.group(group);
++                for(unsigned i=first;i<row.end;++i){unsigned mask;
++                    assert(metadata.mask(phase.object(i),mask));
++                    assert(bool(mask&(1u<<alarm))==bool(row.mask&(1u<<alarm)));
++                }
++                first=row.end;
++            }
++            assert(first==phase.size());
++        }
++        CapturedAlarmGroups<2> small;assert(!small.prepare(phase,metadata,alarms));
++        phase.clear();assert(plan.prepare(phase,metadata,alarms)&&!alarms&&!plan.size());
++        assert(phase.append(0,1,999));phase.sort();assert(!plan.prepare(phase,metadata,alarms));
++    }
+     assert(downwell::RunnerBindingRevisionVerification::run());
+     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native}){
+         const auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
+diff --git a/src/core/CapturedAlarmGroups.h b/src/core/CapturedAlarmGroups.h
+new file mode 100644
+index 00000000..64012cf7
+--- /dev/null
++++ b/src/core/CapturedAlarmGroups.h
+@@ -0,0 +1,31 @@
++#ifndef DOWNWELL_CAPTURED_ALARM_GROUPS_H
++#define DOWNWELL_CAPTURED_ALARM_GROUPS_H
++#include <cstdint>
++namespace downwell {
++// Immutable group boundaries/event columns of one sorted registration capture.
++// Never stores countdowns, eligibility or a current object after mutation.
++template<unsigned Capacity> class CapturedAlarmGroups {
++public:
++    struct Group {std::uint16_t end,mask;};
++    template<class Snapshot,class Metadata>
++    bool prepare(const Snapshot& snapshot,const Metadata& metadata,unsigned& alarms){
++        count_=0;alarms=0;
++        if(snapshot.size()>65535u)return false;
++        for(unsigned first=0;first<snapshot.size();){
++            unsigned mask;
++            if(count_==Capacity||!metadata.mask(snapshot.object(first),mask)||mask>0xfffu)return false;
++            const unsigned end=snapshot.objectGroupEnd(first);
++            if(end<=first||end>snapshot.size())return false;
++            groups_[count_++]={static_cast<std::uint16_t>(end),static_cast<std::uint16_t>(mask)};
++            alarms|=mask;first=end;
++        }
++        return true;
++    }
++    unsigned size()const{return count_;}
++    const Group& group(unsigned i)const{return groups_[i];}
++private:
++    Group groups_[Capacity?Capacity:1]{};
++    unsigned count_=0;
++};
++}
++#endif
