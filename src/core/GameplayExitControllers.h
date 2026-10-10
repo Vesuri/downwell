@@ -8,7 +8,7 @@ namespace downwell {
 class GameplayExitControllers {
 public:
     static constexpr unsigned capacity=128;
-    struct Record {int x=0,y=0,objectId=306;unsigned lifetimeId=0;bool active=true;};
+    struct Record {int x=0,y=0,objectId=306;unsigned lifetimeId=0;bool active=true;unsigned sourceId=0;};
     using Binding=RecordLifecycleBinding<Record>;
     bool bind(Binding b){if(count_||!good_)return false;binding_=b;return true;}
     Binding binding()const{return binding_;}
@@ -18,9 +18,11 @@ public:
     const Record* find(InstanceHandle h)const{
         return h.generation&&h.slot>=retired_&&h.slot<count_&&records_[h.slot].lifetimeId==h.generation?&records_[h.slot]:nullptr;
     }
-    bool create(int object,int x,int y){
-        if(!good_||count_==capacity||!next_||(object!=306&&object!=74))return good_=false;
-        const auto slot=count_++;auto& record=records_[slot];record={x,y,object,next_++,true};
+    bool create(int object,int x,int y,unsigned sourceId=0){
+        if(!good_||count_==capacity||!next_||(object!=306&&object!=74)||sourceId>0x7fffffffu)return good_=false;
+        if(sourceId)for(unsigned i=retired_;i<count_;++i)
+            if(records_[i].sourceId==sourceId)return good_=false;
+        const auto slot=count_++;auto& record=records_[slot];record={x,y,object,next_++,true,sourceId};
         return good_=binding_.birth(handle(slot),record);
     }
     bool clear(){

@@ -603,6 +603,16 @@ one after that handler returns. Native generated-birth integration must
 preserve that boundary across the table above, not infer a stream from the
 terrain representation or a batch's final population.
 
+`registerLevelExitWithSourceIds` supplies that boundary for the exit chain:
+306 is allocated and registered before its Create; 74 and 255 each request
+their own ID immediately before child registration. Exit-controller and goal
+field records retain these IDs, including layer publication. No contiguous
+three-ID reservation or post-Create cursor subtraction is used. Allocation
+failure retains the completed prefix, stops later births and prevents goal
+field RNG when that field was not born. The enclosing generated-instance
+caller still needs the complete source stream; the legacy no-ID entry point
+does not establish it.
+
 `scrBuilder` blocks 187 and 207 write `self.y += 16` after each newline's
 pillars and each extra-pillar row respectively. Shared scalar, run and prepared
 generation retain these setter boundaries, including the completed prefix on

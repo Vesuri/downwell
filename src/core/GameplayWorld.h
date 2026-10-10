@@ -2118,13 +2118,30 @@ public:
         return run_.effectsSucceeded=run_.effectsSucceeded&&goalFieldInstances_.bind(binding);
     }
     bool registerLevelExit(int y) {
-        if(!run_.effectsSucceeded||!exitControllers_.create(306,240,y))return run_.effectsSucceeded=false;
+        return registerLevelExitAllocated(y,[](int,unsigned& id){id=0;return true;});
+    }
+    // The enclosing source stream allocates the trigger before its Create,
+    // then each synchronous child separately. Never reserve three IDs: child
+    // lifecycle callbacks can themselves consume IDs from the same stream.
+    template<class Allocate> bool registerLevelExitWithSourceIds(int y,Allocate allocate){
+        return registerLevelExitAllocated(y,[&](int object,unsigned& id){
+            return allocate(object,id)&&id&&id<=0x7fffffffu;
+        });
+    }
+private:
+    template<class Allocate> bool registerLevelExitAllocated(int y,Allocate allocate){
+        unsigned parent=0;
+        if(!run_.effectsSucceeded||!allocate(306,parent)||!exitControllers_.create(306,240,y,parent))
+            return run_.effectsSucceeded=false;
         return run_.createLevelExit(480,y,enemyRandom_,cameraMotion_,
             [&](downwell::LevelExit::Effect effect,int x,int childY){
+                unsigned child=0;
+                if(!allocate(effect==downwell::LevelExit::Effect::roomEndSetter?74:255,child))return false;
                 return effect==downwell::LevelExit::Effect::roomEndSetter?
-                    exitControllers_.create(74,x,childY):goalFieldInstances_.create(x,childY);
+                    exitControllers_.create(74,x,childY,child):goalFieldInstances_.create(x,childY,255,nullptr,child);
             });
     }
+public:
     const downwell::GameplayExitControllers& exitControllers()const{return exitControllers_;}
     bool bindExitControllerLifecycle(downwell::GameplayExitControllers::Binding binding){
         return run_.effectsSucceeded=run_.effectsSucceeded&&exitControllers_.bind(binding);

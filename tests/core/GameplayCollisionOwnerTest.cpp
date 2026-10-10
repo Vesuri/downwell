@@ -23,6 +23,9 @@ namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_
 #include "core/CurrencyHomingMath.h"
 #include "core/TerrainWallContacts.h"
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
+bool nativeExitSourceBirth(GameplayWorld& world,int y,bool (*allocate)(int,unsigned&)){
+    return world.registerLevelExitWithSourceIds(y,allocate);
+}
 struct NativeSkeletonAudio {
     bool isPlaying(int,bool&);bool stop(int);bool play(int,int,bool,int&);
     bool getGain(int,downwell::MotionBinary64&);bool setGain(int,downwell::MotionBinary64,int);
@@ -843,6 +846,32 @@ int main(){
             }
         }
         assert(ProjectilePublicationVerification::run());
+    }
+    for(unsigned failure=0;failure<4;++failure){
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false);
+        const auto draws=world->randomDrawCount();
+        unsigned calls=0,next=810000;
+        const int expected[]={306,74,255};
+        const bool created=world->registerLevelExitWithSourceIds(700,[&](int object,unsigned& id){
+            assert(calls<3&&object==expected[calls]);
+            if(calls){
+                const auto* parent=world->exitControllers().find(world->exitControllers().handle(0));
+                assert(parent&&parent->sourceId==810000);
+            }
+            ++calls;if(calls==failure)return false;
+            id=next;next+=7;return true;
+        });
+        assert(created==(failure==0)&&calls==(failure?failure:3));
+        assert(world->randomDrawCount()==draws+(created?1:0));
+        if(!created){
+            assert(!world->effectsSucceeded());
+            assert(!world->registerLevelExitWithSourceIds(800,[&](int,unsigned&){assert(false);return true;}));
+            assert(bool(world->exitControllers().find(world->exitControllers().handle(0)))==(failure>1));
+            assert(bool(world->exitControllers().find(world->exitControllers().handle(1)))==(failure>2));
+        }else{
+            assert(world->exitControllers().find(world->exitControllers().handle(1))->sourceId==810007);
+            assert(world->goalFieldInstances().find(world->goalFieldInstances().handle(0))->sourceId==810014);
+        }
     }
     for(unsigned failure=0;failure<4;++failure){
         auto world=std::make_unique<GameplayWorld>(300,true,0,false);
