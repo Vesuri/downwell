@@ -42,7 +42,10 @@ struct Ops {
     bool enemyPlayerY(N& value){value=N::fromInteger(20);return accept(6);}
     bool enemyPlayerX(N& value){value=N::fromInteger(10);return accept(7);}
     bool pointDirection(N,N,N x,N y,N& value){assert(same(x,N::fromInteger(10))&&same(y,N::fromInteger(20)));value={};return accept(8);}
-    bool inView(bool& value){value=visible;return accept(9);}
+    bool inView(bool& value){
+        assert(state.viewMarginsInitialized&&state.marginx.zero()&&state.marginyTop.zero()&&state.marginyBottom.zero());
+        value=visible;return accept(9);
+    }
     bool lengthdir(bool vertical,N,N,N& value){value=N::fromInteger(vertical?2:1);return accept(vertical?11:10);}
     bool meeting(N,N,int object,bool& hit){assert(object==57);hit=collide;return accept(12);}
     bool xscale(int value){assert(value==1);return accept(13);}

@@ -649,6 +649,33 @@ public:
                     value=MotionBinary64::fromInteger(world.mainCameraRenderViewY());return true;
                 }
                 bool room(int& value){value=world.roomId_;return true;}
+                bool inView(bool& visible){
+                    // scrInView(0,0,0), with strict VM comparisons and builtin
+                    // coordinates, not the actor's private integration state.
+                    visible=false;auto* r=record();if(!r)return false;
+                    RunnerImageValue x,y;std::memcpy(&x.bits,&r->preciseX,4);std::memcpy(&y.bits,&r->preciseY,4);
+                    int order;
+                    auto boundary=MotionBinary64::fromInteger(world.mainCameraRenderViewX());
+                    if(!compareRunnerReal(x.promoted(),boundary,order))return false;
+                    if(order<=0)return true;
+                    boundary=MotionBinary64::fromInteger(world.mainCameraRenderViewX());
+                    if(!boundary.add(MotionBinary64::fromInteger(world.cameraViewWidth()))||
+                        !compareRunnerReal(x.promoted(),boundary,order))return false;
+                    if(order>=0)return true;
+                    boundary=MotionBinary64::fromInteger(world.mainCameraRenderViewY());
+                    if(!compareRunnerReal(y.promoted(),boundary,order))return false;
+                    if(order<=0)return true;
+                    boundary=MotionBinary64::fromInteger(world.mainCameraRenderViewY());
+                    if(!boundary.add(MotionBinary64::fromInteger(world.cameraViewHeight()))||
+                        !compareRunnerReal(y.promoted(),boundary,order))return false;
+                    visible=order<0;return true;
+                }
+                bool xscale(int scale){
+                    auto* r=record();if(!r||(scale!=-1&&scale!=1))return false;
+                    if(!world.lifecycle_.integerTransform(key,*r,RunnerTransformField::scaleX,scale,
+                        {0x3f800000u},0xffffffu)||(r=record())==nullptr)return false;
+                    r->scaleX=static_cast<float>(scale);return true;
+                }
                 bool direction(MotionBinary64 wanted,MotionBinary64& accepted){
                     auto* r=record();RunnerImageValue value;
                     // Jelly scripts use custom xsp/ysp; builtin speed remains

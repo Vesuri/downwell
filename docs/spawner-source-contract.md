@@ -135,6 +135,14 @@ Keep the unsimplified source arithmetic at both writes: normalizing only once
 after both reflections changes intermediate observations. Facing changes only
 when the surviving X speed is nonzero under the VM comparison.
 
+The acceleration guard calls `scrInView(0,0,0)`. That script first writes
+`marginx`, `marginyTop` and `marginyBottom` on the caller, even when the
+first comparison fails. Its bounds are strict VM comparisons against view 0:
+`x > left`, `x < left+width`, `y > top`, `y < top+height`, short-circuited
+in that order. These are builtin coordinates, not private `xx/yy`.
+The registered stored binding uses the published camera view and publishes
+the X-scale setter through collision ownership before changing the record.
+
 Time stop zeroes image speed and skips movement, but not death. Death runs
 bookkeeping, four moving-effect births, flash, currency, sound 125 and destroy;
 unlike the jelly it does not emit the separate smoke call. Each moving effect

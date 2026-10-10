@@ -8,6 +8,8 @@ namespace downwell {
 // this state machine alone does not admit the family into a live scheduler.
 struct RedBallStep : RedBallBirth, CheckCollisionWithScript {
     Real directionDifference{};
+    Real marginx{},marginyTop{},marginyBottom{};
+    bool viewMarginsInitialized=false;
     int eye=0,eyeX=0,shotDirection=0;
     bool eyeInitialized=false;
     template<class Ops> bool draw(Ops& ops){
@@ -148,7 +150,12 @@ struct RedBallStep : RedBallBirth, CheckCollisionWithScript {
                 if(!compareRunnerReal(magnitude,Real::fromInteger(cone),order))return false;
                 if(order<0){
                     if(!compareRunnerReal(moveSpeed,maxSpeed,order))return false;
-                    if(order<0){bool visible;if(!ops.inView(visible)||(visible&&!moveSpeed.add(acceleration)))return false;}
+                    if(order<0){
+                        // scrInView(0,0,0) writes caller fields before querying
+                        // the view, including when the first comparison fails.
+                        marginx={};marginyTop={};marginyBottom={};viewMarginsInitialized=true;
+                        bool visible;if(!ops.inView(visible)||(visible&&!moveSpeed.add(acceleration)))return false;
+                    }
                 }else{
                     if(!compareRunnerReal(moveSpeed,Real::fromInteger(1),order))return false;
                     if(order>0&&!moveSpeed.add(negative(deceleration)))return false;

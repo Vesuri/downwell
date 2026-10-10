@@ -13,6 +13,7 @@ event = next(e for e in manifest["resources"]["objects"][118]["events"]
 assert event["actions"][0]["codeId"] == 1247
 print("Pinned red-ball Step: view-gated acceleration, ordered reflection and synchronous death effects")
 for name, digest in (
+    ("gml_GlobalScript_scrInView", "cf66675bc8ea809f5bd42270ceee29d3e50eb9c3aa9d916205006db32e0e3432"),
     ("gml_Object_enmRedBall_Draw_0", "b096cd9f4f3c0e147ef554447d561bbe8dd27305558ce7c1651f8f66093db0d7"),
     ("gml_Object_enmRedBall_Alarm_0", "180a4e611d1fcecef7bce7b7a098d02bd852d41c4923c7abe60b3b5a4513b313"),
     ("gml_Object_enmRedBall_Alarm_1", "b5f534ec4da2c4f3cf6f841a4fbb21b2b3846c8995fa505c362c2154c1f32047"),

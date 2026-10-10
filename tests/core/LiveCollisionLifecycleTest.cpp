@@ -382,6 +382,18 @@ int main(){
         const auto* record=world->resolveInstance(active);
         require(record&&record->imageSpeed==0&&record->spriteId==702&&stopReads==1,
             "frozen Step publishes animation stop and body sprite without unsupported effects");
+        const unsigned activeId=record->instanceId;
+        const auto oldX=balls.state(activeId)->xx,oldY=balls.state(activeId)->yy;
+        require(world->withRegisteredRedBallEvents(balls,*owner,[](InstanceHandle){return Environment{};},
+            [](bool& stopped){stopped=false;return true;},[&]{
+                world->step(Input{},false);return world->effectsSucceeded();
+            }),"registered red-ball movement uses real target, view and transform operations");
+        const auto* moved=balls.state(activeId);record=world->resolveInstance(active);
+        require(moved&&record&&(moved->xx.high!=oldX.high||moved->xx.low!=oldX.low||
+            moved->yy.high!=oldY.high||moved->yy.low!=oldY.low)&&record->imageSpeed>0,
+            "unfrozen registered red-ball integrates motion and resumes animation");
+        require(record->scaleX==((moved->xsp.high>>31)?-1.0f:1.0f),
+            "red-ball facing is stored after collision-transform publication");
     }
     for(unsigned failure=0;failure<=5;++failure){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
