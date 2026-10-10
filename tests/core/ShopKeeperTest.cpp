@@ -28,9 +28,11 @@ int main() {
     for (int i = 0; i < 19; ++i) tick(200);
     require(keeper.frame() == 0, "angry alarm does not fire early");
     tick(200);
-    require(keeper.frame() == 1 && keeper.alarm1 == 5, "angry blink starts at alarm zero");
-    for (int i = 0; i < 5; ++i) tick(200);
-    require(keeper.frame() == 0 && rolls == 2 && keeper.alarm0 == 20, "blink rearms random wait after five updates");
+    require(keeper.frame() == 1 && keeper.alarm1 == 4, "alarm zero arms a later slot consumed in this phase");
+    for (int i = 0; i < 3; ++i) tick(200);
+    require(keeper.frame() == 1 && keeper.alarm1 == 1 && rolls == 1, "blink does not end early");
+    tick(200);
+    require(keeper.frame() == 0 && rolls == 2 && keeper.alarm0 == 20, "earlier-slot random wait is not decremented again");
     feedback.thankful = 1; feedback.resetKeeperImage = true;
     for (int i = 0; i < 12; ++i) tick(190);
     require(keeper.sprite == 486 && keeper.frame() == 4 && feedback.thankful == 2 && keeper.alarm2 == 60,
@@ -63,5 +65,15 @@ int main() {
     }
     keeper.step(feedback, 201, 200, true, 1, random);
     require(!keeper.present && keeper.spawnEnemy, "criminal branch requests enemy replacement");
+    keeper={};feedback={};keeper.sprite=487;keeper.alarm0=keeper.alarm1=keeper.alarm2=1;
+    feedback.thankful=feedback.goodbye=feedback.confused=1;
+    const auto before=rolls;
+    keeper.alarms(feedback,random);
+    require(keeper.frame()==1&&keeper.alarm0==0&&keeper.alarm1==4&&keeper.alarm2==0&&rolls==before,
+        "alarm zero overwrites a due later alarm before it is sampled; no spurious RNG");
+    require(!feedback.thankful&&!feedback.goodbye&&!feedback.confused,"alarm two still runs after earlier mutations");
+    keeper={};keeper.alarm0=keeper.alarm1=0;
+    keeper.alarms(feedback,random);
+    require(keeper.alarm0==-1&&keeper.alarm1==-1&&rolls==before,"zero counters retire without dispatch");
     std::puts("Recovered merchant Step, alarms and binary64 animation tests passed");
 }

@@ -261,6 +261,15 @@ assembly("gml_Object_fxRisingText_Alarm_1",
 assembly("gml_GlobalScript_action_kill_object",
     "caac5c9d9f9d959a5aa6337f729bfc989927d8882d4ce7f9a29b9d45dd0eab33")
 print("Pinned rising-text Step and alarm-driven destruction")
+keeper_alarm0 = assembly("gml_Object_shopKeeper_Alarm_0",
+    "e7d4df117c713ab12670714a4d172050901ec0c3b479e06fa0e0032f8da0f65e")
+keeper_alarm1 = assembly("gml_Object_shopKeeper_Alarm_1",
+    "82f46673e07811bcbfb63dd3e160c83084749cd16dec8d8e4d093aaee5eaa579")
+assembly("gml_Object_shopKeeper_Alarm_2",
+    "7b4985a324acc8f226adbd70211e4118cb31df7f5a32819ff5c16ba46bb16e47")
+assert "pushi.e 5\nconv.i.v\npushi.e -1\npushi.e 1\npop.v.v [array]self.alarm" in keeper_alarm0
+assert "call.i irandom_range(argc=2)\npushi.e -1\npushi.e 0\npop.v.v [array]self.alarm" in keeper_alarm1
+print("Pinned keeper blink alarms: later-slot rearm precedes same-phase countdown")
 assembly("gml_Object_fxRisingText_Draw_0",
     "b3f4de1e393b0608999219ff82fba8a18679e5f526e3295f4b440e283cf6c7cc")
 assembly("gml_GlobalScript_scrDrawBorderTextBlack",

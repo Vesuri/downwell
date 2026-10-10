@@ -33,6 +33,16 @@ Consequently, all eligible instances' Alarm 0 processing precedes Alarm 1,
 and so on. An event's write to a later alarm is seen during this same phase;
 a write to an already-visited alarm waits until the next phase. Countdown of
 zero retires it to -1 without dispatch. Negative values are left unchanged.
+
+The shop keeper is a concrete mutation case: while sprite 487 is selected,
+Alarm 0 writes image index 1 and sets Alarm 1 to 5. Alarm 1 is then decremented
+to 4 in that same phase, even if its old value would have fired. Four further
+phases trigger Alarm 1, which resets the image and assigns Alarm 0 an
+`irandom_range(20,60)` result. That earlier slot is not decremented again until
+the next phase. Pre-decrementing every slot and dispatching a saved event mask
+changes both blink duration and RNG consumption when both counters were due.
+The keeper handlers are hash-pinned in `verify-runner-instance-ids.py`.
+
 ### Object and instance traversal
 
 Alarm table construction at `0x47a57c` passes event type 2 and subtype upper

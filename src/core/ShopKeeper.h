@@ -17,12 +17,16 @@ struct ShopKeeper {
     template<class Range>
     void alarms(ShopFeedback& feedback, Range random) {
         if (!present) return;
-        const bool a = AlarmBank::advanceValue(alarm0);
-        const bool b = AlarmBank::advanceValue(alarm1);
-        const bool c = AlarmBank::advanceValue(alarm2);
-        if (a && sprite == 487) { image = HudReal::integer(1); alarm1 = 5; }
-        if (b && sprite == 487) { image = {}; alarm0 = random(20, 60); }
-        if (c) feedback.thankful = feedback.goodbye = feedback.confused = 0;
+        // Runner alarm slots are processed in ascending order, reading the
+        // current counter after preceding handlers. Alarm 0's new alarm 1
+        // therefore becomes 4 here; alarm 1's new alarm 0 waits until next tick.
+        if (AlarmBank::advanceValue(alarm0) && sprite == 487) {
+            image = HudReal::integer(1); alarm1 = 5;
+        }
+        if (AlarmBank::advanceValue(alarm1) && sprite == 487) {
+            image = {}; alarm0 = random(20, 60);
+        }
+        if (AlarmBank::advanceValue(alarm2)) feedback.thankful = feedback.goodbye = feedback.confused = 0;
     }
     template<class Range>
     void step(ShopFeedback& feedback, int playerX, int x, bool criminal,
