@@ -1018,6 +1018,17 @@ int main() {
             downwell::drawShopFixtures(compact,[&](int sprite,int,int,int){if(sprite==152)++legacyItems;});
             require(legacyItems==2,"compact fixture skips only the registered item");
             require(shop.clear(),"retire rising text render fixture");
+            for(int object:{278,279,280}){
+                const auto child=children.create(object,runtime.mainCameraRenderViewX()+80,runtime.mainCameraRenderViewY()+100);
+                require(child,"registered Shop sprite child");
+                RecordingRenderer drawn;drawn.recordTransforms=true;effectGame.render(drawn);
+                require(effectGame.renderingSucceeded(),"registered child reaches Game Draw");
+                const int sprite=object==278?481:object==279?482:485;unsigned seen=0;
+                for(const auto& t:drawn.transforms)if(t.sprite==sprite){
+                    require(t.frame==0&&t.x==190&&t.y==100&&t.sx==1&&t.sy==1&&t.angle==0,"registered child source transform");++seen;
+                }
+                require(seen==1&&children.clear(),"registered child draws exactly once");
+            }
         }
         {
             downwell::DeferredCreateInstance command(289,runtime.mainCameraRenderViewX()+80,

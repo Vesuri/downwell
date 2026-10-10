@@ -364,6 +364,16 @@ rising_draw = assembly("gml_Object_fxRisingText_Draw_0",
 assert rising_draw.index("self.overXview\npushi.e -10\ncmp.i.v GT") < rising_draw.index("self.underXview\npushi.e 10\ncmp.i.v LT")
 assert "push.v self.drawing\nconv.v.b\nbf [6]" in rising_draw
 assert rising_draw.count("call.i gml_Script___view_get(argc=2)") == 3
+keeper_draw = assembly("gml_Object_shopKeeper_Draw_0",
+    "7d01544f7a5dde5f27d117fec1d300e32a34caa3ef01870c1028e0abf412c268")
+assert keeper_draw.index("call.i draw_self") < keeper_draw.index("pushglb.v global.area")
+assert "pushi.e 3\ncmp.i.v EQ" in keeper_draw and "pushi.e 725\nconv.i.v\ncall.i draw_sprite(argc=4)" in keeper_draw
+for leaf in (278,279,283):
+    object_id=leaf
+    while object_id>=0:
+        definition=objects[object_id]
+        assert not any((e["eventType"],e["eventSubtype"])==(8,0) for e in definition["events"])
+        object_id=definition["parentId"]
 assembly("gml_GlobalScript_scrDrawBorderTextBlack",
     "fa8d7e4e10625d3474e6ca2e2d1ed674d5c25c3ccc2b23a264215ca22bf93d6b")
 item_step = assembly("gml_Object_objObtainableUg_Step_0",

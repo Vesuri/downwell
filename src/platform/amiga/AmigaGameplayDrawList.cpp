@@ -1,6 +1,7 @@
 #include "AmigaGameplayDrawList.h"
 #include "AmigaProfile.h"
 #include "core/ShopFixtures.h"
+#include "core/ShopChildDraw.h"
 #include "core/GameMakerRounding.h"
 #include "core/DamageNumberText.h"
 #include "core/RunnerSpatialSplit.h"
@@ -364,7 +365,27 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
             // Registered Shop Draw events need their own source handlers.
             // Never reinterpret a Shop-local handle as a script-effect slot,
             // or silently omit it while drawing compact Shop copies.
-            if(kind==GameplayWorld::DrawActor::shop)return false;
+            if(kind==GameplayWorld::DrawActor::shop){
+                const auto* owner=port.shopInstances();const auto* record=owner?owner->find(key):nullptr;
+                if(!record)return false;
+                struct Ops {
+                    const downwell::GameplayShopInstances& owner;downwell::InstanceHandle key;
+                    const downwell::GameplayShopInstances::Record& r;decltype(append)& paint;
+                    int viewX,viewY;unsigned currentArea;
+                    downwell::MotionBinary64 x(){return r.x.promoted();}
+                    downwell::MotionBinary64 y(){return r.y.promoted();}
+                    bool area(unsigned& value){value=currentArea;return true;}
+                    bool sprite(int id,unsigned frame,downwell::MotionBinary64 x,downwell::MotionBinary64 y){
+                        std::int32_t px,py;
+                        return x.add(downwell::MotionBinary64::fromInteger(downwellPlayfieldX-viewX))&&
+                            y.add(downwell::MotionBinary64::fromInteger(-viewY))&&x.roundPixel(px)&&y.roundPixel(py)&&
+                            paint(id,frame,px,py,0);
+                    }
+                    bool self(){unsigned frame;return r.spriteId<0||
+                        (owner.drawFrame(key,frame)&&sprite(r.spriteId,frame,x(),y()));}
+                } ops{*owner,key,*record,append,worldViewX,worldViewY,unsigned(port.runStage().area)};
+                return downwell::ShopChildDraw::draw(record->objectId,ops);
+            }
             if(kind==GameplayWorld::DrawActor::redBall){
                 const auto* record=port.redBalls()?port.redBalls()->find(key):nullptr;
                 if(!record)return false;

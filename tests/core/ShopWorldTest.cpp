@@ -3,6 +3,7 @@
 #include "core/ShopFixtures.h"
 #include "core/LaserSightRay.h"
 #include "core/ShopChildCreation.h"
+#include "core/ShopChildDraw.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -10,6 +11,23 @@ static void require(bool ok, const char* message) {
     if (!ok) { std::fprintf(stderr, "%s\n", message); std::abort(); }
 }
 int main() {
+    for(unsigned area:{1u,3u})for(unsigned reject=0;reject<=3;++reject){
+        struct Ops {
+            unsigned currentArea,reject,calls=0;bool good=true;
+            bool event(){return ++calls!=reject;}
+            bool self(){good=good&&calls==0;return event();}
+            bool area(unsigned& out){good=good&&calls==1;out=currentArea;return event();}
+            downwell::MotionBinary64 x(){return downwell::MotionBinary64::fromInteger(3);}
+            downwell::MotionBinary64 y(){return downwell::MotionBinary64::fromInteger(10);}
+            bool sprite(int id,unsigned frame,downwell::MotionBinary64 x,downwell::MotionBinary64 y){
+                good=good&&calls==2&&id==725&&frame==0&&x.high==0x40080000u&&!x.low&&y.high==0x40100000u&&!y.low;
+                return event();
+            }
+        } ops{area,reject};
+        const unsigned total=area==3?3:2;
+        require(downwell::ShopChildDraw::draw(280,ops)==!(reject&&reject<=total)&&ops.good&&
+            ops.calls==(reject&&reject<=total?reject:total),"keeper Draw order and failure prefix");
+    }
     for(unsigned area:{1u,3u,5u})for(unsigned reject:{0u,1u,8u,10u,11u,12u}){
         if(area==5&&reject>=11)continue; // No radio operation exists to reject.
         downwell::ShopWorld world;bool good=true;unsigned rng=0,choices=0;
@@ -338,6 +356,12 @@ int main() {
         ++fixtures;
     });
     require(fixtures == 1, "merchant is a separate moving-object draw");
+    shop->children.table=1;shop->children.cases[1]=2;shop->children.keeper=3;
+    unsigned tables=0,cases=0,keepers=0;
+    downwell::drawShopFixtures(run.shops,[&](int sprite,int,int,int){tables+=sprite==481;cases+=sprite==482;});
+    downwell::drawShopKeepers(run.shops,[&](int,unsigned,int,int){++keepers;});
+    require(tables==0&&cases==2&&keepers==0,"registered children do not have compact Draw duplicates");
+    shop->children.table=shop->children.cases[1]=shop->children.keeper=0;
     require(run.shops.playerSolidAt(39, 0) && run.shops.playerSolidAt(98, 7) &&
         !run.shops.playerSolidAt(38, 0) && !run.shops.playerSolidAt(99, 7),
         "table uses cropped solid mask, not full artwork bounds");

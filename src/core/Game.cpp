@@ -1,4 +1,5 @@
 #include "Game.h"
+#include "ShopChildDraw.h"
 #include "TimeShardDraw.h"
 #include "CorpseDraw.h"
 #include "SmokeDraw.h"
@@ -519,6 +520,25 @@ void Game::renderMain(Renderer& renderer) const {
         if(depth < -1000){drawUnregisteredBullets();if(!drawForeground())return false;}
         if(instance.objectId==35){drawPlayer();return true;}
         if(instance.objectId==212)return startup_.drawRisingText(instance);
+        if(instance.objectId==278||instance.objectId==279||instance.objectId==280||instance.objectId==283){
+            struct Ops {
+                const InstanceRecord& r;const StartupRuntime& world;Renderer& renderer;float vx,vy;
+                MotionBinary64 x(){RunnerImageValue v;std::memcpy(&v.bits,&r.preciseX,4);return v.promoted();}
+                MotionBinary64 y(){RunnerImageValue v;std::memcpy(&v.bits,&r.preciseY,4);return v.promoted();}
+                bool self(){
+                    if(r.spriteId>=0)renderer.drawSpriteTransformed(r.spriteId,static_cast<unsigned>(r.imageIndex),
+                        r.preciseX-vx,r.preciseY-vy,r.scaleX,r.scaleY,r.rotation);
+                    return true;
+                }
+                bool area(unsigned& value){value=unsigned(world.runStage().area);return true;}
+                bool sprite(int id,unsigned frame,MotionBinary64 x,MotionBinary64 y){
+                    RunnerImageValue px,py;if(!px.assign(x)||!py.assign(y))return false;
+                    float fx,fy;std::memcpy(&fx,&px.bits,4);std::memcpy(&fy,&py.bits,4);
+                    renderer.drawSprite(id,frame,fx-vx,fy-vy);return true;
+                }
+            } ops{instance,startup_,renderer,viewX,viewY};
+            return ShopChildDraw::draw(instance.objectId,ops);
+        }
         if(instance.objectId==225||instance.objectId==263){
             if(composite)return true;
             const bool death=startup_.mainDeathSequence().active;

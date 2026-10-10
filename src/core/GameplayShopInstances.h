@@ -40,6 +40,15 @@ public:
     GameplayShopInstances(const ObjectPack& objects,const SpriteCollisionPack& sprites,Binding binding={})
         :objects_(objects),sprites_(sprites),binding_(binding){}
     bool valid()const{return good_;}
+    bool drawFrame(InstanceHandle h,unsigned& frame)const{
+        const auto* r=find(h);std::uint32_t count;
+        if(!good_||!r||!r->initialized||r->spriteId<0||
+           !sprites_.frameCount(unsigned(r->spriteId),count)||!count||count>65535)return false;
+        const auto index=r->imageIndex;const unsigned magnitude=index.bits&0x7fffffffu,exponent=magnitude>>23;
+        if(!SequenceTimeline::valid(index)||((index.bits>>31)&&magnitude)||
+           magnitude>=SequenceTimeline::integerBits(count))return false;
+        frame=exponent<127?0:((magnitude&0x7fffffu)|0x800000u)>>(150-exponent);return true;
+    }
     template<class Ops> bool drawRisingText(InstanceHandle h,Ops& ops){
         if(!ready(h,212))return fail();
         auto& r=records_[h.slot];

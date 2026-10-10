@@ -36,6 +36,26 @@ int main() {
             auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
             assert(owner->attach(*world)&&(!native||world->bindNativeTerrain(*terrain))&&owner->configureCorpseMasks(masks));
             {
+                auto& store=owner->shopInstances();unsigned next=1900000;
+                auto allocate=[&](int,unsigned& id){id=next++;return true;};
+                struct Audio {bool play(int,int,bool,int&){return false;}bool setGain(int,downwell::MotionBinary64,int){return false;}} audio;
+                auto creation=store.creation(allocate,audio);
+                for(int object:{278,279,280,283})assert(creation.create(object,240,134));
+                for(bool composite:{false,true}){
+                    UBYTE pack[8]{};AmigaGameplayDrawList list;
+                    assert(list.collect(*world,pack,pack+8,160,34,composite));
+                    for(unsigned id=1900000;id<next;++id){
+                        auto key=store.sourceHandle(id);const auto* record=store.find(key);unsigned frame;
+                        assert(record&&store.drawFrame(key,frame));unsigned found=0;
+                        for(unsigned i=0;i<list.count;++i){const auto& a=list.actors[i];
+                            if(a.sprite==record->spriteId){assert(a.frame==frame&&a.x==190&&a.y==100&&!a.flip);++found;}
+                        }
+                        assert(found==1);
+                    }
+                }
+                assert(store.clear());
+            }
+            {
                 using N=downwell::MotionBinary64;using F=downwell::RunnerImageValue;
                 auto& store=owner->redBalls();downwell::InstanceHandle ball;downwell::GameMakerRandom random(19);
                 struct Ops {

@@ -978,11 +978,16 @@ other actors, including prepared native command-order caches. Resource Draw
 metadata, visibility and destruction flags still decide admission; no separate
 shop-family painter order is introduced. Replacing speech invalidates the
 cached projection so the marked old child disappears and the new child takes
-its own layer position. This does not implement the parent/child custom Draw
-handlers: the Amiga command collector rejects an admitted Shop Draw until those
-handlers are supplied, rather than interpreting its local handle as a generic
-effect. Those handlers and normal parent-event installation remain required
-before frontend generation admission.
+its own layer position. `ShopChildDraw` admits table/case/item sprite drawing
+and keeper Draw from live records in both renderers. The keeper adds sprite
+725 frame zero at `(x,y-6)` after `draw_self` only in area three. Native frame
+selection admits nonnegative, in-range indices against the resource frame
+count. Compact fixture/keeper passes skip these registered children. The
+native pack includes all case frames; hat 725 remains unbound because its blue
+source pixels require an area-palette contract. Parent menus and native speech
+pixel composition remain unbound; the Amiga collector rejects those entries
+instead of interpreting their handles as generic effects. These handlers and
+normal parent-event installation remain required before frontend admission.
 Rising text and item selection can join `withEncounterSteps` through
 `stepRegisteredShopChild`, with the caller supplying the real upgrade-array
 lookup. Rising-text alarms use the existing mixed alarm phase; alarm 0 marks

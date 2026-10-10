@@ -130,12 +130,14 @@ SELECTIONS = {
         471: None,   # sprBlast: fourteen frames, offline mirrored planar art
         480: [0],    # sprShopCounter
         481: [0],    # sprShopTable
-        482: [0],    # sprShopCase, intact fixture (sold cases stay intact)
+        482: None,   # registered case: intact, flashing and opened frames
         485: None,   # merchant idle
         486: None,   # merchant thanks
         487: None,   # merchant angry/blink
         496: None,   # merchant goodbye
         497: None,   # merchant confused
+        # Keeper hat 725 contains blue source pixels; its area-palette
+        # contract must be resolved before admission to this four-pen pack.
         707: None,   # interaction sign, offline planar and DMA variants
         550: None,   # sprScattered (generated plants)
         551: None,   # broken scenery, retaining the selected intact frame

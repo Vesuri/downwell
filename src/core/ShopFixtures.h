@@ -13,8 +13,8 @@ template<class Emit>
 void drawShopFixtures(const ShopWorld& world, Emit emit) {
     for (const auto& shop : world.instances) if (shop.allocated) {
         if (shop.present) emit(480, 0, shop.x, shop.y);
-        emit(481, 0, shop.x + 64, shop.y);
-        for (int i = 0; i < 3; ++i) emit(482, 0, shop.x + 45 + i * 19, shop.y - 9);
+        if(!shop.children.table)emit(481, 0, shop.x + 64, shop.y);
+        for (int i = 0; i < 3; ++i) if(!shop.children.cases[i])emit(482, 0, shop.x + 45 + i * 19, shop.y - 9);
         for (int i = 0; i < 3; ++i) if (shop.feedback.itemPresent[i]&&!shop.children.items[i]) {
             const int sprite = shopItemSprite(shop.stock.items[i].upgrade);
             // objObtainableUg Create selects frame 1 and image_speed=0;
@@ -34,7 +34,7 @@ void drawShopPrompts(const ShopWorld& world, bool criminal, Emit emit) {
 template<class Emit>
 void drawShopKeepers(const ShopWorld& world, Emit emit) {
     for (const auto& shop : world.instances)
-        if (shop.allocated && shop.keeper.present)
+        if (shop.allocated && shop.keeper.present && !shop.children.keeper)
             emit(shop.keeper.sprite, shop.keeper.frame(), shop.x + 18, shop.y);
 }
 }
