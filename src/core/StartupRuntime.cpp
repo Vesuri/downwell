@@ -2383,6 +2383,8 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
         return;
     case 1221: // enmWhiteJelly Create
     case 1222: // enmWhiteJelly Alarm 1
+    case 1223: // enmWhiteJelly Alarm 0
+    case 1224: // enmWhiteJelly End Step
     case 1225: // enmWhiteJelly ordinary Step
         if(instance&&instance->objectId==115&&whiteJellyDispatch_){
             ++implementedCodeCalls_;

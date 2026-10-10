@@ -1150,6 +1150,8 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
             bool meeting(N,N,int,bool&){return false;}bool enemyDeath(){return false;}
             bool smoke(N,N,int,int){return false;}bool movingFx(N,N,int,N,N,N){return false;}
             bool flash(N,N,int,int,int){return false;}bool currency(int){return false;}bool destroy(){return false;}
+            bool viewY(N& out){out={};return true;}bool room(int&){return false;}
+            bool emitTimer(N&){return false;}bool effectAlarmReset(N){return false;}
         };
         auto runtime=std::make_unique<downwell::StartupRuntime>(downwell::PlatformProfile::desktop,&pack,objects);
         auto owner=runtime->whiteJellyStates<2>();unsigned speeds=0,sprites=0,stopReads=0;

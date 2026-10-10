@@ -471,8 +471,11 @@ public:
             if(code==1222)return owner.hitStunAlarm(key);
             auto ops=makeOps(key);
             if(code==1221)return owner.create(key,random_,ops);
+            if(code==1224)return owner.dispatch(key,[&](auto& s){return s.endStep(ops);});
             bool stop;
-            return code==1225&&readStop(stop)&&owner.step(key,stop,random_,ops);
+            if(!readStop(stop))return false;
+            if(code==1223)return owner.dispatch(key,[&](auto& s){return s.effectAlarm(stop,random_,ops);});
+            return code==1225&&owner.step(key,stop,random_,ops);
         };
         whiteJellyContext_=&dispatch;
         whiteJellyDispatch_=[](void* p,InstanceHandle key,int code){

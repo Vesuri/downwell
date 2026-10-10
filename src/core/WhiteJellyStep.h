@@ -22,6 +22,44 @@ struct WhiteJellyStep : WhiteJellyBirth, CheckCollisionWithScript {
         if(!requested.assign(wanted)||!ops.imageSpeed(requested,accepted))return false;
         imageSpeed=accepted;return true;
     }
+    template<class Random,class Ops> bool enemyContact(Random& random,Ops& ops){
+        if(!initialized)return false;
+        Real selfSum=x.promoted(),otherX,otherY;
+        if(!selfSum.add(y.promoted())||!ops.otherX(otherX)||!ops.otherY(otherY)||!otherX.add(otherY))return false;
+        int order;if(!compareRunnerReal(selfSum,otherX,order))return false;
+        if(!order)return setDirection(Real::fromInteger(int(random.irandomSmall(359))),ops);
+        // Source evaluates the target (self) first, then other.y and other.x.
+        const Real targetY=y.promoted(),targetX=x.promoted();Real angle;
+        if(!ops.otherY(otherY)||!ops.otherX(otherX)||
+            !ops.pointDirection(otherX,otherY,targetX,targetY,angle))return false;
+        return setDirection(angle,ops);
+    }
+    template<class Random,class Ops> bool effectAlarm(bool timeStop,Random& random,Ops& ops){
+        if(!initialized)return false;
+        if(!timeStop){
+            Real angle;
+            if(!randomBinary64(random.nextU32(),Real::fromInteger(40),angle)||
+                !angle.add(Real::fromInteger(-20))||!angle.add(Real::fromInteger(90))||
+                !ops.movingFx(xx,yy,704,{0x3fb99999u,0x9999999au},angle,{0x3fe00000u,0}))return false;
+        }
+        // emitTimer is not assigned by Create: read it through the owner,
+        // including its missing-variable failure, rather than invent a value.
+        Real timer;return ops.emitTimer(timer)&&ops.effectAlarmReset(timer);
+    }
+    template<class Ops> bool endStep(Ops& ops){
+        if(!initialized)return false;
+        Real boundary;int order;
+        if(!ops.viewY(boundary)||!boundary.add(Real::fromInteger(-160))||
+            !compareRunnerReal(y.promoted(),boundary,order))return false;
+        bool outside=order<0;
+        if(!outside){
+            if(!ops.viewY(boundary)||!boundary.add(Real::fromInteger(3000))||
+                !compareRunnerReal(y.promoted(),boundary,order))return false;
+            outside=order>0;
+        }
+        if(!outside)return true;
+        int room;return ops.room(room)&&(room!=11||ops.destroy());
+    }
     template<class Random,class Ops> bool step(bool timeStop,Random& random,Ops& ops){
         if(!initialized)return false;
         int order;

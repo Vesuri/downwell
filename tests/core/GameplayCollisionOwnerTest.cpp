@@ -48,10 +48,16 @@ struct NativeWhiteJellyStepOps : NativeWhiteJellyBirthOps {
     bool meeting(N,N,int,bool&);bool enemyDeath();bool smoke(N,N,int,int);
     bool movingFx(N,N,int,N,N,N);bool flash(N,N,int,int,int);bool currency(int);
     bool destroy();bool sprite(int);
+    bool otherX(N&);bool otherY(N&);bool viewY(N&);bool room(int&);
+    bool emitTimer(N&);bool effectAlarmReset(N);
 };
 bool nativeWhiteJellyStep(downwell::WhiteJellyStep& state,bool stop,
     downwell::GameMakerRandom& random,NativeWhiteJellyStepOps& ops){
     return state.step(stop,random,ops);
+}
+bool nativeWhiteJellyEvents(downwell::WhiteJellyStep& state,bool stop,
+    downwell::GameMakerRandom& random,NativeWhiteJellyStepOps& ops){
+    return state.enemyContact(random,ops)&&state.effectAlarm(stop,random,ops)&&state.endStep(ops);
 }
 bool nativeStoredWhiteJellyCreate(downwell::StoredWhiteJellyStates<8,2>& owner,
     downwell::InstanceHandle key,downwell::GameMakerRandom& random,NativeWhiteJellyStepOps& ops){
