@@ -756,6 +756,30 @@ dispatches and concrete device-audio bindings remain to be connected;
 registered-world tests do not establish normal frontend shop retirement or
 the parent's still-unimplemented ordinary Step.
 
+Child ownership does not supply the parent Shop's ordinary Step. That event
+begins with `pushi.e 277; pushenv [126]` and ends with `popenv [1]`: the inner
+body visits the Shop population for **each** dispatched Shop Step, not just
+the event caller. If outer dispatch and inner selection admit the same
+unchanging population of N shops, this reaches N×N inner bodies. The native
+replacement must use source selection/lifetime order, not simply hardcode a
+second slot loop: activation, destruction and mutation still govern admission.
+The inner body includes radio gain/resume handling, interaction, view-entry and
+angry sounds, the crime/death branch and the final sign script. Shared `dUp`
+and `padCancel` writes remain visible to subsequent inner visits and outer
+events; input snapshots per shop are not equivalent.
+
+`ShopInteraction` and `ShopWorld::step` are still compact adapters, not a full
+implementation of that parent event. Besides missing the inner traversal and
+radio/view branches, their aggregate feedback callbacks cannot stand in for
+ordered live child writes. Source navigation calls sound before writing
+`wfxx`. Purchase writes `thank`, decrements stock, calls `scrGainUg`, charges
+the current price, clears the case's stored-item flag and destroys the cased
+item if sold out, then updates keeper flags/image, creates rising text and
+plays the two sounds. Partial failure must retain that exact prefix. The
+event binding, full body hash, traversal and key orderings are guarded by
+`verify-runner-instance-ids.py`; no claim of normal multi-shop parity follows
+from the compact interaction tests.
+
 `StoredShopChildRegistration` implements these six child resources' synchronous
 Create bodies in real `InstanceStore` records, borrowing the room counter and
 lifecycle publisher. Birth publication precedes Create setters; item image-index

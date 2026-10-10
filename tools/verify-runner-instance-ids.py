@@ -200,6 +200,24 @@ print("Pinned rmMain's 240 walls/four controllers and player child-birth order; 
 shop = assembly("gml_Object_Shop_Create_0",
     "670e7f398a89a720f63eae31b674023ea06e2ae1b6f45be5560349b5f0a7fb3a")
 assert objects[277]["parentId"] == 91
+shop_step = assembly("gml_Object_Shop_Step_0",
+    "ced1552ae520650536d0a6ec2a9c96d183c3a6401c5b5c33d4a0de790950b8b4")
+step_binding = [e for e in objects[277]["events"] if (e["eventType"],e["eventSubtype"]) == (3,0)]
+assert len(step_binding) == 1 and step_binding[0]["actions"][0]["codeName"] == "gml_Object_Shop_Step_0"
+assert shop_step.startswith(".localvar 2 arguments\n\n:[0]\npushi.e 277\npushenv [126]\n")
+assert shop_step.endswith(":[126]\npopenv [1]\n\n:[end]")
+assert ":[125]\ncall.i gml_Script_scrCheckThisSignStep(argc=0)\npopz.v" in shop_step
+assert shop_step.count("pop.v.i global.dUp") == 2
+assert shop_step.count("pop.v.i global.padCancel") == 1
+for block in (43,48,61,66):
+    body = shop_step.split(f":[{block}]\n",1)[1].split(":[",1)[0]
+    assert body.index("call.i gml_Script_soundPlayOL") < body.index("pop.v.i self.wfxx")
+purchase = shop_step.split(":[76]\n",1)[1].split(":[81]\n",1)[0]
+ordered = ["pop.v.i self.thank", "popaf.e", "call.i gml_Script_scrGainUg", "pop.v.v global.currency",
+           "pop.v.i [stacktop]self.storedItem", "call.i instance_destroy", "pop.v.i [stacktop]self.thankful",
+           "pop.v.i [stacktop]self.image_index", "call.i gml_Script_scrRisingTextShop", "call.i gml_Script_soundPlayOL"]
+assert [purchase.index(s) for s in ordered] == sorted(purchase.index(s) for s in ordered)
+print("Pinned Shop Step: per-event with(277) traversal, shared input writes and synchronous purchase ordering")
 inherited = assembly("gml_Object_parentInteractable_Create_0",
     "c7501948045f88afa9ab289ee4b1b5a380bb4de07aee3857eeba1e937a427647")
 assert "call.i" not in inherited and objects[91]["parentId"] == -1
