@@ -1,6 +1,7 @@
 set pagination off
 set confirm off
 target remote 127.0.0.1:2345
+source chip_memory_watch.gdb
 break downwellStartupFailed
 commands
     silent
@@ -62,6 +63,7 @@ end
 printf "Scene bank loads: %lu\n", gDownwellSceneBankLoads
 printf "Three results destinations executed; final gameplay reached 200 updates\n"
 printf "DOWNWELL_RESULTS_RESTART_READY\n"
+downwell-chip-snapshot
 shell touch .run/gdb-ready.marker
 detach
 quit

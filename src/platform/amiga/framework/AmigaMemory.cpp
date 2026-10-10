@@ -3,6 +3,13 @@
 #include <exec/memory.h>
 #include <proto/exec.h>
 
+// Debugger-only Chip allocation watcher reads these SDK fields even when
+// unused debug types have been removed from the executable's companion ELF.
+static_assert(__builtin_offsetof(MemHeader, mh_Attributes) == 14, "Chip audit ABI");
+static_assert(__builtin_offsetof(MemHeader, mh_First) == 16, "Chip audit ABI");
+static_assert(__builtin_offsetof(MemHeader, mh_Free) == 28, "Chip audit ABI");
+static_assert(__builtin_offsetof(MemChunk, mc_Bytes) == 4, "Chip audit ABI");
+
 AmigaMemory::AmigaMemory()
     : game_(0), hud_(0), menu_(0), copper_(0), nullSprite_(0), bulletSprite_(0),
       sceneCache_(0), assets_(0),

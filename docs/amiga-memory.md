@@ -58,6 +58,25 @@ identity in the owner for animated-mask retention. This scratch lives in
 ordinary memory rather than the Amiga task stack; it holds ordering keys,
 not copied terrain or actor records.
 
+## Measuring transient Chip residency
+
+`amiga/chip_memory_watch.gdb` is sourced by the startup-memory, complete-scene
+and Results/Retry verifiers after connecting and before running the executable.
+It watches Exec's Chip `MemHeader.mh_Free`, recording every change and the
+minimum free-byte value, including allocation/free pairs inside DOS file I/O.
+This measures residency after the executable has loaded; it does not measure
+the loader's earlier transient footprint. The watch adds no shipping code or
+allocation, but debugger stops mean these runs are not frame-time measurements.
+
+At each `AmigaPlatform::loadFile` entry and the final verification marker,
+`downwell-chip-snapshot` walks the free list, validates its ordering and total,
+and reports the largest block. Largest-block figures are checkpoint samples,
+not a claimed continuous minimum; the free-byte low-water mark is continuous
+while the watch is installed. The script rejects multiple Chip regions rather
+than silently measuring only one. SDK field offsets are compile-time checked
+in `framework/AmigaMemory.cpp` because unused type metadata need not survive
+in the companion ELF. Use explicit `VERIFY_CHIP_KB=512` when running these gates.
+
 ## Executable size versus runtime memory
 
 The preserved pre-repair `STRIP=1` baseline in

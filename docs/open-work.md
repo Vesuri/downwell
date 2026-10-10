@@ -34,6 +34,10 @@ behavior, both backend integrations and relevant original-game verification.
   gameplay and results/Retry residency checks as regression gates; successful
   handoffs and the initial allocation balance do not measure transient peaks.
   Do not silently raise verification memory or discard source behavior.
+  Restore the full-scene diagnostic's loader fit before claiming those gates:
+  its loaded sections approach 8.37 MB and the current run fails before the
+  debugger connects. Inspect/share nonoverlapping framebuffer-oracle scratch
+  lifetimes rather than dropping assertions or increasing configured memory.
 - Extend the bounded SKIP_TO_GAME contact audit with a comparable pre-regression
   workload; distinguish behavior/input-path changes from increased per-frame work.
   Report quiet, firing/combat, generation and field windows with worst-frame

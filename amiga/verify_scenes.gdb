@@ -1,6 +1,7 @@
 set pagination off
 set confirm off
 target remote 127.0.0.1:2345
+source chip_memory_watch.gdb
 break AmigaPlatform::restore
 commands
 silent
@@ -100,6 +101,7 @@ end
 printf "SPLASH_PUBLICATION_OK: logo=180 credits=180 controls=240 fade-out=60 fade-in=60\n"
 printf "STYLE_SEQUENCE_OK: %lu frames, zero mismatches; 256-byte stack guard intact\n", gDownwellStyleReferenceFrames
 printf "DOWNWELL_GAMEPLAY_ACTIVE\n"
+downwell-chip-snapshot
 shell touch .run/gdb-ready.marker
 detach
 quit
