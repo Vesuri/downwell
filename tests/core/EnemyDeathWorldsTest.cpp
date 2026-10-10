@@ -2,6 +2,8 @@
 #include "core/StartupRuntime.h"
 #include "core/StoredWorldCollision.h"
 #include "core/GameplayCollisionOwner.h"
+#include "core/CurrencyHomingMath.h"
+#include "core/PortableAtan.h"
 #include "../../generated/downwell-area-titles.h"
 #include <cassert>
 #include <memory>
@@ -158,7 +160,10 @@ int main(){
         auto blood=stored->bloodRegistration<2>();auto smoke=stored->smokeRegistration<8>();
         auto flash=stored->flashBallRegistration<8>();auto currency=stored->currencyRegistration<3>();
         auto corpses=stored->corpseRegistration<1>();auto titles=stored->levelNumberRegistration<1>();
-        InstanceHandle skeleton;assert(stored->spawnSkeleton(skeletons,240,40000,skeleton));
+        // The multi-frame case must stay inside scrOutofview's lower limit;
+        // distant single-event fixtures intentionally avoid world contacts.
+        const int skeletonY=seed==16?200:40000;
+        InstanceHandle skeleton;assert(stored->spawnSkeleton(skeletons,240,skeletonY,skeleton));
         const auto initialRandom=stored->randomState();auto first=stored->nextRuntimeInstanceId();
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
         auto native=std::make_unique<GameplayWorld>(300,true,0,seed==15,owner->enemyBinding(),owner->breakableBinding(),
@@ -167,7 +172,7 @@ int main(){
         int storedSpeed=60,nativeSpeed=60;InstanceHandle controller,other,shared;
         assert(native->bindControllerRoomSpeed(nativeSpeed)&&owner->runControllers().create(105500,{}, {},
             [](InstanceHandle){return true;},controller));
-        assert(native->createSkeletonWithSourceId(first-1,240,40000,other));
+        assert(native->createSkeletonWithSourceId(first-1,240,skeletonY,other));
         native->configureEnemyRandom(initialRandom);
         assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::skeleton,other,shared));
         auto prepare=[&](auto& actor,auto&,bool&){actor.money=14;
@@ -253,6 +258,40 @@ int main(){
             },noChildStep,[&]{native->step(0);return native->effectsSucceeded();}));
             assert(selected==1&&native->debrisEffects().size()==2&&owner->blood().size()==2&&
                 owner->registeredFlash().size()>=4);
+            // Advance the death's actual children on the following world tick.
+            // Every unexpected family/alarm is a failure, not a placeholder.
+            auto effectsPhase=std::make_unique<GameplayCollisionOwner::EncounterStepOrder>();
+            CurrencyHomingMath math(portableAtan);
+            struct CorpseEnvironment {
+                int area(){return 1;}int restInPieces(){return 0;}
+                bool create(int,MotionBinary64,MotionBinary64){return false;}
+            } corpseEnvironment;
+            unsigned bloodSteps=0,smokeSteps=0,corpseSteps=0,currencySteps=0,debrisSteps=0;
+            const auto smokeCount=owner->registeredSmoke().size();
+            assert(native->withCurrencyEvents([&](InstanceHandle key,GameplayWorld::CurrencyPhase phase,unsigned){
+                if(phase!=GameplayWorld::CurrencyPhase::step)return false;
+                ++currencySteps;InstanceHandle h;MotionBinary64 px,py;
+                return GameplayCollisionView::encode(GameplayCollisionView::Kind::currency,key,h)&&
+                    ContactCoordinates::playerGlobals(native->player().frameStartXFixed(),
+                        native->player().frameStartYFixed(),240,176,px,py)&&
+                    owner->stepCurrency(h,stop.player.stopped,480,px,py,masks,math,
+                        [&](auto& top){top=MotionBinary64::fromInteger(34);return true;},
+                        nativeAudio,MotionBinary64::fromInteger(1),false);
+            },[&]{return owner->withEncounterSteps(*effectsPhase,[&](InstanceHandle h,int object){
+                if(object==220){++bloodSteps;return owner->stepBlood(h,stop.player.stopped,480,masks);}
+                if(object==225){++smokeSteps;return owner->stepSmoke(h);}
+                if(object==263){++corpseSteps;return owner->stepCorpse(h,stop.player.stopped,480,corpseEnvironment);}
+                return false;
+            },[&]{return native->stepWithOwnedDebris(0,
+                [&](auto key,const auto&,bool& frozen){
+                    ++debrisSteps;return owner->debrisFrozen(key,stop.player.stopped,480,masks,frozen);
+                },[&](auto key,const auto&,auto x,auto y,bool& hit){
+                    return owner->debrisPlaceMeeting(key,x,y,masks,hit);
+                });});}));
+            if(!(bloodSteps==2&&smokeSteps==smokeCount&&corpseSteps==1&&currencySteps==3&&debrisSteps==2))
+                std::fprintf(stderr,"Death follow-up Steps: blood=%u smoke=%u/%u corpse=%u currency=%u debris=%u\n",
+                    bloodSteps,smokeSteps,smokeCount,corpseSteps,currencySteps,debrisSteps);
+            assert(bloodSteps==2&&smokeSteps==smokeCount&&corpseSteps==1&&currencySteps==3&&debrisSteps==2);
             continue;
         }
         assert(stored->withMomentDelayRoomSpeed(storedSpeed,[&]{
