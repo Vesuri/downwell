@@ -612,6 +612,11 @@ back earlier self writes. Text alignment is shared renderer state, not reset
 at the end of this event. Registered stored and native owners expose the same
 body; this API does not itself install normal frontend dispatch or provide a
 native glyph renderer. Branch-command tests are not pixel equivalence evidence.
+The stored Game layer traversal dispatches object 277 through
+`StartupRuntime::withShopParentDraw`; the binding validates the exact retained
+record, borrows a per-parent rendering environment for that Draw only, and
+rejects missing handlers. Compact counter, prompt and menu passes exclude
+source-owned parents so they cannot duplicate or substitute for this event.
 
 ## Shared HUD overlap repair
 

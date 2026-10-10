@@ -12,7 +12,7 @@ inline int shopItemSprite(unsigned upgrade) {
 template<class Emit>
 void drawShopFixtures(const ShopWorld& world, Emit emit) {
     for (const auto& shop : world.instances) if (shop.allocated) {
-        if (shop.present) emit(480, 0, shop.x, shop.y);
+        if (shop.present && !shop.sourceId) emit(480, 0, shop.x, shop.y);
         if(!shop.children.table)emit(481, 0, shop.x + 64, shop.y);
         for (int i = 0; i < 3; ++i) if(!shop.children.cases[i])emit(482, 0, shop.x + 45 + i * 19, shop.y - 9);
         for (int i = 0; i < 3; ++i) if (shop.feedback.itemPresent[i]&&!shop.children.items[i]) {
@@ -28,7 +28,7 @@ template<class Emit>
 void drawShopPrompts(const ShopWorld& world, bool criminal, Emit emit) {
     if (criminal) return;
     for (const auto& shop : world.instances)
-        if (shop.present && !shop.menu.speaking)
+        if (shop.present && !shop.sourceId && !shop.menu.speaking)
             emit(707, shop.prompt.frame(), shop.x, shop.y - 20);
 }
 template<class Emit>

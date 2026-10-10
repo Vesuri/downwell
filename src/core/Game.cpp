@@ -520,6 +520,7 @@ void Game::renderMain(Renderer& renderer) const {
         if(depth < -1000){drawUnregisteredBullets();if(!drawForeground())return false;}
         if(instance.objectId==35){drawPlayer();return true;}
         if(instance.objectId==212)return startup_.drawRisingText(instance);
+        if(instance.objectId==277)return startup_.drawShopParent(instance);
         if(instance.objectId==278||instance.objectId==279||instance.objectId==280||instance.objectId==283){
             struct Ops {
                 const InstanceRecord& r;const StartupRuntime& world;Renderer& renderer;float vx,vy;

@@ -11,6 +11,7 @@
 #include "core/StoredWorldCollision.h"
 #include "core/RisingTextRenderer.h"
 #include "core/ShopFixtures.h"
+#include "ShopParentDrawChecks.h"
 #include "../../generated/downwell-title-glyphs.h"
 #include <algorithm>
 #include <cstring>
@@ -1029,6 +1030,37 @@ int main() {
                 }
                 require(seen==1&&children.clear(),"registered child draws exactly once");
             }
+            downwell::ShopWorld::Instance parent;
+            parent.x=runtime.mainCameraRenderViewX()+80;parent.y=runtime.mainCameraRenderViewY()+100;
+            require(shop.begin(parent),"registered parent for actual Game Draw traversal");
+            RecordingRenderer parentImage;parentImage.recordTransforms=true;
+            struct ParentOps:ShopParentDrawProbe {
+                const downwell::InstanceRecord* record=nullptr;downwell::Renderer* renderer=nullptr;
+                float vx=0,vy=0;
+                bool self(){
+                    if(!ShopParentDrawProbe::self())return false;
+                    renderer->drawSpriteTransformed(record->spriteId,unsigned(record->imageIndex),
+                        record->preciseX-vx,record->preciseY-vy,record->scaleX,record->scaleY,record->rotation);
+                    return true;
+                }
+            } parentOps;
+            parentOps.renderer=&parentImage;parentOps.vx=runtime.mainCameraRenderViewX()-downwell::Game::playfieldX;
+            parentOps.vy=runtime.mainCameraRenderViewY();
+            unsigned parentVisits=0;
+            auto bindParent=[&](const downwell::InstanceRecord& record,auto draw){
+                ++parentVisits;parentOps.record=&record;
+                return record.instanceId==parent.sourceId&&draw(parentOps);
+            };
+            require(runtime.withShopParentDraw(shop,bindParent,[&]{effectGame.render(parentImage);return effectGame.renderingSucceeded();})&&
+                parentVisits==1&&parentOps.calls==12&&parentOps.prompts==1,"parent Draw executes once in the Game layer walk");
+            unsigned counters=0;
+            for(const auto& t:parentImage.transforms)if(t.sprite==480){
+                require(t.x==190&&t.y==100,"parent self sprite uses retained instance transform");++counters;
+            }
+            require(counters==1,"registered counter is drawn by its event");
+            RecordingRenderer unboundParent;effectGame.render(unboundParent);
+            require(!effectGame.renderingSucceeded(),"parent Draw binding does not escape its scope");
+            require(shop.clear(),"retire parent Draw fixture");
         }
         {
             downwell::DeferredCreateInstance command(289,runtime.mainCameraRenderViewX()+80,

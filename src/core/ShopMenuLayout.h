@@ -14,7 +14,7 @@ template<class Sink>
 bool drawShopMenu(const ShopWorld::Instance& shop, int viewX, int viewY,
                   int cameraHeight, unsigned currency, Sink& sink) {
     const auto& menu = shop.menu;
-    if (!shop.present || !menu.active) return true;
+    if (shop.sourceId || !shop.present || !menu.active) return true;
     if (menu.menuState > 1) return false;
     const int boxY = cameraHeight / 2 - 85;
     const int wobble = menu.cursorWobbleX;

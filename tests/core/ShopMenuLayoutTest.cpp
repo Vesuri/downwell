@@ -89,6 +89,9 @@ int main() {
         "legacy entry branch uses fixed choices and decaying cursor offset");
     shop.menu.menuState = 2;
     require(!draw() && sink.commands.empty(), "unimplemented selling must be explicit");
+    shop.sourceId=123;
+    require(draw()&&sink.commands.empty(),"registered parent does not enter compact menu composition");
+    shop.sourceId=0;
     shop.menu.active = false;
     require(draw() && sink.commands.empty(), "inactive menu emits nothing");
     shop.menu.active = true; shop.present = false;

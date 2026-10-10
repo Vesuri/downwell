@@ -2777,6 +2777,22 @@ public:
     bool drawRisingText(const InstanceRecord& record)const{
         return record.objectId==212&&risingTextDraw_&&risingTextDraw_(risingTextDrawContext_,record);
     }
+    template<unsigned Capacity,class Audio,class Bind,class Render>
+    bool withShopParentDraw(StoredShopCreationOwner<instanceCapacity,Capacity,Audio>& owner,Bind bind,Render render){
+        if(shopParentDraw_||!owner.belongsTo(instances_,objectPack_)||!owner.valid())return false;
+        auto draw=[&](const InstanceRecord& record){
+            const auto* parent=owner.parent(record.instanceId);
+            if(!parent||instances_.resolve(parent->key)!=&record)return false;
+            return bind(record,[&](auto& ops){return owner.parentDraw(record.instanceId,ops);});
+        };
+        shopParentDrawContext_=&draw;
+        shopParentDraw_=[](void* p,const InstanceRecord& r){return (*static_cast<decltype(draw)*>(p))(r);};
+        struct Reset {StartupRuntime& world;~Reset(){world.shopParentDraw_=nullptr;world.shopParentDrawContext_=nullptr;}} reset{*this};
+        return render()&&owner.valid();
+    }
+    bool drawShopParent(const InstanceRecord& record)const{
+        return record.objectId==277&&shopParentDraw_&&shopParentDraw_(shopParentDrawContext_,record);
+    }
     template<unsigned Capacity,class CreationAudio,class Audio,class Tick>
     bool withShopParentLifetimeEvents(StoredShopCreationOwner<instanceCapacity,Capacity,CreationAudio>& owner,Audio& audio,Tick tick){
         if(!run_.effectsSucceeded)return false;
@@ -3312,6 +3328,8 @@ private:
     bool (*shopItemStep_)(void*,const InstanceRecord&,bool)=nullptr;
     void* risingTextContext_=nullptr;
     void* risingTextDrawContext_=nullptr;
+    void* shopParentDrawContext_=nullptr;
+    bool (*shopParentDraw_)(void*,const InstanceRecord&)=nullptr;
     bool (*risingTextDraw_)(void*,const InstanceRecord&)=nullptr;
     bool (*risingTextDispatch_)(void*,const InstanceRecord&,RisingTextPhase,unsigned)=nullptr;
     ShopWorld::Instance* (*shopCreate_)(void*,int,int)=nullptr;
