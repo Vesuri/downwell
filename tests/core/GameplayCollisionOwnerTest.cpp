@@ -936,6 +936,18 @@ int main(){
         assert(balls.find(local)->sourceId==990050&&balls.find(local)->initialized&&balls.find(local)->alarms.get(0)==10);
         assert(balls.activate(local,false)&&owner->reconcileActivation()&&owner->population(118,count)&&!count);
         assert(balls.activate(local,true)&&owner->reconcileActivation()&&owner->population(118,count)&&count==1);
+        unsigned births=0;
+        assert(balls.dispatch(local,[](auto& actor){actor.hitStun=true;return true;})&&balls.setAlarm(local,1,2));
+        for(bool stopped:{true,false}){
+            for(unsigned frame=0;frame<10;++frame){
+                assert(owner->withRedBallEffectAlarms(
+                    [&](bool& value){value=stopped;return true;},
+                    [&](unsigned& source){assert(!stopped);source=991000+births++;return true;},
+                    [&]{world->step(0);return world->effectsSucceeded();}));
+            }
+            assert(balls.find(local)->alarms.get(0)==10&&!balls.find(local)->hitStun&&births==(stopped?0u:1u));
+        }
+        assert(balls.find(local)->myFx==991000&&owner->movingEffects().size()==1);
         assert(balls.markDestroyed(local)&&owner->prepareDraw()&&!balls.find(local)&&!GameplayCollisionView(*world).contains(shared));
         assert(world->restartFromResults(DeathMenuSequence::Action::Retry,2,300)==ResultsDestination::gameplay&&world->redBalls()==&balls);
     }

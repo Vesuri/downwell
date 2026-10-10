@@ -1905,6 +1905,7 @@ public:
                     kind==View::Kind::drone?(alarm==0&&self.drones_.advanceAlarm(local)):
                     kind==View::Kind::skeleton?self.skeletons_.advanceAlarm(local,alarm):
                     kind==View::Kind::whiteJelly?self.world_->advanceWhiteJellyRoomAlarm(local,alarm):
+                    kind==View::Kind::redBall?self.world_->advanceRedBallRoomAlarm(local,alarm):
                     kind==View::Kind::smoke?self.smoke_.advanceAlarm(local,alarm):
                     kind==View::Kind::blast?self.blasts_.alarm(local,alarm):
                     kind==View::Kind::corpse?self.advanceCorpseAlarm(local,alarm):
@@ -2361,6 +2362,24 @@ public:
                     std::int32_t count;return runnerAlarmValue(value,count)&&owner.whiteJellies_.setAlarm(key,0,count);
                 }
             } ops{*this,key,timer,allocate};
+            bool stop;return stopped(stop)&&actor.effectAlarm(stop,random,ops);
+        },tick));
+    }
+    template<class ReadStop,class Allocate,class Tick>
+    bool withRedBallEffectAlarms(ReadStop stopped,Allocate allocate,Tick tick){
+        if(!valid()||!world_)return check(false);
+        return check(world_->withRedBallEffectAlarms([&](InstanceHandle key,auto& actor,auto& random){
+            struct Ops {
+                GameplayCollisionOwner& owner;InstanceHandle key;Allocate& allocate;
+                bool movingFx(MotionBinary64 x,MotionBinary64 y,int sprite,MotionBinary64 rate,
+                    MotionBinary64 angle,MotionBinary64 speed){
+                    return owner.spawnMovingFx(x,y,sprite,rate,angle,speed,allocate,
+                        [&](unsigned id){return owner.redBalls_.publishMovingFx(key,id);});
+                }
+                bool effectAlarmReset(MotionBinary64 value){
+                    std::int32_t count;return runnerAlarmValue(value,count)&&owner.redBalls_.setAlarm(key,0,count);
+                }
+            } ops{*this,key,allocate};
             bool stop;return stopped(stop)&&actor.effectAlarm(stop,random,ops);
         },tick));
     }

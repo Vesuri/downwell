@@ -968,6 +968,23 @@ public:
         const bool ok=redBalls_->create(source,x,y,enemyRandom_,makeOps,key);
         return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
     }
+    template<class Execute,class Tick> bool withRedBallEffectAlarms(Execute execute,Tick tick){
+        if(!run_.effectsSucceeded||redBallAlarmDispatch_)return run_.effectsSucceeded=false;
+        redBallAlarmContext_=&execute;
+        redBallAlarmDispatch_=[](void* p,downwell::InstanceHandle key,
+            downwell::GameplayRedBalls::Record& actor,downwell::GameMakerRandom& random){
+            return (*static_cast<Execute*>(p))(key,actor,random);
+        };
+        const bool ok=tick();redBallAlarmDispatch_=nullptr;redBallAlarmContext_=nullptr;
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
+    }
+    bool advanceRedBallRoomAlarm(downwell::InstanceHandle key,unsigned alarm){
+        if(!run_.effectsSucceeded||!redBalls_)return run_.effectsSucceeded=false;
+        const bool ok=redBalls_->advanceAlarm(key,alarm,[&](auto& actor){
+            return redBallAlarmDispatch_&&redBallAlarmDispatch_(redBallAlarmContext_,key,actor,enemyRandom_);
+        });
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
+    }
     template<class Ops> bool stepSpawnerRoomEffect(downwell::InstanceHandle key,Ops& ops){
         if(!run_.effectsSucceeded||!spawners_||!spawners_->valid())return run_.effectsSucceeded=false;
         const bool ok=spawners_->step(key,enemyRandom_,ops);
@@ -2556,6 +2573,8 @@ private:
     downwell::GameplaySpawners* spawners_=nullptr;
     downwell::GameplayWhiteJellies* whiteJellies_=nullptr;
     downwell::GameplayRedBalls* redBalls_=nullptr;
+    bool (*redBallAlarmDispatch_)(void*,downwell::InstanceHandle,downwell::GameplayRedBalls::Record&,downwell::GameMakerRandom&)=nullptr;
+    void* redBallAlarmContext_=nullptr;
     bool (*whiteJellyAlarmDispatch_)(void*,downwell::InstanceHandle,downwell::GameplayWhiteJellies::Record&,downwell::GameMakerRandom&)=nullptr;
     void* whiteJellyAlarmContext_=nullptr;
     MovingEffects* movingEffects_=nullptr;
