@@ -46,6 +46,12 @@ public:
         :records_(records),objects_(objects),lifecycle_(lifecycle),nextId_(nextId),room_(room),good_(good){}
     StoredShopChildRegistration(const StoredShopChildRegistration&)=delete;
     StoredShopChildRegistration& operator=(const StoredShopChildRegistration&)=delete;
+    bool belongsTo(const InstanceStore<WorldCapacity>& records)const{return &records_==&records;}
+    bool valid()const{return good_;}
+    InstanceHandle handle(const InstanceRecord& r){
+        const auto key=sourceHandle(r.instanceId);auto* e=entry(key);
+        return e&&record(*e)==&r?key:InstanceHandle{};
+    }
     InstanceHandle sourceHandle(unsigned id){
         for(auto& e:entries_)if(id&&e.id==id&&record(e))return e.key;
         return {};
@@ -131,6 +137,14 @@ public:
         auto* e=entry(key);auto* r=e?record(*e):nullptr;
         if(!good_||creating_||!r||e->object!=212||!e->state.initialized||number>=AlarmBank::count)return fail();
         if(!r->active||r->destroyRequested||number>1||!r->alarms.advanceOne(number))return true;
+        return risingTextAlarmEvent(key,number);
+    }
+    // The room's mixed alarm phase has already decremented this alarm.
+    // Keep event execution separate from the standalone countdown adapter.
+    bool risingTextAlarmEvent(InstanceHandle key,unsigned number){
+        auto* e=entry(key);auto* r=e?record(*e):nullptr;
+        if(!good_||creating_||!r||e->object!=212||!e->state.initialized||number>1)return fail();
+        if(!r->active||r->destroyRequested)return true;
         if(number==1){e->state.flashing=1;return true;}
         if(!lifecycle_.markDestroyed(key,*r)||!good_)return fail();
         r->destroyRequested=true;return true;

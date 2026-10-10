@@ -1001,6 +1001,7 @@ bool StartupRuntime::cleanupMainOwnedDestroyed(){
     return run_.effectsSucceeded&&instances_.cleanupDestroyedIf(
         [this](const InstanceRecord& r){return hasSimpleOutOfViewEndStep(r.objectId)||r.objectId==60||r.objectId==61||r.objectId==92||r.objectId==261||r.objectId==370||r.objectId==256||
             ((r.objectId==238||r.objectId==211)&&timeEffectDispatch_)||
+            (r.objectId==212&&risingTextDispatch_)||
             (r.objectId==269&&boneDispatch_)||
             (r.objectId==220&&bloodDispatch_)||
             (r.objectId==120&&skeletonDispatch_)||
@@ -1025,6 +1026,7 @@ bool StartupRuntime::cleanupMainOwnedDestroyed(){
                 auto* record=instances_.resolve(key);
                 return record&&timeEffectDispatch_&&timeEffectDispatch_(timeEffectContext_,*record,TimeEffectPhase::cleanup,0);
             }
+            if(r.objectId==212)return risingTextDispatch_(risingTextContext_,r,RisingTextPhase::cleanup,0);
             if(r.objectId==269)return boneDispatch_(boneContext_,r,BonePhase::cleanup);
             if(r.objectId==220)return bloodDispatch_(bloodContext_,r,BloodPhase::cleanup);
             if(r.objectId==120)return skeletonDispatch_(skeletonContext_,r,SkeletonPhase::cleanup,0);
@@ -1970,6 +1972,11 @@ bool StartupRuntime::dispatchObjectEvent(InstanceRecord& instance,
         ++implementedCodeCalls_;
         return run_.effectsSucceeded=limboShardDispatch_&&
             limboShardDispatch_(limboShardContext_,instance,LimboShardPhase::step);
+    }
+    if(instance.objectId==212&&(eventType==2||(eventType==3&&eventSubtype==0))){
+        ++implementedCodeCalls_;
+        return run_.effectsSucceeded=risingTextDispatch_&&risingTextDispatch_(risingTextContext_,instance,
+            eventType==2?RisingTextPhase::alarm:RisingTextPhase::step,unsigned(eventSubtype));
     }
     if(instance.objectId==223&&(eventType==2||(eventType==3&&eventSubtype==0))){
         ++implementedCodeCalls_;

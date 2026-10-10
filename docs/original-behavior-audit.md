@@ -685,7 +685,14 @@ The rising-text event entries publish the Y setter before multiplying binary64
 request; storage survives until the enclosing retirement phase. These entries
 do not invent a time-stop guard absent from the source. They skip inactive or
 already-destroyed records and retain completed mutations on publication failure.
-Draw and normal scheduler admission remain separate from those event entries.
+Draw and automatic frontend admission remain separate from those event entries.
+`StartupRuntime::withRisingTextEvents` admits object 212 to the room's existing
+alarm and ordinary-Step dispatch and pre-Draw cleanup. Its alarm callback only
+executes the event: the shared alarm phase has already decremented the actual
+record, unlike the standalone countdown adapter. The borrowed owner must match
+the room and outlive the scope; absent ownership fails when an event fires.
+The registered room fixture checks tick-60 flashing and tick-90 retirement
+through the collision and layer owners, without admitting other shop families.
 
 `StoredShopCreationOwner` is the concrete owner accepted by
 `ShopWorld::createRegistered`: it registers resource 277 in that same room

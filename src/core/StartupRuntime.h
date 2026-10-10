@@ -2235,6 +2235,24 @@ public:
     unsigned droneNumber()const{return droneNumber_;}
     int mainNextMuzzleOffset() const { return mainEmitter_.leg; }
     const Consumables& consumables() const { return run_.consumables; }
+    enum class RisingTextPhase {alarm,step,cleanup};
+    template<unsigned Capacity,class Tick>
+    bool withRisingTextEvents(StoredShopChildRegistration<instanceCapacity,Capacity>& owner,Tick tick){
+        if(!run_.effectsSucceeded)return false;
+        if(risingTextDispatch_||!owner.belongsTo(instances_)||!owner.valid())return run_.effectsSucceeded=false;
+        auto dispatch=[&](const InstanceRecord& r,RisingTextPhase phase,unsigned number){
+            const auto key=owner.handle(r);if(!key.generation)return false;
+            if(phase==RisingTextPhase::alarm)return owner.risingTextAlarmEvent(key,number);
+            if(phase==RisingTextPhase::cleanup)return owner.retire(key);
+            return owner.stepRisingText(key);
+        };
+        risingTextContext_=&dispatch;
+        risingTextDispatch_=[](void* p,const InstanceRecord& r,RisingTextPhase phase,unsigned number){
+            return (*static_cast<decltype(dispatch)*>(p))(r,phase,number);
+        };
+        struct Reset {StartupRuntime& world;~Reset(){world.risingTextDispatch_=nullptr;world.risingTextContext_=nullptr;}} reset{*this};
+        const bool ok=tick();return run_.effectsSucceeded=run_.effectsSucceeded&&ok&&owner.valid();
+    }
     template<unsigned Capacity,class Audio>
     StoredShopCreationOwner<instanceCapacity,Capacity,Audio> shopCreationOwner(const ObjectPack& objects,Audio& audio){
         return {instances_,objects,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded,audio};
@@ -2616,6 +2634,8 @@ private:
     DeferredInstanceQueue<512> deferredInstances_;
     std::uint32_t nextRuntimeInstanceId_ = 105187;
     void* shopCreateContext_=nullptr;
+    void* risingTextContext_=nullptr;
+    bool (*risingTextDispatch_)(void*,const InstanceRecord&,RisingTextPhase,unsigned)=nullptr;
     ShopWorld::Instance* (*shopCreate_)(void*,int,int)=nullptr;
     bool deferredCommandsSucceeded_ = true;
     bool inputLeft_ = false;

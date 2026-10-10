@@ -50,6 +50,26 @@ int main(){
     for(unsigned i=before;i<live.activeInstanceCount();++i)
         require(collision->resolve(live.instanceHandleAt(i))==&live.instanceAt(i),"collision owner resolves every shop lifetime");
     require(owner.clear()&&live.activeInstanceCount()==before&&!collision->resolve(parentKey),"retire registered shop");layers(live);
+    // Isolate the child whose later events are admitted. Other shop families
+    // must not be silently treated as complete by this scheduler fixture.
+    const auto textId=owner.children().create(212,-100,-100);
+    const auto textKey=owner.children().sourceHandle(textId);
+    require(textId&&textKey.generation,"registered text for mixed-phase fixture");
+    for(unsigned tick=1;tick<=90;++tick){
+        require(live.withRisingTextEvents(owner.children(),[&]{live.step(false);return live.effectsSucceeded();}),
+            "room schedules rising text alarm, Step and cleanup");
+        const auto* r=live.instance(textId);
+        if(tick==90){
+            require(!r&&!owner.children().state(textKey)&&!collision->resolve(textKey),"alarm 90 retires through all live owners");
+        }else{
+            const auto* state=owner.children().state(textKey);
+            require(r&&state&&r->alarms.get(0)==90-int(tick),"room decrements text alarm exactly once");
+            require(state->flashing==int(tick>=60)&&state->drawing==(tick>=60&&!(tick&1)?-1:1),
+                "alarm 60 precedes Step numeric flashing");
+            if(tick==1)require(r->preciseY==-103,"ordinary room Step publishes text movement");
+        }
+    }
+    require(owner.clear(),"clear scheduler fixture");layers(live);
     bool called=false;
     require(!control.withRegisteredShopCreation(owner,[&]{called=true;return true;})&&!called,"reject foreign room owner");
     std::puts("Registered shop runtime allocator, layers and RNG passed");
