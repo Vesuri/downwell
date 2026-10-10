@@ -995,6 +995,27 @@ int main() {
             require(legacyItems==2,"compact fixture skips only the registered item");
             require(shop.clear(),"retire rising text render fixture");
         }
+        {
+            downwell::DeferredCreateInstance command(289,runtime.mainCameraRenderViewX()+80,
+                runtime.mainCameraRenderViewY()+100);
+            command.integerImageIndex=12;command.imageIndex=12;command.imageSpeed=0;
+            downwell::InstanceHandle key;const auto id=runtime.nextRuntimeInstanceId();
+            require(runtime.adoptBuilderScattered(command,key),"adopt scenery Draw fixture");
+            // Isolate the renderer contract: destruction publishes this sprite
+            // without changing the retained mask, frame or layer membership.
+            auto& scenery=const_cast<downwell::InstanceRecord&>(*runtime.instance(id));
+            scenery.spriteId=551;scenery.preciseX+=0.5f;scenery.preciseY+=0.25f;scenery.scaleX=-1;
+            RecordingRenderer drawn;drawn.recordTransforms=true;effectGame.render(drawn);
+            require(effectGame.renderingSucceeded(),"scenery reaches actual Game Draw");
+            unsigned seen=0;
+            for(const auto& t:drawn.transforms)if(t.sprite==551){
+                require(t.frame==12&&t.x==190.5f&&t.y==100.25f&&t.sx==-1&&t.sy==1,
+                    "broken scenery uses published artwork, fractional position and reflection");++seen;
+            }
+            require(seen==1,"broken scenery draws exactly once at its registered boundary");
+            for(const auto& t:drawn.transforms)require(!(t.sprite==550&&t.x==190&&t.y==100),
+                "legacy background pass must not duplicate intact scenery");
+        }
         auto registration=runtime.debrisRegistration<1>();downwell::DebrisEffects<1> debris;unsigned id=0;
         require(runtime.spawnDebris(registration,debris,x,y,1,id),"register composited debris");
         debris.get(1)->imageIndex.bits=0;

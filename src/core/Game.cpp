@@ -432,7 +432,6 @@ void Game::renderMain(Renderer& renderer) const {
         std::int32_t sprite = -1;
         if (instance.objectId == 93) sprite = 51;
         if (instance.objectId == 92) sprite = 51;
-        if (instance.objectId == 289) sprite = 550;
         if (instance.objectId == 293) sprite = 569;
         if (instance.objectId == 296) sprite = 568;
         if (instance.objectId == 109) sprite = 139;
@@ -582,7 +581,7 @@ void Game::renderMain(Renderer& renderer) const {
             return false;
         }
         const bool effect=instance.objectId==219||instance.objectId==220||instance.objectId==224||instance.objectId==242;
-        const bool registeredActor=instance.objectId==269||instance.objectId==120||instance.objectId==283;
+        const bool registeredActor=instance.objectId==269||instance.objectId==120||instance.objectId==283||instance.objectId==289;
         if(effect||registeredActor||enemyPresentationSprite(instance.objectId,instance.grounded,instance.auxiliaryState)>=0){
             if(instance.spriteId<0)return true;
             renderer.drawSpriteTransformed(instance.spriteId,static_cast<unsigned>(instance.imageIndex),
