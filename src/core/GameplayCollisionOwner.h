@@ -634,6 +634,7 @@ private:
     template<class Record,View::Kind Kind> struct Binding {
         GameplayCollisionOwner& parent;
         static int object(const Record& r){
+            if constexpr(Kind==View::Kind::scattered)return 289;
             if constexpr(Kind==View::Kind::sideCameraLocker)return 62;
             if constexpr(Kind==View::Kind::result)return 325;
             if constexpr(Kind==View::Kind::levelNumber)return 372;
@@ -741,6 +742,7 @@ private:
                     return parent.refresh(live,publish);
                 })))return false;
             unsigned sourceId=0;
+            if constexpr(Kind==View::Kind::scattered)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::terrain)sourceId=r.sourceInstanceId;
             if constexpr(Kind==View::Kind::breakable||Kind==View::Kind::enemy)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
@@ -769,6 +771,8 @@ private:
             if constexpr(Kind==View::Kind::scriptEffect||Kind==View::Kind::debris){
                 if(!r.effect)return parent.check(false);
                 position->x=r.effect->x;position->y=r.effect->y;
+            }else if constexpr(Kind==View::Kind::scattered){
+                position->x=r.x;position->y=r.y;
             }else if constexpr(Kind==View::Kind::flashBall||Kind==View::Kind::limboShard||Kind==View::Kind::levelNumber||Kind==View::Kind::result||Kind==View::Kind::runController||Kind==View::Kind::consumptionBlood||Kind==View::Kind::corpse||Kind==View::Kind::blast||Kind==View::Kind::smoke||Kind==View::Kind::corpseExpiry||Kind==View::Kind::playerController||Kind==View::Kind::timeShard||Kind==View::Kind::timeChange||Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::builder||Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency){
                 position->x=r.x;position->y=r.y;
             }else{
@@ -847,6 +851,7 @@ private:
                     return parent.check(!inactive&&parent.layers_.birthScenery(depth));
                 }
             unsigned sourceId=0;
+            if constexpr(Kind==View::Kind::scattered)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
             if constexpr(Kind==View::Kind::breakable||Kind==View::Kind::enemy)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeField||Kind==View::Kind::exitController||Kind==View::Kind::sideCameraLocker)sourceId=r.sourceId;
@@ -1053,6 +1058,8 @@ private:
     Binding<GameplayGoalFields::Record,View::Kind::goalField> goals_{*this};
     Binding<GameplayExitControllers::Record,View::Kind::exitController> exits_{*this};
     Binding<SideCameraLocker,View::Kind::sideCameraLocker> lockers_{*this};
+    Binding<GameplayScattered::Record,View::Kind::scattered> scatteredBinding_{*this};
+    GameplayScattered scattered_{GameplayScattered::Binding::bindMaskDestruction(scatteredBinding_)};
     Binding<GameplayWorld::BulletState,View::Kind::bullet> bullets_{*this};
     Binding<GameplayScriptSpawnInstances::Record,View::Kind::scriptEffect> scriptEffectsBinding_{*this};
     Binding<GameplayWorld::RegisteredExpiry::Record,View::Kind::corpseExpiry> expiryBinding_{*this};
@@ -1204,7 +1211,7 @@ public:
     template<class Visit> bool visitRegistrationOrder(Visit visit)const{return valid()&&visitEligibility(visit);}
     // Drone dispatch deliberately exposes bool& status to arbitrary callbacks;
     // retain its live read rather than delaying a callback's failure to return.
-    bool valid()const{return good_&&blasts_.valid()&&flash_.valid()&&limbo_.valid()&&levelNumbers_.valid()&&result_.valid()&&controllers_.valid()&&consumption_.valid()&&corpses_.valid()&&smoke_.valid()&&expiry_.valid()&&playerControllers_.valid()&&builderController_.valid()&&blood_.valid()&&skeletons_.valid()&&(failureObserved_?(drones_.valid()&&bones_.valid()):
+    bool valid()const{return scattered_.valid()&&good_&&blasts_.valid()&&flash_.valid()&&limbo_.valid()&&levelNumbers_.valid()&&result_.valid()&&controllers_.valid()&&consumption_.valid()&&corpses_.valid()&&smoke_.valid()&&expiry_.valid()&&playerControllers_.valid()&&builderController_.valid()&&blood_.valid()&&skeletons_.valid()&&(failureObserved_?(drones_.valid()&&bones_.valid()):
         (owner_.valid()&&properties_.valid()&&terrain_.valid()&&scriptEffects_.valid()&&debris_.valid()&&
          timeShards_.valid()&&timeChanges_.valid()&&entries_.valid()&&drones_.valid()&&bones_.valid()&&layers_.valid()));}
     unsigned pendingSpatialIndex()const{return owner_.pendingSpatialIndex();}
@@ -1423,6 +1430,7 @@ public:
         if(!world_&&!world.bindDitherAbove(above_))return check(false);
         if(!world_&&!world.bindBuilderController(builderController_))return check(false);
         if(!world_&&!world.bindPlayerControllers(playerControllers_))return check(false);
+        if(!world_&&!world.bindScattered(scattered_))return check(false);
         if(!world_&&!world.bindDroneBullets(drones_))return check(false);
         if(!world_&&!world.bindBones(bones_))return check(false);
         if(!world_&&!world.bindSkeletons(skeletons_))return check(false);

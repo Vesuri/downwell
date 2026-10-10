@@ -7,6 +7,34 @@
 inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
     const downwell::SpriteCollisionPack& sprites){
     using namespace downwell;
+    for(unsigned failure=0;failure<=6;++failure){
+        struct Audit {
+            using Record=GameplayScattered::Record;unsigned calls=0,failure;
+            bool emit(){return ++calls!=failure;}
+            bool birth(InstanceHandle,const Record& r){assert(r.sourceId==899999&&!r.initialized&&r.hitEffect==0);return emit();}
+            bool retire(InstanceHandle,const Record&){return true;}
+            bool activation(InstanceHandle,const Record&,bool){return true;}
+            bool membership(InstanceHandle,const Record&,bool){return true;}
+            bool move(InstanceHandle,const Record&,RunnerImageValue,RunnerImageValue){assert(false);return false;}
+            bool sprite(InstanceHandle,const Record&,int sprite){assert(calls==3&&sprite==550);return emit();}
+            bool mask(InstanceHandle,const Record&,int mask){assert(calls==4&&mask==550);return emit();}
+            bool imageIndex(InstanceHandle,const Record&,RunnerImageValue index){
+                assert((calls==1&&!index.bits)||(calls==5&&index.bits==0x41800000u));return emit();
+            }
+            bool transform(InstanceHandle,const Record&,RunnerTransformField field,RunnerImageValue scale,
+                RunnerImageValue alpha,std::uint32_t blend){
+                assert(calls==2&&field==RunnerTransformField::scaleX&&scale.bits==0xbf800000u&&
+                    alpha.bits==0x3f800000u&&blend==0xffffffu);return emit();
+            }
+        } audit{0,failure};
+        GameplayScattered store(GameplayScattered::Binding::bindMasks(audit));
+        DeferredCreateInstance command(289,240,700);command.integerScaleX=-1;command.integerImageIndex=16;
+        assert(store.adopt(899999,command)==!failure&&audit.calls==(failure?failure:6));
+        const auto key=store.handle(0);const auto* r=store.find(key);
+        assert(r&&r->initialized==!failure&&store.valid()==!failure);
+        if(failure)assert(!store.adopt(900000,command)&&audit.calls==failure&&store.size()==1);
+        else assert(store.clear()&&!store.find(key)&&!store.size());
+    }
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native}){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
             GameplayTerrainInstances::WallCollision{},nullptr,mode);
@@ -63,6 +91,18 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             births[births.size()-2]==74&&births.back()==255);
         assert(world->exitControllers().find(world->exitControllers().handle(0))->sourceId==850008);
         assert(world->exitControllers().find(world->exitControllers().handle(1))->sourceId==850010);
+        DeferredCreateInstance scenery(289,240,700);scenery.integerScaleX=-1;scenery.integerImageIndex=16;
+        const auto beforeScenery=world->randomDrawCount();
+        assert(world->createGeneratedInstanceWithSourceIds(scenery,objects,allocate,backend,noShop));
+        const auto* store=world->scattered();assert(store&&store->size()==1);
+        const auto local=store->handle(0);const auto* actor=store->find(local);InstanceHandle shared;
+        assert(actor&&actor->sourceId==850012&&actor->initialized&&actor->imageIndex.bits==0x41800000u&&
+            actor->scaleX.bits==0xbf800000u&&actor->maskId==550&&actor->hitEffect==1&&actor->objHp==1&&
+            world->randomDrawCount()==beforeScenery&&
+            GameplayCollisionView::encode(GameplayCollisionView::Kind::scattered,local,shared)&&
+            GameplayCollisionView(*world).contains(shared));
+        assert(world->restartFromResults(DeathMenuSequence::Action::Retry,2,300)!=ResultsDestination::none&&
+            world->scattered()==store&&!store->find(local)&&!GameplayCollisionView(*world).contains(shared));
     }
     for(unsigned failure=0;failure<5;++failure){
         auto world=std::make_unique<GameplayWorld>(300,false,1000,false);

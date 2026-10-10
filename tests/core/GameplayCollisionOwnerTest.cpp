@@ -609,6 +609,7 @@ static void checkTypedCollisionView(const GameplayCollisionView& view,GameplayCo
     InstanceHandle shared;GameplayCollisionView::Record reference;
     if(GameplayCollisionView::encode(kind,local,shared))view.resolve(shared,reference);
     switch(kind){
+        case K::scattered:assert(view.resolveLocal<K::scattered>(local)==reference.scattered);break;
         case K::sideCameraLocker:assert(view.resolveLocal<K::sideCameraLocker>(local)==reference.sideCameraLocker);break;
         case K::player:assert(view.resolveLocal<K::player>(local)==reference.player);break;
         case K::enemy:assert(view.resolveLocal<K::enemy>(local)==reference.enemy);break;
@@ -645,7 +646,7 @@ static void checkTypedCollisionView(const GameplayCollisionView& view,GameplayCo
 }
 static void checkCollisionViewMembership(const GameplayWorld& world){
     const GameplayCollisionView view(world);
-    for(unsigned family=0;family<=unsigned(GameplayCollisionView::Kind::blast);++family)
+    for(unsigned family=0;family<=unsigned(GameplayCollisionView::Kind::scattered);++family)
         for(auto local:{InstanceHandle{0,0},InstanceHandle{0xffffffffu,1},InstanceHandle{GameplayCollisionView::capacity,1}})
             checkTypedCollisionView(view,GameplayCollisionView::Kind(family),local);
     for(unsigned slot=0;slot<=GameplayCollisionView::capacity;++slot){

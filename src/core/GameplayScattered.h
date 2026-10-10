@@ -1,0 +1,59 @@
+#ifndef DOWNWELL_CORE_GAMEPLAY_SCATTERED_H
+#define DOWNWELL_CORE_GAMEPLAY_SCATTERED_H
+#include "InstanceLifecycle.h"
+#include "DeferredInstanceQueue.h"
+namespace downwell {
+// Scattered16 (289), a shootable/stompable scenery actor, not objSpike_n.
+// Builder adoption must not repeat its already-consumed Create RNG.
+class GameplayScattered {
+public:
+    static constexpr unsigned capacity=64;
+    struct Record {
+        unsigned lifetimeId=0,sourceId=0;
+        RunnerImageValue x{},y{},imageIndex{},scaleX{0x3f800000u};
+        int spriteId=550,maskId=-1;
+        int objHp=1,hit=0,hitStun=0,hitEffect=0,stomped=0,scriptActive=1,scatterType=0;
+        bool active=true,destroyRequested=false,initialized=false;
+    };
+    using Binding=RecordLifecycleBinding<Record>;
+    explicit GameplayScattered(Binding binding={}):binding_(binding){}
+    bool valid()const{return good_;}
+    unsigned size()const{return count_;}
+    InstanceHandle handle(unsigned slot)const{return slot<capacity?InstanceHandle{slot,records_[slot].lifetimeId}:InstanceHandle{};}
+    const Record* find(InstanceHandle h)const{
+        return h.generation&&h.slot<capacity&&records_[h.slot].lifetimeId==h.generation?&records_[h.slot]:nullptr;
+    }
+    bool adopt(unsigned source,const DeferredCreateInstance& command){
+        if(!good_||!next_||count_==capacity||!source||source>0x7fffffffu||command.objectId!=289||
+            (command.integerScaleX!=1&&command.integerScaleX!=-1)||
+            command.integerImageIndex<0||command.integerImageIndex>16)return fail();
+        for(const auto& r:records_)if(r.lifetimeId&&r.sourceId==source)return fail();
+        unsigned slot=0;while(records_[slot].lifetimeId)++slot;
+        auto& r=records_[slot];r={};r.lifetimeId=next_++;r.sourceId=source;r.active=command.active;++count_;
+        if(!r.x.assignInteger(command.x)||!r.y.assignInteger(command.y)||!binding_.birth(handle(slot),r))return fail();
+        // Inherited parentShootableThing Create precedes these setters.
+        r.hitEffect=1;
+        if(!binding_.imageIndex(handle(slot),r,{}))return fail();
+        RunnerImageValue scale;if(!scale.assignInteger(command.integerScaleX)||
+            !binding_.transform(handle(slot),r,RunnerTransformField::scaleX,scale,{0x3f800000u},0xffffffu))return fail();
+        r.scaleX=scale;
+        if(!binding_.sprite(handle(slot),r,550))return fail();
+        if(!binding_.mask(handle(slot),r,550))return fail();
+        r.maskId=550;r.scatterType=command.integerImageIndex;
+        RunnerImageValue index;if(!index.assignInteger(r.scatterType)||!binding_.imageIndex(handle(slot),r,index))return fail();
+        r.imageIndex=index;r.initialized=true;return true;
+    }
+    bool clear(){
+        if(!good_)return false;
+        for(unsigned slot=0;slot<capacity;++slot)if(records_[slot].lifetimeId){
+            if(!binding_.retire(handle(slot),records_[slot]))return fail();
+            records_[slot]={};--count_;
+        }
+        return true;
+    }
+private:
+    bool fail(){good_=false;return false;}
+    Record records_[capacity]{};Binding binding_;unsigned next_=1,count_=0;bool good_=true;
+};
+}
+#endif

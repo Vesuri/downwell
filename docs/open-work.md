@@ -39,6 +39,10 @@ behavior, both backend integrations and relevant original-game verification.
   collision adapters. Complete original room creation order across families,
   retaining source numeric instance IDs separately from native family-local
   generation handles for serialized bindings and global lookup order.
+  Supply the native generator's source-creation scope from the complete startup
+  stream, including spawner 78 and concrete shop ownership. Complete registered
+  Scattered16 (289) Step, contacts, destruction rewards and Draw admission;
+  its source-ID-bearing Create state alone is not a complete scenery actor.
   Include player-created depth meter/camera/entry-dither and conditional
   companion births in the native creation stream, not just visible actors;
   finish the stored companions' event/render integration as well as native

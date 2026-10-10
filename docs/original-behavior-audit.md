@@ -611,9 +611,21 @@ already-sampled radius without consuming Create RNG again. Exit registration
 borrows the same allocator for its parent and children; shop registration must
 be supplied by its enclosing concrete owner and cannot fall back to compact
 stock. Unknown families and failed allocation/publication stop the handoff.
-This entry point does not supply a startup cursor or intercept the Amiga
-generator's optimized terrain/box paths: those frontend connections, concrete
-native shop ownership and the complete room-wide stream remain required.
+`AmigaGameplayGeneration::withSourceCreation` routes scalar, run, prepared
+terrain and prepared-box births through this handoff while borrowing the
+enclosing allocator. Runs and prepared terrain use their ordered scalar
+publication within the scope so nested births/failures observe each prefix.
+This does not supply a startup cursor: normal scene admission, concrete native
+shop ownership and the complete room-wide stream remain required.
+
+Object 289 is `Scattered16` (parent 90), not a spike. Its native creation
+owner retains the builder's chosen scale/frame without repeating RNG. It
+publishes birth, image index zero, X scale, sprite 550, mask 550 and the chosen
+image index in Create order; inherited shootable state precedes the child's
+hitEffect=1. Numeric identity joins the resource-backed room/layer/spatial
+owner and lifetime generations survive Retry. Its ordinary Step, player/bullet
+contacts, reward/debris sequence and mixed Draw admission are still separate
+requirements; creation ownership alone does not admit a complete scenery actor.
 
 `registerLevelExitWithSourceIds` supplies that boundary for the exit chain:
 306 is allocated and registered before its Create; 74 and 255 each request

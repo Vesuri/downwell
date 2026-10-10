@@ -2233,6 +2233,82 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
 }
 }
 
+void testNumberedGeneration(const char* roomPath,const char* objectPath,const char* patternPath){
+    const auto rb=readFile(roomPath),ob=readFile(objectPath),pb=readFile(patternPath);
+    downwell::RoomPack rooms(rb.data(),rb.size());downwell::ObjectPack objects(ob.data(),ob.size());
+    downwell::BuilderPatternPack patterns(pb.data(),pb.size());downwell::PackedRoom room;
+    require(rooms.findRoom(11,room),"numbered generation room");
+    auto entry=std::make_unique<downwell::StartupRuntime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns);
+    entry->skipToGameForTesting();
+    std::vector<int> referenceBirths;std::uint64_t referenceDigest=0;
+    for(unsigned mode=0;mode<3;++mode){
+        auto world=std::make_unique<AmigaPortRuntime>(300,false,1201-176,true);
+        auto scattered=std::make_unique<downwell::GameplayScattered>();
+        require(world->bindScattered(*scattered),"unindexed generator fixture owns Scattered16 lifetimes");
+        auto scene=std::make_unique<LiveSceneWorld>(patterns,objects);
+        scene->bind(*world,rooms,room,false,entry.get());
+        scene->generation.bind(*world,mode!=0);
+        if(mode==0)scene->builder.setBreakablePublisher(nullptr);
+        auto random=entry->randomState();
+        // Stop before main-pattern generation creates the unregistered
+        // spawner 78. The supplied cursor is a fixture checkpoint, not proof
+        // of the complete original startup allocation stream.
+        struct Cursor {unsigned next=900000;std::vector<int> births;} cursor;
+        auto allocate=[&](int object,unsigned& id){
+            cursor.births.push_back(object);id=cursor.next++;
+            return mode!=2||cursor.births.size()!=3;
+        };
+        auto shop=[](const auto&,auto&){return false;};
+        const bool ok=scene->generation.withSourceCreation(allocate,shop,[&]{
+            require(!scene->generation.withSourceCreation(allocate,shop,[]{return true;}),"nested creation scope rejected");
+            for(unsigned tick=0;!scene->builder.fragmentCount()&&tick<64;++tick)
+                if(!scene->generation.step(random,100000))return false;
+            return scene->builder.fragmentCount()==1;
+        });
+        if(mode==2){
+            if(ok||cursor.births.size()!=3||world->effectsSucceeded())
+                std::cerr<<"Numbered failure: ok="<<ok<<" allocations="<<cursor.births.size()
+                    <<" effects="<<world->effectsSucceeded()<<"\n";
+            require(!ok&&cursor.births.size()==3&&!world->effectsSucceeded(),"numbered generation retains failure prefix");
+            require(!scene->generation.step(random,100000)&&cursor.births.size()==3,"failed generation cannot replay allocation");
+            continue;
+        }
+        if(!ok){
+            auto source=entry->mainBuilderState();auto rng=entry->randomState();
+            std::vector<int> emitted;
+            for(unsigned tick=0;source.generationCount()<0&&tick<64;++tick){
+                downwell::AreaOneBuilderStep result;
+                source.stepVisible(patterns,rng,100000,[](void* p,const auto& c){
+                    static_cast<std::vector<int>*>(p)->push_back(c.objectId);return true;
+                },&emitted,result);
+            }
+            std::cerr<<"Numbered pattern failed after "<<cursor.births.size()<<" allocations; source objects:";
+            for(int object:emitted)std::cerr<<' '<<object;
+            std::cerr<<'\n';
+        }
+        require(ok&&!cursor.births.empty(),"numbered generator routes live births");
+        unsigned numberedTerrain=0;
+        require(scene->terrainLifetimes->visit([&](const auto& id,bool,bool){
+            if(id.source<900000)return true;
+            ++numberedTerrain;
+            return id.source<cursor.next&&cursor.births[id.source-900000]==id.object;
+        })&&numberedTerrain,"native runs retain allocated source IDs");
+        downwell::StateDigest digest;
+        digest.addU64(random.drawCount());digest.addU32(random.stateIndex());
+        for(unsigned i=0;i<16;++i)digest.addU32(random.stateWord(i));
+        for(unsigned i=0;i<world->breakableSlots();++i){const auto& box=world->breakableSlot(i);
+            digest.addU32(box.sourceId);digest.addI32(box.x);digest.addI32(box.y);
+            digest.addU32(box.state.breakSound);digest.addU32(box.state.haveGem);
+        }
+        for(unsigned i=1;i<=scene->tiles.size();++i){const auto& tile=scene->tiles.at(i);
+            digest.addI32(tile.x);digest.addI32(tile.objectId);digest.addU32(tile.frame);digest.addU32(tile.next);
+        }
+        if(!mode){referenceBirths=cursor.births;referenceDigest=digest.value();}
+        else require(referenceBirths==cursor.births&&referenceDigest==digest.value(),
+            "optimized publishers preserve scalar source-ID order, RNG, box state and tiles");
+    }
+}
+
 void testBuilderCheckpoints(const char* roomPath, const char* objectPath, const char* patternPath) {
     auto rb = readFile(roomPath), ob = readFile(objectPath), pb = readFile(patternPath);
     downwell::RoomPack rooms(rb.data(), rb.size());
@@ -2817,6 +2893,7 @@ int main(int argc, char** argv) {
         const auto bytes=readFile(argv[2]);
         const downwell::ObjectPack objects(bytes.data(),bytes.size());
         testGeneratedWorldHandoff(objects);
+        testNumberedGeneration(argv[1],argv[2],argv[3]);
         std::cout << "Generated world handoff passed\n";
         return 0;
     }

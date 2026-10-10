@@ -233,3 +233,11 @@ assert item_step.count("push.v self.whichUg") == 2
 assert "pop.v.v self.sprite_index" in item_step and "image_index" not in item_step
 assert objects[283]["parentId"] == -1
 assert not any(e["eventType"] == 8 for e in objects[283]["events"])
+assert objects[289]["name"] == "Scattered16" and objects[289]["parentId"] == 90
+assert objects[289]["spriteId"] == 550 and objects[289]["textureMaskId"] == -1
+assembly("gml_Object_Scattered16_PreCreate_0",
+    "4c193a4f963773b2c70b60323cfcdd763b259c208f342702a253d03b3f9e966b")
+assembly("gml_Object_parentShootableThing_Create_0",
+    "f5c0c5d89f5db5d6ecc01a01c961592fb0a0e413eda14df7c402ed936f487a40")
+assembly("gml_Object_Scattered16_Create_0",
+    "52b39e49f629e574734e1c9a841513b2194db09abf5e0090d4f582f775d378cd")
