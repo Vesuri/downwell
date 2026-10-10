@@ -146,6 +146,14 @@ TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET) $(ALARM_TEST_TARGET
 all: $(TARGET)
 
 .PHONY: test-white-jelly-birth
+test: test-check-collision-script
+.PHONY: test-check-collision-script
+test-check-collision-script: build/check-collision-script-test
+	./build/check-collision-script-test
+build/check-collision-script-test: tests/core/CheckCollisionWithScriptTest.cpp src/core/CheckCollisionWithScript.h src/core/WhiteJellyStep.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/CheckCollisionWithScriptTest.cpp
+
 test: test-white-jelly-step
 .PHONY: test-white-jelly-step
 test-white-jelly-step: build/white-jelly-step-test

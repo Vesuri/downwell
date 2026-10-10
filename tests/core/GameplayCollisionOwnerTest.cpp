@@ -44,7 +44,7 @@ struct NativeWhiteJellyStepOps : NativeWhiteJellyBirthOps {
     using N=downwell::MotionBinary64;
     bool imageIndex(int);bool sound(int,int,int,int,const char*);bool alarm(int,int);
     bool enemyPlayerY(N&);bool enemyPlayerX(N&);bool lengthdir(bool,N,N,N&);
-    bool collision(int,downwell::WhiteJellyStep&);bool enemyDeath();bool smoke(N,N,int,int);
+    bool meeting(N,N,int,bool&);bool enemyDeath();bool smoke(N,N,int,int);
     bool movingFx(N,N,int,N,N,N);bool flash(N,N,int,int,int);bool currency(int);
     bool destroy();bool sprite(int);
 };

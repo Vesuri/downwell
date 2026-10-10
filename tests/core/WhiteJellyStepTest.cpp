@@ -20,8 +20,8 @@ struct Ops {
     bool enemyPlayerY(N& out){out=N::fromInteger(20);return call(5);}
     bool enemyPlayerX(N& out){out=N::fromInteger(10);return call(6);}
     bool pointDirection(N,N,N x,N y,N& out){assert(same(x,N::fromInteger(10))&&same(y,N::fromInteger(20)));out={};return call(7);}
-    bool lengthdir(bool y,N,N,N& out){out=N::fromInteger(y?2:1);return call(y?9:8);}
-    bool collision(int target,S& state){assert(target==57);state.xcollision=collide?1:0;state.ycollision=collide?-1:0;return call(10);}
+    bool lengthdir(bool y,N,N,N& out){out=N::fromInteger(y?(collide?-2:2):1);return call(y?9:8);}
+    bool meeting(N,N,int target,bool& hit){assert(target==57);hit=collide;return call(10);}
     bool position(bool y,F in,F& out){out=in;return call(y?12:11);}
     bool enemyDeath(){assert(!s.alive);return call(13);}
     bool smoke(N,N,int a,int b){assert(a==1&&b==0);return call(14);}
@@ -61,8 +61,8 @@ int main(){
         const std::vector<int> expected=mode==1?std::vector<int>{1,3,118,4,11,12,19}:
             mode==2?std::vector<int>{11,12,19}:
             mode==3?std::vector<int>{2,13,14,15,15,15,15,16,17,117,18,19}:
-            mode==4?std::vector<int>{5,6,7,8,9,10,1,11,12,19}:
-                    std::vector<int>{5,6,7,8,9,10,11,12,19};
+            mode==4?std::vector<int>{5,6,7,8,9,10,10,10,10,1,11,12,19}:
+                    std::vector<int>{5,6,7,8,9,10,10,10,11,12,19};
         assert(success.calls==expected);
         if(mode==0){assert(same(baseline.xx,N::fromInteger(1))&&same(baseline.yy,N::fromInteger(2)));}
         if(mode==4){assert(baseline.xx.zero()&&baseline.yy.zero()&&same(baseline.direction,N::fromInteger(270)));}

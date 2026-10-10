@@ -2,13 +2,16 @@
 #define DOWNWELL_CORE_WHITE_JELLY_STEP_H
 #include "WhiteJellyBirth.h"
 #include "RunnerRealComparison.h"
+#include "CheckCollisionWithScript.h"
 namespace downwell {
 // enmWhiteJelly Step_0. Operations are synchronous checked owner boundaries:
-// collision must run scrCheckCollisionWith(57), including its caller writes;
+// meeting must query the caller's current mask against the selected target;
 // child effects must complete Create before returning. This is not live admission.
-struct WhiteJellyStep : WhiteJellyBirth {
+struct WhiteJellyStep : WhiteJellyBirth, CheckCollisionWithScript {
     Real directionDifference{};
-    int xcollision=0,ycollision=0;
+    template<class Query> bool wallCollision(Query query){
+        return CheckCollisionWithScript::run(57,xx,yy,xsp,ysp,query);
+    }
     static Real negative(Real v){v.high^=0x80000000u;return v;}
     template<class Ops> bool setDirection(Real wanted,Ops& ops){
         Real accepted;if(!ops.direction(wanted,accepted))return false;
@@ -69,7 +72,9 @@ struct WhiteJellyStep : WhiteJellyBirth {
                     xsp=component;
                     if(!ops.lengthdir(true,moveSpeed,direction,component))return false;
                     ysp=component;
-                    if(!ops.collision(57,*this))return false;
+                    if(!wallCollision([&](Real px,Real py,int target,bool& hit){
+                        return ops.meeting(px,py,target,hit);
+                    }))return false;
                     if(xcollision)xsp={};
                     if(ycollision){
                         ysp={};
