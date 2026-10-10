@@ -1743,7 +1743,8 @@ public:
     // Reject capacity failure before changing any state.
     bool appendBreakables(const int* x, const int* y, unsigned count,
         const downwell::BreakableState* creation=nullptr,const std::uint32_t* sourceIds=nullptr);
-    bool appendGeneratedBreakable(int x,int y,const downwell::GeneratedBreakableCreate& creation);
+    bool appendGeneratedBreakable(int x,int y,const downwell::GeneratedBreakableCreate& creation,
+        std::uint32_t sourceId=0);
     void configureSolidResolver(SolidResolver resolver, void* context, SegmentResolver segment = nullptr,
                                 SolidResolver mask = nullptr,WallContactResolver walls = nullptr,
                                 PlatformContactResolver platforms = nullptr) {

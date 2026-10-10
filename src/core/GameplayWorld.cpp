@@ -921,13 +921,20 @@ bool GameplayWorld::appendBreakables(const int* x, const int* y, unsigned count,
     return true;
 }
 
-bool GameplayWorld::appendGeneratedBreakable(int x,int y,const downwell::GeneratedBreakableCreate& creation){
+bool GameplayWorld::appendGeneratedBreakable(int x,int y,const downwell::GeneratedBreakableCreate& creation,
+    std::uint32_t sourceId){
 #ifndef DOWNWELL_REFERENCE_BREAKABLES
     if(auto* allocation=breakableLifecycle_.nativeAllocation()){
         if(!run_.effectsSucceeded||breakableCount_==breakableCapacity||!nextBreakableLifetimeId_)return false;
+        if(sourceId){
+            if(sourceId>0x7fffffffu)return run_.effectsSucceeded=false;
+            for(unsigned i=0;i<breakableCount_;++i)
+                if(breakables_[i].lifetimeId&&breakables_[i].sourceId==sourceId)return run_.effectsSucceeded=false;
+        }
         const unsigned index=breakableCount_++;
         auto& record=breakables_[index];
         record.x=x;record.y=y;record.active=true;
+        record.sourceId=sourceId;
         record.state.breakSound=static_cast<unsigned short>(creation.sound);
         record.state.haveGem=static_cast<unsigned char>(creation.gems);
         record.lifetimeId=nextBreakableLifetimeId_++;
@@ -946,7 +953,7 @@ bool GameplayWorld::appendGeneratedBreakable(int x,int y,const downwell::Generat
     downwell::BreakableState state;
     state.breakSound=static_cast<unsigned short>(creation.sound);
     state.haveGem=static_cast<unsigned char>(creation.gems);
-    return appendBreakables(&x,&y,1,&state);
+    return appendBreakables(&x,&y,1,&state,sourceId?&sourceId:nullptr);
 }
 
 bool GameplayWorld::breakableActiveAt(int x, int y) const

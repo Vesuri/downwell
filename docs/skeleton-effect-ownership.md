@@ -413,7 +413,8 @@ Blast wall event 2330 uses the target object's direct parent, not a descendant
 test. Only parent 84 reaches hit memory and wall health. Both owners bind this
 event to retained box health; negative health remains until the box's own Step
 handles destruction, and the event does not set the ordinary bullet-hit flag.
-Native breakable batches can accept source IDs before lifecycle publication;
+Native breakable batches and the prepared generated-box path can accept source
+IDs before lifecycle publication, retaining the same prepared Create values;
 omitting them leaves identity unknown. IDs are retained separately from slots
 and registration order (four bytes per record, 2 KiB for the 512-slot pool).
 Known IDs feed blast hit memory; unknown IDs fail at the source ID read rather

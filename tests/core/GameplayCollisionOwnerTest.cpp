@@ -7159,13 +7159,16 @@ int main(){
             assert(contacts==2&&owner->registeredBlasts().find(blast)->state.hits.count==2&&
                 next==605205&&audio.calls==12&&!stomps&&!damages);
         }
-        for(bool knownId:{false,true}){
+        for(bool generated:{false,true})for(bool knownId:{false,true}){
             auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
                 GameplayTerrainInstances::WallCollision{},&rooms,ownership);
             auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
             assert(owner->attach(*world));int speed=60;assert(world->bindControllerRoomSpeed(speed));
-            int x=0,y=24;const unsigned source=605210;
-            assert(world->appendBreakables(&x,&y,1,nullptr,knownId?&source:nullptr));
+            int x=0,y=24;const std::uint32_t source=605210;
+            if(generated)assert(world->appendGeneratedBreakable(x,y,{22,173,2},knownId?source:0));
+            else assert(world->appendBreakables(&x,&y,1,nullptr,knownId?&source:nullptr));
+            assert(world->breakableSlot(0).sourceId==(knownId?source:0));
+            if(generated)assert(world->breakableSlot(0).state.breakSound==173&&world->breakableSlot(0).state.haveGem==2);
             InstanceHandle controller,blast,self,other;
             assert(owner->runControllers().create(100065,{}, {},[](InstanceHandle){return true;},controller)&&
                 owner->createBlast(605211,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(200),blast)&&
@@ -7192,7 +7195,13 @@ int main(){
                 !world->breakableSlot(0).destroyRequested);
             const auto* actor=owner->registeredBlasts().find(blast);
             assert(actor&&actor->state.hits.count==unsigned(knownId));
-            if(knownId)assert(unsigned(actor->state.hits.ids[0])==source);
+            if(knownId){
+                assert(unsigned(actor->state.hits.ids[0])==source);
+                if(generated){
+                    assert(!world->appendGeneratedBreakable(16,24,{16,171,0},source)&&
+                        !world->effectsSucceeded()&&world->breakableSlots()==1&&world->breakableSlot(0).sourceId==source);
+                }
+            }
         }
         for(bool missingFrames:{false,true}){
             auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
