@@ -3,12 +3,26 @@
 #include "WhiteJellyBirth.h"
 #include "RunnerRealComparison.h"
 #include "CheckCollisionWithScript.h"
+#include "EnemyStompScript.h"
+#include "ContactDamageScripts.h"
 namespace downwell {
 // enmWhiteJelly Step_0. Operations are synchronous checked owner boundaries:
 // meeting must query the caller's current mask against the selected target;
 // child effects must complete Create before returning. This is not live admission.
 struct WhiteJellyStep : WhiteJellyBirth, CheckCollisionWithScript {
     Real directionDifference{};
+    ContactDamageScripts damageScripts;
+    template<class Player> bool playerContact(Player& player){
+        if(!initialized)return false;
+        Real threshold;int order;
+        if(!player.globalY(threshold)||!threshold.add(Real::fromInteger(2))||
+            !compareRunnerReal(yy,threshold,order))return false;
+        return order>0?player.stomp():player.damage(1,3,2);
+    }
+    template<class Events> bool stompPlayerChecked(Events& events,bool& good){
+        return EnemyStompScript::run(health,hit,stomped,damageScripts.jump,damageScripts.shake,
+            events,[&]{return events.createBlast(276,x.promoted(),y.promoted());},good);
+    }
     template<class Query> bool wallCollision(Query query){
         return CheckCollisionWithScript::run(57,xx,yy,xsp,ysp,query);
     }

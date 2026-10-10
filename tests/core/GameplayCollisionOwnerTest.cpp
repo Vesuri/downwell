@@ -38,6 +38,17 @@ struct NativeWhiteJellyBirthOps {
     bool direction(downwell::MotionBinary64,downwell::MotionBinary64&);
     bool imageSpeed(downwell::RunnerImageValue,downwell::RunnerImageValue&);
 };
+struct NativeWhiteJellyStompOps {
+    using N=downwell::MotionBinary64;
+    bool playerDead();int playStyle();bool blood(int,int);void setSpinJumping();
+    bool recharge();bool setGrounded(bool);bool setHorizontal(N);bool setVertical(N);bool shake(int,int);
+    bool stompSound(int,int,bool,bool,const char*);bool explodingKnees();bool createBlast(int,N,N);
+    unsigned choose(unsigned);bool explosionSound(int,int,bool,bool);N playerX();N playerY();
+    bool emitSmoke(N,N,int,int);
+};
+bool nativeWhiteJellyStomp(downwell::WhiteJellyStep& actor,NativeWhiteJellyStompOps& ops,bool& good){
+    return actor.stompPlayerChecked(ops,good);
+}
 bool nativeWhiteJellyBirth(downwell::WhiteJellyBirth& state,downwell::RunnerImageValue x,
     downwell::RunnerImageValue y,downwell::GameMakerRandom& random,NativeWhiteJellyBirthOps& ops){
     return state.create(x,y,random,ops);
