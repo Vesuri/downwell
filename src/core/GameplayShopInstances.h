@@ -5,6 +5,7 @@
 #include "ObjectPack.h"
 #include "InstanceLifecycle.h"
 #include "AlarmBank.h"
+#include "ShopKeeperEvents.h"
 namespace downwell {
 // Native ownership of Shop and its ten synchronous children. Numeric IDs
 // belong to the enclosing room allocator, never to this generation pool.
@@ -86,6 +87,35 @@ public:
         const auto* r=find(h);
         if(!good_||creating_||!r||!r->initialized||number>=AlarmBank::count)return fail();
         records_[h.slot].alarms.set(number,ticks);return true;
+    }
+    template<class Environment,class Range> bool stepKeeper(InstanceHandle h,Environment& environment,Range range){
+        if(!ready(h,280))return fail();auto& r=records_[h.slot];
+        if(!r.active||r.destroyRequested)return true;
+        struct Ops {
+            GameplayShopInstances& owner;Record& r;InstanceHandle h;Environment& env;Range& random;
+            MotionBinary64 x(){return r.x.promoted();}
+            MotionBinary64 y(){return r.y.promoted();}
+            MotionBinary64 imageIndex(){return r.imageIndex.promoted();}
+            MotionBinary64 imageSpeed(){return r.imageSpeed.promoted();}
+            int spriteIndex(){return r.spriteId;}
+            bool playerX(MotionBinary64& x){return env.playerX(x)&&owner.good_;}
+            bool criminal(bool& value){return env.criminal(value)&&owner.good_;}
+            bool area(unsigned& value){return env.area(value)&&owner.good_;}
+            bool range(unsigned lo,unsigned hi,unsigned& value){value=random(lo,hi);return owner.good_;}
+            bool sprite(int value){return owner.setSprite(h,value);}
+            bool speed(MotionBinary64 value){return r.imageSpeed.assign(value);}
+            bool image(RunnerImageValue value){
+                if(!owner.binding_.imageIndex(h,r,value)||!owner.good_)return false;
+                r.imageIndex=value;return true;
+            }
+            bool alarm(unsigned n,int v){return owner.setAlarm(h,n,v);}
+            bool destroy(){
+                if(!owner.binding_.markDestroyed(h,r)||!owner.good_)return false;
+                r.destroyRequested=true;return true;
+            }
+            bool createEnemy(int object,MotionBinary64 x,MotionBinary64 y){return env.createEnemy(object,x,y)&&owner.good_;}
+        } ops{*this,r,h,environment,range};
+        return ShopKeeperEvents::step(r.state,ops)||fail();
     }
     bool setSprite(InstanceHandle h,int sprite){
         const auto* r=find(h);

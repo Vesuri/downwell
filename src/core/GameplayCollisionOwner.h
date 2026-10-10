@@ -2015,7 +2015,7 @@ public:
     bool withEncounterSteps(EncounterStepOrder& phase,Execute execute,Tick tick){
         return withEncounterStepsSelected(phase,[](int object){
             return object==78||object==115||object==118||object==120||object==220||object==223||object==225||object==238||object==263||
-                object==269||object==276||object==379||object==212||object==283;
+                object==269||object==276||object==379||object==212||object==280||object==283;
         },execute,tick);
     }
 private:
@@ -2166,6 +2166,11 @@ public:
     GameplayWhiteJellies& whiteJellies(){return whiteJellies_;}
     GameplayRedBalls& redBalls(){return redBalls_;}
     GameplayShopInstances& shopInstances(){return shopInstances_;}
+    template<class Environment> bool stepRegisteredShopKeeper(InstanceHandle shared,Environment& environment){
+        View::Kind kind;InstanceHandle local;
+        if(!valid()||!world_||!resolves(shared)||!View::decode(shared,kind,local)||kind!=View::Kind::shop)return check(false);
+        return check(world_->stepShopKeeperWithWorld(local,environment));
+    }
     template<class Lookup> bool stepRegisteredShopChild(InstanceHandle shared,Lookup lookup){
         View::Kind kind;InstanceHandle local;
         if(!valid()||!world_||!resolves(shared)||!View::decode(shared,kind,local)||kind!=View::Kind::shop)return check(false);

@@ -38,6 +38,13 @@ struct NativeShopAudio {
 };
 struct NativeShopAllocation {bool operator()(int,unsigned&);};
 struct NativeShopItemLookup {bool operator()(unsigned,int&);};
+struct NativeKeeperEnvironment {
+    bool criminal(bool&);
+    bool createEnemy(int,downwell::MotionBinary64,downwell::MotionBinary64);
+};
+bool nativeRegisteredKeeperStep(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle key,NativeKeeperEnvironment& env){
+    return owner.stepRegisteredShopKeeper(key,env);
+}
 bool nativeRegisteredShopChildStep(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle key){
     return owner.stepRegisteredShopChild(key,NativeShopItemLookup{});
 }

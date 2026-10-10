@@ -774,8 +774,15 @@ stored owners. The native mixed dispatcher advances each slot immediately
 before its handler and takes `irandom_range(20,60)` from the world RNG; rejected
 image publication stops before rearming or drawing randomness. The stored
 entry executes the handler only, after its room dispatcher has decremented
-the counter. Keeper Step/animation and stored runtime alarm admission are
-separate requirements; these handlers do not make the keeper a complete actor.
+the counter. `ShopKeeperEvents` implements the ordinary Step's ordered setters
+and retained reaction flags. Its native world entry reads source player-X and
+area from the live world, narrows builtin writes, and borrows world RNG. It
+joins the mixed Step capture at object 280, not an independent family pass.
+Criminal state and synchronous enemy-284 creation are explicit dependencies;
+destruction precedes replacement Create and does not suppress the event tail.
+Keeper animation, stored Step/alarm admission and normal frontend installation
+remain separate requirements; these handlers do not make the keeper a complete
+actor.
 
 The rising-text event entries publish the Y setter before multiplying binary64
 `ysp` by `decreaseBy`. Alarm 1 sets `flashing`; Step then negates the integer

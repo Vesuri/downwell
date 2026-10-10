@@ -501,6 +501,23 @@ public:
             return lo+enemyRandom_.irandomSmall(hi-lo);
         })&&run_.effectsSucceeded;
     }
+    template<class Environment> bool stepShopKeeperWithWorld(downwell::InstanceHandle key,Environment& environment){
+        if(!run_.effectsSucceeded||!shopInstances_||!shopInstances_->valid())return run_.effectsSucceeded=false;
+        struct Inputs {
+            GameplayWorld& world;Environment& external;
+            bool playerX(downwell::MotionBinary64& x){
+                downwell::MotionBinary64 y;
+                return downwell::ContactCoordinates::playerGlobals(world.player_.frameStartXFixed(),
+                    world.player_.frameStartYFixed(),240,176,x,y);
+            }
+            bool area(unsigned& value){value=unsigned(world.run_.stage.area);return true;}
+            bool criminal(bool& value){return external.criminal(value);}
+            bool createEnemy(int object,downwell::MotionBinary64 x,downwell::MotionBinary64 y){return external.createEnemy(object,x,y);}
+        } inputs{*this,environment};
+        return run_.effectsSucceeded=shopInstances_->stepKeeper(key,inputs,[&](unsigned lo,unsigned hi){
+            return lo+enemyRandom_.irandomSmall(hi-lo);
+        })&&run_.effectsSucceeded;
+    }
     template<class Ops> bool drawRegisteredRedBall(downwell::InstanceHandle key,Ops& ops)const{
         return redBalls_&&redBalls_->dispatch(key,[&](auto& actor){return actor.draw(ops);});
     }

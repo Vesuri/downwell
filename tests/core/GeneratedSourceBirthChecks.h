@@ -97,9 +97,9 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             store.setAlarm(keeperKey,1,1)&&store.setAlarm(keeperKey,2,1));
         auto expectedRandom=world->randomState();
         auto tickAlarms=[&]{
-            return collision->withEncounterSteps(*phase,[&](InstanceHandle h,int object){
-                assert(object==283);return collision->stepRegisteredShopChild(h,lookup);
-            },[&]{world->step(0);return world->effectsSucceeded();});
+            // Isolate the real alarm dispatcher; ordinary keeper Step would
+            // choose its facing from the player and overwrite this setup.
+            world->step(0);return world->effectsSucceeded();
         };
         assert(tickAlarms());
         const auto* keeper=store.find(keeperKey);
@@ -112,6 +112,18 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
         assert(keeper&&!keeper->imageIndex.bits&&keeper->alarms.get(0)==int(delay)&&keeper->alarms.get(1)==0&&
             world->randomState().stateIndex()==expectedRandom.stateIndex());
         for(unsigned i=0;i<16;++i)assert(world->randomState().stateWord(i)==expectedRandom.stateWord(i));
+        struct KeeperEnvironment {
+            unsigned reads=0;
+            bool criminal(bool& value){++reads;value=false;return true;}
+            bool createEnemy(int,MotionBinary64,MotionBinary64){assert(false);return false;}
+        } environment;
+        unsigned keeperSteps=0;
+        assert(collision->withEncounterSteps(*phase,[&](InstanceHandle h,int object){
+            if(object==280){++keeperSteps;return collision->stepRegisteredShopKeeper(h,environment);}
+            assert(object==283);return collision->stepRegisteredShopChild(h,lookup);
+        },[&]{world->step(0);return world->effectsSucceeded();}));
+        keeper=store.find(keeperKey);
+        assert(keeper&&keeperSteps==1&&environment.reads==1&&keeper->spriteId==485&&keeper->imageSpeed.bits==0x3db851ecu);
     }
     for(unsigned failure=0;failure<=12;++failure){
         auto world=std::make_unique<GameplayWorld>(300,false,1000,false);

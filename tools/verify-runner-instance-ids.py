@@ -270,6 +270,11 @@ assembly("gml_Object_shopKeeper_Alarm_2",
 assert "pushi.e 5\nconv.i.v\npushi.e -1\npushi.e 1\npop.v.v [array]self.alarm" in keeper_alarm0
 assert "call.i irandom_range(argc=2)\npushi.e -1\npushi.e 0\npop.v.v [array]self.alarm" in keeper_alarm1
 print("Pinned keeper blink alarms: later-slot rearm precedes same-phase countdown")
+keeper_step = assembly("gml_Object_shopKeeper_Step_0",
+    "e2764c44a5e9db85beac82c38bdb12104c5087850fd49f668edb25e08c2319eb")
+assert keeper_step.index("call.i instance_destroy(argc=0)") < keeper_step.index("pushi.e 284")
+assert keeper_step.index("pushi.e 284") < keeper_step.rindex("pushglb.v global.area")
+assert "push.v self.image_speed\npushi.e 2\ndiv.i.v\npop.v.v self.image_speed" in keeper_step
 assembly("gml_Object_fxRisingText_Draw_0",
     "b3f4de1e393b0608999219ff82fba8a18679e5f526e3295f4b440e283cf6c7cc")
 assembly("gml_GlobalScript_scrDrawBorderTextBlack",

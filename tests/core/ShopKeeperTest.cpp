@@ -1,10 +1,51 @@
 #include "core/ShopKeeper.h"
+#include "core/ShopKeeperEvents.h"
 #include <cstdio>
 #include <cstdlib>
 static void require(bool ok, const char* message) {
     if (!ok) { std::fprintf(stderr, "%s\n", message); std::abort(); }
 }
 int main() {
+    using namespace downwell;
+    struct Ops {
+        int selected=485;RunnerImageValue frame{},rate{};AlarmBank clocks;
+        int player=190;unsigned zone=1,rolls=0;bool crime=false,dead=false,spawned=false,tail=false,rejectImage=false;
+        MotionBinary64 x(){return MotionBinary64::fromInteger(200);}
+        MotionBinary64 y(){return MotionBinary64::fromInteger(700);}
+        MotionBinary64 imageIndex(){return frame.promoted();}
+        MotionBinary64 imageSpeed(){return rate.promoted();}
+        int spriteIndex(){return selected;}
+        bool playerX(MotionBinary64& value){value=MotionBinary64::fromInteger(player);return true;}
+        bool criminal(bool& value){value=crime;return true;}
+        bool area(unsigned& value){tail=true;value=zone;return true;}
+        bool sprite(int value){selected=value;return true;}
+        bool speed(MotionBinary64 value){return rate.assign(value);}
+        bool image(RunnerImageValue value){if(rejectImage)return false;frame=value;return true;}
+        bool alarm(unsigned n,int value){clocks.set(n,value);return true;}
+        bool range(unsigned lo,unsigned hi,unsigned& value){require(lo==20&&hi==60,"registered keeper range");++rolls;value=37;return true;}
+        bool destroy(){dead=true;return true;}
+        bool createEnemy(int object,MotionBinary64 px,MotionBinary64 py){
+            require(dead&&object==284&&px.high==x().high&&py.high==y().high,"destroy before replacement Create");
+            spawned=true;return true;
+        }
+    } ops;
+    ShopChildState state;
+    require(ShopKeeperEvents::step(state,ops)&&ops.selected==485&&ops.rate.bits==0x3db851ecu,"source idle setter narrows to binary32");
+    ops.player=200;
+    require(ShopKeeperEvents::step(state,ops)&&ops.selected==487&&!ops.rate.bits&&ops.rolls==1&&ops.clocks.get(0)==37,"registered angry transition");
+    require(ShopKeeperEvents::step(state,ops)&&ops.rolls==1,"retained angry sprite does not resample delay");
+    ops={};state={};state.thankful=state.confused=1;ops.frame.bits=0x40900000u;
+    require(ShopKeeperEvents::step(state,ops)&&state.thankful==2&&!state.confused&&!ops.rate.bits&&ops.clocks.get(2)==60,"registered thank completion");
+    ops={};state={};state.goodbye=1;
+    require(ShopKeeperEvents::step(state,ops)&&state.goodbye==2&&ops.selected==496&&ops.rate.bits==0x3e4ccccdu&&ops.clocks.get(2)==240,"registered goodbye branch");
+    ops={};state={};state.confused=1;ops.frame.bits=0x3fc00000u;
+    require(ShopKeeperEvents::step(state,ops)&&state.confused==2&&ops.selected==497&&!ops.rate.bits&&ops.clocks.get(2)==60,"registered confused completion");
+    ops={};state={};ops.zone=3;
+    require(ShopKeeperEvents::step(state,ops)&&ops.rate.bits==0x3d3851ecu,"area three halves narrowed speed");
+    ops={};state={};ops.crime=true;ops.player=201;
+    require(ShopKeeperEvents::step(state,ops)&&ops.dead&&ops.spawned&&ops.tail,"event continues after deferred destruction");
+    ops={};state={};ops.player=200;ops.rejectImage=true;
+    require(!ShopKeeperEvents::step(state,ops)&&ops.selected==487&&!ops.rolls&&ops.clocks.get(0)==-1&&!ops.tail,"rejected image preserves prefix and stops RNG/tail");
     downwell::ShopKeeper keeper;
     downwell::ShopFeedback feedback;
     unsigned rolls = 0;
