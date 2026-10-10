@@ -3,6 +3,7 @@
 #include "core/GameplayCollisionOwner.h"
 #include "core/StoredShopCreationOwner.h"
 #include "core/GameplayShopInstances.h"
+#include "core/ShopFixtures.h"
 #include <cassert>
 #include <memory>
 #include <vector>
@@ -63,6 +64,34 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
         auto* replacement=world->registerShopWithOwner(480,2000,creation);
         assert(replacement&&replacement->sourceId==960011&&store.size()==11&&next==960022);
         for(auto h:shared)assert(!GameplayCollisionView(*world).contains(h));
+        // Admit only the implemented child events, not a placeholder update
+        // for the keeper, cases or parent shop. The real world alarm/Step/
+        // cleanup phases must own their ordering and retirement.
+        assert(store.clear());
+        const auto textId=creation.create(212,-100,-100),itemId=creation.create(283,-100,-100);
+        const auto textKey=store.sourceHandle(textId),itemKey=store.sourceHandle(itemId);
+        assert(textId&&itemId&&creation.upgrade(itemId,100));
+        auto phase=std::make_unique<GameplayCollisionOwner::EncounterStepOrder>();
+        unsigned textSteps=0,itemSteps=0,reads=0;
+        auto lookup=[&](unsigned id,int& sprite){++reads;sprite=shopItemSprite(id);return sprite>=0;};
+        for(unsigned tick=1;tick<=90;++tick){
+            assert(collision->withEncounterSteps(*phase,[&](InstanceHandle h,int object){
+                if(object==212)++textSteps;else {assert(object==283);++itemSteps;}
+                return collision->stepRegisteredShopChild(h,lookup);
+            },[&]{world->step(0);return world->effectsSucceeded();}));
+            if(tick==90)assert(store.find(textKey)&&store.find(textKey)->destroyRequested);
+            assert(collision->prepareDraw());
+            const auto* text=store.find(textKey);const auto* item=store.find(itemKey);
+            assert(item&&item->spriteId==152&&item->imageIndex.bits==0x3f800000u&&!item->imageSpeed.bits&&
+                reads==tick+1&&itemSteps==tick&&textSteps==(tick==90?89:tick));
+            if(tick==90){
+                assert(!text&&store.size()==1&&collision->population(212,count)&&count==0);
+            }else{
+                assert(text&&text->alarms.get(0)==90-int(tick)&&text->state.flashing==int(tick>=60)&&
+                    text->state.drawing==(tick>=60&&!(tick&1)?-1:1));
+                if(tick==1)assert(text->y.bits==0xc2ce0000u); // -103, before damping.
+            }
+        }
     }
     for(unsigned failure=0;failure<=12;++failure){
         auto world=std::make_unique<GameplayWorld>(300,false,1000,false);

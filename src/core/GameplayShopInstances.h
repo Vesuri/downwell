@@ -65,6 +65,38 @@ public:
     template<class Allocate,class Audio> Creation<Allocate,Audio> creation(Allocate& allocate,Audio& audio){
         return {*this,allocate,audio};
     }
+    bool stepRisingText(InstanceHandle h){
+        if(!ready(h,212))return fail();auto& r=records_[h.slot];
+        if(!r.active||r.destroyRequested)return true;
+        return r.state.stepRisingText(r.y,[&](RunnerImageValue y){
+            if(!binding_.publishedPosition(h,r,r.x,y)||!good_)return false;
+            r.y=y;return true;
+        })||fail();
+    }
+    template<class Lookup> bool stepItem(InstanceHandle h,Lookup lookup){
+        if(!ready(h,283))return fail();auto& r=records_[h.slot];
+        if(!r.active||r.destroyRequested)return true;
+        return r.state.stepItem(r.spriteId,[&](unsigned index,int& sprite){return lookup(index,sprite)&&good_;},
+            [&](int sprite){
+                if(!binding_.sprite(h,r,sprite)||!good_)return false;
+                r.spriteId=sprite;return true;
+            })||fail();
+    }
+    bool advanceAlarm(InstanceHandle h,unsigned number){
+        const auto* record=find(h);
+        if(!good_||creating_||!record||!record->initialized||number>=AlarmBank::count)return fail();
+        auto& r=records_[h.slot];
+        if(!r.active||r.destroyRequested||!r.alarms.advanceOne(number))return true;
+        if(r.objectId!=212||number>1)return fail();
+        if(number==1){r.state.flashing=1;return true;}
+        if(!binding_.markDestroyed(h,r)||!good_)return fail();
+        r.destroyRequested=true;return true;
+    }
+    bool retireMarked(InstanceHandle h){
+        const auto* r=find(h);
+        if(!good_||creating_||!r||!r->destroyRequested||!binding_.retire(h,*r)||!good_)return fail();
+        records_[h.slot]={};--count_;return true;
+    }
     // Cleanup retains generation monotonicity, including a rejected Create's
     // published prefix. No Destroy event is synthesized by room teardown.
     bool clear(){
@@ -77,6 +109,9 @@ public:
     }
 private:
     bool fail(){good_=false;return false;}
+    bool ready(InstanceHandle h,int object)const{
+        const auto* r=find(h);return good_&&!creating_&&r&&r->initialized&&r->objectId==object;
+    }
     bool write(unsigned source,int object,unsigned value){
         const auto h=sourceHandle(source);const auto* r=find(h);
         if(!good_||!r||!r->initialized||r->objectId!=object||value>0x7fffffffu)return fail();

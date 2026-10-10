@@ -37,6 +37,10 @@ struct NativeShopAudio {
     bool setGain(int,downwell::MotionBinary64,int);
 };
 struct NativeShopAllocation {bool operator()(int,unsigned&);};
+struct NativeShopItemLookup {bool operator()(unsigned,int&);};
+bool nativeRegisteredShopChildStep(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle key){
+    return owner.stepRegisteredShopChild(key,NativeShopItemLookup{});
+}
 downwell::ShopWorld::Instance* nativeTypedWorldShopCreate(GameplayWorld& world,
     downwell::GameplayShopInstances& instances,NativeShopAllocation& allocate,NativeShopAudio& audio){
     auto owner=instances.creation(allocate,audio);

@@ -1919,6 +1919,7 @@ public:
                     kind==View::Kind::skeleton?self.skeletons_.advanceAlarm(local,alarm):
                     kind==View::Kind::whiteJelly?self.world_->advanceWhiteJellyRoomAlarm(local,alarm):
                     kind==View::Kind::redBall?self.world_->advanceRedBallRoomAlarm(local,alarm):
+                    kind==View::Kind::shop?self.shopInstances_.advanceAlarm(local,alarm):
                     kind==View::Kind::smoke?self.smoke_.advanceAlarm(local,alarm):
                     kind==View::Kind::blast?self.blasts_.alarm(local,alarm):
                     kind==View::Kind::corpse?self.advanceCorpseAlarm(local,alarm):
@@ -2009,12 +2010,12 @@ public:
     // Registered ordinary-Step dependencies of the skeleton encounter. Flash
     // balls and corpse-expiry pictures have no Step: their existing room
     // animation/cleanup dispatch remains authoritative.
-    using EncounterStepOrder=RunnerStepSnapshot<8*32+8+64+GameplayWhiteJellies::capacity+GameplaySpawners::capacity+GameplayRedBalls::capacity>;
+    using EncounterStepOrder=RunnerStepSnapshot<8*32+8+64+GameplayWhiteJellies::capacity+GameplaySpawners::capacity+GameplayRedBalls::capacity+GameplayShopInstances::capacity>;
     template<class Execute,class Tick>
     bool withEncounterSteps(EncounterStepOrder& phase,Execute execute,Tick tick){
         return withEncounterStepsSelected(phase,[](int object){
             return object==78||object==115||object==118||object==120||object==220||object==223||object==225||object==238||object==263||
-                object==269||object==276||object==379;
+                object==269||object==276||object==379||object==212||object==283;
         },execute,tick);
     }
 private:
@@ -2165,6 +2166,13 @@ public:
     GameplayWhiteJellies& whiteJellies(){return whiteJellies_;}
     GameplayRedBalls& redBalls(){return redBalls_;}
     GameplayShopInstances& shopInstances(){return shopInstances_;}
+    template<class Lookup> bool stepRegisteredShopChild(InstanceHandle shared,Lookup lookup){
+        View::Kind kind;InstanceHandle local;
+        if(!valid()||!world_||!resolves(shared)||!View::decode(shared,kind,local)||kind!=View::Kind::shop)return check(false);
+        const auto* r=shopInstances_.find(local);
+        return check(r&&(r->objectId==212?shopInstances_.stepRisingText(local):
+            r->objectId==283&&shopInstances_.stepItem(local,lookup)));
+    }
     GameplayWorld::MovingEffects& movingEffects(){return movingEffects_;}
     GameplayWorld::Blood& blood(){return blood_;}
     GameplayWorld::Currency& currency(){return currency_;}
@@ -4157,6 +4165,7 @@ private:
                 case View::Kind::whiteJelly:return record.whiteJelly&&whiteJellies_.retireMarked(local);
                 case View::Kind::redBall:return record.redBall&&redBalls_.retireMarked(local);
                 case View::Kind::movingFx:return record.movingFx&&movingEffects_.retire(local);
+                case View::Kind::shop:return record.shop&&shopInstances_.retireMarked(local);
                 default:return false;
             }
         });

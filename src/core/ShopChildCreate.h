@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_SHOP_CHILD_CREATE_H
 #define DOWNWELL_CORE_SHOP_CHILD_CREATE_H
 #include "RunnerImageValue.h"
+#include "MultiplyBinary64.h"
 namespace downwell {
 // User variables are shared by stored and native ownership. Builtin setters
 // stay with the owner so their publication occurs inside synchronous Create.
@@ -15,6 +16,22 @@ struct ShopChildState {
     const char* text=nullptr;
     int drawing=0;
     bool initialized=false;
+    template<class Publish> bool stepRisingText(RunnerImageValue y,Publish publish){
+        auto next=y.promoted();
+        if(!next.add(ysp)||!y.assign(next)||!publish(y))return false;
+        // The narrowed builtin write precedes damping the binary64 user
+        // variable. A rejected setter must not advance damping or flashing.
+        if(!multiplyBinary64(ysp,decreaseBy,ysp))return false;
+        if(flashing)drawing=-drawing;
+        return true;
+    }
+    template<class Lookup,class Publish> bool stepItem(int current,Lookup lookup,Publish publish){
+        int sprite;
+        if(!lookup(whichUg,sprite))return false;
+        if(current==sprite)return true;
+        // The source reads the global array again for the assignment.
+        return lookup(whichUg,sprite)&&publish(sprite);
+    }
     template<class Builtins> bool create(int object,Builtins& builtins){
         if(initialized)return false;
         switch(object){

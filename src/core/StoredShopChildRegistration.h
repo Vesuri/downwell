@@ -104,27 +104,21 @@ public:
         if(!good_||creating_||!r||e->object!=212||!e->state.initialized)return fail();
         if(!r->active||r->destroyRequested)return true;
         RunnerImageValue x,y;std::memcpy(&x.bits,&r->preciseX,4);std::memcpy(&y.bits,&r->preciseY,4);
-        auto next=y.promoted();std::int32_t iy;
-        if(!next.add(e->state.ysp)||!y.assign(next)||!y.roundPixel(iy)||
-           !lifecycle_.publishedPosition(key,*r,x,y)||!good_)return fail();
-        r->preciseY=stored(y);r->y=iy;
-        // The source setter is observable before damping. Do not atomically
-        // commit the final state or narrow the user variable ysp to binary32.
-        if(!multiplyBinary64(e->state.ysp,e->state.decreaseBy,e->state.ysp))return fail();
-        if(e->state.flashing)e->state.drawing=-e->state.drawing;
-        return true;
+        return e->state.stepRisingText(y,[&](RunnerImageValue value){
+            std::int32_t iy;
+            if(!value.roundPixel(iy)||!lifecycle_.publishedPosition(key,*r,x,value)||!good_)return false;
+            r->preciseY=stored(value);r->y=iy;return true;
+        })||fail();
     }
     template<class Lookup> bool stepItem(InstanceHandle key,Lookup lookup){
         auto* e=entry(key);auto* r=e?record(*e):nullptr;
         if(!good_||creating_||!r||e->object!=283||!e->state.initialized)return fail();
         if(!r->active||r->destroyRequested)return true;
-        int sprite;
-        if(!lookup(e->state.whichUg,sprite)||!good_)return fail();
-        if(r->spriteId==sprite)return true;
-        // The VM reads global.ug[whichUg][2] again for the assignment.
-        // Publish only the sprite setter; image_index remains Create's 1.
-        if(!lookup(e->state.whichUg,sprite)||!good_||!lifecycle_.sprite(key,*r,sprite)||!good_)return fail();
-        r->spriteId=sprite;return true;
+        return e->state.stepItem(r->spriteId,[&](unsigned index,int& sprite){return lookup(index,sprite)&&good_;},
+            [&](int sprite){
+                if(!lifecycle_.sprite(key,*r,sprite)||!good_)return false;
+                r->spriteId=sprite;return true;
+            })||fail();
     }
     bool advanceRisingTextAlarm(InstanceHandle key,unsigned number){
         auto* e=entry(key);auto* r=e?record(*e):nullptr;
