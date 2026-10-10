@@ -31,7 +31,10 @@ struct Audit {
     bool sprite(H,const R&,int id){assert(id==hitSprite||id==normalSprite);calls.push_back(6);return true;}
     bool imageIndex(H,const R&,F){calls.push_back(7);return true;}
     bool mask(H,const R&,int){return false;}
-    bool transform(H,const R&,downwell::RunnerTransformField,F,F,unsigned){return false;}
+    bool transform(H,const R& r,downwell::RunnerTransformField field,F value,F,unsigned){
+        assert(field==downwell::RunnerTransformField::scaleX&&r.scaleX.bits==0x3f800000u&&value.bits==0xbf800000u);
+        calls.push_back(8);return true;
+    }
 };
 struct Ops {
     Pool& pool;H key;
@@ -57,6 +60,7 @@ int main(){
         assert(r.busy&&pool.publishMovingFx(first,100001)&&r.myFx==100001);
         return true;
     }));
+    assert(pool.xscale(first,-1)&&pool.find(first)->scaleX.bits==0xbf800000u&&audit.calls.back()==8);
     assert(pool.dispatch(first,[](auto& r){r.hitStun=true;return true;}));
     assert(pool.setAlarm(first,1,2)&&pool.advanceAlarm(first,1)&&pool.find(first)->hitStun);
     assert(pool.advanceAlarm(first,1)&&!pool.find(first)->hitStun);

@@ -1998,11 +1998,11 @@ public:
     // Registered ordinary-Step dependencies of the skeleton encounter. Flash
     // balls and corpse-expiry pictures have no Step: their existing room
     // animation/cleanup dispatch remains authoritative.
-    using EncounterStepOrder=RunnerStepSnapshot<8*32+8+64+GameplayWhiteJellies::capacity+GameplaySpawners::capacity>;
+    using EncounterStepOrder=RunnerStepSnapshot<8*32+8+64+GameplayWhiteJellies::capacity+GameplaySpawners::capacity+GameplayRedBalls::capacity>;
     template<class Execute,class Tick>
     bool withEncounterSteps(EncounterStepOrder& phase,Execute execute,Tick tick){
         return withEncounterStepsSelected(phase,[](int object){
-            return object==78||object==115||object==120||object==220||object==223||object==225||object==238||object==263||
+            return object==78||object==115||object==118||object==120||object==220||object==223||object==225||object==238||object==263||
                 object==269||object==276||object==379;
         },execute,tick);
     }
@@ -2322,6 +2322,12 @@ public:
         if(!valid()||!world_||!resolves(shared)||!View::decode(shared,kind,local)||kind!=View::Kind::whiteJelly||
            !objects_.findEvent(115,3,0,event)||event.ownerObjectId!=115||event.codeId!=1225)return check(false);
         return check(world_->stepWhiteJellyRoomEffect(local,stopped,ops));
+    }
+    template<class Ops> bool stepRegisteredRedBall(InstanceHandle shared,bool stopped,Ops& ops){
+        View::Kind kind;InstanceHandle local;PackedObjectEvent event{};
+        if(!valid()||!world_||!resolves(shared)||!View::decode(shared,kind,local)||kind!=View::Kind::redBall||
+           !objects_.findEvent(118,3,0,event)||event.ownerObjectId!=118||event.codeId!=1247)return check(false);
+        return check(world_->stepRedBallRoomEffect(local,stopped,ops));
     }
     template<class Allocate,class Caller>
     bool spawnMovingFx(MotionBinary64 x,MotionBinary64 y,int sprite,MotionBinary64 rate,

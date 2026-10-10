@@ -915,6 +915,10 @@ int main(){
             GameplayTerrainInstances::WallCollision{},nullptr,mode);
         auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),owner->breakableBinding(),owner->playerBinding(),nullptr);
         assert(owner->attach(*world));auto& balls=owner->redBalls();
+        auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
+        assert(mode==GameplayCollisionOwner::Ownership::reference||world->bindNativeTerrain(*terrain));
+        const auto mb=read("generated/downwell-sprite-masks.dwsm");SpriteMaskPack masks(mb.data(),mb.size());
+        assert(owner->configureCorpseMasks(masks));
         struct Ops {
             GameplayCollisionOwner& owner;InstanceHandle key;
             bool position(bool y,RunnerImageValue v,RunnerImageValue& out){return owner.redBalls().position(key,y,v,out);}
@@ -926,6 +930,24 @@ int main(){
             bool direction(MotionBinary64 v,MotionBinary64& out){return owner.redBallDirection(key,v,out);}
             bool imageSpeed(RunnerImageValue v,RunnerImageValue& out){out=v;return true;}
             bool alarm(int number,int value){return owner.redBalls().setAlarm(key,number,value);}
+            bool enemyPlayerX(MotionBinary64& v){v=MotionBinary64::fromInteger(480);return true;}
+            bool enemyPlayerY(MotionBinary64& v){return playerY(v);}
+            bool inView(bool& value){value=true;return true;}
+            bool lengthdir(bool y,MotionBinary64 speed,MotionBinary64 angle,MotionBinary64& out){
+                return WhiteJellyStep::movementComponent(y,speed,angle,out);
+            }
+            bool meeting(MotionBinary64 x,MotionBinary64 y,int object,bool& hit){
+                const bool ok=owner.redBalls().meeting(key,x,y,object,hit);assert(ok);return ok;
+            }
+            bool xscale(int sign){return owner.redBalls().xscale(key,sign);}
+            bool imageIndex(int value){return value==0&&owner.redBalls().imageIndex(key,{});}
+            bool sprite(int value){return owner.redBalls().sprite(key,value);}
+            bool destroy(){return owner.redBalls().markDestroyed(key);}
+            bool sound(int,int,int,int,const char*){assert(false);return false;}
+            bool enemyDeath(){assert(false);return false;}
+            bool movingFx(MotionBinary64,MotionBinary64,int,MotionBinary64,MotionBinary64,MotionBinary64){assert(false);return false;}
+            bool flash(MotionBinary64,MotionBinary64,int,int,int){assert(false);return false;}
+            bool currency(int){assert(false);return false;}
         };
         InstanceHandle local,shared;const auto randomBefore=world->randomDrawCount();
         assert(world->createRedBallWithSourceId(990050,{0x43700000u},{0x44000000u},
@@ -936,6 +958,22 @@ int main(){
         assert(balls.find(local)->sourceId==990050&&balls.find(local)->initialized&&balls.find(local)->alarms.get(0)==10);
         assert(balls.activate(local,false)&&owner->reconcileActivation()&&owner->population(118,count)&&!count);
         assert(balls.activate(local,true)&&owner->reconcileActivation()&&owner->population(118,count)&&count==1);
+        auto phase=std::make_unique<GameplayCollisionOwner::EncounterStepOrder>();
+        const auto before=balls.find(local)->xx;
+        for(bool stopped:{true,false}){
+            unsigned steps=0;Ops ops{*owner,local};
+            assert(owner->withEncounterSteps(*phase,[&](InstanceHandle h,int object){
+                assert(object==118&&h.slot==shared.slot&&h.generation==shared.generation);++steps;
+                const bool ok=owner->stepRegisteredRedBall(h,stopped,ops);assert(ok);return ok;
+            },[&]{world->step(0);assert(world->effectsSucceeded());return world->effectsSucceeded();}));
+            assert(steps==1);
+            const auto* actor=balls.find(local);
+            assert(actor&&actor->imageSpeed.bits==(stopped?0u:0x3e4ccccdu));
+            const bool unchanged=actor->xx.high==before.high&&actor->xx.low==before.low;
+            assert(unchanged==stopped);
+            if(!stopped)assert(actor->viewMarginsInitialized&&actor->scaleX.bits==0x3f800000u);
+        }
+        assert(balls.setAlarm(local,0,10));
         unsigned births=0;
         assert(balls.dispatch(local,[](auto& actor){actor.hitStun=true;return true;})&&balls.setAlarm(local,1,2));
         for(bool stopped:{true,false}){

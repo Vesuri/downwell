@@ -937,6 +937,11 @@ public:
         const bool ok=whiteJellies_->step(key,stopped,enemyRandom_,ops);
         return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
     }
+    template<class Ops> bool stepRedBallRoomEffect(downwell::InstanceHandle key,bool stopped,Ops& ops){
+        if(!run_.effectsSucceeded||!redBalls_||!redBalls_->valid())return run_.effectsSucceeded=false;
+        const bool ok=redBalls_->step(key,stopped,enemyRandom_,ops);
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
+    }
     template<class Execute,class Tick> bool withWhiteJellyEffectAlarms(Execute execute,Tick tick){
         if(!run_.effectsSucceeded||whiteJellyAlarmDispatch_)return run_.effectsSucceeded=false;
         whiteJellyAlarmContext_=&execute;

@@ -16,6 +16,7 @@ public:
     struct Record:State {
         unsigned lifetimeId=0,sourceId=0;
         RunnerImageValue imageIndex{},timeline{};
+        RunnerImageValue scaleX{0x3f800000u};
         AlarmBank alarms;
         int spriteId=NormalSprite,maskId=Mask;
         bool active=true,destroyRequested=false,busy=false;
@@ -63,6 +64,12 @@ public:
     bool meeting(InstanceHandle key,MotionBinary64 x,MotionBinary64 y,int object,bool& hit){
         if(!good_||!find(key))return fail();
         return binding_.placeMeeting(key,records_[key.slot],object,x,y,hit)||fail();
+    }
+    bool xscale(InstanceHandle key,int sign){
+        if(!good_||!find(key)||(sign!=1&&sign!=-1))return fail();
+        auto& r=records_[key.slot];RunnerImageValue value;
+        if(!value.assignInteger(sign)||!binding_.transform(key,r,RunnerTransformField::scaleX,value,{0x3f800000u},0xffffffu))return fail();
+        r.scaleX=value;return true;
     }
     // emitMovingFx assigns the caller while its event is still executing.
     // Do not redispatch the busy actor or replace the child ID by a local slot.
