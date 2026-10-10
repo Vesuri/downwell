@@ -44,7 +44,11 @@ behavior, both backend integrations and relevant original-game verification.
   requires its depth-driven Step, selected enemy mask queries and synchronous
   child Create-before-deactivate, not an ID-only placeholder. Supply source
   fall-depth state and actual enemy counts; include its area-one white-jelly
-  (115) and red-ball (118) child dependencies. See the
+  (115) and red-ball (118) child dependencies. Connect the
+  source-ordered object-220 moving-effect path through native source-ID
+  ownership, mixed scheduling and Draw as well: sprite-704 emissions must not
+  be treated as the sprite-84 blood specialization. Install the registered
+  enemy/emission scopes in normal frontend encounters, not only fixtures. See the
   [spawner source contract](spawner-source-contract.md). Complete registered
   Scattered16 (289) normal mixed Step/contact/Draw admission on both backends,
   including bullet contacts and the live player selector writes/full recharge

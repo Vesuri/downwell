@@ -550,6 +550,30 @@ int main() {
                 std::find(ended.spriteOrder.begin(),ended.spriteOrder.end(),102)==ended.spriteOrder.end()&&expiry.clear(),
                 "Animation End removes registered expiry from host drawing");
         }
+        {
+            auto moving=world.movingFxRegistration<1>();unsigned source=0;downwell::InstanceHandle child;
+            auto px=n(248),py=n(128);
+            require(px.add({0x3fd00000u,0})&&py.add({0x3fe00000u,0}),"fractional moving-effect render anchor");
+            require(world.spawnMovingFx(moving,px,py,704,{0x3fb99999u,0x9999999au},n(90),{0x3fe00000u,0},frames,
+                [](bool vertical,auto speed,auto angle,auto& value){return downwell::WhiteJellyStep::movementComponent(vertical,speed,angle,value);},
+                [&](unsigned id){source=id;return true;}),"create source moving effect for shared renderer");
+            for(unsigned i=0;i<world.activeInstanceCount();++i)
+                if(world.instanceAt(i).instanceId==source)child=world.instanceHandleAt(i);
+            require(moving.state(child)!=nullptr,"moving-effect draw uses registered lifetime");
+            RecordingRenderer frame;frame.recordTransforms=true;scene->render(frame);unsigned seen=0;
+            for(const auto& item:frame.transforms)if(item.sprite==704){
+                require(item.frame==0&&item.sx==1&&item.sy==1&&item.angle==90&&
+                    item.x==110+248.25f-world.mainCameraRenderViewX()&&
+                    item.y==128.5f-world.mainCameraRenderViewY(),
+                    "shared renderer preserves effect sprite, fraction, angle and current frame");++seen;
+            }
+            require(seen==1&&scene->renderingSucceeded(),"moving effect drawn exactly once in shared layer traversal");
+            unsigned count;require(frames(704,count)&&moving.imageSpeed(child,n(int(count)))&&moving.advanceAnimation(child),
+                "moving-effect animation end marks the registered lifetime");
+            RecordingRenderer ended;scene->render(ended);
+            require(std::find(ended.spriteOrder.begin(),ended.spriteOrder.end(),704)==ended.spriteOrder.end()&&
+                moving.retire(child),"destroyed moving effect disappears before lifetime retirement");
+        }
         auto blood=world.bloodRegistration<2>();downwell::InstanceHandle firstBlood,lastBlood;
         downwell::MotionBinary64 bx=n(248),by=n(128);
         require(bx.add({0x3fd00000u,0})&&by.add({0x3fe00000u,0}),"fractional blood Draw anchor");
