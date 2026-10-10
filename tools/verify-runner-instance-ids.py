@@ -231,6 +231,16 @@ for block,latch,sound in ((103,"shopInView",103),(110,"keeperAngry",94)):
 assert "push.v self.keeperx\ncmp.v.v GT" in view
 assert "pushi.e 0\npop.v.i self.keeperAngry\npushi.e 0\npop.v.i self.shopInView" in shop
 print("Pinned shop greeting/anger latches, strict view edges and six ordered view reads")
+tail = shop_step.split(":[114]\n",1)[1].split(":[126]\n",1)[0]
+assert tail.startswith("pushglb.v global.criminal\nconv.v.b\nbt [116]")
+assert tail.count("pop.v.i global.noControl") == 1
+assert tail.index("pop.v.i self.mask_index") < tail.index("pop.v.i global.noControl") < tail.index("call.i gml_Script_scrCheckThisSignStep")
+prompt = assembly("gml_GlobalScript_scrCheckThisSignStep",
+    "ef914eeede814890ecbc7c2ce347b75f127c74f2b17d01b028addfed172d9891")
+assert prompt.index("call.i place_meeting") < prompt.index("pushglb.v global.interactable")
+assert "pushi.e 2\ncmp.i.v LT" in prompt and "pushi.e 2\ncmp.i.v GT" in prompt
+assert "push.d 5.1\ncmp.d.v LTE" in prompt
+print("Pinned shop crime/exit/sign tail and prompt VM comparison gates")
 inherited = assembly("gml_Object_parentInteractable_Create_0",
     "c7501948045f88afa9ab289ee4b1b5a380bb4de07aee3857eeba1e937a427647")
 assert "call.i" not in inherited and objects[91]["parentId"] == -1

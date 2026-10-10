@@ -14,6 +14,7 @@
 #include "ShopPurchaseEvents.h"
 #include "ShopViewEvents.h"
 #include "ShopMenuEvents.h"
+#include "ShopParentEvents.h"
 namespace downwell {
 // Native ownership of Shop and its ten synchronous children. Numeric IDs
 // belong to the enclosing room allocator, never to this generation pool.
@@ -29,7 +30,7 @@ public:
         AlarmBank alarms;
         ShopChildState state;
         ShopWorld::Instance* shop=nullptr;
-        int checkThis=0,interactOk=1,textOver=0,choice0=-1;
+        int interactOk=1,textOver=0,choice0=-1;
         bool active=true,destroyRequested=false,initialized=false;
     };
     using Binding=RecordLifecycleBinding<Record>;
@@ -128,6 +129,30 @@ public:
             bool resume(){return env.resume(r.shop->radio)&&owner.good_;}
         } ops{*this,r,environment};
         return ShopRadioEvents::step(r.shop->shopBgm,ops)||fail();
+    }
+    template<class Environment> bool parentStepBody(InstanceHandle h,ShopInteraction::Input& input,
+        CurrencyAccount& currency,Environment& environment){
+        if(!ready(h,277)||!records_[h.slot].shop)return fail();
+        if(!records_[h.slot].active||records_[h.slot].destroyRequested)return true;
+        ShopParentBodyOps<GameplayShopInstances,InstanceHandle,Environment> ops{*this,h,input,currency,environment};
+        return ShopParentEvents::body(ops)||fail();
+    }
+    template<class Environment> bool parentTailStep(InstanceHandle h,Environment& environment){
+        if(!ready(h,277)||!records_[h.slot].shop)return fail();auto& r=records_[h.slot];
+        if(!r.active||r.destroyRequested)return true;
+        struct Ops {
+            GameplayShopInstances& owner;InstanceHandle h;Record& r;Environment& env;
+            bool criminal(bool& out){return env.criminal(out)&&owner.good_;}
+            bool death(bool& out){return env.death(out)&&owner.good_;}
+            bool noControl(bool value){return env.noControl(value)&&owner.good_;}
+            bool meeting(bool& out){return env.meeting(out)&&owner.good_;}
+            bool interactable(bool& out){return env.interactable(out)&&owner.good_;}
+            bool mask(int value){
+                if(!owner.binding_.mask(h,r,value)||!owner.good_)return false;
+                r.maskId=value;r.shop->maskEnabled=false;return true;
+            }
+        } ops{*this,h,r,environment};
+        return ShopParentEvents::tail(*r.shop,ops)||fail();
     }
     bool menuKeeper(unsigned id,ShopMenuEvents::KeeperField field,int value){
         const auto key=sourceHandle(id);if(!ready(key,280))return fail();
@@ -359,7 +384,7 @@ private:
             if(!r.state.create(object,builtins)){fail();return 0;}
         }
         // Parent's inherited variables have their source defaults in Record
-        // and the retained ShopWorld menu (the sole owner of speaking).
+        // and the retained ShopWorld menu/prompt (speaking/checkThis).
         r.initialized=true;return source;
     }
     const ObjectPack& objects_;const SpriteCollisionPack& sprites_;Binding binding_;Record records_[capacity]{};

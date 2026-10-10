@@ -836,6 +836,19 @@ still needs the enclosing `with (Shop)` event, view/tail composition and normal
 frontend bindings; a successful isolated menu call is not complete Step
 admission.
 
+`ShopParentEvents` composes one selected inner body: radio, a fresh criminal
+test, menu and view under that test, then the unconditional tail. The tail
+rereads criminal and short-circuits death; either disables interaction and
+publishes mask 582 without releasing noControl. An explicit exit releases
+noControl before clearing leave, speaking and menu state. The final sign query
+runs even after that reset and while criminal/dead. Both owners publish the
+mask through their lifecycle binding and retain the prompt's phase as the sole
+checkThis state. Prompt comparisons use the recovered runner epsilon, including
+real/integer comparisons around two (see [runner comparison evidence](runner-frame-comparisons.md)),
+not exact host comparisons. This body entry does not select the outer/inner
+Shop populations or install frontend script dependencies; those remain
+requirements of complete Step admission.
+
 `StoredShopChildRegistration` implements these six child resources' synchronous
 Create bodies in real `InstanceStore` records, borrowing the room counter and
 lifecycle publisher. Birth publication precedes Create setters; item image-index

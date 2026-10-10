@@ -217,13 +217,13 @@ int main() {
     for (unsigned tick = 0; tick < 10000; ++tick) {
         const bool eligible = (tick % 71) < 30;
         if (eligible) {
-            if (sourcePhase < 2) sourcePhase = 2;
-            if (sourcePhase <= 5.1) sourcePhase += 0.3;
+            if (sourcePhase-2 < -0.00001) sourcePhase = 2;
+            if (sourcePhase-5.1 <= 0.00001) sourcePhase += 0.3;
         } else {
             sourcePhase += 0.1;
-            if (sourcePhase > 2) sourcePhase -= 2;
+            if (sourcePhase-2 > 0.00001) sourcePhase -= 2;
         }
-        prompt.step(eligible);
+        require(prompt.step(eligible),"finite prompt arithmetic");
         std::uint64_t bits = 0;
         std::memcpy(&bits, &sourcePhase, sizeof(bits));
         require(prompt.phase.mantissa == ((bits & 0xfffffffffffffULL) | 0x10000000000000ULL) &&
@@ -231,6 +231,16 @@ int main() {
             "interaction prompt matches source binary64 phase exactly");
         require(prompt.frame() == unsigned(sourcePhase),
             "interaction prompt preserves binary64 frame boundaries through approach/leave cycles");
+    }
+    for(bool eligible:{false,true}){
+        double value=eligible?1.999995:1.900005;
+        std::uint64_t bits;std::memcpy(&bits,&value,8);
+        prompt.phase={(bits&0xfffffffffffffULL)|0x10000000000000ULL,int((bits>>52)&0x7ff)-1023};
+        // Both comparisons are inside the runner's epsilon band: neither
+        // clamp to two nor subtract two just because exact ordering differs.
+        value+=eligible?0.3:0.1;std::memcpy(&bits,&value,8);
+        require(prompt.step(eligible)&&prompt.phase.mantissa==((bits&0xfffffffffffffULL)|0x10000000000000ULL)&&
+            prompt.phase.exponent==int((bits>>52)&0x7ff)-1023,"prompt comparison uses the runner epsilon band");
     }
     for (unsigned farewell = 0; farewell < 3; ++farewell) {
         downwell::ShopWorld world;

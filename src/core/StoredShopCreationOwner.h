@@ -6,6 +6,7 @@
 #include "ShopRadioEvents.h"
 #include "ShopPurchaseEvents.h"
 #include "ShopViewEvents.h"
+#include "ShopParentEvents.h"
 namespace downwell {
 // Concrete owner for ShopWorld::createRegistered. The compact shop owns stock
 // and menu state; its retained room record owns identity and builtins. Children
@@ -16,7 +17,7 @@ template<unsigned WorldCapacity,unsigned ShopCapacity,class Audio> class StoredS
 public:
     struct Parent {
         InstanceHandle key{};unsigned id=0;ShopWorld::Instance* shop=nullptr;
-        int checkThis=0,interactOk=1,textOver=0,choice0=-1;
+        int interactOk=1,textOver=0,choice0=-1;
         bool inheritedInitialized=false;
     };
 private:
@@ -81,6 +82,32 @@ public:
         } ops{*this,*p,*r,environment};
         RunnerImageValue y;std::memcpy(&y.bits,&r->preciseY,4);
         return (roomEnd?ShopLifetimeEvents::roomEnd(ops):ShopLifetimeEvents::endStep(y.promoted(),ops))||fail();
+    }
+    template<class Environment> bool parentStepBody(unsigned id,ShopInteraction::Input& input,
+        CurrencyAccount& currency,Environment& environment){
+        const auto* p=parent(id);auto* r=p?records_.resolve(p->key):nullptr;
+        if(!good_||!r||!p->shop)return fail();
+        if(!r->active||r->destroyRequested)return true;
+        ShopParentBodyOps<StoredShopCreationOwner,unsigned,Environment> ops{*this,id,input,currency,environment};
+        return ShopParentEvents::body(ops)||fail();
+    }
+    template<class Environment> bool parentTailStep(unsigned id,Environment& environment){
+        const auto* p=parent(id);auto* r=p?records_.resolve(p->key):nullptr;
+        if(!good_||!r||!p->shop)return fail();
+        if(!r->active||r->destroyRequested)return true;
+        struct Ops {
+            StoredShopCreationOwner& owner;const Parent& p;InstanceRecord& r;Environment& env;
+            bool criminal(bool& out){return env.criminal(out)&&owner.good_;}
+            bool death(bool& out){return env.death(out)&&owner.good_;}
+            bool noControl(bool value){return env.noControl(value)&&owner.good_;}
+            bool meeting(bool& out){return env.meeting(out)&&owner.good_;}
+            bool interactable(bool& out){return env.interactable(out)&&owner.good_;}
+            bool mask(int value){
+                if(!owner.lifecycle_.mask(p.key,r,value)||!owner.good_)return false;
+                r.maskId=value;p.shop->maskEnabled=false;return true;
+            }
+        } ops{*this,*p,*r,environment};
+        return ShopParentEvents::tail(*p->shop,ops)||fail();
     }
     bool menuKeeper(unsigned id,ShopMenuEvents::KeeperField field,int value){return children_.menuKeeper(id,field,value);}
     bool menuKeeperImageZero(unsigned id){return children_.purchaseResetKeeper(id);}

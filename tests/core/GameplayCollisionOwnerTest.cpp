@@ -7,6 +7,7 @@
 #include "ShopPurchaseChecks.h"
 #include "ShopViewChecks.h"
 #include "ShopMenuChecks.h"
+#include "ShopParentChecks.h"
 #ifndef DOWNWELL_NATIVE_QUERY_PROBE
 #include "SkeletonSoundChecks.h"
 #include "RegisteredSkeletonStompChecks.h"
@@ -41,6 +42,10 @@ struct NativeShopAudio {
     bool setGain(int,downwell::MotionBinary64,int);
 };
 struct NativeShopAllocation {bool operator()(int,unsigned&);};
+bool nativeShopBody(downwell::GameplayShopInstances& owner,downwell::InstanceHandle key,
+    downwell::ShopInteraction::Input& input,downwell::CurrencyAccount& currency,ShopParentProbe& env){
+    return owner.parentStepBody(key,input,currency,env);
+}
 bool nativeShopMenu(downwell::GameplayShopInstances& owner,downwell::InstanceHandle key,
     downwell::ShopInteraction::Input& input,downwell::CurrencyAccount& currency,ShopMenuProbe& env){
     return owner.parentMenuStep(key,input,currency,env);

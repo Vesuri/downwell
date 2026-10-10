@@ -7,6 +7,7 @@
 #include "ShopPurchaseChecks.h"
 #include "ShopViewChecks.h"
 #include "ShopMenuChecks.h"
+#include "ShopParentChecks.h"
 #ifndef DOWNWELL_NATIVE_QUERY_PROBE
 #include <cstdio>
 #include <cstdlib>
@@ -180,16 +181,18 @@ bool shopParentRegistrationCheck(const ObjectPack& objects,unsigned area,unsigne
        rng!=(count>=9||expected?4u:0u)||choices!=(expected?1u:0u))return false;
     const auto* parent=owner.parent(920000);
     if(!parent||parent->inheritedInitialized!=(reject!=1)||parent->shop!=&world.instances[0]||
-       parent->shop->menu.speaking||parent->checkThis||parent->interactOk!=1||parent->textOver||parent->choice0!=-1)return false;
+       parent->shop->menu.speaking||parent->shop->prompt.phase.mantissa||parent->interactOk!=1||parent->textOver||parent->choice0!=-1)return false;
     if(expected){
-        if(!checkShopMenuEvents())return false;
+        if(!checkShopMenuEvents()||!checkShopParentEvents())return false;
         CurrencyAccount menuCurrency;menuCurrency.currency=10000;
-        ShopMenuProbe menuProbe{*shop,menuCurrency,700};ShopInteraction::Input menuInput;menuInput.confirm=true;
-        if(!owner.parentMenuStep(shop->sourceId,menuInput,menuCurrency,menuProbe)||menuInput.confirm||
-           !shop->menu.speaking||!menuProbe.locked||menuProbe.soundIds[0]!=101)return false;
+        ShopParentProbe menuProbe{*shop,menuCurrency,700};ShopInteraction::Input menuInput;menuInput.confirm=true;
+        if(!owner.parentStepBody(shop->sourceId,menuInput,menuCurrency,menuProbe)||menuInput.confirm||
+           !shop->menu.speaking||!menuProbe.locked||menuProbe.soundIds[0]!=101||menuProbe.criminalReads!=2||
+           menuProbe.deathReads!=1||menuProbe.viewReads!=6||shop->prompt.frame()!=2)return false;
         ShopRadioProbe radioStep;radioStep.expectedRadio=shop->radio;
         if(!owner.parentRadioStep(shop->sourceId,radioStep)||!shop->shopBgm||!radioStep.matches("tdlvgmpr"))return false;
         ShopViewProbe view;
+        shop->shopInView=shop->keeperAngry=false;
         if(!checkShopViewEvents()||!owner.parentViewStep(shop->sourceId,view)||!shop->shopInView||!shop->keeperAngry||
            view.greetings!=1||view.angrySounds!=1)return false;
         CurrencyAccount purchaseMoney;purchaseMoney.currency=10000;
@@ -201,6 +204,9 @@ bool shopParentRegistrationCheck(const ObjectPack& objects,unsigned area,unsigne
         if(!records.resolve(itemKey)->destroyRequested||!owner.children().state(keeperKey)->thankful||
            records.resolve(keeperKey)->imageIndex!=0||
            owner.children().state(owner.children().sourceHandle(shop->children.cases[0]))->storedItem)return false;
+        if(!checkShopOwnedTail(*shop,[&](auto& input,auto& currency,auto& env){
+            return owner.parentStepBody(shop->sourceId,input,currency,env);
+        },[&]{return records.resolve(parent->key)->maskId==582;}))return false;
         struct Radio {
             int expected;int view=1020;unsigned views=0,queries=0,stops=0;bool playing=true;
             bool viewY(MotionBinary64& y){++views;y=MotionBinary64::fromInteger(view);return true;}

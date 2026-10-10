@@ -8,6 +8,7 @@
 #include "ShopPurchaseChecks.h"
 #include "ShopViewChecks.h"
 #include "ShopMenuChecks.h"
+#include "ShopParentChecks.h"
 #include <cassert>
 #include <memory>
 #include <vector>
@@ -76,14 +77,16 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             bool stop(int id){assert(id==99);++stops;playing=false;return true;}
         } radio;
         const auto parentKey=store.sourceHandle(replacement->sourceId);
-        assert(checkShopMenuEvents());
+        assert(checkShopMenuEvents()&&checkShopParentEvents());
         CurrencyAccount menuCurrency;menuCurrency.currency=10000;
-        ShopMenuProbe menuProbe{*replacement,menuCurrency,2000};ShopInteraction::Input menuInput;menuInput.confirm=true;
-        assert(store.parentMenuStep(parentKey,menuInput,menuCurrency,menuProbe)&&!menuInput.confirm&&
-            replacement->menu.speaking&&menuProbe.locked&&menuProbe.soundIds[0]==101);
+        ShopParentProbe menuProbe{*replacement,menuCurrency,2000};ShopInteraction::Input menuInput;menuInput.confirm=true;
+        assert(store.parentStepBody(parentKey,menuInput,menuCurrency,menuProbe)&&!menuInput.confirm&&
+            replacement->menu.speaking&&menuProbe.locked&&menuProbe.soundIds[0]==101&&menuProbe.criminalReads==2&&
+            menuProbe.deathReads==1&&menuProbe.viewReads==6&&replacement->prompt.frame()==2);
         ShopRadioProbe radioStep;radioStep.expectedRadio=replacement->radio;
         assert(store.parentRadioStep(parentKey,radioStep)&&replacement->shopBgm&&radioStep.matches("tdlvgmpr"));
         ShopViewProbe view;
+        replacement->shopInView=replacement->keeperAngry=false;
         assert(checkShopViewEvents()&&store.parentViewStep(parentKey,view)&&replacement->shopInView&&replacement->keeperAngry&&
             view.greetings==1&&view.angrySounds==1);
         CurrencyAccount purchaseMoney;purchaseMoney.currency=10000;
@@ -96,6 +99,15 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             store.find(purchaseKeeper)->imageIndex.bits==0&&
             store.find(store.sourceHandle(replacement->children.cases[0]))->state.storedItem==0);
         assert(store.retireMarked(purchased)&&!store.find(purchased));
+        assert(checkShopOwnedTail(*replacement,[&](auto& input,auto& currency,auto& env){
+            return store.parentStepBody(parentKey,input,currency,env);
+        },[&]{
+            InstanceHandle h;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::shop,parentKey,h));
+            if(store.find(parentKey)->maskId!=582)return false;
+            if(native){GameplayCollisionOwner::Owner::Sprite sprite;std::uint32_t flags;
+                return collision->nativePublishedSprite(h,sprite,flags)&&sprite.maskId==582;}
+            const auto* state=collision->properties(h);return state&&state->sprite.maskId==582;
+        }));
         assert(store.parentLifetimeEvent(parentKey,true,radio)&&radio.stops==1&&!store.find(parentKey)->destroyRequested);
         radio.playing=true;
         assert(store.parentLifetimeEvent(parentKey,false,radio)&&radio.views==2&&radio.queries==1);
