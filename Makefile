@@ -196,9 +196,17 @@ test: test-gameplay-white-jellies
 .PHONY: test-gameplay-white-jellies
 test-gameplay-white-jellies: build/gameplay-white-jellies-test
 	./build/gameplay-white-jellies-test
-build/gameplay-white-jellies-test: tests/core/GameplayWhiteJelliesTest.cpp src/core/GameplayWhiteJellies.h src/core/GameMakerRandom.cpp
+build/gameplay-white-jellies-test: tests/core/GameplayWhiteJelliesTest.cpp src/core/GameplayWhiteJellies.h src/core/GameplaySteeringEnemies.h src/core/GameMakerRandom.cpp
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/GameplayWhiteJelliesTest.cpp src/core/GameMakerRandom.cpp
+
+test: test-gameplay-red-balls
+.PHONY: test-gameplay-red-balls
+test-gameplay-red-balls: build/gameplay-red-balls-test
+	./build/gameplay-red-balls-test
+build/gameplay-red-balls-test: tests/core/GameplayWhiteJelliesTest.cpp src/core/GameplayRedBalls.h src/core/GameplaySteeringEnemies.h src/core/RedBallStep.h src/core/RedBallBirth.h src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_TEST_RED_BALL -o $@ tests/core/GameplayWhiteJelliesTest.cpp src/core/GameMakerRandom.cpp
 
 test: test-white-jelly-events
 .PHONY: test-white-jelly-events
