@@ -40,6 +40,13 @@ int main(){
     assert(pool.size()==1&&random.drawCount()==1&&pool.find(first)->initialized);
     assert(audit.calls==std::vector<int>({1,2,2}));
     assert(pool.find(first)->x.bits==0x42000000u&&pool.find(first)->y.bits==0x42800000u);
+    assert(pool.dispatch(first,[](auto& r){r.hitStun=true;return true;}));
+    assert(pool.setAlarm(first,1,2)&&pool.advanceAlarm(first,1)&&pool.find(first)->hitStun);
+    assert(pool.advanceAlarm(first,1)&&!pool.find(first)->hitStun);
+    unsigned effectAlarms=0;
+    assert(pool.setAlarm(first,0,1)&&pool.advanceAlarm(first,0,[&](auto&){
+        ++effectAlarms;return pool.setAlarm(first,0,3);
+    })&&effectAlarms==1&&pool.find(first)->alarms.get(0)==3);
     for(unsigned i=0;i<8;++i)assert(pool.advanceAnimation(first));
     assert(pool.find(first)->imageIndex.bits>0x3f800000u);
     assert(pool.sprite(first,175)&&pool.find(first)->imageIndex.bits==0&&pool.find(first)->timeline.bits==0);

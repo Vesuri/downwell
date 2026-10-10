@@ -1766,6 +1766,7 @@ public:
                     case View::Kind::playerController:return self.playerControllers_.advanceAnimation(local);
                     case View::Kind::bone:return self.bones_.advanceAnimation(local);
                     case View::Kind::skeleton:return self.skeletons_.advanceAnimation(local);
+                    case View::Kind::whiteJelly:return self.whiteJellies_.advanceAnimation(local);
                     case View::Kind::blood:return self.blood_.advanceAnimation(local);
                     case View::Kind::currency:return self.currency_.advanceAnimation(local);
                     default:return true;
@@ -1880,6 +1881,7 @@ public:
                     kind==View::Kind::playerController?self.playerControllers_.advanceAlarm(local,alarm):
                     kind==View::Kind::drone?(alarm==0&&self.drones_.advanceAlarm(local)):
                     kind==View::Kind::skeleton?self.skeletons_.advanceAlarm(local,alarm):
+                    kind==View::Kind::whiteJelly?self.whiteJellies_.advanceAlarm(local,alarm):
                     kind==View::Kind::smoke?self.smoke_.advanceAlarm(local,alarm):
                     kind==View::Kind::blast?self.blasts_.alarm(local,alarm):
                     kind==View::Kind::corpse?self.advanceCorpseAlarm(local,alarm):

@@ -7,6 +7,34 @@
 inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
     const downwell::SpriteCollisionPack& sprites,const downwell::SpriteMaskPack& masks){
     using namespace downwell;
+    // Exercise the production room animation/alarm callbacks through a whole
+    // tick, rather than directly advancing the actor from the test.
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native}){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+        auto world=std::make_unique<GameplayWorld>(300,false,1000,true,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding());
+        assert(owner->attach(*world));auto& store=owner->whiteJellies();
+        struct Ops {
+            GameplayWhiteJellies& store;InstanceHandle key;
+            bool position(bool y,RunnerImageValue v,RunnerImageValue& out){return store.position(key,y,v,out);}
+            bool playerY(MotionBinary64& v){v={};return true;}
+            bool playerX(MotionBinary64& v){v={};return true;}
+            bool pointDirection(MotionBinary64,MotionBinary64,MotionBinary64,MotionBinary64,MotionBinary64& v){v={};return true;}
+            bool direction(MotionBinary64 v,MotionBinary64& out){out=v;return true;}
+            bool imageSpeed(RunnerImageValue v,RunnerImageValue& out){out=v;return true;}
+        };
+        GameMakerRandom random(19);InstanceHandle key;
+        assert(store.create(899000,{0x43800000u},{0x44300000u},random,[&](auto h){return Ops{store,h};},key));
+        assert(store.dispatch(key,[](auto& r){r.hitStun=true;return true;}));
+        assert(store.setAlarm(key,1,2));
+        world->step(0);
+        assert(world->effectsSucceeded()&&owner->valid()&&store.find(key)->imageIndex.bits==0x3e4ccccdu&&
+            store.find(key)->hitStun&&store.find(key)->alarms.get(1)==1);
+        world->step(0);
+        assert(world->effectsSucceeded()&&owner->valid()&&!store.find(key)->hitStun&&
+            store.find(key)->imageIndex.bits==0x3ecccccdu);
+    }
     for(int style:{0,2})for(bool knees:{false,true})for(bool rejectSound:{false,true}){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
             GameplayTerrainInstances::WallCollision{},nullptr,GameplayCollisionOwner::Ownership::native);

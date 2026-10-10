@@ -14,6 +14,7 @@ public:
     struct Record:WhiteJellyStep {
         unsigned lifetimeId=0,sourceId=0;
         RunnerImageValue imageIndex{},timeline{};
+        AlarmBank alarms;
         int spriteId=176,maskId=174;
         bool active=true,destroyRequested=false,busy=false;
     };
@@ -66,6 +67,23 @@ public:
         // inverse sequence mapping for external image_index writes.
         if(!good_||!find(key)||(value.bits&0x7fffffffu)||!binding_.imageIndex(key,records_[key.slot],value))return fail();
         records_[key.slot].imageIndex=value;return true;
+    }
+    bool setAlarm(InstanceHandle key,unsigned number,int value){
+        if(!good_||!find(key)||number>=AlarmBank::count)return fail();
+        records_[key.slot].alarms.set(number,value);return true;
+    }
+    template<class EffectAlarm> bool advanceAlarm(InstanceHandle key,unsigned number,EffectAlarm effectAlarm){
+        return dispatch(key,[&](auto& r){
+            if(number>=AlarmBank::count)return false;
+            if(!r.alarms.advanceOne(number))return true;
+            if(number==1){r.hitStun=false;return true;}
+            return number==0&&effectAlarm(r);
+        });
+    }
+    bool advanceAlarm(InstanceHandle key,unsigned number){
+        // A fired effect alarm needs its source emitTimer and synchronous
+        // effect owners. Never turn missing event dependencies into a no-op.
+        return advanceAlarm(key,number,[](auto&){return false;});
     }
     static unsigned frames(int sprite){return sprite==176?4:sprite==175?1:0;}
     static bool drawFrame(int sprite,RunnerImageValue index,unsigned& frame){
