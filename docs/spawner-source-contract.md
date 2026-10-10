@@ -102,6 +102,24 @@ failure must preserve the executed prefix rather than pretending the birth
 completed. Original `falldepth` and selected view values are inputs; camera
 offset or rounded player displacement is not an established substitute.
 
+## Child steering globals
+
+White-jelly Create reads `plx/ply`; ordinary Step reads `eplx/eply`.
+`scrPlMovement` publishes `plx/ply` from private `xx/yy` before movement.
+Without `pugDecoy`, it copies those values to `eplx/eply`. With the upgrade,
+a nonzero `ballooning` selects that instance's builtin `x/y`; zero still
+selects the player. Do not replace this branch with the existence of any
+balloon, its private `xx/yy`, or an unconditional player alias.
+`scrPlayerGlobalStat` initially sets both pairs from player builtin `x/y`
+and clears `ballooning`.
+
+The registered adapters bind the no-decoy branch to captured player globals.
+The upgrade branch requires the environment's actual retained enemy-target
+globals, including its balloon selection; it does not assume a balloon exists.
+Source hashes for the two scripts respectively:
+`3ff0e28b9dcef221ed9dd6a1ceb801bef746d7538016547fbe49a60af0177644`
+and `34dfd0f192ca34217da36cdfd001b792a3e7d496d3fc8c3e9967f8ce7ff2266a`.
+
 ## Retained wall-background query
 
 `tile_layer_find` is a compatibility GML script, not a native collision

@@ -2304,6 +2304,45 @@ public:
            !objects_.findEvent(115,3,0,event)||event.ownerObjectId!=115||event.codeId!=1225)return check(false);
         return check(world_->stepWhiteJellyRoomEffect(local,stopped,ops));
     }
+    // World-backed Step operations. Decoy target globals, source trig, audio
+    // and synchronous effect births remain explicit environment dependencies.
+    template<class Environment> bool stepRegisteredWhiteJellyWithWorld(InstanceHandle shared,bool stopped,Environment& environment){
+        View::Kind kind;InstanceHandle local;
+        if(!valid()||!world_||!resolves(shared)||!View::decode(shared,kind,local)||kind!=View::Kind::whiteJelly)
+            return check(false);
+        struct Ops : Environment {
+            GameplayCollisionOwner& owner;GameplayWorld& world;InstanceHandle key;
+            Ops(const Environment& env,GameplayCollisionOwner& o,GameplayWorld& w,InstanceHandle k)
+                :Environment(env),owner(o),world(w),key(k){}
+            bool player(bool vertical,MotionBinary64& value){
+                MotionBinary64 x,y;
+                if(!ContactCoordinates::playerGlobals(world.player().frameStartXFixed(),
+                    world.player().frameStartYFixed(),240,176,x,y))return false;
+                value=vertical?y:x;return true;
+            }
+            bool enemyPlayerX(MotionBinary64& value){
+                return world.upgrades().levels[15]?Environment::enemyPlayerX(value):player(false,value);
+            }
+            bool enemyPlayerY(MotionBinary64& value){
+                return world.upgrades().levels[15]?Environment::enemyPlayerY(value):player(true,value);
+            }
+            bool position(bool vertical,RunnerImageValue value,RunnerImageValue& accepted){
+                return owner.whiteJellies_.position(key,vertical,value,accepted);
+            }
+            bool direction(MotionBinary64 value,MotionBinary64& accepted){return owner.whiteJellyDirection(key,value,accepted);}
+            bool imageSpeed(RunnerImageValue value,RunnerImageValue& accepted){
+                if(!value.promoted().valid())return false;accepted=value;return true;
+            }
+            bool imageIndex(int value){
+                RunnerImageValue index;return index.assignInteger(value)&&owner.whiteJellies_.imageIndex(key,index);
+            }
+            bool alarm(int number,int value){return number>=0&&owner.whiteJellies_.setAlarm(key,unsigned(number),value);}
+            bool sprite(int value){return owner.whiteJellies_.sprite(key,value);}
+            bool meeting(MotionBinary64 x,MotionBinary64 y,int object,bool& hit){return owner.whiteJellies_.meeting(key,x,y,object,hit);}
+            bool destroy(){return owner.whiteJellies_.markDestroyed(key);}
+        } ops{environment,*this,*world_,local};
+        return stepRegisteredWhiteJelly(shared,stopped,ops);
+    }
     bool whiteJellyDirection(InstanceHandle local,MotionBinary64 wanted,MotionBinary64& accepted){
         InstanceHandle shared;
         if(!valid()||!whiteJellies_.find(local)||!View::encode(View::Kind::whiteJelly,local,shared)||!resolves(shared))

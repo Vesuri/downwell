@@ -594,6 +594,16 @@ public:
                 }
                 bool playerX(MotionBinary64& value){return player(false,value);}
                 bool playerY(MotionBinary64& value){return player(true,value);}
+                bool enemyPlayerX(MotionBinary64& value){
+                    return world.run_.upgrades.levels[15]?decltype(external)::enemyPlayerX(value):playerX(value);
+                }
+                bool enemyPlayerY(MotionBinary64& value){
+                    return world.run_.upgrades.levels[15]?decltype(external)::enemyPlayerY(value):playerY(value);
+                }
+                bool viewY(MotionBinary64& value){
+                    value=MotionBinary64::fromInteger(world.mainCameraRenderViewY());return true;
+                }
+                bool room(int& value){value=world.roomId_;return true;}
                 bool direction(MotionBinary64 wanted,MotionBinary64& accepted){
                     auto* r=record();RunnerImageValue value;
                     // Jelly scripts use custom xsp/ysp; builtin speed remains

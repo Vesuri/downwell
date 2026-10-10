@@ -51,6 +51,11 @@ def assembly(name, digest):
     assert sha256(payload).hexdigest() == digest, name
     return payload.decode()
 
+# Player and enemy-target globals are distinct when a decoy is selected.
+assembly("gml_GlobalScript_scrPlMovement",
+    "3ff0e28b9dcef221ed9dd6a1ceb801bef746d7538016547fbe49a60af0177644")
+assembly("gml_GlobalScript_scrPlayerGlobalStat",
+    "34dfd0f192ca34217da36cdfd001b792a3e7d496d3fc8c3e9967f8ce7ff2266a")
 builder = assembly("gml_GlobalScript_scrBuilder",
     "0c95048af06ff612499acd64a717766441b820d19ffc6017c0ff3a95425581f5")
 assert (authored[100856]["x"], authored[100856]["y"]) == (-16, 704)

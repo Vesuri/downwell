@@ -95,7 +95,7 @@ bool nativeOwnedWhiteJellyStep(downwell::GameplayWhiteJellies& owner,downwell::I
 }
 bool nativeRegisteredWhiteJellyStep(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle shared,
     bool stop,NativeWhiteJellyStepOps& ops){
-    return owner.stepRegisteredWhiteJelly(shared,stop,ops);
+    return owner.stepRegisteredWhiteJellyWithWorld(shared,stop,ops);
 }
 bool nativeWorldWhiteJellyCreate(GameplayWorld& world,unsigned source,downwell::RunnerImageValue x,
     downwell::RunnerImageValue y,NativeWhiteJellyBirthOps& ops,downwell::InstanceHandle& key){

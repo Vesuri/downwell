@@ -276,9 +276,19 @@ int main(){
         struct JellyEnvironment {
             using N=MotionBinary64;
             unsigned& directions;
-            bool pointDirection(N,N,N,N,N& value){++directions;value=N::fromInteger(450);return true;}
+            StartupRuntime& world;
+            bool pointDirection(N,N,N x,N y,N& value){
+                N expectedX,expectedY;
+                require(ContactCoordinates::playerGlobals(world.mainEnemyTargetX(),world.mainEnemyTargetY(),
+                    240,176,expectedX,expectedY)&&x.high==expectedX.high&&x.low==expectedX.low&&
+                    y.high==expectedY.high&&y.low==expectedY.low,"jelly steering reads captured room globals");
+                value=N::fromInteger(directions++==0?450:90);return true;
+            }
             bool enemyPlayerX(N&){return false;}bool enemyPlayerY(N&){return false;}
-            bool lengthdir(bool,N,N,N&){return false;}
+            bool lengthdir(bool vertical,N speed,N angle,N& value){
+                require(angle.high==N::fromInteger(90).high&&angle.low==0,"controlled vertical steering");
+                value=vertical?WhiteJellyStep::negative(speed):N{};return true;
+            }
             bool sound(int,int,int,int,const char*){return false;}
             bool enemyDeath(){return false;}bool smoke(N,N,int,int){return false;}
             bool movingFx(N,N,int,N,N,N){return false;}bool flash(N,N,int,int,int){return false;}
@@ -292,7 +302,7 @@ int main(){
             bool tile(int depth,MotionBinary64 x,MotionBinary64 y,bool& hit){return depth==100&&world.wallBackgroundTiles().contains(x,y,hit);}
         };
         for(unsigned frame=0;frame<1200&&!childId;++frame){
-            require(world->withRegisteredWhiteJellyEvents(jellies,*owner,[&](InstanceHandle){return JellyEnvironment{directions};},
+            require(world->withRegisteredWhiteJellyEvents(jellies,*owner,[&](InstanceHandle){return JellyEnvironment{directions,*world};},
                 [&](bool&){++stopReads;return false;},[&]{
                     return world->withRegisteredSpawnerEvents(*owner,[&](InstanceHandle){return SpawnerEnvironment{*world};},[&]{
                         world->step(gameplayContactProfileInput(frame,world->mainPlayerX(),world->mainPlayerY()),false);
@@ -316,6 +326,22 @@ int main(){
             }
         }
         require(childId&&world->effectsSucceeded(),"natural spawner produces a fully initialized owned jelly lifetime");
+        InstanceHandle moving;
+        require(world->withRegisteredWhiteJellyEvents(jellies,*owner,
+            [&](InstanceHandle){return JellyEnvironment{directions,*world};},
+            [&](bool& stop){++stopReads;stop=false;return true;},[&]{
+                return world->spawnWhiteJelly(1000,world->mainCameraRenderViewY()+100,moving);
+            }),"publish active registered jelly for whole-Step integration");
+        const unsigned movingId=world->resolveInstance(moving)->instanceId;
+        const auto beforeY=jellies.state(movingId)->yy;
+        require(world->withRegisteredWhiteJellyEvents(jellies,*owner,
+            [&](InstanceHandle){return JellyEnvironment{directions,*world};},
+            [&](bool& stop){++stopReads;stop=false;return true;},[&]{
+                world->step(Input{},false);return world->effectsSucceeded();
+            }),"stored room dispatch supplies Step and End Step operations");
+        const auto* moved=jellies.state(movingId);
+        require(stopReads&&moved&&(moved->yy.high!=beforeY.high||moved->yy.low!=beforeY.low),
+            "registered stored jelly moves using world target without external builtin providers");
     }
     for(unsigned failure=0;failure<=5;++failure){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
