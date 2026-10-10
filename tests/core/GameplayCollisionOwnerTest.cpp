@@ -949,6 +949,17 @@ int main(){
         }
         assert(balls.find(local)->myFx==991000&&owner->movingEffects().size()==1);
         assert(balls.markDestroyed(local)&&owner->prepareDraw()&&!balls.find(local)&&!GameplayCollisionView(*world).contains(shared));
+        unsigned nextSource=992000;
+        for(int offset:{-161,-160,-125,-124,-123,3000,3001}){
+            InstanceHandle edge;
+            assert(world->createRedBallWithSourceId(nextSource++,{0x43700000u},{0x44000000u},
+                [&](auto key){return Ops{*owner,key};},edge));
+            RunnerImageValue y,accepted;
+            assert(y.assignInteger(34+world->cameraOffsetY()+offset)&&balls.position(edge,true,y,accepted));
+            world->step(0);
+            assert(world->effectsSucceeded()&&balls.find(edge)&&balls.find(edge)->destroyRequested==(offset< -124||offset>3000));
+            assert(balls.markDestroyed(edge)&&owner->prepareDraw()&&!balls.find(edge));
+        }
         assert(world->restartFromResults(DeathMenuSequence::Action::Retry,2,300)==ResultsDestination::gameplay&&world->redBalls()==&balls);
     }
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native}){
