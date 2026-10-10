@@ -1,0 +1,341 @@
+diff --git a/docs/terrain-update-contract.md b/docs/terrain-update-contract.md
+index de87605d..9295dd96 100644
+--- a/docs/terrain-update-contract.md
++++ b/docs/terrain-update-contract.md
+@@ -82,6 +82,27 @@ platforms and later actors still run afterwards. Reference ownership and public
+ arbitrary-callback dispatch retain the unskipped walk: this proof does not
+ permit suppressing arbitrary callbacks or newly added box event behavior.
+ 
++## Prepared terrain registration spans
++
++The native instance table uses `RunnerRunMembership` for registration, retaining
++the scalar table under the existing scalar-ownership reference selector.
++Consecutive fresh terrain slots with the same object and consecutive lifetime
++IDs share a descriptor; the locator is not another identity/order list.
++Removal and re-registration split runs as needed. Descriptor capacity still
++permits every slot to become a singleton. The maintained actor/thin-platform
++projection preserves registration order without visiting ordinary walls.
++
++Only the existing callback-free prepared terrain segment may defer registration
++publication. Each birth still allocates its original shared chronology stamp
++and performs spatial and layer work. Registration spans flush at an object,
++slot or lifetime discontinuity and at segment end, including a failed prefix.
++The certified Create path reads the prepared tile plan and publishes dirty
++queues; it cannot query registrations or invoke a game callback. Event-bearing
++or observed Creates continue through scalar immediate publication. Adding such
++an observer to the prepared path requires flushing before it, not exposing a
++partially published registry. Layer ownership, inactive cutoffs and activation
++reconciliation remain independent of this registration representation.
++
+ ## Immutable room index publication
+ 
+ `AmigaRoomTerrainPlan` accelerates only the serialized main-room placements.
+diff --git a/src/core/GameplayCollisionOwner.h b/src/core/GameplayCollisionOwner.h
+index 47be1abb..634c9d30 100644
+--- a/src/core/GameplayCollisionOwner.h
++++ b/src/core/GameplayCollisionOwner.h
+@@ -209,6 +209,21 @@ private:
+     int terrainCreateTile_=-1;
+     const PreparedTerrainCreate::Plan* terrainCreatePlans_[2]{};
+     unsigned terrainRoomFirst_=0,terrainRoomCount_=0;
++    InstanceHandle terrainRegistrationFirst_{};
++    unsigned terrainRegistrationCount_=0;
++    int terrainRegistrationObject_=-1;
++    bool flushTerrainRegistrationSpan(){
++        if(!terrainRegistrationCount_)return true;
++        const bool okay=table_.registerExternalSpan(terrainRegistrationFirst_,terrainRegistrationCount_,terrainRegistrationObject_);
++        terrainRegistrationCount_=0;return check(okay);
++    }
++    bool appendTerrainRegistration(InstanceHandle h,int object){
++        if(terrainRegistrationCount_&&(h.slot!=terrainRegistrationFirst_.slot+terrainRegistrationCount_||
++            h.generation!=terrainRegistrationFirst_.generation+terrainRegistrationCount_||object!=terrainRegistrationObject_))
++            if(!flushTerrainRegistrationSpan())return false;
++        if(!terrainRegistrationCount_){terrainRegistrationFirst_=h;terrainRegistrationObject_=object;}
++        ++terrainRegistrationCount_;return true;
++    }
+     RunnerImageValue terrainRoomDepth_{};
+     bool flushTerrainRoomSpan(){
+         const bool ok=room_.bindTerrainSpan(terrainRoomFirst_,terrainRoomCount_,terrainRoomDepth_);
+@@ -651,6 +666,11 @@ private:
+ #endif
+         const unsigned slot=View::terrainBase+id.handle.slot;
+         if(!valid()||!table_.externalBirth(slot,order)||!nativeBirthQueues(slot,id.object))return check(false);
++#ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
++        if(nativeTerrainLayerRunActive_){
++            if(!appendTerrainRegistration({slot,id.handle.generation},id.object))return false;
++        }else
++#endif
+         if(!check(table_.registerExternalObject({slot,id.handle.generation},id.object,true)))return false;
+         const auto* definition=objectDefaults_.get(id.object);const auto* objectFlags=families_.flags(unsigned(id.object));
+         if(!definition||!objectFlags)return check(false);
+@@ -1239,7 +1259,12 @@ private:
+     const bool nativeFields_;
+     const bool terrainRegistered_;
+     bool unregisteredTerrainCleanup_=false;
++#ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+     NativeInstanceTable<View::capacity,View::terrainBase,View::timeFieldBase,93> table_;
++#else
++    NativeInstanceTable<View::capacity,View::terrainBase,View::timeFieldBase,93,
++        RunnerRunMembership<View::capacity,View::terrainBase,View::timeFieldBase,93>> table_;
++#endif
+     std::uint32_t nativeBoxFlags_=0;
+     std::uint32_t nativeFieldFlags_=0;
+     InstanceHandle markedBoxes_[GameplayWorld::breakableCapacity]{};
+@@ -1654,6 +1679,7 @@ public:
+                 self.terrainCreatePlans_[0]=self.nativeTerrainCreate_.get(60,self.terrainCreateTile_);
+                 self.terrainCreatePlans_[1]=self.nativeTerrainCreate_.get(93,self.terrainCreateTile_);
+                 self.terrainRoomCount_=0;
++                self.terrainRegistrationCount_=0;
+                 self.nativeTerrainLayerRunActive_=true;
+ #endif
+                 return self.valid();
+@@ -1662,10 +1688,11 @@ public:
+                 auto& self=*static_cast<GameplayCollisionOwner*>(p);
+ #ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+                 // Commit the published prefix even after a later Create fails.
++                const bool registrationCompleted=self.flushTerrainRegistrationSpan();
+                 const bool roomCompleted=self.flushTerrainRoomSpan();
+                 const bool completed=self.layers_.completeInheritedTerrain(self.nativeTerrainLayerRun_);
+                 self.nativeTerrainLayerRunActive_=false;
+-                return self.check(roomCompleted&&completed);
++                return self.check(registrationCompleted&&roomCompleted&&completed);
+ #else
+                 return self.valid();
+ #endif
+diff --git a/src/core/NativeInstanceTable.h b/src/core/NativeInstanceTable.h
+index 194a5f7a..84d1249f 100644
+--- a/src/core/NativeInstanceTable.h
++++ b/src/core/NativeInstanceTable.h
+@@ -18,11 +18,12 @@ namespace downwell {
+ // draw routines for the same image, which native Draw does not distinguish.
+ // Revision rules are conservative supersets of that owner's: every change
+ // that can alter a capture advances the capture revision.
+-template<unsigned Capacity,unsigned TerrainFirst=0,unsigned TerrainLast=0,int TerrainEventObject=-1> class NativeInstanceTable {
++template<unsigned Capacity,unsigned TerrainFirst=0,unsigned TerrainLast=0,int TerrainEventObject=-1,
++    class Registration=RunnerObjectMembership<Capacity,TerrainFirst,TerrainLast,TerrainEventObject>> class NativeInstanceTable {
+     static_assert(Capacity>0&&Capacity<65535,"Compact native slots");
+     struct Entry {std::uint32_t generation=0,flags=0;int object=-1,sprite=-1;std::uint32_t order=0,roomOrder=0;};
+     Entry entries_[Capacity];
+-    RunnerObjectMembership<Capacity,TerrainFirst,TerrainLast,TerrainEventObject> registration_;
++    Registration registration_;
+     std::uint32_t bindingRevision_=0,captureRevision_=0;
+ #ifdef DOWNWELL_LOCAL_DRAW_CAPTURE
+     std::uint32_t localCaptureRevision_=0;
+@@ -85,6 +86,19 @@ public:
+         if(okay)changedCapture(h.slot,false);
+         return okay;
+     }
++    // Fresh callback-free terrain construction only. Chronology was allocated
++    // at each original birth; this publishes its registration span once.
++    bool registerExternalSpan(InstanceHandle first,unsigned count,int object){
++        if(!externalOrder_||first.slot<TerrainFirst||first.slot>TerrainLast||
++            count>TerrainLast-first.slot||!first.generation||object<0||
++            (count&&count-1>0xffffffffu-first.generation))return false;
++        for(unsigned s=first.slot;s<first.slot+count;++s)if(entries_[s].generation)return false;
++        if(!registration_.bindFreshSpan(first.slot,count,object,first.generation))return false;
++        captureRevision_=captureRevision_>0xffffffffu-count?0xffffffffu:captureRevision_+count;
++        if(count&&captureDirty_&&((first.slot<captureLast_&&first.slot+count>captureFirst_)||
++            (first.slot<captureEnd_&&first.slot+count>captureSecond_)))*captureDirty_=true;
++        return true;
++    }
+     std::uint32_t registrationOrder(InstanceHandle h)const{return live(h)?entries_[h.slot].order:0;}
+     std::uint32_t roomOrder(InstanceHandle h)const{return live(h)?entries_[h.slot].roomOrder:0;}
+     bool roomReactivated(InstanceHandle h){
+diff --git a/src/core/RunnerRunMembership.h b/src/core/RunnerRunMembership.h
+index 74d0a55a..196b3d47 100644
+--- a/src/core/RunnerRunMembership.h
++++ b/src/core/RunnerRunMembership.h
+@@ -7,16 +7,18 @@ namespace downwell {
+ // share a run; actors remain singletons. The slot map is only a locator, not
+ // a second registration list. Reserve enough descriptors for total splitting
+ // so this representation introduces no new capacity/failure boundary.
+-template<unsigned Capacity,unsigned First,unsigned Last> class RunnerRunMembership {
++template<unsigned Capacity,unsigned First,unsigned Last,int RetainedObject=-1> class RunnerRunMembership {
+     static_assert(First<=Last&&Last<=Capacity&&Capacity<65535,"Invalid run domain");
+     using Slot=std::uint16_t;
+     struct Run {std::uint32_t identity=0;int object=-1;Slot first=0,count=0,next=Capacity,previous=Capacity;};
+     Run runs_[Capacity?Capacity:1]{};
+     // Zero means absent; live locators store descriptor index + 1.
+     Slot locator_[Capacity?Capacity:1]{};
+-    Slot actors_[Capacity-(Last-First)?Capacity-(Last-First):1]{};
++    static constexpr unsigned projectedCapacity=RetainedObject>=0?Capacity:Capacity-(Last-First);
++    Slot actors_[projectedCapacity?projectedCapacity:1]{};
+     unsigned head_=Capacity,tail_=Capacity,free_=Capacity,used_=0,count_=0,actorsCount_=0,revision_=0;
+     bool actor(unsigned slot)const{return slot<First||slot>=Last;}
++    bool projected(unsigned slot,int object)const{return actor(slot)||object==RetainedObject;}
+     unsigned allocate(){
+         if(free_!=Capacity){const unsigned n=free_;free_=runs_[n].next;return n;}
+         return used_++;
+@@ -34,6 +36,10 @@ public:
+         unsigned revision=0,count=0;
+     };
+     bool contains(unsigned slot)const{return slot<Capacity&&locator_[slot]!=0;}
++    bool read(unsigned slot,std::uint32_t& id,int& object)const{
++        if(!contains(slot))return false;
++        const auto& r=at(slot);id=r.identity+slot-r.first;object=r.object;return true;
++    }
+     unsigned size()const{return count_;}
+     unsigned runCount()const{unsigned n=0;for(unsigned r=head_;r!=End;r=runs_[r].next)++n;return n;}
+     // Same contract as the scalar registry: only immediately after a fresh
+@@ -46,20 +52,43 @@ public:
+         unbind(slot);
+         if(!actor(slot)&&tail_!=End){auto& t=runs_[tail_];
+             if(!actor(t.first)&&unsigned(t.first)+t.count==slot&&t.object==object&&t.identity+t.count==id){
+-                ++t.count;locator_[slot]=Slot(tail_+1);++count_;++revision_;return true;
++                ++t.count;locator_[slot]=Slot(tail_+1);++count_;++revision_;
++                if(projected(slot,object))actors_[actorsCount_++]=Slot(slot);
++                return true;
+             }
+         }
+         const unsigned n=allocate();
+         runs_[n]={id,object,Slot(slot),1,Slot(End),Slot(tail_)};
+         if(tail_==End)head_=n;else runs_[tail_].next=Slot(n);
+         tail_=n;locator_[slot]=Slot(n+1);++count_;++revision_;
+-        if(actor(slot))actors_[actorsCount_++]=Slot(slot);
++        if(projected(slot,object))actors_[actorsCount_++]=Slot(slot);
+         return true;
+     }
++    // An admitted constructor span, not a rebind. Publish one descriptor and
++    // initialize only its locator cells. No callbacks or queries may observe
++    // the interior of this operation; arbitrary births keep bind().
++    bool bindFreshSpan(unsigned first,unsigned count,int object,std::uint32_t id){
++        if(first<First||first>Last||count>Last-first||object<0)return false;
++        for(unsigned s=first;s<first+count;++s)if(contains(s))return false;
++        if(!count)return true;
++        unsigned n=tail_;
++        if(n==End||actor(runs_[n].first)||unsigned(runs_[n].first)+runs_[n].count!=first||
++           runs_[n].object!=object||runs_[n].identity+runs_[n].count!=id){
++            n=allocate();runs_[n]={id,object,Slot(first),0,Slot(End),Slot(tail_)};
++            if(tail_==End)head_=n;else runs_[tail_].next=Slot(n);
++            tail_=n;
++        }
++        runs_[n].count+=Slot(count);
++        for(unsigned s=first;s<first+count;++s){
++            locator_[s]=Slot(n+1);
++            if(object==RetainedObject)actors_[actorsCount_++]=Slot(s);
++        }
++        count_+=count;revision_+=count;return true;
++    }
+     bool unbind(unsigned slot){
+         if(!contains(slot))return false;
+         const unsigned n=locator_[slot]-1;auto& r=runs_[n];
+-        if(actor(slot)){
++        if(projected(slot,r.object)){
+             unsigned i=0;while(i<actorsCount_&&actors_[i]!=slot)++i;
+             for(++i;i<actorsCount_;++i)actors_[i-1]=actors_[i];
+             --actorsCount_;
+@@ -130,6 +159,17 @@ public:
+         }
+         return true;
+     }
++    template<class Visit> bool visitRetainedObjectRange(unsigned first,unsigned last,Visit visit)const{
++        static_assert(RetainedObject>=0,"No retained exact object configured");
++        if(first>last||last>Capacity)return false;
++        const unsigned revision=revision_;
++        for(unsigned i=0;i<actorsCount_;++i){const unsigned s=actors_[i];
++            if(s<first||s>=last)continue;
++            const auto& r=at(s);
++            if(r.object==RetainedObject&&(!visit(s,r.identity+s-r.first,r.object)||revision!=revision_))return false;
++        }
++        return true;
++    }
+     template<class IsA,class Visit> void visit(int object,IsA isA,Visit callback)const{
+         // Ancestry is immutable during traversal; callbacks may inspect or
+         // refresh instances, but must not change registration or ancestry.
+diff --git a/tests/core/NativeDrawCaptureTest.cpp b/tests/core/NativeDrawCaptureTest.cpp
+index d7bfad11..f9be966a 100644
+--- a/tests/core/NativeDrawCaptureTest.cpp
++++ b/tests/core/NativeDrawCaptureTest.cpp
+@@ -1,11 +1,14 @@
+ #include "core/NativeInstanceTable.h"
++#include "core/RunnerRunMembership.h"
++#include <type_traits>
+ #include "core/RunnerLayers.h"
+ #include <cassert>
+ #include <cstdio>
+ #include <initializer_list>
+-static void terrainPhaseSelection(){
++template<bool Runs=false> static void terrainPhaseSelection(){
+     using namespace downwell;
+-    NativeInstanceTable<12,3,9,93> selected(true);
++    using Registration=typename std::conditional<Runs,RunnerRunMembership<12,3,9,93>,RunnerObjectMembership<12,3,9,93>>::type;
++    NativeInstanceTable<12,3,9,93,Registration> selected(true);
+     NativeInstanceTable<12> reference(true);
+     for(unsigned slot:{1u,4u,9u,5u,2u,7u,10u}){
+         const InstanceHandle h{slot,slot+1};
+@@ -101,7 +104,28 @@ static void preparedFamily(){
+     assert(!population.good&&direct.bindingRevision()==reference.bindingRevision());
+ }
+ int main(){
+-    terrainPhaseSelection();
++    terrainPhaseSelection();terrainPhaseSelection<true>();
++    {
++        using namespace downwell;
++        NativeInstanceTable<16,4,12,93,RunnerRunMembership<16,4,12,93>> runs(true);
++        NativeInstanceTable<16,4,12,93> scalar(true);
++        bool rd=false,sd=false;
++        assert(runs.watchCaptureRanges(4,8,12,16,rd)&&scalar.watchCaptureRanges(4,8,12,16,sd));
++        rd=sd=false;
++        for(unsigned s=4;s<12;++s){std::uint32_t ro=0,so=0;
++            assert(runs.externalBirth(s,ro)&&scalar.externalBirth(s,so)&&ro==so);
++            assert(scalar.registerExternalObject({s,s+1},s<8?60:93,true));
++        }
++        assert(runs.registerExternalSpan({4,5},4,60)&&runs.registerExternalSpan({8,9},4,93));
++        assert(runs.captureRevision()==scalar.captureRevision()&&runs.bindingRevision()==scalar.bindingRevision()&&rd==sd);
++        for(unsigned s=4;s<12;++s)assert(runs.externalRegistered({s,s+1})&&!runs.externalRegistered({s,s+2}));
++        const auto revision=runs.captureRevision();
++        assert(!runs.registerExternalSpan({4,5},1,60)&&!runs.registerExternalSpan({11,12},2,60)&&
++            runs.captureRevision()==revision);
++        unsigned n=0;
++        assert(runs.visitObjectRegistrationRange(4,12,93,[](auto,auto& f){f=0;return true;},
++            [&](auto h,int,auto){return h.slot==8+n++;})&&n==4);
++    }
+     preparedFamily();
+     {
+         downwell::NativeInstanceTable<8> registry(true);
+diff --git a/tests/core/RunnerObjectMembershipTest.cpp b/tests/core/RunnerObjectMembershipTest.cpp
+index 86d7cdf5..fc262460 100644
+--- a/tests/core/RunnerObjectMembershipTest.cpp
++++ b/tests/core/RunnerObjectMembershipTest.cpp
+@@ -5,6 +5,7 @@
+ #include <vector>
+ #include <algorithm>
+ #include <type_traits>
++#include <cassert>
+ static void require(bool ok,const char* message){if(!ok){std::cerr<<message<<'\n';std::exit(1);}}
+ template<bool Retained,bool Runs=false> void checkRegistry(){
+     using Registry=typename std::conditional<Runs,downwell::RunnerRunMembership<8,Retained?2:0,Retained?6:0>,
+@@ -146,6 +147,33 @@ template<bool Retained,bool Runs=false> void checkRegistry(){
+ int main(){
+     checkRegistry<false>();checkRegistry<true>();
+     checkRegistry<false,true>();checkRegistry<true,true>();
++    {
++        downwell::RunnerObjectMembership<128,8,120,93> scalar;
++        downwell::RunnerRunMembership<128,8,120,93> runs;
++        auto compare=[&]{
++            std::vector<unsigned> a,b;
++            const auto collect=[](auto& out){return [&](unsigned s,auto id,int object){
++                out.insert(out.end(),{s,id,unsigned(object)});return true;};};
++            assert(scalar.visitRegistrations(collect(a))&&runs.visitRegistrations(collect(b))&&a==b);
++            a.clear();b.clear();
++            assert(scalar.visitRetainedObjectRange(0,128,collect(a))&&runs.visitRetainedObjectRange(0,128,collect(b))&&a==b);
++            for(unsigned s=0;s<128;++s){std::uint32_t ai=0,bi=0;int ao=0,bo=0;
++                assert(scalar.read(s,ai,ao)==runs.read(s,bi,bo)&&ai==bi&&ao==bo);}
++        };
++        for(unsigned first=8;first<120;first+=8){
++            const int object=(first&8)?60:93;
++            assert(runs.bindFreshSpan(first,8,object,100+first));
++            for(unsigned s=first;s<first+8;++s)assert(scalar.bind(s,object,100+s));
++            compare();
++        }
++        assert(!runs.bindFreshSpan(8,1,60,200)&&!runs.bindFreshSpan(119,2,60,300));compare();
++        // Fragment every descriptor, then refill the holes with the other
++        // event family. Projection, identities and registration order survive.
++        for(unsigned s=8;s<120;s+=2){assert(scalar.unbind(s)&&runs.unbind(s));compare();}
++        for(unsigned s=8;s<120;s+=2){assert(scalar.bind(s,93,1000+s)&&runs.bindFreshSpan(s,1,93,1000+s));compare();}
++        for(unsigned s:{0u,127u}){assert(scalar.bind(s,35,s+1)&&runs.bind(s,35,s+1));compare();}
++        scalar.clear();runs.clear();compare();
++    }
+     {
+         // Exercise long runs, all split positions, re-registration order and
+         // identity arithmetic against the original scalar owner.
