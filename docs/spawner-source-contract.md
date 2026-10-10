@@ -144,6 +144,19 @@ Tests retain publication/failure prefixes and full RNG state, including child
 draws. `verify-red-ball-events.py` pins the reviewed Step and resource binding;
 these tests do not establish mixed-world dispatch or natural encounter fidelity.
 
+Red-ball/red-ball contact captures the caller's heading, consumes one
+`random_range(-20,20)` word, then assigns their sum through the direction
+setter. Player contact calls typical damage `(1,3,2)` without a stomp branch.
+Alarm 1 clears hit stun without a time-stop guard. Alarm 0 suppresses its
+moving-effect birth during time stop but always resets from retained
+`emitTimer`; the read follows the synchronous child when one is created.
+
+End Step first executes `scrOutofview` (view Y minus 160 / plus 3000, room 11
+only), then independently checks Y below view Y minus 124 in room 11.
+`instance_destroy` is deferred and does not abort the event. A far-above actor
+can consequently execute the destroy builtin twice, with fresh view/room
+reads between calls. The owner must retain the instance through that event.
+
 ### Target selection
 
 White-jelly Create reads `plx/ply`; ordinary Step reads `eplx/eply`.

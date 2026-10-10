@@ -148,6 +148,14 @@ all: $(TARGET)
 .PHONY: test-white-jelly-birth
 test: test-red-ball-birth
 test: test-red-ball-step
+test: test-red-ball-events
+.PHONY: test-red-ball-events
+test-red-ball-events: build/red-ball-events-test
+	./build/red-ball-events-test
+	python3 tools/verify-red-ball-events.py
+build/red-ball-events-test: tests/core/RedBallEventsTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/RedBallEventsTest.cpp src/core/GameMakerRandom.cpp
 .PHONY: test-red-ball-step
 test-red-ball-step: build/red-ball-step-test
 	./build/red-ball-step-test

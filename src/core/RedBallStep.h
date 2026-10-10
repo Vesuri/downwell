@@ -16,6 +16,46 @@ struct RedBallStep : RedBallBirth, CheckCollisionWithScript {
         RunnerImageValue request,accepted;
         if(!request.assign(wanted)||!ops.imageSpeed(request,accepted))return false;imageSpeed=accepted;return true;
     }
+    template<class Random,class Ops> bool enemyContact(Random& random,Ops& ops){
+        if(!initialized)return false;
+        Real wanted=direction,offset;
+        return randomBinary64(random.nextU32(),Real::fromInteger(40),offset)&&
+            offset.add(Real::fromInteger(-20))&&wanted.add(offset)&&setDirection(wanted,ops);
+    }
+    template<class Player> bool playerContact(Player& player){
+        return initialized&&player.damage(1,3,2); // No stomp/height branch.
+    }
+    bool hitStunAlarm(){if(!initialized)return false;hitStun=false;return true;}
+    template<class Random,class Ops> bool effectAlarm(bool stopped,Random& random,Ops& ops){
+        if(!initialized)return false;
+        if(!stopped){
+            Real angle;
+            if(!randomBinary64(random.nextU32(),Real::fromInteger(40),angle)||
+                !angle.add(Real::fromInteger(-20))||!angle.add(Real::fromInteger(90))||
+                !ops.movingFx(xx,yy,704,{0x3fb99999u,0x9999999au},angle,{0x3fe00000u,0}))return false;
+        }
+        // Read after the synchronous child; stopped alarms still reset.
+        return ops.effectAlarmReset(emitTimer);
+    }
+    template<class Ops> bool endStep(Ops& ops){
+        if(!initialized)return false;
+        Real boundary;int order;
+        if(!ops.viewY(boundary)||!boundary.add(Real::fromInteger(-160))||
+            !compareRunnerReal(y.promoted(),boundary,order))return false;
+        bool outside=order<0;
+        if(!outside){
+            if(!ops.viewY(boundary)||!boundary.add(Real::fromInteger(3000))||
+                !compareRunnerReal(y.promoted(),boundary,order))return false;
+            outside=order>0;
+        }
+        int room;
+        if(outside&&(!ops.room(room)||(room==11&&!ops.destroy())))return false;
+        // scrOutofview returns even after instance_destroy: execute the
+        // concrete event's additional upper bound and repeat the builtin call.
+        if(!ops.viewY(boundary)||!boundary.add(Real::fromInteger(-124))||
+            !compareRunnerReal(y.promoted(),boundary,order))return false;
+        return order>=0||(ops.room(room)&&(room!=11||ops.destroy()));
+    }
     template<class Ops> bool reflection(Real delta,bool subtract,Ops& ops){
         Real doubled,wanted=direction;
         return multiplyBinary64(delta,Real::fromInteger(2),doubled)&&
