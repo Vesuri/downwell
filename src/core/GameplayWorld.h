@@ -29,6 +29,7 @@
 #include "core/GameplayBuilderController.h"
 #include "core/GameplayPlayerControllers.h"
 #include "core/GameplayScattered.h"
+#include "core/GameplaySpawners.h"
 #include "core/RegisteredScatteredContact.h"
 #include "core/RunControllerInstances.h"
 #include "core/GameplayResultInstance.h"
@@ -482,6 +483,11 @@ public:
     const downwell::GameplayBuilderController* builderController()const{return builderController_;}
     const downwell::GameplayPlayerControllers* playerControllers()const{return playerControllers_;}
     const downwell::GameplayScattered* scattered()const{return scattered_;}
+    const downwell::GameplaySpawners* spawners()const{return spawners_;}
+    bool bindSpawners(downwell::GameplaySpawners& records){
+        if(spawners_||!records.valid()||records.size())return false;
+        spawners_=&records;return true;
+    }
     bool bindScattered(downwell::GameplayScattered& records){
         if(scattered_||!records.valid()||records.size())return false;
         scattered_=&records;return true;
@@ -1971,6 +1977,14 @@ public:
             return run_.effectsSucceeded=shop(command,allocate)&&run_.effectsSucceeded;
         if(command.objectId==306)return registerLevelExitWithSourceIds(command.y,
             [&](int object,unsigned& id){return allocate(object,id);});
+        if(command.objectId==78){
+            // The current run frontend admits normal cavern mode only.
+            if(!spawners_||run_.stage.area!=1||run_.stage.level<1||run_.stage.level>3)
+                return run_.effectsSucceeded=false;
+            unsigned id=0;downwell::InstanceHandle key;
+            return run_.effectsSucceeded=allocate(78,id)&&run_.effectsSucceeded&&
+                spawners_->createCaverns(id,command.x,command.y,run_.stage.level,false,key);
+        }
         const bool wall=command.objectId==60||command.objectId==93||command.objectId==99;
         const bool enemy=downwell::enemyCreateProfile(command.objectId).health!=0;
         if(!wall&&!enemy&&command.objectId!=92&&command.objectId!=82&&command.objectId!=62&&command.objectId!=289)
@@ -2455,6 +2469,7 @@ private:
     downwell::GameplayBuilderController* builderController_=nullptr;
     downwell::GameplayPlayerControllers* playerControllers_=nullptr;
     downwell::GameplayScattered* scattered_=nullptr;
+    downwell::GameplaySpawners* spawners_=nullptr;
     RunControllers* runControllers_=nullptr;
     downwell::GameplayResultInstance* resultInstance_=nullptr;
     LevelNumbers* levelNumbers_=nullptr;

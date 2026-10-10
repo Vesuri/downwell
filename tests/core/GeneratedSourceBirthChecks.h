@@ -259,8 +259,33 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             world->randomDrawCount()==afterBreak&&next==850016);
         assert(owner->stepRegisteredScattered(shared,11,MotionBinary64::fromInteger(900),childId,queries,environment,audio));
         assert(store->find(local)->destroyRequested&&owner->prepareDraw()&&!store->find(local));
+        world->confirmFirstStage();
+        const auto spawnerId=next;const auto beforeSpawner=world->randomState();
+        assert(world->createGeneratedInstanceWithSourceIds({78,-116,704},objects,allocate,backend,noShop));
+        auto& spawners=owner->spawners();const auto spawnerKey=spawners.handle(0);
+        const auto* spawner=spawners.find(spawnerKey);
+        assert(spawner&&spawner->sourceId==spawnerId&&next==spawnerId+1&&births.back()==78&&
+            spawner->initialized&&spawner->active&&!spawner->state.scriptActive&&
+            spawner->state.channelCount==1&&spawner->state.channels[0].enemies[0]==115);
+        int spawnerX,spawnerY;
+        assert(spawner->x.roundPixel(spawnerX)&&spawner->y.roundPixel(spawnerY)&&spawnerX==-116&&spawnerY==704);
+        assert(world->randomState().stateIndex()==beforeSpawner.stateIndex()&&
+            world->randomDrawCount()==beforeSpawner.drawCount());
+        for(unsigned word=0;word<16;++word)assert(world->randomState().stateWord(word)==beforeSpawner.stateWord(word));
+        InstanceHandle spawnerShared;GameplayCollisionView::Record borrowed;
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::spawner,spawnerKey,spawnerShared)&&
+            GameplayCollisionView(*world).resolve(spawnerShared,borrowed)&&borrowed.spawner==spawner);
+        assert(spawners.mask(spawnerKey,174)&&owner->prepareDraw());
+        assert(spawners.markDestroyed(spawnerKey)&&owner->prepareDraw()&&!spawners.find(spawnerKey)&&
+            !GameplayCollisionView(*world).contains(spawnerShared));
+        assert(world->createGeneratedInstanceWithSourceIds({78,-116,800},objects,allocate,backend,noShop));
+        const auto replacement=spawners.handle(0);
+        assert(replacement.slot==spawnerKey.slot&&replacement.generation!=spawnerKey.generation&&
+            spawners.find(replacement)->sourceId==spawnerId+1);
         assert(world->restartFromResults(DeathMenuSequence::Action::Retry,2,300)!=ResultsDestination::none&&
             world->scattered()==store&&!store->find(local)&&!GameplayCollisionView(*world).contains(shared));
+        assert(world->spawners()==&spawners&&!spawners.size()&&!spawners.find(spawnerKey)&&
+            !GameplayCollisionView(*world).contains(spawnerShared));
     }
     for(unsigned failure=0;failure<5;++failure){
         auto world=std::make_unique<GameplayWorld>(300,false,1000,false);
