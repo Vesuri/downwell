@@ -123,6 +123,27 @@ published. This is not the white-jelly Create with different health values.
 an instance ID, register a lifetime or supply Step/contact/Draw scheduling.
 `verify-enemy-create.py` pins metadata and the reviewed instruction streams.
 
+### Red-ball ordinary Step
+
+Code 1247 is implemented by `RedBallStep`; lifetime registration and event
+scheduling remain separate. Hit stun changes the sprite and alarm but does
+not suppress steering/movement. Acceleration invokes `scrInView(0,0,0)` only
+when within the steering cone and below maximum speed. The collision helper
+publishes its retained collision variables, then X reflection is applied and
+read back through the direction setter before calculating Y reflection.
+Keep the unsimplified source arithmetic at both writes: normalizing only once
+after both reflections changes intermediate observations. Facing changes only
+when the surviving X speed is nonzero under the VM comparison.
+
+Time stop zeroes image speed and skips movement, but not death. Death runs
+bookkeeping, four moving-effect births, flash, currency, sound 125 and destroy;
+unlike the jelly it does not emit the separate smoke call. Each moving effect
+draws speed, angle, then image rate and completes synchronous Create before
+the next iteration. Sprite 703/702 is still assigned after destruction.
+Tests retain publication/failure prefixes and full RNG state, including child
+draws. `verify-red-ball-events.py` pins the reviewed Step and resource binding;
+these tests do not establish mixed-world dispatch or natural encounter fidelity.
+
 ### Target selection
 
 White-jelly Create reads `plx/ply`; ordinary Step reads `eplx/eply`.
