@@ -44,6 +44,12 @@ behavior, both backend integrations and relevant original-game verification.
   workload and behavior checks before/after, preserving hardware scrolling,
   offline assets and native terrain ownership. Do not resume micro-optimization
   sweeps, duplicate simulation passes or reference-only performance modes.
+- Reduce executable and static-memory growth at its owning structures: audit
+  linked collision/query machinery, embedded resource/mask banks and full-height
+  terrain caches. Account separately for Hunk code/data/relocations, zero-filled
+  BSS and dynamic Chip allocations. Loading assets from files reduces executable
+  size only; prove residency savings separately. Preserve the portable/reference
+  oracle without requiring all of its machinery in the shipping native binary.
 - Close this goal only with a normally runnable build, repeatable measured
   baseline, explained/resolved recent regressions and meaningful startup failure
   codes. Retain any remaining absolute 20 ms shortfall explicitly in section 5;
