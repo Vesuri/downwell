@@ -41,8 +41,10 @@ behavior, both backend integrations and relevant original-game verification.
   generation handles for serialized bindings and global lookup order.
   Supply the native generator's source-creation scope from the complete startup
   stream, including spawner 78 and concrete shop ownership. Complete registered
-  Scattered16 (289) Step, contacts, destruction rewards and Draw admission;
-  its source-ID-bearing Create state alone is not a complete scenery actor.
+  Scattered16 (289) mixed Step/contact/Draw admission and the stored-world
+  adapters. Supply the registered destruction adapter with the complete native
+  allocation stream and real view, tile, audio and settings inputs; explicit
+  registered Step tests are not natural scenery encounters.
   Include player-created depth meter/camera/entry-dither and conditional
   companion births in the native creation stream, not just visible actors;
   finish the stored companions' event/render integration as well as native

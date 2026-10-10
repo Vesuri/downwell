@@ -65,7 +65,7 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
     }
     {
         GameplayScattered::Record state;RandomAudit random;ScatteredEffects effects{random};
-        for(auto speed:{MotionBinary64{},MotionBinary64::fromInteger(-1)}){
+        for(auto speed:{MotionBinary64{},MotionBinary64::fromInteger(-1),MotionBinary64{0x3e700000u,0}}){
             effects.speed=speed;random.order.clear();
             assert(ScatteredEvents::playerContact(state,random,effects)&&state.objHp==1);
             assert((random.order==std::vector<int>{8}));
@@ -168,6 +168,44 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             world->randomDrawCount()==beforeScenery&&
             GameplayCollisionView::encode(GameplayCollisionView::Kind::scattered,local,shared)&&
             GameplayCollisionView(*world).contains(shared));
+        struct Queries {
+            unsigned walls=0,tiles=0;
+            bool wall(InstanceHandle,MotionBinary64,MotionBinary64,bool& hit){++walls;hit=false;return true;}
+            bool tile(InstanceHandle,int depth,MotionBinary64,MotionBinary64,bool& hit){assert(depth==100);++tiles;hit=false;return true;}
+        } queries;
+        struct Audio {
+            std::vector<int> calls;int sound=-1;
+            bool isPlaying(int id,bool& playing){sound=id;calls.push_back(1);playing=false;return true;}
+            bool stop(int){assert(false);return false;}
+            bool play(int id,int priority,bool loop,int& voice){assert(id==sound&&priority==50&&!loop);calls.push_back(2);voice=123;return true;}
+            bool getGain(int id,MotionBinary64& gain){assert(id==123);calls.push_back(3);gain=MotionBinary64::fromInteger(1);return true;}
+            bool setGain(int id,MotionBinary64 gain,int time){assert(id==123&&gain.high==0x3ff00000u&&!time);calls.push_back(4);return true;}
+            bool setPitch(int id,MotionBinary64 pitch){assert(id==123&&pitch.high==0x3ff00000u);calls.push_back(5);return true;}
+        } audio;
+        SoundPlayEnvironment environment;
+        auto childId=[&](std::uint32_t& id){id=next++;return true;};
+        assert(owner->scattered().dispatch(local,[](auto& r){r.objHp=0;r.stomped=1;return true;}));
+        assert(owner->stepRegisteredScattered(shared,11,MotionBinary64::fromInteger(600),childId,queries,environment,audio));
+        actor=store->find(local);
+        assert(actor&&actor->spriteId==551&&actor->maskId==550&&actor->imageIndex.bits==0x41800000u&&
+            !actor->scriptActive&&actor->active&&actor->reward.myGem==850013&&next==850016);
+        assert((audio.calls==std::vector<int>{1,2,3,4,5})&&audio.sound>=171&&audio.sound<=174);
+        const auto* gem=world->currencyInstances()->find(world->currencyInstances()->handleForSourceId(actor->reward.myGem));
+        assert(gem&&gem->state.attracted&&gem->state.getAmount==2&&queries.walls==1&&queries.tiles==1);
+        unsigned debrisCount=0;
+        for(unsigned slot=0;slot<GameplayDebrisInstances::capacity;++slot){
+            for(unsigned generation=1;generation<=2;++generation){
+                const auto* d=world->debrisInstances()->find({slot,generation});
+                if(!d)continue;++debrisCount;
+                assert(d->sourceId==850013+generation&&d->effect->ysp.high==0xbfe00000u&&!d->effect->ysp.low);
+            }
+        }
+        assert(debrisCount==2);
+        const auto afterBreak=world->randomDrawCount();
+        assert(owner->stepRegisteredScattered(shared,11,MotionBinary64::fromInteger(600),childId,queries,environment,audio)&&
+            world->randomDrawCount()==afterBreak&&next==850016);
+        assert(owner->stepRegisteredScattered(shared,11,MotionBinary64::fromInteger(900),childId,queries,environment,audio));
+        assert(store->find(local)->destroyRequested&&owner->prepareDraw()&&!store->find(local));
         assert(world->restartFromResults(DeathMenuSequence::Action::Retry,2,300)!=ResultsDestination::none&&
             world->scattered()==store&&!store->find(local)&&!GameplayCollisionView(*world).contains(shared));
     }

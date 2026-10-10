@@ -1,6 +1,6 @@
 #ifndef DOWNWELL_CORE_SCATTERED_EVENTS_H
 #define DOWNWELL_CORE_SCATTERED_EVENTS_H
-#include "MotionBinary64.h"
+#include "RunnerRealComparison.h"
 namespace downwell {
 // Object 289's VM events. The caller owns synchronous child creation, queries,
 // setter publication and audio. In particular currency() must retain myGem;
@@ -31,7 +31,9 @@ struct ScatteredEvents {
         if(!s.scriptActive)return true;
         MotionBinary64 speed;
         if(!effects.playerYSpeed(speed)||!speed.valid())return false;
-        if(speed.zero()||(speed.high&0x80000000u))return true;
+        int order;
+        if(!compareRunnerReal(speed,{},order))return false;
+        if(order<=0)return true;
         s.objHp=0;s.stomped=1;
         int style;
         if(!effects.playStyle(style))return false;

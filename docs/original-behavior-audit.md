@@ -623,9 +623,8 @@ owner retains the builder's chosen scale/frame without repeating RNG. It
 publishes birth, image index zero, X scale, sprite 550, mask 550 and the chosen
 image index in Create order; inherited shootable state precedes the child's
 hitEffect=1. Numeric identity joins the resource-backed room/layer/spatial
-owner and lifetime generations survive Retry. Its ordinary Step, player/bullet
-contacts, reward/debris sequence and mixed Draw admission are still separate
-requirements; creation ownership alone does not admit a complete scenery actor.
+owner and lifetime generations survive Retry. Creation ownership alone does
+not admit a complete scenery actor.
 
 The Scattered16 Step calls out-of-view destruction before its health/active
 test, without returning after that call. On break it creates currency (2),
@@ -638,6 +637,16 @@ with 1.5 for style 2 or 2.5 otherwise, shakes (2,4), then optionally creates
 Exploding Knees blast 276 before choosing its sound 91–93. Alarm 0 clears
 hitStun. `ScatteredEvents` preserves these event boundaries; its effect adapter
 must perform real source-ordered child births and setter publication.
+
+`GameplayWorld::stepRegisteredScattered` composes that Step with registered
+currency and published debris creation, retaining reward/script-sound fields
+on the caller. It requests each child ID from the borrowed room cursor at the
+birth boundary. Sprite and deferred-destruction publication use the scenery
+lifecycle binding; the room cleanup retires the marked record. Native and
+reference collision-owner tests cover this chain, but do not establish normal
+scene admission or the stored SDL adapter. Player velocity comparison uses the
+runner's real-comparison epsilon, including tiny positive speeds that compare
+equal to zero.
 
 `registerLevelExitWithSourceIds` supplies that boundary for the exit chain:
 306 is allocated and registered before its Create; 74 and 255 each request

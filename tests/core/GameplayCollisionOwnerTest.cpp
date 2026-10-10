@@ -102,6 +102,11 @@ struct NativeSkeletonRewardQueries {
     bool wall(downwell::InstanceHandle,downwell::MotionBinary64,downwell::MotionBinary64,bool&);
     bool tile(downwell::InstanceHandle,int,downwell::MotionBinary64,downwell::MotionBinary64,bool&);
 };
+bool nativeRegisteredScatteredStep(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle key,
+    bool (*allocate)(std::uint32_t&),NativeSkeletonRewardQueries& queries,
+    downwell::SoundPlayEnvironment& environment,NativeSkeletonAudio& audio){
+    return owner.stepRegisteredScattered(key,11,downwell::MotionBinary64::fromInteger(600),allocate,queries,environment,audio);
+}
 bool nativeSkeletonReward(GameplayWorld& world,const downwell::ObjectPack& objects,
     downwell::SkeletonActor& actor,bool (*allocate)(std::uint32_t&),NativeSkeletonRewardQueries& queries){
     return world.emitSkeletonCurrency(objects,actor,allocate,queries);

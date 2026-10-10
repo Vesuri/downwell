@@ -485,6 +485,70 @@ public:
         if(scattered_||!records.valid()||records.size())return false;
         scattered_=&records;return true;
     }
+    // Room dispatch supplies the current view/room and the shared numeric-ID
+    // cursor. These are real registered emissions, not the legacy effect pools.
+    template<class Allocate,class Queries,class Audio>
+    bool stepRegisteredScattered(downwell::InstanceHandle key,const downwell::ObjectPack& objects,
+        int room,downwell::MotionBinary64 viewY,Allocate& allocate,Queries& queries,
+        downwell::SoundPlayEnvironment& environment,Audio& audio){
+        if(!run_.effectsSucceeded||!scattered_||!scattered_->find(key))return run_.effectsSucceeded=false;
+        struct Effects {
+            GameplayWorld& world;downwell::GameplayScattered& store;downwell::InstanceHandle key;
+            const downwell::ObjectPack& objects;int room;downwell::MotionBinary64 view;
+            Allocate& allocate;Queries& queries;downwell::SoundPlayEnvironment& environment;Audio& audio;
+            downwell::InstanceHandle debris{};
+            bool outOfView(){
+                const auto* r=store.find(key);if(!r)return false;
+                auto top=view,bottom=view;int order;
+                if(!top.add(downwell::MotionBinary64::fromInteger(-160))||
+                   !downwell::compareRunnerReal(r->y.promoted(),top,order))return false;
+                bool outside=order<0;
+                if(!outside){
+                    if(!bottom.add(downwell::MotionBinary64::fromInteger(3000))||
+                       !downwell::compareRunnerReal(r->y.promoted(),bottom,order))return false;
+                    outside=order>0;
+                }
+                return !outside||room!=11||store.markDestroyed(key);
+            }
+            bool currency(int amount){
+                return world.spawnRegisteredCurrency(objects,[&](auto& out){
+                    const auto* r=store.find(key);if(!r)return false;
+                    out.x=r->x.promoted();out.y=r->y.promoted();out.objectIndex=289;
+                    out.stomped=downwell::MotionBinary64::fromInteger(r->stomped);
+                    out.moniAmount=r->reward.moniAmount;out.atrState=r->reward.atrState;
+                    out.myGem=r->reward.myGem;return true;
+                },[&](auto value){return store.dispatch(key,[&](auto& r){r.reward.moniAmount=value;return true;});},
+                [&](bool value){return store.dispatch(key,[&](auto& r){r.reward.atrState=value;return true;});},
+                [&](std::uint32_t value){return store.dispatch(key,[&](auto& r){r.reward.myGem=value;return true;});},
+                downwell::MotionBinary64::fromInteger(amount),[&](std::uint32_t& id){return allocate(id);},queries);
+            }
+            bool attractGem(){
+                const auto* r=store.find(key);if(!r||!world.currencyInstances_)return false;
+                return world.currencyInstances_->dispatch(world.currencyInstances_->handleForSourceId(r->reward.myGem),
+                    [](auto& state,bool&){state.attracted=true;return true;});
+            }
+            bool createDebris(){
+                std::uint32_t id=0;if(!allocate(id))return false;
+                const auto* r=store.find(key);
+                return r&&world.spawnDebrisWithSourceId(id,r->x.promoted(),r->y.promoted(),world.run_.stage.area,debris);
+            }
+            bool debrisYSpeed(downwell::MotionBinary64 value){
+                const auto* r=world.debrisInstances_?world.debrisInstances_->find(debris):nullptr;
+                auto* effect=r?world.ownedDebrisEffects_.get(r->lifetimeId):nullptr;
+                if(!effect||r->effect!=effect||!value.valid())return false;
+                effect->ysp=value;return true;
+            }
+            bool sound(int id,int priority,int loop,int cut){
+                return store.dispatch(key,[&](auto& r){
+                    int voice;environment.y=r.y.promoted();
+                    return downwell::SoundPlayScript::plain(r.sound,environment,audio,id,priority,loop!=0,cut!=0,
+                        voice,world.run_.effectsSucceeded);
+                });
+            }
+            bool sprite(int id){return store.sprite(key,id);}
+        } effects{*this,*scattered_,key,objects,room,viewY,allocate,queries,environment,audio};
+        return run_.effectsSucceeded=scattered_->step(key,enemyRandom_,effects)&&run_.effectsSucceeded;
+    }
     using RunControllers=downwell::RunControllerInstances<4>;
     const downwell::GameplayResultInstance* resultInstance()const{return resultInstance_;}
     bool bindResultInstance(downwell::GameplayResultInstance& instance){

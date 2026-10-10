@@ -3,6 +3,8 @@
 #include "InstanceLifecycle.h"
 #include "DeferredInstanceQueue.h"
 #include "ScatteredEvents.h"
+#include "CurrencyRewardFields.h"
+#include "SoundPlayScript.h"
 namespace downwell {
 // Scattered16 (289), a shootable/stompable scenery actor, not objSpike_n.
 // Builder adoption must not repeat its already-consumed Create RNG.
@@ -15,6 +17,8 @@ public:
         int spriteId=550,maskId=-1;
         int objHp=1,hit=0,hitStun=0,hitEffect=0,stomped=0,scriptActive=1,scatterType=0;
         int breakSound=0;
+        CurrencyRewardFields reward{};
+        SoundPlayState sound{};
         bool active=true,destroyRequested=false,initialized=false;
     };
     using Binding=RecordLifecycleBinding<Record>;
@@ -36,6 +40,25 @@ public:
     bool alarm0(InstanceHandle h){
         if(!good_||!find(h))return fail();
         ScatteredEvents::alarm0(records_[h.slot]);return true;
+    }
+    template<class F> bool dispatch(InstanceHandle h,F f){
+        if(!good_||!find(h))return fail();
+        return f(records_[h.slot])||fail();
+    }
+    bool sprite(InstanceHandle h,int value){
+        if(!good_||!find(h)||!binding_.sprite(h,records_[h.slot],value))return fail();
+        records_[h.slot].spriteId=value;return true;
+    }
+    bool markDestroyed(InstanceHandle h){
+        if(!good_||!find(h))return fail();
+        auto& r=records_[h.slot];if(r.destroyRequested)return true;
+        if(!binding_.markDestroyed(h,r))return fail();
+        r.destroyRequested=true;return true;
+    }
+    bool retireMarked(InstanceHandle h){
+        if(!good_||!find(h)||!records_[h.slot].destroyRequested||
+           !binding_.retire(h,records_[h.slot]))return fail();
+        records_[h.slot]={};--count_;return true;
     }
     bool adopt(unsigned source,const DeferredCreateInstance& command){
         if(!good_||!next_||count_==capacity||!source||source>0x7fffffffu||command.objectId!=289||

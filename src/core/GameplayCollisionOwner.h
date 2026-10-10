@@ -2107,6 +2107,7 @@ public:
     GameplayWorld::DroneBullets& droneBullets(){return drones_;}
     GameplayWorld::Bones& bones(){return bones_;}
     GameplayWorld::Skeletons& skeletons(){return skeletons_;}
+    GameplayScattered& scattered(){return scattered_;}
     GameplayWorld::Blood& blood(){return blood_;}
     GameplayWorld::Currency& currency(){return currency_;}
     // Selected code 991 destroys OTHER, not the dither. Pair collection and
@@ -2396,6 +2397,14 @@ public:
         if(!valid()||!world_||!View::decode(shared,kind,local)||kind!=View::Kind::skeleton||
            !resolves(shared))return check(false);
         return check(world_->stepSkeletonRoomEffect(local,stop,makeEffects));
+    }
+    template<class Allocate,class Queries,class Audio>
+    bool stepRegisteredScattered(InstanceHandle shared,int room,MotionBinary64 viewY,
+        Allocate& allocate,Queries& queries,SoundPlayEnvironment& environment,Audio& audio){
+        View::Kind kind;InstanceHandle local;
+        if(!valid()||!world_||!View::decode(shared,kind,local)||kind!=View::Kind::scattered||
+           !resolves(shared))return check(false);
+        return check(world_->stepRegisteredScattered(local,objects_,room,viewY,allocate,queries,environment,audio));
     }
     template<class MakeEffects> bool stepSkeleton(InstanceHandle shared,bool stopped,
         MotionBinary64 playerX,MotionBinary64 playerY,MakeEffects makeEffects){
@@ -3673,6 +3682,7 @@ private:
                 case View::Kind::consumptionBlood:return record.consumptionBlood&&consumption_.retire(local);
                 case View::Kind::currency:return record.currency&&currency_.retire(local);
                 case View::Kind::playerController:return record.playerController&&playerControllers_.retire(local);
+                case View::Kind::scattered:return record.scattered&&scattered_.retireMarked(local);
                 default:return false;
             }
         });
