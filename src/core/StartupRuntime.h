@@ -563,6 +563,66 @@ public:
         return run_.effectsSucceeded=run_.effectsSucceeded&&ok&&owner.valid();
     }
     bool spawnWhiteJelly(int x,int y,InstanceHandle& key);
+    template<unsigned Capacity,class Queries,class MakeEnvironment,class ReadStop,class Tick>
+    bool withRegisteredWhiteJellyEvents(StoredWhiteJellyStates<instanceCapacity,Capacity>& owner,Queries& queries,
+        MakeEnvironment makeEnvironment,ReadStop readStop,Tick tick){
+        if(!queries.boundTo(*this))return run_.effectsSucceeded=false;
+        return withWhiteJellyEvents(owner,[&](InstanceHandle key){
+            auto external=makeEnvironment(key);
+            struct Ops : decltype(external) {
+                StartupRuntime& world;Queries& queries;InstanceHandle key;
+                Ops(decltype(external) value,StartupRuntime& runtime,Queries& collision,InstanceHandle h)
+                    :decltype(external)(value),world(runtime),queries(collision),key(h){}
+                InstanceRecord* record(){
+                    auto* r=world.instances_.resolve(key);return r&&r->objectId==115?r:nullptr;
+                }
+                bool position(bool vertical,RunnerImageValue value,RunnerImageValue& accepted){
+                    auto* r=record();if(!r)return false;
+                    RunnerImageValue x,y;std::memcpy(&x.bits,&r->preciseX,4);std::memcpy(&y.bits,&r->preciseY,4);
+                    if(vertical)y=value;else x=value;
+                    if(!world.publishCollisionPosition(key,x,y)||(r=record())==nullptr)return false;
+                    std::memcpy(&r->preciseX,&x.bits,4);std::memcpy(&r->preciseY,&y.bits,4);
+                    accepted=vertical?y:x;return true;
+                }
+                bool player(bool vertical,MotionBinary64& value){
+                    MotionBinary64 x,y;
+                    if(!world.mainPlayerInitialized_||world.roomId_!=mainRoomId||
+                        !ContactCoordinates::playerGlobals(world.mainPlayerMotion_.frameStartXFixed(),
+                            world.mainPlayerMotion_.frameStartYFixed(),world.mainPlayerOriginX_,world.mainPlayerOriginY_,x,y))return false;
+                    value=vertical?y:x;return true;
+                }
+                bool playerX(MotionBinary64& value){return player(false,value);}
+                bool playerY(MotionBinary64& value){return player(true,value);}
+                bool imageSpeed(RunnerImageValue value,RunnerImageValue& accepted){
+                    auto* r=record();if(!r||!value.promoted().valid())return false;
+                    std::memcpy(&r->imageSpeed,&value.bits,4);accepted=value;return true;
+                }
+                bool imageIndex(int value){
+                    auto* r=record();RunnerImageValue index;
+                    if(!r||!index.assignInteger(value)||!world.lifecycle_.imageIndex(key,*r,index))return false;
+                    std::memcpy(&r->imageIndex,&index.bits,4);return true;
+                }
+                bool sprite(int value){
+                    auto* r=record();if(!r||!world.lifecycle_.sprite(key,*r,value))return false;
+                    r->spriteId=value;return true;
+                }
+                bool alarm(int number,int value){
+                    auto* r=record();if(!r||number<0||number>=int(AlarmBank::count))return false;
+                    r->alarms.set(unsigned(number),value);return true;
+                }
+                bool meeting(MotionBinary64 x,MotionBinary64 y,int object,bool& hit){
+                    const auto* r=record();return r&&queries.placeMeeting(key,*r,object,x,y,hit);
+                }
+                bool destroy(){
+                    auto* r=record();if(!r)return false;
+                    if(r->destroyRequested)return true;
+                    if(!world.lifecycle_.markDestroyed(key,*r))return false;
+                    r->destroyRequested=true;return true;
+                }
+            };
+            return Ops{external,*this,queries,key};
+        },readStop,tick);
+    }
     // Spawner grids are integral world coordinates. Preserve synchronous
     // Create and the room-wide numeric allocator before returning the child
     // ID; unsupported channel families must not become generic room records.

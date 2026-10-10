@@ -266,6 +266,55 @@ int main(){
         for(unsigned i=0;i<world->activeInstanceCount();++i)
             require(world->instanceAt(i).objectId!=115,"missing jelly Create scope cannot publish an uninitialized child");
     }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach natural jelly birth world");world->skipToGameForTesting();
+        auto jellies=world->whiteJellyStates<2>();unsigned childId=0,stopReads=0,directions=0;
+        // Steering math remains a controlled provider in this creation-order
+        // test. All room globals, builtin publication and lifetimes are real.
+        struct JellyEnvironment {
+            using N=MotionBinary64;
+            unsigned& directions;
+            bool pointDirection(N,N,N,N,N& value){++directions;value=N::fromInteger(90);return true;}
+            bool direction(N value,N& accepted){accepted=value;return true;}
+            bool enemyPlayerX(N&){return false;}bool enemyPlayerY(N&){return false;}
+            bool lengthdir(bool,N,N,N&){return false;}
+            bool sound(int,int,int,int,const char*){return false;}
+            bool enemyDeath(){return false;}bool smoke(N,N,int,int){return false;}
+            bool movingFx(N,N,int,N,N,N){return false;}bool flash(N,N,int,int,int){return false;}
+            bool currency(int){return false;}bool viewY(N&){return false;}bool room(int&){return false;}
+            bool emitTimer(N&){return false;}bool effectAlarmReset(N){return false;}
+        };
+        struct SpawnerEnvironment {
+            StartupRuntime& world;
+            bool viewY(MotionBinary64& value){value=MotionBinary64::fromInteger(world.mainCameraRenderViewY());return true;}
+            bool viewHeight(MotionBinary64& value){value=MotionBinary64::fromInteger(world.cameraViewHeight());return true;}
+            bool tile(int depth,MotionBinary64 x,MotionBinary64 y,bool& hit){return depth==100&&world.wallBackgroundTiles().contains(x,y,hit);}
+        };
+        for(unsigned frame=0;frame<1200&&!childId;++frame){
+            require(world->withRegisteredWhiteJellyEvents(jellies,*owner,[&](InstanceHandle){return JellyEnvironment{directions};},
+                [&](bool&){++stopReads;return false;},[&]{
+                    return world->withRegisteredSpawnerEvents(*owner,[&](InstanceHandle){return SpawnerEnvironment{*world};},[&]{
+                        world->step(gameplayContactProfileInput(frame,world->mainPlayerX(),world->mainPlayerY()),false);
+                        return world->effectsSucceeded();
+                    });
+                }),"natural spawner completes registered child Create and deactivation in one event");
+            for(unsigned i=0;i<world->activeInstanceCount();++i){
+                const auto& r=world->instanceAt(i);if(r.objectId!=115)continue;
+                require(!childId,"single natural level-one channel birth");childId=r.instanceId;
+                const auto* state=jellies.state(childId);RunnerImageValue x,y,speed;
+                std::memcpy(&speed.bits,&r.imageSpeed,4);
+                require(state&&state->initialized&&state->scriptActive&&!r.active&&r.activationPending&&
+                    speed.bits==0x3e4ccccdu&&r.imageIndex==0&&directions==1&&stopReads==0,
+                    "child Create precedes dormant publication; no same-frame child Step or animation");
+                require(owner->collisionPosition(world->instanceHandleAt(i),x,y)&&
+                    x.bits==state->x.bits&&y.bits==state->y.bits&&r.preciseX==float(r.x)&&r.preciseY==float(r.y),
+                    "jelly builtin coordinates agree with its registered collision state");
+            }
+        }
+        require(childId&&world->effectsSucceeded(),"natural spawner produces a fully initialized owned jelly lifetime");
+    }
     for(unsigned failure=0;failure<=5;++failure){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
