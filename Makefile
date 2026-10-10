@@ -149,6 +149,14 @@ all: $(TARGET)
 test: test-red-ball-birth
 test: test-red-ball-step
 test: test-red-ball-events
+test: test-red-ball-draw
+.PHONY: test-red-ball-draw
+test-red-ball-draw: build/red-ball-draw-test
+	./build/red-ball-draw-test
+	python3 tools/verify-red-ball-events.py
+build/red-ball-draw-test: tests/core/RedBallDrawTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/RedBallDrawTest.cpp
 .PHONY: test-red-ball-events
 test-red-ball-events: build/red-ball-events-test
 	./build/red-ball-events-test

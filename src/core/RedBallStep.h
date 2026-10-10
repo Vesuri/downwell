@@ -8,6 +8,32 @@ namespace downwell {
 // this state machine alone does not admit the family into a live scheduler.
 struct RedBallStep : RedBallBirth, CheckCollisionWithScript {
     Real directionDifference{};
+    int eye=0,eyeX=0,shotDirection=0;
+    bool eyeInitialized=false;
+    template<class Ops> bool draw(Ops& ops){
+        if(!initialized||!ops.shade()||!ops.drawSelf())return false;
+        static constexpr int sprites[]={182,184,185,184,182,183,181,183,182};
+        static constexpr int mirrors[]={1,1,1,-1,-1,-1,-1,1,1};
+        static constexpr int shots[]={0,45,90,135,180,225,270,315,0};
+        for(unsigned row=0;row<9;++row){
+            Real lower{},upper;int order;
+            if(row&&!multiplyBinary64(angle16,Real::fromInteger(int(row*2-1)),lower))return false;
+            if(!compareRunnerReal(playerDirection,lower,order))return false;
+            if(order<0)continue;
+            if(!multiplyBinary64(angle16,Real::fromInteger(row==8?16:int(row*2+1)),upper)||
+                (row==8&&!upper.add(Real::fromInteger(-1)))||
+                !compareRunnerReal(playerDirection,upper,order))return false;
+            if(order<0){eye=sprites[row];eyeX=mirrors[row];shotDirection=shots[row];eyeInitialized=true;break;}
+        }
+        // The last interval ends at 359, not 360. No matching interval keeps
+        // prior eye fields; do not invent them if this is the first Draw.
+        if(!eyeInitialized)return false;
+        const int mirror=eyeX;Real drawY=y.promoted();
+        if(!drawY.add(Real::fromInteger(-5)))return false;
+        const Real drawX=x.promoted();Real frame;
+        if(!ops.imageIndex(frame))return false;
+        return ops.drawSpriteExt(eye,frame,drawX,drawY,mirror,1,0,0xffffffu,1);
+    }
     static Real negative(Real value){value.high^=0x80000000u;return value;}
     template<class Ops> bool setDirection(Real wanted,Ops& ops){
         Real accepted;if(!ops.direction(wanted,accepted))return false;direction=accepted;return true;

@@ -157,6 +157,17 @@ only), then independently checks Y below view Y minus 124 in room 11.
 can consequently execute the destroy builtin twice, with fresh view/room
 reads between calls. The owner must retain the instance through that event.
 
+Red-ball Draw calls shade then body, before assigning `eye`, `eyex` and
+`shotDir` from `playerDir` sectors. The boundaries are expressions of retained
+`ang16`, compared with VM epsilon, not rounded angle indices. The last upper
+bound is `ang16*16-1` (359 for the Create value); if no sector matches, prior
+eye fields survive. Neither concrete nor inherited Create initializes those
+fields. A first Draw in the uncovered range is therefore unsupported by the
+port until a real value exists; do not synthesize a default eye or claim this
+models an original missing-variable diagnostic. The eye is drawn after the
+body at builtin `(x,y-5)`, using current image index and selected horizontal
+mirror, with unit Y scale, zero rotation, white tint and full opacity.
+
 ### Target selection
 
 White-jelly Create reads `plx/ply`; ordinary Step reads `eplx/eply`.
