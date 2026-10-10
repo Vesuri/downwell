@@ -30,8 +30,10 @@ behavior, both backend integrations and relevant original-game verification.
 ## 0. Restore a runnable, measured A500 baseline
 
 - Enforce scene/level-local residency and execution before adding content:
-  1. Replace permanently resident gameplay/room/collision-mask catalogues with
-     explicit scene/level dependencies. Include reachable spawns, persistent
+  1. Replace permanently resident gameplay/room catalogues and SDL collision
+     masks with explicit scene/level dependencies. New native mask consumers
+     must use those dependencies, not link the full reference mask catalogue.
+     Include reachable spawns, persistent
      objects, nested Create/Draw dependencies and transition overlap; fail on
      undeclared resources rather than falling back to all assets. Apply the
      same dependency declarations to SDL texture/audio residency. Prove peak

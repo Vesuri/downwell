@@ -531,6 +531,10 @@ CPPFLAGS := $(CFLAGS) -x c++ -std=gnu++17 -fno-rtti -fno-exceptions \
 	-fno-use-cxa-atexit -DDOWNWELL_FREESTANDING \
 	-I$(AMIGA_SRC)/compat -I$(REPO)/src
 ASFLAGS := -mcpu=68000 -g --register-prefix-optional -I"$(SDKDIR)" -I"$(CURDIR)"
+ifneq ($(findstring -DDOWNWELL_SCENE_VERIFY,$(CFLAGS)),)
+ASFLAGS += --defsym DOWNWELL_REFERENCE_COLLISION_MASKS=1
+REFERENCE_COLLISION_MASK_INPUT := $(REPO)/generated/downwell-sprite-masks.dwsm
+endif
 # Pixel verifiers retain linked source bytes as an independent load oracle.
 # Shipping/profiling executables must never link these transient scene banks.
 ifneq ($(findstring VERIFY,$(CFLAGS)),)
@@ -1012,7 +1016,7 @@ $(AMIGA_EFFECT_STAMPS): $(AMIGA_GAME) $(REPO)/tools/generate-effect-stamps.py
 	cd $(REPO) && python3 tools/generate-effect-stamps.py
 
 obj/AmigaAssets.o: obj/startup-options $(AMIGA_SRC)/AmigaAssets.s $(AMIGA_HUD) $(REPO)/generated/amiga-health-source.inc $(REPO)/generated/amiga-health-art.h $(AMIGA_GAME) $(AMIGA_EFFECT_STAMPS) $(AMIGA_EXIT_MASK) $(AMIGA_ENTRY_MASK) $(AMIGA_SELECTION_MASK) \
-		$(AMIGA_RESULTS) $(AMIGA_SHOP) $(AMIGA_CLEAR) $(ROOM_PACK) $(OBJECT_PACK) $(COLLISION_PACK) $(COLLISION_MASK_PACK) $(BUILDER_PACK)
+		$(AMIGA_RESULTS) $(AMIGA_SHOP) $(AMIGA_CLEAR) $(ROOM_PACK) $(OBJECT_PACK) $(COLLISION_PACK) $(REFERENCE_COLLISION_MASK_INPUT) $(BUILDER_PACK)
 	@mkdir -p $(@D)
 	$(AS) $(ASFLAGS) -o $@ $(AMIGA_SRC)/AmigaAssets.s
 
@@ -1050,6 +1054,9 @@ obj/gcc8_a_support.o: $(SUPPORT)/gcc8_a_support.s
 	$(AS) $(ASFLAGS) -o $@ $<
 
 audit:
+	@if [ -z '$(findstring -DDOWNWELL_SCENE_VERIFY,$(CFLAGS))' ] && $(OBJDUMP) -t $(OUT).elf | grep -q 'amiga_collision_masks'; then \
+		echo "*** reference-only collision masks linked into shipping executable"; exit 1; \
+	else echo "Collision-mask ownership linkage audit: clean"; fi
 	@if [ -z '$(findstring VERIFY,$(CFLAGS))' ] && $(OBJDUMP) -t $(OUT).elf | grep -qE 'amiga_(results|shop|clear)_pack'; then \
 		echo "*** transient scene art linked into shipping executable"; exit 1; \
 	else echo "Transient scene-bank linkage audit: clean"; fi

@@ -272,8 +272,13 @@ extern const UBYTE amiga_object_pack[];
 extern const UBYTE amiga_object_pack_end[];
 extern const UBYTE amiga_collision_pack[];
 extern const UBYTE amiga_collision_pack_end[];
+#ifdef DOWNWELL_SCENE_VERIFY
+// Raw masks are consumed only by the retained scene collision oracle below.
+// Live precise-mask events must declare a scene-owned dependency when wired;
+// they must not restore the whole reference catalogue to shipping startup.
 extern const UBYTE amiga_collision_masks[];
 extern const UBYTE amiga_collision_masks_end[];
+#endif
 extern const UBYTE amiga_builder_pack[];
 extern const UBYTE amiga_builder_pack_end[];
 }
@@ -1789,11 +1794,14 @@ __attribute__((noinline)) static int runDownwell(void) {
         (unsigned long)(amiga_object_pack_end-amiga_object_pack));
     const downwell::SpriteCollisionPack collisionSprites(amiga_collision_pack,
         (unsigned long)(amiga_collision_pack_end-amiga_collision_pack));
+#ifdef DOWNWELL_SCENE_VERIFY
     const downwell::SpriteMaskPack collisionMasks(amiga_collision_masks,
         (unsigned long)(amiga_collision_masks_end-amiga_collision_masks));
+    if(!collisionMasks.valid())return 20;
+#endif
     const downwell::RoomPack rooms(amiga_room_pack,
         (unsigned long)(amiga_room_pack_end-amiga_room_pack));
-    if(!objects.valid()||!collisionSprites.valid()||!collisionMasks.valid()||!rooms.valid())return 20;
+    if(!objects.valid()||!collisionSprites.valid()||!rooms.valid())return 20;
     checkSceneStack(1);
     // Ownership precedes player construction and survives in-place run resets.
     // Keep these bounded tables off the AmigaDOS stack, like the world itself.

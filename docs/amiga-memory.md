@@ -90,31 +90,37 @@ interpret restoring this diagnostic's loader fit as a shipping memory reduction.
 
 ## Executable size versus runtime memory
 
-The normal `STRIP=1` build measured after narrowing the native player's
-alarm columns is **3,307,716 bytes**, SHA-256
-`0cfca3efb708bce4edaed96d4ef203e18f5ef826e96ee2aefb5df40183c41e8b`.
+The normal `STRIP=1` build without reference-only collision-mask payloads is
+**2,613,960 bytes**, SHA-256
+`0cda39ec2541059318b9b2b684975b4d84ec7d55e686dc7928a39da22e2780c5`.
 The matching ELF section sizes distinguish payload from runtime allocation:
 
 | Section | Bytes | Stored in the executable? |
 | --- | ---: | --- |
-| Machine code (`.text`) | 1,339,034 | Yes |
-| Read-only data (`.rodata`) | 1,887,012 | Yes |
+| Machine code (`.text`) | 1,360,586 | Yes |
+| Read-only data (`.rodata`) | 1,171,432 | Yes |
 | Initialized writable data (`.data`) | 34,202 | Yes |
 | Initializer pointer | 4 | Yes |
-| Zero-filled storage (`.bss`) | 4,872,748 | No; allocated at load |
+| Zero-filled storage (`.bss`) | 4,563,828 | No; allocated at load |
 
-Initialized payload totals 3,260,252 bytes. Hunk relocation and container
-records account for the remaining 47,464 bytes. Stripping cannot remove
+Initialized payload totals 2,566,224 bytes. Hunk relocation and container
+records account for the remaining 47,736 bytes. Stripping cannot remove
 the initialized payload. ELF debug sections are not that payload either.
 
 The pre-repair owner audit attributes roughly 551 KB to
 `GameplayCollisionOwner` and its template instantiations, 260 KB to
 `GameplayWorld`, and 64 KB to spatial-tree machinery. This is linked code
-size, not inclusive call cost. Embedded sprite collision masks alone occupy
-511,580 bytes; the room pack is 288,248 bytes and the gameplay pack 234,718
-bytes. Other scene/resource banks and precomputed tables make up the rest.
+size, not inclusive call cost. The room pack is 288,248 bytes and the gameplay
+pack 234,718 bytes. Other scene/resource banks and precomputed tables make up
+the rest. The 511,580-byte raw collision-mask catalogue is linked only when
+`DOWNWELL_SCENE_VERIFY` supplies its actual consumer: the precise terrain-mask
+oracle. Shipping code has no mask-byte reader and neither links nor validates
+that catalogue. The normal linkage audit rejects its symbols. This does not
+remove collision bounds metadata or change the shipping collision algorithm.
+Future live precise-mask events need scene-owned mask dependencies, not a
+restoration of the complete reference catalogue to every executable.
 
-The largest BSS owners are collision storage (2,851,990 bytes) and the
+The largest BSS owners are collision storage (2,611,428 bytes) and the
 full-height CPU terrain raster (1,105,958 bytes). Initialized payload plus
 BSS already approaches 8 MB before dynamic graphics allocations. A small
 Hunk file therefore would not, on its own, prove an A500 memory fit.

@@ -79,12 +79,14 @@ amiga_collision_pack:
 	.globl amiga_collision_pack_end
 amiga_collision_pack_end:
 
+	.ifdef DOWNWELL_REFERENCE_COLLISION_MASKS
 	.balign 4
 	.globl amiga_collision_masks
 amiga_collision_masks:
 	.incbin "../generated/downwell-sprite-masks.dwsm"
 	.globl amiga_collision_masks_end
 amiga_collision_masks_end:
+	.endif
 
 	.balign 4
 	.globl amiga_builder_pack
