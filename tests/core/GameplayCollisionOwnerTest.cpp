@@ -103,6 +103,14 @@ bool nativeRegisteredRedBallStep(downwell::GameplayCollisionOwner& owner,downwel
     bool stop,NativeWhiteJellyStepOps& ops){
     return owner.stepRegisteredRedBallWithWorld(shared,stop,ops);
 }
+struct NativeRedBallDrawOps {
+    using N=downwell::MotionBinary64;
+    bool shade();bool drawSelf();bool imageIndex(N&);
+    bool drawSpriteExt(int,N,N,N,int,int,int,unsigned,int);
+};
+bool nativeRegisteredRedBallDraw(const GameplayWorld& world,downwell::InstanceHandle local,NativeRedBallDrawOps& ops){
+    return world.drawRegisteredRedBall(local,ops);
+}
 bool nativeWorldWhiteJellyCreate(GameplayWorld& world,unsigned source,downwell::RunnerImageValue x,
     downwell::RunnerImageValue y,NativeWhiteJellyBirthOps& ops,downwell::InstanceHandle& key){
     return world.createWhiteJellyWithSourceId(source,x,y,[&](downwell::InstanceHandle){return ops;},key);
@@ -915,8 +923,9 @@ int main(){
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native}){
         const auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
         ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
+        const auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
-            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+            GameplayTerrainInstances::WallCollision{},&rooms,mode);
         auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),owner->breakableBinding(),owner->playerBinding(),nullptr);
         assert(owner->attach(*world));auto& balls=owner->redBalls();
         auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
@@ -964,6 +973,44 @@ int main(){
         assert(balls.find(local)->sourceId==990050&&balls.find(local)->initialized&&balls.find(local)->alarms.get(0)==10);
         assert(balls.activate(local,false)&&owner->reconcileActivation()&&owner->population(118,count)&&!count);
         assert(balls.activate(local,true)&&owner->reconcileActivation()&&owner->population(118,count)&&count==1);
+        const auto checkRedDraw=[&](bool present){
+            assert(owner->prepareDraw());ActorDrawOrderVerification oracle;assert(oracle.verify(*world));
+            for(unsigned repeat=0;repeat<2;++repeat){
+                unsigned visits=0;
+                assert(world->visitRoomActorsReadOnly([&](auto kind,InstanceHandle key,auto){
+                    if(kind==GameplayWorld::DrawActor::redBall){
+                        assert(key.slot==local.slot&&key.generation==local.generation);++visits;
+                    }
+                    return true;
+                })&&visits==unsigned(present));
+            }
+            unsigned shades=0;
+            assert(world->visitRegisteredEnemyShades([&](auto x,auto y){
+                const auto* actor=balls.find(local);assert(actor);int order;
+                assert(compareRunnerReal(x,actor->x.promoted(),order)&&order==0&&
+                    compareRunnerReal(y,actor->y.promoted(),order)&&order==0);
+                ++shades;return true;
+            })&&shades==unsigned(present));
+        };
+        checkRedDraw(true);
+        assert(balls.activate(local,false)&&owner->reconcileActivation());checkRedDraw(false);
+        assert(balls.activate(local,true)&&owner->reconcileActivation());checkRedDraw(true);
+        assert(balls.dispatch(local,[](auto& actor){actor.playerDirection=MotionBinary64::fromInteger(90);return true;}));
+        struct DrawOps {
+            const GameplayRedBalls::Record& actor;unsigned calls=0;
+            bool shade(){assert(calls++==0&&!actor.eyeInitialized);return true;}
+            bool drawSelf(){assert(calls++==1&&!actor.eyeInitialized);return true;}
+            bool imageIndex(MotionBinary64& frame){assert(calls++==2&&actor.eyeInitialized);frame=actor.imageIndex.promoted();return true;}
+            bool drawSpriteExt(int sprite,MotionBinary64 frame,MotionBinary64 x,MotionBinary64 y,
+                int sx,int sy,int angle,unsigned color,int alpha){
+                assert(calls++==3&&sprite==185&&sx==1&&sy==1&&angle==0&&color==0xffffffu&&alpha==1);
+                int order;assert(compareRunnerReal(frame,actor.imageIndex.promoted(),order)&&order==0);
+                assert(compareRunnerReal(x,actor.x.promoted(),order)&&order==0);
+                auto wanted=actor.y.promoted();assert(wanted.add(MotionBinary64::fromInteger(-5))&&
+                    compareRunnerReal(y,wanted,order)&&order==0);return true;
+            }
+        } drawOps{*balls.find(local)};
+        assert(world->drawRegisteredRedBall(local,drawOps)&&drawOps.calls==4&&balls.find(local)->shotDirection==90);
         auto phase=std::make_unique<GameplayCollisionOwner::EncounterStepOrder>();
         const auto before=balls.find(local)->xx;
         for(bool stopped:{true,false}){
@@ -993,6 +1040,7 @@ int main(){
         }
         assert(balls.find(local)->myFx==991000&&owner->movingEffects().size()==1);
         assert(balls.markDestroyed(local)&&owner->prepareDraw()&&!balls.find(local)&&!GameplayCollisionView(*world).contains(shared));
+        checkRedDraw(false);
         unsigned nextSource=992000;
         // The production adapter must ignore the fixture's always-visible
         // callback and fixed enemy target. Check strict camera boundaries

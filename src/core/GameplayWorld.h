@@ -489,6 +489,9 @@ public:
     const downwell::GameplaySpawners* spawners()const{return spawners_;}
     const downwell::GameplayWhiteJellies* whiteJellies()const{return whiteJellies_;}
     const downwell::GameplayRedBalls* redBalls()const{return redBalls_;}
+    template<class Ops> bool drawRegisteredRedBall(downwell::InstanceHandle key,Ops& ops)const{
+        return redBalls_&&redBalls_->dispatch(key,[&](auto& actor){return actor.draw(ops);});
+    }
     bool bindRedBalls(downwell::GameplayRedBalls& records){
         if(redBalls_||!records.valid()||records.size())return false;
         redBalls_=&records;return true;
@@ -1377,13 +1380,14 @@ public:
         return run_.effectsSucceeded=scriptSpawnInstances_&&effects.advanceRegistered(phase,*scriptSpawnInstances_);
     }
     enum class PhaseBoundary { beginStep, alarm, step, collision, endStep, roomEntry };
-    enum class DrawActor { enemy, bullet, scriptEffect, debris, player, entryDither, bone, skeleton, ditherAbove, timeShard, corpseExpiry, smoke, corpse, consumptionBlood, levelNumber, limboShard, flashBall, blast, scattered, whiteJelly, movingFx };
+    enum class DrawActor { enemy, bullet, scriptEffect, debris, player, entryDither, bone, skeleton, ditherAbove, timeShard, corpseExpiry, smoke, corpse, consumptionBlood, levelNumber, limboShard, flashBall, blast, scattered, whiteJelly, movingFx, redBall };
     template<class Visit> bool visitRegisteredEnemyShades(Visit visit)const{
-        if((!bones_||!bones_->size())&&(!skeletons_||!skeletons_->size())&&(!whiteJellies_||!whiteJellies_->size()))return true;
+        if((!bones_||!bones_->size())&&(!skeletons_||!skeletons_->size())&&(!whiteJellies_||!whiteJellies_->size())&&(!redBalls_||!redBalls_->size()))return true;
         return visitRoomActorsReadOnly([&](DrawActor kind,downwell::InstanceHandle key,auto){
             if(kind==DrawActor::bone){const auto* r=bones_->find(key);return r&&visit(r->x.promoted(),r->y.promoted());}
             if(kind==DrawActor::skeleton){const auto* r=skeletons_->find(key);return r&&visit(r->x.promoted(),r->y.promoted());}
             if(kind==DrawActor::whiteJelly){const auto* r=whiteJellies_->find(key);return r&&visit(r->x.promoted(),r->y.promoted());}
+            if(kind==DrawActor::redBall){const auto* r=redBalls_->find(key);return r&&visit(r->x.promoted(),r->y.promoted());}
             return true;
         });
     }
