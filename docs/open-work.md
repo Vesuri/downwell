@@ -42,6 +42,12 @@ behavior, both backend integrations and relevant original-game verification.
   workload and behavior checks before/after, preserving hardware scrolling,
   offline assets and native terrain ownership. Do not resume micro-optimization
   sweeps, duplicate simulation passes or reference-only performance modes.
+  For generation, replace per-cell room/layer attachment in the native terrain
+  path with run-owned chronology and layer membership. Preserve inactive
+  end-of-layer cutoffs, activation, depth order and retirement; an always-active
+  scenery lease alone cannot represent these semantics. Gate on current frames
+  676 and 1689 as well as ordinary gameplay. This is not a revival of rejected
+  immutable-row/copy-on-write spatial encodings.
 - Reduce executable and static-memory growth at its owning structures: audit
   linked collision/query machinery, embedded resource/mask banks and full-height
   terrain caches. Account separately for Hunk code/data/relocations, zero-filled
@@ -448,8 +454,8 @@ windows in the [frame-cost audit](amiga-frame-cost.md), not its historical
 `13e08ca2` section. Source Step-order changes altered the contact tape's
 trajectory; frame 701 is no longer its largest terrain burst. Finish section 0
 before resuming the historical ranked items below, re-estimating their costs
-against the live workload. Extend coverage to the new worst-gap frame 676,
-quiet gameplay and scene handoffs rather than treating the seven captured
+against the live workload. Extend coverage to quiet gameplay and scene handoffs
+rather than treating the captured generation and contact
 windows as a complete game audit. Measure the cold gameplay handoff separately
 with `profile.sh entry`.
 
