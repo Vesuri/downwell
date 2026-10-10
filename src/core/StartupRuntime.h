@@ -11,6 +11,7 @@
 #include "RegisteredScatteredContact.h"
 #include "StoredSpawnerStates.h"
 #include "StoredWhiteJellyStates.h"
+#include "StoredRedBallStates.h"
 #include "RunnerLayerIds.h"
 #include "ScriptEffectRuntimeBinding.h"
 #include "BoxStepDispatch.h"
@@ -538,6 +539,29 @@ public:
     template<unsigned Capacity> StoredWhiteJellyStates<instanceCapacity,Capacity> whiteJellyStates(){
         return StoredWhiteJellyStates<instanceCapacity,Capacity>(instances_);
     }
+    template<unsigned Capacity> StoredRedBallStates<instanceCapacity,Capacity> redBallStates(){
+        return StoredRedBallStates<instanceCapacity,Capacity>(instances_);
+    }
+    template<unsigned Capacity,class MakeOps,class ReadStop,class Tick>
+    bool withRedBallEvents(StoredRedBallStates<instanceCapacity,Capacity>& owner,
+        MakeOps makeOps,ReadStop readStop,Tick tick){
+        if(!run_.effectsSucceeded)return false;
+        if(redBallDispatch_||!owner.belongsTo(instances_)||!owner.valid())return run_.effectsSucceeded=false;
+        auto dispatch=[&](InstanceHandle key,int code){
+            if(code==1244)return owner.hitStunAlarm(key);
+            auto ops=makeOps(key);
+            if(code==1243)return owner.create(key,random_,ops);
+            if(code==1246)return owner.dispatch(key,[&](auto& s){return s.endStep(ops);});
+            if(code==1250)return owner.dispatch(key,[&](auto& s){return s.draw(ops);});
+            bool stopped;if(!readStop(stopped))return false;
+            if(code==1245)return owner.dispatch(key,[&](auto& s){return s.effectAlarm(stopped,random_,ops);});
+            return code==1247&&owner.step(key,stopped,random_,ops);
+        };
+        redBallContext_=&dispatch;
+        redBallDispatch_=[](void* p,InstanceHandle key,int code){return (*static_cast<decltype(dispatch)*>(p))(key,code);};
+        const bool ok=tick();redBallDispatch_=nullptr;redBallContext_=nullptr;
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok&&owner.valid();
+    }
     // Bind recovered events to their resource dispatch, not a second actor loop.
     // The caller supplies real builtin/effect operations and the current player
     // pTimeStop read. This scope does not admit unimplemented contact/Draw events.
@@ -564,18 +588,30 @@ public:
         return run_.effectsSucceeded=run_.effectsSucceeded&&ok&&owner.valid();
     }
     bool spawnWhiteJelly(int x,int y,InstanceHandle& key);
+    bool spawnRedBall(int x,int y,InstanceHandle& key){return spawnSteeringEnemy(118,x,y,key);}
     template<unsigned Capacity,class Queries,class MakeEnvironment,class ReadStop,class Tick>
     bool withRegisteredWhiteJellyEvents(StoredWhiteJellyStates<instanceCapacity,Capacity>& owner,Queries& queries,
         MakeEnvironment makeEnvironment,ReadStop readStop,Tick tick){
+        return withRegisteredSteeringEnemyEvents(owner,queries,makeEnvironment,readStop,tick);
+    }
+    template<unsigned Capacity,class Queries,class MakeEnvironment,class ReadStop,class Tick>
+    bool withRegisteredRedBallEvents(StoredRedBallStates<instanceCapacity,Capacity>& owner,Queries& queries,
+        MakeEnvironment makeEnvironment,ReadStop readStop,Tick tick){
+        return withRegisteredSteeringEnemyEvents(owner,queries,makeEnvironment,readStop,tick);
+    }
+    template<unsigned Capacity,class State,int Object,class Queries,class MakeEnvironment,class ReadStop,class Tick>
+    bool withRegisteredSteeringEnemyEvents(StoredSteeringEnemyStates<instanceCapacity,Capacity,State,Object>& owner,Queries& queries,
+        MakeEnvironment makeEnvironment,ReadStop readStop,Tick tick){
+        static_assert(Object==115||Object==118,"Unsupported steering enemy");
         if(!queries.boundTo(*this))return run_.effectsSucceeded=false;
-        return withWhiteJellyEvents(owner,[&](InstanceHandle key){
+        auto makeOps=[&](InstanceHandle key){
             auto external=makeEnvironment(key);
             struct Ops : decltype(external) {
                 StartupRuntime& world;Queries& queries;InstanceHandle key;
                 Ops(decltype(external) value,StartupRuntime& runtime,Queries& collision,InstanceHandle h)
                     :decltype(external)(value),world(runtime),queries(collision),key(h){}
                 InstanceRecord* record(){
-                    auto* r=world.instances_.resolve(key);return r&&r->objectId==115?r:nullptr;
+                    auto* r=world.instances_.resolve(key);return r&&r->objectId==Object?r:nullptr;
                 }
                 bool position(bool vertical,RunnerImageValue value,RunnerImageValue& accepted){
                     auto* r=record();if(!r)return false;
@@ -635,6 +671,11 @@ public:
                     if(!r||!index.assignInteger(value)||!world.lifecycle_.imageIndex(key,*r,index))return false;
                     std::memcpy(&r->imageIndex,&index.bits,4);return true;
                 }
+                bool imageIndex(MotionBinary64& value){
+                    const auto* r=record();if(!r)return false;
+                    RunnerImageValue index;std::memcpy(&index.bits,&r->imageIndex,4);
+                    value=index.promoted();return value.valid();
+                }
                 bool sprite(int value){
                     auto* r=record();if(!r||!world.lifecycle_.sprite(key,*r,value))return false;
                     r->spriteId=value;return true;
@@ -654,7 +695,9 @@ public:
                 }
             };
             return Ops{external,*this,queries,key};
-        },readStop,tick);
+        };
+        if constexpr(Object==115)return withWhiteJellyEvents(owner,makeOps,readStop,tick);
+        else return withRedBallEvents(owner,makeOps,readStop,tick);
     }
     // Spawner grids are integral world coordinates. Preserve synchronous
     // Create and the room-wide numeric allocator before returning the child
@@ -2886,6 +2929,9 @@ private:
     bool (*spawnerDispatch_)(void*,InstanceHandle)=nullptr;
     void* whiteJellyContext_=nullptr;
     bool (*whiteJellyDispatch_)(void*,InstanceHandle,int)=nullptr;
+    void* redBallContext_=nullptr;
+    bool (*redBallDispatch_)(void*,InstanceHandle,int)=nullptr;
+    bool spawnSteeringEnemy(int object,int x,int y,InstanceHandle& key);
     RunnerLayerIds layerIds_;
     StoredRoomLayers<instanceCapacity,256,4096,8> roomLayers_{layerIds_};
     bool layerBindingSucceeded_;

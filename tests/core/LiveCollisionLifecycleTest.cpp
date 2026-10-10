@@ -339,6 +339,50 @@ int main(){
         require(stopReads&&moved&&(moved->yy.high!=beforeY.high||moved->yy.low!=beforeY.low),
             "registered stored jelly moves using world target without external builtin providers");
     }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach registered red-ball world");world->skipToGameForTesting();
+        auto balls=world->redBallStates<2>();unsigned stopReads=0,id=0;
+        struct Environment {
+            using N=MotionBinary64;
+            bool atan(N y,N x,N& out){return portableAtan(y,x,out);}
+            bool enemyPlayerX(N&){return false;}bool enemyPlayerY(N&){return false;}
+            bool sound(int,int,int,int,const char*){return false;}
+            bool enemyDeath(){return false;}bool currency(int){return false;}
+            bool movingFx(N,N,int,N,N,N){return false;}bool flash(N,N,int,int,int){return false;}
+            bool effectAlarmReset(N){return false;}bool inView(bool&){return false;}
+            bool xscale(int){return false;}bool shade(){return false;}bool drawSelf(){return false;}
+            bool drawSpriteExt(int,N,N,N,int,int,int,unsigned,int){return false;}
+        };
+        require(world->withRegisteredRedBallEvents(balls,*owner,[](InstanceHandle){return Environment{};},
+            [&](bool& stopped){++stopReads;stopped=true;return true;},[&]{
+                if(!world->createSpawnerEnemy(118,MotionBinary64::fromInteger(1000),
+                    MotionBinary64::fromInteger(world->mainCameraRenderViewY()+100),id))return false;
+                const auto* state=balls.state(id);
+                require(state&&state->initialized&&state->health==30,"registered child is complete before deactivation");
+                return world->deactivateSpawnerEnemy(id);
+            }),"red-ball source Create and spawner dormancy");
+        bool found=false;
+        for(unsigned i=0;i<world->activeInstanceCount();++i){
+            const auto& r=world->instanceAt(i);if(r.instanceId!=id)continue;found=true;
+            require(r.objectId==118&&!r.active&&r.activationPending&&r.alarms.get(0)==10&&
+                r.alarms.get(2)==30&&r.imageSpeed>0,"red-ball builtins published before dormant handoff");
+            RunnerImageValue x,y;
+            require(owner->collisionPosition(world->instanceHandleAt(i),x,y)&&x.bits==balls.state(id)->x.bits&&
+                y.bits==balls.state(id)->y.bits,"registered red-ball collision position agrees with Create");
+        }
+        require(found&&!stopReads,"Create does not read time-stop");
+        InstanceHandle active;
+        require(world->withRegisteredRedBallEvents(balls,*owner,[](InstanceHandle){return Environment{};},
+            [&](bool& stopped){++stopReads;stopped=true;return true;},[&]{
+                if(!world->spawnRedBall(1040,world->mainCameraRenderViewY()+100,active))return false;
+                world->step(Input{},false);return world->effectsSucceeded();
+            }),"registered frozen red-ball Step and End Step");
+        const auto* record=world->resolveInstance(active);
+        require(record&&record->imageSpeed==0&&record->spriteId==702&&stopReads==1,
+            "frozen Step publishes animation stop and body sprite without unsupported effects");
+    }
     for(unsigned failure=0;failure<=5;++failure){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());

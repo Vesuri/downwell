@@ -1,4 +1,5 @@
 #include "core/StoredWhiteJellyStates.h"
+#include "core/StoredRedBallStates.h"
 #include "core/GameMakerRandom.h"
 #include <cassert>
 #include <cstdio>
@@ -20,12 +21,34 @@ struct Ops {
     bool imageSpeed(F value,F& accepted){
         auto* r=world.resolve(key);assert(r);std::memcpy(&r->imageSpeed,&value.bits,4);accepted=value;return true;
     }
+    bool alarm(int number,int value){
+        auto* r=world.resolve(key);if(!r)return false;
+        r->alarms.set(unsigned(number),value);return true;
+    }
 };
 static downwell::InstanceHandle birth(World& w,unsigned id,int object=115){
     assert(w.create(id,object,11,false)==downwell::CreateInstanceResult::success);
     const auto h=w.handleAt(w.size()-1);auto* r=w.resolve(h);r->preciseX=24;r->preciseY=56;return h;
 }
 int main(){
+    {
+        World records;downwell::StoredRedBallStates<8,2> red(records);
+        downwell::GameMakerRandom rng(8);
+        birth(records,10,60);const auto key=birth(records,20,118);
+        Ops ops{records,key,false,true};
+        assert(red.create(key,rng,ops)&&red.valid()&&records.size()==1);
+        assert(red.state(20)->initialized&&red.state(20)->health==30&&rng.drawCount()==1);
+        assert(records.resolve(key)->alarms.get(0)==10&&records.resolve(key)->alarms.get(2)==30);
+        records.resolve(key)->active=false;
+        unsigned calls=0;assert(red.dispatch(key,[&](auto&){++calls;return true;})&&!calls);
+        records.resolve(key)->active=true;
+        assert(red.dispatch(key,[](auto& s){s.hitStun=true;return true;}));
+        assert(red.hitStunAlarm(key)&&!red.state(20)->hitStun);
+        assert(records.erase(20)&&!red.state(20));
+        const auto replacement=birth(records,20,118);Ops next{records,replacement};
+        assert(red.create(replacement,rng,next));
+        assert(!red.dispatch(key,[](auto&){return true;})&&!red.valid());
+    }
     World world;Owner owner(world);downwell::GameMakerRandom random(8);
     birth(world,10,60);const auto first=birth(world,11);Ops ops{world,first,false,true};
     assert(owner.create(first,random,ops)&&owner.valid()&&world.size()==1&&random.drawCount()==1);

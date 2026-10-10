@@ -2402,6 +2402,18 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             run_.effectsSucceeded=run_.effectsSucceeded&&spawnerDispatch_(spawnerContext_,key);
         }else ++unimplementedCodeCalls_;
         return;
+    case 1243: // enmRedBall Create
+    case 1244: // Alarm 1
+    case 1245: // Alarm 0
+    case 1246: // End Step
+    case 1247: // ordinary Step
+    case 1250: // Draw
+        if(instance&&instance->objectId==118&&redBallDispatch_){
+            ++implementedCodeCalls_;
+            const auto key=instances_.handleAt(unsigned(instance-&instances_.at(0)));
+            run_.effectsSucceeded=run_.effectsSucceeded&&redBallDispatch_(redBallContext_,key,codeId);
+        }else ++unimplementedCodeCalls_;
+        return;
     case 1221: // enmWhiteJelly Create
     case 1222: // enmWhiteJelly Alarm 1
     case 1223: // enmWhiteJelly Alarm 0
@@ -2940,11 +2952,15 @@ bool StartupRuntime::adoptBuilderScattered(const DeferredCreateInstance& command
 }
 
 bool StartupRuntime::spawnWhiteJelly(int x,int y,InstanceHandle& key){
+    return spawnSteeringEnemy(115,x,y,key);
+}
+bool StartupRuntime::spawnSteeringEnemy(int object,int x,int y,InstanceHandle& key){
     key={};
-    if(!run_.effectsSucceeded||!whiteJellyDispatch_||!objectPack_||!deferredCommandsSucceeded_)
+    const bool ready=object==115?whiteJellyDispatch_!=nullptr:object==118&&redBallDispatch_!=nullptr;
+    if(!run_.effectsSucceeded||!ready||!objectPack_||!deferredCommandsSucceeded_)
         return run_.effectsSucceeded=false;
     DeferredInstanceQueue<1> child;
-    if(!child.enqueueCreate(115,x,y))return run_.effectsSucceeded=false;
+    if(!child.enqueueCreate(object,x,y))return run_.effectsSucceeded=false;
     InstanceHandle created;
     const auto result=child.applyChecked(instances_,*objectPack_,roomId_,nextRuntimeInstanceId_,
         [&](InstanceRecord& record){
@@ -2963,21 +2979,21 @@ bool StartupRuntime::spawnWhiteJelly(int x,int y,InstanceHandle& key){
 bool StartupRuntime::createSpawnerEnemy(int object,MotionBinary64 x,MotionBinary64 y,unsigned& id){
     id=0;
     std::int32_t ix,iy;
-    if(!run_.effectsSucceeded||object!=115||!x.roundPixel(ix)||!y.roundPixel(iy))
+    if(!run_.effectsSucceeded||(object!=115&&object!=118)||!x.roundPixel(ix)||!y.roundPixel(iy))
         return run_.effectsSucceeded=false;
     const auto exactX=MotionBinary64::fromInteger(ix),exactY=MotionBinary64::fromInteger(iy);
     if(x.high!=exactX.high||x.low!=exactX.low||y.high!=exactY.high||y.low!=exactY.low)
         return run_.effectsSucceeded=false;
     InstanceHandle child;
-    if(!spawnWhiteJelly(ix,iy,child))return false;
+    if(!spawnSteeringEnemy(object,ix,iy,child))return false;
     const auto* r=instances_.resolve(child);
-    if(!r||r->objectId!=115||!r->active||r->destroyRequested)return run_.effectsSucceeded=false;
+    if(!r||r->objectId!=object||!r->active||r->destroyRequested)return run_.effectsSucceeded=false;
     id=r->instanceId;return true;
 }
 
 bool StartupRuntime::deactivateSpawnerEnemy(unsigned id){
     const auto* r=instances_.find(id);
-    if(!run_.effectsSucceeded||!r||r->objectId!=115||r->destroyRequested)
+    if(!run_.effectsSucceeded||!r||(r->objectId!=115&&r->objectId!=118)||r->destroyRequested)
         return run_.effectsSucceeded=false;
     const auto key=instances_.handleAt(unsigned(r-&instances_.at(0)));
     return run_.effectsSucceeded=instances_.requestActivation(key,false,

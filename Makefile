@@ -199,7 +199,7 @@ test: test-stored-white-jelly
 .PHONY: test-stored-white-jelly
 test-stored-white-jelly: build/stored-white-jelly-test
 	./build/stored-white-jelly-test
-build/stored-white-jelly-test: tests/core/StoredWhiteJellyStatesTest.cpp src/core/StoredWhiteJellyStates.h src/core/GameMakerRandom.cpp
+build/stored-white-jelly-test: tests/core/StoredWhiteJellyStatesTest.cpp src/core/StoredWhiteJellyStates.h src/core/StoredSteeringEnemyStates.h src/core/StoredRedBallStates.h src/core/GameMakerRandom.cpp
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/StoredWhiteJellyStatesTest.cpp src/core/GameMakerRandom.cpp
 
