@@ -12,9 +12,9 @@ on PAL; do not add 60 Hz catch-up.
 
 ## Priority and scope
 
-Next: finish live skeleton encounters (section 1), following its dependency
-order: collision identity and ordering, time-stop state, damage effects and
-actors, then natural encounter verification. The A500 frame-budget work in
+Next: finish live skeleton encounters (section 1), following its numbered
+integration tasks: production ownership, generation/query/dispatch, time-stop
+and damage chains, then natural encounter verification. The A500 frame-budget work in
 section 5 remains open; use its measured architectural approach rather than
 tuning small functions or compiler flags. Then make catacombs playable
 (section 2), followed by the remaining content (section 4).
@@ -27,206 +27,323 @@ behavior, both backend integrations and relevant original-game verification.
 
 ## 1. Finish live skeleton and bone integration
 
-### A. Resolve collision identity and ordering
+### Scope, completion and working rules
 
-- Connect source-equivalent `instance_place` selection to the live world:
-  spatial-index population, updates and traversal, runtime branch selection,
-  activation/rebinding and lifetime-safe instance lookup. A boolean hit or Draw
-  order cannot identify the field that determines shard direction.
-  Extend the SDL clock-query owner's coverage to identity-bearing and other
-  gameplay queries; register the remaining native field, effect and projectile
-  lifetimes in the resource-backed owner before replacing its unindexed
-  collision adapters. Complete original room creation order across families,
-  retaining source numeric instance IDs separately from native family-local
-  generation handles for serialized bindings and global lookup order.
-  Supply the native generator's source-creation scope from the complete startup
-  stream, including spawner 78 and concrete shop ownership. Shop admission
-  must install the retained per-parent `with (Shop)` capture/body in normal
-  frontend encounters, supplying live shared input, synchronous purchase/child
-  setters and radio/view dependencies. The compact
-  once-per-shop update is not a source-equivalent parent Step. Bind the
-  registered Shop and child custom Draw handlers to the mixed native Draw
-  projection; compact fixtures and the missing-handler rejection are not a
-  rendering implementation. Resolve the area-three keeper hat's blue-pixel
-  palette before adding its native planar asset. Complete
-  ordered Room End dispatch and device-audio bindings as well. Spawner admission
-  requires its depth-driven Step, selected enemy mask queries and synchronous
-  child Create-before-deactivate, not an ID-only placeholder. Supply source
-  fall-depth state and actual enemy counts; include its area-one white-jelly
-  (115) and red-ball (118) child dependencies. Connect the
-  source-ordered object-220 moving-effect path through native source-ID
-  ownership, mixed scheduling and Draw as well: sprite-704 emissions must not
-  be treated as the sprite-84 blood specialization. Install the registered
-  enemy/emission scopes in normal frontend encounters, not only fixtures. See the
-  [spawner source contract](spawner-source-contract.md). Complete registered
-  Scattered16 (289) normal mixed Step/contact/Draw admission on both backends,
-  including bullet contacts and the live player selector writes/full recharge
-  effects used by the registered forced-jump/Exploding Knees composition.
-  Supply the registered destruction adapters with the complete native
-  allocation stream and real view, tile, audio and settings inputs; explicit
-  registered Step tests are not natural scenery encounters.
-  Include player-created depth meter/camera/entry-dither and conditional
-  companion births in the native creation stream, not just visible actors;
-  finish the stored companions' event/render integration as well as native
-  ownership (their synchronous stored Create state is not a complete actor).
-  Schedule authored `objDitherAbove` (61) native wall-destruction contacts
-  through the complete ordered collision pass, using its bound event handler.
-  Connect native terrain's identity runs to ordered collision candidates
-  before enabling destruction dispatch there: finish animation/image publication and
-  dynamic-rebinding publication, plus spatial mutation/traversal publication;
-  schedule retained native wall End Step in the complete mixed phase and
-  connect synchronous area-four limboShard (379) creation;
-  schedule the mixed spatial flush with candidate collection and post-pass
-  retention after the remaining publication paths are connected.
-  Registration stamps alone are not pair
-  order. Occupancy
-  alone cannot select a wall. Do not replace it with a row-clear
-  heuristic or restore duplicate generic per-cell runner state. Verify mixed
-  Begin Step ordering (the owned, explicitly admitted controller already runs
-  the shared event). Extend the SDL
-  collision pass beyond the admitted plain-wall/dither pair, preserving mixed
-  event ordering rather than running independent family passes. Wire actual
-  settings/ending state into its environment; it is not an inert controller or
-  the entry wipe (73).
-  Preserve entry-dither's published
-  view read and effect-surface Draw. See the
-  [main-room birth audit](original-behavior-audit.md#main-room-controller-births-and-numeric-ids).
-- Replace the usual-gun Q20/Q32 trajectory approximation with original setter
-  and trigonometric semantics before enabling projectile selectors. Preserve muzzle-effect
-  creation, collision-event ordering and destruction timing around movement.
-  Integrate the [source arithmetic contract](projectile-motion.md) with absolute
-  room coordinates and original collision-wrapper rounding; replace both live adapters,
-  not just their displayed positions.
-  Connect non-precise line selection and ordered setter publication before
-  enabling the source-ordered spatial line path for live bullets.
-- Verify collision-family ordering, same-object traversal and cross-family
-  painter order against the original runner, not storage-slot order.
-- Complete the recovered selected GMS2 layer/element ordering and verify the
-  box impact's deferred -60000 depth override in full live composition.
-  Keep layer Draw order separate from room animation order; audit existing
-  room-list-based Draw adapters against the selected runner branch. See the
-  [depth-update audit](projectile-motion.md#selected-depth-update-path).
-  Complete native ownership for omitted room/controller instances and mixed
-  composition across retained terrain, fields and separate effect passes; complete live
-  depth-setter publication for remaining actor families, activation ordering and Draw-time structural
-  mutation handling; preserve inactive-instance termination of each layer walk.
-- Resolve remaining precise-mask sampling and original runtime FP-mode/rounding
-  assumptions, including rotated masks required by blood time-field contacts.
+The deliverable is a naturally generated skeleton encounter in the normal SDL
+and Amiga executables: throw, bone/wall/player contacts, shooting, stomp,
+time-stop, death, effects, rewards, retirement and Retry. Both must follow the
+original game, not merely match each other. No test-only allocator, forced actor
+birth, always-successful callback or manually emitted particle proves this.
 
-### B. Connect time-stop state and effects
+The remaining work is split below into 18 bounded tasks. These are integration
+deliverables, not 18 small patches. Keep their IDs stable until closed. Each
+task must end with its production callers connected, the replaced path excluded,
+and evidence covering both targets. Existing helpers should be reused unless
+the live integration demonstrates a specific defect.
 
-- Finish native mixed-pass/device-audio integration for inherited room-entry
-  `startTimeField` (371) and exit-field wind contacts. Connect settings to the SDL
-  admission and verify natural contacts, sound guards and choice RNG on both
-  platforms. Verify their cross-family Draw order against the runner
-  when entry, ordinary and exit fields coexist.
-- Connect player Begin Step `checkStop`/`pTimeStop` and parent-time-field queries
-  to both world schedulers before blood dispatch. Goal-stop and shop control-lock
-  are not substitutes. Preserve transition effects, RNG and audio order.
-- Connect registered Timeout-damage object-82 births to natural damage contacts
-  on both backends, supplying the native complete creation stream. Connect the
-  parent-field contact adapter and complete Draw scheduling across object
-  families, including live time-stop and activation state.
-- Integrate time-shard lifecycle, animation, burst and time-change owners with
-  both schedulers. Wire fractional/mirrored player and shard contacts, transition
-  pacing and audio. Preserve moving shards while gravity/animation are paused,
-  and the separate alarm cooldown rules.
-  Connect the native time-change registration to the complete global numeric-ID
-  stream before enabling automatic player transitions; its explicit-ID entry
-  point is not a substitute for source-ordered allocation.
+Important current boundaries to remove:
+- `src/main.cpp` installs `StoredWorldCollision` and the narrower
+  `StoredDitherCollisionPass`; it does not install the registered skeleton or
+  Shop event environments around normal update/render.
+- `DownwellAmiga.cpp` calls the ordinary `port.step(packedInput)`. The registered
+  skeleton Step/contact entry points are exercised by tests, not installed here.
+- `Game::render` has registered Shop Draw dispatch, but requires a borrowed
+  environment. Exposing that hook is not installing a working frontend.
+- Component fixtures in `EnemyDeathWorldsTest`, `RegisteredShopRuntimeTest`
+  and `GameplayCollisionOwnerTest` establish parts of the contracts, not the
+  natural encounter described above.
 
-### C. Connect damage effects and actors
+**How to work this section**
+1. Start with 1.01 and 1.02, then complete the Shop vertical slice (1.03).
+   Proceed through the dependency order below; do not spend another sequence
+   of turns adding isolated Shop helpers without installing their callers.
+2. Before editing, name the production caller, the legacy path it replaces,
+   the missing inputs, and the end-to-end case that will prove the change.
+   If those cannot be identified, investigate that specific boundary first.
+3. Keep one task active. A newly discovered prerequisite must be attached to
+   one of these tasks with the failing caller/test that requires it. Do not
+   recursively expand the whole game or turn an optional later-area branch
+   into a prerequisite for every earlier integration.
+4. Integrate a complete vertical slice where possible; commit cohesive changes.
+   A helper/test-only commit is allowed as preparation but does not close a task.
+   Remove completed tasks; put results and timings in commits, not this queue.
+5. At each milestone, report the normal route that now works, the remaining
+   failing boundary, and the relevant test/capture. Count closed deliverables,
+   not commits, source lines or isolated green fixtures.
+6. Keep unsupported paths explicit. Do not enable a partial registered system
+   beside the legacy system and count their combined output as source parity.
+   Do not restore generic per-cell terrain ownership to make integration easy.
+7. Preserve the whole scope below. Original-runtime evidence that cannot be
+   obtained locally stays explicitly unverified (1.17); it must not prevent
+   unrelated production integration, nor be silently replaced by SDL agreement.
 
-- Complete the shared player-damage scripts in natural contacts, including
-  source storage, audio/controller side effects, hit effects and immunity ordering.
-  Verify live damage-number placement/direction against original captures and
-  measure the native contact-math cost, not just port-to-port state agreement.
-  Replace non-coincident fixed-point knockback normalization with the source
-  point-direction/lengthdir path and preserve its precision through player motion.
-  Extend integer-only damage text formatting if live source paths require VM
-  real formatting; verify fractional text placement against the original.
-- Connect debris to source-ordered natural breakable destruction and complete
-  its production scheduling, including the player's live time-stop state.
-  Supply native debris's explicit source-ID entry from the complete creation
-  stream. Use the published debris path for the skeleton death sequence as well;
-  natural callers must not use legacy atomic registration.
-  Replace the removal-only box Step with the full ordered audio, smoke, flash,
-  impact, chain-reaction, debris and reward sequence before lifetime retirement.
-  Complete registered currency reward-caller publication, collection, Draw and
-  native ownership; establish the unnormalized homing angle domain and original
-  atan/trig behavior before admitting natural rewards. See the currency contract
-  in [skeleton effects](skeleton-effect-ownership.md).
-  Complete the controller HUD beyond its shared rise/reset state: streak-bar
-  geometry, Gemhigh animation, timer flashing, leading-space/icon centering,
-  pause/time-stop guards and source-ordered controller Draw dispatch. The
-  admitted singleton controller must join complete controller lifetime/ID
-  ownership rather than stand in for arbitrary controller populations.
-- Implement remaining blood, corpse and blast dependencies. Preserve
-  synchronous child Create, RNG consumption and mutation order before rewards
-  and retirement.
-  Connect native corpse creation/expiry to the complete source-ID stream and
-  live mask/tile queries; dispatch its Step and player contact in the mixed
-  world phases, with the real time-stop and Knife and Fork state. Verify the
-  registered corpse/expiry chain in natural skeleton deaths, not only explicit
-  test births.
-- Connect natural death/stomp/hit events to effect owners, including registered
-  flash-ball births: supply the native burst's IDs from the complete creation
-  stream and install the stored world's registered flash scope around natural
-  death callers. Replace those callers' legacy flash-pool paths; explicit
-  registered burst births and seven-frame lifecycle tests are not live
-  encounter admission.
-  Route enemy-death bookkeeping through the shared run-state entry, supplying
-  actual toggleGuncut, the owned achNoKill entry, momentDelay controller events and
-  levelBeginCue creation/audio. Route natural callers through its owned firstLand/BGM
-  entry, and connect the registered levelNumber (372) child's live language/font
-  inputs and surface Draw before admitting natural callers. Complete its native
-  source-ID allocation in the enclosing creation stream. Do not use successful
-  placeholder callbacks.
-  Admit persistent object 37 from the actual native startup Create sequence,
-  including its initialization/HUD dependencies and source numeric ID. Verify
-  the complete rmResult handoff, including Room End events, native destination
-  layer loading and persistent-controller rebinding. Complete registered native
-  exit-wipe birth and its admission to the mixed destination alarm phase,
-  including arbitrary activation/populations; complete both adapters' Result
-  activation publication. Complete stored Result alarm-storage integration and supply
-  the actual shared room-speed state at natural controller call sites.
-  Do not run the old combat alarm pass behind the menu or batch all
-  controller alarms before Result's alarms. Implement remaining fired controller
-  events; see the [Result-room contract](original-behavior-audit.md#result-room-population-and-persistent-alarms).
-  explicit registered births and alarm-0 tests are not full controller admission.
-  A PAL frame scheduler must
-  not replace the source room-speed global with 50.
-  Complete death/low-spec direct drawing at original world-depth boundaries,
-  rather than flattening those paths into an overlay.
-- Complete natural skeleton and owned-bone integration in shared gameplay:
-  source-ordered births and animation/alarm/Step/collision/End Step scheduling,
-  player/bullet damage, rewards, capacity failure and out-of-view retirement.
-  Admit native `stepRegisteredSkeleton` in the complete mixed scheduler with
-  the room creation stream and real tile/audio/settings dependencies. Install
-  stored `withRegisteredSkeletonEvents` alongside every child owner and live
-  time-stop/query adapter for normal encounters, not only explicit test births.
-  Connect the stored mixed bone-contact admission to the real player-damage
-  script and extend admitted wall families only with their reverse handlers;
-  install native `dispatchSkeletonEncounterCollision` in the live sealed pass,
-  supplying complete handlers for its remaining event families.
+### Milestone I — real session ownership and a complete Shop
 
-### D. Verify natural encounters
+#### 1.01 Install a production encounter session
+**Work:** Give each frontend a session-lifetime owner for registered event
+environments, rather than assembling them only inside tests. Reuse the shared
+core APIs; platform code supplies devices, assets and presentation only.
+Define one update boundary and one Draw boundary that install the required
+scopes, preserve nested callbacks, and propagate terminal failure. Wire settings,
+shared input consumption, language/font state, tile/view reads and real audio
+interfaces. SDL currently loads only wind sounds 349–355; load the actual
+resources required by each admitted event before enabling it. Define equivalent
+Amiga audio/resource bindings, not dummy successful callbacks.
 
-- Verify smoke collision dispatch, simultaneous contacts and wall retirement
-  against the original; extend contact shapes as later wall families enter play.
-- Compare joint currency/smoke composition with original captures, including
-  shade holes and retained damage restoration.
-- Compare full state/RNG through natural skeleton encounters, capture native
-  effects and profile dense scenes, including complete smoke geometry costs.
+**Done when:** Normal startup/shortcut, update, Draw, level transition and Retry
+all construct/use/retire the session on both platforms. A deliberate callback
+failure stops the frame and returns the meaningful failure code; an unbound
+required handler is never silently skipped. No new game rules live in backend
+adapters. This task provides lifetime/binding infrastructure, not closure of
+the individual event families below.
 
-References: [skeleton effects](skeleton-effect-ownership.md),
-[effect surfaces](effect-surfaces.md),
-[time-field contacts and identity](time-stop-collision.md),
-[phase eligibility](runner-step-eligibility.md), [alarms](runner-alarms.md),
-[animation fields](runner-image-fields.md).
+#### 1.02 Complete the source creation stream and persistent ownership
+**Depends on:** 1.01.
+**Work:** Feed one source numeric-ID allocator through actual startup and
+rmMain creation, independently of family-local generation handles. Include
+serialized walls/controllers, persistent object 37, player-created camera,
+depth meter, entry-dither and conditional companions, Shop children and spawner
+78. Preserve synchronous Create, RNG interleaving, failures and
+Create-before-deactivate. Complete stored companion events/Draw as well as
+native ownership; an ID-only placeholder is insufficient. Publish activation,
+rebinding and destruction through the same lifecycle. Use the
+[main-room birth audit](original-behavior-audit.md#main-room-controller-births-and-numeric-ids).
 
-Precise-mask reference: [collision bounds](runner-collision-bounds.md).
-FP-mode evidence and remaining runtime checks: [CRT startup](runner-fp-startup.md).
+**Done when:** Full startup and SKIP_TO_GAME reach equivalent source room state
+with matching birth/ID/RNG transcripts through the first generated pattern,
+including invisible children. Both normal frontends supply this allocator to
+later effect callers. Retry/re-entry has no stale handles, reused live IDs or
+missing persistent controller. Family behavior is checked in its task below.
+
+#### 1.03 Finish a naturally encountered Shop end-to-end
+**Depends on:** 1.01–1.02.
+**Work:** Install registered Shop creation, cached language, nested per-parent
+`with (Shop)` Step captures, shared input, synchronous purchases/child setters,
+radio/view reads, child phases and ordered Room End. Bind parent and rising-text
+Draw to real glyph/sprite primitives in both mixed Draw paths. Preserve retained
+Create-time anchors, Draw mutations, negative cursor subimages and text state.
+Supply pending activation/language-unpause behavior where reached. Exclude all
+registered parents/children from compact compatibility passes. Resolve the
+area-three keeper hat's blue pixels through an explicit native palette/art
+decision, not silent quantization. Size overlapping speech lifetimes against
+nested parent Steps, coordinated with §7.
+
+**Done when:** The input-only natural shop route reaches, opens, navigates,
+buys, displays price/description/speech, closes and leaves a Shop on both
+executables. Stock, health/ammo, money, RNG, IDs, audio and child retirement
+agree with source contracts; counter/menu/prompt draw once at their source
+boundaries. Include funded/insufficient/sold-out, criminal, multiple-parent,
+language-change and area-three presentation cases. Existing
+`test-registered-shop-runtime`, `test-shop-parent-draw` and Game render tests
+remain regression gates, not substitutes for this route.
+Reference: [Shop contract](shop-port.md).
+
+### Milestone II — complete live generation, queries and scheduling
+
+#### 1.04 Admit the real spawner and its children
+**Depends on:** 1.01–1.02.
+**Work:** Connect `SpawnerStep` / stored and native spawner owners to natural
+generation and mixed Step. Supply actual fall-depth, enemy counts, mask queries,
+settings and synchronous child creation/deactivation. Install white-jelly 115,
+red-ball 118 and object-220 moving effects, including sprite-704 emissions;
+do not reinterpret them as sprite-84 blood.
+**Done when:** A seeded natural route exercises spawner thresholds and both
+child families; source birth/RNG/order, activation, motion, Draw and retirement
+are checked on both platforms. No spawner or emission exists only as an ID.
+Reference: [spawner contract](spawner-source-contract.md).
+
+#### 1.05 Publish terrain and actor identity to live queries
+**Depends on:** 1.02; test with families admitted by 1.03–1.04.
+**Work:** Extend stored clock-query ownership to gameplay identity queries.
+Connect native terrain identity runs and actor-family records to source-selected
+spatial queries without generic per-cell records. Publish movement, mask/image,
+activation, rebinding and retirement in source order; implement the selected
+tree traversal and mixed spatial flush/post-pass retention. Complete terrain
+animation/image updates, retained wall End Step and synchronous limboShard 379
+births. Preserve coincident walls and first-hit identity, not just occupancy.
+**Done when:** Normal-world identity-bearing queries select the same source ID
+as the registered reference under overlapping/moving/destroyed candidates.
+Include a field that determines shard direction, coincident walls, actor rebinding
+and area-four wall End Step. Full ownership and terrain replay gates pass.
+
+#### 1.06 Replace projectile approximations at their live setters
+**Depends on:** 1.02, 1.05.
+**Work:** Replace usual-gun Q20/Q32 live trajectory adapters with the recovered
+setter/trig path, retaining absolute room coordinates and wrapper rounding.
+Publish speed/direction/position mutations in order; retain muzzle births,
+RNG, collisions and destruction timing. Connect non-precise line selection.
+**Done when:** Both normal shooting paths use the same source-backed motion and
+selection rules. A replay covers fractional/negative coordinates, wall/enemy
+contacts, range expiry and multiple candidates, including source IDs and effect
+birth order. Display-coordinate agreement alone does not pass.
+Reference: [projectile contract](projectile-motion.md).
+
+#### 1.07 Install the single ordered encounter dispatch boundary
+**Depends on:** 1.05–1.06.
+**Work:** Replace the narrower frontend pass with one sealed candidate stream.
+Install dispatch routing for skeleton/bone/player/bullet, smoke/blood/wall and entry/exit-field pairs,
+including reverse handlers and the authored dither 61/wall pair. Supply real
+settings/ending state. Use `dispatchSkeletonEncounterCollision` and the stored
+registered encounter admission with the real player factory/damage script.
+Do not run extra per-family collision passes behind it.
+**Done when:** Simultaneous contacts, reverse events, callback destruction and
+wall retirement produce one source-ordered event transcript in both live worlds.
+Every admitted pair has a handler or an explicit unsupported failure, never
+a placeholder. Collision ordering is independent of storage/Draw order.
+At this boundary, unimplemented families must fail explicitly; 1.09–1.13 own
+their concrete handlers and 1.15 must admit the whole encounter without those
+failures. Closing this dispatch task does not close those family tasks.
+
+#### 1.08 Finish mixed phase and painter publication
+**Depends on:** 1.02, 1.05; install each family as its task lands.
+**Work:** Complete mixed Begin Step, animation, alarms, ordinary Step, collision,
+End Step and cleanup without legacy duplicate passes. Publish deferred depth
+changes, pending activation and Draw-time structural mutations. Use selected
+GMS2 layer/element traversal, including inactive-instance termination and the
+box's -60000 override. Merge terrain, fields and effects at original boundaries;
+keep room animation order separate from Draw. Preserve entry-dither view reads
+and effect-surface Draw.
+**Done when:** A mixed production encounter records phase and painter order
+including same-frame birth, destruction, activation and depth changes. Both
+backends match the recovered ordering contract, and pixel tests cover overlap
+rather than isolated sprites.
+References: [phase eligibility](runner-step-eligibility.md),
+[alarms](runner-alarms.md), [animation](runner-image-fields.md).
+
+### Milestone III — time-stop and complete damage/death chains
+
+#### 1.09 Connect time-stop, fields and shards
+**Depends on:** 1.01–1.02, 1.05, 1.08.
+**Work:** Install player Begin Step checkStop/pTimeStop and parent-field queries.
+Connect startTimeField 371, ordinary/exit fields and wind contacts to live settings,
+audio and scheduling. Admit Timeout object 82 from real damage, plus time-shard
+and time-change births through the source allocator. Preserve fractional/mirrored
+contacts, moving shards during paused gravity/animation, independent alarm
+cooldowns, transition effects and RNG. Goal-stop/shop locks are not pTimeStop.
+**Done when:** Natural entry, overlapping fields, exit and damage-triggered
+Timeout run on both frontends with correct freeze/resume, shards, sound guards,
+RNG and cross-family Draw. Neither backend bypasses the real stop state.
+Reference: [time-stop identity](time-stop-collision.md).
+
+#### 1.10 Connect actual player damage and knockback
+**Depends on:** 1.06–1.09.
+**Work:** Bind shared damage scripts at natural enemy/bone contacts. Preserve
+immunity checks, player writes, hit effects, controller/audio side effects and
+their order. Replace non-coincident fixed-point knockback with the source
+point-direction/lengthdir path through subsequent motion. Resolve live damage
+text formatting/placement, including fractional values if reachable.
+**Done when:** Bone/enemy hit, simultaneous hit, immunity, stomp and fatal-hit
+routes produce checked state/effect transcripts in both frontends. Measure native
+contact cost and compare source-backed direction/placement, not merely two ports.
+Original runtime uncertainty remains separately tracked in 1.17.
+
+#### 1.11 Complete natural destruction and reward creation
+**Depends on:** 1.02, 1.05, 1.08–1.10.
+**Work:** Install registered Scattered16 289 Step/contact/Draw, including bullets,
+forced-jump player writes/full recharge and Exploding Knees. Replace removal-only
+box destruction with ordered sound, smoke, flash, impact, chain reaction, debris
+and reward creation. Use source IDs and published debris state, not atomic legacy
+registration. Bind actual tile/view/settings/audio. Connect registered currency
+creation, homing, collection and Draw; establish unnormalized angle/trig behavior.
+**Done when:** Naturally shot/stomped scenery and chained boxes emit the complete
+effect/reward sequence on both builds with checked RNG, IDs, money and retirement.
+Include debris time-stop and capacity failure. No manually spawned effect fixture
+is used to claim the natural chain complete.
+
+#### 1.12 Finish blood, corpse, blast and flash lifecycles
+**Depends on:** 1.02, 1.05, 1.08–1.11.
+**Work:** Install registered blood/smoke/flash/corpse/expiry/blast owners around
+natural callers, removing legacy flash-pool and equivalent bypasses. Supply live
+mask/tile/time-stop/Knife and Fork state. Preserve synchronous child Create,
+rotated-mask contacts, particle order, corpse consumption and expiry before
+rewards/retirement. Keep death/low-spec direct Draw at its original depth.
+**Done when:** Natural death and consumption routes exercise complete effect
+chains on both targets; overlapping currency/smoke shade holes and retained
+restoration match pixel oracles, and simultaneous wall contacts retire correctly.
+Reference: [skeleton effect contracts](skeleton-effect-ownership.md),
+[effect surfaces](effect-surfaces.md).
+
+#### 1.13 Connect death bookkeeping, first-land and controller HUD
+**Depends on:** 1.02, 1.08–1.12.
+**Work:** Route natural enemy-death callers through shared run-state bookkeeping:
+actual toggleGuncut, achNoKill, momentDelay and levelBeginCue audio/creation.
+Install firstLand/BGM and levelNumber 372 with real language/font/surface Draw.
+Complete controller HUD streak geometry, Gemhigh, timer flashing, leading spaces,
+icon centering and pause/time-stop guards in source Draw order. Use fully owned
+controller identities, not an assumed singleton standing in for any population.
+**Done when:** Natural first landing, kills, streak change/reset and paused/unpaused
+HUD behavior run through the same shared path on both targets with source IDs,
+audio order and pixel checks. No successful placeholder callbacks remain.
+
+#### 1.14 Complete Result handoff and Retry
+**Depends on:** 1.02, 1.08, 1.10, 1.13.
+**Work:** Dispatch ordered Room End, load destination layers and rebind persistent
+object 37. Admit native exit wipe to mixed destination alarms and finish stored
+Result alarm storage/activation publication. Supply the actual shared room-speed
+global; PAL pacing must not overwrite it with 50. Implement fired controller
+events in the recovered Result contract; no old combat pass behind menus and no
+batching all controller alarms ahead of Result alarms.
+**Done when:** Natural death reaches rmResult, waits, accepts input and retries
+twice on both builds with correct persistent state, alarm order, teardown and
+source allocator behavior. Include pending alarms at the handoff.
+Reference: [Result contract](original-behavior-audit.md#result-room-population-and-persistent-alarms).
+
+### Milestone IV — natural skeleton encounter and final evidence
+
+#### 1.15 Enable the registered skeleton and bone route
+**Depends on:** 1.01–1.14.
+**Work:** Install `withRegisteredSkeletonEvents` and native
+`stepRegisteredSkeleton` in normal production scheduling, with real allocator,
+tile, query, audio, settings, stop and reward environments. Route naturally
+generated skeletons and synchronous bone births to these owners. Remove the
+replaced encounter branches, not unrelated area-two content.
+**Done when:** A deterministic input-only route reaches a naturally generated
+skeleton, witnesses a throw and wall/player bone contact, shoots and stomps
+skeletons, collects rewards, observes death effects and out-of-view retirement,
+then dies/retries. It runs on both executables without a fixture-only birth.
+Capacity failure stops later work while preserving the completed prefix.
+
+#### 1.16 Add and run end-to-end encounter verification
+**Depends on:** 1.15.
+**Work:** Record route/seed/build/input hashes and coverage counters for the
+encounter above. Compare full per-frame state, RNG, source IDs, phase/contact/
+painter order and lifetimes, not only a final digest. Capture both renderers
+during overlapping effects. Run the relevant component regressions,
+`make verify-cross-replay` and `make verify-terrain-ownership`; ensure their
+actual coverage includes the new route or extend it.
+**Done when:** The normal executables pass the same declared route, failures
+identify the first divergent frame, and coverage proves every required event
+ran. Repeat after Retry. A passing old cavern tape does not close this task.
+
+#### 1.17 Close original-runner evidence gaps
+**Can proceed independently; required for full fidelity sign-off.**
+**Work:** Resolve selected collision-family/same-object traversal, precise and
+rotated-mask sampling, runtime FP rounding/control state and uncertain GPU
+raster behavior against the original runner. Keep assembly/resource evidence
+separate from inferred runtime behavior. Obtain original encounter/overlap
+captures for comparison, including damage direction and currency/smoke shade.
+The user has no Windows environment; first establish an available way to execute
+the original or obtain trusted captures. Do not assume installing Wine or renting
+a machine is authorized, or that compatibility-layer output proves Windows FP.
+
+**Done when:** Each uncertainty has original-runtime evidence or a sufficient
+source/binary proof covering the actual path. Missing x87/MXCSR runtime evidence
+must remain explicitly unverified; host/native agreement cannot close it.
+References: [collision bounds](runner-collision-bounds.md),
+[FP startup evidence](runner-fp-startup.md). This external-evidence gap does not
+block implementing or testing the other tasks locally.
+
+#### 1.18 Validate the integrated A500 workload and memory
+**Depends on:** 1.15–1.16.
+**Work:** Run bounded native natural-encounter captures, including dense smoke,
+debris, gems, fields, shops and Retry. Measure actual per-owner costs, worst
+gameplay frames, Chip/Fast peaks and stack/capacity margins. Confirm 68000-only
+output and meaningful allocation failures. Use offline assets and retained
+hardware scrolling; no runtime sprite conversion or silent RAM expansion.
+**Done when:** Reproducible measurements and coverage are recorded in the commit;
+newly exposed costs and fit failures have concrete entries in §5/§7. Do not claim
+20 ms or stock-A500 fit unless the measurements prove them. Finishing §1's
+integration does not erase those separate performance/memory requirements.
 
 ## 2. Make catacombs playable
 
