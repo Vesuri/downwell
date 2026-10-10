@@ -130,8 +130,6 @@ int main(){
     require(owner.children().collideCaseBullet(caseKey,107)&&owner.children().state(caseKey)->wallHp==0,
         "case bullet event changes health, not destruction state");
     auto& caseState=const_cast<ShopChildState&>(*owner.children().state(caseKey));
-    caseState.destroyed=caseState.storedItem=caseState.flashing=1; // Pending damage caller fixture.
-    const_cast<InstanceRecord*>(live.instance(caseId))->alarms.set(0,1);
     struct CaseEnvironment {
         StartupRuntime& world;unsigned id,calls=0;
         bool sound(int a,int b,int c,int d){require(calls++==0&&a==10&&b==50&&c==0&&d==1,"case sound order");return true;}
@@ -142,6 +140,11 @@ int main(){
         }
         bool criminal(){require(calls++==2,"criminal follows flash");return true;}
     } caseEnvironment{live,caseId};
+    require(live.withShopCaseEvents(owner.children(),caseEnvironment,[&]{live.step(false);return live.effectsSucceeded();})&&
+        !caseState.destroyed&&!caseState.opened&&caseState.wallHp==0&&caseEnvironment.calls==0,
+        "zero case health does not synthesize a destroyed write or opening effects");
+    caseState.destroyed=caseState.storedItem=caseState.flashing=1; // Synthetic dormant-branch coverage only.
+    const_cast<InstanceRecord*>(live.instance(caseId))->alarms.set(0,1);
     for(unsigned tick=0;tick<2;++tick){
         require(live.withShopCaseEvents(owner.children(),caseEnvironment,[&]{live.step(false);return live.effectsSucceeded();}),
             "registered case joins mixed alarm and Step phases");

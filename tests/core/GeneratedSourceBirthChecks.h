@@ -165,11 +165,9 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
         const auto caseId=creation.create(279,480,2000);const auto caseKey=store.sourceHandle(caseId);
         assert(store.collideCaseBullet(caseKey,106)&&store.find(caseKey)->state.wallHp==1000000);
         assert(store.collideCaseBullet(caseKey,107)&&store.find(caseKey)->state.wallHp==0);
-        // Fixture setup represents the still-unconnected damage caller's
-        // user-variable write, not instance_destroy or implicit HP polling.
+        // Zero health must not invent an opening transition. The later
+        // explicit write only covers the source's dormant opening branch.
         auto& caseState=const_cast<ShopChildState&>(store.find(caseKey)->state);
-        caseState.destroyed=caseState.storedItem=caseState.flashing=1;
-        assert(store.setAlarm(caseKey,0,1));
         struct CaseEnvironment {
             const GameplayShopInstances& store;InstanceHandle key;unsigned calls=0;
             bool sound(int a,int b,int c,int d){assert(calls++==0&&a==10&&b==50&&c==0&&d==1);return true;}
@@ -180,6 +178,12 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             }
             bool criminal(){assert(calls++==2);return true;}
         } caseEnvironment{store,caseKey};
+        assert(collision->withEncounterSteps(*phase,[&](InstanceHandle h,int object){
+            assert(object==279);return collision->stepRegisteredShopCase(h,caseEnvironment);
+        },[&]{world->step(0);return world->effectsSucceeded();}));
+        assert(!caseState.destroyed&&!caseState.opened&&caseState.wallHp==0&&caseEnvironment.calls==0);
+        caseState.destroyed=caseState.storedItem=caseState.flashing=1;
+        assert(store.setAlarm(caseKey,0,1));
         for(unsigned tick=0;tick<2;++tick){
             assert(collision->withEncounterSteps(*phase,[&](InstanceHandle h,int object){
                 assert(object==279);return collision->stepRegisteredShopCase(h,caseEnvironment);

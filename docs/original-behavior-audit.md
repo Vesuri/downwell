@@ -792,9 +792,18 @@ only if `storedItem` is set. Required effect/global callbacks cannot be omitted;
 failure retains the accepted prefix and latches the enclosing status. Alarm 0
 resets image/flashing only before opening. The bullet event only sets health
 to zero when the other sprite is 107; it does not itself set `destroyed`.
-The ordered live contact/damage caller and real sound/flash/criminal adapters
-remain required before frontend admission. Tests that initialize the destroyed
-user variable directly do not establish natural breakage.
+There is no evidenced health-to-`destroyed` transition for this case in the
+pinned build. The complete hash-checked 2,501-root assembly corpus writes
+`destroyed` only in the three Creates (case, gem chunk and gem sphere) and the
+two gem Steps. Case ancestry is 279 → 57 → 56, with only PreCreate on the
+ancestors. The corpus has no dynamic variable setters, eval, instance changes,
+explicit event dispatch or indirect script/method calls that supply a missing
+case write. `verify-main-room-lifetime.py` guards these facts. Do not transplant
+the gem health-driven destruction path into shop cases. Both room tests retain
+the closed case after the bullet event sets health to zero; the explicit flag
+write covers only the dormant opening branch, not natural breakage. Ordered
+bullet contact admission remains open. Sound/flash/criminal callbacks preserve
+the dormant branch but are not evidence of a missing natural damage caller.
 Registered keeper alarms use the same shared handler body in the native and
 stored owners. The native mixed dispatcher advances each slot immediately
 before its handler and takes `irandom_range(20,60)` from the world RNG; rejected

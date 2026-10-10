@@ -44,6 +44,7 @@ roots = {c["name"] for c in manifest["resources"]["code"] if c["parentId"] < 0}
 assert {p.stem for p in assembly} == roots and len(roots) == 2501
 corpus = sha256()
 references = {}
+destroyed_writes = {}
 for path in assembly:
     body = path.read_bytes()
     corpus.update(path.name.encode() + b"\0")
@@ -51,7 +52,12 @@ for path in assembly:
     text = body.decode()
     if re.search(r"\bautoTile\b", text):
         references[path.stem] = [line for line in text.splitlines() if re.search(r"\bautoTile\b", line)]
+    writes = [line for line in text.splitlines() if re.match(r"pop\S* .*\.destroyed$", line)]
+    if writes:
+        destroyed_writes[path.stem] = writes
     assert not re.search(r"call[^\n]*\b(?:variable_instance_set|variable_struct_set|execute_string|execute_file)\b", text)
+    assert not re.search(r"call[^\n]*\b(?:instance_change|event_perform|event_perform_object|script_execute|method_call)\b", text)
+    assert not re.search(r"^callv\b", text, re.M)
 assert corpus.hexdigest() == "f0fdfee7e3ef7d80d4963bf41b032893163718404b656ab267688724a87dc5c1"
 assert references == {
     "gml_Object_objBox_n_Create_0": ["pop.v.i self.autoTile"],
@@ -60,5 +66,18 @@ assert references == {
 }
 create = (export / "Assembly/gml_Object_objBox_n_Create_0.asm").read_text()
 assert "pushi.e 0\npop.v.i self.autoTile" in create
+assert destroyed_writes == {
+    "gml_Object_shopCase_Create_0": ["pop.v.i self.destroyed"],
+    "gml_Object_gemChunk_Create_0": ["pop.v.i self.destroyed"],
+    "gml_Object_gemChunk_Step_0": ["pop.v.i self.destroyed"],
+    "gml_Object_objGemSphere_Create_0": ["pop.v.i self.destroyed"],
+    "gml_Object_objGemSphere_Step_0": ["pop.v.i self.destroyed"],
+}
+objects = manifest["resources"]["objects"]
+assert objects[279]["parentId"] == 57 and objects[57]["parentId"] == 56 and objects[56]["parentId"] == -1
+assert all(e["eventType"] == 14 for oid in (57,56) for e in objects[oid]["events"])
+case_create = (export / "Assembly/gml_Object_shopCase_Create_0.asm").read_text()
+assert "pushi.e 0\npop.v.i self.destroyed" in case_create
+print("Pinned shop case: no destroyed writer beyond Create in its event ancestry; zero health is not an opening transition")
 print("Pinned 2501 root bodies: box autoTile is assigned false only; no dynamic variable setter/eval calls")
 print("Pinned live scrOutofview callers: actors in End Step, Scattered16 in ordinary Step")

@@ -139,8 +139,9 @@ struct ShopWorld {
     // Current shop children all belong to parentWall (57). The counter and
     // friendly keeper do not. Pure query in room coordinates, suitable for
     // each <=8-pixel LaserSightRay step; never dispatch damage or consume RNG.
-    // Destructible-case behavior is not yet modeled by ShopWorld: when added,
-    // its noMask transition must also remove that case from the visitor above.
+    // Do not remove a case merely because wallHp reaches zero: the pinned
+    // source has no natural writer that raises its destroyed flag. Registered
+    // ownership retains the dormant opening branch and its noMask setter.
     bool rayWallIntersects(const ProjectileSegment& path) const {
         bool hit = false;
         visitPlayerSolids([&](Rectangle r) {
