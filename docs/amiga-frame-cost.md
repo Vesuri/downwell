@@ -55,6 +55,52 @@ raw instruction captures are disposable after comparison.
 
 ## Historical pre-integration audit
 
+### Early-game regression comparison
+
+The saved `13e08ca2` trace ELF and `3e0a3080`'s implementation have identical
+80 consecutive observable-state samples (ticks 0–79): player fixed-point
+position/velocity, camera pixels, health, ammo, enemy count, bullet-slot extent
+and RNG draw count. Both run with 512 KiB Chip, 8 MiB Fast and the default
+512 KiB slow RAM. This is evidence for comparing early workload costs, not a
+full state digest or proof that later gameplay is equivalent.
+
+`amiga/profile_early_state.gdb` collects these samples from the per-frame
+trace marker. With the matching saved trace ELF and stripped Hunk installed,
+run `VERIFY_CHIP_KB=512 VERIFY_TIMEOUT_SECONDS=60
+GDB_SOURCE=profile_early_state.gdb READY_MARKER=DOWNWELL_PROFILE_READY bash
+amiga/verify_startup.sh`. Preserve `.run/gdb-startup.log` after each run and
+compare its `EARLY` lines. The debugger stops invalidate timing; instruction
+traces from separate uninterrupted captures supply the costs below.
+
+Frame 51 is **19.2 ms historically versus 56.1 ms currently**. The current
+56.11 ms trace attributes 45.97 ms to gameplay Step, including these inclusive
+costs (parent and child rows must not be added):
+
+| Work | ms |
+| --- | ---: |
+| Actor End Step dispatch and execution | 18.73 |
+| Bullet End Step view retirement, inside that dispatch | 12.15 |
+| Alarm dispatch | 9.65 |
+| Bullet Step effects and publication | 3.91 |
+| Room animation callback | 2.74 |
+| Player movement | 2.70 |
+
+Bullet retirement repeatedly resolves the same published lifetime and
+recomputes view thresholds using binary64 operations. Its source-ordered
+destruction callbacks and subsequent rereads are intentional semantics;
+removing them without proving the admitted callback behavior is not a valid
+optimization. Alarm dispatch repeatedly traverses captured object groups,
+including absent-event groups. These are measured early-game costs even
+before any enemies have spawned, not consequences of the deeper later route.
+
+Evidence: `tmp/early-baseline-{old,current}/state.log`, current frame report
+`tmp/early-baseline-current/frame51.txt`, historical window report in
+`tmp/prof/audit-13e08ca2/`. Historical ELF SHA-256 is
+`26bb4f25411a7d2344342f50447ac567f286e03d26bb44cefc643ab7e06a6e8f`;
+current is `3aa1e229376680c1ada7d5c084133fc0a5950f4062e4ab87aeafae534280eaac`.
+
+### Full historical workload
+
 Default A500 build at `13e08ca2` (2026-10-08), compared with the supplied
 `36d8a0f2` audit. Remaining work is ranked in
 [open-work §5](open-work.md#5-meet-the-amiga-frame-budget). This is a snapshot
