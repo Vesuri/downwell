@@ -2820,6 +2820,10 @@ build/amiga-gameplay-draw-list-replay-test: $(GAMEPLAY_DRAW_LIST_TEST_SOURCES) $
 test-amiga-gameplay-draw-list: build/amiga-gameplay-draw-list-test build/amiga-gameplay-draw-list-replay-test
 	./build/amiga-gameplay-draw-list-test
 	./build/amiga-gameplay-draw-list-replay-test
+.PHONY: test-red-ball-art
+test-red-ball-art: generate-amiga-game
+	python3 tests/red-ball-art-test.py
+test: test-red-ball-art
 test: test-amiga-gameplay-draw-list
 
 .PHONY: test-amiga-landing-index

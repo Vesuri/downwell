@@ -361,6 +361,46 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
             DW_PROFILE_SCOPE(profileActorPreparation);
             if(downwell::RunnerSpatialSplit::less(depth,foregroundDepth)&&!drawForeground())return false;
             if(kind==GameplayWorld::DrawActor::player)return port.findPlayer(key)&&drawPlayer();
+            if(kind==GameplayWorld::DrawActor::redBall){
+                const auto* record=port.redBalls()?port.redBalls()->find(key):nullptr;
+                if(!record)return false;
+                struct Ops {
+                    using N=downwell::MotionBinary64;
+                    const downwell::GameplayRedBalls::Record& actor;
+                    decltype(append)& paint;
+                    int viewX,viewY;bool noControl;
+                    bool shade(){
+                        // The common effect-surface pass consumes this same
+                        // registered actor via visitRegisteredEnemyShades.
+                        // Validate its placement here; do not paint the shade
+                        // as a visible body sprite or duplicate the surface.
+                        downwell::EffectSurfacePlacement::Draw placement;
+                        const downwell::EffectSurfacePlacement::View view{N::fromInteger(viewX),N::fromInteger(viewY),
+                            N::fromInteger(160),N::fromInteger(284)};
+                        return downwell::EffectSurfacePlacement::enemyShade(actor.x.promoted(),actor.y.promoted(),
+                            view,false,noControl,true,placement);
+                    }
+                    bool drawSelf(){
+                        std::int32_t x,y,scale;unsigned frame;
+                        return actor.x.roundPixel(x)&&actor.y.roundPixel(y)&&actor.scaleX.roundPixel(scale)&&
+                            (scale==1||scale==-1)&&downwell::GameplayRedBalls::drawFrame(actor.spriteId,actor.imageIndex,frame)&&
+                            paint(actor.spriteId,frame,downwellPlayfieldX+x-viewX,y-viewY,scale<0);
+                    }
+                    bool imageIndex(N& frame){frame=actor.imageIndex.promoted();return true;}
+                    bool drawSpriteExt(int sprite,N index,N x,N y,int sx,int sy,int angle,unsigned color,int alpha){
+                        const auto expected=actor.imageIndex.promoted();
+                        std::int32_t px,py;unsigned frame;
+                        // All five eye resources have five frames. The body
+                        // supplies its unchanged index in [0,4), so the same
+                        // floor selects both images, including stun frame 0.
+                        return sprite>=181&&sprite<=185&&(sx==1||sx==-1)&&sy==1&&!angle&&color==0xffffffu&&alpha==1&&
+                            index.high==expected.high&&index.low==expected.low&&x.roundPixel(px)&&y.roundPixel(py)&&
+                            downwell::GameplayRedBalls::drawFrame(actor.spriteId,actor.imageIndex,frame)&&
+                            paint(sprite,frame,downwellPlayfieldX+px-viewX,py-viewY,sx<0);
+                    }
+                } ops{*record,append,worldViewX,worldViewY,port.shops().noControl};
+                return port.drawRegisteredRedBall(key,ops);
+            }
             if(kind==GameplayWorld::DrawActor::whiteJelly){
                 const auto* record=port.whiteJellies()?port.whiteJellies()->find(key):nullptr;
                 std::int32_t x,y;unsigned frame;

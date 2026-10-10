@@ -110,6 +110,11 @@ SELECTIONS = {
         176: None,   # sprEnmWhiteJelly
         177: None,   # sprEnmSnail
         178: None,   # sprEnmSnailHit
+        181: None,   # red-ball directional eyes (source IDs retained)
+        182: None,
+        183: None,
+        184: None,
+        185: None,
         186: None,   # sprGroundedTurtle
         187: None,   # sprGroundedTurtleFall
         188: None,   # sprGroundedTurtleWalk
@@ -151,6 +156,8 @@ SELECTIONS = {
         729: None,   # infosp
         695: None,   # sprControls
         696: None,   # sprDevolverLogo
+        702: None,   # sprRedBall
+        703: None,   # sprRedballStun
         733: None,   # sprDitherFade
     },
 }
@@ -650,7 +657,7 @@ def build_records(manifest, extracted, profile, language_path=None):
             if profile == "game" and sprite_id == 96:
                 canvas = flash_palette_canvas(canvas)
             if profile == "game" and sprite_id in (84, 85, 96, 101, 153, 154, 157, 162, 163, 164,
-                    166, 168, 170, 173, 177, 178, 186, 187, 188, 205, 207, 208, 278,
+                    166, 168, 170, 173, 177, 178, 181, 182, 183, 184, 185, 186, 187, 188, 205, 207, 208, 278, 702, 703,
                     458, 459, 460, 471, 485, 486, 487, 496, 497, 602, 603, 605):
                 # Prepare snail Y flips and crawler quarter turns on the host.
                 # Crop transparent padding to keep variants Chip-RAM cheap.
@@ -680,7 +687,7 @@ def build_records(manifest, extracted, profile, language_path=None):
                             ox, oy = oy, canvas.width - ox
                     bounds = variant.getbbox()
                     require(bounds is not None, "empty oriented actor frame")
-                    if gun_spread or sprite_id in (84, 85, 101):
+                    if gun_spread or sprite_id in (84, 85, 101, 181, 182, 183, 184, 185, 702, 703):
                         # Projectile art and smoke's final single-pixel frame
                         # can sit beyond their origin. Keep that anchor inside
                         # the DMA frame when cropping, without moving pixels.
@@ -1005,7 +1012,7 @@ def build_records(manifest, extracted, profile, language_path=None):
     if profile == "game":
         hardware = []
         actors = (0, 1, 3, 12, 15, 27, 31, 37, 84, 85, 96, 101, 133, 134, 153, 154, 157, 162, 163, 164,
-                  166, 168, 170, 173, 177, 178, 186, 187, 188, 205, 207, 208, 278, 458, 459, 460,
+                  166, 168, 170, 173, 177, 178, 181, 182, 183, 184, 185, 186, 187, 188, 205, 207, 208, 278, 458, 459, 460, 702, 703,
                   485, 486, 487, 496, 497, 602, 603, 707)
         for sprite, frame_index, dma_width, planar in encoded:
             if sprite["id"] not in actors:

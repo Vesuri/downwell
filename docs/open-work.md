@@ -556,7 +556,8 @@ Reference: [scene architecture](scene-architecture.md).
 - Budget further Chip residency against the measured 928-byte startup
   headroom; remeasure after pack growth and through scene transitions.
   Restore the renderer's 120,000-byte resident-art gate: the current pack
-  requires 126,168 bytes (125,914 without consumption-particle sprite 92).
+  requires 169,294 bytes. Reconcile gameplay-family residency before admitting
+  the additional encounter artwork on a stock-memory machine.
   Keep the gate unchanged until residency is reduced or a new whole-program
   allocation measurement justifies a different budget.
   Keep the 68000 CPU target; do not silently increase emulator Chip RAM

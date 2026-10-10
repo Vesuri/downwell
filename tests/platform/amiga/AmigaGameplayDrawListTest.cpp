@@ -36,6 +36,44 @@ int main() {
             auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
             assert(owner->attach(*world)&&(!native||world->bindNativeTerrain(*terrain))&&owner->configureCorpseMasks(masks));
             {
+                using N=downwell::MotionBinary64;using F=downwell::RunnerImageValue;
+                auto& store=owner->redBalls();downwell::InstanceHandle ball;downwell::GameMakerRandom random(19);
+                struct Ops {
+                    downwell::GameplayRedBalls& store;downwell::InstanceHandle key;
+                    bool position(bool y,F v,F& out){return store.position(key,y,v,out);}
+                    bool playerX(N& v){v={};return true;}bool playerY(N& v){v={};return true;}
+                    bool pointDirection(N,N,N,N,N& v){v={};return true;}
+                    bool direction(N v,N& out){out=v;return true;}
+                    bool imageSpeed(F v,F& out){out=v;return true;}
+                    bool alarm(int n,int value){return store.setAlarm(key,n,value);}
+                };
+                assert(store.create(105187,{0x43700000u},{0x43000000u},random,
+                    [&](auto key){return Ops{store,key};},ball));
+                for(unsigned tick=0;tick<8;++tick)assert(store.advanceAnimation(ball));
+                auto list=std::make_unique<AmigaGameplayDrawList>();UBYTE pack[8]{};
+                const int directions[]={0,90,180,270,358},eyes[]={182,185,182,181,182};
+                const bool mirrors[]={false,false,true,true,false};
+                for(int sprite:{702,703})for(int facing:{-1,1})for(unsigned n=0;n<5;++n){
+                    assert(store.sprite(ball,sprite)&&store.xscale(ball,facing)&&store.dispatch(ball,[&](auto& actor){
+                        actor.playerDirection=N::fromInteger(directions[n]);return true;
+                    }));
+                    for(bool composite:{false,true}){
+                        assert(list->collect(*world,pack,pack+8,160,34,composite));unsigned seen=0;
+                        for(unsigned i=0;i<list->count;++i)if(list->actors[i].sprite==sprite){
+                            const auto& body=list->actors[i];assert(i+1<list->count);const auto& eye=list->actors[i+1];
+                            assert(body.frame==unsigned(sprite==702?1:0)&&body.x==190&&body.y==94&&body.flip==(facing<0));
+                            assert(eye.sprite==eyes[n]&&eye.frame==body.frame&&eye.x==190&&eye.y==89&&eye.flip==mirrors[n]);
+                            ++seen;
+                        }
+                        assert(seen==1&&store.find(ball)->eyeInitialized&&store.find(ball)->eye==eyes[n]);
+                    }
+                }
+                // Unmatched 359 retains the previous eye.
+                assert(store.dispatch(ball,[](auto& actor){actor.playerDirection=N::fromInteger(359);return true;}));
+                assert(list->collect(*world,pack,pack+8,160,34,true)&&store.find(ball)->eye==182);
+                assert(store.markDestroyed(ball)&&owner->prepareDraw()&&store.clear());
+            }
+            {
                 downwell::DeferredCreateInstance command(289,240,128);
                 command.integerImageIndex=12;command.integerScaleX=-1;
                 assert(owner->scattered().adopt(105189,command));
