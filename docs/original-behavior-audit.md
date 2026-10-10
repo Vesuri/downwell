@@ -742,9 +742,14 @@ the upper bound (Y+3000) only if needed. Outside those bounds it reads room,
 and only in room 11 queries/stops the current radio and marks the parent for
 destruction. Other 5 (Room End) only queries/stops radio, without destroying
 the parent or children. Radio is reread for stop after the playing query.
-Publication failure prevents later effects. These explicit owner entries still
-need mixed End Step/Room End scheduling and concrete device-audio bindings;
-calling them in a fixture does not establish natural room retirement.
+Publication failure prevents later effects. Native registered parents join the
+existing mixed End Step snapshot and pre-Draw retirement; children remain in
+their own lifetimes. `withShopRadioEvents` supplies required playing/stop
+callbacks, and an out-of-view parent without that scope fails instead of
+silently skipping radio shutdown. View Y comes from the same live world End
+Step value as the other registered actors. Stored mixed End Step, both Room
+End schedules and concrete device-audio bindings remain to be connected;
+registered-world tests do not establish normal frontend shop retirement.
 
 `StoredShopChildRegistration` implements these six child resources' synchronous
 Create bodies in real `InstanceStore` records, borrowing the room counter and

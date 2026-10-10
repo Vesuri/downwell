@@ -206,6 +206,28 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             assert(collision->prepareDraw()&&store.find(caseKey)&&!store.find(caseKey)->destroyRequested&&
                 store.find(caseKey)->state.opened&&!store.find(caseKey)->state.flashing&&caseEnvironment.calls==3);
         }
+        assert(store.clear());
+        auto* distant=world->registerShopWithOwner(480,10000,creation);
+        assert(distant&&store.size()==11);
+        const auto distantKey=store.sourceHandle(distant->sourceId);
+        struct ScheduledRadio {
+            const GameplayShopInstances& store;InstanceHandle parent;unsigned queries=0,stops=0;
+            bool isPlaying(int id,bool& out){
+                assert(id==99&&store.find(parent)&&!store.find(parent)->destroyRequested);
+                ++queries;out=true;return true;
+            }
+            bool stop(int id){assert(id==99&&!store.find(parent)->destroyRequested);++stops;return true;}
+        } scheduled{store,distantKey};
+        assert(collision->withShopRadioEvents(scheduled,[&]{world->step(0);return world->effectsSucceeded();}));
+        assert(scheduled.queries==1&&scheduled.stops==1&&store.find(distantKey)->destroyRequested&&store.size()==11);
+        assert(collision->prepareDraw()&&!store.find(distantKey)&&store.size()==10);
+        for(unsigned i=0;i<3;++i)assert(store.find(store.sourceHandle(distant->children.items[i]))&&
+            store.find(store.sourceHandle(distant->children.cases[i])));
+        assert(store.clear());
+        auto* unbound=world->registerShopWithOwner(480,10000,creation);
+        assert(unbound);const auto unboundKey=store.sourceHandle(unbound->sourceId);
+        world->step(0);
+        assert(!world->effectsSucceeded()&&!store.valid()&&store.find(unboundKey)&&!store.find(unboundKey)->destroyRequested);
     }
     for(unsigned failure=0;failure<=12;++failure){
         auto world=std::make_unique<GameplayWorld>(300,false,1000,false);

@@ -125,7 +125,9 @@ private:
     mutable bool drawAuditHasSnapshot_=false;
 #endif
     RunnerStepSnapshot<1+GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity+GameplayWorld::droneBulletCapacity+GameplayWorld::boneCapacity+GameplayWorld::skeletonCapacity+GameplayWorld::currencyCapacity+32+32+4+4+8> combatAlarmPhase_;
-    RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::bulletCapacity+GameplayWorld::droneBulletCapacity+GameplayWorld::skeletonCapacity+GameplayPlayerControllers::capacity+32+GameplayWhiteJellies::capacity+GameplayRedBalls::capacity> actorEndStepPhase_;
+    RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::bulletCapacity+GameplayWorld::droneBulletCapacity+GameplayWorld::skeletonCapacity+GameplayPlayerControllers::capacity+32+GameplayWhiteJellies::capacity+GameplayRedBalls::capacity+ShopWorld::capacity> actorEndStepPhase_;
+    void* shopRadioContext_=nullptr;
+    bool (*shopRadioDispatch_)(void*,int,bool,bool&)=nullptr;
     bool actorEndStepExecuting_=false;
     bool combatAlarmPhaseInUse_=false;
     bool combatAlarmCaptureDirty_=true;
@@ -1554,7 +1556,7 @@ public:
             const auto* nativeTerrain=self.world_->nativeTerrainInstances();
             const unsigned terrainCount=nativeTerrain?nativeTerrain->size():self.terrain_.size();
             const auto terrainCutoff=nativeTerrain?nativeTerrain->lastLifetime():self.terrain_.lastLifetime();
-            if(!self.world_->playerHandle().generation&&!terrainCount&&!self.world_->breakableSlots()&&!self.world_->enemyCount()&&!self.world_->bulletCount()&&!self.drones_.size()&&!self.skeletons_.size()&&!self.whiteJellies_.size()&&!self.redBalls_.size()&&!self.playerControllers_.size()&&!self.corpses_.size())return true;
+            if(!self.world_->playerHandle().generation&&!terrainCount&&!self.world_->breakableSlots()&&!self.world_->enemyCount()&&!self.world_->bulletCount()&&!self.drones_.size()&&!self.skeletons_.size()&&!self.whiteJellies_.size()&&!self.redBalls_.size()&&!self.playerControllers_.size()&&!self.corpses_.size()&&!self.shopInstances_.size())return true;
             MotionBinary64 top;
             if(!multiplyBinary64(MotionBinary64::fromInteger(topQ12),{0x3f300000u,0},top))return self.check(false);
             return self.dispatchActorEndStep([&](InstanceHandle shared,int object){
@@ -1592,6 +1594,16 @@ public:
                 if(object==115&&kind==View::Kind::whiteJelly)return steeringEndStep(self.whiteJellies_);
                 if(object==118&&kind==View::Kind::redBall)return steeringEndStep(self.redBalls_);
                 if(object==263&&kind==View::Kind::corpse)return self.corpses_.endStep(local,top,true);
+                if(object==277&&kind==View::Kind::shop){
+                    struct Environment {
+                        GameplayCollisionOwner& owner;MotionBinary64 top;
+                        bool viewY(MotionBinary64& out){out=top;return true;}
+                        bool room(int& out){out=11;return true;}
+                        bool isPlaying(int id,bool& out){return owner.shopRadioDispatch_&&owner.shopRadioDispatch_(owner.shopRadioContext_,id,false,out);}
+                        bool stop(int id){bool unused=false;return owner.shopRadioDispatch_&&owner.shopRadioDispatch_(owner.shopRadioContext_,id,true,unused);}
+                    } env{self,top};
+                    return self.shopInstances_.parentLifetimeEvent(local,false,env);
+                }
                 if(object==256&&kind==View::Kind::playerController)
                     return self.playerControllers_.balloonEndStep(local,self.world_->upgrades().levels[15]!=0);
                 return object==266&&kind==View::Kind::drone&&self.drones_.endStep(local,top,MotionBinary64::fromInteger(284),true);
@@ -2100,7 +2112,7 @@ public:
             })))return false;
         if(!check(visitRegistered(View::playerControllerBase,View::capacity,
             [&](InstanceHandle h,int object,std::uint32_t flags){
-                if((flags&0x100003u)||(object!=256&&object!=263&&object!=115&&object!=118))return true;
+                if((flags&0x100003u)||(object!=256&&object!=263&&object!=115&&object!=118&&object!=277))return true;
                 return resolves(h)&&actorEndStepPhase_.append(h.slot,h.generation,object);
             })))return false;
         actorEndStepPhase_.sort();
@@ -2170,6 +2182,15 @@ public:
     GameplayWhiteJellies& whiteJellies(){return whiteJellies_;}
     GameplayRedBalls& redBalls(){return redBalls_;}
     GameplayShopInstances& shopInstances(){return shopInstances_;}
+    template<class Audio,class Tick> bool withShopRadioEvents(Audio& audio,Tick tick){
+        if(!valid()||shopRadioDispatch_)return check(false);
+        shopRadioContext_=&audio;
+        shopRadioDispatch_=[](void* p,int id,bool stop,bool& playing){
+            auto& audio=*static_cast<Audio*>(p);return stop?audio.stop(id):audio.isPlaying(id,playing);
+        };
+        struct Reset {GameplayCollisionOwner& owner;~Reset(){owner.shopRadioDispatch_=nullptr;owner.shopRadioContext_=nullptr;}} reset{*this};
+        return check(tick())&&valid();
+    }
     template<class Environment> bool stepRegisteredShopKeeper(InstanceHandle shared,Environment& environment){
         View::Kind kind;InstanceHandle local;
         if(!valid()||!world_||!resolves(shared)||!View::decode(shared,kind,local)||kind!=View::Kind::shop)return check(false);

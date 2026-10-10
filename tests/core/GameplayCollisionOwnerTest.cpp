@@ -56,6 +56,9 @@ struct NativeShopLifetimeEnvironment {
 bool nativeShopLifetime(downwell::GameplayShopInstances& owner,downwell::InstanceHandle key,bool roomEnd,NativeShopLifetimeEnvironment& env){
     return owner.parentLifetimeEvent(key,roomEnd,env);
 }
+bool nativeShopRadioFrame(downwell::GameplayCollisionOwner& owner,GameplayWorld& world,NativeShopLifetimeEnvironment& env){
+    return owner.withShopRadioEvents(env,[&]{world.step(0);return world.effectsSucceeded();});
+}
 bool nativeRegisteredCaseStep(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle key,NativeShopCaseEnvironment& env){
     return owner.stepRegisteredShopCase(key,env);
 }
