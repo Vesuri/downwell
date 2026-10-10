@@ -3,6 +3,7 @@
 #include "core/RisingTextRenderer.h"
 #include "core/ShopChildCreation.h"
 #include "core/ShopInventory.h"
+#include "ShopRadioChecks.h"
 #ifndef DOWNWELL_NATIVE_QUERY_PROBE
 #include <cstdio>
 #include <cstdlib>
@@ -178,6 +179,8 @@ bool shopParentRegistrationCheck(const ObjectPack& objects,unsigned area,unsigne
     if(!parent||parent->inheritedInitialized!=(reject!=1)||parent->shop!=&world.instances[0]||
        parent->speaking||parent->checkThis||parent->interactOk!=1||parent->textOver||parent->choice0!=-1)return false;
     if(expected){
+        ShopRadioProbe radioStep;radioStep.expectedRadio=shop->radio;
+        if(!owner.parentRadioStep(shop->sourceId,radioStep)||!shop->shopBgm||!radioStep.matches("tdlvgmpr"))return false;
         struct Radio {
             int expected;int view=1020;unsigned views=0,queries=0,stops=0;bool playing=true;
             bool viewY(MotionBinary64& y){++views;y=MotionBinary64::fromInteger(view);return true;}
@@ -315,6 +318,7 @@ bool registeredKeeperAlarmCheck(const ObjectPack& objects,bool reject){
 }
 #ifndef DOWNWELL_NATIVE_QUERY_PROBE
 int main(){
+    if(!checkShopRadioLogic())return 1;
     if(!shopLifetimeCheck())return 1;
     if(!shopCaseEventCheck())return 1;
     std::ifstream file("generated/downwell-objects.dwob",std::ios::binary);

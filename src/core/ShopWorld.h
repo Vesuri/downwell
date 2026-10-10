@@ -18,6 +18,7 @@ struct ShopWorld {
         std::uint32_t sourceId=0;
         ShopChildCreation children;
         int radio=-1;
+        bool shopBgm=false;
         int x = 0, y = 0;
         bool allocated = false, wallPresent = false;
         unsigned artRevision = 0;

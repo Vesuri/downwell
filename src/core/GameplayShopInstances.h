@@ -10,6 +10,7 @@
 #include "RunnerSpriteChange.h"
 #include "ShopKeeperAnimation.h"
 #include "ShopLifetimeEvents.h"
+#include "ShopRadioEvents.h"
 namespace downwell {
 // Native ownership of Shop and its ten synchronous children. Numeric IDs
 // belong to the enclosing room allocator, never to this generation pool.
@@ -107,6 +108,23 @@ public:
             }
         } ops{*this,r,h,environment};
         return (roomEnd?ShopLifetimeEvents::roomEnd(ops):ShopLifetimeEvents::endStep(r.y.promoted(),ops))||fail();
+    }
+    template<class Environment> bool parentRadioStep(InstanceHandle h,Environment& environment){
+        if(!ready(h,277))return fail();auto& r=records_[h.slot];
+        if(!r.active||r.destroyRequested)return true;
+        if(!r.shop)return fail();
+        struct Ops {
+            GameplayShopInstances& owner;Record& r;Environment& env;
+            bool timeStop(bool& out){return env.timeStop(out)&&owner.good_;}
+            bool death(bool& out){return env.death(out)&&owner.good_;}
+            bool distance(MotionBinary64& out){return env.distance(r.x.promoted(),r.y.promoted(),out)&&owner.good_;}
+            bool inView(bool& out){return env.inView(r.x.promoted(),r.y.promoted(),out)&&owner.good_;}
+            bool gain(MotionBinary64 value,int ms){return env.gain(r.shop->radio,value,ms)&&owner.good_;}
+            bool noBgm(bool& out){return env.noBgm(out)&&owner.good_;}
+            bool paused(bool& out){return env.paused(r.shop->radio,out)&&owner.good_;}
+            bool resume(){return env.resume(r.shop->radio)&&owner.good_;}
+        } ops{*this,r,environment};
+        return ShopRadioEvents::step(r.shop->shopBgm,ops)||fail();
     }
     bool advanceKeeperAnimation(InstanceHandle h){
         if(!ready(h,280))return fail();auto& r=records_[h.slot];

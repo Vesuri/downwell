@@ -3,6 +3,7 @@
 #include "core/Replay.h"
 #include "core/CurrencySmokeComposition.h"
 #include "QuietSkeletonEffects.h"
+#include "ShopRadioChecks.h"
 #ifndef DOWNWELL_NATIVE_QUERY_PROBE
 #include "SkeletonSoundChecks.h"
 #include "RegisteredSkeletonStompChecks.h"
@@ -55,6 +56,9 @@ struct NativeShopLifetimeEnvironment {
 };
 bool nativeShopLifetime(downwell::GameplayShopInstances& owner,downwell::InstanceHandle key,bool roomEnd,NativeShopLifetimeEnvironment& env){
     return owner.parentLifetimeEvent(key,roomEnd,env);
+}
+bool nativeShopRadioStep(downwell::GameplayShopInstances& owner,downwell::InstanceHandle key,ShopRadioProbe& env){
+    return owner.parentRadioStep(key,env);
 }
 bool nativeShopRadioFrame(downwell::GameplayCollisionOwner& owner,GameplayWorld& world,NativeShopLifetimeEnvironment& env){
     return owner.withShopRadioEvents(env,[&]{world.step(0);return world.effectsSucceeded();});

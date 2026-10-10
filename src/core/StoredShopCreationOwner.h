@@ -3,6 +3,7 @@
 #include "StoredShopChildRegistration.h"
 #include "ShopWorld.h"
 #include "ShopLifetimeEvents.h"
+#include "ShopRadioEvents.h"
 namespace downwell {
 // Concrete owner for ShopWorld::createRegistered. The compact shop owns stock
 // and menu state; its retained room record owns identity and builtins. Children
@@ -43,6 +44,24 @@ public:
         return nullptr;
     }
     auto& children(){return children_;}
+    template<class Environment> bool parentRadioStep(unsigned id,Environment& environment){
+        const auto* p=parent(id);auto* r=p?records_.resolve(p->key):nullptr;
+        if(!good_||!r||!p->shop)return fail();
+        if(!r->active||r->destroyRequested)return true;
+        struct Ops {
+            StoredShopCreationOwner& owner;const Parent& p;InstanceRecord& r;Environment& env;
+            static MotionBinary64 real(float f){RunnerImageValue v;std::memcpy(&v.bits,&f,4);return v.promoted();}
+            bool timeStop(bool& out){return env.timeStop(out)&&owner.good_;}
+            bool death(bool& out){return env.death(out)&&owner.good_;}
+            bool distance(MotionBinary64& out){return env.distance(real(r.preciseX),real(r.preciseY),out)&&owner.good_;}
+            bool inView(bool& out){return env.inView(real(r.preciseX),real(r.preciseY),out)&&owner.good_;}
+            bool gain(MotionBinary64 value,int ms){return env.gain(p.shop->radio,value,ms)&&owner.good_;}
+            bool noBgm(bool& out){return env.noBgm(out)&&owner.good_;}
+            bool paused(bool& out){return env.paused(p.shop->radio,out)&&owner.good_;}
+            bool resume(){return env.resume(p.shop->radio)&&owner.good_;}
+        } ops{*this,*p,*r,environment};
+        return ShopRadioEvents::step(p->shop->shopBgm,ops)||fail();
+    }
     template<class Environment> bool parentLifetimeEvent(unsigned id,bool roomEnd,Environment& environment){
         const auto* p=parent(id);auto* r=p?records_.resolve(p->key):nullptr;
         if(!good_||!r||!p->shop)return fail();

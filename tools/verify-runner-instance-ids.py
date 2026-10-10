@@ -222,6 +222,7 @@ inherited = assembly("gml_Object_parentInteractable_Create_0",
     "c7501948045f88afa9ab289ee4b1b5a380bb4de07aee3857eeba1e937a427647")
 assert "call.i" not in inherited and objects[91]["parentId"] == -1
 radio = shop[:shop.index("pushi.e 278\nconv.i.v")]
+assert "pushi.e 0\npop.v.i self.shopBgm" in radio
 assert "pushglb.v global.area\npushi.e 5\ncmp.i.v NEQ\nbf [5]" in radio
 assert "pushglb.v global.area\npushi.e 3\ncmp.i.v NEQ\nbf [3]" in radio
 for sound in (192,201):

@@ -4,6 +4,7 @@
 #include "core/StoredShopCreationOwner.h"
 #include "core/GameplayShopInstances.h"
 #include "core/ShopFixtures.h"
+#include "ShopRadioChecks.h"
 #include <cassert>
 #include <memory>
 #include <vector>
@@ -72,6 +73,8 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             bool stop(int id){assert(id==99);++stops;playing=false;return true;}
         } radio;
         const auto parentKey=store.sourceHandle(replacement->sourceId);
+        ShopRadioProbe radioStep;radioStep.expectedRadio=replacement->radio;
+        assert(store.parentRadioStep(parentKey,radioStep)&&replacement->shopBgm&&radioStep.matches("tdlvgmpr"));
         assert(store.parentLifetimeEvent(parentKey,true,radio)&&radio.stops==1&&!store.find(parentKey)->destroyRequested);
         radio.playing=true;
         assert(store.parentLifetimeEvent(parentKey,false,radio)&&radio.views==2&&radio.queries==1);

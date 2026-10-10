@@ -780,6 +780,19 @@ event binding, full body hash, traversal and key orderings are guarded by
 `verify-runner-instance-ids.py`; no claim of normal multi-shop parity follows
 from the compact interaction tests.
 
+`ShopRadioEvents` supplies blocks 1–16 of the inner body to both retained
+parent owners. It reads pTimeStop first; death is read only while stopped, and
+distance only before `shopBgm` latches. The strict source comparison against
+160 uses the shared VM-real comparator. Once latched, view-dependent gain
+(1 or binary64 0.3, duration 100) precedes the noBgm read. Muting issues a
+second gain request; otherwise the source checks paused and conditionally
+resumes. Leaving time-stop requests zero gain with duration zero before
+clearing the latch. Rejected operations retain the executed prefix. Owners
+read their live coordinates and radio handle for each callback, but actual
+point-distance, published-view, settings and device-audio adapters still
+belong to full parent Step admission; this component is not scheduled as an
+independent once-per-frame audio pass.
+
 `StoredShopChildRegistration` implements these six child resources' synchronous
 Create bodies in real `InstanceStore` records, borrowing the room counter and
 lifecycle publisher. Birth publication precedes Create setters; item image-index
