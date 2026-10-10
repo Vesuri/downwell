@@ -48,6 +48,18 @@ behavior, both backend integrations and relevant original-game verification.
   records must not make ordinary identity/Create reads copy publication state;
   judge a structural separation against the remaining generation cost and
   memory footprint, not an isolated copy-helper improvement.
+  The next bounded implementation is the prepared segment's **append/Create
+  round trip**, measured in `docs/amiga-frame-cost.md` under “Current generation
+  boundary.” Replace `createPrepared`'s per-cell `birth -> handle(size()-1) ->
+  finishNativeTerrainCreate -> readIdentity` with native segment construction
+  using its just-created identity and prepared constructor/Create metadata.
+  Preserve each cell's birth-before-Create publication order, dirty-queue order,
+  spatial journal pressure and completed failure prefix; authored instances,
+  source Create observers and unsupported geometry keep the scalar oracle.
+  Prove scalar/segment equivalence at publication boundaries and injected
+  failures, then compare the same native generation and ordinary windows.
+  This is one construction-path replacement, not a series of copy, reset or
+  lookup helper tweaks; do not add another runtime mode or duplicate simulation.
 - Reduce executable and static-memory growth at its owning structures: audit
   linked collision/query machinery, embedded resource/mask banks and full-height
   terrain caches. Account separately for Hunk code/data/relocations, zero-filled

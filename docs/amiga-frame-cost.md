@@ -53,6 +53,54 @@ Compact reports and the FPS driver log are in `tmp/a500-baseline-before/`
 The ELF and capture log are retained in `tmp/trace/baseline-c64e8385/`;
 raw instruction captures are disposable after comparison.
 
+### Current generation boundary — `4248fb07`
+
+A fresh 60-field capture at each of 675 and 1688 reproduces the current
+generation stalls (660.8 and 641.9 ms). These use the same saved trace ELF
+as the four-window comparison, SHA-256
+`2f134bde6d70500030c5850e2f032891302a67f1f442c5b5fa9673f6b8e5dccd`.
+The original normal executable and ELF were restored byte-for-byte afterwards.
+The normal-memory configuration is 512 KiB Chip, 8 MiB Fast and the emulator's
+default 512 KiB slow RAM; this is not stock total A500 memory.
+
+These are **inclusive call-tree costs inside generation**, not additive totals:
+
+| Boundary | Frame 676, ms | Frame 1689, ms |
+| --- | ---: | ---: |
+| Entire frame | 660.77 | 641.88 |
+| `generateLiveTerrain` | 548.50 | 545.87 |
+| `AmigaGameplayGeneration::createPrepared` | 410.94 | 487.06 |
+| Per-cell `AmigaGameplayGeneration::birth`, inside prepared segments | 365.51 | 437.49 |
+| `NativeTerrainLifetimes::append` | 282.42 | 337.85 |
+| Owner `nativeTerrainBirth`, inside append | 203.33 | 243.59 |
+| Spatial journal insertion, inside owner birth | 34.43 | 41.33 |
+| Inherited layer publication, inside owner birth | 28.97 | 35.53 |
+| `finishNativeTerrainCreate`, after append | 69.90 | 83.87 |
+
+The prepared path still calls `birth` once per encoded cell, then recovers
+the most recent handle with `handle(size()-1)` and calls
+`finishNativeTerrainCreate`. That callback re-reads the identity and spatial
+flags before applying the already prepared Create plan. Within the latter,
+identity rereading costs 15.55/18.46 ms, and encoding the initial wall state
+costs 14.35/17.14 ms. Removing only that encoding would leave the larger
+per-cell construction pipeline in place. Likewise, replacing a copy helper
+would not remove inherited layer materialization (24.02/29.62 ms).
+
+The preparation boundary is narrow: `createPrepared` rejects a source Create
+observer and falls back to the scalar path, requires backend-only terrain,
+admits the prepared raster and lifetime capacity, and enters `publishRun`.
+Its synchronous birth callback publishes chronology, registration, spatial
+state and layer state before `createProperties` runs. The latter's callback
+uses the immutable Create plan and updates dirty queues; it does not query
+room membership or execute game callbacks. `publishRun` always closes a begun
+segment, including a failed prefix. These boundaries—not a blanket assumption
+that all terrain is immutable—define what a bulk construction path may replace.
+
+Focused reports are `tmp/terrain-current-{676,1689}-report.txt`. Reproduce
+using `amiga/profile.sh trace` with `TRACE_FRAMES=675,1688 TRACE_FIELDS=60`
+and the same contact options above, then select `--frames=676` or
+`--frames=1689 --tree-min 1` in `tools/amiga-trace-report.py`.
+
 ## Historical pre-integration audit
 
 ### Early-game regression comparison
