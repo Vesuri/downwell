@@ -311,6 +311,26 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
                        const downwell::BuilderPatternPack& patterns){
     using Runtime=downwell::StartupRuntime;
     const auto healthy=[](const Runtime& r){return r.effectsSucceeded()&&r.roomLoadSucceeded()&&r.deferredCommandsSucceeded();};
+    {
+        auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns);
+        runtime->skipToGameForTesting();
+        unsigned spawner=0;
+        for(unsigned tick=0;tick<600&&!spawner;++tick){
+            for(unsigned i=0;i<runtime->activeInstanceCount();++i){
+                const auto& r=runtime->instanceAt(i);
+                if(r.objectId!=78)continue;
+                require(!spawner,"one builder spawner birth");spawner=r.instanceId;
+                const auto* s=runtime->spawnerState(spawner);
+                require(s&&s->channelCount==1&&s->enemyMaxCount==20&&!s->scriptActive&&r.active&&
+                    s->channels[0].enemies[0]==115&&s->channels[0].interval==160,
+                    "natural builder invokes owned source cavern spawner Create");
+            }
+            if(!spawner)runtime->step(downwell::gameplayContactProfileInput(tick,runtime->mainPlayerX(),runtime->mainPlayerY()),false);
+        }
+        require(spawner&&healthy(*runtime),"natural spawner initialization preserves room health");
+        runtime->reset(downwell::PlatformProfile::nonDesktop);
+        require(!runtime->spawnerState(spawner),"reset invalidates retained spawner state");
+    }
     for(unsigned mask=0;mask<16;++mask)for(bool outside:{false,true})
     for(unsigned reject=0;reject<=(mask==15?5u:0u);++reject){
         BoxEndStepAudit audit;audit.neighbours=mask;audit.outside=outside;audit.reject=reject;

@@ -1,4 +1,5 @@
 #include "core/SpawnerStep.h"
+#include "core/StoredSpawnerStates.h"
 #include "core/GameMakerRandom.h"
 #include <cassert>
 #include <cstdio>
@@ -82,6 +83,28 @@ int main(int argc,char**){
         expected.push_back(57); // Final wall query, including exhausted attempts.
         if(obstruction<32){expected.push_back(11);expected.push_back(12);}
         assert(ops.calls==expected);
+    }
+    {
+        downwell::InstanceStore<2> records;
+        downwell::StoredSpawnerStates<2,1> owner(records);
+        assert(records.create(100,78,11,false)==downwell::CreateInstanceResult::success);
+        const auto first=records.handleAt(0);
+        records.find(100)->preciseY=100;
+        assert(owner.createCaverns(first,1,false)&&owner.state(100)&&!owner.createCaverns(first,1,false));
+        // Script active=0 does not deactivate the room record.
+        assert(records.find(100)->active&&!owner.state(100)->scriptActive);
+        downwell::GameMakerRandom random(23);Ops ops{random};
+        assert(owner.step(first,random,ops)&&owner.state(100)->scriptActive&&ops.births==1);
+        assert(records.create(101,78,11,false)==downwell::CreateInstanceResult::success);
+        const auto second=records.handleAt(1);
+        assert(!owner.createCaverns(second,1,false)); // Real capacity failure, not shared singleton state.
+        assert(records.erase(100)&&!owner.state(100)&&!owner.step(first,random,ops));
+        assert(owner.createCaverns(second,2,true)&&owner.state(101)->channels[0].above);
+        assert(records.erase(101));
+        assert(records.create(100,78,11,false)==downwell::CreateInstanceResult::success);
+        assert(!owner.state(100)&&owner.createCaverns(records.handleAt(0),3,false));
+        assert(owner.state(100)->channelCount==3&&!owner.state(100)->scriptActive);
+        owner.clear();assert(!owner.state(100));
     }
     for(int guard=0;guard<5;++guard){
         auto s=initial();downwell::GameMakerRandom random(2);Ops ops{random};

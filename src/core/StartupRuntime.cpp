@@ -80,6 +80,7 @@ void StartupRuntime::reset(PlatformProfile profile) {
     }
     tick_ = 0;
     companionCreates_={};droneNumber_=0;
+    spawners_.clear();
     profile_ = profile;
     random_.setSeed(randomSeed_); // Result of the Windows runner's randomize().
     roomId_ = entryRoomId;
@@ -2372,7 +2373,13 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
         }
         return;
     case 1047: // gml_Object_Spawner_Create_0 / spawnerInit
-        ++implementedCodeCalls_;
+        // Current run entry is normal mode. Later-area configuration and
+        // hard-mode run admission remain separate from this cavern Create.
+        if(instance&&run_.stage.area==1){
+            ++implementedCodeCalls_;
+            const auto key=instances_.handleAt(unsigned(instance-&instances_.at(0)));
+            run_.effectsSucceeded=run_.effectsSucceeded&&spawners_.createCaverns(key,run_.stage.level,false);
+        }else ++unimplementedCodeCalls_;
         return;
     case 1086: // gml_Object_objBox_n_Alarm_0
         ++implementedCodeCalls_;

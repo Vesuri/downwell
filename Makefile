@@ -150,7 +150,7 @@ test: test-spawner-step
 test-spawner-step: build/spawner-step-test
 	./build/spawner-step-test
 	python3 tools/verify-spawner-configuration.py build/spawner-step-test
-build/spawner-step-test: tests/core/SpawnerStepTest.cpp src/core/SpawnerStep.h src/core/GameMakerRandom.cpp src/core/GameMakerRandom.h src/core/RunnerRealComparison.h src/core/MultiplyBinary64.h src/core/MotionBinary64.h
+build/spawner-step-test: tests/core/SpawnerStepTest.cpp src/core/StoredSpawnerStates.h src/core/SpawnerStep.h src/core/GameMakerRandom.cpp src/core/GameMakerRandom.h src/core/RunnerRealComparison.h src/core/MultiplyBinary64.h src/core/MotionBinary64.h
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/SpawnerStepTest.cpp src/core/GameMakerRandom.cpp
 

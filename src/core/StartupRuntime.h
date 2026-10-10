@@ -8,6 +8,7 @@
 #include "StoredBuilderPublication.h"
 #include "StoredShopCreationOwner.h"
 #include "RegisteredScatteredContact.h"
+#include "StoredSpawnerStates.h"
 #include "RunnerLayerIds.h"
 #include "ScriptEffectRuntimeBinding.h"
 #include "BoxStepDispatch.h"
@@ -453,6 +454,7 @@ public:
     const InstanceRecord& instanceAt(std::size_t index) const {
         return instances_.at(index);
     }
+    const SpawnerStep* spawnerState(unsigned id)const{return spawners_.state(id);}
     bool roomDestinationSet() const { return roomDestinationSet_; }
     bool roomLoadSucceeded() const { return roomLoadSucceeded_; }
     bool recoveredEventBindingsActive() const { return objectPack_ != nullptr; }
@@ -2620,6 +2622,7 @@ private:
     int roomDestination_ = 0;
     int showSplash_ = 0;
     InstanceStore<instanceCapacity> instances_;
+    StoredSpawnerStates<instanceCapacity,8> spawners_{instances_};
     RunnerLayerIds layerIds_;
     StoredRoomLayers<instanceCapacity,256,4096,8> roomLayers_{layerIds_};
     bool layerBindingSucceeded_;
