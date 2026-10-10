@@ -1,12 +1,83 @@
 #ifndef DOWNWELL_TEST_GENERATED_SOURCE_BIRTH_CHECKS_H
 #define DOWNWELL_TEST_GENERATED_SOURCE_BIRTH_CHECKS_H
 #include "core/GameplayCollisionOwner.h"
+#include "core/StoredShopCreationOwner.h"
 #include <cassert>
 #include <memory>
 #include <vector>
 inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
     const downwell::SpriteCollisionPack& sprites,const downwell::SpriteMaskPack& masks){
     using namespace downwell;
+    // The generated Shop callback now enters the actual GameplayWorld run
+    // state. Use a concrete retained owner here, not successful ID-only child
+    // callbacks. Native family ownership/front-end installation is separate.
+    for(bool member:{false,true})for(unsigned failure=0;failure<4;++failure){
+        auto world=std::make_unique<GameplayWorld>(300,false,1000,false);
+        auto reference=std::make_unique<GameplayWorld>(300,false,1000,false);
+        if(member)assert(world->grantUpgrade(14)&&reference->grantUpgrade(14));
+        InstanceStore<16> records;unsigned next=940000;const int room=11;bool good=true;
+        if(failure==3)for(unsigned i=0;i<8;++i)
+            assert(records.create(930000+i,62,room,false,0)==CreateInstanceResult::success);
+        struct Audio {
+            unsigned failure,calls=0;
+            bool play(int sound,int priority,bool loop,int& handle){
+                assert(sound==192&&priority==100&&loop);++calls;handle=77;return failure!=1;
+            }
+            bool setGain(int handle,MotionBinary64 gain,int duration){
+                assert(handle==77&&gain.zero()&&!duration);++calls;return failure!=2;
+            }
+        } audio{failure};
+        struct Publication {
+            const InstanceStore<16>& records;unsigned births=0;
+            bool birth(InstanceHandle,const InstanceRecord&){assert(false);return false;}
+            bool birthAt(InstanceHandle h,const InstanceRecord& r,RunnerImageValue x,RunnerImageValue y){
+                std::int32_t px,py;
+                assert(records.resolve(h)==&r&&x.roundPixel(px)&&y.roundPixel(py)&&
+                    px==r.x&&py==r.y&&r.imageIndex==0&&r.imageSpeed==1);
+                ++births;return true;
+            }
+            bool retire(InstanceHandle,const InstanceRecord&){return true;}
+            bool activation(InstanceHandle,const InstanceRecord&,bool){return true;}
+            bool membership(InstanceHandle,const InstanceRecord&,bool){return true;}
+        } publication{records};
+        StoredShopCreationOwner<16,1,Audio> owner(records,objects,
+            InstanceLifecycleBinding::bindPositionedLifetime(publication),next,room,good,audio);
+        auto allocate=[&](int,unsigned& id){id=next++;return true;};
+        auto backend=[](const auto&,unsigned){assert(false);return false;};
+        ShopWorld::Instance* shop=nullptr;
+        auto createShop=[&](const auto& command,auto& cursor){
+            assert(&cursor==&allocate);
+            shop=world->registerShopWithOwner(command.x,command.y,owner);return shop!=nullptr;
+        };
+        assert(world->createGeneratedInstanceWithSourceIds({62,100,700},objects,allocate,backend,createShop));
+        const auto beforeRandom=world->randomState();
+        const bool created=world->createGeneratedInstanceWithSourceIds({277,480,2000},objects,allocate,backend,createShop);
+        assert(created==!failure&&world->effectsSucceeded()==!failure&&good==!failure);
+        if(!failure){
+            const auto* control=reference->registerShop(480,2000);
+            assert(control&&shop&&records.size()==11&&next==940012&&shop->sourceId==940001&&
+                shop->children.table==940002&&shop->children.items[2]==940011&&audio.calls==2&&publication.births==11);
+            for(unsigned i=0;i<3;++i)assert(shop->stock.items[i].upgrade==control->stock.items[i].upgrade&&
+                shop->stock.items[i].price==control->stock.items[i].price);
+            assert(shop->farewellVariant==control->farewellVariant&&
+                world->randomState().stateIndex()==reference->randomState().stateIndex());
+            for(unsigned i=0;i<16;++i)assert(world->randomState().stateWord(i)==reference->randomState().stateWord(i));
+            assert(world->createGeneratedInstanceWithSourceIds({62,200,700},objects,allocate,backend,createShop)&&next==940013);
+        }else{
+            assert(!shop&&next==(failure==3?940009u:940002u)&&audio.calls==(failure==1?1u:2u));
+            if(failure<3){
+                assert(world->randomState().stateIndex()==beforeRandom.stateIndex());
+                for(unsigned i=0;i<16;++i)assert(world->randomState().stateWord(i)==beforeRandom.stateWord(i));
+            }
+            // Failure retains its published prefix and cannot be hidden by a
+            // subsequent compact shop or by restarting registered Create.
+            const unsigned consumed=next,count=records.size();const auto random=world->randomState();
+            assert(!world->registerShop(0,0)&&!world->registerShopWithOwner(0,0,owner)&&
+                next==consumed&&records.size()==count&&world->shops().allocatedCount==1&&
+                world->randomState().stateIndex()==random.stateIndex());
+            for(unsigned i=0;i<16;++i)assert(world->randomState().stateWord(i)==random.stateWord(i));
+        }
+    }
     // Exercise the production room animation/alarm callbacks through a whole
     // tick, rather than directly advancing the actor from the test.
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native}){

@@ -30,6 +30,15 @@ namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_
 #include "core/CurrencyHomingMath.h"
 #include "core/TerrainWallContacts.h"
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
+#include "core/StoredShopCreationOwner.h"
+struct NativeShopAudio {
+    bool play(int,int,bool,int&);
+    bool setGain(int,downwell::MotionBinary64,int);
+};
+downwell::ShopWorld::Instance* nativeWorldShopCreate(GameplayWorld& world,
+    downwell::StoredShopCreationOwner<16,1,NativeShopAudio>& owner,int x,int y){
+    return world.registerShopWithOwner(x,y,owner);
+}
 bool nativeWhiteJellyDirection(downwell::GameplayCollisionOwner& owner,
     downwell::InstanceHandle key,downwell::MotionBinary64 value,downwell::MotionBinary64& accepted){
     return owner.whiteJellyDirection(key,value,accepted);

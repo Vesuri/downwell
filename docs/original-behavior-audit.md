@@ -724,6 +724,12 @@ positions and performs the item/case field writes. Missing or rejected work
 fails the enclosing status, retains the accepted prefix and prevents later
 births/RNG; the phases cannot be retried. The default compact creation path
 remains separate until the frontend supplies every required child owner.
+`GameplayWorld::registerShopWithOwner` supplies the native world's actual RNG,
+health, area and membership ownership to this same registered path. It can be
+called by the generator's Shop callback while borrowing the enclosing numeric
+stream; it does not allocate a second stream or substitute compact creation
+after failure. This entry does not itself supply native child lifetime owners
+or admit their later events in the frontend scheduler.
 The shared registered path itself starts sound 192 (201 in area 3) at priority
 100 with looping enabled, retains the returned handle and immediately sets
 its gain to zero with zero transition time. Area 5 retains radio=-1 and makes

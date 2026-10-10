@@ -2286,9 +2286,22 @@ public:
     int nextMuzzleOffset() const { return emitter_.leg; }
     const downwell::Consumables& consumables() const { return run_.consumables; }
     downwell::ShopWorld::Instance* registerShop(int x, int y) {
+        if(!run_.effectsSucceeded)return nullptr;
         return run_.createShop(x, y, [this](unsigned lo, unsigned hi) {
             return lo + enemyRandom_.irandomSmall(hi - lo);
         }, [this] { return enemyRandom_.chooseIndexSmall(3); }, health_);
+    }
+    // The enclosing creation stream owns parent/child IDs and lifetime
+    // publication. Stock and farewell must use this world's RNG and current
+    // run state, not a copied seed or a backend's reconstructed inventory.
+    // A failed synchronous Create is terminal; never fall back to compact
+    // stock after publishing a prefix of the shop's children.
+    template<class Owner>
+    downwell::ShopWorld::Instance* registerShopWithOwner(int x,int y,Owner& owner){
+        if(!run_.effectsSucceeded)return nullptr;
+        return run_.createRegisteredShop(x,y,[this](unsigned lo,unsigned hi){
+            return lo+enemyRandom_.irandomSmall(hi-lo);
+        },[this]{return enemyRandom_.chooseIndexSmall(3);},health_,owner);
     }
     const downwell::ShopWorld& shops() const { return run_.shops; }
     bool registerSideCameraLocker(int x, int y,unsigned sourceId=0) {
