@@ -913,6 +913,11 @@ public:
         const bool ok=whiteJellies_->create(source,x,y,enemyRandom_,makeOps,key);
         return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
     }
+    template<class Ops> bool stepSpawnerRoomEffect(downwell::InstanceHandle key,Ops& ops){
+        if(!run_.effectsSucceeded||!spawners_||!spawners_->valid())return run_.effectsSucceeded=false;
+        const bool ok=spawners_->step(key,enemyRandom_,ops);
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
+    }
     static constexpr unsigned boneCapacity=32;
     const Bones* bones()const{return bones_;}
     bool bindBones(Bones& bones){

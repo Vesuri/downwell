@@ -76,6 +76,51 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
         world->step(0);
         assert(world->effectsSucceeded()&&owner->valid()&&store.find(key)&&store.find(key)->destroyRequested);
         assert(owner->prepareDraw()&&!store.find(key));
+        InstanceHandle spawner;
+        assert(owner->spawners().createCaverns(899001,-116,100,1,false,spawner));
+        struct SpawnOps {
+            GameplayWorld& world;GameplayCollisionOwner& owner;const ObjectPack& objects;
+            InstanceHandle spawner,child{};unsigned next=899002,births=0,deactivations=0;
+            bool playerY(MotionBinary64& v){v=MotionBinary64::fromInteger(101);return true;}
+            bool area(int& v){v=1;return true;}
+            bool fallDepth(MotionBinary64& v){v=MotionBinary64::fromInteger(160);return true;}
+            bool death(bool& v){v=false;return true;}
+            bool endReached(bool& v){v=false;return true;}
+            bool enemyCount(int& v){v=int(owner.whiteJellies().size());return true;}
+            bool objectMask(int object,int& mask){PackedObject r;if(!objects.findObject(object,r))return false;mask=r.textureMaskId;return true;}
+            bool mask(int v){return owner.spawners().mask(spawner,v);}
+            bool viewY(MotionBinary64& v){v=MotionBinary64::fromInteger(34);return true;}
+            bool viewHeight(MotionBinary64& v){v=MotionBinary64::fromInteger(284);return true;}
+            bool meeting(MotionBinary64 x,MotionBinary64 y,int object,bool& hit){return owner.spawners().meeting(spawner,x,y,object,hit);}
+            bool tile(int depth,MotionBinary64,MotionBinary64,bool& hit){assert(depth==100);hit=false;return true;}
+            bool create(int object,MotionBinary64 x,MotionBinary64 y,unsigned& id){
+                assert(object==115&&!births&&!deactivations);RunnerImageValue px,py;
+                if(!px.assign(x)||!py.assign(y))return false;id=next++;
+                const bool ok=world.createWhiteJellyWithSourceId(id,px,py,
+                    [&](auto h){return Ops{owner.whiteJellies(),h};},child);
+                assert(ok&&owner.whiteJellies().find(child)->initialized&&owner.whiteJellies().find(child)->active);
+                ++births;return ok;
+            }
+            bool deactivate(unsigned id){
+                const auto* r=owner.whiteJellies().find(child);
+                assert(births==1&&!deactivations&&r&&r->initialized&&r->sourceId==id);
+                ++deactivations;return owner.whiteJellies().activate(child,false);
+            }
+        } spawnOps{*world,*owner,objects,spawner};
+        auto oracle=world->randomState();
+        oracle.irandomSmall(32);oracle.chooseIndexSmall(2);oracle.irandomSmall(0);oracle.irandomSmall(0);
+        const int childX=160+16*(2+int(oracle.irandomSmall(6)));
+        const int childY=336+16*(1+int(oracle.irandomSmall(4)));
+        oracle.nextU32(); // Synchronous white-jelly Create, before deactivation.
+        unsigned spawnerSteps=0;
+        assert(owner->withEncounterSteps(phase,[&](InstanceHandle h,int object){
+            assert(object==78);++spawnerSteps;return owner->stepRegisteredSpawner(h,spawnOps);
+        },[&]{world->step(0);return world->effectsSucceeded();}));
+        const auto* child=store.find(spawnOps.child);int actualX,actualY;
+        assert(spawnerSteps==1&&spawnOps.births==1&&spawnOps.deactivations==1&&child&&!child->active&&
+            child->scriptActive&&child->imageIndex.bits==0&&child->x.roundPixel(actualX)&&child->y.roundPixel(actualY)&&
+            actualX==childX&&actualY==childY&&world->randomState().stateIndex()==oracle.stateIndex());
+        for(unsigned word=0;word<16;++word)assert(world->randomState().stateWord(word)==oracle.stateWord(word));
     }
     for(int style:{0,2})for(bool knees:{false,true})for(bool rejectSound:{false,true}){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},

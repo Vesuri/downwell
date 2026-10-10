@@ -1743,6 +1743,10 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         })){run_.effectsSucceeded=false;return {};}
     }
 
+    // Spawner 78 follows builder/entry work and precedes breakable Step.
+    if(skeletonBoneSteps_&&!skeletonBoneSteps_(skeletonBoneContext_,92)){
+        run_.effectsSucceeded=false;return {};
+    }
     // objBox_n (92) observes health after player Begin Step and before bullet
     // Step (261). A bound source adapter also runs healthy boxes' alarmStop.
     // The unbound path retains the old destruction boundary until all effect,

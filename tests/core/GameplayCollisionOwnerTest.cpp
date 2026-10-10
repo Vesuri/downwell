@@ -130,6 +130,8 @@ struct NativeSpawnerOps {
 };
 bool nativeSpawnerStep(downwell::SpawnerStep& state,downwell::MotionBinary64 y,
     downwell::GameMakerRandom& random,NativeSpawnerOps& ops){return state.step(y,random,ops);}
+bool nativeRegisteredSpawnerStep(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle key,
+    NativeSpawnerOps& ops){return owner.stepRegisteredSpawner(key,ops);}
 bool nativeSpawnerCreate(downwell::SpawnerStep& state,int level,bool hard){return state.createCaverns(level,hard);}
 bool nativeStoredSpawnerCreate(downwell::StoredSpawnerStates<2,1>& states,downwell::InstanceHandle key,
     int level,bool hard){return states.createCaverns(key,level,hard);}
