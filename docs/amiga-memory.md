@@ -1,12 +1,13 @@
 # Amiga memory budget
 
-The CPU target is an A500/68000. The current emulator has 512 KiB Chip RAM and
-8 MiB Fast RAM; the latter remains a development configuration, not a final
-memory requirement.
+The CPU target is an A500/68000. The current emulator has 512 KiB Chip RAM,
+512 KiB slow RAM at `$C00000`, and 8 MiB Fast RAM at `$200000`. Exec labels
+both non-Chip regions `MEMF_FAST`; they do not have the same bus timing.
+This remains a development configuration, not a final memory requirement.
 
 ## Native terrain identities
 
-`nativeTerrainStorage` reserves 104,528 bytes of ordinary BSS on the 68000,
+`nativeTerrainStorage` reserves 145,534 bytes of ordinary BSS on the 68000,
 outside Chip RAM and the task stack. It retains at most 2,048 terrain
 lifetimes in birth order. Adjacent generated cells share identity/geometry
 descriptors; coincident and authored walls remain distinct. The bounded
@@ -76,6 +77,16 @@ while the watch is installed. The script rejects multiple Chip regions rather
 than silently measuring only one. SDK field offsets are compile-time checked
 in `framework/AmigaMemory.cpp` because unused type metadata need not survive
 in the companion ELF. Use explicit `VERIFY_CHIP_KB=512` when running these gates.
+
+Scene verification shares one 54,528-byte ordinary-memory scratch arena between
+the actor, field-overlay, terrain-row and Results-HUD pixel oracles. An RAII
+lease traps on overlapping use; the two simultaneous HUD images occupy separate
+halves. Each oracle still initializes its own complete expected image. The arena
+is allocated with `MEMF_FAST` after loading and freed on every return from the
+diagnostic run; allocation failure returns 20. This avoids forcing all test
+scratch into the executable's large load-time allocation and lets Exec use an
+existing secondary non-Chip region. It is absent from normal builds. Do not
+interpret restoring this diagnostic's loader fit as a shipping memory reduction.
 
 ## Executable size versus runtime memory
 

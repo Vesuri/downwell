@@ -7,6 +7,8 @@
 // unused debug types have been removed from the executable's companion ELF.
 static_assert(__builtin_offsetof(MemHeader, mh_Attributes) == 14, "Chip audit ABI");
 static_assert(__builtin_offsetof(MemHeader, mh_First) == 16, "Chip audit ABI");
+static_assert(__builtin_offsetof(MemHeader, mh_Lower) == 20, "Chip audit ABI");
+static_assert(__builtin_offsetof(MemHeader, mh_Upper) == 24, "Chip audit ABI");
 static_assert(__builtin_offsetof(MemHeader, mh_Free) == 28, "Chip audit ABI");
 static_assert(__builtin_offsetof(MemChunk, mc_Bytes) == 4, "Chip audit ABI");
 

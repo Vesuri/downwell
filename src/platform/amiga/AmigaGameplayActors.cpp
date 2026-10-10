@@ -7,6 +7,7 @@
 #include "framework/Bitmap.h"
 #include "framework/AmigaHardware.h"
 #ifdef DOWNWELL_SCENE_VERIFY
+#include "AmigaVerificationScratch.h"
 extern "C" { extern volatile ULONG gDownwellGameplayBobChecks, gDownwellGameplayBobFailures; }
 #ifdef DOWNWELL_BOB_VERIFY
 extern "C" void downwellGameplayBobsReady();
@@ -39,7 +40,8 @@ void AmigaGameplayActors::draw(AmigaRenderer renderer, Bitmap& display,
     amigaRendererSetClipRect(&renderer, downwellPlayfieldX, 0,
                              downwellPlayfieldWidth, downwellDisplayHeight);
 #ifdef DOWNWELL_SCENE_VERIFY
-    alignas(2) static UBYTE expected[downwellGameRingBytes];
+    AmigaVerificationScratch scratch;
+    UBYTE* expected=scratch.data<downwellGameRingBytes>();
     for (unsigned byte = 0; byte < downwellGameRingBytes; ++byte)
         expected[byte] = renderer.game[byte];
     AmigaRenderer oracle = renderer;

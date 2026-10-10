@@ -17,6 +17,7 @@ __attribute__((noinline,used)) void downwellFieldReentryReady(){__asm__ volatile
 #include <hardware/dmabits.h>
 #include <hardware/intbits.h>
 #include "AmigaInput.h"
+#include "AmigaVerificationScratch.h"
 #include "../../../generated/amiga-game-planes.h"
 extern "C" int amigaBlitterBindGamePlanes(const UBYTE*,unsigned,const UBYTE*,unsigned,const UBYTE*);
 #ifdef DOWNWELL_PLANE_BANK_VERIFY
@@ -1297,7 +1298,9 @@ static void drawMainWorldSpan(
 #ifdef DOWNWELL_SCENE_VERIFY
             // Compare the cached row transfer against fresh composition at
             // the same ring position, including the physical wrap boundary.
-            static UWORD expected[downwellDisplayHeight][2][terrainRasterWords];
+            AmigaVerificationScratch scratch;
+            auto expected=reinterpret_cast<UWORD (*)[2][terrainRasterWords]>(
+                scratch.data<downwellDisplayHeight*2*terrainRasterWords*sizeof(UWORD)>());
             for (int y = 0; y < clipHeight; ++y)
                 for (unsigned plane = 0; plane < 2; ++plane) {
                     const unsigned physical = (renderer->gameOrigin + clipY + y) % downwellGameRingHeight;
@@ -1622,7 +1625,8 @@ static void exposeGameplayFrame(const AmigaMemory& memory, const Bitmap& display
     gDownwellCaptureViewX = 160 + port.cameraOffsetX();
     gDownwellCaptureViewY = 34 + port.cameraOffsetY();
     gDownwellGameplayGame = (const UBYTE*)display.data;
-    alignas(2) static UBYTE expected[downwellGameRingBytes];
+    AmigaVerificationScratch scratch;
+    UBYTE* expected=scratch.data<downwellGameRingBytes>();
     for (unsigned byte = 0; byte < downwellGameRingBytes; ++byte) expected[byte] = memory.game()[byte];
     static downwell::TimeFieldOutlines fieldOracle;
     fieldOracle.set(port.timeFields(), port.goalField(), port.levelExitPresent(),
@@ -1706,6 +1710,10 @@ __attribute__((noinline)) static int runDownwell(void) {
     if(gCoverageWordVerifiedCases!=80)return 20;
 #endif
     AmigaPlatform platform;
+#ifdef DOWNWELL_SCENE_VERIFY
+    AmigaVerificationScratch::Storage verificationStorage;
+    if (!verificationStorage.valid()) return 20;
+#endif
     AmigaMemory memory;
     AmigaRenderer renderer;
     unsigned front = 0;
@@ -4193,7 +4201,10 @@ __attribute__((noinline)) static int runDownwell(void) {
                 }
                 // Exercise the real Chip/blitter overlay against the scalar
                 // compositor without changing this gameplay replay's death state.
-                static UBYTE savedHud[downwellLayerBytes], expectedHud[downwellLayerBytes];
+                {
+                AmigaVerificationScratch scratch;
+                UBYTE* savedHud=scratch.data<2*downwellLayerBytes>();
+                UBYTE* expectedHud=savedHud+downwellLayerBytes;
                 AmigaHardware::blitterDrain();
                 for (unsigned byte = 0; byte < downwellLayerBytes; ++byte)
                     savedHud[byte] = expectedHud[byte] = renderer.hud[byte];
@@ -4306,6 +4317,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                 }
                 if (changedHudBytes < 100) ++gDownwellResultsBackdropFailures;
                 ++gDownwellResultsBackdropChecks;
+                }
                 // Run the same deferred consumable code on the actual 68000,
                 // isolated from the 600-update world's replay and terrain.
                 alignas(PlayerMotion) static UBYTE itemPlayerStorage[sizeof(PlayerMotion)];

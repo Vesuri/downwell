@@ -7,7 +7,7 @@ set $chip_exec = (struct ExecBase *) *(unsigned long *)4
 set $chip_node = (unsigned char *) $chip_exec->MemList.lh_Head
 set $chip_header = (unsigned char *)0
 while *(unsigned long *)$chip_node
-  printf "MEMORY_REGION attributes=%u free_at_entry=%lu\n", *(unsigned short *)($chip_node+14), *(unsigned long *)($chip_node+28)
+  printf "MEMORY_REGION attributes=%u range=%08lx..%08lx free_at_entry=%lu\n", *(unsigned short *)($chip_node+14), *(unsigned long *)($chip_node+20), *(unsigned long *)($chip_node+24), *(unsigned long *)($chip_node+28)
   if *(unsigned short *)($chip_node+14) & 2
     if $chip_header
       printf "CHIP_AUDIT_ERROR: multiple Chip regions\n"
