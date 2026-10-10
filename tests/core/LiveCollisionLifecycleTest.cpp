@@ -343,7 +343,7 @@ int main(){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
         require(owner->attach(*world),"attach registered red-ball world");world->skipToGameForTesting();
-        auto balls=world->redBallStates<2>();unsigned stopReads=0,id=0;
+        auto balls=world->redBallStates<3>();unsigned stopReads=0,id=0;
         struct Environment {
             using N=MotionBinary64;
             bool atan(N y,N x,N& out){return portableAtan(y,x,out);}
@@ -403,6 +403,44 @@ int main(){
             require(world->resolveInstance(active)->alarms.get(0)==(before==1?10:before-1),
                 "red-ball alarm reset occurs immediately inside the room alarm phase");
         }
+        InstanceHandle other,player,field;
+        require(world->withRegisteredRedBallEvents(balls,*owner,[](InstanceHandle){return Environment{};},
+            [](bool&){return false;},[&]{return world->spawnRedBall(1040,world->mainCameraRenderViewY()+100,other);}),
+            "publish second red-ball contact lifetime");
+        for(unsigned i=0;i<world->activeInstanceCount();++i)
+            if(world->instanceAt(i).objectId==35)player=world->instanceHandleAt(i);
+        unsigned damageCalls=0;
+        struct Player {
+            unsigned& calls;
+            bool damage(int damage,int height,int knockback){
+                require(damage==1&&height==3&&knockback==2,"red-ball dispatch preserves damage arguments");
+                ++calls;return true;
+            }
+        };
+        const auto makePlayer=[&](auto&){return Player{damageCalls};};
+        auto oracle=world->randomState();MotionBinary64 offset,expected=balls.state(activeId)->direction;
+        require(randomBinary64(oracle.nextU32(),MotionBinary64::fromInteger(40),offset)&&
+            offset.add(MotionBinary64::fromInteger(-20))&&expected.add(offset),"contact RNG oracle");
+        RunnerImageValue narrowed;require(RunnerDirectionValue::normalize(expected,narrowed),"contact setter oracle");
+        require(world->dispatchRedBallCollision(balls,*owner,{active,other,4,118,118,1248},makePlayer),
+            "resource-bound same-object contact");
+        const auto accepted=balls.state(activeId)->direction;
+        require(accepted.high==narrowed.promoted().high&&accepted.low==narrowed.promoted().low&&
+            world->randomDrawCount()==oracle.drawCount()&&world->randomState().stateIndex()==oracle.stateIndex(),
+            "contact heading and RNG match source");
+        for(unsigned i=0;i<16;++i)require(world->randomState().stateWord(i)==oracle.stateWord(i),"contact full RNG state");
+        require(world->dispatchRedBallCollision(balls,*owner,{active,player,4,35,118,1249},makePlayer)&&damageCalls==1,
+            "player contact dispatches damage once");
+        require(world->spawnOrdinaryTimeField(1040,world->mainCameraRenderViewY()+100,field),"create field contact target");
+        require(balls.dispatch(active,[](auto& s){s.timefieldImmune=true;return true;})&&
+            world->dispatchRedBallCollision(balls,*owner,{active,field,4,82,83,1066},makePlayer)&&
+            balls.state(activeId)->health==30,"inherited red-ball field immunity");
+        require(balls.dispatch(active,[](auto& s){s.timefieldImmune=false;return true;})&&
+            world->dispatchRedBallCollision(balls,*owner,{active,field,4,82,83,1066},makePlayer)&&
+            balls.state(activeId)->health==0&&balls.state(activeId)->alive,
+            "field collision defers red-ball death effects until Step");
+        require(!world->dispatchRedBallCollision(balls,*owner,{active,player,4,35,118,1248},makePlayer)&&damageCalls==1,
+            "mismatched resource event is rejected without executing another contact");
     }
     for(unsigned failure=0;failure<=5;++failure){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);

@@ -678,17 +678,7 @@ public:
                     r->scaleX=static_cast<float>(scale);return true;
                 }
                 bool direction(MotionBinary64 wanted,MotionBinary64& accepted){
-                    auto* r=record();RunnerImageValue value;
-                    // Jelly scripts use custom xsp/ysp; builtin speed remains
-                    // at constructor zero. Do not apply this specialization
-                    // if another caller has supplied nonzero engine speed.
-                    if(!r||r->moveSpeed!=0||!RunnerDirectionValue::normalize(wanted,value))return false;
-                    std::memcpy(&r->direction,&value.bits,4);
-                    // cos/sin * zero followed by the runner's near-integer
-                    // snap yields positive zero for BOTH engine components.
-                    r->velocityX=0;r->velocityY=0;
-                    if(!queries.engineMotionChanged(key,*r))return false;
-                    accepted=value.promoted();return true;
+                    return world.publishSteeringEnemyDirection(key,Object,queries,wanted,accepted);
                 }
                 bool imageSpeed(RunnerImageValue value,RunnerImageValue& accepted){
                     auto* r=record();if(!r||!value.promoted().valid())return false;
@@ -2265,6 +2255,42 @@ public:
         return run_.effectsSucceeded=skeletons.dispatch(skeletons.handle(*self),[](auto& actor,auto&,bool&){
             actor.collideTimeField();return true;
         });
+    }
+    template<class Queries> bool publishSteeringEnemyDirection(InstanceHandle key,int object,Queries& queries,
+        MotionBinary64 wanted,MotionBinary64& accepted){
+        auto* r=instances_.resolve(key);RunnerImageValue value;
+        // These scripts use custom xsp/ysp, not nonzero builtin engine speed.
+        if(!run_.effectsSucceeded||!queries.boundTo(*this)||!r||r->objectId!=object||
+           (object!=115&&object!=118)||r->moveSpeed!=0||!RunnerDirectionValue::normalize(wanted,value))return false;
+        std::memcpy(&r->direction,&value.bits,4);
+        // The runner snaps both zero-speed engine components to positive zero.
+        r->velocityX=0;r->velocityY=0;
+        if(!queries.engineMotionChanged(key,*r))return false;
+        accepted=value.promoted();return true;
+    }
+    template<unsigned Capacity,class Queries,class MakePlayer>
+    bool dispatchRedBallCollision(StoredRedBallStates<instanceCapacity,Capacity>& owner,Queries& queries,
+        const RunnerCollisionEventContext::Frame& event,MakePlayer makePlayer){
+        if(!run_.effectsSucceeded)return false;
+        const auto* self=instances_.resolve(event.self);const auto* other=instances_.resolve(event.other);
+        PackedObjectEvent binding{};bool found=false;
+        if(!owner.belongsTo(instances_)||!owner.valid()||!queries.boundTo(*this)||!self||!other||!objectPack_||
+           self->objectId!=118||event.type!=4||event.subtype!=other->objectId||
+           !objectPack_->collisionEvent(118,other->objectId,found,binding)||!found||
+           event.owner!=binding.ownerObjectId||event.code!=binding.codeId||
+           !((event.owner==118&&(event.code==1248||event.code==1249))||
+             (event.owner==83&&event.code==1066)))return run_.effectsSucceeded=false;
+        return run_.effectsSucceeded=owner.dispatch(event.self,[&](auto& actor){
+            if(event.code==1066){if(!actor.timefieldImmune)actor.health=0;return true;}
+            if(event.code==1249){auto player=makePlayer(actor);return actor.playerContact(player);}
+            struct Ops {
+                StartupRuntime& world;Queries& queries;InstanceHandle key;
+                bool direction(MotionBinary64 wanted,MotionBinary64& accepted){
+                    return world.publishSteeringEnemyDirection(key,118,queries,wanted,accepted);
+                }
+            } ops{*this,queries,event.self};
+            return actor.enemyContact(random_,ops);
+        })&&run_.effectsSucceeded;
     }
     template<unsigned Capacity,class PointDirection,class DirectionSetter>
     bool dispatchWhiteJellyEnemyCollision(StoredWhiteJellyStates<instanceCapacity,Capacity>& owner,
