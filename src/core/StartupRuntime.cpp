@@ -422,6 +422,8 @@ void StartupRuntime::stepInternal(bool advancePressed,
     }
     if(!instances_.visitAnimationChecked([this](InstanceHandle key,InstanceRecord& instance){
         if(!lifecycle_.capturePrevious(key,instance))return false;
+        if(instance.objectId==280&&shopKeeperDispatch_&&
+           !shopKeeperDispatch_(shopKeeperContext_,instance,ShopKeeperPhase::animation,0))return false;
         if(instance.objectId==220&&!dispatchParentMovingFx(instance,BloodPhase::animation))return false;
         if(instance.objectId==269&&(!boneDispatch_||!boneDispatch_(boneContext_,instance,BonePhase::animation)))return false;
         if(instance.objectId==120&&(!skeletonDispatch_||!skeletonDispatch_(skeletonContext_,instance,SkeletonPhase::animation,0)))return false;

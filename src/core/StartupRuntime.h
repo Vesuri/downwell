@@ -2681,7 +2681,7 @@ public:
     int mainNextMuzzleOffset() const { return mainEmitter_.leg; }
     const Consumables& consumables() const { return run_.consumables; }
     enum class RisingTextPhase {alarm,step,cleanup};
-    enum class ShopKeeperPhase {alarm,step,cleanup};
+    enum class ShopKeeperPhase {alarm,step,cleanup,animation};
     template<class Effects> bool collideScatteredPlayer(InstanceHandle key,Effects& effects){
         auto* r=instances_.resolve(key);
         if(!run_.effectsSucceeded||!r||r->objectId!=289)return run_.effectsSucceeded=false;
@@ -2792,6 +2792,7 @@ public:
         auto dispatch=[&](const InstanceRecord& r,ShopKeeperPhase phase,unsigned number){
             const auto key=owner.handle(r);if(!key.generation)return false;
             if(phase==ShopKeeperPhase::cleanup)return owner.retire(key);
+            if(phase==ShopKeeperPhase::animation)return owner.advanceKeeperAnimation(key);
             auto range=[&](unsigned lo,unsigned hi){return lo+random_.irandomSmall(hi-lo);};
             return phase==ShopKeeperPhase::alarm?owner.keeperAlarmEvent(key,number,range):owner.stepKeeper(key,inputs,range);
         };

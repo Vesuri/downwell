@@ -124,6 +124,14 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
         },[&]{world->step(0);return world->effectsSucceeded();}));
         keeper=store.find(keeperKey);
         assert(keeper&&keeperSteps==1&&environment.reads==1&&keeper->spriteId==485&&keeper->imageSpeed.bits==0x3db851ecu);
+        const auto beforeAnimation=keeper->imageIndex;
+        RunnerImageValue expectedAnimation;
+        assert(SequenceTimeline::add(beforeAnimation,{0x3db851ecu},expectedAnimation));
+        assert(collision->withEncounterSteps(*phase,[&](InstanceHandle h,int object){
+            return object==280?collision->stepRegisteredShopKeeper(h,environment):collision->stepRegisteredShopChild(h,lookup);
+        },[&]{world->step(0);return world->effectsSucceeded();}));
+        assert(store.find(keeperKey)->imageIndex.bits==expectedAnimation.bits&&
+            store.find(keeperKey)->keeperTimeline.bits==expectedAnimation.bits);
         // The sprite setter may reset image_index even though the event
         // contains no explicit image write. Check the actor AND published
         // collision state, including same-ID and absent-resource semantics.

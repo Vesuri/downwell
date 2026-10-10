@@ -774,7 +774,15 @@ metadata and apply `RunnerSpriteChange` to the owning record as well as its
 collision publication. A shorter or absent sprite can implicitly reset the
 image index; same-ID writes retain it and an explicit collision mask is not
 replaced. This reset belongs to the sprite setter, not a second image-index
-publication. Shop sequence advancement/reconciliation remains separate.
+publication. Keeper sequence advancement uses the same bounded unit-track
+owner on both backends, dispatched before alarms and Step. The five recovered
+sprites have 4/5/2/4/2 frames and unit per-game-frame playback. The only explicit
+index writes in these keeper events are zero and blink frame one on the
+two-frame angry sprite. The runner inverse mapping at `0x50ed71`–`0x50ee09`
+reduces exactly for these values (zero or the exactly representable half-cycle);
+other inverse writes are rejected rather than approximated. Changed-sprite
+resets also reset the retained timeline. This admission does not implement
+the other shop objects' animation, collision events or Draw paths.
 Registered keeper alarms use the same shared handler body in the native and
 stored owners. The native mixed dispatcher advances each slot immediately
 before its handler and takes `irandom_range(20,60)` from the world RNG; rejected

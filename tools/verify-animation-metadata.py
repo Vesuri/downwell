@@ -28,6 +28,9 @@ for index, name, frames in (
     (207,"sprEnmSkeletonThrow",8), (208,"sprEnmSkeletonIdle",6),
     (458,"sprBulScatter2",6), (459,"sprBulScatter1",6),
     (460,"sprSkeletonBone",4),
+    (485,"sprShopKeeper",4), (486,"sprShopKeeperYay",5),
+    (487,"sprShopKeeperAngry",2), (496,"sprShopKeeperBye",4),
+    (497,"sprShopKeeperHuh",2),
 ):
     s = sprites[index]
     assert (s["name"],s["frames"],s["spriteType"]) == (name,frames,"Normal")

@@ -1805,6 +1805,10 @@ public:
                     case View::Kind::movingFx:return self.movingEffects_.advanceAnimation(local);
                     case View::Kind::blood:return self.blood_.advanceAnimation(local);
                     case View::Kind::currency:return self.currency_.advanceAnimation(local);
+                    case View::Kind::shop:{
+                        const auto* r=self.shopInstances_.find(local);
+                        return r&&(r->objectId!=280||self.shopInstances_.advanceKeeperAnimation(local));
+                    }
                     default:return true;
                 }
             };

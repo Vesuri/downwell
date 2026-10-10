@@ -6,6 +6,7 @@
 #include <memory>
 #include <cstdio>
 #include <cstdlib>
+#include <cmath>
 using namespace downwell;
 static void require(bool ok,const char* text){if(!ok){std::fprintf(stderr,"%s\n",text);std::exit(1);}}
 static std::vector<std::uint8_t> read(const char* path){std::ifstream f(path,std::ios::binary);return {std::istreambuf_iterator<char>(f),{}};}
@@ -20,6 +21,8 @@ int main(){
     const auto rb=read("generated/downwell-rooms.dwrm"),ob=read("generated/downwell-objects.dwob"),pb=read("generated/downwell-builder-patterns.dwbp");
     RoomPack rooms(rb.data(),rb.size());ObjectPack objects(ob.data(),ob.size());BuilderPatternPack patterns(pb.data(),pb.size());
     require(rooms.valid()&&objects.valid()&&patterns.valid(),"valid original metadata");
+    PackedObjectEvent animationEnd;
+    require(!objects.findEvent(280,7,7,animationEnd),"keeper has no inherited Animation End event");
     const auto sb=read("generated/downwell-sprites.dwsc"),mb=read("generated/downwell-sprite-masks.dwsm");
     SpriteCollisionPack sprites(sb.data(),sb.size());SpriteMaskPack masks(mb.data(),mb.size());
     require(sprites.valid()&&masks.valid(),"valid collision metadata");
@@ -105,6 +108,23 @@ int main(){
     require(keeper&&keeper->imageIndex==0&&keeper->alarms.get(0)>=20&&keeper->alarms.get(0)<=60&&
         collision->resolve(keeperKey)==keeper,"blink reset preserves registered collision identity");
     require(owner.clear()&&!collision->resolve(keeperKey),"retire keeper fixture");layers(live);
+    const auto idleId=owner.children().create(280,498,2000);
+    float idleFrame=0;
+    for(unsigned tick=0;tick<60;++tick){
+        idleFrame=float(double(idleFrame)+double(0.09f));
+        if(idleFrame>=4)idleFrame=float(std::fmod(float(std::fmod(idleFrame,4.0f))+4.0f,4.0f));
+        require(keeperTick(),"stored keeper idle animation joins room phase");
+        const auto* idle=live.instance(idleId);
+        require(idle&&idle->spriteId==485&&idle->imageIndex==idleFrame,
+            "stored idle animation rounds each frame and wraps before Step");
+        if(tick==29){
+            const auto key=owner.children().sourceHandle(idleId);
+            require(idleFrame>=2&&owner.children().keeperSprite(key,487)&&live.instance(idleId)->imageIndex==0&&
+                owner.children().keeperSprite(key,485),"shorter keeper sprite resets the owning image and timeline");
+            idleFrame=0;
+        }
+    }
+    require(owner.clear(),"retire idle keeper fixture");layers(live);
     InstanceHandle scenery;const auto sceneryId=live.nextRuntimeInstanceId();
     DeferredCreateInstance sceneryCommand(289,240,int(live.mainCameraViewY())+100);
     sceneryCommand.integerImageIndex=12;sceneryCommand.imageIndex=12;sceneryCommand.imageSpeed=0;

@@ -8,6 +8,7 @@
 #include "ShopKeeperEvents.h"
 #include "SpriteCollisionPack.h"
 #include "RunnerSpriteChange.h"
+#include "ShopKeeperAnimation.h"
 namespace downwell {
 // Native ownership of Shop and its ten synchronous children. Numeric IDs
 // belong to the enclosing room allocator, never to this generation pool.
@@ -19,6 +20,7 @@ public:
         unsigned lifetimeId=0,sourceId=0;
         int objectId=-1,spriteId=-1,maskId=-1;
         RunnerImageValue x{},y{},imageIndex{},imageSpeed{0x3f800000u};
+        RunnerImageValue keeperTimeline{};
         AlarmBank alarms;
         ShopChildState state;
         ShopWorld::Instance* shop=nullptr;
@@ -88,6 +90,15 @@ public:
         if(!good_||creating_||!r||!r->initialized||number>=AlarmBank::count)return fail();
         records_[h.slot].alarms.set(number,ticks);return true;
     }
+    bool advanceKeeperAnimation(InstanceHandle h){
+        if(!ready(h,280))return fail();auto& r=records_[h.slot];
+        if(!r.active||r.destroyRequested)return true;
+        return ShopKeeperAnimation::advance(r.keeperTimeline,r.spriteId,r.imageIndex,r.imageSpeed,
+            [&](RunnerImageValue value){
+                if(!binding_.imageIndex(h,r,value)||!good_)return false;
+                r.imageIndex=value;return true;
+            })||fail();
+    }
     template<class Environment,class Range> bool stepKeeper(InstanceHandle h,Environment& environment,Range range){
         if(!ready(h,280))return fail();auto& r=records_[h.slot];
         if(!r.active||r.destroyRequested)return true;
@@ -132,6 +143,7 @@ public:
         // image_index write. Keep the owning record in agreement with it.
         auto& record=records_[h.slot];record.spriteId=sprite;
         if(change.resetIndex)record.imageIndex={};
+        if(change.resetTimeline)record.keeperTimeline={};
         return true;
     }
     template<class Range> bool advanceAlarm(InstanceHandle h,unsigned number,Range range){

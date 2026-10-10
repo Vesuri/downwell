@@ -1,5 +1,9 @@
 #include "core/ShopKeeper.h"
 #include "core/ShopKeeperEvents.h"
+#include "core/ShopKeeperAnimation.h"
+#include <cmath>
+#include <cstring>
+#include <initializer_list>
 #include <cstdio>
 #include <cstdlib>
 static void require(bool ok, const char* message) {
@@ -7,6 +11,25 @@ static void require(bool ok, const char* message) {
 }
 int main() {
     using namespace downwell;
+    const int sprites[]={485,486,487,496,497};
+    for(int sprite:sprites)for(float speed:{0.0f,0.09f,0.4f,0.2f,0.045f}){
+        RunnerImageValue timeline{},index{},rate;std::memcpy(&rate.bits,&speed,4);
+        float expected=0;const unsigned frames=ShopKeeperAnimation::frames(sprite);
+        for(unsigned tick=0;tick<1000;++tick){
+            if(tick%71==0){expected=sprite==487&&(tick&1)?1.0f:0.0f;std::memcpy(&index.bits,&expected,4);}
+            expected=float(double(expected)+double(speed));
+            if(expected>=frames)expected=float(std::fmod(float(std::fmod(expected,float(frames)))+float(frames),float(frames)));
+            require(ShopKeeperAnimation::advance(timeline,sprite,index,rate,[&](RunnerImageValue next){index=next;return true;}),
+                "registered keeper animation advances");
+            unsigned bits;std::memcpy(&bits,&expected,4);
+            require(index.bits==bits&&timeline.bits==bits,"keeper animation matches scalar rounding and wraps");
+        }
+    }
+    RunnerImageValue rejectedTimeline{0x3f000000u};
+    require(!ShopKeeperAnimation::advance(rejectedTimeline,485,rejectedTimeline,{0x3db851ecu},
+        [](RunnerImageValue){return false;})&&rejectedTimeline.bits==0x3f000000u,"failed image publication retains timeline");
+    require(!ShopKeeperAnimation::advance(rejectedTimeline,485,{0x3fc00000u},{},
+        [](RunnerImageValue){return true;}),"unsupported explicit inverse is not approximated");
     struct Ops {
         int selected=485;RunnerImageValue frame{},rate{};AlarmBank clocks;
         int player=190;unsigned zone=1,rolls=0;bool crime=false,dead=false,spawned=false,tail=false,rejectImage=false;

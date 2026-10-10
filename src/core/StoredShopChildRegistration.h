@@ -7,6 +7,8 @@
 #include "RunnerRealComparison.h"
 #include "ShopChildCreate.h"
 #include "ShopKeeperEvents.h"
+#include "ShopKeeperAnimation.h"
+#include "RunnerSpriteChange.h"
 #include <cstring>
 namespace downwell {
 // Synchronous Create ownership for Shop's ten children. This is deliberately
@@ -19,7 +21,7 @@ public:
     using State=ShopChildState;
     using Material=State::Material;
 private:
-    struct Entry {InstanceHandle key{};unsigned id=0;int object=-1;State state;};
+    struct Entry {InstanceHandle key{};unsigned id=0;int object=-1;State state;RunnerImageValue keeperTimeline{};};
     Entry entries_[Capacity]{};
     InstanceStore<WorldCapacity>& records_;const ObjectPack& objects_;
     InstanceLifecycleBinding lifecycle_;std::uint32_t& nextId_;const int& room_;bool& good_;
@@ -127,6 +129,28 @@ public:
         if(!r->active||r->destroyRequested||number>1||!r->alarms.advanceOne(number))return true;
         return risingTextAlarmEvent(key,number);
     }
+    bool advanceKeeperAnimation(InstanceHandle key){
+        auto* e=entry(key);auto* r=e?record(*e):nullptr;
+        if(!good_||creating_||!r||e->object!=280||!e->state.initialized)return fail();
+        if(!r->active||r->destroyRequested)return true;
+        RunnerImageValue index,speed;
+        std::memcpy(&index.bits,&r->imageIndex,4);std::memcpy(&speed.bits,&r->imageSpeed,4);
+        return ShopKeeperAnimation::advance(e->keeperTimeline,r->spriteId,index,speed,[&](RunnerImageValue value){
+            if(!lifecycle_.imageIndex(key,*r,value)||!good_)return false;
+            r->imageIndex=stored(value);return true;
+        })||fail();
+    }
+    bool keeperSprite(InstanceHandle key,int value){
+        auto* e=entry(key);auto* r=e?record(*e):nullptr;
+        if(!good_||creating_||!r||e->object!=280)return fail();
+        RunnerImageValue index;std::memcpy(&index.bits,&r->imageIndex,4);
+        RunnerSpriteChange::Result change;
+        const auto frames=ShopKeeperAnimation::frames(value);
+        if(!frames||!RunnerSpriteChange::plan(r->spriteId,value,index,frames,change)||
+           !lifecycle_.sprite(key,*r,value)||!good_)return fail();
+        r->spriteId=value;if(change.resetIndex)r->imageIndex=0;
+        if(change.resetTimeline)e->keeperTimeline={};return true;
+    }
     template<class Environment,class Range> bool stepKeeper(InstanceHandle key,Environment& environment,Range range){
         auto* e=entry(key);auto* r=e?record(*e):nullptr;
         if(!good_||creating_||!r||e->object!=280||!e->state.initialized)return fail();
@@ -144,8 +168,7 @@ public:
             bool area(unsigned& value){return env.area(value)&&owner.good_;}
             bool range(unsigned lo,unsigned hi,unsigned& value){value=random(lo,hi);return owner.good_;}
             bool sprite(int value){
-                if(!owner.lifecycle_.sprite(key,r,value)||!owner.good_)return false;
-                r.spriteId=value;return true;
+                return owner.keeperSprite(key,value);
             }
             bool speed(MotionBinary64 value){RunnerImageValue v;if(!v.assign(value))return false;r.imageSpeed=stored(v);return true;}
             bool image(RunnerImageValue value){
