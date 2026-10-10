@@ -601,6 +601,32 @@ public:
         MakeEnvironment makeEnvironment,ReadStop readStop,Tick tick){
         return withRegisteredSteeringEnemyEvents(owner,queries,makeEnvironment,readStop,tick);
     }
+    template<unsigned Capacity,class State,int Object,unsigned Effects,class Queries,class Frames,class MakeEnvironment,class ReadStop,class Tick>
+    bool withRegisteredSteeringEnemyMovingFx(StoredSteeringEnemyStates<instanceCapacity,Capacity,State,Object>& owner,
+        StoredMovingFxRegistration<instanceCapacity,Effects>& effects,Queries& queries,Frames frames,
+        MakeEnvironment makeEnvironment,ReadStop readStop,Tick tick){
+        return withMovingFxEvents(effects,[&](auto key,const auto&,bool& allowed){
+            bool stopped;return readStop(stopped)&&movingFxTimeAllowed(effects,key,stopped,allowed);
+        },[&]{
+            return withRegisteredSteeringEnemyEvents(owner,queries,[&](InstanceHandle key){
+                auto external=makeEnvironment(key);
+                struct Environment:decltype(external) {
+                    StartupRuntime& world;
+                    StoredSteeringEnemyStates<instanceCapacity,Capacity,State,Object>& owner;
+                    StoredMovingFxRegistration<instanceCapacity,Effects>& effects;
+                    Frames& frames;InstanceHandle key;
+                    Environment(decltype(external) base,StartupRuntime& w,decltype(owner) o,decltype(effects) e,Frames& f,InstanceHandle k)
+                        :decltype(external)(base),world(w),owner(o),effects(e),frames(f),key(k){}
+                    bool movingFx(MotionBinary64 x,MotionBinary64 y,int sprite,MotionBinary64 rate,MotionBinary64 angle,MotionBinary64 speed){
+                        return world.spawnMovingFx(effects,x,y,sprite,rate,angle,speed,frames,
+                            [](bool vertical,auto speed,auto angle,auto& value){return WhiteJellyStep::movementComponent(vertical,speed,angle,value);},
+                            [&](unsigned id){return owner.publishMovingFx(key,id);});
+                    }
+                };
+                return Environment{external,*this,owner,effects,frames,key};
+            },readStop,tick);
+        });
+    }
     template<unsigned Capacity,class State,int Object,class Queries,class MakeEnvironment,class ReadStop,class Tick>
     bool withRegisteredSteeringEnemyEvents(StoredSteeringEnemyStates<instanceCapacity,Capacity,State,Object>& owner,Queries& queries,
         MakeEnvironment makeEnvironment,ReadStop readStop,Tick tick){

@@ -403,6 +403,27 @@ int main(){
             require(world->resolveInstance(active)->alarms.get(0)==(before==1?10:before-1),
                 "red-ball alarm reset occurs immediately inside the room alarm phase");
         }
+        auto emissions=world->movingFxRegistration<4>();unsigned emittedId=0;InstanceHandle emitted;
+        for(unsigned frame=0;frame<12;++frame){
+            require(world->withRegisteredSteeringEnemyMovingFx(balls,emissions,*owner,
+                [&](int sprite,unsigned& count){return sprites.frameCount(sprite,count);},
+                [](InstanceHandle){return Environment{};},[](bool& stopped){stopped=false;return true;},[&]{
+                    world->step(Input{},false);return world->effectsSucceeded();
+                }),"red-ball Alarm 0 emits a registered moving child under normal room scheduling");
+            const unsigned childId=balls.state(activeId)->myFx;
+            if(childId&&!emittedId){
+                emittedId=childId;
+                for(unsigned i=0;i<world->activeInstanceCount();++i)
+                    if(world->instanceAt(i).instanceId==childId)emitted=world->instanceHandleAt(i);
+                const auto* child=emissions.state(emitted);
+                require(child&&child->initialized&&child->spriteId==704&&child->imageIndex.bits==0,
+                    "alarm stores the source child ID after Create and newborn misses earlier animation phase");
+                require(child->imageSpeed.bits==0x3dcccccdu&&child->angle.promoted().valid(),
+                    "enemy emission supplies source animation speed and heading setters");
+            }
+        }
+        require(emittedId&&emissions.state(emitted)&&
+            emissions.state(emitted)->imageIndex.bits!=0,"emitted child joins subsequent room animation phases");
         InstanceHandle other,player,field;
         require(world->withRegisteredRedBallEvents(balls,*owner,[](InstanceHandle){return Environment{};},
             [](bool&){return false;},[&]{return world->spawnRedBall(1040,world->mainCameraRenderViewY()+100,other);}),

@@ -14,6 +14,7 @@ struct SteeringEnemyBirthState {
     Real xx{},yy{},xsp{},ysp{},velocity{},moveSpeed{},maxSpeed{},acceleration{},deceleration{};
     Real rotateSpeed{},angle16{},playerDirection{},imageRate{},takenImpact{},hitAngle{},hitDirection{};
     int health=0,money=0,cone=0,hitDamage=0;
+    unsigned myFx=0; // Unassigned until emitMovingFx returns its child ID.
     bool alive=false,scriptActive=false,hit=false,stomped=false,hitStun=false,grounded=false;
     bool timefieldImmune=false,damageStun=false,inWater=false,bulletImmune=false,bulletThrough=false;
     bool initialized=false;

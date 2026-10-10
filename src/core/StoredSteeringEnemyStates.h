@@ -51,6 +51,13 @@ public:
         free->busy=false;
         return (good_&&ok&&alive(*free))||fail();
     }
+    bool publishMovingFx(InstanceHandle key,unsigned childId){
+        auto* e=find(key);const auto* child=records_.find(childId);
+        // This is a script field write within the current event, not recursive
+        // event dispatch. The child's synchronous Create has already returned.
+        if(!good_||!e||!e->busy||!e->state.initialized||!child||child->objectId!=220)return fail();
+        e->state.myFx=childId;return true;
+    }
     template<class Event> bool dispatch(InstanceHandle key,Event event){
         auto* e=find(key);const auto* r=records_.resolve(key);
         if(!good_||!e||e->busy||!e->state.initialized)return fail();
