@@ -780,6 +780,33 @@ angry sounds, the crime/death branch and the final sign script. Shared `dUp`
 and `padCancel` writes remain visible to subsequent inner visits and outer
 events; input snapshots per shop are not equivalent.
 
+The original executable's object-selector `pushenv` at `0x57a6f0` captures
+targets before running the body. Its ordinary pass reads the ancestor-inclusive
+head at object+`0x44` (`0x57a9fd`) and excludes flags `0x100003`. It then scans
+arrays at `0xb5a098` and `0xb5a070`, in that order, with the same flag filter
+and an object-field equality test. Their precise admission roles must be
+resolved before substituting an object-membership-only implementation.
+The scratch list uses instance+`0x16c`; its helpers append at the tail.
+An already-present array candidate is moved to the tail without increasing
+the selected count.
+
+For an ordinary list A,B with no additional array candidates, the count-two
+inline path executes A,B. For A,B,C, the larger path writes `[null,A,B]`
+while leaving C as initial self; `popenv` (`0x57ad70`) decrements the array
+cursor and consequently executes C,B,A. This is not the outer Step ordering.
+The zero/one/two specializations and the larger snapshot must not be collapsed
+into one forward registration walk. Duplicate array candidates also require
+the original inline bookkeeping, not just reversing a deduplicated vector.
+
+`popenv` publishes the next captured pointer without another activity or
+destruction-flag check. Later births cannot enter an existing capture; another
+outer event captures anew. Deferred lifetime retirement must preserve captured
+targets. Per-component active/destroy guards therefore cannot silently replace
+the admission decision for a body already selected by `with`.
+`python3 tools/verify-runner-with.py` pins these reviewed routine bytes and
+the key instructions against the original executable hash. This is static
+binary evidence, not a Windows execution test or completed scheduler admission.
+
 `ShopInteraction` and `ShopWorld::step` are still compact adapters, not a full
 implementation of that parent event. Besides missing the inner traversal and
 radio/view branches, their aggregate feedback callbacks cannot stand in for
