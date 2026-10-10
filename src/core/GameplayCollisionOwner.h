@@ -2394,13 +2394,22 @@ public:
     // World-backed Step operations. Decoy target globals, source atan, audio
     // and synchronous effect births remain explicit environment dependencies.
     template<class Environment> bool stepRegisteredWhiteJellyWithWorld(InstanceHandle shared,bool stopped,Environment& environment){
+        return stepRegisteredSteeringEnemyWithWorld<false>(shared,stopped,environment);
+    }
+    template<class Environment> bool stepRegisteredRedBallWithWorld(InstanceHandle shared,bool stopped,Environment& environment){
+        return stepRegisteredSteeringEnemyWithWorld<true>(shared,stopped,environment);
+    }
+private:
+    template<bool Red,class Environment> bool stepRegisteredSteeringEnemyWithWorld(InstanceHandle shared,bool stopped,Environment& environment){
         View::Kind kind;InstanceHandle local;
-        if(!valid()||!world_||!resolves(shared)||!View::decode(shared,kind,local)||kind!=View::Kind::whiteJelly)
+        if(!valid()||!world_||!resolves(shared)||!View::decode(shared,kind,local)||
+            kind!=(Red?View::Kind::redBall:View::Kind::whiteJelly))
             return check(false);
         struct Ops : Environment {
             GameplayCollisionOwner& owner;GameplayWorld& world;InstanceHandle key;
             Ops(const Environment& env,GameplayCollisionOwner& o,GameplayWorld& w,InstanceHandle k)
                 :Environment(env),owner(o),world(w),key(k){}
+            auto& store(){if constexpr(Red)return owner.redBalls_;else return owner.whiteJellies_;}
             bool player(bool vertical,MotionBinary64& value){
                 MotionBinary64 x,y;
                 if(!ContactCoordinates::playerGlobals(world.player().frameStartXFixed(),
@@ -2423,28 +2432,50 @@ public:
                 });
             }
             bool position(bool vertical,RunnerImageValue value,RunnerImageValue& accepted){
-                return owner.whiteJellies_.position(key,vertical,value,accepted);
+                return store().position(key,vertical,value,accepted);
             }
-            bool direction(MotionBinary64 value,MotionBinary64& accepted){return owner.whiteJellyDirection(key,value,accepted);}
+            bool direction(MotionBinary64 value,MotionBinary64& accepted){
+                if constexpr(Red)return owner.redBallDirection(key,value,accepted);
+                else return owner.whiteJellyDirection(key,value,accepted);
+            }
+            bool xscale(int sign){return store().xscale(key,sign);}
+            bool inView(bool& visible){
+                // scrInView(0,0,0) reads published builtin coordinates, not
+                // the private xx/yy integrator. Native gameplay uses this
+                // 160x284 camera; the wider hardware HUD is not its view.
+                visible=false;const auto* r=store().find(key);if(!r)return false;
+                const int left=160+world.cameraOffsetX(),top=34+world.cameraOffsetY();
+                int order;
+                if(!compareRunnerReal(r->x.promoted(),MotionBinary64::fromInteger(left),order))return false;
+                if(order<=0)return true;
+                if(!compareRunnerReal(r->x.promoted(),MotionBinary64::fromInteger(left+160),order))return false;
+                if(order>=0)return true;
+                if(!compareRunnerReal(r->y.promoted(),MotionBinary64::fromInteger(top),order))return false;
+                if(order<=0)return true;
+                if(!compareRunnerReal(r->y.promoted(),MotionBinary64::fromInteger(top+284),order))return false;
+                visible=order<0;return true;
+            }
             bool imageSpeed(RunnerImageValue value,RunnerImageValue& accepted){
                 if(!value.promoted().valid())return false;accepted=value;return true;
             }
             bool imageIndex(int value){
-                RunnerImageValue index;return index.assignInteger(value)&&owner.whiteJellies_.imageIndex(key,index);
+                RunnerImageValue index;return index.assignInteger(value)&&store().imageIndex(key,index);
             }
-            bool alarm(int number,int value){return number>=0&&owner.whiteJellies_.setAlarm(key,unsigned(number),value);}
-            bool sprite(int value){return owner.whiteJellies_.sprite(key,value);}
-            bool meeting(MotionBinary64 x,MotionBinary64 y,int object,bool& hit){return owner.whiteJellies_.meeting(key,x,y,object,hit);}
-            bool destroy(){return owner.whiteJellies_.markDestroyed(key);}
+            bool alarm(int number,int value){return number>=0&&store().setAlarm(key,unsigned(number),value);}
+            bool sprite(int value){return store().sprite(key,value);}
+            bool meeting(MotionBinary64 x,MotionBinary64 y,int object,bool& hit){return store().meeting(key,x,y,object,hit);}
+            bool destroy(){return store().markDestroyed(key);}
             bool movingFx(MotionBinary64 x,MotionBinary64 y,int sprite,MotionBinary64 rate,
                 MotionBinary64 angle,MotionBinary64 speed){
                 return owner.spawnMovingFx(x,y,sprite,rate,angle,speed,
                     [&](unsigned& source){return Environment::allocateMovingFx(source);},
-                    [&](unsigned source){return owner.whiteJellies_.publishMovingFx(key,source);});
+                    [&](unsigned source){return store().publishMovingFx(key,source);});
             }
         } ops{environment,*this,*world_,local};
-        return stepRegisteredWhiteJelly(shared,stopped,ops);
+        if constexpr(Red)return stepRegisteredRedBall(shared,stopped,ops);
+        else return stepRegisteredWhiteJelly(shared,stopped,ops);
     }
+public:
     bool whiteJellyDirection(InstanceHandle local,MotionBinary64 wanted,MotionBinary64& accepted){
         return steeringEnemyDirection(whiteJellies_,View::Kind::whiteJelly,115,local,wanted,accepted);
     }

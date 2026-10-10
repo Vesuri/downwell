@@ -99,6 +99,10 @@ bool nativeRegisteredWhiteJellyStep(downwell::GameplayCollisionOwner& owner,down
     bool stop,NativeWhiteJellyStepOps& ops){
     return owner.stepRegisteredWhiteJellyWithWorld(shared,stop,ops);
 }
+bool nativeRegisteredRedBallStep(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle shared,
+    bool stop,NativeWhiteJellyStepOps& ops){
+    return owner.stepRegisteredRedBallWithWorld(shared,stop,ops);
+}
 bool nativeWorldWhiteJellyCreate(GameplayWorld& world,unsigned source,downwell::RunnerImageValue x,
     downwell::RunnerImageValue y,NativeWhiteJellyBirthOps& ops,downwell::InstanceHandle& key){
     return world.createWhiteJellyWithSourceId(source,x,y,[&](downwell::InstanceHandle){return ops;},key);
@@ -933,6 +937,8 @@ int main(){
             bool enemyPlayerX(MotionBinary64& v){v=MotionBinary64::fromInteger(480);return true;}
             bool enemyPlayerY(MotionBinary64& v){return playerY(v);}
             bool inView(bool& value){value=true;return true;}
+            bool atan(MotionBinary64 y,MotionBinary64 x,MotionBinary64& out){return portableAtan(y,x,out);}
+            bool allocateMovingFx(unsigned&){assert(false);return false;}
             bool lengthdir(bool y,MotionBinary64 speed,MotionBinary64 angle,MotionBinary64& out){
                 return WhiteJellyStep::movementComponent(y,speed,angle,out);
             }
@@ -988,6 +994,35 @@ int main(){
         assert(balls.find(local)->myFx==991000&&owner->movingEffects().size()==1);
         assert(balls.markDestroyed(local)&&owner->prepareDraw()&&!balls.find(local)&&!GameplayCollisionView(*world).contains(shared));
         unsigned nextSource=992000;
+        // The production adapter must ignore the fixture's always-visible
+        // callback and fixed enemy target. Check strict camera boundaries
+        // using published x/y while leaving private xx/yy at the birth point.
+        for(const auto offset:std::initializer_list<std::pair<int,int>>{
+            {0,100},{1,100},{159,100},{160,100},{80,0},{80,1},{80,283},{80,284}}){
+            InstanceHandle edge,encoded;
+            assert(world->createRedBallWithSourceId(nextSource++,{0x43700000u},{0x44000000u},
+                [&](auto key){return Ops{*owner,key};},edge));
+            RunnerImageValue x,y,accepted;
+            assert(x.assignInteger(160+world->cameraOffsetX()+offset.first)&&
+                y.assignInteger(34+world->cameraOffsetY()+offset.second)&&
+                balls.position(edge,false,x,accepted)&&balls.position(edge,true,y,accepted));
+            MotionBinary64 px,py,heading,direction;
+            assert(ContactCoordinates::playerGlobals(world->player().frameStartXFixed(),
+                world->player().frameStartYFixed(),240,176,px,py));
+            const auto* actor=balls.find(edge);
+            assert(RunnerPointDirection::evaluate(actor->xx,actor->yy,px,py,heading,portableAtan)&&
+                owner->redBallDirection(edge,heading,direction));
+            const auto speed=actor->moveSpeed;
+            assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::redBall,edge,encoded));
+            Ops ops{*owner,edge};
+            assert(owner->stepRegisteredRedBallWithWorld(encoded,false,ops));
+            actor=balls.find(edge);assert(actor&&actor->viewMarginsInitialized);
+            int order;assert(compareRunnerReal(actor->playerDirection,heading,order)&&order==0);
+            assert(compareRunnerReal(actor->moveSpeed,speed,order));
+            const bool inside=offset.first>0&&offset.first<160&&offset.second>0&&offset.second<284;
+            assert(order==(inside?1:0));
+            assert(balls.markDestroyed(edge)&&owner->prepareDraw()&&!balls.find(edge));
+        }
         for(int offset:{-161,-160,-125,-124,-123,3000,3001}){
             InstanceHandle edge;
             assert(world->createRedBallWithSourceId(nextSource++,{0x43700000u},{0x44000000u},
