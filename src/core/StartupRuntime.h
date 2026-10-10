@@ -3,6 +3,7 @@
 
 #include "AreaOneBuilder.h"
 #include "RunnerDirectionValue.h"
+#include "RunnerAlarmValue.h"
 #include "BlastWallContact.h"
 #include "BlastShootableContact.h"
 #include "InstanceStore.h"
@@ -710,6 +711,10 @@ public:
                 bool alarm(int number,int value){
                     auto* r=record();if(!r||number<0||number>=int(AlarmBank::count))return false;
                     r->alarms.set(unsigned(number),value);return true;
+                }
+                bool effectAlarmReset(MotionBinary64 value){
+                    std::int32_t ticks;
+                    return runnerAlarmValue(value,ticks)&&alarm(0,ticks);
                 }
                 bool meeting(MotionBinary64 x,MotionBinary64 y,int object,bool& hit){
                     const auto* r=record();return r&&queries.placeMeeting(key,*r,object,x,y,hit);

@@ -394,6 +394,15 @@ int main(){
             "unfrozen registered red-ball integrates motion and resumes animation");
         require(record->scaleX==((moved->xsp.high>>31)?-1.0f:1.0f),
             "red-ball facing is stored after collision-transform publication");
+        for(unsigned frame=0;frame<12;++frame){
+            const int before=world->resolveInstance(active)->alarms.get(0);
+            require(world->withRegisteredRedBallEvents(balls,*owner,[](InstanceHandle){return Environment{};},
+                [](bool& stopped){stopped=true;return true;},[&]{
+                    world->step(Input{},false);return world->effectsSucceeded();
+                }),"stopped red-ball Alarm 0 resets stored countdown without spawning an effect");
+            require(world->resolveInstance(active)->alarms.get(0)==(before==1?10:before-1),
+                "red-ball alarm reset occurs immediately inside the room alarm phase");
+        }
     }
     for(unsigned failure=0;failure<=5;++failure){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);

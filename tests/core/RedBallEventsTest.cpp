@@ -1,8 +1,10 @@
 #include "core/RedBallStep.h"
+#include "core/RunnerAlarmValue.h"
 #include "core/RunnerDirectionValue.h"
 #include "core/GameMakerRandom.h"
 using S=downwell::RedBallStep;using N=downwell::MotionBinary64;using F=downwell::RunnerImageValue;
 #ifdef DOWNWELL_FREESTANDING
+bool nativeAlarmValue(N value,std::int32_t& out){return downwell::runnerAlarmValue(value,out);}
 struct Ops {
     bool direction(N,N&);bool damage(int,int,int);bool movingFx(N,N,int,N,N,N);
     bool effectAlarmReset(N);bool viewY(N&);bool room(int&);bool destroy();
@@ -15,8 +17,21 @@ bool nativeRedBallEvents(S& s,bool stopped,downwell::GameMakerRandom& random,Ops
 #include <cassert>
 #include <vector>
 #include <cstdio>
+#include <cstring>
 static bool same(N a,N b){return a.high==b.high&&a.low==b.low;}
 int main(){
+    const auto checkAlarm=[](double value){
+        std::uint64_t bits;std::memcpy(&bits,&value,8);
+        N input{unsigned(bits>>32),unsigned(bits)};std::int32_t ticks=0;
+        assert(downwell::runnerAlarmValue(input,ticks)&&ticks==static_cast<std::int32_t>(value));
+    };
+    for(int i=-10000;i<=10000;++i)checkAlarm(double(i)+0.75);
+    for(double value:{-2147483648.75,-2147483648.0,2147483647.75,0.0,-0.0})checkAlarm(value);
+    std::int32_t ticks=0;
+    assert(downwell::runnerAlarmValue({0,1},ticks)&&ticks==0);
+    assert(!downwell::runnerAlarmValue({0x41e00000u,0},ticks));
+    assert(!downwell::runnerAlarmValue({0x7ff00000u,0},ticks));
+    assert(!downwell::runnerAlarmValue({0xc1e00000u,0x00200000u},ticks));
     for(bool reject:{false,true}){
         S s;s.initialized=true;s.direction=N::fromInteger(359);
         downwell::GameMakerRandom random(91),oracle(91);
