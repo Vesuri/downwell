@@ -9,6 +9,7 @@
 #include "StoredShopCreationOwner.h"
 #include "RegisteredScatteredContact.h"
 #include "StoredSpawnerStates.h"
+#include "StoredWhiteJellyStates.h"
 #include "RunnerLayerIds.h"
 #include "ScriptEffectRuntimeBinding.h"
 #include "BoxStepDispatch.h"
@@ -455,6 +456,32 @@ public:
         return instances_.at(index);
     }
     const SpawnerStep* spawnerState(unsigned id)const{return spawners_.state(id);}
+    template<unsigned Capacity> StoredWhiteJellyStates<instanceCapacity,Capacity> whiteJellyStates(){
+        return StoredWhiteJellyStates<instanceCapacity,Capacity>(instances_);
+    }
+    // Bind recovered events to their resource dispatch, not a second actor loop.
+    // The caller supplies real builtin/effect operations and the current player
+    // pTimeStop read. This scope does not admit unimplemented contact/Draw events.
+    template<unsigned Capacity,class MakeOps,class ReadStop,class Tick>
+    bool withWhiteJellyEvents(StoredWhiteJellyStates<instanceCapacity,Capacity>& owner,
+        MakeOps makeOps,ReadStop readStop,Tick tick){
+        if(!run_.effectsSucceeded)return false;
+        if(whiteJellyDispatch_||!owner.belongsTo(instances_)||!owner.valid())return run_.effectsSucceeded=false;
+        auto dispatch=[&](InstanceHandle key,int code){
+            if(code==1222)return owner.hitStunAlarm(key);
+            auto ops=makeOps(key);
+            if(code==1221)return owner.create(key,random_,ops);
+            bool stop;
+            return code==1225&&readStop(stop)&&owner.step(key,stop,random_,ops);
+        };
+        whiteJellyContext_=&dispatch;
+        whiteJellyDispatch_=[](void* p,InstanceHandle key,int code){
+            return (*static_cast<decltype(dispatch)*>(p))(key,code);
+        };
+        const bool ok=tick();whiteJellyDispatch_=nullptr;whiteJellyContext_=nullptr;
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok&&owner.valid();
+    }
+    bool spawnWhiteJelly(int x,int y,InstanceHandle& key);
     bool roomDestinationSet() const { return roomDestinationSet_; }
     bool roomLoadSucceeded() const { return roomLoadSucceeded_; }
     bool recoveredEventBindingsActive() const { return objectPack_ != nullptr; }
@@ -2623,6 +2650,8 @@ private:
     int showSplash_ = 0;
     InstanceStore<instanceCapacity> instances_;
     StoredSpawnerStates<instanceCapacity,8> spawners_{instances_};
+    void* whiteJellyContext_=nullptr;
+    bool (*whiteJellyDispatch_)(void*,InstanceHandle,int)=nullptr;
     RunnerLayerIds layerIds_;
     StoredRoomLayers<instanceCapacity,256,4096,8> roomLayers_{layerIds_};
     bool layerBindingSucceeded_;

@@ -27,6 +27,7 @@ public:
     StoredWhiteJellyStates(const StoredWhiteJellyStates&)=delete;
     StoredWhiteJellyStates& operator=(const StoredWhiteJellyStates&)=delete;
     bool valid()const{return good_;}
+    bool belongsTo(const InstanceStore<WorldCapacity>& records)const{return &records_==&records;}
     bool clear(){
         for(const auto& e:entries_)if(e.busy)return fail();
         for(auto& e:entries_)e={};good_=true;return true;

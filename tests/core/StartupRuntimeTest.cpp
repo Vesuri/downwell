@@ -1130,6 +1130,45 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
 
     if(objects&&patterns)testLiveLifecycle(pack,*objects,*patterns);
 
+    if(objects){
+        // Exercise the actual resource Create/ordinary Step dispatch with a
+        // controlled stopped actor. These operations are a test fixture, not
+        // a replacement for live trigonometry/effect bindings.
+        using N=downwell::MotionBinary64;using F=downwell::RunnerImageValue;
+        struct Ops {
+            unsigned& speeds;unsigned& sprites;
+            bool position(bool,F v,F& out){out=v;return true;}
+            bool playerY(N& out){out={};return true;}
+            bool playerX(N& out){out={};return true;}
+            bool pointDirection(N,N,N,N,N& out){out=N::fromInteger(90);return true;}
+            bool direction(N v,N& out){out=v;return true;}
+            bool imageSpeed(F v,F& out){++speeds;out=v;return true;}
+            bool sprite(int id){require(id==176,"stopped jelly publishes original sprite");++sprites;return true;}
+            bool enemyPlayerY(N&){return false;}bool enemyPlayerX(N&){return false;}
+            bool imageIndex(int){return false;}bool sound(int,int,int,int,const char*){return false;}
+            bool alarm(int,int){return false;}bool lengthdir(bool,N,N,N&){return false;}
+            bool meeting(N,N,int,bool&){return false;}bool enemyDeath(){return false;}
+            bool smoke(N,N,int,int){return false;}bool movingFx(N,N,int,N,N,N){return false;}
+            bool flash(N,N,int,int,int){return false;}bool currency(int){return false;}bool destroy(){return false;}
+        };
+        auto runtime=std::make_unique<downwell::StartupRuntime>(downwell::PlatformProfile::desktop,&pack,objects);
+        auto owner=runtime->whiteJellyStates<2>();unsigned speeds=0,sprites=0,stopReads=0;
+        downwell::InstanceHandle key;unsigned id=0;
+        require(runtime->withWhiteJellyEvents(owner,[&](auto){return Ops{speeds,sprites};},
+            [&](bool& stop){++stopReads;stop=true;return true;},[&]{
+                if(!runtime->spawnWhiteJelly(24,56,key))return false;
+                for(std::size_t i=0;i<runtime->activeInstanceCount();++i)
+                    if(runtime->instanceAt(i).objectId==115)id=runtime->instanceAt(i).instanceId;
+                require(owner.state(id)&&owner.state(id)->initialized&&speeds==1,"resource Create reaches jelly owner");
+                runtime->step(false);return runtime->effectsSucceeded()&&runtime->deferredCommandsSucceeded();
+            }),"scoped jelly resource event dispatch succeeds");
+        require(stopReads==1&&speeds==2&&sprites==1,"ordinary room phase executes stopped jelly Step exactly once");
+        require(owner.state(id)->imageSpeed.bits==0,"stopped jelly image speed retained");
+        const auto count=runtime->activeInstanceCount();
+        require(!runtime->spawnWhiteJelly(24,56,key)&&runtime->activeInstanceCount()==count,
+                "jelly resource birth cannot reuse expired stack-bound operations");
+    }
+
     if(objects&&patterns){
         struct CorpseAudit:LifecycleAudit {
             unsigned fieldQueries=0,motionQueries=0;bool fieldHit=false;

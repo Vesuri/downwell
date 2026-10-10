@@ -2381,6 +2381,15 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             run_.effectsSucceeded=run_.effectsSucceeded&&spawners_.createCaverns(key,run_.stage.level,false);
         }else ++unimplementedCodeCalls_;
         return;
+    case 1221: // enmWhiteJelly Create
+    case 1222: // enmWhiteJelly Alarm 1
+    case 1225: // enmWhiteJelly ordinary Step
+        if(instance&&instance->objectId==115&&whiteJellyDispatch_){
+            ++implementedCodeCalls_;
+            const auto key=instances_.handleAt(unsigned(instance-&instances_.at(0)));
+            run_.effectsSucceeded=run_.effectsSucceeded&&whiteJellyDispatch_(whiteJellyContext_,key,codeId);
+        }else ++unimplementedCodeCalls_;
+        return;
     case 1086: // gml_Object_objBox_n_Alarm_0
         ++implementedCodeCalls_;
         if(instance!=nullptr)instance->box.alarmZero();
@@ -2905,6 +2914,26 @@ bool StartupRuntime::adoptBuilderScattered(const DeferredCreateInstance& command
     const auto* r=instances_.find(id);
     if(!run_.effectsSucceeded||!deferredCommandsSucceeded_||!r||r->objectId!=289)return run_.effectsSucceeded=false;
     key=instances_.handleAt(unsigned(r-&instances_.at(0)));return true;
+}
+
+bool StartupRuntime::spawnWhiteJelly(int x,int y,InstanceHandle& key){
+    if(!run_.effectsSucceeded||!whiteJellyDispatch_||!objectPack_||!deferredCommandsSucceeded_)
+        return run_.effectsSucceeded=false;
+    DeferredInstanceQueue<1> child;
+    if(!child.enqueueCreate(115,x,y))return run_.effectsSucceeded=false;
+    InstanceHandle created;
+    const auto result=child.applyChecked(instances_,*objectPack_,roomId_,nextRuntimeInstanceId_,
+        [&](InstanceRecord& record){
+            created=instances_.handleAt(instances_.size()-1);
+            if(instances_.resolve(created)!=&record)return false;
+            // All three PreCreates only inherit, ending at parentLife's absent
+            // parent. Shared Create includes both parent Creates.
+            const auto missing=unimplementedCodeCalls_;
+            dispatchInstancePhase(record,RoomInstancePhase::create);
+            return missing==unimplementedCodeCalls_&&deferredCommandsSucceeded_&&run_.effectsSucceeded;
+        },lifecycle_);
+    if(result!=ApplyInstanceCommandsResult::success||!instances_.resolve(created))return run_.effectsSucceeded=false;
+    key=created;return true;
 }
 
 bool StartupRuntime::spawnBuilderPrimitive(int object,int x,int y,InstanceHandle& key){
