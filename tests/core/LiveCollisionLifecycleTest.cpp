@@ -471,6 +471,26 @@ int main(){
         RunnerImageValue x,y;
         require(collision->collisionPosition(child,x,y)&&x.bits==state->x.bits&&y.bits==state->y.bits,
             "moving effect has a registered published collision position");
+        auto blood=world->bloodRegistration<1>();InstanceHandle bloodLocal;
+        require(world->spawnBlood(blood,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(400),
+            MotionBinary64::fromInteger(90),[](InstanceHandle){return true;},bloodLocal),"coexisting blood specialization");
+        const auto bloodWorld=blood.worldHandle(bloodLocal);
+        unsigned steps=0;
+        for(unsigned frame=0;frame<200&&(world->resolveInstance(child)||world->resolveInstance(bloodWorld));++frame){
+            require(world->withMovingFxEvents(effects,[&](auto key,const auto&,bool& allowed){
+                ++steps;return world->movingFxTimeAllowed(effects,key,false,allowed);
+            },[&]{return world->withBloodEvents(blood,[&](auto key,const auto&,bool& allowed){
+                return world->bloodTimeAllowed(blood,key,false,allowed);
+            },[&]{world->step(Input{},false);return world->effectsSucceeded();});}),
+                "general moving effects and blood share object-220 scheduler slots by lifetime ownership");
+            if(frame==0){
+                const auto* moved=effects.state(child);
+                require(moved&&moved->yy.high==0x4078f800u&&moved->yy.low==0,
+                    "scheduled moving-effect Step integrates half-pixel Y velocity");
+            }
+        }
+        require(steps&&!world->resolveInstance(child)&&!world->resolveInstance(bloodWorld)&&!effects.state(child),
+            "both object-220 owners animate to destruction and retire from the mixed world");
     }
     for(unsigned failure=0;failure<=5;++failure){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);

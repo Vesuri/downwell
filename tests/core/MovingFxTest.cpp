@@ -6,6 +6,11 @@ bool nativeMovingFxBirth(downwell::StoredMovingFxRegistration<8,2>& owner,N x,N 
     return owner.create(x,y,child)&&owner.sprite(child,704,4)&&owner.imageSpeed(child,{0x3fb99999u,0x9999999au})&&
         owner.imageAngle(child,N::fromInteger(90))&&owner.velocity(child,true,{0xbfe00000u,0});
 }
+bool nativeMovingFxLifecycle(downwell::StoredMovingFxRegistration<8,2>& owner,downwell::InstanceHandle key,bool stopped,int width){
+    return owner.advanceAnimation(key)&&owner.step(key,[&](auto h,const auto&,bool& allowed){
+        return owner.timeAllowed(h,stopped,width,allowed);
+    });
+}
 struct Ops {bool timeStopBound(bool&);bool imageSpeed(F,F&);bool position(bool,F,F&);};
 bool nativeMovingFx(downwell::MovingFx& state,Ops& ops){return state.step(ops);}
 #else

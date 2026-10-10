@@ -4,6 +4,7 @@
 #include "InstanceStore.h"
 #include "InstanceLifecycle.h"
 #include "ObjectPack.h"
+#include "TimeStopBound.h"
 #include <cstring>
 namespace downwell {
 // Object 220's source identity and synchronous Create/setter publication.
@@ -30,6 +31,10 @@ public:
     StoredMovingFxRegistration& operator=(const StoredMovingFxRegistration&)=delete;
     bool belongsTo(const InstanceStore<WorldCapacity>& records)const{return &records_==&records;}
     bool valid()const{return good_;}
+    InstanceHandle handle(const InstanceRecord& record){
+        for(auto& e:entries_)if(e.id==record.instanceId&&records_.resolve(e.key)==&record)return e.key;
+        return {};
+    }
     const MovingFx* state(InstanceHandle key){auto* e=entry(key);return e?&e->state:nullptr;}
     unsigned sourceId(InstanceHandle key){auto* e=entry(key);return e?e->id:0;}
     bool create(MotionBinary64 x,MotionBinary64 y,InstanceHandle& output){
@@ -71,6 +76,54 @@ public:
     bool velocity(InstanceHandle key,bool vertical,MotionBinary64 value){
         auto* e=entry(key);if(!good_||!e||!value.valid())return fail();
         (vertical?e->state.ysp:e->state.xsp)=value;return true;
+    }
+    bool timeAllowed(InstanceHandle key,bool stopped,int width,bool& allowed){
+        auto* e=entry(key);if(!good_||!e)return fail();
+        return TimeStopBound::evaluate(stopped,e->state.x.promoted(),e->state.y.promoted(),width,
+            [&](auto x,auto y,bool& hit){
+                auto* r=records_.resolve(key);return r&&lifecycle_.placeMeeting(key,*r,82,x,y,hit);
+            },allowed)||fail();
+    }
+    template<class Query> bool step(InstanceHandle key,Query query){
+        auto* e=entry(key);if(!good_||!e)return fail();
+        auto* r=records_.resolve(key);if(!r->active||r->destroyRequested)return true;
+        std::memcpy(&e->state.imageSpeed.bits,&r->imageSpeed,4);
+        struct Ops {
+            StoredMovingFxRegistration& owner;Entry& e;Query& query;
+            bool timeStopBound(bool& allowed){return query(e.key,e.state,allowed);}
+            bool imageSpeed(RunnerImageValue value,RunnerImageValue& accepted){
+                if(!owner.imageSpeed(e.key,value.promoted()))return false;accepted=value;return true;
+            }
+            bool position(bool vertical,RunnerImageValue value,RunnerImageValue& accepted){
+                const auto x=vertical?e.state.x:value,y=vertical?value:e.state.y;
+                auto* r=owner.records_.resolve(e.key);std::int32_t ix,iy;
+                if(!r||!x.promoted().roundPixel(ix)||!y.promoted().roundPixel(iy)||
+                    !owner.lifecycle_.publishedPosition(e.key,*r,x,y))return false;
+                r=owner.records_.resolve(e.key);if(!r)return false;
+                r->x=ix;r->y=iy;r->preciseX=stored(x);r->preciseY=stored(y);accepted=value;return true;
+            }
+        } ops{*this,*e,query};
+        return e->state.step(ops)||fail();
+    }
+    bool advanceAnimation(InstanceHandle key){
+        auto* e=entry(key);if(!good_||!e)return fail();
+        auto* r=records_.resolve(key);if(!r->active||r->destroyRequested)return true;
+        std::memcpy(&e->state.imageSpeed.bits,&r->imageSpeed,4);
+        if(!e->state.advanceImage([&](const auto& state){
+            auto* r=records_.resolve(key);
+            if(!r||!lifecycle_.imageIndex(key,*r,state.imageIndex))return false;
+            r=records_.resolve(key);if(!r)return false;r->imageIndex=stored(state.imageIndex);return true;
+        }))return fail();
+        if(e->state.destroyRequested){
+            r=records_.resolve(key);if(!r||!lifecycle_.markDestroyed(key,*r))return fail();
+            r=records_.resolve(key);if(!r)return fail();r->destroyRequested=true;
+        }
+        return true;
+    }
+    bool retire(InstanceHandle key){
+        auto* e=entry(key);if(!good_||!e||!records_.resolve(key)->destroyRequested)return fail();
+        if(!records_.erase(e->id,[&](auto h,const auto& r){return lifecycle_.retire(h,r);}))return fail();
+        *e={};return true;
     }
 };
 }

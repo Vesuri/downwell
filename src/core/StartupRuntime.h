@@ -810,6 +810,31 @@ public:
     enum class BonePhase {animation,step,cleanup};
     enum class BloodPhase {animation,step,cleanup};
     template<unsigned Capacity,class Query,class Tick>
+    bool withMovingFxEvents(StoredMovingFxRegistration<instanceCapacity,Capacity>& owner,Query query,Tick tick){
+        if(!run_.effectsSucceeded||movingFxDispatch_||!owner.belongsTo(instances_)||!owner.valid())return run_.effectsSucceeded=false;
+        auto dispatch=[&](const InstanceRecord& record,BloodPhase phase,bool& handled){
+            const auto key=owner.handle(record);handled=key.generation!=0;
+            if(!handled)return true;
+            if(phase==BloodPhase::animation)return owner.advanceAnimation(key);
+            if(phase==BloodPhase::cleanup)return owner.retire(key);
+            return owner.step(key,query);
+        };
+        movingFxContext_=&dispatch;
+        movingFxDispatch_=[](void* p,const InstanceRecord& r,BloodPhase phase,bool& handled){
+            return (*static_cast<decltype(dispatch)*>(p))(r,phase,handled);
+        };
+        const bool ok=tick();movingFxDispatch_=nullptr;movingFxContext_=nullptr;
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok&&owner.valid();
+    }
+    bool dispatchParentMovingFx(const InstanceRecord& record,BloodPhase phase){
+        bool handled=false;
+        if(movingFxDispatch_){
+            if(!movingFxDispatch_(movingFxContext_,record,phase,handled))return false;
+            if(handled)return true;
+        }
+        return bloodDispatch_&&bloodDispatch_(bloodContext_,record,phase);
+    }
+    template<unsigned Capacity,class Query,class Tick>
     bool withBloodEvents(StoredBloodRegistration<instanceCapacity,Capacity>& registration,Query query,Tick tick){
         if(!run_.effectsSucceeded)return false;
         if(bloodDispatch_||!registration.belongsTo(instances_)||!registration.valid())return run_.effectsSucceeded=false;
@@ -1894,6 +1919,12 @@ public:
     template<unsigned Capacity> StoredMovingFxRegistration<instanceCapacity,Capacity> movingFxRegistration(){
         return StoredMovingFxRegistration<instanceCapacity,Capacity>(instances_,objectPack_,lifecycle_,
             nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded);
+    }
+    template<unsigned Capacity> bool movingFxTimeAllowed(StoredMovingFxRegistration<instanceCapacity,Capacity>& owner,
+        InstanceHandle key,bool stopped,bool& allowed){
+        if(!run_.effectsSucceeded||!owner.belongsTo(instances_))return run_.effectsSucceeded=false;
+        int width=0;if(stopped&&!timeStopRoomWidth(width))return false;
+        return run_.effectsSucceeded=owner.timeAllowed(key,stopped,width,allowed);
     }
     template<unsigned Capacity,class Frames,class Lengthdir,class Caller>
     bool spawnMovingFx(StoredMovingFxRegistration<instanceCapacity,Capacity>& owner,
@@ -3057,6 +3088,8 @@ private:
     bool (*boneDispatch_)(void*,const InstanceRecord&,BonePhase)=nullptr;
     void* boneContext_=nullptr;
     bool (*bloodDispatch_)(void*,const InstanceRecord&,BloodPhase)=nullptr;
+    void* movingFxContext_=nullptr;
+    bool (*movingFxDispatch_)(void*,const InstanceRecord&,BloodPhase,bool&)=nullptr;
     void* bloodContext_=nullptr;
     bool (*skeletonDispatch_)(void*,const InstanceRecord&,SkeletonPhase,unsigned)=nullptr;
     void* skeletonContext_=nullptr;

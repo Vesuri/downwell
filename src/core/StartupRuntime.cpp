@@ -422,7 +422,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
     }
     if(!instances_.visitAnimationChecked([this](InstanceHandle key,InstanceRecord& instance){
         if(!lifecycle_.capturePrevious(key,instance))return false;
-        if(instance.objectId==220&&(!bloodDispatch_||!bloodDispatch_(bloodContext_,instance,BloodPhase::animation)))return false;
+        if(instance.objectId==220&&!dispatchParentMovingFx(instance,BloodPhase::animation))return false;
         if(instance.objectId==269&&(!boneDispatch_||!boneDispatch_(boneContext_,instance,BonePhase::animation)))return false;
         if(instance.objectId==120&&(!skeletonDispatch_||!skeletonDispatch_(skeletonContext_,instance,SkeletonPhase::animation,0)))return false;
         if(instance.objectId==263&&(!corpseDispatch_||!corpseDispatch_(corpseContext_,instance,CorpsePhase::animation,0)))return false;
@@ -1004,7 +1004,7 @@ bool StartupRuntime::cleanupMainOwnedDestroyed(){
             ((r.objectId==238||r.objectId==211)&&timeEffectDispatch_)||
             (r.objectId==212&&risingTextDispatch_)||
             (r.objectId==269&&boneDispatch_)||
-            (r.objectId==220&&bloodDispatch_)||
+            (r.objectId==220&&(bloodDispatch_||movingFxDispatch_))||
             (r.objectId==120&&skeletonDispatch_)||
             (r.objectId==263&&corpseDispatch_)||
             (r.objectId==372&&levelNumberDispatch_)||
@@ -1029,7 +1029,7 @@ bool StartupRuntime::cleanupMainOwnedDestroyed(){
             }
             if(r.objectId==212)return risingTextDispatch_(risingTextContext_,r,RisingTextPhase::cleanup,0);
             if(r.objectId==269)return boneDispatch_(boneContext_,r,BonePhase::cleanup);
-            if(r.objectId==220)return bloodDispatch_(bloodContext_,r,BloodPhase::cleanup);
+            if(r.objectId==220)return dispatchParentMovingFx(r,BloodPhase::cleanup);
             if(r.objectId==120)return skeletonDispatch_(skeletonContext_,r,SkeletonPhase::cleanup,0);
             if(r.objectId==263)return corpseDispatch_(corpseContext_,r,CorpsePhase::cleanup,0);
             if(r.objectId==372)return levelNumberDispatch_(levelNumberContext_,r,true,0);
@@ -2030,7 +2030,7 @@ bool StartupRuntime::dispatchObjectEvent(InstanceRecord& instance,
     }
     if(instance.objectId==220&&eventType==3&&eventSubtype==0){
         ++implementedCodeCalls_;
-        run_.effectsSucceeded=bloodDispatch_&&bloodDispatch_(bloodContext_,instance,BloodPhase::step);
+        run_.effectsSucceeded=dispatchParentMovingFx(instance,BloodPhase::step);
         return run_.effectsSucceeded;
     }
     if(instance.objectId==266&&((eventType==2&&eventSubtype==0)||
