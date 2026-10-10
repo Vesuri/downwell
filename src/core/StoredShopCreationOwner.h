@@ -50,7 +50,6 @@ public:
     template<class Environment> bool parentRadioStep(unsigned id,Environment& environment){
         const auto* p=parent(id);auto* r=p?records_.resolve(p->key):nullptr;
         if(!good_||!r||!p->shop)return fail();
-        if(!r->active||r->destroyRequested)return true;
         struct Ops {
             StoredShopCreationOwner& owner;const Parent& p;InstanceRecord& r;Environment& env;
             static MotionBinary64 real(float f){RunnerImageValue v;std::memcpy(&v.bits,&f,4);return v.promoted();}
@@ -83,18 +82,17 @@ public:
         RunnerImageValue y;std::memcpy(&y.bits,&r->preciseY,4);
         return (roomEnd?ShopLifetimeEvents::roomEnd(ops):ShopLifetimeEvents::endStep(y.promoted(),ops))||fail();
     }
+    // Already admitted by object-with capture; do not recheck its flags.
     template<class Environment> bool parentStepBody(unsigned id,ShopInteraction::Input& input,
         CurrencyAccount& currency,Environment& environment){
         const auto* p=parent(id);auto* r=p?records_.resolve(p->key):nullptr;
         if(!good_||!r||!p->shop)return fail();
-        if(!r->active||r->destroyRequested)return true;
         ShopParentBodyOps<StoredShopCreationOwner,unsigned,Environment> ops{*this,id,input,currency,environment};
         return ShopParentEvents::body(ops)||fail();
     }
     template<class Environment> bool parentTailStep(unsigned id,Environment& environment){
         const auto* p=parent(id);auto* r=p?records_.resolve(p->key):nullptr;
         if(!good_||!r||!p->shop)return fail();
-        if(!r->active||r->destroyRequested)return true;
         struct Ops {
             StoredShopCreationOwner& owner;const Parent& p;InstanceRecord& r;Environment& env;
             bool criminal(bool& out){return env.criminal(out)&&owner.good_;}
@@ -116,7 +114,6 @@ public:
         CurrencyAccount& currency,Environment& environment){
         const auto* p=parent(id);auto* r=p?records_.resolve(p->key):nullptr;
         if(!good_||!r||!p->shop)return fail();
-        if(!r->active||r->destroyRequested)return true;
         ShopMenuOwnerOps<StoredShopCreationOwner,unsigned,Environment> ops{*this,id,*p->shop,currency,environment};
         return ShopMenuEvents::step(p->shop->menu,input,ops)||fail();
     }
@@ -124,7 +121,6 @@ public:
     template<class Environment> bool parentViewStep(unsigned id,Environment& environment){
         const auto* p=parent(id);auto* r=p?records_.resolve(p->key):nullptr;
         if(!good_||!r||!p->shop)return fail();
-        if(!r->active||r->destroyRequested)return true;
         struct Ops {
             StoredShopCreationOwner& owner;const Parent& p;InstanceRecord& r;Environment& env;
             static MotionBinary64 real(float f){RunnerImageValue v;std::memcpy(&v.bits,&f,4);return v.promoted();}
@@ -142,7 +138,7 @@ public:
     template<class Environment> bool purchase(unsigned id,CurrencyAccount& currency,
         Environment& environment,ShopInventory::Purchase& result){
         const auto* p=parent(id);auto* r=p?records_.resolve(p->key):nullptr;
-        if(!good_||!r||!p->shop||!r->active||r->destroyRequested)return fail();
+        if(!good_||!r||!p->shop)return fail();
         struct Ops {
             StoredShopCreationOwner& owner;Environment& env;
             bool grant(unsigned id){return env.grant(id)&&owner.good_;}

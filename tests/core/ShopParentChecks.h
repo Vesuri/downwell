@@ -1,7 +1,44 @@
 #ifndef DOWNWELL_TEST_SHOP_PARENT_CHECKS_H
 #define DOWNWELL_TEST_SHOP_PARENT_CHECKS_H
 #include "core/ShopParentEvents.h"
+#include "core/RunnerWithSnapshot.h"
 #include "ShopMenuChecks.h"
+inline bool checkShopWithCapture(){
+    using namespace downwell;
+    for(unsigned count=0;count<=8;++count){
+        RunnerWithSnapshot<8> selected;
+        for(unsigned i=0;i<count;++i)if(!selected.append({i,10+i}))return false;
+        // Rebinding and activation queues can contain an already selected
+        // lifetime. Inline order stays unchanged; the larger list reappends.
+        if(count&&!selected.append({0,10}))return false;
+        if(!selected.seal()||selected.size()!=count)return false;
+        unsigned seen=0;
+        if(!selected.visit([&](InstanceHandle key){
+            const unsigned expected=count<=2?seen:(seen?count-seen:0);
+            ++seen;return key.slot==expected&&key.generation==10+expected;
+        })||seen!=count)return false;
+        for(unsigned stop=1;stop<=count;++stop){
+            seen=0;
+            if(selected.visit([&](InstanceHandle){return ++seen!=stop;})||seen!=stop)return false;
+        }
+    }
+    RunnerWithSnapshot<3> mixed;
+    // Same slot, new generation is a different lifetime, not a duplicate.
+    if(!mixed.append({4,1})||!mixed.append({5,1})||!mixed.append({4,2})||
+       !mixed.append({5,1})||!mixed.seal())return false;
+    const InstanceHandle expected[]={{5,1},{4,2},{4,1}};unsigned seen=0;
+    if(!mixed.visit([&](InstanceHandle h){
+        const auto e=expected[seen++];return h.slot==e.slot&&h.generation==e.generation;
+    })||seen!=3)return false;
+    RunnerWithSnapshot<1> overflow;
+    if(!overflow.append({0,1})||overflow.append({1,1})||overflow.seal()||
+       overflow.visit([](InstanceHandle){return true;}))return false;
+    RunnerWithSnapshot<1> unsealed;
+    if(unsealed.visit([](InstanceHandle){return true;}))return false;
+    RunnerWithSnapshot<1> invalid;
+    if(invalid.append({0,0})||invalid.seal())return false;
+    return true;
+}
 struct ShopParentProbe:ShopMenuProbe {
     bool crime=false,dead=false;unsigned criminalReads=0,deathReads=0,viewReads=0;
     ShopParentProbe(downwell::ShopWorld::Instance& shop,downwell::CurrencyAccount& currency,int y)
@@ -23,6 +60,7 @@ struct ShopParentProbe:ShopMenuProbe {
 };
 inline bool checkShopParentEvents(){
     using namespace downwell;
+    if(!checkShopWithCapture())return false;
     struct Body {
         unsigned calls=0,reject=0;char trace[6]{};bool crime=false;
         bool event(char c){trace[calls++]=c;return calls!=reject;}
@@ -68,6 +106,18 @@ inline bool checkShopParentEvents(){
     ShopWorld::Instance shop;Tail tail{shop};tail.meet=false;
     if(!ShopParentEvents::tail(shop,tail)||tail.eligibilityReads||shop.prompt.frame()!=0||!shop.prompt.phase.mantissa)return false;
     return true;
+}
+template<class Run> bool checkShopCapturedBody(const downwell::RunnerWithSnapshot<1>& selected,
+    downwell::ShopWorld::Instance& shop,Run run){
+    using namespace downwell;
+    shop.menu={};shop.shopBgm=true;shop.prompt={};
+    CurrencyAccount currency;ShopInteraction::Input input;input.confirm=true;
+    ShopParentProbe probe{shop,currency,shop.y};
+    unsigned visits=0;
+    return selected.visit([&](InstanceHandle h){++visits;return run(h,input,currency,probe);})&&
+        visits==1&&!shop.shopBgm&&!input.confirm&&shop.menu.speaking&&probe.locked&&
+        probe.soundIds[0]==101&&probe.criminalReads==2&&probe.deathReads==1&&
+        probe.viewReads==6&&shop.prompt.frame()==2;
 }
 template<class Run,class Mask> bool checkShopOwnedTail(downwell::ShopWorld::Instance& shop,Run run,Mask mask){
     using namespace downwell;

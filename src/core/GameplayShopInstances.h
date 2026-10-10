@@ -115,7 +115,6 @@ public:
     }
     template<class Environment> bool parentRadioStep(InstanceHandle h,Environment& environment){
         if(!ready(h,277))return fail();auto& r=records_[h.slot];
-        if(!r.active||r.destroyRequested)return true;
         if(!r.shop)return fail();
         struct Ops {
             GameplayShopInstances& owner;Record& r;Environment& env;
@@ -130,16 +129,16 @@ public:
         } ops{*this,r,environment};
         return ShopRadioEvents::step(r.shop->shopBgm,ops)||fail();
     }
+    // Already admitted by object-with capture. Activity/destruction changes
+    // after capture do not cancel this body or any of its remaining branches.
     template<class Environment> bool parentStepBody(InstanceHandle h,ShopInteraction::Input& input,
         CurrencyAccount& currency,Environment& environment){
         if(!ready(h,277)||!records_[h.slot].shop)return fail();
-        if(!records_[h.slot].active||records_[h.slot].destroyRequested)return true;
         ShopParentBodyOps<GameplayShopInstances,InstanceHandle,Environment> ops{*this,h,input,currency,environment};
         return ShopParentEvents::body(ops)||fail();
     }
     template<class Environment> bool parentTailStep(InstanceHandle h,Environment& environment){
         if(!ready(h,277)||!records_[h.slot].shop)return fail();auto& r=records_[h.slot];
-        if(!r.active||r.destroyRequested)return true;
         struct Ops {
             GameplayShopInstances& owner;InstanceHandle h;Record& r;Environment& env;
             bool criminal(bool& out){return env.criminal(out)&&owner.good_;}
@@ -174,14 +173,12 @@ public:
     template<class Environment> bool parentMenuStep(InstanceHandle h,ShopInteraction::Input& input,
         CurrencyAccount& currency,Environment& environment){
         if(!ready(h,277)||!records_[h.slot].shop)return fail();auto& r=records_[h.slot];
-        if(!r.active||r.destroyRequested)return true;
         ShopMenuOwnerOps<GameplayShopInstances,InstanceHandle,Environment> ops{*this,h,*r.shop,currency,environment};
         return ShopMenuEvents::step(r.shop->menu,input,ops)||fail();
     }
     // Caller retains the !criminal branch decision taken before interaction.
     template<class Environment> bool parentViewStep(InstanceHandle h,Environment& environment){
         if(!ready(h,277)||!records_[h.slot].shop)return fail();auto& r=records_[h.slot];
-        if(!r.active||r.destroyRequested)return true;
         struct Ops {
             GameplayShopInstances& owner;Record& r;Environment& env;
             MotionBinary64 x(){return r.x.promoted();}
@@ -199,7 +196,6 @@ public:
         Environment& environment,ShopInventory::Purchase& result){
         if(!ready(h,277)||!records_[h.slot].shop)return fail();
         auto& parent=records_[h.slot];
-        if(!parent.active||parent.destroyRequested)return fail();
         struct Ops {
             GameplayShopInstances& owner;Environment& env;
             bool grant(unsigned id){return env.grant(id)&&owner.good_;}

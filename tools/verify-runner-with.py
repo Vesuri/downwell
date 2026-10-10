@@ -12,6 +12,11 @@ for start, end, digest in (
     (0x57F490, 0x57F503, "c676817351443f2acc549b47c213024b16285a65f5cf02b8513d0286f9bf15e1"),
     (0x57FA60, 0x57FAE5, "16bac4426c59a52a2b02df82311bbad78b862d51d5675db02c72103cc556f387"),
     (0x57BCE0, 0x57BD1F, "d94700c23e06600f67443bd9b1d7d10e56c0abcbf64597402581a49ed277f9a7"),
+    # Object-change queue/setter, activation queue producers, deferred rebind.
+    (0x464460, 0x464522, "a07c8a5c86486411b9cb3c4b8d660d5fbba4c99ac283ce0113b622482dd77834"),
+    (0x467640, 0x467678, "cba757068aff96e0b61205df89cbbb28685f611c14f5b507a3d681e9b888ef72"),
+    (0x4627D0, 0x46281C, "0ca6095a8151103bf924542f817fd86226f3edbce56733c6faf45d694bc4975e"),
+    (0x46A500, 0x46A526, "6c10e2ded6c6458c51c65781b094afe14f66c3f262f7c25702ddd0f541f030b4"),
 ):
     assert sha256(region(start, end - start)).hexdigest() == digest, hex(start)
 

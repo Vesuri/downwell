@@ -216,9 +216,15 @@ bool shopParentRegistrationCheck(const ObjectPack& objects,unsigned area,unsigne
         if(!owner.parentLifetimeEvent(shop->sourceId,true,radio)||radio.stops!=1||records.resolve(parent->key)->destroyRequested)return false;
         radio.playing=true;
         if(!owner.parentLifetimeEvent(shop->sourceId,false,radio)||radio.views!=2||radio.queries!=1)return false;
+        RunnerWithSnapshot<1> captured;
+        if(!captured.append(parent->key)||!captured.seal())return false;
         ++radio.view;
         if(!owner.parentLifetimeEvent(shop->sourceId,false,radio)||radio.views!=3||radio.stops!=2||
            !records.resolve(parent->key)->destroyRequested||records.size()!=11)return false;
+        if(!checkShopCapturedBody(captured,*shop,[&](InstanceHandle h,auto& input,auto& currency,auto& env){
+            const auto* r=records.resolve(h);
+            return r&&r->destroyRequested&&owner.parentStepBody(r->instanceId,input,currency,env);
+        }))return false;
         for(unsigned i=1;i<records.size();++i)if(records.at(i).destroyRequested!=(records.at(i).instanceId==shop->children.items[0]))return false;
         if(shop->sourceId!=920000||shop->children.table!=920001||shop->children.risingText!=920007||
            shop->children.items[2]!=920010||shop->radio!=(area==5?-1:123)||shop->farewellVariant!=2)return false;

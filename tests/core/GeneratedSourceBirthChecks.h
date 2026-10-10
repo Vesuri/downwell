@@ -111,9 +111,13 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
         assert(store.parentLifetimeEvent(parentKey,true,radio)&&radio.stops==1&&!store.find(parentKey)->destroyRequested);
         radio.playing=true;
         assert(store.parentLifetimeEvent(parentKey,false,radio)&&radio.views==2&&radio.queries==1);
+        RunnerWithSnapshot<1> captured;assert(captured.append(parentKey)&&captured.seal());
         ++radio.view;
         assert(store.parentLifetimeEvent(parentKey,false,radio)&&radio.views==3&&radio.stops==2&&
             store.find(parentKey)->destroyRequested&&store.size()==10);
+        assert(checkShopCapturedBody(captured,*replacement,[&](InstanceHandle h,auto& input,auto& currency,auto& env){
+            return store.find(h)&&store.find(h)->destroyRequested&&store.parentStepBody(h,input,currency,env);
+        }));
         // Admit only the implemented child events, not a placeholder update
         // for the keeper, cases or parent shop. The real world alarm/Step/
         // cleanup phases must own their ordering and retirement.

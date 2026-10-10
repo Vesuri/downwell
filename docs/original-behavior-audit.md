@@ -784,8 +784,12 @@ The original executable's object-selector `pushenv` at `0x57a6f0` captures
 targets before running the body. Its ordinary pass reads the ancestor-inclusive
 head at object+`0x44` (`0x57a9fd`) and excludes flags `0x100003`. It then scans
 arrays at `0xb5a098` and `0xb5a070`, in that order, with the same flag filter
-and an object-field equality test. Their precise admission roles must be
-resolved before substituting an object-membership-only implementation.
+and an object-field equality test. The first is the pending object-change
+queue: `0x464460` enqueues uniquely, publishes object ID at instance+`0x80`,
+retains the former object for deferred unlink, and updates the object pointer.
+Maintenance calls `0x46a500` to unlink/rebind. The second is the activation
+reconciliation queue, populated by `0x467640` and `0x4627d0`. Consequently
+current registered membership alone cannot replace the three capture sources.
 The scratch list uses instance+`0x16c`; its helpers append at the tail.
 An already-present array candidate is moved to the tail without increasing
 the selected count.
@@ -806,6 +810,15 @@ the admission decision for a body already selected by `with`.
 `python3 tools/verify-runner-with.py` pins these reviewed routine bytes and
 the key instructions against the original executable hash. This is static
 binary evidence, not a Windows execution test or completed scheduler admission.
+
+`RunnerWithSnapshot` retains generation handles in that capture order and
+separately preserves the inline order for zero, one or two unique targets.
+Its caller filters the three sources before sealing; visits do not recheck
+flags. The parent body and its radio/menu/view/tail/purchase components require
+prior admission and retain lifetime validation without repeating activity
+checks. A captured lifetime must remain resolvable through the body, even if
+marked for deferred destruction. This contract does not permit slot reuse or
+replace the original selector with a compact shop-slot loop.
 
 `ShopInteraction` and `ShopWorld::step` are still compact adapters, not a full
 implementation of that parent event. Besides missing the inner traversal and
