@@ -385,6 +385,23 @@ void runRoomMutations(){
             require(walk(scalar,a)&&walk(runs,b)&&a==b,"run room ordered enumeration");
         }
     };
+    for(int depth=-1;depth<=1;++depth)for(unsigned first=8;first<56;++first)
+      for(unsigned count=1;count<=56-first;++count){
+        scalar.clear();runs.clear();RunnerImageValue key;key.assignInteger(depth);
+        for(unsigned actor:{0u,63u})require(scalar.bind(actor,{})&&runs.bind(actor,{}),"span actor neighbors");
+        if(first>8)require(scalar.bind(first-1,key)&&runs.bind(first-1,key),"span merges prior terrain");
+        for(unsigned s=first;s<first+count;++s)require(scalar.bind(s,key),"scalar span birth");
+        require(runs.bindTerrainSpan(first,count,key),"bounded terrain span birth");compare();
+        require(!runs.bindTerrainSpan(first,count,key),"occupied span rejected without mutation");compare();
+        const unsigned middle=first+count/2;
+        require(scalar.mark(middle)&&runs.mark(middle),"span mark");compare();
+        require(scalar.remove(middle)&&runs.remove(middle),"span split retirement");compare();
+        const auto active=[](unsigned s){return (s&1)!=0;};
+        const auto changed=[](unsigned,bool){return true;};
+        require(scalar.reconcileChecked(active,changed)&&runs.reconcileChecked(active,changed),"span activation");compare();
+    }
+    require(!runs.bindTerrainSpan(7,1,{})&&!runs.bindTerrainSpan(55,2,{})&&
+        !runs.bindTerrainSpan(8,1,{0x7fc00000u}),"span bounds and invalid depth");
     for(unsigned round=0;round<64;++round){
         auto clearedReference=runs;
         clearedReference.clearReference();

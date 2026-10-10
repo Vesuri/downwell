@@ -77,6 +77,19 @@ public:
         if(s>=Capacity||!RunnerSpatialSplit::valid(key))return false;
         remove(s);insertActive(s,key);return true;
     }
+    // A callback-free, freshly allocated terrain segment. One ordered
+    // insertion supplies all its cells; the scalar bind remains the oracle.
+    bool bindTerrainSpan(unsigned first,unsigned count,RunnerImageValue key){
+        if(!count)return true;
+        if(first<First||first>=Last||count>Last-first||!RunnerSpatialSplit::valid(key))return false;
+        for(unsigned s=first;s<first+count;++s)if(contains(s))return false;
+        insertActive(first,key);
+        const unsigned n=locator_[first]-1;
+        auto& run=runs_[n];
+        run.count=Slot(unsigned(run.count)+count-1);
+        for(unsigned s=first+1;s<first+count;++s)locator_[s]=Slot(n+1);
+        return true;
+    }
     bool remove(unsigned s){
         if(!contains(s))return false;
         const unsigned n=locator_[s]-1;auto& r=runs_[n];

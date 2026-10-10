@@ -190,6 +190,18 @@ private:
     using TerrainLayerRun=decltype(layers_)::TerrainRunBirth;
     TerrainLayerRun nativeTerrainLayerRun_;
     bool nativeTerrainLayerRunActive_=false;
+    unsigned terrainRoomFirst_=0,terrainRoomCount_=0;
+    RunnerImageValue terrainRoomDepth_{};
+    bool flushTerrainRoomSpan(){
+        const bool ok=room_.bindTerrainSpan(terrainRoomFirst_,terrainRoomCount_,terrainRoomDepth_);
+        terrainRoomCount_=0;return check(ok);
+    }
+    bool appendTerrainRoomSpan(unsigned slot,RunnerImageValue depth){
+        if(terrainRoomCount_&&(slot!=terrainRoomFirst_+terrainRoomCount_||depth.bits!=terrainRoomDepth_.bits))
+            if(!flushTerrainRoomSpan())return false;
+        if(!terrainRoomCount_){terrainRoomFirst_=slot;terrainRoomDepth_=depth;}
+        ++terrainRoomCount_;return true;
+    }
 #endif
     ObjectDrawMetadata<386> drawMetadata_;
     ObjectAlarmMetadata<386> alarmMetadata_;
@@ -623,6 +635,11 @@ private:
         if(!check(table_.registerExternalObject({slot,id.handle.generation},id.object,true)))return false;
         const auto* definition=objectDefaults_.get(id.object);const auto* objectFlags=families_.flags(unsigned(id.object));
         if(!definition||!objectFlags)return check(false);
+#ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+        if(nativeTerrainLayerRunActive_){
+            if(!appendTerrainRoomSpan(slot,definition->creationDepth))return false;
+        }else
+#endif
         if(!check(room_.bind(slot,definition->creationDepth)))return false;
         if(!active)activationPending_=true;
         flags=definition->initialFlags|(active?0u:2u);
@@ -1597,6 +1614,7 @@ public:
                 if(!self.check(self.valid()&&!self.nativeTerrainLayerRunActive_&&wall&&thin&&
                     RunnerSpatialSplit::equal(wall->creationDepth,thin->creationDepth)))return false;
                 self.nativeTerrainLayerRun_=TerrainLayerRun{};
+                self.terrainRoomCount_=0;
                 self.nativeTerrainLayerRunActive_=true;
 #endif
                 return self.valid();
@@ -1604,9 +1622,11 @@ public:
             [](void* p){
                 auto& self=*static_cast<GameplayCollisionOwner*>(p);
 #ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+                // Commit the published prefix even after a later Create fails.
+                const bool roomCompleted=self.flushTerrainRoomSpan();
                 const bool completed=self.layers_.completeInheritedTerrain(self.nativeTerrainLayerRun_);
                 self.nativeTerrainLayerRunActive_=false;
-                return self.check(completed);
+                return self.check(roomCompleted&&completed);
 #else
                 return self.valid();
 #endif
