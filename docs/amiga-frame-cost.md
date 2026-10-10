@@ -53,53 +53,83 @@ Compact reports and the FPS driver log are in `tmp/a500-baseline-before/`
 The ELF and capture log are retained in `tmp/trace/baseline-c64e8385/`;
 raw instruction captures are disposable after comparison.
 
-### Current generation boundary — `4248fb07`
+### Current matched boundary — `2fcd7feb`
 
-A fresh 60-field capture at each of 675 and 1688 reproduces the current
-generation stalls (660.8 and 641.9 ms). These use the same saved trace ELF
-as the four-window comparison, SHA-256
-`2f134bde6d70500030c5850e2f032891302a67f1f442c5b5fa9673f6b8e5dccd`.
-The original normal executable and ELF were restored byte-for-byte afterwards.
-The normal-memory configuration is 512 KiB Chip, 8 MiB Fast and the emulator's
-default 512 KiB slow RAM; this is not stock total A500 memory.
+Four fresh 100-field captures start at 50, 675, 1300 and 1688 after the
+scene-residency changes. The configuration remains 512 KiB Chip, 8 MiB Fast
+and the emulator's default 512 KiB slow RAM, not stock total A500 memory.
+Compare the same complete frame IDs, not every frame that fits in a capture:
 
-These are **inclusive call-tree costs inside generation**, not additive totals:
+| Frames | Mean ms | Worst ms (frame) |
+| --- | ---: | ---: |
+| 51–74 | 41.32 | 63.6 (54) |
+| 676–683 | 151.69 | 605.1 (676) |
+| 1301–1314 | 74.91 | 104.0 (1314) |
+| 1689–1696 | 141.49 | 578.7 (1689) |
+
+Quiet frame 51 is 32.5 ms; combat/field frame 1304 is 96.1 ms. Against the
+accepted `768d4ce4` trace, frames 51/54/676/1304/1689 move by
+0.0/+0.4/+0.3/0.0/−0.1 ms respectively: timing noise, not a speedup from
+asset exclusion. Each capture restarts the same deterministic controller.
+The last captured ticks are 98/689/1324/1707, view Y is 152/1504/2137/2598,
+maximum enemy slots 0/5/6/7, and final health 4/3/3/3.
+The complete 1,800-update contact tape takes 6,225 PAL fields (14.46 FPS),
+maximum gap 35 fields at frame 1512. Full-run coverage remains ticks 0–1799,
+view Y 39–2749 (maximum 2759), seven enemy slots, two damage-number births,
+final health 2 and no dead samples. Log: `tmp/scene-local-baseline-fps.log`.
+
+These are **inclusive function costs**, not additive totals. The owner/append
+rows include scalar terrain births in the same frame as prepared segments:
 
 | Boundary | Frame 676, ms | Frame 1689, ms |
 | --- | ---: | ---: |
-| Entire frame | 660.77 | 641.88 |
-| `generateLiveTerrain` | 548.50 | 545.87 |
-| `AmigaGameplayGeneration::createPrepared` | 410.94 | 487.06 |
-| Per-cell `AmigaGameplayGeneration::birth`, inside prepared segments | 365.51 | 437.49 |
-| `NativeTerrainLifetimes::append` | 282.42 | 337.85 |
-| Owner `nativeTerrainBirth`, inside append | 203.33 | 243.59 |
-| Spatial journal insertion, inside owner birth | 34.43 | 41.33 |
-| Inherited layer publication, inside owner birth | 28.97 | 35.53 |
-| `finishNativeTerrainCreate`, after append | 69.90 | 83.87 |
+| Entire frame | 605.1 | 578.7 |
+| `NativeTerrainLifetimes::appendConstructed` | 331.39 | 396.62 |
+| Owner `nativeTerrainBirth`, inside append | 211.19 | 251.66 |
+| Birth dirty-queue/family publication | 34.98 | 36.22 |
+| Inherited layer publication | 27.60 | 33.68 |
+| Registration publication | 22.56 | 26.93 |
+| `createKnownIdentity`, after owner birth | 37.06 | 45.00 |
+| Run identity/publication insertion | 36.80 | 43.18 |
 
-The prepared path still calls `birth` once per encoded cell, then recovers
-the most recent handle with `handle(size()-1)` and calls
-`finishNativeTerrainCreate`. That callback re-reads the identity and spatial
-flags before applying the already prepared Create plan. Within the latter,
-identity rereading costs 15.55/18.46 ms, and encoding the initial wall state
-costs 14.35/17.14 ms. Removing only that encoding would leave the larger
-per-cell construction pipeline in place. Likewise, replacing a copy helper
-would not remove inherited layer materialization (24.02/29.62 ms).
+Frames 676/1689 construct 111/132 terrain cells. Prepared construction alone
+costs 372.50/441.61 ms. It already passes the born identity directly to Create;
+there is no remaining ordinal lookup to remove. It still materializes and
+publishes chronology, queues, membership and layer state separately for each
+cell. Pixel row painting is not this cost. Per-cell registration redesign is
+closed by the two rejected attempts below; a faster copy/flag helper would
+also leave the construction pipeline intact.
 
-The preparation boundary is narrow: `createPrepared` rejects a source Create
-observer and falls back to the scalar path, requires backend-only terrain,
-admits the prepared raster and lifetime capacity, and enters `publishRun`.
-Its synchronous birth callback publishes chronology, registration, spatial
-state and layer state before `createProperties` runs. The latter's callback
-uses the immutable Create plan and updates dirty queues; it does not query
-room membership or execute game callbacks. `publishRun` always closes a begun
-segment, including a failed prefix. These boundaries—not a blanket assumption
-that all terrain is immutable—define what a bulk construction path may replace.
+`createPrepared` admits a callback-free terrain segment: source Create
+observers and unsupported geometry use the scalar oracle. `constructRun`
+still calls `appendConstructed` per cell. Its birth callback publishes default
+bounds before the prepared Create plan dirties appearance. No game callback
+or query observes the interior of this admitted segment, but index pressure,
+IDs, reverse-prepend queue order and the completed failure prefix remain
+observable. `publishRun` closes even a failed prefix. Whole-run construction
+must preserve those boundaries, including reactivation and inactive layer
+cutoffs; merely replacing physical attachment with per-cell logical lookups
+does not eliminate the measured work.
 
-Focused reports are `tmp/terrain-current-{676,1689}-report.txt`. Reproduce
-using `amiga/profile.sh trace` with `TRACE_FRAMES=675,1688 TRACE_FIELDS=60`
-and the same contact options above, then select `--frames=676` or
-`--frames=1689 --tree-min 1` in `tools/amiga-trace-report.py`.
+The replacement boundary is `AmigaGameplayGeneration::createPrepared` →
+`GameplayWorld::constructNativeTerrainRun` → the native lifetime/owner pair,
+not the scalar registration container. A meaningful first run-construction
+attempt targets at least 80 ms of each generation stall by removing repeated
+layer-state materialization, constructor/Create staging and run-insertion
+validation together. Registration and spatial journal order remain exact;
+neither is an excuse for a new per-cell publication accumulator. Capacity or
+unsupported resource/observer cases must retain the scalar failed-prefix
+behavior, rather than changing a partial constructor failure into an atomic
+batch rejection. The retained scalar ownership fixture is the oracle for
+activation, depth moves, slot reuse, inactive cutoffs and teardown.
+
+Reproduce with the contact options above and
+`TRACE_FRAMES=50,675,1300,1688 TRACE_FIELDS=100`. Trace ELF SHA-256:
+`8a758e4d5d3748600eaa2c500fd8e0d0c2cbdb7ea42df847be8b8bdd907c8189`.
+Reports: `tmp/scene-local-baseline-report.txt` and
+`tmp/scene-local-{676,1689}-report.txt`; retained ELF/capture metadata:
+`tmp/trace/scene-local-baseline/`. Use `--frames=676 --causes --tree-min 1`
+or `--frames=1689 --causes --tree-min 1` for the focused reports.
 
 ## Historical pre-integration audit
 
