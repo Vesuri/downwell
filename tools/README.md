@@ -60,6 +60,32 @@ the deterministic `DWBP` format documented in `docs/builder-pattern-pack.md`.
 It verifies the pinned Steam build through the extraction manifest and keeps
 the derived cell payload under ignored `generated/`.
 
+## Shared Amiga DMA planes
+
+`generate-amiga-plane-bank.py` reads `generated/amiga-game.dwap` and interns
+its immutable colour and mask planes independently, including aligned matching
+substreams. It writes `amiga-game.planes`, its size/source-hash header, and an
+input/output hash manifest under `generated/`. The Amiga build installs the bank
+as `Downwell.planes`; keep it beside the executable, `.boot` and `.front` files.
+CPU effects continue reading the original ordinary-memory DWAP. The blitter
+binds separate low/high/mask views through the common `Bitmap` class; it does
+not regenerate or upload planes during gameplay.
+
+`make test-amiga-plane-bank` checks every view against the original pixels and
+rejects malformed bank layouts. For the native pixel oracle, build with
+`PLANE_VERIFY=1 SKIP_TO_GAME=1` after `make clean`, then run:
+
+```sh
+VERIFY_CHIP_KB=512 VERIFY_TIMEOUT_SECONDS=60 \
+GDB_SOURCE=verify_plane_bank.gdb READY_MARKER=DOWNWELL_PLANE_DMA_READY \
+bash amiga/verify_startup.sh
+```
+
+The fixture draws every planar asset twice using the real blitter, varying
+source cropping and destination word alignment, and compares untouched edges
+and both destination planes to an independent CPU pixel oracle. Restore a
+normal build after verification; `PLANE_VERIFY` is not a playable configuration.
+
 ## Prepared Amiga ammo dividers
 
 `make generated/amiga-ammo-dividers.h` composes resource 421's ordered divider

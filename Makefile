@@ -2393,6 +2393,22 @@ test-amiga-terrain-batch: generate-amiga-game build/amiga-terrain-batch-test bui
 build/amiga-terrain-batch-test: tests/platform/amiga/AmigaTerrainBatchTest.cpp src/platform/amiga/AmigaRenderer.c $(HOST_CHECK_HEADERS)
 	@mkdir -p build
 	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $(filter %.cpp %.c,$^)
+generated/amiga-game.planes: generated/amiga-game.dwap tools/generate-amiga-plane-bank.py
+	python3 tools/generate-amiga-plane-bank.py
+
+generated/amiga-game-planes.h: generated/amiga-game.planes
+	@test -f $@ || python3 tools/generate-amiga-plane-bank.py
+
+build/amiga-plane-bank-test: tests/platform/amiga/AmigaPlaneBankTest.cpp src/platform/amiga/AmigaPlaneBank.h generated/amiga-game-planes.h
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -Isrc -o $@ $<
+
+.PHONY: test-amiga-plane-bank
+test-amiga-plane-bank: build/amiga-plane-bank-test
+	./build/amiga-plane-bank-test
+
+test: test-amiga-plane-bank
+
 build/amiga-terrain-painter-test: tests/platform/amiga/AmigaTerrainPainterTest.cpp src/platform/amiga/AmigaTerrainPainter.cpp src/platform/amiga/AmigaRenderer.c $(filter-out tests/platform/amiga/AmigaLiveTerrainTest.cpp,$(AMIGA_LIVE_TERRAIN_TEST_SOURCES)) $(HOST_CHECK_HEADERS)
 	@mkdir -p build
 	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -DDOWNWELL_TERRAIN_BATCH -o $@ $(filter %.cpp %.c,$^)

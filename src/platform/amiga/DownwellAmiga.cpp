@@ -17,6 +17,11 @@ __attribute__((noinline,used)) void downwellFieldReentryReady(){__asm__ volatile
 #include <hardware/dmabits.h>
 #include <hardware/intbits.h>
 #include "AmigaInput.h"
+#include "../../../generated/amiga-game-planes.h"
+extern "C" int amigaBlitterBindGamePlanes(const UBYTE*,unsigned,const UBYTE*,unsigned,const UBYTE*);
+#ifdef DOWNWELL_PLANE_BANK_VERIFY
+extern "C" int amigaBlitterVerifyGamePlanes(const UBYTE*,UBYTE*);
+#endif
 #include "AmigaHealthHud.h"
 #include "core/SceneDescentVerification.h"
 #include "AmigaProfile.h"
@@ -1878,8 +1883,7 @@ __attribute__((noinline)) static int runDownwell(void) {
         downwellStartupFailed();
         return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
     }
-    const ULONG gamePackBytes =
-        amigaRendererChipPackBytes(amiga_game_pack, amiga_game_pack_end);
+    const ULONG gamePackBytes = DOWNWELL_GAME_PLANE_BYTES;
     const ULONG effectStampBytes=amiga_effect_stamps_end-amiga_effect_stamps;
     const ULONG sceneBankOffset=(gamePackBytes+AmigaEffectSurface::bytes+3)&~3UL;
     // The retired selection cache holds two game rings followed by DMA-only
@@ -2059,11 +2063,20 @@ __attribute__((noinline)) static int runDownwell(void) {
         port.configureGenerationStep(generateLiveTerrain, &liveGeneration);
     }
 #endif
-    if(!amigaRendererCopyChipPack(amiga_game_pack,amiga_game_pack_end,memory.assets(),gamePackBytes)){
+    if(platform.loadFile("PROGDIR:Downwell.planes",memory.assets(),gamePackBytes)!=(LONG)gamePackBytes||
+       !amigaBlitterBindGamePlanes(amiga_game_pack,amiga_game_pack_end-amiga_game_pack,
+           memory.assets(),gamePackBytes,downwellGamePlaneSourceHash)){
+        gDownwellStartupFailure=7;downwellStartupFailed();
         platform.restore();FreeMem(startupCopperWords,4*sizeof(UWORD));memory.release();return 20;
     }
-    activeGamePack = memory.assets();
-    activeGamePackEnd = activeGamePack + gamePackBytes;
+    activeGamePack = amiga_game_pack;
+    activeGamePackEnd = amiga_game_pack_end;
+#ifdef DOWNWELL_PLANE_BANK_VERIFY
+    if(!amigaBlitterVerifyGamePlanes(amiga_game_pack,memory.game())){
+        gDownwellStartupFailure=7;downwellStartupFailed();
+        platform.restore();FreeMem(startupCopperWords,4*sizeof(UWORD));memory.release();return 20;
+    }
+#endif
 #ifdef DOWNWELL_TERRAIN_DIRECT
     if(!AmigaTerrainPainter::bindPrepared(amiga_terrain_phase6,amiga_terrain_phase6_end-amiga_terrain_phase6)){
         platform.restore();FreeMem(startupCopperWords,4*sizeof(UWORD));memory.release();return 20;
@@ -2097,7 +2110,7 @@ __attribute__((noinline)) static int runDownwell(void) {
     static downwell::EffectMaskAssets effectAssets;
     alignas(downwell::CurrencySmokeComposition) static UBYTE effectStorage[sizeof(downwell::CurrencySmokeComposition)];
     auto& controllerEffects = *new (effectStorage) downwell::CurrencySmokeComposition;
-    if (!effectAssets.bind(activeGamePack,gamePackBytes)||
+    if (!effectAssets.bind(activeGamePack,activeGamePackEnd-activeGamePack)||
         !effectAssets.bindEntryMask(amiga_entry_mask,amiga_entry_mask_end-amiga_entry_mask)||
         !AmigaEffectSurface::bind(controllerEffects.surface(),memory.assets()+gamePackBytes,
             amiga_effect_stamps,effectStampBytes,effectStamps,effectPayloadBytes,effectAssets)||

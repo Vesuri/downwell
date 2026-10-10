@@ -26,6 +26,7 @@ GEMHIGH_VERIFY ?= 0
 LASER_VERIFY ?= 0
 RESULTS_RESTART_VERIFY ?= 0
 BOB_VERIFY ?= 0
+PLANE_VERIFY ?= 0
 EXIT_WIPE_VERIFY ?= 0
 ENTRY_WIPE_VERIFY ?= 0
 CLEAR_VERIFY ?= 0
@@ -251,6 +252,9 @@ CFLAGS += -DDOWNWELL_RESULTS_RESTART_VERIFY -DDOWNWELL_SCENE_VERIFY
 endif
 ifeq ($(BOB_VERIFY),1)
 CFLAGS += -DDOWNWELL_BOB_VERIFY -DDOWNWELL_SCENE_VERIFY
+endif
+ifeq ($(PLANE_VERIFY),1)
+CFLAGS += -DDOWNWELL_PLANE_BANK_VERIFY
 endif
 ifeq ($(REFERENCE_EFFECT_COMPOSITION),1)
 CFLAGS += -DDOWNWELL_REFERENCE_EFFECT_COMPOSITION
@@ -569,7 +573,17 @@ endif
 
 .PHONY: all check clean audit
 
-all: check $(OUT).exe $(OUT).boot $(OUT).front
+all: check $(OUT).exe $(OUT).boot $(OUT).front $(OUT).planes
+
+$(REPO)/generated/amiga-game.planes: $(AMIGA_GAME) $(REPO)/tools/generate-amiga-plane-bank.py
+	python3 $(REPO)/tools/generate-amiga-plane-bank.py
+
+$(REPO)/generated/amiga-game-planes.h: $(REPO)/generated/amiga-game.planes
+	@test -f $@ || python3 $(REPO)/tools/generate-amiga-plane-bank.py
+
+$(OUT).planes: $(REPO)/generated/amiga-game.planes
+	@mkdir -p $(@D)
+	cp -f $< $@
 
 $(OUT).boot: $(AMIGA_BOOT_BANK)
 	@mkdir -p $(@D)
@@ -703,6 +717,7 @@ $(OUT).elf: $(OBJECTS)
 	@$(MAKE) --no-print-directory audit
 
 obj/DownwellAmiga.o: $(AMIGA_SRC)/DownwellAmiga.cpp \
+		$(REPO)/generated/amiga-game-planes.h \
 		$(REPO)/src/core/PortReplay.h $(AMIGA_SCENE_BANKS) $(REPO)/generated/amiga-hud-text.h $(REPO)/generated/amiga-health-art.h
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -c -o $@ $<
@@ -918,6 +933,7 @@ obj/AmigaRenderer.o: $(AMIGA_SRC)/AmigaRenderer.c $(AMIGA_SRC)/AmigaRenderer.h
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 obj/AmigaBlitter.o: $(AMIGA_SRC)/AmigaBlitter.cpp \
+		$(AMIGA_SRC)/AmigaPlaneBank.h \
 		$(AMIGA_SRC)/framework/AmigaHardware.h \
 		$(AMIGA_SRC)/framework/Bitmap.h
 	@mkdir -p $(@D)

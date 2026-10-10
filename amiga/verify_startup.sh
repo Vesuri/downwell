@@ -42,6 +42,7 @@ printf 'Stack %s\ncd dh1:\nDownwell\n' "$VERIFY_STACK_BYTES" > "$DH0/s/startup-s
 cp -f out/Downwell.exe "$DH1/Downwell"
 cp -f out/Downwell.boot "$DH1/Downwell.boot"
 cp -f out/Downwell.front "$DH1/Downwell.front"
+cp -f out/Downwell.planes "$DH1/Downwell.planes"
 find "$RUN/state" -name '*.uss' -delete
 rm -f "$RUN/gdb-startup.log" "$RUN/fsuae-startup.log" \
   "$RUN/gdb-ready.marker"

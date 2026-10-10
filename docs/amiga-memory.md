@@ -82,21 +82,28 @@ instead of the pair columns.
 | Two channel-seven sprite buffers | 272 |
 | Null sprite | 8 |
 | Shared splash/style cache | 66,704 |
-| Resident gameplay art pack (directory, planar art) | 125,914 |
+| Resident gameplay DMA plane atlas (directory and shared planes) | 112,970 |
 | Effect surface | 20,448 |
 | Offline interleaved smoke/gem stamps | 0 additional (4,932 in cache tail) |
 | Shared scene bank (boot or front art; gameplay terrain scratch and field images) | 146,818 |
-| **Total** | **501,654** |
+| **Total, before allocation alignment** | **488,710** |
 
-A bounded first-gameplay-frame run on the 512 KiB Chip / 8 MiB Fast A500
-configuration reports 928 bytes of Chip RAM remaining after these allocations.
+The directory sizes depend on the generated asset set; remeasure actual free
+and largest Chip blocks when it changes. The original contiguous gameplay
+DWAP stays in ordinary memory for CPU rendering, effects, metadata and sprite
+stream selection. `Downwell.planes` is loaded once into the resident Chip
+allocation. Its immutable colour and mask planes are interned independently
+offline, including aligned substreams. Blitter source views bind those three
+addresses; no mask generation, conversion or per-frame upload takes place.
+`make test-amiga-plane-bank` compares every source view byte-for-byte and
+checks that malformed directories cannot publish out-of-bank DMA pointers.
 The 388-byte effect-stamp header/directory stays in ordinary memory. Its 4,932
 DMA bytes occupy the retired selection cache at offset 61,440, immediately
 after the two 30,720-byte gameplay rings and within the 66,704-byte allocation.
 Startup fixtures initialize this payload; every gameplay entry reloads it
 after draining the blitter because intervening scenes can overwrite the cache.
 Neither the per-frame stamp lookup nor the pixel streams change. The resident
-large-field arc images cost 56,376 of the scene bank's bytes. Headroom must be
+large-field arc images cost 71,456 of the scene bank's bytes. Headroom must be
 remeasured when any pack or other Chip owner grows.
 
 ## Scene banks
@@ -105,8 +112,8 @@ Chip RAM holds only the current scene's art. `generate-amiga-hud.py --profile
 game` encodes the former single game pack and splits its records, unchanged,
 into three banks:
 
-- `amiga-game.dwap`, gameplay art, copied into Chip once at startup and
-  resident throughout.
+- `amiga-game.dwap`, the ordinary-memory gameplay reference. Its offline
+  `amiga-game.planes` derivative (`Downwell.planes`) is the resident DMA bank.
 - `amiga-boot.dwap` (`Downwell.boot`), the publisher logo, controls, credits
   text and dither fade. Startup composes it into the splash cache, then
   discards it.

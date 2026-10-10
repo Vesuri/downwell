@@ -29,12 +29,12 @@ behavior, both backend integrations and relevant original-game verification.
 
 ## 0. Restore a runnable, measured A500 baseline
 
-- Restore normal startup and gameplay at explicit 512 KiB Chip / 8 MiB Fast,
-  68000 settings. Diagnose actual allocation owners and scene lifetimes; remove
-  unnecessary simultaneous residency without discarding source behavior or
-  silently raising emulator memory. Preserve the user's local 1 MiB launcher
-  workaround until the fix is verified. Measure free/largest Chip blocks and
-  peak allocations through startup, gameplay, transitions and Retry.
+- Verify free/largest Chip blocks and peak allocations through complete startup,
+  gameplay, transitions and Retry at explicit 512 KiB Chip / 8 MiB Fast,
+  68000 settings. Check scene-bank lifetimes and resident shared-plane views
+  across handoffs, not just the allocation boundary and first gameplay frames.
+  Preserve the user's local 1 MiB launcher workaround until that wider check
+  passes; do not silently raise verification memory or discard source behavior.
 - Preserve the current failing executable/symbols and establish a reproducible
   bounded SKIP_TO_GAME gameplay profile. Locate a comparable pre-regression
   build; distinguish behavior/input-path changes from increased per-frame work.
