@@ -208,6 +208,67 @@ int main(){
     BuilderPatternPack patterns(bb.data(),bb.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     SpriteMaskPack masks(mb.data(),mb.size());
     require(rooms.valid()&&objects.valid()&&patterns.valid()&&sprites.valid()&&masks.valid(),"real collision resources validate");
+    for(bool rejectMask:{false,true}){
+        struct SpawnerQueries:StoredWorldCollision {
+            using StoredWorldCollision::StoredWorldCollision;
+            bool reject=false;unsigned masks=0,walls=0,enemies=0;mutable unsigned counts=0;
+            InstanceHandle caller{};
+            bool instanceNumber(int object,unsigned& count)const{
+                require(object==83,"spawner counts the complete enemy ancestry");++counts;
+                return StoredWorldCollision::instanceNumber(object,count);
+            }
+            bool mask(InstanceHandle key,const InstanceRecord& r,int value){
+                if(r.objectId==78){
+                    require(value==174&&r.maskId==-1,"spawner publishes selected jelly resource mask");
+                    ++masks;caller=key;if(reject)return false;
+                }
+                return StoredWorldCollision::mask(key,r,value);
+            }
+            bool placeMeeting(InstanceHandle key,const InstanceRecord& r,int object,MotionBinary64 x,MotionBinary64 y,bool& hit){
+                if(r.objectId!=78)return StoredWorldCollision::placeMeeting(key,r,object,x,y,hit);
+                require(r.objectId==78&&r.maskId==174,"candidate query sees the published spawner mask");
+                if(object==57)++walls;else{require(object==83,"spawner query selector");++enemies;}
+                RunnerImageValue beforeX,beforeY,afterX,afterY;
+                require(collisionPosition(key,beforeX,beforeY),"spawner position before candidate query");
+                const bool ok=StoredWorldCollision::placeMeeting(key,r,object,x,y,hit);
+                require(collisionPosition(key,afterX,afterY)&&beforeX.bits==afterX.bits&&beforeY.bits==afterY.bits,
+                    "candidate query restores the spawner's published position");
+                return ok;
+            }
+        };
+        auto owner=std::make_unique<SpawnerQueries>(objects,sprites,masks);owner->reject=rejectMask;
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            InstanceLifecycleBinding::bindPointQueries(*owner));
+        require(owner->attach(*world),"attach resource-backed natural spawner queries");world->skipToGameForTesting();
+        unsigned births=0,tiles=0;
+        struct Environment {
+            StartupRuntime& world;unsigned& births;unsigned& tiles;
+            bool viewY(MotionBinary64& value){value=MotionBinary64::fromInteger(world.mainCameraRenderViewY());return true;}
+            bool viewHeight(MotionBinary64& value){value=MotionBinary64::fromInteger(world.cameraViewHeight());return true;}
+            bool tile(int depth,MotionBinary64 x,MotionBinary64 y,bool& hit){
+                require(depth==100,"spawner queries depth-100 tile layer");++tiles;
+                return world.wallBackgroundTiles().contains(x,y,hit);
+            }
+            bool create(int object,MotionBinary64,MotionBinary64,unsigned&){
+                require(object==115,"natural level-one channel selects a white jelly");++births;
+                return false; // Deliberately absent child provider must remain a failure.
+            }
+            bool deactivate(unsigned){require(false,"failed child cannot be deactivated");return false;}
+        };
+        bool admitted=true;
+        for(unsigned frame=0;frame<1200&&admitted;++frame)
+            admitted=world->withRegisteredSpawnerEvents(*owner,[&](InstanceHandle){return Environment{*world,births,tiles};},[&]{
+                world->step(gameplayContactProfileInput(frame,world->mainPlayerX(),world->mainPlayerY()),false);
+                return world->effectsSucceeded();
+            });
+        require(!admitted&&!world->effectsSucceeded()&&owner->counts&&owner->masks==1,"natural spawner reaches registered mask publication");
+        const auto* caller=world->resolveInstance(owner->caller);
+        const auto* state=caller?world->spawnerState(caller->instanceId):nullptr;
+        require(caller&&state&&caller->maskId==(rejectMask?-1:174)&&state->maskIndex==(rejectMask?-1:174),
+            "mask failure preserves both caller and script publication prefix");
+        require(rejectMask?(!owner->walls&&!owner->enemies&&!births&&!tiles):
+            (owner->walls>=2&&owner->enemies&&births==1&&tiles),"real candidate queries precede synchronous birth");
+    }
     for(unsigned failure=0;failure<=5;++failure){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());

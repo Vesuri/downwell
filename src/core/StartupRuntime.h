@@ -496,6 +496,40 @@ public:
             return Ops{external,*this};
         },tick);
     }
+    // Query ownership must have been attached before these room lifetimes
+    // were born. Publish mask_index through the normal lifecycle before using
+    // the spawner as the temporary-position caller of either family query.
+    template<class Queries,class MakeEnvironment,class Tick>
+    bool withRegisteredSpawnerEvents(Queries& queries,MakeEnvironment makeEnvironment,Tick tick){
+        if(!queries.boundTo(*this))return run_.effectsSucceeded=false;
+        return withWorldSpawnerEvents([&](InstanceHandle key){
+            auto external=makeEnvironment(key);
+            struct Ops : decltype(external) {
+                StartupRuntime& world;Queries& queries;InstanceHandle key;
+                Ops(decltype(external) value,StartupRuntime& runtime,Queries& owner,InstanceHandle h)
+                    :decltype(external)(value),world(runtime),queries(owner),key(h){}
+                bool enemyCount(int& value){
+                    unsigned count;if(!queries.instanceNumber(83,count))return false;
+                    value=int(count);return true;
+                }
+                bool objectMask(int object,int& value){
+                    PackedObject resource;
+                    if(!world.objectPack_||!world.objectPack_->findObject(object,resource))return false;
+                    value=resource.textureMaskId;return true;
+                }
+                bool mask(int value){
+                    auto* r=world.instances_.resolve(key);
+                    if(!r||r->objectId!=78||!world.lifecycle_.mask(key,*r,value))return false;
+                    r->maskId=value;return true;
+                }
+                bool meeting(MotionBinary64 x,MotionBinary64 y,int object,bool& hit){
+                    const auto* r=world.instances_.resolve(key);
+                    return r&&r->objectId==78&&queries.placeMeeting(key,*r,object,x,y,hit);
+                }
+            };
+            return Ops{external,*this,queries,key};
+        },tick);
+    }
     template<unsigned Capacity> StoredWhiteJellyStates<instanceCapacity,Capacity> whiteJellyStates(){
         return StoredWhiteJellyStates<instanceCapacity,Capacity>(instances_);
     }
