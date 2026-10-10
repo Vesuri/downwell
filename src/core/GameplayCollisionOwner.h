@@ -1989,7 +1989,7 @@ public:
     // Registered ordinary-Step dependencies of the skeleton encounter. Flash
     // balls and corpse-expiry pictures have no Step: their existing room
     // animation/cleanup dispatch remains authoritative.
-    using EncounterStepOrder=RunnerStepSnapshot<7*32+8+64+GameplayWhiteJellies::capacity+GameplaySpawners::capacity>;
+    using EncounterStepOrder=RunnerStepSnapshot<8*32+8+64+GameplayWhiteJellies::capacity+GameplaySpawners::capacity>;
     template<class Execute,class Tick>
     bool withEncounterSteps(EncounterStepOrder& phase,Execute execute,Tick tick){
         return withEncounterStepsSelected(phase,[](int object){
@@ -3381,6 +3381,20 @@ public:
         if(!valid()||!world_||!View::decode(shared,kind,local)||kind!=View::Kind::blood||!resolves(shared))return check(false);
         return check(world_->stepBloodRoomEffect(local,[&](const auto&,bool& allowed){
             return bloodTimeAllowed(local,pTimeStop,roomWidth,masks,allowed);
+        }));
+    }
+    // Object 220 also owns general moving particles. Keep their motion state
+    // separate from blood, but use the same published-mask field query and
+    // source TimeStopBound ordering in the captured mixed Step phase.
+    bool stepMovingFx(InstanceHandle shared,bool pTimeStop,int roomWidth,const SpriteMaskPack& masks){
+        View::Kind kind;InstanceHandle local;
+        if(!valid()||!world_||!View::decode(shared,kind,local)||
+           kind!=View::Kind::movingFx||!resolves(shared))return check(false);
+        return check(movingEffects_.step(local,[&](const auto& child,bool& allowed){
+            return TimeStopBound::evaluate(pTimeStop,child.x.promoted(),child.y.promoted(),roomWidth,
+                [&](auto x,auto y,bool& hit){
+                    return masks.valid()&&registeredPlaceMeeting(shared,82,x,y,masks,hit);
+                },allowed);
         }));
     }
     bool stepBlast(InstanceHandle shared){

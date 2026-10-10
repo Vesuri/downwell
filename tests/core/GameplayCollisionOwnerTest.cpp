@@ -919,6 +919,32 @@ int main(){
         GameplayCollisionView::Record record;
         assert(GameplayCollisionView(*world).resolve(shared,record)&&record.movingFx==effects.find(local));
         unsigned count;assert(owner->population(220,count)&&count==1);
+        const auto mb=read("generated/downwell-sprite-masks.dwsm");SpriteMaskPack masks(mb.data(),mb.size());
+        unsigned motionFrames;
+        assert(sprites.frameCount(704,motionFrames)&&effects.sprite(local,704,motionFrames)&&
+            effects.imageSpeed(local,{0x3fe00000u,0})&&
+            effects.velocity(local,false,MotionBinary64::fromInteger(1))&&
+            effects.velocity(local,true,MotionBinary64::fromInteger(2)));
+        auto phase=std::make_unique<RunnerStepSnapshot<GameplayCollisionView::capacity>>();
+        const auto step=[&](bool stopped){
+            unsigned calls=0;
+            assert(owner->dispatchStepPhase(0,*phase,[&](InstanceHandle h,const PackedObjectEvent& event){
+                if(h.slot!=shared.slot||h.generation!=shared.generation)return true;
+                assert(event.codeId==1991);++calls;
+                return owner->stepMovingFx(h,stopped,480,masks);
+            })&&calls==1);
+        };
+        const auto at=[&](int x,int y){
+            RunnerImageValue px,py;
+            return px.assignInteger(x)&&py.assignInteger(y)&&effects.find(local)->x.bits==px.bits&&effects.find(local)->y.bits==py.bits;
+        };
+        step(true);
+        assert(effects.find(local)->imageSpeed.bits==0&&at(240,512));
+        step(false);
+        assert(effects.find(local)->imageSpeed.bits==0x3f000000u&&at(241,514));
+        assert(world->createTimeFieldWithSourceId(990010,241,514));
+        step(true);
+        assert(effects.find(local)->imageSpeed.bits==0x3f000000u&&at(242,516));
         unsigned frames;assert(sprites.frameCount(704,frames)&&effects.sprite(local,704,frames)&&
             effects.imageSpeed(local,MotionBinary64::fromInteger(int(frames))));
         auto oracle=std::make_unique<ActorDrawOrderVerification>();
