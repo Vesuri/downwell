@@ -86,6 +86,10 @@ bool nativeOwnedWhiteJellyStep(downwell::GameplayWhiteJellies& owner,downwell::I
 bool nativeWhiteJellyAnimation(downwell::GameplayWhiteJellies& owner,downwell::InstanceHandle key){
     return owner.advanceAnimation(key)&&owner.sprite(key,175)&&owner.imageIndex(key,{});
 }
+bool nativeWhiteJellyMeeting(downwell::GameplayWhiteJellies& owner,downwell::InstanceHandle key,
+    downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool& hit){
+    return owner.meeting(key,x,y,57,hit);
+}
 bool nativeWhiteJellyEvents(downwell::WhiteJellyStep& state,bool stop,
     downwell::GameMakerRandom& random,NativeWhiteJellyStepOps& ops){
     return state.enemyContact(random,ops)&&state.effectAlarm(stop,random,ops)&&state.endStep(ops);
@@ -1218,7 +1222,10 @@ int main(){
     }
     auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
-    checkGeneratedSourceBirths(objects,sprites);
+    {
+        const auto bytes=read("generated/downwell-sprite-masks.dwsm");SpriteMaskPack maskPack(bytes.data(),bytes.size());
+        assert(maskPack.valid());checkGeneratedSourceBirths(objects,sprites,maskPack);
+    }
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
         GameplayCollisionOwner::Ownership::nativeScenery}){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},

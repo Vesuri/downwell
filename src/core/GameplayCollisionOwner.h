@@ -883,7 +883,7 @@ private:
             return parent.check(r.x.bits==x.bits&&r.y.bits==y.bits)&&birth(local,r);
         }
         bool placeMeeting(InstanceHandle local,const Record& r,int object,MotionBinary64 x,MotionBinary64 y,bool& hit){
-            static_assert(Kind==View::Kind::corpse,"corpse query binding");
+            static_assert(Kind==View::Kind::corpse||Kind==View::Kind::whiteJelly,"registered actor query binding");
             InstanceHandle shared;
             if(!parent.corpseMasks_||!key(local,r,shared))return parent.check(false);
             return parent.registeredPlaceMeeting(shared,object,x,y,*parent.corpseMasks_,hit);
@@ -1069,7 +1069,7 @@ private:
     Binding<GameplaySpawners::Record,View::Kind::spawner> spawnerBinding_{*this};
     GameplaySpawners spawners_{GameplaySpawners::Binding::bindMaskDestruction(spawnerBinding_)};
     Binding<GameplayWhiteJellies::Record,View::Kind::whiteJelly> whiteJellyBinding_{*this};
-    GameplayWhiteJellies whiteJellies_{GameplayWhiteJellies::Binding::bindPositionedActor(whiteJellyBinding_)};
+    GameplayWhiteJellies whiteJellies_{GameplayWhiteJellies::Binding::bindPositionedQueryActor(whiteJellyBinding_)};
     Binding<GameplayWorld::BulletState,View::Kind::bullet> bullets_{*this};
     Binding<GameplayScriptSpawnInstances::Record,View::Kind::scriptEffect> scriptEffectsBinding_{*this};
     Binding<GameplayWorld::RegisteredExpiry::Record,View::Kind::corpseExpiry> expiryBinding_{*this};

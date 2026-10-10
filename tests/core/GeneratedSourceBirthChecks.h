@@ -5,7 +5,7 @@
 #include <memory>
 #include <vector>
 inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
-    const downwell::SpriteCollisionPack& sprites){
+    const downwell::SpriteCollisionPack& sprites,const downwell::SpriteMaskPack& masks){
     using namespace downwell;
     for(int style:{0,2})for(bool knees:{false,true})for(bool rejectSound:{false,true}){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
@@ -283,6 +283,7 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
         assert(replacement.slot==spawnerKey.slot&&replacement.generation!=spawnerKey.generation&&
             spawners.find(replacement)->sourceId==spawnerId+1);
         auto& jellies=owner->whiteJellies();
+        assert(owner->configureCorpseMasks(masks));
         struct JellyOps {
             GameplayWhiteJellies& store;InstanceHandle key;
             bool position(bool y,RunnerImageValue v,RunnerImageValue& out){return store.position(key,y,v,out);}
@@ -300,6 +301,16 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             GameplayCollisionView(*world).resolve(jellyShared,jellyRecord)&&jellyRecord.whiteJelly==jellies.find(jelly));
         assert(jellyRecord.whiteJelly->sourceId==899000&&jellyRecord.whiteJelly->x.bits==0x43800000u&&
             jellyRecord.whiteJelly->y.bits==0x44300000u&&owner->prepareDraw());
+        bool wallHit=false;
+        assert(jellies.meeting(jelly,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(512),57,wallHit)&&wallHit);
+        assert(jellies.meeting(jelly,MotionBinary64::fromInteger(-1000),MotionBinary64::fromInteger(-1000),57,wallHit)&&!wallHit);
+        assert(jellies.find(jelly)->x.bits==0x43800000u&&jellies.find(jelly)->y.bits==0x44300000u);
+        WhiteJellyStep collisionProbe=*jellies.find(jelly);
+        collisionProbe.xx=MotionBinary64::fromInteger(240);collisionProbe.yy=MotionBinary64::fromInteger(512);
+        collisionProbe.xsp=collisionProbe.ysp=MotionBinary64::fromInteger(1);
+        assert(collisionProbe.wallCollision([&](auto x,auto y,int target,bool& hit){
+            return jellies.meeting(jelly,x,y,target,hit);
+        })&&collisionProbe.xcollision==1&&collisionProbe.ycollision==1);
         InstanceHandle playerShared;
         assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::player,world->playerHandle(),playerShared));
         struct JellyPlayer {

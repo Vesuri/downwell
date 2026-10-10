@@ -57,6 +57,10 @@ public:
         if(!binding_.publishedPosition(key,r,x,y))return fail();
         if(vertical)r.y=value;else r.x=value;accepted=value;return true;
     }
+    bool meeting(InstanceHandle key,MotionBinary64 x,MotionBinary64 y,int object,bool& hit){
+        if(!good_||!find(key))return fail();
+        return binding_.placeMeeting(key,records_[key.slot],object,x,y,hit)||fail();
+    }
     bool imageIndex(InstanceHandle key,RunnerImageValue value){
         // The authored hit event only assigns zero. Do not claim arbitrary
         // inverse sequence mapping for external image_index writes.
