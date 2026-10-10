@@ -102,7 +102,28 @@ failure must preserve the executed prefix rather than pretending the birth
 completed. Original `falldepth` and selected view values are inputs; camera
 offset or rounded player displacement is not an established substitute.
 
-## Child steering globals
+## Spawner child initialization and steering
+
+### Red-ball Create
+
+Object 118 (`enmRedBall`) has parent 83, sprite 702, mask 153 and Create code
+1243. Its PreCreate and both parent PreCreate handlers only call inherited;
+the chain terminates at parentLife (34). The concrete Create first executes
+the shared parentLife/subparentEnemy prefix, including X-before-Y move_snap.
+It then sets health 30 and reward 20, consumes one `random_range(1,1.5)` word,
+and initializes private coordinates and steering parameters. Initial speed is
+0.1, maximum 1.2, acceleration 0.05, deceleration 0.25, cone 90 degrees and
+turn rate 2 degrees.
+
+It reads player Y before X, publishes direction and reads it back into
+`playerDir`, then sets script-active. `emitTimer=10` precedes alarm 0=10;
+alarm 2=30 follows. Only then are custom `imgSp=0.2` and builtin image speed
+published. This is not the white-jelly Create with different health values.
+`RedBallBirth` implements that synchronous event; it does not itself allocate
+an instance ID, register a lifetime or supply Step/contact/Draw scheduling.
+`verify-enemy-create.py` pins metadata and the reviewed instruction streams.
+
+### Target selection
 
 White-jelly Create reads `plx/ply`; ordinary Step reads `eplx/eply`.
 `scrPlMovement` publishes `plx/ply` from private `xx/yy` before movement.

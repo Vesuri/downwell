@@ -146,6 +146,15 @@ TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET) $(ALARM_TEST_TARGET
 all: $(TARGET)
 
 .PHONY: test-white-jelly-birth
+test: test-red-ball-birth
+.PHONY: test-red-ball-birth
+test-red-ball-birth: build/red-ball-birth-test
+	./build/red-ball-birth-test
+	python3 tools/verify-enemy-create.py
+build/red-ball-birth-test: tests/core/RedBallBirthTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/RedBallBirthTest.cpp src/core/GameMakerRandom.cpp
+build/white-jelly-birth-test build/white-jelly-step-test build/white-jelly-events-test build/gameplay-white-jellies-test build/stored-white-jelly-test: src/core/SteeringEnemyBirthState.h
 test: test-gameplay-white-jellies
 .PHONY: test-gameplay-white-jellies
 test-gameplay-white-jellies: build/gameplay-white-jellies-test

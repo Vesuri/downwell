@@ -51,3 +51,22 @@ markers = ["call.i event_inherited(argc=0)", "call.i random_range(argc=2)",
 positions = [assembly.index(marker) for marker in markers]
 assert positions == sorted(positions)
 print("Pinned white-jelly inheritance, RNG and direction/image setter sequence")
+
+red = manifest["resources"]["objects"][118]
+assert (red["name"], red["parentId"], red["spriteId"], red["textureMaskId"]) == ("enmRedBall", 83, 702, 153)
+assert manifest["resources"]["objects"][34]["parentId"] == -1
+assert next(e for e in red["events"] if e["eventType"] == 0)["actions"][0]["codeId"] == 1243
+for name in ("enmRedBall", "subparentEnemy", "parentLife"):
+    payload = (export / "Assembly" / f"gml_Object_{name}_PreCreate_0.asm").read_bytes()
+    assert sha256(payload).hexdigest() == "4c193a4f963773b2c70b60323cfcdd763b259c208f342702a253d03b3f9e966b"
+payload = (export / "Assembly/gml_Object_enmRedBall_Create_0.asm").read_bytes()
+assert sha256(payload).hexdigest() == "730c853b056f240eda01cb48dfb434c2221de456c686ac1b4499f9b2e7224847"
+assembly = payload.decode()
+markers = ["call.i event_inherited(argc=0)", "call.i random_range(argc=2)",
+           "pop.v.v self.xx", "pushglb.v global.ply", "pushglb.v global.plx",
+           "call.i point_direction(argc=4)", "pop.v.v self.direction", "pop.v.i self.active",
+           "pop.v.i self.emitTimer", "pushi.e 0\npop.v.v [array]self.alarm",
+           "pushi.e 2\npop.v.v [array]self.alarm", "pop.v.v self.image_speed"]
+positions = [assembly.index(marker) for marker in markers]
+assert positions == sorted(positions)
+print("Pinned red-ball PreCreate chain and synchronous Create RNG/heading/alarm/image sequence")
