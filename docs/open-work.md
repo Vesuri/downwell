@@ -44,7 +44,10 @@ behavior, both backend integrations and relevant original-game verification.
   must install the retained per-parent `with (Shop)` capture/body in normal
   frontend encounters, supplying live shared input, synchronous purchase/child
   setters and radio/view dependencies. The compact
-  once-per-shop update is not a source-equivalent parent Step. Complete
+  once-per-shop update is not a source-equivalent parent Step. Bind the
+  registered Shop and child custom Draw handlers to the mixed native Draw
+  projection; compact fixtures and the missing-handler rejection are not a
+  rendering implementation. Complete
   ordered Room End dispatch and device-audio bindings as well. Spawner admission
   requires its depth-driven Step, selected enemy mask queries and synchronous
   child Create-before-deactivate, not an ID-only placeholder. Supply source

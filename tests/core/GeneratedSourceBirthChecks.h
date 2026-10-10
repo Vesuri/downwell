@@ -17,6 +17,7 @@
 inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
     const downwell::SpriteCollisionPack& sprites,const downwell::SpriteMaskPack& masks,const downwell::RoomPack& rooms){
     using namespace downwell;
+    std::vector<unsigned> referenceShopDraw;
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
                   GameplayCollisionOwner::Ownership::nativeScenery}){
         const bool native=mode!=GameplayCollisionOwner::Ownership::reference;
@@ -70,6 +71,26 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             }
             shared.push_back(h);
         }
+        auto shopDrawOrder=[&](bool cached){
+            std::vector<unsigned> ids;
+            auto visit=[&](GameplayWorld::DrawActor kind,InstanceHandle key,RunnerImageValue){
+                if(kind!=GameplayWorld::DrawActor::shop)return true;
+                const auto* record=store.find(key);assert(record);
+                ids.push_back(record->sourceId);return true;
+            };
+            assert(cached?world->visitRoomActorsReadOnly(visit):world->visitRoomActors(visit));
+            return ids;
+        };
+        const auto drawn=shopDrawOrder(false);
+        assert(drawn.size()==10&&drawn==shopDrawOrder(true)&&drawn==shopDrawOrder(true));
+        if(!native)referenceShopDraw=drawn;else assert(drawn==referenceShopDraw);
+        unsigned textDraws=0,parentDraws=0;
+        for(auto id:drawn){
+            const auto* r=store.find(store.sourceHandle(id));assert(r);
+            assert(r->objectId!=98); // Invisible wall has neither sprite nor Draw event.
+            textDraws+=r->objectId==212;parentDraws+=r->objectId==277;
+        }
+        assert(textDraws==1&&parentDraws==1);
         {
             const auto key=store.sourceHandle(960000);auto& shop=*sourceParent->shop;
             const auto previous=shop.children.risingText,created=next;
@@ -81,6 +102,11 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             const auto* text=store.find(store.sourceHandle(created));
             assert(text&&ShopLanguageLookup::same(text->state.text,greeting)&&text->x.promoted().high==MotionBinary64::fromInteger(500).high&&
                 text->y.promoted().high==MotionBinary64::fromInteger(1982).high);
+            const auto fresh=shopDrawOrder(false);
+            assert(fresh==shopDrawOrder(true)&&fresh==shopDrawOrder(true));
+            unsigned replacements=0;
+            for(auto id:fresh){assert(id!=previous);replacements+=id==created;}
+            assert(replacements==1);
         }
         const unsigned replacementId=next;
         assert(world->restartFromResults(DeathMenuSequence::Action::Retry,2,300)==ResultsDestination::gameplay);

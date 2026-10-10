@@ -973,8 +973,16 @@ binds its positioned births and image setters to the shared collision tables
 and source-ID-bearing room/layer lifetimes in reference and native modes.
 World room teardown clears the pool before resetting compact Shop state, and
 Retry preserves the binding without preserving old generation handles. This
-registration does not project their Draw or admit the parent
-events; those are required before normal frontend generation admission.
+registration projects Shop lifetimes into the same layer Draw traversal as
+other actors, including prepared native command-order caches. Resource Draw
+metadata, visibility and destruction flags still decide admission; no separate
+shop-family painter order is introduced. Replacing speech invalidates the
+cached projection so the marked old child disappears and the new child takes
+its own layer position. This does not implement the parent/child custom Draw
+handlers: the Amiga command collector rejects an admitted Shop Draw until those
+handlers are supplied, rather than interpreting its local handle as a generic
+effect. Those handlers and normal parent-event installation remain required
+before frontend generation admission.
 Rising text and item selection can join `withEncounterSteps` through
 `stepRegisteredShopChild`, with the caller supplying the real upgrade-array
 lookup. Rising-text alarms use the existing mixed alarm phase; alarm 0 marks

@@ -361,6 +361,10 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
             DW_PROFILE_SCOPE(profileActorPreparation);
             if(downwell::RunnerSpatialSplit::less(depth,foregroundDepth)&&!drawForeground())return false;
             if(kind==GameplayWorld::DrawActor::player)return port.findPlayer(key)&&drawPlayer();
+            // Registered Shop Draw events need their own source handlers.
+            // Never reinterpret a Shop-local handle as a script-effect slot,
+            // or silently omit it while drawing compact Shop copies.
+            if(kind==GameplayWorld::DrawActor::shop)return false;
             if(kind==GameplayWorld::DrawActor::redBall){
                 const auto* record=port.redBalls()?port.redBalls()->find(key):nullptr;
                 if(!record)return false;
