@@ -54,6 +54,17 @@ public:
         out={x+p.left,y+p.top,x+p.right,y+p.bottom};
         return true;
     }
+    // Constructor publication can retain this immutable key directly. The
+    // journal still admits every insertion in source order and owns pressure
+    // handling; no instance or tree-membership decision is cached here.
+    bool publication(int object,int x,int y,Key& out,
+                     RunnerSpatialSplit::PixelBox& box,bool& precise)const{
+        if(!key(object,x,y,out)||!pixels(out,box))return false;
+        precise=shapes_[out.value&3u].precise;
+        if(box.right<box.left){const auto v=box.left;box.left=box.right;box.right=v;}
+        if(box.bottom<box.top){const auto v=box.top;box.top=box.bottom;box.bottom=v;}
+        return true;
+    }
     template<unsigned N> bool prepare(const PreparedObjectDefaults<N>& objects,
         const SpriteCollisionPack& sprites){
         DW_TERRAIN_PREPARATION_SCOPE;

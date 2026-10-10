@@ -94,6 +94,19 @@ int main(){
             assert(RunnerSpatialSplit::decodePixels(reference,decoded));
             assert(pixels.left==decoded.left&&pixels.top==decoded.top&&
                 pixels.right==decoded.right&&pixels.bottom==decoded.bottom);
+            PreparedTerrainBirthBounds::Key publication;
+            RunnerSpatialSplit::PixelBox published;bool publishedPrecise=false;
+            assert(grid.publication(object,x,y,publication,published,publishedPrecise));
+            assert(publishedPrecise==precise);
+            if(decoded.right<decoded.left)std::swap(decoded.right,decoded.left);
+            if(decoded.bottom<decoded.top)std::swap(decoded.bottom,decoded.top);
+            assert(published.left==decoded.left&&published.right==decoded.right&&
+                published.top==decoded.top&&published.bottom==decoded.bottom);
+            RunnerSpatialSplit::Box publishedBox;assert(grid.bounds(publication,publishedBox,true));
+            RunnerSpatialSplit::PixelBox publishedDecoded;
+            assert(RunnerSpatialSplit::decodePixels(publishedBox,publishedDecoded));
+            assert(published.left==publishedDecoded.left&&published.right==publishedDecoded.right&&
+                published.top==publishedDecoded.top&&published.bottom==publishedDecoded.bottom);
             RunnerSpatialSplit::PixelBox dictionary;
             assert(grid.atReference(object,x,y,px,py,result,precise,&dictionary));
             assert(pixels.left==dictionary.left&&pixels.top==dictionary.top&&

@@ -49,7 +49,9 @@ public:
 #ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
     using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2,true,View::terrainBase,View::timeFieldBase,false>;
 #else
-    using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2,true,View::terrainBase,View::timeFieldBase>;
+    using Registration=typename RunnerRegistrationStorage<View::capacity,View::terrainBase,View::timeFieldBase,true>::Type;
+    using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2,true,View::terrainBase,View::timeFieldBase,
+        true,RunnerSpatialLifetimes<View::capacity>,Registration,true>;
 #endif
 private:
     Owner owner_;
@@ -610,12 +612,31 @@ private:
         if(!check(room_.bind(slot,definition->creationDepth)))return false;
         if(!active)activationPending_=true;
         flags=definition->initialFlags|(active?0u:2u);
-        RunnerImageValue x,y;Owner::Box bounds,cached{};bool found,precise;
-        if(!nativeTerrainBirthBounds(id,x,y,bounds,found,precise))return false;
-        if(!check(owner_.externalSpatialPublication([&](auto& index){
-            return RunnerSpatialBoundsUpdate::finishRefresh(index,slot,*objectFlags,flags,false,cached,
-                found?&bounds:nullptr,x,y,precise,true);
-        })))return false;
+        bool published=false;
+#ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+        PreparedTerrainBirthBounds::Key geometry;RunnerSpatialSplit::PixelBox pixels;bool preparedPrecise;
+        // Only a fresh, resource-certified integer-grid constructor. Mutated
+        // bounds and unexpected pre-indexed defaults keep the full oracle.
+        if(!(flags&0x8000u)&&terrainBirthBounds_.publication(id.object,id.x,id.y,geometry,pixels,preparedPrecise)){
+            flags=(flags&~0x208u)|(preparedPrecise?0x200u:0u);
+            if(NativeDirtyQueue::shouldPublishBounds(*objectFlags,flags,false)){
+                DW_PROFILE_COUNT(counterSpatialFirstPublication);
+                if(!check(owner_.externalSpatialPublication([&](auto& index){
+                    return index.insertGeometry(geometry,slot,pixels);
+                })))return false;
+                flags|=0x8000u;
+            }
+            published=true;
+        }
+#endif
+        if(!published){
+            RunnerImageValue x,y;Owner::Box bounds,cached{};bool found,precise;
+            if(!nativeTerrainBirthBounds(id,x,y,bounds,found,precise))return false;
+            if(!check(owner_.externalSpatialPublication([&](auto& index){
+                return RunnerSpatialBoundsUpdate::finishRefresh(index,slot,*objectFlags,flags,false,cached,
+                    found?&bounds:nullptr,x,y,precise,true);
+            })))return false;
+        }
         if(!check(layers_.birth({slot,id.handle.generation},id.source,definition->creationDepth,!active,false)))return false;
         // The birth callback precedes run publication. Publish the scenery
         // cutoff directly; resolving this handle through the run is premature.
@@ -1202,6 +1223,9 @@ public:
             terrainBirthBounds_.prepare(objectDefaults_,sprites_)&&
             nativeTerrainCreate_.prepare(objectDefaults_,sprites_)&&
             families_.bindInstanceFlags(objects)&&drawMetadata_.bind(objects)&&alarmMetadata_.bind(objects);
+#ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+        if(good_)good_=owner_.bindTerrainGeometry(terrainBirthBounds_);
+#endif
         if(good_){const auto* box=objectDefaults_.get(92);if(!box)good_=false;else {
             nativeBoxFlags_=box->initialFlags;
             good_=RunnerDepthService::integerDepth(box->creationDepth,boxLayer_.depth);
