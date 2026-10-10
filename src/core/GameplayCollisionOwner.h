@@ -3174,12 +3174,18 @@ private:
         // masks. Retain this union with it instead of rescanning every tick.
         // Binding changes during dispatch still disable absent-column skips.
         if(!alreadySorted||!retainedMask){
+            const bool typedCombat=SkipInactive&&native_&&retainedMask==&combatAlarmMask_;
             int previousObject=-1;
             for(unsigned i=0;i<count;++i){
                 const int object=snapshot.object(i);
-                if(object==previousObject)continue;
+                // A resource ID alone is not a typed-family identity. If an
+                // unusual captured actor also uses object 35, it must still
+                // contribute its full mask after the player's narrow one.
+                if(object==previousObject&&!(typedCombat&&object==35))continue;
                 unsigned mask;
                 if(!check(alarmMetadata_.mask(object,mask)))return false;
+                if(typedCombat&&object==35&&snapshot.handle(i).slot<View::enemyBase)
+                    mask&=GameplayWorld::playerDamageAlarmColumns;
                 capturedAlarms|=mask;previousObject=object;
             }
             if(retainedMask)*retainedMask=capturedAlarms;

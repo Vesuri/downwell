@@ -90,24 +90,24 @@ interpret restoring this diagnostic's loader fit as a shipping memory reduction.
 
 ## Executable size versus runtime memory
 
-The preserved pre-repair `STRIP=1` baseline in
-`tmp/a500-baseline-before/Downwell.exe` is **3,277,112 bytes**, SHA-256
-`11e7a541b9ebc34be9c2a5cdc55dcd624fb3ab05398b2d1234cb5418cd896fbd`.
+The normal `STRIP=1` build measured after narrowing the native player's
+alarm columns is **3,307,716 bytes**, SHA-256
+`0cfca3efb708bce4edaed96d4ef203e18f5ef826e96ee2aefb5df40183c41e8b`.
 The matching ELF section sizes distinguish payload from runtime allocation:
 
 | Section | Bytes | Stored in the executable? |
 | --- | ---: | --- |
-| Machine code (`.text`) | 1,309,748 | Yes |
-| Read-only data (`.rodata`) | 1,887,160 | Yes |
+| Machine code (`.text`) | 1,339,034 | Yes |
+| Read-only data (`.rodata`) | 1,887,012 | Yes |
 | Initialized writable data (`.data`) | 34,202 | Yes |
 | Initializer pointer | 4 | Yes |
-| Zero-filled storage (`.bss`) | 4,761,676 | No; allocated at load |
+| Zero-filled storage (`.bss`) | 4,872,748 | No; allocated at load |
 
-Initialized payload totals 3,231,114 bytes. Hunk relocation and container
-records account for the remaining 45,998 bytes. Stripping cannot remove
+Initialized payload totals 3,260,252 bytes. Hunk relocation and container
+records account for the remaining 47,464 bytes. Stripping cannot remove
 the initialized payload. ELF debug sections are not that payload either.
 
-Grouping linked text symbols by owner attributes roughly 551 KB to
+The pre-repair owner audit attributes roughly 551 KB to
 `GameplayCollisionOwner` and its template instantiations, 260 KB to
 `GameplayWorld`, and 64 KB to spatial-tree machinery. This is linked code
 size, not inclusive call cost. Embedded sprite collision masks alone occupy

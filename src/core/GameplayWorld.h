@@ -1744,6 +1744,10 @@ public:
         if(key.slot||!key.generation||key.generation!=playerInstance_.lifetimeId)return run_.effectsSucceeded=false;
         playerInstance_.damageAlarm=ticks;return true;
     }
+    // This adapter owns Alarm 1 only, irrespective of the larger immutable
+    // event table on object 35. Keep the dispatcher's admitted columns tied
+    // to this ownership contract, not a snapshot of the live countdown.
+    static constexpr unsigned playerDamageAlarmColumns=1u<<1;
     bool playerDamageAlarmPending(downwell::InstanceHandle key,unsigned alarm,bool& pending)const{
         if(key.slot||!key.generation||key.generation!=playerInstance_.lifetimeId)return false;
         pending=alarm==1&&playerInstance_.damageAlarm>=0;return true;

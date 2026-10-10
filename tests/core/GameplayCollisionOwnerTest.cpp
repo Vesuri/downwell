@@ -2633,6 +2633,15 @@ int main(){
         assert(world->typicalPlayerDamage(damageBinding,one,one,one,damageEvents,noBirth)&&world->playerDamaged());
         assert(damageEvents.alarm==-1&&!damageEvents.clears&&!world->noDamageAchievement()&&!world->areaNoDamageAchievement());
         assert(world->typicalPlayerDamage(damageBinding,one,one,one,damageEvents,noBirth)&&!damageEvents.clears&&selections==1);
+        static_assert(GameplayWorld::playerDamageAlarmColumns==(1u<<1),"Player adapter owns Alarm 1");
+        for(int counter:{-2,-1,0,1,2}){
+            assert(world->setPlayerDamageAlarm(world->playerHandle(),counter));
+            for(unsigned alarm=0;alarm<12;++alarm){
+                bool pending=true;
+                assert(world->playerDamageAlarmPending(world->playerHandle(),alarm,pending));
+                assert(pending==bool((GameplayWorld::playerDamageAlarmColumns&(1u<<alarm))&&counter>=0));
+            }
+        }
         assert(world->setPlayerDamageAlarm(world->playerHandle(),2));
         world->setPlayerHit();assert(world->playerHit()==1);
         assert(world->setOxygen({0x40230000u,0}));
