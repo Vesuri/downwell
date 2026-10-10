@@ -159,9 +159,9 @@ int main(){
         auto flash=stored->flashBallRegistration<8>();auto currency=stored->currencyRegistration<3>();
         auto corpses=stored->corpseRegistration<1>();auto titles=stored->levelNumberRegistration<1>();
         InstanceHandle skeleton;assert(stored->spawnSkeleton(skeletons,240,40000,skeleton));
-        const auto initialRandom=stored->randomState();const auto first=stored->nextRuntimeInstanceId();
+        const auto initialRandom=stored->randomState();auto first=stored->nextRuntimeInstanceId();
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
-        auto native=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),owner->breakableBinding(),
+        auto native=std::make_unique<GameplayWorld>(300,true,0,seed==15,owner->enemyBinding(),owner->breakableBinding(),
             owner->playerBinding(),&owner->terrain());
         assert(owner->attach(*native)&&owner->configureCorpseMasks(masks));
         int storedSpeed=60,nativeSpeed=60;InstanceHandle controller,other,shared;
@@ -170,8 +170,8 @@ int main(){
         assert(native->createSkeletonWithSourceId(first-1,240,40000,other));
         native->configureEnemyRandom(initialRandom);
         assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::skeleton,other,shared));
-        auto prepare=[](auto& actor,auto&,bool&){actor.health=0;actor.money=14;
-            actor.takenImpact=MotionBinary64::fromInteger(2);return true;};
+        auto prepare=[&](auto& actor,auto&,bool&){actor.money=14;
+            if(seed!=15){actor.health=0;actor.takenImpact=MotionBinary64::fromInteger(2);}return true;};
         assert(skeletons.dispatch(skeleton,prepare)&&owner->skeletons().dispatch(other,prepare));
         struct Audio {
             std::vector<int> plays;
@@ -190,6 +190,34 @@ int main(){
         const char* language="english";unsigned font=2;bool hard=false;
         LevelNumberTextContext text{fonts,area_titles::entries,area_titles::count,language,font,hard};
         TimeStopEffects<4> stop;SoundPlayEnvironment storedEnv,nativeEnv;
+        // Reach death through resource-bound contacts, not a health override.
+        // Each blast owns separate hit memory; its impact Create consumes an
+        // ID before the next blast. Both worlds then run the same death Step.
+        auto blasts=stored->blastRegistration<2>();
+        if(seed==15){
+            unsigned next=first;
+            for(unsigned hit=0;hit<2;++hit){
+                InstanceHandle a,b,bShared;
+                assert(stored->withMomentDelayRoomSpeed(storedSpeed,[&]{
+                    return stored->spawnBlast(blasts,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(40000),a);
+                }));
+                assert(owner->createBlast(next++,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(40000),b)&&
+                    GameplayCollisionView::encode(GameplayCollisionView::Kind::blast,b,bShared));
+                RunnerCollisionEventContext sc,nc;
+                assert(stored->withMomentDelayRoomSpeed(storedSpeed,[&]{
+                    return storedOwner->dispatchCollisionEvent(sc,blasts.worldHandle(a),skeletons.worldHandle(skeleton),{true,false},
+                        [&](const auto& event){return stored->dispatchBlastSkeletonCollisionWithEffects(blasts,skeletons,event,
+                            [&](int sprite,unsigned& count){return sprites.frameCount(sprite,count);},storedEnv,storedAudio);});
+                }));
+                assert(owner->dispatchCollisionEvent(nc,bShared,shared,{true,false},[&](const auto& event){
+                    return owner->dispatchBlastSkeletonCollisionWithEffects(event,[&](unsigned& id){id=next++;return true;},
+                        [&](int sprite,unsigned& count){return sprites.frameCount(sprite,count);},nativeEnv,nativeAudio);
+                }));
+                assert(skeletons.instances().find(skeleton)->state.health==(hit?-40:10)&&
+                    owner->skeletons().find(other)->state.health==(hit?-40:10)&&next==stored->nextRuntimeInstanceId());
+            }
+            first=next;
+        }
         if(seed==16){
             // Children born during this ordinary Step must not receive an
             // ordinary Step from the snapshot already being dispatched.
