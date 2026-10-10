@@ -24,6 +24,12 @@ describes the variables. Activate it with:
 make -C amiga
 ```
 
+Use `make -C amiga STRIP=1` for a symbol-stripped `out/Downwell.exe`.
+The default is `STRIP=0`; switching either way regenerates the executable
+without requiring a clean build. The `.elf` retains its debugging information,
+and `run.sh` launches the selected `.exe` as usual. Stripping does not change
+the game's code/assets or establish that its runtime memory requirements fit.
+
 The baseline machine is an Amiga 500 with a 68000 and no FPU. Compile all
 portable target code with `-m68000 -msoft-float`; any future routine using a
 newer CPU must remain an optional, runtime-selected optimization rather than a

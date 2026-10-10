@@ -1,6 +1,13 @@
 # Downwell — native Amiga 68000 cross-build.
 
 OUT      := out/Downwell
+# Strip only the converted Hunk executable; retain the ELF for debugging.
+STRIP ?= 0
+ifneq ($(STRIP),0)
+ifneq ($(STRIP),1)
+$(error STRIP must be 0 or 1)
+endif
+endif
 CC       := m68k-amiga-elf-gcc
 AS       := m68k-amiga-elf-as
 OBJDUMP  := m68k-amiga-elf-objdump
@@ -680,9 +687,14 @@ check:
 	done
 	@echo "Amiga 68000 toolchain OK"
 
-$(OUT).exe: $(OUT).elf
-	@elf2hunk $< $@
-	@echo "Built $@"
+.PHONY: FORCE_HUNK_OPTIONS
+$(OUT).exe: $(OUT).elf FORCE_HUNK_OPTIONS
+	@mkdir -p $(@D)
+	@printf '%s\n' '$(STRIP)' > $(OUT).hunk-options.tmp
+	@if [ ! -f $@ ] || [ $< -nt $@ ] || ! cmp -s $(OUT).hunk-options.tmp $(OUT).hunk-options; then \
+		elf2hunk $< $@ $(if $(filter 1,$(STRIP)),-s) && \
+		mv -f $(OUT).hunk-options.tmp $(OUT).hunk-options && echo "Built $@ (STRIP=$(STRIP))"; \
+	else rm -f $(OUT).hunk-options.tmp; fi
 
 $(OUT).elf: $(OBJECTS)
 	@mkdir -p $(@D)
