@@ -18,6 +18,7 @@
 #include "core/StoredSpawnerStates.h"
 #include "core/WhiteJellyBirth.h"
 #include "core/WhiteJellyStep.h"
+#include "core/StoredWhiteJellyStates.h"
 #ifdef DOWNWELL_LOCAL_DRAW_CAPTURE
 namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_CAPTURE; }
 #endif
@@ -51,6 +52,14 @@ struct NativeWhiteJellyStepOps : NativeWhiteJellyBirthOps {
 bool nativeWhiteJellyStep(downwell::WhiteJellyStep& state,bool stop,
     downwell::GameMakerRandom& random,NativeWhiteJellyStepOps& ops){
     return state.step(stop,random,ops);
+}
+bool nativeStoredWhiteJellyCreate(downwell::StoredWhiteJellyStates<8,2>& owner,
+    downwell::InstanceHandle key,downwell::GameMakerRandom& random,NativeWhiteJellyStepOps& ops){
+    return owner.create(key,random,ops);
+}
+bool nativeStoredWhiteJellyStep(downwell::StoredWhiteJellyStates<8,2>& owner,
+    downwell::InstanceHandle key,bool stop,downwell::GameMakerRandom& random,NativeWhiteJellyStepOps& ops){
+    return owner.step(key,stop,random,ops);
 }
 struct NativeSpawnerOps {
     bool playerY(downwell::MotionBinary64&);bool area(int&);bool fallDepth(downwell::MotionBinary64&);
