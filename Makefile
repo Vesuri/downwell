@@ -1982,6 +1982,12 @@ build/shop-world-test: tests/core/ShopWorldTest.cpp src/core/PlayerMotion.cpp $(
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
 test-shop-world: build/shop-world-test
 	./build/shop-world-test
+build/stored-shop-child-test: tests/core/StoredShopChildTest.cpp src/core/ObjectPack.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+test-stored-shop-child: build/stored-shop-child-test
+	./build/stored-shop-child-test
+.PHONY: test-stored-shop-child
 .PHONY: test-shop-interaction
 build/shop-interaction-test: tests/core/ShopInteractionTest.cpp $(HOST_CHECK_HEADERS)
 	@mkdir -p build

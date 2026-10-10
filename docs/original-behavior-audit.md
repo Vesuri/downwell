@@ -667,6 +667,18 @@ neither call. Rejected playback/gain publication stops before the first child
 or stock RNG. The inherited parentInteractable Create has no calls, hence no
 additional births or RNG; both that body and the radio branch are hash-pinned.
 
+`StoredShopChildRegistration` implements these six child resources' synchronous
+Create bodies in real `InstanceStore` records, borrowing the room counter and
+lifecycle publisher. Birth publication precedes Create setters; item image-index
+publication precedes its zero image-speed assignment. The retained side state
+holds material, case health/flags, keeper flags, item selection and rising-text
+variables; the latter's alarms are in the instance's actual alarm bank. Teardown
+retires records before invalidating their handles, without resetting the shared
+counter. The source check includes each child's PreCreate ancestry and verifies
+that the invisible wall's ancestors have no Create body to execute. This owner
+does not itself admit the children's later Step, Alarm or Draw events, and is
+not yet installed by either normal generation adapter.
+
 `scrBuilder` blocks 187 and 207 write `self.y += 16` after each newline's
 pillars and each extra-pillar row respectively. Shared scalar, run and prepared
 generation retain these setter boundaries, including the completed prefix on

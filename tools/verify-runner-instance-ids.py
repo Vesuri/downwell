@@ -198,3 +198,16 @@ text = assembly("gml_GlobalScript_scrShopAssignText",
 assert text.count("call.i choose(argc=3)") == 1
 assert "gml_Script_instance_create" not in text
 print("Pinned seven pre-stock shop children and three post-stock item births before farewell RNG")
+# Child Create admission must include the inherited chain, not only the leaf.
+for object_id, parent_id in ((278,59),(279,57),(98,59),(280,-1),(212,-1),(283,-1),(59,57),(57,56),(56,-1)):
+    definition = objects[object_id]
+    assert definition["parentId"] == parent_id
+    assembly("gml_Object_" + definition["name"] + "_PreCreate_0",
+             "4c193a4f963773b2c70b60323cfcdd763b259c208f342702a253d03b3f9e966b")
+    if object_id in (59,57,56):
+        assert not any(e["eventType"] == 0 for e in definition["events"])
+invisible = assembly("gml_Object_objInvisWall_Create_0",
+    "ecdc8901c3fa1d986b23cc44ef9d6c7c133222fd45681d8d96639a7c2c391f40")
+assert invisible.count("call.i") == 1 and "call.i event_inherited(argc=0)" in invisible
+assert 'push.s "rock"@777\npop.v.s self.material' in invisible
+print("Pinned shop child PreCreate ancestry and invisible-wall inherited Create")
