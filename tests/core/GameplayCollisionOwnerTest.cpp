@@ -802,6 +802,7 @@ static void checkTypedCollisionView(const GameplayCollisionView& view,GameplayCo
     InstanceHandle shared;GameplayCollisionView::Record reference;
     if(GameplayCollisionView::encode(kind,local,shared))view.resolve(shared,reference);
     switch(kind){
+        case K::shop:assert(view.resolveLocal<K::shop>(local)==reference.shop);break;
         case K::movingFx:assert(view.resolveLocal<K::movingFx>(local)==reference.movingFx);break;
         case K::scattered:assert(view.resolveLocal<K::scattered>(local)==reference.scattered);break;
         case K::spawner:assert(view.resolveLocal<K::spawner>(local)==reference.spawner);break;
@@ -1615,7 +1616,8 @@ int main(){
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     {
         const auto bytes=read("generated/downwell-sprite-masks.dwsm");SpriteMaskPack maskPack(bytes.data(),bytes.size());
-        assert(maskPack.valid());checkGeneratedSourceBirths(objects,sprites,maskPack);
+        const auto roomBytes=read("generated/downwell-rooms.dwrm");RoomPack rooms(roomBytes.data(),roomBytes.size());
+        assert(maskPack.valid()&&rooms.valid());checkGeneratedSourceBirths(objects,sprites,maskPack,rooms);
     }
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
         GameplayCollisionOwner::Ownership::nativeScenery}){

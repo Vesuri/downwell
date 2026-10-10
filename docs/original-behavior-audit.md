@@ -755,9 +755,13 @@ host floats. Its borrowed creation adapter takes the enclosing allocator and
 audio owner; it never reserves IDs ahead of child Create. `ShopChildState`
 supplies the same six child Create bodies to both owners. The native pool
 publishes positioned births before setters, retains rejected prefixes, and
-does not reuse generation handles after teardown. Its lifecycle binding must
-be connected to native collision/layer ownership before normal generation
-admission; the pool alone does not schedule later child events.
+does not reuse generation handles after teardown. `GameplayCollisionOwner`
+binds its positioned births and image setters to the shared collision tables
+and source-ID-bearing room/layer lifetimes in reference and native modes.
+World room teardown clears the pool before resetting compact Shop state, and
+Retry preserves the binding without preserving old generation handles. This
+registration does not schedule later child events or project their Draw; those
+are required before normal frontend generation admission.
 
 The rising-text event entries publish the Y setter before multiplying binary64
 `ysp` by `decreaseBy`. Alarm 1 sets `flashing`; Step then negates the integer

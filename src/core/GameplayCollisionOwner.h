@@ -643,6 +643,7 @@ private:
     template<class Record,View::Kind Kind> struct Binding {
         GameplayCollisionOwner& parent;
         static int object(const Record& r){
+            if constexpr(Kind==View::Kind::shop)return r.objectId;
             if constexpr(Kind==View::Kind::movingFx)return 220;
             if constexpr(Kind==View::Kind::scattered)return 289;
             if constexpr(Kind==View::Kind::spawner)return 78;
@@ -755,6 +756,7 @@ private:
                     return parent.refresh(live,publish);
                 })))return false;
             unsigned sourceId=0;
+            if constexpr(Kind==View::Kind::shop)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::scattered||Kind==View::Kind::spawner||Kind==View::Kind::redBall||Kind==View::Kind::whiteJelly||Kind==View::Kind::movingFx)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::terrain)sourceId=r.sourceInstanceId;
             if constexpr(Kind==View::Kind::breakable||Kind==View::Kind::enemy)sourceId=r.sourceId;
@@ -781,7 +783,9 @@ private:
         bool birthPosition(const Record& r,NativePosition& result){
             auto* position=&result;
             if constexpr(Kind==View::Kind::scriptEffect)if(!r.effect||!r.effect->valid)return parent.check(false);
-            if constexpr(Kind==View::Kind::scriptEffect||Kind==View::Kind::debris){
+            if constexpr(Kind==View::Kind::shop){
+                position->x=r.x;position->y=r.y;
+            }else if constexpr(Kind==View::Kind::scriptEffect||Kind==View::Kind::debris){
                 if(!r.effect)return parent.check(false);
                 position->x=r.effect->x;position->y=r.effect->y;
             }else if constexpr(Kind==View::Kind::scattered||Kind==View::Kind::spawner||Kind==View::Kind::redBall||Kind==View::Kind::whiteJelly||Kind==View::Kind::movingFx){
@@ -864,6 +868,7 @@ private:
                     return parent.check(!inactive&&parent.layers_.birthScenery(depth));
                 }
             unsigned sourceId=0;
+            if constexpr(Kind==View::Kind::shop)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::scattered||Kind==View::Kind::spawner||Kind==View::Kind::redBall||Kind==View::Kind::whiteJelly||Kind==View::Kind::movingFx)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
             if constexpr(Kind==View::Kind::breakable||Kind==View::Kind::enemy)sourceId=r.sourceId;
@@ -1079,6 +1084,8 @@ private:
     Binding<GameplayRedBalls::Record,View::Kind::redBall> redBallBinding_{*this};
     GameplayWhiteJellies whiteJellies_{GameplayWhiteJellies::Binding::bindPositionedQueryActor(whiteJellyBinding_)};
     GameplayRedBalls redBalls_{GameplayRedBalls::Binding::bindPositionedQueryActor(redBallBinding_)};
+    Binding<GameplayShopInstances::Record,View::Kind::shop> shopBinding_{*this};
+    GameplayShopInstances shopInstances_{objects_,GameplayShopInstances::Binding::bindPositionedActor(shopBinding_)};
     Binding<GameplayWorld::MovingEffects::Record,View::Kind::movingFx> movingFxBinding_{*this};
     GameplayWorld::MovingEffects movingEffects_{GameplayWorld::MovingEffects::Binding::bindPositionedActor(movingFxBinding_)};
     Binding<GameplayWorld::BulletState,View::Kind::bullet> bullets_{*this};
@@ -1232,7 +1239,7 @@ public:
     template<class Visit> bool visitRegistrationOrder(Visit visit)const{return valid()&&visitEligibility(visit);}
     // Drone dispatch deliberately exposes bool& status to arbitrary callbacks;
     // retain its live read rather than delaying a callback's failure to return.
-    bool valid()const{return redBalls_.valid()&&movingEffects_.valid()&&whiteJellies_.valid()&&spawners_.valid()&&scattered_.valid()&&good_&&blasts_.valid()&&flash_.valid()&&limbo_.valid()&&levelNumbers_.valid()&&result_.valid()&&controllers_.valid()&&consumption_.valid()&&corpses_.valid()&&smoke_.valid()&&expiry_.valid()&&playerControllers_.valid()&&builderController_.valid()&&blood_.valid()&&skeletons_.valid()&&(failureObserved_?(drones_.valid()&&bones_.valid()):
+    bool valid()const{return shopInstances_.valid()&&redBalls_.valid()&&movingEffects_.valid()&&whiteJellies_.valid()&&spawners_.valid()&&scattered_.valid()&&good_&&blasts_.valid()&&flash_.valid()&&limbo_.valid()&&levelNumbers_.valid()&&result_.valid()&&controllers_.valid()&&consumption_.valid()&&corpses_.valid()&&smoke_.valid()&&expiry_.valid()&&playerControllers_.valid()&&builderController_.valid()&&blood_.valid()&&skeletons_.valid()&&(failureObserved_?(drones_.valid()&&bones_.valid()):
         (owner_.valid()&&properties_.valid()&&terrain_.valid()&&scriptEffects_.valid()&&debris_.valid()&&
          timeShards_.valid()&&timeChanges_.valid()&&entries_.valid()&&drones_.valid()&&bones_.valid()&&layers_.valid()));}
     unsigned pendingSpatialIndex()const{return owner_.pendingSpatialIndex();}
@@ -1456,6 +1463,7 @@ public:
         if(!world_&&!world.bindMovingEffects(movingEffects_))return check(false);
         if(!world_&&!world.bindWhiteJellies(whiteJellies_))return check(false);
         if(!world_&&!world.bindRedBalls(redBalls_))return check(false);
+        if(!world_&&!world.bindShopInstances(shopInstances_))return check(false);
         if(!world_&&!world.bindDroneBullets(drones_))return check(false);
         if(!world_&&!world.bindBones(bones_))return check(false);
         if(!world_&&!world.bindSkeletons(skeletons_))return check(false);
@@ -2156,6 +2164,7 @@ public:
     GameplaySpawners& spawners(){return spawners_;}
     GameplayWhiteJellies& whiteJellies(){return whiteJellies_;}
     GameplayRedBalls& redBalls(){return redBalls_;}
+    GameplayShopInstances& shopInstances(){return shopInstances_;}
     GameplayWorld::MovingEffects& movingEffects(){return movingEffects_;}
     GameplayWorld::Blood& blood(){return blood_;}
     GameplayWorld::Currency& currency(){return currency_;}

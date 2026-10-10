@@ -7,8 +7,63 @@
 #include <memory>
 #include <vector>
 inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
-    const downwell::SpriteCollisionPack& sprites,const downwell::SpriteMaskPack& masks){
+    const downwell::SpriteCollisionPack& sprites,const downwell::SpriteMaskPack& masks,const downwell::RoomPack& rooms){
     using namespace downwell;
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                  GameplayCollisionOwner::Ownership::nativeScenery}){
+        const bool native=mode!=GameplayCollisionOwner::Ownership::reference;
+        auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},&rooms,mode);
+        auto world=std::make_unique<GameplayWorld>(300,false,1000,false,collision->enemyBinding(),
+            collision->breakableBinding(),collision->playerBinding(),native?nullptr:&collision->terrain(),&rooms);
+        assert(collision->attach(*world));
+        auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
+        if(native)assert(world->bindNativeTerrain(*terrain));
+        auto& store=collision->shopInstances();unsigned next=960000;
+        auto allocate=[&](int,unsigned& id){id=next++;return true;};
+        struct Audio {
+            bool play(int sound,int priority,bool loop,int& voice){voice=99;return sound==192&&priority==100&&loop;}
+            bool setGain(int voice,MotionBinary64 gain,int ticks){return voice==99&&gain.zero()&&!ticks;}
+        } audio;
+        auto creation=store.creation(allocate,audio);
+        auto shop=[&](const auto& command,auto& cursor){
+            assert(&cursor==&allocate);return world->registerShopWithOwner(command.x,command.y,creation)!=nullptr;
+        };
+        auto backend=[](const auto&,unsigned){assert(false);return false;};
+        assert(world->createGeneratedInstanceWithSourceIds({277,480,2000},objects,allocate,backend,shop));
+        assert(collision->valid()&&store.size()==11&&next==960011&&world->shopInstances()==&store);
+        unsigned count=0;
+        for(int object:{277,278,98,280,212})assert(collision->population(object,count)&&count==1);
+        for(int object:{279,283})assert(collision->population(object,count)&&count==3);
+        InstanceHandle player;bool hit=false;
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::player,world->playerHandle(),player));
+        assert(collision->actorSolidPlaceMeeting(player,MotionBinary64::fromInteger(525),
+            MotionBinary64::fromInteger(1991),masks,hit)&&hit);
+        assert(collision->actorSolidPlaceMeeting(player,MotionBinary64::fromInteger(700),
+            MotionBinary64::fromInteger(1900),masks,hit)&&!hit);
+        std::vector<InstanceHandle> shared;
+        for(unsigned source=960000;source<960011;++source){
+            const auto local=store.sourceHandle(source);const auto* r=store.find(local);InstanceHandle h;
+            assert(r&&GameplayCollisionView::encode(GameplayCollisionView::Kind::shop,local,h));
+            GameplayCollisionView::Record view;
+            assert(GameplayCollisionView(*world).resolve(h,view)&&view.shop==r);
+            if(native){
+                RunnerImageValue x,y;GameplayCollisionOwner::Owner::Sprite sprite;std::uint32_t flags;
+                assert(collision->nativePublishedPosition(h,x,y)&&x.bits==r->x.bits&&y.bits==r->y.bits&&
+                    collision->nativePublishedSprite(h,sprite,flags)&&sprite.imageIndex.bits==r->imageIndex.bits);
+            }else{
+                const auto state=collision->state(h);assert(state&&state->x.bits==r->x.bits&&state->y.bits==r->y.bits);
+            }
+            shared.push_back(h);
+        }
+        assert(world->restartFromResults(DeathMenuSequence::Action::Retry,2,300)==ResultsDestination::gameplay);
+        assert(collision->valid()&&store.size()==0&&world->shopInstances()==&store);
+        for(auto h:shared)assert(!GameplayCollisionView(*world).contains(h));
+        assert(collision->population(277,count)&&count==0&&collision->population(279,count)&&count==0);
+        auto* replacement=world->registerShopWithOwner(480,2000,creation);
+        assert(replacement&&replacement->sourceId==960011&&store.size()==11&&next==960022);
+        for(auto h:shared)assert(!GameplayCollisionView(*world).contains(h));
+    }
     for(unsigned failure=0;failure<=12;++failure){
         auto world=std::make_unique<GameplayWorld>(300,false,1000,false);
         auto reference=std::make_unique<GameplayWorld>(300,false,1000,false);

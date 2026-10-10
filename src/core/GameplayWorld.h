@@ -32,6 +32,7 @@
 #include "core/GameplaySpawners.h"
 #include "core/GameplayWhiteJellies.h"
 #include "core/GameplayRedBalls.h"
+#include "core/GameplayShopInstances.h"
 #include "core/MovingFxInstances.h"
 #include "core/RegisteredScatteredContact.h"
 #include "core/RunControllerInstances.h"
@@ -489,6 +490,11 @@ public:
     const downwell::GameplaySpawners* spawners()const{return spawners_;}
     const downwell::GameplayWhiteJellies* whiteJellies()const{return whiteJellies_;}
     const downwell::GameplayRedBalls* redBalls()const{return redBalls_;}
+    const downwell::GameplayShopInstances* shopInstances()const{return shopInstances_;}
+    bool bindShopInstances(downwell::GameplayShopInstances& records){
+        if(shopInstances_||!records.valid()||records.size())return false;
+        shopInstances_=&records;return true;
+    }
     template<class Ops> bool drawRegisteredRedBall(downwell::InstanceHandle key,Ops& ops)const{
         return redBalls_&&redBalls_->dispatch(key,[&](auto& actor){return actor.draw(ops);});
     }
@@ -2600,6 +2606,7 @@ private:
     downwell::GameplaySpawners* spawners_=nullptr;
     downwell::GameplayWhiteJellies* whiteJellies_=nullptr;
     downwell::GameplayRedBalls* redBalls_=nullptr;
+    downwell::GameplayShopInstances* shopInstances_=nullptr;
     bool (*redBallAlarmDispatch_)(void*,downwell::InstanceHandle,downwell::GameplayRedBalls::Record&,downwell::GameMakerRandom&)=nullptr;
     void* redBallAlarmContext_=nullptr;
     bool (*whiteJellyAlarmDispatch_)(void*,downwell::InstanceHandle,downwell::GameplayWhiteJellies::Record&,downwell::GameMakerRandom&)=nullptr;
