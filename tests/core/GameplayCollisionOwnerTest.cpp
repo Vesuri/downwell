@@ -89,6 +89,10 @@ bool nativeOwnedWhiteJellyStep(downwell::GameplayWhiteJellies& owner,downwell::I
     bool stop,downwell::GameMakerRandom& random,NativeWhiteJellyStepOps& ops){
     return owner.step(key,stop,random,ops);
 }
+bool nativeRegisteredWhiteJellyStep(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle shared,
+    bool stop,NativeWhiteJellyStepOps& ops){
+    return owner.stepRegisteredWhiteJelly(shared,stop,ops);
+}
 bool nativeWhiteJellyAnimation(downwell::GameplayWhiteJellies& owner,downwell::InstanceHandle key){
     return owner.advanceAnimation(key)&&owner.sprite(key,175)&&owner.imageIndex(key,{});
 }

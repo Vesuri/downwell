@@ -1981,11 +1981,11 @@ public:
     // Registered ordinary-Step dependencies of the skeleton encounter. Flash
     // balls and corpse-expiry pictures have no Step: their existing room
     // animation/cleanup dispatch remains authoritative.
-    using EncounterStepOrder=RunnerStepSnapshot<7*32+8+64>;
+    using EncounterStepOrder=RunnerStepSnapshot<7*32+8+64+GameplayWhiteJellies::capacity>;
     template<class Execute,class Tick>
     bool withEncounterSteps(EncounterStepOrder& phase,Execute execute,Tick tick){
         return withEncounterStepsSelected(phase,[](int object){
-            return object==120||object==220||object==223||object==225||object==238||object==263||
+            return object==115||object==120||object==220||object==223||object==225||object==238||object==263||
                 object==269||object==276||object==379;
         },execute,tick);
     }
@@ -2256,6 +2256,12 @@ public:
            event.owner!=binding.ownerObjectId||event.code!=binding.codeId||
            !((event.owner==120&&event.code==1266)||(event.owner==83&&event.code==1066)))return check(false);
         return check(world_->collideSkeletonRoomEffect(local,event.code==1066,makePlayer));
+    }
+    template<class Ops> bool stepRegisteredWhiteJelly(InstanceHandle shared,bool stopped,Ops& ops){
+        View::Kind kind;InstanceHandle local;PackedObjectEvent event{};
+        if(!valid()||!world_||!resolves(shared)||!View::decode(shared,kind,local)||kind!=View::Kind::whiteJelly||
+           !objects_.findEvent(115,3,0,event)||event.ownerObjectId!=115||event.codeId!=1225)return check(false);
+        return check(world_->stepWhiteJellyRoomEffect(local,stopped,ops));
     }
     template<class PointDirection,class DirectionSetter>
     bool dispatchWhiteJellyEnemyCollision(const RunnerCollisionEventContext::Frame& event,

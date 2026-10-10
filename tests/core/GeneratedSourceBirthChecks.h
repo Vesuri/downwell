@@ -12,9 +12,12 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native}){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
             GameplayTerrainInstances::WallCollision{},nullptr,mode);
-        auto world=std::make_unique<GameplayWorld>(300,false,1000,true,owner->enemyBinding(),
-            owner->breakableBinding(),owner->playerBinding());
-        assert(owner->attach(*world));auto& store=owner->whiteJellies();
+        const bool native=mode==GameplayCollisionOwner::Ownership::native;
+        auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),native?nullptr:&owner->terrain());
+        auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
+        assert(owner->attach(*world)&&(!native||world->bindNativeTerrain(*terrain)));
+        auto& store=owner->whiteJellies();
         struct Ops {
             GameplayWhiteJellies& store;InstanceHandle key;
             bool position(bool y,RunnerImageValue v,RunnerImageValue& out){return store.position(key,y,v,out);}
@@ -23,6 +26,22 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             bool pointDirection(MotionBinary64,MotionBinary64,MotionBinary64,MotionBinary64,MotionBinary64& v){v={};return true;}
             bool direction(MotionBinary64 v,MotionBinary64& out){out=v;return true;}
             bool imageSpeed(RunnerImageValue v,RunnerImageValue& out){out=v;return true;}
+            bool enemyPlayerY(MotionBinary64& v){v={};return true;}
+            bool enemyPlayerX(MotionBinary64& v){v={};return true;}
+            bool lengthdir(bool y,MotionBinary64 speed,MotionBinary64 angle,MotionBinary64& out){
+                assert(angle.zero());out=y?MotionBinary64{}:speed;return true;
+            }
+            bool meeting(MotionBinary64 x,MotionBinary64 y,int target,bool& hit){const bool ok=store.meeting(key,x,y,target,hit);assert(ok);return ok;}
+            bool imageIndex(int v){assert(!v);return store.imageIndex(key,{});}
+            bool alarm(int n,int v){return store.setAlarm(key,n,v);}
+            bool sprite(int v){return store.sprite(key,v);}
+            bool destroy(){return store.markDestroyed(key);}
+            bool sound(int,int,int,int,const char*){assert(false);return false;}
+            bool enemyDeath(){assert(false);return false;}
+            bool smoke(MotionBinary64,MotionBinary64,int,int){assert(false);return false;}
+            bool movingFx(MotionBinary64,MotionBinary64,int,MotionBinary64,MotionBinary64,MotionBinary64){assert(false);return false;}
+            bool flash(MotionBinary64,MotionBinary64,int,int,int){assert(false);return false;}
+            bool currency(int){assert(false);return false;}
         };
         GameMakerRandom random(19);InstanceHandle key;
         assert(store.create(899000,{0x43800000u},{0x44300000u},random,[&](auto h){return Ops{store,h};},key));
@@ -34,6 +53,16 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
         world->step(0);
         assert(world->effectsSucceeded()&&owner->valid()&&!store.find(key)->hitStun&&
             store.find(key)->imageIndex.bits==0x3ecccccdu);
+        assert(owner->configureCorpseMasks(masks));
+        assert(store.dispatch(key,[](auto& r){r.xx=MotionBinary64::fromInteger(-1000);return true;}));
+        GameplayCollisionOwner::EncounterStepOrder phase;Ops ops{store,key};unsigned steps=0;
+        auto expectedX=MotionBinary64::fromInteger(-1000);
+        assert(expectedX.add(store.find(key)->moveSpeed));
+        assert(owner->withEncounterSteps(phase,[&](InstanceHandle h,int object){
+            assert(object==115);++steps;const bool ok=owner->stepRegisteredWhiteJelly(h,false,ops);assert(ok);return ok;
+        },[&]{world->step(0);return world->effectsSucceeded();}));
+        assert(steps==1&&store.find(key)->xx.high==expectedX.high&&store.find(key)->xx.low==expectedX.low&&
+            store.find(key)->x.bits==0xc47a0000u);
         RunnerImageValue outside,accepted;
         assert(outside.assignInteger(-1000)&&store.position(key,true,outside,accepted));
         world->step(0);

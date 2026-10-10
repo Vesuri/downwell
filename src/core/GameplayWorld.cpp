@@ -1775,11 +1775,14 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     // does not admit the omitted actor/effect handlers or replace legacy
     // bullet contacts with the original Collision event pass.
     DW_PROFILE_PHASE(profileEnemyMotion);
-    for (unsigned i=0;i<enemyStepOrder_.size();++i)
+    for (unsigned i=0;i<enemyStepOrder_.size();++i){
+        if(skeletonBoneSteps_&&!skeletonBoneSteps_(skeletonBoneContext_,enemyStepOrder_.object(i))){
+            run_.effectsSucceeded=false;return {};
+        }
         if(!stepEnemyRoomEffect(enemyStepOrder_.handle(i),publishedCameraX,generationCameraY))return {};
+    }
 
-    // The admitted legacy enemies are 111..119. Skeleton 120 and blood 220
-    // follow them, before damage numbers (221).
+    // Flush remaining registered enemies and blood before damage numbers.
     if(skeletonBoneSteps_&&!skeletonBoneSteps_(skeletonBoneContext_,221)){
         run_.effectsSucceeded=false;return {};
     }
