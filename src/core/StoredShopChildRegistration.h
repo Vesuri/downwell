@@ -3,6 +3,7 @@
 #include "InstanceStore.h"
 #include "InstanceLifecycle.h"
 #include "ObjectPack.h"
+#include "MultiplyBinary64.h"
 #include <cstring>
 namespace downwell {
 // Synchronous Create ownership for Shop's ten children. This is deliberately
@@ -20,7 +21,8 @@ public:
         unsigned whichUg=0;
         MotionBinary64 ysp{},decreaseBy{};
         const char* text=nullptr;
-        bool drawing=false,initialized=false;
+        int drawing=0;
+        bool initialized=false;
     };
 private:
     struct Entry {InstanceHandle key{};unsigned id=0;int object=-1;State state;};
@@ -109,6 +111,35 @@ public:
         auto* e=entry(sourceHandle(id));
         if(!good_||!e||!e->state.initialized||e->object!=279||value>0x7fffffffu)return fail();
         e->state.storedItem=int(value);return true;
+    }
+    bool stepRisingText(InstanceHandle key){
+        auto* e=entry(key);auto* r=e?record(*e):nullptr;
+        if(!good_||creating_||!r||e->object!=212||!e->state.initialized)return fail();
+        if(!r->active||r->destroyRequested)return true;
+        RunnerImageValue x,y;std::memcpy(&x.bits,&r->preciseX,4);std::memcpy(&y.bits,&r->preciseY,4);
+        auto next=y.promoted();std::int32_t iy;
+        if(!next.add(e->state.ysp)||!y.assign(next)||!y.roundPixel(iy)||
+           !lifecycle_.publishedPosition(key,*r,x,y)||!good_)return fail();
+        r->preciseY=stored(y);r->y=iy;
+        // The source setter is observable before damping. Do not atomically
+        // commit the final state or narrow the user variable ysp to binary32.
+        if(!multiplyBinary64(e->state.ysp,e->state.decreaseBy,e->state.ysp))return fail();
+        if(e->state.flashing)e->state.drawing=-e->state.drawing;
+        return true;
+    }
+    bool advanceRisingTextAlarm(InstanceHandle key,unsigned number){
+        auto* e=entry(key);auto* r=e?record(*e):nullptr;
+        if(!good_||creating_||!r||e->object!=212||!e->state.initialized||number>=AlarmBank::count)return fail();
+        if(!r->active||r->destroyRequested||number>1||!r->alarms.advanceOne(number))return true;
+        if(number==1){e->state.flashing=1;return true;}
+        if(!lifecycle_.markDestroyed(key,*r)||!good_)return fail();
+        r->destroyRequested=true;return true;
+    }
+    bool retire(InstanceHandle key){
+        auto* e=entry(key);auto* r=e?record(*e):nullptr;
+        if(!good_||creating_||!r||!r->destroyRequested||
+           !records_.erase(e->id,[&](auto h,const auto& value){return lifecycle_.retire(h,value);}))return fail();
+        *e={};return true;
     }
     bool clear(){
         if(creating_)return fail();

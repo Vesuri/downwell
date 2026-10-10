@@ -679,6 +679,14 @@ that the invisible wall's ancestors have no Create body to execute. This owner
 does not itself admit the children's later Step, Alarm or Draw events, and is
 not yet installed by either normal generation adapter.
 
+The rising-text event entries publish the Y setter before multiplying binary64
+`ysp` by `decreaseBy`. Alarm 1 sets `flashing`; Step then negates the integer
+`drawing` field (it is not a boolean toggle). Alarm 0 publishes a destruction
+request; storage survives until the enclosing retirement phase. These entries
+do not invent a time-stop guard absent from the source. They skip inactive or
+already-destroyed records and retain completed mutations on publication failure.
+Draw and normal scheduler admission remain separate from those event entries.
+
 `StoredShopCreationOwner` is the concrete owner accepted by
 `ShopWorld::createRegistered`: it registers resource 277 in that same room
 store/counter, retains the inherited interactable state and delegates child

@@ -15,20 +15,20 @@ static bool sameText(const char* a,const char* b){
     return *a==*b;
 }
 struct ShopChildObserver {
-    unsigned births=0,retirements=0,images=0,rejectBirth=0;
-    bool valid=true,rejectImage=false;
+    unsigned births=0,retirements=0,images=0,rejectBirth=0,moves=0,destroys=0;
+    bool valid=true,rejectImage=false,rejectMove=false,rejectDestroy=false;
     bool birth(InstanceHandle,const InstanceRecord& r){
         valid=valid&&r.imageIndex==0&&r.imageSpeed==1&&r.alarms.get(0)==-1;
         return ++births!=rejectBirth;
     }
     bool retire(InstanceHandle,const InstanceRecord&){++retirements;return true;}
     bool birthAt(InstanceHandle h,const InstanceRecord& r,RunnerImageValue,RunnerImageValue){return birth(h,r);}
-    bool markDestroyed(InstanceHandle,const InstanceRecord&){return true;}
+    bool markDestroyed(InstanceHandle,const InstanceRecord& r){++destroys;valid=valid&&!r.destroyRequested;return !rejectDestroy;}
     bool mask(InstanceHandle,const InstanceRecord&,int){return true;}
     bool transform(InstanceHandle,const InstanceRecord&,RunnerTransformField,RunnerImageValue,RunnerImageValue,std::uint32_t){return true;}
     bool activation(InstanceHandle,const InstanceRecord&,bool){return true;}
     bool membership(InstanceHandle,const InstanceRecord&,bool){return true;}
-    bool move(InstanceHandle,const InstanceRecord&,RunnerImageValue,RunnerImageValue){return true;}
+    bool move(InstanceHandle,const InstanceRecord&,RunnerImageValue,RunnerImageValue){++moves;return !rejectMove;}
     bool sprite(InstanceHandle,const InstanceRecord&,int){return true;}
     bool imageIndex(InstanceHandle,const InstanceRecord& r,RunnerImageValue v){
         valid=valid&&r.objectId==283&&r.imageIndex==0&&r.imageSpeed==1&&v.bits==0x3f800000;
@@ -129,6 +129,46 @@ bool shopParentRegistrationCheck(const ObjectPack& objects,unsigned area,unsigne
     if(!owner.clear()||records.size()||owner.parent(920000)||records.resolve(key)||observer.retirements!=count)return false;
     world.reset();return true;
 }
+bool risingTextEventsCheck(const ObjectPack& objects,unsigned failure){
+    InstanceStore<2> records;std::uint32_t next=930000;const int room=11;bool good=true;
+    ShopChildObserver observer;observer.rejectMove=failure==1;observer.rejectDestroy=failure==2;
+    StoredShopChildRegistration<2,1> owner(records,objects,InstanceLifecycleBinding::bindPositionedActor(observer),next,room,good);
+    const auto id=owner.create(212,-100,-100);const auto key=owner.sourceHandle(id);
+    if(!id)return false;
+    auto* r=records.resolve(key);
+    // The room scheduler excludes inactive instances; the event entry also
+    // refuses to mutate them. Unbound alarms must not count down.
+    r->active=false;r->alarms.set(4,2);
+    if(!owner.advanceRisingTextAlarm(key,0)||!owner.stepRisingText(key)||r->alarms.get(0)!=90||observer.moves)return false;
+    r->active=true;
+#ifndef DOWNWELL_NATIVE_QUERY_PROBE
+    float referenceY=-100;double referenceSpeed=-3;
+#endif
+    for(unsigned tick=1;tick<=90;++tick){
+        if(!owner.advanceRisingTextAlarm(key,0)){
+            return failure==2&&tick==90&&!good&&!r->destroyRequested&&observer.destroys==1&&observer.moves==89&&owner.clear();
+        }
+        if(!owner.advanceRisingTextAlarm(key,1)||!owner.advanceRisingTextAlarm(key,4))return false;
+        if(!owner.stepRisingText(key)){
+            const auto* s=owner.state(key);
+            return failure==1&&tick==1&&!good&&r->preciseY==-100&&s->ysp.high==0xc0080000u&&s->ysp.low==0&&owner.clear();
+        }
+        const auto* s=owner.state(key);
+        if(!s||r->alarms.get(4)!=2||s->flashing!=(tick>=60?1:0)||
+           s->drawing!=((tick>=60&&tick<90&&!(tick&1))?-1:1))return false;
+        if(tick==90){
+            if(!r->destroyRequested||observer.moves!=89||observer.destroys!=1) return false;
+        }else{
+#ifndef DOWNWELL_NATIVE_QUERY_PROBE
+            referenceY=static_cast<float>(double(referenceY)+referenceSpeed);referenceSpeed*=0.85;
+            std::uint64_t bits;std::memcpy(&bits,&referenceSpeed,8);
+            if(r->preciseY!=referenceY||s->ysp.high!=unsigned(bits>>32)||s->ysp.low!=unsigned(bits))return false;
+#endif
+        }
+    }
+    if(!observer.valid||!owner.retire(key)||records.size()||owner.state(key)||observer.retirements!=1)return false;
+    return owner.create(212,0,0)==930001&&owner.state(key)==nullptr&&owner.clear();
+}
 #ifndef DOWNWELL_NATIVE_QUERY_PROBE
 int main(){
     std::ifstream file("generated/downwell-objects.dwob",std::ios::binary);
@@ -144,6 +184,9 @@ int main(){
             std::fprintf(stderr,"shop parent registration failed in area %u at birth %u\n",area,reject);return 1;
         }
         if(area!=5)for(unsigned reject=1;reject<=2;++reject)if(!shopParentRegistrationCheck(objects,area,0,reject))return 1;
+    }
+    for(unsigned failure=0;failure<=2;++failure)if(!risingTextEventsCheck(objects,failure)){
+        std::fprintf(stderr,"rising text events failed for rejection %u\n",failure);return 1;
     }
     std::puts("Stored shop children: Create state, numeric IDs, publication failures and teardown passed");
 }

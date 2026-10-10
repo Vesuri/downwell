@@ -211,3 +211,15 @@ invisible = assembly("gml_Object_objInvisWall_Create_0",
 assert invisible.count("call.i") == 1 and "call.i event_inherited(argc=0)" in invisible
 assert 'push.s "rock"@777\npop.v.s self.material' in invisible
 print("Pinned shop child PreCreate ancestry and invisible-wall inherited Create")
+rising_step = assembly("gml_Object_fxRisingText_Step_0",
+    "c1f478f143645d40945f8424c5051635b9f711099afb2dac73b2d75bbc18a96d")
+assert rising_step.index("pop.v.v self.y\n") < rising_step.index("pop.v.v self.ysp\n") < rising_step.index("pop.v.v self.drawing")
+assert "push.v self.drawing\npushi.e -1\nmul.i.v" in rising_step
+assert "call.i" not in rising_step
+assembly("gml_Object_fxRisingText_Alarm_0",
+    "7fa420002321759f60d9103f49806b50a0673341e139e47b46bb18672ccf6d78")
+assembly("gml_Object_fxRisingText_Alarm_1",
+    "a26b8b83ab354c399e30bee6a3ccd72da89e8fec98436de8b7ac320b3d76ecc7")
+assembly("gml_GlobalScript_action_kill_object",
+    "caac5c9d9f9d959a5aa6337f729bfc989927d8882d4ce7f9a29b9d45dd0eab33")
+print("Pinned rising-text Step and alarm-driven destruction")
