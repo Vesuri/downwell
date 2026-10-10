@@ -20,8 +20,8 @@ struct Audit {
     bool activation(H,const R& r,bool value){assert(r.active!=value);calls.push_back(4);return true;}
     bool membership(H,const R&,bool){return false;}
     bool markDestroyed(H,const R& r){assert(!r.destroyRequested);calls.push_back(5);return true;}
-    bool sprite(H,const R&,int){return false;}
-    bool imageIndex(H,const R&,F){return false;}
+    bool sprite(H,const R&,int id){assert(id==175||id==176);calls.push_back(6);return true;}
+    bool imageIndex(H,const R&,F){calls.push_back(7);return true;}
     bool mask(H,const R&,int){return false;}
     bool transform(H,const R&,downwell::RunnerTransformField,F,F,unsigned){return false;}
 };
@@ -40,6 +40,13 @@ int main(){
     assert(pool.size()==1&&random.drawCount()==1&&pool.find(first)->initialized);
     assert(audit.calls==std::vector<int>({1,2,2}));
     assert(pool.find(first)->x.bits==0x42000000u&&pool.find(first)->y.bits==0x42800000u);
+    for(unsigned i=0;i<8;++i)assert(pool.advanceAnimation(first));
+    assert(pool.find(first)->imageIndex.bits>0x3f800000u);
+    assert(pool.sprite(first,175)&&pool.find(first)->imageIndex.bits==0&&pool.find(first)->timeline.bits==0);
+    assert(pool.advanceAnimation(first)&&pool.find(first)->imageIndex.bits==0x3e4ccccdu);
+    assert(pool.sprite(first,176)&&pool.find(first)->imageIndex.bits==0x3e4ccccdu);
+    assert(pool.imageIndex(first,{})&&pool.find(first)->timeline.bits==0x3e4ccccdu);
+    assert(pool.advanceAnimation(first)&&pool.find(first)->imageIndex.bits==0x3e4ccccdu);
     assert(pool.activate(first,false)&&!pool.find(first)->active&&pool.find(first)->scriptActive);
     unsigned events=0;assert(pool.dispatch(first,[&](auto&){++events;return true;})&&!events);
     assert(pool.activate(first,true));

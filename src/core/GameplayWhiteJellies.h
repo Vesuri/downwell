@@ -2,6 +2,8 @@
 #define DOWNWELL_CORE_GAMEPLAY_WHITE_JELLIES_H
 #include "InstanceLifecycle.h"
 #include "WhiteJellyStep.h"
+#include "RunnerSpriteChange.h"
+#include "UnitSequenceFrames.h"
 namespace downwell {
 // Native owner for source object 115. No generic room-record duplication.
 // Builtin operations publish through this owner at the actual script writes;
@@ -11,7 +13,7 @@ public:
     static constexpr unsigned capacity=32;
     struct Record:WhiteJellyStep {
         unsigned lifetimeId=0,sourceId=0;
-        RunnerImageValue imageIndex{};
+        RunnerImageValue imageIndex{},timeline{};
         int spriteId=176,maskId=174;
         bool active=true,destroyRequested=false,busy=false;
     };
@@ -56,8 +58,36 @@ public:
         if(vertical)r.y=value;else r.x=value;accepted=value;return true;
     }
     bool imageIndex(InstanceHandle key,RunnerImageValue value){
-        if(!good_||!find(key)||!binding_.imageIndex(key,records_[key.slot],value))return fail();
+        // The authored hit event only assigns zero. Do not claim arbitrary
+        // inverse sequence mapping for external image_index writes.
+        if(!good_||!find(key)||(value.bits&0x7fffffffu)||!binding_.imageIndex(key,records_[key.slot],value))return fail();
         records_[key.slot].imageIndex=value;return true;
+    }
+    static unsigned frames(int sprite){return sprite==176?4:sprite==175?1:0;}
+    bool sprite(InstanceHandle key,int value){
+        if(!good_||!find(key)||!frames(value))return fail();auto& r=records_[key.slot];
+        RunnerSpriteChange::Result change;
+        if(!RunnerSpriteChange::plan(r.spriteId,value,r.imageIndex,frames(value),change)||
+            !binding_.sprite(key,r,value))return fail();
+        r.spriteId=value;
+        if(change.resetIndex)r.imageIndex={};
+        if(change.resetTimeline)r.timeline={};
+        return true;
+    }
+    bool advanceAnimation(InstanceHandle key){
+        if(!good_||!find(key))return fail();auto& r=records_[key.slot];
+        if(r.busy||!r.initialized)return fail();
+        if(!r.active||r.destroyRequested)return true;
+        auto candidate=r.timeline;RunnerImageValue image;bool reconcile=false,crossed;
+        if(!UnitSequenceFrames::evaluate(candidate,frames(r.spriteId),image)){
+            if(r.imageIndex.bits&0x7fffffffu)return fail();reconcile=true;
+        }else if(!UnitSequenceFrames::needsReconcile(r.imageIndex,image,reconcile))return fail();
+        if(reconcile){if(r.imageIndex.bits&0x7fffffffu)return fail();candidate={};}
+        r.busy=true;
+        const bool ok=UnitSequenceFrames::advance(candidate,r.imageSpeed,frames(r.spriteId),image,crossed)&&
+            binding_.imageIndex(key,r,image);
+        r.busy=false;
+        if(!good_||!ok)return fail();r.timeline=candidate;r.imageIndex=image;return true;
     }
     bool activate(InstanceHandle key,bool active){
         if(!good_||!find(key))return fail();auto& r=records_[key.slot];

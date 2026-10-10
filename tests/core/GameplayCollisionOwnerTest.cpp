@@ -65,6 +65,9 @@ bool nativeOwnedWhiteJellyStep(downwell::GameplayWhiteJellies& owner,downwell::I
     bool stop,downwell::GameMakerRandom& random,NativeWhiteJellyStepOps& ops){
     return owner.step(key,stop,random,ops);
 }
+bool nativeWhiteJellyAnimation(downwell::GameplayWhiteJellies& owner,downwell::InstanceHandle key){
+    return owner.advanceAnimation(key)&&owner.sprite(key,175)&&owner.imageIndex(key,{});
+}
 bool nativeWhiteJellyEvents(downwell::WhiteJellyStep& state,bool stop,
     downwell::GameMakerRandom& random,NativeWhiteJellyStepOps& ops){
     return state.enemyContact(random,ops)&&state.effectAlarm(stop,random,ops)&&state.endStep(ops);

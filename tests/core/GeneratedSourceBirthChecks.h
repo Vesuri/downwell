@@ -300,6 +300,10 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             GameplayCollisionView(*world).resolve(jellyShared,jellyRecord)&&jellyRecord.whiteJelly==jellies.find(jelly));
         assert(jellyRecord.whiteJelly->sourceId==899000&&jellyRecord.whiteJelly->x.bits==0x43800000u&&
             jellyRecord.whiteJelly->y.bits==0x44300000u&&owner->prepareDraw());
+        for(unsigned frame=0;frame<8;++frame)assert(jellies.advanceAnimation(jelly));
+        assert(jellies.sprite(jelly,175)&&jellies.find(jelly)->imageIndex.bits==0&&owner->prepareDraw());
+        assert(jellies.find(jelly)->maskId==174&&jellies.sprite(jelly,176)&&
+            jellies.imageIndex(jelly,{})&&jellies.advanceAnimation(jelly)&&owner->prepareDraw());
         assert(jellies.activate(jelly,false)&&owner->prepareDraw()&&jellies.activate(jelly,true));
         assert(jellies.markDestroyed(jelly)&&owner->prepareDraw()&&!jellies.find(jelly)&&
             !GameplayCollisionView(*world).contains(jellyShared));
