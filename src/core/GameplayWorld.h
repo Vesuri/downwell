@@ -2021,7 +2021,13 @@ public:
         }, [this] { return enemyRandom_.chooseIndexSmall(3); }, health_);
     }
     const downwell::ShopWorld& shops() const { return run_.shops; }
-    bool registerSideCameraLocker(int x, int y) { return run_.sideCameraLockers.create(x, y); }
+    bool registerSideCameraLocker(int x, int y,unsigned sourceId=0) {
+        return run_.effectsSucceeded=run_.effectsSucceeded&&run_.sideCameraLockers.create(x,y,sourceId);
+    }
+    bool bindSideCameraLockerLifecycle(downwell::SideCameraLockers::Binding binding){
+        return run_.effectsSucceeded=run_.effectsSucceeded&&run_.sideCameraLockers.bindLifecycle(binding);
+    }
+    const downwell::SideCameraLockers& sideCameraLockers()const{return run_.sideCameraLockers;}
     const downwell::OrdinaryTimeFields<64>& timeFields() const {return run_.timeFields;}
     template<class Audio> bool duckMusic(downwell::MusicDuck& caller,int duration,
         downwell::MotionBinary64 amount,Audio& audio){return run_.duckMusic(caller,duration,amount,audio);}

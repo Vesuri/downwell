@@ -613,6 +613,17 @@ field RNG when that field was not born. The enclosing generated-instance
 caller still needs the complete source stream; the legacy no-ID entry point
 does not establish it.
 
+Side-camera lockers (62) retain generation-checked lifetimes in their existing
+coordinate store. Registration observes the supplied birth position first;
+Create then publishes the X setter to 80 when x < 160, or 400 when x > 320
+in rmMain. At either boundary no X setter runs. The native collision owner
+binds this lifecycle for normal generator calls, including source-ID layer
+publication when an ID is supplied. Teardown retires before invalidating the
+record; Retry preserves the generation cursor and owner binding. Birth,
+position-publication and retirement failures are terminal. This registration
+does not replace the existing camera-contact adapter with the full ordered
+collision dispatcher, nor supply the missing global source-ID allocator.
+
 `scrBuilder` blocks 187 and 207 write `self.y += 16` after each newline's
 pillars and each extra-pillar row respectively. Shared scalar, run and prepared
 generation retain these setter boundaries, including the completed prefix on

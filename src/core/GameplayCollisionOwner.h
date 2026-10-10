@@ -634,6 +634,7 @@ private:
     template<class Record,View::Kind Kind> struct Binding {
         GameplayCollisionOwner& parent;
         static int object(const Record& r){
+            if constexpr(Kind==View::Kind::sideCameraLocker)return 62;
             if constexpr(Kind==View::Kind::result)return 325;
             if constexpr(Kind==View::Kind::levelNumber)return 372;
             if constexpr(Kind==View::Kind::limboShard)return 379;
@@ -743,7 +744,7 @@ private:
             if constexpr(Kind==View::Kind::terrain)sourceId=r.sourceInstanceId;
             if constexpr(Kind==View::Kind::breakable)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
-            if constexpr(Kind==View::Kind::timeField||Kind==View::Kind::exitController)sourceId=r.sourceId;
+            if constexpr(Kind==View::Kind::timeField||Kind==View::Kind::exitController||Kind==View::Kind::sideCameraLocker)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::debris||Kind==View::Kind::scriptEffect)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
             if constexpr(Kind==View::Kind::flashBall||Kind==View::Kind::limboShard||Kind==View::Kind::levelNumber||Kind==View::Kind::result||Kind==View::Kind::runController||Kind==View::Kind::consumptionBlood||Kind==View::Kind::corpse||Kind==View::Kind::corpseExpiry||Kind==View::Kind::blast||Kind==View::Kind::smoke)sourceId=r.sourceId;
@@ -771,7 +772,7 @@ private:
             }else if constexpr(Kind==View::Kind::flashBall||Kind==View::Kind::limboShard||Kind==View::Kind::levelNumber||Kind==View::Kind::result||Kind==View::Kind::runController||Kind==View::Kind::consumptionBlood||Kind==View::Kind::corpse||Kind==View::Kind::blast||Kind==View::Kind::smoke||Kind==View::Kind::corpseExpiry||Kind==View::Kind::playerController||Kind==View::Kind::timeShard||Kind==View::Kind::timeChange||Kind==View::Kind::entryDither||Kind==View::Kind::ditherAbove||Kind==View::Kind::builder||Kind==View::Kind::drone||Kind==View::Kind::bone||Kind==View::Kind::skeleton||Kind==View::Kind::blood||Kind==View::Kind::currency){
                 position->x=r.x;position->y=r.y;
             }else{
-                constexpr bool roomCoordinates=Kind==View::Kind::player||Kind==View::Kind::terrain||Kind==View::Kind::timeField||Kind==View::Kind::goalField||Kind==View::Kind::exitController;
+                constexpr bool roomCoordinates=Kind==View::Kind::player||Kind==View::Kind::terrain||Kind==View::Kind::timeField||Kind==View::Kind::goalField||Kind==View::Kind::exitController||Kind==View::Kind::sideCameraLocker;
                 constexpr int ox=roomCoordinates?0:240,oy=roomCoordinates?0:176;
                 if(r.x>0x7fffffff-ox||r.y>0x7fffffff-oy||
                     !real(r.x+ox,position->x)||!real(r.y+oy,position->y))return parent.check(false);
@@ -848,7 +849,7 @@ private:
             unsigned sourceId=0;
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
             if constexpr(Kind==View::Kind::breakable)sourceId=r.sourceId;
-            if constexpr(Kind==View::Kind::timeField||Kind==View::Kind::exitController)sourceId=r.sourceId;
+            if constexpr(Kind==View::Kind::timeField||Kind==View::Kind::exitController||Kind==View::Kind::sideCameraLocker)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::debris||Kind==View::Kind::scriptEffect)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
             if constexpr(Kind==View::Kind::flashBall||Kind==View::Kind::limboShard||Kind==View::Kind::levelNumber||Kind==View::Kind::result||Kind==View::Kind::runController||Kind==View::Kind::consumptionBlood||Kind==View::Kind::corpse||Kind==View::Kind::corpseExpiry||Kind==View::Kind::blast||Kind==View::Kind::smoke)sourceId=r.sourceId;
@@ -1051,6 +1052,7 @@ private:
     Binding<OrdinaryTimeField,View::Kind::timeField> fields_{*this};
     Binding<GameplayGoalFields::Record,View::Kind::goalField> goals_{*this};
     Binding<GameplayExitControllers::Record,View::Kind::exitController> exits_{*this};
+    Binding<SideCameraLocker,View::Kind::sideCameraLocker> lockers_{*this};
     Binding<GameplayWorld::BulletState,View::Kind::bullet> bullets_{*this};
     Binding<GameplayScriptSpawnInstances::Record,View::Kind::scriptEffect> scriptEffectsBinding_{*this};
     Binding<GameplayWorld::RegisteredExpiry::Record,View::Kind::corpseExpiry> expiryBinding_{*this};
@@ -1401,6 +1403,7 @@ public:
         if(!world_&&!world.bindTimeFieldLifecycle(OrdinaryTimeFields<64>::Binding::bind(fields_)))return check(false);
         if(!world_&&!world.bindGoalFieldLifecycle(GameplayGoalFields::Binding::bindMaskDestruction(goals_)))return check(false);
         if(!world_&&!world.bindExitControllerLifecycle(GameplayExitControllers::Binding::bind(exits_)))return check(false);
+        if(!world_&&!world.bindSideCameraLockerLifecycle(SideCameraLockers::Binding::bindMovement(lockers_)))return check(false);
         if(!world_&&!world.bindBulletLifecycle(GameplayWorld::BulletLifecycleBinding::bindMaskDestruction(bullets_)))return check(false);
         if(!world_&&!world.bindScriptSpawnInstances(scriptEffects_))return check(false);
         if(!world_&&!world.bindRegisteredExpiry(expiry_))return check(false);

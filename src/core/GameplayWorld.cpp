@@ -57,7 +57,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     if(!clearRoomScriptEffects())return downwell::ResultsDestination::none;
     if(!run_.effectsSucceeded||!clearBulletOwnership())return downwell::ResultsDestination::none;
     if (!run_.effectsSucceeded || !clearEnemyOwnership() || !clearBreakableOwnership() || !retirePlayerOwnership()) return downwell::ResultsDestination::none;
-    if(!run_.timeFields.clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
+    if(!run_.timeFields.clear()||!run_.sideCameraLockers.clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(!goalFieldInstances_.clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(!exitControllers_.clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(terrainInstances_&&!terrainInstances_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
@@ -122,6 +122,8 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto nextGemIdentity=nextGemLifetimeId_;
     const auto fieldBirths=run_.timeFields.birthSequence();
     const auto fieldLifecycle=run_.timeFields.lifecycle();
+    const auto lockerBirths=run_.sideCameraLockers.birthSequence();
+    const auto lockerLifecycle=run_.sideCameraLockers.lifecycle();
     const auto goalBirths=goalFieldInstances_.birthSequence();
     const auto goalLifecycle=goalFieldInstances_.binding();
     const auto exitBirths=exitControllers_.birthSequence();
@@ -186,6 +188,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     run_.restart(action, records);
     if(!run_.timeFields.restoreEmptyBirthSequence(fieldBirths))run_.effectsSucceeded=false;
     if(!run_.timeFields.bindLifecycle(fieldLifecycle))run_.effectsSucceeded=false;
+    if(!run_.sideCameraLockers.restoreEmptyBirthSequence(lockerBirths)||!run_.sideCameraLockers.bindLifecycle(lockerLifecycle))run_.effectsSucceeded=false;
     if(!goalFieldInstances_.restoreEmptyBirthSequence(goalBirths)||!goalFieldInstances_.bind(goalLifecycle))run_.effectsSucceeded=false;
     if(!exitControllers_.restoreEmptyBirthSequence(exitBirths)||!exitControllers_.bind(exitLifecycle))run_.effectsSucceeded=false;
     if(!run_.smokeEffects.restoreEmptyBirthSequence(smokeBirths)||
@@ -308,7 +311,7 @@ bool GameplayWorld::retireGameplayRoom() {
     roomTerrainLoaded_=false;
     if(nativeTerrainInstances_&&!nativeTerrainInstances_->clear())return run_.effectsSucceeded=false;
     if(!run_.timeFields.clear())return run_.effectsSucceeded=false;
-    run_.sideCameraLockers.clear();
+    if(!run_.sideCameraLockers.clear())return run_.effectsSucceeded=false;
     return true;
 }
 

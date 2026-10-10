@@ -8,6 +8,39 @@ void require(bool value, const char* text) {
     if (!value) { std::cerr << text << '\n'; std::exit(1); }
 }
 int main() {
+    for(unsigned failure=0;failure<4;++failure){
+        downwell::SideCameraLockers lockers;
+        struct Owner {
+            downwell::SideCameraLockers& store;unsigned failure,births=0,moves=0,retires=0;
+            bool birth(downwell::InstanceHandle h,const downwell::SideCameraLocker& r){
+                require(store.find(h)==&r&&r.x==0&&r.y==700&&r.sourceId==830001,
+                    "locker identity and raw position published before Create");
+                ++births;return failure!=1;
+            }
+            bool move(downwell::InstanceHandle h,const downwell::SideCameraLocker& r,
+                downwell::RunnerImageValue x,downwell::RunnerImageValue y){
+                require(store.find(h)==&r&&r.x==80&&x.bits==0x42a00000u&&y.bits==0x442f0000u,
+                    "locker Create publishes source X setter after birth");
+                ++moves;return failure!=2;
+            }
+            bool retire(downwell::InstanceHandle h,const downwell::SideCameraLocker& r){
+                require(store.find(h)==&r,"locker remains resolvable during retirement");
+                ++retires;return failure!=3;
+            }
+            bool activation(downwell::InstanceHandle,const downwell::SideCameraLocker&,bool){return true;}
+            bool membership(downwell::InstanceHandle,const downwell::SideCameraLocker&,bool){return true;}
+        } owner{lockers,failure};
+        require(lockers.bindLifecycle(downwell::SideCameraLockers::Binding::bindMovement(owner)),"bind locker owner");
+        require(lockers.create(0,700,830001)==(failure==0||failure==3),"locker publication failure propagated");
+        const auto key=lockers.handle(0);
+        require(lockers.find(key)&&owner.births==1&&owner.moves==(failure==1?0u:1u),"failed Create retains published prefix");
+        require(lockers.clear()==(failure==0),"retirement failure propagated");
+        if(!failure){
+            require(!lockers.find(key)&&lockers.birthSequence()>key.generation,"room clear never reuses a lifetime");
+            require(lockers.create(0,700,830001)&&lockers.handle(0).generation!=key.generation,
+                "new room permits source ID reuse but not stale lifetime handles");
+        }else require(!lockers.create(0,700,830002),"failed publication is terminal");
+    }
     {
         struct Random {
             unsigned calls=0;

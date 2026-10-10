@@ -589,6 +589,7 @@ static void checkTypedCollisionView(const GameplayCollisionView& view,GameplayCo
     InstanceHandle shared;GameplayCollisionView::Record reference;
     if(GameplayCollisionView::encode(kind,local,shared))view.resolve(shared,reference);
     switch(kind){
+        case K::sideCameraLocker:assert(view.resolveLocal<K::sideCameraLocker>(local)==reference.sideCameraLocker);break;
         case K::player:assert(view.resolveLocal<K::player>(local)==reference.player);break;
         case K::enemy:assert(view.resolveLocal<K::enemy>(local)==reference.enemy);break;
         case K::breakable:assert(view.resolveLocal<K::breakable>(local)==reference.breakable);break;
@@ -1084,6 +1085,33 @@ int main(){
     }
     auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+        GameplayCollisionOwner::Ownership::nativeScenery}){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),nullptr);
+        assert(owner->attach(*world)&&world->registerSideCameraLocker(0,700,830001));
+        const auto local=world->sideCameraLockers().handle(0);InstanceHandle shared;
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::sideCameraLocker,local,shared));
+        checkTypedCollisionView(GameplayCollisionView(*world),GameplayCollisionView::Kind::sideCameraLocker,local);
+        assert(GameplayCollisionView(*world).contains(shared)&&world->sideCameraLockers().find(local)->sourceId==830001);
+        RunnerImageValue x,y;
+        if(mode==GameplayCollisionOwner::Ownership::reference){
+            const auto* state=owner->state(shared);assert(state);x=state->x;y=state->y;
+        }else assert(owner->nativePublishedPosition(shared,x,y));
+        assert(x.bits==0x42a00000u&&y.bits==0x442f0000u);
+        unsigned found=0;
+        assert(owner->visitRegistrationOrder([&](InstanceHandle h,int object,std::uint32_t){
+            if(object==62){assert(h.slot==shared.slot&&h.generation==shared.generation);++found;}return true;
+        })&&found==1);
+        assert(world->restartFromResults(DeathMenuSequence::Action::Retry,2,300)==ResultsDestination::gameplay);
+        assert(!GameplayCollisionView(*world).contains(shared)&&!world->sideCameraLockers().find(local));
+        assert(world->registerSideCameraLocker(400,900,830002));
+        const auto fresh=world->sideCameraLockers().handle(0);
+        assert(fresh.generation>local.generation&&world->sideCameraLockers().find(fresh)->x==400);
+        assert(owner->valid()&&world->effectsSucceeded());
+    }
     const auto resultRoomBytes=read("generated/downwell-rooms.dwrm");
     RoomPack resultRooms(resultRoomBytes.data(),resultRoomBytes.size());
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::nativeTerrain,

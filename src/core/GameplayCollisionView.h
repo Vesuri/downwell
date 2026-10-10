@@ -8,7 +8,7 @@ namespace downwell {
 // and lifetimeId do not. Borrowed views never cache pointers across a mutation.
 class GameplayCollisionView {
 public:
-    enum class Kind {player,enemy,breakable,terrain,timeField,goalField,exitController,bullet,scriptEffect,debris,timeChange,entryDither,drone,bone,skeleton,blood,currency,ditherAbove,builder,timeShard,playerController,corpseExpiry,smoke,corpse,consumptionBlood,runController,result,levelNumber,limboShard,flashBall,blast};
+    enum class Kind {player,enemy,breakable,terrain,timeField,goalField,exitController,bullet,scriptEffect,debris,timeChange,entryDither,drone,bone,skeleton,blood,currency,ditherAbove,builder,timeShard,playerController,corpseExpiry,smoke,corpse,consumptionBlood,runController,result,levelNumber,limboShard,flashBall,blast,sideCameraLocker};
     static constexpr unsigned enemyBase=1;
     static constexpr unsigned breakableBase=enemyBase+GameplayWorld::enemyCapacity;
     static constexpr unsigned terrainBase=breakableBase+GameplayWorld::breakableCapacity;
@@ -39,8 +39,10 @@ public:
     static constexpr unsigned limboShardBase=levelNumberBase+4;
     static constexpr unsigned flashBallBase=limboShardBase+32;
     static constexpr unsigned blastBase=flashBallBase+32;
-    static constexpr unsigned capacity=blastBase+8;
+    static constexpr unsigned sideCameraLockerBase=blastBase+8;
+    static constexpr unsigned capacity=sideCameraLockerBase+SideCameraLockers::capacity;
     struct Record {
+        const SideCameraLocker* sideCameraLocker=nullptr;
         const GameplayWorld::RegisteredBlasts::Record* blast=nullptr;
         const GameplayWorld::RegisteredExpiry::Record* corpseExpiry=nullptr;
         const GameplayWorld::RegisteredSmoke::Record* smoke=nullptr;
@@ -81,6 +83,7 @@ public:
         if(!local.generation)return false;
         unsigned base=0,count=0;
         switch(kind){
+            case Kind::sideCameraLocker:base=sideCameraLockerBase;count=SideCameraLockers::capacity;break;
             case Kind::player:count=1;break;
             case Kind::enemy:base=enemyBase;count=GameplayWorld::enemyCapacity;break;
             case Kind::breakable:base=breakableBase;count=GameplayWorld::breakableCapacity;break;
@@ -119,6 +122,7 @@ public:
     }
     static bool decode(InstanceHandle key,Kind& kind,InstanceHandle& local){
         if(!key.generation||key.slot>=capacity)return false;
+        if(key.slot>=sideCameraLockerBase){kind=Kind::sideCameraLocker;local={key.slot-sideCameraLockerBase,key.generation};return true;}
         if(key.slot>=blastBase){kind=Kind::blast;local={key.slot-blastBase,key.generation};return true;}
         if(key.slot>=flashBallBase){kind=Kind::flashBall;local={key.slot-flashBallBase,key.generation};return true;}
         if(key.slot>=limboShardBase){kind=Kind::limboShard;local={key.slot-limboShardBase,key.generation};return true;}
@@ -166,6 +170,7 @@ public:
     template<Kind Family> auto resolveLocal(InstanceHandle local)const{
         auto lookup=[&](){
             if constexpr(Family==Kind::player)return world_.findPlayer(local);
+            else if constexpr(Family==Kind::sideCameraLocker)return world_.sideCameraLockers().find(local);
             else if constexpr(Family==Kind::enemy)return world_.resolveEnemyLifetime(local);
             else if constexpr(Family==Kind::breakable)return world_.findBreakable(local);
             else if constexpr(Family==Kind::terrain)return world_.terrainInstances()?world_.terrainInstances()->find(local):nullptr;
@@ -233,6 +238,9 @@ private:
                 break;
             case Kind::exitController:
                 if(!(next.exitController=world_.exitControllers().find(local)))return false;
+                break;
+            case Kind::sideCameraLocker:
+                if(!(next.sideCameraLocker=world_.sideCameraLockers().find(local)))return false;
                 break;
             case Kind::bullet:
                 if(!(next.bullet=world_.resolveBulletLifetime(local)))return false;

@@ -776,7 +776,7 @@ struct RunSession {
         clearDamageNumbers();
         if(!timeFields.clear()){effectsSucceeded=false;return;}
         effectsSucceeded=true;
-        sideCameraLockers.clear();
+        if(!sideCameraLockers.clear()){effectsSucceeded=false;return;}
         gemHigh = false;
         levelExit = {};
         goalField = {};
