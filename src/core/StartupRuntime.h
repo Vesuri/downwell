@@ -473,6 +473,29 @@ public:
         const bool ok=tick();spawnerDispatch_=nullptr;spawnerContext_=nullptr;
         return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
     }
+    // Use the stored world's actual player/run globals while borrowing the
+    // remaining query and child-creation operations. The pre-movement player
+    // global is deliberately distinct from ordinary Step's fall-depth value.
+    template<class MakeOps,class Tick> bool withWorldSpawnerEvents(MakeOps makeOps,Tick tick){
+        return withSpawnerEvents([&](InstanceHandle key){
+            auto external=makeOps(key);
+            struct Ops : decltype(external) {
+                StartupRuntime& world;
+                Ops(decltype(external) value,StartupRuntime& runtime):decltype(external)(value),world(runtime){}
+                bool playerY(MotionBinary64& value){
+                    MotionBinary64 x;
+                    return world.mainPlayerInitialized_&&world.roomId_==mainRoomId&&
+                        ContactCoordinates::playerGlobals(world.mainPlayerMotion_.frameStartXFixed(),
+                            world.mainPlayerMotion_.frameStartYFixed(),world.mainPlayerOriginX_,world.mainPlayerOriginY_,x,value);
+                }
+                bool area(int& value){value=world.run_.stage.area;return true;}
+                bool fallDepth(MotionBinary64& value){return world.sourceFallDepth(value);}
+                bool death(bool& value){value=world.mainDeath_.active;return true;}
+                bool endReached(bool& value){value=world.mainBuilderEndReached_;return true;}
+            };
+            return Ops{external,*this};
+        },tick);
+    }
     template<unsigned Capacity> StoredWhiteJellyStates<instanceCapacity,Capacity> whiteJellyStates(){
         return StoredWhiteJellyStates<instanceCapacity,Capacity>(instances_);
     }

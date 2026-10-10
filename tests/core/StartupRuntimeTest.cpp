@@ -364,8 +364,51 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
             "live player ordinary Step publishes private depth relative to the owned meter");
         runtime->step(downwell::Input{},false);
         require(reads==6,"borrowed spawner operations expire at the end of their scope");
+        // Natural builder-created lifetime, with real player/run inputs. The
+        // inherited fixture values are deliberately contradictory: none of
+        // those five methods may be used by the world-backed composition.
+        const auto before=*runtime->spawnerState(spawner);
+        struct AtEnemyLimit : Ops {
+            unsigned& counts;
+            AtEnemyLimit(unsigned& reads,unsigned& calls):Ops{1000000,true,reads},counts(calls){}
+            bool enemyCount(int& value){++counts;value=20;return true;}
+        };
+        unsigned counts=0;
+        require(runtime->withWorldSpawnerEvents([&](downwell::InstanceHandle){return AtEnemyLimit{reads,counts};},[&]{
+            runtime->step(downwell::Input{},false);return healthy(*runtime);
+        }),"world-backed stored spawner runs through its natural resource event");
+        require(reads==6&&counts==1&&runtime->sourceFallDepth(depth),"world adapter ignores fixture death/fall depth");
+        const auto* live=runtime->spawnerState(spawner);
+        auto delta=before.fallDepthMemory;delta.high^=0x80000000u;
+        require(delta.add(depth),"live spawner depth delta arithmetic");
+        require(live&&live->fallDepthMemory.high==depth.high&&
+            live->fallDepthMemory.low==depth.low&&live->depthMeasure.high==delta.high&&live->depthMeasure.low==delta.low&&
+            live->channels[0].countdown.high==before.channels[0].countdown.high&&
+            live->channels[0].countdown.low==before.channels[0].countdown.low,
+            "live globals update depth before the real enemy-limit guard skips countdown");
         runtime->reset(downwell::PlatformProfile::nonDesktop);
         require(!runtime->spawnerState(spawner),"reset invalidates retained spawner state");
+        auto unbound=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns);
+        unbound->skipToGameForTesting();spawner=0;
+        unsigned naturalTick=0;
+        for(;naturalTick<600&&!spawner;++naturalTick){
+            for(unsigned i=0;i<unbound->activeInstanceCount();++i){const auto& r=unbound->instanceAt(i);
+                if(r.objectId==78)spawner=r.instanceId;
+            }
+            if(!spawner)unbound->step(downwell::gameplayContactProfileInput(naturalTick,unbound->mainPlayerX(),unbound->mainPlayerY()),false);
+        }
+        require(spawner&&healthy(*unbound),"fresh natural spawner for missing-birth-provider check");
+        bool admitted=true;
+        for(unsigned wait=0;wait<600&&admitted;++wait,++naturalTick)
+            admitted=unbound->withWorldSpawnerEvents([&](downwell::InstanceHandle){return Ops{0,true,reads};},[&]{
+                unbound->step(downwell::gameplayContactProfileInput(naturalTick,unbound->mainPlayerX(),unbound->mainPlayerY()),false);
+                return healthy(*unbound);
+            });
+        require(!admitted&&!unbound->effectsSucceeded(),"actual first active Step cannot silently skip missing birth dependencies");
+        const auto* failed=unbound->spawnerState(spawner);
+        require(failed&&failed->scriptActive&&failed->spawningEnemy==115&&failed->spawnAmt==1&&
+            failed->maskIndex==-1&&reads==6,
+            "missing mask provider fails after the real channel reset and enemy selection prefix");
     }
     for(unsigned mask=0;mask<16;++mask)for(bool outside:{false,true})
     for(unsigned reject=0;reject<=(mask==15?5u:0u);++reject){
