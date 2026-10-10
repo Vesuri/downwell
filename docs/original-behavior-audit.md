@@ -655,11 +655,17 @@ children after all stock/text RNG would also lose synchronous Create ordering.
 `ShopChildCreation` retains the returned IDs and the two child phases.
 `ShopWorld::createRegistered` composes them around stock generation and before
 farewell selection. Its required owner registers the parent and performs
-inherited/radio setup, completes each child Create, reads actual retained
+inherited setup, completes each child Create, reads actual retained
 positions and performs the item/case field writes. Missing or rejected work
 fails the enclosing status, retains the accepted prefix and prevents later
 births/RNG; the phases cannot be retried. The default compact creation path
 remains separate until the frontend supplies every required child owner.
+The shared registered path itself starts sound 192 (201 in area 3) at priority
+100 with looping enabled, retains the returned handle and immediately sets
+its gain to zero with zero transition time. Area 5 retains radio=-1 and makes
+neither call. Rejected playback/gain publication stops before the first child
+or stock RNG. The inherited parentInteractable Create has no calls, hence no
+additional births or RNG; both that body and the radio branch are hash-pinned.
 
 `scrBuilder` blocks 187 and 207 write `self.y += 16` after each newline's
 pillars and each extra-pillar row respectively. Shared scalar, run and prepared

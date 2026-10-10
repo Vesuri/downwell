@@ -25,6 +25,7 @@ namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
 struct NativeShopBirthOwner {
     bool begin(downwell::ShopWorld::Instance&);
+    bool play(int,int,bool,int&);bool setGain(int,downwell::MotionBinary64,int);
     unsigned create(int,int,int);
     bool readX(unsigned,int&);bool position(unsigned,int&,int&);
     bool upgrade(unsigned,unsigned);bool stored(unsigned,unsigned);

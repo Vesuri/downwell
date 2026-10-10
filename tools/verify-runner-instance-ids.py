@@ -162,6 +162,15 @@ print("Pinned rmMain's 240 walls/four controllers and player child-birth order; 
 shop = assembly("gml_Object_Shop_Create_0",
     "670e7f398a89a720f63eae31b674023ea06e2ae1b6f45be5560349b5f0a7fb3a")
 assert objects[277]["parentId"] == 91
+inherited = assembly("gml_Object_parentInteractable_Create_0",
+    "c7501948045f88afa9ab289ee4b1b5a380bb4de07aee3857eeba1e937a427647")
+assert "call.i" not in inherited and objects[91]["parentId"] == -1
+radio = shop[:shop.index("pushi.e 278\nconv.i.v")]
+assert "pushglb.v global.area\npushi.e 5\ncmp.i.v NEQ\nbf [5]" in radio
+assert "pushglb.v global.area\npushi.e 3\ncmp.i.v NEQ\nbf [3]" in radio
+for sound in (192,201):
+    assert f"pushi.e 1\nconv.i.v\npushi.e 100\nconv.i.v\npushi.e {sound}\nconv.i.v\ncall.i audio_play_sound(argc=3)" in radio
+assert "pushi.e 0\nconv.i.v\npushi.e 0\nconv.i.v\npush.v self.radio\ncall.i audio_sound_gain(argc=3)" in radio
 prefix, stock = shop.split(":[8]\n", 1)
 assert prefix.count("call.i gml_Script_instance_create(argc=3)") == 7
 assert prefix.count("pushi.e 279\nconv.i.v") == 3

@@ -17,6 +17,7 @@ struct ShopWorld {
     struct Instance {
         std::uint32_t sourceId=0;
         ShopChildCreation children;
+        int radio=-1;
         int x = 0, y = 0;
         bool allocated = false, wallPresent = false;
         unsigned artRevision = 0;
@@ -62,7 +63,7 @@ struct ShopWorld {
         return nullptr; // Caller must handle exhaustion; do not consume RNG.
     }
     // Explicit registered creation. The owner must register the parent and
-    // execute inherited/radio setup in begin, then supply synchronous child
+    // execute inherited setup in begin, then supply audio and synchronous child
     // creation and actual retained-instance reads/writes. No fallback owner.
     // The legacy compact create above remains until each backend provides it.
     template<class Range,class Choice,class Owner>
@@ -74,6 +75,10 @@ struct ShopWorld {
             shop.allocated=shop.wallPresent=true;shop.artRevision=1;
             ++allocatedCount;++fixtureRevision;
             if(!owner.begin(shop)||!good||!shop.sourceId||shop.sourceId>0x7fffffffu){good=false;return nullptr;}
+            if(area!=5&&(!owner.play(area==3?201:192,100,true,shop.radio)||!good||
+                !owner.setGain(shop.radio,MotionBinary64{},0)||!good)){
+                good=false;return nullptr;
+            }
             auto create=[&](int object,int cx,int cy)->std::uint32_t{
                 if(!good)return 0;const auto id=owner.create(object,cx,cy);return good?id:0;
             };

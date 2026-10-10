@@ -10,15 +10,25 @@ static void require(bool ok, const char* message) {
     if (!ok) { std::fprintf(stderr, "%s\n", message); std::abort(); }
 }
 int main() {
-    for(unsigned reject:{0u,1u,8u,10u}){
+    for(unsigned area:{1u,3u,5u})for(unsigned reject:{0u,1u,8u,10u,11u,12u}){
+        if(area==5&&reject>=11)continue; // No radio operation exists to reject.
         downwell::ShopWorld world;bool good=true;unsigned rng=0,choices=0;
         struct Owner {
-            unsigned reject,births=0,writes=0;downwell::ShopWorld::Instance* parent=nullptr;
+            unsigned reject,area,births=0,writes=0,audio=0;downwell::ShopWorld::Instance* parent=nullptr;
             bool begin(downwell::ShopWorld::Instance& shop){
                 require(!parent,"parent registered once");parent=&shop;shop.sourceId=860000;return true;
             }
+            bool play(int sound,int priority,bool loop,int& handle){
+                require(parent&&area!=5&&!births&&!audio&&sound==(area==3?201:192)&&priority==100&&loop,
+                    "shop starts source radio before child births");handle=902;++audio;return reject!=11;
+            }
+            bool setGain(int handle,downwell::MotionBinary64 gain,int duration){
+                require(audio==1&&!births&&handle==902&&gain.zero()&&duration==0,
+                    "shop radio is muted immediately after play");++audio;return reject!=12;
+            }
             unsigned create(int,int,int){
                 require(parent&&parent->sourceId==860000,"parent identity precedes children");
+                require(audio==(area==5?0u:2u),"area-specific radio setup precedes fixtures");
                 ++births;return births==reject?0:860000+births*3;
             }
             bool readX(unsigned,int& x){x=118;return true;}
@@ -31,17 +41,18 @@ int main() {
                     "registered shop retains item identity before field write");++writes;return true;
             }
             bool stored(unsigned,unsigned value){require(value==1,"stored item flag");++writes;return true;}
-        } owner{reject};
+        } owner{reject,area};
         auto range=[&](unsigned,unsigned){
             require(owner.births==7,"registered fixtures before stock selection");
             const unsigned values[]={100,101,104,105};return values[rng++];
         };
         auto choice=[&]{require(owner.births==10&&owner.writes==6,"farewell follows all item assignments");++choices;return 2u;};
-        auto* shop=world.createRegistered(100,700,range,choice,4,1,false,0,false,owner,good);
+        auto* shop=world.createRegistered(100,700,range,choice,4,area,false,0,false,owner,good);
         require(bool(shop)==(reject==0)&&good==(reject==0)&&world.allocatedCount==1,"registered shop failure prefix retained");
-        require(rng==(reject==1?0u:4u)&&choices==(reject?0u:1u),"registered shop RNG prefix");
-        if(!reject)require(shop->farewellVariant==2,"registered farewell retained");
-        else require(!world.createRegistered(100,700,range,choice,4,1,false,0,false,owner,good)&&world.allocatedCount==1,
+        require(rng==((reject==1||reject>=11)?0u:4u)&&choices==(reject?0u:1u),"registered shop RNG prefix");
+        if(reject>=11)require(!owner.births&&owner.audio==reject-10,"radio failure stops before child births");
+        if(!reject)require(shop->farewellVariant==2&&shop->radio==(area==5?-1:902),"registered farewell and radio retained");
+        else require(!world.createRegistered(100,700,range,choice,4,area,false,0,false,owner,good)&&world.allocatedCount==1,
             "failed registered shop cannot continue creation");
     }
     for(unsigned failure=0;failure<=10;++failure){
