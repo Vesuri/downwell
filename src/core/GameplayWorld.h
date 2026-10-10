@@ -931,6 +931,23 @@ public:
         const bool ok=whiteJellies_->step(key,stopped,enemyRandom_,ops);
         return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
     }
+    template<class Execute,class Tick> bool withWhiteJellyEffectAlarms(Execute execute,Tick tick){
+        if(!run_.effectsSucceeded||whiteJellyAlarmDispatch_)return run_.effectsSucceeded=false;
+        whiteJellyAlarmContext_=&execute;
+        whiteJellyAlarmDispatch_=[](void* p,downwell::InstanceHandle key,
+            downwell::GameplayWhiteJellies::Record& actor,downwell::GameMakerRandom& random){
+            return (*static_cast<Execute*>(p))(key,actor,random);
+        };
+        const bool ok=tick();whiteJellyAlarmDispatch_=nullptr;whiteJellyAlarmContext_=nullptr;
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
+    }
+    bool advanceWhiteJellyRoomAlarm(downwell::InstanceHandle key,unsigned alarm){
+        if(!run_.effectsSucceeded||!whiteJellies_)return run_.effectsSucceeded=false;
+        const bool ok=whiteJellies_->advanceAlarm(key,alarm,[&](auto& actor){
+            return whiteJellyAlarmDispatch_&&whiteJellyAlarmDispatch_(whiteJellyAlarmContext_,key,actor,enemyRandom_);
+        });
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
+    }
     template<class MakeOps> bool createWhiteJellyWithSourceId(unsigned source,
         downwell::RunnerImageValue x,downwell::RunnerImageValue y,MakeOps makeOps,downwell::InstanceHandle& key){
         key={};
@@ -2525,6 +2542,8 @@ private:
     downwell::GameplayScattered* scattered_=nullptr;
     downwell::GameplaySpawners* spawners_=nullptr;
     downwell::GameplayWhiteJellies* whiteJellies_=nullptr;
+    bool (*whiteJellyAlarmDispatch_)(void*,downwell::InstanceHandle,downwell::GameplayWhiteJellies::Record&,downwell::GameMakerRandom&)=nullptr;
+    void* whiteJellyAlarmContext_=nullptr;
     MovingEffects* movingEffects_=nullptr;
     RunControllers* runControllers_=nullptr;
     downwell::GameplayResultInstance* resultInstance_=nullptr;

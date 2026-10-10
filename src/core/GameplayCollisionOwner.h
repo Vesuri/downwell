@@ -14,6 +14,7 @@
 #include "SmokeTrig.h"
 #include "DebrisDraw.h"
 #include "TimeStopBound.h"
+#include "RunnerAlarmValue.h"
 #include "GameplayRoomLayers.h"
 #include "ObjectDrawMetadata.h"
 #include "ObjectAlarmMetadata.h"
@@ -1898,7 +1899,7 @@ public:
                     kind==View::Kind::playerController?self.playerControllers_.advanceAlarm(local,alarm):
                     kind==View::Kind::drone?(alarm==0&&self.drones_.advanceAlarm(local)):
                     kind==View::Kind::skeleton?self.skeletons_.advanceAlarm(local,alarm):
-                    kind==View::Kind::whiteJelly?self.whiteJellies_.advanceAlarm(local,alarm):
+                    kind==View::Kind::whiteJelly?self.world_->advanceWhiteJellyRoomAlarm(local,alarm):
                     kind==View::Kind::smoke?self.smoke_.advanceAlarm(local,alarm):
                     kind==View::Kind::blast?self.blasts_.alarm(local,alarm):
                     kind==View::Kind::corpse?self.advanceCorpseAlarm(local,alarm):
@@ -2337,6 +2338,25 @@ public:
             bool velocity(Handle child,bool vertical,MotionBinary64 value){return owner.movingEffects_.velocity(child,vertical,value);}
         } ops{*this,allocate,caller};
         return check(MovingFxSpawnScript::run(ops,x,y,sprite,rate,angle,speed));
+    }
+    template<class ReadStop,class ReadTimer,class Allocate,class Tick>
+    bool withWhiteJellyEffectAlarms(ReadStop stopped,ReadTimer timer,Allocate allocate,Tick tick){
+        if(!valid()||!world_)return check(false);
+        return check(world_->withWhiteJellyEffectAlarms([&](InstanceHandle key,auto& actor,auto& random){
+            struct Ops {
+                GameplayCollisionOwner& owner;InstanceHandle key;ReadTimer& timer;Allocate& allocate;
+                bool movingFx(MotionBinary64 x,MotionBinary64 y,int sprite,MotionBinary64 rate,
+                    MotionBinary64 angle,MotionBinary64 speed){
+                    return owner.spawnMovingFx(x,y,sprite,rate,angle,speed,allocate,
+                        [&](unsigned id){return owner.whiteJellies_.publishMovingFx(key,id);});
+                }
+                bool emitTimer(MotionBinary64& value){return timer(key,value);}
+                bool effectAlarmReset(MotionBinary64 value){
+                    std::int32_t count;return runnerAlarmValue(value,count)&&owner.whiteJellies_.setAlarm(key,0,count);
+                }
+            } ops{*this,key,timer,allocate};
+            bool stop;return stopped(stop)&&actor.effectAlarm(stop,random,ops);
+        },tick));
     }
     // World-backed Step operations. Decoy target globals, source atan, audio
     // and synchronous effect births remain explicit environment dependencies.

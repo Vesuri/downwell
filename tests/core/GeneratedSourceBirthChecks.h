@@ -94,6 +94,28 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             MotionBinary64::fromInteger(2345),expectedDirection,portableAtan));
         assert(store.find(key)->playerDirection.high==expectedDirection.high&&store.find(key)->playerDirection.low==expectedDirection.low);
         RunnerImageValue outside,accepted;
+        unsigned allocations=0,timerReads=0;
+        for(bool stopped:{true,false}){
+            assert(store.setAlarm(key,0,1));
+            assert(owner->withWhiteJellyEffectAlarms(
+                [&](bool& value){value=stopped;return true;},
+                [&](InstanceHandle caller,MotionBinary64& value){
+                    assert(caller.slot==key.slot&&caller.generation==key.generation);
+                    ++timerReads;value={0x40298000u,0};return true; // 12.75 truncates to 12.
+                },
+                [&](unsigned& source){assert(!stopped);source=900000+allocations++;return true;},
+                [&]{world->step(0);return world->effectsSucceeded();}));
+            assert(store.find(key)->alarms.get(0)==12&&allocations==(stopped?0u:1u));
+        }
+        assert(timerReads==2&&store.find(key)->myFx==900000&&owner->movingEffects().size()==1);
+        unsigned emitted=0;
+        assert(owner->visitRegistrationOrder([&](InstanceHandle h,int object,std::uint32_t){
+            if(object!=220)return true;
+            GameplayCollisionView::Record child;
+            assert(GameplayCollisionView(*world).resolve(h,child)&&child.movingFx&&
+                child.movingFx->sourceId==900000&&child.movingFx->spriteId==704);
+            ++emitted;return true;
+        })&&emitted==1);
         assert(outside.assignInteger(-1000)&&store.position(key,true,outside,accepted));
         world->step(0);
         assert(world->effectsSucceeded()&&owner->valid()&&store.find(key)&&store.find(key)->destroyRequested);
@@ -138,12 +160,13 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
         const int childX=160+16*(2+int(oracle.irandomSmall(6)));
         const int childY=336+16*(1+int(oracle.irandomSmall(4)));
         oracle.nextU32(); // Synchronous white-jelly Create, before deactivation.
-        unsigned spawnerSteps=0;
+        unsigned spawnerSteps=0,particleSteps=0;
         assert(owner->withEncounterSteps(phase,[&](InstanceHandle h,int object){
+            if(object==220){++particleSteps;return owner->stepMovingFx(h,false,480,masks);}
             assert(object==78);++spawnerSteps;return owner->stepRegisteredSpawner(h,spawnOps);
         },[&]{world->step(0);return world->effectsSucceeded();}));
         const auto* child=store.find(spawnOps.child);int actualX,actualY;
-        assert(spawnerSteps==1&&spawnOps.births==1&&spawnOps.deactivations==1&&child&&!child->active&&
+        assert(spawnerSteps==1&&particleSteps==1&&spawnOps.births==1&&spawnOps.deactivations==1&&child&&!child->active&&
             child->scriptActive&&child->imageIndex.bits==0&&child->x.roundPixel(actualX)&&child->y.roundPixel(actualY)&&
             actualX==childX&&actualY==childY&&world->randomState().stateIndex()==oracle.stateIndex());
         for(unsigned word=0;word<16;++word)assert(world->randomState().stateWord(word)==oracle.stateWord(word));
