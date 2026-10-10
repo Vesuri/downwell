@@ -304,6 +304,7 @@ public:
     const downwell::GameplayTerrainInstances* terrainInstances()const{return terrainInstances_;}
     using NativeTerrain=downwell::NativeTerrainLifetimes<downwell::GameplayTerrainInstances::capacity>;
     const NativeTerrain* nativeTerrainInstances()const{return nativeTerrainInstances_;}
+    NativeTerrain* nativeTerrainInstances(){return nativeTerrainInstances_;}
     bool bindNativeTerrain(NativeTerrain& terrain){
         if(!run_.effectsSucceeded||terrainInstances_||!terrain.valid()||
             (nativeTerrainInstances_&&nativeTerrainInstances_!=&terrain))return run_.effectsSucceeded=false;

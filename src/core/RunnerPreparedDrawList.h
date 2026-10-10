@@ -21,6 +21,7 @@ public:
     RunnerPreparedDrawList(){clear();}
     void clear(){for(auto& node:nodes_)node=Node{};for(auto& head:heads_)head=End;changed();}
     std::uint32_t revision()const{return revision_;}
+    void invalidateOrder(){changed();}
     bool contains(unsigned e)const{return e<Elements&&nodes_[e].action!=absent;}
     bool attach(unsigned layer,unsigned e,unsigned previous){
         if(layer>=Layers||e>=Elements||contains(e)||

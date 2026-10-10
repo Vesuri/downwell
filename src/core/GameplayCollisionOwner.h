@@ -184,7 +184,11 @@ private:
 #ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
     GameplayRoomLayers<View::capacity> layers_;
 #else
-    GameplayRoomLayers<View::capacity,true> layers_;
+    GameplayRoomLayers<View::capacity,true,GameplayWorld::NativeTerrain> layers_;
+    bool nativeTerrainLayersBound_=false;
+    using TerrainLayerRun=decltype(layers_)::TerrainRunBirth;
+    TerrainLayerRun nativeTerrainLayerRun_;
+    bool nativeTerrainLayerRunActive_=false;
 #endif
     ObjectDrawMetadata<386> drawMetadata_;
     ObjectAlarmMetadata<386> alarmMetadata_;
@@ -604,6 +608,15 @@ private:
     }
     bool nativeTerrainBirth(const GameplayWorld::NativeTerrain::Identity& id,bool active,
         std::uint32_t& order,std::uint32_t& flags){
+#ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+        // Some callers install the native store after attaching this owner.
+        // Bind at the first birth, before any terrain layer publication.
+        if(!nativeTerrainLayersBound_){
+            if(!world_||!world_->nativeTerrainInstances()||
+               !layers_.bindTerrain(*world_->nativeTerrainInstances(),View::terrainBase))return check(false);
+            nativeTerrainLayersBound_=true;
+        }
+#endif
         const unsigned slot=View::terrainBase+id.handle.slot;
         if(!valid()||!table_.externalBirth(slot,order)||!nativeBirthQueues(slot,id.object))return check(false);
         if(!check(table_.registerExternalObject({slot,id.handle.generation},id.object,true)))return false;
@@ -637,6 +650,15 @@ private:
                     found?&bounds:nullptr,x,y,precise,true);
             })))return false;
         }
+#ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+        if(nativeTerrainLayerRunActive_){
+            if(!check(active&&!id.source&&id.creationCode==-1&&(id.object==60||id.object==93)))return false;
+            if(nativeTerrainLayerRun_.layer==TerrainLayerRun{}.layer){
+                if(!check(layers_.birthAllocatedTerrain({slot,id.handle.generation},definition->creationDepth,false,&nativeTerrainLayerRun_)))return false;
+            }else if(!check(layers_.birthInheritedTerrain({slot,id.handle.generation},nativeTerrainLayerRun_)))return false;
+            return true; // Retained active terrain has no physical Draw node.
+        }
+#endif
         if(!check(layers_.birth({slot,id.handle.generation},id.source,definition->creationDepth,!active,false)))return false;
         // The birth callback precedes run publication. Publish the scenery
         // cutoff directly; resolving this handle through the run is premature.
@@ -1549,6 +1571,27 @@ public:
                 // Reconcile room membership at the phase boundary, not here.
                 // Object-family and layer-element publication stay separate.
                 return true;
+            },
+            [](void* p){
+                auto& self=*static_cast<GameplayCollisionOwner*>(p);
+#ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+                const auto* wall=self.objectDefaults_.get(60);const auto* thin=self.objectDefaults_.get(93);
+                if(!self.check(self.valid()&&!self.nativeTerrainLayerRunActive_&&wall&&thin&&
+                    RunnerSpatialSplit::equal(wall->creationDepth,thin->creationDepth)))return false;
+                self.nativeTerrainLayerRun_=TerrainLayerRun{};
+                self.nativeTerrainLayerRunActive_=true;
+#endif
+                return self.valid();
+            },
+            [](void* p){
+                auto& self=*static_cast<GameplayCollisionOwner*>(p);
+#ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+                const bool completed=self.layers_.completeInheritedTerrain(self.nativeTerrainLayerRun_);
+                self.nativeTerrainLayerRunActive_=false;
+                return self.check(completed);
+#else
+                return self.valid();
+#endif
             }
         }))return check(false);
 #ifndef DOWNWELL_REFERENCE_BREAKABLES

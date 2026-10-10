@@ -1,6 +1,7 @@
 #include "core/RunnerLogicalLayerOrder.h"
 #include "core/RunnerLayerDraw.h"
 #include "core/RunnerPreparedDrawList.h"
+#include "core/NativeTerrainLifetimes.h"
 #include <vector>
 #include <cstdio>
 #include <cstdlib>
@@ -206,7 +207,82 @@ static void failedPublication(){
         }
     }
 }
-int main(){inheritedCapacity();merges();mutations();failedPublication();preparedCutoffs();
+static void nativePublication(){
+    struct Fixture {
+        NativeTerrainLifetimes<8> terrain;
+        RunnerLogicalLayerOrder<3,16,NativeTerrainLifetimes<8>> layers;
+        unsigned layer=0,stamp=0;
+    } fixture;
+    REQUIRE(fixture.layers.bindTerrain(fixture.terrain));
+    REQUIRE(fixture.layers.insertAfterEquals(1,100,false,fixture.layer));
+    REQUIRE(fixture.terrain.bind({&fixture,
+        [](void*,unsigned){return true;},
+        [](void* p,const NativeTerrainLifetimes<8>::Identity& id,bool active,std::uint32_t& stamp,std::uint32_t&){
+            auto& f=*static_cast<Fixture*>(p);stamp=++f.stamp;
+            REQUIRE(f.terrain.layerState(id.handle)&&!f.terrain.layerState(id.handle)->bound());
+            return f.layers.retainInstance(id.handle,f.layer,!active);
+        },
+        [](void* p,unsigned slot){auto& f=*static_cast<Fixture*>(p);
+            return f.layers.releaseInstance(f.terrain.currentHandle(slot));},
+        [](void*,unsigned){return true;}
+    }));
+    for(unsigned i=0;i<8;++i)REQUIRE(fixture.terrain.append(60,int(i)*16,0));
+    for(unsigned i=0;i<8;++i){
+        const auto h=fixture.terrain.handle(i);const auto before=*fixture.terrain.layerState(h);
+        REQUIRE(before.bound()&&before.order.serial.low==i+1);
+        if(i==2)REQUIRE(fixture.terrain.rebindOrder(h,100+i));
+        REQUIRE(fixture.terrain.layerState(h)->same(before));
+    }
+    REQUIRE(fixture.layers.publishInactive(fixture.terrain.handle(3),true));
+    REQUIRE(fixture.layers.reconcileRetained(fixture.terrain.handle(3)));
+    unsigned count=0;
+    REQUIRE(fixture.terrain.visitLayerStates([&](InstanceHandle,const RunnerRetainedLayerState& s){
+        REQUIRE(s.bound());++count;return true;
+    }));REQUIRE(count==8);
+    // Releasing layer publications splits runs during whole-room teardown.
+    REQUIRE(fixture.terrain.clear()&&fixture.layers.elementCount(fixture.layer)==0);
+    REQUIRE(fixture.terrain.append(60,0,0));
+    REQUIRE(fixture.terrain.layerState(fixture.terrain.handle(0))->bound());
+    REQUIRE(fixture.terrain.clear());
+}
+static void nativeRunPrefixes(){
+    for(unsigned prefix=0;prefix<=8;++prefix){
+        struct Fixture {
+            NativeTerrainLifetimes<8> terrain;
+            RunnerLogicalLayerOrder<3,16,NativeTerrainLifetimes<8>> layers;
+            unsigned layer=0,pending=0,births=0,ends=0;
+        } f;
+        REQUIRE(f.layers.bindTerrain(f.terrain)&&f.layers.insertAfterEquals(1,100,false,f.layer));
+        NativeTerrainLifetimes<8>::Binding binding;
+        binding.context=&f;binding.admit=[](void*,unsigned){return true;};
+        binding.birth=[](void* p,const NativeTerrainLifetimes<8>::Identity& id,bool,std::uint32_t& stamp,std::uint32_t&){
+            auto& f=*static_cast<Fixture*>(p);stamp=++f.births;
+            if(f.births==1)return f.layers.retainAllocated(id.handle.slot,f.layer,false);
+            f.terrain.publishInheritedLayer(id.handle.slot);++f.pending;return true;
+        };
+        binding.mark=[](void*,unsigned){return true;};
+        binding.retire=[](void* p,unsigned slot){auto& f=*static_cast<Fixture*>(p);
+            return f.layers.releaseInstance(f.terrain.currentHandle(slot));};
+        binding.beginRun=[](void* p){auto& f=*static_cast<Fixture*>(p);return !f.births&&!f.pending;};
+        binding.endRun=[](void* p){auto& f=*static_cast<Fixture*>(p);++f.ends;
+            return !f.pending||f.layers.retainInheritedCount(f.layer,f.pending);};
+        REQUIRE(f.terrain.bind(binding));
+        const bool complete=f.terrain.publishRun([&]{
+            for(unsigned i=0;i<prefix;++i){
+                REQUIRE(f.terrain.append(60,int(i)*16,0));
+                REQUIRE(f.terrain.layerState(f.terrain.handle(i))->order.serial.low==i+1);
+            }
+            return prefix==8;
+        });
+        REQUIRE(complete==(prefix==8)&&f.ends==1&&f.terrain.size()==prefix);
+        REQUIRE(f.layers.elementCount(f.layer)==prefix);
+        unsigned observed=0;
+        REQUIRE(f.layers.visitLogical(f.layer,[&](bool retained,unsigned slot){
+            REQUIRE(retained&&slot==prefix-1-observed);++observed;return true;
+        }));REQUIRE(observed==prefix);
+    }
+}
+int main(){inheritedCapacity();merges();mutations();failedPublication();preparedCutoffs();nativePublication();nativeRunPrefixes();
     REQUIRE(drawMutation(true,true)==drawMutation(false,true));
     REQUIRE(drawMutation(true,false)==drawMutation(false,false));
     REQUIRE(drawMutation(true,true)==std::vector<unsigned>({3,0}));

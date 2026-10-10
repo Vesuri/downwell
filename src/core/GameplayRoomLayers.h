@@ -77,7 +77,8 @@ template<unsigned I,bool CompactUnnumbered=false,class Terrain=void,
     unsigned live_=0,playerId_=0;
     FailureSignal<> good_=true;bool prepared_=false;
     std::uint32_t drawRevision_=0;
-    void changedDraw(){if(drawRevision_!=0xffffffffu)++drawRevision_;}
+    void changedDraw(){if(drawRevision_!=0xffffffffu)++drawRevision_;
+        if constexpr(Storage::retained)if(preparedDrawEnabled_)preparedDraw_.invalidateOrder();}
     bool fail(){good_=false;return false;}
     template<class Visit> bool visitProjectedElements(unsigned layer,Visit visit)const{
         if(!layers_.get(layer))return false;
@@ -131,6 +132,8 @@ public:
     std::uint32_t preparedDrawRevision()const{return preparedDraw_.revision();}
     bool publishPreparedDraw(InstanceHandle h,unsigned token,RunnerLayerDraw::Action action){
         if(!preparedDrawEnabled_)return true;
+        if constexpr(Storage::retained)if(auto state=retainedState(h))if(state->bound())
+            return action==(state->inactive?RunnerLayerDraw::Action::endLayer:RunnerLayerDraw::Action::skip);
         const unsigned element=registry_.find(h);
         const auto prepared=action==RunnerLayerDraw::Action::endLayer?PreparedDraw::endLayer:
             action==RunnerLayerDraw::Action::drawEvent||action==RunnerLayerDraw::Action::sprite||
@@ -284,6 +287,7 @@ public:
         const unsigned count=run.pending,draw=run.drawPending;
         run.pending=run.drawPending=0;run.admitted=false;
         drawRevision_=drawRevision_>0xffffffffu-draw?0xffffffffu:drawRevision_+draw;
+        if(draw&&preparedDrawEnabled_)preparedDraw_.invalidateOrder();
         if(count){
             if(!layers_.retainInheritedCount(run.layer,count))return fail();
             live_+=count;

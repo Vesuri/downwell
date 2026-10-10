@@ -5,6 +5,7 @@
 #include "WallEndStep.h"
 #include "PackedWallState.h"
 #include "WallFootprint.h"
+#include "RunnerLogicalLayerOrder.h"
 namespace downwell {
 // Identity and birth chronology: no duplicate spatial tree, room list, animation state or
 // raster cache. Generated source IDs remain unknown until the shared global
@@ -12,8 +13,9 @@ namespace downwell {
 template<unsigned Capacity> class NativeTerrainLifetimes {
     struct Order {
         std::uint32_t stamp=0;
-        Order shifted(unsigned n)const{return {stamp?stamp+n:0};}
-        bool same(const Order& other)const{return stamp==other.stamp;}
+        RunnerRetainedLayerState layer;
+        Order shifted(unsigned n)const{return {stamp?stamp+n:0,layer.shifted(n)};}
+        bool same(const Order& other)const{return stamp==other.stamp&&layer.same(other.layer);}
     };
     using Runs=TerrainOwnershipRuns<Capacity,Order>;
     Runs runs_;
@@ -25,7 +27,13 @@ template<unsigned Capacity> class NativeTerrainLifetimes {
     InstanceHandle steppingHandle_{};
     bool good_=true;
     bool wallPresentationState_=false,unboundedWallArt_=false;
+    Order* pendingPublication_=nullptr;
+    InstanceHandle pendingHandle_{};
+    bool publicationRun_=false;
+    RunnerRetainedLayerState inheritedLayer_;
+    unsigned inheritedLayerCount_=0;
 public:
+    static constexpr unsigned capacity=Capacity;
     using Identity=typename Runs::Identity;
     struct Binding {
         void* context=nullptr;
@@ -37,6 +45,8 @@ public:
         bool (*collision)(void*,const Identity&,bool)=nullptr;
         bool (*presentation)(void*,const Identity&,int,int)=nullptr;
         bool (*activation)(void*,const Identity&,bool,std::uint32_t)=nullptr;
+        bool (*beginRun)(void*)=nullptr;
+        bool (*endRun)(void*)=nullptr;
     };
     bool spatialFlags(InstanceHandle h,std::uint32_t& out)const{
         if(!contains(h))return false;
@@ -46,10 +56,11 @@ public:
     }
     bool bind(Binding binding){
         if(!good_)return false;
-        if(!binding.context&&(binding.admit||binding.birth||binding.retire||binding.mark||binding.create||binding.collision||binding.presentation||binding.activation))return good_=false;
+        if(!binding.context&&(binding.admit||binding.birth||binding.retire||binding.mark||binding.create||binding.collision||binding.presentation||binding.activation||binding.beginRun||binding.endRun))return good_=false;
         if(binding_.context)return binding_.context==binding.context&&binding_.admit==binding.admit&&
             binding_.birth==binding.birth&&binding_.retire==binding.retire&&binding_.mark==binding.mark&&binding_.create==binding.create&&
-            binding_.collision==binding.collision&&binding_.presentation==binding.presentation&&binding_.activation==binding.activation;
+            binding_.collision==binding.collision&&binding_.presentation==binding.presentation&&binding_.activation==binding.activation&&
+            binding_.beginRun==binding.beginRun&&binding_.endRun==binding.endRun;
         if(binding.context&&(!binding.admit||!binding.birth||!binding.retire||!binding.mark||size()))return good_=false;
         binding_=binding;return true;
     }
@@ -57,7 +68,60 @@ public:
         Order value;return good_&&runs_.publication(h,value)?value.stamp:0;
     }
     bool rebindOrder(InstanceHandle h,std::uint32_t order){
-        return good_=(good_&&order&&runs_.changePublication(h,Order{order}));
+        Order value;
+        if(!good_||!order||!runs_.publication(h,value))return good_=false;
+        value.stamp=order;return good_=runs_.changePublication(h,value);
+    }
+    RunnerRetainedLayerRead layerState(InstanceHandle h)const{
+        if(pendingPublication_&&h.slot==pendingHandle_.slot&&h.generation==pendingHandle_.generation)
+            return pendingPublication_->layer;
+        Order value;return runs_.publication(h,value)?RunnerRetainedLayerRead(value.layer):nullptr;
+    }
+    RunnerRetainedLayerRead layerState(unsigned slot)const{
+        return layerState(pendingPublication_&&slot==pendingHandle_.slot?pendingHandle_:runs_.currentHandle(slot));
+    }
+    void setLayerState(unsigned slot,const RunnerRetainedLayerState& layer){
+        if(pendingPublication_&&slot==pendingHandle_.slot){
+            pendingPublication_->layer=layer;
+            if(publicationRun_){inheritedLayer_=layer;inheritedLayerCount_=1;}
+            return;
+        }
+        const auto h=runs_.currentHandle(slot);Order value;
+        if(!runs_.publication(h,value)){good_=false;return;}
+        value.layer=layer;if(!runs_.changePublication(h,value))good_=false;
+    }
+    void publishInheritedLayer(unsigned slot){
+        if(!publicationRun_||!pendingPublication_||slot!=pendingHandle_.slot||!inheritedLayer_.bound()){
+            good_=false;return;
+        }
+        pendingPublication_->layer=inheritedLayer_.shifted(inheritedLayerCount_++);
+    }
+    // The caller admits a callback-free terrain segment, not an event Create.
+    // Completed prefixes must be charged even when a later cell fails.
+    template<class Emit> bool publishRun(Emit emit){
+        if(!good_||publicationRun_||pendingPublication_)return good_=false;
+        publicationRun_=true;inheritedLayer_={};inheritedLayerCount_=0;
+        const bool began=!binding_.beginRun||binding_.beginRun(binding_.context);
+        const bool emitted=began&&emit();
+        const bool ended=!began||!binding_.endRun||binding_.endRun(binding_.context);
+        publicationRun_=false;
+        return good_=good_&&began&&emitted&&ended;
+    }
+    template<class Visit> bool visitLayerStates(Visit visit)const{
+        return runs_.visit([&](const Identity& id){return visit(id.handle,*layerState(id.handle));});
+    }
+    template<class Visit> bool visitLayerCutoffs(unsigned layer,const RunnerLayerOrderKey* after,Visit visit)const{
+        return runs_.visitPublicationRuns([&](const auto& run){
+            const auto& basis=run.publication().layer;
+            if(!basis.bound()||basis.layer!=layer||!basis.inactive)return true;
+            bool found=false;unsigned first=0;
+            run.visitSlots([&](unsigned,unsigned offset){
+                if(after&&!after->before(basis.shifted(offset).order))return true;
+                if(!found||(basis.order.tail?offset<first:offset>first)){found=true;first=offset;}
+                return true;
+            });
+            return !found||visit(basis.shifted(first).order);
+        });
     }
     bool valid()const{return good_;}
     std::uint32_t lastLifetime()const{return next_-1;}
@@ -200,8 +264,11 @@ public:
         Order order;
         const Identity identity{{slot,next_},object,x,y,creation,source};
         std::uint32_t spatial=8u;
-        if(slot==Capacity||(binding_.birth&&!binding_.birth(binding_.context,identity,active,order.stamp,spatial))||
-            !runs_.append({slot,next_},object,x,y,source,creation,order))return good_=false;
+        if(slot==Capacity||pendingPublication_)return good_=false;
+        pendingPublication_=&order;pendingHandle_=identity.handle;
+        const bool published=!binding_.birth||binding_.birth(binding_.context,identity,active,order.stamp,spatial);
+        pendingPublication_=nullptr;pendingHandle_={};
+        if(!published||!runs_.append({slot,next_},object,x,y,source,creation,order))return good_=false;
         ++next_;freeHint_=slot+1;
         flags_[slot]=(active?0:2)|((spatial&8u)?4u:0u)|((spatial&0x200u)?8u:0u)|((spatial&0x8000u)?16u:0u);
         createSprite_[slot]=-2;
@@ -248,7 +315,10 @@ public:
     bool clear(){
         if(stepping_)return good_=false;
         if(!good_)return false;
-        if(binding_.retire&&!runs_.visit([&](const Identity& id){return binding_.retire(binding_.context,id.handle.slot);}))return good_=false;
+        // Releasing retained layers can split publication runs. Reacquire by
+        // ordinal rather than mutating a borrowed descriptor traversal.
+        if(binding_.retire)for(unsigned i=0;i<runs_.size();++i)
+            if(!binding_.retire(binding_.context,runs_.handle(i).slot))return good_=false;
         runs_.~Runs();new(&runs_) Runs;freeHint_=0;wallPresentationState_=unboundedWallArt_=false;return true;
     }
 private:

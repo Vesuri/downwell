@@ -99,9 +99,12 @@ bool AmigaGameplayGeneration::createPrepared(void* opaque,const downwell::AreaOn
     }
     if(!self.tiles_.appendPrepared(batch))return false;
     if(self.lifetimes_){
-        const auto* source=batch.creates();
-        for(unsigned i=0;i<batch.count();++i,source+=2)
-            if(!self.birth((source[0]&128)?93:60,(int(source[0]&127)-32)*16,batch.y))return false;
+        if(!self.lifetimes_->publishRun([&]{
+            const auto* source=batch.creates();
+            for(unsigned i=0;i<batch.count();++i,source+=2)
+                if(!self.birth((source[0]&128)?93:60,(int(source[0]&127)-32)*16,batch.y))return false;
+            return true;
+        }))return false;
     }
     batch.completePublication();
     return true;
@@ -122,9 +125,11 @@ bool AmigaGameplayGeneration::createRun(void* opaque,const downwell::AreaOneBuil
         if(run.y+24>self.dirtyEnd)self.dirtyEnd=run.y+24;
         return run.executeSpan([&]{
             if(!index.publishSpan(self.tiles_))return false;
-            for(unsigned i=0;self.lifetimes_&&i<run.count;++i)
-                if(!self.birth(run.objectId,run.x+int(i)*run.stepX,run.y))return false;
-            return true;
+            return !self.lifetimes_||self.lifetimes_->publishRun([&]{
+                for(unsigned i=0;i<run.count;++i)
+                    if(!self.birth(run.objectId,run.x+int(i)*run.stepX,run.y))return false;
+                return true;
+            });
         });
     }
     bool dirty=false;

@@ -114,21 +114,23 @@ struct Scene {
     AmigaAreaOneTerrainBuilder builder{fragments,19};
     AmigaTerrainCollisionContext collision;
     AmigaTerrainTiles tiles;
+    std::unique_ptr<AmigaGameplayGeneration::TerrainLifetimes> lifetimes;
     AmigaGameplayGeneration generation;
     std::unique_ptr<downwell::GameplayCollisionOwner> owner;
     std::unique_ptr<AmigaPortRuntime> world;
     Scene(const downwell::BuilderPatternPack& patterns,const downwell::ObjectPack& objects,
           const downwell::SpriteCollisionPack& sprites,const downwell::RoomPack& rooms,
           const downwell::PackedRoom& room,const downwell::StartupRuntime& entry,Ownership ownership,
-          bool nativeBoxes=true,bool nativeFields=true)
+          bool nativeBoxes=true,bool nativeFields=true,bool nativeLifetimes=false)
         :collision{nullptr,nullptr,&patterns,nullptr,0,nullptr},
-         generation(builder,patterns,objects,index,tiles){
+         lifetimes(nativeLifetimes?std::make_unique<AmigaGameplayGeneration::TerrainLifetimes>():nullptr),
+         generation(builder,patterns,objects,index,tiles,lifetimes.get()){
         owner=std::make_unique<downwell::GameplayCollisionOwner>(objects,sprites,
             downwell::GameplayTerrainInstances::Presentation{},downwell::GameplayTerrainInstances::WallCollision{},
             &rooms,ownership,nativeBoxes,nativeFields);
         require(owner->valid(),"owner prepares");
-        // Native ownership keeps no terrain identity records: the occupancy
-        // grid is the only terrain representation, as on the Amiga.
+        // Exercise both the older occupancy-only backend and the shipping
+        // native lifetime store; the latter is bound during loadRoom below.
         world=std::make_unique<AmigaPortRuntime>(300,false,1201-176,true,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),
             (ownership==Ownership::native||ownership==Ownership::nativeScenery)?nullptr:&owner->terrain(),&rooms);
@@ -360,13 +362,14 @@ int main(int argc,char** argv){
             &rooms,&objects,2,&patterns);
         host->skipToGameForTesting();
         auto reference=std::make_unique<Scene>(patterns,objects,sprites,rooms,room,*host,Ownership::reference);
-        std::unique_ptr<Scene> others[6]={
+        std::unique_ptr<Scene> others[7]={
             std::make_unique<Scene>(patterns,objects,sprites,rooms,room,*host,Ownership::nativeTerrain),
             std::make_unique<Scene>(patterns,objects,sprites,rooms,room,*host,Ownership::native),
             std::make_unique<Scene>(patterns,objects,sprites,rooms,room,*host,Ownership::nativeScenery),
             std::make_unique<Scene>(patterns,objects,sprites,rooms,room,*host,Ownership::nativeScenery,false,false),
             std::make_unique<Scene>(patterns,objects,sprites,rooms,room,*host,Ownership::nativeScenery,true,false),
-            std::make_unique<Scene>(patterns,objects,sprites,rooms,room,*host,Ownership::nativeScenery,false,true)};
+            std::make_unique<Scene>(patterns,objects,sprites,rooms,room,*host,Ownership::nativeScenery,false,true),
+            std::make_unique<Scene>(patterns,objects,sprites,rooms,room,*host,Ownership::nativeScenery,true,true,true)};
         for(frame=0;frame<downwell::gameplayContactProfileFrames;++frame){
             const auto& player=reference->world->player();
             const auto input=downwell::packReplayInput(downwell::gameplayContactProfileInput(
