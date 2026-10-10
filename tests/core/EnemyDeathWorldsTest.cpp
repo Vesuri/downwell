@@ -267,9 +267,17 @@ int main(){
                 bool create(int,MotionBinary64,MotionBinary64){return false;}
             } corpseEnvironment;
             unsigned bloodSteps=0,smokeSteps=0,corpseSteps=0,currencySteps=0,debrisSteps=0;
+            unsigned currencyExpiries=0;
             const auto smokeCount=owner->registeredSmoke().size();
-            assert(native->withCurrencyEvents([&](InstanceHandle key,GameplayWorld::CurrencyPhase phase,unsigned){
-                if(phase!=GameplayWorld::CurrencyPhase::step)return false;
+            owner->configureCorpseChildIds([](void* p,std::uint32_t& id){
+                id=(*static_cast<std::uint32_t*>(p))++;return true;
+            },&next);
+            auto effectsTick=[&]{return native->withCurrencyEvents([&](InstanceHandle key,GameplayWorld::CurrencyPhase phase,unsigned alarm){
+                if(phase==GameplayWorld::CurrencyPhase::alarm){
+                    if(alarm!=2)return false;
+                    ++currencyExpiries;
+                    return owner->currency().expire(key,MotionBinary64::fromInteger(1),false,nativeAudio);
+                }
                 ++currencySteps;InstanceHandle h;MotionBinary64 px,py;
                 return GameplayCollisionView::encode(GameplayCollisionView::Kind::currency,key,h)&&
                     ContactCoordinates::playerGlobals(native->player().frameStartXFixed(),
@@ -287,11 +295,30 @@ int main(){
                     ++debrisSteps;return owner->debrisFrozen(key,stop.player.stopped,480,masks,frozen);
                 },[&](auto key,const auto&,auto x,auto y,bool& hit){
                     return owner->debrisPlaceMeeting(key,x,y,masks,hit);
-                });});}));
+                });});});};
+            assert(effectsTick());
             if(!(bloodSteps==2&&smokeSteps==smokeCount&&corpseSteps==1&&currencySteps==3&&debrisSteps==2))
                 std::fprintf(stderr,"Death follow-up Steps: blood=%u smoke=%u/%u corpse=%u currency=%u debris=%u\n",
                     bloodSteps,smokeSteps,smokeCount,corpseSteps,currencySteps,debrisSteps);
             assert(bloodSteps==2&&smokeSteps==smokeCount&&corpseSteps==1&&currencySteps==3&&debrisSteps==2);
+            bool sawExpiry=false;
+            // Cover corpse Alarm 0 (180) plus its 12-frame / 0.3 image
+            // sequence, and currency's 10 + 180 + 120 alarm chain.
+            for(unsigned tick=0;tick<340;++tick){
+                assert(owner->prepareDraw());
+                assert(effectsTick());
+                sawExpiry=sawExpiry||owner->registeredExpiry().size()!=0;
+            }
+            assert(owner->prepareDraw());
+            if(!(sawExpiry&&owner->registeredCorpses().size()==0&&owner->registeredExpiry().size()==0&&
+                owner->blood().size()==0&&owner->registeredSmoke().size()==0&&owner->registeredFlash().size()==0&&
+                native->debrisEffects().size()==0))
+                std::fprintf(stderr,"Death cleanup: expirySeen=%d corpse=%u expiry=%u blood=%u smoke=%u flash=%u debris=%u\n",
+                    sawExpiry,owner->registeredCorpses().size(),owner->registeredExpiry().size(),owner->blood().size(),
+                    owner->registeredSmoke().size(),owner->registeredFlash().size(),native->debrisEffects().size());
+            assert(currencyExpiries==3&&sawExpiry&&owner->registeredCorpses().size()==0&&
+                owner->registeredExpiry().size()==0&&owner->blood().size()==0&&
+                owner->registeredSmoke().size()==0&&owner->registeredFlash().size()==0&&native->debrisEffects().size()==0);
             continue;
         }
         assert(stored->withMomentDelayRoomSpeed(storedSpeed,[&]{
