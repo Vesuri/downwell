@@ -74,7 +74,28 @@ int main() {
         require(bool(shop)==(reject==0)&&good==(reject==0)&&world.allocatedCount==1,"registered shop failure prefix retained");
         require(rng==((reject==1||reject>=11)?0u:4u)&&choices==(reject?0u:1u),"registered shop RNG prefix");
         if(reject>=11)require(!owner.births&&owner.audio==reject-10,"radio failure stops before child births");
-        if(!reject)require(shop->farewellVariant==2&&shop->radio==(area==5?-1:902),"registered farewell and radio retained");
+        if(!reject){
+            require(shop->farewellVariant==2&&shop->radio==(area==5?-1:902),"registered farewell and radio retained");
+            // Make every compact callback observable: an expired blink alarm,
+            // confirmation in an open item menu, wobble and out-of-view cleanup.
+            shop->keeper.sprite=487;shop->keeper.alarm1=1;
+            shop->feedback.resetKeeperImage=true;shop->feedback.soundCount=1;
+            shop->menu.active=shop->menu.speaking=true;shop->menu.menuState=1;
+            shop->menu.cursorWobbleX=6;shop->menu.cursorPhaseQuarters=12;
+            world.interactable=true;world.noControl=true;
+            downwell::CurrencyAccount money;money.currency=10000;int facing=1;
+            unsigned calls=0;auto random=[&](unsigned lo,unsigned){++calls;return lo;};
+            world.keeperAlarms(random);world.advanceKeepers(0,false,area,random);
+            downwell::Input input;input.fire=true;
+            world.step(input,100,700,false,false,facing,money,[&]{++calls;return 1u;},
+                [&](unsigned){++calls;},[&](auto&,auto){++calls;});
+            world.advancePresentation();world.endStep(5000);
+            require(!calls&&money.currency==10000&&shop->keeper.alarm1==1&&
+                shop->menu.cursorWobbleX==6&&shop->menu.cursorPhaseQuarters==12&&
+                shop->feedback.resetKeeperImage&&shop->feedback.soundCount==1&&
+                shop->present&&shop->wallPresent&&world.noControl&&facing==1,
+                "compact player-frame path leaves registered Shop events and lifetimes alone");
+        }
         else require(!world.createRegistered(100,700,range,choice,4,area,false,0,false,owner,good)&&world.allocatedCount==1,
             "failed registered shop cannot continue creation");
     }

@@ -200,23 +200,23 @@ public:
     template<class Range>
     void keeperAlarms(Range random) {
         if (!allocatedCount) return;
-        for (auto& shop : instances) if (shop.allocated)
+        for (auto& shop : instances) if (shop.allocated && !shop.sourceId)
             shop.keeper.alarms(shop.feedback, random);
     }
     template<class Range>
     void advanceKeepers(int playerX, bool criminal, unsigned area, Range random) {
         if (!allocatedCount) return;
-        for (auto& shop : instances) if (shop.allocated) {
+        for (auto& shop : instances) if (shop.allocated && !shop.sourceId) {
             shop.keeper.step(shop.feedback, playerX, shop.x + 18, criminal, area, random);
             shop.feedback.resetKeeperImage = false; // consumed by the actual child state
             shop.keeper.advanceAnimation();
         }
     }
-    // Run once per simulated frame, not per render/capture or display-buffer
-    // refresh. Source Draw mutates these fields even while the menu is closed.
+    // Compact compatibility path only. Registered Draw owns these mutations
+    // at its layer slot; a player update must not advance them a second time.
     void advancePresentation() {
         if (!allocatedCount) return;
-        for (auto& shop : instances) if (shop.present)
+        for (auto& shop : instances) if (shop.present && !shop.sourceId)
             shop.menu.advancePresentation();
     }
     template<class Choose, class Grant, class Emit>
@@ -226,7 +226,7 @@ public:
         ShopInteraction::Input edges{held.right && !previous.right,
             held.left && !previous.left, held.fire && !previous.fire, false};
         previous = held; // Always track raw edges, including while locked.
-        for (auto& shop : instances) if (shop.allocated) {
+        for (auto& shop : instances) if (shop.allocated && !shop.sourceId) {
             shop.feedback.beginStep();
             if (!shop.present) continue;
             const ShopInteraction::Context context{meets(shop, x, y),
@@ -248,6 +248,9 @@ public:
     }
     void endStep(int viewY) {
         for (auto& shop : instances) {
+            // Registered lifetimes retire through their source End Step and
+            // room owner, including audio and deferred destruction publication.
+            if(shop.sourceId)continue;
             if (shop.present && (shop.y < viewY - 320 || shop.y > viewY + 3000)) {
                 shop.present = false;
                 ++fixtureRevision;

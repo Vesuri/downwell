@@ -988,6 +988,12 @@ source pixels require an area-palette contract. Parent menus and native speech
 pixel composition remain unbound; the Amiga collector rejects those entries
 instead of interpreting their handles as generic effects. These handlers and
 normal parent-event installation remain required before frontend admission.
+Compact Shop alarm, Step, keeper animation, presentation and End Step passes
+exclude parents with a registered source ID. This boundary applies even when
+the shared player-frame path calls those compatibility passes: it must not
+consume another keeper RNG word, execute a second purchase, advance Draw state
+during Step, or retire a parent without the registered audio/lifetime event.
+Missing registered dependencies are not filled by running a compact copy.
 Rising text and item selection can join `withEncounterSteps` through
 `stepRegisteredShopChild`, with the caller supplying the real upgrade-array
 lookup. Rising-text alarms use the existing mixed alarm phase; alarm 0 marks
