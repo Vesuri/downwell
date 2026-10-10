@@ -30,6 +30,7 @@
 #include "core/GameplayPlayerControllers.h"
 #include "core/GameplayScattered.h"
 #include "core/GameplaySpawners.h"
+#include "core/GameplayWhiteJellies.h"
 #include "core/RegisteredScatteredContact.h"
 #include "core/RunControllerInstances.h"
 #include "core/GameplayResultInstance.h"
@@ -484,6 +485,11 @@ public:
     const downwell::GameplayPlayerControllers* playerControllers()const{return playerControllers_;}
     const downwell::GameplayScattered* scattered()const{return scattered_;}
     const downwell::GameplaySpawners* spawners()const{return spawners_;}
+    const downwell::GameplayWhiteJellies* whiteJellies()const{return whiteJellies_;}
+    bool bindWhiteJellies(downwell::GameplayWhiteJellies& records){
+        if(whiteJellies_||!records.valid()||records.size())return false;
+        whiteJellies_=&records;return true;
+    }
     bool bindSpawners(downwell::GameplaySpawners& records){
         if(spawners_||!records.valid()||records.size())return false;
         spawners_=&records;return true;
@@ -2470,6 +2476,7 @@ private:
     downwell::GameplayPlayerControllers* playerControllers_=nullptr;
     downwell::GameplayScattered* scattered_=nullptr;
     downwell::GameplaySpawners* spawners_=nullptr;
+    downwell::GameplayWhiteJellies* whiteJellies_=nullptr;
     RunControllers* runControllers_=nullptr;
     downwell::GameplayResultInstance* resultInstance_=nullptr;
     LevelNumbers* levelNumbers_=nullptr;

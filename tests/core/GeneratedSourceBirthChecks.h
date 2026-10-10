@@ -282,10 +282,36 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
         const auto replacement=spawners.handle(0);
         assert(replacement.slot==spawnerKey.slot&&replacement.generation!=spawnerKey.generation&&
             spawners.find(replacement)->sourceId==spawnerId+1);
+        auto& jellies=owner->whiteJellies();
+        struct JellyOps {
+            GameplayWhiteJellies& store;InstanceHandle key;
+            bool position(bool y,RunnerImageValue v,RunnerImageValue& out){return store.position(key,y,v,out);}
+            bool playerY(MotionBinary64& v){v={};return true;}
+            bool playerX(MotionBinary64& v){v={};return true;}
+            bool pointDirection(MotionBinary64,MotionBinary64,MotionBinary64,MotionBinary64,MotionBinary64& v){v=MotionBinary64::fromInteger(90);return true;}
+            bool direction(MotionBinary64 v,MotionBinary64& out){out=v;return true;}
+            bool imageSpeed(RunnerImageValue v,RunnerImageValue& out){out=v;return true;}
+        };
+        GameMakerRandom jellyRandom(19);InstanceHandle jelly;
+        assert(jellies.create(899000,{0x43788000u},{0x442f0000u},jellyRandom,
+            [&](auto h){return JellyOps{jellies,h};},jelly)); // 248.5,700 ->256,704
+        InstanceHandle jellyShared;GameplayCollisionView::Record jellyRecord;
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::whiteJelly,jelly,jellyShared)&&
+            GameplayCollisionView(*world).resolve(jellyShared,jellyRecord)&&jellyRecord.whiteJelly==jellies.find(jelly));
+        assert(jellyRecord.whiteJelly->sourceId==899000&&jellyRecord.whiteJelly->x.bits==0x43800000u&&
+            jellyRecord.whiteJelly->y.bits==0x44300000u&&owner->prepareDraw());
+        assert(jellies.activate(jelly,false)&&owner->prepareDraw()&&jellies.activate(jelly,true));
+        assert(jellies.markDestroyed(jelly)&&owner->prepareDraw()&&!jellies.find(jelly)&&
+            !GameplayCollisionView(*world).contains(jellyShared));
+        InstanceHandle jellyReplacement;
+        assert(jellies.create(899001,{0x43788000u},{0x442f0000u},jellyRandom,
+            [&](auto h){return JellyOps{jellies,h};},jellyReplacement));
+        assert(jellyReplacement.slot==jelly.slot&&jellyReplacement.generation!=jelly.generation);
         assert(world->restartFromResults(DeathMenuSequence::Action::Retry,2,300)!=ResultsDestination::none&&
             world->scattered()==store&&!store->find(local)&&!GameplayCollisionView(*world).contains(shared));
         assert(world->spawners()==&spawners&&!spawners.size()&&!spawners.find(spawnerKey)&&
             !GameplayCollisionView(*world).contains(spawnerShared));
+        assert(world->whiteJellies()==&jellies&&!jellies.size()&&!jellies.find(jellyReplacement));
     }
     for(unsigned failure=0;failure<5;++failure){
         auto world=std::make_unique<GameplayWorld>(300,false,1000,false);

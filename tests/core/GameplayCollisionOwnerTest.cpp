@@ -700,6 +700,7 @@ static void checkTypedCollisionView(const GameplayCollisionView& view,GameplayCo
     switch(kind){
         case K::scattered:assert(view.resolveLocal<K::scattered>(local)==reference.scattered);break;
         case K::spawner:assert(view.resolveLocal<K::spawner>(local)==reference.spawner);break;
+        case K::whiteJelly:assert(view.resolveLocal<K::whiteJelly>(local)==reference.whiteJelly);break;
         case K::sideCameraLocker:assert(view.resolveLocal<K::sideCameraLocker>(local)==reference.sideCameraLocker);break;
         case K::player:assert(view.resolveLocal<K::player>(local)==reference.player);break;
         case K::enemy:assert(view.resolveLocal<K::enemy>(local)==reference.enemy);break;
