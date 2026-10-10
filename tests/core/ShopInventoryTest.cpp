@@ -1,11 +1,13 @@
 #include "core/ShopInventory.h"
 #include "core/GameMakerRounding.h"
+#include "ShopPurchaseChecks.h"
 #include <cstdio>
 #include <cstdlib>
 static void require(bool ok, const char* message) {
     if (!ok) { std::fprintf(stderr, "%s\n", message); std::abort(); }
 }
 int main() {
+    require(checkShopPurchasePrefixes(),"registered purchase preserves each accepted prefix on failure");
     using Shop = downwell::ShopInventory;
     const unsigned bases[] = {300,150,500,250,400,1000};
     for (unsigned area = 1; area <= 5; ++area)

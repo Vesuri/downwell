@@ -4,6 +4,7 @@
 #include "core/ShopChildCreation.h"
 #include "core/ShopInventory.h"
 #include "ShopRadioChecks.h"
+#include "ShopPurchaseChecks.h"
 #ifndef DOWNWELL_NATIVE_QUERY_PROBE
 #include <cstdio>
 #include <cstdlib>
@@ -181,6 +182,14 @@ bool shopParentRegistrationCheck(const ObjectPack& objects,unsigned area,unsigne
     if(expected){
         ShopRadioProbe radioStep;radioStep.expectedRadio=shop->radio;
         if(!owner.parentRadioStep(shop->sourceId,radioStep)||!shop->shopBgm||!radioStep.matches("tdlvgmpr"))return false;
+        CurrencyAccount purchaseMoney;purchaseMoney.currency=10000;
+        ShopPurchaseProbe purchase{*shop,purchaseMoney,700};ShopInventory::Purchase result;
+        if(!owner.purchase(shop->sourceId,purchaseMoney,purchase,result)||result!=ShopInventory::Purchase::bought||purchase.calls!=4)return false;
+        const auto itemKey=owner.children().sourceHandle(shop->children.items[0]);
+        const auto keeperKey=owner.children().sourceHandle(shop->children.keeper);
+        if(!records.resolve(itemKey)->destroyRequested||!owner.children().state(keeperKey)->thankful||
+           records.resolve(keeperKey)->imageIndex!=0||
+           owner.children().state(owner.children().sourceHandle(shop->children.cases[0]))->storedItem)return false;
         struct Radio {
             int expected;int view=1020;unsigned views=0,queries=0,stops=0;bool playing=true;
             bool viewY(MotionBinary64& y){++views;y=MotionBinary64::fromInteger(view);return true;}
@@ -193,7 +202,7 @@ bool shopParentRegistrationCheck(const ObjectPack& objects,unsigned area,unsigne
         ++radio.view;
         if(!owner.parentLifetimeEvent(shop->sourceId,false,radio)||radio.views!=3||radio.stops!=2||
            !records.resolve(parent->key)->destroyRequested||records.size()!=11)return false;
-        for(unsigned i=1;i<records.size();++i)if(records.at(i).destroyRequested)return false;
+        for(unsigned i=1;i<records.size();++i)if(records.at(i).destroyRequested!=(records.at(i).instanceId==shop->children.items[0]))return false;
         if(shop->sourceId!=920000||shop->children.table!=920001||shop->children.risingText!=920007||
            shop->children.items[2]!=920010||shop->radio!=(area==5?-1:123)||shop->farewellVariant!=2)return false;
         const auto* item=owner.children().state(owner.children().sourceHandle(shop->children.items[2]));

@@ -756,6 +756,18 @@ dispatches and concrete device-audio bindings remain to be connected;
 registered-world tests do not establish normal frontend shop retirement or
 the parent's still-unimplemented ordinary Step.
 
+The retained owners' checked purchase entry follows blocks 73–80: stock and
+affordability gates precede `thank` and the decrement; grant completes before
+the current balance, cursor, price and stock are read again. Sold-out purchases
+clear the actual case and mark the actual item, then write the keeper's thankful
+flag and image index before rising text and the two sounds. Image/destruction
+writes publish through the same lifecycle binding as ordinary events. Item
+retirement remains deferred to each world's cleanup pass. Grant/text/audio
+are required synchronous dependencies, not successful placeholders. This entry
+admits the existing unsigned currency/three-item domain; a callback leaving
+that domain fails closed, retaining its prefix, rather than wrapping a balance
+or indexing outside the stock. It is not the complete parent interaction event.
+
 Child ownership does not supply the parent Shop's ordinary Step. That event
 begins with `pushi.e 277; pushenv [126]` and ends with `popenv [1]`: the inner
 body visits the Shop population for **each** dispatched Shop Step, not just

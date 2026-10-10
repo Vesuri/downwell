@@ -2756,9 +2756,12 @@ public:
     bool withShopItemEvents(StoredShopChildRegistration<instanceCapacity,Capacity>& owner,Lookup lookup,Tick tick){
         if(!run_.effectsSucceeded)return false;
         if(shopItemStep_||!owner.belongsTo(instances_)||!owner.valid())return run_.effectsSucceeded=false;
-        auto step=[&](const InstanceRecord& record){const auto key=owner.handle(record);return key.generation&&owner.stepItem(key,lookup);};
+        auto step=[&](const InstanceRecord& record,bool cleanup){
+            const auto key=owner.handle(record);
+            return key.generation&&(cleanup?owner.retire(key):owner.stepItem(key,lookup));
+        };
         shopItemStepContext_=&step;
-        shopItemStep_=[](void* p,const InstanceRecord& r){return (*static_cast<decltype(step)*>(p))(r);};
+        shopItemStep_=[](void* p,const InstanceRecord& r,bool cleanup){return (*static_cast<decltype(step)*>(p))(r,cleanup);};
         struct Reset {StartupRuntime& world;~Reset(){world.shopItemStep_=nullptr;world.shopItemStepContext_=nullptr;}} reset{*this};
         const bool ok=tick();return run_.effectsSucceeded=run_.effectsSucceeded&&ok&&owner.valid();
     }
@@ -3261,7 +3264,7 @@ private:
     bool (*shopCaseDispatch_)(void*,const InstanceRecord&,bool,unsigned)=nullptr;
     void* scatteredStepContext_=nullptr;
     bool (*scatteredStep_)(void*,InstanceHandle)=nullptr;
-    bool (*shopItemStep_)(void*,const InstanceRecord&)=nullptr;
+    bool (*shopItemStep_)(void*,const InstanceRecord&,bool)=nullptr;
     void* risingTextContext_=nullptr;
     void* risingTextDrawContext_=nullptr;
     bool (*risingTextDraw_)(void*,const InstanceRecord&)=nullptr;

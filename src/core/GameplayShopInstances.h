@@ -11,6 +11,7 @@
 #include "ShopKeeperAnimation.h"
 #include "ShopLifetimeEvents.h"
 #include "ShopRadioEvents.h"
+#include "ShopPurchaseEvents.h"
 namespace downwell {
 // Native ownership of Shop and its ten synchronous children. Numeric IDs
 // belong to the enclosing room allocator, never to this generation pool.
@@ -125,6 +126,46 @@ public:
             bool resume(){return env.resume(r.shop->radio)&&owner.good_;}
         } ops{*this,r,environment};
         return ShopRadioEvents::step(r.shop->shopBgm,ops)||fail();
+    }
+    // Environment borrows this parent's grant/text/sound scripts. maido(y)
+    // executes scrRisingTextShop with its live msgx/logMaido and supplied y.
+    template<class Environment> bool purchase(InstanceHandle h,CurrencyAccount& currency,
+        Environment& environment,ShopInventory::Purchase& result){
+        if(!ready(h,277)||!records_[h.slot].shop)return fail();
+        auto& parent=records_[h.slot];
+        if(!parent.active||parent.destroyRequested)return fail();
+        struct Ops {
+            GameplayShopInstances& owner;Environment& env;
+            bool grant(unsigned id){return env.grant(id)&&owner.good_;}
+            bool clearCase(unsigned id){return owner.write(id,279,0);}
+            bool destroyItem(unsigned id){
+                const auto key=owner.sourceHandle(id);
+                if(!owner.ready(key,283))return false;
+                auto& r=owner.records_[key.slot];
+                if(!r.active||r.destroyRequested||!owner.binding_.markDestroyed(key,r)||!owner.good_)return false;
+                r.destroyRequested=true;return true;
+            }
+            bool thankKeeper(unsigned id){
+                const auto key=owner.sourceHandle(id);
+                if(!owner.ready(key,280))return false;
+                owner.records_[key.slot].state.thankful=1;return true;
+            }
+            bool resetKeeper(unsigned id){
+                const auto key=owner.sourceHandle(id);
+                if(!owner.ready(key,280))return false;
+                auto& r=owner.records_[key.slot];
+                if(!owner.binding_.imageIndex(key,r,{})||!owner.good_)return false;
+                r.imageIndex={};return true;
+            }
+            bool maido(unsigned id){
+                const auto key=owner.sourceHandle(id);
+                if(!owner.ready(key,280))return false;
+                auto y=owner.records_[key.slot].y.promoted();
+                return y.add(MotionBinary64::fromInteger(-18))&&env.maido(y)&&owner.good_;
+            }
+            bool sound(int id,int priority,const char* group){return env.sound(id,priority,0,1,group)&&owner.good_;}
+        } ops{*this,environment};
+        return ShopPurchaseEvents::buy(*parent.shop,currency,ops,result)||fail();
     }
     bool advanceKeeperAnimation(InstanceHandle h){
         if(!ready(h,280))return fail();auto& r=records_[h.slot];

@@ -1006,6 +1006,7 @@ bool StartupRuntime::cleanupMainOwnedDestroyed(){
             ((r.objectId==238||r.objectId==211)&&timeEffectDispatch_)||
             (r.objectId==212&&risingTextDispatch_)||
             (r.objectId==280&&shopKeeperDispatch_)||
+            (r.objectId==283&&shopItemStep_)||
             (r.objectId==277&&shopParentDispatch_)||
             (r.objectId==269&&boneDispatch_)||
             (r.objectId==220&&(bloodDispatch_||movingFxDispatch_))||
@@ -1033,6 +1034,7 @@ bool StartupRuntime::cleanupMainOwnedDestroyed(){
             }
             if(r.objectId==212)return risingTextDispatch_(risingTextContext_,r,RisingTextPhase::cleanup,0);
             if(r.objectId==280)return shopKeeperDispatch_(shopKeeperContext_,r,ShopKeeperPhase::cleanup,0);
+            if(r.objectId==283)return shopItemStep_(shopItemStepContext_,r,true);
             if(r.objectId==277)return shopParentDispatch_(shopParentContext_,r,ShopParentPhase::cleanup);
             if(r.objectId==269)return boneDispatch_(boneContext_,r,BonePhase::cleanup);
             if(r.objectId==220)return dispatchParentMovingFx(r,BloodPhase::cleanup);
@@ -2009,7 +2011,7 @@ bool StartupRuntime::dispatchObjectEvent(InstanceRecord& instance,
     }
     if(instance.objectId==283&&eventType==3&&eventSubtype==0){
         ++implementedCodeCalls_;
-        return run_.effectsSucceeded=shopItemStep_&&shopItemStep_(shopItemStepContext_,instance);
+        return run_.effectsSucceeded=shopItemStep_&&shopItemStep_(shopItemStepContext_,instance,false);
     }
     if(instance.objectId==289&&scatteredStep_){
         if(eventType==3&&eventSubtype==0){

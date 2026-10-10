@@ -4,6 +4,7 @@
 #include "ShopWorld.h"
 #include "ShopLifetimeEvents.h"
 #include "ShopRadioEvents.h"
+#include "ShopPurchaseEvents.h"
 namespace downwell {
 // Concrete owner for ShopWorld::createRegistered. The compact shop owns stock
 // and menu state; its retained room record owns identity and builtins. Children
@@ -79,6 +80,28 @@ public:
         } ops{*this,*p,*r,environment};
         RunnerImageValue y;std::memcpy(&y.bits,&r->preciseY,4);
         return (roomEnd?ShopLifetimeEvents::roomEnd(ops):ShopLifetimeEvents::endStep(y.promoted(),ops))||fail();
+    }
+    // Environment borrows this parent's grant/text/sound scripts. maido(y)
+    // executes scrRisingTextShop with its live msgx/logMaido and supplied y.
+    template<class Environment> bool purchase(unsigned id,CurrencyAccount& currency,
+        Environment& environment,ShopInventory::Purchase& result){
+        const auto* p=parent(id);auto* r=p?records_.resolve(p->key):nullptr;
+        if(!good_||!r||!p->shop||!r->active||r->destroyRequested)return fail();
+        struct Ops {
+            StoredShopCreationOwner& owner;Environment& env;
+            bool grant(unsigned id){return env.grant(id)&&owner.good_;}
+            bool clearCase(unsigned id){return owner.children_.stored(id,0);}
+            bool destroyItem(unsigned id){return owner.children_.purchaseDestroyItem(id);}
+            bool thankKeeper(unsigned id){return owner.children_.purchaseThankKeeper(id);}
+            bool resetKeeper(unsigned id){return owner.children_.purchaseResetKeeper(id);}
+            bool maido(unsigned id){
+                MotionBinary64 y;
+                return owner.children_.purchaseKeeperY(id,y)&&y.add(MotionBinary64::fromInteger(-18))&&
+                    env.maido(y)&&owner.good_;
+            }
+            bool sound(int id,int priority,const char* group){return env.sound(id,priority,0,1,group)&&owner.good_;}
+        } ops{*this,environment};
+        return ShopPurchaseEvents::buy(*p->shop,currency,ops,result)||fail();
     }
     bool begin(ShopWorld::Instance& shop){
         if(!good_||shop.sourceId||!nextId_||nextId_>0x7fffffffu)return fail();

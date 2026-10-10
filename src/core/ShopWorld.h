@@ -8,6 +8,7 @@
 #include "ProjectileSegment.h"
 #include "EnemyContact.h"
 #include "ShopChildCreation.h"
+#include "MotionBinary64.h"
 namespace downwell {
 // Bounded world ownership and static child masks, separate from shop rendering.
 // Coordinates passed here are integer mask-query positions. Full fractional

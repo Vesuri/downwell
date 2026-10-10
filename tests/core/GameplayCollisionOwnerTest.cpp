@@ -4,6 +4,7 @@
 #include "core/CurrencySmokeComposition.h"
 #include "QuietSkeletonEffects.h"
 #include "ShopRadioChecks.h"
+#include "ShopPurchaseChecks.h"
 #ifndef DOWNWELL_NATIVE_QUERY_PROBE
 #include "SkeletonSoundChecks.h"
 #include "RegisteredSkeletonStompChecks.h"
@@ -38,6 +39,10 @@ struct NativeShopAudio {
     bool setGain(int,downwell::MotionBinary64,int);
 };
 struct NativeShopAllocation {bool operator()(int,unsigned&);};
+bool nativeShopPurchase(downwell::GameplayShopInstances& owner,downwell::InstanceHandle key,
+    downwell::CurrencyAccount& currency,ShopPurchaseProbe& env,downwell::ShopInventory::Purchase& result){
+    return owner.purchase(key,currency,env,result);
+}
 struct NativeShopItemLookup {bool operator()(unsigned,int&);};
 struct NativeKeeperEnvironment {
     bool criminal(bool&);

@@ -5,6 +5,7 @@
 #include "core/GameplayShopInstances.h"
 #include "core/ShopFixtures.h"
 #include "ShopRadioChecks.h"
+#include "ShopPurchaseChecks.h"
 #include <cassert>
 #include <memory>
 #include <vector>
@@ -75,13 +76,21 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
         const auto parentKey=store.sourceHandle(replacement->sourceId);
         ShopRadioProbe radioStep;radioStep.expectedRadio=replacement->radio;
         assert(store.parentRadioStep(parentKey,radioStep)&&replacement->shopBgm&&radioStep.matches("tdlvgmpr"));
+        CurrencyAccount purchaseMoney;purchaseMoney.currency=10000;
+        ShopPurchaseProbe purchase{*replacement,purchaseMoney,2000};ShopInventory::Purchase result;
+        assert(store.purchase(parentKey,purchaseMoney,purchase,result)&&result==ShopInventory::Purchase::bought&&purchase.calls==4);
+        const auto purchased=store.sourceHandle(replacement->children.items[0]);
+        const auto purchaseKeeper=store.sourceHandle(replacement->children.keeper);
+        assert(store.find(purchased)->destroyRequested&&store.find(purchaseKeeper)->state.thankful==1&&
+            store.find(purchaseKeeper)->imageIndex.bits==0&&
+            store.find(store.sourceHandle(replacement->children.cases[0]))->state.storedItem==0);
+        assert(store.retireMarked(purchased)&&!store.find(purchased));
         assert(store.parentLifetimeEvent(parentKey,true,radio)&&radio.stops==1&&!store.find(parentKey)->destroyRequested);
         radio.playing=true;
         assert(store.parentLifetimeEvent(parentKey,false,radio)&&radio.views==2&&radio.queries==1);
         ++radio.view;
         assert(store.parentLifetimeEvent(parentKey,false,radio)&&radio.views==3&&radio.stops==2&&
-            store.find(parentKey)->destroyRequested&&store.size()==11);
-        assert(store.find(store.sourceHandle(replacement->children.items[0]))&&!store.find(store.sourceHandle(replacement->children.items[0]))->destroyRequested);
+            store.find(parentKey)->destroyRequested&&store.size()==10);
         // Admit only the implemented child events, not a placeholder update
         // for the keeper, cases or parent shop. The real world alarm/Step/
         // cleanup phases must own their ordering and retirement.

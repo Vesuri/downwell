@@ -265,6 +265,7 @@ build/amiga-wall-damage-test: tests/platform/amiga/AmigaWallDamageTest.cpp src/p
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
 build/gameplay-collision-owner-test: src/platform/amiga/AmigaWallDamage.h
+build/gameplay-collision-owner-test build/stored-shop-child-test: tests/core/ShopPurchaseChecks.h
 build/gameplay-collision-owner-test build/live-collision-lifecycle-test: tests/core/TimeoutDamageEvents.h
 build/gameplay-collision-owner-test build/live-collision-lifecycle-test: tests/core/RegisteredSkeletonStompChecks.h tests/core/SkeletonSoundChecks.h
 build/gameplay-collision-owner-test build/live-collision-lifecycle-test: tests/core/BlastSkeletonChecks.h
@@ -2131,7 +2132,7 @@ build/consumables-test: tests/core/ConsumablesTest.cpp src/core/PlayerMotion.cpp
 test-consumables: build/consumables-test
 	./build/consumables-test
 .PHONY: test-shop-inventory
-build/shop-inventory-test: tests/core/ShopInventoryTest.cpp src/core/ShopInventory.h src/core/CurrencyAccount.h src/core/GameMakerRounding.h
+build/shop-inventory-test: tests/core/ShopInventoryTest.cpp tests/core/ShopPurchaseChecks.h $(wildcard src/core/*.h)
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
 test-shop-inventory: build/shop-inventory-test

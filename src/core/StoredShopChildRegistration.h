@@ -102,6 +102,28 @@ public:
         if(!good_||!e||!e->state.initialized||e->object!=279||value>0x7fffffffu)return fail();
         e->state.storedItem=int(value);return true;
     }
+    bool purchaseDestroyItem(unsigned id){
+        const auto key=sourceHandle(id);auto* e=entry(key);auto* r=e?record(*e):nullptr;
+        if(!good_||creating_||!r||!e->state.initialized||e->object!=283||!r->active||r->destroyRequested||
+           !lifecycle_.markDestroyed(key,*r)||!good_)return fail();
+        r->destroyRequested=true;return true;
+    }
+    bool purchaseThankKeeper(unsigned id){
+        auto* e=entry(sourceHandle(id));
+        if(!good_||creating_||!e||!record(*e)||!e->state.initialized||e->object!=280)return fail();
+        e->state.thankful=1;return true;
+    }
+    bool purchaseResetKeeper(unsigned id){
+        const auto key=sourceHandle(id);auto* e=entry(key);auto* r=e?record(*e):nullptr;
+        if(!good_||creating_||!r||!e->state.initialized||e->object!=280||
+           !lifecycle_.imageIndex(key,*r,{})||!good_)return fail();
+        r->imageIndex=0;return true;
+    }
+    bool purchaseKeeperY(unsigned id,MotionBinary64& y){
+        auto* e=entry(sourceHandle(id));auto* r=e?record(*e):nullptr;
+        if(!good_||creating_||!r||!e->state.initialized||e->object!=280)return fail();
+        RunnerImageValue value;std::memcpy(&value.bits,&r->preciseY,4);y=value.promoted();return true;
+    }
     bool stepRisingText(InstanceHandle key){
         auto* e=entry(key);auto* r=e?record(*e):nullptr;
         if(!good_||creating_||!r||e->object!=212||!e->state.initialized)return fail();

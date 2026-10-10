@@ -23,6 +23,7 @@ int main(){
     require(rooms.valid()&&objects.valid()&&patterns.valid(),"valid original metadata");
     PackedObjectEvent animationEnd;
     require(!objects.findEvent(280,7,7,animationEnd),"keeper has no inherited Animation End event");
+    require(!objects.findEvent(283,1,0,animationEnd),"purchased item has no inherited Destroy event to dispatch before marking");
     const auto sb=read("generated/downwell-sprites.dwsc"),mb=read("generated/downwell-sprite-masks.dwsm");
     SpriteCollisionPack sprites(sb.data(),sb.size());SpriteMaskPack masks(mb.data(),mb.size());
     require(sprites.valid()&&masks.valid(),"valid collision metadata");
@@ -82,6 +83,12 @@ int main(){
             if(tick==1)require(r->preciseY==-103,"ordinary room Step publishes text movement");
         }
     }
+    const auto purchasedItemKey=owner.children().sourceHandle(itemId);
+    require(owner.children().purchaseDestroyItem(itemId)&&live.instance(itemId)->destroyRequested&&collision->resolve(purchasedItemKey),
+        "purchase marks the retained item before cleanup");
+    require(live.withShopItemEvents(owner.children(),lookup,[&]{live.step(false);return live.effectsSucceeded();})&&
+        !live.instance(itemId)&&!collision->resolve(purchasedItemKey)&&!owner.children().state(purchasedItemKey),
+        "room cleanup retires purchased item from every owner");
     require(owner.clear(),"clear scheduler fixture");layers(live);
     const auto keeperId=owner.children().create(280,0,2000);
     const auto keeperKey=owner.children().sourceHandle(keeperId);
