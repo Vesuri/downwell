@@ -1,8 +1,25 @@
 set pagination off
 set confirm off
 target remote 127.0.0.1:2345
+break downwellStartupFailed
+commands
+    silent
+    printf "Startup failed before results verification: reason=%lu Chip free=%lu largest=%lu remaining=%lu\n", gDownwellStartupFailure, gDownwellStartupChipFree, gDownwellStartupChipLargest, gDownwellStartupChipRemaining
+    quit 1
+end
+break downwellSceneStackFailed
+commands
+    silent
+    printf "Scene stack guard failed before results verification\n"
+    quit 1
+end
 break downwellResultsRestartReady
 continue
+if gDownwellPreciseMaskChecks != 2
+    printf "Native terrain mask probe did not complete\n"
+    quit 1
+end
+printf "Initial Chip allocation: free=%lu largest=%lu remaining=%lu; native terrain mask checks=%lu\n", gDownwellStartupChipFree, gDownwellStartupChipLargest, gDownwellStartupChipRemaining, gDownwellPreciseMaskChecks
 if gDownwellResultsRestartCount != 3 || gDownwellResultsRestartMask != 7
     printf "Not all results destinations executed\n"
     quit 1

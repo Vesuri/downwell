@@ -2018,22 +2018,19 @@ __attribute__((noinline)) static int runDownwell(void) {
         // Exercise the target's actual precise-mask route, not an occupancy
         // answer. This does not replace the legacy live collision adapters.
         // The verification callback probes resources only, not game events.
-        // Keep this full heterogeneous phase workspace off the task stack.
-        using MaskPhase=downwell::RunnerStepSnapshot<downwell::GameplayCollisionView::capacity>;
-        alignas(MaskPhase) static UBYTE maskPhaseStorage[sizeof(MaskPhase)];
-        auto& maskPhase=*new(maskPhaseStorage) MaskPhase;
+        // This is a resource-query probe, not an event dispatch. Borrow the
+        // registration stream rather than allocating a full room snapshot.
+        // Terrain may be run-owned; never consult the unused scalar store.
         bool testedWall=false;
-        const bool maskChecksSucceeded=collisionOwner.dispatchStepPhase(2,maskPhase,
-            [&](downwell::InstanceHandle shared,const downwell::PackedObjectEvent& event){
-            if(testedWall||event.codeId!=986)return true;
-            downwell::GameplayCollisionView::Kind kind;downwell::InstanceHandle local;
-            if(!downwell::GameplayCollisionView::decode(shared,kind,local)||
-                kind!=downwell::GameplayCollisionView::Kind::terrain)return false;
-            const auto wall=collisionOwner.terrain().find(local);
-            if(!wall||wall->objectId!=60||!wall->active)return false;
+        const bool maskChecksSucceeded=collisionOwner.visitRegistrationOrder(
+            [&](downwell::InstanceHandle shared,int object,std::uint32_t flags){
+            if(testedWall||object!=60||(flags&0x100003u))return true;
+            GameplayWorld::NativeTerrain::Identity wall;bool active,destroyed;
+            if(!downwell::GameplayCollisionView(port).readTerrain(shared,wall,active,destroyed)||
+                wall.object!=60||!active||destroyed)return false;
             bool hit=false;
-            if(!collisionOwner.terrainPositionMeeting(60,downwell::MotionBinary64::fromInteger(wall->x),
-                downwell::MotionBinary64::fromInteger(wall->y),collisionMasks,hit)||!hit)return false;
+            if(!collisionOwner.terrainPositionMeeting(60,downwell::MotionBinary64::fromInteger(wall.x),
+                downwell::MotionBinary64::fromInteger(wall.y),collisionMasks,hit)||!hit)return false;
             ++gDownwellPreciseMaskChecks;testedWall=true;
             return true;
         });

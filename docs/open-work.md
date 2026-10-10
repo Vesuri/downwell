@@ -29,12 +29,11 @@ behavior, both backend integrations and relevant original-game verification.
 
 ## 0. Restore a runnable, measured A500 baseline
 
-- Verify free/largest Chip blocks and peak allocations through complete startup,
-  gameplay, transitions and Retry at explicit 512 KiB Chip / 8 MiB Fast,
-  68000 settings. Check scene-bank lifetimes and resident shared-plane views
-  across handoffs, not just the allocation boundary and first gameplay frames.
-  Preserve the user's local 1 MiB launcher workaround until that wider check
-  passes; do not silently raise verification memory or discard source behavior.
+- Measure transient peak allocations and free/largest Chip blocks during bank
+  loads at explicit 512 KiB Chip / 8 MiB Fast, 68000 settings. Keep startup,
+  gameplay and results/Retry residency checks as regression gates; successful
+  handoffs and the initial allocation balance do not measure transient peaks.
+  Do not silently raise verification memory or discard source behavior.
 - Extend the bounded SKIP_TO_GAME contact audit with a comparable pre-regression
   workload; distinguish behavior/input-path changes from increased per-frame work.
   Report quiet, firing/combat, generation and field windows with worst-frame
