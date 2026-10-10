@@ -909,8 +909,9 @@ int main(){
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native}){
         const auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
         ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
+        const auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
-            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+            GameplayTerrainInstances::WallCollision{},&rooms,mode);
         auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),owner->breakableBinding(),owner->playerBinding(),nullptr);
         assert(owner->attach(*world));auto& effects=owner->movingEffects();InstanceHandle local,shared;
         assert(effects.create(990001,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(512),local));
@@ -920,7 +921,32 @@ int main(){
         unsigned count;assert(owner->population(220,count)&&count==1);
         unsigned frames;assert(sprites.frameCount(704,frames)&&effects.sprite(local,704,frames)&&
             effects.imageSpeed(local,MotionBinary64::fromInteger(int(frames))));
+        auto oracle=std::make_unique<ActorDrawOrderVerification>();
+        const auto checkDraw=[&](std::initializer_list<InstanceHandle> expected){
+            assert(owner->prepareDraw());
+            assert(oracle->verify(*world));
+            // Repeat to exercise the prepared read-only cache as well as its rebuild.
+            for(unsigned repeat=0;repeat<2;++repeat){
+                auto next=expected.begin();
+                assert(world->visitRoomActorsReadOnly([&](auto kind,InstanceHandle key,auto depth){
+                    if(kind!=GameplayWorld::DrawActor::movingFx)return true;
+                    assert(next!=expected.end()&&key.slot==next->slot&&key.generation==next->generation&&
+                        !(depth.bits&0x7fffffffu));++next;return true;
+                })&&next==expected.end());
+            }
+        };
+        checkDraw({local});
+        InstanceHandle newer;
+        assert(effects.create(990002,MotionBinary64::fromInteger(248),MotionBinary64::fromInteger(512),newer)&&
+            effects.sprite(newer,704,frames));
+        checkDraw({newer,local});
+        assert(effects.activate(newer,false)&&owner->reconcileActivation());checkDraw({local});
+        assert(effects.activate(newer,true)&&owner->reconcileActivation());checkDraw({newer,local});
+        assert(effects.imageSpeed(newer,MotionBinary64::fromInteger(int(frames)))&&
+            effects.advanceAnimation(newer));
+        checkDraw({local});assert(!effects.find(newer));
         assert(effects.advanceAnimation(local)&&effects.find(local)->destroyRequested&&effects.retire(local));
+        checkDraw({});
         assert(!GameplayCollisionView(*world).contains(shared)&&owner->population(220,count)&&!count&&owner->valid());
     }
     {
