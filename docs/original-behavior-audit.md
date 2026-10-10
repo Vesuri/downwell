@@ -1066,7 +1066,12 @@ priority over the left-edge adjustment when text exceeds both bounds. It sets
 horizontal alignment to centre even on a hidden flashing frame, then restores
 left alignment. The shared Draw entry delegates the original four-black-pass
 border text operation. Odd widths retain
-half-pixel placement rather than rounding before alignment.
+half-pixel placement rather than rounding before alignment. `ShopTextDraw`
+is the single event body used by stored and native `drawRisingText` ownership
+entries; native callers can dispatch it at the text child's mixed layer slot.
+Each entry retains completed state writes and latches rejected draw operations.
+This event body does not supply native glyph composition or replace the
+currently unbound Amiga Shop command collector.
 
 The shared `Game` layer walk dispatches object 212 through
 `withRisingTextDraw`; an unbound live text fails rendering rather than silently

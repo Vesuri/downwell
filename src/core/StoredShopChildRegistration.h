@@ -10,6 +10,7 @@
 #include "ShopKeeperAnimation.h"
 #include "RunnerSpriteChange.h"
 #include "ShopMenuEvents.h"
+#include "ShopTextDraw.h"
 #include <cstring>
 namespace downwell {
 // Synchronous Create ownership for Shop's ten children. This is deliberately
@@ -317,32 +318,7 @@ public:
         if(!r->active||r->destroyRequested)return true;
         auto& s=e->state;RunnerImageValue px,py;
         std::memcpy(&px.bits,&r->preciseX,4);std::memcpy(&py.bits,&r->preciseY,4);
-        if(!ops.widthHashText(s.text,s.textWidth)||!good_)return fail();
-        s.drawX=px.promoted();MotionBinary64 half,viewX,viewWidth;
-        if(!multiplyBinary64(s.textWidth,{0x3fe00000u,0},half))return fail();
-        auto over=px.promoted();
-        if(!over.add(half)||!ops.view(0,viewX)||!good_||!ops.view(2,viewWidth)||!good_||!viewX.add(viewWidth))return fail();
-        viewX.high^=0x80000000u;if(!over.add(viewX))return fail();s.overXview=over;
-        auto under=px.promoted();half.high^=0x80000000u;
-        if(!under.add(half)||!ops.view(0,viewX)||!good_)return fail();
-        viewX.high^=0x80000000u;if(!under.add(viewX))return fail();s.underXview=under;
-        int comparison;
-        if(!compareRunnerReal(over,MotionBinary64::fromInteger(-10),comparison))return fail();
-        if(comparison>0){
-            over.high^=0x80000000u;
-            if(!s.drawX.add(over)||!s.drawX.add(MotionBinary64::fromInteger(-10)))return fail();
-        }else{
-            if(!compareRunnerReal(under,MotionBinary64::fromInteger(10),comparison))return fail();
-            if(comparison<0){
-                under.high^=0x80000000u;
-                if(!s.drawX.add(under)||!s.drawX.add(MotionBinary64::fromInteger(10)))return fail();
-            }
-        }
-        if(!ops.align(1)||!good_)return fail();
-        // drawing's source domain is integer +/-1 (or zero); the selected
-        // runner's numeric conversion is positive, not C++ nonzero truth.
-        if(s.drawing>0&&(!ops.borderTextBlack(s.text,s.drawX,py.promoted())||!good_))return fail();
-        return (ops.align(0)&&good_)||fail();
+        return ShopTextDraw::draw(s,px,py,ops,[&]{return good_;})||fail();
     }
     bool clear(){
         if(creating_)return fail();

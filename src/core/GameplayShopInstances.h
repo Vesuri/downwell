@@ -15,6 +15,7 @@
 #include "ShopViewEvents.h"
 #include "ShopMenuEvents.h"
 #include "ShopParentEvents.h"
+#include "ShopTextDraw.h"
 namespace downwell {
 // Native ownership of Shop and its ten synchronous children. Numeric IDs
 // belong to the enclosing room allocator, never to this generation pool.
@@ -39,6 +40,12 @@ public:
     GameplayShopInstances(const ObjectPack& objects,const SpriteCollisionPack& sprites,Binding binding={})
         :objects_(objects),sprites_(sprites),binding_(binding){}
     bool valid()const{return good_;}
+    template<class Ops> bool drawRisingText(InstanceHandle h,Ops& ops){
+        if(!ready(h,212))return fail();
+        auto& r=records_[h.slot];
+        if(!r.active||r.destroyRequested)return true;
+        return ShopTextDraw::draw(r.state,r.x,r.y,ops,[&]{return good_;})||fail();
+    }
     unsigned size()const{return count_;}
     InstanceHandle handle(unsigned slot)const{
         return slot<capacity?InstanceHandle{slot,records_[slot].lifetimeId}:InstanceHandle{};

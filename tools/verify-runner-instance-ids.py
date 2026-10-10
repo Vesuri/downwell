@@ -359,8 +359,11 @@ keeper_step = assembly("gml_Object_shopKeeper_Step_0",
 assert keeper_step.index("call.i instance_destroy(argc=0)") < keeper_step.index("pushi.e 284")
 assert keeper_step.index("pushi.e 284") < keeper_step.rindex("pushglb.v global.area")
 assert "push.v self.image_speed\npushi.e 2\ndiv.i.v\npop.v.v self.image_speed" in keeper_step
-assembly("gml_Object_fxRisingText_Draw_0",
+rising_draw = assembly("gml_Object_fxRisingText_Draw_0",
     "b3f4de1e393b0608999219ff82fba8a18679e5f526e3295f4b440e283cf6c7cc")
+assert rising_draw.index("self.overXview\npushi.e -10\ncmp.i.v GT") < rising_draw.index("self.underXview\npushi.e 10\ncmp.i.v LT")
+assert "push.v self.drawing\nconv.v.b\nbf [6]" in rising_draw
+assert rising_draw.count("call.i gml_Script___view_get(argc=2)") == 3
 assembly("gml_GlobalScript_scrDrawBorderTextBlack",
     "fa8d7e4e10625d3474e6ca2e2d1ed674d5c25c3ccc2b23a264215ca22bf93d6b")
 item_step = assembly("gml_Object_objObtainableUg_Step_0",

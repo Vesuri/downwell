@@ -10,6 +10,7 @@
 #include "ShopMenuChecks.h"
 #include "ShopParentChecks.h"
 #include "ShopSpeechChecks.h"
+#include "ShopTextDrawChecks.h"
 #include "../../generated/downwell-shop-text.h"
 #include <cassert>
 #include <memory>
@@ -17,6 +18,7 @@
 inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
     const downwell::SpriteCollisionPack& sprites,const downwell::SpriteMaskPack& masks,const downwell::RoomPack& rooms){
     using namespace downwell;
+    assert(shopTextDrawPrefixes());
     std::vector<unsigned> referenceShopDraw;
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
                   GameplayCollisionOwner::Ownership::nativeScenery}){
@@ -107,6 +109,13 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             unsigned replacements=0;
             for(auto id:fresh){assert(id!=previous);replacements+=id==created;}
             assert(replacements==1);
+            ShopTextDrawProbe draw;
+            assert(world->visitRoomActors([&](GameplayWorld::DrawActor kind,InstanceHandle local,RunnerImageValue){
+                if(kind!=GameplayWorld::DrawActor::shop)return true;
+                const auto* r=store.find(local);assert(r);
+                return r->objectId!=212||store.drawRisingText(local,draw);
+            }));
+            assert(draw.good&&draw.calls==7&&draw.draws==1);
         }
         const unsigned replacementId=next;
         assert(world->restartFromResults(DeathMenuSequence::Action::Retry,2,300)==ResultsDestination::gameplay);
