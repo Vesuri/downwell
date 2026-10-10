@@ -7,6 +7,73 @@
 inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
     const downwell::SpriteCollisionPack& sprites){
     using namespace downwell;
+    // Scattered16 event order, including child Create RNG and failure prefixes.
+    // These are event tests, not admission of natural encounters.
+    struct RandomAudit {
+        std::vector<int> order;
+        unsigned chooseIndexSmall(unsigned n){order.push_back(100+int(n));return n-1;}
+    };
+    struct ScatteredEffects {
+        RandomAudit& random;unsigned failAt=0,calls=0;int style=0;
+        bool knees=true;MotionBinary64 speed=MotionBinary64::fromInteger(1);
+        bool op(int code){random.order.push_back(code);return ++calls!=failAt;}
+        bool outOfView(){return op(1);}
+        bool currency(int n){assert(n==2);return op(2);}
+        bool attractGem(){return op(3);}
+        bool createDebris(){return op(4);}
+        bool debrisYSpeed(MotionBinary64 v){assert(v.high==0xbfe00000u&&!v.low);return op(5);}
+        bool sound(int s,int volume,int pan,int pitch){
+            assert(!pan&&pitch==1&&((s==174&&volume==50)||(s==93&&volume==60)));return op(6);
+        }
+        bool sprite(int s){assert(s==551);return op(7);}
+        bool playerYSpeed(MotionBinary64& v){v=speed;return op(8);}
+        bool playStyle(int& v){v=style;return op(9);}
+        bool jump(int zero,MotionBinary64 v){assert(!zero&&!v.low&&v.high==(style==2?0x3ff80000u:0x40040000u));return op(10);}
+        bool shake(int a,int b){assert(a==2&&b==4);return op(11);}
+        bool explodingKnees(bool& v){v=knees;return op(12);}
+        bool createBlast(){return op(13);}
+    };
+    for(unsigned failure=0;failure<=9;++failure){
+        GameplayScattered store;DeferredCreateInstance command(289,240,700);
+        assert(store.adopt(899998,command));const auto key=store.handle(0);
+        RandomAudit random;ScatteredEffects effects{random};
+        assert(store.playerContact(key,random,effects));
+        assert((random.order==std::vector<int>{8,9,10,11,12,13,103,6}));
+        assert(store.find(key)->objHp==0&&store.find(key)->stomped==1);
+        random.order.clear();effects.calls=0;effects.failAt=failure;
+        assert(store.step(key,random,effects)==!failure);
+        const std::vector<int> expected{1,2,3,4,5,4,5,104,6,7};
+        const unsigned length=failure?(failure>=8?failure+1:failure):10;
+        assert(random.order==std::vector<int>(expected.begin(),expected.begin()+length));
+        assert(store.find(key)->scriptActive==(failure?1:0));
+        if(failure){assert(!store.step(key,random,effects)&&random.order.size()==length);}
+        else {
+            assert(store.find(key)->active); // Script active=0 is not deactivation.
+            assert(store.find(key)->spriteId==551&&store.find(key)->maskId==550&&
+                store.find(key)->imageIndex.bits==0);
+            random.order.clear();assert(store.step(key,random,effects));
+            assert((random.order==std::vector<int>{1}));
+        }
+    }
+    for(unsigned failure=0;failure<=7;++failure){
+        GameplayScattered::Record state;RandomAudit random;ScatteredEffects effects{random,failure};effects.style=2;
+        assert(ScatteredEvents::playerContact(state,random,effects)==!failure);
+        const std::vector<int> expected{8,9,10,11,12,13,103,6};
+        const unsigned length=failure?(failure==7?8:failure):8;
+        assert(random.order==std::vector<int>(expected.begin(),expected.begin()+length));
+        assert(state.objHp==(failure==1?1:0)&&state.stomped==(failure==1?0:1));
+    }
+    {
+        GameplayScattered::Record state;RandomAudit random;ScatteredEffects effects{random};
+        for(auto speed:{MotionBinary64{},MotionBinary64::fromInteger(-1)}){
+            effects.speed=speed;random.order.clear();
+            assert(ScatteredEvents::playerContact(state,random,effects)&&state.objHp==1);
+            assert((random.order==std::vector<int>{8}));
+        }
+        state.scriptActive=0;random.order.clear();
+        assert(ScatteredEvents::playerContact(state,random,effects)&&random.order.empty());
+        state.hitStun=5;ScatteredEvents::alarm0(state);assert(!state.hitStun);
+    }
     for(unsigned failure=0;failure<=6;++failure){
         struct Audit {
             using Record=GameplayScattered::Record;unsigned calls=0,failure;

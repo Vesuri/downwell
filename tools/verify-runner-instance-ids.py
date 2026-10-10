@@ -241,3 +241,9 @@ assembly("gml_Object_parentShootableThing_Create_0",
     "f5c0c5d89f5db5d6ecc01a01c961592fb0a0e413eda14df7c402ed936f487a40")
 assembly("gml_Object_Scattered16_Create_0",
     "52b39e49f629e574734e1c9a841513b2194db09abf5e0090d4f582f775d378cd")
+assembly("gml_Object_Scattered16_Step_0",
+    "28f7516d6d107d7dadbf1ccae5a02792436e188cbb5c97f0295754906c4fec8c")
+assembly("gml_Object_Scattered16_Collision_objPlayer_n",
+    "70c90ba626fea6e8b178ce91ab34fffa53dd48be9448d0eca6030f6a866d2bd2")
+assembly("gml_Object_Scattered16_Alarm_0",
+    "b5f534ec4da2c4f3cf6f841a4fbb21b2b3846c8995fa505c362c2154c1f32047")

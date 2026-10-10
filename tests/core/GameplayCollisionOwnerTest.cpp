@@ -24,6 +24,16 @@ namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_
 #include "core/CurrencyHomingMath.h"
 #include "core/TerrainWallContacts.h"
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
+struct NativeScatteredEffects {
+    bool outOfView();bool currency(int);bool attractGem();bool createDebris();
+    bool debrisYSpeed(downwell::MotionBinary64);bool sound(int,int,int,int);bool sprite(int);
+    bool playerYSpeed(downwell::MotionBinary64&);bool playStyle(int&);
+    bool jump(int,downwell::MotionBinary64);bool shake(int,int);bool explodingKnees(bool&);bool createBlast();
+};
+bool nativeScatteredStep(downwell::GameplayScattered& store,downwell::InstanceHandle key,
+    downwell::GameMakerRandom& random,NativeScatteredEffects& effects){return store.step(key,random,effects);}
+bool nativeScatteredContact(downwell::GameplayScattered& store,downwell::InstanceHandle key,
+    downwell::GameMakerRandom& random,NativeScatteredEffects& effects){return store.playerContact(key,random,effects);}
 struct NativeShopBirthOwner {
     bool begin(downwell::ShopWorld::Instance&);
     bool play(int,int,bool,int&);bool setGain(int,downwell::MotionBinary64,int);

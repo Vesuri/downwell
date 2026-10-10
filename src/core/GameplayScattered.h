@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_GAMEPLAY_SCATTERED_H
 #include "InstanceLifecycle.h"
 #include "DeferredInstanceQueue.h"
+#include "ScatteredEvents.h"
 namespace downwell {
 // Scattered16 (289), a shootable/stompable scenery actor, not objSpike_n.
 // Builder adoption must not repeat its already-consumed Create RNG.
@@ -13,6 +14,7 @@ public:
         RunnerImageValue x{},y{},imageIndex{},scaleX{0x3f800000u};
         int spriteId=550,maskId=-1;
         int objHp=1,hit=0,hitStun=0,hitEffect=0,stomped=0,scriptActive=1,scatterType=0;
+        int breakSound=0;
         bool active=true,destroyRequested=false,initialized=false;
     };
     using Binding=RecordLifecycleBinding<Record>;
@@ -22,6 +24,18 @@ public:
     InstanceHandle handle(unsigned slot)const{return slot<capacity?InstanceHandle{slot,records_[slot].lifetimeId}:InstanceHandle{};}
     const Record* find(InstanceHandle h)const{
         return h.generation&&h.slot<capacity&&records_[h.slot].lifetimeId==h.generation?&records_[h.slot]:nullptr;
+    }
+    template<class Random,class Effects> bool step(InstanceHandle h,Random& random,Effects& effects){
+        if(!good_||!find(h)||!records_[h.slot].initialized)return fail();
+        return ScatteredEvents::step(records_[h.slot],random,effects)||fail();
+    }
+    template<class Random,class Effects> bool playerContact(InstanceHandle h,Random& random,Effects& effects){
+        if(!good_||!find(h)||!records_[h.slot].initialized)return fail();
+        return ScatteredEvents::playerContact(records_[h.slot],random,effects)||fail();
+    }
+    bool alarm0(InstanceHandle h){
+        if(!good_||!find(h))return fail();
+        ScatteredEvents::alarm0(records_[h.slot]);return true;
     }
     bool adopt(unsigned source,const DeferredCreateInstance& command){
         if(!good_||!next_||count_==capacity||!source||source>0x7fffffffu||command.objectId!=289||

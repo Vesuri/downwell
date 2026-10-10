@@ -627,6 +627,18 @@ owner and lifetime generations survive Retry. Its ordinary Step, player/bullet
 contacts, reward/debris sequence and mixed Draw admission are still separate
 requirements; creation ownership alone does not admit a complete scenery actor.
 
+The Scattered16 Step calls out-of-view destruction before its health/active
+test, without returning after that call. On break it creates currency (2),
+attracts only `myGem` when stomped, creates two debris instances with a -0.5
+Y-speed setter after each synchronous Create, chooses sound 171–174, plays it
+at volume 50, changes sprite to 551, then clears the script variable `active`.
+That last write is not runner deactivation. Neither mask nor image index is
+reset. Player contact first tests descending motion, sets HP/stomped, bounces
+with 1.5 for style 2 or 2.5 otherwise, shakes (2,4), then optionally creates
+Exploding Knees blast 276 before choosing its sound 91–93. Alarm 0 clears
+hitStun. `ScatteredEvents` preserves these event boundaries; its effect adapter
+must perform real source-ordered child births and setter publication.
+
 `registerLevelExitWithSourceIds` supplies that boundary for the exit chain:
 306 is allocated and registered before its Create; 74 and 255 each request
 their own ID immediately before child registration. Exit-controller and goal
