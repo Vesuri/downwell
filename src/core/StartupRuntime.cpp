@@ -1466,6 +1466,7 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
                 InstanceHandle child;
                 return runtime->spawnBuilderPrimitive(command.objectId,command.x,command.y,child);
             }
+            if(command.objectId==289){InstanceHandle child;return runtime->adoptBuilderScattered(command,child);}
             if (command.objectId == 82 && !runtime->run_.adoptTimeField(
                 command.x,command.y,command.timeFieldRadiusWord()))return false;
             // Publish each child before the builder continues to the next
@@ -1976,6 +1977,13 @@ bool StartupRuntime::dispatchObjectEvent(InstanceRecord& instance,
     if(instance.objectId==283&&eventType==3&&eventSubtype==0){
         ++implementedCodeCalls_;
         return run_.effectsSucceeded=shopItemStep_&&shopItemStep_(shopItemStepContext_,instance);
+    }
+    if(instance.objectId==289&&scatteredStep_){
+        if(eventType==3&&eventSubtype==0){
+            ++implementedCodeCalls_;
+            return run_.effectsSucceeded=scatteredStep_(scatteredStepContext_,instances_.handleAt(unsigned(&instance-&instances_.at(0))));
+        }
+        if(eventType==2&&eventSubtype==0){++implementedCodeCalls_;ScatteredEvents::alarm0(instance.scattered);return true;}
     }
     if(instance.objectId==212&&(eventType==2||(eventType==3&&eventSubtype==0))){
         ++implementedCodeCalls_;
@@ -2546,8 +2554,13 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
         return;
     case 2385: // gml_Object_Scattered16_Create_0
         ++implementedCodeCalls_;
-        if (instance != nullptr)
+        if (instance != nullptr){
             instance->imageSpeed = 0.0F;
+            instance->scattered={};instance->scattered.scatterType=int(instance->imageIndex);
+            const auto key=instances_.handleAt(unsigned(instance-&instances_.at(0)));
+            if(!lifecycle_.mask(key,*instance,550)){run_.effectsSucceeded=false;return;}
+            instance->maskId=550;
+        }
         return;
     case 865: // gml_Object_objInitRm_Create_0
         ++implementedCodeCalls_;
@@ -2871,6 +2884,20 @@ bool StartupRuntime::spawnOrdinaryTimeField(int x,int y,InstanceHandle& key){
     if(result!=ApplyInstanceCommandsResult::success||!instances_.resolve(created))
         return run_.effectsSucceeded=false;
     key=created;return true;
+}
+
+bool StartupRuntime::adoptBuilderScattered(const DeferredCreateInstance& command,InstanceHandle& key){
+    if(!run_.effectsSucceeded||!objectPack_||!deferredCommandsSucceeded_||deferredInstances_.size()||
+       command.objectId!=289||command.integerImageIndex<0||command.integerImageIndex>16||
+       command.imageIndex!=float(command.integerImageIndex)||command.imageSpeed!=0||
+       (command.integerScaleX!=1&&command.integerScaleX!=-1)||command.scaleX!=float(command.integerScaleX))
+        return run_.effectsSucceeded=false;
+    const auto id=nextRuntimeInstanceId_;
+    if(!deferredInstances_.enqueueCreate(command))return run_.effectsSucceeded=false;
+    flushDeferredInstances(instances_,roomId_);
+    const auto* r=instances_.find(id);
+    if(!run_.effectsSucceeded||!deferredCommandsSucceeded_||!r||r->objectId!=289)return run_.effectsSucceeded=false;
+    key=instances_.handleAt(unsigned(r-&instances_.at(0)));return true;
 }
 
 bool StartupRuntime::spawnBuilderPrimitive(int object,int x,int y,InstanceHandle& key){

@@ -36,6 +36,13 @@ template<unsigned WorldCapacity,unsigned Capacity> class StoredDebrisRegistratio
     }
     static float stored(RunnerImageValue v){float f;std::memcpy(&f,&v.bits,4);return f;}
 public:
+    template<unsigned N> bool setYSpeed(InstanceHandle key,DebrisEffects<N>& effects,MotionBinary64 value){
+        const auto* r=records_.resolve(key);
+        auto* e=r?forRecord(*r):nullptr;
+        auto* effect=e?effects.get(e->local):nullptr;
+        if(!succeeded_||!e||!effect||!selected(key,*r,effects)||!value.valid())return fail();
+        effect->ysp=value;return true;
+    }
     StoredDebrisRegistration(InstanceStore<WorldCapacity>& records,const ObjectPack* objects,
         InstanceLifecycleBinding lifecycle,std::uint32_t& nextId,const int& room,bool& succeeded)
         :records_(records),objects_(objects),lifecycle_(lifecycle),nextId_(nextId),room_(room),succeeded_(succeeded){}

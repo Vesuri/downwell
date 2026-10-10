@@ -1407,6 +1407,7 @@ public:
     // Builder-created primitives use the same global ID stream and synchronous
     // resource Create path as room children. Other families must have an owner.
     bool spawnBuilderPrimitive(int object,int x,int y,InstanceHandle& key);
+    bool adoptBuilderScattered(const DeferredCreateInstance& command,InstanceHandle& key);
     template<unsigned Capacity> class BuilderOwner {
         StartupRuntime& world_;
         StoredSkeletonRegistration<instanceCapacity,Capacity>& skeletons_;
@@ -2236,6 +2237,64 @@ public:
     int mainNextMuzzleOffset() const { return mainEmitter_.leg; }
     const Consumables& consumables() const { return run_.consumables; }
     enum class RisingTextPhase {alarm,step,cleanup};
+    template<class Effects> bool collideScatteredPlayer(InstanceHandle key,Effects& effects){
+        auto* r=instances_.resolve(key);
+        if(!run_.effectsSucceeded||!r||r->objectId!=289)return run_.effectsSucceeded=false;
+        return run_.effectsSucceeded=ScatteredEvents::playerContact(r->scattered,random_,effects)&&run_.effectsSucceeded;
+    }
+    template<unsigned Capacity,class Position,class Tile,class Audio,class Tick>
+    bool withScatteredEvents(StoredCurrencyRegistration<instanceCapacity,Capacity>& gems,
+        Position position,Tile tile,SoundPlayEnvironment& environment,Audio& audio,Tick tick){
+        if(!run_.effectsSucceeded||scatteredStep_||!gems.belongsTo(instances_)||!gems.valid())
+            return run_.effectsSucceeded=false;
+        auto step=[&](InstanceHandle key){return stepScattered(key,gems,position,tile,environment,audio);};
+        scatteredStepContext_=&step;
+        scatteredStep_=[](void* p,InstanceHandle h){return (*static_cast<decltype(step)*>(p))(h);};
+        struct Reset {StartupRuntime& w;~Reset(){w.scatteredStep_=nullptr;w.scatteredStepContext_=nullptr;}} reset{*this};
+        const bool ok=tick();return run_.effectsSucceeded=run_.effectsSucceeded&&ok&&gems.valid();
+    }
+    template<unsigned Capacity,class Position,class Tile,class Audio>
+    bool stepScattered(InstanceHandle key,StoredCurrencyRegistration<instanceCapacity,Capacity>& gems,
+        Position position,Tile tile,SoundPlayEnvironment& environment,Audio& audio){
+        auto* caller=instances_.resolve(key);
+        if(!run_.effectsSucceeded||!caller||caller->objectId!=289||!gems.belongsTo(instances_))return run_.effectsSucceeded=false;
+        struct Effects {
+            StartupRuntime& w;InstanceHandle key;StoredCurrencyRegistration<instanceCapacity,Capacity>& gems;
+            Position& position;Tile& tile;SoundPlayEnvironment& environment;Audio& audio;InstanceHandle debris{};
+            InstanceRecord* caller(){auto* r=w.instances_.resolve(key);return r&&r->objectId==289?r:nullptr;}
+            bool outOfView(){
+                MotionBinary64 x,y;if(!position(key,x,y))return false;
+                auto view=MotionBinary64::fromInteger(w.ordinaryStepViewTopQ12_);
+                if(!view.zero())view.high-=12u<<20;
+                auto top=view,bottom=view;int order;
+                if(!top.add(MotionBinary64::fromInteger(-160))||!compareRunnerReal(y,top,order))return false;
+                bool outside=order<0;
+                if(!outside){if(!bottom.add(MotionBinary64::fromInteger(3000))||!compareRunnerReal(y,bottom,order))return false;outside=order>0;}
+                if(!outside||w.roomId_!=mainRoomId)return true;
+                auto* r=caller();if(!r)return false;if(r->destroyRequested)return true;
+                if(w.lifecycle_.hasOwner()&&!w.lifecycle_.markDestroyed(key,*r))return false;
+                r->destroyRequested=true;r->outOfViewDestroyRequested=true;return true;
+            }
+            bool currency(int amount){
+                return w.spawnRegisteredCurrency(gems,[&](auto& out){
+                    if(!position(key,out.x,out.y))return false;const auto* r=caller();if(!r)return false;
+                    out.objectIndex=289;out.moniAmount=r->boxReward.moniAmount;out.myGem=r->boxReward.myGem;
+                    out.atrState=r->boxReward.atrState;out.stomped=MotionBinary64::fromInteger(r->scattered.stomped);return true;
+                },[&](auto v){auto* r=caller();if(!r)return false;r->boxReward.moniAmount=v;return true;},
+                [&](bool v){auto* r=caller();if(!r)return false;r->boxReward.atrState=v;return true;},
+                [&](std::uint32_t v){auto* r=caller();if(!r)return false;r->boxReward.myGem=v;return true;},
+                MotionBinary64::fromInteger(amount),tile);
+            }
+            bool attractGem(){const auto* r=caller();const auto* child=r?w.instances_.find(r->boxReward.myGem):nullptr;
+                return child&&gems.attracted(gems.handle(*child),true);}
+            bool createDebris(){MotionBinary64 x,y;return position(key,x,y)&&w.spawnDebris(x,y,w.run_.stage.area,debris);}
+            bool debrisYSpeed(MotionBinary64 v){return w.ownedDebrisRegistration_.setYSpeed(debris,w.ownedDebrisEffects_,v);}
+            bool sound(int id,int priority,int loop,int cut){auto* r=caller();int voice;
+                return r&&SoundPlayScript::plain(r->sound,environment,audio,id,priority,loop!=0,cut!=0,voice,w.run_.effectsSucceeded);}
+            bool sprite(int id){auto* r=caller();if(!r||!w.lifecycle_.sprite(key,*r,id))return false;r->spriteId=id;return true;}
+        } effects{*this,key,gems,position,tile,environment,audio};
+        return run_.effectsSucceeded=ScatteredEvents::step(caller->scattered,random_,effects)&&run_.effectsSucceeded;
+    }
     template<unsigned Capacity,class Lookup,class Tick>
     bool withShopItemEvents(StoredShopChildRegistration<instanceCapacity,Capacity>& owner,Lookup lookup,Tick tick){
         if(!run_.effectsSucceeded)return false;
@@ -2657,6 +2716,8 @@ private:
     std::uint32_t nextRuntimeInstanceId_ = 105187;
     void* shopCreateContext_=nullptr;
     void* shopItemStepContext_=nullptr;
+    void* scatteredStepContext_=nullptr;
+    bool (*scatteredStep_)(void*,InstanceHandle)=nullptr;
     bool (*shopItemStep_)(void*,const InstanceRecord&)=nullptr;
     void* risingTextContext_=nullptr;
     void* risingTextDrawContext_=nullptr;

@@ -41,8 +41,9 @@ behavior, both backend integrations and relevant original-game verification.
   generation handles for serialized bindings and global lookup order.
   Supply the native generator's source-creation scope from the complete startup
   stream, including spawner 78 and concrete shop ownership. Complete registered
-  Scattered16 (289) mixed Step/contact/Draw admission and the stored-world
-  adapters. Supply the registered destruction adapter with the complete native
+  Scattered16 (289) normal mixed Step/contact/Draw admission on both backends,
+  including bullet contacts and the real player-bounce/Exploding Knees adapter.
+  Supply the registered destruction adapters with the complete native
   allocation stream and real view, tile, audio and settings inputs; explicit
   registered Step tests are not natural scenery encounters.
   Include player-created depth meter/camera/entry-dither and conditional

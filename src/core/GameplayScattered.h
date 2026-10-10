@@ -11,12 +11,10 @@ namespace downwell {
 class GameplayScattered {
 public:
     static constexpr unsigned capacity=64;
-    struct Record {
+    struct Record:ScatteredScriptState {
         unsigned lifetimeId=0,sourceId=0;
         RunnerImageValue x{},y{},imageIndex{},scaleX{0x3f800000u};
-        int spriteId=550,maskId=-1;
-        int objHp=1,hit=0,hitStun=0,hitEffect=0,stomped=0,scriptActive=1,scatterType=0;
-        int breakSound=0;
+        int maskId=-1;
         CurrencyRewardFields reward{};
         SoundPlayState sound{};
         bool active=true,destroyRequested=false,initialized=false;
@@ -66,7 +64,7 @@ public:
             command.integerImageIndex<0||command.integerImageIndex>16)return fail();
         for(const auto& r:records_)if(r.lifetimeId&&r.sourceId==source)return fail();
         unsigned slot=0;while(records_[slot].lifetimeId)++slot;
-        auto& r=records_[slot];r={};r.lifetimeId=next_++;r.sourceId=source;r.active=command.active;++count_;
+        auto& r=records_[slot];r={};r.hitEffect=0;r.lifetimeId=next_++;r.sourceId=source;r.active=command.active;++count_;
         if(!r.x.assignInteger(command.x)||!r.y.assignInteger(command.y)||!binding_.birth(handle(slot),r))return fail();
         // Inherited parentShootableThing Create precedes these setters.
         r.hitEffect=1;

@@ -2,6 +2,10 @@
 #define DOWNWELL_CORE_SCATTERED_EVENTS_H
 #include "RunnerRealComparison.h"
 namespace downwell {
+struct ScatteredScriptState {
+    int objHp=1,hit=0,hitStun=0,hitEffect=1,stomped=0,scriptActive=1,scatterType=0;
+    int breakSound=0,spriteId=550;
+};
 // Object 289's VM events. The caller owns synchronous child creation, queries,
 // setter publication and audio. In particular currency() must retain myGem;
 // attractGem() changes that returned instance, not every gem in the batch.

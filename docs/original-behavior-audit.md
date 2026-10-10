@@ -648,6 +648,17 @@ scene admission or the stored SDL adapter. Player velocity comparison uses the
 runner's real-comparison epsilon, including tiny positive speeds that compare
 equal to zero.
 
+The stored runtime uses the same `ScatteredScriptState` and event functions.
+Its prepared builder entry retains the chosen frame/mirror without new RNG,
+and publishes the explicit mask 550. `withScatteredEvents` dispatches Step and
+alarm 0 through the ordinary room scheduler; it composes registered currency,
+owned published debris, audio and sprite publication. New debris must join
+the same tick's later phases (`stepWithOwnedDebris`), not a separate particle
+tick. The stored-room fixture verifies this composition and subsequent source
+layer traversal. The scope still requires installation with natural player
+contacts, child lifecycles and production audio/settings before normal scene
+admission; fixture stomp callbacks do not implement player damage/bounce.
+
 `registerLevelExitWithSourceIds` supplies that boundary for the exit chain:
 306 is allocated and registered before its Create; 74 and 255 each request
 their own ID immediately before child registration. Exit-controller and goal

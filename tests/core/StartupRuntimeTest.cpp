@@ -152,6 +152,11 @@ struct LifecycleAudit {
     unsigned rejectBirthOccurrence=1,matchingBirths=0;
     unsigned masks=0;
     bool mask(downwell::InstanceHandle h,const downwell::InstanceRecord& r,int next){
+        if(r.objectId==289){
+            require(matches(h,r)&&r.spriteId==550&&r.maskId==-1&&r.imageSpeed==0&&next==550,
+                "scenery Create publishes its explicit sprite mask after prepared image state");
+            return true;
+        }
         ++calls;require(matches(h,r)&&r.active&&r.objectId==116&&r.batActivity.flying&&next==r.spriteId,
                 "host bat mask uses already-published flying sprite");
         if(rejectBatMask)return false;

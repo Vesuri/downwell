@@ -20,6 +20,7 @@
 #include "BreakableState.h"
 #include "SoundPlayScript.h"
 #include "CurrencyRewardFields.h"
+#include "ScatteredEvents.h"
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -87,7 +88,8 @@ struct InstanceRecord {
     AlarmBank alarms;
     WallEndStepState wall{};
     BreakableState box{};
-    CurrencyRewardFields boxReward{};
+    CurrencyRewardFields boxReward{}; // Shared scrCurrencySpawn caller fields for boxes/scenery.
+    ScatteredScriptState scattered{}; // Object 289 only; runner active remains separate.
     std::uint32_t boxMyFx=0; // scrEffectSpawn's source numeric child ID on object 92.
     std::uint32_t bulletMyFx=0; // Last scrEffectSpawn child, retained through destruction requests.
     bool bulletHitIgnore=false;

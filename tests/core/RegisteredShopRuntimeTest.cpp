@@ -25,7 +25,7 @@ int main(){
     require(sprites.valid()&&masks.valid(),"valid collision metadata");
     auto collision=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
     auto liveStorage=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
-        InstanceLifecycleBinding::bindPositionedBirths(*collision));
+        collision->binding());
     require(collision->attach(*liveStorage),"attach actual collision owner");
     auto controlStorage=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns);
     auto& live=*liveStorage;auto& control=*controlStorage;live.skipToGameForTesting();control.skipToGameForTesting();
@@ -80,7 +80,65 @@ int main(){
         }
     }
     require(owner.clear(),"clear scheduler fixture");layers(live);
+    InstanceHandle scenery;const auto sceneryId=live.nextRuntimeInstanceId();
+    DeferredCreateInstance sceneryCommand(289,240,int(live.mainCameraViewY())+100);
+    sceneryCommand.integerImageIndex=12;sceneryCommand.imageIndex=12;sceneryCommand.imageSpeed=0;
+    const auto beforeAdoption=live.randomState().drawCount();
+    require(live.adoptBuilderScattered(sceneryCommand,scenery)&&scenery.generation&&
+        live.instance(sceneryId)->maskId==550&&live.randomState().drawCount()==beforeAdoption,
+        "prepared builder scenery adopts mask and choices without new RNG");
+    struct Contact {
+        bool playerYSpeed(MotionBinary64& v){v=MotionBinary64::fromInteger(1);return true;}
+        bool playStyle(int& v){v=0;return true;}
+        bool jump(int x,MotionBinary64 v){return !x&&v.high==0x40040000u&&!v.low;}
+        bool shake(int a,int b){return a==2&&b==4;}
+        bool explodingKnees(bool& v){v=false;return true;}
+        bool createBlast(){return false;}
+        bool sound(int,int,int,int){return false;}
+    } contact;
+    require(live.collideScatteredPlayer(scenery,contact),"shared scenery stomp event");
+    auto gems=live.currencyRegistration<8>();
+    auto position=[&](InstanceHandle h,MotionBinary64& x,MotionBinary64& y){
+        RunnerImageValue px,py;if(!collision->collisionPosition(h,px,py))return false;
+        x=px.promoted();y=py.promoted();return true;
+    };
+    auto tile=[](InstanceHandle,int depth,MotionBinary64,MotionBinary64,bool& hit){hit=false;return depth==100;};
+    struct BreakAudio {
+        unsigned plays=0;
+        bool isPlaying(int,bool& playing){playing=false;return true;}
+        bool stop(int){return false;}
+        bool play(int id,int priority,bool loop,int& voice){++plays;voice=888;return id>=171&&id<=174&&priority==50&&!loop;}
+        bool getGain(int id,MotionBinary64& gain){gain=MotionBinary64::fromInteger(1);return id==888;}
+        bool setGain(int id,MotionBinary64,int ticks){return id==888&&!ticks;}
+        bool setPitch(int id,MotionBinary64 pitch){return id==888&&pitch.high==0x3ff00000u&&!pitch.low;}
+    } breakAudio;
+    SoundPlayEnvironment environment;
+    const auto childStart=live.nextRuntimeInstanceId();const auto oldFrame=live.instance(sceneryId)->imageIndex;
+    const bool sceneryStep=live.withScatteredEvents(gems,position,tile,environment,breakAudio,[&]{
+        return live.stepWithOwnedDebris({},[](auto,const auto&,bool& frozen){frozen=false;return true;});
+    });
+    if(!sceneryStep){const auto* r=live.instance(sceneryId);
+        std::fprintf(stderr,"scenery failure: next=%u expected-start=%u plays=%u sprite=%d debris=%u healthy-collision=%d\n",
+            live.nextRuntimeInstanceId(),childStart,breakAudio.plays,r?r->spriteId:-1,live.debrisEffects().size(),collision->valid());}
+    require(sceneryStep,"mixed room Step runs registered scenery destruction");
+    const auto* broken=live.instance(sceneryId);
+    require(broken&&broken->spriteId==551&&broken->maskId==550&&broken->imageIndex==oldFrame&&
+        !broken->scattered.scriptActive&&broken->active&&breakAudio.plays==1,"broken scenery retains frame, mask and membership");
+    require(broken->boxReward.myGem==childStart&&live.instance(childStart)->objectId==248&&
+        live.instance(childStart+1)->objectId==370&&live.instance(childStart+2)->objectId==370,
+        "shared room cursor supplies gem and debris births");
+    require(live.debrisEffects().size()==2,"two owned published debris effects");layers(live);
+    require(gems.dispatch(gems.handle(*live.instance(childStart)),[](auto& state,bool&){
+        return state.attracted&&state.getAmount==2;
+    }),"stomp attracts the retained myGem child");
+    for(unsigned local=1;local<=2;++local){const auto* debris=live.debrisEffects().retained(local);
+        require(debris&&debris->ysp.high==0xbfe00000u&&!debris->ysp.low,"post-Create debris speed preserved through birth tick");}
+    unsigned sceneryDraws=0;
+    require(live.visitDrawChecked([&](InstanceHandle,const InstanceRecord& record){
+        if(record.instanceId==sceneryId){++sceneryDraws;return record.spriteId==551&&record.imageIndex==oldFrame;}
+        return true;
+    })&&sceneryDraws==1,"broken scenery remains in source layer Draw traversal");
     bool called=false;
     require(!control.withRegisteredShopCreation(owner,[&]{called=true;return true;})&&!called,"reject foreign room owner");
-    std::puts("Registered shop runtime allocator, layers and RNG passed");
+    std::puts("Registered shop and scenery runtime allocator, effects, layers and RNG passed");
 }
