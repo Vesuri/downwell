@@ -98,3 +98,22 @@ snappyViewh/snappyViewy, wl and mask_index are caller state. Query/callback
 failure must preserve the executed prefix rather than pretending the birth
 completed. Original `falldepth` and selected view values are inputs; camera
 offset or rounded player displacement is not an established substitute.
+
+## Retained wall-background query
+
+`tile_layer_find` is a compatibility GML script, not a native collision
+builtin. Its assembly SHA-256 is
+`f0510e9d42df02317e319f030a7e8a64642b65053a3898ec8d9bd2df42cb7087`,
+pinned by `verify-wall-background.py`. It visits layers at the requested
+depth, then tile elements (type 7). For positive scales it rejects X below
+left, Y below top, X at/above right, then Y at/above bottom, in that order.
+Those are VM real comparisons, including epsilon; they are not pixel-mask
+or rounded-screen-coordinate tests.
+
+`WallBackgroundTiles::contains` implements that boolean query for the store's
+unscaled 16×16 depth-100 wall patches. The query uses retained world positions
+and remains independent of rendering, scrolling and the lifetime of the wall
+which created the patch. It does not return a layer element ID or claim to
+cover arbitrary serialized tiles, negative scales or other depths. Callers
+must establish that this store covers the queried layer before treating it
+as the complete `tile_layer_find` result.

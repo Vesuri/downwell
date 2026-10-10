@@ -92,7 +92,9 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             bool viewY(MotionBinary64& v){v=MotionBinary64::fromInteger(34);return true;}
             bool viewHeight(MotionBinary64& v){v=MotionBinary64::fromInteger(284);return true;}
             bool meeting(MotionBinary64 x,MotionBinary64 y,int object,bool& hit){return owner.spawners().meeting(spawner,x,y,object,hit);}
-            bool tile(int depth,MotionBinary64,MotionBinary64,bool& hit){assert(depth==100);hit=false;return true;}
+            bool tile(int depth,MotionBinary64 x,MotionBinary64 y,bool& hit){
+                return depth==100&&world.wallBackgroundTiles().contains(x,y,hit);
+            }
             bool create(int object,MotionBinary64 x,MotionBinary64 y,unsigned& id){
                 assert(object==115&&!births&&!deactivations);RunnerImageValue px,py;
                 if(!px.assign(x)||!py.assign(y))return false;id=next++;

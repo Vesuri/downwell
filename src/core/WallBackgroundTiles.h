@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_WALL_BACKGROUND_TILES_H
 #define DOWNWELL_CORE_WALL_BACKGROUND_TILES_H
 #include "MotionBinary64.h"
+#include "RunnerRealComparison.h"
 namespace downwell {
 // Retained output of wall code 986, independent of the retiring instance.
 // This is not general layer_tile_create ownership. All entries use resource
@@ -20,6 +21,29 @@ public:
         tiles_[count_++]={x,y};return true;
     }
     void clear(){count_=0;good_=true;}
+    // Boolean projection of gml_Script_tile_layer_find for this store's
+    // unscaled 16x16 depth-100 tiles. Not a general layer/element selector:
+    // callers needing the returned element ID must use ordered layer ownership.
+    // Source comparisons use the runner epsilon, not rasterized coordinates.
+    bool contains(MotionBinary64 x,MotionBinary64 y,bool& hit)const{
+        if(!good_||!x.valid()||!y.valid())return false;
+        for(unsigned i=0;i<count_;++i){
+            const auto& tile=tiles_[i];int order;
+            if(!compareRunnerReal(x,tile.x,order))return false;
+            if(order<0)continue;
+            if(!compareRunnerReal(y,tile.y,order))return false;
+            if(order<0)continue;
+            auto right=tile.x,bottom=tile.y;
+            if(!right.add(MotionBinary64::fromInteger(width))||
+                !compareRunnerReal(x,right,order))return false;
+            if(order>=0)continue;
+            if(!bottom.add(MotionBinary64::fromInteger(height))||
+                !compareRunnerReal(y,bottom,order))return false;
+            if(order>=0)continue;
+            hit=true;return true;
+        }
+        hit=false;return true;
+    }
     // Paint only an explicitly requested screen-space rectangle. The Amiga
     // caller can request a newly exposed strip or damaged retained-cache area;
     // this API does not require whole-frame repainting. Depth scheduling and

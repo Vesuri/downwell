@@ -14,6 +14,8 @@ assert hashlib.sha256((root / "data/data.win").read_bytes()).hexdigest() == dige
 assert manifest["extractor"]["version"] == "0.9.2.0"
 assert hashlib.sha256((export / "Assembly/gml_GlobalScript_tile_add.asm").read_bytes()).hexdigest() == \
     "68bba6cb8861dafcabe5fd469d67d8002c0508dcca330ebf7f9bc182ada8eb8c"
+assert hashlib.sha256((export / "Assembly/gml_GlobalScript_tile_layer_find.asm").read_bytes()).hexdigest() == \
+    "f0510e9d42df02317e319f030a7e8a64642b65053a3898ec8d9bd2df42cb7087"
 resources = manifest["resources"]
 sprite = resources["sprites"][739]
 assert sprite["id"] == 739 and sprite["name"] == "tileCavern"

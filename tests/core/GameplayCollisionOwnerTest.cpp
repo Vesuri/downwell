@@ -140,6 +140,8 @@ bool nativeRegisteredSpawnerStep(downwell::GameplayCollisionOwner& owner,downwel
     NativeSpawnerOps& ops){return owner.stepRegisteredSpawner(key,ops);}
 bool nativeWorldSpawnerStep(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle key,
     NativeSpawnerOps& ops){return owner.stepRegisteredSpawnerWithWorld(key,ops);}
+bool nativeWallTileQuery(const GameplayWorld& world,downwell::MotionBinary64 x,
+    downwell::MotionBinary64 y,bool& hit){return world.wallBackgroundTiles().contains(x,y,hit);}
 bool nativeSpawnerCreate(downwell::SpawnerStep& state,int level,bool hard){return state.createCaverns(level,hard);}
 bool nativeStoredSpawnerCreate(downwell::StoredSpawnerStates<2,1>& states,downwell::InstanceHandle key,
     int level,bool hard){return states.createCaverns(key,level,hard);}
