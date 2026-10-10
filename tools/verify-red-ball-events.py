@@ -13,6 +13,11 @@ event = next(e for e in manifest["resources"]["objects"][118]["events"]
 assert event["actions"][0]["codeId"] == 1247
 print("Pinned red-ball Step: view-gated acceleration, ordered reflection and synchronous death effects")
 for name, digest in (
+    ("gml_GlobalScript_emitMovingFx", "5971093b936584478f261fa56f1201f3a174b1bb750d9a395008d9e4e6d3b108"),
+    ("gml_Object_parentMovingFx_Create_0", "ee1e21a6d8c86f140da3bed0f2eb66e0828f4d2843c9021ac70dac8823c7f64d"),
+    ("gml_Object_parentMovingFx_Step_0", "e2d91724e976a16d0025b17b15b7ab34c824fbb022f5e9c13431b1597e2680a5"),
+    ("gml_Object_parentMovingFx_Other_7", "7fa420002321759f60d9103f49806b50a0673341e139e47b46bb18672ccf6d78"),
+    ("gml_GlobalScript_roundPosition", "8f2c499d8085446183837ed2101bd9252e46494f3cfca1e090a108a7b79d78e4"),
     ("gml_Object_subparentEnemy_Collision_parentTimeField", "03d79d845b4e318d58b395ae57c65e519c181cd56c4478fdb86301fcd1168409"),
     ("gml_GlobalScript_scrInView", "cf66675bc8ea809f5bd42270ceee29d3e50eb9c3aa9d916205006db32e0e3432"),
     ("gml_Object_enmRedBall_Draw_0", "b096cd9f4f3c0e147ef554447d561bbe8dd27305558ce7c1651f8f66093db0d7"),

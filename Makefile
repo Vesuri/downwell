@@ -146,7 +146,14 @@ TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET) $(ALARM_TEST_TARGET
 all: $(TARGET)
 
 .PHONY: test-white-jelly-birth
-test: test-red-ball-birth
+test: test-moving-fx test-red-ball-birth
+.PHONY: test-moving-fx
+test-moving-fx: build/moving-fx-test
+	./build/moving-fx-test
+	python3 tools/verify-red-ball-events.py
+build/moving-fx-test: tests/core/MovingFxTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
 test: test-red-ball-step
 test: test-red-ball-events
 test: test-red-ball-draw
