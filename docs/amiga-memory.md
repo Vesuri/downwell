@@ -90,27 +90,27 @@ interpret restoring this diagnostic's loader fit as a shipping memory reduction.
 
 ## Executable size versus runtime memory
 
-The normal `STRIP=1` build without reference-only collision-mask payloads is
-**2,613,960 bytes**, SHA-256
-`0cda39ec2541059318b9b2b684975b4d84ec7d55e686dc7928a39da22e2780c5`.
+The normal `STRIP=1` build with admitted room payloads and without reference-only
+collision-mask payloads is **2,352,988 bytes**, SHA-256
+`cebbe708b60ce6fd56fac1f9720a779344d23ad673188fdfb304f2a90a2a6ab7`.
 The matching ELF section sizes distinguish payload from runtime allocation:
 
 | Section | Bytes | Stored in the executable? |
 | --- | ---: | --- |
-| Machine code (`.text`) | 1,360,586 | Yes |
-| Read-only data (`.rodata`) | 1,171,432 | Yes |
+| Machine code (`.text`) | 1,361,350 | Yes |
+| Read-only data (`.rodata`) | 909,652 | Yes |
 | Initialized writable data (`.data`) | 34,202 | Yes |
 | Initializer pointer | 4 | Yes |
 | Zero-filled storage (`.bss`) | 4,563,828 | No; allocated at load |
 
-Initialized payload totals 2,566,224 bytes. Hunk relocation and container
-records account for the remaining 47,736 bytes. Stripping cannot remove
+Initialized payload totals 2,305,208 bytes. Hunk relocation and container
+records account for the remaining 47,780 bytes. Stripping cannot remove
 the initialized payload. ELF debug sections are not that payload either.
 
 The pre-repair owner audit attributes roughly 551 KB to
 `GameplayCollisionOwner` and its template instantiations, 260 KB to
 `GameplayWorld`, and 64 KB to spatial-tree machinery. This is linked code
-size, not inclusive call cost. The room pack is 288,248 bytes and the gameplay
+size, not inclusive call cost. The runtime room pack is 26,468 bytes and the gameplay
 pack 234,718 bytes. Other scene/resource banks and precomputed tables make up
 the rest. The 511,580-byte raw collision-mask catalogue is linked only when
 `DOWNWELL_SCENE_VERIFY` supplies its actual consumer: the precise terrain-mask
@@ -127,6 +127,9 @@ Hunk file therefore would not, on its own, prove an A500 memory fit.
 Moving data to sidecar files changes file size, not residency, unless its
 lifetime or representation also changes. The shared DMA plane atlas below
 addresses Chip residency; it does not remove the original CPU-side pack.
+The room projection excludes unreachable source rooms, rather than moving
+their bytes into another resident allocation. Its supported-room union remains
+resident; see [the room contract](room-pack.md#admitted-runtime-projection).
 
 Reproduce section sizes with `m68k-amiga-elf-objdump -h Downwell.elf`, and
 linked symbol sizes with `m68k-amiga-elf-objdump -t Downwell.elf`. Use the

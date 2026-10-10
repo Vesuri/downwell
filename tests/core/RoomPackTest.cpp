@@ -789,6 +789,26 @@ void testStoredLayerDraw(){
 } // namespace
 
 int main(int argc, char** argv) {
+    {
+        auto bytes=makePack();
+        bytes[4]=downwell::RoomPack::projectedFormatVersion;
+        bytes[6]=44;
+        bytes.insert(bytes.begin()+40,{131,0,0,0});
+        downwell::RoomPack projected(bytes.data(),bytes.size());
+        downwell::RunnerLayerIds ids;
+        std::int32_t next=-1;
+        require(projected.valid()&&projected.catalogLayerMaximum()==131&&
+            downwell::PackedRoomLayerLoader::loadCatalogIds(projected,ids)&&
+            ids.allocate(next)&&next==132,"projected rooms preserve absent catalogue identity seed");
+        downwell::PackedRoom absent;
+        require(!projected.findRoom(11,absent),"unadmitted room has no fallback");
+        bytes[40]=12;
+        require(!downwell::RoomPack(bytes.data(),bytes.size()).valid(),"seed below retained layer ID rejected");
+        bytes[43]=128;
+        require(!downwell::RoomPack(bytes.data(),bytes.size()).valid(),"negative catalogue seed rejected");
+        bytes.resize(43);
+        require(!downwell::RoomPack(bytes.data(),bytes.size()).valid(),"truncated projection header rejected");
+    }
     testDecode();
     testBackgroundDecode();
     testBackgroundConstruction();

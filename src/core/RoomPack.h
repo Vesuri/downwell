@@ -19,7 +19,8 @@ enum class RoomPackError {
     badRoomRange,
     badLayerRange,
     badInstanceIdBoundary,
-    badLayerType
+    badLayerType,
+    badCatalogMaximum
 };
 
 struct PackedRoom {
@@ -82,6 +83,9 @@ struct PackedRoomLayer {
 class RoomPack {
 public:
     static constexpr std::uint16_t formatVersion = 4;
+    // Projected packs retain the process-wide source catalogue ID seed even
+    // when room payloads not admitted by this executable are absent.
+    static constexpr std::uint16_t projectedFormatVersion = 5;
     static constexpr std::uint32_t manifestSchema = 3;
     static constexpr std::uint64_t sourceHashPrefix = 0xe00a94be5faf7dc0ULL;
     static constexpr std::size_t headerSize = 40;
@@ -101,6 +105,7 @@ public:
     std::uint32_t layerCount() const { return layerCount_; }
     std::uint32_t membershipCount() const { return membershipCount_; }
     std::uint32_t nextRuntimeInstanceId() const { return nextRuntimeInstanceId_; }
+    std::uint32_t catalogLayerMaximum() const { return catalogLayerMaximum_; }
 
     bool room(std::uint32_t index, PackedRoom& output) const;
     bool findRoom(std::int32_t roomId, PackedRoom& output) const;
@@ -125,6 +130,8 @@ private:
     std::size_t layersOffset_ = 0;
     std::size_t membershipsOffset_ = 0;
     std::uint32_t roomCount_ = 0;
+    std::uint32_t catalogLayerMaximum_ = 0;
+    bool projected_ = false;
     std::uint32_t instanceCount_ = 0;
     std::uint32_t layerCount_ = 0;
     std::uint32_t membershipCount_ = 0;

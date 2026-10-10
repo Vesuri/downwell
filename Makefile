@@ -2533,6 +2533,8 @@ generate-room-pack: generated/room-layer-metadata.json
 	python3 tools/verify-runner-instance-ids.py
 	python3 tools/verify-room-layer-metadata.py
 	tools/generate-room-pack.py
+	tools/generate-room-pack.py --runtime
+	python3 tests/runtime-room-admission-test.py
 
 verify-room-pack: $(ROOM_PACK_TEST_TARGET) $(STARTUP_TEST_TARGET)
 	python3 tools/verify-runner-instance-ids.py

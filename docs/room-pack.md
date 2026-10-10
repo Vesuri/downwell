@@ -21,7 +21,7 @@ No compiler padding is present.
 | Offset | Type | Meaning |
 | ---: | --- | --- |
 | 0 | char[4] | `DWRM` magic |
-| 4 | u16 | Format version, currently 3 |
+| 4 | u16 | Format version, 4 for the complete reference catalogue |
 | 6 | u16 | Header size, 40 |
 | 8 | u32 | Source manifest schema, currently 3 |
 | 12 | u32 | Room count |
@@ -29,18 +29,51 @@ No compiler padding is present.
 | 20 | u32 | Layer count |
 | 24 | u32 | Layer-membership count |
 | 28 | u64 | First eight source SHA-256 bytes |
-| 36 | u32 | First runtime-created object ID (`GEN8.LastObj`) |
+| 36 | u32 | First runtime-created object ID (`GEN8.LastObj + 1`) |
 
 Arrays immediately follow in this order: room records, instance records, layer
 records, then membership instance IDs. Rooms are stored in authoritative
 `GEN8.RoomOrder`, not numeric resource-table order.
 
-## Room record — 40 bytes
+## Admitted runtime projection
+
+The Amiga executable embeds `downwell-runtime-rooms.dwrm`, generated alongside
+the complete reference pack. Its explicit room set is 7 (initialization),
+8 (style selection), 11 (gameplay), 16 (results), and 20 (garden). These are
+the destinations of `StartupRuntime` and the serialized-room consumers of
+`GameplayWorld` and `AmigaMenu`. The recovered initialization selects room 20
+unconditionally; alternative gardens, Steam/demo/debug/trailer rooms are not
+reachable through those callers. Missing rooms fail through `findRoom`; there
+is no fallback to the full catalogue. Admitting another room requires changing
+`RUNTIME_ROOMS` in the generator and reviewing the fixed 28 KiB payload budget.
+
+This projection uses version 5, a 44-byte header, and an additional u32 at offset
+40: the maximum loaded layer ID from the **complete original catalogue**.
+The loader validates every retained layer against that maximum; version 4
+derives the same value while validating the full catalogue. Both seed the
+process layer allocator identically, including after re-entry. Room payload
+indices are rebased, but IDs, serialized order, views, instance bytes and layer
+membership are unchanged. The runtime instance-ID seed is also unchanged.
+
+The sidecar JSON records the full input pack hash, source hash, pinned extractor
+version/commit, generator hash, admitted IDs and budget. The regression test
+checks retained payload equality and that growing an unrelated room by 10,000
+instances leaves the projection byte-identical. Global identity metadata is
+deliberately still global: changing its maximum must change the seed.
+
+The current projection is a permanently resident union of supported rooms,
+not a per-room loading lease. It excludes unreachable content without claiming
+that garden payloads have already been unloaded during gameplay. SDL and
+source-wide fixtures still use the complete reference pack.
+
+## Room record — 488 bytes
 
 `i32 roomId, width, height, speed, creationCodeId; u32 flags,
 firstInstance, instanceCount, firstLayer, layerCount`
 
 Room flag bit 0 is persistence.
+The 40-byte prefix is followed by eight 56-byte serialized view records (14
+signed integers each, in `VIEW_FIELDS` order in the generator).
 
 ## Instance record — 48 bytes
 

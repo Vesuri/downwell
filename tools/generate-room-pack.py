@@ -18,6 +18,13 @@ EXPECTED_ROOMS = 25
 EXPECTED_INSTANCES = 5186
 EXPECTED_LAYERS = 132
 
+# Executable reachability, not every room in the original resource catalogue.
+# StartupRuntime's room transitions and GameplayWorld's result-room admission
+# use these IDs. A new room requires an explicit admission here; missing rooms
+# fail through RoomPack::findRoom rather than loading the reference catalogue.
+RUNTIME_ROOMS = frozenset((7, 8, 11, 16, 20))
+RUNTIME_BUDGET = 28 * 1024
+
 HEADER = struct.Struct("<4sHHIIIIIQI")
 ROOM = struct.Struct("<iiiiiIIIII")
 VIEW = struct.Struct("<14i")
@@ -193,21 +200,77 @@ def atomic_write(path, payload):
         raise
 
 
+def runtime_projection(full):
+    """Retain admitted payloads with original IDs, order and global ID seeds."""
+    header = list(HEADER.unpack_from(full))
+    require(header[:4] == [MAGIC, VERSION, HEADER.size, MANIFEST_SCHEMA],
+            "projection requires a full v4 pack")
+    rooms, instances, layers, members = header[4:8]
+    room_stride = ROOM.size + 8 * VIEW.size
+    instance_base = HEADER.size + rooms * room_stride
+    layer_base = instance_base + instances * INSTANCE.size
+    member_base = layer_base + layers * LAYER.size
+    require(len(full) == member_base + members * MEMBERSHIP.size,
+            "projection input size mismatch")
+    maximum = max((LAYER.unpack_from(full, layer_base + i * LAYER.size)[0]
+                   for i in range(layers)), default=0)
+    require(maximum <= 0x7fffffff, "catalogue layer maximum out of range")
+    room_records, instance_records, layer_records, memberships = [], [], [], []
+    found = set()
+    for i in range(rooms):
+        pos = HEADER.size + i * room_stride
+        room = list(ROOM.unpack_from(full, pos))
+        if room[0] not in RUNTIME_ROOMS:
+            continue
+        require(room[0] not in found, "duplicate admitted room")
+        found.add(room[0])
+        first_instance, count, first_layer, layer_count = room[6:10]
+        require(first_instance + count <= instances and first_layer + layer_count <= layers,
+                "projected room range invalid")
+        room[6], room[8] = len(instance_records), len(layer_records)
+        room_records.append(ROOM.pack(*room) + full[pos + ROOM.size:pos + room_stride])
+        for j in range(first_instance, first_instance + count):
+            at = instance_base + j * INSTANCE.size
+            instance_records.append(full[at:at + INSTANCE.size])
+        for j in range(first_layer, first_layer + layer_count):
+            layer = list(LAYER.unpack_from(full, layer_base + j * LAYER.size))
+            first, count = layer[3:5]
+            require(first + count <= members, "projected membership range invalid")
+            layer[3] = len(memberships)
+            for k in range(first, first + count):
+                at = member_base + k * MEMBERSHIP.size
+                memberships.append(full[at:at + MEMBERSHIP.size])
+            layer_records.append(LAYER.pack(*layer))
+    require(found == RUNTIME_ROOMS, "missing admitted runtime room")
+    header[1:3] = [5, HEADER.size + 4]
+    header[4:8] = [len(room_records), len(instance_records), len(layer_records), len(memberships)]
+    payload = b"".join((HEADER.pack(*header), struct.pack("<I", maximum),
+                        *room_records, *instance_records, *layer_records, *memberships))
+    require(len(payload) <= RUNTIME_BUDGET, "runtime room budget exceeded")
+    return payload
+
+
 def main():
     root = Path(__file__).resolve().parent.parent
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", type=Path,
                         default=root / "extracted/utmt-0.9.2.0/manifest.json")
-    parser.add_argument("--output", type=Path,
-                        default=root / "generated/downwell-rooms.dwrm")
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--runtime", action="store_true")
     parser.add_argument("--layer-metadata", type=Path,
                         default=root / "generated/room-layer-metadata.json")
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
+    if args.output is None:
+        args.output = root / ("generated/downwell-runtime-rooms.dwrm" if args.runtime
+                              else "generated/downwell-rooms.dwrm")
 
     manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
     layer_metadata = json.loads(args.layer_metadata.read_text(encoding="utf-8"))
     payload = build_pack(manifest, layer_metadata)
+    if args.runtime:
+        full_hash = hashlib.sha256(payload).hexdigest()
+        payload = runtime_projection(payload)
     digest = hashlib.sha256(payload).hexdigest()
 
     if args.check:
@@ -218,6 +281,15 @@ def main():
         return
 
     atomic_write(args.output, payload)
+    if args.runtime:
+        atomic_write(args.output.with_suffix(".json"), (json.dumps({
+            "schema": "runtime-room-admission/v1", "rooms": sorted(RUNTIME_ROOMS),
+            "budgetBytes": RUNTIME_BUDGET, "bytes": len(payload), "sha256": digest,
+            "sourceSha256": SOURCE_SHA256, "fullPackSha256": full_hash,
+            "generatorSha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+            "extractor": layer_metadata["extractor"], "version": layer_metadata["version"],
+            "commit": layer_metadata["commit"],
+        }, indent=2) + "\n").encode())
     print(f"room pack written: {len(payload)} bytes sha256 {digest}")
 
 

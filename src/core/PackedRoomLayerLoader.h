@@ -16,12 +16,9 @@ struct PackedRoomLayerLoader {
     // This seeds identities, not room elements or their separate ID counter.
     static bool loadCatalogIds(const RoomPack& pack,RunnerLayerIds& ids){
         if(!pack.valid())return false;
-        for(unsigned i=0;i<pack.layerCount();++i){
-            PackedRoomLayer layer;
-            if(!pack.layer(i,layer)||layer.layerId>0x7fffffffu||
-                !ids.observeLoaded(std::int32_t(layer.layerId)))return false;
-        }
-        return true;
+        // Decoding validates the retained layers against the original global
+        // maximum. Do not require inactive room payloads merely to seed IDs.
+        return ids.observeLoaded(std::int32_t(pack.catalogLayerMaximum()));
     }
     template<unsigned L,unsigned E,unsigned I,class LayerStorage,class Publish>
     static bool load(const RoomPack& pack,int roomId,LayerStorage& layers,

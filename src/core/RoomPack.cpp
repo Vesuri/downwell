@@ -66,13 +66,26 @@ RoomPack::RoomPack(const std::uint8_t* bytes, std::size_t size)
         error_ = RoomPackError::badMagic;
         return;
     }
-    if (readU16(bytes + 4) != formatVersion) {
+    projected_ = readU16(bytes + 4) == projectedFormatVersion;
+    if (readU16(bytes + 4) != formatVersion && !projected_) {
         error_ = RoomPackError::unsupportedVersion;
         return;
     }
-    if (readU16(bytes + 6) != headerSize) {
+    const std::size_t packedHeaderSize = headerSize + (projected_ ? 4 : 0);
+    if (readU16(bytes + 6) != packedHeaderSize) {
         error_ = RoomPackError::badHeaderSize;
         return;
+    }
+    if (size < packedHeaderSize) {
+        error_ = RoomPackError::tooShort;
+        return;
+    }
+    if (projected_) {
+        catalogLayerMaximum_ = readU32(bytes + headerSize);
+        if (catalogLayerMaximum_ > 0x7fffffffU) {
+            error_ = RoomPackError::badCatalogMaximum;
+            return;
+        }
     }
     if (readU32(bytes + 8) != manifestSchema) {
         error_ = RoomPackError::badManifestSchema;
@@ -89,7 +102,7 @@ RoomPack::RoomPack(const std::uint8_t* bytes, std::size_t size)
     membershipCount_ = readU32(bytes + 24);
     nextRuntimeInstanceId_ = readU32(bytes + 36);
 
-    roomsOffset_ = headerSize;
+    roomsOffset_ = packedHeaderSize;
     std::size_t offset = roomsOffset_;
     if (!addRegion(offset, roomCount_, roomRecordSize, size)) {
         error_ = RoomPackError::sizeOverflow;
@@ -132,6 +145,13 @@ bool RoomPack::validateRanges() {
     for (std::uint32_t index = 0; index < layerCount_; ++index) {
         PackedRoomLayer value;
         layer(index, value);
+        if (value.layerId > 0x7fffffffU ||
+            (projected_ && value.layerId > catalogLayerMaximum_)) {
+            error_ = RoomPackError::badCatalogMaximum;
+            return false;
+        }
+        if (!projected_ && value.layerId > catalogLayerMaximum_)
+            catalogLayerMaximum_ = value.layerId;
         if ((value.type != 1 && value.type != 2) ||
             (value.type == 1 && value.membershipCount != 0)) {
             error_ = RoomPackError::badLayerType;
