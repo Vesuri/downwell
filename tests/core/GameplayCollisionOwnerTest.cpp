@@ -14,6 +14,7 @@
 #include "GeneratedSourceBirthChecks.h"
 #endif
 #include "core/BoxWorldEffects.h"
+#include "core/SpawnerStep.h"
 #ifdef DOWNWELL_LOCAL_DRAW_CAPTURE
 namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_CAPTURE; }
 #endif
@@ -24,6 +25,16 @@ namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_
 #include "core/CurrencyHomingMath.h"
 #include "core/TerrainWallContacts.h"
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
+struct NativeSpawnerOps {
+    bool playerY(downwell::MotionBinary64&);bool area(int&);bool fallDepth(downwell::MotionBinary64&);
+    bool death(bool&);bool endReached(bool&);bool enemyCount(int&);bool objectMask(int,int&);bool mask(int);
+    bool viewY(downwell::MotionBinary64&);bool viewHeight(downwell::MotionBinary64&);
+    bool meeting(downwell::MotionBinary64,downwell::MotionBinary64,int,bool&);
+    bool tile(int,downwell::MotionBinary64,downwell::MotionBinary64,bool&);
+    bool create(int,downwell::MotionBinary64,downwell::MotionBinary64,unsigned&);bool deactivate(unsigned);
+};
+bool nativeSpawnerStep(downwell::SpawnerStep& state,downwell::MotionBinary64 y,
+    downwell::GameMakerRandom& random,NativeSpawnerOps& ops){return state.step(y,random,ops);}
 struct NativeScatteredEffects {
     bool outOfView();bool currency(int);bool attractGem();bool createDebris();
     bool debrisYSpeed(downwell::MotionBinary64);bool sound(int,int,int,int);bool sprite(int);

@@ -109,6 +109,7 @@ PLAYER_COLLISION_TEST_TARGET := build/player-collision-test
 PLAYER_COLLISION_TEST_SOURCES := tests/core/PlayerCollisionTest.cpp
 PLAYER_CONTROLS_TEST_TARGET := build/player-controls-test
 GAME_RENDER_TEST_TARGET := build/game-render-test
+
 GAME_RENDER_TEST_SOURCES := tests/core/GameRenderTest.cpp src/core/Game.cpp src/core/HudNumbers.cpp src/core/StartupRuntime.cpp src/core/PlayerMotion.cpp src/core/AreaOneBuilder.cpp src/core/GameMakerRandom.cpp src/core/RoomPack.cpp src/core/ObjectPack.cpp src/core/BuilderPatternPack.cpp
 HUD_NUMBER_TEST_TARGET := build/hud-number-test
 HUD_NUMBER_TEST_SOURCES := tests/core/HudNumbersTest.cpp src/core/HudNumbers.cpp
@@ -143,6 +144,14 @@ TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET) $(ALARM_TEST_TARGET
 .PHONY: all run test trace-area-one extract verify-extraction generate-room-pack verify-room-pack generate-object-pack verify-object-pack generate-sprite-pack verify-sprite-pack generate-font-pack verify-font-pack generate-builder-pattern-pack verify-builder-pattern-pack generate-amiga-hud verify-amiga-hud generate-amiga-game verify-amiga-game verify-native-data verify-amiga-startup verify-amiga-menu-title verify-amiga-menu-entry verify-amiga-menu-wake-frame verify-amiga-menu-title-frame verify-amiga-menu-entry-frame verify-amiga-gameplay-frame verify-amiga-gameplay-active-frame verify-amiga-splash-frame verify-amiga-controls-frame verify-amiga-credits-frame verify-amiga-style-frame verify-amiga-locked-style-frame verify-amiga-selected-style-frame verify-amiga-scenes verify-cross-replay amiga clean
 
 all: $(TARGET)
+
+.PHONY: test-spawner-step
+test: test-spawner-step
+test-spawner-step: build/spawner-step-test
+	./build/spawner-step-test
+build/spawner-step-test: tests/core/SpawnerStepTest.cpp src/core/SpawnerStep.h src/core/GameMakerRandom.cpp src/core/GameMakerRandom.h src/core/RunnerRealComparison.h src/core/MultiplyBinary64.h src/core/MotionBinary64.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/SpawnerStepTest.cpp src/core/GameMakerRandom.cpp
 
 .PHONY: verify-amiga-wall-damage
 test: verify-amiga-wall-damage
