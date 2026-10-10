@@ -2335,14 +2335,16 @@ public:
         return check(world_->stepSpawnerRoomEffect(local,ops));
     }
     // Bind retained world state and resource-backed queries here, not in each
-    // frontend. The environment still owns the actual builder, selected view,
-    // tile layer and synchronous source-ID/Create/deactivation stream.
+    // frontend. The environment owns builder/view/tile inputs and the complete
+    // source-ID stream. Registered steering children use the shared Create
+    // path; other enemy families still require explicit environment handling.
     template<class Environment> bool stepRegisteredSpawnerWithWorld(InstanceHandle shared,Environment& environment){
         View::Kind kind;InstanceHandle local;
         if(!valid()||!world_||!resolves(shared)||!View::decode(shared,kind,local)||kind!=View::Kind::spawner)
             return check(false);
         struct Ops {
             GameplayCollisionOwner& owner;GameplayWorld& world;InstanceHandle key;Environment& env;
+            InstanceHandle pendingChild{};unsigned pendingSource=0;
             bool playerY(MotionBinary64& value){
                 MotionBinary64 x;
                 return ContactCoordinates::playerGlobals(world.player().frameStartXFixed(),
@@ -2364,10 +2366,31 @@ public:
             bool viewY(MotionBinary64& value){return env.viewY(value);}
             bool viewHeight(MotionBinary64& value){return env.viewHeight(value);}
             bool tile(int depth,MotionBinary64 x,MotionBinary64 y,bool& hit){return env.tile(depth,x,y,hit);}
-            bool create(int object,MotionBinary64 x,MotionBinary64 y,unsigned& id){return env.create(object,x,y,id);}
-            bool deactivate(unsigned id){return env.deactivate(id);}
+            bool create(int object,MotionBinary64 x,MotionBinary64 y,unsigned& id){
+                if(pendingChild.generation)return false;
+                if(object!=115&&object!=118)return env.create(object,x,y,id);
+                if(!env.allocateSteeringSource(object,id)||
+                    !owner.createRegisteredSteeringEnemy(object,id,x,y,
+                        [&](auto dy,auto dx,auto& out){return env.atan(dy,dx,out);},pendingChild))return false;
+                pendingSource=id;return true;
+            }
+            bool deactivate(unsigned id){
+                if(!pendingChild.generation)return env.deactivate(id);
+                View::Kind kind;InstanceHandle local;
+                if(id!=pendingSource||!View::decode(pendingChild,kind,local))return false;
+                bool ok=false;
+                if(kind==View::Kind::whiteJelly){
+                    const auto* r=owner.whiteJellies_.find(local);
+                    ok=r&&r->sourceId==id&&owner.whiteJellies_.activate(local,false);
+                }else if(kind==View::Kind::redBall){
+                    const auto* r=owner.redBalls_.find(local);
+                    ok=r&&r->sourceId==id&&owner.redBalls_.activate(local,false);
+                }
+                if(ok){pendingChild={};pendingSource=0;}
+                return ok;
+            }
         } ops{*this,*world_,local,environment};
-        return stepRegisteredSpawner(shared,ops);
+        return check(stepRegisteredSpawner(shared,ops)&&!ops.pendingChild.generation);
     }
     template<class Ops> bool stepRegisteredWhiteJelly(InstanceHandle shared,bool stopped,Ops& ops){
         View::Kind kind;InstanceHandle local;PackedObjectEvent event{};

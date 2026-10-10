@@ -158,6 +158,8 @@ bool nativeStoredWhiteJellyStep(downwell::StoredWhiteJellyStates<8,2>& owner,
     return owner.step(key,stop,random,ops);
 }
 struct NativeSpawnerOps {
+    bool allocateSteeringSource(int,unsigned&);
+    bool atan(downwell::MotionBinary64,downwell::MotionBinary64,downwell::MotionBinary64&);
     bool playerY(downwell::MotionBinary64&);bool area(int&);bool fallDepth(downwell::MotionBinary64&);
     bool death(bool&);bool endReached(bool&);bool enemyCount(int&);bool objectMask(int,int&);bool mask(int);
     bool viewY(downwell::MotionBinary64&);bool viewHeight(downwell::MotionBinary64&);
@@ -3814,7 +3816,8 @@ int main(){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
             GameplayTerrainInstances::WallCollision{},&rooms,mode);
         auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
-            owner->breakableBinding(),owner->playerBinding(),&owner->terrain(),&rooms);
+            owner->breakableBinding(),owner->playerBinding(),
+            mode==GameplayCollisionOwner::Ownership::reference?&owner->terrain():nullptr,&rooms);
         assert(owner->attach(*world));
         // Source can branch on value two even though normal offers cap Drone.
         auto& upgrades=const_cast<UpgradeInventory&>(world->upgrades());upgrades.levels[9]=2;upgrades.levels[15]=1;
@@ -3868,14 +3871,20 @@ int main(){
             assert(owner->spawners().createCaverns(170004,-116,-1000,1,false,spawner)&&
                 GameplayCollisionView::encode(GameplayCollisionView::Kind::spawner,spawner,sharedSpawner));
             struct Environment {
-                unsigned guards=0;
-                bool endReached(bool& value){++guards;value=true;return true;}
-                bool viewY(MotionBinary64&){assert(false);return false;}
-                bool viewHeight(MotionBinary64&){assert(false);return false;}
-                bool tile(int,MotionBinary64,MotionBinary64,bool&){assert(false);return false;}
+                GameplayWorld& world;unsigned guards=0,births=0;bool blocked=true;
+                bool endReached(bool& value){++guards;value=blocked;return true;}
+                bool viewY(MotionBinary64& value){value=MotionBinary64::fromInteger(34+world.cameraOffsetY());return true;}
+                bool viewHeight(MotionBinary64& value){value=MotionBinary64::fromInteger(284);return true;}
+                bool tile(int layer,MotionBinary64 x,MotionBinary64 y,bool& hit){
+                    return layer==100&&world.wallBackgroundTiles().contains(x,y,hit);
+                }
+                bool allocateSteeringSource(int object,unsigned& source){
+                    assert(!blocked&&object==115);source=180000+births++;return true;
+                }
+                bool atan(MotionBinary64 y,MotionBinary64 x,MotionBinary64& out){return portableAtan(y,x,out);}
                 bool create(int,MotionBinary64,MotionBinary64,unsigned&){assert(false);return false;}
                 bool deactivate(unsigned){assert(false);return false;}
-            } environment;
+            } environment{*world};
             GameplayCollisionOwner::EncounterStepOrder phase;
             const auto randomBefore=world->randomDrawCount();
             for(unsigned tick=0;tick<2;++tick){
@@ -3890,6 +3899,22 @@ int main(){
                     !state.channels[0].countdown.low&&environment.guards==tick+1);
             }
             assert(world->randomDrawCount()==randomBefore);
+            // Drive the real depth meter far enough to cross the channel's
+            // threshold, then let the world-backed adapter own child Create
+            // and deactivation (neither reaches Environment's fallback).
+            auto nativeTerrain=std::make_unique<GameplayWorld::NativeTerrain>();
+            assert(mode==GameplayCollisionOwner::Ownership::reference||world->bindNativeTerrain(*nativeTerrain));
+            assert(owner->configureCorpseMasks(masks));
+            assert(fractionalMeter.assign(MotionBinary64::fromInteger(-224))&&
+                owner->playerControllers().position(meter,children.find(meter)->x,fractionalMeter));
+            environment.blocked=false;
+            assert(owner->withEncounterSteps(phase,[&](InstanceHandle h,int object){
+                assert(object==78);return owner->stepRegisteredSpawnerWithWorld(h,environment);
+            },[&]{world->step(0);return world->effectsSucceeded();}));
+            assert(environment.births==1&&owner->whiteJellies().size()==1);
+            const auto* child=owner->whiteJellies().find(owner->whiteJellies().handle(0));
+            assert(child&&child->sourceId==180000&&child->initialized&&child->scriptActive&&!child->active&&
+                child->imageIndex.bits==0);
         }else{
             assert(!world->createPlayerChildren(allocate)&&calls==failure);
         }
