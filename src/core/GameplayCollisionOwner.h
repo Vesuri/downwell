@@ -3028,7 +3028,16 @@ public:
         return check(kind==View::Kind::corpse&&corpses_.writeShootableHit(local));
     }
     bool boundTo(const GameplayWorld& world)const{return valid()&&world_==&world;}
-    bool population(int object,unsigned& count)const{return valid()&&selectorAvailable(object)&&owner_.instanceNumber(object,families_,count);}
+    bool population(int object,unsigned& count)const{
+        if(!valid()||object<0||!families_.flags(unsigned(object)))return false;
+        if(!native_)return selectorAvailable(object)&&owner_.instanceNumber(object,families_,count);
+        unsigned value=0;
+        if(!visitRegistered(0,View::capacity,[&](InstanceHandle,int child,std::uint32_t flags){
+            if(!(flags&0x140003u)&&families_.isA(child,object))++value;
+            return true;
+        }))return false;
+        count=value;return true;
+    }
     bool terrainPositionMeeting(int object,MotionBinary64 x,MotionBinary64 y,const SpriteMaskPack& masks,bool& hit){
         if(native_)return nativeTerrainPositionMeeting(object,x,y,masks,hit);
         return terrainQuery(object)?registeredPositionMeeting(object,x,y,masks,hit):check(false);

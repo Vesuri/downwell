@@ -108,6 +108,9 @@ bool nativeSpawnerMeeting(downwell::GameplaySpawners& owner,downwell::InstanceHa
     downwell::MotionBinary64 x,downwell::MotionBinary64 y,int object,bool& hit){
     return owner.meeting(key,x,y,object,hit);
 }
+bool nativeRegisteredEnemyPopulation(const downwell::GameplayCollisionOwner& owner,unsigned& count){
+    return owner.population(83,count);
+}
 bool nativeWhiteJellyEvents(downwell::WhiteJellyStep& state,bool stop,
     downwell::GameMakerRandom& random,NativeWhiteJellyStepOps& ops){
     return state.enemyContact(random,ops)&&state.effectAlarm(stop,random,ops)&&state.endStep(ops);

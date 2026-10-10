@@ -86,7 +86,7 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             bool fallDepth(MotionBinary64& v){v=MotionBinary64::fromInteger(160);return true;}
             bool death(bool& v){v=false;return true;}
             bool endReached(bool& v){v=false;return true;}
-            bool enemyCount(int& v){v=int(owner.whiteJellies().size());return true;}
+            bool enemyCount(int& v){unsigned n;if(!owner.population(83,n))return false;v=int(n);return true;}
             bool objectMask(int object,int& mask){PackedObject r;if(!objects.findObject(object,r))return false;mask=r.textureMaskId;return true;}
             bool mask(int v){return owner.spawners().mask(spawner,v);}
             bool viewY(MotionBinary64& v){v=MotionBinary64::fromInteger(34);return true;}
@@ -99,12 +99,14 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
                 const bool ok=world.createWhiteJellyWithSourceId(id,px,py,
                     [&](auto h){return Ops{owner.whiteJellies(),h};},child);
                 assert(ok&&owner.whiteJellies().find(child)->initialized&&owner.whiteJellies().find(child)->active);
+                unsigned count;assert(owner.population(83,count)&&count==1);
                 ++births;return ok;
             }
             bool deactivate(unsigned id){
                 const auto* r=owner.whiteJellies().find(child);
                 assert(births==1&&!deactivations&&r&&r->initialized&&r->sourceId==id);
-                ++deactivations;return owner.whiteJellies().activate(child,false);
+                ++deactivations;const bool ok=owner.whiteJellies().activate(child,false);
+                unsigned count;assert(ok&&owner.population(83,count)&&count==0);return ok;
             }
         } spawnOps{*world,*owner,objects,spawner};
         auto oracle=world->randomState();
@@ -416,11 +418,16 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             GameplayCollisionView(*world).resolve(jellyShared,jellyRecord)&&jellyRecord.whiteJelly==jellies.find(jelly));
         assert(jellyRecord.whiteJelly->sourceId==899000&&jellyRecord.whiteJelly->x.bits==0x43800000u&&
             jellyRecord.whiteJelly->y.bits==0x44300000u&&owner->prepareDraw());
+        unsigned familyCount;
+        assert(owner->population(83,familyCount)&&familyCount==2); // Generated enemy 112 and registered jelly.
+        assert(owner->population(115,familyCount)&&familyCount==1);
         assert(spawners.mask(replacement,174));bool candidateHit=false;
         assert(spawners.meeting(replacement,MotionBinary64::fromInteger(256),MotionBinary64::fromInteger(704),83,candidateHit)&&candidateHit);
         assert(jellies.activate(jelly,false));
+        assert(owner->population(83,familyCount)&&familyCount==1);
         assert(spawners.meeting(replacement,MotionBinary64::fromInteger(256),MotionBinary64::fromInteger(704),83,candidateHit)&&!candidateHit);
         assert(jellies.activate(jelly,true));
+        assert(owner->population(83,familyCount)&&familyCount==2);
         assert(spawners.meeting(replacement,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(512),57,candidateHit)&&candidateHit);
         assert(spawners.meeting(replacement,MotionBinary64::fromInteger(-1000),MotionBinary64::fromInteger(-1000),57,candidateHit)&&!candidateHit);
         int retainedX,retainedY;
@@ -493,7 +500,11 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
         assert(jellies.find(jelly)->maskId==174&&jellies.sprite(jelly,176)&&
             jellies.imageIndex(jelly,{})&&jellies.advanceAnimation(jelly)&&owner->prepareDraw());
         assert(jellies.activate(jelly,false)&&owner->prepareDraw()&&jellies.activate(jelly,true));
-        assert(jellies.markDestroyed(jelly)&&owner->prepareDraw()&&!jellies.find(jelly)&&
+        assert(jellies.markDestroyed(jelly)&&jellies.find(jelly)&&owner->population(83,familyCount)&&familyCount==1);
+        assert(owner->population(115,familyCount)&&familyCount==0);
+        familyCount=123;
+        assert(!owner->population(-1,familyCount)&&familyCount==123);
+        assert(owner->prepareDraw()&&!jellies.find(jelly)&&
             !GameplayCollisionView(*world).contains(jellyShared));
         InstanceHandle jellyReplacement;
         assert(jellies.create(899001,{0x43788000u},{0x442f0000u},jellyRandom,
