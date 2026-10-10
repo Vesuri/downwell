@@ -361,6 +361,15 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
             DW_PROFILE_SCOPE(profileActorPreparation);
             if(downwell::RunnerSpatialSplit::less(depth,foregroundDepth)&&!drawForeground())return false;
             if(kind==GameplayWorld::DrawActor::player)return port.findPlayer(key)&&drawPlayer();
+            if(kind==GameplayWorld::DrawActor::scattered){
+                const auto* record=port.scattered()?port.scattered()->find(key):nullptr;
+                std::int32_t x,y,frame,scale;
+                if(!record||!record->x.roundPixel(x)||!record->y.roundPixel(y)||
+                   !record->imageIndex.roundPixel(frame)||!record->scaleX.roundPixel(scale)||
+                   (scale!=1&&scale!=-1)||frame<0||frame>16)return false;
+                return append(record->spriteId,frame,downwellPlayfieldX+x-worldViewX,
+                    y-worldViewY,scale<0);
+            }
             if(kind==GameplayWorld::DrawActor::ditherAbove){
                 const auto* record=port.ditherAbove()?port.ditherAbove()->find(key):nullptr;
                 std::int32_t x,y;

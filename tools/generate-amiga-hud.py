@@ -131,6 +131,7 @@ SELECTIONS = {
         497: None,   # merchant confused
         707: None,   # interaction sign, offline planar and DMA variants
         550: None,   # sprScattered (generated plants)
+        551: None,   # broken scenery, retaining the selected intact frame
         568: None,   # sprDungTorch
         569: None,   # sprGemChunk
         602: None,   # sprFxBoingRed (gem-high muzzle)
@@ -731,7 +732,7 @@ def build_records(manifest, extracted, profile, language_path=None):
                                 originX=canvas.height - sprite["originY"],
                                 originY=sprite["originX"])
                 encoded.append((metadata, 768 + frame_index, stride, data))
-            if (profile == "hud" and sprite_id == 408) or (profile == "game" and sprite_id in (127, 139, 550, 568, 569,
+            if (profile == "hud" and sprite_id == 408) or (profile == "game" and sprite_id in (127, 139, 550, 551, 568, 569,
                     0, 1, 3, 12, 15, 27, 31, 37,
                     153, 154, 163, 164, 166, 168, 170, 172, 173, 177, 186, 187, 188, 206, 278)):
                 mirrored = canvas.transpose(Image.Transpose.FLIP_LEFT_RIGHT)

@@ -36,6 +36,29 @@ int main() {
             auto terrain=std::make_unique<GameplayWorld::NativeTerrain>();
             assert(owner->attach(*world)&&(!native||world->bindNativeTerrain(*terrain))&&owner->configureCorpseMasks(masks));
             {
+                downwell::DeferredCreateInstance command(289,240,128);
+                command.integerImageIndex=12;command.integerScaleX=-1;
+                assert(owner->scattered().adopt(105189,command));
+                const auto key=owner->scattered().handle(0);
+                UBYTE pack[8]{};
+                for(int sprite:{550,551}){
+                    assert(owner->scattered().sprite(key,sprite));
+                    for(bool composite:{false,true}){
+                        AmigaGameplayDrawList list;assert(list.collect(*world,pack,pack+8,160,34,composite));
+                        unsigned seen=0;
+                        for(unsigned i=0;i<list.count;++i)if(list.actors[i].sprite==sprite){
+                            const auto& actor=list.actors[i];
+                            assert(actor.frame==12&&actor.x==190&&actor.y==94&&actor.flip);++seen;
+                        }
+                        assert(seen==1);
+                    }
+                }
+                assert(owner->scattered().markDestroyed(key));
+                AmigaGameplayDrawList retired;assert(retired.collect(*world,pack,pack+8,160,34,true));
+                for(unsigned i=0;i<retired.count;++i)assert(retired.actors[i].sprite!=551);
+                assert(owner->scattered().clear());
+            }
+            {
                 auto list=std::make_unique<AmigaGameplayDrawList>();UBYTE pack[8]{};
                 downwell::InstanceHandle title;
                 assert(owner->levelNumbers().create(105190,{}, {},[](auto,auto& state){
