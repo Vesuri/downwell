@@ -29,6 +29,7 @@
 #include "core/GameplayBuilderController.h"
 #include "core/GameplayPlayerControllers.h"
 #include "core/GameplayScattered.h"
+#include "core/RegisteredScatteredContact.h"
 #include "core/RunControllerInstances.h"
 #include "core/GameplayResultInstance.h"
 #include "core/LevelNumberInstances.h"
@@ -484,6 +485,20 @@ public:
     bool bindScattered(downwell::GameplayScattered& records){
         if(scattered_||!records.valid()||records.size())return false;
         scattered_=&records;return true;
+    }
+    template<class Allocate,class Delay,class Player,class Audio>
+    bool collideScatteredPlayerWithBlast(downwell::InstanceHandle key,Allocate& allocate,Delay delay,Player& player,
+        downwell::SoundPlayEnvironment& environment,Audio& audio){
+        if(!run_.effectsSucceeded||!scattered_)return run_.effectsSucceeded=false;
+        return run_.effectsSucceeded=scattered_->dispatch(key,[&](auto& state){
+            auto blast=[&]{
+                unsigned id=0;if(!allocate(id))return false;
+                const auto* r=scattered_->find(key);downwell::InstanceHandle child;
+                return r&&createBlastWithSourceId(id,r->x.promoted(),r->y.promoted(),delay,child);
+            };
+            auto events=downwell::registeredScatteredContact(*this,state,player,blast,state.sound,environment,audio,run_.effectsSucceeded);
+            return scattered_->playerContact(key,enemyRandom_,events);
+        })&&run_.effectsSucceeded;
     }
     // Room dispatch supplies the current view/room and the shared numeric-ID
     // cursor. These are real registered emissions, not the legacy effect pools.

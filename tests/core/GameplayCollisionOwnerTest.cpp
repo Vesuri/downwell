@@ -69,12 +69,18 @@ bool nativeSkeletonSound(GameplayWorld& world,downwell::SkeletonActor& actor,
     return world.playSkeletonSound(actor,133,environment,audio);
 }
 struct NativeSkeletonStompPlayer {
+    bool playerYSpeed(downwell::MotionBinary64&);
     int playStyle();void setSpinJumping();bool recharge();bool setGrounded(bool);
     bool setHorizontal(downwell::MotionBinary64);bool setVertical(downwell::MotionBinary64);
     bool createBlast(int,int,int);unsigned choose(unsigned);
     downwell::MotionBinary64 playerX();downwell::MotionBinary64 playerY();
     bool emitSmoke(downwell::MotionBinary64,downwell::MotionBinary64,int,int);
 };
+bool nativeScatteredPlayerContact(downwell::GameplayCollisionOwner& owner,
+    const downwell::RunnerCollisionEventContext::Frame& event,bool (*allocate)(unsigned&),bool (*delay)(),
+    NativeSkeletonStompPlayer& player,downwell::SoundPlayEnvironment& environment,NativeSkeletonAudio& audio){
+    return owner.dispatchScatteredPlayerCollision(event,allocate,delay,player,environment,audio);
+}
 bool nativeRegisteredStomp(GameplayWorld& world,downwell::SkeletonActor& actor,
     bool (*allocate)(unsigned&),NativeSkeletonStompPlayer& player,
     downwell::SoundPlayEnvironment& environment,NativeSkeletonAudio& audio,bool& good){

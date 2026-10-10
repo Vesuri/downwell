@@ -659,6 +659,14 @@ layer traversal. The scope still requires installation with natural player
 contacts, child lifecycles and production audio/settings before normal scene
 admission; fixture stomp callbacks do not implement player damage/bounce.
 
+`RegisteredScatteredContact` retains the caller's `scrFjump` and `scrSShake`
+fields, reuses the shared forced-jump script, and creates Exploding Knees through
+the registered blast owner before choosing sound 91–93. Unlike enemy stomp it
+does not check player death, emit blood/smoke or a stomp sound, or recharge a
+second time. The native collision entry validates resource event 2388 and both
+lifetimes. Player selector writes and synchronous recharge effects are explicit
+borrowed dependencies; the compact `stompBounce` helper is not their substitute.
+
 `registerLevelExitWithSourceIds` supplies that boundary for the exit chain:
 306 is allocated and registered before its Create; 74 and 255 each request
 their own ID immediately before child registration. Exit-controller and goal

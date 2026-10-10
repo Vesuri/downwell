@@ -42,7 +42,8 @@ behavior, both backend integrations and relevant original-game verification.
   Supply the native generator's source-creation scope from the complete startup
   stream, including spawner 78 and concrete shop ownership. Complete registered
   Scattered16 (289) normal mixed Step/contact/Draw admission on both backends,
-  including bullet contacts and the real player-bounce/Exploding Knees adapter.
+  including bullet contacts and the live player selector writes/full recharge
+  effects used by the registered forced-jump/Exploding Knees composition.
   Supply the registered destruction adapters with the complete native
   allocation stream and real view, tile, audio and settings inputs; explicit
   registered Step tests are not natural scenery encounters.

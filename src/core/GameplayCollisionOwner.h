@@ -2324,6 +2324,16 @@ public:
             });
         }));
     }
+    template<class Allocate,class Delay,class Player,class Audio>
+    bool dispatchScatteredPlayerCollision(const RunnerCollisionEventContext::Frame& event,
+        Allocate& allocate,Delay delay,Player& player,SoundPlayEnvironment& environment,Audio& audio){
+        View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;
+        if(!valid()||!world_||!resolves(event.self)||!resolves(event.other)||
+           !View::decode(event.self,kind,local)||kind!=View::Kind::scattered||objectOf(event.other)!=35||
+           event.type!=4||event.subtype!=35||!objects_.collisionEvent(289,35,found,binding)||!found||
+           event.owner!=binding.ownerObjectId||event.code!=binding.codeId||event.code!=2388)return check(false);
+        return check(world_->collideScatteredPlayerWithBlast(local,allocate,delay,player,environment,audio));
+    }
     bool dispatchSmokeCollision(const RunnerCollisionEventContext::Frame& event){
         View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;
         if(!valid()||!world_||!resolves(event.self)||

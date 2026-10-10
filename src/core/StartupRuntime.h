@@ -7,6 +7,7 @@
 #include "InstanceStore.h"
 #include "StoredBuilderPublication.h"
 #include "StoredShopCreationOwner.h"
+#include "RegisteredScatteredContact.h"
 #include "RunnerLayerIds.h"
 #include "ScriptEffectRuntimeBinding.h"
 #include "BoxStepDispatch.h"
@@ -2241,6 +2242,17 @@ public:
         auto* r=instances_.resolve(key);
         if(!run_.effectsSucceeded||!r||r->objectId!=289)return run_.effectsSucceeded=false;
         return run_.effectsSucceeded=ScatteredEvents::playerContact(r->scattered,random_,effects)&&run_.effectsSucceeded;
+    }
+    template<unsigned Capacity,class Position,class Player,class Audio>
+    bool collideScatteredPlayerWithBlast(InstanceHandle key,StoredBlastRegistration<instanceCapacity,Capacity>& blasts,
+        Position position,Player& player,SoundPlayEnvironment& environment,Audio& audio){
+        auto* r=instances_.resolve(key);
+        if(!run_.effectsSucceeded||!r||r->objectId!=289||!blasts.belongsTo(instances_))return run_.effectsSucceeded=false;
+        auto blast=[&]{MotionBinary64 x,y;InstanceHandle child;
+            return position(key,x,y)&&spawnBlast(blasts,x,y,child);
+        };
+        auto events=registeredScatteredContact(*this,r->scattered,player,blast,r->sound,environment,audio,run_.effectsSucceeded);
+        return collideScatteredPlayer(key,events);
     }
     template<unsigned Capacity,class Position,class Tile,class Audio,class Tick>
     bool withScatteredEvents(StoredCurrencyRegistration<instanceCapacity,Capacity>& gems,

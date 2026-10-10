@@ -88,15 +88,15 @@ int main(){
         live.instance(sceneryId)->maskId==550&&live.randomState().drawCount()==beforeAdoption,
         "prepared builder scenery adopts mask and choices without new RNG");
     struct Contact {
+        unsigned spins=0,recharges=0;bool grounded=true;MotionBinary64 velocity{};
         bool playerYSpeed(MotionBinary64& v){v=MotionBinary64::fromInteger(1);return true;}
-        bool playStyle(int& v){v=0;return true;}
-        bool jump(int x,MotionBinary64 v){return !x&&v.high==0x40040000u&&!v.low;}
-        bool shake(int a,int b){return a==2&&b==4;}
-        bool explodingKnees(bool& v){v=false;return true;}
-        bool createBlast(){return false;}
-        bool sound(int,int,int,int){return false;}
+        int playStyle(){return 0;}
+        void setSpinJumping(){++spins;}
+        bool recharge(){++recharges;return grounded;}
+        bool setGrounded(bool value){grounded=value;return true;}
+        bool setHorizontal(MotionBinary64){return false;}
+        bool setVertical(MotionBinary64 value){velocity=value;return !grounded;}
     } contact;
-    require(live.collideScatteredPlayer(scenery,contact),"shared scenery stomp event");
     auto gems=live.currencyRegistration<8>();
     auto position=[&](InstanceHandle h,MotionBinary64& x,MotionBinary64& y){
         RunnerImageValue px,py;if(!collision->collisionPosition(h,px,py))return false;
@@ -113,6 +113,12 @@ int main(){
         bool setPitch(int id,MotionBinary64 pitch){return id==888&&pitch.high==0x3ff00000u&&!pitch.low;}
     } breakAudio;
     SoundPlayEnvironment environment;
+    auto blasts=live.blastRegistration<4>();
+    require(live.collideScatteredPlayerWithBlast(scenery,blasts,position,contact,environment,breakAudio),"registered scenery contact");
+    const auto* contacted=live.instance(sceneryId);
+    require(contacted&&contacted->scattered.jump.vertical.high==0x40040000u&&contacted->scattered.shake.shakeDur==4&&
+        contact.spins==1&&contact.recharges==1&&!contact.grounded&&contact.velocity.high==0xc0040000u,
+        "shared forced jump retains caller fields and writes player after recharge");
     const auto childStart=live.nextRuntimeInstanceId();const auto oldFrame=live.instance(sceneryId)->imageIndex;
     const bool sceneryStep=live.withScatteredEvents(gems,position,tile,environment,breakAudio,[&]{
         return live.stepWithOwnedDebris({},[](auto,const auto&,bool& frozen){frozen=false;return true;});
@@ -138,6 +144,26 @@ int main(){
         if(record.instanceId==sceneryId){++sceneryDraws;return record.spriteId==551&&record.imageIndex==oldFrame;}
         return true;
     })&&sceneryDraws==1,"broken scenery remains in source layer Draw traversal");
+    require(live.grantUpgrade(0),"enable Exploding Knees in shared run state");
+    InstanceHandle explosiveScenery;
+    require(live.adoptBuilderScattered(sceneryCommand,explosiveScenery),"second scenery contact caller");
+    const auto blastId=live.nextRuntimeInstanceId();auto expectedRandom=live.randomState();
+    const unsigned expectedFlip=expectedRandom.chooseIndexSmall(2);
+    const int expectedSound=91+int(expectedRandom.chooseIndexSmall(3));
+    struct ExplosionAudio:BreakAudio {
+        int chosen=-1;
+        bool play(int id,int priority,bool loop,int& voice){chosen=id;++plays;voice=888;return id>=91&&id<=93&&priority==60&&!loop;}
+    } explosionAudio;
+    Contact explosiveContact;int roomSpeed=60;
+    require(live.withMomentDelayRoomSpeed(roomSpeed,[&]{
+        return live.collideScatteredPlayerWithBlast(explosiveScenery,blasts,position,explosiveContact,environment,explosionAudio);
+    }),"stored scenery creates blast before choosing its sound");
+    const auto* blast=blasts.instances().find(blasts.instances().sourceHandle(blastId));
+    require(blast&&blast->state.xscale.bits==(expectedFlip?0xbf800000u:0x3f800000u)&&
+        live.nextRuntimeInstanceId()==blastId+1&&explosionAudio.chosen==expectedSound&&explosionAudio.plays==1,
+        "stored blast source ID and child-then-sound RNG order");
+    require(live.randomState().stateIndex()==expectedRandom.stateIndex(),"stored contact RNG cursor");
+    for(unsigned i=0;i<16;++i)require(live.randomState().stateWord(i)==expectedRandom.stateWord(i),"stored contact RNG words");
     bool called=false;
     require(!control.withRegisteredShopCreation(owner,[&]{called=true;return true;})&&!called,"reject foreign room owner");
     std::puts("Registered shop and scenery runtime allocator, effects, layers and RNG passed");

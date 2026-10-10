@@ -7,6 +7,59 @@
 inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
     const downwell::SpriteCollisionPack& sprites){
     using namespace downwell;
+    for(int style:{0,2})for(bool knees:{false,true})for(bool rejectSound:{false,true}){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,GameplayCollisionOwner::Ownership::native);
+        auto world=std::make_unique<GameplayWorld>(300,false,1000,true,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding());
+        assert(owner->attach(*world));
+        DeferredCreateInstance command(289,240,700);assert(owner->scattered().adopt(890000,command));
+        const auto key=owner->scattered().handle(0);
+        if(knees)assert(world->grantUpgrade(0));
+        struct Player {
+            int style;unsigned spins=0,recharges=0,writes=0;bool grounded=true;MotionBinary64 velocity{};
+            bool playerYSpeed(MotionBinary64& v){v=MotionBinary64::fromInteger(1);return true;}
+            int playStyle(){return style;}
+            void setSpinJumping(){assert(!spins&&!recharges&&!writes);++spins;}
+            bool recharge(){assert(spins==1&&grounded&&!writes);++recharges;return true;}
+            bool setGrounded(bool v){assert(recharges==1&&!v&&!writes);grounded=v;++writes;return true;}
+            bool setHorizontal(MotionBinary64){assert(false);return false;}
+            bool setVertical(MotionBinary64 v){assert(!grounded&&writes==1);velocity=v;++writes;return true;}
+        } player{style};
+        struct Audio {
+            bool reject;int chosen=-1;unsigned calls=0;
+            bool isPlaying(int id,bool& v){chosen=id;v=false;++calls;return true;}
+            bool stop(int){assert(false);return false;}
+            bool play(int id,int priority,bool loop,int& voice){assert(id==chosen&&priority==60&&!loop);voice=1;++calls;return !reject;}
+            bool getGain(int,MotionBinary64& v){v=MotionBinary64::fromInteger(1);++calls;return true;}
+            bool setGain(int,MotionBinary64,int){++calls;return true;}
+            bool setPitch(int,MotionBinary64){++calls;return true;}
+        } audio{rejectSound};
+        unsigned next=890001,delays=0;
+        auto allocate=[&](unsigned& id){id=next++;return true;};
+        auto expected=world->randomState();unsigned flip=0;int sound=-1;
+        if(knees){flip=expected.chooseIndexSmall(2);sound=91+int(expected.chooseIndexSmall(3));}
+        SoundPlayEnvironment env;
+        const bool failed=knees&&rejectSound;
+        InstanceHandle self,other;
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::scattered,key,self)&&
+            GameplayCollisionView::encode(GameplayCollisionView::Kind::player,world->playerHandle(),other));
+        const RunnerCollisionEventContext::Frame event{self,other,4,35,289,2388};
+        assert(owner->dispatchScatteredPlayerCollision(event,allocate,[&]{++delays;return true;},player,env,audio)==!failed);
+        const auto* actor=owner->scattered().find(key);
+        assert(actor&&actor->objHp==0&&actor->stomped&&actor->scriptActive&&player.spins==1&&player.recharges==1&&
+            player.writes==2&&!player.grounded&&player.velocity.high==(style==2?0xbff80000u:0xc0040000u)&&!player.velocity.low);
+        assert(actor->jump.horizontal.zero()&&actor->jump.vertical.high==(style==2?0x3ff80000u:0x40040000u)&&
+            actor->shake.shakeAmt==2&&actor->shake.shakeDur==4&&delays==unsigned(knees)&&next==890001+unsigned(knees));
+        assert(world->randomState().stateIndex()==expected.stateIndex());
+        for(unsigned i=0;i<16;++i)assert(world->randomState().stateWord(i)==expected.stateWord(i));
+        assert(audio.calls==(knees?(rejectSound?2u:5u):0u));
+        if(knees){
+            assert(audio.chosen==sound&&actor->sound.sfxIndex==sound);
+            const auto* blast=world->registeredBlasts()->find(world->registeredBlasts()->sourceHandle(890001));
+            assert(blast&&blast->state.xscale.bits==(flip?0xbf800000u:0x3f800000u));
+        }
+    }
     // Scattered16 event order, including child Create RNG and failure prefixes.
     // These are event tests, not admission of natural encounters.
     struct RandomAudit {
