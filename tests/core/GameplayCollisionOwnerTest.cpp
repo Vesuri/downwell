@@ -57,6 +57,14 @@ bool nativeWhiteJellyPlayerContact(downwell::GameplayCollisionOwner& owner,
     const downwell::RunnerCollisionEventContext::Frame& event,NativeWhiteJellyPlayer& player){
     return owner.dispatchWhiteJellyPlayerCollision(event,[&](auto&){return player;});
 }
+bool nativeRedBallContacts(downwell::GameplayCollisionOwner& owner,
+    const downwell::RunnerCollisionEventContext::Frame& enemy,
+    const downwell::RunnerCollisionEventContext::Frame& playerEvent,
+    const downwell::RunnerCollisionEventContext::Frame& field,NativeWhiteJellyPlayer& player){
+    return owner.dispatchRedBallEnemyCollision(enemy)&&
+        owner.dispatchRedBallPlayerCollision(playerEvent,[&](auto&){return player;})&&
+        owner.dispatchRedBallFieldCollision(field);
+}
 bool nativeWhiteJellyStomp(downwell::WhiteJellyStep& actor,NativeWhiteJellyStompOps& ops,bool& good){
     return actor.stompPlayerChecked(ops,good);
 }
@@ -1039,6 +1047,48 @@ int main(){
             assert(balls.find(local)->alarms.get(0)==10&&!balls.find(local)->hitStun&&births==(stopped?0u:1u));
         }
         assert(balls.find(local)->myFx==991000&&owner->movingEffects().size()==1);
+        InstanceHandle peer,peerShared,playerShared;
+        assert(world->createRedBallWithSourceId(991010,{0x43700000u},{0x44000000u},
+            [&](auto key){return Ops{*owner,key};},peer));
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::redBall,peer,peerShared)&&
+            GameplayCollisionView::encode(GameplayCollisionView::Kind::player,world->playerHandle(),playerShared));
+        const RunnerCollisionEventContext::Frame redContact{shared,peerShared,4,118,118,1248};
+        for(int initial:{0,359}){
+            MotionBinary64 accepted;assert(owner->redBallDirection(local,MotionBinary64::fromInteger(initial),accepted));
+            auto random=world->randomState();auto expected=balls.find(local)->direction;MotionBinary64 offset;
+            assert(randomBinary64(random.nextU32(),MotionBinary64::fromInteger(40),offset)&&
+                offset.add(MotionBinary64::fromInteger(-20))&&expected.add(offset));
+            RunnerImageValue normalized;assert(RunnerDirectionValue::normalize(expected,normalized));
+            const auto peerDirection=balls.find(peer)->direction;
+            assert(owner->dispatchRedBallEnemyCollision(redContact));
+            const auto actual=balls.find(local)->direction,wanted=normalized.promoted();
+            assert(actual.high==wanted.high&&actual.low==wanted.low&&
+                balls.find(peer)->direction.high==peerDirection.high&&balls.find(peer)->direction.low==peerDirection.low);
+            assert(world->randomState().stateIndex()==random.stateIndex());
+            for(unsigned word=0;word<16;++word)assert(world->randomState().stateWord(word)==random.stateWord(word));
+        }
+        struct RedPlayer {
+            unsigned& calls;
+            bool damage(int amount,int horizontal,int vertical){
+                assert(amount==1&&horizontal==3&&vertical==2);++calls;return true;
+            }
+        };
+        unsigned damageCalls=0;
+        const RunnerCollisionEventContext::Frame playerContact{shared,playerShared,4,35,118,1249};
+        assert(owner->dispatchRedBallPlayerCollision(playerContact,[&](auto& actor){
+            assert(actor.sourceId==990050);return RedPlayer{damageCalls};
+        })&&damageCalls==1);
+        assert(balls.markDestroyed(peer)&&owner->prepareDraw());
+        assert(world->createTimeFieldWithSourceId(991011,240,512));
+        InstanceHandle field;
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::timeField,
+            {0,world->timeFields().identityAt(0)},field));
+        const RunnerCollisionEventContext::Frame fieldContact{shared,field,4,82,83,1066};
+        assert(balls.dispatch(local,[](auto& actor){actor.timefieldImmune=true;return true;})&&
+            owner->dispatchRedBallFieldCollision(fieldContact)&&balls.find(local)->health==30);
+        assert(balls.dispatch(local,[](auto& actor){actor.timefieldImmune=false;return true;})&&
+            owner->dispatchRedBallFieldCollision(fieldContact)&&balls.find(local)->health==0&&
+            balls.find(local)->alive&&!balls.find(local)->destroyRequested);
         assert(balls.markDestroyed(local)&&owner->prepareDraw()&&!balls.find(local)&&!GameplayCollisionView(*world).contains(shared));
         checkRedDraw(false);
         unsigned nextSource=992000;

@@ -2533,29 +2533,59 @@ public:
         return check(world_->collideWhiteJellyEnemy(local,ops));
     }
     bool dispatchWhiteJellyFieldCollision(const RunnerCollisionEventContext::Frame& event){
+        return dispatchSteeringFieldCollision(event,whiteJellies_,View::Kind::whiteJelly,115);
+    }
+    bool dispatchRedBallEnemyCollision(const RunnerCollisionEventContext::Frame& event){
         View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;
         if(!valid()||!world_||!resolves(event.self)||!resolves(event.other)||
-           !View::decode(event.self,kind,local)||kind!=View::Kind::whiteJelly||
+           !View::decode(event.self,kind,local)||kind!=View::Kind::redBall||objectOf(event.other)!=118||
+           event.type!=4||event.subtype!=118||event.owner!=118||event.code!=1248||
+           !objects_.collisionEvent(118,118,found,binding)||!found||binding.ownerObjectId!=118||binding.codeId!=1248)
+            return check(false);
+        struct Ops {
+            GameplayCollisionOwner& owner;InstanceHandle key;
+            bool direction(MotionBinary64 wanted,MotionBinary64& accepted){return owner.redBallDirection(key,wanted,accepted);}
+        } ops{*this,local};
+        return check(world_->collideRedBallEnemy(local,ops));
+    }
+    bool dispatchRedBallFieldCollision(const RunnerCollisionEventContext::Frame& event){
+        return dispatchSteeringFieldCollision(event,redBalls_,View::Kind::redBall,118);
+    }
+    template<class MakePlayer> bool dispatchWhiteJellyPlayerCollision(
+        const RunnerCollisionEventContext::Frame& event,MakePlayer makePlayer){
+        return dispatchSteeringPlayerCollision(event,whiteJellies_,View::Kind::whiteJelly,115,1227,makePlayer);
+    }
+    template<class MakePlayer> bool dispatchRedBallPlayerCollision(
+        const RunnerCollisionEventContext::Frame& event,MakePlayer makePlayer){
+        return dispatchSteeringPlayerCollision(event,redBalls_,View::Kind::redBall,118,1249,makePlayer);
+    }
+private:
+    template<class Store> bool dispatchSteeringFieldCollision(const RunnerCollisionEventContext::Frame& event,
+        Store& store,View::Kind expected,int object){
+        View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;
+        if(!valid()||!world_||!resolves(event.self)||!resolves(event.other)||
+           !View::decode(event.self,kind,local)||kind!=expected||
            event.type!=4||event.subtype!=objectOf(event.other)||event.owner!=83||event.code!=1066||
-           !objects_.collisionEvent(115,event.subtype,found,binding)||!found||
+           !objects_.collisionEvent(object,event.subtype,found,binding)||!found||
            binding.ownerObjectId!=83||binding.codeId!=1066)return check(false);
-        return check(whiteJellies_.dispatch(local,[](auto& actor){
+        return check(store.dispatch(local,[](auto& actor){
             if(!actor.timefieldImmune)actor.health=0;
             return true;
         }));
     }
-    template<class MakePlayer> bool dispatchWhiteJellyPlayerCollision(
-        const RunnerCollisionEventContext::Frame& event,MakePlayer makePlayer){
+    template<class Store,class MakePlayer> bool dispatchSteeringPlayerCollision(
+        const RunnerCollisionEventContext::Frame& event,Store& store,View::Kind expected,int object,int code,MakePlayer makePlayer){
         View::Kind kind;InstanceHandle local;PackedObjectEvent binding{};bool found=false;
         if(!valid()||!world_||!resolves(event.self)||!resolves(event.other)||
-           !View::decode(event.self,kind,local)||kind!=View::Kind::whiteJelly||objectOf(event.other)!=35||
-           event.type!=4||event.subtype!=35||event.owner!=115||event.code!=1227||
-           !objects_.collisionEvent(115,35,found,binding)||!found||binding.ownerObjectId!=115||binding.codeId!=1227)
+           !View::decode(event.self,kind,local)||kind!=expected||objectOf(event.other)!=35||
+           event.type!=4||event.subtype!=35||event.owner!=object||event.code!=code||
+           !objects_.collisionEvent(object,35,found,binding)||!found||binding.ownerObjectId!=object||binding.codeId!=code)
             return check(false);
-        return check(whiteJellies_.dispatch(local,[&](auto& actor){
+        return check(store.dispatch(local,[&](auto& actor){
             auto player=makePlayer(actor);return actor.playerContact(player);
         }));
     }
+public:
     template<class Frames,class Audio,class Atan>
     bool dispatchSkeletonBulletCollision(const RunnerCollisionEventContext::Frame& event,
         Frames frames,SoundPlayEnvironment& environment,Audio& audio,Atan atan){

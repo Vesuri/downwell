@@ -935,6 +935,11 @@ public:
         const bool ok=whiteJellies_->dispatch(key,[&](auto& actor){return actor.enemyContact(enemyRandom_,ops);});
         return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
     }
+    template<class Ops> bool collideRedBallEnemy(downwell::InstanceHandle key,Ops& ops){
+        if(!run_.effectsSucceeded||!redBalls_||!redBalls_->valid())return run_.effectsSucceeded=false;
+        const bool ok=redBalls_->dispatch(key,[&](auto& actor){return actor.enemyContact(enemyRandom_,ops);});
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
+    }
     template<class Ops> bool stepWhiteJellyRoomEffect(downwell::InstanceHandle key,bool stopped,Ops& ops){
         if(!run_.effectsSucceeded||!whiteJellies_||!whiteJellies_->valid())return run_.effectsSucceeded=false;
         const bool ok=whiteJellies_->step(key,stopped,enemyRandom_,ops);
