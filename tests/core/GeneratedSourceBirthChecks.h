@@ -324,6 +324,15 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
         for(int playerY:{700,702})assert(owner->dispatchWhiteJellyPlayerCollision(playerContact,
             [&](auto& actor){assert(actor.sourceId==899000);return JellyPlayer{MotionBinary64::fromInteger(playerY),stomps,damages};}));
         assert(stomps==1&&damages==1);
+        InstanceHandle fieldShared;
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::timeField,
+            {0,world->timeFields().identityAt(0)},fieldShared));
+        const RunnerCollisionEventContext::Frame fieldContact{jellyShared,fieldShared,4,82,83,1066};
+        assert(jellies.dispatch(jelly,[](auto& r){r.timefieldImmune=true;return true;}));
+        assert(owner->dispatchWhiteJellyFieldCollision(fieldContact)&&jellies.find(jelly)->health==25);
+        assert(jellies.dispatch(jelly,[](auto& r){r.timefieldImmune=false;return true;}));
+        assert(owner->dispatchWhiteJellyFieldCollision(fieldContact)&&jellies.find(jelly)->health==0&&
+            jellies.find(jelly)->alive&&!jellies.find(jelly)->destroyRequested);
         for(unsigned frame=0;frame<8;++frame)assert(jellies.advanceAnimation(jelly));
         assert(jellies.sprite(jelly,175)&&jellies.find(jelly)->imageIndex.bits==0&&owner->prepareDraw());
         assert(jellies.find(jelly)->maskId==174&&jellies.sprite(jelly,176)&&
