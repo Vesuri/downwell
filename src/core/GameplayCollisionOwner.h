@@ -1177,6 +1177,7 @@ private:
     const bool nativeBoxes_;
     const bool nativeFields_;
     const bool terrainRegistered_;
+    bool unregisteredTerrainCleanup_=false;
     NativeInstanceTable<View::capacity,View::terrainBase,View::timeFieldBase,93> table_;
     std::uint32_t nativeBoxFlags_=0;
     std::uint32_t nativeFieldFlags_=0;
@@ -2191,6 +2192,19 @@ private:
         // event body may borrow registration order without a terrain snapshot.
         PackedObjectEvent event;
         if(objects_.findEvent(93,1,0,event)||objects_.findEvent(93,12,0,event))return check(false);
+        if(!native_&&!terrainRegistered_){
+            // The retained terrain-only backend deliberately has no registry
+            // bindings. Its records still receive this pinned lifetime event;
+            // a registry walk cannot find them. Native run ownership below
+            // keeps its indexed family walk and does not use this fallback.
+            return check(retireMainRoomObjectsChecked(terrain_.size(),11,1,topQ12,[&](unsigned i){
+                const auto h=terrain_.handle(i);const auto* r=terrain_.find(h);
+                return LifetimeInstance{93,r?r->y:0,r&&r->objectId==93&&h.generation<=cutoff&&r->active&&!r->destroyRequested};
+            },[&](unsigned i){
+                if(!terrain_.requestDestroy(terrain_.handle(i)))return false;
+                unregisteredTerrainCleanup_=true;return true;
+            }));
+        }
         const auto visit=[&](InstanceHandle h,int object,std::uint32_t flags){
                 if(object!=93||h.generation>cutoff||(flags&0x100003u))return true;
                 GameplayWorld::NativeTerrain::Identity id;bool active,destroyed;
@@ -4217,6 +4231,21 @@ public:
     }
 private:
     template<class RetireEffect> bool prepareDrawWithEffects(RetireEffect retireEffect){
+        if(unregisteredTerrainCleanup_){
+            if(!valid()||!world_)return check(false);
+            // Only the unbound terrain-only store reaches here. Thin platforms
+            // have no Destroy/Clean Up event or binding observers, so their
+            // disposal cannot reorder another family's observable callbacks.
+            // Keep marked identities alive until Draw entry, as elsewhere.
+            for(unsigned i=0;i<terrain_.size();){
+                const auto h=terrain_.handle(i);const auto* r=terrain_.find(h);
+                if(!r)return check(false);
+                if(r->objectId==93&&r->destroyRequested){
+                    if(!terrain_.retireMarked(h))return check(false);
+                }else ++i;
+            }
+            unregisteredTerrainCleanup_=false;
+        }
         return cleanupDestroyed([&](InstanceHandle shared,const View::Record& record){
             View::Kind kind;InstanceHandle local;
             if(!View::decode(shared,kind,local))return false;

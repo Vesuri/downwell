@@ -382,6 +382,19 @@ int main(int argc,char** argv){
                 require(other->world->effectsSucceeded()&&other->world->generationSucceeded()&&
                     other->owner->valid(),"native Step succeeds for the complete tape");
                 require(other->digest()==beforeCleanup,"pre-cleanup state, flags and order agree");
+                if(other->world->terrainInstances()){
+                    const auto& expectedTerrain=reference->owner->terrain();
+                    const auto& actual=other->owner->terrain();
+                    require(actual.size()==expectedTerrain.size(),"terrain identities survive until Draw cleanup");
+                    for(unsigned i=0;i<expectedTerrain.size();++i){
+                        const auto h=expectedTerrain.handle(i);const auto* a=expectedTerrain.find(h);
+                        if(a->objectId!=93)continue;
+                        const auto* b=actual.find(h);
+                        require(b&&b->objectId==93&&b->x==a->x&&b->y==a->y&&
+                            b->active==a->active&&b->destroyRequested==a->destroyRequested,
+                            "thin-platform identities and End Step marks agree before Draw");
+                    }
+                }
             }
             require(reference->owner->prepareDraw(),"reference Draw cleanup succeeds");
             const auto expected=reference->digest();
@@ -390,9 +403,17 @@ int main(int argc,char** argv){
                 require(other->digest()==expected,"simulation state and actor order agree");
                 requireSameBackendTerrain(*reference,*other);
                 if(other->world->terrainInstances()){
-                    if(other->owner->terrain().size()!=reference->owner->terrain().size())
+                    if(other->owner->terrain().size()!=reference->owner->terrain().size()){
                         std::cerr<<"phase="<<phase<<" owner="<<(&other-&others[0])<<" terrain="
                             <<other->owner->terrain().size()<<" reference="<<reference->owner->terrain().size()<<"\n";
+                        const auto& actual=other->owner->terrain();const auto& expectedTerrain=reference->owner->terrain();
+                        for(unsigned i=0;i<actual.size();++i){const auto h=actual.handle(i);const auto* a=actual.find(h);
+                            const auto* b=expectedTerrain.find(h);
+                            if(!b||a->objectId!=b->objectId||a->x!=b->x||a->y!=b->y||a->destroyRequested!=b->destroyRequested)
+                                std::cerr<<"extra/different handle="<<h.slot<<":"<<h.generation<<" object="<<a->objectId
+                                    <<" xy="<<a->x<<","<<a->y<<" active="<<a->active<<" destroyed="<<a->destroyRequested<<"\n";
+                        }
+                    }
                     require(other->owner->terrain().size()==reference->owner->terrain().size(),"terrain identities agree");
                 }
                 else if(frame%30==0)requireWallsMatchGrid(*reference,*other);

@@ -38,10 +38,6 @@ behavior, both backend integrations and relevant original-game verification.
   workload; distinguish behavior/input-path changes from increased per-frame work.
   Report quiet, firing/combat, generation and field windows with worst-frame
   costs and coverage. Old section 5 numbers are not a current baseline.
-  Resolve the long terrain-ownership fixture's phase-0 frame-1113 identity-count
-  mismatch (nativeTerrain mode 632 versus reference 630). The unchanged
-  `3b3ae032` source reproduces the failure with current generated packs; do not
-  weaken this assertion or count the fixture as passing.
 - Remove the measured regression at its architectural cause. Compare the same
   workload and behavior checks before/after, preserving hardware scrolling,
   offline assets and native terrain ownership. Do not resume micro-optimization

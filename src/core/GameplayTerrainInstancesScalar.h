@@ -161,7 +161,13 @@ public:
         if(r.destroyRequested)return true;
         // Publish collision exclusion before marking the local record. Keep
         // its address and identity alive through the remainder of the event.
-        if(!binding_.markDestroyed(h,bindingRecord(r)))return good_=false;
+        // The terrain-only backend has no runner registry. Its pinned thin
+        // platform has empty Destroy/Clean Up and no wall collision or Draw
+        // publication, so the local mark is the complete state change. Other
+        // unowned objects remain unsupported; a bound owner's failure must
+        // never be turned into a successful local destruction.
+        if(binding_.hasOwner()? !binding_.markDestroyed(h,bindingRecord(r)) : r.objectId!=93)
+            return good_=false;
         const int before=drawSprite(r);const bool wasVisible=visible(r);r.destroyRequested=true;
         if(wasVisible&&!collision_.notify(r.x,r.y,false))return good_=false;
         return note(r,before,-1,before>=0);

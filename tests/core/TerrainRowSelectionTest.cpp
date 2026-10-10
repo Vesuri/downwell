@@ -7,6 +7,7 @@ using namespace downwell;
 struct Lifecycle {
     using H=InstanceHandle;using R=GameplayTerrainInstances::Record;using V=RunnerImageValue;
     int retireRemaining=-1;
+    bool destroyFails=false;
     bool birth(H h,const R& r){
         assert(h.generation==r.lifetimeId&&r.lifetimeId);
         assert(r.spriteId==(r.objectId==99?46:-1)&&r.imageIndex==0&&r.imageSpeed==1&&!r.destroyRequested&&!r.wallNeedsReset);
@@ -18,7 +19,7 @@ struct Lifecycle {
     bool retire(H,const R&){if(!retireRemaining)return false;if(retireRemaining>0)--retireRemaining;return true;}
     bool activation(H,const R&,bool){return true;}bool membership(H,const R&,bool){return true;}
     bool move(H,const R&,V,V){return true;}bool sprite(H,const R&,int){return true;}
-    bool imageIndex(H,const R&,V){return true;}bool markDestroyed(H,const R&){return true;}
+    bool imageIndex(H,const R&,V){return true;}bool markDestroyed(H,const R&){return !destroyFails;}
 };
 static Lifecycle lifecycle;
 static GameplayTerrainInstances terrain(GameplayTerrainInstances::Binding::bindDestruction(lifecycle));
@@ -92,5 +93,18 @@ int main(){
     for(unsigned i=0;i<160;++i)assert(partial.append(60,0,int(i)*64,true));
     assert(!partial.clear()&&!partial.valid()&&partial.size()==143);
     for(int first=0;first<11000;first+=13)check(first,first+3,70,partial);
-    std::puts("Terrain row selection: ordered footprint equivalence, 2000 retire/reuse mutations, limits and unknown-art fallback passed");
+    static GameplayTerrainInstances unregistered;
+    assert(unregistered.append(93,16,32,true));
+    const auto thin=unregistered.handle(0);
+    assert(unregistered.requestDestroy(thin)&&unregistered.find(thin)->destroyRequested);
+    assert(unregistered.size()==1&&unregistered.requestDestroy(thin));
+    assert(unregistered.retireMarked(thin)&&unregistered.size()==0);
+    assert(unregistered.append(60,16,32,true));
+    assert(!unregistered.requestDestroy(unregistered.handle(0)));
+    Lifecycle destroyFailure;destroyFailure.destroyFails=true;
+    static GameplayTerrainInstances boundFailure(GameplayTerrainInstances::Binding::bindDestruction(destroyFailure));
+    assert(boundFailure.append(93,16,32,true));
+    const auto bound=boundFailure.handle(0);
+    assert(!boundFailure.requestDestroy(bound)&&!boundFailure.find(bound)->destroyRequested);
+    std::puts("Terrain row selection: ordered footprint equivalence, 2000 retire/reuse mutations, limits, local thin retirement and bound failure passed");
 }
