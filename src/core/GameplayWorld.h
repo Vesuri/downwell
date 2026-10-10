@@ -31,6 +31,7 @@
 #include "core/GameplayScattered.h"
 #include "core/GameplaySpawners.h"
 #include "core/GameplayWhiteJellies.h"
+#include "core/GameplayRedBalls.h"
 #include "core/MovingFxInstances.h"
 #include "core/RegisteredScatteredContact.h"
 #include "core/RunControllerInstances.h"
@@ -487,6 +488,11 @@ public:
     const downwell::GameplayScattered* scattered()const{return scattered_;}
     const downwell::GameplaySpawners* spawners()const{return spawners_;}
     const downwell::GameplayWhiteJellies* whiteJellies()const{return whiteJellies_;}
+    const downwell::GameplayRedBalls* redBalls()const{return redBalls_;}
+    bool bindRedBalls(downwell::GameplayRedBalls& records){
+        if(redBalls_||!records.valid()||records.size())return false;
+        redBalls_=&records;return true;
+    }
     using MovingEffects=downwell::MovingFxInstances<32>;
     const MovingEffects* movingEffects()const{return movingEffects_;}
     bool bindMovingEffects(MovingEffects& records){
@@ -953,6 +959,13 @@ public:
         key={};
         if(!run_.effectsSucceeded||!whiteJellies_||!whiteJellies_->valid())return run_.effectsSucceeded=false;
         const bool ok=whiteJellies_->create(source,x,y,enemyRandom_,makeOps,key);
+        return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
+    }
+    template<class MakeOps> bool createRedBallWithSourceId(unsigned source,
+        downwell::RunnerImageValue x,downwell::RunnerImageValue y,MakeOps makeOps,downwell::InstanceHandle& key){
+        key={};
+        if(!run_.effectsSucceeded||!redBalls_||!redBalls_->valid())return run_.effectsSucceeded=false;
+        const bool ok=redBalls_->create(source,x,y,enemyRandom_,makeOps,key);
         return run_.effectsSucceeded=run_.effectsSucceeded&&ok;
     }
     template<class Ops> bool stepSpawnerRoomEffect(downwell::InstanceHandle key,Ops& ops){
@@ -2542,6 +2555,7 @@ private:
     downwell::GameplayScattered* scattered_=nullptr;
     downwell::GameplaySpawners* spawners_=nullptr;
     downwell::GameplayWhiteJellies* whiteJellies_=nullptr;
+    downwell::GameplayRedBalls* redBalls_=nullptr;
     bool (*whiteJellyAlarmDispatch_)(void*,downwell::InstanceHandle,downwell::GameplayWhiteJellies::Record&,downwell::GameMakerRandom&)=nullptr;
     void* whiteJellyAlarmContext_=nullptr;
     MovingEffects* movingEffects_=nullptr;

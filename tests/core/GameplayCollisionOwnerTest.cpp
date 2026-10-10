@@ -763,6 +763,7 @@ static void checkTypedCollisionView(const GameplayCollisionView& view,GameplayCo
         case K::scattered:assert(view.resolveLocal<K::scattered>(local)==reference.scattered);break;
         case K::spawner:assert(view.resolveLocal<K::spawner>(local)==reference.spawner);break;
         case K::whiteJelly:assert(view.resolveLocal<K::whiteJelly>(local)==reference.whiteJelly);break;
+        case K::redBall:assert(view.resolveLocal<K::redBall>(local)==reference.redBall);break;
         case K::sideCameraLocker:assert(view.resolveLocal<K::sideCameraLocker>(local)==reference.sideCameraLocker);break;
         case K::player:assert(view.resolveLocal<K::player>(local)==reference.player);break;
         case K::enemy:assert(view.resolveLocal<K::enemy>(local)==reference.enemy);break;
@@ -907,6 +908,37 @@ static void checkNativeAnimationBatches(const ObjectPack& objects,const SpriteCo
 }
 int main(){
     assert(downwell::RunnerBindingRevisionVerification::run());
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native}){
+        const auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
+        ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),owner->breakableBinding(),owner->playerBinding(),nullptr);
+        assert(owner->attach(*world));auto& balls=owner->redBalls();
+        struct Ops {
+            GameplayCollisionOwner& owner;InstanceHandle key;
+            bool position(bool y,RunnerImageValue v,RunnerImageValue& out){return owner.redBalls().position(key,y,v,out);}
+            bool playerY(MotionBinary64& v){v=MotionBinary64::fromInteger(512);return true;}
+            bool playerX(MotionBinary64& v){v=MotionBinary64::fromInteger(240);return true;}
+            bool pointDirection(MotionBinary64 x,MotionBinary64 y,MotionBinary64 tx,MotionBinary64 ty,MotionBinary64& out){
+                return RunnerPointDirection::evaluate(x,y,tx,ty,out,portableAtan);
+            }
+            bool direction(MotionBinary64 v,MotionBinary64& out){return owner.redBallDirection(key,v,out);}
+            bool imageSpeed(RunnerImageValue v,RunnerImageValue& out){out=v;return true;}
+            bool alarm(int number,int value){return owner.redBalls().setAlarm(key,number,value);}
+        };
+        InstanceHandle local,shared;const auto randomBefore=world->randomDrawCount();
+        assert(world->createRedBallWithSourceId(990050,{0x43700000u},{0x44000000u},
+            [&](auto key){return Ops{*owner,key};},local)&&world->randomDrawCount()==randomBefore+1);
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::redBall,local,shared));
+        checkTypedCollisionView(GameplayCollisionView(*world),GameplayCollisionView::Kind::redBall,local);
+        unsigned count;assert(owner->population(118,count)&&count==1&&owner->population(83,count)&&count==1);
+        assert(balls.find(local)->sourceId==990050&&balls.find(local)->initialized&&balls.find(local)->alarms.get(0)==10);
+        assert(balls.activate(local,false)&&owner->reconcileActivation()&&owner->population(118,count)&&!count);
+        assert(balls.activate(local,true)&&owner->reconcileActivation()&&owner->population(118,count)&&count==1);
+        assert(balls.markDestroyed(local)&&owner->prepareDraw()&&!balls.find(local)&&!GameplayCollisionView(*world).contains(shared));
+        assert(world->restartFromResults(DeathMenuSequence::Action::Retry,2,300)==ResultsDestination::gameplay&&world->redBalls()==&balls);
+    }
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native}){
         const auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
         ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());

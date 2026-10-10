@@ -46,6 +46,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     if(scattered_&&!scattered_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(spawners_&&!spawners_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(whiteJellies_&&!whiteJellies_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
+    if(redBalls_&&!redBalls_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(movingEffects_&&!movingEffects_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(droneBullets_&&!droneBullets_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(bones_&&!bones_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
@@ -87,6 +88,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto scattered=scattered_;
     const auto spawners=spawners_;
     const auto whiteJellies=whiteJellies_;
+    const auto redBalls=redBalls_;
     const auto movingEffects=movingEffects_;
     const auto runControllers=runControllers_;
     const auto resultInstance=resultInstance_;
@@ -167,6 +169,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     scattered_=scattered;
     spawners_=spawners;
     whiteJellies_=whiteJellies;
+    redBalls_=redBalls;
     movingEffects_=movingEffects;
     runControllers_=runControllers;
     resultInstance_=resultInstance;
@@ -306,6 +309,7 @@ bool GameplayWorld::retireGameplayRoom() {
     if(scattered_&&!scattered_->clear())return run_.effectsSucceeded=false;
     if(spawners_&&!spawners_->clear())return run_.effectsSucceeded=false;
     if(whiteJellies_&&!whiteJellies_->clear())return run_.effectsSucceeded=false;
+    if(redBalls_&&!redBalls_->clear())return run_.effectsSucceeded=false;
     if(movingEffects_&&!movingEffects_->clear())return run_.effectsSucceeded=false;
     if(droneBullets_&&!droneBullets_->clear())return run_.effectsSucceeded=false;
     if(bones_&&!bones_->clear())return run_.effectsSucceeded=false;
