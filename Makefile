@@ -1194,6 +1194,16 @@ verify-point-direction: build/point-direction-test
 	python3 tools/verify-runner-point-direction.py
 	./build/point-direction-test
 
+.PHONY: verify-direction-value
+test: verify-direction-value
+verify-direction-value: build/direction-value-test
+	python3 tools/verify-runner-direction-value.py
+	./build/direction-value-test
+
+build/direction-value-test: tests/core/RunnerDirectionValueTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ $<
+
 build/point-direction-test: tests/core/RunnerPointDirectionTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
 	@mkdir -p build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/RunnerPointDirectionTest.cpp src/core/GameMakerRandom.cpp

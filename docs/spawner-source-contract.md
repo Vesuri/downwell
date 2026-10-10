@@ -36,6 +36,9 @@ calls `irandom(0)`.
 
 115 is enmWhiteJelly; 118 is enmRedBall. These are not interchangeable with
 the builder's existing enemy profiles.
+The jelly Create's point-direction result then passes through the builtin
+[direction setter](runner-direction-value.md): binary32 normalization and
+engine-component publication, not a raw assignment to a custom VM real.
 
 ## Ordinary Step order
 
