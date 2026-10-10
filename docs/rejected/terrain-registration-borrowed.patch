@@ -1,0 +1,460 @@
+diff --git a/src/core/GameplayCollisionOwner.h b/src/core/GameplayCollisionOwner.h
+index 47be1abb..c246a910 100644
+--- a/src/core/GameplayCollisionOwner.h
++++ b/src/core/GameplayCollisionOwner.h
+@@ -25,6 +25,7 @@
+ #include "PreparedTerrainBirthBounds.h"
+ #include "RunnerBorrowedState.h"
+ #include "NativeInstanceTable.h"
++#include "NativeTerrainRegistration.h"
+ #include "RunnerCollisionEventContext.h"
+ #include "RunnerCollisionDispatch.h"
+ #include "NativeEnemyAlarmRoster.h"
+@@ -645,7 +646,8 @@ private:
+         // Bind at the first birth, before any terrain layer publication.
+         if(!nativeTerrainLayersBound_){
+             if(!world_||!world_->nativeTerrainInstances()||
+-               !layers_.bindTerrain(*world_->nativeTerrainInstances(),View::terrainBase))return check(false);
++               !layers_.bindTerrain(*world_->nativeTerrainInstances(),View::terrainBase)||
++               !table_.bindTerrainStorage(*world_->nativeTerrainInstances()))return check(false);
+             nativeTerrainLayersBound_=true;
+         }
+ #endif
+@@ -1239,7 +1241,12 @@ private:
+     const bool nativeFields_;
+     const bool terrainRegistered_;
+     bool unregisteredTerrainCleanup_=false;
++#ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+     NativeInstanceTable<View::capacity,View::terrainBase,View::timeFieldBase,93> table_;
++#else
++    NativeInstanceTable<View::capacity,View::terrainBase,View::timeFieldBase,93,
++        NativeTerrainRegistration<View::capacity,View::terrainBase,View::timeFieldBase,GameplayWorld::NativeTerrain>> table_;
++#endif
+     std::uint32_t nativeBoxFlags_=0;
+     std::uint32_t nativeFieldFlags_=0;
+     InstanceHandle markedBoxes_[GameplayWorld::breakableCapacity]{};
+diff --git a/src/core/NativeInstanceTable.h b/src/core/NativeInstanceTable.h
+index 194a5f7a..51792881 100644
+--- a/src/core/NativeInstanceTable.h
++++ b/src/core/NativeInstanceTable.h
+@@ -18,11 +18,12 @@ namespace downwell {
+ // draw routines for the same image, which native Draw does not distinguish.
+ // Revision rules are conservative supersets of that owner's: every change
+ // that can alter a capture advances the capture revision.
+-template<unsigned Capacity,unsigned TerrainFirst=0,unsigned TerrainLast=0,int TerrainEventObject=-1> class NativeInstanceTable {
++template<unsigned Capacity,unsigned TerrainFirst=0,unsigned TerrainLast=0,int TerrainEventObject=-1,
++    class Registration=RunnerObjectMembership<Capacity,TerrainFirst,TerrainLast,TerrainEventObject>> class NativeInstanceTable {
+     static_assert(Capacity>0&&Capacity<65535,"Compact native slots");
+     struct Entry {std::uint32_t generation=0,flags=0;int object=-1,sprite=-1;std::uint32_t order=0,roomOrder=0;};
+     Entry entries_[Capacity];
+-    RunnerObjectMembership<Capacity,TerrainFirst,TerrainLast,TerrainEventObject> registration_;
++    Registration registration_;
+     std::uint32_t bindingRevision_=0,captureRevision_=0;
+ #ifdef DOWNWELL_LOCAL_DRAW_CAPTURE
+     std::uint32_t localCaptureRevision_=0;
+@@ -46,6 +47,7 @@ template<unsigned Capacity,unsigned TerrainFirst=0,unsigned TerrainLast=0,int Te
+     bool live(InstanceHandle h)const{return h.slot<Capacity&&h.generation&&entries_[h.slot].generation==h.generation;}
+ public:
+     explicit NativeInstanceTable(bool externalOrder=false):externalOrder_(externalOrder){}
++    template<class Terrain> bool bindTerrainStorage(Terrain& terrain){return registration_.bindTerrain(terrain);}
+     // Bind once for an append-only external family wholly inside/outside
+     // the watched alarm ranges. Keep chronology/revisions, not slot entries.
+     bool bindExternalFamily(unsigned first,unsigned end,NativeFamilyBirth& birth){
+@@ -182,10 +184,14 @@ public:
+         // Native terrain shares registration chronology, not actor phases.
+         // Maintain the existing compact projection at birth/retirement instead
+         // of repeatedly walking every wall for each disjoint actor family.
++        if constexpr(Registration::borrowsTerrain)
++            return registration_.visit(first,last,-1,[&](InstanceHandle h){return registrationOrder(h);},emit);
++        else {
+         if constexpr(TerrainFirst<TerrainLast)
+             if(last<=TerrainFirst||first>=TerrainLast)
+                 return registration_.visitRetainedRegistrationRange(first,last,emit);
+         return registration_.visitRegistrationRange(first,last,emit);
++        }
+     }
+     // Select the exact resource before consulting external lifetime/geometry
+     // state. Thin-platform End Step must not resolve every ordinary wall.
+@@ -198,9 +204,13 @@ public:
+             else if(!externalFlags(h,value))return false;
+             return visit(h,object,value);
+         };
++        if constexpr(Registration::borrowsTerrain)
++            return registration_.visit(first,last,selected,[&](InstanceHandle h){return registrationOrder(h);},emit);
++        else {
+         if constexpr(TerrainFirst<TerrainLast&&TerrainEventObject>=0)
+             if(selected==TerrainEventObject)return registration_.visitRetainedObjectRange(first,last,emit);
+         return registration_.visitRegistrationRange(first,last,emit);
++        }
+     }
+     void clear(){
+         registration_.clear();
+diff --git a/src/core/NativeTerrainLifetimes.h b/src/core/NativeTerrainLifetimes.h
+index 1c94d291..b6eab7bf 100644
+--- a/src/core/NativeTerrainLifetimes.h
++++ b/src/core/NativeTerrainLifetimes.h
+@@ -29,6 +29,23 @@ template<unsigned Capacity> class NativeTerrainLifetimes {
+     bool wallPresentationState_=false,unboundedWallArt_=false;
+     Order* pendingPublication_=nullptr;
+     InstanceHandle pendingHandle_{};
++    const typename Runs::Identity* pendingIdentity_=nullptr;
++    // Registration borrows run identities and stamps. Only eligibility and
++    // exceptional re-registration order need independent storage.
++    unsigned char registered_[(Capacity+7)/8]{},rebound_[(Capacity+7)/8]{};
++    std::uint16_t registrationTail_[Capacity]{};
++    unsigned registrationTailCount_=0;
++    static bool bit(const unsigned char* bits,unsigned slot){return bits[slot/8]&(1u<<(slot%8));}
++    static void bit(unsigned char* bits,unsigned slot,bool value){
++        const unsigned mask=1u<<(slot%8);
++        bits[slot/8]=value?(bits[slot/8]|mask):(bits[slot/8]&~mask);
++    }
++    void removeRegistrationTail(unsigned slot){
++        for(unsigned i=0;i<registrationTailCount_;++i)if(registrationTail_[i]==slot){
++            for(unsigned j=i+1;j<registrationTailCount_;++j)registrationTail_[j-1]=registrationTail_[j];
++            --registrationTailCount_;return;
++        }
++    }
+     bool publicationRun_=false;
+     RunnerRetainedLayerState inheritedLayer_;
+     unsigned inheritedLayerCount_=0;
+@@ -65,12 +82,75 @@ public:
+         binding_=binding;return true;
+     }
+     unsigned registrationOrder(InstanceHandle h)const{
+-        Order value;return good_&&runs_.publication(h,value)?value.stamp:0;
++        if(pendingPublication_&&h.slot==pendingHandle_.slot&&h.generation==pendingHandle_.generation)
++            return pendingPublication_->stamp;
++        unsigned stamp=0;
++        if(good_)runs_.readPublication(h,[&](const Order& value,unsigned offset){
++            stamp=value.stamp?value.stamp+offset:0;return true;
++        });
++        return stamp;
+     }
+     bool rebindOrder(InstanceHandle h,std::uint32_t order){
+         Order value;
+-        if(!good_||!order||!runs_.publication(h,value))return good_=false;
+-        value.stamp=order;return good_=runs_.changePublication(h,value);
++        if(!good_||!order||!runs_.publication(h,value)||bit(registered_,h.slot))return good_=false;
++        value.stamp=order;
++        if(!runs_.changePublication(h,value))return good_=false;
++        bit(rebound_,h.slot,true);return true;
++    }
++    bool readRegistration(unsigned slot,std::uint32_t& generation,int& object)const{
++        if(slot>=Capacity||!bit(registered_,slot))return false;
++        if(pendingIdentity_&&slot==pendingHandle_.slot){
++            generation=pendingHandle_.generation;object=pendingIdentity_->object;return true;
++        }
++        const auto h=runs_.currentHandle(slot);
++        if(!h.generation)return false;
++        generation=h.generation;object=runs_.object(slot);return true;
++    }
++    bool bindRegistration(InstanceHandle h,int object){
++        const bool pending=pendingIdentity_&&h.slot==pendingHandle_.slot&&h.generation==pendingHandle_.generation;
++        if(h.slot>=Capacity||bit(registered_,h.slot)||
++            (pending?pendingIdentity_->object!=object:(!runs_.contains(h)||runs_.object(h.slot)!=object)))return false;
++        if(bit(rebound_,h.slot)){
++            if(registrationTailCount_==Capacity)return false;
++            unsigned i=registrationTailCount_++;
++            const unsigned stamp=registrationOrder(h);
++            while(i&&registrationOrder(runs_.currentHandle(registrationTail_[i-1]))>stamp){
++                registrationTail_[i]=registrationTail_[i-1];--i;
++            }
++            registrationTail_[i]=static_cast<std::uint16_t>(h.slot);
++        }
++        bit(registered_,h.slot,true);return true;
++    }
++    bool unbindRegistration(unsigned slot){
++        if(slot>=Capacity||!bit(registered_,slot))return false;
++        if(bit(rebound_,slot))removeRegistrationTail(slot);
++        bit(registered_,slot,false);return true;
++    }
++    void clearRegistrations(){
++        for(unsigned i=0;i<(Capacity+7)/8;++i)registered_[i]=rebound_[i]=0;
++        registrationTailCount_=0;
++    }
++    template<class Visit> bool visitRegistrations(int selected,Visit visit)const{
++        unsigned tail=0;
++        const auto emitTail=[&](){
++            const unsigned slot=registrationTail_[tail++];
++            const int object=runs_.object(slot);
++            return (selected>=0&&selected!=object)||visit(runs_.currentHandle(slot),object);
++        };
++        if(!runs_.visitKeys(selected,[&](InstanceHandle h,int object){
++            if(!bit(registered_,h.slot)||bit(rebound_,h.slot))return true;
++            if(tail<registrationTailCount_){
++                const unsigned stamp=registrationOrder(h);
++                while(tail<registrationTailCount_&&
++                    registrationOrder(runs_.currentHandle(registrationTail_[tail]))<stamp)
++                    if(!emitTail())return false;
++            }
++            return visit(h,object);
++        }))return false;
++        while(tail<registrationTailCount_)if(!emitTail())return false;
++        if(pendingIdentity_&&bit(registered_,pendingHandle_.slot)&&
++            (selected<0||selected==pendingIdentity_->object))return visit(pendingHandle_,pendingIdentity_->object);
++        return true;
+     }
+     RunnerRetainedLayerRead layerState(InstanceHandle h)const{
+         if(pendingPublication_&&h.slot==pendingHandle_.slot&&h.generation==pendingHandle_.generation)
+@@ -289,9 +369,10 @@ private:
+         const Identity identity{{slot,next_},object,x,y,creation,source};
+         std::uint32_t spatial=8u;
+         if(slot==Capacity||pendingPublication_)return good_=false;
+-        pendingPublication_=&order;pendingHandle_=identity.handle;
++        bit(rebound_,slot,false);bit(registered_,slot,false);
++        pendingPublication_=&order;pendingHandle_=identity.handle;pendingIdentity_=&identity;
+         const bool published=!binding_.birth||binding_.birth(binding_.context,identity,active,order.stamp,spatial);
+-        pendingPublication_=nullptr;pendingHandle_={};
++        pendingPublication_=nullptr;pendingHandle_={};pendingIdentity_=nullptr;
+         if(!published||!runs_.append({slot,next_},object,x,y,source,creation,order))return good_=false;
+         ++next_;freeHint_=slot+1;
+         flags_[slot]=(active?0:2)|((spatial&8u)?4u:0u)|((spatial&0x200u)?8u:0u)|((spatial&0x8000u)?16u:0u);
+@@ -334,6 +415,7 @@ public:
+     bool retire(InstanceHandle h){
+         if(stepping_||!good_||!runs_.contains(h)||!(flags_[h.slot]&1)||
+             (binding_.retire&&!binding_.retire(binding_.context,h.slot))||!runs_.retire(h))return good_=false;
++        if(bit(registered_,h.slot))unbindRegistration(h.slot);
+         if(h.slot<freeHint_)freeHint_=h.slot;
+         return true;
+     }
+@@ -346,6 +428,7 @@ public:
+         // ordinal rather than mutating a borrowed descriptor traversal.
+         if(binding_.retire)for(unsigned i=0;i<runs_.size();++i)
+             if(!binding_.retire(binding_.context,runs_.handle(i).slot))return good_=false;
++        clearRegistrations();
+         runs_.~Runs();new(&runs_) Runs;freeHint_=0;wallPresentationState_=unboundedWallArt_=false;return true;
+     }
+ private:
+diff --git a/src/core/RunnerObjectMembership.h b/src/core/RunnerObjectMembership.h
+index a301e5e2..541abc0c 100644
+--- a/src/core/RunnerObjectMembership.h
++++ b/src/core/RunnerObjectMembership.h
+@@ -15,7 +15,11 @@ template<unsigned Capacity,unsigned RetainedFirst=0,unsigned RetainedLast=0,int
+     static constexpr bool retained=RetainedFirst<RetainedLast;
+     static_assert(!retained||Capacity<65535,"Retained registration slots must fit uint16");
+ public:
++    static constexpr bool borrowsTerrain=false;
+     static constexpr unsigned End = Capacity;
++    // Borrowed merge cursors: callers must not mutate membership while walking.
++    unsigned firstRegistration()const{return head_;}
++    unsigned nextRegistration(unsigned slot)const{return contains(slot)?entries_[slot].next:End;}
+     template<unsigned First,unsigned Last> struct RegistrationProjection {
+         static_assert(First<=Last&&Last<=Capacity&&Capacity<65535,"Invalid projected registration domain");
+         static constexpr unsigned slots=Capacity-(Last-First);
+diff --git a/src/core/TerrainOwnershipRuns.h b/src/core/TerrainOwnershipRuns.h
+index 63808b8f..1d889213 100644
+--- a/src/core/TerrainOwnershipRuns.h
++++ b/src/core/TerrainOwnershipRuns.h
+@@ -97,6 +97,11 @@ public:
+         const auto& r=runs_[locator_[h.slot]-1];
+         out=static_cast<const Publication&>(r).shifted(h.slot-r.first);return true;
+     }
++    template<class Read> bool readPublication(InstanceHandle h,Read read)const{
++        if(!contains(h))return false;
++        const auto& r=runs_[locator_[h.slot]-1];
++        return read(static_cast<const Publication&>(r),h.slot-r.first);
++    }
+     // Exclusive constructor writer. Borrow only until the next structural
+     // operation; a shared descriptor must keep the split-aware mutation path.
+     Publication* singletonPublication(InstanceHandle h){
+@@ -211,6 +216,16 @@ public:
+         return true;
+     }
+     template<class Visit> bool visit(Visit visit)const{return visitSelected<false>(0,0,visit);}
++    // Registration borrows identities without constructing geometry records.
++    template<class Visit> bool visitKeys(int selected,Visit visit)const{
++        for(unsigned n=head_;n!=End;n=runs_[n].next){const auto& r=runs_[n];
++            if(selected>=0&&r.object!=selected)continue;
++            for(unsigned i=0;i<r.count;++i){const unsigned slot=r.first+i;
++                if(locator_[slot]==n+1&&!visit(InstanceHandle{slot,r.generation+i},r.object))return false;
++            }
++        }
++        return true;
++    }
+     template<class Visit> bool visitRows(int first,int end,Visit visit)const{
+         return first>=end||visitSelected<true>(first,end,visit);
+     }
+diff --git a/tests/core/NativeDrawCaptureTest.cpp b/tests/core/NativeDrawCaptureTest.cpp
+index d7bfad11..ac22a083 100644
+--- a/tests/core/NativeDrawCaptureTest.cpp
++++ b/tests/core/NativeDrawCaptureTest.cpp
+@@ -1,8 +1,81 @@
+ #include "core/NativeInstanceTable.h"
++#include "core/NativeTerrainRegistration.h"
++#include "core/NativeTerrainLifetimes.h"
+ #include "core/RunnerLayers.h"
+ #include <cassert>
+ #include <cstdio>
+ #include <initializer_list>
++static void borrowedTerrainRegistration(){
++    using namespace downwell;
++    struct Fixture {
++        using Terrain=NativeTerrainLifetimes<6>;
++        Terrain terrain;
++        NativeInstanceTable<12,3,9,93,NativeTerrainRegistration<12,3,9,Terrain>> table{true};
++        NativeInstanceTable<12> reference{true};
++        Fixture(){
++            assert(table.bindTerrainStorage(terrain));
++            Terrain::Binding binding;
++            binding.context=this;
++            binding.admit=[](void*,unsigned){return true;};
++            binding.birth=[](void* context,const Terrain::Identity& id,bool,std::uint32_t& order,std::uint32_t&){
++                auto& f=*static_cast<Fixture*>(context);const InstanceHandle h{id.handle.slot+3,id.handle.generation};
++                std::uint32_t refOrder=0;
++                const bool okay=f.table.externalBirth(h.slot,order)&&f.reference.externalBirth(h.slot,refOrder)&&order==refOrder&&
++                    f.table.registerExternalObject(h,id.object,true)&&f.reference.registerExternalObject(h,id.object,true)&&
++                    f.table.externalRegistered(h); // Identity is visible during synchronous birth.
++                if(okay)f.compare();return okay;
++            };
++            binding.retire=[](void* context,unsigned slot){
++                auto& f=*static_cast<Fixture*>(context);std::uint32_t gen;int object;
++                if(!f.terrain.readRegistration(slot,gen,object))return true;
++                return f.table.registerExternalObject({slot+3,gen},object,false)&&
++                    f.reference.registerExternalObject({slot+3,gen},object,false);
++            };
++            binding.mark=[](void*,unsigned){return true;};
++            assert(terrain.bind(binding));
++        }
++        void actor(unsigned slot){assert(table.birth({slot,1},119,0x10,42)&&reference.birth({slot,1},119,0x10,42));}
++        void rebind(unsigned slot){
++            std::uint32_t gen;int object;assert(terrain.readRegistration(slot,gen,object));
++            const InstanceHandle h{slot+3,gen};
++            assert(table.registerExternalObject(h,object,false)&&reference.registerExternalObject(h,object,false));
++            std::uint32_t order=0,refOrder=0;
++            assert(table.externalBirth(h.slot,order)&&reference.externalBirth(h.slot,refOrder)&&order==refOrder);
++            assert(terrain.rebindOrder({slot,gen},order));
++            assert(table.registerExternalObject(h,object,true)&&reference.registerExternalObject(h,object,true));
++        }
++        void compare(){
++            for(int selected:{-1,60,93,119})for(unsigned first=0;first<=12;++first)for(unsigned last=first;last<=12;++last){
++                unsigned expected[12]{},actual[12]{},n=0,m=0;
++                auto flags=[](auto h,auto& value){value=h.generation;return true;};
++                assert(reference.visitRegistrationRange(first,last,flags,[&](auto h,int object,auto){
++                    if(selected<0||selected==object)expected[n++]=h.slot*100+h.generation;return true;
++                }));
++                auto emit=[&](auto h,int,auto){actual[m++]=h.slot*100+h.generation;return true;};
++                assert(selected<0?table.visitRegistrationRange(first,last,flags,emit):
++                    table.visitObjectRegistrationRange(first,last,selected,flags,emit));
++                assert(n==m);for(unsigned i=0;i<n;++i)assert(expected[i]==actual[i]);
++            }
++        }
++    } f;
++    f.actor(1);assert(f.terrain.append(60,0,0,true,0,-1));
++    f.actor(9);assert(f.terrain.append(93,16,0,true,0,-1));
++    assert(f.terrain.append(60,32,0,true,0,-1));f.actor(2);f.compare();
++    f.rebind(0);f.compare();
++    assert(f.terrain.append(93,48,0,true,0,-1));f.compare();
++    f.rebind(2);f.rebind(0);f.compare();
++    assert(f.terrain.markDestroyed({1,2})&&f.terrain.retire({1,2}));f.compare();
++    assert(f.terrain.append(60,64,0,true,0,-1));f.compare(); // Reused slot, fresh birth order.
++    assert(f.terrain.clear());f.compare();
++    assert(f.terrain.append(93,0,0,true,0,-1));f.compare(); // Re-entry, generations retained.
++    std::uint32_t generation;int object;
++    assert(f.terrain.readRegistration(0,generation,object));
++    // Even an omitted terrain mutation invalidates an actor-only borrowed walk.
++    assert(!f.table.visitRegistrationRange(0,3,[&](auto,int,auto){
++        assert(f.table.registerExternalObject({3,generation},object,false));return true;
++    }));
++    assert(f.reference.registerExternalObject({3,generation},object,false));f.compare();
++}
+ static void terrainPhaseSelection(){
+     using namespace downwell;
+     NativeInstanceTable<12,3,9,93> selected(true);
+@@ -101,6 +174,7 @@ static void preparedFamily(){
+     assert(!population.good&&direct.bindingRevision()==reference.bindingRevision());
+ }
+ int main(){
++    borrowedTerrainRegistration();
+     terrainPhaseSelection();
+     preparedFamily();
+     {
+diff --git a/src/core/NativeTerrainRegistration.h b/src/core/NativeTerrainRegistration.h
+new file mode 100644
+index 00000000..a3171e2a
+--- /dev/null
++++ b/src/core/NativeTerrainRegistration.h
+@@ -0,0 +1,84 @@
++#ifndef DOWNWELL_NATIVE_TERRAIN_REGISTRATION_H
++#define DOWNWELL_NATIVE_TERRAIN_REGISTRATION_H
++#include "RunnerObjectMembership.h"
++#include "InstanceHandle.h"
++namespace downwell {
++// The terrain store already owns identity and chronology. Keep registration
++// nodes only for actors; merge their live sequence with borrowed terrain runs.
++// Traversals have the runner's read-only membership contract.
++template<unsigned Capacity,unsigned First,unsigned Last,class Terrain>
++class NativeTerrainRegistration {
++    static_assert(First<Last&&Last<=Capacity&&Last-First==Terrain::capacity,"Terrain registration domain");
++    static constexpr unsigned Actors=Capacity-(Last-First);
++    RunnerObjectMembership<Actors> actors_;
++    Terrain* terrain_=nullptr;
++    unsigned revision_=0;
++    static unsigned local(unsigned slot){return slot<First?slot:slot-(Last-First);}
++    static unsigned shared(unsigned slot){return slot<First?slot:slot+(Last-First);}
++public:
++    static constexpr bool borrowsTerrain=true;
++    bool bindTerrain(Terrain& terrain){
++        if(terrain_&&terrain_!=&terrain)return false;
++        terrain_=&terrain;return true;
++    }
++    bool read(unsigned slot,std::uint32_t& generation,int& object)const{
++        if(slot>=Capacity)return false;
++        if(slot>=First&&slot<Last)return terrain_&&terrain_->readRegistration(slot-First,generation,object);
++        return actors_.read(local(slot),generation,object);
++    }
++    bool contains(unsigned slot)const{
++        std::uint32_t generation;int object;return read(slot,generation,object);
++    }
++    bool bind(unsigned slot,int object,std::uint32_t generation){
++        if(slot>=Capacity)return false;
++        const bool okay=slot>=First&&slot<Last?terrain_&&terrain_->bindRegistration({slot-First,generation},object):
++            actors_.bind(local(slot),object,generation);
++        if(okay)++revision_;
++        return okay;
++    }
++    bool unbind(unsigned slot){
++        if(slot>=Capacity)return false;
++        const bool okay=slot>=First&&slot<Last?terrain_&&terrain_->unbindRegistration(slot-First):actors_.unbind(local(slot));
++        if(okay)++revision_;
++        return okay;
++    }
++    void clear(){actors_.clear();if(terrain_)terrain_->clearRegistrations();++revision_;}
++    template<class Order,class Visit>
++    bool visit(unsigned first,unsigned last,int selected,Order order,Visit emit)const{
++        if(first>last||last>Capacity)return false;
++        if(first==last)return true;
++        const unsigned revision=revision_;
++        unsigned actor=actors_.firstRegistration();
++        std::uint32_t generation=0;int object=-1;
++        const auto advance=[&](){
++            while(actor!=Actors){
++                const unsigned slot=shared(actor);
++                if(!actors_.read(actor,generation,object))return false;
++                if(slot>=first&&slot<last&&(selected<0||object==selected))break;
++                actor=actors_.nextRegistration(actor);
++            }
++            return true;
++        };
++        const auto emitActor=[&](){
++            if(!emit(shared(actor),generation,object)||revision!=revision_)return false;
++            actor=actors_.nextRegistration(actor);return advance();
++        };
++        if(!advance())return false;
++        if(terrain_&&first<Last&&last>First){
++            if(!terrain_->visitRegistrations(selected,[&](InstanceHandle h,int terrainObject){
++                const unsigned slot=First+h.slot;
++                if(slot<first||slot>=last)return true;
++                if(actor!=Actors){
++                    const unsigned stamp=terrain_->registrationOrder(h);
++                    while(actor!=Actors&&order(InstanceHandle{shared(actor),generation})<stamp)
++                        if(!emitActor())return false;
++                }
++                return emit(slot,h.generation,terrainObject)&&revision==revision_;
++            }))return false;
++        }
++        while(actor!=Actors)if(!emitActor())return false;
++        return true;
++    }
++};
++}
++#endif

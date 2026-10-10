@@ -55,7 +55,9 @@ behavior, both backend integrations and relevant original-game verification.
   offline assets and native terrain ownership. Do not resume micro-optimization
   sweeps, duplicate simulation passes or reference-only performance modes.
   For generation, remove the remaining per-cell ownership/publication work
-  around the run-owned chronology and bounded layer membership. Preserve inactive
+  around the run-owned chronology and bounded layer membership. Standalone
+  registration-owner replacements are closed after two measured rejections;
+  do not retry registry encodings or tune their lookup helpers. Preserve inactive
   end-of-layer cutoffs, activation, depth order and retirement; an always-active
   scenery lease alone cannot represent these semantics. Gate on current frames
   676 and 1689 as well as ordinary gameplay. This is not a revival of rejected
