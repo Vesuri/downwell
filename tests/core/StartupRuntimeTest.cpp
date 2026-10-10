@@ -656,34 +656,58 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
         runtime->step(false);
         require(failure.calls==calls&&runtime->tick()==tick,"failed child creation is not retried");
     }
-    LifecycleAudit audit;
+    struct BulletAudit:LifecycleAudit {
+        struct Retired {downwell::InstanceHandle key;float x,y;bool destroyed;};
+        std::vector<Retired> bullets;
+        bool retire(downwell::InstanceHandle key,const downwell::InstanceRecord& r){
+            if(r.objectId==261)bullets.push_back({key,r.preciseX,r.preciseY,r.destroyRequested});
+            return LifecycleAudit::retire(key,r);
+        }
+    } audit;
     auto indexed=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
         downwell::InstanceLifecycleBinding::bindMaskDestruction(audit));
     auto plain=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns);
     audit.observedRuntime=indexed.get();
     indexed->skipToGameForTesting();plain->skipToGameForTesting();audit.verify(*indexed);
     require(audit.initialViewsSeen==1,"live room entry observed source initial camera view");
-    unsigned collisionShots=0;
+    unsigned collisionShots=0,postCollisionRetirements=0;
     for(unsigned tick=0;tick<1800;++tick){
         const auto input=downwell::gameplayContactProfileInput(tick,indexed->mainPlayerX(),indexed->mainPlayerY());
         std::vector<downwell::StartupRuntime::MainBulletState> shots;
+        std::vector<std::pair<float,float>> publishedPositions;
+        audit.bullets.clear();
         require(indexed->stepWithCollisionPass(input,false,[&]{
             for(std::size_t i=0;i<indexed->mainBulletCount();++i){
                 const auto& shot=indexed->mainBulletAt(i);
                 require(shot.trajectory.initialized,"live collision pass sees completed bullet Step initialization");
                 shots.push_back(shot);++collisionShots;
+                const auto* record=indexed->resolveInstance(shot.instance);
+                require(record,"Collision bullet has a retained instance");
+                publishedPositions.push_back({record->preciseX,record->preciseY});
             }
             return true;
         }),"live retained Step completes before collision observation");
         plain->step(input,false);
-        require(shots.size()==indexed->mainBulletCount(),"post-Collision path does not dispatch bullets again");
+        std::size_t retained=0;
         for(std::size_t i=0;i<shots.size();++i){
-            const auto& before=shots[i];const auto& after=indexed->mainBulletAt(i);
+            const auto& before=shots[i];
+            if(!indexed->resolveInstance(before.instance)){
+                unsigned matches=0;
+                for(const auto& retired:audit.bullets)if(retired.key.slot==before.instance.slot&&retired.key.generation==before.instance.generation){
+                    require(retired.destroyed&&retired.x==publishedPositions[i].first&&retired.y==publishedPositions[i].second,
+                        "End Step retires a marked bullet without moving it again");++matches;
+                }
+                require(matches==1,"removed Collision bullet has exactly one lifecycle retirement");
+                ++postCollisionRetirements;continue;
+            }
+            require(retained<indexed->mainBulletCount(),"surviving bullet remains in the compact view");
+            const auto& after=indexed->mainBulletAt(retained++);
             require(before.instance.slot==after.instance.slot&&before.instance.generation==after.instance.generation&&
                 before.trajectory.x.pixel==after.trajectory.x.pixel&&before.trajectory.x.fraction==after.trajectory.x.fraction&&
                 before.trajectory.y.pixel==after.trajectory.y.pixel&&before.trajectory.y.fraction==after.trajectory.y.fraction,
                 "bullet position observed at Collision is retained through End Step");
         }
+        require(retained==indexed->mainBulletCount(),"post-Collision phase creates no extra bullet or duplicate entry");
         require(healthy(*indexed)&&indexed->stateDigest()==plain->stateDigest(),
                 "lifecycle publication preserves complete live gameplay state and RNG");
         const auto* builder=indexed->instance(100856);
@@ -693,6 +717,7 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
         audit.verify(*indexed);
     }
     require(collisionShots>0,"natural contact tape exercises bullet Step at the collision boundary");
+    require(postCollisionRetirements>0,"natural contact tape exercises bullet End Step retirement");
     std::cout << "Live lifecycle births=" << audit.births << " retires=" << audit.retires
               << " activations=" << audit.activations << " inactivations=" << audit.inactivations
               << " memberships=" << audit.memberships << " moves=" << audit.moves
