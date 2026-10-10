@@ -1264,7 +1264,7 @@ verify-gameplay-collision-owner: build/gameplay-collision-owner-test build/gamep
 
 build/live-collision-lifecycle-test build/gameplay-collision-owner-test build/gameplay-collision-owner-scalar-test build/gameplay-collision-owner-snapshot-test: tests/core/RegisteredSkeletonThrowChecks.h
 
-build/gameplay-collision-owner-test: tests/core/GameplayCollisionOwnerTest.cpp tests/core/ScheduledBoxEffectsCheck.h src/core/GameplayWorld.cpp src/core/PlayerMotion.cpp src/core/Replay.cpp src/core/GameMakerRandom.cpp src/core/ObjectPack.cpp src/core/RoomPack.cpp src/core/AreaOneBuilder.cpp src/core/BuilderPatternPack.cpp $(wildcard src/core/*.h)
+build/gameplay-collision-owner-test: tests/core/GameplayCollisionOwnerTest.cpp tests/core/ScheduledBoxEffectsCheck.h tests/core/GeneratedSourceBirthChecks.h src/core/GameplayWorld.cpp src/core/PlayerMotion.cpp src/core/Replay.cpp src/core/GameMakerRandom.cpp src/core/ObjectPack.cpp src/core/RoomPack.cpp src/core/AreaOneBuilder.cpp src/core/BuilderPatternPack.cpp $(wildcard src/core/*.h)
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
 

@@ -11,6 +11,7 @@
 #include "SourceBulletSchedulingChecks.h"
 #include "RegisteredSkeletonThrowChecks.h"
 #include "ScheduledBoxEffectsCheck.h"
+#include "GeneratedSourceBirthChecks.h"
 #endif
 #include "core/BoxWorldEffects.h"
 #ifdef DOWNWELL_LOCAL_DRAW_CAPTURE
@@ -42,6 +43,12 @@ bool nativeGeneratedFieldBirth(GameplayWorld& world,unsigned source,const downwe
 }
 bool nativeGeneratedEnemyBirth(GameplayWorld& world,unsigned source,const downwell::DeferredCreateInstance& command,
     const downwell::ObjectPack& objects){return world.adoptGeneratedEnemyWithSourceId(source,command,objects);}
+bool nativeGeneratedSourceBirth(GameplayWorld& world,const downwell::DeferredCreateInstance& command,
+    const downwell::ObjectPack& objects,bool (*allocate)(int,unsigned&),
+    bool (*terrain)(const downwell::DeferredCreateInstance&,unsigned)){
+    return world.createGeneratedInstanceWithSourceIds(command,objects,allocate,terrain,
+        [](const auto&,auto&){return false;});
+}
 struct NativeSkeletonAudio {
     bool isPlaying(int,bool&);bool stop(int);bool play(int,int,bool,int&);
     bool getGain(int,downwell::MotionBinary64&);bool setGain(int,downwell::MotionBinary64,int);
@@ -1098,6 +1105,7 @@ int main(){
     }
     auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
+    checkGeneratedSourceBirths(objects,sprites);
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
         GameplayCollisionOwner::Ownership::nativeScenery}){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},

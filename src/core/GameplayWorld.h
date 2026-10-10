@@ -1871,6 +1871,46 @@ public:
             return run_.effectsSucceeded=false;
         return run_.effectsSucceeded=adoptGeneratedEnemy(command,objects,sourceId);
     }
+    // Source-identity handoff for a synchronous builder command. The caller
+    // supplies the room-wide allocator, including nested shop/exit Creates.
+    // Do not reserve a batch: publication can synchronously create children.
+    // Terrain receives the allocated ID even when its native owner is a run.
+    // Unsupported families fail instead of silently consuming an ID without
+    // constructing an actor. The legacy handoff above remains the reference
+    // until the enclosing frontend supplies its complete creation stream.
+    template<class Allocate,class Terrain,class Shop>
+    bool createGeneratedInstanceWithSourceIds(const downwell::DeferredCreateInstance& command,
+        const downwell::ObjectPack& objects,Allocate& allocate,Terrain terrain,Shop shop){
+        if(!run_.effectsSucceeded)return false;
+        if(command.objectId==277)
+            return run_.effectsSucceeded=shop(command,allocate)&&run_.effectsSucceeded;
+        if(command.objectId==306)return registerLevelExitWithSourceIds(command.y,
+            [&](int object,unsigned& id){return allocate(object,id);});
+        const bool wall=command.objectId==60||command.objectId==93||command.objectId==99;
+        const bool enemy=downwell::enemyCreateProfile(command.objectId).health!=0;
+        if(!wall&&!enemy&&command.objectId!=92&&command.objectId!=82&&command.objectId!=62)
+            return run_.effectsSucceeded=false;
+        unsigned source=0;
+        if(!allocate(command.objectId,source)||!run_.effectsSucceeded||!source||source>0x7fffffffu)
+            return run_.effectsSucceeded=false;
+        if(command.objectId==82)return adoptGeneratedTimeFieldWithSourceId(source,command);
+        if(command.objectId==62)return registerSideCameraLocker(command.x,command.y,source);
+        if(!terrain(command,source)||!run_.effectsSucceeded)return run_.effectsSucceeded=false;
+        if(wall){
+            if(terrainInstances_&&
+                (!terrainInstances_->append(command.objectId,command.x,command.y,command.active,source)||
+                 !terrainInstances_->createProperties(terrainInstances_->handle(terrainInstances_->size()-1),
+                    downwell::terrainTileForArea(run_.stage.area),false,enemyRandom_)))
+                return run_.effectsSucceeded=false;
+            return true;
+        }
+        if(command.objectId==92){
+            const int x=command.x-240,y=command.y-176;const auto state=command.boxCreate();
+            const std::uint32_t sourceId=source;
+            return run_.effectsSucceeded=appendBreakables(&x,&y,1,&state,&sourceId);
+        }
+        return adoptGeneratedEnemyWithSourceId(source,command,objects);
+    }
 private:
     bool adoptGeneratedEnemy(const downwell::DeferredCreateInstance& command,
         const downwell::ObjectPack& objects,std::uint32_t sourceId){

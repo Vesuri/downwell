@@ -603,6 +603,18 @@ one after that handler returns. Native generated-birth integration must
 preserve that boundary across the table above, not infer a stream from the
 terrain representation or a batch's final population.
 
+`GameplayWorld::createGeneratedInstanceWithSourceIds` is the checked native
+handoff for this stream. It borrows the allocator by reference, publishes each
+allocated terrain ID to the backend and reference terrain owner, and retains
+IDs on boxes, ordinary enemies, fields and lockers. Field commands adopt their
+already-sampled radius without consuming Create RNG again. Exit registration
+borrows the same allocator for its parent and children; shop registration must
+be supplied by its enclosing concrete owner and cannot fall back to compact
+stock. Unknown families and failed allocation/publication stop the handoff.
+This entry point does not supply a startup cursor or intercept the Amiga
+generator's optimized terrain/box paths: those frontend connections, concrete
+native shop ownership and the complete room-wide stream remain required.
+
 `registerLevelExitWithSourceIds` supplies that boundary for the exit chain:
 306 is allocated and registered before its Create; 74 and 255 each request
 their own ID immediately before child registration. Exit-controller and goal
