@@ -6,6 +6,7 @@
 #include "BlastShootableContact.h"
 #include "BoxDestructionScript.h"
 #include "MainRoomLifetime.h"
+#include "ProjectileViewInterior.h"
 #include "RunnerSpatialInstances.h"
 #include "RunnerObjectFamilies.h"
 #include "RunnerRoomMembership.h"
@@ -1650,6 +1651,8 @@ public:
             if(!self.world_->playerHandle().generation&&!terrainCount&&!self.world_->breakableSlots()&&!self.world_->enemyCount()&&!self.world_->bulletCount()&&!self.drones_.size()&&!self.skeletons_.size()&&!self.whiteJellies_.size()&&!self.redBalls_.size()&&!self.playerControllers_.size()&&!self.corpses_.size()&&!self.shopInstances_.size())return true;
             MotionBinary64 top;
             if(!multiplyBinary64(MotionBinary64::fromInteger(topQ12),{0x3f300000u,0},top))return self.check(false);
+            const bool interiorSupported=topQ12>=(-2147483647L-1)&&topQ12<=2147483647L;
+            const ProjectileViewInterior bulletInterior(static_cast<std::int32_t>(topQ12));
             return self.dispatchActorEndStep([&](InstanceHandle shared,int object){
                 View::Kind kind;InstanceHandle local;
                 if(!View::decode(shared,kind,local))return false;
@@ -1671,7 +1674,7 @@ public:
                             return LifetimeInstance{object,enemy->y+176,enemy->active&&!enemy->destroyRequested};
                         },[&](unsigned){return self.world_->markEnemyDestroyed(local);});
                 }
-                if(object==261&&kind==View::Kind::bullet)return self.endStepBullet(shared,top);
+                if(object==261&&kind==View::Kind::bullet)return self.endStepBullet(shared,top,interiorSupported?&bulletInterior:nullptr);
                 if(object==120&&kind==View::Kind::skeleton)return self.skeletons_.endStep(local,top,true);
                 const auto steeringEndStep=[&](auto& store){
                     struct Ops {
@@ -3087,10 +3090,15 @@ public:
     }
     // GameplayWorld owns rmMain; invoke only at the selected End Step slot.
     // Read the published builtin again after each destruction request.
-    bool endStepBullet(InstanceHandle shared,MotionBinary64 top){
+    bool endStepBullet(InstanceHandle shared,MotionBinary64 top,const ProjectileViewInterior* interior=nullptr){
         View::Kind kind;InstanceHandle local;
         if(!valid()||!world_||!resolves(shared)||!View::decode(shared,kind,local)||kind!=View::Kind::bullet)
             return check(false);
+        if(native_&&interior){
+            const auto* position=nativePosition(shared.slot);
+            if(!position)return check(false);
+            if(interior->contains(position->y))return true;
+        }
         struct Ops {
             GameplayCollisionOwner& owner;InstanceHandle shared,local;MotionBinary64 top;
             bool readY(MotionBinary64& y){
