@@ -694,6 +694,22 @@ the room and outlive the scope; absent ownership fails when an event fires.
 The registered room fixture checks tick-60 flashing and tick-90 retirement
 through the collision and layer owners, without admitting other shop families.
 
+Rising-text Draw measures hash-to-newline text with the current font, retains
+`stWidth`, `xxx`, `overXview` and `underXview`, and gives the right-edge adjustment
+priority over the left-edge adjustment when text exceeds both bounds. It sets
+horizontal alignment to centre even on a hidden flashing frame, then restores
+left alignment. The shared Draw entry delegates the original four-black-pass
+border text operation; renderer binding is still required. Odd widths retain
+half-pixel placement rather than rounding before alignment.
+
+The selected Windows numeric truth helper at `0x56a390` dispatches real/bool
+payloads to a strict comparison with 0.5, signed int32 to `SETG` against zero,
+and signed int64 to an equivalent high/low-word comparison. Thus both numeric
+representations of -1 are false, unlike implicit C++ boolean conversion. This
+is the relevant +/-1 `drawing` domain; it does not claim support for every VM
+value type. `verify-runner-numeric-truth.py` pins the helper, its type table and
+threshold against the original executable hash.
+
 `StoredShopCreationOwner` is the concrete owner accepted by
 `ShopWorld::createRegistered`: it registers resource 277 in that same room
 store/counter, retains the inherited interactable state and delegates child

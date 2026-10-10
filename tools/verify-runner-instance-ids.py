@@ -223,3 +223,7 @@ assembly("gml_Object_fxRisingText_Alarm_1",
 assembly("gml_GlobalScript_action_kill_object",
     "caac5c9d9f9d959a5aa6337f729bfc989927d8882d4ce7f9a29b9d45dd0eab33")
 print("Pinned rising-text Step and alarm-driven destruction")
+assembly("gml_Object_fxRisingText_Draw_0",
+    "b3f4de1e393b0608999219ff82fba8a18679e5f526e3295f4b440e283cf6c7cc")
+assembly("gml_GlobalScript_scrDrawBorderTextBlack",
+    "fa8d7e4e10625d3474e6ca2e2d1ed674d5c25c3ccc2b23a264215ca22bf93d6b")

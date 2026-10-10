@@ -4,6 +4,7 @@
 #include "InstanceLifecycle.h"
 #include "ObjectPack.h"
 #include "MultiplyBinary64.h"
+#include "RunnerRealComparison.h"
 #include <cstring>
 namespace downwell {
 // Synchronous Create ownership for Shop's ten children. This is deliberately
@@ -20,6 +21,7 @@ public:
         int opened=0,destroyed=0,flashing=0,thankful=0,goodbye=0,confused=0;
         unsigned whichUg=0;
         MotionBinary64 ysp{},decreaseBy{};
+        MotionBinary64 textWidth{},drawX{},overXview{},underXview{};
         const char* text=nullptr;
         int drawing=0;
         bool initialized=false;
@@ -154,6 +156,42 @@ public:
         if(!good_||creating_||!r||!r->destroyRequested||
            !records_.erase(e->id,[&](auto h,const auto& value){return lifecycle_.retire(h,value);}))return fail();
         *e={};return true;
+    }
+    // Draw operations use the current font and convert '#' to newlines for
+    // width/text. The callback must execute the existing border-text script,
+    // not replace its four black passes with a different outline algorithm.
+    template<class Ops> bool drawRisingText(InstanceHandle key,Ops& ops){
+        auto* e=entry(key);auto* r=e?record(*e):nullptr;
+        if(!good_||creating_||!r||e->object!=212||!e->state.initialized)return fail();
+        if(!r->active||r->destroyRequested)return true;
+        auto& s=e->state;RunnerImageValue px,py;
+        std::memcpy(&px.bits,&r->preciseX,4);std::memcpy(&py.bits,&r->preciseY,4);
+        if(!ops.widthHashText(s.text,s.textWidth)||!good_)return fail();
+        s.drawX=px.promoted();MotionBinary64 half,viewX,viewWidth;
+        if(!multiplyBinary64(s.textWidth,{0x3fe00000u,0},half))return fail();
+        auto over=px.promoted();
+        if(!over.add(half)||!ops.view(0,viewX)||!good_||!ops.view(2,viewWidth)||!good_||!viewX.add(viewWidth))return fail();
+        viewX.high^=0x80000000u;if(!over.add(viewX))return fail();s.overXview=over;
+        auto under=px.promoted();half.high^=0x80000000u;
+        if(!under.add(half)||!ops.view(0,viewX)||!good_)return fail();
+        viewX.high^=0x80000000u;if(!under.add(viewX))return fail();s.underXview=under;
+        int comparison;
+        if(!compareRunnerReal(over,MotionBinary64::fromInteger(-10),comparison))return fail();
+        if(comparison>0){
+            over.high^=0x80000000u;
+            if(!s.drawX.add(over)||!s.drawX.add(MotionBinary64::fromInteger(-10)))return fail();
+        }else{
+            if(!compareRunnerReal(under,MotionBinary64::fromInteger(10),comparison))return fail();
+            if(comparison<0){
+                under.high^=0x80000000u;
+                if(!s.drawX.add(under)||!s.drawX.add(MotionBinary64::fromInteger(10)))return fail();
+            }
+        }
+        if(!ops.align(1)||!good_)return fail();
+        // drawing's source domain is integer +/-1 (or zero); the selected
+        // runner's numeric conversion is positive, not C++ nonzero truth.
+        if(s.drawing>0&&(!ops.borderTextBlack(s.text,s.drawX,py.promoted())||!good_))return fail();
+        return (ops.align(0)&&good_)||fail();
     }
     bool clear(){
         if(creating_)return fail();

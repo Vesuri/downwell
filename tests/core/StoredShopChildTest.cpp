@@ -169,6 +169,34 @@ bool risingTextEventsCheck(const ObjectPack& objects,unsigned failure){
     if(!observer.valid||!owner.retire(key)||records.size()||owner.state(key)||observer.retirements!=1)return false;
     return owner.create(212,0,0)==930001&&owner.state(key)==nullptr&&owner.clear();
 }
+bool risingTextDrawCheck(const ObjectPack& objects,int x,int width,bool flashing){
+    InstanceStore<2> records;std::uint32_t next=940000;const int room=11;bool good=true;
+    ShopChildObserver observer;
+    StoredShopChildRegistration<2,1> owner(records,objects,InstanceLifecycleBinding::bindPositionedActor(observer),next,room,good);
+    const auto key=owner.sourceHandle(owner.create(212,x,700));
+    if(!key.generation)return false;
+    if(flashing&&(!owner.risingTextAlarmEvent(key,1)||!owner.stepRisingText(key)))return false;
+    struct Draw {
+        int width,x,expectedY;bool flashing;unsigned calls=0,draws=0;bool valid=true;
+        bool widthHashText(const char* text,MotionBinary64& out){valid=valid&&calls++==0&&sameText(text,"+100 GEMS#+50 AMMO");out=MotionBinary64::fromInteger(width);return true;}
+        bool view(unsigned axis,MotionBinary64& out){
+            valid=valid&&axis==(calls==2?2u:0u)&&calls>=1&&calls<=3;++calls;out=MotionBinary64::fromInteger(160);return true;
+        }
+        bool align(unsigned value){valid=valid&&value==(calls==4?1u:0u);++calls;return true;}
+        bool borderTextBlack(const char*,MotionBinary64 px,MotionBinary64 py){
+            valid=valid&&calls++==5&&!flashing;++draws;
+            // Preserve the right-boundary-first branch, including text wider
+            // than the view. Odd widths exercise half-pixel placement.
+            int twice=x*2;
+            if(x*2+width>620)twice=620-width;
+            else if(x*2-width<340)twice=340+width;
+            std::int32_t measuredX,measuredY;
+            valid=valid&&px.add(px)&&px.roundPixel(measuredX)&&py.roundPixel(measuredY)&&measuredX==twice&&measuredY==expectedY;
+            return true;
+        }
+    } draw{width,x,flashing?697:700,flashing};
+    return owner.drawRisingText(key,draw)&&draw.valid&&draw.calls==(flashing?6u:7u)&&draw.draws==(flashing?0u:1u)&&owner.clear();
+}
 #ifndef DOWNWELL_NATIVE_QUERY_PROBE
 int main(){
     std::ifstream file("generated/downwell-objects.dwob",std::ios::binary);
@@ -188,6 +216,8 @@ int main(){
     for(unsigned failure=0;failure<=2;++failure)if(!risingTextEventsCheck(objects,failure)){
         std::fprintf(stderr,"rising text events failed for rejection %u\n",failure);return 1;
     }
+    for(int x:{160,170,240,310,320})for(int width:{40,41,200})for(bool flashing:{false,true})
+        if(!risingTextDrawCheck(objects,x,width,flashing)){std::fprintf(stderr,"rising text Draw failed\n");return 1;}
     std::puts("Stored shop children: Create state, numeric IDs, publication failures and teardown passed");
 }
 #endif
