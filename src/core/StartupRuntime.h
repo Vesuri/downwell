@@ -2015,6 +2015,45 @@ public:
             actor.collideTimeField();return true;
         });
     }
+    template<unsigned Capacity,class PointDirection,class DirectionSetter>
+    bool dispatchWhiteJellyEnemyCollision(StoredWhiteJellyStates<instanceCapacity,Capacity>& owner,
+        const RunnerCollisionEventContext::Frame& event,PointDirection pointDirection,DirectionSetter directionSetter){
+        if(!run_.effectsSucceeded)return false;
+        const auto* self=instances_.resolve(event.self);const auto* other=instances_.resolve(event.other);
+        PackedObjectEvent binding{};bool found=false;
+        if(!owner.belongsTo(instances_)||!owner.valid()||!self||!other||!objectPack_||self->objectId!=115||
+           event.type!=4||event.subtype!=other->objectId||event.owner!=115||event.code!=1226||
+           !objectPack_->collisionEvent(115,other->objectId,found,binding)||!found||
+           binding.ownerObjectId!=115||binding.codeId!=1226)return run_.effectsSucceeded=false;
+        struct Ops {
+            StartupRuntime& world;InstanceHandle self,other;PointDirection& point;DirectionSetter& setter;
+            bool read(bool vertical,MotionBinary64& out){
+                const auto* r=world.instances_.resolve(other);if(!r)return false;
+                RunnerImageValue value;const float coordinate=vertical?r->preciseY:r->preciseX;
+                std::memcpy(&value.bits,&coordinate,4);out=value.promoted();return true;
+            }
+            bool otherX(MotionBinary64& out){return read(false,out);}
+            bool otherY(MotionBinary64& out){return read(true,out);}
+            bool pointDirection(MotionBinary64 x,MotionBinary64 y,MotionBinary64 tx,MotionBinary64 ty,MotionBinary64& out){
+                return point(x,y,tx,ty,out);
+            }
+            bool direction(MotionBinary64 wanted,MotionBinary64& accepted){return setter(self,wanted,accepted);}
+        } ops{*this,event.self,event.other,pointDirection,directionSetter};
+        return run_.effectsSucceeded=owner.dispatch(event.self,[&](auto& state){return state.enemyContact(random_,ops);});
+    }
+    template<unsigned Capacity> bool dispatchWhiteJellyFieldCollision(
+        StoredWhiteJellyStates<instanceCapacity,Capacity>& owner,const RunnerCollisionEventContext::Frame& event){
+        if(!run_.effectsSucceeded)return false;
+        const auto* self=instances_.resolve(event.self);const auto* other=instances_.resolve(event.other);
+        PackedObjectEvent binding{};bool found=false;
+        if(!owner.belongsTo(instances_)||!owner.valid()||!self||!other||!objectPack_||self->objectId!=115||
+           event.type!=4||event.subtype!=other->objectId||event.owner!=83||event.code!=1066||
+           !objectPack_->collisionEvent(115,other->objectId,found,binding)||!found||
+           binding.ownerObjectId!=83||binding.codeId!=1066)return run_.effectsSucceeded=false;
+        return run_.effectsSucceeded=owner.dispatch(event.self,[](auto& state){
+            if(!state.timefieldImmune)state.health=0;return true;
+        });
+    }
     template<unsigned Capacity,class MakePlayer> bool dispatchSkeletonCollision(
         StoredSkeletonRegistration<instanceCapacity,Capacity>& skeletons,
         const RunnerCollisionEventContext::Frame& event,MakePlayer makePlayer){

@@ -1162,9 +1162,39 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                 for(std::size_t i=0;i<runtime->activeInstanceCount();++i)
                     if(runtime->instanceAt(i).objectId==115)id=runtime->instanceAt(i).instanceId;
                 require(owner.state(id)&&owner.state(id)->initialized&&speeds==1,"resource Create reaches jelly owner");
-                runtime->step(false);return runtime->effectsSucceeded()&&runtime->deferredCommandsSucceeded();
+                runtime->step(false);
+                require(stopReads==1&&speeds==2&&sprites==1,"ordinary room phase executes stopped jelly Step exactly once");
+                downwell::InstanceHandle other;
+                if(!runtime->spawnWhiteJelly(56,56,other))return false;
+                unsigned directions=0;
+                downwell::RunnerCollisionEventContext::Frame contact{key,other,4,115,115,1226};
+                require(runtime->dispatchWhiteJellyEnemyCollision(owner,contact,
+                    [&](N x,N y,N tx,N ty,N& angle){
+                        // Other reads are the selected room record's published
+                        // coordinates; self reads are this fixture's owned state.
+                        require(x.high==N::fromInteger(56).high&&y.high==N::fromInteger(56).high&&
+                            tx.high==N::fromInteger(32).high&&ty.high==N::fromInteger(64).high,
+                            "jelly contact reads the selected other lifetime");
+                        angle=N::fromInteger(45);return true;
+                    },[&](auto selected,N wanted,N& accepted){
+                        require(selected.slot==key.slot&&selected.generation==key.generation,
+                            "contact direction setter targets self, not other");
+                        ++directions;accepted=wanted;return true;
+                    }),"registered jelly enemy contact follows resource binding");
+                require(directions==1&&owner.state(id)->direction.high==N::fromInteger(45).high,
+                    "jelly contact stores accepted direction");
+                downwell::InstanceHandle field;
+                if(!runtime->spawnOrdinaryTimeField(32,64,field))return false;
+                downwell::RunnerCollisionEventContext::Frame fieldContact{key,field,4,82,83,1066};
+                require(owner.dispatch(key,[](auto& s){s.timefieldImmune=true;return true;})&&
+                    runtime->dispatchWhiteJellyFieldCollision(owner,fieldContact)&&owner.state(id)->health==25,
+                    "inherited field contact respects jelly immunity");
+                require(owner.dispatch(key,[](auto& s){s.timefieldImmune=false;return true;})&&
+                    runtime->dispatchWhiteJellyFieldCollision(owner,fieldContact)&&owner.state(id)->health==0&&owner.state(id)->alive,
+                    "field contact only writes health; ordinary Step owns death");
+                return runtime->effectsSucceeded()&&runtime->deferredCommandsSucceeded();
             }),"scoped jelly resource event dispatch succeeds");
-        require(stopReads==1&&speeds==2&&sprites==1,"ordinary room phase executes stopped jelly Step exactly once");
+        require(stopReads==1&&speeds==3&&sprites==1,"second synchronous birth does not run another Step");
         require(owner.state(id)->imageSpeed.bits==0,"stopped jelly image speed retained");
         const auto count=runtime->activeInstanceCount();
         require(!runtime->spawnWhiteJelly(24,56,key)&&runtime->activeInstanceCount()==count,
