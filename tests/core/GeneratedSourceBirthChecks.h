@@ -140,10 +140,10 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
                 return depth==100&&world.wallBackgroundTiles().contains(x,y,hit);
             }
             bool create(int object,MotionBinary64 x,MotionBinary64 y,unsigned& id){
-                assert(object==115&&!births&&!deactivations);RunnerImageValue px,py;
-                if(!px.assign(x)||!py.assign(y))return false;id=next++;
-                const bool ok=world.createWhiteJellyWithSourceId(id,px,py,
-                    [&](auto h){return Ops{owner.whiteJellies(),h,owner};},child);
+                assert(object==115&&!births&&!deactivations);id=next++;
+                InstanceHandle shared;GameplayCollisionView::Kind kind;
+                const bool ok=owner.createRegisteredSteeringEnemy(object,id,x,y,portableAtan,shared)&&
+                    GameplayCollisionView::decode(shared,kind,child)&&kind==GameplayCollisionView::Kind::whiteJelly;
                 assert(ok&&owner.whiteJellies().find(child)->initialized&&owner.whiteJellies().find(child)->active);
                 unsigned count;assert(owner.population(83,count)&&count==1);
                 ++births;return ok;

@@ -111,6 +111,11 @@ bool nativeRegisteredRedBallStep(downwell::GameplayCollisionOwner& owner,downwel
     bool stop,NativeWhiteJellyStepOps& ops){
     return owner.stepRegisteredRedBallWithWorld(shared,stop,ops);
 }
+bool nativeRegisteredSteeringBirth(downwell::GameplayCollisionOwner& owner,int object,unsigned source,
+    downwell::MotionBinary64 x,downwell::MotionBinary64 y,NativeWhiteJellyStepOps& ops,downwell::InstanceHandle& shared){
+    return owner.createRegisteredSteeringEnemy(object,source,x,y,
+        [&](auto dy,auto dx,auto& out){return ops.atan(dy,dx,out);},shared);
+}
 struct NativeRedBallDrawOps {
     using N=downwell::MotionBinary64;
     bool shade();bool drawSelf();bool imageIndex(N&);
@@ -1098,8 +1103,12 @@ int main(){
         for(const auto offset:std::initializer_list<std::pair<int,int>>{
             {0,100},{1,100},{159,100},{160,100},{80,0},{80,1},{80,283},{80,284}}){
             InstanceHandle edge,encoded;
-            assert(world->createRedBallWithSourceId(nextSource++,{0x43700000u},{0x44000000u},
-                [&](auto key){return Ops{*owner,key};},edge));
+            GameplayCollisionView::Kind bornKind;
+            assert(owner->createRegisteredSteeringEnemy(118,nextSource++,MotionBinary64::fromInteger(241),
+                MotionBinary64::fromInteger(513),portableAtan,encoded)&&
+                GameplayCollisionView::decode(encoded,bornKind,edge)&&bornKind==GameplayCollisionView::Kind::redBall);
+            assert(balls.find(edge)->x.bits==0x43700000u&&balls.find(edge)->y.bits==0x44000000u&&
+                balls.find(edge)->alarms.get(0)==10&&balls.find(edge)->alarms.get(2)==30&&balls.find(edge)->active);
             RunnerImageValue x,y,accepted;
             assert(x.assignInteger(160+world->cameraOffsetX()+offset.first)&&
                 y.assignInteger(34+world->cameraOffsetY()+offset.second)&&
@@ -1108,7 +1117,10 @@ int main(){
             assert(ContactCoordinates::playerGlobals(world->player().frameStartXFixed(),
                 world->player().frameStartYFixed(),240,176,px,py));
             const auto* actor=balls.find(edge);
-            assert(RunnerPointDirection::evaluate(actor->xx,actor->yy,px,py,heading,portableAtan)&&
+            assert(RunnerPointDirection::evaluate(actor->xx,actor->yy,px,py,heading,portableAtan));
+            RunnerImageValue expectedHeading;assert(RunnerDirectionValue::normalize(heading,expectedHeading));
+            assert(actor->playerDirection.high==expectedHeading.promoted().high&&
+                actor->playerDirection.low==expectedHeading.promoted().low&&
                 owner->redBallDirection(edge,heading,direction));
             const auto speed=actor->moveSpeed;
             assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::redBall,edge,encoded));

@@ -2279,6 +2279,55 @@ public:
            !((event.owner==120&&event.code==1266)||(event.owner==83&&event.code==1066)))return check(false);
         return check(world_->collideSkeletonRoomEffect(local,event.code==1066,makePlayer));
     }
+    // The source allocator remains caller-owned: this entry must consume the
+    // same numeric stream as all other synchronous room births. Return only
+    // after the concrete Create (including RNG and alarms) has completed.
+    template<class Atan> bool createRegisteredSteeringEnemy(int object,unsigned source,
+        MotionBinary64 x,MotionBinary64 y,Atan atan,InstanceHandle& shared){
+        shared={};
+        if(object==115)return createRegisteredSteeringEnemy<false>(source,x,y,atan,shared);
+        if(object==118)return createRegisteredSteeringEnemy<true>(source,x,y,atan,shared);
+        return check(false);
+    }
+private:
+    template<bool Red,class Atan> bool createRegisteredSteeringEnemy(unsigned source,
+        MotionBinary64 x,MotionBinary64 y,Atan& atan,InstanceHandle& shared){
+        RunnerImageValue px,py;
+        if(!valid()||!world_||!px.assign(x)||!py.assign(y))return check(false);
+        struct Ops {
+            GameplayCollisionOwner& owner;GameplayWorld& world;InstanceHandle key;Atan& atan;
+            auto& store(){if constexpr(Red)return owner.redBalls_;else return owner.whiteJellies_;}
+            bool position(bool vertical,RunnerImageValue value,RunnerImageValue& accepted){
+                return store().position(key,vertical,value,accepted);
+            }
+            bool player(bool vertical,MotionBinary64& out){
+                MotionBinary64 x,y;
+                if(!ContactCoordinates::playerGlobals(world.player().frameStartXFixed(),world.player().frameStartYFixed(),
+                    240,176,x,y))return false;
+                out=vertical?y:x;return true;
+            }
+            bool playerX(MotionBinary64& out){return player(false,out);}
+            bool playerY(MotionBinary64& out){return player(true,out);}
+            bool pointDirection(MotionBinary64 x,MotionBinary64 y,MotionBinary64 tx,MotionBinary64 ty,MotionBinary64& out){
+                return RunnerPointDirection::evaluate(x,y,tx,ty,out,atan);
+            }
+            bool direction(MotionBinary64 value,MotionBinary64& accepted){
+                if constexpr(Red)return owner.redBallDirection(key,value,accepted);
+                else return owner.whiteJellyDirection(key,value,accepted);
+            }
+            bool imageSpeed(RunnerImageValue value,RunnerImageValue& accepted){
+                if(!value.promoted().valid())return false;accepted=value;return true;
+            }
+            bool alarm(int number,int value){return number>=0&&store().setAlarm(key,unsigned(number),value);}
+        };
+        InstanceHandle local;
+        auto make=[&](InstanceHandle key){return Ops{*this,*world_,key,atan};};
+        bool created;
+        if constexpr(Red)created=world_->createRedBallWithSourceId(source,px,py,make,local);
+        else created=world_->createWhiteJellyWithSourceId(source,px,py,make,local);
+        return check(created&&View::encode(Red?View::Kind::redBall:View::Kind::whiteJelly,local,shared));
+    }
+public:
     template<class Ops> bool stepRegisteredSpawner(InstanceHandle shared,Ops& ops){
         View::Kind kind;InstanceHandle local;PackedObjectEvent event{};
         if(!valid()||!world_||!resolves(shared)||!View::decode(shared,kind,local)||kind!=View::Kind::spawner||
