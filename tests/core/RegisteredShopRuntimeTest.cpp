@@ -2,6 +2,7 @@
 #include "core/StoredWorldCollision.h"
 #include "core/ShopFixtures.h"
 #include "ShopParentChecks.h"
+#include "ShopParentDrawChecks.h"
 #include "../../generated/downwell-shop-text.h"
 #include <fstream>
 #include <vector>
@@ -59,6 +60,9 @@ int main(){
         shop->stock.items[i].price==legacy->stock.items[i].price,"live pricing context");
     layers(live);
     const auto parentKey=owner.parent(id)->key;
+    ShopParentDrawProbe parentDraw;
+    require(owner.parentDraw(id,parentDraw)&&parentDraw.calls==12&&parentDraw.prompts==1&&
+        !parentDraw.sprites,"inactive registered parent retains Draw layout and prompt dispatch");
     for(unsigned i=before;i<live.activeInstanceCount();++i)
         require(collision->resolve(live.instanceHandleAt(i))==&live.instanceAt(i),"collision owner resolves every shop lifetime");
     const auto previousText=shop->children.risingText;

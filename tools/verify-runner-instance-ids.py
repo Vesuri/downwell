@@ -345,6 +345,12 @@ assembly("gml_Object_fxRisingText_Alarm_1",
 assembly("gml_GlobalScript_action_kill_object",
     "caac5c9d9f9d959a5aa6337f729bfc989927d8882d4ce7f9a29b9d45dd0eab33")
 print("Pinned rising-text Step and alarm-driven destruction")
+parent_draw = assembly("gml_Object_Shop_Draw_0",
+    "508208ea5afbd21bee18f4dd96aa5692d263d90a32942aa659a69fc2dbf25f47")
+assert parent_draw.count("call.i sprite_get_number(argc=1)") == 2
+assert "push.v self.cIndex\npush.v self.cSp\nadd.v.v\npop.v.v self.cIndex" in parent_draw
+assert parent_draw.index("pop.v.v self.boxy1") < parent_draw.index("push.v self.cIndex")
+print("Pinned parent Shop Draw layout, menu branches and two-read cursor wrap")
 keeper_alarm0 = assembly("gml_Object_shopKeeper_Alarm_0",
     "e7d4df117c713ab12670714a4d172050901ec0c3b479e06fa0e0032f8da0f65e")
 keeper_alarm1 = assembly("gml_Object_shopKeeper_Alarm_1",

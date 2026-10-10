@@ -16,6 +16,7 @@
 #include "ShopMenuEvents.h"
 #include "ShopParentEvents.h"
 #include "ShopTextDraw.h"
+#include "ShopParentDraw.h"
 namespace downwell {
 // Native ownership of Shop and its ten synchronous children. Numeric IDs
 // belong to the enclosing room allocator, never to this generation pool.
@@ -40,6 +41,12 @@ public:
     GameplayShopInstances(const ObjectPack& objects,const SpriteCollisionPack& sprites,Binding binding={})
         :objects_(objects),sprites_(sprites),binding_(binding){}
     bool valid()const{return good_;}
+    template<class Environment> bool parentDraw(InstanceHandle h,Environment& env){
+        if(!ready(h,277)||!records_[h.slot].shop)return fail();
+        auto& r=records_[h.slot];if(!r.active||r.destroyRequested)return true;
+        ShopDrawOwnerOps<GameplayShopInstances,Environment> ops{*this,env};
+        return ShopParentDraw::draw(*r.shop,ops)||fail();
+    }
     bool drawFrame(InstanceHandle h,unsigned& frame)const{
         const auto* r=find(h);std::uint32_t count;
         if(!good_||!r||!r->initialized||r->spriteId<0||

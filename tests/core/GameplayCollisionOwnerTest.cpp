@@ -9,6 +9,7 @@
 #include "ShopMenuChecks.h"
 #include "ShopParentChecks.h"
 #include "ShopTextDrawChecks.h"
+#include "ShopParentDrawChecks.h"
 #ifndef DOWNWELL_NATIVE_QUERY_PROBE
 #include "SkeletonSoundChecks.h"
 #include "RegisteredSkeletonStompChecks.h"
@@ -93,6 +94,9 @@ bool nativeShopRadioStep(downwell::GameplayShopInstances& owner,downwell::Instan
 }
 bool nativeShopTextDraw(downwell::GameplayShopInstances& owner,downwell::InstanceHandle key,ShopTextDrawProbe& ops){
     return owner.drawRisingText(key,ops);
+}
+bool nativeShopParentDraw(downwell::GameplayShopInstances& owner,downwell::InstanceHandle key,ShopParentDrawProbe& ops){
+    return owner.parentDraw(key,ops);
 }
 bool nativeShopRadioFrame(downwell::GameplayCollisionOwner& owner,GameplayWorld& world,NativeShopLifetimeEnvironment& env){
     return owner.withShopRadioEvents(env,[&]{world.step(0);return world.effectsSucceeded();});

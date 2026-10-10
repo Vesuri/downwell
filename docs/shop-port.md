@@ -595,6 +595,24 @@ and the original 256-byte stack guard on a 4096-byte task stack. Resident art
 is now 276684 bytes and startup Chip headroom 17424 bytes. Normal native build
 restored after the verifier run; SDL build and renderer tests also pass.
 
+## Registered parent Draw contract
+
+`ShopParentDraw` follows `gml_Object_Shop_Draw_0`; its exact assembly input is
+pinned by `tools/verify-runner-instance-ids.py`. Layout assignments, including
+overwritten view reads, and wobble decay happen even when the menu is closed.
+An active menu advances the quarter-frame cursor before drawing; wrapping
+performs a second sprite-frame-count read and can leave a negative subimage.
+The selling branch retains the shared self `i` loop variable and distinguishes
+raw numeric text arguments from explicitly converted strings.
+
+The environment supplies live view/camera, currency and criminal reads,
+the retained Create-time `tablex`, sprite and text primitives, and the final
+`scrCheckThisDraw` call. Each failed operation ends the event without rolling
+back earlier self writes. Text alignment is shared renderer state, not reset
+at the end of this event. Registered stored and native owners expose the same
+body; this API does not itself install normal frontend dispatch or provide a
+native glyph renderer. Branch-command tests are not pixel equivalence evidence.
+
 ## Shared HUD overlap repair
 
 Retained shop composition now accepts an in-clip foreground overlay callback.

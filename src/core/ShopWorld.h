@@ -11,6 +11,7 @@
 #include "MotionBinary64.h"
 #include "ShopRisingText.h"
 #include "ShopText.h"
+#include "ShopDrawState.h"
 namespace downwell {
 // Bounded world ownership and static child masks, separate from shop rendering.
 // Coordinates passed here are integer mask-query positions. Full fractional
@@ -36,6 +37,7 @@ struct ShopWorld {
         ShopRisingText speech;
         MotionBinary64 messageX{};
         ShopText text;
+        ShopDrawState draw;
     };
     Instance instances[capacity];
     unsigned allocatedCount = 0;

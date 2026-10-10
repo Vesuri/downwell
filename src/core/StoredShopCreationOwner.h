@@ -7,6 +7,7 @@
 #include "ShopPurchaseEvents.h"
 #include "ShopViewEvents.h"
 #include "ShopParentEvents.h"
+#include "ShopParentDraw.h"
 namespace downwell {
 // Concrete owner for ShopWorld::createRegistered. The compact shop owns stock
 // and menu state; its retained room record owns identity and builtins. Children
@@ -49,6 +50,13 @@ public:
         return nullptr;
     }
     auto& children(){return children_;}
+    template<class Environment> bool parentDraw(unsigned id,Environment& env){
+        const auto* p=parent(id);if(!good_||!p||!p->shop)return fail();
+        const auto* r=records_.resolve(p->key);if(!r)return fail();
+        if(!r->active||r->destroyRequested)return true;
+        ShopDrawOwnerOps<StoredShopCreationOwner,Environment> ops{*this,env};
+        return ShopParentDraw::draw(*p->shop,ops)||fail();
+    }
     bool sayMessage(unsigned id,ShopMenuEvents::Message message,MotionBinary64 y){
         const auto* p=parent(id);if(!good_||!p||!p->shop)return fail();
         const auto* text=ShopMenuEvents::message(p->shop->text,message);

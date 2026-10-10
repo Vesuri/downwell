@@ -11,6 +11,7 @@
 #include "ShopParentChecks.h"
 #include "ShopSpeechChecks.h"
 #include "ShopTextDrawChecks.h"
+#include "ShopParentDrawChecks.h"
 #include "../../generated/downwell-shop-text.h"
 #include <cassert>
 #include <memory>
@@ -93,6 +94,15 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             textDraws+=r->objectId==212;parentDraws+=r->objectId==277;
         }
         assert(textDraws==1&&parentDraws==1);
+        {
+            ShopParentDrawProbe draw;
+            assert(world->visitRoomActors([&](GameplayWorld::DrawActor kind,InstanceHandle key,RunnerImageValue){
+                if(kind!=GameplayWorld::DrawActor::shop)return true;
+                const auto* record=store.find(key);assert(record);
+                return record->objectId!=277||store.parentDraw(key,draw);
+            }));
+            assert(draw.calls==12&&draw.prompts==1&&!draw.sprites);
+        }
         {
             const auto key=store.sourceHandle(960000);auto& shop=*sourceParent->shop;
             const auto previous=shop.children.risingText,created=next;

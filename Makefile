@@ -661,6 +661,13 @@ build/shop-text-test: tests/core/ShopTextTest.cpp src/core/ShopText.h src/core/S
 	@mkdir -p build
 	$(CXX) -Isrc -Igenerated $(CXXFLAGS) -o $@ $<
 .PHONY: test-shop-text
+build/shop-parent-draw-test: tests/core/ShopParentDrawTest.cpp tests/core/ShopParentDrawChecks.h $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ $<
+.PHONY: test-shop-parent-draw
+test-shop-parent-draw: build/shop-parent-draw-test
+	./build/shop-parent-draw-test
+test: test-shop-parent-draw
 test-shop-text: build/shop-text-test
 	python3 tests/test_generate_shop_text.py
 	./build/shop-text-test
