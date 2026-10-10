@@ -7542,6 +7542,35 @@ int main(){
         const auto newborn=birth(-10000);
         world->step(0);assert(world->effectsSucceeded()&&destroyed(newborn));
     }
+    // Native stationary boxes share the exact source retirement predicate,
+    // but interior frames need no per-box event. Exercise empty proof, appended
+    // interior/outside births, retirement and another birth after cleanup.
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+                  GameplayCollisionOwner::Ownership::nativeScenery}){
+        auto owner=makeCollisionOwner(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},&rooms,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),owner->breakableBinding(),
+            owner->playerBinding(),&owner->terrain(),&rooms);
+        assert(owner->attach(*world));
+        const auto birth=[&](int y){
+            assert(world->createGeneratedInstance({92,240,y},objects,[](const auto&){return true;}));
+            const auto slot=world->breakableSlots()-1;
+            return InstanceHandle{slot,world->breakableSlot(slot).lifetimeId};
+        };
+        world->step(0);assert(world->effectsSucceeded());
+        const auto inside=birth(400);
+        world->step(0);world->step(0);
+        assert(world->effectsSucceeded()&&!world->findBreakable(inside)->destroyRequested);
+        const auto outside=birth(-10000);
+        world->step(0);
+        assert(world->effectsSucceeded()&&world->findBreakable(outside)->destroyRequested&&
+            !world->findBreakable(inside)->destroyRequested);
+        assert(owner->prepareDraw()&&!world->findBreakable(outside));
+        world->step(0);assert(world->effectsSucceeded());
+        const auto newborn=birth(-10000);
+        world->step(0);
+        assert(world->effectsSucceeded()&&world->findBreakable(newborn)->destroyRequested);
+    }
     std::vector<bool> bloodContactReference;
     for(auto ownership:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
                        GameplayCollisionOwner::Ownership::nativeScenery}){

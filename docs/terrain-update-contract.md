@@ -62,6 +62,26 @@ than assuming invisibility makes its state irrelevant. Wall End Step behavior
 has a separate VM comparison in `verify-wall-end-step`; the local call whitelist
 here is not a proof of its callees' side effects or their ordering.
 
+## Native breakable retirement
+
+Native breakable End Step has a separate stationary-retirement proof.
+`verify-main-room-lifetime.py` pins `objBox_n.autoTile` to its sole false Create
+assignment across the exported bytecode corpus. The native box store exposes
+no position or autotiling setter. For this production event only, a retained
+inclusive camera interval proves that no eligible box can take `scrOutofview`'s
+destruction branch. Interior frames do not walk the box population. Births
+extend the interval; owner attachment invalidates it. Marks and retirement
+only shrink the eligible set, so old extremes remain conservative until the
+next boundary crossing rebuilds the proof from surviving boxes.
+Unsupported coordinates or autotiling state prevent proof publication.
+Any future position/autotiling mutation API must invalidate this proof too.
+
+Crossing the interval runs the existing ordered event walk with its captured
+slot prefix and lifetime ceiling. The player still runs before boxes, and thin
+platforms and later actors still run afterwards. Reference ownership and public
+arbitrary-callback dispatch retain the unskipped walk: this proof does not
+permit suppressing arbitrary callbacks or newly added box event behavior.
+
 ## Immutable room index publication
 
 `AmigaRoomTerrainPlan` accelerates only the serialized main-room placements.

@@ -17,7 +17,7 @@ int main(){
         bool retire=!expected;
         assert(outOfViewRetirement(real(y),real(camera),main,retire)&&retire==expected);
         CorpseLifecycle corpse;assert(corpse.y.assign(real(y)));corpse.yy=real(123456);
-        corpse.active=false;corpse.health=0;corpse.disappearing=true;
+        corpse.active=false;corpse.health={};corpse.disappearing=true;
         corpse.alarms.set(0,1);Retire events;
         assert(corpse.endStep(main,real(camera),events));
         assert(corpse.destroyRequested==expected&&events.count==unsigned(expected));

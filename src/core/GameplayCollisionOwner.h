@@ -65,6 +65,13 @@ public:
 private:
     Owner owner_;
     StationaryRetirementWindow thinRetirementWindow_;
+    StationaryRetirementWindow boxRetirementWindow_;
+    void observeStationaryBoxBirth(const GameplayWorld::Breakable& box){
+        if(box.state.autoTile||box.y < -521464||box.y > 523951){
+            boxRetirementWindow_.invalidate();return;
+        }
+        boxRetirementWindow_.append(box.y+176,true,box.lifetimeId);
+    }
     // Published binary32 setters are not the actors' integer drawing positions.
     // Terrain owns immutable coordinates in runs, not duplicate slot records.
     struct NativePosition {
@@ -920,6 +927,7 @@ private:
             if constexpr(Kind==View::Kind::entryDither)if(!real(-200000,depth))return parent.check(false);
             if constexpr(Kind==View::Kind::enemy)sprite=r.spriteId;
             if constexpr(Kind==View::Kind::breakable)if(parent.nativeBoxes_){
+                parent.observeStationaryBoxBirth(r);
 #ifndef DOWNWELL_REFERENCE_BREAKABLES
                 // Ordinary callback births (e.g. an added layer observer)
                 // may reacquire an empty family's layer independently.
@@ -1537,6 +1545,7 @@ public:
     }
     bool serviceSpatialIndex(unsigned budget){return check(owner_.serviceSpatialIndex(budget));}
     bool attach(GameplayWorld& world){
+        boxRetirementWindow_.invalidate();
         combatAlarmCaptureValid_=false;
         if(!(native_?table_.watchCaptureRanges(0,nativeBoxAlarmPrefix_?View::breakableBase:View::terrainBase,View::debrisBase,View::capacity,combatAlarmCaptureDirty_):
             owner_.watchCaptureRanges(0,View::terrainBase,View::debrisBase,View::capacity,combatAlarmCaptureDirty_)))
@@ -1670,6 +1679,7 @@ public:
                 auto& self=*static_cast<GameplayCollisionOwner*>(context);
                 if(!self.world_||slot>=self.world_->breakableSlots())return false;
                 const auto& r=self.world_->breakableSlot(slot);const InstanceHandle h{View::breakableBase+slot,r.lifetimeId};
+                self.observeStationaryBoxBirth(r);
                 auto* state=self.nativePosition(h.slot);
                 return state&&self.boxes_.birthPosition(r,*state)&&self.boxes_.nativeAppearance(h,r)&&
                     self.nativeBirthQueues(h.slot,92)&&self.refreshNativeActor(h,true);
@@ -1751,7 +1761,8 @@ public:
                 if(object==256&&kind==View::Kind::playerController)
                     return self.playerControllers_.balloonEndStep(local,self.world_->upgrades().levels[15]!=0);
                 return object==266&&kind==View::Kind::drone&&self.drones_.endStep(local,top,MotionBinary64::fromInteger(284),true);
-            },[&]{return !terrainCount||self.retireThinPlatforms(topQ12,terrainCutoff);});
+            },[&]{return !terrainCount||self.retireThinPlatforms(topQ12,terrainCutoff);},
+              [&](auto boxes,auto execute){return self.dispatchStationaryBoxes(boxes,topQ12,execute);});
         },this,true);
         world.configureRoomActorDraw([](const void* context,GameplayWorld::DrawActorVisitor visit,void* visitor){
             const auto& self=*static_cast<const GameplayCollisionOwner*>(context);
@@ -2221,6 +2232,11 @@ public:
     }
     template<class Execute,class BetweenBoxesAndActors>
     bool dispatchActorEndStep(Execute execute,BetweenBoxesAndActors betweenBoxesAndActors){
+        return dispatchActorEndStep(execute,betweenBoxesAndActors,
+            [&](auto boxes,auto event){return dispatchNativeBoxes(boxes,event);});
+    }
+    template<class Execute,class BetweenBoxesAndActors,class NativeBoxes>
+    bool dispatchActorEndStep(Execute execute,BetweenBoxesAndActors betweenBoxesAndActors,NativeBoxes nativeBoxes){
         if(!valid()||!world_||actorEndStepExecuting_||combatAlarmPhaseInUse_)return check(false);
         actorEndStepExecuting_=true;
         struct Reset {bool& value;~Reset(){value=false;}} reset{actorEndStepExecuting_};
@@ -2275,14 +2291,7 @@ public:
         // ownership uses the captured registration order above. Capture actors
         // BEFORE callbacks so box-born actors wait.
         if(nativeBoxes_){
-            const unsigned end=boxes.end;
-            for(unsigned i=0;i<end&&i<world_->breakableSlots();++i){
-                const auto& box=world_->breakableSlot(i);
-                if(!box.nativeRegistration||box.lifetimeId>boxes.lastLifetime||!box.active||box.destroyRequested||
-                    (nativeBoxFlags_&0x100003u))continue;
-                const InstanceHandle h{View::breakableBase+i,box.lifetimeId};
-                if(!check(execute(h,92))||!valid())return false;
-            }
+            if(!nativeBoxes(boxes,execute))return false;
         }else{
             for(unsigned i=0;i<combatAlarmPhase_.size();++i){
                 const auto h=combatAlarmPhase_.handle(i);std::uint32_t flags;
@@ -2299,6 +2308,38 @@ public:
         return true;
     }
 private:
+    template<class Execute>
+    bool dispatchNativeBoxes(GameplayWorld::BoxAlarmPrefix boxes,Execute execute){
+        for(unsigned i=0;i<boxes.end&&i<world_->breakableSlots();++i){
+            const auto& box=world_->breakableSlot(i);
+            if(!box.nativeRegistration||box.lifetimeId>boxes.lastLifetime||!box.active||box.destroyRequested||
+                (nativeBoxFlags_&0x100003u))continue;
+            const InstanceHandle h{View::breakableBase+i,box.lifetimeId};
+            if(!check(execute(h,92))||!valid())return false;
+        }
+        return true;
+    }
+    // This specialization is only for the pinned production objBox_n End Step,
+    // not arbitrary event callbacks. Native box positions and autoTile are
+    // immutable after admission. A boundary crossing retains the exact ordered
+    // walk; births during earlier callbacks cannot enter its captured prefix.
+    template<class Execute>
+    bool dispatchStationaryBoxes(GameplayWorld::BoxAlarmPrefix boxes,long topQ12,Execute execute){
+        if(boxRetirementWindow_.contains(topQ12,boxes.lastLifetime))return true;
+        auto proof=boxRetirementWindow_.begin(boxes.lastLifetime);
+        const bool okay=dispatchNativeBoxes(boxes,[&](InstanceHandle h,int object){
+            const auto& box=world_->breakableSlot(h.slot-View::breakableBase);
+            if(!execute(h,object))return false;
+            // Removal only shrinks the set. Retained old extremes are safe
+            // until a camera crossing rebuilds this proof from survivors.
+            if(box.destroyRequested)return true;
+            if(box.state.autoTile||box.y < -521464||box.y > 523951)proof.supported=false;
+            else proof.include(box.y+176);
+            return true;
+        });
+        if(okay)boxRetirementWindow_.complete(proof);
+        return okay;
+    }
     bool retireThinPlatforms(long topQ12,std::uint32_t cutoff){
         const bool retain=native_&&world_->nativeTerrainInstances();
         if(retain&&thinRetirementWindow_.contains(topQ12,cutoff))return true;
