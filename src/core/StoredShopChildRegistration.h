@@ -6,6 +6,7 @@
 #include "MultiplyBinary64.h"
 #include "RunnerRealComparison.h"
 #include "ShopChildCreate.h"
+#include "ShopKeeperEvents.h"
 #include <cstring>
 namespace downwell {
 // Synchronous Create ownership for Shop's ten children. This is deliberately
@@ -125,6 +126,40 @@ public:
         if(!good_||creating_||!r||e->object!=212||!e->state.initialized||number>=AlarmBank::count)return fail();
         if(!r->active||r->destroyRequested||number>1||!r->alarms.advanceOne(number))return true;
         return risingTextAlarmEvent(key,number);
+    }
+    template<class Environment,class Range> bool stepKeeper(InstanceHandle key,Environment& environment,Range range){
+        auto* e=entry(key);auto* r=e?record(*e):nullptr;
+        if(!good_||creating_||!r||e->object!=280||!e->state.initialized)return fail();
+        if(!r->active||r->destroyRequested)return true;
+        struct Ops {
+            StoredShopChildRegistration& owner;InstanceRecord& r;InstanceHandle key;Environment& env;Range& random;
+            static MotionBinary64 real(float value){RunnerImageValue word;std::memcpy(&word.bits,&value,4);return word.promoted();}
+            MotionBinary64 x(){return real(r.preciseX);}
+            MotionBinary64 y(){return real(r.preciseY);}
+            MotionBinary64 imageIndex(){return real(r.imageIndex);}
+            MotionBinary64 imageSpeed(){return real(r.imageSpeed);}
+            int spriteIndex(){return r.spriteId;}
+            bool playerX(MotionBinary64& value){return env.playerX(value)&&owner.good_;}
+            bool criminal(bool& value){return env.criminal(value)&&owner.good_;}
+            bool area(unsigned& value){return env.area(value)&&owner.good_;}
+            bool range(unsigned lo,unsigned hi,unsigned& value){value=random(lo,hi);return owner.good_;}
+            bool sprite(int value){
+                if(!owner.lifecycle_.sprite(key,r,value)||!owner.good_)return false;
+                r.spriteId=value;return true;
+            }
+            bool speed(MotionBinary64 value){RunnerImageValue v;if(!v.assign(value))return false;r.imageSpeed=stored(v);return true;}
+            bool image(RunnerImageValue value){
+                if(!owner.lifecycle_.imageIndex(key,r,value)||!owner.good_)return false;
+                r.imageIndex=stored(value);return true;
+            }
+            bool alarm(unsigned n,int v){r.alarms.set(n,v);return true;}
+            bool destroy(){
+                if(!owner.lifecycle_.markDestroyed(key,r)||!owner.good_)return false;
+                r.destroyRequested=true;return true;
+            }
+            bool createEnemy(int object,MotionBinary64 x,MotionBinary64 y){return env.createEnemy(object,x,y)&&owner.good_;}
+        } ops{*this,*r,key,environment,range};
+        return ShopKeeperEvents::step(e->state,ops)||fail();
     }
     // Called after the stored room dispatcher decrements the selected alarm.
     template<class Range> bool keeperAlarmEvent(InstanceHandle key,unsigned number,Range range){

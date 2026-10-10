@@ -780,7 +780,12 @@ area from the live world, narrows builtin writes, and borrows world RNG. It
 joins the mixed Step capture at object 280, not an independent family pass.
 Criminal state and synchronous enemy-284 creation are explicit dependencies;
 destruction precedes replacement Create and does not suppress the event tail.
-Keeper animation, stored Step/alarm admission and normal frontend installation
+`StartupRuntime::withShopKeeperEvents` supplies the stored world's player
+globals, area and RNG to that same Step and admits its alarm handlers and
+pre-Draw retirement through the existing room dispatcher. The owner scope
+requires a criminal-state reader and synchronous replacement creator; failure
+retains completed writes rather than inventing the replacement or undoing the
+destruction mark. Native keeper animation and normal frontend installation
 remain separate requirements; these handlers do not make the keeper a complete
 actor.
 

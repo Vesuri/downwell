@@ -2681,6 +2681,7 @@ public:
     int mainNextMuzzleOffset() const { return mainEmitter_.leg; }
     const Consumables& consumables() const { return run_.consumables; }
     enum class RisingTextPhase {alarm,step,cleanup};
+    enum class ShopKeeperPhase {alarm,step,cleanup};
     template<class Effects> bool collideScatteredPlayer(InstanceHandle key,Effects& effects){
         auto* r=instances_.resolve(key);
         if(!run_.effectsSucceeded||!r||r->objectId!=289)return run_.effectsSucceeded=false;
@@ -2771,6 +2772,35 @@ public:
     }
     bool drawRisingText(const InstanceRecord& record)const{
         return record.objectId==212&&risingTextDraw_&&risingTextDraw_(risingTextDrawContext_,record);
+    }
+    template<unsigned Capacity,class Environment,class Tick>
+    bool withShopKeeperEvents(StoredShopChildRegistration<instanceCapacity,Capacity>& owner,Environment& environment,Tick tick){
+        if(!run_.effectsSucceeded)return false;
+        if(shopKeeperDispatch_||!owner.belongsTo(instances_)||!owner.valid())return run_.effectsSucceeded=false;
+        struct Inputs {
+            StartupRuntime& world;Environment& external;
+            bool playerX(MotionBinary64& x){
+                MotionBinary64 y;
+                return world.mainPlayerInitialized_&&world.roomId_==mainRoomId&&
+                    ContactCoordinates::playerGlobals(world.mainPlayerMotion_.frameStartXFixed(),
+                        world.mainPlayerMotion_.frameStartYFixed(),world.mainPlayerOriginX_,world.mainPlayerOriginY_,x,y);
+            }
+            bool area(unsigned& value){value=unsigned(world.run_.stage.area);return true;}
+            bool criminal(bool& value){return external.criminal(value);}
+            bool createEnemy(int object,MotionBinary64 x,MotionBinary64 y){return external.createEnemy(object,x,y);}
+        } inputs{*this,environment};
+        auto dispatch=[&](const InstanceRecord& r,ShopKeeperPhase phase,unsigned number){
+            const auto key=owner.handle(r);if(!key.generation)return false;
+            if(phase==ShopKeeperPhase::cleanup)return owner.retire(key);
+            auto range=[&](unsigned lo,unsigned hi){return lo+random_.irandomSmall(hi-lo);};
+            return phase==ShopKeeperPhase::alarm?owner.keeperAlarmEvent(key,number,range):owner.stepKeeper(key,inputs,range);
+        };
+        shopKeeperContext_=&dispatch;
+        shopKeeperDispatch_=[](void* p,const InstanceRecord& r,ShopKeeperPhase phase,unsigned n){
+            return (*static_cast<decltype(dispatch)*>(p))(r,phase,n);
+        };
+        struct Reset {StartupRuntime& world;~Reset(){world.shopKeeperDispatch_=nullptr;world.shopKeeperContext_=nullptr;}} reset{*this};
+        const bool ok=tick();return run_.effectsSucceeded=run_.effectsSucceeded&&ok&&owner.valid();
     }
     template<unsigned Capacity,class Tick>
     bool withRisingTextEvents(StoredShopChildRegistration<instanceCapacity,Capacity>& owner,Tick tick){
@@ -3181,6 +3211,8 @@ private:
     std::uint32_t nextRuntimeInstanceId_ = 105187;
     void* shopCreateContext_=nullptr;
     void* shopItemStepContext_=nullptr;
+    void* shopKeeperContext_=nullptr;
+    bool (*shopKeeperDispatch_)(void*,const InstanceRecord&,ShopKeeperPhase,unsigned)=nullptr;
     void* scatteredStepContext_=nullptr;
     bool (*scatteredStep_)(void*,InstanceHandle)=nullptr;
     bool (*shopItemStep_)(void*,const InstanceRecord&)=nullptr;

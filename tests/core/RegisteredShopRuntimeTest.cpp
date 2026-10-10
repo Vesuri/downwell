@@ -80,6 +80,31 @@ int main(){
         }
     }
     require(owner.clear(),"clear scheduler fixture");layers(live);
+    const auto keeperId=owner.children().create(280,0,2000);
+    const auto keeperKey=owner.children().sourceHandle(keeperId);
+    struct KeeperEnvironment {
+        unsigned reads=0;
+        bool criminal(bool& value){++reads;value=false;return true;}
+        bool createEnemy(int,MotionBinary64,MotionBinary64){require(false,"no criminal replacement in peaceful fixture");return false;}
+    } keeperEnvironment;
+    auto keeperTick=[&]{return live.withShopKeeperEvents(owner.children(),keeperEnvironment,[&]{
+        live.step(false);return live.effectsSucceeded();
+    });};
+    require(keeperId&&keeperTick(),"stored keeper joins ordinary room Step");
+    const auto* keeper=live.instance(keeperId);
+    require(keeper&&keeper->spriteId==487&&keeper->imageIndex==0&&keeper->imageSpeed==0&&keeperEnvironment.reads==1,
+        "shared keeper Step reads the live player and publishes angry appearance");
+    const int blinkDelay=keeper->alarms.get(0);
+    require(blinkDelay>=20&&blinkDelay<=60,"world RNG supplies source blink delay");
+    for(int i=0;i<blinkDelay;++i)require(keeperTick(),"stored keeper mixed alarm countdown");
+    keeper=live.instance(keeperId);
+    require(keeper&&keeper->imageIndex==1&&keeper->alarms.get(1)==4,
+        "stored alarm zero arms a later slot consumed in the same world phase");
+    for(unsigned i=0;i<4;++i)require(keeperTick(),"stored keeper blink completion");
+    keeper=live.instance(keeperId);
+    require(keeper&&keeper->imageIndex==0&&keeper->alarms.get(0)>=20&&keeper->alarms.get(0)<=60&&
+        collision->resolve(keeperKey)==keeper,"blink reset preserves registered collision identity");
+    require(owner.clear()&&!collision->resolve(keeperKey),"retire keeper fixture");layers(live);
     InstanceHandle scenery;const auto sceneryId=live.nextRuntimeInstanceId();
     DeferredCreateInstance sceneryCommand(289,240,int(live.mainCameraViewY())+100);
     sceneryCommand.integerImageIndex=12;sceneryCommand.imageIndex=12;sceneryCommand.imageSpeed=0;
@@ -166,5 +191,37 @@ int main(){
     for(unsigned i=0;i<16;++i)require(live.randomState().stateWord(i)==expectedRandom.stateWord(i),"stored contact RNG words");
     bool called=false;
     require(!control.withRegisteredShopCreation(owner,[&]{called=true;return true;})&&!called,"reject foreign room owner");
+    // Use a fresh room: the scenery fixture above leaves a pending blast
+    // controller alarm whose room-speed/effect scopes are intentionally gone.
+    auto replacementCollision=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+    auto replacementStorage=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+        replacementCollision->binding());
+    auto& replacementWorld=*replacementStorage;
+    require(replacementCollision->attach(replacementWorld),"attach replacement fixture collision owner");
+    replacementWorld.skipToGameForTesting();
+    auto replacementOwner=replacementWorld.shopCreationOwner<1>(objects,audio);
+    const auto criminalKeeperId=replacementOwner.children().create(280,0,2000);
+    const auto criminalKeeperKey=replacementOwner.children().sourceHandle(criminalKeeperId);
+    struct MissingReplacement {
+        StartupRuntime& world;unsigned id,calls=0;
+        bool criminal(bool& value){value=true;return true;}
+        bool createEnemy(int object,MotionBinary64 x,MotionBinary64 y){
+            ++calls;const auto* r=world.instance(id);
+            require(object==284&&x.zero()&&y.high==MotionBinary64::fromInteger(2000).high&&r&&r->destroyRequested,
+                "replacement requested after the caller's destruction mark");
+            return false;
+        }
+    } missing{replacementWorld,criminalKeeperId};
+    const auto allocationBoundary=replacementWorld.nextRuntimeInstanceId();
+    const bool replacementStep=replacementWorld.withShopKeeperEvents(replacementOwner.children(),missing,[&]{
+        replacementWorld.step(false);return replacementWorld.effectsSucceeded();
+    });
+    if(!criminalKeeperId||replacementStep||missing.calls!=1||replacementWorld.effectsSucceeded())
+        std::fprintf(stderr,"keeper replacement: id=%u result=%d calls=%u healthy=%d playerX=%g\n",
+            criminalKeeperId,replacementStep,missing.calls,replacementWorld.effectsSucceeded(),double(replacementWorld.mainPlayerX()));
+    require(criminalKeeperId&&!replacementStep&&missing.calls==1&&!replacementWorld.effectsSucceeded(),"missing replacement ownership is a terminal event failure");
+    require(replacementWorld.nextRuntimeInstanceId()==allocationBoundary&&replacementWorld.instance(criminalKeeperId)&&
+        replacementWorld.instance(criminalKeeperId)->destroyRequested&&replacementCollision->resolve(criminalKeeperKey),
+        "failed replacement retains the published caller and does not invent a child ID");
     std::puts("Registered shop and scenery runtime allocator, effects, layers and RNG passed");
 }
