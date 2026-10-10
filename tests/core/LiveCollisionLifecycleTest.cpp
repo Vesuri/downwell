@@ -285,10 +285,6 @@ int main(){
                 value=N::fromInteger(directions++==0?450:90);return true;
             }
             bool enemyPlayerX(N&){return false;}bool enemyPlayerY(N&){return false;}
-            bool lengthdir(bool vertical,N speed,N angle,N& value){
-                require(angle.high==N::fromInteger(90).high&&angle.low==0,"controlled vertical steering");
-                value=vertical?WhiteJellyStep::negative(speed):N{};return true;
-            }
             bool sound(int,int,int,int,const char*){return false;}
             bool enemyDeath(){return false;}bool smoke(N,N,int,int){return false;}
             bool movingFx(N,N,int,N,N,N){return false;}bool flash(N,N,int,int,int){return false;}

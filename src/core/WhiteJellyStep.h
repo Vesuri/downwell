@@ -5,6 +5,8 @@
 #include "CheckCollisionWithScript.h"
 #include "EnemyStompScript.h"
 #include "ContactDamageScripts.h"
+#include "SmokeDirection.h"
+#include "SmokeTrig.h"
 namespace downwell {
 // enmWhiteJelly Step_0. Operations are synchronous checked owner boundaries:
 // meeting must query the caller's current mask against the selected target;
@@ -12,6 +14,18 @@ namespace downwell {
 struct WhiteJellyStep : WhiteJellyBirth, CheckCollisionWithScript {
     Real directionDifference{};
     ContactDamageScripts damageScripts;
+    // Source movesp starts at .2, rises only toward maxsp <= .8 and is
+    // assigned 3 on a hit. Direction is read back from its builtin setter.
+    // Reuse the recovered lengthdir wrappers, not host libm or steering LUTs.
+    static bool movementComponent(bool vertical,Real speed,Real direction,Real& output){
+        RunnerImageValue length,angle,radians;Real trig,component;
+        if(!length.assign(speed)||length.bits>0x40400000u||!angle.assign(direction)||
+            ((angle.bits&0x80000000u)&&(angle.bits&0x7fffffffu))||
+            !SmokeDirection::radians<0x43b40000u>(angle,radians)||
+            !smokeTrigComponent(radians.promoted(),!vertical,trig)||
+            !SmokeDirection::component<0x40400000u>(length,trig,vertical,component))return false;
+        output=component;return true;
+    }
     template<class Player> bool playerContact(Player& player){
         if(!initialized)return false;
         Real threshold;int order;

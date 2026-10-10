@@ -182,7 +182,7 @@ test: test-white-jelly-step
 .PHONY: test-white-jelly-step
 test-white-jelly-step: build/white-jelly-step-test
 	./build/white-jelly-step-test
-build/white-jelly-step-test: tests/core/WhiteJellyStepTest.cpp src/core/WhiteJellyStep.h src/core/WhiteJellyBirth.h src/core/GameMakerRandom.cpp
+build/white-jelly-step-test: tests/core/WhiteJellyStepTest.cpp src/core/WhiteJellyStep.h src/core/WhiteJellyBirth.h src/core/GameMakerRandom.cpp src/core/SmokeDirection.h src/core/SmokeTrig.h generated/smoke-trig.inc
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/WhiteJellyStepTest.cpp src/core/GameMakerRandom.cpp
 

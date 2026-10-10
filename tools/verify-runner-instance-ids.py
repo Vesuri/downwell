@@ -52,6 +52,10 @@ def assembly(name, digest):
     return payload.decode()
 
 # Player and enemy-target globals are distinct when a decoy is selected.
+assembly("gml_Object_enmWhiteJelly_Create_0",
+    "d23276a6a24d6e69159f8f8a2bde523119b594f5336d1e17a739d4e2116e312e")
+assembly("gml_Object_enmWhiteJelly_Step_0",
+    "5368114688f29a938da820781c3ed7852643ca1a873b26e99419ffc930c118f7")
 assembly("gml_GlobalScript_scrPlMovement",
     "3ff0e28b9dcef221ed9dd6a1ceb801bef746d7538016547fbe49a60af0177644")
 assembly("gml_GlobalScript_scrPlayerGlobalStat",

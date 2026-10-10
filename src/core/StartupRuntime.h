@@ -600,6 +600,9 @@ public:
                 bool enemyPlayerY(MotionBinary64& value){
                     return world.run_.upgrades.levels[15]?decltype(external)::enemyPlayerY(value):playerY(value);
                 }
+                bool lengthdir(bool vertical,MotionBinary64 speed,MotionBinary64 angle,MotionBinary64& value){
+                    return WhiteJellyStep::movementComponent(vertical,speed,angle,value);
+                }
                 bool viewY(MotionBinary64& value){
                     value=MotionBinary64::fromInteger(world.mainCameraRenderViewY());return true;
                 }

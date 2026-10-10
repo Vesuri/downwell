@@ -50,6 +50,24 @@ static S initial(){
     return s;
 }
 int main(){
+    {
+        // Compare the single-component adapter with the retained paired
+        // recovered program, including fractional and wrapped headings.
+        for(unsigned eighths=0;eighths<=2880;++eighths){
+            N angle=N::fromInteger(eighths),scaled;
+            assert(downwell::multiplyBinary64(angle,{0x3fc00000u,0},scaled));
+            for(N speed:{N{0x3fc99999u,0x9999999au},N{0x3fe99999u,0x9999999au},N::fromInteger(3)}){
+                N x,y,actualX,actualY;
+                assert(downwell::SmokeDirection::vector(speed,scaled,x,y,downwell::smokeTrig));
+                assert(S::movementComponent(false,speed,scaled,actualX)&&same(x,actualX));
+                assert(S::movementComponent(true,speed,scaled,actualY)&&same(y,actualY));
+            }
+        }
+        N out=N::fromInteger(99);
+        assert(!S::movementComponent(false,N::fromInteger(4),{},out)&&same(out,N::fromInteger(99)));
+        assert(!S::movementComponent(false,N::fromInteger(1),N::fromInteger(-1),out)&&same(out,N::fromInteger(99)));
+        assert(!S::movementComponent(false,N::fromInteger(1),N::fromInteger(361),out)&&same(out,N::fromInteger(99)));
+    }
     for(int mode=0;mode<5;++mode){
         auto baseline=initial();
         if(mode==1)baseline.hit=true;

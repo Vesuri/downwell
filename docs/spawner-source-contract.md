@@ -120,6 +120,28 @@ Source hashes for the two scripts respectively:
 `3ff0e28b9dcef221ed9dd6a1ceb801bef746d7538016547fbe49a60af0177644`
 and `34dfd0f192ca34217da36cdfd001b792a3e7d496d3fc8c3e9967f8ce7ff2266a`.
 
+## White-jelly movement components
+
+`movesp` starts at 0.2. Its only upward update adds 0.05 when below `maxsp`
+(0.2 initially, then 0.4 or 0.8); a hit assigns 3. Other updates subtract.
+Consequently the admitted scripted speed remains positive and no greater than
+3. The builtin direction setter normalizes the heading to [0,360], including
+signed zero. The custom `playerDir` is not substituted for that stored heading.
+
+`WhiteJellyStep::movementComponent` uses the already recovered lengthdir
+wrappers and SSE trigonometric program, with explicit speed/heading guards.
+It preserves argument narrowing, float degree-to-radian arithmetic, trig
+result narrowing, multiplication, sign and tiny-fraction snap. Each axis is
+evaluated at its separate source call; no host libm or approximate steering
+table is used. The component tests compare with the retained paired program;
+they are not independent Windows-runner execution evidence. The shared
+nearest-even assumptions still apply. Point-direction's atan dependency is
+separate from these lengthdir calls.
+
+Reviewed Create and Step assembly SHA-256 respectively:
+`d23276a6a24d6e69159f8f8a2bde523119b594f5336d1e17a739d4e2116e312e`
+and `5368114688f29a938da820781c3ed7852643ca1a873b26e99419ffc930c118f7`.
+
 ## Retained wall-background query
 
 `tile_layer_find` is a compatibility GML script, not a native collision

@@ -2326,6 +2326,9 @@ public:
             bool enemyPlayerY(MotionBinary64& value){
                 return world.upgrades().levels[15]?Environment::enemyPlayerY(value):player(true,value);
             }
+            bool lengthdir(bool vertical,MotionBinary64 speed,MotionBinary64 angle,MotionBinary64& value){
+                return WhiteJellyStep::movementComponent(vertical,speed,angle,value);
+            }
             bool position(bool vertical,RunnerImageValue value,RunnerImageValue& accepted){
                 return owner.whiteJellies_.position(key,vertical,value,accepted);
             }

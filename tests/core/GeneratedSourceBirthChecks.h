@@ -78,7 +78,8 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
         assert(store.dispatch(key,[](auto& r){r.xx=MotionBinary64::fromInteger(-1000);return true;}));
         GameplayCollisionOwner::EncounterStepOrder phase;Ops ops{store,key,*owner,world.get()};unsigned steps=0;
         auto expectedX=MotionBinary64::fromInteger(-1000);
-        assert(expectedX.add(store.find(key)->moveSpeed));
+        RunnerImageValue narrowedSpeed;
+        assert(narrowedSpeed.assign(store.find(key)->moveSpeed)&&expectedX.add(narrowedSpeed.promoted()));
         assert(owner->withEncounterSteps(phase,[&](InstanceHandle h,int object){
             assert(object==115);++steps;const bool ok=owner->stepRegisteredWhiteJellyWithWorld(h,false,ops);assert(ok);return ok;
         },[&]{world->step(0);return world->effectsSucceeded();}));
