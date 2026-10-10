@@ -111,6 +111,9 @@ bool nativeSpawnerMeeting(downwell::GameplaySpawners& owner,downwell::InstanceHa
 bool nativeRegisteredEnemyPopulation(const downwell::GameplayCollisionOwner& owner,unsigned& count){
     return owner.population(83,count);
 }
+bool nativePlayerFallDepth(GameplayWorld& world,downwell::MotionBinary64& value){
+    return world.publishPlayerFallDepth()&&world.sourceFallDepth(value);
+}
 bool nativeWhiteJellyEvents(downwell::WhiteJellyStep& state,bool stop,
     downwell::GameMakerRandom& random,NativeWhiteJellyStepOps& ops){
     return state.enemyContact(random,ops)&&state.effectAlarm(stop,random,ops)&&state.endStep(ops);
@@ -3498,6 +3501,19 @@ int main(){
                 assert(retryCalls<3&&object==retryOrder[retryCalls]);id=170000+ ++retryCalls;return true;
             })&&retryCalls==3&&children.size()==2&&owner->entryDithers().size()==1&&world->droneNumber()==0);
             assert(world->findPlayer(world->playerHandle())->cameraSourceId==170002);
+            world->step(0);
+            MotionBinary64 px,privateY,depth;
+            const auto meter=children.sourceHandle(170001);
+            assert(world->effectsSucceeded()&&world->sourceFallDepth(depth)&&
+                ContactCoordinates::playerGlobals(world->player().offsetXFixed(),world->player().offsetYFixed(),240,176,px,privateY));
+            auto expectedDepth=privateY,negativeMeter=children.find(meter)->y.promoted();negativeMeter.high^=0x80000000u;
+            assert(expectedDepth.add(negativeMeter)&&depth.high==expectedDepth.high&&depth.low==expectedDepth.low);
+            // Read the meter's fractional published Y, not an assumed room
+            // origin or rounded bitmap coordinate. Negative depth is valid.
+            auto movedY=privateY;assert(movedY.add({0x40040000u,0}));
+            RunnerImageValue fractionalMeter;assert(fractionalMeter.assign(movedY));
+            assert(owner->playerControllers().position(meter,children.find(meter)->x,fractionalMeter)&&
+                world->publishPlayerFallDepth()&&world->sourceFallDepth(depth)&&depth.high==0xc0040000u&&!depth.low);
         }else{
             assert(!world->createPlayerChildren(allocate)&&calls==failure);
         }

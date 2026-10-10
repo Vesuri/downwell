@@ -1897,6 +1897,20 @@ bool StartupRuntime::dispatchObjectEvent(InstanceRecord& instance,
         run_.playerDamageEndStep();
         return true;
     }
+    if(instance.objectId==35&&eventType==3&&eventSubtype==0&&roomId_==mainRoomId){
+        // Publish from the current portable private accumulator, not rounded
+        // builtin y or camera depth. The rest of Step 850 remains unimplemented.
+        const InstanceRecord* meter=nullptr;
+        for(unsigned i=0;i<instances_.size();++i){const auto& r=instances_.at(i);
+            if(r.objectId!=66||!r.active||r.destroyRequested)continue;
+            if(meter){run_.effectsSucceeded=false;return false;}meter=&r;
+        }
+        MotionBinary64 x,y;RunnerImageValue meterY;
+        if(!meter||!ContactCoordinates::playerGlobals(mainPlayerMotion_.offsetXFixed(),mainPlayerMotion_.offsetYFixed(),
+            mainPlayerOriginX_,mainPlayerOriginY_,x,y)){run_.effectsSucceeded=false;return false;}
+        std::memcpy(&meterY.bits,&meter->preciseY,4);
+        if(!run_.publishFallDepth(y,meterY))return false;
+    }
     if(roomId_==mainRoomId&&eventType==3&&eventSubtype==2&&
        (instance.objectId==92||hasSimpleOutOfViewEndStep(instance.objectId))){
         ++implementedCodeCalls_;

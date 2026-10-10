@@ -659,6 +659,24 @@ public:
             });
     }
     unsigned droneNumber()const{return droneNumber_;}
+    bool sourceFallDepth(downwell::MotionBinary64& value)const{
+        if(!run_.effectsSucceeded||!playerChildrenStarted_)return false;
+        value=run_.fallDepth;return true;
+    }
+    bool publishPlayerFallDepth(){
+        if(!run_.effectsSucceeded||!playerChildrenStarted_||!playerControllers_)return run_.effectsSucceeded=false;
+        const downwell::GameplayPlayerControllers::Record* meter=nullptr;
+        for(unsigned i=0;i<downwell::GameplayPlayerControllers::capacity;++i){
+            const auto* r=playerControllers_->find(playerControllers_->handle(i));
+            if(!r||r->objectId!=66||!r->active||r->destroyRequested)continue;
+            if(meter)return run_.effectsSucceeded=false;
+            meter=r;
+        }
+        downwell::MotionBinary64 x,y;
+        if(!meter||!downwell::ContactCoordinates::playerGlobals(player_.offsetXFixed(),player_.offsetYFixed(),240,176,x,y))
+            return run_.effectsSucceeded=false;
+        return run_.publishFallDepth(y,meter->y);
+    }
     // Borrow the enclosing source-ID stream only for this room load. Children
     // execute synchronously at the authored player birth, not after the room.
     template<class Allocate,class Load> bool withPlayerChildCreation(Allocate allocate,Load load){

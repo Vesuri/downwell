@@ -456,6 +456,10 @@ public:
         return instances_.at(index);
     }
     const SpawnerStep* spawnerState(unsigned id)const{return spawners_.state(id);}
+    bool sourceFallDepth(MotionBinary64& value)const{
+        if(!run_.effectsSucceeded||!mainPlayerInitialized_||roomId_!=mainRoomId)return false;
+        value=run_.fallDepth;return true;
+    }
     template<class MakeOps,class Tick> bool withSpawnerEvents(MakeOps makeOps,Tick tick){
         if(!run_.effectsSucceeded)return false;
         if(spawnerDispatch_)return run_.effectsSucceeded=false;

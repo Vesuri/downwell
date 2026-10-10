@@ -45,6 +45,15 @@ it has no authored movement events. Do not accumulate positive deltas or use
 the camera's high-water mark: jumping can decrease falldepth. The selected
 meter's published Y and the player's private yy are separate representations.
 
+The current portable player represents its private accumulator on a Q8 lattice.
+Fall-depth publication converts that accumulator directly to binary64, adds the
+room origin, and subtracts the owned meter's published binary32 Y. It does not
+use the rounded player sprite coordinate. This preserves the formula for the
+represented state, not the original runner's full player-motion precision.
+The native publication requires the source player-child stream to have created
+the meter; it must not invent a meter for legacy worlds. Publication occurs at
+player ordinary Step, before the spawner reads the retained global.
+
 1. If script active is false, activate when global.ply > self.y and area != 5.
    Continue into the active body in the same event.
 2. Assign depthMeasure = global.falldepth - falldepthMem, then update

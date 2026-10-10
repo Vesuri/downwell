@@ -123,6 +123,12 @@ struct RunSession {
     bool firstLand=false;
     int backgroundMusicId=193; // scrInitialize; survives ordinary run/room reset.
     MotionBinary64 oxygen=MotionBinary64::fromInteger(100); // scrPlayerGlobalStat.
+    MotionBinary64 fallDepth{}; // scrPlayerGlobalStat; player ordinary Step writes yy - objDepthMeter.y.
+    bool publishFallDepth(MotionBinary64 privateY,RunnerImageValue meterY){
+        auto negative=meterY.promoted();negative.high^=0x80000000u;
+        if(!effectsSucceeded||!privateY.add(negative))return effectsSucceeded=false;
+        fallDepth=privateY;return true;
+    }
     bool setOxygen(MotionBinary64 value){
         if(!effectsSucceeded)return false;
         if(!value.valid())return effectsSucceeded=false;
@@ -146,7 +152,7 @@ struct RunSession {
         if(area<1||area>5)return false;
         sound=193+area;return true;
     }
-    void playerCreated(){noKill=true;noDamage=true;areaNoDamage=true;firstLand=false;oxygen=MotionBinary64::fromInteger(100);playerDamaged=false;}
+    void playerCreated(){noKill=true;noDamage=true;areaNoDamage=true;firstLand=false;oxygen=MotionBinary64::fromInteger(100);fallDepth={};playerDamaged=false;}
     template<class Audio,class Delay,class Cue>
     bool recordEnemyDeath(bool cutGunshot,Audio& audio,Delay delay,Cue cue){
         return recordEnemyDeath(cutGunshot,audio,[&]{noKill=false;return true;},delay,cue);
@@ -753,6 +759,7 @@ struct RunSession {
         return {gems.lifetime, gems.record, combo.state.record};
     }
     void reset(const RunRecords& saved = {}) {
+        fallDepth={};
         oxygen=MotionBinary64::fromInteger(100);
         for(auto& sound:overlapSounds)sound=0;
         fieldWind={};

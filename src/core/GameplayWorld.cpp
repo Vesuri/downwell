@@ -1670,6 +1670,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     const std::uint32_t bulletStepLastLifetime=nextBulletLifetimeId_-1;
     const std::uint32_t gemStepLastLifetime=nextGemLifetimeId_-1;
     if(!captureEnemyStepOrder())return {};
+    if(playerChildrenStarted_&&!publishPlayerFallDepth())return {};
     if(skeletonBoneSteps_&&!skeletonBoneSteps_(skeletonBoneContext_,-1)){
         run_.effectsSucceeded=false;return {};
     }

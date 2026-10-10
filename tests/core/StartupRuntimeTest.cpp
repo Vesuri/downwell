@@ -352,6 +352,16 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
                 "spawner publishes fall-depth before guards and only then reduces countdown");
         }
         require(reads==6,"source Step reads fall depth twice per dispatch");
+        downwell::MotionBinary64 depth;downwell::RunnerImageValue playerY,meterY;
+        const float actualY=runtime->mainPlayerY();std::memcpy(&playerY.bits,&actualY,4);
+        unsigned meters=0;
+        for(unsigned i=0;i<runtime->activeInstanceCount();++i){const auto& r=runtime->instanceAt(i);
+            if(r.objectId==66&&r.active&&!r.destroyRequested){++meters;std::memcpy(&meterY.bits,&r.preciseY,4);}
+        }
+        auto expectedDepth=playerY.promoted(),negativeMeter=meterY.promoted();negativeMeter.high^=0x80000000u;
+        require(meters==1&&expectedDepth.add(negativeMeter)&&runtime->sourceFallDepth(depth)&&
+            depth.high==expectedDepth.high&&depth.low==expectedDepth.low,
+            "live player ordinary Step publishes private depth relative to the owned meter");
         runtime->step(downwell::Input{},false);
         require(reads==6,"borrowed spawner operations expire at the end of their scope");
         runtime->reset(downwell::PlatformProfile::nonDesktop);
