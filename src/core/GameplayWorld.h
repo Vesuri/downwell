@@ -178,6 +178,7 @@ public:
     struct EnemyState {
         // Family-local lifetime key; never a recovered Windows instance ID.
         std::uint32_t lifetimeId = 0;
+        std::uint32_t sourceId = 0;
         // Stable ownership slot, independent of the compacted traversal index.
         unsigned short identitySlot = 0xffffu;
         int objectId;
@@ -1800,7 +1801,7 @@ public:
                         int alarm0 = -1, int alarm1 = -1,
                         int direction = 0, int moveSpeed = 0,
                         bool active = true, bool grounded = false,
-                        bool awake = false);
+                        bool awake = false,std::uint32_t sourceId=0);
     void configureEnemyRandom(const downwell::GameMakerRandom& random) {
         enemyRandom_ = random;
         enemyRandom_.prepareLookahead(randomLookahead_);
@@ -1861,6 +1862,19 @@ public:
         }
         const auto profile = downwell::enemyCreateProfile(command.objectId);
         if (!profile.health) return true;
+        return adoptGeneratedEnemy(command,objects,0);
+    }
+    bool adoptGeneratedEnemyWithSourceId(std::uint32_t sourceId,const downwell::DeferredCreateInstance& command,
+        const downwell::ObjectPack& objects){
+        if(!run_.effectsSucceeded)return false;
+        if(!sourceId||sourceId>0x7fffffffu||!downwell::enemyCreateProfile(command.objectId).health)
+            return run_.effectsSucceeded=false;
+        return run_.effectsSucceeded=adoptGeneratedEnemy(command,objects,sourceId);
+    }
+private:
+    bool adoptGeneratedEnemy(const downwell::DeferredCreateInstance& command,
+        const downwell::ObjectPack& objects,std::uint32_t sourceId){
+        const auto profile=downwell::enemyCreateProfile(command.objectId);
         DW_GENERATION_SCOPE(profileGeneratedEnemy);
         downwell::PackedObject object;
         return objects.findObject(command.objectId, object) &&
@@ -1870,8 +1884,9 @@ public:
                 command.motionState, command.auxiliaryState,
                 command.alarms.get(0), command.alarms.get(1),
                 command.integerDirection, command.integerMoveSpeed,
-                command.active, command.grounded, true);
+                command.active, command.grounded, true,sourceId);
     }
+public:
     std::uint64_t randomDrawCount() const { return enemyRandom_.drawCount(); }
     const downwell::GameMakerRandom& randomState() const { return enemyRandom_; }
 

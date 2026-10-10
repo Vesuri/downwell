@@ -29,6 +29,8 @@ bool nativeExitSourceBirth(GameplayWorld& world,int y,bool (*allocate)(int,unsig
 bool nativeGeneratedFieldBirth(GameplayWorld& world,unsigned source,const downwell::DeferredCreateInstance& command){
     return world.adoptGeneratedTimeFieldWithSourceId(source,command);
 }
+bool nativeGeneratedEnemyBirth(GameplayWorld& world,unsigned source,const downwell::DeferredCreateInstance& command,
+    const downwell::ObjectPack& objects){return world.adoptGeneratedEnemyWithSourceId(source,command,objects);}
 struct NativeSkeletonAudio {
     bool isPlaying(int,bool&);bool stop(int);bool play(int,int,bool,int&);
     bool getGain(int,downwell::MotionBinary64&);bool setGain(int,downwell::MotionBinary64,int);
@@ -1113,6 +1115,28 @@ int main(){
         assert(owner->valid()&&world->effectsSucceeded());
     }
     const auto resultRoomBytes=read("generated/downwell-rooms.dwrm");
+    for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::native,
+        GameplayCollisionOwner::Ownership::nativeScenery}){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,GameplayTerrainInstances::Presentation{},
+            GameplayTerrainInstances::WallCollision{},nullptr,mode);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),nullptr);
+        assert(owner->attach(*world));const auto draws=world->randomDrawCount();
+        DeferredCreateInstance command{116,240,700};
+        assert(world->adoptGeneratedEnemyWithSourceId(840001,command,objects));
+        const auto& first=world->enemyAt(0);const InstanceHandle old{first.identitySlot,first.lifetimeId};
+        assert(first.sourceId==840001);
+        assert(world->adoptGeneratedEnemyWithSourceId(840009,command,objects));
+        const auto& second=world->enemyAt(1);const InstanceHandle retained{second.identitySlot,second.lifetimeId};
+        assert(world->markEnemyDestroyed(old)&&world->retireMarkedEnemy(old)&&!world->resolveEnemyLifetime(old));
+        assert(world->resolveEnemyLifetime(retained)&&world->resolveEnemyLifetime(retained)->sourceId==840009);
+        assert(world->adoptGeneratedEnemyWithSourceId(840017,command,objects));
+        const auto& newest=world->enemyAt(world->enemyCount()-1);
+        assert(newest.sourceId==840017&&newest.lifetimeId!=old.generation&&world->randomDrawCount()==draws);
+        const auto count=world->enemyCount();
+        assert(!world->adoptGeneratedEnemyWithSourceId(840009,command,objects)&&!world->effectsSucceeded());
+        assert(world->enemyCount()==count&&world->resolveEnemyLifetime(retained)->sourceId==840009);
+    }
     RoomPack resultRooms(resultRoomBytes.data(),resultRoomBytes.size());
     for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::nativeTerrain,
                   GameplayCollisionOwner::Ownership::native}){

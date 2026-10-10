@@ -636,10 +636,13 @@ bool GameplayWorld::configureEnemy(unsigned index, int objectId,
                                       int motionState, int auxiliaryState,
                                       int alarm0, int alarm1,
                                       int direction, int moveSpeed,
-                                      bool active, bool grounded, bool awake)
+                                      bool active, bool grounded, bool awake,std::uint32_t sourceId)
 {
     if (index >= enemyCapacity || !run_.effectsSucceeded)
         return false;
+    if(sourceId>0x7fffffffu)return run_.effectsSucceeded=false;
+    for(unsigned i=0;sourceId&&i<enemyCount_;++i)
+        if(i!=index&&enemies_[i].lifetimeId&&enemies_[i].sourceId==sourceId)return run_.effectsSucceeded=false;
     if (!nextEnemyLifetimeId_) {
         run_.effectsSucceeded = false;
         return false;
@@ -655,6 +658,7 @@ bool GameplayWorld::configureEnemy(unsigned index, int objectId,
     enemySlotIndex_[slot]=static_cast<unsigned short>(index+1);
     enemy.identitySlot=static_cast<unsigned short>(slot);
     enemy.lifetimeId = nextEnemyLifetimeId_++;
+    enemy.sourceId = sourceId;
     enemy.objectId = objectId;
     enemy.spriteId = spriteId;
     enemy.maskId=-1;

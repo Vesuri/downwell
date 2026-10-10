@@ -742,7 +742,7 @@ private:
                 })))return false;
             unsigned sourceId=0;
             if constexpr(Kind==View::Kind::terrain)sourceId=r.sourceInstanceId;
-            if constexpr(Kind==View::Kind::breakable)sourceId=r.sourceId;
+            if constexpr(Kind==View::Kind::breakable||Kind==View::Kind::enemy)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
             if constexpr(Kind==View::Kind::timeField||Kind==View::Kind::exitController||Kind==View::Kind::sideCameraLocker)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::debris||Kind==View::Kind::scriptEffect)sourceId=r.sourceId;
@@ -848,7 +848,7 @@ private:
                 }
             unsigned sourceId=0;
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
-            if constexpr(Kind==View::Kind::breakable)sourceId=r.sourceId;
+            if constexpr(Kind==View::Kind::breakable||Kind==View::Kind::enemy)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeField||Kind==View::Kind::exitController||Kind==View::Kind::sideCameraLocker)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::debris||Kind==View::Kind::scriptEffect)sourceId=r.sourceId;
             if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
