@@ -15,7 +15,7 @@ from pathlib import Path
 from PIL import Image
 # This exporter is also loaded by path by the host pixel-oracle tests.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from amiga_scene_contract import GAME_IDS, BANK_BUDGETS, VERSION as SCENE_CONTRACT_VERSION, require_budget
+from amiga_scene_contract import GAME_IDS, CAVERN_IDS, BANK_BUDGETS, VERSION as SCENE_CONTRACT_VERSION, require_budget
 
 
 MAGIC = b"DWAP"
@@ -1308,7 +1308,7 @@ def main():
                 "sceneAdmissionSha256": hashlib.sha256(
                     Path(__file__).with_name("amiga_scene_contract.py").read_bytes()).hexdigest(),
                 "bankBudgetBytes": BANK_BUDGETS[profile]}
-               if profile in ("game", "boot", "front") else {}),
+               if profile in ("game", "boot", "front", "cavern") else {}),
         }, indent=2).encode() + b"\n"
         if args.check:
             require(packing_path.read_bytes() == packing_provenance, "packing provenance differs")
@@ -1319,6 +1319,8 @@ def main():
     if args.profile == "game":
         banks = scene_banks(build_records(manifest, args.extracted, args.profile, args.language))
         data = pack_records(banks["game"])
+        cavern = pack_records([r for r in banks["game"] if r[0]["id"] in CAVERN_IDS])
+        emit("cavern", args.output.with_name("amiga-cavern.dwap"), cavern)
         front = pack_records(banks["front"], live_prefix=True)
         live_end = max(r[8] + r[9] for r in
             (RECORD.unpack_from(front, HEADER.size + i * RECORD.size)
@@ -1335,6 +1337,7 @@ def main():
                  b"#pragma once\n"
                  + f"#define DOWNWELL_BOOT_BANK_BYTES {len(pack_records(banks['boot']))}UL\n"
                    f"#define DOWNWELL_GAME_BANK_BYTES {len(data)}UL\n"
+                   f"#define DOWNWELL_CAVERN_BANK_BYTES {len(cavern)}UL\n"
                    f"#define DOWNWELL_GAME_BANK_BUDGET {BANK_BUDGETS['game']}UL\n"
                    f"#define DOWNWELL_FRONT_BANK_BYTES {len(front)}UL\n"
                    f"#define DOWNWELL_FRONT_LIVE_BYTES {live_end}UL\n"

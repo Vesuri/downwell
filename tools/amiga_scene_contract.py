@@ -39,6 +39,26 @@ GAME_IDS = frozenset({
 BANK_BUDGETS = {'boot': 24 * 1024, 'front': 96 * 1024,
                 'game': 240 * 1024, 'game-planes': 112 * 1024}
 
+# Explicit cavern roots, independent of future additions to GAME_IDS. Derived
+# mirror/DMA forms are admitted only for these roots. Later-area skeleton/bone
+# and wood/default debris art must not become cavern residents. builderCavern
+# and spawnerSet1 define its enemy roots; breakablesDebris Create selects 115
+# for area 1 (116 for area 2, 91 for area 4). Keep common effects/companions,
+# merchant art and generated scenery: these are reachable without area change.
+CAVERN_ROOTS = frozenset({
+    0, 1, 3, 12, 15, 27, 31, 37, 51, 76, 84, 85, 92, 96, 101, 102,
+    115, 117, 127, 133, 134, 139, 143, 147, 149, 150, 151, 152,
+    153, 154, 157, 162, 163, 164, 166, 168, 170, 172, 173, 175, 176,
+    177, 178, 181, 182, 183, 184, 185, 186, 187, 188, 278, 458, 459,
+    471, 480, 481, 482, 485, 486, 487, 496, 497, 550, 551, 568, 569,
+    602, 603, 605, 702, 703, 707,
+})
+CAVERN_IDS = frozenset(
+    {root + offset for root in CAVERN_ROOTS for offset in (0, 62000, 63000)} |
+    {65006, 65100, 65101, 65102, 65103, 65104, 65105, 65106, 65107,
+     65108, 65109, 65110}) & GAME_IDS
+BANK_BUDGETS.update({'cavern': 224 * 1024, 'cavern-planes': 105 * 1024})
+
 
 def require_budget(bank, size):
     if bank not in BANK_BUDGETS:

@@ -33,6 +33,8 @@ cp -f out/Downwell.boot "$DH1/Downwell.boot"
 cp -f out/Downwell.front "$DH1/Downwell.front"
 cp -f out/Downwell.planes "$DH1/Downwell.planes"
 cp -f out/Downwell.game "$DH1/Downwell.game"
+cp -f out/Downwell.cavern "$DH1/Downwell.cavern"
+cp -f out/Downwell.cavernplanes "$DH1/Downwell.cavernplanes"
 for bank in results shop clear; do
   cp -f "out/Downwell.$bank" "$DH1/Downwell.$bank"
 done

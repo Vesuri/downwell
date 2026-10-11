@@ -3,11 +3,12 @@
 import importlib.util
 from pathlib import Path
 import sys
+import struct
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
-from amiga_scene_contract import GAME_IDS, BANK_BUDGETS, require_budget
+from amiga_scene_contract import GAME_IDS, CAVERN_IDS, CAVERN_ROOTS, BANK_BUDGETS, require_budget
 
 spec = importlib.util.spec_from_file_location('amiga_hud', ROOT / 'tools/generate-amiga-hud.py')
 hud = importlib.util.module_from_spec(spec)
@@ -19,6 +20,33 @@ def record(ident, frame=0):
 
 
 class Admission(unittest.TestCase):
+    def test_cavern_admission_is_not_the_gameplay_union(self):
+        for ident in (91, 116, 205, 206, 207, 208, 460):
+            for offset in (0, 62000, 63000):
+                self.assertNotIn(ident + offset, CAVERN_IDS)
+        for ident in (31, 115, 133, 153, 702, 63031, 63153, 63702, 65110):
+            self.assertIn(ident, CAVERN_IDS)
+        self.assertTrue(CAVERN_IDS < GAME_IDS)
+        self.assertNotIn(200, CAVERN_ROOTS)
+        # Later gameplay assets cannot gain residency by catalogue growth.
+        baseline = [i for i in sorted(GAME_IDS) if i in CAVERN_IDS]
+        extended = GAME_IDS | frozenset(range(10000, 20000))
+        self.assertEqual([i for i in sorted(extended) if i in CAVERN_IDS], baseline)
+
+    def test_cavern_payloads_match_full_reference(self):
+        def records(path):
+            data = path.read_bytes()
+            count = struct.unpack_from('>I', data, 8)[0]
+            result = {}
+            for i in range(count):
+                row = hud.RECORD.unpack_from(data, 20 + i * 24)
+                result[row[:2]] = (row[2:8], data[row[8]:row[8]+row[9]])
+            return result
+        full = records(ROOT / 'generated/amiga-game.dwap')
+        cavern = records(ROOT / 'generated/amiga-cavern.dwap')
+        self.assertEqual(cavern, {key: value for key, value in full.items() if key[0] in CAVERN_IDS})
+        self.assertLess(len(cavern), len(full))
+
     def test_existing_ownership_and_shared_dependencies(self):
         records = [record(696), record(369), record(43), record(51, 7),
                    record(51, 13), record(51, 0), record(27), record(76),

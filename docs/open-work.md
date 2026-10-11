@@ -30,7 +30,7 @@ behavior, both backend integrations and relevant original-game verification.
 ## 0. Restore a runnable, measured A500 baseline
 
 - Enforce scene/level-local residency and execution before adding content:
-  1. Split the current gameplay art union by level; replace remaining resident
+  1. Finish splitting gameplay art by level beyond the cavern subset; replace remaining resident
      gameplay tables/room catalogues and SDL collision masks with explicit
      scene/level dependencies. New native mask consumers
      must use those dependencies, not link the full reference mask catalogue.
@@ -731,15 +731,16 @@ Reference: [scene architecture](scene-architecture.md).
   Establish the A500 memory requirement; expanded-emulator runs do not prove
   stock-machine fit. Size the shop speech overlap reserve against repeated
   messages within the nested parent Step, not just one replacement per parent.
-- Budget further Chip residency against the measured 13,872-byte startup
-  minimum free space; remeasure after pack growth and through scene transitions.
-  The compact DMA plane bank is 112,970 bytes. Reconcile gameplay-family
+- Budget further Chip residency against the measured 20,272-byte cavern
+  minimum free space (126,840 bytes before gameplay); remeasure after pack
+  growth and through scene transitions. The cavern DMA bank is 106,574 bytes;
+  the full reference/later-area union remains 112,970 bytes. Reconcile gameplay-family
   residency before admitting additional encounter artwork on a stock-memory machine.
   Keep the gate unchanged until residency is reduced or a new whole-program
   allocation measurement justifies a different budget.
   Keep the 68000 CPU target; do not silently increase emulator Chip RAM
   to make memory checks pass.
-- The gameplay and HUD packs and cover masks are still linked into the
+- The HUD pack and cover masks are still linked into the
   executable, so ordinary memory holds them beside any Chip copy. Give them
   scene/level dependency contracts and bounded file residency; merely moving
   every bank to a permanently loaded sidecar does not reduce memory.

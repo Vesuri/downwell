@@ -583,7 +583,23 @@ endif
 
 .PHONY: all check clean audit
 
-all: check $(OUT).exe $(OUT).boot $(OUT).front $(OUT).game $(OUT).planes $(OUT).results $(OUT).shop $(OUT).clear
+all: check $(OUT).exe $(OUT).boot $(OUT).front $(OUT).game $(OUT).planes $(OUT).cavern $(OUT).cavernplanes $(OUT).results $(OUT).shop $(OUT).clear
+
+$(OUT).cavern: $(REPO)/generated/amiga-cavern.dwap
+	@mkdir -p $(@D)
+	cp -f $< $@
+
+$(OUT).cavernplanes: $(REPO)/generated/amiga-cavern.planes
+	@mkdir -p $(@D)
+	cp -f $< $@
+
+$(REPO)/generated/amiga-cavern.planes: $(REPO)/generated/amiga-game.planes
+	@test -f $@ || python3 $(REPO)/tools/generate-amiga-plane-bank.py
+
+$(REPO)/generated/amiga-cavern-planes.h: $(REPO)/generated/amiga-cavern.planes
+	@test -f $@ || python3 $(REPO)/tools/generate-amiga-plane-bank.py
+
+obj/DownwellAmiga.o: $(REPO)/generated/amiga-cavern-planes.h
 
 $(OUT).game: $(AMIGA_GAME)
 	@mkdir -p $(@D)
@@ -606,7 +622,7 @@ $(OUT).clear: $(AMIGA_CLEAR)
 	@mkdir -p $(@D)
 	cp -f $< $@
 
-$(REPO)/generated/amiga-game.planes: $(AMIGA_GAME) $(REPO)/tools/generate-amiga-plane-bank.py $(REPO)/tools/amiga_scene_contract.py
+$(REPO)/generated/amiga-game.planes: $(AMIGA_GAME) $(REPO)/generated/amiga-cavern.dwap $(REPO)/tools/generate-amiga-plane-bank.py $(REPO)/tools/amiga_scene_contract.py
 	python3 $(REPO)/tools/generate-amiga-plane-bank.py
 
 $(REPO)/generated/amiga-game-planes.h: $(REPO)/generated/amiga-game.planes
@@ -1013,7 +1029,7 @@ $(AMIGA_ENTRY_MASK): $(AMIGA_GAME)
 $(AMIGA_SELECTION_MASK): $(AMIGA_GAME)
 	@test -f $@ || $(MAKE) -C $(REPO) generate-amiga-game
 
-$(AMIGA_BOOT_BANK) $(AMIGA_FRONT_BANK) $(AMIGA_SCENE_BANKS): $(AMIGA_GAME)
+$(AMIGA_BOOT_BANK) $(AMIGA_FRONT_BANK) $(AMIGA_SCENE_BANKS) $(REPO)/generated/amiga-cavern.dwap: $(AMIGA_GAME)
 	@test -f $@ || $(MAKE) -C $(REPO) generate-amiga-game
 
 $(AMIGA_EFFECT_STAMPS): $(AMIGA_GAME) $(REPO)/tools/generate-effect-stamps.py
