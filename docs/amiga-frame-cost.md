@@ -2,28 +2,28 @@
 
 ## External collision-backend execution boundary
 
-The guarded native backend omits generic actor-bounds calculation and generic
-collision-queue maintenance; it retains source position/appearance publication,
+The guarded native backend omits generic actor/terrain collision geometry,
+index membership and collision-queue maintenance; it retains source position/appearance publication,
 family preparation, registration and event order. The source/full-service path
 remains available to collision-enabled scenes. This is not another queue encoding.
 
 | Budget frame | Retained maintenance, ms | External backend, ms |
 | --- | ---: | ---: |
-| Contact 51 | 31.8 | 31.3 |
-| Contact 676 | 396.9 | 365.0 |
-| Contact 1512 | 201.5 | 188.5 |
-| Contact 1689 | 386.9 | 359.4 |
-| No-input generation 163 | 245.63 | 222.1 |
+| Contact 51 | 31.8 | 31.2 |
+| Contact 676 | 396.9 | 331.6 |
+| Contact 1512 | 201.5 | 175.4 |
+| Contact 1689 | 386.9 | 320.1 |
+| No-input generation 163 | 245.63 | 208.9 |
 
 Matched contact-window means (starting 51/676/1512/1689, respectively) are
-38.029→37.029, 184.233→173.000, 75.312→72.875 and 148.425→140.550 ms.
-Matched worst frames are 55.6→52.6, 396.9→365.0, 201.5→188.5 and
-386.9→359.4 ms. These measurements do not establish a 20 ms baseline.
+38.029→37.024, 184.233→161.800, 75.312→71.237 and 148.425→130.725 ms.
+Matched worst frames are 55.6→52.6, 396.9→331.6, 201.5→175.4 and
+386.9→320.1 ms. These measurements do not establish a 20 ms baseline.
 Baseline reports: `tmp/no-query-contact-report.txt`, `tmp/span-envelope-report.txt`.
-Candidate reports: `tmp/external-collision-contact-report.txt`,
-`tmp/external-collision-idle-report.txt`. Contact/idle trace ELF hashes:
-`df6c54629bf368b3fab78a7819d49d8a3d9816edca1735139b2d7826a9ae9e3b` /
-`f1abff17ab3a69c400e9d09825295d5d0ad911d9180ff41761c8068b60f7dae7`.
+Candidate reports: `tmp/external-terrain-contact-report.txt`,
+`tmp/external-terrain-idle-report.txt`. Contact/idle trace ELF hashes:
+`4fd579fc30f59f30bc3c38c595ce8c20063deef4ec7590bac5aa9f4aa4a0ac60` /
+`dcf6c25bd9859454bd2462b2d2f58fe0c048be2891eb1ddacab1f1070c4f1ec9`.
 Reproduce with the contact command below using
 `TRACE_FRAMES=50,675,1511,1688 TRACE_FIELDS=35`, and the no-input generation
 command using `TRACE_FRAMES=162 TRACE_FIELDS=35`.

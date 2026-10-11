@@ -214,10 +214,16 @@ collection, dirty-pass execution and native object-query preparation, including
 paths which bypass the index. Unexpected consumers invalidate the owner; they
 must not silently return an empty collision result. Full collision services
 remain the default for reference owners and explicit query fixtures. The guard
-suppresses generic actor-bounds refresh and spatial/collision queue maintenance.
+suppresses generic actor/terrain collision geometry, index membership and
+spatial/collision queue maintenance.
 Breakable births retain position, appearance and family preparation without
 constructing generic cached geometry. Registration, activation, layers, live
-sprite/position setters and terrain identity publication remain synchronous.
+sprite/position setters and terrain lifetime/registration publication remain synchronous.
+Prepared terrain spans publish the same registration/layer failure prefix
+without geometry keys, bounds envelopes or index publication. Scalar terrain
+births use the same backend boundary; the full collision-enabled path retains
+the original geometry/publication behavior. The contact verifier requires an
+empty generic index even while native terrain and actors are alive.
 Diagnostic dirty-queue traversal is unavailable under this declaration rather
 than pretending that an unmaintained queue represents source state. Collision
 metadata bits are private to the excluded backend; eligibility/order bits remain

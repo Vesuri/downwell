@@ -29,6 +29,10 @@ if $owner->owner_.index_.tree_.tree_ != 0
     printf "Derived spatial tree unexpectedly resident during normal startup\n"
     quit 1
 end
+if $owner->owner_.index_.population_ != 0
+    printf "Unused generic collision index populated during normal startup\n"
+    quit 1
+end
 printf "Startup spatial tree: unmaterialized, no backing allocation\n"
 if gDownwellFieldBandLoads != 0
     printf "Gameplay field images loaded before gameplay admission\n"

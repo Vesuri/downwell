@@ -130,6 +130,10 @@ if $owner->owner_.index_.queries_ || $owner->owner_.index_.count_ != 0 || $tree 
     printf "No-query gameplay maintained a spatial journal or materialized tree\n"
     quit 1
 end
+if $owner->owner_.index_.population_ != 0
+    printf "External collision backend published unused generic index membership\n"
+    quit 1
+end
 printf "Spatial storage: owner_bytes=%lu tree_capacity_bytes=%lu journal_bytes=%lu pending=%lu population=%lu deferred=%u resident=%u\n", sizeof(*$owner), sizeof(*$tree), sizeof($owner->owner_.index_.operations_), $owner->owner_.index_.count_, $owner->owner_.index_.population_, $owner->owner_.index_.deferred_, $tree != 0
 if $tree != 0
     printf "Spatial materialized tree: used=%lu live=%lu\n", $tree->used_, $tree->live_

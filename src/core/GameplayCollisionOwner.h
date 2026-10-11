@@ -739,6 +739,42 @@ private:
            !nativeTerrainLayersBound_||!wall||terrainRoomCount_||
            !layers_.admitPreparedTerrainSpan(count,wall->creationDepth,layerSlot)||
            !table_.canFreshExternalSpan(slot,count))return Result::unsupported;
+        if(!collisionConsumersAdmitted_){
+            // This backend observes source identities/layers, not generic
+            // collision geometry or index membership. Admit the whole source
+            // span before publishing its same synchronous failure prefix.
+            unsigned present=0;
+            for(unsigned i=0;i<count;++i){
+                present|=1u<<cells.kind(i);
+                if(room_.contains(slot+i))return Result::unsupported;
+            }
+            for(unsigned kind=0;kind<2;++kind)if(present&(1u<<kind)){
+                const int object=kind?93:60;
+                const auto* definition=objectDefaults_.get(object);
+                const auto* objectFlags=families_.flags(unsigned(object));
+                const auto* plan=terrainCreatePlans_[kind];
+                if(!definition||!objectFlags||!(*objectFlags&0x28u)||!plan||plan->sprite!=tile||
+                   (definition->initialFlags&0x8000u))return Result::unsupported;
+                flags[kind]=(definition->initialFlags&~0x8208u)|(plan->changedSprite?8u:0u);
+            }
+            bool okay=true;
+            for(unsigned i=0;i<count;++i){
+                if(!i){terrainRoomFirst_=slot;terrainRoomDepth_=wall->creationDepth;}
+                const unsigned current=slot+i,kind=cells.kind(i);
+                std::uint32_t order=0;
+                thinRetirementWindow_.append(cells.y,kind!=0,first.handle.generation+i);
+                if(!table_.externalBirth(current,order)){okay=false;break;}
+                if(!i)stamp=order;
+                if(!table_.registerExternalObject({current,first.handle.generation+i},kind?93:60,true)){
+                    okay=false;break;
+                }
+                ++completed;
+            }
+            terrainRoomCount_+=completed;
+            if(completed&&!layers_.publishPreparedTerrainSpan(layerSlot,completed,layer))okay=false;
+            if(!okay){check(false);return Result::failure;}
+            return Result::success;
+        }
         struct Recipe {
             int low=0x7fffffff,high=(-2147483647-1);
             PreparedTerrainBirthBounds::Key key;
@@ -837,12 +873,14 @@ private:
         if(!check(room_.bind(slot,definition->creationDepth)))return false;
         if(!active)activationChanged(slot);
         flags=definition->initialFlags|(active?0u:2u);
-        bool published=false;
+        if(!collisionConsumersAdmitted_)flags&=~0x8208u;
+        bool published=!collisionConsumersAdmitted_;
 #ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
         PreparedTerrainBirthBounds::Key geometry;RunnerSpatialSplit::PixelBox pixels;bool preparedPrecise;
         // Only a fresh, resource-certified integer-grid constructor. Mutated
         // bounds and unexpected pre-indexed defaults keep the full oracle.
-        if(!(flags&0x8000u)&&terrainBirthBounds_.publication(id.object,id.x,id.y,geometry,pixels,preparedPrecise)){
+        if(collisionConsumersAdmitted_&&!(flags&0x8000u)&&
+           terrainBirthBounds_.publication(id.object,id.x,id.y,geometry,pixels,preparedPrecise)){
             flags=(flags&~0x208u)|(preparedPrecise?0x200u:0u);
             if(NativeDirtyQueue::shouldPublishBounds(*objectFlags,flags,false)){
                 DW_PROFILE_COUNT(counterSpatialFirstPublication);
