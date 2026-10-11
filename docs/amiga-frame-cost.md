@@ -46,6 +46,45 @@ report's `--frames` selector now restricts its frame table as well as attributio
 Reference report/ELF: `tmp/baseline-exact-windows-report.txt` and
 `tmp/trace/baseline-exact-windows/Downwell.elf`.
 
+## Phase attribution at the current baseline
+
+A two-window recheck at `05a36ba3` isolates early frame 51 and combat frame
+1305. This is diagnostic evidence, not an optimization or a new baseline.
+Both frames reproduce the committed baseline within 0.5 ms.
+
+| Inclusive owner | Frame 51 ms | Frame 1305 ms |
+| --- | ---: | ---: |
+| Whole frame | 26.35 | 61.51 |
+| GameplayWorld Step | 16.15 | 43.46 |
+| Room actor Draw collection | 3.02 | 4.41 |
+| Enemy alarms, including captured dispatch | 1.55 | 3.24 |
+
+In frame 51, bullet Step costs 2.95 ms, player Step 2.07 ms, room
+animation 2.02 ms and DitherAbove Begin Step 1.67 ms. These are nested in
+GameplayWorld Step, not additional frame costs. Bullet position publication
+is 0.95 ms inside bullet Step; the source projectile computation is 1.22 ms.
+This does not support an isolated setter or arithmetic-helper optimization.
+
+Frame 1305 spends 16.63 ms in enemy Step, including walking motion/collision
+5.91 ms and bat behavior 4.06 ms. Source-line attribution puts the box-prefix
+scan/eligibility checks at roughly 2 ms, below the structural work threshold.
+Moreover, `BoxDestructionScript::runRetained` calls `alarmStop(0)` even when
+health is positive. A health-only pending-destruction queue cannot replace
+this phase without retaining that behavior and its ordered callbacks.
+
+Reproduction: use the baseline trace command above with
+`TRACE_FRAMES=50,1304`, `TRACE_FIELDS=35` and
+`TRACE_OUTPUT="$PWD/tmp/trace/phase-owner-audit"`. Run the report with
+`--frames 51` or `--frames 1305`, plus
+`--lines GameplayWorld::step --focus GameplayWorld::step --tree-min 0.15`.
+The line selector is a substring selector: its output also includes
+`stepEnemyRoomEffect` and other matching names; do not mistake their lines
+for the outer Step's self cost. Reports are
+`tmp/phase-owner-{51,1305}.txt`; matching retained ELF SHA-256 is
+`0cf51e6fc452c443bb065fee48348da8ff55ab450df158932f6d27541d04f85f`.
+Raw captures are disposable after recording the numbers. The normal stripped
+build was restored after this bounded run (1,928,980 bytes).
+
 ## Bitmap-selected room cleanup
 
 At `11f8ca10`, two retiring thin platforms make Draw cleanup cost 38.15 ms
