@@ -1,0 +1,174 @@
+diff --git a/Makefile b/Makefile
+index 5d5fd877..9ffc90e0 100644
+--- a/Makefile
++++ b/Makefile
+@@ -3280,6 +3280,14 @@ build/replay-frame-trace-test: tests/core/ReplayFrameTraceTest.cpp src/core/Repl
+ .PHONY: test-generation-timing
+ test: test-prepared-terrain-birth test-runner-alarm-projection
+ .PHONY: test-runner-alarm-projection
++test: test-runner-deferred-spatial-dirty
++.PHONY: test-runner-deferred-spatial-dirty
++test-runner-deferred-spatial-dirty: build/runner-deferred-spatial-dirty-test
++	./build/runner-deferred-spatial-dirty-test
++build/runner-deferred-spatial-dirty-test: tests/core/RunnerDeferredSpatialDirtyQueueTest.cpp $(wildcard src/core/*.h)
++	@mkdir -p build
++	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ tests/core/RunnerDeferredSpatialDirtyQueueTest.cpp
++
+ test-runner-alarm-projection: build/runner-alarm-projection-test
+ 	./build/runner-alarm-projection-test
+ build/runner-alarm-projection-test: tests/core/RunnerAlarmProjectionTest.cpp src/core/RunnerAlarmProjection.h
+diff --git a/src/core/GameplayCollisionOwner.h b/src/core/GameplayCollisionOwner.h
+index 997f0e13..4ce375e3 100644
+--- a/src/core/GameplayCollisionOwner.h
++++ b/src/core/GameplayCollisionOwner.h
+@@ -31,6 +32,7 @@
+ #include "NativeEnemyAlarmRoster.h"
+ #include "RunnerWithSnapshot.h"
+ #include "RunnerAlarmProjection.h"
++#include "RunnerDeferredSpatialDirtyQueue.h"
+ namespace downwell {
+ #ifdef DOWNWELL_DRAW_CACHE_AUDIT
+ // Optional diagnostic observer; absent from normal code and simulation state.
+@@ -91,7 +101,11 @@ private:
+         int dx=0,dy=0,cacheX=0,cacheY=0;
+     };
+     NativeWallQuery* wallQuery_=nullptr; // Borrowed only inside a non-reentrant query.
++#ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+     using NativeDirtyQueue=RunnerSpatialDirtyQueue<View::capacity>;
++#else
++    using NativeDirtyQueue=RunnerDeferredSpatialDirtyQueue<View::capacity>;
++#endif
+     NativeDirtyQueue nativeSpatialDirty_,nativeCollisionDirty_;
+     unsigned nativeCollisionRetained_[View::capacity]{};
+     bool nativeDirty(unsigned slot,int object,std::uint32_t flags){
+diff --git a/src/core/RunnerDeferredSpatialDirtyQueue.h b/src/core/RunnerDeferredSpatialDirtyQueue.h
+new file mode 100644
+index 00000000..f806662b
+--- /dev/null
++++ b/src/core/RunnerDeferredSpatialDirtyQueue.h
+@@ -0,0 +1,76 @@
++#ifndef DOWNWELL_RUNNER_DEFERRED_SPATIAL_DIRTY_QUEUE_H
++#define DOWNWELL_RUNNER_DEFERRED_SPATIAL_DIRTY_QUEUE_H
++#include "RunnerSpatialDirtyQueue.h"
++namespace downwell {
++// Before first ordered observation, remove-and-prepend is represented exactly
++// by the last mark's serial. No callback runs during materialization. After
++// observation (or serial exhaustion), use the original mutable list forever:
++// flush callbacks may reorder successors and must see immediate live links.
++template<unsigned Capacity,class Clock=std::uint32_t> class RunnerDeferredSpatialDirtyQueue {
++    using Queue=RunnerSpatialDirtyQueue<Capacity>;
++    using Index=typename SlotIndex<Capacity>::Type;
++    Clock stamps_[Capacity]{};
++    Clock clock_=0;
++    unsigned count_=0,head_=Capacity;
++    mutable Queue queue_;
++    mutable Index order_[Capacity]{};
++    mutable bool observed_=false;
++    void materialize()const{
++        if(observed_)return;
++        unsigned count=0;
++        for(unsigned slot=0;slot<Capacity;++slot)if(stamps_[slot])order_[count++]=Index(slot);
++        auto sift=[&](unsigned root,unsigned end){
++            const Index value=order_[root];
++            while(root<end/2){
++                unsigned child=root*2+1;
++                if(child+1<end&&stamps_[order_[child]]<stamps_[order_[child+1]])++child;
++                if(stamps_[order_[child]]<=stamps_[value])break;
++                order_[root]=order_[child];root=child;
++            }
++            order_[root]=value;
++        };
++        for(unsigned root=count/2;root;--root)sift(root-1,count);
++        for(unsigned end=count;end>1;--end){
++            const Index value=order_[0];order_[0]=order_[end-1];order_[end-1]=value;
++            sift(0,end-1);
++        }
++        for(unsigned i=0;i<count;++i)queue_.mark(order_[i]);
++        observed_=true;
++    }
++public:
++    static constexpr unsigned End=Capacity;
++    static bool shouldQueue(bool object,std::uint32_t objectFlags,std::uint32_t flags){
++        return Queue::shouldQueue(object,objectFlags,flags);
++    }
++    static bool shouldRefreshQueued(std::uint32_t flags){return Queue::shouldRefreshQueued(flags);}
++    static bool shouldPublishBounds(std::uint32_t objectFlags,std::uint32_t flags,bool prepared){
++        return Queue::shouldPublishBounds(objectFlags,flags,prepared);
++    }
++    bool contains(unsigned slot)const{return observed_?queue_.contains(slot):slot<Capacity&&stamps_[slot]!=0;}
++    unsigned size()const{return observed_?queue_.size():count_;}
++    unsigned first()const{materialize();return queue_.first();}
++    unsigned next(unsigned slot)const{materialize();return queue_.next(slot);}
++    bool mark(unsigned slot){
++        if(observed_)return queue_.mark(slot);
++        if(slot>=Capacity)return false;
++        if(slot==head_)return true;
++        if(clock_==Clock(-1)){materialize();return queue_.mark(slot);}
++        if(!stamps_[slot])++count_;
++        stamps_[slot]=++clock_;head_=slot;return true;
++    }
++    bool remove(unsigned slot){
++        if(observed_)return queue_.remove(slot);
++        if(slot>=Capacity||!stamps_[slot])return false;
++        stamps_[slot]=0;--count_;if(head_==slot)head_=End;return true;
++    }
++    void clear(){
++        if(observed_){queue_.clear();return;}
++        for(auto& stamp:stamps_)stamp=0;
++        clock_=0;count_=0;head_=End;
++    }
++    template<class Flags,class Refresh> bool flush(Flags flags,Refresh refresh){
++        materialize();return queue_.flush(flags,refresh);
++    }
++};
++}
++#endif
+diff --git a/tests/core/RunnerDeferredSpatialDirtyQueueTest.cpp b/tests/core/RunnerDeferredSpatialDirtyQueueTest.cpp
+new file mode 100644
+index 00000000..ee8ef515
+--- /dev/null
++++ b/tests/core/RunnerDeferredSpatialDirtyQueueTest.cpp
+@@ -0,0 +1,43 @@
++#include "core/RunnerDeferredSpatialDirtyQueue.h"
++#include <cassert>
++#include <vector>
++template<class Queue> std::vector<unsigned> ordered(const Queue& q){
++    std::vector<unsigned> result;
++    for(unsigned i=q.first();i!=q.End;i=q.next(i))result.push_back(i);
++    return result;
++}
++int main(){
++    // Narrow serial forces overflow into the exact live-list path.
++    for(unsigned seed=0;seed<128;++seed){
++        downwell::RunnerDeferredSpatialDirtyQueue<97,std::uint8_t> actual;
++        downwell::RunnerSpatialDirtyQueue<97> reference;
++        unsigned random=seed;
++        for(unsigned step=0;step<2000;++step){
++            random=random*1664525u+1013904223u;
++            const unsigned slot=(random>>8)%100;
++            if((random&7)<5)assert(actual.mark(slot)==reference.mark(slot));
++            else if((random&7)<7)assert(actual.remove(slot)==reference.remove(slot));
++            else if(step%101==0){actual.clear();reference.clear();}
++            assert(actual.size()==reference.size());
++            for(unsigned i=0;i<100;++i)assert(actual.contains(i)==reference.contains(i));
++            if(step==seed*7)assert(ordered(actual)==ordered(reference));
++        }
++        assert(ordered(actual)==ordered(reference));
++        actual.clear();reference.clear();assert(ordered(actual)==ordered(reference));
++    }
++    for(bool failure:{false,true}){
++        downwell::RunnerDeferredSpatialDirtyQueue<16> actual;
++        downwell::RunnerSpatialDirtyQueue<16> reference;
++        for(unsigned i=0;i<8;++i){actual.mark(i);reference.mark(i);}
++        auto run=[&](auto& q){
++            std::vector<unsigned> visited;
++            const bool okay=q.flush([](unsigned i){return i==5?2u:0u;},[&](unsigned i){
++                visited.push_back(i);
++                if(i==7){q.mark(2);q.remove(3);q.mark(12);}
++                return !(failure&&i==4);
++            });
++            assert(okay!=failure);return visited;
++        };
++        assert(run(actual)==run(reference));assert(ordered(actual)==ordered(reference));
++    }
++}
