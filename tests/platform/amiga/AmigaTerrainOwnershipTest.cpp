@@ -367,7 +367,7 @@ int main(int argc,char** argv){
     }
     // Admission is fail-closed, including direct consumers which never query
     // the tree. Each violation poisons a fresh owner, not the replay below.
-    for(unsigned consumer=0;consumer<4;++consumer){
+    for(unsigned consumer=0;consumer<5;++consumer){
         auto guarded=downwell::makeCollisionOwner(objects,sprites,{}, {},&rooms,Ownership::nativeScenery,true,true,false);
         require(guarded->declareExternalCollisionBackend(),"external collision admission");
         bool accepted=false;
@@ -378,8 +378,34 @@ int main(int argc,char** argv){
         else if(consumer==2){
             auto pairs=std::make_unique<downwell::RunnerCollisionPairs<downwell::GameplayCollisionView::capacity,16>>();
             accepted=guarded->collectCollisionPairs(*pairs,false);
-        }else accepted=guarded->queueCollision({});
+        }else if(consumer==3)accepted=guarded->queueCollision({});
+        else {downwell::RunnerImageValue x,y;accepted=guarded->nativePublishedPosition({0,1},x,y);}
         require(!accepted&&!guarded->valid(),"unexpected collision consumer fails terminally");
+    }
+    // End Step must consume the bullet's published binary32 state, including
+    // writes during Collision, not stale birth coordinates or integer artwork.
+    for(std::uint32_t yBits:{0x80000000u,0x00000000u,0x44000001u,0x461c4000u,0xc61c4000u}){
+        std::uint64_t referenceDigest=0;bool referenceDestroyed=false;
+        for(bool external:{false,true}){
+            auto owner=downwell::makeCollisionOwner(objects,sprites,{}, {},nullptr,
+                Ownership::nativeScenery,true,true,!external);
+            if(external)require(owner->declareExternalCollisionBackend(),"position owner scene admission");
+            auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
+                owner->breakableBinding(),owner->playerBinding(),nullptr);
+            require(owner->attach(*world),"position owner world attaches");
+            downwell::InstanceHandle shot;
+            require(world->withCollisionPass([&]{
+                require(world->bulletCount()==1,"position fixture fires once");
+                const auto& bullet=world->bulletAt(0);shot={bullet.identitySlot,bullet.lifetimeId};
+                return world->publishBulletCollisionPosition(shot,{0x43700001u},{yBits});
+            },[&]{world->step(4);return world->effectsSucceeded();}),"collision-position publication");
+            const auto* bullet=world->resolveBulletLifetime(shot);
+            require(bullet&&bullet->sourceMotion.x.bits==0x43700001u&&bullet->sourceMotion.y.bits==yBits,
+                "record retains exact published bullet coordinates");
+            if(!external){referenceDigest=world->checkpoint();referenceDestroyed=bullet->destroyRequested;}
+            else require(world->checkpoint()==referenceDigest&&bullet->destroyRequested==referenceDestroyed,
+                "record-owned position preserves End Step retirement and state");
+        }
     }
     {
         auto unneeded=downwell::makeCollisionOwner(objects,sprites,{}, {},&rooms,Ownership::nativeScenery);

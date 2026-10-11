@@ -225,7 +225,15 @@ suppresses generic actor/terrain collision geometry, index membership and
 spatial/collision queue maintenance.
 Breakable births retain position, appearance and family preparation without
 constructing generic cached geometry. Registration, activation, layers, live
-sprite/position setters and terrain lifetime/registration publication remain synchronous.
+sprite setters and terrain lifetime/registration publication remain synchronous.
+Player, enemy and bullet position setters retain lifetime/ownership validation,
+but do not maintain the excluded backend's coordinate mirror. Player/enemy
+records own their integer positions; bullet `sourceMotion` owns the published
+binary32 coordinates, including Collision-phase assignments read by End Step.
+Birth still validates coordinate admission. Direct published-position reads for
+these families fail closed under the external-backend declaration; a new
+consumer must explicitly admit the full backend before births. Full-service
+owners retain the mirrored path as the comparison implementation.
 Prepared terrain spans publish the same registration/layer failure prefix
 without geometry keys, bounds envelopes or index publication. Scalar terrain
 births use the same backend boundary; the full collision-enabled path retains

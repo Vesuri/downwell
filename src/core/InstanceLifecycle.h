@@ -70,6 +70,20 @@ public:
         };
         return b;
     }
+    // Scene admission: the record owns its published position and there is no
+    // collision-position observer. Keep the owner's lifetime/failure checks,
+    // but don't narrow integer values just to copy them into an unused mirror.
+    // Install on a freshly bound adapter, before any record births.
+    template<class Owner> bool useRecordPosition(Owner& owner){
+        if(context_!=&owner||!move_||integerPositionCheck_)return false;
+        integerPositionCheck_=[](void* p,InstanceHandle h,const Record& r){
+            return static_cast<Owner*>(p)->recordPosition(h,r);
+        };
+        move_=[](void* p,InstanceHandle h,const Record& r,RunnerImageValue x,RunnerImageValue y){
+            return static_cast<Owner*>(p)->recordPosition(h,r,x,y);
+        };
+        return true;
+    }
     template<class Owner> static RecordLifecycleBinding bindPositionedLifetime(Owner& owner){
         auto b=bind(owner);
         b.birthAt_=[](void* p,InstanceHandle h,const Record& r,RunnerImageValue x,RunnerImageValue y){
@@ -245,6 +259,7 @@ public:
     // For explicit rounded x/y assignments in the supported enemy scripts,
     // not xx/yy motion accumulators or a query-time synchronization pass.
     bool integerPosition(InstanceHandle h,const Record& r,std::int32_t x,std::int32_t y)const {
+        if(integerPositionCheck_)return integerPositionCheck_(context_,h,r);
         if(!move_)return true;
         RunnerImageValue px,py;
         return px.assignInteger(x)&&py.assignInteger(y)&&
@@ -289,6 +304,7 @@ private:
     bool (*activation_)(void*,InstanceHandle,const Record&,bool)=nullptr;
     bool (*membership_)(void*,InstanceHandle,const Record&,bool)=nullptr;
     bool (*move_)(void*,InstanceHandle,const Record&,RunnerImageValue,RunnerImageValue)=nullptr;
+    bool (*integerPositionCheck_)(void*,InstanceHandle,const Record&)=nullptr;
     bool (*sprite_)(void*,InstanceHandle,const Record&,int)=nullptr;
     bool (*mask_)(void*,InstanceHandle,const Record&,int)=nullptr;
     bool (*placeMeeting_)(void*,InstanceHandle,const Record&,int,MotionBinary64,MotionBinary64,bool&)=nullptr;

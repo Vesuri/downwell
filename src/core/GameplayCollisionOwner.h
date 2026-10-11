@@ -1130,6 +1130,8 @@ private:
             const auto* definition=parent.objectDefaults_.get(object(r));
             if(!definition)return parent.check(false);
             auto* position=parent.nativePosition(h.slot);
+            // Birth still validates coordinate admission. Record-owned scenes
+            // never observe this initial snapshot or maintain it after birth.
             if(!position||!birthPosition(r,*position)||!nativeAppearance(h,r))return parent.check(false);
             bool inactive=false;
             if constexpr(Kind!=View::Kind::timeField)inactive=!r.active;
@@ -1277,6 +1279,17 @@ private:
             if constexpr(Kind==View::Kind::enemy)if(!parent.updateEnemyAlarmRoster(h))return false;
             if(!parent.check(parent.layers_.activation(h,active)))return false;
             parent.activationChanged(h.slot);return parent.publishPreparedDraw(h);}
+        bool recordOwnsPosition()const{
+            return !parent.collisionConsumersAdmitted_&&
+                (Kind==View::Kind::player||Kind==View::Kind::enemy||Kind==View::Kind::bullet);
+        }
+        bool recordPosition(InstanceHandle local,const Record& r){
+            InstanceHandle h;
+            return parent.check(recordOwnsPosition())&&key(local,r,h);
+        }
+        bool recordPosition(InstanceHandle local,const Record& r,RunnerImageValue x,RunnerImageValue y){
+            return recordPosition(local,r)&&parent.check(RunnerSpatialSplit::valid(x)&&RunnerSpatialSplit::valid(y));
+        }
         // Retain actual narrowed setter values before admitting spatial queries.
         // Bounds/queue publication remains separate; integer draw positions
         // cannot establish whether a later source setter changed the position.
@@ -1742,6 +1755,9 @@ public:
         return true;
     }
     bool nativePublishedPosition(InstanceHandle h,RunnerImageValue& x,RunnerImageValue& y){
+        if(!collisionConsumersAdmitted_&&
+           (h.slot<View::breakableBase||(h.slot>=View::bulletBase&&h.slot<View::scriptEffectBase)))
+            return check(false);
         if(!native_||!valid()||!table_.contains(h))return false;
         const auto* position=nativePosition(h.slot);if(!position)return false;
         x=position->x;y=position->y;return true;
@@ -1786,7 +1802,8 @@ public:
         if(!world_&&!world.bindGoalFieldLifecycle(GameplayGoalFields::Binding::bindMaskDestruction(goals_)))return check(false);
         if(!world_&&!world.bindExitControllerLifecycle(GameplayExitControllers::Binding::bind(exits_)))return check(false);
         if(!world_&&!world.bindSideCameraLockerLifecycle(SideCameraLockers::Binding::bindMovement(lockers_)))return check(false);
-        if(!world_&&!world.bindBulletLifecycle(GameplayWorld::BulletLifecycleBinding::bindMaskDestruction(bullets_)))return check(false);
+        if(!world_&&!world.bindBulletLifecycle(scenePositionBinding(
+            GameplayWorld::BulletLifecycleBinding::bindMaskDestruction(bullets_),bullets_)))return check(false);
         if(!world_&&!world.bindScriptSpawnInstances(scriptEffects_))return check(false);
         if(!world_&&!world.bindRegisteredExpiry(expiry_))return check(false);
         if(!world_&&!world.bindRegisteredSmoke(smoke_))return check(false);
@@ -2370,8 +2387,14 @@ public:
         });
         return true;
     }
-    auto playerBinding(){return GameplayWorld::PlayerLifecycleBinding::bindMasks(player_);}
-    auto enemyBinding(){return GameplayWorld::EnemyLifecycleBinding::bindMaskDestruction(enemies_);}
+private:
+    template<class Lifecycle,class Adapter> Lifecycle scenePositionBinding(Lifecycle binding,Adapter& adapter){
+        if(!collisionConsumersAdmitted_)check(binding.useRecordPosition(adapter));
+        return binding;
+    }
+public:
+    auto playerBinding(){return scenePositionBinding(GameplayWorld::PlayerLifecycleBinding::bindMasks(player_),player_);}
+    auto enemyBinding(){return scenePositionBinding(GameplayWorld::EnemyLifecycleBinding::bindMaskDestruction(enemies_),enemies_);}
     auto breakableBinding(){
         auto binding=GameplayWorld::BreakableLifecycleBinding::bindDestruction(boxes_);
 #ifndef DOWNWELL_REFERENCE_BREAKABLES
@@ -3437,15 +3460,25 @@ public:
         if(!valid()||!world_||!resolves(shared)||!View::decode(shared,kind,local)||kind!=View::Kind::bullet)
             return check(false);
         if(native_&&interior){
-            const auto* position=nativePosition(shared.slot);
-            if(!position)return check(false);
-            if(interior->contains(position->y))return true;
+            RunnerImageValue y;
+            if(!collisionConsumersAdmitted_){
+                const auto* bullet=world_->resolveBulletLifetime(local);
+                if(!bullet)return check(false);
+                y=bullet->sourceMotion.y;
+            }else{
+                const auto* position=nativePosition(shared.slot);
+                if(!position)return check(false);
+                y=position->y;
+            }
+            if(interior->contains(y))return true;
         }
         struct Ops {
             GameplayCollisionOwner& owner;InstanceHandle shared,local;MotionBinary64 top;
             bool readY(MotionBinary64& y){
                 if(!owner.resolves(shared))return false;
-                if(owner.native_){const auto* p=owner.nativePosition(shared.slot);if(!p)return false;y=p->y.promoted();}
+                if(owner.native_&&!owner.collisionConsumersAdmitted_){
+                    const auto* p=owner.world_->resolveBulletLifetime(local);if(!p)return false;y=p->sourceMotion.y.promoted();
+                }else if(owner.native_){const auto* p=owner.nativePosition(shared.slot);if(!p)return false;y=p->y.promoted();}
                 else {const auto* p=owner.state(shared);if(!p)return false;y=p->y.promoted();}
                 return y.valid();
             }
