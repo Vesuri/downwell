@@ -174,6 +174,36 @@ Reports: `tmp/sparse-draw-fps-gdb.log`, `tmp/sparse-draw-report.txt` and
 `tmp/sparse-draw-confirm-report.txt`. Reproduce using the preceding contact command
 with `TRACE_FRAMES=50,675,1300,1688 TRACE_FIELDS=100`.
 
+### Remaining generation ownership costs — `c4228228`
+
+Independent 35-field captures starting at 675/1688 measure frames 676/1689
+at 460.29/410.0 ms. Inclusive boundaries (not additive):
+
+| Boundary | Frame 676, ms | Frame 1689, ms |
+| --- | ---: | ---: |
+| Prepared terrain owner span | 133.03 | 150.08 |
+| Terrain identity/run insertion (`appendSpan`) | 25.33 | 30.89 |
+| External-object registration | 22.64 | 26.93 |
+| Dirty-queue marking, all callers | 21.70 | 21.96 |
+
+Frame 676 also has a separate breakable-birth cost: `createBreakable` takes
+73.75 ms, with 65.47 ms in `NativeFamilyBirth::publish`. Its birth observer
+spends 49.07 ms in `refreshNativeActor`, including 17.90 ms recomputing unit
+sprite bounds and 21.06 ms in spatial publication. This is not the prepared
+terrain constructor or terrain rendering. Frame 1689 has no corresponding
+breakable-birth subtree; it must not be credited with this prospective saving.
+
+The production caller is `boxAllocation_.observeBirth`, after `birthPosition`
+and `nativeAppearance`, before spatial/layer publication completes. Reusing
+immutable shape geometry there would not justify caching eligibility, tree
+membership or callback results. The generic bounds refresh remains necessary
+for unsupported positions or appearance and later mutations.
+
+Reproduce with the contact command above, `TRACE_FIELDS=35` and
+`TRACE_FRAMES=675,1688`. Reports: `tmp/generation-current-{676,1689}.txt`;
+driver log: `tmp/generation-current-trace.log`. Trace ELF SHA-256:
+`838723d93bbe446201d652fe0a9f467328932cc341e4a0c47747f7760766af1d`.
+
 ### Remaining early-game dispatch cost — `f4b4433a`
 
 A fresh six-field capture starting at frame 50 confirms frame 51 at **32.56

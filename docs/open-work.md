@@ -70,6 +70,15 @@ behavior, both backend integrations and relevant original-game verification.
   path (see the rejected-approaches table). Judge the next structural change
   against the remaining generation cost and memory footprint, not an isolated
   copy-helper improvement.
+- Remove repeated breakable birth geometry calculation at
+  `boxAllocation_.observeBirth`: frame 676 spends 49.07 ms in its bounds
+  refresh, including 17.90 ms recomputing unit sprite bounds. Establish the
+  admitted sprite/mask/scale/position domain from source and production
+  setters, prepare immutable geometry outside gameplay, and preserve ordered
+  spatial publication and the generic fallback. Compare against the fresh
+  `c4228228` generation captures; frame 1689 has no matching breakable births
+  and cannot be credited with this saving. This does not reopen registry
+  representation or small-helper tuning.
 - Reduce executable and static-memory growth at its owning structures: audit
   linked collision/query machinery, embedded resource/mask banks and full-height
   terrain caches. Account separately for Hunk code/data/relocations, zero-filled
