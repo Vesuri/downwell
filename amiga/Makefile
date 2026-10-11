@@ -557,6 +557,9 @@ CPPFLAGS := $(CFLAGS) -x c++ -std=gnu++17 -fno-rtti -fno-exceptions \
 	-fno-use-cxa-atexit -DDOWNWELL_FREESTANDING \
 	-I$(AMIGA_SRC)/compat -I$(REPO)/src
 ASFLAGS := -mcpu=68000 -g --register-prefix-optional -I"$(SDKDIR)" -I"$(CURDIR)"
+ifeq ($(ENTRY_WIPE_VERIFY),1)
+ASFLAGS += --defsym DOWNWELL_ENTRY_WIPE_VERIFY=1
+endif
 ifeq ($(EXIT_WIPE_VERIFY),1)
 ASFLAGS += --defsym DOWNWELL_EXIT_WIPE_VERIFY=1
 endif
@@ -612,7 +615,11 @@ endif
 
 .PHONY: all check clean audit
 
-all: check $(OUT).exe $(OUT).boot $(OUT).front $(OUT).game $(OUT).planes $(OUT).cavern $(OUT).cavernplanes $(OUT).results $(OUT).shop $(OUT).clear $(OUT).fields $(OUT).columns $(OUT).patterns $(OUT).exitmask $(OUT).selectionmask $(OUT).hud
+all: check $(OUT).exe $(OUT).boot $(OUT).front $(OUT).game $(OUT).planes $(OUT).cavern $(OUT).cavernplanes $(OUT).results $(OUT).shop $(OUT).clear $(OUT).fields $(OUT).columns $(OUT).patterns $(OUT).exitmask $(OUT).selectionmask $(OUT).hud $(OUT).entrymask
+
+$(OUT).entrymask: $(AMIGA_ENTRY_MASK)
+	@mkdir -p $(@D)
+	cp $< $@
 
 $(OUT).hud: $(AMIGA_HUD)
 	@mkdir -p $(@D)
@@ -664,7 +671,7 @@ $(OUT).game: $(AMIGA_GAME)
 	@mkdir -p $(@D)
 	cp -f $< $@
 
-$(REPO)/generated/amiga-transient-banks.h: $(AMIGA_RESULTS) $(AMIGA_SHOP) $(AMIGA_CLEAR) $(AMIGA_HUD) $(AMIGA_EXIT_MASK) $(AMIGA_SELECTION_MASK) $(REPO)/generated/downwell-builder-patterns.dwbp $(REPO)/tools/generate-amiga-transient-banks.py
+$(REPO)/generated/amiga-transient-banks.h: $(AMIGA_RESULTS) $(AMIGA_SHOP) $(AMIGA_CLEAR) $(AMIGA_HUD) $(AMIGA_EXIT_MASK) $(AMIGA_ENTRY_MASK) $(AMIGA_SELECTION_MASK) $(REPO)/generated/downwell-builder-patterns.dwbp $(REPO)/tools/generate-amiga-transient-banks.py
 	python3 $(REPO)/tools/generate-amiga-transient-banks.py
 
 obj/DownwellAmiga.o: $(REPO)/generated/amiga-transient-banks.h
@@ -1135,6 +1142,8 @@ obj/gcc8_a_support.o: $(SUPPORT)/gcc8_a_support.s
 	$(AS) $(ASFLAGS) -o $@ $<
 
 audit: $(OUT).elf
+	@if [ '$(ENTRY_WIPE_VERIFY)' != 1 ] && $(OBJDUMP) -t $(OUT).elf | grep -q 'amiga_entry_mask'; then \
+		echo "*** entry mask must be scene-loaded, not linked"; exit 1; fi
 	@if [ -z '$(findstring DOWNWELL_REFERENCE_SCENE_BANKS,$(CPPFLAGS))' ] && $(OBJDUMP) -t $(OUT).elf | grep -q 'amiga_hud_pack'; then \
 		echo "*** HUD source must be scene-loaded, not linked"; exit 1; fi
 	@if $(OBJDUMP) -t $(OUT).elf | grep -q 'amiga_selection_mask'; then \

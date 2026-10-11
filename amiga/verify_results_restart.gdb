@@ -93,6 +93,11 @@ if gDownwellGameArtLoads != 3 || gDownwellGameArtReleases != 2 || gDownwellGameA
     printf "Gameplay CPU art lease failed: loads=%u releases=%u preparations=%u resident=%u\n", gDownwellGameArtLoads, gDownwellGameArtReleases, gDownwellGameArtPreparations, gDownwellGameArtResidentBytes
     quit 1
 end
+if gDownwellEntryMaskLoads != gDownwellGameArtLoads || gDownwellEntryMaskResidentBytes != 31104
+    printf "Entry mask did not follow the gameplay lease across re-entry\n"
+    quit 1
+end
+printf "Entry mask: three gameplay leases, no reload for retained Retry\n"
 printf "Gameplay CPU art lease: zero startup preparation, Retry retained, re-entry rebound\n"
 if gDownwellBuilderPatternLoads != 3 || gDownwellBuilderPatternReleases != 2 || gDownwellBuilderPatternBytes != 70779
     printf "Builder pattern lease failed: loads=%u releases=%u resident=%u\n", gDownwellBuilderPatternLoads, gDownwellBuilderPatternReleases, gDownwellBuilderPatternBytes

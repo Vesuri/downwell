@@ -539,13 +539,21 @@ is freed with that source on departure. Reentry loads a fresh source once.
 Missing/short reads fail before publishing the cover/scene. No file I/O or
 mask preparation belongs to ordinary contact gameplay. The exit byte oracle
 alone retains its linked reference; production link audits reject both masks.
-The entry mask remains linked because the gameplay CPU effect compositor
-borrows it beyond entry-cover DMA lifetime. It is not safe to retire that
-source merely because the hardware wipe has detached.
+`Downwell.entrymask` (31,104 bytes) occupies the tail of the ordinary-memory
+gameplay art lease. It loads once on acquisition and retires with that lease;
+Retry retains it, while returning from style/surface reacquires it. The
+gameplay CPU effect compositor borrows it beyond entry-cover DMA lifetime,
+so detaching the hardware wipe must not retire this source. The shared Chip
+overlay still receives its existing copy when needed. No extra Chip allocation
+or per-frame file I/O is introduced. Only `ENTRY_WIPE_VERIFY=1` links a byte
+oracle; the production link audit rejects it. Missing/short files fail before
+binding the compositor or publishing the lease, returning code 20. Startup's
+memory verifier requires zero entry-mask loads and resident bytes.
 
-These leases remove 45,360 permanent payload bytes outside their scenes.
-Selection temporarily reacquires its 14,256 bytes in ordinary memory; neither
-lease changes the reserved Chip layout. Fixed mask budgets and hashes are in
+These leases remove 76,464 permanent payload bytes outside their scenes.
+Selection temporarily reacquires its 14,256 bytes and gameplay its 31,104
+entry-mask bytes in ordinary memory; none changes the reserved Chip layout.
+Fixed mask budgets and hashes are in
 the generated transient-bank manifest. The assembly option fingerprint must
 include the exact verifier definitions, not just whether any VERIFY flag is
 present, so switching verifiers cannot retain linked oracle assets.

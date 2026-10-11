@@ -275,8 +275,10 @@ extern const UBYTE amiga_shop_pack_end[];
 extern const UBYTE amiga_exit_mask[];
 extern const UBYTE amiga_exit_mask_end[];
 #endif
+#ifdef DOWNWELL_ENTRY_WIPE_VERIFY
 extern const UBYTE amiga_entry_mask[];
 extern const UBYTE amiga_entry_mask_end[];
+#endif
 extern const UBYTE amiga_room_pack[];
 extern const UBYTE amiga_room_pack_end[];
 extern const UBYTE amiga_object_pack[];
@@ -343,6 +345,8 @@ static volatile UBYTE* const ciaaPra = (volatile UBYTE*)0xbfe001;
 static volatile unsigned long long lastPortCheckpoint;
 static const UBYTE* activeGamePack = nullptr;
 static const UBYTE* activeGamePackEnd = nullptr;
+static const UBYTE* activeEntryMask = nullptr;
+extern "C" { volatile ULONG gDownwellEntryMaskLoads=0, gDownwellEntryMaskResidentBytes=0; }
 static const UBYTE* activeHudPack = nullptr;
 static const UBYTE* activeHudPackEnd = nullptr;
 static bool entryHudReady=false;
@@ -610,13 +614,13 @@ volatile ULONG gDownwellEntryFieldBytes=0;
 static bool selectEntryMaskBank(){
     if(residentCover==ResidentCover::entry)return true;
     if(residentCover!=ResidentCover::none||!overlayAssetStorage||AmigaEntryMask::bytes>overlayAssetCapacity||
-       amiga_entry_mask_end-amiga_entry_mask!=AmigaEntryMask::bytes)return false;
+       !activeEntryMask||gDownwellEntryMaskResidentBytes!=AmigaEntryMask::bytes)return false;
     AmigaHardware::blitterDrain();
     overlayBank.release();
 #ifdef DOWNWELL_PROFILE_ENTRY
     if(gDownwellResultsPack)++gDownwellEntryResultsDiscarded;
 #endif
-    for(unsigned i=0;i<AmigaEntryMask::bytes;++i)overlayAssetStorage[i]=amiga_entry_mask[i];
+    for(unsigned i=0;i<AmigaEntryMask::bytes;++i)overlayAssetStorage[i]=activeEntryMask[i];
     gDownwellResultsPack=gDownwellShopPack=nullptr;
     gDownwellResultsAssetBytes=gDownwellShopAssetBytes=0;
     residentCover=ResidentCover::entry;return true;
@@ -2289,7 +2293,8 @@ __attribute__((noinline)) static int runDownwell(void) {
         effectAssets.release();
         AmigaGameplayActors::releaseDamageText();
         hudText.release();
-        activeGamePack=activeGamePackEnd=nullptr;
+        activeGamePack=activeGamePackEnd=activeEntryMask=nullptr;
+        gDownwellEntryMaskResidentBytes=0;
         releaseTerrainRaster();
         memory.releaseGameAssets();memory.releaseGameCatalogue();
         gDownwellGamePlaneResidentBytes=gDownwellGameArtResidentBytes=0;
@@ -2314,12 +2319,30 @@ __attribute__((noinline)) static int runDownwell(void) {
         gamePackBytes=planeBytes;
         gDownwellGameArtExpectedBytes=cpuBytes;
         gDownwellGamePlaneExpectedBytes=gamePackBytes;
-        if(!memory.acquireGameCatalogue(cpuBytes))return false;
+        // The CPU compositor can need this mask after the DMA wipe retires.
+        // Keep it with the gameplay lease, never in the startup executable or
+        // the shared Chip overlay which shops/results can overwrite.
+        static_assert(DOWNWELL_ENTRYMASK_BANK_BYTES==AmigaEntryMask::bytes&&
+            DOWNWELL_ENTRYMASK_BANK_BYTES<=DOWNWELL_ENTRYMASK_BANK_BUDGET,
+            "Gameplay entry mask residency budget");
+        if(!memory.acquireGameCatalogue(cpuBytes+DOWNWELL_ENTRYMASK_BANK_BYTES))return false;
         activeGamePack=memory.gameCatalogue();activeGamePackEnd=activeGamePack+cpuBytes;
+        UBYTE* entryMask=memory.gameCatalogue()+cpuBytes;
+        if(platform.loadFile("PROGDIR:Downwell.entrymask",entryMask,
+                DOWNWELL_ENTRYMASK_BANK_BYTES)!=LONG(DOWNWELL_ENTRYMASK_BANK_BYTES)){
+            releaseGameplayArt();return false;
+        }
+        activeEntryMask=entryMask;
+        gDownwellEntryMaskResidentBytes=DOWNWELL_ENTRYMASK_BANK_BYTES;
+        ++gDownwellEntryMaskLoads;
+#ifdef DOWNWELL_ENTRY_WIPE_VERIFY
+        for(unsigned i=0;i<AmigaEntryMask::bytes;++i)
+            if(entryMask[i]!=amiga_entry_mask[i]){releaseGameplayArt();return false;}
+#endif
         bool good=acquireTerrainRaster()&&
             platform.loadFile(cpuPath,memory.gameCatalogue(),cpuBytes)==LONG(cpuBytes)&&
             effectAssets.bind(activeGamePack,cpuBytes)&&
-            effectAssets.bindEntryMask(amiga_entry_mask,amiga_entry_mask_end-amiga_entry_mask)&&
+            effectAssets.bindEntryMask(activeEntryMask,DOWNWELL_ENTRYMASK_BANK_BYTES)&&
             AmigaGameplayActors::prepareDamageText(activeGamePack,activeGamePackEnd);
         good=good&&acquireFieldColumns();
 #ifndef DOWNWELL_REFERENCE_ACTOR_PREFIX

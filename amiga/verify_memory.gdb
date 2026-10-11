@@ -15,6 +15,10 @@ if gDownwellHudLoads != 0
     printf "Gameplay HUD loaded before its scene admission\n"
     quit 1
 end
+if gDownwellEntryMaskLoads != 0 || gDownwellEntryMaskResidentBytes != 0
+    printf "Gameplay entry mask loaded before its scene admission\n"
+    quit 1
+end
 if gDownwellBuilderPatternBytes != 0 || gDownwellBuilderPatternLoads != 0
     printf "Builder patterns loaded before gameplay entry\n"
     quit 1
