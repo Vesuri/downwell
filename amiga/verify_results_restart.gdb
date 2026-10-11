@@ -94,6 +94,11 @@ if gDownwellGameArtLoads != 3 || gDownwellGameArtReleases != 2 || gDownwellGameA
     quit 1
 end
 printf "Gameplay CPU art lease: zero startup preparation, Retry retained, re-entry rebound\n"
+if gDownwellBuilderPatternLoads != 3 || gDownwellBuilderPatternReleases != 2 || gDownwellBuilderPatternBytes != 70779
+    printf "Builder pattern lease failed: loads=%u releases=%u resident=%u\n", gDownwellBuilderPatternLoads, gDownwellBuilderPatternReleases, gDownwellBuilderPatternBytes
+    quit 1
+end
+printf "Builder pattern lease: Retry retained; retired terrain allowed style/surface unload and re-entry\n"
 printf "Three results destinations executed; final gameplay reached 200 updates\n"
 printf "DOWNWELL_RESULTS_RESTART_READY\n"
 downwell-chip-snapshot

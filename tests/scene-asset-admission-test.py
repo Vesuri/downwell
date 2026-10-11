@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Content growth must not silently grow the resident native art bank."""
 import importlib.util
+import json
 from pathlib import Path
 import sys
 import struct
@@ -25,6 +26,36 @@ def record(ident, frame=0):
 
 
 class Admission(unittest.TestCase):
+    def test_builder_pattern_budget_is_not_inferred_from_payload(self):
+        spec = importlib.util.spec_from_file_location(
+            'transient_contract', ROOT / 'tools/generate-amiga-transient-banks.py')
+        contract = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(contract)
+        self.assertEqual(contract.BANKS['patterns'], 72 * 1024)
+        with tempfile.TemporaryDirectory(prefix='downwell-pattern-budget-') as directory:
+            root = Path(directory)
+            # Synthetic payloads only: this tests the size/ownership boundary,
+            # while BuilderPatternPack's format tests validate the actual pack.
+            for path in ('data/data.win', 'tools/generate-amiga-hud.py',
+                         'tools/generate-amiga-transient-banks.py'):
+                target = root / path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(b'fixture')
+            (root / 'generated').mkdir()
+            for name in contract.BANKS:
+                path = ('downwell-builder-patterns.dwbp' if name == 'patterns'
+                        else f'amiga-{name}.dwap')
+                (root / 'generated' / path).write_bytes(b'fixture')
+            contract.ROOT = root
+            contract.main()
+            manifest = json.loads((root / 'generated/amiga-transient-banks.json').read_text())
+            self.assertEqual(manifest['banks']['patterns']['owner'], 'terrain-lifetimes')
+            self.assertEqual(manifest['banks']['patterns']['bytes'], 7)
+            (root / 'generated/downwell-builder-patterns.dwbp').write_bytes(
+                bytes(contract.BANKS['patterns'] + 1))
+            with self.assertRaisesRegex(SystemExit, 'exceeds explicit'):
+                contract.main()
+
     def test_rejected_elf_cannot_bypass_audit_on_retry(self):
         makefile = (ROOT / 'amiga/Makefile').read_text()
         # Exercise the production Hunk publication rule with an existing ELF

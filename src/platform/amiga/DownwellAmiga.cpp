@@ -30,6 +30,7 @@ volatile unsigned gDownwellGamePlaneResidentBytes, gDownwellGamePlaneLoads, gDow
     gDownwellGamePlaneExpectedBytes;
 volatile unsigned gDownwellGameArtResidentBytes, gDownwellGameArtLoads, gDownwellGameArtReleases,
     gDownwellGameArtPreparations, gDownwellGameArtExpectedBytes;
+volatile unsigned gDownwellBuilderPatternBytes, gDownwellBuilderPatternLoads, gDownwellBuilderPatternReleases;
 volatile unsigned gDownwellTerrainRasterResidentBytes;
 __attribute__((noinline, used)) void downwellGamePlanesReady(){ __asm__ volatile("" ::: "memory"); }
 }
@@ -289,8 +290,6 @@ extern const UBYTE amiga_collision_pack_end[];
 extern const UBYTE amiga_collision_masks[];
 extern const UBYTE amiga_collision_masks_end[];
 #endif
-extern const UBYTE amiga_builder_pack[];
-extern const UBYTE amiga_builder_pack_end[];
 }
 
 enum {
@@ -2034,10 +2033,28 @@ __attribute__((noinline)) static int runDownwell(void) {
     sceneBank = memory.assets() + sceneBankOffset;
     UBYTE* effectStamps=memory.sceneCache()+effectStampCacheOffset;
     memcpy(effectStamps,amiga_effect_stamps+AmigaEffectStampBank::payloadOffset,effectPayloadBytes);
-    const downwell::BuilderPatternPack builders(
-        amiga_builder_pack,
-        (unsigned long)(amiga_builder_pack_end - amiga_builder_pack));
+    downwell::BuilderPatternPack builders(nullptr,0);
+    static_assert(DOWNWELL_PATTERNS_BANK_BYTES<=DOWNWELL_PATTERNS_BANK_BUDGET,
+        "Builder pattern residency budget");
+    const auto acquireBuilderPatterns=[&](){
+        if(builders.valid())return memory.builderPatterns()!=nullptr;
+        if(!memory.acquireBuilderPatterns(DOWNWELL_PATTERNS_BANK_BYTES))return false;
+        if(platform.loadFile("PROGDIR:Downwell.patterns",memory.builderPatterns(),
+                DOWNWELL_PATTERNS_BANK_BYTES)!=LONG(DOWNWELL_PATTERNS_BANK_BYTES)){
+            memory.releaseBuilderPatterns();return false;
+        }
+        builders=downwell::BuilderPatternPack(memory.builderPatterns(),DOWNWELL_PATTERNS_BANK_BYTES);
+        if(!builders.valid()){
+            builders=downwell::BuilderPatternPack(nullptr,0);
+            memory.releaseBuilderPatterns();return false;
+        }
+        gDownwellBuilderPatternBytes=DOWNWELL_PATTERNS_BANK_BYTES;
+        ++gDownwellBuilderPatternLoads;return true;
+    };
 #ifdef DOWNWELL_REPLAY_VERIFY
+    if(!acquireBuilderPatterns()){
+        platform.restore();FreeMem(startupCopperWords,4*sizeof(UWORD));memory.release();return 20;
+    }
     const downwell::ReplayReader verificationReplay(
         downwell::portReplayBytes, downwell::portReplaySize);
 #endif
@@ -2067,7 +2084,7 @@ __attribute__((noinline)) static int runDownwell(void) {
     const int emptyBlock = 0;
     port.configureBreakables(&emptyBlock, &emptyBlock, 0);
 #endif
-    if (!rooms.valid() || !objects.valid() || !builders.valid() ||
+    if (!rooms.valid() || !objects.valid() ||
 #ifdef DOWNWELL_REPLAY_VERIFY
         !verificationReplay.valid() || verificationReplay.frameCount()>downwell::ReplayFrameTrace::capacity ||
 #endif
@@ -2083,6 +2100,7 @@ __attribute__((noinline)) static int runDownwell(void) {
 #ifndef DOWNWELL_REPLAY_VERIFY
     bool initialGameplayPrepared=false;
     const auto prepareInitialGameplay=[&](){
+        if(!acquireBuilderPatterns())return false;
         if(initialGameplayPrepared)return true;
         amigaBuildTerrainIndex(emptyTerrain, terrainIndex);
         terrainTiles.clear();
@@ -2812,6 +2830,14 @@ __attribute__((noinline)) static int runDownwell(void) {
                 }
                 if (presentationChanged && (presentedScene == AmigaScene::menu ||
                         presentedScene == AmigaScene::styleSelect)) {
+                    // Terrain runs borrow prepared pattern bytes. Art/DMA
+                    // teardown alone is insufficient: release only after all
+                    // borrowing lifetimes have retired, including Retry paths.
+                    if(builders.valid()&&(!nativeTerrain||!nativeTerrain->size())){
+                        builders=downwell::BuilderPatternPack(nullptr,0);
+                        memory.releaseBuilderPatterns();gDownwellBuilderPatternBytes=0;
+                        ++gDownwellBuilderPatternReleases;
+                    }
                     if (!frontPack && !loadFrontBank(platform)) break;
                     // Front art is admitted only when a consumer enters. The
                     // garden planes are prepared once per entry, never during

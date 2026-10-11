@@ -66,6 +66,11 @@ end
 # The living world-1 contact tape never enters a shop, results or upgrade room.
 # New scene content must not introduce bank loading/preparation to this route.
 if gDownwellProfileRequireDamage && gDownwellProfileDeadSamples == 0
+    if gDownwellBuilderPatternBytes != 70779 || gDownwellBuilderPatternLoads != 1 || gDownwellBuilderPatternReleases != 0
+        printf "Builder patterns did not retain exactly one gameplay lease\n"
+        quit 1
+    end
+    printf "Builder patterns: one entry load, %lu ordinary-memory bytes\n", gDownwellBuilderPatternBytes
     if gDownwellFieldColumnLoads != 1 || gDownwellFieldColumnResidentBytes != 70816
         printf "CPU field columns did not retain exactly one gameplay lease\n"
         quit 1

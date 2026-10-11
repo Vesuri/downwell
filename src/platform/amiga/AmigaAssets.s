@@ -80,10 +80,3 @@ amiga_collision_masks:
 	.globl amiga_collision_masks_end
 amiga_collision_masks_end:
 	.endif
-
-	.balign 4
-	.globl amiga_builder_pack
-amiga_builder_pack:
-	.incbin "../generated/downwell-builder-patterns.dwbp"
-	.globl amiga_builder_pack_end
-amiga_builder_pack_end:

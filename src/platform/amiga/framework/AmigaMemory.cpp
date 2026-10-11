@@ -16,6 +16,7 @@ AmigaMemory::AmigaMemory()
     : game_(0), hud_(0), menu_(0), copper_(0), nullSprite_(0), bulletSprite_(0),
       sceneCache_(0), assets_(0), gameAssets_(0), gameAssetBytes_(0),
       gameCatalogue_(0), gameCatalogueBytes_(0),
+      builderPatterns_(0), builderPatternBytes_(0),
       terrainRaster_(0), terrainRasterBytes_(0),
       fieldColumns_(0), fieldColumnBytes_(0),
       gameBytes_(0), hudBytes_(0), menuPlaneBytes_(0), menuEntryBytes_(0),
@@ -102,6 +103,7 @@ void AmigaMemory::release()
 {
     releaseGameAssets();
     releaseGameCatalogue();
+    releaseBuilderPatterns();
     releaseTerrainRaster();
     releaseFieldColumns();
     if (assets_) FreeMem(assets_, assetBytes_);
@@ -161,6 +163,22 @@ void AmigaMemory::releaseGameCatalogue()
     if (gameCatalogue_) FreeMem(gameCatalogue_, gameCatalogueBytes_);
     gameCatalogue_ = 0;
     gameCatalogueBytes_ = 0;
+}
+
+bool AmigaMemory::acquireBuilderPatterns(ULONG bytes)
+{
+    if (!bytes) return false;
+    if (builderPatterns_) return builderPatternBytes_ == bytes;
+    builderPatterns_ = (UBYTE*)AllocMem(bytes, MEMF_FAST);
+    builderPatternBytes_ = builderPatterns_ ? bytes : 0;
+    return builderPatterns_ != 0;
+}
+
+void AmigaMemory::releaseBuilderPatterns()
+{
+    if (builderPatterns_) FreeMem(builderPatterns_, builderPatternBytes_);
+    builderPatterns_ = 0;
+    builderPatternBytes_ = 0;
 }
 
 bool AmigaMemory::acquireTerrainRaster(ULONG bytes)

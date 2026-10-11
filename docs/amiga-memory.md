@@ -378,6 +378,35 @@ The room projection excludes unreachable source rooms, rather than moving
 their bytes into another resident allocation. Its supported-room union remains
 resident; see [the room contract](room-pack.md#admitted-runtime-projection).
 
+### Builder pattern lifetime
+
+The 70,779-byte cavern builder pack is `Downwell.patterns`, not linked into
+the executable. The reviewed ceiling is 72 KiB, declared independently of
+export size in `generate-amiga-transient-banks.py`. Its generated manifest
+records input hashes and the bank's owner as `terrain-lifetimes`.
+
+Normal publisher/garden/style startup has neither the allocation nor a parsed
+view. First gameplay entry allocates ordinary Fast memory (no Chip fallback),
+reads and validates the pack before room generation. Missing/invalid input
+fails entry with return code 20. The pack object stays at a stable address so
+generation and rendering borrowers retain their existing references.
+
+Native terrain runs borrow immutable prepared-cell bytes from this pack.
+Consequently this lease is **not** released with the graphics catalogue at
+upgrade entry: it must survive as long as any such terrain identity survives.
+Retry reuses the lease. Returning to style selection or the garden releases
+it once native terrain is empty, invalidating the parsed view before freeing
+its bytes. Re-entry validates a new lease. Whole-program teardown frees the
+allocation after the last use. Peak gameplay payload is unchanged; startup
+residency and executable size are reduced, not the live terrain footprint.
+
+Guards: normal `verify-amiga-memory` rejects any startup pattern load;
+`verify-amiga-results-restart` checks three loads/two releases across Retry,
+style and surface destinations; the contact tape checks one load and zero
+releases. `make verify-amiga-pattern-failure` hides only the verifier's mounted
+copy, checks the actual 68000 return value is 20, and restores the normal
+stripped build. The link audit rejects reintroduction of `amiga_builder_pack`.
+
 Reproduce section sizes with `m68k-amiga-elf-objdump -h Downwell.elf`, and
 linked symbol sizes with `m68k-amiga-elf-objdump -t Downwell.elf`. Use the
 matching stripped Hunk for file-size comparisons; the debugger ELF intentionally

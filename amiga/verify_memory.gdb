@@ -11,6 +11,10 @@ end
 break downwellStartupReady
 continue
 printf "Startup passed: resident assets=%lu, Chip remaining=%lu bytes\n", gDownwellStartupAssetBytes, gDownwellStartupChipRemaining
+if gDownwellBuilderPatternBytes != 0 || gDownwellBuilderPatternLoads != 0
+    printf "Builder patterns loaded before gameplay entry\n"
+    quit 1
+end
 if gDownwellSceneBankLoads != 1 || gDownwellSplashPreparations != 1 || gDownwellGardenPreparations != 0
     printf "Normal startup loaded/prepared a scene beyond the splash sequence\n"
     quit 1

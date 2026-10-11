@@ -3205,6 +3205,10 @@ verify-amiga-scenes:
 	printf '%s  %s\n' '$(AMIGA_CONTROLS_FRAME_SHA256)' 'amiga/.run/controls-frame.bin' | shasum -a 256 -c -
 
 .PHONY: verify-amiga-results-restart
+.PHONY: verify-amiga-pattern-failure
+verify-amiga-pattern-failure:
+	bash -c 'set -e; . amiga/env.sh; trap "$(MAKE) -C amiga -j4 STRIP=1" EXIT; $(MAKE) -C amiga -j4 SKIP_TO_GAME=1 STRIP=1; GDB_SOURCE=verify_builder_patterns_missing.gdb READY_MARKER=DOWNWELL_PATTERN_FAILURE_READY READY_DESCRIPTION="missing builder bank fails with return code 20" VERIFY_TIMEOUT_SECONDS=$${VERIFY_TIMEOUT_SECONDS:-60} amiga/verify_startup.sh'
+
 verify-amiga-results-restart:
 	bash -c 'set -e; . amiga/env.sh; trap "$(MAKE) -C amiga clean && $(MAKE) -C amiga -j4 STRIP=1" EXIT; $(MAKE) -C amiga clean; $(MAKE) -C amiga -j4 RESULTS_RESTART_VERIFY=1 SKIP_TO_GAME=1 STRIP=1; GDB_SOURCE=verify_results_restart.gdb READY_MARKER=DOWNWELL_RESULTS_RESTART_READY READY_DESCRIPTION="native scene admission across all results destinations and gameplay reentry" VERIFY_TIMEOUT_SECONDS=$${VERIFY_TIMEOUT_SECONDS:-180} amiga/verify_startup.sh'
 

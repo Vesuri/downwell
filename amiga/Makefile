@@ -598,7 +598,11 @@ endif
 
 .PHONY: all check clean audit
 
-all: check $(OUT).exe $(OUT).boot $(OUT).front $(OUT).game $(OUT).planes $(OUT).cavern $(OUT).cavernplanes $(OUT).results $(OUT).shop $(OUT).clear $(OUT).fields $(OUT).columns
+all: check $(OUT).exe $(OUT).boot $(OUT).front $(OUT).game $(OUT).planes $(OUT).cavern $(OUT).cavernplanes $(OUT).results $(OUT).shop $(OUT).clear $(OUT).fields $(OUT).columns $(OUT).patterns
+
+$(OUT).patterns: $(REPO)/generated/downwell-builder-patterns.dwbp
+	@mkdir -p $(@D)
+	cp $< $@
 
 $(OUT).columns: $(REPO)/generated/amiga-field-columns.bin
 	@mkdir -p $(@D)
@@ -634,7 +638,7 @@ $(OUT).game: $(AMIGA_GAME)
 	@mkdir -p $(@D)
 	cp -f $< $@
 
-$(REPO)/generated/amiga-transient-banks.h: $(AMIGA_RESULTS) $(AMIGA_SHOP) $(AMIGA_CLEAR) $(REPO)/tools/generate-amiga-transient-banks.py
+$(REPO)/generated/amiga-transient-banks.h: $(AMIGA_RESULTS) $(AMIGA_SHOP) $(AMIGA_CLEAR) $(REPO)/generated/downwell-builder-patterns.dwbp $(REPO)/tools/generate-amiga-transient-banks.py
 	python3 $(REPO)/tools/generate-amiga-transient-banks.py
 
 obj/DownwellAmiga.o: $(REPO)/generated/amiga-transient-banks.h
@@ -1104,6 +1108,8 @@ obj/gcc8_a_support.o: $(SUPPORT)/gcc8_a_support.s
 	$(AS) $(ASFLAGS) -o $@ $<
 
 audit: $(OUT).elf
+	@if $(OBJDUMP) -t $(OUT).elf | grep -q 'amiga_builder_pack'; then \
+		echo "*** builder patterns must be run-loaded, not linked"; exit 1; fi
 	@if $(OBJDUMP) -t $(OUT).elf | grep -qE 'fieldBandPixels|fieldColumnWords'; then \
 		echo "*** gameplay field upload pixels must be scene-loaded, not linked"; exit 1; \
 	else echo "Field image source linkage audit: clean"; fi

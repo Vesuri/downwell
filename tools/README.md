@@ -80,6 +80,10 @@ substreams. It writes `amiga-game.planes`, its size/source-hash header, and an
 input/output hash manifest under `generated/`. The Amiga build installs the bank
 as `Downwell.planes`; keep it beside the executable, `.boot`, `.front`, `.game`,
 `.results`, `.shop` and `.clear` files. The build and run scripts package them.
+The builder data is separately packaged as `Downwell.patterns`; keep it beside
+the executable too. It is loaded at gameplay entry, retained while terrain
+borrows its prepared cells, and unloaded on front-end return after retirement.
+It is not a graphics-bank lease and must not be freed merely on upgrade entry.
 CPU effects read the unchanged DWAP loaded as `Downwell.game` in non-Chip
 memory. It is absent from both the executable and front-end residency. The blitter
 binds separate low/high/mask views through the common `Bitmap` class; it does
