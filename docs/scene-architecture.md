@@ -220,6 +220,22 @@ terminal failure. Bind observers before dispatch, and never retain an event's
 borrowed status reference after returning. No inactive-family list is walked.
 Reference ownership and `REFERENCE_VALIDATION=1` retain full status polling.
 
+Activation setters and inactive births record their slot in
+`RunnerActivationChanges`. At the next phase boundary, room runs select only
+those slots for eligibility reads. The set does not impose request order:
+inactive-room order still precedes active-room order, and reactivation still
+performs the original registration, layer and Draw publication. Unchanged
+terrain must not resolve identities or read flags because an actor toggled.
+The run traversal retains the full reconciliation as its reference; scalar
+ownership uses that reference in the shared-owner replay fixtures. Publication
+callbacks must not change activation flags or room ownership during this pass.
+The change set is cleared only after successful reconciliation; failure is
+terminal with the original completed publication prefix. New activation
+writers must call `activationChanged`, not just set a global pending flag.
+The room fixture grows unrelated membership from 32 to 1,024 entries and
+requires one eligibility read for one inactive request, alongside randomized
+publication-order, slot-reuse and failure-prefix comparisons.
+
 Internal collision handles use the existing disjoint slot ranges, not Windows
 numeric instance IDs. `GameplayCollisionView::decode` reads a compile-time
 slot-to-family tag and that family's base. It never walks other families to

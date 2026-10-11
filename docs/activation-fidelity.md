@@ -134,8 +134,13 @@ the original object-flag gates, without setting bounds-dirty bit `8`; repeated
 activation is idle for those queues. End Step coalesces presentation notices
 but not collision exclusion, including destruction followed by deactivation.
 Native terrain births also enter the existing room-membership container.
-Activation requests set its pending flag; the phase-boundary reconciliation
-moves terrain between active/inactive room lists. Marked terrain participates
+Activation requests record the changed slot and set its pending flag; the
+phase-boundary reconciliation selects those slots in the original room-list
+order, not request order. Unchanged identities need no flag read. The full
+walk remains the scalar fixture's oracle. A birth that is initially inactive
+also records its slot. The selection is valid because publication only updates
+registration/layer membership, not other instances' activation flags.
+Reconciliation moves terrain between active/inactive room lists. Marked terrain participates
 in the same active-before-inactive cleanup traversal and retires through its
 run owner. Reactivation obtains a fresh shared registration stamp in the run
 publication, preserving its position relative to fast-box cleanup; the birth

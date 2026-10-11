@@ -1,5 +1,59 @@
 # Amiga gameplay frame-cost audit
 
+## Activation-stall audit — 2026-10-11
+
+The contact tape's 33-field gap at frame 1512 was not covered by the four
+recent generation/combat windows. A fresh 60-field capture starting at 1511
+on `1335f367` measures **658.3 ms** for that frame. Room activation
+reconciliation costs **440.05 ms**, including 720 eligibility reads
+(327.45 ms). Unchanged terrain repeatedly resolves its identity and flags
+because a room activation request is pending. Rendering is not this stall.
+
+The changed-slot projection retains the two room passes and publication order
+but excludes unchanged eligibility reads. Frame 1512 is **223.6 ms**, with
+**4.50 ms** inside selected room reconciliation. An independent 35-field
+capture confirms **223.8 ms**. The same controller and 512 KiB Chip / 8 MiB
+Fast / 512 KiB slow configuration are used throughout. No source event,
+generation call or publication is deferred to obtain the reduction.
+
+| Matched frames | Mean before / after, ms | Worst before / after, ms |
+| --- | ---: | ---: |
+| 51–74 | 39.629 / 39.642 | 56.6 / 56.6 |
+| 676–683 | 131.350 / 131.363 | 447.1 / 446.8 |
+| 1301–1314 | 73.421 / 73.436 | 97.2 / 97.2 |
+| 1512–1519 | 136.225 / 81.850 | 658.3 / 223.6 |
+| 1689–1696 | 117.700 / 117.725 | 404.4 / 404.3 |
+
+No frame in the four previously measured windows increases by more than 0.3 ms. The quiet frame
+51 remains 32.1 ms; combat/field frame 1304 remains 89.3 ms. Removing this
+stall does not restore the 20 ms gameplay budget.
+
+The full 1,800-update tape takes **5,922 PAL fields (15.20 FPS)**, versus
+6,127 fields (14.69 FPS) at `1335f367`. Its largest gap is now 22 fields at
+676, rather than 33 at 1512. Coverage is unchanged: ticks 0–1799, view Y
+39–2749 (maximum 2759), seven enemy slots, two damage-number births, final
+health 2 and no dead samples. The CPU art bank loads/prepares exactly once
+(221,282 bytes); no upgrade/results/shop banks are loaded. The gameplay-only
+terrain raster lease is 1,081,344 ordinary-memory bytes. FPS evidence:
+`tmp/activation-selection-fps-gdb.log`.
+
+Reproduce with the contact trace command below, selecting
+`TRACE_FRAMES=50,675,1300,1511,1688 TRACE_FIELDS=100`; independent confirmation
+uses `TRACE_FRAMES=1511 TRACE_FIELDS=35`. Reports:
+`tmp/worst-1512-report.txt`, `tmp/activation-selection-report.txt`,
+`tmp/activation-selection-1512.txt`, `tmp/activation-confirm-report.txt`.
+Baseline ELF SHA-256:
+`432a9f9f84fe90f80f159423cadb47050ea208a6496578adb84f162822adee22`;
+candidate ELF SHA-256:
+`9aecfd582a4ee547d8de254a60533861637cc3d2184e07e71843c2a008f7b816`.
+The scalar ownership fixture retains full room reconciliation; the run-room
+fixture checks ordered publication and failure prefixes, including a 32-to-1024
+unrelated-entry growth case that must retain exactly one eligibility read.
+Three shared-owner variants, ten terrain tapes (18,000 frames), the 64-frame
+cross-target replay and normal 512 KiB Chip startup pass. The restored normal
+build leaves 126,840 Chip bytes free. Logs use the
+`tmp/activation-selection-{host,replay,startup,startup-gdb}.log` prefix.
+
 ## Runnable 512 KiB regression baseline — 2026-10-10
 
 `c64e8385`, cycle-exact A500/68000, PAL, 512 KiB Chip / 8 MiB Fast.

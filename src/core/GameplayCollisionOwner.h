@@ -12,6 +12,7 @@
 #include "RunnerObjectFamilies.h"
 #include "RunnerRoomMembership.h"
 #include "RunnerRunRoomMembership.h"
+#include "RunnerActivationChanges.h"
 #include "SmokeDirection.h"
 #include "SmokeTrig.h"
 #include "DebrisDraw.h"
@@ -230,6 +231,8 @@ private:
     bool failureObserved_=false;
     CallbackFailureScopes callbackFailures_;
     bool activationPending_=false;
+    RunnerActivationChanges<View::capacity> activationChanges_;
+    void activationChanged(unsigned slot){activationChanges_.mark(slot);activationPending_=true;}
     bool destructionPending_=false;
     bool terrainFamilies_[2]={false,false};
     bool timeFieldFamily_=false;
@@ -755,7 +758,7 @@ private:
         }else
 #endif
         if(!check(room_.bind(slot,definition->creationDepth)))return false;
-        if(!active)activationPending_=true;
+        if(!active)activationChanged(slot);
         flags=definition->initialFlags|(active?0u:2u);
         bool published=false;
 #ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
@@ -919,7 +922,7 @@ private:
                 DW_PROFILE_SCOPE(profileBirthRoomOrder);
                 if(!parent.check(parent.room_.bind(h.slot,p.depth)))return false;
             }
-            if constexpr(Kind!=View::Kind::timeField)if(!r.active)parent.activationPending_=true;
+            if constexpr(Kind!=View::Kind::timeField)if(!r.active)parent.activationChanged(h.slot);
             if constexpr(Kind==View::Kind::enemy){
                 p.sprite.spriteId=r.spriteId;p.sprite.maskId=r.maskId;
                 if(!real(r.objectId==117?r.motionState:r.facing,p.sprite.scaleX)||
@@ -1044,7 +1047,7 @@ private:
             if constexpr(Kind==View::Kind::enemy)if(!parent.updateEnemyAlarmRoster(h))return false;
             if(!parent.check(parent.room_.bind(h.slot,depth)))return false;
             if(!parent.refreshNativeActor(h,true))return false;
-            if(inactive)parent.activationPending_=true;
+            if(inactive)parent.activationChanged(h.slot);
             if constexpr(Kind==View::Kind::breakable||Kind==View::Kind::timeField)
                 if(parent.sceneryLayers_){
                     // These native stores only birth active scenery and
@@ -1155,7 +1158,7 @@ private:
                 parent.owner_.setActive(h,active,*parent.families_.flags(object(r)))))return false;
             if constexpr(Kind==View::Kind::enemy)if(!parent.updateEnemyAlarmRoster(h))return false;
             if(!parent.check(parent.layers_.activation(h,active)))return false;
-            parent.activationPending_=true;return parent.publishPreparedDraw(h);}
+            parent.activationChanged(h.slot);return parent.publishPreparedDraw(h);}
         // Retain actual narrowed setter values before admitting spatial queries.
         // Bounds/queue publication remains separate; integer draw positions
         // cannot establish whether a later source setter changed the position.
@@ -1735,7 +1738,7 @@ public:
                 if(!self.check(self.layers_.activation({slot,id.handle.generation},active)))return false;
                 if(self.preparedDrawEnabled()&&!self.check(self.layers_.publishPreparedDraw(
                     {slot,id.handle.generation},0,active?RunnerLayerDraw::Action::skip:RunnerLayerDraw::Action::endLayer)))return false;
-                self.activationPending_=true;
+                self.activationChanged(slot);
                 // Reconcile room membership at the phase boundary, not here.
                 // Object-family and layer-element publication stay separate.
                 return true;
@@ -4378,7 +4381,13 @@ public:
     bool reconcileActivation(){
         if(!valid()||!world_)return check(false);
         if(!activationPending_)return true;
-        const bool result=room_.reconcileChecked([&](unsigned slot){
+        const bool result=room_.
+#ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+            reconcileChecked(
+#else
+            reconcileSelectedChecked([&](unsigned first,unsigned end){return activationChanges_.next(first,end);},
+#endif
+        [&](unsigned slot){
             std::uint32_t flags;
             if(!eligibilityFlags(handleAt(slot),flags)){good_=false;return true;}
             return (flags&2u)!=0;
@@ -4405,7 +4414,7 @@ public:
                 (!nativeBoxes_||!registered||table_.roomReactivated(h))&&layers_.reconcile(h)&&publishPreparedDraw(h);
         });
         if(!check(result&&good_))return false;
-        activationPending_=false;return true;
+        activationChanges_.clear();activationPending_=false;return true;
     }
     // Distinguish immediate flag 2 from deferred room membership. Read-only;
     // this does not reconcile or derive order from object registrations.

@@ -186,9 +186,17 @@ public:
         }
         return true;
     }
-    template<class Inactive,class Publish> bool reconcileChecked(Inactive inactive,Publish publish){
+    // Selection only removes unchanged flag reads; traversal/publication stays
+    // inactive-room then active-room order. Callbacks must not mutate this owner
+    // or activation flags. Promoted entries may be visited again in list zero.
+    template<class Select,class Inactive,class Publish>
+    bool reconcileSelectedChecked(Select select,Inactive inactive,Publish publish){
         for(unsigned list=1;;--list){
             for(unsigned s=first(list);s!=End;){
+                const unsigned n=locator_[s]-1;
+                const unsigned end=unsigned(runs_[n].first)+runs_[n].count;
+                s=select(s,end);
+                if(s==end){s=after(n);continue;}
                 const unsigned following=next(s);
                 if(bool(inactive(s))!=bool(list)){
                     const auto key=runs_[locator_[s]-1].key;const bool wasMarked=marked(s);
@@ -201,6 +209,9 @@ public:
             }
             if(!list)break;
         }return true;
+    }
+    template<class Inactive,class Publish> bool reconcileChecked(Inactive inactive,Publish publish){
+        return reconcileSelectedChecked([](unsigned first,unsigned){return first;},inactive,publish);
     }
     template<class Inactive,class Publish> void reconcile(Inactive inactive,Publish publish){
         reconcileChecked(inactive,[&](unsigned s,bool registered){publish(s,registered);return true;});

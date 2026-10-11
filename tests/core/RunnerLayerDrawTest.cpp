@@ -5,6 +5,7 @@
 #include "core/RunnerLayers.h"
 #include "core/RunnerRoomMembership.h"
 #include "core/RunnerRunRoomMembership.h"
+#include "core/RunnerActivationChanges.h"
 #include "core/RunnerDepthChanges.h"
 #include "core/RunnerLayerIds.h"
 #include <cstdlib>
@@ -465,5 +466,45 @@ void animationCursorCallbacks(){
         require(expectedResult==actualResult&&expected==actual,"cursor callback mutation and failure prefixes match retained walk");
     }
 }
+void activationSelection(){
+    using Room=RunnerRunRoomMembership<1024,16,1024>;
+    for(unsigned population:{32u,1024u}){
+        Room reference,selected;
+        RunnerActivationChanges<1024> changed;
+        bool inactive[1024]{};
+        for(unsigned s=0;s<population;++s)require(reference.bind(s,{})&&selected.bind(s,{}),"activation population");
+        inactive[3]=true;changed.mark(3);
+        unsigned reads=0;
+        require(reference.reconcileChecked([&](unsigned s){return inactive[s];},[](unsigned,bool){return true;}),"activation oracle");
+        require(selected.reconcileSelectedChecked([&](unsigned a,unsigned b){return changed.next(a,b);},
+            [&](unsigned s){++reads;return inactive[s];},[](unsigned,bool){return true;}),"selected activation");
+        require(reads==1,"unrelated population growth adds no eligibility reads");changed.clear();
+        unsigned random=37;
+        for(unsigned step=0;step<2048;++step){
+            random=random*1664525u+1013904223u;
+            const unsigned slot=(random>>8)%population;
+            if(step%5==0){
+                require(reference.remove(slot)&&selected.remove(slot),"remove pending activation identity");
+                changed.mark(slot);inactive[slot]=false;
+                RunnerImageValue key;key.assignInteger(int(step%7)-3);
+                require(reference.bind(slot,key)&&selected.bind(slot,key),"rebind pending activation slot");
+            }else {inactive[slot]=!inactive[slot];changed.mark(slot);}
+            if(step%3==0)continue; // Multiple requests, including opposite writes, coalesce.
+            std::vector<unsigned> a,b;
+            const unsigned failAt=step%17==0?1u:0u;
+            const bool x=reference.reconcileChecked([&](unsigned s){return inactive[s];},
+                [&](unsigned s,bool active){a.push_back(s*2+active);return a.size()!=failAt;});
+            const bool y=selected.reconcileSelectedChecked([&](unsigned first,unsigned end){return changed.next(first,end);},
+                [&](unsigned s){return inactive[s];},[&](unsigned s,bool active){b.push_back(s*2+active);return b.size()!=failAt;});
+            require(x==y&&a==b,"selected activation publication order and terminal prefix");
+            for(unsigned s=0;s<population;++s)require(reference.active(s)==selected.active(s),"selected activation membership");
+            std::vector<unsigned> ra,rb;
+            reference.visitDrawChecked([&](unsigned s){ra.push_back(s);return true;});
+            selected.visitDrawChecked([&](unsigned s){rb.push_back(s);return true;});
+            require(ra==rb,"selected activation preserves room ordering");
+            if(x)changed.clear(); // Failed publication remains pending in this recovery fixture.
+        }
+    }
 }
-int main(){dispatch();traversal();retainedLayerBoundaries();roomActivation();drawBirths();animationProjection(false);animationProjection(true);animationProjection<true>(false);animationProjection<true>(true);retainedAnimationMutations();retainedAnimationMutations<true>();runRoomMutations();animationCursorCallbacks();cleanupProjection();std::cout<<"Selected layer Draw order, retained-layer observation boundaries, synchronous births, scalar/run animation projections, mutation/cleanup equivalence and 1024 instance-dispatch cases verified\n";}
+}
+int main(){dispatch();traversal();retainedLayerBoundaries();roomActivation();drawBirths();animationProjection(false);animationProjection(true);animationProjection<true>(false);animationProjection<true>(true);retainedAnimationMutations();retainedAnimationMutations<true>();runRoomMutations();animationCursorCallbacks();activationSelection();cleanupProjection();std::cout<<"Selected layer Draw order, retained-layer observation boundaries, synchronous births, scalar/run animation projections, mutation/cleanup equivalence and 1024 instance-dispatch cases verified\n";}

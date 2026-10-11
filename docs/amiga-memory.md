@@ -91,20 +91,20 @@ interpret restoring this diagnostic's loader fit as a shipping memory reduction.
 ## Executable size versus runtime memory
 
 The normal `STRIP=1` build with admitted room payloads, scene-loaded gameplay art
-and without reference-only collision masks is **2,126,284 bytes**, SHA-256
-`7e1f555a918127ae1f5b708423fe938cb2f6b34406017f5779c0340a4a002802`.
+and without reference-only collision masks is **2,141,540 bytes**, SHA-256
+`2447739db88622127840af64b44e1cd93a4b0e0677f59fd1f8a60672421250bb`.
 The matching ELF section sizes distinguish payload from runtime allocation:
 
 | Section | Bytes | Stored in the executable? |
 | --- | ---: | --- |
-| Machine code (`.text`) | 1,367,772 | Yes |
+| Machine code (`.text`) | 1,382,984 | Yes |
 | Read-only data (`.rodata`) | 675,032 | Yes |
 | Initialized writable data (`.data`) | 34,194 | Yes |
 | Initializer pointer | 4 | Yes |
-| Zero-filled storage (`.bss`) | 3,491,140 | No; allocated at load |
+| Zero-filled storage (`.bss`) | 3,491,636 | No; allocated at load |
 
-Initialized payload totals 2,077,002 bytes. Hunk relocation and container
-records account for the remaining 49,282 bytes. Stripping cannot remove
+Initialized payload totals 2,092,214 bytes. Hunk relocation and container
+records account for the remaining 49,326 bytes. Stripping cannot remove
 the initialized payload. ELF debug sections are not that payload either.
 The sparse executable Draw chain adds 8,568 ordinary BSS bytes and 2,072
 Hunk bytes against `f4b4433a`; it adds no Chip allocation. Normal 512 KiB Chip
@@ -112,6 +112,11 @@ startup still leaves 126,840 bytes free (`tmp/sparse-draw-startup-gdb.log`).
 Native prepared bounds reuse the existing geometry table and add no BSS or
 Chip allocation; the same startup free space is verified in
 `tmp/native-geometry-startup-gdb.log`.
+The activation change set adds 496 ordinary BSS bytes, no Chip allocation.
+Its selected reconciliation increases the linked Hunk by 15,256 bytes against
+`1335f367`; this is a frame-cost improvement, not a binary-size reduction.
+Normal startup still leaves 126,840 Chip bytes free, with no gameplay art or
+terrain raster resident (`tmp/activation-selection-startup-gdb.log`).
 
 The pre-repair owner audit attributes roughly 551 KB to
 `GameplayCollisionOwner` and its template instantiations, 260 KB to
