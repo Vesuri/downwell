@@ -73,6 +73,11 @@ behavior, both backend integrations and relevant original-game verification.
   ordinary gameplay; use the current measurements in `amiga-frame-cost.md`.
   Separate the measured RNG refill cost from publication; do not count nested
   timings twice or replace these owners with arithmetic-helper tuning.
+  Evaluate the measured 10.63 ms builder-position publication boundary as one
+  generation-phase operation: establish which nested Create paths can observe
+  builder coordinates, preserve failed-birth position prefixes, and retain the
+  callback reference. Do not replace it with individual setter/helper tuning
+  or defer source-visible writes without an explicit no-observer proof.
   This is not a revival of rejected
   immutable-row/copy-on-write spatial encodings. Preserve bounded run membership
   rather than replacing it with another per-cell logical lookup/publication

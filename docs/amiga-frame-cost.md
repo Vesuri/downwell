@@ -48,6 +48,46 @@ Reference report/ELF: `tmp/baseline-exact-windows-report.txt` and
 
 ## Phase attribution at the current baseline
 
+### Remaining generation structure at `f9c046ce`
+
+A fresh 24-field contact capture measures frame 676 at 232.13 ms, with
+158.02 ms in generation. Inclusive costs (do not sum nested entries):
+
+| Work | ms |
+| --- | ---: |
+| Prepared terrain emitter | 90.78 |
+| Native terrain construction | 73.71 |
+| Append prepared cells | 65.05 |
+| Span ownership/publication | 39.67 |
+| Room-span membership, inside publication | 7.78 |
+| Layer-span publication, inside publication | 6.63 |
+| Layer admission, inside publication | 5.49 |
+| Fresh-table admission, inside publication | 3.31 |
+| Builder-position publication across row advances | 10.63 |
+| Terrain row synchronization, outside generation | 2.8 |
+
+Builder-position publication includes 6.44 ms in the lifecycle publication
+boundary and 3.16 ms narrowing coordinates. The generator installs this
+publisher for the duration of `AmigaGameplayGeneration::step`; every
+`AreaOneBuilder::advanceRow` publishes through it. Removing or deferring those
+publications is not automatically safe: nested Create observations and the
+position retained after a failed birth belong to the source contract. A
+phase-owned publication path must prove those observation boundaries first;
+an individual setter/validation rewrite is not the proposed change.
+
+Span construction is already batched. Its source-line attribution has no
+single large loop body that justifies another local rewrite; the helper costs
+above are not all removable work. Keep the rejected registry and per-cell
+encoding approaches closed.
+
+Reproduce with `SKIP_TO_GAME=1 PROFILE_CONTACT=1 VERIFY_CHIP_KB=512 STRIP=1
+VERIFY_TIMEOUT_SECONDS=150 TRACE_FRAMES=675 TRACE_FIELDS=24
+TRACE_OUTPUT="$PWD/tmp/trace/generation-phase-current" bash amiga/profile.sh trace`,
+then report `--frames 676 --causes --lines constructTerrainSpan`.
+Report: `tmp/generation-phase-current-676.txt`; trace ELF SHA-256:
+`cd7b7df1306318e25c4cc5ee5350633ea763ab942962a51b1521aec0119dc32d`.
+The normal stripped build was restored. This is attribution, not a speedup.
+
 ### Firing versus retirement boundaries
 
 A bounded recheck at `f1b720e7` separates two early contact-tape spikes before
