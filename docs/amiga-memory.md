@@ -135,7 +135,29 @@ remove collision bounds metadata or change the shipping collision algorithm.
 Future live precise-mask events need scene-owned mask dependencies, not a
 restoration of the complete reference catalogue to every executable.
 
-The largest BSS owner is collision storage (2,619,994 bytes). Terrain raster
+The largest BSS owner is collision storage (2,620,546 bytes in the current
+native ELF). Of this, the scheduled spatial owner is 1,465,932 bytes and its
+journal/index container is 1,327,222 bytes. The derived R-tree alone reserves
+1,236,578 bytes (including a 1,204,752-byte node pool); the ordered mutation
+journal is a separate 90,112 bytes. These are nested sizes, not additive.
+
+The bounded 1,800-update contact run at `03e29381` leaves the tree at its
+single empty root (`used=live=1`), while the journal has 1,156 pending
+operations and population 824, still deferred. No level reset occurs during
+this workload. This demonstrates dormant tree backing in this run, not
+permission to remove the journal or the query implementation. Queries,
+explicit service, journal pressure and eager numeric fallback can require
+materialization; any lease must preserve synchronous failure and historical
+insertion/removal order. It must also distinguish front-end, gameplay and
+reference-oracle lifetimes. No tree residency saving is implemented yet.
+
+Reproduce with the bounded contact `profile.sh fps` command in the frame-cost
+audit. Its `Spatial storage` line reads fields directly through the debugger:
+calling `nodeCount()` or `height()` would drain the journal and invalidate this
+observation. The ELF layout can be inspected without running the game:
+`m68k-amiga-elf-gdb -batch amiga/out/Downwell.elf -ex 'set max-value-size unlimited' -ex 'ptype /o ((downwell::GameplayCollisionOwner*)0)->owner_.index_'`.
+
+Terrain raster
 pixels now require a separate 1,081,344-byte ordinary-memory gameplay lease;
 only row validity, shop revisions and binding state remain in the static owner.
 The lease is absent during normal startup and front-end scenes, and is released

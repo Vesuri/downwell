@@ -91,6 +91,10 @@ if gDownwellSampleFocus != 0
         quit 1
     end
 end
+# Read storage directly: calling nodeCount()/height() would drain the journal
+# and change the very residency/work state this diagnostic is measuring.
+set $owner = (downwell::GameplayCollisionOwner*)&'_ZZL11runDownwellvE16collisionStorage.lto_priv.0'
+printf "Spatial storage: owner_bytes=%lu tree_bytes=%lu journal_bytes=%lu pending=%lu population=%lu deferred=%u tree_used=%lu tree_live=%lu\n", sizeof(*$owner), sizeof($owner->owner_.index_.tree_), sizeof($owner->owner_.index_.operations_), $owner->owner_.index_.count_, $owner->owner_.index_.population_, $owner->owner_.index_.deferred_, $owner->owner_.index_.tree_.used_, $owner->owner_.index_.tree_.live_
 printf "DOWNWELL_PROFILE_READY\n"
 shell touch .run/gdb-ready.marker
 detach
