@@ -63,7 +63,9 @@ template<unsigned Capacity,unsigned Nodes,bool ScheduledIndex=false,unsigned Ret
     using Membership=Registration;
 public:
     using Real=RunnerImageValue;
+    using SpatialIndex=Index;
     template<class Provider> bool bindTree(Provider provider){return index_.bindTree(provider);}
+    template<class Provider> bool bindJournal(Provider provider){return index_.bindJournal(provider);}
     bool declareNoSpatialQueries(){return index_.declareNoQueries();}
     template<unsigned First,unsigned Last> using RegistrationProjection=
         typename Membership::template RegistrationProjection<First,Last>;

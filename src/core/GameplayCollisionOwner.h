@@ -51,8 +51,10 @@ public:
     using ScalarStates=RunnerBorrowedSpatialStates<RunnerSpatialState,View::capacity>;
 #ifdef DOWNWELL_PLATFORM_AMIGA
     using DerivedTree=RunnerSpatialTreeLease<View::capacity*2>;
+    template<class Operation,unsigned Count> using JournalStorage=RunnerSpatialJournalLease<Operation,Count>;
 #else
     using DerivedTree=RunnerSpatialIndex<View::capacity*2>;
+    template<class Operation,unsigned Count> using JournalStorage=RunnerSpatialJournalInline<Operation,Count>;
 #endif
     // Verification builds keep the complete scalar membership pipeline alive,
     // not just isolated container tests. Spatial journal scheduling is the
@@ -61,12 +63,12 @@ public:
     using Registration=typename RunnerRegistrationStorage<View::capacity,View::terrainBase,View::timeFieldBase,false>::Type;
     using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2,true,View::terrainBase,View::timeFieldBase,false,
         RunnerSpatialLifetimes<View::capacity>,Registration,false,void,ScalarStates,
-        RunnerSpatialJournal<View::capacity*2,View::capacity,4096,false,DerivedTree>>;
+        RunnerSpatialJournal<View::capacity*2,View::capacity,4096,false,DerivedTree,JournalStorage>>;
 #else
     using Registration=typename RunnerRegistrationStorage<View::capacity,View::terrainBase,View::timeFieldBase,true>::Type;
     using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2,true,View::terrainBase,View::timeFieldBase,
         true,RunnerSpatialLifetimes<View::capacity>,Registration,true,void,ScalarStates,
-        RunnerSpatialJournal<View::capacity*2,View::capacity,4096,true,DerivedTree>>;
+        RunnerSpatialJournal<View::capacity*2,View::capacity,4096,true,DerivedTree,JournalStorage>>;
 #endif
     struct ReferenceStorage {
         Owner::State states[View::capacity]{};
@@ -80,6 +82,7 @@ public:
     };
     bool hasNativeCollisionStorage()const{return nativeCollisionStorage_!=nullptr;}
     template<class Provider> bool bindSpatialTree(Provider provider){return owner_.bindTree(provider);}
+    template<class Provider> bool bindSpatialJournal(Provider provider){return owner_.bindJournal(provider);}
     bool declareNoSpatialQueries(){return owner_.declareNoSpatialQueries();}
     // Stronger than no index queries: direct cached geometry and ordered
     // collision passes also belong to the external backend. Only before births.

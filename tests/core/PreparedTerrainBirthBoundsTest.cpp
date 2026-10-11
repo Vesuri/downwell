@@ -4,16 +4,24 @@
 #include <fstream>
 #include <vector>
 #include <cstdio>
+#include <type_traits>
 static std::vector<unsigned char> read(const char* path){
     std::ifstream f(path,std::ios::binary);assert(f);
     return {std::istreambuf_iterator<char>(f),{}};
 }
-template<unsigned Nodes,unsigned Pending>
+template<class Journal> static void bindJournal(Journal& journal){
+    using Bank=typename Journal::JournalStorage::Bank;
+    typename Journal::JournalStorage::Provider provider{nullptr,[](void*){return new Bank;},
+        [](void*,Bank* bank){delete bank;}};
+    assert(journal.bindJournal(provider));
+}
+template<unsigned Nodes,unsigned Pending,template<class,unsigned> class Storage=downwell::RunnerSpatialJournalInline>
 static void journalHistory(const downwell::PreparedTerrainBirthBounds& grid){
     using namespace downwell;
     using Math=RunnerSpatialSplit;
     RunnerSpatialJournal<Nodes,64,Pending> reference;
-    RunnerSpatialJournal<Nodes,64,Pending,true> compact;
+    RunnerSpatialJournal<Nodes,64,Pending,true,RunnerSpatialIndex<Nodes>,Storage> compact;
+    if constexpr(!std::is_same<Storage<int,1>,RunnerSpatialJournalInline<int,1>>::value)bindJournal(compact);
     assert(compact.bindGeometry(grid)&&!compact.bindGeometry(grid));
     assert(!compact.insertGeometry({0xffffffffu},0,{0,0,1,1})&&compact.valid()&&!compact.pending());
     bool present[64]{};Math::Box previous[64]{};
@@ -52,6 +60,7 @@ static void journalHistory(const downwell::PreparedTerrainBirthBounds& grid){
     }
     assert(reference.height()==compact.height()&&reference.nodeCount()==compact.nodeCount());
 }
+template<template<class,unsigned> class Storage=downwell::RunnerSpatialJournalInline>
 static void journalSpans(const downwell::PreparedTerrainBirthBounds& grid){
     using namespace downwell;using Math=RunnerSpatialSplit;
     PreparedTerrainBirthBounds::Key keys[16];Math::PixelBox pixels[16];
@@ -64,7 +73,9 @@ static void journalSpans(const downwell::PreparedTerrainBirthBounds& grid){
         if(p.top<envelope.top)envelope.top=p.top;if(p.bottom>envelope.bottom)envelope.bottom=p.bottom;
     }
     for(bool invalidKey:{false,true})for(unsigned stop=0;stop<=16;++stop){
-        RunnerSpatialJournal<512,64,32,true> scalar,batch;
+        RunnerSpatialJournal<512,64,32,true> scalar;
+        RunnerSpatialJournal<512,64,32,true,RunnerSpatialIndex<512>,Storage> batch;
+        if constexpr(!std::is_same<Storage<int,1>,RunnerSpatialJournalInline<int,1>>::value)bindJournal(batch);
         assert(scalar.bindGeometry(grid)&&batch.bindGeometry(grid));
         unsigned done=999,calls=0;
         bool admitted=false;
@@ -99,6 +110,9 @@ int main(){
     journalHistory<512,8>(grid);
     journalHistory<16,8>(grid);
     journalSpans(grid);
+    journalHistory<512,8,RunnerSpatialJournalLease>(grid);
+    journalHistory<16,8,RunnerSpatialJournalLease>(grid);
+    journalSpans<RunnerSpatialJournalLease>(grid);
     unsigned checks=0;
     for(int object:{60,93,99,92}){
         const auto* d=defaults.get(object);assert(d);

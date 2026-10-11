@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_RUNNER_SPATIAL_JOURNAL_H
 #include "RunnerSpatialIndex.h"
 #include "PreparedTerrainBirthBounds.h"
+#include "RunnerSpatialJournalStorage.h"
 namespace downwell {
 template<bool Prepared> struct RunnerSpatialGeometrySource {};
 template<> struct RunnerSpatialGeometrySource<true> {
@@ -11,7 +12,8 @@ template<> struct RunnerSpatialGeometrySource<true> {
 // flags, dirty queues and lifetime changes synchronously. Never collapse equal
 // updates or reconstruct from current positions: tree order depends on history.
 // All reads catch up. service() permits bounded work between publication bursts.
-template<unsigned Nodes,unsigned Slots,unsigned Pending=512,bool PreparedGeometry=false,class Tree=RunnerSpatialIndex<Nodes>>
+template<unsigned Nodes,unsigned Slots,unsigned Pending=512,bool PreparedGeometry=false,class Tree=RunnerSpatialIndex<Nodes>,
+    template<class,unsigned> class Storage=RunnerSpatialJournalInline>
 class RunnerSpatialJournal:private RunnerSpatialGeometrySource<PreparedGeometry> {
     static_assert(Pending && !(Pending&(Pending-1)),"Journal capacity must be a power of two");
     static_assert(!PreparedGeometry||Slots<0x80000000u,"Prepared journal identity tag");
@@ -26,6 +28,9 @@ class RunnerSpatialJournal:private RunnerSpatialGeometrySource<PreparedGeometry>
     static constexpr unsigned safePopulation=Nodes>reserve?(Nodes-reserve)/2:0;
 public:
     using Box=typename Math::Box;
+    struct Operation{Box box;std::uint32_t instance;bool insert;};
+    using JournalStorage=Storage<Operation,Pending>;
+    template<class Provider> bool bindJournal(Provider provider){return operations_.bind(provider);}
     template<class Provider> bool bindTree(Provider provider){return tree_.bind(provider);}
     // Scene dependency declaration, only before any publication. This is not
     // lazy query reconstruction: omitted history can never answer a query.
@@ -67,6 +72,7 @@ public:
         if(!this->geometry_||!valid())return false;
         if(!admitsFreshGeometrySpan(first,count,envelope))return true;
         if(queries_&&!admitPixels(envelope,combined))return false;
+        if(queries_&&count&&!prepareStorage())return false;
         admitted=true;
         const unsigned start=count_;
         for(unsigned i=0;i<count;++i){
@@ -123,6 +129,7 @@ public:
     unsigned pending()const{return count_;}
     void clear(){
         tree_.clear();head_=count_=population_=0;good_=deferred_=true;haveBounds_=false;
+        operations_.clear();
         for(auto& word:present_)word=0;
     }
     unsigned nodeCount()const{if(!queries_){good_=false;return 0;}catchUp();return tree_.nodeCount();}
@@ -203,9 +210,8 @@ public:
         return true;
     }
 private:
-    struct Operation{Box box;std::uint32_t instance;bool insert;};
     mutable Tree tree_;
-    Operation operations_[Pending]{};
+    JournalStorage operations_;
     std::uint32_t present_[(Slots+31)/32? (Slots+31)/32:1]{};
     mutable unsigned head_=0,count_=0;
     unsigned population_=0;
@@ -218,7 +224,9 @@ private:
         present_[instance>>5]|=1u<<(instance&31);++population_;return true;
     }
     bool catchUp()const{return service(count_);}
+    bool prepareStorage(){if(!operations_.prepare())return good_=false;return true;}
     bool makeRoom(){
+        if(!prepareStorage())return false;
         if(count_<Pending)return true;
         DW_PROFILE_COUNT(counterSpatialJournalPressure);
         return catchUp();

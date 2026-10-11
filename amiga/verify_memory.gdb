@@ -34,6 +34,11 @@ if $owner->owner_.index_.population_ != 0
     quit 1
 end
 printf "Startup spatial tree: unmaterialized, no backing allocation\n"
+if $owner->owner_.index_.operations_.bank_ != 0
+    printf "Unused mutation journal resident during normal startup\n"
+    quit 1
+end
+printf "Startup journal: optional_bytes=%lu resident=0\n", sizeof(*$owner->owner_.index_.operations_.bank_)
 if gDownwellFieldBandLoads != 0
     printf "Gameplay field images loaded before gameplay admission\n"
     quit 1

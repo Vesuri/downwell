@@ -242,6 +242,7 @@ __attribute__((noinline, used)) void downwellShopLiveReady() { __asm__ volatile(
 #include "core/ObjectPack.h"
 #include "core/GameplayCollisionOwner.h"
 #include "AmigaSpatialTreeStorage.h"
+#include "AmigaSpatialJournalStorage.h"
 #ifdef DOWNWELL_LOCAL_DRAW_CAPTURE
 namespace downwell { volatile unsigned localDrawCaptureMode=DOWNWELL_LOCAL_DRAW_CAPTURE; }
 #endif
@@ -1846,11 +1847,13 @@ __attribute__((noinline)) static int runDownwell(void) {
     referenceStorage=new(referenceMemory) ReferenceStorage;
 #endif
     AmigaSpatialTreeStorage<downwell::GameplayCollisionOwner::View::capacity*2> spatialTreeStorage;
+    AmigaSpatialJournalStorage<downwell::GameplayCollisionOwner::Owner::SpatialIndex::JournalStorage> spatialJournalStorage;
     auto& collisionOwner=*new(collisionStorage) downwell::GameplayCollisionOwner(objects,collisionSprites,
         downwell::GameplayTerrainInstances::Presentation::bind(wallDamage),
         downwell::GameplayTerrainInstances::WallCollision::bind(wallCollision),&rooms,ownership,
         DOWNWELL_NATIVE_BOXES!=0,DOWNWELL_NATIVE_FIELDS!=0,referenceStorage);
-    if(!collisionOwner.valid()||!collisionOwner.bindSpatialTree(spatialTreeStorage.provider()))return 20;
+    if(!collisionOwner.valid()||!collisionOwner.bindSpatialTree(spatialTreeStorage.provider())||
+       !collisionOwner.bindSpatialJournal(spatialJournalStorage.provider()))return 20;
     if(ownership!=downwell::GameplayCollisionOwner::Ownership::reference&&
        !collisionOwner.declareExternalCollisionBackend())return 20;
     checkSceneStack(2);

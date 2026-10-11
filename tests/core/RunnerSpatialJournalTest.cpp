@@ -38,12 +38,31 @@ template<class A,class B> static void compare(A& eager,B& journal){
     }
     assert(eager.height()==journal.height()&&eager.nodeCount()==journal.nodeCount()&&!journal.pending());
 }
+template<class Storage> struct JournalProvider {
+    using Bank=typename Storage::Bank;
+    unsigned acquisitions=0,releases=0;bool fail=false;
+    typename Storage::Provider provider(){return {this,[](void* context)->Bank*{
+        auto& self=*static_cast<JournalProvider*>(context);++self.acquisitions;
+        return self.fail?nullptr:new Bank;
+    },[](void* context,Bank* bank){++static_cast<JournalProvider*>(context)->releases;delete bank;}};}
+};
+template<bool Leased> struct JournalPolicy {
+    template<class Op,unsigned N> using Storage=downwell::RunnerSpatialJournalInline<Op,N>;
+};
+template<> struct JournalPolicy<true> {
+    template<class Op,unsigned N> using Storage=downwell::RunnerSpatialJournalLease<Op,N>;
+};
 template<unsigned Nodes,unsigned Pending,bool Prepared=false,bool Background=true,bool Leased=false> static void mutations(){
     downwell::RunnerSpatialIndex<Nodes> eager;
     TreeProvider<Nodes> provider;
     using Tree=typename std::conditional<Leased,downwell::RunnerSpatialTreeLease<Nodes>,downwell::RunnerSpatialIndex<Nodes>>::type;
-    downwell::RunnerSpatialJournal<Nodes,128,Pending,false,Tree> journal;
+    using Journal=downwell::RunnerSpatialJournal<Nodes,128,Pending,false,Tree,JournalPolicy<Leased>::template Storage>;
+    // Provider precedes its borrower, including destructor release.
+    using Lease=downwell::RunnerSpatialJournalLease<typename Journal::Operation,Pending>;
+    JournalProvider<Lease> journalProvider;
+    Journal journal;
     if constexpr(Leased)assert(journal.bindTree(provider.provider()));
+    if constexpr(Leased)assert(journal.bindJournal(journalProvider.provider()));
     bool present[128]{};Box previous[128]{};
     unsigned random=17;
     for(unsigned step=0;step<12000;++step){
@@ -77,6 +96,47 @@ template<unsigned Nodes,unsigned Pending,bool Prepared=false,bool Background=tru
     if(Nodes==1024)assert(journal.deferred()); // This fixture must exercise the journal, not fallback.
 }
 int main(){
+    {
+        using Journal=downwell::RunnerSpatialJournal<128,32,4,false,
+            downwell::RunnerSpatialIndex<128>,downwell::RunnerSpatialJournalLease>;
+        using Larger=downwell::RunnerSpatialJournal<128,32,4096,false,
+            downwell::RunnerSpatialIndex<128>,downwell::RunnerSpatialJournalLease>;
+        static_assert(sizeof(Journal)==sizeof(Larger),"Unused history capacity must not grow scene residency");
+        JournalProvider<Journal::JournalStorage> provider;
+        {
+            Journal journal;
+            assert(journal.bindJournal(provider.provider()));
+            assert(!journal.bindJournal(provider.provider()));
+            assert(journal.valid()&&journal.service(0)&&provider.acquisitions==0);
+            journal.clear();assert(provider.releases==0);
+            provider.fail=true;
+            assert(!journal.insert(box(0,0),0)&&!journal.valid()&&!journal.pending());
+            assert(!journal.insert(box(0,0),0)&&provider.acquisitions==1);
+            journal.clear();provider.fail=false;
+            assert(journal.insert(box(0,0),0)&&provider.acquisitions==2);
+            for(unsigned i=1;i<5;++i)assert(journal.insert(box(i*16,0),i));
+            assert(journal.pending()==1&&provider.acquisitions==2);
+            journal.clear();assert(provider.releases==1);
+            assert(journal.insert(box(0,0),0)&&provider.acquisitions==3);
+        }
+        assert(provider.releases==2);
+        Journal missing;
+        assert(!missing.insert(box(0,0),0)&&!missing.valid());
+        missing.clear();assert(missing.declareNoQueries());
+        for(unsigned i=0;i<32;++i)assert(missing.insert(box(i*16,0),i));
+        assert(missing.pending()==0&&missing.service(100));
+        assert(!missing.query(box(0,0),[](unsigned){assert(false);return true;}));
+    }
+    {
+        using Journal=downwell::RunnerSpatialJournal<128,32,4,true,
+            downwell::RunnerSpatialIndex<128>,downwell::RunnerSpatialJournalLease>;
+        downwell::PreparedTerrainBirthBounds geometry;
+        Journal journal;assert(journal.bindGeometry(geometry));
+        unsigned completed=99,calls=0;bool admitted=true;
+        assert(!journal.insertGeometrySpan(0,4,{0,0,64,16},completed,admitted,
+            [&](unsigned,auto&){++calls;return true;}));
+        assert(!admitted&&!completed&&!calls&&!journal.pending()&&!journal.valid());
+    }
     {
         using Lease=downwell::RunnerSpatialTreeLease<128>;
         TreeProvider<128> provider;

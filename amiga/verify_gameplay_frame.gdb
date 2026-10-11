@@ -12,6 +12,11 @@ if $owner->owner_.index_.tree_.tree_ == 0
     quit 1
 end
 printf "Reference spatial tree: materialized for original-mask queries\n"
+if $owner->owner_.index_.operations_.bank_ == 0
+    printf "Reference scene did not acquire its ordered journal backing\n"
+    quit 1
+end
+printf "Reference journal: resident_bytes=%lu\n", sizeof(*$owner->owner_.index_.operations_.bank_)
 if gDownwellStackGuardReady != 1
     printf "Target could not install the task-stack guard\n"
     quit 1

@@ -182,12 +182,16 @@ remove collision bounds metadata or change the shipping collision algorithm.
 Future live precise-mask events need scene-owned mask dependencies, not a
 restoration of the complete reference catalogue to every executable.
 
-Collision storage reserves 1,385,452 ordinary BSS bytes. The derived R-tree
+Collision storage uses scene-dependent backing. The derived R-tree
 is separately leased on first use: its 1,236,578-byte allocation includes a
 1,204,752-byte node pool. Replacing embedded backing with the 18-byte lease
 removes 1,236,560 resident bytes when no tree consumer runs. The ordered
-mutation journal remains a separate 90,112 bytes; these are not extra copies
-of the tree. Native allocation requests `MEMF_FAST`, with no Chip fallback.
+mutation journal is a separate optional 90,112-byte allocation, not another
+copy of the tree. Its 16-byte lease replaces the embedded bank. Native
+allocation requests `MEMF_FAST`, with no Chip fallback.
+The native owner therefore occupies 1,247,790 bytes, down from 1,337,886:
+90,096 fewer always-resident ordinary bytes. This is a BSS/residency reduction,
+not a claim that 90 KiB disappeared from the executable's on-disk payload.
 
 Normal Amiga gameplay declares that it has no spatial-index query consumers
 before constructing the player or room. Its implemented collision adapters use
@@ -198,7 +202,10 @@ Box/line queries and tree-size observations fail terminally under this contract:
 there is no reconstruction from current positions or silent fallback. Clear
 preserves the declaration. A new query consumer must choose the full index
 before scene construction, not switch it on after losing birth history.
-This removes work, not the journal's static 90,112-byte storage reservation.
+No journal bank is acquired under this declaration. Its provider is bound
+before births but is invoked only before the first queued operation in a
+query-enabled scene. Failed acquisition invalidates the journal before that
+operation publishes membership or invokes a prepared-span producer.
 
 This declaration excludes index traversal, not all collision-state readers.
 `GameplayCollisionOwner::collisionPointCandidate` and `collisionOverlap` read
@@ -229,21 +236,26 @@ than pretending that an unmaintained queue represents source state. Collision
 metadata bits are private to the excluded backend; eligibility/order bits remain
 live. Queue/mask-retention backing is absent for this scene, including startup
 and Retry; the full-service path requires caller-supplied storage. The ordinary
-actor-position array and mutation journal are separate retained structures.
+actor-position array remains a separate retained structure. Journal backing is
+absent under this declaration, checked at startup and after the contact tape.
 A passing bounded replay
 establishes coverage only for that workload, not every future scene or consumer.
 
 Query-enabled owners, including the native original-mask verification path,
-retain the complete ordered journal. Validity checks, zero-budget service and
+retain the complete ordered journal in the leased bank. Reset releases both
+journal and tree backing; the providers survive to support re-entry. The
+platform provider scopes also release memory on early exits from the
+placement-created owner. The host's default inline bank remains the oracle;
+lease tests compare ordered results, pressure, prepared spans and failure
+prefixes against it. Validity checks, zero-budget service and
 empty resets do not allocate. Queries, nonempty explicit service, journal pressure and eager numeric fallback
 can materialize the tree synchronously, preserving historical insertion/removal
 order. Allocation failure is terminal until clear; clear releases backing and
-permits a fresh acquisition. The platform scope also frees backing on early
-exit from placement-constructed gameplay owners. The host retains the embedded
-tree as the reference implementation.
+permits a fresh acquisition. The host retains the embedded tree as the
+reference implementation.
 
 The bounded 1,800-update contact workload has no allocated tree, with zero
-pending journal operations and population 824. The native original-mask fixture
+pending journal operations and zero generic index population. The native original-mask fixture
 does allocate on query. This is a residency saving, not a smaller materialized
 tree or a performance claim; query-heavy scenes still require the full backing.
 
