@@ -11,6 +11,8 @@ end
 printf "PROFILE natural entry PROBES (instrumented); cold gameplay frame retained; clock_clamps=%lu\n", gDownwellProfileClockClamps
 printf "ROOM_PLAN startup bind: ticks=%lu ms=%.3f\n", gDownwellRoomPlanTicks, gDownwellRoomPlanTicks*20.0/80128.0
 printf "ENTRY scene banks: transient_loads=%lu discarded_for_entry=%lu results_frames=%lu field_loads=%u\n", gDownwellTransientLoads, gDownwellEntryResultsDiscarded, gDownwellEntryResultsFrames, gDownwellFieldBandLoads
+printf "ENTRY attribution: room_admission_phase=%u game_art_admission_phase=%u (exclusive phase ticks; nested phases reported separately)\n", profileEntryRoomAdmission, profileEntryGameArtAdmission
+printf "ENTRY room detail: pattern_lease_phase=%u metadata_phase=%u creates_phase=%u\n", profileEntryPatternLease, profileEntryRoomMetadata, profileEntryRoomCreates
 if @VERIFY_AMMO@
     printf "ENTRY ammo pixels: checks=%lu failures=%lu prepared=%lu\n", gDownwellAmmoChecks, gDownwellAmmoFailures, gDownwellAmmoFactoredUses
     if gDownwellAmmoChecks == 0 || gDownwellAmmoFailures != 0 || gDownwellAmmoFactoredUses == 0

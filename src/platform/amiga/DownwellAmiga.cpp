@@ -2118,8 +2118,14 @@ __attribute__((noinline)) static int runDownwell(void) {
 #ifndef DOWNWELL_REPLAY_VERIFY
     bool initialGameplayPrepared=false;
     const auto prepareInitialGameplay=[&](){
-        if(!acquireBuilderPatterns())return false;
+        DW_PROFILE_SCOPE(profileEntryRoomAdmission);
+        {
+            DW_PROFILE_SCOPE(profileEntryPatternLease);
+            if(!acquireBuilderPatterns())return false;
+        }
         if(initialGameplayPrepared)return true;
+        {
+        DW_PROFILE_SCOPE(profileEntryRoomMetadata);
         amigaBuildTerrainIndex(emptyTerrain, terrainIndex);
         terrainTiles.clear();
 #if defined(DOWNWELL_PROBES) || defined(DOWNWELL_FPSCOUNT)
@@ -2153,6 +2159,9 @@ __attribute__((noinline)) static int runDownwell(void) {
         terrainCollision.fragments = fragments;
         terrainCollision.fragmentCount = 0;
         terrainCollision.runtime = &port;
+        }
+        {
+        DW_PROFILE_SCOPE(profileEntryRoomCreates);
         if (!liveGeneration.loadRoomWithStartField(port,rooms,mainRoom,&roomTerrainPlan,&roomTerrainBackend,
             [](AmigaPortRuntime& world,AmigaAreaOneTerrainBuilder& builder,
                const downwell::PackedRoomInstance& instance,void* context){
@@ -2167,6 +2176,7 @@ __attribute__((noinline)) static int runDownwell(void) {
             gDownwellStartupFailure = 6;
             downwellStartupFailed();
             return false;
+        }
         }
         worldViewX = mainViewX + port.cameraOffsetX();
         worldViewY = mainInitialViewY + port.cameraOffsetY();
@@ -2302,6 +2312,7 @@ __attribute__((noinline)) static int runDownwell(void) {
         gDownwellGamePlaneResidentBytes=gDownwellGameArtResidentBytes=0;
     };
     const auto acquireGameplayPlanes=[&](){
+        DW_PROFILE_SCOPE(profileEntryGameArtAdmission);
 #if defined(DOWNWELL_REPLAY_VERIFY) || defined(DOWNWELL_PLANE_BANK_VERIFY)
         constexpr bool artReferenceOracle=true;
 #else
