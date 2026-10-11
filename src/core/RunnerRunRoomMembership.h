@@ -179,6 +179,34 @@ public:
         for(unsigned list=0;list<2;++list){
             for(unsigned s=first(list);s!=End;){
                 const unsigned n=locator_[s]-1;
+                const unsigned end=unsigned(runs_[n].first)+runs_[n].count;
+                if(!runs_[n].marks){s=after(n);continue;}
+                // Marks already belong to this owner. Select the next marked
+                // cell without expanding an otherwise unchanged terrain run.
+                // Re-read after each callback: removal may split the run and
+                // the callback can mark a later lifetime in source room order.
+                while(s<end){
+                    const unsigned limit=(s|31u)+1<end?(s|31u)+1:end;
+                    auto word=marks_[s>>5]>>(s&31);
+                    if(word){
+                        while(s<limit&&!(word&1u)){++s;word>>=1;}
+                        if(s<limit)break;
+                    }
+                    s=limit;
+                }
+                if(s==end){s=after(n);continue;}
+                const unsigned following=next(s);
+                if(!visit(s,runs_[n].key,list==0))return false;
+                s=following;
+            }
+        }
+        return true;
+    }
+    template<class Visit> bool visitMarkedCleanupOrderedReference(Visit visit){
+        if(!markedCount_)return true;
+        for(unsigned list=0;list<2;++list){
+            for(unsigned s=first(list);s!=End;){
+                const unsigned n=locator_[s]-1;
                 if(!runs_[n].marks){s=after(n);continue;}
                 const unsigned following=next(s);
                 if(marked(s)&&!visit(s,runs_[n].key,list==0))return false;s=following;

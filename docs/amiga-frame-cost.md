@@ -1,5 +1,55 @@
 # Amiga gameplay frame-cost audit
 
+## Bitmap-selected room cleanup
+
+At `11f8ca10`, two retiring thin platforms make Draw cleanup cost 38.15 ms
+in frame 1047 and 19.8 ms in frame 1535. The cause is expanding a marked
+terrain run into individual cells, including every unmarked cell. Publication
+splitting itself costs only 0.89 ms in frame 1047 and was deliberately left
+unchanged. The estimated removable traversal cost was about 23 ms.
+
+Cleanup now selects marked cells from the existing owner bitmap, bounded by
+the current room run. It retains active-before-inactive ordering, saves the
+next room position before each callback, and re-reads membership afterwards.
+There is no new queue, storage or publication pass. The old cell traversal is
+retained as `visitMarkedCleanupOrderedReference` for differential tests.
+Frame 1047 cleanup falls to 13.89 ms. A fresh baseline/candidate capture gives
+116.3 → 91.9 ms for frame 1047 and 81.7 → 72.3 ms for frame 1535.
+
+Matched complete-frame ranges against the prior seven-window contact report
+(extra frames now fitting into a 35-field capture are excluded):
+
+| Frames | Mean before → after, ms | Worst before → after, ms |
+| ---: | ---: | ---: |
+| 51–70 | 33.580 → 33.405 | 46.5 → 46.5 |
+| 676–681 | 101.033 → 101.017 | 239.5 → 239.0 |
+| 1047–1055 | 67.278 → 64.700 | 116.4 → 91.9 |
+| 1305–1314 | 60.310 → 60.320 | 78.8 → 79.0 |
+| 1512–1521 | 61.170 → 60.720 | 139.3 → 139.6 |
+| 1535–1545 | 56.355 → 55.445 | 82.0 → 72.3 |
+| 1689–1695 | 85.629 → 85.500 | 221.2 → 221.3 |
+
+Full contact tape: 5,010 → 4,996 PAL fields over 1,800 updates, 17.96 →
+18.01 FPS; maximum gap remains 12 fields at generation frame 676. This removes
+retirement scanning stalls, not the remaining generation or simulation costs.
+Host tests cover sparse marks across word boundaries, callback-added marks,
+interior removals, inactive suffixes and failure prefixes; the full terrain
+oracle passes ten tapes / 18,000 frames / up to 928 terrain records.
+
+Reproduce with the contact commands below using trace directories
+`tmp/trace/retirement-attribution` (1046,1534) and `tmp/trace/sparse-cleanup`
+(50,675,1046,1304,1511,1534,1688), 35 fields each. Reports:
+`tmp/retirement-{1047,1535}.txt`, `tmp/sparse-cleanup-report.txt`,
+`tmp/sparse-cleanup-1047.txt`, `tmp/sparse-cleanup-{host,fps}.log`.
+Baseline/candidate trace ELF SHA-256:
+`e98978b516ccd9f72748f5a53cdcc62c4d930e4d40c7f2d3079ab661b3f7453d` /
+`3cf60a1c7d1b6a259827daeffc0368bff23394de91d3f2b70a6d8aabd98d3614`.
+Normal STRIP=1 startup passes on 512 KiB Chip (plus 512 KiB slow and 8 MiB
+Fast), retaining 126,840 free Chip bytes and the unchanged 904,628-byte owner;
+reference allocations remain absent. Executable: 1,999,680 bytes. Evidence:
+`tmp/sparse-cleanup-memory{,-gdb}.log`; normal ELF SHA-256
+`f875a0dce7ea4a43f1662c4dfa46495cdf9468dd976dec0576fd019ac76bc9f5`.
+
 ## Direct admitted terrain transactions
 
 Retained, callback-free spans in the external collision backend now publish

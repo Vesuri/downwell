@@ -442,6 +442,36 @@ void runRoomMutations(){
     std::cout<<"Room storage (64 slots): scalar="<<sizeof(scalar)<<" runs="<<sizeof(runs)<<'\n';
 }
 void animationCursorCallbacks(){
+    // Compare sparse selection with the retained cell traversal across word
+    // boundaries, callback marks, interior removals and failed prefixes.
+    using SparseRoom=RunnerRunRoomMembership<1024,16,1008>;
+    for(unsigned offset=0;offset<64;++offset)for(unsigned fail=0;fail<5;++fail){
+        SparseRoom selected,reference;
+        for(auto* room:{&selected,&reference}){
+            require(room->bindTerrainSpan(16,992,{}),"large cleanup terrain run");
+            require(room->bind(0,{})&&room->bind(1023,{}),"cleanup actor boundaries");
+            require(room->reconcileChecked([](unsigned s){return s>=900;},
+                [](unsigned,bool){return true;}),"cleanup inactive suffix");
+            for(unsigned s:{16+offset,300+offset,700+offset,900+offset,1023u})
+                require(room->mark(s),"sparse cleanup marks");
+        }
+        std::vector<unsigned> a,b;
+        auto walk=[&](auto& room,auto& out,bool oracle){
+            auto visit=[&](unsigned s,RunnerImageValue key,bool active){
+                require(key.bits==0,"cleanup preserves depth key");
+                out.push_back(s+1024u*active);
+                if(out.size()==fail)return false;
+                if(s==16+offset)require(room.mark(200+offset),"callback later mark");
+                return room.remove(s);
+            };
+            return oracle?room.visitMarkedCleanupOrderedReference(visit):room.visitMarkedCleanupOrdered(visit);
+        };
+        require(walk(selected,a,false)==walk(reference,b,true)&&a==b,
+            "sparse cleanup order and failed prefix equal reference");
+        for(unsigned s=0;s<1024;++s)require(selected.contains(s)==reference.contains(s)&&
+            selected.marked(s)==reference.marked(s)&&selected.active(s)==reference.active(s),
+            "sparse cleanup resulting membership");
+    }
     using Room=RunnerRunRoomMembership<12,4,8>;
     for(unsigned scenario=0;scenario<4;++scenario){
         Room reference,batches;
