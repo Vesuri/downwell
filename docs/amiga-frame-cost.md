@@ -139,39 +139,35 @@ Create results are prepared once per used terrain kind; chronological IDs,
 registration links and journal entries retain their original per-cell order.
 Run identity/publication insertion and retained-layer population are published
 in spans. There is no generic first-cell constructor just to obtain a layer.
+The spatial journal admits the complete envelope once and appends its ordered
+geometry keys without repeating bounds admission/publication for every cell.
 Unprepared families, missing layers, source observers, journal pressure and
 unsupported geometry retain the scalar constructor. A terminal failure still
 publishes only the completed prefix, not an atomic all-or-nothing batch.
 
-Same four windows and configuration as `2fcd7feb`:
+Current four windows, with the cavern asset bank and single-admission journal:
 
 | Frames | Mean ms | Worst ms (frame) |
 | --- | ---: | ---: |
-| 51–74 | 41.33 | 63.4 (54) |
-| 676–683 | 141.38 | 521.9 (676) |
-| 1301–1314 | 74.91 | 104.1 (1314) |
-| 1689–1696 | 129.19 | 480.3 (1689) |
+| 51–74 | 41.37 | 63.4 (54) |
+| 676–683 | 134.09 | 465.9 (676) |
+| 1301–1314 | 74.96 | 104.1 (1314) |
+| 1689–1696 | 121.14 | 415.6 (1689) |
 
-The two generation stalls save 83.2/98.4 ms; no matched frame is more than
-0.5 ms slower. Frame 51 remains 32.5 ms and frame 1304 is 96.2 ms. The complete
-contact tape takes 6,211 PAL fields (14.49 FPS), with maximum gap 34 at frame
-1512. These are still unacceptable gameplay stalls, not 50 FPS.
+Against `2be39f73`, the generation stalls save 56.3/64.8 ms; no matched frame
+is more than 0.3 ms slower. Independent 35-field captures confirm 465.9/415.8 ms.
+Frame 51 remains 32.5 ms and frame 1304 is 96.2 ms. These are still
+unacceptable gameplay stalls, not 50 FPS.
+The 1,800-frame contact tape takes 6,250 PAL fields (14.40 FPS), versus 6,265
+at `2be39f73`, with the same maximum gap of 34 fields at frame 1512. Coverage
+remains ticks 0–1799, view Y 39–2749 (maximum 2759), seven enemy slots,
+final health 2 and no dead samples. Gameplay art loads/prepares once.
 
 Trace ELF SHA-256:
-`0d7c830e273ab30848f6b8ff95b22fca72c1d31e95f7eea64b94d96656d0c1d9`.
-Reports: `tmp/terrain-complete-report.txt`,
-`tmp/terrain-complete-{676,1689}-report.txt`, and
-`tmp/terrain-complete-fps.log`. Reproduce using the preceding contact command
+`05bebfd7e34eca667285774fbc607315e6b0e7e9551894c622644ee62962f3d4`.
+Reports: `tmp/journal-span-fps-gdb.log`, `tmp/journal-span-report.txt` and
+`tmp/journal-span-confirm-report.txt`. Reproduce using the preceding contact command
 with `TRACE_FRAMES=50,675,1300,1688 TRACE_FIELDS=100`.
-
-The subsequent gameplay CPU-art lease changes residency, not gameplay cost.
-The same four windows have means 41.39/141.15/74.97/129.26 ms and worst frames
-63.5/522.0/104.2/480.4 ms. Frame 51 remains 32.5 ms; no matched frame grows by
-more than 0.5 ms. The full contact run remains 6,211 PAL fields (14.49 FPS),
-with identical coverage and exactly one gameplay-art load/preparation for all
-1,800 updates. Report: `tmp/game-art-lease-report.txt`; full run:
-`tmp/game-art-lease-fps.log`. Matching trace ELF SHA-256:
-`5ab9fd6efcb62aa22ef2865c0c2f2e671cd74a78ed98bf4f044ca6e5427ec2fc`.
 
 ## Historical pre-integration audit
 

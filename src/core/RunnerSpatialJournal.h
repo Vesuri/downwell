@@ -41,6 +41,48 @@ public:
             this->geometry_=&geometry;return true;
         }else return false;
     }
+    // A synchronous constructor may publish a whole admitted segment without
+    // re-admitting its envelope for every cell. Retain one ordered operation
+    // per cell; admission excludes pressure/service and eager boundaries.
+    // Producer must not observe/mutate this journal. Its keys must lie within
+    // the supplied normalized envelope, just as insertGeometry trusts pixels.
+    // A failed producer leaves exactly the completed prefix, not a rollback.
+    // Ineligible segments return success with admitted=false and invoke no
+    // producer, allowing the caller to retain its scalar publication path.
+    template<class Producer> bool insertGeometrySpan(unsigned first,unsigned count,
+        const Math::PixelBox& envelope,unsigned& completed,bool& admitted,Producer produce){
+        static_assert(PreparedGeometry,"Prepared geometry policy required");
+        completed=0;admitted=false;
+        Math::PixelBox combined;
+        if(!this->geometry_||!valid())return false;
+        if(!admitsFreshGeometrySpan(first,count,envelope))return true;
+        if(!admitPixels(envelope,combined))return false;
+        admitted=true;
+        const unsigned start=count_;
+        for(unsigned i=0;i<count;++i){
+            PreparedTerrainBirthBounds::Key key;
+            if(!produce(i,key)||!this->geometry_->validKey(key)){
+                // Normally only the final envelope is needed. On failure,
+                // reconstruct the admitted prefix's historical union exactly.
+                for(unsigned j=0;j<completed;++j){
+                    const auto& op=operations_[(head_+start+j)&(Pending-1)];
+                    Math::PixelBox pixels;Box box;
+                    if(!this->geometry_->bounds({op.box.left.bits},box,true)||
+                       !Math::decodePixels(box,pixels)||!admitPixels(pixels,combined))return false;
+                    bounds_=combined;haveBounds_=true;
+                }
+                return false;
+            }
+            const unsigned instance=first+i;
+            auto& operation=operations_[(head_+count_)&(Pending-1)];
+            operation.box.left.bits=key.value;
+            operation.instance=instance|0x80000000u;operation.insert=true;++count_;
+            DW_PROFILE_COUNT(counterSpatialJournalQueued);
+            present_[instance>>5]|=1u<<(instance&31);++population_;++completed;
+        }
+        if(count){bounds_=combined;haveBounds_=true;}
+        return true;
+    }
     // Immutable resource key, not a live instance lookup. Pixel endpoints
     // obey the same trusted/normalized contract as insertPrepared. Preserve
     // one logical operation per publication, including pressure/service timing.

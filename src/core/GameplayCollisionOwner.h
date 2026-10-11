@@ -689,17 +689,13 @@ private:
             if(recipe.pixels.bottom>envelope.bottom)envelope.bottom=recipe.pixels.bottom;
         }
         bool admitted=false;
-        if(!owner_.externalSpatialPublication([&](auto& index){
-            admitted=index.admitsFreshGeometrySpan(slot,count,envelope);return true;
-        }))return Result::failure;
-        if(!admitted)return Result::unsupported;
-        terrainRoomFirst_=slot;terrainRoomDepth_=wall->creationDepth;
         // The same immutable Create plan applies to every cell. Its repeated
         // queue setters only prepend the already-current head; one mark per
         // cell preserves the complete reverse-birth queue order.
         unsigned roomCount=0;
         bool okay=owner_.externalSpatialPublication([&](auto& index){
-          for(unsigned i=0;i<count;++i){
+          return index.insertGeometrySpan(slot,count,envelope,completed,admitted,[&](unsigned i,PreparedTerrainBirthBounds::Key& key){
+            if(!i){terrainRoomFirst_=slot;terrainRoomDepth_=wall->creationDepth;}
             const unsigned current=slot+i;
             const unsigned kind=cells.kind(i);const int object=kind?93:60;
             const auto& recipe=recipes[kind];
@@ -713,13 +709,11 @@ private:
             ++roomCount;
             DW_PROFILE_COUNT(counterSpatialFirstPublication);
             const unsigned delta=unsigned(cells.x(i)-recipe.low);
-            auto pixels=recipe.pixels;pixels.left+=int(delta);pixels.right+=int(delta);
-            auto key=recipe.key;key.value+=delta/4;
-            if(!index.insertGeometry(key,current,pixels))return false;
-            ++completed;
-          }
-          return true;
+            key=recipe.key;key.value+=delta/4;
+            return true;
+          });
         });
+        if(!admitted&&okay)return Result::unsupported;
         terrainRoomCount_+=roomCount;
         if(completed&&!layers_.publishPreparedTerrainSpan(layerSlot,completed,layer))okay=false;
         if(!okay){check(false);return Result::failure;}

@@ -77,6 +77,16 @@ rectangle publication work but does not reduce the journal's reserved capacity
 or eliminate the instance bounds cache. Ordered-query tests cover pressure,
 retirement/reuse, scratch overwrites and eager fallback.
 
+A callback-free prepared segment may use `insertGeometrySpan`. Its admission
+checks fresh slots, population, pending capacity and the complete normalized
+geometry envelope before invoking any producer. An ineligible segment invokes
+no producer and retains scalar publication. An admitted segment still appends
+every key in source order, but publishes its historical bounds union once.
+Its producer may publish owned lifetime/queue state, not observe or mutate the
+journal. Pressure cannot occur inside the admitted interval. A producer or
+key failure retains only completed operations and reconstructs that prefix's
+bounds union; it neither publishes future geometry nor rolls back prior cells.
+
 A prepared first publication with an all-positive-zero cached rectangle and no
 index-membership bit skips old-rectangle normalization and removal. It writes
 the original cache and flags at the same point, validates new bounds only when

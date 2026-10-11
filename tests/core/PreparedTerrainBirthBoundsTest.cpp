@@ -52,6 +52,43 @@ static void journalHistory(const downwell::PreparedTerrainBirthBounds& grid){
     }
     assert(reference.height()==compact.height()&&reference.nodeCount()==compact.nodeCount());
 }
+static void journalSpans(const downwell::PreparedTerrainBirthBounds& grid){
+    using namespace downwell;using Math=RunnerSpatialSplit;
+    PreparedTerrainBirthBounds::Key keys[16];Math::PixelBox pixels[16];
+    Math::PixelBox envelope{10000,10000,-10000,-10000};
+    for(unsigned i=0;i<16;++i){
+        bool precise;
+        assert(grid.publication(i%2?93:60,int(i)*16,64,keys[i],pixels[i],precise));
+        const auto& p=pixels[i];
+        if(p.left<envelope.left)envelope.left=p.left;if(p.right>envelope.right)envelope.right=p.right;
+        if(p.top<envelope.top)envelope.top=p.top;if(p.bottom>envelope.bottom)envelope.bottom=p.bottom;
+    }
+    for(bool invalidKey:{false,true})for(unsigned stop=0;stop<=16;++stop){
+        RunnerSpatialJournal<512,64,32,true> scalar,batch;
+        assert(scalar.bindGeometry(grid)&&batch.bindGeometry(grid));
+        unsigned done=999,calls=0;
+        bool admitted=false;
+        const bool okay=batch.insertGeometrySpan(8,16,envelope,done,admitted,[&](unsigned i,auto& key){
+            ++calls;if(i==stop){key={0xffffffffu};return invalidKey;}key=keys[i];return true;
+        });
+        assert(admitted&&okay==(stop==16)&&done==stop&&calls==(stop==16?16:stop+1));
+        for(unsigned i=0;i<stop;++i)assert(scalar.insertGeometry(keys[i],8+i,pixels[i]));
+        assert(scalar.pending()==batch.pending()&&batch.deferred()&&batch.valid());
+        // Failure must retain the prefix's history, not the whole envelope.
+        for(int x=-10000;x<10000;x+=499)for(int y=-5000;y<5000;y+=157)
+            assert(scalar.admitsFreshGeometrySpan(32,1,{x,y,x+16,y+16})==
+                   batch.admitsFreshGeometrySpan(32,1,{x,y,x+16,y+16}));
+        assert(scalar.service(3)&&batch.service(3)&&scalar.pending()==batch.pending());
+        std::vector<unsigned> a,b;
+        const auto box=Math::encodePixels({-256,-256,768,8192});
+        assert(scalar.query(box,[&](unsigned id){a.push_back(id);return true;}));
+        assert(batch.query(box,[&](unsigned id){b.push_back(id);return true;}));
+        assert(a==b&&scalar.height()==batch.height()&&scalar.nodeCount()==batch.nodeCount());
+        calls=0;
+        assert(batch.insertGeometrySpan(32,33,envelope,done,admitted,[&](unsigned,auto&){++calls;return true;}));
+        assert(!admitted&&!calls&&!done&&batch.valid());
+    }
+}
 int main(){
     using namespace downwell;
     const auto ob=read("generated/downwell-objects.dwob"),sp=read("generated/downwell-sprites.dwsc");
@@ -61,6 +98,7 @@ int main(){
     static_assert(sizeof(grid)<9000,"Terrain table must share coordinate offsets");
     journalHistory<512,8>(grid);
     journalHistory<16,8>(grid);
+    journalSpans(grid);
     unsigned checks=0;
     for(int object:{60,93,99}){
         const auto* d=defaults.get(object);assert(d);
