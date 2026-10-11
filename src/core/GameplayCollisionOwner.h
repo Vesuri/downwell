@@ -568,6 +568,39 @@ private:
         });
         state->appearanceFlags=flags&0xc208u;return check(okay);
     }
+    bool publishNativeBoxBirth(InstanceHandle h,const GameplayWorld::Breakable& r){
+        auto* state=nativePosition(h.slot);
+        if(!state)return check(false);
+#ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+        return boxes_.birthPosition(r,*state)&&boxes_.nativeAppearance(h,r)&&
+            nativeBirthQueues(h.slot,92)&&refreshNativeActor(h,true);
+#else
+        RunnerImageValue x,y;Owner::Box bounds;
+        RunnerSpatialSplit::PixelBox pixels;PreparedTerrainBirthBounds::Key geometry;
+        bool precise=false;
+        // Only the authoritative fresh native allocator reaches this path.
+        // Keep changed resources, non-grid positions and unusual lifetimes on
+        // the complete constructor/refresh oracle. No Create is delayed.
+        const bool prepared=r.active&&!r.destroyRequested&&r.x<=0x7fffffff-240&&r.y<=0x7fffffff-176&&
+            terrainBirthBounds_.at(92,r.x+240,r.y+176,x,y,bounds,precise,&pixels,&geometry);
+        if(!prepared)return boxes_.birthPosition(r,*state)&&boxes_.nativeAppearance(h,r)&&
+            nativeBirthQueues(h.slot,92)&&refreshNativeActor(h,true);
+        if(!boxes_.nativeAppearance(h,r))return false;
+        state->x=x;state->y=y;
+        if(!nativeBirthQueues(h.slot,92))return false;
+        const auto* objectFlags=families_.flags(92);if(!objectFlags)return check(false);
+        std::uint32_t flags=(nativeBoxFlags_&~0xc208u)|(precise?0x200u:0u);
+        state->bounds=bounds;
+        const bool okay=owner_.externalSpatialPublication([&](auto& index){
+            if(!NativeDirtyQueue::shouldPublishBounds(*objectFlags,flags,false))return true;
+            if(pixels.right<pixels.left){const int a=pixels.left;pixels.left=pixels.right;pixels.right=a;}
+            if(pixels.bottom<pixels.top){const int a=pixels.top;pixels.top=pixels.bottom;pixels.bottom=a;}
+            if(!index.insertGeometry(geometry,h.slot,pixels))return false;
+            flags|=0x8000u;return true;
+        });
+        state->appearanceFlags=flags&0xc208u;return check(okay);
+#endif
+    }
     bool nativeTerrainBirthBounds(const GameplayWorld::NativeTerrain::Identity& id,
         RunnerImageValue& x,RunnerImageValue& y,Owner::Box& bounds,bool& found,bool& precise,int sprite=-2){
         if(sprite==-2&&terrainBirthBounds_.at(id.object,id.x,id.y,x,y,bounds,precise)){found=true;return true;}
@@ -1790,9 +1823,7 @@ public:
                 if(!self.world_||slot>=self.world_->breakableSlots())return false;
                 const auto& r=self.world_->breakableSlot(slot);const InstanceHandle h{View::breakableBase+slot,r.lifetimeId};
                 self.observeStationaryBoxBirth(r);
-                auto* state=self.nativePosition(h.slot);
-                return state&&self.boxes_.birthPosition(r,*state)&&self.boxes_.nativeAppearance(h,r)&&
-                    self.nativeBirthQueues(h.slot,92)&&self.refreshNativeActor(h,true);
+                return self.publishNativeBoxBirth(h,r);
             };
             boxAllocation_.acquire=[](void* context,NativeFamilyBirth& birth){
                 auto& self=*static_cast<GameplayCollisionOwner*>(context);

@@ -9,11 +9,11 @@ namespace downwell {
 class PreparedTerrainBirthBounds {
     static constexpr unsigned rows=528,offsetCapacity=4;
     struct Shape {unsigned char left=0,right=0,top=0,bottom=0;bool ready=false,precise=false;};
-    Shape shapes_[3];
-    RunnerSpatialSplit::PixelBox pixelOffsets_[3]{};
+    Shape shapes_[4];
+    RunnerSpatialSplit::PixelBox pixelOffsets_[4]{};
     int offsets_[offsetCapacity]{};
     RunnerImageValue values_[rows][offsetCapacity];
-    static unsigned shape(int object){return object==60?0:object==93?1:object==99?2:3;}
+    static unsigned shape(int object){return object==60?0:object==93?1:object==99?2:object==92?3:4;}
 public:
     // Immutable geometry identity, not an instance ID or a pointer into live
     // terrain. It can be retained in publication history after that instance
@@ -22,18 +22,18 @@ public:
     struct Key {std::uint32_t value=0;};
     bool validKey(Key key)const{
         const unsigned id=key.value&3u,row=key.value>>8;
-        return id<3&&shapes_[id].ready&&row>=16&&row<rows;
+        return shapes_[id].ready&&row>=16&&row<rows;
     }
     bool key(int object,int x,int y,Key& out)const{
         const unsigned id=shape(object);
-        if(id==3||!shapes_[id].ready||x < -256||x>=768||y<0||y>=8192||
+        if(id==4||!shapes_[id].ready||x < -256||x>=768||y<0||y>=8192||
             (unsigned(x)&15u)||(unsigned(y)&15u))return false;
         out.value=(unsigned(y+256)>>4)*256u+(unsigned(x+256)>>4)*4u+id;
         return true;
     }
     bool bounds(Key key,RunnerSpatialSplit::Box& out,bool normalize=false)const{
         const unsigned id=key.value&3u,column=(key.value>>2)&63u,row=key.value>>8;
-        if(id==3||!shapes_[id].ready||row<16||row>=rows)return false;
+        if(!shapes_[id].ready||row<16||row>=rows)return false;
         const auto& s=shapes_[id];
         const auto* horizontal=values_[column];const auto* vertical=values_[row];
         out={horizontal[s.left],vertical[s.top],horizontal[s.right],vertical[s.bottom]};
@@ -73,8 +73,8 @@ public:
         // Offset zero is the position itself. Bounds often share endpoints
         // across axes/objects; prepare each distinct offset only once.
         int offsets[offsetCapacity]={};unsigned count=1;
-        const int ids[]={60,93,99};
-        for(unsigned i=0;i<3;++i){
+        const int ids[]={60,93,99,92};
+        for(unsigned i=0;i<4;++i){
             const auto* object=objects.get(ids[i]);if(!object)continue;
             PackedSpriteCollision resource;
             if(!sprites.collisionSprite(object->spriteId,object->maskId,resource))continue;
@@ -120,7 +120,7 @@ private:
     bool atPrepared(int object,int x,int y,RunnerImageValue& positionX,RunnerImageValue& positionY,
         RunnerSpatialSplit::Box& box,bool& precise,RunnerSpatialSplit::PixelBox* pixels,Key* key)const{
         const unsigned id=shape(object);
-        if(id==3||!shapes_[id].ready||x < -256||x>=768||y<0||y>=8192||
+        if(id==4||!shapes_[id].ready||x < -256||x>=768||y<0||y>=8192||
             (unsigned(x)&15u)||(unsigned(y)&15u))return false;
         const unsigned column=unsigned(x+256)>>4,row=unsigned(y+256)>>4;
         if(key)key->value=row*256u+column*4u+id;

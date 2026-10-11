@@ -242,6 +242,19 @@ allocator may use the descriptor. Registration queries, alarms and cleanup
 continue to merge native records using their original chronology stamps.
 
 `REFERENCE_BREAKABLES=1` retains per-birth initialization and generic ownership.
+Fresh grid-aligned box births may use shape 3 of the existing prepared
+birth-geometry table (object 92). The table shares the terrain coordinate
+offsets; its key owns immutable geometry, never a live box pointer. Preparation
+must match the scalar binary32 position and bounds across the admitted grid.
+Unavailable resource geometry, non-grid coordinates and non-fresh records
+retain the complete constructor/refresh path. Native publication still happens
+before the family layer attachment: initialize appearance and position, mark
+the original dirty queues, then publish cached bounds and the journal entry.
+The entry is neither batched across Create nor deferred beyond the existing
+journal rules. Pressure, eager fallback, retirement and the first observing
+query retain the same insertion/removal history. Scalar ownership retains
+expanded bounds as an independent oracle.
+
 The native-ownership replay compares both families' state/order against the
 registered reference, including room-backed cleanup, slot reuse and Retry.
 The native Draw-capture unit test also checks shared chronology, alarm versus

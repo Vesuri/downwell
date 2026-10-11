@@ -28,8 +28,8 @@ static void journalHistory(const downwell::PreparedTerrainBirthBounds& grid){
             b=compact.remove(previous[id],id,true,removedB);
             assert(removedA==removedB);if(a)present[id]=false;
         }else{
-            const int objects[]={60,93,99};PreparedTerrainBirthBounds::Key key;
-            assert(grid.key(objects[(random>>20)%3],int((random>>4)&31u)*16-128,
+            const int objects[]={60,93,99,92};PreparedTerrainBirthBounds::Key key;
+            assert(grid.key(objects[(random>>20)%4],int((random>>4)&31u)*16-128,
                 int((random>>16)&31u)*16,key));
             assert(grid.bounds(key,previous[id],true));
             Math::PixelBox pixels;assert(Math::decodePixels(previous[id],pixels));
@@ -100,7 +100,7 @@ int main(){
     journalHistory<16,8>(grid);
     journalSpans(grid);
     unsigned checks=0;
-    for(int object:{60,93,99}){
+    for(int object:{60,93,99,92}){
         const auto* d=defaults.get(object);assert(d);
         PackedSpriteCollision resource;assert(sprites.collisionSprite(d->spriteId,d->maskId,resource));
         for(int y=0;y<8192;y+=16)for(int x=-256;x<768;x+=16){
@@ -152,11 +152,11 @@ int main(){
             ++checks;
         }
     }
-    for(int object:{-1,35,60,93,99,386})for(int x:{-272,-256,-255,0,1,752,768})
+    for(int object:{-1,35,60,93,99,92,386})for(int x:{-272,-256,-255,0,1,752,768})
         for(int y:{-16,0,1,8176,8192}){
             RunnerImageValue px{123},py{456};RunnerSpatialSplit::Box box{{1},{2},{3},{4}};bool precise=true;
             RunnerSpatialSplit::PixelBox pixels{11,22,33,44};
-            const bool expected=(object==60||object==93||object==99)&&x>=-256&&x<768&&y>=0&&y<8192&&
+            const bool expected=(object==60||object==93||object==99||object==92)&&x>=-256&&x<768&&y>=0&&y<8192&&
                 !(unsigned(x)&15u)&&!(unsigned(y)&15u);
             assert(grid.at(object,x,y,px,py,box,precise,&pixels)==expected);
             PreparedTerrainBirthBounds::Key key{0xffffffffu};
