@@ -64,7 +64,11 @@ behavior, both backend integrations and relevant original-game verification.
   do not retry registry encodings or tune their lookup helpers. Preserve inactive
   end-of-layer cutoffs, activation, depth order and retirement; an always-active
   scenery lease alone cannot represent these semantics. Gate on current frames
-  676, 1512 and 1689 as well as ordinary gameplay. This is not a revival of rejected
+  676, 1512 and 1689, plus no-input generation frame 163 (265.5 ms at
+  `092fc0ee` with the pending tree lease), as well as ordinary gameplay.
+  Separate the measured RNG refill cost from publication; do not count nested
+  timings twice or replace these owners with arithmetic-helper tuning.
+  This is not a revival of rejected
   immutable-row/copy-on-write spatial encodings. Preserve bounded run membership
   rather than replacing it with another per-cell logical lookup/publication
   path (see the rejected-approaches table). Judge the next structural change

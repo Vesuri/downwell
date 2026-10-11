@@ -43,6 +43,43 @@ build. Saved reports: `tmp/idle-baseline-{report,early}.txt`, FPS evidence:
 `tmp/idle-baseline-fps-gdb.log`. Matching trace ELF SHA-256:
 `95e363efdd0688e6a58921d3e2f12e567f6fa8c9cf09848b46dc800c8910f617`.
 
+## No-input generation gate
+
+At `092fc0ee` plus the pending derived-tree lease, a 35-field capture beginning
+at frame 162 measures the no-input tape's worst reported gap directly. Frame
+163 is **265.5 ms** (1,886,590 cycles), not a 280 ms CPU measurement inferred
+from its 14-field presentation gap. Frames 164–170 are respectively 63.1,
+60.3, 50.4, 46.9, 54.8, 48.0 and 50.4 ms. This is a baseline measurement,
+not an optimization or a paired comparison with the previous alarm dispatcher.
+
+| Owner in frame 163 | Inclusive ms |
+| --- | ---: |
+| Live generation | 208.29 |
+| Prepared terrain publication (within generation) | 98.67 |
+| Breakable construction (within generation) | 43.09 |
+| Enemy configuration (within generation) | 18.97 |
+| RNG lookahead refill (nested in source consumers) | 13.82 |
+| Draw collection | 13.09 |
+| Main-world row painting | 9.01 |
+
+Nested costs must not be summed. The burst occurs without player input,
+bullets or damage; capture coverage ends at tick 170, view Y 1076, three
+enemy slots and health 4. It adds an idle-generation gate alongside the
+contact tape's 676/1512/1689, rather than attributing all stalls to firing.
+
+```sh
+PROFILE_IDLE=1 SKIP_TO_GAME=1 PROFILE_CONTACT=0 PROFILE_FRAMES=600 \
+  VERIFY_CHIP_KB=512 VERIFY_TIMEOUT_SECONDS=120 STRIP=1 \
+  TRACE_FRAMES=162 TRACE_FIELDS=35 \
+  TRACE_OUTPUT=$PWD/tmp/trace/idle-generation-092fc0ee bash amiga/profile.sh trace
+python3 tools/amiga-trace-report.py tmp/trace/idle-generation-092fc0ee \
+  --frames=163 --causes --tree-min 2
+```
+
+Report: `tmp/idle-generation-092fc0ee-report.txt`; matching ELF SHA-256:
+`26f75ea6d27c275c7ede44572f52681669900983a2732e709305b473609bf2a1`.
+The bounded script restores the normal build. Raw traces are disposable.
+
 ## Retained End Step capture — 2026-10-11
 
 At `5373be79`, a fresh 30-field capture starting at 1300 measures frame 1305
