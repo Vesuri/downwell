@@ -1445,6 +1445,11 @@ int main(){
         auto world=std::make_unique<GameplayWorld>(300,false,1000,false);
         BulletAudit audit{world.get()};
         assert(world->bindBulletLifecycle(GameplayWorld::BulletLifecycleBinding::bindMaskDestruction(audit)));
+        BulletAudit otherAudit{world.get()};
+        assert(world->usesBulletDestruction(GameplayWorld::BulletLifecycleBinding::bindMaskDestruction(audit)));
+        assert(!world->usesBulletDestruction(GameplayWorld::BulletLifecycleBinding::bindMaskDestruction(otherAudit)));
+        assert(!world->usesBulletDestruction(GameplayWorld::BulletLifecycleBinding::bindDestruction(audit)));
+        assert(!world->usesBulletDestruction({}));
         world->step(4);assert(world->effectsSucceeded()&&world->bulletCount()==1);
         const auto& shot=world->bulletAt(0);const InstanceHandle key{shot.identitySlot,shot.lifetimeId};
         assert(world->markBulletDestroyed(key)&&audit.last==6);

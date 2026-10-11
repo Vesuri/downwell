@@ -2221,6 +2221,9 @@ public:
     bool bindBulletLifecycle(BulletLifecycleBinding binding){
         if(bulletSlotEnd_||!run_.effectsSucceeded)return false;bulletLifecycle_=binding;return true;
     }
+    bool usesBulletDestruction(const BulletLifecycleBinding& binding)const{
+        return bulletLifecycle_.sameDestruction(binding);
+    }
     bool retireMarkedBullet(downwell::InstanceHandle h);
     // Destruction is visible to collision queries immediately, but the
     // executing record remains resolvable until room cleanup.

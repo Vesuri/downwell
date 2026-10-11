@@ -24,6 +24,15 @@ struct ProjectileViewInterior {
         // callback (and hence no callback-driven reread) can occur here.
         return y.roundPixel(pixel)&&pixel>=first&&pixel<=last;
     }
+    // A conservative proof of at least one bullet destroy condition. There
+    // is a half-pixel or greater gap to the source threshold (and its epsilon).
+    // Ambiguous edge values retain the full source evaluator.
+    bool definitelyOutside(RunnerImageValue y)const{
+        const unsigned exponent=(y.bits>>23)&255u;
+        if(exponent==255u||(!exponent&&(y.bits&0x7fffffffu)))return false;
+        std::int32_t pixel;
+        return y.roundPixel(pixel)&&(pixel<=first-3||pixel>=last+3);
+    }
 };
 }
 #endif

@@ -72,12 +72,18 @@ trigonometry is 1.76 ms, below the structural work threshold.
 Frame 60 leaves `tryNativeActorEndStepInterior` and enters the complete
 captured dispatcher (11.84 ms). Generic projectile retirement reads published
 Y four times, performs source binary64 threshold arithmetic/comparisons, and
-publishes destruction. The no-op proof does not cover this boundary. A typed
-production phase is a candidate, not an implemented saving: it must retain
-player-before-boxes-before-actors order, thin-platform retirement, captured
-birth cutoffs, activation and destruction/failure prefixes. The existing
-callback adapter is still required for mutable or unsupported environments.
-Merely changing snapshot traversal repeats a rejected approach.
+publishes destruction. The original no-op proof does not cover this boundary.
+The native phase now additionally admits definitely-outside bullets when the
+destruction function and owner match the pinned native binding. It captures
+those handles in registration order before player End Step, then marks them
+without the generic event evaluator. This is valid only while every box,
+thin-platform and ordinary enemy retirement is proven a no-op and no other
+End Step family is present. The native mark cannot move actors or create new
+ones; repeated source destroy requests already become no-ops after its first
+successful mark. Cleanup remains deferred. Ambiguous floating-point boundaries,
+custom bindings and unsupported phases retain the complete callback adapter.
+The no-op-only selector and source evaluator remain reference paths. No new
+per-instance storage or task-stack snapshot is introduced.
 
 Reproduce with `SKIP_TO_GAME=1 PROFILE_CONTACT=1 VERIFY_CHIP_KB=512 STRIP=1
 VERIFY_TIMEOUT_SECONDS=120 TRACE_FRAMES=53 TRACE_FIELDS=24

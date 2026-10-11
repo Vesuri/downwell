@@ -42,10 +42,11 @@ static void checkViewInterior(){
                 Ops ops{published.promoted(),number(top)};bool good=true;
                 assert(ProjectileViewRetirement::run(ops,good)&&good);
                 if(interior.contains(published)){assert(!ops.kills);++admitted;}
+                if(interior.definitelyOutside(published))assert(ops.kills&&!interior.contains(published));
             }
         }
         for(std::uint32_t bits:{0x00000001u,0x80000001u,0x7f800000u,0xff800000u,0x7fc00000u})
-            assert(!interior.contains({bits}));
+            assert(!interior.contains({bits})&&!interior.definitelyOutside({bits}));
     };
     for(int whole=-600;whole<=600;whole+=3)
         for(int fraction:{0,1,2047,2048,4095})check(whole*4096+fraction);

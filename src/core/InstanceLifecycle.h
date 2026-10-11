@@ -142,6 +142,9 @@ public:
     }
     bool hasPlaceMeeting()const{return placeMeeting_!=nullptr;}
     bool hasOwner()const{return context_!=nullptr;}
+    bool sameDestruction(const RecordLifecycleBinding& other)const{
+        return destroyed_&&context_==other.context_&&destroyed_==other.destroyed_;
+    }
     template<class Owner> static RecordLifecycleBinding bindQueryDestruction(Owner& owner){
         auto b=bindQueries(owner);
         b.destroyed_=[](void* p,InstanceHandle h,const Record& r){return static_cast<Owner*>(p)->markDestroyed(h,r);};

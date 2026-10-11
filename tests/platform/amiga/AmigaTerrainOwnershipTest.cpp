@@ -431,6 +431,29 @@ int main(int argc,char** argv){
         scene->world->setPlayerHit();
         require(scene->owner->tryNativeActorEndStepInterior(-2147483647L-1,admitted)&&!admitted&&scene->world->playerHit()==1,
             "unsupported boundary falls back before any event executes");
+        for(unsigned i=0;i<360&&!scene->world->bulletCount();++i){
+            scene->world->step(i%2?4:0);
+            require(scene->world->effectsSucceeded()&&scene->owner->prepareDraw(),"release entry and fire");
+        }
+        require(scene->world->effectsSucceeded()&&scene->world->bulletCount()==1,
+            "native retirement phase fixture fires one bullet");
+        top=(34L+scene->world->cameraOffsetY())*4096;
+        const auto& shotRecord=scene->world->bulletAt(0);
+        const downwell::InstanceHandle shot{shotRecord.identitySlot,shotRecord.lifetimeId};
+        downwell::RunnerImageValue outside;
+        require(outside.assignInteger(top/4096+400)&&
+            scene->world->publishBulletCollisionPosition(shot,shotRecord.sourceMotion.x,outside),
+            "publish retirement boundary before phase capture");
+        scene->world->setPlayerHit();
+        require(scene->owner->tryNativeActorEndStepInterior(top,admitted)&&!admitted&&
+            scene->world->playerHit()==1&&!scene->world->resolveBulletLifetime(shot)->destroyRequested,
+            "retained no-op reference refuses boundary without side effects");
+        require(scene->owner->tryNativeActorEndStepInterior(top,admitted,true)&&admitted&&
+            scene->world->playerHit()==2&&scene->world->resolveBulletLifetime(shot)->destroyRequested,
+            "native phase executes player then marks captured outside bullet");
+        require(scene->owner->prepareDraw()&&!scene->world->resolveBulletLifetime(shot),
+            "native phase preserves delayed room cleanup");
+        scene->world->setPlayerHit();
         require(scene->world->createGeneratedInstance({111,240,-10000},objects,[](const auto&){return true;}),
             "birth out-of-view enemy");
         require(scene->owner->tryNativeActorEndStepInterior(top,admitted)&&!admitted&&scene->world->playerHit()==1,

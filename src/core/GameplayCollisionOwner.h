@@ -2032,7 +2032,7 @@ public:
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
             if(!self.valid())return false;
             bool interior=false;
-            if(!self.tryNativeActorEndStepInterior(topQ12,interior))return false;
+            if(!self.tryNativeActorEndStepInterior(topQ12,interior,true))return false;
             if(interior)return true;
             const auto* nativeTerrain=self.world_->nativeTerrainInstances();
             const unsigned terrainCount=nativeTerrain?nativeTerrain->size():self.terrain_.size();
@@ -2560,10 +2560,11 @@ private:
 public:
     GameplayTerrainInstances& terrain(){return terrain_;}
     // Only the pinned production rmMain events are eligible, never an
-    // arbitrary Execute callback. If every retirement is a no-op, none can
-    // mutate a later actor or admit a new lifetime. Keep the complete ordered
-    // dispatcher below for every boundary/unsupported case.
-    bool tryNativeActorEndStepInterior(long topQ12,bool& handled){
+    // arbitrary Execute callback. The reference selector admits no-op phases
+    // only; production also admits provably outside bullets when their pinned
+    // mark callback cannot mutate a later actor or admit a new lifetime. Keep
+    // the complete ordered dispatcher for ambiguous/unsupported cases.
+    bool tryNativeActorEndStepInterior(long topQ12,bool& handled,bool retireBullets=false){
         handled=false;
         if(!valid()||!world_)return check(false);
         if(!native_||collisionConsumersAdmitted_||!nativeBoxes_||actorEndStepExecuting_||combatAlarmPhaseInUse_)
@@ -2575,6 +2576,8 @@ public:
            !thinRetirementWindow_.contains(topQ12,terrain->lastLifetime()))return true;
         if(topQ12<(-2147483647L-1)||topQ12>2147483647L)return true;
         const ProjectileViewInterior interior(static_cast<std::int32_t>(topQ12));
+        retireBullets=retireBullets&&world_->usesBulletDestruction(
+            GameplayWorld::BulletLifecycleBinding::bindMaskDestruction(bullets_));
         for(unsigned i=0;i<world_->enemyCount();++i){
             const auto& enemy=world_->enemyAt(i);
             const InstanceHandle h{View::enemyBase+enemy.identitySlot,enemy.lifetimeId};
@@ -2588,13 +2591,30 @@ public:
             position.include(enemy.y+176);
             if(!position.supported||topQ12<position.low||topQ12>position.high)return true;
         }
+        bool retiring=false;
         for(unsigned i=0;i<world_->bulletSlotEnd();++i){
             const auto& bullet=world_->bulletAt(i);
             if(bullet.identitySlot>=GameplayWorld::bulletCapacity||!bullet.lifetimeId)continue;
             const InstanceHandle h{View::bulletBase+bullet.identitySlot,bullet.lifetimeId};
             std::uint32_t flags;
             if(!table_.registered(h)||!table_.flags(h,flags)||(flags&0x100003u))continue;
-            if(table_.objectId(h)!=261||!interior.contains(bullet.sourceMotion.y))return true;
+            if(table_.objectId(h)!=261)return true;
+            if(!interior.contains(bullet.sourceMotion.y)){
+                if(!retireBullets||!interior.definitelyOutside(bullet.sourceMotion.y))return true;
+                retiring=true;
+            }
+        }
+        if(retiring){
+            // Reuse the phase workspace, not the Amiga task stack. Capture
+            // registration order before player End Step or any publication.
+            actorEndStepCaptured_=false;actorEndStepPhase_.clear();
+            if(!check(visitRegistered(View::bulletBase,View::scriptEffectBase,
+                [&](InstanceHandle h,int object,std::uint32_t flags){
+                    if(flags&0x100003u)return true;
+                    const auto* bullet=world_->resolveBulletLifetime({h.slot-View::bulletBase,h.generation});
+                    return object==261&&bullet&&(interior.contains(bullet->sourceMotion.y)||
+                        actorEndStepPhase_.append(h.slot,h.generation,object));
+                })))return false;
         }
         // This event changes playerHit only. It cannot invalidate any proof
         // above or run a nested destruction/birth callback.
@@ -2604,6 +2624,17 @@ public:
         if(table_.registered(player)&&table_.flags(player,flags)&&!(flags&0x100003u)){
             if(!check(table_.objectId(player)==35&&world_->findPlayer(local)))return false;
             world_->playerDamageEndStep();
+        }
+        if(retiring){
+            // The pinned native mark only changes exclusion/cleanup/Draw
+            // membership. It cannot move self, mutate another actor, or birth
+            // anything. Multiple source destroy requests collapse to the same
+            // first mark: GameplayWorld already makes later requests no-ops.
+            // Custom destruction bindings were excluded before any mutation.
+            for(unsigned i=0;i<actorEndStepPhase_.size();++i){
+                const auto h=actorEndStepPhase_.handle(i);
+                if(!check(world_->markBulletDestroyed({h.slot-View::bulletBase,h.generation})))return false;
+            }
         }
         handled=true;return true;
     }
