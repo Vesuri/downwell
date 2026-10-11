@@ -8,59 +8,58 @@ idle baseline. The separate no-input route uses ordinary startup/generation,
 with no actor, health, collision or RNG injection. It includes the initial
 fall; after landing the enemies continue their source behavior.
 
-On `7c56ea58` plus the pending derived-tree lease and this diagnostic, 600
-updates take 1,344 PAL fields (**22.32 FPS**), with a maximum 13-field gap at
-frame 163. Coverage is ticks 0–599, view Y 39–1082, three enemy slots, final
-health 4, no dead samples, zero input samples with buttons, and zero bullet
-slots. The coarse maximum includes generation; it is not a measured 260 ms
-CPU cost. Instruction captures cover early falling and settled gameplay:
+At `778b7fc4`, three 35-field captures cover early falling, generation and
+settled gameplay, using 512 KiB Chip and 8 MiB Fast on the cycle-exact PAL
+A500. They end at ticks 72/170/313, view Y 415/1076/1082, with 0/3/3 enemy
+slots and health 4. Input comes exclusively from the no-input controller.
+These captures are not a new full-tape FPS measurement.
 
 | Complete frames | Mean ms | Worst ms |
 | --- | ---: | ---: |
-| 51–72 | 30.923 | 41.6 |
-| 301–313 | 48.962 | 50.7 |
+| 51–72 | 30.9 | 41.4 |
+| 301–313 | 47.2 | 49.2 |
 
-Frame 301 is 47.9 ms: enemy Step 14.42 ms, captured alarm dispatch 5.11 ms,
-player motion 3.73 ms, actor End Step dispatch 2.43 ms, and draw collection
-2.99 ms. These are separate owners; none is an improvement claim. The enemy
+Frame 301 is 45.89 ms: enemy Step 14.42 ms, captured alarm dispatch 3.36 ms,
+player motion 3.73 ms, actor End Step dispatch 2.35 ms, and draw collection
+2.98 ms. These are separate owners; none is an improvement claim. The enemy
 Step cost includes movement/collision behavior as well as publication, not
-just irrelevant-family scanning. Do not remove offscreen source Steps merely
-because their pixels are invisible.
+just irrelevant-family scanning. The extra registered effect-surface traversal
+is 0.53 ms: below the work threshold. Do not remove offscreen source Steps merely
+because their pixels are invisible, or replace this measured generation target
+with sub-millisecond empty-family/helper changes.
 
 ```sh
 VERIFY_CHIP_KB=512 VERIFY_TIMEOUT_SECONDS=120 STRIP=1 bash amiga/profile.sh idle
 PROFILE_IDLE=1 SKIP_TO_GAME=1 PROFILE_CONTACT=0 PROFILE_FRAMES=600 \
   VERIFY_CHIP_KB=512 VERIFY_TIMEOUT_SECONDS=120 STRIP=1 \
-  TRACE_FRAMES=50,300 TRACE_FIELDS=35 TRACE_OUTPUT=$PWD/tmp/trace/idle-baseline \
+  TRACE_FRAMES=50,162,300 TRACE_FIELDS=35 TRACE_OUTPUT=$PWD/tmp/trace/scene-dispatch-778b7fc4 \
   bash amiga/profile.sh trace
-python3 tools/amiga-trace-report.py tmp/trace/idle-baseline --frames=301 --tree-min=1
+python3 tools/amiga-trace-report.py tmp/trace/scene-dispatch-778b7fc4 --frames=301 --causes --tree-min=0.5
 ```
 
 `PROFILE_IDLE` is a diagnostic input route only, never a shipping or optimized
 logic mode. The build rejects other input tapes combined with it; the FPS
 verifier requires no input, bullets, damage or death. Scripts restore the normal
-build. Saved reports: `tmp/idle-baseline-{report,early}.txt`, FPS evidence:
-`tmp/idle-baseline-fps-gdb.log`. Matching trace ELF SHA-256:
-`95e363efdd0688e6a58921d3e2f12e567f6fa8c9cf09848b46dc800c8910f617`.
+build. Saved reports: `tmp/scene-dispatch-idle51.txt` and
+`tmp/scene-dispatch-idle301.txt`. Matching trace ELF SHA-256:
+`7d3e033bc0653c9bd7137eac7ba92b6d3df7ac98d1b090b1ea2c55eb851495af`.
 
 ## No-input generation gate
 
-At `092fc0ee` plus the pending derived-tree lease, a 35-field capture beginning
-at frame 162 measures the no-input tape's worst reported gap directly. Frame
-163 is **265.5 ms** (1,886,590 cycles), not a 280 ms CPU measurement inferred
-from its 14-field presentation gap. Frames 164–170 are respectively 63.1,
-60.3, 50.4, 46.9, 54.8, 48.0 and 50.4 ms. This is a baseline measurement,
-not an optimization or a paired comparison with the previous alarm dispatcher.
+The same `778b7fc4` capture measures frame 163 at **256.91 ms** (1,825,390
+cycles). This is instruction time, not a CPU estimate from a presentation gap.
+It agrees with the preceding sparse-cutoff measurement (256.8 ms) within noise.
 
 | Owner in frame 163 | Inclusive ms |
 | --- | ---: |
-| Live generation | 208.29 |
-| Prepared terrain publication (within generation) | 98.67 |
-| Breakable construction (within generation) | 43.09 |
-| Enemy configuration (within generation) | 18.97 |
-| RNG lookahead refill (nested in source consumers) | 13.82 |
-| Draw collection | 13.09 |
-| Main-world row painting | 9.01 |
+| Live generation | 208.09 |
+| Prepared terrain admission (within generation) | 98.63 |
+| Native terrain construction (within admission) | 87.28 |
+| Terrain collision-owner span publication (within construction) | 47.24 |
+| Breakable construction (within generation) | 42.78 |
+| Breakable native birth publication (within construction) | 26.54 |
+| Enemy configuration (within generation) | 18.74 |
+| Main-world row painting | 8.93 |
 
 Nested costs must not be summed. The burst occurs without player input,
 bullets or damage; capture coverage ends at tick 170, view Y 1076, three
@@ -71,13 +70,13 @@ contact tape's 676/1512/1689, rather than attributing all stalls to firing.
 PROFILE_IDLE=1 SKIP_TO_GAME=1 PROFILE_CONTACT=0 PROFILE_FRAMES=600 \
   VERIFY_CHIP_KB=512 VERIFY_TIMEOUT_SECONDS=120 STRIP=1 \
   TRACE_FRAMES=162 TRACE_FIELDS=35 \
-  TRACE_OUTPUT=$PWD/tmp/trace/idle-generation-092fc0ee bash amiga/profile.sh trace
-python3 tools/amiga-trace-report.py tmp/trace/idle-generation-092fc0ee \
+  TRACE_OUTPUT=$PWD/tmp/trace/scene-dispatch-generation bash amiga/profile.sh trace
+python3 tools/amiga-trace-report.py tmp/trace/scene-dispatch-generation \
   --frames=163 --causes --tree-min 2
 ```
 
-Report: `tmp/idle-generation-092fc0ee-report.txt`; matching ELF SHA-256:
-`26f75ea6d27c275c7ede44572f52681669900983a2732e709305b473609bf2a1`.
+Report: `tmp/scene-dispatch-generation163.txt`; matching ELF is the three-window
+capture identified above.
 The bounded script restores the normal build. Raw traces are disposable.
 
 ## Retained End Step capture — 2026-10-11
