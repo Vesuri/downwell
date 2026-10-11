@@ -26,6 +26,8 @@ PAL field is 142,102 of them.
 import argparse
 import bisect
 import collections
+import hashlib
+import json
 import os
 import re
 import shutil
@@ -496,6 +498,33 @@ def complete_frame_numbers(frame_cycles, partial_frames):
     return [f for f in sorted(frame_cycles) if f not in partial_frames]
 
 
+def frame_summary(frame_cycles, partial_frames, elf_hash):
+    """Keep exact cycles after disposable instruction traces are removed."""
+    return {'schema': 'downwell-frame-cycles/v1', 'elf_sha256': elf_hash,
+            'pal_field_cycles': FIELD_CYCLES,
+            'frames': [{'frame': f, 'cycles': frame_cycles[f]}
+                       for f in complete_frame_numbers(frame_cycles, partial_frames)],
+            'partial_frames': sorted(partial_frames)}
+
+
+def file_hash(path):
+    digest = hashlib.sha256()
+    with open(path, 'rb') as source:
+        for block in iter(lambda: source.read(1024 * 1024), b''):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def merge_frame_cycles(target, partial, seen_complete, source, start, last):
+    complete = set(source) - {start, last}
+    overlap = complete & seen_complete
+    if overlap:
+        raise ValueError(f'overlapping complete-frame captures: {sorted(overlap)}')
+    seen_complete.update(complete)
+    target.update(source)
+    partial.update((start, last))
+
+
 def select_frames(frame_cycles, partial_frames, frames=None, min_fields=0.0, partial_frame=None):
     if partial_frame is not None:
         if frames is not None or min_fields:
@@ -524,7 +553,9 @@ def main():
     parser.add_argument('--focus', action='append', default=[],
                         help='print callers/callees for an exact logical name or matching substring')
     parser.add_argument('--frames', default=None,
-                        help='restrict attribution to game frames N or N-M')
+                        help='restrict attribution and the frame table to game frames N or N-M')
+    parser.add_argument('--frame-summary', default=None,
+                        help='save exact complete-frame cycles and ELF hash for matched comparisons')
     parser.add_argument('--partial-frame', type=int, default=None,
                         help='attribute only a captured slice of N; never a frame-duration measurement')
     parser.add_argument('--min-fields', type=float, default=0.0,
@@ -556,12 +587,18 @@ def main():
     entries = collections.Counter()  # (frame, callee entry pc) -> user-mode calls
     frame_cycles = collections.Counter()
     partial_frames = set()  # recording starts/ends inside a game frame
+    seen_complete = set()
     total_fields = 0
     for start_frame, path in traces:
+        trace_cycles = collections.Counter()
         fields, last = attribute(path, start_frame, calls, mark, stacks,
-                                 frame_cycles, entries)
+                                 trace_cycles, entries)
         total_fields += fields
-        partial_frames.update((start_frame, last))
+        try:
+            merge_frame_cycles(frame_cycles, partial_frames, seen_complete,
+                               trace_cycles, start_frame, last)
+        except ValueError as error:
+            sys.exit(str(error))
 
     complete = complete_frame_numbers(frame_cycles, partial_frames)
     try:
@@ -569,6 +606,14 @@ def main():
     except ValueError as error:
         sys.exit(str(error))
     unit = 'captured slice' if args.partial_frame is not None else 'frame'
+    if args.frame_summary:
+        summary = frame_summary(frame_cycles, partial_frames, file_hash(elf))
+        summary['tool'] = 'amiga-trace-report/frame-summary-v1'
+        summary['tool_sha256'] = file_hash(__file__)
+        summary['inputs'] = {os.path.basename(path): file_hash(path) for _, path in traces}
+        with open(args.frame_summary, 'w') as target:
+            json.dump(summary, target, indent=2)
+            target.write('\n')
     sym = Symbolizer(elf, symbols)
     sym.resolve(p for key in stacks for p in key[1:] if isinstance(p, int))
 
@@ -615,7 +660,7 @@ def main():
           '## Game frames (frame mark to next mark; ms = cycles / 142102 x 20)')
     print('| frame | ms | fields | largest parts below runDownwell (ms) |')
     print('| ---: | ---: | ---: | --- |')
-    for f in sorted(chosen) if args.partial_frame is not None else complete:
+    for f in sorted(chosen):
         c = frame_cycles[f]
         parts = ', '.join(f'{display_name(name)} {ms(v):.1f}' for name, v in per_frame[f].most_common(6))
         print(f'| {f} | {ms(c):.1f} | {c / FIELD_CYCLES:.2f} | {parts} |')

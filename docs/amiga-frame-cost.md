@@ -1,5 +1,51 @@
 # Amiga gameplay frame-cost audit
 
+## Current reproducible baseline
+
+Game revision `e8588c07`, A500/68000 with 512 KiB Chip, 512 KiB slow and
+8 MiB Fast. Exact complete-frame cycles, partial-frame exclusions, trace hashes
+and the matching ELF hash are committed in
+[`amiga-frame-baseline.json`](amiga-frame-baseline.json). This is a measured
+baseline, not a claim that the regression or 20 ms budget is resolved.
+
+| Matched frames | Mean ms | Worst ms |
+| --- | ---: | ---: |
+| 51–70 | 33.4059 | 46.5187 |
+| 676–681 | 101.0014 | 238.9664 |
+| 1047–1055 | 64.6839 | 91.9438 |
+| 1305–1314 | 60.3150 | 79.0418 |
+| 1512–1521 | 60.6326 | 139.5814 |
+| 1535–1545 | 55.4820 | 72.2706 |
+| 1689–1694 | 89.5376 | 221.2552 |
+
+Frame 51 alone is 26.4 ms; the early tape includes firing, not idle input.
+Capture duration is **not** a comparison window: a faster build fits more
+updates into the same number of PAL fields. The ranges above select exactly
+the same complete frames in both revisions. The last capture does not fully
+contain frame 1695, so it must not be included. Do not average rounded values
+copied from the Markdown report when exact cycles are available.
+
+```sh
+SKIP_TO_GAME=1 PROFILE_CONTACT=1 VERIFY_CHIP_KB=512 \
+  VERIFY_TIMEOUT_SECONDS=180 STRIP=1 \
+  TRACE_FRAMES=50,675,1046,1304,1511,1534,1688 TRACE_FIELDS=35 \
+  TRACE_OUTPUT="$PWD/tmp/trace/candidate" bash amiga/profile.sh trace
+python3 tools/amiga-trace-report.py tmp/trace/candidate --causes \
+  --frame-summary tmp/candidate-frames.json > tmp/candidate-report.txt
+python3 tools/amiga-frame-compare.py docs/amiga-frame-baseline.json \
+  tmp/candidate-frames.json \
+  --frames 51-70,676-681,1047-1055,1305-1314,1512-1521,1535-1545,1689-1694
+```
+
+The comparison rejects missing/partial frames instead of silently reducing
+coverage. If a slower candidate fails to cover a range, recapture a longer
+window. Overlapping complete-frame captures are rejected rather than summed
+into an apparent longer frame. Workload and replay equivalence remain separate
+requirements; matching frame numbers alone does not prove either. The trace
+report's `--frames` selector now restricts its frame table as well as attribution.
+Reference report/ELF: `tmp/baseline-exact-windows-report.txt` and
+`tmp/trace/baseline-exact-windows/Downwell.elf`.
+
 ## Bitmap-selected room cleanup
 
 At `11f8ca10`, two retiring thin platforms make Draw cleanup cost 38.15 ms

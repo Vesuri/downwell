@@ -5,11 +5,49 @@ from pathlib import Path
 import unittest
 from unittest import mock
 from collections import Counter
+import json
+import tempfile
 
 spec = importlib.util.spec_from_file_location(
     "trace_report", Path(__file__).resolve().parents[1] / "tools/amiga-trace-report.py")
 report = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(report)
+compare_spec = importlib.util.spec_from_file_location(
+    "frame_compare", Path(__file__).resolve().parents[1] / "tools/amiga-frame-compare.py")
+comparison = importlib.util.module_from_spec(compare_spec)
+compare_spec.loader.exec_module(comparison)
+
+
+class MatchedWindows(unittest.TestCase):
+    def test_summary_excludes_partial_and_retains_exact_cycles(self):
+        summary = report.frame_summary({10: 10, 11: 142103, 12: 20}, {10, 12}, 'a' * 64)
+        self.assertEqual(summary['frames'], [{'frame': 11, 'cycles': 142103}])
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'frames.json'
+            path.write_text(json.dumps(summary))
+            self.assertEqual(comparison.load_summary(path), ('a' * 64, {11: 142103}))
+            summary['frames'].append({'frame': 12, 'cycles': 20})
+            path.write_text(json.dumps(summary))
+            with self.assertRaisesRegex(ValueError, 'partial'):
+                comparison.load_summary(path)
+
+    def test_faster_capture_extra_frames_do_not_change_comparison(self):
+        before = {11: 142102, 12: 284204}
+        after = {11: 71051, 12: 142102, 13: 1, 14: 1}
+        rows = comparison.compare(before, after, comparison.windows('11-12'))
+        self.assertEqual(rows, [(11, 12, 30, 15, 40, 20, -10)])
+        with self.assertRaisesRegex(ValueError, 'missing complete frames'):
+            comparison.compare(before, after, comparison.windows('11-14'))
+        for invalid in ('', '0', '12-11', '1-', '1,,2', '1.5'):
+            with self.assertRaises(ValueError):
+                comparison.windows(invalid)
+
+    def test_duplicate_capture_is_not_double_duration(self):
+        cycles, partial, complete = Counter(), set(), set()
+        report.merge_frame_cycles(cycles, partial, complete, {10: 1, 11: 100, 12: 2}, 10, 12)
+        with self.assertRaisesRegex(ValueError, 'overlapping'):
+            report.merge_frame_cycles(cycles, partial, complete, {9: 1, 11: 100, 13: 2}, 9, 13)
+        self.assertEqual(cycles[11], 100)
 
 
 class PartialAttribution(unittest.TestCase):

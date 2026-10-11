@@ -1,0 +1,330 @@
+{
+  "schema": "downwell-frame-cycles/v1",
+  "elf_sha256": "d5b1520bfbdd9d6818362f053a890d8437a337c65f46a49dbb043ba645608f27",
+  "pal_field_cycles": 142102,
+  "frames": [
+    {
+      "frame": 51,
+      "cycles": 187550
+    },
+    {
+      "frame": 52,
+      "cycles": 190280
+    },
+    {
+      "frame": 53,
+      "cycles": 187930
+    },
+    {
+      "frame": 54,
+      "cycles": 330520
+    },
+    {
+      "frame": 55,
+      "cycles": 247590
+    },
+    {
+      "frame": 56,
+      "cycles": 237770
+    },
+    {
+      "frame": 57,
+      "cycles": 258700
+    },
+    {
+      "frame": 58,
+      "cycles": 215200
+    },
+    {
+      "frame": 59,
+      "cycles": 208290
+    },
+    {
+      "frame": 60,
+      "cycles": 319240
+    },
+    {
+      "frame": 61,
+      "cycles": 193160
+    },
+    {
+      "frame": 62,
+      "cycles": 193140
+    },
+    {
+      "frame": 63,
+      "cycles": 184520
+    },
+    {
+      "frame": 64,
+      "cycles": 329110
+    },
+    {
+      "frame": 65,
+      "cycles": 242140
+    },
+    {
+      "frame": 66,
+      "cycles": 236110
+    },
+    {
+      "frame": 67,
+      "cycles": 255270
+    },
+    {
+      "frame": 68,
+      "cycles": 210450
+    },
+    {
+      "frame": 69,
+      "cycles": 205880
+    },
+    {
+      "frame": 70,
+      "cycles": 314200
+    },
+    {
+      "frame": 676,
+      "cycles": 1697880
+    },
+    {
+      "frame": 677,
+      "cycles": 538050
+    },
+    {
+      "frame": 678,
+      "cycles": 476100
+    },
+    {
+      "frame": 679,
+      "cycles": 535570
+    },
+    {
+      "frame": 680,
+      "cycles": 529090
+    },
+    {
+      "frame": 681,
+      "cycles": 529060
+    },
+    {
+      "frame": 1047,
+      "cycles": 653270
+    },
+    {
+      "frame": 1048,
+      "cycles": 484470
+    },
+    {
+      "frame": 1049,
+      "cycles": 430370
+    },
+    {
+      "frame": 1050,
+      "cycles": 467330
+    },
+    {
+      "frame": 1051,
+      "cycles": 422480
+    },
+    {
+      "frame": 1052,
+      "cycles": 438510
+    },
+    {
+      "frame": 1053,
+      "cycles": 408430
+    },
+    {
+      "frame": 1054,
+      "cycles": 429610
+    },
+    {
+      "frame": 1055,
+      "cycles": 401800
+    },
+    {
+      "frame": 1056,
+      "cycles": 389540
+    },
+    {
+      "frame": 1305,
+      "cycles": 435680
+    },
+    {
+      "frame": 1306,
+      "cycles": 444610
+    },
+    {
+      "frame": 1307,
+      "cycles": 427530
+    },
+    {
+      "frame": 1308,
+      "cycles": 401460
+    },
+    {
+      "frame": 1309,
+      "cycles": 409690
+    },
+    {
+      "frame": 1310,
+      "cycles": 398040
+    },
+    {
+      "frame": 1311,
+      "cycles": 401200
+    },
+    {
+      "frame": 1312,
+      "cycles": 408300
+    },
+    {
+      "frame": 1313,
+      "cycles": 397330
+    },
+    {
+      "frame": 1314,
+      "cycles": 561600
+    },
+    {
+      "frame": 1512,
+      "cycles": 991740
+    },
+    {
+      "frame": 1513,
+      "cycles": 347610
+    },
+    {
+      "frame": 1514,
+      "cycles": 320840
+    },
+    {
+      "frame": 1515,
+      "cycles": 492720
+    },
+    {
+      "frame": 1516,
+      "cycles": 332980
+    },
+    {
+      "frame": 1517,
+      "cycles": 318660
+    },
+    {
+      "frame": 1518,
+      "cycles": 374330
+    },
+    {
+      "frame": 1519,
+      "cycles": 417740
+    },
+    {
+      "frame": 1520,
+      "cycles": 324240
+    },
+    {
+      "frame": 1521,
+      "cycles": 387150
+    },
+    {
+      "frame": 1535,
+      "cycles": 513490
+    },
+    {
+      "frame": 1536,
+      "cycles": 453380
+    },
+    {
+      "frame": 1537,
+      "cycles": 358150
+    },
+    {
+      "frame": 1538,
+      "cycles": 347190
+    },
+    {
+      "frame": 1539,
+      "cycles": 396070
+    },
+    {
+      "frame": 1540,
+      "cycles": 369310
+    },
+    {
+      "frame": 1541,
+      "cycles": 358820
+    },
+    {
+      "frame": 1542,
+      "cycles": 398850
+    },
+    {
+      "frame": 1543,
+      "cycles": 370270
+    },
+    {
+      "frame": 1544,
+      "cycles": 367180
+    },
+    {
+      "frame": 1545,
+      "cycles": 403550
+    },
+    {
+      "frame": 1689,
+      "cycles": 1572040
+    },
+    {
+      "frame": 1690,
+      "cycles": 438510
+    },
+    {
+      "frame": 1691,
+      "cycles": 404920
+    },
+    {
+      "frame": 1692,
+      "cycles": 447920
+    },
+    {
+      "frame": 1693,
+      "cycles": 422040
+    },
+    {
+      "frame": 1694,
+      "cycles": 531610
+    },
+    {
+      "frame": 1695,
+      "cycles": 435670
+    }
+  ],
+  "partial_frames": [
+    50,
+    71,
+    675,
+    682,
+    1046,
+    1057,
+    1304,
+    1315,
+    1511,
+    1522,
+    1534,
+    1546,
+    1688,
+    1696
+  ],
+  "tool": "amiga-trace-report/frame-summary-v1",
+  "tool_sha256": "d4299f6ddcc0c0f72af128edf02817b1c86d56973513913faf6cc7b58154ba1a",
+  "inputs": {
+    "trace-50.bin": "42b2e875aabbbeaeeace2bd78d450f64592c797b11c660bfe0235a8cac4161b7",
+    "trace-675.bin": "e75a4a88e254aedd6f5c2509dedb85835640e0e1ee860dfe02c4725c5cdbd3c6",
+    "trace-1046.bin": "54d9f23a6ff13139cf061a49d87c2ccf8ae9b89067a1d6629c45d95342763f7f",
+    "trace-1304.bin": "45f9bc1f251abeda78309402b158a257e5a01b10b1cffe9c2f1314ba939989ba",
+    "trace-1511.bin": "fc90faf3f1e195cb0e26755643fa4daf4c090604b64dfbf493e336d6adeb41d2",
+    "trace-1534.bin": "4c857d1532cb87cf6d2e36ade236e7dd14cc1b853f71142ac8ffba1e9c94ec51",
+    "trace-1688.bin": "d74a893e1a0a3f562a4c80e572a807f4a8cb6aded00c6ec3d7a9f044f8d69fdb"
+  }
+}
