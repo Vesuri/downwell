@@ -421,6 +421,8 @@ extern "C" volatile ULONG gDownwellSceneBankLoads;
 volatile ULONG gDownwellSceneBankLoads;
 extern "C" volatile ULONG gDownwellSplashPreparations, gDownwellGardenPreparations, gDownwellStartupScene;
 volatile ULONG gDownwellSplashPreparations, gDownwellGardenPreparations, gDownwellStartupScene;
+extern "C" volatile ULONG gDownwellInitialRoomPreparations;
+volatile ULONG gDownwellInitialRoomPreparations;
 #ifdef DOWNWELL_PROFILE_IDLE
 extern "C" volatile ULONG gDownwellIdleInputViolations, gDownwellIdleBulletSlots;
 volatile ULONG gDownwellIdleInputViolations, gDownwellIdleBulletSlots;
@@ -2040,8 +2042,10 @@ __attribute__((noinline)) static int runDownwell(void) {
     downwell::GameMakerRandom enemyRandom(2);
     downwell::PackedRoom mainRoom;
     const AmigaTerrainCollisionContext emptyTerrain{0, 0, &builders, 0, 0, 0};
+#ifdef DOWNWELL_REPLAY_VERIFY
     amigaBuildTerrainIndex(emptyTerrain, terrainIndex);
     terrainTiles.clear();
+#endif
 #ifndef DOWNWELL_REPLAY_VERIFY
     const int emptyBlock = 0;
     port.configureBreakables(&emptyBlock, &emptyBlock, 0);
@@ -2060,7 +2064,11 @@ __attribute__((noinline)) static int runDownwell(void) {
         return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
     }
 #ifndef DOWNWELL_REPLAY_VERIFY
-    {
+    bool initialGameplayPrepared=false;
+    const auto prepareInitialGameplay=[&](){
+        if(initialGameplayPrepared)return true;
+        amigaBuildTerrainIndex(emptyTerrain, terrainIndex);
+        terrainTiles.clear();
 #if defined(DOWNWELL_PROBES) || defined(DOWNWELL_FPSCOUNT)
         // Keep the zero-cost reference measurement visible to the debugger.
         (void)gDownwellRoomPlanFields;
@@ -2103,12 +2111,9 @@ __attribute__((noinline)) static int runDownwell(void) {
 #endif
                 world.configureEnemyRandom(random);return true;
             },&enemyRandom)) {
-            platform.restore();
-            FreeMem(startupCopperWords, 4 * sizeof(UWORD));
-            memory.release();
             gDownwellStartupFailure = 6;
             downwellStartupFailed();
-            return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
+            return false;
         }
         worldViewX = mainViewX + port.cameraOffsetX();
         worldViewY = mainInitialViewY + port.cameraOffsetY();
@@ -2136,12 +2141,9 @@ __attribute__((noinline)) static int runDownwell(void) {
         bool outside=true;
         if(!maskChecksSucceeded||!testedWall||!collisionOwner.terrainPositionMeeting(60,downwell::MotionBinary64::fromInteger(-10000),
             downwell::MotionBinary64::fromInteger(-10000),collisionMasks,outside)||outside){
-            platform.restore();
-            FreeMem(startupCopperWords,4*sizeof(UWORD));
-            memory.release();
             gDownwellStartupFailure=6;
             downwellStartupFailed();
-            return 20;
+            return false;
         }
         ++gDownwellPreciseMaskChecks;
 #endif
@@ -2157,7 +2159,16 @@ __attribute__((noinline)) static int runDownwell(void) {
         liveGeneration.bind(port);
         port.configureEnemyRandom(enemyRandom);
         port.configureGenerationStep(generateLiveTerrain, &liveGeneration);
+        initialGameplayPrepared=true;++gDownwellInitialRoomPreparations;
+        return true;
+    };
+#if (defined(DOWNWELL_SCENE_VERIFY) && !defined(DOWNWELL_SCENE_DESCENT_VERIFY)) || defined(DOWNWELL_FIELD_VERIFY) || defined(DOWNWELL_ENTRY_WIPE_VERIFY)
+    // These explicit fixtures inspect the authored room before their scene
+    // loop. The full-scene route exercises ordinary deferred room admission.
+    if(!prepareInitialGameplay()){
+        platform.restore();FreeMem(startupCopperWords,4*sizeof(UWORD));memory.release();return 20;
     }
+#endif
 #endif
 #ifdef DOWNWELL_TERRAIN_DIRECT
     if(!AmigaTerrainPainter::bindPrepared(amiga_terrain_phase6,amiga_terrain_phase6_end-amiga_terrain_phase6)){
@@ -2850,6 +2861,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     platform.publish(splashBlankList);
                     platform.waitVblank();
                     DW_PROFILE_PHASE(profileEntryFields);
+                    if(!prepareInitialGameplay()){exitCode=20;break;}
                     if (!acquireGameplayPlanes()) { exitCode=20; break; }
 #ifdef DOWNWELL_PREPARED_FIELDS
                     // Terrain batching owns the prefix. Rebind after every

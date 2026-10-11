@@ -66,6 +66,10 @@ end
 # The living world-1 contact tape never enters a shop, results or upgrade room.
 # New scene content must not introduce bank loading/preparation to this route.
 if gDownwellProfileRequireDamage && gDownwellProfileDeadSamples == 0
+    if gDownwellInitialRoomPreparations != 1
+        printf "Gameplay room was not prepared exactly once at entry\n"
+        quit 1
+    end
     if gDownwellGameArtLoads != 1 || gDownwellGameArtPreparations != 1 || gDownwellGameArtReleases != 0 || gDownwellGameArtResidentBytes != gDownwellGameArtExpectedBytes
         printf "Gameplay art reloaded/prepared during the live contact tape\n"
         quit 1

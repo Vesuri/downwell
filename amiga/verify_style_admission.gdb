@@ -17,6 +17,10 @@ if gDownwellGameArtLoads != 0 || gDownwellGamePlaneLoads != 0
     printf "Direct style admitted gameplay assets\n"
     quit 1
 end
+if gDownwellInitialRoomPreparations != 0
+    printf "Direct style constructed the gameplay room\n"
+    quit 1
+end
 printf "Direct style: 64 frames, only front bank resident\n"
 printf "DOWNWELL_STYLE_ADMISSION_READY\n"
 shell touch .run/gdb-ready.marker

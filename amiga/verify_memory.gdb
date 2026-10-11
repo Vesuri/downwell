@@ -15,6 +15,10 @@ if gDownwellSceneBankLoads != 1 || gDownwellSplashPreparations != 1 || gDownwell
     printf "Normal startup loaded/prepared a scene beyond the splash sequence\n"
     quit 1
 end
+if gDownwellInitialRoomPreparations != 0
+    printf "Normal startup constructed the gameplay room before scene entry\n"
+    quit 1
+end
 # This is the normal-startup audit; explicit plane/replay oracle builds have
 # their own verifiers and must not weaken the front-end residency guard.
 if gDownwellGamePlaneResidentBytes != 0 || gDownwellGamePlaneLoads != 0

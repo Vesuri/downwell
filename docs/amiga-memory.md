@@ -256,6 +256,13 @@ remeasured when any pack or other Chip owner grows.
 
 ## Scene banks
 
+Initial gameplay room construction is admitted at first gameplay entry, not
+publisher, garden or direct-style startup. Its ordered room births, prepared
+terrain index and generation bindings use the same initializer once; later
+Retry/level reloads retain their existing reset path. The publisher/style and
+full-scene verifiers check this execution boundary. This does not yet defer
+the world/owner constructors or release their reserved ordinary-memory storage.
+
 Boot/front art shares a scene bank. Both gameplay art banks are absent during
 ordinary front-end scenes, including later returns. CPU-side actor/effect
 preparation occurs only when a gameplay lease is acquired. The gameplay bank
