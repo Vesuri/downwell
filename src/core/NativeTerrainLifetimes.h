@@ -50,6 +50,9 @@ public:
     // object kind in bit 7 and a signed-grid column biased by 32 in bits 0–6.
     struct PreparedCells {
         const unsigned char* bytes=nullptr;unsigned count=0;int y=0;
+        // Optional lifetime promise, never inferred from a raw pointer: bytes
+        // remain immutable until these terrain lifetimes have all been cleared.
+        bool retained=false;
         unsigned kind(unsigned i)const{return bytes[i*2]>>7;}
         int object(unsigned i)const{return kind(i)?93:60;}
         int x(unsigned i)const{return (int(bytes[i*2]&127)-32)*16;}
@@ -339,6 +342,16 @@ private:
             if(result!=SpanResult::unsupported){
                 if(completed>count)return good_=false;
                 unsigned i=0;
+                if(cells.retained&&completed){
+                    if(!runs_.appendRetainedCells({slot,next_},cells.bytes,cells.y,completed,order))return good_=false;
+                    for(;i<completed;++i){
+                        const auto kind=cells.kind(i),value=spatial[kind];
+                        if(order.layer.bound()&&order.layer.inactive)selectLayerCutoff(slot+i,true);
+                        flags_[slot+i]=32u|((value&8u)?4u:0u)|((value&0x200u)?8u:0u)|((value&0x8000u)?16u:0u);
+                        createSprite_[slot+i]=static_cast<std::int16_t>(tile);walls_[slot+i]=PackedWallState{};
+                        if(!kind&&(wallRadius(tile)<0||wallRadius(tile)>16))unboundedWallArt_=true;
+                    }
+                }
                 while(i<completed){
                     const unsigned kind=cells.kind(i);const int x=cells.x(i),object=cells.object(i);
                     int step=16;if(i+1<completed&&cells.x(i+1)==x-16)step=-16;

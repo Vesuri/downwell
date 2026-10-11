@@ -106,7 +106,9 @@ bool AmigaGameplayGeneration::createPrepared(void* opaque,const downwell::AreaOn
             return true;
         };
         if(self.runtime_->nativeTerrainInstances()==self.lifetimes_){
-            if(!self.runtime_->constructNativeTerrainPrepared({batch.creates(),batch.count(),batch.y}))return false;
+            // The builder pack outlives the world's terrain. Clear lifetimes
+            // before unloading/replacing that pack at a scene handoff.
+            if(!self.runtime_->constructNativeTerrainPrepared({batch.creates(),batch.count(),batch.y,true}))return false;
         }else if(!self.lifetimes_->publishRun([&]{
             return produce([&](int object,int x,int y){return self.birth(object,x,y);});
         }))return false;

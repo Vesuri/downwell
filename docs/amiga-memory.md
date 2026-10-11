@@ -22,6 +22,15 @@ descriptors; coincident and authored walls remain distinct. The bounded
 descriptor array reserves worst-case singleton capacity, so compression
 reduces live descriptors rather than the allocation size. Per-cell state is
 one flags byte plus the run locator, not a duplicate generic runner record.
+Prepared builder segments may retain one descriptor for their complete mixed
+wall/platform identity stream, borrowing immutable bytes from the builder pack.
+The caller must explicitly promise that the pack outlives these lifetimes;
+temporary streams keep the copying constructor. Normal Amiga generation uses
+the executable-resident builder pack. A future scene-local pack must clear all
+borrowing terrain before replacement or unloading. Publication mutations split
+the descriptor while advancing its borrowed stream, preserving per-cell order,
+holes, generations and source coordinates. Authored IDs and borrowed stream
+pointers share descriptor storage; the 68000 allocation does not grow.
 Each run also retains a shared native registration-clock base. An intervening
 actor birth prevents adjacent walls from merging across that chronology gap.
 The existing per-cell flags byte also packs constructor spatial membership,

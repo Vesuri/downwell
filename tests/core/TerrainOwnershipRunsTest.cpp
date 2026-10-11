@@ -595,14 +595,14 @@ static void preparedSpanConstruction(){
         };
         return b;
     };
-    for(int failure:{-1,0,1,5,11}){
+    for(bool retained:{false,true})for(int failure:{-1,0,1,5,11}){
         Native scalar,bulk;Observer a{&scalar},b{&bulk};a.fail=b.fail=failure;
         require(scalar.bind(binding(a,false))&&bulk.bind(binding(b,true)));
         bool af=true,bf=true;
         unsigned char source[24]{};
         for(unsigned i=0;i<12;++i)source[i*2]=32+(i<6?i:11-i)+(i%3==1?128:0);
         const bool expected=scalar.constructPrepared(51,af,{source,12,32});
-        const bool actual=bulk.constructPrepared(51,bf,{source,12,32});
+        const bool actual=bulk.constructPrepared(51,bf,{source,12,32,retained});
         require(expected==actual&&scalar.size()==bulk.size()&&scalar.lastLifetime()==bulk.lastLifetime());
         require(af==bf&&a.next==b.next&&a.clock.low==b.clock.low&&a.clock.high==b.clock.high);
         require(b.spanCalls==1&&b.spanCells==(failure<0?12u:unsigned(failure)));
@@ -616,7 +616,56 @@ static void preparedSpanConstruction(){
     }
     std::puts("Prepared span construction: publication clocks, final fields and failed prefixes agree");
 }
+static void retainedIdentitySegments(){
+    using Runs=downwell::TerrainOwnershipRuns<64,Publication>;
+    Runs scalar,retained;
+    unsigned char cells[128]{};
+    const Publication initial{{0xfffffff0u,3},17};
+    for(unsigned i=0;i<64;++i){
+        cells[2*i]=unsigned((i*17)%64)|(i%3?128:0);
+        require(scalar.append({i,i+1},i%3?93:60,(int(cells[2*i]&127)-32)*16,48,0,-1,initial.shifted(i)));
+    }
+    require(retained.appendRetainedCells({0,1},cells,48,64,initial));
+    require(retained.runCount()==1);
+    auto compare=[&]{
+        require(retained.size()==scalar.size());unsigned n=0;
+        require(retained.visit([&](const auto& id){
+            const auto h=scalar.handle(n++);Runs::Identity expected;
+            require(scalar.read(h,expected));
+            require(id.handle.slot==h.slot&&id.handle.generation==h.generation&&
+                id.object==expected.object&&id.x==expected.x&&id.y==expected.y&&
+                id.source==expected.source&&id.creationCode==expected.creationCode);
+            Runs::Identity direct;require(retained.read(h,direct)&&direct.object==id.object&&direct.x==id.x&&
+                direct.y==id.y&&direct.source==id.source&&direct.creationCode==id.creationCode);
+            require(retained.object(h.slot)==scalar.object(h.slot));
+            Publication a,b;require(scalar.publication(h,a)&&retained.publication(h,b)&&a.same(b));return true;
+        }));require(n==scalar.size());
+        std::vector<unsigned> a,b;
+        require(scalar.visitRows(40,50,[&](const auto& id){a.push_back(id.handle.slot);return true;}));
+        require(retained.visitRows(40,50,[&](const auto& id){b.push_back(id.handle.slot);return true;}));
+        require(a==b);
+    };
+    compare();
+    // Holes, slot reuse and split/trim of borrowed streams must retain source
+    // coordinates, generation, chronology and independently mutable order.
+    for(unsigned i=0;i<64;i+=3){require(scalar.retire({i,i+1})&&retained.retire({i,i+1}));compare();}
+    for(unsigned i=1;i<64;i+=3){
+        const Publication changed{{700+i,9},42};
+        require(scalar.changePublication({i,i+1},changed)&&retained.changePublication({i,i+1},changed));compare();
+    }
+    for(unsigned i=0;i<64;i+=3){
+        require(scalar.append({i,100+i},60,32,96,55,676,initial));
+        require(retained.append({i,100+i},60,32,96,55,676,initial));compare();
+    }
+    while(scalar.size()){
+        const auto h=scalar.handle(scalar.size()/2);
+        require(scalar.retire(h)&&retained.retire(h));compare();
+    }
+    require(!retained.runCount());
+    std::puts("Retained immutable identity segments: mutation, reuse, holes and order agree");
+}
 int main(){
+    retainedIdentitySegments();
     bulkPublicationRuns();
     preparedSpanConstruction();
     constructedSegments();

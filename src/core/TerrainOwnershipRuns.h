@@ -17,8 +17,15 @@ template<unsigned Capacity,class Publication=TerrainIdentityOnly> class TerrainO
     static constexpr unsigned End=Capacity;
     struct Run:Publication {
         int object=0,x=0,y=0,step=0,creationCode=-1;
-        std::uint32_t generation=0,source=0;
+        std::uint32_t generation=0;
+        // object == -2 borrows an immutable prepared-cell stream. Authored
+        // identities instead retain their numeric source ID in the same space.
+        union { std::uint32_t source=0; const unsigned char* cells; };
         Slot first=0,count=0,live=0,next=End,previous=End;
+        int objectAt(unsigned i)const{return object==-2?((cells[2*i]&128)?93:60):object;}
+        int xAt(unsigned i)const{return object==-2?(int(cells[2*i]&127)-32)*16:x+int(i)*step;}
+        std::uint32_t sourceId()const{return object==-2?0:source;}
+        void advance(unsigned n){if(object==-2)cells+=2*n;else x+=int(n)*step;}
     };
     Run runs_[Capacity]{};
     inline static const Publication initialPublication_{};
@@ -38,13 +45,13 @@ template<unsigned Capacity,class Publication=TerrainIdentityOnly> class TerrainO
         if(!rightLive){left.count=Slot(offset);return End;}
         if(rightLive==left.live){
             static_cast<Publication&>(left)=static_cast<const Publication&>(left).shifted(offset);
-            left.x+=int(offset)*left.step;left.generation+=offset;
+            left.advance(offset);left.generation+=offset;
             left.first=Slot(first);left.count=Slot(end-first);return n;
         }
         const unsigned right=allocate();
         auto& r=runs_[right];r=left;
         static_cast<Publication&>(r)=static_cast<const Publication&>(left).shifted(offset);
-        r.x+=int(offset)*r.step;r.generation+=offset;
+        r.advance(offset);r.generation+=offset;
         r.first=Slot(first);r.count=Slot(end-first);r.live=Slot(rightLive);r.previous=Slot(n);
         if(r.next==End)tail_=right;else runs_[r.next].previous=Slot(right);
         left.next=Slot(right);left.count=Slot(offset);left.live-=Slot(rightLive);
@@ -68,7 +75,10 @@ public:
         if(!occupied(slot))return {};
         const auto& r=runs_[locator_[slot]-1];return {slot,r.generation+slot-r.first};
     }
-    int object(unsigned slot)const{return occupied(slot)?runs_[locator_[slot]-1].object:-1;}
+    int object(unsigned slot)const{
+        if(!occupied(slot))return -1;
+        const auto& r=runs_[locator_[slot]-1];return r.objectAt(slot-r.first);
+    }
     InstanceHandle handle(unsigned ordinal)const{
         if(ordinal>=population_)return {};
         // Live generation immediately reads the newest birth for Create.
@@ -90,7 +100,7 @@ public:
         if(!contains(h))return false;
         const auto& r=runs_[locator_[h.slot]-1];
         const unsigned offset=h.slot-r.first;
-        out={h,r.object,r.x+int(offset)*r.step,r.y,r.creationCode,r.source};return true;
+        out={h,r.objectAt(offset),r.xAt(offset),r.y,r.creationCode,r.sourceId()};return true;
     }
     bool publication(InstanceHandle h,Publication& out)const{
         if(!contains(h))return false;
@@ -134,7 +144,7 @@ public:
         // Only generated, adjacent horizontal cells share a descriptor.
         // Authored source identities and creation scripts remain singleton.
         if(tail_!=End&&!source&&creationCode==-1){auto& r=runs_[tail_];
-            if(!r.source&&r.creationCode==-1&&r.object==object&&r.y==y&&
+            if(r.object!=-2&&!r.source&&r.creationCode==-1&&r.object==object&&r.y==y&&
                 unsigned(r.first)+r.count==h.slot&&r.generation+r.count==h.generation){
                 // Avoid subtraction overflow, including unusual caller coordinates.
                 const int last=r.x+int(r.count-1)*r.step;
@@ -160,6 +170,25 @@ public:
     }
     bool appendInherited(InstanceHandle h,int object,int x,int y,std::uint32_t source,int creationCode,bool* inherited){
         return append(h,object,x,y,source,creationCode,initialPublication_,true,inherited);
+    }
+    // The caller guarantees immutable bytes until every cell is retired or
+    // this owner is cleared. This is a source-ordered identity span, not a
+    // geometry index: exceptional publication changes still split it normally.
+    bool appendRetainedCells(InstanceHandle first,const unsigned char* cells,int y,unsigned count,
+                             const Publication& publication){
+        if(!count)return true;
+        if(!cells||first.slot>=Capacity||count>Capacity-first.slot||count>Capacity-population_||
+           !first.generation||count-1>0xffffffffu-first.generation)return false;
+        for(unsigned i=0;i<count;++i)if(occupied(first.slot+i))return false;
+        const unsigned n=allocate();auto& r=runs_[n];
+        static_cast<Publication&>(r)=publication;
+        r.object=-2;r.cells=cells;r.x=r.step=0;r.y=y;r.creationCode=-1;
+        r.generation=first.generation;r.first=Slot(first.slot);r.count=r.live=Slot(count);
+        r.next=End;r.previous=Slot(tail_);
+        if(tail_==End)head_=n;else runs_[tail_].next=Slot(n);
+        tail_=n;
+        for(unsigned i=0;i<count;++i)locator_[first.slot+i]=Slot(n+1);
+        population_+=count;return true;
     }
     // An admitted callback-free constructor publishes one complete horizontal
     // span. Keep the scalar append as its oracle; don't rebuild a Publication
@@ -208,7 +237,7 @@ private:
                 (r.y>=end&&unsigned(r.y)-unsigned(end)>=16u)))continue;
             int x=r.x;
             for(unsigned i=0;i<r.count;++i){const unsigned slot=r.first+i;
-                if(locator_[slot]==n+1&&!visit(Identity{{slot,r.generation+i},r.object,x,r.y,r.creationCode,r.source}))return false;
+                if(locator_[slot]==n+1&&!visit(Identity{{slot,r.generation+i},r.objectAt(i),r.object==-2?r.xAt(i):x,r.y,r.creationCode,r.sourceId()}))return false;
                 if(i+1<r.count)x+=r.step;
             }
         }
