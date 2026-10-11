@@ -113,6 +113,7 @@ private:
     NativeDirtyQueue nativeSpatialDirty_,nativeCollisionDirty_;
     unsigned nativeCollisionRetained_[View::capacity]{};
     bool nativeDirty(unsigned slot,int object,std::uint32_t flags){
+        if(!collisionConsumersAdmitted_)return true;
         const auto* objectFlags=families_.flags(unsigned(object));
         if(!objectFlags||slot>=View::capacity)return check(false);
         if(NativeDirtyQueue::shouldQueue(true,*objectFlags,flags)){
@@ -122,6 +123,7 @@ private:
         return true;
     }
     bool nativeBirthQueues(unsigned slot,int object){
+        if(!collisionConsumersAdmitted_)return check(families_.prepareBirth(unsigned(object)));
         const auto* defaults=objectDefaults_.get(object);
         // Binding setters precede ancestor preparation. Repeated prepends
         // during that synchronous binding leave the same queue head.
@@ -131,6 +133,7 @@ private:
         return true;
     }
     bool nativeRetireQueues(unsigned slot){
+        if(!collisionConsumersAdmitted_)return true;
         if(auto* state=nativePosition(slot))if(state->appearanceFlags&0x8000u){
             auto box=state->bounds;
             if(RunnerSpatialSplit::less(box.right,box.left)){const auto v=box.left;box.left=box.right;box.right=v;}
@@ -553,6 +556,10 @@ private:
     }
     bool refreshNativeActor(InstanceHandle h,bool publish){
         if(!native_||!valid())return false;
+        // The external backend owns collision geometry. Position, appearance
+        // and family publication still happen synchronously in the caller;
+        // no generic bounds or index membership may be observed in this scene.
+        if(!collisionConsumersAdmitted_)return true;
         auto* state=nativePosition(h.slot);std::uint32_t flags;
         if(!state||!eligibilityFlags(h,flags))return check(false);
         const auto* objectFlags=families_.flags(unsigned(objectOf(h)));if(!objectFlags)return check(false);
@@ -591,6 +598,8 @@ private:
     bool publishNativeBoxBirth(InstanceHandle h,const GameplayWorld::Breakable& r){
         auto* state=nativePosition(h.slot);
         if(!state)return check(false);
+        if(!collisionConsumersAdmitted_)return boxes_.birthPosition(r,*state)&&
+            boxes_.nativeAppearance(h,r)&&nativeBirthQueues(h.slot,92);
 #ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
         return boxes_.birthPosition(r,*state)&&boxes_.nativeAppearance(h,r)&&
             nativeBirthQueues(h.slot,92)&&refreshNativeActor(h,true);
@@ -776,8 +785,8 @@ private:
             thinRetirementWindow_.append(cells.y,kind!=0,first.handle.generation+i);
             if(!table_.externalBirth(current,order))return false;
             if(!i)stamp=order;
-            if(recipe.queue)nativeSpatialDirty_.mark(current);
-            if(recipe.collision)nativeCollisionDirty_.mark(current);
+            if(collisionConsumersAdmitted_&&recipe.queue)nativeSpatialDirty_.mark(current);
+            if(collisionConsumersAdmitted_&&recipe.collision)nativeCollisionDirty_.mark(current);
             if(!table_.registerExternalObject({current,first.handle.generation+i},object,true))return false;
             ++roomCount;
             DW_PROFILE_COUNT(counterSpatialFirstPublication);
@@ -1623,6 +1632,7 @@ public:
         return check(RunnerSpriteOverlap::test(first,second,a,b,sprites_,masks,RunnerMaskDispatch{},inverseTrig,roundPixel,hit));
     }
     bool queueCollision(InstanceHandle h){
+        if(!check(collisionConsumersAdmitted_))return false;
         if(!valid()||!resolves(h))return check(false);
         const auto* flags=families_.flags(unsigned(objectOf(h)));if(!flags)return check(false);
         return check(native_?(!(*flags&8u)||nativeCollisionDirty_.mark(h.slot)):owner_.queueCollision(h,*flags));
@@ -1668,7 +1678,7 @@ public:
     // complete scene publication and ordered animation/image writes. The
     // ordinary sprite getter has no collision-frame cache to invalidate.
     template<class Visit> bool visitNativeDirty(bool collision,Visit visit)const{
-        if(!native_||!valid())return false;
+        if(!native_||!valid()||!collisionConsumersAdmitted_)return false;
         const auto& queue=collision?nativeCollisionDirty_:nativeSpatialDirty_;
         for(unsigned slot=queue.first();slot!=NativeDirtyQueue::End;slot=queue.next(slot)){
             const auto h=handleAt(slot);

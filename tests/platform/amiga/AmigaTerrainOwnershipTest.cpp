@@ -41,10 +41,11 @@ using View=downwell::GameplayCollisionView;
 // reordered callbacks when all marked records ultimately disappear.
 std::vector<unsigned> cleanupOrder(const downwell::ObjectPack& objects,
     const downwell::SpriteCollisionPack& sprites,Ownership ownership,unsigned scenario,
-    const downwell::RoomPack* rooms=nullptr){
+    const downwell::RoomPack* rooms=nullptr,bool externalCollision=false){
     auto owner=downwell::makeCollisionOwner(objects,sprites,
         downwell::GameplayTerrainInstances::Presentation{},downwell::GameplayTerrainInstances::WallCollision{},
         rooms,ownership);
+    if(externalCollision)require(owner->declareExternalCollisionBackend(),"cleanup external collision admission");
     auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
         owner->breakableBinding(),owner->playerBinding());
     require(owner->attach(*world),"cleanup fixture attaches");
@@ -333,6 +334,8 @@ int main(int argc,char** argv){
         const auto roomExpected=cleanupOrder(objects,sprites,Ownership::reference,scenario,&rooms);
         require(cleanupOrder(objects,sprites,Ownership::nativeScenery,scenario,&rooms)==roomExpected,
             "native scenery lease preserves room-backed cleanup, reuse and Retry");
+        require(cleanupOrder(objects,sprites,Ownership::nativeScenery,scenario,&rooms,true)==roomExpected,
+            "external collision backend preserves cleanup, reuse and Retry");
     }
     {
         downwell::StartupRuntime entry(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns);
@@ -360,7 +363,7 @@ int main(int argc,char** argv){
     }
     // Admission is fail-closed, including direct consumers which never query
     // the tree. Each violation poisons a fresh owner, not the replay below.
-    for(unsigned consumer=0;consumer<3;++consumer){
+    for(unsigned consumer=0;consumer<4;++consumer){
         auto guarded=downwell::makeCollisionOwner(objects,sprites,{}, {},&rooms,Ownership::nativeScenery);
         require(guarded->declareExternalCollisionBackend(),"external collision admission");
         bool accepted=false;
@@ -368,10 +371,10 @@ int main(int argc,char** argv){
             downwell::GameplayCollisionOwner::Owner::Box bounds;
             accepted=guarded->nativeActorBounds({},bounds);
         }else if(consumer==1)accepted=guarded->flushNativeSpatial();
-        else{
+        else if(consumer==2){
             auto pairs=std::make_unique<downwell::RunnerCollisionPairs<downwell::GameplayCollisionView::capacity,16>>();
             accepted=guarded->collectCollisionPairs(*pairs,false);
-        }
+        }else accepted=guarded->queueCollision({});
         require(!accepted&&!guarded->valid(),"unexpected collision consumer fails terminally");
     }
     unsigned tapes=0,frames=0,maxTerrain=0;

@@ -1,5 +1,33 @@
 # Amiga gameplay frame-cost audit
 
+## External collision-backend execution boundary
+
+The guarded native backend omits generic actor-bounds calculation and generic
+collision-queue maintenance; it retains source position/appearance publication,
+family preparation, registration and event order. The source/full-service path
+remains available to collision-enabled scenes. This is not another queue encoding.
+
+| Budget frame | Retained maintenance, ms | External backend, ms |
+| --- | ---: | ---: |
+| Contact 51 | 31.8 | 31.3 |
+| Contact 676 | 396.9 | 365.0 |
+| Contact 1512 | 201.5 | 188.5 |
+| Contact 1689 | 386.9 | 359.4 |
+| No-input generation 163 | 245.63 | 222.1 |
+
+Matched contact-window means (starting 51/676/1512/1689, respectively) are
+38.029→37.029, 184.233→173.000, 75.312→72.875 and 148.425→140.550 ms.
+Matched worst frames are 55.6→52.6, 396.9→365.0, 201.5→188.5 and
+386.9→359.4 ms. These measurements do not establish a 20 ms baseline.
+Baseline reports: `tmp/no-query-contact-report.txt`, `tmp/span-envelope-report.txt`.
+Candidate reports: `tmp/external-collision-contact-report.txt`,
+`tmp/external-collision-idle-report.txt`. Contact/idle trace ELF hashes:
+`df6c54629bf368b3fab78a7819d49d8a3d9816edca1735139b2d7826a9ae9e3b` /
+`f1abff17ab3a69c400e9d09825295d5d0ad911d9180ff41761c8068b60f7dae7`.
+Reproduce with the contact command below using
+`TRACE_FRAMES=50,675,1511,1688 TRACE_FIELDS=35`, and the no-input generation
+command using `TRACE_FRAMES=162 TRACE_FIELDS=35`.
+
 ## Early contact execution gate
 
 At `ba27fad3`, a fresh 35-field capture beginning at marker 50 reproduces

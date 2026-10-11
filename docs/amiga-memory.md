@@ -51,7 +51,7 @@ Room teardown preserves the generation counter, preventing old handles from
 addressing replacement walls. Generated numeric VM IDs are not inferred from
 these family-local handles.
 
-Native actor publication retains position, sprite/mask IDs, binary32
+Full-service native actor publication retains position, sprite/mask IDs, binary32
 scale/angle/image index, timeline/cached frame, cached bounds and spatial/appearance flags per
 non-terrain collision slot inside the ordinary-memory collision owner.
 Terrain slots are excluded from that array; their coordinates remain
@@ -210,9 +210,16 @@ collection, dirty-pass execution and native object-query preparation, including
 paths which bypass the index. Unexpected consumers invalidate the owner; they
 must not silently return an empty collision result. Full collision services
 remain the default for reference owners and explicit query fixtures. The guard
-does not remove cached bounds, flags, dirty queues or their maintenance and is
-not itself a performance optimization. A passing bounded replay establishes
-coverage only for that workload, not every future scene or consumer.
+suppresses generic actor-bounds refresh and spatial/collision queue maintenance.
+Breakable births retain position, appearance and family preparation without
+constructing generic cached geometry. Registration, activation, layers, live
+sprite/position setters and terrain identity publication remain synchronous.
+Diagnostic dirty-queue traversal is unavailable under this declaration rather
+than pretending that an unmaintained queue represents source state. Collision
+metadata bits are private to the excluded backend; eligibility/order bits remain
+live. Backing arrays remain reserved for the full-service path: this is an
+execution saving, not a claimed storage reduction. A passing bounded replay
+establishes coverage only for that workload, not every future scene or consumer.
 
 Query-enabled owners, including the native original-mask verification path,
 retain the complete ordered journal. Validity checks, zero-budget service and
