@@ -27,13 +27,22 @@ class RunnerSpatialJournal:private RunnerSpatialGeometrySource<PreparedGeometry>
 public:
     using Box=typename Math::Box;
     template<class Provider> bool bindTree(Provider provider){return tree_.bind(provider);}
+    // Scene dependency declaration, only before any publication. This is not
+    // lazy query reconstruction: omitted history can never answer a query.
+    // A later consumer must select the full index at scene admission.
+    bool declareNoQueries(){
+        if(!valid()||count_||population_||!deferred_)return false;
+        queries_=false;return true;
+    }
+    bool queriesEnabled()const{return queries_;}
     // Read-only admission for a constructor with no intervening observation.
     // Do not cross pressure/service or eager-fallback boundaries in this path.
     bool admitsFreshGeometrySpan(unsigned first,unsigned count,const Math::PixelBox& envelope)const{
         if constexpr(!PreparedGeometry)return false;
         if(!valid()||!deferred_||first>=Slots||count>Slots-first||
-           count>Pending-count_||population_>safePopulation||count>safePopulation-population_)return false;
+           (queries_&&(count>Pending-count_||population_>safePopulation||count>safePopulation-population_)))return false;
         for(unsigned i=first;i<first+count;++i)if(contains(i))return false;
+        if(!queries_)return true;
         Math::PixelBox combined;return admitPixels(envelope,combined);
     }
     bool bindGeometry(const PreparedTerrainBirthBounds& geometry){
@@ -57,7 +66,7 @@ public:
         Math::PixelBox combined;
         if(!this->geometry_||!valid())return false;
         if(!admitsFreshGeometrySpan(first,count,envelope))return true;
-        if(!admitPixels(envelope,combined))return false;
+        if(queries_&&!admitPixels(envelope,combined))return false;
         admitted=true;
         const unsigned start=count_;
         for(unsigned i=0;i<count;++i){
@@ -65,7 +74,7 @@ public:
             if(!produce(i,key)||!this->geometry_->validKey(key)){
                 // Normally only the final envelope is needed. On failure,
                 // reconstruct the admitted prefix's historical union exactly.
-                for(unsigned j=0;j<completed;++j){
+                for(unsigned j=0;queries_&&j<completed;++j){
                     const auto& op=operations_[(head_+start+j)&(Pending-1)];
                     Math::PixelBox pixels;Box box;
                     if(!this->geometry_->bounds({op.box.left.bits},box,true)||
@@ -75,13 +84,15 @@ public:
                 return false;
             }
             const unsigned instance=first+i;
+            if(queries_){
             auto& operation=operations_[(head_+count_)&(Pending-1)];
             operation.box.left.bits=key.value;
             operation.instance=instance|0x80000000u;operation.insert=true;++count_;
             DW_PROFILE_COUNT(counterSpatialJournalQueued);
+            }
             present_[instance>>5]|=1u<<(instance&31);++population_;++completed;
         }
-        if(count){bounds_=combined;haveBounds_=true;}
+        if(queries_&&count){bounds_=combined;haveBounds_=true;}
         return true;
     }
     // Immutable resource key, not a live instance lookup. Pixel endpoints
@@ -91,6 +102,7 @@ public:
                         const Math::PixelBox& pixels){
         static_assert(PreparedGeometry,"Prepared geometry policy required");
         if(!valid()||!this->geometry_||!this->geometry_->validKey(key))return false;
+        if(!queries_)return insertIdentity(instance);
         Math::PixelBox next;
         if(!deferred_||instance>=Slots||contains(instance)||population_>=safePopulation||
             !admitPixels(pixels,next)){
@@ -113,8 +125,8 @@ public:
         tree_.clear();head_=count_=population_=0;good_=deferred_=true;haveBounds_=false;
         for(auto& word:present_)word=0;
     }
-    unsigned nodeCount()const{catchUp();return tree_.nodeCount();}
-    int height()const{catchUp();return tree_.height();}
+    unsigned nodeCount()const{if(!queries_){good_=false;return 0;}catchUp();return tree_.nodeCount();}
+    int height()const{if(!queries_){good_=false;return 0;}catchUp();return tree_.height();}
     // Borrow during admission, then take the journal's own snapshot. Neither
     // admission nor catch-up mutates caller storage; no temporary value copy
     // is needed at the API boundary (notably on the 68000 stack).
@@ -127,6 +139,7 @@ public:
     // is accepted here. Population, historical union and pressure stay live.
     bool insertPrepared(const Box& box,std::uint32_t instance,const Math::PixelBox* pixels){
         if(!valid())return false;
+        if(!queries_)return Math::valid(box)&&insertIdentity(instance);
         Math::PixelBox next;
         if(!deferred_ || instance>=Slots || contains(instance) ||
             population_>=safePopulation || !(pixels?admitPixels(*pixels,next):admit(box,next))){
@@ -141,6 +154,12 @@ public:
     }
     bool remove(const Box& oldBounds,std::uint32_t instance,bool retry,bool& removed){
         if(!valid())return false;
+        if(!queries_){
+            if(instance>=Slots||!retry||!Math::valid(oldBounds))return good_=false;
+            removed=contains(instance);
+            if(removed){present_[instance>>5]&=~(1u<<(instance&31));--population_;}
+            return true;
+        }
         // Full-root retry with a unique identity has an unambiguous result.
         // Unbounded IDs, duplicates and no-retry searches use the eager tree.
         if(!deferred_ || instance>=Slots || !retry || !Math::valid(oldBounds)){
@@ -155,9 +174,11 @@ public:
         removed=true;return true;
     }
     template<class Visit> bool query(Box box,Visit visit)const{
+        if(!queries_)return good_=false;
         return catchUp()&&tree_.query(box,visit);
     }
     template<class Visit> bool queryLine(const RunnerLineArguments& args,Visit visit)const{
+        if(!queries_)return good_=false;
         return catchUp()&&tree_.queryLine(args,visit);
     }
     bool service(unsigned budget)const{
@@ -189,9 +210,13 @@ private:
     mutable unsigned head_=0,count_=0;
     unsigned population_=0;
     mutable bool good_=true;
-    bool deferred_=true,haveBounds_=false;
+    bool deferred_=true,haveBounds_=false,queries_=true;
     Math::PixelBox bounds_{};
     bool contains(unsigned instance)const{return (present_[instance>>5]>>(instance&31))&1u;}
+    bool insertIdentity(unsigned instance){
+        if(instance>=Slots||contains(instance))return good_=false;
+        present_[instance>>5]|=1u<<(instance&31);++population_;return true;
+    }
     bool catchUp()const{return service(count_);}
     bool makeRoom(){
         if(count_<Pending)return true;

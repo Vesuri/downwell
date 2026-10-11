@@ -100,20 +100,20 @@ interpret restoring this diagnostic's loader fit as a shipping memory reduction.
 
 The normal `STRIP=1` build with admitted room payloads, scene-loaded gameplay art
 and large-field pixels, and without reference-only collision masks is
-**2,078,032 bytes**, SHA-256
-`d99c1e1f1782cd96c028f3b2126ae48a0bfcd774300c30edfe69e0ba40ee2881`.
+**2,078,348 bytes**, SHA-256
+`9f3389c5ab310a4dd0dafae702bf2b6cc7a77831fe9423062d5663fcd05983a1`.
 The matching ELF section sizes distinguish payload from runtime allocation:
 
 | Section | Bytes | Stored in the executable? |
 | --- | ---: | --- |
-| Machine code (`.text`) | 1,391,882 | Yes |
+| Machine code (`.text`) | 1,392,294 | Yes |
 | Read-only data (`.rodata`) | 603,520 | Yes |
 | Initialized writable data (`.data`) | 34,194 | Yes |
 | Initializer pointer | 4 | Yes |
 | Zero-filled storage (`.bss`) | 2,256,828 | No; allocated at load |
 
-Initialized payload totals 2,029,600 bytes. Hunk relocation, padding and container
-records account for the remaining 48,432 bytes. Stripping cannot remove
+Initialized payload totals 2,030,012 bytes. Hunk relocation, padding and container
+records account for the remaining 48,336 bytes. Stripping cannot remove
 the initialized payload. ELF debug sections are not that payload either.
 
 Linked serialized banks account for 312,657 of the 603,520 read-only bytes:
@@ -179,23 +179,36 @@ removes 1,236,560 resident bytes when no tree consumer runs. The ordered
 mutation journal remains a separate 90,112 bytes; these are not extra copies
 of the tree. Native allocation requests `MEMF_FAST`, with no Chip fallback.
 
-Validity checks, zero-budget service and empty resets do not allocate.
-Queries, nonempty explicit service, journal pressure and eager numeric fallback
+Normal Amiga gameplay declares that it has no spatial-index query consumers
+before constructing the player or room. Its implemented collision adapters use
+the terrain grid and family owners. That declaration suppresses the unused
+mutation journal and historical spatial envelope; it retains unique identity
+membership and every synchronous flag, dirty-queue and layer publication.
+Box/line queries and tree-size observations fail terminally under this contract:
+there is no reconstruction from current positions or silent fallback. Clear
+preserves the declaration. A new query consumer must choose the full index
+before scene construction, not switch it on after losing birth history.
+This removes work, not the journal's static 90,112-byte storage reservation.
+
+Query-enabled owners, including the native original-mask verification path,
+retain the complete ordered journal. Validity checks, zero-budget service and
+empty resets do not allocate. Queries, nonempty explicit service, journal pressure and eager numeric fallback
 can materialize the tree synchronously, preserving historical insertion/removal
 order. Allocation failure is terminal until clear; clear releases backing and
 permits a fresh acquisition. The platform scope also frees backing on early
 exit from placement-constructed gameplay owners. The host retains the embedded
 tree as the reference implementation.
 
-The bounded 1,800-update contact workload has no allocated tree, with 1,156
+The bounded 1,800-update contact workload has no allocated tree, with zero
 pending journal operations and population 824. The native original-mask fixture
 does allocate on query. This is a residency saving, not a smaller materialized
 tree or a performance claim; query-heavy scenes still require the full backing.
 
 Reproduce with the bounded contact `profile.sh fps` command in the frame-cost
 audit. Its `Spatial storage` line reads fields directly through the debugger:
-calling `nodeCount()` or `height()` would drain the journal and invalidate this
-observation. The ELF layout can be inspected without running the game:
+calling `nodeCount()` or `height()` would violate a no-query declaration, or
+drain a query-enabled journal and invalidate this observation. The ELF layout
+can be inspected without running the game:
 `m68k-amiga-elf-gdb -batch amiga/out/Downwell.elf -ex 'set max-value-size unlimited' -ex 'ptype /o ((downwell::GameplayCollisionOwner*)0)->owner_.index_'`.
 
 Terrain raster
@@ -210,8 +223,8 @@ gameplay memory is essentially unchanged: this is scene residency, not a
 smaller raster representation.
 `tmp/raster-lease-startup-gdb.log` verifies no raster residency at startup and
 126,840 Chip bytes free. At the audited build above, initialized payload plus
-BSS is 4,286,428 bytes before gameplay raster and dynamic graphics allocations.
-Adding the raster alone brings this to 5,367,772 ordinary-memory bytes. A small
+BSS is 4,286,840 bytes before gameplay raster and dynamic graphics allocations.
+Adding the raster alone brings this to 5,368,184 ordinary-memory bytes. A small
 Hunk file therefore would not, on its own, prove an A500 memory fit.
 Moving data to sidecar files changes file size, not residency, unless its
 lifetime or representation also changes. The shared DMA plane atlas below

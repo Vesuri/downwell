@@ -73,6 +73,7 @@ public:
         Owner::Properties properties[View::capacity]{};
     };
     template<class Provider> bool bindSpatialTree(Provider provider){return owner_.bindTree(provider);}
+    bool declareNoSpatialQueries(){return owner_.declareNoSpatialQueries();}
 private:
     Owner owner_;
     StationaryRetirementWindow thinRetirementWindow_;

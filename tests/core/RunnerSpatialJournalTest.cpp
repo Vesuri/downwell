@@ -81,6 +81,31 @@ int main(){
         using Lease=downwell::RunnerSpatialTreeLease<128>;
         TreeProvider<128> provider;
         downwell::RunnerSpatialJournal<128,32,4,false,Lease> journal;
+        assert(journal.bindTree(provider.provider())&&journal.declareNoQueries());
+        for(unsigned pass=0;pass<128;++pass){
+            for(unsigned i=0;i<32;++i)assert(journal.insert(box(i*16,pass*16),i));
+            assert(!journal.declareNoQueries()); // Declaration after births is invalid.
+            for(unsigned i=0;i<32;++i){bool removed=false;
+                assert(journal.remove(box(i*16,pass*16),i,true,removed)&&removed);
+            }
+            assert(journal.pending()==0&&journal.service(100)&&provider.acquisitions==0);
+        }
+        bool visited=false;
+        assert(!journal.query(box(0,0),[&](unsigned){visited=true;return true;}));
+        assert(!visited&&!journal.valid()&&provider.acquisitions==0);
+        journal.clear();assert(journal.valid()&&!journal.queriesEnabled());
+        assert(journal.insert(box(0,0),0));
+        assert(!journal.insert(box(0,0),0)&&!journal.valid());
+        journal.clear();downwell::RunnerLineArguments line;
+        assert(!journal.queryLine(line,[](unsigned){return true;})&&!journal.valid());
+        journal.clear();assert(journal.nodeCount()==0&&!journal.valid());
+        journal.clear();assert(journal.height()==0&&!journal.valid());
+        assert(provider.acquisitions==0);
+    }
+    {
+        using Lease=downwell::RunnerSpatialTreeLease<128>;
+        TreeProvider<128> provider;
+        downwell::RunnerSpatialJournal<128,32,4,false,Lease> journal;
         assert(journal.bindTree(provider.provider()));
         assert(!journal.bindTree(provider.provider()));
         assert(journal.valid()&&journal.service(0)&&provider.acquisitions==0);

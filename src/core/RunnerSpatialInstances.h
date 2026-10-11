@@ -64,6 +64,7 @@ template<unsigned Capacity,unsigned Nodes,bool ScheduledIndex=false,unsigned Ret
 public:
     using Real=RunnerImageValue;
     template<class Provider> bool bindTree(Provider provider){return index_.bindTree(provider);}
+    bool declareNoSpatialQueries(){return index_.declareNoQueries();}
     template<unsigned First,unsigned Last> using RegistrationProjection=
         typename Membership::template RegistrationProjection<First,Last>;
     using Box=Math::Box;
