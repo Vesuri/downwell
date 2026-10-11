@@ -542,6 +542,17 @@ ifneq ($(filter 1,$(FIELD_VERIFY) $(SCENE_VERIFY) $(SCENE_DESCENT_VERIFY) $(CAME
 $(error Profiling must not be combined with verification instrumentation)
 endif
 endif
+# This is the scene ownership contract, not an optional optimization mode.
+# Match DownwellAmiga's reference-owner selection. Pixel/reference fixtures
+# retain generic collision services; shipping, profiling and native reentry
+# fixtures use only their declared external collision backend.
+ifeq ($(filter -DDOWNWELL_FIELD_VERIFY -DDOWNWELL_ENTRY_WIPE_VERIFY,$(CFLAGS)),)
+ifeq ($(findstring -DDOWNWELL_SCENE_VERIFY,$(CFLAGS)),)
+CFLAGS += -DDOWNWELL_EXTERNAL_COLLISION_BACKEND
+else ifneq ($(findstring -DDOWNWELL_RESULTS_RESTART_VERIFY,$(CFLAGS)),)
+CFLAGS += -DDOWNWELL_EXTERNAL_COLLISION_BACKEND
+endif
+endif
 CPPFLAGS := $(CFLAGS) -x c++ -std=gnu++17 -fno-rtti -fno-exceptions \
 	-fno-use-cxa-atexit -DDOWNWELL_FREESTANDING \
 	-I$(AMIGA_SRC)/compat -I$(REPO)/src

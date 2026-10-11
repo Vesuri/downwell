@@ -1,8 +1,8 @@
 # Amiga gameplay frame-cost audit
 
-## Current reproducible baseline
+## Regression comparison baseline
 
-Game revision `e8588c07`, A500/68000 with 512 KiB Chip, 512 KiB slow and
+The fixed comparison baseline is game revision `e8588c07`, A500/68000 with 512 KiB Chip, 512 KiB slow and
 8 MiB Fast. Exact complete-frame cycles, partial-frame exclusions, trace hashes
 and the matching ELF hash are committed in
 [`amiga-frame-baseline.json`](amiga-frame-baseline.json). This is a measured

@@ -26,6 +26,24 @@ def record(ident, frame=0):
 
 
 class Admission(unittest.TestCase):
+    def test_external_collision_contract_matches_reference_selection(self):
+        makefile = (ROOT / 'amiga/Makefile').read_text()
+        begin = makefile.index('# This is the scene ownership contract')
+        end = makefile.index('CPPFLAGS :=', begin)
+        rule = makefile[begin:end]
+        cases = [('', True), ('SCENE_VERIFY', False),
+                 ('SCENE_VERIFY RESULTS_RESTART_VERIFY', True),
+                 ('ENTRY_WIPE_VERIFY', False),
+                 ('SCENE_VERIFY FIELD_VERIFY', False),
+                 ('SCENE_VERIFY FIELD_VERIFY RESULTS_RESTART_VERIFY', False)]
+        for flags, expected in cases:
+            flags = ' '.join('-DDOWNWELL_' + flag for flag in flags.split())
+            harness = f'CFLAGS := {flags}\n' + rule + '\nall:\n\t@echo $(CFLAGS)\n'
+            result = subprocess.run(['make', '-f', '-', 'all'], input=harness,
+                                    text=True, check=True, stdout=subprocess.PIPE)
+            self.assertEqual('-DDOWNWELL_EXTERNAL_COLLISION_BACKEND' in result.stdout,
+                             expected, flags)
+
     def test_verifier_switch_rebuilds_asset_objects(self):
         makefile = (ROOT / 'amiga/Makefile').read_text()
         begin = makefile.index('.PHONY: FORCE_STARTUP_OPTIONS')

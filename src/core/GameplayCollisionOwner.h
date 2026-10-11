@@ -112,10 +112,20 @@ public:
     // No generic geometry/queue consumer may be enabled after this admission.
     bool declareExternalCollisionBackend(){
         if(!native_||!nativeBoxes_||nativeCollisionStorage_||!owner_.declareNoSpatialQueries())return check(false);
-        collisionConsumersAdmitted_=false;return true;
+#ifndef DOWNWELL_EXTERNAL_COLLISION_BACKEND
+        collisionConsumersAdmitted_=false;
+#endif
+        return true;
     }
 private:
+#ifdef DOWNWELL_EXTERNAL_COLLISION_BACKEND
+    // This build owns collision in its scene backend. Keep the full service
+    // in reference builds, but do not retain unreachable spatial consumers
+    // through runtime-selected lifecycle callbacks in the shipping image.
+    static constexpr bool collisionConsumersAdmitted_=false;
+#else
     bool collisionConsumersAdmitted_=true;
+#endif
     Owner owner_;
     StationaryRetirementWindow thinRetirementWindow_;
     StationaryRetirementWindow boxRetirementWindow_;
@@ -1551,6 +1561,12 @@ public:
         terrain_(terrainRegistered_?GameplayTerrainInstances::Binding::bindDestruction(terrainBinding_):
             GameplayTerrainInstances::Binding{},presentation,collision),
         nativeTerrainPresentation_(presentation),nativeTerrainCollision_(collision){
+#ifdef DOWNWELL_EXTERNAL_COLLISION_BACKEND
+        // Reject incompatible ownership instead of silently constructing a
+        // partial reference runner. The scene must still declare its external
+        // backend before births; that admission closes the spatial index.
+        if(!native_||!nativeBoxes_||reference||nativeCollision){good_=false;return;}
+#endif
         owner_.observeStateFailure(good_);properties_.observeFailure(good_);
         // Only the scalar/reference backend may own these arrays. Native
         // publication borrows the journal, never its scalar actor records.

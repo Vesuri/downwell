@@ -7,6 +7,20 @@ This remains a development configuration, not a final memory requirement.
 
 ## Native terrain identities
 
+Shipping and profiling builds declare `DOWNWELL_EXTERNAL_COLLISION_BACKEND`
+from their scene ownership contract. Generic collision consumers are then
+compile-time unavailable, rather than runtime-selected branches retained
+through lifecycle callbacks. Constructing a scalar/reference owner, disabling
+native boxes, or supplying generic collision backing fails this contract;
+unsupported collision collection still fails and latches owner failure.
+Explicit full-reference scene/field/entry fixtures retain the complete owner.
+The native results/reentry fixture uses the shipping restriction. The host
+tests compile both contracts and check the build-selection matrix. This is
+not a gameplay optimization toggle or permission to omit source events.
+It does not yet remove every spatial routine from the link: some are still
+reachable through other shared-owner paths. Runtime external-backend admission
+and the scene's no-query guards remain mandatory before births.
+
 The scalar terrain oracle borrows an explicit `GameplayTerrainInstances::Storage`
 bank for its records, birth-order slots and row ranges. `ReferenceStorage`
 provides that bank for reference and native-terrain comparison owners. Native
