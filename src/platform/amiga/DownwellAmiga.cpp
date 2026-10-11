@@ -1852,7 +1852,7 @@ __attribute__((noinline)) static int runDownwell(void) {
         DOWNWELL_NATIVE_BOXES!=0,DOWNWELL_NATIVE_FIELDS!=0,referenceStorage);
     if(!collisionOwner.valid()||!collisionOwner.bindSpatialTree(spatialTreeStorage.provider()))return 20;
     if(ownership!=downwell::GameplayCollisionOwner::Ownership::reference&&
-       !collisionOwner.declareNoSpatialQueries())return 20;
+       !collisionOwner.declareExternalCollisionBackend())return 20;
     checkSceneStack(2);
 #ifdef DOWNWELL_REPLAY_VERIFY
     AmigaPortRuntime& port = *new (portRuntimeStorage)

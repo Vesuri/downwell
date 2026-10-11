@@ -130,7 +130,7 @@ struct Scene {
             downwell::GameplayTerrainInstances::Presentation{},downwell::GameplayTerrainInstances::WallCollision{},
             &rooms,ownership,nativeBoxes,nativeFields);
         require(owner->valid(),"owner prepares");
-        if(noQueries)require(owner->declareNoSpatialQueries(),"scene declares no spatial consumer before births");
+        if(noQueries)require(owner->declareExternalCollisionBackend(),"scene declares external collision backend before births");
         // Exercise both the older occupancy-only backend and the shipping
         // native lifetime store; the latter is bound during loadRoom below.
         world=std::make_unique<AmigaPortRuntime>(300,false,1201-176,true,owner->enemyBinding(),
@@ -357,6 +357,22 @@ int main(int argc,char** argv){
                 require(expected==(i<GameplayWorld::breakableCapacity),"box fixture reaches capacity failure");
             }
         }
+    }
+    // Admission is fail-closed, including direct consumers which never query
+    // the tree. Each violation poisons a fresh owner, not the replay below.
+    for(unsigned consumer=0;consumer<3;++consumer){
+        auto guarded=downwell::makeCollisionOwner(objects,sprites,{}, {},&rooms,Ownership::nativeScenery);
+        require(guarded->declareExternalCollisionBackend(),"external collision admission");
+        bool accepted=false;
+        if(consumer==0){
+            downwell::GameplayCollisionOwner::Owner::Box bounds;
+            accepted=guarded->nativeActorBounds({},bounds);
+        }else if(consumer==1)accepted=guarded->flushNativeSpatial();
+        else{
+            auto pairs=std::make_unique<downwell::RunnerCollisionPairs<downwell::GameplayCollisionView::capacity,16>>();
+            accepted=guarded->collectCollisionPairs(*pairs,false);
+        }
+        require(!accepted&&!guarded->valid(),"unexpected collision consumer fails terminally");
     }
     unsigned tapes=0,frames=0,maxTerrain=0;
     for(unsigned phase=0;phase<10;++phase){

@@ -204,6 +204,16 @@ coordinates through that view. Do not infer permission to remove cached bounds,
 appearance flags or dirty ordering from an absent R-tree query alone; those
 would require a separately proven consumer contract.
 
+Normal native gameplay additionally calls `declareExternalCollisionBackend()`
+before births. This fails closed on direct cached-geometry reads, collision-pair
+collection, dirty-pass execution and native object-query preparation, including
+paths which bypass the index. Unexpected consumers invalidate the owner; they
+must not silently return an empty collision result. Full collision services
+remain the default for reference owners and explicit query fixtures. The guard
+does not remove cached bounds, flags, dirty queues or their maintenance and is
+not itself a performance optimization. A passing bounded replay establishes
+coverage only for that workload, not every future scene or consumer.
+
 Query-enabled owners, including the native original-mask verification path,
 retain the complete ordered journal. Validity checks, zero-budget service and
 empty resets do not allocate. Queries, nonempty explicit service, journal pressure and eager numeric fallback

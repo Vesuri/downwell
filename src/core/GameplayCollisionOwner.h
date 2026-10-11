@@ -74,7 +74,15 @@ public:
     };
     template<class Provider> bool bindSpatialTree(Provider provider){return owner_.bindTree(provider);}
     bool declareNoSpatialQueries(){return owner_.declareNoSpatialQueries();}
+    // Stronger than no index queries: direct cached geometry and ordered
+    // collision passes also belong to the external backend. Only before births.
+    // Retain maintenance until this consumer boundary has been verified.
+    bool declareExternalCollisionBackend(){
+        if(!native_||!owner_.declareNoSpatialQueries())return check(false);
+        collisionConsumersAdmitted_=false;return true;
+    }
 private:
+    bool collisionConsumersAdmitted_=true;
     Owner owner_;
     StationaryRetirementWindow thinRetirementWindow_;
     StationaryRetirementWindow boxRetirementWindow_;
@@ -682,6 +690,7 @@ private:
     }
     bool nativeCollisionVisual(InstanceHandle h,Owner::State& state,Owner::Sprite& sprite){
         DW_PROFILE_COUNT(counterCachedCollisionReads);
+        if(!check(collisionConsumersAdmitted_))return false;
         if(wallQuery_&&wallQuery_->handle.slot==h.slot&&wallQuery_->handle.generation==h.generation){
             state=wallQuery_->state;sprite=wallQuery_->sprite;return true;
         }
@@ -1513,6 +1522,7 @@ public:
     // collision pass: complete animation/scene publication remains required.
     bool flushNativeSpatial(){
         DW_PROFILE_COUNT(counterCollisionDirtyPasses);
+        if(!check(collisionConsumersAdmitted_))return false;
         if(!native_||!valid())return false;
         return check(nativeSpatialDirty_.flush([&](unsigned slot){
             std::uint32_t flags=0;
@@ -1528,6 +1538,7 @@ public:
     template<unsigned Pairs> bool collectCollisionPairs(
         RunnerCollisionPairs<View::capacity,Pairs>& pairs,bool indexAvailable=true){
         DW_PROFILE_COUNT(counterCollisionPairPasses);
+        if(!check(collisionConsumersAdmitted_))return false;
         if(!valid())return false;
         if(!native_)return check(owner_.collectCollisionPairs(pairs,indexAvailable,
             [&](InstanceHandle h,bool publish){return refresh(h,publish);},
@@ -1679,6 +1690,7 @@ public:
     // refresh. This does not flush the mixed queue or admit native selectors.
     bool nativeActorBounds(InstanceHandle h,Owner::Box& bounds,bool refreshBounds=false){
         DW_PROFILE_COUNT(counterCachedCollisionReads);
+        if(!check(collisionConsumersAdmitted_))return false;
         if(!native_||!valid()||(refreshBounds&&!refreshNativeActor(h,true)))return false;
         std::uint32_t flags;if(!eligibilityFlags(h,flags))return false;
         const auto* state=nativePosition(h.slot);if(!state)return false;
@@ -3860,6 +3872,7 @@ private:
                 });
     }
     template<class Visit> bool nativeQueryMembers(int object,Visit visit){
+        if(!check(collisionConsumersAdmitted_))return false;
         if(object==56||object==57||object==59||object==83||object==90){
             // The solid parent spans native boxes, retained walls/platforms
             // and any other registered descendants. Merge by registration
@@ -3883,6 +3896,7 @@ private:
     }
     bool prepareNativeObjectQuery(int object,RunnerSpatialObjectPreparation::Path& path){
         DW_PROFILE_COUNT(counterObjectQueryPreparations);
+        if(!check(collisionConsumersAdmitted_))return false;
         if(!valid()||!world_||!native_)return check(false);
         if(object==82){if(!timeFieldFamily_)return check(false);}
         else if(object==90||object==83){/* No terrain descendants; use every registered subtype. */}
