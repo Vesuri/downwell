@@ -10,7 +10,7 @@ if gDownwellProfileFrozen != 1 || gDownwellProfileTargetScene != 3 || gDownwellP
 end
 printf "PROFILE natural entry PROBES (instrumented); cold gameplay frame retained; clock_clamps=%lu\n", gDownwellProfileClockClamps
 printf "ROOM_PLAN startup bind: ticks=%lu ms=%.3f\n", gDownwellRoomPlanTicks, gDownwellRoomPlanTicks*20.0/80128.0
-printf "ENTRY results bank: eager_uploads=%lu discarded_for_entry=%lu results_frames=%lu\n", gDownwellEntryResultsUploads, gDownwellEntryResultsDiscarded, gDownwellEntryResultsFrames
+printf "ENTRY scene banks: transient_loads=%lu discarded_for_entry=%lu results_frames=%lu field_loads=%u\n", gDownwellTransientLoads, gDownwellEntryResultsDiscarded, gDownwellEntryResultsFrames, gDownwellFieldBandLoads
 if @VERIFY_AMMO@
     printf "ENTRY ammo pixels: checks=%lu failures=%lu prepared=%lu\n", gDownwellAmmoChecks, gDownwellAmmoFailures, gDownwellAmmoFactoredUses
     if gDownwellAmmoChecks == 0 || gDownwellAmmoFailures != 0 || gDownwellAmmoFactoredUses == 0
@@ -37,8 +37,12 @@ while $s < 4
 end
 dump binary memory .run/entry-hud.bin gDownwellEntryHud gDownwellEntryHud+gDownwellEntryHudBytes
 dump binary memory .run/entry-fields.bin gDownwellEntryFields gDownwellEntryFields+gDownwellEntryFieldBytes
-if gDownwellResultsPack != 0 || gDownwellResultsAssetBytes != 0 || gDownwellEntryResultsUploads != 0 || gDownwellUpgradeSourceBytes != 0
+if gDownwellResultsPack != 0 || gDownwellResultsAssetBytes != 0 || gDownwellTransientLoads != 0 || gDownwellUpgradeSourceBytes != 0
     printf "Entry loaded an unrelated results/upgrade bank\n"
+    quit 1
+end
+if gDownwellFieldBandLoads != 1
+    printf "Entry did not load the field bank exactly once\n"
     quit 1
 end
 printf "DOWNWELL_PROFILE_READY\n"

@@ -4,33 +4,34 @@
 #ifdef DOWNWELL_PREPARED_FIELDS
 #include "AmigaFieldBands.h"
 #include "AmigaFieldComposite.h"
-#include "AmigaImmutableUpload.h"
+#include "AmigaFieldBandBank.h"
 #include "framework/BitmapCopyPlan.h"
 static UWORD* residentFieldBands;
-static AmigaImmutableUpload fieldBandUpload;
+static AmigaFieldBandBank fieldBandBank;
+extern "C" { volatile unsigned gDownwellFieldBandLoads; }
 static BitmapCopyPlan fieldPaintPlans[17],fieldRestorePlans[17];
 extern "C" volatile unsigned gDownwellPreparedFieldMode;
 extern "C" void amigaBlitterInvalidateFieldBands(){
-    fieldBandUpload.invalidate();
+    fieldBandBank.invalidate();
     residentFieldBands=nullptr;
 }
-extern "C" void amigaBlitterStageFieldBands(UBYTE* bank){
-    fieldBandUpload.step(reinterpret_cast<UWORD*>(bank),downwell::fieldBandPixels,
-        sizeof(downwell::fieldBandPixels)/sizeof(UWORD),256);
-}
-extern "C" void amigaBlitterBindFieldBands(UBYTE* bank){
+extern "C" bool amigaBlitterBindFieldBands(UBYTE* bank,
+    bool (*read)(void*,UBYTE*,unsigned),void* context){
     AmigaHardware::blitterDrain();
+    residentFieldBands=nullptr;
+    if(!fieldBandBank.load(bank,downwell::fieldBandBytes+2,downwell::fieldBandBytes,
+        downwell::fieldBandChecksum,[&](UBYTE* target,unsigned bytes){
+            if(!read(context,target,bytes))return false;
+            ++gDownwellFieldBandLoads;return true;
+        }))return false;
     residentFieldBands=reinterpret_cast<UWORD*>(bank);
-    fieldBandUpload.step(residentFieldBands,downwell::fieldBandPixels,
-        sizeof(downwell::fieldBandPixels)/sizeof(UWORD),
-        sizeof(downwell::fieldBandPixels)/sizeof(UWORD));
-    residentFieldBands[sizeof(downwell::fieldBandPixels)/sizeof(UWORD)]=0;
     for(unsigned x=0;x<=16;++x){
         if(!fieldPaintPlans[x].prepare(11,11,24,110,x,x,160)||
            !fieldRestorePlans[x].prepare(24,11,24,110,110,x,160)){
-            residentFieldBands=nullptr;return;
+            residentFieldBands=nullptr;return false;
         }
     }
+    return true;
 }
 extern "C" int amigaBlitterFieldBands(const UBYTE* terrain,UBYTE* target,
     const downwell::TimeFieldOutlines::Circle& circle,unsigned origin,bool restore,UWORD* rows){

@@ -99,23 +99,24 @@ interpret restoring this diagnostic's loader fit as a shipping memory reduction.
 ## Executable size versus runtime memory
 
 The normal `STRIP=1` build with admitted room payloads, scene-loaded gameplay art
-and without reference-only collision masks at `917e6e57` is **2,149,912 bytes**, SHA-256
-`1330f38a17c89c6c9c7829b9b76707b4e1ff233b88fea4bd9a877dee25411674`.
+and large-field pixels, and without reference-only collision masks is
+**2,078,032 bytes**, SHA-256
+`d99c1e1f1782cd96c028f3b2126ae48a0bfcd774300c30edfe69e0ba40ee2881`.
 The matching ELF section sizes distinguish payload from runtime allocation:
 
 | Section | Bytes | Stored in the executable? |
 | --- | ---: | --- |
-| Machine code (`.text`) | 1,392,234 | Yes |
-| Read-only data (`.rodata`) | 674,952 | Yes |
+| Machine code (`.text`) | 1,391,882 | Yes |
+| Read-only data (`.rodata`) | 603,520 | Yes |
 | Initialized writable data (`.data`) | 34,194 | Yes |
 | Initializer pointer | 4 | Yes |
 | Zero-filled storage (`.bss`) | 2,256,828 | No; allocated at load |
 
-Initialized payload totals 2,101,384 bytes. Hunk relocation, padding and container
-records account for the remaining 48,528 bytes. Stripping cannot remove
+Initialized payload totals 2,029,600 bytes. Hunk relocation, padding and container
+records account for the remaining 48,432 bytes. Stripping cannot remove
 the initialized payload. ELF debug sections are not that payload either.
 
-Linked serialized banks account for 312,657 of the 674,952 read-only bytes:
+Linked serialized banks account for 312,657 of the 603,520 read-only bytes:
 
 | Linked bank group | Bytes |
 | --- | ---: |
@@ -130,12 +131,12 @@ Linked serialized banks account for 312,657 of the 674,952 read-only bytes:
 | Small time-field images | 29,264 |
 
 The remaining read-only bytes include generated tables, constants and strings.
-In particular, large-field `fieldBandPixels` contributes another 71,456 bytes
-outside these serialized banks. `AmigaBlitter` copies that immutable stream
-into the gameplay Chip bank; drawing reads the Chip copy. This is distinct
+The 71,456-byte large-field pixel stream is read from `Downwell.fields`
+directly into the gameplay Chip bank; there is no linked
+CPU upload copy. A linkage guard rejects its return. This is distinct
 from `fieldColumnWords` (70,816 bytes), the CPU column-rendering representation;
-those are not interchangeable arrays. Front-end scenes currently retain both
-linked sources even though only gameplay consumes them.
+those are not interchangeable arrays. Front-end scenes still retain the CPU
+column commands, but do not read or prepare the large-field pixel file.
 
 Reproduce the section and bank measurements with `m68k-amiga-elf-objdump -h`
 and `m68k-amiga-elf-objdump -t -C` on `amiga/out/Downwell.elf`, after sourcing
@@ -209,8 +210,8 @@ gameplay memory is essentially unchanged: this is scene residency, not a
 smaller raster representation.
 `tmp/raster-lease-startup-gdb.log` verifies no raster residency at startup and
 126,840 Chip bytes free. At the audited build above, initialized payload plus
-BSS is 4,358,212 bytes before gameplay raster and dynamic graphics allocations.
-Adding the raster alone brings this to 5,439,556 ordinary-memory bytes. A small
+BSS is 4,286,428 bytes before gameplay raster and dynamic graphics allocations.
+Adding the raster alone brings this to 5,367,772 ordinary-memory bytes. A small
 Hunk file therefore would not, on its own, prove an A500 memory fit.
 Moving data to sidecar files changes file size, not residency, unless its
 lifetime or representation also changes. The shared DMA plane atlas below
@@ -354,11 +355,12 @@ complete directory occupy the first 37,030 bytes. Only one-shot garden
 scenery follows the live prefix;
 `AmigaGardenScene::prepare` copies it into the scrolling canvases before any
 staging starts. Writable sprite DMA headers never alias another payload.
-The generator emits `DOWNWELL_FRONT_LIVE_BYTES`, and the target statically
-checks that it ends before byte 75,360. After the first garden frame retires
-the previous scene, each garden update stages at most 256 words of immutable
-large-field arcs at that offset. No live front artwork or canvas is modified.
-This borrows existing Chip storage, rather than allocating another bank.
+Large-field arcs are not prepared in the garden. After retiring front-end DMA,
+gameplay entry reads `Downwell.fields` directly into the existing range at
+75,360. The generated size must fit its reviewed 71,456-byte budget. A rolling
+word checksum verifies the offline big-endian stream before DMA pointers are
+published, and a zero guard word follows it. A missing, short or corrupt read
+fails entry with return code 20; there is no full-catalogue or linked fallback.
 After garden DMA retires, clean-content style updates stage at most 256 words
 of small-field images into `[44304,73568)`. The generated
 `DOWNWELL_FRONT_STYLE_BYTES` bound keeps every style source below that range;
@@ -412,9 +414,9 @@ blit plans remain resident through level-clear/upgrade and the next level;
 those scenes do not overwrite their ranges. Each entry still resets both
 overlays and rebinds their backing/terrain pointers. Invalidate residency
 before any boot/front bank load, including a failed load. Entry completes any
-unfinished staged image upload (including skipped/short garden or style
-paths), then binds the immutable plans; partially uploaded images are never
-exposed to DMA. Upload completion and bound-bank residency are separate:
+unfinished small-image upload (including skipped/short garden or style paths),
+loads the large-image file if absent, then binds the immutable plans; partially
+loaded images are never exposed to DMA. Upload completion and residency are separate:
 preloading small images must not skip first-entry large-field plan setup.
 `REFERENCE_FIELD_BANK=1` retains synchronous entry uploads without garden or
 style staging. Terrain scratch writes are confined to the prefix and

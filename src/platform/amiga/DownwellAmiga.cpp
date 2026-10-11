@@ -77,9 +77,8 @@ void downwellTerrainBatchMismatch();
 // Change only initialized data for identical-code comparisons.
 // Both modes load the same images and reserve the same scene-bank partition.
 extern "C" { volatile unsigned gDownwellPreparedFieldMode=DOWNWELL_FIELD_MODE; }
-extern "C" void amigaBlitterBindFieldBands(UBYTE*);
+extern "C" bool amigaBlitterBindFieldBands(UBYTE*,bool (*)(void*,UBYTE*,unsigned),void*);
 extern "C" void amigaBlitterInvalidateFieldBands();
-extern "C" void amigaBlitterStageFieldBands(UBYTE*);
 extern "C" int amigaBlitterFieldBands(const UBYTE*,UBYTE*,const downwell::TimeFieldOutlines::Circle&,unsigned,bool,UWORD*);
 extern "C" int amigaBlitterRetireFieldBands(const UBYTE*,UBYTE*,const downwell::TimeFieldOutlines::Circle&,const downwell::TimeFieldOutlines::Circle&,unsigned);
 extern "C" int amigaBlitterComposeFieldBands(const UBYTE*,UBYTE*,const downwell::TimeFieldOutlines::Circle&,unsigned,UWORD*);
@@ -409,8 +408,10 @@ static const ULONG baseSceneBankBytes = DOWNWELL_FRONT_BANK_BYTES > DOWNWELL_BOO
     ? DOWNWELL_FRONT_BANK_BYTES : DOWNWELL_BOOT_BANK_BYTES;
 #ifdef DOWNWELL_PREPARED_FIELDS
 static const ULONG fieldBandOffset=75360;
-static const ULONG sceneBankBytes=fieldBandOffset+sizeof(downwell::fieldBandPixels)+sizeof(UWORD)>baseSceneBankBytes?
-    fieldBandOffset+sizeof(downwell::fieldBandPixels)+sizeof(UWORD):baseSceneBankBytes;
+static_assert(downwell::fieldBandBytes<=71456,
+    "Large-field bank exceeds its reviewed scene budget");
+static const ULONG sceneBankBytes=fieldBandOffset+downwell::fieldBandBytes+sizeof(UWORD)>baseSceneBankBytes?
+    fieldBandOffset+downwell::fieldBandBytes+sizeof(UWORD):baseSceneBankBytes;
 #else
 static const ULONG sceneBankBytes=baseSceneBankBytes;
 #endif
@@ -577,7 +578,6 @@ static bool selectExitMaskBank() {
 }
 #ifdef DOWNWELL_PROFILE_ENTRY
 extern "C" {
-volatile ULONG gDownwellEntryResultsUploads=0;
 volatile ULONG gDownwellEntryResultsDiscarded=0;
 volatile ULONG gDownwellEntryResultsFrames=0;
 const UBYTE* volatile gDownwellEntryHud=nullptr;
@@ -2888,7 +2888,11 @@ __attribute__((noinline)) static int runDownwell(void) {
 #endif
                     if(!fieldBankResident){
                         DW_PROFILE_PHASE(profileEntryLargeFields);
-                        amigaBlitterBindFieldBands(sceneBank+fieldBandOffset);
+                        if(!amigaBlitterBindFieldBands(sceneBank+fieldBandOffset,
+                            [](void* p,UBYTE* target,unsigned bytes){
+                                return static_cast<AmigaPlatform*>(p)->loadFile(
+                                    "PROGDIR:Downwell.fields",target,bytes)==LONG(bytes);
+                            },&platform)){exitCode=20;break;}
                         ++gDownwellFieldBankUploads;
                     }else ++gDownwellFieldBankReuses;
 #ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
@@ -3082,15 +3086,6 @@ __attribute__((noinline)) static int runDownwell(void) {
                     // game-state transitions or overwriting a live DMA source.
                     if (!presentationChanged && !styleScene.preparePart())
                         break;
-#if defined(DOWNWELL_PREPARED_FIELDS) && !defined(DOWNWELL_REFERENCE_FIELD_BANK)
-                    // Garden static art is already in its scrolling canvases.
-                    // The offline live prefix retains every title, DMA sprite,
-                    // style asset and oracle record below this upload region.
-                    static_assert(DOWNWELL_FRONT_LIVE_BYTES <= fieldBandOffset,
-                        "live front artwork overlaps the staged field bank");
-                    if (!presentationChanged)
-                        amigaBlitterStageFieldBands(sceneBank+fieldBandOffset);
-#endif
                     if (++menuSpriteFrameCount == 2)
                         downwellMenuSpriteReady();
 #ifdef DOWNWELL_SCENE_VERIFY

@@ -2218,7 +2218,17 @@ build/generate-field-columns: tools/generate-field-columns.cpp $(wildcard src/co
 generated/downwell-field-columns.h: build/generate-field-columns tools/generate-field-columns.py
 	python3 tools/generate-field-columns.py
 
+generated/amiga-field-bands.bin: generated/downwell-field-columns.h
+	@test -f $@ || python3 tools/generate-field-columns.py
+
 .PHONY: verify-field-columns
+.PHONY: verify-field-band-bank
+build/field-band-bank-test: tests/platform/amiga/AmigaFieldBandBankTest.cpp src/platform/amiga/AmigaFieldBandBank.h generated/downwell-field-columns.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+verify-field-band-bank: build/field-band-bank-test generated/amiga-field-bands.bin
+	./build/field-band-bank-test generated/amiga-field-bands.bin
+test: verify-field-band-bank
 build/bitmap-copy-plan-test: tests/platform/amiga/BitmapCopyPlanTest.cpp src/platform/amiga/framework/BitmapCopyPlan.h
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
 .PHONY: verify-bitmap-copy-plan

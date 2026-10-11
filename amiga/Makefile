@@ -598,7 +598,14 @@ endif
 
 .PHONY: all check clean audit
 
-all: check $(OUT).exe $(OUT).boot $(OUT).front $(OUT).game $(OUT).planes $(OUT).cavern $(OUT).cavernplanes $(OUT).results $(OUT).shop $(OUT).clear
+all: check $(OUT).exe $(OUT).boot $(OUT).front $(OUT).game $(OUT).planes $(OUT).cavern $(OUT).cavernplanes $(OUT).results $(OUT).shop $(OUT).clear $(OUT).fields
+
+$(OUT).fields: $(REPO)/generated/amiga-field-bands.bin
+	@mkdir -p $(@D)
+	cp -f $< $@
+
+$(REPO)/generated/amiga-field-bands.bin: $(REPO)/generated/downwell-field-columns.h
+	$(MAKE) -C $(REPO) generated/amiga-field-bands.bin
 
 $(OUT).cavern: $(REPO)/generated/amiga-cavern.dwap
 	@mkdir -p $(@D)
@@ -1070,7 +1077,7 @@ $(REPO)/generated/amiga-field-images.bin: $(REPO)/tools/generate-field-images.cp
 $(REPO)/generated/downwell-field-columns.h: $(REPO)/tools/generate-field-columns.cpp $(REPO)/tools/generate-field-columns.py $(wildcard $(REPO)/src/core/*.h)
 	$(MAKE) -C $(REPO) generated/downwell-field-columns.h
 ifeq ($(PREPARED_FIELDS),1)
-obj/DownwellAmiga.o: $(REPO)/generated/downwell-field-columns.h
+obj/DownwellAmiga.o obj/AmigaBlitter.o: $(REPO)/generated/downwell-field-columns.h
 endif
 obj/AmigaFieldPrepared.o: $(AMIGA_SRC)/AmigaFieldPrepared.s $(REPO)/generated/amiga-field-images.bin
 	@mkdir -p $(@D)
@@ -1089,6 +1096,9 @@ obj/gcc8_a_support.o: $(SUPPORT)/gcc8_a_support.s
 	$(AS) $(ASFLAGS) -o $@ $<
 
 audit:
+	@if $(OBJDUMP) -t $(OUT).elf | grep -q 'fieldBandPixels'; then \
+		echo "*** gameplay field upload pixels must be scene-loaded, not linked"; exit 1; \
+	else echo "Field image source linkage audit: clean"; fi
 	@python3 $(REPO)/tools/audit-amiga-scene-loads.py $(OUT).elf $(if $(filter 1,$(REPLAY_VERIFY) $(PLANE_VERIFY)),--reference-oracle)
 	@if $(OBJDUMP) -t $(OUT).elf | grep -qE 'amiga_game_pack'; then \
 		echo "*** gameplay CPU art must be scene-loaded, not linked"; exit 1; \

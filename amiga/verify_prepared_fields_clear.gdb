@@ -21,6 +21,7 @@ if gDownwellPreparedFieldFailures != 0 || $fixtures < 1 || gDownwellPreparedFiel
 end
 printf "PROFILE exit field pixels: %u checks, %u fused transfers, %u fixture transfers, %u actual exit transfers; failures=%u\n", gDownwellPreparedFieldChecks, gDownwellPreparedFieldFusedChecks, $fixture_fusions, gDownwellPreparedFieldFusedChecks - $fixture_fusions, gDownwellPreparedFieldFailures
 printf "PROFILE exit gameplay frames: %lu\n", gDownwellProfileFrames[3]
+printf "PROFILE large-field file reads: %u\n", gDownwellFieldBandLoads
 printf "DOWNWELL_PROFILE_READY\n"
 shell touch .run/gdb-ready.marker
 detach

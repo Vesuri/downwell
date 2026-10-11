@@ -194,6 +194,16 @@ horizontal-shift phases against independent pixels and physical-row footprints;
 `verify-prepared-time-fields` checks integration and mixed source order. These
 are portable-raster checks, not claims of Windows GPU raster equivalence.
 
+The same generator emits `generated/amiga-field-bands.bin`, deployed as
+`Downwell.fields`. Its manifest pins the payload SHA-256 and byte count. The
+Amiga reads this immutable big-endian stream directly into the existing
+large-field Chip range at gameplay entry and validates its rolling word
+checksum before publishing DMA pointers. It retains no linked CPU pixel copy;
+the generated host array remains the independent loading/pixel oracle.
+`make verify-field-band-bank` checks exact payload words, failed/corrupt reads,
+invalidation/reuse and the shifted-blitter guard word. This does not externalize
+the CPU column commands used by other placements.
+
 `make analyze-field-layouts` reports unchanged-column/word opportunities and
 deduplicated bitmap-band storage/counts for those large rasters. Its uniform
 radius-pair model is a geometry/storage audit, not a replacement for native
