@@ -99,6 +99,33 @@ then report `--frames 676 --causes`. Reports:
 `tmp/builder-phase-idle-compare.txt`; contact trace ELF SHA-256:
 `28c8c65ff785cb09acf10f14866ab65f129213ce9acc8cacf7667122a59ed65c`.
 
+#### Constructor initialization attribution
+
+A fresh capture of `e2daa8a0` confirms frame 676 at 226.85 ms. The
+`appendPreparedCells` source-line report accounts for all 76,944 self cycles
+(10.83 ms), excluding callees. At this revision, lines 362–367—the retained
+cell initialization loop—account for about 41.2% of that self cost, or 4.47 ms.
+Its repeated `wallRadius` calls add about 1.60 ms. Thus moving eligible fresh
+cell initialization to level preparation has a **roughly 6 ms ceiling**, before
+charging admission and fallback checks. It cannot remove the whole 73.95 ms
+native construction boundary.
+
+The same initialization writes `flags_`, `createSprite_` and `walls_`. Reused
+slots may contain prior activation, destruction, Create and wall-query state;
+room clearing currently rebuilds identities without resetting those arrays.
+Prepared output must therefore be limited to untouched slots with matching
+source defaults, not selected merely because the slot is free. Constructor
+flags are supplied only for kinds present in a segment, so absent-kind zeroes
+cannot certify a shared initialization template. The existing constructor
+also installs only the completed prefix after a publication failure.
+
+Reproduce with the contact command above, using `TRACE_FRAMES=675
+TRACE_FIELDS=24 TRACE_OUTPUT="$PWD/tmp/trace/terrain-init-audit"`, then report
+`--frames 676 --causes --lines appendPreparedCells`.
+Report: `tmp/terrain-init-audit-report.txt`; ELF SHA-256:
+`aef5a613f6ee6ee643a4de3474a354a6d3c9dc02aaa38700a87f5e6d16684c11`.
+This is attribution and an estimate, not an implemented speedup.
+
 ### Firing versus retirement boundaries
 
 A bounded recheck at `f1b720e7` separates two early contact-tape spikes before
