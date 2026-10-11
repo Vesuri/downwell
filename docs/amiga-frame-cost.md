@@ -48,6 +48,16 @@ Reference report/ELF: `tmp/baseline-exact-windows-report.txt` and
 
 ## Phase attribution at the current baseline
 
+The independent no-input generation gate uses
+[`amiga-idle-frame-baseline.json`](amiga-idle-frame-baseline.json), captured at
+`27ff7482`. Do not compare these frame numbers with the contact tape. Reproduce
+with `PROFILE_IDLE=1 SKIP_TO_GAME=1 PROFILE_CONTACT=0 PROFILE_FRAMES=600
+VERIFY_CHIP_KB=512 VERIFY_TIMEOUT_SECONDS=120 STRIP=1 TRACE_FRAMES=162
+TRACE_FIELDS=35 TRACE_OUTPUT=$PWD/tmp/trace/idle-check bash amiga/profile.sh trace`.
+Export `--frame-summary` with the trace reporter and compare frames `163-174`
+using `tools/amiga-frame-compare.py`; partial frames 162 and 175 are excluded.
+Keep both the no-input gate and the contact windows when evaluating generation.
+
 A two-window recheck at `05a36ba3` isolates early frame 51 and combat frame
 1305. This is diagnostic evidence, not an optimization or a new baseline.
 Both frames reproduce the committed baseline within 0.5 ms.

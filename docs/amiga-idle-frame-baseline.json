@@ -1,0 +1,25 @@
+{
+  "schema": "downwell-frame-cycles/v1",
+  "elf_sha256": "7d6b965223b9276df6524e5b258cac6b5c949ed59a2a239be3978d7cf8c1d450",
+  "pal_field_cycles": 142102,
+  "frames": [
+    {"frame": 163, "cycles": 1158580},
+    {"frame": 164, "cycles": 392730},
+    {"frame": 165, "cycles": 393870},
+    {"frame": 166, "cycles": 324850},
+    {"frame": 167, "cycles": 300570},
+    {"frame": 168, "cycles": 355580},
+    {"frame": 169, "cycles": 306700},
+    {"frame": 170, "cycles": 320480},
+    {"frame": 171, "cycles": 299420},
+    {"frame": 172, "cycles": 315260},
+    {"frame": 173, "cycles": 299630},
+    {"frame": 174, "cycles": 314190}
+  ],
+  "partial_frames": [162, 175],
+  "tool": "amiga-trace-report/frame-summary-v1",
+  "tool_sha256": "d4299f6ddcc0c0f72af128edf02817b1c86d56973513913faf6cc7b58154ba1a",
+  "inputs": {
+    "trace-162.bin": "f081f2ec1af4e8779581872c073848d70df48ecbdeda964930acceb2e6d9bf0a"
+  }
+}
