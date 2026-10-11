@@ -108,15 +108,22 @@ allocation fallback. The caller must keep it alive until after its owner.
 Missing backing fails on collision-service use. External-backend admission
 rejects a supplied bank rather than retaining an unnecessary scene dependency.
 Terrain geometry and lifetime identities remain in their run owner.
-On the 68000 this bank is 100,186 bytes, including 30,720 bytes of box records
-and 21,894 bytes of prepared
-geometry. Full-service reference owners carry the same geometry in their
+On the 68000 this bank is 126,862 bytes, including 30,720 bytes of box records
+and 48,570 bytes of prepared geometry (26,676 bytes of native-endian sprite
+descriptors plus 21,894 bytes of prepared bounds). Full-service reference owners carry the same geometry in their
 explicit `ReferenceStorage`. Guarded external-backend owners neither reserve
 nor prepare it; they retain only a four-byte geometry pointer. Required sprite
 metadata, object defaults and terrain Create plans remain available. Startup
 and contact-profile verifiers assert null bank and geometry pointers, and the
 preparation-count gate distinguishes terrain Create plans from optional
 collision birth bounds. Query-enabled fixtures verify the full-service path.
+The native-endian descriptor cache lives in this same explicit bank, not in
+the always-resident owner. External scenes read required frame counts directly
+from the immutable serialized pack. Adding unrelated descriptors cannot grow
+their native cache or cause a full-catalogue decode; the growth fixture adds
+128 descriptors and exercises existing births without admitting geometry.
+The startup and contact verifiers also require a null prepared-descriptor
+pointer. This does not yet partition the serialized sprite metadata itself.
 Moving box records into the explicit bank
 removes 30,720 bytes from an external-backend scene; full-service native totals
 are unchanged because that scene admits the bank. This does not reduce Chip

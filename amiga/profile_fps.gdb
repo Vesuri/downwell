@@ -145,6 +145,11 @@ if $owner->geometry_ != 0
     quit 1
 end
 printf "Collision geometry: optional_bytes=%lu resident=0\n", sizeof(*$owner->geometry_)
+if $owner->sprites_.prepared_ != 0
+    printf "External collision backend retained the full sprite descriptor cache\n"
+    quit 1
+end
+printf "Sprite descriptor cache: resident=0\n"
 if $owner->nativeCollisionStorage_ != 0
     printf "External collision backend retained unused queue/mask backing\n"
     quit 1

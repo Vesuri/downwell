@@ -81,6 +81,10 @@ public:
         std::uint32_t appearanceFlags=8u;
     };
     struct CollisionGeometryStorage {
+        // Native-endian descriptors belong to the admitted collision service,
+        // not every scene. External backends read occasional frame counts
+        // from the immutable pack without decoding the whole catalogue.
+        PackedSpriteCollision descriptors[741];
         PreparedSpriteGeometry<741> sprites;
         PreparedTerrainBirthBounds terrain;
     };
@@ -257,9 +261,6 @@ private:
     PropertyStore properties_;
     RunnerObjectFamilies<386> families_;
     const ObjectPack& objects_;
-    // The pinned original has 741 sprite descriptors. Decode once before
-    // any births/queries; keep preparation storage off the target task stack.
-    PackedSpriteCollision preparedSprites_[741];
     SpriteCollisionPack sprites_;
     PreparedObjectDefaults<386> objectDefaults_;
     CollisionGeometryStorage* geometry_=nullptr;
@@ -585,7 +586,7 @@ private:
                         (sprite.scaleX.bits>>31)!=0,(sprite.scaleY.bits>>31)!=0);
                 }
                 if(prepared)return owner_.refresh(key,*flags,false,&bounds,
-                    preparedSprites_[id].collisionMode==1,publish);
+                    geometry_->descriptors[id].collisionMode==1,publish);
             }
         }
         return flags&&owner_.refreshSprite(key,*flags,false,sprites_,appearance->sprite,true,
@@ -633,7 +634,7 @@ private:
         const bool okay=owner_.externalSpatialPublication([&](auto& index){
             return RunnerSpatialBoundsUpdate::finishRefresh(index,h.slot,*objectFlags,flags,false,state->bounds,
                 found?&bounds:nullptr,state->x,state->y,
-                found&&(prepared?preparedSprites_[collisionSprite].collisionMode==1:resource.collisionMode==1),publish);
+                found&&(prepared?geometry_->descriptors[collisionSprite].collisionMode==1:resource.collisionMode==1),publish);
         });
         state->appearanceFlags=flags&0xc208u;return check(okay);
     }
@@ -1576,7 +1577,7 @@ public:
         if(!native_&&!terrain_.bindStorage(reference->terrain)){good_=false;return;}
         if(preparedDrawEnabled())layers_.enablePreparedDraw();
         geometry_=native_?(nativeCollision?&nativeCollision->geometry:nullptr):&reference->geometry;
-        good_=sprites_.prepare(preparedSprites_,741)&&objectDefaults_.prepare(objects,sprites_)&&
+        good_=(!geometry_||sprites_.prepare(geometry_->descriptors,741))&&objectDefaults_.prepare(objects,sprites_)&&
             (!geometry_||(geometry_->sprites.prepare(sprites_)&&
                          geometry_->terrain.prepare(objectDefaults_,sprites_)))&&
             nativeTerrainCreate_.prepare(objectDefaults_,sprites_)&&

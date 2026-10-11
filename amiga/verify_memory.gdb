@@ -51,6 +51,11 @@ if $owner->geometry_ != 0
     quit 1
 end
 printf "Startup collision geometry: optional_bytes=%lu resident=0\n", sizeof(*$owner->geometry_)
+if $owner->sprites_.prepared_ != 0
+    printf "Unadmitted native-endian sprite catalogue resident during startup\n"
+    quit 1
+end
+printf "Startup sprite descriptor cache: resident=0\n"
 if $owner->nativeCollisionStorage_ != 0
     printf "Unused collision queue/mask backing resident during startup\n"
     quit 1

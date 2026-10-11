@@ -289,6 +289,31 @@ int main(int argc,char** argv){
     downwell::PackedRoom room;
     require(rooms.valid()&&objects.valid()&&patterns.valid()&&sprites.valid()&&rooms.findRoom(11,room),"resources");
     {
+        // Unrelated sprite growth must not force the external collision scene
+        // to decode/allocate a full native-endian descriptor catalogue. The
+        // reference geometry service still enforces its explicit capacity.
+        auto grownBytes=spriteBytes;
+        for(unsigned i=0;i<128;++i)
+            grownBytes.insert(grownBytes.end(),spriteBytes.begin()+sprites.headerSize,
+                spriteBytes.begin()+sprites.headerSize+sprites.recordSize);
+        const auto count=sprites.spriteCount()+128;
+        for(unsigned byte=0;byte<4;++byte)grownBytes[16+byte]=std::uint8_t(count>>(byte*8));
+        downwell::SpriteCollisionPack grown(grownBytes.data(),grownBytes.size());
+        require(grown.valid()&&grown.spriteCount()==count,"grown descriptor fixture validates");
+        auto external=downwell::makeCollisionOwner(objects,grown,{}, {},&rooms,
+            Ownership::nativeScenery,true,true,false);
+        require(external->valid()&&external->declareExternalCollisionBackend()&&
+            !external->hasPreparedCollisionGeometry(),"unrelated descriptors require no external-scene cache");
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,external->enemyBinding(),
+            external->breakableBinding(),external->playerBinding());
+        require(external->attach(*world),"grown catalogue external scene attaches");
+        for(int object:{112,82,92})
+            require(world->createGeneratedInstance({object,240,512},objects,[](const auto&){return true;}),
+                "existing births remain valid with unrelated descriptors");
+        auto full=downwell::makeCollisionOwner(objects,grown,{}, {},&rooms,Ownership::nativeScenery);
+        require(!full->valid(),"full collision service still rejects undeclared geometry growth");
+    }
+    {
         auto prepared=std::make_unique<downwell::PreparedRoomTerrain>();
         require(prepared->prepare(rooms,room)&&prepared->matches(rooms,room),"room terrain plan admits resources");
         unsigned selected=0;int extent=0;
