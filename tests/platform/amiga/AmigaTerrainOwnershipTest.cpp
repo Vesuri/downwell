@@ -368,6 +368,47 @@ int main(int argc,char** argv){
             }
         }
     }
+    {
+        downwell::StartupRuntime entry(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns);
+        entry.skipToGameForTesting();
+        auto scene=std::make_unique<Scene>(patterns,objects,sprites,rooms,room,entry,
+            Ownership::nativeScenery,true,true,true,true);
+        bool admitted=false;long top=0;
+        for(unsigned i=0;i<120&&!admitted;++i){
+            scene->world->step(0);
+            require(scene->world->effectsSucceeded()&&scene->owner->prepareDraw(),"interior fixture Step");
+            top=(34L+scene->world->cameraOffsetY())*4096;
+            require(scene->owner->tryNativeActorEndStepInterior(top,admitted),"interior admission query");
+        }
+        require(admitted,"ordinary native End Step reaches the no-op interior");
+        scene->world->setPlayerHit();
+        require(scene->owner->tryNativeActorEndStepInterior(top,admitted)&&admitted&&scene->world->playerHit()==2,
+            "interior still executes player hit End Step");
+        require(scene->owner->tryNativeActorEndStepInterior(top,admitted)&&admitted&&scene->world->playerHit()==0,
+            "interior still expires player hit state");
+        const auto player=scene->world->playerHandle();
+        const auto* playerRecord=scene->world->findPlayer(player);
+        require(playerRecord&&scene->owner->playerBinding().activation(player,*playerRecord,false),"deactivate player");
+        scene->world->setPlayerHit();
+        require(scene->owner->tryNativeActorEndStepInterior(top,admitted)&&admitted&&scene->world->playerHit()==1,
+            "inactive player gets no End Step from interior admission");
+        require(scene->owner->playerBinding().activation(player,*playerRecord,true),"reactivate player");
+        downwell::InstanceHandle drone;
+        require(scene->owner->droneBullets().create(605099,downwell::MotionBinary64::fromInteger(240),
+            downwell::MotionBinary64::fromInteger(192),drone),"birth nonordinary End Step family");
+        require(scene->owner->tryNativeActorEndStepInterior(top,admitted)&&!admitted&&scene->world->playerHit()==1,
+            "nonordinary family falls back before executing player");
+        require(scene->owner->droneBullets().markDestroyed(drone)&&scene->owner->prepareDraw(),"retire nonordinary family");
+        require(scene->owner->tryNativeActorEndStepInterior(top,admitted)&&admitted&&scene->world->playerHit()==2,
+            "retired family no longer prevents ordinary admission");
+        scene->world->setPlayerHit();
+        require(scene->owner->tryNativeActorEndStepInterior(-2147483647L-1,admitted)&&!admitted&&scene->world->playerHit()==1,
+            "unsupported boundary falls back before any event executes");
+        require(scene->world->createGeneratedInstance({111,240,-10000},objects,[](const auto&){return true;}),
+            "birth out-of-view enemy");
+        require(scene->owner->tryNativeActorEndStepInterior(top,admitted)&&!admitted&&scene->world->playerHit()==1,
+            "out-of-view actor retains the complete ordered phase");
+    }
     // Admission is fail-closed, including direct consumers which never query
     // the tree. Each violation poisons a fresh owner, not the replay below.
     for(unsigned consumer=0;consumer<6;++consumer){

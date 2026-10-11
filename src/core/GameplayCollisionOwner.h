@@ -1966,6 +1966,9 @@ public:
         world.configureRegisteredActorEndStep([](void* context,long topQ12){
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
             if(!self.valid())return false;
+            bool interior=false;
+            if(!self.tryNativeActorEndStepInterior(topQ12,interior))return false;
+            if(interior)return true;
             const auto* nativeTerrain=self.world_->nativeTerrainInstances();
             const unsigned terrainCount=nativeTerrain?nativeTerrain->size():self.terrain_.size();
             const auto terrainCutoff=nativeTerrain?nativeTerrain->lastLifetime():self.terrain_.lastLifetime();
@@ -2490,6 +2493,54 @@ private:
     }
 public:
     GameplayTerrainInstances& terrain(){return terrain_;}
+    // Only the pinned production rmMain events are eligible, never an
+    // arbitrary Execute callback. If every retirement is a no-op, none can
+    // mutate a later actor or admit a new lifetime. Keep the complete ordered
+    // dispatcher below for every boundary/unsupported case.
+    bool tryNativeActorEndStepInterior(long topQ12,bool& handled){
+        handled=false;
+        if(!valid()||!world_)return check(false);
+        if(!native_||collisionConsumersAdmitted_||!nativeBoxes_||actorEndStepExecuting_||combatAlarmPhaseInUse_)
+            return true;
+        if(drones_.size()||skeletons_.size()||whiteJellies_.size()||redBalls_.size()||
+           playerControllers_.size()||corpses_.size()||shopInstances_.size())return true;
+        const auto* terrain=world_->nativeTerrainInstances();
+        if(!terrain||!boxRetirementWindow_.contains(topQ12,world_->captureBoxAlarms().lastLifetime)||
+           !thinRetirementWindow_.contains(topQ12,terrain->lastLifetime()))return true;
+        if(topQ12<(-2147483647L-1)||topQ12>2147483647L)return true;
+        const ProjectileViewInterior interior(static_cast<std::int32_t>(topQ12));
+        for(unsigned i=0;i<world_->enemyCount();++i){
+            const auto& enemy=world_->enemyAt(i);
+            const InstanceHandle h{View::enemyBase+enemy.identitySlot,enemy.lifetimeId};
+            std::uint32_t flags;
+            if(!table_.registered(h)||!table_.flags(h,flags)||(flags&0x100003u))continue;
+            if(!hasSimpleOutOfViewEndStep(table_.objectId(h)))continue;
+            StationaryRetirementWindow::Proof position;
+            // Same coordinate domain as the retained box proof; the original
+            // event remains responsible for unusual or boundary coordinates.
+            if(enemy.y < -521464||enemy.y > 523951)return true;
+            position.include(enemy.y+176);
+            if(!position.supported||topQ12<position.low||topQ12>position.high)return true;
+        }
+        for(unsigned i=0;i<world_->bulletSlotEnd();++i){
+            const auto& bullet=world_->bulletAt(i);
+            if(bullet.identitySlot>=GameplayWorld::bulletCapacity||!bullet.lifetimeId)continue;
+            const InstanceHandle h{View::bulletBase+bullet.identitySlot,bullet.lifetimeId};
+            std::uint32_t flags;
+            if(!table_.registered(h)||!table_.flags(h,flags)||(flags&0x100003u))continue;
+            if(table_.objectId(h)!=261||!interior.contains(bullet.sourceMotion.y))return true;
+        }
+        // This event changes playerHit only. It cannot invalidate any proof
+        // above or run a nested destruction/birth callback.
+        const auto local=world_->playerHandle();
+        const InstanceHandle player{local.slot,local.generation};
+        std::uint32_t flags;
+        if(table_.registered(player)&&table_.flags(player,flags)&&!(flags&0x100003u)){
+            if(!check(table_.objectId(player)==35&&world_->findPlayer(local)))return false;
+            world_->playerDamageEndStep();
+        }
+        handled=true;return true;
+    }
     // Production handoff for the currently owned End Step actors. Keep its
     // actor capture off the Amiga task stack. Reference boxes borrow the idle
     // alarm workspace; native boxes borrow their lifetime prefix instead.

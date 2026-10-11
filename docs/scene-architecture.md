@@ -279,6 +279,28 @@ prevent publishing its stale proof. Unsupported coordinate ranges and revision
 exhaustion retain the original walk. This is specific to the pinned stationary
 event, not a general license to skip actor End Step or source callbacks.
 
+## Native no-op End Step admission
+
+The external-collision native scene can omit the mixed End Step capture and
+dispatch only when its pinned event bodies have no effects beyond the player's
+`playerHit` update. `tryNativeActorEndStepInterior` first checks the existing
+stationary box and thin-platform proofs at the current lifetime ceilings.
+It then checks the small native enemy/projectile stores against the same
+retirement bounds; registration and live exclusion flags still govern which
+actors participate. Projectile Y comes from published `sourceMotion`, including
+collision writes, not artwork coordinates. It does not walk terrain or the
+whole room, allocate a second roster, or construct a new generic snapshot.
+
+No event executes until every proof succeeds. Player 35's pinned body only
+advances/clears `playerHit`, so moving that update past these read-only tests
+cannot affect admission. Inactive/unregistered players receive no update.
+A boundary crossing, nonordinary End Step family, full collision service,
+unsupported numeric range or invalidated stationary proof retains the original
+captured, ordered dispatcher. That path remains responsible for synchronous
+destruction callbacks, birth cutoffs and live activation changes. This is not
+a cached result for an arbitrary event callback, nor permission to omit a newly
+implemented event: additional actor families require explicit admission proof.
+
 ## Read-only actor ordering
 
 Native and reference spatial refresh share the immutable
