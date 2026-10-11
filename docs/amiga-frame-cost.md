@@ -30,40 +30,57 @@ command using `TRACE_FRAMES=162 TRACE_FIELDS=35`.
 
 ## Early contact execution gate
 
-At `ba27fad3`, a fresh 35-field capture beginning at marker 50 reproduces
-frame 51 at **31.76 ms** (225,680 cycles). It contains live bullets but no
-enemies; capture coverage ends at tick 67, view Y 120, health 4. It is not
+At `1330206e`, a fresh 35-field capture beginning at marker 50 reproduces
+frame 51 at **31.23 ms**. It contains live bullets but no
+enemies; capture coverage ends at tick 68, view Y 120, health 4. It is not
 an idle frame. The normal stripped executable is restored after the capture.
 
 | Separate owner in frame 51 | Inclusive ms |
 | --- | ---: |
 | Actor End Step dispatch/execution | 4.07 |
-| Bullet Step, including collision publication | 3.78 |
-| Draw collection | 3.02 |
-| Player movement/update | 2.68 |
+| Bullet Step, including position publication | 3.34 |
+| Draw collection | 3.10 |
+| Player movement/update | 2.54 |
 | Room animation | 2.01 |
 | Entry dither Begin Step | 1.69 |
 | Captured alarm dispatch | 1.29 |
 
-These are not all empty-family scans. Bullet collision publication accounts
-for 1.77 ms *inside* Bullet Step; Draw's registered traversal includes actual
-sprite projection. The extra effect-surface traversal outside Draw collection
-is only 0.45 ms. Do not reopen alarm or sub-millisecond traversal variants on
+These are not all empty-family scans. Bullet position publication accounts
+for 1.34 ms *inside* Bullet Step; Draw's registered traversal includes actual
+sprite projection. Player position publication is only 0.62 ms, nested within
+player movement. Do not reopen alarm or sub-millisecond traversal variants on
 the strength of older, pre-repair numbers. This capture still exceeds the
 historical 19.2 ms frame; it does not establish restored performance.
 
 ```sh
 SKIP_TO_GAME=1 PROFILE_CONTACT=1 VERIFY_CHIP_KB=512 \
-  VERIFY_TIMEOUT_SECONDS=120 STRIP=1 TRACE_FRAMES=50 TRACE_FIELDS=35 \
-  TRACE_OUTPUT=$PWD/tmp/trace/scene-early-ba27fad3 bash amiga/profile.sh trace
-python3 tools/amiga-trace-report.py tmp/trace/scene-early-ba27fad3 \
-  --frames=51 --causes --tree-min=0.3
+  VERIFY_TIMEOUT_SECONDS=180 STRIP=1 TRACE_FRAMES=50,1300 TRACE_FIELDS=35 \
+  TRACE_OUTPUT=$PWD/tmp/trace/published-state-1330206e bash amiga/profile.sh trace
+python3 tools/amiga-trace-report.py tmp/trace/published-state-1330206e \
+  --frames=51 --causes --tree-min=0.15 --top=140
 ```
 
 Do not combine the contact tape with `PROFILE_FRAMES`: that option selects
 ordinary-gameplay profiling and the Makefile rejects the combination.
-Report: `tmp/scene-early-ba27fad3-report.txt`. Trace ELF SHA-256:
-`4193edc19fa7048e1124b71077dbac2122d15e3339960c7eb768cd3b489a7c48`.
+Reports: `tmp/published-state-51.txt`, `tmp/published-state-1305.txt` (select
+`--frames=1305` for the latter). Trace ELF SHA-256:
+`a0bbbda9e7ffe9762dc8d3529317b6d1e9355c31dc43182cc63f206ffda1fe2e`.
+
+The second capture reaches tick 1309, view Y 2122, six enemy slots and health
+3. Frame 1305 is **68.17 ms**: enemy Step 19.34 ms, bullet Step 5.28 ms,
+draw collection 4.33 ms, actor End Step 4.05 ms, player movement 3.22 ms and
+room animation 3.33 ms. These are separate owners, not removable overhead.
+Walking-enemy tile meeting costs 4.10 ms inside enemy Step; its point callbacks
+include 1.77 ms of native terrain checks and 0.97 ms of breakable lookup.
+Enemy integer-position publication is 1.82 ms, also nested within enemy Step.
+
+Published actor state is not wholly collision-only: `endStepBullet` reads its
+binary32 Y for source retirement and the admitted interior test. Sprite-change
+handling reads the previous sprite and image index and may reset timeline state.
+`withPlayerTimeStop` also has an explicit published player-position reader.
+No blanket actor-state deletion or sub-millisecond setter optimization is
+justified by this census. The consumer boundary must distinguish those readers
+from the generic collision geometry already excluded by scene admission.
 
 ## No-input workload and naming
 
