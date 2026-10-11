@@ -171,6 +171,29 @@ ordinary memory, never Chip RAM. `REFERENCE_ENEMY_ALARM_ROSTER=1` retains the
 original dispatcher on both targets; `verify-native-enemy-alarm-roster` and
 the collision-owner tests cover pinning, reuse, failure prefixes and order.
 
+### Captured alarm-column projection
+
+The native-scenery combat phase retains twelve membership bitmaps alongside
+its captured, sorted list. Each bit selects an existing captured entry whose
+immutable event metadata admits that alarm column. Rebuilding the captured
+list rebuilds this projection; an unchanged list reuses it. Dispatch visits
+selected entries rather than walking unrelated object groups in every column.
+Adding an uninstantiated resource to the catalogue adds no projection entry.
+This is not an offscreen-actor cull or a snapshot of countdown values.
+
+Each column also selects the first entry after object 92 and after object 210,
+when present, as merge fences for native box and enemy callbacks. Fences run
+even if their captured entry has no alarm. Binding changes abandon projection
+for the remaining original suffix and subsequent columns. Live eligibility,
+generation and countdown checks still happen immediately before dispatch;
+new births do not expand the captured phase. Scalar terrain-ownership builds
+retain the full captured walk as a replay oracle.
+
+`test-runner-alarm-projection` checks column selection, boundaries, reset,
+external-group order and binding mutations against a linear walk.
+`verify-gameplay-collision-owner` compares production dispatch with the full
+captured reference, including event/RNG witnesses.
+
 ## Skeleton consequence
 
 Its Alarm 2 sets Alarm 3 to 15. Alarm 3 is then decremented to 14 in the same

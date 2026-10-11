@@ -30,6 +30,7 @@
 #include "RunnerCollisionDispatch.h"
 #include "NativeEnemyAlarmRoster.h"
 #include "RunnerWithSnapshot.h"
+#include "RunnerAlarmProjection.h"
 namespace downwell {
 #ifdef DOWNWELL_DRAW_CACHE_AUDIT
 // Optional diagnostic observer; absent from normal code and simulation state.
@@ -147,6 +148,7 @@ private:
     mutable bool drawAuditHasSnapshot_=false;
 #endif
     RunnerStepSnapshot<1+GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity+GameplayWorld::droneBulletCapacity+GameplayWorld::boneCapacity+GameplayWorld::skeletonCapacity+GameplayWorld::currencyCapacity+32+32+4+4+8> combatAlarmPhase_;
+    RunnerAlarmProjection<1+GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity+GameplayWorld::droneBulletCapacity+GameplayWorld::boneCapacity+GameplayWorld::skeletonCapacity+GameplayWorld::currencyCapacity+32+32+4+4+8> combatAlarmProjection_;
     RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::bulletCapacity+GameplayWorld::droneBulletCapacity+GameplayWorld::skeletonCapacity+GameplayPlayerControllers::capacity+32+GameplayWhiteJellies::capacity+GameplayRedBalls::capacity+ShopWorld::capacity> actorEndStepPhase_;
     void* shopRadioContext_=nullptr;
     bool (*shopRadioDispatch_)(void*,int,bool,bool&)=nullptr;
@@ -3415,6 +3417,12 @@ private:
         if(!alreadySorted){DW_PROFILE_SCOPE(profileAlarmSort);snapshot.sort();}
         const unsigned count=snapshot.size();
         const auto bindingRevision=this->bindingRevision();
+        const bool typedCombat=SkipInactive&&native_&&retainedMask==&combatAlarmMask_;
+#ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
+        const bool projected=false; // Full captured walk remains the oracle.
+#else
+        const bool projected=typedCombat;
+#endif
         unsigned capturedAlarms=alreadySorted&&retainedMask?*retainedMask:0;
         // Capture admitted resource-backed objects and sort grouped them.
         // No callbacks occur here, so one lookup per group safely identifies
@@ -3423,19 +3431,26 @@ private:
         // masks. Retain this union with it instead of rescanning every tick.
         // Binding changes during dispatch still disable absent-column skips.
         if(!alreadySorted||!retainedMask){
-            const bool typedCombat=SkipInactive&&native_&&retainedMask==&combatAlarmMask_;
+            if(projected&&!check(combatAlarmProjection_.reset(count)))return false;
             int previousObject=-1;
+            unsigned mask=0;bool boxFence=false,enemyFence=false;
             for(unsigned i=0;i<count;++i){
                 const int object=snapshot.object(i);
                 // A resource ID alone is not a typed-family identity. If an
                 // unusual captured actor also uses object 35, it must still
                 // contribute its full mask after the player's narrow one.
-                if(object==previousObject&&!(typedCombat&&object==35))continue;
-                unsigned mask;
-                if(!check(alarmMetadata_.mask(object,mask)))return false;
+                if(!projected&&object==previousObject&&!(typedCombat&&object==35))continue;
+                if(object!=previousObject||(typedCombat&&object==35))
+                    if(!check(alarmMetadata_.mask(object,mask)))return false;
                 if(typedCombat&&object==35&&snapshot.handle(i).slot<View::enemyBase)
                     mask&=GameplayWorld::playerDamageAlarmColumns;
                 capturedAlarms|=mask;previousObject=object;
+                if(projected){
+                    unsigned selection=mask;
+                    if(!boxFence&&object>92){boxFence=true;selection|=0xfffu;}
+                    if(!enemyFence&&object>210){enemyFence=true;selection|=0xfffu;}
+                    if(!check(combatAlarmProjection_.include(i,selection)))return false;
+                }
             }
             if(retainedMask)*retainedMask=capturedAlarms;
         }
@@ -3461,7 +3476,10 @@ private:
           int cachedObject=-1;unsigned alarmMask=0;
           PackedObjectEvent event;bool eventCached=false,eventFound=false;
           unsigned groupEnd=0;
-          for(unsigned i=0;i<count;++i){
+          const auto next=[&](unsigned start){
+              return projected&&bindingsUnchanged(bindingRevision)?combatAlarmProjection_.next(alarm,start):start;
+          };
+          for(unsigned i=next(0);i<count;i=next(i+1)){
             // Resource order, not layer or compact-array order. The native
             // box family is the sole object-92 owner in this combat phase.
             if(boxesPending&&snapshot.object(i)>92){

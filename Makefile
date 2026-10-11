@@ -3278,7 +3278,13 @@ build/replay-frame-trace-test: tests/core/ReplayFrameTraceTest.cpp src/core/Repl
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
 
 .PHONY: test-generation-timing
-test: test-prepared-terrain-birth
+test: test-prepared-terrain-birth test-runner-alarm-projection
+.PHONY: test-runner-alarm-projection
+test-runner-alarm-projection: build/runner-alarm-projection-test
+	./build/runner-alarm-projection-test
+build/runner-alarm-projection-test: tests/core/RunnerAlarmProjectionTest.cpp src/core/RunnerAlarmProjection.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
 .PHONY: test-prepared-terrain-birth
 test-prepared-terrain-birth: build/prepared-terrain-birth-test
 	./build/prepared-terrain-birth-test
