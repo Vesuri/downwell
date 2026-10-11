@@ -58,6 +58,15 @@ have a separate compile-time full-catalogue path. The native load-path audit
 rejects `Downwell.game`/`Downwell.planes` loads outside those two oracle builds.
 Exporter growth cannot change this admission policy.
 
+`AmigaSceneAdmission` also guards runtime boundaries in normal builds:
+gameplay art acquisition requires the gameplay scene; gameplay Step requires
+that scene and live CPU art, DMA art, entry-mask and terrain-raster leases.
+Rejected admission returns 20, with `gDownwellSceneAdmissionFailure` identifying
+acquisition (1) or dispatch (2). Only replay/plane pixel oracles can acquire
+gameplay art before presentation. This constant-sized boundary check does not
+walk resources or actors, and does not replace family-level dispatch/residency
+contracts. Startup and results re-entry verifiers require no guard failure.
+
 Use the platform framework for Copper publication and DMA retirement.
 Prepare an inactive list or patch only safe, relevant words; do not rebuild
 complete lists for pointer-only scrolling. Failed preparation must prevent

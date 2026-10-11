@@ -11,6 +11,10 @@ end
 break downwellStartupReady
 continue
 printf "Startup passed: resident assets=%lu, Chip remaining=%lu bytes\n", gDownwellStartupAssetBytes, gDownwellStartupChipRemaining
+if gDownwellSceneAdmissionFailure != 0
+    printf "Scene ownership guard failed at startup\n"
+    quit 1
+end
 if gDownwellHudLoads != 0
     printf "Gameplay HUD loaded before its scene admission\n"
     quit 1

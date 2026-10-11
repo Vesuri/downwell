@@ -26,6 +26,30 @@ def record(ident, frame=0):
 
 
 class Admission(unittest.TestCase):
+    def test_runtime_scene_boundary(self):
+        # Compile the production predicate, including every incomplete lease.
+        source = '''
+#include "platform/amiga/AmigaSceneAdmission.h"
+#include <cassert>
+int main() {
+    for (auto scene : {AmigaScene::splash, AmigaScene::menu,
+                       AmigaScene::styleSelect, AmigaScene::gameplay}) {
+        const bool game = scene == AmigaScene::gameplay;
+        assert(AmigaSceneAdmission::acquireGameplay(scene, false) == game);
+        assert(AmigaSceneAdmission::acquireGameplay(scene, true));
+        for (unsigned bits=0; bits<16; ++bits)
+            assert(AmigaSceneAdmission::stepGameplay(scene, bits&1, bits&2,
+                bits&4, bits&8) == (game && bits==15));
+    }
+}
+'''
+        with tempfile.TemporaryDirectory(prefix='downwell-scene-boundary-') as directory:
+            exe = Path(directory) / 'test'
+            subprocess.run(['c++', '-std=c++17', '-include', 'initializer_list',
+                            '-I', str(ROOT / 'src'), '-x', 'c++', '-', '-o', str(exe)],
+                           input=source, text=True, check=True)
+            subprocess.run([str(exe)], check=True)
+
     def test_hud_is_packaged_as_scene_data(self):
         for script in ('run.sh', 'verify_startup.sh', 'verify_replay.sh'):
             text = (ROOT / 'amiga' / script).read_text()

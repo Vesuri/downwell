@@ -16,6 +16,10 @@ commands
 end
 break downwellResultsRestartReady
 continue
+if gDownwellSceneAdmissionFailure != 0
+    printf "Scene ownership guard failed across results re-entry\n"
+    quit 1
+end
 set $owner = (downwell::GameplayCollisionOwner*)&'_ZZL11runDownwellvE16collisionStorage.lto_priv.0'
 if $owner->collisionConsumersAdmitted_ || !$owner->native_ || !$owner->sceneryLayers_
     printf "Results re-entry is not exercising shipping native scene admission\n"

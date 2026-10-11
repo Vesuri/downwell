@@ -19,6 +19,8 @@ __attribute__((noinline,used)) void downwellFieldReentryReady(){__asm__ volatile
 #include "AmigaInput.h"
 #include "AmigaVerificationScratch.h"
 #include "AmigaGameplayAssetAdmission.h"
+#include "AmigaSceneAdmission.h"
+extern "C" { volatile unsigned gDownwellSceneAdmissionFailure; }
 #if defined(DOWNWELL_REPLAY_VERIFY) || defined(DOWNWELL_PLANE_BANK_VERIFY)
 #include "../../../generated/amiga-game-planes.h"
 #endif
@@ -2301,6 +2303,14 @@ __attribute__((noinline)) static int runDownwell(void) {
     };
     const auto acquireGameplayPlanes=[&](){
 #if defined(DOWNWELL_REPLAY_VERIFY) || defined(DOWNWELL_PLANE_BANK_VERIFY)
+        constexpr bool artReferenceOracle=true;
+#else
+        constexpr bool artReferenceOracle=false;
+#endif
+        if(!AmigaSceneAdmission::acquireGameplay(scenes.scene(),artReferenceOracle)){
+            gDownwellSceneAdmissionFailure=1;return false;
+        }
+#if defined(DOWNWELL_REPLAY_VERIFY) || defined(DOWNWELL_PLANE_BANK_VERIFY)
         // These explicit full-catalogue pixel oracles include later-area art.
         if(!AmigaGameplayAssetAdmission::referenceOracle(port.runStage().area))return false;
         constexpr ULONG cpuBytes=DOWNWELL_GAME_BANK_BYTES,planeBytes=DOWNWELL_GAME_PLANE_BYTES;
@@ -3634,6 +3644,11 @@ __attribute__((noinline)) static int runDownwell(void) {
             const bool wasSideLocked = port.cameraSideLocked();
 #endif
             checkSceneStack(6);
+            if(!AmigaSceneAdmission::stepGameplay(scenes.scene(),
+                    activeGamePack!=nullptr, memory.gameAssets()!=nullptr,
+                    activeEntryMask!=nullptr, terrainRaster.hasStorage())){
+                gDownwellSceneAdmissionFailure=2;exitCode=20;break;
+            }
             const AmigaPortFrame result = port.step(packedInput);
 #ifdef DOWNWELL_OVERFLOW_VERIFY
             {
