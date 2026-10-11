@@ -1344,6 +1344,24 @@ int main(){
     }
     {
         bool owner=true,otherOwner=true;
+        CallbackFailureScopes callbacks;
+        static_assert(sizeof(callbacks)==sizeof(void*),"Inactive families add no polling storage");
+        CallbackFailureSignal outerSignal,innerSignal,unrelated[100];
+        outerSignal.observe(owner,callbacks);innerSignal.observe(owner,callbacks);
+        for(auto& item:unrelated)item.observe(owner,callbacks);
+        assert(callbacks.valid()&&owner);
+        {
+            auto outer=outerSignal.borrow();outer.value()=false;
+            assert(!callbacks.valid()&&owner);
+            {auto inner=innerSignal.borrow();assert(!callbacks.valid());inner.value()=true;}
+            assert(!callbacks.valid());outer.value()=true;
+            assert(callbacks.valid()&&owner);
+        }
+        {auto inner=innerSignal.borrow();inner.value()=false;assert(!callbacks.valid());}
+        assert(callbacks.valid()&&!owner&&!innerSignal);
+        innerSignal=true;assert(!owner); // Recovery never clears the terminal owner latch.
+        owner=true;unrelated[99]=false;assert(!owner&&callbacks.valid());
+        owner=true;
         FailureSignal<> signal;signal.observe(owner);
         assert(signal&&owner);signal=false;assert(!signal&&!owner);
         signal=true;assert(signal&&!owner); // Child recovery cannot recover its owner.
@@ -1366,7 +1384,7 @@ int main(){
         // Public child access may fail without returning through an owner
         // callback. Both polling and subscribed ownership must see it now.
         for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::nativeScenery})
-        for(unsigned family=0;family<15;++family){
+        for(unsigned family=0;family<20;++family){
             auto owner=makeCollisionOwner(objects,sprites,
                 GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},nullptr,mode);
             assert(owner->valid());bool result=true;
@@ -1386,6 +1404,11 @@ int main(){
             case 12:result=owner->registeredSmoke().retire({});break;
             case 13:result=owner->registeredExpiry().retire({});break;
             case 14:result=owner->playerControllers().setAlarm({},0,1);break;
+            case 15:result=owner->droneBullets().retire({});break;
+            case 16:result=owner->bones().retire({});break;
+            case 17:result=owner->skeletons().retire({});break;
+            case 18:result=owner->blood().retire({});break;
+            case 19:result=owner->registeredBlasts().retire({});break;
             }
             assert(!result&&!owner->valid());
         }
@@ -1393,6 +1416,25 @@ int main(){
         assert(!result.position(0,0)&&!healthy&&!result.valid());
         healthy=true;GameplayBuilderController builder;builder.observeFailure(healthy);
         assert(!builder.position(0,0)&&!healthy&&!builder.valid());
+        for(auto mode:{GameplayCollisionOwner::Ownership::reference,GameplayCollisionOwner::Ownership::nativeScenery}){
+            auto owner=makeCollisionOwner(objects,sprites,GameplayTerrainInstances::Presentation{},
+                GameplayTerrainInstances::WallCollision{},nullptr,mode);
+            auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+                owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+            assert(owner->attach(*world));InstanceHandle bone,drone;
+            assert(world->createBoneWithSourceId(706100,240,200,bone));
+            assert(owner->droneBullets().create(706101,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(200),drone));
+            assert(owner->bones().dispatch(bone,[&](auto&,auto&,bool& good){
+                good=false;assert(!owner->valid());
+                assert(owner->droneBullets().dispatch(drone,[&](auto&,auto&,bool& inner){
+                    assert(inner&&!owner->valid());return true;
+                }));
+                assert(!owner->valid());good=true;assert(owner->valid());return true;
+            })&&owner->valid());
+            assert(!owner->bones().dispatch(bone,[&](auto&,auto&,bool& good){
+                good=false;assert(!owner->valid());return true;
+            })&&!owner->valid());
+        }
     }
     for(bool failSmoke:{false,true}){
         auto world=std::make_unique<GameplayWorld>(300,false,1000,false);

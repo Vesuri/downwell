@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_BLOOD_INSTANCES_H
 #include "BloodEffect.h"
 #include "InstanceLifecycle.h"
+#include "CallbackFailureSignal.h"
 namespace downwell {
 // Registered object-220 blood specialization. Room numeric IDs and local
 // generations are distinct. Keep BloodEffects as the scalar owner oracle.
@@ -22,6 +23,7 @@ public:
     BloodInstances(const BloodInstances&)=delete;
     BloodInstances& operator=(const BloodInstances&)=delete;
     bool valid()const{return good_;}
+    void observeFailure(bool& owner,CallbackFailureScopes& scopes){good_.observe(owner,scopes);}
     unsigned size()const{return count_;}
     const Record* find(InstanceHandle h)const{
         return h.generation&&h.slot<Capacity&&records_[h.slot].lifetimeId==h.generation?&records_[h.slot]:nullptr;
@@ -85,7 +87,8 @@ public:
                 record.x=x;record.y=y;return true;
             }
         } ops{*this,key,*r,query};
-        const bool ok=r->state.stepPublished(ops,good_);executing_={};return good_=good_&&ok;
+        auto status=good_.borrow();
+        const bool ok=r->state.stepPublished(ops,status.value());executing_={};return good_=good_&&ok;
     }
     bool advanceAnimation(InstanceHandle key){
         auto* r=resolve(key);if(!r||executing_.generation)return fail();
@@ -119,7 +122,7 @@ private:
     bool fail(){good_=false;return false;}
     Record* resolve(InstanceHandle h){return good_?const_cast<Record*>(find(h)):nullptr;}
     Record records_[Capacity]{};Binding binding_;Builtins builtins_;
-    unsigned next_=1,count_=0;bool good_=true;InstanceHandle executing_{};
+    unsigned next_=1,count_=0;CallbackFailureSignal good_=true;InstanceHandle executing_{};
 };
 }
 #endif

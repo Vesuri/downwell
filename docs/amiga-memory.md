@@ -91,20 +91,20 @@ interpret restoring this diagnostic's loader fit as a shipping memory reduction.
 ## Executable size versus runtime memory
 
 The normal `STRIP=1` build with admitted room payloads, scene-loaded gameplay art
-and without reference-only collision masks is **2,132,076 bytes**, SHA-256
-`70b22e253d28bc5611ed2b7aeca7601de097dbd5c858287d1052d45afdc1de32`.
+and without reference-only collision masks is **2,126,284 bytes**, SHA-256
+`7e1f555a918127ae1f5b708423fe938cb2f6b34406017f5779c0340a4a002802`.
 The matching ELF section sizes distinguish payload from runtime allocation:
 
 | Section | Bytes | Stored in the executable? |
 | --- | ---: | --- |
-| Machine code (`.text`) | 1,373,290 | Yes |
+| Machine code (`.text`) | 1,367,772 | Yes |
 | Read-only data (`.rodata`) | 675,032 | Yes |
 | Initialized writable data (`.data`) | 34,194 | Yes |
 | Initializer pointer | 4 | Yes |
-| Zero-filled storage (`.bss`) | 3,491,096 | No; allocated at load |
+| Zero-filled storage (`.bss`) | 3,491,140 | No; allocated at load |
 
-Initialized payload totals 2,082,520 bytes. Hunk relocation and container
-records account for the remaining 49,556 bytes. Stripping cannot remove
+Initialized payload totals 2,077,002 bytes. Hunk relocation and container
+records account for the remaining 49,282 bytes. Stripping cannot remove
 the initialized payload. ELF debug sections are not that payload either.
 The sparse executable Draw chain adds 8,568 ordinary BSS bytes and 2,072
 Hunk bytes against `f4b4433a`; it adds no Chip allocation. Normal 512 KiB Chip
@@ -133,8 +133,9 @@ The lease is absent during normal startup and front-end scenes, and is released
 before upgrade selection, then reacquired for gameplay. The allocation is
 `MEMF_FAST | MEMF_CLEAR`: untouched clean rows preserve the former zero-filled
 BSS contract. No clearing or allocation occurs in ordinary gameplay frames.
-Static BSS falls by 1,081,336 bytes, but peak gameplay memory is essentially
-unchanged: this is scene residency, not a smaller raster representation.
+The lease keeps 1,081,344 pixel bytes out of startup allocation, but peak
+gameplay memory is essentially unchanged: this is scene residency, not a
+smaller raster representation.
 `tmp/raster-lease-startup-gdb.log` verifies no raster residency at startup and
 126,840 Chip bytes free. Initialized payload plus BSS exceeds 5 MB even before
 the gameplay raster and dynamic graphics allocations. A small

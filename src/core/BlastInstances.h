@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_BLAST_INSTANCES_H
 #include "BlastActor.h"
 #include "InstanceLifecycle.h"
+#include "CallbackFailureSignal.h"
 namespace downwell {
 template<unsigned Capacity,unsigned HitCapacity=64> class BlastInstances {
 public:
@@ -17,6 +18,7 @@ public:
     explicit BlastInstances(Binding binding,Builtins builtins={}):binding_(binding),builtins_(builtins){}
     BlastInstances(const BlastInstances&)=delete;
     bool valid()const{return good_;}unsigned size()const{return count_;}
+    void observeFailure(bool& owner,CallbackFailureScopes& scopes){good_.observe(owner,scopes);}
     const Record* find(InstanceHandle key)const{
         return key.generation&&key.slot<Capacity&&records_[key.slot].lifetimeId==key.generation?&records_[key.slot]:nullptr;
     }
@@ -60,13 +62,15 @@ public:
             bool imageSpeed(RunnerImageValue v){return publish.imageSpeed(v);}
             bool xscale(RunnerImageValue v){return publish.xscale(v);}
         } events{services,publisher};
-        const bool ok=binding_.birthAt(out,r,r.x,r.y)&&good_&&r.state.create(events,good_);
+        auto status=good_.borrow();
+        const bool ok=binding_.birthAt(out,r,r.x,r.y)&&good_&&r.state.create(events,status.value());
         executing_={};return good_=good_&&ok;
     }
     template<class Event> bool dispatch(InstanceHandle key,Event event){
         auto* r=resolve(key);if(!r||executing_.generation)return fail();
         if(!r->active||r->destroyRequested)return true;
-        executing_=key;Publisher publish(*this,key);const bool ok=event(r->state,publish,good_);
+        executing_=key;Publisher publish(*this,key);auto status=good_.borrow();
+        const bool ok=event(r->state,publish,status.value());
         executing_={};return good_=good_&&ok;
     }
     bool advanceAnimation(InstanceHandle key){return dispatch(key,[](auto& state,auto& publish,bool& good){return state.advanceAnimation(publish,good);});}
@@ -97,7 +101,7 @@ private:
     Record* resolve(InstanceHandle key){return good_?const_cast<Record*>(find(key)):nullptr;}
     bool fail(){good_=false;return false;}
     Binding binding_;Builtins builtins_;Record records_[Capacity]{};
-    unsigned next_=1,count_=0;InstanceHandle executing_{};bool good_=true;
+    unsigned next_=1,count_=0;InstanceHandle executing_{};CallbackFailureSignal good_=true;
 };
 }
 #endif

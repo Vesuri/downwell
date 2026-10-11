@@ -3,6 +3,7 @@
 #include "SkeletonActor.h"
 #include "RegisteredSkeletonThrow.h"
 #include "InstanceLifecycle.h"
+#include "CallbackFailureSignal.h"
 namespace downwell {
 // Fixed, generation-addressed ownership. Source numeric IDs are allocated by
 // the room, never derived from a local slot. Engine active != actor.active.
@@ -27,6 +28,7 @@ public:
     SkeletonInstances(const SkeletonInstances&)=delete;
     SkeletonInstances& operator=(const SkeletonInstances&)=delete;
     bool valid()const{return good_;}
+    void observeFailure(bool& owner,CallbackFailureScopes& scopes){good_.observe(owner,scopes);}
     unsigned size()const{return count_;}
     const Record* find(InstanceHandle key)const{
         return key.generation&&key.slot<Capacity&&records_[key.slot].lifetimeId==key.generation?&records_[key.slot]:nullptr;
@@ -71,7 +73,8 @@ public:
     template<class Event> bool dispatch(InstanceHandle key,Event event){
         auto* r=resolve(key);if(!r||executing_.generation)return fail();
         if(!r->active||r->destroyRequested)return true;
-        executing_=key;const bool ok=event(r->state,r->throwing,good_);
+        executing_=key;auto status=good_.borrow();
+        const bool ok=event(r->state,r->throwing,status.value());
         RunnerImageValue x,y;
         const bool published=r->state.sprite==r->spriteId&&r->state.facing==r->publishedFacing&&
             x.assignInteger(r->state.x)&&y.assignInteger(r->state.y)&&x.bits==r->x.bits&&y.bits==r->y.bits;
@@ -189,7 +192,7 @@ private:
     bool fail(){good_=false;return false;}
     Record* resolve(InstanceHandle key){return good_?const_cast<Record*>(find(key)):nullptr;}
     Record records_[Capacity]{};Binding binding_;Builtins builtins_;
-    unsigned next_=1,count_=0;bool good_=true;InstanceHandle executing_{};
+    unsigned next_=1,count_=0;CallbackFailureSignal good_=true;InstanceHandle executing_{};
 };
 }
 #endif

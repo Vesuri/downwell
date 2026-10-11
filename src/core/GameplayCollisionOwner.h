@@ -228,6 +228,7 @@ private:
     InstanceHandle initialPlayerKey_{};
     bool good_=false;
     bool failureObserved_=false;
+    CallbackFailureScopes callbackFailures_;
     bool activationPending_=false;
     bool destructionPending_=false;
     bool terrainFamilies_[2]={false,false};
@@ -1432,6 +1433,9 @@ public:
             corpses_.observeFailure(good_);smoke_.observeFailure(good_);
             expiry_.observeFailure(good_);playerControllers_.observeFailure(good_);
             builderController_.observeFailure(good_);
+            drones_.observeFailure(good_,callbackFailures_);bones_.observeFailure(good_,callbackFailures_);
+            blasts_.observeFailure(good_,callbackFailures_);blood_.observeFailure(good_,callbackFailures_);
+            skeletons_.observeFailure(good_,callbackFailures_);
             layers_.observeFailure(good_);failureObserved_=true;
         }
 #endif
@@ -1443,8 +1447,7 @@ public:
     // These dispatchers expose bool& status to arbitrary callbacks. Keep
     // their live reads: a nested query can see failure before callback return.
     bool valid()const{
-        if(failureObserved_)return good_&&drones_.valid()&&bones_.valid()&&
-            blasts_.valid()&&blood_.valid()&&skeletons_.valid();
+        if(failureObserved_)return good_&&callbackFailures_.valid();
         return shopInstances_.valid()&&redBalls_.valid()&&movingEffects_.valid()&&whiteJellies_.valid()&&
             spawners_.valid()&&scattered_.valid()&&good_&&blasts_.valid()&&flash_.valid()&&limbo_.valid()&&
             levelNumbers_.valid()&&result_.valid()&&controllers_.valid()&&consumption_.valid()&&corpses_.valid()&&

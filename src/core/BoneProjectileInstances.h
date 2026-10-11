@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_BONE_PROJECTILE_INSTANCES_H
 #include "BoneProjectile.h"
 #include "InstanceLifecycle.h"
+#include "CallbackFailureSignal.h"
 namespace downwell {
 // Registered ownership, separate from the scalar BoneProjectileStore oracle.
 // The room allocates numeric IDs; local generations never stand in for them.
@@ -24,6 +25,7 @@ public:
     BoneProjectileInstances(const BoneProjectileInstances&)=delete;
     BoneProjectileInstances& operator=(const BoneProjectileInstances&)=delete;
     bool valid()const{return good_;}
+    void observeFailure(bool& owner,CallbackFailureScopes& scopes){good_.observe(owner,scopes);}
     unsigned size()const{return count_;}
     const Record* find(InstanceHandle h)const{
         return h.generation&&h.slot<Capacity&&records_[h.slot].lifetimeId==h.generation?&records_[h.slot]:nullptr;
@@ -98,14 +100,16 @@ public:
         auto* r=resolve(key);if(!r||executing_.generation)return fail();
         if(!r->active||r->destroyRequested)return true;
         executing_=key;Publisher publish(*this,key);
-        const bool ok=event(r->state,publish,good_);executing_={};return good_=good_&&ok;
+        auto status=good_.borrow();
+        const bool ok=event(r->state,publish,status.value());executing_={};return good_=good_&&ok;
     }
     bool advanceAnimation(InstanceHandle key){
         // The caller selected this lifetime from the reconciled room list.
         // Pending deactivation must not suppress that list's final animation.
         auto* r=resolve(key);if(!r||executing_.generation)return fail();
         executing_=key;Publisher publish(*this,key);
-        const bool ok=r->state.advanceImagePublished(publish,good_);executing_={};
+        auto status=good_.borrow();
+        const bool ok=r->state.advanceImagePublished(publish,status.value());executing_={};
         return good_=good_&&ok;
     }
     bool retire(InstanceHandle key){
@@ -127,7 +131,7 @@ private:
     bool fail(){good_=false;return false;}
     Record* resolve(InstanceHandle h){return good_?const_cast<Record*>(find(h)):nullptr;}
     Record records_[Capacity]{};Binding binding_;
-    unsigned next_=1,count_=0;bool good_=true;InstanceHandle executing_{};
+    unsigned next_=1,count_=0;CallbackFailureSignal good_=true;InstanceHandle executing_{};
 };
 }
 #endif

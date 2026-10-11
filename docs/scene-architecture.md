@@ -208,6 +208,18 @@ capacity changes and every meter offset.
 
 ## Family routing is not a family scan
 
+Native owner validation observes terminal component failures instead of polling
+the implemented family catalogue. Most components use `FailureSignal`.
+Dispatchers that pass a mutable `bool&` to synchronous event bodies use
+`CallbackFailureSignal`: a stack-scoped borrow exposes that live status to the
+owner until the callback and its nested publications return. Nested validation
+must see an outer callback's failure even while an inner callback is healthy.
+Outside those borrows, assignment notifies the owner immediately; retiring a
+borrow latches its final failure. Component recovery cannot clear the owner's
+terminal failure. Bind observers before dispatch, and never retain an event's
+borrowed status reference after returning. No inactive-family list is walked.
+Reference ownership and `REFERENCE_VALIDATION=1` retain full status polling.
+
 Internal collision handles use the existing disjoint slot ranges, not Windows
 numeric instance IDs. `GameplayCollisionView::decode` reads a compile-time
 slot-to-family tag and that family's base. It never walks other families to
