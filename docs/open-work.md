@@ -50,6 +50,14 @@ behavior, both backend integrations and relevant original-game verification.
      variants (see the rejected-approaches table).
      Use the current actor-event audit; do not start another capture/traversal
      or individual setter optimization without a structural removal.
+     Next, evaluate a scene-owned typed End Step phase replacing generic
+     actor resolution throughout capture and execution, not just its traversal.
+     Its measured boundary is 4.91 ms in frame 51 (4.17 ms in dispatch);
+     aim to remove 2–3 ms without dropping the source-visible events.
+     Preserve player/box/platform/actor ordering, phase-wide birth cutoffs,
+     live eligibility, slot reuse and synchronous destruction callbacks.
+     Keep the generic full-service dispatcher as the ordering oracle; prove
+     ordinary and callback-mutating cases before native timing acceptance.
   3. Add regression fixtures that add unrelated resources/families and verify
      unchanged current-scene residency and work counts, alongside replay and
      bounded native timing gates. Transition-only preparation must not run in

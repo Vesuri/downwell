@@ -547,6 +547,51 @@ Reports: `tmp/current-event-cost-{51,1305}.txt`; driver log:
 
 ## Historical pre-integration audit
 
+### Matched early-frame attribution
+
+An eight-PAL-field re-capture of the preserved `13e08ca2` ELF measures
+frame 51 at 19.45 ms (the original longer capture reported 19.2 ms).
+Compare with the `d771b7bf` frame-51 capture above, not the obsolete
+56.1 ms post-integration snapshot below:
+
+| Same boundary in frame 51 | `13e08ca2`, ms | `d771b7bf`, ms |
+| --- | ---: | ---: |
+| Entire frame | 19.45 | 30.37 |
+| Gameplay Step | 11.18 | 20.25 |
+| Player movement | 2.17 | 2.07 |
+| Machine-gun projectile helper, excluding outer publication | 1.26 | 1.22 |
+| Bullet coordinate publication | 0.34 | 0.94 |
+| Room animation callback | 1.34 | 2.02 |
+| Captured alarm dispatch | 0.69 | 1.29 |
+| Draw collection | 2.19 | 3.00 |
+
+Rows are inclusive and must not be summed. Ordinary movement, terrain
+segment tests and projectile motion have not acquired the missing 11 ms.
+The later mixed End Step callback costs 4.91 ms, including 4.17 ms in its
+capture/dispatch/execution boundary. Registered Dither Above Begin Step costs
+1.66 ms. Neither had an equivalent callback in the old frame; this does **not**
+make their entire cost removable. The old implementation retired enemies and
+boxes directly and handled projectile retirement in Step. Commits `40921412`,
+`660f9be6`, `3c0d265b`, `c9cbba2e` and `69c390e6` establish the later mixed
+ordering, thin-platform boundary, post-collision projectile retirement and
+player-hit End Step. Reverting that ordering is not a performance fix.
+
+Any native End Step replacement must own a complete captured phase: player
+35 before boxes 92, then the thin-platform boundary and ordered actors; live
+eligibility and destruction callbacks still apply, while callback-born actors
+wait for the next capture. Replacing generic lifetime resolution requires
+validating borrowed typed records across retirement/reuse and activation, not
+removing those semantics or merely shortening the existing capture loops.
+
+Historical re-capture: `tmp/old-early-recheck-report.txt`,
+`tmp/old-early-recheck-gdb.log`, ELF in `tmp/trace/old-early-recheck/` with
+SHA-256 `26bb4f25411a7d2344342f50447ac567f286e03d26bb44cefc643ab7e06a6e8f`.
+The debugger stopped at `downwellTraceReady(50)`, recorded eight uninterrupted
+PAL fields using `monitor profile 8`, and the report selected `--frames=51`.
+Both normal binaries were restored immediately afterward. The existing
+80-sample state comparison below bounds workload comparability; it is not a
+full pixel/event-equivalence claim.
+
 ### Early-game regression comparison
 
 The saved `13e08ca2` trace ELF and `3e0a3080`'s implementation have identical
