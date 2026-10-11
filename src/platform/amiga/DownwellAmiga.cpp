@@ -421,6 +421,10 @@ extern "C" volatile ULONG gDownwellSceneBankLoads;
 volatile ULONG gDownwellSceneBankLoads;
 extern "C" volatile ULONG gDownwellSplashPreparations, gDownwellGardenPreparations, gDownwellStartupScene;
 volatile ULONG gDownwellSplashPreparations, gDownwellGardenPreparations, gDownwellStartupScene;
+#ifdef DOWNWELL_PROFILE_IDLE
+extern "C" volatile ULONG gDownwellIdleInputViolations, gDownwellIdleBulletSlots;
+volatile ULONG gDownwellIdleInputViolations, gDownwellIdleBulletSlots;
+#endif
 static bool loadSceneBank(AmigaPlatform& platform, const char* name, ULONG bytes) {
     AmigaHardware::blitterDrain();
     invalidateGameplayFieldBank();
@@ -2672,9 +2676,11 @@ __attribute__((noinline)) static int runDownwell(void) {
                         clearProfileFrames >= 160 ? 4 : port.levelClearFrame().choices ? 3 : 2;
                 } else gDownwellProfileSection = clearProfileFrames ? 6 : 0;
 #else
+#ifndef DOWNWELL_PROFILE_IDLE
                 liveInput.right = ((port.tick() / 120) & 1) == 0;
                 liveInput.left = !liveInput.right;
                 liveInput.fire = (port.tick() % 16) == 0 || (port.tick() % 16) == 3;
+#endif
 #ifdef DOWNWELL_PROFILE_CONTACT
                 liveInput=downwell::gameplayContactProfileInput(port.tick(),
                     240+port.player().offsetX(),176+port.player().offsetY());
@@ -2706,6 +2712,12 @@ __attribute__((noinline)) static int runDownwell(void) {
 #endif
 #endif
             packedInput = downwell::packReplayInput(liveInput);
+#ifdef DOWNWELL_PROFILE_IDLE
+            if (scenes.scene()==AmigaScene::gameplay) {
+                if (packedInput) ++gDownwellIdleInputViolations;
+                if (port.bulletSlotEnd()>gDownwellIdleBulletSlots) gDownwellIdleBulletSlots=port.bulletSlotEnd();
+            }
+#endif
             DW_PROFILE_PHASE(profileSimulation);
             if (!sceneResetRequested) scenes.step(liveInput);
             DW_PROFILE_PHASE(profileOther);

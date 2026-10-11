@@ -1,5 +1,48 @@
 # Amiga gameplay frame-cost audit
 
+## No-input workload and naming
+
+The early contact-tape windows called "quiet" below are low-contact **firing**
+windows: they contain live bullets and projectile updates. They are not an
+idle baseline. The separate no-input route uses ordinary startup/generation,
+with no actor, health, collision or RNG injection. It includes the initial
+fall; after landing the enemies continue their source behavior.
+
+On `7c56ea58` plus the pending derived-tree lease and this diagnostic, 600
+updates take 1,344 PAL fields (**22.32 FPS**), with a maximum 13-field gap at
+frame 163. Coverage is ticks 0–599, view Y 39–1082, three enemy slots, final
+health 4, no dead samples, zero input samples with buttons, and zero bullet
+slots. The coarse maximum includes generation; it is not a measured 260 ms
+CPU cost. Instruction captures cover early falling and settled gameplay:
+
+| Complete frames | Mean ms | Worst ms |
+| --- | ---: | ---: |
+| 51–72 | 30.923 | 41.6 |
+| 301–313 | 48.962 | 50.7 |
+
+Frame 301 is 47.9 ms: enemy Step 14.42 ms, captured alarm dispatch 5.11 ms,
+player motion 3.73 ms, actor End Step dispatch 2.43 ms, and draw collection
+2.99 ms. These are separate owners; none is an improvement claim. The enemy
+Step cost includes movement/collision behavior as well as publication, not
+just irrelevant-family scanning. Do not remove offscreen source Steps merely
+because their pixels are invisible.
+
+```sh
+VERIFY_CHIP_KB=512 VERIFY_TIMEOUT_SECONDS=120 STRIP=1 bash amiga/profile.sh idle
+PROFILE_IDLE=1 SKIP_TO_GAME=1 PROFILE_CONTACT=0 PROFILE_FRAMES=600 \
+  VERIFY_CHIP_KB=512 VERIFY_TIMEOUT_SECONDS=120 STRIP=1 \
+  TRACE_FRAMES=50,300 TRACE_FIELDS=35 TRACE_OUTPUT=$PWD/tmp/trace/idle-baseline \
+  bash amiga/profile.sh trace
+python3 tools/amiga-trace-report.py tmp/trace/idle-baseline --frames=301 --tree-min=1
+```
+
+`PROFILE_IDLE` is a diagnostic input route only, never a shipping or optimized
+logic mode. The build rejects other input tapes combined with it; the FPS
+verifier requires no input, bullets, damage or death. Scripts restore the normal
+build. Saved reports: `tmp/idle-baseline-{report,early}.txt`, FPS evidence:
+`tmp/idle-baseline-fps-gdb.log`. Matching trace ELF SHA-256:
+`95e363efdd0688e6a58921d3e2f12e567f6fa8c9cf09848b46dc800c8910f617`.
+
 ## Retained End Step capture — 2026-10-11
 
 At `5373be79`, a fresh 30-field capture starting at 1300 measures frame 1305

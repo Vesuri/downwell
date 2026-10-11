@@ -7,6 +7,11 @@ transition=0
 case "$mode" in
   probes) flags=(PROBES=1); script=profile.gdb ;;
   fps) flags=(FPSCOUNT=1); script=profile_fps.gdb ;;
+  idle)
+    flags=(FPSCOUNT=1); script=profile_fps.gdb
+    export PROFILE_IDLE=1 SKIP_TO_GAME=1 SKIP_INTRO=0 SKIP_LEVEL=0
+    export PROFILE_CONTACT=0 PROFILE_SHOP=0 PROFILE_ENTRY=0 PROFILE_LASER=0 PROFILE_OVERFLOW=0 PROFILE_NAVIGATE=0
+    ;;
   overflow-state)
     flags=(FPSCOUNT=1 OVERFLOW_VERIFY=1); script=verify_overflow.gdb
     export PROFILE_OVERFLOW=1 SKIP_TO_GAME=1 SKIP_INTRO=0 SKIP_LEVEL=0
@@ -99,7 +104,7 @@ case "$mode" in
     export PROFILE_ENTRY=1 SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_FRAMES=0
     export PROFILE_CONTACT=0 PROFILE_LASER=0 PROFILE_NAVIGATE=0
     ;;
-  *) echo "usage: bash amiga/profile.sh [probes|fps|overflow-state|shop|terrain-shop|trace|frames|draw-cache|draw-order|ammo|transition|entry|terrain|fields|fields-clear]" >&2; exit 1 ;;
+  *) echo "usage: bash amiga/profile.sh [probes|fps|idle|overflow-state|shop|terrain-shop|trace|frames|draw-cache|draw-order|ammo|transition|entry|terrain|fields|fields-clear]" >&2; exit 1 ;;
 esac
 if [[ $mode == draw-cache || $mode == draw-order || $mode == ammo ]]; then
   export SKIP_TO_GAME=1 SKIP_LEVEL=0 PROFILE_CONTACT="${PROFILE_CONTACT:-1}"
@@ -113,6 +118,7 @@ restore() {
   unset PROFILE_OVERFLOW
   unset OVERFLOW_VERIFY
   unset PROFILE_NAVIGATE
+  unset PROFILE_IDLE
   unset REFERENCE_RANDOM
   unset REFERENCE_BOX_RANDOM
   unset REFERENCE_PATTERNS
@@ -191,6 +197,7 @@ printf 'Profile optimization: %s\n' "${AMIGA_OPTIMIZATION:--O3}"
 printf 'Profile prepared field reference: %s\n' "${PROFILE_FIELD_REFERENCE:-0}"
 printf 'Profile Laser Sight fixture: %s\n' "${PROFILE_LASER:-0}"
 printf 'Profile natural contact tape: %s\n' "${PROFILE_CONTACT:-0}"
+printf 'Profile no-input gameplay tape: %s\n' "${PROFILE_IDLE:-0}"
 printf 'Profile natural overflow tape (seed 8, route 4): %s\n' "${PROFILE_OVERFLOW:-0}"
 printf 'Profile inner generation probes: %s (only active in probes mode)\n' "${GENERATION_DETAIL:-0}"
 printf 'Profile coarse generation timing: %s (FPS mode only)\n' "${GENERATION_TIMING:-0}"

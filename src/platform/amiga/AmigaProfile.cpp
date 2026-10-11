@@ -78,6 +78,12 @@ volatile ULONG gDownwellProfileRequireDamage =
 #else
     0;
 #endif
+volatile ULONG gDownwellProfileIdle =
+#ifdef DOWNWELL_PROFILE_IDLE
+    1;
+#else
+    0;
+#endif
 volatile ULONG gDownwellProfileEpoch;
 volatile ULONG gDownwellProfileFrames[4];
 volatile ULONG gDownwellProfileFields[4];
@@ -129,6 +135,7 @@ __attribute__((noinline, used)) void downwellProfileReady()
 {
     // Keep this debugger gate reachable through LTO/section collection.
     (void)gDownwellProfileRequireDamage;
+    (void)gDownwellProfileIdle;
     (void)gDownwellProfileGenerationTiming;
     (void)gDownwellProfileGenerationPhase;
     (void)gDownwellTerrainPreparationCalls;

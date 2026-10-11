@@ -15,6 +15,13 @@ if gDownwellProfileMaxGap[$s] > 0 && (gDownwellProfileMaxGapFrame[$s] == 0 || gD
     quit 1
 end
 printf "Damage number births: %lu\n", gDownwellProfileDamageBirths
+if gDownwellProfileIdle
+    printf "IDLE_INPUT: nonzero_samples=%lu bullet_slots=%lu\n", gDownwellIdleInputViolations, gDownwellIdleBulletSlots
+    if gDownwellIdleInputViolations != 0 || gDownwellIdleBulletSlots != 0 || gDownwellProfileDamageBirths != 0 || gDownwellProfileDeadSamples != 0 || gDownwellProfileLastHealth != 4
+        printf "Idle route is not an undamaged no-input/no-projectile baseline\n"
+        quit 1
+    end
+end
 printf "ROOM_PLAN preparation: PAL_fields=%lu approximately_ms=%lu (20 ms resolution, before first presented frame)\n", gDownwellRoomPlanFields, gDownwellRoomPlanFields*20
 printf "PREPARATION terrain: calls=%lu PAL_fields=%lu approximately_ms=%lu (20 ms counter resolution, before takeover)\n", gDownwellTerrainPreparationCalls, gDownwellTerrainPreparationFields, gDownwellTerrainPreparationFields*20
 if gDownwellTerrainPreparationCalls != gDownwellTerrainPreparationExpectedCalls
