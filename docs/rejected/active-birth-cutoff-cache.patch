@@ -1,0 +1,95 @@
+diff --git a/src/core/RunnerLogicalLayerOrder.h b/src/core/RunnerLogicalLayerOrder.h
+index bfb3ba74..cafc9edd 100644
+--- a/src/core/RunnerLogicalLayerOrder.h
++++ b/src/core/RunnerLogicalLayerOrder.h
+@@ -133,13 +133,13 @@ public:
+         auto s=terrain_?terrain_->layerState(h):RunnerRetainedLayerRead{};
+         if(!succeeded()||!s||s->bound()||!Base::retain(layer,1))return false;
+         terrain_->setLayerState(h.slot,{stamp(false),Base::get(layer)->id,layer,inactive});
+-        cutoffs_[layer].dirty=true;return true;
++        if(inactive)cutoffs_[layer].dirty=true;return true;
+     }
+     bool retainAllocated(unsigned slot,unsigned layer,bool inactive,bool inherited=false){
+         if(!Base::retain(layer,1))return false;
+         if(inherited){clock_.advance();terrain_->publishInheritedLayer(slot);}
+         else terrain_->setLayerState(slot,{stamp(false),Base::get(layer)->id,layer,inactive});
+-        cutoffs_[layer].dirty=true;return true;
++        if(inactive||inherited)cutoffs_[layer].dirty=true;return true;
+     }
+     bool retainInheritedCount(unsigned layer,unsigned count){
+         if(!Base::retain(layer,count))return false;
+@@ -148,7 +148,10 @@ public:
+     bool retainConstructedSpan(unsigned layer,unsigned count,RunnerRetainedLayerState& first){
+         if(!count||!succeeded()||!Base::get(layer)||!Base::retain(layer,count))return false;
+         first={stamp(false),Base::get(layer)->id,layer,false};
+-        clock_=clock_.shifted(count-1);cutoffs_[layer].dirty=true;return true;
++        // Active births add no cutoff and do not change existing order keys.
++        // Keep the negative/first-cutoff cache rather than rescanning every
++        // retained terrain run after each generated segment.
++        clock_=clock_.shifted(count-1);return true;
+     }
+     bool releaseInstance(InstanceHandle h){
+         auto s=terrain_?terrain_->layerState(h):RunnerRetainedLayerRead{};
+diff --git a/tests/core/RunnerLogicalLayerOrderTest.cpp b/tests/core/RunnerLogicalLayerOrderTest.cpp
+index 9cd406de..ac8acaf7 100644
+--- a/tests/core/RunnerLogicalLayerOrderTest.cpp
++++ b/tests/core/RunnerLogicalLayerOrderTest.cpp
+@@ -8,14 +8,16 @@
+ using namespace downwell;
+ static void check(bool ok,unsigned line){if(!ok){std::fprintf(stderr,"logical layer failure at %u\n",line);std::abort();}}
+ #define REQUIRE(x) check((x),__LINE__)
+-struct Terrain {
+-    static constexpr unsigned capacity=4;
++template<unsigned Capacity> struct TestTerrain {
++    static constexpr unsigned capacity=Capacity;
++    mutable unsigned cutoffScans=0;
+     RunnerRetainedLayerState states[capacity]{};
+     RunnerRetainedLayerRead layerState(unsigned slot)const{return slot<capacity?RunnerRetainedLayerRead(states[slot]):nullptr;}
+     RunnerRetainedLayerRead layerState(InstanceHandle h)const{return h.generation==1?layerState(h.slot):nullptr;}
+     void setLayerState(unsigned slot,const RunnerRetainedLayerState& value){states[slot]=value;}
+     void publishInheritedLayer(unsigned){REQUIRE(false);}
+     template<class Visit> bool visitLayerCutoffs(unsigned layer,const RunnerLayerOrderKey* after,Visit visit)const{
++        ++cutoffScans;
+         for(const auto& s:states)if(s.bound()&&s.layer==layer&&s.inactive&&(!after||after->before(s.order)))
+             if(!visit(s.order))return false;
+         return true;
+@@ -24,6 +26,31 @@ struct Terrain {
+         for(unsigned i=0;i<capacity;++i)if(!visit(InstanceHandle{i,1},states[i]))return false;return true;
+     }
+ };
++using Terrain=TestTerrain<4>;
++template<unsigned Count> static void activeBirthCutoffAdmission(){
++    TestTerrain<Count> terrain;RunnerLogicalLayerOrder<1,Count+1,TestTerrain<Count>> logical;
++    REQUIRE(logical.bindTerrain(terrain));unsigned layer;
++    REQUIRE(logical.insertAfterEquals(1,0,false,layer));
++    REQUIRE(logical.attach(layer,Count,true,false,[](unsigned){return false;}));
++    const auto actor=logical.physicalOrder(Count);
++    REQUIRE(!logical.cutsOff(layer,nullptr,actor));REQUIRE(terrain.cutoffScans==1);
++    for(unsigned i=0;i<Count;++i){
++        if(i%3==0)REQUIRE(logical.retainInstance({i,1},layer,false));
++        else if(i%3==1)REQUIRE(logical.retainAllocated(i,layer,false));
++        else {RunnerRetainedLayerState state;
++            REQUIRE(logical.retainConstructedSpan(layer,1,state));terrain.states[i]=state;}
++        REQUIRE(!logical.cutsOff(layer,nullptr,actor));
++        REQUIRE(terrain.cutoffScans==1);
++    }
++    REQUIRE(logical.publishInactive({0,1},true));
++    REQUIRE(logical.cutsOff(layer,nullptr,actor));REQUIRE(terrain.cutoffScans==2);
++    REQUIRE(logical.releaseInstance({Count-1,1}));
++    REQUIRE(logical.cutsOff(layer,nullptr,actor));const auto scans=terrain.cutoffScans;
++    REQUIRE(logical.retainInstance({Count-1,1},layer,false));
++    REQUIRE(logical.cutsOff(layer,nullptr,actor));REQUIRE(terrain.cutoffScans==scans);
++    REQUIRE(logical.publishInactive({0,1},false));
++    REQUIRE(!logical.cutsOff(layer,nullptr,actor));REQUIRE(terrain.cutoffScans==scans+1);
++}
+ using Logical=RunnerLogicalLayerOrder<3,8,Terrain>;
+ using Reference=RunnerLayers<3,8>;
+ static void compare(Logical& logical,const Reference& reference){
+@@ -339,6 +366,7 @@ static void sparsePreparedDraw(){
+     }
+ }
+ int main(){inheritedCapacity();merges();mutations();failedPublication();preparedCutoffs();nativePublication();nativeRunPrefixes();sparsePreparedDraw();
++    activeBirthCutoffAdmission<32>();activeBirthCutoffAdmission<2048>();
+     REQUIRE(drawMutation(true,true)==drawMutation(false,true));
+     REQUIRE(drawMutation(true,false)==drawMutation(false,false));
+     REQUIRE(drawMutation(true,true)==std::vector<unsigned>({3,0}));
