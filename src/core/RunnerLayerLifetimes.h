@@ -20,7 +20,9 @@ public:
         bool inactive=false;
     };
     RunnerLayerLifetimes(Layers& layers,Registry& registry,RunnerLayerIds& ids):
-        layers_(layers),registry_(registry),ids_(ids){}
+        layers_(layers),registry_(registry),ids_(ids){
+        for(auto& head:sourceHeads_)head=I;
+    }
     RunnerLayerLifetimes(const RunnerLayerLifetimes&)=delete;
     RunnerLayerLifetimes& operator=(const RunnerLayerLifetimes&)=delete;
     bool succeeded()const{return good_&&layers_.succeeded()&&pending_.succeeded();}
@@ -60,7 +62,7 @@ private:
     unsigned findSource(std::uint32_t id)const{
         if constexpr(IndexedSourceIds){
             if(id){
-                for(unsigned slot=sourceHead_;slot!=I;slot=sourceNext_[slot])
+                for(unsigned slot=sourceHeads_[sourceBucket(id)];slot!=I;slot=sourceNext_[slot])
                     if(states_[slot].sourceId==id)return slot;
                 return I;
             }
@@ -72,15 +74,17 @@ private:
     }
     void publishSource(unsigned slot){
         if constexpr(IndexedSourceIds)if(states_[slot].sourceId){
-            sourcePrevious_[slot]=I;sourceNext_[slot]=sourceHead_;
-            if(sourceHead_!=I)sourcePrevious_[sourceHead_]=slot;
-            sourceHead_=slot;
+            auto& head=sourceHeads_[sourceBucket(states_[slot].sourceId)];
+            sourcePrevious_[slot]=I;sourceNext_[slot]=head;
+            if(head!=I)sourcePrevious_[head]=slot;
+            head=slot;
         }
     }
     void retireSource(unsigned slot){
         if constexpr(IndexedSourceIds)if(states_[slot].sourceId){
             const unsigned before=sourcePrevious_[slot],after=sourceNext_[slot];
-            if(before==I)sourceHead_=after;else sourceNext_[before]=after;
+            if(before==I)sourceHeads_[sourceBucket(states_[slot].sourceId)]=after;
+            else sourceNext_[before]=after;
             if(after!=I)sourcePrevious_[after]=before;
         }
     }
@@ -262,7 +266,12 @@ private:
     Layers& layers_;Registry& registry_;RunnerLayerIds& ids_;
     mutable State states_[I?I:1]{};
     using SourceLink=typename RunnerLayerSourceLink<(I<65535)>::Type;
-    SourceLink sourceHead_=I;
+    // Membership only: buckets never supply event/layer enumeration order.
+    // Collisions retain the full key check and the existing lifetime links;
+    // no allocation or new capacity failure is introduced.
+    static constexpr unsigned sourceBuckets=IndexedSourceIds?256:1;
+    static unsigned sourceBucket(std::uint32_t id){return id&(sourceBuckets-1);}
+    SourceLink sourceHeads_[sourceBuckets]{};
     SourceLink sourceNext_[IndexedSourceIds&&I?I:1]{};
     SourceLink sourcePrevious_[IndexedSourceIds&&I?I:1]{};
     // Enabled only by owners routing all depth/attachment mutations here.

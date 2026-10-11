@@ -622,13 +622,13 @@ void retainedLifetimeIntegration(){
         "actor and retained retirement dispose only their own empty layers");
     require(logicalCapacityFailure<true>()==logicalCapacityFailure<false>(),"logical/physical capacity failure witnesses");
 }
-template<bool Indexed> void numberedSourceRetirement(){
+template<bool Indexed> void numberedSourceRetirement(unsigned stride=1){
     using R=RunnerLayerInstances<4,8>;
     using Owner=RunnerLayerLifetimes<4,8,512,false,false,R::Layers,Indexed>;
     R registry;R::Layers layers;RunnerLayerIds ids;Owner owner(layers,registry,ids);
-    require(owner.adopt({{511,1},71,{},{}})&&owner.adopt({{1,2},72,{},{}})&&
-        owner.adopt({{400,3},73,{},{}}),"sparse numbered owners");
-    require(owner.retire({1,2})&&owner.adopt({{2,4},72,{},{}}),"middle source retirement and ID reuse");
+    require(owner.adopt({{511,1},71,{},{}})&&owner.adopt({{1,2},71+stride,{},{}})&&
+        owner.adopt({{400,3},71+2*stride,{},{}}),"sparse numbered owners");
+    require(owner.retire({1,2})&&owner.adopt({{2,4},71+stride,{},{}}),"middle source retirement and ID reuse");
     require(owner.retire({511,1})&&owner.retire({2,4})&&owner.retire({400,3}),
         "tail, head and last numbered source retirement");
     require(owner.adopt({{511,5},71,{},{}})&&owner.resolve({511,5}),"reused source slot after empty directory");
@@ -636,6 +636,7 @@ template<bool Indexed> void numberedSourceRetirement(){
         "duplicate failure retains the existing source and no new lifetime");
 }
 int main(){numberedSourceRetirement<true>();numberedSourceRetirement<false>();lifetimeRoomInitialization<false>();roomUninitialization<false>();retainedLifetimeIntegration();permutations();lifecycle();identityCollisions();bounds();roomFallback();globalFallbackOrder();serializedInitialization();rebindRelease();roomInitializationFailures();lifetimeDepthIntegration();lifetimeRoomInitialization();roomUninitialization();unnumberedLifetimes();
+    numberedSourceRetirement<true>(256);numberedSourceRetirement<false>(256);
     static_assert(sizeof(downwell::RunnerLayerEntry<true>)==12,"derived entry contains only identity fields");
     require(presenceWitness<true>()==presenceWitness<false>(),"derived/explicit presence lifecycle trace");
     require(compactLifetimeWitness<true>()==compactLifetimeWitness<false>(),"compact/full lifetime mutation trace");
