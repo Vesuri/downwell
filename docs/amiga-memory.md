@@ -281,6 +281,19 @@ the output with an empty count. Diagnostic registration walks describe only
 the admitted registry, while ownership replay also compares native terrain
 identities, chronology and destruction marks before cleanup.
 
+An admitted prepared span publishes its birth chronology and stationary
+retirement certificate as one callback-free transaction. Every slot is first
+checked fresh, lifetime/order overflow and layer capacity are admitted, and
+the wall/platform Create plans must have no extra observer. The resulting
+birth clock and saturated binding/capture revisions equal the per-cell path;
+the local Draw revision is untouched. Same-row platform bounds are included
+once and the certificate retains the final lifetime ceiling. Object 93 still
+registers in original order. Registration cannot allocate or exhaust a separate
+pool for these fresh slots. Unsupported spans retain scalar publication and
+its failure prefix; no event Create is delayed past another segment. The
+full-service path retains the scalar notices as the oracle. This adds no
+per-cell storage, new registry or scene allocation.
+
 `make verify-amiga-results-restart` uses native-scenery ownership and external
 collision admission, not the full-service owner selected by the other scene
 oracles. It injects results readiness and then exercises production confirmation,

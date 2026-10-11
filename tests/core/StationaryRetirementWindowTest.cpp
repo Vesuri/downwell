@@ -50,5 +50,24 @@ int main() {
     // the domain where both original view-offset operations are defined.
     assert(!StationaryRetirementWindow::interior(-521288,-2146828289L));
     assert(!StationaryRetirementWindow::interior(524127,2135195648L));
+    for(int y:{-2147483647,-10000,0,400,2147483647})
+    for(unsigned count=1;count<=32;++count)for(unsigned selected=0;selected<=count;++selected){
+        StationaryRetirementWindow scalar,batch;
+        auto initial=scalar.begin(1);scalar.complete(initial);batch.complete(initial);
+        auto stale=scalar.begin(1);
+        for(unsigned i=0;i<count;++i)scalar.append(y,i<selected,i+2);
+        batch.appendSpan(y,selected!=0,count+1,count);
+        assert(scalar.begin(count+1).revision==batch.begin(count+1).revision);
+        for(long top:{-2146828288L,-40000000L,0L,2000000L,2135195647L})
+            assert(scalar.contains(top,count+1)==batch.contains(top,count+1));
+        scalar.complete(stale);batch.complete(stale);
+        assert(!scalar.contains(0,1)&&!batch.contains(0,1));
+    }
+    StationaryRetirementWindow saturated;
+    saturated.complete(saturated.begin(1));
+    saturated.appendSpan(0,false,2,0xffffffffu);
+    assert(saturated.begin(2).revision==0xffffffffu&&!saturated.contains(0,2));
+    saturated.appendSpan(0,true,3,1);
+    assert(saturated.begin(3).revision==0xffffffffu&&!saturated.contains(0,3));
     std::printf("Stationary retirement: %u exact boundary/oracle checks passed\n",checks);
 }

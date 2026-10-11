@@ -785,14 +785,17 @@ private:
                    (definition->initialFlags&0x8000u))return Result::unsupported;
                 flags[kind]=(definition->initialFlags&~0x8208u)|(plan->changedSprite?8u:0u);
             }
+            // Fresh slots, bounded generations and layer capacity were all
+            // admitted above. Platform registration is allocation-free and
+            // cannot fail for these fresh slots. No callback observes a cell
+            // prefix, so publish chronology and retirement proof once.
+            if(!table_.externalBirthSpan(slot,count,stamp))return Result::unsupported;
+            thinRetirementWindow_.appendSpan(cells.y,(present&2u)!=0,
+                first.handle.generation+count-1,count);
+            terrainRoomFirst_=slot;terrainRoomDepth_=wall->creationDepth;
             bool okay=true;
             for(unsigned i=0;i<count;++i){
-                if(!i){terrainRoomFirst_=slot;terrainRoomDepth_=wall->creationDepth;}
                 const unsigned current=slot+i,kind=cells.kind(i);
-                std::uint32_t order=0;
-                thinRetirementWindow_.append(cells.y,kind!=0,first.handle.generation+i);
-                if(!table_.externalBirth(current,order)){okay=false;break;}
-                if(!i)stamp=order;
                 // Only thin-platform End Step consumes terrain registration
                 // in the external backend. Walls retain native ownership,
                 // but have no generic selector or dispatched wall event.

@@ -65,6 +65,20 @@ public:
         if(!externalOrder_||slot>=Capacity||!nextOrder_||order)return false;
         order=nextOrder_++;changedBinding(slot,false);return true;
     }
+    // One callback-free construction transaction. The caller has admitted
+    // every slot before this publication; there is no observer between births.
+    // Keep exact chronology and saturated revisions, without a second registry.
+    bool externalBirthSpan(unsigned first,unsigned count,std::uint32_t& order){
+        if(!count||first>=Capacity||count>Capacity-first||order||!canExternalBirth(count))return false;
+        order=nextOrder_;nextOrder_+=count;
+        bindingRevision_=bindingRevision_>0xffffffffu-count?0xffffffffu:bindingRevision_+count;
+        captureRevision_=captureRevision_>0xffffffffu-count?0xffffffffu:captureRevision_+count;
+        const unsigned end=first+count;
+        if(captureDirty_&&((captureFirst_<captureLast_&&first<captureLast_&&end>captureFirst_)||
+                          (captureSecond_<captureEnd_&&first<captureEnd_&&end>captureSecond_)))
+            *captureDirty_=true;
+        return true;
+    }
     bool canExternalBirth(unsigned count)const{
         return externalOrder_&&nextOrder_&&(!count||count-1<=0xffffffffu-nextOrder_);
     }

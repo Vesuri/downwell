@@ -100,7 +100,48 @@ static void preparedFamily(){
     assert(reference.externalBirth(2,expected)&&!birth.publish(stamp)&&stamp==expected);
     assert(!population.good&&direct.bindingRevision()==reference.bindingRevision());
 }
+static void externalSpan(){
+    using namespace downwell;
+    for(unsigned first=0;first<8;++first)for(unsigned count=1;count<=8-first;++count)
+    for(unsigned watch=0;watch<=8;++watch)for(unsigned end=watch;end<=8;++end)
+    for(unsigned nearLimit:{0u,1u,7u})for(bool second:{false,true}){
+        NativeInstanceTable<8> batch(true),scalar(true);
+        NativeFamilyBirth a,b;
+        assert(batch.bindExternalFamily(0,8,a)&&scalar.bindExternalFamily(0,8,b));
+        *a.bindingRevision=*b.bindingRevision=nearLimit?0xffffffffu-nearLimit:0;
+        *a.captureRevision=*b.captureRevision=nearLimit?0xffffffffu-nearLimit:0;
+        *a.nextOrder=*b.nextOrder=nearLimit?0xffffffffu-count+1:1;
+        bool dirty=false,expectedDirty=false;
+        assert(second?batch.watchCaptureRanges(0,0,watch,end,dirty):
+            batch.watchCaptureRanges(watch,end,8,8,dirty));
+        assert(second?scalar.watchCaptureRanges(0,0,watch,end,expectedDirty):
+            scalar.watchCaptureRanges(watch,end,8,8,expectedDirty));
+        dirty=expectedDirty=false;
+        std::uint32_t stamp=0,expected=0;
+        if(nearLimit&&count<8-first){
+            assert(!batch.externalBirthSpan(first,count+1,stamp)&&stamp==0&&!dirty);
+        }
+        for(unsigned i=0;i<count;++i){
+            std::uint32_t order=0;assert(scalar.externalBirth(first+i,order));
+            if(!i)expected=order;
+        }
+        assert(batch.externalBirthSpan(first,count,stamp)&&stamp==expected);
+        assert(dirty==expectedDirty&&batch.bindingRevision()==scalar.bindingRevision()&&
+            batch.captureRevision()==scalar.captureRevision()&&
+            batch.localCaptureRevision()==scalar.localCaptureRevision()&&*a.nextOrder==*b.nextOrder);
+        const auto revision=batch.bindingRevision();
+        std::uint32_t zero=0;
+        assert(!batch.externalBirthSpan(8,1,zero)&&!batch.externalBirthSpan(0,9,zero)&&
+            !batch.externalBirthSpan(0,0,zero)&&!batch.externalBirthSpan(0,1,stamp));
+        assert(zero==0&&batch.bindingRevision()==revision);
+        if(nearLimit)assert(!batch.externalBirthSpan(0,1,zero));
+    }
+    NativeInstanceTable<8> ordinary;
+    std::uint32_t stamp=0;
+    assert(!ordinary.externalBirthSpan(0,1,stamp)&&stamp==0);
+}
 int main(){
+    externalSpan();
     terrainPhaseSelection();
     preparedFamily();
     {

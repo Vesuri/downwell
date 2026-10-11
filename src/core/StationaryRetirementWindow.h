@@ -43,6 +43,17 @@ public:
         proof_.cutoff=cutoff;proof_.revision=revision_;
         valid_=proof_.supported&&revision_!=0xffffffffu;
     }
+    // All members share Y and are published without callbacks. selected means
+    // at least one member has the pinned retirement event; walls only advance
+    // the ceiling. Preserve the scalar notification's revision saturation.
+    void appendSpan(int y,bool selected,std::uint32_t cutoff,unsigned count) {
+        if(!count)return;
+        revision_=revision_>0xffffffffu-count?0xffffffffu:revision_+count;
+        if(!valid_)return;
+        if(selected)proof_.include(y);
+        proof_.cutoff=cutoff;proof_.revision=revision_;
+        valid_=proof_.supported&&revision_!=0xffffffffu;
+    }
     Proof begin(std::uint32_t cutoff)const {
         Proof p;p.revision=revision_;p.cutoff=cutoff;return p;
     }

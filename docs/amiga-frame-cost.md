@@ -1,6 +1,6 @@
 # Amiga gameplay frame-cost audit
 
-## Scene-admitted wall ownership
+## Scene-admitted span publication
 
 The external collision backend no longer maintains generic wall registration:
 no admitted consumer reads it. Native lifetime, chronology, activation and
@@ -9,51 +9,65 @@ End Step registration; full-service scenes retain every registration. Generic
 whole-scene dispatch and terrain population consumers fail closed rather than
 silently observing a partial registry. No replacement registry is allocated.
 
-Matched contact timings against `759fb458`, 512 KiB Chip / 8 MiB Fast:
+Callback-free spans now publish birth-clock and retirement-window notices once,
+rather than once per cell. The scalar/full-service path remains the oracle;
+chronology, saturated revisions and watched-range invalidations are identical.
+Platform registrations still run in source order. No additional storage is used.
+The preceding audit measured the replaced notices at 13.76 ms in frame 676;
+the estimate was a 10–12 ms saving. Native construction measures 83.81 ms
+instead of 98.97 ms, and span construction 31.71 instead of 46.79 ms.
+
+Matched contact timings against `7b3a56b7`, 512 KiB Chip / 8 MiB Fast:
 
 | Frame / work | Before ms | After ms |
 | --- | ---: | ---: |
 | 51, early gameplay | 26.4 | 26.4 |
-| 676, generation | 287.1 | 260.6 |
-| 1047, thin-platform retirement | 118.2 | 118.0 |
-| 1305, combat | 63.3 | 63.3 |
-| 1512, generation | 153.7 | 146.2 |
-| 1515, gameplay | 72.8 | 72.9 |
-| 1535, thin-platform retirement | 82.4 | 82.5 |
-| 1689, generation | 275.5 | 245.2 |
+| 676, generation | 260.6 | 245.6 |
+| 1047, thin-platform retirement | 118.0 | 118.0 |
+| 1305, combat | 63.3 | 63.1 |
+| 1512, generation | 146.2 | 142.2 |
+| 1515, gameplay | 72.9 | 72.6 |
+| 1535, thin-platform retirement | 82.5 | 82.2 |
+| 1689, generation | 245.2 | 227.9 |
 
-The complete 1,800-update tape takes 5,079 PAL fields, **17.72 FPS**
-(previously 5,083 / 17.71 FPS). This removes generation stalls, not the ordinary
+The complete 1,800-update tape takes 5,074 PAL fields, **17.74 FPS**
+(previously 5,079 / 17.72 FPS). This reduces generation stalls, not the ordinary
 frame-budget shortfall. The maximum gap is 13 fields at frame 676; it is not
 the acceptance gate. Ten host tapes / 18,000 frames compare native terrain
 lifetimes and pre-cleanup retirement marks with full-service ownership.
 Cross-target replay passes. Targeted activation/re-entry tests retain inactive
 platforms and retire them on reactivation; undeclared consumers are rejected.
+All seven matched window means and maxima are unchanged or lower. Scalar/span
+notification tests cover both watched ranges, empty ranges, invalid requests,
+order overflow, revision saturation, unsupported coordinates and stale proofs.
 
 Reproduce with `SKIP_TO_GAME=1 PROFILE_CONTACT=1 VERIFY_CHIP_KB=512
 VERIFY_TIMEOUT_SECONDS=180 STRIP=1 TRACE_FRAMES=50,675,1046,1304,1511,1534,1688
-TRACE_FIELDS=35 TRACE_OUTPUT=$PWD/tmp/trace/wall-admission-contact
+TRACE_FIELDS=35 TRACE_OUTPUT=$PWD/tmp/trace/span-notices-contact
 bash amiga/profile.sh trace`, then `python3 tools/amiga-trace-report.py
-tmp/trace/wall-admission-contact --causes`. Run the same settings with
+tmp/trace/span-notices-contact --causes`. Run the same settings with
 `bash amiga/profile.sh fps` for the uninterrupted tape.
-Reports: `tmp/wall-admission-report.txt`, `tmp/wall-admission-fps.log`,
-`tmp/wall-admission-replay.log`, `tmp/wall-admission-host.log`.
+Reports: `tmp/span-notices-report.txt`, `tmp/span-notices-676.txt`,
+`tmp/span-notices-fps.log`, `tmp/span-notices-replay.log`,
+`tmp/span-notices-host.log`, `tmp/span-notices-boundaries.log`.
+Matched baseline: `tmp/wall-admission-report.txt`.
 Trace ELF SHA-256:
-`e422323a4777996700adf399606d40c28758c8f01acf01e4bb329d95c7894ff1`.
+`26173e5272b14edf4b443bf508cf0fd16dd52cbcde15418de5476bd71db57ce8`.
 
-No-input generation frame 163 measures **172.8 ms**; reproduce with
+No-input generation frame 163 improves **172.8 → 169.5 ms**; reproduce with
 `PROFILE_IDLE=1 SKIP_TO_GAME=1 PROFILE_CONTACT=0 PROFILE_FRAMES=600
 VERIFY_CHIP_KB=512 VERIFY_TIMEOUT_SECONDS=120 STRIP=1 TRACE_FRAMES=162
-TRACE_FIELDS=35 TRACE_OUTPUT=$PWD/tmp/trace/wall-admission-idle
-bash amiga/profile.sh trace`. Report: `tmp/wall-admission-idle-report.txt`;
-ELF SHA-256 `39559513fdfe457ff827ba3d7fb03be33eb4127d733f853ca94fc0d2b7b45b0d`.
-This is an absolute measurement, not a matched-current-baseline saving.
+TRACE_FIELDS=35 TRACE_OUTPUT=$PWD/tmp/trace/span-notices-idle
+bash amiga/profile.sh trace`. Report: `tmp/span-notices-idle-report.txt`;
+ELF SHA-256 `c9d82b4b9846d473a334858aee22abce3699bbcd4c4695a2c380c8293e5b82ce`.
+Matched baseline: `tmp/wall-admission-idle-report.txt`.
 Normal `STRIP=1` startup passes `verify_memory.gdb` with 126,840 bytes
 Chip remaining, no gameplay preparation or excluded reference allocations.
-The restored normal executable is 1,995,944 bytes; its ELF SHA-256 is
-`4cd50f7ef0e6492073cc1b72bfce71e5502e699b0402c777c2c6279bd6731b5e`.
-Startup evidence: `tmp/wall-admission-memory.log` and
-`tmp/wall-admission-memory-gdb.log`.
+The restored normal executable is 1,996,052 bytes (+108); its ELF SHA-256 is
+`6c47f6cf20f79c2d5f29747ccb91902bde0c636743fc46654a750793fd61696a`.
+The owner remains 904,628 bytes; no storage is added by span notifications.
+Startup evidence: `tmp/span-notices-memory.log` and
+`tmp/span-notices-memory-gdb.log`.
 
 ## Remaining prepared-publication boundary at `55674919`
 
