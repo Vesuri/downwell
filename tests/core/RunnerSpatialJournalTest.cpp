@@ -1,10 +1,21 @@
 #include "core/RunnerSpatialJournal.h"
+#include "core/RunnerSpatialTreeLease.h"
 #include <cassert>
 #include <cstdio>
 #include <vector>
+#include <type_traits>
 using Math=downwell::RunnerSpatialSplit;
 using Box=Math::Box;
 static Box box(int x,int y,int w=16,int h=16){return Math::encodePixels({x,y,x+w,y+h});}
+template<unsigned Nodes> struct TreeProvider {
+    using Lease=downwell::RunnerSpatialTreeLease<Nodes>;
+    using Tree=typename Lease::Tree;
+    unsigned acquisitions=0,releases=0;bool fail=false;
+    typename Lease::Provider provider(){return {this,[](void* context)->Tree*{
+        auto& self=*static_cast<TreeProvider*>(context);++self.acquisitions;
+        return self.fail?nullptr:new Tree;
+    },[](void* context,Tree* tree){++static_cast<TreeProvider*>(context)->releases;delete tree;}};}
+};
 template<class A,class B> static void compare(A& eager,B& journal){
     assert(eager.valid()==journal.valid());
     if(!eager.valid())return;
@@ -27,9 +38,12 @@ template<class A,class B> static void compare(A& eager,B& journal){
     }
     assert(eager.height()==journal.height()&&eager.nodeCount()==journal.nodeCount()&&!journal.pending());
 }
-template<unsigned Nodes,unsigned Pending,bool Prepared=false,bool Background=true> static void mutations(){
+template<unsigned Nodes,unsigned Pending,bool Prepared=false,bool Background=true,bool Leased=false> static void mutations(){
     downwell::RunnerSpatialIndex<Nodes> eager;
-    downwell::RunnerSpatialJournal<Nodes,128,Pending> journal;
+    TreeProvider<Nodes> provider;
+    using Tree=typename std::conditional<Leased,downwell::RunnerSpatialTreeLease<Nodes>,downwell::RunnerSpatialIndex<Nodes>>::type;
+    downwell::RunnerSpatialJournal<Nodes,128,Pending,false,Tree> journal;
+    if constexpr(Leased)assert(journal.bindTree(provider.provider()));
     bool present[128]{};Box previous[128]{};
     unsigned random=17;
     for(unsigned step=0;step<12000;++step){
@@ -63,6 +77,46 @@ template<unsigned Nodes,unsigned Pending,bool Prepared=false,bool Background=tru
     if(Nodes==1024)assert(journal.deferred()); // This fixture must exercise the journal, not fallback.
 }
 int main(){
+    {
+        using Lease=downwell::RunnerSpatialTreeLease<128>;
+        TreeProvider<128> provider;
+        downwell::RunnerSpatialJournal<128,32,4,false,Lease> journal;
+        assert(journal.bindTree(provider.provider()));
+        assert(!journal.bindTree(provider.provider()));
+        assert(journal.valid()&&journal.service(0)&&provider.acquisitions==0);
+        for(unsigned i=0;i<4;++i)assert(journal.insert(box(i*16,0),i));
+        assert(provider.acquisitions==0&&journal.pending()==4);
+        assert(journal.insert(box(64,0),4)); // Pressure materializes, in order.
+        assert(provider.acquisitions==1&&journal.pending()==1);
+        journal.clear();assert(provider.releases==1&&journal.valid());
+        provider.fail=true;
+        assert(journal.insert(box(0,0),0));
+        bool visited=false;
+        assert(!journal.query(box(0,0),[&](unsigned){visited=true;return true;}));
+        assert(!visited&&!journal.valid()&&journal.pending()==1&&provider.acquisitions==2);
+        assert(!journal.service(1)&&provider.acquisitions==2);
+        journal.clear();provider.fail=false;
+        assert(journal.query(box(0,0),[&](unsigned){assert(false);return true;}));
+        assert(provider.acquisitions==3);
+        journal.clear();assert(provider.releases==2);
+        auto fractional=box(0,0);fractional.left.bits=0x3f000000;
+        assert(journal.insert(fractional,0)&&!journal.deferred()&&provider.acquisitions==4);
+        journal.clear();assert(provider.releases==3);
+    }
+    mutations<1024,8,false,false,true>();
+    mutations<1024,64,true,true,true>();
+    mutations<16,8,true,false,true>(); // Identical tree-capacity failure prefix.
+    {
+        TreeProvider<32> provider;
+        {
+            downwell::RunnerSpatialTreeLease<32> tree;
+            assert(tree.bind(provider.provider())&&tree.insert(box(0,0),1));
+        }
+        assert(provider.acquisitions==1&&provider.releases==1);
+        downwell::RunnerSpatialTreeLease<32> unbound;
+        assert(!unbound.query(box(0,0),[](unsigned){assert(false);return true;}));
+        assert(!unbound.valid());
+    }
     {
         // Batch admission must never drain history, cross the pressure gate,
         // accept occupied identities, or change the historical bounds.

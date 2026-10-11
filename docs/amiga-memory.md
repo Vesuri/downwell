@@ -143,21 +143,25 @@ remove collision bounds metadata or change the shipping collision algorithm.
 Future live precise-mask events need scene-owned mask dependencies, not a
 restoration of the complete reference catalogue to every executable.
 
-The largest BSS owner is collision storage (2,620,546 bytes in the current
-native ELF). Of this, the scheduled spatial owner is 1,465,932 bytes and its
-journal/index container is 1,327,222 bytes. The derived R-tree alone reserves
-1,236,578 bytes (including a 1,204,752-byte node pool); the ordered mutation
-journal is a separate 90,112 bytes. These are nested sizes, not additive.
+Collision storage reserves 1,385,452 ordinary BSS bytes. The derived R-tree
+is separately leased on first use: its 1,236,578-byte allocation includes a
+1,204,752-byte node pool. Replacing embedded backing with the 18-byte lease
+removes 1,236,560 resident bytes when no tree consumer runs. The ordered
+mutation journal remains a separate 90,112 bytes; these are not extra copies
+of the tree. Native allocation requests `MEMF_FAST`, with no Chip fallback.
 
-The bounded 1,800-update contact run at `03e29381` leaves the tree at its
-single empty root (`used=live=1`), while the journal has 1,156 pending
-operations and population 824, still deferred. No level reset occurs during
-this workload. This demonstrates dormant tree backing in this run, not
-permission to remove the journal or the query implementation. Queries,
-explicit service, journal pressure and eager numeric fallback can require
-materialization; any lease must preserve synchronous failure and historical
-insertion/removal order. It must also distinguish front-end, gameplay and
-reference-oracle lifetimes. No tree residency saving is implemented yet.
+Validity checks, zero-budget service and empty resets do not allocate.
+Queries, nonempty explicit service, journal pressure and eager numeric fallback
+can materialize the tree synchronously, preserving historical insertion/removal
+order. Allocation failure is terminal until clear; clear releases backing and
+permits a fresh acquisition. The platform scope also frees backing on early
+exit from placement-constructed gameplay owners. The host retains the embedded
+tree as the reference implementation.
+
+The bounded 1,800-update contact workload has no allocated tree, with 1,156
+pending journal operations and population 824. The native original-mask fixture
+does allocate on query. This is a residency saving, not a smaller materialized
+tree or a performance claim; query-heavy scenes still require the full backing.
 
 Reproduce with the bounded contact `profile.sh fps` command in the frame-cost
 audit. Its `Spatial storage` line reads fields directly through the debugger:

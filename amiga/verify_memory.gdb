@@ -19,6 +19,12 @@ if gDownwellInitialRoomPreparations != 0
     printf "Normal startup constructed the gameplay room before scene entry\n"
     quit 1
 end
+set $owner = (downwell::GameplayCollisionOwner*)&'_ZZL11runDownwellvE16collisionStorage.lto_priv.0'
+if $owner->owner_.index_.tree_.tree_ != 0
+    printf "Derived spatial tree unexpectedly resident during normal startup\n"
+    quit 1
+end
+printf "Startup spatial tree: unmaterialized, no backing allocation\n"
 # This is the normal-startup audit; explicit plane/replay oracle builds have
 # their own verifiers and must not weaken the front-end residency guard.
 if gDownwellGamePlaneResidentBytes != 0 || gDownwellGamePlaneLoads != 0

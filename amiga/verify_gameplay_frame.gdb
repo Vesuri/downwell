@@ -6,6 +6,12 @@ if gDownwellPreciseMaskChecks != 2
     printf "Resident original-mask hit/miss checks did not complete\n"
     quit 1
 end
+set $owner = (downwell::GameplayCollisionOwner*)&'_ZZL11runDownwellvE16collisionStorage.lto_priv.0'
+if $owner->owner_.index_.tree_.tree_ == 0
+    printf "Reference mask queries did not materialize their spatial tree\n"
+    quit 1
+end
+printf "Reference spatial tree: materialized for original-mask queries\n"
 if gDownwellStackGuardReady != 1
     printf "Target could not install the task-stack guard\n"
     quit 1

@@ -54,7 +54,8 @@ template<unsigned Capacity,unsigned Nodes,bool PreparedGeometry> struct RunnerSp
 template<unsigned Capacity,unsigned Nodes,bool ScheduledIndex=false,unsigned RetainedFirst=0,unsigned RetainedLast=0,bool RunRegistration=ScheduledIndex,class Lifetimes=RunnerSpatialLifetimes<Capacity>,
     class Registration=typename RunnerRegistrationStorage<Capacity,RetainedFirst,RetainedLast,
         RunRegistration&&(RetainedFirst<RetainedLast)>::Type,bool PreparedGeometry=false,class TerrainStates=void,
-    class StateStorage=RunnerSpatialStates<RunnerSpatialState,Capacity,RetainedFirst,RetainedLast,TerrainStates>> class RunnerSpatialInstances {
+    class StateStorage=RunnerSpatialStates<RunnerSpatialState,Capacity,RetainedFirst,RetainedLast,TerrainStates>,
+    class Index=typename RunnerSpatialIndexStorage<Capacity,Nodes,ScheduledIndex,PreparedGeometry>::Type> class RunnerSpatialInstances {
     static_assert(Capacity>0,"Spatial instances need stable slots");
     using Queue=typename RunnerDirtyQueueStorage<Capacity,RetainedFirst,RetainedLast,TerrainStates,0>::Type;
     using CollisionQueue=typename RunnerDirtyQueueStorage<Capacity,RetainedFirst,RetainedLast,TerrainStates,1>::Type;
@@ -62,6 +63,7 @@ template<unsigned Capacity,unsigned Nodes,bool ScheduledIndex=false,unsigned Ret
     using Membership=Registration;
 public:
     using Real=RunnerImageValue;
+    template<class Provider> bool bindTree(Provider provider){return index_.bindTree(provider);}
     template<unsigned First,unsigned Last> using RegistrationProjection=
         typename Membership::template RegistrationProjection<First,Last>;
     using Box=Math::Box;
@@ -756,7 +758,7 @@ public:
             if(pixels.right<pixels.left){auto a=pixels.left;pixels.left=pixels.right;pixels.right=a;}
             if(pixels.bottom<pixels.top){auto a=pixels.top;pixels.top=pixels.bottom;pixels.bottom=a;}
             struct PreparedIndex {
-                typename RunnerSpatialIndexStorage<Capacity,Nodes,ScheduledIndex,PreparedGeometry>::Type& index;
+                Index& index;
                 const Math::PixelBox& pixels;
                 bool insert(const Box& box,std::uint32_t id){return index.insertPrepared(box,id,&pixels);}
                 bool remove(const Box& box,std::uint32_t id,bool retry,bool& removed){
@@ -1153,7 +1155,7 @@ private:
     Membership membership_;
     Queue spatial_;
     CollisionQueue collision_;
-    typename RunnerSpatialIndexStorage<Capacity,Nodes,ScheduledIndex,PreparedGeometry>::Type index_;
+    Index index_;
     bool good_=true;
     std::uint32_t bindingRevision_=0;
     std::uint32_t captureRevision_=0;

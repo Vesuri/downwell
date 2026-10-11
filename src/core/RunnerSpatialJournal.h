@@ -11,7 +11,7 @@ template<> struct RunnerSpatialGeometrySource<true> {
 // flags, dirty queues and lifetime changes synchronously. Never collapse equal
 // updates or reconstruct from current positions: tree order depends on history.
 // All reads catch up. service() permits bounded work between publication bursts.
-template<unsigned Nodes,unsigned Slots,unsigned Pending=512,bool PreparedGeometry=false>
+template<unsigned Nodes,unsigned Slots,unsigned Pending=512,bool PreparedGeometry=false,class Tree=RunnerSpatialIndex<Nodes>>
 class RunnerSpatialJournal:private RunnerSpatialGeometrySource<PreparedGeometry> {
     static_assert(Pending && !(Pending&(Pending-1)),"Journal capacity must be a power of two");
     static_assert(!PreparedGeometry||Slots<0x80000000u,"Prepared journal identity tag");
@@ -26,6 +26,7 @@ class RunnerSpatialJournal:private RunnerSpatialGeometrySource<PreparedGeometry>
     static constexpr unsigned safePopulation=Nodes>reserve?(Nodes-reserve)/2:0;
 public:
     using Box=typename Math::Box;
+    template<class Provider> bool bindTree(Provider provider){return tree_.bind(provider);}
     // Read-only admission for a constructor with no intervening observation.
     // Do not cross pressure/service or eager-fallback boundaries in this path.
     bool admitsFreshGeometrySpan(unsigned first,unsigned count,const Math::PixelBox& envelope)const{
@@ -182,7 +183,7 @@ public:
     }
 private:
     struct Operation{Box box;std::uint32_t instance;bool insert;};
-    mutable RunnerSpatialIndex<Nodes> tree_;
+    mutable Tree tree_;
     Operation operations_[Pending]{};
     std::uint32_t present_[(Slots+31)/32? (Slots+31)/32:1]{};
     mutable unsigned head_=0,count_=0;

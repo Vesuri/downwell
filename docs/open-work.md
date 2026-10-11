@@ -80,14 +80,11 @@ behavior, both backend integrations and relevant original-game verification.
   BSS and dynamic Chip allocations. Loading assets from files reduces executable
   size only; prove residency savings separately. Preserve the portable/reference
   oracle without requiring all of its machinery in the shipping native binary.
-  Separate the 1,236,578-byte dormant derived-tree backing from the ordered
-  spatial journal (see the native layout in the memory contract). Keep the
-  journal and exact query results; cover first query, explicit service,
-  pressure/eager fallback, allocation failure, reset and re-entry. Do not merely
-  move the same always-resident bytes into a startup allocation or restart a
-  rejected per-cell registration encoding experiment. Prove residency across
-  scenes and native workloads before claiming a reduction; this does not by
-  itself address the remaining frame-time shortfall.
+  Do not restart rejected per-cell registration encodings. Future query-heavy
+  scenes must budget the full on-demand tree allocation from the memory
+  contract; its absence in the current contact workload does not prove those
+  scenes fit. Continue removing unrelated resident resources and code without
+  moving the same always-resident bytes into startup allocations.
 - Close this goal only with a normally runnable build, repeatable measured
   baseline, explained/resolved recent regressions and meaningful startup failure
   codes. Retain any remaining absolute 20 ms shortfall explicitly in section 5;

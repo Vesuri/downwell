@@ -112,7 +112,11 @@ end
 # Read storage directly: calling nodeCount()/height() would drain the journal
 # and change the very residency/work state this diagnostic is measuring.
 set $owner = (downwell::GameplayCollisionOwner*)&'_ZZL11runDownwellvE16collisionStorage.lto_priv.0'
-printf "Spatial storage: owner_bytes=%lu tree_bytes=%lu journal_bytes=%lu pending=%lu population=%lu deferred=%u tree_used=%lu tree_live=%lu\n", sizeof(*$owner), sizeof($owner->owner_.index_.tree_), sizeof($owner->owner_.index_.operations_), $owner->owner_.index_.count_, $owner->owner_.index_.population_, $owner->owner_.index_.deferred_, $owner->owner_.index_.tree_.used_, $owner->owner_.index_.tree_.live_
+set $tree = $owner->owner_.index_.tree_.tree_
+printf "Spatial storage: owner_bytes=%lu tree_capacity_bytes=%lu journal_bytes=%lu pending=%lu population=%lu deferred=%u resident=%u\n", sizeof(*$owner), sizeof(*$tree), sizeof($owner->owner_.index_.operations_), $owner->owner_.index_.count_, $owner->owner_.index_.population_, $owner->owner_.index_.deferred_, $tree != 0
+if $tree != 0
+    printf "Spatial materialized tree: used=%lu live=%lu\n", $tree->used_, $tree->live_
+end
 printf "DOWNWELL_PROFILE_READY\n"
 shell touch .run/gdb-ready.marker
 detach

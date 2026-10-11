@@ -9,6 +9,7 @@
 #include "StationaryRetirementWindow.h"
 #include "ProjectileViewInterior.h"
 #include "RunnerSpatialInstances.h"
+#include "RunnerSpatialTreeLease.h"
 #include "RunnerObjectFamilies.h"
 #include "RunnerRoomMembership.h"
 #include "RunnerRunRoomMembership.h"
@@ -48,22 +49,30 @@ class GameplayCollisionOwner {
 public:
     using View=GameplayCollisionView;
     using ScalarStates=RunnerBorrowedSpatialStates<RunnerSpatialState,View::capacity>;
+#ifdef DOWNWELL_PLATFORM_AMIGA
+    using DerivedTree=RunnerSpatialTreeLease<View::capacity*2>;
+#else
+    using DerivedTree=RunnerSpatialIndex<View::capacity*2>;
+#endif
     // Verification builds keep the complete scalar membership pipeline alive,
     // not just isolated container tests. Spatial journal scheduling is the
     // same on both sides so query timing is not changed by this comparison.
 #ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
     using Registration=typename RunnerRegistrationStorage<View::capacity,View::terrainBase,View::timeFieldBase,false>::Type;
     using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2,true,View::terrainBase,View::timeFieldBase,false,
-        RunnerSpatialLifetimes<View::capacity>,Registration,false,void,ScalarStates>;
+        RunnerSpatialLifetimes<View::capacity>,Registration,false,void,ScalarStates,
+        RunnerSpatialJournal<View::capacity*2,View::capacity,4096,false,DerivedTree>>;
 #else
     using Registration=typename RunnerRegistrationStorage<View::capacity,View::terrainBase,View::timeFieldBase,true>::Type;
     using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2,true,View::terrainBase,View::timeFieldBase,
-        true,RunnerSpatialLifetimes<View::capacity>,Registration,true,void,ScalarStates>;
+        true,RunnerSpatialLifetimes<View::capacity>,Registration,true,void,ScalarStates,
+        RunnerSpatialJournal<View::capacity*2,View::capacity,4096,true,DerivedTree>>;
 #endif
     struct ReferenceStorage {
         Owner::State states[View::capacity]{};
         Owner::Properties properties[View::capacity]{};
     };
+    template<class Provider> bool bindSpatialTree(Provider provider){return owner_.bindTree(provider);}
 private:
     Owner owner_;
     StationaryRetirementWindow thinRetirementWindow_;
