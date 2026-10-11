@@ -1,0 +1,228 @@
+diff --git a/Makefile b/Makefile
+index 39d69b92..21533b84 100644
+--- a/Makefile
++++ b/Makefile
+@@ -2355,7 +2355,7 @@ $(FONT_PACK_TEST_TARGET): $(FONT_PACK_TEST_SOURCES)
+ 	@mkdir -p $(@D)
+ 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(FONT_PACK_TEST_SOURCES)
+ 
+-$(BUILDER_PATTERN_PACK_TEST_TARGET): $(BUILDER_PATTERN_PACK_TEST_SOURCES)
++$(BUILDER_PATTERN_PACK_TEST_TARGET): $(BUILDER_PATTERN_PACK_TEST_SOURCES) src/core/BuilderPatternPack.h src/core/AssetCrc32.h
+ 	@mkdir -p $(@D)
+ 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(BUILDER_PATTERN_PACK_TEST_SOURCES)
+ 
+diff --git a/amiga/Makefile b/amiga/Makefile
+index 16d6b40d..3704d06d 100644
+--- a/amiga/Makefile
++++ b/amiga/Makefile
+@@ -676,6 +676,12 @@ $(REPO)/generated/amiga-transient-banks.h: $(AMIGA_RESULTS) $(AMIGA_SHOP) $(AMIG
+ 
+ obj/DownwellAmiga.o: $(REPO)/generated/amiga-transient-banks.h
+ 
++$(REPO)/generated/amiga-pattern-certificate.h: $(REPO)/generated/downwell-builder-patterns.dwbp $(REPO)/tools/certify-builder-patterns.py $(REPO)/src/core/BuilderPatternPack.cpp $(REPO)/src/core/BuilderPatternPack.h $(REPO)/src/core/AssetCrc32.h $(REPO)/tests/core/BuilderPatternPackTest.cpp
++	$(MAKE) -C $(REPO) build/builder-pattern-pack-test
++	python3 $(REPO)/tools/certify-builder-patterns.py
++
++obj/DownwellAmiga.o: $(REPO)/generated/amiga-pattern-certificate.h
++
+ $(OUT).results: $(AMIGA_RESULTS)
+ 	@mkdir -p $(@D)
+ 	cp -f $< $@
+diff --git a/src/core/BuilderPatternPack.cpp b/src/core/BuilderPatternPack.cpp
+index 7bfc4173..90c904db 100644
+--- a/src/core/BuilderPatternPack.cpp
++++ b/src/core/BuilderPatternPack.cpp
+@@ -1,4 +1,5 @@
+ #include "BuilderPatternPack.h"
++#include "AssetCrc32.h"
+ 
+ namespace downwell {
+ namespace {
+@@ -21,6 +22,26 @@ bool range(std::uint32_t first, std::uint32_t count, std::uint32_t limit) {
+ }
+ } // namespace
+ 
++BuilderPatternPack BuilderPatternPack::certifiedLocal(const std::uint8_t* bytes,
++    std::size_t size,std::size_t certifiedSize,std::uint32_t certifiedCrc){
++    BuilderPatternPack result(nullptr,0);
++    if(!bytes||size<headerSize||size!=certifiedSize||assetCrc32(bytes,size)!=certifiedCrc)
++        return result;
++    // Certification is currently for the cavern prepared-program format only.
++    if(u32(bytes)!=0x50425744u||u16(bytes+4)!=formatVersion||
++       u16(bytes+6)!=headerSize||u32(bytes+8)!=manifestSchema||
++       u64(bytes+20)!=sourceHashPrefix)return result;
++    result.bytes_=bytes;
++    result.patternCount_=u32(bytes+12);result.cellCount_=u32(bytes+16);
++    result.rowCount_=u32(bytes+28);result.patternsOffset_=headerSize;
++    result.rowsOffset_=headerSize+result.patternCount_*patternRecordSize;
++    result.cellsOffset_=result.rowsOffset_+result.rowCount_*rowRecordSize;
++    result.preparedOffsets_=bytes+result.cellsOffset_+result.cellCount_+4;
++    result.preparedPrograms_=result.preparedOffsets_+(std::size_t(result.rowCount_)*2+3)*4;
++    result.error_=BuilderPatternPackError::none;
++    return result;
++}
++
+ BuilderPatternPack::BuilderPatternPack(const std::uint8_t* bytes,
+                                        std::size_t size) : bytes_(bytes) {
+     if (bytes == nullptr || size < headerSize) return;
+diff --git a/src/core/BuilderPatternPack.h b/src/core/BuilderPatternPack.h
+index 2730d278..2df45040 100644
+--- a/src/core/BuilderPatternPack.h
++++ b/src/core/BuilderPatternPack.h
+@@ -43,6 +43,11 @@ public:
+     static constexpr std::size_t rowRecordSize = 8;
+ 
+     BuilderPatternPack(const std::uint8_t* bytes, std::size_t size);
++    // Only for the immutable local pack validated by the host build. The
++    // compiled size/CRC belong to that exact payload, never to a file header.
++    // Arbitrary/untrusted inputs must use the full constructor above.
++    static BuilderPatternPack certifiedLocal(const std::uint8_t* bytes,
++        std::size_t size,std::size_t certifiedSize,std::uint32_t certifiedCrc);
+     bool valid() const { return error_ == BuilderPatternPackError::none; }
+     BuilderPatternPackError error() const { return error_; }
+     std::uint32_t patternCount() const { return patternCount_; }
+diff --git a/src/platform/amiga/DownwellAmiga.cpp b/src/platform/amiga/DownwellAmiga.cpp
+index 7c2da60d..2e064951 100644
+--- a/src/platform/amiga/DownwellAmiga.cpp
++++ b/src/platform/amiga/DownwellAmiga.cpp
+@@ -355,6 +355,7 @@ static bool entryHudReady=false;
+ 
+ #include "AmigaTransientBank.h"
+ #include "../../../generated/amiga-transient-banks.h"
++#include "../../../generated/amiga-pattern-certificate.h"
+ using TransientOwner = AmigaTransientBank::Owner;
+ static constexpr AmigaTransientBank::Contract shopBankContract{
+     TransientOwner::shop, "PROGDIR:Downwell.shop", DOWNWELL_SHOP_BANK_BYTES, DOWNWELL_SHOP_BANK_BUDGET};
+@@ -2061,7 +2062,12 @@ __attribute__((noinline)) static int runDownwell(void) {
+                 DOWNWELL_PATTERNS_BANK_BYTES)!=LONG(DOWNWELL_PATTERNS_BANK_BYTES)){
+             memory.releaseBuilderPatterns();return false;
+         }
++#ifdef DOWNWELL_REFERENCE_PATTERNS
+         builders=downwell::BuilderPatternPack(memory.builderPatterns(),DOWNWELL_PATTERNS_BANK_BYTES);
++#else
++        builders=downwell::BuilderPatternPack::certifiedLocal(memory.builderPatterns(),
++            DOWNWELL_PATTERNS_BANK_BYTES,DOWNWELL_CERTIFIED_PATTERN_BYTES,DOWNWELL_CERTIFIED_PATTERN_CRC);
++#endif
+         if(!builders.valid()){
+             builders=downwell::BuilderPatternPack(nullptr,0);
+             memory.releaseBuilderPatterns();return false;
+diff --git a/tests/core/BuilderPatternPackTest.cpp b/tests/core/BuilderPatternPackTest.cpp
+index 3a9c23de..fed32ab9 100644
+--- a/tests/core/BuilderPatternPackTest.cpp
++++ b/tests/core/BuilderPatternPackTest.cpp
+@@ -1,4 +1,5 @@
+ #include "core/BuilderPatternPack.h"
++#include "core/AssetCrc32.h"
+ #include <cstdlib>
+ #include <fstream>
+ #include <iostream>
+@@ -19,6 +20,37 @@ int main(int argc, char** argv) {
+         (std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
+     downwell::BuilderPatternPack pack(bytes.data(), bytes.size());
+     require(pack.valid(), "generated builder-pattern pack validates");
++    const std::uint8_t crcFixture[]={'1','2','3','4','5','6','7','8','9'};
++    require(downwell::assetCrc32(crcFixture,9)==0xcbf43926u,"standard CRC32 vector");
++    const auto crc=downwell::assetCrc32(bytes.data(),bytes.size());
++    const auto certified=downwell::BuilderPatternPack::certifiedLocal(bytes.data(),bytes.size(),bytes.size(),crc);
++    require(certified.valid()&&certified.patternCount()==pack.patternCount()&&
++        certified.rowCount()==pack.rowCount()&&certified.cellCount()==pack.cellCount(),"certified metadata matches parser");
++    for(unsigned id=0;id<pack.patternCount();++id){
++        downwell::PackedBuilderPattern a,b;
++        require(pack.pattern(id,a)&&certified.pattern(id,b),"certified pattern exists");
++        require(a.family==b.family&&a.sourceIndex==b.sourceIndex&&a.width==b.width&&
++            a.rowCount==b.rowCount&&a.firstRow==b.firstRow&&a.firstCell==b.firstCell&&
++            a.cellCount==b.cellCount,"certified pattern exact");
++        for(unsigned y=0;y<a.rowCount;++y){
++            const std::uint8_t *ar=nullptr,*br=nullptr;std::uint32_t aw=0,bw=0;
++            require(pack.rowData(a,y,ar,aw)&&certified.rowData(b,y,br,bw)&&ar==br&&aw==bw,
++                    "certified source row view exact");
++            for(unsigned reverse=0;reverse<2;++reverse)
++                require(pack.preparedRow(a,y,reverse)==certified.preparedRow(b,y,reverse),
++                        "certified prepared row view exact");
++        }
++    }
++    for(unsigned reverse=0;reverse<2;++reverse)
++        require(pack.preparedPillars(reverse)==certified.preparedPillars(reverse),"certified pillars exact");
++    require(!downwell::BuilderPatternPack::certifiedLocal(nullptr,bytes.size(),bytes.size(),crc).valid(),"null certificate input rejected");
++    require(!downwell::BuilderPatternPack::certifiedLocal(bytes.data(),bytes.size()-1,bytes.size(),crc).valid(),"truncated certified pack rejected");
++    require(!downwell::BuilderPatternPack::certifiedLocal(bytes.data(),bytes.size(),bytes.size(),crc^1).valid(),"wrong certificate rejected");
++    for(std::size_t at=0;at<bytes.size();at+=701){
++        auto corrupt=bytes;corrupt[at]^=0x80;
++        require(!downwell::BuilderPatternPack::certifiedLocal(corrupt.data(),corrupt.size(),bytes.size(),crc).valid(),
++                "corruption across metadata and programs rejected");
++    }
+     const std::uint8_t* literal = nullptr;
+     std::uint32_t length = 123;
+     require(!pack.literalData(0, literal, length) && !literal && length == 123,
+diff --git a/src/core/AssetCrc32.h b/src/core/AssetCrc32.h
+new file mode 100644
+index 00000000..66b66dad
+--- /dev/null
++++ b/src/core/AssetCrc32.h
+@@ -0,0 +1,25 @@
++#ifndef DOWNWELL_ASSET_CRC32_H
++#define DOWNWELL_ASSET_CRC32_H
++#include <cstddef>
++#include <cstdint>
++namespace downwell {
++// Accidental-corruption check for host-certified local assets, not an
++// authentication primitive for untrusted downloads.
++inline std::uint32_t assetCrc32(const std::uint8_t* bytes,std::size_t size){
++    struct Table {
++        std::uint32_t words[256]{};
++        constexpr Table(){
++            for(unsigned i=0;i<256;++i){
++                auto n=std::uint32_t(i);
++                for(unsigned bit=0;bit<8;++bit)n=(n>>1)^((n&1)?0xedb88320u:0u);
++                words[i]=n;
++            }
++        }
++    };
++    static constexpr Table table{};
++    std::uint32_t crc=0xffffffffu;
++    for(std::size_t i=0;i<size;++i)crc=(crc>>8)^table.words[(crc^bytes[i])&255];
++    return crc^0xffffffffu;
++}
++}
++#endif
+diff --git a/tools/certify-builder-patterns.py b/tools/certify-builder-patterns.py
+new file mode 100644
+index 00000000..df314d5b
+--- /dev/null
++++ b/tools/certify-builder-patterns.py
+@@ -0,0 +1,34 @@
++#!/usr/bin/env python3
++"""Certify the exact local cavern pack with the retained host parser/oracle."""
++import hashlib
++import json
++from pathlib import Path
++import subprocess
++import zlib
++
++ROOT = Path(__file__).resolve().parents[1]
++VERSION = 'certify-builder-patterns/v1'
++
++def main():
++    pack = ROOT / 'generated/downwell-builder-patterns.dwbp'
++    validator = ROOT / 'build/builder-pattern-pack-test'
++    before = pack.read_bytes()
++    subprocess.run([str(validator), str(pack)], check=True)
++    if pack.read_bytes() != before:
++        raise SystemExit('pack changed during certification')
++    crc = zlib.crc32(before)
++    (ROOT / 'generated/amiga-pattern-certificate.h').write_text(
++        f'// {VERSION}; host validated, do not edit.\n#pragma once\n'
++        f'#define DOWNWELL_CERTIFIED_PATTERN_BYTES {len(before)}u\n'
++        f'#define DOWNWELL_CERTIFIED_PATTERN_CRC 0x{crc:08x}u\n')
++    paths = ['data/data.win', 'generated/downwell-builder-patterns.dwbp',
++             'src/core/BuilderPatternPack.cpp', 'src/core/BuilderPatternPack.h',
++             'src/core/AssetCrc32.h', 'tests/core/BuilderPatternPackTest.cpp',
++             'tools/certify-builder-patterns.py', 'build/builder-pattern-pack-test']
++    (ROOT / 'generated/amiga-pattern-certificate.json').write_text(json.dumps({
++        'tool': VERSION, 'crc32': f'{crc:08x}',
++        'inputs': {p: hashlib.sha256((ROOT / p).read_bytes()).hexdigest() for p in paths}
++    }, indent=2)+'\n')
++
++if __name__ == '__main__':
++    main()
+
