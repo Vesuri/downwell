@@ -99,21 +99,49 @@ interpret restoring this diagnostic's loader fit as a shipping memory reduction.
 ## Executable size versus runtime memory
 
 The normal `STRIP=1` build with admitted room payloads, scene-loaded gameplay art
-and without reference-only collision masks is **2,141,020 bytes**, SHA-256
-`e28bd170d36ac30c3515fef90eb7d0c4319d9595a286b77851be2f9fa89a70c1`.
+and without reference-only collision masks at `917e6e57` is **2,149,912 bytes**, SHA-256
+`1330f38a17c89c6c9c7829b9b76707b4e1ff233b88fea4bd9a877dee25411674`.
 The matching ELF section sizes distinguish payload from runtime allocation:
 
 | Section | Bytes | Stored in the executable? |
 | --- | ---: | --- |
-| Machine code (`.text`) | 1,383,684 | Yes |
+| Machine code (`.text`) | 1,392,234 | Yes |
 | Read-only data (`.rodata`) | 674,952 | Yes |
 | Initialized writable data (`.data`) | 34,194 | Yes |
 | Initializer pointer | 4 | Yes |
-| Zero-filled storage (`.bss`) | 3,491,648 | No; allocated at load |
+| Zero-filled storage (`.bss`) | 2,256,828 | No; allocated at load |
 
-Initialized payload totals 2,092,834 bytes. Hunk relocation, padding and container
-records account for the remaining 48,186 bytes. Stripping cannot remove
+Initialized payload totals 2,101,384 bytes. Hunk relocation, padding and container
+records account for the remaining 48,528 bytes. Stripping cannot remove
 the initialized payload. ELF debug sections are not that payload either.
+
+Linked serialized banks account for 312,657 of the 674,952 read-only bytes:
+
+| Linked bank group | Bytes |
+| --- | ---: |
+| HUD source | 13,986 |
+| Effect stamps | 5,320 |
+| Entry, exit and selection masks | 76,464 |
+| Admitted room pack | 26,468 |
+| Object metadata | 47,136 |
+| Sprite collision metadata | 26,700 |
+| Builder patterns | 70,779 |
+| Prepared terrain and initial terrain | 16,540 |
+| Small time-field images | 29,264 |
+
+The remaining read-only bytes include generated tables, constants and strings.
+In particular, large-field `fieldBandPixels` contributes another 71,456 bytes
+outside these serialized banks. `AmigaBlitter` copies that immutable stream
+into the gameplay Chip bank; drawing reads the Chip copy. This is distinct
+from `fieldColumnWords` (70,816 bytes), the CPU column-rendering representation;
+those are not interchangeable arrays. Front-end scenes currently retain both
+linked sources even though only gameplay consumes them.
+
+Reproduce the section and bank measurements with `m68k-amiga-elf-objdump -h`
+and `m68k-amiga-elf-objdump -t -C` on `amiga/out/Downwell.elf`, after sourcing
+`amiga/env.sh`. Serialized banks use end-minus-start symbol addresses; their
+symbols have zero size. Function-size sums must deduplicate aliased addresses
+and must not include debug-section symbols.
 The sparse executable Draw chain adds 8,568 ordinary BSS bytes and 2,072
 Hunk bytes against `f4b4433a`; it adds no Chip allocation. Normal 512 KiB Chip
 startup still leaves 126,840 bytes free (`tmp/sparse-draw-startup-gdb.log`).
@@ -180,8 +208,9 @@ The lease keeps 1,081,344 pixel bytes out of startup allocation, but peak
 gameplay memory is essentially unchanged: this is scene residency, not a
 smaller raster representation.
 `tmp/raster-lease-startup-gdb.log` verifies no raster residency at startup and
-126,840 Chip bytes free. Initialized payload plus BSS exceeds 5 MB even before
-the gameplay raster and dynamic graphics allocations. A small
+126,840 Chip bytes free. At the audited build above, initialized payload plus
+BSS is 4,358,212 bytes before gameplay raster and dynamic graphics allocations.
+Adding the raster alone brings this to 5,439,556 ordinary-memory bytes. A small
 Hunk file therefore would not, on its own, prove an A500 memory fit.
 Moving data to sidecar files changes file size, not residency, unless its
 lifetime or representation also changes. The shared DMA plane atlas below

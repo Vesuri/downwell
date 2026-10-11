@@ -39,6 +39,12 @@ behavior, both backend integrations and relevant original-game verification.
      undeclared resources rather than falling back to all assets. Apply the
      same dependency declarations to SDL texture/audio residency. Prove peak
      ordinary/Chip memory and unload/re-entry with growing unrelated content.
+     The next bounded presentation-bank split is the 71,456-byte large-field
+     upload stream: load it directly into its existing gameplay Chip range
+     rather than retaining its linked CPU copy through every scene. Preserve
+     first-entry, upgrade/re-entry and short/skipped-intro admission; cover
+     missing/truncated files and exact field pixels. Keep the distinct CPU
+     column-rendering tables until their live consumers are separately handled.
   2. Make phase dispatch depend on live, eligible family membership and scene
      ownership, not the catalogue of implemented families. Preserve event/RNG
      order, synchronous births, activation and captured-phase cutoffs. Assert
