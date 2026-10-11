@@ -1,5 +1,6 @@
 #include "GameplayEncounterCoverage.h"
 #include "core/GameplayContactProfileInput.h"
+#include "core/GemLifetime.h"
 #include <cassert>
 #include <vector>
 
@@ -9,7 +10,10 @@ struct Coordinate {
     const Coordinate& promoted()const{return *this;}
     bool roundPixel(std::int32_t& out)const{out=value;return valid;}
 };
-struct Actor {int x=0,y=0;bool active=true,destroyRequested=false;};
+struct Actor {
+    int x=0,y=0;bool active=true,destroyRequested=false;
+    struct Motion {downwell::GemLifetime lifetime;} motion;
+};
 struct Effect {Coordinate x{},y{};bool destroyRequested=false;int flash=0;};
 struct Effects {
     std::vector<Effect> values;
@@ -74,6 +78,19 @@ int main(){
     assert(coverage.denseFrames==3&&coverage.longestDenseRun==2);
     assert(coverage.peakFrame==3&&coverage.peak[1]==24&&coverage.peak[2]==0);
     assert(coverage.maxima[1]==24&&coverage.maxima[2]==24);
+    // Live centres are not visible sprite parts: disappearance flashes still
+    // count as live actors but must not qualify a raster-overflow workload.
+    World flashing;flashing.gems.resize(9);
+    flashing.gems[0].motion.lifetime.age=downwell::GemLifetime::disappearingAge;
+    GameplayEncounterCoverage visible;
+    assert(visible.sample(flashing,10));
+    assert(visible.maxima[2]==9&&visible.maxVisibleCurrency==8&&visible.visibleCurrencyFrame==10);
+    ++flashing.gems[0].motion.lifetime.age;
+    assert(visible.sample(flashing,11));
+    assert(visible.maxVisibleCurrency==9&&visible.visibleCurrencyFrame==11);
+    flashing.cameraX=160;
+    GameplayEncounterCoverage offscreen;
+    assert(offscreen.sample(flashing,12)&&offscreen.maxVisibleCurrency==0);
     world.smoke.values={{{0,false},{0}}};assert(!coverage.sample(world,7));
     std::cout<<"Encounter census bounds, lifetimes, families and runs passed\n";
 }

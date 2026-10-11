@@ -967,7 +967,7 @@ test: verify-ordinary-time-field
 test: verify-runner-spatial-split
 .PHONY: verify-runner-spatial-split
 .PHONY: verify-contact-profile
-build/encounter-coverage-test: tests/platform/amiga/GameplayEncounterCoverageTest.cpp tests/platform/amiga/GameplayEncounterCoverage.h src/core/GameplayContactProfileInput.h src/core/Input.h
+build/encounter-coverage-test: tests/platform/amiga/GameplayEncounterCoverageTest.cpp tests/platform/amiga/GameplayEncounterCoverage.h src/core/GameplayContactProfileInput.h src/core/Input.h src/core/GemLifetime.h
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
 .PHONY: verify-encounter-coverage

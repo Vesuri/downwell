@@ -612,10 +612,10 @@ this selector as well: host composition alone does not prove sprite DMA.
 
 For a natural channel-overflow and shade-subtraction workload, run
 `./build/amiga-currency-promotion-test --overflow --census`. This uses ordinary
-startup seed 8 and encounter input route 4, not injected currency or changed
+startup seed 40 and encounter input route 21, not injected currency or changed
 RNG state. `make test-amiga-currency-promotion` runs both tapes. Reproduce its
 source replay independently with
-`DOWNWELL_ENCOUNTER_PROFILE_SEARCH=1 DOWNWELL_ENCOUNTER_CASE=8:4 make verify-contact-profile`.
+`DOWNWELL_ENCOUNTER_PROFILE_SEARCH=1 DOWNWELL_ENCOUNTER_CASE=40:21 make verify-contact-profile`.
 The shared route helper is checked against the search's original button
 formula, including entrance boundaries. CSV rows include required sprite parts,
 death state and actual shade pixel changes: the latter compares the unshaded
@@ -624,18 +624,20 @@ inferring subtraction from a failed promotion. Reasons can overlap. This host
 fixture verifies the promoted suffix and unchanged actor prefix on fallback;
 it does not verify native fallback DMA pixels or time its composition. It is
 not evidence of smoke/debris coverage or complete dense-combat coverage.
+The search's `max_visible_currency` excludes disappearance-flash frames;
+`max_currency` counts live centres and cannot establish sprite overflow.
 
 Use `SKIP_TO_GAME=1 PROFILE_OVERFLOW=1 VERIFY_TIMEOUT_SECONDS=600 bash amiga/profile.sh fps`
 for its native 1,800-update window. The wrapper first runs both host renderer
-tapes and verifies the seed-8 entry checkpoint (including all RNG words), then
+tapes and verifies the seed-40 entry checkpoint (including all RNG words), then
 restores the ordinary executable on exit. `PROFILE_OVERFLOW=1` also selects
 this tape for `trace` and `frames`; do not combine it with another tape flag.
-For example, capture all-raster shade subtraction (1303–1312), a shaded
-prefix with an unshaded sprite suffix (1379–1388), and nine-channel overflow
-(1397–1403) separately:
+For example, capture all-raster shade subtraction (842–851), a shaded
+prefix with an unshaded sprite suffix (932–941), and nine-channel overflow
+(even frames 962–972, alternating with seven parts) separately:
 
 ```sh
-SKIP_TO_GAME=1 PROFILE_OVERFLOW=1 TRACE_FRAMES=1302,1378,1396 TRACE_FIELDS=60 \
+SKIP_TO_GAME=1 PROFILE_OVERFLOW=1 TRACE_FRAMES=841,931,961 TRACE_FIELDS=40 \
   TRACE_OUTPUT="$PWD/tmp/trace/overflow" VERIFY_TIMEOUT_SECONDS=600 \
   bash amiga/profile.sh trace
 ```
@@ -653,7 +655,7 @@ Use them before proposing removal of hidden producers, alongside native costs.
 
 For source-backed currency pixels, generate a witness with
 `./build/amiga-currency-promotion-test --overflow --pixel-witness > tmp/currency-pixels.txt`.
-Capture ticks `1303,1308,1397,1398,1399,1400,1401,1402,1403,1404` with
+Capture ticks `850,932,962,964,966,968,970,972` with
 `PROFILE_OVERFLOW=1`, `DUMP_TICKS` and `profile.sh frames`, then run
 `python3 tools/verify-amiga-currency-frames.py tmp/currency-frames tmp/currency-pixels.txt
 --reference tmp/currency-reference-frames` (on one command line). The reference
@@ -682,9 +684,13 @@ wrapper generates expected observations from the host replay with its existing
 decoded-source comparisons enabled. A mismatch stops at its first frame/group;
 the groups cover player/camera, all 16 RNG words and position in the stream,
 enemy publication state, currency motion/animation/lifetimes, and published
-live bullets/damage numbers/time fields. Bullet slot holes are excluded because
-native ownership defers retirement until Draw cleanup; their live order and
-lifetime keys are compared. Fields are explicitly serialized, never
+live bullets/damage numbers/time fields. Bullet slot holes and destroy-marked
+enemy records awaiting Draw cleanup are excluded; surviving order and lifetime
+keys are compared. Inactive surviving enemies remain included. The host fixture
+compacts destroyed enemies at End Step, so its physical records cannot be
+compared directly with the native pre-cleanup array. On an enemy-group mismatch,
+the debugger prints the observed fields; compare with the host test's
+`--enemy-witness` output at the same frame. Fields are explicitly serialized, never
 raw struct bytes. The generator records input, source and executable hashes.
 This is a correctness-only build: digest computation and the expected table
 are absent from FPS/trace builds. Its timings must not be reported as game FPS.

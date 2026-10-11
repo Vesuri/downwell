@@ -44,8 +44,32 @@ static void generationCensus(unsigned frame,const downwell::BuilderPatternPack& 
         unsigned(fragment.reversed),segments,groups,events,longest,draws,cells,words);
 }
 
+static void verifyEnemyWitnessRetirement(){
+    auto world=std::make_unique<GameplayWorld>(0);
+    for(unsigned i=0;i<3;++i)require(world->configureEnemy(i,111,163,int(i)*16,100,0,0,1,1),
+        "enemy witness fixture creation");
+    std::uint64_t before[5],marked[5],retired[5],changed[5];
+    amigaOverflowWitness(*world,before);
+    const auto& middle=world->enemyAt(1);
+    const downwell::InstanceHandle key{middle.identitySlot,middle.lifetimeId};
+    // Observation fixture only; this unowned world has no room destroy hook.
+    const_cast<GameplayWorld::EnemyState&>(middle).destroyRequested=true;
+    amigaOverflowWitness(*world,marked);
+    require(marked[2]!=before[2],"enemy witness detects logical destruction");
+    require(world->retireMarkedEnemy(key),"enemy witness compacted destruction");
+    amigaOverflowWitness(*world,retired);
+    require(marked[2]==retired[2],"enemy witness ignores only pending cleanup storage");
+    auto& survivor=const_cast<GameplayWorld::EnemyState&>(world->enemyAt(1));
+    ++survivor.x;amigaOverflowWitness(*world,changed);
+    require(changed[2]!=retired[2],"enemy witness detects surviving position mismatch");
+    survivor.active=false;amigaOverflowWitness(*world,retired);
+    ++survivor.x;amigaOverflowWitness(*world,changed);
+    require(changed[2]!=retired[2],"enemy witness retains inactive surviving records");
+}
+
 int main(int argc,char** argv){
-    bool census=false,overflowTape=false,witness=false,generation=false,pixelWitness=false,shadeCensus=false;
+    verifyEnemyWitnessRetirement();
+    bool census=false,overflowTape=false,witness=false,generation=false,pixelWitness=false,shadeCensus=false,enemyWitness=false;
     for(int i=1;i<argc;++i){
         if(std::strcmp(argv[i],"--census")==0&&!census)census=true;
         else if(std::strcmp(argv[i],"--overflow")==0&&!overflowTape)overflowTape=true;
@@ -53,16 +77,18 @@ int main(int argc,char** argv){
         else if(std::strcmp(argv[i],"--generation-census")==0&&!generation)generation=true;
         else if(std::strcmp(argv[i],"--pixel-witness")==0&&!pixelWitness)pixelWitness=true;
         else if(std::strcmp(argv[i],"--shade-census")==0&&!shadeCensus)shadeCensus=true;
-        else require(false,"usage: amiga-currency-promotion-test [--census] [--overflow] [--witness] [--generation-census] [--pixel-witness] [--shade-census]");
+        else if(std::strcmp(argv[i],"--enemy-witness")==0&&!enemyWitness)enemyWitness=true;
+        else require(false,"usage: amiga-currency-promotion-test [--census] [--overflow] [--witness] [--generation-census] [--pixel-witness] [--shade-census] [--enemy-witness]");
     }
     const auto rb=readFile("generated/downwell-rooms.dwrm"),ob=readFile("generated/downwell-objects.dwob"),
         pb=readFile("generated/downwell-builder-patterns.dwbp"),ab=readFile("generated/amiga-game.dwap");
     downwell::RoomPack rooms(rb.data(),rb.size());downwell::ObjectPack objects(ob.data(),ob.size());
     downwell::BuilderPatternPack patterns(pb.data(),pb.size());downwell::PackedRoom room;
     require(rooms.findRoom(11,room),"main room");
-    downwell::StartupRuntime host(downwell::PlatformProfile::nonDesktop,&rooms,&objects,overflowTape?8:2,&patterns);
+    downwell::StartupRuntime host(downwell::PlatformProfile::nonDesktop,&rooms,&objects,overflowTape?amigaOverflowSeed:2,&patterns);
     host.skipToGameForTesting();downwell::OwnedTerrainFixture terrain;
     if(overflowTape){
+        std::printf("OVERFLOW_CONFIG seed=%u route=%u\n",amigaOverflowSeed,amigaOverflowRoute);
         AmigaAreaOneTerrainBuilder entry(nullptr,0);downwell::GameMakerRandom random;
         require(amigaOverflowProfileEntry(entry,random),"overflow native checkpoint");
         random.nextU32(); // Ordinary entrance Create, not an extra gameplay draw.
@@ -72,7 +98,7 @@ int main(int argc,char** argv){
             "overflow entry complete source RNG state");
         const auto& b=host.mainBuilderState();
         require(b.y()==704&&b.generationCount()==-30&&b.rightRoomCount()==2&&
-            b.rightRoom(0)==13&&b.rightRoom(1)==4&&!b.rowsGenerated()&&!b.spawnerMade()&&!b.endReached(),
+            b.rightRoom(0)==3&&b.rightRoom(1)==12&&!b.rowsGenerated()&&!b.spawnerMade()&&!b.endReached(),
             "overflow entry source builder checkpoint");
     }
     AmigaPortRuntime game(300,false,1201-176,true,{},{},{},&terrain);game.initializeEntryInput(false);
@@ -138,19 +164,25 @@ int main(int argc,char** argv){
     AmigaGameplayDrawList list;downwell::CurrencySmokeComposition oracle,remainder;
     downwell::PaletteEffectSurface<> projected;unsigned promoted=0;
     unsigned empty=0,raster=0,mixed=0,overflow=0,covered=0,shaded=0,maxSmoke=0,maxDebris=0;
-    unsigned partial=0,shadePartial=0;
+    unsigned partial=0,shadePartial=0,overlapChecks=0;
     if(census)std::puts("frame,visible_gems,smoke,debris,entry,promoted,parts,shade_pixels_changed,dead");
     for(unsigned tick=1;tick<=1800;++tick){
         const unsigned fragmentsBefore=live.builder.fragmentCount();
         auto input=downwell::gameplayContactProfileInput(game.tick(),240+game.player().offsetX(),
             176+game.player().offsetY(),downwell::gameplayContactProfilePhase);
         if(overflowTape)require(downwell::gameplayEncounterProfileInput(game.tick(),240+game.player().offsetX(),
-            176+game.player().offsetY(),4,input),"ordinary seed-8 route-4 inputs");
+            176+game.player().offsetY(),amigaOverflowRoute,input),"ordinary pinned overflow inputs");
         game.step(downwell::packReplayInput(input));host.step(input,false);parityFrame=tick-1;
         compareInitialGameplay(game,host);
         if(generation)for(unsigned i=fragmentsBefore;i<live.builder.fragmentCount();++i)
             generationCensus(tick,patterns,live.fragments[i]);
         require(game.effectsSucceeded()&&game.generationSucceeded(),"runtime");
+        if(enemyWitness)for(unsigned i=0;i<game.enemyCount();++i){const auto& e=game.enemyAt(i);
+            std::printf("ENEMY %u %u %u %d %d %d %d %d %d %ld %ld %ld %ld %d %d %u %u %u %u\n",
+                tick,i,e.lifetimeId,e.objectId,e.spriteId,e.maskId,e.x,e.y,e.health,
+                e.preciseX,e.preciseY,e.speedX,e.speedY,e.alarm0,e.alarm1,e.imagePhase,e.imageFrame,
+                unsigned(e.active),unsigned(e.destroyRequested));
+        }
         if(witness){
             std::uint64_t values[5];amigaOverflowWitness(game,values);
             std::printf("WITNESS %u",tick);
@@ -175,7 +207,7 @@ int main(int argc,char** argv){
         require(complete.collect(game,ab.data(),ab.data()+ab.size(),vx,vy,true,&frames),"reference actor prefix");
         const bool referenceHardware=complete.promoteCurrencyComplete(game,vx,vy,assets,frames);
         const bool hardware=list.promoteCurrency(game,vx,vy,assets,frames);
-        if(pixelWitness&&tick==1397)for(unsigned i=firstCurrency;i<list.count;++i){
+        if(pixelWitness&&parts>8)for(unsigned i=firstCurrency;i<list.count;++i){
             const auto& b=list.actors[i];
             std::printf("CURRENCY_BOB %u %u %u %d %d %d\n",tick,b.sprite,b.frame,b.x,b.y,b.flip);
         }
@@ -203,10 +235,6 @@ int main(int argc,char** argv){
         },[](Real n,std::int32_t& out){return n.roundPixel(out);}),"compositor oracle");
         };
         compose(oracle,0);
-        if(pixelWitness&&(tick==1303||tick==1308||(tick>=1397&&tick<=1404)))
-            oracle.surface().visit([&](unsigned x,unsigned y,unsigned alpha,unsigned low,unsigned high){
-                std::printf("PIXELS %u %u %u %04x %04x %04x\n",tick,x,y,alpha,low,high);
-            });
         // Independently compose the currency before shade subtraction. Only
         // classify changed pixels on gem-only, live frames; rejection alone
         // does not establish that a shade actually erases visible content.
@@ -220,6 +248,10 @@ int main(int argc,char** argv){
         }
         const bool shadeChanged=!game.dead()&&!smoke&&!debris&&!list.entryCoverVisible&&
             !projected.samePixels(oracle.surface());
+        if(pixelWitness&&(parts>8||tick==850||tick==932))
+            oracle.surface().visit([&](unsigned x,unsigned y,unsigned alpha,unsigned low,unsigned high){
+                std::printf("PIXELS %u %u %u %04x %04x %04x\n",tick,x,y,alpha,low,high);
+            });
         if(shadeChanged){++shaded;require(!hardware||list.currencyRasterRequired,"shade-subtracted currency stays raster");}
         if(shadeCensus&&shadeChanged){
             // Diagnostic only: isolate each producer, then apply the same
@@ -273,7 +305,7 @@ int main(int argc,char** argv){
         }
         require((!list.currencyRasterRequired||channels<=8)&&remainder.surface().samePixels(oracle.surface()),
             "partitioned final alpha and colours, including planar overflow");
-        if(overflowTape&&tick==1397){
+        if(overflowTape&&parts==9&&!overlapChecks){
             // Projection-only adversarial fixture, not natural tape coverage:
             // overlap all visible gems at a clipped, non-word-aligned origin.
             // Restore published positions before the next source Step.
@@ -304,6 +336,7 @@ int main(int argc,char** argv){
                 auto& g=const_cast<GameplayWorld::GemState&>(game.gemAt(i));
                 g.x=saved[i][0];g.y=saved[i][1];
             }
+            ++overlapChecks;
         }
         list.count=AmigaGameplayDrawList::capacity;
         require(!list.promoteCurrency(game,vx,vy,assets,frames)&&list.count==AmigaGameplayDrawList::capacity,
@@ -312,7 +345,8 @@ int main(int argc,char** argv){
         require(!list.promoteCurrency(game,vx,vy,assets,frames)&&!list.count,"entry-cover fallback");
     }
     if(overflowTape){
-        require(overflow>0,"natural seed-8 route-4 tape exercises sprite-channel overflow");
+        require(overflow>0,"natural pinned tape exercises sprite-channel overflow");
+        require(overlapChecks==1,"nine-gem overlap pixel fixture executed");
         require(shaded>0,"natural tape exercises actual shade subtraction");
         require(partial>0,"natural tape exercises partial hardware promotion");
 #ifndef DOWNWELL_REFERENCE_SHADE_PARTITION

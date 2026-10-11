@@ -10,6 +10,7 @@
 struct GameplayEncounterCoverage {
     using Counts=std::array<unsigned,5>; // enemies, bullets, currency, smoke, debris
     Counts maxima{},peak{};
+    unsigned maxVisibleCurrency=0,visibleCurrencyFrame=0;
     unsigned peakTotal=0,peakFrame=0,denseFrames=0,longestDenseRun=0,denseRun=0;
     template<class World> bool sample(const World& game,unsigned frame) {
         Counts counts{};
@@ -19,8 +20,14 @@ struct GameplayEncounterCoverage {
             if(e.active&&!e.destroyRequested&&inside(240+e.x,176+e.y))++counts[0];}
         for(unsigned i=0;i<game.bulletSlotEnd();++i){const auto& b=game.bulletAt(i);
             if(b.active&&!b.destroyRequested&&inside(240+b.x,176+b.y))++counts[1];}
+        unsigned visibleCurrency=0;
         for(unsigned i=0;i<game.gemSlotEnd();++i){const auto& g=game.gemAt(i);
-            if(g.active&&inside(240+g.x,176+g.y))++counts[2];}
+            if(g.active&&inside(240+g.x,176+g.y)){
+                ++counts[2];if(g.motion.lifetime.visible())++visibleCurrency;
+            }}
+        if(visibleCurrency>maxVisibleCurrency){
+            maxVisibleCurrency=visibleCurrency;visibleCurrencyFrame=frame;
+        }
         bool okay=true;
         const auto effect=[&](const auto& e,unsigned family){
             if(e.destroyRequested)return;
@@ -49,6 +56,7 @@ struct GameplayEncounterCoverage {
         const char* names[]={"enemies","bullets","currency","smoke","debris"};
         for(unsigned i=0;i<peak.size();++i)std::cout<<" peak_"<<names[i]<<'='<<peak[i]
             <<" max_"<<names[i]<<'='<<maxima[i];
+        std::cout<<" max_visible_currency="<<maxVisibleCurrency<<" visible_currency_frame="<<visibleCurrencyFrame;
         std::cout<<'\n';
     }
 };

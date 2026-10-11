@@ -22,8 +22,14 @@ inline void amigaOverflowWitness(const GameplayWorld& w,std::uint64_t (&out)[5])
     for(unsigned i=0;i<16;++i)random.addU32(w.randomState().stateWord(i));
     out[1]=random.value();
     VerificationDigest enemies;
-    enemies.addU32(w.enemyCount());
+    // Native ownership retires marked enemies in Draw cleanup; the unowned
+    // host fixture compacts them at End Step. Compare surviving lifetimes in
+    // order, including inactive enemies, rather than the pending cleanup tail.
+    unsigned survivingEnemies=0;
+    for(unsigned i=0;i<w.enemyCount();++i)if(!w.enemyAt(i).destroyRequested)++survivingEnemies;
+    enemies.addU32(survivingEnemies);
     for(unsigned i=0;i<w.enemyCount();++i){const auto& e=w.enemyAt(i);
+        if(e.destroyRequested)continue;
         enemies.addU32(e.lifetimeId);enemies.addI32(e.objectId);
         enemies.addI32(e.spriteId);enemies.addI32(e.maskId);
         enemies.addI32(e.x);enemies.addI32(e.y);enemies.addI32(e.health);

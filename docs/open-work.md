@@ -627,7 +627,7 @@ cases separately from eligible gem-only frames before another compositor
 attempt. Use the effect-coverage census described in the profiling procedure
 to establish that the chosen window actually exercises each proposed path;
 producer-phase timings alone do not prove smoke/debris or raster coverage.
-Use the seed-8 route-4 tape for shade subtraction and channel overflow. Preserve
+Use the seed-40 route-21 tape for shade subtraction and channel overflow. Preserve
 the unshaded actor/BOB pass, topmost unshaded hardware suffix, shaded raster prefix, and
 controller/ordinary-actor boundary when changing
 the retained raster. Do not tune sub-millisecond stamp helpers. Mixed producers and entry cover still

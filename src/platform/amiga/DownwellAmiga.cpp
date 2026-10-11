@@ -2814,7 +2814,7 @@ __attribute__((noinline)) static int runDownwell(void) {
 #endif
 #ifdef DOWNWELL_PROFILE_OVERFLOW
                 downwell::gameplayEncounterProfileInput(port.tick(),
-                    240+port.player().offsetX(),176+port.player().offsetY(),4,liveInput);
+                    240+port.player().offsetX(),176+port.player().offsetY(),amigaOverflowRoute,liveInput);
 #endif
 #endif
             }

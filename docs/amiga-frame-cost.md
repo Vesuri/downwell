@@ -1223,7 +1223,13 @@ callers. Values are rounded ms/frame; this is not a sum of inclusive functions.
 
 ## Remaining threshold-sized structures
 
-### Natural raster fallback baseline
+### Historical natural raster fallback baseline
+
+The figures below belong to the historical seed-8/route-4 trajectory. After
+the source Step-order correction, that route no longer supplies this coverage.
+The current source-checked workload is seed 40, route 21, documented in
+[profiling](amiga-profiling.md). Its frame numbers and timings must not be
+compared directly with this table or used to imply a rendering speedup.
 
 Seed 8, encounter route 4 at `e5c6ed59`, selected through
 `SKIP_TO_GAME=1 PROFILE_OVERFLOW=1`, supplies an additional workload; it is not
@@ -1252,8 +1258,8 @@ surface as being above every actor: partial promotion must explicitly preserve
 that boundary for ordinary actors while placing the promoted suffix above it.
 Shade subtraction, opaque black and sprite priority remain authoritative.
 
-Reproduce with the overflow trace command in [profiling](amiga-profiling.md),
-then `amiga-trace-report.py --frames=1303-1312` and `--frames=1397-1403`.
+Reproducing this table requires revision `e5c6ed59` and its overflow trace
+command, then `amiga-trace-report.py --frames=1303-1312` and `--frames=1397-1403`.
 ELF SHA-256: `5e0befc89c52e2005ce88d5468317cedbf3b4607b1eeacc7deddd120a8b1bc36`.
 Compact reports and folded stacks: `tmp/overflow-{shade,channels}-report.txt`
 and `tmp/overflow-{shade,channels}.folded`; capture log and ELF are under
