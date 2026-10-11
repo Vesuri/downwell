@@ -1,5 +1,60 @@
 # Amiga gameplay frame-cost audit
 
+## No-input initial-fall comparison
+
+The immediate regression target is the quiet fall, not the contact tape or
+the separate 50 FPS goal. Rebuilt `13e08ca2` and `06d1a583` match all 160
+pre-Step observations (ticks 0–159): player position/velocity/grounded state,
+camera, health, ammo, enemy count, bullet extent and RNG draw count. No buttons
+are pressed. This is observable-state agreement, not a full replay digest;
+the player has not landed by the last observation.
+
+Separate uninterrupted instruction captures give these matched-frame means:
+
+| Work, ms/frame | Historical | Current |
+| --- | ---: | ---: |
+| Frames 11–20, including publication wait | 20.35 | 22.03 |
+| Frames 11–20, excluding that wait | 15.78 | 21.53 |
+| Frames 51–55, including publication wait | 20.64 | 23.69 |
+| Frames 51–55, excluding that wait | 17.12 | 23.01 |
+| Gameplay Step, frames 51–55 | 7.43 | 12.00 |
+| Player movement, inside Step | 2.10 | 2.04 |
+| Alarm phase, inside Step | 0.91 | 1.55 |
+| Actor Draw collection | 1.30 | 1.75 |
+
+Worst marker-to-marker times are 26.1 → 29.2 ms for 11–20 and
+23.4 → 25.0 ms for 51–55. These include variable display waiting; they are
+not worst work-only costs. Frame 56 generates terrain and is deliberately
+excluded from the steady-fall window. The current DitherAbove Begin Step
+alone costs 2.08 ms in 51–55. Source-required controller behavior cannot
+simply be removed: the structural question is the added phase traversal,
+state publication and ownership work. Player physics and terrain row copying
+do not explain the observed increase. No optimization is claimed here.
+
+Both captures use A500/68000, PAL cycle exact, **1 MiB Chip**, 512 KiB slow,
+8 MiB Fast. The rebuilt historical executable fails allocation with 512 KiB
+Chip using the current generated asset snapshot; 1 MiB is used symmetrically
+for this comparison only. It does not replace the production 512 KiB startup
+gate. The old build uses its own field-column generator (the generated C++
+layout changed); its only gameplay edit disables automatic left/right/fire
+input. Its launcher/environment use the current shared tools. This is a
+rebuild comparison, not the original historical binary's absolute timing.
+
+Current flags: `SKIP_TO_GAME=1 PROFILE_AUTORUN=1 PROFILE_IDLE=1 FPSCOUNT=1
+TRACE_FRAMES=10,50,90 PROFILE_FRAMES=160 STRIP=1`. Historical flags omit
+`PROFILE_IDLE` and `STRIP`, with the no-button harness edit instead.
+Use `profile_quiet_state.gdb` in a separate state-only run. Trace with
+`profile_trace.gdb`, three captures of 12 PAL fields, and report precisely
+`--frames=11-20` or `--frames=51-55`. Do not time the state-breakpoint run.
+
+Measured ELF SHA-256:
+
+- Historical: `784563b8b4e74de6f00c66b5feb34a47d4b1ef1186137922a0ac0fc1f29f9be9`.
+- Current: `3c2847e4781903b7a7db5f1c18313f3219476830679c39c9050485ea96391982`.
+
+The normal stripped executable was restored byte-identically after capture
+(`c8bf6211b9ad2c965fe46f27c1e9268e75ac4e710e51ad9f0d824a90f9f4fa28`).
+
 ## Regression comparison baseline
 
 The fixed comparison baseline is game revision `e8588c07`, A500/68000 with 512 KiB Chip, 512 KiB slow and
