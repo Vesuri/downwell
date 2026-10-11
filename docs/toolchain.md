@@ -13,11 +13,12 @@ The build emits dependency files and mirrors the source tree under `build/`.
 
 ## Amiga cross-build
 
-The sibling ports use the BartmanAbyss Amiga GCC toolchain installed under
-`~/.local`, together with `elf2hunk`, vasm, FS-UAE, and the matching GDB.
-AmigaXDev installs it with the Kickstarts (`make setup`); `amiga/env.sh` sources
-its shared `~/.local/share/amiga/env.sh`, and AmigaXDev's `docs/environment.md`
-describes the variables. Activate it with:
+The port uses the shared BartmanAbyss Amiga GCC toolchain under `~/.local`,
+together with `elf2hunk`, vasm, FS-UAE, and the matching GDB. AmigaXDev installs
+it with the Kickstarts (`make setup`); `amiga/env.sh` sources its shared
+`~/.local/share/amiga/env.sh`, and AmigaXDev's `docs/environment.md` describes
+the variables (`docs/reference/port-toolchain.md` has the generic build rules).
+Activate it with:
 
 ```sh
 . amiga/env.sh

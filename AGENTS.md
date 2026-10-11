@@ -4,6 +4,25 @@ This repository is a behavior-first port of the Windows Steam release of
 Downwell to an SDL host reference implementation and then to native Amiga 500
 68000 code.
 
+## Shared environment and knowledge
+
+The toolchain, emulators, Kickstarts, WHDLoad and the Python environment come from AmigaXDev
+(`make setup` there); `amiga/env.sh` sources `~/.local/share/amiga/env.sh`. Lessons that hold
+for any port live in AmigaXDev's docs: add or correct them there, and keep only what is
+specific to this game in `docs/`.
+
+| AmigaXDev doc | For |
+| --- | --- |
+| `docs/environment.md` | the shared variables and installed files |
+| `docs/playbooks/new-port-playbook.md` | the phases of a port and their gates |
+| `docs/reference/amiga-hardware.md` | Chip bus, takeover, interrupts, copper, blitter, Paula, AGA, the dA JoRMaS framework |
+| `docs/reference/m68k-optimisation.md` | 68000/68020 cost model and code generation |
+| `docs/reference/measurement-method.md` | profiling instruments, A/B discipline, pricing a change |
+| `docs/reference/validation-harness.md` | faithfulness to the original: references, differentials, sabotage |
+| `docs/reference/headless-fsuae.md` | the shared launcher, FS-UAE builds, gdb stub, diag runs |
+| `docs/reference/port-toolchain.md` | flags, linking, link audits, WHDLoad slaves, release archives |
+| `docs/native-port-validation.md` | crash dumps as regressions, installer updates, release archive checks |
+
 ## Source of truth
 
 - `data/` is the user's untouched Windows Steam build. Treat it as read-only.
