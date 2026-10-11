@@ -85,6 +85,10 @@ if $chip_changes == 0 || $chip_minimum > gDownwellStartupChipRemaining
     printf "CHIP_AUDIT_ERROR: watcher missed startup allocations\n"
     quit 1
 end
+if gDownwellExitMaskLoads != 0 || gDownwellSelectionMaskLoads != 0
+    printf "Transition-only masks loaded at normal startup\n"
+    quit 1
+end
 printf "DOWNWELL_MEMORY_READY\n"
 shell touch .run/gdb-ready.marker
 detach

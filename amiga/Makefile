@@ -546,6 +546,9 @@ CPPFLAGS := $(CFLAGS) -x c++ -std=gnu++17 -fno-rtti -fno-exceptions \
 	-fno-use-cxa-atexit -DDOWNWELL_FREESTANDING \
 	-I$(AMIGA_SRC)/compat -I$(REPO)/src
 ASFLAGS := -mcpu=68000 -g --register-prefix-optional -I"$(SDKDIR)" -I"$(CURDIR)"
+ifeq ($(EXIT_WIPE_VERIFY),1)
+ASFLAGS += --defsym DOWNWELL_EXIT_WIPE_VERIFY=1
+endif
 ifneq ($(findstring -DDOWNWELL_SCENE_VERIFY,$(CFLAGS)),)
 ASFLAGS += --defsym DOWNWELL_REFERENCE_COLLISION_MASKS=1
 REFERENCE_COLLISION_MASK_INPUT := $(REPO)/generated/downwell-sprite-masks.dwsm
@@ -598,7 +601,15 @@ endif
 
 .PHONY: all check clean audit
 
-all: check $(OUT).exe $(OUT).boot $(OUT).front $(OUT).game $(OUT).planes $(OUT).cavern $(OUT).cavernplanes $(OUT).results $(OUT).shop $(OUT).clear $(OUT).fields $(OUT).columns $(OUT).patterns
+all: check $(OUT).exe $(OUT).boot $(OUT).front $(OUT).game $(OUT).planes $(OUT).cavern $(OUT).cavernplanes $(OUT).results $(OUT).shop $(OUT).clear $(OUT).fields $(OUT).columns $(OUT).patterns $(OUT).exitmask $(OUT).selectionmask
+
+$(OUT).exitmask: $(AMIGA_EXIT_MASK)
+	@mkdir -p $(@D)
+	cp $< $@
+
+$(OUT).selectionmask: $(AMIGA_SELECTION_MASK)
+	@mkdir -p $(@D)
+	cp $< $@
 
 $(OUT).patterns: $(REPO)/generated/downwell-builder-patterns.dwbp
 	@mkdir -p $(@D)
@@ -638,7 +649,7 @@ $(OUT).game: $(AMIGA_GAME)
 	@mkdir -p $(@D)
 	cp -f $< $@
 
-$(REPO)/generated/amiga-transient-banks.h: $(AMIGA_RESULTS) $(AMIGA_SHOP) $(AMIGA_CLEAR) $(REPO)/generated/downwell-builder-patterns.dwbp $(REPO)/tools/generate-amiga-transient-banks.py
+$(REPO)/generated/amiga-transient-banks.h: $(AMIGA_RESULTS) $(AMIGA_SHOP) $(AMIGA_CLEAR) $(AMIGA_EXIT_MASK) $(AMIGA_SELECTION_MASK) $(REPO)/generated/downwell-builder-patterns.dwbp $(REPO)/tools/generate-amiga-transient-banks.py
 	python3 $(REPO)/tools/generate-amiga-transient-banks.py
 
 obj/DownwellAmiga.o: $(REPO)/generated/amiga-transient-banks.h
@@ -725,6 +736,7 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
 	@printf '%s\n' '$(PROFILE_OVERFLOW)' >> $@.tmp
 	@printf '%s\n' '$(OVERFLOW_VERIFY)' >> $@.tmp
 	@printf '%s\n' '$(findstring VERIFY,$(CFLAGS))' >> $@.tmp
+	@printf '%s\n' '$(CFLAGS)' '$(CPPFLAGS)' '$(ASFLAGS)' >> $@.tmp
 	@cmp -s $@.tmp $@ || cp $@.tmp $@
 
 $(OBJECTS): obj/startup-options
@@ -1108,6 +1120,10 @@ obj/gcc8_a_support.o: $(SUPPORT)/gcc8_a_support.s
 	$(AS) $(ASFLAGS) -o $@ $<
 
 audit: $(OUT).elf
+	@if $(OBJDUMP) -t $(OUT).elf | grep -q 'amiga_selection_mask'; then \
+		echo "*** selection mask must be scene-loaded, not linked"; exit 1; fi
+	@if [ '$(EXIT_WIPE_VERIFY)' != 1 ] && $(OBJDUMP) -t $(OUT).elf | grep -q 'amiga_exit_mask'; then \
+		echo "*** exit mask must be scene-loaded, not linked"; exit 1; fi
 	@if $(OBJDUMP) -t $(OUT).elf | grep -q 'amiga_builder_pack'; then \
 		echo "*** builder patterns must be run-loaded, not linked"; exit 1; fi
 	@if $(OBJDUMP) -t $(OUT).elf | grep -qE 'fieldBandPixels|fieldColumnWords'; then \

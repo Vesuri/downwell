@@ -36,6 +36,10 @@ if gDownwellUpgradeSourceBytes != 0
     printf "Upgrade source still resident after returning to gameplay\n"
     quit 1
 end
+if gDownwellSelectionMaskLoads != 2
+    printf "Selection mask did not load exactly once per upgrade scene\n"
+    quit 1
+end
 if gDownwellTerrainRasterResidentBytes != 1081344
     printf "Gameplay raster not reacquired after upgrade departure\n"
     quit 1

@@ -13,12 +13,14 @@ amiga_effect_stamps:
 	.globl amiga_effect_stamps_end
 amiga_effect_stamps_end:
 
+	.ifdef DOWNWELL_EXIT_WIPE_VERIFY
 	.balign 4
 	.globl amiga_exit_mask
 amiga_exit_mask:
 	.incbin "../generated/amiga-game.exit-mask"
 	.globl amiga_exit_mask_end
 amiga_exit_mask_end:
+	.endif
 
 	.balign 4
 	.globl amiga_entry_mask
@@ -26,13 +28,6 @@ amiga_entry_mask:
 	.incbin "../generated/amiga-game.entry-mask"
 	.globl amiga_entry_mask_end
 amiga_entry_mask_end:
-
-	.balign 4
-	.globl amiga_selection_mask
-amiga_selection_mask:
-	.incbin "../generated/amiga-game.selection-mask"
-	.globl amiga_selection_mask_end
-amiga_selection_mask_end:
 
 	.ifdef DOWNWELL_REFERENCE_SCENE_BANKS
 	.balign 4

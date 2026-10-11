@@ -29,7 +29,7 @@ cp -f "${EXE%.exe}.planes" "$DH1/Downwell.planes"
 cp -f "${EXE%.exe}.game" "$DH1/Downwell.game"
 cp -f "${EXE%.exe}.cavern" "$DH1/Downwell.cavern"
 cp -f "${EXE%.exe}.cavernplanes" "$DH1/Downwell.cavernplanes"
-for bank in results shop clear fields columns patterns; do
+for bank in results shop clear fields columns patterns exitmask selectionmask; do
   cp -f "${EXE%.exe}.$bank" "$DH1/Downwell.$bank"
 done
 echo "running $EXE"

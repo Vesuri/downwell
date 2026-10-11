@@ -26,6 +26,26 @@ def record(ident, frame=0):
 
 
 class Admission(unittest.TestCase):
+    def test_verifier_switch_rebuilds_asset_objects(self):
+        makefile = (ROOT / 'amiga/Makefile').read_text()
+        begin = makefile.index('.PHONY: FORCE_STARTUP_OPTIONS')
+        end = makefile.index('\n$(OBJECTS): obj/startup-options', begin)
+        rule = makefile[begin:end]
+        with tempfile.TemporaryDirectory(prefix='downwell-scene-options-') as directory:
+            root = Path(directory)
+            def build(cflags, asflags):
+                harness = f'CFLAGS := {cflags}\nASFLAGS := {asflags}\n' + rule
+                subprocess.run(['make', '-f', '-', 'obj/startup-options'],
+                               input=harness, text=True, cwd=root, check=True,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                return (root / 'obj/startup-options').read_bytes()
+            exit_mode = build('-DDOWNWELL_EXIT_WIPE_VERIFY', '--defsym DOWNWELL_EXIT_WIPE_VERIFY=1')
+            clear_mode = build('-DDOWNWELL_CLEAR_VERIFY', '')
+            self.assertNotEqual(exit_mode, clear_mode)
+            self.assertEqual(clear_mode, build('-DDOWNWELL_CLEAR_VERIFY', ''))
+            # An assembler-only feature must invalidate the objects as well.
+            self.assertNotEqual(clear_mode, build('-DDOWNWELL_CLEAR_VERIFY', '--defsym TEST=1'))
+
     def test_builder_pattern_budget_is_not_inferred_from_payload(self):
         spec = importlib.util.spec_from_file_location(
             'transient_contract', ROOT / 'tools/generate-amiga-transient-banks.py')
@@ -43,8 +63,7 @@ class Admission(unittest.TestCase):
                 target.write_bytes(b'fixture')
             (root / 'generated').mkdir()
             for name in contract.BANKS:
-                path = ('downwell-builder-patterns.dwbp' if name == 'patterns'
-                        else f'amiga-{name}.dwap')
+                path = Path(contract.bank_path(name)).name
                 (root / 'generated' / path).write_bytes(b'fixture')
             contract.ROOT = root
             contract.main()

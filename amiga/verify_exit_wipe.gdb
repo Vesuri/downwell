@@ -7,6 +7,10 @@ if gDownwellExitWipeFailures != 0 || gDownwellExitWipeFrames < 40
     printf "Exit wipe failed: frames=%lu failures=%lu\n", gDownwellExitWipeFrames, gDownwellExitWipeFailures
     quit 1
 end
+if gDownwellExitMaskLoads != 1 || gDownwellSelectionMaskLoads != 0
+    printf "Exit mask load ownership failed\n"
+    quit 1
+end
 printf "Exit wipe: %lu presented frames, both cover DMA pointers and bank bytes verified\n", gDownwellExitWipeFrames
 printf "DOWNWELL_EXIT_WIPE_READY\n"
 shell touch .run/gdb-ready.marker

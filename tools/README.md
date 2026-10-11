@@ -84,6 +84,12 @@ The builder data is separately packaged as `Downwell.patterns`; keep it beside
 the executable too. It is loaded at gameplay entry, retained while terrain
 borrows its prepared cells, and unloaded on front-end return after retirement.
 It is not a graphics-bank lease and must not be freed merely on upgrade entry.
+`Downwell.exitmask` loads directly into the retired overlay Chip bank on exit;
+`Downwell.selectionmask` is ordinary source memory owned by upgrade selection
+and copied into its DMA layout during entry. Both are packaged sidecars with
+fixed budgets and input/output hashes in `amiga-transient-banks.json`; neither
+is linked or loaded during normal startup or contact gameplay. The entry mask
+is different: gameplay's CPU effect compositor still reads that linked source.
 CPU effects read the unchanged DWAP loaded as `Downwell.game` in non-Chip
 memory. It is absent from both the executable and front-end residency. The blitter
 binds separate low/high/mask views through the common `Bitmap` class; it does

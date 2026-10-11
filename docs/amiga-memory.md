@@ -504,6 +504,26 @@ remeasured when any pack or other Chip owner grows.
 
 ## Scene banks
 
+The exit and upgrade-selection masks are scene-owned sidecars, not permanent
+executable payloads. `Downwell.exitmask` (31,104 bytes) loads directly into the
+existing, retired overlay Chip bank before exit-cover publication; no extra
+allocation is made. `Downwell.selectionmask` (14,256 bytes) shares the ordinary
+upgrade source allocation, is copied to the upgrade DMA layout on entry, and
+is freed with that source on departure. Reentry loads a fresh source once.
+Missing/short reads fail before publishing the cover/scene. No file I/O or
+mask preparation belongs to ordinary contact gameplay. The exit byte oracle
+alone retains its linked reference; production link audits reject both masks.
+The entry mask remains linked because the gameplay CPU effect compositor
+borrows it beyond entry-cover DMA lifetime. It is not safe to retire that
+source merely because the hardware wipe has detached.
+
+These leases remove 45,360 permanent payload bytes outside their scenes.
+Selection temporarily reacquires its 14,256 bytes in ordinary memory; neither
+lease changes the reserved Chip layout. Fixed mask budgets and hashes are in
+the generated transient-bank manifest. The assembly option fingerprint must
+include the exact verifier definitions, not just whether any VERIFY flag is
+present, so switching verifiers cannot retain linked oracle assets.
+
 Initial gameplay room construction is admitted at first gameplay entry, not
 publisher, garden or direct-style startup. Its ordered room births, prepared
 terrain index and generation bindings use the same initializer once; later

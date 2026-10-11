@@ -271,12 +271,12 @@ extern const UBYTE amiga_results_pack_end[];
 extern const UBYTE amiga_shop_pack[];
 extern const UBYTE amiga_shop_pack_end[];
 #endif
+#ifdef DOWNWELL_EXIT_WIPE_VERIFY
 extern const UBYTE amiga_exit_mask[];
 extern const UBYTE amiga_exit_mask_end[];
+#endif
 extern const UBYTE amiga_entry_mask[];
 extern const UBYTE amiga_entry_mask_end[];
-extern const UBYTE amiga_selection_mask[];
-extern const UBYTE amiga_selection_mask_end[];
 extern const UBYTE amiga_room_pack[];
 extern const UBYTE amiga_room_pack_end[];
 extern const UBYTE amiga_object_pack[];
@@ -360,6 +360,7 @@ static constexpr AmigaTransientBank::Contract clearBankContract{
 static AmigaTransientBank overlayBank;
 static AmigaPlatform* sceneAssetPlatform;
 extern "C" { volatile ULONG gDownwellTransientLoads, gDownwellUpgradeSourceBytes; }
+extern "C" { volatile ULONG gDownwellExitMaskLoads=0, gDownwellSelectionMaskLoads=0; }
 
 static bool readTransientBank(const char* file, UBYTE* target, unsigned bytes) {
     if (!sceneAssetPlatform || sceneAssetPlatform->loadFile(file, target, bytes) != LONG(bytes)) return false;
@@ -380,11 +381,12 @@ static bool sameSceneBank(const UBYTE* loaded, const UBYTE* reference, unsigned 
 class UpgradeSource {
     UBYTE* storage_ = nullptr;
     AmigaTransientBank bank_;
+    static constexpr unsigned storageBytes=clearBankContract.bytes+DOWNWELL_SELECTIONMASK_BANK_BYTES;
 public:
     ~UpgradeSource() { release(); }
     bool acquire() {
         if (bank_.view(TransientOwner::upgrade).data) return true;
-        if (!storage_) storage_ = static_cast<UBYTE*>(AllocMem(clearBankContract.bytes, MEMF_FAST));
+        if (!storage_) storage_ = static_cast<UBYTE*>(AllocMem(storageBytes, MEMF_FAST));
         if (!storage_ || !bank_.load(TransientOwner::upgrade, clearBankContract, storage_,
                 clearBankContract.bytes, readTransientBank, [](const UBYTE* data,unsigned bytes){
                     // Validate the full directory, including the CPU-resident
@@ -393,14 +395,21 @@ public:
                 })) {
             release(); return false;
         }
-        gDownwellUpgradeSourceBytes = clearBankContract.bytes;
+        // Upgrade preparation copies this source into its own DMA bank. It
+        // must never become a permanent linked asset or a gameplay load.
+        if (!sceneAssetPlatform || sceneAssetPlatform->loadFile("PROGDIR:Downwell.selectionmask",
+                storage_+clearBankContract.bytes,DOWNWELL_SELECTIONMASK_BANK_BYTES)!=
+                LONG(DOWNWELL_SELECTIONMASK_BANK_BYTES)) { release(); return false; }
+        ++gDownwellSelectionMaskLoads;
+        gDownwellUpgradeSourceBytes = storageBytes;
         return true;
     }
     AmigaTransientBank::View view() const { return bank_.view(TransientOwner::upgrade); }
+    const UBYTE* mask() const { return storage_?storage_+clearBankContract.bytes:nullptr; }
     void release() {
         amigaRendererReleaseHardwareSpriteCopies();
         bank_.release();
-        if (storage_) FreeMem(storage_, clearBankContract.bytes);
+        if (storage_) FreeMem(storage_, storageBytes);
         storage_ = nullptr; gDownwellUpgradeSourceBytes = 0;
     }
 };
@@ -575,13 +584,14 @@ static bool selectExitMaskBank() {
     if (residentCover==ResidentCover::exit) return true;
     if (residentCover!=ResidentCover::none) return false;
     if (!overlayAssetStorage || AmigaExitMask::bytes > overlayAssetCapacity ||
-        amiga_exit_mask_end - amiga_exit_mask != AmigaExitMask::bytes) return false;
+        DOWNWELL_EXITMASK_BANK_BYTES != AmigaExitMask::bytes || !sceneAssetPlatform) return false;
     AmigaHardware::blitterDrain();
     overlayBank.release();
-    for (unsigned i = 0; i < AmigaExitMask::bytes; ++i)
-        overlayAssetStorage[i] = amiga_exit_mask[i];
     gDownwellResultsPack = gDownwellShopPack = nullptr;
     gDownwellResultsAssetBytes = gDownwellShopAssetBytes = 0;
+    if (sceneAssetPlatform->loadFile("PROGDIR:Downwell.exitmask",overlayAssetStorage,
+            AmigaExitMask::bytes)!=LONG(AmigaExitMask::bytes)) return false;
+    ++gDownwellExitMaskLoads;
     residentCover = ResidentCover::exit;
     return true;
 }
@@ -3423,7 +3433,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     if (!clear.enter(port, scenes.styleCursor(), liveInput,
                             memory.menuForeground(), menuPlaneBytes * 2 + amigaMenuEntryPlaneBytes,
                             amiga_hud_pack_end - amiga_hud_pack, upgradeSource.view().data, upgradeSource.view().bytes,
-                            amiga_selection_mask, amiga_selection_mask_end - amiga_selection_mask)) { exitCode = 20; break; }
+                            upgradeSource.mask(), DOWNWELL_SELECTIONMASK_BANK_BYTES)) { exitCode = 20; break; }
 #ifdef DOWNWELL_CLEAR_VERIFY
                     gDownwellClearPhase = 2;
 #endif
