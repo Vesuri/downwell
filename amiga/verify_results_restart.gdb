@@ -55,8 +55,13 @@ if gDownwellLiveGenerationFailed != 0 || gDownwellTerrainRasterFailures != 0 || 
     printf "Scene reentry renderer or generation failure\n"
     quit 1
 end
-# Boot and front banks at startup; style select and surface each reload front.
-if gDownwellSceneBankLoads != 4
+# This target builds SKIP_TO_GAME=1: no boot/front bank at startup.
+# Style select and surface each load front once; Retry retains gameplay.
+if gDownwellStartupScene != 3 || gDownwellSplashPreparations != 0
+    printf "Results verifier did not start directly in gameplay\n"
+    quit 1
+end
+if gDownwellSceneBankLoads != 2
     printf "Unexpected scene bank loads: %lu\n", gDownwellSceneBankLoads
     quit 1
 end
