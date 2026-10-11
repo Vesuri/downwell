@@ -31,6 +31,22 @@ simply be removed: the structural question is the added phase traversal,
 state publication and ownership work. Player physics and terrain row copying
 do not explain the observed increase. No optimization is claimed here.
 
+Source check: `13e08ca2` has no authored `ditherAbove_` Begin Step in
+`GameplayWorld::step`. Object 61 was introduced by `16ccf0ff` and subsequently
+connected to room admission. Thus its current 2.08 ms is not all redundant
+bookkeeping, nor does matching the 160 player-state observations prove full
+old/new behavior equivalence. It is **not** entry-wipe object 73. Assembly
+`gml_Object_objDitherAbove_Step_1.asm` requires camera X publication, a single
+16-pixel Y advance when the camera gap reaches 272 (208 in low-spec), Y
+rounding, and ending destruction. Wall contacts use this published position.
+The reference test is `make verify-dither-above`; it checks the pinned source,
+ordered writes and failure prefixes. Removing the controller, delaying its
+published position until Draw, or turning its single increment into catch-up
+would invalidate the restoration. Its roughly 0.76 ms of position setters
+is included in the 2.08 ms, not an additional saving. Any reduced native
+representation must retain the whole controller's behavior and be measured
+against the current implementation as well as the historical target.
+
 Both captures use A500/68000, PAL cycle exact, **1 MiB Chip**, 512 KiB slow,
 8 MiB Fast. The rebuilt historical executable fails allocation with 512 KiB
 Chip using the current generated asset snapshot; 1 MiB is used symmetrically
