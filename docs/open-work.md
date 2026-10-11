@@ -90,6 +90,14 @@ behavior, both backend integrations and relevant original-game verification.
   contract; its absence in the current contact workload does not prove those
   scenes fit. Continue removing unrelated resident resources and code without
   moving the same always-resident bytes into startup allocations.
+  Separate the remaining scalar-reference control bank in
+  `RunnerSpatialInstances` (lifetimes, registration membership and both dirty
+  queues) from its shared spatial index. Native ownership must admit the index
+  without reserving the scalar bank; reference ownership must explicitly supply
+  it. Keep generation high-water marks across clear, partial-failure inspection
+  and reference/native query fixtures. Undeclared scalar consumers must fail
+  explicitly, including accessors that currently bypass `valid()`; do not
+  introduce a hidden fallback bank or a replacement registration encoding.
 - Close this goal only with a normally runnable build, repeatable measured
   baseline, explained/resolved recent regressions and meaningful startup failure
   codes. Retain any remaining absolute 20 ms shortfall explicitly in section 5;
