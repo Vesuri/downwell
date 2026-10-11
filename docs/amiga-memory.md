@@ -266,8 +266,20 @@ without constructing unused binary32 position/appearance mirrors or generic
 cached geometry. The original integer-offset overflow admission is retained.
 Direct box mirror reads fail terminally, as do scenes attempting this admission
 without native boxes. Full-service births retain the original publication path
-and its caller-supplied records. Registration, activation, layers, live
-sprite setters and terrain lifetime/registration publication remain synchronous.
+and its caller-supplied records. Actor registration, activation, layers, live
+sprite setters and native terrain lifetime publication remain synchronous.
+The external backend admits generic terrain registration only for object 93:
+its pinned End Step uses the existing indexed registration-order walk.
+Walls have no dispatched wall event or generic terrain selector in this scene,
+so their generic registration is not maintained at birth, retirement or
+reactivation. Their native lifetime, chronology, room/layer membership and
+activation flags remain authoritative. This is consumer admission, not another
+terrain registration encoding or a replacement list. Full-service scenes keep
+the complete registry. Generic whole-scene Step/alarm dispatch is unavailable
+under external admission; terrain population queries fail without replacing
+the output with an empty count. Diagnostic registration walks describe only
+the admitted registry, while ownership replay also compares native terrain
+identities, chronology and destruction marks before cleanup.
 Player, enemy and bullet position setters retain lifetime/ownership validation,
 but do not maintain the excluded backend's coordinate mirror. Player/enemy
 records own their integer positions; bullet `sourceMotion` owns the published
@@ -276,7 +288,7 @@ Birth still validates coordinate admission. Direct published-position reads for
 these families fail closed under the external-backend declaration; a new
 consumer must explicitly admit the full backend before births. Full-service
 owners retain the mirrored path as the comparison implementation.
-Prepared terrain spans publish the same registration/layer failure prefix
+Prepared terrain spans publish the same admitted registration/layer failure prefix
 without geometry keys, bounds envelopes or index publication. Scalar terrain
 births use the same backend boundary; the full collision-enabled path retains
 the original geometry/publication behavior. The contact verifier requires an

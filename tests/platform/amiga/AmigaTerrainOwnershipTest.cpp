@@ -411,6 +411,50 @@ int main(int argc,char** argv){
         require(scene->owner->tryNativeActorEndStepInterior(top,admitted)&&!admitted&&scene->world->playerHit()==1,
             "out-of-view actor retains the complete ordered phase");
     }
+    {
+        downwell::StartupRuntime entry(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns);
+        entry.skipToGameForTesting();
+        for(bool external:{false,true}){
+            auto scene=std::make_unique<Scene>(patterns,objects,sprites,rooms,room,entry,
+                Ownership::nativeScenery,true,true,true,external);
+            auto& terrain=*scene->lifetimes;
+            downwell::InstanceHandle thin[3];
+            for(unsigned i=0;i<3;++i){
+                require(terrain.append(93,240+int(i)*16,6000),"thin retirement fixture birth");
+                thin[i]=terrain.handle(terrain.size()-1);
+            }
+            unsigned registered=0,platforms=0;
+            require(terrain.visit([&](const auto& id,bool,bool){
+                if(id.object==93)++platforms;return true;
+            }),"native terrain event census");
+            require(scene->owner->visitRegistrationOrder([&](auto h,int,std::uint32_t){
+                if(h.slot>=View::terrainBase&&h.slot<View::timeFieldBase)++registered;
+                return true;
+            }),"admitted registration census");
+            require(external?registered==platforms:registered==terrain.size(),
+                "external scene registers only event-bearing platforms; full service retains every wall");
+            require(terrain.activation(thin[0],false)&&terrain.activation(thin[1],false)&&
+                scene->owner->reconcileActivation(),"deactivate two thin platforms");
+            require(terrain.activation(thin[1],true)&&scene->owner->reconcileActivation(),
+                "reactivate an earlier birth after a later active platform");
+            scene->world->step(0);
+            require(scene->world->effectsSucceeded(),"thin boundary Step succeeds");
+            for(unsigned i=0;i<3;++i){
+                GameplayWorld::NativeTerrain::Identity id;bool active=false,destroyed=false;
+                require(terrain.read(thin[i],id,active,destroyed)&&active==(i!=0)&&destroyed==(i!=0),
+                    "only active platforms acquire retirement marks before cleanup");
+            }
+            require(scene->owner->prepareDraw()&&terrain.contains(thin[0])&&
+                !terrain.contains(thin[1])&&!terrain.contains(thin[2]),"cleanup retains inactive platform");
+            require(terrain.activation(thin[0],true)&&scene->owner->reconcileActivation(),
+                "late platform reactivation remains observable");
+            scene->world->step(0);
+            GameplayWorld::NativeTerrain::Identity id;bool active=false,destroyed=false;
+            require(scene->world->effectsSucceeded()&&terrain.read(thin[0],id,active,destroyed)&&
+                active&&destroyed&&scene->owner->prepareDraw()&&!terrain.contains(thin[0]),
+                "reactivated platform retires through the native room boundary");
+        }
+    }
     // Admission is fail-closed, including direct consumers which never query
     // the tree. Each violation poisons a fresh owner, not the replay below.
     for(const auto position:{std::pair<int,int>{0,0},{1,17},{-2147483647-1,-2147483647-1},
@@ -440,7 +484,7 @@ int main(int argc,char** argv){
                 "box integer-offset overflow admission is unchanged");
         }
     }
-    for(unsigned consumer=0;consumer<8;++consumer){
+    for(unsigned consumer=0;consumer<10;++consumer){
         auto guarded=downwell::makeCollisionOwner(objects,sprites,{}, {},&rooms,Ownership::nativeScenery,true,true,false);
         require(guarded->declareExternalCollisionBackend(),"external collision admission");
         bool accepted=false;
@@ -457,9 +501,22 @@ int main(int argc,char** argv){
             accepted=guarded->nativePublishedSprite({View::enemyBase,1},sprite,flags);}
         else if(consumer==6){downwell::GameplayCollisionOwner::Owner::Sprite sprite;std::uint32_t flags;
             accepted=guarded->nativePublishedSprite({View::breakableBase,1},sprite,flags);}
-        else {downwell::RunnerImageValue x,y;
+        else if(consumer==7){downwell::RunnerImageValue x,y;
             accepted=guarded->nativePublishedPosition({View::breakableBase,1},x,y);}
+        else if(consumer==8){downwell::RunnerStepSnapshot<1> phase;
+            accepted=guarded->dispatchStepPhase(0,phase,[](auto,auto){return true;});}
+        else {downwell::RunnerStepSnapshot<1> phase;
+            accepted=guarded->dispatchAlarmPhase(phase,[](auto,auto,auto){return true;});}
         require(!accepted&&!guarded->valid(),"unexpected collision consumer fails terminally");
+    }
+    {
+        auto guarded=downwell::makeCollisionOwner(objects,sprites,{}, {},&rooms,Ownership::nativeScenery,true,true,false);
+        require(guarded->declareExternalCollisionBackend(),"terrain selector admission");
+        for(int object:{60,93,56,57,59}){
+            unsigned count=0xabcdefu;
+            require(!guarded->population(object,count)&&count==0xabcdefu,
+                "unadmitted terrain count must not silently report zero");
+        }
     }
     // End Step must consume the bullet's published binary32 state, including
     // writes during Collision, not stale birth coordinates or integer artwork.
@@ -532,6 +589,28 @@ int main(int argc,char** argv){
                 require(other->world->effectsSucceeded()&&other->world->generationSucceeded()&&
                     other->owner->valid(),"native Step succeeds for the complete tape");
                 require(other->digest()==beforeCleanup,"pre-cleanup state, flags and order agree");
+                if(other.get()==others[7].get()){
+                    auto terrainDigest=[](const Scene& scene){
+                        downwell::StateDigest d;unsigned count=0;
+                        require(scene.lifetimes->visit([&](const auto& id,bool active,bool destroyed){
+                            d.addU32(id.handle.slot);d.addU32(id.handle.generation);
+                            d.addI32(id.object);d.addI32(id.x);d.addI32(id.y);
+                            d.addBool(active);d.addBool(destroyed);
+                            d.addU32(scene.lifetimes->registrationOrder(id.handle));++count;return true;
+                        }),"native terrain lifetime walk before cleanup");
+                        d.addU32(count);return d.value();
+                    };
+                    require(terrainDigest(*other)==terrainDigest(*others[6]),
+                        "external terrain lifetimes, chronology and retirement marks match full service before cleanup");
+                    if(phase==downwell::gameplayContactProfilePhase){
+                        unsigned marked=0;
+                        require(other->lifetimes->visit([&](const auto& id,bool,bool destroyed){
+                            if(id.object==93&&destroyed)++marked;return true;
+                        }),"retirement timing coverage");
+                        if(marked)std::cout<<"thin boundary frame="<<frame+1<<" marked="<<marked
+                            <<" terrain="<<other->lifetimes->size()<<"\n";
+                    }
+                }
                 if(other->world->terrainInstances()){
                     const auto& expectedTerrain=reference->owner->terrain();
                     const auto& actual=other->owner->terrain();

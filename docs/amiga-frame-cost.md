@@ -1,5 +1,60 @@
 # Amiga gameplay frame-cost audit
 
+## Scene-admitted wall ownership
+
+The external collision backend no longer maintains generic wall registration:
+no admitted consumer reads it. Native lifetime, chronology, activation and
+room/layer ownership remain unchanged. Object 93 retains its existing indexed
+End Step registration; full-service scenes retain every registration. Generic
+whole-scene dispatch and terrain population consumers fail closed rather than
+silently observing a partial registry. No replacement registry is allocated.
+
+Matched contact timings against `759fb458`, 512 KiB Chip / 8 MiB Fast:
+
+| Frame / work | Before ms | After ms |
+| --- | ---: | ---: |
+| 51, early gameplay | 26.4 | 26.4 |
+| 676, generation | 287.1 | 260.6 |
+| 1047, thin-platform retirement | 118.2 | 118.0 |
+| 1305, combat | 63.3 | 63.3 |
+| 1512, generation | 153.7 | 146.2 |
+| 1515, gameplay | 72.8 | 72.9 |
+| 1535, thin-platform retirement | 82.4 | 82.5 |
+| 1689, generation | 275.5 | 245.2 |
+
+The complete 1,800-update tape takes 5,079 PAL fields, **17.72 FPS**
+(previously 5,083 / 17.71 FPS). This removes generation stalls, not the ordinary
+frame-budget shortfall. The maximum gap is 13 fields at frame 676; it is not
+the acceptance gate. Ten host tapes / 18,000 frames compare native terrain
+lifetimes and pre-cleanup retirement marks with full-service ownership.
+Cross-target replay passes. Targeted activation/re-entry tests retain inactive
+platforms and retire them on reactivation; undeclared consumers are rejected.
+
+Reproduce with `SKIP_TO_GAME=1 PROFILE_CONTACT=1 VERIFY_CHIP_KB=512
+VERIFY_TIMEOUT_SECONDS=180 STRIP=1 TRACE_FRAMES=50,675,1046,1304,1511,1534,1688
+TRACE_FIELDS=35 TRACE_OUTPUT=$PWD/tmp/trace/wall-admission-contact
+bash amiga/profile.sh trace`, then `python3 tools/amiga-trace-report.py
+tmp/trace/wall-admission-contact --causes`. Run the same settings with
+`bash amiga/profile.sh fps` for the uninterrupted tape.
+Reports: `tmp/wall-admission-report.txt`, `tmp/wall-admission-fps.log`,
+`tmp/wall-admission-replay.log`, `tmp/wall-admission-host.log`.
+Trace ELF SHA-256:
+`e422323a4777996700adf399606d40c28758c8f01acf01e4bb329d95c7894ff1`.
+
+No-input generation frame 163 measures **172.8 ms**; reproduce with
+`PROFILE_IDLE=1 SKIP_TO_GAME=1 PROFILE_CONTACT=0 PROFILE_FRAMES=600
+VERIFY_CHIP_KB=512 VERIFY_TIMEOUT_SECONDS=120 STRIP=1 TRACE_FRAMES=162
+TRACE_FIELDS=35 TRACE_OUTPUT=$PWD/tmp/trace/wall-admission-idle
+bash amiga/profile.sh trace`. Report: `tmp/wall-admission-idle-report.txt`;
+ELF SHA-256 `39559513fdfe457ff827ba3d7fb03be33eb4127d733f853ca94fc0d2b7b45b0d`.
+This is an absolute measurement, not a matched-current-baseline saving.
+Normal `STRIP=1` startup passes `verify_memory.gdb` with 126,840 bytes
+Chip remaining, no gameplay preparation or excluded reference allocations.
+The restored normal executable is 1,995,944 bytes; its ELF SHA-256 is
+`4cd50f7ef0e6492073cc1b72bfce71e5502e699b0402c777c2c6279bd6731b5e`.
+Startup evidence: `tmp/wall-admission-memory.log` and
+`tmp/wall-admission-memory-gdb.log`.
+
 ## Prepared-publication boundary at `759fb458`
 
 A fresh 35-PAL-field capture beginning at contact marker 675 reproduces
@@ -859,6 +914,7 @@ named holds the numbers. Do not retry a row without removing the reason in its l
 
 | Area | Approach | Result | Why it lost | Commit, patch |
 | --- | --- | --- | --- | --- |
+| Scene terrain admission | Omit all generic terrain registration; retire thin platforms through the active room walk | Generation 676/1512/1689 287.1/153.7/275.5 → 260.0/145.6/243.6 ms, but phase-7 retirement 1047/1535 118.2/82.4 → 178.8/151.5 ms; 18,000-frame ownership and cross-target replay pass | Removing the live platform consumer's membership replaces its small indexed walk with a 60–70 ms room scan. Retain object 93 registration; only wall registration is unconsumed | This row's introducing commit; `tmp/terrain-retirement2-{baseline,candidate}-report.txt`, candidate ELF `8c181023896588bbe3ea0257e3693b8f3e010d4c1820029115f236dd7d3438f6`; no retained implementation |
 | Enemy appearance publication | Record-owned image/transform state, retaining lifetime validation and sprite/Draw membership | Frame 1305 66.44 → 66.18 ms; 51 30.37 → 30.7; generation 676/1512/1689 302.1/160.8/283.9 → 301.8/160.5/283.6 ms; 18,000-frame ownership and full-service collision tests pass | Validation still costs 2.23 ms inside the replaced 3.31 ms publication boundary; whole-frame change is within noise. Removed; no setter/validation-helper variants | This row's introducing commit; `tmp/record-appearance-report.txt`, `tmp/record-appearance-1305.txt`; no retained implementation |
 | Terrain Draw cutoff | Preserve cached cutoff across active scalar/prepared-span births | Against add6c322 with the same tree lease: idle generation 163 265.5 → 265.4 ms (1,886,300 → 1,885,440 cycles); cutoff traversal remains 7.93 ms | Other invalidation paths still require the complete retained-run scan. Misses the estimated 8 ms saving; logical ordering, 32/2048-entry admission tests and 18,000-frame terrain replay pass but do not establish a performance win. Removed; do not sweep invalidation variants instead of replacing the full-run observation | This row's introducing commit, [`active-birth-cutoff-cache.patch`](rejected/active-birth-cutoff-cache.patch) |
 | Native dirty queues | Last-mark serials until first observation, then reconstruct once and retain the original linked queue | Against 092fc0ee with the same tree lease: contact 676 416.0 → 419.2 ms, 1512 209.3 → 210.2, 1689 403.4 → 406.1; idle 163 265.5 → 267.0; 1,800 updates 5,568 → 5,565 PAL fields; +47,584 ordinary bytes | Misses the estimated 10 ms burst saving: mark bookkeeping rises from about 17 ms to 20 ms in 676. Slight tape/quiet-frame variation does not offset worse affected generation frames or extra storage. Ordering/overflow/callback tests and 18,000-frame terrain replay pass. No further dirty-queue variants after this and the fresh-span rejection | This row's introducing commit, [`deferred-dirty-queue.patch`](rejected/deferred-dirty-queue.patch) |

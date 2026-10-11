@@ -482,7 +482,7 @@ private:
                     std::uint32_t spatial;
                     if(!world_->nativeTerrainInstances()->spatialFlags(id.handle,spatial))return false;
                     out=(definition->initialFlags&~8u)|spatial|
-                        (table_.externalRegistered(h)?0u:0x80000u);return true;
+                        (((collisionConsumersAdmitted_||id.object==93)?table_.externalRegistered(h):room_.active(h.slot))?0u:0x80000u);return true;
                 }
             }
             return false;
@@ -793,7 +793,10 @@ private:
                 thinRetirementWindow_.append(cells.y,kind!=0,first.handle.generation+i);
                 if(!table_.externalBirth(current,order)){okay=false;break;}
                 if(!i)stamp=order;
-                if(!table_.registerExternalObject({current,first.handle.generation+i},kind?93:60,true)){
+                // Only thin-platform End Step consumes terrain registration
+                // in the external backend. Walls retain native ownership,
+                // but have no generic selector or dispatched wall event.
+                if(kind&&!table_.registerExternalObject({current,first.handle.generation+i},93,true)){
                     okay=false;break;
                 }
                 ++completed;
@@ -890,7 +893,7 @@ private:
 #endif
         const unsigned slot=View::terrainBase+id.handle.slot;
         if(!valid()||!table_.externalBirth(slot,order)||!nativeBirthQueues(slot,id.object))return check(false);
-        if(!check(table_.registerExternalObject({slot,id.handle.generation},id.object,true)))return false;
+        if((collisionConsumersAdmitted_||id.object==93)&&!check(table_.registerExternalObject({slot,id.handle.generation},id.object,true)))return false;
         const auto* definition=objectDefaults_.get(id.object);const auto* objectFlags=families_.flags(unsigned(id.object));
         if(!definition||!objectFlags)return check(false);
 #ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
@@ -965,7 +968,7 @@ private:
         }
         if(!check(room_.remove(slot)))return false;
         if(!check(layers_.retire({slot,h.generation})))return false;
-        if(!check(table_.registerExternalObject({slot,h.generation},id.object,false)))return false;
+        if((collisionConsumersAdmitted_||id.object==93)&&!check(table_.registerExternalObject({slot,h.generation},id.object,false)))return false;
         table_.externalRetire(slot);return nativeRetireQueues(slot);
     }
     template<class Record,View::Kind Kind> struct Binding {
@@ -1605,7 +1608,9 @@ public:
     }
     GameplayCollisionOwner(const GameplayCollisionOwner&)=delete;
     GameplayCollisionOwner& operator=(const GameplayCollisionOwner&)=delete;
-    // Registration order with live flags, for differential verification.
+    // Admitted generic registrations with live flags, for differential
+    // verification. External-backend walls live only in their native owner;
+    // thin platforms retain registration for their source End Step event.
     template<class Visit> bool visitRegistrationOrder(Visit visit)const{return valid()&&visitEligibility(visit);}
     // These dispatchers expose bool& status to arbitrary callbacks. Keep
     // their live reads: a nested query can see failure before callback return.
@@ -2439,6 +2444,7 @@ public:
     // immediately before each event. An empty own event is still dispatched.
     template<unsigned Capacity,class Execute>
     bool dispatchStepPhase(unsigned subtype,RunnerStepSnapshot<Capacity>& snapshot,Execute execute){
+        if(!check(collisionConsumersAdmitted_))return false;
         if(!valid()||!world_||subtype>2)return check(false);
         snapshot.clear();
         if(!check(visitEligibility([&](InstanceHandle h,int object,std::uint32_t flags){
@@ -3584,6 +3590,7 @@ public:
     template<unsigned Capacity,class AdvanceAndDispatch>
     bool dispatchAlarmPhase(RunnerStepSnapshot<Capacity>& snapshot,AdvanceAndDispatch advanceAndDispatch){
         DW_PROFILE_SCOPE(profileAlarmCapture);
+        if(!check(collisionConsumersAdmitted_))return false;
         if(!valid()||!world_)return check(false);
         snapshot.clear();
         if(!check(visitEligibility([&](InstanceHandle h,int object,std::uint32_t flags){
@@ -4036,6 +4043,7 @@ public:
     bool boundTo(const GameplayWorld& world)const{return valid()&&world_==&world;}
     bool population(int object,unsigned& count)const{
         if(!valid()||object<0||!families_.flags(unsigned(object)))return false;
+        if(!collisionConsumersAdmitted_&&(families_.isA(60,object)||families_.isA(93,object)))return false;
         if(!native_)return selectorAvailable(object)&&owner_.instanceNumber(object,families_,count);
         unsigned value=0;
         if(!visitRegistered(0,View::capacity,[&](InstanceHandle,int child,std::uint32_t flags){
@@ -4683,7 +4691,8 @@ public:
                     if(!table_.externalBirth(slot,order)||
                         !world_->rebindNativeTerrainOrder({slot-View::terrainBase,h.generation},order))return false;
                 }
-                return table_.registerExternalObject(h,objectOf(h),registered)&&
+                const int object=objectOf(h);
+                return ((!collisionConsumersAdmitted_&&object!=93)||table_.registerExternalObject(h,object,registered))&&
                     layers_.reconcile(h)&&publishPreparedDraw(h);
             }
             // Writes while inactive may have been consumed by an intervening
