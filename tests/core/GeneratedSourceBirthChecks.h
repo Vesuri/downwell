@@ -405,7 +405,9 @@ inline void checkGeneratedSourceBirths(const downwell::ObjectPack& objects,
             bool transform(InstanceHandle,const GameplayShopInstances::Record&,RunnerTransformField,RunnerImageValue,RunnerImageValue,std::uint32_t){return true;}
             bool markDestroyed(InstanceHandle,const GameplayShopInstances::Record&){return true;}
         } publication{nullptr,failure};
+        auto storage=std::make_unique<GameplayShopInstances::Storage>();
         auto store=std::make_unique<GameplayShopInstances>(objects,sprites,GameplayShopInstances::Binding::bindPositionedActor(publication));
+        assert(store->bindStorage(storage.get()));
         publication.store=store.get();unsigned next=950000;std::vector<int> order;
         auto allocate=[&](int object,unsigned& id){order.push_back(object);id=next++;return true;};
         struct Audio {

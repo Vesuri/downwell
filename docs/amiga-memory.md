@@ -824,6 +824,22 @@ block, requested asset bytes and remaining Chip memory after allocations.
 
 ## Ordinary memory
 
+Registered Shop parents and children borrow an explicit
+`GameplayShopInstances::Storage` bank. The current native frontend uses the
+compatibility Shop path and admits no such bank; normal startup and the contact
+profile enforce a null backing pointer. This does not disable compatibility
+shops or install the unfinished registered-Shop session. Its eventual scene
+owner must bind empty backing before registered creation, retain it through all
+parent/child callbacks, and retire every record before withdrawing it. Missing
+backing rejects parent and child births before source-ID allocation or
+publication. Unload/re-entry preserves lifetime generations; live or nonempty
+replacement backing is rejected. Reference fixtures explicitly supply their
+bank. The store itself contains no capacity-sized array, so increasing this
+unadmitted family's capacity cannot grow ordinary scene residency.
+The 96-record bank occupies 20,928 ordinary bytes on the 68000. The native
+owner saves 20,924 bytes net of its borrowed pointer; no Chip allocation is
+changed. This is a residency change, not a gameplay frame-time improvement.
+
 Skeleton and bone records borrow an explicit
 `GameplayCollisionOwner::SkeletonEncounterStorage` bank. Cavern startup and
 contact-profile guards require both pointers to be null; there is no implicit

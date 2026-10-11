@@ -1817,6 +1817,64 @@ int main(){
     }
     auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
+    static_assert(sizeof(GameplayShopInstances)<1024,
+        "Unadmitted registered Shop capacity must not grow the scene owner");
+    for(bool parent:{false,true}){
+        auto owner=makeCollisionOwner(objects,sprites,{}, {},nullptr,
+            GameplayCollisionOwner::Ownership::nativeScenery,true,true,false,false,false);
+        assert(owner->valid()&&!owner->shopInstances().hasStorage()&&owner->declareExternalCollisionBackend());
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding());
+        assert(owner->attach(*world));
+        auto& shops=owner->shopInstances();
+        assert(shops.clear()&&!shops.find({0,1})&&!shops.handle(0).generation&&
+            !shops.sourceHandle(1).generation);
+        unsigned allocations=0;
+        auto allocate=[&](int,unsigned& id){id=710000+allocations++;return true;};
+        struct Audio {
+            bool play(int,int,bool,int&){assert(false);return false;}
+            bool setGain(int,MotionBinary64,int){assert(false);return false;}
+        } audio;
+        auto creation=shops.creation(allocate,audio);
+        ShopWorld::Instance shop{};
+        assert(!(parent?creation.begin(shop):creation.create(212,0,0)!=0));
+        assert(!owner->valid()&&!allocations&&!shop.sourceId&&!shops.size());
+    }
+    {
+        auto bank=std::make_unique<GameplayShopInstances::Storage>();
+        struct Publication {
+            unsigned births=0,retires=0;
+            bool birth(InstanceHandle,const GameplayShopInstances::Record&){assert(false);return false;}
+            bool birthAt(InstanceHandle,const GameplayShopInstances::Record&,RunnerImageValue,RunnerImageValue){++births;return true;}
+            bool retire(InstanceHandle,const GameplayShopInstances::Record&){++retires;return true;}
+            bool activation(InstanceHandle,const GameplayShopInstances::Record&,bool){return true;}
+            bool membership(InstanceHandle,const GameplayShopInstances::Record&,bool){return true;}
+        } publication;
+        GameplayShopInstances shops(objects,sprites,GameplayShopInstances::Binding::bindPositionedLifetime(publication));
+        assert(shops.bindStorage(bank.get()));
+        unsigned next=710010;
+        auto allocate=[&](int,unsigned& id){id=next++;return true;};
+        struct Audio {
+            bool play(int,int,bool,int&){return false;}
+            bool setGain(int,MotionBinary64,int){return false;}
+        } audio;
+        auto creation=shops.creation(allocate,audio);
+        const auto first=creation.create(212,0,0);const auto old=shops.sourceHandle(first);
+        assert(first&&old.generation&&shops.clear()&&shops.bindStorage(nullptr));
+        assert(!shops.hasStorage()&&shops.clear()&&!shops.find(old));
+        assert(shops.bindStorage(bank.get()));
+        const auto second=creation.create(212,0,0);const auto fresh=shops.sourceHandle(second);
+        assert(second&&fresh.generation>old.generation&&!shops.find(old));
+        assert(!shops.bindStorage(nullptr)&&!shops.valid()&&shops.find(fresh));
+        assert(shops.clear()); // Failed admission still permits teardown.
+        assert(publication.births==2&&publication.retires==2);
+    }
+    {
+        auto bank=std::make_unique<GameplayShopInstances::Storage>();
+        bank->records[0].lifetimeId=17;
+        GameplayShopInstances shops(objects,sprites);
+        assert(!shops.bindStorage(bank.get())&&!shops.valid()&&!shops.hasStorage());
+    }
     for(bool bone:{false,true}){
         auto owner=makeCollisionOwner(objects,sprites,{}, {},nullptr,
             GameplayCollisionOwner::Ownership::nativeScenery,true,true,false,false);

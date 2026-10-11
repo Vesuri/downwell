@@ -39,8 +39,20 @@ public:
         bool active=true,destroyRequested=false,initialized=false;
     };
     using Binding=RecordLifecycleBinding<Record>;
+    struct Storage { Record records[capacity]{}; };
+    bool hasStorage()const{return records_!=nullptr;}
+    // Registered shops are an explicit scene dependency. The compatibility
+    // shop renderer needs none of these records. Retire every child before
+    // releasing backing; keep lifetime generations across unload/re-entry.
+    bool bindStorage(Storage* storage){
+        if(!good_||count_||creating_)return fail();
+        if(storage)for(const auto& record:storage->records)if(record.lifetimeId)return fail();
+        records_=storage?storage->records:nullptr;return true;
+    }
     GameplayShopInstances(const ObjectPack& objects,const SpriteCollisionPack& sprites,Binding binding={})
         :objects_(objects),sprites_(sprites),binding_(binding){}
+    GameplayShopInstances(const GameplayShopInstances&)=delete;
+    GameplayShopInstances& operator=(const GameplayShopInstances&)=delete;
     bool valid()const{return good_;}
     void observeFailure(bool& owner){good_.observe(owner);}
     template<class Environment> bool parentDraw(InstanceHandle h,Environment& env){
@@ -66,13 +78,13 @@ public:
     }
     unsigned size()const{return count_;}
     InstanceHandle handle(unsigned slot)const{
-        return slot<capacity?InstanceHandle{slot,records_[slot].lifetimeId}:InstanceHandle{};
+        return records_&&slot<capacity?InstanceHandle{slot,records_[slot].lifetimeId}:InstanceHandle{};
     }
     const Record* find(InstanceHandle h)const{
-        return h.generation&&h.slot<capacity&&records_[h.slot].lifetimeId==h.generation?&records_[h.slot]:nullptr;
+        return records_&&h.generation&&h.slot<capacity&&records_[h.slot].lifetimeId==h.generation?&records_[h.slot]:nullptr;
     }
     InstanceHandle sourceHandle(unsigned source)const{
-        for(unsigned i=0;i<capacity;++i)if(source&&records_[i].lifetimeId&&records_[i].sourceId==source)return handle(i);
+        for(unsigned i=0;records_&&i<capacity;++i)if(source&&records_[i].lifetimeId&&records_[i].sourceId==source)return handle(i);
         return {};
     }
     template<class Allocate> bool sayMessage(InstanceHandle h,ShopMenuEvents::Message message,MotionBinary64 y,Allocate& allocate){
@@ -111,8 +123,9 @@ public:
         Creation(GameplayShopInstances& owner,Allocate& allocate,Audio& audio):owner_(owner),allocate_(allocate),audio_(audio){}
         bool valid()const{return owner_.valid();}
         bool begin(ShopWorld::Instance& shop){
-            if(shop.sourceId)return owner_.fail();
-            for(const auto& r:owner_.records_)if(r.lifetimeId&&r.shop==&shop)return owner_.fail();
+            if(shop.sourceId||!owner_.records_)return owner_.fail();
+            for(unsigned i=0;i<capacity;++i){const auto& r=owner_.records_[i];
+                if(r.lifetimeId&&r.shop==&shop)return owner_.fail();}
             return owner_.create(277,shop.x,shop.y,allocate_,&shop)!=0;
         }
         bool play(int sound,int priority,bool loop,int& voice){
@@ -395,7 +408,7 @@ public:
     // published prefix. No Destroy event is synthesized by room teardown.
     bool clear(){
         if(creating_)return fail();
-        for(unsigned i=0;i<capacity;++i)if(records_[i].lifetimeId){
+        for(unsigned i=0;records_&&i<capacity;++i)if(records_[i].lifetimeId){
             if(!binding_.retire(handle(i),records_[i]))return fail();
             records_[i]={};--count_;
         }
@@ -417,7 +430,7 @@ private:
         return createReal(object,MotionBinary64::fromInteger(x),MotionBinary64::fromInteger(y),allocate,shop);
     }
     template<class Allocate> unsigned createReal(int object,MotionBinary64 x,MotionBinary64 y,Allocate& allocate,ShopWorld::Instance* shop){
-        if(!good_||creating_||!next_||count_==capacity||
+        if(!good_||!records_||creating_||!next_||count_==capacity||
            (object!=277&&object!=278&&object!=279&&object!=98&&object!=280&&object!=212&&object!=283)||
            (object==277)!=bool(shop)){fail();return 0;}
         PackedObject definition;RunnerImageValue px,py;
@@ -447,7 +460,7 @@ private:
         // and the retained ShopWorld menu/prompt (speaking/checkThis).
         r.initialized=true;return source;
     }
-    const ObjectPack& objects_;const SpriteCollisionPack& sprites_;Binding binding_;Record records_[capacity]{};
+    const ObjectPack& objects_;const SpriteCollisionPack& sprites_;Binding binding_;Record* records_=nullptr;
     unsigned count_=0,next_=1;FailureSignal<> good_=true;bool creating_=false;
 };
 }

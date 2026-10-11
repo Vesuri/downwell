@@ -8,6 +8,7 @@ struct CollisionOwnerFixtureDeleter {
     std::unique_ptr<GameplayCollisionOwner::ReferenceStorage> reference;
     std::unique_ptr<GameplayCollisionOwner::NativeCollisionStorage> collision;
     std::unique_ptr<GameplayCollisionOwner::SkeletonEncounterStorage> encounter;
+    std::unique_ptr<GameplayShopInstances::Storage> shops;
     void operator()(GameplayCollisionOwner* owner)const {delete owner;}
 };
 using CollisionOwnerFixture=std::unique_ptr<GameplayCollisionOwner,CollisionOwnerFixtureDeleter>;
@@ -16,7 +17,8 @@ using CollisionOwnerFixture=std::unique_ptr<GameplayCollisionOwner,CollisionOwne
 inline auto makeCollisionOwner(const ObjectPack& objects,const SpriteCollisionPack& sprites,
         GameplayTerrainInstances::Presentation presentation={},GameplayTerrainInstances::WallCollision collision={},
         const RoomPack* rooms=nullptr,GameplayCollisionOwner::Ownership mode=GameplayCollisionOwner::Ownership::reference,
-        bool nativeBoxes=true,bool nativeFields=true,bool collisionStorage=true,bool encounterStorage=true) {
+        bool nativeBoxes=true,bool nativeFields=true,bool collisionStorage=true,bool encounterStorage=true,
+        bool shopStorage=true) {
     CollisionOwnerFixtureDeleter backing;
     if(mode==GameplayCollisionOwner::Ownership::reference||mode==GameplayCollisionOwner::Ownership::nativeTerrain)
         backing.reference=std::make_unique<GameplayCollisionOwner::ReferenceStorage>();
@@ -25,6 +27,10 @@ inline auto makeCollisionOwner(const ObjectPack& objects,const SpriteCollisionPa
     if(encounterStorage)backing.encounter=std::make_unique<GameplayCollisionOwner::SkeletonEncounterStorage>();
     auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,presentation,collision,rooms,mode,
         nativeBoxes,nativeFields,backing.reference.get(),backing.collision.get(),backing.encounter.get());
+    if(shopStorage){
+        backing.shops=std::make_unique<GameplayShopInstances::Storage>();
+        owner->shopInstances().bindStorage(backing.shops.get());
+    }
     return CollisionOwnerFixture(owner.release(),std::move(backing));
 }
 }

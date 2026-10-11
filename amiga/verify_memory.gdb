@@ -61,6 +61,11 @@ if $owner->bones_.records_ != 0 || $owner->skeletons_.records_ != 0
     quit 1
 end
 printf "Startup skeleton encounter: resident=0\n"
+if $owner->shopInstances_.records_ != 0
+    printf "Registered Shop records resident without scene admission\n"
+    quit 1
+end
+printf "Startup registered Shop records: optional_bytes=%lu resident=0\n", sizeof(*$owner->shopInstances_.records_)*96
 if $owner->nativeCollisionStorage_ != 0
     printf "Unused collision queue/mask backing resident during startup\n"
     quit 1
