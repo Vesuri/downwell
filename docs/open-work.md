@@ -39,6 +39,10 @@ behavior, both backend integrations and relevant original-game verification.
      undeclared resources rather than falling back to all assets. Apply the
      same dependency declarations to SDL texture/audio residency. Prove peak
      ordinary/Chip memory and unload/re-entry with growing unrelated content.
+     The 70,816-byte CPU field-column commands are still permanently linked:
+     they need an ordinary-memory gameplay lease, independent of the existing
+     Chip field-band bank. Preserve the off-centre column-renderer fallback;
+     release on gameplay retirement and validate reload/failure before drawing.
   2. Make phase dispatch depend on live, eligible family membership and scene
      ownership, not the catalogue of implemented families. Preserve event/RNG
      order, synchronous births, activation and captured-phase cutoffs. Assert

@@ -1,5 +1,42 @@
 # Amiga gameplay frame-cost audit
 
+## Early contact execution gate
+
+At `ba27fad3`, a fresh 35-field capture beginning at marker 50 reproduces
+frame 51 at **31.76 ms** (225,680 cycles). It contains live bullets but no
+enemies; capture coverage ends at tick 67, view Y 120, health 4. It is not
+an idle frame. The normal stripped executable is restored after the capture.
+
+| Separate owner in frame 51 | Inclusive ms |
+| --- | ---: |
+| Actor End Step dispatch/execution | 4.07 |
+| Bullet Step, including collision publication | 3.78 |
+| Draw collection | 3.02 |
+| Player movement/update | 2.68 |
+| Room animation | 2.01 |
+| Entry dither Begin Step | 1.69 |
+| Captured alarm dispatch | 1.29 |
+
+These are not all empty-family scans. Bullet collision publication accounts
+for 1.77 ms *inside* Bullet Step; Draw's registered traversal includes actual
+sprite projection. The extra effect-surface traversal outside Draw collection
+is only 0.45 ms. Do not reopen alarm or sub-millisecond traversal variants on
+the strength of older, pre-repair numbers. This capture still exceeds the
+historical 19.2 ms frame; it does not establish restored performance.
+
+```sh
+SKIP_TO_GAME=1 PROFILE_CONTACT=1 VERIFY_CHIP_KB=512 \
+  VERIFY_TIMEOUT_SECONDS=120 STRIP=1 TRACE_FRAMES=50 TRACE_FIELDS=35 \
+  TRACE_OUTPUT=$PWD/tmp/trace/scene-early-ba27fad3 bash amiga/profile.sh trace
+python3 tools/amiga-trace-report.py tmp/trace/scene-early-ba27fad3 \
+  --frames=51 --causes --tree-min=0.3
+```
+
+Do not combine the contact tape with `PROFILE_FRAMES`: that option selects
+ordinary-gameplay profiling and the Makefile rejects the combination.
+Report: `tmp/scene-early-ba27fad3-report.txt`. Trace ELF SHA-256:
+`4193edc19fa7048e1124b71077dbac2122d15e3339960c7eb768cd3b489a7c48`.
+
 ## No-input workload and naming
 
 The early contact-tape windows called "quiet" below are low-contact **firing**
