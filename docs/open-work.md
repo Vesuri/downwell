@@ -73,16 +73,8 @@ behavior, both backend integrations and relevant original-game verification.
   ordinary gameplay; use the current measurements in `amiga-frame-cost.md`.
   Separate the measured RNG refill cost from publication; do not count nested
   timings twice or replace these owners with arithmetic-helper tuning.
-  Next constructor attempt: prepare generated-cell default state at the level
-  boundary, not on the first gameplay allocation. The measured ceiling is
-  about 6 ms in frame 676 (see constructor attribution in `amiga-frame-cost.md`).
-  Admit only never-used slots with matching tile/spatial defaults; retain the
-  current initialization for reused slots, different defaults and callback
-  paths. Preserve partial completed spans and invalidate preparation on room
-  reset. Check both mixed wall/platform segments and single-kind segments;
-  missing-kind output flags are not proof of that kind's defaults. Measure
-  preparation cost as well as gameplay savings; do not turn this into helper
-  or copy-loop tuning if it fails to remove at least 3 ms.
+  Fresh-cell default preinitialization is closed after its measured attempt;
+  do not retry initialization or copy-loop variants (see rejected approaches).
   This is not a revival of rejected
   immutable-row/copy-on-write spatial encodings. Preserve bounded run membership
   rather than replacing it with another per-cell logical lookup/publication

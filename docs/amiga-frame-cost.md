@@ -99,33 +99,6 @@ then report `--frames 676 --causes`. Reports:
 `tmp/builder-phase-idle-compare.txt`; contact trace ELF SHA-256:
 `28c8c65ff785cb09acf10f14866ab65f129213ce9acc8cacf7667122a59ed65c`.
 
-#### Constructor initialization attribution
-
-A fresh capture of `e2daa8a0` confirms frame 676 at 226.85 ms. The
-`appendPreparedCells` source-line report accounts for all 76,944 self cycles
-(10.83 ms), excluding callees. At this revision, lines 362–367—the retained
-cell initialization loop—account for about 41.2% of that self cost, or 4.47 ms.
-Its repeated `wallRadius` calls add about 1.60 ms. Thus moving eligible fresh
-cell initialization to level preparation has a **roughly 6 ms ceiling**, before
-charging admission and fallback checks. It cannot remove the whole 73.95 ms
-native construction boundary.
-
-The same initialization writes `flags_`, `createSprite_` and `walls_`. Reused
-slots may contain prior activation, destruction, Create and wall-query state;
-room clearing currently rebuilds identities without resetting those arrays.
-Prepared output must therefore be limited to untouched slots with matching
-source defaults, not selected merely because the slot is free. Constructor
-flags are supplied only for kinds present in a segment, so absent-kind zeroes
-cannot certify a shared initialization template. The existing constructor
-also installs only the completed prefix after a publication failure.
-
-Reproduce with the contact command above, using `TRACE_FRAMES=675
-TRACE_FIELDS=24 TRACE_OUTPUT="$PWD/tmp/trace/terrain-init-audit"`, then report
-`--frames 676 --causes --lines appendPreparedCells`.
-Report: `tmp/terrain-init-audit-report.txt`; ELF SHA-256:
-`aef5a613f6ee6ee643a4de3474a354a6d3c9dc02aaa38700a87f5e6d16684c11`.
-This is attribution and an estimate, not an implemented speedup.
-
 ### Firing versus retirement boundaries
 
 A bounded recheck at `f1b720e7` separates two early contact-tape spikes before
@@ -1339,6 +1312,7 @@ named holds the numbers. Do not retry a row without removing the reason in its l
 
 | Area | Approach | Result | Why it lost | Commit, patch |
 | --- | --- | --- | --- | --- |
+| Fresh terrain state | Prepare default flags, sprite and wall state before room births; skip matching initialization on untouched slots, retaining platform-specific flag writes | Frame 676 226.85 → 224.04 ms (1,611,770 → 1,591,820 cycles); constructor self 10.83 → 8.94 ms; scalar/reuse/failure-prefix and 18,000-frame ownership checks pass | Only 2.81 ms removed versus the 3 ms floor and roughly 6 ms estimated ceiling. Kind-dependent flags and freshness bookkeeping retain much of the work. Removed before broader timing/startup-cost validation; no initialization/helper variants | This row's introducing commit; [`fresh-terrain-state.patch`](rejected/fresh-terrain-state.patch); `tmp/terrain-preinit-mixed-report.txt`, ELF `c0a9f079d74dfd863dbe7785d4f87cb39f50dc3a9823b87589e6b561ad1a340a` |
 | Pattern admission | Host-validated local pack plus compiled size/CRC32, replacing the runtime structural validator | Pattern lease excluding IO 1426.183 → 1344.975 ms; complete cold handoff plus first gameplay 9357.425 → 9277.429 ms | The integrity scan retains almost all admission cost; about 0.9% combined-transition reduction does not justify weaker corruption-only admission and extra machinery. Removed; no CRC/table/helper variants | This row's introducing commit; [`certified-pattern-admission.patch`](rejected/certified-pattern-admission.patch) |
 | Scene terrain admission | Omit all generic terrain registration; retire thin platforms through the active room walk | Generation 676/1512/1689 287.1/153.7/275.5 → 260.0/145.6/243.6 ms, but phase-7 retirement 1047/1535 118.2/82.4 → 178.8/151.5 ms; 18,000-frame ownership and cross-target replay pass | Removing the live platform consumer's membership replaces its small indexed walk with a 60–70 ms room scan. Retain object 93 registration; only wall registration is unconsumed | This row's introducing commit; `tmp/terrain-retirement2-{baseline,candidate}-report.txt`, candidate ELF `8c181023896588bbe3ea0257e3693b8f3e010d4c1820029115f236dd7d3438f6`; no retained implementation |
 | Enemy appearance publication | Record-owned image/transform state, retaining lifetime validation and sprite/Draw membership | Frame 1305 66.44 → 66.18 ms; 51 30.37 → 30.7; generation 676/1512/1689 302.1/160.8/283.9 → 301.8/160.5/283.6 ms; 18,000-frame ownership and full-service collision tests pass | Validation still costs 2.23 ms inside the replaced 3.31 ms publication boundary; whole-frame change is within noise. Removed; no setter/validation-helper variants | This row's introducing commit; `tmp/record-appearance-report.txt`, `tmp/record-appearance-1305.txt`; no retained implementation |

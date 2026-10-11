@@ -1,0 +1,246 @@
+diff --git a/src/core/GameplayCollisionOwner.h b/src/core/GameplayCollisionOwner.h
+index 68265b87..17bc2000 100644
+--- a/src/core/GameplayCollisionOwner.h
++++ b/src/core/GameplayCollisionOwner.h
+@@ -2009,7 +2009,21 @@ public:
+                 return static_cast<GameplayCollisionOwner*>(p)->constructTerrainSpan(first,cells,tile,
+                                                                                    completed,stamp,flags,layer,true);
+             }
++#else
++            ,nullptr,nullptr
+ #endif
++            ,[](void* p,int tile,std::uint32_t* spatial){
++                auto& self=*static_cast<GameplayCollisionOwner*>(p);
++                if(!self.valid()||self.collisionConsumersAdmitted_)return false;
++                for(unsigned kind=0;kind<2;++kind){
++                    const int object=kind?93:60;
++                    const auto* definition=self.objectDefaults_.get(object);
++                    const auto* plan=self.nativeTerrainCreate_.get(object,tile);
++                    if(!definition||!plan||plan->sprite!=tile)return false;
++                    spatial[kind]=(definition->initialFlags&~0x8208u)|(plan->changedSprite?8u:0u);
++                }
++                return true;
++            }
+         }))return check(false);
+ #ifndef DOWNWELL_REFERENCE_BREAKABLES
+         if(nativeBoxes_){
+diff --git a/src/core/GameplayWorld.h b/src/core/GameplayWorld.h
+index 8997b9c1..33847272 100644
+--- a/src/core/GameplayWorld.h
++++ b/src/core/GameplayWorld.h
+@@ -309,6 +309,8 @@ public:
+         if(!run_.effectsSucceeded||terrainInstances_||!terrain.valid()||
+             (nativeTerrainInstances_&&nativeTerrainInstances_!=&terrain))return run_.effectsSucceeded=false;
+         if(!terrain.bind(nativeTerrainBinding_))return run_.effectsSucceeded=false;
++        if(!terrain.size()&&!terrain.prepareFreshCells(downwell::terrainTileForArea(run_.stage.area)))
++            return run_.effectsSucceeded=false;
+         nativeTerrainInstances_=&terrain;return true;
+     }
+     bool configureNativeTerrainBinding(NativeTerrain::Binding binding){
+diff --git a/src/core/NativeTerrainLifetimes.h b/src/core/NativeTerrainLifetimes.h
+index 98f7fac1..57f4efc6 100644
+--- a/src/core/NativeTerrainLifetimes.h
++++ b/src/core/NativeTerrainLifetimes.h
+@@ -23,6 +23,9 @@ template<unsigned Capacity> class NativeTerrainLifetimes {
+     unsigned char flags_[Capacity]{};
+     std::int16_t createSprite_[Capacity]{};
+     PackedWallState walls_[Capacity]{};
++    int preparedTile_=-1;
++    std::uint32_t preparedSpatial_[2]{};
++    unsigned writtenEnd_=0;
+     WallEndStepState* stepping_=nullptr;
+     InstanceHandle steppingHandle_{};
+     bool good_=true;
+@@ -74,6 +77,9 @@ public:
+         // Complete callback-free admission/publication, with no per-cell run
+         // session. Unsupported must leave every owner untouched.
+         decltype(constructSpan) constructDirectSpan=nullptr;
++        // Optional immutable per-level defaults for callback-free generated
++        // cells. False declines preparation, not the source constructor.
++        bool (*freshDefaults)(void*,int,std::uint32_t*)=nullptr;
+     };
+     bool spatialFlags(InstanceHandle h,std::uint32_t& out)const{
+         if(!contains(h))return false;
+@@ -83,15 +89,31 @@ public:
+     }
+     bool bind(Binding binding){
+         if(!good_)return false;
+-        if(!binding.context&&(binding.admit||binding.birth||binding.retire||binding.mark||binding.create||binding.collision||binding.presentation||binding.activation||binding.beginRun||binding.endRun||binding.constructSpan||binding.constructDirectSpan))return good_=false;
++        if(!binding.context&&(binding.admit||binding.birth||binding.retire||binding.mark||binding.create||binding.collision||binding.presentation||binding.activation||binding.beginRun||binding.endRun||binding.constructSpan||binding.constructDirectSpan||binding.freshDefaults))return good_=false;
+         if(binding_.context)return binding_.context==binding.context&&binding_.admit==binding.admit&&
+             binding_.birth==binding.birth&&binding_.retire==binding.retire&&binding_.mark==binding.mark&&binding_.create==binding.create&&
+             binding_.collision==binding.collision&&binding_.presentation==binding.presentation&&binding_.activation==binding.activation&&
+             binding_.beginRun==binding.beginRun&&binding_.endRun==binding.endRun&&binding_.constructSpan==binding.constructSpan&&
+-            binding_.constructDirectSpan==binding.constructDirectSpan;
++            binding_.constructDirectSpan==binding.constructDirectSpan&&binding_.freshDefaults==binding.freshDefaults;
+         if(binding.context&&(!binding.admit||!binding.birth||!binding.retire||!binding.mark||size()))return good_=false;
+         binding_=binding;return true;
+     }
++    // Run before room births, never on the first generated gameplay row.
++    // Only never-written slots may consume this template. Reuse and every
++    // unmatched constructor retain the ordinary per-cell initialization.
++    bool prepareFreshCells(int tile){
++        if(!good_||size()||publicationRun_||pendingPublication_)return false;
++        preparedTile_=-1;writtenEnd_=0;
++        std::uint32_t spatial[2]{};
++        if(!binding_.freshDefaults||!binding_.freshDefaults(binding_.context,tile,spatial)||
++           tile<0||tile>32767||wallRadius(tile)<0||wallRadius(tile)>16)return true;
++        const auto flags=packedCreatedFlags(spatial[0]);
++        for(unsigned i=0;i<Capacity;++i){
++            flags_[i]=flags;createSprite_[i]=static_cast<std::int16_t>(tile);walls_[i]=PackedWallState{};
++        }
++        preparedSpatial_[0]=spatial[0];preparedSpatial_[1]=spatial[1];preparedTile_=tile;
++        return true;
++    }
+     unsigned registrationOrder(InstanceHandle h)const{
+         Order value;return good_&&runs_.publication(h,value)?value.stamp:0;
+     }
+@@ -341,6 +363,9 @@ public:
+         });
+     }
+ private:
++    static unsigned char packedCreatedFlags(std::uint32_t value){
++        return 32u|((value&8u)?4u:0u)|((value&0x200u)?8u:0u)|((value&0x8000u)?16u:0u);
++    }
+     bool appendPreparedCells(PreparedCells cells,int tile,bool& effectsSucceeded,
+                              bool direct=false,bool* admitted=nullptr){
+         const unsigned count=cells.count;
+@@ -350,6 +375,11 @@ private:
+         const auto construct=direct?binding_.constructDirectSpan:binding_.constructSpan;
+         if(construct&&contiguous&&canAppend(count)){
+             Order order;unsigned completed=0;std::uint32_t spatial[2]{};
++            const bool fresh=preparedTile_==tile&&slot>=writtenEnd_;
++            // The owner certifies both kinds at preparation. Present kinds
++            // overwrite these outputs during construction; an absent kind
++            // is not inferred from a zero-valued output.
++            if(fresh){spatial[0]=preparedSpatial_[0];spatial[1]=preparedSpatial_[1];}
+             const Identity first{{slot,next_},cells.object(0),cells.x(0),cells.y,-1,0};
+             const auto result=construct(binding_.context,first,cells,tile,
+                                                     completed,order.stamp,spatial,order.layer);
+@@ -359,6 +389,16 @@ private:
+                 unsigned i=0;
+                 if(cells.retained&&completed){
+                     if(!runs_.appendRetainedCells({slot,next_},cells.bytes,cells.y,completed,order))return good_=false;
++                    if(fresh&&!order.layer.inactive&&spatial[0]==preparedSpatial_[0]&&
++                       spatial[1]==preparedSpatial_[1]){
++                        // Walls already have their complete prepared state.
++                        // Thin platforms may differ in the source dirty bit;
++                        // publish only that kind-dependent byte here.
++                        const auto wall=packedCreatedFlags(spatial[0]),thin=packedCreatedFlags(spatial[1]);
++                        if(wall!=thin)for(unsigned j=0;j<completed;++j)
++                            if(cells.kind(j))flags_[slot+j]=thin;
++                        i=completed;
++                    }
+                     for(;i<completed;++i){
+                         const auto kind=cells.kind(i),value=spatial[kind];
+                         if(order.layer.bound()&&order.layer.inactive)selectLayerCutoff(slot+i,true);
+@@ -385,6 +425,7 @@ private:
+                     i+=n;
+                 }
+                 next_+=completed;freeHint_=slot+completed;
++                if(completed&&freeHint_>writtenEnd_)writtenEnd_=freeHint_;
+                 // This callback can fail only in birth publication. Like the
+                 // scalar birth path, do not report it as a Create failure by
+                 // overwriting the caller's separate effects flag.
+@@ -411,6 +452,7 @@ private:
+         if(!published||!runs_.append({slot,next_},object,x,y,source,creation,order))return good_=false;
+         if(order.layer.bound()&&order.layer.inactive)selectLayerCutoff(slot,true);
+         ++next_;freeHint_=slot+1;
++        if(freeHint_>writtenEnd_)writtenEnd_=freeHint_;
+         flags_[slot]=(active?0:2)|((spatial&8u)?4u:0u)|((spatial&0x200u)?8u:0u)|((spatial&0x8000u)?16u:0u);
+         createSprite_[slot]=-2;
+         walls_[slot]=PackedWallState{}; // Slot reuse must not inherit a query cache.
+@@ -465,6 +507,7 @@ public:
+         if(binding_.retire)for(unsigned i=0;i<runs_.size();++i)
+             if(!binding_.retire(binding_.context,runs_.handle(i).slot))return good_=false;
+         runs_.~Runs();new(&runs_) Runs;freeHint_=0;wallPresentationState_=unboundedWallArt_=false;
++        preparedTile_=-1;writtenEnd_=0;
+         for(auto& byte:layerCutoffSlots_)byte=0;layerCutoffCount_=0;return true;
+     }
+ private:
+diff --git a/tests/core/TerrainOwnershipRunsTest.cpp b/tests/core/TerrainOwnershipRunsTest.cpp
+index 817ce95c..0aa335d6 100644
+--- a/tests/core/TerrainOwnershipRunsTest.cpp
++++ b/tests/core/TerrainOwnershipRunsTest.cpp
+@@ -571,14 +571,14 @@ static void preparedSpanConstruction(){
+     using Native=downwell::NativeTerrainLifetimes<16>;
+     struct Observer {
+         Native* live;unsigned next=100,spanCalls=0,spanCells=0,begins=0,ends=0,directMisses=0;
+-        downwell::RunnerRegistrationOrder clock{0xfffffffcu,7};int fail=-1;
++        downwell::RunnerRegistrationOrder clock{0xfffffffcu,7};int fail=-1;bool different=false;
+     };
+     auto binding=[](Observer& observer,bool spans){
+         Native::Binding b;
+         b.context=&observer;b.admit=[](void*,unsigned){return true;};
+         b.birth=[](void* p,const Native::Identity& id,bool,std::uint32_t& stamp,std::uint32_t& flags){
+             auto& o=*static_cast<Observer*>(p);if(int(id.handle.slot)==o.fail)return false;
+-            stamp=o.next++;flags=0x8008u;o.clock.advance();
++            stamp=o.next++;flags=o.different&&id.object==60?0x8000u:0x8008u;o.clock.advance();
+             o.live->setLayerState(id.handle.slot,{{o.clock,false},21,2,false});return true;
+         };
+         b.retire=[](void*,unsigned){return true;};b.mark=b.retire;
+@@ -591,25 +591,32 @@ static void preparedSpanConstruction(){
+             const unsigned count=cells.count;completed=count;
+             if(o.fail>=0&&unsigned(o.fail)>=id.handle.slot&&unsigned(o.fail)<id.handle.slot+count)
+                 completed=unsigned(o.fail)-id.handle.slot;
+-            stamp=o.next;o.next+=completed;flags[0]=flags[1]=0x8208u;o.spanCells+=completed;
++            stamp=o.next;o.next+=completed;flags[0]=o.different?0x8200u:0x8208u;flags[1]=0x8208u;o.spanCells+=completed;
+             if(completed)layer={{o.clock.shifted(1),false},21,2,false};
+             o.clock=o.clock.shifted(completed);
+             return completed==count?Native::SpanResult::success:Native::SpanResult::failure;
+         };
+         return b;
+     };
++    for(unsigned prepare:{0u,1u,2u,3u})for(unsigned pattern:{0u,1u,2u})
+     for(unsigned direct:{0u,1u,2u})for(bool retained:{false,true})for(int failure:{-1,0,1,5,11}){
+         Native scalar,bulk;Observer a{&scalar},b{&bulk};a.fail=b.fail=failure;
++        a.different=b.different=prepare==3;
+         auto bindings=binding(b,true);
+         if(direct==1)bindings.constructDirectSpan=bindings.constructSpan;
+         if(direct==2)bindings.constructDirectSpan=[](void* p,const Native::Identity&,Native::PreparedCells,int,
+             unsigned&,std::uint32_t&,std::uint32_t*,downwell::RunnerRetainedLayerState&){
+             ++static_cast<Observer*>(p)->directMisses;return Native::SpanResult::unsupported;
+         };
++        if(prepare)bindings.freshDefaults=[](void* p,int,std::uint32_t* flags){
++            flags[0]=static_cast<Observer*>(p)->different?0x8200u:0x8208u;flags[1]=0x8208u;return true;
++        };
+         require(scalar.bind(binding(a,false))&&bulk.bind(bindings));
++        if(prepare)require(bulk.prepareFreshCells(prepare==2?52:51));
+         bool af=true,bf=true;
+         unsigned char source[24]{};
+-        for(unsigned i=0;i<12;++i)source[i*2]=32+(i<6?i:11-i)+(i%3==1?128:0);
++        for(unsigned i=0;i<12;++i)source[i*2]=32+(i<6?i:11-i)+
++            ((pattern==1||(pattern==2&&i%3==1))?128:0);
+         const bool expected=scalar.constructPrepared(51,af,{source,12,32});
+         const bool actual=bulk.constructPrepared(51,bf,{source,12,32,retained});
+         require(expected==actual&&scalar.size()==bulk.size()&&scalar.lastLifetime()==bulk.lastLifetime());
+@@ -624,6 +631,29 @@ static void preparedSpanConstruction(){
+             require(scalar.spatialFlags(h,ap)&&bulk.spatialFlags(h,bp)&&ap==bp);
+             require(scalar.appearance(h,as,ai,ac)&&bulk.appearance(h,bs,bi,bc)&&as==bs&&ai==bi&&ac==bc);
+         }
++        // Failed constructors expose only the completed prefix; read-only
++        // wall state remains inspectable after terminal publication failure.
++        for(unsigned i=0;i<scalar.size();++i)if(!(source[2*i]&128)){
++            downwell::WallEndStepState as,bs;
++            require(scalar.wallState(scalar.handle(i),as)&&bulk.wallState(bulk.handle(i),bs));
++            require(as.checked==bs.checked&&as.pillar==bs.pillar&&as.neighbors==bs.neighbors);
++        }
++        if(actual&&retained&&(prepare==1||prepare==3)){
++            for(unsigned i=0;i<12;++i){
++                const auto h=bulk.currentHandle(i);
++                require(bulk.publishCachedOffset(h,16,0)&&bulk.markDestroyed(h)&&bulk.retire(h));
++            }
++            // Free is not fresh: reused cells must not retain destruction or
++            // query-cache state from their previous lifetime.
++            require(bulk.constructPrepared(51,bf,{source,12,64,true}));
++            for(unsigned i=0;i<12;++i){
++                const auto h=bulk.currentHandle(i);int x=99,y=99;std::uint32_t flags;
++                require(bulk.cachedOffset(h,x,y)&&!x&&!y&&bulk.spatialFlags(h,flags)&&
++                    flags==((prepare==3&&!(source[2*i]&128))?0x8200u:0x8208u));
++            }
++            require(bulk.clear()&&bulk.prepareFreshCells(51)&&
++                    bulk.constructPrepared(51,bf,{source,12,96,true}));
++        }
+     }
+     std::puts("Prepared span construction: publication clocks, final fields and failed prefixes agree");
+ }
