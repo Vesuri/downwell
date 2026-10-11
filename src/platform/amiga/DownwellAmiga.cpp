@@ -2313,7 +2313,8 @@ __attribute__((noinline)) static int runDownwell(void) {
     };
     const auto acquireGameplayPlanes=[&](){
         DW_PROFILE_SCOPE(profileEntryGameArtAdmission);
-#if defined(DOWNWELL_REPLAY_VERIFY) || defined(DOWNWELL_PLANE_BANK_VERIFY)
+#ifndef DOWNWELL_REPLAY_VERIFY
+#ifdef DOWNWELL_PLANE_BANK_VERIFY
         constexpr bool artReferenceOracle=true;
 #else
         constexpr bool artReferenceOracle=false;
@@ -2321,6 +2322,7 @@ __attribute__((noinline)) static int runDownwell(void) {
         if(!AmigaSceneAdmission::acquireGameplay(scenes.scene(),artReferenceOracle)){
             gDownwellSceneAdmissionFailure=1;return false;
         }
+#endif
 #if defined(DOWNWELL_REPLAY_VERIFY) || defined(DOWNWELL_PLANE_BANK_VERIFY)
         // These explicit full-catalogue pixel oracles include later-area art.
         if(!AmigaGameplayAssetAdmission::referenceOracle(port.runStage().area))return false;
@@ -3655,7 +3657,12 @@ __attribute__((noinline)) static int runDownwell(void) {
             const bool wasSideLocked = port.cameraSideLocked();
 #endif
             checkSceneStack(6);
-            if(!AmigaSceneAdmission::stepGameplay(scenes.scene(),
+            if(!AmigaSceneAdmission::stepGameplay(
+#ifdef DOWNWELL_REPLAY_VERIFY
+                    AmigaScene::gameplay, // Replay harness has no front-end scene owner.
+#else
+                    scenes.scene(),
+#endif
                     activeGamePack!=nullptr, memory.gameAssets()!=nullptr,
                     activeEntryMask!=nullptr, terrainRaster.hasStorage())){
                 gDownwellSceneAdmissionFailure=2;exitCode=20;break;
