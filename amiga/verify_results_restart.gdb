@@ -20,6 +20,12 @@ if gDownwellPreciseMaskChecks != 2
     printf "Native terrain mask probe did not complete\n"
     quit 1
 end
+set $owner = (downwell::GameplayCollisionOwner*)&'_ZZL11runDownwellvE16collisionStorage.lto_priv.0'
+if $owner->geometry_ == 0
+    printf "Full-service scene fixture is missing its admitted collision geometry\n"
+    quit 1
+end
+printf "Full-service collision geometry: %lu resident bytes\n", sizeof(*$owner->geometry_)
 printf "Initial Chip allocation: free=%lu largest=%lu remaining=%lu; native terrain mask checks=%lu\n", gDownwellStartupChipFree, gDownwellStartupChipLargest, gDownwellStartupChipRemaining, gDownwellPreciseMaskChecks
 if gDownwellResultsRestartCount != 3 || gDownwellResultsRestartMask != 7
     printf "Not all results destinations executed\n"

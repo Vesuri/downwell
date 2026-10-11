@@ -70,17 +70,24 @@ public:
         true,RunnerSpatialLifetimes<View::capacity>,Registration,true,void,ScalarStates,
         RunnerSpatialJournal<View::capacity*2,View::capacity,4096,true,DerivedTree,JournalStorage>>;
 #endif
+    struct CollisionGeometryStorage {
+        PreparedSpriteGeometry<741> sprites;
+        PreparedTerrainBirthBounds terrain;
+    };
     struct ReferenceStorage {
         Owner::State states[View::capacity]{};
         Owner::Properties properties[View::capacity]{};
+        CollisionGeometryStorage geometry;
     };
     using NativeDirtyQueue=RunnerSpatialDirtyQueue<View::capacity>;
     // Caller-owned backing for collision-enabled native scenes only.
     struct NativeCollisionStorage {
         NativeDirtyQueue spatial,collision;
         unsigned retained[View::capacity]{};
+        CollisionGeometryStorage geometry;
     };
     bool hasNativeCollisionStorage()const{return nativeCollisionStorage_!=nullptr;}
+    bool hasPreparedCollisionGeometry()const{return geometry_!=nullptr;}
     template<class Provider> bool bindSpatialTree(Provider provider){return owner_.bindTree(provider);}
     template<class Provider> bool bindSpatialJournal(Provider provider){return owner_.bindJournal(provider);}
     bool declareNoSpatialQueries(){return owner_.declareNoSpatialQueries();}
@@ -232,8 +239,7 @@ private:
     PackedSpriteCollision preparedSprites_[741];
     SpriteCollisionPack sprites_;
     PreparedObjectDefaults<386> objectDefaults_;
-    PreparedSpriteGeometry<741> spriteGeometry_;
-    PreparedTerrainBirthBounds terrainBirthBounds_;
+    CollisionGeometryStorage* geometry_=nullptr;
     PreparedTerrainCreate nativeTerrainCreate_;
 #ifdef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
     GameplayRoomLayers<View::capacity> layers_;
@@ -549,7 +555,7 @@ private:
                 Owner::Box bounds;bool prepared;
                 {
                     DW_PROFILE_SCOPE(profileBoundsGeometry);
-                    prepared=spriteGeometry_.at(id,state->x,state->y,bounds,
+                    prepared=geometry_&&geometry_->sprites.at(id,state->x,state->y,bounds,
                         (sprite.scaleX.bits>>31)!=0,(sprite.scaleY.bits>>31)!=0);
                 }
                 if(prepared)return owner_.refresh(key,*flags,false,&bounds,
@@ -583,7 +589,7 @@ private:
         const bool prepared=!(sprite.angle.bits&0x7fffffffu)&&
             (sprite.scaleX.bits&0x7fffffffu)==0x3f800000u&&
             (sprite.scaleY.bits&0x7fffffffu)==0x3f800000u&&
-            spriteGeometry_.at(collisionSprite,state->x,state->y,bounds,
+            geometry_&&geometry_->sprites.at(collisionSprite,state->x,state->y,bounds,
                 (sprite.scaleX.bits>>31)!=0,(sprite.scaleY.bits>>31)!=0);
         const bool found=prepared||sprites_.collisionSprite(sprite.spriteId,sprite.maskId,resource);
         if(found&&!prepared){
@@ -621,7 +627,7 @@ private:
         // Keep changed resources, non-grid positions and unusual lifetimes on
         // the complete constructor/refresh oracle. No Create is delayed.
         const bool prepared=r.active&&!r.destroyRequested&&r.x<=0x7fffffff-240&&r.y<=0x7fffffff-176&&
-            terrainBirthBounds_.at(92,r.x+240,r.y+176,x,y,bounds,precise,&pixels,&geometry);
+            geometry_&&geometry_->terrain.at(92,r.x+240,r.y+176,x,y,bounds,precise,&pixels,&geometry);
         if(!prepared)return boxes_.birthPosition(r,*state)&&boxes_.nativeAppearance(h,r)&&
             nativeBirthQueues(h.slot,92)&&refreshNativeActor(h,true);
         if(!boxes_.nativeAppearance(h,r))return false;
@@ -642,7 +648,7 @@ private:
     }
     bool nativeTerrainBirthBounds(const GameplayWorld::NativeTerrain::Identity& id,
         RunnerImageValue& x,RunnerImageValue& y,Owner::Box& bounds,bool& found,bool& precise,int sprite=-2){
-        if(sprite==-2&&terrainBirthBounds_.at(id.object,id.x,id.y,x,y,bounds,precise)){found=true;return true;}
+        if(sprite==-2&&geometry_&&geometry_->terrain.at(id.object,id.x,id.y,x,y,bounds,precise)){found=true;return true;}
         const auto* definition=objectDefaults_.get(id.object);
         if(!definition||!x.assignInteger(id.x)||!y.assignInteger(id.y))return check(false);
         PackedSpriteCollision resource;
@@ -803,8 +809,8 @@ private:
                (definition->initialFlags&0x8000u))return Result::unsupported;
             auto& recipe=recipes[kind];PreparedTerrainBirthBounds::Key lastKey;
             RunnerSpatialSplit::PixelBox last;bool precise,lastPrecise;
-            if(!terrainBirthBounds_.publication(object,recipe.low,cells.y,recipe.key,recipe.pixels,precise)||
-               !terrainBirthBounds_.publication(object,recipe.high,cells.y,lastKey,last,lastPrecise))return Result::unsupported;
+            if(!geometry_||!geometry_->terrain.publication(object,recipe.low,cells.y,recipe.key,recipe.pixels,precise)||
+               !geometry_->terrain.publication(object,recipe.high,cells.y,lastKey,last,lastPrecise))return Result::unsupported;
             flags[kind]=(definition->initialFlags&~0x208u)|(precise?0x200u:0u);
             if(!NativeDirtyQueue::shouldPublishBounds(*objectFlags,flags[kind],false))return Result::unsupported;
             recipe.queue=NativeDirtyQueue::shouldQueue(true,*objectFlags,definition->initialFlags);
@@ -883,7 +889,7 @@ private:
         // Only a fresh, resource-certified integer-grid constructor. Mutated
         // bounds and unexpected pre-indexed defaults keep the full oracle.
         if(collisionConsumersAdmitted_&&!(flags&0x8000u)&&
-           terrainBirthBounds_.publication(id.object,id.x,id.y,geometry,pixels,preparedPrecise)){
+           geometry_&&geometry_->terrain.publication(id.object,id.x,id.y,geometry,pixels,preparedPrecise)){
             flags=(flags&~0x208u)|(preparedPrecise?0x200u:0u);
             if(NativeDirtyQueue::shouldPublishBounds(*objectFlags,flags,false)){
                 DW_PROFILE_COUNT(counterSpatialFirstPublication);
@@ -1011,7 +1017,7 @@ private:
             RunnerSpatialSplit::PixelBox terrainPixels;
             PreparedTerrainBirthBounds::Key terrainGeometry;
             if constexpr(Kind==View::Kind::terrain)
-                preparedTerrain=parent.terrainBirthBounds_.at(r.objectId,r.x,r.y,
+                preparedTerrain=parent.geometry_&&parent.geometry_->terrain.at(r.objectId,r.x,r.y,
                     state.x,state.y,terrainBounds,terrainPrecise,&terrainPixels,&terrainGeometry);
             if(!preparedTerrain){
                 NativePosition position;
@@ -1516,13 +1522,14 @@ public:
         if(native_?reference!=nullptr:(!reference||!owner_.bindStateStorage(reference->states)||
                                      !properties_.bindStorage(reference->properties))){good_=false;return;}
         if(preparedDrawEnabled())layers_.enablePreparedDraw();
+        geometry_=native_?(nativeCollision?&nativeCollision->geometry:nullptr):&reference->geometry;
         good_=sprites_.prepare(preparedSprites_,741)&&objectDefaults_.prepare(objects,sprites_)&&
-            spriteGeometry_.prepare(sprites_)&&
-            terrainBirthBounds_.prepare(objectDefaults_,sprites_)&&
+            (!geometry_||(geometry_->sprites.prepare(sprites_)&&
+                         geometry_->terrain.prepare(objectDefaults_,sprites_)))&&
             nativeTerrainCreate_.prepare(objectDefaults_,sprites_)&&
             families_.bindInstanceFlags(objects)&&drawMetadata_.bind(objects)&&alarmMetadata_.bind(objects);
 #ifndef DOWNWELL_SCALAR_TERRAIN_OWNERSHIP
-        if(good_)good_=owner_.bindTerrainGeometry(terrainBirthBounds_);
+        if(good_&&geometry_)good_=owner_.bindTerrainGeometry(geometry_->terrain);
 #endif
         if(good_){const auto* box=objectDefaults_.get(92);if(!box)good_=false;else {
             nativeBoxFlags_=box->initialFlags;

@@ -47,6 +47,7 @@ std::vector<unsigned> cleanupOrder(const downwell::ObjectPack& objects,
         rooms,ownership,true,true,!externalCollision);
     require(owner->hasNativeCollisionStorage()==(!externalCollision&&
         (ownership==Ownership::native||ownership==Ownership::nativeScenery)),"scene collision backing admission");
+    require(owner->hasPreparedCollisionGeometry()==!externalCollision,"geometry follows collision admission");
     if(externalCollision)require(owner->declareExternalCollisionBackend(),"cleanup external collision admission");
     auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
         owner->breakableBinding(),owner->playerBinding());
@@ -412,10 +413,12 @@ int main(int argc,char** argv){
         require(!unneeded->declareExternalCollisionBackend()&&!unneeded->valid(),
             "external backend rejects unnecessary collision backing");
         auto missing=downwell::makeCollisionOwner(objects,sprites,{}, {},&rooms,Ownership::nativeScenery,true,true,false);
+        require(!missing->hasPreparedCollisionGeometry(),"no collision backing means no geometry preparation");
         require(!missing->flushNativeSpatial()&&!missing->valid(),
             "full collision service fails without explicit backing");
         std::cout<<"native collision backing: "<<sizeof(downwell::GameplayCollisionOwner::NativeCollisionStorage)
             <<" bytes; external scenes retain only a pointer\n";
+        std::cout<<"optional collision geometry: "<<sizeof(downwell::GameplayCollisionOwner::CollisionGeometryStorage)<<" bytes\n";
     }
     unsigned tapes=0,frames=0,maxTerrain=0;
     for(unsigned phase=0;phase<10;++phase){

@@ -68,16 +68,22 @@ run-owned. This storage does not allocate Chip RAM or another spatial index:
 native publication borrows the otherwise unused reference owner's journal/tree
 allocation, without attaching generic lifetime/property records there.
 Collision-enabled native scenes explicitly supply `NativeCollisionStorage`:
-two dirty queues (each two 16-bit links per shared slot plus counters) and one
-unsigned slot per shared identity for animated-mask retention. This is borrowed
+two dirty queues (each two 16-bit links per shared slot plus counters), one
+unsigned slot per shared identity for animated-mask retention, and prepared
+sprite/terrain collision geometry. This is borrowed
 ordinary-memory backing, not part of every owner, not Chip memory and not an
 allocation fallback. The caller must keep it alive until after its owner.
 Missing backing fails on collision-service use. External-backend admission
 rejects a supplied bank rather than retaining an unnecessary scene dependency.
 Terrain geometry and lifetime identities remain in their run owner.
-On the 68000 this bank is 47,572 bytes; replacing its embedded reservation with
-one four-byte pointer removes 47,568 ordinary resident bytes from the external
-scene owner. Startup and contact-profile verifiers assert a null bank pointer.
+On the 68000 this bank is 69,466 bytes, including 21,894 bytes of prepared
+geometry. Full-service reference owners carry the same geometry in their
+explicit `ReferenceStorage`. Guarded external-backend owners neither reserve
+nor prepare it; they retain only a four-byte geometry pointer. Required sprite
+metadata, object defaults and terrain Create plans remain available. Startup
+and contact-profile verifiers assert null bank and geometry pointers, and the
+preparation-count gate distinguishes terrain Create plans from optional
+collision birth bounds. Query-enabled fixtures verify the full-service path.
 This does not reduce Chip usage or remove the separate actor-position array.
 
 ## Measuring transient Chip residency

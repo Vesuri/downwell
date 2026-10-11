@@ -121,6 +121,11 @@ end
 # and change the very residency/work state this diagnostic is measuring.
 set $owner = (downwell::GameplayCollisionOwner*)&'_ZZL11runDownwellvE16collisionStorage.lto_priv.0'
 set $tree = $owner->owner_.index_.tree_.tree_
+if $owner->geometry_ != 0
+    printf "External collision backend retained unused prepared geometry\n"
+    quit 1
+end
+printf "Collision geometry: optional_bytes=%lu resident=0\n", sizeof(*$owner->geometry_)
 if $owner->nativeCollisionStorage_ != 0
     printf "External collision backend retained unused queue/mask backing\n"
     quit 1

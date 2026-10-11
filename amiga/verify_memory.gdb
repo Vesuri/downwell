@@ -20,6 +20,11 @@ if gDownwellInitialRoomPreparations != 0
     quit 1
 end
 set $owner = (downwell::GameplayCollisionOwner*)&'_ZZL11runDownwellvE16collisionStorage.lto_priv.0'
+if $owner->geometry_ != 0
+    printf "Unused prepared collision geometry resident during startup\n"
+    quit 1
+end
+printf "Startup collision geometry: optional_bytes=%lu resident=0\n", sizeof(*$owner->geometry_)
 if $owner->nativeCollisionStorage_ != 0
     printf "Unused collision queue/mask backing resident during startup\n"
     quit 1
