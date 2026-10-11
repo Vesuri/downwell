@@ -7,7 +7,15 @@ This remains a development configuration, not a final memory requirement.
 
 ## Native terrain identities
 
-`nativeTerrainStorage` reserves 145,534 bytes of ordinary BSS on the 68000,
+Inactive retained-layer membership has a one-bit-per-slot projection plus a
+count (260 bytes for 2,048 slots on 68000). It owns no layer, order or lifetime
+records: cutoff queries read those from the authoritative run owner. Successful
+publication, layer-state changes, retirement and clear maintain the projection;
+pending/unpublished births are excluded. With no inactive entries, Draw cutoff
+queries return without walking terrain. The retained-run traversal remains the
+test oracle for earliest-key and interval queries.
+
+`nativeTerrainStorage` reserves 145,798 bytes of ordinary BSS on the 68000,
 outside Chip RAM and the task stack. It retains at most 2,048 terrain
 lifetimes in birth order. Adjacent generated cells share identity/geometry
 descriptors; coincident and authored walls remain distinct. The bounded

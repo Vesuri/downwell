@@ -282,6 +282,35 @@ static void nativeRunPrefixes(){
         }));REQUIRE(observed==prefix);
     }
 }
+static void sparseTerrainCutoffs(){
+    NativeTerrainLifetimes<64> terrain;unsigned random=72123;
+    for(unsigned turn=0;turn<5000;++turn){
+        random=random*1664525u+1013904223u;
+        const unsigned slot=(random>>8)%64,op=(random>>20)%4;
+        const auto h=terrain.currentHandle(slot);
+        if(op==0&&terrain.available())REQUIRE(terrain.append(60,int(turn%16)*16,0));
+        else if(op==1&&h.generation){REQUIRE(terrain.markDestroyed(h));REQUIRE(terrain.retire(h));}
+        else if(h.generation){
+            RunnerRetainedLayerState state;
+            state.layer=(random>>4)%3;state.publishedId=state.layer;
+            state.inactive=(random&3)!=0;
+            state.order={{turn+1,0},bool(random&4)};
+            if(op==3&&random&16)state={};
+            terrain.setLayerState(slot,state);REQUIRE(terrain.valid());
+        }
+        for(unsigned layer=0;layer<3;++layer)for(unsigned useAfter=0;useAfter<2;++useAfter){
+            const RunnerLayerOrderKey after{{turn/2+1,0},bool(random&32)};
+            RunnerLayerOrderKey got{},expected{};bool a=false,b=false;
+            REQUIRE(terrain.visitLayerCutoffs(layer,useAfter?&after:nullptr,[&](auto key){
+                if(!a||key.before(got))got=key;a=true;return true;}));
+            REQUIRE(terrain.visitLayerCutoffsReference(layer,useAfter?&after:nullptr,[&](auto key){
+                if(!b||key.before(expected))expected=key;b=true;return true;}));
+            REQUIRE(a==b);if(a)REQUIRE(!got.before(expected)&&!expected.before(got));
+        }
+        if(turn%251==250){REQUIRE(terrain.clear());unsigned calls=0;
+            REQUIRE(terrain.visitLayerCutoffs(0,nullptr,[&](auto){++calls;return true;}));REQUIRE(!calls);}
+    }
+}
 static void sparsePreparedDraw(){
     using List=RunnerPreparedDrawList<3,512>;
     List list;
@@ -339,6 +368,7 @@ static void sparsePreparedDraw(){
     }
 }
 int main(){inheritedCapacity();merges();mutations();failedPublication();preparedCutoffs();nativePublication();nativeRunPrefixes();sparsePreparedDraw();
+    sparseTerrainCutoffs();
     REQUIRE(drawMutation(true,true)==drawMutation(false,true));
     REQUIRE(drawMutation(true,false)==drawMutation(false,false));
     REQUIRE(drawMutation(true,true)==std::vector<unsigned>({3,0}));

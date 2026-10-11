@@ -32,6 +32,16 @@ template<unsigned Capacity> class NativeTerrainLifetimes {
     bool publicationRun_=false;
     RunnerRetainedLayerState inheritedLayer_;
     unsigned inheritedLayerCount_=0;
+    // Membership only: retained layer/order state stays authoritative in runs_.
+    // Active scenery must not participate in Draw's inactive cutoff query.
+    unsigned char layerCutoffSlots_[(Capacity+7)/8]{};
+    unsigned layerCutoffCount_=0;
+    void selectLayerCutoff(unsigned slot,bool selected){
+        auto& byte=layerCutoffSlots_[slot/8];const unsigned bit=1u<<(slot&7);
+        if(bool(byte&bit)==selected)return;
+        if(selected){byte|=bit;++layerCutoffCount_;}
+        else{byte&=~bit;--layerCutoffCount_;}
+    }
 public:
     static constexpr unsigned capacity=Capacity;
     using Identity=typename Runs::Identity;
@@ -100,6 +110,7 @@ public:
         const auto h=runs_.currentHandle(slot);Order value;
         if(!runs_.publication(h,value)){good_=false;return;}
         value.layer=layer;if(!runs_.changePublication(h,value))good_=false;
+        else selectLayerCutoff(slot,layer.bound()&&layer.inactive);
     }
     void publishInheritedLayer(unsigned slot){
         if(!publicationRun_||!pendingPublication_||slot!=pendingHandle_.slot||!inheritedLayer_.bound()){
@@ -122,6 +133,20 @@ public:
         return runs_.visit([&](const Identity& id){return visit(id.handle,*layerState(id.handle));});
     }
     template<class Visit> bool visitLayerCutoffs(unsigned layer,const RunnerLayerOrderKey* after,Visit visit)const{
+        if(!layerCutoffCount_)return true;
+        // Candidates are unordered: the caller reduces to the earliest key
+        // or tests existence in an interval. Read keys live after layer moves.
+        for(unsigned byte=0;byte<(Capacity+7)/8;++byte){
+            const unsigned bits=layerCutoffSlots_[byte];if(!bits)continue;
+            for(unsigned bit=0;bit<8;++bit)if(bits&(1u<<bit)){
+                const auto state=layerState(byte*8+bit);
+                if(state&&state->bound()&&state->layer==layer&&state->inactive&&
+                   (!after||after->before(state->order))&&!visit(state->order))return false;
+            }
+        }
+        return true;
+    }
+    template<class Visit> bool visitLayerCutoffsReference(unsigned layer,const RunnerLayerOrderKey* after,Visit visit)const{
         return runs_.visitPublicationRuns([&](const auto& run){
             const auto& basis=run.publication().layer;
             if(!basis.bound()||basis.layer!=layer||!basis.inactive)return true;
@@ -320,6 +345,8 @@ private:
                     unsigned n=1;
                     while(i+n<completed&&cells.kind(i+n)==kind&&cells.x(i+n)==x+int(n)*step)++n;
                     if(!runs_.appendSpan({slot+i,next_+i},object,x,cells.y,step,n,order.shifted(i)))return good_=false;
+                    if(order.layer.bound()&&order.layer.inactive)
+                        for(unsigned j=0;j<n;++j)selectLayerCutoff(slot+i+j,true);
                     const auto value=spatial[kind];
                     const unsigned char flags=32u|((value&8u)?4u:0u)|((value&0x200u)?8u:0u)|((value&0x8000u)?16u:0u);
                     for(unsigned j=0;j<n;++j){
@@ -353,6 +380,7 @@ private:
         const bool published=!binding_.birth||binding_.birth(binding_.context,identity,active,order.stamp,spatial);
         pendingPublication_=nullptr;pendingHandle_={};
         if(!published||!runs_.append({slot,next_},object,x,y,source,creation,order))return good_=false;
+        if(order.layer.bound()&&order.layer.inactive)selectLayerCutoff(slot,true);
         ++next_;freeHint_=slot+1;
         flags_[slot]=(active?0:2)|((spatial&8u)?4u:0u)|((spatial&0x200u)?8u:0u)|((spatial&0x8000u)?16u:0u);
         createSprite_[slot]=-2;
@@ -394,6 +422,7 @@ public:
     bool retire(InstanceHandle h){
         if(stepping_||!good_||!runs_.contains(h)||!(flags_[h.slot]&1)||
             (binding_.retire&&!binding_.retire(binding_.context,h.slot))||!runs_.retire(h))return good_=false;
+        selectLayerCutoff(h.slot,false);
         if(h.slot<freeHint_)freeHint_=h.slot;
         return true;
     }
@@ -406,7 +435,8 @@ public:
         // ordinal rather than mutating a borrowed descriptor traversal.
         if(binding_.retire)for(unsigned i=0;i<runs_.size();++i)
             if(!binding_.retire(binding_.context,runs_.handle(i).slot))return good_=false;
-        runs_.~Runs();new(&runs_) Runs;freeHint_=0;wallPresentationState_=unboundedWallArt_=false;return true;
+        runs_.~Runs();new(&runs_) Runs;freeHint_=0;wallPresentationState_=unboundedWallArt_=false;
+        for(auto& byte:layerCutoffSlots_)byte=0;layerCutoffCount_=0;return true;
     }
 private:
     int drawSprite(InstanceHandle h)const{
