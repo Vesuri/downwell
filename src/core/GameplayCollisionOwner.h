@@ -63,12 +63,12 @@ public:
     using Registration=typename RunnerRegistrationStorage<View::capacity,View::terrainBase,View::timeFieldBase,false>::Type;
     using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2,true,View::terrainBase,View::timeFieldBase,false,
         RunnerSpatialLifetimes<View::capacity>,Registration,false,void,ScalarStates,
-        RunnerSpatialJournal<View::capacity*2,View::capacity,4096,false,DerivedTree,JournalStorage>>;
+        RunnerSpatialJournal<View::capacity*2,View::capacity,4096,false,DerivedTree,JournalStorage>,true>;
 #else
     using Registration=typename RunnerRegistrationStorage<View::capacity,View::terrainBase,View::timeFieldBase,true>::Type;
     using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2,true,View::terrainBase,View::timeFieldBase,
         true,RunnerSpatialLifetimes<View::capacity>,Registration,true,void,ScalarStates,
-        RunnerSpatialJournal<View::capacity*2,View::capacity,4096,true,DerivedTree,JournalStorage>>;
+        RunnerSpatialJournal<View::capacity*2,View::capacity,4096,true,DerivedTree,JournalStorage>,true>;
 #endif
     // Generic published collision builtins, not native artwork coordinates.
     struct NativePosition {
@@ -85,6 +85,7 @@ public:
         PreparedTerrainBirthBounds terrain;
     };
     struct ReferenceStorage {
+        Owner::ControlStorage control;
         Owner::State states[View::capacity]{};
         Owner::Properties properties[View::capacity]{};
         CollisionGeometryStorage geometry;
@@ -101,6 +102,7 @@ public:
         NativePosition boxes[GameplayWorld::breakableCapacity]{};
     };
     bool hasNativeCollisionStorage()const{return nativeCollisionStorage_!=nullptr;}
+    bool hasScalarControlStorage()const{return owner_.hasControlStorage();}
     bool hasPreparedCollisionGeometry()const{return geometry_!=nullptr;}
     template<class Provider> bool bindSpatialTree(Provider provider){return owner_.bindTree(provider);}
     template<class Provider> bool bindSpatialJournal(Provider provider){return owner_.bindJournal(provider);}
@@ -1536,7 +1538,8 @@ public:
         owner_.observeStateFailure(good_);properties_.observeFailure(good_);
         // Only the scalar/reference backend may own these arrays. Native
         // publication borrows the journal, never its scalar actor records.
-        if(native_?reference!=nullptr:(!reference||!owner_.bindStateStorage(reference->states)||
+        if(native_?(reference!=nullptr||!owner_.declareExternalSpatialOwnership()):
+                                    (!reference||!owner_.bindControlStorage(&reference->control)||!owner_.bindStateStorage(reference->states)||
                                      !properties_.bindStorage(reference->properties))){good_=false;return;}
         if(!native_&&!terrain_.bindStorage(reference->terrain)){good_=false;return;}
         if(preparedDrawEnabled())layers_.enablePreparedDraw();
@@ -3956,7 +3959,9 @@ public:
     bool retire(InstanceHandle key,const NativeTimeChangeRegistration::Record& record){
         return timeChangeBinding_.retire(key,record);
     }
-    Owner::StateRead state(InstanceHandle key)const{return valid()?owner_.resolve(key):Owner::StateRead{};}
+    // Reference-state inspection never materializes a scalar backend for a
+    // native owner. Native published-state consumers use the guarded APIs.
+    Owner::StateRead state(InstanceHandle key)const{return !native_&&valid()?owner_.resolve(key):Owner::StateRead{};}
     typename PropertyStore::Read properties(InstanceHandle key)const{return state(key)?properties_.read(key.slot):typename PropertyStore::Read{};}
     // These take selected shared collision handles, not box-array indices.
     // Game fields can still be written after a destruction mark; only actual

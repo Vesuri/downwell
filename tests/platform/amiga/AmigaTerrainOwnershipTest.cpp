@@ -48,6 +48,8 @@ std::vector<unsigned> cleanupOrder(const downwell::ObjectPack& objects,
     require(owner->hasNativeCollisionStorage()==(!externalCollision&&
         (ownership==Ownership::native||ownership==Ownership::nativeScenery)),"scene collision backing admission");
     require(owner->hasPreparedCollisionGeometry()==!externalCollision,"geometry follows collision admission");
+    require(owner->hasScalarControlStorage()==(ownership==Ownership::reference||ownership==Ownership::nativeTerrain),
+        "scalar control bank belongs only to reference ownership, not native index consumers");
     require(owner->terrain().hasStorage()==(ownership==Ownership::reference||ownership==Ownership::nativeTerrain),
         "scalar terrain backing belongs only to reference terrain owners");
     if(externalCollision)require(owner->declareExternalCollisionBackend(),"cleanup external collision admission");

@@ -32,6 +32,20 @@
 #include "RunnerSpatialStates.h"
 #include "RunnerObservedDirtyQueue.h"
 namespace downwell {
+template<class Bank,bool Borrowed> class RunnerSpatialControlStorage {
+    Bank bank_;
+public:
+    Bank* get(){return &bank_;}
+    const Bank* get()const{return &bank_;}
+    bool bind(Bank*){return false;}
+};
+template<class Bank> class RunnerSpatialControlStorage<Bank,true> {
+    Bank* bank_=nullptr;
+public:
+    Bank* get(){return bank_;}
+    const Bank* get()const{return bank_;}
+    bool bind(Bank* bank){if(!bank||bank_)return false;bank_=bank;return true;}
+};
 template<unsigned Capacity,unsigned First,unsigned Last,bool Runs> struct RunnerRegistrationStorage {
     using Type=RunnerObjectMembership<Capacity,First,Last>;
 };
@@ -55,13 +69,28 @@ template<unsigned Capacity,unsigned Nodes,bool ScheduledIndex=false,unsigned Ret
     class Registration=typename RunnerRegistrationStorage<Capacity,RetainedFirst,RetainedLast,
         RunRegistration&&(RetainedFirst<RetainedLast)>::Type,bool PreparedGeometry=false,class TerrainStates=void,
     class StateStorage=RunnerSpatialStates<RunnerSpatialState,Capacity,RetainedFirst,RetainedLast,TerrainStates>,
-    class Index=typename RunnerSpatialIndexStorage<Capacity,Nodes,ScheduledIndex,PreparedGeometry>::Type> class RunnerSpatialInstances {
+    class Index=typename RunnerSpatialIndexStorage<Capacity,Nodes,ScheduledIndex,PreparedGeometry>::Type,
+    bool BorrowControl=false> class RunnerSpatialInstances {
     static_assert(Capacity>0,"Spatial instances need stable slots");
     using Queue=typename RunnerDirtyQueueStorage<Capacity,RetainedFirst,RetainedLast,TerrainStates,0>::Type;
     using CollisionQueue=typename RunnerDirtyQueueStorage<Capacity,RetainedFirst,RetainedLast,TerrainStates,1>::Type;
     using Math=RunnerSpatialSplit;
     using Membership=Registration;
 public:
+    struct ControlStorage {
+        Lifetimes lifetimes;
+        Membership membership;
+        Queue spatial;
+        CollisionQueue collision;
+    };
+    bool hasControlStorage()const{return control_.get()!=nullptr;}
+    bool bindControlStorage(ControlStorage* bank){
+        return checked(!externalSpatialOwner_&&control_.bind(bank));
+    }
+    bool declareExternalSpatialOwnership(){
+        if(control_.get()||externalSpatialOwner_)return checked(false);
+        externalSpatialOwner_=true;return true;
+    }
     using Real=RunnerImageValue;
     using SpatialIndex=Index;
     template<class Provider> bool bindTree(Provider provider){return index_.bindTree(provider);}
@@ -88,7 +117,7 @@ public:
     // 0x432170 stores only the narrowed image_index. Sequence reconciliation
     // belongs to animation; do not invent bounds dirtiness or reset timeline.
     bool writeImageIndex(InstanceHandle h,Sprite& sprite,Real value){
-        if(!valid()||!live(h))return false;
+        if(!scalarValid()||!live(h))return false;
         if(!checked(Math::valid(value)))return false;
         sprite.imageIndex=value;return true;
     }
@@ -97,7 +126,7 @@ public:
     // alpha and blend. No angle wrapping. Equal signed zeros are a no-op.
     bool changeTransform(InstanceHandle h,Sprite& sprite,TransformField field,Real value,
                          Real alpha,std::uint32_t blend,std::uint32_t objectFlags){
-        if(!valid()||!live(h))return false;
+        if(!scalarValid()||!live(h))return false;
         auto flags=states_.flags(h.slot);bool changed;
         if(!checked(RunnerSpriteSetters::transform(sprite,field,value,alpha,blend,flags,changed)))return false;
         if(!changed)return true;
@@ -107,7 +136,7 @@ public:
     // Integer setter 0x46bfd0. VM-number narrowing/rounding is a separate entry
     // point; an invalid resource ID remains stored and means a missing mask.
     bool changeMask(InstanceHandle h,Sprite& sprite,int mask,std::uint32_t objectFlags){
-        if(!valid()||!live(h))return false;
+        if(!scalarValid()||!live(h))return false;
         if(sprite.maskId==mask)return true;
         sprite.maskId=mask;{auto edit=states_.edit(h.slot);edit.get().flags|=8u;}
         markSpatialChange(h.slot,objectFlags);return true;
@@ -120,7 +149,7 @@ public:
     bool bindObjectFromPacks(InstanceHandle h,int object,bool registered,Properties& properties,
                             const ObjectPack& objects,const SpriteCollisionPack& sprites,
                             const Graph& graph,bool allPrepared,std::int32_t* creationDepth=nullptr){
-        if(!valid()||!live(h))return false;
+        if(!scalarValid()||!live(h))return false;
         PackedObject definition;
         {
             DW_PROFILE_SCOPE(profileBindingDefinition);
@@ -155,7 +184,7 @@ public:
     bool bindObjectPrepared(InstanceHandle h,int object,bool registered,Properties& properties,
         const PreparedObjectDefaults<Resources>& defaults,const Graph& graph,
         bool allPrepared,Real* creationDepth=nullptr){
-        if(!valid()||!live(h))return false;
+        if(!scalarValid()||!live(h))return false;
         const auto* definition=defaults.get(object);
         if(!definition||!graph.valid()||!graph.flags(unsigned(object)))return checked(false);
         const auto objectFlags=*graph.flags(unsigned(object));
@@ -191,7 +220,7 @@ public:
                 (*flags&0x87u)==definition->propertyFlags&&
                 (state.flags&~2u)==8u&&!state.special&&
                 (definition->spriteId==-1||definition->frames<=65535u)&&
-                valid()&&lifetimes_.canAttach(h,object)&&
+                scalarValid()&&control_.get()->lifetimes.canAttach(h,object)&&
                 Math::valid(state.x)&&Math::valid(state.y)){
                 auto edit=states_.edit(h.slot);auto& s=edit.get();
                 // Store semantic fields directly; do not copy padding or the
@@ -200,13 +229,13 @@ public:
                 s.bounds.left=state.bounds.left;s.bounds.top=state.bounds.top;
                 s.bounds.right=state.bounds.right;s.bounds.bottom=state.bounds.bottom;
                 s.flags=state.flags;s.kind=state.kind;s.special=false;
-                s.previous={state.x,state.y};lifetimes_.publish(h,object);
-                if(!membership_.bind(h.slot,object,h.generation)){
+                s.previous={state.x,state.y};control_.get()->lifetimes.publish(h,object);
+                if(!control_.get()->membership.bind(h.slot,object,h.generation)){
                     changedBinding(h.slot);return false;
                 }
                 // The old attach/rebind pair advances both revisions twice.
                 // Nothing can observe their intermediate values here.
-                changedFreshBinding(h.slot);membership_.repeatFreshTailBinding();
+                changedFreshBinding(h.slot);control_.get()->membership.repeatFreshTailBinding();
                 properties.sprite.spriteId=definition->spriteId;
                 properties.sprite.maskId=definition->maskId;
                 properties.sprite.scaleX.bits=properties.sprite.scaleY.bits=0x3f800000u;
@@ -248,7 +277,7 @@ public:
                     // Keep both owner and membership revision effects without
                     // resolving and traversing the unchanged registration.
                     changedBinding(h.slot);
-                    membership_.repeatFreshTailBinding();
+                    control_.get()->membership.repeatFreshTailBinding();
                 }else if(!rebindObjectMembership(h,object,false))return checked(false);
             }else if(!rebindObjectMembership(h,object,registered))return checked(false);
         }
@@ -261,8 +290,9 @@ public:
         return true;
     }
     template<class Terrain> bool bindTerrainLifetimes(Terrain& terrain){
-        if(!lifetimes_.bind(terrain)||!membership_.bindTerrain(terrain)||!states_.bind(terrain))return false;
-        if constexpr(States::runOwned)return spatial_.bindTerrain(terrain)&&collision_.bindTerrain(terrain);
+        if(!requireControl())return false;
+        if(!control_.get()->lifetimes.bind(terrain)||!control_.get()->membership.bindTerrain(terrain)||!states_.bind(terrain))return false;
+        if constexpr(States::runOwned)return control_.get()->spatial.bindTerrain(terrain)&&control_.get()->collision.bindTerrain(terrain);
         return true;
     }
     bool bindTerrainGeometry(const PreparedTerrainBirthBounds& geometry){
@@ -280,27 +310,28 @@ public:
         Properties& p,const PreparedObjectDefaults<Resources>& defaults,Graph& graph,
         const Box& bounds,Math::PixelBox pixels,bool precise,Between between,
         PreparedTerrainBirthBounds::Key geometry={}){
+        if(!scalarValid())return false;
         const auto* d=defaults.get(object);const auto* objectFlags=graph.flags(unsigned(object));
         if constexpr(RunRegistration&&ScheduledIndex){
             if(d&&graph.valid()&&objectFlags&&(*objectFlags&0x87u)==d->propertyFlags&&
                 (state.flags&~2u)==8u&&!state.special&&
                 !(state.bounds.left.bits|state.bounds.top.bits|state.bounds.right.bits|state.bounds.bottom.bits)&&
                 (d->spriteId==-1||d->frames<=65535u)&&
-                (AllocatedTerrain||(valid()&&lifetimes_.canAttach(h,object)))&&
+                (AllocatedTerrain||(scalarValid()&&control_.get()->lifetimes.canAttach(h,object)))&&
                 Math::valid(state.x)&&Math::valid(state.y)){
                 auto edit=states_.edit(h.slot);auto& s=edit.get();
                 s.x=state.x;s.y=state.y;s.previous={state.x,state.y};
                 s.kind=state.kind;s.special=false;s.flags=state.flags;
-                lifetimes_.publish(h,object);
+                control_.get()->lifetimes.publish(h,object);
                 if constexpr(AllocatedTerrain){
                     static_assert(PreparedGeometry,"Admitted native terrain owner only");
-                    if(!membership_.bindAllocatedTerrain(h.slot,object)){
+                    if(!control_.get()->membership.bindAllocatedTerrain(h.slot,object)){
                         s.bounds={};changedBinding(h.slot);return false;
                     }
-                }else if(!membership_.bind(h.slot,object,h.generation)){
+                }else if(!control_.get()->membership.bind(h.slot,object,h.generation)){
                     s.bounds={};changedBinding(h.slot);return false;
                 }
-                changedFreshBinding(h.slot);membership_.repeatFreshTailBinding();
+                changedFreshBinding(h.slot);control_.get()->membership.repeatFreshTailBinding();
                 p.sprite.spriteId=d->spriteId;p.sprite.maskId=d->maskId;
                 p.sprite.scaleX.bits=p.sprite.scaleY.bits=0x3f800000u;
                 p.sprite.angle.bits=p.sprite.imageIndex.bits=0;
@@ -312,7 +343,7 @@ public:
                 // prepareBirth may change the family's live preparation bits.
                 const auto flags=*graph.flags(unsigned(object));
                 if(!finishFreshPreparedTerrain(h.slot,flags,bounds,pixels,precise,true,geometry))return false;
-                if(flags&8u)collision_.mark(h.slot);
+                if(flags&8u)control_.get()->collision.mark(h.slot);
                 return true;
             }
         }
@@ -353,6 +384,7 @@ public:
         const Box& bounds,Math::PixelBox pixels,bool precise,PropertiesBirth properties,Between between,
         PreparedTerrainBirthBounds::Key geometry,bool& prepared,bool inherited=false){
         static_assert(PreparedGeometry&&RunRegistration&&ScheduledIndex,"Owned terrain run only");
+        if(!scalarValid())return false;
         DW_PROFILE_SCOPE(profileInstanceBirth);
         if constexpr(States::runOwned){
             return attachGeneratedTerrainCell(h,object,(state.flags&2u)!=0,d,graph,objectFlags,
@@ -361,11 +393,11 @@ public:
         auto edit=states_.edit(h.slot);auto& s=edit.get();
         s.x=state.x;s.y=state.y;s.previous={state.x,state.y};
         s.kind=1;s.special=false;s.flags=state.flags;
-        lifetimes_.publish(h,object);
-        if(!membership_.bindAllocatedTerrain(h.slot,object,inherited)){
+        control_.get()->lifetimes.publish(h,object);
+        if(!control_.get()->membership.bindAllocatedTerrain(h.slot,object,inherited)){
             s.bounds={};changedBinding(h.slot);return false;
         }
-        changedFreshBinding(h.slot);membership_.repeatFreshTailBinding();
+        changedFreshBinding(h.slot);control_.get()->membership.repeatFreshTailBinding();
         properties();
         s.flags=d.initialFlags|(state.flags&2u);
         markSpatialChange(h.slot,*objectFlags);
@@ -375,7 +407,7 @@ public:
             prepared=true;
         }
         if(!finishFreshPreparedTerrain(h.slot,*objectFlags,bounds,pixels,precise,true,geometry))return false;
-        if(*objectFlags&8u)collision_.mark(h.slot);
+        if(*objectFlags&8u)control_.get()->collision.mark(h.slot);
         return true;
     }
     // Admitted generated identity owns its coordinates and immutable geometry.
@@ -391,6 +423,7 @@ public:
         const GeneratedTerrainContinuation& plan,Math::PixelBox pixels,
         PreparedTerrainBirthBounds::Key geometry,InheritedTerrainBatch& batch){
         static_assert(States::runOwned,"Run-owned continuation only");
+        if(!scalarValid())return false;
         if(!batch.count)batch.first=h.slot;
         ++batch.count;
         states_.inheritedConstructor(h.slot,inactive,plan.queue,plan.queue&&plan.collision);
@@ -405,16 +438,17 @@ public:
         }
         if(plan.collision&&!plan.queue){
             // A failed journal insert precedes this collision publication.
-            collision_.publishInheritedMembership(h.slot);
+            control_.get()->collision.publishInheritedMembership(h.slot);
             ++batch.collisionCount;batch.lastCollision=h.slot;
         }
         return true;
     }
     void completeInheritedTerrain(int object,const InheritedTerrainBatch& batch){
+        if(!requireControl())return;
         if(!batch.count)return;
-        membership_.completeInheritedTerrain(object,batch.count);
-        spatial_.completeInheritedTerrain(batch.lastSpatial,batch.spatialCount);
-        collision_.completeInheritedTerrain(batch.lastCollision,batch.collisionCount);
+        control_.get()->membership.completeInheritedTerrain(object,batch.count);
+        control_.get()->spatial.completeInheritedTerrain(batch.lastSpatial,batch.spatialCount);
+        control_.get()->collision.completeInheritedTerrain(batch.lastCollision,batch.collisionCount);
         const unsigned delta=batch.count*2u;
         bindingRevision_=bindingRevision_>0xffffffffu-delta?0xffffffffu:bindingRevision_+delta;
         captureRevision_=captureRevision_>0xffffffffu-delta?0xffffffffu:captureRevision_+delta;
@@ -438,20 +472,21 @@ public:
         const GeneratedTerrainContinuation* continuation=nullptr){
             static_assert(States::runOwned&&PreparedGeometry&&RunRegistration&&ScheduledIndex,
                 "Admitted run-owned terrain only");
+            if(!scalarValid())return false;
             const bool queue=continuation?continuation->queue:
                 Queue::shouldQueue(true,*objectFlags,d.initialFlags|(inactive?2u:0u));
-            const auto order=membership_.nextGeneratedOrder();
+            const auto order=control_.get()->membership.nextGeneratedOrder();
             if(!inherited&&order.present()){
                 RunnerRegistrationOrder spatial,collision;
-                if(queue){spatial=spatial_.generatedOrder(h.slot);
-                    if(*objectFlags&8u)collision=collision_.generatedOrder(h.slot);}
+                if(queue){spatial=control_.get()->spatial.generatedOrder(h.slot);
+                    if(*objectFlags&8u)collision=control_.get()->collision.generatedOrder(h.slot);}
                 // The admitted callbacks publish properties/room only. They
                 // cannot inspect this owner or issue births/queries. Commit
                 // precisely the completed prefix at its first observation:
                 // return to the caller, including every terminal-failure exit.
                 unsigned stage=2;
                 const auto finish=[&](bool success){
-                    const bool published=membership_.publishGeneratedConstructor(h.slot,object,inactive,
+                    const bool published=control_.get()->membership.publishGeneratedConstructor(h.slot,object,inactive,
                         order,spatial,collision,stage);
                     changedFreshBinding(h.slot);return published&&success;
                 };
@@ -468,19 +503,19 @@ public:
                     stage=4;
                 }
                 if((continuation?continuation->collision:bool(*objectFlags&8u))&&!collision.present())
-                    collision=collision_.generatedOrder(h.slot);
+                    collision=control_.get()->collision.generatedOrder(h.slot);
                 return finish(true);
             }else{
                 // Preserve the legacy failed-registration prefix at clock
                 // exhaustion, and the independent inherited reference path.
-                states_.freshGenerated(h.slot,inactive);lifetimes_.publish(h,object);
-                if(!membership_.bindAllocatedTerrain(h.slot,object,inherited)){
+                states_.freshGenerated(h.slot,inactive);control_.get()->lifetimes.publish(h,object);
+                if(!control_.get()->membership.bindAllocatedTerrain(h.slot,object,inherited)){
                     changedBinding(h.slot);return false;
                 }
-                changedFreshBinding(h.slot);membership_.repeatFreshTailBinding();
+                changedFreshBinding(h.slot);control_.get()->membership.repeatFreshTailBinding();
                 properties();states_.stageGenerated(h.slot,2);
-                if(queue){spatial_.markAllocatedTerrain(h.slot,inherited);
-                    if(*objectFlags&8u)collision_.markAllocatedTerrain(h.slot,inherited);}
+                if(queue){control_.get()->spatial.markAllocatedTerrain(h.slot,inherited);
+                    if(*objectFlags&8u)control_.get()->collision.markAllocatedTerrain(h.slot,inherited);}
             }
             if(!between(d.creationDepth))return false;
             if(!prepared){if(!checked(graph.prepareBirth(unsigned(object))))return false;prepared=true;}
@@ -495,11 +530,12 @@ public:
             if(continuation?continuation->collision:bool(*objectFlags&8u)){
                 // A continuation has already put this cell at the collision
                 // head when queue-eligible. No observer occurs in between.
-                if(!continuation||!continuation->queue)collision_.markAllocatedTerrain(h.slot,inherited);
+                if(!continuation||!continuation->queue)control_.get()->collision.markAllocatedTerrain(h.slot,inherited);
             }
             return true;
     }
     void finishInheritedTerrainCreate(InstanceHandle h,const PreparedTerrainCreate::Plan& plan){
+        if(!requireControl())return;
         // The admitted run has prepared family flags. Create changes only
         // bounds-dirty (not queue eligibility), so its repeated queue marks
         // would target the heads already published by this same birth.
@@ -520,7 +556,7 @@ public:
     // The caller owns lifetime validation, cached bounds and dirty flags.
     // Never mix this route with registered reference instances.
     template<class Operation> bool externalSpatialPublication(Operation operation){
-        if(!valid()||membership_.size())return false;
+        if(!valid()||!externalSpatialOwner_)return checked(false);
         return checked(operation(index_));
     }
     std::uint32_t bindingRevision()const{return bindingRevision_;}
@@ -543,8 +579,11 @@ public:
     // Replacing the external handle domain requires replacing this owner too.
     void clear(){
         changedBinding();
-        membership_.clear();spatial_.clear();collision_.clear();index_.clear();
-        lifetimes_.clear();states_.clear();
+        if(auto* bank=control_.get()){
+            bank->membership.clear();bank->spatial.clear();bank->collision.clear();
+            bank->lifetimes.clear();
+        }
+        index_.clear();states_.clear();
         good_=true;
     }
     StateRead resolve(InstanceHandle h)const{
@@ -561,23 +600,23 @@ public:
     // For a synchronous owner-controlled slot walk only. Deferred consumers
     // must retain the returned generation, never look it up again after reuse.
     InstanceHandle currentHandle(unsigned slot)const{
-        return slot<Capacity&&lifetimes_.object(slot)>=0?handle(slot):InstanceHandle{};
+        return requireControl()&&slot<Capacity&&control_.get()->lifetimes.object(slot)>=0?handle(slot):InstanceHandle{};
     }
-    int objectId(InstanceHandle h)const{return live(h)?lifetimes_.object(h.slot):-1;}
+    int objectId(InstanceHandle h)const{return live(h)?control_.get()->lifetimes.object(h.slot):-1;}
     // Borrow until the registry takes its own snapshot. Birth wrappers must
     // not copy the complete state through each ownership boundary.
     bool attach(InstanceHandle h,int object,const State& state){
-        if(!valid() || !lifetimes_.canAttach(h,object) ||
+        if(!scalarValid() || !control_.get()->lifetimes.canAttach(h,object) ||
             (state.flags&0x8000u) || !Math::valid(state.x)||!Math::valid(state.y))return false;
         auto edit=states_.edit(h.slot);auto& s=edit.get();s=state;s.previous={state.x,state.y};
-        lifetimes_.publish(h,object);
+        control_.get()->lifetimes.publish(h,object);
         changedBinding(h.slot);
-        return membership_.bind(h.slot,object,h.generation);
+        return control_.get()->membership.bind(h.slot,object,h.generation);
     }
     // 0x50dbf8..0x50dc0a, before this instance's animation in active-room
     // traversal. Do not filter flags here or dirty either spatial queue.
     bool capturePrevious(InstanceHandle h){
-        if(!valid()||!live(h))return false;
+        if(!scalarValid()||!live(h))return false;
         return checked(states_.capture(h.slot));
     }
     // Optional room-animation optimization. The caller owns the flag for this
@@ -589,10 +628,10 @@ public:
     }
     // At source reconciliation boundaries, not when the active flag is written.
     bool registerObject(InstanceHandle h,bool registered){
-        if(!valid()||!live(h))return false;
-        if(membership_.contains(h.slot)!=registered)changedCapture(h.slot);
-        if(!registered)membership_.unbind(h.slot);
-        else if(!membership_.contains(h.slot))membership_.bind(h.slot,lifetimes_.object(h.slot),h.generation);
+        if(!scalarValid()||!live(h))return false;
+        if(control_.get()->membership.contains(h.slot)!=registered)changedCapture(h.slot);
+        if(!registered)control_.get()->membership.unbind(h.slot);
+        else if(!control_.get()->membership.contains(h.slot))control_.get()->membership.bind(h.slot,control_.get()->lifetimes.object(h.slot),h.generation);
         auto edit=states_.edit(h.slot);auto& flags=edit.get().flags;
         if(registered)flags&=~0x80000u;else flags|=0x80000u;
         return true;
@@ -602,11 +641,11 @@ public:
     // explicit argument, not inferred from activation flags. The caller must
     // separately apply the resource/flag/queue effects at 0x46b8b2..0x46b968.
     bool rebindObjectMembership(InstanceHandle h,int object,bool registered){
-        if(!valid()||!live(h)||object<0)return false;
-        if(!lifetimes_.rebind(h.slot,object))return false;
+        if(!scalarValid()||!live(h)||object<0)return false;
+        if(!control_.get()->lifetimes.rebind(h.slot,object))return false;
         changedBinding(h.slot);
-        if(registered)membership_.bind(h.slot,object,h.generation);
-        else membership_.unbind(h.slot);
+        if(registered)control_.get()->membership.bind(h.slot,object,h.generation);
+        else control_.get()->membership.unbind(h.slot);
         return true;
     }
     // Collision/flag portion of 0x46b8b2..0x46b968, after membership rebinding
@@ -618,7 +657,7 @@ public:
     bool applyBindingProperties(InstanceHandle h,std::uint32_t objectFlags,
                                 bool allPrepared,SetSprite setSprite){
         DW_PROFILE_SCOPE(profileBindingProperties);
-        if(!valid()||!live(h))return false;
+        if(!scalarValid()||!live(h))return false;
         auto edit=states_.edit(h.slot);auto& flags=edit.get().flags;
         if(objectFlags&1u){
             flags|=0x28u;
@@ -639,13 +678,13 @@ public:
     // when that bit is clear. 0x501e50 also queues collision processing when
     // eligible; repeated activation without an intervening deactivation is idle.
     bool setActive(InstanceHandle h,bool active,std::uint32_t objectFlags){
-        if(!valid()||!live(h))return false;
+        if(!scalarValid()||!live(h))return false;
         auto edit=states_.edit(h.slot);auto& flags=edit.get().flags;
         if(bool(flags&2u)==active)changedCapture(h.slot);
         if(active){
             if((flags&2u)&&Queue::shouldQueue(true,objectFlags,flags)){
-                spatial_.mark(h.slot);
-                if(objectFlags&8u)collision_.mark(h.slot);
+                control_.get()->spatial.mark(h.slot);
+                if(objectFlags&8u)control_.get()->collision.mark(h.slot);
             }
             flags&=~2u;
         }else flags|=2u;
@@ -656,16 +695,16 @@ public:
     // This does not itself queue a spatial refresh; earlier setters may have.
     template<class Graph,class Refresh>
     bool publishBirth(InstanceHandle h,Graph& graph,Refresh refreshBounds){
-        if(!valid()||!live(h)||!graph.valid())return false;
-        const auto object=unsigned(lifetimes_.object(h.slot));
+        if(!scalarValid()||!live(h)||!graph.valid())return false;
+        const auto object=unsigned(control_.get()->lifetimes.object(h.slot));
         if(!graph.flags(object))return false;
         if(!checked(graph.prepareBirth(object)&&refreshBounds(h,true)))return false;
-        if(*graph.flags(object)&8u)collision_.mark(h.slot);
+        if(*graph.flags(object)&8u)control_.get()->collision.mark(h.slot);
         return true;
     }
     // Immediate exclusion flags can precede deferred object-list reconciliation.
     bool setExclusions(InstanceHandle h,std::uint32_t exclusions){
-        if(!valid()||!live(h)||(exclusions&~0x100003u))return false;
+        if(!scalarValid()||!live(h)||(exclusions&~0x100003u))return false;
         auto edit=states_.edit(h.slot);auto& f=edit.get().flags;
         if((f&0x100003u)!=exclusions)changedCapture(h.slot);
         f=(f&~0x100003u)|exclusions;return true;
@@ -674,7 +713,7 @@ public:
         return moveDomain<true>(h,x,y,objectFlags);
     }
     template<bool MayBeTerrain> bool moveDomain(InstanceHandle h,Real x,Real y,std::uint32_t objectFlags){
-        if(!valid()||!live(h))return false;
+        if(!scalarValid()||!live(h))return false;
         if(snapshotDirty_&&h.slot>=snapshotFirst_&&h.slot<snapshotLast_)*snapshotDirty_=true;
         auto edit=states_.template editDomain<MayBeTerrain>(h.slot);auto& s=edit.get();
 #ifdef DOWNWELL_PROBES
@@ -685,14 +724,14 @@ public:
         }
 #endif
         return checked(RunnerSpatialPosition::assign(h.slot,s.x,s.y,s.flags,x,y,
-            s.special,true,objectFlags,spatial_,collision_));
+            s.special,true,objectFlags,control_.get()->spatial,control_.get()->collision));
     }
     // Caller resolves the verified ordinary/unit-track frame count (zero for
     // missing/empty resources). Cached frame is runner offset 0x180; timeline
     // is 0x88, distinct from image_index. Special sprite ownership is unsupported.
     bool changeSprite(InstanceHandle h,Sprite& sprite,Real& timeline,Real& cachedFrame,
                       int next,unsigned frames,std::uint32_t objectFlags){
-        if(!valid()||!live(h))return false;
+        if(!scalarValid()||!live(h))return false;
         if(sprite.spriteId==next)return true;
         if(states_.special(h.slot))return checked(false);
         RunnerSpriteChange::Result change;
@@ -708,7 +747,7 @@ public:
     // unit tracks. Missing IDs differ from an unavailable/corrupt resource pack.
     bool changeSpriteFromPack(InstanceHandle h,Sprite& sprite,Real& timeline,Real& cachedFrame,
                              int next,const SpriteCollisionPack& pack,std::uint32_t objectFlags){
-        if(!valid()||!live(h))return false;
+        if(!scalarValid()||!live(h))return false;
         if(sprite.spriteId==next)return true; // Source no-op performs no lookup.
         if(!pack.valid())return checked(false);
         std::uint32_t frames=0;
@@ -739,7 +778,7 @@ public:
     bool refresh(InstanceHandle h,std::uint32_t objectFlags,bool allPrepared,
         const Box* bounds,bool precise,bool publish){
         DW_PROFILE_SCOPE(profileBoundsPublication);
-        if(!valid()||!live(h))return false;
+        if(!scalarValid()||!live(h))return false;
         auto edit=states_.edit(h.slot);auto& s=edit.get();
         return checked(RunnerSpatialBoundsUpdate::finishRefresh(index_,h.slot,
             objectFlags,s.flags,allPrepared,s.bounds,bounds,s.x,s.y,precise,publish));
@@ -753,7 +792,7 @@ public:
         if constexpr(!ScheduledIndex)return refresh(h,objectFlags,false,&bounds,precise,publish);
         else{
             DW_PROFILE_SCOPE(profileBoundsPublication);
-            if(!valid()||!live(h))return false;
+            if(!scalarValid()||!live(h))return false;
             auto edit=states_.edit(h.slot);auto& s=edit.get();
             if(!(s.flags&0x8000u)&&!(s.bounds.left.bits|s.bounds.top.bits|s.bounds.right.bits|s.bounds.bottom.bits)){
                 return finishFreshPreparedTerrain(h.slot,objectFlags,bounds,pixels,precise,publish);
@@ -781,7 +820,7 @@ public:
     bool refreshSprite(InstanceHandle h,std::uint32_t objectFlags,bool allPrepared,
         const SpriteCollisionPack& pack,const Sprite& sprite,bool compatibility,
         Trig trig,Round round,bool publish){
-        if(!valid()||!live(h))return false;
+        if(!scalarValid()||!live(h))return false;
         if(!pack.valid())return checked(false);
         PackedSpriteCollision resource;
         if(!pack.collisionSprite(sprite.spriteId,sprite.maskId,resource))
@@ -807,7 +846,7 @@ public:
         const Sprite& a,const Sprite& b,const SpriteCollisionPack& sprites,
         const SpriteMaskPack& masks,const RunnerMaskDispatch& dispatch,bool publish,
         Refresh refreshBounds,Trig inverseTrig,Round round,bool& hit){
-        if(!valid()||!live(self)||!live(other))return false;
+        if(!scalarValid()||!live(self)||!live(other))return false;
         auto firstEdit=states_.edit(self.slot);auto secondEdit=states_.edit(other.slot);
         auto& first=firstEdit.get();auto& second=secondEdit.get();
         if(self.slot==other.slot || ((first.flags|second.flags)&0x100001u)){hit=false;return true;}
@@ -825,7 +864,7 @@ public:
     template<class Refresh>
     bool nonPreciseLineCandidate(InstanceHandle h,const Sprite& sprite,const RunnerLineArguments& args,
         bool compatibility,const SpriteCollisionPack& sprites,Refresh refreshBounds,bool& hit){
-        if(!valid()||!live(h))return false;
+        if(!scalarValid()||!live(h))return false;
         auto edit=states_.edit(h.slot);auto& state=edit.get();
         if(state.special&&sprite.maskId<0)return checked(false);
         if((state.flags&8u)&&!checked(refreshBounds(h,true)))return false;
@@ -846,7 +885,7 @@ public:
         bool compatibility,bool precise,const SpriteCollisionPack& sprites,
         const SpriteMaskPack& masks,Refresh refreshBounds,Trig inverseTrig,
         Round round,bool& hit){
-        if(!valid()||!live(h))return false;
+        if(!scalarValid()||!live(h))return false;
         auto edit=states_.edit(h.slot);auto& state=edit.get();
         if(!Math::valid(x)||!Math::valid(y)||(state.special&&sprite.maskId<0))return checked(false);
         if((state.flags&8u)&&!checked(refreshBounds(h,true)))return false;
@@ -859,7 +898,7 @@ public:
     // Object rebinding also calls this on a LIVE instance: object membership,
     // generation and all flags other than indexed must survive.
     bool removeSpatialMembership(InstanceHandle h){
-        if(!valid()||!live(h))return false;
+        if(!scalarValid()||!live(h))return false;
         auto edit=states_.edit(h.slot);auto& state=edit.get();
         if(state.flags&0x8000u){
             Box box=state.bounds;
@@ -868,32 +907,32 @@ public:
             if(!checked(index_.remove(box,h.slot,true,removed)))return false;
             state.flags&=~0x8000u;
         }
-        spatial_.remove(h.slot);collision_.remove(h.slot);
+        control_.get()->spatial.remove(h.slot);control_.get()->collision.remove(h.slot);
         return true;
     }
     bool retire(InstanceHandle h){
         if(!removeSpatialMembership(h))return false;
-        membership_.unbind(h.slot);
-        lifetimes_.retire(h.slot);changedBinding(h.slot);return true;
+        control_.get()->membership.unbind(h.slot);
+        control_.get()->lifetimes.retire(h.slot);changedBinding(h.slot);return true;
     }
-    unsigned pendingSpatial()const{return spatial_.size();}
-    unsigned pendingCollision()const{return collision_.size();}
+    unsigned pendingSpatial()const{return requireControl()?control_.get()->spatial.size():0;}
+    unsigned pendingCollision()const{return requireControl()?control_.get()->collision.size():0;}
     // Tail of engine-component refresh 0x466a44: unconditional bounds dirtiness
     // and 0x501e50 requeue, even for an unchanged direction or zero speed.
     bool engineMotionChanged(InstanceHandle h,std::uint32_t objectFlags){
-        if(!valid()||!live(h))return false;
+        if(!scalarValid()||!live(h))return false;
         {auto edit=states_.edit(h.slot);edit.get().flags|=8u;}
         markSpatialChange(h.slot,objectFlags);return true;
     }
     // 0x501ef0, called for OTHER after a precise collision and inactivity
     // checks. Queue only collision processing, without dirtying spatial bounds.
     bool queueCollision(InstanceHandle h,std::uint32_t objectFlags){
-        if(!valid()||!live(h))return false;
-        return !(objectFlags&8u)||checked(collision_.mark(h.slot));
+        if(!scalarValid()||!live(h))return false;
+        return !(objectFlags&8u)||checked(control_.get()->collision.mark(h.slot));
     }
     template<class Refresh> bool flush(Refresh refreshBounds){
-        if(!valid())return false;
-        return checked(spatial_.flush([&](unsigned slot){return states_.flags(slot);},
+        if(!scalarValid())return false;
+        return checked(control_.get()->spatial.flush([&](unsigned slot){return states_.flags(slot);},
             [&](unsigned slot){return refreshBounds(handle(slot),true);}));
     }
     // 0x5022c0: flush bounds, query collision-dirty instances in intrusive-list
@@ -905,10 +944,10 @@ public:
     template<unsigned Pairs,class Refresh,class HasEvent,class MaskFrames>
     bool collectCollisionPairs(RunnerCollisionPairs<Capacity,Pairs>& pairs,
         bool indexAvailable,Refresh refreshBounds,HasEvent hasEvent,MaskFrames maskFrames){
-        if(!valid())return false;
+        if(!scalarValid())return false;
         unsigned retained[Capacity];
-        return checked(RunnerCollisionCollect::run(pairs,collision_,retained,indexAvailable,
-            [&]{return flush(refreshBounds);},[&](unsigned slot){return lifetimes_.object(slot)>=0?handle(slot):InstanceHandle{};},
+        return checked(RunnerCollisionCollect::run(pairs,control_.get()->collision,retained,indexAvailable,
+            [&]{return flush(refreshBounds);},[&](unsigned slot){return control_.get()->lifetimes.object(slot)>=0?handle(slot):InstanceHandle{};},
             [&](InstanceHandle h,std::uint32_t& flags){if(!live(h))return false;flags=states_.flags(h.slot);return true;},
             [&](InstanceHandle h,Box& box){if(!live(h))return false;box=states_.read(h.slot)->bounds;return true;},
             [&](Box box,auto visit){return index_.query(box,visit);},hasEvent,maskFrames));
@@ -920,7 +959,7 @@ public:
     template<class Graph,class Refresh,class Precise>
     bool placeVm(InstanceHandle self,int object,MotionBinary64 x,MotionBinary64 y,
         bool allPrepared,Graph& graph,Refresh refreshBounds,Precise precise,Result& result){
-        if(!valid())return false;
+        if(!scalarValid())return false;
         Real nx,ny;
         if(!checked(nx.assign(x)&&ny.assign(y)))return false;
         return place(self,object,nx,ny,allPrepared,graph,refreshBounds,precise,result);
@@ -931,26 +970,26 @@ public:
     template<class Graph,class Refresh,class Candidate>
     bool point(int object,Real x,Real y,bool compatibility,bool allPrepared,
         Graph& graph,Refresh refreshBounds,Candidate candidate,bool& hit){
-        if(!valid()||object<0||object>=100000||!graph.valid()||!graph.flags(unsigned(object)))return false;
+        if(!scalarValid()||object<0||object>=100000||!graph.valid()||!graph.flags(unsigned(object)))return false;
         if(!Math::valid(x)||!Math::valid(y))return checked(false);
         auto isA=[&](int child,int parent){return graph.isA(child,parent);};
         using Prep=RunnerSpatialObjectPreparation;
-        const auto path=Prep::prepare(membership_.count(object,isA),index_.height(),
+        const auto path=Prep::prepare(control_.get()->membership.count(object,isA),index_.height(),
             *graph.flags(unsigned(object)),allPrepared,
             [&]{return graph.markSpatialFamily(unsigned(object));},
-            [&](auto emit){membership_.visit(object,isA,[&](unsigned slot,std::uint32_t){
+            [&](auto emit){control_.get()->membership.visit(object,isA,[&](unsigned slot,std::uint32_t){
                 auto edit=states_.edit(slot);auto& state=edit.get();return emit(slot,state.flags,state.bounds);
             });},
             [&](unsigned slot,auto&,auto&){return refreshBounds(handle(slot),false);},
             [&](Box box,unsigned slot){return index_.insert(box,slot);});
         return checked(RunnerPointTraversal::run(path,x,y,compatibility,[&]{return flush(refreshBounds);},
             [&](unsigned slot,bool indexed,bool& admitted){
-                if(slot>=Capacity||lifetimes_.object(slot)<0)return false;
+                if(slot>=Capacity||control_.get()->lifetimes.object(slot)<0)return false;
                 admitted=!(states_.flags(slot)&0x100003u)&&
-                    (!indexed||(states_.kind(slot)==1&&isA(lifetimes_.object(slot),object)));return true;
+                    (!indexed||(states_.kind(slot)==1&&isA(control_.get()->lifetimes.object(slot),object)));return true;
             },[&](unsigned slot,Real px,Real py,bool& result){return candidate(handle(slot),px,py,result);},
             [&](Box box,auto visit){return index_.query(box,visit);},
-            [&](auto visit){membership_.visit(object,isA,[&](unsigned slot,std::uint32_t){return visit(slot);});return true;},hit));
+            [&](auto visit){control_.get()->membership.visit(object,isA,[&](unsigned slot,std::uint32_t){return visit(slot);});return true;},hit));
     }
     // collision_line object-resource selector, 0x4fd370. Args have passed the
     // VM float wrapper. Family preparation selects list/tree; tree queries
@@ -958,27 +997,27 @@ public:
     template<class Graph,class Refresh,class Candidate>
     bool collisionLine(InstanceHandle self,int object,const RunnerLineArguments& args,bool notMe,
         bool allPrepared,Graph& graph,Refresh refreshBounds,Candidate candidate,Result& result){
-        if(!valid()||object<0||object>=100000||!graph.valid()||!graph.flags(unsigned(object)))return false;
+        if(!scalarValid()||object<0||object>=100000||!graph.valid()||!graph.flags(unsigned(object)))return false;
         if(!checked(Math::valid(args.x1)&&Math::valid(args.y1)&&Math::valid(args.x2)&&Math::valid(args.y2))||
            (notMe&&!live(self)))return false;
         auto isA=[&](int child,int parent){return graph.isA(child,parent);};
         using Prep=RunnerSpatialObjectPreparation;
-        const auto path=Prep::prepare(membership_.count(object,isA),index_.height(),
+        const auto path=Prep::prepare(control_.get()->membership.count(object,isA),index_.height(),
             *graph.flags(unsigned(object)),allPrepared,[&]{return graph.markSpatialFamily(unsigned(object));},
-            [&](auto emit){membership_.visit(object,isA,[&](unsigned slot,std::uint32_t){
+            [&](auto emit){control_.get()->membership.visit(object,isA,[&](unsigned slot,std::uint32_t){
                 auto edit=states_.edit(slot);auto& state=edit.get();return emit(slot,state.flags,state.bounds);
             });},[&](unsigned slot,auto&,auto&){return refreshBounds(handle(slot),false);},
             [&](Box box,unsigned slot){return index_.insert(box,slot);});
         RunnerLineTraversal::Result next;
         const bool ok=RunnerLineTraversal::run(path,args,[&]{return flush(refreshBounds);},
             [&](unsigned slot,bool indexed,bool& admitted){
-            if(slot>=Capacity||lifetimes_.object(slot)<0)return false;
+            if(slot>=Capacity||control_.get()->lifetimes.object(slot)<0)return false;
             const auto h=handle(slot);
             admitted=!((states_.flags(slot)&0x100003u)||(notMe&&h.slot==self.slot&&h.generation==self.generation)||
-               (indexed&&(states_.kind(slot)!=1||!isA(lifetimes_.object(slot),object))));return true;
+               (indexed&&(states_.kind(slot)!=1||!isA(control_.get()->lifetimes.object(slot),object))));return true;
         },[&](unsigned slot,const auto& line,bool& hit){return candidate(handle(slot),line,hit);},
         [&](const auto& line,auto visit){return index_.queryLine(line,visit);},
-        [&](auto visit){membership_.visit(object,isA,[&](unsigned slot,std::uint32_t){return visit(slot);});return true;},next);
+        [&](auto visit){control_.get()->membership.visit(object,isA,[&](unsigned slot,std::uint32_t){return visit(slot);});return true;},next);
         if(!checked(ok))return false;
         result={next.found,next.found?handle(next.slot):InstanceHandle{}};return true;
     }
@@ -1001,12 +1040,12 @@ private:
     template<bool FullState,class Graph,class Candidate>
     bool collisionPointVmMode(InstanceHandle self,int object,MotionBinary64 x,MotionBinary64 y,
         bool notMe,const Graph& graph,Candidate candidate,Result& result){
-        if(!valid()||object<0||object>=100000||!graph.valid()||!graph.flags(unsigned(object)))return false;
+        if(!scalarValid()||object<0||object>=100000||!graph.valid()||!graph.flags(unsigned(object)))return false;
         Real nx,ny;
         if(!checked(nx.assign(x)&&ny.assign(y))||(notMe&&!live(self)))return false;
         RunnerCollisionPoint::Result next;
         const bool ok=RunnerCollisionPoint::run(self,notMe,nx,ny,[&](auto visit){
-            membership_.visit(object,[&](int child,int parent){return graph.isA(child,parent);},
+            control_.get()->membership.visit(object,[&](int child,int parent){return graph.isA(child,parent);},
                 [&](unsigned slot,std::uint32_t generation){return visit(InstanceHandle{slot,generation});});
             return true;
         },[&](InstanceHandle h,std::uint32_t& flags){return readEligibility<FullState>(h,flags);},candidate,next);
@@ -1026,7 +1065,7 @@ public:
         return visitRegistrationRange(0,Capacity,visit);
     }
     template<class Visit> bool visitRegistrationFlags(Visit visit)const{
-        return valid()&&membership_.visitRegistrationRange(0,Capacity,
+        return scalarValid()&&control_.get()->membership.visitRegistrationRange(0,Capacity,
             [&](unsigned slot,std::uint32_t generation,int object){
                 const InstanceHandle h{slot,generation};std::uint32_t flags;
                 return instanceFlags(h,flags)&&visit(h,object,flags);
@@ -1035,7 +1074,7 @@ public:
     // Narrow a phase snapshot to a disjoint owner domain before resolving
     // records. Selected lifetimes remain checked; no slot-order iteration.
     template<class Visit> bool visitRegistrationRange(unsigned first,unsigned last,Visit visit)const{
-        return valid()&&membership_.visitRegistrationRange(first,last,[&](unsigned slot,std::uint32_t generation,int object){
+        return scalarValid()&&control_.get()->membership.visitRegistrationRange(first,last,[&](unsigned slot,std::uint32_t generation,int object){
             const InstanceHandle h{slot,generation};const auto state=resolve(h);
             return state&&visit(h,object,*state);
         });
@@ -1043,14 +1082,14 @@ public:
     template<unsigned First,unsigned Last,class Visit>
     bool visitRegistrationRange(RegistrationProjection<First,Last>& projection,
         unsigned first,unsigned last,Visit visit)const{
-        return valid()&&membership_.visitRegistrationRange(projection,first,last,
+        return scalarValid()&&control_.get()->membership.visitRegistrationRange(projection,first,last,
             [&](unsigned slot,std::uint32_t generation,int object){
                 const InstanceHandle h{slot,generation};const auto state=resolve(h);
                 return state&&visit(h,object,*state);
             });
     }
     template<class Visit> bool visitRetainedRegistrationRange(unsigned first,unsigned last,Visit visit)const{
-        return valid()&&membership_.visitRetainedRegistrationRange(first,last,
+        return scalarValid()&&control_.get()->membership.visitRetainedRegistrationRange(first,last,
             [&](unsigned slot,std::uint32_t generation,int object){
                 const InstanceHandle h{slot,generation};const auto state=resolve(h);
                 return state&&visit(h,object,*state);
@@ -1068,9 +1107,9 @@ public:
     }
 private:
     template<bool FullState,class Graph> bool instanceNumberMode(int object,const Graph& graph,unsigned& result)const{
-        if(!valid()||object<0||!graph.valid()||!graph.flags(unsigned(object)))return false;
+        if(!scalarValid()||object<0||!graph.valid()||!graph.flags(unsigned(object)))return false;
         unsigned count=0;bool good=true;
-        membership_.visit(object,[&](int child,int parent){return graph.isA(child,parent);},
+        control_.get()->membership.visit(object,[&](int child,int parent){return graph.isA(child,parent);},
             [&](unsigned slot,std::uint32_t generation){
                 std::uint32_t flags;
                 if(!readEligibility<FullState>({slot,generation},flags)){good=false;return false;}
@@ -1088,31 +1127,31 @@ public:
     template<class Graph,class Refresh,class Precise>
     bool place(InstanceHandle self,int object,Real x,Real y,bool allPrepared,
         Graph& graph,Refresh refreshBounds,Precise precise,Result& result){
-        if(!valid()||!live(self)||object<0||!graph.valid()||!graph.flags(unsigned(object))||
-            !graph.flags(unsigned(lifetimes_.object(self.slot))))return false;
+        if(!scalarValid()||!live(self)||object<0||!graph.valid()||!graph.flags(unsigned(object))||
+            !graph.flags(unsigned(control_.get()->lifetimes.object(self.slot))))return false;
         auto isA=[&](int child,int parent){return graph.isA(child,parent);};
         auto prepare=[&]{
             using Prep=RunnerSpatialObjectPreparation;
-            return Prep::prepare(membership_.count(object,isA),index_.height(),
+            return Prep::prepare(control_.get()->membership.count(object,isA),index_.height(),
                 *graph.flags(unsigned(object)),allPrepared,
                 [&]{return graph.markSpatialFamily(unsigned(object));},
-                [&](auto emit){membership_.visit(object,isA,[&](unsigned slot,std::uint32_t){
+                [&](auto emit){control_.get()->membership.visit(object,isA,[&](unsigned slot,std::uint32_t){
                     auto edit=states_.edit(slot);auto& s=edit.get();return emit(slot,s.flags,s.bounds);
                 });},
                 [&](unsigned slot,auto&,auto&){return refreshBounds(handle(slot),false);},
                 [&](Box box,unsigned slot){return index_.insert(box,slot);});
         };
         auto eligible=[&](unsigned slot,bool spatial){
-            return slot<Capacity && slot!=self.slot && lifetimes_.object(slot)>=0 &&
+            return slot<Capacity && slot!=self.slot && control_.get()->lifetimes.object(slot)>=0 &&
                 !(states_.flags(slot)&0x100003u) &&
-                (!spatial || (states_.kind(slot)==1 && isA(lifetimes_.object(slot),object)));
+                (!spatial || (states_.kind(slot)==1 && isA(control_.get()->lifetimes.object(slot),object)));
         };
         auto edit=states_.edit(self.slot);auto& s=edit.get();
         RunnerPlaceQuery::Result hit;
         const bool success=RunnerPlaceQuery::run(s.x,s.y,s.flags,s.bounds,x,y,prepare,
             [&]{return flush(refreshBounds);},[&](bool publish){return refreshBounds(self,publish);},
-            [&](Real nx,Real ny){return move(self,nx,ny,*graph.flags(unsigned(lifetimes_.object(self.slot))));},
-            [&](auto visit){membership_.visit(object,isA,[&](unsigned slot,std::uint32_t){
+            [&](Real nx,Real ny){return move(self,nx,ny,*graph.flags(unsigned(control_.get()->lifetimes.object(self.slot))));},
+            [&](auto visit){control_.get()->membership.visit(object,isA,[&](unsigned slot,std::uint32_t){
                 return !eligible(slot,false)||visit(slot);
             });return true;},
             [&](Box box,auto visit){return index_.query(box,[&](unsigned slot){
@@ -1153,13 +1192,11 @@ private:
         if(!checked(index_.insertPrepared(normalized,slot,&pixels)))return false;
         s.flags|=0x8000u;return true;
     }
-    Lifetimes lifetimes_;
+    RunnerSpatialControlStorage<ControlStorage,BorrowControl> control_;
     States states_;
-    Membership membership_;
-    Queue spatial_;
-    CollisionQueue collision_;
     Index index_;
-    bool good_=true;
+    mutable bool good_=true;
+    bool externalSpatialOwner_=false;
     std::uint32_t bindingRevision_=0;
     std::uint32_t captureRevision_=0;
     bool* captureDirty_=nullptr;
@@ -1184,12 +1221,14 @@ private:
     bool checked(bool ok){if(!ok)good_=false;return ok;}
     void markSpatialChange(unsigned slot,std::uint32_t objectFlags){
         if(Queue::shouldQueue(true,objectFlags,states_.flags(slot))){
-            spatial_.mark(slot);
-            if(objectFlags&8u)collision_.mark(slot);
+            control_.get()->spatial.mark(slot);
+            if(objectFlags&8u)control_.get()->collision.mark(slot);
         }
     }
-    bool live(InstanceHandle h)const{return lifetimes_.contains(h);}
-    InstanceHandle handle(unsigned slot)const{return lifetimes_.handle(slot);}
+    bool requireControl()const{if(!control_.get()){good_=false;return false;}return true;}
+    bool scalarValid()const{return requireControl()&&valid();}
+    bool live(InstanceHandle h)const{return requireControl()&&control_.get()->lifetimes.contains(h);}
+    InstanceHandle handle(unsigned slot)const{return requireControl()?control_.get()->lifetimes.handle(slot):InstanceHandle{};}
     static bool normalize(Box& b){
         if(!Math::valid(b.left)||!Math::valid(b.top)||!Math::valid(b.right)||!Math::valid(b.bottom))return false;
         if(Math::less(b.right,b.left)){auto n=b.left;b.left=b.right;b.right=n;}

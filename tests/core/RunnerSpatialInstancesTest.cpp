@@ -62,6 +62,42 @@ template<bool Scheduled,unsigned Nodes> static void preparedTerrainPublication()
 }
 int main(){
     {
+        using Lease=RunnerSpatialInstances<8,32,true,0,0,true,RunnerSpatialLifetimes<8>,
+            RunnerObjectMembership<8,0,0>,false,void,RunnerSpatialStates<RunnerSpatialState,8,0,0,void>,
+            RunnerSpatialJournal<32,8,4096>,true>;
+        static_assert(sizeof(Lease)+sizeof(Lease::ControlStorage) <
+            sizeof(RunnerSpatialInstances<8,32,true>)+64,"control lease does not duplicate its bank");
+        Lease::State state;
+        for(unsigned consumer=0;consumer<7;++consumer){
+            Lease native;
+            assert(native.valid()&&!native.hasControlStorage()&&native.declareExternalSpatialOwnership());
+            assert(native.externalSpatialPublication([](auto&){return true;}));
+            switch(consumer){
+            case 0:assert(!native.attach({0,1},1,state));break;
+            case 1:assert(!native.contains({0,1}));break;
+            case 2:assert(!native.resolve({0,1}));break;
+            case 3:assert(!native.currentHandle(0).generation);break;
+            case 4:assert(!native.pendingSpatial());break;
+            case 5:assert(!native.pendingCollision());break;
+            case 6:assert(!native.visitRegistrationFlags([](auto,int,unsigned){return true;}));break;
+            }
+            assert(!native.valid());
+        }
+        Lease native;assert(native.declareExternalSpatialOwnership());
+        native.clear();assert(native.valid()&&!native.hasControlStorage());
+        assert(native.externalSpatialPublication([](auto&){return true;}));
+        Lease::ControlStorage forbidden;
+        assert(!native.bindControlStorage(&forbidden)&&!native.valid());
+        Lease reference;Lease::ControlStorage bank;
+        assert(reference.bindControlStorage(&bank)&&reference.hasControlStorage());
+        assert(reference.attach({0,1},1,state));
+        reference.clear();
+        assert(!reference.contains({0,1})&&!reference.attach({0,1},1,state));
+        assert(reference.attach({0,2},1,state)); // Clear preserves generation ceilings.
+        assert(!reference.declareExternalSpatialOwnership()&&!reference.valid());
+        assert(reference.contains({0,2})&&reference.resolve({0,2})); // Failure-prefix inspection remains available.
+    }
+    {
         // Engine refresh queues even unchanged/zero-speed writes. Requeue
         // order is remove-and-prepend, not first insertion order.
         using Owner=RunnerSpatialInstances<8,32,true>;

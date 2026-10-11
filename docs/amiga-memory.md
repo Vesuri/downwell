@@ -103,7 +103,7 @@ metadata, object defaults and terrain Create plans remain available. Startup
 and contact-profile verifiers assert null bank and geometry pointers, and the
 preparation-count gate distinguishes terrain Create plans from optional
 collision birth bounds. Query-enabled fixtures verify the full-service path.
-The native owner is 1,043,240 bytes. Moving box records into the explicit bank
+Moving box records into the explicit bank
 removes 30,720 bytes from an external-backend scene; full-service native totals
 are unchanged because that scene admits the bank. This does not reduce Chip
 usage or remove the remaining actor-position array.
@@ -226,7 +226,7 @@ removes 1,236,560 resident bytes when no tree consumer runs. The ordered
 mutation journal is a separate optional 90,112-byte allocation, not another
 copy of the tree. Its 16-byte lease replaces the embedded bank. Native
 allocation requests `MEMF_FAST`, with no Chip fallback.
-The native owner therefore occupies 1,247,790 bytes, down from 1,337,886:
+At the journal split, the native owner occupied 1,247,790 bytes, down from 1,337,886:
 90,096 fewer always-resident ordinary bytes. This is a BSS/residency reduction,
 not a claim that 90 KiB disappeared from the executable's on-disk payload.
 
@@ -358,7 +358,9 @@ instead of the pair columns.
 ## Scalar reference storage admission
 
 `GameplayCollisionOwner::ReferenceStorage` owns the scalar spatial and appearance
-arrays. It is not a member of `GameplayCollisionOwner`. Reference and
+arrays and `RunnerSpatialInstances::ControlStorage`. The control bank owns the
+scalar lifetime high-water marks, registration membership and both dirty queues.
+It is not a member of `GameplayCollisionOwner`. Reference and
 terrain-only reference construction require that backing explicitly; native
 construction rejects it. The normal Amiga build reserves no such arrays.
 Reference scene/field/entry verification builds construct them before the owner,
@@ -369,8 +371,25 @@ read/write latches terminal failure and immediately notifies the owner; no
 additional per-frame validation scan is needed. The small failed-write sentinel
 is not backing storage and can never make a failed owner valid again. Record
 capacity changes do not change the borrower's size. These rules remove the
-two scalar record arrays only: the shared journal/index and other reference
-ownership machinery still have their existing owners.
+two scalar record arrays. The separate control-bank lease removes another
+138,612 ordinary bytes on the 68000: its 138,616-byte bank is replaced by a
+four-byte pointer. `GameplayCollisionOwner` is 904,628 bytes; its shared spatial
+owner is 664 bytes. The index and its on-demand journal/tree retain their
+existing ownership and are not part of the scalar bank.
+
+Native construction explicitly declares external spatial ownership instead
+of reading an always-empty scalar membership table before each index operation.
+This declaration and scalar-bank binding are mutually exclusive. There is no
+lazy allocation or fallback bank. Actual scalar consumers, including direct
+lifetime and queue-count accessors, latch failure when backing is absent.
+Reference-state inspection through `GameplayCollisionOwner::state` still returns
+no scalar record for native ownership; native published-state APIs retain their
+separate guards. Clear preserves the supplied bank's generation high-water
+marks and is safe for an index-only owner without a bank. It does not switch
+backend admission or release backing whose lifetimes may still be observed.
+Startup/contact checks assert absence; full reference Results/Retry checks
+assert presence. This changes ordinary residency, not Chip usage or the
+registration representation.
 
 ## Current Chip RAM ownership
 

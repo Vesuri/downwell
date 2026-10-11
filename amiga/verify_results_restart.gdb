@@ -21,6 +21,11 @@ if gDownwellPreciseMaskChecks != 2
     quit 1
 end
 set $owner = (downwell::GameplayCollisionOwner*)&'_ZZL11runDownwellvE16collisionStorage.lto_priv.0'
+if $owner->owner_.control_.bank_ == 0
+    printf "Full-service reference scene is missing scalar control backing\n"
+    quit 1
+end
+printf "Reference scalar control: %lu resident bytes\n", sizeof(*$owner->owner_.control_.bank_)
 if $owner->terrain_.records_ == 0
     printf "Full-service scene fixture is missing scalar terrain backing\n"
     quit 1

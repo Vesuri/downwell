@@ -120,6 +120,11 @@ end
 # Read storage directly: calling nodeCount()/height() would drain the journal
 # and change the very residency/work state this diagnostic is measuring.
 set $owner = (downwell::GameplayCollisionOwner*)&'_ZZL11runDownwellvE16collisionStorage.lto_priv.0'
+if $owner->owner_.control_.bank_ != 0
+    printf "Unused scalar control bank resident during native gameplay\n"
+    quit 1
+end
+printf "Scalar control: optional_bytes=%lu resident=0\n", sizeof(*$owner->owner_.control_.bank_)
 if $owner->terrain_.records_ != 0
     printf "Native terrain retained unused scalar reference backing\n"
     quit 1
