@@ -1,5 +1,50 @@
 # Amiga gameplay frame-cost audit
 
+## Prepared-publication boundary at `759fb458`
+
+A fresh 35-PAL-field capture beginning at contact marker 675 reproduces
+frame 676 at **286.81 ms** (2,037,790 cycles). Its following complete frames
+677–680 take 76.2, 67.3, 75.6 and 74.9 ms. Coverage reaches tick 680,
+view Y 1496, five enemy slots and health 3, with 512 KiB Chip and 8 MiB Fast.
+This is attribution, not an optimization or restored frame-budget claim.
+
+| Inclusive boundary in frame 676 | ms | Relationship |
+| --- | ---: | --- |
+| Entire gameplay Step | 257.45 | Contains generation and ordinary simulation |
+| Live generation | 211.74 | Parent of the following generation work |
+| Prepared terrain publication, 33 calls | 141.81 | Includes native ownership and backend occupancy |
+| Native prepared construction | 124.35 | Inside prepared publication |
+| Prepared cell lifetime insertion | 101.46 | Inside native construction |
+| Collision-owner span construction | 72.42 | Inside lifetime insertion |
+| External-object registration | 21.95 | Inside span construction; existing rejected lane |
+| External birth chronology | 9.45 | Inside span construction |
+| Layer span publication / admission | 7.49 / 5.62 | Inside span construction |
+| Identity/run insertion | 8.23 | Inside lifetime insertion, outside span construction |
+| End-of-span room publication | 8.14 | Inside native construction, outside lifetime insertion |
+| Event cells, 34 calls | 48.00 | Separate from prepared publication |
+| Breakable births, 17 calls | 14.33 | Inside event cells |
+| Builder row advancement | 11.40 | Separate from prepared publication and event cells |
+| Builder position publication | 10.90 | Inside row advancement |
+| Draw collection | 7.8 | Outside gameplay Step |
+
+Do not sum parent and child rows. These costs do not justify another
+registration encoding, individual setter rewrite, or sub-millisecond Draw
+helper experiment. The current all-window report attributes about 4.12 ms
+to Draw collection, including actual command production; its prepared-order
+traversal is only 1.01 ms. A replacement of prepared publication must cover
+the complete lifetime/layer/room transaction, preserve event-Create barriers
+and successful failure prefixes, and remove work rather than defer a second
+per-cell reconstruction. RNG consumption remains interleaved with event Creates.
+
+Reproduce with `SKIP_TO_GAME=1 PROFILE_CONTACT=1 VERIFY_CHIP_KB=512
+VERIFY_TIMEOUT_SECONDS=180 STRIP=1 TRACE_FRAMES=675 TRACE_FIELDS=35
+TRACE_OUTPUT=$PWD/tmp/trace/generation-owner-audit bash amiga/profile.sh trace`,
+then `python3 tools/amiga-trace-report.py tmp/trace/generation-owner-audit
+--frames=676 --top=140 --tree-min=0.15 --causes`.
+Report: `tmp/generation-owner-676.txt`; driver: `tmp/generation-owner-audit.log`.
+Trace ELF SHA-256:
+`ded490a6892d5b12839df26d4cd7055138e3e392d273e5c50fb26ea3f5ea0f7a`.
+
 ## External collision-backend execution boundary
 
 The guarded native backend omits generic actor/terrain collision geometry,
