@@ -66,6 +66,10 @@ end
 # The living world-1 contact tape never enters a shop, results or upgrade room.
 # New scene content must not introduce bank loading/preparation to this route.
 if gDownwellProfileRequireDamage && gDownwellProfileDeadSamples == 0
+    if gDownwellFieldColumnLoads != 1 || gDownwellFieldColumnResidentBytes != 70816
+        printf "CPU field columns did not retain exactly one gameplay lease\n"
+        quit 1
+    end
     if gDownwellFieldBandLoads != 1
         printf "Large-field image bank did not load exactly once at gameplay entry\n"
         quit 1

@@ -100,23 +100,23 @@ interpret restoring this diagnostic's loader fit as a shipping memory reduction.
 
 The normal `STRIP=1` build with admitted room payloads, scene-loaded gameplay art
 and large-field pixels, and without reference-only collision masks is
-**2,078,348 bytes**, SHA-256
-`9f3389c5ab310a4dd0dafae702bf2b6cc7a77831fe9423062d5663fcd05983a1`.
+**2,008,404 bytes**, SHA-256
+`9a6ec6bd2e583d27e1a1305b169be2e8a21c9c9e208bb92e8bbaa291a3c21d31`.
 The matching ELF section sizes distinguish payload from runtime allocation:
 
 | Section | Bytes | Stored in the executable? |
 | --- | ---: | --- |
-| Machine code (`.text`) | 1,392,294 | Yes |
-| Read-only data (`.rodata`) | 603,520 | Yes |
+| Machine code (`.text`) | 1,393,032 | Yes |
+| Read-only data (`.rodata`) | 532,732 | Yes |
 | Initialized writable data (`.data`) | 34,194 | Yes |
 | Initializer pointer | 4 | Yes |
-| Zero-filled storage (`.bss`) | 2,256,828 | No; allocated at load |
+| Zero-filled storage (`.bss`) | 2,256,840 | No; allocated at load |
 
-Initialized payload totals 2,030,012 bytes. Hunk relocation, padding and container
-records account for the remaining 48,336 bytes. Stripping cannot remove
+Initialized payload totals 1,959,962 bytes. Hunk relocation, padding and container
+records account for the remaining 48,442 bytes. Stripping cannot remove
 the initialized payload. ELF debug sections are not that payload either.
 
-Linked serialized banks account for 312,657 of the 603,520 read-only bytes:
+Linked serialized banks account for 312,657 of the 532,732 read-only bytes:
 
 | Linked bank group | Bytes |
 | --- | ---: |
@@ -134,9 +134,15 @@ The remaining read-only bytes include generated tables, constants and strings.
 The 71,456-byte large-field pixel stream is read from `Downwell.fields`
 directly into the gameplay Chip bank; there is no linked
 CPU upload copy. A linkage guard rejects its return. This is distinct
-from `fieldColumnWords` (70,816 bytes), the CPU column-rendering representation;
-those are not interchangeable arrays. Front-end scenes still retain the CPU
-column commands, but do not read or prepare the large-field pixel file.
+from the 70,816-byte CPU column-rendering representation in `Downwell.columns`;
+those are not interchangeable arrays. The latter has an ordinary-memory
+gameplay lease (`MEMF_FAST`, no Chip fallback), loaded and checksum-validated
+before renderer admission. Front-end scenes retain neither payload. Gameplay
+retirement invalidates the column binding before freeing the lease. Re-entry
+reads it again; an absent binding rejects drawing, never reads a file mid-frame.
+The native link audit rejects `fieldColumnWords` as well as `fieldBandPixels`.
+The host keeps both original arrays as serialization oracles; file-loaded CPU
+commands are also checked against independent raster pixels.
 
 Reproduce the section and bank measurements with `m68k-amiga-elf-objdump -h`
 and `m68k-amiga-elf-objdump -t -C` on `amiga/out/Downwell.elf`, after sourcing
@@ -223,8 +229,9 @@ gameplay memory is essentially unchanged: this is scene residency, not a
 smaller raster representation.
 `tmp/raster-lease-startup-gdb.log` verifies no raster residency at startup and
 126,840 Chip bytes free. At the audited build above, initialized payload plus
-BSS is 4,286,840 bytes before gameplay raster and dynamic graphics allocations.
-Adding the raster alone brings this to 5,368,184 ordinary-memory bytes. A small
+BSS is 4,216,802 bytes before gameplay raster and dynamic graphics allocations.
+Adding the raster and CPU field-column leases brings this to 5,368,962
+ordinary-memory bytes. A small
 Hunk file therefore would not, on its own, prove an A500 memory fit.
 Moving data to sidecar files changes file size, not residency, unless its
 lifetime or representation also changes. The shared DMA plane atlas below

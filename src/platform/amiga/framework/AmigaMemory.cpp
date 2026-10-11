@@ -17,6 +17,7 @@ AmigaMemory::AmigaMemory()
       sceneCache_(0), assets_(0), gameAssets_(0), gameAssetBytes_(0),
       gameCatalogue_(0), gameCatalogueBytes_(0),
       terrainRaster_(0), terrainRasterBytes_(0),
+      fieldColumns_(0), fieldColumnBytes_(0),
       gameBytes_(0), hudBytes_(0), menuPlaneBytes_(0), menuEntryBytes_(0),
       copperBytes_(0),
       playerSpriteBytes_(0), bulletSpriteBytes_(0), enemySpriteBytes_(0),
@@ -102,6 +103,7 @@ void AmigaMemory::release()
     releaseGameAssets();
     releaseGameCatalogue();
     releaseTerrainRaster();
+    releaseFieldColumns();
     if (assets_) FreeMem(assets_, assetBytes_);
     if (sceneCache_) FreeMem(sceneCache_, sceneCacheBytes_);
     if (enemySprite_[1]) FreeMem(enemySprite_[1], enemySpriteBytes_);
@@ -126,6 +128,22 @@ void AmigaMemory::release()
     enemySprite_[1] = 0;
     sceneCache_ = 0;
     assets_ = 0;
+}
+
+bool AmigaMemory::acquireFieldColumns(ULONG bytes)
+{
+    if (!bytes) return false;
+    if (fieldColumns_) return fieldColumnBytes_ == bytes;
+    fieldColumns_ = (UBYTE*)AllocMem(bytes, MEMF_FAST);
+    fieldColumnBytes_ = fieldColumns_ ? bytes : 0;
+    return fieldColumns_ != 0;
+}
+
+void AmigaMemory::releaseFieldColumns()
+{
+    if (fieldColumns_) FreeMem(fieldColumns_, fieldColumnBytes_);
+    fieldColumns_ = 0;
+    fieldColumnBytes_ = 0;
 }
 
 bool AmigaMemory::acquireGameCatalogue(ULONG bytes)

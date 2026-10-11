@@ -20,6 +20,10 @@ if gDownwellPreparedFieldChecks < 700 || gDownwellPreparedFieldFixtureChecks < 5
     quit 1
 end
 printf "PROFILE prepared field pixels: %u full-buffer comparisons in %lu gameplay updates; failures=%u\n", gDownwellPreparedFieldChecks, gDownwellProfileGameSamples, gDownwellPreparedFieldFailures
+if gDownwellFieldColumnLoads != 1 || gDownwellFieldColumnResidentBytes != 70816
+    printf "Prepared field commands missing or reloaded during gameplay\n"
+    quit 1
+end
 printf "PROFILE terrain-mask phases: %u full-buffer comparisons\n", gDownwellPreparedFieldFixtureChecks
 printf "PROFILE overlapping field composites: %u full-buffer comparisons\n", gDownwellPreparedFieldCompositeChecks
 printf "PROFILE fused field transfers: %u full-buffer comparisons\n", gDownwellPreparedFieldFusedChecks

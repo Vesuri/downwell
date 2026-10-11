@@ -1,11 +1,20 @@
 #include "platform/amiga/AmigaFieldColumns.h"
 #include "platform/amiga/AmigaFieldBands.h"
+#include "platform/amiga/AmigaFieldColumnBank.h"
 #include <array>
 #include <cstdlib>
 #include <iostream>
+#include <fstream>
+#include <vector>
 
 static void require(bool ok,const char* what){if(!ok){std::cerr<<what<<'\n';std::exit(1);}}
-int main(){
+int main(int argc,char** argv){
+    require(argc==2,"column bank argument");
+    std::vector<downwell::FieldColumnWord> storage(downwell::fieldColumnBytes/8);
+    AmigaFieldColumnBank bank;
+    require(bank.load(reinterpret_cast<unsigned char*>(storage.data()),downwell::fieldColumnBytes,
+        [&](unsigned char* p,unsigned n){std::ifstream input(argv[1],std::ios::binary);
+            return bool(input.read(reinterpret_cast<char*>(p),n));}),"column bank load");
     std::array<UBYTE,downwellGameRingBytes> terrain,actual,expected;
     unsigned random=98761;
     for(auto& byte:terrain){random=random*1664525u+1013904223u;byte=random>>24;}
@@ -28,10 +37,10 @@ int main(){
                 expected[offset]=(expected[offset]&~bit)|((pen&(1u<<p))?bit:0);
             }
         });
-        require(amigaFieldColumns(terrain.data(),actual.data(),circle,origin,false,rows),"draw admission");
+        require(amigaFieldColumns(terrain.data(),actual.data(),circle,origin,false,rows,bank.data()),"draw admission");
         if(actual!=expected){std::cerr<<radius<<' '<<phase<<' '<<circle.x<<' '<<circle.y<<'\n';require(false,"column pixels");}
         for(unsigned row=0;row<20;++row)require(rows[row]==oracleRows[row],"column row footprint");
-        require(amigaFieldColumns(terrain.data(),actual.data(),circle,origin,true),"restore admission");
+        require(amigaFieldColumns(terrain.data(),actual.data(),circle,origin,true,nullptr,bank.data()),"restore admission");
         require(actual==terrain,"column restoration");++cases;
     }
     std::cout<<cases<<" large-field radius/shift cases match independent pixels, row footprints and restoration\n";
@@ -68,4 +77,8 @@ int main(){
     require(!amigaFieldBandParts({181,140,128*256},0,[](unsigned,unsigned,unsigned,unsigned,unsigned){}),"left band fallback");
     require(!amigaFieldBandParts({199,140,128*256},0,[](unsigned,unsigned,unsigned,unsigned,unsigned){}),"right band fallback");
     std::cout<<bands<<" resident band phases/placements match draw/restore pixels, clipping and wrap\n";
+    bank.invalidate();actual=terrain;
+    require(!amigaFieldColumns(terrain.data(),actual.data(),{176,140,128*256},0,false,nullptr,bank.data()),
+        "unloaded scene rejects drawing instead of a catalogue fallback");
+    require(actual==terrain,"unloaded scene leaves target untouched");
 }

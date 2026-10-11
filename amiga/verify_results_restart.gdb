@@ -66,6 +66,10 @@ if gDownwellGamePlaneLoads != 3 || gDownwellGamePlaneReleases != 2 || gDownwellG
     quit 1
 end
 printf "Gameplay DMA lease: Retry retained; style/surface released and reloaded\n"
+if gDownwellFieldColumnLoads != 3 || gDownwellFieldColumnResidentBytes != 70816
+    printf "Field-column lease did not follow gameplay Retry/re-entry\n"
+    quit 1
+end
 if gDownwellGameArtLoads != 3 || gDownwellGameArtReleases != 2 || gDownwellGameArtPreparations != 3 || gDownwellGameArtResidentBytes != gDownwellGameArtExpectedBytes || gDownwellGameArtExpectedBytes == 0
     printf "Gameplay CPU art lease failed: loads=%u releases=%u preparations=%u resident=%u\n", gDownwellGameArtLoads, gDownwellGameArtReleases, gDownwellGameArtPreparations, gDownwellGameArtResidentBytes
     quit 1

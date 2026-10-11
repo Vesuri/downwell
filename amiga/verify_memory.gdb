@@ -29,6 +29,10 @@ if gDownwellFieldBandLoads != 0
     printf "Gameplay field images loaded before gameplay admission\n"
     quit 1
 end
+if gDownwellFieldColumnLoads != 0 || gDownwellFieldColumnResidentBytes != 0
+    printf "Gameplay CPU field columns resident before gameplay admission\n"
+    quit 1
+end
 # This is the normal-startup audit; explicit plane/replay oracle builds have
 # their own verifiers and must not weaken the front-end residency guard.
 if gDownwellGamePlaneResidentBytes != 0 || gDownwellGamePlaneLoads != 0

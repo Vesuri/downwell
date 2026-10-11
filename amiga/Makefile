@@ -598,7 +598,14 @@ endif
 
 .PHONY: all check clean audit
 
-all: check $(OUT).exe $(OUT).boot $(OUT).front $(OUT).game $(OUT).planes $(OUT).cavern $(OUT).cavernplanes $(OUT).results $(OUT).shop $(OUT).clear $(OUT).fields
+all: check $(OUT).exe $(OUT).boot $(OUT).front $(OUT).game $(OUT).planes $(OUT).cavern $(OUT).cavernplanes $(OUT).results $(OUT).shop $(OUT).clear $(OUT).fields $(OUT).columns
+
+$(OUT).columns: $(REPO)/generated/amiga-field-columns.bin
+	@mkdir -p $(@D)
+	cp -f $< $@
+
+$(REPO)/generated/amiga-field-columns.bin: $(REPO)/generated/downwell-field-columns.h
+	$(MAKE) -C $(REPO) generated/amiga-field-columns.bin
 
 $(OUT).fields: $(REPO)/generated/amiga-field-bands.bin
 	@mkdir -p $(@D)
@@ -1096,7 +1103,7 @@ obj/gcc8_a_support.o: $(SUPPORT)/gcc8_a_support.s
 	$(AS) $(ASFLAGS) -o $@ $<
 
 audit:
-	@if $(OBJDUMP) -t $(OUT).elf | grep -q 'fieldBandPixels'; then \
+	@if $(OBJDUMP) -t $(OUT).elf | grep -qE 'fieldBandPixels|fieldColumnWords'; then \
 		echo "*** gameplay field upload pixels must be scene-loaded, not linked"; exit 1; \
 	else echo "Field image source linkage audit: clean"; fi
 	@python3 $(REPO)/tools/audit-amiga-scene-loads.py $(OUT).elf $(if $(filter 1,$(REPLAY_VERIFY) $(PLANE_VERIFY)),--reference-oracle)

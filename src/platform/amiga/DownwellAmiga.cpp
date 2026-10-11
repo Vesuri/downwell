@@ -74,6 +74,10 @@ void downwellTerrainBatchMismatch();
 #ifdef DOWNWELL_PREPARED_FIELDS
 #include "AmigaPreparedTimeFields.h"
 #include "AmigaFieldColumns.h"
+#include "AmigaFieldColumnBank.h"
+static AmigaFieldColumnBank gameplayColumnBank;
+static_assert(downwell::fieldColumnBytes<=70816,"Field column scene budget needs review");
+extern "C" { volatile ULONG gDownwellFieldColumnLoads=0,gDownwellFieldColumnResidentBytes=0; }
 // Change only initialized data for identical-code comparisons.
 // Both modes load the same images and reserve the same scene-bank partition.
 extern "C" { volatile unsigned gDownwellPreparedFieldMode=DOWNWELL_FIELD_MODE; }
@@ -129,7 +133,7 @@ struct PreparedFieldOps {
         amigaFieldVerifyColumn(terrain,target,circle,origin,restore);
 #endif
         const bool ok=(gDownwellPreparedFieldMode>=5&&amigaBlitterFieldBands(terrain,target,circle,origin,restore,rows)) ||
-            amigaFieldColumns(terrain,target,circle,origin,restore,rows);
+            amigaFieldColumns(terrain,target,circle,origin,restore,rows,gameplayColumnBank.data());
 #ifdef DOWNWELL_PREPARED_FIELDS_VERIFY
         amigaFieldVerifyFinish(target);
 #endif
@@ -2213,7 +2217,26 @@ __attribute__((noinline)) static int runDownwell(void) {
         gDownwellTerrainRasterResidentBytes=AmigaTerrainRaster::storageBytes;
         return true;
     };
+    const auto releaseFieldColumns=[&](){
+#ifdef DOWNWELL_PREPARED_FIELDS
+        gameplayColumnBank.invalidate();memory.releaseFieldColumns();
+        gDownwellFieldColumnResidentBytes=0;
+#endif
+    };
+    const auto acquireFieldColumns=[&](){
+#ifdef DOWNWELL_PREPARED_FIELDS
+        if(!memory.acquireFieldColumns(downwell::fieldColumnBytes)||
+            !gameplayColumnBank.load(memory.fieldColumns(),downwell::fieldColumnBytes,
+                [&](UBYTE* target,unsigned bytes){
+                    ++gDownwellFieldColumnLoads;
+                    return platform.loadFile("PROGDIR:Downwell.columns",target,bytes)==LONG(bytes);
+                }))return false;
+        gDownwellFieldColumnResidentBytes=downwell::fieldColumnBytes;
+#endif
+        return true;
+    };
     const auto releaseGameplayArt=[&](){
+        releaseFieldColumns();
         amigaBlitterReleaseGamePlanes();
 #ifdef DOWNWELL_TERRAIN_BATCH
         (void)AmigaTerrainPainter::bindBatch(nullptr,nullptr,nullptr,0);
@@ -2245,7 +2268,7 @@ __attribute__((noinline)) static int runDownwell(void) {
         const auto* planeHash=downwellCavernPlaneSourceHash;
 #endif
         if(gDownwellGameArtResidentBytes)
-            return memory.gameAssets()&&activeGamePack&&acquireTerrainRaster();
+            return memory.gameAssets()&&activeGamePack&&acquireTerrainRaster()&&acquireFieldColumns();
         gamePackBytes=planeBytes;
         gDownwellGameArtExpectedBytes=cpuBytes;
         gDownwellGamePlaneExpectedBytes=gamePackBytes;
@@ -2256,6 +2279,7 @@ __attribute__((noinline)) static int runDownwell(void) {
             effectAssets.bind(activeGamePack,cpuBytes)&&
             effectAssets.bindEntryMask(amiga_entry_mask,amiga_entry_mask_end-amiga_entry_mask)&&
             AmigaGameplayActors::prepareDamageText(activeGamePack,activeGamePackEnd);
+        good=good&&acquireFieldColumns();
 #ifndef DOWNWELL_REFERENCE_ACTOR_PREFIX
         good=good&&actorFrames.prepare(activeGamePack,activeGamePackEnd);
 #endif
@@ -3359,6 +3383,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     gDownwellResultsPack = gDownwellShopPack = nullptr;
                     gDownwellResultsAssetBytes = gDownwellShopAssetBytes = 0;
                     releaseTerrainRaster();
+                    releaseFieldColumns();
                     if (!upgradeSource.acquire()) { exitCode = 20; break; }
                     if (!clear.enter(port, scenes.styleCursor(), liveInput,
                             memory.menuForeground(), menuPlaneBytes * 2 + amigaMenuEntryPlaneBytes,

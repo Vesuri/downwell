@@ -26,6 +26,9 @@ public:
     bool acquireTerrainRaster(ULONG bytes);
     void releaseTerrainRaster();
     UBYTE* terrainRaster() const { return terrainRaster_; }
+    bool acquireFieldColumns(ULONG bytes);
+    void releaseFieldColumns();
+    UBYTE* fieldColumns() const { return fieldColumns_; }
 
     UBYTE* game() const { return game_; }
     UBYTE* hud() const { return hud_; }
@@ -64,6 +67,8 @@ private:
     ULONG gameCatalogueBytes_;
     UBYTE* terrainRaster_;
     ULONG terrainRasterBytes_;
+    UBYTE* fieldColumns_;
+    ULONG fieldColumnBytes_;
     ULONG gameBytes_;
     ULONG hudBytes_;
     ULONG menuPlaneBytes_;

@@ -36,7 +36,8 @@ template<bool Restore> inline bool paint(const UBYTE* terrain,UBYTE* target,
     return true;
 }
 template<bool Restore> void transfer(const UBYTE* terrain,UBYTE* target,
-    const downwell::TimeFieldOutlines::Circle& circle,unsigned origin,UWORD* rows){
+    const downwell::TimeFieldOutlines::Circle& circle,unsigned origin,UWORD* rows,
+    const downwell::FieldColumnWord* words){
     using namespace downwell;
     if(circle.x<=downwellPlayfieldX-132||circle.x>=downwellPlayfieldX+downwellPlayfieldWidth+132||
        circle.y<=-132||circle.y>=downwellDisplayHeight+132)return;
@@ -54,8 +55,8 @@ template<bool Restore> void transfer(const UBYTE* terrain,UBYTE* target,
         const unsigned column=frame[col+8];
         const int x=base+col;
         const unsigned leftMask=clip[x],rightMask=shift?clip[x+1]:0;
-        const auto* word=fieldColumnWords+fieldColumnOffsets[column];
-        const auto* stop=fieldColumnWords+fieldColumnOffsets[column+1];
+        const auto* word=words+fieldColumnOffsets[column];
+        const auto* stop=words+fieldColumnOffsets[column+1];
         for(;word!=stop;++word){
             const int y=circle.y+word->row;
             if(y<0||y>=downwellDisplayHeight)continue;
@@ -79,10 +80,17 @@ template<bool Restore> void transfer(const UBYTE* terrain,UBYTE* target,
 }
 }
 inline bool amigaFieldColumns(const UBYTE* terrain,UBYTE* target,
-    const downwell::TimeFieldOutlines::Circle& circle,unsigned origin,bool restore,UWORD* rows=nullptr){
-    if(origin>=downwellGameRingHeight||circle.radius<128*256||circle.radius>=130*256)return false;
-    if(restore)downwell_field_columns::transfer<true>(terrain,target,circle,origin,nullptr);
-    else downwell_field_columns::transfer<false>(terrain,target,circle,origin,rows);
+    const downwell::TimeFieldOutlines::Circle& circle,unsigned origin,bool restore,UWORD* rows=nullptr,
+    const downwell::FieldColumnWord* words=
+#ifdef DOWNWELL_PLATFORM_AMIGA
+    nullptr
+#else
+    downwell::fieldColumnWords
+#endif
+    ){
+    if(!words||origin>=downwellGameRingHeight||circle.radius<128*256||circle.radius>=130*256)return false;
+    if(restore)downwell_field_columns::transfer<true>(terrain,target,circle,origin,nullptr,words);
+    else downwell_field_columns::transfer<false>(terrain,target,circle,origin,rows,words);
     return true;
 }
 #endif

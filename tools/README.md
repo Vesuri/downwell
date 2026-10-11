@@ -201,8 +201,20 @@ large-field Chip range at gameplay entry and validates its rolling word
 checksum before publishing DMA pointers. It retains no linked CPU pixel copy;
 the generated host array remains the independent loading/pixel oracle.
 `make verify-field-band-bank` checks exact payload words, failed/corrupt reads,
-invalidation/reuse and the shifted-blitter guard word. This does not externalize
-the CPU column commands used by other placements.
+invalidation/reuse and the shifted-blitter guard word.
+
+The CPU commands used by other placements are separately emitted as
+`generated/amiga-field-columns.bin`, deployed as `Downwell.columns` (70,816
+bytes). Gameplay admission loads and validates them into a `MEMF_FAST` lease;
+gameplay retirement invalidates the renderer binding before releasing that
+lease. They are absent during publisher/credits/controls/garden/style scenes
+and upgrade selection. No render call loads assets. An absent binding rejects
+drawing, rather than falling back to a permanently linked table. The native
+link audit rejects both original field payload arrays; the host retains them
+as independent serialization oracles. `verify-field-column-bank` exercises
+load failure, corruption, reuse and re-entry; `verify-field-columns` renders
+the file-loaded commands against independent pixels, including off-centre
+placements. The manifest records both payload hashes and the v4 generator.
 
 `make analyze-field-layouts` reports unchanged-column/word opportunities and
 deduplicated bitmap-band storage/counts for those large rasters. Its uniform
