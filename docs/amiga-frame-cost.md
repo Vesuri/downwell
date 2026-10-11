@@ -483,27 +483,27 @@ Reproduce with the contact command above, `TRACE_FIELDS=35` and
 driver log: `tmp/generation-current-trace.log`. Trace ELF SHA-256:
 `838723d93bbe446201d652fe0a9f467328932cc341e4a0c47747f7760766af1d`.
 
-### Remaining early-game dispatch cost — `f4b4433a`
+### Remaining actor-event costs — `d771b7bf`
 
-A fresh six-field capture starting at frame 50 confirms frame 51 at **32.56
-ms** (frame 52: 32.9 ms). This is before enemy births: the capture ends at
-tick 52, view Y 106, zero allocated enemy slots and health 4. It does not
-establish later combat coverage. The historical comparable frame below was
-19.2 ms; the early regression is therefore not resolved by the generation
-or residency changes.
+Two eight-field captures starting at 50 and 1304 measure frame 51 at
+**30.37 ms** and frame 1305 at **66.44 ms**. The first ends at tick 53,
+view Y 107, zero enemy slots and health 4. The second ends at tick 1305,
+view Y 2120, six enemy slots and health 3. The historical comparable early
+frame below was 19.2 ms. Generation/residency changes have not resolved that
+regression; these short windows do not establish whole-game performance.
 
 | Inclusive boundary, frame 51 | ms |
 | --- | ---: |
-| Entire gameplay Step | 22.21 |
-| Actor End Step capture/dispatch/execution | 4.28 |
-| Bullet Step and published-position update | 3.82 |
-| Draw collection | 3.04 |
-| Player movement | 2.70 |
+| Entire gameplay Step | 20.25 |
+| Actor End Step capture/dispatch/execution | 4.17 |
+| Bullet Step and published-position update | 2.94 |
+| Draw collection | 3.0 |
+| Player movement | 2.07 |
 | Room animation callback | 2.02 |
-| Bullet position publication, inside Bullet Step | 1.81 |
-| Dither Above Begin Step | 1.69 |
-| Captured alarm dispatch | 1.48 |
-| Bullet retirement, inside Actor End Step | 0.81 |
+| Bullet position publication, inside Bullet Step | 0.94 |
+| Dither Above Begin Step | 1.66 |
+| Captured alarm dispatch | 1.29 |
+| Bullet retirement, inside Actor End Step | 0.83 |
 
 Parent/child rows overlap. In particular, another arithmetic or bullet
 retirement helper change cannot remove the remaining dispatch cost. The
@@ -513,15 +513,37 @@ The player's event updates `playerHit`; out-of-view destruction can run
 callbacks and reread published positions. Absence of enemies alone is not
 a certificate that this phase is empty. Any phase-elision replacement must
 account for these effects at the owning lifecycle boundary rather than
-introducing another full-room proof scan.
+introducing another full-room proof scan. The historical `GameplayWorld::step`
+used direct enemy/box retirement and a drone adapter, not this mixed actor
+phase. Its lower time is not permission to restore that older event ordering.
+
+Frame 1305 spends 18.39 ms in enemy Step, 4.87 ms in bullet Step and 4.11 ms
+in actor End Step. Within enemy Step, transform publication is 1.56 ms,
+image-index publication 1.14 ms, and walker sprite publication 0.61 ms.
+Together those disjoint appearance publications are 3.31 ms; this is an
+upper bound on removable work, not a predicted saving. Walking collision
+checks (4.10 ms) and bat collision resolution (2.14 ms) are separate, actual
+gameplay work and must not be charged to that appearance estimate.
+
+`Binding::transform`, `imageIndex`, `mask` and `sprite` still maintain the
+generic `NativePosition::sprite` state even when collision consumers are
+not admitted. Direct `nativePublishedSprite` callers are currently tests;
+generic collision refresh/collection consumes it internally. However sprite
+writes also update table sprite membership and prepared Draw admission, and
+`RunnerSpriteChange::plan` uses the prior image index to implement reset
+semantics. Removing the entire appearance mirror therefore requires separating
+those source-visible effects, not merely nulling the callbacks or dropping
+setters. The full-service reference and unsupported-read guards must survive.
+This evidence does not justify tuning any individual sub-millisecond helper.
 
 Reproduce with `SKIP_TO_GAME=1 PROFILE_CONTACT=1 VERIFY_CHIP_KB=512
-VERIFY_TIMEOUT_SECONDS=90 STRIP=1 TRACE_FIELDS=6 TRACE_FRAMES=50
-TRACE_OUTPUT=$PWD/tmp/trace/early-current bash amiga/profile.sh trace`, then
-`python3 tools/amiga-trace-report.py tmp/trace/early-current --frames=51
---causes --tree-min 1`. Report: `tmp/early-current-frame51.txt`; driver log:
-`tmp/early-current-trace.log`. Trace ELF SHA-256:
-`c1c2d1c92f5ede0b1fb4f82b9c5a43e597896c86aeb04ef4b4826eee20438d45`.
+VERIFY_TIMEOUT_SECONDS=120 STRIP=1 TRACE_FIELDS=8 TRACE_FRAMES=50,1304
+TRACE_OUTPUT=$PWD/tmp/trace/current-event-cost bash amiga/profile.sh trace`, then
+`python3 tools/amiga-trace-report.py tmp/trace/current-event-cost --frames=51
+--causes --tree-min 0.3` (select `--frames=1305` for the later frame).
+Reports: `tmp/current-event-cost-{51,1305}.txt`; driver log:
+`tmp/current-event-cost.log`. Trace ELF SHA-256:
+`e98c02aec4d148dd18fb258e62605b9188483bafd1c729fd56818cd4578e8bbb`.
 
 ## Historical pre-integration audit
 
