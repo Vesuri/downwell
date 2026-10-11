@@ -20,6 +20,11 @@ if gDownwellInitialRoomPreparations != 0
     quit 1
 end
 set $owner = (downwell::GameplayCollisionOwner*)&'_ZZL11runDownwellvE16collisionStorage.lto_priv.0'
+if $owner->terrain_.records_ != 0
+    printf "Unused scalar terrain reference backing resident during startup\n"
+    quit 1
+end
+printf "Startup scalar terrain: resident=0\n"
 if $owner->geometry_ != 0
     printf "Unused prepared collision geometry resident during startup\n"
     quit 1

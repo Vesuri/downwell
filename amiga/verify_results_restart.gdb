@@ -21,6 +21,10 @@ if gDownwellPreciseMaskChecks != 2
     quit 1
 end
 set $owner = (downwell::GameplayCollisionOwner*)&'_ZZL11runDownwellvE16collisionStorage.lto_priv.0'
+if $owner->terrain_.records_ == 0
+    printf "Full-service scene fixture is missing scalar terrain backing\n"
+    quit 1
+end
 if $owner->geometry_ == 0
     printf "Full-service scene fixture is missing its admitted collision geometry\n"
     quit 1

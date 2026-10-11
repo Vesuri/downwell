@@ -1,4 +1,5 @@
 #include "core/GameplayCollisionOwner.h"
+#include "OwnedTerrainFixture.h"
 #ifndef DOWNWELL_NATIVE_QUERY_PROBE
 #include "CollisionOwnerFixture.h"
 #endif
@@ -1680,7 +1681,7 @@ int main(){
     {
         TerrainDestructionAudit lifecycle;
         struct RejectDamage {unsigned calls=0;bool changed(int x,int y,int before,int after){assert(x==32&&y==48&&before==51&&after==-1);++calls;return false;}} damage;
-        auto store=std::make_unique<GameplayTerrainInstances>(GameplayTerrainInstances::Binding::bindDestruction(lifecycle),
+        auto store=std::make_unique<OwnedTerrainFixture>(GameplayTerrainInstances::Binding::bindDestruction(lifecycle),
             GameplayTerrainInstances::Presentation::bind(damage));lifecycle.store=store.get();
         assert(store->append(60,32,48,true));const auto h=store->handle(0);
         assert(!store->requestDestroy(h)&&store->find(h)->destroyRequested&&!store->valid()&&damage.calls==1&&lifecycle.destroys==1);
@@ -1720,7 +1721,7 @@ int main(){
     }
     for(unsigned failure=0;failure<3;++failure){
         TerrainDestructionAudit audit;audit.rejectDestroy=failure==1;audit.rejectActivation=failure==2;
-        auto terrain=std::make_unique<GameplayTerrainInstances>(GameplayTerrainInstances::Binding::bindDestruction(audit));
+        auto terrain=std::make_unique<OwnedTerrainFixture>(GameplayTerrainInstances::Binding::bindDestruction(audit));
         audit.store=terrain.get();assert(terrain->append(60,32,48,true));
         const auto h=terrain->handle(0);const auto record=terrain->find(h);
         assert(terrain->requestDestroy(h)==(failure!=1)&&audit.destroys==1);
@@ -1737,7 +1738,7 @@ int main(){
         }
     }
     {
-        auto terrain=std::make_unique<GameplayTerrainInstances>();assert(terrain->append(60,0,0,true));
+        auto terrain=std::make_unique<OwnedTerrainFixture>();assert(terrain->append(60,0,0,true));
         const auto h=terrain->handle(0);
         GameplayTerrainInstances::Record snapshot;
         assert(terrain->read(h,snapshot)&&terrain->ownsIdentity(h,snapshot));
@@ -1752,7 +1753,7 @@ int main(){
     }
     {
         TerrainDestructionAudit audit;
-        auto store=std::make_unique<GameplayTerrainInstances>(GameplayTerrainInstances::Binding::bindDestruction(audit));
+        auto store=std::make_unique<OwnedTerrainFixture>(GameplayTerrainInstances::Binding::bindDestruction(audit));
         audit.store=store.get();
         for(unsigned i=0;i<32;++i)assert(store->append(60,int(i),0,true));
         for(unsigned i=0;i<4096;++i){
@@ -2230,6 +2231,8 @@ int main(){
         auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
         assert(owner->attach(*world));auto& smoke=owner->registeredSmoke();GameMakerRandom random(2);
+        auto scalarBacking=std::make_unique<GameplayTerrainInstances::Storage>();
+        if(!owner->terrain().hasStorage())assert(owner->terrain().bindStorage(*scalarBacking));
         InstanceHandle local,self,walls[2];assert(smoke.create(105187,{}, {},random,local)&&
             GameplayCollisionView::encode(GameplayCollisionView::Kind::smoke,local,self));
         for(unsigned i=0;i<2;++i){assert(owner->terrain().append(60,int(i)*16,200,true)&&
@@ -2261,6 +2264,8 @@ int main(){
             GameplayTerrainInstances::WallCollision{},nullptr,mode);
         auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        auto scalarBacking=std::make_unique<GameplayTerrainInstances::Storage>();
+        if(!owner->terrain().hasStorage())assert(owner->terrain().bindStorage(*scalarBacking));
         assert(owner->attach(*world));auto& particles=owner->consumptionParticles();GameMakerRandom random(2);
         struct Globals {
             MotionBinary64 grav{};
@@ -4121,6 +4126,8 @@ int main(){
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain(),&rooms,
             GameplayWorld::PlayerBirthTiming::authoredRoom);
         assert(owner->attach(*world));
+        auto scalarBacking=std::make_unique<GameplayTerrainInstances::Storage>();
+        if(!owner->terrain().hasStorage())assert(owner->terrain().bindStorage(*scalarBacking));
         unsigned allocations=0,walls=0;const int expected[]={66,64,73};
         auto allocate=[&](int object,unsigned& id){
             assert(allocations<3&&object==expected[allocations]&&!walls);
@@ -6980,7 +6987,7 @@ int main(){
         assert(!roomWorld->effectsSucceeded()&&roomOwner->terrain().size()==240);
     }
     {
-        auto terrain=std::make_unique<GameplayTerrainInstances>();
+        auto terrain=std::make_unique<OwnedTerrainFixture>();
         auto partial=std::make_unique<GameplayWorld>(300,true,0,false,
             GameplayWorld::EnemyLifecycleBinding{},GameplayWorld::BreakableLifecycleBinding{},
             GameplayWorld::PlayerLifecycleBinding{},terrain.get());
@@ -6990,7 +6997,7 @@ int main(){
         assert(!partial->loadRoomTerrain(rooms,room,[&](const auto&){++calls;return true;})&&calls==3);
     }
     {
-        auto terrain=std::make_unique<GameplayTerrainInstances>();PackedRoomInstance r;
+        auto terrain=std::make_unique<OwnedTerrainFixture>();PackedRoomInstance r;
         assert(rooms.roomInstance(room,0,r));r.scaleX=2;
         assert(!terrain->appendRoom(r)&&!terrain->valid()&&terrain->size()==0);
     }
@@ -7700,6 +7707,8 @@ int main(){
             bool wall(InstanceHandle,MotionBinary64,MotionBinary64,bool& hit){hit=false;return true;}
             bool tile(InstanceHandle,int,MotionBinary64,MotionBinary64,bool& hit){hit=false;return true;}
         } queries;
+        auto scalarBacking=std::make_unique<GameplayTerrainInstances::Storage>();
+        if(!owner->terrain().hasStorage())assert(owner->terrain().bindStorage(*scalarBacking));
         TerrainWallContacts<16> walls;
         for(int x:{224,240,256}){
             assert(world->createGeneratedInstance({60,x,640},objects,[](const auto&){return true;})&&walls.append(60,x,640));
@@ -8067,6 +8076,8 @@ int main(){
                 GameplayTerrainInstances::WallCollision{},&rooms,ownership);
             auto scene=std::make_unique<GameplayWorld>(300,false,1000,false,contacts->enemyBinding(),
                 contacts->breakableBinding(),contacts->playerBinding(),&contacts->terrain());
+            auto scalarBacking=std::make_unique<GameplayTerrainInstances::Storage>();
+            if(!contacts->terrain().hasStorage())assert(contacts->terrain().bindStorage(*scalarBacking));
             assert(contacts->attach(*scene));InstanceHandle local,self,other;int otherObject=-1;
             assert(contacts->terrain().append(60,0,200,true));
             if(contact==0){
@@ -8650,7 +8661,7 @@ int main(){
     }
     auto owner=makeCollisionOwner(objects,sprites);
     {
-        auto terrain=std::make_unique<GameplayTerrainInstances>();GameMakerRandom random;
+        auto terrain=std::make_unique<OwnedTerrainFixture>();GameMakerRandom random;
         assert(terrain->append(60,128,0,true,123,999));
         const auto h=terrain->handle(0);
         assert(terrain->createProperties(h,51,false,random));
@@ -8784,7 +8795,7 @@ int main(){
     }
     {
         TerrainAudit audit;
-        auto store=std::make_unique<GameplayTerrainInstances>(GameplayTerrainInstances::Binding::bind(audit));
+        auto store=std::make_unique<OwnedTerrainFixture>(GameplayTerrainInstances::Binding::bind(audit));
         audit.store=store.get();
         assert(store->append(60,1,2,true)&&store->append(93,3,4,true));
         const auto first=store->handle(0),second=store->handle(1);
@@ -8796,7 +8807,7 @@ int main(){
     }
     {
         TerrainAudit audit;
-        auto store=std::make_unique<GameplayTerrainInstances>(GameplayTerrainInstances::Binding::bind(audit));
+        auto store=std::make_unique<OwnedTerrainFixture>(GameplayTerrainInstances::Binding::bind(audit));
         audit.store=store.get();audit.failBirth=1;
         auto failure=std::make_unique<GameplayWorld>(300,true,0,false,
             GameplayWorld::EnemyLifecycleBinding{},GameplayWorld::BreakableLifecycleBinding{},
@@ -8806,7 +8817,7 @@ int main(){
         failure->step(0);assert(!failure->effectsSucceeded());
     }
     {
-        auto terrain=std::make_unique<GameplayTerrainInstances>();
+        auto terrain=std::make_unique<OwnedTerrainFixture>();
         auto full=std::make_unique<GameplayWorld>(300,true,0,false,
             GameplayWorld::EnemyLifecycleBinding{},GameplayWorld::BreakableLifecycleBinding{},
             GameplayWorld::PlayerLifecycleBinding{},terrain.get());

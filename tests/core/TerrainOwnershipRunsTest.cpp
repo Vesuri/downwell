@@ -1,4 +1,5 @@
 #include "core/TerrainOwnershipRuns.h"
+#include "OwnedTerrainFixture.h"
 #include "core/NativeTerrainLifetimes.h"
 #include "core/GameplayTerrainInstancesRuns.h"
 #include "core/RunnerSpatialLifetimes.h"
@@ -167,7 +168,7 @@ static void initializedBoundary(){
     TerrainObserver observer;
     for(int object:{60,93,99})for(int tile:{-1,51,100000}){
         Terrain runs(Terrain::Binding::bindDestruction(observer));
-        downwell::GameplayTerrainInstancesScalar scalar;
+        downwell::OwnedTerrainFixture scalar;
         downwell::GameMakerRandom a,b;
         require(runs.appendInitialized(object,32,48,false,tile,a));
         require(scalar.append(object,32,48,false)&&scalar.createProperties(scalar.handle(0),tile,false,b));
@@ -843,6 +844,7 @@ int main(){
     append(1,1,60,(-2147483647-1),0); // No signed coordinate/generation wrap merge.
     append(64,1,60,0,0);append(2,0,60,0,0);append(2,1,35,0,0);
     std::printf("Terrain identity/geometry/order runs: %u scalar comparisons passed\n",comparisons);
-    std::printf("Terrain store bytes (host): scalar=%zu runs=%zu\n",
-        sizeof(downwell::GameplayTerrainInstancesScalar),sizeof(downwell::GameplayTerrainInstancesRuns));
+    std::printf("Terrain store bytes (host): scalar service=%zu backing=%zu runs=%zu\n",
+        sizeof(downwell::GameplayTerrainInstancesScalar),sizeof(downwell::GameplayTerrainInstancesScalar::Storage),
+        sizeof(downwell::GameplayTerrainInstancesRuns));
 }

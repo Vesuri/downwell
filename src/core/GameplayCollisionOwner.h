@@ -78,6 +78,7 @@ public:
         Owner::State states[View::capacity]{};
         Owner::Properties properties[View::capacity]{};
         CollisionGeometryStorage geometry;
+        GameplayTerrainInstances::Storage terrain;
     };
     using NativeDirtyQueue=RunnerSpatialDirtyQueue<View::capacity>;
     // Caller-owned backing for collision-enabled native scenes only.
@@ -1521,6 +1522,7 @@ public:
         // publication borrows the journal, never its scalar actor records.
         if(native_?reference!=nullptr:(!reference||!owner_.bindStateStorage(reference->states)||
                                      !properties_.bindStorage(reference->properties))){good_=false;return;}
+        if(!native_&&!terrain_.bindStorage(reference->terrain)){good_=false;return;}
         if(preparedDrawEnabled())layers_.enablePreparedDraw();
         geometry_=native_?(nativeCollision?&nativeCollision->geometry:nullptr):&reference->geometry;
         good_=sprites_.prepare(preparedSprites_,741)&&objectDefaults_.prepare(objects,sprites_)&&

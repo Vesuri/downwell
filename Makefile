@@ -265,6 +265,7 @@ build/amiga-wall-damage-test: tests/platform/amiga/AmigaWallDamageTest.cpp src/p
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
 build/gameplay-collision-owner-test: src/platform/amiga/AmigaWallDamage.h
+build/gameplay-collision-owner-test build/gameplay-collision-owner-scalar-test build/gameplay-collision-owner-snapshot-test build/live-collision-lifecycle-test build/terrain-row-selection-test build/terrain-ownership-runs-test build/amiga-terrain-painter-test build/amiga-scene-runtime-test build/amiga-currency-promotion-test build/amiga-currency-promotion-reference-test: tests/core/OwnedTerrainFixture.h
 build/gameplay-collision-owner-test build/stored-shop-child-test build/registered-shop-runtime-test: tests/core/ShopPurchaseChecks.h tests/core/ShopViewChecks.h tests/core/ShopMenuChecks.h tests/core/ShopParentChecks.h
 build/gameplay-collision-owner-test build/stored-shop-child-test: tests/core/ShopSpeechChecks.h
 build/gameplay-collision-owner-test build/live-collision-lifecycle-test: tests/core/TimeoutDamageEvents.h

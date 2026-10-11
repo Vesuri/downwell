@@ -30,6 +30,14 @@ public:
         bool wallNeedsReset=false;
     };
     using Binding=RecordLifecycleBinding<Record>;
+    static constexpr unsigned rowGroupSize=32;
+    struct RowRange{int first=0,last=0;};
+    // Explicit scene-owned reference backing; native run ownership needs none.
+    struct Storage {
+        Record records[capacity]{};
+        unsigned order[capacity]{};
+        RowRange rowRanges[(capacity+rowGroupSize-1)/rowGroupSize]{};
+    };
     struct Presentation {
         void* context;
         bool (*changed)(void*,int,int,int,int); // Center, old/new sprite (-1 means hidden).
@@ -55,6 +63,12 @@ public:
         binding_(binding),presentation_(presentation),collision_(collision){}
     GameplayTerrainInstancesScalar(const GameplayTerrainInstancesScalar&)=delete;
     GameplayTerrainInstancesScalar& operator=(const GameplayTerrainInstancesScalar&)=delete;
+    bool bindStorage(Storage& storage){
+        if(!good_||records_||count_||next_!=1)return good_=false;
+        records_=storage.records;order_=storage.order;rowRanges_=storage.rowRanges;
+        return true;
+    }
+    bool hasStorage()const{return records_!=nullptr;}
     bool valid()const{return good_;}
     void observeFailure(bool& owner){good_.observe(owner);}
     unsigned size()const{return count_;}
@@ -75,7 +89,7 @@ public:
         return true;
     }
     const Record* find(InstanceHandle h)const{
-        return h.slot<capacity&&h.generation&&records_[h.slot].lifetimeId==h.generation?&records_[h.slot]:nullptr;
+        return records_&&h.slot<capacity&&h.generation&&records_[h.slot].lifetimeId==h.generation?&records_[h.slot]:nullptr;
     }
     // Ownership is a lifetime, not a C++ record address. A run-backed store
     // may provide a caller-owned snapshot for a synchronous callback.
@@ -94,7 +108,7 @@ public:
     }
     bool append(int object,int x,int y,bool active,std::uint32_t sourceId=0,int creationCode=-1){
         DW_PROFILE_SCOPE(profileTerrainRecord);
-        if(!good_)return false;
+        if(!good_||!records_)return good_=false;
         if((object!=60&&object!=93&&object!=99)||count_==capacity||!next_)return good_=false;
         unsigned slot=freeHint_;
         while(slot<capacity&&records_[slot].lifetimeId)++slot;
@@ -248,8 +262,6 @@ private:
 #else
     static const Record& bindingRecord(const Record& record){return record;}
 #endif
-    static constexpr unsigned rowGroupSize=32;
-    struct RowRange{int first=0,last=0;};
     void extendRowRange(unsigned index,int y,bool reset){
         auto& range=rowRanges_[index/rowGroupSize];
         if(reset)range.first=range.last=y;
@@ -271,9 +283,9 @@ private:
     Binding binding_;
     Presentation presentation_;
     WallCollision collision_;
-    Record records_[capacity]{};
-    unsigned order_[capacity]{}; // Birth order, independent of reusable identity slots.
-    RowRange rowRanges_[(capacity+rowGroupSize-1)/rowGroupSize]{};
+    Record* records_=nullptr;
+    unsigned* order_=nullptr; // Birth order, independent of reusable identity slots.
+    RowRange* rowRanges_=nullptr;
     bool unboundedWallArt_=false;
     unsigned count_=0;
     unsigned freeHint_=0;

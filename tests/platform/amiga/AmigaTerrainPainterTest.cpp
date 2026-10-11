@@ -1,4 +1,5 @@
 #include "platform/amiga/AmigaTerrainPainter.h"
+#include "../../core/OwnedTerrainFixture.h"
 #include "core/GameplayWorld.h"
 #include <memory>
 #include <algorithm>
@@ -43,7 +44,7 @@ int main(int argc,char** argv){
         // coincident walls. Retiring one lifetime must not erase the other or
         // make a later row rebuild resurrect the retired wall.
         PaintLifecycle lifecycle;
-        auto records=std::make_unique<downwell::GameplayTerrainInstances>(
+        auto records=std::make_unique<downwell::OwnedTerrainFixture>(
             downwell::GameplayTerrainInstances::Binding::bindDestruction(lifecycle));
         auto native=std::make_unique<GameplayWorld::NativeTerrain>();
         auto referenceWorld=std::make_unique<GameplayWorld>(300,true,0,false,

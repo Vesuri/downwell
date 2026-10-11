@@ -1,4 +1,5 @@
 #include "platform/amiga/AmigaSceneRuntime.h"
+#include "../../core/OwnedTerrainFixture.h"
 #include "platform/amiga/AmigaPortRuntime.h"
 #include "platform/amiga/AmigaTerrain.h"
 #include "platform/amiga/AmigaGameplayGeneration.h"
@@ -2431,7 +2432,7 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
             for (unsigned i = 0; i < 16; ++i)
                 require(random.stateWord(i) == reference.randomState().stateWord(i), "native entry RNG matches decoded startup");
         }
-        downwell::GameplayTerrainInstances terrainInstances;
+        downwell::OwnedTerrainFixture terrainInstances;
         AmigaPortRuntime game(300, false, 1201 - 176, true,{},{},{},&terrainInstances);
         game.initializeEntryInput(false);
         LiveSceneWorld live(patterns, objects);
@@ -2781,7 +2782,7 @@ int main(int argc, char** argv) {
             downwell::StartupRuntime host(downwell::PlatformProfile::nonDesktop,&rooms,&objects,seed,&patterns);
             host.skipToGameForTesting();
             TerrainBirthAudit births,worstBirths;unsigned worstBirthTick=0;
-            downwell::GameplayTerrainInstances terrain(downwell::GameplayTerrainInstances::Binding::bind(births));
+            downwell::OwnedTerrainFixture terrain(downwell::GameplayTerrainInstances::Binding::bind(births));
             AmigaPortRuntime game(300,false,1201-176,true,{},{},{},&terrain);game.initializeEntryInput(false);
             LiveSceneWorld live(patterns,objects);live.bind(game,rooms,room,false,&host);
             unsigned firstDamage=0,damageFrames=0,currencyBirths=0,currencyAdvances=0;

@@ -1,9 +1,11 @@
 #include "core/GameplayTerrainInstances.h"
+#include "OwnedTerrainFixture.h"
 #include <cassert>
 #include <climits>
 #include <cstdio>
 #include <vector>
 using namespace downwell;
+static_assert(sizeof(GameplayTerrainInstances)<512,"reference backing must not become embedded again");
 struct Lifecycle {
     using H=InstanceHandle;using R=GameplayTerrainInstances::Record;using V=RunnerImageValue;
     int retireRemaining=-1;
@@ -22,7 +24,7 @@ struct Lifecycle {
     bool imageIndex(H,const R&,V){return true;}bool markDestroyed(H,const R&){return !destroyFails;}
 };
 static Lifecycle lifecycle;
-static GameplayTerrainInstances terrain(GameplayTerrainInstances::Binding::bindDestruction(lifecycle));
+static OwnedTerrainFixture terrain(GameplayTerrainInstances::Binding::bindDestruction(lifecycle));
 static unsigned examined=0;
 static void check(int first,int end,int sprite=70,const GameplayTerrainInstances& store=terrain){
     std::vector<unsigned> expected,actual;
@@ -41,9 +43,19 @@ static void check(int first,int end,int sprite=70,const GameplayTerrainInstances
     assert(calls<=1&&completed==(calls==0));
 }
 int main(){
+    {
+        GameplayTerrainInstances absent;
+        assert(absent.valid()&&!absent.hasStorage()&&!absent.find({0,1})&&absent.clear());
+        assert(!absent.append(60,0,0,true)&&!absent.valid());
+        static GameplayTerrainInstances::Storage storage;
+        GameplayTerrainInstances admitted;
+        assert(admitted.bindStorage(storage)&&admitted.hasStorage());
+        assert(admitted.append(60,0,0,true)&&admitted.clear());
+        assert(!admitted.bindStorage(storage)&&!admitted.valid());
+    }
     // Dirty recycled records must not take the untouched-slot fast path.
     {
-        static GameplayTerrainInstances reused(GameplayTerrainInstances::Binding::bindDestruction(lifecycle));
+        static OwnedTerrainFixture reused(GameplayTerrainInstances::Binding::bindDestruction(lifecycle));
         GameMakerRandom rng(5);
         for(unsigned i=0;i<96;++i){
             const int object=i%3==0?60:i%3==1?93:99;
@@ -89,11 +101,11 @@ int main(){
     assert(terrain.visitWallRows(500,501,[&](const auto&){++reset;return true;}));
     assert(!reset);
     Lifecycle failure;failure.retireRemaining=17;
-    static GameplayTerrainInstances partial(GameplayTerrainInstances::Binding::bindDestruction(failure));
+    static OwnedTerrainFixture partial(GameplayTerrainInstances::Binding::bindDestruction(failure));
     for(unsigned i=0;i<160;++i)assert(partial.append(60,0,int(i)*64,true));
     assert(!partial.clear()&&!partial.valid()&&partial.size()==143);
     for(int first=0;first<11000;first+=13)check(first,first+3,70,partial);
-    static GameplayTerrainInstances unregistered;
+    static OwnedTerrainFixture unregistered;
     assert(unregistered.append(93,16,32,true));
     const auto thin=unregistered.handle(0);
     assert(unregistered.requestDestroy(thin)&&unregistered.find(thin)->destroyRequested);
@@ -102,7 +114,7 @@ int main(){
     assert(unregistered.append(60,16,32,true));
     assert(!unregistered.requestDestroy(unregistered.handle(0)));
     Lifecycle destroyFailure;destroyFailure.destroyFails=true;
-    static GameplayTerrainInstances boundFailure(GameplayTerrainInstances::Binding::bindDestruction(destroyFailure));
+    static OwnedTerrainFixture boundFailure(GameplayTerrainInstances::Binding::bindDestruction(destroyFailure));
     assert(boundFailure.append(93,16,32,true));
     const auto bound=boundFailure.handle(0);
     assert(!boundFailure.requestDestroy(bound)&&!boundFailure.find(bound)->destroyRequested);

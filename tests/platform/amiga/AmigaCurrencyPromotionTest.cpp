@@ -61,7 +61,7 @@ int main(int argc,char** argv){
     downwell::BuilderPatternPack patterns(pb.data(),pb.size());downwell::PackedRoom room;
     require(rooms.findRoom(11,room),"main room");
     downwell::StartupRuntime host(downwell::PlatformProfile::nonDesktop,&rooms,&objects,overflowTape?8:2,&patterns);
-    host.skipToGameForTesting();downwell::GameplayTerrainInstances terrain;
+    host.skipToGameForTesting();downwell::OwnedTerrainFixture terrain;
     if(overflowTape){
         AmigaAreaOneTerrainBuilder entry(nullptr,0);downwell::GameMakerRandom random;
         require(amigaOverflowProfileEntry(entry,random),"overflow native checkpoint");

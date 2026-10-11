@@ -7,6 +7,23 @@ This remains a development configuration, not a final memory requirement.
 
 ## Native terrain identities
 
+The scalar terrain oracle borrows an explicit `GameplayTerrainInstances::Storage`
+bank for its records, birth-order slots and row ranges. `ReferenceStorage`
+provides that bank for reference and native-terrain comparison owners. Native
+and native-scenery owners retain only the empty scalar service, not its arrays;
+their terrain is owned by `nativeTerrainStorage` below. There is no allocation
+fallback. An undeclared scalar birth fails, while empty lookup/clear remain
+safe. Bind fresh backing once and keep it alive throughout the borrower's
+use; clear preserves lifetime generations for Retry rather than rebinding.
+Startup/contact guards require absent backing, the full-service re-entry
+fixture requires it present, and a host size assertion prevents embedding
+the arrays in the scalar service again. This is ordinary-memory residency,
+not Chip-memory savings or a new terrain registry encoding.
+The 68000 bank is 152,064 bytes; replacing the embedded arrays with three
+four-byte pointers removes 152,052 bytes from the native owner. The small
+scalar service itself is 150 bytes. Full-service reference totals grow only
+by those pointers, not by a second copy of the bank.
+
 Inactive retained-layer membership has a one-bit-per-slot projection plus a
 count (260 bytes for 2,048 slots on 68000). It owns no layer, order or lifetime
 records: cutoff queries read those from the authoritative run owner. Successful
